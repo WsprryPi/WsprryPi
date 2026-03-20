@@ -256,6 +256,7 @@ void transmitter_cb(WsprTransmitter::TransmissionCallbackEvent event,
         }
         break;
     }
+
     case WsprTransmitter::TransmissionCallbackEvent::COMPLETE:
     {
         const double elapsed = value;
@@ -272,57 +273,72 @@ void transmitter_cb(WsprTransmitter::TransmissionCallbackEvent event,
                       s_elapsed,
                       " seconds.");
             do_config = false;
-            // Notify clients of cancellation.
             send_ws_message("transmit", "canceled");
+        }
+        else if (!msg.empty() && elapsed != 0.0)
+        {
+            llog.logS(to_log_level(level),
+                      "Completed transmission (",
+                      msg,
+                      ") ",
+                      s_elapsed,
+                      " seconds.");
+        }
+        else if (elapsed != 0.0)
+        {
+            llog.logS(to_log_level(level),
+                      "Completed transmission: ",
+                      s_elapsed,
+                      " seconds.");
+        }
+        else if (!msg.empty())
+        {
+            llog.logS(to_log_level(level),
+                      "Completed transmission (",
+                      msg,
+                      ").");
         }
         else
         {
-            if (!msg.empty() && elapsed != 0.0)
-            {
-                llog.logS(to_log_level(level),
-                          "Completed transmission (",
-                          msg,
-                          ") ",
-                          s_elapsed,
-                          " seconds.");
-            }
-            else if (elapsed != 0.0)
-            {
-                llog.logS(to_log_level(level),
-                          "Completed transmission: ",
-                          s_elapsed,
-                          " seconds.");
-            }
-            else if (!msg.empty())
-            {
-                llog.logS(to_log_level(level),
-                          "Completed transmission (",
-                          msg,
-                          ").");
-            }
-            else
-            {
-                llog.logS(to_log_level(level),
-                          "Completed transmission.");
-            }
+            llog.logS(to_log_level(level),
+                      "Completed transmission.");
         }
 
         // Turn off LED.
         ledControl.toggleGPIO(false);
 
-        // Notify the websocket clients
+        // Notify the websocket clients.
         send_ws_message("transmit", "finished");
 
-        // Set Config will determine if we have work to do (if not canceled).
+        // Set config will determine if we have work to do.
         if (do_config)
             set_config();
 
         break;
     }
+
+    case WsprTransmitter::TransmissionCallbackEvent::SKIPPED:
+    {
+        // Turn off LED in case the UI/state expects an idle indication.
+        ledControl.toggleGPIO(false);
+
+        if (!msg.empty())
+            llog.logS(to_log_level(level), msg, ".");
+        else
+            llog.logS(to_log_level(level), "Skipping transmission.");
+
+        // Notify websocket clients.
+        send_ws_message("transmit", "skipped");
+
+        // Advance to the next configured slot.
+        set_config();
+
+        break;
+    }
+
     case WsprTransmitter::TransmissionCallbackEvent::LOGGING:
     default:
     {
-        // Optional: treat LOGGING as an informational message.
         if (!msg.empty())
             llog.logS(to_log_level(level), msg);
 
@@ -623,7 +639,7 @@ void end_test_tone()
 bool wspr_loop()
 {
     // Display the final configuration after parsing arguments and INI file.
-    show_config_values();
+    show_config_values(); 
 
     // Start web server and set priority
     if (config.web_port >= 1024 && config.web_port <= 49151)

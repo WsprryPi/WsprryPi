@@ -45,6 +45,7 @@
         "devel",
         "DFFF",
         "dimlen",
+        "DISDEBUG",
         "DMAKE",
         "dylib",
         "EABI",
