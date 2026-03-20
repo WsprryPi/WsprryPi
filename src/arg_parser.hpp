@@ -201,6 +201,23 @@ bool set_frequencies();
 extern bool load_from_ini();
 
 /**
+ * @brief Parses command-line arguments and configures the program settings.
+ *
+ * This function processes command-line options using `getopt_long()`, applying
+ * values to the program configuration. It first checks for an INI file (`-i`)
+ * before processing other options to ensure that command-line arguments can
+ * override INI file settings.
+ *
+ * It validates required parameters and logs any errors, ensuring proper
+ * configuration before execution.
+ *
+ * @param argc The number of command-line arguments.
+ * @param argv The array of command-line argument strings.
+ * @return true if parsing is successful, false if an error occurs.
+ */
+bool handle_early_cli_options(int argc, char *argv[]);
+
+/**
  * @brief Parses command-line arguments and applies overrides.
  *
  * @param argc Number of command-line arguments.

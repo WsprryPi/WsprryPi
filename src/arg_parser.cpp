@@ -1,3 +1,4 @@
+
 /**
  * @file arg_parser.cpp
  * @brief Command-line argument parser and configuration handler.
@@ -543,9 +544,18 @@ bool validate_config_data()
                 llog.logE(ERROR, " - At least one frequency must be specified.");
             }
 
-            llog.logE(ERROR, "Try: wsprrypi --help");
-            std::cerr << std::endl;
-            std::exit(EXIT_FAILURE);
+            if (config.use_ini)
+            {
+                llog.logE(ERROR, "Please check your configuration for missing or invalid values.");
+                return true;
+            }
+            else
+            {
+                llog.logE(ERROR, "Please check the INI file for missing or invalid values.");
+                llog.logE(ERROR, "Try: wsprrypi --help");
+                std::cerr << std::endl;
+                std::exit(EXIT_FAILURE);
+            }
         }
 
         if (config.transmit)
@@ -837,20 +847,42 @@ bool load_from_ini()
 }
 
 /**
- * @brief Parses command-line arguments and configures the program settings.
+ * @brief Handles early-exit command-line options.
  *
- * This function processes command-line options using `getopt_long()`, applying
- * values to the program configuration. It first checks for an INI file (`-i`)
- * before processing other options to ensure that command-line arguments can
- * override INI file settings.
+ * Scans the raw argument list for options that should be handled immediately,
+ * before normal configuration and argument parsing occur.
  *
- * It validates required parameters and logs any errors, ensuring proper
- * configuration before execution.
+ * Supported early options:
+ * - `-h`, `--help`
+ * - `-v`, `--version`
  *
- * @param argc The number of command-line arguments.
- * @param argv The array of command-line argument strings.
- * @return true if parsing is successful, false if an error occurs.
+ * @param argc Argument count.
+ * @param argv Argument vector.
+ * @return true if an early option was handled and the program exited.
+ * @return false if normal parsing should continue.
  */
+bool handle_early_cli_options(int argc, char *argv[])
+{
+    for (int i = 1; i < argc; ++i)
+    {
+        const std::string arg = argv[i];
+
+        if (arg == "-h" || arg == "--help")
+        {
+            print_usage("", EXIT_SUCCESS);
+            return true;
+        }
+
+        if (arg == "-v" || arg == "--version")
+        {
+            std::cout << get_version_string() << std::endl;
+            std::exit(EXIT_SUCCESS);
+        }
+    }
+
+    return false;
+}
+
 bool parse_command_line(int argc, char *argv[])
 {
     // Check if any arguments (besides the program name) were provided.

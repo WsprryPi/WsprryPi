@@ -123,19 +123,7 @@ int main(int argc, char *argv[])
     initialize_logger();
 
     // Parse command line first allowing calls for -h or -v
-    try
-    {
-        if (!parse_command_line(argc, argv))
-        {
-            print_usage("Failure parsing command line.", EXIT_FAILURE);
-        }
-    }
-    catch (const std::exception &e)
-    {
-        // Handle any exceptions thrown during command-line parsing.
-        std::string error_message = "Exception caught processing arguments: " + std::string(e.what());
-        print_usage(error_message, EXIT_FAILURE);
-    }
+    handle_early_cli_options(argc, argv);
 
     // Make sure we are running as root
     if (getuid() != 0)
@@ -168,6 +156,21 @@ int main(int argc, char *argv[])
         ".");
 
     llog.logS(INFO, "Process PID:", getpid());
+
+    // Now do the full argumenbts check
+    try
+    {
+        if (!parse_command_line(argc, argv))
+        {
+            print_usage("Failure parsing command line.", EXIT_FAILURE);
+        }
+    }
+    catch (const std::exception &e)
+    {
+        // Handle any exceptions thrown during command-line parsing.
+        std::string error_message = "Exception caught processing arguments: " + std::string(e.what());
+        print_usage(error_message, EXIT_FAILURE);
+    }
 
     // Startup WSPR loop
     try
