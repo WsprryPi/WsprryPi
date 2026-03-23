@@ -101,28 +101,6 @@ extern std::atomic<bool> shutdown_flag;
 extern void callback_shutdown_system();
 
 /**
- * @brief Callback function for housekeeping tasks between transmissions.
- *
- * This function checks whether there are pending PPM or INI changes that need
- * to be integrated. If a pending PPM change is detected, it logs the event and
- * resets the flag. Similarly, if a pending INI change is detected, it applies the
- * deferred changes, logs the integration, and resets the flag. If any changes were
- * integrated, a flag is set to indicate that DMA/Symbol reconfiguration is required.
- */
-void callback_transmission_started(const std::string &msg, double frequency);
-
-/**
- * @brief Callback function for housekeeping tasks between transmissions.
- *
- * This function checks whether there are pending PPM or INI changes that need
- * to be integrated. If a pending PPM change is detected, it logs the event and
- * resets the flag. Similarly, if a pending INI change is detected, it applies the
- * deferred changes, logs the integration, and resets the flag. If any changes were
- * integrated, a flag is set to indicate that DMA/Symbol reconfiguration is required.
- */
-void callback_transmission_complete(const std::string &msg, double elapsed);
-
-/**
  * @brief Perform a system shutdown sequence.
  *
  * @details
