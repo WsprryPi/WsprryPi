@@ -31,6 +31,7 @@
 
 // Project headers
 #include "arg_parser.hpp"
+#include "band_gpio_selector.hpp"
 #include "config_handler.hpp"
 #include "gpio_input.hpp"
 #include "gpio_output.hpp"
@@ -62,6 +63,15 @@
 #include <linux/reboot.h> // for LINUX_REBOOT_CMD_* constants
 #include <sys/resource.h>
 #include <unistd.h>
+
+/**
+ * @brief Selects and controls the GPIO assigned to the active amateur band.
+ *
+ * This object is used by the transmission callback path to assert the
+ * correct GPIO when transmission begins and to release it when the
+ * transmission completes, is skipped, or is cancelled.
+ */
+static BandGPIOSelector bandGPIOSelector;
 
 /**
  * @brief Mutex to protect access to the shutdown flag for the WSPR loop.
@@ -219,6 +229,26 @@ void transmitter_cb(WsprTransmitter::TransmissionCallbackEvent event,
     {
         const double frequency = value;
 
+        // Handle band selector relay output
+        if (frequency != 0.0)
+        {
+            if (!bandGPIOSelector.selectFrequency(frequency))
+            {
+                llog.logS(WARN,
+                          "Failed to select GPIO for transmit band at ",
+                          wsprTransmitter.formatFrequencyMHz(frequency),
+                          " MHz.");
+            }
+            else if (!bandGPIOSelector.setBandState(true))
+            {
+                llog.logS(WARN,
+                          "Failed to assert GPIO for transmit band at ",
+                          wsprTransmitter.formatFrequencyMHz(frequency),
+                          " MHz.");
+                bandGPIOSelector.stop();
+            }
+        }
+
         // Turn on LED.
         ledControl.toggleGPIO(true);
 
@@ -304,6 +334,10 @@ void transmitter_cb(WsprTransmitter::TransmissionCallbackEvent event,
                       "Completed transmission.");
         }
 
+        // Tirn off band selector relay
+        bandGPIOSelector.setBandState(false);
+        bandGPIOSelector.stop();
+
         // Turn off LED.
         ledControl.toggleGPIO(false);
 
@@ -319,6 +353,10 @@ void transmitter_cb(WsprTransmitter::TransmissionCallbackEvent event,
 
     case WsprTransmitter::TransmissionCallbackEvent::SKIPPED:
     {
+        // Turn off band select relay
+        bandGPIOSelector.setBandState(false);
+        bandGPIOSelector.stop();
+
         // Turn off LED in case the UI/state expects an idle indication.
         ledControl.toggleGPIO(false);
 
@@ -717,6 +755,8 @@ bool wspr_loop()
     // -------------------------------------------------------------------------
     // Shutdown and cleanup
     // -------------------------------------------------------------------------
+    bandGPIOSelector.setBandState(false);
+    bandGPIOSelector.stop();
     wsprTransmitter.stopAndJoin(); // Stop the transmitter threads
     shutdownMonitor.stop();        // Stop the GPIO monitor
     ledControl.stop();             // Stop LED driver
