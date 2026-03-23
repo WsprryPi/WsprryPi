@@ -16,23 +16,24 @@
  *
  * Copyright © 2026 Lee C. Bussy (@LBussy). All rights reserved.
  *
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to
- * deal in the Software without restriction, including without limitation the
- * rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
- * sell copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
+ * Permission is hereby granted, free of charge, to any person obtaining a
+ * copy of this software and associated documentation files (the
+ * "Software"), to deal in the Software without restriction, including
+ * without limitation the rights to use, copy, modify, merge, publish,
+ * distribute, sublicense, and/or sell copies of the Software, and to
+ * permit persons to whom the Software is furnished to do so, subject to
+ * the following conditions:
  *
- * The above copyright notice and this permission notice shall be included in
- * all copies or substantial portions of the Software.
+ * The above copyright notice and this permission notice shall be included
+ * in all copies or substantial portions of the Software.
  *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE.
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
+ * OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+ * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+ * IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+ * CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
+ * TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
+ * SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
 #include "band_gpio_selector.hpp"
@@ -86,7 +87,7 @@ std::optional<HamBand> BandGPIOSelector::hamBandFromString(
     return std::nullopt;
 }
 
-bool BandGPIOSelector::selectBand(HamBand band)
+bool BandGPIOSelector::prepareBand(HamBand band)
 {
     const BandGPIOConfig &config = gpio_config_for_band(band);
 
@@ -108,7 +109,7 @@ bool BandGPIOSelector::selectBand(HamBand band)
     return true;
 }
 
-bool BandGPIOSelector::selectFrequency(double frequency_hz)
+bool BandGPIOSelector::prepareFrequency(double frequency_hz)
 {
     const auto result = band_lookup_.lookup(frequency_hz);
     if (!std::holds_alternative<std::string>(result))
@@ -122,7 +123,27 @@ bool BandGPIOSelector::selectFrequency(double frequency_hz)
         return false;
     }
 
-    return selectBand(*band);
+    return prepareBand(*band);
+}
+
+bool BandGPIOSelector::selectBand(HamBand band)
+{
+    if (!prepareBand(band))
+    {
+        return false;
+    }
+
+    return setBandState(true);
+}
+
+bool BandGPIOSelector::selectFrequency(double frequency_hz)
+{
+    if (!prepareFrequency(frequency_hz))
+    {
+        return false;
+    }
+
+    return setBandState(true);
 }
 
 bool BandGPIOSelector::setBandState(bool state)

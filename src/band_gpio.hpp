@@ -54,7 +54,9 @@ enum class HamBand
     BAND_15M,
     BAND_12M,
     BAND_10M,
-    BAND_6M
+    BAND_6M,
+    BAND_4M,
+    BAND_2M
 };
 
 /**
@@ -105,6 +107,8 @@ constexpr const char *band_to_string(HamBand band)
         case HamBand::BAND_12M:   return "12m";
         case HamBand::BAND_10M:   return "10m";
         case HamBand::BAND_6M:    return "6m";
+        case HamBand::BAND_4M:    return "4m";
+        case HamBand::BAND_2M:    return "2m";
     }
 
     return "unknown";

@@ -229,25 +229,8 @@ void transmitter_cb(WsprTransmitter::TransmissionCallbackEvent event,
     {
         const double frequency = value;
 
-        // Handle band selector relay output
-        if (frequency != 0.0)
-        {
-            if (!bandGPIOSelector.selectFrequency(frequency))
-            {
-                llog.logS(WARN,
-                          "Failed to select GPIO for transmit band at ",
-                          wsprTransmitter.formatFrequencyMHz(frequency),
-                          " MHz.");
-            }
-            else if (!bandGPIOSelector.setBandState(true))
-            {
-                llog.logS(WARN,
-                          "Failed to assert GPIO for transmit band at ",
-                          wsprTransmitter.formatFrequencyMHz(frequency),
-                          " MHz.");
-                bandGPIOSelector.stop();
-            }
-        }
+        // Assert the precomputed band GPIO.
+        bandGPIOSelector.setBandState(true);
 
         // Turn on LED.
         ledControl.toggleGPIO(true);
@@ -334,7 +317,7 @@ void transmitter_cb(WsprTransmitter::TransmissionCallbackEvent event,
                       "Completed transmission.");
         }
 
-        // Tirn off band selector relay
+        // Deassert and release the prepared band GPIO.
         bandGPIOSelector.setBandState(false);
         bandGPIOSelector.stop();
 
@@ -353,7 +336,7 @@ void transmitter_cb(WsprTransmitter::TransmissionCallbackEvent event,
 
     case WsprTransmitter::TransmissionCallbackEvent::SKIPPED:
     {
-        // Turn off band select relay
+        // Deassert and release the prepared band GPIO.
         bandGPIOSelector.setBandState(false);
         bandGPIOSelector.stop();
 
@@ -610,6 +593,15 @@ void start_test_tone()
         wsprTransmitter.configure(freq,
                                   config.power_level,
                                   config.ppm);
+
+        if (!bandGPIOSelector.prepareFrequency(freq))
+        {
+            llog.logS(WARN,
+                      "Unable to prepare band GPIO for test tone at ",
+                      lookup.freq_display_string(freq),
+                      ".");
+        }
+
         wsprTransmitter.startAsync();
         llog.logS(INFO, "Test tone being transmitted at:", lookup.freq_display_string(freq));
         send_ws_message("transmit", "starting");
@@ -631,6 +623,8 @@ void end_test_tone()
 
         // Stop current tone
         wsprTransmitter.stopAndJoin();
+        bandGPIOSelector.setBandState(false);
+        bandGPIOSelector.stop();
         send_ws_message("transmit", "finished");
         ledControl.toggleGPIO(false);
 
@@ -677,7 +671,7 @@ void end_test_tone()
 bool wspr_loop()
 {
     // Display the final configuration after parsing arguments and INI file.
-    show_config_values(); 
+    show_config_values();
 
     // Start web server and set priority
     if (config.web_port >= 1024 && config.web_port <= 49151)
@@ -755,15 +749,15 @@ bool wspr_loop()
     // -------------------------------------------------------------------------
     // Shutdown and cleanup
     // -------------------------------------------------------------------------
+    wsprTransmitter.stopAndJoin(); // Stop the transmitter threads
     bandGPIOSelector.setBandState(false);
     bandGPIOSelector.stop();
-    wsprTransmitter.stopAndJoin(); // Stop the transmitter threads
-    shutdownMonitor.stop();        // Stop the GPIO monitor
-    ledControl.stop();             // Stop LED driver
-    iniMonitor.stop();             // Stop config file monitor
-    ppmManager.stop();             // Stop PPM manager (if active)
-    webServer.stop();              // Stop web server
-    socketServer.stop();           // Stop the socket server
+    shutdownMonitor.stop(); // Stop the GPIO monitor
+    ledControl.stop();      // Stop LED driver
+    iniMonitor.stop();      // Stop config file monitor
+    ppmManager.stop();      // Stop PPM manager (if active)
+    webServer.stop();       // Stop web server
+    socketServer.stop();    // Stop the socket server
 
     if (reboot_flag.load())
     {
@@ -1029,6 +1023,14 @@ void set_config(bool force)
             config.grid_square,
             config.power_dbm,
             config.use_offset);
+
+        if (!bandGPIOSelector.prepareFrequency(current_frequency))
+        {
+            llog.logS(WARN,
+                      "Unable to prepare band GPIO for ",
+                      wsprTransmitter.formatFrequencyMHz(current_frequency),
+                      " MHz.");
+        }
     }
 
     // Enable/disable transmit if/as needed

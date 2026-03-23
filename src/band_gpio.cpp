@@ -46,6 +46,7 @@ static const BandGPIOConfig &disabled_band_gpio_config()
     return disabled_config;
 }
 
+// TODO:  Put this in config object
 const BandGPIOConfig &gpio_config_for_band(HamBand band)
 {
     switch (band)
@@ -118,6 +119,16 @@ const BandGPIOConfig &gpio_config_for_band(HamBand band)
         case HamBand::BAND_6M:
         {
             static const BandGPIOConfig config{21, true, false};
+            return config;
+        }
+        case HamBand::BAND_4M:
+        {
+            static const BandGPIOConfig config{-1, false, false};
+            return config;
+        }
+        case HamBand::BAND_2M:
+        {
+            static const BandGPIOConfig config{-1, false, false};
             return config;
         }
     }

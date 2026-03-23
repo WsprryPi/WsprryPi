@@ -37,6 +37,15 @@
 #include <string_view>
 #include <regex>
 
+namespace
+{
+    constexpr double FREQ_2200M = 137500.0;
+    constexpr double FREQ_2200M_15 = 137612.5;
+
+    constexpr double FREQ_630M = 475700.0;
+    constexpr double FREQ_630M_15 = 475812.5;
+}
+
 /**
  * @brief Constructs the WSPRBandLookup object and initializes frequency data.
  *
@@ -82,10 +91,14 @@ WSPRBandLookup::WSPRBandLookup()
 {
     // Initialize WSPR band frequencies
     wsprFrequencies = {
-        {"lf", 137500},
-        {"lf-15", 137612.5},
-        {"mf", 475700},
-        {"mf-15", 475812.5},
+        {"lf", FREQ_2200M},
+        {"2200m", FREQ_2200M},
+        {"lf-15", FREQ_2200M_15},
+        {"2200m-15", FREQ_2200M_15},
+        {"mf", FREQ_630M},
+        {"630m", FREQ_630M},
+        {"mf-15", FREQ_630M_15},
+        {"630m-15", FREQ_630M_15},
         {"160m", 1838100},
         {"160m-15", 1838212.5},
         {"80m", 3570100},
