@@ -316,4 +316,23 @@ void dump_json(const nlohmann::json &j, std::string tag);
  */
 void patch_all_from_web(const nlohmann::json &j);
 
+/**
+ * @brief Repairs or restores the configuration from stock defaults.
+ *
+ * Performs either a repair or full restore of the INI configuration using
+ * stock defaults, then reloads the runtime configuration state.
+ *
+ * If repair is selected, only missing or invalid values are corrected.
+ * If restore is selected, the configuration is fully reset to stock.
+ *
+ * After updating the INI file, the configuration is reloaded by converting
+ * INI data to JSON and then parsing it into the global configuration.
+ *
+ * @param attempt_repair If true, performs a repair. If false, performs a
+ *                       full restore from stock.
+ *
+ * @return None.
+ */
+void repair_from_web(bool attempt_repair);
+
 #endif // _CONFIG_HANDLER_HPP

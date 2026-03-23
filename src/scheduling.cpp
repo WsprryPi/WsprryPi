@@ -907,6 +907,8 @@ void set_config(bool force)
         do_config = true;
         freq_iterator = 0;       // Reset iterator
         current_frequency = 0.0; // Zero out freq
+        ini_to_json(config.ini_filename);
+        json_to_config();
     }
 
     // Store the PPM flag we had coming in

@@ -5755,24 +5755,31 @@ manage_exe() {
 # @details This function installs or removes a configuration file. During
 #          installation, it validates the source file, updates the semantic
 #          version placeholder, and sets appropriate permissions. During
-#          uninstallation, it removes the configuration file.
+#          uninstallation, it removes the configuration file. For the main
+#          WSPR INI file, it also installs a stock copy with ".stock"
+#          appended to the destination filename.
 #
-# @global ACTION Specifies whether the function runs in 'install' or 'uninstall' mode.
+# @global ACTION Specifies whether the function runs in 'install' or
+#         'uninstall' mode.
 # @global USER_HOME The user's home directory path.
 # @global REPO_NAME The name of the repository.
-# @global DRY_RUN If set to "true", performs a dry-run without making changes.
+# @global DRY_RUN If set to "true", performs a dry-run without making
+#         changes.
+# @global LOCAL_CONFIG_DIR The local configuration directory path.
+# @global WSPR_INI The primary WSPR INI filename.
 #
 # @param $1 The name of the configuration file.
 # @param $2 The destination directory for the configuration file.
 # @param $3 Debug flag for enabling or disabling debug output.
 #
-# @throws Exits with status 1 if required arguments are missing, the source file
-#         is not found, or the target directory does not exist.
+# @throws Exits with status 1 if required arguments are missing, the
+#         source file is not found, or the target directory does not
+#         exist.
 #
 # @return Returns 0 on success, or 1 if any operation fails.
 #
 # @example
-#   manage_config "wsprrypi.ini" "/usr/local/etc" "debug"
+# manage_config "wsprrypi.ini" "/usr/local/etc" "debug"
 # -----------------------------------------------------------------------------
 # shellcheck disable=SC2317
 # shellcheck disable=SC2329
@@ -5780,6 +5787,14 @@ manage_config() {
     local debug
     debug=$(debug_start "$@")
     eval set -- "$(debug_filter "$@")"
+
+    local config_file
+    local config_name
+    local config_path
+    local source_path
+    local stock_source_path=""
+    local stock_config_path=""
+    local retval=0
 
     # Ensure the configuration arguments are provided
     if [[ -z "$1" || -z "$2" ]]; then
@@ -5789,16 +5804,13 @@ manage_config() {
         return 1
     fi
 
-    # Declare local variables
-    local config_file config_name config_path source_path
-    local retval=0 # Initialize return value
-
     # Get from args or associative array
     config_file="$1"
     config_path="$2"
-    config_name="${config_file##*/}"                 # Remove path
-    config_name="${config_name%.*}"                  # Remove extension (if present)
-    source_path="${LOCAL_CONFIG_DIR}/${config_file}" # Config files source
+    config_name="${config_file##*/}"
+    config_name="${config_name%.*}"
+    source_path="${LOCAL_CONFIG_DIR}/${config_file}"
+
     # If config file is logrotate then rename it to repo_name
     if [[ "${config_file}" != "logrotate.conf" ]]; then
         config_path="${config_path}/${config_file}"
@@ -5821,58 +5833,141 @@ manage_config() {
             return 1
         fi
 
+        # Save the stock source and stock destination for the primary INI
+        if [[ "${config_file}" == "$WSPR_INI" ]]; then
+            stock_source_path="$source_path"
+            stock_config_path="${config_path}.stock"
+        fi
+
         # If we are doing the INI file, see if we can merge
         if [[ "${config_file}" == "$WSPR_INI" ]]; then
-            local old_path
+            local old_path=""
+            local merged_ini=""
+
             if [[ -f "/usr/local/etc/wspr.ini" ]]; then
                 old_path="/usr/local/etc/wspr.ini"
             elif [[ -f "/usr/local/etc/wsprrypi.ini" ]]; then
                 old_path="/usr/local/etc/wsprrypi.ini"
-            else
-                old_path=""
             fi
 
             if [[ -n "$old_path" ]]; then
-                local merged_ini="${LOCAL_CONFIG_DIR}/wsprrypi_merged.ini"
-                upgrade_ini "$old_path" "$source_path" "${merged_ini}" "$debug"
+                merged_ini="${LOCAL_CONFIG_DIR}/wsprrypi_merged.ini"
+                upgrade_ini "$old_path" "$source_path" "$merged_ini" "$debug"
                 source_path="$merged_ini"
             fi
         fi
 
-        # Install the configuration
-        debug_print "Copying configuration from $source_path to $config_path." "$debug"
+        # Install the active configuration
+        debug_print \
+            "Copying configuration from $source_path to $config_path." \
+            "$debug"
         if [[ "$DRY_RUN" == "true" ]]; then
             logD "Exec: cp -f $source_path $config_path"
         else
-            exec_command "Install configuration" cp -f "${source_path}" "${config_path}" "$debug" || retval=1
+            exec_command \
+                "Install configuration" \
+                cp -f "${source_path}" "${config_path}" "$debug" \
+                || retval=1
         fi
 
-        # Update version
-        replace_string_in_script "$config_path" "SEMANTIC_VERSION" "$(get_sem_ver "$debug")" "$debug"
+        # Update version in the active configuration
+        replace_string_in_script \
+            "$config_path" \
+            "SEMANTIC_VERSION" \
+            "$(get_sem_ver "$debug")" \
+            "$debug"
 
-        # Change ownership on the configuration
+        # Install the stock configuration copy for the primary INI
+        if [[ -n "$stock_source_path" && -n "$stock_config_path" ]]; then
+            debug_print \
+                "Copying stock configuration from $stock_source_path to $stock_config_path." \
+                "$debug"
+            if [[ "$DRY_RUN" == "true" ]]; then
+                logD "Exec: cp -f $stock_source_path $stock_config_path"
+            else
+                exec_command \
+                    "Install stock configuration" \
+                    cp -f "${stock_source_path}" "${stock_config_path}" "$debug" \
+                    || retval=1
+            fi
+
+            replace_string_in_script \
+                "$stock_config_path" \
+                "SEMANTIC_VERSION" \
+                "$(get_sem_ver "$debug")" \
+                "$debug"
+
+            debug_print \
+                "Changing ownership on stock configuration." \
+                "$debug"
+            if [[ "$DRY_RUN" == "true" ]]; then
+                logD "Exec: chown root:root $stock_config_path"
+            else
+                exec_command \
+                    "Change ownership on stock configuration" \
+                    chown root:root "${stock_config_path}" "$debug" \
+                    || retval=1
+            fi
+
+            debug_print \
+                "Changing permissions on stock configuration." \
+                "$debug"
+            if [[ "$DRY_RUN" == "true" ]]; then
+                logD "Exec: chmod 644 $stock_config_path"
+            else
+                exec_command \
+                    "Set stock config permissions" \
+                    chmod 644 "${stock_config_path}" "$debug" \
+                    || retval=1
+            fi
+        fi
+
+        # Change ownership on the active configuration
         debug_print "Changing ownership on configuration." "$debug"
         if [[ "$DRY_RUN" == "true" ]]; then
             logD "Exec: chown root:root $config_path"
         else
-            exec_command "Change ownership on configuration" chown root:root "${config_path}" "$debug" || retval=1
+            exec_command \
+                "Change ownership on configuration" \
+                chown root:root "${config_path}" "$debug" \
+                || retval=1
         fi
 
-        # Change permissions on the configuration
+        # Change permissions on the active configuration
         debug_print "Changing permissions on configuration." "$debug"
         if [[ "$DRY_RUN" == "true" ]]; then
             logD "Exec: chmod 644 $config_path"
         else
-            exec_command "Set config permissions" chmod 644 "${config_path}" "$debug" || retval=1
+            exec_command \
+                "Set config permissions" \
+                chmod 644 "${config_path}" "$debug" \
+                || retval=1
         fi
 
     elif [[ "$ACTION" == "uninstall" ]]; then
-        # Remove the configuration
+        # Remove the active configuration
         debug_print "Removing configuration." "$debug"
         if [[ "$DRY_RUN" == "true" ]]; then
-            logD "Exec: rm -rf $config_path"
+            logD "Exec: rm -f $config_path"
         else
-            exec_command "Remove configuration" rm -f "${config_path}" "$debug" || retval=1
+            exec_command \
+                "Remove configuration" \
+                rm -f "${config_path}" "$debug" \
+                || retval=1
+        fi
+
+        # Remove the stock configuration copy for the primary INI
+        if [[ "${config_file}" == "$WSPR_INI" ]]; then
+            stock_config_path="${config_path}.stock"
+            debug_print "Removing stock configuration." "$debug"
+            if [[ "$DRY_RUN" == "true" ]]; then
+                logD "Exec: rm -f $stock_config_path"
+            else
+                exec_command \
+                    "Remove stock configuration" \
+                    rm -f "${stock_config_path}" "$debug" \
+                    || retval=1
+            fi
         fi
     else
         die 1 "Invalid action. Use 'install' or 'uninstall'."
