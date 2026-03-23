@@ -192,6 +192,71 @@ void WebServer::start(int port)
               res.set_content(j.dump(4), "application/json");
             });
 
+    // INI repair handler: Allow repair or restore
+    svr.Post("/config/repair",
+            [this](const httplib::Request &req, httplib::Response &res) {
+                try
+                {
+                    nlohmann::json j = nlohmann::json::parse(req.body);
+
+                    if (!j.contains("verb") || !j["verb"].is_string())
+                    {
+                        setCORSHeaders(res);
+                        res.status = 400;
+                        nlohmann::json err = {
+                            {"error", "invalid_request"},
+                            {"message", "Missing or invalid 'verb'."}
+                        };
+                        res.set_content(err.dump(4), "application/json");
+                        return;
+                    }
+
+                    const std::string verb = j["verb"].get<std::string>();
+
+                    if (verb == "repair")
+                    {
+                        repair_from_web(true);
+                    }
+                    else if (verb == "restore")
+                    {
+                        repair_from_web(false);
+                    }
+                    else
+                    {
+                        setCORSHeaders(res);
+                        res.status = 400;
+                        nlohmann::json err = {
+                            {"error", "invalid_verb"},
+                            {"message", "Verb must be 'repair' or 'restore'."}
+                        };
+                        res.set_content(err.dump(4), "application/json");
+                        return;
+                    }
+
+                    setCORSHeaders(res);
+                    res.status = 200;
+                    nlohmann::json ok = {
+                        {"status", "ok"},
+                        {"message", "Configuration operation completed."}
+                    };
+                    res.set_content(ok.dump(4), "application/json");
+                    return;
+                }
+                catch (const nlohmann::json::parse_error &e)
+                {
+                    llog.logE(WARN,
+                            "Error parsing JSON:",
+                            std::string(e.what()));
+                    setCORSHeaders(res);
+                    res.status = 400;
+                    nlohmann::json err = {
+                        {"error", "invalid_json"},
+                        {"message", e.what()}
+                    };
+                    res.set_content(err.dump(4), "application/json");
+                }
+            });
+
     // Accept connections from any network interface.
     svr.listen("0.0.0.0", port_);
 

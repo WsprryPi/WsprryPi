@@ -69,7 +69,7 @@ WSPR_PARAMS := AA0NT EM18 20 40m
 TEST_FREQ := 730000
 
 # Install location
-# If you prefer the old behavior (PREFIX=/usr/local/bin), set it on the command
+# If you prefer a different location, set it on the command
 # line: make PREFIX=/usr/local/bin install
 PREFIX ?= /usr/local/bin
 
@@ -365,9 +365,13 @@ gdb: debug
 
 install: release
 	$(Q)echo "Installing $(OUT) to $(PREFIX)."
+	$(Q)echo "$(PREFIX)/$(OUT) status before install:"
+	$(Q) ls -al $(PREFIX)/$(OUT) || { $(Q)echo "Error: Daemon binary not found at $(PREFIX)/$(OUT)."; }
 	$(Q)$(SUDO) systemctl stop $(OUT).service || true
 	$(Q)$(SUDO) install -d $(PREFIX)
 	$(Q)$(SUDO) install -m 755 $(BIN_DIR)/$(OUT) $(PREFIX)/$(OUT)
+	$(Q)echo "$(PREFIX)/$(OUT) status after install:"
+	$(Q)$(SUDO) ls -al $(PREFIX)/$(OUT) || { echo "Error: Daemon binary not found at $(PREFIX)/$(OUT)."; }
 	$(Q)$(SUDO) systemctl enable $(OUT).service || true
 	$(Q)$(SUDO) systemctl start $(OUT).service || true
 	$(Q)echo "Installation complete."

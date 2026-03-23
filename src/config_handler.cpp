@@ -472,3 +472,32 @@ void patch_all_from_web(const nlohmann::json &j)
     // Send all WebSocket clients notice that we have a new config
     send_ws_message("configuration", "reload");
 }
+
+// Execute INI file repair or restore function
+void repair_from_web(bool attempt_repair)
+{
+    if (attempt_repair)
+    {
+        iniFile.repair_from_stock(get_raw_version_string());
+    }
+    else
+    {
+        iniFile.reset_to_stock(get_raw_version_string());
+    }
+
+    // Merge the INI file configuration into the base JSON.
+    ini_to_json(config.ini_filename);
+
+    // Parse the updated JSON configuration into the global configuration struct.
+    json_to_config();
+
+    if (attempt_repair)
+    {
+        llog.logS(INFO, "Configuration file repaired from stock.");
+    }
+    else
+    {
+        llog.logS(INFO, "Configuration file restored from stock.");
+    }
+    send_ws_message("configuration", "reload");
+}

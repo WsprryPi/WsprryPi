@@ -157,7 +157,7 @@ int main(int argc, char *argv[])
 
     llog.logS(INFO, "Process PID:", getpid());
 
-    // Now do the full argumenbts check
+    // Now do the full arguments check
     try
     {
         if (!parse_command_line(argc, argv))
