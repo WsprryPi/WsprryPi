@@ -1,11 +1,16 @@
-#ifndef BAND_GPIO_SELECTOR_HPP
-#define BAND_GPIO_SELECTOR_HPP
-
 /**
  * @file band_gpio_selector.hpp
- * @brief Selects and controls a GPIO line for the active amateur band.
+ * @brief Interface for selecting and controlling GPIO per amateur band.
  *
- * This project is is licensed under the MIT License. See LICENSE.md
+ * This class provides the runtime interface for selecting an amateur
+ * band and controlling its associated GPIO output. It uses the band
+ * configuration defined in band_gpio.* and supports selection by
+ * HamBand or by frequency via WSPRBandLookup.
+ *
+ * This header represents the control interface of the band GPIO
+ * subsystem.
+ *
+ * This project is licensed under the MIT License. See LICENSE.md
  * for more information.
  *
  * Copyright © 2026 Lee C. Bussy (@LBussy). All rights reserved.
@@ -29,6 +34,9 @@
  * SOFTWARE.
  */
 
+#ifndef BAND_GPIO_SELECTOR_HPP
+#define BAND_GPIO_SELECTOR_HPP
+
 #include <optional>
 #include <string>
 
@@ -37,73 +45,83 @@
 #include "wspr_band_lookup.hpp"
 
 /**
- * @class BandGPIOSelector
- * @brief Selects the GPIO assigned to the current amateur band.
+ * @brief Controls a single GPIO output using amateur band selection.
  *
- * This class bridges WSPRBandLookup and GPIOOutput. It can select a band
- * directly from a HamBand value or derive the band from a transmit frequency.
- *
- * The selected GPIO is configured but left inactive until setBandState(true)
- * is called. Selecting a new band automatically releases the previously
- * selected GPIO because GPIOOutput::enableGPIOPin() handles that transition.
+ * This class maps ham bands to configured GPIO outputs and uses GPIOOutput to
+ * enable and drive the selected pin. GPIO polarity is taken from the selected
+ * band's BandGPIOConfig.
  */
 class BandGPIOSelector
 {
 public:
     /**
-     * @brief Select a GPIO line for the specified band.
+     * @brief Select a band and enable its configured GPIO pin.
      *
-     * @param band Amateur band to select.
-     * @param active_high True for active-high operation.
-     * @return True if the band's GPIO was selected successfully.
+     * Any previously active GPIO pin is released before the new one is enabled.
+     *
+     * @param band The ham band to select.
+     * @return True on success, false on failure.
      */
-    bool selectBand(HamBand band, bool active_high = true);
+    bool selectBand(HamBand band);
 
     /**
-     * @brief Select a GPIO line based on a transmit frequency.
+     * @brief Select a band based on a frequency in Hz.
      *
-     * The frequency is resolved through WSPRBandLookup and then mapped to a
-     * HamBand value supported by band_gpio.hpp.
+     * The frequency is resolved through WSPRBandLookup and then converted to a
+     * HamBand enum before the configured GPIO is enabled.
      *
-     * @param frequency_hz Frequency in Hz.
-     * @param active_high True for active-high operation.
-     * @return True if a supported band was found and selected.
+     * @param frequency_hz The frequency in Hz.
+     * @return True on success, false on failure.
      */
-    bool selectFrequency(double frequency_hz, bool active_high = true);
+    bool selectFrequency(double frequency_hz);
 
     /**
-     * @brief Set the active state of the currently selected band GPIO.
+     * @brief Set the currently selected band GPIO enabled or disabled.
      *
-     * @param state True to assert the band GPIO, false to deassert it.
-     * @return True on success, false if no GPIO is currently selected.
+     * The meaning of the logical state is translated using the selected band's
+     * configured polarity.
+     *
+     * @param state True to enable the selected band's external hardware, false
+     *              to disable it.
+     * @return True on success, false on failure.
      */
     bool setBandState(bool state);
 
     /**
-     * @brief Release the currently selected GPIO, if any.
+     * @brief Release the currently selected GPIO.
      */
     void stop();
 
     /**
      * @brief Return the currently selected band.
      *
-     * @return Pointer to the current band, or nullptr if none is selected.
+     * @return Pointer to current band, or nullptr if none selected.
      */
     const HamBand *currentBand() const;
 
+    /**
+     * @brief Return the current band configuration.
+     *
+     * @return Pointer to the current configuration, or nullptr if none is
+     *         selected.
+     */
+    const BandGPIOConfig *currentConfig() const;
+
 private:
     /**
-     * @brief Convert a band name to a HamBand value.
+     * @brief Convert a band name string to a HamBand enum.
      *
-     * @param band_name Band name such as "40M" or "22m".
-     * @return Matching HamBand on success, or std::nullopt if unsupported.
+     * @param band_name The band name to convert.
+     * @return The matching HamBand, or std::nullopt if unsupported.
      */
-    std::optional<HamBand> hamBandFromString(const std::string &band_name) const;
+    std::optional<HamBand> hamBandFromString(
+        const std::string &band_name) const;
 
     GPIOOutput gpio_;
     WSPRBandLookup band_lookup_;
     bool has_band_ = false;
     HamBand current_band_ = HamBand::BAND_2200M;
+    BandGPIOConfig current_config_{};
 };
 
 #endif // BAND_GPIO_SELECTOR_HPP
