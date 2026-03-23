@@ -1,12 +1,40 @@
-#ifndef BAND_GPIO_HPP
-#define BAND_GPIO_HPP
-
 /**
  * @file band_gpio.hpp
- * @brief Band-to-GPIO mapping helpers.
+ * @brief Defines amateur band enumeration and GPIO configuration model.
+ *
+ * This file defines the HamBand enumeration and BandGPIOConfig structure
+ * used to describe how each amateur band maps to a GPIO output. The
+ * configuration includes GPIO number, enable state, and polarity.
+ *
+ * This header represents the data model for the band GPIO subsystem.
+ * It does not perform any GPIO control directly.
+ *
+ * This project is licensed under the MIT License. See LICENSE.md
+ * for more information.
+ *
+ * Copyright © 2026 Lee C. Bussy (@LBussy). All rights reserved.
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to
+ * deal in the Software without restriction, including without limitation the
+ * rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+ * sell copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
  */
 
-#include <cstdint>
+#ifndef BAND_GPIO_HPP
+#define BAND_GPIO_HPP
 
 /**
  * @brief Supported amateur radio bands for GPIO band selection.
@@ -30,33 +58,28 @@ enum class HamBand
 };
 
 /**
- * @brief Return the BCM GPIO assigned to a band.
+ * @brief GPIO configuration for a specific amateur radio band.
+ *
+ * The logical state passed to BandGPIOSelector::setBandState() is interpreted
+ * as enabled or disabled. The active_high field controls how that logical
+ * state is translated to the physical GPIO level.
+ */
+struct BandGPIOConfig
+{
+    int gpio = -1;
+    bool enabled = false;
+    bool active_high = false;
+};
+
+/**
+ * @brief Return the GPIO configuration assigned to a band.
+ *
+ * A disabled configuration is returned for unknown or unsupported bands.
  *
  * @param band The band to look up.
- * @return The BCM GPIO number, or -1 if the band is invalid.
+ * @return The GPIO configuration for the band.
  */
-constexpr int gpio_for_band(HamBand band)
-{
-    switch (band)
-    {
-        case HamBand::BAND_2200M: return 17;
-        case HamBand::BAND_630M:  return 27;
-        case HamBand::BAND_160M:  return 22;
-        case HamBand::BAND_80M:   return 23;
-        case HamBand::BAND_60M:   return 24;
-        case HamBand::BAND_40M:   return 25;
-        case HamBand::BAND_30M:   return 5;
-        case HamBand::BAND_22M:   return 6;
-        case HamBand::BAND_20M:   return 12;
-        case HamBand::BAND_17M:   return 13;
-        case HamBand::BAND_15M:   return 16;
-        case HamBand::BAND_12M:   return 26;
-        case HamBand::BAND_10M:   return 20;
-        case HamBand::BAND_6M:    return 21;
-    }
-
-    return -1;
-}
+const BandGPIOConfig &gpio_config_for_band(HamBand band);
 
 /**
  * @brief Return the display name for a band.
@@ -88,14 +111,11 @@ constexpr const char *band_to_string(HamBand band)
 }
 
 /**
- * @brief Check whether a band maps to a valid GPIO.
+ * @brief Check whether a band is configured and enabled.
  *
  * @param band The band to test.
- * @return True if the band has a valid GPIO mapping.
+ * @return True if the band is enabled and has a valid GPIO.
  */
-constexpr bool has_gpio_for_band(HamBand band)
-{
-    return gpio_for_band(band) >= 0;
-}
+bool is_band_gpio_enabled(HamBand band);
 
 #endif // BAND_GPIO_HPP
