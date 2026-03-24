@@ -153,4 +153,14 @@ public:
     void print_wspr_frequencies() const;
 };
 
+/**
+ * @brief Convert a HamBand enum value to its string representation.
+ *
+ * This is used for logging, debugging, and user-facing messages.
+ *
+ * @param band The HamBand enum value.
+ * @return Null-terminated string representing the band.
+ */
+const char *ham_band_to_string(HamBand band);
+
 #endif // WSPR_BAND_LOOKUP_HPP
