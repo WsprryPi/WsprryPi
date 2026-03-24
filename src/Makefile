@@ -332,7 +332,7 @@ $(BIN_DIR)/$(OUT): $(CPP_OBJECTS)
 # Phony targets
 # ─────────────────────────────────────────────────────────────────────────────
 
-.PHONY: clean release debug test test-tone test-oneshot gdb install uninstall lint macros help
+.PHONY: clean release debug test test-tone test-oneshot gdb install debuginstall uninstall lint macros help
 DEBUG: debug
 RELEASE: release
 
@@ -376,6 +376,19 @@ install: release
 	$(Q)$(SUDO) systemctl start $(OUT).service || true
 	$(Q)echo "Installation complete."
 
+debuginstall: debug
+	$(Q)echo "Installing DEBUG $(OUT) to $(PREFIX)."
+	$(Q)echo "$(PREFIX)/$(OUT) status before install:"
+	$(Q) ls -al $(PREFIX)/$(OUT) || { $(Q)echo "Error: Daemon binary not found at $(PREFIX)/$(OUT)."; }
+	$(Q)$(SUDO) systemctl stop $(OUT).service || true
+	$(Q)$(SUDO) install -d $(PREFIX)
+	$(Q)$(SUDO) install -m 755 $(BIN_DIR)/$(TEST_OUT) $(PREFIX)/$(OUT)
+	$(Q)echo "$(PREFIX)/$(OUT) status after install:"
+	$(Q)$(SUDO) ls -al $(PREFIX)/$(OUT) || { echo "Error: Daemon binary not found at $(PREFIX)/$(OUT)."; }
+	$(Q)$(SUDO) systemctl enable $(OUT).service || true
+	$(Q)$(SUDO) systemctl start $(OUT).service || true
+	$(Q)echo "Installation complete."
+
 uninstall:
 	$(Q)echo "Removing $(PREFIX)/$(OUT)."
 	$(Q)$(SUDO) systemctl stop $(OUT).service || true
@@ -400,6 +413,7 @@ help:
 	$(Q)echo "  test-tone    Run the binary with a test tone"
 	$(Q)echo "  test-oneshot Run the binary with one iteration"
 	$(Q)echo "  install      Install the binary to $(PREFIX)"
+	$(Q)echo "  debuginstall Install the debug binary to $(PREFIX)"
 	$(Q)echo "  uninstall    Remove the installed binary"
 	$(Q)echo "  lint         Run static analysis"
 	$(Q)echo "  macros       Show macros"

@@ -39,6 +39,7 @@
         "CXXVER",
         "davidanson",
         "DDEBUG",
+        "debuginstall",
         "debugpy",
         "delm",
         "DEPFILES",
