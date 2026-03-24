@@ -46,7 +46,7 @@ static const BandGPIOConfig &disabled_band_gpio_config()
     return disabled_config;
 }
 
-// TODO:  Put this in config object
+// TODO: Put this in the config object.
 const BandGPIOConfig &gpio_config_for_band(HamBand band)
 {
     switch (band)
