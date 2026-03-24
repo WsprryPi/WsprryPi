@@ -37,8 +37,15 @@
 
 #include "band_gpio_selector.hpp"
 
+#include "logging.hpp"
+
 bool BandGPIOSelector::prepareBand(HamBand band)
 {
+    if (!enabled_)
+    {
+        return false;
+    }
+
     const BandGPIOConfig &config = gpio_config_for_band(band);
 
     stop();
@@ -48,14 +55,31 @@ bool BandGPIOSelector::prepareBand(HamBand band)
         return false;
     }
 
-    if (!gpio_.enableGPIOPin(config.gpio, config.active_high))
-    {
-        return false;
-    }
-
     has_band_ = true;
     current_band_ = band;
     current_config_ = config;
+
+    if (!drive_gpio_)
+    {
+        llog.logS(DEBUG, tag,
+                  "Prepared band ",
+                  ham_band_to_string(band),
+                  ", GPIO ",
+                  config.gpio,
+                  ", polarity ",
+                  (config.active_high ? "active high" : "active low"),
+                  ", drive ",
+                  (drive_gpio_ ? "enabled" : "disabled"));
+        return true;
+    }
+
+    if (!gpio_.enableGPIOPin(config.gpio, config.active_high))
+    {
+        has_band_ = false;
+        current_config_ = BandGPIOConfig{};
+        return false;
+    }
+
     return true;
 }
 
@@ -72,9 +96,28 @@ bool BandGPIOSelector::prepareFrequency(double frequency_hz)
 
 bool BandGPIOSelector::setBandState(bool state)
 {
+    if (!enabled_)
+    {
+        return true;
+    }
+
     if (!has_band_ || !current_config_.enabled || current_config_.gpio < 0)
     {
         return false;
+    }
+
+    if (!drive_gpio_)
+    {
+        llog.logS(DEBUG, tag,
+                  (state ? "Assert band " : "Deassert band "),
+                  ham_band_to_string(current_band_),
+                  ", GPIO ",
+                  current_config_.gpio,
+                  ", polarity ",
+                  (current_config_.active_high ? "active high" : "active low"),
+                  ", drive ",
+                  (drive_gpio_ ? "enabled" : "disabled"));
+        return true;
     }
 
     return gpio_.toggleGPIO(state);
@@ -82,7 +125,29 @@ bool BandGPIOSelector::setBandState(bool state)
 
 void BandGPIOSelector::stop()
 {
-    gpio_.stop();
+    if (!enabled_)
+    {
+        return;
+    }
+
+    if (drive_gpio_)
+    {
+        gpio_.stop();
+    }
+    else
+    {
+        if (!drive_gpio_ && has_band_)
+        {
+            llog.logS(DEBUG, tag,
+                      "Releasing band ",
+                      ham_band_to_string(current_band_),
+                      ", GPIO ",
+                      current_config_.gpio,
+                      ", drive ",
+                      (drive_gpio_ ? "enabled" : "disabled"));
+        }
+    }
+
     has_band_ = false;
     current_config_ = BandGPIOConfig{};
 }

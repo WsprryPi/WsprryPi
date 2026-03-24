@@ -670,6 +670,11 @@ void end_test_tone()
  */
 bool wspr_loop()
 {
+    // TODO: Feature toggles while I work on configuration items
+    bandGPIOSelector.setEnabled(true);    // (true) - Allows logic to run and show debug messages; set false to disable all band GPIO logic and messages
+    bandGPIOSelector.setDriveGPIO(false); // (false) - Shows DEBUG messages vs performing actions
+    // TODO^
+
     // Display the final configuration after parsing arguments and INI file.
     show_config_values();
 

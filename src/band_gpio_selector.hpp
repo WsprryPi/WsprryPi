@@ -105,12 +105,44 @@ public:
      */
     const BandGPIOConfig *currentConfig() const;
 
+    /**
+     * @brief Enable or disable band-based GPIO control.
+     *
+     * When disabled, all band GPIO operations become no-ops. This allows
+     * the feature to be safely toggled off during development or when
+     * hardware is not present.
+     *
+     * @param enabled True to enable band GPIO control, false to disable it.
+     */
+    void setEnabled(bool enabled)
+    {
+        enabled_ = enabled;
+    }
+
+    /**
+     * @brief Enable or disable physical GPIO output.
+     *
+     * When disabled, the selector still resolves and stores band
+     * configuration, but it does not touch GPIO hardware. This is useful
+     * for validation and logging during development.
+     *
+     * @param enabled True to allow GPIO hardware control, false to disable
+     * physical GPIO activity.
+     */
+    void setDriveGPIO(bool enabled)
+    {
+        drive_gpio_ = enabled;
+    }
+
 private:
     GPIOOutput gpio_;
     WSPRBandLookup band_lookup_;
     bool has_band_ = false;
     HamBand current_band_ = HamBand::BAND_2200M;
     BandGPIOConfig current_config_{};
+    bool enabled_ = false;
+    bool drive_gpio_ = false;
+    static constexpr const char *tag = "[BandGPIO]";
 };
 
 #endif // BAND_GPIO_SELECTOR_HPP
