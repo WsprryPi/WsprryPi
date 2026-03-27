@@ -637,7 +637,11 @@ void end_test_tone()
         if (config.mode == ModeType::WSPR)
         {
             // Re-initialize WSPR with next frequency, PPM, etc.
-            set_config(/*advance_freq=*/true);
+            if (!validate_config_data())
+            {
+                llog.logE(ERROR, "Initial configuration validation failed.");
+                return;
+            }
         }
         else
         {
@@ -677,6 +681,21 @@ bool wspr_loop()
 
     // Display the final configuration after parsing arguments and INI file.
     show_config_values();
+
+    if (config.mode == ModeType::WSPR)
+    {
+        if (!validate_config_data())
+        {
+            llog.logE(ERROR, "Initial configuration validation failed.");
+            llog.logE(WARN, "Continuing in safe mode with transmissions disabled.");
+            config.transmit = false;
+            config_to_json();
+        }
+    }
+    else
+    {
+        validate_config_data();
+    }
 
     // Start web server and set priority
     if (config.web_port >= 1024 && config.web_port <= 49151)
@@ -726,15 +745,8 @@ bool wspr_loop()
     // Set pending config flags and do initial config
     ini_reload_pending.store(true, std::memory_order_relaxed);
 
-    if (config.mode == ModeType::WSPR)
+    if (config.mode == ModeType::TONE)
     {
-        // Set up WSPR transmissions
-        set_config(true); // Handles get next (or only) frequency, PPM, and setup
-    }
-    else
-    {
-        // Setup test tone
-        validate_config_data();
         wsprTransmitter.configure(config.test_tone, config.power_level, config.ppm);
         wsprTransmitter.startAsync();
         llog.logS(INFO, "transmitting tone, hit Ctrl-C to terminate tone.");
@@ -944,10 +956,33 @@ void set_config(bool force)
     if (force)
     {
         do_config = true;
-        freq_iterator = 0;       // Reset iterator
-        current_frequency = 0.0; // Zero out freq
-        ini_to_json(config.ini_filename);
-        json_to_config();
+        freq_iterator = 0;
+        current_frequency = 0.0;
+
+        if (config.use_ini)
+        {
+            std::string load_error;
+            std::vector<std::string> warning_messages;
+            if (!load_json(config.ini_filename, &load_error, &warning_messages))
+            {
+                for (const auto &warning_message : warning_messages)
+                {
+                    llog.logS(WARN, warning_message);
+                }
+
+                llog.logS(ERROR,
+                          "Configuration reload failed; keeping current config:",
+                          load_error);
+                config_to_json();
+                json_to_ini();
+                return;
+            }
+
+            for (const auto &warning_message : warning_messages)
+            {
+                llog.logS(WARN, warning_message);
+            }
+        }
     }
 
     // Store the PPM flag we had coming in
@@ -957,17 +992,39 @@ void set_config(bool force)
     if (ini_reload_pending.load())
     {
         do_config = true;
-        // Validate configuration and ensure all required settings are present.
+
+        if (config.use_ini)
+        {
+            std::string load_error;
+            std::vector<std::string> warning_messages;
+            if (!load_json(config.ini_filename, &load_error, &warning_messages))
+            {
+                for (const auto &warning_message : warning_messages)
+                {
+                    llog.logS(WARN, warning_message);
+                }
+
+                llog.logS(ERROR,
+                          "Configuration reload failed; keeping current config:",
+                          load_error);
+                config_to_json();
+                json_to_ini();
+                ini_reload_pending.store(false, std::memory_order_relaxed);
+                send_ws_message("configuration", "reload_failed");
+                return;
+            }
+
+            for (const auto &warning_message : warning_messages)
+            {
+                llog.logS(WARN, warning_message);
+            }
+        }
+
         if (!validate_config_data())
         {
             llog.logE(ERROR, "Configuration validation failed.");
-            // Let wspr_loop know to break out
-            {
-                std::lock_guard<std::mutex> lk(exitwspr_mtx);
-                exitwspr_ready = true;
-            }
-            exitwspr_cv.notify_one();
-            return;
+            config.transmit = false;
+            config_to_json();
         }
     }
 

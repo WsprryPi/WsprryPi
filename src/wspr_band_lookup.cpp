@@ -326,14 +326,55 @@ double WSPRBandLookup::parse_string_to_frequency(
 {
     std::string input_str(input);
 
-    input_str.erase(0, input_str.find_first_not_of(" \t\n\r"));
-    input_str.erase(input_str.find_last_not_of(" \t\n\r") + 1);
+    auto first = input_str.find_first_not_of(" \t\n\r");
+    if (first == std::string::npos)
+    {
+        input_str.clear();
+    }
+    else
+    {
+        auto last = input_str.find_last_not_of(" \t\n\r");
+        input_str = input_str.substr(first, last - first + 1);
+    }
+
+    std::string lower = input_str;
+    std::transform(
+        lower.begin(),
+        lower.end(),
+        lower.begin(),
+        [](unsigned char c)
+        {
+            return static_cast<char>(std::tolower(c));
+        });
+
+    double scale = 1.0;
+
+    if (lower.size() >= 3 && lower.ends_with("ghz"))
+    {
+        scale = 1e9;
+        input_str.erase(input_str.size() - 3);
+    }
+    else if (lower.size() >= 3 && lower.ends_with("mhz"))
+    {
+        scale = 1e6;
+        input_str.erase(input_str.size() - 3);
+    }
+    else if (lower.size() >= 3 && lower.ends_with("khz"))
+    {
+        scale = 1e3;
+        input_str.erase(input_str.size() - 3);
+    }
+    else if (lower.size() >= 2 && lower.ends_with("hz"))
+    {
+        scale = 1.0;
+        input_str.erase(input_str.size() - 2);
+    }
 
     if (input_str.find_first_not_of("0123456789.-") == std::string::npos)
     {
         try
         {
-            const double raw_freq = std::stod(input_str);
+            const double raw_freq = std::stod(input_str) * scale;
             if (raw_freq == 0.0)
             {
                 return 0.0;
@@ -354,11 +395,12 @@ double WSPRBandLookup::parse_string_to_frequency(
         }
         catch (const std::exception &)
         {
-            throw std::invalid_argument("Invalid frequency format: " + input_str);
+            throw std::invalid_argument(
+                "Invalid frequency format: " + input_str);
         }
     }
 
-    const auto result = lookup(std::string(input_str));
+    const auto result = lookup(input_str);
     if (std::holds_alternative<double>(result))
     {
         return std::get<double>(result);

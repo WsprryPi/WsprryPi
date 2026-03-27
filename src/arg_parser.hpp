@@ -30,6 +30,7 @@
 #define ARG_PARSER_HPP
 
 // Project headers
+#include "config_handler.hpp"
 #include "ini_file.hpp"
 #include "lcblog.hpp"
 #include "monitorfile.hpp"
@@ -174,7 +175,12 @@ extern void show_config_values(bool reload = false);
  */
 extern bool validate_config_data();
 
+bool validate_config_candidate(
+    ArgParserConfig &candidate,
+    std::string *error_message = nullptr);
+
 bool set_frequencies();
+bool set_frequencies(ArgParserConfig &target);
 
 /**
  * @brief Loads configuration values from an INI file.
