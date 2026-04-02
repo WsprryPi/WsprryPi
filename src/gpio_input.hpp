@@ -101,6 +101,7 @@ public:
 
 private:
     void monitorLoop();
+    void releaseGPIOResources();
 
     int gpio_pin_;                   ///< BCM GPIO pin number.
     bool trigger_high_;              ///< Rising edge if true, falling if false.
