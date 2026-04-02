@@ -681,17 +681,7 @@ bool wspr_loop()
     // Display the final configuration after parsing arguments and INI file.
     show_config_values();
 
-    if (config.mode == ModeType::WSPR)
-    {
-        if (!validate_config_data())
-        {
-            llog.logE(ERROR, "Initial configuration validation failed.");
-            llog.logE(WARN, "Continuing in safe mode with transmissions disabled.");
-            config.transmit = false;
-            config_to_json();
-        }
-    }
-    else
+    if (config.mode != ModeType::WSPR)
     {
         validate_config_data();
     }
@@ -739,13 +729,16 @@ bool wspr_loop()
         iniMonitor.setPriority(SCHED_RR, 10);
     }
 
-    // TODO: It looks like the initial config load on startup does not trigger transmission enabled
     llog.logS(INFO, "WSPR loop running.");
 
-    // Set pending config flags and do initial config
-    ini_reload_pending.store(true, std::memory_order_relaxed);
-
-    if (config.mode == ModeType::TONE)
+    // Startup WSPR configuration should be applied exactly once using the
+    // same reload-safe path that handles validation, setup, and scheduling.
+    if (config.mode == ModeType::WSPR)
+    {
+        ini_reload_pending.store(true, std::memory_order_relaxed);
+        set_config();
+    }
+    else if (config.mode == ModeType::TONE)
     {
         wsprTransmitter.configure(config.test_tone, config.power_level, config.ppm);
         wsprTransmitter.startAsync();
@@ -985,8 +978,10 @@ void set_config(bool force)
         }
     }
 
-    // Store the PPM flag we had coming in
-    bool using_ntp_ = config.use_ntp;
+    // Track actual PPM manager runtime state rather than inferring it from the
+    // just-loaded config. Startup and reload both need to enable/disable the
+    // subsystem based on whether it is already running.
+    const bool ppm_running = ppmManager.isRunning();
 
     // If we are reloading from INI:
     if (ini_reload_pending.load())
@@ -1029,15 +1024,13 @@ void set_config(bool force)
     }
 
     // See if we need to start NTP (chrony) monitoring
-    if (
-        // If we are not using it now but should be
-        (!using_ntp_ && config.use_ntp))
+    if (config.use_ntp && !ppm_running)
     {
         ppm_init();
         ppm_reload_pending.store(true, std::memory_order_seq_cst);
     }
     // Or, see if we need to stop it
-    else if (using_ntp_ && !config.use_ntp)
+    else if (!config.use_ntp && ppm_running)
     {
         ppmManager.stop();
         llog.logS(INFO, "PPM Manager disabled.");
