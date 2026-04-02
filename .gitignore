@@ -86,3 +86,11 @@ docs/_build/
 *~
 *.bak
 *.old
+
+# Node stuff
+node_modules/
+package.json
+package-lock.json
+
+# Codex
+.codex

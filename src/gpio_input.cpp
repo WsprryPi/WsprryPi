@@ -65,6 +65,27 @@ GPIOInput::~GPIOInput()
     (void)stop();
 }
 
+void GPIOInput::releaseGPIOResources()
+{
+#if GPIOD_API_MAJOR >= 2
+    if (request_)
+    {
+        request_.reset();
+    }
+#else
+    try
+    {
+        line_.release();
+    }
+    catch (...)
+    {
+        // Ignore stale or already released handles.
+    }
+#endif
+
+    chip_.reset();
+}
+
 bool GPIOInput::enable(int pin,
                        bool trigger_high,
                        PullMode pull_mode,
@@ -73,6 +94,13 @@ bool GPIOInput::enable(int pin,
     if (running_)
     {
         (void)stop();
+    }
+
+    {
+        std::lock_guard<std::mutex> lock(monitor_mutex_);
+        // Defensive cleanup for stale libgpiod handles left behind by a
+        // previous failed init or prior stop before we request the line again.
+        releaseGPIOResources();
     }
 
     {
@@ -152,7 +180,8 @@ bool GPIOInput::enable(int pin,
     }
     catch (const std::exception& e)
     {
-        // TODO: This tries to reinit on settings save
+        std::lock_guard<std::mutex> lock(monitor_mutex_);
+        releaseGPIOResources();
         llog.logE(ERROR, "GPIOInput: init error.", e.what());
         status_ = Status::Error;
         running_ = false;
@@ -178,10 +207,7 @@ bool GPIOInput::enable(int pin,
 
 bool GPIOInput::stop()
 {
-    if (!running_)
-    {
-        return false;
-    }
+    const bool was_running = running_.exchange(false);
 
     stop_thread_ = true;
     cv_.notify_all();
@@ -191,9 +217,13 @@ bool GPIOInput::stop()
         monitor_thread_.join();
     }
 
-    running_ = false;
-    status_ = Status::Stopped;
-    return true;
+    {
+        std::lock_guard<std::mutex> lock(monitor_mutex_);
+        releaseGPIOResources();
+        status_ = Status::Stopped;
+    }
+
+    return was_running;
 }
 
 void GPIOInput::resetTrigger()
