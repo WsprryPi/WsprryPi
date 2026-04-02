@@ -2,7 +2,7 @@
  * @file config_handler.cpp
  * @brief Provides an interface to ArgParserConfig and JSON config
  *
- * This project is is licensed under the MIT License. See LICENSE.md
+ * This project is licensed under the MIT License. See LICENSE.md
  * for more information.
  *
  * Copyright © 2023-2026 Lee C. Bussy (@LBussy). All rights reserved.
@@ -28,468 +28,707 @@
 
 #include "config_handler.hpp"
 
+#include "arg_parser.hpp"
 #include "ini_file.hpp"
 #include "json.hpp"
 #include "logging.hpp"
 #include "scheduling.hpp"
 
+#include <algorithm>
+#include <cctype>
+#include <cstdlib>
 #include <iostream>
+#include <map>
+#include <stdexcept>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
-/**
- * @brief Global configuration object.
- *
- * This ArgParserConfig instance holds the application’s configuration settings,
- * typically loaded from an INI file or a JSON configuration.
- */
 ArgParserConfig config;
-
-/**
- * @brief Global JSON configuration object.
- *
- * This nlohmann::json object holds the application's configuration in JSON format.
- * It is used to merge and update configuration settings dynamically.
- */
 nlohmann::json jConfig;
 
-/**
- * @brief Convert a JSON value to a string representation.
- *
- * Safely extracts a JSON value as a string. If the value is already a string,
- * it is returned directly. If the value is numeric, it is converted to a
- * string. For all other types, the JSON is serialized using dump().
- *
- * @param j The JSON value to convert.
- * @return A string representation of the JSON value.
- */
-std::string json_to_string(const nlohmann::json &j)
+namespace
 {
-    if (j.is_string())
-        return j.get<std::string>();
-    else if (j.is_number())
-        return std::to_string(j.get<double>());
-    else
-        return j.dump(); // Fallback for other types
-}
+    std::string trim_copy(const std::string &value)
+    {
+        const std::string whitespace = " \t\r\n";
+        const std::size_t first = value.find_first_not_of(whitespace);
 
-/**
- * @brief Parses configuration from a JSON object into an ArgParser struct.
- *
- * @param jConfig The JSON object containing configuration data.
- *
- * Expected JSON structure (example):
- * @code
- * {
- *   "Meta": {
- *       "Mode": "WSPR",
- *       "Use INI": true,
- *       "INI Filename": "",
- *       "Date Time Log": false,
- *       "Loop TX": true,
- *       "TX Iterations": 5,
- *       "Test Tone": 440.0,
- *       "Center Frequency Set": [ 12.2, 123.7, 98754.323 ]
- *   },
- *   "Control": {
- *       "Transmit": false
- *   },
- *   "Common": {
- *       "Call Sign": "NXXX",
- *       "Grid Square": "ZZ99",
- *       "TX Power": 20,
- *       "Frequency": "20m",
- *       "Transmit Pin": 4
- *   },
- *   "Extended": {
- *       "PPM": 0.0,
- *       "Use NTP": true,
- *       "Offset": true,
- *       "Use LED": false,
- *       "LED Pin": 18,
- *       "Power Level": 7
- *   },
- *   "Server": {
- *       "Web Port": 31415,
- *       "Web Port": 31416,
- *       "Use Shutdown": false,
- *       "Shutdown Button": 19
- *   }
- * }
- * @endcode
- */
-void json_to_config()
+        if (first == std::string::npos)
+        {
+            return "";
+        }
+
+        const std::size_t last = value.find_last_not_of(whitespace);
+        return value.substr(first, last - first + 1);
+    }
+
+} // namespace
+
+void init_default_config()
 {
-    // Meta
-    std::string modeStr = jConfig["Meta"]["Mode"].get<std::string>();
-    if (modeStr == "WSPR")
-    {
-        config.mode = ModeType::WSPR;
-    }
-    else if (modeStr == "TONE")
-    {
-        config.mode = ModeType::TONE;
-    }
-    else
-    {
-        // Handle invalid mode values
-        config.mode = ModeType::WSPR; // Default
-    }
-
-    config.use_ini = jConfig["Meta"]["Use INI"].get<bool>();
-    config.ini_filename = jConfig["Meta"]["INI Filename"].get<std::string>();
-    config.date_time_log = jConfig["Meta"]["Date Time Log"].get<bool>();
-    config.loop_tx = jConfig["Meta"]["Loop TX"].get<bool>();
-    config.tx_iterations.store(jConfig["Meta"]["TX Iterations"].get<int>());
-    config.test_tone = jConfig["Meta"]["Test Tone"].get<double>();
-    config.center_freq_set = jConfig["Meta"]["Center Frequency Set"].get<std::vector<double>>();
-
     // Control
-    config.transmit = jConfig["Control"]["Transmit"].get<bool>();
+    config.transmit = false;
 
     // Common
-    config.callsign = jConfig["Common"]["Call Sign"].get<std::string>();
-    config.grid_square = jConfig["Common"]["Grid Square"].get<std::string>();
-    config.power_dbm = jConfig["Common"]["TX Power"].get<int>();
-    // "Frequency" can be an integer or a double stored as a string.
-    config.frequencies = json_to_string(jConfig["Common"]["Frequency"]);
-    config.tx_pin = jConfig["Common"]["Transmit Pin"].get<int>();
+    config.callsign = "NXXX";
+    config.grid_square = "ZZ99";
+    config.power_dbm = 20;
+    config.frequencies = "20m";
+    config.tx_pin = 4;
 
     // Extended
-    config.ppm = jConfig["Extended"]["PPM"].get<double>();
-    config.use_ntp = jConfig["Extended"]["Use NTP"].get<bool>();
-    config.use_offset = jConfig["Extended"]["Offset"].get<bool>();
-    config.use_led = jConfig["Extended"]["Use LED"].get<bool>();
-    config.led_pin = jConfig["Extended"]["LED Pin"].get<int>();
-    config.power_level = jConfig["Extended"]["Power Level"].get<int>();
+    config.ppm = 0.0;
+    config.use_ntp = true;
+    config.use_offset = true;
+    config.use_led = false;
+    config.led_pin = 18;
+    config.power_level = 7;
 
     // Server
-    config.web_port = jConfig["Server"]["Web Port"].get<int>();
-    config.socket_port = jConfig["Server"]["Socket Port"].get<int>();
-    config.use_shutdown = jConfig["Server"]["Use Shutdown"].get<bool>();
-    config.shutdown_pin = jConfig["Server"]["Shutdown Button"].get<int>();
-}
+    config.web_port = 31415;
+    config.socket_port = 31416;
+    config.use_shutdown = false;
+    config.shutdown_pin = 19;
 
-/**
- * @brief Creates a JSON object from the configuration struct.
- *
- * @details
- * This function overlays the configuration stored in an ArgParser struct
- * onto a JSON object. It uses the same structure as the original JSON file,
- * converting booleans and numbers into strings where needed (since the
- * parsing code expects strings).
- *
- * @param config The configuration struct to overlay.
- */
-void config_to_json()
-{
     // Meta
-    jConfig["Meta"]["Mode"] = "WSPR";
-    if (config.mode == ModeType::TONE)
-    {
-        jConfig["Meta"]["Mode"] = "TONE";
-    }
-    jConfig["Meta"]["Use INI"] = config.use_ini;
-    jConfig["Meta"]["INI Filename"] = config.ini_filename;
-    jConfig["Meta"]["Date Time Log"] = config.date_time_log;
-    jConfig["Meta"]["Loop TX"] = config.loop_tx;
-    jConfig["Meta"]["TX Iterations"] = config.tx_iterations.load();
-    jConfig["Meta"]["Test Tone"] = config.test_tone;
-    jConfig["Meta"]["Center Frequency Set"] = config.center_freq_set;
-
-    // Control
-    jConfig["Control"]["Transmit"] = config.transmit;
-
-    // Common
-    jConfig["Common"]["Call Sign"] = config.callsign;
-    jConfig["Common"]["Grid Square"] = config.grid_square;
-    jConfig["Common"]["TX Power"] = config.power_dbm;
-    jConfig["Common"]["Frequency"] = config.frequencies;
-    jConfig["Common"]["Transmit Pin"] = config.tx_pin;
-
-    // Extended
-    jConfig["Extended"]["PPM"] = config.ppm;
-    jConfig["Extended"]["Use NTP"] = config.use_ntp;
-    jConfig["Extended"]["Offset"] = config.use_offset;
-    jConfig["Extended"]["Use LED"] = config.use_led;
-    jConfig["Extended"]["LED Pin"] = config.led_pin;
-    jConfig["Extended"]["Power Level"] = config.power_level;
-
-    // Server
-    jConfig["Server"]["Web Port"] = config.web_port;
-    jConfig["Server"]["Socket Port"] = config.socket_port;
-    jConfig["Server"]["Use Shutdown"] = config.use_shutdown;
-    jConfig["Server"]["Shutdown Button"] = config.shutdown_pin;
+    config.use_ini = true;
 }
 
-/**
- * @brief Initializes the global configuration JSON object.
- *
- * @details
- * This function sets up a default configuration structure in the global
- * nlohmann::json object, `jConfig`. The JSON object is organized into several
- * sections: "Meta", "Common", "Control", "Extended", and "Server". Each section
- * contains key/value pairs that represent configuration parameters. In addition,
- * the "Center Frequency Set" under "Meta" is explicitly initialized as an empty array.
- *
- * @note The JSON values are stored as strings. Adjust the types as needed if numeric
- *       types are required in later processing.
- */
+namespace
+{
+    std::vector<double> parse_center_frequency_set(const nlohmann::json &value)
+    {
+        if (value.is_array())
+        {
+            return value.get<std::vector<double>>();
+        }
+
+        if (value.is_string())
+        {
+            const std::string raw_value = trim_copy(value.get<std::string>());
+
+            if (raw_value.empty())
+            {
+                return {};
+            }
+
+            try
+            {
+                nlohmann::json parsed = nlohmann::json::parse(raw_value);
+
+                if (!parsed.is_array())
+                {
+                    throw std::runtime_error(
+                        "Center Frequency Set string did not parse to an array");
+                }
+
+                return parsed.get<std::vector<double>>();
+            }
+            catch (const std::exception &e)
+            {
+                throw std::runtime_error(
+                    std::string("Invalid Meta.Center Frequency Set: ") + e.what());
+            }
+        }
+
+        throw std::runtime_error(
+            "Meta.Center Frequency Set must be an array or JSON array string");
+    }
+
+    nlohmann::json parse_ini_value(const std::string &raw_value)
+    {
+        const std::string trimmed = trim_copy(raw_value);
+        std::string lowered = trimmed;
+
+        std::transform(
+            lowered.begin(),
+            lowered.end(),
+            lowered.begin(),
+            [](unsigned char c)
+            {
+                return static_cast<char>(std::tolower(c));
+            });
+
+        if (lowered == "true" || lowered == "false")
+        {
+            return lowered == "true";
+        }
+
+        char *end = nullptr;
+        long lval = std::strtol(trimmed.c_str(), &end, 10);
+        if (*end == '\0')
+        {
+            return lval;
+        }
+
+        end = nullptr;
+        double dval = std::strtod(trimmed.c_str(), &end);
+        if (*end == '\0')
+        {
+            return dval;
+        }
+
+        const bool looks_like_json =
+            !trimmed.empty() &&
+            ((trimmed.front() == '[' && trimmed.back() == ']') ||
+             (trimmed.front() == '{' && trimmed.back() == '}'));
+
+        if (looks_like_json)
+        {
+            try
+            {
+                return nlohmann::json::parse(trimmed);
+            }
+            catch (const std::exception &)
+            {
+            }
+        }
+
+        return trimmed;
+    }
+
+    std::string json_to_string(const nlohmann::json &j)
+    {
+        if (j.is_string())
+        {
+            return j.get<std::string>();
+        }
+
+        if (j.is_number())
+        {
+            return std::to_string(j.get<double>());
+        }
+
+        return j.dump();
+    }
+
+    std::string default_json_value_to_string(const nlohmann::json &value)
+    {
+        if (value.is_string())
+        {
+            return value.get<std::string>();
+        }
+
+        return value.dump();
+    }
+
+    bool is_required_tx_key(const std::string &section, const std::string &key)
+    {
+        return section == "Common" &&
+               (key == "Call Sign" ||
+                key == "Grid Square" ||
+                key == "TX Power" ||
+                key == "Frequency");
+    }
+
+    bool should_warn_if_missing(const std::string &section, const std::string &key)
+    {
+        return (section == "Control" && key == "Transmit") ||
+               (section == "Common" &&
+                (key == "Call Sign" ||
+                 key == "Grid Square" ||
+                 key == "TX Power" ||
+                 key == "Frequency" ||
+                 key == "Transmit Pin")) ||
+               (section == "Extended" &&
+                (key == "PPM" ||
+                 key == "Use NTP" ||
+                 key == "Offset" ||
+                 key == "Use LED" ||
+                 key == "LED Pin" ||
+                 key == "Power Level")) ||
+               (section == "Server" &&
+                (key == "Web Port" ||
+                 key == "Socket Port" ||
+                 key == "Use Shutdown" ||
+                 key == "Shutdown Button"));
+    }
+
+    void collect_ini_warnings(
+        const nlohmann::json &defaults,
+        const std::map<std::string, std::unordered_map<std::string, std::string>> &ini_data,
+        std::vector<std::string> &warnings,
+        bool &missing_required_tx_item)
+    {
+        for (const auto &section_item : defaults.items())
+        {
+            if (!section_item.value().is_object())
+            {
+                continue;
+            }
+
+            const std::string &section = section_item.key();
+            const auto section_it = ini_data.find(section);
+
+            for (const auto &key_item : section_item.value().items())
+            {
+                const std::string &key = key_item.key();
+
+                if (!should_warn_if_missing(section, key))
+                {
+                    continue;
+                }
+
+                bool missing_or_empty = false;
+
+                if (section_it == ini_data.end())
+                {
+                    missing_or_empty = true;
+                }
+                else
+                {
+                    const auto key_it = section_it->second.find(key);
+                    if (key_it == section_it->second.end() ||
+                        trim_copy(key_it->second).empty())
+                    {
+                        missing_or_empty = true;
+                    }
+                }
+
+                if (!missing_or_empty)
+                {
+                    continue;
+                }
+
+                warnings.push_back(
+                    section + "." + key +
+                    " missing or empty. Using default '" +
+                    default_json_value_to_string(key_item.value()) + "'.");
+
+                if (is_required_tx_key(section, key))
+                {
+                    missing_required_tx_item = true;
+                }
+            }
+        }
+    }
+
+    void init_config_json_impl(nlohmann::json &target)
+    {
+        target["Meta"] = {
+            {"Mode", "WSPR"},
+            {"Use INI", false},
+            {"INI Filename", ""},
+            {"Date Time Log", false},
+            {"Loop TX", false},
+            {"TX Iterations", 0},
+            {"Test Tone", 730000.0}};
+        target["Meta"]["Center Frequency Set"] = nlohmann::json::array();
+
+        target["Common"] = {
+            {"Call Sign", "NXXX"},
+            {"Frequency", "20m"},
+            {"Grid Square", "ZZ99"},
+            {"TX Power", 20},
+            {"Transmit Pin", 4}};
+
+        target["Control"] = {
+            {"Transmit", false}};
+
+        target["Extended"] = {
+            {"LED Pin", 18},
+            {"Offset", true},
+            {"PPM", 0.0},
+            {"Power Level", 7},
+            {"Use LED", false},
+            {"Use NTP", true}};
+
+        target["Server"] = {
+            {"Web Port", 31415},
+            {"Socket Port", 31416},
+            {"Shutdown Button", 19},
+            {"Use Shutdown", false}};
+    }
+
+    void json_to_config_impl(const nlohmann::json &source, ArgParserConfig &target)
+    {
+        const std::string mode_str = source.at("Meta").at("Mode").get<std::string>();
+        if (mode_str == "WSPR")
+        {
+            target.mode = ModeType::WSPR;
+        }
+        else if (mode_str == "TONE")
+        {
+            target.mode = ModeType::TONE;
+        }
+        else
+        {
+            target.mode = ModeType::WSPR;
+        }
+
+        target.use_ini = source.at("Meta").at("Use INI").get<bool>();
+        target.ini_filename = source.at("Meta").at("INI Filename").get<std::string>();
+        target.date_time_log = source.at("Meta").at("Date Time Log").get<bool>();
+        target.loop_tx = source.at("Meta").at("Loop TX").get<bool>();
+        target.tx_iterations.store(source.at("Meta").at("TX Iterations").get<int>());
+        target.test_tone = source.at("Meta").at("Test Tone").get<double>();
+        target.center_freq_set = parse_center_frequency_set(source.at("Meta").at("Center Frequency Set"));
+
+        target.transmit = source.at("Control").at("Transmit").get<bool>();
+
+        target.callsign = source.at("Common").at("Call Sign").get<std::string>();
+        target.grid_square = source.at("Common").at("Grid Square").get<std::string>();
+        target.power_dbm = source.at("Common").at("TX Power").get<int>();
+        target.frequencies = json_to_string(source.at("Common").at("Frequency"));
+        target.tx_pin = source.at("Common").at("Transmit Pin").get<int>();
+
+        target.ppm = source.at("Extended").at("PPM").get<double>();
+        target.use_ntp = source.at("Extended").at("Use NTP").get<bool>();
+        target.use_offset = source.at("Extended").at("Offset").get<bool>();
+        target.use_led = source.at("Extended").at("Use LED").get<bool>();
+        target.led_pin = source.at("Extended").at("LED Pin").get<int>();
+        target.power_level = source.at("Extended").at("Power Level").get<int>();
+
+        target.web_port = source.at("Server").at("Web Port").get<int>();
+        target.socket_port = source.at("Server").at("Socket Port").get<int>();
+        target.use_shutdown = source.at("Server").at("Use Shutdown").get<bool>();
+        target.shutdown_pin = source.at("Server").at("Shutdown Button").get<int>();
+    }
+
+    void config_to_json_impl(const ArgParserConfig &source, nlohmann::json &target)
+    {
+        target["Meta"]["Mode"] = "WSPR";
+        if (source.mode == ModeType::TONE)
+        {
+            target["Meta"]["Mode"] = "TONE";
+        }
+
+        target["Meta"]["Use INI"] = source.use_ini;
+        target["Meta"]["INI Filename"] = source.ini_filename;
+        target["Meta"]["Date Time Log"] = source.date_time_log;
+        target["Meta"]["Loop TX"] = source.loop_tx;
+        target["Meta"]["TX Iterations"] = source.tx_iterations.load();
+        target["Meta"]["Test Tone"] = source.test_tone;
+        target["Meta"]["Center Frequency Set"] = source.center_freq_set;
+
+        target["Control"]["Transmit"] = source.transmit;
+
+        target["Common"]["Call Sign"] = source.callsign;
+        target["Common"]["Grid Square"] = source.grid_square;
+        target["Common"]["TX Power"] = source.power_dbm;
+        target["Common"]["Frequency"] = source.frequencies;
+        target["Common"]["Transmit Pin"] = source.tx_pin;
+
+        target["Extended"]["PPM"] = source.ppm;
+        target["Extended"]["Use NTP"] = source.use_ntp;
+        target["Extended"]["Offset"] = source.use_offset;
+        target["Extended"]["Use LED"] = source.use_led;
+        target["Extended"]["LED Pin"] = source.led_pin;
+        target["Extended"]["Power Level"] = source.power_level;
+
+        target["Server"]["Web Port"] = source.web_port;
+        target["Server"]["Socket Port"] = source.socket_port;
+        target["Server"]["Use Shutdown"] = source.use_shutdown;
+        target["Server"]["Shutdown Button"] = source.shutdown_pin;
+    }
+
+    void copy_config(const ArgParserConfig &source, ArgParserConfig &target)
+    {
+        target.transmit = source.transmit;
+        target.callsign = source.callsign;
+        target.grid_square = source.grid_square;
+        target.power_dbm = source.power_dbm;
+        target.frequencies = source.frequencies;
+        target.tx_pin = source.tx_pin;
+        target.ppm = source.ppm;
+        target.use_ntp = source.use_ntp;
+        target.use_offset = source.use_offset;
+        target.power_level = source.power_level;
+        target.use_led = source.use_led;
+        target.led_pin = source.led_pin;
+        target.web_port = source.web_port;
+        target.socket_port = source.socket_port;
+        target.use_shutdown = source.use_shutdown;
+        target.shutdown_pin = source.shutdown_pin;
+        target.date_time_log = source.date_time_log;
+        target.loop_tx = source.loop_tx;
+        target.tx_iterations.store(source.tx_iterations.load());
+        target.test_tone = source.test_tone;
+        target.mode = source.mode;
+        target.use_ini = source.use_ini;
+        target.ini_filename = source.ini_filename;
+        target.center_freq_set = source.center_freq_set;
+        target.ntp_good = source.ntp_good;
+    }
+
+    void ini_to_json_impl(const std::string &filename, nlohmann::json &target)
+    {
+        nlohmann::json patch;
+        const auto ini_data = iniFile.getData();
+
+        for (const auto &section_pair : ini_data)
+        {
+            const std::string &section = section_pair.first;
+            const auto &key_values = section_pair.second;
+
+            for (const auto &kv : key_values)
+            {
+                const std::string &key = kv.first;
+                const std::string trimmed = trim_copy(kv.second);
+
+                if (trimmed.empty())
+                {
+                    continue;
+                }
+
+                patch[section][key] = parse_ini_value(trimmed);
+            }
+        }
+
+        patch["Meta"]["INI Filename"] = filename;
+        patch["Meta"]["Use INI"] = true;
+        target.merge_patch(patch);
+    }
+
+    bool build_candidate_from_ini(
+        const std::string &filename,
+        nlohmann::json &candidate_json,
+        ArgParserConfig &candidate_config,
+        std::string *error_message,
+        std::vector<std::string> *warning_messages)
+    {
+        try
+        {
+            init_config_json_impl(candidate_json);
+
+            std::vector<std::string> local_warnings;
+            bool missing_required_tx_item = false;
+            const auto ini_data = iniFile.getData();
+
+            collect_ini_warnings(
+                candidate_json,
+                ini_data,
+                local_warnings,
+                missing_required_tx_item);
+
+            ini_to_json_impl(filename, candidate_json);
+            json_to_config_impl(candidate_json, candidate_config);
+
+            if (missing_required_tx_item)
+            {
+                if (warning_messages != nullptr)
+                {
+                    *warning_messages = local_warnings;
+                    warning_messages->push_back(
+                        "Transmission disabled until configuration is repaired.");
+                }
+
+                if (error_message != nullptr)
+                {
+                    *error_message = "Missing or empty required configuration items.";
+                }
+
+                return false;
+            }
+
+            std::string validation_error;
+            if (!validate_config_candidate(candidate_config, &validation_error))
+            {
+                if (error_message != nullptr)
+                {
+                    *error_message = validation_error;
+                }
+                return false;
+            }
+
+            if (warning_messages != nullptr)
+            {
+                *warning_messages = local_warnings;
+            }
+
+            config_to_json_impl(candidate_config, candidate_json);
+            return true;
+        }
+        catch (const std::exception &e)
+        {
+            if (error_message != nullptr)
+            {
+                *error_message = e.what();
+            }
+            return false;
+        }
+    }
+} // namespace
+
 void init_config_json()
 {
-    // Meta section: General configuration settings
-    jConfig["Meta"] = {
-        {"Mode", "WSPR"},
-        {"Use INI", false},
-        {"INI Filename", ""},
-        {"Date Time Log", false},
-        {"Loop TX", false},
-        {"TX Iterations", 0},
-        {"Test Tone", 730000.0}};
-    // Initialize "Center Frequency Set" as an empty JSON array
-    jConfig["Meta"]["Center Frequency Set"] = nlohmann::json::array();
-
-    // Common section: Settings related to communication parameters
-    jConfig["Common"] = {
-        {"Call Sign", "NXXX"},
-        {"Frequency", "20m"},
-        {"Grid Square", "ZZ99"},
-        {"TX Power", 20},
-        {"Transmit Pin", 4}};
-
-    // Control section: Enable/disable controls
-    jConfig["Control"] = {
-        {"Transmit", false}};
-
-    // Extended section: Additional configuration options
-    jConfig["Extended"] = {
-        {"LED Pin", 18},
-        {"Offset", true},
-        {"PPM", 0.0},
-        {"Power Level", 7},
-        {"Use LED", false},
-        {"Use NTP", true}};
-
-    // Server section: Settings for server communication
-    jConfig["Server"] = {
-        {"Web Port", 31415},
-        {"Socket Port", 31416},
-        {"Shutdown Button", 19},
-        {"Use Shutdown", false}};
+    init_config_json_impl(jConfig);
 }
 
-/**
- * @brief Patches the global JSON configuration with data from the INI file.
- *
- * @details
- * This function retrieves INI configuration data from the global INI handler object `ini`
- * and converts the data into a JSON object (named `patch`). Each INI section is converted
- * into a JSON object containing key/value pairs. It then adds the filename to the "Meta"
- * section under "INI Filename" and merges the resulting patch into the global JSON
- * configuration object `jConfig` using `merge_patch()`.
- *
- * If any exception is thrown while retrieving the INI data, the function catches the exception
- * and returns without modifying `jConfig`.
- *
- * @param filename The name of the INI file to record in the JSON configuration.
- */
 void ini_to_json(std::string filename)
 {
-    nlohmann::json patch;
-    auto ini_data = iniFile.getData();
+    ini_to_json_impl(filename, jConfig);
+}
 
-    for (const auto &sectionPair : ini_data)
+void json_to_config()
+{
+    json_to_config_impl(jConfig, config);
+}
+
+void config_to_json()
+{
+    config_to_json_impl(config, jConfig);
+}
+
+void json_to_ini()
+{
+    if (!config.use_ini)
     {
-        const std::string &section = sectionPair.first;
-        const auto &keyValues = sectionPair.second;
+        return;
+    }
 
-        for (const auto &kv : keyValues)
+    std::map<std::string, std::unordered_map<std::string, std::string>> new_data;
+
+    for (auto &section : jConfig.items())
+    {
+        const std::string section_name = section.key();
+
+        if (!section.value().is_object())
         {
-            const std::string &key = kv.first;
-            const std::string &raw_value = kv.second;
+            continue;
+        }
 
-            std::string val = raw_value;
-            std::transform(val.begin(), val.end(), val.begin(), ::tolower);
+        for (auto &kv : section.value().items())
+        {
+            std::string out_val;
 
-            if (val == "true" || val == "false")
+            if (kv.value().is_array() || kv.value().is_object())
             {
-                patch[section][key] = (val == "true");
+                out_val = kv.value().dump();
+            }
+            else if (kv.value().is_string())
+            {
+                out_val = kv.value().get<std::string>();
             }
             else
             {
-                char *end = nullptr;
-                long lval = std::strtol(raw_value.c_str(), &end, 10);
-                if (*end == '\0')
-                {
-                    patch[section][key] = lval;
-                    continue;
-                }
-
-                double dval = std::strtod(raw_value.c_str(), &end);
-                if (*end == '\0')
-                {
-                    patch[section][key] = dval;
-                    continue;
-                }
-
-                patch[section][key] = raw_value;
+                out_val = kv.value().dump();
             }
+
+            new_data[section_name][kv.key()] = out_val;
         }
     }
 
-    patch["Meta"]["INI Filename"] = filename;
-    patch["Meta"]["Use INI"] = config.use_ini;
-    jConfig.merge_patch(patch);
+    iniFile.setData(new_data);
+    iniFile.save();
 }
 
-/**
- * @brief Saves the global JSON configuration back to the INI file.
- *
- * @details
- * If the configuration indicates that an INI file is being used (i.e. `config.use_ini`
- * is true), this function first updates the global JSON configuration by calling
- * `config_to_json()`. It then converts the JSON configuration (`jConfig`)
- * into an internal data structure (`newData`) suitable for the INI handler. Each
- * section in the JSON becomes a key in the map, with its value being an unordered map
- * of key/value pairs. If a JSON value is an array, it is converted to a string using
- * the `dump()` method; otherwise, the value is retrieved as a string.
- *
- * Finally, the new data is set into the global INI handler object (`ini`) using
- * `iniFile.setData(newData)` and saved to disk via `iniFile.save()`.
- *
- * @note This function assumes that all JSON values can be represented as strings.
- */
-void json_to_ini()
+bool load_json(
+    std::string filename,
+    std::string *error_message,
+    std::vector<std::string> *warning_messages)
 {
-    if (config.use_ini)
+    nlohmann::json candidate_json;
+    ArgParserConfig candidate_config;
+    std::string local_error_message;
+    std::vector<std::string> local_warning_messages;
+
+    if (!build_candidate_from_ini(
+            filename,
+            candidate_json,
+            candidate_config,
+            &local_error_message,
+            &local_warning_messages))
     {
-        // Convert JSON back to INI data.
-        std::map<std::string, std::unordered_map<std::string, std::string>> newData;
-        for (auto &section : jConfig.items())
+        if (error_message != nullptr)
         {
-            const std::string sectionName = section.key();
-
-            if (section.value().is_object())
-            {
-                for (auto &kv : section.value().items())
-                {
-                    std::string out_val;
-
-                    if (kv.value().is_array() || kv.value().is_object())
-                    {
-                        // Keep full dump for complex types
-                        out_val = kv.value().dump();
-                    }
-                    else if (kv.value().is_string())
-                    {
-                        // Strip quotes from string
-                        out_val = kv.value().get<std::string>();
-                    }
-                    else
-                    {
-                        // Dump everything else without quotes (numbers, bools)
-                        out_val = kv.value().dump();
-                    }
-
-                    newData[sectionName][kv.key()] = out_val;
-                }
-            }
+            *error_message = local_error_message;
         }
 
-        // Set the new data into the INI file object and save the changes.
-        iniFile.setData(newData);
-        iniFile.save();
+        if (warning_messages != nullptr)
+        {
+            *warning_messages = local_warning_messages;
+        }
+
+        return false;
     }
+
+    if (warning_messages != nullptr)
+    {
+        *warning_messages = local_warning_messages;
+    }
+
+    copy_config(candidate_config, config);
+    jConfig = candidate_json;
+    return true;
 }
 
-/**
- * @brief Loads the global JSON configuration by merging default JSON and INI file data.
- *
- * @details
- * This function performs a three-step process:
- *  1. Calls `init_config_json()` to create a base JSON configuration with default values.
- *  2. Calls `patch_ini_data(filename)` to overlay INI file data (from the given filename)
- *     onto the base JSON configuration.
- *  3. Calls `json_to_config()` to parse the updated JSON configuration into the global
- *     configuration structure (of type `ArgParser`).
- *
- * This layered approach allows default settings to be overridden by INI file values.
- *
- * @param filename The path to the INI file whose data will be merged into the JSON configuration.
- */
-void load_json(std::string filename)
-{
-    // Create the base JSON configuration with default values.
-    init_config_json();
-
-    // Merge the INI file configuration into the base JSON.
-    ini_to_json(filename);
-
-    // Parse the updated JSON configuration into the global configuration struct.
-    json_to_config();
-}
-
-/**
- * @brief Prints a formatted JSON object to standard output.
- *
- * @details This function outputs the given JSON object to `std::cout` with
- *          an indent of 4 spaces and ensures key names are sorted.
- *          Useful for debugging or configuration output.
- *
- * @param j The JSON object to dump (will not be modified).
- *
- * @return void
- */
-void dump_json(const nlohmann::json &j, std::string tag = "")
+void dump_json(const nlohmann::json &j, std::string tag)
 {
     llog.logS(DEBUG, tag, "JSON Dump:", j.dump());
 }
 
-/**
- * @brief Applies a full patch update from incoming JSON.
- * @details This function receives a JSON object (typically from the web server),
- *          merges it into the current global JSON configuration (`jConfig`),
- *          updates the INI file and global config structure accordingly, and
- *          rebuilds the cleaned `jConfig` from the sanitized config values.
- *
- *          The flow is:
- *            1. Patch the input into `jConfig`.
- *            2. Update the INI file to reflect patched values.
- *            3. Update the config struct from patched values.
- *            4. Overwrite `jConfig` with sanitized config struct values.
- *            5. Dump final JSON (for debugging).
- *
- * @param j The incoming JSON object to patch into global configuration.
- *
- * @throws May throw exceptions from internal calls (e.g., parsing or write errors).
- */
 void patch_all_from_web(const nlohmann::json &j)
 {
-    jConfig.merge_patch(j); ///< Patch new values into the global JSON config
-    json_to_ini();          ///< Write patched config to INI
-    json_to_config();       ///< Write patched config into global struct
-    config_to_json();       ///< Rebuild jConfig from sanitized struct
-    // Send all WebSocket clients notice that we have a new config
+    nlohmann::json candidate_json = jConfig;
+    candidate_json.merge_patch(j);
+
+    ArgParserConfig candidate_config;
+    std::string error_message;
+
+    try
+    {
+        json_to_config_impl(candidate_json, candidate_config);
+
+        if (!validate_config_candidate(candidate_config, &error_message))
+        {
+            throw std::runtime_error(error_message);
+        }
+
+        config_to_json_impl(candidate_config, candidate_json);
+    }
+    catch (const std::exception &e)
+    {
+        throw std::runtime_error(
+            std::string("Configuration update rejected: ") + e.what());
+    }
+
+    copy_config(candidate_config, config);
+    jConfig = candidate_json;
+    json_to_ini();
     send_ws_message("configuration", "reload");
 }
 
-// Execute INI file repair or restore function
 void repair_from_web(bool attempt_repair)
 {
+    const std::string filename = config.ini_filename;
+
     if (attempt_repair)
     {
         iniFile.repair_from_stock(get_raw_version_string());
+        iniMonitor.stop();
+        iniMonitor.filemon(config.ini_filename, callback_ini_changed);
+        iniMonitor.setPriority(SCHED_RR, 10);
     }
     else
     {
         iniFile.reset_to_stock(get_raw_version_string());
+        iniMonitor.stop();
+        iniMonitor.filemon(config.ini_filename, callback_ini_changed);
+        iniMonitor.setPriority(SCHED_RR, 10);
     }
 
-    // Merge the INI file configuration into the base JSON.
-    ini_to_json(config.ini_filename);
+    std::string load_error;
+    std::vector<std::string> warning_messages;
+    if (!load_json(filename, &load_error, &warning_messages))
+    {
+        for (const auto &warning_message : warning_messages)
+        {
+            llog.logS(WARN, warning_message);
+        }
 
-    // Parse the updated JSON configuration into the global configuration struct.
-    json_to_config();
+        llog.logS(
+            ERROR,
+            "Failed to reload repaired configuration; keeping current config:",
+            load_error);
+        return;
+    }
+
+    for (const auto &warning_message : warning_messages)
+    {
+        llog.logS(WARN, warning_message);
+    }
 
     if (attempt_repair)
     {
@@ -499,5 +738,6 @@ void repair_from_web(bool attempt_repair)
     {
         llog.logS(INFO, "Configuration file restored from stock.");
     }
+
     send_ws_message("configuration", "reload");
 }

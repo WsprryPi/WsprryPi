@@ -431,15 +431,137 @@ void show_config_values(bool reload)
  *
  * @return true if the configuration is valid, false otherwise.
  */
+
+bool validate_config_candidate(
+    ArgParserConfig &candidate,
+    std::string *error_message)
+{
+    const bool frequencies_ok = set_frequencies(candidate);
+
+    if (candidate.mode == ModeType::TONE)
+    {
+        return true;
+    }
+
+    if (candidate.mode != ModeType::WSPR)
+    {
+        if (error_message != nullptr)
+        {
+            *error_message = "Mode must be either WSPR or TONE.";
+        }
+        return false;
+    }
+
+    if (!candidate.transmit)
+    {
+        if (!frequencies_ok)
+        {
+            candidate.center_freq_set.clear();
+        }
+
+        return true;
+    }
+
+    std::string callsign = candidate.callsign;
+    std::string locator = candidate.grid_square;
+
+    const bool missing_call_sign = callsign.empty();
+    const bool missing_grid_square = locator.empty();
+    const bool invalid_tx_power = candidate.power_dbm <= 0;
+    const bool no_frequencies = candidate.center_freq_set.empty();
+
+    if (missing_call_sign || missing_grid_square ||
+        invalid_tx_power || no_frequencies)
+    {
+        std::ostringstream oss;
+        oss << "Missing required parameters.";
+        if (missing_call_sign)
+        {
+            oss << " Missing callsign.";
+        }
+        if (missing_grid_square)
+        {
+            oss << " Missing grid square.";
+        }
+        if (invalid_tx_power)
+        {
+            oss << " TX power must be greater than 0 dBm.";
+        }
+        if (no_frequencies)
+        {
+            oss << " At least one frequency must be specified.";
+        }
+
+        if (error_message != nullptr)
+        {
+            *error_message = oss.str();
+        }
+        return false;
+    }
+
+    if (!is_valid_callsign(callsign))
+    {
+        if (error_message != nullptr)
+        {
+            *error_message = "Invalid callsign.";
+        }
+        return false;
+    }
+
+    if (!validate_and_truncate_locator(locator))
+    {
+        if (error_message != nullptr)
+        {
+            *error_message = "Invalid grid square.";
+        }
+        return false;
+    }
+
+    candidate.callsign = callsign;
+    candidate.grid_square = locator;
+    candidate.power_dbm = round_to_nearest_wspr_power(candidate.power_dbm);
+
+    return true;
+}
+
 bool validate_config_data()
 {
-    // Clear pending config flags
     ini_reload_pending.store(false, std::memory_order_relaxed);
 
-    // Parse frequency string data
-    set_frequencies();
+    std::string validation_error;
+    if (!validate_config_candidate(config, &validation_error))
+    {
+        llog.logE(FATAL, "Missing required parameters.");
 
-    // Determine NTP functionality
+        if (config.callsign.empty())
+        {
+            llog.logE(ERROR, " - Missing callsign.");
+        }
+        if (config.grid_square.empty())
+        {
+            llog.logE(ERROR, " - Missing grid square.");
+        }
+        if (config.power_dbm <= 0)
+        {
+            llog.logE(ERROR, " - TX power must be greater than 0 dBm.");
+        }
+        if (config.center_freq_set.empty())
+        {
+            llog.logE(ERROR, " - At least one frequency must be specified.");
+        }
+
+        if (config.use_ini)
+        {
+            llog.logE(ERROR, "Please check the INI file for missing or invalid values.");
+            return false;
+        }
+
+        llog.logE(ERROR, "Please check your configuration for missing or invalid values.");
+        llog.logE(ERROR, "Try: wsprrypi --help");
+        std::cerr << std::endl;
+        std::exit(EXIT_FAILURE);
+    }
+
     if (!config.use_ntp && config.ppm != 0.0)
     {
         llog.logS(INFO, "PPM value to be used for tone generation: ",
@@ -451,7 +573,6 @@ bool validate_config_data()
         llog.logE(WARN, "NTP disabled and PPM not set.");
     }
 
-    // Enable LED only if set and the pin is valid
     if (config.use_led && (config.led_pin >= 0 && config.led_pin <= 27))
     {
         ledControl.enableGPIOPin(config.led_pin, true);
@@ -462,10 +583,13 @@ bool validate_config_data()
         ledControl.stop();
     }
 
-    // Enable shutdown button only if it's desired and the pin is valid
     if (config.use_shutdown && (config.shutdown_pin >= 0 && config.shutdown_pin <= 27))
     {
-        shutdownMonitor.enable(config.shutdown_pin, false, GPIOInput::PullMode::PullUp, callback_shutdown_system);
+        shutdownMonitor.enable(
+            config.shutdown_pin,
+            false,
+            GPIOInput::PullMode::PullUp,
+            callback_shutdown_system);
         shutdownMonitor.setPriority(SCHED_RR, 10);
     }
     else
@@ -474,105 +598,26 @@ bool validate_config_data()
         shutdownMonitor.stop();
     }
 
-    // Handle test tone mode (TONE mode does not require callsign, grid, etc.)
     if (config.mode == ModeType::TONE)
     {
-        // Log test tone frequency
-        llog.logS(INFO, "A test tone will be generated at:",
-                  lookup.freq_display_string(config.test_tone));
+        llog.logS(
+            INFO,
+            "A test tone will be generated at:",
+            lookup.freq_display_string(config.test_tone));
     }
     else if (config.mode == ModeType::WSPR)
     {
-        // Extract and validate required parameters
-        bool missing_call_sign = [&]() -> bool
-        {
-            try
-            {
-                return config.callsign.empty();
-            }
-            catch (const std::exception &)
-            {
-                return true; // Assume missing if an error occurs
-            }
-        }();
-
-        bool missing_grid_square = [&]() -> bool
-        {
-            try
-            {
-                return config.grid_square.empty();
-            }
-            catch (const std::exception &)
-            {
-                return true; // Assume missing if an error occurs
-            }
-        }();
-
-        bool invalid_tx_power = [&]() -> bool
-        {
-            try
-            {
-                return config.power_dbm <= 0;
-            }
-            catch (const std::exception &)
-            {
-                return true; // Assume invalid if an error occurs
-            }
-        }();
-
-        bool no_frequencies = config.center_freq_set.empty();
-
-        // If any required parameter is missing, log error and exit
-        if (missing_call_sign || missing_grid_square || invalid_tx_power || no_frequencies)
-        {
-            llog.logE(FATAL, "Missing required parameters.");
-
-            if (missing_call_sign)
-            {
-                llog.logE(ERROR, " - Missing callsign.");
-            }
-            if (missing_grid_square)
-            {
-                llog.logE(ERROR, " - Missing grid square.");
-            }
-            if (invalid_tx_power)
-            {
-                llog.logE(ERROR, " - TX power must be greater than 0 dBm.");
-            }
-            if (no_frequencies)
-            {
-                llog.logE(ERROR, " - At least one frequency must be specified.");
-            }
-
-            if (config.use_ini)
-            {
-                llog.logE(ERROR, "Please check your configuration for missing or invalid values.");
-                return true;
-            }
-            else
-            {
-                llog.logE(ERROR, "Please check the INI file for missing or invalid values.");
-                llog.logE(ERROR, "Try: wsprrypi --help");
-                std::cerr << std::endl;
-                std::exit(EXIT_FAILURE);
-            }
-        }
-
         if (config.transmit)
         {
-            // Log WSPR packet details
             llog.logS(INFO, "WSPR packet payload:");
             llog.logS(INFO, "- Callsign:", config.callsign);
             llog.logS(INFO, "- Locator:", config.grid_square);
             llog.logS(INFO, "- Power:", config.power_dbm, " dBm");
 
-            // total number of entries (including any 0.0 ones)
             if (config.center_freq_set.size() > 1)
             {
-                // Print frequency list
                 llog.logS(INFO, "Requested TX frequencies:");
 
-                // Concatenate frequency messages for logging
                 for (const auto &freq : config.center_freq_set)
                 {
                     if (freq == 0.0)
@@ -587,23 +632,27 @@ bool validate_config_data()
             }
             else
             {
-                // Print single frequency
-                llog.logS(INFO, "Requested TX frequency:", lookup.freq_display_string(config.center_freq_set[0]));
+                llog.logS(
+                    INFO,
+                    "Requested TX frequency:",
+                    lookup.freq_display_string(config.center_freq_set[0]));
             }
 
-            // Handle frequency offset
             if (config.use_offset)
             {
-                llog.logS(INFO, "A random offset will be added to all transmissions.");
+                llog.logS(
+                    INFO,
+                    "A random offset will be added to all transmissions.");
             }
         }
 
-        // Set termination count (defaults to 1 if unset) if not in loop_tx and use_ini mode
         if (!config.use_ini)
         {
             if (config.loop_tx)
             {
-                llog.logS(INFO, "Transmissions will continue until it receives a signal to stop.");
+                llog.logS(
+                    INFO,
+                    "Transmissions will continue until it receives a signal to stop.");
             }
             else
             {
@@ -612,7 +661,11 @@ bool validate_config_data()
                     config.tx_iterations.store(1);
                     config.transmit = true;
                 }
-                llog.logS(INFO, "TX will stop after:", config.tx_iterations.load(), "iteration(s) of the frequency list.");
+                llog.logS(
+                    INFO,
+                    "TX will stop after:",
+                    config.tx_iterations.load(),
+                    "iteration(s) of the frequency list.");
             }
         }
     }
@@ -628,88 +681,60 @@ bool validate_config_data()
 /**
  * @brief Parse and validate the configured frequency list.
  *
- * Reads the whitespace-separated tokens from `config.frequencies`, converts
- * each to a double (in Hz) using `lookup.parse_string_to_frequency()`,
- * and appends valid entries to `config.center_freq_set` in the same order.
- * Invalid tokens are logged and skipped. If no valid frequencies remain,
- * transmission is disabled (`config.transmit = false`) and the function
- * returns `false`.
- *
- * @return `true` if at least one valid frequency was parsed and stored;
- *         `false` otherwise.
+ * @param target The configuration object to parse into.
+ * @return `true` if at least one valid frequency was parsed or retained.
  */
-bool set_frequencies()
+bool set_frequencies(ArgParserConfig &target)
 {
-    // Safely read the raw frequency string (accessor may throw).
     std::string raw_list;
     try
     {
-        raw_list = config.frequencies;
+        raw_list = target.frequencies;
     }
     catch (const std::exception &e)
     {
         llog.logE(WARN, "Failed to read frequency list:", e.what());
         raw_list.clear();
     }
-    llog.logS(DEBUG, "Parsing raw:", raw_list);
 
-    // Tokenize on whitespace.
     std::istringstream iss(raw_list);
-
-    // Clear any existing frequencies.
-    config.center_freq_set.clear();
+    std::vector<double> parsed_frequencies;
 
     std::string token;
     while (iss >> token)
     {
         try
         {
-            // Parse each token to a double (Hz) and validate against known bands.
-            double freq = lookup.parse_string_to_frequency(token, /*validate=*/true);
-            llog.logS(DEBUG, "Pushing back:", freq);
-            config.center_freq_set.push_back(freq);
+            double freq = lookup.parse_string_to_frequency(token, false);
+            parsed_frequencies.push_back(freq);
         }
-        catch (const std::invalid_argument &e)
+        catch (const std::invalid_argument &)
         {
-            // Log and skip invalid entries.
             llog.logE(WARN, "Ignoring invalid frequency token:", token);
         }
     }
 
-    // Ensure we have at least one valid frequency.
-    if (config.center_freq_set.empty() && config.mode == ModeType::WSPR)
+    if (!parsed_frequencies.empty())
     {
-        llog.logE(ERROR, "Empty or invalid frequency list; disabling transmission.");
-        config.transmit = false;
-        return false;
+        target.center_freq_set = parsed_frequencies;
+        return true;
     }
-    llog.logS(DEBUG, "Frequency count:", config.center_freq_set.size());
 
-    return true;
+    if (target.mode != ModeType::WSPR || !target.transmit)
+    {
+        return true;
+    }
+
+    llog.logE(ERROR, "Empty or invalid frequency list; keeping previous frequencies.");
+    target.transmit = false;
+    return false;
 }
 
-/**
- * @brief Loads configuration values from an INI file.
- *
- * This function attempts to load settings from an INI file using the global `ini` object
- * and populates the global `config` structure with values retrieved from it.
- *
- * If `config.use_ini` is false or if the INI file fails to load, the function immediately
- * returns false. Otherwise, it attempts to read values from various INI sections:
- *
- * - **[Control]**: Transmit flag.
- * - **[Common]**: Callsign, Grid Square, TX Power, Frequency, Transmit Pin.
- * - **[Extended]**: PPM, Use NTP, Offset, Power Level, Use LED, LED Pin.
- * - **[Server]**: Web Port, Socket Port, Use Shutdown, Shutdown Button.
- *
- * Each key is read inside a `try` block to allow partial loading—if a key is missing or
- * causes an exception, it is silently skipped, and loading continues.
- *
- * After successful loading, the global `jConfig` JSON object is updated to reflect the
- * contents of the `config` structure.
- *
- * @return true if the INI file was used and loaded successfully, false otherwise.
- */
+bool set_frequencies()
+{
+    return set_frequencies(config);
+}
+
 bool load_from_ini()
 {
     // Attempt to load INI file if enabled
@@ -903,10 +928,51 @@ bool parse_command_line(int argc, char *argv[])
             config.ini_filename = *(it + 1);
             config.use_ini = true;
             config.loop_tx = true;
-            // Create original JSON and Config struct, overlay INI contents
-            iniFile.set_filename(config.ini_filename);
-            ini_to_json(config.ini_filename);
-            json_to_config();
+            // Stage, validate, and commit the INI contents.
+            std::string load_error;
+            std::vector<std::string> warning_messages;
+
+            try
+            {
+                iniFile.set_filename(config.ini_filename);
+
+                if (!load_json(config.ini_filename, &load_error, &warning_messages))
+                {
+                    for (const auto &warning_message : warning_messages)
+                    {
+                        llog.logS(WARN, warning_message);
+                    }
+
+                    llog.logS(ERROR, "Configuration load failed:", load_error);
+                    llog.logS(WARN, "Using safe default configuration. Transmission disabled.");
+
+                    init_default_config();
+                    config.ini_filename = *(it + 1);
+                    config.use_ini = true;
+                    config.loop_tx = true;
+                    config.transmit = false;
+                    config_to_json();
+                }
+                else
+                {
+                    for (const auto &warning_message : warning_messages)
+                    {
+                        llog.logS(WARN, warning_message);
+                    }
+                }
+            }
+            catch (const std::exception &e)
+            {
+                llog.logS(ERROR, "Configuration load failed:", e.what());
+                llog.logS(WARN, "Using safe default configuration. Transmission disabled.");
+
+                init_default_config();
+                config.ini_filename = *(it + 1);
+                config.use_ini = true;
+                config.loop_tx = true;
+                config.transmit = false;
+                config_to_json();
+            }
 
             // Remove "-i <file>" from args
             args.erase(it, it + 2);

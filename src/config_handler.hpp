@@ -112,7 +112,7 @@ struct ArgParserConfig
     bool use_ini;                        ///< Load configuration from INI file.
     std::string ini_filename;            ///< INI file name and path.
     std::vector<double> center_freq_set; ///< Parsed list of center frequencies in Hz.
-    bool ntp_good;                       ///< A more ualitative measurement of NTP vs simply running
+    bool ntp_good;                       ///< A more qualitative measurement of NTP vs simply running
 
     /**
      * @brief Default constructor initializing all configuration parameters.
@@ -154,6 +154,8 @@ struct ArgParserConfig
  * typically loaded from an INI file or a JSON configuration.
  */
 extern ArgParserConfig config;
+
+void init_default_config();
 
 /**
  * @brief Initializes the global configuration JSON object.
@@ -281,7 +283,10 @@ extern void json_to_ini();
  *
  * @param filename The path to the INI file whose data will be merged into the JSON configuration.
  */
-extern void load_json(std::string filename);
+extern bool load_json(
+    std::string filename,
+    std::string *error_message = nullptr,
+    std::vector<std::string> *warning_messages = nullptr);
 
 /**
  * @brief Prints a formatted JSON object to standard output.

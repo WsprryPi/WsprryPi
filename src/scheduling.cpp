@@ -31,6 +31,7 @@
 
 // Project headers
 #include "arg_parser.hpp"
+#include "band_gpio_selector.hpp"
 #include "config_handler.hpp"
 #include "gpio_input.hpp"
 #include "gpio_output.hpp"
@@ -62,6 +63,15 @@
 #include <linux/reboot.h> // for LINUX_REBOOT_CMD_* constants
 #include <sys/resource.h>
 #include <unistd.h>
+
+/**
+ * @brief Selects and controls the GPIO assigned to the active amateur band.
+ *
+ * This object is used by the transmission callback path to assert the
+ * correct GPIO when transmission begins and to release it when the
+ * transmission completes, is skipped, or is cancelled.
+ */
+static BandGPIOSelector bandGPIOSelector;
 
 /**
  * @brief Mutex to protect access to the shutdown flag for the WSPR loop.
@@ -219,6 +229,9 @@ void transmitter_cb(WsprTransmitter::TransmissionCallbackEvent event,
     {
         const double frequency = value;
 
+        // Assert the precomputed band GPIO.
+        bandGPIOSelector.setBandState(true);
+
         // Turn on LED.
         ledControl.toggleGPIO(true);
 
@@ -304,6 +317,10 @@ void transmitter_cb(WsprTransmitter::TransmissionCallbackEvent event,
                       "Completed transmission.");
         }
 
+        // Deassert and release the prepared band GPIO.
+        bandGPIOSelector.setBandState(false);
+        bandGPIOSelector.stop();
+
         // Turn off LED.
         ledControl.toggleGPIO(false);
 
@@ -319,6 +336,10 @@ void transmitter_cb(WsprTransmitter::TransmissionCallbackEvent event,
 
     case WsprTransmitter::TransmissionCallbackEvent::SKIPPED:
     {
+        // Deassert and release the prepared band GPIO.
+        bandGPIOSelector.setBandState(false);
+        bandGPIOSelector.stop();
+
         // Turn off LED in case the UI/state expects an idle indication.
         ledControl.toggleGPIO(false);
 
@@ -572,6 +593,15 @@ void start_test_tone()
         wsprTransmitter.configure(freq,
                                   config.power_level,
                                   config.ppm);
+
+        if (!bandGPIOSelector.prepareFrequency(freq))
+        {
+            llog.logS(WARN,
+                      "Unable to prepare band GPIO for test tone at ",
+                      lookup.freq_display_string(freq),
+                      ".");
+        }
+
         wsprTransmitter.startAsync();
         llog.logS(INFO, "Test tone being transmitted at:", lookup.freq_display_string(freq));
         send_ws_message("transmit", "starting");
@@ -593,6 +623,8 @@ void end_test_tone()
 
         // Stop current tone
         wsprTransmitter.stopAndJoin();
+        bandGPIOSelector.setBandState(false);
+        bandGPIOSelector.stop();
         send_ws_message("transmit", "finished");
         ledControl.toggleGPIO(false);
 
@@ -605,7 +637,11 @@ void end_test_tone()
         if (config.mode == ModeType::WSPR)
         {
             // Re-initialize WSPR with next frequency, PPM, etc.
-            set_config(/*advance_freq=*/true);
+            if (!validate_config_data())
+            {
+                llog.logE(ERROR, "Initial configuration validation failed.");
+                return;
+            }
         }
         else
         {
@@ -638,8 +674,28 @@ void end_test_tone()
  */
 bool wspr_loop()
 {
+    // TODO: Feature toggles while I work on configuration items
+    bandGPIOSelector.setEnabled(true);    // (true) - Allows logic to run and show debug messages; set false to disable all band GPIO logic and messages
+    bandGPIOSelector.setDriveGPIO(false); // (false) - Shows DEBUG messages vs performing actions
+    // TODO^
+
     // Display the final configuration after parsing arguments and INI file.
-    show_config_values(); 
+    show_config_values();
+
+    if (config.mode == ModeType::WSPR)
+    {
+        if (!validate_config_data())
+        {
+            llog.logE(ERROR, "Initial configuration validation failed.");
+            llog.logE(WARN, "Continuing in safe mode with transmissions disabled.");
+            config.transmit = false;
+            config_to_json();
+        }
+    }
+    else
+    {
+        validate_config_data();
+    }
 
     // Start web server and set priority
     if (config.web_port >= 1024 && config.web_port <= 49151)
@@ -689,15 +745,8 @@ bool wspr_loop()
     // Set pending config flags and do initial config
     ini_reload_pending.store(true, std::memory_order_relaxed);
 
-    if (config.mode == ModeType::WSPR)
+    if (config.mode == ModeType::TONE)
     {
-        // Set up WSPR transmissions
-        set_config(true); // Handles get next (or only) frequency, PPM, and setup
-    }
-    else
-    {
-        // Setup test tone
-        validate_config_data();
         wsprTransmitter.configure(config.test_tone, config.power_level, config.ppm);
         wsprTransmitter.startAsync();
         llog.logS(INFO, "transmitting tone, hit Ctrl-C to terminate tone.");
@@ -718,12 +767,14 @@ bool wspr_loop()
     // Shutdown and cleanup
     // -------------------------------------------------------------------------
     wsprTransmitter.stopAndJoin(); // Stop the transmitter threads
-    shutdownMonitor.stop();        // Stop the GPIO monitor
-    ledControl.stop();             // Stop LED driver
-    iniMonitor.stop();             // Stop config file monitor
-    ppmManager.stop();             // Stop PPM manager (if active)
-    webServer.stop();              // Stop web server
-    socketServer.stop();           // Stop the socket server
+    bandGPIOSelector.setBandState(false);
+    bandGPIOSelector.stop();
+    shutdownMonitor.stop(); // Stop the GPIO monitor
+    ledControl.stop();      // Stop LED driver
+    iniMonitor.stop();      // Stop config file monitor
+    ppmManager.stop();      // Stop PPM manager (if active)
+    webServer.stop();       // Stop web server
+    socketServer.stop();    // Stop the socket server
 
     if (reboot_flag.load())
     {
@@ -905,10 +956,33 @@ void set_config(bool force)
     if (force)
     {
         do_config = true;
-        freq_iterator = 0;       // Reset iterator
-        current_frequency = 0.0; // Zero out freq
-        ini_to_json(config.ini_filename);
-        json_to_config();
+        freq_iterator = 0;
+        current_frequency = 0.0;
+
+        if (config.use_ini)
+        {
+            std::string load_error;
+            std::vector<std::string> warning_messages;
+            if (!load_json(config.ini_filename, &load_error, &warning_messages))
+            {
+                for (const auto &warning_message : warning_messages)
+                {
+                    llog.logS(WARN, warning_message);
+                }
+
+                llog.logS(ERROR,
+                          "Configuration reload failed; keeping current config:",
+                          load_error);
+                config_to_json();
+                json_to_ini();
+                return;
+            }
+
+            for (const auto &warning_message : warning_messages)
+            {
+                llog.logS(WARN, warning_message);
+            }
+        }
     }
 
     // Store the PPM flag we had coming in
@@ -918,17 +992,39 @@ void set_config(bool force)
     if (ini_reload_pending.load())
     {
         do_config = true;
-        // Validate configuration and ensure all required settings are present.
+
+        if (config.use_ini)
+        {
+            std::string load_error;
+            std::vector<std::string> warning_messages;
+            if (!load_json(config.ini_filename, &load_error, &warning_messages))
+            {
+                for (const auto &warning_message : warning_messages)
+                {
+                    llog.logS(WARN, warning_message);
+                }
+
+                llog.logS(ERROR,
+                          "Configuration reload failed; keeping current config:",
+                          load_error);
+                config_to_json();
+                json_to_ini();
+                ini_reload_pending.store(false, std::memory_order_relaxed);
+                send_ws_message("configuration", "reload_failed");
+                return;
+            }
+
+            for (const auto &warning_message : warning_messages)
+            {
+                llog.logS(WARN, warning_message);
+            }
+        }
+
         if (!validate_config_data())
         {
             llog.logE(ERROR, "Configuration validation failed.");
-            // Let wspr_loop know to break out
-            {
-                std::lock_guard<std::mutex> lk(exitwspr_mtx);
-                exitwspr_ready = true;
-            }
-            exitwspr_cv.notify_one();
-            return;
+            config.transmit = false;
+            config_to_json();
         }
     }
 
@@ -989,6 +1085,14 @@ void set_config(bool force)
             config.grid_square,
             config.power_dbm,
             config.use_offset);
+
+        if (!bandGPIOSelector.prepareFrequency(current_frequency))
+        {
+            llog.logS(WARN,
+                      "Unable to prepare band GPIO for ",
+                      wsprTransmitter.formatFrequencyMHz(current_frequency),
+                      " MHz.");
+        }
     }
 
     // Enable/disable transmit if/as needed

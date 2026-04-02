@@ -152,6 +152,7 @@ bool GPIOInput::enable(int pin,
     }
     catch (const std::exception& e)
     {
+        // TODO: This tries to reinit on settings save
         llog.logE(ERROR, "GPIOInput: init error.", e.what());
         status_ = Status::Error;
         running_ = false;
