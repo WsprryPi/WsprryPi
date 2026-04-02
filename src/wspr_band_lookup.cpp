@@ -65,8 +65,9 @@ namespace
         double frequency_hz;
     };
 
-    // TODO: These are actual RF / center frequencies, not the dial frequencies people expect
-    // TODO: Implement WSPR_CENTER_80M vs WSPR_DIAL_80M
+    // TODO: Actual/dial frequency alignment
+    // These are actual RF / center frequencies, not the dial frequencies people expect
+    // Implement WSPR_CENTER_80M vs WSPR_DIAL_80M
     constexpr double FREQ_2200M = 137500.0;
     constexpr double FREQ_2200M_15 = 137612.5;
     constexpr double FREQ_630M = 475700.0;
