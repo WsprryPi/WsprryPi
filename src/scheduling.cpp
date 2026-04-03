@@ -218,6 +218,34 @@ constexpr LogLevel to_log_level(WsprTransmitter::LogLevel level)
     return LogLevel::INFO; // Safe fallback
 }
 
+bool request_wspr_shutdown(std::string_view reason)
+{
+    const bool already_requested =
+        exiting_wspr.exchange(true, std::memory_order_seq_cst);
+
+    if (!reason.empty())
+    {
+        if (already_requested)
+        {
+            llog.logS(INFO,
+                      "Shutdown already in progress; duplicate request:",
+                      reason);
+        }
+        else
+        {
+            llog.logS(INFO, "Shutdown requested:", reason);
+        }
+    }
+
+    {
+        std::lock_guard<std::mutex> lk(exitwspr_mtx);
+        exitwspr_ready = true;
+    }
+    exitwspr_cv.notify_one();
+
+    return !already_requested;
+}
+
 void transmitter_cb(WsprTransmitter::TransmissionCallbackEvent event,
                     WsprTransmitter::LogLevel level,
                     const std::string &msg,
@@ -480,7 +508,9 @@ void callback_shutdown_system()
  */
 void shutdown_system()
 {
-    exiting_wspr.store(true, std::memory_order_seq_cst);
+    shutdown_flag.store(true, std::memory_order_relaxed);
+    request_wspr_shutdown("system power-off requested");
+
     if (config.use_led)
     {
         // Flash LED three times if configured
@@ -496,15 +526,6 @@ void shutdown_system()
             }
         }
     }
-
-    // Let wspr_loop know to break out
-    {
-        std::lock_guard<std::mutex> lk(exitwspr_mtx);
-        exitwspr_ready = true;
-    }
-    exitwspr_cv.notify_one();
-    // Set shutdown flag
-    shutdown_flag.store(true, std::memory_order_relaxed);
 }
 
 /**
@@ -526,7 +547,9 @@ void shutdown_system()
  */
 void reboot_system()
 {
-    exiting_wspr.store(true, std::memory_order_seq_cst);
+    reboot_flag.store(true, std::memory_order_relaxed);
+    request_wspr_shutdown("system reboot requested");
+
     if (config.use_led)
     {
         // Flash LED two times if configured
@@ -542,15 +565,6 @@ void reboot_system()
             }
         }
     }
-
-    // Let wspr_loop know to break out
-    {
-        std::lock_guard<std::mutex> lk(exitwspr_mtx);
-        exitwspr_ready = true;
-    }
-    exitwspr_cv.notify_one();
-    // Set reboot flag
-    reboot_flag.store(true, std::memory_order_relaxed);
 }
 
 /**
@@ -754,29 +768,57 @@ bool wspr_loop()
                          { return exitwspr_ready; });
     }
 
-    llog.logS(DEBUG, "WSPR Loop terminating.");
+    llog.logS(INFO, "WSPR loop termination started.");
 
     // -------------------------------------------------------------------------
     // Shutdown and cleanup
     // -------------------------------------------------------------------------
+    llog.logS(INFO, "Stopping runtime components.");
+
+    llog.logS(INFO, "Stopping transmitter.");
     wsprTransmitter.stopAndJoin(); // Stop the transmitter threads
+    llog.logS(INFO, "Transmitter stopped.");
+
+    llog.logS(INFO, "Stopping band GPIO selector.");
     bandGPIOSelector.setBandState(false);
     bandGPIOSelector.stop();
+    llog.logS(INFO, "Band GPIO selector stopped.");
+
+    llog.logS(INFO, "Stopping shutdown monitor.");
     shutdownMonitor.stop(); // Stop the GPIO monitor
-    ledControl.stop();      // Stop LED driver
-    iniMonitor.stop();      // Stop config file monitor
-    ppmManager.stop();      // Stop PPM manager (if active)
-    webServer.stop();       // Stop web server
-    socketServer.stop();    // Stop the socket server
+    llog.logS(INFO, "Shutdown monitor stopped.");
+
+    llog.logS(INFO, "Stopping LED driver.");
+    ledControl.stop(); // Stop LED driver
+    llog.logS(INFO, "LED driver stopped.");
+
+    llog.logS(INFO, "Stopping configuration monitor.");
+    iniMonitor.stop(); // Stop config file monitor
+    llog.logS(INFO, "Configuration monitor stopped.");
+
+    llog.logS(INFO, "Stopping PPM manager.");
+    ppmManager.stop(); // Stop PPM manager (if active)
+    llog.logS(INFO, "PPM manager stopped.");
+
+    llog.logS(INFO, "Stopping web server.");
+    webServer.stop(); // Stop web server
+
+    llog.logS(INFO, "Stopping socket server.");
+    socketServer.stop(); // Stop the socket server
+    llog.logS(INFO, "Socket server stopped.");
+
+    llog.logS(INFO, "Runtime components stopped.");
 
     if (reboot_flag.load())
     {
         llog.logS(INFO, "Rebooting.");
+        std::cerr << "[INFO ] Rebooting." << std::endl;
         reboot_machine();
     }
     if (shutdown_flag.load())
     {
         llog.logS(INFO, "Shutting down.");
+        std::cerr << "[INFO ] Shutting down." << std::endl;
         shutdown_machine();
     }
 
@@ -897,13 +939,7 @@ double next_frequency(bool reset)
             if (remaining <= 0)
             {
                 llog.logS(INFO, "Completed last of TX iterations, signalling shutdown.");
-
-                // Tell wspr_loop to break out:
-                {
-                    std::lock_guard<std::mutex> lk(exitwspr_mtx);
-                    exitwspr_ready = true;
-                }
-                exitwspr_cv.notify_one();
+                request_wspr_shutdown("completed configured TX iterations");
             }
             else
             {

@@ -72,20 +72,13 @@ SignalHandler signalHandler;
  */
 void callback_signal_handler(int signum, bool is_critical)
 {
-    std::string_view signal_name = SignalHandler::signalToString(signum);
     if (!is_critical)
     {
-        exiting_wspr.store(true, std::memory_order_relaxed);
-        llog.logS(DEBUG, "Intercepted signal, shutdown will proceed:", signal_name);
-        {
-            exiting_wspr.store(true, std::memory_order_seq_cst);
-            std::lock_guard<std::mutex> lk(exitwspr_mtx);
-            exitwspr_ready = true;
-        }
-        exitwspr_cv.notify_one();
+        request_wspr_shutdown({});
     }
     else
     {
+        std::string_view signal_name = SignalHandler::signalToString(signum);
         std::cerr << "[FATAL] Critical signal received: " << signal_name << ". Performing immediate shutdown." << std::endl;
         std::quick_exit(signum);
     }
@@ -171,6 +164,10 @@ int main(int argc, char *argv[])
         std::string error_message = "Exception caught processing arguments: " + std::string(e.what());
         print_usage(error_message, EXIT_FAILURE);
     }
+
+    // Re-assert the handled signal mask on the main runtime thread before
+    // entering the long-lived scheduling loop.
+    block_signals();
 
     // Startup WSPR loop
     try
