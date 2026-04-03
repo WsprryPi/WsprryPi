@@ -165,6 +165,10 @@ int main(int argc, char *argv[])
         print_usage(error_message, EXIT_FAILURE);
     }
 
+    // Re-assert the handled signal mask on the main runtime thread before
+    // entering the long-lived scheduling loop.
+    block_signals();
+
     // Startup WSPR loop
     try
     {
@@ -186,8 +190,6 @@ int main(int argc, char *argv[])
 
     // Stop the SignalHandler.
     signalHandler.stop();
-
-    std::cerr << "[INFO ] " << get_project_name() << " main returning with status " << retval << "." << std::endl;
 
     return retval;
 }

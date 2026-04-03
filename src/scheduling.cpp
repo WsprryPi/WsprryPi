@@ -774,7 +774,6 @@ bool wspr_loop()
     // Shutdown and cleanup
     // -------------------------------------------------------------------------
     llog.logS(INFO, "Stopping runtime components.");
-    std::cerr << "[INFO ] Shutdown teardown started." << std::endl;
 
     llog.logS(INFO, "Stopping transmitter.");
     wsprTransmitter.stopAndJoin(); // Stop the transmitter threads
@@ -803,7 +802,6 @@ bool wspr_loop()
 
     llog.logS(INFO, "Stopping web server.");
     webServer.stop(); // Stop web server
-    llog.logS(INFO, "Web server stopped.");
 
     llog.logS(INFO, "Stopping socket server.");
     socketServer.stop(); // Stop the socket server
@@ -825,7 +823,6 @@ bool wspr_loop()
     }
 
     llog.logS(INFO, get_project_name(), "exiting.");
-    std::cerr << "[INFO ] " << get_project_name() << " exiting." << std::endl;
     // Flush all file system buffers to disk
     sync();
 
