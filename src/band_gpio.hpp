@@ -36,6 +36,8 @@
 #ifndef BAND_GPIO_HPP
 #define BAND_GPIO_HPP
 
+constexpr int HAM_BAND_COUNT = 16;
+
 /**
  * @brief Supported amateur radio bands for GPIO band selection.
  */
@@ -58,6 +60,11 @@ enum class HamBand
     BAND_4M,
     BAND_2M
 };
+
+constexpr int ham_band_index(HamBand band)
+{
+    return static_cast<int>(band);
+}
 
 /**
  * @brief GPIO configuration for a specific amateur radio band.

@@ -29,9 +29,11 @@
 #ifndef _CONFIG_HANDLER_HPP
 #define _CONFIG_HANDLER_HPP
 
+#include "band_gpio.hpp"
 #include "ini_file.hpp"
 #include "json.hpp"
 
+#include <array>
 #include <atomic>
 #include <string>
 #include <vector>
@@ -113,6 +115,7 @@ struct ArgParserConfig
     std::string ini_filename;            ///< INI file name and path.
     std::vector<double> center_freq_set; ///< Parsed list of center frequencies in Hz.
     bool ntp_good;                       ///< A more qualitative measurement of NTP vs simply running
+    std::array<BandGPIOConfig, HAM_BAND_COUNT> band_gpio; ///< Per-band GPIO assignment.
 
     /**
      * @brief Default constructor initializing all configuration parameters.
@@ -142,7 +145,8 @@ struct ArgParserConfig
           use_ini(false),
           ini_filename(""),
           center_freq_set({}),
-          ntp_good(false)
+          ntp_good(false),
+          band_gpio({})
     {
     }
 };

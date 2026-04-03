@@ -139,11 +139,20 @@ void WebServer::start(int port)
             setCORSHeaders(res);
             res.set_content("Ok", "text/plain");
         }
-        catch (nlohmann::json::parse_error &e)
+        catch (const nlohmann::json::parse_error &e)
         {
             llog.logE(WARN, "Error parsing JSON:", std::string(e.what()));
+            setCORSHeaders(res);
             res.status = 400;
             nlohmann::json err = {{"error", "invalid_json"}, {"message", e.what()}};
+            res.set_content(err.dump(4), "application/json");
+        }
+        catch (const std::exception &e)
+        {
+            llog.logE(WARN, "Configuration update rejected:", std::string(e.what()));
+            setCORSHeaders(res);
+            res.status = 400;
+            nlohmann::json err = {{"error", "invalid_config"}, {"message", e.what()}};
             res.set_content(err.dump(4), "application/json");
         }
     };
