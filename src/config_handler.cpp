@@ -253,6 +253,7 @@ void init_default_config()
     config.ppm = 0.0;
     config.use_ntp = true;
     config.use_offset = true;
+    config.wspr_audio_offset_hz = 1500.0;
     config.use_led = false;
     config.led_pin = 18;
     config.power_level = 7;
@@ -271,7 +272,7 @@ void init_default_config()
 
 namespace
 {
-    std::vector<double> parse_center_frequency_set(const nlohmann::json &value)
+    std::vector<double> parse_wspr_dial_frequency_set(const nlohmann::json &value)
     {
         if (value.is_array())
         {
@@ -294,7 +295,7 @@ namespace
                 if (!parsed.is_array())
                 {
                     throw std::runtime_error(
-                        "Center Frequency Set string did not parse to an array");
+                        "WSPR dial frequency set string did not parse to an array");
                 }
 
                 return parsed.get<std::vector<double>>();
@@ -302,12 +303,12 @@ namespace
             catch (const std::exception &e)
             {
                 throw std::runtime_error(
-                    std::string("Invalid Meta.Center Frequency Set: ") + e.what());
+                    std::string("Invalid Meta WSPR dial frequency set: ") + e.what());
             }
         }
 
         throw std::runtime_error(
-            "Meta.Center Frequency Set must be an array or JSON array string");
+            "Meta.WSPR Dial Frequency Set must be an array or JSON array string");
     }
 
     nlohmann::json parse_ini_value(const std::string &raw_value)
@@ -488,7 +489,7 @@ namespace
             {"Loop TX", false},
             {"TX Iterations", 0},
             {"Test Tone", 730000.0}};
-        target["Meta"]["Center Frequency Set"] = nlohmann::json::array();
+        target["Meta"]["WSPR Dial Frequency Set"] = nlohmann::json::array();
 
         target["Common"] = {
             {"Call Sign", "NXXX"},
@@ -506,7 +507,8 @@ namespace
             {"PPM", 0.0},
             {"Power Level", 7},
             {"Use LED", false},
-            {"Use NTP", true}};
+            {"Use NTP", true},
+            {"WSPR Audio Offset Hz", 1500.0}};
 
         target["Server"] = {
             {"Web Port", 31415},
@@ -551,7 +553,24 @@ namespace
         target.loop_tx = source.at("Meta").at("Loop TX").get<bool>();
         target.tx_iterations.store(source.at("Meta").at("TX Iterations").get<int>());
         target.test_tone = source.at("Meta").at("Test Tone").get<double>();
-        target.center_freq_set = parse_center_frequency_set(source.at("Meta").at("Center Frequency Set"));
+        const auto &meta = source.at("Meta");
+        if (meta.contains("WSPR Dial Frequency Set") &&
+            !meta.at("WSPR Dial Frequency Set").empty())
+        {
+            target.wspr_dial_freq_set =
+                parse_wspr_dial_frequency_set(meta.at("WSPR Dial Frequency Set"));
+        }
+        else if (
+            meta.contains("Center Frequency Set") &&
+            !meta.at("Center Frequency Set").empty())
+        {
+            target.wspr_dial_freq_set =
+                parse_wspr_dial_frequency_set(meta.at("Center Frequency Set"));
+        }
+        else
+        {
+            target.wspr_dial_freq_set.clear();
+        }
 
         target.transmit = source.at("Control").at("Transmit").get<bool>();
 
@@ -564,6 +583,15 @@ namespace
         target.ppm = source.at("Extended").at("PPM").get<double>();
         target.use_ntp = source.at("Extended").at("Use NTP").get<bool>();
         target.use_offset = source.at("Extended").at("Offset").get<bool>();
+        if (source.at("Extended").contains("WSPR Audio Offset Hz"))
+        {
+            target.wspr_audio_offset_hz =
+                source.at("Extended").at("WSPR Audio Offset Hz").get<double>();
+        }
+        else
+        {
+            target.wspr_audio_offset_hz = 1500.0;
+        }
         target.use_led = source.at("Extended").at("Use LED").get<bool>();
         target.led_pin = source.at("Extended").at("LED Pin").get<int>();
         target.power_level = source.at("Extended").at("Power Level").get<int>();
@@ -621,7 +649,8 @@ namespace
         target["Meta"]["Loop TX"] = source.loop_tx;
         target["Meta"]["TX Iterations"] = source.tx_iterations.load();
         target["Meta"]["Test Tone"] = source.test_tone;
-        target["Meta"]["Center Frequency Set"] = source.center_freq_set;
+        target["Meta"]["WSPR Dial Frequency Set"] = source.wspr_dial_freq_set;
+        target["Meta"]["Center Frequency Set"] = source.wspr_dial_freq_set;
 
         target["Control"]["Transmit"] = source.transmit;
 
@@ -634,6 +663,7 @@ namespace
         target["Extended"]["PPM"] = source.ppm;
         target["Extended"]["Use NTP"] = source.use_ntp;
         target["Extended"]["Offset"] = source.use_offset;
+        target["Extended"]["WSPR Audio Offset Hz"] = source.wspr_audio_offset_hz;
         target["Extended"]["Use LED"] = source.use_led;
         target["Extended"]["LED Pin"] = source.led_pin;
         target["Extended"]["Power Level"] = source.power_level;
@@ -674,10 +704,11 @@ namespace
         target.loop_tx = source.loop_tx;
         target.tx_iterations.store(source.tx_iterations.load());
         target.test_tone = source.test_tone;
+        target.wspr_audio_offset_hz = source.wspr_audio_offset_hz;
         target.mode = source.mode;
         target.use_ini = source.use_ini;
         target.ini_filename = source.ini_filename;
-        target.center_freq_set = source.center_freq_set;
+        target.wspr_dial_freq_set = source.wspr_dial_freq_set;
         target.ntp_good = source.ntp_good;
         target.band_gpio = source.band_gpio;
     }

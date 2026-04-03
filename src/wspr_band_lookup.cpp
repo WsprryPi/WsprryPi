@@ -3,7 +3,7 @@
  * @brief Implements WSPR frequency lookup and band correlation.
  *
  * This file centralizes amateur band edge buckets used for feature
- * correlation, such as LPF GPIO selection, and default WSPR frequencies used
+ * correlation, such as LPF GPIO selection, and default WSPR dial frequencies used
  * when a user selects a band name or alias. Band edge definitions in this file
  * are intended for feature correlation and convenience, not legal enforcement.
  *
@@ -36,6 +36,7 @@
 #include <algorithm>
 #include <array>
 #include <cctype>
+#include <cmath>
 #include <iomanip>
 #include <regex>
 #include <sstream>
@@ -65,28 +66,38 @@ namespace
         double frequency_hz;
     };
 
-    // TODO: Actual/dial frequency alignment
-    // These are actual RF / center frequencies, not the dial frequencies people expect
-    // Implement WSPR_CENTER_80M vs WSPR_DIAL_80M
-    constexpr double FREQ_2200M = 137500.0;
-    constexpr double FREQ_2200M_15 = 137612.5;
-    constexpr double FREQ_630M = 475700.0;
-    constexpr double FREQ_630M_15 = 475812.5;
-    constexpr double FREQ_160M = 1838100.0;
-    constexpr double FREQ_160M_15 = 1838212.5;
-    constexpr double FREQ_80M = 3570100.0;
-    constexpr double FREQ_60M = 5288700.0;
-    constexpr double FREQ_40M = 7040100.0;
-    constexpr double FREQ_30M = 10140200.0;
-    constexpr double FREQ_22M = 13553000.0;
-    constexpr double FREQ_20M = 14097100.0;
-    constexpr double FREQ_17M = 18106100.0;
-    constexpr double FREQ_15M = 21096100.0;
-    constexpr double FREQ_12M = 24926100.0;
-    constexpr double FREQ_10M = 28126100.0;
-    constexpr double FREQ_6M = 50294500.0;
-    constexpr double FREQ_4M = 70092500.0;
-    constexpr double FREQ_2M = 144490500.0;
+    struct LegacyActualWSPRAliasDefinition
+    {
+        const char *alias;
+        double actual_frequency_hz;
+    };
+
+    // Built-in WSPR aliases are user-facing USB dial frequencies.
+    // The scheduler converts dial frequency to actual RF exactly once before
+    // configuring the RF-only transmitter/backend layer.
+    //
+    // TODO: Numeric configs may already contain actual RF values from older
+    // versions or user workarounds. This patch does not auto-detect or migrate
+    // those entries.
+    constexpr double FREQ_2200M = 136000.0;
+    constexpr double FREQ_2200M_15 = 136112.5;
+    constexpr double FREQ_630M = 474200.0;
+    constexpr double FREQ_630M_15 = 474312.5;
+    constexpr double FREQ_160M = 1836600.0;
+    constexpr double FREQ_160M_15 = 1836712.5;
+    constexpr double FREQ_80M = 3568600.0;
+    constexpr double FREQ_60M = 5287200.0;
+    constexpr double FREQ_40M = 7038600.0;
+    constexpr double FREQ_30M = 10138700.0;
+    constexpr double FREQ_22M = 13551500.0;
+    constexpr double FREQ_20M = 14095600.0;
+    constexpr double FREQ_17M = 18104600.0;
+    constexpr double FREQ_15M = 21094600.0;
+    constexpr double FREQ_12M = 24924600.0;
+    constexpr double FREQ_10M = 28124600.0;
+    constexpr double FREQ_6M = 50293000.0;
+    constexpr double FREQ_4M = 70091000.0;
+    constexpr double FREQ_2M = 144489000.0;
 
     constexpr std::array<BandDefinition, 16> BAND_DEFINITIONS = {{
         {"2200M", HamBand::BAND_2200M, 135700LL, 137800LL, FREQ_2200M},
@@ -145,6 +156,32 @@ namespace
         {"6m", FREQ_6M},
         {"4m", FREQ_4M},
         {"2m", FREQ_2M},
+    }};
+
+    constexpr std::array<LegacyActualWSPRAliasDefinition, 23> LEGACY_ACTUAL_WSPR_ALIASES = {{
+        {"lf", 137500.0},
+        {"2200m", 137500.0},
+        {"lf-15", 137612.5},
+        {"2200m-15", 137612.5},
+        {"mf", 475700.0},
+        {"630m", 475700.0},
+        {"mf-15", 475812.5},
+        {"630m-15", 475812.5},
+        {"160m", 1838100.0},
+        {"160m-15", 1838212.5},
+        {"80m", 3570100.0},
+        {"60m", 5288700.0},
+        {"40m", 7040100.0},
+        {"30m", 10140200.0},
+        {"22m", 13553000.0},
+        {"20m", 14097100.0},
+        {"17m", 18106100.0},
+        {"15m", 21096100.0},
+        {"12m", 24926100.0},
+        {"10m", 28126100.0},
+        {"6m", 50294500.0},
+        {"4m", 70092500.0},
+        {"2m", 144490500.0},
     }};
 }
 
@@ -410,6 +447,20 @@ double WSPRBandLookup::parse_string_to_frequency(
     }
 
     throw std::invalid_argument("Invalid frequency format: " + input_str);
+}
+
+std::optional<std::string> WSPRBandLookup::legacy_actual_wspr_alias_for_frequency(
+    double frequency) const
+{
+    for (const auto &alias : LEGACY_ACTUAL_WSPR_ALIASES)
+    {
+        if (std::fabs(alias.actual_frequency_hz - frequency) <= 0.5)
+        {
+            return std::string(alias.alias);
+        }
+    }
+
+    return std::nullopt;
 }
 
 void WSPRBandLookup::print_wspr_frequencies() const

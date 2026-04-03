@@ -106,6 +106,7 @@ VER := $(shell if ! git describe --tags --exact-match >/dev/null 2>&1; then echo
 
 OUT := $(strip $(EXE_NAME))
 TEST_OUT := $(strip $(EXE_NAME)_debug)
+SEMANTICS_TEST_OUT := dial_frequency_semantics_test
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Output directories
@@ -128,6 +129,10 @@ REL_CPP_SOURCES := $(patsubst ../../%,%,$(CPP_SOURCES))
 
 CPP_OBJECTS       := $(patsubst %.cpp, $(OBJ_DIR_RELEASE)/%.o,$(REL_CPP_SOURCES))
 CPP_DEBUG_OBJECTS := $(patsubst %.cpp, $(OBJ_DIR_DEBUG)/%.o,$(REL_CPP_SOURCES))
+MAIN_DEBUG_OBJECT := $(OBJ_DIR_DEBUG)/./main.o
+SEMANTICS_TEST_SRC := tests/dial_frequency_semantics_test.cpp
+SEMANTICS_TEST_OBJ := $(OBJ_DIR_DEBUG)/tests/dial_frequency_semantics_test.o
+SEMANTICS_TEST_DEPS := $(filter-out $(MAIN_DEBUG_OBJECT),$(CPP_DEBUG_OBJECTS))
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Dependency includes
@@ -303,6 +308,17 @@ $(BIN_DIR)/$(TEST_OUT): $(CPP_DEBUG_OBJECTS)
 	$(Q)echo "Linking debug: $(TEST_OUT) (libgpiod major: $(GPIOD_API_MAJOR))"
 	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) $^ -o $@ $(LDFLAGS)
 
+$(SEMANTICS_TEST_OBJ): $(SEMANTICS_TEST_SRC)
+	$(Q)mkdir -p $(dir $@)
+	$(Q)mkdir -p $(DEP_DIR)/tests
+	$(Q)echo "Compiling (debug) $< into $@"
+	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -MF $(DEP_DIR)/tests/dial_frequency_semantics_test.d -c $< -o $@
+
+$(BIN_DIR)/$(SEMANTICS_TEST_OUT): $(SEMANTICS_TEST_OBJ) $(SEMANTICS_TEST_DEPS)
+	$(Q)mkdir -p $(BIN_DIR)
+	$(Q)echo "Linking debug: $(SEMANTICS_TEST_OUT)"
+	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) $^ -o $@ $(LDFLAGS)
+
 # ─────────────────────────────────────────────────────────────────────────────
 # Compile rules (release)
 # ─────────────────────────────────────────────────────────────────────────────
@@ -332,7 +348,7 @@ $(BIN_DIR)/$(OUT): $(CPP_OBJECTS)
 # Phony targets
 # ─────────────────────────────────────────────────────────────────────────────
 
-.PHONY: clean release debug test test-tone test-oneshot gdb install debuginstall uninstall lint macros help
+.PHONY: clean release debug test test-tone test-oneshot semantics-test gdb install debuginstall uninstall lint macros help
 DEBUG: debug
 RELEASE: release
 
@@ -358,6 +374,10 @@ test-tone: debug
 test-oneshot: debug
 	$(Q)echo "Running test oneshot with sudo privileges."
 	$(Q)$(SUDO) ./$(BIN_DIR)/$(TEST_OUT) -D -x 1 $(WSPR_PARAMS)
+
+semantics-test: $(BIN_DIR)/$(SEMANTICS_TEST_OUT)
+	$(Q)echo "Running dial/actual frequency semantics tests."
+	$(Q)./$(BIN_DIR)/$(SEMANTICS_TEST_OUT)
 
 gdb: debug
 	$(Q)echo "Running debug session."

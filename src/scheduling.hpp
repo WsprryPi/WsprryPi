@@ -240,9 +240,9 @@ void shutdown_machine();
 void send_ws_message(std::string type, std::string state);
 
 /**
- * @brief Retrieve the next center frequency, cycling through the configured list.
+ * @brief Retrieve the next configured WSPR dial frequency, cycling through the list.
  *
- * This method returns the next frequency from `config.center_freq_set` in a
+ * This method returns the next frequency from `config.wspr_dial_freq_set` in a
  * round-robin fashion.  It uses `freq_iterator_` modulo the list size to
  * index into the vector, then increments `freq_iterator_` for the subsequent call.
  *
