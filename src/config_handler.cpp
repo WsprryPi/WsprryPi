@@ -825,6 +825,15 @@ void json_to_ini()
             continue;
         }
 
+        if (section_name != "Control" &&
+            section_name != "Common" &&
+            section_name != "Extended" &&
+            section_name != "Server" &&
+            section_name != "Band GPIO")
+        {
+            continue;
+        }
+
         if (section_name == "Band GPIO")
         {
             for (const auto &[band, band_name] : kHamBandJsonKeys)
