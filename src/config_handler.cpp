@@ -49,6 +49,25 @@ nlohmann::json jConfig;
 
 namespace
 {
+    const std::array<std::pair<HamBand, const char *>, HAM_BAND_COUNT> kHamBandJsonKeys = {{
+        {HamBand::BAND_2200M, "2200m"},
+        {HamBand::BAND_630M, "630m"},
+        {HamBand::BAND_160M, "160m"},
+        {HamBand::BAND_80M, "80m"},
+        {HamBand::BAND_60M, "60m"},
+        {HamBand::BAND_40M, "40m"},
+        {HamBand::BAND_30M, "30m"},
+        {HamBand::BAND_22M, "22m"},
+        {HamBand::BAND_20M, "20m"},
+        {HamBand::BAND_17M, "17m"},
+        {HamBand::BAND_15M, "15m"},
+        {HamBand::BAND_12M, "12m"},
+        {HamBand::BAND_10M, "10m"},
+        {HamBand::BAND_6M, "6m"},
+        {HamBand::BAND_4M, "4m"},
+        {HamBand::BAND_2M, "2m"},
+    }};
+
     std::string trim_copy(const std::string &value)
     {
         const std::string whitespace = " \t\r\n";
@@ -61,6 +80,35 @@ namespace
 
         const std::size_t last = value.find_last_not_of(whitespace);
         return value.substr(first, last - first + 1);
+    }
+
+    BandGPIOConfig make_band_gpio_config(int gpio, bool enabled, bool active_high = false)
+    {
+        BandGPIOConfig config;
+        config.gpio = gpio;
+        config.enabled = enabled;
+        config.active_high = active_high;
+        return config;
+    }
+
+    void set_default_band_gpio_config(std::array<BandGPIOConfig, HAM_BAND_COUNT> &band_gpio)
+    {
+        band_gpio[ham_band_index(HamBand::BAND_2200M)] = make_band_gpio_config(17, true);
+        band_gpio[ham_band_index(HamBand::BAND_630M)] = make_band_gpio_config(27, true);
+        band_gpio[ham_band_index(HamBand::BAND_160M)] = make_band_gpio_config(22, true);
+        band_gpio[ham_band_index(HamBand::BAND_80M)] = make_band_gpio_config(23, true);
+        band_gpio[ham_band_index(HamBand::BAND_60M)] = make_band_gpio_config(24, true);
+        band_gpio[ham_band_index(HamBand::BAND_40M)] = make_band_gpio_config(25, true);
+        band_gpio[ham_band_index(HamBand::BAND_30M)] = make_band_gpio_config(5, true);
+        band_gpio[ham_band_index(HamBand::BAND_22M)] = make_band_gpio_config(6, true);
+        band_gpio[ham_band_index(HamBand::BAND_20M)] = make_band_gpio_config(12, true);
+        band_gpio[ham_band_index(HamBand::BAND_17M)] = make_band_gpio_config(13, true);
+        band_gpio[ham_band_index(HamBand::BAND_15M)] = make_band_gpio_config(16, true);
+        band_gpio[ham_band_index(HamBand::BAND_12M)] = make_band_gpio_config(26, true);
+        band_gpio[ham_band_index(HamBand::BAND_10M)] = make_band_gpio_config(20, true);
+        band_gpio[ham_band_index(HamBand::BAND_6M)] = make_band_gpio_config(21, true);
+        band_gpio[ham_band_index(HamBand::BAND_4M)] = make_band_gpio_config(-1, false);
+        band_gpio[ham_band_index(HamBand::BAND_2M)] = make_band_gpio_config(-1, false);
     }
 
 } // namespace
@@ -93,6 +141,8 @@ void init_default_config()
 
     // Meta
     config.use_ini = true;
+
+    set_default_band_gpio_config(config.band_gpio);
 }
 
 namespace
@@ -339,10 +389,24 @@ namespace
             {"Socket Port", 31416},
             {"Shutdown Button", 19},
             {"Use Shutdown", false}};
+
+        target["Band GPIO"] = nlohmann::json::object();
+        std::array<BandGPIOConfig, HAM_BAND_COUNT> default_band_gpio{};
+        set_default_band_gpio_config(default_band_gpio);
+        for (const auto &[band, band_name] : kHamBandJsonKeys)
+        {
+            const BandGPIOConfig &band_config = default_band_gpio[ham_band_index(band)];
+            target["Band GPIO"][band_name] = {
+                {"GPIO", band_config.gpio},
+                {"Enabled", band_config.enabled},
+                {"Active High", band_config.active_high}};
+        }
     }
 
     void json_to_config_impl(const nlohmann::json &source, ArgParserConfig &target)
     {
+        set_default_band_gpio_config(target.band_gpio);
+
         const std::string mode_str = source.at("Meta").at("Mode").get<std::string>();
         if (mode_str == "WSPR")
         {
@@ -384,6 +448,39 @@ namespace
         target.socket_port = source.at("Server").at("Socket Port").get<int>();
         target.use_shutdown = source.at("Server").at("Use Shutdown").get<bool>();
         target.shutdown_pin = source.at("Server").at("Shutdown Button").get<int>();
+
+        // Missing Band GPIO data is allowed; seeded defaults stay in place.
+        const auto band_gpio_section_it = source.find("Band GPIO");
+        if (band_gpio_section_it == source.end() || !band_gpio_section_it->is_object())
+        {
+            return;
+        }
+
+        for (const auto &[band, band_name] : kHamBandJsonKeys)
+        {
+            const auto band_config_it = band_gpio_section_it->find(band_name);
+            if (band_config_it == band_gpio_section_it->end() || !band_config_it->is_object())
+            {
+                continue;
+            }
+
+            BandGPIOConfig &band_config = target.band_gpio[ham_band_index(band)];
+
+            if (band_config_it->contains("GPIO"))
+            {
+                band_config.gpio = band_config_it->at("GPIO").get<int>();
+            }
+
+            if (band_config_it->contains("Enabled"))
+            {
+                band_config.enabled = band_config_it->at("Enabled").get<bool>();
+            }
+
+            if (band_config_it->contains("Active High"))
+            {
+                band_config.active_high = band_config_it->at("Active High").get<bool>();
+            }
+        }
     }
 
     void config_to_json_impl(const ArgParserConfig &source, nlohmann::json &target)
@@ -421,6 +518,14 @@ namespace
         target["Server"]["Socket Port"] = source.socket_port;
         target["Server"]["Use Shutdown"] = source.use_shutdown;
         target["Server"]["Shutdown Button"] = source.shutdown_pin;
+
+        for (const auto &[band, band_name] : kHamBandJsonKeys)
+        {
+            const BandGPIOConfig &band_config = source.band_gpio[ham_band_index(band)];
+            target["Band GPIO"][band_name]["GPIO"] = band_config.gpio;
+            target["Band GPIO"][band_name]["Enabled"] = band_config.enabled;
+            target["Band GPIO"][band_name]["Active High"] = band_config.active_high;
+        }
     }
 
     void copy_config(const ArgParserConfig &source, ArgParserConfig &target)
@@ -450,6 +555,7 @@ namespace
         target.ini_filename = source.ini_filename;
         target.center_freq_set = source.center_freq_set;
         target.ntp_good = source.ntp_good;
+        target.band_gpio = source.band_gpio;
     }
 
     void ini_to_json_impl(const std::string &filename, nlohmann::json &target)
