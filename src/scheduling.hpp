@@ -37,6 +37,7 @@
 #include <atomic>
 #include <condition_variable>
 #include <string>
+#include <string_view>
 #include <thread>
 
 /**
@@ -119,6 +120,20 @@ extern void callback_shutdown_system();
  * supports it.
  */
 void shutdown_system();
+
+/**
+ * @brief Request a coordinated WSPR loop shutdown and emit an early log.
+ *
+ * This helper is safe to call from normal thread context, including the
+ * dedicated signal-wait thread. It records that shutdown is in progress,
+ * emits an INFO-level reason, and wakes the main loop so cleanup starts
+ * before later teardown steps can suppress logs.
+ *
+ * @param reason Human-readable source of the shutdown request.
+ * @return true if this call initiated shutdown, false if shutdown was
+ *         already in progress.
+ */
+bool request_wspr_shutdown(std::string_view reason);
 
 /**
  * @brief Perform a system reboot sequence.
