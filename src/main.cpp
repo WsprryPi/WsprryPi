@@ -147,9 +147,18 @@ int main(int argc, char *argv[])
         print_usage(error_message, EXIT_FAILURE);
     }
 
+    initialize_logger(config.use_journald, config.date_time_log);
+
     // Display version, Raspberry Pi model, and process ID after CLI parsing so
     // the first backend banner matches the requested logging mode.
     llog.logS(INFO, get_version_string());
+
+    if (!config.use_journald)
+    {
+        llog.logS(INFO,
+                  "Log timestamps:",
+                  config.date_time_log ? "enabled" : "disabled");
+    }
 
     llog.logS(
         INFO,

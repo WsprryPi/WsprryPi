@@ -1007,6 +1007,7 @@ bool parse_command_line(int argc, char *argv[])
         {"use-ntp", no_argument, nullptr, 'n'},       // Via: [Extended] Use NTP = True
         {"repeat", no_argument, nullptr, 'r'},        // Global: config.loop_tx
         {"offset", no_argument, nullptr, 'o'},        // Via: [Extended] Offset = True
+        {"journald", no_argument, nullptr, 'J'},      // Global: config.use_journald
         {"date-time-log", no_argument, nullptr, 'D'}, // Global: config.date_time_log
         // Required arguments
         {"ppm", required_argument, nullptr, 'p'},       // Via: [Extended] PPM = 0.0
@@ -1023,7 +1024,7 @@ bool parse_command_line(int argc, char *argv[])
     while (true)
     {
         int option_index = 0;
-        int c = getopt_long(argc, argv, "h?vnroDp:x:t:a:l:s:d:w:k:", long_options, &option_index);
+        int c = getopt_long(argc, argv, "h?vnroJDp:x:t:a:l:s:d:w:k:", long_options, &option_index);
 
         if (c == -1)
             break;
@@ -1056,10 +1057,14 @@ bool parse_command_line(int argc, char *argv[])
             config.use_offset = true;
             break;
         }
-        case 'D': // Use journald logging backend
+        case 'J': // Use journald logging backend
+        {
+            config.use_journald = true;
+            break;
+        }
+        case 'D': // Add date/time stamps to stream logging
         {
             config.date_time_log = true;
-            initialize_logger(true);
             break;
         }
         // Required arguments

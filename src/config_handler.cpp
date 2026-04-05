@@ -600,6 +600,7 @@ namespace
         target.socket_port = source.at("Server").at("Socket Port").get<int>();
         target.use_shutdown = source.at("Server").at("Use Shutdown").get<bool>();
         target.shutdown_pin = source.at("Server").at("Shutdown Button").get<int>();
+        target.use_journald = false;
 
         // Missing Band GPIO data is allowed; seeded defaults stay in place.
         const auto band_gpio_section_it = source.find("Band GPIO");
@@ -700,6 +701,7 @@ namespace
         target.socket_port = source.socket_port;
         target.use_shutdown = source.use_shutdown;
         target.shutdown_pin = source.shutdown_pin;
+        target.use_journald = source.use_journald;
         target.date_time_log = source.date_time_log;
         target.loop_tx = source.loop_tx;
         target.tx_iterations.store(source.tx_iterations.load());

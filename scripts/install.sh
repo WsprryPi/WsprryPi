@@ -6084,7 +6084,7 @@ upgrade_ini() {
 # @return Returns 0 on success, or 1 if any operation fails.
 #
 # @example
-#   manage_service "/usr/bin/mydaemon" "/usr/local/bin/mydaemon -D" "false" "debug"
+#   manage_service "/usr/bin/mydaemon" "/usr/local/bin/mydaemon -J" "false" "debug"
 # -----------------------------------------------------------------------------
 # shellcheck disable=SC2317
 # shellcheck disable=SC2329
@@ -6828,7 +6828,7 @@ manage_wsprry_pi() {
         "compile_binary \"$WSPR_EXE\""
         "manage_exe \"$WSPR_EXE\""
         "manage_config \"$WSPR_INI\" \"/usr/local/etc/\""
-        "manage_service \"/usr/bin/$WSPR_EXE\" \"/usr/local/bin/$WSPR_EXE -D -i /usr/local/etc/$WSPR_INI\" \"false\""
+        "manage_service \"/usr/bin/$WSPR_EXE\" \"/usr/local/bin/$WSPR_EXE -J -i /usr/local/etc/$WSPR_INI\" \"false\""
         "manage_config \"$LOG_ROTATE\" \"/etc/logrotate.d\""
         "manage_web"
         "manage_apache"

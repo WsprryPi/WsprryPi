@@ -28,6 +28,7 @@
 
 #include "logging.hpp"
 
+#include "config_handler.hpp"
 #include "lcblog.hpp"
 #include "version.hpp"
 
@@ -45,7 +46,7 @@
  * initialize_logger();
  * // Sets llog to DEBUG or INFO depending on the build mode.
  */
-void initialize_logger(bool use_journald)
+void initialize_logger(bool use_journald, bool enable_timestamps)
 {
     // Determine the log level based on the build mode.
     const std::string debug_state = get_debug_state();
@@ -60,9 +61,24 @@ void initialize_logger(bool use_journald)
         llog.setLogLevel(INFO); // Default to informational logging.
     }
 
-    // Journald is an explicit opt-in backend. Default CLI runs stay on
-    // stdout/stderr unless the caller requests journald explicitly.
+    if (use_journald)
+    {
+        enable_timestamps = false;
+    }
+
+    config.use_journald = use_journald;
+    config.date_time_log = enable_timestamps;
+
+    // Defensive guard against future regressions that try to combine
+    // journald with timestamp prefixes.
+    if (config.use_journald && config.date_time_log)
+    {
+        config.date_time_log = false;
+    }
+
     llog.enableJournald(use_journald);
+    llog.enableTimestamps(config.date_time_log);
+
     if (use_journald)
     {
         llog.setJournaldIdentifier(get_exe_name());

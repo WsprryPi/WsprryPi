@@ -104,6 +104,7 @@ struct ArgParserConfig
     int shutdown_pin;  ///< GPIO pin used to signal shutdown.
 
     // Command line only
+    bool use_journald;              ///< Route logs to journald instead of streams.
     bool date_time_log;             ///< Prefix logs with timestamp.
     bool loop_tx;                   ///< Repeat transmission cycle.
     std::atomic<int> tx_iterations; ///< Number of transmission iterations (0 = infinite).
@@ -138,6 +139,7 @@ struct ArgParserConfig
           socket_port(-1),
           use_shutdown(false),
           shutdown_pin(-1),
+          use_journald(false),
           date_time_log(false),
           loop_tx(false),
           tx_iterations(0),
