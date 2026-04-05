@@ -45,7 +45,7 @@
  * initialize_logger();
  * // Sets llog to DEBUG or INFO depending on the build mode.
  */
-void initialize_logger()
+void initialize_logger(bool use_journald)
 {
     // Determine the log level based on the build mode.
     const std::string debug_state = get_debug_state();
@@ -60,7 +60,11 @@ void initialize_logger()
         llog.setLogLevel(INFO); // Default to informational logging.
     }
 
-    // Set up journald logging
-    llog.enableJournald(true);
-    llog.setJournaldIdentifier(get_exe_name());
+    // Journald is an explicit opt-in backend. Default CLI runs stay on
+    // stdout/stderr unless the caller requests journald explicitly.
+    llog.enableJournald(use_journald);
+    if (use_journald)
+    {
+        llog.setJournaldIdentifier(get_exe_name());
+    }
 }

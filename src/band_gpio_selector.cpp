@@ -43,7 +43,7 @@ bool BandGPIOSelector::prepareBand(HamBand band)
 {
     if (!enabled_)
     {
-        return false;
+        return true;
     }
 
     const BandGPIOConfig &config = gpio_config_for_band(band);

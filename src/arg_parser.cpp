@@ -1056,10 +1056,10 @@ bool parse_command_line(int argc, char *argv[])
             config.use_offset = true;
             break;
         }
-        case 'D': // Add date/time stamps to logging
+        case 'D': // Use journald logging backend
         {
             config.date_time_log = true;
-            llog.enableTimestamps(config.date_time_log);
+            initialize_logger(true);
             break;
         }
         // Required arguments

@@ -177,6 +177,31 @@ ModeType lastMode;
  */
 std::atomic<bool> web_test_tone{false};
 
+void consume_tx_iteration_if_needed()
+{
+    if (config.use_ini || config.loop_tx)
+    {
+        return;
+    }
+
+    if (config.tx_iterations.load(std::memory_order_acquire) <= 0)
+    {
+        return;
+    }
+
+    int remaining = --config.tx_iterations;
+
+    if (remaining <= 0)
+    {
+        llog.logS(INFO, "Completed last of TX iterations, signalling shutdown.");
+        request_wspr_shutdown("completed configured TX iterations");
+    }
+    else
+    {
+        llog.logS(INFO, "WSPR transmissions remaining:", remaining);
+    }
+}
+
 static std::string to_lower_copy(const std::string &s)
 {
     std::string out = s;
@@ -220,7 +245,6 @@ constexpr LogLevel to_log_level(WsprTransmitter::LogLevel level)
 
     return LogLevel::INFO; // Safe fallback
 }
-
 
 static bool configure_current_wspr_transmission(
     double actual_rf_frequency_hz)
@@ -298,6 +322,11 @@ void transmitter_cb(WsprTransmitter::TransmissionCallbackEvent event,
     case WsprTransmitter::TransmissionCallbackEvent::STARTING:
     {
         const double frequency = value;
+
+        if (config.mode == ModeType::WSPR)
+        {
+            consume_tx_iteration_if_needed();
+        }
 
         // Assert the precomputed band GPIO.
         bandGPIOSelector.setBandState(true);
@@ -661,8 +690,8 @@ void start_test_tone()
             config.wspr_audio_offset_hz,
             " Hz.");
         wsprTransmitter.configureTone(actual_rf_freq,
-                                  config.power_level,
-                                  config.ppm);
+                                      config.power_level,
+                                      config.ppm);
 
         if (!bandGPIOSelector.prepareFrequency(dial_freq))
         {
@@ -750,9 +779,18 @@ void end_test_tone()
  */
 bool wspr_loop()
 {
-    // TODO: Feature toggles while I work on configuration items
-    bandGPIOSelector.setEnabled(true);    // (true) - Allows logic to run and show debug messages; set false to disable all band GPIO logic and messages
-    bandGPIOSelector.setDriveGPIO(false); // (false) - Shows DEBUG messages vs performing actions
+    bool any_band_gpio_enabled = false;
+    for (int i = 0; i < HAM_BAND_COUNT; ++i)
+    {
+        if (config.band_gpio[i].enabled && config.band_gpio[i].gpio >= 0)
+        {
+            any_band_gpio_enabled = true;
+            break;
+        }
+    }
+
+    bandGPIOSelector.setEnabled(any_band_gpio_enabled);
+    bandGPIOSelector.setDriveGPIO(any_band_gpio_enabled);
 
     // Display the final configuration after parsing arguments and INI file.
     show_config_values();
@@ -995,27 +1033,6 @@ double next_frequency(bool reset)
     // Compute index in [0, freqs.size())
     const size_t idx = freq_iterator % freqs.size();
 
-    // True whenever we’ve wrapped back around to the “first” slot
-    if (idx == 0 && !reset)
-    {
-        // Check if we are doing transmission iterations
-        if (!config.use_ini && !config.loop_tx)
-        {
-            // Atomically decrement and grab the new value:
-            int remaining = --config.tx_iterations;
-
-            if (remaining <= 0)
-            {
-                llog.logS(INFO, "Completed last of TX iterations, signalling shutdown.");
-                request_wspr_shutdown("completed configured TX iterations");
-            }
-            else
-            {
-                llog.logS(INFO, "WSPR transmissions remaining:", remaining);
-            }
-        }
-    }
-
     // Fetch frequency
     double freq = freqs[idx];
 
@@ -1202,6 +1219,9 @@ void set_config(bool force)
                       "Unable to prepare band GPIO for ",
                       wsprTransmitter.formatFrequencyMHz(current_dial_frequency),
                       " MHz.");
+            config.transmit = false;
+            config_to_json();
+            return;
         }
     }
 

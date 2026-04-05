@@ -132,7 +132,23 @@ int main(int argc, char *argv[])
         std::exit(EXIT_FAILURE);
     }
 
-    // Display version, Raspberry Pi model, and process ID for context.
+    // Now do the full arguments check
+    try
+    {
+        if (!parse_command_line(argc, argv))
+        {
+            print_usage("Failure parsing command line.", EXIT_FAILURE);
+        }
+    }
+    catch (const std::exception &e)
+    {
+        // Handle any exceptions thrown during command-line parsing.
+        std::string error_message = "Exception caught processing arguments: " + std::string(e.what());
+        print_usage(error_message, EXIT_FAILURE);
+    }
+
+    // Display version, Raspberry Pi model, and process ID after CLI parsing so
+    // the first backend banner matches the requested logging mode.
     llog.logS(INFO, get_version_string());
 
     llog.logS(
@@ -149,21 +165,6 @@ int main(int argc, char *argv[])
         ".");
 
     llog.logS(INFO, "Process PID:", getpid());
-
-    // Now do the full arguments check
-    try
-    {
-        if (!parse_command_line(argc, argv))
-        {
-            print_usage("Failure parsing command line.", EXIT_FAILURE);
-        }
-    }
-    catch (const std::exception &e)
-    {
-        // Handle any exceptions thrown during command-line parsing.
-        std::string error_message = "Exception caught processing arguments: " + std::string(e.what());
-        print_usage(error_message, EXIT_FAILURE);
-    }
 
     // Re-assert the handled signal mask on the main runtime thread before
     // entering the long-lived scheduling loop.

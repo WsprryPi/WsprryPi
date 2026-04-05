@@ -45,6 +45,6 @@
  * initialize_logger();
  * // Sets llog to DEBUG or INFO depending on the build mode.
  */
-extern void initialize_logger();
+extern void initialize_logger(bool use_journald = false);
 
 #endif // _LOGGING_HPP
