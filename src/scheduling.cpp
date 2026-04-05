@@ -176,6 +176,7 @@ ModeType lastMode;
  * progress via web controls, and false otherwise.
  */
 std::atomic<bool> web_test_tone{false};
+std::atomic<bool> shutdown_after_current_transmission{false};
 
 void consume_tx_iteration_if_needed()
 {
@@ -193,8 +194,8 @@ void consume_tx_iteration_if_needed()
 
     if (remaining <= 0)
     {
-        llog.logS(INFO, "Completed last of TX iterations, signalling shutdown.");
-        request_wspr_shutdown("completed configured TX iterations");
+        shutdown_after_current_transmission.store(true, std::memory_order_release);
+        llog.logS(INFO, "Completed last of TX iterations, signalling shutdown after current transmission.");
     }
     else
     {
@@ -426,6 +427,15 @@ void transmitter_cb(WsprTransmitter::TransmissionCallbackEvent event,
         // Notify the websocket clients.
         send_ws_message("transmit", "finished");
 
+        const bool shutdown_when_idle =
+            shutdown_after_current_transmission.exchange(false, std::memory_order_acq_rel);
+
+        if (shutdown_when_idle && do_config)
+        {
+            request_wspr_shutdown("completed configured TX iterations");
+            do_config = false;
+        }
+
         // Set config will determine if we have work to do.
         if (do_config)
             set_config();
@@ -449,6 +459,8 @@ void transmitter_cb(WsprTransmitter::TransmissionCallbackEvent event,
 
         // Notify websocket clients.
         send_ws_message("transmit", "skipped");
+
+        shutdown_after_current_transmission.store(false, std::memory_order_release);
 
         // Advance to the next configured slot.
         set_config();
