@@ -86,7 +86,7 @@ struct ArgParserConfig
     std::string callsign;    ///< WSPR callsign.
     std::string grid_square; ///< 4- or 6-character Maidenhead locator.
     int power_dbm;           ///< Transmit power in dBm.
-    std::string frequencies; ///< Space-separated frequency list.
+    std::string frequencies; ///< Space-separated user-facing WSPR dial frequency list.
     int tx_pin;              ///< GPIO pin number for RF transmit control.
 
     // Extended
@@ -107,13 +107,14 @@ struct ArgParserConfig
     bool date_time_log;             ///< Prefix logs with timestamp.
     bool loop_tx;                   ///< Repeat transmission cycle.
     std::atomic<int> tx_iterations; ///< Number of transmission iterations (0 = infinite).
-    double test_tone;               ///< Enable continuous tone mode (in Hz).
+    double test_tone;               ///< Direct-RF continuous tone frequency in Hz.
+    double wspr_audio_offset_hz;    ///< Audio offset added to WSPR dial frequencies to derive RF.
 
     // Runtime variables
     ModeType mode;                       ///< Current operating mode.
     bool use_ini;                        ///< Load configuration from INI file.
     std::string ini_filename;            ///< INI file name and path.
-    std::vector<double> center_freq_set; ///< Parsed list of center frequencies in Hz.
+    std::vector<double> wspr_dial_freq_set; ///< Parsed list of WSPR dial frequencies in Hz.
     bool ntp_good;                       ///< A more qualitative measurement of NTP vs simply running
     std::array<BandGPIOConfig, HAM_BAND_COUNT> band_gpio; ///< Per-band GPIO assignment.
 
@@ -141,10 +142,11 @@ struct ArgParserConfig
           loop_tx(false),
           tx_iterations(0),
           test_tone(0.0),
+          wspr_audio_offset_hz(1500.0),
           mode(ModeType::WSPR),
           use_ini(false),
           ini_filename(""),
-          center_freq_set({}),
+          wspr_dial_freq_set({}),
           ntp_good(false),
           band_gpio({})
     {
@@ -169,7 +171,8 @@ void init_default_config();
  * nlohmann::json object, `jConfig`. The JSON object is organized into several
  * sections: "Meta", "Common", "Control", "Extended", and "Server". Each section
  * contains key/value pairs that represent configuration parameters. In addition,
- * the "Center Frequency Set" under "Meta" is explicitly initialized as an empty array.
+ * the WSPR dial-frequency list under "Meta" is explicitly initialized as an
+ * empty array.
  *
  * @note The JSON values are stored as strings. Adjust the types as needed if numeric
  *       types are required in later processing.
@@ -209,7 +212,8 @@ void ini_to_json(std::string filename);
  *       "Loop TX": true,
  *       "TX Iterations": 5,
  *       "Test Tone": 440.0,
- *       "Center Frequency Set": [ 12.2, 123.7, 98754.323 ]
+ *       "WSPR Dial Frequency Set": [ 14095600.0, 10138700.0 ],
+ *       "Center Frequency Set": [ 14095600.0 ]
  *   },
  *   "Control": {
  *       "Transmit": false
@@ -227,7 +231,8 @@ void ini_to_json(std::string filename);
  *       "Offset": true,
  *       "Use LED": false,
  *       "LED Pin": 18,
- *       "Power Level": 7
+ *       "Power Level": 7,
+ *       "WSPR Audio Offset Hz": 1500.0
  *   },
  *   "Server": {
  *       "Web Port": 31415,

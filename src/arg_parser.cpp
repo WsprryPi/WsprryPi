@@ -306,6 +306,17 @@ std::string join_frequencies(const std::vector<std::string> &args, size_t start_
     return oss.str();
 }
 
+bool token_looks_numeric_frequency(std::string_view token)
+{
+    return std::any_of(
+        token.begin(),
+        token.end(),
+        [](unsigned char c)
+        {
+            return std::isdigit(c) != 0;
+        });
+}
+
 /**
  * @brief Displays the usage information for the WsprryPi application.
  *
@@ -357,9 +368,9 @@ void print_usage(const std::string &message, int exit_code)
     }
 
     std::cerr << "\nUsage:\n"
-              << "  (sudo) wsprrypi [options] callsign gridsquare transmit_power frequency <f2> <f3> ...\n"
+              << "  (sudo) wsprrypi [options] callsign gridsquare transmit_power dial_frequency <f2> <f3> ...\n"
               << "    OR\n"
-              << "  (sudo) wsprrypi --test-tone {frequency}\n\n"
+              << "  (sudo) wsprrypi --test-tone {rf_frequency}\n\n"
               << "Options:\n"
               << "  -h, --help\n"
               << "    Display this help message.\n"
@@ -405,12 +416,13 @@ void show_config_values(bool reload)
     llog.logS(DEBUG, "Call Sign:", config.callsign);
     llog.logS(DEBUG, "Grid Square:", config.grid_square);
     llog.logS(DEBUG, "Transmit Power:", config.power_dbm);
-    llog.logS(DEBUG, "Frequencies:", config.frequencies);
+    llog.logS(DEBUG, "WSPR Dial Frequencies:", config.frequencies);
     llog.logS(DEBUG, "Transmit Pin:", config.tx_pin);
     // [Extended]
     llog.logS(DEBUG, "PPM Offset:", config.ppm);
     llog.logS(DEBUG, "Synchronize with NTP:", config.use_ntp ? "true" : "false");
     llog.logS(DEBUG, "Use Frequency Randomization:", config.use_offset ? "true" : "false");
+    llog.logS(DEBUG, "WSPR Audio Offset Hz:", config.wspr_audio_offset_hz);
     llog.logS(DEBUG, "Power Level:", config.power_level);
     llog.logS(DEBUG, "Use LED:", config.use_led ? "true" : "false");
     llog.logS(DEBUG, "LED on GPIO", config.led_pin);
@@ -426,7 +438,8 @@ void show_config_values(bool reload)
  *
  * This function extracts configuration values from the INI class, ensuring that
  * required parameters such as callsign, grid square, transmit power, and
- * frequency list are properly set. If any critical parameter is missing or invalid,
+ * WSPR dial-frequency list are properly set. If any critical parameter is missing
+ * or invalid,
  * the function logs the error and exits the program.
  *
  * @return true if the configuration is valid, false otherwise.
@@ -456,7 +469,7 @@ bool validate_config_candidate(
     {
         if (!frequencies_ok)
         {
-            candidate.center_freq_set.clear();
+            candidate.wspr_dial_freq_set.clear();
         }
 
         return true;
@@ -468,7 +481,7 @@ bool validate_config_candidate(
     const bool missing_call_sign = callsign.empty();
     const bool missing_grid_square = locator.empty();
     const bool invalid_tx_power = candidate.power_dbm <= 0;
-    const bool no_frequencies = candidate.center_freq_set.empty();
+    const bool no_frequencies = candidate.wspr_dial_freq_set.empty();
 
     if (missing_call_sign || missing_grid_square ||
         invalid_tx_power || no_frequencies)
@@ -489,7 +502,7 @@ bool validate_config_candidate(
         }
         if (no_frequencies)
         {
-            oss << " At least one frequency must be specified.";
+            oss << " At least one WSPR dial frequency must be specified.";
         }
 
         if (error_message != nullptr)
@@ -545,9 +558,9 @@ bool validate_config_data()
         {
             llog.logE(ERROR, " - TX power must be greater than 0 dBm.");
         }
-        if (config.center_freq_set.empty())
+        if (config.wspr_dial_freq_set.empty())
         {
-            llog.logE(ERROR, " - At least one frequency must be specified.");
+            llog.logE(ERROR, " - At least one WSPR dial frequency must be specified.");
         }
 
         if (config.use_ini)
@@ -600,9 +613,9 @@ bool validate_config_data()
 
     if (config.mode == ModeType::TONE)
     {
-        llog.logS(
+            llog.logS(
             INFO,
-            "A test tone will be generated at:",
+            "A direct RF test tone will be generated at:",
             lookup.freq_display_string(config.test_tone));
     }
     else if (config.mode == ModeType::WSPR)
@@ -614,11 +627,11 @@ bool validate_config_data()
             llog.logS(INFO, "- Locator:", config.grid_square);
             llog.logS(INFO, "- Power:", config.power_dbm, " dBm");
 
-            if (config.center_freq_set.size() > 1)
+            if (config.wspr_dial_freq_set.size() > 1)
             {
-                llog.logS(INFO, "Requested TX frequencies:");
+                llog.logS(INFO, "Requested WSPR dial frequencies:");
 
-                for (const auto &freq : config.center_freq_set)
+                for (const auto &freq : config.wspr_dial_freq_set)
                 {
                     if (freq == 0.0)
                     {
@@ -634,8 +647,8 @@ bool validate_config_data()
             {
                 llog.logS(
                     INFO,
-                    "Requested TX frequency:",
-                    lookup.freq_display_string(config.center_freq_set[0]));
+                    "Requested WSPR dial frequency:",
+                    lookup.freq_display_string(config.wspr_dial_freq_set[0]));
             }
 
             if (config.use_offset)
@@ -665,7 +678,7 @@ bool validate_config_data()
                     INFO,
                     "TX will stop after:",
                     config.tx_iterations.load(),
-                    "iteration(s) of the frequency list.");
+                    "iteration(s) of the WSPR dial-frequency list.");
             }
         }
     }
@@ -679,7 +692,7 @@ bool validate_config_data()
 }
 
 /**
- * @brief Parse and validate the configured frequency list.
+ * @brief Parse and validate the configured WSPR dial-frequency list.
  *
  * @param target The configuration object to parse into.
  * @return `true` if at least one valid frequency was parsed or retained.
@@ -693,7 +706,7 @@ bool set_frequencies(ArgParserConfig &target)
     }
     catch (const std::exception &e)
     {
-        llog.logE(WARN, "Failed to read frequency list:", e.what());
+        llog.logE(WARN, "Failed to read WSPR dial-frequency list:", e.what());
         raw_list.clear();
     }
 
@@ -706,17 +719,33 @@ bool set_frequencies(ArgParserConfig &target)
         try
         {
             double freq = lookup.parse_string_to_frequency(token, false);
+            if (token_looks_numeric_frequency(token))
+            {
+                const auto legacy_alias =
+                    lookup.legacy_actual_wspr_alias_for_frequency(freq);
+                if (legacy_alias.has_value())
+                {
+                    llog.logS(
+                        WARN,
+                        "Numeric WSPR frequency token '",
+                        token,
+                        "' exactly matches the legacy actual RF value for alias '",
+                        *legacy_alias,
+                        "'. WsprryPi now interprets WSPR numeric frequencies as dial frequencies. ",
+                        "If this value came from an older config, update it to the dial frequency explicitly.");
+                }
+            }
             parsed_frequencies.push_back(freq);
         }
         catch (const std::invalid_argument &)
         {
-            llog.logE(WARN, "Ignoring invalid frequency token:", token);
+            llog.logE(WARN, "Ignoring invalid WSPR frequency token:", token);
         }
     }
 
     if (!parsed_frequencies.empty())
     {
-        target.center_freq_set = parsed_frequencies;
+        target.wspr_dial_freq_set = parsed_frequencies;
         return true;
     }
 
@@ -725,7 +754,7 @@ bool set_frequencies(ArgParserConfig &target)
         return true;
     }
 
-    llog.logE(ERROR, "Empty or invalid frequency list; keeping previous frequencies.");
+    llog.logE(ERROR, "Empty or invalid WSPR dial-frequency list; keeping previous dial frequencies.");
     target.transmit = false;
     return false;
 }
@@ -1096,17 +1125,19 @@ bool parse_command_line(int argc, char *argv[])
             {
                 try
                 {
+                    // `--test-tone` is an explicit direct-RF path. Do not apply
+                    // the WSPR USB dial-to-RF audio offset to this value.
                     config.test_tone = lookup.parse_string_to_frequency(optarg, false);
                     config.mode = ModeType::TONE;
 
                     if (config.test_tone <= 0.0)
                     {
-                        print_usage("Invalid test tone frequency (<=0).", EXIT_FAILURE);
+                        print_usage("Invalid direct RF test tone frequency (<=0).", EXIT_FAILURE);
                     }
                 }
                 catch (const std::invalid_argument &e)
                 {
-                    std::string error_message = "Invalid test tone frequency input: " +
+                    std::string error_message = "Invalid direct RF test tone frequency input: " +
                                                 std::string(optarg) +
                                                 " Exception: " + e.what();
                     print_usage(error_message, EXIT_FAILURE);
@@ -1265,7 +1296,7 @@ bool parse_command_line(int argc, char *argv[])
             // Extract required positional arguments
             if (positional_args.size() < 4)
             {
-                print_usage("Missing required positional arguments: callsign, gridsquare, power, and frequency.", EXIT_FAILURE);
+                print_usage("Missing required positional arguments: callsign, gridsquare, power, and dial_frequency.", EXIT_FAILURE);
             }
 
             // Validate callsign with REGEX

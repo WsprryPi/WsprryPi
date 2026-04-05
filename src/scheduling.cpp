@@ -33,6 +33,7 @@
 #include "arg_parser.hpp"
 #include "band_gpio_selector.hpp"
 #include "config_handler.hpp"
+#include "frequency_semantics.hpp"
 #include "gpio_input.hpp"
 #include "gpio_output.hpp"
 #include "logging.hpp"
@@ -106,20 +107,20 @@ std::atomic<bool> exiting_wspr = false;
 bool exitwspr_ready = false;
 
 /**
- * @brief Round‐robin index into the configured frequency list.
+ * @brief Round‐robin index into the configured WSPR dial-frequency list.
  *
- * Tracks which entry in the `config.center_freq_set` vector will be
+ * Tracks which entry in the `config.wspr_dial_freq_set` vector will be
  * used for the next WSPR transmission.  Wraps via modulo on each use.
  */
 int freq_iterator = 0;
 
 /**
- * @brief Currently active transmit frequency (in Hz).
+ * @brief Currently active WSPR dial frequency (in Hz).
  *
  * Holds the last frequency value retrieved by `next_frequency()`.
  * A zero value indicates that no frequency is configured or the list was empty.
  */
-double current_frequency = 0.0;
+double current_dial_frequency = 0.0;
 
 /**
  * @brief File-scope self-pipe descriptors for signal notifications.
@@ -590,8 +591,13 @@ void start_test_tone()
         }
         wsprTransmitter.stopAndJoin();
 
-        // Pick the “first” frequency
-        auto freq = next_frequency(/*restart=*/true);
+        // Pick the first configured WSPR dial frequency and convert it to RF
+        // only at the transmitter boundary.
+        const double dial_freq = next_frequency(/*restart=*/true);
+        const double actual_rf_freq = resolve_actual_rf_frequency_hz(
+            dial_freq,
+            config.wspr_audio_offset_hz,
+            FrequencyPath::WsprDial);
 
         while (wsprTransmitter.getState() == WsprTransmitter::State::TRANSMITTING)
         {
@@ -604,20 +610,31 @@ void start_test_tone()
         config.mode = ModeType::TONE;
 
         // Set up and start the tone
-        wsprTransmitter.configure(freq,
+        llog.logS(
+            DEBUG,
+            "Resolved WSPR dial frequency ",
+            lookup.freq_display_string(dial_freq),
+            " to actual RF ",
+            lookup.freq_display_string(actual_rf_freq),
+            " using audio offset ",
+            config.wspr_audio_offset_hz,
+            " Hz.");
+        wsprTransmitter.configure(actual_rf_freq,
                                   config.power_level,
                                   config.ppm);
 
-        if (!bandGPIOSelector.prepareFrequency(freq))
+        if (!bandGPIOSelector.prepareFrequency(dial_freq))
         {
             llog.logS(WARN,
-                      "Unable to prepare band GPIO for test tone at ",
-                      lookup.freq_display_string(freq),
+                      "Unable to prepare band GPIO for WSPR dial frequency ",
+                      lookup.freq_display_string(dial_freq),
                       ".");
         }
 
         wsprTransmitter.startAsync();
-        llog.logS(INFO, "Test tone being transmitted at:", lookup.freq_display_string(freq));
+        llog.logS(INFO,
+                  "WSPR-band test tone using dial frequency:",
+                  lookup.freq_display_string(dial_freq));
         send_ws_message("transmit", "starting");
     }
 }
@@ -661,9 +678,13 @@ void end_test_tone()
         {
             // It was already a tone, so set it up again
             validate_config_data();
-            wsprTransmitter.configure(config.test_tone,
-                                      config.power_level,
-                                      config.ppm);
+            wsprTransmitter.configure(
+                resolve_actual_rf_frequency_hz(
+                    config.test_tone,
+                    config.wspr_audio_offset_hz,
+                    FrequencyPath::DirectRf),
+                config.power_level,
+                config.ppm);
             wsprTransmitter.startAsync();
 
             llog.logS(INFO,
@@ -754,7 +775,13 @@ bool wspr_loop()
     }
     else if (config.mode == ModeType::TONE)
     {
-        wsprTransmitter.configure(config.test_tone, config.power_level, config.ppm);
+        wsprTransmitter.configure(
+            resolve_actual_rf_frequency_hz(
+                config.test_tone,
+                config.wspr_audio_offset_hz,
+                FrequencyPath::DirectRf),
+            config.power_level,
+            config.ppm);
         wsprTransmitter.startAsync();
         llog.logS(INFO, "transmitting tone, hit Ctrl-C to terminate tone.");
     }
@@ -902,9 +929,9 @@ void send_ws_message(std::string type, std::string state)
 }
 
 /**
- * @brief Retrieve the next center frequency, cycling through the configured list.
+ * @brief Retrieve the next configured WSPR dial frequency, cycling through the list.
  *
- * This method returns the next frequency from `config.center_freq_set` in a
+ * This method returns the next frequency from `config.wspr_dial_freq_set` in a
  * round-robin fashion.  It uses `freq_iterator` modulo the list size to
  * index into the vector, then increments `freq_iterator` for the subsequent call.
  *
@@ -918,7 +945,7 @@ void send_ws_message(std::string type, std::string state)
  */
 double next_frequency(bool reset)
 {
-    const auto &freqs = config.center_freq_set;
+    const auto &freqs = config.wspr_dial_freq_set;
     if (freqs.empty())
     {
         return 0.0;
@@ -986,7 +1013,7 @@ void set_config(bool force)
     {
         do_config = true;
         freq_iterator = 0;
-        current_frequency = 0.0;
+        current_dial_frequency = 0.0;
 
         if (config.use_ini)
         {
@@ -1090,13 +1117,13 @@ void set_config(bool force)
 
     // Get next frequency and indicate if we are (re)setting the stack
     static double last_freq = 0.0;
-    current_frequency = next_frequency(force);
-    if (current_frequency != last_freq)
+    current_dial_frequency = next_frequency(force);
+    if (current_dial_frequency != last_freq)
     {
-        last_freq = current_frequency;
+        last_freq = current_dial_frequency;
         do_config = true;
     }
-    else if (config.use_offset && current_frequency != 0.0)
+    else if (config.use_offset && current_dial_frequency != 0.0)
     {
         // Allow randomization as/if needed
         do_random = true;
@@ -1105,9 +1132,23 @@ void set_config(bool force)
     // If we have a change, do setup
     if (do_config || do_random)
     {
+        const double actual_rf_frequency_hz = resolve_actual_rf_frequency_hz(
+            current_dial_frequency,
+            config.wspr_audio_offset_hz,
+            FrequencyPath::WsprDial);
+
         // Do DMA configuration
+        llog.logS(
+            DEBUG,
+            "Resolved WSPR dial frequency ",
+            lookup.freq_display_string(current_dial_frequency),
+            " to actual RF ",
+            lookup.freq_display_string(actual_rf_frequency_hz),
+            " using audio offset ",
+            config.wspr_audio_offset_hz,
+            " Hz.");
         wsprTransmitter.configure(
-            current_frequency,
+            actual_rf_frequency_hz,
             config.power_level,
             config.ppm,
             config.callsign,
@@ -1115,11 +1156,11 @@ void set_config(bool force)
             config.power_dbm,
             config.use_offset);
 
-        if (!bandGPIOSelector.prepareFrequency(current_frequency))
+        if (!bandGPIOSelector.prepareFrequency(current_dial_frequency))
         {
             llog.logS(WARN,
                       "Unable to prepare band GPIO for ",
-                      wsprTransmitter.formatFrequencyMHz(current_frequency),
+                      wsprTransmitter.formatFrequencyMHz(current_dial_frequency),
                       " MHz.");
         }
     }

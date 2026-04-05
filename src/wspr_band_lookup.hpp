@@ -3,7 +3,7 @@
  * @brief Provides WSPR frequency lookup, formatting, and band correlation.
  *
  * This class translates frequencies to band names, band names to default WSPR
- * frequencies, and frequency strings to Hz. Band edge definitions are used to
+ * dial frequencies, and frequency strings to Hz. Band edge definitions are used to
  * correlate a manually entered frequency to a band for feature selection, such
  * as LPF GPIO control. These band edge definitions are not intended to enforce
  * legal operating privileges.
@@ -60,7 +60,7 @@ private:
     using FrequencyRange = std::tuple<long long, long long, std::string>;
 
     /**
-     * @brief Stores default WSPR frequencies by normalized band name or alias.
+     * @brief Stores default WSPR dial frequencies by normalized band name or alias.
      */
     std::unordered_map<std::string, double> wsprFrequencies;
 
@@ -109,7 +109,7 @@ public:
     std::optional<HamBand> lookup_ham_band(double frequency) const;
 
     /**
-     * @brief Looks up a default WSPR frequency or validates a numeric value.
+     * @brief Looks up a default WSPR dial frequency or validates a numeric value.
      *
      * @param input Band name, alias, or numeric frequency in Hz.
      * @return Default WSPR frequency for string input or a band name for
@@ -146,6 +146,21 @@ public:
     double parse_string_to_frequency(
         std::string_view input,
         bool validate = true) const;
+
+    /**
+     * @brief Detect whether a numeric frequency exactly matches a legacy
+     *        built-in actual-RF WSPR alias value.
+     *
+     * @details
+     * This is intended only for conservative compatibility warnings. It does
+     * not reinterpret user input automatically.
+     *
+     * @param frequency Frequency in Hz.
+     * @return Matching WSPR alias such as "20m", or std::nullopt if no exact
+     *         legacy built-in actual frequency matches.
+     */
+    std::optional<std::string> legacy_actual_wspr_alias_for_frequency(
+        double frequency) const;
 
     /**
      * @brief Prints all predefined WSPR frequencies to standard output.
