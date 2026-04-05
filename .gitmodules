@@ -28,3 +28,6 @@
 [submodule "src/WSPR-Transmitter"]
 	path = src/WSPR-Transmitter
 	url = https://github.com/WsprryPi/WSPR-Transmitter.git
+[submodule "src/WSPR-Reference"]
+	path = src/WSPR-Reference
+	url = https://github.com/WsprryPi/WSPR-Reference.git

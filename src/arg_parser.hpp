@@ -35,7 +35,6 @@
 #include "lcblog.hpp"
 #include "monitorfile.hpp"
 #include "version.hpp"
-#include "wspr_message.hpp"
 #include "wspr_band_lookup.hpp"
 
 // Standard library headers
@@ -72,17 +71,6 @@ extern MonitorFile iniMonitor;
  * within the WSPR system.
  */
 extern WSPRBandLookup lookup;
-
-/**
- * @brief Pointer to a WSPR message.
- *
- * This pointer is used to reference a WsprMessage object, which constructs a WSPR message
- * from a callsign, grid location, and power level. It is initialized to nullptr until
- * a valid WsprMessage instance is created.
- *
- * @note Remember to allocate memory for this pointer before use.
- */
-extern WsprMessage *message;
 
 /**
  * @brief Atomic variable representing the current WSPR transmission interval.

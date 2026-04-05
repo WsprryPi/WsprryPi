@@ -38,7 +38,6 @@
 #include "scheduling.hpp"
 #include "signal_handler.hpp"
 #include "wspr_band_lookup.hpp"
-#include "wspr_message.hpp"
 #include "wspr_transmit.hpp"
 
 // Standard library headers
@@ -70,17 +69,6 @@
  * @see https://github.com/WsprryPi/MonitorFile for detailed documentation and examples.
  */
 MonitorFile iniMonitor;
-
-/**
- * @brief Pointer to a WSPR message.
- *
- * This pointer is used to reference a WsprMessage object, which constructs a WSPR message
- * from a callsign, grid location, and power level. It is initialized to nullptr until
- * a valid WsprMessage instance is created.
- *
- * @note Remember to allocate memory for this pointer before use.
- */
-WsprMessage *message = nullptr;
 
 /**
  * @brief Instance of WSPRBandLookup.

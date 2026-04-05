@@ -86,6 +86,7 @@ SUBMODULE_SRCDIRS += $(wildcard ./PPM-Manager/src)
 SUBMODULE_SRCDIRS += $(wildcard ./Signal-Handler/src)
 SUBMODULE_SRCDIRS += $(wildcard ./Singleton/src)
 SUBMODULE_SRCDIRS += $(wildcard ./WSPR-Message/src)
+SUBMODULE_SRCDIRS += $(wildcard ./WSPR-Reference/src/wspr)
 SUBMODULE_SRCDIRS += $(wildcard ./WSPR-Transmitter/src)
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -256,6 +257,7 @@ CXXFLAGS := -Wno-psabi -std=c++$(CXXVER) \
 # Include paths
 CXXFLAGS += -I$(abspath .)
 CXXFLAGS += $(foreach dir,$(SUBMODULE_SRCDIRS),-I$(abspath $(dir)))
+CXXFLAGS += -I$(abspath ./WSPR-Reference/include)
 
 # Build metadata defines
 CXXFLAGS += -DMAKE_TAG=\"$(VER)\" \

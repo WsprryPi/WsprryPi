@@ -39,6 +39,7 @@
 #include "logging.hpp"
 #include "ppm_manager.hpp"
 #include "signal_handler.hpp"
+#include "wspr_reference_adapter.hpp"
 #include "web_server.hpp"
 #include "web_socket.hpp"
 #include "wspr_transmit.hpp"
@@ -50,6 +51,7 @@
 #include <cerrno>
 #include <condition_variable>
 #include <cstring>
+#include <exception>
 #include <fstream>
 #include <iomanip>
 #include <iostream>
@@ -217,6 +219,45 @@ constexpr LogLevel to_log_level(WsprTransmitter::LogLevel level)
     }
 
     return LogLevel::INFO; // Safe fallback
+}
+
+
+static bool configure_current_wspr_transmission(
+    double actual_rf_frequency_hz)
+{
+    try
+    {
+        const PreparedWsprTransmission plan =
+            build_prepared_wspr_transmission(
+                config.callsign,
+                config.grid_square,
+                config.power_dbm);
+
+        wsprTransmitter.configureWspr(
+            actual_rf_frequency_hz,
+            config.power_level,
+            config.ppm,
+            plan,
+            config.use_offset);
+
+        if (plan.frameCount() > 1U)
+        {
+            llog.logS(
+                INFO,
+                "Prepared paired WSPR transmission with ",
+                static_cast<int>(plan.frameCount()),
+                " frames using plan ",
+                plan.plan_type,
+                ".");
+        }
+
+        return true;
+    }
+    catch (const std::exception &e)
+    {
+        llog.logE(ERROR, "WSPR encoding/configuration failed: ", e.what());
+        return false;
+    }
 }
 
 bool request_wspr_shutdown(std::string_view reason)
@@ -619,7 +660,7 @@ void start_test_tone()
             " using audio offset ",
             config.wspr_audio_offset_hz,
             " Hz.");
-        wsprTransmitter.configure(actual_rf_freq,
+        wsprTransmitter.configureTone(actual_rf_freq,
                                   config.power_level,
                                   config.ppm);
 
@@ -678,7 +719,7 @@ void end_test_tone()
         {
             // It was already a tone, so set it up again
             validate_config_data();
-            wsprTransmitter.configure(
+            wsprTransmitter.configureTone(
                 resolve_actual_rf_frequency_hz(
                     config.test_tone,
                     config.wspr_audio_offset_hz,
@@ -775,7 +816,7 @@ bool wspr_loop()
     }
     else if (config.mode == ModeType::TONE)
     {
-        wsprTransmitter.configure(
+        wsprTransmitter.configureTone(
             resolve_actual_rf_frequency_hz(
                 config.test_tone,
                 config.wspr_audio_offset_hz,
@@ -1147,14 +1188,13 @@ void set_config(bool force)
             " using audio offset ",
             config.wspr_audio_offset_hz,
             " Hz.");
-        wsprTransmitter.configure(
-            actual_rf_frequency_hz,
-            config.power_level,
-            config.ppm,
-            config.callsign,
-            config.grid_square,
-            config.power_dbm,
-            config.use_offset);
+        if (!configure_current_wspr_transmission(
+                actual_rf_frequency_hz))
+        {
+            config.transmit = false;
+            config_to_json();
+            return;
+        }
 
         if (!bandGPIOSelector.prepareFrequency(current_dial_frequency))
         {
