@@ -170,6 +170,15 @@ bool validate_config_candidate(
 bool set_frequencies();
 bool set_frequencies(ArgParserConfig &target);
 
+bool set_direct_tone_startup_request(
+    const std::string &raw_token,
+    std::string *error_message = nullptr);
+bool has_direct_tone_startup_request() noexcept;
+bool try_get_direct_tone_startup_request(
+    WsprDialFrequencyEntry &entry_out,
+    double &actual_rf_frequency_hz_out) noexcept;
+void clear_direct_tone_startup_request() noexcept;
+
 /**
  * @brief Loads configuration values from an INI file.
  *

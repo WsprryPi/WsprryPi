@@ -139,7 +139,6 @@ struct ArgParserConfig
     bool require_paired_plan;       ///< Request paired WSPR planning from the encoder.
     bool loop_tx;                   ///< Repeat transmission cycle.
     std::atomic<int> tx_iterations; ///< Number of transmission iterations (0 = infinite).
-    double test_tone;               ///< Direct-RF continuous tone frequency in Hz.
     double wspr_audio_offset_hz;    ///< Audio offset added to WSPR dial frequencies to derive RF.
 
     // Runtime variables
@@ -177,7 +176,6 @@ struct ArgParserConfig
           require_paired_plan(false),
           loop_tx(false),
           tx_iterations(0),
-          test_tone(0.0),
           wspr_audio_offset_hz(1500.0),
           mode(ModeType::WSPR),
           use_ini(false),
@@ -249,7 +247,6 @@ void ini_to_json(std::string filename);
  *       "Date Time Log": false,
  *       "Loop TX": true,
  *       "TX Iterations": 5,
- *       "Test Tone": 440.0,
  *       "WSPR Dial Frequency Set": [ 14095600.0, 10138700.0 ],
  *       "Center Frequency Set": [ 14095600.0 ]
  *   },

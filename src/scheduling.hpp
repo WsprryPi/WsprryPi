@@ -190,7 +190,7 @@ extern void start_test_tone();
  *
  * If we’re in test‐tone, shut it down, clear the flag,
  * restore lastMode, and re-configure either WSPR or
- * (if it wasn’t WSPR) another tone on config.test_tone.
+ * a transient direct-tone startup request if one was active before.
  */
 extern void end_test_tone();
 

@@ -488,8 +488,7 @@ namespace
             {"INI Filename", ""},
             {"Date Time Log", false},
             {"Loop TX", false},
-            {"TX Iterations", 0},
-            {"Test Tone", 730000.0}};
+            {"TX Iterations", 0}};
         target["Meta"]["WSPR Dial Frequency Set"] = nlohmann::json::array();
 
         target["Common"] = {
@@ -534,19 +533,7 @@ namespace
     {
         set_default_band_gpio_config(target.band_gpio);
 
-        const std::string mode_str = source.at("Meta").at("Mode").get<std::string>();
-        if (mode_str == "WSPR")
-        {
-            target.mode = ModeType::WSPR;
-        }
-        else if (mode_str == "TONE")
-        {
-            target.mode = ModeType::TONE;
-        }
-        else
-        {
-            target.mode = ModeType::WSPR;
-        }
+        target.mode = ModeType::WSPR;
 
         target.use_ini = source.at("Meta").at("Use INI").get<bool>();
         target.ini_filename = source.at("Meta").at("INI Filename").get<std::string>();
@@ -554,7 +541,6 @@ namespace
         target.require_paired_plan = source.at("Meta").value("Require Paired Plan", false);
         target.loop_tx = source.at("Meta").at("Loop TX").get<bool>();
         target.tx_iterations.store(source.at("Meta").at("TX Iterations").get<int>());
-        target.test_tone = source.at("Meta").at("Test Tone").get<double>();
         const auto &meta = source.at("Meta");
         if (meta.contains("WSPR Dial Frequency Set") &&
             !meta.at("WSPR Dial Frequency Set").empty())
@@ -641,18 +627,12 @@ namespace
     void config_to_json_impl(const ArgParserConfig &source, nlohmann::json &target)
     {
         target["Meta"]["Mode"] = "WSPR";
-        if (source.mode == ModeType::TONE)
-        {
-            target["Meta"]["Mode"] = "TONE";
-        }
-
         target["Meta"]["Use INI"] = source.use_ini;
         target["Meta"]["INI Filename"] = source.ini_filename;
         target["Meta"]["Date Time Log"] = source.date_time_log;
         target["Meta"]["Require Paired Plan"] = source.require_paired_plan;
         target["Meta"]["Loop TX"] = source.loop_tx;
         target["Meta"]["TX Iterations"] = source.tx_iterations.load();
-        target["Meta"]["Test Tone"] = source.test_tone;
         target["Meta"]["WSPR Dial Frequency Set"] = source.wspr_dial_freq_set;
         target["Meta"]["Center Frequency Set"] = source.wspr_dial_freq_set;
 
@@ -709,7 +689,6 @@ namespace
         target.require_paired_plan = source.require_paired_plan;
         target.loop_tx = source.loop_tx;
         target.tx_iterations.store(source.tx_iterations.load());
-        target.test_tone = source.test_tone;
         target.wspr_audio_offset_hz = source.wspr_audio_offset_hz;
         target.mode = source.mode;
         target.use_ini = source.use_ini;

@@ -381,6 +381,16 @@ static WsprTransmissionRequest make_tone_request(
 
 static WsprTransmissionRequest make_direct_tone_request(double actual_rf_frequency_hz)
 {
+    WsprDialFrequencyEntry entry;
+    double ignored_actual_rf_frequency_hz = 0.0;
+    if (try_get_direct_tone_startup_request(entry, ignored_actual_rf_frequency_hz))
+    {
+        return make_tone_request(
+            actual_rf_frequency_hz,
+            actual_rf_frequency_hz,
+            entry);
+    }
+
     return make_tone_request(
         actual_rf_frequency_hz,
         actual_rf_frequency_hz,
@@ -1067,11 +1077,11 @@ void start_test_tone()
 }
 
 /**
- * @brief   Ends the test‐tone and restores the previous mode.
+ * @brief   Ends the test-tone and restores the previous mode.
  *
- * If we’re in test‐tone, shut it down, clear the flag,
+ * If we're in test-tone, shut it down, clear the flag,
  * restore lastMode, and re-configure either WSPR or
- * (if it wasn’t WSPR) another tone on config.test_tone.
+ * a transient direct-tone startup request if one was active before.
  */
 void end_test_tone()
 {
@@ -1105,14 +1115,31 @@ void end_test_tone()
         }
         else
         {
-            // It was already a tone, so set it up again
+            WsprDialFrequencyEntry entry;
+            double actual_rf_frequency_hz = 0.0;
+            if (!try_get_direct_tone_startup_request(entry, actual_rf_frequency_hz))
+            {
+                llog.logE(ERROR,
+                          "Unable to restore direct test tone; no transient tone request is active.");
+                return;
+            }
+
             validate_config_data();
-            current_transmission_request = make_direct_tone_request(
-                resolve_actual_rf_frequency_hz(
-                    config.test_tone,
-                    config.wspr_audio_offset_hz,
-                    FrequencyPath::DirectRf));
+            current_transmission_request =
+                make_direct_tone_request(actual_rf_frequency_hz);
             wsprTransmitter.configureExecution(current_transmission_request);
+            log_selected_frequency_entry_gpio(entry);
+            if (!frequencyEntryGPIOSelector.prepare(
+                    entry,
+                    config.tx_freq_control_active_high))
+            {
+                llog.logS(WARN,
+                          "Unable to prepare frequency entry control GPIO ",
+                          entry.control_gpio,
+                          " for ",
+                          entry.token,
+                          ".");
+            }
             wsprTransmitter.startAsync();
 
             llog.logS(INFO,
@@ -1218,12 +1245,29 @@ bool wspr_loop()
     }
     else if (config.mode == ModeType::TONE)
     {
-        current_transmission_request = make_direct_tone_request(
-            resolve_actual_rf_frequency_hz(
-                config.test_tone,
-                config.wspr_audio_offset_hz,
-                FrequencyPath::DirectRf));
+        WsprDialFrequencyEntry entry;
+        double actual_rf_frequency_hz = 0.0;
+        if (!try_get_direct_tone_startup_request(entry, actual_rf_frequency_hz))
+        {
+            llog.logE(ERROR, "Direct RF test tone requested without a startup tone request.");
+            return false;
+        }
+
+        current_transmission_request =
+            make_direct_tone_request(actual_rf_frequency_hz);
         wsprTransmitter.configureExecution(current_transmission_request);
+        log_selected_frequency_entry_gpio(entry);
+        if (!frequencyEntryGPIOSelector.prepare(
+                entry,
+                config.tx_freq_control_active_high))
+        {
+            llog.logS(WARN,
+                      "Unable to prepare frequency entry control GPIO ",
+                      entry.control_gpio,
+                      " for ",
+                      entry.token,
+                      ".");
+        }
         wsprTransmitter.startAsync();
         llog.logS(INFO, "transmitting tone, hit Ctrl-C to terminate tone.");
     }

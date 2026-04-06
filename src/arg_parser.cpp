@@ -122,6 +122,17 @@ std::atomic<bool> ppm_reload_pending(false);
  */
 const std::vector<int> wspr_power_levels = {0, 3, 7, 10, 13, 17, 20, 23, 27, 30, 33, 37, 40, 43, 47, 50, 53, 57, 60};
 
+namespace
+{
+struct DirectToneStartupRequest
+{
+    WsprDialFrequencyEntry entry{};
+    double actual_rf_frequency_hz = 0.0;
+};
+
+std::optional<DirectToneStartupRequest> direct_tone_startup_request;
+} // namespace
+
 /**
  * @brief Callback for INI file change detection
  *
@@ -408,6 +419,76 @@ static bool parse_frequency_entry_token(
     return true;
 }
 
+bool set_direct_tone_startup_request(
+    const std::string &raw_token,
+    std::string *error_message)
+{
+    WsprDialFrequencyEntry entry;
+    std::string local_error;
+    if (!parse_frequency_entry_token(raw_token, entry, local_error))
+    {
+        if (error_message != nullptr)
+        {
+            *error_message = local_error;
+        }
+        return false;
+    }
+
+    try
+    {
+        const double actual_rf_frequency_hz =
+            lookup.parse_string_to_frequency(entry.token, false);
+        if (actual_rf_frequency_hz <= 0.0)
+        {
+            if (error_message != nullptr)
+            {
+                *error_message = "Invalid direct RF test tone frequency (<=0).";
+            }
+            return false;
+        }
+
+        entry.dial_frequency_hz = actual_rf_frequency_hz;
+        direct_tone_startup_request = DirectToneStartupRequest{
+            entry,
+            actual_rf_frequency_hz};
+        return true;
+    }
+    catch (const std::exception &e)
+    {
+        if (error_message != nullptr)
+        {
+            *error_message =
+                "Invalid direct RF test tone frequency input: " +
+                raw_token + " Exception: " + e.what();
+        }
+        return false;
+    }
+}
+
+bool has_direct_tone_startup_request() noexcept
+{
+    return direct_tone_startup_request.has_value();
+}
+
+bool try_get_direct_tone_startup_request(
+    WsprDialFrequencyEntry &entry_out,
+    double &actual_rf_frequency_hz_out) noexcept
+{
+    if (!direct_tone_startup_request.has_value())
+    {
+        return false;
+    }
+
+    entry_out = direct_tone_startup_request->entry;
+    actual_rf_frequency_hz_out = direct_tone_startup_request->actual_rf_frequency_hz;
+    return true;
+}
+
+void clear_direct_tone_startup_request() noexcept
+{
+    direct_tone_startup_request.reset();
+}
+
 /**
  * @brief Displays the usage information for the WsprryPi application.
  *
@@ -574,6 +655,15 @@ bool validate_config_candidate(
 
     if (candidate.mode == ModeType::TONE)
     {
+        if (!has_direct_tone_startup_request())
+        {
+            if (error_message != nullptr)
+            {
+                *error_message = "Missing direct RF test tone frequency.";
+            }
+            return false;
+        }
+
         return true;
     }
 
@@ -729,10 +819,22 @@ bool validate_config_data()
 
     if (config.mode == ModeType::TONE)
     {
-            llog.logS(
+        WsprDialFrequencyEntry entry;
+        double actual_rf_frequency_hz = 0.0;
+        if (!try_get_direct_tone_startup_request(entry, actual_rf_frequency_hz))
+        {
+            llog.logE(ERROR, " - Missing direct RF test tone frequency.");
+            if (config.use_ini)
+            {
+                return false;
+            }
+            std::exit(EXIT_FAILURE);
+        }
+
+        llog.logS(
             INFO,
             "A direct RF test tone will be generated at:",
-            lookup.freq_display_string(config.test_tone));
+            lookup.freq_display_string(actual_rf_frequency_hz));
     }
     else if (config.mode == ModeType::WSPR)
     {
@@ -1069,6 +1171,8 @@ bool handle_early_cli_options(int argc, char *argv[])
 
 bool parse_command_line(int argc, char *argv[])
 {
+    clear_direct_tone_startup_request();
+
     // Check if any arguments (besides the program name) were provided.
     if (argc == 1) // No arguments or options provided.
     {
@@ -1157,7 +1261,7 @@ bool parse_command_line(int argc, char *argv[])
         // Required arguments
         {"ppm", required_argument, nullptr, 'p'},       // Via: [Extended] PPM = 0.0
         {"terminate", required_argument, nullptr, 'x'}, // Global: config.tx_iterations
-        {"test-tone", required_argument, nullptr, 't'}, // Global: config.test_tone
+        {"test-tone", required_argument, nullptr, 't'},
         {"transmit-gpio", required_argument, nullptr, 'a'}, // Via: [Common] Transmit Pin = 4
         {"transmit-pin", required_argument, nullptr, 'a'},
         {"led_pin", required_argument, nullptr, 'l'},         // Via: [Extended] LED Pin = 18
@@ -1280,25 +1384,13 @@ bool parse_command_line(int argc, char *argv[])
         {
             if (!config.use_ini)
             {
-                try
+                std::string error_message;
+                if (!set_direct_tone_startup_request(optarg, &error_message))
                 {
-                    // `--test-tone` is an explicit direct-RF path. Do not apply
-                    // the WSPR USB dial-to-RF audio offset to this value.
-                    config.test_tone = lookup.parse_string_to_frequency(optarg, false);
-                    config.mode = ModeType::TONE;
-
-                    if (config.test_tone <= 0.0)
-                    {
-                        print_usage("Invalid direct RF test tone frequency (<=0).", EXIT_FAILURE);
-                    }
-                }
-                catch (const std::invalid_argument &e)
-                {
-                    std::string error_message = "Invalid direct RF test tone frequency input: " +
-                                                std::string(optarg) +
-                                                " Exception: " + e.what();
                     print_usage(error_message, EXIT_FAILURE);
                 }
+
+                config.mode = ModeType::TONE;
             }
             else
             {
