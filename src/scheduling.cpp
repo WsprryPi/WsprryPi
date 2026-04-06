@@ -76,6 +76,67 @@
  */
 static BandGPIOSelector bandGPIOSelector;
 
+class FrequencyEntryGPIOSelector
+{
+public:
+    bool prepare(const WsprDialFrequencyEntry &entry, bool active_high)
+    {
+        stop();
+
+        if (entry.control_gpio == kFrequencyEntryControlGpioUnset)
+        {
+            return true;
+        }
+
+        try
+        {
+            if (!gpio_.enableGPIOPin(entry.control_gpio, active_high))
+            {
+                return false;
+            }
+        }
+        catch (const std::exception &e)
+        {
+            llog.logS(ERROR,
+                      "Unable to enable frequency entry control GPIO ",
+                      entry.control_gpio,
+                      ": ",
+                      e.what());
+            return false;
+        }
+
+        has_gpio_ = true;
+        return true;
+    }
+
+    bool setState(bool state)
+    {
+        if (!has_gpio_)
+        {
+            return true;
+        }
+
+        return gpio_.toggleGPIO(state);
+    }
+
+    void stop()
+    {
+        if (!has_gpio_)
+        {
+            return;
+        }
+
+        gpio_.stop();
+        has_gpio_ = false;
+    }
+
+private:
+    GPIOOutput gpio_{};
+    bool has_gpio_ = false;
+};
+
+static FrequencyEntryGPIOSelector frequencyEntryGPIOSelector;
+
 /**
  * @brief Mutex to protect access to the shutdown flag for the WSPR loop.
  *
@@ -123,6 +184,7 @@ int freq_iterator = 0;
  * A zero value indicates that no frequency is configured or the list was empty.
  */
 double current_dial_frequency = 0.0;
+WsprDialFrequencyEntry current_frequency_entry{};
 
 /**
  * @brief File-scope self-pipe descriptors for signal notifications.
@@ -181,6 +243,7 @@ std::atomic<bool> shutdown_after_wspr_plan{false};
 PreparedWsprTransmission active_wspr_plan{};
 std::size_t active_wspr_frame_index = 0;
 double active_wspr_plan_dial_frequency = 0.0;
+WsprDialFrequencyEntry active_wspr_plan_frequency_entry{};
 bool active_wspr_plan_in_progress = false;
 
 static void reset_active_wspr_plan_state()
@@ -188,6 +251,7 @@ static void reset_active_wspr_plan_state()
     active_wspr_plan = PreparedWsprTransmission{};
     active_wspr_frame_index = 0;
     active_wspr_plan_dial_frequency = 0.0;
+    active_wspr_plan_frequency_entry = WsprDialFrequencyEntry{};
     active_wspr_plan_in_progress = false;
 }
 
@@ -196,6 +260,8 @@ static bool active_wspr_plan_has_more_frames_after_current() noexcept
     return active_wspr_plan_in_progress &&
            (active_wspr_frame_index + 1U) < active_wspr_plan.frameCount();
 }
+
+static WsprDialFrequencyEntry next_frequency_entry(bool reset);
 
 static PreparedWsprTransmission slot_plan_for_frame(
     const PreparedWsprTransmission &plan,
@@ -262,6 +328,27 @@ static std::string to_lower_copy(const std::string &s)
                        return static_cast<char>(std::tolower(c));
                    });
     return out;
+}
+
+static void log_selected_frequency_entry_gpio(const WsprDialFrequencyEntry &entry)
+{
+    if (entry.control_gpio == kFrequencyEntryControlGpioUnset)
+    {
+        llog.logS(INFO,
+                  "Selected frequency entry control GPIO: none for ",
+                  entry.token,
+                  ".");
+        return;
+    }
+
+    llog.logS(INFO,
+              "Selected frequency entry control GPIO: ",
+              entry.control_gpio,
+              " (",
+              config.tx_freq_control_active_high ? "active high" : "active low",
+              ") for ",
+              entry.token,
+              ".");
 }
 
 static std::string format_elapsed(double elapsed)
@@ -389,6 +476,7 @@ static bool configure_current_wspr_transmission(
                 active_wspr_plan = plan;
                 active_wspr_frame_index = 0;
                 active_wspr_plan_dial_frequency = current_dial_frequency;
+                active_wspr_plan_frequency_entry = current_frequency_entry;
                 active_wspr_plan_in_progress = true;
             }
             else
@@ -410,6 +498,7 @@ static bool configure_current_wspr_transmission(
                   auto_upgraded ? "true" : "false",
                   ".");
 
+        wsprTransmitter.setTransmitGpio(config.tx_pin);
         wsprTransmitter.configureWspr(
             actual_rf_frequency_hz,
             config.power_level,
@@ -486,6 +575,7 @@ void transmitter_cb(WsprTransmitter::TransmissionCallbackEvent event,
 
         // Assert the precomputed band GPIO.
         bandGPIOSelector.setBandState(true);
+        frequencyEntryGPIOSelector.setState(true);
 
         // Turn on LED.
         ledControl.toggleGPIO(true);
@@ -577,6 +667,8 @@ void transmitter_cb(WsprTransmitter::TransmissionCallbackEvent event,
         // Deassert and release the prepared band GPIO.
         bandGPIOSelector.setBandState(false);
         bandGPIOSelector.stop();
+        frequencyEntryGPIOSelector.setState(false);
+        frequencyEntryGPIOSelector.stop();
 
         // Turn off LED.
         ledControl.toggleGPIO(false);
@@ -623,6 +715,8 @@ void transmitter_cb(WsprTransmitter::TransmissionCallbackEvent event,
         // Deassert and release the prepared band GPIO.
         bandGPIOSelector.setBandState(false);
         bandGPIOSelector.stop();
+        frequencyEntryGPIOSelector.setState(false);
+        frequencyEntryGPIOSelector.stop();
 
         // Turn off LED in case the UI/state expects an idle indication.
         ledControl.toggleGPIO(false);
@@ -852,7 +946,9 @@ void start_test_tone()
 
         // Pick the first configured WSPR dial frequency and convert it to RF
         // only at the transmitter boundary.
-        const double dial_freq = next_frequency(/*restart=*/true);
+        const WsprDialFrequencyEntry entry = next_frequency_entry(/*restart=*/true);
+        const double dial_freq = entry.dial_frequency_hz;
+        current_frequency_entry = entry;
         const double actual_rf_freq = resolve_actual_rf_frequency_hz(
             dial_freq,
             config.wspr_audio_offset_hz,
@@ -878,9 +974,23 @@ void start_test_tone()
             " using audio offset ",
             config.wspr_audio_offset_hz,
             " Hz.");
+        wsprTransmitter.setTransmitGpio(config.tx_pin);
         wsprTransmitter.configureTone(actual_rf_freq,
                                       config.power_level,
                                       config.ppm);
+
+        log_selected_frequency_entry_gpio(entry);
+        if (!frequencyEntryGPIOSelector.prepare(
+                entry,
+                config.tx_freq_control_active_high))
+        {
+            llog.logS(WARN,
+                      "Unable to prepare frequency entry control GPIO ",
+                      entry.control_gpio,
+                      " for ",
+                      entry.token,
+                      ".");
+        }
 
         if (!bandGPIOSelector.prepareFrequency(dial_freq))
         {
@@ -915,6 +1025,8 @@ void end_test_tone()
         wsprTransmitter.stopAndJoin();
         bandGPIOSelector.setBandState(false);
         bandGPIOSelector.stop();
+        frequencyEntryGPIOSelector.setState(false);
+        frequencyEntryGPIOSelector.stop();
         send_ws_message("transmit", "finished");
         ledControl.toggleGPIO(false);
 
@@ -937,6 +1049,7 @@ void end_test_tone()
         {
             // It was already a tone, so set it up again
             validate_config_data();
+            wsprTransmitter.setTransmitGpio(config.tx_pin);
             wsprTransmitter.configureTone(
                 resolve_actual_rf_frequency_hz(
                     config.test_tone,
@@ -986,6 +1099,12 @@ bool wspr_loop()
 
     if (config.mode != ModeType::WSPR)
     {
+        validate_config_data();
+    }
+    else
+    {
+        // Validate the startup WSPR configuration before any long-lived
+        // services are started so malformed CLI frequency lists fail cleanly.
         validate_config_data();
     }
 
@@ -1043,6 +1162,7 @@ bool wspr_loop()
     }
     else if (config.mode == ModeType::TONE)
     {
+        wsprTransmitter.setTransmitGpio(config.tx_pin);
         wsprTransmitter.configureTone(
             resolve_actual_rf_frequency_hz(
                 config.test_tone,
@@ -1078,6 +1198,11 @@ bool wspr_loop()
     bandGPIOSelector.setBandState(false);
     bandGPIOSelector.stop();
     llog.logS(INFO, "Band GPIO selector stopped.");
+
+    llog.logS(INFO, "Stopping frequency entry GPIO selector.");
+    frequencyEntryGPIOSelector.setState(false);
+    frequencyEntryGPIOSelector.stop();
+    llog.logS(INFO, "Frequency entry GPIO selector stopped.");
 
     llog.logS(INFO, "Stopping shutdown monitor.");
     shutdownMonitor.stop(); // Stop the GPIO monitor
@@ -1211,24 +1336,27 @@ void send_ws_message(std::string type, std::string state)
  *   - `freq_iterator` should be initialized to 0.
  *   - Wrapping is handled via the modulo operation.
  */
-double next_frequency(bool reset)
+WsprDialFrequencyEntry next_frequency_entry(bool reset)
 {
-    const auto &freqs = config.wspr_dial_freq_set;
-    if (freqs.empty())
+    (void)reset;
+
+    const auto &entries = config.wspr_dial_frequency_entries;
+    if (entries.empty())
     {
-        return 0.0;
+        return WsprDialFrequencyEntry{};
     }
 
-    // Compute index in [0, freqs.size())
-    const size_t idx = freq_iterator % freqs.size();
+    const std::size_t idx =
+        static_cast<std::size_t>(freq_iterator % entries.size());
+    const WsprDialFrequencyEntry entry = entries[idx];
 
-    // Fetch frequency
-    double freq = freqs[idx];
-
-    // Advance iterator
     ++freq_iterator;
+    return entry;
+}
 
-    return freq;
+double next_frequency(bool reset)
+{
+    return next_frequency_entry(reset).dial_frequency_hz;
 }
 
 /**
@@ -1261,6 +1389,7 @@ void set_config(bool force)
         do_config = true;
         freq_iterator = 0;
         current_dial_frequency = 0.0;
+        current_frequency_entry = WsprDialFrequencyEntry{};
         reset_active_wspr_plan_state();
         shutdown_after_wspr_plan.store(false, std::memory_order_release);
 
@@ -1332,6 +1461,7 @@ void set_config(bool force)
             llog.logE(ERROR, "Configuration validation failed.");
             config.transmit = false;
             config_to_json();
+            return;
         }
     }
 
@@ -1366,19 +1496,27 @@ void set_config(bool force)
 
     // Get next frequency and indicate if we are (re)setting the stack
     static double last_freq = 0.0;
+    static WsprDialFrequencyEntry last_frequency_entry{};
     if (active_wspr_plan_in_progress && active_wspr_frame_index > 0U)
     {
         current_dial_frequency = active_wspr_plan_dial_frequency;
+        current_frequency_entry = active_wspr_plan_frequency_entry;
         do_config = true;
     }
     else
     {
-        current_dial_frequency = next_frequency(force);
+        current_frequency_entry = next_frequency_entry(force);
+        current_dial_frequency = current_frequency_entry.dial_frequency_hz;
     }
 
-    if (current_dial_frequency != last_freq)
+    const bool frequency_entry_changed =
+        current_frequency_entry.token != last_frequency_entry.token ||
+        current_frequency_entry.control_gpio != last_frequency_entry.control_gpio;
+
+    if (current_dial_frequency != last_freq || frequency_entry_changed)
     {
         last_freq = current_dial_frequency;
+        last_frequency_entry = current_frequency_entry;
         do_config = true;
     }
     else if (config.use_offset && current_dial_frequency != 0.0)
@@ -1408,6 +1546,22 @@ void set_config(bool force)
         if (!configure_current_wspr_transmission(
                 actual_rf_frequency_hz))
         {
+            config.transmit = false;
+            config_to_json();
+            return;
+        }
+
+        log_selected_frequency_entry_gpio(current_frequency_entry);
+        if (!frequencyEntryGPIOSelector.prepare(
+                current_frequency_entry,
+                config.tx_freq_control_active_high))
+        {
+            llog.logS(ERROR,
+                      "Unable to prepare frequency entry control GPIO ",
+                      current_frequency_entry.control_gpio,
+                      " for ",
+                      current_frequency_entry.token,
+                      ".");
             config.transmit = false;
             config_to_json();
             return;

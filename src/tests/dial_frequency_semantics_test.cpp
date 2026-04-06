@@ -1,3 +1,4 @@
+#include "arg_parser.hpp"
 #include "config_handler.hpp"
 #include "frequency_semantics.hpp"
 #include "wspr_band_lookup.hpp"
@@ -109,6 +110,58 @@ int main()
         require(
             legacy_alias.has_value() && *legacy_alias == "20m",
             "legacy actual RF alias detection must identify 20m");
+    }
+
+    {
+        init_config_json();
+        json_to_config();
+        config.transmit = true;
+        config.frequencies = "80m@17,40m@27,20m,14.097100MHz@22";
+
+        require(
+            set_frequencies(config),
+            "mixed frequency lists with optional @GPIO suffixes must parse");
+        require(
+            config.wspr_dial_frequency_entries.size() == 4,
+            "parsed frequency entries must preserve all configured tokens");
+        require(
+            config.wspr_dial_frequency_entries[0].control_gpio == 17 &&
+                nearly_equal(config.wspr_dial_frequency_entries[0].dial_frequency_hz, 3568600.0),
+            "80m@17 must retain the GPIO mapping and dial frequency");
+        require(
+            config.wspr_dial_frequency_entries[1].control_gpio == 27 &&
+                nearly_equal(config.wspr_dial_frequency_entries[1].dial_frequency_hz, 7038600.0),
+            "40m@27 must retain the GPIO mapping and dial frequency");
+        require(
+            config.wspr_dial_frequency_entries[2].control_gpio == kFrequencyEntryControlGpioUnset &&
+                nearly_equal(config.wspr_dial_frequency_entries[2].dial_frequency_hz, 14095600.0),
+            "entries without @GPIO must remain unmapped");
+        require(
+            config.wspr_dial_frequency_entries[3].control_gpio == 22 &&
+                nearly_equal(config.wspr_dial_frequency_entries[3].dial_frequency_hz, 14097100.0),
+            "unit-qualified frequencies must also support @GPIO");
+    }
+
+    {
+        init_config_json();
+        json_to_config();
+        config.transmit = true;
+        config.frequencies = "80m@";
+
+        require(
+            !set_frequencies(config),
+            "missing @GPIO suffix values must be rejected");
+    }
+
+    {
+        init_config_json();
+        json_to_config();
+        config.transmit = true;
+        config.frequencies = "80m@99";
+
+        require(
+            !set_frequencies(config),
+            "out-of-range @GPIO values must be rejected");
     }
 
     std::cout << "dial_frequency_semantics_test passed" << std::endl;

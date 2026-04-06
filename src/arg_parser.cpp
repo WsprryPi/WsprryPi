@@ -160,6 +160,57 @@ static void normalize_wspr_callsign(std::string &callsign)
     std::transform(callsign.begin(), callsign.end(), callsign.begin(), ::toupper);
 }
 
+static bool is_valid_runtime_transmit_gpio(int gpio) noexcept
+{
+    return is_supported_transmit_gpio(gpio);
+}
+
+static std::string transmit_gpio_validation_message()
+{
+    std::ostringstream oss;
+    oss << "Invalid transmit GPIO. Supported GPIO values: ";
+
+    for (std::size_t i = 0; i < kSupportedTransmitGpio.size(); ++i)
+    {
+        if (i != 0U)
+        {
+            oss << ", ";
+        }
+
+        oss << kSupportedTransmitGpio[i];
+    }
+
+    oss << ".";
+    return oss.str();
+}
+
+static bool parse_tx_gpio_polarity(std::string_view raw_value, bool &active_high_out)
+{
+    std::string lowered(raw_value);
+    std::transform(
+        lowered.begin(),
+        lowered.end(),
+        lowered.begin(),
+        [](unsigned char c)
+        {
+            return static_cast<char>(std::tolower(c));
+        });
+
+    if (lowered == "high" || lowered == "active-high" || lowered == "active_high")
+    {
+        active_high_out = true;
+        return true;
+    }
+
+    if (lowered == "low" || lowered == "active-low" || lowered == "active_low")
+    {
+        active_high_out = false;
+        return true;
+    }
+
+    return false;
+}
+
 /**
  * @brief Rounds an input power level to the nearest valid WSPR power level.
  *
@@ -236,6 +287,127 @@ bool token_looks_numeric_frequency(std::string_view token)
         });
 }
 
+static std::string trim_copy_string(std::string value)
+{
+    const auto first = value.find_first_not_of(" \t\n\r");
+    if (first == std::string::npos)
+    {
+        return "";
+    }
+
+    const auto last = value.find_last_not_of(" \t\n\r");
+    return value.substr(first, last - first + 1);
+}
+
+static bool parse_gpio_number_strict(
+    std::string_view raw_value,
+    int &gpio_out) noexcept
+{
+    try
+    {
+        std::size_t consumed = 0;
+        const std::string raw_string(raw_value);
+        const int parsed_gpio = std::stoi(raw_string, &consumed);
+        if (consumed != raw_string.size())
+        {
+            return false;
+        }
+
+        gpio_out = parsed_gpio;
+        return true;
+    }
+    catch (const std::exception &)
+    {
+        return false;
+    }
+}
+
+static std::vector<std::string> split_frequency_tokens(const std::string &raw_list)
+{
+    std::string normalized = raw_list;
+    std::replace(normalized.begin(), normalized.end(), ',', ' ');
+
+    std::istringstream iss(normalized);
+    std::vector<std::string> tokens;
+    std::string token;
+    while (iss >> token)
+    {
+        tokens.push_back(token);
+    }
+
+    return tokens;
+}
+
+static bool parse_frequency_entry_token(
+    std::string_view raw_token,
+    WsprDialFrequencyEntry &entry,
+    std::string &error_message)
+{
+    const std::string token = trim_copy_string(std::string(raw_token));
+    if (token.empty())
+    {
+        error_message = "Frequency token is empty.";
+        return false;
+    }
+
+    const std::size_t at_pos = token.find('@');
+    if (at_pos == std::string::npos)
+    {
+        entry.token = token;
+        entry.control_gpio = kFrequencyEntryControlGpioUnset;
+        return true;
+    }
+
+    if (token.find('@', at_pos + 1U) != std::string::npos)
+    {
+        error_message =
+            "Invalid frequency token '" + token +
+            "': only one @GPIO suffix is allowed.";
+        return false;
+    }
+
+    const std::string base_token = trim_copy_string(token.substr(0, at_pos));
+    const std::string gpio_token =
+        trim_copy_string(token.substr(at_pos + 1U));
+
+    if (base_token.empty())
+    {
+        error_message =
+            "Invalid frequency token '" + token +
+            "': frequency or band designator is missing before @GPIO.";
+        return false;
+    }
+
+    if (gpio_token.empty())
+    {
+        error_message =
+            "Invalid frequency token '" + token +
+            "': GPIO value is missing after @.";
+        return false;
+    }
+
+    int parsed_gpio = kFrequencyEntryControlGpioUnset;
+    if (!parse_gpio_number_strict(gpio_token, parsed_gpio))
+    {
+        error_message =
+            "Invalid frequency token '" + token +
+            "': GPIO suffix must be an integer BCM GPIO.";
+        return false;
+    }
+
+    if (!is_valid_frequency_entry_control_gpio(parsed_gpio))
+    {
+        error_message =
+            "Invalid frequency token '" + token +
+            "': GPIO suffix must be between 0 and 27.";
+        return false;
+    }
+
+    entry.token = base_token;
+    entry.control_gpio = parsed_gpio;
+    return true;
+}
+
 /**
  * @brief Displays the usage information for the WsprryPi application.
  *
@@ -297,6 +469,10 @@ void print_usage(const std::string &message, int exit_code)
               << "    Show the WsprryPi version.\n"
               << "  -i, --ini-file <file>\n"
               << "    Load parameters from an INI file. Provide the path and filename.\n\n"
+              << "  -a, --transmit-gpio <gpio>\n"
+              << "    Select the RF transmit GPIO (supported: 4 or 20).\n\n"
+              << "  --tx-gpio-polarity <high|low>\n"
+              << "    Set polarity for per-frequency LPF/control GPIO outputs.\n\n"
               << "See the documentation for a complete list of available options.\n\n";
 
     // Handle exit behavior
@@ -337,6 +513,9 @@ void show_config_values(bool reload)
     llog.logS(DEBUG, "Transmit Power:", config.power_dbm);
     llog.logS(DEBUG, "WSPR Dial Frequencies:", config.frequencies);
     llog.logS(DEBUG, "Transmit Pin:", config.tx_pin);
+    llog.logS(DEBUG,
+              "Frequency Control GPIO Polarity:",
+              config.tx_freq_control_active_high ? "active high" : "active low");
     // [Extended]
     llog.logS(DEBUG, "PPM Offset:", config.ppm);
     llog.logS(DEBUG, "Synchronize with NTP:", config.use_ntp ? "true" : "false");
@@ -369,6 +548,29 @@ bool validate_config_candidate(
     std::string *error_message)
 {
     const bool frequencies_ok = set_frequencies(candidate);
+    if (!frequencies_ok && !trim_copy_string(candidate.frequencies).empty())
+    {
+        if (error_message != nullptr && error_message->empty())
+        {
+            *error_message = "Invalid WSPR dial-frequency list.";
+        }
+
+        return false;
+    }
+
+    const bool requires_valid_transmit_gpio =
+        candidate.mode == ModeType::TONE || candidate.transmit;
+
+    if (requires_valid_transmit_gpio &&
+        !is_valid_runtime_transmit_gpio(candidate.tx_pin))
+    {
+        if (error_message != nullptr)
+        {
+            *error_message = transmit_gpio_validation_message();
+        }
+
+        return false;
+    }
 
     if (candidate.mode == ModeType::TONE)
     {
@@ -466,6 +668,11 @@ bool validate_config_data()
         {
             llog.logE(ERROR, " - At least one WSPR dial frequency must be specified.");
         }
+        if ((config.mode == ModeType::TONE || config.transmit) &&
+            !is_valid_runtime_transmit_gpio(config.tx_pin))
+        {
+            llog.logE(ERROR, " - ", transmit_gpio_validation_message());
+        }
 
         if (config.use_ini)
         {
@@ -478,6 +685,11 @@ bool validate_config_data()
         std::cerr << std::endl;
         std::exit(EXIT_FAILURE);
     }
+
+    llog.logS(INFO, "Transmit GPIO:", config.tx_pin);
+    llog.logS(INFO,
+              "Frequency-entry control GPIO polarity:",
+              config.tx_freq_control_active_high ? "active high" : "active low");
 
     if (!config.use_ntp && config.ppm != 0.0)
     {
@@ -614,16 +826,26 @@ bool set_frequencies(ArgParserConfig &target)
         raw_list.clear();
     }
 
-    std::istringstream iss(raw_list);
     std::vector<double> parsed_frequencies;
+    std::vector<WsprDialFrequencyEntry> parsed_entries;
 
-    std::string token;
-    while (iss >> token)
+    for (const std::string &token : split_frequency_tokens(raw_list))
     {
+        WsprDialFrequencyEntry entry;
+        std::string entry_error;
+        if (!parse_frequency_entry_token(token, entry, entry_error))
+        {
+            llog.logE(ERROR, entry_error);
+            target.wspr_dial_freq_set.clear();
+            target.wspr_dial_frequency_entries.clear();
+            return false;
+        }
+
         try
         {
-            double freq = lookup.parse_string_to_frequency(token, false);
-            if (token_looks_numeric_frequency(token))
+            const double freq = lookup.parse_string_to_frequency(entry.token, false);
+            entry.dial_frequency_hz = freq;
+            if (token_looks_numeric_frequency(entry.token))
             {
                 const auto legacy_alias =
                     lookup.legacy_actual_wspr_alias_for_frequency(freq);
@@ -632,7 +854,7 @@ bool set_frequencies(ArgParserConfig &target)
                     llog.logS(
                         WARN,
                         "Numeric WSPR frequency token '",
-                        token,
+                        entry.token,
                         "' exactly matches the legacy actual RF value for alias '",
                         *legacy_alias,
                         "'. WsprryPi now interprets WSPR numeric frequencies as dial frequencies. ",
@@ -640,6 +862,7 @@ bool set_frequencies(ArgParserConfig &target)
                 }
             }
             parsed_frequencies.push_back(freq);
+            parsed_entries.push_back(entry);
         }
         catch (const std::invalid_argument &)
         {
@@ -650,16 +873,19 @@ bool set_frequencies(ArgParserConfig &target)
     if (!parsed_frequencies.empty())
     {
         target.wspr_dial_freq_set = parsed_frequencies;
+        target.wspr_dial_frequency_entries = parsed_entries;
         return true;
     }
 
     if (target.mode != ModeType::WSPR || !target.transmit)
     {
+        target.wspr_dial_frequency_entries.clear();
         return true;
     }
 
-    llog.logE(ERROR, "Empty or invalid WSPR dial-frequency list; keeping previous dial frequencies.");
-    target.transmit = false;
+    llog.logE(ERROR, "Empty or invalid WSPR dial-frequency list.");
+    target.wspr_dial_freq_set.clear();
+    target.wspr_dial_frequency_entries.clear();
     return false;
 }
 
@@ -851,6 +1077,7 @@ bool parse_command_line(int argc, char *argv[])
 
     // Create original JSON
     init_config_json();
+    json_to_config();
     std::vector<char *> args(argv, argv + argc); // Copy arguments for modification
 
     // First pass: Look for "-i <file>" before processing other options
@@ -926,11 +1153,13 @@ bool parse_command_line(int argc, char *argv[])
         {"journald", no_argument, nullptr, 'J'},      // Global: config.use_journald
         {"date-time-log", no_argument, nullptr, 'D'}, // Global: config.date_time_log
         {"require-paired", no_argument, nullptr, 1001}, // Global: config.require_paired_plan
+        {"tx-gpio-polarity", required_argument, nullptr, 1002},
         // Required arguments
         {"ppm", required_argument, nullptr, 'p'},       // Via: [Extended] PPM = 0.0
         {"terminate", required_argument, nullptr, 'x'}, // Global: config.tx_iterations
         {"test-tone", required_argument, nullptr, 't'}, // Global: config.test_tone
-        // Not yet implemented: {"transmit-pin", required_argument, nullptr, 'a'},    // Via: [Common] Transmit Pin = 4
+        {"transmit-gpio", required_argument, nullptr, 'a'}, // Via: [Common] Transmit Pin = 4
+        {"transmit-pin", required_argument, nullptr, 'a'},
         {"led_pin", required_argument, nullptr, 'l'},         // Via: [Extended] LED Pin = 18
         {"shutdown_button", required_argument, nullptr, 's'}, // Via: [Server] Shutdown Button = 19
         {"power_level", required_argument, nullptr, 'd'},     // Via: [Extended] Power Level = 7
@@ -987,6 +1216,19 @@ bool parse_command_line(int argc, char *argv[])
         case 1001: // Require paired WSPR planning
         {
             config.require_paired_plan = true;
+            break;
+        }
+        case 1002:
+        {
+            bool active_high = false;
+            if (!parse_tx_gpio_polarity(optarg, active_high))
+            {
+                print_usage(
+                    "Invalid TX GPIO polarity. Expected 'high' or 'low'.",
+                    EXIT_FAILURE);
+            }
+
+            config.tx_freq_control_active_high = active_high;
             break;
         }
         // Required arguments
@@ -1068,15 +1310,19 @@ bool parse_command_line(int argc, char *argv[])
         {
             try
             {
-                int transmit_pin = std::stoi(optarg);
-                if (transmit_pin < 0 || transmit_pin > 27)
-                    print_usage("Invalid transmit pin.", EXIT_FAILURE);
-                else
-                    config.tx_pin = transmit_pin;
+                std::size_t consumed = 0;
+                const int transmit_pin = std::stoi(optarg, &consumed);
+                if (consumed != std::strlen(optarg) ||
+                    !is_valid_runtime_transmit_gpio(transmit_pin))
+                {
+                    print_usage(transmit_gpio_validation_message(), EXIT_FAILURE);
+                }
+
+                config.tx_pin = transmit_pin;
             }
             catch (const std::exception &)
             {
-                print_usage("Invalid transmit pin.", EXIT_FAILURE);
+                print_usage(transmit_gpio_validation_message(), EXIT_FAILURE);
             }
             break;
         }

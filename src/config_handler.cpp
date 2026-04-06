@@ -247,7 +247,7 @@ void init_default_config()
     config.grid_square = "ZZ99";
     config.power_dbm = 20;
     config.frequencies = "20m";
-    config.tx_pin = 4;
+    config.tx_pin = kDefaultTransmitGpio;
 
     // Extended
     config.ppm = 0.0;
@@ -266,6 +266,7 @@ void init_default_config()
 
     // Meta
     config.use_ini = true;
+    config.tx_freq_control_active_high = false;
 
     set_default_band_gpio_config(config.band_gpio);
 }
@@ -496,7 +497,7 @@ namespace
             {"Frequency", "20m"},
             {"Grid Square", "ZZ99"},
             {"TX Power", 20},
-            {"Transmit Pin", 4}};
+            {"Transmit Pin", kDefaultTransmitGpio}};
 
         target["Control"] = {
             {"Transmit", false}};
@@ -714,6 +715,8 @@ namespace
         target.use_ini = source.use_ini;
         target.ini_filename = source.ini_filename;
         target.wspr_dial_freq_set = source.wspr_dial_freq_set;
+        target.wspr_dial_frequency_entries = source.wspr_dial_frequency_entries;
+        target.tx_freq_control_active_high = source.tx_freq_control_active_high;
         target.ntp_good = source.ntp_good;
         target.band_gpio = source.band_gpio;
     }
@@ -776,6 +779,8 @@ namespace
 
             ini_to_json_impl(filename, candidate_json);
             json_to_config_impl(candidate_json, candidate_config);
+            candidate_config.tx_freq_control_active_high =
+                config.tx_freq_control_active_high;
 
             if (missing_required_tx_item)
             {
@@ -977,6 +982,8 @@ void patch_all_from_web(const nlohmann::json &j)
     try
     {
         json_to_config_impl(candidate_json, candidate_config);
+        candidate_config.tx_freq_control_active_high =
+            config.tx_freq_control_active_high;
 
         if (!validate_config_candidate(candidate_config, &error_message))
         {

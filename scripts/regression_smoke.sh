@@ -119,6 +119,30 @@ check_log_absent() {
     fi
 }
 
+check_command_fails() {
+    local desc="$1"
+    local cmd="$2"
+    shift 2
+
+    local outfile
+    outfile="$(mktemp "${LOG_DIR}/check.XXXXXX.log")"
+
+    if run_and_capture "${outfile}" "$cmd"; then
+        cat "${outfile}" >&2
+        fail "$desc (command unexpectedly succeeded)"
+    fi
+
+    local needle
+    for needle in "$@"; do
+        grep -Fq -- "$needle" "${outfile}" || {
+            cat "${outfile}" >&2
+            fail "$desc (missing: $needle)"
+        }
+    done
+
+    pass "$desc"
+}
+
 check_log_count() {
     local file="$1"
     local needle="$2"
@@ -189,6 +213,9 @@ run_log_check \
     "${default_log}" \
     "cd '${SRC_ROOT}' && timeout --foreground 5s sudo -n stdbuf -oL -eL ./build/bin/wsprrypi AA0NT EM18 20 80m || true" \
     "Logging backend: streams"
+check_log_contains "${default_log}" "Transmit GPIO: 4"
+check_log_contains "${default_log}" "Frequency-entry control GPIO polarity: active low"
+check_log_contains "${default_log}" "Selected frequency entry control GPIO: none for 80m."
 check_timestamp_prefix_absent "${default_log}"
 check_log_contains "${default_log}" \
     "Selected WSPR plan: Type1Single, frames: 1, paired requested: false, auto-upgraded: false."
@@ -220,6 +247,66 @@ run_log_check \
     "cd '${SRC_ROOT}' && timeout --foreground 5s sudo -n stdbuf -oL -eL ./build/bin/wsprrypi --journald -D AA0NT EM18 20 80m || true" \
     "Logging backend: journald"
 check_timestamp_prefix_absent "${journald_timestamp_log}"
+
+custom_tx_gpio_log="${LOG_DIR}/custom_tx_gpio_startup.log"
+run_log_check \
+    "--transmit-gpio overrides the default WSPR RF GPIO" \
+    "${custom_tx_gpio_log}" \
+    "cd '${SRC_ROOT}' && timeout --foreground 5s sudo -n stdbuf -oL -eL ./build/bin/wsprrypi --transmit-gpio 20 AA0NT EM18 20 80m || true" \
+    "Transmit GPIO: 20" \
+    "Selected WSPR plan: Type1Single, frames: 1, paired requested: false, auto-upgraded: false."
+
+mixed_freq_gpio_log="${LOG_DIR}/mixed_frequency_gpio_startup.log"
+run_log_check \
+    "Mixed frequency list accepts optional @GPIO suffixes" \
+    "${mixed_freq_gpio_log}" \
+    "cd '${SRC_ROOT}' && timeout --foreground 5s sudo -n stdbuf -oL -eL ./build/bin/wsprrypi AA0NT EM18 20 80m@17,40m@27,20m,14.097100MHz@22 || true" \
+    "Selected frequency entry control GPIO: 17 (active low) for 80m." \
+    "Selected WSPR plan: Type1Single, frames: 1, paired requested: false, auto-upgraded: false."
+
+high_polarity_log="${LOG_DIR}/frequency_gpio_high_polarity.log"
+run_log_check \
+    "--tx-gpio-polarity high is accepted" \
+    "${high_polarity_log}" \
+    "cd '${SRC_ROOT}' && timeout --foreground 5s sudo -n stdbuf -oL -eL ./build/bin/wsprrypi --tx-gpio-polarity high AA0NT EM18 20 80m@17 || true" \
+    "Frequency-entry control GPIO polarity: active high" \
+    "Selected frequency entry control GPIO: 17 (active high) for 80m."
+
+low_polarity_log="${LOG_DIR}/frequency_gpio_low_polarity.log"
+run_log_check \
+    "--tx-gpio-polarity low is accepted" \
+    "${low_polarity_log}" \
+    "cd '${SRC_ROOT}' && timeout --foreground 5s sudo -n stdbuf -oL -eL ./build/bin/wsprrypi --tx-gpio-polarity low AA0NT EM18 20 80m@17 || true" \
+    "Frequency-entry control GPIO polarity: active low" \
+    "Selected frequency entry control GPIO: 17 (active low) for 80m."
+
+test_tone_gpio_log="${LOG_DIR}/test_tone_tx_gpio.log"
+run_log_check \
+    "--transmit-gpio also applies to test-tone mode" \
+    "${test_tone_gpio_log}" \
+    "cd '${SRC_ROOT}' && timeout --foreground 5s sudo -n stdbuf -oL -eL ./build/bin/wsprrypi --transmit-gpio 20 --test-tone 7040100 || true" \
+    "Transmit GPIO: 20" \
+    "A direct RF test tone will be generated at:"
+
+check_command_fails \
+    "Invalid transmit GPIO is rejected" \
+    "cd '${SRC_ROOT}' && sudo -n ./build/bin/wsprrypi --transmit-gpio 17 AA0NT EM18 20 80m" \
+    "Invalid transmit GPIO. Supported GPIO values: 4, 20."
+
+check_command_fails \
+    "Invalid @GPIO syntax is rejected" \
+    "cd '${SRC_ROOT}' && sudo -n ./build/bin/wsprrypi AA0NT EM18 20 80m@,40m@27" \
+    "Invalid frequency token '80m@': GPIO value is missing after @."
+
+check_command_fails \
+    "Invalid frequency-entry GPIO is rejected" \
+    "cd '${SRC_ROOT}' && sudo -n ./build/bin/wsprrypi AA0NT EM18 20 80m@99,40m@27" \
+    "Invalid frequency token '80m@99': GPIO suffix must be between 0 and 27."
+
+check_command_fails \
+    "Invalid frequency-entry GPIO polarity is rejected" \
+    "cd '${SRC_ROOT}' && sudo -n ./build/bin/wsprrypi --tx-gpio-polarity sideways AA0NT EM18 20 80m@17" \
+    "Invalid TX GPIO polarity. Expected 'high' or 'low'."
 
 run_and_check \
     "Explicit Type 3 input reaches planner" \
@@ -347,7 +434,8 @@ paired_rf_log="${LOG_DIR}/rf_paired.log"
 run_log_check \
     "Forced paired two-slot RF behavior log checks" \
     "${paired_rf_log}" \
-    "cd '${SRC_ROOT}' && timeout --foreground 360s sudo -n ./build/bin/wsprrypi -D --require-paired W1/AA0NT EM18IG 20 80m || true" \
+    "cd '${SRC_ROOT}' && timeout --foreground 360s sudo -n ./build/bin/wsprrypi -D --tx-gpio-polarity high --require-paired W1/AA0NT EM18IG 20 20m@17 || true" \
+    "Selected frequency entry control GPIO: 17 (active high) for 20m." \
     "Paired WSPR planning explicitly requested." \
     "Selected WSPR plan: Type2Type3Paired, frames: 2, paired requested: true, auto-upgraded: false." \
     "Scheduling paired WSPR frame 2 of 2 for the next WSPR slot." \
@@ -359,6 +447,8 @@ check_log_count "${paired_rf_log}" \
     "Paired WSPR planning explicitly requested." 1
 check_log_count "${paired_rf_log}" \
     "Scheduling paired WSPR frame 2 of 2 for the next WSPR slot." 1
+check_log_count "${paired_rf_log}" \
+    "Selected frequency entry control GPIO: 17 (active high) for 20m." 2
 
 python3 - "$paired_rf_log" <<'PY'
 import re

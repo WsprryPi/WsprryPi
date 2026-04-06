@@ -38,6 +38,36 @@
 #include <string>
 #include <vector>
 
+inline constexpr int kTransmitGpioUnset = -1;
+inline constexpr int kDefaultTransmitGpio = 4;
+inline constexpr std::array<int, 2> kSupportedTransmitGpio = {4, 20};
+inline constexpr int kFrequencyEntryControlGpioUnset = -1;
+
+inline constexpr bool is_supported_transmit_gpio(int gpio) noexcept
+{
+    for (int supported_gpio : kSupportedTransmitGpio)
+    {
+        if (gpio == supported_gpio)
+        {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+inline constexpr bool is_valid_frequency_entry_control_gpio(int gpio) noexcept
+{
+    return gpio >= 0 && gpio <= 27;
+}
+
+struct WsprDialFrequencyEntry
+{
+    std::string token;
+    double dial_frequency_hz = 0.0;
+    int control_gpio = kFrequencyEntryControlGpioUnset;
+};
+
 /**
  * @brief  Construct the singleton IniFile instance.
  *
@@ -117,6 +147,8 @@ struct ArgParserConfig
     bool use_ini;                        ///< Load configuration from INI file.
     std::string ini_filename;            ///< INI file name and path.
     std::vector<double> wspr_dial_freq_set; ///< Parsed list of WSPR dial frequencies in Hz.
+    std::vector<WsprDialFrequencyEntry> wspr_dial_frequency_entries; ///< Parsed list of WSPR entries with optional control GPIO metadata.
+    bool tx_freq_control_active_high;    ///< Global polarity for per-frequency control GPIO outputs.
     bool ntp_good;                       ///< A more qualitative measurement of NTP vs simply running
     std::array<BandGPIOConfig, HAM_BAND_COUNT> band_gpio; ///< Per-band GPIO assignment.
 
@@ -129,7 +161,7 @@ struct ArgParserConfig
           grid_square(""),
           power_dbm(0),
           frequencies(""),
-          tx_pin(-1),
+          tx_pin(kTransmitGpioUnset),
           ppm(0.0),
           use_ntp(false),
           use_offset(false),
@@ -151,6 +183,8 @@ struct ArgParserConfig
           use_ini(false),
           ini_filename(""),
           wspr_dial_freq_set({}),
+          wspr_dial_frequency_entries({}),
+          tx_freq_control_active_high(false),
           ntp_good(false),
           band_gpio({})
     {
