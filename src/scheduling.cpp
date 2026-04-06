@@ -210,6 +210,14 @@ static PreparedWsprTransmission slot_plan_for_frame(
     return slot_plan;
 }
 
+static bool is_auto_paired_upgrade_eligible() noexcept
+{
+    return config.mode == ModeType::WSPR &&
+           !config.test_tone &&
+           (config.callsign.find('/') != std::string::npos) &&
+           config.grid_square.size() == 6U;
+}
+
 void consume_tx_iteration_if_needed()
 {
     if (config.use_ini || config.loop_tx)
@@ -294,6 +302,8 @@ static bool configure_current_wspr_transmission(
     {
         PreparedWsprTransmission plan;
         PreparedWsprTransmission slot_plan;
+        bool paired_requested = config.require_paired_plan;
+        bool auto_upgraded = false;
 
         if (active_wspr_plan_in_progress)
         {
@@ -309,16 +319,70 @@ static bool configure_current_wspr_transmission(
         }
         else
         {
-            const wspr::TransmissionPlanPreference preference =
-                config.require_paired_plan
-                    ? wspr::TransmissionPlanPreference::RequirePaired
-                    : wspr::TransmissionPlanPreference::Auto;
+            if (paired_requested)
+            {
+                llog.logS(INFO,
+                          "Paired WSPR planning explicitly requested.");
 
-            plan = build_prepared_wspr_transmission(
-                config.callsign,
-                config.grid_square,
-                config.power_dbm,
-                preference);
+                plan = build_prepared_wspr_transmission(
+                    config.callsign,
+                    config.grid_square,
+                    config.power_dbm,
+                    wspr::TransmissionPlanPreference::RequirePaired);
+            }
+            else
+            {
+                const bool paired_upgrade_eligible =
+                    is_auto_paired_upgrade_eligible();
+
+                try
+                {
+                    plan = build_prepared_wspr_transmission(
+                        config.callsign,
+                        config.grid_square,
+                        config.power_dbm,
+                        wspr::TransmissionPlanPreference::Auto);
+                }
+                catch (const std::exception &)
+                {
+                    if (!paired_upgrade_eligible)
+                        throw;
+
+                    llog.logS(INFO,
+                              "Auto-upgrading to paired WSPR plan because callsign is compound and locator is 6 characters.");
+
+                    PreparedWsprTransmission paired_plan =
+                        build_prepared_wspr_transmission(
+                            config.callsign,
+                            config.grid_square,
+                            config.power_dbm,
+                            wspr::TransmissionPlanPreference::RequirePaired);
+
+                    plan = std::move(paired_plan);
+                    auto_upgraded = true;
+                }
+
+                if (!auto_upgraded &&
+                    plan.frameCount() <= 1U &&
+                    paired_upgrade_eligible)
+                {
+                    llog.logS(INFO,
+                              "Auto-upgrading to paired WSPR plan because callsign is compound and locator is 6 characters.");
+
+                    PreparedWsprTransmission paired_plan =
+                        build_prepared_wspr_transmission(
+                            config.callsign,
+                            config.grid_square,
+                            config.power_dbm,
+                            wspr::TransmissionPlanPreference::RequirePaired);
+
+                    if (paired_plan.frameCount() > 1U)
+                    {
+                        plan = std::move(paired_plan);
+                        auto_upgraded = true;
+                    }
+                }
+            }
 
             if (plan.frameCount() > 1U)
             {
@@ -336,12 +400,14 @@ static bool configure_current_wspr_transmission(
         }
 
         llog.logS(INFO,
-                  "Prepared WSPR plan type: ",
+                  "Selected WSPR plan: ",
                   plan.plan_type,
                   ", frames: ",
                   static_cast<int>(plan.frames.size()),
                   ", paired requested: ",
-                  config.require_paired_plan ? "true" : "false",
+                  paired_requested ? "true" : "false",
+                  ", auto-upgraded: ",
+                  auto_upgraded ? "true" : "false",
                   ".");
 
         wsprTransmitter.configureWspr(

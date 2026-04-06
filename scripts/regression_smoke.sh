@@ -14,8 +14,8 @@ set -euo pipefail
 # - Runs real RF/manual-style checks that require sudo -n and time
 # - Captures logs and verifies paired two-slot timing from output
 
-SRC_ROOT="$(git rev-parse --show-toplevel)"
-SRC_ROOT="${SRC_ROOT}/src"
+GIT_ROOT="$(git rev-parse --show-toplevel)"
+SRC_ROOT="${GIT_ROOT}/src"
 
 REF_DIR="${SRC_ROOT}/WSPR-Reference"
 REF_BUILD_DIR="${REF_DIR}/build"
@@ -63,16 +63,42 @@ run_and_check() {
     pass "$desc"
 }
 
+run_log_check() {
+    local desc="$1"
+    local outfile="$2"
+    local cmd="$3"
+    shift 3
+
+    if ! run_and_capture "${outfile}" "$cmd"; then
+        cat "${outfile}" >&2
+        fail "$desc"
+    fi
+
+    local needle
+    for needle in "$@"; do
+        grep -Fq -- "$needle" "${outfile}" || {
+            cat "${outfile}" >&2
+            fail "$desc (missing: $needle)"
+        }
+    done
+
+    pass "$desc"
+}
+
 check_timestamp_prefix_present() {
     local file="$1"
-    grep -Eq '^[0-9]{4}-[0-9]{2}-[0-9]{2} .* \[INFO \]' "$file" ||
+    if ! grep -Eq '^[0-9]{4}-[0-9]{2}-[0-9]{2} ' "$file"; then
+        cat "$file" >&2
         fail "Expected timestamp prefix in ${file}"
+    fi
 }
 
 check_timestamp_prefix_absent() {
     local file="$1"
-    grep -Eq '^[0-9]{4}-[0-9]{2}-[0-9]{2} .* \[INFO \]' "$file" &&
+    if grep -Eq '^[0-9]{4}-[0-9]{2}-[0-9]{2} ' "$file"; then
+        cat "$file" >&2
         fail "Did not expect timestamp prefix in ${file}"
+    fi
 }
 
 step "Sanity-check project layout"
@@ -125,45 +151,61 @@ run_and_check \
     "Default help text" \
     "cd '${SRC_ROOT}' && ./build/bin/wsprrypi --help" \
     "Usage:" \
-   -- "--test-tone"
+    "--test-tone"
 
 default_log="${LOG_DIR}/default_startup.log"
-run_and_capture "${default_log}" \
-    "cd '${SRC_ROOT}' && timeout 2s sudo -n ./build/bin/wsprrypi AA0NT EM18 20 80m || true"
-grep -Fq "Logging backend: streams" "${default_log}" || fail "Default logging backend was not streams"
+run_log_check \
+    "Default logging backend is streams with no timestamps" \
+    "${default_log}" \
+    "cd '${SRC_ROOT}' && timeout --foreground 5s sudo -n stdbuf -oL -eL ./build/bin/wsprrypi AA0NT EM18 20 80m || true" \
+    "Logging backend: streams"
 check_timestamp_prefix_absent "${default_log}"
-pass "Default logging backend is streams with no timestamps"
 
 timestamp_log="${LOG_DIR}/timestamp_startup.log"
-run_and_capture "${timestamp_log}" \
-    "cd '${SRC_ROOT}' && timeout 2s sudo -n ./build/bin/wsprrypi -D AA0NT EM18 20 80m || true"
-grep -Fq "Logging backend: streams" "${timestamp_log}" || fail "Timestamp mode did not stay on streams"
+run_log_check \
+    "-D enables timestamps on streams" \
+    "${timestamp_log}" \
+    "cd '${SRC_ROOT}' && timeout --foreground 5s sudo -n stdbuf -oL -eL ./build/bin/wsprrypi -D AA0NT EM18 20 80m || true" \
+    "Logging backend: streams"
 check_timestamp_prefix_present "${timestamp_log}"
-pass "-D enables timestamps on streams"
 
 journald_log="${LOG_DIR}/journald_startup.log"
-run_and_capture "${journald_log}" \
-    "cd '${SRC_ROOT}' && timeout 2s sudo -n ./build/bin/wsprrypi --journald AA0NT EM18 20 80m || true"
-grep -Fq "Logging backend: journald" "${journald_log}" || fail "Explicit journald mode did not activate"
+run_log_check \
+    "--journald selects journald without timestamp prefixes" \
+    "${journald_log}" \
+    "cd '${SRC_ROOT}' && timeout --foreground 5s sudo -n stdbuf -oL -eL ./build/bin/wsprrypi --journald AA0NT EM18 20 80m || true" \
+    "Logging backend: journald"
 check_timestamp_prefix_absent "${journald_log}"
-pass "--journald selects journald without timestamp prefixes"
 
 journald_timestamp_log="${LOG_DIR}/journald_timestamp_startup.log"
-run_and_capture "${journald_timestamp_log}" \
-    "cd '${ROOT_DIR}' && timeout 2s sudo -n ./build/bin/wsprrypi --journald -D AA0NT EM18 20 80m || true"
-grep -Fq "Logging backend: journald" "${journald_timestamp_log}" || fail "Combined journald + -D did not activate journald"
+run_log_check \
+    "--journald overrides timestamp prefixes" \
+    "${journald_timestamp_log}" \
+    "cd '${SRC_ROOT}' && timeout --foreground 5s sudo -n stdbuf -oL -eL ./build/bin/wsprrypi --journald -D AA0NT EM18 20 80m || true" \
+    "Logging backend: journald"
 check_timestamp_prefix_absent "${journald_timestamp_log}"
-pass "--journald overrides timestamp prefixes"
 
 run_and_check \
     "Explicit Type 3 input reaches planner" \
-    "cd '${SRC_ROOT}' && timeout 2s sudo -n ./build/bin/wsprrypi '<AA0NT>' EM18IG 20 80m || true" \
-    "Prepared WSPR plan type: Type3Single, frames: 1."
+    "cd '${SRC_ROOT}' && timeout --foreground 5s sudo -n stdbuf -oL -eL ./build/bin/wsprrypi '<AA0NT>' EM18IG 20 80m || true" \
+    "Selected WSPR plan: Type3Single, frames: 1, paired requested: false, auto-upgraded: false."
 
 run_and_check \
     "Require-paired reaches paired planner" \
-    "cd '${SRC_ROOT}' && timeout 2s sudo -n ./build/bin/wsprrypi --require-paired W1/AA0NT EM18IG 20 80m || true" \
-    "Prepared WSPR plan type: Type2Type3Paired, frames: 2"
+    "cd '${SRC_ROOT}' && timeout --foreground 5s sudo -n stdbuf -oL -eL ./build/bin/wsprrypi --require-paired W1/AA0NT EM18IG 20 80m || true" \
+    "Selected WSPR plan: Type2Type3Paired, frames: 2, paired requested: true, auto-upgraded: false."
+
+auto_paired_log="${LOG_DIR}/auto_paired_startup.log"
+run_log_check \
+    "Auto-upgrade to paired WSPR plan works" \
+    "${auto_paired_log}" \
+    "cd '${SRC_ROOT}' && timeout --foreground 5s sudo -n stdbuf -oL -eL ./build/bin/wsprrypi W1/AA0NT EM18IG 20 80m || true" \
+    "Auto-upgrading to paired WSPR plan because callsign is compound and locator is 6 characters." \
+    "Selected WSPR plan: Type2Type3Paired, frames: 2, paired requested: false, auto-upgraded: true."
+if grep -Fq "Type1Single" "${auto_paired_log}"; then
+    cat "${auto_paired_log}" >&2
+    fail "Unexpected downgrade to Type1Single in auto-paired case"
+fi
 
 if [[ "${RUN_RF:-0}" != "1" ]]; then
     step "Manual RF checklist"
@@ -171,19 +213,60 @@ if [[ "${RUN_RF:-0}" != "1" ]]; then
 
 Set RUN_RF=1 to execute RF/integration validation automatically.
 
+Before running the manual checks, refresh sudo credentials once:
+  sudo -v
+
 Suggested manual checks:
 
 1. Type 1 one-shot
    sudo -n ./build/bin/wsprrypi AA0NT EM18 20 80m
 
+   Expect log lines:
+   - Selected WSPR plan: Type1Single, frames: 1, paired requested: false, auto-upgraded: false.
+   - Waiting for next transmission window.
+   - Started transmission:
+   - Completed transmission: 110.592
+   - Shutdown requested: completed configured TX iterations
+
 2. Explicit Type 3 one-shot
    sudo -n ./build/bin/wsprrypi "<AA0NT>" EM18IG 20 80m
 
-3. Forced paired two-slot run
+   Expect log lines:
+   - Selected WSPR plan: Type3Single, frames: 1, paired requested: false, auto-upgraded: false.
+   - Waiting for next transmission window.
+   - Started transmission:
+   - Completed transmission: 110.592
+   - Shutdown requested: completed configured TX iterations
+
+3. Auto-upgraded paired two-slot run
+   sudo -n ./build/bin/wsprrypi -D W1/AA0NT EM18IG 20 80m
+
+   Expect log lines:
+   - Auto-upgrading to paired WSPR plan because callsign is compound and locator is 6 characters.
+   - Selected WSPR plan: Type2Type3Paired, frames: 2, paired requested: false, auto-upgraded: true.
+   - Scheduling paired WSPR frame 2 of 2 for the next WSPR slot.
+   - Started transmission:
+   - Completed transmission: 110.592
+   - Shutdown requested: completed configured TX iterations
+
+4. Forced paired two-slot run
    sudo -n ./build/bin/wsprrypi -D --require-paired W1/AA0NT EM18IG 20 80m
 
-4. Test tone sanity
+   Expect log lines:
+   - Paired WSPR planning explicitly requested.
+   - Selected WSPR plan: Type2Type3Paired, frames: 2, paired requested: true, auto-upgraded: false.
+   - Scheduling paired WSPR frame 2 of 2 for the next WSPR slot.
+   - Started transmission:
+   - Completed transmission: 110.592
+   - Shutdown requested: completed configured TX iterations
+
+5. Test tone sanity
    sudo -n ./build/bin/wsprrypi --test-tone 3.5686MHz
+
+   Expect log lines:
+   - Started transmission:
+   - no WSPR slot wait
+   - clean Ctrl-C or timeout shutdown
 
 EOF
     pass "Non-RF regression smoke completed"
@@ -193,29 +276,32 @@ fi
 step "RF/integration checks"
 
 type1_rf_log="${LOG_DIR}/rf_type1.log"
-run_and_capture "${type1_rf_log}" \
-    "cd '${SRC_ROOT}' && timeout 180s sudo -n ./build/bin/wsprrypi AA0NT EM18 20 80m || true"
-grep -Fq "Prepared WSPR plan type: Type1Single, frames: 1." "${type1_rf_log}" || fail "Type 1 plan not detected"
-grep -Fq "Started transmission:" "${type1_rf_log}" || fail "Type 1 transmission did not start"
-grep -Fq "Completed transmission: 110.592" "${type1_rf_log}" || fail "Type 1 transmission duration incorrect"
-grep -Fq "Shutdown requested: completed configured TX iterations" "${type1_rf_log}" || fail "Type 1 shutdown did not occur"
-pass "Type 1 one-shot RF behavior looks correct"
+run_log_check \
+    "Type 1 one-shot RF behavior looks correct" \
+    "${type1_rf_log}" \
+    "cd '${SRC_ROOT}' && timeout --foreground 180s sudo -n ./build/bin/wsprrypi AA0NT EM18 20 80m || true" \
+    "Selected WSPR plan: Type1Single, frames: 1, paired requested: false, auto-upgraded: false." \
+    "Started transmission:" \
+    "Completed transmission: 110.592" \
+    "Shutdown requested: completed configured TX iterations"
 
 type3_rf_log="${LOG_DIR}/rf_type3.log"
-run_and_capture "${type3_rf_log}" \
-    "cd '${SRC_ROOT}' && timeout 180s sudo -n ./build/bin/wsprrypi '<AA0NT>' EM18IG 20 80m || true"
-grep -Fq "Prepared WSPR plan type: Type3Single, frames: 1." "${type3_rf_log}" || fail "Type 3 plan not detected"
-grep -Fq "Completed transmission: 110.592" "${type3_rf_log}" || fail "Type 3 transmission duration incorrect"
-pass "Explicit Type 3 one-shot RF behavior looks correct"
+run_log_check \
+    "Explicit Type 3 one-shot RF behavior looks correct" \
+    "${type3_rf_log}" \
+    "cd '${SRC_ROOT}' && timeout --foreground 180s sudo -n ./build/bin/wsprrypi '<AA0NT>' EM18IG 20 80m || true" \
+    "Selected WSPR plan: Type3Single, frames: 1, paired requested: false, auto-upgraded: false." \
+    "Completed transmission: 110.592"
 
 paired_rf_log="${LOG_DIR}/rf_paired.log"
-run_and_capture "${paired_rf_log}" \
-    "cd '${ROOT_DIR}' && timeout 360s sudo -n ./build/bin/wsprrypi -D --require-paired W1/AA0NT EM18IG 20 80m || true"
-
-grep -Fq "Prepared WSPR plan type: Type2Type3Paired, frames: 2" "${paired_rf_log}" || fail "Paired plan not detected"
-grep -Fq "Scheduling paired WSPR frame 2 of 2 for the next WSPR slot." "${paired_rf_log}" || fail "Frame 2 was not scheduled for the next slot"
-
-grep -Fq "Completed transmission: 110.592" "${paired_rf_log}" || fail "Expected per-slot transmission duration not found"
+run_log_check \
+    "Forced paired two-slot RF behavior log checks" \
+    "${paired_rf_log}" \
+    "cd '${SRC_ROOT}' && timeout --foreground 360s sudo -n ./build/bin/wsprrypi -D --require-paired W1/AA0NT EM18IG 20 80m || true" \
+    "Selected WSPR plan: Type2Type3Paired, frames: 2, paired requested: true, auto-upgraded: false." \
+    "Scheduling paired WSPR frame 2 of 2 for the next WSPR slot." \
+    "Completed transmission: 110.592" \
+    "Shutdown requested: completed configured TX iterations"
 
 python3 - "$paired_rf_log" <<'PY'
 import re
@@ -241,14 +327,50 @@ if delta != 120:
     print(f"Expected paired frame start delta of 120 seconds, found {delta}", file=sys.stderr)
     sys.exit(1)
 PY
+pass "Forced paired two-slot RF timing looks correct"
 
-grep -Fq "Shutdown requested: completed configured TX iterations" "${paired_rf_log}" || fail "Paired shutdown did not occur after plan completion"
-pass "Paired two-slot RF behavior looks correct"
+auto_paired_rf_log="${LOG_DIR}/rf_auto_paired.log"
+run_log_check \
+    "Auto-upgraded paired two-slot RF behavior log checks" \
+    "${auto_paired_rf_log}" \
+    "cd '${SRC_ROOT}' && timeout --foreground 360s sudo -n ./build/bin/wsprrypi -D W1/AA0NT EM18IG 20 80m || true" \
+    "Auto-upgrading to paired WSPR plan because callsign is compound and locator is 6 characters." \
+    "Selected WSPR plan: Type2Type3Paired, frames: 2, paired requested: false, auto-upgraded: true." \
+    "Scheduling paired WSPR frame 2 of 2 for the next WSPR slot." \
+    "Completed transmission: 110.592" \
+    "Shutdown requested: completed configured TX iterations"
+
+python3 - "$auto_paired_rf_log" <<'PY'
+import re
+import sys
+from datetime import datetime
+
+path = sys.argv[1]
+text = open(path, "r", encoding="utf-8").read().splitlines()
+
+starts = []
+for line in text:
+    if "Started transmission:" in line:
+        m = re.match(r"^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})", line)
+        if m:
+            starts.append(datetime.strptime(m.group(1), "%Y-%m-%d %H:%M:%S"))
+
+if len(starts) != 2:
+    print(f"Expected exactly 2 timestamped transmission starts, found {len(starts)}", file=sys.stderr)
+    sys.exit(1)
+
+delta = int((starts[1] - starts[0]).total_seconds())
+if delta != 120:
+    print(f"Expected paired frame start delta of 120 seconds, found {delta}", file=sys.stderr)
+    sys.exit(1)
+PY
+pass "Auto-upgraded paired two-slot RF timing looks correct"
 
 tone_rf_log="${LOG_DIR}/rf_tone.log"
-run_and_capture "${tone_rf_log}" \
-    "cd '${SRC_ROOT}' && timeout 5s sudo -n ./build/bin/wsprrypi --test-tone 3.5686MHz || true"
-grep -Fq "Started transmission:" "${tone_rf_log}" || fail "Test tone did not start"
-pass "Test tone startup looks correct"
+run_log_check \
+    "Test tone startup looks correct" \
+    "${tone_rf_log}" \
+    "cd '${SRC_ROOT}' && timeout --foreground 5s sudo -n stdbuf -oL -eL ./build/bin/wsprrypi --test-tone 3.5686MHz || true" \
+    "Started transmission:"
 
 pass "RF/integration regression smoke completed"
