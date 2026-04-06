@@ -55,6 +55,7 @@
 #include <fstream>
 #include <iomanip>
 #include <iostream>
+#include <random>
 #include <string>
 #include <thread>
 #include <vector>
@@ -181,6 +182,7 @@ int freq_iterator = 0;
  */
 double current_dial_frequency = 0.0;
 WsprDialFrequencyEntry current_frequency_entry{};
+WsprTransmissionRequest current_transmission_request{};
 
 /**
  * @brief File-scope self-pipe descriptors for signal notifications.
@@ -347,6 +349,68 @@ static void log_selected_frequency_entry_gpio(const WsprDialFrequencyEntry &entr
               ".");
 }
 
+static double maybe_apply_wspr_random_offset(double actual_rf_frequency_hz)
+{
+    if (!config.use_offset || actual_rf_frequency_hz == 0.0)
+    {
+        return actual_rf_frequency_hz;
+    }
+
+    std::random_device rd;
+    std::mt19937 gen(rd());
+    std::uniform_real_distribution<> dis(-1.0, 1.0);
+    return actual_rf_frequency_hz + dis(gen) * kWsprRandomOffsetHz;
+}
+
+static WsprTransmissionRequest make_tone_request(
+    double actual_rf_frequency_hz,
+    double dial_frequency_hz,
+    const WsprDialFrequencyEntry &entry)
+{
+    WsprTransmissionRequest request;
+    request.mode = WsprTransmissionMode::TONE;
+    request.dial_frequency_hz = dial_frequency_hz;
+    request.actual_rf_frequency_hz = actual_rf_frequency_hz;
+    request.ppm = config.ppm;
+    request.power_level = config.power_level;
+    request.tx_gpio = config.tx_pin;
+    request.frequency_control_gpio = entry.control_gpio;
+    request.frequency_control_active_high = config.tx_freq_control_active_high;
+    request.frequency_entry_label = entry.token;
+    return request;
+}
+
+static WsprTransmissionRequest make_direct_tone_request(double actual_rf_frequency_hz)
+{
+    return make_tone_request(
+        actual_rf_frequency_hz,
+        actual_rf_frequency_hz,
+        WsprDialFrequencyEntry{});
+}
+
+static WsprTransmissionRequest make_wspr_request(
+    const PreparedWsprTransmission &slot_plan,
+    double dial_frequency_hz,
+    double actual_rf_frequency_hz,
+    const WsprDialFrequencyEntry &entry,
+    double applied_offset_hz)
+{
+    WsprTransmissionRequest request;
+    request.mode = WsprTransmissionMode::WSPR;
+    request.wspr_plan = slot_plan;
+    request.dial_frequency_hz = dial_frequency_hz;
+    request.actual_rf_frequency_hz = actual_rf_frequency_hz;
+    request.ppm = config.ppm;
+    request.power_level = config.power_level;
+    request.tx_gpio = config.tx_pin;
+    request.use_offset = config.use_offset;
+    request.applied_offset_hz = applied_offset_hz;
+    request.frequency_control_gpio = entry.control_gpio;
+    request.frequency_control_active_high = config.tx_freq_control_active_high;
+    request.frequency_entry_label = entry.token;
+    return request;
+}
+
 static std::string format_elapsed(double elapsed)
 {
     if (elapsed == 0.0)
@@ -379,7 +443,8 @@ constexpr LogLevel to_log_level(WsprTransmitter::LogLevel level)
 }
 
 static bool configure_current_wspr_transmission(
-    double actual_rf_frequency_hz)
+    double actual_rf_frequency_hz,
+    WsprTransmissionRequest &request_out)
 {
     try
     {
@@ -494,13 +559,12 @@ static bool configure_current_wspr_transmission(
                   auto_upgraded ? "true" : "false",
                   ".");
 
-        wsprTransmitter.setTransmitGpio(config.tx_pin);
-        wsprTransmitter.configureWspr(
-            actual_rf_frequency_hz,
-            config.power_level,
-            config.ppm,
+        request_out = make_wspr_request(
             slot_plan,
-            config.use_offset);
+            current_dial_frequency,
+            actual_rf_frequency_hz,
+            current_frequency_entry,
+            0.0);
 
         if (plan.frameCount() > 1U)
         {
@@ -970,10 +1034,9 @@ void start_test_tone()
             " using audio offset ",
             config.wspr_audio_offset_hz,
             " Hz.");
-        wsprTransmitter.setTransmitGpio(config.tx_pin);
-        wsprTransmitter.configureTone(actual_rf_freq,
-                                      config.power_level,
-                                      config.ppm);
+        current_transmission_request =
+            make_tone_request(actual_rf_freq, dial_freq, entry);
+        wsprTransmitter.configureExecution(current_transmission_request);
 
         log_selected_frequency_entry_gpio(entry);
         if (!frequencyEntryGPIOSelector.prepare(
@@ -1045,14 +1108,12 @@ void end_test_tone()
         {
             // It was already a tone, so set it up again
             validate_config_data();
-            wsprTransmitter.setTransmitGpio(config.tx_pin);
-            wsprTransmitter.configureTone(
+            current_transmission_request = make_direct_tone_request(
                 resolve_actual_rf_frequency_hz(
                     config.test_tone,
                     config.wspr_audio_offset_hz,
-                    FrequencyPath::DirectRf),
-                config.power_level,
-                config.ppm);
+                    FrequencyPath::DirectRf));
+            wsprTransmitter.configureExecution(current_transmission_request);
             wsprTransmitter.startAsync();
 
             llog.logS(INFO,
@@ -1158,14 +1219,12 @@ bool wspr_loop()
     }
     else if (config.mode == ModeType::TONE)
     {
-        wsprTransmitter.setTransmitGpio(config.tx_pin);
-        wsprTransmitter.configureTone(
+        current_transmission_request = make_direct_tone_request(
             resolve_actual_rf_frequency_hz(
                 config.test_tone,
                 config.wspr_audio_offset_hz,
-                FrequencyPath::DirectRf),
-            config.power_level,
-            config.ppm);
+                FrequencyPath::DirectRf));
+        wsprTransmitter.configureExecution(current_transmission_request);
         wsprTransmitter.startAsync();
         llog.logS(INFO, "transmitting tone, hit Ctrl-C to terminate tone.");
     }
@@ -1386,6 +1445,7 @@ void set_config(bool force)
         freq_iterator = 0;
         current_dial_frequency = 0.0;
         current_frequency_entry = WsprDialFrequencyEntry{};
+        current_transmission_request = WsprTransmissionRequest{};
         reset_active_wspr_plan_state();
         shutdown_after_wspr_plan.store(false, std::memory_order_release);
 
@@ -1524,10 +1584,14 @@ void set_config(bool force)
     // If we have a change, do setup
     if (do_config || do_random)
     {
-        const double actual_rf_frequency_hz = resolve_actual_rf_frequency_hz(
+        const double base_actual_rf_frequency_hz = resolve_actual_rf_frequency_hz(
             current_dial_frequency,
             config.wspr_audio_offset_hz,
             FrequencyPath::WsprDial);
+        const double actual_rf_frequency_hz =
+            maybe_apply_wspr_random_offset(base_actual_rf_frequency_hz);
+        const double applied_offset_hz =
+            actual_rf_frequency_hz - base_actual_rf_frequency_hz;
 
         // Do DMA configuration
         llog.logS(
@@ -1540,12 +1604,15 @@ void set_config(bool force)
             config.wspr_audio_offset_hz,
             " Hz.");
         if (!configure_current_wspr_transmission(
-                actual_rf_frequency_hz))
+                actual_rf_frequency_hz,
+                current_transmission_request))
         {
             config.transmit = false;
             config_to_json();
             return;
         }
+        current_transmission_request.applied_offset_hz = applied_offset_hz;
+        wsprTransmitter.configureExecution(current_transmission_request);
 
         log_selected_frequency_entry_gpio(current_frequency_entry);
         if (!frequencyEntryGPIOSelector.prepare(
