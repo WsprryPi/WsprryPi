@@ -82,26 +82,16 @@ public:
     bool prepare(const WsprDialFrequencyEntry &entry, bool active_high)
     {
         stop();
+        last_error_.clear();
 
         if (entry.control_gpio == kFrequencyEntryControlGpioUnset)
         {
             return true;
         }
 
-        try
+        if (!gpio_.enableGPIOPin(entry.control_gpio, active_high))
         {
-            if (!gpio_.enableGPIOPin(entry.control_gpio, active_high))
-            {
-                return false;
-            }
-        }
-        catch (const std::exception &e)
-        {
-            llog.logS(ERROR,
-                      "Unable to enable frequency entry control GPIO ",
-                      entry.control_gpio,
-                      ": ",
-                      e.what());
+            last_error_ = gpio_.lastError();
             return false;
         }
 
@@ -130,9 +120,15 @@ public:
         has_gpio_ = false;
     }
 
+    const std::string &lastError() const noexcept
+    {
+        return last_error_;
+    }
+
 private:
     GPIOOutput gpio_{};
     bool has_gpio_ = false;
+    std::string last_error_{};
 };
 
 static FrequencyEntryGPIOSelector frequencyEntryGPIOSelector;
@@ -1561,9 +1557,16 @@ void set_config(bool force)
                       current_frequency_entry.control_gpio,
                       " for ",
                       current_frequency_entry.token,
-                      ".");
+                      ".",
+                      frequencyEntryGPIOSelector.lastError().empty()
+                          ? ""
+                          : std::string(" ") + frequencyEntryGPIOSelector.lastError());
+            frequencyEntryGPIOSelector.stop();
+            bandGPIOSelector.setBandState(false);
+            bandGPIOSelector.stop();
             config.transmit = false;
             config_to_json();
+            request_wspr_shutdown("frequency entry control GPIO unavailable");
             return;
         }
 

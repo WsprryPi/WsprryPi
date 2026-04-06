@@ -100,10 +100,16 @@ public:
      */
     bool toggleGPIO(bool state);
 
+    /**
+     * @brief Returns the most recent GPIO setup error, if any.
+     */
+    const std::string &lastError() const noexcept { return last_error_; }
+
 private:
     int pin_;
     bool active_high_;
     bool enabled_;
+    std::string last_error_;
 
     // Using unique_ptr to manage the libgpiod chip.
     std::unique_ptr<gpiod::chip> chip_;

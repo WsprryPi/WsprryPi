@@ -75,6 +75,10 @@ bool BandGPIOSelector::prepareBand(HamBand band)
 
     if (!gpio_.enableGPIOPin(config.gpio, config.active_high))
     {
+        if (!gpio_.lastError().empty())
+        {
+            llog.logS(ERROR, tag, gpio_.lastError());
+        }
         has_band_ = false;
         current_config_ = BandGPIOConfig{};
         return false;
