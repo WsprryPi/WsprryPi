@@ -1542,8 +1542,8 @@ void set_config(bool force)
     if (ppm_reload_pending.load())
     {
         config.ppm = ppmManager.getCurrentPPM();
-        wsprTransmitter.applyPpmCorrection(config.ppm);
         llog.logS(INFO, "PPM updated:", config.ppm);
+        do_config = true;
 
         // Clear pending ppm flags
         ppm_reload_pending.store(false, std::memory_order_relaxed);
