@@ -277,7 +277,6 @@ static PreparedWsprTransmission slot_plan_for_frame(
 static bool is_auto_paired_upgrade_eligible() noexcept
 {
     return config.mode == ModeType::WSPR &&
-           !config.test_tone &&
            (config.callsign.find('/') != std::string::npos) &&
            config.grid_square.size() == 6U;
 }

@@ -344,6 +344,53 @@ check_log_absent "${auto_paired_log}" "Type1Single"
 check_log_absent "${auto_paired_log}" \
     "Paired WSPR planning explicitly requested."
 
+persisted_test_tone_ini="${LOG_DIR}/auto_paired_with_persisted_test_tone.ini"
+cat >"${persisted_test_tone_ini}" <<'EOF'
+[Meta]
+Mode = WSPR
+Test Tone = 14097100.0
+
+[Control]
+Transmit = True
+
+[Common]
+Call Sign = W1/AA0NT
+Grid Square = EM18IG
+TX Power = 20
+Frequency = 80m
+Transmit Pin = 4
+
+[Extended]
+PPM = 0.0
+Use NTP = False
+Offset = False
+Use LED = False
+LED Pin = 18
+Power Level = 7
+
+[Server]
+Web Port = 31425
+Socket Port = 31426
+Use Shutdown = False
+Shutdown Button = 19
+
+[Band GPIO]
+80m = -1
+80m Active High = false
+EOF
+
+persisted_test_tone_log="${LOG_DIR}/auto_paired_with_persisted_test_tone.log"
+run_log_check \
+    "Auto-upgrade eligibility ignores persisted test tone state in WSPR mode" \
+    "${persisted_test_tone_log}" \
+    "cd '${SRC_ROOT}' && timeout --foreground 5s sudo -n stdbuf -oL -eL ./build/bin/wsprrypi -i '${persisted_test_tone_ini}' || true" \
+    "Auto-upgrading to paired WSPR plan because callsign is compound and locator is 6 characters." \
+    "Selected WSPR plan: Type2Type3Paired, frames: 2, paired requested: false, auto-upgraded: true."
+check_log_absent "${persisted_test_tone_log}" \
+    "A direct RF test tone will be generated at:"
+check_log_absent "${persisted_test_tone_log}" \
+    "Paired WSPR planning explicitly requested."
+
 if [[ "${RUN_RF:-0}" != "1" ]]; then
     step "Manual RF checklist"
     cat <<'EOF'
