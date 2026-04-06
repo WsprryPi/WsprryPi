@@ -550,6 +550,7 @@ namespace
         target.use_ini = source.at("Meta").at("Use INI").get<bool>();
         target.ini_filename = source.at("Meta").at("INI Filename").get<std::string>();
         target.date_time_log = source.at("Meta").at("Date Time Log").get<bool>();
+        target.require_paired_plan = source.at("Meta").value("Require Paired Plan", false);
         target.loop_tx = source.at("Meta").at("Loop TX").get<bool>();
         target.tx_iterations.store(source.at("Meta").at("TX Iterations").get<int>());
         target.test_tone = source.at("Meta").at("Test Tone").get<double>();
@@ -647,6 +648,7 @@ namespace
         target["Meta"]["Use INI"] = source.use_ini;
         target["Meta"]["INI Filename"] = source.ini_filename;
         target["Meta"]["Date Time Log"] = source.date_time_log;
+        target["Meta"]["Require Paired Plan"] = source.require_paired_plan;
         target["Meta"]["Loop TX"] = source.loop_tx;
         target["Meta"]["TX Iterations"] = source.tx_iterations.load();
         target["Meta"]["Test Tone"] = source.test_tone;
@@ -703,6 +705,7 @@ namespace
         target.shutdown_pin = source.shutdown_pin;
         target.use_journald = source.use_journald;
         target.date_time_log = source.date_time_log;
+        target.require_paired_plan = source.require_paired_plan;
         target.loop_tx = source.loop_tx;
         target.tx_iterations.store(source.tx_iterations.load());
         target.test_tone = source.test_tone;

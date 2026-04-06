@@ -252,17 +252,25 @@ static bool configure_current_wspr_transmission(
 {
     try
     {
+        const wspr::TransmissionPlanPreference preference =
+            config.require_paired_plan
+                ? wspr::TransmissionPlanPreference::RequirePaired
+                : wspr::TransmissionPlanPreference::Auto;
+
         const PreparedWsprTransmission plan =
             build_prepared_wspr_transmission(
                 config.callsign,
                 config.grid_square,
-                config.power_dbm);
+                config.power_dbm,
+                preference);
 
         llog.logS(INFO,
                   "Prepared WSPR plan type: ",
                   plan.plan_type,
                   ", frames: ",
                   static_cast<int>(plan.frames.size()),
+                  ", paired requested: ",
+                  config.require_paired_plan ? "true" : "false",
                   ".");
 
         wsprTransmitter.configureWspr(

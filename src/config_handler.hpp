@@ -106,6 +106,7 @@ struct ArgParserConfig
     // Command line only
     bool use_journald;              ///< Route logs to journald instead of streams.
     bool date_time_log;             ///< Prefix logs with timestamp.
+    bool require_paired_plan;       ///< Request paired WSPR planning from the encoder.
     bool loop_tx;                   ///< Repeat transmission cycle.
     std::atomic<int> tx_iterations; ///< Number of transmission iterations (0 = infinite).
     double test_tone;               ///< Direct-RF continuous tone frequency in Hz.
@@ -141,6 +142,7 @@ struct ArgParserConfig
           shutdown_pin(-1),
           use_journald(false),
           date_time_log(false),
+          require_paired_plan(false),
           loop_tx(false),
           tx_iterations(0),
           test_tone(0.0),

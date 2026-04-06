@@ -925,6 +925,7 @@ bool parse_command_line(int argc, char *argv[])
         {"offset", no_argument, nullptr, 'o'},        // Via: [Extended] Offset = True
         {"journald", no_argument, nullptr, 'J'},      // Global: config.use_journald
         {"date-time-log", no_argument, nullptr, 'D'}, // Global: config.date_time_log
+        {"require-paired", no_argument, nullptr, 1001}, // Global: config.require_paired_plan
         // Required arguments
         {"ppm", required_argument, nullptr, 'p'},       // Via: [Extended] PPM = 0.0
         {"terminate", required_argument, nullptr, 'x'}, // Global: config.tx_iterations
@@ -981,6 +982,11 @@ bool parse_command_line(int argc, char *argv[])
         case 'D': // Add date/time stamps to stream logging
         {
             config.date_time_log = true;
+            break;
+        }
+        case 1001: // Require paired WSPR planning
+        {
+            config.require_paired_plan = true;
             break;
         }
         // Required arguments
