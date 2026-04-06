@@ -101,6 +101,36 @@ check_timestamp_prefix_absent() {
     fi
 }
 
+check_log_contains() {
+    local file="$1"
+    local needle="$2"
+    grep -Fq -- "$needle" "$file" || {
+        cat "$file" >&2
+        fail "Missing expected log line in ${file}: ${needle}"
+    }
+}
+
+check_log_absent() {
+    local file="$1"
+    local needle="$2"
+    if grep -Fq -- "$needle" "$file"; then
+        cat "$file" >&2
+        fail "Unexpected log line in ${file}: ${needle}"
+    fi
+}
+
+check_log_count() {
+    local file="$1"
+    local needle="$2"
+    local expected="$3"
+    local actual
+    actual="$(grep -F -- "$needle" "$file" | wc -l | tr -d ' ')"
+    [[ "${actual}" == "${expected}" ]] || {
+        cat "$file" >&2
+        fail "Expected ${expected} occurrences of '${needle}' in ${file}, found ${actual}"
+    }
+}
+
 step "Sanity-check project layout"
 require_file "${SRC_ROOT}/Makefile"
 require_file "${BIN_DIR}/wsprrypi"
@@ -160,6 +190,12 @@ run_log_check \
     "cd '${SRC_ROOT}' && timeout --foreground 5s sudo -n stdbuf -oL -eL ./build/bin/wsprrypi AA0NT EM18 20 80m || true" \
     "Logging backend: streams"
 check_timestamp_prefix_absent "${default_log}"
+check_log_contains "${default_log}" \
+    "Selected WSPR plan: Type1Single, frames: 1, paired requested: false, auto-upgraded: false."
+check_log_absent "${default_log}" \
+    "Auto-upgrading to paired WSPR plan because callsign is compound and locator is 6 characters."
+check_log_absent "${default_log}" \
+    "Paired WSPR planning explicitly requested."
 
 timestamp_log="${LOG_DIR}/timestamp_startup.log"
 run_log_check \
@@ -189,11 +225,26 @@ run_and_check \
     "Explicit Type 3 input reaches planner" \
     "cd '${SRC_ROOT}' && timeout --foreground 5s sudo -n stdbuf -oL -eL ./build/bin/wsprrypi '<AA0NT>' EM18IG 20 80m || true" \
     "Selected WSPR plan: Type3Single, frames: 1, paired requested: false, auto-upgraded: false."
+type3_startup_log="${LOG_DIR}/type3_startup.log"
+run_log_check \
+    "Explicit Type 3 does not auto-upgrade to paired" \
+    "${type3_startup_log}" \
+    "cd '${SRC_ROOT}' && timeout --foreground 5s sudo -n stdbuf -oL -eL ./build/bin/wsprrypi '<AA0NT>' EM18IG 20 80m || true" \
+    "Selected WSPR plan: Type3Single, frames: 1, paired requested: false, auto-upgraded: false."
+check_log_absent "${type3_startup_log}" \
+    "Auto-upgrading to paired WSPR plan because callsign is compound and locator is 6 characters."
+check_log_absent "${type3_startup_log}" \
+    "Paired WSPR planning explicitly requested."
 
-run_and_check \
+forced_paired_startup_log="${LOG_DIR}/forced_paired_startup.log"
+run_log_check \
     "Require-paired reaches paired planner" \
+    "${forced_paired_startup_log}" \
     "cd '${SRC_ROOT}' && timeout --foreground 5s sudo -n stdbuf -oL -eL ./build/bin/wsprrypi --require-paired W1/AA0NT EM18IG 20 80m || true" \
+    "Paired WSPR planning explicitly requested." \
     "Selected WSPR plan: Type2Type3Paired, frames: 2, paired requested: true, auto-upgraded: false."
+check_log_absent "${forced_paired_startup_log}" \
+    "Auto-upgrading to paired WSPR plan because callsign is compound and locator is 6 characters."
 
 auto_paired_log="${LOG_DIR}/auto_paired_startup.log"
 run_log_check \
@@ -202,10 +253,9 @@ run_log_check \
     "cd '${SRC_ROOT}' && timeout --foreground 5s sudo -n stdbuf -oL -eL ./build/bin/wsprrypi W1/AA0NT EM18IG 20 80m || true" \
     "Auto-upgrading to paired WSPR plan because callsign is compound and locator is 6 characters." \
     "Selected WSPR plan: Type2Type3Paired, frames: 2, paired requested: false, auto-upgraded: true."
-if grep -Fq "Type1Single" "${auto_paired_log}"; then
-    cat "${auto_paired_log}" >&2
-    fail "Unexpected downgrade to Type1Single in auto-paired case"
-fi
+check_log_absent "${auto_paired_log}" "Type1Single"
+check_log_absent "${auto_paired_log}" \
+    "Paired WSPR planning explicitly requested."
 
 if [[ "${RUN_RF:-0}" != "1" ]]; then
     step "Manual RF checklist"
@@ -298,10 +348,17 @@ run_log_check \
     "Forced paired two-slot RF behavior log checks" \
     "${paired_rf_log}" \
     "cd '${SRC_ROOT}' && timeout --foreground 360s sudo -n ./build/bin/wsprrypi -D --require-paired W1/AA0NT EM18IG 20 80m || true" \
+    "Paired WSPR planning explicitly requested." \
     "Selected WSPR plan: Type2Type3Paired, frames: 2, paired requested: true, auto-upgraded: false." \
     "Scheduling paired WSPR frame 2 of 2 for the next WSPR slot." \
     "Completed transmission: 110.592" \
     "Shutdown requested: completed configured TX iterations"
+check_log_absent "${paired_rf_log}" \
+    "Auto-upgrading to paired WSPR plan because callsign is compound and locator is 6 characters."
+check_log_count "${paired_rf_log}" \
+    "Paired WSPR planning explicitly requested." 1
+check_log_count "${paired_rf_log}" \
+    "Scheduling paired WSPR frame 2 of 2 for the next WSPR slot." 1
 
 python3 - "$paired_rf_log" <<'PY'
 import re
@@ -339,6 +396,13 @@ run_log_check \
     "Scheduling paired WSPR frame 2 of 2 for the next WSPR slot." \
     "Completed transmission: 110.592" \
     "Shutdown requested: completed configured TX iterations"
+check_log_absent "${auto_paired_rf_log}" \
+    "Paired WSPR planning explicitly requested."
+check_log_absent "${auto_paired_rf_log}" "Type1Single"
+check_log_count "${auto_paired_rf_log}" \
+    "Auto-upgrading to paired WSPR plan because callsign is compound and locator is 6 characters." 1
+check_log_count "${auto_paired_rf_log}" \
+    "Scheduling paired WSPR frame 2 of 2 for the next WSPR slot." 1
 
 python3 - "$auto_paired_rf_log" <<'PY'
 import re
