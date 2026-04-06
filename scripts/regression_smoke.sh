@@ -327,7 +327,7 @@ forced_paired_startup_log="${LOG_DIR}/forced_paired_startup.log"
 run_log_check \
     "Require-paired reaches paired planner" \
     "${forced_paired_startup_log}" \
-    "cd '${SRC_ROOT}' && timeout --foreground 5s sudo -n stdbuf -oL -eL ./build/bin/wsprrypi --require-paired W1/AA0NT EM18IG 20 80m || true" \
+    "cd '${SRC_ROOT}' && timeout --foreground 5s sudo -n stdbuf -oL -eL ./build/bin/wsprrypi --require-paired W0/AA0NT EM18IG 20 80m || true" \
     "Paired WSPR planning explicitly requested." \
     "Selected WSPR plan: Type2Type3Paired, frames: 2, paired requested: true, auto-upgraded: false."
 check_log_absent "${forced_paired_startup_log}" \
@@ -337,7 +337,7 @@ auto_paired_log="${LOG_DIR}/auto_paired_startup.log"
 run_log_check \
     "Auto-upgrade to paired WSPR plan works" \
     "${auto_paired_log}" \
-    "cd '${SRC_ROOT}' && timeout --foreground 5s sudo -n stdbuf -oL -eL ./build/bin/wsprrypi W1/AA0NT EM18IG 20 80m || true" \
+    "cd '${SRC_ROOT}' && timeout --foreground 5s sudo -n stdbuf -oL -eL ./build/bin/wsprrypi W0/AA0NT EM18IG 20 80m || true" \
     "Auto-upgrading to paired WSPR plan because callsign is compound and locator is 6 characters." \
     "Selected WSPR plan: Type2Type3Paired, frames: 2, paired requested: false, auto-upgraded: true."
 check_log_absent "${auto_paired_log}" "Type1Single"
@@ -354,7 +354,7 @@ Mode = WSPR
 Transmit = True
 
 [Common]
-Call Sign = W1/AA0NT
+Call Sign = W0/AA0NT
 Grid Square = EM18IG
 TX Power = 20
 Frequency = 80m
@@ -422,7 +422,7 @@ Suggested manual checks:
    - Shutdown requested: completed configured TX iterations
 
 3. Auto-upgraded paired two-slot run
-   sudo -n ./build/bin/wsprrypi -D W1/AA0NT EM18IG 20 80m
+   sudo -n ./build/bin/wsprrypi -D W0/AA0NT EM18IG 20 80m
 
    Expect log lines:
    - Auto-upgrading to paired WSPR plan because callsign is compound and locator is 6 characters.
@@ -433,7 +433,7 @@ Suggested manual checks:
    - Shutdown requested: completed configured TX iterations
 
 4. Forced paired two-slot run
-   sudo -n ./build/bin/wsprrypi -D --require-paired W1/AA0NT EM18IG 20 80m
+   sudo -n ./build/bin/wsprrypi -D --require-paired W0/AA0NT EM18IG 20 80m
 
    Expect log lines:
    - Paired WSPR planning explicitly requested.
@@ -480,7 +480,7 @@ paired_rf_log="${LOG_DIR}/rf_paired.log"
 run_log_check \
     "Forced paired two-slot RF behavior log checks" \
     "${paired_rf_log}" \
-    "cd '${SRC_ROOT}' && timeout --foreground 360s sudo -n ./build/bin/wsprrypi -D --tx-gpio-polarity high --require-paired W1/AA0NT EM18IG 20 20m@17 || true" \
+    "cd '${SRC_ROOT}' && timeout --foreground 360s sudo -n ./build/bin/wsprrypi -D --tx-gpio-polarity high --require-paired W0/AA0NT EM18IG 20 20m@17 || true" \
     "Selected frequency entry control GPIO: 17 (active high) for 20m." \
     "Paired WSPR planning explicitly requested." \
     "Selected WSPR plan: Type2Type3Paired, frames: 2, paired requested: true, auto-upgraded: false." \
@@ -526,7 +526,7 @@ auto_paired_rf_log="${LOG_DIR}/rf_auto_paired.log"
 run_log_check \
     "Auto-upgraded paired two-slot RF behavior log checks" \
     "${auto_paired_rf_log}" \
-    "cd '${SRC_ROOT}' && timeout --foreground 360s sudo -n ./build/bin/wsprrypi -D W1/AA0NT EM18IG 20 80m || true" \
+    "cd '${SRC_ROOT}' && timeout --foreground 360s sudo -n ./build/bin/wsprrypi -D W0/AA0NT EM18IG 20 80m || true" \
     "Auto-upgrading to paired WSPR plan because callsign is compound and locator is 6 characters." \
     "Selected WSPR plan: Type2Type3Paired, frames: 2, paired requested: false, auto-upgraded: true." \
     "Scheduling paired WSPR frame 2 of 2 for the next WSPR slot." \
