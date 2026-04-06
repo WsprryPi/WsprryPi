@@ -240,23 +240,6 @@ void shutdown_machine();
 void send_ws_message(std::string type, std::string state);
 
 /**
- * @brief Retrieve the next configured WSPR dial frequency, cycling through the list.
- *
- * This method returns the next frequency from `config.wspr_dial_freq_set` in a
- * round-robin fashion.  It uses `freq_iterator_` modulo the list size to
- * index into the vector, then increments `freq_iterator_` for the subsequent call.
- *
- * @return double
- *   - Next frequency in Hz from the list.
- *   - Returns 0.0 if the list is empty.
- *
- * @note
- *   - `freq_iterator_` should be initialized to 0.
- *   - Wrapping is handled via the modulo operation.
- */
-double next_frequency(bool reset = false);
-
-/**
  * @brief Apply updated transmission parameters and reinitialize DMA.
  *
  * Retrieves the current PPM value if NTP calibration is enabled, captures

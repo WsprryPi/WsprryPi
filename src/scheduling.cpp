@@ -76,6 +76,7 @@
  * transmission completes, is skipped, or is cancelled.
  */
 static BandGPIOSelector bandGPIOSelector;
+static void log_selected_frequency_entry_gpio(const WsprDialFrequencyEntry &entry);
 
 class FrequencyEntryGPIOSelector
 {
@@ -177,7 +178,7 @@ int freq_iterator = 0;
 /**
  * @brief Currently active WSPR dial frequency (in Hz).
  *
- * Holds the last frequency value retrieved by `next_frequency()`.
+ * Holds the last dial frequency selected by the scheduler.
  * A zero value indicates that no frequency is configured or the list was empty.
  */
 double current_dial_frequency = 0.0;
@@ -243,6 +244,46 @@ std::size_t active_wspr_frame_index = 0;
 double active_wspr_plan_dial_frequency = 0.0;
 WsprDialFrequencyEntry active_wspr_plan_frequency_entry{};
 bool active_wspr_plan_in_progress = false;
+
+static void stop_active_transmission_selectors() noexcept
+{
+    bandGPIOSelector.setBandState(false);
+    bandGPIOSelector.stop();
+    frequencyEntryGPIOSelector.setState(false);
+    frequencyEntryGPIOSelector.stop();
+}
+
+static bool prepare_frequency_entry_gpio_or_log(
+    const WsprDialFrequencyEntry &entry,
+    LogLevel failure_level)
+{
+    log_selected_frequency_entry_gpio(entry);
+    if (frequencyEntryGPIOSelector.prepare(
+            entry,
+            config.tx_freq_control_active_high))
+    {
+        return true;
+    }
+
+    llog.logS(
+        failure_level,
+        "Unable to prepare frequency entry control GPIO ",
+        entry.control_gpio,
+        " for ",
+        entry.token,
+        ".",
+        frequencyEntryGPIOSelector.lastError().empty()
+            ? ""
+            : std::string(" ") + frequencyEntryGPIOSelector.lastError());
+    return false;
+}
+
+static void commit_execution_request(
+    const WsprTransmissionRequest &request)
+{
+    current_transmission_request = request;
+    wsprTransmitter.configureExecution(current_transmission_request);
+}
 
 static void reset_active_wspr_plan_state()
 {
@@ -733,11 +774,8 @@ void transmitter_cb(WsprTransmitter::TransmissionCallbackEvent event,
                       "Completed transmission.");
         }
 
-        // Deassert and release the prepared band GPIO.
-        bandGPIOSelector.setBandState(false);
-        bandGPIOSelector.stop();
-        frequencyEntryGPIOSelector.setState(false);
-        frequencyEntryGPIOSelector.stop();
+        // Deassert and release the prepared selectors.
+        stop_active_transmission_selectors();
 
         // Turn off LED.
         ledControl.toggleGPIO(false);
@@ -781,11 +819,8 @@ void transmitter_cb(WsprTransmitter::TransmissionCallbackEvent event,
 
     case WsprTransmitter::TransmissionCallbackEvent::SKIPPED:
     {
-        // Deassert and release the prepared band GPIO.
-        bandGPIOSelector.setBandState(false);
-        bandGPIOSelector.stop();
-        frequencyEntryGPIOSelector.setState(false);
-        frequencyEntryGPIOSelector.stop();
+        // Deassert and release the prepared selectors.
+        stop_active_transmission_selectors();
 
         // Turn off LED in case the UI/state expects an idle indication.
         ledControl.toggleGPIO(false);
@@ -1043,22 +1078,10 @@ void start_test_tone()
             " using audio offset ",
             config.wspr_audio_offset_hz,
             " Hz.");
-        current_transmission_request =
-            make_tone_request(actual_rf_freq, dial_freq, entry);
-        wsprTransmitter.configureExecution(current_transmission_request);
+        commit_execution_request(
+            make_tone_request(actual_rf_freq, dial_freq, entry));
 
-        log_selected_frequency_entry_gpio(entry);
-        if (!frequencyEntryGPIOSelector.prepare(
-                entry,
-                config.tx_freq_control_active_high))
-        {
-            llog.logS(WARN,
-                      "Unable to prepare frequency entry control GPIO ",
-                      entry.control_gpio,
-                      " for ",
-                      entry.token,
-                      ".");
-        }
+        (void)prepare_frequency_entry_gpio_or_log(entry, WARN);
 
         if (!bandGPIOSelector.prepareFrequency(dial_freq))
         {
@@ -1091,10 +1114,7 @@ void end_test_tone()
 
         // Stop current tone
         wsprTransmitter.stopAndJoin();
-        bandGPIOSelector.setBandState(false);
-        bandGPIOSelector.stop();
-        frequencyEntryGPIOSelector.setState(false);
-        frequencyEntryGPIOSelector.stop();
+        stop_active_transmission_selectors();
         send_ws_message("transmit", "finished");
         ledControl.toggleGPIO(false);
 
@@ -1125,21 +1145,9 @@ void end_test_tone()
             }
 
             validate_config_data();
-            current_transmission_request =
-                make_direct_tone_request(actual_rf_frequency_hz);
-            wsprTransmitter.configureExecution(current_transmission_request);
-            log_selected_frequency_entry_gpio(entry);
-            if (!frequencyEntryGPIOSelector.prepare(
-                    entry,
-                    config.tx_freq_control_active_high))
-            {
-                llog.logS(WARN,
-                          "Unable to prepare frequency entry control GPIO ",
-                          entry.control_gpio,
-                          " for ",
-                          entry.token,
-                          ".");
-            }
+            commit_execution_request(
+                make_direct_tone_request(actual_rf_frequency_hz));
+            (void)prepare_frequency_entry_gpio_or_log(entry, WARN);
             wsprTransmitter.startAsync();
 
             llog.logS(INFO,
@@ -1253,21 +1261,9 @@ bool wspr_loop()
             return false;
         }
 
-        current_transmission_request =
-            make_direct_tone_request(actual_rf_frequency_hz);
-        wsprTransmitter.configureExecution(current_transmission_request);
-        log_selected_frequency_entry_gpio(entry);
-        if (!frequencyEntryGPIOSelector.prepare(
-                entry,
-                config.tx_freq_control_active_high))
-        {
-            llog.logS(WARN,
-                      "Unable to prepare frequency entry control GPIO ",
-                      entry.control_gpio,
-                      " for ",
-                      entry.token,
-                      ".");
-        }
+        commit_execution_request(
+            make_direct_tone_request(actual_rf_frequency_hz));
+        (void)prepare_frequency_entry_gpio_or_log(entry, WARN);
         wsprTransmitter.startAsync();
         llog.logS(INFO, "transmitting tone, hit Ctrl-C to terminate tone.");
     }
@@ -1292,14 +1288,10 @@ bool wspr_loop()
     wsprTransmitter.stopAndJoin(); // Stop the transmitter threads
     llog.logS(INFO, "Transmitter stopped.");
 
-    llog.logS(INFO, "Stopping band GPIO selector.");
-    bandGPIOSelector.setBandState(false);
-    bandGPIOSelector.stop();
-    llog.logS(INFO, "Band GPIO selector stopped.");
-
     llog.logS(INFO, "Stopping frequency entry GPIO selector.");
-    frequencyEntryGPIOSelector.setState(false);
-    frequencyEntryGPIOSelector.stop();
+    llog.logS(INFO, "Stopping band GPIO selector.");
+    stop_active_transmission_selectors();
+    llog.logS(INFO, "Band GPIO selector stopped.");
     llog.logS(INFO, "Frequency entry GPIO selector stopped.");
 
     llog.logS(INFO, "Stopping shutdown monitor.");
@@ -1450,11 +1442,6 @@ WsprDialFrequencyEntry next_frequency_entry(bool reset)
 
     ++freq_iterator;
     return entry;
-}
-
-double next_frequency(bool reset)
-{
-    return next_frequency_entry(reset).dial_frequency_hz;
 }
 
 /**
@@ -1655,25 +1642,13 @@ void set_config(bool force)
             return;
         }
         current_transmission_request.applied_offset_hz = applied_offset_hz;
-        wsprTransmitter.configureExecution(current_transmission_request);
+        commit_execution_request(current_transmission_request);
 
-        log_selected_frequency_entry_gpio(current_frequency_entry);
-        if (!frequencyEntryGPIOSelector.prepare(
+        if (!prepare_frequency_entry_gpio_or_log(
                 current_frequency_entry,
-                config.tx_freq_control_active_high))
+                ERROR))
         {
-            llog.logS(ERROR,
-                      "Unable to prepare frequency entry control GPIO ",
-                      current_frequency_entry.control_gpio,
-                      " for ",
-                      current_frequency_entry.token,
-                      ".",
-                      frequencyEntryGPIOSelector.lastError().empty()
-                          ? ""
-                          : std::string(" ") + frequencyEntryGPIOSelector.lastError());
-            frequencyEntryGPIOSelector.stop();
-            bandGPIOSelector.setBandState(false);
-            bandGPIOSelector.stop();
+            stop_active_transmission_selectors();
             config.transmit = false;
             config_to_json();
             request_wspr_shutdown("frequency entry control GPIO unavailable");
