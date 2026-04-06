@@ -1,6 +1,16 @@
 /**
  * @file scheduling.hpp
- * @brief Manages transmit, INI monitoring and scheduling for Wsprry Pi
+ * @brief Orchestration layer for planning and committing transmissions.
+ *
+ * This layer owns scheduling and request construction for the current
+ * architecture. It decides whether a slot runs WSPR or direct tone,
+ * applies any random WSPR offset, resolves per-frequency control GPIO
+ * metadata, prepares selector state, and commits the single execution
+ * request consumed by the transmitter.
+ *
+ * The transmitter executes only already-committed requests. Hardware
+ * realization remains inside the backend. All execution must cross the
+ * scheduler-to-transmitter boundary as a committed request.
  *
  * This project is is licensed under the MIT License. See LICENSE.md
  * for more information.
@@ -177,31 +187,35 @@ void reboot_system();
 bool ppm_init();
 
 /**
- * @brief   Initiates a continuous test‐tone transmission.
+ * @brief Start a transient runtime test tone from the orchestration layer.
  *
- * Stops any ongoing transmission, saves the current mode,
- * switches into TONE mode, and transmits on the first
- * configured frequency using the current power and PPM.
+ * Stops any ongoing execution, preserves the previous runtime mode, and
+ * commits a tone request built from the first configured scheduler
+ * frequency entry. This is transient runtime behavior; it does not
+ * persist tone mode into configuration files.
  */
 extern void start_test_tone();
 
 /**
- * @brief   Ends the test‐tone and restores the previous mode.
+ * @brief End the transient runtime test tone and restore prior flow.
  *
- * If we’re in test‐tone, shut it down, clear the flag,
- * restore lastMode, and re-configure either WSPR or
- * a transient direct-tone startup request if one was active before.
+ * Stops the active tone, tears down scheduler-owned selector GPIO state,
+ * restores the previous runtime mode, and then resumes either normal WSPR
+ * orchestration or the transient direct-tone startup request that was
+ * active before the web-triggered tone.
  */
 extern void end_test_tone();
 
 /**
- * @brief Runs the main WSPR scheduler and transmission loop.
+ * @brief Run the main orchestration loop.
  *
  * @details
  * Coordinates all core runtime components:
+ * - Validates startup configuration.
  * - Initializes optional NTP/PPM drift correction.
  * - Starts the TCP command server and sets its priority.
- * - Launches the WSPR transmission thread.
+ * - Commits the initial execution request for WSPR or direct tone.
+ * - Launches the transmitter using only committed requests.
  * - Performs full cleanup and shutdown sequence before exiting.
  *
  * @note This function blocks and runs until `exitwspr_cv` notifies.

@@ -1,6 +1,18 @@
 /**
  * @file scheduling.cpp
- * @brief Manages transmit, INI monitoring and scheduling for Wsprry Pi
+ * @brief Orchestration layer for planning and committing transmissions.
+ *
+ * This file owns planning policy for the current architecture. It is the
+ * only layer that decides:
+ * - Auto versus RequirePaired WSPR planning.
+ * - WSPR versus direct-tone execution mode.
+ * - Random WSPR RF offset application.
+ * - Per-frequency control GPIO metadata and selector preparation.
+ * - When a built request is committed to the transmitter.
+ *
+ * The transmitter only consumes committed `WsprTransmissionRequest`
+ * snapshots. The backend only realizes hardware for the backend-neutral
+ * execution plan derived from that committed request.
  *
  * This project is is licensed under the MIT License. See LICENSE.md
  * for more information.
@@ -76,8 +88,17 @@
  * transmission completes, is skipped, or is cancelled.
  */
 static BandGPIOSelector bandGPIOSelector;
-static void log_selected_frequency_entry_gpio(const WsprDialFrequencyEntry &entry);
+static void log_selected_frequency_entry_gpio(
+    const WsprDialFrequencyEntry &entry);
 
+/**
+ * @brief Runtime owner for the currently prepared per-frequency selector GPIO.
+ *
+ * Scheduling prepares and tears down this selector around the committed
+ * request for the active slot. It is intentionally file-local so per-
+ * frequency control remains an orchestration concern rather than a
+ * transmitter or backend policy concern.
+ */
 class FrequencyEntryGPIOSelector
 {
 public:
@@ -239,12 +260,27 @@ ModeType lastMode;
 std::atomic<bool> web_test_tone{false};
 std::atomic<bool> shutdown_after_current_transmission{false};
 std::atomic<bool> shutdown_after_wspr_plan{false};
+/**
+ * @brief Scheduler-owned paired WSPR plan being continued across slots.
+ *
+ * When a paired plan is selected, the scheduler saves the full prepared
+ * plan and the frequency entry that produced it. The second slot reuses
+ * this saved scheduler state instead of asking the planner for a new
+ * policy decision.
+ */
 PreparedWsprTransmission active_wspr_plan{};
 std::size_t active_wspr_frame_index = 0;
 double active_wspr_plan_dial_frequency = 0.0;
 WsprDialFrequencyEntry active_wspr_plan_frequency_entry{};
 bool active_wspr_plan_in_progress = false;
 
+/**
+ * @brief Tear down every selector prepared for the active committed request.
+ *
+ * This is the single teardown path for scheduler-owned selector GPIO state.
+ * Any code that needs to release band-selection or per-frequency control
+ * GPIOs must call this helper rather than stopping selectors individually.
+ */
 static void stop_active_transmission_selectors() noexcept
 {
     bandGPIOSelector.setBandState(false);
@@ -253,6 +289,17 @@ static void stop_active_transmission_selectors() noexcept
     frequencyEntryGPIOSelector.stop();
 }
 
+/**
+ * @brief Prepare the per-frequency control GPIO for the next committed slot.
+ *
+ * This helper logs the selected entry metadata and prepares the transient
+ * runtime selector state that belongs to the current scheduler slot. It
+ * does not start transmission or commit a request by itself.
+ *
+ * @param entry Frequency entry selected by the scheduler.
+ * @param failure_level Log level used if preparation fails.
+ * @return `true` if no GPIO is needed or preparation succeeded.
+ */
 static bool prepare_frequency_entry_gpio_or_log(
     const WsprDialFrequencyEntry &entry,
     LogLevel failure_level)
@@ -278,6 +325,15 @@ static bool prepare_frequency_entry_gpio_or_log(
     return false;
 }
 
+/**
+ * @brief Commit the single execution request consumed by the transmitter.
+ *
+ * This is the execution boundary between orchestration and transmitter
+ * layers. All WSPR and tone execution must pass through this helper so the
+ * transmitter only ever sees a complete, scheduler-owned request snapshot.
+ *
+ * @param request Fully built execution request for one transmitter run.
+ */
 static void commit_execution_request(
     const WsprTransmissionRequest &request)
 {
@@ -302,6 +358,13 @@ static bool active_wspr_plan_has_more_frames_after_current() noexcept
 
 static WsprDialFrequencyEntry next_frequency_entry(bool reset);
 
+/**
+ * @brief Return the prepared plan for a single frame from a saved plan.
+ *
+ * The scheduler uses this when continuing a paired transmission so each
+ * committed request still represents exactly one execution slot even when
+ * the planner originally returned multiple frames.
+ */
 static PreparedWsprTransmission slot_plan_for_frame(
     const PreparedWsprTransmission &plan,
     std::size_t frame_index)
@@ -341,12 +404,20 @@ void consume_tx_iteration_if_needed()
         if (active_wspr_plan_has_more_frames_after_current())
         {
             shutdown_after_wspr_plan.store(true, std::memory_order_release);
-            llog.logS(INFO, "Completed last of TX iterations, signalling shutdown after paired transmission.");
+            llog.logS(
+                INFO,
+                "Completed last of TX iterations, signalling shutdown "
+                "after paired transmission.");
         }
         else
         {
-            shutdown_after_current_transmission.store(true, std::memory_order_release);
-            llog.logS(INFO, "Completed last of TX iterations, signalling shutdown after current transmission.");
+            shutdown_after_current_transmission.store(
+                true,
+                std::memory_order_release);
+            llog.logS(
+                INFO,
+                "Completed last of TX iterations, signalling shutdown "
+                "after current transmission.");
         }
     }
     else
@@ -368,7 +439,8 @@ static std::string to_lower_copy(const std::string &s)
     return out;
 }
 
-static void log_selected_frequency_entry_gpio(const WsprDialFrequencyEntry &entry)
+static void log_selected_frequency_entry_gpio(
+    const WsprDialFrequencyEntry &entry)
 {
     if (entry.control_gpio == kFrequencyEntryControlGpioUnset)
     {
@@ -402,6 +474,12 @@ static double maybe_apply_wspr_random_offset(double actual_rf_frequency_hz)
     return actual_rf_frequency_hz + dis(gen) * kWsprRandomOffsetHz;
 }
 
+/**
+ * @brief Build the scheduler-side request for a direct tone execution.
+ *
+ * This request is fully committed at the orchestration layer. The
+ * transmitter must not infer any additional policy from tone mode.
+ */
 static WsprTransmissionRequest make_tone_request(
     double actual_rf_frequency_hz,
     double dial_frequency_hz,
@@ -420,7 +498,14 @@ static WsprTransmissionRequest make_tone_request(
     return request;
 }
 
-static WsprTransmissionRequest make_direct_tone_request(double actual_rf_frequency_hz)
+/**
+ * @brief Build the startup direct-tone request from transient CLI state.
+ *
+ * Startup tone mode is transient runtime state created by `--test-tone`.
+ * It is not persistent configuration.
+ */
+static WsprTransmissionRequest make_direct_tone_request(
+    double actual_rf_frequency_hz)
 {
     WsprDialFrequencyEntry entry;
     double ignored_actual_rf_frequency_hz = 0.0;
@@ -438,6 +523,13 @@ static WsprTransmissionRequest make_direct_tone_request(double actual_rf_frequen
         WsprDialFrequencyEntry{});
 }
 
+/**
+ * @brief Build the scheduler-side request for one WSPR execution slot.
+ *
+ * The request captures all execution-time state, including the prepared
+ * WSPR frame for this slot, the committed RF frequency, and scheduler-owned
+ * per-frequency GPIO metadata.
+ */
 static WsprTransmissionRequest make_wspr_request(
     const PreparedWsprTransmission &slot_plan,
     double dial_frequency_hz,
@@ -492,6 +584,18 @@ constexpr LogLevel to_log_level(WsprTransmitter::LogLevel level)
     return LogLevel::INFO; // Safe fallback
 }
 
+/**
+ * @brief Build the next committed WSPR request for the current slot.
+ *
+ * This is scheduler policy code. It chooses Auto versus RequirePaired,
+ * records paired continuation state, and builds exactly one slot-scoped
+ * execution request. If a paired plan spans multiple slots, later slots
+ * reuse the saved scheduler plan instead of making a new planning choice.
+ *
+ * @param actual_rf_frequency_hz RF frequency already chosen by the scheduler.
+ * @param request_out Receives the committed request snapshot for one slot.
+ * @return `true` if the request was built successfully.
+ */
 static bool configure_current_wspr_transmission(
     double actual_rf_frequency_hz,
     WsprTransmissionRequest &request_out)
@@ -505,6 +609,9 @@ static bool configure_current_wspr_transmission(
 
         if (active_wspr_plan_in_progress)
         {
+            // Continue the already selected paired plan. This reuses saved
+            // scheduler state and does not invoke a new planning policy
+            // decision for the second slot.
             plan = active_wspr_plan;
             slot_plan = slot_plan_for_frame(plan, active_wspr_frame_index);
 
@@ -546,8 +653,10 @@ static bool configure_current_wspr_transmission(
                     if (!paired_upgrade_eligible)
                         throw;
 
-                    llog.logS(INFO,
-                              "Auto-upgrading to paired WSPR plan because callsign is compound and locator is 6 characters.");
+                    llog.logS(
+                        INFO,
+                        "Auto-upgrading to paired WSPR plan because "
+                        "callsign is compound and locator is 6 characters.");
 
                     PreparedWsprTransmission paired_plan =
                         build_prepared_wspr_transmission(
@@ -564,8 +673,10 @@ static bool configure_current_wspr_transmission(
                     plan.frameCount() <= 1U &&
                     paired_upgrade_eligible)
                 {
-                    llog.logS(INFO,
-                              "Auto-upgrading to paired WSPR plan because callsign is compound and locator is 6 characters.");
+                    llog.logS(
+                        INFO,
+                        "Auto-upgrading to paired WSPR plan because "
+                        "callsign is compound and locator is 6 characters.");
 
                     PreparedWsprTransmission paired_plan =
                         build_prepared_wspr_transmission(
@@ -1026,11 +1137,11 @@ void reboot_system()
 }
 
 /**
- * @brief   Initiates a continuous test‐tone transmission.
+ * @brief Start a transient runtime tone using scheduler-owned setup.
  *
- * Stops any ongoing transmission, saves the current mode,
- * switches into TONE mode, and transmits on the first
- * configured frequency using the current power and PPM.
+ * The scheduler stops any active run, reuses the first configured
+ * frequency entry, prepares selector GPIO state, commits a tone request,
+ * and starts the transmitter. Tone mode here is runtime-only behavior.
  */
 void start_test_tone()
 {
@@ -1048,9 +1159,10 @@ void start_test_tone()
         }
         wsprTransmitter.stopAndJoin();
 
-        // Pick the first configured WSPR dial frequency and convert it to RF
-        // only at the transmitter boundary.
-        const WsprDialFrequencyEntry entry = next_frequency_entry(/*restart=*/true);
+        // Pick the first configured scheduler frequency entry, then commit
+        // the resolved RF frequency into the request before execution.
+        const WsprDialFrequencyEntry entry =
+            next_frequency_entry(/*restart=*/true);
         const double dial_freq = entry.dial_frequency_hz;
         current_frequency_entry = entry;
         const double actual_rf_freq = resolve_actual_rf_frequency_hz(
@@ -1058,7 +1170,9 @@ void start_test_tone()
             config.wspr_audio_offset_hz,
             FrequencyPath::WsprDial);
 
-        while (wsprTransmitter.getState() == WsprTransmitter::State::TRANSMITTING)
+        while (
+            wsprTransmitter.getState() ==
+            WsprTransmitter::State::TRANSMITTING)
         {
             std::this_thread::sleep_for(std::chrono::milliseconds(1));
         }
@@ -1100,11 +1214,10 @@ void start_test_tone()
 }
 
 /**
- * @brief   Ends the test-tone and restores the previous mode.
+ * @brief End the transient runtime tone and restore prior orchestration.
  *
- * If we're in test-tone, shut it down, clear the flag,
- * restore lastMode, and re-configure either WSPR or
- * a transient direct-tone startup request if one was active before.
+ * This stops the current tone, tears down selector lifecycle state through
+ * the scheduler helper, and then resumes the pre-tone runtime mode.
  */
 void end_test_tone()
 {
@@ -1137,10 +1250,13 @@ void end_test_tone()
         {
             WsprDialFrequencyEntry entry;
             double actual_rf_frequency_hz = 0.0;
-            if (!try_get_direct_tone_startup_request(entry, actual_rf_frequency_hz))
+            if (!try_get_direct_tone_startup_request(
+                    entry,
+                    actual_rf_frequency_hz))
             {
                 llog.logE(ERROR,
-                          "Unable to restore direct test tone; no transient tone request is active.");
+                          "Unable to restore direct test tone; no "
+                          "transient tone request is active.");
                 return;
             }
 
@@ -1157,16 +1273,13 @@ void end_test_tone()
 }
 
 /**
- * @brief Main control loop for WSPR operation.
+ * @brief Main orchestration loop for startup, scheduling, and shutdown.
  *
  * @details
- * This function initializes and coordinates all core components required for
- * WSPR transmission. It sets up optional NTP-based PPM correction, launches
- * the TCP server, spawns the transmission handler thread, and blocks until
- * a shutdown signal is received.
- *
- * When signaled to exit, it cleanly shuts down all background services and
- * threads in the correct order.
+ * This loop validates configuration, starts long-lived services, prepares
+ * the initial committed execution request, and then runs until shutdown.
+ * WSPR startup goes through the same reload-safe scheduling path used for
+ * later reconfiguration so request construction remains centralized here.
  *
  * @note This function blocks until `exitwspr_cv` is set by another thread.
  */
@@ -1412,23 +1525,22 @@ void send_ws_message(std::string type, std::string state)
 }
 
 /**
- * @brief Retrieve the next configured WSPR dial frequency, cycling through the list.
+ * @brief Return the next configured scheduler frequency entry.
  *
- * This method returns the next frequency from `config.wspr_dial_freq_set` in a
- * round-robin fashion.  It uses `freq_iterator` modulo the list size to
- * index into the vector, then increments `freq_iterator` for the subsequent call.
+ * The scheduler owns round-robin traversal of configured frequency entries,
+ * including their optional `@GPIO` metadata. When `reset` is true, the next
+ * returned entry is the first configured slot.
  *
- * @return double
- *   - Next frequency in Hz from the list.
- *   - Returns 0.0 if the list is empty.
- *
- * @note
- *   - `freq_iterator` should be initialized to 0.
- *   - Wrapping is handled via the modulo operation.
+ * @param reset True to restart from the first configured entry.
+ * @return The next configured entry, or a default-constructed entry if none
+ *         are configured.
  */
 WsprDialFrequencyEntry next_frequency_entry(bool reset)
 {
-    (void)reset;
+    if (reset)
+    {
+        freq_iterator = 0;
+    }
 
     const auto &entries = config.wspr_dial_frequency_entries;
     if (entries.empty())
@@ -1445,14 +1557,12 @@ WsprDialFrequencyEntry next_frequency_entry(bool reset)
 }
 
 /**
- * @brief Apply updated transmission parameters and reinitialize DMA.
+ * @brief Reload scheduler state and commit the next execution request.
  *
- * Retrieves the current PPM value if NTP calibration is enabled, captures
- * the latest configuration settings, and reconfigures the WSPR transmitter
- * with the specified frequency and parameters.
- *
- * @throws std::runtime_error if DMA setup or mailbox operations fail within
- *         `setupTransmission()`.
+ * This function is the central orchestration path for startup, reload, PPM
+ * updates, random WSPR offset application, paired-slot continuation, GPIO
+ * selector preparation, and request commit. The transmitter receives only
+ * the final committed request built here.
  */
 void set_config(bool force)
 {

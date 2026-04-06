@@ -1,6 +1,6 @@
 /**
  * @file gpio_output.hpp
- * @brief Handles LED output.
+ * @brief Safe libgpiod-backed GPIO output helper.
  *
  * This project is is licensed under the MIT License. See LICENSE.md
  * for more information.
@@ -39,18 +39,10 @@
  * @class GPIOOutput
  * @brief Simple GPIO output controller using libgpiod.
  *
- * This class configures a specified GPIO pin as an output. The pin can be
- * configured as active high (default) or as an active low sink. Methods are provided
- * to enable (configure) the pin, disable (release) it, and toggle its output state.
- *
- * Example:
- * @code
- * GPIOOutput gpio;
- * gpio.enableGPIOPin(17, true); // enable pin 17 as active high output
- * gpio.toggleGPIO(true);         // set pin high (active)
- * gpio.toggleGPIO(false);        // set pin low (inactive)
- * gpio.stop_gpio_pin();        // release the pin
- * @endcode
+ * This helper acquires one GPIO line, keeps it in a known inactive state
+ * when enabled or released, and reports setup failures through
+ * `lastError()`. Higher-level policy such as LED behavior, band selection,
+ * or per-frequency selector ownership lives elsewhere.
  */
 class GPIOOutput
 {

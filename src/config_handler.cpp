@@ -533,6 +533,8 @@ namespace
     {
         set_default_band_gpio_config(target.band_gpio);
 
+        // Persistent config always initializes in WSPR mode. Transient tone
+        // startup is a CLI/runtime request layered on top later.
         target.mode = ModeType::WSPR;
 
         target.use_ini = source.at("Meta").at("Use INI").get<bool>();

@@ -1,7 +1,7 @@
 
 /**
  * @file arg_parser.cpp
- * @brief Command-line argument parser and configuration handler.
+ * @brief Parse runtime startup choices and frequency-entry syntax.
  *
  * This project is is licensed under the MIT License. See LICENSE.md
  * for more information.
@@ -354,6 +354,9 @@ static bool parse_frequency_entry_token(
     WsprDialFrequencyEntry &entry,
     std::string &error_message)
 {
+    // Frequency-entry tokens may optionally carry a scheduler-owned @GPIO
+    // suffix. The suffix is metadata for per-frequency control GPIO, not a
+    // separate persistent transmit GPIO setting.
     const std::string token = trim_copy_string(std::string(raw_token));
     if (token.empty())
     {
@@ -423,6 +426,8 @@ bool set_direct_tone_startup_request(
     const std::string &raw_token,
     std::string *error_message)
 {
+    // --test-tone creates a transient startup request only. It does not
+    // persist tone mode or RF frequency into configuration files.
     WsprDialFrequencyEntry entry;
     std::string local_error;
     if (!parse_frequency_entry_token(raw_token, entry, local_error))
@@ -655,6 +660,7 @@ bool validate_config_candidate(
 
     if (candidate.mode == ModeType::TONE)
     {
+        // Tone mode is valid only when a transient startup request exists.
         if (!has_direct_tone_startup_request())
         {
             if (error_message != nullptr)
@@ -1332,6 +1338,8 @@ bool parse_command_line(int argc, char *argv[])
                     EXIT_FAILURE);
             }
 
+            // This applies to per-frequency selector GPIO outputs derived
+            // from frequency tokens with optional @GPIO suffixes.
             config.tx_freq_control_active_high = active_high;
             break;
         }
@@ -1390,6 +1398,8 @@ bool parse_command_line(int argc, char *argv[])
                     print_usage(error_message, EXIT_FAILURE);
                 }
 
+                // Direct test tone is a transient startup mode selected from
+                // the CLI. It is not persisted into config storage.
                 config.mode = ModeType::TONE;
             }
             else

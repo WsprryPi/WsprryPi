@@ -1,6 +1,12 @@
 /**
  * @file arg_parser.hpp
- * @brief Command-line argument parser and configuration handler.
+ * @brief Parse runtime startup choices and frequency-entry syntax.
+ *
+ * This layer translates CLI input into runtime configuration and transient
+ * startup requests. Persistent configuration remains in `config_handler.*`.
+ * In particular, `--test-tone` creates a transient startup request rather
+ * than persistent config, and frequency tokens may carry optional `@GPIO`
+ * suffixes consumed later by scheduling.
  *
  * This project is is licensed under the MIT License. See LICENSE.md
  * for more information.

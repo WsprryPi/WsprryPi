@@ -1,6 +1,11 @@
 /**
  * @file config_handler.hpp
- * @brief Provides an interface to ArgParserConfig and JSON config
+ * @brief Persistent configuration model and JSON/INI translation helpers.
+ *
+ * This layer owns durable configuration values and their serialized
+ * representation. Transient runtime requests such as `--test-tone` do not
+ * live here. Frequency entries may include optional `@GPIO` metadata, and
+ * `tx-gpio-polarity` applies to those per-frequency control outputs.
  *
  * This project is is licensed under the MIT License. See LICENSE.md
  * for more information.
@@ -63,9 +68,9 @@ inline constexpr bool is_valid_frequency_entry_control_gpio(int gpio) noexcept
 
 struct WsprDialFrequencyEntry
 {
-    std::string token;
-    double dial_frequency_hz = 0.0;
-    int control_gpio = kFrequencyEntryControlGpioUnset;
+    std::string token; ///< Original frequency token without `@GPIO`.
+    double dial_frequency_hz = 0.0; ///< Resolved WSPR dial frequency in Hz.
+    int control_gpio = kFrequencyEntryControlGpioUnset; ///< Optional selector GPIO.
 };
 
 /**
@@ -90,7 +95,7 @@ extern nlohmann::json jConfig;
  *
  * This enumeration defines the available modes for operation.
  * - `WSPR`: Represents the WSPR (Weak Signal Propagation Reporter) transmission mode.
- * - `TONE`: Represents a test tone generation mode.
+ * - `TONE`: Represents transient direct-tone runtime behavior.
  */
 enum class ModeType
 {
@@ -145,9 +150,10 @@ struct ArgParserConfig
     ModeType mode;                       ///< Current operating mode.
     bool use_ini;                        ///< Load configuration from INI file.
     std::string ini_filename;            ///< INI file name and path.
-    std::vector<double> wspr_dial_freq_set; ///< Parsed list of WSPR dial frequencies in Hz.
-    std::vector<WsprDialFrequencyEntry> wspr_dial_frequency_entries; ///< Parsed list of WSPR entries with optional control GPIO metadata.
-    bool tx_freq_control_active_high;    ///< Global polarity for per-frequency control GPIO outputs.
+    std::vector<double> wspr_dial_freq_set; ///< Parsed WSPR dial frequencies.
+    std::vector<WsprDialFrequencyEntry>
+        wspr_dial_frequency_entries; ///< Parsed entries with optional GPIO metadata.
+    bool tx_freq_control_active_high; ///< Global polarity for selector GPIO outputs.
     bool ntp_good;                       ///< A more qualitative measurement of NTP vs simply running
     std::array<BandGPIOConfig, HAM_BAND_COUNT> band_gpio; ///< Per-band GPIO assignment.
 

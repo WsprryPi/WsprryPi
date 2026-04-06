@@ -1,6 +1,6 @@
 /**
  * @file gpio_output.cpp
- * @brief Handles LED output.
+ * @brief Safe libgpiod-backed GPIO output helper implementation.
  *
  * This project is is licensed under the MIT License. See LICENSE.md
  * for more information.
@@ -29,7 +29,7 @@
 #include "gpio_output.hpp"
 #include <iostream>
 
-// Global instance
+// Global instance for the optional status LED.
 GPIOOutput ledControl;
 
 /**

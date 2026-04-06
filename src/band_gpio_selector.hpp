@@ -42,11 +42,14 @@
 #include "wspr_band_lookup.hpp"
 
 /**
- * @brief Controls a single GPIO output using amateur band selection.
+ * @brief Controls scheduler-selected GPIO output for the active amateur band.
  *
  * This class maps ham bands to configured GPIO outputs and uses GPIOOutput to
  * enable and drive the selected pin. GPIO polarity is taken from the selected
  * band's BandGPIOConfig.
+ *
+ * Scheduling/orchestration decides when a band is selected. This helper only
+ * manages the currently selected band GPIO lifecycle.
  */
 class BandGPIOSelector
 {
@@ -87,6 +90,9 @@ public:
 
     /**
      * @brief Release the currently selected GPIO.
+     *
+     * This ends the lifecycle of the active band-selection output. Callers
+     * are expected to deassert the logical band state before stopping.
      */
     void stop();
 
