@@ -177,6 +177,38 @@ ModeType lastMode;
  */
 std::atomic<bool> web_test_tone{false};
 std::atomic<bool> shutdown_after_current_transmission{false};
+std::atomic<bool> shutdown_after_wspr_plan{false};
+PreparedWsprTransmission active_wspr_plan{};
+std::size_t active_wspr_frame_index = 0;
+double active_wspr_plan_dial_frequency = 0.0;
+bool active_wspr_plan_in_progress = false;
+
+static void reset_active_wspr_plan_state()
+{
+    active_wspr_plan = PreparedWsprTransmission{};
+    active_wspr_frame_index = 0;
+    active_wspr_plan_dial_frequency = 0.0;
+    active_wspr_plan_in_progress = false;
+}
+
+static bool active_wspr_plan_has_more_frames_after_current() noexcept
+{
+    return active_wspr_plan_in_progress &&
+           (active_wspr_frame_index + 1U) < active_wspr_plan.frameCount();
+}
+
+static PreparedWsprTransmission slot_plan_for_frame(
+    const PreparedWsprTransmission &plan,
+    std::size_t frame_index)
+{
+    PreparedWsprTransmission slot_plan;
+    slot_plan.plan_type = plan.plan_type;
+    slot_plan.callsign = plan.callsign;
+    slot_plan.locator = plan.locator;
+    slot_plan.power_dbm = plan.power_dbm;
+    slot_plan.frames.push_back(plan.frames.at(frame_index));
+    return slot_plan;
+}
 
 void consume_tx_iteration_if_needed()
 {
@@ -194,8 +226,16 @@ void consume_tx_iteration_if_needed()
 
     if (remaining <= 0)
     {
-        shutdown_after_current_transmission.store(true, std::memory_order_release);
-        llog.logS(INFO, "Completed last of TX iterations, signalling shutdown after current transmission.");
+        if (active_wspr_plan_has_more_frames_after_current())
+        {
+            shutdown_after_wspr_plan.store(true, std::memory_order_release);
+            llog.logS(INFO, "Completed last of TX iterations, signalling shutdown after paired transmission.");
+        }
+        else
+        {
+            shutdown_after_current_transmission.store(true, std::memory_order_release);
+            llog.logS(INFO, "Completed last of TX iterations, signalling shutdown after current transmission.");
+        }
     }
     else
     {
@@ -252,17 +292,48 @@ static bool configure_current_wspr_transmission(
 {
     try
     {
-        const wspr::TransmissionPlanPreference preference =
-            config.require_paired_plan
-                ? wspr::TransmissionPlanPreference::RequirePaired
-                : wspr::TransmissionPlanPreference::Auto;
+        PreparedWsprTransmission plan;
+        PreparedWsprTransmission slot_plan;
 
-        const PreparedWsprTransmission plan =
-            build_prepared_wspr_transmission(
+        if (active_wspr_plan_in_progress)
+        {
+            plan = active_wspr_plan;
+            slot_plan = slot_plan_for_frame(plan, active_wspr_frame_index);
+
+            llog.logS(INFO,
+                      "Scheduling paired WSPR frame ",
+                      static_cast<int>(active_wspr_frame_index + 1U),
+                      " of ",
+                      static_cast<int>(plan.frameCount()),
+                      " for the next WSPR slot.");
+        }
+        else
+        {
+            const wspr::TransmissionPlanPreference preference =
+                config.require_paired_plan
+                    ? wspr::TransmissionPlanPreference::RequirePaired
+                    : wspr::TransmissionPlanPreference::Auto;
+
+            plan = build_prepared_wspr_transmission(
                 config.callsign,
                 config.grid_square,
                 config.power_dbm,
                 preference);
+
+            if (plan.frameCount() > 1U)
+            {
+                active_wspr_plan = plan;
+                active_wspr_frame_index = 0;
+                active_wspr_plan_dial_frequency = current_dial_frequency;
+                active_wspr_plan_in_progress = true;
+            }
+            else
+            {
+                reset_active_wspr_plan_state();
+            }
+
+            slot_plan = slot_plan_for_frame(plan, active_wspr_frame_index);
+        }
 
         llog.logS(INFO,
                   "Prepared WSPR plan type: ",
@@ -277,7 +348,7 @@ static bool configure_current_wspr_transmission(
             actual_rf_frequency_hz,
             config.power_level,
             config.ppm,
-            plan,
+            slot_plan,
             config.use_offset);
 
         if (plan.frameCount() > 1U)
@@ -295,6 +366,8 @@ static bool configure_current_wspr_transmission(
     }
     catch (const std::exception &e)
     {
+        reset_active_wspr_plan_state();
+        shutdown_after_wspr_plan.store(false, std::memory_order_release);
         llog.logE(ERROR, "WSPR encoding/configuration failed: ", e.what());
         return false;
     }
@@ -339,7 +412,8 @@ void transmitter_cb(WsprTransmitter::TransmissionCallbackEvent event,
     {
         const double frequency = value;
 
-        if (config.mode == ModeType::WSPR)
+        if (config.mode == ModeType::WSPR &&
+            (!active_wspr_plan_in_progress || active_wspr_frame_index == 0U))
         {
             consume_tx_iteration_if_needed();
         }
@@ -401,6 +475,8 @@ void transmitter_cb(WsprTransmitter::TransmissionCallbackEvent event,
                       s_elapsed,
                       " seconds.");
             do_config = false;
+            reset_active_wspr_plan_state();
+            shutdown_after_wspr_plan.store(false, std::memory_order_release);
             send_ws_message("transmit", "canceled");
         }
         else if (!msg.empty() && elapsed != 0.0)
@@ -444,9 +520,27 @@ void transmitter_cb(WsprTransmitter::TransmissionCallbackEvent event,
 
         const bool shutdown_when_idle =
             shutdown_after_current_transmission.exchange(false, std::memory_order_acq_rel);
+        const bool shutdown_when_plan_finishes =
+            shutdown_after_wspr_plan.load(std::memory_order_acquire);
+
+        if (do_config && active_wspr_plan_has_more_frames_after_current())
+        {
+            ++active_wspr_frame_index;
+        }
+        else if (active_wspr_plan_in_progress)
+        {
+            reset_active_wspr_plan_state();
+        }
 
         if (shutdown_when_idle && do_config)
         {
+            request_wspr_shutdown("completed configured TX iterations");
+            do_config = false;
+        }
+        else if (shutdown_when_plan_finishes && do_config &&
+                 !active_wspr_plan_in_progress)
+        {
+            shutdown_after_wspr_plan.store(false, std::memory_order_release);
             request_wspr_shutdown("completed configured TX iterations");
             do_config = false;
         }
@@ -476,6 +570,8 @@ void transmitter_cb(WsprTransmitter::TransmissionCallbackEvent event,
         send_ws_message("transmit", "skipped");
 
         shutdown_after_current_transmission.store(false, std::memory_order_release);
+        shutdown_after_wspr_plan.store(false, std::memory_order_release);
+        reset_active_wspr_plan_state();
 
         // Advance to the next configured slot.
         set_config();
@@ -1099,6 +1195,8 @@ void set_config(bool force)
         do_config = true;
         freq_iterator = 0;
         current_dial_frequency = 0.0;
+        reset_active_wspr_plan_state();
+        shutdown_after_wspr_plan.store(false, std::memory_order_release);
 
         if (config.use_ini)
         {
@@ -1202,7 +1300,16 @@ void set_config(bool force)
 
     // Get next frequency and indicate if we are (re)setting the stack
     static double last_freq = 0.0;
-    current_dial_frequency = next_frequency(force);
+    if (active_wspr_plan_in_progress && active_wspr_frame_index > 0U)
+    {
+        current_dial_frequency = active_wspr_plan_dial_frequency;
+        do_config = true;
+    }
+    else
+    {
+        current_dial_frequency = next_frequency(force);
+    }
+
     if (current_dial_frequency != last_freq)
     {
         last_freq = current_dial_frequency;
