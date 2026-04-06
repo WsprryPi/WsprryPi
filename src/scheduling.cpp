@@ -258,6 +258,13 @@ static bool configure_current_wspr_transmission(
                 config.grid_square,
                 config.power_dbm);
 
+        llog.logS(INFO,
+                  "Prepared WSPR plan type: ",
+                  plan.plan_type,
+                  ", frames: ",
+                  static_cast<int>(plan.frames.size()),
+                  ".");
+
         wsprTransmitter.configureWspr(
             actual_rf_frequency_hz,
             config.power_level,

@@ -27,7 +27,7 @@
 # ─────────────────────────────────────────────────────────────────────────────
 
 # Debug flags (add/remove as needed)
-DEBUG_DEFS := -DDEBUG_WSPR
+# DEBUG_DEFS := -DDEBUG_WSPR
 # DEBUG_DEFS += -DDEBUG_PPMMANAGER
 # DEBUG_DEFS += -DDEBUG_SIGNAL_HANDLER
 

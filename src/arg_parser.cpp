@@ -155,47 +155,9 @@ void callback_ini_changed()
     }
 }
 
-/**
- * @brief Validates a WSPR callsign and normalizes it to uppercase.
- *
- * This function checks whether a given callsign meets the criteria for a valid WSPR Type 1
- * callsign. Validation includes:
- * - Ensuring the callsign length is between 3 and 6 characters.
- * - Matching the callsign against a regular expression pattern that enforces the WSPR Type 1 format.
- *
- * The regex pattern used is:
- * @verbatim
- * ^(?:[A-Za-z0-9]?[A-Za-z0-9][0-9][A-Za-z]?[A-Za-z]?[A-Za-z]?|[A-Za-z][0-9][A-Za-z]|[A-Za-z0-9]{3}[0-9][A-Za-z]{2})$
- * @endverbatim
- * This pattern is evaluated in a case-insensitive manner.
- *
- * If the callsign is valid, the function converts it to uppercase.
- *
- * @param callsign A reference to the callsign string to validate. If valid, the string is modified in place to uppercase.
- * @return true if the callsign is valid, false otherwise.
- */
-bool is_valid_callsign(std::string &callsign)
+static void normalize_wspr_callsign(std::string &callsign)
 {
-    // WSPR Type 1 callsign regex pattern (case-insensitive)
-    static const std::regex callsign_pattern(
-        R"(^(?:[A-Za-z0-9]?[A-Za-z0-9][0-9][A-Za-z]?[A-Za-z]?[A-Za-z]?|[A-Za-z][0-9][A-Za-z]|[A-Za-z0-9]{3}[0-9][A-Za-z]{2})$)",
-        std::regex::icase);
-
-    // Check that the callsign length is within the valid range (3-6 characters)
-    if (callsign.length() < 3 || callsign.length() > 6)
-    {
-        return false;
-    }
-
-    // Validate the callsign using the regex pattern
-    if (std::regex_match(callsign, callsign_pattern))
-    {
-        // Convert the valid callsign to uppercase
-        std::transform(callsign.begin(), callsign.end(), callsign.begin(), ::toupper);
-        return true;
-    }
-
-    return false;
+    std::transform(callsign.begin(), callsign.end(), callsign.begin(), ::toupper);
 }
 
 /**
@@ -228,40 +190,9 @@ int round_to_nearest_wspr_power(int power)
     return closest;
 }
 
-/**
- * @brief Validates and truncates a Maidenhead grid locator.
- *
- * This function validates the input grid locator by checking if it matches a valid 4-character
- * format (two letters followed by two digits). The locator is first converted to uppercase.
- * - If the locator is exactly 4 characters and valid, it is accepted as-is.
- * - If the locator is 6 or 8 characters long and its first 4 characters are valid,
- *   the locator is truncated to these 4 characters.
- *
- * @param locator A reference to the grid locator string. The string is modified in place
- *                if it needs to be truncated.
- * @return true if the locator is valid or has been successfully truncated to a valid format,
- *         false otherwise.
- */
-bool validate_and_truncate_locator(std::string &locator)
+static void normalize_wspr_locator(std::string &locator)
 {
-    static const std::regex locator_pattern(R"(^[A-Za-z]{2}[0-9]{2})");
-
-    // Convert to uppercase before validation
     std::transform(locator.begin(), locator.end(), locator.begin(), ::toupper);
-
-    if (locator.length() == 4 && std::regex_match(locator, locator_pattern))
-    {
-        return true; // Already valid
-    }
-
-    // If locator is 6 or 8 characters, check first 4 characters
-    if ((locator.length() == 6 || locator.length() == 8) && std::regex_match(locator.substr(0, 4), locator_pattern))
-    {
-        locator = locator.substr(0, 4); // Truncate to first 4 characters
-        return true;
-    }
-
-    return false; // Invalid locator
 }
 
 /**
@@ -500,23 +431,8 @@ bool validate_config_candidate(
         return false;
     }
 
-    if (!is_valid_callsign(callsign))
-    {
-        if (error_message != nullptr)
-        {
-            *error_message = "Invalid callsign.";
-        }
-        return false;
-    }
-
-    if (!validate_and_truncate_locator(locator))
-    {
-        if (error_message != nullptr)
-        {
-            *error_message = "Invalid grid square.";
-        }
-        return false;
-    }
+    normalize_wspr_callsign(callsign);
+    normalize_wspr_locator(locator);
 
     candidate.callsign = callsign;
     candidate.grid_square = locator;
@@ -1292,30 +1208,13 @@ bool parse_command_line(int argc, char *argv[])
                 print_usage("Missing required positional arguments: callsign, gridsquare, power, and dial_frequency.", EXIT_FAILURE);
             }
 
-            // Validate callsign with REGEX
-            if (is_valid_callsign(positional_args[0]))
-            {
-                config.callsign = positional_args[0];
-            }
-            else
-            {
-                print_usage("Invalid call sign '" + positional_args[0] + "' for type 1 WSPR message.", EXIT_FAILURE);
-            }
+            std::string callsign = positional_args[0];
+            normalize_wspr_callsign(callsign);
+            config.callsign = callsign;
 
-            // Validate and truncate gridsquare
             std::string gridsquare = positional_args[1];
-            if (validate_and_truncate_locator(gridsquare))
-            {
-                if (gridsquare != positional_args[1])
-                {
-                    llog.logS(DEBUG, "Grid square truncated to:", gridsquare);
-                }
-                config.grid_square = gridsquare;
-            }
-            else
-            {
-                print_usage("Invalid maidenhead locator: " + gridsquare, EXIT_FAILURE);
-            }
+            normalize_wspr_locator(gridsquare);
+            config.grid_square = gridsquare;
 
             // Validate power to standard values
             try
