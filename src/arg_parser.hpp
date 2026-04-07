@@ -45,6 +45,7 @@
 
 // Standard library headers
 #include <atomic>
+#include <cstdint>
 #include <optional>
 #include <thread>
 
@@ -111,6 +112,7 @@ extern std::atomic<int> wspr_interval;
  * @note The atomic nature ensures thread-safe access across multiple threads.
  */
 extern std::atomic<bool> ini_reload_pending;
+extern std::atomic<std::uint64_t> ini_reload_generation;
 
 /**
  * @brief Atomic flag indicating that a new PPM value needs to be applied.
@@ -119,6 +121,8 @@ extern std::atomic<bool> ini_reload_pending;
  * subsystems should reload or reconfigure based on the new frequency offset.
  */
 extern std::atomic<bool> ppm_reload_pending;
+
+void apply_runtime_config_side_effects();
 
 /**
  * @brief Called when the INI file is modified.

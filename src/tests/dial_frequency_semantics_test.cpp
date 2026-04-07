@@ -6,6 +6,7 @@
 
 #include <cmath>
 #include <cstdlib>
+#include <fstream>
 #include <getopt.h>
 #include <iostream>
 #include <map>
@@ -81,6 +82,26 @@ namespace
               {"Socket Port", "-1"},
               {"Use Shutdown", "false"},
               {"Shutdown Button", "-1"}}}};
+    }
+
+    void write_managed_ini_file(
+        const std::string &path,
+        const std::map<std::string, std::unordered_map<std::string, std::string>> &data)
+    {
+        std::ofstream out(path, std::ios::trunc);
+        require(out.is_open(), "managed INI regression helper must open temp INI file");
+
+        for (const auto &section_pair : data)
+        {
+            out << "[" << section_pair.first << "]\n";
+            for (const auto &kv : section_pair.second)
+            {
+                out << kv.first << " = " << kv.second << "\n";
+            }
+            out << "\n";
+        }
+
+        require(static_cast<bool>(out), "managed INI regression helper must write temp INI file");
     }
 } // namespace
 
@@ -505,16 +526,219 @@ int main()
         callback_ini_changed();
 
         require(
-            !ini_reload_pending.load(std::memory_order_relaxed),
-            "valid disable reload during TX must apply immediately");
+            ini_reload_pending.load(std::memory_order_relaxed),
+            "valid disable reload during TX must remain deferred until the current transmission completes");
         require(
-            !config.transmit,
-            "valid disable reload during TX must commit disabled live config");
+            config.transmit,
+            "valid disable reload during TX must not mutate live config mid-transmission");
         require(
-            wsprTransmitter.getState() != WsprTransmitter::State::TRANSMITTING,
-            "valid disable reload during TX must stop the active transmission promptly");
+            wsprTransmitter.getState() == WsprTransmitter::State::TRANSMITTING,
+            "valid disable reload during TX must not interrupt the active transmission");
 
         wsprTransmitter.backendSetStateValue(WsprTransmitter::State::DISABLED);
+        require(
+            set_config(false),
+            "valid disable reload after TX completion must commit cleanly");
+        require(
+            !config.transmit,
+            "valid disable reload after TX completion must commit disabled live config");
+        require(
+            !managed_reload_tx_inhibited_for_test(),
+            "valid disable reload after TX completion must not set the invalid-reload inhibit latch");
+    }
+
+    {
+        init_config_json();
+        json_to_config();
+        ini_reload_pending.store(false, std::memory_order_relaxed);
+        exiting_wspr.store(false, std::memory_order_relaxed);
+        reset_managed_reload_runtime_for_test();
+        set_scheduler_execution_suppressed_for_test(true);
+
+        config.use_ini = true;
+        config.ini_filename = "/tmp/managed_reload_post_tx_disable.ini";
+        config.mode = ModeType::WSPR;
+        config.transmit = true;
+        config.callsign = "AA0NT";
+        config.grid_square = "EM18";
+        config.power_dbm = 20;
+        config.frequencies = "20m";
+        config.tx_pin = 4;
+        set_frequencies(config);
+        iniFile.setData(
+            make_managed_ini_data("AA0NT", "EM18", "20m", true));
+
+        require(
+            set_config(true),
+            "initial managed enabled config must commit before post-TX reload regression");
+        const double committed_frequency_before_reload =
+            current_transmission_request_for_test().actual_rf_frequency_hz;
+
+        wsprTransmitter.backendSetStateValue(WsprTransmitter::State::TRANSMITTING);
+        iniFile.setData(
+            make_managed_ini_data("W1AW", "FN31", "80m", false));
+        callback_ini_changed();
+
+        require(
+            ini_reload_pending.load(std::memory_order_relaxed),
+            "deferred disable reload must remain pending until COMPLETE callback");
+        require(
+            config.transmit,
+            "deferred disable reload must not mutate live config before COMPLETE callback");
+
+        wsprTransmitter.backendSetStateValue(WsprTransmitter::State::DISABLED);
+        transmitter_cb(
+            WsprTransmitter::TransmissionCallbackEvent::COMPLETE,
+            WsprTransmitter::LogLevel::INFO,
+            "managed post-tx reload regression",
+            110.6);
+
+        require(
+            !ini_reload_pending.load(std::memory_order_relaxed),
+            "deferred reload must be consumed immediately by the COMPLETE handoff");
+        require(
+            !config.transmit,
+            "deferred disable reload must commit disabled live config at COMPLETE handoff");
+        require(
+            config.callsign == "W1AW" &&
+                config.grid_square == "FN31" &&
+                config.frequencies == "80m",
+            "deferred disable reload must commit the latest candidate before any next scheduling pass");
+        require(
+            current_transmission_request_for_test().actual_rf_frequency_hz == 0.0,
+            "deferred disable reload must not schedule a second transmission after COMPLETE handoff");
+        require(
+            committed_frequency_before_reload != current_transmission_request_for_test().actual_rf_frequency_hz,
+            "deferred disable reload must replace the prior committed request state");
+
+        set_scheduler_execution_suppressed_for_test(false);
+    }
+
+    {
+        init_config_json();
+        json_to_config();
+        ini_reload_pending.store(false, std::memory_order_relaxed);
+        exiting_wspr.store(false, std::memory_order_relaxed);
+        reset_managed_reload_runtime_for_test();
+        set_scheduler_execution_suppressed_for_test(true);
+
+        const std::string ini_path = "/tmp/managed_reload_file_backed_post_tx.ini";
+        write_managed_ini_file(
+            ini_path,
+            make_managed_ini_data("AA0NT", "EM18", "80m", true));
+        iniFile.set_filename(ini_path);
+
+        config.use_ini = true;
+        config.ini_filename = ini_path;
+        config.mode = ModeType::WSPR;
+        config.transmit = true;
+        config.callsign = "AA0NT";
+        config.grid_square = "EM18";
+        config.power_dbm = 20;
+        config.frequencies = "80m";
+        config.tx_pin = 4;
+        set_frequencies(config);
+
+        require(
+            set_config(true),
+            "file-backed managed enabled config must commit before deferred reload regression");
+        require(
+            nearly_equal(current_transmission_request_for_test().actual_rf_frequency_hz, 3570100.0),
+            "file-backed managed enabled config must commit the initial 80m request");
+
+        wsprTransmitter.backendSetStateValue(WsprTransmitter::State::TRANSMITTING);
+        write_managed_ini_file(
+            ini_path,
+            make_managed_ini_data("W1AW", "FN31", "80m", false));
+        callback_ini_changed();
+
+        require(
+            ini_reload_pending.load(std::memory_order_relaxed),
+            "file-backed deferred disable reload must remain pending until COMPLETE callback");
+        require(
+            config.transmit,
+            "file-backed deferred disable reload must not mutate live config during TX");
+
+        wsprTransmitter.backendSetStateValue(WsprTransmitter::State::DISABLED);
+        transmitter_cb(
+            WsprTransmissionCallbackEvent::COMPLETE,
+            WsprTransmitLogLevel::INFO,
+            "file-backed deferred reload regression",
+            110.592);
+
+        require(
+            !ini_reload_pending.load(std::memory_order_relaxed),
+            "file-backed deferred reload must be consumed immediately after COMPLETE");
+        require(
+            !config.transmit,
+            "file-backed deferred disable reload must commit disabled config");
+        require(
+            config.callsign == "W1AW" &&
+                config.grid_square == "FN31" &&
+                config.frequencies == "80m",
+            "file-backed deferred disable reload must use the latest on-disk INI as the source of truth");
+        require(
+            current_transmission_request_for_test().actual_rf_frequency_hz == 0.0,
+            "file-backed deferred disable reload must not schedule a second transmission");
+
+        set_scheduler_execution_suppressed_for_test(false);
+    }
+
+    {
+        init_config_json();
+        json_to_config();
+        ini_reload_pending.store(false, std::memory_order_relaxed);
+        exiting_wspr.store(false, std::memory_order_relaxed);
+        reset_managed_reload_runtime_for_test();
+
+        config.use_ini = true;
+        config.ini_filename = "/tmp/managed_reload_reclassify_disable.ini";
+        config.mode = ModeType::WSPR;
+        config.transmit = true;
+        config.callsign = "AA0NT";
+        config.grid_square = "EM18";
+        config.power_dbm = 20;
+        config.frequencies = "20m";
+        config.tx_pin = 4;
+        set_frequencies(config);
+
+        wsprTransmitter.backendSetStateValue(WsprTransmitter::State::TRANSMITTING);
+
+        iniFile.setData(
+            make_managed_ini_data("AA0NT", "EM18", "20m", true));
+        callback_ini_changed();
+
+        require(
+            ini_reload_pending.load(std::memory_order_relaxed),
+            "the first managed reload during TX must leave reload pending");
+        require(
+            config.transmit,
+            "the first managed reload during TX must not change live transmit state");
+        require(
+            wsprTransmitter.getState() == WsprTransmitter::State::TRANSMITTING,
+            "the first managed reload during TX must keep the current TX running");
+
+        iniFile.setData(
+            make_managed_ini_data("AA0NT", "EM18", "20m", false));
+        callback_ini_changed();
+
+        require(
+            ini_reload_pending.load(std::memory_order_relaxed),
+            "a later valid disable edit during TX must remain deferred while the current TX is active");
+        require(
+            config.transmit,
+            "a later valid disable edit during TX must not mutate live config before TX completion");
+        require(
+            wsprTransmitter.getState() == WsprTransmitter::State::TRANSMITTING,
+            "a later valid disable edit during TX must not interrupt the active transmission");
+
+        wsprTransmitter.backendSetStateValue(WsprTransmitter::State::DISABLED);
+        require(
+            set_config(false),
+            "the latest deferred managed reload must apply after TX completion");
+        require(
+            !config.transmit,
+            "multiple rapid INI changes must coalesce so the latest valid disable wins");
     }
 
     {
@@ -561,6 +785,40 @@ int main()
         require(
             config.callsign == "AA0NT",
             "invalid reload after TX completion must still preserve last-known-good live config");
+    }
+
+    {
+        init_config_json();
+        json_to_config();
+        ini_reload_pending.store(false, std::memory_order_relaxed);
+        exiting_wspr.store(false, std::memory_order_relaxed);
+        reset_managed_reload_runtime_for_test();
+
+        config.use_ini = true;
+        config.ini_filename = "/tmp/managed_reload_locator_error.ini";
+        config.mode = ModeType::WSPR;
+        config.transmit = true;
+        config.callsign = "AA0NT";
+        config.grid_square = "EM18";
+        config.power_dbm = 20;
+        config.frequencies = "80m";
+        config.tx_pin = 4;
+        set_frequencies(config);
+
+        iniFile.setData(
+            make_managed_ini_data("AA0NT", "BAD", "80m", true));
+
+        require(
+            set_config(true),
+            "invalid managed locator/type reload must remain recoverable");
+        require(
+            config.callsign == "AA0NT" &&
+                config.grid_square == "EM18" &&
+                config.frequencies == "80m",
+            "invalid managed locator/type reload must preserve last-known-good live config");
+        require(
+            managed_reload_tx_inhibited_for_test(),
+            "invalid managed locator/type reload must disable future transmissions until repaired");
     }
 
     {

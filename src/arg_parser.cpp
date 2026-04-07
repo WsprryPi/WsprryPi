@@ -101,6 +101,7 @@ WSPRBandLookup lookup;
  * @note The atomic nature ensures thread-safe access across multiple threads.
  */
 std::atomic<bool> ini_reload_pending(false);
+std::atomic<std::uint64_t> ini_reload_generation(0);
 
 /**
  * @brief Atomic flag indicating that a new PPM value needs to be applied.
@@ -150,48 +151,24 @@ void callback_ini_changed()
         return;
     }
 
-    const bool reload_already_pending =
-        ini_reload_pending.exchange(true, std::memory_order_acq_rel);
-    if (reload_already_pending)
+    const std::uint64_t generation =
+        ini_reload_generation.fetch_add(1, std::memory_order_acq_rel) + 1U;
+    ini_reload_pending.store(true, std::memory_order_release);
+
+    const WsprTransmitter::State transmitter_state = wsprTransmitter.getState();
+
+    if (transmitter_state == WsprTransmitter::State::TRANSMITTING)
     {
-        llog.logS(DEBUG, "INI reload already pending; suppressing duplicate callback.");
+        llog.logS(
+            INFO,
+            "INI file changed during transmission; deferring managed reload until the current TX completes (generation ",
+            generation,
+            ").");
         return;
     }
 
-    if (wsprTransmitter.getState() == WsprTransmitter::State::TRANSMITTING)
-    {
-        PreparedConfigCandidate candidate{};
-        prepare_ini_config_candidate(config.ini_filename, candidate);
-
-        for (const auto &warning_message : candidate.warnings)
-        {
-            llog.logS(WARN, warning_message);
-        }
-
-        if (!candidate.valid)
-        {
-            llog.logS(
-                WARN,
-                "INI file changed, but reload is invalid. Current transmission will finish; future transmissions will be disabled until a valid configuration is loaded.");
-            return;
-        }
-
-        if (!candidate.transmit_enabled)
-        {
-            llog.logS(INFO, "INI file changed, valid disable requested; stopping current transmission.");
-            set_config(true);
-        }
-        else
-        {
-            llog.logS(INFO, "INI file changed, reload after transmission.");
-        }
-    }
-    else
-    {
-        // We're not transmitting, jam it in
-        llog.logS(INFO, "INI file changed, reloading.");
-        set_config(true);
-    }
+    llog.logS(INFO, "INI file changed, reloading.");
+    (void)set_config(true);
 }
 
 static void normalize_wspr_callsign(std::string &callsign)
@@ -767,49 +744,8 @@ bool validate_config_candidate(
     return true;
 }
 
-bool validate_config_data()
+void apply_runtime_config_side_effects()
 {
-    ini_reload_pending.store(false, std::memory_order_relaxed);
-
-    std::string validation_error;
-    if (!validate_config_candidate(config, &validation_error))
-    {
-        llog.logE(FATAL, "Missing required parameters.");
-
-        if (config.callsign.empty())
-        {
-            llog.logE(ERROR, " - Missing callsign.");
-        }
-        if (config.grid_square.empty())
-        {
-            llog.logE(ERROR, " - Missing grid square.");
-        }
-        if (config.power_dbm <= 0)
-        {
-            llog.logE(ERROR, " - TX power must be greater than 0 dBm.");
-        }
-        if (config.wspr_dial_freq_set.empty())
-        {
-            llog.logE(ERROR, " - At least one WSPR dial frequency must be specified.");
-        }
-        if ((config.mode == ModeType::TONE || config.transmit) &&
-            !is_valid_runtime_transmit_gpio(config.tx_pin))
-        {
-            llog.logE(ERROR, " - ", transmit_gpio_validation_message());
-        }
-
-        if (config.use_ini)
-        {
-            llog.logE(ERROR, "Please check the INI file for missing or invalid values.");
-            return false;
-        }
-
-        llog.logE(ERROR, "Please check your configuration for missing or invalid values.");
-        llog.logE(ERROR, "Try: wsprrypi --help");
-        std::cerr << std::endl;
-        std::exit(EXIT_FAILURE);
-    }
-
     llog.logS(INFO, "Transmit GPIO:", config.tx_pin);
     llog.logS(INFO,
               "Frequency-entry control GPIO polarity:",
@@ -858,88 +794,149 @@ bool validate_config_data()
         if (!try_get_direct_tone_startup_request(entry, actual_rf_frequency_hz))
         {
             llog.logE(ERROR, " - Missing direct RF test tone frequency.");
-            if (config.use_ini)
-            {
-                return false;
-            }
-            std::exit(EXIT_FAILURE);
+            return;
         }
 
         llog.logS(
             INFO,
             "A direct RF test tone will be generated at:",
             lookup.freq_display_string(actual_rf_frequency_hz));
+        return;
     }
-    else if (config.mode == ModeType::WSPR)
+
+    if (config.mode != ModeType::WSPR)
     {
-        if (config.transmit)
+        return;
+    }
+
+    if (config.transmit)
+    {
+        llog.logS(INFO, "WSPR packet payload:");
+        llog.logS(INFO, "- Callsign:", config.callsign);
+        llog.logS(INFO, "- Locator:", config.grid_square);
+        llog.logS(INFO, "- Power:", config.power_dbm, " dBm");
+
+        if (config.wspr_dial_freq_set.size() > 1)
         {
-            llog.logS(INFO, "WSPR packet payload:");
-            llog.logS(INFO, "- Callsign:", config.callsign);
-            llog.logS(INFO, "- Locator:", config.grid_square);
-            llog.logS(INFO, "- Power:", config.power_dbm, " dBm");
+            llog.logS(INFO, "Requested WSPR dial frequencies:");
 
-            if (config.wspr_dial_freq_set.size() > 1)
+            for (const auto &freq : config.wspr_dial_freq_set)
             {
-                llog.logS(INFO, "Requested WSPR dial frequencies:");
-
-                for (const auto &freq : config.wspr_dial_freq_set)
+                if (freq == 0.0)
                 {
-                    if (freq == 0.0)
-                    {
-                        llog.logS(INFO, "- Skip (0.0)");
-                    }
-                    else
-                    {
-                        llog.logS(INFO, "- ", lookup.freq_display_string(freq));
-                    }
+                    llog.logS(INFO, "- Skip (0.0)");
                 }
-            }
-            else
-            {
-                llog.logS(
-                    INFO,
-                    "Requested WSPR dial frequency:",
-                    lookup.freq_display_string(config.wspr_dial_freq_set[0]));
-            }
-
-            if (config.use_offset)
-            {
-                llog.logS(
-                    INFO,
-                    "A random offset will be added to all transmissions.");
+                else
+                {
+                    llog.logS(INFO, "- ", lookup.freq_display_string(freq));
+                }
             }
         }
-
-        if (!config.use_ini)
+        else
         {
-            if (config.loop_tx)
-            {
-                llog.logS(
-                    INFO,
-                    "Transmissions will continue until it receives a signal to stop.");
-            }
-            else
-            {
-                if (config.tx_iterations.load() <= 0)
-                {
-                    config.tx_iterations.store(1);
-                    config.transmit = true;
-                }
-                llog.logS(
-                    INFO,
-                    "TX will stop after:",
-                    config.tx_iterations.load(),
-                    "iteration(s) of the WSPR dial-frequency list.");
-            }
+            llog.logS(
+                INFO,
+                "Requested WSPR dial frequency:",
+                lookup.freq_display_string(config.wspr_dial_freq_set[0]));
+        }
+
+        if (config.use_offset)
+        {
+            llog.logS(
+                INFO,
+                "A random offset will be added to all transmissions.");
         }
     }
-    else
+
+    if (!config.use_ini)
+    {
+        if (config.loop_tx)
+        {
+            llog.logS(
+                INFO,
+                "Transmissions will continue until it receives a signal to stop.");
+        }
+        else
+        {
+            if (config.tx_iterations.load() <= 0)
+            {
+                config.tx_iterations.store(1);
+                config.transmit = true;
+            }
+            llog.logS(
+                INFO,
+                "TX will stop after:",
+                config.tx_iterations.load(),
+                "iteration(s) of the WSPR dial-frequency list.");
+        }
+    }
+}
+
+bool validate_config_data()
+{
+    ini_reload_pending.store(false, std::memory_order_relaxed);
+
+    std::string validation_error;
+    if (!validate_config_candidate(config, &validation_error))
+    {
+        llog.logE(FATAL, "Missing required parameters.");
+
+        if (config.callsign.empty())
+        {
+            llog.logE(ERROR, " - Missing callsign.");
+        }
+        if (config.grid_square.empty())
+        {
+            llog.logE(ERROR, " - Missing grid square.");
+        }
+        if (config.power_dbm <= 0)
+        {
+            llog.logE(ERROR, " - TX power must be greater than 0 dBm.");
+        }
+        if (config.wspr_dial_freq_set.empty())
+        {
+            llog.logE(ERROR, " - At least one WSPR dial frequency must be specified.");
+        }
+        if ((config.mode == ModeType::TONE || config.transmit) &&
+            !is_valid_runtime_transmit_gpio(config.tx_pin))
+        {
+            llog.logE(ERROR, " - ", transmit_gpio_validation_message());
+        }
+
+        if (config.use_ini)
+        {
+            llog.logE(ERROR, "Please check the INI file for missing or invalid values.");
+            return false;
+        }
+
+        llog.logE(ERROR, "Please check your configuration for missing or invalid values.");
+        llog.logE(ERROR, "Try: wsprrypi --help");
+        std::cerr << std::endl;
+        std::exit(EXIT_FAILURE);
+    }
+
+    if (config.mode != ModeType::TONE && config.mode != ModeType::WSPR)
     {
         llog.logE(FATAL, "Mode must be either WSPR or TONE.");
         std::exit(EXIT_FAILURE);
     }
 
+    if (config.mode == ModeType::TONE)
+    {
+        WsprDialFrequencyEntry entry;
+        double actual_rf_frequency_hz = 0.0;
+        if (!try_get_direct_tone_startup_request(entry, actual_rf_frequency_hz))
+        {
+            llog.logE(ERROR, " - Missing direct RF test tone frequency.");
+            if (config.use_ini)
+            {
+                return false;
+            }
+            std::exit(EXIT_FAILURE);
+        }
+    }
+
+    apply_runtime_config_side_effects();
     return true;
 }
 

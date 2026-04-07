@@ -748,6 +748,15 @@ namespace
         {
             init_config_json_impl(candidate_json);
 
+            // External INI edits are observed by the file monitor before this
+            // candidate build runs. Refresh the singleton from disk unless the
+            // caller intentionally staged in-memory edits that have not yet
+            // been persisted.
+            if (!iniFile.hasPendingChanges())
+            {
+                iniFile.load();
+            }
+
             std::vector<std::string> local_warnings;
             bool missing_required_tx_item = false;
             const auto ini_data = iniFile.getData();

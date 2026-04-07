@@ -64,6 +64,7 @@ public:
      * @return True on success, false on failure.
      */
     bool prepareBand(HamBand band);
+    bool prepareBand(HamBand band, const BandGPIOConfig &config);
 
     /**
      * @brief Prepare a band based on a frequency in Hz.
