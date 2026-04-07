@@ -356,6 +356,11 @@ static bool active_wspr_plan_has_more_frames_after_current() noexcept
            (active_wspr_frame_index + 1U) < active_wspr_plan.frameCount();
 }
 
+static bool is_managed_persistent_mode() noexcept
+{
+    return config.use_ini;
+}
+
 static WsprDialFrequencyEntry next_frequency_entry(bool reset);
 
 /**
@@ -1267,6 +1272,18 @@ void end_test_tone()
     }
 }
 
+static void stop_runtime_components_for_early_exit() noexcept
+{
+    wsprTransmitter.stopAndJoin();
+    stop_active_transmission_selectors();
+    shutdownMonitor.stop();
+    ledControl.stop();
+    iniMonitor.stop();
+    ppmManager.stop();
+    webServer.stop();
+    socketServer.stop();
+}
+
 /**
  * @brief Main orchestration loop for startup, scheduling, and shutdown.
  *
@@ -1357,7 +1374,11 @@ bool wspr_loop()
     if (config.mode == ModeType::WSPR)
     {
         ini_reload_pending.store(true, std::memory_order_relaxed);
-        set_config();
+        if (!set_config())
+        {
+            stop_runtime_components_for_early_exit();
+            return false;
+        }
     }
     else if (config.mode == ModeType::TONE)
     {
@@ -1366,6 +1387,7 @@ bool wspr_loop()
         if (!try_get_direct_tone_startup_request(entry, actual_rf_frequency_hz))
         {
             llog.logE(ERROR, "Direct RF test tone requested without a startup tone request.");
+            stop_runtime_components_for_early_exit();
             return false;
         }
 
@@ -1559,13 +1581,13 @@ WsprDialFrequencyEntry next_frequency_entry(bool reset)
  * selector preparation, and request commit. The transmitter receives only
  * the final committed request built here.
  */
-void set_config(bool force)
+bool set_config(bool force)
 {
     // Exit if we are shutting down
     if (exiting_wspr.load())
     {
         llog.logS(DEBUG, "Exiting set_config() early.");
-        return;
+        return true;
     }
     else
     {
@@ -1600,7 +1622,7 @@ void set_config(bool force)
                           load_error);
                 config_to_json();
                 json_to_ini();
-                return;
+                return true;
             }
 
             for (const auto &warning_message : warning_messages)
@@ -1638,7 +1660,7 @@ void set_config(bool force)
                 json_to_ini();
                 ini_reload_pending.store(false, std::memory_order_relaxed);
                 send_ws_message("configuration", "reload_failed");
-                return;
+                return true;
             }
 
             for (const auto &warning_message : warning_messages)
@@ -1652,7 +1674,7 @@ void set_config(bool force)
             llog.logE(ERROR, "Configuration validation failed.");
             config.transmit = false;
             config_to_json();
-            return;
+            return true;
         }
     }
 
@@ -1744,7 +1766,7 @@ void set_config(bool force)
         {
             config.transmit = false;
             config_to_json();
-            return;
+            return is_managed_persistent_mode();
         }
         current_transmission_request.applied_offset_hz = applied_offset_hz;
         commit_execution_request(current_transmission_request);
@@ -1756,8 +1778,7 @@ void set_config(bool force)
             stop_active_transmission_selectors();
             config.transmit = false;
             config_to_json();
-            request_wspr_shutdown("frequency entry control GPIO unavailable");
-            return;
+            return is_managed_persistent_mode();
         }
 
         if (!bandGPIOSelector.prepareFrequency(current_dial_frequency))
@@ -1768,7 +1789,7 @@ void set_config(bool force)
                       " MHz.");
             config.transmit = false;
             config_to_json();
-            return;
+            return is_managed_persistent_mode();
         }
     }
 
@@ -1793,4 +1814,5 @@ void set_config(bool force)
 #ifdef DEBUG_WSPR_TRANSMIT
     wsprTransmitter.dumpParameters();
 #endif
+    return true;
 }

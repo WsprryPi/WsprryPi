@@ -265,6 +265,6 @@ void send_ws_message(std::string type, std::string state);
  * @throws std::runtime_error if DMA setup or mailbox operations fail within
  *         `configure()`.
  */
-void set_config(bool force = false);
+bool set_config(bool force = false);
 
 #endif // _SCHEDULING_HPP

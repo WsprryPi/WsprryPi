@@ -1,6 +1,7 @@
 #include "arg_parser.hpp"
 #include "config_handler.hpp"
 #include "frequency_semantics.hpp"
+#include "scheduling.hpp"
 #include "wspr_band_lookup.hpp"
 
 #include <cmath>
@@ -314,6 +315,29 @@ int main()
         require(
             !validate_config_candidate(invalid_wspr_candidate, &validation_error),
             "normal WSPR validation must still reject missing callsign even after tone usage");
+    }
+
+    {
+        init_config_json();
+        json_to_config();
+        ini_reload_pending.store(false, std::memory_order_relaxed);
+        exiting_wspr.store(false, std::memory_order_relaxed);
+
+        config.use_ini = false;
+        config.mode = ModeType::WSPR;
+        config.transmit = true;
+        config.callsign = "<AA0NT>";
+        config.grid_square = "EM18";
+        config.power_dbm = 20;
+        config.frequencies = "20m";
+        config.tx_pin = 4;
+
+        require(
+            !set_config(true),
+            "one-shot startup planning failure must propagate as a fatal startup error");
+        require(
+            !config.transmit,
+            "one-shot startup planning failure must disable transmission");
     }
 
     std::cout << "dial_frequency_semantics_test passed" << std::endl;
