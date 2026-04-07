@@ -234,6 +234,19 @@ int main()
             WsprTransmitter::TransmissionCallbackEvent::CANCELLED !=
                 WsprTransmitter::TransmissionCallbackEvent::COMPLETE,
             "transmitter callback contract must expose cancellation as a distinct typed event");
+        require(
+            !committed_request.isSkipWindow(),
+            "zero-frequency detection must not be inferred for normal committed WSPR requests");
+
+        committed_request.actual_rf_frequency_hz = 0.0;
+        require(
+            !committed_request.isSkipWindow(),
+            "zero RF frequency alone must not create a skip-window request");
+
+        committed_request.skip_window = true;
+        require(
+            committed_request.isSkipWindow(),
+            "skip-window requests must be explicitly marked by the scheduler");
     }
 
     {

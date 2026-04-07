@@ -931,6 +931,14 @@ void transmitter_cb(WsprTransmitter::TransmissionCallbackEvent event,
 
     case WsprTransmitter::TransmissionCallbackEvent::SKIPPED:
     {
+        if (!current_transmission_request.isSkipWindow())
+        {
+            llog.logS(
+                WARN,
+                "Ignoring unexpected SKIPPED transmitter callback for non-skip request.");
+            break;
+        }
+
         // Deassert and release the prepared selectors.
         stop_active_transmission_selectors();
 
