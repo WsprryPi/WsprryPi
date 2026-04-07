@@ -186,30 +186,6 @@ bool try_get_direct_tone_startup_request(
 void clear_direct_tone_startup_request() noexcept;
 
 /**
- * @brief Loads configuration values from an INI file.
- *
- * This function attempts to load settings from an INI file using the global `ini` object
- * and populates the global `config` structure with values retrieved from it.
- *
- * If `config.use_ini` is false or if the INI file fails to load, the function immediately
- * returns false. Otherwise, it attempts to read values from various INI sections:
- *
- * - **[Control]**: Transmit flag.
- * - **[Common]**: Callsign, Grid Square, TX Power, Frequency, Transmit Pin.
- * - **[Extended]**: PPM, Use NTP, Offset, Power Level, Use LED, LED Pin.
- * - **[Server]**: Web Port, Socket Port, Use Shutdown, Shutdown Button.
- *
- * Each key is read inside a `try` block to allow partial loading—if a key is missing or
- * causes an exception, it is silently skipped, and loading continues.
- *
- * After successful loading, the global `jConfig` JSON object is updated to reflect the
- * contents of the `config` structure.
- *
- * @return true if the INI file was used and loaded successfully, false otherwise.
- */
-extern bool load_from_ini();
-
-/**
  * @brief Parses command-line arguments and configures the program settings.
  *
  * This function processes command-line options using `getopt_long()`, applying
