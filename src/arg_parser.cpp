@@ -160,15 +160,30 @@ void callback_ini_changed()
 
     if (wsprTransmitter.getState() == WsprTransmitter::State::TRANSMITTING)
     {
-        if (config.transmit)
+        PreparedConfigCandidate candidate{};
+        prepare_ini_config_candidate(config.ini_filename, candidate);
+
+        for (const auto &warning_message : candidate.warnings)
         {
-            // Transmit not changed, make pending change
-            llog.logS(INFO, "INI file changed, reload after transmission.");
+            llog.logS(WARN, warning_message);
         }
-        else // We are or are setting transmissions to disabled
+
+        if (!candidate.valid)
         {
-            // Execute reconfig immediately.
+            llog.logS(
+                WARN,
+                "INI file changed, but reload is invalid. Current transmission will finish; future transmissions will be disabled until a valid configuration is loaded.");
+            return;
+        }
+
+        if (!candidate.transmit_enabled)
+        {
+            llog.logS(INFO, "INI file changed, valid disable requested; stopping current transmission.");
             set_config(true);
+        }
+        else
+        {
+            llog.logS(INFO, "INI file changed, reload after transmission.");
         }
     }
     else

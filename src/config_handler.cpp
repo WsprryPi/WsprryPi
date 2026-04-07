@@ -912,26 +912,19 @@ bool load_json(
     std::string *error_message,
     std::vector<std::string> *warning_messages)
 {
-    nlohmann::json candidate_json;
-    ArgParserConfig candidate_config;
-    std::string local_error_message;
-    std::vector<std::string> local_warning_messages;
+    PreparedConfigCandidate candidate;
+    prepare_ini_config_candidate(filename, candidate);
 
-    if (!build_candidate_from_ini(
-            filename,
-            candidate_json,
-            candidate_config,
-            &local_error_message,
-            &local_warning_messages))
+    if (!candidate.valid)
     {
         if (error_message != nullptr)
         {
-            *error_message = local_error_message;
+            *error_message = candidate.error_reason;
         }
 
         if (warning_messages != nullptr)
         {
-            *warning_messages = local_warning_messages;
+            *warning_messages = candidate.warnings;
         }
 
         return false;
@@ -939,12 +932,50 @@ bool load_json(
 
     if (warning_messages != nullptr)
     {
-        *warning_messages = local_warning_messages;
+        *warning_messages = candidate.warnings;
     }
 
-    copy_config(candidate_config, config);
-    jConfig = candidate_json;
+    commit_config_candidate(candidate);
     return true;
+}
+
+void prepare_ini_config_candidate(
+    const std::string &filename,
+    PreparedConfigCandidate &candidate_out)
+{
+    candidate_out = PreparedConfigCandidate{};
+
+    if (!build_candidate_from_ini(
+            filename,
+            candidate_out.normalized_json,
+            candidate_out.normalized_config,
+            &candidate_out.error_reason,
+            &candidate_out.warnings))
+    {
+        candidate_out.valid = false;
+        candidate_out.transmit_enabled = false;
+        return;
+    }
+
+    candidate_out.valid = true;
+    candidate_out.transmit_enabled = candidate_out.normalized_config.transmit;
+}
+
+void commit_config_candidate(const PreparedConfigCandidate &candidate)
+{
+    if (!candidate.valid)
+    {
+        throw std::invalid_argument(
+            "Cannot commit an invalid configuration candidate.");
+    }
+
+    copy_config(candidate.normalized_config, config);
+    jConfig = candidate.normalized_json;
+}
+
+void copy_runtime_config(const ArgParserConfig &source, ArgParserConfig &target)
+{
+    copy_config(source, target);
 }
 
 void dump_json(const nlohmann::json &j, std::string tag)

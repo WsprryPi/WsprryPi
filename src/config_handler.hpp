@@ -193,6 +193,52 @@ struct ArgParserConfig
           band_gpio({})
     {
     }
+
+    ArgParserConfig(const ArgParserConfig &other)
+        : ArgParserConfig()
+    {
+        *this = other;
+    }
+
+    ArgParserConfig &operator=(const ArgParserConfig &other)
+    {
+        if (this == &other)
+        {
+            return *this;
+        }
+
+        transmit = other.transmit;
+        callsign = other.callsign;
+        grid_square = other.grid_square;
+        power_dbm = other.power_dbm;
+        frequencies = other.frequencies;
+        tx_pin = other.tx_pin;
+        ppm = other.ppm;
+        use_ntp = other.use_ntp;
+        use_offset = other.use_offset;
+        power_level = other.power_level;
+        use_led = other.use_led;
+        led_pin = other.led_pin;
+        web_port = other.web_port;
+        socket_port = other.socket_port;
+        use_shutdown = other.use_shutdown;
+        shutdown_pin = other.shutdown_pin;
+        use_journald = other.use_journald;
+        date_time_log = other.date_time_log;
+        require_paired_plan = other.require_paired_plan;
+        loop_tx = other.loop_tx;
+        tx_iterations.store(other.tx_iterations.load());
+        wspr_audio_offset_hz = other.wspr_audio_offset_hz;
+        mode = other.mode;
+        use_ini = other.use_ini;
+        ini_filename = other.ini_filename;
+        wspr_dial_freq_set = other.wspr_dial_freq_set;
+        wspr_dial_frequency_entries = other.wspr_dial_frequency_entries;
+        tx_freq_control_active_high = other.tx_freq_control_active_high;
+        ntp_good = other.ntp_good;
+        band_gpio = other.band_gpio;
+        return *this;
+    }
 };
 
 /**
@@ -202,6 +248,16 @@ struct ArgParserConfig
  * typically loaded from an INI file or a JSON configuration.
  */
 extern ArgParserConfig config;
+
+struct PreparedConfigCandidate
+{
+    nlohmann::json normalized_json{};
+    ArgParserConfig normalized_config{};
+    bool valid = false;
+    bool transmit_enabled = false;
+    std::string error_reason{};
+    std::vector<std::string> warnings{};
+};
 
 void init_default_config();
 
@@ -337,6 +393,14 @@ extern bool load_json(
     std::string filename,
     std::string *error_message = nullptr,
     std::vector<std::string> *warning_messages = nullptr);
+
+void prepare_ini_config_candidate(
+    const std::string &filename,
+    PreparedConfigCandidate &candidate_out);
+
+void commit_config_candidate(const PreparedConfigCandidate &candidate);
+
+void copy_runtime_config(const ArgParserConfig &source, ArgParserConfig &target);
 
 /**
  * @brief Prints a formatted JSON object to standard output.

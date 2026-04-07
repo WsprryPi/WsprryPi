@@ -42,6 +42,7 @@
 // Project headers
 #include "arg_parser.hpp"
 #include "ppm_manager.hpp"
+#include "wspr_transmit_types.hpp"
 
 // Standard library headers
 #include <atomic>
@@ -261,5 +262,10 @@ void send_ws_message(std::string type, std::string state);
  *         `configure()`.
  */
 bool set_config(bool force = false);
+
+bool managed_reload_tx_inhibited_for_test() noexcept;
+void reset_managed_reload_runtime_for_test() noexcept;
+void set_scheduler_execution_suppressed_for_test(bool suppressed) noexcept;
+WsprTransmissionRequest current_transmission_request_for_test();
 
 #endif // _SCHEDULING_HPP
