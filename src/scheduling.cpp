@@ -426,19 +426,6 @@ void consume_tx_iteration_if_needed()
     }
 }
 
-static std::string to_lower_copy(const std::string &s)
-{
-    std::string out = s;
-    std::transform(out.begin(),
-                   out.end(),
-                   out.begin(),
-                   [](unsigned char c)
-                   {
-                       return static_cast<char>(std::tolower(c));
-                   });
-    return out;
-}
-
 static void log_selected_frequency_entry_gpio(
     const WsprDialFrequencyEntry &entry)
 {
@@ -843,20 +830,7 @@ void transmitter_cb(WsprTransmitter::TransmissionCallbackEvent event,
         bool do_config = true;
 
         const std::string s_elapsed = format_elapsed(elapsed);
-        const std::string msg_lower = to_lower_copy(msg);
-
-        if (msg_lower.find("canceled") != std::string::npos)
-        {
-            llog.logS(to_log_level(level),
-                      "Transmission cancelled after ",
-                      s_elapsed,
-                      " seconds.");
-            do_config = false;
-            reset_active_wspr_plan_state();
-            shutdown_after_wspr_plan.store(false, std::memory_order_release);
-            send_ws_message("transmit", "canceled");
-        }
-        else if (!msg.empty() && elapsed != 0.0)
+        if (!msg.empty() && elapsed != 0.0)
         {
             llog.logS(to_log_level(level),
                       "Completed transmission (",
@@ -924,6 +898,27 @@ void transmitter_cb(WsprTransmitter::TransmissionCallbackEvent event,
         // Set config will determine if we have work to do.
         if (do_config)
             set_config();
+
+        break;
+    }
+
+    case WsprTransmitter::TransmissionCallbackEvent::CANCELLED:
+    {
+        const double elapsed = value;
+        const std::string s_elapsed = format_elapsed(elapsed);
+
+        llog.logS(to_log_level(level),
+                  "Transmission cancelled after ",
+                  s_elapsed,
+                  " seconds.");
+
+        stop_active_transmission_selectors();
+        ledControl.toggleGPIO(false);
+        send_ws_message("transmit", "canceled");
+
+        shutdown_after_current_transmission.store(false, std::memory_order_release);
+        shutdown_after_wspr_plan.store(false, std::memory_order_release);
+        reset_active_wspr_plan_state();
 
         break;
     }

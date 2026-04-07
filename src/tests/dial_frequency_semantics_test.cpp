@@ -229,6 +229,10 @@ int main()
         require(
             plan.total_symbol_count == 2U * WSPR_SYMBOL_COUNT,
             "transmitter plan must derive symbol count from the committed request only");
+        require(
+            WsprTransmitter::TransmissionCallbackEvent::CANCELLED !=
+                WsprTransmitter::TransmissionCallbackEvent::COMPLETE,
+            "transmitter callback contract must expose cancellation as a distinct typed event");
     }
 
     {
