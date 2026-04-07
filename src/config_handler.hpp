@@ -1,6 +1,11 @@
 /**
  * @file config_handler.hpp
- * @brief Provides an interface to ArgParserConfig and JSON config
+ * @brief Persistent configuration model and JSON/INI translation helpers.
+ *
+ * This layer owns durable configuration values and their serialized
+ * representation. Transient runtime requests such as `--test-tone` do not
+ * live here. Frequency entries may include optional `@GPIO` metadata, and
+ * `tx-gpio-polarity` applies to those per-frequency control outputs.
  *
  * This project is is licensed under the MIT License. See LICENSE.md
  * for more information.
@@ -38,6 +43,36 @@
 #include <string>
 #include <vector>
 
+inline constexpr int kTransmitGpioUnset = -1;
+inline constexpr int kDefaultTransmitGpio = 4;
+inline constexpr std::array<int, 2> kSupportedTransmitGpio = {4, 20};
+inline constexpr int kFrequencyEntryControlGpioUnset = -1;
+
+inline constexpr bool is_supported_transmit_gpio(int gpio) noexcept
+{
+    for (int supported_gpio : kSupportedTransmitGpio)
+    {
+        if (gpio == supported_gpio)
+        {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+inline constexpr bool is_valid_frequency_entry_control_gpio(int gpio) noexcept
+{
+    return gpio >= 0 && gpio <= 27;
+}
+
+struct WsprDialFrequencyEntry
+{
+    std::string token; ///< Original frequency token without `@GPIO`.
+    double dial_frequency_hz = 0.0; ///< Resolved WSPR dial frequency in Hz.
+    int control_gpio = kFrequencyEntryControlGpioUnset; ///< Optional selector GPIO.
+};
+
 /**
  * @brief  Construct the singleton IniFile instance.
  *
@@ -60,7 +95,7 @@ extern nlohmann::json jConfig;
  *
  * This enumeration defines the available modes for operation.
  * - `WSPR`: Represents the WSPR (Weak Signal Propagation Reporter) transmission mode.
- * - `TONE`: Represents a test tone generation mode.
+ * - `TONE`: Represents transient direct-tone runtime behavior.
  */
 enum class ModeType
 {
@@ -104,17 +139,21 @@ struct ArgParserConfig
     int shutdown_pin;  ///< GPIO pin used to signal shutdown.
 
     // Command line only
+    bool use_journald;              ///< Route logs to journald instead of streams.
     bool date_time_log;             ///< Prefix logs with timestamp.
+    bool require_paired_plan;       ///< Request paired WSPR planning from the encoder.
     bool loop_tx;                   ///< Repeat transmission cycle.
     std::atomic<int> tx_iterations; ///< Number of transmission iterations (0 = infinite).
-    double test_tone;               ///< Direct-RF continuous tone frequency in Hz.
     double wspr_audio_offset_hz;    ///< Audio offset added to WSPR dial frequencies to derive RF.
 
     // Runtime variables
     ModeType mode;                       ///< Current operating mode.
     bool use_ini;                        ///< Load configuration from INI file.
     std::string ini_filename;            ///< INI file name and path.
-    std::vector<double> wspr_dial_freq_set; ///< Parsed list of WSPR dial frequencies in Hz.
+    std::vector<double> wspr_dial_freq_set; ///< Parsed WSPR dial frequencies.
+    std::vector<WsprDialFrequencyEntry>
+        wspr_dial_frequency_entries; ///< Parsed entries with optional GPIO metadata.
+    bool tx_freq_control_active_high; ///< Global polarity for selector GPIO outputs.
     bool ntp_good;                       ///< A more qualitative measurement of NTP vs simply running
     std::array<BandGPIOConfig, HAM_BAND_COUNT> band_gpio; ///< Per-band GPIO assignment.
 
@@ -127,7 +166,7 @@ struct ArgParserConfig
           grid_square(""),
           power_dbm(0),
           frequencies(""),
-          tx_pin(-1),
+          tx_pin(kTransmitGpioUnset),
           ppm(0.0),
           use_ntp(false),
           use_offset(false),
@@ -138,18 +177,67 @@ struct ArgParserConfig
           socket_port(-1),
           use_shutdown(false),
           shutdown_pin(-1),
+          use_journald(false),
           date_time_log(false),
+          require_paired_plan(false),
           loop_tx(false),
           tx_iterations(0),
-          test_tone(0.0),
           wspr_audio_offset_hz(1500.0),
           mode(ModeType::WSPR),
           use_ini(false),
           ini_filename(""),
           wspr_dial_freq_set({}),
+          wspr_dial_frequency_entries({}),
+          tx_freq_control_active_high(false),
           ntp_good(false),
           band_gpio({})
     {
+    }
+
+    ArgParserConfig(const ArgParserConfig &other)
+        : ArgParserConfig()
+    {
+        *this = other;
+    }
+
+    ArgParserConfig &operator=(const ArgParserConfig &other)
+    {
+        if (this == &other)
+        {
+            return *this;
+        }
+
+        transmit = other.transmit;
+        callsign = other.callsign;
+        grid_square = other.grid_square;
+        power_dbm = other.power_dbm;
+        frequencies = other.frequencies;
+        tx_pin = other.tx_pin;
+        ppm = other.ppm;
+        use_ntp = other.use_ntp;
+        use_offset = other.use_offset;
+        power_level = other.power_level;
+        use_led = other.use_led;
+        led_pin = other.led_pin;
+        web_port = other.web_port;
+        socket_port = other.socket_port;
+        use_shutdown = other.use_shutdown;
+        shutdown_pin = other.shutdown_pin;
+        use_journald = other.use_journald;
+        date_time_log = other.date_time_log;
+        require_paired_plan = other.require_paired_plan;
+        loop_tx = other.loop_tx;
+        tx_iterations.store(other.tx_iterations.load());
+        wspr_audio_offset_hz = other.wspr_audio_offset_hz;
+        mode = other.mode;
+        use_ini = other.use_ini;
+        ini_filename = other.ini_filename;
+        wspr_dial_freq_set = other.wspr_dial_freq_set;
+        wspr_dial_frequency_entries = other.wspr_dial_frequency_entries;
+        tx_freq_control_active_high = other.tx_freq_control_active_high;
+        ntp_good = other.ntp_good;
+        band_gpio = other.band_gpio;
+        return *this;
     }
 };
 
@@ -160,6 +248,16 @@ struct ArgParserConfig
  * typically loaded from an INI file or a JSON configuration.
  */
 extern ArgParserConfig config;
+
+struct PreparedConfigCandidate
+{
+    nlohmann::json normalized_json{};
+    ArgParserConfig normalized_config{};
+    bool valid = false;
+    bool transmit_enabled = false;
+    std::string error_reason{};
+    std::vector<std::string> warnings{};
+};
 
 void init_default_config();
 
@@ -211,7 +309,6 @@ void ini_to_json(std::string filename);
  *       "Date Time Log": false,
  *       "Loop TX": true,
  *       "TX Iterations": 5,
- *       "Test Tone": 440.0,
  *       "WSPR Dial Frequency Set": [ 14095600.0, 10138700.0 ],
  *       "Center Frequency Set": [ 14095600.0 ]
  *   },
@@ -296,6 +393,14 @@ extern bool load_json(
     std::string filename,
     std::string *error_message = nullptr,
     std::vector<std::string> *warning_messages = nullptr);
+
+void prepare_ini_config_candidate(
+    const std::string &filename,
+    PreparedConfigCandidate &candidate_out);
+
+void commit_config_candidate(const PreparedConfigCandidate &candidate);
+
+void copy_runtime_config(const ArgParserConfig &source, ArgParserConfig &target);
 
 /**
  * @brief Prints a formatted JSON object to standard output.

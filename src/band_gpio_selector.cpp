@@ -1,6 +1,6 @@
 /**
  * @file band_gpio_selector.cpp
- * @brief Runtime control of GPIO selection for the active amateur band.
+ * @brief Runtime GPIO lifecycle for scheduler-selected amateur bands.
  *
  * This file implements the BandGPIOSelector class, which selects the
  * appropriate GPIO based on the active amateur band and controls its
@@ -8,6 +8,8 @@
  *
  * It bridges frequency-based band lookup (WSPRBandLookup) with GPIO
  * control (GPIOOutput), using configuration provided by band_gpio.*.
+ * Scheduling decides which band should be active; this helper only
+ * prepares, asserts, and releases the selected output safely.
  *
  * This file represents the runtime behavior of the band GPIO subsystem.
  *
@@ -41,12 +43,17 @@
 
 bool BandGPIOSelector::prepareBand(HamBand band)
 {
+    return prepareBand(band, gpio_config_for_band(band));
+}
+
+bool BandGPIOSelector::prepareBand(
+    HamBand band,
+    const BandGPIOConfig &config)
+{
     if (!enabled_)
     {
-        return false;
+        return true;
     }
-
-    const BandGPIOConfig &config = gpio_config_for_band(band);
 
     stop();
 
@@ -75,6 +82,10 @@ bool BandGPIOSelector::prepareBand(HamBand band)
 
     if (!gpio_.enableGPIOPin(config.gpio, config.active_high))
     {
+        if (!gpio_.lastError().empty())
+        {
+            llog.logS(ERROR, tag, gpio_.lastError());
+        }
         has_band_ = false;
         current_config_ = BandGPIOConfig{};
         return false;

@@ -247,7 +247,7 @@ void init_default_config()
     config.grid_square = "ZZ99";
     config.power_dbm = 20;
     config.frequencies = "20m";
-    config.tx_pin = 4;
+    config.tx_pin = kDefaultTransmitGpio;
 
     // Extended
     config.ppm = 0.0;
@@ -266,6 +266,7 @@ void init_default_config()
 
     // Meta
     config.use_ini = true;
+    config.tx_freq_control_active_high = false;
 
     set_default_band_gpio_config(config.band_gpio);
 }
@@ -487,8 +488,7 @@ namespace
             {"INI Filename", ""},
             {"Date Time Log", false},
             {"Loop TX", false},
-            {"TX Iterations", 0},
-            {"Test Tone", 730000.0}};
+            {"TX Iterations", 0}};
         target["Meta"]["WSPR Dial Frequency Set"] = nlohmann::json::array();
 
         target["Common"] = {
@@ -496,7 +496,7 @@ namespace
             {"Frequency", "20m"},
             {"Grid Square", "ZZ99"},
             {"TX Power", 20},
-            {"Transmit Pin", 4}};
+            {"Transmit Pin", kDefaultTransmitGpio}};
 
         target["Control"] = {
             {"Transmit", false}};
@@ -533,26 +533,16 @@ namespace
     {
         set_default_band_gpio_config(target.band_gpio);
 
-        const std::string mode_str = source.at("Meta").at("Mode").get<std::string>();
-        if (mode_str == "WSPR")
-        {
-            target.mode = ModeType::WSPR;
-        }
-        else if (mode_str == "TONE")
-        {
-            target.mode = ModeType::TONE;
-        }
-        else
-        {
-            target.mode = ModeType::WSPR;
-        }
+        // Persistent config always initializes in WSPR mode. Transient tone
+        // startup is a CLI/runtime request layered on top later.
+        target.mode = ModeType::WSPR;
 
         target.use_ini = source.at("Meta").at("Use INI").get<bool>();
         target.ini_filename = source.at("Meta").at("INI Filename").get<std::string>();
         target.date_time_log = source.at("Meta").at("Date Time Log").get<bool>();
+        target.require_paired_plan = source.at("Meta").value("Require Paired Plan", false);
         target.loop_tx = source.at("Meta").at("Loop TX").get<bool>();
         target.tx_iterations.store(source.at("Meta").at("TX Iterations").get<int>());
-        target.test_tone = source.at("Meta").at("Test Tone").get<double>();
         const auto &meta = source.at("Meta");
         if (meta.contains("WSPR Dial Frequency Set") &&
             !meta.at("WSPR Dial Frequency Set").empty())
@@ -600,6 +590,7 @@ namespace
         target.socket_port = source.at("Server").at("Socket Port").get<int>();
         target.use_shutdown = source.at("Server").at("Use Shutdown").get<bool>();
         target.shutdown_pin = source.at("Server").at("Shutdown Button").get<int>();
+        target.use_journald = false;
 
         // Missing Band GPIO data is allowed; seeded defaults stay in place.
         const auto band_gpio_section_it = source.find("Band GPIO");
@@ -638,17 +629,12 @@ namespace
     void config_to_json_impl(const ArgParserConfig &source, nlohmann::json &target)
     {
         target["Meta"]["Mode"] = "WSPR";
-        if (source.mode == ModeType::TONE)
-        {
-            target["Meta"]["Mode"] = "TONE";
-        }
-
         target["Meta"]["Use INI"] = source.use_ini;
         target["Meta"]["INI Filename"] = source.ini_filename;
         target["Meta"]["Date Time Log"] = source.date_time_log;
+        target["Meta"]["Require Paired Plan"] = source.require_paired_plan;
         target["Meta"]["Loop TX"] = source.loop_tx;
         target["Meta"]["TX Iterations"] = source.tx_iterations.load();
-        target["Meta"]["Test Tone"] = source.test_tone;
         target["Meta"]["WSPR Dial Frequency Set"] = source.wspr_dial_freq_set;
         target["Meta"]["Center Frequency Set"] = source.wspr_dial_freq_set;
 
@@ -700,15 +686,18 @@ namespace
         target.socket_port = source.socket_port;
         target.use_shutdown = source.use_shutdown;
         target.shutdown_pin = source.shutdown_pin;
+        target.use_journald = source.use_journald;
         target.date_time_log = source.date_time_log;
+        target.require_paired_plan = source.require_paired_plan;
         target.loop_tx = source.loop_tx;
         target.tx_iterations.store(source.tx_iterations.load());
-        target.test_tone = source.test_tone;
         target.wspr_audio_offset_hz = source.wspr_audio_offset_hz;
         target.mode = source.mode;
         target.use_ini = source.use_ini;
         target.ini_filename = source.ini_filename;
         target.wspr_dial_freq_set = source.wspr_dial_freq_set;
+        target.wspr_dial_frequency_entries = source.wspr_dial_frequency_entries;
+        target.tx_freq_control_active_high = source.tx_freq_control_active_high;
         target.ntp_good = source.ntp_good;
         target.band_gpio = source.band_gpio;
     }
@@ -759,6 +748,15 @@ namespace
         {
             init_config_json_impl(candidate_json);
 
+            // External INI edits are observed by the file monitor before this
+            // candidate build runs. Refresh the singleton from disk unless the
+            // caller intentionally staged in-memory edits that have not yet
+            // been persisted.
+            if (!iniFile.hasPendingChanges())
+            {
+                iniFile.load();
+            }
+
             std::vector<std::string> local_warnings;
             bool missing_required_tx_item = false;
             const auto ini_data = iniFile.getData();
@@ -771,6 +769,8 @@ namespace
 
             ini_to_json_impl(filename, candidate_json);
             json_to_config_impl(candidate_json, candidate_config);
+            candidate_config.tx_freq_control_active_high =
+                config.tx_freq_control_active_high;
 
             if (missing_required_tx_item)
             {
@@ -921,26 +921,19 @@ bool load_json(
     std::string *error_message,
     std::vector<std::string> *warning_messages)
 {
-    nlohmann::json candidate_json;
-    ArgParserConfig candidate_config;
-    std::string local_error_message;
-    std::vector<std::string> local_warning_messages;
+    PreparedConfigCandidate candidate;
+    prepare_ini_config_candidate(filename, candidate);
 
-    if (!build_candidate_from_ini(
-            filename,
-            candidate_json,
-            candidate_config,
-            &local_error_message,
-            &local_warning_messages))
+    if (!candidate.valid)
     {
         if (error_message != nullptr)
         {
-            *error_message = local_error_message;
+            *error_message = candidate.error_reason;
         }
 
         if (warning_messages != nullptr)
         {
-            *warning_messages = local_warning_messages;
+            *warning_messages = candidate.warnings;
         }
 
         return false;
@@ -948,12 +941,50 @@ bool load_json(
 
     if (warning_messages != nullptr)
     {
-        *warning_messages = local_warning_messages;
+        *warning_messages = candidate.warnings;
     }
 
-    copy_config(candidate_config, config);
-    jConfig = candidate_json;
+    commit_config_candidate(candidate);
     return true;
+}
+
+void prepare_ini_config_candidate(
+    const std::string &filename,
+    PreparedConfigCandidate &candidate_out)
+{
+    candidate_out = PreparedConfigCandidate{};
+
+    if (!build_candidate_from_ini(
+            filename,
+            candidate_out.normalized_json,
+            candidate_out.normalized_config,
+            &candidate_out.error_reason,
+            &candidate_out.warnings))
+    {
+        candidate_out.valid = false;
+        candidate_out.transmit_enabled = false;
+        return;
+    }
+
+    candidate_out.valid = true;
+    candidate_out.transmit_enabled = candidate_out.normalized_config.transmit;
+}
+
+void commit_config_candidate(const PreparedConfigCandidate &candidate)
+{
+    if (!candidate.valid)
+    {
+        throw std::invalid_argument(
+            "Cannot commit an invalid configuration candidate.");
+    }
+
+    copy_config(candidate.normalized_config, config);
+    jConfig = candidate.normalized_json;
+}
+
+void copy_runtime_config(const ArgParserConfig &source, ArgParserConfig &target)
+{
+    copy_config(source, target);
 }
 
 void dump_json(const nlohmann::json &j, std::string tag)
@@ -972,6 +1003,8 @@ void patch_all_from_web(const nlohmann::json &j)
     try
     {
         json_to_config_impl(candidate_json, candidate_config);
+        candidate_config.tx_freq_control_active_high =
+            config.tx_freq_control_active_high;
 
         if (!validate_config_candidate(candidate_config, &error_message))
         {

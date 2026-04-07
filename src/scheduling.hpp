@@ -1,6 +1,16 @@
 /**
  * @file scheduling.hpp
- * @brief Manages transmit, INI monitoring and scheduling for Wsprry Pi
+ * @brief Orchestration layer for planning and committing transmissions.
+ *
+ * This layer owns scheduling and request construction for the current
+ * architecture. It decides whether a slot runs WSPR or direct tone,
+ * applies any random WSPR offset, resolves per-frequency control GPIO
+ * metadata, prepares selector state, and commits the single execution
+ * request consumed by the transmitter.
+ *
+ * The transmitter executes only already-committed requests. Hardware
+ * realization remains inside the backend. All execution must cross the
+ * scheduler-to-transmitter boundary as a committed request.
  *
  * This project is is licensed under the MIT License. See LICENSE.md
  * for more information.
@@ -32,6 +42,7 @@
 // Project headers
 #include "arg_parser.hpp"
 #include "ppm_manager.hpp"
+#include "wspr_transmit_types.hpp"
 
 // Standard library headers
 #include <atomic>
@@ -71,11 +82,6 @@ extern std::atomic<bool> exiting_wspr;
  * loop can break out of its wait and begin shutdown.
  */
 extern bool exitwspr_ready;
-
-/**
- * @brief Atomic bool used to signal other functions that we are shutting down.
- */
-extern std::atomic<bool> exiting;
 
 /**
  * @brief Flag indicating if a system shutdown is in progress.
@@ -177,31 +183,35 @@ void reboot_system();
 bool ppm_init();
 
 /**
- * @brief   Initiates a continuous test‐tone transmission.
+ * @brief Start a transient runtime test tone from the orchestration layer.
  *
- * Stops any ongoing transmission, saves the current mode,
- * switches into TONE mode, and transmits on the first
- * configured frequency using the current power and PPM.
+ * Stops any ongoing execution, preserves the previous runtime mode, and
+ * commits a tone request built from the first configured scheduler
+ * frequency entry. This is transient runtime behavior; it does not
+ * persist tone mode into configuration files.
  */
 extern void start_test_tone();
 
 /**
- * @brief   Ends the test‐tone and restores the previous mode.
+ * @brief End the transient runtime test tone and restore prior flow.
  *
- * If we’re in test‐tone, shut it down, clear the flag,
- * restore lastMode, and re-configure either WSPR or
- * (if it wasn’t WSPR) another tone on config.test_tone.
+ * Stops the active tone, tears down scheduler-owned selector GPIO state,
+ * restores the previous runtime mode, and then resumes either normal WSPR
+ * orchestration or the transient direct-tone startup request that was
+ * active before the web-triggered tone.
  */
 extern void end_test_tone();
 
 /**
- * @brief Runs the main WSPR scheduler and transmission loop.
+ * @brief Run the main orchestration loop.
  *
  * @details
  * Coordinates all core runtime components:
+ * - Validates startup configuration.
  * - Initializes optional NTP/PPM drift correction.
  * - Starts the TCP command server and sets its priority.
- * - Launches the WSPR transmission thread.
+ * - Commits the initial execution request for WSPR or direct tone.
+ * - Launches the transmitter using only committed requests.
  * - Performs full cleanup and shutdown sequence before exiting.
  *
  * @note This function blocks and runs until `exitwspr_cv` notifies.
@@ -240,23 +250,6 @@ void shutdown_machine();
 void send_ws_message(std::string type, std::string state);
 
 /**
- * @brief Retrieve the next configured WSPR dial frequency, cycling through the list.
- *
- * This method returns the next frequency from `config.wspr_dial_freq_set` in a
- * round-robin fashion.  It uses `freq_iterator_` modulo the list size to
- * index into the vector, then increments `freq_iterator_` for the subsequent call.
- *
- * @return double
- *   - Next frequency in Hz from the list.
- *   - Returns 0.0 if the list is empty.
- *
- * @note
- *   - `freq_iterator_` should be initialized to 0.
- *   - Wrapping is handled via the modulo operation.
- */
-double next_frequency(bool reset = false);
-
-/**
  * @brief Apply updated transmission parameters and reinitialize DMA.
  *
  * Retrieves the current PPM value if NTP calibration is enabled, captures
@@ -268,6 +261,16 @@ double next_frequency(bool reset = false);
  * @throws std::runtime_error if DMA setup or mailbox operations fail within
  *         `configure()`.
  */
-void set_config(bool force = false);
+bool set_config(bool force = false);
+void transmitter_cb(WsprTransmissionCallbackEvent event,
+                    WsprTransmitLogLevel level,
+                    const std::string &msg,
+                    double value);
+
+bool managed_reload_tx_inhibited_state() noexcept;
+bool managed_reload_tx_inhibited_for_test() noexcept;
+void reset_managed_reload_runtime_for_test() noexcept;
+void set_scheduler_execution_suppressed_for_test(bool suppressed) noexcept;
+WsprTransmissionRequest current_transmission_request_for_test();
 
 #endif // _SCHEDULING_HPP

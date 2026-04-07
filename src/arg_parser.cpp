@@ -1,7 +1,7 @@
 
 /**
  * @file arg_parser.cpp
- * @brief Command-line argument parser and configuration handler.
+ * @brief Parse runtime startup choices and frequency-entry syntax.
  *
  * This project is is licensed under the MIT License. See LICENSE.md
  * for more information.
@@ -38,7 +38,6 @@
 #include "scheduling.hpp"
 #include "signal_handler.hpp"
 #include "wspr_band_lookup.hpp"
-#include "wspr_message.hpp"
 #include "wspr_transmit.hpp"
 
 // Standard library headers
@@ -72,17 +71,6 @@
 MonitorFile iniMonitor;
 
 /**
- * @brief Pointer to a WSPR message.
- *
- * This pointer is used to reference a WsprMessage object, which constructs a WSPR message
- * from a callsign, grid location, and power level. It is initialized to nullptr until
- * a valid WsprMessage instance is created.
- *
- * @note Remember to allocate memory for this pointer before use.
- */
-WsprMessage *message = nullptr;
-
-/**
  * @brief Instance of WSPRBandLookup.
  *
  * This instance of WSPRBandLookup is used to translate frequency representations:
@@ -113,6 +101,7 @@ WSPRBandLookup lookup;
  * @note The atomic nature ensures thread-safe access across multiple threads.
  */
 std::atomic<bool> ini_reload_pending(false);
+std::atomic<std::uint64_t> ini_reload_generation(0);
 
 /**
  * @brief Atomic flag indicating that a new PPM value needs to be applied.
@@ -134,6 +123,17 @@ std::atomic<bool> ppm_reload_pending(false);
  */
 const std::vector<int> wspr_power_levels = {0, 3, 7, 10, 13, 17, 20, 23, 27, 30, 33, 37, 40, 43, 47, 50, 53, 57, 60};
 
+namespace
+{
+struct DirectToneStartupRequest
+{
+    WsprDialFrequencyEntry entry{};
+    double actual_rf_frequency_hz = 0.0;
+};
+
+std::optional<DirectToneStartupRequest> direct_tone_startup_request;
+} // namespace
+
 /**
  * @brief Callback for INI file change detection
  *
@@ -145,65 +145,82 @@ const std::vector<int> wspr_power_levels = {0, 3, 7, 10, 13, 17, 20, 23, 27, 30,
  */
 void callback_ini_changed()
 {
-    ini_reload_pending.store(true, std::memory_order_relaxed);
-    if (wsprTransmitter.getState() == WsprTransmitter::State::TRANSMITTING)
+    if (exiting_wspr.load(std::memory_order_acquire))
     {
-        if (config.transmit)
-        {
-            // Transmit not changed, make pending change
-            llog.logS(INFO, "INI file changed, reload after transmission.");
-        }
-        else // We are or are setting transmissions to disabled
-        {
-            // Execute reconfig immediately.
-            set_config(true);
-        }
+        llog.logS(DEBUG, "Ignoring INI reload while shutdown is in progress.");
+        return;
     }
-    else
+
+    const std::uint64_t generation =
+        ini_reload_generation.fetch_add(1, std::memory_order_acq_rel) + 1U;
+    ini_reload_pending.store(true, std::memory_order_release);
+
+    const WsprTransmitter::State transmitter_state = wsprTransmitter.getState();
+
+    if (transmitter_state == WsprTransmitter::State::TRANSMITTING)
     {
-        // We're not transmitting, jam it in
-        llog.logS(INFO, "INI file changed, reloading.");
-        set_config(true);
+        llog.logS(
+            INFO,
+            "INI file changed during transmission; deferring managed reload until the current TX completes (generation ",
+            generation,
+            ").");
+        return;
     }
+
+    llog.logS(INFO, "INI file changed, reloading.");
+    (void)set_config(true);
 }
 
-/**
- * @brief Validates a WSPR callsign and normalizes it to uppercase.
- *
- * This function checks whether a given callsign meets the criteria for a valid WSPR Type 1
- * callsign. Validation includes:
- * - Ensuring the callsign length is between 3 and 6 characters.
- * - Matching the callsign against a regular expression pattern that enforces the WSPR Type 1 format.
- *
- * The regex pattern used is:
- * @verbatim
- * ^(?:[A-Za-z0-9]?[A-Za-z0-9][0-9][A-Za-z]?[A-Za-z]?[A-Za-z]?|[A-Za-z][0-9][A-Za-z]|[A-Za-z0-9]{3}[0-9][A-Za-z]{2})$
- * @endverbatim
- * This pattern is evaluated in a case-insensitive manner.
- *
- * If the callsign is valid, the function converts it to uppercase.
- *
- * @param callsign A reference to the callsign string to validate. If valid, the string is modified in place to uppercase.
- * @return true if the callsign is valid, false otherwise.
- */
-bool is_valid_callsign(std::string &callsign)
+static void normalize_wspr_callsign(std::string &callsign)
 {
-    // WSPR Type 1 callsign regex pattern (case-insensitive)
-    static const std::regex callsign_pattern(
-        R"(^(?:[A-Za-z0-9]?[A-Za-z0-9][0-9][A-Za-z]?[A-Za-z]?[A-Za-z]?|[A-Za-z][0-9][A-Za-z]|[A-Za-z0-9]{3}[0-9][A-Za-z]{2})$)",
-        std::regex::icase);
+    std::transform(callsign.begin(), callsign.end(), callsign.begin(), ::toupper);
+}
 
-    // Check that the callsign length is within the valid range (3-6 characters)
-    if (callsign.length() < 3 || callsign.length() > 6)
+static bool is_valid_runtime_transmit_gpio(int gpio) noexcept
+{
+    return is_supported_transmit_gpio(gpio);
+}
+
+static std::string transmit_gpio_validation_message()
+{
+    std::ostringstream oss;
+    oss << "Invalid transmit GPIO. Supported GPIO values: ";
+
+    for (std::size_t i = 0; i < kSupportedTransmitGpio.size(); ++i)
     {
-        return false;
+        if (i != 0U)
+        {
+            oss << ", ";
+        }
+
+        oss << kSupportedTransmitGpio[i];
     }
 
-    // Validate the callsign using the regex pattern
-    if (std::regex_match(callsign, callsign_pattern))
+    oss << ".";
+    return oss.str();
+}
+
+static bool parse_tx_gpio_polarity(std::string_view raw_value, bool &active_high_out)
+{
+    std::string lowered(raw_value);
+    std::transform(
+        lowered.begin(),
+        lowered.end(),
+        lowered.begin(),
+        [](unsigned char c)
+        {
+            return static_cast<char>(std::tolower(c));
+        });
+
+    if (lowered == "high" || lowered == "active-high" || lowered == "active_high")
     {
-        // Convert the valid callsign to uppercase
-        std::transform(callsign.begin(), callsign.end(), callsign.begin(), ::toupper);
+        active_high_out = true;
+        return true;
+    }
+
+    if (lowered == "low" || lowered == "active-low" || lowered == "active_low")
+    {
+        active_high_out = false;
         return true;
     }
 
@@ -240,40 +257,9 @@ int round_to_nearest_wspr_power(int power)
     return closest;
 }
 
-/**
- * @brief Validates and truncates a Maidenhead grid locator.
- *
- * This function validates the input grid locator by checking if it matches a valid 4-character
- * format (two letters followed by two digits). The locator is first converted to uppercase.
- * - If the locator is exactly 4 characters and valid, it is accepted as-is.
- * - If the locator is 6 or 8 characters long and its first 4 characters are valid,
- *   the locator is truncated to these 4 characters.
- *
- * @param locator A reference to the grid locator string. The string is modified in place
- *                if it needs to be truncated.
- * @return true if the locator is valid or has been successfully truncated to a valid format,
- *         false otherwise.
- */
-bool validate_and_truncate_locator(std::string &locator)
+static void normalize_wspr_locator(std::string &locator)
 {
-    static const std::regex locator_pattern(R"(^[A-Za-z]{2}[0-9]{2})");
-
-    // Convert to uppercase before validation
     std::transform(locator.begin(), locator.end(), locator.begin(), ::toupper);
-
-    if (locator.length() == 4 && std::regex_match(locator, locator_pattern))
-    {
-        return true; // Already valid
-    }
-
-    // If locator is 6 or 8 characters, check first 4 characters
-    if ((locator.length() == 6 || locator.length() == 8) && std::regex_match(locator.substr(0, 4), locator_pattern))
-    {
-        locator = locator.substr(0, 4); // Truncate to first 4 characters
-        return true;
-    }
-
-    return false; // Invalid locator
 }
 
 /**
@@ -315,6 +301,202 @@ bool token_looks_numeric_frequency(std::string_view token)
         {
             return std::isdigit(c) != 0;
         });
+}
+
+static std::string trim_copy_string(std::string value)
+{
+    const auto first = value.find_first_not_of(" \t\n\r");
+    if (first == std::string::npos)
+    {
+        return "";
+    }
+
+    const auto last = value.find_last_not_of(" \t\n\r");
+    return value.substr(first, last - first + 1);
+}
+
+static bool parse_gpio_number_strict(
+    std::string_view raw_value,
+    int &gpio_out) noexcept
+{
+    try
+    {
+        std::size_t consumed = 0;
+        const std::string raw_string(raw_value);
+        const int parsed_gpio = std::stoi(raw_string, &consumed);
+        if (consumed != raw_string.size())
+        {
+            return false;
+        }
+
+        gpio_out = parsed_gpio;
+        return true;
+    }
+    catch (const std::exception &)
+    {
+        return false;
+    }
+}
+
+static std::vector<std::string> split_frequency_tokens(const std::string &raw_list)
+{
+    std::string normalized = raw_list;
+    std::replace(normalized.begin(), normalized.end(), ',', ' ');
+
+    std::istringstream iss(normalized);
+    std::vector<std::string> tokens;
+    std::string token;
+    while (iss >> token)
+    {
+        tokens.push_back(token);
+    }
+
+    return tokens;
+}
+
+static bool parse_frequency_entry_token(
+    std::string_view raw_token,
+    WsprDialFrequencyEntry &entry,
+    std::string &error_message)
+{
+    // Frequency-entry tokens may optionally carry a scheduler-owned @GPIO
+    // suffix. The suffix is metadata for per-frequency control GPIO, not a
+    // separate persistent transmit GPIO setting.
+    const std::string token = trim_copy_string(std::string(raw_token));
+    if (token.empty())
+    {
+        error_message = "Frequency token is empty.";
+        return false;
+    }
+
+    const std::size_t at_pos = token.find('@');
+    if (at_pos == std::string::npos)
+    {
+        entry.token = token;
+        entry.control_gpio = kFrequencyEntryControlGpioUnset;
+        return true;
+    }
+
+    if (token.find('@', at_pos + 1U) != std::string::npos)
+    {
+        error_message =
+            "Invalid frequency token '" + token +
+            "': only one @GPIO suffix is allowed.";
+        return false;
+    }
+
+    const std::string base_token = trim_copy_string(token.substr(0, at_pos));
+    const std::string gpio_token =
+        trim_copy_string(token.substr(at_pos + 1U));
+
+    if (base_token.empty())
+    {
+        error_message =
+            "Invalid frequency token '" + token +
+            "': frequency or band designator is missing before @GPIO.";
+        return false;
+    }
+
+    if (gpio_token.empty())
+    {
+        error_message =
+            "Invalid frequency token '" + token +
+            "': GPIO value is missing after @.";
+        return false;
+    }
+
+    int parsed_gpio = kFrequencyEntryControlGpioUnset;
+    if (!parse_gpio_number_strict(gpio_token, parsed_gpio))
+    {
+        error_message =
+            "Invalid frequency token '" + token +
+            "': GPIO suffix must be an integer BCM GPIO.";
+        return false;
+    }
+
+    if (!is_valid_frequency_entry_control_gpio(parsed_gpio))
+    {
+        error_message =
+            "Invalid frequency token '" + token +
+            "': GPIO suffix must be between 0 and 27.";
+        return false;
+    }
+
+    entry.token = base_token;
+    entry.control_gpio = parsed_gpio;
+    return true;
+}
+
+bool set_direct_tone_startup_request(
+    const std::string &raw_token,
+    std::string *error_message)
+{
+    // --test-tone creates a transient startup request only. It does not
+    // persist tone mode or RF frequency into configuration files.
+    WsprDialFrequencyEntry entry;
+    std::string local_error;
+    if (!parse_frequency_entry_token(raw_token, entry, local_error))
+    {
+        if (error_message != nullptr)
+        {
+            *error_message = local_error;
+        }
+        return false;
+    }
+
+    try
+    {
+        const double actual_rf_frequency_hz =
+            lookup.parse_string_to_frequency(entry.token, false);
+        if (actual_rf_frequency_hz <= 0.0)
+        {
+            if (error_message != nullptr)
+            {
+                *error_message = "Invalid direct RF test tone frequency (<=0).";
+            }
+            return false;
+        }
+
+        entry.dial_frequency_hz = actual_rf_frequency_hz;
+        direct_tone_startup_request = DirectToneStartupRequest{
+            entry,
+            actual_rf_frequency_hz};
+        return true;
+    }
+    catch (const std::exception &e)
+    {
+        if (error_message != nullptr)
+        {
+            *error_message =
+                "Invalid direct RF test tone frequency input: " +
+                raw_token + " Exception: " + e.what();
+        }
+        return false;
+    }
+}
+
+bool has_direct_tone_startup_request() noexcept
+{
+    return direct_tone_startup_request.has_value();
+}
+
+bool try_get_direct_tone_startup_request(
+    WsprDialFrequencyEntry &entry_out,
+    double &actual_rf_frequency_hz_out) noexcept
+{
+    if (!direct_tone_startup_request.has_value())
+    {
+        return false;
+    }
+
+    entry_out = direct_tone_startup_request->entry;
+    actual_rf_frequency_hz_out = direct_tone_startup_request->actual_rf_frequency_hz;
+    return true;
+}
+
+void clear_direct_tone_startup_request() noexcept
+{
+    direct_tone_startup_request.reset();
 }
 
 /**
@@ -378,6 +560,10 @@ void print_usage(const std::string &message, int exit_code)
               << "    Show the WsprryPi version.\n"
               << "  -i, --ini-file <file>\n"
               << "    Load parameters from an INI file. Provide the path and filename.\n\n"
+              << "  -a, --transmit-gpio <gpio>\n"
+              << "    Select the RF transmit GPIO (supported: 4 or 20).\n\n"
+              << "  --tx-gpio-polarity <high|low>\n"
+              << "    Set polarity for per-frequency LPF/control GPIO outputs.\n\n"
               << "See the documentation for a complete list of available options.\n\n";
 
     // Handle exit behavior
@@ -418,6 +604,9 @@ void show_config_values(bool reload)
     llog.logS(DEBUG, "Transmit Power:", config.power_dbm);
     llog.logS(DEBUG, "WSPR Dial Frequencies:", config.frequencies);
     llog.logS(DEBUG, "Transmit Pin:", config.tx_pin);
+    llog.logS(DEBUG,
+              "Frequency Control GPIO Polarity:",
+              config.tx_freq_control_active_high ? "active high" : "active low");
     // [Extended]
     llog.logS(DEBUG, "PPM Offset:", config.ppm);
     llog.logS(DEBUG, "Synchronize with NTP:", config.use_ntp ? "true" : "false");
@@ -450,9 +639,42 @@ bool validate_config_candidate(
     std::string *error_message)
 {
     const bool frequencies_ok = set_frequencies(candidate);
+    if (!frequencies_ok && !trim_copy_string(candidate.frequencies).empty())
+    {
+        if (error_message != nullptr && error_message->empty())
+        {
+            *error_message = "Invalid WSPR dial-frequency list.";
+        }
+
+        return false;
+    }
+
+    const bool requires_valid_transmit_gpio =
+        candidate.mode == ModeType::TONE || candidate.transmit;
+
+    if (requires_valid_transmit_gpio &&
+        !is_valid_runtime_transmit_gpio(candidate.tx_pin))
+    {
+        if (error_message != nullptr)
+        {
+            *error_message = transmit_gpio_validation_message();
+        }
+
+        return false;
+    }
 
     if (candidate.mode == ModeType::TONE)
     {
+        // Tone mode is valid only when a transient startup request exists.
+        if (!has_direct_tone_startup_request())
+        {
+            if (error_message != nullptr)
+            {
+                *error_message = "Missing direct RF test tone frequency.";
+            }
+            return false;
+        }
+
         return true;
     }
 
@@ -512,23 +734,8 @@ bool validate_config_candidate(
         return false;
     }
 
-    if (!is_valid_callsign(callsign))
-    {
-        if (error_message != nullptr)
-        {
-            *error_message = "Invalid callsign.";
-        }
-        return false;
-    }
-
-    if (!validate_and_truncate_locator(locator))
-    {
-        if (error_message != nullptr)
-        {
-            *error_message = "Invalid grid square.";
-        }
-        return false;
-    }
+    normalize_wspr_callsign(callsign);
+    normalize_wspr_locator(locator);
 
     candidate.callsign = callsign;
     candidate.grid_square = locator;
@@ -537,43 +744,12 @@ bool validate_config_candidate(
     return true;
 }
 
-bool validate_config_data()
+void apply_runtime_config_side_effects()
 {
-    ini_reload_pending.store(false, std::memory_order_relaxed);
-
-    std::string validation_error;
-    if (!validate_config_candidate(config, &validation_error))
-    {
-        llog.logE(FATAL, "Missing required parameters.");
-
-        if (config.callsign.empty())
-        {
-            llog.logE(ERROR, " - Missing callsign.");
-        }
-        if (config.grid_square.empty())
-        {
-            llog.logE(ERROR, " - Missing grid square.");
-        }
-        if (config.power_dbm <= 0)
-        {
-            llog.logE(ERROR, " - TX power must be greater than 0 dBm.");
-        }
-        if (config.wspr_dial_freq_set.empty())
-        {
-            llog.logE(ERROR, " - At least one WSPR dial frequency must be specified.");
-        }
-
-        if (config.use_ini)
-        {
-            llog.logE(ERROR, "Please check the INI file for missing or invalid values.");
-            return false;
-        }
-
-        llog.logE(ERROR, "Please check your configuration for missing or invalid values.");
-        llog.logE(ERROR, "Try: wsprrypi --help");
-        std::cerr << std::endl;
-        std::exit(EXIT_FAILURE);
-    }
+    llog.logS(INFO, "Transmit GPIO:", config.tx_pin);
+    llog.logS(INFO,
+              "Frequency-entry control GPIO polarity:",
+              config.tx_freq_control_active_high ? "active high" : "active low");
 
     if (!config.use_ntp && config.ppm != 0.0)
     {
@@ -613,81 +789,154 @@ bool validate_config_data()
 
     if (config.mode == ModeType::TONE)
     {
-            llog.logS(
+        WsprDialFrequencyEntry entry;
+        double actual_rf_frequency_hz = 0.0;
+        if (!try_get_direct_tone_startup_request(entry, actual_rf_frequency_hz))
+        {
+            llog.logE(ERROR, " - Missing direct RF test tone frequency.");
+            return;
+        }
+
+        llog.logS(
             INFO,
             "A direct RF test tone will be generated at:",
-            lookup.freq_display_string(config.test_tone));
+            lookup.freq_display_string(actual_rf_frequency_hz));
+        return;
     }
-    else if (config.mode == ModeType::WSPR)
+
+    if (config.mode != ModeType::WSPR)
     {
-        if (config.transmit)
+        return;
+    }
+
+    if (config.transmit)
+    {
+        llog.logS(INFO, "WSPR packet payload:");
+        llog.logS(INFO, "- Callsign:", config.callsign);
+        llog.logS(INFO, "- Locator:", config.grid_square);
+        llog.logS(INFO, "- Power:", config.power_dbm, " dBm");
+
+        if (config.wspr_dial_freq_set.size() > 1)
         {
-            llog.logS(INFO, "WSPR packet payload:");
-            llog.logS(INFO, "- Callsign:", config.callsign);
-            llog.logS(INFO, "- Locator:", config.grid_square);
-            llog.logS(INFO, "- Power:", config.power_dbm, " dBm");
+            llog.logS(INFO, "Requested WSPR dial frequencies:");
 
-            if (config.wspr_dial_freq_set.size() > 1)
+            for (const auto &freq : config.wspr_dial_freq_set)
             {
-                llog.logS(INFO, "Requested WSPR dial frequencies:");
-
-                for (const auto &freq : config.wspr_dial_freq_set)
+                if (freq == 0.0)
                 {
-                    if (freq == 0.0)
-                    {
-                        llog.logS(INFO, "- Skip (0.0)");
-                    }
-                    else
-                    {
-                        llog.logS(INFO, "- ", lookup.freq_display_string(freq));
-                    }
+                    llog.logS(INFO, "- Skip (0.0)");
                 }
-            }
-            else
-            {
-                llog.logS(
-                    INFO,
-                    "Requested WSPR dial frequency:",
-                    lookup.freq_display_string(config.wspr_dial_freq_set[0]));
-            }
-
-            if (config.use_offset)
-            {
-                llog.logS(
-                    INFO,
-                    "A random offset will be added to all transmissions.");
+                else
+                {
+                    llog.logS(INFO, "- ", lookup.freq_display_string(freq));
+                }
             }
         }
-
-        if (!config.use_ini)
+        else
         {
-            if (config.loop_tx)
-            {
-                llog.logS(
-                    INFO,
-                    "Transmissions will continue until it receives a signal to stop.");
-            }
-            else
-            {
-                if (config.tx_iterations.load() <= 0)
-                {
-                    config.tx_iterations.store(1);
-                    config.transmit = true;
-                }
-                llog.logS(
-                    INFO,
-                    "TX will stop after:",
-                    config.tx_iterations.load(),
-                    "iteration(s) of the WSPR dial-frequency list.");
-            }
+            llog.logS(
+                INFO,
+                "Requested WSPR dial frequency:",
+                lookup.freq_display_string(config.wspr_dial_freq_set[0]));
+        }
+
+        if (config.use_offset)
+        {
+            llog.logS(
+                INFO,
+                "A random offset will be added to all transmissions.");
         }
     }
-    else
+
+    if (!config.use_ini)
+    {
+        if (config.loop_tx)
+        {
+            llog.logS(
+                INFO,
+                "Transmissions will continue until it receives a signal to stop.");
+        }
+        else
+        {
+            if (config.tx_iterations.load() <= 0)
+            {
+                config.tx_iterations.store(1);
+                config.transmit = true;
+            }
+            llog.logS(
+                INFO,
+                "TX will stop after:",
+                config.tx_iterations.load(),
+                "iteration(s) of the WSPR dial-frequency list.");
+        }
+    }
+}
+
+bool validate_config_data()
+{
+    ini_reload_pending.store(false, std::memory_order_relaxed);
+
+    std::string validation_error;
+    if (!validate_config_candidate(config, &validation_error))
+    {
+        llog.logE(FATAL, "Missing required parameters.");
+
+        if (config.callsign.empty())
+        {
+            llog.logE(ERROR, " - Missing callsign.");
+        }
+        if (config.grid_square.empty())
+        {
+            llog.logE(ERROR, " - Missing grid square.");
+        }
+        if (config.power_dbm <= 0)
+        {
+            llog.logE(ERROR, " - TX power must be greater than 0 dBm.");
+        }
+        if (config.wspr_dial_freq_set.empty())
+        {
+            llog.logE(ERROR, " - At least one WSPR dial frequency must be specified.");
+        }
+        if ((config.mode == ModeType::TONE || config.transmit) &&
+            !is_valid_runtime_transmit_gpio(config.tx_pin))
+        {
+            llog.logE(ERROR, " - ", transmit_gpio_validation_message());
+        }
+
+        if (config.use_ini)
+        {
+            llog.logE(ERROR, "Please check the INI file for missing or invalid values.");
+            return false;
+        }
+
+        llog.logE(ERROR, "Please check your configuration for missing or invalid values.");
+        llog.logE(ERROR, "Try: wsprrypi --help");
+        std::cerr << std::endl;
+        std::exit(EXIT_FAILURE);
+    }
+
+    if (config.mode != ModeType::TONE && config.mode != ModeType::WSPR)
     {
         llog.logE(FATAL, "Mode must be either WSPR or TONE.");
         std::exit(EXIT_FAILURE);
     }
 
+    if (config.mode == ModeType::TONE)
+    {
+        WsprDialFrequencyEntry entry;
+        double actual_rf_frequency_hz = 0.0;
+        if (!try_get_direct_tone_startup_request(entry, actual_rf_frequency_hz))
+        {
+            llog.logE(ERROR, " - Missing direct RF test tone frequency.");
+            if (config.use_ini)
+            {
+                return false;
+            }
+            std::exit(EXIT_FAILURE);
+        }
+    }
+
+    apply_runtime_config_side_effects();
     return true;
 }
 
@@ -710,16 +959,26 @@ bool set_frequencies(ArgParserConfig &target)
         raw_list.clear();
     }
 
-    std::istringstream iss(raw_list);
     std::vector<double> parsed_frequencies;
+    std::vector<WsprDialFrequencyEntry> parsed_entries;
 
-    std::string token;
-    while (iss >> token)
+    for (const std::string &token : split_frequency_tokens(raw_list))
     {
+        WsprDialFrequencyEntry entry;
+        std::string entry_error;
+        if (!parse_frequency_entry_token(token, entry, entry_error))
+        {
+            llog.logE(ERROR, entry_error);
+            target.wspr_dial_freq_set.clear();
+            target.wspr_dial_frequency_entries.clear();
+            return false;
+        }
+
         try
         {
-            double freq = lookup.parse_string_to_frequency(token, false);
-            if (token_looks_numeric_frequency(token))
+            const double freq = lookup.parse_string_to_frequency(entry.token, false);
+            entry.dial_frequency_hz = freq;
+            if (token_looks_numeric_frequency(entry.token))
             {
                 const auto legacy_alias =
                     lookup.legacy_actual_wspr_alias_for_frequency(freq);
@@ -728,7 +987,7 @@ bool set_frequencies(ArgParserConfig &target)
                     llog.logS(
                         WARN,
                         "Numeric WSPR frequency token '",
-                        token,
+                        entry.token,
                         "' exactly matches the legacy actual RF value for alias '",
                         *legacy_alias,
                         "'. WsprryPi now interprets WSPR numeric frequencies as dial frequencies. ",
@@ -736,6 +995,7 @@ bool set_frequencies(ArgParserConfig &target)
                 }
             }
             parsed_frequencies.push_back(freq);
+            parsed_entries.push_back(entry);
         }
         catch (const std::invalid_argument &)
         {
@@ -746,158 +1006,25 @@ bool set_frequencies(ArgParserConfig &target)
     if (!parsed_frequencies.empty())
     {
         target.wspr_dial_freq_set = parsed_frequencies;
+        target.wspr_dial_frequency_entries = parsed_entries;
         return true;
     }
 
     if (target.mode != ModeType::WSPR || !target.transmit)
     {
+        target.wspr_dial_frequency_entries.clear();
         return true;
     }
 
-    llog.logE(ERROR, "Empty or invalid WSPR dial-frequency list; keeping previous dial frequencies.");
-    target.transmit = false;
+    llog.logE(ERROR, "Empty or invalid WSPR dial-frequency list.");
+    target.wspr_dial_freq_set.clear();
+    target.wspr_dial_frequency_entries.clear();
     return false;
 }
 
 bool set_frequencies()
 {
     return set_frequencies(config);
-}
-
-bool load_from_ini()
-{
-    // Attempt to load INI file if enabled
-    bool loaded = config.use_ini && iniFile.load();
-
-    if (!loaded)
-    {
-        return false;
-    }
-
-    // Load Control section
-    try
-    {
-        config.transmit = iniFile.get_bool_value("Control", "Transmit");
-    }
-    catch (...)
-    {
-    }
-
-    // Load Common section
-    try
-    {
-        config.callsign = iniFile.get_string_value("Common", "Call Sign");
-    }
-    catch (...)
-    {
-    }
-    try
-    {
-        config.grid_square = iniFile.get_string_value("Common", "Grid Square");
-    }
-    catch (...)
-    {
-    }
-    try
-    {
-        config.power_dbm = iniFile.get_int_value("Common", "TX Power");
-    }
-    catch (...)
-    {
-    }
-    try
-    {
-        config.frequencies = iniFile.get_string_value("Common", "Frequency");
-    }
-    catch (...)
-    {
-    }
-    try
-    {
-        config.tx_pin = iniFile.get_int_value("Common", "Transmit Pin");
-    }
-    catch (...)
-    {
-    }
-
-    // Load Extended section
-    try
-    {
-        config.ppm = iniFile.get_double_value("Extended", "PPM");
-    }
-    catch (...)
-    {
-    }
-    try
-    {
-        config.use_ntp = iniFile.get_bool_value("Extended", "Use NTP");
-    }
-    catch (...)
-    {
-    }
-    try
-    {
-        config.use_offset = iniFile.get_bool_value("Extended", "Offset");
-    }
-    catch (...)
-    {
-    }
-    try
-    {
-        config.power_level = iniFile.get_int_value("Extended", "Power Level");
-    }
-    catch (...)
-    {
-    }
-    try
-    {
-        config.use_led = iniFile.get_bool_value("Extended", "Use LED");
-    }
-    catch (...)
-    {
-    }
-    try
-    {
-        config.led_pin = iniFile.get_int_value("Extended", "LED Pin");
-    }
-    catch (...)
-    {
-    }
-
-    // Load Server section
-    try
-    {
-        config.web_port = iniFile.get_int_value("Server", "Web Port");
-    }
-    catch (...)
-    {
-    }
-    try
-    {
-        config.socket_port = iniFile.get_int_value("Server", "Socket Port");
-    }
-    catch (...)
-    {
-    }
-    try
-    {
-        config.use_shutdown = iniFile.get_bool_value("Server", "Use Shutdown");
-    }
-    catch (...)
-    {
-    }
-    try
-    {
-        config.shutdown_pin = iniFile.get_int_value("Server", "Shutdown Button");
-    }
-    catch (...)
-    {
-    }
-
-    // Synchronize config with global JSON object
-    config_to_json();
-
-    return true;
 }
 
 /**
@@ -939,6 +1066,8 @@ bool handle_early_cli_options(int argc, char *argv[])
 
 bool parse_command_line(int argc, char *argv[])
 {
+    clear_direct_tone_startup_request();
+
     // Check if any arguments (besides the program name) were provided.
     if (argc == 1) // No arguments or options provided.
     {
@@ -947,6 +1076,7 @@ bool parse_command_line(int argc, char *argv[])
 
     // Create original JSON
     init_config_json();
+    json_to_config();
     std::vector<char *> args(argv, argv + argc); // Copy arguments for modification
 
     // First pass: Look for "-i <file>" before processing other options
@@ -1019,12 +1149,16 @@ bool parse_command_line(int argc, char *argv[])
         {"use-ntp", no_argument, nullptr, 'n'},       // Via: [Extended] Use NTP = True
         {"repeat", no_argument, nullptr, 'r'},        // Global: config.loop_tx
         {"offset", no_argument, nullptr, 'o'},        // Via: [Extended] Offset = True
+        {"journald", no_argument, nullptr, 'J'},      // Global: config.use_journald
         {"date-time-log", no_argument, nullptr, 'D'}, // Global: config.date_time_log
+        {"require-paired", no_argument, nullptr, 1001}, // Global: config.require_paired_plan
+        {"tx-gpio-polarity", required_argument, nullptr, 1002},
         // Required arguments
         {"ppm", required_argument, nullptr, 'p'},       // Via: [Extended] PPM = 0.0
         {"terminate", required_argument, nullptr, 'x'}, // Global: config.tx_iterations
-        {"test-tone", required_argument, nullptr, 't'}, // Global: config.test_tone
-        // Not yet implemented: {"transmit-pin", required_argument, nullptr, 'a'},    // Via: [Common] Transmit Pin = 4
+        {"test-tone", required_argument, nullptr, 't'},
+        {"transmit-gpio", required_argument, nullptr, 'a'}, // Via: [Common] Transmit Pin = 4
+        {"transmit-pin", required_argument, nullptr, 'a'},
         {"led_pin", required_argument, nullptr, 'l'},         // Via: [Extended] LED Pin = 18
         {"shutdown_button", required_argument, nullptr, 's'}, // Via: [Server] Shutdown Button = 19
         {"power_level", required_argument, nullptr, 'd'},     // Via: [Extended] Power Level = 7
@@ -1035,7 +1169,7 @@ bool parse_command_line(int argc, char *argv[])
     while (true)
     {
         int option_index = 0;
-        int c = getopt_long(argc, argv, "h?vnroDp:x:t:a:l:s:d:w:k:", long_options, &option_index);
+        int c = getopt_long(argc, argv, "h?vnroJDp:x:t:a:l:s:d:w:k:", long_options, &option_index);
 
         if (c == -1)
             break;
@@ -1068,10 +1202,34 @@ bool parse_command_line(int argc, char *argv[])
             config.use_offset = true;
             break;
         }
-        case 'D': // Add date/time stamps to logging
+        case 'J': // Use journald logging backend
+        {
+            config.use_journald = true;
+            break;
+        }
+        case 'D': // Add date/time stamps to stream logging
         {
             config.date_time_log = true;
-            llog.enableTimestamps(config.date_time_log);
+            break;
+        }
+        case 1001: // Require paired WSPR planning
+        {
+            config.require_paired_plan = true;
+            break;
+        }
+        case 1002:
+        {
+            bool active_high = false;
+            if (!parse_tx_gpio_polarity(optarg, active_high))
+            {
+                print_usage(
+                    "Invalid TX GPIO polarity. Expected 'high' or 'low'.",
+                    EXIT_FAILURE);
+            }
+
+            // This applies to per-frequency selector GPIO outputs derived
+            // from frequency tokens with optional @GPIO suffixes.
+            config.tx_freq_control_active_high = active_high;
             break;
         }
         // Required arguments
@@ -1123,25 +1281,15 @@ bool parse_command_line(int argc, char *argv[])
         {
             if (!config.use_ini)
             {
-                try
+                std::string error_message;
+                if (!set_direct_tone_startup_request(optarg, &error_message))
                 {
-                    // `--test-tone` is an explicit direct-RF path. Do not apply
-                    // the WSPR USB dial-to-RF audio offset to this value.
-                    config.test_tone = lookup.parse_string_to_frequency(optarg, false);
-                    config.mode = ModeType::TONE;
-
-                    if (config.test_tone <= 0.0)
-                    {
-                        print_usage("Invalid direct RF test tone frequency (<=0).", EXIT_FAILURE);
-                    }
-                }
-                catch (const std::invalid_argument &e)
-                {
-                    std::string error_message = "Invalid direct RF test tone frequency input: " +
-                                                std::string(optarg) +
-                                                " Exception: " + e.what();
                     print_usage(error_message, EXIT_FAILURE);
                 }
+
+                // Direct test tone is a transient startup mode selected from
+                // the CLI. It is not persisted into config storage.
+                config.mode = ModeType::TONE;
             }
             else
             {
@@ -1153,15 +1301,19 @@ bool parse_command_line(int argc, char *argv[])
         {
             try
             {
-                int transmit_pin = std::stoi(optarg);
-                if (transmit_pin < 0 || transmit_pin > 27)
-                    print_usage("Invalid transmit pin.", EXIT_FAILURE);
-                else
-                    config.tx_pin = transmit_pin;
+                std::size_t consumed = 0;
+                const int transmit_pin = std::stoi(optarg, &consumed);
+                if (consumed != std::strlen(optarg) ||
+                    !is_valid_runtime_transmit_gpio(transmit_pin))
+                {
+                    print_usage(transmit_gpio_validation_message(), EXIT_FAILURE);
+                }
+
+                config.tx_pin = transmit_pin;
             }
             catch (const std::exception &)
             {
-                print_usage("Invalid transmit pin.", EXIT_FAILURE);
+                print_usage(transmit_gpio_validation_message(), EXIT_FAILURE);
             }
             break;
         }
@@ -1299,30 +1451,13 @@ bool parse_command_line(int argc, char *argv[])
                 print_usage("Missing required positional arguments: callsign, gridsquare, power, and dial_frequency.", EXIT_FAILURE);
             }
 
-            // Validate callsign with REGEX
-            if (is_valid_callsign(positional_args[0]))
-            {
-                config.callsign = positional_args[0];
-            }
-            else
-            {
-                print_usage("Invalid call sign '" + positional_args[0] + "' for type 1 WSPR message.", EXIT_FAILURE);
-            }
+            std::string callsign = positional_args[0];
+            normalize_wspr_callsign(callsign);
+            config.callsign = callsign;
 
-            // Validate and truncate gridsquare
             std::string gridsquare = positional_args[1];
-            if (validate_and_truncate_locator(gridsquare))
-            {
-                if (gridsquare != positional_args[1])
-                {
-                    llog.logS(DEBUG, "Grid square truncated to:", gridsquare);
-                }
-                config.grid_square = gridsquare;
-            }
-            else
-            {
-                print_usage("Invalid maidenhead locator: " + gridsquare, EXIT_FAILURE);
-            }
+            normalize_wspr_locator(gridsquare);
+            config.grid_square = gridsquare;
 
             // Validate power to standard values
             try

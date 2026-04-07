@@ -41,6 +41,12 @@
 #include <string>
 #include <unordered_map>
 
+#ifdef DEBUG_WSPR
+constexpr bool kDebugWspr = true;
+#else
+constexpr bool kDebugWspr = false;
+#endif
+
 /**
  * @brief Converts a value to a string view.
  *
@@ -153,11 +159,7 @@ std::string get_project_name()
  */
 std::string get_debug_state()
 {
-#ifdef DEBUG_WSPR
-    return "DEBUG"; // Debug mode enabled.
-#else
-    return "INFO"; // Default to INFO for non-debug builds.
-#endif
+    return kDebugWspr ? "DEBUG" : "INFO";
 }
 
 /**

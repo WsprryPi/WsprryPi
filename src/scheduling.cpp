@@ -1,6 +1,18 @@
 /**
  * @file scheduling.cpp
- * @brief Manages transmit, INI monitoring and scheduling for Wsprry Pi
+ * @brief Orchestration layer for planning and committing transmissions.
+ *
+ * This file owns planning policy for the current architecture. It is the
+ * only layer that decides:
+ * - Auto versus RequirePaired WSPR planning.
+ * - WSPR versus direct-tone execution mode.
+ * - Random WSPR RF offset application.
+ * - Per-frequency control GPIO metadata and selector preparation.
+ * - When a built request is committed to the transmitter.
+ *
+ * The transmitter only consumes committed `WsprTransmissionRequest`
+ * snapshots. The backend only realizes hardware for the backend-neutral
+ * execution plan derived from that committed request.
  *
  * This project is is licensed under the MIT License. See LICENSE.md
  * for more information.
@@ -39,6 +51,7 @@
 #include "logging.hpp"
 #include "ppm_manager.hpp"
 #include "signal_handler.hpp"
+#include "wspr_reference_adapter.hpp"
 #include "web_server.hpp"
 #include "web_socket.hpp"
 #include "wspr_transmit.hpp"
@@ -50,9 +63,11 @@
 #include <cerrno>
 #include <condition_variable>
 #include <cstring>
+#include <exception>
 #include <fstream>
 #include <iomanip>
 #include <iostream>
+#include <random>
 #include <string>
 #include <thread>
 #include <vector>
@@ -73,6 +88,77 @@
  * transmission completes, is skipped, or is cancelled.
  */
 static BandGPIOSelector bandGPIOSelector;
+static void log_selected_frequency_entry_gpio(
+    const WsprDialFrequencyEntry &entry,
+    const ArgParserConfig &cfg);
+static bool prepare_band_gpio_for_frequency_or_log(
+    double frequency_hz,
+    const ArgParserConfig &cfg);
+
+/**
+ * @brief Runtime owner for the currently prepared per-frequency selector GPIO.
+ *
+ * Scheduling prepares and tears down this selector around the committed
+ * request for the active slot. It is intentionally file-local so per-
+ * frequency control remains an orchestration concern rather than a
+ * transmitter or backend policy concern.
+ */
+class FrequencyEntryGPIOSelector
+{
+public:
+    bool prepare(const WsprDialFrequencyEntry &entry, bool active_high)
+    {
+        stop();
+        last_error_.clear();
+
+        if (entry.control_gpio == kFrequencyEntryControlGpioUnset)
+        {
+            return true;
+        }
+
+        if (!gpio_.enableGPIOPin(entry.control_gpio, active_high))
+        {
+            last_error_ = gpio_.lastError();
+            return false;
+        }
+
+        has_gpio_ = true;
+        return true;
+    }
+
+    bool setState(bool state)
+    {
+        if (!has_gpio_)
+        {
+            return true;
+        }
+
+        return gpio_.toggleGPIO(state);
+    }
+
+    void stop()
+    {
+        if (!has_gpio_)
+        {
+            return;
+        }
+
+        gpio_.stop();
+        has_gpio_ = false;
+    }
+
+    const std::string &lastError() const noexcept
+    {
+        return last_error_;
+    }
+
+private:
+    GPIOOutput gpio_{};
+    bool has_gpio_ = false;
+    std::string last_error_{};
+};
+
+static FrequencyEntryGPIOSelector frequencyEntryGPIOSelector;
 
 /**
  * @brief Mutex to protect access to the shutdown flag for the WSPR loop.
@@ -96,6 +182,7 @@ std::condition_variable exitwspr_cv;
  * @brief Atomic bool used to signal other functions that we are shutting down.
  */
 std::atomic<bool> exiting_wspr = false;
+static std::mutex set_config_mtx;
 
 /**
  * @brief Flag indicating whether the WSPR loop should terminate.
@@ -117,10 +204,12 @@ int freq_iterator = 0;
 /**
  * @brief Currently active WSPR dial frequency (in Hz).
  *
- * Holds the last frequency value retrieved by `next_frequency()`.
+ * Holds the last dial frequency selected by the scheduler.
  * A zero value indicates that no frequency is configured or the list was empty.
  */
 double current_dial_frequency = 0.0;
+WsprDialFrequencyEntry current_frequency_entry{};
+WsprTransmissionRequest current_transmission_request{};
 
 /**
  * @brief File-scope self-pipe descriptors for signal notifications.
@@ -174,18 +263,378 @@ ModeType lastMode;
  * progress via web controls, and false otherwise.
  */
 std::atomic<bool> web_test_tone{false};
+std::atomic<bool> shutdown_after_current_transmission{false};
+std::atomic<bool> shutdown_after_wspr_plan{false};
+static bool managed_reload_tx_inhibited = false;
+static bool suppress_scheduler_execution_for_test = false;
+/**
+ * @brief Scheduler-owned paired WSPR plan being continued across slots.
+ *
+ * When a paired plan is selected, the scheduler saves the full prepared
+ * plan and the frequency entry that produced it. The second slot reuses
+ * this saved scheduler state instead of asking the planner for a new
+ * policy decision.
+ */
+PreparedWsprTransmission active_wspr_plan{};
+std::size_t active_wspr_frame_index = 0;
+double active_wspr_plan_dial_frequency = 0.0;
+WsprDialFrequencyEntry active_wspr_plan_frequency_entry{};
+bool active_wspr_plan_in_progress = false;
 
-static std::string to_lower_copy(const std::string &s)
+/**
+ * @brief Tear down every selector prepared for the active committed request.
+ *
+ * This is the single teardown path for scheduler-owned selector GPIO state.
+ * Any code that needs to release band-selection or per-frequency control
+ * GPIOs must call this helper rather than stopping selectors individually.
+ */
+static void stop_active_transmission_selectors() noexcept
 {
-    std::string out = s;
-    std::transform(out.begin(),
-                   out.end(),
-                   out.begin(),
-                   [](unsigned char c)
-                   {
-                       return static_cast<char>(std::tolower(c));
-                   });
-    return out;
+    bandGPIOSelector.setBandState(false);
+    bandGPIOSelector.stop();
+    frequencyEntryGPIOSelector.setState(false);
+    frequencyEntryGPIOSelector.stop();
+}
+
+/**
+ * @brief Prepare the per-frequency control GPIO for the next committed slot.
+ *
+ * This helper logs the selected entry metadata and prepares the transient
+ * runtime selector state that belongs to the current scheduler slot. It
+ * does not start transmission or commit a request by itself.
+ *
+ * @param entry Frequency entry selected by the scheduler.
+ * @param failure_level Log level used if preparation fails.
+ * @return `true` if no GPIO is needed or preparation succeeded.
+ */
+static bool prepare_frequency_entry_gpio_or_log(
+    const WsprDialFrequencyEntry &entry,
+    const ArgParserConfig &cfg,
+    bool active_high,
+    LogLevel failure_level)
+{
+    log_selected_frequency_entry_gpio(entry, cfg);
+    if (frequencyEntryGPIOSelector.prepare(
+            entry,
+            active_high))
+    {
+        return true;
+    }
+
+    llog.logS(
+        failure_level,
+        "Unable to prepare frequency entry control GPIO ",
+        entry.control_gpio,
+        " for ",
+        entry.token,
+        ".",
+        frequencyEntryGPIOSelector.lastError().empty()
+            ? ""
+            : std::string(" ") + frequencyEntryGPIOSelector.lastError());
+    return false;
+}
+
+/**
+ * @brief Commit the single execution request consumed by the transmitter.
+ *
+ * This is the execution boundary between orchestration and transmitter
+ * layers. All WSPR and tone execution must pass through this helper so the
+ * transmitter only ever sees a complete, scheduler-owned request snapshot.
+ *
+ * @param request Fully built execution request for one transmitter run.
+ */
+static void commit_execution_request(
+    const WsprTransmissionRequest &request)
+{
+    current_transmission_request = request;
+    wsprTransmitter.configureExecution(current_transmission_request);
+}
+
+static void reset_active_wspr_plan_state()
+{
+    active_wspr_plan = PreparedWsprTransmission{};
+    active_wspr_frame_index = 0;
+    active_wspr_plan_dial_frequency = 0.0;
+    active_wspr_plan_frequency_entry = WsprDialFrequencyEntry{};
+    active_wspr_plan_in_progress = false;
+}
+
+static bool active_wspr_plan_has_more_frames_after_current() noexcept
+{
+    return active_wspr_plan_in_progress &&
+           (active_wspr_frame_index + 1U) < active_wspr_plan.frameCount();
+}
+
+static bool is_managed_persistent_mode() noexcept
+{
+    return config.use_ini;
+}
+
+static bool runtime_transmit_enabled(const ArgParserConfig &cfg) noexcept
+{
+    return cfg.transmit && !managed_reload_tx_inhibited;
+}
+
+static bool managed_reload_generation_changed(
+    std::uint64_t generation_snapshot) noexcept
+{
+    return ini_reload_generation.load(std::memory_order_acquire) != generation_snapshot;
+}
+
+static void set_managed_reload_tx_inhibited(
+    bool inhibited,
+    std::string_view reason = {})
+{
+    managed_reload_tx_inhibited = inhibited;
+
+    if (!reason.empty())
+    {
+        llog.logS(ERROR, reason);
+    }
+}
+
+static WsprDialFrequencyEntry next_frequency_entry_from(
+    const std::vector<WsprDialFrequencyEntry> &entries,
+    int &iterator,
+    bool reset)
+{
+    if (reset)
+    {
+        iterator = 0;
+    }
+
+    if (entries.empty())
+    {
+        return WsprDialFrequencyEntry{};
+    }
+
+    const auto idx =
+        static_cast<std::size_t>(iterator % static_cast<int>(entries.size()));
+    const WsprDialFrequencyEntry entry = entries[idx];
+    ++iterator;
+    return entry;
+}
+
+static WsprDialFrequencyEntry next_frequency_entry(bool reset);
+
+/**
+ * @brief Return the prepared plan for a single frame from a saved plan.
+ *
+ * The scheduler uses this when continuing a paired transmission so each
+ * committed request still represents exactly one execution slot even when
+ * the planner originally returned multiple frames.
+ */
+static PreparedWsprTransmission slot_plan_for_frame(
+    const PreparedWsprTransmission &plan,
+    std::size_t frame_index)
+{
+    PreparedWsprTransmission slot_plan;
+    slot_plan.plan_type = plan.plan_type;
+    slot_plan.callsign = plan.callsign;
+    slot_plan.locator = plan.locator;
+    slot_plan.power_dbm = plan.power_dbm;
+    slot_plan.frames.push_back(plan.frames.at(frame_index));
+    return slot_plan;
+}
+
+static bool is_auto_paired_upgrade_eligible(const ArgParserConfig &cfg) noexcept
+{
+    return cfg.mode == ModeType::WSPR &&
+           (cfg.callsign.find('/') != std::string::npos) &&
+           cfg.grid_square.size() == 6U;
+}
+
+void consume_tx_iteration_if_needed()
+{
+    if (config.use_ini || config.loop_tx)
+    {
+        return;
+    }
+
+    if (config.tx_iterations.load(std::memory_order_acquire) <= 0)
+    {
+        return;
+    }
+
+    int remaining = --config.tx_iterations;
+
+    if (remaining <= 0)
+    {
+        if (active_wspr_plan_has_more_frames_after_current())
+        {
+            shutdown_after_wspr_plan.store(true, std::memory_order_release);
+            llog.logS(
+                INFO,
+                "Completed last of TX iterations, signalling shutdown "
+                "after paired transmission.");
+        }
+        else
+        {
+            shutdown_after_current_transmission.store(
+                true,
+                std::memory_order_release);
+            llog.logS(
+                INFO,
+                "Completed last of TX iterations, signalling shutdown "
+                "after current transmission.");
+        }
+    }
+    else
+    {
+        llog.logS(INFO, "WSPR transmissions remaining:", remaining);
+    }
+}
+
+static void log_selected_frequency_entry_gpio(
+    const WsprDialFrequencyEntry &entry,
+    const ArgParserConfig &cfg)
+{
+    if (entry.control_gpio == kFrequencyEntryControlGpioUnset)
+    {
+        llog.logS(INFO,
+                  "Selected frequency entry control GPIO: none for ",
+                  entry.token,
+                  ".");
+        return;
+    }
+
+    llog.logS(INFO,
+              "Selected frequency entry control GPIO: ",
+              entry.control_gpio,
+              " (",
+              cfg.tx_freq_control_active_high ? "active high" : "active low",
+              ") for ",
+              entry.token,
+              ".");
+}
+
+static bool prepare_band_gpio_for_frequency_or_log(
+    double frequency_hz,
+    const ArgParserConfig &cfg)
+{
+    const auto band = lookup.lookup_ham_band(frequency_hz);
+    if (!band.has_value())
+    {
+        llog.logS(
+            WARN,
+            "Unable to map frequency ",
+            lookup.freq_display_string(frequency_hz),
+            " to a ham band for band-selector GPIO preparation.");
+        return false;
+    }
+
+    const BandGPIOConfig &band_gpio_config =
+        cfg.band_gpio[ham_band_index(*band)];
+    if (!bandGPIOSelector.prepareBand(*band, band_gpio_config))
+    {
+        llog.logS(
+            WARN,
+            "Unable to prepare band GPIO for ",
+            wsprTransmitter.formatFrequencyMHz(frequency_hz),
+            " MHz.");
+        return false;
+    }
+
+    return true;
+}
+
+static double maybe_apply_wspr_random_offset(
+    double actual_rf_frequency_hz,
+    const ArgParserConfig &cfg)
+{
+    if (!cfg.use_offset || actual_rf_frequency_hz == 0.0)
+    {
+        return actual_rf_frequency_hz;
+    }
+
+    std::random_device rd;
+    std::mt19937 gen(rd());
+    std::uniform_real_distribution<> dis(-1.0, 1.0);
+    return actual_rf_frequency_hz + dis(gen) * kWsprRandomOffsetHz;
+}
+
+/**
+ * @brief Build the scheduler-side request for a direct tone execution.
+ *
+ * This request is fully committed at the orchestration layer. The
+ * transmitter must not infer any additional policy from tone mode.
+ */
+static WsprTransmissionRequest make_tone_request(
+    const ArgParserConfig &cfg,
+    double actual_rf_frequency_hz,
+    double dial_frequency_hz,
+    const WsprDialFrequencyEntry &entry)
+{
+    WsprTransmissionRequest request;
+    request.mode = WsprTransmissionMode::TONE;
+    request.dial_frequency_hz = dial_frequency_hz;
+    request.actual_rf_frequency_hz = actual_rf_frequency_hz;
+    request.ppm = cfg.ppm;
+    request.power_level = cfg.power_level;
+    request.tx_gpio = cfg.tx_pin;
+    request.frequency_control_gpio = entry.control_gpio;
+    request.frequency_control_active_high = cfg.tx_freq_control_active_high;
+    request.frequency_entry_label = entry.token;
+    return request;
+}
+
+/**
+ * @brief Build the startup direct-tone request from transient CLI state.
+ *
+ * Startup tone mode is transient runtime state created by `--test-tone`.
+ * It is not persistent configuration.
+ */
+static WsprTransmissionRequest make_direct_tone_request(
+    const ArgParserConfig &cfg,
+    double actual_rf_frequency_hz)
+{
+    WsprDialFrequencyEntry entry;
+    double ignored_actual_rf_frequency_hz = 0.0;
+    if (try_get_direct_tone_startup_request(entry, ignored_actual_rf_frequency_hz))
+    {
+        return make_tone_request(
+            cfg,
+            actual_rf_frequency_hz,
+            actual_rf_frequency_hz,
+            entry);
+    }
+
+    return make_tone_request(
+        cfg,
+        actual_rf_frequency_hz,
+        actual_rf_frequency_hz,
+        WsprDialFrequencyEntry{});
+}
+
+/**
+ * @brief Build the scheduler-side request for one WSPR execution slot.
+ *
+ * The request captures all execution-time state, including the prepared
+ * WSPR frame for this slot, the committed RF frequency, and scheduler-owned
+ * per-frequency GPIO metadata.
+ */
+static WsprTransmissionRequest make_wspr_request(
+    const ArgParserConfig &cfg,
+    const PreparedWsprTransmission &slot_plan,
+    double dial_frequency_hz,
+    double actual_rf_frequency_hz,
+    const WsprDialFrequencyEntry &entry,
+    double applied_offset_hz)
+{
+    WsprTransmissionRequest request;
+    request.mode = WsprTransmissionMode::WSPR;
+    request.wspr_plan = slot_plan;
+    request.dial_frequency_hz = dial_frequency_hz;
+    request.actual_rf_frequency_hz = actual_rf_frequency_hz;
+    request.ppm = cfg.ppm;
+    request.power_level = cfg.power_level;
+    request.tx_gpio = cfg.tx_pin;
+    request.use_offset = cfg.use_offset;
+    request.applied_offset_hz = applied_offset_hz;
+    request.frequency_control_gpio = entry.control_gpio;
+    request.frequency_control_active_high = cfg.tx_freq_control_active_high;
+    request.frequency_entry_label = entry.token;
+    return request;
 }
 
 static std::string format_elapsed(double elapsed)
@@ -217,6 +666,188 @@ constexpr LogLevel to_log_level(WsprTransmitter::LogLevel level)
     }
 
     return LogLevel::INFO; // Safe fallback
+}
+
+/**
+ * @brief Build the next committed WSPR request for the current slot.
+ *
+ * This is scheduler policy code. It chooses Auto versus RequirePaired,
+ * records paired continuation state, and builds exactly one slot-scoped
+ * execution request. If a paired plan spans multiple slots, later slots
+ * reuse the saved scheduler plan instead of making a new planning choice.
+ *
+ * @param actual_rf_frequency_hz RF frequency already chosen by the scheduler.
+ * @param request_out Receives the committed request snapshot for one slot.
+ * @return `true` if the request was built successfully.
+ */
+static bool configure_current_wspr_transmission(
+    const ArgParserConfig &cfg,
+    double dial_frequency_hz,
+    const WsprDialFrequencyEntry &frequency_entry,
+    PreparedWsprTransmission &active_plan,
+    std::size_t &active_frame_index,
+    double &active_plan_dial_frequency,
+    WsprDialFrequencyEntry &active_plan_frequency_entry,
+    bool &active_plan_in_progress,
+    double actual_rf_frequency_hz,
+    WsprTransmissionRequest &request_out)
+{
+    try
+    {
+        PreparedWsprTransmission plan;
+        PreparedWsprTransmission slot_plan;
+        bool paired_requested = cfg.require_paired_plan;
+        bool auto_upgraded = false;
+
+        if (active_plan_in_progress)
+        {
+            // Continue the already selected paired plan. This reuses saved
+            // scheduler state and does not invoke a new planning policy
+            // decision for the second slot.
+            plan = active_plan;
+            slot_plan = slot_plan_for_frame(plan, active_frame_index);
+
+            llog.logS(INFO,
+                      "Scheduling paired WSPR frame ",
+                      static_cast<int>(active_frame_index + 1U),
+                      " of ",
+                      static_cast<int>(plan.frameCount()),
+                      " for the next WSPR slot.");
+        }
+        else
+        {
+            if (paired_requested)
+            {
+                llog.logS(INFO,
+                          "Paired WSPR planning explicitly requested.");
+
+                plan = build_prepared_wspr_transmission(
+                    cfg.callsign,
+                    cfg.grid_square,
+                    cfg.power_dbm,
+                    wspr::TransmissionPlanPreference::RequirePaired);
+            }
+            else
+            {
+                const bool paired_upgrade_eligible =
+                    is_auto_paired_upgrade_eligible(cfg);
+
+                try
+                {
+                    plan = build_prepared_wspr_transmission(
+                        cfg.callsign,
+                        cfg.grid_square,
+                        cfg.power_dbm,
+                        wspr::TransmissionPlanPreference::Auto);
+                }
+                catch (const std::exception &)
+                {
+                    if (!paired_upgrade_eligible)
+                        throw;
+
+                    llog.logS(
+                        INFO,
+                        "Auto-upgrading to paired WSPR plan because "
+                        "callsign is compound and locator is 6 characters.");
+
+                    PreparedWsprTransmission paired_plan =
+                        build_prepared_wspr_transmission(
+                            cfg.callsign,
+                            cfg.grid_square,
+                            cfg.power_dbm,
+                            wspr::TransmissionPlanPreference::RequirePaired);
+
+                    plan = std::move(paired_plan);
+                    auto_upgraded = true;
+                }
+
+                if (!auto_upgraded &&
+                    plan.frameCount() <= 1U &&
+                    paired_upgrade_eligible)
+                {
+                    llog.logS(
+                        INFO,
+                        "Auto-upgrading to paired WSPR plan because "
+                        "callsign is compound and locator is 6 characters.");
+
+                    PreparedWsprTransmission paired_plan =
+                        build_prepared_wspr_transmission(
+                            cfg.callsign,
+                            cfg.grid_square,
+                            cfg.power_dbm,
+                            wspr::TransmissionPlanPreference::RequirePaired);
+
+                    if (paired_plan.frameCount() > 1U)
+                    {
+                        plan = std::move(paired_plan);
+                        auto_upgraded = true;
+                    }
+                }
+            }
+
+            if (plan.frameCount() > 1U)
+            {
+                active_plan = plan;
+                active_frame_index = 0;
+                active_plan_dial_frequency = dial_frequency_hz;
+                active_plan_frequency_entry = frequency_entry;
+                active_plan_in_progress = true;
+            }
+            else
+            {
+                active_plan = PreparedWsprTransmission{};
+                active_frame_index = 0;
+                active_plan_dial_frequency = 0.0;
+                active_plan_frequency_entry = WsprDialFrequencyEntry{};
+                active_plan_in_progress = false;
+            }
+
+            slot_plan = slot_plan_for_frame(plan, active_frame_index);
+        }
+
+        llog.logS(INFO,
+                  "Selected WSPR plan: ",
+                  plan.plan_type,
+                  ", frames: ",
+                  static_cast<int>(plan.frames.size()),
+                  ", paired requested: ",
+                  paired_requested ? "true" : "false",
+                  ", auto-upgraded: ",
+                  auto_upgraded ? "true" : "false",
+                  ".");
+
+        request_out = make_wspr_request(
+            cfg,
+            slot_plan,
+            dial_frequency_hz,
+            actual_rf_frequency_hz,
+            frequency_entry,
+            0.0);
+
+        if (plan.frameCount() > 1U)
+        {
+            llog.logS(
+                INFO,
+                "Prepared paired WSPR transmission with ",
+                static_cast<int>(plan.frameCount()),
+                " frames using plan ",
+                plan.plan_type,
+                ".");
+        }
+
+        return true;
+    }
+    catch (const std::exception &e)
+    {
+        active_plan = PreparedWsprTransmission{};
+        active_frame_index = 0;
+        active_plan_dial_frequency = 0.0;
+        active_plan_frequency_entry = WsprDialFrequencyEntry{};
+        active_plan_in_progress = false;
+        shutdown_after_wspr_plan.store(false, std::memory_order_release);
+        llog.logE(ERROR, "WSPR encoding/configuration failed: ", e.what());
+        return false;
+    }
 }
 
 bool request_wspr_shutdown(std::string_view reason)
@@ -258,8 +889,15 @@ void transmitter_cb(WsprTransmitter::TransmissionCallbackEvent event,
     {
         const double frequency = value;
 
+        if (config.mode == ModeType::WSPR &&
+            (!active_wspr_plan_in_progress || active_wspr_frame_index == 0U))
+        {
+            consume_tx_iteration_if_needed();
+        }
+
         // Assert the precomputed band GPIO.
         bandGPIOSelector.setBandState(true);
+        frequencyEntryGPIOSelector.setState(true);
 
         // Turn on LED.
         ledControl.toggleGPIO(true);
@@ -302,22 +940,12 @@ void transmitter_cb(WsprTransmitter::TransmissionCallbackEvent event,
     case WsprTransmitter::TransmissionCallbackEvent::COMPLETE:
     {
         const double elapsed = value;
-
         bool do_config = true;
+        const bool deferred_reload_pending =
+            ini_reload_pending.load(std::memory_order_acquire);
 
         const std::string s_elapsed = format_elapsed(elapsed);
-        const std::string msg_lower = to_lower_copy(msg);
-
-        if (msg_lower.find("canceled") != std::string::npos)
-        {
-            llog.logS(to_log_level(level),
-                      "Transmission cancelled after ",
-                      s_elapsed,
-                      " seconds.");
-            do_config = false;
-            send_ws_message("transmit", "canceled");
-        }
-        else if (!msg.empty() && elapsed != 0.0)
+        if (!msg.empty() && elapsed != 0.0)
         {
             llog.logS(to_log_level(level),
                       "Completed transmission (",
@@ -346,9 +974,8 @@ void transmitter_cb(WsprTransmitter::TransmissionCallbackEvent event,
                       "Completed transmission.");
         }
 
-        // Deassert and release the prepared band GPIO.
-        bandGPIOSelector.setBandState(false);
-        bandGPIOSelector.stop();
+        // Deassert and release the prepared selectors.
+        stop_active_transmission_selectors();
 
         // Turn off LED.
         ledControl.toggleGPIO(false);
@@ -356,18 +983,79 @@ void transmitter_cb(WsprTransmitter::TransmissionCallbackEvent event,
         // Notify the websocket clients.
         send_ws_message("transmit", "finished");
 
+        const bool shutdown_when_idle =
+            shutdown_after_current_transmission.exchange(false, std::memory_order_acq_rel);
+        const bool shutdown_when_plan_finishes =
+            shutdown_after_wspr_plan.load(std::memory_order_acquire);
+
+        if (deferred_reload_pending)
+        {
+            reset_active_wspr_plan_state();
+        }
+        else if (do_config && active_wspr_plan_has_more_frames_after_current())
+        {
+            ++active_wspr_frame_index;
+        }
+        else if (active_wspr_plan_in_progress)
+        {
+            reset_active_wspr_plan_state();
+        }
+
+        if (shutdown_when_idle && do_config)
+        {
+            request_wspr_shutdown("completed configured TX iterations");
+            do_config = false;
+        }
+        else if (shutdown_when_plan_finishes && do_config &&
+                 !active_wspr_plan_in_progress)
+        {
+            shutdown_after_wspr_plan.store(false, std::memory_order_release);
+            request_wspr_shutdown("completed configured TX iterations");
+            do_config = false;
+        }
+
         // Set config will determine if we have work to do.
         if (do_config)
+        {
             set_config();
+        }
+
+        break;
+    }
+
+    case WsprTransmitter::TransmissionCallbackEvent::CANCELLED:
+    {
+        const double elapsed = value;
+        const std::string s_elapsed = format_elapsed(elapsed);
+
+        llog.logS(to_log_level(level),
+                  "Transmission cancelled after ",
+                  s_elapsed,
+                  " seconds.");
+
+        stop_active_transmission_selectors();
+        ledControl.toggleGPIO(false);
+        send_ws_message("transmit", "canceled");
+
+        shutdown_after_current_transmission.store(false, std::memory_order_release);
+        shutdown_after_wspr_plan.store(false, std::memory_order_release);
+        reset_active_wspr_plan_state();
 
         break;
     }
 
     case WsprTransmitter::TransmissionCallbackEvent::SKIPPED:
     {
-        // Deassert and release the prepared band GPIO.
-        bandGPIOSelector.setBandState(false);
-        bandGPIOSelector.stop();
+        if (!current_transmission_request.isSkipWindow())
+        {
+            llog.logS(
+                WARN,
+                "Ignoring unexpected SKIPPED transmitter callback for non-skip request.");
+            break;
+        }
+
+        // Deassert and release the prepared selectors.
+        stop_active_transmission_selectors();
 
         // Turn off LED in case the UI/state expects an idle indication.
         ledControl.toggleGPIO(false);
@@ -379,6 +1067,10 @@ void transmitter_cb(WsprTransmitter::TransmissionCallbackEvent event,
 
         // Notify websocket clients.
         send_ws_message("transmit", "skipped");
+
+        shutdown_after_current_transmission.store(false, std::memory_order_release);
+        shutdown_after_wspr_plan.store(false, std::memory_order_release);
+        reset_active_wspr_plan_state();
 
         // Advance to the next configured slot.
         set_config();
@@ -569,11 +1261,11 @@ void reboot_system()
 }
 
 /**
- * @brief   Initiates a continuous test‐tone transmission.
+ * @brief Start a transient runtime tone using scheduler-owned setup.
  *
- * Stops any ongoing transmission, saves the current mode,
- * switches into TONE mode, and transmits on the first
- * configured frequency using the current power and PPM.
+ * The scheduler stops any active run, reuses the first configured
+ * frequency entry, prepares selector GPIO state, commits a tone request,
+ * and starts the transmitter. Tone mode here is runtime-only behavior.
  */
 void start_test_tone()
 {
@@ -591,15 +1283,20 @@ void start_test_tone()
         }
         wsprTransmitter.stopAndJoin();
 
-        // Pick the first configured WSPR dial frequency and convert it to RF
-        // only at the transmitter boundary.
-        const double dial_freq = next_frequency(/*restart=*/true);
+        // Pick the first configured scheduler frequency entry, then commit
+        // the resolved RF frequency into the request before execution.
+        const WsprDialFrequencyEntry entry =
+            next_frequency_entry(/*restart=*/true);
+        const double dial_freq = entry.dial_frequency_hz;
+        current_frequency_entry = entry;
         const double actual_rf_freq = resolve_actual_rf_frequency_hz(
             dial_freq,
             config.wspr_audio_offset_hz,
             FrequencyPath::WsprDial);
 
-        while (wsprTransmitter.getState() == WsprTransmitter::State::TRANSMITTING)
+        while (
+            wsprTransmitter.getState() ==
+            WsprTransmitter::State::TRANSMITTING)
         {
             std::this_thread::sleep_for(std::chrono::milliseconds(1));
         }
@@ -619,9 +1316,14 @@ void start_test_tone()
             " using audio offset ",
             config.wspr_audio_offset_hz,
             " Hz.");
-        wsprTransmitter.configure(actual_rf_freq,
-                                  config.power_level,
-                                  config.ppm);
+        commit_execution_request(
+            make_tone_request(config, actual_rf_freq, dial_freq, entry));
+
+        (void)prepare_frequency_entry_gpio_or_log(
+            entry,
+            config,
+            config.tx_freq_control_active_high,
+            WARN);
 
         if (!bandGPIOSelector.prepareFrequency(dial_freq))
         {
@@ -640,11 +1342,10 @@ void start_test_tone()
 }
 
 /**
- * @brief   Ends the test‐tone and restores the previous mode.
+ * @brief End the transient runtime tone and restore prior orchestration.
  *
- * If we’re in test‐tone, shut it down, clear the flag,
- * restore lastMode, and re-configure either WSPR or
- * (if it wasn’t WSPR) another tone on config.test_tone.
+ * This stops the current tone, tears down selector lifecycle state through
+ * the scheduler helper, and then resumes the pre-tone runtime mode.
  */
 void end_test_tone()
 {
@@ -654,8 +1355,7 @@ void end_test_tone()
 
         // Stop current tone
         wsprTransmitter.stopAndJoin();
-        bandGPIOSelector.setBandState(false);
-        bandGPIOSelector.stop();
+        stop_active_transmission_selectors();
         send_ws_message("transmit", "finished");
         ledControl.toggleGPIO(false);
 
@@ -676,15 +1376,26 @@ void end_test_tone()
         }
         else
         {
-            // It was already a tone, so set it up again
+            WsprDialFrequencyEntry entry;
+            double actual_rf_frequency_hz = 0.0;
+            if (!try_get_direct_tone_startup_request(
+                    entry,
+                    actual_rf_frequency_hz))
+            {
+                llog.logE(ERROR,
+                          "Unable to restore direct test tone; no "
+                          "transient tone request is active.");
+                return;
+            }
+
             validate_config_data();
-            wsprTransmitter.configure(
-                resolve_actual_rf_frequency_hz(
-                    config.test_tone,
-                    config.wspr_audio_offset_hz,
-                    FrequencyPath::DirectRf),
-                config.power_level,
-                config.ppm);
+            commit_execution_request(
+                make_direct_tone_request(config, actual_rf_frequency_hz));
+            (void)prepare_frequency_entry_gpio_or_log(
+                entry,
+                config,
+                config.tx_freq_control_active_high,
+                WARN);
             wsprTransmitter.startAsync();
 
             llog.logS(INFO,
@@ -693,31 +1404,56 @@ void end_test_tone()
     }
 }
 
+static void stop_runtime_components_for_early_exit() noexcept
+{
+    ini_reload_pending.store(false, std::memory_order_relaxed);
+    iniMonitor.stop();
+    wsprTransmitter.stopAndJoin();
+    stop_active_transmission_selectors();
+    shutdownMonitor.stop();
+    ledControl.stop();
+    ppmManager.stop();
+    webServer.stop();
+    socketServer.stop();
+}
+
 /**
- * @brief Main control loop for WSPR operation.
+ * @brief Main orchestration loop for startup, scheduling, and shutdown.
  *
  * @details
- * This function initializes and coordinates all core components required for
- * WSPR transmission. It sets up optional NTP-based PPM correction, launches
- * the TCP server, spawns the transmission handler thread, and blocks until
- * a shutdown signal is received.
- *
- * When signaled to exit, it cleanly shuts down all background services and
- * threads in the correct order.
+ * This loop validates configuration, starts long-lived services, prepares
+ * the initial committed execution request, and then runs until shutdown.
+ * WSPR startup goes through the same reload-safe scheduling path used for
+ * later reconfiguration so request construction remains centralized here.
  *
  * @note This function blocks until `exitwspr_cv` is set by another thread.
  */
 bool wspr_loop()
 {
-    // TODO: Feature toggles while I work on configuration items
-    bandGPIOSelector.setEnabled(true);    // (true) - Allows logic to run and show debug messages; set false to disable all band GPIO logic and messages
-    bandGPIOSelector.setDriveGPIO(false); // (false) - Shows DEBUG messages vs performing actions
+    bool any_band_gpio_enabled = false;
+    for (int i = 0; i < HAM_BAND_COUNT; ++i)
+    {
+        if (config.band_gpio[i].enabled && config.band_gpio[i].gpio >= 0)
+        {
+            any_band_gpio_enabled = true;
+            break;
+        }
+    }
+
+    bandGPIOSelector.setEnabled(any_band_gpio_enabled);
+    bandGPIOSelector.setDriveGPIO(any_band_gpio_enabled);
 
     // Display the final configuration after parsing arguments and INI file.
     show_config_values();
 
     if (config.mode != ModeType::WSPR)
     {
+        validate_config_data();
+    }
+    else
+    {
+        // Validate the startup WSPR configuration before any long-lived
+        // services are started so malformed CLI frequency lists fail cleanly.
         validate_config_data();
     }
 
@@ -771,17 +1507,30 @@ bool wspr_loop()
     if (config.mode == ModeType::WSPR)
     {
         ini_reload_pending.store(true, std::memory_order_relaxed);
-        set_config();
+        if (!set_config())
+        {
+            stop_runtime_components_for_early_exit();
+            return false;
+        }
     }
     else if (config.mode == ModeType::TONE)
     {
-        wsprTransmitter.configure(
-            resolve_actual_rf_frequency_hz(
-                config.test_tone,
-                config.wspr_audio_offset_hz,
-                FrequencyPath::DirectRf),
-            config.power_level,
-            config.ppm);
+        WsprDialFrequencyEntry entry;
+        double actual_rf_frequency_hz = 0.0;
+        if (!try_get_direct_tone_startup_request(entry, actual_rf_frequency_hz))
+        {
+            llog.logE(ERROR, "Direct RF test tone requested without a startup tone request.");
+            stop_runtime_components_for_early_exit();
+            return false;
+        }
+
+        commit_execution_request(
+            make_direct_tone_request(config, actual_rf_frequency_hz));
+        (void)prepare_frequency_entry_gpio_or_log(
+            entry,
+            config,
+            config.tx_freq_control_active_high,
+            WARN);
         wsprTransmitter.startAsync();
         llog.logS(INFO, "transmitting tone, hit Ctrl-C to terminate tone.");
     }
@@ -802,14 +1551,20 @@ bool wspr_loop()
     // -------------------------------------------------------------------------
     llog.logS(INFO, "Stopping runtime components.");
 
+    llog.logS(INFO, "Stopping configuration monitor.");
+    ini_reload_pending.store(false, std::memory_order_relaxed);
+    iniMonitor.stop(); // Stop config file monitor before transmitter teardown.
+    llog.logS(INFO, "Configuration monitor stopped.");
+
     llog.logS(INFO, "Stopping transmitter.");
     wsprTransmitter.stopAndJoin(); // Stop the transmitter threads
     llog.logS(INFO, "Transmitter stopped.");
 
+    llog.logS(INFO, "Stopping frequency entry GPIO selector.");
     llog.logS(INFO, "Stopping band GPIO selector.");
-    bandGPIOSelector.setBandState(false);
-    bandGPIOSelector.stop();
+    stop_active_transmission_selectors();
     llog.logS(INFO, "Band GPIO selector stopped.");
+    llog.logS(INFO, "Frequency entry GPIO selector stopped.");
 
     llog.logS(INFO, "Stopping shutdown monitor.");
     shutdownMonitor.stop(); // Stop the GPIO monitor
@@ -818,10 +1573,6 @@ bool wspr_loop()
     llog.logS(INFO, "Stopping LED driver.");
     ledControl.stop(); // Stop LED driver
     llog.logS(INFO, "LED driver stopped.");
-
-    llog.logS(INFO, "Stopping configuration monitor.");
-    iniMonitor.stop(); // Stop config file monitor
-    llog.logS(INFO, "Configuration monitor stopped.");
 
     llog.logS(INFO, "Stopping PPM manager.");
     ppmManager.stop(); // Stop PPM manager (if active)
@@ -929,261 +1680,518 @@ void send_ws_message(std::string type, std::string state)
 }
 
 /**
- * @brief Retrieve the next configured WSPR dial frequency, cycling through the list.
+ * @brief Return the next configured scheduler frequency entry.
  *
- * This method returns the next frequency from `config.wspr_dial_freq_set` in a
- * round-robin fashion.  It uses `freq_iterator` modulo the list size to
- * index into the vector, then increments `freq_iterator` for the subsequent call.
+ * The scheduler owns round-robin traversal of configured frequency entries,
+ * including their optional `@GPIO` metadata. When `reset` is true, the next
+ * returned entry is the first configured slot.
  *
- * @return double
- *   - Next frequency in Hz from the list.
- *   - Returns 0.0 if the list is empty.
- *
- * @note
- *   - `freq_iterator` should be initialized to 0.
- *   - Wrapping is handled via the modulo operation.
+ * @param reset True to restart from the first configured entry.
+ * @return The next configured entry, or a default-constructed entry if none
+ *         are configured.
  */
-double next_frequency(bool reset)
+WsprDialFrequencyEntry next_frequency_entry(bool reset)
 {
-    const auto &freqs = config.wspr_dial_freq_set;
-    if (freqs.empty())
-    {
-        return 0.0;
-    }
-
-    // Compute index in [0, freqs.size())
-    const size_t idx = freq_iterator % freqs.size();
-
-    // True whenever we’ve wrapped back around to the “first” slot
-    if (idx == 0 && !reset)
-    {
-        // Check if we are doing transmission iterations
-        if (!config.use_ini && !config.loop_tx)
-        {
-            // Atomically decrement and grab the new value:
-            int remaining = --config.tx_iterations;
-
-            if (remaining <= 0)
-            {
-                llog.logS(INFO, "Completed last of TX iterations, signalling shutdown.");
-                request_wspr_shutdown("completed configured TX iterations");
-            }
-            else
-            {
-                llog.logS(INFO, "WSPR transmissions remaining:", remaining);
-            }
-        }
-    }
-
-    // Fetch frequency
-    double freq = freqs[idx];
-
-    // Advance iterator
-    ++freq_iterator;
-
-    return freq;
+    return next_frequency_entry_from(
+        config.wspr_dial_frequency_entries,
+        freq_iterator,
+        reset);
 }
 
 /**
- * @brief Apply updated transmission parameters and reinitialize DMA.
+ * @brief Reload scheduler state and commit the next execution request.
  *
- * Retrieves the current PPM value if NTP calibration is enabled, captures
- * the latest configuration settings, and reconfigures the WSPR transmitter
- * with the specified frequency and parameters.
- *
- * @throws std::runtime_error if DMA setup or mailbox operations fail within
- *         `setupTransmission()`.
+ * This function is the central orchestration path for startup, reload, PPM
+ * updates, random WSPR offset application, paired-slot continuation, GPIO
+ * selector preparation, and request commit. The transmitter receives only
+ * the final committed request built here.
  */
-void set_config(bool force)
+bool set_config(bool force)
 {
+    std::lock_guard<std::mutex> lk(set_config_mtx);
+
     // Exit if we are shutting down
     if (exiting_wspr.load())
     {
         llog.logS(DEBUG, "Exiting set_config() early.");
-        return;
+        ini_reload_pending.store(false, std::memory_order_relaxed);
+        return true;
     }
     else
     {
         llog.logS(DEBUG, "Processing set_config().");
     }
 
-    bool do_config = false;
-    bool do_random = false;
-    if (force)
+    for (;;)
     {
-        do_config = true;
-        freq_iterator = 0;
-        current_dial_frequency = 0.0;
+        const bool reload_requested =
+            ini_reload_pending.load(std::memory_order_acquire);
+        const std::uint64_t reload_generation_snapshot =
+            reload_requested
+                ? ini_reload_generation.load(std::memory_order_acquire)
+                : 0U;
+        const bool managed_candidate_requested =
+            config.use_ini && (force || reload_requested);
 
-        if (config.use_ini)
+        auto newer_reload_arrived =
+            [&]() noexcept
         {
-            std::string load_error;
-            std::vector<std::string> warning_messages;
-            if (!load_json(config.ini_filename, &load_error, &warning_messages))
-            {
-                for (const auto &warning_message : warning_messages)
-                {
-                    llog.logS(WARN, warning_message);
-                }
+            return reload_requested &&
+                   managed_reload_generation_changed(reload_generation_snapshot);
+        };
 
-                llog.logS(ERROR,
-                          "Configuration reload failed; keeping current config:",
-                          load_error);
-                config_to_json();
-                json_to_ini();
-                return;
+        auto finalize_reload_pending =
+            [&]() noexcept
+        {
+            if (newer_reload_arrived())
+            {
+                ini_reload_pending.store(true, std::memory_order_release);
+                return false;
             }
 
-            for (const auto &warning_message : warning_messages)
+            ini_reload_pending.store(false, std::memory_order_release);
+            return true;
+        };
+
+        PreparedConfigCandidate prepared_candidate{};
+        bool candidate_ready_to_commit = false;
+        ArgParserConfig working_config = config;
+
+        if (managed_candidate_requested)
+        {
+            prepare_ini_config_candidate(config.ini_filename, prepared_candidate);
+
+            for (const auto &warning_message : prepared_candidate.warnings)
             {
                 llog.logS(WARN, warning_message);
             }
-        }
-    }
 
-    // Track actual PPM manager runtime state rather than inferring it from the
-    // just-loaded config. Startup and reload both need to enable/disable the
-    // subsystem based on whether it is already running.
-    const bool ppm_running = ppmManager.isRunning();
-
-    // If we are reloading from INI:
-    if (ini_reload_pending.load())
-    {
-        do_config = true;
-
-        if (config.use_ini)
-        {
-            std::string load_error;
-            std::vector<std::string> warning_messages;
-            if (!load_json(config.ini_filename, &load_error, &warning_messages))
+            if (newer_reload_arrived())
             {
-                for (const auto &warning_message : warning_messages)
-                {
-                    llog.logS(WARN, warning_message);
-                }
+                continue;
+            }
 
+            if (!prepared_candidate.valid)
+            {
                 llog.logS(ERROR,
                           "Configuration reload failed; keeping current config:",
-                          load_error);
-                config_to_json();
-                json_to_ini();
-                ini_reload_pending.store(false, std::memory_order_relaxed);
+                          prepared_candidate.error_reason);
                 send_ws_message("configuration", "reload_failed");
-                return;
+                set_managed_reload_tx_inhibited(
+                    true,
+                    "Managed reload rejected. Future transmissions disabled until a valid configuration is loaded.");
+
+                if (wsprTransmitter.getState() != WsprTransmitter::State::TRANSMITTING)
+                {
+                    wsprTransmitter.stopAndJoin();
+                    stop_active_transmission_selectors();
+                    current_transmission_request = WsprTransmissionRequest{};
+                }
+
+                if (!finalize_reload_pending())
+                {
+                    continue;
+                }
+                return true;
             }
 
-            for (const auto &warning_message : warning_messages)
-            {
-                llog.logS(WARN, warning_message);
-            }
+            working_config = prepared_candidate.normalized_config;
+            candidate_ready_to_commit = true;
         }
 
-        if (!validate_config_data())
+        bool do_config = force;
+        bool do_random = false;
+
+        const bool ppm_running = ppmManager.isRunning();
+        const bool should_start_ppm = working_config.use_ntp && !ppm_running;
+        const bool should_stop_ppm = !working_config.use_ntp && ppm_running;
+        const bool should_log_ppm_disabled =
+            force && !working_config.use_ntp && !ppm_running;
+
+        if (reload_requested)
         {
-            llog.logE(ERROR, "Configuration validation failed.");
-            config.transmit = false;
-            config_to_json();
+            do_config = true;
         }
-    }
 
-    // See if we need to start NTP (chrony) monitoring
-    if (config.use_ntp && !ppm_running)
-    {
-        ppm_init();
-        ppm_reload_pending.store(true, std::memory_order_seq_cst);
-    }
-    // Or, see if we need to stop it
-    else if (!config.use_ntp && ppm_running)
-    {
-        ppmManager.stop();
-        llog.logS(INFO, "PPM Manager disabled.");
-        ppm_reload_pending.store(false, std::memory_order_seq_cst);
-    }
-    else if (force && !config.use_ntp)
-    {
-        llog.logS(INFO, "PPM Manager disabled.");
-    }
-
-    // Update PPM if a change was noted
-    if (ppm_reload_pending.load())
-    {
-        config.ppm = ppmManager.getCurrentPPM();
-        wsprTransmitter.applyPpmCorrection(config.ppm);
-        llog.logS(INFO, "PPM updated:", config.ppm);
-
-        // Clear pending ppm flags
-        ppm_reload_pending.store(false, std::memory_order_relaxed);
-    }
-
-    // Get next frequency and indicate if we are (re)setting the stack
-    static double last_freq = 0.0;
-    current_dial_frequency = next_frequency(force);
-    if (current_dial_frequency != last_freq)
-    {
-        last_freq = current_dial_frequency;
-        do_config = true;
-    }
-    else if (config.use_offset && current_dial_frequency != 0.0)
-    {
-        // Allow randomization as/if needed
-        do_random = true;
-    }
-
-    // If we have a change, do setup
-    if (do_config || do_random)
-    {
-        const double actual_rf_frequency_hz = resolve_actual_rf_frequency_hz(
-            current_dial_frequency,
-            config.wspr_audio_offset_hz,
-            FrequencyPath::WsprDial);
-
-        // Do DMA configuration
-        llog.logS(
-            DEBUG,
-            "Resolved WSPR dial frequency ",
-            lookup.freq_display_string(current_dial_frequency),
-            " to actual RF ",
-            lookup.freq_display_string(actual_rf_frequency_hz),
-            " using audio offset ",
-            config.wspr_audio_offset_hz,
-            " Hz.");
-        wsprTransmitter.configure(
-            actual_rf_frequency_hz,
-            config.power_level,
-            config.ppm,
-            config.callsign,
-            config.grid_square,
-            config.power_dbm,
-            config.use_offset);
-
-        if (!bandGPIOSelector.prepareFrequency(current_dial_frequency))
+        const bool ppm_update_pending =
+            ppm_reload_pending.load(std::memory_order_acquire);
+        bool runtime_ppm_changed = false;
+        if (ppm_update_pending)
         {
-            llog.logS(WARN,
-                      "Unable to prepare band GPIO for ",
-                      wsprTransmitter.formatFrequencyMHz(current_dial_frequency),
-                      " MHz.");
+            working_config.ppm = ppmManager.getCurrentPPM();
+            llog.logS(INFO, "PPM updated:", working_config.ppm);
+            runtime_ppm_changed = true;
+            do_config = true;
         }
-    }
 
-    // Enable/disable transmit if/as needed
-    if (config.transmit && (do_config || do_random))
-    {
-        if (do_random)
+        int next_freq_iterator = force ? 0 : freq_iterator;
+        double next_current_dial_frequency =
+            force ? 0.0 : current_dial_frequency;
+        WsprDialFrequencyEntry next_current_frequency_entry =
+            force ? WsprDialFrequencyEntry{} : current_frequency_entry;
+        WsprTransmissionRequest next_transmission_request =
+            force ? WsprTransmissionRequest{} : current_transmission_request;
+        PreparedWsprTransmission next_active_wspr_plan =
+            force ? PreparedWsprTransmission{} : active_wspr_plan;
+        std::size_t next_active_wspr_frame_index =
+            force ? 0U : active_wspr_frame_index;
+        double next_active_wspr_plan_dial_frequency =
+            force ? 0.0 : active_wspr_plan_dial_frequency;
+        WsprDialFrequencyEntry next_active_wspr_plan_frequency_entry =
+            force ? WsprDialFrequencyEntry{} : active_wspr_plan_frequency_entry;
+        bool next_active_wspr_plan_in_progress =
+            force ? false : active_wspr_plan_in_progress;
+        if (force)
         {
-            llog.logS(DEBUG, "New random frequency.");
+            shutdown_after_wspr_plan.store(false, std::memory_order_release);
+        }
+
+        static double last_freq = 0.0;
+        static WsprDialFrequencyEntry last_frequency_entry{};
+        if (next_active_wspr_plan_in_progress && next_active_wspr_frame_index > 0U)
+        {
+            next_current_dial_frequency = next_active_wspr_plan_dial_frequency;
+            next_current_frequency_entry = next_active_wspr_plan_frequency_entry;
+            do_config = true;
         }
         else
         {
-            llog.logS(DEBUG, "Setup complete.");
+            next_current_frequency_entry = next_frequency_entry_from(
+                working_config.wspr_dial_frequency_entries,
+                next_freq_iterator,
+                force);
+            next_current_dial_frequency =
+                next_current_frequency_entry.dial_frequency_hz;
         }
-        llog.logS(INFO, "Waiting for next transmission window.");
-        wsprTransmitter.startAsync();
-    }
-    else if (!config.transmit && (do_config || do_random))
-    {
-        llog.logS(INFO, "Transmissions disabled.");
-    }
+
+        const bool frequency_entry_changed =
+            next_current_frequency_entry.token != last_frequency_entry.token ||
+            next_current_frequency_entry.control_gpio != last_frequency_entry.control_gpio;
+
+        if (next_current_dial_frequency != last_freq || frequency_entry_changed)
+        {
+            do_config = true;
+        }
+        else if (working_config.use_offset && next_current_dial_frequency != 0.0)
+        {
+            do_random = true;
+        }
+
+        if (do_config || do_random)
+        {
+            if (!runtime_transmit_enabled(working_config))
+            {
+                if (newer_reload_arrived())
+                {
+                    continue;
+                }
+
+                if (candidate_ready_to_commit)
+                {
+                    prepared_candidate.normalized_config.ppm = working_config.ppm;
+                    // Managed reloads are transactional; only fully validated candidates may replace live state. Invalid reloads result in TX being disabled after the current transmission completes.
+                    // For managed -i reloads, once a deferred reload is consumed after TX completion, the freshly prepared valid INI candidate must become the sole source of truth for the next scheduling decision; previously committed live config must not override it.
+                    commit_config_candidate(prepared_candidate);
+                    apply_runtime_config_side_effects();
+                    set_managed_reload_tx_inhibited(false);
+                    if (reload_requested)
+                    {
+                        send_ws_message("configuration", "reload");
+                    }
+                }
+                else if (runtime_ppm_changed)
+                {
+                    config.ppm = working_config.ppm;
+                }
+
+                if (should_start_ppm)
+                {
+                    ppm_init();
+                    ppm_reload_pending.store(true, std::memory_order_seq_cst);
+                }
+                else if (should_stop_ppm)
+                {
+                    ppmManager.stop();
+                    llog.logS(INFO, "PPM Manager disabled.");
+                    ppm_reload_pending.store(false, std::memory_order_seq_cst);
+                }
+                else if (should_log_ppm_disabled)
+                {
+                    llog.logS(INFO, "PPM Manager disabled.");
+                }
+                else if (ppm_update_pending)
+                {
+                    ppm_reload_pending.store(false, std::memory_order_relaxed);
+                }
+
+                wsprTransmitter.stopAndJoin();
+                stop_active_transmission_selectors();
+                current_transmission_request = WsprTransmissionRequest{};
+                current_dial_frequency = 0.0;
+                current_frequency_entry = WsprDialFrequencyEntry{};
+                freq_iterator = next_freq_iterator;
+                active_wspr_plan = next_active_wspr_plan;
+                active_wspr_frame_index = next_active_wspr_frame_index;
+                active_wspr_plan_dial_frequency = next_active_wspr_plan_dial_frequency;
+                active_wspr_plan_frequency_entry = next_active_wspr_plan_frequency_entry;
+                active_wspr_plan_in_progress = next_active_wspr_plan_in_progress;
+                last_freq = next_current_dial_frequency;
+                last_frequency_entry = next_current_frequency_entry;
+                llog.logS(INFO, "Transmissions disabled.");
+
+                if (!finalize_reload_pending())
+                {
+                    continue;
+                }
+                return true;
+            }
+
+            if (exiting_wspr.load(std::memory_order_acquire))
+            {
+                llog.logS(DEBUG, "Aborting reconfiguration because shutdown is in progress.");
+                if (!finalize_reload_pending())
+                {
+                    continue;
+                }
+                return true;
+            }
+
+            const double base_actual_rf_frequency_hz = resolve_actual_rf_frequency_hz(
+                next_current_dial_frequency,
+                working_config.wspr_audio_offset_hz,
+                FrequencyPath::WsprDial);
+            const double actual_rf_frequency_hz =
+                maybe_apply_wspr_random_offset(base_actual_rf_frequency_hz,
+                                               working_config);
+            const double applied_offset_hz =
+                actual_rf_frequency_hz - base_actual_rf_frequency_hz;
+
+            llog.logS(
+                DEBUG,
+                "Resolved WSPR dial frequency ",
+                lookup.freq_display_string(next_current_dial_frequency),
+                " to actual RF ",
+                lookup.freq_display_string(actual_rf_frequency_hz),
+                " using audio offset ",
+                working_config.wspr_audio_offset_hz,
+                " Hz.");
+            if (!configure_current_wspr_transmission(
+                    working_config,
+                    next_current_dial_frequency,
+                    next_current_frequency_entry,
+                    next_active_wspr_plan,
+                    next_active_wspr_frame_index,
+                    next_active_wspr_plan_dial_frequency,
+                    next_active_wspr_plan_frequency_entry,
+                    next_active_wspr_plan_in_progress,
+                    actual_rf_frequency_hz,
+                    next_transmission_request))
+            {
+                if (newer_reload_arrived())
+                {
+                    continue;
+                }
+
+                if (is_managed_persistent_mode())
+                {
+                    set_managed_reload_tx_inhibited(
+                        true,
+                        "Managed reload planning failed. Future transmissions disabled until a valid configuration is loaded.");
+                    send_ws_message("configuration", "reload_failed");
+                    wsprTransmitter.stopAndJoin();
+                    stop_active_transmission_selectors();
+                    current_transmission_request = WsprTransmissionRequest{};
+                    if (!finalize_reload_pending())
+                    {
+                        continue;
+                    }
+                    return true;
+                }
+
+                ini_reload_pending.store(false, std::memory_order_relaxed);
+                config.transmit = false;
+                config_to_json();
+                return false;
+            }
+
+            next_transmission_request.applied_offset_hz = applied_offset_hz;
+
+            if (!prepare_frequency_entry_gpio_or_log(
+                    next_current_frequency_entry,
+                    working_config,
+                    working_config.tx_freq_control_active_high,
+                    ERROR))
+            {
+                stop_active_transmission_selectors();
+
+                if (newer_reload_arrived())
+                {
+                    continue;
+                }
+
+                if (is_managed_persistent_mode())
+                {
+                    set_managed_reload_tx_inhibited(
+                        true,
+                        "Managed reload could not prepare selector GPIO. Future transmissions disabled until a valid configuration is loaded.");
+                    send_ws_message("configuration", "reload_failed");
+                    if (!finalize_reload_pending())
+                    {
+                        continue;
+                    }
+                    return true;
+                }
+
+                ini_reload_pending.store(false, std::memory_order_relaxed);
+                config.transmit = false;
+                config_to_json();
+                return false;
+            }
+
+            if (!prepare_band_gpio_for_frequency_or_log(
+                    next_current_dial_frequency,
+                    working_config))
+            {
+                stop_active_transmission_selectors();
+
+                if (newer_reload_arrived())
+                {
+                    continue;
+                }
+
+                if (is_managed_persistent_mode())
+                {
+                    set_managed_reload_tx_inhibited(
+                        true,
+                        "Managed reload could not prepare band GPIO. Future transmissions disabled until a valid configuration is loaded.");
+                    send_ws_message("configuration", "reload_failed");
+                    if (!finalize_reload_pending())
+                    {
+                        continue;
+                    }
+                    return true;
+                }
+
+                ini_reload_pending.store(false, std::memory_order_relaxed);
+                config.transmit = false;
+                config_to_json();
+                return false;
+            }
+
+            if (newer_reload_arrived())
+            {
+                stop_active_transmission_selectors();
+                continue;
+            }
+
+            if (candidate_ready_to_commit)
+            {
+                prepared_candidate.normalized_config.ppm = working_config.ppm;
+                // Managed reloads are transactional; only fully validated candidates may replace live state. Invalid reloads result in TX being disabled after the current transmission completes.
+                // For managed -i reloads, once a deferred reload is consumed after TX completion, the freshly prepared valid INI candidate must become the sole source of truth for the next scheduling decision; previously committed live config must not override it.
+                commit_config_candidate(prepared_candidate);
+                apply_runtime_config_side_effects();
+                set_managed_reload_tx_inhibited(false);
+                if (reload_requested)
+                {
+                    send_ws_message("configuration", "reload");
+                }
+            }
+            else if (runtime_ppm_changed)
+            {
+                config.ppm = working_config.ppm;
+            }
+
+            if (should_start_ppm)
+            {
+                ppm_init();
+                ppm_reload_pending.store(true, std::memory_order_seq_cst);
+            }
+            else if (should_stop_ppm)
+            {
+                ppmManager.stop();
+                llog.logS(INFO, "PPM Manager disabled.");
+                ppm_reload_pending.store(false, std::memory_order_seq_cst);
+            }
+            else if (should_log_ppm_disabled)
+            {
+                llog.logS(INFO, "PPM Manager disabled.");
+            }
+
+            if (ppm_update_pending)
+            {
+                ppm_reload_pending.store(false, std::memory_order_relaxed);
+            }
+
+            current_dial_frequency = next_current_dial_frequency;
+            current_frequency_entry = next_current_frequency_entry;
+            current_transmission_request = next_transmission_request;
+            freq_iterator = next_freq_iterator;
+            active_wspr_plan = next_active_wspr_plan;
+            active_wspr_frame_index = next_active_wspr_frame_index;
+            active_wspr_plan_dial_frequency = next_active_wspr_plan_dial_frequency;
+            active_wspr_plan_frequency_entry = next_active_wspr_plan_frequency_entry;
+            active_wspr_plan_in_progress = next_active_wspr_plan_in_progress;
+            last_freq = next_current_dial_frequency;
+            last_frequency_entry = next_current_frequency_entry;
+
+            if (suppress_scheduler_execution_for_test)
+            {
+                if (!finalize_reload_pending())
+                {
+                    stop_active_transmission_selectors();
+                    continue;
+                }
+                return true;
+            }
+            commit_execution_request(current_transmission_request);
+        }
+
+        if (runtime_transmit_enabled(config) && (do_config || do_random))
+        {
+            if (do_random)
+            {
+                llog.logS(DEBUG, "New random frequency.");
+            }
+            else
+            {
+                llog.logS(DEBUG, "Setup complete.");
+            }
+            llog.logS(INFO, "Waiting for next transmission window.");
+            wsprTransmitter.startAsync();
+        }
 #ifdef DEBUG_WSPR_TRANSMIT
-    wsprTransmitter.dumpParameters();
+        wsprTransmitter.dumpParameters();
 #endif
+        if (!finalize_reload_pending())
+        {
+            continue;
+        }
+        return true;
+    }
+}
+
+bool managed_reload_tx_inhibited_for_test() noexcept
+{
+    return managed_reload_tx_inhibited;
+}
+
+bool managed_reload_tx_inhibited_state() noexcept
+{
+    return managed_reload_tx_inhibited;
+}
+
+void reset_managed_reload_runtime_for_test() noexcept
+{
+    managed_reload_tx_inhibited = false;
+}
+
+void set_scheduler_execution_suppressed_for_test(bool suppressed) noexcept
+{
+    suppress_scheduler_execution_for_test = suppressed;
+}
+
+WsprTransmissionRequest current_transmission_request_for_test()
+{
+    return current_transmission_request;
 }

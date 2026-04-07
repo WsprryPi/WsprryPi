@@ -1,6 +1,6 @@
 /**
  * @file gpio_output.cpp
- * @brief Handles LED output.
+ * @brief Safe libgpiod-backed GPIO output helper implementation.
  *
  * This project is is licensed under the MIT License. See LICENSE.md
  * for more information.
@@ -29,7 +29,7 @@
 #include "gpio_output.hpp"
 #include <iostream>
 
-// Global instance
+// Global instance for the optional status LED.
 GPIOOutput ledControl;
 
 /**
@@ -46,6 +46,7 @@ GPIOOutput::GPIOOutput() :
     pin_(-1),
     active_high_(true),
     enabled_(false),
+    last_error_(),
     chip_(nullptr)
 {
 }
@@ -72,11 +73,13 @@ GPIOOutput::~GPIOOutput()
  *                    for active-low (sink) logic.
  * @return True if the pin was successfully enabled.
  *
- * @throws std::runtime_error if the GPIO line cannot be obtained or if an error occurs
- *         during configuration.
+ * On failure the function returns false and records a human-readable message
+ * in lastError().
  */
 bool GPIOOutput::enableGPIOPin(int pin, bool active_high)
 {
+    last_error_.clear();
+
     if (enabled_)
     {
         stop();
@@ -128,8 +131,14 @@ bool GPIOOutput::enableGPIOPin(int pin, bool active_high)
     }
     catch (const std::exception& e)
     {
-        throw std::runtime_error(
-            "Error enabling GPIO pin " + std::to_string(pin_) + ": " + e.what());
+        last_error_ =
+            "Error enabling GPIO pin " + std::to_string(pin_) + ": " + e.what();
+        enabled_ = false;
+#if GPIOD_API_MAJOR >= 2
+        request_.reset();
+#endif
+        chip_.reset();
+        return false;
     }
     return enabled_;
 }
@@ -147,6 +156,9 @@ void GPIOOutput::stop()
     if (!enabled_)
     {
         // Clear any stale handles just in case
+#if GPIOD_API_MAJOR >= 2
+        request_.reset();
+#endif
         chip_.reset();
         return;
     }
@@ -173,6 +185,9 @@ void GPIOOutput::stop()
 #endif
 
     enabled_ = false;
+#if GPIOD_API_MAJOR >= 2
+    request_.reset();
+#endif
     chip_.reset();
 }
 
