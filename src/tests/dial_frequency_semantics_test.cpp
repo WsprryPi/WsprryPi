@@ -340,6 +340,42 @@ int main()
             "one-shot startup planning failure must disable transmission");
     }
 
+    {
+        init_config_json();
+        json_to_config();
+        ini_reload_pending.store(false, std::memory_order_relaxed);
+        exiting_wspr.store(false, std::memory_order_relaxed);
+
+        config.use_ini = false;
+        config.mode = ModeType::WSPR;
+        config.transmit = false;
+        config.callsign = "AA0NT";
+        config.grid_square = "EM18";
+        config.power_dbm = 20;
+        config.frequencies = "20m";
+        config.tx_pin = 4;
+
+        require(
+            set_config(true),
+            "disabled WSPR configuration must not fail scheduler setup");
+        require(
+            wsprTransmitter.getState() == WsprTransmitter::State::DISABLED,
+            "disabled WSPR configuration must not arm transmitter hardware");
+    }
+
+    {
+        ini_reload_pending.store(false, std::memory_order_relaxed);
+        exiting_wspr.store(true, std::memory_order_relaxed);
+
+        callback_ini_changed();
+
+        require(
+            !ini_reload_pending.load(std::memory_order_relaxed),
+            "INI reload callback must not queue reload work after shutdown starts");
+
+        exiting_wspr.store(false, std::memory_order_relaxed);
+    }
+
     std::cout << "dial_frequency_semantics_test passed" << std::endl;
     return EXIT_SUCCESS;
 }

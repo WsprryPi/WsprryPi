@@ -144,7 +144,20 @@ std::optional<DirectToneStartupRequest> direct_tone_startup_request;
  */
 void callback_ini_changed()
 {
-    ini_reload_pending.store(true, std::memory_order_relaxed);
+    if (exiting_wspr.load(std::memory_order_acquire))
+    {
+        llog.logS(DEBUG, "Ignoring INI reload while shutdown is in progress.");
+        return;
+    }
+
+    const bool reload_already_pending =
+        ini_reload_pending.exchange(true, std::memory_order_acq_rel);
+    if (reload_already_pending)
+    {
+        llog.logS(DEBUG, "INI reload already pending; suppressing duplicate callback.");
+        return;
+    }
+
     if (wsprTransmitter.getState() == WsprTransmitter::State::TRANSMITTING)
     {
         if (config.transmit)

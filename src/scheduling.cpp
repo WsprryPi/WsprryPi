@@ -178,6 +178,7 @@ std::condition_variable exitwspr_cv;
  * @brief Atomic bool used to signal other functions that we are shutting down.
  */
 std::atomic<bool> exiting_wspr = false;
+static std::mutex set_config_mtx;
 
 /**
  * @brief Flag indicating whether the WSPR loop should terminate.
@@ -1274,11 +1275,12 @@ void end_test_tone()
 
 static void stop_runtime_components_for_early_exit() noexcept
 {
+    ini_reload_pending.store(false, std::memory_order_relaxed);
+    iniMonitor.stop();
     wsprTransmitter.stopAndJoin();
     stop_active_transmission_selectors();
     shutdownMonitor.stop();
     ledControl.stop();
-    iniMonitor.stop();
     ppmManager.stop();
     webServer.stop();
     socketServer.stop();
@@ -1414,6 +1416,11 @@ bool wspr_loop()
     // -------------------------------------------------------------------------
     llog.logS(INFO, "Stopping runtime components.");
 
+    llog.logS(INFO, "Stopping configuration monitor.");
+    ini_reload_pending.store(false, std::memory_order_relaxed);
+    iniMonitor.stop(); // Stop config file monitor before transmitter teardown.
+    llog.logS(INFO, "Configuration monitor stopped.");
+
     llog.logS(INFO, "Stopping transmitter.");
     wsprTransmitter.stopAndJoin(); // Stop the transmitter threads
     llog.logS(INFO, "Transmitter stopped.");
@@ -1431,10 +1438,6 @@ bool wspr_loop()
     llog.logS(INFO, "Stopping LED driver.");
     ledControl.stop(); // Stop LED driver
     llog.logS(INFO, "LED driver stopped.");
-
-    llog.logS(INFO, "Stopping configuration monitor.");
-    iniMonitor.stop(); // Stop config file monitor
-    llog.logS(INFO, "Configuration monitor stopped.");
 
     llog.logS(INFO, "Stopping PPM manager.");
     ppmManager.stop(); // Stop PPM manager (if active)
@@ -1583,10 +1586,18 @@ WsprDialFrequencyEntry next_frequency_entry(bool reset)
  */
 bool set_config(bool force)
 {
+    std::lock_guard<std::mutex> lk(set_config_mtx);
+    auto clear_ini_reload_pending =
+        []
+    {
+        ini_reload_pending.store(false, std::memory_order_relaxed);
+    };
+
     // Exit if we are shutting down
     if (exiting_wspr.load())
     {
         llog.logS(DEBUG, "Exiting set_config() early.");
+        clear_ini_reload_pending();
         return true;
     }
     else
@@ -1622,6 +1633,7 @@ bool set_config(bool force)
                           load_error);
                 config_to_json();
                 json_to_ini();
+                clear_ini_reload_pending();
                 return true;
             }
 
@@ -1658,7 +1670,7 @@ bool set_config(bool force)
                           load_error);
                 config_to_json();
                 json_to_ini();
-                ini_reload_pending.store(false, std::memory_order_relaxed);
+                clear_ini_reload_pending();
                 send_ws_message("configuration", "reload_failed");
                 return true;
             }
@@ -1674,6 +1686,7 @@ bool set_config(bool force)
             llog.logE(ERROR, "Configuration validation failed.");
             config.transmit = false;
             config_to_json();
+            clear_ini_reload_pending();
             return true;
         }
     }
@@ -1741,6 +1754,23 @@ bool set_config(bool force)
     // If we have a change, do setup
     if (do_config || do_random)
     {
+        if (!config.transmit)
+        {
+            wsprTransmitter.stopAndJoin();
+            stop_active_transmission_selectors();
+            current_transmission_request = WsprTransmissionRequest{};
+            clear_ini_reload_pending();
+            llog.logS(INFO, "Transmissions disabled.");
+            return true;
+        }
+
+        if (exiting_wspr.load(std::memory_order_acquire))
+        {
+            llog.logS(DEBUG, "Aborting reconfiguration because shutdown is in progress.");
+            clear_ini_reload_pending();
+            return true;
+        }
+
         const double base_actual_rf_frequency_hz = resolve_actual_rf_frequency_hz(
             current_dial_frequency,
             config.wspr_audio_offset_hz,
@@ -1766,6 +1796,7 @@ bool set_config(bool force)
         {
             config.transmit = false;
             config_to_json();
+            clear_ini_reload_pending();
             return is_managed_persistent_mode();
         }
         current_transmission_request.applied_offset_hz = applied_offset_hz;
@@ -1778,6 +1809,7 @@ bool set_config(bool force)
             stop_active_transmission_selectors();
             config.transmit = false;
             config_to_json();
+            clear_ini_reload_pending();
             return is_managed_persistent_mode();
         }
 
@@ -1789,6 +1821,7 @@ bool set_config(bool force)
                       " MHz.");
             config.transmit = false;
             config_to_json();
+            clear_ini_reload_pending();
             return is_managed_persistent_mode();
         }
     }
@@ -1807,12 +1840,9 @@ bool set_config(bool force)
         llog.logS(INFO, "Waiting for next transmission window.");
         wsprTransmitter.startAsync();
     }
-    else if (!config.transmit && (do_config || do_random))
-    {
-        llog.logS(INFO, "Transmissions disabled.");
-    }
 #ifdef DEBUG_WSPR_TRANSMIT
     wsprTransmitter.dumpParameters();
 #endif
+    clear_ini_reload_pending();
     return true;
 }
