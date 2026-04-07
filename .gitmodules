@@ -22,9 +22,6 @@
 [submodule "src/Singleton"]
 	path = src/Singleton
 	url = https://github.com/WsprryPi/Singleton.git
-[submodule "src/WSPR-Message"]
-	path = src/WSPR-Message
-	url = https://github.com/WsprryPi/WSPR-Message.git
 [submodule "src/WSPR-Transmitter"]
 	path = src/WSPR-Transmitter
 	url = https://github.com/WsprryPi/WSPR-Transmitter.git
