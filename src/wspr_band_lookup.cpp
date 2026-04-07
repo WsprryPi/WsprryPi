@@ -75,10 +75,6 @@ namespace
     // Built-in WSPR aliases are user-facing USB dial frequencies.
     // The scheduler converts dial frequency to actual RF exactly once before
     // configuring the RF-only transmitter/backend layer.
-    //
-    // TODO: Numeric configs may already contain actual RF values from older
-    // versions or user workarounds. This patch does not auto-detect or migrate
-    // those entries.
     constexpr double FREQ_2200M = 136000.0;
     constexpr double FREQ_2200M_15 = 136112.5;
     constexpr double FREQ_630M = 474200.0;
