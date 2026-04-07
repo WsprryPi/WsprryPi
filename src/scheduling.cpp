@@ -1815,10 +1815,12 @@ bool set_config(bool force)
 
         const bool ppm_update_pending =
             ppm_reload_pending.load(std::memory_order_acquire);
+        bool runtime_ppm_changed = false;
         if (ppm_update_pending)
         {
             working_config.ppm = ppmManager.getCurrentPPM();
             llog.logS(INFO, "PPM updated:", working_config.ppm);
+            runtime_ppm_changed = true;
             do_config = true;
         }
 
@@ -1886,6 +1888,7 @@ bool set_config(bool force)
 
                 if (candidate_ready_to_commit)
                 {
+                    prepared_candidate.normalized_config.ppm = working_config.ppm;
                     // Managed reloads are transactional; only fully validated candidates may replace live state. Invalid reloads result in TX being disabled after the current transmission completes.
                     // For managed -i reloads, once a deferred reload is consumed after TX completion, the freshly prepared valid INI candidate must become the sole source of truth for the next scheduling decision; previously committed live config must not override it.
                     commit_config_candidate(prepared_candidate);
@@ -1895,6 +1898,10 @@ bool set_config(bool force)
                     {
                         send_ws_message("configuration", "reload");
                     }
+                }
+                else if (runtime_ppm_changed)
+                {
+                    config.ppm = working_config.ppm;
                 }
 
                 if (should_start_ppm)
@@ -2079,6 +2086,7 @@ bool set_config(bool force)
 
             if (candidate_ready_to_commit)
             {
+                prepared_candidate.normalized_config.ppm = working_config.ppm;
                 // Managed reloads are transactional; only fully validated candidates may replace live state. Invalid reloads result in TX being disabled after the current transmission completes.
                 // For managed -i reloads, once a deferred reload is consumed after TX completion, the freshly prepared valid INI candidate must become the sole source of truth for the next scheduling decision; previously committed live config must not override it.
                 commit_config_candidate(prepared_candidate);
@@ -2088,6 +2096,10 @@ bool set_config(bool force)
                 {
                     send_ws_message("configuration", "reload");
                 }
+            }
+            else if (runtime_ppm_changed)
+            {
+                config.ppm = working_config.ppm;
             }
 
             if (should_start_ppm)

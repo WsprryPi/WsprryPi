@@ -882,6 +882,44 @@ int main()
     }
 
     {
+        init_config_json();
+        json_to_config();
+        ini_reload_pending.store(false, std::memory_order_relaxed);
+        ppm_reload_pending.store(false, std::memory_order_relaxed);
+        exiting_wspr.store(false, std::memory_order_relaxed);
+        reset_managed_reload_runtime_for_test();
+        set_scheduler_execution_suppressed_for_test(true);
+
+        config.use_ini = false;
+        config.mode = ModeType::WSPR;
+        config.transmit = true;
+        config.callsign = "AA0NT";
+        config.grid_square = "EM18";
+        config.power_dbm = 20;
+        config.frequencies = "20m";
+        config.tx_pin = 4;
+        config.ppm = 12.5;
+        set_frequencies(config);
+
+        ppm_reload_pending.store(true, std::memory_order_relaxed);
+
+        require(
+            set_config(true),
+            "pending runtime PPM update must be consumable during scheduler commit");
+        require(
+            nearly_equal(current_transmission_request_for_test().ppm, 0.0),
+            "committed request must consume the current PPM manager value");
+        require(
+            nearly_equal(config.ppm, current_transmission_request_for_test().ppm),
+            "live runtime config must retain the committed PPM for later requests");
+        require(
+            !ppm_reload_pending.load(std::memory_order_relaxed),
+            "consumed runtime PPM update must clear the pending flag");
+
+        set_scheduler_execution_suppressed_for_test(false);
+    }
+
+    {
         PreparedConfigCandidate candidate;
         iniFile.setData(
             make_managed_ini_data("W1AW", "FN31", "80m", false));
