@@ -1,14 +1,20 @@
 #!/usr/bin/env bash
-
-# -----------------------------------------------------------------------------
-# @brief Prevent accidental push to main or master without PR
-# -----------------------------------------------------------------------------
-
-echo "[githook: pre-push] Checking for improper push."
+set -u
+set -o pipefail
 
 branch=$(git symbolic-ref --short HEAD)
 
 if [[ "$branch" == "main" || "$branch" == "master" ]]; then
-    echo "Error: Pushing directly to $branch is disabled. Use a PR instead."
+    printf "[pre-push] ERROR: Direct push to %s blocked\n" "$branch" >&2
     exit 1
 fi
+
+cd "$(git rev-parse --show-toplevel)" || exit 1
+source ".githooks/lib/common.sh"
+
+log "[pre-push] Validating submodules before push"
+
+validate_submodules || {
+    log "[pre-push] BLOCKED: Submodule state invalid"
+    exit 1
+}

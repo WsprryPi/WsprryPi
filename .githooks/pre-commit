@@ -1,127 +1,19 @@
 #!/usr/bin/env bash
+set -u
+set -o pipefail
 
-# -----------------------------------------------------------------------------
-# @brief Git pre-commit hook to check for debug symbols in staged files when
-#        on the 'main' branch, with exclusion support, and always check for
-#        merge conflict markers.
-# -----------------------------------------------------------------------------
+cd "$(git rev-parse --show-toplevel)" || exit 1
+source ".githooks/lib/common.sh"
 
-# -----------------------------------------------------------------------------
-# @var DEBUG_PATTERNS
-# @brief Array of debug patterns to search for in staged files.
-# -----------------------------------------------------------------------------
-DEBUG_PATTERNS=("DEBUG" "std::cerr" "console\.log" "print\\(")
+log "[pre-commit] Validating submodules"
 
-# -----------------------------------------------------------------------------
-# @var ALLOWED_EXTENSIONS
-# @brief Array of file extensions to check (without the leading dot).
-# -----------------------------------------------------------------------------
-ALLOWED_EXTENSIONS=("c" "h" "cpp" "hpp" "py" "sh" "js" "php" "html" "css")
-
-# -----------------------------------------------------------------------------
-# @var EXCLUDED_PATTERNS
-# @brief Pattern to exclude safe debug usage.
-# -----------------------------------------------------------------------------
-EXCLUDED_PATTERNS='\(DEBUG,'
-
-# -----------------------------------------------------------------------------
-# @brief Build a single grep pattern from the DEBUG_PATTERNS array.
-# @return The combined grep regex.
-# -----------------------------------------------------------------------------
-build_debug_pattern() {
-    local pattern=""
-    for item in "${DEBUG_PATTERNS[@]}"; do
-        if [[ -z "$pattern" ]]; then
-            pattern="$item"
-        else
-            pattern="$pattern|$item"
-        fi
-    done
-    echo "$pattern"
+validate_submodules || {
+    log "[pre-commit] BLOCKED: Submodule state invalid"
+    exit 1
 }
 
-# -----------------------------------------------------------------------------
-# @brief Build a single grep pattern from the ALLOWED_EXTENSIONS array.
-# @return The combined grep regex for file extensions.
-# -----------------------------------------------------------------------------
-build_extension_pattern() {
-    local pattern=""
-    for ext in "${ALLOWED_EXTENSIONS[@]}"; do
-        if [[ -z "$pattern" ]]; then
-            pattern="\.${ext}$"
-        else
-            pattern="$pattern|\.${ext}$"
-        fi
-    done
-    echo "$pattern"
-}
-
-# -----------------------------------------------------------------------------
-# @brief Check for debug symbols in staged files with allowed extensions.
-#        Only runs when on the 'main' branch.
-# -----------------------------------------------------------------------------
-check_debug_symbols_if_on_main() {
-    local current_branch
-    current_branch=$(git rev-parse --abbrev-ref HEAD)
-
-    if [[ "$current_branch" != "main" ]]; then
-        return 0
-    fi
-
-    local extension_pattern
-    extension_pattern=$(build_extension_pattern)
-
-    # Get staged files with allowed extensions
-    local staged_files
-    staged_files=$(git diff --cached --name-only | grep -E "($extension_pattern)")
-
-    if [[ -z "$staged_files" ]]; then
-        return 0
-    fi
-
-    local debug_pattern
-    debug_pattern=$(build_debug_pattern)
-
-    # Extract staged diffs for allowed files
-    local staged_diff
-    staged_diff=$(git diff --cached -- $staged_files)
-
-    # Check added lines for debug patterns, excluding allowed patterns
-    local bad_lines
-    bad_lines=$(echo "$staged_diff" | grep -E "^\+.*($debug_pattern)" | grep -vE "$EXCLUDED_PATTERNS")
-
-    if [[ -n "$bad_lines" ]]; then
-        echo "[githook: pre-commit] Error: Debug code detected in staged files on 'main' branch (excluding allowed patterns). Please remove it before committing."
-        echo "$bad_lines"
-        exit 1
-    fi
-}
-
-# -----------------------------------------------------------------------------
-# @brief Check for unresolved merge conflict markers in all staged files.
-# -----------------------------------------------------------------------------
-check_merge_conflicts() {
-    if git diff --cached | grep -E '^[<=>]{7}' > /dev/null; then
-        echo "[githook: pre-commit] Error: Merge conflict markers detected. Please resolve them before committing."
-        exit 1
-    fi
-}
-
-# -----------------------------------------------------------------------------
-# @brief Main execution logic for the pre-commit hook.
-# -----------------------------------------------------------------------------
-main() {
-    echo "[githook: pre-commit] Checking for debug symbols and conflict markers."
-
-    if git diff --cached --name-only | grep -q '^.githooks/'; then
-        echo "[githook: pre-commit] Skipping checks for .githooks/*"
-        exit 0
-    fi
-
-    check_debug_symbols_if_on_main
-    check_merge_conflicts
-
-    exit 0
-}
-
-main "$@"
+# Check merge conflicts
+if git diff --cached | grep -E '^[<=>]{7}' > /dev/null; then
+    log "[pre-commit] ERROR: Merge conflict markers detected"
+    exit 1
+fi

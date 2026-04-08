@@ -1,115 +1,18 @@
 #!/usr/bin/env bash
-
-# -----------------------------------------------------------------------------
-# @brief Hook run after a checkout to synch modules
-# -----------------------------------------------------------------------------
-
 set -u
 set -o pipefail
 
-: "${GIT_HOOKS_ASSUME_YES:=}"   # non-empty to auto-yes prompts
+checkout_type="${3:-0}"
 
-# Quiet helper: print to stderr
-log() { printf "%s\n" "$*" >&2; }
+# Only run on branch checkout
+[[ "$checkout_type" != "1" ]] && exit 0
 
-# Submodule maintenance: sync -> init/update -> clean
-sync_and_clean_submodules() {
-    git submodule sync --recursive >/dev/null 2>&1 || return $?
-    git submodule update --init --recursive >/dev/null 2>&1 || return $?
-    git submodule foreach --recursive '
-        git clean -xfd >/dev/null 2>&1
-        if [ -f Makefile ]; then
-            make clean >/dev/null 2>&1 || true
-        elif [ -f src/Makefile ]; then
-            make -C src clean >/dev/null 2>&1 || true
-        fi
-    ' >/dev/null 2>&1 || true
+cd "$(git rev-parse --show-toplevel)" || exit 1
+source ".githooks/lib/common.sh"
+
+log "[post-checkout] Updating submodules"
+
+sync_submodules || {
+    log "[post-checkout] FAILED to sync submodules"
+    exit 1
 }
-
-# Get submodule paths present in a given tree-ish (NUL-separated)
-list_submodules_in_tree() {
-    git ls-tree -z "$1" | \
-        awk -v RS='\0' -v ORS='\0' '{ if ($1 ~ /^160000$/) { print $4 "\0" } }'
-}
-
-# TTY-safe yes/no prompt with CI override
-prompt_yes() {
-    local msg="$1"
-    local ans
-
-    # CI/automation override
-    if [ -n "${GIT_HOOKS_ASSUME_YES}" ]; then
-        return 0
-    fi
-
-    if [ -t 0 ]; then
-        read -rp "$msg [y/N] " ans
-    else
-        if [ -r /dev/tty ]; then
-            # shellcheck disable=SC2162
-            read -p "$msg [y/N] " ans < /dev/tty
-        else
-            return 1
-        fi
-    fi
-    case "${ans:-}" in
-        y|Y|yes|YES) return 0 ;;
-        *) return 1 ;;
-    esac
-}
-
-clean_obsolete_submodules() {
-    local prev_ref="$1"
-    local new_ref="$2"
-
-    # If prev_ref is empty/unborn, nothing to compare
-    if [ -z "${prev_ref:-}" ] || [ "$prev_ref" = "0000000000000000000000000000000000000000" ]; then
-        return 0
-    fi
-
-    mapfile -d '' removed_paths < <(
-        git diff --name-only -z --diff-filter=D "$prev_ref" "$new_ref" 2>/dev/null || true
-    )
-
-    declare -A prev_subs=()
-    while IFS= read -r -d '' p; do
-        [[ -n "${p:-}" ]] || continue
-        prev_subs["$p"]=1
-    done < <(list_submodules_in_tree "$prev_ref")
-
-    for p in "${removed_paths[@]:-}"; do
-        [[ -n "${p:-}" ]] || continue
-        if [[ -n "${prev_subs[$p]:-}" ]]; then
-            if [ -d "$p" ]; then
-                log "[post-checkout] Submodule directory '$p' no longer tracked in this branch."
-                if prompt_yes "Delete directory '$p'?"; then
-                    rm -rf -- "$p"
-                    log "Deleted $p."
-                else
-                    log "Skipped deleting $p."
-                fi
-            fi
-        fi
-    done
-}
-
-main() {
-    local prev_ref="${1:-}"
-    local new_ref="${2:-}"
-    local checkout_type="${3:-0}" # 1 = branch, 0 = file
-
-    # Only on branch switches
-    case "$checkout_type" in
-      1) ;;           # branch checkout → do work
-      0) exit 0 ;;    # file checkout → skip
-      *) ;;           # unknown → proceed conservatively
-    esac
-
-    cd "$(git rev-parse --show-toplevel)" || exit 0
-
-    sync_and_clean_submodules || true
-    clean_obsolete_submodules "$prev_ref" "$new_ref" || true
-}
-
-main "$@"
-exit 0
