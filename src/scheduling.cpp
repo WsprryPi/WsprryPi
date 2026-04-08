@@ -432,6 +432,31 @@ static PreparedWsprTransmission slot_plan_for_frame(
     slot_plan.plan_type = plan.plan_type;
     slot_plan.callsign = plan.callsign;
     slot_plan.locator = plan.locator;
+    slot_plan.callsign_raw = plan.callsign_raw;
+    slot_plan.locator_raw = plan.locator_raw;
+    slot_plan.callsign_normalized = plan.callsign_normalized;
+    slot_plan.locator_normalized = plan.locator_normalized;
+    slot_plan.frame_callsigns = plan.frame_callsigns;
+    slot_plan.frame_locators = plan.frame_locators;
+    slot_plan.total_frame_count =
+        plan.total_frame_count != 0U ? plan.total_frame_count : plan.frameCount();
+    slot_plan.current_frame = frame_index + 1U;
+    if (frame_index < plan.frame_callsigns.size())
+    {
+        slot_plan.frame_callsign = plan.frame_callsigns.at(frame_index);
+    }
+    else
+    {
+        slot_plan.frame_callsign = plan.callsign_normalized;
+    }
+    if (frame_index < plan.frame_locators.size())
+    {
+        slot_plan.frame_locator = plan.frame_locators.at(frame_index);
+    }
+    else
+    {
+        slot_plan.frame_locator = plan.locator_normalized;
+    }
     slot_plan.power_dbm = plan.power_dbm;
     slot_plan.frames.push_back(plan.frames.at(frame_index));
     return slot_plan;
@@ -696,7 +721,9 @@ static bool configure_current_wspr_transmission(
     {
         PreparedWsprTransmission plan;
         PreparedWsprTransmission slot_plan;
-        bool paired_requested = cfg.require_paired_plan;
+        const wspr::TransmissionPlanPreference preference =
+            wspr_planner_preference_to_plan_preference(
+                cfg.wspr_planner_preference);
         bool auto_upgraded = false;
 
         if (active_plan_in_progress)
@@ -716,7 +743,7 @@ static bool configure_current_wspr_transmission(
         }
         else
         {
-            if (paired_requested)
+            if (cfg.wspr_planner_preference == WsprPlannerPreference::RequirePaired)
             {
                 llog.logS(INFO,
                           "Paired WSPR planning explicitly requested.");
@@ -732,13 +759,19 @@ static bool configure_current_wspr_transmission(
                 const bool paired_upgrade_eligible =
                     is_auto_paired_upgrade_eligible(cfg);
 
+                if (cfg.wspr_planner_preference == WsprPlannerPreference::PreferPaired)
+                {
+                    llog.logS(INFO,
+                              "Paired WSPR planning preferred when available.");
+                }
+
                 try
                 {
                     plan = build_prepared_wspr_transmission(
                         cfg.callsign,
                         cfg.grid_square,
                         cfg.power_dbm,
-                        wspr::TransmissionPlanPreference::Auto);
+                        preference);
                 }
                 catch (const std::exception &)
                 {
@@ -761,7 +794,8 @@ static bool configure_current_wspr_transmission(
                     auto_upgraded = true;
                 }
 
-                if (!auto_upgraded &&
+                if (cfg.wspr_planner_preference == WsprPlannerPreference::Auto &&
+                    !auto_upgraded &&
                     plan.frameCount() <= 1U &&
                     paired_upgrade_eligible)
                 {
@@ -810,8 +844,8 @@ static bool configure_current_wspr_transmission(
                   plan.plan_type,
                   ", frames: ",
                   static_cast<int>(plan.frames.size()),
-                  ", paired requested: ",
-                  paired_requested ? "true" : "false",
+                  ", preference: ",
+                  wspr_planner_preference_to_string(cfg.wspr_planner_preference),
                   ", auto-upgraded: ",
                   auto_upgraded ? "true" : "false",
                   ".");
@@ -1664,6 +1698,21 @@ void send_ws_message(std::string type, std::string state)
     j["type"] = type;
     j["state"] = state;
 
+    if (type == "transmit")
+    {
+        const WsprRuntimeStatusSnapshot snapshot = current_tx_runtime_status_snapshot();
+        j["tx_state"] = snapshot.tx_state;
+        j["plan_type"] = snapshot.plan_type;
+        j["frame_count"] = snapshot.frame_count;
+        j["current_frame"] = snapshot.current_frame;
+        j["callsign_raw"] = snapshot.callsign_raw;
+        j["callsign_normalized"] = snapshot.callsign_normalized;
+        j["locator_raw"] = snapshot.locator_raw;
+        j["locator_normalized"] = snapshot.locator_normalized;
+        j["frame_callsign"] = snapshot.frame_callsign;
+        j["frame_locator"] = snapshot.frame_locator;
+    }
+
     // Capture current UTC time and format as ISO 8601 (YYYY-MM-DDThh:mm:ssZ)
     auto now = std::chrono::system_clock::now();
     auto now_t = std::chrono::system_clock::to_time_t(now);
@@ -1677,6 +1726,38 @@ void send_ws_message(std::string type, std::string state)
     // Serialize and send to all WebSocket clients
     const std::string message = j.dump();
     socketServer.sendAllClients(message);
+}
+
+WsprRuntimeStatusSnapshot current_tx_runtime_status_snapshot()
+{
+    std::lock_guard<std::mutex> lk(set_config_mtx);
+
+    WsprRuntimeStatusSnapshot snapshot;
+    snapshot.tx_state = wsprTransmitter.stateToStringLower(
+        wsprTransmitter.getState());
+
+    if (current_transmission_request.mode != WsprTransmissionMode::WSPR ||
+        current_transmission_request.wspr_plan.empty())
+    {
+        return snapshot;
+    }
+
+    const PreparedWsprTransmission &plan = current_transmission_request.wspr_plan;
+    snapshot.plan_type = plan.plan_type;
+    snapshot.frame_count =
+        plan.total_frame_count != 0U ? plan.total_frame_count : plan.frameCount();
+    snapshot.current_frame = plan.current_frame;
+    snapshot.callsign_raw = plan.callsign_raw;
+    snapshot.callsign_normalized =
+        !plan.callsign_normalized.empty() ? plan.callsign_normalized : plan.callsign;
+    snapshot.locator_raw = plan.locator_raw;
+    snapshot.locator_normalized =
+        !plan.locator_normalized.empty() ? plan.locator_normalized : plan.locator;
+    snapshot.frame_callsign =
+        !plan.frame_callsign.empty() ? plan.frame_callsign : snapshot.callsign_normalized;
+    snapshot.frame_locator =
+        !plan.frame_locator.empty() ? plan.frame_locator : snapshot.locator_normalized;
+    return snapshot;
 }
 
 /**

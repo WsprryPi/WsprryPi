@@ -37,9 +37,11 @@
 #include "band_gpio.hpp"
 #include "ini_file.hpp"
 #include "json.hpp"
+#include "wspr_ref_plan.hpp"
 
 #include <array>
 #include <atomic>
+#include <stdexcept>
 #include <string>
 #include <vector>
 
@@ -103,6 +105,46 @@ enum class ModeType
     TONE  ///< Test tone generation mode
 };
 
+enum class WsprPlannerPreference
+{
+    Auto = 0,
+    PreferPaired,
+    RequirePaired
+};
+
+inline constexpr const char *wspr_planner_preference_to_string(
+    WsprPlannerPreference preference) noexcept
+{
+    switch (preference)
+    {
+    case WsprPlannerPreference::Auto:
+        return "auto";
+    case WsprPlannerPreference::PreferPaired:
+        return "prefer_paired";
+    case WsprPlannerPreference::RequirePaired:
+        return "require_paired";
+    }
+
+    return "auto";
+}
+
+inline constexpr wspr::TransmissionPlanPreference
+wspr_planner_preference_to_plan_preference(
+    WsprPlannerPreference preference) noexcept
+{
+    switch (preference)
+    {
+    case WsprPlannerPreference::Auto:
+        return wspr::TransmissionPlanPreference::Auto;
+    case WsprPlannerPreference::PreferPaired:
+        return wspr::TransmissionPlanPreference::PreferPaired;
+    case WsprPlannerPreference::RequirePaired:
+        return wspr::TransmissionPlanPreference::RequirePaired;
+    }
+
+    return wspr::TransmissionPlanPreference::Auto;
+}
+
 /**
  * @brief Global configuration instance for argument parsing and runtime settings.
  *
@@ -141,7 +183,7 @@ struct ArgParserConfig
     // Command line only
     bool use_journald;              ///< Route logs to journald instead of streams.
     bool date_time_log;             ///< Prefix logs with timestamp.
-    bool require_paired_plan;       ///< Request paired WSPR planning from the encoder.
+    WsprPlannerPreference wspr_planner_preference; ///< Preferred planner behavior for Type 2/3 pairing.
     bool loop_tx;                   ///< Repeat transmission cycle.
     std::atomic<int> tx_iterations; ///< Number of transmission iterations (0 = infinite).
     double wspr_audio_offset_hz;    ///< Audio offset added to WSPR dial frequencies to derive RF.
@@ -179,7 +221,7 @@ struct ArgParserConfig
           shutdown_pin(-1),
           use_journald(false),
           date_time_log(false),
-          require_paired_plan(false),
+          wspr_planner_preference(WsprPlannerPreference::Auto),
           loop_tx(false),
           tx_iterations(0),
           wspr_audio_offset_hz(1500.0),
@@ -225,7 +267,7 @@ struct ArgParserConfig
         shutdown_pin = other.shutdown_pin;
         use_journald = other.use_journald;
         date_time_log = other.date_time_log;
-        require_paired_plan = other.require_paired_plan;
+        wspr_planner_preference = other.wspr_planner_preference;
         loop_tx = other.loop_tx;
         tx_iterations.store(other.tx_iterations.load());
         wspr_audio_offset_hz = other.wspr_audio_offset_hz;
@@ -256,7 +298,27 @@ struct PreparedConfigCandidate
     bool valid = false;
     bool transmit_enabled = false;
     std::string error_reason{};
+    nlohmann::json error_details{};
     std::vector<std::string> warnings{};
+};
+
+class ConfigValidationError : public std::runtime_error
+{
+public:
+    explicit ConfigValidationError(
+        const std::string &message,
+        nlohmann::json details = {})
+        : std::runtime_error(message), details_(std::move(details))
+    {
+    }
+
+    const nlohmann::json &details() const noexcept
+    {
+        return details_;
+    }
+
+private:
+    nlohmann::json details_{};
 };
 
 void init_default_config();

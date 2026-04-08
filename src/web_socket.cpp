@@ -346,9 +346,25 @@ void WebSocketServer::handleMessage(const std::string &raw_message)
         else if (cmd == "get_tx_state")
         {
             llog.logS(DEBUG, "Received JSON get_tx_state command.");
-            // Report current TX state
-            reply["tx_state"] = wsprTransmitter.stateToStringLower(
-                wsprTransmitter.getState());
+            const WsprRuntimeStatusSnapshot snapshot =
+                current_tx_runtime_status_snapshot();
+            reply["tx_state"] = snapshot.tx_state;
+            reply["plan_type"] = snapshot.plan_type;
+            reply["frame_count"] = snapshot.frame_count;
+            reply["current_frame"] = snapshot.current_frame;
+            reply["callsign_raw"] = snapshot.callsign_raw;
+            reply["callsign_normalized"] = snapshot.callsign_normalized;
+            reply["locator_raw"] = snapshot.locator_raw;
+            reply["locator_normalized"] = snapshot.locator_normalized;
+            reply["frame_callsign"] = snapshot.frame_callsign;
+            reply["frame_locator"] = snapshot.frame_locator;
+            auto now = std::chrono::system_clock::now();
+            auto now_t = std::chrono::system_clock::to_time_t(now);
+            std::tm tm_utc{};
+            gmtime_r(&now_t, &tm_utc);
+            std::ostringstream oss;
+            oss << std::put_time(&tm_utc, "%Y-%m-%dT%H:%M:%SZ");
+            reply["timestamp"] = oss.str();
         }
         else if (cmd == "tone_start")
         {

@@ -59,9 +59,13 @@ namespace
         const std::string &callsign,
         const std::string &grid_square,
         const std::string &frequency,
-        bool transmit)
+        bool transmit,
+        WsprPlannerPreference planner_preference = WsprPlannerPreference::Auto)
     {
-        return {
+        auto data = std::map<std::string, std::unordered_map<std::string, std::string>>{
+            {"Meta",
+             {{"Planner Preference",
+               wspr_planner_preference_to_string(planner_preference)}}},
             {"Control", {{"Transmit", transmit ? "true" : "false"}}},
             {"Common",
              {{"Call Sign", callsign},
@@ -82,6 +86,7 @@ namespace
               {"Socket Port", "-1"},
               {"Use Shutdown", "false"},
               {"Shutdown Button", "-1"}}}};
+        return data;
     }
 
     void write_managed_ini_file(
@@ -102,6 +107,137 @@ namespace
         }
 
         require(static_cast<bool>(out), "managed INI regression helper must write temp INI file");
+    }
+
+    void prime_valid_runtime_identity_config()
+    {
+        init_default_config();
+        config.use_ini = false;
+        config.mode = ModeType::WSPR;
+        config.transmit = true;
+        config.callsign = "AA0NT";
+        config.grid_square = "EM18";
+        config.power_dbm = 20;
+        config.frequencies = "20m";
+        config.tx_pin = 4;
+        config.wspr_planner_preference = WsprPlannerPreference::Auto;
+        config_to_json();
+    }
+
+    nlohmann::json make_identity_patch(
+        const std::string &callsign,
+        const std::string &grid_square,
+        WsprPlannerPreference planner_preference = WsprPlannerPreference::Auto)
+    {
+        return {
+            {"Meta",
+             {{"Planner Preference",
+               wspr_planner_preference_to_string(planner_preference)}}},
+            {"Control", {{"Transmit", true}}},
+            {"Common",
+             {{"Call Sign", callsign},
+              {"Grid Square", grid_square},
+              {"TX Power", 20},
+              {"Frequency", "20m"}}}};
+    }
+
+    void reset_runtime_planning_state_for_identity_test()
+    {
+        ini_reload_pending.store(false, std::memory_order_relaxed);
+        ppm_reload_pending.store(false, std::memory_order_relaxed);
+        exiting_wspr.store(false, std::memory_order_relaxed);
+        reset_managed_reload_runtime_for_test();
+        set_scheduler_execution_suppressed_for_test(true);
+    }
+
+    void finish_runtime_planning_state_for_identity_test()
+    {
+        set_scheduler_execution_suppressed_for_test(false);
+    }
+
+    void require_patch_accepts_and_runtime_plans(
+        const nlohmann::json &patch,
+        const std::string &expected_plan_type,
+        const std::string &expected_callsign,
+        const std::string &expected_locator,
+        const std::string &message,
+        std::size_t expected_frame_count = 1U,
+        std::size_t expected_current_frame = 1U,
+        const std::string &expected_frame_callsign = std::string(),
+        const std::string &expected_frame_locator = std::string())
+    {
+        prime_valid_runtime_identity_config();
+        patch_all_from_web(patch);
+
+        reset_runtime_planning_state_for_identity_test();
+        require(set_config(true), message + " must succeed during scheduler planning");
+        const WsprTransmissionRequest request = current_transmission_request_for_test();
+        require(
+            request.mode == WsprTransmissionMode::WSPR,
+            message + " must commit a WSPR execution request");
+        require(
+            request.wspr_plan.plan_type == expected_plan_type,
+            message + " must commit the expected plan type");
+        require(
+            request.wspr_plan.callsign == expected_callsign,
+            message + " must commit the normalized callsign expected by runtime planning");
+        require(
+            request.wspr_plan.locator == expected_locator,
+            message + " must commit the normalized locator expected by runtime planning");
+
+        const WsprRuntimeStatusSnapshot snapshot =
+            current_tx_runtime_status_snapshot();
+        require(
+            snapshot.plan_type == expected_plan_type,
+            message + " must expose the expected runtime plan type");
+        require(
+            snapshot.frame_count == expected_frame_count &&
+                snapshot.current_frame == expected_current_frame,
+            message + " must expose the expected runtime frame progress");
+        require(
+            snapshot.callsign_normalized == expected_callsign &&
+                snapshot.locator_normalized == expected_locator &&
+                snapshot.frame_callsign ==
+                    (expected_frame_callsign.empty() ? expected_callsign : expected_frame_callsign) &&
+                snapshot.frame_locator ==
+                    (expected_frame_locator.empty() ? expected_locator : expected_frame_locator),
+            message + " must expose normalized runtime identity metadata");
+        finish_runtime_planning_state_for_identity_test();
+    }
+
+    void require_patch_rejects_with_plan_status(
+        const nlohmann::json &patch,
+        const std::string &expected_plan_status,
+        const std::string &message)
+    {
+        prime_valid_runtime_identity_config();
+        const std::string original_callsign = config.callsign;
+        const std::string original_locator = config.grid_square;
+        const WsprPlannerPreference original_planner_preference =
+            config.wspr_planner_preference;
+
+        bool threw = false;
+        try
+        {
+            patch_all_from_web(patch);
+        }
+        catch (const ConfigValidationError &e)
+        {
+            threw = true;
+            require(
+                e.details().is_object(),
+                message + " must expose structured planner validation details");
+            require(
+                e.details().value("plan_status", "") == expected_plan_status,
+                message + " must report the expected planner status");
+        }
+
+        require(threw, message + " must be rejected at config acceptance time");
+        require(
+            config.callsign == original_callsign &&
+                config.grid_square == original_locator &&
+                config.wspr_planner_preference == original_planner_preference,
+            message + " must not mutate live config after rejection");
     }
 } // namespace
 
@@ -931,6 +1067,258 @@ int main()
             candidate.normalized_config.callsign == "W1AW" &&
                 candidate.normalized_config.grid_square == "FN31",
             "prepared INI candidate must carry normalized configuration without mutating live config");
+    }
+
+    {
+        require_patch_accepts_and_runtime_plans(
+            make_identity_patch("AA0NT", "EM18"),
+            "Type1Single",
+            "AA0NT",
+            "EM18",
+            "valid Type 1 config patch");
+    }
+
+    {
+        require_patch_accepts_and_runtime_plans(
+            make_identity_patch("AA0NT/12", "EM18"),
+            "Type2Single",
+            "AA0NT/12",
+            "EM18",
+            "valid compound Type 2 config patch");
+    }
+
+    {
+        require_patch_accepts_and_runtime_plans(
+            make_identity_patch("<AA0NT>", "EM18IG"),
+            "Type3Single",
+            "<AA0NT>",
+            "EM18IG",
+            "valid explicit Type 3 config patch");
+    }
+
+    {
+        require_patch_accepts_and_runtime_plans(
+            make_identity_patch("AA0NT/12", "EM18IG"),
+            "Type2Type3Paired",
+            "AA0NT/12",
+            "EM18IG",
+            "valid compound callsign with 6-character locator config patch",
+            2U,
+            1U,
+            "AA0NT/12",
+            "EM18");
+    }
+
+    {
+        require_patch_rejects_with_plan_status(
+            make_identity_patch("<AA0NT>", "EM18"),
+            "Type3RequiresSixCharLocator",
+            "explicit Type 3 config patch with only a 4-character locator");
+    }
+
+    {
+        prime_valid_runtime_identity_config();
+        patch_all_from_web(make_identity_patch("aa0nt/12", "em18"));
+        require(
+            config.callsign == "AA0NT/12" &&
+                config.grid_square == "EM18",
+            "lowercase callsign and locator must be normalized during config acceptance");
+
+        reset_runtime_planning_state_for_identity_test();
+        require(
+            set_config(true),
+            "lowercase identity patch must still succeed during scheduler planning");
+        const WsprTransmissionRequest request = current_transmission_request_for_test();
+        require(
+            request.wspr_plan.plan_type == "Type2Single" &&
+                request.wspr_plan.callsign == "AA0NT/12" &&
+                request.wspr_plan.locator == "EM18",
+            "runtime planning must agree with config-boundary normalization for lowercase identities");
+        finish_runtime_planning_state_for_identity_test();
+    }
+
+    {
+        prime_valid_runtime_identity_config();
+        patch_all_from_web(make_identity_patch("  aa0nt  ", "  em18  "));
+        require(
+            config.callsign == "AA0NT" &&
+                config.grid_square == "EM18",
+            "whitespace-surrounded identities must be trimmed and normalized in durable config");
+
+        reset_runtime_planning_state_for_identity_test();
+        require(
+            set_config(true),
+            "whitespace-surrounded identities must still succeed during scheduler planning");
+        const WsprTransmissionRequest request = current_transmission_request_for_test();
+        require(
+            request.wspr_plan.plan_type == "Type1Single",
+            "runtime planning must still classify whitespace-surrounded identities as a valid Type 1 plan");
+        require(
+            request.wspr_plan.callsign == "AA0NT" &&
+                request.wspr_plan.locator == "EM18",
+            "committed single-frame requests must use the same normalized identities as accepted config and planner results");
+        finish_runtime_planning_state_for_identity_test();
+    }
+
+    {
+        require_patch_accepts_and_runtime_plans(
+            make_identity_patch(
+                "AA0NT/12",
+                "EM18IG",
+                WsprPlannerPreference::RequirePaired),
+            "Type2Type3Paired",
+            "AA0NT/12",
+            "EM18IG",
+            "RequirePaired config patch with a plannable compound identity",
+            2U,
+            1U,
+            "AA0NT/12",
+            "EM18");
+    }
+
+    {
+        require_patch_rejects_with_plan_status(
+            make_identity_patch(
+                "AA0NT",
+                "EM18",
+                WsprPlannerPreference::RequirePaired),
+            "PairedTransmissionRequiresExtendedIdentity",
+            "RequirePaired config patch with a plain Type 1 identity");
+    }
+
+    {
+        prime_valid_runtime_identity_config();
+        require_patch_rejects_with_plan_status(
+            make_identity_patch("<AA0NT>", "EM18"),
+            "Type3RequiresSixCharLocator",
+            "invalid explicit Type 3 config patch");
+
+        reset_runtime_planning_state_for_identity_test();
+        require(
+            set_config(true),
+            "rejecting an invalid config patch must leave the prior valid config runnable");
+        const WsprTransmissionRequest request = current_transmission_request_for_test();
+        require(
+            request.wspr_plan.plan_type == "Type1Single" &&
+                request.wspr_plan.callsign == "AA0NT" &&
+                request.wspr_plan.locator == "EM18",
+            "invalid config patches must fail before scheduling and preserve the prior valid runtime plan");
+        finish_runtime_planning_state_for_identity_test();
+    }
+
+    {
+        prime_valid_runtime_identity_config();
+        patch_all_from_web(make_identity_patch(
+            "AA0NT/12",
+            "EM18IG",
+            WsprPlannerPreference::RequirePaired));
+
+        reset_runtime_planning_state_for_identity_test();
+        require(
+            set_config(true),
+            "paired runtime snapshot regression must commit the first frame");
+        {
+            const WsprRuntimeStatusSnapshot snapshot =
+                current_tx_runtime_status_snapshot();
+            require(
+                snapshot.plan_type == "Type2Type3Paired" &&
+                    snapshot.frame_count == 2U &&
+                    snapshot.current_frame == 1U,
+                "paired runtime snapshot must expose first-frame progress");
+            require(
+                snapshot.callsign_normalized == "AA0NT/12" &&
+                    snapshot.locator_normalized == "EM18IG" &&
+                    snapshot.frame_callsign == "AA0NT/12" &&
+                    snapshot.frame_locator == "EM18",
+                "paired runtime snapshot must expose overall normalized identity and Type 2 frame identity");
+        }
+
+        transmitter_cb(
+            WsprTransmitter::TransmissionCallbackEvent::COMPLETE,
+            WsprTransmitter::LogLevel::INFO,
+            "",
+            110.6);
+
+        {
+            const WsprRuntimeStatusSnapshot snapshot =
+                current_tx_runtime_status_snapshot();
+            require(
+                snapshot.plan_type == "Type2Type3Paired" &&
+                    snapshot.frame_count == 2U &&
+                    snapshot.current_frame == 2U,
+                "paired runtime snapshot must advance to the second frame after completion");
+            require(
+                snapshot.callsign_normalized == "AA0NT/12" &&
+                    snapshot.locator_normalized == "EM18IG" &&
+                    snapshot.frame_callsign == "<AA0NT/12>" &&
+                    snapshot.frame_locator == "EM18IG",
+                "paired runtime snapshot must expose Type 3 frame identity for the second frame");
+        }
+        finish_runtime_planning_state_for_identity_test();
+    }
+
+    {
+        PreparedConfigCandidate candidate;
+        iniFile.setData(
+            make_managed_ini_data(
+                "AA0NT/12",
+                "EM18IG",
+                "20m",
+                true,
+                WsprPlannerPreference::RequirePaired));
+        prepare_ini_config_candidate("/tmp/managed_candidate.ini", candidate);
+        require(
+            candidate.valid,
+            "managed INI candidate must succeed for a RequirePaired identity that can be planned");
+        require(
+            candidate.normalized_config.wspr_planner_preference ==
+                WsprPlannerPreference::RequirePaired,
+            "managed INI candidate must preserve Planner Preference = require_paired");
+    }
+
+    {
+        PreparedConfigCandidate candidate;
+        iniFile.setData(
+            make_managed_ini_data("<AA0NT>", "EM18", "20m", true));
+        prepare_ini_config_candidate("/tmp/managed_candidate.ini", candidate);
+        require(
+            !candidate.valid,
+            "managed INI candidate must reject invalid explicit Type 3 identities during candidate preparation");
+        require(
+            candidate.error_details.value("plan_status", "") == "Type3RequiresSixCharLocator",
+            "managed INI candidate rejection must surface planner status details");
+    }
+
+    {
+        init_default_config();
+        config.use_ini = true;
+        config.ini_filename = "/tmp/planner_preference_persist.ini";
+        config.mode = ModeType::WSPR;
+        config.transmit = true;
+        config.callsign = "AA0NT";
+        config.grid_square = "EM18";
+        config.power_dbm = 20;
+        config.frequencies = "20m";
+        config.tx_pin = 4;
+        config.wspr_planner_preference = WsprPlannerPreference::Auto;
+        config_to_json();
+
+        patch_all_from_web(make_identity_patch(
+            "AA0NT/12",
+            "EM18IG",
+            WsprPlannerPreference::PreferPaired));
+
+        const auto persisted_ini = iniFile.getData();
+        const auto meta_it = persisted_ini.find("Meta");
+        require(
+            meta_it != persisted_ini.end(),
+            "json_to_ini must persist the Meta section");
+        require(
+            meta_it->second.at("Planner Preference") == "prefer_paired",
+            "json_to_ini must persist planner preference in the Meta section");
+        require(
+            meta_it->second.find("Require Paired Plan") == meta_it->second.end(),
+            "json_to_ini must not persist the removed Require Paired Plan compatibility field");
     }
 
     {
