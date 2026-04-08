@@ -46,6 +46,7 @@
 
 // Standard library headers
 #include <atomic>
+#include <cstddef>
 #include <condition_variable>
 #include <string>
 #include <string_view>
@@ -248,6 +249,22 @@ void shutdown_machine();
  * @note Requires <nlohmann/json.hpp>, <chrono>, <ctime>, <iomanip>, and <sstream>.
  */
 void send_ws_message(std::string type, std::string state);
+
+struct WsprRuntimeStatusSnapshot
+{
+    std::string tx_state;
+    std::string plan_type;
+    std::size_t frame_count = 0;
+    std::size_t current_frame = 0; // 1-based, 0 when unavailable
+    std::string callsign_raw;
+    std::string callsign_normalized;
+    std::string locator_raw;
+    std::string locator_normalized;
+    std::string frame_callsign;
+    std::string frame_locator;
+};
+
+WsprRuntimeStatusSnapshot current_tx_runtime_status_snapshot();
 
 /**
  * @brief Apply updated transmission parameters and reinitialize DMA.

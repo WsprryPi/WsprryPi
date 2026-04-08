@@ -147,6 +147,20 @@ void WebServer::start(int port)
             nlohmann::json err = {{"error", "invalid_json"}, {"message", e.what()}};
             res.set_content(err.dump(4), "application/json");
         }
+        catch (const ConfigValidationError &e)
+        {
+            llog.logE(WARN, "Configuration update rejected:", std::string(e.what()));
+            setCORSHeaders(res);
+            res.status = 400;
+            nlohmann::json err = e.details();
+            if (!err.is_object())
+            {
+                err = nlohmann::json::object();
+            }
+            err["error"] = "invalid_config";
+            err["message"] = e.what();
+            res.set_content(err.dump(4), "application/json");
+        }
         catch (const std::exception &e)
         {
             llog.logE(WARN, "Configuration update rejected:", std::string(e.what()));

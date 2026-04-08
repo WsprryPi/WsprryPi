@@ -49,6 +49,78 @@ nlohmann::json jConfig;
 
 namespace
 {
+    std::string trim_copy(const std::string &value);
+
+    nlohmann::json make_plan_validation_error_details(
+        const wspr::TransmissionPlanResult &plan)
+    {
+        nlohmann::json details;
+        details["status"] = "invalid_config";
+        details["plan_status"] = std::string(wspr::to_string(plan.status));
+        details["message"] = plan.message;
+
+        if (!plan.rationale.empty())
+        {
+            details["rationale"] = plan.rationale;
+        }
+
+        if (!plan.normalized_callsign.empty())
+        {
+            details["normalized_callsign"] = plan.normalized_callsign;
+        }
+
+        if (!plan.normalized_locator.empty())
+        {
+            details["normalized_locator"] = plan.normalized_locator;
+        }
+
+        return details;
+    }
+
+    bool validate_wspr_semantics(
+        const ArgParserConfig &candidate,
+        std::string *error_message,
+        nlohmann::json *error_details = nullptr)
+    {
+        if (candidate.mode != ModeType::WSPR)
+        {
+            return true;
+        }
+
+        const std::string trimmed_callsign = trim_copy(candidate.callsign);
+        const std::string trimmed_locator = trim_copy(candidate.grid_square);
+        if (trimmed_callsign.empty() || trimmed_locator.empty())
+        {
+            return true;
+        }
+
+        const auto preference =
+            candidate.require_paired_plan
+                ? wspr::TransmissionPlanPreference::RequirePaired
+                : wspr::TransmissionPlanPreference::Auto;
+        const auto plan = wspr::plan_transmission(
+            candidate.callsign,
+            candidate.grid_square,
+            candidate.power_dbm,
+            preference);
+
+        if (plan.ok)
+        {
+            return true;
+        }
+
+        const nlohmann::json details = make_plan_validation_error_details(plan);
+        if (error_message != nullptr)
+        {
+            *error_message = plan.message;
+        }
+        if (error_details != nullptr)
+        {
+            *error_details = details;
+        }
+        return false;
+    }
+
     const std::array<std::pair<HamBand, const char *>, HAM_BAND_COUNT> kHamBandJsonKeys = {{
         {HamBand::BAND_2200M, "2200m"},
         {HamBand::BAND_630M, "630m"},
@@ -742,6 +814,7 @@ namespace
         nlohmann::json &candidate_json,
         ArgParserConfig &candidate_config,
         std::string *error_message,
+        nlohmann::json *error_details,
         std::vector<std::string> *warning_messages)
     {
         try
@@ -795,6 +868,23 @@ namespace
                 if (error_message != nullptr)
                 {
                     *error_message = validation_error;
+                }
+                return false;
+            }
+
+            nlohmann::json semantic_error_details;
+            if (!validate_wspr_semantics(
+                    candidate_config,
+                    &validation_error,
+                    &semantic_error_details))
+            {
+                if (error_message != nullptr)
+                {
+                    *error_message = validation_error;
+                }
+                if (error_details != nullptr)
+                {
+                    *error_details = semantic_error_details;
                 }
                 return false;
             }
@@ -959,6 +1049,7 @@ void prepare_ini_config_candidate(
             candidate_out.normalized_json,
             candidate_out.normalized_config,
             &candidate_out.error_reason,
+            &candidate_out.error_details,
             &candidate_out.warnings))
     {
         candidate_out.valid = false;
@@ -999,6 +1090,7 @@ void patch_all_from_web(const nlohmann::json &j)
 
     ArgParserConfig candidate_config;
     std::string error_message;
+    nlohmann::json error_details;
 
     try
     {
@@ -1011,7 +1103,19 @@ void patch_all_from_web(const nlohmann::json &j)
             throw std::runtime_error(error_message);
         }
 
+        if (!validate_wspr_semantics(
+                candidate_config,
+                &error_message,
+                &error_details))
+        {
+            throw ConfigValidationError(error_message, error_details);
+        }
+
         config_to_json_impl(candidate_config, candidate_json);
+    }
+    catch (const ConfigValidationError &)
+    {
+        throw;
     }
     catch (const std::exception &e)
     {

@@ -697,8 +697,8 @@ bool validate_config_candidate(
         return true;
     }
 
-    std::string callsign = candidate.callsign;
-    std::string locator = candidate.grid_square;
+    std::string callsign = trim_copy_string(candidate.callsign);
+    std::string locator = trim_copy_string(candidate.grid_square);
 
     const bool missing_call_sign = callsign.empty();
     const bool missing_grid_square = locator.empty();

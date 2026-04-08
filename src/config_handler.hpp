@@ -37,9 +37,11 @@
 #include "band_gpio.hpp"
 #include "ini_file.hpp"
 #include "json.hpp"
+#include "wspr_ref_plan.hpp"
 
 #include <array>
 #include <atomic>
+#include <stdexcept>
 #include <string>
 #include <vector>
 
@@ -256,7 +258,27 @@ struct PreparedConfigCandidate
     bool valid = false;
     bool transmit_enabled = false;
     std::string error_reason{};
+    nlohmann::json error_details{};
     std::vector<std::string> warnings{};
+};
+
+class ConfigValidationError : public std::runtime_error
+{
+public:
+    explicit ConfigValidationError(
+        const std::string &message,
+        nlohmann::json details = {})
+        : std::runtime_error(message), details_(std::move(details))
+    {
+    }
+
+    const nlohmann::json &details() const noexcept
+    {
+        return details_;
+    }
+
+private:
+    nlohmann::json details_{};
 };
 
 void init_default_config();
