@@ -31,6 +31,7 @@
 # 	All other is specifically guarded within the submodules and does not
 #	(should not) use LCBLog.
 DEBUG_DEFS := -DDEBUG_WSPR
+# DEBUG_DEFS := -DDEBUG_TRANS_SYMBOL
 # DEBUG_DEFS += -DDEBUG_PPMMANAGER
 # DEBUG_DEFS += -DDEBUG_SIGNAL_HANDLER
 

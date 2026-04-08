@@ -724,8 +724,6 @@ static bool configure_current_wspr_transmission(
         const wspr::TransmissionPlanPreference preference =
             wspr_planner_preference_to_plan_preference(
                 cfg.wspr_planner_preference);
-        bool paired_requested =
-            cfg.wspr_planner_preference != WsprPlannerPreference::Auto;
         bool auto_upgraded = false;
 
         if (active_plan_in_progress)
@@ -846,8 +844,8 @@ static bool configure_current_wspr_transmission(
                   plan.plan_type,
                   ", frames: ",
                   static_cast<int>(plan.frames.size()),
-                  ", paired requested: ",
-                  paired_requested ? "true" : "false",
+                  ", preference: ",
+                  wspr_planner_preference_to_string(cfg.wspr_planner_preference),
                   ", auto-upgraded: ",
                   auto_upgraded ? "true" : "false",
                   ".");
