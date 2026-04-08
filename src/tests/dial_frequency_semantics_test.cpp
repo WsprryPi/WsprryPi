@@ -1038,12 +1038,13 @@ int main()
         set_frequencies(config);
 
         ppm_reload_pending.store(true, std::memory_order_relaxed);
+        const double expected_ppm = ppmManager.getCurrentPPM();
 
         require(
             set_config(true),
             "pending runtime PPM update must be consumable during scheduler commit");
         require(
-            nearly_equal(current_transmission_request_for_test().ppm, 0.0),
+            nearly_equal(current_transmission_request_for_test().ppm, expected_ppm),
             "committed request must consume the current PPM manager value");
         require(
             nearly_equal(config.ppm, current_transmission_request_for_test().ppm),

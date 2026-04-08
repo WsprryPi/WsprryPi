@@ -347,6 +347,10 @@ static void commit_execution_request(
     const WsprTransmissionRequest &request)
 {
     current_transmission_request = request;
+    if (suppress_scheduler_execution_for_test)
+    {
+        return;
+    }
     wsprTransmitter.configureExecution(current_transmission_request);
 }
 
@@ -586,6 +590,7 @@ static double maybe_apply_wspr_random_offset(
  */
 static WsprTransmissionRequest make_tone_request(
     const ArgParserConfig &cfg,
+    double committed_ppm,
     double actual_rf_frequency_hz,
     double dial_frequency_hz,
     const WsprDialFrequencyEntry &entry)
@@ -594,7 +599,7 @@ static WsprTransmissionRequest make_tone_request(
     request.mode = WsprTransmissionMode::TONE;
     request.dial_frequency_hz = dial_frequency_hz;
     request.actual_rf_frequency_hz = actual_rf_frequency_hz;
-    request.ppm = cfg.ppm;
+    request.ppm = committed_ppm;
     request.power_level = cfg.power_level;
     request.tx_gpio = cfg.tx_pin;
     request.frequency_control_gpio = entry.control_gpio;
@@ -611,6 +616,7 @@ static WsprTransmissionRequest make_tone_request(
  */
 static WsprTransmissionRequest make_direct_tone_request(
     const ArgParserConfig &cfg,
+    double committed_ppm,
     double actual_rf_frequency_hz)
 {
     WsprDialFrequencyEntry entry;
@@ -619,6 +625,7 @@ static WsprTransmissionRequest make_direct_tone_request(
     {
         return make_tone_request(
             cfg,
+            committed_ppm,
             actual_rf_frequency_hz,
             actual_rf_frequency_hz,
             entry);
@@ -626,6 +633,7 @@ static WsprTransmissionRequest make_direct_tone_request(
 
     return make_tone_request(
         cfg,
+        committed_ppm,
         actual_rf_frequency_hz,
         actual_rf_frequency_hz,
         WsprDialFrequencyEntry{});
@@ -640,6 +648,7 @@ static WsprTransmissionRequest make_direct_tone_request(
  */
 static WsprTransmissionRequest make_wspr_request(
     const ArgParserConfig &cfg,
+    double committed_ppm,
     const PreparedWsprTransmission &slot_plan,
     double dial_frequency_hz,
     double actual_rf_frequency_hz,
@@ -651,7 +660,7 @@ static WsprTransmissionRequest make_wspr_request(
     request.wspr_plan = slot_plan;
     request.dial_frequency_hz = dial_frequency_hz;
     request.actual_rf_frequency_hz = actual_rf_frequency_hz;
-    request.ppm = cfg.ppm;
+    request.ppm = committed_ppm;
     request.power_level = cfg.power_level;
     request.tx_gpio = cfg.tx_pin;
     request.use_offset = cfg.use_offset;
@@ -707,6 +716,7 @@ constexpr LogLevel to_log_level(WsprTransmitter::LogLevel level)
  */
 static bool configure_current_wspr_transmission(
     const ArgParserConfig &cfg,
+    double committed_ppm,
     double dial_frequency_hz,
     const WsprDialFrequencyEntry &frequency_entry,
     PreparedWsprTransmission &active_plan,
@@ -852,6 +862,7 @@ static bool configure_current_wspr_transmission(
 
         request_out = make_wspr_request(
             cfg,
+            committed_ppm,
             slot_plan,
             dial_frequency_hz,
             actual_rf_frequency_hz,
@@ -1350,8 +1361,9 @@ void start_test_tone()
             " using audio offset ",
             config.wspr_audio_offset_hz,
             " Hz.");
+        const double committed_ppm = config.ppm;
         commit_execution_request(
-            make_tone_request(config, actual_rf_freq, dial_freq, entry));
+            make_tone_request(config, committed_ppm, actual_rf_freq, dial_freq, entry));
 
         (void)prepare_frequency_entry_gpio_or_log(
             entry,
@@ -1423,8 +1435,12 @@ void end_test_tone()
             }
 
             validate_config_data();
+            const double committed_ppm = config.ppm;
             commit_execution_request(
-                make_direct_tone_request(config, actual_rf_frequency_hz));
+                make_direct_tone_request(
+                    config,
+                    committed_ppm,
+                    actual_rf_frequency_hz));
             (void)prepare_frequency_entry_gpio_or_log(
                 entry,
                 config,
@@ -1558,8 +1574,12 @@ bool wspr_loop()
             return false;
         }
 
+        const double committed_ppm = config.ppm;
         commit_execution_request(
-            make_direct_tone_request(config, actual_rf_frequency_hz));
+            make_direct_tone_request(
+                config,
+                committed_ppm,
+                actual_rf_frequency_hz));
         (void)prepare_frequency_entry_gpio_or_log(
             entry,
             config,
@@ -1883,8 +1903,15 @@ bool set_config(bool force)
         bool do_config = force;
         bool do_random = false;
 
-        const bool ppm_running = ppmManager.isRunning();
-        const bool should_start_ppm = working_config.use_ntp && !ppm_running;
+        bool ppm_running = ppmManager.isRunning();
+        bool should_start_ppm = working_config.use_ntp && !ppm_running;
+        if (should_start_ppm)
+        {
+            ppm_init();
+            ppm_reload_pending.store(true, std::memory_order_seq_cst);
+            ppm_running = ppmManager.isRunning();
+            should_start_ppm = false;
+        }
         const bool should_stop_ppm = !working_config.use_ntp && ppm_running;
         const bool should_log_ppm_disabled =
             force && !working_config.use_ntp && !ppm_running;
@@ -1896,11 +1923,18 @@ bool set_config(bool force)
 
         const bool ppm_update_pending =
             ppm_reload_pending.load(std::memory_order_acquire);
+        const bool ppm_manager_authoritative =
+            working_config.use_ntp && ppm_running;
         bool runtime_ppm_changed = false;
+        double committed_ppm = working_config.ppm;
+        if (ppm_update_pending || ppm_manager_authoritative)
+        {
+            committed_ppm = ppmManager.getCurrentPPM();
+            working_config.ppm = committed_ppm;
+        }
         if (ppm_update_pending)
         {
-            working_config.ppm = ppmManager.getCurrentPPM();
-            llog.logS(INFO, "PPM updated:", working_config.ppm);
+            llog.logS(INFO, "PPM updated:", committed_ppm);
             runtime_ppm_changed = true;
             do_config = true;
         }
@@ -2058,6 +2092,7 @@ bool set_config(bool force)
                 " Hz.");
             if (!configure_current_wspr_transmission(
                     working_config,
+                    committed_ppm,
                     next_current_dial_frequency,
                     next_current_frequency_entry,
                     next_active_wspr_plan,
@@ -2206,7 +2241,6 @@ bool set_config(bool force)
 
             current_dial_frequency = next_current_dial_frequency;
             current_frequency_entry = next_current_frequency_entry;
-            current_transmission_request = next_transmission_request;
             freq_iterator = next_freq_iterator;
             active_wspr_plan = next_active_wspr_plan;
             active_wspr_frame_index = next_active_wspr_frame_index;
@@ -2215,6 +2249,7 @@ bool set_config(bool force)
             active_wspr_plan_in_progress = next_active_wspr_plan_in_progress;
             last_freq = next_current_dial_frequency;
             last_frequency_entry = next_current_frequency_entry;
+            commit_execution_request(next_transmission_request);
 
             if (suppress_scheduler_execution_for_test)
             {
@@ -2225,7 +2260,6 @@ bool set_config(bool force)
                 }
                 return true;
             }
-            commit_execution_request(current_transmission_request);
         }
 
         if (runtime_transmit_enabled(config) && (do_config || do_random))
