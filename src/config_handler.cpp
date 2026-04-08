@@ -51,6 +51,41 @@ namespace
 {
     std::string trim_copy(const std::string &value);
 
+    WsprPlannerPreference parse_wspr_planner_preference(
+        const nlohmann::json &meta)
+    {
+        const std::string raw =
+            trim_copy(meta.value("Planner Preference", std::string("auto")));
+        std::string lowered = raw;
+        std::transform(
+            lowered.begin(),
+            lowered.end(),
+            lowered.begin(),
+            [](unsigned char c)
+            {
+                return static_cast<char>(std::tolower(c));
+            });
+
+        if (lowered.empty() || lowered == "auto")
+        {
+            return WsprPlannerPreference::Auto;
+        }
+
+        if (lowered == "prefer_paired" || lowered == "prefer-paired")
+        {
+            return WsprPlannerPreference::PreferPaired;
+        }
+
+        if (lowered == "require_paired" || lowered == "require-paired")
+        {
+            return WsprPlannerPreference::RequirePaired;
+        }
+
+        throw std::runtime_error(
+            "Invalid planner preference '" + raw +
+            "'. Expected auto, prefer_paired, or require_paired.");
+    }
+
     nlohmann::json make_plan_validation_error_details(
         const wspr::TransmissionPlanResult &plan)
     {
@@ -95,9 +130,8 @@ namespace
         }
 
         const auto preference =
-            candidate.require_paired_plan
-                ? wspr::TransmissionPlanPreference::RequirePaired
-                : wspr::TransmissionPlanPreference::Auto;
+            wspr_planner_preference_to_plan_preference(
+                candidate.wspr_planner_preference);
         const auto plan = wspr::plan_transmission(
             candidate.callsign,
             candidate.grid_square,
@@ -559,6 +593,7 @@ namespace
             {"Use INI", false},
             {"INI Filename", ""},
             {"Date Time Log", false},
+            {"Planner Preference", "auto"},
             {"Loop TX", false},
             {"TX Iterations", 0}};
         target["Meta"]["WSPR Dial Frequency Set"] = nlohmann::json::array();
@@ -612,7 +647,8 @@ namespace
         target.use_ini = source.at("Meta").at("Use INI").get<bool>();
         target.ini_filename = source.at("Meta").at("INI Filename").get<std::string>();
         target.date_time_log = source.at("Meta").at("Date Time Log").get<bool>();
-        target.require_paired_plan = source.at("Meta").value("Require Paired Plan", false);
+        target.wspr_planner_preference =
+            parse_wspr_planner_preference(source.at("Meta"));
         target.loop_tx = source.at("Meta").at("Loop TX").get<bool>();
         target.tx_iterations.store(source.at("Meta").at("TX Iterations").get<int>());
         const auto &meta = source.at("Meta");
@@ -704,7 +740,8 @@ namespace
         target["Meta"]["Use INI"] = source.use_ini;
         target["Meta"]["INI Filename"] = source.ini_filename;
         target["Meta"]["Date Time Log"] = source.date_time_log;
-        target["Meta"]["Require Paired Plan"] = source.require_paired_plan;
+        target["Meta"]["Planner Preference"] =
+            wspr_planner_preference_to_string(source.wspr_planner_preference);
         target["Meta"]["Loop TX"] = source.loop_tx;
         target["Meta"]["TX Iterations"] = source.tx_iterations.load();
         target["Meta"]["WSPR Dial Frequency Set"] = source.wspr_dial_freq_set;
@@ -760,7 +797,7 @@ namespace
         target.shutdown_pin = source.shutdown_pin;
         target.use_journald = source.use_journald;
         target.date_time_log = source.date_time_log;
-        target.require_paired_plan = source.require_paired_plan;
+        target.wspr_planner_preference = source.wspr_planner_preference;
         target.loop_tx = source.loop_tx;
         target.tx_iterations.store(source.tx_iterations.load());
         target.wspr_audio_offset_hz = source.wspr_audio_offset_hz;
@@ -946,7 +983,8 @@ void json_to_ini()
             continue;
         }
 
-        if (section_name != "Control" &&
+        if (section_name != "Meta" &&
+            section_name != "Control" &&
             section_name != "Common" &&
             section_name != "Extended" &&
             section_name != "Server" &&

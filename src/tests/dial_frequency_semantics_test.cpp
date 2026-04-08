@@ -60,10 +60,12 @@ namespace
         const std::string &grid_square,
         const std::string &frequency,
         bool transmit,
-        bool require_paired_plan = false)
+        WsprPlannerPreference planner_preference = WsprPlannerPreference::Auto)
     {
         auto data = std::map<std::string, std::unordered_map<std::string, std::string>>{
-            {"Meta", {{"Require Paired Plan", require_paired_plan ? "true" : "false"}}},
+            {"Meta",
+             {{"Planner Preference",
+               wspr_planner_preference_to_string(planner_preference)}}},
             {"Control", {{"Transmit", transmit ? "true" : "false"}}},
             {"Common",
              {{"Call Sign", callsign},
@@ -118,17 +120,19 @@ namespace
         config.power_dbm = 20;
         config.frequencies = "20m";
         config.tx_pin = 4;
-        config.require_paired_plan = false;
+        config.wspr_planner_preference = WsprPlannerPreference::Auto;
         config_to_json();
     }
 
     nlohmann::json make_identity_patch(
         const std::string &callsign,
         const std::string &grid_square,
-        bool require_paired_plan = false)
+        WsprPlannerPreference planner_preference = WsprPlannerPreference::Auto)
     {
         return {
-            {"Meta", {{"Require Paired Plan", require_paired_plan}}},
+            {"Meta",
+             {{"Planner Preference",
+               wspr_planner_preference_to_string(planner_preference)}}},
             {"Control", {{"Transmit", true}}},
             {"Common",
              {{"Call Sign", callsign},
@@ -209,7 +213,8 @@ namespace
         prime_valid_runtime_identity_config();
         const std::string original_callsign = config.callsign;
         const std::string original_locator = config.grid_square;
-        const bool original_require_paired_plan = config.require_paired_plan;
+        const WsprPlannerPreference original_planner_preference =
+            config.wspr_planner_preference;
 
         bool threw = false;
         try
@@ -231,7 +236,7 @@ namespace
         require(
             config.callsign == original_callsign &&
                 config.grid_square == original_locator &&
-                config.require_paired_plan == original_require_paired_plan,
+                config.wspr_planner_preference == original_planner_preference,
             message + " must not mutate live config after rejection");
     }
 } // namespace
@@ -1092,6 +1097,19 @@ int main()
     }
 
     {
+        require_patch_accepts_and_runtime_plans(
+            make_identity_patch("AA0NT/12", "EM18IG"),
+            "Type2Type3Paired",
+            "AA0NT/12",
+            "EM18IG",
+            "valid compound callsign with 6-character locator config patch",
+            2U,
+            1U,
+            "AA0NT/12",
+            "EM18");
+    }
+
+    {
         require_patch_rejects_with_plan_status(
             make_identity_patch("<AA0NT>", "EM18"),
             "Type3RequiresSixCharLocator",
@@ -1144,7 +1162,10 @@ int main()
 
     {
         require_patch_accepts_and_runtime_plans(
-            make_identity_patch("AA0NT/12", "EM18IG", true),
+            make_identity_patch(
+                "AA0NT/12",
+                "EM18IG",
+                WsprPlannerPreference::RequirePaired),
             "Type2Type3Paired",
             "AA0NT/12",
             "EM18IG",
@@ -1157,7 +1178,10 @@ int main()
 
     {
         require_patch_rejects_with_plan_status(
-            make_identity_patch("AA0NT", "EM18", true),
+            make_identity_patch(
+                "AA0NT",
+                "EM18",
+                WsprPlannerPreference::RequirePaired),
             "PairedTransmissionRequiresExtendedIdentity",
             "RequirePaired config patch with a plain Type 1 identity");
     }
@@ -1184,7 +1208,10 @@ int main()
 
     {
         prime_valid_runtime_identity_config();
-        patch_all_from_web(make_identity_patch("AA0NT/12", "EM18IG", true));
+        patch_all_from_web(make_identity_patch(
+            "AA0NT/12",
+            "EM18IG",
+            WsprPlannerPreference::RequirePaired));
 
         reset_runtime_planning_state_for_identity_test();
         require(
@@ -1233,14 +1260,20 @@ int main()
     {
         PreparedConfigCandidate candidate;
         iniFile.setData(
-            make_managed_ini_data("AA0NT/12", "EM18IG", "20m", true, true));
+            make_managed_ini_data(
+                "AA0NT/12",
+                "EM18IG",
+                "20m",
+                true,
+                WsprPlannerPreference::RequirePaired));
         prepare_ini_config_candidate("/tmp/managed_candidate.ini", candidate);
         require(
             candidate.valid,
             "managed INI candidate must succeed for a RequirePaired identity that can be planned");
         require(
-            candidate.normalized_config.require_paired_plan,
-            "managed INI candidate must preserve Require Paired Plan");
+            candidate.normalized_config.wspr_planner_preference ==
+                WsprPlannerPreference::RequirePaired,
+            "managed INI candidate must preserve Planner Preference = require_paired");
     }
 
     {
@@ -1254,6 +1287,38 @@ int main()
         require(
             candidate.error_details.value("plan_status", "") == "Type3RequiresSixCharLocator",
             "managed INI candidate rejection must surface planner status details");
+    }
+
+    {
+        init_default_config();
+        config.use_ini = true;
+        config.ini_filename = "/tmp/planner_preference_persist.ini";
+        config.mode = ModeType::WSPR;
+        config.transmit = true;
+        config.callsign = "AA0NT";
+        config.grid_square = "EM18";
+        config.power_dbm = 20;
+        config.frequencies = "20m";
+        config.tx_pin = 4;
+        config.wspr_planner_preference = WsprPlannerPreference::Auto;
+        config_to_json();
+
+        patch_all_from_web(make_identity_patch(
+            "AA0NT/12",
+            "EM18IG",
+            WsprPlannerPreference::PreferPaired));
+
+        const auto persisted_ini = iniFile.getData();
+        const auto meta_it = persisted_ini.find("Meta");
+        require(
+            meta_it != persisted_ini.end(),
+            "json_to_ini must persist the Meta section");
+        require(
+            meta_it->second.at("Planner Preference") == "prefer_paired",
+            "json_to_ini must persist planner preference in the Meta section");
+        require(
+            meta_it->second.find("Require Paired Plan") == meta_it->second.end(),
+            "json_to_ini must not persist the removed Require Paired Plan compatibility field");
     }
 
     {

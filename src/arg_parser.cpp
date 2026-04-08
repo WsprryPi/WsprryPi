@@ -1151,7 +1151,7 @@ bool parse_command_line(int argc, char *argv[])
         {"offset", no_argument, nullptr, 'o'},        // Via: [Extended] Offset = True
         {"journald", no_argument, nullptr, 'J'},      // Global: config.use_journald
         {"date-time-log", no_argument, nullptr, 'D'}, // Global: config.date_time_log
-        {"require-paired", no_argument, nullptr, 1001}, // Global: config.require_paired_plan
+        {"require-paired", no_argument, nullptr, 1001}, // Global: config.wspr_planner_preference
         {"tx-gpio-polarity", required_argument, nullptr, 1002},
         // Required arguments
         {"ppm", required_argument, nullptr, 'p'},       // Via: [Extended] PPM = 0.0
@@ -1214,7 +1214,7 @@ bool parse_command_line(int argc, char *argv[])
         }
         case 1001: // Require paired WSPR planning
         {
-            config.require_paired_plan = true;
+            config.wspr_planner_preference = WsprPlannerPreference::RequirePaired;
             break;
         }
         case 1002:

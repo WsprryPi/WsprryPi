@@ -721,7 +721,11 @@ static bool configure_current_wspr_transmission(
     {
         PreparedWsprTransmission plan;
         PreparedWsprTransmission slot_plan;
-        bool paired_requested = cfg.require_paired_plan;
+        const wspr::TransmissionPlanPreference preference =
+            wspr_planner_preference_to_plan_preference(
+                cfg.wspr_planner_preference);
+        bool paired_requested =
+            cfg.wspr_planner_preference != WsprPlannerPreference::Auto;
         bool auto_upgraded = false;
 
         if (active_plan_in_progress)
@@ -741,7 +745,7 @@ static bool configure_current_wspr_transmission(
         }
         else
         {
-            if (paired_requested)
+            if (cfg.wspr_planner_preference == WsprPlannerPreference::RequirePaired)
             {
                 llog.logS(INFO,
                           "Paired WSPR planning explicitly requested.");
@@ -757,13 +761,19 @@ static bool configure_current_wspr_transmission(
                 const bool paired_upgrade_eligible =
                     is_auto_paired_upgrade_eligible(cfg);
 
+                if (cfg.wspr_planner_preference == WsprPlannerPreference::PreferPaired)
+                {
+                    llog.logS(INFO,
+                              "Paired WSPR planning preferred when available.");
+                }
+
                 try
                 {
                     plan = build_prepared_wspr_transmission(
                         cfg.callsign,
                         cfg.grid_square,
                         cfg.power_dbm,
-                        wspr::TransmissionPlanPreference::Auto);
+                        preference);
                 }
                 catch (const std::exception &)
                 {
@@ -786,7 +796,8 @@ static bool configure_current_wspr_transmission(
                     auto_upgraded = true;
                 }
 
-                if (!auto_upgraded &&
+                if (cfg.wspr_planner_preference == WsprPlannerPreference::Auto &&
+                    !auto_upgraded &&
                     plan.frameCount() <= 1U &&
                     paired_upgrade_eligible)
                 {
