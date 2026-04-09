@@ -199,6 +199,19 @@ bool try_get_qrss_startup_request(
     double &frequency_hz_out,
     double &dot_seconds_out) noexcept;
 void clear_qrss_startup_request() noexcept;
+bool set_fskcw_startup_request(
+    const std::string &message,
+    const std::string &mark_frequency_hz,
+    const std::string &space_frequency_hz,
+    const std::string &dot_seconds,
+    std::string *error_message = nullptr);
+bool has_fskcw_startup_request() noexcept;
+bool try_get_fskcw_startup_request(
+    std::string &message_out,
+    double &mark_frequency_hz_out,
+    double &space_frequency_hz_out,
+    double &dot_seconds_out) noexcept;
+void clear_fskcw_startup_request() noexcept;
 
 /**
  * @brief Parses command-line arguments and configures the program settings.

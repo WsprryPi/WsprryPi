@@ -103,7 +103,8 @@ enum class ModeType
 {
     WSPR, ///< WSPR transmission mode
     TONE, ///< Test tone generation mode
-    QRSS  ///< Temporary QRSS test mode
+    QRSS, ///< Temporary QRSS test mode
+    FSKCW ///< Temporary FSKCW test mode
 };
 
 enum class WsprPlannerPreference

@@ -141,6 +141,16 @@ struct QrssStartupRequest
 };
 
 std::optional<QrssStartupRequest> qrss_startup_request;
+
+struct FskcwStartupRequest
+{
+    std::string message;
+    double mark_frequency_hz = 0.0;
+    double space_frequency_hz = 0.0;
+    double dot_seconds = 0.0;
+};
+
+std::optional<FskcwStartupRequest> fskcw_startup_request;
 } // namespace
 
 /**
@@ -581,6 +591,98 @@ void clear_qrss_startup_request() noexcept
     qrss_startup_request.reset();
 }
 
+bool set_fskcw_startup_request(
+    const std::string &message,
+    const std::string &mark_frequency_hz,
+    const std::string &space_frequency_hz,
+    const std::string &dot_seconds,
+    std::string *error_message)
+{
+    try
+    {
+        const std::string trimmed_message = trim_copy_string(message);
+        if (trimmed_message.empty())
+        {
+            if (error_message != nullptr)
+                *error_message = "Invalid FSKCW message.";
+            return false;
+        }
+
+        const double parsed_mark_frequency_hz = std::stod(mark_frequency_hz);
+        if (parsed_mark_frequency_hz <= 0.0)
+        {
+            if (error_message != nullptr)
+                *error_message = "Invalid FSKCW mark frequency (<=0).";
+            return false;
+        }
+
+        const double parsed_space_frequency_hz = std::stod(space_frequency_hz);
+        if (parsed_space_frequency_hz <= 0.0)
+        {
+            if (error_message != nullptr)
+                *error_message = "Invalid FSKCW space frequency (<=0).";
+            return false;
+        }
+
+        if (parsed_mark_frequency_hz <= parsed_space_frequency_hz)
+        {
+            if (error_message != nullptr)
+                *error_message = "FSKCW mark frequency must be greater than space frequency.";
+            return false;
+        }
+
+        const double parsed_dot_seconds = std::stod(dot_seconds);
+        if (parsed_dot_seconds <= 0.0)
+        {
+            if (error_message != nullptr)
+                *error_message = "Invalid FSKCW dot length (<=0).";
+            return false;
+        }
+
+        fskcw_startup_request = FskcwStartupRequest{
+            trimmed_message,
+            parsed_mark_frequency_hz,
+            parsed_space_frequency_hz,
+            parsed_dot_seconds};
+        return true;
+    }
+    catch (const std::exception &)
+    {
+        if (error_message != nullptr)
+        {
+            *error_message =
+                "Invalid FSKCW startup request. Expected message, mark frequency, space frequency, and dot length.";
+        }
+        return false;
+    }
+}
+
+bool has_fskcw_startup_request() noexcept
+{
+    return fskcw_startup_request.has_value();
+}
+
+bool try_get_fskcw_startup_request(
+    std::string &message_out,
+    double &mark_frequency_hz_out,
+    double &space_frequency_hz_out,
+    double &dot_seconds_out) noexcept
+{
+    if (!fskcw_startup_request.has_value())
+        return false;
+
+    message_out = fskcw_startup_request->message;
+    mark_frequency_hz_out = fskcw_startup_request->mark_frequency_hz;
+    space_frequency_hz_out = fskcw_startup_request->space_frequency_hz;
+    dot_seconds_out = fskcw_startup_request->dot_seconds;
+    return true;
+}
+
+void clear_fskcw_startup_request() noexcept
+{
+    fskcw_startup_request.reset();
+}
+
 /**
  * @brief Displays the usage information for the WsprryPi application.
  *
@@ -636,7 +738,9 @@ void print_usage(const std::string &message, int exit_code)
               << "    OR\n"
               << "  (sudo) wsprrypi --test-tone {rf_frequency}\n"
               << "    OR\n"
-              << "  (sudo) wsprrypi --qrss-message \"TEXT\" --qrss-frequency {hz} --qrss-dot-seconds {seconds}\n\n"
+              << "  (sudo) wsprrypi --qrss-message \"TEXT\" --qrss-frequency {hz} --qrss-dot-seconds {seconds}\n"
+              << "    OR\n"
+              << "  (sudo) wsprrypi --fskcw-message \"TEXT\" --fskcw-mark-frequency {hz} --fskcw-space-frequency {hz} --fskcw-dot-seconds {seconds}\n\n"
               << "Options:\n"
               << "  -h, --help\n"
               << "    Display this help message.\n"
@@ -776,11 +880,25 @@ bool validate_config_candidate(
         return true;
     }
 
+    if (candidate.mode == ModeType::FSKCW)
+    {
+        if (!has_fskcw_startup_request())
+        {
+            if (error_message != nullptr)
+            {
+                *error_message = "Missing FSKCW startup request.";
+            }
+            return false;
+        }
+
+        return true;
+    }
+
     if (candidate.mode != ModeType::WSPR)
     {
         if (error_message != nullptr)
         {
-            *error_message = "Mode must be either WSPR, TONE, or QRSS.";
+            *error_message = "Mode must be either WSPR, TONE, QRSS, or FSKCW.";
         }
         return false;
     }
@@ -925,6 +1043,36 @@ void apply_runtime_config_side_effects()
         return;
     }
 
+    if (config.mode == ModeType::FSKCW)
+    {
+        std::string message;
+        double mark_frequency_hz = 0.0;
+        double space_frequency_hz = 0.0;
+        double dot_seconds = 0.0;
+        if (!try_get_fskcw_startup_request(
+                message,
+                mark_frequency_hz,
+                space_frequency_hz,
+                dot_seconds))
+        {
+            llog.logE(ERROR, " - Missing FSKCW startup request.");
+            return;
+        }
+
+        llog.logS(
+            INFO,
+            "A temporary FSKCW test transmission will be generated: message='",
+            message,
+            "' mark=",
+            lookup.freq_display_string(mark_frequency_hz),
+            " space=",
+            lookup.freq_display_string(space_frequency_hz),
+            " dot=",
+            dot_seconds,
+            " s");
+        return;
+    }
+
     if (config.mode != ModeType::WSPR)
     {
         return;
@@ -1038,9 +1186,10 @@ bool validate_config_data()
 
     if (config.mode != ModeType::TONE &&
         config.mode != ModeType::WSPR &&
-        config.mode != ModeType::QRSS)
+        config.mode != ModeType::QRSS &&
+        config.mode != ModeType::FSKCW)
     {
-        llog.logE(FATAL, "Mode must be either WSPR, TONE, or QRSS.");
+        llog.logE(FATAL, "Mode must be either WSPR, TONE, QRSS, or FSKCW.");
         std::exit(EXIT_FAILURE);
     }
 
@@ -1066,6 +1215,26 @@ bool validate_config_data()
         if (!try_get_qrss_startup_request(message, frequency_hz, dot_seconds))
         {
             llog.logE(ERROR, " - Missing QRSS startup request.");
+            if (config.use_ini)
+            {
+                return false;
+            }
+            std::exit(EXIT_FAILURE);
+        }
+    }
+    else if (config.mode == ModeType::FSKCW)
+    {
+        std::string message;
+        double mark_frequency_hz = 0.0;
+        double space_frequency_hz = 0.0;
+        double dot_seconds = 0.0;
+        if (!try_get_fskcw_startup_request(
+                message,
+                mark_frequency_hz,
+                space_frequency_hz,
+                dot_seconds))
+        {
+            llog.logE(ERROR, " - Missing FSKCW startup request.");
             if (config.use_ini)
             {
                 return false;
@@ -1206,6 +1375,7 @@ bool parse_command_line(int argc, char *argv[])
 {
     clear_direct_tone_startup_request();
     clear_qrss_startup_request();
+    clear_fskcw_startup_request();
 
     // Check if any arguments (besides the program name) were provided.
     if (argc == 1) // No arguments or options provided.
@@ -1295,6 +1465,10 @@ bool parse_command_line(int argc, char *argv[])
         {"qrss-message", required_argument, nullptr, 1003},
         {"qrss-frequency", required_argument, nullptr, 1004},
         {"qrss-dot-seconds", required_argument, nullptr, 1005},
+        {"fskcw-message", required_argument, nullptr, 1006},
+        {"fskcw-mark-frequency", required_argument, nullptr, 1007},
+        {"fskcw-space-frequency", required_argument, nullptr, 1008},
+        {"fskcw-dot-seconds", required_argument, nullptr, 1009},
         // Required arguments
         {"ppm", required_argument, nullptr, 'p'},       // Via: [Extended] PPM = 0.0
         {"terminate", required_argument, nullptr, 'x'}, // Global: config.tx_iterations
@@ -1377,6 +1551,10 @@ bool parse_command_line(int argc, char *argv[])
         case 1003:
         case 1004:
         case 1005:
+        case 1006:
+        case 1007:
+        case 1008:
+        case 1009:
         {
             break;
         }
@@ -1585,6 +1763,10 @@ bool parse_command_line(int argc, char *argv[])
     std::string qrss_message_arg;
     std::string qrss_frequency_arg;
     std::string qrss_dot_seconds_arg;
+    std::string fskcw_message_arg;
+    std::string fskcw_mark_frequency_arg;
+    std::string fskcw_space_frequency_arg;
+    std::string fskcw_dot_seconds_arg;
     for (int i = 1; i < argc; ++i)
     {
         const std::string arg = argv[i];
@@ -1599,6 +1781,22 @@ bool parse_command_line(int argc, char *argv[])
         else if (arg == "--qrss-dot-seconds" && i + 1 < argc)
         {
             qrss_dot_seconds_arg = argv[++i];
+        }
+        else if (arg == "--fskcw-message" && i + 1 < argc)
+        {
+            fskcw_message_arg = argv[++i];
+        }
+        else if (arg == "--fskcw-mark-frequency" && i + 1 < argc)
+        {
+            fskcw_mark_frequency_arg = argv[++i];
+        }
+        else if (arg == "--fskcw-space-frequency" && i + 1 < argc)
+        {
+            fskcw_space_frequency_arg = argv[++i];
+        }
+        else if (arg == "--fskcw-dot-seconds" && i + 1 < argc)
+        {
+            fskcw_dot_seconds_arg = argv[++i];
         }
     }
 
@@ -1633,7 +1831,46 @@ bool parse_command_line(int argc, char *argv[])
         }
 
         clear_direct_tone_startup_request();
+        clear_fskcw_startup_request();
         config.mode = ModeType::QRSS;
+    }
+
+    const bool any_fskcw_arg =
+        !fskcw_message_arg.empty() ||
+        !fskcw_mark_frequency_arg.empty() ||
+        !fskcw_space_frequency_arg.empty() ||
+        !fskcw_dot_seconds_arg.empty();
+    if (any_fskcw_arg)
+    {
+        if (config.use_ini)
+        {
+            print_usage("FSKCW test mode is invalid when using INI file.", EXIT_FAILURE);
+        }
+
+        if (fskcw_message_arg.empty() ||
+            fskcw_mark_frequency_arg.empty() ||
+            fskcw_space_frequency_arg.empty() ||
+            fskcw_dot_seconds_arg.empty())
+        {
+            print_usage(
+                "FSKCW test mode requires --fskcw-message, --fskcw-mark-frequency, --fskcw-space-frequency, and --fskcw-dot-seconds.",
+                EXIT_FAILURE);
+        }
+
+        std::string error_message;
+        if (!set_fskcw_startup_request(
+                fskcw_message_arg,
+                fskcw_mark_frequency_arg,
+                fskcw_space_frequency_arg,
+                fskcw_dot_seconds_arg,
+                &error_message))
+        {
+            print_usage(error_message, EXIT_FAILURE);
+        }
+
+        clear_direct_tone_startup_request();
+        clear_qrss_startup_request();
+        config.mode = ModeType::FSKCW;
     }
 
     if (config.mode == ModeType::WSPR)

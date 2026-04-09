@@ -728,6 +728,56 @@ static TransmissionRequest make_qrss_legacy_request(
     return request;
 }
 
+static wsprrypi::TransmissionRequest make_fskcw_controller_request(
+    const ArgParserConfig &cfg,
+    double committed_ppm,
+    const std::string &message,
+    double mark_frequency_hz,
+    double space_frequency_hz,
+    double dot_seconds)
+{
+    wsprrypi::TransmissionRequest request;
+    request.id.value = 1;
+    request.mode = wsprrypi::TransmissionMode::FSKCW;
+    request.output.backend = wsprrypi::BackendKind::RPI_CLOCK_GPIO;
+    request.output.output = wsprrypi::ClockSource::GPIO_CLK;
+    request.output.gpio = cfg.tx_pin;
+    request.calibration.ppm = committed_ppm;
+    request.metadata.label = "fskcw-cli-test";
+    request.metadata.origin = "cli";
+    request.metadata.note = "temporary fskcw test path";
+
+    wsprrypi::FskcwPayload payload;
+    payload.message = message;
+    payload.mark_frequency_hz = mark_frequency_hz;
+    payload.space_frequency_hz = space_frequency_hz;
+    payload.timing.dot = seconds_to_nanoseconds(dot_seconds);
+    payload.timing.dash = payload.timing.dot * 3;
+    payload.timing.intra_element_gap = payload.timing.dot;
+    payload.timing.inter_character_gap = payload.timing.dot * 3;
+    payload.timing.inter_word_gap = payload.timing.dot * 7;
+    request.payload = payload;
+    return request;
+}
+
+static TransmissionRequest make_fskcw_legacy_request(
+    const ArgParserConfig &cfg,
+    double committed_ppm,
+    double mark_frequency_hz,
+    double space_frequency_hz)
+{
+    TransmissionRequest request;
+    request.mode = TransmissionMode::WSPR;
+    request.dial_frequency_hz = mark_frequency_hz;
+    request.actual_rf_frequency_hz = mark_frequency_hz;
+    request.ppm = committed_ppm;
+    request.power_level = cfg.power_level;
+    request.tx_gpio = cfg.tx_pin;
+    request.applied_offset_hz = mark_frequency_hz - space_frequency_hz;
+    request.frequency_entry_label = "fskcw-cli-test";
+    return request;
+}
+
 /**
  * @brief Build the scheduler-side request for one WSPR execution slot.
  *
@@ -1055,6 +1105,15 @@ void transmitter_cb(WsprTransmitter::TransmissionCallbackEvent event,
             {
                 llog.logS(to_log_level(level),
                           "Started QRSS test transmission: ",
+                          frequency,
+                          " Hz (",
+                          wsprTransmitter.formatFrequencyMHz(frequency),
+                          " MHz).");
+            }
+            else if (config.mode == ModeType::FSKCW)
+            {
+                llog.logS(to_log_level(level),
+                          "Started FSKCW test transmission at mark frequency: ",
                           frequency,
                           " Hz (",
                           wsprTransmitter.formatFrequencyMHz(frequency),
@@ -1724,6 +1783,56 @@ bool wspr_loop()
             frequency_hz,
             " Hz (",
             wsprTransmitter.formatFrequencyMHz(frequency_hz),
+            " MHz), dot length ",
+            dot_seconds,
+            " s.");
+    }
+    else if (config.mode == ModeType::FSKCW)
+    {
+        std::string message;
+        double mark_frequency_hz = 0.0;
+        double space_frequency_hz = 0.0;
+        double dot_seconds = 0.0;
+        if (!try_get_fskcw_startup_request(
+                message,
+                mark_frequency_hz,
+                space_frequency_hz,
+                dot_seconds))
+        {
+            llog.logE(ERROR, "FSKCW test mode requested without a startup FSKCW request.");
+            stop_runtime_components_for_early_exit();
+            return false;
+        }
+
+        const double committed_ppm = config.ppm;
+        shutdown_after_current_transmission.store(true, std::memory_order_release);
+        shutdown_after_wspr_plan.store(false, std::memory_order_release);
+        commit_execution_request(
+            make_fskcw_controller_request(
+                config,
+                committed_ppm,
+                message,
+                mark_frequency_hz,
+                space_frequency_hz,
+                dot_seconds),
+            make_fskcw_legacy_request(
+                config,
+                committed_ppm,
+                mark_frequency_hz,
+                space_frequency_hz));
+        wsprTransmitter.startAsync();
+        llog.logS(
+            INFO,
+            "transmitting temporary FSKCW test message '",
+            message,
+            "' mark=",
+            mark_frequency_hz,
+            " Hz (",
+            wsprTransmitter.formatFrequencyMHz(mark_frequency_hz),
+            " MHz), space=",
+            space_frequency_hz,
+            " Hz (",
+            wsprTransmitter.formatFrequencyMHz(space_frequency_hz),
             " MHz), dot length ",
             dot_seconds,
             " s.");
