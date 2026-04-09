@@ -260,7 +260,7 @@ CXXFLAGS := -Wno-psabi -std=c++$(CXXVER) \
 # Include paths
 CXXFLAGS += -I$(abspath .)
 CXXFLAGS += $(foreach dir,$(SUBMODULE_SRCDIRS),-I$(abspath $(dir)))
-CXXFLAGS += -I$(abspath ./WSPR-Reference/include)
+CXXFLAGS += -I$(abspath ./WSPR-Reference/src/wspr)
 
 # Build metadata defines
 CXXFLAGS += -DMAKE_TAG=\"$(VER)\" \

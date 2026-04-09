@@ -10,7 +10,7 @@
  * - Per-frequency control GPIO metadata and selector preparation.
  * - When a built request is committed to the transmitter.
  *
- * The transmitter only consumes committed `WsprTransmissionRequest`
+ * The transmitter only consumes committed `TransmissionRequest`
  * snapshots. The backend only realizes hardware for the backend-neutral
  * execution plan derived from that committed request.
  *
@@ -209,7 +209,7 @@ int freq_iterator = 0;
  */
 double current_dial_frequency = 0.0;
 WsprDialFrequencyEntry current_frequency_entry{};
-WsprTransmissionRequest current_transmission_request{};
+TransmissionRequest current_transmission_request{};
 
 /**
  * @brief File-scope self-pipe descriptors for signal notifications.
@@ -344,13 +344,36 @@ static bool prepare_frequency_entry_gpio_or_log(
  * @param request Fully built execution request for one transmitter run.
  */
 static void commit_execution_request(
-    const WsprTransmissionRequest &request)
+    const TransmissionRequest &request)
 {
     current_transmission_request = request;
     if (suppress_scheduler_execution_for_test)
     {
         return;
     }
+    if (!current_transmission_request.isTone() &&
+        !current_transmission_request.isSkipWindow())
+    {
+        wsprrypi::TransmissionRequest controller_request;
+        controller_request.mode = wsprrypi::TransmissionMode::WSPR;
+        controller_request.output.backend = wsprrypi::BackendKind::RPI_CLOCK_GPIO;
+        controller_request.output.output = wsprrypi::ClockSource::GPIO_CLK;
+        controller_request.output.gpio = current_transmission_request.tx_gpio;
+        controller_request.calibration.ppm = current_transmission_request.ppm;
+        controller_request.id.value = 1;
+
+        wsprrypi::WsprPayload payload;
+        payload.prepared = current_transmission_request.payload;
+        payload.base_frequency_hz =
+            current_transmission_request.actual_rf_frequency_hz;
+        controller_request.payload = payload;
+
+        wsprTransmitter.configureExecution(
+            controller_request,
+            current_transmission_request);
+        return;
+    }
+
     wsprTransmitter.configureExecution(current_transmission_request);
 }
 
@@ -588,15 +611,15 @@ static double maybe_apply_wspr_random_offset(
  * This request is fully committed at the orchestration layer. The
  * transmitter must not infer any additional policy from tone mode.
  */
-static WsprTransmissionRequest make_tone_request(
+static TransmissionRequest make_tone_request(
     const ArgParserConfig &cfg,
     double committed_ppm,
     double actual_rf_frequency_hz,
     double dial_frequency_hz,
     const WsprDialFrequencyEntry &entry)
 {
-    WsprTransmissionRequest request;
-    request.mode = WsprTransmissionMode::TONE;
+    TransmissionRequest request;
+    request.mode = TransmissionMode::TONE;
     request.dial_frequency_hz = dial_frequency_hz;
     request.actual_rf_frequency_hz = actual_rf_frequency_hz;
     request.ppm = committed_ppm;
@@ -614,7 +637,7 @@ static WsprTransmissionRequest make_tone_request(
  * Startup tone mode is transient runtime state created by `--test-tone`.
  * It is not persistent configuration.
  */
-static WsprTransmissionRequest make_direct_tone_request(
+static TransmissionRequest make_direct_tone_request(
     const ArgParserConfig &cfg,
     double committed_ppm,
     double actual_rf_frequency_hz)
@@ -646,7 +669,7 @@ static WsprTransmissionRequest make_direct_tone_request(
  * WSPR frame for this slot, the committed RF frequency, and scheduler-owned
  * per-frequency GPIO metadata.
  */
-static WsprTransmissionRequest make_wspr_request(
+static TransmissionRequest make_wspr_request(
     const ArgParserConfig &cfg,
     double committed_ppm,
     const PreparedWsprTransmission &slot_plan,
@@ -655,9 +678,9 @@ static WsprTransmissionRequest make_wspr_request(
     const WsprDialFrequencyEntry &entry,
     double applied_offset_hz)
 {
-    WsprTransmissionRequest request;
-    request.mode = WsprTransmissionMode::WSPR;
-    request.wspr_plan = slot_plan;
+    TransmissionRequest request;
+    request.mode = TransmissionMode::WSPR;
+    request.payload = slot_plan;
     request.dial_frequency_hz = dial_frequency_hz;
     request.actual_rf_frequency_hz = actual_rf_frequency_hz;
     request.ppm = committed_ppm;
@@ -725,7 +748,7 @@ static bool configure_current_wspr_transmission(
     WsprDialFrequencyEntry &active_plan_frequency_entry,
     bool &active_plan_in_progress,
     double actual_rf_frequency_hz,
-    WsprTransmissionRequest &request_out)
+    TransmissionRequest &request_out)
 {
     try
     {
@@ -1756,13 +1779,13 @@ WsprRuntimeStatusSnapshot current_tx_runtime_status_snapshot()
     snapshot.tx_state = wsprTransmitter.stateToStringLower(
         wsprTransmitter.getState());
 
-    if (current_transmission_request.mode != WsprTransmissionMode::WSPR ||
-        current_transmission_request.wspr_plan.empty())
+    if (current_transmission_request.mode != TransmissionMode::WSPR ||
+        current_transmission_request.payload.empty())
     {
         return snapshot;
     }
 
-    const PreparedWsprTransmission &plan = current_transmission_request.wspr_plan;
+    const PreparedWsprTransmission &plan = current_transmission_request.payload;
     snapshot.plan_type = plan.plan_type;
     snapshot.frame_count =
         plan.total_frame_count != 0U ? plan.total_frame_count : plan.frameCount();
@@ -1886,7 +1909,7 @@ bool set_config(bool force)
                 {
                     wsprTransmitter.stopAndJoin();
                     stop_active_transmission_selectors();
-                    current_transmission_request = WsprTransmissionRequest{};
+                    current_transmission_request = TransmissionRequest{};
                 }
 
                 if (!finalize_reload_pending())
@@ -1944,8 +1967,8 @@ bool set_config(bool force)
             force ? 0.0 : current_dial_frequency;
         WsprDialFrequencyEntry next_current_frequency_entry =
             force ? WsprDialFrequencyEntry{} : current_frequency_entry;
-        WsprTransmissionRequest next_transmission_request =
-            force ? WsprTransmissionRequest{} : current_transmission_request;
+        TransmissionRequest next_transmission_request =
+            force ? TransmissionRequest{} : current_transmission_request;
         PreparedWsprTransmission next_active_wspr_plan =
             force ? PreparedWsprTransmission{} : active_wspr_plan;
         std::size_t next_active_wspr_frame_index =
@@ -2041,7 +2064,7 @@ bool set_config(bool force)
 
                 wsprTransmitter.stopAndJoin();
                 stop_active_transmission_selectors();
-                current_transmission_request = WsprTransmissionRequest{};
+                current_transmission_request = TransmissionRequest{};
                 current_dial_frequency = 0.0;
                 current_frequency_entry = WsprDialFrequencyEntry{};
                 freq_iterator = next_freq_iterator;
@@ -2116,7 +2139,7 @@ bool set_config(bool force)
                     send_ws_message("configuration", "reload_failed");
                     wsprTransmitter.stopAndJoin();
                     stop_active_transmission_selectors();
-                    current_transmission_request = WsprTransmissionRequest{};
+                    current_transmission_request = TransmissionRequest{};
                     if (!finalize_reload_pending())
                     {
                         continue;
@@ -2306,7 +2329,7 @@ void set_scheduler_execution_suppressed_for_test(bool suppressed) noexcept
     suppress_scheduler_execution_for_test = suppressed;
 }
 
-WsprTransmissionRequest current_transmission_request_for_test()
+TransmissionRequest current_transmission_request_for_test()
 {
     return current_transmission_request;
 }

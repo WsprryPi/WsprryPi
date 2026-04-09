@@ -288,6 +288,6 @@ bool managed_reload_tx_inhibited_state() noexcept;
 bool managed_reload_tx_inhibited_for_test() noexcept;
 void reset_managed_reload_runtime_for_test() noexcept;
 void set_scheduler_execution_suppressed_for_test(bool suppressed) noexcept;
-WsprTransmissionRequest current_transmission_request_for_test();
+TransmissionRequest current_transmission_request_for_test();
 
 #endif // _SCHEDULING_HPP
