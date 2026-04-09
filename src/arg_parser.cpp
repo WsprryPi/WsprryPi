@@ -151,6 +151,16 @@ struct FskcwStartupRequest
 };
 
 std::optional<FskcwStartupRequest> fskcw_startup_request;
+
+struct DfcwStartupRequest
+{
+    std::string message;
+    double dot_frequency_hz = 0.0;
+    double dash_frequency_hz = 0.0;
+    double dot_seconds = 0.0;
+};
+
+std::optional<DfcwStartupRequest> dfcw_startup_request;
 } // namespace
 
 /**
@@ -683,6 +693,98 @@ void clear_fskcw_startup_request() noexcept
     fskcw_startup_request.reset();
 }
 
+bool set_dfcw_startup_request(
+    const std::string &message,
+    const std::string &dot_frequency_hz,
+    const std::string &dash_frequency_hz,
+    const std::string &dot_seconds,
+    std::string *error_message)
+{
+    try
+    {
+        const std::string trimmed_message = trim_copy_string(message);
+        if (trimmed_message.empty())
+        {
+            if (error_message != nullptr)
+                *error_message = "Invalid DFCW message.";
+            return false;
+        }
+
+        const double parsed_dot_frequency_hz = std::stod(dot_frequency_hz);
+        if (parsed_dot_frequency_hz <= 0.0)
+        {
+            if (error_message != nullptr)
+                *error_message = "Invalid DFCW dot frequency (<=0).";
+            return false;
+        }
+
+        const double parsed_dash_frequency_hz = std::stod(dash_frequency_hz);
+        if (parsed_dash_frequency_hz <= 0.0)
+        {
+            if (error_message != nullptr)
+                *error_message = "Invalid DFCW dash frequency (<=0).";
+            return false;
+        }
+
+        if (parsed_dot_frequency_hz == parsed_dash_frequency_hz)
+        {
+            if (error_message != nullptr)
+                *error_message = "DFCW dot and dash frequencies must differ.";
+            return false;
+        }
+
+        const double parsed_dot_seconds = std::stod(dot_seconds);
+        if (parsed_dot_seconds <= 0.0)
+        {
+            if (error_message != nullptr)
+                *error_message = "Invalid DFCW dot length (<=0).";
+            return false;
+        }
+
+        dfcw_startup_request = DfcwStartupRequest{
+            trimmed_message,
+            parsed_dot_frequency_hz,
+            parsed_dash_frequency_hz,
+            parsed_dot_seconds};
+        return true;
+    }
+    catch (const std::exception &)
+    {
+        if (error_message != nullptr)
+        {
+            *error_message =
+                "Invalid DFCW startup request. Expected message, dot frequency, dash frequency, and dot length.";
+        }
+        return false;
+    }
+}
+
+bool has_dfcw_startup_request() noexcept
+{
+    return dfcw_startup_request.has_value();
+}
+
+bool try_get_dfcw_startup_request(
+    std::string &message_out,
+    double &dot_frequency_hz_out,
+    double &dash_frequency_hz_out,
+    double &dot_seconds_out) noexcept
+{
+    if (!dfcw_startup_request.has_value())
+        return false;
+
+    message_out = dfcw_startup_request->message;
+    dot_frequency_hz_out = dfcw_startup_request->dot_frequency_hz;
+    dash_frequency_hz_out = dfcw_startup_request->dash_frequency_hz;
+    dot_seconds_out = dfcw_startup_request->dot_seconds;
+    return true;
+}
+
+void clear_dfcw_startup_request() noexcept
+{
+    dfcw_startup_request.reset();
+}
+
 /**
  * @brief Displays the usage information for the WsprryPi application.
  *
@@ -741,6 +843,8 @@ void print_usage(const std::string &message, int exit_code)
               << "  (sudo) wsprrypi --qrss-message \"TEXT\" --qrss-frequency {hz} --qrss-dot-seconds {seconds}\n"
               << "    OR\n"
               << "  (sudo) wsprrypi --fskcw-message \"TEXT\" --fskcw-mark-frequency {hz} --fskcw-space-frequency {hz} --fskcw-dot-seconds {seconds}\n\n"
+              << "    OR\n"
+              << "  (sudo) wsprrypi --dfcw-message \"TEXT\" --dfcw-dot-frequency {hz} --dfcw-dash-frequency {hz} --dfcw-dot-seconds {seconds}\n\n"
               << "Options:\n"
               << "  -h, --help\n"
               << "    Display this help message.\n"
@@ -894,11 +998,25 @@ bool validate_config_candidate(
         return true;
     }
 
+    if (candidate.mode == ModeType::DFCW)
+    {
+        if (!has_dfcw_startup_request())
+        {
+            if (error_message != nullptr)
+            {
+                *error_message = "Missing DFCW startup request.";
+            }
+            return false;
+        }
+
+        return true;
+    }
+
     if (candidate.mode != ModeType::WSPR)
     {
         if (error_message != nullptr)
         {
-            *error_message = "Mode must be either WSPR, TONE, QRSS, or FSKCW.";
+            *error_message = "Mode must be either WSPR, TONE, QRSS, FSKCW, or DFCW.";
         }
         return false;
     }
@@ -1073,6 +1191,36 @@ void apply_runtime_config_side_effects()
         return;
     }
 
+    if (config.mode == ModeType::DFCW)
+    {
+        std::string message;
+        double dot_frequency_hz = 0.0;
+        double dash_frequency_hz = 0.0;
+        double dot_seconds = 0.0;
+        if (!try_get_dfcw_startup_request(
+                message,
+                dot_frequency_hz,
+                dash_frequency_hz,
+                dot_seconds))
+        {
+            llog.logE(ERROR, " - Missing DFCW startup request.");
+            return;
+        }
+
+        llog.logS(
+            INFO,
+            "A temporary DFCW test transmission will be generated: message='",
+            message,
+            "' dot=",
+            lookup.freq_display_string(dot_frequency_hz),
+            " dash=",
+            lookup.freq_display_string(dash_frequency_hz),
+            " dot=",
+            dot_seconds,
+            " s");
+        return;
+    }
+
     if (config.mode != ModeType::WSPR)
     {
         return;
@@ -1187,9 +1335,10 @@ bool validate_config_data()
     if (config.mode != ModeType::TONE &&
         config.mode != ModeType::WSPR &&
         config.mode != ModeType::QRSS &&
-        config.mode != ModeType::FSKCW)
+        config.mode != ModeType::FSKCW &&
+        config.mode != ModeType::DFCW)
     {
-        llog.logE(FATAL, "Mode must be either WSPR, TONE, QRSS, or FSKCW.");
+        llog.logE(FATAL, "Mode must be either WSPR, TONE, QRSS, FSKCW, or DFCW.");
         std::exit(EXIT_FAILURE);
     }
 
@@ -1235,6 +1384,26 @@ bool validate_config_data()
                 dot_seconds))
         {
             llog.logE(ERROR, " - Missing FSKCW startup request.");
+            if (config.use_ini)
+            {
+                return false;
+            }
+            std::exit(EXIT_FAILURE);
+        }
+    }
+    else if (config.mode == ModeType::DFCW)
+    {
+        std::string message;
+        double dot_frequency_hz = 0.0;
+        double dash_frequency_hz = 0.0;
+        double dot_seconds = 0.0;
+        if (!try_get_dfcw_startup_request(
+                message,
+                dot_frequency_hz,
+                dash_frequency_hz,
+                dot_seconds))
+        {
+            llog.logE(ERROR, " - Missing DFCW startup request.");
             if (config.use_ini)
             {
                 return false;
@@ -1376,6 +1545,7 @@ bool parse_command_line(int argc, char *argv[])
     clear_direct_tone_startup_request();
     clear_qrss_startup_request();
     clear_fskcw_startup_request();
+    clear_dfcw_startup_request();
 
     // Check if any arguments (besides the program name) were provided.
     if (argc == 1) // No arguments or options provided.
@@ -1469,6 +1639,10 @@ bool parse_command_line(int argc, char *argv[])
         {"fskcw-mark-frequency", required_argument, nullptr, 1007},
         {"fskcw-space-frequency", required_argument, nullptr, 1008},
         {"fskcw-dot-seconds", required_argument, nullptr, 1009},
+        {"dfcw-message", required_argument, nullptr, 1010},
+        {"dfcw-dot-frequency", required_argument, nullptr, 1011},
+        {"dfcw-dash-frequency", required_argument, nullptr, 1012},
+        {"dfcw-dot-seconds", required_argument, nullptr, 1013},
         // Required arguments
         {"ppm", required_argument, nullptr, 'p'},       // Via: [Extended] PPM = 0.0
         {"terminate", required_argument, nullptr, 'x'}, // Global: config.tx_iterations
@@ -1555,6 +1729,10 @@ bool parse_command_line(int argc, char *argv[])
         case 1007:
         case 1008:
         case 1009:
+        case 1010:
+        case 1011:
+        case 1012:
+        case 1013:
         {
             break;
         }
@@ -1767,6 +1945,10 @@ bool parse_command_line(int argc, char *argv[])
     std::string fskcw_mark_frequency_arg;
     std::string fskcw_space_frequency_arg;
     std::string fskcw_dot_seconds_arg;
+    std::string dfcw_message_arg;
+    std::string dfcw_dot_frequency_arg;
+    std::string dfcw_dash_frequency_arg;
+    std::string dfcw_dot_seconds_arg;
     for (int i = 1; i < argc; ++i)
     {
         const std::string arg = argv[i];
@@ -1797,6 +1979,22 @@ bool parse_command_line(int argc, char *argv[])
         else if (arg == "--fskcw-dot-seconds" && i + 1 < argc)
         {
             fskcw_dot_seconds_arg = argv[++i];
+        }
+        else if (arg == "--dfcw-message" && i + 1 < argc)
+        {
+            dfcw_message_arg = argv[++i];
+        }
+        else if (arg == "--dfcw-dot-frequency" && i + 1 < argc)
+        {
+            dfcw_dot_frequency_arg = argv[++i];
+        }
+        else if (arg == "--dfcw-dash-frequency" && i + 1 < argc)
+        {
+            dfcw_dash_frequency_arg = argv[++i];
+        }
+        else if (arg == "--dfcw-dot-seconds" && i + 1 < argc)
+        {
+            dfcw_dot_seconds_arg = argv[++i];
         }
     }
 
@@ -1832,6 +2030,7 @@ bool parse_command_line(int argc, char *argv[])
 
         clear_direct_tone_startup_request();
         clear_fskcw_startup_request();
+        clear_dfcw_startup_request();
         config.mode = ModeType::QRSS;
     }
 
@@ -1870,7 +2069,47 @@ bool parse_command_line(int argc, char *argv[])
 
         clear_direct_tone_startup_request();
         clear_qrss_startup_request();
+        clear_dfcw_startup_request();
         config.mode = ModeType::FSKCW;
+    }
+
+    const bool any_dfcw_arg =
+        !dfcw_message_arg.empty() ||
+        !dfcw_dot_frequency_arg.empty() ||
+        !dfcw_dash_frequency_arg.empty() ||
+        !dfcw_dot_seconds_arg.empty();
+    if (any_dfcw_arg)
+    {
+        if (config.use_ini)
+        {
+            print_usage("DFCW test mode is invalid when using INI file.", EXIT_FAILURE);
+        }
+
+        if (dfcw_message_arg.empty() ||
+            dfcw_dot_frequency_arg.empty() ||
+            dfcw_dash_frequency_arg.empty() ||
+            dfcw_dot_seconds_arg.empty())
+        {
+            print_usage(
+                "DFCW test mode requires --dfcw-message, --dfcw-dot-frequency, --dfcw-dash-frequency, and --dfcw-dot-seconds.",
+                EXIT_FAILURE);
+        }
+
+        std::string error_message;
+        if (!set_dfcw_startup_request(
+                dfcw_message_arg,
+                dfcw_dot_frequency_arg,
+                dfcw_dash_frequency_arg,
+                dfcw_dot_seconds_arg,
+                &error_message))
+        {
+            print_usage(error_message, EXIT_FAILURE);
+        }
+
+        clear_direct_tone_startup_request();
+        clear_qrss_startup_request();
+        clear_fskcw_startup_request();
+        config.mode = ModeType::DFCW;
     }
 
     if (config.mode == ModeType::WSPR)

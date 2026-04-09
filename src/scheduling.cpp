@@ -778,6 +778,56 @@ static TransmissionRequest make_fskcw_legacy_request(
     return request;
 }
 
+static wsprrypi::TransmissionRequest make_dfcw_controller_request(
+    const ArgParserConfig &cfg,
+    double committed_ppm,
+    const std::string &message,
+    double dot_frequency_hz,
+    double dash_frequency_hz,
+    double dot_seconds)
+{
+    wsprrypi::TransmissionRequest request;
+    request.id.value = 1;
+    request.mode = wsprrypi::TransmissionMode::DFCW;
+    request.output.backend = wsprrypi::BackendKind::RPI_CLOCK_GPIO;
+    request.output.output = wsprrypi::ClockSource::GPIO_CLK;
+    request.output.gpio = cfg.tx_pin;
+    request.calibration.ppm = committed_ppm;
+    request.metadata.label = "dfcw-cli-test";
+    request.metadata.origin = "cli";
+    request.metadata.note = "temporary dfcw test path";
+
+    wsprrypi::DfcwPayload payload;
+    payload.message = message;
+    payload.dot_frequency_hz = dot_frequency_hz;
+    payload.dash_frequency_hz = dash_frequency_hz;
+    payload.timing.dot = seconds_to_nanoseconds(dot_seconds);
+    payload.timing.dash = payload.timing.dot * 3;
+    payload.timing.intra_element_gap = payload.timing.dot;
+    payload.timing.inter_character_gap = payload.timing.dot * 3;
+    payload.timing.inter_word_gap = payload.timing.dot * 7;
+    request.payload = payload;
+    return request;
+}
+
+static TransmissionRequest make_dfcw_legacy_request(
+    const ArgParserConfig &cfg,
+    double committed_ppm,
+    double dot_frequency_hz,
+    double dash_frequency_hz)
+{
+    TransmissionRequest request;
+    request.mode = TransmissionMode::WSPR;
+    request.dial_frequency_hz = dot_frequency_hz;
+    request.actual_rf_frequency_hz = dot_frequency_hz;
+    request.ppm = committed_ppm;
+    request.power_level = cfg.power_level;
+    request.tx_gpio = cfg.tx_pin;
+    request.applied_offset_hz = dash_frequency_hz - dot_frequency_hz;
+    request.frequency_entry_label = "dfcw-cli-test";
+    return request;
+}
+
 /**
  * @brief Build the scheduler-side request for one WSPR execution slot.
  *
@@ -1114,6 +1164,15 @@ void transmitter_cb(WsprTransmitter::TransmissionCallbackEvent event,
             {
                 llog.logS(to_log_level(level),
                           "Started FSKCW test transmission at mark frequency: ",
+                          frequency,
+                          " Hz (",
+                          wsprTransmitter.formatFrequencyMHz(frequency),
+                          " MHz).");
+            }
+            else if (config.mode == ModeType::DFCW)
+            {
+                llog.logS(to_log_level(level),
+                          "Started DFCW test transmission at dot frequency: ",
                           frequency,
                           " Hz (",
                           wsprTransmitter.formatFrequencyMHz(frequency),
@@ -1833,6 +1892,56 @@ bool wspr_loop()
             space_frequency_hz,
             " Hz (",
             wsprTransmitter.formatFrequencyMHz(space_frequency_hz),
+            " MHz), dot length ",
+            dot_seconds,
+            " s.");
+    }
+    else if (config.mode == ModeType::DFCW)
+    {
+        std::string message;
+        double dot_frequency_hz = 0.0;
+        double dash_frequency_hz = 0.0;
+        double dot_seconds = 0.0;
+        if (!try_get_dfcw_startup_request(
+                message,
+                dot_frequency_hz,
+                dash_frequency_hz,
+                dot_seconds))
+        {
+            llog.logE(ERROR, "DFCW test mode requested without a startup DFCW request.");
+            stop_runtime_components_for_early_exit();
+            return false;
+        }
+
+        const double committed_ppm = config.ppm;
+        shutdown_after_current_transmission.store(true, std::memory_order_release);
+        shutdown_after_wspr_plan.store(false, std::memory_order_release);
+        commit_execution_request(
+            make_dfcw_controller_request(
+                config,
+                committed_ppm,
+                message,
+                dot_frequency_hz,
+                dash_frequency_hz,
+                dot_seconds),
+            make_dfcw_legacy_request(
+                config,
+                committed_ppm,
+                dot_frequency_hz,
+                dash_frequency_hz));
+        wsprTransmitter.startAsync();
+        llog.logS(
+            INFO,
+            "transmitting temporary DFCW test message '",
+            message,
+            "' dot=",
+            dot_frequency_hz,
+            " Hz (",
+            wsprTransmitter.formatFrequencyMHz(dot_frequency_hz),
+            " MHz), dash=",
+            dash_frequency_hz,
+            " Hz (",
+            wsprTransmitter.formatFrequencyMHz(dash_frequency_hz),
             " MHz), dot length ",
             dot_seconds,
             " s.");
