@@ -132,6 +132,15 @@ struct DirectToneStartupRequest
 };
 
 std::optional<DirectToneStartupRequest> direct_tone_startup_request;
+
+struct QrssStartupRequest
+{
+    std::string message;
+    double frequency_hz = 0.0;
+    double dot_seconds = 0.0;
+};
+
+std::optional<QrssStartupRequest> qrss_startup_request;
 } // namespace
 
 /**
@@ -499,6 +508,79 @@ void clear_direct_tone_startup_request() noexcept
     direct_tone_startup_request.reset();
 }
 
+bool set_qrss_startup_request(
+    const std::string &message,
+    const std::string &frequency_hz,
+    const std::string &dot_seconds,
+    std::string *error_message)
+{
+    try
+    {
+        const std::string trimmed_message = trim_copy_string(message);
+        if (trimmed_message.empty())
+        {
+            if (error_message != nullptr)
+                *error_message = "Invalid QRSS message.";
+            return false;
+        }
+
+        const double parsed_frequency_hz = std::stod(frequency_hz);
+        if (parsed_frequency_hz <= 0.0)
+        {
+            if (error_message != nullptr)
+                *error_message = "Invalid QRSS frequency (<=0).";
+            return false;
+        }
+
+        const double parsed_dot_seconds = std::stod(dot_seconds);
+        if (parsed_dot_seconds <= 0.0)
+        {
+            if (error_message != nullptr)
+                *error_message = "Invalid QRSS dot length (<=0).";
+            return false;
+        }
+
+        qrss_startup_request = QrssStartupRequest{
+            trimmed_message,
+            parsed_frequency_hz,
+            parsed_dot_seconds};
+        return true;
+    }
+    catch (const std::exception &)
+    {
+        if (error_message != nullptr)
+        {
+            *error_message =
+                "Invalid QRSS startup request. Expected message, frequency, and dot length.";
+        }
+        return false;
+    }
+}
+
+bool has_qrss_startup_request() noexcept
+{
+    return qrss_startup_request.has_value();
+}
+
+bool try_get_qrss_startup_request(
+    std::string &message_out,
+    double &frequency_hz_out,
+    double &dot_seconds_out) noexcept
+{
+    if (!qrss_startup_request.has_value())
+        return false;
+
+    message_out = qrss_startup_request->message;
+    frequency_hz_out = qrss_startup_request->frequency_hz;
+    dot_seconds_out = qrss_startup_request->dot_seconds;
+    return true;
+}
+
+void clear_qrss_startup_request() noexcept
+{
+    qrss_startup_request.reset();
+}
+
 /**
  * @brief Displays the usage information for the WsprryPi application.
  *
@@ -552,7 +634,9 @@ void print_usage(const std::string &message, int exit_code)
     std::cerr << "\nUsage:\n"
               << "  (sudo) wsprrypi [options] callsign gridsquare transmit_power dial_frequency <f2> <f3> ...\n"
               << "    OR\n"
-              << "  (sudo) wsprrypi --test-tone {rf_frequency}\n\n"
+              << "  (sudo) wsprrypi --test-tone {rf_frequency}\n"
+              << "    OR\n"
+              << "  (sudo) wsprrypi --qrss-message \"TEXT\" --qrss-frequency {hz} --qrss-dot-seconds {seconds}\n\n"
               << "Options:\n"
               << "  -h, --help\n"
               << "    Display this help message.\n"
@@ -678,11 +762,25 @@ bool validate_config_candidate(
         return true;
     }
 
+    if (candidate.mode == ModeType::QRSS)
+    {
+        if (!has_qrss_startup_request())
+        {
+            if (error_message != nullptr)
+            {
+                *error_message = "Missing QRSS startup request.";
+            }
+            return false;
+        }
+
+        return true;
+    }
+
     if (candidate.mode != ModeType::WSPR)
     {
         if (error_message != nullptr)
         {
-            *error_message = "Mode must be either WSPR or TONE.";
+            *error_message = "Mode must be either WSPR, TONE, or QRSS.";
         }
         return false;
     }
@@ -804,6 +902,29 @@ void apply_runtime_config_side_effects()
         return;
     }
 
+    if (config.mode == ModeType::QRSS)
+    {
+        std::string message;
+        double frequency_hz = 0.0;
+        double dot_seconds = 0.0;
+        if (!try_get_qrss_startup_request(message, frequency_hz, dot_seconds))
+        {
+            llog.logE(ERROR, " - Missing QRSS startup request.");
+            return;
+        }
+
+        llog.logS(
+            INFO,
+            "A temporary QRSS test transmission will be generated: message='",
+            message,
+            "' frequency=",
+            lookup.freq_display_string(frequency_hz),
+            " dot=",
+            dot_seconds,
+            " s");
+        return;
+    }
+
     if (config.mode != ModeType::WSPR)
     {
         return;
@@ -915,9 +1036,11 @@ bool validate_config_data()
         std::exit(EXIT_FAILURE);
     }
 
-    if (config.mode != ModeType::TONE && config.mode != ModeType::WSPR)
+    if (config.mode != ModeType::TONE &&
+        config.mode != ModeType::WSPR &&
+        config.mode != ModeType::QRSS)
     {
-        llog.logE(FATAL, "Mode must be either WSPR or TONE.");
+        llog.logE(FATAL, "Mode must be either WSPR, TONE, or QRSS.");
         std::exit(EXIT_FAILURE);
     }
 
@@ -928,6 +1051,21 @@ bool validate_config_data()
         if (!try_get_direct_tone_startup_request(entry, actual_rf_frequency_hz))
         {
             llog.logE(ERROR, " - Missing direct RF test tone frequency.");
+            if (config.use_ini)
+            {
+                return false;
+            }
+            std::exit(EXIT_FAILURE);
+        }
+    }
+    else if (config.mode == ModeType::QRSS)
+    {
+        std::string message;
+        double frequency_hz = 0.0;
+        double dot_seconds = 0.0;
+        if (!try_get_qrss_startup_request(message, frequency_hz, dot_seconds))
+        {
+            llog.logE(ERROR, " - Missing QRSS startup request.");
             if (config.use_ini)
             {
                 return false;
@@ -1067,6 +1205,7 @@ bool handle_early_cli_options(int argc, char *argv[])
 bool parse_command_line(int argc, char *argv[])
 {
     clear_direct_tone_startup_request();
+    clear_qrss_startup_request();
 
     // Check if any arguments (besides the program name) were provided.
     if (argc == 1) // No arguments or options provided.
@@ -1153,6 +1292,9 @@ bool parse_command_line(int argc, char *argv[])
         {"date-time-log", no_argument, nullptr, 'D'}, // Global: config.date_time_log
         {"require-paired", no_argument, nullptr, 1001}, // Global: config.wspr_planner_preference
         {"tx-gpio-polarity", required_argument, nullptr, 1002},
+        {"qrss-message", required_argument, nullptr, 1003},
+        {"qrss-frequency", required_argument, nullptr, 1004},
+        {"qrss-dot-seconds", required_argument, nullptr, 1005},
         // Required arguments
         {"ppm", required_argument, nullptr, 'p'},       // Via: [Extended] PPM = 0.0
         {"terminate", required_argument, nullptr, 'x'}, // Global: config.tx_iterations
@@ -1230,6 +1372,12 @@ bool parse_command_line(int argc, char *argv[])
             // This applies to per-frequency selector GPIO outputs derived
             // from frequency tokens with optional @GPIO suffixes.
             config.tx_freq_control_active_high = active_high;
+            break;
+        }
+        case 1003:
+        case 1004:
+        case 1005:
+        {
             break;
         }
         // Required arguments
@@ -1432,6 +1580,60 @@ bool parse_command_line(int argc, char *argv[])
             break;
         }
         }
+    }
+
+    std::string qrss_message_arg;
+    std::string qrss_frequency_arg;
+    std::string qrss_dot_seconds_arg;
+    for (int i = 1; i < argc; ++i)
+    {
+        const std::string arg = argv[i];
+        if (arg == "--qrss-message" && i + 1 < argc)
+        {
+            qrss_message_arg = argv[++i];
+        }
+        else if (arg == "--qrss-frequency" && i + 1 < argc)
+        {
+            qrss_frequency_arg = argv[++i];
+        }
+        else if (arg == "--qrss-dot-seconds" && i + 1 < argc)
+        {
+            qrss_dot_seconds_arg = argv[++i];
+        }
+    }
+
+    const bool any_qrss_arg =
+        !qrss_message_arg.empty() ||
+        !qrss_frequency_arg.empty() ||
+        !qrss_dot_seconds_arg.empty();
+    if (any_qrss_arg)
+    {
+        if (config.use_ini)
+        {
+            print_usage("QRSS test mode is invalid when using INI file.", EXIT_FAILURE);
+        }
+
+        if (qrss_message_arg.empty() ||
+            qrss_frequency_arg.empty() ||
+            qrss_dot_seconds_arg.empty())
+        {
+            print_usage(
+                "QRSS test mode requires --qrss-message, --qrss-frequency, and --qrss-dot-seconds.",
+                EXIT_FAILURE);
+        }
+
+        std::string error_message;
+        if (!set_qrss_startup_request(
+                qrss_message_arg,
+                qrss_frequency_arg,
+                qrss_dot_seconds_arg,
+                &error_message))
+        {
+            print_usage(error_message, EXIT_FAILURE);
+        }
+
+        clear_direct_tone_startup_request();
+        config.mode = ModeType::QRSS;
     }
 
     if (config.mode == ModeType::WSPR)

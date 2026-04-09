@@ -102,7 +102,8 @@ extern nlohmann::json jConfig;
 enum class ModeType
 {
     WSPR, ///< WSPR transmission mode
-    TONE  ///< Test tone generation mode
+    TONE, ///< Test tone generation mode
+    QRSS  ///< Temporary QRSS test mode
 };
 
 enum class WsprPlannerPreference

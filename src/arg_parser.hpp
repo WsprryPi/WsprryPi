@@ -188,6 +188,17 @@ bool try_get_direct_tone_startup_request(
     WsprDialFrequencyEntry &entry_out,
     double &actual_rf_frequency_hz_out) noexcept;
 void clear_direct_tone_startup_request() noexcept;
+bool set_qrss_startup_request(
+    const std::string &message,
+    const std::string &frequency_hz,
+    const std::string &dot_seconds,
+    std::string *error_message = nullptr);
+bool has_qrss_startup_request() noexcept;
+bool try_get_qrss_startup_request(
+    std::string &message_out,
+    double &frequency_hz_out,
+    double &dot_seconds_out) noexcept;
+void clear_qrss_startup_request() noexcept;
 
 /**
  * @brief Parses command-line arguments and configures the program settings.
