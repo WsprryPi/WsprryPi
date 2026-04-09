@@ -506,8 +506,8 @@ static PreparedWsprTransmission slot_plan_for_frame(
 static bool is_auto_paired_upgrade_eligible(const ArgParserConfig &cfg) noexcept
 {
     return cfg.mode == ModeType::WSPR &&
-           (cfg.callsign.find('/') != std::string::npos) &&
-           cfg.grid_square.size() == 6U;
+           (cfg.wspr.callsign.find('/') != std::string::npos) &&
+           cfg.wspr.grid_square.size() == 6U;
 }
 
 void consume_tx_iteration_if_needed()
@@ -684,10 +684,7 @@ static std::chrono::nanoseconds seconds_to_nanoseconds(double seconds)
 
 static wsprrypi::TransmissionRequest make_qrss_controller_request(
     const ArgParserConfig &cfg,
-    double committed_ppm,
-    const std::string &message,
-    double frequency_hz,
-    double dot_seconds)
+    double committed_ppm)
 {
     wsprrypi::TransmissionRequest request;
     request.id.value = 1;
@@ -701,9 +698,9 @@ static wsprrypi::TransmissionRequest make_qrss_controller_request(
     request.metadata.note = "temporary qrss test path";
 
     wsprrypi::QrssPayload payload;
-    payload.message = message;
-    payload.frequency_hz = frequency_hz;
-    payload.timing.dot = seconds_to_nanoseconds(dot_seconds);
+    payload.message = cfg.qrss.message;
+    payload.frequency_hz = cfg.qrss.frequency_hz;
+    payload.timing.dot = seconds_to_nanoseconds(cfg.qrss.dot_seconds);
     payload.timing.dash = payload.timing.dot * 3;
     payload.timing.intra_element_gap = payload.timing.dot;
     payload.timing.inter_character_gap = payload.timing.dot * 3;
@@ -714,13 +711,12 @@ static wsprrypi::TransmissionRequest make_qrss_controller_request(
 
 static TransmissionRequest make_qrss_legacy_request(
     const ArgParserConfig &cfg,
-    double committed_ppm,
-    double frequency_hz)
+    double committed_ppm)
 {
     TransmissionRequest request;
     request.mode = TransmissionMode::WSPR;
-    request.dial_frequency_hz = frequency_hz;
-    request.actual_rf_frequency_hz = frequency_hz;
+    request.dial_frequency_hz = cfg.qrss.frequency_hz;
+    request.actual_rf_frequency_hz = cfg.qrss.frequency_hz;
     request.ppm = committed_ppm;
     request.power_level = cfg.power_level;
     request.tx_gpio = cfg.tx_pin;
@@ -730,11 +726,7 @@ static TransmissionRequest make_qrss_legacy_request(
 
 static wsprrypi::TransmissionRequest make_fskcw_controller_request(
     const ArgParserConfig &cfg,
-    double committed_ppm,
-    const std::string &message,
-    double mark_frequency_hz,
-    double space_frequency_hz,
-    double dot_seconds)
+    double committed_ppm)
 {
     wsprrypi::TransmissionRequest request;
     request.id.value = 1;
@@ -748,10 +740,10 @@ static wsprrypi::TransmissionRequest make_fskcw_controller_request(
     request.metadata.note = "temporary fskcw test path";
 
     wsprrypi::FskcwPayload payload;
-    payload.message = message;
-    payload.mark_frequency_hz = mark_frequency_hz;
-    payload.space_frequency_hz = space_frequency_hz;
-    payload.timing.dot = seconds_to_nanoseconds(dot_seconds);
+    payload.message = cfg.fskcw.message;
+    payload.mark_frequency_hz = cfg.fskcw.mark_frequency_hz;
+    payload.space_frequency_hz = cfg.fskcw.space_frequency_hz;
+    payload.timing.dot = seconds_to_nanoseconds(cfg.fskcw.dot_seconds);
     payload.timing.dash = payload.timing.dot * 3;
     payload.timing.intra_element_gap = payload.timing.dot;
     payload.timing.inter_character_gap = payload.timing.dot * 3;
@@ -762,29 +754,24 @@ static wsprrypi::TransmissionRequest make_fskcw_controller_request(
 
 static TransmissionRequest make_fskcw_legacy_request(
     const ArgParserConfig &cfg,
-    double committed_ppm,
-    double mark_frequency_hz,
-    double space_frequency_hz)
+    double committed_ppm)
 {
     TransmissionRequest request;
     request.mode = TransmissionMode::WSPR;
-    request.dial_frequency_hz = mark_frequency_hz;
-    request.actual_rf_frequency_hz = mark_frequency_hz;
+    request.dial_frequency_hz = cfg.fskcw.mark_frequency_hz;
+    request.actual_rf_frequency_hz = cfg.fskcw.mark_frequency_hz;
     request.ppm = committed_ppm;
     request.power_level = cfg.power_level;
     request.tx_gpio = cfg.tx_pin;
-    request.applied_offset_hz = mark_frequency_hz - space_frequency_hz;
+    request.applied_offset_hz =
+        cfg.fskcw.mark_frequency_hz - cfg.fskcw.space_frequency_hz;
     request.frequency_entry_label = "fskcw-cli-test";
     return request;
 }
 
 static wsprrypi::TransmissionRequest make_dfcw_controller_request(
     const ArgParserConfig &cfg,
-    double committed_ppm,
-    const std::string &message,
-    double dot_frequency_hz,
-    double dash_frequency_hz,
-    double dot_seconds)
+    double committed_ppm)
 {
     wsprrypi::TransmissionRequest request;
     request.id.value = 1;
@@ -798,10 +785,10 @@ static wsprrypi::TransmissionRequest make_dfcw_controller_request(
     request.metadata.note = "temporary dfcw test path";
 
     wsprrypi::DfcwPayload payload;
-    payload.message = message;
-    payload.dot_frequency_hz = dot_frequency_hz;
-    payload.dash_frequency_hz = dash_frequency_hz;
-    payload.timing.dot = seconds_to_nanoseconds(dot_seconds);
+    payload.message = cfg.dfcw.message;
+    payload.dot_frequency_hz = cfg.dfcw.dot_frequency_hz;
+    payload.dash_frequency_hz = cfg.dfcw.dash_frequency_hz;
+    payload.timing.dot = seconds_to_nanoseconds(cfg.dfcw.dot_seconds);
     payload.timing.dash = payload.timing.dot * 3;
     payload.timing.intra_element_gap = payload.timing.dot;
     payload.timing.inter_character_gap = payload.timing.dot * 3;
@@ -812,18 +799,17 @@ static wsprrypi::TransmissionRequest make_dfcw_controller_request(
 
 static TransmissionRequest make_dfcw_legacy_request(
     const ArgParserConfig &cfg,
-    double committed_ppm,
-    double dot_frequency_hz,
-    double dash_frequency_hz)
+    double committed_ppm)
 {
     TransmissionRequest request;
     request.mode = TransmissionMode::WSPR;
-    request.dial_frequency_hz = dot_frequency_hz;
-    request.actual_rf_frequency_hz = dot_frequency_hz;
+    request.dial_frequency_hz = cfg.dfcw.dot_frequency_hz;
+    request.actual_rf_frequency_hz = cfg.dfcw.dot_frequency_hz;
     request.ppm = committed_ppm;
     request.power_level = cfg.power_level;
     request.tx_gpio = cfg.tx_pin;
-    request.applied_offset_hz = dash_frequency_hz - dot_frequency_hz;
+    request.applied_offset_hz =
+        cfg.dfcw.dash_frequency_hz - cfg.dfcw.dot_frequency_hz;
     request.frequency_entry_label = "dfcw-cli-test";
     return request;
 }
@@ -922,7 +908,7 @@ static bool configure_current_wspr_transmission(
         PreparedWsprTransmission slot_plan;
         const wspr::TransmissionPlanPreference preference =
             wspr_planner_preference_to_plan_preference(
-                cfg.wspr_planner_preference);
+                cfg.wspr.planner_preference);
         bool auto_upgraded = false;
 
         if (active_plan_in_progress)
@@ -942,15 +928,15 @@ static bool configure_current_wspr_transmission(
         }
         else
         {
-            if (cfg.wspr_planner_preference == WsprPlannerPreference::RequirePaired)
+            if (cfg.wspr.planner_preference == WsprPlannerPreference::RequirePaired)
             {
                 llog.logS(INFO,
                           "Paired WSPR planning explicitly requested.");
 
                 plan = build_prepared_wspr_transmission(
-                    cfg.callsign,
-                    cfg.grid_square,
-                    cfg.power_dbm,
+                    cfg.wspr.callsign,
+                    cfg.wspr.grid_square,
+                    cfg.wspr.power_dbm,
                     wspr::TransmissionPlanPreference::RequirePaired);
             }
             else
@@ -958,7 +944,7 @@ static bool configure_current_wspr_transmission(
                 const bool paired_upgrade_eligible =
                     is_auto_paired_upgrade_eligible(cfg);
 
-                if (cfg.wspr_planner_preference == WsprPlannerPreference::PreferPaired)
+                if (cfg.wspr.planner_preference == WsprPlannerPreference::PreferPaired)
                 {
                     llog.logS(INFO,
                               "Paired WSPR planning preferred when available.");
@@ -967,9 +953,9 @@ static bool configure_current_wspr_transmission(
                 try
                 {
                     plan = build_prepared_wspr_transmission(
-                        cfg.callsign,
-                        cfg.grid_square,
-                        cfg.power_dbm,
+                        cfg.wspr.callsign,
+                        cfg.wspr.grid_square,
+                        cfg.wspr.power_dbm,
                         preference);
                 }
                 catch (const std::exception &)
@@ -984,16 +970,16 @@ static bool configure_current_wspr_transmission(
 
                     PreparedWsprTransmission paired_plan =
                         build_prepared_wspr_transmission(
-                            cfg.callsign,
-                            cfg.grid_square,
-                            cfg.power_dbm,
+                            cfg.wspr.callsign,
+                            cfg.wspr.grid_square,
+                            cfg.wspr.power_dbm,
                             wspr::TransmissionPlanPreference::RequirePaired);
 
                     plan = std::move(paired_plan);
                     auto_upgraded = true;
                 }
 
-                if (cfg.wspr_planner_preference == WsprPlannerPreference::Auto &&
+                if (cfg.wspr.planner_preference == WsprPlannerPreference::Auto &&
                     !auto_upgraded &&
                     plan.frameCount() <= 1U &&
                     paired_upgrade_eligible)
@@ -1005,9 +991,9 @@ static bool configure_current_wspr_transmission(
 
                     PreparedWsprTransmission paired_plan =
                         build_prepared_wspr_transmission(
-                            cfg.callsign,
-                            cfg.grid_square,
-                            cfg.power_dbm,
+                            cfg.wspr.callsign,
+                            cfg.wspr.grid_square,
+                            cfg.wspr.power_dbm,
                             wspr::TransmissionPlanPreference::RequirePaired);
 
                     if (paired_plan.frameCount() > 1U)
@@ -1044,7 +1030,7 @@ static bool configure_current_wspr_transmission(
                   ", frames: ",
                   static_cast<int>(plan.frames.size()),
                   ", preference: ",
-                  wspr_planner_preference_to_string(cfg.wspr_planner_preference),
+                  wspr_planner_preference_to_string(cfg.wspr.planner_preference),
                   ", auto-upgraded: ",
                   auto_upgraded ? "true" : "false",
                   ".");
@@ -1555,7 +1541,7 @@ void start_test_tone()
         current_frequency_entry = entry;
         const double actual_rf_freq = resolve_actual_rf_frequency_hz(
             dial_freq,
-            config.wspr_audio_offset_hz,
+            config.wspr.audio_offset_hz,
             FrequencyPath::WsprDial);
 
         while (
@@ -1578,7 +1564,7 @@ void start_test_tone()
             " to actual RF ",
             lookup.freq_display_string(actual_rf_freq),
             " using audio offset ",
-            config.wspr_audio_offset_hz,
+            config.wspr.audio_offset_hz,
             " Hz.");
         const double committed_ppm = config.ppm;
         commit_execution_request(
@@ -1825,14 +1811,10 @@ bool wspr_loop()
         commit_execution_request(
             make_qrss_controller_request(
                 config,
-                committed_ppm,
-                message,
-                frequency_hz,
-                dot_seconds),
+                committed_ppm),
             make_qrss_legacy_request(
                 config,
-                committed_ppm,
-                frequency_hz));
+                committed_ppm));
         wsprTransmitter.startAsync();
         llog.logS(
             INFO,
@@ -1869,16 +1851,10 @@ bool wspr_loop()
         commit_execution_request(
             make_fskcw_controller_request(
                 config,
-                committed_ppm,
-                message,
-                mark_frequency_hz,
-                space_frequency_hz,
-                dot_seconds),
+                committed_ppm),
             make_fskcw_legacy_request(
                 config,
-                committed_ppm,
-                mark_frequency_hz,
-                space_frequency_hz));
+                committed_ppm));
         wsprTransmitter.startAsync();
         llog.logS(
             INFO,
@@ -1919,16 +1895,10 @@ bool wspr_loop()
         commit_execution_request(
             make_dfcw_controller_request(
                 config,
-                committed_ppm,
-                message,
-                dot_frequency_hz,
-                dash_frequency_hz,
-                dot_seconds),
+                committed_ppm),
             make_dfcw_legacy_request(
                 config,
-                committed_ppm,
-                dot_frequency_hz,
-                dash_frequency_hz));
+                committed_ppm));
         wsprTransmitter.startAsync();
         llog.logS(
             INFO,
@@ -2431,7 +2401,7 @@ bool set_config(bool force)
 
             const double base_actual_rf_frequency_hz = resolve_actual_rf_frequency_hz(
                 next_current_dial_frequency,
-                working_config.wspr_audio_offset_hz,
+                working_config.wspr.audio_offset_hz,
                 FrequencyPath::WsprDial);
             const double actual_rf_frequency_hz =
                 maybe_apply_wspr_random_offset(base_actual_rf_frequency_hz,
@@ -2446,7 +2416,7 @@ bool set_config(bool force)
                 " to actual RF ",
                 lookup.freq_display_string(actual_rf_frequency_hz),
                 " using audio offset ",
-                working_config.wspr_audio_offset_hz,
+                working_config.wspr.audio_offset_hz,
                 " Hz.");
             if (!configure_current_wspr_transmission(
                     working_config,

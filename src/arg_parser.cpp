@@ -161,6 +161,16 @@ struct DfcwStartupRequest
 };
 
 std::optional<DfcwStartupRequest> dfcw_startup_request;
+
+void sync_wspr_mode_config(ArgParserConfig &cfg)
+{
+    cfg.wspr.callsign = cfg.callsign;
+    cfg.wspr.grid_square = cfg.grid_square;
+    cfg.wspr.power_dbm = cfg.power_dbm;
+    cfg.wspr.frequencies = cfg.frequencies;
+    cfg.wspr.audio_offset_hz = cfg.wspr_audio_offset_hz;
+    cfg.wspr.planner_preference = cfg.wspr_planner_preference;
+}
 } // namespace
 
 /**
@@ -903,7 +913,7 @@ void show_config_values(bool reload)
     llog.logS(DEBUG, "PPM Offset:", config.ppm);
     llog.logS(DEBUG, "Synchronize with NTP:", config.use_ntp ? "true" : "false");
     llog.logS(DEBUG, "Use Frequency Randomization:", config.use_offset ? "true" : "false");
-    llog.logS(DEBUG, "WSPR Audio Offset Hz:", config.wspr_audio_offset_hz);
+    llog.logS(DEBUG, "WSPR Audio Offset Hz:", config.wspr.audio_offset_hz);
     llog.logS(DEBUG, "Power Level:", config.power_level);
     llog.logS(DEBUG, "Use LED:", config.use_led ? "true" : "false");
     llog.logS(DEBUG, "LED on GPIO", config.led_pin);
@@ -1074,6 +1084,7 @@ bool validate_config_candidate(
     candidate.callsign = callsign;
     candidate.grid_square = locator;
     candidate.power_dbm = round_to_nearest_wspr_power(candidate.power_dbm);
+    sync_wspr_mode_config(candidate);
 
     return true;
 }
@@ -1291,6 +1302,7 @@ void apply_runtime_config_side_effects()
 
 bool validate_config_data()
 {
+    sync_wspr_mode_config(config);
     ini_reload_pending.store(false, std::memory_order_relaxed);
 
     std::string validation_error;
@@ -2031,6 +2043,9 @@ bool parse_command_line(int argc, char *argv[])
         clear_direct_tone_startup_request();
         clear_fskcw_startup_request();
         clear_dfcw_startup_request();
+        config.qrss.message = qrss_message_arg;
+        config.qrss.frequency_hz = std::stod(qrss_frequency_arg);
+        config.qrss.dot_seconds = std::stod(qrss_dot_seconds_arg);
         config.mode = ModeType::QRSS;
     }
 
@@ -2070,6 +2085,10 @@ bool parse_command_line(int argc, char *argv[])
         clear_direct_tone_startup_request();
         clear_qrss_startup_request();
         clear_dfcw_startup_request();
+        config.fskcw.message = fskcw_message_arg;
+        config.fskcw.mark_frequency_hz = std::stod(fskcw_mark_frequency_arg);
+        config.fskcw.space_frequency_hz = std::stod(fskcw_space_frequency_arg);
+        config.fskcw.dot_seconds = std::stod(fskcw_dot_seconds_arg);
         config.mode = ModeType::FSKCW;
     }
 
@@ -2109,6 +2128,10 @@ bool parse_command_line(int argc, char *argv[])
         clear_direct_tone_startup_request();
         clear_qrss_startup_request();
         clear_fskcw_startup_request();
+        config.dfcw.message = dfcw_message_arg;
+        config.dfcw.dot_frequency_hz = std::stod(dfcw_dot_frequency_arg);
+        config.dfcw.dash_frequency_hz = std::stod(dfcw_dash_frequency_arg);
+        config.dfcw.dot_seconds = std::stod(dfcw_dot_seconds_arg);
         config.mode = ModeType::DFCW;
     }
 
@@ -2163,6 +2186,8 @@ bool parse_command_line(int argc, char *argv[])
             {
                 print_usage(std::string("Failed to capture frequencies: ") + e.what(), EXIT_FAILURE);
             }
+
+            sync_wspr_mode_config(config);
         }
     }
     // Re-save any config changes in the JSON

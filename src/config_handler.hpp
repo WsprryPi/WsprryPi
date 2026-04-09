@@ -115,6 +115,39 @@ enum class WsprPlannerPreference
     RequirePaired
 };
 
+struct WsprModeConfig
+{
+    std::string callsign;
+    std::string grid_square;
+    int power_dbm = 0;
+    std::string frequencies;
+    double audio_offset_hz = 1500.0;
+    WsprPlannerPreference planner_preference = WsprPlannerPreference::Auto;
+};
+
+struct QrssModeConfig
+{
+    std::string message;
+    double frequency_hz = 0.0;
+    double dot_seconds = 0.0;
+};
+
+struct FskcwModeConfig
+{
+    std::string message;
+    double mark_frequency_hz = 0.0;
+    double space_frequency_hz = 0.0;
+    double dot_seconds = 0.0;
+};
+
+struct DfcwModeConfig
+{
+    std::string message;
+    double dot_frequency_hz = 0.0;
+    double dash_frequency_hz = 0.0;
+    double dot_seconds = 0.0;
+};
+
 inline constexpr const char *wspr_planner_preference_to_string(
     WsprPlannerPreference preference) noexcept
 {
@@ -193,6 +226,10 @@ struct ArgParserConfig
 
     // Runtime variables
     ModeType mode;                       ///< Current operating mode.
+    WsprModeConfig wspr;                 ///< Long-term WSPR mode configuration.
+    QrssModeConfig qrss;                 ///< Long-term QRSS mode configuration.
+    FskcwModeConfig fskcw;               ///< Long-term FSKCW mode configuration.
+    DfcwModeConfig dfcw;                 ///< Long-term DFCW mode configuration.
     bool use_ini;                        ///< Load configuration from INI file.
     std::string ini_filename;            ///< INI file name and path.
     std::vector<double> wspr_dial_freq_set; ///< Parsed WSPR dial frequencies.
@@ -229,6 +266,10 @@ struct ArgParserConfig
           tx_iterations(0),
           wspr_audio_offset_hz(1500.0),
           mode(ModeType::WSPR),
+          wspr({}),
+          qrss({}),
+          fskcw({}),
+          dfcw({}),
           use_ini(false),
           ini_filename(""),
           wspr_dial_freq_set({}),
@@ -275,6 +316,10 @@ struct ArgParserConfig
         tx_iterations.store(other.tx_iterations.load());
         wspr_audio_offset_hz = other.wspr_audio_offset_hz;
         mode = other.mode;
+        wspr = other.wspr;
+        qrss = other.qrss;
+        fskcw = other.fskcw;
+        dfcw = other.dfcw;
         use_ini = other.use_ini;
         ini_filename = other.ini_filename;
         wspr_dial_freq_set = other.wspr_dial_freq_set;
