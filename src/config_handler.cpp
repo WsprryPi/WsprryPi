@@ -86,6 +86,50 @@ namespace
             "'. Expected auto, prefer_paired, or require_paired.");
     }
 
+    ModeType parse_mode_type(const nlohmann::json &meta)
+    {
+        const std::string raw =
+            trim_copy(meta.value("Mode", std::string("WSPR")));
+        std::string upper = raw;
+        std::transform(
+            upper.begin(),
+            upper.end(),
+            upper.begin(),
+            [](unsigned char c)
+            {
+                return static_cast<char>(std::toupper(c));
+            });
+
+        if (upper.empty() || upper == "WSPR")
+            return ModeType::WSPR;
+        if (upper == "QRSS")
+            return ModeType::QRSS;
+        if (upper == "FSKCW")
+            return ModeType::FSKCW;
+        if (upper == "DFCW")
+            return ModeType::DFCW;
+        if (upper == "TONE")
+            return ModeType::TONE;
+
+        throw std::runtime_error(
+            "Invalid mode '" + raw +
+            "'. Expected WSPR, QRSS, FSKCW, DFCW, or TONE.");
+    }
+
+    const char *mode_type_to_string(ModeType mode) noexcept
+    {
+        switch (mode)
+        {
+        case ModeType::WSPR: return "WSPR";
+        case ModeType::QRSS: return "QRSS";
+        case ModeType::FSKCW: return "FSKCW";
+        case ModeType::DFCW: return "DFCW";
+        case ModeType::TONE: return "TONE";
+        }
+
+        return "WSPR";
+    }
+
     nlohmann::json make_plan_validation_error_details(
         const wspr::TransmissionPlanResult &plan)
     {
@@ -671,13 +715,10 @@ namespace
     {
         set_default_band_gpio_config(target.band_gpio);
 
-        // Persistent config always initializes in WSPR mode. Transient tone
-        // startup is a CLI/runtime request layered on top later.
-        target.mode = ModeType::WSPR;
-
         target.use_ini = source.at("Meta").at("Use INI").get<bool>();
         target.ini_filename = source.at("Meta").at("INI Filename").get<std::string>();
         target.date_time_log = source.at("Meta").at("Date Time Log").get<bool>();
+        target.mode = parse_mode_type(source.at("Meta"));
         target.wspr_planner_preference =
             parse_wspr_planner_preference(source.at("Meta"));
         target.loop_tx = source.at("Meta").at("Loop TX").get<bool>();
@@ -842,7 +883,9 @@ namespace
 
     void config_to_json_impl(const ArgParserConfig &source, nlohmann::json &target)
     {
-        target["Meta"]["Mode"] = "WSPR";
+        target["Meta"]["Mode"] =
+            mode_type_to_string(
+                source.mode == ModeType::TONE ? ModeType::WSPR : source.mode);
         target["Meta"]["Use INI"] = source.use_ini;
         target["Meta"]["INI Filename"] = source.ini_filename;
         target["Meta"]["Date Time Log"] = source.date_time_log;

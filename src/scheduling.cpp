@@ -391,6 +391,94 @@ static void commit_execution_request(
     wsprTransmitter.configureExecution(controller_request, current_transmission_request);
 }
 
+static bool resolve_qrss_runtime_request(
+    const ArgParserConfig &cfg,
+    std::string &message_out,
+    double &frequency_hz_out,
+    double &dot_seconds_out) noexcept
+{
+    if (try_get_qrss_startup_request(message_out, frequency_hz_out, dot_seconds_out))
+    {
+        return true;
+    }
+
+    if (cfg.qrss.message.empty() ||
+        cfg.qrss.frequency_hz <= 0.0 ||
+        cfg.qrss.dot_seconds <= 0.0)
+    {
+        return false;
+    }
+
+    message_out = cfg.qrss.message;
+    frequency_hz_out = cfg.qrss.frequency_hz;
+    dot_seconds_out = cfg.qrss.dot_seconds;
+    return true;
+}
+
+static bool resolve_fskcw_runtime_request(
+    const ArgParserConfig &cfg,
+    std::string &message_out,
+    double &mark_frequency_hz_out,
+    double &space_frequency_hz_out,
+    double &dot_seconds_out) noexcept
+{
+    if (try_get_fskcw_startup_request(
+            message_out,
+            mark_frequency_hz_out,
+            space_frequency_hz_out,
+            dot_seconds_out))
+    {
+        return true;
+    }
+
+    if (cfg.fskcw.message.empty() ||
+        cfg.fskcw.mark_frequency_hz <= 0.0 ||
+        cfg.fskcw.space_frequency_hz <= 0.0 ||
+        cfg.fskcw.mark_frequency_hz <= cfg.fskcw.space_frequency_hz ||
+        cfg.fskcw.dot_seconds <= 0.0)
+    {
+        return false;
+    }
+
+    message_out = cfg.fskcw.message;
+    mark_frequency_hz_out = cfg.fskcw.mark_frequency_hz;
+    space_frequency_hz_out = cfg.fskcw.space_frequency_hz;
+    dot_seconds_out = cfg.fskcw.dot_seconds;
+    return true;
+}
+
+static bool resolve_dfcw_runtime_request(
+    const ArgParserConfig &cfg,
+    std::string &message_out,
+    double &dot_frequency_hz_out,
+    double &dash_frequency_hz_out,
+    double &dot_seconds_out) noexcept
+{
+    if (try_get_dfcw_startup_request(
+            message_out,
+            dot_frequency_hz_out,
+            dash_frequency_hz_out,
+            dot_seconds_out))
+    {
+        return true;
+    }
+
+    if (cfg.dfcw.message.empty() ||
+        cfg.dfcw.dot_frequency_hz <= 0.0 ||
+        cfg.dfcw.dash_frequency_hz <= 0.0 ||
+        cfg.dfcw.dot_frequency_hz == cfg.dfcw.dash_frequency_hz ||
+        cfg.dfcw.dot_seconds <= 0.0)
+    {
+        return false;
+    }
+
+    message_out = cfg.dfcw.message;
+    dot_frequency_hz_out = cfg.dfcw.dot_frequency_hz;
+    dash_frequency_hz_out = cfg.dfcw.dash_frequency_hz;
+    dot_seconds_out = cfg.dfcw.dot_seconds;
+    return true;
+}
+
 static void reset_active_wspr_plan_state()
 {
     active_wspr_plan = PreparedWsprTransmission{};
@@ -1798,9 +1886,9 @@ bool wspr_loop()
         std::string message;
         double frequency_hz = 0.0;
         double dot_seconds = 0.0;
-        if (!try_get_qrss_startup_request(message, frequency_hz, dot_seconds))
+        if (!resolve_qrss_runtime_request(config, message, frequency_hz, dot_seconds))
         {
-            llog.logE(ERROR, "QRSS test mode requested without a startup QRSS request.");
+            llog.logE(ERROR, "QRSS mode requested without a valid QRSS configuration.");
             stop_runtime_components_for_early_exit();
             return false;
         }
@@ -1818,7 +1906,7 @@ bool wspr_loop()
         wsprTransmitter.startAsync();
         llog.logS(
             INFO,
-            "transmitting temporary QRSS test message '",
+            "transmitting QRSS message '",
             message,
             "' at ",
             frequency_hz,
@@ -1834,13 +1922,14 @@ bool wspr_loop()
         double mark_frequency_hz = 0.0;
         double space_frequency_hz = 0.0;
         double dot_seconds = 0.0;
-        if (!try_get_fskcw_startup_request(
+        if (!resolve_fskcw_runtime_request(
+                config,
                 message,
                 mark_frequency_hz,
                 space_frequency_hz,
                 dot_seconds))
         {
-            llog.logE(ERROR, "FSKCW test mode requested without a startup FSKCW request.");
+            llog.logE(ERROR, "FSKCW mode requested without a valid FSKCW configuration.");
             stop_runtime_components_for_early_exit();
             return false;
         }
@@ -1858,7 +1947,7 @@ bool wspr_loop()
         wsprTransmitter.startAsync();
         llog.logS(
             INFO,
-            "transmitting temporary FSKCW test message '",
+            "transmitting FSKCW message '",
             message,
             "' mark=",
             mark_frequency_hz,
@@ -1878,13 +1967,14 @@ bool wspr_loop()
         double dot_frequency_hz = 0.0;
         double dash_frequency_hz = 0.0;
         double dot_seconds = 0.0;
-        if (!try_get_dfcw_startup_request(
+        if (!resolve_dfcw_runtime_request(
+                config,
                 message,
                 dot_frequency_hz,
                 dash_frequency_hz,
                 dot_seconds))
         {
-            llog.logE(ERROR, "DFCW test mode requested without a startup DFCW request.");
+            llog.logE(ERROR, "DFCW mode requested without a valid DFCW configuration.");
             stop_runtime_components_for_early_exit();
             return false;
         }
@@ -1902,7 +1992,7 @@ bool wspr_loop()
         wsprTransmitter.startAsync();
         llog.logS(
             INFO,
-            "transmitting temporary DFCW test message '",
+            "transmitting DFCW message '",
             message,
             "' dot=",
             dot_frequency_hz,

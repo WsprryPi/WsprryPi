@@ -171,6 +171,31 @@ void sync_wspr_mode_config(ArgParserConfig &cfg)
     cfg.wspr.audio_offset_hz = cfg.wspr_audio_offset_hz;
     cfg.wspr.planner_preference = cfg.wspr_planner_preference;
 }
+
+bool persisted_qrss_config_available(const ArgParserConfig &cfg) noexcept
+{
+    return !cfg.qrss.message.empty() &&
+           cfg.qrss.frequency_hz > 0.0 &&
+           cfg.qrss.dot_seconds > 0.0;
+}
+
+bool persisted_fskcw_config_available(const ArgParserConfig &cfg) noexcept
+{
+    return !cfg.fskcw.message.empty() &&
+           cfg.fskcw.mark_frequency_hz > 0.0 &&
+           cfg.fskcw.space_frequency_hz > 0.0 &&
+           cfg.fskcw.mark_frequency_hz > cfg.fskcw.space_frequency_hz &&
+           cfg.fskcw.dot_seconds > 0.0;
+}
+
+bool persisted_dfcw_config_available(const ArgParserConfig &cfg) noexcept
+{
+    return !cfg.dfcw.message.empty() &&
+           cfg.dfcw.dot_frequency_hz > 0.0 &&
+           cfg.dfcw.dash_frequency_hz > 0.0 &&
+           cfg.dfcw.dot_frequency_hz != cfg.dfcw.dash_frequency_hz &&
+           cfg.dfcw.dot_seconds > 0.0;
+}
 } // namespace
 
 /**
@@ -982,11 +1007,12 @@ bool validate_config_candidate(
 
     if (candidate.mode == ModeType::QRSS)
     {
-        if (!has_qrss_startup_request())
+        if (!has_qrss_startup_request() &&
+            !persisted_qrss_config_available(candidate))
         {
             if (error_message != nullptr)
             {
-                *error_message = "Missing QRSS startup request.";
+                *error_message = "Missing QRSS configuration.";
             }
             return false;
         }
@@ -996,11 +1022,12 @@ bool validate_config_candidate(
 
     if (candidate.mode == ModeType::FSKCW)
     {
-        if (!has_fskcw_startup_request())
+        if (!has_fskcw_startup_request() &&
+            !persisted_fskcw_config_available(candidate))
         {
             if (error_message != nullptr)
             {
-                *error_message = "Missing FSKCW startup request.";
+                *error_message = "Missing FSKCW configuration.";
             }
             return false;
         }
@@ -1010,11 +1037,12 @@ bool validate_config_candidate(
 
     if (candidate.mode == ModeType::DFCW)
     {
-        if (!has_dfcw_startup_request())
+        if (!has_dfcw_startup_request() &&
+            !persisted_dfcw_config_available(candidate))
         {
             if (error_message != nullptr)
             {
-                *error_message = "Missing DFCW startup request.";
+                *error_message = "Missing DFCW configuration.";
             }
             return false;
         }
@@ -1156,13 +1184,20 @@ void apply_runtime_config_side_effects()
         double dot_seconds = 0.0;
         if (!try_get_qrss_startup_request(message, frequency_hz, dot_seconds))
         {
-            llog.logE(ERROR, " - Missing QRSS startup request.");
-            return;
+            if (!persisted_qrss_config_available(config))
+            {
+                llog.logE(ERROR, " - Missing QRSS configuration.");
+                return;
+            }
+
+            message = config.qrss.message;
+            frequency_hz = config.qrss.frequency_hz;
+            dot_seconds = config.qrss.dot_seconds;
         }
 
         llog.logS(
             INFO,
-            "A temporary QRSS test transmission will be generated: message='",
+            "A QRSS transmission will be generated: message='",
             message,
             "' frequency=",
             lookup.freq_display_string(frequency_hz),
@@ -1184,13 +1219,21 @@ void apply_runtime_config_side_effects()
                 space_frequency_hz,
                 dot_seconds))
         {
-            llog.logE(ERROR, " - Missing FSKCW startup request.");
-            return;
+            if (!persisted_fskcw_config_available(config))
+            {
+                llog.logE(ERROR, " - Missing FSKCW configuration.");
+                return;
+            }
+
+            message = config.fskcw.message;
+            mark_frequency_hz = config.fskcw.mark_frequency_hz;
+            space_frequency_hz = config.fskcw.space_frequency_hz;
+            dot_seconds = config.fskcw.dot_seconds;
         }
 
         llog.logS(
             INFO,
-            "A temporary FSKCW test transmission will be generated: message='",
+            "A FSKCW transmission will be generated: message='",
             message,
             "' mark=",
             lookup.freq_display_string(mark_frequency_hz),
@@ -1214,13 +1257,21 @@ void apply_runtime_config_side_effects()
                 dash_frequency_hz,
                 dot_seconds))
         {
-            llog.logE(ERROR, " - Missing DFCW startup request.");
-            return;
+            if (!persisted_dfcw_config_available(config))
+            {
+                llog.logE(ERROR, " - Missing DFCW configuration.");
+                return;
+            }
+
+            message = config.dfcw.message;
+            dot_frequency_hz = config.dfcw.dot_frequency_hz;
+            dash_frequency_hz = config.dfcw.dash_frequency_hz;
+            dot_seconds = config.dfcw.dot_seconds;
         }
 
         llog.logS(
             INFO,
-            "A temporary DFCW test transmission will be generated: message='",
+            "A DFCW transmission will be generated: message='",
             message,
             "' dot=",
             lookup.freq_display_string(dot_frequency_hz),
@@ -1375,12 +1426,15 @@ bool validate_config_data()
         double dot_seconds = 0.0;
         if (!try_get_qrss_startup_request(message, frequency_hz, dot_seconds))
         {
-            llog.logE(ERROR, " - Missing QRSS startup request.");
-            if (config.use_ini)
+            if (!persisted_qrss_config_available(config))
             {
-                return false;
+                llog.logE(ERROR, " - Missing QRSS configuration.");
+                if (config.use_ini)
+                {
+                    return false;
+                }
+                std::exit(EXIT_FAILURE);
             }
-            std::exit(EXIT_FAILURE);
         }
     }
     else if (config.mode == ModeType::FSKCW)
@@ -1395,12 +1449,15 @@ bool validate_config_data()
                 space_frequency_hz,
                 dot_seconds))
         {
-            llog.logE(ERROR, " - Missing FSKCW startup request.");
-            if (config.use_ini)
+            if (!persisted_fskcw_config_available(config))
             {
-                return false;
+                llog.logE(ERROR, " - Missing FSKCW configuration.");
+                if (config.use_ini)
+                {
+                    return false;
+                }
+                std::exit(EXIT_FAILURE);
             }
-            std::exit(EXIT_FAILURE);
         }
     }
     else if (config.mode == ModeType::DFCW)
@@ -1415,12 +1472,15 @@ bool validate_config_data()
                 dash_frequency_hz,
                 dot_seconds))
         {
-            llog.logE(ERROR, " - Missing DFCW startup request.");
-            if (config.use_ini)
+            if (!persisted_dfcw_config_available(config))
             {
-                return false;
+                llog.logE(ERROR, " - Missing DFCW configuration.");
+                if (config.use_ini)
+                {
+                    return false;
+                }
+                std::exit(EXIT_FAILURE);
             }
-            std::exit(EXIT_FAILURE);
         }
     }
 
