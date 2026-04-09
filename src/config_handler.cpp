@@ -374,6 +374,16 @@ void init_default_config()
     config.use_ini = true;
     config.tx_freq_control_active_high = false;
 
+    config.wspr.callsign = config.callsign;
+    config.wspr.grid_square = config.grid_square;
+    config.wspr.power_dbm = config.power_dbm;
+    config.wspr.frequencies = config.frequencies;
+    config.wspr.audio_offset_hz = config.wspr_audio_offset_hz;
+    config.wspr.planner_preference = config.wspr_planner_preference;
+    config.qrss = QrssModeConfig{};
+    config.fskcw = FskcwModeConfig{};
+    config.dfcw = DfcwModeConfig{};
+
     set_default_band_gpio_config(config.band_gpio);
 }
 
@@ -624,6 +634,27 @@ namespace
             {"Use Shutdown", false}};
 
         target["Band GPIO"] = nlohmann::json::object();
+        target["WSPR"] = {
+            {"Call Sign", "NXXX"},
+            {"Grid Square", "ZZ99"},
+            {"TX Power", 20},
+            {"Frequency", "20m"},
+            {"Audio Offset Hz", 1500.0},
+            {"Planner Preference", "auto"}};
+        target["QRSS"] = {
+            {"Message", ""},
+            {"Frequency", 0.0},
+            {"Dot Seconds", 0.0}};
+        target["FSKCW"] = {
+            {"Message", ""},
+            {"Mark Frequency", 0.0},
+            {"Space Frequency", 0.0},
+            {"Dot Seconds", 0.0}};
+        target["DFCW"] = {
+            {"Message", ""},
+            {"Dot Frequency", 0.0},
+            {"Dash Frequency", 0.0},
+            {"Dot Seconds", 0.0}};
         std::array<BandGPIOConfig, HAM_BAND_COUNT> default_band_gpio{};
         set_default_band_gpio_config(default_band_gpio);
         for (const auto &[band, band_name] : kHamBandJsonKeys)
@@ -690,6 +721,81 @@ namespace
         {
             target.wspr_audio_offset_hz = 1500.0;
         }
+        target.wspr.callsign =
+            source.contains("WSPR") && source.at("WSPR").contains("Call Sign")
+                ? source.at("WSPR").at("Call Sign").get<std::string>()
+                : target.callsign;
+        target.wspr.grid_square =
+            source.contains("WSPR") && source.at("WSPR").contains("Grid Square")
+                ? source.at("WSPR").at("Grid Square").get<std::string>()
+                : target.grid_square;
+        target.wspr.power_dbm =
+            source.contains("WSPR") && source.at("WSPR").contains("TX Power")
+                ? source.at("WSPR").at("TX Power").get<int>()
+                : target.power_dbm;
+        target.wspr.frequencies =
+            source.contains("WSPR") && source.at("WSPR").contains("Frequency")
+                ? json_to_string(source.at("WSPR").at("Frequency"))
+                : target.frequencies;
+        target.wspr.audio_offset_hz =
+            source.contains("WSPR") && source.at("WSPR").contains("Audio Offset Hz")
+                ? source.at("WSPR").at("Audio Offset Hz").get<double>()
+                : target.wspr_audio_offset_hz;
+        target.wspr.planner_preference =
+            source.contains("WSPR")
+                ? parse_wspr_planner_preference(source.at("WSPR"))
+                : target.wspr_planner_preference;
+        target.qrss.message =
+            source.contains("QRSS") && source.at("QRSS").contains("Message")
+                ? source.at("QRSS").at("Message").get<std::string>()
+                : target.qrss.message;
+        target.qrss.frequency_hz =
+            source.contains("QRSS") && source.at("QRSS").contains("Frequency")
+                ? source.at("QRSS").at("Frequency").get<double>()
+                : target.qrss.frequency_hz;
+        target.qrss.dot_seconds =
+            source.contains("QRSS") && source.at("QRSS").contains("Dot Seconds")
+                ? source.at("QRSS").at("Dot Seconds").get<double>()
+                : target.qrss.dot_seconds;
+        target.fskcw.message =
+            source.contains("FSKCW") && source.at("FSKCW").contains("Message")
+                ? source.at("FSKCW").at("Message").get<std::string>()
+                : target.fskcw.message;
+        target.fskcw.mark_frequency_hz =
+            source.contains("FSKCW") && source.at("FSKCW").contains("Mark Frequency")
+                ? source.at("FSKCW").at("Mark Frequency").get<double>()
+                : target.fskcw.mark_frequency_hz;
+        target.fskcw.space_frequency_hz =
+            source.contains("FSKCW") && source.at("FSKCW").contains("Space Frequency")
+                ? source.at("FSKCW").at("Space Frequency").get<double>()
+                : target.fskcw.space_frequency_hz;
+        target.fskcw.dot_seconds =
+            source.contains("FSKCW") && source.at("FSKCW").contains("Dot Seconds")
+                ? source.at("FSKCW").at("Dot Seconds").get<double>()
+                : target.fskcw.dot_seconds;
+        target.dfcw.message =
+            source.contains("DFCW") && source.at("DFCW").contains("Message")
+                ? source.at("DFCW").at("Message").get<std::string>()
+                : target.dfcw.message;
+        target.dfcw.dot_frequency_hz =
+            source.contains("DFCW") && source.at("DFCW").contains("Dot Frequency")
+                ? source.at("DFCW").at("Dot Frequency").get<double>()
+                : target.dfcw.dot_frequency_hz;
+        target.dfcw.dash_frequency_hz =
+            source.contains("DFCW") && source.at("DFCW").contains("Dash Frequency")
+                ? source.at("DFCW").at("Dash Frequency").get<double>()
+                : target.dfcw.dash_frequency_hz;
+        target.dfcw.dot_seconds =
+            source.contains("DFCW") && source.at("DFCW").contains("Dot Seconds")
+                ? source.at("DFCW").at("Dot Seconds").get<double>()
+                : target.dfcw.dot_seconds;
+
+        target.callsign = target.wspr.callsign;
+        target.grid_square = target.wspr.grid_square;
+        target.power_dbm = target.wspr.power_dbm;
+        target.frequencies = target.wspr.frequencies;
+        target.wspr_audio_offset_hz = target.wspr.audio_offset_hz;
+        target.wspr_planner_preference = target.wspr.planner_preference;
         target.use_led = source.at("Extended").at("Use LED").get<bool>();
         target.led_pin = source.at("Extended").at("LED Pin").get<int>();
         target.power_level = source.at("Extended").at("Power Level").get<int>();
@@ -754,6 +860,24 @@ namespace
         target["Common"]["TX Power"] = source.power_dbm;
         target["Common"]["Frequency"] = source.frequencies;
         target["Common"]["Transmit Pin"] = source.tx_pin;
+        target["WSPR"]["Call Sign"] = source.wspr.callsign;
+        target["WSPR"]["Grid Square"] = source.wspr.grid_square;
+        target["WSPR"]["TX Power"] = source.wspr.power_dbm;
+        target["WSPR"]["Frequency"] = source.wspr.frequencies;
+        target["WSPR"]["Audio Offset Hz"] = source.wspr.audio_offset_hz;
+        target["WSPR"]["Planner Preference"] =
+            wspr_planner_preference_to_string(source.wspr.planner_preference);
+        target["QRSS"]["Message"] = source.qrss.message;
+        target["QRSS"]["Frequency"] = source.qrss.frequency_hz;
+        target["QRSS"]["Dot Seconds"] = source.qrss.dot_seconds;
+        target["FSKCW"]["Message"] = source.fskcw.message;
+        target["FSKCW"]["Mark Frequency"] = source.fskcw.mark_frequency_hz;
+        target["FSKCW"]["Space Frequency"] = source.fskcw.space_frequency_hz;
+        target["FSKCW"]["Dot Seconds"] = source.fskcw.dot_seconds;
+        target["DFCW"]["Message"] = source.dfcw.message;
+        target["DFCW"]["Dot Frequency"] = source.dfcw.dot_frequency_hz;
+        target["DFCW"]["Dash Frequency"] = source.dfcw.dash_frequency_hz;
+        target["DFCW"]["Dot Seconds"] = source.dfcw.dot_seconds;
 
         target["Extended"]["PPM"] = source.ppm;
         target["Extended"]["Use NTP"] = source.use_ntp;
@@ -802,6 +926,10 @@ namespace
         target.tx_iterations.store(source.tx_iterations.load());
         target.wspr_audio_offset_hz = source.wspr_audio_offset_hz;
         target.mode = source.mode;
+        target.wspr = source.wspr;
+        target.qrss = source.qrss;
+        target.fskcw = source.fskcw;
+        target.dfcw = source.dfcw;
         target.use_ini = source.use_ini;
         target.ini_filename = source.ini_filename;
         target.wspr_dial_freq_set = source.wspr_dial_freq_set;
