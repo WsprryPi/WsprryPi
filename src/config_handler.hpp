@@ -223,6 +223,10 @@ struct ArgParserConfig
     bool loop_tx;                   ///< Repeat transmission cycle.
     std::atomic<int> tx_iterations; ///< Number of transmission iterations (0 = infinite).
     double wspr_audio_offset_hz;    ///< Audio offset added to WSPR dial frequencies to derive RF.
+    double modulation_dot_seconds;  ///< Shared modulation dot length default.
+    double modulation_fsk_offset_hz; ///< Shared FSK/DFCW tone offset default.
+    int schedule_start_minute;      ///< Shared schedule minute offset within the hour.
+    int schedule_repeat_minutes;    ///< Shared schedule repeat interval in minutes.
 
     // Runtime variables
     ModeType mode;                       ///< Current operating mode.
@@ -265,6 +269,10 @@ struct ArgParserConfig
           loop_tx(false),
           tx_iterations(0),
           wspr_audio_offset_hz(1500.0),
+          modulation_dot_seconds(3.0),
+          modulation_fsk_offset_hz(500.0),
+          schedule_start_minute(0),
+          schedule_repeat_minutes(10),
           mode(ModeType::WSPR),
           wspr({}),
           qrss({}),
@@ -315,6 +323,10 @@ struct ArgParserConfig
         loop_tx = other.loop_tx;
         tx_iterations.store(other.tx_iterations.load());
         wspr_audio_offset_hz = other.wspr_audio_offset_hz;
+        modulation_dot_seconds = other.modulation_dot_seconds;
+        modulation_fsk_offset_hz = other.modulation_fsk_offset_hz;
+        schedule_start_minute = other.schedule_start_minute;
+        schedule_repeat_minutes = other.schedule_repeat_minutes;
         mode = other.mode;
         wspr = other.wspr;
         qrss = other.qrss;
@@ -524,6 +536,8 @@ void copy_runtime_config(const ArgParserConfig &source, ArgParserConfig &target)
  * @return void
  */
 void dump_json(const nlohmann::json &j, std::string tag);
+
+nlohmann::json get_public_config_json();
 
 /**
  * @brief Applies a full patch update from incoming JSON.

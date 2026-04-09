@@ -965,6 +965,37 @@ bool validate_config_candidate(
     ArgParserConfig &candidate,
     std::string *error_message)
 {
+    if (candidate.modulation_dot_seconds <= 0.0)
+    {
+        if (error_message != nullptr)
+        {
+            *error_message = "Modulation dot_seconds must be greater than 0.";
+        }
+
+        return false;
+    }
+
+    if (candidate.schedule_start_minute < 0 ||
+        candidate.schedule_start_minute > 59)
+    {
+        if (error_message != nullptr)
+        {
+            *error_message = "Schedule start_minute must be between 0 and 59.";
+        }
+
+        return false;
+    }
+
+    if (candidate.schedule_repeat_minutes <= 0)
+    {
+        if (error_message != nullptr)
+        {
+            *error_message = "Schedule repeat_minutes must be greater than 0.";
+        }
+
+        return false;
+    }
+
     const bool frequencies_ok = set_frequencies(candidate);
     if (!frequencies_ok && !trim_copy_string(candidate.frequencies).empty())
     {

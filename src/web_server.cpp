@@ -189,7 +189,7 @@ void WebServer::start(int port)
     svr.Get("/config",
             [this](const httplib::Request &req, httplib::Response &res) {
               setCORSHeaders(res);
-              res.set_content(jConfig.dump(4), "application/json");
+              res.set_content(get_public_config_json().dump(4), "application/json");
             });
 
     svr.Put("/config", handlePutPatch);
