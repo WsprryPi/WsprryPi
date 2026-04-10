@@ -2060,9 +2060,11 @@ bool wspr_loop()
     // Display the final configuration after parsing arguments and INI file.
     show_config_values();
 
+    const bool startup_config_handoff = consume_startup_config_handoff();
+
     if (config.mode != ModeType::WSPR)
     {
-        if (consume_startup_config_prevalidated())
+        if (startup_config_handoff)
         {
             apply_runtime_config_side_effects();
         }
@@ -2075,7 +2077,7 @@ bool wspr_loop()
     {
         // Validate the startup WSPR configuration before any long-lived
         // services are started so malformed CLI frequency lists fail cleanly.
-        if (consume_startup_config_prevalidated())
+        if (startup_config_handoff)
         {
             apply_runtime_config_side_effects();
         }
@@ -2129,13 +2131,14 @@ bool wspr_loop()
     }
 
     llog.logS(INFO, "WSPR loop running.");
+    emit_deferred_startup_diagnostics();
 
     // Startup WSPR configuration should be applied exactly once using the
     // same reload-safe path that handles validation, setup, and scheduling.
     if (config.mode == ModeType::WSPR)
     {
-        ini_reload_pending.store(true, std::memory_order_relaxed);
-        if (!set_config())
+        ini_reload_pending.store(!startup_config_handoff, std::memory_order_relaxed);
+        if (!set_config(startup_config_handoff ? false : true))
         {
             stop_runtime_components_for_early_exit();
             return false;

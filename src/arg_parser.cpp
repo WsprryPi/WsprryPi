@@ -44,6 +44,7 @@
 #include <algorithm>
 #include <atomic>
 #include <cstring>
+#include <mutex>
 #include <regex>
 #include <sstream>
 #include <stdexcept>
@@ -102,7 +103,16 @@ WSPRBandLookup lookup;
  */
 std::atomic<bool> ini_reload_pending(false);
 std::atomic<std::uint64_t> ini_reload_generation(0);
-static std::atomic<bool> startup_config_prevalidated{false};
+static std::atomic<bool> startup_config_handoff_ready{false};
+static std::mutex deferred_startup_diagnostics_mtx;
+
+struct DeferredStartupDiagnostic
+{
+    LogLevel level = INFO;
+    std::string message;
+};
+
+static std::vector<DeferredStartupDiagnostic> deferred_startup_diagnostics;
 
 /**
  * @brief Atomic flag indicating that a new PPM value needs to be applied.
@@ -198,6 +208,33 @@ bool persisted_dfcw_config_available(const ArgParserConfig &cfg) noexcept
            cfg.dfcw.dot_seconds > 0.0;
 }
 } // namespace
+
+static void defer_startup_diagnostic(LogLevel level, std::string message)
+{
+    std::lock_guard<std::mutex> lock(deferred_startup_diagnostics_mtx);
+    deferred_startup_diagnostics.push_back(
+        DeferredStartupDiagnostic{level, std::move(message)});
+}
+
+static void clear_deferred_startup_diagnostics()
+{
+    std::lock_guard<std::mutex> lock(deferred_startup_diagnostics_mtx);
+    deferred_startup_diagnostics.clear();
+}
+
+void emit_deferred_startup_diagnostics()
+{
+    std::vector<DeferredStartupDiagnostic> pending;
+    {
+        std::lock_guard<std::mutex> lock(deferred_startup_diagnostics_mtx);
+        pending.swap(deferred_startup_diagnostics);
+    }
+
+    for (const auto &diagnostic : pending)
+    {
+        llog.logS(diagnostic.level, diagnostic.message);
+    }
+}
 
 /**
  * @brief Callback for INI file change detection
@@ -1681,7 +1718,8 @@ bool handle_early_cli_options(int argc, char *argv[])
 
 bool parse_command_line(int argc, char *argv[])
 {
-    startup_config_prevalidated.store(false, std::memory_order_release);
+    startup_config_handoff_ready.store(false, std::memory_order_release);
+    clear_deferred_startup_diagnostics();
     clear_direct_tone_startup_request();
     clear_qrss_startup_request();
     clear_fskcw_startup_request();
@@ -1718,11 +1756,15 @@ bool parse_command_line(int argc, char *argv[])
                 {
                     for (const auto &warning_message : warning_messages)
                     {
-                        llog.logS(WARN, warning_message);
+                        defer_startup_diagnostic(WARN, warning_message);
                     }
 
-                    llog.logS(ERROR, "Configuration load failed:", load_error);
-                    llog.logS(WARN, "Using safe default configuration. Transmission disabled.");
+                    defer_startup_diagnostic(
+                        ERROR,
+                        std::string("Configuration load failed: ") + load_error);
+                    defer_startup_diagnostic(
+                        WARN,
+                        "Using safe default configuration. Transmission disabled.");
 
                     init_default_config();
                     config.ini_filename = *(it + 1);
@@ -1730,21 +1772,26 @@ bool parse_command_line(int argc, char *argv[])
                     config.loop_tx = true;
                     config.transmit = false;
                     config_to_json();
+                    startup_config_handoff_ready.store(true, std::memory_order_release);
                 }
                 else
                 {
                     for (const auto &warning_message : warning_messages)
                     {
-                        llog.logS(WARN, warning_message);
+                        defer_startup_diagnostic(WARN, warning_message);
                     }
 
-                    startup_config_prevalidated.store(true, std::memory_order_release);
+                    startup_config_handoff_ready.store(true, std::memory_order_release);
                 }
             }
             catch (const std::exception &e)
             {
-                llog.logS(ERROR, "Configuration load failed:", e.what());
-                llog.logS(WARN, "Using safe default configuration. Transmission disabled.");
+                defer_startup_diagnostic(
+                    ERROR,
+                    std::string("Configuration load failed: ") + e.what());
+                defer_startup_diagnostic(
+                    WARN,
+                    "Using safe default configuration. Transmission disabled.");
 
                 init_default_config();
                 config.ini_filename = *(it + 1);
@@ -1752,6 +1799,7 @@ bool parse_command_line(int argc, char *argv[])
                 config.loop_tx = true;
                 config.transmit = false;
                 config_to_json();
+                startup_config_handoff_ready.store(true, std::memory_order_release);
             }
 
             // Remove "-i <file>" from args
@@ -2326,7 +2374,7 @@ bool parse_command_line(int argc, char *argv[])
     return true;
 }
 
-bool consume_startup_config_prevalidated() noexcept
+bool consume_startup_config_handoff() noexcept
 {
-    return startup_config_prevalidated.exchange(false, std::memory_order_acq_rel);
+    return startup_config_handoff_ready.exchange(false, std::memory_order_acq_rel);
 }
