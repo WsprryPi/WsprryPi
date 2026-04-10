@@ -568,9 +568,19 @@ static bool is_managed_persistent_mode() noexcept
     return config.use_ini;
 }
 
+static void log_transmit_disabled_skip()
+{
+    llog.logS(INFO, "Transmit disabled, skipping transmission and scheduling.");
+}
+
+static bool runtime_transmit_requested(const ArgParserConfig &cfg) noexcept
+{
+    return cfg.transmit;
+}
+
 static bool runtime_transmit_enabled(const ArgParserConfig &cfg) noexcept
 {
-    return cfg.transmit && !managed_reload_tx_inhibited;
+    return runtime_transmit_requested(cfg) && !managed_reload_tx_inhibited;
 }
 
 static bool managed_reload_generation_changed(
@@ -973,6 +983,12 @@ static TransmissionRequest make_dfcw_legacy_request(
 
 static bool start_non_wspr_transmission_now(const ArgParserConfig &cfg)
 {
+    if (!runtime_transmit_requested(cfg))
+    {
+        log_transmit_disabled_skip();
+        return true;
+    }
+
     const double committed_ppm = cfg.ppm;
 
     if (cfg.mode == ModeType::QRSS)
@@ -1091,6 +1107,13 @@ static void schedule_next_non_wspr_launch(const ArgParserConfig &cfg)
         cfg.mode != ModeType::FSKCW &&
         cfg.mode != ModeType::DFCW)
     {
+        return;
+    }
+
+    if (!runtime_transmit_requested(cfg))
+    {
+        non_wspr_schedule_generation.fetch_add(1, std::memory_order_acq_rel);
+        log_transmit_disabled_skip();
         return;
     }
 
@@ -1845,6 +1868,12 @@ void start_test_tone()
 {
     if (!web_test_tone.load())
     {
+        if (!runtime_transmit_requested(config))
+        {
+            log_transmit_disabled_skip();
+            return;
+        }
+
         web_test_tone.store(true);
 
         // Save previous mode so we can restore it later
@@ -1964,6 +1993,12 @@ void end_test_tone()
             }
 
             validate_config_data();
+            if (!runtime_transmit_requested(config))
+            {
+                log_transmit_disabled_skip();
+                return;
+            }
+
             const double committed_ppm = config.ppm;
             commit_execution_request(
                 make_direct_tone_request(
@@ -2103,19 +2138,26 @@ bool wspr_loop()
             return false;
         }
 
-        const double committed_ppm = config.ppm;
-        commit_execution_request(
-            make_direct_tone_request(
+        if (!runtime_transmit_requested(config))
+        {
+            log_transmit_disabled_skip();
+        }
+        else
+        {
+            const double committed_ppm = config.ppm;
+            commit_execution_request(
+                make_direct_tone_request(
+                    config,
+                    committed_ppm,
+                    actual_rf_frequency_hz));
+            (void)prepare_frequency_entry_gpio_or_log(
+                entry,
                 config,
-                committed_ppm,
-                actual_rf_frequency_hz));
-        (void)prepare_frequency_entry_gpio_or_log(
-            entry,
-            config,
-            config.tx_freq_control_active_high,
-            WARN);
-        wsprTransmitter.startAsync();
-        llog.logS(INFO, "transmitting tone, hit Ctrl-C to terminate tone.");
+                config.tx_freq_control_active_high,
+                WARN);
+            wsprTransmitter.startAsync();
+            llog.logS(INFO, "transmitting tone, hit Ctrl-C to terminate tone.");
+        }
     }
     else if (config.mode == ModeType::QRSS)
     {
@@ -2638,7 +2680,14 @@ bool set_config(bool force)
                 active_wspr_plan_in_progress = next_active_wspr_plan_in_progress;
                 last_freq = next_current_dial_frequency;
                 last_frequency_entry = next_current_frequency_entry;
-                llog.logS(INFO, "Transmissions disabled.");
+                if (!runtime_transmit_requested(working_config))
+                {
+                    log_transmit_disabled_skip();
+                }
+                else
+                {
+                    llog.logS(INFO, "Transmissions disabled.");
+                }
 
                 if (!finalize_reload_pending())
                 {
