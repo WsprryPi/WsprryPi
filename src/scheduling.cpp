@@ -515,6 +515,18 @@ static const char *mode_type_name(ModeType mode) noexcept
     return "UNKNOWN";
 }
 
+static bool is_non_wspr_runtime_mode(ModeType mode) noexcept
+{
+    return mode == ModeType::QRSS ||
+           mode == ModeType::FSKCW ||
+           mode == ModeType::DFCW;
+}
+
+static void log_scheduler_path_selection(ModeType mode)
+{
+    llog.logS(INFO, "Scheduling path selected: ", mode_type_name(mode), ".");
+}
+
 static std::chrono::system_clock::time_point next_non_wspr_schedule_time(
     const ArgParserConfig &cfg)
 {
@@ -2139,6 +2151,7 @@ bool wspr_loop()
     // same reload-safe path that handles validation, setup, and scheduling.
     if (config.mode == ModeType::WSPR)
     {
+        log_scheduler_path_selection(config.mode);
         ini_reload_pending.store(!startup_config_handoff, std::memory_order_relaxed);
         if (!set_config(startup_config_handoff ? false : true))
         {
@@ -2148,6 +2161,7 @@ bool wspr_loop()
     }
     else if (config.mode == ModeType::TONE)
     {
+        log_scheduler_path_selection(config.mode);
         WsprDialFrequencyEntry entry;
         double actual_rf_frequency_hz = 0.0;
         if (!try_get_direct_tone_startup_request(entry, actual_rf_frequency_hz))
@@ -2180,6 +2194,7 @@ bool wspr_loop()
     }
     else if (config.mode == ModeType::QRSS)
     {
+        log_scheduler_path_selection(config.mode);
         if (has_non_wspr_cli_startup_request(config.mode))
         {
             shutdown_after_current_transmission.store(true, std::memory_order_release);
@@ -2199,6 +2214,7 @@ bool wspr_loop()
     }
     else if (config.mode == ModeType::FSKCW)
     {
+        log_scheduler_path_selection(config.mode);
         if (has_non_wspr_cli_startup_request(config.mode))
         {
             shutdown_after_current_transmission.store(true, std::memory_order_release);
@@ -2218,6 +2234,7 @@ bool wspr_loop()
     }
     else if (config.mode == ModeType::DFCW)
     {
+        log_scheduler_path_selection(config.mode);
         if (has_non_wspr_cli_startup_request(config.mode))
         {
             shutdown_after_current_transmission.store(true, std::memory_order_release);
@@ -2586,6 +2603,78 @@ bool set_config(bool force)
             do_config = true;
         }
 
+        if (is_non_wspr_runtime_mode(working_config.mode))
+        {
+            if (candidate_ready_to_commit)
+            {
+                prepared_candidate.normalized_config.ppm = working_config.ppm;
+                commit_config_candidate(prepared_candidate);
+                apply_runtime_config_side_effects();
+                set_managed_reload_tx_inhibited(false);
+                if (reload_requested)
+                {
+                    send_ws_message("configuration", "reload");
+                }
+            }
+            else if (runtime_ppm_changed)
+            {
+                config.ppm = working_config.ppm;
+            }
+
+            if (should_start_ppm)
+            {
+                ppm_init();
+                ppm_reload_pending.store(true, std::memory_order_seq_cst);
+            }
+            else if (should_stop_ppm)
+            {
+                ppmManager.stop();
+                llog.logS(INFO, "PPM Manager disabled.");
+                ppm_reload_pending.store(false, std::memory_order_seq_cst);
+            }
+            else if (should_log_ppm_disabled)
+            {
+                llog.logS(INFO, "PPM Manager disabled.");
+            }
+
+            if (ppm_update_pending)
+            {
+                ppm_reload_pending.store(false, std::memory_order_relaxed);
+            }
+
+            wsprTransmitter.stopAndJoin();
+            stop_active_transmission_selectors();
+            current_transmission_request = TransmissionRequest{};
+            current_dial_frequency = 0.0;
+            current_frequency_entry = WsprDialFrequencyEntry{};
+            freq_iterator = 0;
+            reset_active_wspr_plan_state();
+            non_wspr_schedule_generation.fetch_add(1, std::memory_order_acq_rel);
+
+            log_scheduler_path_selection(working_config.mode);
+
+            if (!runtime_transmit_enabled(working_config))
+            {
+                log_transmit_disabled_skip();
+                if (!finalize_reload_pending())
+                {
+                    continue;
+                }
+                return true;
+            }
+
+            if (!has_non_wspr_cli_startup_request(working_config.mode))
+            {
+                schedule_next_non_wspr_launch(working_config);
+            }
+
+            if (!finalize_reload_pending())
+            {
+                continue;
+            }
+            return true;
+        }
+
         int next_freq_iterator = force ? 0 : freq_iterator;
         double next_current_dial_frequency =
             force ? 0.0 : current_dial_frequency;
@@ -2641,6 +2730,13 @@ bool set_config(bool force)
 
         if (do_config || do_random)
         {
+            log_scheduler_path_selection(working_config.mode);
+
+            if (working_config.mode == ModeType::WSPR && do_config)
+            {
+                non_wspr_schedule_generation.fetch_add(1, std::memory_order_acq_rel);
+            }
+
             if (!runtime_transmit_enabled(working_config))
             {
                 if (newer_reload_arrived())
