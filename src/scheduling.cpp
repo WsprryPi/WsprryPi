@@ -2062,13 +2062,27 @@ bool wspr_loop()
 
     if (config.mode != ModeType::WSPR)
     {
-        validate_config_data();
+        if (consume_startup_config_prevalidated())
+        {
+            apply_runtime_config_side_effects();
+        }
+        else
+        {
+            validate_config_data();
+        }
     }
     else
     {
         // Validate the startup WSPR configuration before any long-lived
         // services are started so malformed CLI frequency lists fail cleanly.
-        validate_config_data();
+        if (consume_startup_config_prevalidated())
+        {
+            apply_runtime_config_side_effects();
+        }
+        else
+        {
+            validate_config_data();
+        }
     }
 
     // Start web server and set priority

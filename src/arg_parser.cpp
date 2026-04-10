@@ -102,6 +102,7 @@ WSPRBandLookup lookup;
  */
 std::atomic<bool> ini_reload_pending(false);
 std::atomic<std::uint64_t> ini_reload_generation(0);
+static std::atomic<bool> startup_config_prevalidated{false};
 
 /**
  * @brief Atomic flag indicating that a new PPM value needs to be applied.
@@ -1623,10 +1624,45 @@ bool set_frequencies()
  */
 bool handle_early_cli_options(int argc, char *argv[])
 {
+    bool early_use_journald = config.use_journald;
+    bool early_enable_timestamps = config.date_time_log;
+
     for (int i = 1; i < argc; ++i)
     {
         const std::string arg = argv[i];
 
+        if (arg == "--journald")
+        {
+            early_use_journald = true;
+            early_enable_timestamps = false;
+        }
+        else if (arg == "--date-time-log")
+        {
+            early_enable_timestamps = true;
+        }
+        else if (arg.size() > 1U && arg[0] == '-' && arg[1] != '-')
+        {
+            for (std::size_t j = 1; j < arg.size(); ++j)
+            {
+                if (arg[j] == 'J')
+                {
+                    early_use_journald = true;
+                    early_enable_timestamps = false;
+                }
+                else if (arg[j] == 'D')
+                {
+                    early_enable_timestamps = true;
+                }
+            }
+        }
+
+    }
+
+    initialize_logger(early_use_journald, early_enable_timestamps);
+
+    for (int i = 1; i < argc; ++i)
+    {
+        const std::string arg = argv[i];
         if (arg == "-h" || arg == "--help")
         {
             print_usage("", EXIT_SUCCESS);
@@ -1645,6 +1681,7 @@ bool handle_early_cli_options(int argc, char *argv[])
 
 bool parse_command_line(int argc, char *argv[])
 {
+    startup_config_prevalidated.store(false, std::memory_order_release);
     clear_direct_tone_startup_request();
     clear_qrss_startup_request();
     clear_fskcw_startup_request();
@@ -1700,6 +1737,8 @@ bool parse_command_line(int argc, char *argv[])
                     {
                         llog.logS(WARN, warning_message);
                     }
+
+                    startup_config_prevalidated.store(true, std::memory_order_release);
                 }
             }
             catch (const std::exception &e)
@@ -2285,4 +2324,9 @@ bool parse_command_line(int argc, char *argv[])
     config_to_json();
 
     return true;
+}
+
+bool consume_startup_config_prevalidated() noexcept
+{
+    return startup_config_prevalidated.exchange(false, std::memory_order_acq_rel);
 }
