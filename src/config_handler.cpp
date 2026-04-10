@@ -703,6 +703,115 @@ namespace
                  key == "Shutdown Button"));
     }
 
+    bool ini_has_nonempty_value(
+        const std::map<std::string, std::unordered_map<std::string, std::string>> &ini_data,
+        const std::string &section,
+        const std::string &key)
+    {
+        const auto section_it = ini_data.find(section);
+        if (section_it == ini_data.end())
+        {
+            return false;
+        }
+
+        const auto key_it = section_it->second.find(key);
+        return key_it != section_it->second.end() &&
+               !trim_copy(key_it->second).empty();
+    }
+
+    bool ini_has_effective_value(
+        const std::map<std::string, std::unordered_map<std::string, std::string>> &ini_data,
+        const std::string &section,
+        const std::string &key)
+    {
+        if (ini_has_nonempty_value(ini_data, section, key))
+        {
+            return true;
+        }
+
+        if (section == "Control" && key == "Transmit")
+        {
+            return ini_has_nonempty_value(ini_data, "Runtime", "Transmit");
+        }
+
+        if (section == "Common" && key == "Call Sign")
+        {
+            return ini_has_nonempty_value(ini_data, "WSPR", "Call Sign");
+        }
+
+        if (section == "Common" && key == "Grid Square")
+        {
+            return ini_has_nonempty_value(ini_data, "WSPR", "Grid Square");
+        }
+
+        if (section == "Common" && key == "TX Power")
+        {
+            return ini_has_nonempty_value(ini_data, "WSPR", "TX Power");
+        }
+
+        if (section == "Common" && key == "Frequency")
+        {
+            return ini_has_nonempty_value(ini_data, "WSPR", "Frequency");
+        }
+
+        if (section == "Common" && key == "Transmit Pin")
+        {
+            return ini_has_nonempty_value(ini_data, "Runtime", "Transmit Pin");
+        }
+
+        if (section == "Extended" && key == "PPM")
+        {
+            return ini_has_nonempty_value(ini_data, "Runtime", "PPM");
+        }
+
+        if (section == "Extended" && key == "Use NTP")
+        {
+            return ini_has_nonempty_value(ini_data, "Runtime", "Use NTP");
+        }
+
+        if (section == "Extended" && key == "Offset")
+        {
+            return ini_has_nonempty_value(ini_data, "Runtime", "Offset");
+        }
+
+        if (section == "Extended" && key == "Use LED")
+        {
+            return ini_has_nonempty_value(ini_data, "Runtime", "Use LED");
+        }
+
+        if (section == "Extended" && key == "LED Pin")
+        {
+            return ini_has_nonempty_value(ini_data, "Runtime", "LED Pin");
+        }
+
+        if (section == "Extended" && key == "Power Level")
+        {
+            return ini_has_nonempty_value(ini_data, "Runtime", "Power Level");
+        }
+
+        if (section == "Server" && key == "Web Port")
+        {
+            return ini_has_nonempty_value(ini_data, "Runtime", "Web Port");
+        }
+
+        if (section == "Server" && key == "Socket Port")
+        {
+            return ini_has_nonempty_value(ini_data, "Runtime", "Socket Port");
+        }
+
+        if (section == "Server" && key == "Use Shutdown")
+        {
+            return ini_has_nonempty_value(ini_data, "Runtime", "Use Shutdown");
+        }
+
+        if (section == "Server" && key == "Shutdown Button")
+        {
+            return ini_has_nonempty_value(ini_data, "Runtime", "Shutdown Button");
+        }
+
+        return false;
+    }
+
     void collect_ini_warnings(
         const nlohmann::json &defaults,
         const std::map<std::string, std::unordered_map<std::string, std::string>> &ini_data,
@@ -717,7 +826,6 @@ namespace
             }
 
             const std::string &section = section_item.key();
-            const auto section_it = ini_data.find(section);
 
             for (const auto &key_item : section_item.value().items())
             {
@@ -729,20 +837,7 @@ namespace
                 }
 
                 bool missing_or_empty = false;
-
-                if (section_it == ini_data.end())
-                {
-                    missing_or_empty = true;
-                }
-                else
-                {
-                    const auto key_it = section_it->second.find(key);
-                    if (key_it == section_it->second.end() ||
-                        trim_copy(key_it->second).empty())
-                    {
-                        missing_or_empty = true;
-                    }
-                }
+                missing_or_empty = !ini_has_effective_value(ini_data, section, key);
 
                 if (!missing_or_empty)
                 {

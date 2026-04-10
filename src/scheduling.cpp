@@ -2061,6 +2061,7 @@ bool wspr_loop()
     show_config_values();
 
     const bool startup_config_handoff = consume_startup_config_handoff();
+    set_startup_diagnostic_deferral(true);
 
     if (config.mode != ModeType::WSPR)
     {
@@ -2131,6 +2132,7 @@ bool wspr_loop()
     }
 
     llog.logS(INFO, "WSPR loop running.");
+    set_startup_diagnostic_deferral(false);
     emit_deferred_startup_diagnostics();
 
     // Startup WSPR configuration should be applied exactly once using the

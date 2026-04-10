@@ -104,6 +104,7 @@ WSPRBandLookup lookup;
 std::atomic<bool> ini_reload_pending(false);
 std::atomic<std::uint64_t> ini_reload_generation(0);
 static std::atomic<bool> startup_config_handoff_ready{false};
+static std::atomic<bool> startup_diagnostic_deferral_enabled{false};
 static std::mutex deferred_startup_diagnostics_mtx;
 
 struct DeferredStartupDiagnostic
@@ -234,6 +235,25 @@ void emit_deferred_startup_diagnostics()
     {
         llog.logS(diagnostic.level, diagnostic.message);
     }
+}
+
+void set_startup_diagnostic_deferral(bool enabled) noexcept
+{
+    startup_diagnostic_deferral_enabled.store(enabled, std::memory_order_release);
+}
+
+template <typename... Args>
+void log_startup_config_message(LogLevel level, Args &&...args)
+{
+    if (startup_diagnostic_deferral_enabled.load(std::memory_order_acquire))
+    {
+        std::ostringstream oss;
+        (oss << ... << args);
+        defer_startup_diagnostic(level, oss.str());
+        return;
+    }
+
+    llog.logS(level, std::forward<Args>(args)...);
 }
 
 /**
@@ -1195,13 +1215,16 @@ void apply_runtime_config_side_effects()
 
     if (!config.use_ntp && config.ppm != 0.0)
     {
-        llog.logS(INFO, "PPM value to be used for tone generation: ",
-                  std::fixed, std::setprecision(2), config.ppm);
+        log_startup_config_message(INFO,
+                                   "PPM value to be used for tone generation: ",
+                                   std::fixed,
+                                   std::setprecision(2),
+                                   config.ppm);
     }
     else if (!config.use_ntp && config.ppm != 0.0)
     {
         config.ppm = 0.0;
-        llog.logE(WARN, "NTP disabled and PPM not set.");
+        log_startup_config_message(WARN, "NTP disabled and PPM not set.");
     }
 
     if (config.use_led && (config.led_pin >= 0 && config.led_pin <= 27))
@@ -1235,11 +1258,11 @@ void apply_runtime_config_side_effects()
         double actual_rf_frequency_hz = 0.0;
         if (!try_get_direct_tone_startup_request(entry, actual_rf_frequency_hz))
         {
-            llog.logE(ERROR, " - Missing direct RF test tone frequency.");
+            log_startup_config_message(ERROR, " - Missing direct RF test tone frequency.");
             return;
         }
 
-        llog.logS(
+        log_startup_config_message(
             INFO,
             "A direct RF test tone will be generated at:",
             lookup.freq_display_string(actual_rf_frequency_hz));
@@ -1255,7 +1278,7 @@ void apply_runtime_config_side_effects()
         {
             if (!persisted_qrss_config_available(config))
             {
-                llog.logE(ERROR, " - Missing QRSS configuration.");
+                log_startup_config_message(ERROR, " - Missing QRSS configuration.");
                 return;
             }
 
@@ -1264,9 +1287,9 @@ void apply_runtime_config_side_effects()
             dot_seconds = config.qrss.dot_seconds;
         }
 
-        llog.logS(
+        log_startup_config_message(
             INFO,
-            "A QRSS transmission will be generated: message='",
+            "QRSS configuration loaded: message='",
             message,
             "' frequency=",
             lookup.freq_display_string(frequency_hz),
@@ -1290,7 +1313,7 @@ void apply_runtime_config_side_effects()
         {
             if (!persisted_fskcw_config_available(config))
             {
-                llog.logE(ERROR, " - Missing FSKCW configuration.");
+                log_startup_config_message(ERROR, " - Missing FSKCW configuration.");
                 return;
             }
 
@@ -1300,9 +1323,9 @@ void apply_runtime_config_side_effects()
             dot_seconds = config.fskcw.dot_seconds;
         }
 
-        llog.logS(
+        log_startup_config_message(
             INFO,
-            "A FSKCW transmission will be generated: message='",
+            "FSKCW configuration loaded: message='",
             message,
             "' mark=",
             lookup.freq_display_string(mark_frequency_hz),
@@ -1328,7 +1351,7 @@ void apply_runtime_config_side_effects()
         {
             if (!persisted_dfcw_config_available(config))
             {
-                llog.logE(ERROR, " - Missing DFCW configuration.");
+                log_startup_config_message(ERROR, " - Missing DFCW configuration.");
                 return;
             }
 
@@ -1338,9 +1361,9 @@ void apply_runtime_config_side_effects()
             dot_seconds = config.dfcw.dot_seconds;
         }
 
-        llog.logS(
+        log_startup_config_message(
             INFO,
-            "A DFCW transmission will be generated: message='",
+            "DFCW configuration loaded: message='",
             message,
             "' dot=",
             lookup.freq_display_string(dot_frequency_hz),
@@ -1359,30 +1382,30 @@ void apply_runtime_config_side_effects()
 
     if (config.transmit)
     {
-        llog.logS(INFO, "WSPR packet payload:");
-        llog.logS(INFO, "- Callsign:", config.callsign);
-        llog.logS(INFO, "- Locator:", config.grid_square);
-        llog.logS(INFO, "- Power:", config.power_dbm, " dBm");
+        log_startup_config_message(INFO, "WSPR packet payload:");
+        log_startup_config_message(INFO, "- Callsign:", config.callsign);
+        log_startup_config_message(INFO, "- Locator:", config.grid_square);
+        log_startup_config_message(INFO, "- Power:", config.power_dbm, " dBm");
 
         if (config.wspr_dial_freq_set.size() > 1)
         {
-            llog.logS(INFO, "Requested WSPR dial frequencies:");
+            log_startup_config_message(INFO, "Requested WSPR dial frequencies:");
 
             for (const auto &freq : config.wspr_dial_freq_set)
             {
                 if (freq == 0.0)
                 {
-                    llog.logS(INFO, "- Skip (0.0)");
+                    log_startup_config_message(INFO, "- Skip (0.0)");
                 }
                 else
                 {
-                    llog.logS(INFO, "- ", lookup.freq_display_string(freq));
+                    log_startup_config_message(INFO, "- ", lookup.freq_display_string(freq));
                 }
             }
         }
         else
         {
-            llog.logS(
+            log_startup_config_message(
                 INFO,
                 "Requested WSPR dial frequency:",
                 lookup.freq_display_string(config.wspr_dial_freq_set[0]));
@@ -1390,7 +1413,7 @@ void apply_runtime_config_side_effects()
 
         if (config.use_offset)
         {
-            llog.logS(
+            log_startup_config_message(
                 INFO,
                 "A random offset will be added to all transmissions.");
         }
@@ -1400,7 +1423,7 @@ void apply_runtime_config_side_effects()
     {
         if (config.loop_tx)
         {
-            llog.logS(
+            log_startup_config_message(
                 INFO,
                 "Transmissions will continue until it receives a signal to stop.");
         }
@@ -1411,7 +1434,7 @@ void apply_runtime_config_side_effects()
                 config.tx_iterations.store(1);
                 config.transmit = true;
             }
-            llog.logS(
+            log_startup_config_message(
                 INFO,
                 "TX will stop after:",
                 config.tx_iterations.load(),

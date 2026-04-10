@@ -244,6 +244,7 @@ void clear_dfcw_startup_request() noexcept;
 bool handle_early_cli_options(int argc, char *argv[]);
 
 bool consume_startup_config_handoff() noexcept;
+void set_startup_diagnostic_deferral(bool enabled) noexcept;
 void emit_deferred_startup_diagnostics();
 
 /**
