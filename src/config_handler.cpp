@@ -52,10 +52,10 @@ namespace
     std::string trim_copy(const std::string &value);
 
     WsprPlannerPreference parse_wspr_planner_preference(
-        const nlohmann::json &meta)
+        const nlohmann::json &wspr)
     {
         const std::string raw =
-            trim_copy(meta.value("Planner Preference", std::string("auto")));
+            trim_copy(wspr.value("Planner Preference", std::string("auto")));
         std::string lowered = raw;
         std::transform(
             lowered.begin(),
@@ -84,6 +84,135 @@ namespace
         throw std::runtime_error(
             "Invalid planner preference '" + raw +
             "'. Expected auto, prefer_paired, or require_paired.");
+    }
+
+    ModeType parse_mode_type(const nlohmann::json &meta)
+    {
+        const std::string raw =
+            trim_copy(meta.value("Mode", std::string("WSPR")));
+        std::string upper = raw;
+        std::transform(
+            upper.begin(),
+            upper.end(),
+            upper.begin(),
+            [](unsigned char c)
+            {
+                return static_cast<char>(std::toupper(c));
+            });
+
+        if (upper.empty() || upper == "WSPR")
+            return ModeType::WSPR;
+        if (upper == "QRSS")
+            return ModeType::QRSS;
+        if (upper == "FSKCW")
+            return ModeType::FSKCW;
+        if (upper == "DFCW")
+            return ModeType::DFCW;
+        if (upper == "TONE")
+            return ModeType::TONE;
+
+        throw std::runtime_error(
+            "Invalid mode '" + raw +
+            "'. Expected WSPR, QRSS, FSKCW, DFCW, or TONE.");
+    }
+
+    const char *mode_type_to_string(ModeType mode) noexcept
+    {
+        switch (mode)
+        {
+        case ModeType::WSPR: return "WSPR";
+        case ModeType::QRSS: return "QRSS";
+        case ModeType::FSKCW: return "FSKCW";
+        case ModeType::DFCW: return "DFCW";
+        case ModeType::TONE: return "TONE";
+        }
+
+        return "WSPR";
+    }
+
+    nlohmann::json public_config_from_internal(const nlohmann::json &source)
+    {
+        nlohmann::json public_json;
+        public_json["Meta"] = {
+            {"Mode", source.at("Meta").at("Mode")}};
+
+        public_json["Runtime"] = {
+            {"Transmit", source.at("Runtime").at("Transmit")},
+            {"Transmit Pin", source.at("Runtime").at("Transmit Pin")},
+            {"Power Level", source.at("Runtime").at("Power Level")},
+            {"Use LED", source.at("Runtime").at("Use LED")},
+            {"LED Pin", source.at("Runtime").at("LED Pin")},
+            {"Web Port", source.at("Runtime").at("Web Port")},
+            {"Socket Port", source.at("Runtime").at("Socket Port")},
+            {"Use Shutdown", source.at("Runtime").at("Use Shutdown")},
+            {"Shutdown Button", source.at("Runtime").at("Shutdown Button")},
+            {"Frequency Control GPIO Polarity",
+             source.at("Runtime").value("Frequency Control GPIO Polarity", false)}};
+
+        public_json["Calibration"] = source.at("Calibration");
+        public_json["WSPR"] = source.at("WSPR");
+        public_json["CW"] = source.at("CW");
+        public_json["Band GPIO"] = source.at("Band GPIO");
+        return public_json;
+    }
+
+    void apply_public_config_to_internal(
+        const nlohmann::json &public_json,
+        nlohmann::json &internal_json)
+    {
+        if (public_json.contains("Meta"))
+        {
+            const auto &meta = public_json.at("Meta");
+            if (meta.contains("Mode"))
+                internal_json["Meta"]["Mode"] = meta.at("Mode");
+            if (meta.contains("Use INI"))
+                internal_json["Meta"]["Use INI"] = meta.at("Use INI");
+            if (meta.contains("INI Filename"))
+                internal_json["Meta"]["INI Filename"] = meta.at("INI Filename");
+            if (meta.contains("Date Time Log"))
+                internal_json["Meta"]["Date Time Log"] = meta.at("Date Time Log");
+            if (meta.contains("Loop TX"))
+                internal_json["Meta"]["Loop TX"] = meta.at("Loop TX");
+            if (meta.contains("TX Iterations"))
+                internal_json["Meta"]["TX Iterations"] = meta.at("TX Iterations");
+        }
+
+        if (public_json.contains("Runtime"))
+        {
+            const auto &runtime = public_json.at("Runtime");
+            if (runtime.contains("Transmit"))
+                internal_json["Runtime"]["Transmit"] = runtime.at("Transmit");
+            if (runtime.contains("Transmit Pin"))
+                internal_json["Runtime"]["Transmit Pin"] = runtime.at("Transmit Pin");
+            if (runtime.contains("Power Level"))
+                internal_json["Runtime"]["Power Level"] = runtime.at("Power Level");
+            if (runtime.contains("Use LED"))
+                internal_json["Runtime"]["Use LED"] = runtime.at("Use LED");
+            if (runtime.contains("LED Pin"))
+                internal_json["Runtime"]["LED Pin"] = runtime.at("LED Pin");
+            if (runtime.contains("Web Port"))
+                internal_json["Runtime"]["Web Port"] = runtime.at("Web Port");
+            if (runtime.contains("Socket Port"))
+                internal_json["Runtime"]["Socket Port"] = runtime.at("Socket Port");
+            if (runtime.contains("Use Shutdown"))
+                internal_json["Runtime"]["Use Shutdown"] = runtime.at("Use Shutdown");
+            if (runtime.contains("Shutdown Button"))
+                internal_json["Runtime"]["Shutdown Button"] = runtime.at("Shutdown Button");
+            if (runtime.contains("Frequency Control GPIO Polarity"))
+            {
+                internal_json["Runtime"]["Frequency Control GPIO Polarity"] =
+                    runtime.at("Frequency Control GPIO Polarity");
+            }
+        }
+
+        if (public_json.contains("Calibration"))
+            internal_json["Calibration"] = public_json.at("Calibration");
+        if (public_json.contains("WSPR"))
+            internal_json["WSPR"] = public_json.at("WSPR");
+        if (public_json.contains("CW"))
+            internal_json["CW"] = public_json.at("CW");
+        if (public_json.contains("Band GPIO"))
+            internal_json["Band GPIO"] = public_json.at("Band GPIO");
     }
 
     nlohmann::json make_plan_validation_error_details(
@@ -345,26 +474,32 @@ namespace
 
 void init_default_config()
 {
-    // Control
+    // Runtime
     config.transmit = false;
+    config.tx_pin = kDefaultTransmitGpio;
 
-    // Common
+    // WSPR
     config.callsign = "NXXX";
     config.grid_square = "ZZ99";
     config.power_dbm = 20;
     config.frequencies = "20m";
-    config.tx_pin = kDefaultTransmitGpio;
+    config.wspr_audio_offset_hz = WSPR_AUDIO_OFFSET_HZ;
 
-    // Extended
+    // Runtime
     config.ppm = 0.0;
     config.use_ntp = true;
     config.use_offset = true;
-    config.wspr_audio_offset_hz = 1500.0;
     config.use_led = false;
     config.led_pin = 18;
     config.power_level = 7;
 
-    // Server
+    // CW
+    config.modulation_dot_seconds = 3.0;
+    config.modulation_fsk_offset_hz = 500.0;
+    config.schedule_start_minute = 0;
+    config.schedule_repeat_minutes = 10;
+
+    // Runtime
     config.web_port = 31415;
     config.socket_port = 31416;
     config.use_shutdown = false;
@@ -373,6 +508,16 @@ void init_default_config()
     // Meta
     config.use_ini = true;
     config.tx_freq_control_active_high = false;
+
+    config.wspr.callsign = config.callsign;
+    config.wspr.grid_square = config.grid_square;
+    config.wspr.power_dbm = config.power_dbm;
+    config.wspr.frequencies = config.frequencies;
+    config.wspr.audio_offset_hz = WSPR_AUDIO_OFFSET_HZ;
+    config.wspr.planner_preference = config.wspr_planner_preference;
+    config.qrss = QrssModeConfig{};
+    config.fskcw = FskcwModeConfig{};
+    config.dfcw = DfcwModeConfig{};
 
     set_default_band_gpio_config(config.band_gpio);
 }
@@ -497,7 +642,7 @@ namespace
 
     bool is_required_tx_key(const std::string &section, const std::string &key)
     {
-        return section == "Common" &&
+        return section == "WSPR" &&
                (key == "Call Sign" ||
                 key == "Grid Square" ||
                 key == "TX Power" ||
@@ -506,25 +651,58 @@ namespace
 
     bool should_warn_if_missing(const std::string &section, const std::string &key)
     {
-        return (section == "Control" && key == "Transmit") ||
-               (section == "Common" &&
+        return (section == "Runtime" &&
+                (key == "Transmit" ||
+                 key == "Transmit Pin" ||
+                 key == "Use LED" ||
+                 key == "LED Pin" ||
+                 key == "Power Level" ||
+                 key == "Web Port" ||
+                 key == "Socket Port" ||
+                 key == "Use Shutdown" ||
+                 key == "Shutdown Button" ||
+                 key == "Frequency Control GPIO Polarity")) ||
+               (section == "WSPR" &&
                 (key == "Call Sign" ||
                  key == "Grid Square" ||
                  key == "TX Power" ||
                  key == "Frequency" ||
-                 key == "Transmit Pin")) ||
-               (section == "Extended" &&
+                 key == "Planner Preference" ||
+                 key == "Use Random Offset")) ||
+               (section == "Meta" && key == "Mode") ||
+               (section == "Calibration" &&
                 (key == "PPM" ||
-                 key == "Use NTP" ||
-                 key == "Offset" ||
-                 key == "Use LED" ||
-                 key == "LED Pin" ||
-                 key == "Power Level")) ||
-               (section == "Server" &&
-                (key == "Web Port" ||
-                 key == "Socket Port" ||
-                 key == "Use Shutdown" ||
-                 key == "Shutdown Button"));
+                 key == "Use NTP")) ||
+               (section == "CW" &&
+                (key == "Base Frequency" ||
+                 key == "Shift Hz" ||
+                 key == "Dot Seconds" ||
+                 key == "Start Minute" ||
+                 key == "Repeat Minutes"));
+    }
+
+    bool ini_has_nonempty_value(
+        const std::map<std::string, std::unordered_map<std::string, std::string>> &ini_data,
+        const std::string &section,
+        const std::string &key)
+    {
+        const auto section_it = ini_data.find(section);
+        if (section_it == ini_data.end())
+        {
+            return false;
+        }
+
+        const auto key_it = section_it->second.find(key);
+        return key_it != section_it->second.end() &&
+               !trim_copy(key_it->second).empty();
+    }
+
+    bool ini_has_effective_value(
+        const std::map<std::string, std::unordered_map<std::string, std::string>> &ini_data,
+        const std::string &section,
+        const std::string &key)
+    {
+        return ini_has_nonempty_value(ini_data, section, key);
     }
 
     void collect_ini_warnings(
@@ -541,7 +719,6 @@ namespace
             }
 
             const std::string &section = section_item.key();
-            const auto section_it = ini_data.find(section);
 
             for (const auto &key_item : section_item.value().items())
             {
@@ -553,20 +730,7 @@ namespace
                 }
 
                 bool missing_or_empty = false;
-
-                if (section_it == ini_data.end())
-                {
-                    missing_or_empty = true;
-                }
-                else
-                {
-                    const auto key_it = section_it->second.find(key);
-                    if (key_it == section_it->second.end() ||
-                        trim_copy(key_it->second).empty())
-                    {
-                        missing_or_empty = true;
-                    }
-                }
+                missing_or_empty = !ini_has_effective_value(ini_data, section, key);
 
                 if (!missing_or_empty)
                 {
@@ -593,37 +757,41 @@ namespace
             {"Use INI", false},
             {"INI Filename", ""},
             {"Date Time Log", false},
-            {"Planner Preference", "auto"},
             {"Loop TX", false},
             {"TX Iterations", 0}};
         target["Meta"]["WSPR Dial Frequency Set"] = nlohmann::json::array();
 
-        target["Common"] = {
-            {"Call Sign", "NXXX"},
-            {"Frequency", "20m"},
-            {"Grid Square", "ZZ99"},
-            {"TX Power", 20},
-            {"Transmit Pin", kDefaultTransmitGpio}};
-
-        target["Control"] = {
-            {"Transmit", false}};
-
-        target["Extended"] = {
+        target["Runtime"] = {
+            {"Transmit", false},
+            {"Transmit Pin", kDefaultTransmitGpio},
             {"LED Pin", 18},
-            {"Offset", true},
-            {"PPM", 0.0},
-            {"Power Level", 7},
             {"Use LED", false},
-            {"Use NTP", true},
-            {"WSPR Audio Offset Hz", 1500.0}};
-
-        target["Server"] = {
+            {"Power Level", 7},
             {"Web Port", 31415},
             {"Socket Port", 31416},
+            {"Use Shutdown", false},
             {"Shutdown Button", 19},
-            {"Use Shutdown", false}};
+            {"Frequency Control GPIO Polarity", false}};
+
+        target["Calibration"] = {
+            {"PPM", 0.0},
+            {"Use NTP", true}};
 
         target["Band GPIO"] = nlohmann::json::object();
+        target["WSPR"] = {
+            {"Call Sign", "NXXX"},
+            {"Grid Square", "ZZ99"},
+            {"TX Power", 20},
+            {"Frequency", "20m"},
+            {"Planner Preference", "auto"},
+            {"Use Random Offset", true}};
+        target["CW"] = {
+            {"Message", ""},
+            {"Base Frequency", 3572000.0},
+            {"Shift Hz", 500.0},
+            {"Dot Seconds", 3.0},
+            {"Start Minute", 0},
+            {"Repeat Minutes", 10}};
         std::array<BandGPIOConfig, HAM_BAND_COUNT> default_band_gpio{};
         set_default_band_gpio_config(default_band_gpio);
         for (const auto &[band, band_name] : kHamBandJsonKeys)
@@ -640,15 +808,12 @@ namespace
     {
         set_default_band_gpio_config(target.band_gpio);
 
-        // Persistent config always initializes in WSPR mode. Transient tone
-        // startup is a CLI/runtime request layered on top later.
-        target.mode = ModeType::WSPR;
-
         target.use_ini = source.at("Meta").at("Use INI").get<bool>();
         target.ini_filename = source.at("Meta").at("INI Filename").get<std::string>();
         target.date_time_log = source.at("Meta").at("Date Time Log").get<bool>();
+        target.mode = parse_mode_type(source.at("Meta"));
         target.wspr_planner_preference =
-            parse_wspr_planner_preference(source.at("Meta"));
+            parse_wspr_planner_preference(source.at("WSPR"));
         target.loop_tx = source.at("Meta").at("Loop TX").get<bool>();
         target.tx_iterations.store(source.at("Meta").at("TX Iterations").get<int>());
         const auto &meta = source.at("Meta");
@@ -670,34 +835,80 @@ namespace
             target.wspr_dial_freq_set.clear();
         }
 
-        target.transmit = source.at("Control").at("Transmit").get<bool>();
+        target.transmit = source.at("Runtime").at("Transmit").get<bool>();
+        target.tx_pin = source.at("Runtime").at("Transmit Pin").get<int>();
+        target.ppm = source.at("Calibration").at("PPM").get<double>();
+        target.use_ntp = source.at("Calibration").at("Use NTP").get<bool>();
+        target.use_offset = source.at("WSPR").at("Use Random Offset").get<bool>();
+        target.tx_freq_control_active_high =
+            source.at("Runtime").value("Frequency Control GPIO Polarity", false);
+        target.modulation_dot_seconds =
+            source.contains("CW") &&
+                    source.at("CW").contains("Dot Seconds")
+                ? source.at("CW").at("Dot Seconds").get<double>()
+                : target.modulation_dot_seconds;
+        target.modulation_fsk_offset_hz =
+            source.contains("CW") &&
+                    source.at("CW").contains("Shift Hz")
+                ? source.at("CW").at("Shift Hz").get<double>()
+                : target.modulation_fsk_offset_hz;
+        target.schedule_start_minute =
+            source.contains("CW") &&
+                    source.at("CW").contains("Start Minute")
+                ? source.at("CW").at("Start Minute").get<int>()
+                : target.schedule_start_minute;
+        target.schedule_repeat_minutes =
+            source.contains("CW") &&
+                    source.at("CW").contains("Repeat Minutes")
+                ? source.at("CW").at("Repeat Minutes").get<int>()
+                : target.schedule_repeat_minutes;
+        target.wspr_audio_offset_hz = WSPR_AUDIO_OFFSET_HZ;
+        target.wspr.callsign =
+            source.at("WSPR").at("Call Sign").get<std::string>();
+        target.wspr.grid_square =
+            source.at("WSPR").at("Grid Square").get<std::string>();
+        target.wspr.power_dbm =
+            source.at("WSPR").at("TX Power").get<int>();
+        target.wspr.frequencies =
+            json_to_string(source.at("WSPR").at("Frequency"));
+        target.wspr.audio_offset_hz =
+            WSPR_AUDIO_OFFSET_HZ;
+        target.wspr.planner_preference =
+            parse_wspr_planner_preference(source.at("WSPR"));
+        const auto &cw = source.at("CW");
+        const std::string cw_message =
+            cw.value("Message", std::string(""));
+        const double cw_base_frequency_hz =
+            cw.value("Base Frequency", 0.0);
+        const double cw_shift_hz =
+            cw.value("Shift Hz", 0.0);
+        target.qrss.message =
+            cw_message;
+        target.qrss.frequency_hz = cw_base_frequency_hz;
+        target.qrss.dot_seconds = target.modulation_dot_seconds;
+        target.fskcw.message = cw_message;
+        target.fskcw.space_frequency_hz = cw_base_frequency_hz;
+        target.fskcw.mark_frequency_hz = cw_base_frequency_hz + cw_shift_hz;
+        target.fskcw.dot_seconds = target.modulation_dot_seconds;
+        target.dfcw.message = cw_message;
+        target.dfcw.dot_frequency_hz = cw_base_frequency_hz;
+        target.dfcw.dash_frequency_hz = cw_base_frequency_hz + cw_shift_hz;
+        target.dfcw.dot_seconds = target.modulation_dot_seconds;
 
-        target.callsign = source.at("Common").at("Call Sign").get<std::string>();
-        target.grid_square = source.at("Common").at("Grid Square").get<std::string>();
-        target.power_dbm = source.at("Common").at("TX Power").get<int>();
-        target.frequencies = json_to_string(source.at("Common").at("Frequency"));
-        target.tx_pin = source.at("Common").at("Transmit Pin").get<int>();
+        target.callsign = target.wspr.callsign;
+        target.grid_square = target.wspr.grid_square;
+        target.power_dbm = target.wspr.power_dbm;
+        target.frequencies = target.wspr.frequencies;
+        target.wspr_audio_offset_hz = WSPR_AUDIO_OFFSET_HZ;
+        target.wspr_planner_preference = target.wspr.planner_preference;
+        target.use_led = source.at("Runtime").at("Use LED").get<bool>();
+        target.led_pin = source.at("Runtime").at("LED Pin").get<int>();
+        target.power_level = source.at("Runtime").at("Power Level").get<int>();
 
-        target.ppm = source.at("Extended").at("PPM").get<double>();
-        target.use_ntp = source.at("Extended").at("Use NTP").get<bool>();
-        target.use_offset = source.at("Extended").at("Offset").get<bool>();
-        if (source.at("Extended").contains("WSPR Audio Offset Hz"))
-        {
-            target.wspr_audio_offset_hz =
-                source.at("Extended").at("WSPR Audio Offset Hz").get<double>();
-        }
-        else
-        {
-            target.wspr_audio_offset_hz = 1500.0;
-        }
-        target.use_led = source.at("Extended").at("Use LED").get<bool>();
-        target.led_pin = source.at("Extended").at("LED Pin").get<int>();
-        target.power_level = source.at("Extended").at("Power Level").get<int>();
-
-        target.web_port = source.at("Server").at("Web Port").get<int>();
-        target.socket_port = source.at("Server").at("Socket Port").get<int>();
-        target.use_shutdown = source.at("Server").at("Use Shutdown").get<bool>();
-        target.shutdown_pin = source.at("Server").at("Shutdown Button").get<int>();
+        target.web_port = source.at("Runtime").at("Web Port").get<int>();
+        target.socket_port = source.at("Runtime").at("Socket Port").get<int>();
+        target.use_shutdown = source.at("Runtime").at("Use Shutdown").get<bool>();
+        target.shutdown_pin = source.at("Runtime").at("Shutdown Button").get<int>();
         target.use_journald = false;
 
         // Missing Band GPIO data is allowed; seeded defaults stay in place.
@@ -736,37 +947,63 @@ namespace
 
     void config_to_json_impl(const ArgParserConfig &source, nlohmann::json &target)
     {
-        target["Meta"]["Mode"] = "WSPR";
+        target["Meta"]["Mode"] =
+            mode_type_to_string(
+                source.mode == ModeType::TONE ? ModeType::WSPR : source.mode);
         target["Meta"]["Use INI"] = source.use_ini;
         target["Meta"]["INI Filename"] = source.ini_filename;
         target["Meta"]["Date Time Log"] = source.date_time_log;
-        target["Meta"]["Planner Preference"] =
-            wspr_planner_preference_to_string(source.wspr_planner_preference);
         target["Meta"]["Loop TX"] = source.loop_tx;
         target["Meta"]["TX Iterations"] = source.tx_iterations.load();
         target["Meta"]["WSPR Dial Frequency Set"] = source.wspr_dial_freq_set;
         target["Meta"]["Center Frequency Set"] = source.wspr_dial_freq_set;
 
-        target["Control"]["Transmit"] = source.transmit;
+        target["Runtime"]["Transmit"] = source.transmit;
+        target["Runtime"]["Transmit Pin"] = source.tx_pin;
+        target["Runtime"]["Power Level"] = source.power_level;
+        target["Runtime"]["Use LED"] = source.use_led;
+        target["Runtime"]["LED Pin"] = source.led_pin;
+        target["Runtime"]["Web Port"] = source.web_port;
+        target["Runtime"]["Socket Port"] = source.socket_port;
+        target["Runtime"]["Use Shutdown"] = source.use_shutdown;
+        target["Runtime"]["Shutdown Button"] = source.shutdown_pin;
+        target["Runtime"]["Frequency Control GPIO Polarity"] =
+            source.tx_freq_control_active_high;
 
-        target["Common"]["Call Sign"] = source.callsign;
-        target["Common"]["Grid Square"] = source.grid_square;
-        target["Common"]["TX Power"] = source.power_dbm;
-        target["Common"]["Frequency"] = source.frequencies;
-        target["Common"]["Transmit Pin"] = source.tx_pin;
+        target["Calibration"]["PPM"] = source.ppm;
+        target["Calibration"]["Use NTP"] = source.use_ntp;
 
-        target["Extended"]["PPM"] = source.ppm;
-        target["Extended"]["Use NTP"] = source.use_ntp;
-        target["Extended"]["Offset"] = source.use_offset;
-        target["Extended"]["WSPR Audio Offset Hz"] = source.wspr_audio_offset_hz;
-        target["Extended"]["Use LED"] = source.use_led;
-        target["Extended"]["LED Pin"] = source.led_pin;
-        target["Extended"]["Power Level"] = source.power_level;
+        target["WSPR"]["Call Sign"] = source.wspr.callsign;
+        target["WSPR"]["Grid Square"] = source.wspr.grid_square;
+        target["WSPR"]["TX Power"] = source.wspr.power_dbm;
+        target["WSPR"]["Frequency"] = source.wspr.frequencies;
+        target["WSPR"]["Planner Preference"] =
+            wspr_planner_preference_to_string(source.wspr.planner_preference);
+        target["WSPR"]["Use Random Offset"] = source.use_offset;
 
-        target["Server"]["Web Port"] = source.web_port;
-        target["Server"]["Socket Port"] = source.socket_port;
-        target["Server"]["Use Shutdown"] = source.use_shutdown;
-        target["Server"]["Shutdown Button"] = source.shutdown_pin;
+        std::string cw_message = source.qrss.message;
+        double cw_base_frequency_hz = source.qrss.frequency_hz;
+        double cw_shift_hz = source.modulation_fsk_offset_hz;
+        if (source.mode == ModeType::FSKCW)
+        {
+            cw_message = source.fskcw.message;
+            cw_base_frequency_hz = source.fskcw.space_frequency_hz;
+            cw_shift_hz =
+                source.fskcw.mark_frequency_hz - source.fskcw.space_frequency_hz;
+        }
+        else if (source.mode == ModeType::DFCW)
+        {
+            cw_message = source.dfcw.message;
+            cw_base_frequency_hz = source.dfcw.dot_frequency_hz;
+            cw_shift_hz =
+                source.dfcw.dash_frequency_hz - source.dfcw.dot_frequency_hz;
+        }
+        target["CW"]["Message"] = cw_message;
+        target["CW"]["Base Frequency"] = cw_base_frequency_hz;
+        target["CW"]["Shift Hz"] = cw_shift_hz;
+        target["CW"]["Dot Seconds"] = source.modulation_dot_seconds;
+        target["CW"]["Start Minute"] = source.schedule_start_minute;
+        target["CW"]["Repeat Minutes"] = source.schedule_repeat_minutes;
 
         for (const auto &[band, band_name] : kHamBandJsonKeys)
         {
@@ -801,7 +1038,15 @@ namespace
         target.loop_tx = source.loop_tx;
         target.tx_iterations.store(source.tx_iterations.load());
         target.wspr_audio_offset_hz = source.wspr_audio_offset_hz;
+        target.modulation_dot_seconds = source.modulation_dot_seconds;
+        target.modulation_fsk_offset_hz = source.modulation_fsk_offset_hz;
+        target.schedule_start_minute = source.schedule_start_minute;
+        target.schedule_repeat_minutes = source.schedule_repeat_minutes;
         target.mode = source.mode;
+        target.wspr = source.wspr;
+        target.qrss = source.qrss;
+        target.fskcw = source.fskcw;
+        target.dfcw = source.dfcw;
         target.use_ini = source.use_ini;
         target.ini_filename = source.ini_filename;
         target.wspr_dial_freq_set = source.wspr_dial_freq_set;
@@ -824,6 +1069,17 @@ namespace
             if (section == "Band GPIO")
             {
                 patch_band_gpio_from_ini(key_values, patch);
+                continue;
+            }
+
+            // Canonical persistent sections only. Unknown sections, including
+            // pre-2.x legacy sections, are not imported or treated as fallbacks.
+            if (section != "Meta" &&
+                section != "Runtime" &&
+                section != "Calibration" &&
+                section != "WSPR" &&
+                section != "CW")
+            {
                 continue;
             }
 
@@ -879,8 +1135,6 @@ namespace
 
             ini_to_json_impl(filename, candidate_json);
             json_to_config_impl(candidate_json, candidate_config);
-            candidate_config.tx_freq_control_active_high =
-                config.tx_freq_control_active_high;
 
             if (missing_required_tx_item)
             {
@@ -960,6 +1214,11 @@ void json_to_config()
     json_to_config_impl(jConfig, config);
 }
 
+nlohmann::json get_public_config_json()
+{
+    return public_config_from_internal(jConfig);
+}
+
 void config_to_json()
 {
     config_to_json_impl(config, jConfig);
@@ -984,10 +1243,10 @@ void json_to_ini()
         }
 
         if (section_name != "Meta" &&
-            section_name != "Control" &&
-            section_name != "Common" &&
-            section_name != "Extended" &&
-            section_name != "Server" &&
+            section_name != "Runtime" &&
+            section_name != "Calibration" &&
+            section_name != "WSPR" &&
+            section_name != "CW" &&
             section_name != "Band GPIO")
         {
             continue;
@@ -1021,6 +1280,44 @@ void json_to_ini()
 
         for (auto &kv : section.value().items())
         {
+            const std::string &key = kv.key();
+            const bool persist_key =
+                (section_name == "Meta" &&
+                 key == "Mode") ||
+                (section_name == "Runtime" &&
+                 (key == "Transmit" ||
+                  key == "Transmit Pin" ||
+                  key == "Use LED" ||
+                  key == "LED Pin" ||
+                  key == "Power Level" ||
+                  key == "Web Port" ||
+                  key == "Socket Port" ||
+                  key == "Use Shutdown" ||
+                  key == "Shutdown Button" ||
+                  key == "Frequency Control GPIO Polarity")) ||
+                (section_name == "Calibration" &&
+                 (key == "PPM" ||
+                  key == "Use NTP")) ||
+                (section_name == "WSPR" &&
+                 (key == "Call Sign" ||
+                  key == "Grid Square" ||
+                  key == "TX Power" ||
+                  key == "Frequency" ||
+                  key == "Planner Preference" ||
+                  key == "Use Random Offset")) ||
+                (section_name == "CW" &&
+                 (key == "Message" ||
+                  key == "Base Frequency" ||
+                  key == "Shift Hz" ||
+                  key == "Dot Seconds" ||
+                  key == "Start Minute" ||
+                  key == "Repeat Minutes"));
+
+            if (!persist_key)
+            {
+                continue;
+            }
+
             std::string out_val;
 
             if (kv.value().is_array() || kv.value().is_object())
@@ -1036,7 +1333,7 @@ void json_to_ini()
                 out_val = kv.value().dump();
             }
 
-            new_data[section_name][kv.key()] = out_val;
+            new_data[section_name][key] = out_val;
         }
     }
 
@@ -1123,8 +1420,11 @@ void dump_json(const nlohmann::json &j, std::string tag)
 
 void patch_all_from_web(const nlohmann::json &j)
 {
+    nlohmann::json candidate_public_json = public_config_from_internal(jConfig);
+    candidate_public_json.merge_patch(j);
+
     nlohmann::json candidate_json = jConfig;
-    candidate_json.merge_patch(j);
+    apply_public_config_to_internal(candidate_public_json, candidate_json);
 
     ArgParserConfig candidate_config;
     std::string error_message;

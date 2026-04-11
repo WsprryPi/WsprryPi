@@ -188,6 +188,43 @@ bool try_get_direct_tone_startup_request(
     WsprDialFrequencyEntry &entry_out,
     double &actual_rf_frequency_hz_out) noexcept;
 void clear_direct_tone_startup_request() noexcept;
+bool set_qrss_startup_request(
+    const std::string &message,
+    const std::string &frequency_hz,
+    const std::string &dot_seconds,
+    std::string *error_message = nullptr);
+bool has_qrss_startup_request() noexcept;
+bool try_get_qrss_startup_request(
+    std::string &message_out,
+    double &frequency_hz_out,
+    double &dot_seconds_out) noexcept;
+void clear_qrss_startup_request() noexcept;
+bool set_fskcw_startup_request(
+    const std::string &message,
+    const std::string &mark_frequency_hz,
+    const std::string &space_frequency_hz,
+    const std::string &dot_seconds,
+    std::string *error_message = nullptr);
+bool has_fskcw_startup_request() noexcept;
+bool try_get_fskcw_startup_request(
+    std::string &message_out,
+    double &mark_frequency_hz_out,
+    double &space_frequency_hz_out,
+    double &dot_seconds_out) noexcept;
+void clear_fskcw_startup_request() noexcept;
+bool set_dfcw_startup_request(
+    const std::string &message,
+    const std::string &dot_frequency_hz,
+    const std::string &dash_frequency_hz,
+    const std::string &dot_seconds,
+    std::string *error_message = nullptr);
+bool has_dfcw_startup_request() noexcept;
+bool try_get_dfcw_startup_request(
+    std::string &message_out,
+    double &dot_frequency_hz_out,
+    double &dash_frequency_hz_out,
+    double &dot_seconds_out) noexcept;
+void clear_dfcw_startup_request() noexcept;
 
 /**
  * @brief Parses command-line arguments and configures the program settings.
@@ -205,6 +242,10 @@ void clear_direct_tone_startup_request() noexcept;
  * @return true if parsing is successful, false if an error occurs.
  */
 bool handle_early_cli_options(int argc, char *argv[]);
+
+bool consume_startup_config_handoff() noexcept;
+void set_startup_diagnostic_deferral(bool enabled) noexcept;
+void emit_deferred_startup_diagnostics();
 
 /**
  * @brief Parses command-line arguments and applies overrides.

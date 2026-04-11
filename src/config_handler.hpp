@@ -49,6 +49,7 @@ inline constexpr int kTransmitGpioUnset = -1;
 inline constexpr int kDefaultTransmitGpio = 4;
 inline constexpr std::array<int, 2> kSupportedTransmitGpio = {4, 20};
 inline constexpr int kFrequencyEntryControlGpioUnset = -1;
+inline constexpr double WSPR_AUDIO_OFFSET_HZ = 1500.0;
 
 inline constexpr bool is_supported_transmit_gpio(int gpio) noexcept
 {
@@ -102,7 +103,10 @@ extern nlohmann::json jConfig;
 enum class ModeType
 {
     WSPR, ///< WSPR transmission mode
-    TONE  ///< Test tone generation mode
+    TONE, ///< Test tone generation mode
+    QRSS, ///< Temporary QRSS test mode
+    FSKCW, ///< Temporary FSKCW test mode
+    DFCW ///< Temporary DFCW test mode
 };
 
 enum class WsprPlannerPreference
@@ -110,6 +114,39 @@ enum class WsprPlannerPreference
     Auto = 0,
     PreferPaired,
     RequirePaired
+};
+
+struct WsprModeConfig
+{
+    std::string callsign;
+    std::string grid_square;
+    int power_dbm = 0;
+    std::string frequencies;
+    double audio_offset_hz = WSPR_AUDIO_OFFSET_HZ;
+    WsprPlannerPreference planner_preference = WsprPlannerPreference::Auto;
+};
+
+struct QrssModeConfig
+{
+    std::string message;
+    double frequency_hz = 0.0;
+    double dot_seconds = 0.0;
+};
+
+struct FskcwModeConfig
+{
+    std::string message;
+    double mark_frequency_hz = 0.0;
+    double space_frequency_hz = 0.0;
+    double dot_seconds = 0.0;
+};
+
+struct DfcwModeConfig
+{
+    std::string message;
+    double dot_frequency_hz = 0.0;
+    double dash_frequency_hz = 0.0;
+    double dot_seconds = 0.0;
 };
 
 inline constexpr const char *wspr_planner_preference_to_string(
@@ -156,25 +193,27 @@ wspr_planner_preference_to_plan_preference(
  */
 struct ArgParserConfig
 {
-    // Control
+    // Runtime
     bool transmit; ///< Transmission mode enabled.
 
-    // Common
+    // WSPR
     std::string callsign;    ///< WSPR callsign.
     std::string grid_square; ///< 4- or 6-character Maidenhead locator.
     int power_dbm;           ///< Transmit power in dBm.
     std::string frequencies; ///< Space-separated user-facing WSPR dial frequency list.
-    int tx_pin;              ///< GPIO pin number for RF transmit control.
 
-    // Extended
+    // Runtime
+    int tx_pin; ///< GPIO pin number for RF transmit control.
+
+    // Runtime
     double ppm;      ///< PPM frequency calibration.
     bool use_ntp;    ///< Apply NTP-based frequency correction.
-    bool use_offset; ///< Enable random frequency offset.
+    bool use_offset; ///< Enable WSPR random frequency offset.
     int power_level; ///< Power level for RF hardware (0–7).
     bool use_led;    ///< Enable TX LED indicator.
     int led_pin;     ///< GPIO pin for LED indicator.
 
-    // Server
+    // Runtime
     int web_port;      ///< Web server port number.
     int socket_port;   ///< Socket server port number.
     bool use_shutdown; ///< Enable GPIO-based shutdown feature.
@@ -186,10 +225,18 @@ struct ArgParserConfig
     WsprPlannerPreference wspr_planner_preference; ///< Preferred planner behavior for Type 2/3 pairing.
     bool loop_tx;                   ///< Repeat transmission cycle.
     std::atomic<int> tx_iterations; ///< Number of transmission iterations (0 = infinite).
-    double wspr_audio_offset_hz;    ///< Audio offset added to WSPR dial frequencies to derive RF.
+    double wspr_audio_offset_hz;    ///< Runtime WSPR audio offset constant.
+    double modulation_dot_seconds;  ///< Shared CW dot length.
+    double modulation_fsk_offset_hz; ///< Shared CW shift in Hz.
+    int schedule_start_minute;      ///< CW schedule minute offset within the hour.
+    int schedule_repeat_minutes;    ///< CW schedule repeat interval in minutes.
 
     // Runtime variables
     ModeType mode;                       ///< Current operating mode.
+    WsprModeConfig wspr;                 ///< Long-term WSPR mode configuration.
+    QrssModeConfig qrss;                 ///< Long-term QRSS mode configuration.
+    FskcwModeConfig fskcw;               ///< Long-term FSKCW mode configuration.
+    DfcwModeConfig dfcw;                 ///< Long-term DFCW mode configuration.
     bool use_ini;                        ///< Load configuration from INI file.
     std::string ini_filename;            ///< INI file name and path.
     std::vector<double> wspr_dial_freq_set; ///< Parsed WSPR dial frequencies.
@@ -224,8 +271,16 @@ struct ArgParserConfig
           wspr_planner_preference(WsprPlannerPreference::Auto),
           loop_tx(false),
           tx_iterations(0),
-          wspr_audio_offset_hz(1500.0),
+          wspr_audio_offset_hz(WSPR_AUDIO_OFFSET_HZ),
+          modulation_dot_seconds(3.0),
+          modulation_fsk_offset_hz(500.0),
+          schedule_start_minute(0),
+          schedule_repeat_minutes(10),
           mode(ModeType::WSPR),
+          wspr({}),
+          qrss({}),
+          fskcw({}),
+          dfcw({}),
           use_ini(false),
           ini_filename(""),
           wspr_dial_freq_set({}),
@@ -271,7 +326,15 @@ struct ArgParserConfig
         loop_tx = other.loop_tx;
         tx_iterations.store(other.tx_iterations.load());
         wspr_audio_offset_hz = other.wspr_audio_offset_hz;
+        modulation_dot_seconds = other.modulation_dot_seconds;
+        modulation_fsk_offset_hz = other.modulation_fsk_offset_hz;
+        schedule_start_minute = other.schedule_start_minute;
+        schedule_repeat_minutes = other.schedule_repeat_minutes;
         mode = other.mode;
+        wspr = other.wspr;
+        qrss = other.qrss;
+        fskcw = other.fskcw;
+        dfcw = other.dfcw;
         use_ini = other.use_ini;
         ini_filename = other.ini_filename;
         wspr_dial_freq_set = other.wspr_dial_freq_set;
@@ -329,10 +392,10 @@ void init_default_config();
  * @details
  * This function sets up a default configuration structure in the global
  * nlohmann::json object, `jConfig`. The JSON object is organized into several
- * sections: "Meta", "Common", "Control", "Extended", and "Server". Each section
- * contains key/value pairs that represent configuration parameters. In addition,
- * the WSPR dial-frequency list under "Meta" is explicitly initialized as an
- * empty array.
+ * sections: "Meta", "Runtime", "Calibration", "WSPR", "CW", and
+ * "Band GPIO". Each section contains key/value
+ * pairs that represent configuration parameters. In addition, the WSPR
+ * dial-frequency list under "Meta" is explicitly initialized as an empty array.
  *
  * @note The JSON values are stored as strings. Adjust the types as needed if numeric
  *       types are required in later processing.
@@ -365,39 +428,39 @@ void ini_to_json(std::string filename);
  * @code
  * {
  *   "Meta": {
- *       "Mode": "WSPR",
- *       "Use INI": true,
- *       "INI Filename": "",
- *       "Date Time Log": false,
- *       "Loop TX": true,
- *       "TX Iterations": 5,
- *       "WSPR Dial Frequency Set": [ 14095600.0, 10138700.0 ],
- *       "Center Frequency Set": [ 14095600.0 ]
+ *       "Mode": "WSPR"
  *   },
- *   "Control": {
- *       "Transmit": false
+ *   "Runtime": {
+ *       "Transmit": false,
+ *       "Transmit Pin": 4,
+ *       "Use LED": false,
+ *       "LED Pin": 18,
+ *       "Power Level": 7,
+ *       "Web Port": 31415,
+ *       "Socket Port": 31416,
+ *       "Use Shutdown": false,
+ *       "Shutdown Button": 19,
+ *       "Frequency Control GPIO Polarity": false
  *   },
- *   "Common": {
+ *   "Calibration": {
+ *       "PPM": 0.0,
+ *       "Use NTP": true
+ *   },
+ *   "WSPR": {
  *       "Call Sign": "NXXX",
  *       "Grid Square": "ZZ99",
  *       "TX Power": 20,
  *       "Frequency": "20m",
- *       "Transmit Pin": 4
+ *       "Planner Preference": "auto",
+ *       "Use Random Offset": true
  *   },
- *   "Extended": {
- *       "PPM": 0.0,
- *       "Use NTP": true,
- *       "Offset": true,
- *       "Use LED": false,
- *       "LED Pin": 18,
- *       "Power Level": 7,
- *       "WSPR Audio Offset Hz": 1500.0
- *   },
- *   "Server": {
- *       "Web Port": 31415,
- *       "Web Port": 31416,
- *       "Use Shutdown": false,
- *       "Shutdown Button": 19
+ *   "CW": {
+ *       "Message": "",
+ *       "Base Frequency": 3572000.0,
+ *       "Shift Hz": 500.0,
+ *       "Dot Seconds": 3.0,
+ *       "Start Minute": 0,
+ *       "Repeat Minutes": 10
  *   }
  * }
  * @endcode
@@ -476,6 +539,8 @@ void copy_runtime_config(const ArgParserConfig &source, ArgParserConfig &target)
  * @return void
  */
 void dump_json(const nlohmann::json &j, std::string tag);
+
+nlohmann::json get_public_config_json();
 
 /**
  * @brief Applies a full patch update from incoming JSON.

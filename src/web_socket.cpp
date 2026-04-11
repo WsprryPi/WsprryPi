@@ -311,7 +311,7 @@ std::string WebSocketServer::computeWebSocketAccept(const std::string &client_ke
  * - "tx_status" → Responds with transmission status acknowledgment.
  * - "shutdown"  → Responds with shutdown acknowledgment.
  * - "reboot"    → Responds with reboot acknowledgment.
- * - "stop_tx"   → Responds with stop transmission acknowledgment.
+ * - "stop"      → Stops active transmission and disables transmit persistently.
  *
  * All other messages are echoed back with a generic reply.
  *
@@ -342,6 +342,19 @@ void WebSocketServer::handleMessage(const std::string &raw_message)
             llog.logS(INFO, "Received websocket reboot command.");
             reply["command"] = "reboot";
             reboot_system();
+        }
+        else if (cmd == "stop")
+        {
+            llog.logS(INFO, "Received websocket stop command.");
+            const StopTransmissionResult stop_result =
+                stop_transmission_by_user_request();
+            reply["command"] = "stop";
+            reply["status"] = stop_result.persisted ? "ok" : "error";
+            reply["transmission_active"] = stop_result.transmission_active;
+            reply["stop_performed"] = stop_result.stop_performed;
+            reply["transmit_disabled"] = stop_result.transmit_disabled;
+            reply["persisted"] = stop_result.persisted;
+            reply["message"] = stop_result.message;
         }
         else if (cmd == "get_tx_state")
         {

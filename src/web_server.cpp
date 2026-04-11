@@ -30,6 +30,7 @@
 
 #include "config_handler.hpp"
 #include "logging.hpp"
+#include "scheduling.hpp"
 #include "version.hpp"
 
 /**
@@ -189,7 +190,7 @@ void WebServer::start(int port)
     svr.Get("/config",
             [this](const httplib::Request &req, httplib::Response &res) {
               setCORSHeaders(res);
-              res.set_content(jConfig.dump(4), "application/json");
+              res.set_content(get_public_config_json().dump(4), "application/json");
             });
 
     svr.Put("/config", handlePutPatch);
@@ -271,6 +272,62 @@ void WebServer::start(int port)
                             "Error parsing JSON:",
                             std::string(e.what()));
                     setCORSHeaders(res);
+                    res.status = 400;
+                    nlohmann::json err = {
+                        {"error", "invalid_json"},
+                        {"message", e.what()}
+                    };
+                    res.set_content(err.dump(4), "application/json");
+                }
+            });
+
+    svr.Post("/control/stop",
+            [this](const httplib::Request &req, httplib::Response &res) {
+                setCORSHeaders(res);
+
+                if (req.body.empty())
+                {
+                    res.status = 400;
+                    nlohmann::json err = {
+                        {"error", "invalid_request"},
+                        {"message", "Request body must explicitly contain {\"command\":\"stop\"}."}
+                    };
+                    res.set_content(err.dump(4), "application/json");
+                    return;
+                }
+
+                try
+                {
+                    nlohmann::json j = nlohmann::json::parse(req.body);
+                    if (!j.contains("command") ||
+                        !j["command"].is_string() ||
+                        j["command"].get<std::string>() != "stop")
+                    {
+                        res.status = 400;
+                        nlohmann::json err = {
+                            {"error", "invalid_request"},
+                            {"message", "Request body must explicitly contain {\"command\":\"stop\"}."}
+                        };
+                        res.set_content(err.dump(4), "application/json");
+                        return;
+                    }
+
+                    const StopTransmissionResult stop_result =
+                        stop_transmission_by_user_request();
+                    nlohmann::json ok = {
+                        {"command", "stop"},
+                        {"status", stop_result.persisted ? "ok" : "error"},
+                        {"transmission_active", stop_result.transmission_active},
+                        {"stop_performed", stop_result.stop_performed},
+                        {"transmit_disabled", stop_result.transmit_disabled},
+                        {"persisted", stop_result.persisted},
+                        {"message", stop_result.message}
+                    };
+                    res.status = stop_result.persisted ? 200 : 500;
+                    res.set_content(ok.dump(4), "application/json");
+                }
+                catch (const nlohmann::json::parse_error &e)
+                {
                     res.status = 400;
                     nlohmann::json err = {
                         {"error", "invalid_json"},

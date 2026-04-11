@@ -1,8 +1,21 @@
 {
     "cSpell.words": [
+        "Callsign",
+        "callsigns",
+        "Chrony",
+        "Deassert",
+        "dfcw",
+        "exitwspr",
+        "filemon",
+        "fskcw",
         "gpiochip",
         "GPIOD",
-        "Wsprry"
+        "pairable",
+        "qrss",
+        "toplevel",
+        "unsynchronized",
+        "Wsprry",
+        "wsprrypi"
     ],
     "files.associations": {
         "*.py": "python",
