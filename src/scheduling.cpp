@@ -1614,6 +1614,11 @@ void transmitter_cb(WsprTransmitter::TransmissionCallbackEvent event,
             request_wspr_shutdown("completed configured TX iterations");
             do_config = false;
         }
+        else if (deferred_reload_pending && do_config)
+        {
+            set_config();
+            do_config = false;
+        }
         else if (do_config &&
                  config.mode != ModeType::WSPR &&
                  config.mode != ModeType::TONE &&
@@ -2497,6 +2502,18 @@ bool set_config(bool force)
                 : 0U;
         const bool managed_candidate_requested =
             config.use_ini && (force || reload_requested);
+        const bool ppm_update_requested =
+            ppm_reload_pending.load(std::memory_order_acquire);
+
+        if (wsprTransmitter.getState() == WsprTransmitter::State::TRANSMITTING &&
+            (managed_candidate_requested || ppm_update_requested))
+        {
+            if (managed_candidate_requested)
+            {
+                ini_reload_pending.store(true, std::memory_order_release);
+            }
+            return true;
+        }
 
         auto newer_reload_arrived =
             [&]() noexcept
