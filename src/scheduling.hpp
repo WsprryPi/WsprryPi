@@ -250,6 +250,17 @@ void shutdown_machine();
  */
 void send_ws_message(std::string type, std::string state);
 
+struct StopTransmissionResult
+{
+    bool transmission_active = false;
+    bool stop_performed = false;
+    bool transmit_disabled = false;
+    bool persisted = false;
+    std::string message;
+};
+
+StopTransmissionResult stop_transmission_by_user_request();
+
 struct WsprRuntimeStatusSnapshot
 {
     std::string tx_state;

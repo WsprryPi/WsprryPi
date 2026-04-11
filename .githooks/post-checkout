@@ -8,6 +8,7 @@ checkout_type="${3:-0}"
 [[ "$checkout_type" != "1" ]] && exit 0
 
 cd "$(git rev-parse --show-toplevel)" || exit 1
+# shellcheck disable=1091
 source ".githooks/lib/common.sh"
 
 log "[post-checkout] Updating submodules"

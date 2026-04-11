@@ -710,7 +710,7 @@ void consume_tx_iteration_if_needed()
             shutdown_after_wspr_plan.store(true, std::memory_order_release);
             llog.logS(
                 INFO,
-                "Completed last of TX iterations, signalling shutdown "
+                "Parsed last of TX iterations, signaling shutdown "
                 "after paired transmission.");
         }
         else
@@ -720,7 +720,7 @@ void consume_tx_iteration_if_needed()
                 std::memory_order_release);
             llog.logS(
                 INFO,
-                "Completed last of TX iterations, signalling shutdown "
+                "Parsed last of TX iterations, signaling shutdown "
                 "after current transmission.");
         }
     }
@@ -2033,6 +2033,94 @@ void end_test_tone()
                       "Transmitting tone, hit Ctrl-C to terminate tone.");
         }
     }
+}
+
+StopTransmissionResult stop_transmission_by_user_request()
+{
+    StopTransmissionResult result;
+    bool persist_to_ini = false;
+
+    {
+        std::lock_guard<std::mutex> lk(set_config_mtx);
+
+        const WsprTransmitter::State state = wsprTransmitter.getState();
+        result.transmission_active =
+            state == WsprTransmitter::State::TRANSMITTING;
+
+        llog.logS(
+            INFO,
+            result.transmission_active
+                ? "Stop transmission requested by user; stopping active transmission."
+                : "Stop transmission requested by user; no active transmission.");
+
+        // Invalidate delayed launches before releasing the lock so no pending
+        // scheduler thread can start another transmission during stop handling.
+        non_wspr_schedule_generation.fetch_add(1, std::memory_order_acq_rel);
+        shutdown_after_current_transmission.store(false, std::memory_order_release);
+        shutdown_after_wspr_plan.store(false, std::memory_order_release);
+        reset_active_wspr_plan_state();
+
+        config.transmit = false;
+        result.transmit_disabled = true;
+        config_to_json();
+        persist_to_ini = config.use_ini;
+    }
+
+    wsprTransmitter.stopAndJoin();
+    stop_active_transmission_selectors();
+    ledControl.toggleGPIO(false);
+
+    {
+        std::lock_guard<std::mutex> lk(set_config_mtx);
+
+        current_transmission_request = TransmissionRequest{};
+        current_dial_frequency = 0.0;
+        current_frequency_entry = WsprDialFrequencyEntry{};
+        freq_iterator = 0;
+        web_test_tone.store(false);
+
+        result.stop_performed = result.transmission_active;
+    }
+
+    if (persist_to_ini)
+    {
+        try
+        {
+            iniFile.set_bool_value("Runtime", "Transmit", false);
+            iniFile.commit_changes();
+            result.persisted = true;
+            llog.logS(INFO, "Runtime.Transmit persisted false due to user stop request.");
+        }
+        catch (const std::exception &e)
+        {
+            result.persisted = false;
+            result.message =
+                std::string("Transmission stopped but failed to persist Runtime.Transmit=false: ") +
+                e.what();
+            llog.logS(ERROR, result.message);
+            return result;
+        }
+    }
+    else
+    {
+        result.persisted = false;
+        result.message =
+            "Transmission stopped and runtime transmit disabled; no INI file is active.";
+        llog.logS(INFO, result.message);
+        send_ws_message("transmit", "stopped");
+        return result;
+    }
+
+    {
+        std::lock_guard<std::mutex> lk(set_config_mtx);
+        set_managed_reload_tx_inhibited(false);
+    }
+    send_ws_message("transmit", "stopped");
+
+    result.message = result.transmission_active
+        ? "Active transmission stopped and transmit disabled."
+        : "Transmit disabled; no active transmission was running.";
+    return result;
 }
 
 static void stop_runtime_components_for_early_exit() noexcept
