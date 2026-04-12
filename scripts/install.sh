@@ -39,6 +39,7 @@ IFS=$'\n\t'
 # sudo ./install.sh debug
 # sudo DRY_RUN=true ./install.sh debug
 # sudo ACTION=uninstall ./install.sh
+# REPO_BRANCH=dev ./install.sh --release
 # curl -fsSL {url} | sudo bash
 # curl -fsSL {url} | sudo bash -s -- debug
 # curl -fsSL {url} | sudo env DRY_RUN=true bash -s -- debug
@@ -240,28 +241,85 @@ readonly GIT_DIRS="${GIT_DIRS:-("config" "WsprryPi-UI/data" "executables" "syste
 # @details This variable holds the name of the main WsprryPi service that
 #          will be installed in `/etc/systemd/system/`.
 #
+# @var NON_MAIN_AS_RELEASE
+# @brief Controls whether non-main branches build as release.
+# @details When set to `"true"`, branches other than `main` or `master`
+#          build as release and use the standard executable name. When set to
+#          `"false"`, non-main branches build as debug and use the `_debug`
+#          executable suffix.
+#
+# @var BUILD_TYPE_OVERRIDE
+# @brief Optional explicit build type override.
+# @details When set to `"DEBUG"` or `"RELEASE"`, this overrides the branch-
+#          based build selection logic.
+#
+# @var WSPR_BUILD_TYPE
+# @brief The resolved build type for WsprryPi.
+# @details This value is derived from `BUILD_TYPE_OVERRIDE`, `REPO_BRANCH`,
+#          and `NON_MAIN_AS_RELEASE`.
+#
 # @var WSPR_EXE
 # @brief The executable name for WsprryPi.
 # @details This variable holds the name of the main WsprryPi executable that
 #          will be installed in `/usr/local/bin/` and used for signal
-#          processing.  Branches != main will use the debug version.
+#          processing. Debug builds use the `_debug` suffix.
 #
 # @var WSPR_INI
 # @brief The configuration file for WsprryPi.
 # @details This variable specifies the name of the WsprryPi configuration file,
 #          typically stored in `/usr/local/etc/`, containing user settings.
-#
-# @var LOG_ROTATE
-# @brief The log rotation configuration file.
-# @details This variable defines the logrotate configuration file, used to
-#          manage WsprryPi logs under `/var/log/wsprrypi/` by limiting file
-#          size and retention.
 # -----------------------------------------------------------------------------
 readonly WSPR_SERVICE="wsprrypi"
-# shellcheck disable=SC2155
-readonly WSPR_EXE="${WSPR_SERVICE}$([[ "${REPO_BRANCH}" != "main" ]] && printf '_debug')"
+declare NON_MAIN_AS_RELEASE="${NON_MAIN_AS_RELEASE:-false}"
+declare BUILD_TYPE_OVERRIDE="${BUILD_TYPE_OVERRIDE:-}"
+declare WSPR_BUILD_TYPE=""
+declare WSPR_EXE=""
 readonly WSPR_INI="wsprrypi.ini"
-readonly LOG_ROTATE="logrotate.conf"
+
+# -----------------------------------------------------------------------------
+# @brief Resolve the effective build type and executable name.
+# @details Applies `BUILD_TYPE_OVERRIDE` first. Otherwise, `main` and `master`
+#          default to release builds. Non-main branches default to debug unless
+#          `NON_MAIN_AS_RELEASE=true` is set.
+#
+# @global BUILD_TYPE_OVERRIDE Optional explicit build override.
+# @global NON_MAIN_AS_RELEASE Whether non-main branches should build as release.
+# @global REPO_BRANCH The selected repository branch.
+# @global WSPR_BUILD_TYPE The resolved build type.
+# @global WSPR_EXE The resolved executable name.
+#
+# @param $@ Optional debug flag.
+#
+# @return 0 on success.
+# -----------------------------------------------------------------------------
+resolve_build_settings() {
+    local debug
+    debug=$(debug_start "$@")
+    eval set -- "$(debug_filter "$@")"
+    local branch
+    local build_type
+
+    branch="${REPO_BRANCH:-main}"
+    build_type="${BUILD_TYPE_OVERRIDE^^}"
+
+    if [[ -z "${build_type}" ]]; then
+        if [[ "${branch}" == "main" || "${branch}" == "master" ]]; then
+            build_type="RELEASE"
+        elif [[ "${NON_MAIN_AS_RELEASE}" == "true" ]]; then
+            build_type="RELEASE"
+        else
+            build_type="DEBUG"
+        fi
+    fi
+
+    WSPR_BUILD_TYPE="${build_type}"
+    WSPR_EXE="${WSPR_SERVICE}$([[ "${WSPR_BUILD_TYPE}" == "DEBUG" ]] &&         printf '_debug')"
+
+    debug_end "$debug"
+    return 0
+}
+
+resolve_build_settings
 
 # -----------------------------------------------------------------------------
 # @var USER_HOME
@@ -521,20 +579,26 @@ declare LOG_FILE="${LOG_FILE:-$USER_HOME/$WSPR_SERVICE.log}"
 # @details Defines the verbosity level for logging messages. This variable
 #          controls which messages are logged based on their severity.
 #          It defaults to:
-#            - `"INFO"` when running on the `main` or `master` branch.
-#            - `"DEBUG"` on any other branch.
+#            - `"INFO"` for release builds.
+#            - `"DEBUG"` for debug builds.
 #
-# @default "INFO" on main/master; "DEBUG" on any other branch
+# @default "INFO" for release builds; "DEBUG" for debug builds
 #
 # @example
 # LOG_LEVEL="ERROR" ./install.sh  # Force log level to ERROR.
 # -----------------------------------------------------------------------------
-: "${LOG_LEVEL:=$(if git rev-parse --abbrev-ref HEAD 2>/dev/null |
-    grep -Eq '^(main|master)$'; then
-    echo INFO
+declare LOG_LEVEL_SET_FROM_ENV="false"
+if [[ -n "${LOG_LEVEL+x}" ]]; then
+    LOG_LEVEL_SET_FROM_ENV="true"
 else
-    echo DEBUG
-fi)}"
+    LOG_LEVEL="$(if [[ "${WSPR_BUILD_TYPE}" == "RELEASE" ]]; then
+        printf "%s
+" "INFO"
+    else
+        printf "%s
+" "DEBUG"
+    fi)"
+fi
 declare LOG_LEVEL
 
 # -----------------------------------------------------------------------------
@@ -4979,6 +5043,7 @@ ARGUMENTS_LIST=(
 OPTIONS_LIST=(
     "-h|--help 0 usage Show these instructions 1"
     "-v|--version 0 version Display $WSPR_SERVICE version 1"
+    "--release 0 set_release_build Build as release regardless of branch 0"
 )
 
 # -----------------------------------------------------------------------------
@@ -4999,6 +5064,37 @@ OPTIONS_LIST=(
 #
 # @return 0 on success, or the status code of the last executed command.
 # -----------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
+# @brief Force a release build from the command line.
+# @details Sets `BUILD_TYPE_OVERRIDE` to `RELEASE`, re-resolves the effective
+#          build settings, and updates the default log level when the user did
+#          not explicitly provide `LOG_LEVEL` in the environment.
+#
+# @global BUILD_TYPE_OVERRIDE Optional explicit build override.
+# @global LOG_LEVEL Current logging level.
+# @global LOG_LEVEL_SET_FROM_ENV Tracks whether LOG_LEVEL came from the
+#                                environment.
+# @global WSPR_BUILD_TYPE The resolved build type.
+#
+# @param $@ Optional debug flag.
+#
+# @return 0 on success.
+# -----------------------------------------------------------------------------
+set_release_build() {
+    local debug
+    debug=$(debug_start "$@")
+    eval set -- "$(debug_filter "$@")"
+
+    BUILD_TYPE_OVERRIDE="RELEASE"
+    resolve_build_settings "$debug"
+    if [[ "${LOG_LEVEL_SET_FROM_ENV}" != "true" ]]; then
+        LOG_LEVEL="INFO"
+    fi
+
+    debug_end "$debug"
+    return 0
+}
+
 # shellcheck disable=SC2317
 process_args() {
     local debug
@@ -5329,6 +5425,7 @@ remove_legacy_files_and_dirs() {
         "/var/log/wspr/"
         "/var/log/WsprryPi/"
         "/etc/logrotate.d/wspr"
+        "/etc/logrotate.d/wsprrypi"
     )
 
     for item in "${files_and_dirs[@]}"; do
@@ -5571,7 +5668,7 @@ compile_binary() {
     # Ensure the executable argument is provided
     if [[ -z "$1" ]]; then
         logE "Error: Missing required arguments."
-        logE "Usage: compile_binary <type>"
+        logE "Usage: compile_binary <executable>"
         debug_end "$debug"
         return 1
     fi
@@ -5594,10 +5691,11 @@ compile_binary() {
         die 1 "Executables source directory does not exist."
     fi
 
-    if [[ "$executable" == *_debug ]]; then
-        type=DEBUG
-    else
-        type=RELEASE
+    type="${WSPR_BUILD_TYPE}"
+    if [[ "${type}" != "DEBUG" && "${type}" != "RELEASE" ]]; then
+        logE "Error: Invalid WSPR_BUILD_TYPE '${type}'."
+        debug_end "$debug"
+        return 1
     fi
 
     # Stop Daemon
@@ -5811,12 +5909,7 @@ manage_config() {
     config_name="${config_name%.*}"
     source_path="${LOCAL_CONFIG_DIR}/${config_file}"
 
-    # If config file is logrotate then rename it to repo_name
-    if [[ "${config_file}" != "logrotate.conf" ]]; then
-        config_path="${config_path}/${config_file}"
-    else
-        config_path="${config_path}/${REPO_NAME,,}"
-    fi
+    config_path="${config_path}/${config_file}"
 
     if [[ "$ACTION" == "install" ]]; then
         # Validate source file exists
@@ -5980,9 +6073,10 @@ manage_config() {
 # -----------------------------------------------------------------------------
 # @brief Migrate values from an old INI into a new INI file.
 # @details Reads values from an old INI file, ignores comments there, and merges
-#   those values into a new INI file, preserving the new file's formatting
-#   and inline comments. Only keys present in the new INI will have their
-#   values updated.
+#   those values into a new INI file while preserving the new file's formatting
+#   and inline comments. Matching is section-aware, so repeated key names in
+#   different sections do not overwrite each other. A backup of the previous
+#   INI is retained alongside the original file before the merged file is used.
 #
 # @param $1 Path to the old INI file containing original values.
 # @param $2 Path to the new INI file to merge into.
@@ -5993,69 +6087,121 @@ manage_config() {
 # shellcheck disable=SC2317
 # shellcheck disable=SC2329
 upgrade_ini() {
-    local debug old_ini new_ini merged_ini rc
+    local debug old_ini new_ini merged_ini rc backup_ini
     debug=$(debug_start "$@")
     eval set -- "$(debug_filter "$@")"
 
     old_ini="$1"
     new_ini="$2"
     merged_ini="$3"
+    backup_ini="${old_ini}.pre_migration.bak"
 
     debug_print "Merging $old_ini → $merged_ini." "$debug"
 
-    # run mawk and capture any stderr
+    if [[ -f "${old_ini}" ]]; then
+        exec_command             "Backup existing INI"             cp -f "${old_ini}" "${backup_ini}" "$debug" || {
+            logE "INI backup failed."
+            debug_end "$debug"
+            return 1
+        }
+    fi
+
+    # Run mawk and capture any stderr.
     rc=0
     if ! mawk '
-    # Phase 1: read old.ini → overrides[key]=value
-    NR==FNR {
+    function trim(value) {
+      gsub(/^[ 	]+|[ 	]+$/, "", value)
+      return value
+    }
+
+    # Phase 1: read old.ini → overrides[section,key]=value
+    NR == FNR {
       if ($0 ~ /^[[:space:]]*([;#]|$)/) next
-      l = $0; sub(/[;#].*$/, "", l)
-      key = l; sub(/=.*/, "", key)
-      val = l; sub(/^[^=]*=[ \t]*/, "", val)
-      sub(/[ \t]*$/, "", val)
-      gsub(/^[ \t]+|[ \t]+$/, "", key)
-      overrides[key] = val
+
+      if ($0 ~ /^[[:space:]]*\[/) {
+        section = $0
+        sub(/^[[:space:]]*\[/, "", section)
+        sub(/\][[:space:]]*$/, "", section)
+        section = trim(section)
+        current_section = section
+        next
+      }
+
+      l = $0
+      sub(/[;#].*$/, "", l)
+      if (l !~ /=/) next
+
+      key = l
+      sub(/=.*/, "", key)
+      key = trim(key)
+
+      val = l
+      sub(/^[^=]*=[ 	]*/, "", val)
+      sub(/[ 	]*$/, "", val)
+
+      overrides[current_section SUBSEP key] = val
       next
     }
+
     # Phase 2: walk new.ini
     {
-      if ($0 ~ /^[[:space:]]*([;#]|\[)/) { print; next }
-      line = $0; comment = ""
+      if ($0 ~ /^[[:space:]]*[;#]/ || $0 ~ /^[[:space:]]*$/) {
+        print
+        next
+      }
+
+      if ($0 ~ /^[[:space:]]*\[/) {
+        section = $0
+        sub(/^[[:space:]]*\[/, "", section)
+        sub(/\][[:space:]]*$/, "", section)
+        section = trim(section)
+        current_section = section
+        print
+        next
+      }
+
+      line = $0
+      comment = ""
       p = match(line, /;|#/)
       if (p) {
-        comment = substr(line,p); line = substr(line,1,p-1)
+        comment = substr(line, p)
+        line = substr(line, 1, p - 1)
       }
-      eq = match(line,/=/)
+
+      eq = match(line, /=/)
       if (eq) {
-        left = substr(line,1,eq-1)
-        orig=substr(line,eq+1)
-        keytrim=left; gsub(/^[ \t]+|[ \t]+$/, "",keytrim)
-        if (keytrim in overrides) {
-          # preserve whitespace
-          tmp=orig; gsub(/^[ \t]*/,"",tmp)
-          leadWS=substr(orig,1,length(orig)-length(tmp))
-          tmp2=tmp; gsub(/[ \t]*$/,"",tmp2)
-          trailerWS=substr(tmp,length(tmp2)+1)
-          printf("%s=%s%s%s%s\n", left, leadWS, overrides[keytrim], trailerWS, comment)
+        left = substr(line, 1, eq - 1)
+        orig = substr(line, eq + 1)
+        keytrim = trim(left)
+        composite = current_section SUBSEP keytrim
+
+        if (composite in overrides) {
+          tmp = orig
+          gsub(/^[ 	]*/, "", tmp)
+          leadWS = substr(orig, 1, length(orig) - length(tmp))
+
+          tmp2 = tmp
+          gsub(/[ 	]*$/, "", tmp2)
+          trailerWS = substr(tmp, length(tmp2) + 1)
+
+          printf("%s=%s%s%s%s
+", left, leadWS, overrides[composite], trailerWS, comment)
           next
         }
       }
+
       print
     }
     ' "$old_ini" "$new_ini" >"$merged_ini" 2>/tmp/upgrade_ini.err; then
         rc=$?
-        # Capture the errors
         local err_details
         err_details=$(sed 's/^/  > /' /tmp/upgrade_ini.err)
 
-        # log summary + details
         logE "INI merge failed (mawk exited $rc)." "$err_details"
         rm -f /tmp/upgrade_ini.err
         debug_end "$debug"
         return 1
     fi
-
-    exec_command "Remove old INI after merge" rm "${old_ini}" "$debug" || retval=1
 
     rm -f /tmp/upgrade_ini.err
     debug_end "$debug"
@@ -6971,6 +7117,16 @@ _main() {
     validate_sys_accs "$debug" # Verify critical system files are accessible
     validate_env_vars "$debug" # Check for required environment variables
     get_proj_params "$debug"   # Get project and git parameters
+    resolve_build_settings "$debug"
+    if [[ "${LOG_LEVEL_SET_FROM_ENV}" != "true" ]]; then
+        if [[ "${WSPR_BUILD_TYPE}" == "RELEASE" ]]; then
+            LOG_LEVEL="INFO"
+        else
+            LOG_LEVEL="DEBUG"
+        fi
+    fi
+    printf "Resolved build type: %s for branch '%s'.
+"         "${WSPR_BUILD_TYPE}" "${REPO_BRANCH:-main}"
 
     check_bash "$debug"        # Ensure the script is executed in a Bash shell
     check_sh_ver "$debug"      # Verify the Bash version meets minimum requirements
