@@ -128,7 +128,8 @@ BIN_DIR         := build/bin
 
 LOCAL_CPP_SOURCES := $(shell find . -maxdepth 1 -type f -name '*.cpp' 2>/dev/null)
 SUBMODULE_CPP_SOURCES := $(shell find $(SUBMODULE_SRCDIRS) -type f -name '*.cpp' ! -name 'main.cpp' 2>/dev/null)
-SUBMODULE_CPP_SOURCES := $(filter-out ./WSPR-Transmitter/src/si5351_backend_harness.cpp,$(SUBMODULE_CPP_SOURCES))
+SI5351_TEST_SOURCE := ./WSPR-Transmitter/src/si5351_backend_harness.cpp
+SUBMODULE_CPP_SOURCES := $(filter-out $(SI5351_TEST_SOURCE),$(SUBMODULE_CPP_SOURCES))
 
 CPP_SOURCES := $(LOCAL_CPP_SOURCES) $(SUBMODULE_CPP_SOURCES)
 REL_CPP_SOURCES := $(patsubst ../../%,%,$(CPP_SOURCES))
