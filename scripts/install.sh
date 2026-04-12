@@ -313,13 +313,17 @@ resolve_build_settings() {
     fi
 
     WSPR_BUILD_TYPE="${build_type}"
-    WSPR_EXE="${WSPR_SERVICE}$([[ "${WSPR_BUILD_TYPE}" == "DEBUG" ]] &&         printf '_debug')"
+
+    if [[ "${WSPR_BUILD_TYPE}" == "DEBUG" ]]; then
+        WSPR_EXE="${WSPR_SERVICE}_debug"
+    else
+        WSPR_EXE="${WSPR_SERVICE}"
+    fi
 
     debug_end "$debug"
     return 0
 }
 
-resolve_build_settings
 
 # -----------------------------------------------------------------------------
 # @var USER_HOME
@@ -6107,8 +6111,7 @@ upgrade_ini() {
     fi
 
     # Run mawk and capture any stderr.
-    rc=0
-    if ! mawk '
+    mawk '
     function trim(value) {
       gsub(/^[ 	]+|[ 	]+$/, "", value)
       return value
@@ -6184,16 +6187,16 @@ upgrade_ini() {
           gsub(/[ 	]*$/, "", tmp2)
           trailerWS = substr(tmp, length(tmp2) + 1)
 
-          printf("%s=%s%s%s%s
-", left, leadWS, overrides[composite], trailerWS, comment)
+          printf("%s=%s%s%s%s\n", left, leadWS, overrides[composite], trailerWS, comment)
           next
         }
       }
 
       print
     }
-    ' "$old_ini" "$new_ini" >"$merged_ini" 2>/tmp/upgrade_ini.err; then
-        rc=$?
+    ' "$old_ini" "$new_ini" >"$merged_ini" 2>/tmp/upgrade_ini.err
+    rc=$?
+    if (( rc != 0 )); then
         local err_details
         err_details=$(sed 's/^/  > /' /tmp/upgrade_ini.err)
 
@@ -6975,7 +6978,6 @@ manage_wsprry_pi() {
         "manage_exe \"$WSPR_EXE\""
         "manage_config \"$WSPR_INI\" \"/usr/local/etc/\""
         "manage_service \"/usr/bin/$WSPR_EXE\" \"/usr/local/bin/$WSPR_EXE -J -i /usr/local/etc/$WSPR_INI\" \"false\""
-        "manage_config \"$LOG_ROTATE\" \"/etc/logrotate.d\""
         "manage_web"
         "manage_apache"
         "manage_sound"
@@ -7125,8 +7127,7 @@ _main() {
             LOG_LEVEL="DEBUG"
         fi
     fi
-    printf "Resolved build type: %s for branch '%s'.
-"         "${WSPR_BUILD_TYPE}" "${REPO_BRANCH:-main}"
+    logI "Resolved build type: ${WSPR_BUILD_TYPE} for branch ${REPO_BRANCH:-main}."
 
     check_bash "$debug"        # Ensure the script is executed in a Bash shell
     check_sh_ver "$debug"      # Verify the Bash version meets minimum requirements
