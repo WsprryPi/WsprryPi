@@ -319,7 +319,6 @@ resolve_build_settings() {
     return 0
 }
 
-resolve_build_settings
 
 # -----------------------------------------------------------------------------
 # @var USER_HOME
@@ -7125,8 +7124,7 @@ _main() {
             LOG_LEVEL="DEBUG"
         fi
     fi
-    printf "Resolved build type: %s for branch '%s'.
-"         "${WSPR_BUILD_TYPE}" "${REPO_BRANCH:-main}"
+    logI "Resolved build type: ${WSPR_BUILD_TYPE} for branch ${REPO_BRANCH:-main}."
 
     check_bash "$debug"        # Ensure the script is executed in a Bash shell
     check_sh_ver "$debug"      # Verify the Bash version meets minimum requirements
