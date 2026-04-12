@@ -1,19 +1,16 @@
 {
     "cSpell.words": [
-        "Callsign",
         "callsigns",
         "Chrony",
         "Deassert",
-        "dfcw",
+        "Dfcw",
         "exitwspr",
         "filemon",
         "fskcw",
-        "gpiochip",
-        "GPIOD",
-        "pairable",
-        "qrss",
-        "toplevel",
+        "gridsquare",
+        "Qrss",
         "unsynchronized",
+        "vnro",
         "Wsprry",
         "wsprrypi"
     ],

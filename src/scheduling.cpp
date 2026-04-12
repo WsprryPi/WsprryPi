@@ -90,6 +90,7 @@
  * transmission completes, is skipped, or is cancelled.
  */
 static BandGPIOSelector bandGPIOSelector;
+
 struct BandGPIOResolution
 {
     BandGPIOConfig config{};
@@ -2065,7 +2066,7 @@ void end_test_tone()
                 make_direct_tone_request(
                     config,
                     committed_ppm,
-                    actual_rf_frequency_hz);
+                    actual_rf_frequency_hz));
             (void)prepare_band_gpio_for_frequency_or_log(
                 entry.dial_frequency_hz,
                 entry,
