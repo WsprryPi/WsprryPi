@@ -7,7 +7,7 @@
  * - Auto versus RequirePaired WSPR planning.
  * - WSPR versus direct-tone execution mode.
  * - Random WSPR RF offset application.
- * - Per-frequency control GPIO metadata and selector preparation.
+ * - Per-band selector GPIO preparation.
  * - When a built request is committed to the transmitter.
  *
  * The transmitter only consumes committed `TransmissionRequest`
@@ -90,77 +90,10 @@
  * transmission completes, is skipped, or is cancelled.
  */
 static BandGPIOSelector bandGPIOSelector;
-static void log_selected_frequency_entry_gpio(
-    const WsprDialFrequencyEntry &entry,
-    const ArgParserConfig &cfg);
 static bool prepare_band_gpio_for_frequency_or_log(
-    double frequency_hz,
+    double source_frequency_hz,
+    const WsprFrequencyEntry &entry,
     const ArgParserConfig &cfg);
-
-/**
- * @brief Runtime owner for the currently prepared per-frequency selector GPIO.
- *
- * Scheduling prepares and tears down this selector around the committed
- * request for the active slot. It is intentionally file-local so per-
- * frequency control remains an orchestration concern rather than a
- * transmitter or backend policy concern.
- */
-class FrequencyEntryGPIOSelector
-{
-public:
-    bool prepare(const WsprDialFrequencyEntry &entry, bool active_high)
-    {
-        stop();
-        last_error_.clear();
-
-        if (entry.control_gpio == kFrequencyEntryControlGpioUnset)
-        {
-            return true;
-        }
-
-        if (!gpio_.enableGPIOPin(entry.control_gpio, active_high))
-        {
-            last_error_ = gpio_.lastError();
-            return false;
-        }
-
-        has_gpio_ = true;
-        return true;
-    }
-
-    bool setState(bool state)
-    {
-        if (!has_gpio_)
-        {
-            return true;
-        }
-
-        return gpio_.toggleGPIO(state);
-    }
-
-    void stop()
-    {
-        if (!has_gpio_)
-        {
-            return;
-        }
-
-        gpio_.stop();
-        has_gpio_ = false;
-    }
-
-    const std::string &lastError() const noexcept
-    {
-        return last_error_;
-    }
-
-private:
-    GPIOOutput gpio_{};
-    bool has_gpio_ = false;
-    std::string last_error_{};
-};
-
-static FrequencyEntryGPIOSelector frequencyEntryGPIOSelector;
 
 /**
  * @brief Mutex to protect access to the shutdown flag for the WSPR loop.
@@ -210,7 +143,7 @@ int freq_iterator = 0;
  * A zero value indicates that no frequency is configured or the list was empty.
  */
 double current_dial_frequency = 0.0;
-WsprDialFrequencyEntry current_frequency_entry{};
+WsprFrequencyEntry current_frequency_entry{};
 TransmissionRequest current_transmission_request{};
 
 /**
@@ -281,60 +214,23 @@ static std::atomic<std::uint64_t> non_wspr_schedule_generation{0};
 PreparedWsprTransmission active_wspr_plan{};
 std::size_t active_wspr_frame_index = 0;
 double active_wspr_plan_dial_frequency = 0.0;
-WsprDialFrequencyEntry active_wspr_plan_frequency_entry{};
+WsprFrequencyEntry active_wspr_plan_frequency_entry{};
 bool active_wspr_plan_in_progress = false;
 
 /**
- * @brief Tear down every selector prepared for the active committed request.
+ * @brief Tear down the selector prepared for the active committed request.
  *
- * This is the single teardown path for scheduler-owned selector GPIO state.
- * Any code that needs to release band-selection or per-frequency control
- * GPIOs must call this helper rather than stopping selectors individually.
+ * This is the single teardown path for scheduler-owned band-selection GPIO
+ * state. Any code that needs to release the active selector must call this
+ * helper rather than stopping the selector directly.
  */
 static void stop_active_transmission_selectors() noexcept
 {
-    bandGPIOSelector.setBandState(false);
-    bandGPIOSelector.stop();
-    frequencyEntryGPIOSelector.setState(false);
-    frequencyEntryGPIOSelector.stop();
-}
-
-/**
- * @brief Prepare the per-frequency control GPIO for the next committed slot.
- *
- * This helper logs the selected entry metadata and prepares the transient
- * runtime selector state that belongs to the current scheduler slot. It
- * does not start transmission or commit a request by itself.
- *
- * @param entry Frequency entry selected by the scheduler.
- * @param failure_level Log level used if preparation fails.
- * @return `true` if no GPIO is needed or preparation succeeded.
- */
-static bool prepare_frequency_entry_gpio_or_log(
-    const WsprDialFrequencyEntry &entry,
-    const ArgParserConfig &cfg,
-    bool active_high,
-    LogLevel failure_level)
-{
-    log_selected_frequency_entry_gpio(entry, cfg);
-    if (frequencyEntryGPIOSelector.prepare(
-            entry,
-            active_high))
+    if (bandGPIOSelector.currentConfig() != nullptr)
     {
-        return true;
+        bandGPIOSelector.setBandState(false);
     }
-
-    llog.logS(
-        failure_level,
-        "Unable to prepare frequency entry control GPIO ",
-        entry.control_gpio,
-        " for ",
-        entry.token,
-        ".",
-        frequencyEntryGPIOSelector.lastError().empty()
-            ? ""
-            : std::string(" ") + frequencyEntryGPIOSelector.lastError());
-    return false;
+    bandGPIOSelector.stop();
 }
 
 /**
@@ -565,7 +461,7 @@ static void reset_active_wspr_plan_state()
     active_wspr_plan = PreparedWsprTransmission{};
     active_wspr_frame_index = 0;
     active_wspr_plan_dial_frequency = 0.0;
-    active_wspr_plan_frequency_entry = WsprDialFrequencyEntry{};
+    active_wspr_plan_frequency_entry = WsprFrequencyEntry{};
     active_wspr_plan_in_progress = false;
 }
 
@@ -613,8 +509,8 @@ static void set_managed_reload_tx_inhibited(
     }
 }
 
-static WsprDialFrequencyEntry next_frequency_entry_from(
-    const std::vector<WsprDialFrequencyEntry> &entries,
+static WsprFrequencyEntry next_frequency_entry_from(
+    const std::vector<WsprFrequencyEntry> &entries,
     int &iterator,
     bool reset)
 {
@@ -625,17 +521,17 @@ static WsprDialFrequencyEntry next_frequency_entry_from(
 
     if (entries.empty())
     {
-        return WsprDialFrequencyEntry{};
+        return WsprFrequencyEntry{};
     }
 
     const auto idx =
         static_cast<std::size_t>(iterator % static_cast<int>(entries.size()));
-    const WsprDialFrequencyEntry entry = entries[idx];
+    const WsprFrequencyEntry entry = entries[idx];
     ++iterator;
     return entry;
 }
 
-static WsprDialFrequencyEntry next_frequency_entry(bool reset);
+static WsprFrequencyEntry next_frequency_entry(bool reset);
 
 /**
  * @brief Return the prepared plan for a single frame from a saved plan.
@@ -730,52 +626,83 @@ void consume_tx_iteration_if_needed()
     }
 }
 
-static void log_selected_frequency_entry_gpio(
-    const WsprDialFrequencyEntry &entry,
-    const ArgParserConfig &cfg)
-{
-    if (entry.control_gpio == kFrequencyEntryControlGpioUnset)
-    {
-        llog.logS(INFO,
-                  "Selected frequency entry control GPIO: none for ",
-                  entry.token,
-                  ".");
-        return;
-    }
-
-    llog.logS(INFO,
-              "Selected frequency entry control GPIO: ",
-              entry.control_gpio,
-              " (",
-              cfg.tx_freq_control_active_high ? "active high" : "active low",
-              ") for ",
-              entry.token,
-              ".");
-}
-
 static bool prepare_band_gpio_for_frequency_or_log(
-    double frequency_hz,
+    double source_frequency_hz,
+    const WsprFrequencyEntry &entry,
     const ArgParserConfig &cfg)
 {
-    const auto band = lookup.lookup_ham_band(frequency_hz);
+    const auto band = lookup.lookup_ham_band(source_frequency_hz);
     if (!band.has_value())
     {
         llog.logS(
             WARN,
-            "Unable to map frequency ",
-            lookup.freq_display_string(frequency_hz),
+            "Unable to map source frequency ",
+            lookup.freq_display_string(source_frequency_hz),
             " to a ham band for band-selector GPIO preparation.");
         return false;
     }
 
-    const BandGPIOConfig &band_gpio_config =
-        cfg.band_gpio[ham_band_index(*band)];
+    BandGPIOConfig band_gpio_config{};
+    const char *selector_source = "frequency entry";
+    if (entry.selector_gpio != kSelectorGpioUnset)
+    {
+        band_gpio_config.gpio = entry.selector_gpio;
+        band_gpio_config.enabled = true;
+        band_gpio_config.active_high = entry.selector_gpio_active_high;
+    }
+    else if (entry.allow_band_gpio_fallback)
+    {
+        band_gpio_config = cfg.band_gpio[ham_band_index(*band)];
+        selector_source = "band configuration";
+        if (!band_gpio_config.enabled || band_gpio_config.gpio < 0)
+        {
+            stop_active_transmission_selectors();
+            llog.logS(
+                DEBUG,
+                "[BandGPIO]",
+                "No selector GPIO requested for frequency entry ",
+                entry.token,
+                "; no configured band GPIO for band ",
+                ham_band_to_string(*band),
+                "; leaving LPF selection inactive.");
+            return true;
+        }
+    }
+    else
+    {
+        stop_active_transmission_selectors();
+        llog.logS(
+            DEBUG,
+            "[BandGPIO]",
+            "No selector GPIO requested for frequency entry ",
+            entry.token,
+            "; leaving LPF selection inactive.");
+        return true;
+    }
+
+    llog.logS(
+        DEBUG,
+        "[BandGPIO]",
+        "Unified scheduler selector derived band ",
+        ham_band_to_string(*band),
+        " from source frequency ",
+        lookup.freq_display_string(source_frequency_hz),
+        "; selected GPIO ",
+        band_gpio_config.gpio,
+        " (",
+        (band_gpio_config.active_high ? "active high" : "active low"),
+        ")",
+        " from ",
+        selector_source,
+        ", enabled ",
+        (band_gpio_config.enabled ? "true" : "false"),
+        ".");
     if (!bandGPIOSelector.prepareBand(*band, band_gpio_config))
     {
         llog.logS(
             WARN,
-            "Unable to prepare band GPIO for ",
-            wsprTransmitter.formatFrequencyMHz(frequency_hz),
+            "Unable to prepare unified scheduler band GPIO for ",
+            wsprTransmitter.formatFrequencyMHz(source_frequency_hz),
             " MHz.");
         return false;
     }
@@ -809,7 +736,7 @@ static TransmissionRequest make_tone_request(
     double committed_ppm,
     double actual_rf_frequency_hz,
     double dial_frequency_hz,
-    const WsprDialFrequencyEntry &entry)
+    const WsprFrequencyEntry &entry)
 {
     TransmissionRequest request;
     request.mode = TransmissionMode::TONE;
@@ -818,8 +745,6 @@ static TransmissionRequest make_tone_request(
     request.ppm = committed_ppm;
     request.power_level = cfg.power_level;
     request.tx_gpio = cfg.tx_pin;
-    request.frequency_control_gpio = entry.control_gpio;
-    request.frequency_control_active_high = cfg.tx_freq_control_active_high;
     request.frequency_entry_label = entry.token;
     return request;
 }
@@ -835,7 +760,7 @@ static TransmissionRequest make_direct_tone_request(
     double committed_ppm,
     double actual_rf_frequency_hz)
 {
-    WsprDialFrequencyEntry entry;
+    WsprFrequencyEntry entry;
     double ignored_actual_rf_frequency_hz = 0.0;
     if (try_get_direct_tone_startup_request(entry, ignored_actual_rf_frequency_hz))
     {
@@ -852,7 +777,7 @@ static TransmissionRequest make_direct_tone_request(
         committed_ppm,
         actual_rf_frequency_hz,
         actual_rf_frequency_hz,
-        WsprDialFrequencyEntry{});
+        WsprFrequencyEntry{});
 }
 
 static std::chrono::nanoseconds seconds_to_nanoseconds(double seconds)
@@ -1169,8 +1094,8 @@ static void schedule_next_non_wspr_launch(const ArgParserConfig &cfg)
  * @brief Build the scheduler-side request for one WSPR execution slot.
  *
  * The request captures all execution-time state, including the prepared
- * WSPR frame for this slot, the committed RF frequency, and scheduler-owned
- * per-frequency GPIO metadata.
+ * WSPR frame for this slot, the committed RF frequency, and the original
+ * scheduler frequency-entry label used for diagnostics.
  */
 static TransmissionRequest make_wspr_request(
     const ArgParserConfig &cfg,
@@ -1178,7 +1103,7 @@ static TransmissionRequest make_wspr_request(
     const PreparedWsprTransmission &slot_plan,
     double dial_frequency_hz,
     double actual_rf_frequency_hz,
-    const WsprDialFrequencyEntry &entry,
+    const WsprFrequencyEntry &entry,
     double applied_offset_hz)
 {
     TransmissionRequest request;
@@ -1191,8 +1116,6 @@ static TransmissionRequest make_wspr_request(
     request.tx_gpio = cfg.tx_pin;
     request.use_offset = cfg.use_offset;
     request.applied_offset_hz = applied_offset_hz;
-    request.frequency_control_gpio = entry.control_gpio;
-    request.frequency_control_active_high = cfg.tx_freq_control_active_high;
     request.frequency_entry_label = entry.token;
     return request;
 }
@@ -1244,11 +1167,11 @@ static bool configure_current_wspr_transmission(
     const ArgParserConfig &cfg,
     double committed_ppm,
     double dial_frequency_hz,
-    const WsprDialFrequencyEntry &frequency_entry,
+    const WsprFrequencyEntry &frequency_entry,
     PreparedWsprTransmission &active_plan,
     std::size_t &active_frame_index,
     double &active_plan_dial_frequency,
-    WsprDialFrequencyEntry &active_plan_frequency_entry,
+    WsprFrequencyEntry &active_plan_frequency_entry,
     bool &active_plan_in_progress,
     double actual_rf_frequency_hz,
     TransmissionRequest &request_out)
@@ -1368,7 +1291,7 @@ static bool configure_current_wspr_transmission(
                 active_plan = PreparedWsprTransmission{};
                 active_frame_index = 0;
                 active_plan_dial_frequency = 0.0;
-                active_plan_frequency_entry = WsprDialFrequencyEntry{};
+                active_plan_frequency_entry = WsprFrequencyEntry{};
                 active_plan_in_progress = false;
             }
 
@@ -1413,7 +1336,7 @@ static bool configure_current_wspr_transmission(
         active_plan = PreparedWsprTransmission{};
         active_frame_index = 0;
         active_plan_dial_frequency = 0.0;
-        active_plan_frequency_entry = WsprDialFrequencyEntry{};
+        active_plan_frequency_entry = WsprFrequencyEntry{};
         active_plan_in_progress = false;
         shutdown_after_wspr_plan.store(false, std::memory_order_release);
         llog.logE(ERROR, "WSPR encoding/configuration failed: ", e.what());
@@ -1466,9 +1389,12 @@ void transmitter_cb(WsprTransmitter::TransmissionCallbackEvent event,
             consume_tx_iteration_if_needed();
         }
 
-        // Assert the precomputed band GPIO.
-        bandGPIOSelector.setBandState(true);
-        frequencyEntryGPIOSelector.setState(true);
+        // Assert the scheduler-selected band GPIO.
+        if (!bandGPIOSelector.setBandState(true))
+        {
+            llog.logS(DEBUG,
+                      "Band GPIO assert request was issued but did not complete.");
+        }
 
         // Turn on LED.
         ledControl.toggleGPIO(true);
@@ -1878,7 +1804,7 @@ void reboot_system()
  * @brief Start a transient runtime tone using scheduler-owned setup.
  *
  * The scheduler stops any active run, reuses the first configured
- * frequency entry, prepares selector GPIO state, commits a tone request,
+ * frequency entry, prepares band-selector GPIO state, commits a tone request,
  * and starts the transmitter. Tone mode here is runtime-only behavior.
  */
 void start_test_tone()
@@ -1905,7 +1831,7 @@ void start_test_tone()
 
         // Pick the first configured scheduler frequency entry, then commit
         // the resolved RF frequency into the request before execution.
-        const WsprDialFrequencyEntry entry =
+        const WsprFrequencyEntry entry =
             next_frequency_entry(/*restart=*/true);
         const double dial_freq = entry.dial_frequency_hz;
         current_frequency_entry = entry;
@@ -1940,19 +1866,7 @@ void start_test_tone()
         commit_execution_request(
             make_tone_request(config, committed_ppm, actual_rf_freq, dial_freq, entry));
 
-        (void)prepare_frequency_entry_gpio_or_log(
-            entry,
-            config,
-            config.tx_freq_control_active_high,
-            WARN);
-
-        if (!bandGPIOSelector.prepareFrequency(dial_freq))
-        {
-            llog.logS(WARN,
-                      "Unable to prepare band GPIO for WSPR dial frequency ",
-                      lookup.freq_display_string(dial_freq),
-                      ".");
-        }
+        (void)prepare_band_gpio_for_frequency_or_log(dial_freq, entry, config);
 
         wsprTransmitter.startAsync();
         llog.logS(INFO,
@@ -1997,7 +1911,7 @@ void end_test_tone()
         }
         else
         {
-            WsprDialFrequencyEntry entry;
+            WsprFrequencyEntry entry;
             double actual_rf_frequency_hz = 0.0;
             if (!try_get_direct_tone_startup_request(
                     entry,
@@ -2022,11 +1936,10 @@ void end_test_tone()
                     config,
                     committed_ppm,
                     actual_rf_frequency_hz));
-            (void)prepare_frequency_entry_gpio_or_log(
+            (void)prepare_band_gpio_for_frequency_or_log(
+                entry.dial_frequency_hz,
                 entry,
-                config,
-                config.tx_freq_control_active_high,
-                WARN);
+                config);
             wsprTransmitter.startAsync();
 
             llog.logS(INFO,
@@ -2075,7 +1988,7 @@ StopTransmissionResult stop_transmission_by_user_request()
 
         current_transmission_request = TransmissionRequest{};
         current_dial_frequency = 0.0;
-        current_frequency_entry = WsprDialFrequencyEntry{};
+        current_frequency_entry = WsprFrequencyEntry{};
         freq_iterator = 0;
         web_test_tone.store(false);
 
@@ -2255,7 +2168,7 @@ bool wspr_loop()
     else if (config.mode == ModeType::TONE)
     {
         log_scheduler_path_selection(config.mode);
-        WsprDialFrequencyEntry entry;
+        WsprFrequencyEntry entry;
         double actual_rf_frequency_hz = 0.0;
         if (!try_get_direct_tone_startup_request(entry, actual_rf_frequency_hz))
         {
@@ -2276,11 +2189,10 @@ bool wspr_loop()
                     config,
                     committed_ppm,
                     actual_rf_frequency_hz));
-            (void)prepare_frequency_entry_gpio_or_log(
+            (void)prepare_band_gpio_for_frequency_or_log(
+                entry.dial_frequency_hz,
                 entry,
-                config,
-                config.tx_freq_control_active_high,
-                WARN);
+                config);
             wsprTransmitter.startAsync();
             llog.logS(INFO, "transmitting tone, hit Ctrl-C to terminate tone.");
         }
@@ -2371,11 +2283,9 @@ bool wspr_loop()
     wsprTransmitter.stopAndJoin(); // Stop the transmitter threads
     llog.logS(INFO, "Transmitter stopped.");
 
-    llog.logS(INFO, "Stopping frequency entry GPIO selector.");
     llog.logS(INFO, "Stopping band GPIO selector.");
     stop_active_transmission_selectors();
     llog.logS(INFO, "Band GPIO selector stopped.");
-    llog.logS(INFO, "Frequency entry GPIO selector stopped.");
 
     llog.logS(INFO, "Stopping shutdown monitor.");
     shutdownMonitor.stop(); // Stop the GPIO monitor
@@ -2541,17 +2451,17 @@ WsprRuntimeStatusSnapshot current_tx_runtime_status_snapshot()
  * @brief Return the next configured scheduler frequency entry.
  *
  * The scheduler owns round-robin traversal of configured frequency entries,
- * including their optional `@GPIO` metadata. When `reset` is true, the next
- * returned entry is the first configured slot.
+ * using the returned source frequency for band-selector policy. When `reset`
+ * is true, the next returned entry is the first configured slot.
  *
  * @param reset True to restart from the first configured entry.
  * @return The next configured entry, or a default-constructed entry if none
  *         are configured.
  */
-WsprDialFrequencyEntry next_frequency_entry(bool reset)
+WsprFrequencyEntry next_frequency_entry(bool reset)
 {
     return next_frequency_entry_from(
-        config.wspr_dial_frequency_entries,
+        config.wspr_frequency_entries,
         freq_iterator,
         reset);
 }
@@ -2751,7 +2661,7 @@ bool set_config(bool force)
             stop_active_transmission_selectors();
             current_transmission_request = TransmissionRequest{};
             current_dial_frequency = 0.0;
-            current_frequency_entry = WsprDialFrequencyEntry{};
+            current_frequency_entry = WsprFrequencyEntry{};
             freq_iterator = 0;
             reset_active_wspr_plan_state();
             non_wspr_schedule_generation.fetch_add(1, std::memory_order_acq_rel);
@@ -2783,8 +2693,8 @@ bool set_config(bool force)
         int next_freq_iterator = force ? 0 : freq_iterator;
         double next_current_dial_frequency =
             force ? 0.0 : current_dial_frequency;
-        WsprDialFrequencyEntry next_current_frequency_entry =
-            force ? WsprDialFrequencyEntry{} : current_frequency_entry;
+        WsprFrequencyEntry next_current_frequency_entry =
+            force ? WsprFrequencyEntry{} : current_frequency_entry;
         TransmissionRequest next_transmission_request =
             force ? TransmissionRequest{} : current_transmission_request;
         PreparedWsprTransmission next_active_wspr_plan =
@@ -2793,8 +2703,8 @@ bool set_config(bool force)
             force ? 0U : active_wspr_frame_index;
         double next_active_wspr_plan_dial_frequency =
             force ? 0.0 : active_wspr_plan_dial_frequency;
-        WsprDialFrequencyEntry next_active_wspr_plan_frequency_entry =
-            force ? WsprDialFrequencyEntry{} : active_wspr_plan_frequency_entry;
+        WsprFrequencyEntry next_active_wspr_plan_frequency_entry =
+            force ? WsprFrequencyEntry{} : active_wspr_plan_frequency_entry;
         bool next_active_wspr_plan_in_progress =
             force ? false : active_wspr_plan_in_progress;
         if (force)
@@ -2803,7 +2713,7 @@ bool set_config(bool force)
         }
 
         static double last_freq = 0.0;
-        static WsprDialFrequencyEntry last_frequency_entry{};
+        static WsprFrequencyEntry last_frequency_entry{};
         if (next_active_wspr_plan_in_progress && next_active_wspr_frame_index > 0U)
         {
             next_current_dial_frequency = next_active_wspr_plan_dial_frequency;
@@ -2813,7 +2723,7 @@ bool set_config(bool force)
         else
         {
             next_current_frequency_entry = next_frequency_entry_from(
-                working_config.wspr_dial_frequency_entries,
+                working_config.wspr_frequency_entries,
                 next_freq_iterator,
                 force);
             next_current_dial_frequency =
@@ -2822,7 +2732,8 @@ bool set_config(bool force)
 
         const bool frequency_entry_changed =
             next_current_frequency_entry.token != last_frequency_entry.token ||
-            next_current_frequency_entry.control_gpio != last_frequency_entry.control_gpio;
+            next_current_frequency_entry.selector_gpio != last_frequency_entry.selector_gpio ||
+            next_current_frequency_entry.selector_gpio_active_high != last_frequency_entry.selector_gpio_active_high;
 
         if (next_current_dial_frequency != last_freq || frequency_entry_changed)
         {
@@ -2891,7 +2802,7 @@ bool set_config(bool force)
                 stop_active_transmission_selectors();
                 current_transmission_request = TransmissionRequest{};
                 current_dial_frequency = 0.0;
-                current_frequency_entry = WsprDialFrequencyEntry{};
+                current_frequency_entry = WsprFrequencyEntry{};
                 freq_iterator = next_freq_iterator;
                 active_wspr_plan = next_active_wspr_plan;
                 active_wspr_frame_index = next_active_wspr_frame_index;
@@ -2987,40 +2898,9 @@ bool set_config(bool force)
 
             next_transmission_request.applied_offset_hz = applied_offset_hz;
 
-            if (!prepare_frequency_entry_gpio_or_log(
-                    next_current_frequency_entry,
-                    working_config,
-                    working_config.tx_freq_control_active_high,
-                    ERROR))
-            {
-                stop_active_transmission_selectors();
-
-                if (newer_reload_arrived())
-                {
-                    continue;
-                }
-
-                if (is_managed_persistent_mode())
-                {
-                    set_managed_reload_tx_inhibited(
-                        true,
-                        "Managed reload could not prepare selector GPIO. Future transmissions disabled until a valid configuration is loaded.");
-                    send_ws_message("configuration", "reload_failed");
-                    if (!finalize_reload_pending())
-                    {
-                        continue;
-                    }
-                    return true;
-                }
-
-                ini_reload_pending.store(false, std::memory_order_relaxed);
-                config.transmit = false;
-                config_to_json();
-                return false;
-            }
-
             if (!prepare_band_gpio_for_frequency_or_log(
                     next_current_dial_frequency,
+                    next_current_frequency_entry,
                     working_config))
             {
                 stop_active_transmission_selectors();

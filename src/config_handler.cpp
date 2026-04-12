@@ -145,9 +145,7 @@ namespace
             {"Web Port", source.at("Runtime").at("Web Port")},
             {"Socket Port", source.at("Runtime").at("Socket Port")},
             {"Use Shutdown", source.at("Runtime").at("Use Shutdown")},
-            {"Shutdown Button", source.at("Runtime").at("Shutdown Button")},
-            {"Frequency Control GPIO Polarity",
-             source.at("Runtime").value("Frequency Control GPIO Polarity", false)}};
+            {"Shutdown Button", source.at("Runtime").at("Shutdown Button")}};
 
         public_json["Calibration"] = source.at("Calibration");
         public_json["WSPR"] = source.at("WSPR");
@@ -198,11 +196,6 @@ namespace
                 internal_json["Runtime"]["Use Shutdown"] = runtime.at("Use Shutdown");
             if (runtime.contains("Shutdown Button"))
                 internal_json["Runtime"]["Shutdown Button"] = runtime.at("Shutdown Button");
-            if (runtime.contains("Frequency Control GPIO Polarity"))
-            {
-                internal_json["Runtime"]["Frequency Control GPIO Polarity"] =
-                    runtime.at("Frequency Control GPIO Polarity");
-            }
         }
 
         if (public_json.contains("Calibration"))
@@ -507,7 +500,6 @@ void init_default_config()
 
     // Meta
     config.use_ini = true;
-    config.tx_freq_control_active_high = false;
 
     config.wspr.callsign = config.callsign;
     config.wspr.grid_square = config.grid_square;
@@ -660,8 +652,7 @@ namespace
                  key == "Web Port" ||
                  key == "Socket Port" ||
                  key == "Use Shutdown" ||
-                 key == "Shutdown Button" ||
-                 key == "Frequency Control GPIO Polarity")) ||
+                 key == "Shutdown Button")) ||
                (section == "WSPR" &&
                 (key == "Call Sign" ||
                  key == "Grid Square" ||
@@ -770,8 +761,7 @@ namespace
             {"Web Port", 31415},
             {"Socket Port", 31416},
             {"Use Shutdown", false},
-            {"Shutdown Button", 19},
-            {"Frequency Control GPIO Polarity", false}};
+            {"Shutdown Button", 19}};
 
         target["Calibration"] = {
             {"PPM", 0.0},
@@ -840,8 +830,6 @@ namespace
         target.ppm = source.at("Calibration").at("PPM").get<double>();
         target.use_ntp = source.at("Calibration").at("Use NTP").get<bool>();
         target.use_offset = source.at("WSPR").at("Use Random Offset").get<bool>();
-        target.tx_freq_control_active_high =
-            source.at("Runtime").value("Frequency Control GPIO Polarity", false);
         target.modulation_dot_seconds =
             source.contains("CW") &&
                     source.at("CW").contains("Dot Seconds")
@@ -967,8 +955,6 @@ namespace
         target["Runtime"]["Socket Port"] = source.socket_port;
         target["Runtime"]["Use Shutdown"] = source.use_shutdown;
         target["Runtime"]["Shutdown Button"] = source.shutdown_pin;
-        target["Runtime"]["Frequency Control GPIO Polarity"] =
-            source.tx_freq_control_active_high;
 
         target["Calibration"]["PPM"] = source.ppm;
         target["Calibration"]["Use NTP"] = source.use_ntp;
@@ -1050,8 +1036,7 @@ namespace
         target.use_ini = source.use_ini;
         target.ini_filename = source.ini_filename;
         target.wspr_dial_freq_set = source.wspr_dial_freq_set;
-        target.wspr_dial_frequency_entries = source.wspr_dial_frequency_entries;
-        target.tx_freq_control_active_high = source.tx_freq_control_active_high;
+        target.wspr_frequency_entries = source.wspr_frequency_entries;
         target.ntp_good = source.ntp_good;
         target.band_gpio = source.band_gpio;
     }
@@ -1293,8 +1278,7 @@ void json_to_ini()
                   key == "Web Port" ||
                   key == "Socket Port" ||
                   key == "Use Shutdown" ||
-                  key == "Shutdown Button" ||
-                  key == "Frequency Control GPIO Polarity")) ||
+                  key == "Shutdown Button")) ||
                 (section_name == "Calibration" &&
                  (key == "PPM" ||
                   key == "Use NTP")) ||
@@ -1433,8 +1417,6 @@ void patch_all_from_web(const nlohmann::json &j)
     try
     {
         json_to_config_impl(candidate_json, candidate_config);
-        candidate_config.tx_freq_control_active_high =
-            config.tx_freq_control_active_high;
 
         if (!validate_config_candidate(candidate_config, &error_message))
         {

@@ -5,8 +5,8 @@
  * This layer translates CLI input into runtime configuration and transient
  * startup requests. Persistent configuration remains in `config_handler.*`.
  * In particular, `--test-tone` creates a transient startup request rather
- * than persistent config, and frequency tokens may carry optional `@GPIO`
- * suffixes consumed later by scheduling.
+ * than persistent config, and frequency tokens may carry optional
+ * `@GPIO[H|L]` selector suffixes.
  *
  * This project is is licensed under the MIT License. See LICENSE.md
  * for more information.
@@ -185,7 +185,7 @@ bool set_direct_tone_startup_request(
     std::string *error_message = nullptr);
 bool has_direct_tone_startup_request() noexcept;
 bool try_get_direct_tone_startup_request(
-    WsprDialFrequencyEntry &entry_out,
+    WsprFrequencyEntry &entry_out,
     double &actual_rf_frequency_hz_out) noexcept;
 void clear_direct_tone_startup_request() noexcept;
 bool set_qrss_startup_request(
