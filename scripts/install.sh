@@ -6091,7 +6091,7 @@ manage_config() {
 # shellcheck disable=SC2317
 # shellcheck disable=SC2329
 upgrade_ini() {
-    local debug old_ini new_ini merged_ini rc backup_ini
+    local debug old_ini new_ini merged_ini rc backup_ini tmp_merged err_details
     debug=$(debug_start "$@")
     eval set -- "$(debug_filter "$@")"
 
@@ -6099,21 +6099,37 @@ upgrade_ini() {
     new_ini="$2"
     merged_ini="$3"
     backup_ini="${old_ini}.pre_migration.bak"
+    tmp_merged="${merged_ini}.tmp"
 
-    debug_print "Merging $old_ini → $merged_ini." "$debug"
+    debug_print "Merging $old_ini -> $merged_ini." "$debug"
 
-    if [[ -f "${old_ini}" ]]; then
-        exec_command             "Backup existing INI"             cp -f "${old_ini}" "${backup_ini}" "$debug" || {
+    if [[ ! -f "$new_ini" ]]; then
+        logE "New INI file not found: $new_ini"
+        debug_end "$debug"
+        return 1
+    fi
+
+    if [[ ! -s "$new_ini" ]]; then
+        logE "New INI file is empty: $new_ini"
+        debug_end "$debug"
+        return 1
+    fi
+
+    if [[ -f "$old_ini" ]]; then
+        exec_command \
+            "Backup existing INI" \
+            cp -f "$old_ini" "$backup_ini" "$debug" || {
             logE "INI backup failed."
             debug_end "$debug"
             return 1
         }
     fi
 
-    # Run mawk and capture any stderr.
+    rm -f /tmp/upgrade_ini.err "$tmp_merged"
+
     mawk '
     function trim(value) {
-      gsub(/^[ 	]+|[ 	]+$/, "", value)
+      gsub(/^[ \t]+|[ \t]+$/, "", value)
       return value
     }
 
@@ -6139,8 +6155,8 @@ upgrade_ini() {
       key = trim(key)
 
       val = l
-      sub(/^[^=]*=[ 	]*/, "", val)
-      sub(/[ 	]*$/, "", val)
+      sub(/^[^=]*=[ \t]*/, "", val)
+      sub(/[ \t]*$/, "", val)
 
       overrides[current_section SUBSEP key] = val
       next
@@ -6180,33 +6196,62 @@ upgrade_ini() {
 
         if (composite in overrides) {
           tmp = orig
-          gsub(/^[ 	]*/, "", tmp)
+          gsub(/^[ \t]*/, "", tmp)
           leadWS = substr(orig, 1, length(orig) - length(tmp))
 
           tmp2 = tmp
-          gsub(/[ 	]*$/, "", tmp2)
+          gsub(/[ \t]*$/, "", tmp2)
           trailerWS = substr(tmp, length(tmp2) + 1)
 
-          printf("%s=%s%s%s%s\n", left, leadWS, overrides[composite], trailerWS, comment)
+          printf("%s=%s%s%s%s\n",
+                 left, leadWS, overrides[composite], trailerWS, comment)
           next
         }
       }
 
       print
     }
-    ' "$old_ini" "$new_ini" >"$merged_ini" 2>/tmp/upgrade_ini.err
-    rc=$?
-    if (( rc != 0 )); then
-        local err_details
-        err_details=$(sed 's/^/  > /' /tmp/upgrade_ini.err)
+    ' "$old_ini" "$new_ini" >"$tmp_merged" 2>/tmp/upgrade_ini.err
 
-        logE "INI merge failed (mawk exited $rc)." "$err_details"
-        rm -f /tmp/upgrade_ini.err
-        debug_end "$debug"
-        return 1
+    rc=$?
+
+    if (( rc != 0 )); then
+        err_details=$(sed 's/^/  > /' /tmp/upgrade_ini.err)
+        logE "INI merge failed (mawk exited $rc). Falling back to default INI." "$err_details"
+
+        if [[ -s "$new_ini" ]]; then
+            cp -f "$new_ini" "$merged_ini"
+            rm -f /tmp/upgrade_ini.err "$tmp_merged"
+            debug_print "Fallback to installer INI succeeded." "$debug"
+            debug_end "$debug"
+            return 0
+        else
+            logE "Fallback failed: installer INI is also empty."
+            rm -f /tmp/upgrade_ini.err "$tmp_merged"
+            debug_end "$debug"
+            return 1
+        fi
     fi
 
-    rm -f /tmp/upgrade_ini.err
+    if [[ ! -s "$tmp_merged" ]]; then
+        logE "INI merge produced an empty file. Falling back to default INI."
+
+        if [[ -s "$new_ini" ]]; then
+            cp -f "$new_ini" "$merged_ini"
+            debug_print "Fallback to installer INI succeeded." "$debug"
+        else
+            logE "Fallback failed: installer INI is also empty."
+            rm -f /tmp/upgrade_ini.err "$tmp_merged"
+            debug_end "$debug"
+            return 1
+        fi
+    else
+        mv -f "$tmp_merged" "$merged_ini"
+        debug_print "INI merge successful." "$debug"
+    fi
+
+    rm -f /tmp/upgrade_ini.err "$tmp_merged"
+
     debug_end "$debug"
     return 0
 }
