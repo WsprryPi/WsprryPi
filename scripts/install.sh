@@ -313,7 +313,12 @@ resolve_build_settings() {
     fi
 
     WSPR_BUILD_TYPE="${build_type}"
-    WSPR_EXE="${WSPR_SERVICE}$([[ "${WSPR_BUILD_TYPE}" == "DEBUG" ]] &&         printf '_debug')"
+
+    if [[ "${WSPR_BUILD_TYPE}" == "DEBUG" ]]; then
+        WSPR_EXE="${WSPR_SERVICE}_debug"
+    else
+        WSPR_EXE="${WSPR_SERVICE}"
+    fi
 
     debug_end "$debug"
     return 0
