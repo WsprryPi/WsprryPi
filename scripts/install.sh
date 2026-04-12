@@ -6106,8 +6106,7 @@ upgrade_ini() {
     fi
 
     # Run mawk and capture any stderr.
-    rc=0
-    if ! mawk '
+    mawk '
     function trim(value) {
       gsub(/^[ 	]+|[ 	]+$/, "", value)
       return value
@@ -6183,16 +6182,16 @@ upgrade_ini() {
           gsub(/[ 	]*$/, "", tmp2)
           trailerWS = substr(tmp, length(tmp2) + 1)
 
-          printf("%s=%s%s%s%s
-", left, leadWS, overrides[composite], trailerWS, comment)
+          printf("%s=%s%s%s%s\n", left, leadWS, overrides[composite], trailerWS, comment)
           next
         }
       }
 
       print
     }
-    ' "$old_ini" "$new_ini" >"$merged_ini" 2>/tmp/upgrade_ini.err; then
-        rc=$?
+    ' "$old_ini" "$new_ini" >"$merged_ini" 2>/tmp/upgrade_ini.err
+    rc=$?
+    if (( rc != 0 )); then
         local err_details
         err_details=$(sed 's/^/  > /' /tmp/upgrade_ini.err)
 
