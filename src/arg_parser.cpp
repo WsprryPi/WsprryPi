@@ -2288,7 +2288,9 @@ bool parse_command_line(int argc, char *argv[])
             }
             break;
         }
-=======
+        case 1003:
+        case 1004:
+        case 1005:
         case 1006:
         case 1007:
         case 1008:

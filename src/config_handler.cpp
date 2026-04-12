@@ -585,11 +585,8 @@ void init_default_config()
     config.transmit_backend = TransmitBackendKind::GPIO;
     config.si5351_i2c_bus = kDefaultSi5351I2cBus;
     config.si5351_i2c_address = kDefaultSi5351I2cAddress;
-    config.si5351_reference_hz = kDefaultSi5351ReferenceHz;
     config.si5351_tx_output = kDefaultSi5351TxOutput;
 
-    // CW
-    config.modulation_dot_seconds = 3.0;
     config.modulation_fsk_offset_hz = 500.0;
     config.schedule_start_minute = 0;
     config.schedule_repeat_minutes = 10;
@@ -1160,11 +1157,8 @@ namespace
         target.transmit_backend = source.transmit_backend;
         target.si5351_i2c_bus = source.si5351_i2c_bus;
         target.si5351_i2c_address = source.si5351_i2c_address;
-        target.si5351_reference_hz = source.si5351_reference_hz;
         target.si5351_tx_output = source.si5351_tx_output;
         target.use_led = source.use_led;
-        target.led_pin = source.led_pin;
-        target.web_port = source.web_port;
         target.socket_port = source.socket_port;
         target.use_shutdown = source.use_shutdown;
         target.shutdown_pin = source.shutdown_pin;
