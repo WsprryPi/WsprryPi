@@ -458,6 +458,33 @@ static std::string trim_copy_string(std::string value)
     return value.substr(first, last - first + 1);
 }
 
+static TransmitBackendKind parse_transmit_backend_option(
+    const std::string &value)
+{
+    std::string lowered = trim_copy_string(value);
+    std::transform(
+        lowered.begin(),
+        lowered.end(),
+        lowered.begin(),
+        [](unsigned char c)
+        {
+            return static_cast<char>(std::tolower(c));
+        });
+
+    if (lowered == "gpio")
+    {
+        return TransmitBackendKind::GPIO;
+    }
+
+    if (lowered == "si5351")
+    {
+        return TransmitBackendKind::SI5351;
+    }
+
+    throw std::invalid_argument(
+        "Invalid backend. Expected 'gpio' or 'si5351'.");
+}
+
 static bool parse_gpio_number_strict(
     std::string_view raw_value,
     int &gpio_out) noexcept
@@ -986,6 +1013,8 @@ void print_usage(const std::string &message, int exit_code)
               << "    Load parameters from an INI file. Provide the path and filename.\n\n"
               << "  -a, --transmit-gpio <gpio>\n"
               << "    Select the RF transmit GPIO (supported: 4 or 20).\n\n"
+              << "  --backend <gpio|si5351>\n"
+              << "    Select the RF transmit backend. Default: gpio.\n\n"
               << "See the documentation for a complete list of available options.\n\n";
 
     // Handle exit behavior
@@ -1025,6 +1054,8 @@ void show_config_values(bool reload)
     llog.logS(DEBUG, "Grid Square:", config.grid_square);
     llog.logS(DEBUG, "Transmit Power:", config.power_dbm);
     llog.logS(DEBUG, "WSPR Dial Frequencies:", config.frequencies);
+    llog.logS(DEBUG, "Transmit Backend:",
+              transmit_backend_kind_to_string(config.transmit_backend));
     llog.logS(DEBUG, "Transmit Pin:", config.tx_pin);
     // [Extended]
     llog.logS(DEBUG, "PPM Offset:", config.ppm);
@@ -1100,7 +1131,8 @@ bool validate_config_candidate(
     }
 
     const bool requires_valid_transmit_gpio =
-        candidate.mode == ModeType::TONE || candidate.transmit;
+        candidate.transmit_backend == TransmitBackendKind::GPIO &&
+        (candidate.mode == ModeType::TONE || candidate.transmit);
 
     if (requires_valid_transmit_gpio &&
         !is_valid_runtime_transmit_gpio(candidate.tx_pin))
@@ -1108,6 +1140,19 @@ bool validate_config_candidate(
         if (error_message != nullptr)
         {
             *error_message = transmit_gpio_validation_message();
+        }
+
+        return false;
+    }
+
+    if (candidate.transmit_backend == TransmitBackendKind::SI5351 &&
+        (candidate.mode == ModeType::TONE || candidate.transmit) &&
+        (candidate.power_level < 1 || candidate.power_level > 4))
+    {
+        if (error_message != nullptr)
+        {
+            *error_message =
+                "Invalid Si5351 power level. Expected 1 through 4.";
         }
 
         return false;
@@ -1242,6 +1287,14 @@ bool validate_config_candidate(
 
 void apply_runtime_config_side_effects()
 {
+    const wsprrypi::BackendKind backend_kind =
+        config.transmit_backend == TransmitBackendKind::SI5351
+            ? wsprrypi::BackendKind::SI5351
+            : wsprrypi::BackendKind::RPI_CLOCK_GPIO;
+    wsprTransmitter.selectBackend(backend_kind);
+
+    llog.logS(INFO, "Transmit backend:",
+              transmit_backend_kind_to_string(config.transmit_backend));
     llog.logS(INFO, "Transmit GPIO:", config.tx_pin);
 
     if (!config.use_ntp && config.ppm != 0.0)
@@ -1515,9 +1568,17 @@ bool validate_config_data()
             llog.logE(ERROR, " - At least one WSPR dial frequency must be specified.");
         }
         if ((config.mode == ModeType::TONE || config.transmit) &&
+            config.transmit_backend == TransmitBackendKind::GPIO &&
             !is_valid_runtime_transmit_gpio(config.tx_pin))
         {
             llog.logE(ERROR, " - ", transmit_gpio_validation_message());
+        }
+        if ((config.mode == ModeType::TONE || config.transmit) &&
+            config.transmit_backend == TransmitBackendKind::SI5351 &&
+            (config.power_level < 1 || config.power_level > 4))
+        {
+            llog.logE(ERROR,
+                      " - Invalid Si5351 power level. Expected 1 through 4.");
         }
 
         if (config.use_ini)
@@ -1889,6 +1950,7 @@ bool parse_command_line(int argc, char *argv[])
         {"journald", no_argument, nullptr, 'J'},        // Global: config.use_journald
         {"date-time-log", no_argument, nullptr, 'D'},   // Global: config.date_time_log
         {"require-paired", no_argument, nullptr, 1001}, // Global: config.wspr_planner_preference
+        {"backend", required_argument, nullptr, 1002},
         {"qrss-message", required_argument, nullptr, 1003},
         {"qrss-frequency", required_argument, nullptr, 1004},
         {"qrss-dot-seconds", required_argument, nullptr, 1005},
@@ -1962,6 +2024,19 @@ bool parse_command_line(int argc, char *argv[])
         case 1001: // Require paired WSPR planning
         {
             config.wspr_planner_preference = WsprPlannerPreference::RequirePaired;
+            break;
+        }
+        case 1002: // Select transmit backend
+        {
+            try
+            {
+                config.transmit_backend =
+                    parse_transmit_backend_option(optarg);
+            }
+            catch (const std::exception &e)
+            {
+                print_usage(e.what(), EXIT_FAILURE);
+            }
             break;
         }
         case 1003:

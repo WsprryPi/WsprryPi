@@ -118,6 +118,26 @@ enum class WsprPlannerPreference
     RequirePaired
 };
 
+enum class TransmitBackendKind
+{
+    GPIO = 0,
+    SI5351
+};
+
+inline constexpr const char *transmit_backend_kind_to_string(
+    TransmitBackendKind backend) noexcept
+{
+    switch (backend)
+    {
+    case TransmitBackendKind::GPIO:
+        return "gpio";
+    case TransmitBackendKind::SI5351:
+        return "si5351";
+    }
+
+    return "gpio";
+}
+
 struct WsprModeConfig
 {
     std::string callsign;
@@ -212,6 +232,7 @@ struct ArgParserConfig
     bool use_ntp;    ///< Apply NTP-based frequency correction.
     bool use_offset; ///< Enable WSPR random frequency offset.
     int power_level; ///< Power level for RF hardware (0–7).
+    TransmitBackendKind transmit_backend; ///< RF hardware backend.
     bool use_led;    ///< Enable TX LED indicator.
     int led_pin;     ///< GPIO pin for LED indicator.
 
@@ -261,6 +282,7 @@ struct ArgParserConfig
           use_ntp(false),
           use_offset(false),
           power_level(7),
+          transmit_backend(TransmitBackendKind::GPIO),
           use_led(false),
           led_pin(-1),
           web_port(-1),
@@ -314,6 +336,7 @@ struct ArgParserConfig
         use_ntp = other.use_ntp;
         use_offset = other.use_offset;
         power_level = other.power_level;
+        transmit_backend = other.transmit_backend;
         use_led = other.use_led;
         led_pin = other.led_pin;
         web_port = other.web_port;

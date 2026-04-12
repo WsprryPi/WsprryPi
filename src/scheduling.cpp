@@ -259,6 +259,12 @@ static void stop_active_transmission_selectors() noexcept
     bandGPIOSelector.stop();
 }
 
+static wsprrypi::BackendKind to_controller_backend(
+    TransmitBackendKind backend) noexcept;
+
+static wsprrypi::ClockSource to_controller_clock_source(
+    TransmitBackendKind backend) noexcept;
+
 /**
  * @brief Commit the single execution request consumed by the transmitter.
  *
@@ -281,8 +287,10 @@ static void commit_execution_request(
     {
         wsprrypi::TransmissionRequest controller_request;
         controller_request.mode = wsprrypi::TransmissionMode::WSPR;
-        controller_request.output.backend = wsprrypi::BackendKind::RPI_CLOCK_GPIO;
-        controller_request.output.output = wsprrypi::ClockSource::GPIO_CLK;
+        controller_request.output.backend =
+            to_controller_backend(config.transmit_backend);
+        controller_request.output.output =
+            to_controller_clock_source(config.transmit_backend);
         controller_request.output.gpio = current_transmission_request.tx_gpio;
         controller_request.calibration.ppm = current_transmission_request.ppm;
         controller_request.id.value = 1;
@@ -515,6 +523,22 @@ static bool runtime_transmit_requested(const ArgParserConfig &cfg) noexcept
 static bool runtime_transmit_enabled(const ArgParserConfig &cfg) noexcept
 {
     return runtime_transmit_requested(cfg) && !managed_reload_tx_inhibited;
+}
+
+static wsprrypi::BackendKind to_controller_backend(
+    TransmitBackendKind backend) noexcept
+{
+    return backend == TransmitBackendKind::SI5351
+        ? wsprrypi::BackendKind::SI5351
+        : wsprrypi::BackendKind::RPI_CLOCK_GPIO;
+}
+
+static wsprrypi::ClockSource to_controller_clock_source(
+    TransmitBackendKind backend) noexcept
+{
+    return backend == TransmitBackendKind::SI5351
+        ? wsprrypi::ClockSource::SI5351_CLK0
+        : wsprrypi::ClockSource::GPIO_CLK;
 }
 
 static bool managed_reload_generation_changed(

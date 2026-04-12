@@ -86,6 +86,30 @@ namespace
             "'. Expected auto, prefer_paired, or require_paired.");
     }
 
+    TransmitBackendKind parse_transmit_backend_kind(
+        const nlohmann::json &runtime)
+    {
+        const std::string raw =
+            trim_copy(runtime.value("Transmit Backend", std::string("gpio")));
+        std::string lowered = raw;
+        std::transform(
+            lowered.begin(),
+            lowered.end(),
+            lowered.begin(),
+            [](unsigned char c)
+            {
+                return static_cast<char>(std::tolower(c));
+            });
+
+        if (lowered.empty() || lowered == "gpio")
+            return TransmitBackendKind::GPIO;
+        if (lowered == "si5351")
+            return TransmitBackendKind::SI5351;
+
+        throw std::runtime_error(
+            "Invalid Runtime.Transmit Backend. Expected 'gpio' or 'si5351'.");
+    }
+
     ModeType parse_mode_type(const nlohmann::json &meta)
     {
         const std::string raw =
@@ -138,6 +162,7 @@ namespace
 
         public_json["Runtime"] = {
             {"Transmit", source.at("Runtime").at("Transmit")},
+            {"Transmit Backend", source.at("Runtime").at("Transmit Backend")},
             {"Transmit Pin", source.at("Runtime").at("Transmit Pin")},
             {"Power Level", source.at("Runtime").at("Power Level")},
             {"Use LED", source.at("Runtime").at("Use LED")},
@@ -180,6 +205,8 @@ namespace
             const auto &runtime = public_json.at("Runtime");
             if (runtime.contains("Transmit"))
                 internal_json["Runtime"]["Transmit"] = runtime.at("Transmit");
+            if (runtime.contains("Transmit Backend"))
+                internal_json["Runtime"]["Transmit Backend"] = runtime.at("Transmit Backend");
             if (runtime.contains("Transmit Pin"))
                 internal_json["Runtime"]["Transmit Pin"] = runtime.at("Transmit Pin");
             if (runtime.contains("Power Level"))
@@ -485,6 +512,7 @@ void init_default_config()
     config.use_led = false;
     config.led_pin = 18;
     config.power_level = 7;
+    config.transmit_backend = TransmitBackendKind::GPIO;
 
     // CW
     config.modulation_dot_seconds = 3.0;
@@ -645,6 +673,7 @@ namespace
     {
         return (section == "Runtime" &&
                 (key == "Transmit" ||
+                 key == "Transmit Backend" ||
                  key == "Transmit Pin" ||
                  key == "Use LED" ||
                  key == "LED Pin" ||
@@ -754,6 +783,7 @@ namespace
 
         target["Runtime"] = {
             {"Transmit", false},
+            {"Transmit Backend", "gpio"},
             {"Transmit Pin", kDefaultTransmitGpio},
             {"LED Pin", 18},
             {"Use LED", false},
@@ -826,6 +856,8 @@ namespace
         }
 
         target.transmit = source.at("Runtime").at("Transmit").get<bool>();
+        target.transmit_backend =
+            parse_transmit_backend_kind(source.at("Runtime"));
         target.tx_pin = source.at("Runtime").at("Transmit Pin").get<int>();
         target.ppm = source.at("Calibration").at("PPM").get<double>();
         target.use_ntp = source.at("Calibration").at("Use NTP").get<bool>();
@@ -947,6 +979,8 @@ namespace
         target["Meta"]["Center Frequency Set"] = source.wspr_dial_freq_set;
 
         target["Runtime"]["Transmit"] = source.transmit;
+        target["Runtime"]["Transmit Backend"] =
+            transmit_backend_kind_to_string(source.transmit_backend);
         target["Runtime"]["Transmit Pin"] = source.tx_pin;
         target["Runtime"]["Power Level"] = source.power_level;
         target["Runtime"]["Use LED"] = source.use_led;
@@ -1012,6 +1046,7 @@ namespace
         target.use_ntp = source.use_ntp;
         target.use_offset = source.use_offset;
         target.power_level = source.power_level;
+        target.transmit_backend = source.transmit_backend;
         target.use_led = source.use_led;
         target.led_pin = source.led_pin;
         target.web_port = source.web_port;
@@ -1271,6 +1306,7 @@ void json_to_ini()
                  key == "Mode") ||
                 (section_name == "Runtime" &&
                  (key == "Transmit" ||
+                  key == "Transmit Backend" ||
                   key == "Transmit Pin" ||
                   key == "Use LED" ||
                   key == "LED Pin" ||
