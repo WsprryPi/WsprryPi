@@ -171,18 +171,18 @@ namespace
 
         reset_runtime_planning_state_for_identity_test();
         require(set_config(true), message + " must succeed during scheduler planning");
-        const WsprTransmissionRequest request = current_transmission_request_for_test();
+        const TransmissionRequest request = current_transmission_request_for_test();
         require(
-            request.mode == WsprTransmissionMode::WSPR,
+            request.mode == TransmissionMode::WSPR,
             message + " must commit a WSPR execution request");
         require(
-            request.wspr_plan.plan_type == expected_plan_type,
+            request.payload.plan_type == expected_plan_type,
             message + " must commit the expected plan type");
         require(
-            request.wspr_plan.callsign == expected_callsign,
+            request.payload.callsign == expected_callsign,
             message + " must commit the normalized callsign expected by runtime planning");
         require(
-            request.wspr_plan.locator == expected_locator,
+            request.payload.locator == expected_locator,
             message + " must commit the normalized locator expected by runtime planning");
 
         const WsprRuntimeStatusSnapshot snapshot =
@@ -331,30 +331,35 @@ int main()
         init_config_json();
         json_to_config();
         config.transmit = true;
-        config.frequencies = "80m@17,40m@27,20m,14.097100MHz@22";
+        config.frequencies = "80m@17H,40m@27L,20m,14.097100MHz@22";
 
         require(
             set_frequencies(config),
             "mixed frequency lists with optional @GPIO suffixes must parse");
         require(
-            config.wspr_dial_frequency_entries.size() == 4,
+            config.wspr_frequency_entries.size() == 4,
             "parsed frequency entries must preserve all configured tokens");
         require(
-            config.wspr_dial_frequency_entries[0].control_gpio == 17 &&
-                nearly_equal(config.wspr_dial_frequency_entries[0].dial_frequency_hz, 3568600.0),
-            "80m@17 must retain the GPIO mapping and dial frequency");
+            config.wspr_frequency_entries[0].selector_gpio == 17 &&
+                config.wspr_frequency_entries[0].selector_gpio_active_high &&
+                nearly_equal(config.wspr_frequency_entries[0].dial_frequency_hz, 3568600.0),
+            "80m@17H must retain the GPIO mapping, polarity, and dial frequency");
         require(
-            config.wspr_dial_frequency_entries[1].control_gpio == 27 &&
-                nearly_equal(config.wspr_dial_frequency_entries[1].dial_frequency_hz, 7038600.0),
-            "40m@27 must retain the GPIO mapping and dial frequency");
+            config.wspr_frequency_entries[1].selector_gpio == 27 &&
+                !config.wspr_frequency_entries[1].selector_gpio_active_high &&
+                nearly_equal(config.wspr_frequency_entries[1].dial_frequency_hz, 7038600.0),
+            "40m@27L must retain the GPIO mapping, polarity, and dial frequency");
         require(
-            config.wspr_dial_frequency_entries[2].control_gpio == kFrequencyEntryControlGpioUnset &&
-                nearly_equal(config.wspr_dial_frequency_entries[2].dial_frequency_hz, 14095600.0),
-            "entries without @GPIO must remain unmapped");
+            config.wspr_frequency_entries[2].selector_gpio == kSelectorGpioUnset &&
+                !config.wspr_frequency_entries[2].selector_gpio_active_high &&
+                !config.wspr_frequency_entries[2].allow_band_gpio_fallback &&
+                nearly_equal(config.wspr_frequency_entries[2].dial_frequency_hz, 14095600.0),
+            "CLI entries without @GPIO must remain unmapped, explicit-only, and default active low");
         require(
-            config.wspr_dial_frequency_entries[3].control_gpio == 22 &&
-                nearly_equal(config.wspr_dial_frequency_entries[3].dial_frequency_hz, 14097100.0),
-            "unit-qualified frequencies must also support @GPIO");
+            config.wspr_frequency_entries[3].selector_gpio == 22 &&
+                !config.wspr_frequency_entries[3].selector_gpio_active_high &&
+                nearly_equal(config.wspr_frequency_entries[3].dial_frequency_hz, 14097100.0),
+            "unit-qualified frequencies must also support @GPIO with default active-low polarity");
     }
 
     {
@@ -382,18 +387,16 @@ int main()
     {
         WsprTransmitter transmitter;
 
-        WsprTransmissionRequest committed_request;
-        committed_request.mode = WsprTransmissionMode::WSPR;
+        TransmissionRequest committed_request;
+        committed_request.mode = TransmissionMode::WSPR;
         committed_request.actual_rf_frequency_hz = 14097100.0;
         committed_request.ppm = 1.75;
         committed_request.power_level = 5;
         committed_request.tx_gpio = 20;
         committed_request.use_offset = true;
         committed_request.applied_offset_hz = 42.0;
-        committed_request.frequency_control_gpio = 17;
-        committed_request.frequency_control_active_high = true;
         committed_request.frequency_entry_label = "20m@17";
-        committed_request.wspr_plan.frames.resize(2);
+        committed_request.payload.frames.resize(2);
 
         transmitter.current_request_ = committed_request;
 
@@ -1129,11 +1132,11 @@ int main()
         require(
             set_config(true),
             "lowercase identity patch must still succeed during scheduler planning");
-        const WsprTransmissionRequest request = current_transmission_request_for_test();
+        const TransmissionRequest request = current_transmission_request_for_test();
         require(
-            request.wspr_plan.plan_type == "Type2Single" &&
-                request.wspr_plan.callsign == "AA0NT/12" &&
-                request.wspr_plan.locator == "EM18",
+            request.payload.plan_type == "Type2Single" &&
+                request.payload.callsign == "AA0NT/12" &&
+                request.payload.locator == "EM18",
             "runtime planning must agree with config-boundary normalization for lowercase identities");
         finish_runtime_planning_state_for_identity_test();
     }
@@ -1150,13 +1153,13 @@ int main()
         require(
             set_config(true),
             "whitespace-surrounded identities must still succeed during scheduler planning");
-        const WsprTransmissionRequest request = current_transmission_request_for_test();
+        const TransmissionRequest request = current_transmission_request_for_test();
         require(
-            request.wspr_plan.plan_type == "Type1Single",
+            request.payload.plan_type == "Type1Single",
             "runtime planning must still classify whitespace-surrounded identities as a valid Type 1 plan");
         require(
-            request.wspr_plan.callsign == "AA0NT" &&
-                request.wspr_plan.locator == "EM18",
+            request.payload.callsign == "AA0NT" &&
+                request.payload.locator == "EM18",
             "committed single-frame requests must use the same normalized identities as accepted config and planner results");
         finish_runtime_planning_state_for_identity_test();
     }
@@ -1198,11 +1201,11 @@ int main()
         require(
             set_config(true),
             "rejecting an invalid config patch must leave the prior valid config runnable");
-        const WsprTransmissionRequest request = current_transmission_request_for_test();
+        const TransmissionRequest request = current_transmission_request_for_test();
         require(
-            request.wspr_plan.plan_type == "Type1Single" &&
-                request.wspr_plan.callsign == "AA0NT" &&
-                request.wspr_plan.locator == "EM18",
+            request.payload.plan_type == "Type1Single" &&
+                request.payload.callsign == "AA0NT" &&
+                request.payload.locator == "EM18",
             "invalid config patches must fail before scheduling and preserve the prior valid runtime plan");
         finish_runtime_planning_state_for_identity_test();
     }

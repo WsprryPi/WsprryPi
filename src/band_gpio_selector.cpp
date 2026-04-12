@@ -52,6 +52,8 @@ bool BandGPIOSelector::prepareBand(
 {
     if (!enabled_)
     {
+        llog.logS(DEBUG, tag,
+                  "Unified scheduler selector prepare skipped; band GPIO control disabled.");
         return true;
     }
 
@@ -59,6 +61,10 @@ bool BandGPIOSelector::prepareBand(
 
     if (!config.enabled || config.gpio < 0)
     {
+        llog.logS(DEBUG, tag,
+                  "Unified scheduler selector prepare failed for band ",
+                  band_to_string(band),
+                  ": no enabled GPIO is configured.");
         return false;
     }
 
@@ -69,8 +75,8 @@ bool BandGPIOSelector::prepareBand(
     if (!drive_gpio_)
     {
         llog.logS(DEBUG, tag,
-                  "Prepared band ",
-                  ham_band_to_string(band),
+                  "Unified scheduler selector prepared band ",
+                  band_to_string(band),
                   ", GPIO ",
                   config.gpio,
                   ", polarity ",
@@ -84,54 +90,89 @@ bool BandGPIOSelector::prepareBand(
     {
         if (!gpio_.lastError().empty())
         {
-            llog.logS(ERROR, tag, gpio_.lastError());
+            llog.logS(ERROR, tag,
+                      "Unified scheduler selector failed to prepare band ",
+                      band_to_string(band),
+                      ", GPIO ",
+                      config.gpio,
+                      ": ",
+                      gpio_.lastError());
+        }
+        else
+        {
+            llog.logS(ERROR, tag,
+                      "Unified scheduler selector failed to prepare band ",
+                      band_to_string(band),
+                      ", GPIO ",
+                      config.gpio,
+                      ".");
         }
         has_band_ = false;
         current_config_ = BandGPIOConfig{};
         return false;
     }
 
+    llog.logS(DEBUG, tag,
+              "Unified scheduler selector prepared band ",
+              band_to_string(band),
+              ", GPIO ",
+              config.gpio,
+              ", polarity ",
+              (config.active_high ? "active high" : "active low"),
+              ", drive enabled");
+
     return true;
-}
-
-bool BandGPIOSelector::prepareFrequency(double frequency_hz)
-{
-    const auto band = band_lookup_.lookup_ham_band(frequency_hz);
-    if (!band.has_value())
-    {
-        return false;
-    }
-
-    return prepareBand(*band);
 }
 
 bool BandGPIOSelector::setBandState(bool state)
 {
     if (!enabled_)
     {
+        llog.logS(DEBUG, tag,
+                  "Unified scheduler selector ",
+                  (state ? "assert" : "deassert"),
+                  " skipped; band GPIO control disabled.");
         return true;
     }
 
     if (!has_band_ || !current_config_.enabled || current_config_.gpio < 0)
     {
+        llog.logS(DEBUG, tag,
+                  "Unified scheduler selector failed to ",
+                  (state ? "assert" : "deassert"),
+                  ": no band GPIO is prepared.");
         return false;
     }
 
     if (!drive_gpio_)
     {
         llog.logS(DEBUG, tag,
-                  (state ? "Assert band " : "Deassert band "),
-                  ham_band_to_string(current_band_),
+                  "Unified scheduler selector ",
+                  (state ? "assert band " : "deassert band "),
+                  band_to_string(current_band_),
                   ", GPIO ",
                   current_config_.gpio,
                   ", polarity ",
                   (current_config_.active_high ? "active high" : "active low"),
-                  ", drive ",
-                  (drive_gpio_ ? "enabled" : "disabled"));
+                  ", drive disabled");
         return true;
     }
 
-    return gpio_.toggleGPIO(state);
+    const bool ok = gpio_.toggleGPIO(state);
+
+    llog.logS(ok ? DEBUG : ERROR,
+              tag,
+              "Unified scheduler selector ",
+              (state ? "asserted band " : "deasserted band "),
+              band_to_string(current_band_),
+              ", GPIO ",
+              current_config_.gpio,
+              ", polarity ",
+              (current_config_.active_high ? "active high" : "active low"),
+              ", result ",
+              (ok ? "ok" : "failed"));
+
+    return ok;
 }
 
 void BandGPIOSelector::stop()
@@ -143,6 +184,15 @@ void BandGPIOSelector::stop()
 
     if (drive_gpio_)
     {
+        if (has_band_)
+        {
+            llog.logS(DEBUG, tag,
+                      "Unified scheduler selector releasing band ",
+                      band_to_string(current_band_),
+                      ", GPIO ",
+                      current_config_.gpio,
+                      ".");
+        }
         gpio_.stop();
     }
     else
@@ -150,8 +200,8 @@ void BandGPIOSelector::stop()
         if (!drive_gpio_ && has_band_)
         {
             llog.logS(DEBUG, tag,
-                      "Releasing band ",
-                      ham_band_to_string(current_band_),
+                      "Unified scheduler selector releasing band ",
+                      band_to_string(current_band_),
                       ", GPIO ",
                       current_config_.gpio,
                       ", drive ",

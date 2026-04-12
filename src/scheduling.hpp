@@ -4,8 +4,8 @@
  *
  * This layer owns scheduling and request construction for the current
  * architecture. It decides whether a slot runs WSPR or direct tone,
- * applies any random WSPR offset, resolves per-frequency control GPIO
- * metadata, prepares selector state, and commits the single execution
+ * applies any random WSPR offset, resolves band-selector GPIO state from
+ * the scheduler source frequency, and commits the single execution
  * request consumed by the transmitter.
  *
  * The transmitter executes only already-committed requests. Hardware

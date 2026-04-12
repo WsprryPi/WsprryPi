@@ -139,7 +139,7 @@ namespace
 {
 struct DirectToneStartupRequest
 {
-    WsprDialFrequencyEntry entry{};
+    WsprFrequencyEntry entry{};
     double actual_rf_frequency_hz = 0.0;
 };
 
@@ -322,33 +322,6 @@ static std::string transmit_gpio_validation_message()
     return oss.str();
 }
 
-static bool parse_tx_gpio_polarity(std::string_view raw_value, bool &active_high_out)
-{
-    std::string lowered(raw_value);
-    std::transform(
-        lowered.begin(),
-        lowered.end(),
-        lowered.begin(),
-        [](unsigned char c)
-        {
-            return static_cast<char>(std::tolower(c));
-        });
-
-    if (lowered == "high" || lowered == "active-high" || lowered == "active_high")
-    {
-        active_high_out = true;
-        return true;
-    }
-
-    if (lowered == "low" || lowered == "active-low" || lowered == "active_low")
-    {
-        active_high_out = false;
-        return true;
-    }
-
-    return false;
-}
-
 /**
  * @brief Rounds an input power level to the nearest valid WSPR power level.
  *
@@ -478,12 +451,11 @@ static std::vector<std::string> split_frequency_tokens(const std::string &raw_li
 
 static bool parse_frequency_entry_token(
     std::string_view raw_token,
-    WsprDialFrequencyEntry &entry,
+    WsprFrequencyEntry &entry,
     std::string &error_message)
 {
-    // Frequency-entry tokens may optionally carry a scheduler-owned @GPIO
-    // suffix. The suffix is metadata for per-frequency control GPIO, not a
-    // separate persistent transmit GPIO setting.
+    // Frequency-entry tokens may carry @GPIO[H|L] suffixes that override the
+    // selected band GPIO for one scheduler slot.
     const std::string token = trim_copy_string(std::string(raw_token));
     if (token.empty())
     {
@@ -495,7 +467,8 @@ static bool parse_frequency_entry_token(
     if (at_pos == std::string::npos)
     {
         entry.token = token;
-        entry.control_gpio = kFrequencyEntryControlGpioUnset;
+        entry.selector_gpio = kSelectorGpioUnset;
+        entry.selector_gpio_active_high = false;
         return true;
     }
 
@@ -508,7 +481,7 @@ static bool parse_frequency_entry_token(
     }
 
     const std::string base_token = trim_copy_string(token.substr(0, at_pos));
-    const std::string gpio_token =
+    std::string gpio_token =
         trim_copy_string(token.substr(at_pos + 1U));
 
     if (base_token.empty())
@@ -527,16 +500,33 @@ static bool parse_frequency_entry_token(
         return false;
     }
 
-    int parsed_gpio = kFrequencyEntryControlGpioUnset;
+    bool parsed_active_high = false;
+    const char polarity_suffix = gpio_token.empty() ? '\0' : gpio_token.back();
+    if (polarity_suffix == 'H' || polarity_suffix == 'h' ||
+        polarity_suffix == 'L' || polarity_suffix == 'l')
+    {
+        parsed_active_high = (polarity_suffix == 'H' || polarity_suffix == 'h');
+        gpio_token.pop_back();
+        gpio_token = trim_copy_string(gpio_token);
+        if (gpio_token.empty())
+        {
+            error_message =
+                "Invalid frequency token '" + token +
+                "': GPIO value is missing before polarity suffix.";
+            return false;
+        }
+    }
+
+    int parsed_gpio = kSelectorGpioUnset;
     if (!parse_gpio_number_strict(gpio_token, parsed_gpio))
     {
         error_message =
             "Invalid frequency token '" + token +
-            "': GPIO suffix must be an integer BCM GPIO.";
+            "': GPIO suffix must be an integer BCM GPIO optionally followed by H or L.";
         return false;
     }
 
-    if (!is_valid_frequency_entry_control_gpio(parsed_gpio))
+    if (!is_valid_selector_gpio(parsed_gpio))
     {
         error_message =
             "Invalid frequency token '" + token +
@@ -545,7 +535,8 @@ static bool parse_frequency_entry_token(
     }
 
     entry.token = base_token;
-    entry.control_gpio = parsed_gpio;
+    entry.selector_gpio = parsed_gpio;
+    entry.selector_gpio_active_high = parsed_active_high;
     return true;
 }
 
@@ -555,7 +546,7 @@ bool set_direct_tone_startup_request(
 {
     // --test-tone creates a transient startup request only. It does not
     // persist tone mode or RF frequency into configuration files.
-    WsprDialFrequencyEntry entry;
+    WsprFrequencyEntry entry;
     std::string local_error;
     if (!parse_frequency_entry_token(raw_token, entry, local_error))
     {
@@ -603,7 +594,7 @@ bool has_direct_tone_startup_request() noexcept
 }
 
 bool try_get_direct_tone_startup_request(
-    WsprDialFrequencyEntry &entry_out,
+    WsprFrequencyEntry &entry_out,
     double &actual_rf_frequency_hz_out) noexcept
 {
     if (!direct_tone_startup_request.has_value())
@@ -947,8 +938,6 @@ void print_usage(const std::string &message, int exit_code)
               << "    Load parameters from an INI file. Provide the path and filename.\n\n"
               << "  -a, --transmit-gpio <gpio>\n"
               << "    Select the RF transmit GPIO (supported: 4 or 20).\n\n"
-              << "  --tx-gpio-polarity <high|low>\n"
-              << "    Set polarity for per-frequency LPF/control GPIO outputs.\n\n"
               << "See the documentation for a complete list of available options.\n\n";
 
     // Handle exit behavior
@@ -989,9 +978,6 @@ void show_config_values(bool reload)
     llog.logS(DEBUG, "Transmit Power:", config.power_dbm);
     llog.logS(DEBUG, "WSPR Dial Frequencies:", config.frequencies);
     llog.logS(DEBUG, "Transmit Pin:", config.tx_pin);
-    llog.logS(DEBUG,
-              "Frequency Control GPIO Polarity:",
-              config.tx_freq_control_active_high ? "active high" : "active low");
     // [Extended]
     llog.logS(DEBUG, "PPM Offset:", config.ppm);
     llog.logS(DEBUG, "Synchronize with NTP:", config.use_ntp ? "true" : "false");
@@ -1209,9 +1195,6 @@ bool validate_config_candidate(
 void apply_runtime_config_side_effects()
 {
     llog.logS(INFO, "Transmit GPIO:", config.tx_pin);
-    llog.logS(INFO,
-              "Frequency-entry control GPIO polarity:",
-              config.tx_freq_control_active_high ? "active high" : "active low");
 
     if (!config.use_ntp && config.ppm != 0.0)
     {
@@ -1254,7 +1237,7 @@ void apply_runtime_config_side_effects()
 
     if (config.mode == ModeType::TONE)
     {
-        WsprDialFrequencyEntry entry;
+        WsprFrequencyEntry entry;
         double actual_rf_frequency_hz = 0.0;
         if (!try_get_direct_tone_startup_request(entry, actual_rf_frequency_hz))
         {
@@ -1499,7 +1482,7 @@ bool validate_config_data()
 
     if (config.mode == ModeType::TONE)
     {
-        WsprDialFrequencyEntry entry;
+        WsprFrequencyEntry entry;
         double actual_rf_frequency_hz = 0.0;
         if (!try_get_direct_tone_startup_request(entry, actual_rf_frequency_hz))
         {
@@ -1600,17 +1583,17 @@ bool set_frequencies(ArgParserConfig &target)
     }
 
     std::vector<double> parsed_frequencies;
-    std::vector<WsprDialFrequencyEntry> parsed_entries;
+    std::vector<WsprFrequencyEntry> parsed_entries;
 
     for (const std::string &token : split_frequency_tokens(raw_list))
     {
-        WsprDialFrequencyEntry entry;
+        WsprFrequencyEntry entry;
         std::string entry_error;
         if (!parse_frequency_entry_token(token, entry, entry_error))
         {
             llog.logE(ERROR, entry_error);
             target.wspr_dial_freq_set.clear();
-            target.wspr_dial_frequency_entries.clear();
+            target.wspr_frequency_entries.clear();
             return false;
         }
 
@@ -1618,6 +1601,7 @@ bool set_frequencies(ArgParserConfig &target)
         {
             const double freq = lookup.parse_string_to_frequency(entry.token, false);
             entry.dial_frequency_hz = freq;
+            entry.allow_band_gpio_fallback = target.use_ini;
             if (token_looks_numeric_frequency(entry.token))
             {
                 const auto legacy_alias =
@@ -1646,19 +1630,19 @@ bool set_frequencies(ArgParserConfig &target)
     if (!parsed_frequencies.empty())
     {
         target.wspr_dial_freq_set = parsed_frequencies;
-        target.wspr_dial_frequency_entries = parsed_entries;
+        target.wspr_frequency_entries = parsed_entries;
         return true;
     }
 
     if (target.mode != ModeType::WSPR || !target.transmit)
     {
-        target.wspr_dial_frequency_entries.clear();
+        target.wspr_frequency_entries.clear();
         return true;
     }
 
     llog.logE(ERROR, "Empty or invalid WSPR dial-frequency list.");
     target.wspr_dial_freq_set.clear();
-    target.wspr_dial_frequency_entries.clear();
+    target.wspr_frequency_entries.clear();
     return false;
 }
 
@@ -1844,7 +1828,6 @@ bool parse_command_line(int argc, char *argv[])
         {"journald", no_argument, nullptr, 'J'},      // Global: config.use_journald
         {"date-time-log", no_argument, nullptr, 'D'}, // Global: config.date_time_log
         {"require-paired", no_argument, nullptr, 1001}, // Global: config.wspr_planner_preference
-        {"tx-gpio-polarity", required_argument, nullptr, 1002},
         {"qrss-message", required_argument, nullptr, 1003},
         {"qrss-frequency", required_argument, nullptr, 1004},
         {"qrss-dot-seconds", required_argument, nullptr, 1005},
@@ -1918,21 +1901,6 @@ bool parse_command_line(int argc, char *argv[])
         case 1001: // Require paired WSPR planning
         {
             config.wspr_planner_preference = WsprPlannerPreference::RequirePaired;
-            break;
-        }
-        case 1002:
-        {
-            bool active_high = false;
-            if (!parse_tx_gpio_polarity(optarg, active_high))
-            {
-                print_usage(
-                    "Invalid TX GPIO polarity. Expected 'high' or 'low'.",
-                    EXIT_FAILURE);
-            }
-
-            // This applies to per-frequency selector GPIO outputs derived
-            // from frequency tokens with optional @GPIO suffixes.
-            config.tx_freq_control_active_high = active_high;
             break;
         }
         case 1003:

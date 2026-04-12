@@ -4,8 +4,8 @@
  *
  * This layer owns durable configuration values and their serialized
  * representation. Transient runtime requests such as `--test-tone` do not
- * live here. Frequency entries may include optional `@GPIO` metadata, and
- * `tx-gpio-polarity` applies to those per-frequency control outputs.
+ * live here. Frequency entries may include optional `@GPIO[H|L]` metadata
+ * that overrides the selected band GPIO for one scheduler slot.
  *
  * This project is is licensed under the MIT License. See LICENSE.md
  * for more information.
@@ -48,7 +48,7 @@
 inline constexpr int kTransmitGpioUnset = -1;
 inline constexpr int kDefaultTransmitGpio = 4;
 inline constexpr std::array<int, 2> kSupportedTransmitGpio = {4, 20};
-inline constexpr int kFrequencyEntryControlGpioUnset = -1;
+inline constexpr int kSelectorGpioUnset = -1;
 inline constexpr double WSPR_AUDIO_OFFSET_HZ = 1500.0;
 
 inline constexpr bool is_supported_transmit_gpio(int gpio) noexcept
@@ -64,16 +64,18 @@ inline constexpr bool is_supported_transmit_gpio(int gpio) noexcept
     return false;
 }
 
-inline constexpr bool is_valid_frequency_entry_control_gpio(int gpio) noexcept
+inline constexpr bool is_valid_selector_gpio(int gpio) noexcept
 {
     return gpio >= 0 && gpio <= 27;
 }
 
-struct WsprDialFrequencyEntry
+struct WsprFrequencyEntry
 {
-    std::string token; ///< Original frequency token without `@GPIO`.
+    std::string token; ///< Original frequency token without `@GPIO[H|L]`.
     double dial_frequency_hz = 0.0; ///< Resolved WSPR dial frequency in Hz.
-    int control_gpio = kFrequencyEntryControlGpioUnset; ///< Optional selector GPIO.
+    int selector_gpio = kSelectorGpioUnset; ///< Optional per-entry selector GPIO.
+    bool selector_gpio_active_high = false; ///< Optional selector GPIO polarity; false means active low.
+    bool allow_band_gpio_fallback = false; ///< True when [Band GPIO] may supply the selector.
 };
 
 /**
@@ -240,9 +242,8 @@ struct ArgParserConfig
     bool use_ini;                        ///< Load configuration from INI file.
     std::string ini_filename;            ///< INI file name and path.
     std::vector<double> wspr_dial_freq_set; ///< Parsed WSPR dial frequencies.
-    std::vector<WsprDialFrequencyEntry>
-        wspr_dial_frequency_entries; ///< Parsed entries with optional GPIO metadata.
-    bool tx_freq_control_active_high; ///< Global polarity for selector GPIO outputs.
+    std::vector<WsprFrequencyEntry>
+        wspr_frequency_entries; ///< Parsed entries with optional GPIO/polarity metadata.
     bool ntp_good;                       ///< A more qualitative measurement of NTP vs simply running
     std::array<BandGPIOConfig, HAM_BAND_COUNT> band_gpio; ///< Per-band GPIO assignment.
 
@@ -284,8 +285,7 @@ struct ArgParserConfig
           use_ini(false),
           ini_filename(""),
           wspr_dial_freq_set({}),
-          wspr_dial_frequency_entries({}),
-          tx_freq_control_active_high(false),
+          wspr_frequency_entries({}),
           ntp_good(false),
           band_gpio({})
     {
@@ -338,8 +338,7 @@ struct ArgParserConfig
         use_ini = other.use_ini;
         ini_filename = other.ini_filename;
         wspr_dial_freq_set = other.wspr_dial_freq_set;
-        wspr_dial_frequency_entries = other.wspr_dial_frequency_entries;
-        tx_freq_control_active_high = other.tx_freq_control_active_high;
+        wspr_frequency_entries = other.wspr_frequency_entries;
         ntp_good = other.ntp_good;
         band_gpio = other.band_gpio;
         return *this;
@@ -439,8 +438,7 @@ void ini_to_json(std::string filename);
  *       "Web Port": 31415,
  *       "Socket Port": 31416,
  *       "Use Shutdown": false,
- *       "Shutdown Button": 19,
- *       "Frequency Control GPIO Polarity": false
+ *       "Shutdown Button": 19
  *   },
  *   "Calibration": {
  *       "PPM": 0.0,

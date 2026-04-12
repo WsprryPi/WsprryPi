@@ -39,7 +39,6 @@
 
 #include "band_gpio.hpp"
 #include "gpio_output.hpp"
-#include "wspr_band_lookup.hpp"
 
 /**
  * @brief Controls scheduler-selected GPIO output for the active amateur band.
@@ -65,17 +64,6 @@ public:
      */
     bool prepareBand(HamBand band);
     bool prepareBand(HamBand band, const BandGPIOConfig &config);
-
-    /**
-     * @brief Prepare a band based on a frequency in Hz.
-     *
-     * The frequency is resolved through WSPRBandLookup directly to HamBand and
-     * then the configured GPIO is enabled in its inactive state.
-     *
-     * @param frequency_hz The frequency in Hz.
-     * @return True on success, false on failure.
-     */
-    bool prepareFrequency(double frequency_hz);
 
     /**
      * @brief Set the currently selected band GPIO enabled or disabled.
@@ -143,7 +131,6 @@ public:
 
 private:
     GPIOOutput gpio_;
-    WSPRBandLookup band_lookup_;
     bool has_band_ = false;
     HamBand current_band_ = HamBand::BAND_2200M;
     BandGPIOConfig current_config_{};
