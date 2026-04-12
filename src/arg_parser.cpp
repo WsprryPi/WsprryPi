@@ -1940,6 +1940,7 @@ bool parse_command_line(int argc, char *argv[])
     // Update argc and argv pointers for getopt_long()
     argc = args.size();
     argv = args.data();
+    bool explicit_power_level = false;
 
     static struct option long_options[] = {
         {"help", no_argument, nullptr, 'h'},
@@ -2032,6 +2033,11 @@ bool parse_command_line(int argc, char *argv[])
             {
                 config.transmit_backend =
                     parse_transmit_backend_option(optarg);
+                if (config.transmit_backend == TransmitBackendKind::SI5351 &&
+                    !explicit_power_level)
+                {
+                    config.power_level = 1;
+                }
             }
             catch (const std::exception &e)
             {
@@ -2195,6 +2201,7 @@ bool parse_command_line(int argc, char *argv[])
                 {
                     config.power_level = power;
                 }
+                explicit_power_level = true;
             }
             catch (const std::exception &)
             {

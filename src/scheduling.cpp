@@ -862,6 +862,28 @@ static TransmissionRequest make_direct_tone_request(
         WsprFrequencyEntry{});
 }
 
+static wsprrypi::TransmissionRequest make_tone_controller_request(
+    const ArgParserConfig &cfg,
+    double committed_ppm,
+    double actual_rf_frequency_hz)
+{
+    wsprrypi::TransmissionRequest request;
+    request.id.value = 1;
+    request.mode = wsprrypi::TransmissionMode::TONE;
+    request.output.backend = to_controller_backend(cfg.transmit_backend);
+    request.output.output = to_controller_clock_source(cfg.transmit_backend);
+    request.output.gpio = cfg.tx_pin;
+    request.calibration.ppm = committed_ppm;
+    request.metadata.label = "tone-cli-test";
+    request.metadata.origin = "cli";
+    request.metadata.note = "temporary direct RF test tone path";
+
+    wsprrypi::TonePayload payload;
+    payload.frequency_hz = actual_rf_frequency_hz;
+    request.payload = payload;
+    return request;
+}
+
 static std::chrono::nanoseconds seconds_to_nanoseconds(double seconds)
 {
     return std::chrono::duration_cast<std::chrono::nanoseconds>(
