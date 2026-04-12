@@ -2273,7 +2273,6 @@ bool parse_command_line(int argc, char *argv[])
         }
         case 1002: // Select transmit backend
         {
-            try
             {
                 config.transmit_backend =
                     parse_transmit_backend_option(optarg);
@@ -2289,9 +2288,7 @@ bool parse_command_line(int argc, char *argv[])
             }
             break;
         }
-        case 1003:
-        case 1004:
-        case 1005:
+=======
         case 1006:
         case 1007:
         case 1008:
