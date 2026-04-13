@@ -1290,16 +1290,6 @@ bool validate_config_candidate(
 
             return false;
         }
-
-        if (candidate.use_ini && candidate.si5351_tx_output != 0)
-        {
-            llog.logS(
-                WARN,
-                "App-managed Si5351 operation uses CLK0 for transmission; configured TX output CLK",
-                candidate.si5351_tx_output,
-                " normalized to CLK0.");
-            candidate.si5351_tx_output = 0;
-        }
     }
 
     if (candidate.mode == ModeType::TONE)
@@ -1449,287 +1439,291 @@ void apply_runtime_config_side_effects()
     si5351_config.power_level = config.power_level;
     si5351_config.app_managed = config.use_ini;
     wsprTransmitter.selectBackend(backend_kind, si5351_config);
+
+    llog.logS(INFO,
+              "Transmit backend:",
               transmit_backend_kind_to_string(config.transmit_backend));
-              if (config.transmit_backend == TransmitBackendKind::SI5351)
-              {
-                  std::ostringstream address;
-                  address << "0x" << std::hex << std::uppercase
-                          << config.si5351_i2c_address;
-                  llog.logS(INFO, "Si5351 I2C bus:", config.si5351_i2c_bus);
-                  llog.logS(INFO, "Si5351 I2C address:", address.str());
-                  llog.logS(INFO, "Si5351 reference frequency Hz:",
-                            config.si5351_reference_hz);
-                  llog.logS(INFO, "Si5351 TX output:",
-                            std::string("CLK") + std::to_string(config.si5351_tx_output));
-                  if (config.use_ini)
-                  {
-                      std::ostringstream parked_outputs;
-                      bool first_output = true;
-                      for (int output = 0; output < 3; ++output)
-                      {
-                          if (output == config.si5351_tx_output)
-                              continue;
 
-                          if (!first_output)
-                              parked_outputs << ", ";
-                          parked_outputs << "CLK" << output;
-                          first_output = false;
-                      }
+    if (config.transmit_backend == TransmitBackendKind::SI5351)
+    {
+        std::ostringstream address;
+        address << "0x" << std::hex << std::uppercase
+                << config.si5351_i2c_address;
+        llog.logS(INFO, "Si5351 I2C bus:", config.si5351_i2c_bus);
+        llog.logS(INFO, "Si5351 I2C address:", address.str());
+        llog.logS(INFO, "Si5351 reference frequency Hz:",
+                  config.si5351_reference_hz);
+        llog.logS(INFO, "Si5351 TX output:",
+                  std::string("CLK") +
+                      std::to_string(config.si5351_tx_output));
+        if (config.use_ini)
+        {
+            std::ostringstream parked_outputs;
+            bool first_output = true;
+            for (int output = 0; output < 3; ++output)
+            {
+                if (output == config.si5351_tx_output)
+                    continue;
 
-                      llog.logS(
-                          INFO,
-                          "Si5351 unused output parking: ",
-                          parked_outputs.str(),
-                          " held in a safe non-transmitting state; internal PLL remains parked.");
-                  }
-              }
-              else
-              {
-                  llog.logS(INFO, "Transmit GPIO:", config.tx_pin);
-              }
+                if (!first_output)
+                    parked_outputs << ", ";
+                parked_outputs << "CLK" << output;
+                first_output = false;
+            }
 
-              if (!config.use_ntp && config.ppm != 0.0)
-              {
-                  log_startup_config_message(INFO,
-                                             "PPM value to be used for tone generation: ",
-                                             std::fixed,
-                                             std::setprecision(2),
-                                             config.ppm);
-              }
-              else if (!config.use_ntp && config.ppm != 0.0)
-              {
-                  config.ppm = 0.0;
-                  log_startup_config_message(WARN, "NTP disabled and PPM not set.");
-              }
+            llog.logS(
+                INFO,
+                "Si5351 unused output parking: ",
+                parked_outputs.str(),
+                " held in a safe non-transmitting state; internal PLL remains parked.");
+        }
+    }
+    else
+    {
+        llog.logS(INFO, "Transmit GPIO:", config.tx_pin);
+    }
+    if (!config.use_ntp && config.ppm != 0.0)
+    {
+        log_startup_config_message(INFO,
+                                   "PPM value to be used for tone generation: ",
+                                   std::fixed,
+                                   std::setprecision(2),
+                                   config.ppm);
+    }
+    else if (!config.use_ntp && config.ppm != 0.0)
+    {
+        config.ppm = 0.0;
+        log_startup_config_message(WARN, "NTP disabled and PPM not set.");
+    }
 
-              if (config.use_led && (config.led_pin >= 0 && config.led_pin <= 27))
-              {
-                  ledControl.enableGPIOPin(config.led_pin, true);
-              }
-              else
-              {
-                  llog.logS(DEBUG, "Invalid or disabled LED settings, turning off LED.");
-                  ledControl.stop();
-              }
+    if (config.use_led && (config.led_pin >= 0 && config.led_pin <= 27))
+    {
+        ledControl.enableGPIOPin(config.led_pin, true);
+    }
+    else
+    {
+        llog.logS(DEBUG, "Invalid or disabled LED settings, turning off LED.");
+        ledControl.stop();
+    }
 
-              if (config.use_shutdown && (config.shutdown_pin >= 0 && config.shutdown_pin <= 27))
-              {
-                  shutdownMonitor.enable(
-                      config.shutdown_pin,
-                      false,
-                      GPIOInput::PullMode::PullUp,
-                      callback_shutdown_system);
-                  shutdownMonitor.setPriority(SCHED_RR, 10);
-              }
-              else
-              {
-                  llog.logS(DEBUG, "Disabling shutdown pin functionality.");
-                  shutdownMonitor.stop();
-              }
+    if (config.use_shutdown && (config.shutdown_pin >= 0 && config.shutdown_pin <= 27))
+    {
+        shutdownMonitor.enable(
+            config.shutdown_pin,
+            false,
+            GPIOInput::PullMode::PullUp,
+            callback_shutdown_system);
+        shutdownMonitor.setPriority(SCHED_RR, 10);
+    }
+    else
+    {
+        llog.logS(DEBUG, "Disabling shutdown pin functionality.");
+        shutdownMonitor.stop();
+    }
 
-              if (config.mode == ModeType::TONE)
-              {
-                  WsprFrequencyEntry entry;
-                  double actual_rf_frequency_hz = 0.0;
-                  if (!try_get_direct_tone_startup_request(entry, actual_rf_frequency_hz))
-                  {
-                      log_startup_config_message(ERROR, " - Missing direct RF test tone frequency.");
-                      return;
-                  }
+    if (config.mode == ModeType::TONE)
+    {
+        WsprFrequencyEntry entry;
+        double actual_rf_frequency_hz = 0.0;
+        if (!try_get_direct_tone_startup_request(entry, actual_rf_frequency_hz))
+        {
+            log_startup_config_message(ERROR, " - Missing direct RF test tone frequency.");
+            return;
+        }
 
-                  log_startup_config_message(
-                      INFO,
-                      "A direct RF test tone will be generated at:",
-                      lookup.freq_display_string(actual_rf_frequency_hz));
-                  return;
-              }
+        log_startup_config_message(
+            INFO,
+            "A direct RF test tone will be generated at:",
+            lookup.freq_display_string(actual_rf_frequency_hz));
+        return;
+    }
 
-              if (config.mode == ModeType::QRSS)
-              {
-                  std::string message;
-                  double frequency_hz = 0.0;
-                  double dot_seconds = 0.0;
-                  if (!try_get_qrss_startup_request(message, frequency_hz, dot_seconds))
-                  {
-                      if (!persisted_qrss_config_available(config))
-                      {
-                          log_startup_config_message(ERROR, " - Missing QRSS configuration.");
-                          return;
-                      }
+    if (config.mode == ModeType::QRSS)
+    {
+        std::string message;
+        double frequency_hz = 0.0;
+        double dot_seconds = 0.0;
+        if (!try_get_qrss_startup_request(message, frequency_hz, dot_seconds))
+        {
+            if (!persisted_qrss_config_available(config))
+            {
+                log_startup_config_message(ERROR, " - Missing QRSS configuration.");
+                return;
+            }
 
-                      message = config.qrss.message;
-                      frequency_hz = config.qrss.frequency_hz;
-                      dot_seconds = config.qrss.dot_seconds;
-                  }
+            message = config.qrss.message;
+            frequency_hz = config.qrss.frequency_hz;
+            dot_seconds = config.qrss.dot_seconds;
+        }
 
-                  log_startup_config_message(
-                      INFO,
-                      "QRSS configuration loaded: message='",
-                      message,
-                      "' frequency=",
-                      lookup.freq_display_string(frequency_hz),
-                      " dot=",
-                      dot_seconds,
-                      " s");
-                  return;
-              }
+        log_startup_config_message(
+            INFO,
+            "QRSS configuration loaded: message='",
+            message,
+            "' frequency=",
+            lookup.freq_display_string(frequency_hz),
+            " dot=",
+            dot_seconds,
+            " s");
+        return;
+    }
 
-              if (config.mode == ModeType::FSKCW)
-              {
-                  std::string message;
-                  double mark_frequency_hz = 0.0;
-                  double space_frequency_hz = 0.0;
-                  double dot_seconds = 0.0;
-                  if (!try_get_fskcw_startup_request(
-                          message,
-                          mark_frequency_hz,
-                          space_frequency_hz,
-                          dot_seconds))
-                  {
-                      if (!persisted_fskcw_config_available(config))
-                      {
-                          log_startup_config_message(ERROR, " - Missing FSKCW configuration.");
-                          return;
-                      }
+    if (config.mode == ModeType::FSKCW)
+    {
+        std::string message;
+        double mark_frequency_hz = 0.0;
+        double space_frequency_hz = 0.0;
+        double dot_seconds = 0.0;
+        if (!try_get_fskcw_startup_request(
+                message,
+                mark_frequency_hz,
+                space_frequency_hz,
+                dot_seconds))
+        {
+            if (!persisted_fskcw_config_available(config))
+            {
+                log_startup_config_message(ERROR, " - Missing FSKCW configuration.");
+                return;
+            }
 
-                      message = config.fskcw.message;
-                      mark_frequency_hz = config.fskcw.mark_frequency_hz;
-                      space_frequency_hz = config.fskcw.space_frequency_hz;
-                      dot_seconds = config.fskcw.dot_seconds;
-                  }
+            message = config.fskcw.message;
+            mark_frequency_hz = config.fskcw.mark_frequency_hz;
+            space_frequency_hz = config.fskcw.space_frequency_hz;
+            dot_seconds = config.fskcw.dot_seconds;
+        }
 
-                  log_startup_config_message(
-                      INFO,
-                      "FSKCW configuration loaded: message='",
-                      message,
-                      "' mark=",
-                      lookup.freq_display_string(mark_frequency_hz),
-                      " space=",
-                      lookup.freq_display_string(space_frequency_hz),
-                      " dot=",
-                      dot_seconds,
-                      " s");
-                  return;
-              }
+        log_startup_config_message(
+            INFO,
+            "FSKCW configuration loaded: message='",
+            message,
+            "' mark=",
+            lookup.freq_display_string(mark_frequency_hz),
+            " space=",
+            lookup.freq_display_string(space_frequency_hz),
+            " dot=",
+            dot_seconds,
+            " s");
+        return;
+    }
 
-              if (config.mode == ModeType::DFCW)
-              {
-                  std::string message;
-                  double dot_frequency_hz = 0.0;
-                  double dash_frequency_hz = 0.0;
-                  double dot_seconds = 0.0;
-                  if (!try_get_dfcw_startup_request(
-                          message,
-                          dot_frequency_hz,
-                          dash_frequency_hz,
-                          dot_seconds))
-                  {
-                      if (!persisted_dfcw_config_available(config))
-                      {
-                          log_startup_config_message(ERROR, " - Missing DFCW configuration.");
-                          return;
-                      }
+    if (config.mode == ModeType::DFCW)
+    {
+        std::string message;
+        double dot_frequency_hz = 0.0;
+        double dash_frequency_hz = 0.0;
+        double dot_seconds = 0.0;
+        if (!try_get_dfcw_startup_request(
+                message,
+                dot_frequency_hz,
+                dash_frequency_hz,
+                dot_seconds))
+        {
+            if (!persisted_dfcw_config_available(config))
+            {
+                log_startup_config_message(ERROR, " - Missing DFCW configuration.");
+                return;
+            }
 
-                      message = config.dfcw.message;
-                      dot_frequency_hz = config.dfcw.dot_frequency_hz;
-                      dash_frequency_hz = config.dfcw.dash_frequency_hz;
-                      dot_seconds = config.dfcw.dot_seconds;
-                  }
+            message = config.dfcw.message;
+            dot_frequency_hz = config.dfcw.dot_frequency_hz;
+            dash_frequency_hz = config.dfcw.dash_frequency_hz;
+            dot_seconds = config.dfcw.dot_seconds;
+        }
 
-                  log_startup_config_message(
-                      INFO,
-                      "DFCW configuration loaded: message='",
-                      message,
-                      "' dot=",
-                      lookup.freq_display_string(dot_frequency_hz),
-                      " dash=",
-                      lookup.freq_display_string(dash_frequency_hz),
-                      " dot=",
-                      dot_seconds,
-                      " s");
-                  return;
-              }
+        log_startup_config_message(
+            INFO,
+            "DFCW configuration loaded: message='",
+            message,
+            "' dot=",
+            lookup.freq_display_string(dot_frequency_hz),
+            " dash=",
+            lookup.freq_display_string(dash_frequency_hz),
+            " dot=",
+            dot_seconds,
+            " s");
+        return;
+    }
 
-              if (config.mode != ModeType::WSPR)
-              {
-                  return;
-              }
+    if (config.mode != ModeType::WSPR)
+    {
+        return;
+    }
 
-              if (config.transmit)
-              {
-                  log_startup_config_message(INFO, "WSPR packet payload:");
-                  log_startup_config_message(INFO, "- Callsign:", config.callsign);
-                  log_startup_config_message(INFO, "- Locator:", config.grid_square);
-                  log_startup_config_message(INFO, "- Power:", config.power_dbm, " dBm");
+    if (config.transmit)
+    {
+        log_startup_config_message(INFO, "WSPR packet payload:");
+        log_startup_config_message(INFO, "- Callsign:", config.callsign);
+        log_startup_config_message(INFO, "- Locator:", config.grid_square);
+        log_startup_config_message(INFO, "- Power:", config.power_dbm, " dBm");
 
-                  if (config.wspr_frequency_entries.size() > 1)
-                  {
-                      log_startup_config_message(INFO, "Requested WSPR dial frequencies:");
+        if (config.wspr_frequency_entries.size() > 1)
+        {
+            log_startup_config_message(INFO, "Requested WSPR dial frequencies:");
 
-                      for (const auto &entry : config.wspr_frequency_entries)
-                      {
-                          if (entry.dial_frequency_hz == 0.0)
-                          {
-                              log_startup_config_message(INFO, "- Skip (0.0)");
-                          }
-                          else
-                          {
-                              log_startup_config_message(
-                                  INFO,
-                                  "- ",
-                                  lookup.freq_display_string(entry.dial_frequency_hz),
-                                  get_wspr_gpio_suffix_for_entry(entry, config, lookup));
-                          }
-                      }
-                  }
-                  else
-                  {
-                      const WsprFrequencyEntry &entry = config.wspr_frequency_entries[0];
+            for (const auto &entry : config.wspr_frequency_entries)
+            {
+                if (entry.dial_frequency_hz == 0.0)
+                {
+                    log_startup_config_message(INFO, "- Skip (0.0)");
+                }
+                else
+                {
+                    log_startup_config_message(
+                        INFO,
+                        "- ",
+                        lookup.freq_display_string(entry.dial_frequency_hz),
+                        get_wspr_gpio_suffix_for_entry(entry, config, lookup));
+                }
+            }
+        }
+        else
+        {
+            const WsprFrequencyEntry &entry = config.wspr_frequency_entries[0];
 
-                      if (entry.dial_frequency_hz == 0.0)
-                      {
-                          log_startup_config_message(INFO, "Requested WSPR dial frequency:", "Skip (0.0)");
-                      }
-                      else
-                      {
-                          log_startup_config_message(
-                              INFO,
-                              "Requested WSPR dial frequency:",
-                              lookup.freq_display_string(entry.dial_frequency_hz),
-                              get_wspr_gpio_suffix_for_entry(entry, config, lookup));
-                      }
-                  }
+            if (entry.dial_frequency_hz == 0.0)
+            {
+                log_startup_config_message(INFO, "Requested WSPR dial frequency:", "Skip (0.0)");
+            }
+            else
+            {
+                log_startup_config_message(
+                    INFO,
+                    "Requested WSPR dial frequency:",
+                    lookup.freq_display_string(entry.dial_frequency_hz),
+                    get_wspr_gpio_suffix_for_entry(entry, config, lookup));
+            }
+        }
 
-                  if (config.use_offset)
-                  {
-                      log_startup_config_message(
-                          INFO,
-                          "A random offset will be added to all transmissions.");
-                  }
-              }
+        if (config.use_offset)
+        {
+            log_startup_config_message(
+                INFO,
+                "A random offset will be added to all transmissions.");
+        }
+    }
 
-              if (!config.use_ini)
-              {
-                  if (config.loop_tx)
-                  {
-                      log_startup_config_message(
-                          INFO,
-                          "Transmissions will continue until it receives a signal to stop.");
-                  }
-                  else
-                  {
-                      if (config.tx_iterations.load() <= 0)
-                      {
-                          config.tx_iterations.store(1);
-                          config.transmit = true;
-                      }
-                      log_startup_config_message(
-                          INFO,
-                          "TX will stop after:",
-                          config.tx_iterations.load(),
-                          "iteration(s) of the WSPR dial-frequency list.");
-                  }
-              }
+    if (!config.use_ini)
+    {
+        if (config.loop_tx)
+        {
+            log_startup_config_message(
+                INFO,
+                "Transmissions will continue until it receives a signal to stop.");
+        }
+        else
+        {
+            if (config.tx_iterations.load() <= 0)
+            {
+                config.tx_iterations.store(1);
+                config.transmit = true;
+            }
+            log_startup_config_message(
+                INFO,
+                "TX will stop after:",
+                config.tx_iterations.load(),
+                "iteration(s) of the WSPR dial-frequency list.");
+        }
+    }
 }
 
 bool validate_config_data()
@@ -2280,6 +2274,7 @@ bool parse_command_line(int argc, char *argv[])
         }
         case 1002: // Select transmit backend
         {
+            try
             {
                 config.transmit_backend =
                     parse_transmit_backend_option(optarg);

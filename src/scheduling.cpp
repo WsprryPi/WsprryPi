@@ -549,16 +549,16 @@ static wsprrypi::BackendKind to_controller_backend(
     TransmitBackendKind backend) noexcept
 {
     return backend == TransmitBackendKind::SI5351
-        ? wsprrypi::BackendKind::SI5351
-        : wsprrypi::BackendKind::RPI_CLOCK_GPIO;
+               ? wsprrypi::BackendKind::SI5351
+               : wsprrypi::BackendKind::RPI_CLOCK_GPIO;
 }
 
 static wsprrypi::ClockSource to_controller_clock_source(
     TransmitBackendKind backend) noexcept
 {
     return backend == TransmitBackendKind::SI5351
-        ? wsprrypi::ClockSource::SI5351_CLK0
-        : wsprrypi::ClockSource::GPIO_CLK;
+               ? wsprrypi::ClockSource::SI5351_CLK0
+               : wsprrypi::ClockSource::GPIO_CLK;
 }
 
 static bool managed_reload_generation_changed(
@@ -2066,7 +2066,7 @@ void end_test_tone()
                 make_direct_tone_request(
                     config,
                     committed_ppm,
-                    actual_rf_frequency_hz));
+                    actual_rf_frequency_hz);
             (void)prepare_band_gpio_for_frequency_or_log(
                 entry.dial_frequency_hz,
                 entry,
@@ -2325,7 +2325,6 @@ bool wspr_loop()
                 entry.dial_frequency_hz,
                 entry,
                 config);
-            commit_execution_request(request);
             wsprTransmitter.startAsync();
             llog.logS(INFO, "transmitting tone, hit Ctrl-C to terminate tone.");
         }
