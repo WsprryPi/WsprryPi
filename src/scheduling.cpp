@@ -90,10 +90,36 @@
  * transmission completes, is skipped, or is cancelled.
  */
 static BandGPIOSelector bandGPIOSelector;
+struct BandGPIOResolution
+{
+    BandGPIOConfig config{};
+    bool selector_enabled = false;
+    bool from_band_config = false;
+    const char *selector_source = "none";
+};
+
+namespace
+{
+    std::string get_active_gpio_suffix()
+    {
+        const BandGPIOConfig *cfg = bandGPIOSelector.currentConfig();
+
+        if (cfg == nullptr || !cfg->enabled || cfg->gpio < 0)
+        {
+            return "";
+        }
+
+        return " (GPIO" +
+               std::to_string(cfg->gpio) +
+               (cfg->active_high ? "H)" : "L)");
+    }
+}
+
 static bool prepare_band_gpio_for_frequency_or_log(
     double source_frequency_hz,
     const WsprFrequencyEntry &entry,
-    const ArgParserConfig &cfg);
+    const ArgParserConfig &cfg,
+    int frequency_entry_index = -1);
 
 /**
  * @brief Mutex to protect access to the shutdown flag for the WSPR loop.
@@ -629,7 +655,8 @@ void consume_tx_iteration_if_needed()
 static bool prepare_band_gpio_for_frequency_or_log(
     double source_frequency_hz,
     const WsprFrequencyEntry &entry,
-    const ArgParserConfig &cfg)
+    const ArgParserConfig &cfg,
+    int frequency_entry_index)
 {
     const auto band = lookup.lookup_ham_band(source_frequency_hz);
     if (!band.has_value())
@@ -642,21 +669,35 @@ static bool prepare_band_gpio_for_frequency_or_log(
         return false;
     }
 
-    BandGPIOConfig band_gpio_config{};
-    const char *selector_source = "frequency entry";
+    BandGPIOResolution resolution;
+    resolution.selector_source = "frequency entry";
     if (entry.selector_gpio != kSelectorGpioUnset)
     {
-        band_gpio_config.gpio = entry.selector_gpio;
-        band_gpio_config.enabled = true;
-        band_gpio_config.active_high = entry.selector_gpio_active_high;
+        resolution.config.gpio = entry.selector_gpio;
+        resolution.config.enabled = true;
+        resolution.config.active_high = entry.selector_gpio_active_high;
+        resolution.selector_enabled = true;
     }
     else if (entry.allow_band_gpio_fallback)
     {
-        band_gpio_config = cfg.band_gpio[ham_band_index(*band)];
-        selector_source = "band configuration";
-        if (!band_gpio_config.enabled || band_gpio_config.gpio < 0)
+        resolution.config = cfg.band_gpio[ham_band_index(*band)];
+        resolution.from_band_config = true;
+        resolution.selector_source = "band configuration";
+        resolution.selector_enabled =
+            resolution.config.enabled && resolution.config.gpio >= 0;
+        if (!resolution.selector_enabled)
         {
             stop_active_transmission_selectors();
+            llog.logS(
+                DEBUG,
+                "[BandGPIO]",
+                "Frequency entry index ",
+                frequency_entry_index,
+                " token ",
+                entry.token,
+                " resolved band ",
+                ham_band_to_string(*band),
+                "; GPIO switching enabled false; fallback path band configuration had no enabled GPIO.");
             llog.logS(
                 DEBUG,
                 "[BandGPIO]",
@@ -674,6 +715,16 @@ static bool prepare_band_gpio_for_frequency_or_log(
         llog.logS(
             DEBUG,
             "[BandGPIO]",
+            "Frequency entry index ",
+            frequency_entry_index,
+            " token ",
+            entry.token,
+            " resolved band ",
+            ham_band_to_string(*band),
+            "; GPIO switching enabled false; no per-entry selector and band fallback disabled.");
+        llog.logS(
+            DEBUG,
+            "[BandGPIO]",
             "No selector GPIO requested for frequency entry ",
             entry.token,
             "; leaving LPF selection inactive.");
@@ -683,21 +734,28 @@ static bool prepare_band_gpio_for_frequency_or_log(
     llog.logS(
         DEBUG,
         "[BandGPIO]",
+        "Frequency entry index ",
+        frequency_entry_index,
+        " token ",
+        entry.token,
+        "; ",
         "Unified scheduler selector derived band ",
         ham_band_to_string(*band),
         " from source frequency ",
         lookup.freq_display_string(source_frequency_hz),
         "; selected GPIO ",
-        band_gpio_config.gpio,
+        resolution.config.gpio,
         " (",
-        (band_gpio_config.active_high ? "active high" : "active low"),
+        (resolution.config.active_high ? "active high" : "active low"),
         ")",
         " from ",
-        selector_source,
+        resolution.selector_source,
         ", enabled ",
-        (band_gpio_config.enabled ? "true" : "false"),
+        (resolution.selector_enabled ? "true" : "false"),
+        "; committed request token ",
+        entry.token,
         ".");
-    if (!bandGPIOSelector.prepareBand(*band, band_gpio_config))
+    if (!bandGPIOSelector.prepareBand(*band, resolution.config))
     {
         llog.logS(
             WARN,
@@ -1410,7 +1468,9 @@ void transmitter_cb(WsprTransmitter::TransmissionCallbackEvent event,
                       msg,
                       ") ",
                       wsprTransmitter.formatFrequencyMHz(frequency),
-                      " MHz.");
+                      " MHz",
+                      get_active_gpio_suffix(),
+                      ".");
         }
         else if (frequency != 0.0)
         {
@@ -1418,35 +1478,37 @@ void transmitter_cb(WsprTransmitter::TransmissionCallbackEvent event,
             {
                 llog.logS(to_log_level(level),
                           "Started QRSS test transmission: ",
-                          frequency,
-                          " Hz (",
                           wsprTransmitter.formatFrequencyMHz(frequency),
-                          " MHz).");
+                          " MHz",
+                          get_active_gpio_suffix(),
+                          ".");
             }
             else if (config.mode == ModeType::FSKCW)
             {
                 llog.logS(to_log_level(level),
                           "Started FSKCW test transmission at mark frequency: ",
-                          frequency,
-                          " Hz (",
                           wsprTransmitter.formatFrequencyMHz(frequency),
-                          " MHz).");
+                          " MHz",
+                          get_active_gpio_suffix(),
+                          ".");
             }
             else if (config.mode == ModeType::DFCW)
             {
                 llog.logS(to_log_level(level),
                           "Started DFCW test transmission at dot frequency: ",
-                          frequency,
-                          " Hz (",
                           wsprTransmitter.formatFrequencyMHz(frequency),
-                          " MHz).");
+                          " MHz",
+                          get_active_gpio_suffix(),
+                          ".");
             }
             else
             {
                 llog.logS(to_log_level(level),
                           "Started transmission: ",
                           wsprTransmitter.formatFrequencyMHz(frequency),
-                          " MHz.");
+                          " MHz",
+                          get_active_gpio_suffix(),
+                          ".");
             }
         }
         else if (!msg.empty())
@@ -1863,10 +1925,13 @@ void start_test_tone()
             config.wspr.audio_offset_hz,
             " Hz.");
         const double committed_ppm = config.ppm;
-        commit_execution_request(
-            make_tone_request(config, committed_ppm, actual_rf_freq, dial_freq, entry));
-
-        (void)prepare_band_gpio_for_frequency_or_log(dial_freq, entry, config);
+        TransmissionRequest request =
+            make_tone_request(config, committed_ppm, actual_rf_freq, dial_freq, entry);
+        (void)prepare_band_gpio_for_frequency_or_log(
+            dial_freq,
+            entry,
+            config);
+        commit_execution_request(request);
 
         wsprTransmitter.startAsync();
         llog.logS(INFO,
@@ -1931,15 +1996,16 @@ void end_test_tone()
             }
 
             const double committed_ppm = config.ppm;
-            commit_execution_request(
+            TransmissionRequest request =
                 make_direct_tone_request(
                     config,
                     committed_ppm,
-                    actual_rf_frequency_hz));
+                    actual_rf_frequency_hz);
             (void)prepare_band_gpio_for_frequency_or_log(
                 entry.dial_frequency_hz,
                 entry,
                 config);
+            commit_execution_request(request);
             wsprTransmitter.startAsync();
 
             llog.logS(INFO,
@@ -2031,8 +2097,8 @@ StopTransmissionResult stop_transmission_by_user_request()
     send_ws_message("transmit", "stopped");
 
     result.message = result.transmission_active
-        ? "Active transmission stopped and transmit disabled."
-        : "Transmit disabled; no active transmission was running.";
+                         ? "Active transmission stopped and transmit disabled."
+                         : "Transmit disabled; no active transmission was running.";
     return result;
 }
 
@@ -2184,15 +2250,16 @@ bool wspr_loop()
         else
         {
             const double committed_ppm = config.ppm;
-            commit_execution_request(
+            TransmissionRequest request =
                 make_direct_tone_request(
                     config,
                     committed_ppm,
-                    actual_rf_frequency_hz));
+                    actual_rf_frequency_hz);
             (void)prepare_band_gpio_for_frequency_or_log(
                 entry.dial_frequency_hz,
                 entry,
                 config);
+            commit_execution_request(request);
             wsprTransmitter.startAsync();
             llog.logS(INFO, "transmitting tone, hit Ctrl-C to terminate tone.");
         }
@@ -2714,6 +2781,7 @@ bool set_config(bool force)
 
         static double last_freq = 0.0;
         static WsprFrequencyEntry last_frequency_entry{};
+        int next_frequency_entry_index = -1;
         if (next_active_wspr_plan_in_progress && next_active_wspr_frame_index > 0U)
         {
             next_current_dial_frequency = next_active_wspr_plan_dial_frequency;
@@ -2722,6 +2790,12 @@ bool set_config(bool force)
         }
         else
         {
+            if (!working_config.wspr_frequency_entries.empty())
+            {
+                next_frequency_entry_index =
+                    next_freq_iterator %
+                    static_cast<int>(working_config.wspr_frequency_entries.size());
+            }
             next_current_frequency_entry = next_frequency_entry_from(
                 working_config.wspr_frequency_entries,
                 next_freq_iterator,
@@ -2901,7 +2975,8 @@ bool set_config(bool force)
             if (!prepare_band_gpio_for_frequency_or_log(
                     next_current_dial_frequency,
                     next_current_frequency_entry,
-                    working_config))
+                    working_config,
+                    next_frequency_entry_index))
             {
                 stop_active_transmission_selectors();
 
@@ -3039,6 +3114,30 @@ void reset_managed_reload_runtime_for_test() noexcept
 void set_scheduler_execution_suppressed_for_test(bool suppressed) noexcept
 {
     suppress_scheduler_execution_for_test = suppressed;
+}
+
+void set_band_gpio_selector_for_test(bool enabled, bool drive_gpio) noexcept
+{
+    bandGPIOSelector.setEnabled(enabled);
+    bandGPIOSelector.setDriveGPIO(drive_gpio);
+}
+
+bool current_band_gpio_selection_for_test(
+    BandGPIOConfig &config_out,
+    std::string &band_label_out) noexcept
+{
+    const BandGPIOConfig *current_config = bandGPIOSelector.currentConfig();
+    const HamBand *current_band = bandGPIOSelector.currentBand();
+    if (current_config == nullptr || current_band == nullptr)
+    {
+        config_out = BandGPIOConfig{};
+        band_label_out.clear();
+        return false;
+    }
+
+    config_out = *current_config;
+    band_label_out = ham_band_to_string(*current_band);
+    return true;
 }
 
 TransmissionRequest current_transmission_request_for_test()

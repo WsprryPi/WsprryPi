@@ -299,6 +299,12 @@ bool managed_reload_tx_inhibited_state() noexcept;
 bool managed_reload_tx_inhibited_for_test() noexcept;
 void reset_managed_reload_runtime_for_test() noexcept;
 void set_scheduler_execution_suppressed_for_test(bool suppressed) noexcept;
+
+void set_band_gpio_selector_for_test(bool enabled, bool drive_gpio) noexcept;
+
+bool current_band_gpio_selection_for_test(
+    BandGPIOConfig &config_out,
+    std::string &band_label_out) noexcept;
 TransmissionRequest current_transmission_request_for_test();
 
 #endif // _SCHEDULING_HPP

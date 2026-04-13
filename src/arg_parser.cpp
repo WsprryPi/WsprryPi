@@ -1,4 +1,3 @@
-
 /**
  * @file arg_parser.cpp
  * @brief Parse runtime startup choices and frequency-entry syntax.
@@ -43,12 +42,16 @@
 // Standard library headers
 #include <algorithm>
 #include <atomic>
+#include <cctype>
 #include <cstring>
+#include <iomanip>
 #include <mutex>
+#include <optional>
 #include <regex>
 #include <sstream>
 #include <stdexcept>
 #include <string>
+#include <utility>
 #include <vector>
 
 // System headers
@@ -137,77 +140,122 @@ const std::vector<int> wspr_power_levels = {0, 3, 7, 10, 13, 17, 20, 23, 27, 30,
 
 namespace
 {
-struct DirectToneStartupRequest
-{
-    WsprFrequencyEntry entry{};
-    double actual_rf_frequency_hz = 0.0;
-};
+    struct DirectToneStartupRequest
+    {
+        WsprFrequencyEntry entry{};
+        double actual_rf_frequency_hz = 0.0;
+    };
 
-std::optional<DirectToneStartupRequest> direct_tone_startup_request;
+    std::optional<DirectToneStartupRequest> direct_tone_startup_request;
 
-struct QrssStartupRequest
-{
-    std::string message;
-    double frequency_hz = 0.0;
-    double dot_seconds = 0.0;
-};
+    struct QrssStartupRequest
+    {
+        std::string message;
+        double frequency_hz = 0.0;
+        double dot_seconds = 0.0;
+    };
 
-std::optional<QrssStartupRequest> qrss_startup_request;
+    std::optional<QrssStartupRequest> qrss_startup_request;
 
-struct FskcwStartupRequest
-{
-    std::string message;
-    double mark_frequency_hz = 0.0;
-    double space_frequency_hz = 0.0;
-    double dot_seconds = 0.0;
-};
+    struct FskcwStartupRequest
+    {
+        std::string message;
+        double mark_frequency_hz = 0.0;
+        double space_frequency_hz = 0.0;
+        double dot_seconds = 0.0;
+    };
 
-std::optional<FskcwStartupRequest> fskcw_startup_request;
+    std::optional<FskcwStartupRequest> fskcw_startup_request;
 
-struct DfcwStartupRequest
-{
-    std::string message;
-    double dot_frequency_hz = 0.0;
-    double dash_frequency_hz = 0.0;
-    double dot_seconds = 0.0;
-};
+    struct DfcwStartupRequest
+    {
+        std::string message;
+        double dot_frequency_hz = 0.0;
+        double dash_frequency_hz = 0.0;
+        double dot_seconds = 0.0;
+    };
 
-std::optional<DfcwStartupRequest> dfcw_startup_request;
+    std::optional<DfcwStartupRequest> dfcw_startup_request;
 
-void sync_wspr_mode_config(ArgParserConfig &cfg)
-{
-    cfg.wspr.callsign = cfg.callsign;
-    cfg.wspr.grid_square = cfg.grid_square;
-    cfg.wspr.power_dbm = cfg.power_dbm;
-    cfg.wspr.frequencies = cfg.frequencies;
-    cfg.wspr.audio_offset_hz = cfg.wspr_audio_offset_hz;
-    cfg.wspr.planner_preference = cfg.wspr_planner_preference;
-}
+    void sync_wspr_mode_config(ArgParserConfig &cfg)
+    {
+        cfg.wspr.callsign = cfg.callsign;
+        cfg.wspr.grid_square = cfg.grid_square;
+        cfg.wspr.power_dbm = cfg.power_dbm;
+        cfg.wspr.frequencies = cfg.frequencies;
+        cfg.wspr.audio_offset_hz = cfg.wspr_audio_offset_hz;
+        cfg.wspr.planner_preference = cfg.wspr_planner_preference;
+    }
 
-bool persisted_qrss_config_available(const ArgParserConfig &cfg) noexcept
-{
-    return !cfg.qrss.message.empty() &&
-           cfg.qrss.frequency_hz > 0.0 &&
-           cfg.qrss.dot_seconds > 0.0;
-}
+    bool persisted_qrss_config_available(const ArgParserConfig &cfg) noexcept
+    {
+        return !cfg.qrss.message.empty() &&
+               cfg.qrss.frequency_hz > 0.0 &&
+               cfg.qrss.dot_seconds > 0.0;
+    }
 
-bool persisted_fskcw_config_available(const ArgParserConfig &cfg) noexcept
-{
-    return !cfg.fskcw.message.empty() &&
-           cfg.fskcw.mark_frequency_hz > 0.0 &&
-           cfg.fskcw.space_frequency_hz > 0.0 &&
-           cfg.fskcw.mark_frequency_hz > cfg.fskcw.space_frequency_hz &&
-           cfg.fskcw.dot_seconds > 0.0;
-}
+    bool persisted_fskcw_config_available(const ArgParserConfig &cfg) noexcept
+    {
+        return !cfg.fskcw.message.empty() &&
+               cfg.fskcw.mark_frequency_hz > 0.0 &&
+               cfg.fskcw.space_frequency_hz > 0.0 &&
+               cfg.fskcw.mark_frequency_hz > cfg.fskcw.space_frequency_hz &&
+               cfg.fskcw.dot_seconds > 0.0;
+    }
 
-bool persisted_dfcw_config_available(const ArgParserConfig &cfg) noexcept
-{
-    return !cfg.dfcw.message.empty() &&
-           cfg.dfcw.dot_frequency_hz > 0.0 &&
-           cfg.dfcw.dash_frequency_hz > 0.0 &&
-           cfg.dfcw.dot_frequency_hz != cfg.dfcw.dash_frequency_hz &&
-           cfg.dfcw.dot_seconds > 0.0;
-}
+    bool persisted_dfcw_config_available(const ArgParserConfig &cfg) noexcept
+    {
+        return !cfg.dfcw.message.empty() &&
+               cfg.dfcw.dot_frequency_hz > 0.0 &&
+               cfg.dfcw.dash_frequency_hz > 0.0 &&
+               cfg.dfcw.dot_frequency_hz != cfg.dfcw.dash_frequency_hz &&
+               cfg.dfcw.dot_seconds > 0.0;
+    }
+
+    static std::string get_wspr_gpio_suffix_for_entry(
+        const WsprFrequencyEntry &entry,
+        const ArgParserConfig &config,
+        WSPRBandLookup &lookup)
+    {
+        int gpio = kSelectorGpioUnset;
+        bool active_high = false;
+        bool enabled = false;
+
+        if (entry.selector_gpio != kSelectorGpioUnset)
+        {
+            gpio = entry.selector_gpio;
+            active_high = entry.selector_gpio_active_high;
+            enabled = true;
+        }
+        else if (entry.allow_band_gpio_fallback)
+        {
+            const std::optional<HamBand> band =
+                lookup.lookup_ham_band(entry.dial_frequency_hz);
+
+            if (band.has_value())
+            {
+                const BandGPIOConfig &band_cfg =
+                    config.band_gpio[ham_band_index(*band)];
+
+                if (band_cfg.enabled && band_cfg.gpio >= 0)
+                {
+                    gpio = band_cfg.gpio;
+                    active_high = band_cfg.active_high;
+                    enabled = true;
+                }
+            }
+        }
+
+        if (!enabled)
+        {
+            return "";
+        }
+
+        return " (GPIO" +
+               std::to_string(gpio) +
+               (active_high ? "H)" : "L)");
+    }
+
 } // namespace
 
 static void defer_startup_diagnostic(LogLevel level, std::string message)
@@ -1370,28 +1418,42 @@ void apply_runtime_config_side_effects()
         log_startup_config_message(INFO, "- Locator:", config.grid_square);
         log_startup_config_message(INFO, "- Power:", config.power_dbm, " dBm");
 
-        if (config.wspr_dial_freq_set.size() > 1)
+        if (config.wspr_frequency_entries.size() > 1)
         {
             log_startup_config_message(INFO, "Requested WSPR dial frequencies:");
 
-            for (const auto &freq : config.wspr_dial_freq_set)
+            for (const auto &entry : config.wspr_frequency_entries)
             {
-                if (freq == 0.0)
+                if (entry.dial_frequency_hz == 0.0)
                 {
                     log_startup_config_message(INFO, "- Skip (0.0)");
                 }
                 else
                 {
-                    log_startup_config_message(INFO, "- ", lookup.freq_display_string(freq));
+                    log_startup_config_message(
+                        INFO,
+                        "- ",
+                        lookup.freq_display_string(entry.dial_frequency_hz),
+                        get_wspr_gpio_suffix_for_entry(entry, config, lookup));
                 }
             }
         }
         else
         {
-            log_startup_config_message(
-                INFO,
-                "Requested WSPR dial frequency:",
-                lookup.freq_display_string(config.wspr_dial_freq_set[0]));
+            const WsprFrequencyEntry &entry = config.wspr_frequency_entries[0];
+
+            if (entry.dial_frequency_hz == 0.0)
+            {
+                log_startup_config_message(INFO, "Requested WSPR dial frequency:", "Skip (0.0)");
+            }
+            else
+            {
+                log_startup_config_message(
+                    INFO,
+                    "Requested WSPR dial frequency:",
+                    lookup.freq_display_string(entry.dial_frequency_hz),
+                    get_wspr_gpio_suffix_for_entry(entry, config, lookup));
+            }
         }
 
         if (config.use_offset)
@@ -1699,7 +1761,6 @@ bool handle_early_cli_options(int argc, char *argv[])
                 }
             }
         }
-
     }
 
     initialize_logger(early_use_journald, early_enable_timestamps);
@@ -1822,11 +1883,11 @@ bool parse_command_line(int argc, char *argv[])
     static struct option long_options[] = {
         {"help", no_argument, nullptr, 'h'},
         {"version", no_argument, nullptr, 'v'},
-        {"use-ntp", no_argument, nullptr, 'n'},       // Via: [Extended] Use NTP = True
-        {"repeat", no_argument, nullptr, 'r'},        // Global: config.loop_tx
-        {"offset", no_argument, nullptr, 'o'},        // Via: [Extended] Offset = True
-        {"journald", no_argument, nullptr, 'J'},      // Global: config.use_journald
-        {"date-time-log", no_argument, nullptr, 'D'}, // Global: config.date_time_log
+        {"use-ntp", no_argument, nullptr, 'n'},         // Via: [Extended] Use NTP = True
+        {"repeat", no_argument, nullptr, 'r'},          // Global: config.loop_tx
+        {"offset", no_argument, nullptr, 'o'},          // Via: [Extended] Offset = True
+        {"journald", no_argument, nullptr, 'J'},        // Global: config.use_journald
+        {"date-time-log", no_argument, nullptr, 'D'},   // Global: config.date_time_log
         {"require-paired", no_argument, nullptr, 1001}, // Global: config.wspr_planner_preference
         {"qrss-message", required_argument, nullptr, 1003},
         {"qrss-frequency", required_argument, nullptr, 1004},

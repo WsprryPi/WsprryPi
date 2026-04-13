@@ -111,6 +111,7 @@ VER := $(shell if ! git describe --tags --exact-match >/dev/null 2>&1; then echo
 OUT := $(strip $(EXE_NAME))
 TEST_OUT := $(strip $(EXE_NAME)_debug)
 SEMANTICS_TEST_OUT := dial_frequency_semantics_test
+BAND_GPIO_ROTATION_TEST_OUT := band_gpio_rotation_test
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Output directories
@@ -137,6 +138,9 @@ MAIN_DEBUG_OBJECT := $(OBJ_DIR_DEBUG)/./main.o
 SEMANTICS_TEST_SRC := tests/dial_frequency_semantics_test.cpp
 SEMANTICS_TEST_OBJ := $(OBJ_DIR_DEBUG)/tests/dial_frequency_semantics_test.o
 SEMANTICS_TEST_DEPS := $(filter-out $(MAIN_DEBUG_OBJECT),$(CPP_DEBUG_OBJECTS))
+BAND_GPIO_ROTATION_TEST_SRC := tests/band_gpio_rotation_test.cpp
+BAND_GPIO_ROTATION_TEST_OBJ := $(OBJ_DIR_DEBUG)/tests/band_gpio_rotation_test.o
+BAND_GPIO_ROTATION_TEST_DEPS := $(filter-out $(MAIN_DEBUG_OBJECT),$(CPP_DEBUG_OBJECTS))
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Dependency includes
@@ -324,6 +328,17 @@ $(BIN_DIR)/$(SEMANTICS_TEST_OUT): $(SEMANTICS_TEST_OBJ) $(SEMANTICS_TEST_DEPS)
 	$(Q)echo "Linking debug: $(SEMANTICS_TEST_OUT)"
 	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) $^ -o $@ $(LDFLAGS)
 
+$(BAND_GPIO_ROTATION_TEST_OBJ): $(BAND_GPIO_ROTATION_TEST_SRC)
+	$(Q)mkdir -p $(dir $@)
+	$(Q)mkdir -p $(DEP_DIR)/tests
+	$(Q)echo "Compiling (debug) $< into $@"
+	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -MF $(DEP_DIR)/tests/band_gpio_rotation_test.d -c $< -o $@
+
+$(BIN_DIR)/$(BAND_GPIO_ROTATION_TEST_OUT): $(BAND_GPIO_ROTATION_TEST_OBJ) $(BAND_GPIO_ROTATION_TEST_DEPS)
+	$(Q)mkdir -p $(BIN_DIR)
+	$(Q)echo "Linking debug: $(BAND_GPIO_ROTATION_TEST_OUT)"
+	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) $^ -o $@ $(LDFLAGS)
+
 # ─────────────────────────────────────────────────────────────────────────────
 # Compile rules (release)
 # ─────────────────────────────────────────────────────────────────────────────
@@ -383,6 +398,10 @@ test-oneshot: debug
 semantics-test: $(BIN_DIR)/$(SEMANTICS_TEST_OUT)
 	$(Q)echo "Running dial/actual frequency semantics tests."
 	$(Q)./$(BIN_DIR)/$(SEMANTICS_TEST_OUT)
+
+band-gpio-rotation-test: $(BIN_DIR)/$(BAND_GPIO_ROTATION_TEST_OUT)
+	$(Q)echo "Running band GPIO rotation regression tests."
+	$(Q)./$(BIN_DIR)/$(BAND_GPIO_ROTATION_TEST_OUT)
 
 gdb: debug
 	$(Q)echo "Running debug session."
