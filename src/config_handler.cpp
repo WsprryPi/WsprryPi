@@ -1431,6 +1431,19 @@ void patch_all_from_web(const nlohmann::json &j)
             throw ConfigValidationError(error_message, error_details);
         }
 
+        const auto band_gpio_section_it = candidate_json.find("Band GPIO");
+        if (band_gpio_section_it != candidate_json.end() &&
+            band_gpio_section_it->is_object())
+        {
+            for (WsprFrequencyEntry &entry : candidate_config.wspr_frequency_entries)
+            {
+                if (entry.selector_gpio == kSelectorGpioUnset)
+                {
+                    entry.allow_band_gpio_fallback = true;
+                }
+            }
+        }
+
         config_to_json_impl(candidate_config, candidate_json);
     }
     catch (const ConfigValidationError &)
