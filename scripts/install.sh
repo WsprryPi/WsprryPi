@@ -39,7 +39,7 @@ IFS=$'\n\t'
 # sudo ./install.sh debug
 # sudo DRY_RUN=true ./install.sh debug
 # sudo ACTION=uninstall ./install.sh
-# REPO_BRANCH=dev ./install.sh --release
+# REPO_BRANCH=dev ./install.sh --debug
 # curl -fsSL {url} | sudo bash
 # curl -fsSL {url} | sudo bash -s -- debug
 # curl -fsSL {url} | sudo env DRY_RUN=true bash -s -- debug
@@ -245,8 +245,8 @@ readonly GIT_DIRS="${GIT_DIRS:-("config" "WsprryPi-UI/data" "executables" "syste
 # @brief Controls whether non-main branches build as release.
 # @details When set to `"true"`, branches other than `main` or `master`
 #          build as release and use the standard executable name. When set to
-#          `"false"`, non-main branches build as debug and use the `_debug`
-#          executable suffix.
+#          `"false"`, non-main branches follow the default build policy unless
+#          overridden explicitly.
 #
 # @var BUILD_TYPE_OVERRIDE
 # @brief Optional explicit build type override.
@@ -255,8 +255,7 @@ readonly GIT_DIRS="${GIT_DIRS:-("config" "WsprryPi-UI/data" "executables" "syste
 #
 # @var WSPR_BUILD_TYPE
 # @brief The resolved build type for WsprryPi.
-# @details This value is derived from `BUILD_TYPE_OVERRIDE`, `REPO_BRANCH`,
-#          and `NON_MAIN_AS_RELEASE`.
+# @details This value is resolved by `resolve_build_settings()`.
 #
 # @var WSPR_EXE
 # @brief The executable name for WsprryPi.
@@ -278,9 +277,9 @@ readonly WSPR_INI="wsprrypi.ini"
 
 # -----------------------------------------------------------------------------
 # @brief Resolve the effective build type and executable name.
-# @details Applies `BUILD_TYPE_OVERRIDE` first. Otherwise, `main` and `master`
-#          default to release builds. Non-main branches default to debug unless
-#          `NON_MAIN_AS_RELEASE=true` is set.
+# @details Applies `BUILD_TYPE_OVERRIDE` first. Otherwise, defaults to release
+#          builds. Non-main branch behavior may still be controlled with
+#          `NON_MAIN_AS_RELEASE` if desired.
 #
 # @global BUILD_TYPE_OVERRIDE Optional explicit build override.
 # @global NON_MAIN_AS_RELEASE Whether non-main branches should build as release.
@@ -302,13 +301,24 @@ resolve_build_settings() {
     branch="${REPO_BRANCH:-main}"
     build_type="${BUILD_TYPE_OVERRIDE^^}"
 
-    if [[ -z "${build_type}" ]]; then
-        if [[ "${branch}" == "main" || "${branch}" == "master" ]]; then
-            build_type="RELEASE"
-        elif [[ "${NON_MAIN_AS_RELEASE}" == "true" ]]; then
-            build_type="RELEASE"
-        else
-            build_type="DEBUG"
+    if [[ -n "${build_type}" ]]; then
+        case "${build_type}" in
+            DEBUG|RELEASE)
+                ;;
+            *)
+                printf "%s\n" \
+                    "Error: BUILD_TYPE_OVERRIDE must be DEBUG or RELEASE." >&2
+                debug_end "$debug"
+                return 1
+                ;;
+        esac
+    else
+        build_type="RELEASE"
+
+        if [[ "${branch}" != "main" && "${branch}" != "master" ]]; then
+            if [[ "${NON_MAIN_AS_RELEASE}" != "true" ]]; then
+                build_type="RELEASE"
+            fi
         fi
     fi
 
@@ -323,7 +333,6 @@ resolve_build_settings() {
     debug_end "$debug"
     return 0
 }
-
 
 # -----------------------------------------------------------------------------
 # @var USER_HOME
