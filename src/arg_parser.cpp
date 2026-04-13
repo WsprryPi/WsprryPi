@@ -1290,6 +1290,16 @@ bool validate_config_candidate(
 
             return false;
         }
+
+        if (candidate.use_ini && candidate.si5351_tx_output != 0)
+        {
+            llog.logS(
+                WARN,
+                "App-managed Si5351 operation uses CLK0 for transmission; configured TX output CLK",
+                candidate.si5351_tx_output,
+                " normalized to CLK0.");
+            candidate.si5351_tx_output = 0;
+        }
     }
 
     if (candidate.mode == ModeType::TONE)
