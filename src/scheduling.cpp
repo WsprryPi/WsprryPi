@@ -99,6 +99,13 @@ struct BandGPIOResolution
     const char *selector_source = "none";
 };
 
+enum class BandGPIOPrepareStatus
+{
+    Inactive,
+    Prepared,
+    Failed
+};
+
 namespace
 {
     std::string get_active_gpio_suffix()
@@ -116,7 +123,7 @@ namespace
     }
 }
 
-static bool prepare_band_gpio_for_frequency_or_log(
+static BandGPIOPrepareStatus prepare_band_gpio_for_frequency_or_log(
     double source_frequency_hz,
     const WsprFrequencyEntry &entry,
     const ArgParserConfig &cfg,
@@ -230,6 +237,8 @@ std::atomic<bool> shutdown_after_wspr_plan{false};
 static bool managed_reload_tx_inhibited = false;
 static bool suppress_scheduler_execution_for_test = false;
 static std::atomic<std::uint64_t> non_wspr_schedule_generation{0};
+static std::atomic<BandGPIOPrepareStatus> active_band_gpio_prepare_status{
+    BandGPIOPrepareStatus::Inactive};
 /**
  * @brief Scheduler-owned paired WSPR plan being continued across slots.
  *
@@ -258,6 +267,9 @@ static void stop_active_transmission_selectors() noexcept
         bandGPIOSelector.setBandState(false);
     }
     bandGPIOSelector.stop();
+    active_band_gpio_prepare_status.store(
+        BandGPIOPrepareStatus::Inactive,
+        std::memory_order_release);
 }
 
 static wsprrypi::BackendKind to_controller_backend(
@@ -696,7 +708,7 @@ void consume_tx_iteration_if_needed()
     }
 }
 
-static bool prepare_band_gpio_for_frequency_or_log(
+static BandGPIOPrepareStatus prepare_band_gpio_for_frequency_or_log(
     double source_frequency_hz,
     const WsprFrequencyEntry &entry,
     const ArgParserConfig &cfg,
@@ -710,7 +722,10 @@ static bool prepare_band_gpio_for_frequency_or_log(
             "Unable to map source frequency ",
             lookup.freq_display_string(source_frequency_hz),
             " to a ham band for band-selector GPIO preparation.");
-        return false;
+        active_band_gpio_prepare_status.store(
+            BandGPIOPrepareStatus::Failed,
+            std::memory_order_release);
+        return BandGPIOPrepareStatus::Failed;
     }
 
     BandGPIOResolution resolution;
@@ -750,7 +765,7 @@ static bool prepare_band_gpio_for_frequency_or_log(
                 "; no configured band GPIO for band ",
                 ham_band_to_string(*band),
                 "; leaving LPF selection inactive.");
-            return true;
+            return BandGPIOPrepareStatus::Inactive;
         }
     }
     else
@@ -772,7 +787,7 @@ static bool prepare_band_gpio_for_frequency_or_log(
             "No selector GPIO requested for frequency entry ",
             entry.token,
             "; leaving LPF selection inactive.");
-        return true;
+        return BandGPIOPrepareStatus::Inactive;
     }
 
     llog.logS(
@@ -806,10 +821,16 @@ static bool prepare_band_gpio_for_frequency_or_log(
             "Unable to prepare unified scheduler band GPIO for ",
             wsprTransmitter.formatFrequencyMHz(source_frequency_hz),
             " MHz.");
-        return false;
+        active_band_gpio_prepare_status.store(
+            BandGPIOPrepareStatus::Failed,
+            std::memory_order_release);
+        return BandGPIOPrepareStatus::Failed;
     }
 
-    return true;
+    active_band_gpio_prepare_status.store(
+        BandGPIOPrepareStatus::Prepared,
+        std::memory_order_release);
+    return BandGPIOPrepareStatus::Prepared;
 }
 
 static double maybe_apply_wspr_random_offset(
@@ -1513,8 +1534,10 @@ void transmitter_cb(WsprTransmitter::TransmissionCallbackEvent event,
             consume_tx_iteration_if_needed();
         }
 
-        // Assert the scheduler-selected band GPIO.
-        if (!bandGPIOSelector.setBandState(true))
+        // Assert the scheduler-selected band GPIO when one was prepared.
+        if (active_band_gpio_prepare_status.load(std::memory_order_acquire) ==
+                BandGPIOPrepareStatus::Prepared &&
+            !bandGPIOSelector.setBandState(true))
         {
             llog.logS(DEBUG,
                       "Band GPIO assert request was issued but did not complete.");
@@ -3037,11 +3060,11 @@ bool set_config(bool force)
 
             next_transmission_request.applied_offset_hz = applied_offset_hz;
 
-            if (!prepare_band_gpio_for_frequency_or_log(
+            if (prepare_band_gpio_for_frequency_or_log(
                     next_current_dial_frequency,
                     next_current_frequency_entry,
                     working_config,
-                    next_frequency_entry_index))
+                    next_frequency_entry_index) == BandGPIOPrepareStatus::Failed)
             {
                 stop_active_transmission_selectors();
 
