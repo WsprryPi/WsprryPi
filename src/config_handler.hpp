@@ -50,6 +50,10 @@ inline constexpr int kDefaultTransmitGpio = 4;
 inline constexpr std::array<int, 2> kSupportedTransmitGpio = {4, 20};
 inline constexpr int kSelectorGpioUnset = -1;
 inline constexpr double WSPR_AUDIO_OFFSET_HZ = 1500.0;
+inline constexpr int kDefaultSi5351I2cBus = 1;
+inline constexpr int kDefaultSi5351I2cAddress = 0x60;
+inline constexpr int kDefaultSi5351ReferenceHz = 27000000;
+inline constexpr int kDefaultSi5351TxOutput = 0;
 
 inline constexpr bool is_supported_transmit_gpio(int gpio) noexcept
 {
@@ -231,8 +235,12 @@ struct ArgParserConfig
     double ppm;      ///< PPM frequency calibration.
     bool use_ntp;    ///< Apply NTP-based frequency correction.
     bool use_offset; ///< Enable WSPR random frequency offset.
-    int power_level; ///< Power level for RF hardware (0–7).
+    int power_level; ///< Power level for RF hardware (GPIO 0-7, Si5351 1-4).
     TransmitBackendKind transmit_backend; ///< RF hardware backend.
+    int si5351_i2c_bus; ///< Si5351 I2C bus number.
+    int si5351_i2c_address; ///< Si5351 I2C slave address.
+    int si5351_reference_hz; ///< Si5351 reference frequency in Hz.
+    int si5351_tx_output; ///< Si5351 output clock index (0=CLK0).
     bool use_led;    ///< Enable TX LED indicator.
     int led_pin;     ///< GPIO pin for LED indicator.
 
@@ -283,6 +291,10 @@ struct ArgParserConfig
           use_offset(false),
           power_level(7),
           transmit_backend(TransmitBackendKind::GPIO),
+          si5351_i2c_bus(kDefaultSi5351I2cBus),
+          si5351_i2c_address(kDefaultSi5351I2cAddress),
+          si5351_reference_hz(kDefaultSi5351ReferenceHz),
+          si5351_tx_output(kDefaultSi5351TxOutput),
           use_led(false),
           led_pin(-1),
           web_port(-1),
@@ -337,6 +349,10 @@ struct ArgParserConfig
         use_offset = other.use_offset;
         power_level = other.power_level;
         transmit_backend = other.transmit_backend;
+        si5351_i2c_bus = other.si5351_i2c_bus;
+        si5351_i2c_address = other.si5351_i2c_address;
+        si5351_reference_hz = other.si5351_reference_hz;
+        si5351_tx_output = other.si5351_tx_output;
         use_led = other.use_led;
         led_pin = other.led_pin;
         web_port = other.web_port;

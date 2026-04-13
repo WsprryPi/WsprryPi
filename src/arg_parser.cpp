@@ -485,6 +485,45 @@ static TransmitBackendKind parse_transmit_backend_option(
         "Invalid backend. Expected 'gpio' or 'si5351'.");
 }
 
+static int parse_integer_option(
+    const char *raw_value,
+    const std::string &option_name,
+    int base = 10)
+{
+    std::size_t consumed = 0;
+    const std::string value(raw_value == nullptr ? "" : raw_value);
+    const int parsed = std::stoi(value, &consumed, base);
+    if (consumed != value.size())
+    {
+        throw std::invalid_argument(option_name + " must be an integer.");
+    }
+
+    return parsed;
+}
+
+static int parse_si5351_tx_output_option(const char *raw_value)
+{
+    std::string value = trim_copy_string(raw_value == nullptr ? "" : raw_value);
+    std::transform(
+        value.begin(),
+        value.end(),
+        value.begin(),
+        [](unsigned char c)
+        {
+            return static_cast<char>(std::tolower(c));
+        });
+
+    if (value == "clk0" || value == "0")
+        return 0;
+    if (value == "clk1" || value == "1")
+        return 1;
+    if (value == "clk2" || value == "2")
+        return 2;
+
+    throw std::invalid_argument(
+        "Invalid Si5351 TX output. Expected CLK0, CLK1, CLK2, 0, 1, or 2.");
+}
+
 static bool parse_gpio_number_strict(
     std::string_view raw_value,
     int &gpio_out) noexcept
@@ -1015,6 +1054,16 @@ void print_usage(const std::string &message, int exit_code)
               << "    Select the RF transmit GPIO (supported: 4 or 20).\n\n"
               << "  --backend <gpio|si5351>\n"
               << "    Select the RF transmit backend. Default: gpio.\n\n"
+              << "  --power-level <level>\n"
+              << "    Select RF power level. GPIO accepts 0-7; Si5351 accepts 1-4.\n\n"
+              << "  --si5351-i2c-bus <bus>\n"
+              << "    Select the Si5351 I2C bus when --backend si5351 is used. Default: 1.\n"
+              << "  --si5351-i2c-address <addr>\n"
+              << "    Select the Si5351 I2C address when --backend si5351 is used. Default: 0x60.\n"
+              << "  --si5351-reference-frequency <hz>\n"
+              << "    Select the Si5351 reference frequency when --backend si5351 is used. Default: 27000000.\n"
+              << "  --si5351-tx-output <CLK0|CLK1|CLK2>\n"
+              << "    Select the Si5351 transmit output when --backend si5351 is used. Default: CLK0.\n\n"
               << "See the documentation for a complete list of available options.\n\n";
 
     // Handle exit behavior
@@ -1057,6 +1106,18 @@ void show_config_values(bool reload)
     llog.logS(DEBUG, "Transmit Backend:",
               transmit_backend_kind_to_string(config.transmit_backend));
     llog.logS(DEBUG, "Transmit Pin:", config.tx_pin);
+    if (config.transmit_backend == TransmitBackendKind::SI5351)
+    {
+        std::ostringstream address;
+        address << "0x" << std::hex << std::uppercase
+                << config.si5351_i2c_address;
+        llog.logS(DEBUG, "Si5351 I2C Bus:", config.si5351_i2c_bus);
+        llog.logS(DEBUG, "Si5351 I2C Address:", address.str());
+        llog.logS(DEBUG, "Si5351 Reference Frequency Hz:",
+                  config.si5351_reference_hz);
+        llog.logS(DEBUG, "Si5351 TX Output:",
+                  std::string("CLK") + std::to_string(config.si5351_tx_output));
+    }
     // [Extended]
     llog.logS(DEBUG, "PPM Offset:", config.ppm);
     llog.logS(DEBUG, "Synchronize with NTP:", config.use_ntp ? "true" : "false");
@@ -1146,16 +1207,64 @@ bool validate_config_candidate(
     }
 
     if (candidate.transmit_backend == TransmitBackendKind::SI5351 &&
-        (candidate.mode == ModeType::TONE || candidate.transmit) &&
-        (candidate.power_level < 1 || candidate.power_level > 4))
+        (candidate.mode == ModeType::TONE || candidate.transmit))
     {
-        if (error_message != nullptr)
+        if (candidate.si5351_i2c_bus < 0)
         {
-            *error_message =
-                "Invalid Si5351 power level. Expected 1 through 4.";
+            if (error_message != nullptr)
+            {
+                *error_message =
+                    "Invalid Si5351 I2C bus. Expected a non-negative bus number.";
+            }
+
+            return false;
         }
 
-        return false;
+        if (candidate.si5351_i2c_address < 0x03 ||
+            candidate.si5351_i2c_address > 0x77)
+        {
+            if (error_message != nullptr)
+            {
+                *error_message =
+                    "Invalid Si5351 I2C address. Expected 0x03 through 0x77.";
+            }
+
+            return false;
+        }
+
+        if (candidate.si5351_reference_hz <= 0)
+        {
+            if (error_message != nullptr)
+            {
+                *error_message =
+                    "Invalid Si5351 reference frequency. Expected a positive frequency in Hz.";
+            }
+
+            return false;
+        }
+
+        if (candidate.si5351_tx_output < 0 ||
+            candidate.si5351_tx_output > 2)
+        {
+            if (error_message != nullptr)
+            {
+                *error_message =
+                    "Invalid Si5351 TX output. Expected CLK0, CLK1, CLK2, 0, 1, or 2.";
+            }
+
+            return false;
+        }
+
+        if (candidate.power_level < 1 || candidate.power_level > 4)
+        {
+            if (error_message != nullptr)
+            {
+                *error_message =
+                    "Invalid Si5351 power level. Expected 1 through 4.";
+            }
+
+            return false;
+        }
     }
 
     if (candidate.mode == ModeType::TONE)
@@ -1291,11 +1400,32 @@ void apply_runtime_config_side_effects()
         config.transmit_backend == TransmitBackendKind::SI5351
             ? wsprrypi::BackendKind::SI5351
             : wsprrypi::BackendKind::RPI_CLOCK_GPIO;
-    wsprTransmitter.selectBackend(backend_kind);
+    WsprTransmitter::Si5351RuntimeConfig si5351_config;
+    si5351_config.i2c_bus = config.si5351_i2c_bus;
+    si5351_config.i2c_address = config.si5351_i2c_address;
+    si5351_config.reference_hz = config.si5351_reference_hz;
+    si5351_config.tx_output = config.si5351_tx_output;
+    si5351_config.power_level = config.power_level;
+    wsprTransmitter.selectBackend(backend_kind, si5351_config);
 
     llog.logS(INFO, "Transmit backend:",
               transmit_backend_kind_to_string(config.transmit_backend));
-    llog.logS(INFO, "Transmit GPIO:", config.tx_pin);
+    if (config.transmit_backend == TransmitBackendKind::SI5351)
+    {
+        std::ostringstream address;
+        address << "0x" << std::hex << std::uppercase
+                << config.si5351_i2c_address;
+        llog.logS(INFO, "Si5351 I2C bus:", config.si5351_i2c_bus);
+        llog.logS(INFO, "Si5351 I2C address:", address.str());
+        llog.logS(INFO, "Si5351 reference frequency Hz:",
+                  config.si5351_reference_hz);
+        llog.logS(INFO, "Si5351 TX output:",
+                  std::string("CLK") + std::to_string(config.si5351_tx_output));
+    }
+    else
+    {
+        llog.logS(INFO, "Transmit GPIO:", config.tx_pin);
+    }
 
     if (!config.use_ntp && config.ppm != 0.0)
     {
@@ -1574,11 +1704,35 @@ bool validate_config_data()
             llog.logE(ERROR, " - ", transmit_gpio_validation_message());
         }
         if ((config.mode == ModeType::TONE || config.transmit) &&
-            config.transmit_backend == TransmitBackendKind::SI5351 &&
-            (config.power_level < 1 || config.power_level > 4))
+            config.transmit_backend == TransmitBackendKind::SI5351)
         {
-            llog.logE(ERROR,
-                      " - Invalid Si5351 power level. Expected 1 through 4.");
+            if (config.si5351_i2c_bus < 0)
+            {
+                llog.logE(ERROR,
+                          " - Invalid Si5351 I2C bus. Expected a non-negative bus number.");
+            }
+            if (config.si5351_i2c_address < 0x03 ||
+                config.si5351_i2c_address > 0x77)
+            {
+                llog.logE(ERROR,
+                          " - Invalid Si5351 I2C address. Expected 0x03 through 0x77.");
+            }
+            if (config.si5351_reference_hz <= 0)
+            {
+                llog.logE(ERROR,
+                          " - Invalid Si5351 reference frequency. Expected a positive frequency in Hz.");
+            }
+            if (config.si5351_tx_output < 0 ||
+                config.si5351_tx_output > 2)
+            {
+                llog.logE(ERROR,
+                          " - Invalid Si5351 TX output. Expected CLK0, CLK1, CLK2, 0, 1, or 2.");
+            }
+            if (config.power_level < 1 || config.power_level > 4)
+            {
+                llog.logE(ERROR,
+                          " - Invalid Si5351 power level. Expected 1 through 4.");
+            }
         }
 
         if (config.use_ini)
@@ -1963,6 +2117,14 @@ bool parse_command_line(int argc, char *argv[])
         {"dfcw-dot-frequency", required_argument, nullptr, 1011},
         {"dfcw-dash-frequency", required_argument, nullptr, 1012},
         {"dfcw-dot-seconds", required_argument, nullptr, 1013},
+        {"si5351-i2c-bus", required_argument, nullptr, 1014},
+        {"si5351-i2c-address", required_argument, nullptr, 1015},
+        {"si5351-reference-frequency", required_argument, nullptr, 1016},
+        {"si5351-tx-output", required_argument, nullptr, 1017},
+        {"si5351_i2c_bus", required_argument, nullptr, 1014},
+        {"si5351_i2c_address", required_argument, nullptr, 1015},
+        {"si5351_reference_frequency", required_argument, nullptr, 1016},
+        {"si5351_tx_output", required_argument, nullptr, 1017},
         // Required arguments
         {"ppm", required_argument, nullptr, 'p'},       // Via: [Extended] PPM = 0.0
         {"terminate", required_argument, nullptr, 'x'}, // Global: config.tx_iterations
@@ -1972,6 +2134,7 @@ bool parse_command_line(int argc, char *argv[])
         {"led_pin", required_argument, nullptr, 'l'},         // Via: [Extended] LED Pin = 18
         {"shutdown_button", required_argument, nullptr, 's'}, // Via: [Server] Shutdown Button = 19
         {"power_level", required_argument, nullptr, 'd'},     // Via: [Extended] Power Level = 7
+        {"power-level", required_argument, nullptr, 'd'},
         {"web-port", required_argument, nullptr, 'w'},        // Via: [Server] Port = 31415
         {"socket-port", required_argument, nullptr, 'k'},     // Via: [Server] Port = 31416
         {nullptr, 0, nullptr, 0}};
@@ -2057,6 +2220,58 @@ bool parse_command_line(int argc, char *argv[])
         case 1012:
         case 1013:
         {
+            break;
+        }
+        case 1014:
+        {
+            try
+            {
+                config.si5351_i2c_bus =
+                    parse_integer_option(optarg, "--si5351-i2c-bus");
+            }
+            catch (const std::exception &e)
+            {
+                print_usage(e.what(), EXIT_FAILURE);
+            }
+            break;
+        }
+        case 1015:
+        {
+            try
+            {
+                config.si5351_i2c_address =
+                    parse_integer_option(optarg, "--si5351-i2c-address", 0);
+            }
+            catch (const std::exception &e)
+            {
+                print_usage(e.what(), EXIT_FAILURE);
+            }
+            break;
+        }
+        case 1016:
+        {
+            try
+            {
+                config.si5351_reference_hz =
+                    parse_integer_option(optarg, "--si5351-reference-frequency");
+            }
+            catch (const std::exception &e)
+            {
+                print_usage(e.what(), EXIT_FAILURE);
+            }
+            break;
+        }
+        case 1017:
+        {
+            try
+            {
+                config.si5351_tx_output =
+                    parse_si5351_tx_output_option(optarg);
+            }
+            catch (const std::exception &e)
+            {
+                print_usage(e.what(), EXIT_FAILURE);
+            }
             break;
         }
         // Required arguments

@@ -38,6 +38,7 @@
 #include <cctype>
 #include <cstdlib>
 #include <iostream>
+#include <limits>
 #include <map>
 #include <stdexcept>
 #include <string>
@@ -110,6 +111,72 @@ namespace
             "Invalid Runtime.Transmit Backend. Expected 'gpio' or 'si5351'.");
     }
 
+    int parse_integer_config_value(
+        const nlohmann::json &source,
+        const std::string &context,
+        int base = 10)
+    {
+        if (source.is_number_integer())
+        {
+            return source.get<int>();
+        }
+
+        if (source.is_number_unsigned())
+        {
+            const auto value = source.get<unsigned int>();
+            if (value > static_cast<unsigned int>(std::numeric_limits<int>::max()))
+            {
+                throw std::runtime_error(context + " is out of range.");
+            }
+            return static_cast<int>(value);
+        }
+
+        if (source.is_string())
+        {
+            const std::string raw = trim_copy(source.get<std::string>());
+            std::size_t consumed = 0;
+            const int parsed = std::stoi(raw, &consumed, base);
+            if (consumed == raw.size())
+            {
+                return parsed;
+            }
+        }
+
+        throw std::runtime_error(context + " must be an integer.");
+    }
+
+    int parse_si5351_tx_output(const nlohmann::json &source)
+    {
+        if (source.is_number_integer() || source.is_number_unsigned())
+        {
+            return parse_integer_config_value(
+                source,
+                "Si5351.TX Output");
+        }
+
+        const std::string raw =
+            trim_copy(source.get<std::string>());
+        std::string lowered = raw;
+        std::transform(
+            lowered.begin(),
+            lowered.end(),
+            lowered.begin(),
+            [](unsigned char c)
+            {
+                return static_cast<char>(std::tolower(c));
+            });
+
+        if (lowered == "clk0" || lowered == "0")
+            return 0;
+        if (lowered == "clk1" || lowered == "1")
+            return 1;
+        if (lowered == "clk2" || lowered == "2")
+            return 2;
+
+        throw std::runtime_error(
+            "Invalid Si5351.TX Output. Expected CLK0, CLK1, CLK2, 0, 1, or 2.");
+    }
+
     ModeType parse_mode_type(const nlohmann::json &meta)
     {
         const std::string raw =
@@ -173,6 +240,7 @@ namespace
             {"Shutdown Button", source.at("Runtime").at("Shutdown Button")}};
 
         public_json["Calibration"] = source.at("Calibration");
+        public_json["Si5351"] = source.at("Si5351");
         public_json["WSPR"] = source.at("WSPR");
         public_json["CW"] = source.at("CW");
         public_json["Band GPIO"] = source.at("Band GPIO");
@@ -227,6 +295,8 @@ namespace
 
         if (public_json.contains("Calibration"))
             internal_json["Calibration"] = public_json.at("Calibration");
+        if (public_json.contains("Si5351"))
+            internal_json["Si5351"] = public_json.at("Si5351");
         if (public_json.contains("WSPR"))
             internal_json["WSPR"] = public_json.at("WSPR");
         if (public_json.contains("CW"))
@@ -513,6 +583,10 @@ void init_default_config()
     config.led_pin = 18;
     config.power_level = 7;
     config.transmit_backend = TransmitBackendKind::GPIO;
+    config.si5351_i2c_bus = kDefaultSi5351I2cBus;
+    config.si5351_i2c_address = kDefaultSi5351I2cAddress;
+    config.si5351_reference_hz = kDefaultSi5351ReferenceHz;
+    config.si5351_tx_output = kDefaultSi5351TxOutput;
 
     // CW
     config.modulation_dot_seconds = 3.0;
@@ -693,6 +767,11 @@ namespace
                (section == "Calibration" &&
                 (key == "PPM" ||
                  key == "Use NTP")) ||
+               (section == "Si5351" &&
+                (key == "I2C Bus" ||
+                 key == "I2C Address" ||
+                 key == "Reference Frequency" ||
+                 key == "TX Output")) ||
                (section == "CW" &&
                 (key == "Base Frequency" ||
                  key == "Shift Hz" ||
@@ -797,6 +876,12 @@ namespace
             {"PPM", 0.0},
             {"Use NTP", true}};
 
+        target["Si5351"] = {
+            {"I2C Bus", kDefaultSi5351I2cBus},
+            {"I2C Address", kDefaultSi5351I2cAddress},
+            {"Reference Frequency", kDefaultSi5351ReferenceHz},
+            {"TX Output", "CLK0"}};
+
         target["Band GPIO"] = nlohmann::json::object();
         target["WSPR"] = {
             {"Call Sign", "NXXX"},
@@ -859,6 +944,26 @@ namespace
         target.transmit_backend =
             parse_transmit_backend_kind(source.at("Runtime"));
         target.tx_pin = source.at("Runtime").at("Transmit Pin").get<int>();
+        const nlohmann::json si5351 =
+            source.contains("Si5351") ? source.at("Si5351") : nlohmann::json::object();
+        target.si5351_i2c_bus =
+            si5351.contains("I2C Bus")
+                ? parse_integer_config_value(si5351.at("I2C Bus"), "Si5351.I2C Bus")
+                : kDefaultSi5351I2cBus;
+        target.si5351_i2c_address =
+            si5351.contains("I2C Address")
+                ? parse_integer_config_value(si5351.at("I2C Address"), "Si5351.I2C Address", 0)
+                : kDefaultSi5351I2cAddress;
+        target.si5351_reference_hz =
+            si5351.contains("Reference Frequency")
+                ? parse_integer_config_value(
+                      si5351.at("Reference Frequency"),
+                      "Si5351.Reference Frequency")
+                : kDefaultSi5351ReferenceHz;
+        target.si5351_tx_output =
+            si5351.contains("TX Output")
+                ? parse_si5351_tx_output(si5351.at("TX Output"))
+                : kDefaultSi5351TxOutput;
         target.ppm = source.at("Calibration").at("PPM").get<double>();
         target.use_ntp = source.at("Calibration").at("Use NTP").get<bool>();
         target.use_offset = source.at("WSPR").at("Use Random Offset").get<bool>();
@@ -993,6 +1098,12 @@ namespace
         target["Calibration"]["PPM"] = source.ppm;
         target["Calibration"]["Use NTP"] = source.use_ntp;
 
+        target["Si5351"]["I2C Bus"] = source.si5351_i2c_bus;
+        target["Si5351"]["I2C Address"] = source.si5351_i2c_address;
+        target["Si5351"]["Reference Frequency"] = source.si5351_reference_hz;
+        target["Si5351"]["TX Output"] =
+            std::string("CLK") + std::to_string(source.si5351_tx_output);
+
         target["WSPR"]["Call Sign"] = source.wspr.callsign;
         target["WSPR"]["Grid Square"] = source.wspr.grid_square;
         target["WSPR"]["TX Power"] = source.wspr.power_dbm;
@@ -1047,6 +1158,10 @@ namespace
         target.use_offset = source.use_offset;
         target.power_level = source.power_level;
         target.transmit_backend = source.transmit_backend;
+        target.si5351_i2c_bus = source.si5351_i2c_bus;
+        target.si5351_i2c_address = source.si5351_i2c_address;
+        target.si5351_reference_hz = source.si5351_reference_hz;
+        target.si5351_tx_output = source.si5351_tx_output;
         target.use_led = source.use_led;
         target.led_pin = source.led_pin;
         target.web_port = source.web_port;
@@ -1265,6 +1380,7 @@ void json_to_ini()
         if (section_name != "Meta" &&
             section_name != "Runtime" &&
             section_name != "Calibration" &&
+            section_name != "Si5351" &&
             section_name != "WSPR" &&
             section_name != "CW" &&
             section_name != "Band GPIO")
@@ -1318,6 +1434,11 @@ void json_to_ini()
                 (section_name == "Calibration" &&
                  (key == "PPM" ||
                   key == "Use NTP")) ||
+                (section_name == "Si5351" &&
+                 (key == "I2C Bus" ||
+                  key == "I2C Address" ||
+                  key == "Reference Frequency" ||
+                  key == "TX Output")) ||
                 (section_name == "WSPR" &&
                  (key == "Call Sign" ||
                   key == "Grid Square" ||
