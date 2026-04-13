@@ -230,8 +230,6 @@ namespace
         public_json["Runtime"] = {
             {"Transmit", source.at("Runtime").at("Transmit")},
             {"Transmit Backend", source.at("Runtime").at("Transmit Backend")},
-            {"Transmit Pin", source.at("Runtime").at("Transmit Pin")},
-            {"Power Level", source.at("Runtime").at("Power Level")},
             {"Use LED", source.at("Runtime").at("Use LED")},
             {"LED Pin", source.at("Runtime").at("LED Pin")},
             {"Web Port", source.at("Runtime").at("Web Port")},
@@ -239,6 +237,7 @@ namespace
             {"Use Shutdown", source.at("Runtime").at("Use Shutdown")},
             {"Shutdown Button", source.at("Runtime").at("Shutdown Button")}};
 
+        public_json["GPIO"] = source.at("GPIO");
         public_json["Calibration"] = source.at("Calibration");
         public_json["Si5351"] = source.at("Si5351");
         public_json["WSPR"] = source.at("WSPR");
@@ -275,10 +274,6 @@ namespace
                 internal_json["Runtime"]["Transmit"] = runtime.at("Transmit");
             if (runtime.contains("Transmit Backend"))
                 internal_json["Runtime"]["Transmit Backend"] = runtime.at("Transmit Backend");
-            if (runtime.contains("Transmit Pin"))
-                internal_json["Runtime"]["Transmit Pin"] = runtime.at("Transmit Pin");
-            if (runtime.contains("Power Level"))
-                internal_json["Runtime"]["Power Level"] = runtime.at("Power Level");
             if (runtime.contains("Use LED"))
                 internal_json["Runtime"]["Use LED"] = runtime.at("Use LED");
             if (runtime.contains("LED Pin"))
@@ -293,6 +288,8 @@ namespace
                 internal_json["Runtime"]["Shutdown Button"] = runtime.at("Shutdown Button");
         }
 
+        if (public_json.contains("GPIO"))
+            internal_json["GPIO"] = public_json.at("GPIO");
         if (public_json.contains("Calibration"))
             internal_json["Calibration"] = public_json.at("Calibration");
         if (public_json.contains("Si5351"))
@@ -566,7 +563,7 @@ void init_default_config()
 {
     // Runtime
     config.transmit = false;
-    config.tx_pin = kDefaultTransmitGpio;
+    config.transmit_backend = TransmitBackendKind::GPIO;
 
     // WSPR
     config.callsign = "NXXX";
@@ -577,15 +574,18 @@ void init_default_config()
 
     // Runtime
     config.ppm = 0.0;
-    config.use_ntp = true;
     config.use_offset = true;
     config.use_led = false;
     config.led_pin = 18;
-    config.power_level = 7;
-    config.transmit_backend = TransmitBackendKind::GPIO;
+    config.gpio_tx_pin = kDefaultTransmitGpio;
+    config.gpio_power_level = 7;
+    config.gpio_use_ntp = true;
     config.si5351_i2c_bus = kDefaultSi5351I2cBus;
     config.si5351_i2c_address = kDefaultSi5351I2cAddress;
+    config.si5351_reference_hz = kDefaultSi5351ReferenceHz;
     config.si5351_tx_output = kDefaultSi5351TxOutput;
+    config.si5351_power_level = 1;
+    resolve_backend_specific_config(config);
 
     config.modulation_fsk_offset_hz = 500.0;
     config.schedule_start_minute = 0;
@@ -611,6 +611,20 @@ void init_default_config()
     config.dfcw = DfcwModeConfig{};
 
     set_default_band_gpio_config(config.band_gpio);
+}
+
+void resolve_backend_specific_config(ArgParserConfig &config) noexcept
+{
+    config.tx_pin = config.gpio_tx_pin;
+    if (config.transmit_backend == TransmitBackendKind::SI5351)
+    {
+        config.power_level = config.si5351_power_level;
+        config.use_ntp = false;
+        return;
+    }
+
+    config.power_level = config.gpio_power_level;
+    config.use_ntp = config.gpio_use_ntp;
 }
 
 namespace
@@ -646,12 +660,12 @@ namespace
             catch (const std::exception &e)
             {
                 throw std::runtime_error(
-                    std::string("Invalid Meta WSPR dial frequency set: ") + e.what());
+                    std::string("Invalid WSPR.WSPR Dial Frequency Set: ") + e.what());
             }
         }
 
         throw std::runtime_error(
-            "Meta.WSPR Dial Frequency Set must be an array or JSON array string");
+            "WSPR.WSPR Dial Frequency Set must be an array or JSON array string");
     }
 
     nlohmann::json parse_ini_value(const std::string &raw_value)
@@ -745,14 +759,16 @@ namespace
         return (section == "Runtime" &&
                 (key == "Transmit" ||
                  key == "Transmit Backend" ||
-                 key == "Transmit Pin" ||
                  key == "Use LED" ||
                  key == "LED Pin" ||
-                 key == "Power Level" ||
                  key == "Web Port" ||
                  key == "Socket Port" ||
                  key == "Use Shutdown" ||
                  key == "Shutdown Button")) ||
+               (section == "GPIO" &&
+                (key == "Transmit Pin" ||
+                 key == "Power Level" ||
+                 key == "Use NTP")) ||
                (section == "WSPR" &&
                 (key == "Call Sign" ||
                  key == "Grid Square" ||
@@ -762,13 +778,13 @@ namespace
                  key == "Use Random Offset")) ||
                (section == "Meta" && key == "Mode") ||
                (section == "Calibration" &&
-                (key == "PPM" ||
-                 key == "Use NTP")) ||
+                key == "PPM") ||
                (section == "Si5351" &&
                 (key == "I2C Bus" ||
                  key == "I2C Address" ||
                  key == "Reference Frequency" ||
-                 key == "TX Output")) ||
+                 key == "TX Output" ||
+                 key == "Power Level")) ||
                (section == "CW" &&
                 (key == "Base Frequency" ||
                  key == "Shift Hz" ||
@@ -855,29 +871,30 @@ namespace
             {"Date Time Log", false},
             {"Loop TX", false},
             {"TX Iterations", 0}};
-        target["Meta"]["WSPR Dial Frequency Set"] = nlohmann::json::array();
-
         target["Runtime"] = {
             {"Transmit", false},
             {"Transmit Backend", "gpio"},
-            {"Transmit Pin", kDefaultTransmitGpio},
             {"LED Pin", 18},
             {"Use LED", false},
-            {"Power Level", 7},
             {"Web Port", 31415},
             {"Socket Port", 31416},
             {"Use Shutdown", false},
             {"Shutdown Button", 19}};
 
-        target["Calibration"] = {
-            {"PPM", 0.0},
+        target["GPIO"] = {
+            {"Transmit Pin", kDefaultTransmitGpio},
+            {"Power Level", 7},
             {"Use NTP", true}};
+
+        target["Calibration"] = {
+            {"PPM", 0.0}};
 
         target["Si5351"] = {
             {"I2C Bus", kDefaultSi5351I2cBus},
             {"I2C Address", kDefaultSi5351I2cAddress},
             {"Reference Frequency", kDefaultSi5351ReferenceHz},
-            {"TX Output", "CLK0"}};
+            {"TX Output", "CLK0"},
+            {"Power Level", 1}};
 
         target["Band GPIO"] = nlohmann::json::object();
         target["WSPR"] = {
@@ -886,7 +903,8 @@ namespace
             {"TX Power", 20},
             {"Frequency", "20m"},
             {"Planner Preference", "auto"},
-            {"Use Random Offset", true}};
+            {"Use Random Offset", true},
+            {"WSPR Dial Frequency Set", nlohmann::json::array()}};
         target["CW"] = {
             {"Message", ""},
             {"Base Frequency", 3572000.0},
@@ -918,19 +936,12 @@ namespace
             parse_wspr_planner_preference(source.at("WSPR"));
         target.loop_tx = source.at("Meta").at("Loop TX").get<bool>();
         target.tx_iterations.store(source.at("Meta").at("TX Iterations").get<int>());
-        const auto &meta = source.at("Meta");
-        if (meta.contains("WSPR Dial Frequency Set") &&
-            !meta.at("WSPR Dial Frequency Set").empty())
+        const auto &wspr = source.at("WSPR");
+        if (wspr.contains("WSPR Dial Frequency Set") &&
+            !wspr.at("WSPR Dial Frequency Set").empty())
         {
             target.wspr_dial_freq_set =
-                parse_wspr_dial_frequency_set(meta.at("WSPR Dial Frequency Set"));
-        }
-        else if (
-            meta.contains("Center Frequency Set") &&
-            !meta.at("Center Frequency Set").empty())
-        {
-            target.wspr_dial_freq_set =
-                parse_wspr_dial_frequency_set(meta.at("Center Frequency Set"));
+                parse_wspr_dial_frequency_set(wspr.at("WSPR Dial Frequency Set"));
         }
         else
         {
@@ -940,7 +951,20 @@ namespace
         target.transmit = source.at("Runtime").at("Transmit").get<bool>();
         target.transmit_backend =
             parse_transmit_backend_kind(source.at("Runtime"));
-        target.tx_pin = source.at("Runtime").at("Transmit Pin").get<int>();
+        const nlohmann::json gpio =
+            source.contains("GPIO") ? source.at("GPIO") : nlohmann::json::object();
+        target.gpio_tx_pin =
+            gpio.contains("Transmit Pin")
+                ? gpio.at("Transmit Pin").get<int>()
+                : kDefaultTransmitGpio;
+        target.gpio_power_level =
+            gpio.contains("Power Level")
+                ? gpio.at("Power Level").get<int>()
+                : 7;
+        target.gpio_use_ntp =
+            gpio.contains("Use NTP")
+                ? gpio.at("Use NTP").get<bool>()
+                : true;
         const nlohmann::json si5351 =
             source.contains("Si5351") ? source.at("Si5351") : nlohmann::json::object();
         target.si5351_i2c_bus =
@@ -961,8 +985,12 @@ namespace
             si5351.contains("TX Output")
                 ? parse_si5351_tx_output(si5351.at("TX Output"))
                 : kDefaultSi5351TxOutput;
+        target.si5351_power_level =
+            si5351.contains("Power Level")
+                ? si5351.at("Power Level").get<int>()
+                : 1;
+        resolve_backend_specific_config(target);
         target.ppm = source.at("Calibration").at("PPM").get<double>();
-        target.use_ntp = source.at("Calibration").at("Use NTP").get<bool>();
         target.use_offset = source.at("WSPR").at("Use Random Offset").get<bool>();
         target.modulation_dot_seconds =
             source.contains("CW") &&
@@ -1025,7 +1053,6 @@ namespace
         target.wspr_planner_preference = target.wspr.planner_preference;
         target.use_led = source.at("Runtime").at("Use LED").get<bool>();
         target.led_pin = source.at("Runtime").at("LED Pin").get<int>();
-        target.power_level = source.at("Runtime").at("Power Level").get<int>();
 
         target.web_port = source.at("Runtime").at("Web Port").get<int>();
         target.socket_port = source.at("Runtime").at("Socket Port").get<int>();
@@ -1077,14 +1104,10 @@ namespace
         target["Meta"]["Date Time Log"] = source.date_time_log;
         target["Meta"]["Loop TX"] = source.loop_tx;
         target["Meta"]["TX Iterations"] = source.tx_iterations.load();
-        target["Meta"]["WSPR Dial Frequency Set"] = source.wspr_dial_freq_set;
-        target["Meta"]["Center Frequency Set"] = source.wspr_dial_freq_set;
 
         target["Runtime"]["Transmit"] = source.transmit;
         target["Runtime"]["Transmit Backend"] =
             transmit_backend_kind_to_string(source.transmit_backend);
-        target["Runtime"]["Transmit Pin"] = source.tx_pin;
-        target["Runtime"]["Power Level"] = source.power_level;
         target["Runtime"]["Use LED"] = source.use_led;
         target["Runtime"]["LED Pin"] = source.led_pin;
         target["Runtime"]["Web Port"] = source.web_port;
@@ -1092,14 +1115,18 @@ namespace
         target["Runtime"]["Use Shutdown"] = source.use_shutdown;
         target["Runtime"]["Shutdown Button"] = source.shutdown_pin;
 
+        target["GPIO"]["Transmit Pin"] = source.gpio_tx_pin;
+        target["GPIO"]["Power Level"] = source.gpio_power_level;
+        target["GPIO"]["Use NTP"] = source.gpio_use_ntp;
+
         target["Calibration"]["PPM"] = source.ppm;
-        target["Calibration"]["Use NTP"] = source.use_ntp;
 
         target["Si5351"]["I2C Bus"] = source.si5351_i2c_bus;
         target["Si5351"]["I2C Address"] = source.si5351_i2c_address;
         target["Si5351"]["Reference Frequency"] = source.si5351_reference_hz;
         target["Si5351"]["TX Output"] =
             std::string("CLK") + std::to_string(source.si5351_tx_output);
+        target["Si5351"]["Power Level"] = source.si5351_power_level;
 
         target["WSPR"]["Call Sign"] = source.wspr.callsign;
         target["WSPR"]["Grid Square"] = source.wspr.grid_square;
@@ -1108,6 +1135,7 @@ namespace
         target["WSPR"]["Planner Preference"] =
             wspr_planner_preference_to_string(source.wspr.planner_preference);
         target["WSPR"]["Use Random Offset"] = source.use_offset;
+        target["WSPR"]["WSPR Dial Frequency Set"] = source.wspr_dial_freq_set;
 
         std::string cw_message = source.qrss.message;
         double cw_base_frequency_hz = source.qrss.frequency_hz;
@@ -1155,9 +1183,14 @@ namespace
         target.use_offset = source.use_offset;
         target.power_level = source.power_level;
         target.transmit_backend = source.transmit_backend;
+        target.gpio_tx_pin = source.gpio_tx_pin;
+        target.gpio_power_level = source.gpio_power_level;
+        target.gpio_use_ntp = source.gpio_use_ntp;
         target.si5351_i2c_bus = source.si5351_i2c_bus;
         target.si5351_i2c_address = source.si5351_i2c_address;
         target.si5351_reference_hz = source.si5351_reference_hz;
+        target.si5351_tx_output = source.si5351_tx_output;
+        target.si5351_power_level = source.si5351_power_level;
         target.socket_port = source.socket_port;
         target.shutdown_pin = source.shutdown_pin;
         target.use_journald = source.use_journald;
@@ -1203,7 +1236,9 @@ namespace
             // pre-2.x legacy sections, are not imported or treated as fallbacks.
             if (section != "Meta" &&
                 section != "Runtime" &&
+                section != "GPIO" &&
                 section != "Calibration" &&
+                section != "Si5351" &&
                 section != "WSPR" &&
                 section != "CW")
             {
@@ -1371,6 +1406,7 @@ void json_to_ini()
 
         if (section_name != "Meta" &&
             section_name != "Runtime" &&
+            section_name != "GPIO" &&
             section_name != "Calibration" &&
             section_name != "Si5351" &&
             section_name != "WSPR" &&
@@ -1415,22 +1451,24 @@ void json_to_ini()
                 (section_name == "Runtime" &&
                  (key == "Transmit" ||
                   key == "Transmit Backend" ||
-                  key == "Transmit Pin" ||
                   key == "Use LED" ||
                   key == "LED Pin" ||
-                  key == "Power Level" ||
                   key == "Web Port" ||
                   key == "Socket Port" ||
                   key == "Use Shutdown" ||
                   key == "Shutdown Button")) ||
-                (section_name == "Calibration" &&
-                 (key == "PPM" ||
+                (section_name == "GPIO" &&
+                 (key == "Transmit Pin" ||
+                  key == "Power Level" ||
                   key == "Use NTP")) ||
+                (section_name == "Calibration" &&
+                 key == "PPM") ||
                 (section_name == "Si5351" &&
                  (key == "I2C Bus" ||
                   key == "I2C Address" ||
                   key == "Reference Frequency" ||
-                  key == "TX Output")) ||
+                  key == "TX Output" ||
+                  key == "Power Level")) ||
                 (section_name == "WSPR" &&
                  (key == "Call Sign" ||
                   key == "Grid Square" ||

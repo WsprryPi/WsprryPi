@@ -228,19 +228,23 @@ struct ArgParserConfig
     int power_dbm;           ///< Transmit power in dBm.
     std::string frequencies; ///< Space-separated user-facing WSPR dial frequency list.
 
-    // Runtime
-    int tx_pin; ///< GPIO pin number for RF transmit control.
+    // Resolved active backend values
+    int tx_pin; ///< Active GPIO pin number for RF transmit control.
 
     // Runtime
     double ppm;      ///< PPM frequency calibration.
-    bool use_ntp;    ///< Apply NTP-based frequency correction.
+    bool use_ntp;    ///< Active backend NTP correction setting.
     bool use_offset; ///< Enable WSPR random frequency offset.
-    int power_level; ///< Power level for RF hardware (GPIO 0-7, Si5351 1-4).
+    int power_level; ///< Active backend RF power level.
     TransmitBackendKind transmit_backend; ///< RF hardware backend.
+    int gpio_tx_pin; ///< GPIO backend transmit pin.
+    int gpio_power_level; ///< GPIO backend power level (0-7).
+    bool gpio_use_ntp; ///< GPIO backend NTP correction setting.
     int si5351_i2c_bus; ///< Si5351 I2C bus number.
     int si5351_i2c_address; ///< Si5351 I2C slave address.
     int si5351_reference_hz; ///< Si5351 reference frequency in Hz.
     int si5351_tx_output; ///< Si5351 output clock index (0=CLK0).
+    int si5351_power_level; ///< Si5351 drive-strength level (1-4).
     bool use_led;    ///< Enable TX LED indicator.
     int led_pin;     ///< GPIO pin for LED indicator.
 
@@ -291,10 +295,14 @@ struct ArgParserConfig
           use_offset(false),
           power_level(7),
           transmit_backend(TransmitBackendKind::GPIO),
+          gpio_tx_pin(kTransmitGpioUnset),
+          gpio_power_level(7),
+          gpio_use_ntp(false),
           si5351_i2c_bus(kDefaultSi5351I2cBus),
           si5351_i2c_address(kDefaultSi5351I2cAddress),
           si5351_reference_hz(kDefaultSi5351ReferenceHz),
           si5351_tx_output(kDefaultSi5351TxOutput),
+          si5351_power_level(1),
           use_led(false),
           led_pin(-1),
           web_port(-1),
@@ -349,10 +357,14 @@ struct ArgParserConfig
         use_offset = other.use_offset;
         power_level = other.power_level;
         transmit_backend = other.transmit_backend;
+        gpio_tx_pin = other.gpio_tx_pin;
+        gpio_power_level = other.gpio_power_level;
+        gpio_use_ntp = other.gpio_use_ntp;
         si5351_i2c_bus = other.si5351_i2c_bus;
         si5351_i2c_address = other.si5351_i2c_address;
         si5351_reference_hz = other.si5351_reference_hz;
         si5351_tx_output = other.si5351_tx_output;
+        si5351_power_level = other.si5351_power_level;
         use_led = other.use_led;
         led_pin = other.led_pin;
         web_port = other.web_port;
@@ -423,6 +435,7 @@ private:
 };
 
 void init_default_config();
+void resolve_backend_specific_config(ArgParserConfig &config) noexcept;
 
 /**
  * @brief Initializes the global configuration JSON object.
@@ -430,7 +443,7 @@ void init_default_config();
  * @details
  * This function sets up a default configuration structure in the global
  * nlohmann::json object, `jConfig`. The JSON object is organized into several
- * sections: "Meta", "Runtime", "Calibration", "WSPR", "CW", and
+ * sections: "Meta", "Runtime", "GPIO", "Si5351", "Calibration", "WSPR", "CW", and
  * "Band GPIO". Each section contains key/value
  * pairs that represent configuration parameters. In addition, the WSPR
  * dial-frequency list under "Meta" is explicitly initialized as an empty array.
@@ -470,18 +483,27 @@ void ini_to_json(std::string filename);
  *   },
  *   "Runtime": {
  *       "Transmit": false,
- *       "Transmit Pin": 4,
  *       "Use LED": false,
  *       "LED Pin": 18,
- *       "Power Level": 7,
  *       "Web Port": 31415,
  *       "Socket Port": 31416,
  *       "Use Shutdown": false,
  *       "Shutdown Button": 19
  *   },
- *   "Calibration": {
- *       "PPM": 0.0,
+ *   "GPIO": {
+ *       "Transmit Pin": 4,
+ *       "Power Level": 7,
  *       "Use NTP": true
+ *   },
+ *   "Si5351": {
+ *       "I2C Bus": 1,
+ *       "I2C Address": 96,
+ *       "Reference Frequency": 27000000,
+ *       "TX Output": "CLK0",
+ *       "Power Level": 1
+ *   },
+ *   "Calibration": {
+ *       "PPM": 0.0
  *   },
  *   "WSPR": {
  *       "Call Sign": "NXXX",

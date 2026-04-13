@@ -1221,7 +1221,7 @@ bool validate_config_candidate(
         (candidate.mode == ModeType::TONE || candidate.transmit);
 
     if (requires_valid_transmit_gpio &&
-        !is_valid_runtime_transmit_gpio(candidate.tx_pin))
+        !is_valid_runtime_transmit_gpio(candidate.gpio_tx_pin))
     {
         if (error_message != nullptr)
         {
@@ -1280,7 +1280,7 @@ bool validate_config_candidate(
             return false;
         }
 
-        if (candidate.power_level < 1 || candidate.power_level > 4)
+        if (candidate.si5351_power_level < 1 || candidate.si5351_power_level > 4)
         {
             if (error_message != nullptr)
             {
@@ -1290,6 +1290,18 @@ bool validate_config_candidate(
 
             return false;
         }
+    }
+    else if (candidate.transmit_backend == TransmitBackendKind::GPIO &&
+             (candidate.mode == ModeType::TONE || candidate.transmit) &&
+             (candidate.gpio_power_level < 0 || candidate.gpio_power_level > 7))
+    {
+        if (error_message != nullptr)
+        {
+            *error_message =
+                "Invalid GPIO power level. Expected 0 through 7.";
+        }
+
+        return false;
     }
 
     if (candidate.mode == ModeType::TONE)
@@ -1728,6 +1740,7 @@ void apply_runtime_config_side_effects()
 
 bool validate_config_data()
 {
+    resolve_backend_specific_config(config);
     sync_wspr_mode_config(config);
     ini_reload_pending.store(false, std::memory_order_relaxed);
 
@@ -1761,6 +1774,12 @@ bool validate_config_data()
             !is_valid_runtime_transmit_gpio(config.tx_pin))
         {
             llog.logE(ERROR, " - ", transmit_gpio_validation_message());
+        }
+        if ((config.mode == ModeType::TONE || config.transmit) &&
+            config.transmit_backend == TransmitBackendKind::GPIO &&
+            (config.gpio_power_level < 0 || config.gpio_power_level > 7))
+        {
+            llog.logE(ERROR, " - Invalid GPIO power level. Expected 0 through 7.");
         }
         if ((config.mode == ModeType::TONE || config.transmit) &&
             config.transmit_backend == TransmitBackendKind::SI5351)
@@ -2176,12 +2195,35 @@ bool parse_command_line(int argc, char *argv[])
     // Update argc and argv pointers for getopt_long()
     argc = args.size();
     argv = args.data();
+
+    for (int i = 1; i < argc; ++i)
+    {
+        const std::string arg = argv[i];
+        try
+        {
+            if (arg == "--backend" && i + 1 < argc)
+            {
+                config.transmit_backend =
+                    parse_transmit_backend_option(argv[i + 1]);
+            }
+            else if (arg.rfind("--backend=", 0) == 0)
+            {
+                config.transmit_backend =
+                    parse_transmit_backend_option(arg.substr(10));
+            }
+        }
+        catch (const std::exception &)
+        {
+        }
+    }
+    resolve_backend_specific_config(config);
+
     bool explicit_power_level = false;
 
     static struct option long_options[] = {
         {"help", no_argument, nullptr, 'h'},
         {"version", no_argument, nullptr, 'v'},
-        {"use-ntp", no_argument, nullptr, 'n'},         // Via: [Extended] Use NTP = True
+        {"use-ntp", no_argument, nullptr, 'n'},         // Via: [GPIO] Use NTP = True
         {"repeat", no_argument, nullptr, 'r'},          // Global: config.loop_tx
         {"offset", no_argument, nullptr, 'o'},          // Via: [Extended] Offset = True
         {"journald", no_argument, nullptr, 'J'},        // Global: config.use_journald
@@ -2211,11 +2253,11 @@ bool parse_command_line(int argc, char *argv[])
         {"ppm", required_argument, nullptr, 'p'},       // Via: [Extended] PPM = 0.0
         {"terminate", required_argument, nullptr, 'x'}, // Global: config.tx_iterations
         {"test-tone", required_argument, nullptr, 't'},
-        {"transmit-gpio", required_argument, nullptr, 'a'}, // Via: [Common] Transmit Pin = 4
+        {"transmit-gpio", required_argument, nullptr, 'a'}, // Via: [GPIO] Transmit Pin = 4
         {"transmit-pin", required_argument, nullptr, 'a'},
         {"led_pin", required_argument, nullptr, 'l'},         // Via: [Extended] LED Pin = 18
         {"shutdown_button", required_argument, nullptr, 's'}, // Via: [Server] Shutdown Button = 19
-        {"power_level", required_argument, nullptr, 'd'},     // Via: [Extended] Power Level = 7
+        {"power_level", required_argument, nullptr, 'd'},     // Via: [GPIO]/[Si5351] Power Level
         {"power-level", required_argument, nullptr, 'd'},
         {"web-port", required_argument, nullptr, 'w'},    // Via: [Server] Port = 31415
         {"socket-port", required_argument, nullptr, 'k'}, // Via: [Server] Port = 31416
@@ -2244,7 +2286,8 @@ bool parse_command_line(int argc, char *argv[])
         }
         case 'n': // Use NTP
         {
-            config.use_ntp = true;
+            config.gpio_use_ntp = true;
+            resolve_backend_specific_config(config);
             break;
         }
         case 'r': // Repeat
@@ -2281,8 +2324,9 @@ bool parse_command_line(int argc, char *argv[])
                 if (config.transmit_backend == TransmitBackendKind::SI5351 &&
                     !explicit_power_level)
                 {
-                    config.power_level = 1;
+                    config.si5351_power_level = 1;
                 }
+                resolve_backend_specific_config(config);
             }
             catch (const std::exception &e)
             {
@@ -2371,11 +2415,13 @@ bool parse_command_line(int argc, char *argv[])
 
                 // Apply the clamped value
                 config.ppm = clamped_ppm;
-                config.use_ntp = false;
+                config.gpio_use_ntp = false;
+                resolve_backend_specific_config(config);
             }
             catch (const std::exception &)
             {
-                config.use_ntp = true;
+                config.gpio_use_ntp = true;
+                resolve_backend_specific_config(config);
                 llog.logE(ERROR, "Error parsing PPM value, defaulting to NTP:", optarg);
             }
             break;
@@ -2433,7 +2479,8 @@ bool parse_command_line(int argc, char *argv[])
                     print_usage(transmit_gpio_validation_message(), EXIT_FAILURE);
                 }
 
-                config.tx_pin = transmit_pin;
+                config.gpio_tx_pin = transmit_pin;
+                resolve_backend_specific_config(config);
             }
             catch (const std::exception &)
             {
@@ -2490,20 +2537,41 @@ bool parse_command_line(int argc, char *argv[])
             try
             {
                 int power = std::stoi(optarg);
-                if (power < 0 or power > 7)
+                if (config.transmit_backend == TransmitBackendKind::SI5351)
                 {
-                    config.power_level = 7;
+                    if (power < 1 || power > 4)
+                    {
+                        config.si5351_power_level = 1;
+                    }
+                    else
+                    {
+                        config.si5351_power_level = power;
+                    }
+                }
+                else if (power < 0 or power > 7)
+                {
+                    config.gpio_power_level = 7;
                 }
                 else
                 {
-                    config.power_level = power;
+                    config.gpio_power_level = power;
                 }
+                resolve_backend_specific_config(config);
                 explicit_power_level = true;
             }
             catch (const std::exception &)
             {
-                llog.logE(WARN, "Invalid power level, defaulting to 7.");
-                config.power_level = 7;
+                if (config.transmit_backend == TransmitBackendKind::SI5351)
+                {
+                    llog.logE(WARN, "Invalid Si5351 power level, defaulting to 1.");
+                    config.si5351_power_level = 1;
+                }
+                else
+                {
+                    llog.logE(WARN, "Invalid GPIO power level, defaulting to 7.");
+                    config.gpio_power_level = 7;
+                }
+                resolve_backend_specific_config(config);
             }
             break;
         }
@@ -2799,6 +2867,8 @@ bool parse_command_line(int argc, char *argv[])
             sync_wspr_mode_config(config);
         }
     }
+    resolve_backend_specific_config(config);
+
     // Re-save any config changes in the JSON
     config_to_json();
 

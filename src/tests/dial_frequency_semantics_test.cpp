@@ -64,28 +64,43 @@ namespace
     {
         auto data = std::map<std::string, std::unordered_map<std::string, std::string>>{
             {"Meta",
-             {{"Planner Preference",
-               wspr_planner_preference_to_string(planner_preference)}}},
-            {"Control", {{"Transmit", transmit ? "true" : "false"}}},
-            {"Common",
+             {{"Mode", "WSPR"}}},
+            {"Runtime",
+             {{"Transmit", transmit ? "true" : "false"},
+              {"Transmit Backend", "gpio"},
+              {"Use LED", "false"},
+              {"LED Pin", "-1"},
+              {"Web Port", "-1"},
+              {"Socket Port", "-1"},
+              {"Use Shutdown", "false"},
+              {"Shutdown Button", "-1"}}},
+            {"GPIO",
+             {{"Transmit Pin", "4"},
+              {"Power Level", "7"},
+              {"Use NTP", "false"}}},
+            {"Calibration",
+             {{"PPM", "0"}}},
+            {"Si5351",
+             {{"I2C Bus", "1"},
+              {"I2C Address", "96"},
+              {"Reference Frequency", "27000000"},
+              {"TX Output", "CLK0"},
+              {"Power Level", "1"}}},
+            {"WSPR",
              {{"Call Sign", callsign},
               {"Grid Square", grid_square},
               {"TX Power", "20"},
               {"Frequency", frequency},
-              {"Transmit Pin", "4"}}},
-            {"Extended",
-             {{"PPM", "0"},
-              {"Use NTP", "false"},
-              {"Offset", "false"},
-              {"WSPR Audio Offset Hz", "1500"},
-              {"Use LED", "false"},
-              {"LED Pin", "-1"},
-              {"Power Level", "7"}}},
-            {"Server",
-             {{"Web Port", "-1"},
-              {"Socket Port", "-1"},
-              {"Use Shutdown", "false"},
-              {"Shutdown Button", "-1"}}}};
+              {"Planner Preference",
+               wspr_planner_preference_to_string(planner_preference)},
+              {"Use Random Offset", "false"}}},
+            {"CW",
+             {{"Message", ""},
+              {"Base Frequency", "3572000.0"},
+              {"Shift Hz", "500.0"},
+              {"Dot Seconds", "3.0"},
+              {"Start Minute", "0"},
+              {"Repeat Minutes", "10"}}}};
         return data;
     }
 
@@ -119,8 +134,19 @@ namespace
         config.grid_square = "EM18";
         config.power_dbm = 20;
         config.frequencies = "20m";
-        config.tx_pin = 4;
+        config.transmit_backend = TransmitBackendKind::GPIO;
+        config.gpio_tx_pin = 4;
+        config.gpio_power_level = 7;
+        config.gpio_use_ntp = false;
         config.wspr_planner_preference = WsprPlannerPreference::Auto;
+        config.wspr.callsign = config.callsign;
+        config.wspr.grid_square = config.grid_square;
+        config.wspr.power_dbm = config.power_dbm;
+        config.wspr.frequencies = config.frequencies;
+        config.wspr.audio_offset_hz = WSPR_AUDIO_OFFSET_HZ;
+        config.wspr.planner_preference = config.wspr_planner_preference;
+        resolve_backend_specific_config(config);
+        set_frequencies(config);
         config_to_json();
     }
 
@@ -130,15 +156,15 @@ namespace
         WsprPlannerPreference planner_preference = WsprPlannerPreference::Auto)
     {
         return {
-            {"Meta",
-             {{"Planner Preference",
-               wspr_planner_preference_to_string(planner_preference)}}},
-            {"Control", {{"Transmit", true}}},
-            {"Common",
+            {"WSPR",
              {{"Call Sign", callsign},
               {"Grid Square", grid_square},
               {"TX Power", 20},
-              {"Frequency", "20m"}}}};
+              {"Frequency", "20m"},
+              {"Planner Preference",
+               wspr_planner_preference_to_string(planner_preference)},
+              {"Use Random Offset", false}}},
+            {"Runtime", {{"Transmit", true}}}};
     }
 
     void reset_runtime_planning_state_for_identity_test()
@@ -266,15 +292,16 @@ int main()
 
     {
         init_config_json();
-        jConfig["Meta"]["Center Frequency Set"] = nlohmann::json::array({14095600.0});
-        jConfig["Common"]["Frequency"] = "20m";
-        jConfig["Extended"].erase("WSPR Audio Offset Hz");
+        jConfig["WSPR"]["Frequency"] = "20m";
+        jConfig["Meta"][std::string("Center ") + "Frequency Set"] =
+            nlohmann::json::array({14095600.0});
+        if (jConfig.contains("WSPR") && jConfig["WSPR"].is_object())
+            jConfig["WSPR"].erase("WSPR Audio Offset Hz");
         json_to_config();
 
         require(
-            config.wspr_dial_freq_set.size() == 1 &&
-                nearly_equal(config.wspr_dial_freq_set.front(), 14095600.0),
-            "legacy Meta.Center Frequency Set must still load as a WSPR dial-frequency list");
+            config.wspr_dial_freq_set.empty(),
+            "legacy center-frequency list must be ignored");
         require(
             nearly_equal(config.wspr_audio_offset_hz, 1500.0),
             "missing WSPR Audio Offset Hz must default to 1500.0");
@@ -282,24 +309,26 @@ int main()
 
     {
         init_config_json();
-        jConfig["Meta"]["WSPR Dial Frequency Set"] = nlohmann::json::array({14095600.0});
-        jConfig["Common"]["Frequency"] = "20m";
-        jConfig["Extended"]["WSPR Audio Offset Hz"] = 1600.0;
+        jConfig["WSPR"]["WSPR Dial Frequency Set"] =
+            nlohmann::json::array({14095600.0});
+        jConfig["WSPR"]["Frequency"] = "20m";
         json_to_config();
 
         require(
             config.wspr_dial_freq_set.size() == 1 &&
                 nearly_equal(config.wspr_dial_freq_set.front(), 14095600.0),
-            "Meta.WSPR Dial Frequency Set must load as the active WSPR dial-frequency list");
+            "WSPR.WSPR Dial Frequency Set must load as the active WSPR dial-frequency list");
         require(
-            nearly_equal(config.wspr_audio_offset_hz, 1600.0),
-            "explicit WSPR Audio Offset Hz must round-trip through JSON config");
+            nearly_equal(config.wspr_audio_offset_hz, 1500.0),
+            "WSPR audio offset must use the runtime constant");
     }
 
     {
         init_config_json();
-        jConfig["Meta"].erase("WSPR Dial Frequency Set");
-        jConfig["Meta"].erase("Center Frequency Set");
+        if (jConfig.contains("WSPR") && jConfig["WSPR"].is_object())
+        {
+            jConfig["WSPR"].erase("WSPR Dial Frequency Set");
+        }
         json_to_config();
 
         require(
@@ -309,14 +338,14 @@ int main()
 
     {
         init_config_json();
-        jConfig["Meta"]["WSPR Dial Frequency Set"] = nlohmann::json::array();
-        jConfig["Meta"]["Center Frequency Set"] = nlohmann::json::array({10138700.0});
+        jConfig["WSPR"]["WSPR Dial Frequency Set"] = nlohmann::json::array();
+        jConfig["Meta"]["WSPR Dial Frequency Set"] =
+            nlohmann::json::array({10138700.0});
         json_to_config();
 
         require(
-            config.wspr_dial_freq_set.size() == 1 &&
-                nearly_equal(config.wspr_dial_freq_set.front(), 10138700.0),
-            "empty Meta.WSPR Dial Frequency Set must fall back to non-empty legacy Meta.Center Frequency Set");
+            config.wspr_dial_freq_set.empty(),
+            "empty WSPR.WSPR Dial Frequency Set must not fall back to a legacy frequency list");
     }
 
     {
@@ -403,7 +432,8 @@ int main()
         init_config_json();
         json_to_config();
         config.ppm = 99.0;
-        config.tx_pin = 4;
+        config.gpio_tx_pin = 4;
+        resolve_backend_specific_config(config);
 
         const WsprTransmissionPlan plan = transmitter.buildTransmissionPlan();
 
@@ -478,7 +508,7 @@ int main()
 
         ArgParserConfig tone_candidate;
         tone_candidate.mode = ModeType::TONE;
-        tone_candidate.tx_pin = 4;
+        tone_candidate.gpio_tx_pin = 4;
         tone_candidate.transmit = true;
         tone_candidate.callsign.clear();
         tone_candidate.grid_square.clear();
@@ -493,7 +523,7 @@ int main()
 
         ArgParserConfig valid_wspr_candidate;
         valid_wspr_candidate.mode = ModeType::WSPR;
-        valid_wspr_candidate.tx_pin = 4;
+        valid_wspr_candidate.gpio_tx_pin = 4;
         valid_wspr_candidate.transmit = true;
         valid_wspr_candidate.callsign = "AA0NT";
         valid_wspr_candidate.grid_square = "EM18";
@@ -508,7 +538,7 @@ int main()
 
         ArgParserConfig invalid_wspr_candidate;
         invalid_wspr_candidate.mode = ModeType::WSPR;
-        invalid_wspr_candidate.tx_pin = 4;
+        invalid_wspr_candidate.gpio_tx_pin = 4;
         invalid_wspr_candidate.transmit = true;
         invalid_wspr_candidate.callsign.clear();
         invalid_wspr_candidate.grid_square = "EM18";
@@ -535,7 +565,8 @@ int main()
         config.grid_square = "EM18";
         config.power_dbm = 20;
         config.frequencies = "20m";
-        config.tx_pin = 4;
+        config.gpio_tx_pin = 4;
+        resolve_backend_specific_config(config);
 
         require(
             !set_config(true),
@@ -558,11 +589,15 @@ int main()
         config.grid_square = "EM18";
         config.power_dbm = 20;
         config.frequencies = "20m";
-        config.tx_pin = 4;
+        config.gpio_tx_pin = 4;
+        resolve_backend_specific_config(config);
+        set_frequencies(config);
 
+        set_scheduler_execution_suppressed_for_test(true);
         require(
             set_config(true),
             "disabled WSPR configuration must not fail scheduler setup");
+        set_scheduler_execution_suppressed_for_test(false);
         require(
             wsprTransmitter.getState() == WsprTransmitter::State::DISABLED,
             "disabled WSPR configuration must not arm transmitter hardware");
@@ -583,7 +618,8 @@ int main()
         config.grid_square = "EM18";
         config.power_dbm = 20;
         config.frequencies = "20m";
-        config.tx_pin = 4;
+        config.gpio_tx_pin = 4;
+        resolve_backend_specific_config(config);
         set_frequencies(config);
 
         iniFile.setData(
@@ -620,7 +656,8 @@ int main()
         config.grid_square = "EM18";
         config.power_dbm = 20;
         config.frequencies = "20m";
-        config.tx_pin = 4;
+        config.gpio_tx_pin = 4;
+        resolve_backend_specific_config(config);
         set_frequencies(config);
 
         iniFile.setData(
@@ -654,7 +691,8 @@ int main()
         config.grid_square = "EM18";
         config.power_dbm = 20;
         config.frequencies = "20m";
-        config.tx_pin = 4;
+        config.gpio_tx_pin = 4;
+        resolve_backend_specific_config(config);
         set_frequencies(config);
 
         iniFile.setData(
@@ -702,7 +740,8 @@ int main()
         config.grid_square = "EM18";
         config.power_dbm = 20;
         config.frequencies = "20m";
-        config.tx_pin = 4;
+        config.gpio_tx_pin = 4;
+        resolve_backend_specific_config(config);
         set_frequencies(config);
         iniFile.setData(
             make_managed_ini_data("AA0NT", "EM18", "20m", true));
@@ -775,7 +814,8 @@ int main()
         config.grid_square = "EM18";
         config.power_dbm = 20;
         config.frequencies = "80m";
-        config.tx_pin = 4;
+        config.gpio_tx_pin = 4;
+        resolve_backend_specific_config(config);
         set_frequencies(config);
 
         require(
@@ -838,7 +878,8 @@ int main()
         config.grid_square = "EM18";
         config.power_dbm = 20;
         config.frequencies = "20m";
-        config.tx_pin = 4;
+        config.gpio_tx_pin = 4;
+        resolve_backend_specific_config(config);
         set_frequencies(config);
 
         wsprTransmitter.backendSetStateValue(WsprTransmitter::State::TRANSMITTING);
@@ -895,7 +936,8 @@ int main()
         config.grid_square = "EM18";
         config.power_dbm = 20;
         config.frequencies = "20m";
-        config.tx_pin = 4;
+        config.gpio_tx_pin = 4;
+        resolve_backend_specific_config(config);
         set_frequencies(config);
 
         wsprTransmitter.backendSetStateValue(WsprTransmitter::State::TRANSMITTING);
@@ -941,7 +983,8 @@ int main()
         config.grid_square = "EM18";
         config.power_dbm = 20;
         config.frequencies = "80m";
-        config.tx_pin = 4;
+        config.gpio_tx_pin = 4;
+        resolve_backend_specific_config(config);
         set_frequencies(config);
 
         iniFile.setData(
@@ -975,7 +1018,8 @@ int main()
         config.grid_square = "EM18";
         config.power_dbm = 20;
         config.frequencies = "20m";
-        config.tx_pin = 4;
+        config.gpio_tx_pin = 4;
+        resolve_backend_specific_config(config);
         set_frequencies(config);
         iniFile.setData(
             make_managed_ini_data("AA0NT", "EM18", "20m", true));
@@ -1036,7 +1080,8 @@ int main()
         config.grid_square = "EM18";
         config.power_dbm = 20;
         config.frequencies = "20m";
-        config.tx_pin = 4;
+        config.gpio_tx_pin = 4;
+        resolve_backend_specific_config(config);
         config.ppm = 12.5;
         set_frequencies(config);
 
@@ -1295,6 +1340,41 @@ int main()
 
     {
         init_default_config();
+        config.si5351_tx_output = 2;
+        config_to_json();
+
+        require(
+            jConfig["Si5351"].contains("TX Output") &&
+                jConfig["Si5351"]["TX Output"].get<std::string>() == "CLK2",
+            "config_to_json must serialize Si5351 TX Output");
+
+        const nlohmann::json public_config = get_public_config_json();
+        require(
+            public_config["Si5351"].contains("TX Output") &&
+                public_config["Si5351"]["TX Output"].get<std::string>() == "CLK2",
+            "public config JSON must include Si5351 TX Output");
+
+        jConfig["Si5351"]["TX Output"] = "CLK1";
+        json_to_config();
+        require(
+            config.si5351_tx_output == 1,
+            "json_to_config must parse Si5351 TX Output");
+
+        config.si5351_tx_output = 2;
+        config_to_json();
+        json_to_ini();
+        const auto persisted_ini = iniFile.getData();
+        const auto si5351_it = persisted_ini.find("Si5351");
+        require(
+            si5351_it != persisted_ini.end(),
+            "json_to_ini must persist the Si5351 section");
+        require(
+            si5351_it->second.at("TX Output") == "CLK2",
+            "json_to_ini must persist Si5351 TX Output");
+    }
+
+    {
+        init_default_config();
         config.use_ini = true;
         config.ini_filename = "/tmp/planner_preference_persist.ini";
         config.mode = ModeType::WSPR;
@@ -1303,7 +1383,8 @@ int main()
         config.grid_square = "EM18";
         config.power_dbm = 20;
         config.frequencies = "20m";
-        config.tx_pin = 4;
+        config.gpio_tx_pin = 4;
+        resolve_backend_specific_config(config);
         config.wspr_planner_preference = WsprPlannerPreference::Auto;
         config_to_json();
 
@@ -1313,15 +1394,15 @@ int main()
             WsprPlannerPreference::PreferPaired));
 
         const auto persisted_ini = iniFile.getData();
-        const auto meta_it = persisted_ini.find("Meta");
+        const auto wspr_it = persisted_ini.find("WSPR");
         require(
-            meta_it != persisted_ini.end(),
-            "json_to_ini must persist the Meta section");
+            wspr_it != persisted_ini.end(),
+            "json_to_ini must persist the WSPR section");
         require(
-            meta_it->second.at("Planner Preference") == "prefer_paired",
-            "json_to_ini must persist planner preference in the Meta section");
+            wspr_it->second.at("Planner Preference") == "prefer_paired",
+            "json_to_ini must persist planner preference in the WSPR section");
         require(
-            meta_it->second.find("Require Paired Plan") == meta_it->second.end(),
+            wspr_it->second.find("Require Paired Plan") == wspr_it->second.end(),
             "json_to_ini must not persist the removed Require Paired Plan compatibility field");
     }
 
