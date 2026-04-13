@@ -517,6 +517,25 @@ static void log_transmit_disabled_skip()
 
 static bool runtime_transmit_requested(const ArgParserConfig &cfg) noexcept
 {
+    if (!cfg.use_ini)
+    {
+        if (cfg.mode == ModeType::TONE &&
+            has_direct_tone_startup_request())
+        {
+            return true;
+        }
+
+        if (has_non_wspr_cli_startup_request(cfg.mode))
+        {
+            return true;
+        }
+
+        if (cfg.mode == ModeType::WSPR && !cfg.loop_tx)
+        {
+            return true;
+        }
+    }
+
     return cfg.transmit;
 }
 
