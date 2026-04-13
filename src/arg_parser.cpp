@@ -1291,6 +1291,16 @@ bool validate_config_candidate(
 
             return false;
         }
+
+        if (candidate.use_ini && candidate.si5351_tx_output != 0)
+        {
+            llog.logS(
+                WARN,
+                "App-managed Si5351 operation uses CLK0 for transmission; configured TX output CLK",
+                candidate.si5351_tx_output,
+                " normalized to CLK0.");
+            candidate.si5351_tx_output = 0;
+        }
     }
 
     if (candidate.mode == ModeType::TONE)
@@ -1438,6 +1448,7 @@ void apply_runtime_config_side_effects()
     si5351_config.reference_hz = config.si5351_reference_hz;
     si5351_config.tx_output = config.si5351_tx_output;
     si5351_config.power_level = config.power_level;
+    si5351_config.app_managed = config.use_ini;
     wsprTransmitter.selectBackend(backend_kind, si5351_config);
 
     llog.logS(INFO, "Transmit backend:",
@@ -1453,6 +1464,12 @@ void apply_runtime_config_side_effects()
                   config.si5351_reference_hz);
         llog.logS(INFO, "Si5351 TX output:",
                   std::string("CLK") + std::to_string(config.si5351_tx_output));
+        if (config.use_ini)
+        {
+            llog.logS(
+                INFO,
+                "Si5351 unused output parking: enabled for app-managed operation.");
+        }
     }
     else
     {
