@@ -1291,16 +1291,6 @@ bool validate_config_candidate(
 
             return false;
         }
-
-        if (candidate.use_ini && candidate.si5351_tx_output != 0)
-        {
-            llog.logS(
-                WARN,
-                "App-managed Si5351 operation uses CLK0 for transmission; configured TX output CLK",
-                candidate.si5351_tx_output,
-                " normalized to CLK0.");
-            candidate.si5351_tx_output = 0;
-        }
     }
 
     if (candidate.mode == ModeType::TONE)
@@ -1466,9 +1456,24 @@ void apply_runtime_config_side_effects()
                   std::string("CLK") + std::to_string(config.si5351_tx_output));
         if (config.use_ini)
         {
+            std::ostringstream parked_outputs;
+            bool first_output = true;
+            for (int output = 0; output < 3; ++output)
+            {
+                if (output == config.si5351_tx_output)
+                    continue;
+
+                if (!first_output)
+                    parked_outputs << ", ";
+                parked_outputs << "CLK" << output;
+                first_output = false;
+            }
+
             llog.logS(
                 INFO,
-                "Si5351 unused output parking: enabled for app-managed operation.");
+                "Si5351 unused output parking: ",
+                parked_outputs.str(),
+                " held in a safe non-transmitting state; internal PLL remains parked.");
         }
     }
     else
