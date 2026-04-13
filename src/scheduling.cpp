@@ -916,8 +916,8 @@ static wsprrypi::TransmissionRequest make_qrss_controller_request(
     wsprrypi::TransmissionRequest request;
     request.id.value = 1;
     request.mode = wsprrypi::TransmissionMode::QRSS;
-    request.output.backend = wsprrypi::BackendKind::RPI_CLOCK_GPIO;
-    request.output.output = wsprrypi::ClockSource::GPIO_CLK;
+    request.output.backend = to_controller_backend(cfg.transmit_backend);
+    request.output.output = to_controller_clock_source(cfg.transmit_backend);
     request.output.gpio = cfg.tx_pin;
     request.calibration.ppm = committed_ppm;
     request.metadata.label = "qrss-cli-test";
@@ -958,8 +958,8 @@ static wsprrypi::TransmissionRequest make_fskcw_controller_request(
     wsprrypi::TransmissionRequest request;
     request.id.value = 1;
     request.mode = wsprrypi::TransmissionMode::FSKCW;
-    request.output.backend = wsprrypi::BackendKind::RPI_CLOCK_GPIO;
-    request.output.output = wsprrypi::ClockSource::GPIO_CLK;
+    request.output.backend = to_controller_backend(cfg.transmit_backend);
+    request.output.output = to_controller_clock_source(cfg.transmit_backend);
     request.output.gpio = cfg.tx_pin;
     request.calibration.ppm = committed_ppm;
     request.metadata.label = "fskcw-cli-test";
@@ -1003,8 +1003,8 @@ static wsprrypi::TransmissionRequest make_dfcw_controller_request(
     wsprrypi::TransmissionRequest request;
     request.id.value = 1;
     request.mode = wsprrypi::TransmissionMode::DFCW;
-    request.output.backend = wsprrypi::BackendKind::RPI_CLOCK_GPIO;
-    request.output.output = wsprrypi::ClockSource::GPIO_CLK;
+    request.output.backend = to_controller_backend(cfg.transmit_backend);
+    request.output.output = to_controller_clock_source(cfg.transmit_backend);
     request.output.gpio = cfg.tx_pin;
     request.calibration.ppm = committed_ppm;
     request.metadata.label = "dfcw-cli-test";
