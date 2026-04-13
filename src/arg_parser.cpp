@@ -1050,21 +1050,39 @@ void print_usage(const std::string &message, int exit_code)
               << "    Show the WsprryPi version.\n"
               << "  -i, --ini-file <file>\n"
               << "    Load parameters from an INI file. Provide the path and filename.\n\n"
-              << "  -a, --transmit-gpio <gpio>\n"
-              << "    Select the RF transmit GPIO (supported: 4 or 20).\n\n"
               << "  --backend <gpio|si5351>\n"
-              << "    Select the RF transmit backend. Default: gpio.\n\n"
-              << "  --power-level <level>\n"
-              << "    Select RF power level. GPIO accepts 0-7; Si5351 accepts 1-4.\n\n"
-              << "  --si5351-i2c-bus <bus>\n"
-              << "    Select the Si5351 I2C bus when --backend si5351 is used. Default: 1.\n"
-              << "  --si5351-i2c-address <addr>\n"
-              << "    Select the Si5351 I2C address when --backend si5351 is used. Default: 0x60.\n"
-              << "  --si5351-reference-frequency <hz>\n"
-              << "    Select the Si5351 reference frequency when --backend si5351 is used. Default: 27000000.\n"
-              << "  --si5351-tx-output <CLK0|CLK1|CLK2>\n"
-              << "    Select the Si5351 transmit output when --backend si5351 is used. Default: CLK0.\n\n"
-              << "See the documentation for a complete list of available options.\n\n";
+              << "    Select the RF transmit backend. Default: gpio.\n\n";
+
+    if (config.transmit_backend == TransmitBackendKind::SI5351)
+    {
+        std::cerr << "  --power-level <level>\n"
+                  << "    Select Si5351 drive-strength level (1-4).\n\n"
+                  << "  --si5351-i2c-bus <bus>\n"
+                  << "    Select the Si5351 I2C bus. Default: 1.\n"
+                  << "  --si5351-i2c-address <addr>\n"
+                  << "    Select the Si5351 I2C address. Default: 0x60.\n"
+                  << "  --si5351-reference-frequency <hz>\n"
+                  << "    Select the Si5351 reference frequency. Default: 27000000.\n"
+                  << "  --si5351-tx-output <CLK0|CLK1|CLK2>\n"
+                  << "    Select the Si5351 transmit output. Default: CLK0.\n\n";
+    }
+    else
+    {
+        std::cerr << "  -a, --transmit-gpio <gpio>\n"
+                  << "    Select the RF transmit GPIO (supported: 4 or 20).\n\n"
+                  << "  --power-level <level>\n"
+                  << "    Select GPIO RF power level (0-7).\n\n"
+                  << "  --si5351-i2c-bus <bus>\n"
+                  << "    Select the Si5351 I2C bus when --backend si5351 is used. Default: 1.\n"
+                  << "  --si5351-i2c-address <addr>\n"
+                  << "    Select the Si5351 I2C address when --backend si5351 is used. Default: 0x60.\n"
+                  << "  --si5351-reference-frequency <hz>\n"
+                  << "    Select the Si5351 reference frequency when --backend si5351 is used. Default: 27000000.\n"
+                  << "  --si5351-tx-output <CLK0|CLK1|CLK2>\n"
+                  << "    Select the Si5351 transmit output when --backend si5351 is used. Default: CLK0.\n\n";
+    }
+
+    std::cerr << "See the documentation for a complete list of available options.\n\n";
 
     // Handle exit behavior
     switch (exit_code)
@@ -1105,7 +1123,6 @@ void show_config_values(bool reload)
     llog.logS(DEBUG, "WSPR Dial Frequencies:", config.frequencies);
     llog.logS(DEBUG, "Transmit Backend:",
               transmit_backend_kind_to_string(config.transmit_backend));
-    llog.logS(DEBUG, "Transmit Pin:", config.tx_pin);
     if (config.transmit_backend == TransmitBackendKind::SI5351)
     {
         std::ostringstream address;
@@ -1118,12 +1135,21 @@ void show_config_values(bool reload)
         llog.logS(DEBUG, "Si5351 TX Output:",
                   std::string("CLK") + std::to_string(config.si5351_tx_output));
     }
+    else
+    {
+        llog.logS(DEBUG, "Transmit GPIO:", config.tx_pin);
+    }
     // [Extended]
     llog.logS(DEBUG, "PPM Offset:", config.ppm);
     llog.logS(DEBUG, "Synchronize with NTP:", config.use_ntp ? "true" : "false");
     llog.logS(DEBUG, "Use Frequency Randomization:", config.use_offset ? "true" : "false");
     llog.logS(DEBUG, "WSPR Audio Offset Hz:", config.wspr.audio_offset_hz);
-    llog.logS(DEBUG, "Power Level:", config.power_level);
+    llog.logS(
+        DEBUG,
+        config.transmit_backend == TransmitBackendKind::SI5351
+            ? "Si5351 Drive Level:"
+            : "GPIO Power Level:",
+        config.power_level);
     llog.logS(DEBUG, "Use LED:", config.use_led ? "true" : "false");
     llog.logS(DEBUG, "LED on GPIO", config.led_pin);
     // [Server]
@@ -1392,6 +1418,12 @@ bool validate_config_candidate(
     sync_wspr_mode_config(candidate);
 
     return true;
+}
+
+static bool validation_error_is_missing_required(
+    const std::string &validation_error)
+{
+    return validation_error.rfind("Missing", 0) == 0;
 }
 
 void apply_runtime_config_side_effects()
@@ -1679,7 +1711,11 @@ bool validate_config_data()
     std::string validation_error;
     if (!validate_config_candidate(config, &validation_error))
     {
-        llog.logE(FATAL, "Missing required parameters.");
+        llog.logE(
+            FATAL,
+            validation_error_is_missing_required(validation_error)
+                ? "Missing required parameters."
+                : "Invalid configuration.");
 
         if (config.callsign.empty())
         {
@@ -1947,6 +1983,7 @@ bool handle_early_cli_options(int argc, char *argv[])
 {
     bool early_use_journald = config.use_journald;
     bool early_enable_timestamps = config.date_time_log;
+    TransmitBackendKind early_backend = config.transmit_backend;
 
     for (int i = 1; i < argc; ++i)
     {
@@ -1960,6 +1997,27 @@ bool handle_early_cli_options(int argc, char *argv[])
         else if (arg == "--date-time-log")
         {
             early_enable_timestamps = true;
+        }
+        else if (arg == "--backend" && i + 1 < argc)
+        {
+            try
+            {
+                early_backend = parse_transmit_backend_option(argv[i + 1]);
+            }
+            catch (const std::exception &)
+            {
+            }
+        }
+        else if (arg.rfind("--backend=", 0) == 0)
+        {
+            try
+            {
+                early_backend =
+                    parse_transmit_backend_option(arg.substr(10));
+            }
+            catch (const std::exception &)
+            {
+            }
         }
         else if (arg.size() > 1U && arg[0] == '-' && arg[1] != '-')
         {
@@ -1985,6 +2043,7 @@ bool handle_early_cli_options(int argc, char *argv[])
         const std::string arg = argv[i];
         if (arg == "-h" || arg == "--help")
         {
+            config.transmit_backend = early_backend;
             print_usage("", EXIT_SUCCESS);
             return true;
         }
