@@ -1157,10 +1157,8 @@ namespace
         target.transmit_backend = source.transmit_backend;
         target.si5351_i2c_bus = source.si5351_i2c_bus;
         target.si5351_i2c_address = source.si5351_i2c_address;
-        target.si5351_tx_output = source.si5351_tx_output;
-        target.use_led = source.use_led;
+        target.si5351_reference_hz = source.si5351_reference_hz;
         target.socket_port = source.socket_port;
-        target.use_shutdown = source.use_shutdown;
         target.shutdown_pin = source.shutdown_pin;
         target.use_journald = source.use_journald;
         target.date_time_log = source.date_time_log;

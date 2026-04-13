@@ -1138,11 +1138,8 @@ void show_config_values(bool reload)
     else
     {
         llog.logS(DEBUG, "Transmit GPIO:", config.tx_pin);
-    }
     // [Extended]
     llog.logS(DEBUG, "PPM Offset:", config.ppm);
-    llog.logS(DEBUG, "Synchronize with NTP:", config.use_ntp ? "true" : "false");
-    llog.logS(DEBUG, "Use Frequency Randomization:", config.use_offset ? "true" : "false");
     llog.logS(DEBUG, "WSPR Audio Offset Hz:", config.wspr.audio_offset_hz);
     llog.logS(
         DEBUG,
@@ -1440,8 +1437,6 @@ void apply_runtime_config_side_effects()
     si5351_config.power_level = config.power_level;
     si5351_config.app_managed = config.use_ini;
     wsprTransmitter.selectBackend(backend_kind, si5351_config);
-
-    llog.logS(INFO, "Transmit backend:",
               transmit_backend_kind_to_string(config.transmit_backend));
     if (config.transmit_backend == TransmitBackendKind::SI5351)
     {
