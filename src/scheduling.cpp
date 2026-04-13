@@ -98,6 +98,23 @@ struct BandGPIOResolution
     const char *selector_source = "none";
 };
 
+namespace
+{
+    std::string get_active_gpio_suffix()
+    {
+        const BandGPIOConfig *cfg = bandGPIOSelector.currentConfig();
+
+        if (cfg == nullptr || !cfg->enabled || cfg->gpio < 0)
+        {
+            return "";
+        }
+
+        return " (GPIO" +
+               std::to_string(cfg->gpio) +
+               (cfg->active_high ? "H)" : "L)");
+    }
+}
+
 static bool prepare_band_gpio_for_frequency_or_log(
     double source_frequency_hz,
     const WsprFrequencyEntry &entry,
@@ -1451,7 +1468,9 @@ void transmitter_cb(WsprTransmitter::TransmissionCallbackEvent event,
                       msg,
                       ") ",
                       wsprTransmitter.formatFrequencyMHz(frequency),
-                      " MHz.");
+                      " MHz",
+                      get_active_gpio_suffix(),
+                      ".");
         }
         else if (frequency != 0.0)
         {
@@ -1459,35 +1478,37 @@ void transmitter_cb(WsprTransmitter::TransmissionCallbackEvent event,
             {
                 llog.logS(to_log_level(level),
                           "Started QRSS test transmission: ",
-                          frequency,
-                          " Hz (",
                           wsprTransmitter.formatFrequencyMHz(frequency),
-                          " MHz).");
+                          " MHz",
+                          get_active_gpio_suffix(),
+                          ".");
             }
             else if (config.mode == ModeType::FSKCW)
             {
                 llog.logS(to_log_level(level),
                           "Started FSKCW test transmission at mark frequency: ",
-                          frequency,
-                          " Hz (",
                           wsprTransmitter.formatFrequencyMHz(frequency),
-                          " MHz).");
+                          " MHz",
+                          get_active_gpio_suffix(),
+                          ".");
             }
             else if (config.mode == ModeType::DFCW)
             {
                 llog.logS(to_log_level(level),
                           "Started DFCW test transmission at dot frequency: ",
-                          frequency,
-                          " Hz (",
                           wsprTransmitter.formatFrequencyMHz(frequency),
-                          " MHz).");
+                          " MHz",
+                          get_active_gpio_suffix(),
+                          ".");
             }
             else
             {
                 llog.logS(to_log_level(level),
                           "Started transmission: ",
                           wsprTransmitter.formatFrequencyMHz(frequency),
-                          " MHz.");
+                          " MHz",
+                          get_active_gpio_suffix(),
+                          ".");
             }
         }
         else if (!msg.empty())
@@ -2076,8 +2097,8 @@ StopTransmissionResult stop_transmission_by_user_request()
     send_ws_message("transmit", "stopped");
 
     result.message = result.transmission_active
-        ? "Active transmission stopped and transmit disabled."
-        : "Transmit disabled; no active transmission was running.";
+                         ? "Active transmission stopped and transmit disabled."
+                         : "Transmit disabled; no active transmission was running.";
     return result;
 }
 

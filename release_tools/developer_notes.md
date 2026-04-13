@@ -113,7 +113,7 @@ Any references to `{hostname}` should be replaced with the hostname of your targ
     ``` bash
     git config --global user.email "you@example.com"
     git config --global user.name "Your Name"
-
+    ```
 
 ## VS Code
 
@@ -198,6 +198,12 @@ I have opted to use submodules to reuse common elements in my projects, as well 
 ``` bash
 git submodule foreach --recursive 'git clean -xfd'
 git submodule update --init --recursive
+```
+
+Or possibly better/cleaner:
+
+```bash
+git submodule update --init --recursive --force
 ```
 
 ## Reboot
