@@ -525,9 +525,8 @@ declare -A SUPPORTED_MODELS
 if [[ -z "${SUPPORTED_MODELS+x}" || ${#SUPPORTED_MODELS[@]} -eq 0 ]]; then
     # If SUPPORTED_MODELS is not set or empty, define the default supported models
     SUPPORTED_MODELS=(
-        # Unsupported models
-        ["Raspberry Pi 5|5-model-b|bcm2712"]="Unsupported"
         # Supported models
+        ["Raspberry Pi 5|5-model-b|bcm2712"]="Supported"
         ["Raspberry Pi 400|400|bcm2711"]="Supported"
         ["Raspberry Pi Compute Module 4|4-compute-module|bcm2711"]="Supported"
         ["Raspberry Pi Compute Module 3|3-compute-module|bcm2837"]="Supported"
@@ -2132,6 +2131,17 @@ print_model_name() {
 
     debug_end "$debug"
     die 1 "Detected Raspberry Pi model '$detected_model' is not recognized."
+}
+
+is_pi5() {
+    local detected_model
+
+    if ! detected_model=$(tr '\0' '\n' </proc/device-tree/compatible 2>/dev/null \
+        | sed -n 's/raspberrypi,//p'); then
+        return 1
+    fi
+
+    [[ "${detected_model:-}" == "5-model-b" ]]
 }
 
 # -----------------------------------------------------------------------------
@@ -6547,7 +6557,6 @@ manage_sound() {
             REBOOT="true"
             debug_print "Added blacklist entry to $file." "$debug"
         else
-            REBOOT="false"
             debug_print "Sound is already disabled." "$debug"
         fi
 
@@ -6566,12 +6575,83 @@ manage_sound() {
             fi
             REBOOT="true"
         else
-            REBOOT="false"
             debug_print "Sound is already enabled or no blacklist file exists." "$debug"
         fi
     else
         die 1 "Invalid action. Use 'install' or 'uninstall'."
     fi
+
+    debug_end "$debug"
+    return 0
+}
+
+# -----------------------------------------------------------------------------
+# @brief Enable Raspberry Pi I2C support during installation.
+# @details Uses raspi-config when available, otherwise updates the active boot
+#          config file directly and ensures `dtparam=i2c_arm=on` exists exactly
+#          once. The change is idempotent and requests a reboot only when the
+#          script makes a boot-configuration change.
+#
+# @global ACTION Specifies whether the function runs in 'install' or 'uninstall' mode.
+# @global REBOOT Indicates whether a system reboot is required.
+#
+# @param $1 Debug flag for enabling or disabling debug output.
+#
+# @return Returns 0 on success.
+# -----------------------------------------------------------------------------
+# shellcheck disable=SC2317
+# shellcheck disable=SC2329
+manage_i2c() {
+    local debug
+    debug=$(debug_start "$@")
+    eval set -- "$(debug_filter "$@")"
+
+    if [[ "$ACTION" != "install" ]]; then
+        debug_end "$debug"
+        return 0
+    fi
+
+    local boot_config=""
+    local i2c_setting="dtparam=i2c_arm=on"
+
+    if [[ -f "/boot/firmware/config.txt" ]]; then
+        boot_config="/boot/firmware/config.txt"
+    elif [[ -f "/boot/config.txt" ]]; then
+        boot_config="/boot/config.txt"
+    else
+        debug_end "$debug"
+        die 1 "Could not locate Raspberry Pi boot config file."
+    fi
+
+    if grep -Eq '^[[:space:]]*dtparam=i2c_arm=on([[:space:]]*(#.*)?)?$' "$boot_config"; then
+        debug_print "I2C already enabled in $boot_config." "$debug"
+        debug_end "$debug"
+        return 0
+    fi
+
+    if command -v raspi-config >/dev/null 2>&1; then
+        if exec_command "Enable I2C" raspi-config nonint do_i2c 0 "$debug"; then
+            debug_end "$debug"
+            return 0
+        fi
+    fi
+
+    if grep -Eq '^[[:space:]#]*dtparam=i2c_arm=' "$boot_config"; then
+        if [[ "$DRY_RUN" == "true" ]]; then
+            logD "Exec: sed -i 's|^[[:space:]#]*dtparam=i2c_arm=.*|$i2c_setting|' $boot_config"
+        else
+            sed -i "s|^[[:space:]#]*dtparam=i2c_arm=.*|$i2c_setting|" "$boot_config"
+        fi
+    else
+        if [[ "$DRY_RUN" == "true" ]]; then
+            logD "Exec: printf '\\n%s\\n' '$i2c_setting' >> $boot_config"
+        else
+            printf "\n%s\n" "$i2c_setting" >>"$boot_config"
+        fi
+    fi
+
+    REBOOT="true"
+    debug_print "Enabled I2C in $boot_config." "$debug"
 
     debug_end "$debug"
     return 0
@@ -6979,7 +7059,7 @@ finish_script() {
         printf "Ensure your device is on the same network and that mDNS is\n"
         printf "supported by your system.\n\n"
 
-        if [[ "${REBOOT:-false}" == "true" ]]; then
+        if [[ "${REBOOT:-false}" == "true" ]] && ! is_pi5; then
             printf "Remember to reboot to disable your soundcard before transmission.\n\n"
         fi
     elif [[ "$ACTION" == "uninstall" && "$overall_status" -eq 0 ]]; then
@@ -7031,6 +7111,7 @@ manage_wsprry_pi() {
         "compile_binary \"$WSPR_EXE\""
         "manage_exe \"$WSPR_EXE\""
         "manage_config \"$WSPR_INI\" \"/usr/local/etc/\""
+        "manage_i2c"
         "manage_service \"/usr/bin/$WSPR_EXE\" \"/usr/local/bin/$WSPR_EXE -J -i /usr/local/etc/$WSPR_INI\" \"false\""
         "manage_web"
         "manage_apache"
