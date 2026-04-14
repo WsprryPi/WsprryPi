@@ -1104,7 +1104,7 @@ namespace
             parse_wspr_planner_preference(source.at("WSPR"));
         const auto &cw = source.at("CW");
         const std::string cw_message =
-            cw.value("Message", std::string(""));
+            trim_copy(cw.value("Message", std::string("")));
         const double cw_base_frequency_hz =
             cw.value("Base Frequency", 0.0);
         const double cw_shift_hz =

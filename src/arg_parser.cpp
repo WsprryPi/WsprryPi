@@ -2763,7 +2763,7 @@ bool parse_command_line(int argc, char *argv[])
         clear_direct_tone_startup_request();
         clear_fskcw_startup_request();
         clear_dfcw_startup_request();
-        config.qrss.message = qrss_message_arg;
+        config.qrss.message = trim_copy_string(qrss_message_arg);
         config.qrss.frequency_hz = std::stod(qrss_frequency_arg);
         config.qrss.dot_seconds = std::stod(qrss_dot_seconds_arg);
         config.mode = ModeType::QRSS;
@@ -2805,7 +2805,7 @@ bool parse_command_line(int argc, char *argv[])
         clear_direct_tone_startup_request();
         clear_qrss_startup_request();
         clear_dfcw_startup_request();
-        config.fskcw.message = fskcw_message_arg;
+        config.fskcw.message = trim_copy_string(fskcw_message_arg);
         config.fskcw.mark_frequency_hz = std::stod(fskcw_mark_frequency_arg);
         config.fskcw.space_frequency_hz = std::stod(fskcw_space_frequency_arg);
         config.fskcw.dot_seconds = std::stod(fskcw_dot_seconds_arg);
@@ -2848,7 +2848,7 @@ bool parse_command_line(int argc, char *argv[])
         clear_direct_tone_startup_request();
         clear_qrss_startup_request();
         clear_fskcw_startup_request();
-        config.dfcw.message = dfcw_message_arg;
+        config.dfcw.message = trim_copy_string(dfcw_message_arg);
         config.dfcw.dot_frequency_hz = std::stod(dfcw_dot_frequency_arg);
         config.dfcw.dash_frequency_hz = std::stod(dfcw_dash_frequency_arg);
         config.dfcw.dot_seconds = std::stod(dfcw_dot_seconds_arg);

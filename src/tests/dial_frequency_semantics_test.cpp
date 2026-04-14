@@ -1461,6 +1461,124 @@ int main()
     }
 
     {
+        init_config_json();
+        jConfig["CW"]["Message"] = "  HELLO WORLD  ";
+        json_to_config();
+
+        require(
+            config.qrss.message == "HELLO WORLD" &&
+                config.fskcw.message == "HELLO WORLD" &&
+                config.dfcw.message == "HELLO WORLD",
+            "json_to_config must trim CW message edges for QRSS, FSKCW, and DFCW");
+
+        config.mode = ModeType::DFCW;
+        config_to_json();
+        require(
+            jConfig["CW"]["Message"].get<std::string>() == "HELLO WORLD",
+            "config_to_json must serialize trimmed CW messages without altering internal spaces");
+
+        config.use_ini = true;
+        json_to_ini();
+        const auto persisted_ini = iniFile.getData();
+        const auto cw_it = persisted_ini.find("CW");
+        require(
+            cw_it != persisted_ini.end() &&
+                cw_it->second.at("Message") == "HELLO WORLD",
+            "json_to_ini must persist trimmed CW messages without leading or trailing spaces");
+    }
+
+    {
+        init_config_json();
+        json_to_config();
+        config.use_ini = false;
+        clear_qrss_startup_request();
+        clear_fskcw_startup_request();
+        clear_dfcw_startup_request();
+        reset_getopt_state();
+
+        std::vector<std::string> args = {
+            "wsprrypi",
+            "--qrss-message",
+            "  AT AT  ",
+            "--qrss-frequency",
+            "7030000",
+            "--qrss-dot-seconds",
+            "3",
+            "--transmit-gpio",
+            "4"};
+        std::vector<char *> argv = argv_for(args);
+
+        require(
+            parse_command_line(static_cast<int>(argv.size()), argv.data()),
+            "QRSS CLI parsing must succeed");
+        require(
+            config.qrss.message == "AT AT",
+            "QRSS CLI parsing must trim CW message edges and preserve internal spaces");
+    }
+
+    {
+        init_config_json();
+        json_to_config();
+        config.use_ini = false;
+        clear_qrss_startup_request();
+        clear_fskcw_startup_request();
+        clear_dfcw_startup_request();
+        reset_getopt_state();
+
+        std::vector<std::string> args = {
+            "wsprrypi",
+            "--fskcw-message",
+            "  CQ TEST  ",
+            "--fskcw-mark-frequency",
+            "7030100",
+            "--fskcw-space-frequency",
+            "7030000",
+            "--fskcw-dot-seconds",
+            "3",
+            "--transmit-gpio",
+            "4"};
+        std::vector<char *> argv = argv_for(args);
+
+        require(
+            parse_command_line(static_cast<int>(argv.size()), argv.data()),
+            "FSKCW CLI parsing must succeed");
+        require(
+            config.fskcw.message == "CQ TEST",
+            "FSKCW CLI parsing must trim CW message edges and preserve internal spaces");
+    }
+
+    {
+        init_config_json();
+        json_to_config();
+        config.use_ini = false;
+        clear_qrss_startup_request();
+        clear_fskcw_startup_request();
+        clear_dfcw_startup_request();
+        reset_getopt_state();
+
+        std::vector<std::string> args = {
+            "wsprrypi",
+            "--dfcw-message",
+            "  CQ DX  ",
+            "--dfcw-dot-frequency",
+            "7030000",
+            "--dfcw-dash-frequency",
+            "7030100",
+            "--dfcw-dot-seconds",
+            "3",
+            "--transmit-gpio",
+            "4"};
+        std::vector<char *> argv = argv_for(args);
+
+        require(
+            parse_command_line(static_cast<int>(argv.size()), argv.data()),
+            "DFCW CLI parsing must succeed");
+        require(
+            config.dfcw.message == "CQ DX",
+            "DFCW CLI parsing must trim CW message edges and preserve internal spaces");
+    }
+
+    {
         ArgParserConfig invalid_gap_candidate;
         invalid_gap_candidate.cw_intra_element_gap = 0.0;
         std::string validation_error;

@@ -1140,9 +1140,9 @@ static bool start_non_wspr_transmission_now(const ArgParserConfig &cfg)
         wsprTransmitter.startAsync();
         llog.logS(
             INFO,
-            "transmitting QRSS message '",
+            "transmitting QRSS message \"",
             message,
-            "' at ",
+            "\" at ",
             frequency_hz,
             " Hz (",
             wsprTransmitter.formatFrequencyMHz(frequency_hz),
@@ -1175,9 +1175,9 @@ static bool start_non_wspr_transmission_now(const ArgParserConfig &cfg)
         wsprTransmitter.startAsync();
         llog.logS(
             INFO,
-            "transmitting FSKCW message '",
+            "transmitting FSKCW message \"",
             message,
-            "' mark=",
+            "\" mark=",
             mark_frequency_hz,
             " Hz (",
             wsprTransmitter.formatFrequencyMHz(mark_frequency_hz),
@@ -1214,9 +1214,9 @@ static bool start_non_wspr_transmission_now(const ArgParserConfig &cfg)
         wsprTransmitter.startAsync();
         llog.logS(
             INFO,
-            "transmitting DFCW message '",
+            "transmitting DFCW message \"",
             message,
-            "' dot=",
+            "\" dot=",
             dot_frequency_hz,
             " Hz (",
             wsprTransmitter.formatFrequencyMHz(dot_frequency_hz),
