@@ -1275,7 +1275,11 @@ namespace
         target.si5351_reference_hz = source.si5351_reference_hz;
         target.si5351_tx_output = source.si5351_tx_output;
         target.si5351_power_level = source.si5351_power_level;
+        target.use_led = source.use_led;
+        target.led_pin = source.led_pin;
+        target.web_port = source.web_port;
         target.socket_port = source.socket_port;
+        target.use_shutdown = source.use_shutdown;
         target.shutdown_pin = source.shutdown_pin;
         target.use_journald = source.use_journald;
         target.date_time_log = source.date_time_log;

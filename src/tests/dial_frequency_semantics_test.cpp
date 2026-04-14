@@ -1562,6 +1562,36 @@ int main()
     }
 
     {
+        init_default_config();
+        PreparedConfigCandidate candidate;
+        candidate.valid = true;
+        candidate.normalized_config = config;
+        candidate.normalized_config.use_led = true;
+        candidate.normalized_config.led_pin = 18;
+        candidate.normalized_config.web_port = 31555;
+        candidate.normalized_config.use_shutdown = true;
+        candidate.normalized_config.shutdown_pin = 19;
+        candidate.normalized_json = jConfig;
+        candidate.normalized_json["Operation"]["Use LED"] = true;
+        candidate.normalized_json["Operation"]["LED Pin"] = 18;
+        candidate.normalized_json["Operation"]["Web Port"] = 31555;
+        candidate.normalized_json["Operation"]["Use Shutdown"] = true;
+        candidate.normalized_json["Operation"]["Shutdown Button"] = 19;
+
+        commit_config_candidate(candidate);
+
+        require(
+            config.use_led && config.led_pin == 18,
+            "managed config candidate commit must update LED runtime settings");
+        require(
+            config.web_port == 31555,
+            "managed config candidate commit must update web server port in live config");
+        require(
+            config.use_shutdown && config.shutdown_pin == 19,
+            "managed config candidate commit must update shutdown GPIO settings");
+    }
+
+    {
         init_config_json();
         jConfig["CW"]["Dot Seconds"] = 2.0;
         jConfig["CW"]["Intra Element Gap"] = 1.5;
