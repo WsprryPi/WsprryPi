@@ -931,6 +931,47 @@ static std::chrono::nanoseconds seconds_to_nanoseconds(double seconds)
         std::chrono::duration<double>(seconds));
 }
 
+static wsprrypi::FadeShape cw_fade_shape_from_config(const std::string &shape)
+{
+    if (shape == "linear")
+    {
+        return wsprrypi::FadeShape::LINEAR;
+    }
+
+    if (shape == "raised_cosine")
+    {
+        return wsprrypi::FadeShape::RAISED_COSINE;
+    }
+
+    return wsprrypi::FadeShape::NONE;
+}
+
+static wsprrypi::MorseTiming cw_timing_from_config(
+    double dot_seconds,
+    const ArgParserConfig &cfg)
+{
+    wsprrypi::MorseTiming timing;
+    timing.dot = seconds_to_nanoseconds(dot_seconds);
+    timing.dash = timing.dot * 3;
+    timing.intra_element_gap =
+        seconds_to_nanoseconds(dot_seconds * cfg.cw_intra_element_gap);
+    timing.inter_character_gap =
+        seconds_to_nanoseconds(dot_seconds * cfg.cw_inter_character_gap);
+    timing.inter_word_gap =
+        seconds_to_nanoseconds(dot_seconds * cfg.cw_inter_word_gap);
+    return timing;
+}
+
+static wsprrypi::EnvelopeSettings cw_envelope_from_config(
+    const ArgParserConfig &cfg)
+{
+    wsprrypi::EnvelopeSettings envelope;
+    envelope.fade_shape = cw_fade_shape_from_config(cfg.cw_fade_shape);
+    envelope.fade_in = std::chrono::milliseconds(cfg.cw_fade_in_ms);
+    envelope.fade_out = std::chrono::milliseconds(cfg.cw_fade_out_ms);
+    return envelope;
+}
+
 static wsprrypi::TransmissionRequest make_qrss_controller_request(
     const ArgParserConfig &cfg,
     double committed_ppm)
@@ -949,11 +990,8 @@ static wsprrypi::TransmissionRequest make_qrss_controller_request(
     wsprrypi::QrssPayload payload;
     payload.message = cfg.qrss.message;
     payload.frequency_hz = cfg.qrss.frequency_hz;
-    payload.timing.dot = seconds_to_nanoseconds(cfg.qrss.dot_seconds);
-    payload.timing.dash = payload.timing.dot * 3;
-    payload.timing.intra_element_gap = payload.timing.dot;
-    payload.timing.inter_character_gap = payload.timing.dot * 3;
-    payload.timing.inter_word_gap = payload.timing.dot * 7;
+    payload.timing = cw_timing_from_config(cfg.qrss.dot_seconds, cfg);
+    payload.envelope = cw_envelope_from_config(cfg);
     request.payload = payload;
     return request;
 }
@@ -992,11 +1030,8 @@ static wsprrypi::TransmissionRequest make_fskcw_controller_request(
     payload.message = cfg.fskcw.message;
     payload.mark_frequency_hz = cfg.fskcw.mark_frequency_hz;
     payload.space_frequency_hz = cfg.fskcw.space_frequency_hz;
-    payload.timing.dot = seconds_to_nanoseconds(cfg.fskcw.dot_seconds);
-    payload.timing.dash = payload.timing.dot * 3;
-    payload.timing.intra_element_gap = payload.timing.dot;
-    payload.timing.inter_character_gap = payload.timing.dot * 3;
-    payload.timing.inter_word_gap = payload.timing.dot * 7;
+    payload.timing = cw_timing_from_config(cfg.fskcw.dot_seconds, cfg);
+    payload.envelope = cw_envelope_from_config(cfg);
     request.payload = payload;
     return request;
 }
@@ -1037,11 +1072,8 @@ static wsprrypi::TransmissionRequest make_dfcw_controller_request(
     payload.message = cfg.dfcw.message;
     payload.dot_frequency_hz = cfg.dfcw.dot_frequency_hz;
     payload.dash_frequency_hz = cfg.dfcw.dash_frequency_hz;
-    payload.timing.dot = seconds_to_nanoseconds(cfg.dfcw.dot_seconds);
-    payload.timing.dash = payload.timing.dot * 3;
-    payload.timing.intra_element_gap = payload.timing.dot;
-    payload.timing.inter_character_gap = payload.timing.dot * 3;
-    payload.timing.inter_word_gap = payload.timing.dot * 7;
+    payload.timing = cw_timing_from_config(cfg.dfcw.dot_seconds, cfg);
+    payload.envelope = cw_envelope_from_config(cfg);
     request.payload = payload;
     return request;
 }

@@ -99,6 +99,12 @@ namespace
               {"Base Frequency", "3572000.0"},
               {"Shift Hz", "500.0"},
               {"Dot Seconds", "3.0"},
+              {"Intra Element Gap", "1.0"},
+              {"Inter Character Gap", "3.0"},
+              {"Inter Word Gap", "7.0"},
+              {"Fade Shape", "none"},
+              {"Fade In Ms", "0"},
+              {"Fade Out Ms", "0"},
               {"Start Minute", "0"},
               {"Repeat Minutes", "10"}}}};
         return data;
@@ -1371,6 +1377,77 @@ int main()
         require(
             si5351_it->second.at("TX Output") == "CLK2",
             "json_to_ini must persist Si5351 TX Output");
+    }
+
+    {
+        init_config_json();
+        jConfig["CW"]["Dot Seconds"] = 2.0;
+        jConfig["CW"]["Intra Element Gap"] = 1.5;
+        jConfig["CW"]["Inter Character Gap"] = 4.0;
+        jConfig["CW"]["Inter Word Gap"] = 8.0;
+        jConfig["CW"]["Fade Shape"] = "raised-cosine";
+        jConfig["CW"]["Fade In Ms"] = 25;
+        jConfig["CW"]["Fade Out Ms"] = 40;
+        json_to_config();
+
+        require(
+            nearly_equal(config.modulation_dot_seconds, 2.0) &&
+                nearly_equal(config.cw_intra_element_gap, 1.5) &&
+                nearly_equal(config.cw_inter_character_gap, 4.0) &&
+                nearly_equal(config.cw_inter_word_gap, 8.0),
+            "json_to_config must parse CW timing gap multipliers");
+        require(
+            config.qrss.dot_seconds == config.modulation_dot_seconds &&
+                config.fskcw.dot_seconds == config.modulation_dot_seconds &&
+                config.dfcw.dot_seconds == config.modulation_dot_seconds,
+            "CW dot length must remain shared by QRSS, FSKCW, and DFCW configs");
+        require(
+            config.cw_fade_shape == "raised_cosine" &&
+                config.cw_fade_in_ms == 25 &&
+                config.cw_fade_out_ms == 40,
+            "json_to_config must parse CW fade settings");
+
+        config_to_json();
+        require(
+            nearly_equal(jConfig["CW"]["Intra Element Gap"].get<double>(), 1.5) &&
+                nearly_equal(jConfig["CW"]["Inter Character Gap"].get<double>(), 4.0) &&
+                nearly_equal(jConfig["CW"]["Inter Word Gap"].get<double>(), 8.0) &&
+                jConfig["CW"]["Fade Shape"].get<std::string>() == "raised_cosine",
+            "config_to_json must serialize CW timing and fade settings");
+
+        config.use_ini = true;
+        json_to_ini();
+        const auto persisted_ini = iniFile.getData();
+        const auto cw_it = persisted_ini.find("CW");
+        require(
+            cw_it != persisted_ini.end(),
+            "json_to_ini must persist the CW section");
+        require(
+            nearly_equal(std::stod(cw_it->second.at("Intra Element Gap")), 1.5) &&
+                nearly_equal(std::stod(cw_it->second.at("Inter Character Gap")), 4.0) &&
+                nearly_equal(std::stod(cw_it->second.at("Inter Word Gap")), 8.0) &&
+                cw_it->second.at("Fade Shape") == "raised_cosine" &&
+                cw_it->second.at("Fade In Ms") == "25" &&
+                cw_it->second.at("Fade Out Ms") == "40",
+            "json_to_ini must persist CW timing and fade settings");
+    }
+
+    {
+        ArgParserConfig invalid_gap_candidate;
+        invalid_gap_candidate.cw_intra_element_gap = 0.0;
+        std::string validation_error;
+        require(
+            !validate_config_candidate(invalid_gap_candidate, &validation_error) &&
+                validation_error == "CW gap settings must be greater than 0.",
+            "validation must reject non-positive CW gap settings");
+
+        ArgParserConfig invalid_fade_candidate;
+        invalid_fade_candidate.cw_fade_in_ms = -1;
+        validation_error.clear();
+        require(
+            !validate_config_candidate(invalid_fade_candidate, &validation_error) &&
+                validation_error == "CW fade durations must be 0 or greater.",
+            "validation must reject negative CW fade durations");
     }
 
     {

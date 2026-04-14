@@ -263,6 +263,12 @@ struct ArgParserConfig
     double wspr_audio_offset_hz;    ///< Runtime WSPR audio offset constant.
     double modulation_dot_seconds;  ///< Shared CW dot length.
     double modulation_fsk_offset_hz; ///< Shared CW shift in Hz.
+    double cw_intra_element_gap; ///< CW intra-element gap in dot-length multiples.
+    double cw_inter_character_gap; ///< CW inter-character gap in dot-length multiples.
+    double cw_inter_word_gap; ///< CW inter-word gap in dot-length multiples.
+    std::string cw_fade_shape; ///< CW envelope fade shape.
+    int cw_fade_in_ms; ///< CW envelope fade-in duration in milliseconds.
+    int cw_fade_out_ms; ///< CW envelope fade-out duration in milliseconds.
     int schedule_start_minute;      ///< CW schedule minute offset within the hour.
     int schedule_repeat_minutes;    ///< CW schedule repeat interval in minutes.
 
@@ -317,6 +323,12 @@ struct ArgParserConfig
           wspr_audio_offset_hz(WSPR_AUDIO_OFFSET_HZ),
           modulation_dot_seconds(3.0),
           modulation_fsk_offset_hz(500.0),
+          cw_intra_element_gap(1.0),
+          cw_inter_character_gap(3.0),
+          cw_inter_word_gap(7.0),
+          cw_fade_shape("none"),
+          cw_fade_in_ms(0),
+          cw_fade_out_ms(0),
           schedule_start_minute(0),
           schedule_repeat_minutes(10),
           mode(ModeType::WSPR),
@@ -379,6 +391,12 @@ struct ArgParserConfig
         wspr_audio_offset_hz = other.wspr_audio_offset_hz;
         modulation_dot_seconds = other.modulation_dot_seconds;
         modulation_fsk_offset_hz = other.modulation_fsk_offset_hz;
+        cw_intra_element_gap = other.cw_intra_element_gap;
+        cw_inter_character_gap = other.cw_inter_character_gap;
+        cw_inter_word_gap = other.cw_inter_word_gap;
+        cw_fade_shape = other.cw_fade_shape;
+        cw_fade_in_ms = other.cw_fade_in_ms;
+        cw_fade_out_ms = other.cw_fade_out_ms;
         schedule_start_minute = other.schedule_start_minute;
         schedule_repeat_minutes = other.schedule_repeat_minutes;
         mode = other.mode;
@@ -518,6 +536,12 @@ void ini_to_json(std::string filename);
  *       "Base Frequency": 3572000.0,
  *       "Shift Hz": 500.0,
  *       "Dot Seconds": 3.0,
+ *       "Intra Element Gap": 1.0,
+ *       "Inter Character Gap": 3.0,
+ *       "Inter Word Gap": 7.0,
+ *       "Fade Shape": "none",
+ *       "Fade In Ms": 0,
+ *       "Fade Out Ms": 0,
  *       "Start Minute": 0,
  *       "Repeat Minutes": 10
  *   }

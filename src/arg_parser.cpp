@@ -1205,6 +1205,41 @@ bool validate_config_candidate(
         return false;
     }
 
+    if (candidate.cw_intra_element_gap <= 0.0 ||
+        candidate.cw_inter_character_gap <= 0.0 ||
+        candidate.cw_inter_word_gap <= 0.0)
+    {
+        if (error_message != nullptr)
+        {
+            *error_message = "CW gap settings must be greater than 0.";
+        }
+
+        return false;
+    }
+
+    if (candidate.cw_fade_shape != "none" &&
+        candidate.cw_fade_shape != "linear" &&
+        candidate.cw_fade_shape != "raised_cosine")
+    {
+        if (error_message != nullptr)
+        {
+            *error_message =
+                "Invalid CW fade shape. Expected none, linear, or raised_cosine.";
+        }
+
+        return false;
+    }
+
+    if (candidate.cw_fade_in_ms < 0 || candidate.cw_fade_out_ms < 0)
+    {
+        if (error_message != nullptr)
+        {
+            *error_message = "CW fade durations must be 0 or greater.";
+        }
+
+        return false;
+    }
+
     const bool frequencies_ok = set_frequencies(candidate);
     if (!frequencies_ok && !trim_copy_string(candidate.frequencies).empty())
     {

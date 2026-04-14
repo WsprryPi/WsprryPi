@@ -231,6 +231,28 @@ namespace
         return "WSPR";
     }
 
+    std::string parse_cw_fade_shape(const nlohmann::json &cw)
+    {
+        std::string raw = trim_copy(cw.value("Fade Shape", std::string("none")));
+        std::transform(
+            raw.begin(),
+            raw.end(),
+            raw.begin(),
+            [](unsigned char c)
+            {
+                return static_cast<char>(std::tolower(c));
+            });
+        std::replace(raw.begin(), raw.end(), '-', '_');
+
+        if (raw.empty() || raw == "none" || raw == "linear" || raw == "raised_cosine")
+        {
+            return raw.empty() ? std::string("none") : raw;
+        }
+
+        throw std::runtime_error(
+            "Invalid CW.Fade Shape. Expected none, linear, or raised_cosine.");
+    }
+
     nlohmann::json public_config_from_internal(const nlohmann::json &source)
     {
         nlohmann::json public_json;
@@ -597,7 +619,14 @@ void init_default_config()
     config.si5351_power_level = 1;
     resolve_backend_specific_config(config);
 
+    config.modulation_dot_seconds = 3.0;
     config.modulation_fsk_offset_hz = 500.0;
+    config.cw_intra_element_gap = 1.0;
+    config.cw_inter_character_gap = 3.0;
+    config.cw_inter_word_gap = 7.0;
+    config.cw_fade_shape = "none";
+    config.cw_fade_in_ms = 0;
+    config.cw_fade_out_ms = 0;
     config.schedule_start_minute = 0;
     config.schedule_repeat_minutes = 10;
 
@@ -811,6 +840,12 @@ namespace
                 (key == "Base Frequency" ||
                  key == "Shift Hz" ||
                  key == "Dot Seconds" ||
+                 key == "Intra Element Gap" ||
+                 key == "Inter Character Gap" ||
+                 key == "Inter Word Gap" ||
+                 key == "Fade Shape" ||
+                 key == "Fade In Ms" ||
+                 key == "Fade Out Ms" ||
                  key == "Start Minute" ||
                  key == "Repeat Minutes"));
     }
@@ -932,6 +967,12 @@ namespace
             {"Base Frequency", 3572000.0},
             {"Shift Hz", 500.0},
             {"Dot Seconds", 3.0},
+            {"Intra Element Gap", 1.0},
+            {"Inter Character Gap", 3.0},
+            {"Inter Word Gap", 7.0},
+            {"Fade Shape", "none"},
+            {"Fade In Ms", 0},
+            {"Fade Out Ms", 0},
             {"Start Minute", 0},
             {"Repeat Minutes", 10}};
         std::array<BandGPIOConfig, HAM_BAND_COUNT> default_band_gpio{};
@@ -1024,6 +1065,33 @@ namespace
                     source.at("CW").contains("Shift Hz")
                 ? source.at("CW").at("Shift Hz").get<double>()
                 : target.modulation_fsk_offset_hz;
+        target.cw_intra_element_gap =
+            source.contains("CW") &&
+                    source.at("CW").contains("Intra Element Gap")
+                ? source.at("CW").at("Intra Element Gap").get<double>()
+                : target.cw_intra_element_gap;
+        target.cw_inter_character_gap =
+            source.contains("CW") &&
+                    source.at("CW").contains("Inter Character Gap")
+                ? source.at("CW").at("Inter Character Gap").get<double>()
+                : target.cw_inter_character_gap;
+        target.cw_inter_word_gap =
+            source.contains("CW") &&
+                    source.at("CW").contains("Inter Word Gap")
+                ? source.at("CW").at("Inter Word Gap").get<double>()
+                : target.cw_inter_word_gap;
+        target.cw_fade_shape =
+            source.contains("CW") ? parse_cw_fade_shape(source.at("CW")) : "none";
+        target.cw_fade_in_ms =
+            source.contains("CW") &&
+                    source.at("CW").contains("Fade In Ms")
+                ? source.at("CW").at("Fade In Ms").get<int>()
+                : target.cw_fade_in_ms;
+        target.cw_fade_out_ms =
+            source.contains("CW") &&
+                    source.at("CW").contains("Fade Out Ms")
+                ? source.at("CW").at("Fade Out Ms").get<int>()
+                : target.cw_fade_out_ms;
         target.schedule_start_minute =
             source.contains("CW") &&
                     source.at("CW").contains("Start Minute")
@@ -1180,6 +1248,12 @@ namespace
         target["CW"]["Base Frequency"] = cw_base_frequency_hz;
         target["CW"]["Shift Hz"] = cw_shift_hz;
         target["CW"]["Dot Seconds"] = source.modulation_dot_seconds;
+        target["CW"]["Intra Element Gap"] = source.cw_intra_element_gap;
+        target["CW"]["Inter Character Gap"] = source.cw_inter_character_gap;
+        target["CW"]["Inter Word Gap"] = source.cw_inter_word_gap;
+        target["CW"]["Fade Shape"] = source.cw_fade_shape;
+        target["CW"]["Fade In Ms"] = source.cw_fade_in_ms;
+        target["CW"]["Fade Out Ms"] = source.cw_fade_out_ms;
         target["CW"]["Start Minute"] = source.schedule_start_minute;
         target["CW"]["Repeat Minutes"] = source.schedule_repeat_minutes;
 
@@ -1223,6 +1297,12 @@ namespace
         target.wspr_audio_offset_hz = source.wspr_audio_offset_hz;
         target.modulation_dot_seconds = source.modulation_dot_seconds;
         target.modulation_fsk_offset_hz = source.modulation_fsk_offset_hz;
+        target.cw_intra_element_gap = source.cw_intra_element_gap;
+        target.cw_inter_character_gap = source.cw_inter_character_gap;
+        target.cw_inter_word_gap = source.cw_inter_word_gap;
+        target.cw_fade_shape = source.cw_fade_shape;
+        target.cw_fade_in_ms = source.cw_fade_in_ms;
+        target.cw_fade_out_ms = source.cw_fade_out_ms;
         target.schedule_start_minute = source.schedule_start_minute;
         target.schedule_repeat_minutes = source.schedule_repeat_minutes;
         target.mode = source.mode;
@@ -1503,6 +1583,12 @@ void json_to_ini()
                   key == "Base Frequency" ||
                   key == "Shift Hz" ||
                   key == "Dot Seconds" ||
+                  key == "Intra Element Gap" ||
+                  key == "Inter Character Gap" ||
+                  key == "Inter Word Gap" ||
+                  key == "Fade Shape" ||
+                  key == "Fade In Ms" ||
+                  key == "Fade Out Ms" ||
                   key == "Start Minute" ||
                   key == "Repeat Minutes"));
 
