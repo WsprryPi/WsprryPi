@@ -1701,7 +1701,7 @@ void repair_from_web(bool attempt_repair)
 
         llog.logS(
             ERROR,
-            "Failed to reload repaired configuration; keeping current config:",
+            "Failed to reload repaired configuration; previous configuration remains loaded:",
             load_error);
         return;
     }

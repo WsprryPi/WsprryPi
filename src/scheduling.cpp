@@ -2709,12 +2709,12 @@ bool set_config(bool force)
             if (!prepared_candidate.valid)
             {
                 llog.logS(ERROR,
-                          "Configuration reload failed; keeping current config:",
+                          "Invalid configuration reload rejected; previous valid configuration remains loaded:",
                           prepared_candidate.error_reason);
                 send_ws_message("configuration", "reload_failed");
                 set_managed_reload_tx_inhibited(
                     true,
-                    "Managed reload rejected. Future transmissions disabled until a valid configuration is loaded.");
+                    "Transmit is blocked until a valid configuration is loaded.");
 
                 if (wsprTransmitter.getState() != WsprTransmitter::State::TRANSMITTING)
                 {
@@ -3040,7 +3040,7 @@ bool set_config(bool force)
                 {
                     set_managed_reload_tx_inhibited(
                         true,
-                        "Managed reload planning failed. Future transmissions disabled until a valid configuration is loaded.");
+                        "Managed reload planning failed; previous valid configuration remains loaded. Transmit is blocked until a valid configuration is loaded.");
                     send_ws_message("configuration", "reload_failed");
                     wsprTransmitter.stopAndJoin();
                     stop_active_transmission_selectors();
@@ -3077,7 +3077,7 @@ bool set_config(bool force)
                 {
                     set_managed_reload_tx_inhibited(
                         true,
-                        "Managed reload could not prepare band GPIO. Future transmissions disabled until a valid configuration is loaded.");
+                        "Managed reload could not prepare band GPIO; previous valid configuration remains loaded. Transmit is blocked until a valid configuration is loaded.");
                     send_ws_message("configuration", "reload_failed");
                     if (!finalize_reload_pending())
                     {
