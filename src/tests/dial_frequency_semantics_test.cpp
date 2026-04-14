@@ -3,6 +3,7 @@
 #include "frequency_semantics.hpp"
 #include "scheduling.hpp"
 #include "wspr_band_lookup.hpp"
+#include "wspr_transmit_backend_si5351.hpp"
 
 #include <cmath>
 #include <cstdlib>
@@ -187,6 +188,11 @@ namespace
         set_scheduler_execution_suppressed_for_test(false);
     }
 
+    void clear_pi_generation_override_for_scope() noexcept
+    {
+        clear_raspberry_pi_generation_override_for_test();
+    }
+
     void require_patch_accepts_and_runtime_plans(
         const nlohmann::json &patch,
         const std::string &expected_plan_type,
@@ -295,6 +301,158 @@ int main()
             resolve_actual_rf_frequency_hz(730000.0, 1500.0, FrequencyPath::DirectRf),
             730000.0),
         "Direct-RF paths must not apply the WSPR audio offset");
+
+    {
+        set_raspberry_pi_generation_override_for_test(4);
+        prime_valid_runtime_identity_config();
+        reset_runtime_planning_state_for_identity_test();
+
+        std::string validation_error;
+        require(
+            validate_config_candidate(config, &validation_error),
+            "GPIO backend must remain allowed on Raspberry Pi 4");
+        require(
+            set_config(true),
+            "scheduler must allow GPIO execution requests on Raspberry Pi 4");
+        require(
+            current_transmission_request_for_test().mode == TransmissionMode::WSPR,
+            "scheduler must commit a normal WSPR request for GPIO on Raspberry Pi 4");
+
+        finish_runtime_planning_state_for_identity_test();
+        clear_pi_generation_override_for_scope();
+    }
+
+    {
+        set_raspberry_pi_generation_override_for_test(5);
+        prime_valid_runtime_identity_config();
+
+        std::string validation_error;
+        require(
+            !validate_config_candidate(config, &validation_error),
+            "GPIO backend must be rejected on Raspberry Pi 5");
+        require(
+            validation_error.find(
+                "GPIO transmission mode is unsupported on Raspberry Pi 5 and newer.") !=
+                std::string::npos,
+            "GPIO backend rejection on Raspberry Pi 5 must explain the unsupported platform");
+
+        PreparedConfigCandidate candidate;
+        iniFile.setData(make_managed_ini_data("AA0NT", "EM18", "20m", true));
+        prepare_ini_config_candidate("/tmp/gpio_pi5.ini", candidate);
+        require(
+            !candidate.valid,
+            "managed GPIO configuration must be rejected on Raspberry Pi 5");
+        require(
+            candidate.error_reason.find(
+                "GPIO transmission mode is unsupported on Raspberry Pi 5 and newer.") !=
+                std::string::npos,
+            "managed GPIO rejection on Raspberry Pi 5 must preserve the platform error");
+
+        clear_pi_generation_override_for_scope();
+    }
+
+    {
+        set_raspberry_pi_generation_override_for_test(5);
+        reset_current_transmission_request_for_test();
+        reset_getopt_state();
+
+        std::vector<std::string> args = {
+            "wsprrypi",
+            "--backend",
+            "gpio",
+            "AA0NT",
+            "EM18",
+            "20",
+            "20m"};
+        std::vector<char *> argv = argv_for(args);
+
+        require(
+            parse_command_line(static_cast<int>(argv.size()), argv.data()),
+            "CLI GPIO setup on Raspberry Pi 5 must still parse before validation");
+        std::string validation_error;
+        require(
+            !validate_config_data_for_test(&validation_error),
+            "CLI startup validation must fail for GPIO on Raspberry Pi 5");
+        require(
+            validation_error.find(
+                "GPIO transmission mode is unsupported on Raspberry Pi 5 and newer.") !=
+                std::string::npos,
+            "CLI startup validation on Raspberry Pi 5 must report the GPIO platform error");
+        require(
+            current_transmission_request_for_test().actual_rf_frequency_hz == 0.0 &&
+                current_transmission_request_for_test().payload.frames.empty(),
+            "CLI startup failure on Raspberry Pi 5 must not commit a transmission request");
+
+        clear_pi_generation_override_for_scope();
+    }
+
+    {
+        set_raspberry_pi_generation_override_for_test(5);
+        prime_valid_runtime_identity_config();
+        config.transmit_backend = TransmitBackendKind::SI5351;
+        config.si5351_i2c_bus = 1;
+        config.si5351_i2c_address = 0x60;
+        config.si5351_reference_hz = 27000000;
+        config.si5351_tx_output = 0;
+        config.si5351_power_level = 1;
+        resolve_backend_specific_config(config);
+
+        std::string validation_error;
+        require(
+            validate_config_candidate(config, &validation_error),
+            "non-GPIO backends must remain allowed on Raspberry Pi 5");
+
+        clear_pi_generation_override_for_scope();
+    }
+
+    {
+        set_raspberry_pi_generation_override_for_test(5);
+
+        WsprSi5351Backend::Config si5351_config;
+        si5351_config.device.i2c_bus = 1;
+        si5351_config.device.i2c_address = 0x60;
+        si5351_config.device.reference_hz = 27000000;
+        si5351_config.planner.reference_hz = 27000000;
+        si5351_config.planner.tx_output = Si5351Device::Output::CLK0;
+        si5351_config.power_level = 1;
+        si5351_config.dry_run = true;
+
+        WsprSi5351Backend backend(wsprTransmitter, si5351_config);
+
+        wsprrypi::ExecutionPlan plan;
+        plan.id.value = 1;
+        plan.request_id.value = 1;
+        plan.mode = wsprrypi::TransmissionMode::TONE;
+        plan.backend = wsprrypi::BackendKind::SI5351;
+        plan.reference_frequency_hz = 14097100.0;
+        plan.events.push_back(wsprrypi::RfEvent{
+            std::chrono::nanoseconds{0},
+            std::chrono::milliseconds{1},
+            wsprrypi::RfEventType::RF_ON,
+            14097100.0,
+            true,
+            {}});
+        plan.summary.total_duration = std::chrono::milliseconds{1};
+        plan.summary.event_count = plan.events.size();
+        plan.summary.min_frequency_hz = 14097100.0;
+        plan.summary.max_frequency_hz = 14097100.0;
+
+        wsprrypi::BackendExecutionInputs inputs;
+        inputs.power_level = 1;
+
+        const wsprrypi::BackendCompileResult compile_result =
+            backend.configure(plan, inputs);
+        require(
+            compile_result.ok,
+            "Si5351 backend configure path must remain allowed on Raspberry Pi 5");
+
+        const wsprrypi::ExecutionResult execute_result = backend.execute(plan);
+        require(
+            execute_result.ok,
+            "Si5351 backend execution path must remain allowed on Raspberry Pi 5");
+
+        clear_pi_generation_override_for_scope();
+    }
 
     {
         init_config_json();

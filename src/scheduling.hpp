@@ -307,5 +307,6 @@ bool current_band_gpio_selection_for_test(
     BandGPIOConfig &config_out,
     std::string &band_label_out) noexcept;
 TransmissionRequest current_transmission_request_for_test();
+void reset_current_transmission_request_for_test() noexcept;
 
 #endif // _SCHEDULING_HPP
