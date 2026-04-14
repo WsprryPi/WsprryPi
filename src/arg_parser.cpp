@@ -1172,6 +1172,15 @@ bool validate_config_candidate(
     ArgParserConfig &candidate,
     std::string *error_message)
 {
+    resolve_backend_specific_config(candidate);
+
+    const bool backend_validation_required =
+        candidate.mode == ModeType::TONE ||
+        (!candidate.use_ini && candidate.mode != ModeType::WSPR) ||
+        (!candidate.use_ini && candidate.mode == ModeType::WSPR &&
+         !candidate.loop_tx) ||
+        candidate.transmit;
+
     if (candidate.modulation_dot_seconds <= 0.0)
     {
         if (error_message != nullptr)
@@ -1261,7 +1270,13 @@ bool validate_config_candidate(
 
     const bool requires_valid_transmit_gpio =
         candidate.transmit_backend == TransmitBackendKind::GPIO &&
-        (candidate.mode == ModeType::TONE || candidate.transmit);
+        backend_validation_required;
+
+    if (requires_valid_transmit_gpio &&
+        !platform_supports_gpio_clock_transmission(error_message))
+    {
+        return false;
+    }
 
     if (requires_valid_transmit_gpio &&
         !is_valid_runtime_transmit_gpio(candidate.gpio_tx_pin))
@@ -1275,7 +1290,7 @@ bool validate_config_candidate(
     }
 
     if (candidate.transmit_backend == TransmitBackendKind::SI5351 &&
-        (candidate.mode == ModeType::TONE || candidate.transmit))
+        backend_validation_required)
     {
         if (candidate.si5351_i2c_bus < 0)
         {
@@ -1335,7 +1350,7 @@ bool validate_config_candidate(
         }
     }
     else if (candidate.transmit_backend == TransmitBackendKind::GPIO &&
-             (candidate.mode == ModeType::TONE || candidate.transmit) &&
+             backend_validation_required &&
              (candidate.gpio_power_level < 0 || candidate.gpio_power_level > 7))
     {
         if (error_message != nullptr)
@@ -1781,14 +1796,32 @@ void apply_runtime_config_side_effects()
     }
 }
 
-bool validate_config_data()
+bool validate_config_data_for_test(
+    std::string *validation_error) noexcept
 {
+    // Regression tests need the same startup validation path without the
+    // process-exit behavior used by the normal CLI failure flow.
     resolve_backend_specific_config(config);
     sync_wspr_mode_config(config);
     ini_reload_pending.store(false, std::memory_order_relaxed);
 
+    std::string local_validation_error;
+    if (!validate_config_candidate(config, &local_validation_error))
+    {
+        if (validation_error != nullptr)
+        {
+            *validation_error = local_validation_error;
+        }
+        return false;
+    }
+
+    return true;
+}
+
+bool validate_config_data()
+{
     std::string validation_error;
-    if (!validate_config_candidate(config, &validation_error))
+    if (!validate_config_data_for_test(&validation_error))
     {
         llog.logE(
             FATAL,
@@ -1812,19 +1845,33 @@ bool validate_config_data()
         {
             llog.logE(ERROR, " - At least one WSPR dial frequency must be specified.");
         }
-        if ((config.mode == ModeType::TONE || config.transmit) &&
+        const bool backend_validation_required =
+            config.mode == ModeType::TONE ||
+            (!config.use_ini && config.mode != ModeType::WSPR) ||
+            (!config.use_ini && config.mode == ModeType::WSPR &&
+             !config.loop_tx) ||
+            config.transmit;
+        if (backend_validation_required &&
+            config.transmit_backend == TransmitBackendKind::GPIO &&
+            !platform_supports_gpio_clock_transmission())
+        {
+            std::string platform_error;
+            (void)platform_supports_gpio_clock_transmission(&platform_error);
+            llog.logE(ERROR, " - ", platform_error);
+        }
+        if (backend_validation_required &&
             config.transmit_backend == TransmitBackendKind::GPIO &&
             !is_valid_runtime_transmit_gpio(config.tx_pin))
         {
             llog.logE(ERROR, " - ", transmit_gpio_validation_message());
         }
-        if ((config.mode == ModeType::TONE || config.transmit) &&
+        if (backend_validation_required &&
             config.transmit_backend == TransmitBackendKind::GPIO &&
             (config.gpio_power_level < 0 || config.gpio_power_level > 7))
         {
             llog.logE(ERROR, " - Invalid GPIO power level. Expected 0 through 7.");
         }
-        if ((config.mode == ModeType::TONE || config.transmit) &&
+        if (backend_validation_required &&
             config.transmit_backend == TransmitBackendKind::SI5351)
         {
             if (config.si5351_i2c_bus < 0)

@@ -92,6 +92,11 @@ extern std::string get_debug_state();
  * ```
  */
 extern std::string get_pi_model();
+int get_raspberry_pi_generation();
+bool platform_supports_gpio_clock_transmission(
+    std::string *error_message = nullptr);
+void set_raspberry_pi_generation_override_for_test(int generation) noexcept;
+void clear_raspberry_pi_generation_override_for_test() noexcept;
 
 /**
  * @brief Return the operating system version name.

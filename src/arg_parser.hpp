@@ -172,6 +172,8 @@ extern void show_config_values(bool reload = false);
  * @return false if validation fails (application exits).
  */
 extern bool validate_config_data();
+bool validate_config_data_for_test(
+    std::string *validation_error = nullptr) noexcept;
 
 bool validate_config_candidate(
     ArgParserConfig &candidate,

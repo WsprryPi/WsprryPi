@@ -2765,6 +2765,43 @@ bool set_config(bool force)
         bool do_config = force;
         bool do_random = false;
 
+        std::string backend_platform_error;
+        const bool backend_platform_supported =
+            !(working_config.mode == ModeType::TONE ||
+              runtime_transmit_requested(working_config))
+            || working_config.transmit_backend != TransmitBackendKind::GPIO
+            || platform_supports_gpio_clock_transmission(
+                &backend_platform_error);
+
+        if (!backend_platform_supported)
+        {
+            llog.logS(ERROR, backend_platform_error);
+
+            if (working_config.use_ini)
+            {
+                set_managed_reload_tx_inhibited(
+                    true,
+                    "No transmit due to invalid backend/platform combination.");
+                wsprTransmitter.stopAndJoin();
+                stop_active_transmission_selectors();
+                current_transmission_request = TransmissionRequest{};
+                current_dial_frequency = 0.0;
+                current_frequency_entry = WsprFrequencyEntry{};
+
+                if (!finalize_reload_pending())
+                {
+                    continue;
+                }
+                return true;
+            }
+
+            if (!finalize_reload_pending())
+            {
+                continue;
+            }
+            return false;
+        }
+
         bool ppm_running = ppmManager.isRunning();
         bool should_start_ppm = working_config.use_ntp && !ppm_running;
         if (should_start_ppm)
@@ -3259,4 +3296,9 @@ bool current_band_gpio_selection_for_test(
 TransmissionRequest current_transmission_request_for_test()
 {
     return current_transmission_request;
+}
+
+void reset_current_transmission_request_for_test() noexcept
+{
+    current_transmission_request = TransmissionRequest{};
 }
