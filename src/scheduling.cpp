@@ -591,6 +591,23 @@ static void set_managed_reload_tx_inhibited(
     }
 }
 
+bool transmitter_reload_should_defer() noexcept
+{
+    const WsprTransmitter::State state = wsprTransmitter.getState();
+
+    if (state == WsprTransmitter::State::TRANSMITTING ||
+        state == WsprTransmitter::State::RECOVERING)
+    {
+        return true;
+    }
+
+    // Direct-tone modes start immediately and can still be in the launch
+    // handoff while the controller remains ENABLED. Treat that window as
+    // active for reload purposes so INI edits do not cancel the live run.
+    return state == WsprTransmitter::State::ENABLED &&
+           wsprTransmitter.activeExecutionIsTone();
+}
+
 static WsprFrequencyEntry next_frequency_entry_from(
     const std::vector<WsprFrequencyEntry> &entries,
     int &iterator,
@@ -2691,7 +2708,7 @@ bool set_config(bool force)
         const bool ppm_update_requested =
             ppm_reload_pending.load(std::memory_order_acquire);
 
-        if (wsprTransmitter.getState() == WsprTransmitter::State::TRANSMITTING &&
+        if (transmitter_reload_should_defer() &&
             (managed_candidate_requested || ppm_update_requested))
         {
             if (managed_candidate_requested)

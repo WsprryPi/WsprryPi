@@ -290,6 +290,7 @@ WsprRuntimeStatusSnapshot current_tx_runtime_status_snapshot();
  *         `configure()`.
  */
 bool set_config(bool force = false);
+bool transmitter_reload_should_defer() noexcept;
 void transmitter_cb(WsprTransmissionCallbackEvent event,
                     WsprTransmitLogLevel level,
                     const std::string &msg,

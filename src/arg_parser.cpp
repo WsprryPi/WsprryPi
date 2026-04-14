@@ -325,9 +325,7 @@ void callback_ini_changed()
         ini_reload_generation.fetch_add(1, std::memory_order_acq_rel) + 1U;
     ini_reload_pending.store(true, std::memory_order_release);
 
-    const WsprTransmitter::State transmitter_state = wsprTransmitter.getState();
-
-    if (transmitter_state == WsprTransmitter::State::TRANSMITTING)
+    if (transmitter_reload_should_defer())
     {
         llog.logS(
             INFO,
@@ -1615,13 +1613,13 @@ void apply_runtime_config_side_effects()
 
         log_startup_config_message(
             INFO,
-            "QRSS configuration loaded: message='",
+            "QRSS configuration loaded: message=\"",
             message,
-            "' frequency=",
+            "\" frequency=",
             lookup.freq_display_string(frequency_hz),
             " dot=",
             dot_seconds,
-            " s");
+            "s");
         return;
     }
 
@@ -1651,15 +1649,15 @@ void apply_runtime_config_side_effects()
 
         log_startup_config_message(
             INFO,
-            "FSKCW configuration loaded: message='",
+            "FSKCW configuration loaded: message=\"",
             message,
-            "' mark=",
+            "\" mark=",
             lookup.freq_display_string(mark_frequency_hz),
             " space=",
             lookup.freq_display_string(space_frequency_hz),
             " dot=",
             dot_seconds,
-            " s");
+            "s");
         return;
     }
 
@@ -1689,15 +1687,15 @@ void apply_runtime_config_side_effects()
 
         log_startup_config_message(
             INFO,
-            "DFCW configuration loaded: message='",
+            "DFCW configuration loaded: message=\"",
             message,
-            "' dot=",
+            "\" dot=",
             lookup.freq_display_string(dot_frequency_hz),
             " dash=",
             lookup.freq_display_string(dash_frequency_hz),
             " dot=",
             dot_seconds,
-            " s");
+            "s");
         return;
     }
 
