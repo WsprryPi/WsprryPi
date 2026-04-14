@@ -381,6 +381,19 @@ int main(int argc, char *argv[])
     }
     close_async_shutdown_pipe();
 
+    if (reboot_flag.load(std::memory_order_acquire))
+    {
+        llog.logS(INFO, "Rebooting.");
+        std::cerr << "[INFO ] Rebooting." << std::endl;
+        reboot_machine();
+    }
+    if (shutdown_flag.load(std::memory_order_acquire))
+    {
+        llog.logS(INFO, "Shutting down.");
+        std::cerr << "[INFO ] Shutting down." << std::endl;
+        shutdown_machine();
+    }
+
     // Graceful shutdown preserves Unix signal semantics by returning 128 +
     // signum after cleanup completes.
     if (retval == EXIT_SUCCESS)

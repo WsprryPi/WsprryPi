@@ -2219,17 +2219,18 @@ StopTransmissionResult stop_transmission_by_user_request()
     return result;
 }
 
-static void stop_runtime_components_for_early_exit() noexcept
+static void stop_runtime_components_for_process_exit() noexcept
 {
     ini_reload_pending.store(false, std::memory_order_relaxed);
-    iniMonitor.stop();
-    wsprTransmitter.stopAndJoin();
-    stop_active_transmission_selectors();
-    shutdownMonitor.stop();
-    ledControl.stop();
-    ppmManager.stop();
+
     webServer.stop();
     socketServer.stop();
+    iniMonitor.stop();
+    shutdownMonitor.stop();
+    ppmManager.stop();
+    wsprTransmitter.shutdownForProcessExit();
+    stop_active_transmission_selectors();
+    ledControl.stop();
 }
 
 /**
@@ -2344,7 +2345,7 @@ bool wspr_loop()
         ini_reload_pending.store(!startup_config_handoff, std::memory_order_relaxed);
         if (!set_config(startup_config_handoff ? false : true))
         {
-            stop_runtime_components_for_early_exit();
+            stop_runtime_components_for_process_exit();
             return false;
         }
     }
@@ -2356,7 +2357,7 @@ bool wspr_loop()
         if (!try_get_direct_tone_startup_request(entry, actual_rf_frequency_hz))
         {
             llog.logE(ERROR, "Direct RF test tone requested without a startup tone request.");
-            stop_runtime_components_for_early_exit();
+            stop_runtime_components_for_process_exit();
             return false;
         }
 
@@ -2389,7 +2390,7 @@ bool wspr_loop()
             shutdown_after_wspr_plan.store(false, std::memory_order_release);
             if (!start_non_wspr_transmission_now(config))
             {
-                stop_runtime_components_for_early_exit();
+                stop_runtime_components_for_process_exit();
                 return false;
             }
         }
@@ -2409,7 +2410,7 @@ bool wspr_loop()
             shutdown_after_wspr_plan.store(false, std::memory_order_release);
             if (!start_non_wspr_transmission_now(config))
             {
-                stop_runtime_components_for_early_exit();
+                stop_runtime_components_for_process_exit();
                 return false;
             }
         }
@@ -2429,7 +2430,7 @@ bool wspr_loop()
             shutdown_after_wspr_plan.store(false, std::memory_order_release);
             if (!start_non_wspr_transmission_now(config))
             {
-                stop_runtime_components_for_early_exit();
+                stop_runtime_components_for_process_exit();
                 return false;
             }
         }
@@ -2457,52 +2458,40 @@ bool wspr_loop()
     // -------------------------------------------------------------------------
     llog.logS(INFO, "Stopping runtime components.");
 
+    llog.logS(INFO, "Stopping web server.");
+    webServer.stop();
+    llog.logS(INFO, "Web server stopped.");
+
+    llog.logS(INFO, "Stopping socket server.");
+    socketServer.stop();
+    llog.logS(INFO, "Socket server stopped.");
+
     llog.logS(INFO, "Stopping configuration monitor.");
     ini_reload_pending.store(false, std::memory_order_relaxed);
     iniMonitor.stop(); // Stop config file monitor before transmitter teardown.
     llog.logS(INFO, "Configuration monitor stopped.");
 
+    llog.logS(INFO, "Stopping shutdown monitor.");
+    shutdownMonitor.stop(); // Stop the GPIO monitor
+    llog.logS(INFO, "Shutdown monitor stopped.");
+
+    llog.logS(INFO, "Stopping PPM manager.");
+    ppmManager.stop(); // Stop PPM manager (if active)
+    llog.logS(INFO, "PPM manager stopped.");
+
     llog.logS(INFO, "Stopping transmitter.");
-    wsprTransmitter.stopAndJoin(); // Stop the transmitter threads
+    wsprTransmitter.shutdownForProcessExit();
     llog.logS(INFO, "Transmitter stopped.");
 
     llog.logS(INFO, "Stopping band GPIO selector.");
     stop_active_transmission_selectors();
     llog.logS(INFO, "Band GPIO selector stopped.");
 
-    llog.logS(INFO, "Stopping shutdown monitor.");
-    shutdownMonitor.stop(); // Stop the GPIO monitor
-    llog.logS(INFO, "Shutdown monitor stopped.");
-
     llog.logS(INFO, "Stopping LED driver.");
     ledControl.stop(); // Stop LED driver
     llog.logS(INFO, "LED driver stopped.");
 
-    llog.logS(INFO, "Stopping PPM manager.");
-    ppmManager.stop(); // Stop PPM manager (if active)
-    llog.logS(INFO, "PPM manager stopped.");
-
-    llog.logS(INFO, "Stopping web server.");
-    webServer.stop(); // Stop web server
-
-    llog.logS(INFO, "Stopping socket server.");
-    socketServer.stop(); // Stop the socket server
-    llog.logS(INFO, "Socket server stopped.");
-
     llog.logS(INFO, "Runtime components stopped.");
-
-    if (reboot_flag.load())
-    {
-        llog.logS(INFO, "Rebooting.");
-        std::cerr << "[INFO ] Rebooting." << std::endl;
-        reboot_machine();
-    }
-    if (shutdown_flag.load())
-    {
-        llog.logS(INFO, "Shutting down.");
-        std::cerr << "[INFO ] Shutting down." << std::endl;
-        shutdown_machine();
-    }
 
     llog.logS(INFO, get_project_name(), "exiting.");
     // Flush all file system buffers to disk
