@@ -1600,7 +1600,7 @@ void transmitter_cb(WsprTransmitter::TransmissionCallbackEvent event,
             {
                 llog.logS(to_log_level(level),
                           "Started QRSS test transmission: ",
-                          wsprTransmitter.formatFrequencyMHz(frequency),
+                          wsprTransmitter.formatFrequencyMHz(config.qrss.frequency_hz),
                           " MHz",
                           get_active_gpio_suffix(),
                           ".");
@@ -1609,7 +1609,7 @@ void transmitter_cb(WsprTransmitter::TransmissionCallbackEvent event,
             {
                 llog.logS(to_log_level(level),
                           "Started FSKCW test transmission at mark frequency: ",
-                          wsprTransmitter.formatFrequencyMHz(frequency),
+                          wsprTransmitter.formatFrequencyMHz(config.fskcw.mark_frequency_hz),
                           " MHz",
                           get_active_gpio_suffix(),
                           ".");
@@ -1618,7 +1618,7 @@ void transmitter_cb(WsprTransmitter::TransmissionCallbackEvent event,
             {
                 llog.logS(to_log_level(level),
                           "Started DFCW test transmission at dot frequency: ",
-                          wsprTransmitter.formatFrequencyMHz(frequency),
+                          wsprTransmitter.formatFrequencyMHz(config.dfcw.dot_frequency_hz),
                           " MHz",
                           get_active_gpio_suffix(),
                           ".");
