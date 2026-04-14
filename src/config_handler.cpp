@@ -135,10 +135,20 @@ namespace
         {
             const std::string raw = trim_copy(source.get<std::string>());
             std::size_t consumed = 0;
-            const int parsed = std::stoi(raw, &consumed, base);
-            if (consumed == raw.size())
+            try
             {
-                return parsed;
+                const int parsed = std::stoi(raw, &consumed, base);
+                if (consumed == raw.size())
+                {
+                    return parsed;
+                }
+            }
+            catch (const std::invalid_argument &)
+            {
+            }
+            catch (const std::out_of_range &)
+            {
+                throw std::runtime_error(context + " is out of range.");
             }
         }
 
@@ -692,6 +702,18 @@ namespace
         if (*end == '\0')
         {
             return lval;
+        }
+
+        if (lowered.size() > 2 &&
+            lowered[0] == '0' &&
+            lowered[1] == 'x')
+        {
+            end = nullptr;
+            long hex_lval = std::strtol(trimmed.c_str(), &end, 0);
+            if (*end == '\0')
+            {
+                return hex_lval;
+            }
         }
 
         end = nullptr;

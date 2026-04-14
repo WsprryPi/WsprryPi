@@ -1374,6 +1374,50 @@ int main()
     }
 
     {
+        const auto prepare_si5351_address_candidate =
+            [](const std::string &address)
+        {
+            PreparedConfigCandidate candidate;
+            auto data = make_managed_ini_data("AA0NT", "EM18", "20m", true);
+            data["Runtime"]["Transmit Backend"] = "si5351";
+            data["Si5351"]["I2C Address"] = address;
+            iniFile.setData(data);
+            prepare_ini_config_candidate("/tmp/si5351_i2c_address.ini", candidate);
+            return candidate;
+        };
+
+        PreparedConfigCandidate hex_candidate =
+            prepare_si5351_address_candidate("0x60");
+        require(
+            hex_candidate.valid &&
+                hex_candidate.normalized_config.si5351_i2c_address == 0x60,
+            "Si5351 I2C address must accept 0x-prefixed hex strings");
+
+        PreparedConfigCandidate decimal_candidate =
+            prepare_si5351_address_candidate("96");
+        require(
+            decimal_candidate.valid &&
+                decimal_candidate.normalized_config.si5351_i2c_address == 96,
+            "Si5351 I2C address must accept decimal strings");
+
+        PreparedConfigCandidate out_of_range_candidate =
+            prepare_si5351_address_candidate("0x80");
+        require(
+            !out_of_range_candidate.valid &&
+                out_of_range_candidate.error_reason ==
+                    "Invalid Si5351 I2C address. Expected 0x03 through 0x77.",
+            "Si5351 I2C address must reject out-of-range hex values");
+
+        PreparedConfigCandidate malformed_candidate =
+            prepare_si5351_address_candidate("0xzz");
+        require(
+            !malformed_candidate.valid &&
+                malformed_candidate.error_reason ==
+                    "Si5351.I2C Address must be an integer.",
+            "Si5351 I2C address must reject malformed strings cleanly");
+    }
+
+    {
         init_default_config();
         config.use_ini = true;
         config.ini_filename = "/tmp/planner_preference_persist.ini";
