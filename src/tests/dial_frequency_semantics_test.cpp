@@ -31,6 +31,15 @@ namespace
         }
     }
 
+    std::string read_text_file(const std::string &path)
+    {
+        std::ifstream in(path);
+        require(in.is_open(), "test helper must open " + path);
+        return std::string(
+            std::istreambuf_iterator<char>(in),
+            std::istreambuf_iterator<char>());
+    }
+
     bool nearly_equal(double lhs, double rhs, double epsilon = 0.01)
     {
         return std::fabs(lhs - rhs) <= epsilon;
@@ -1589,6 +1598,70 @@ int main()
         require(
             config.use_shutdown && config.shutdown_pin == 19,
             "managed config candidate commit must update shutdown GPIO settings");
+    }
+
+    {
+        init_config_json();
+        json_to_config();
+        reset_current_transmission_request_for_test();
+        set_scheduler_execution_suppressed_for_test(true);
+
+        config.use_ini = true;
+        config.ini_filename = "/tmp/stop_request.ini";
+        config.mode = ModeType::WSPR;
+        config.transmit = true;
+        config.callsign = "AA0NT";
+        config.grid_square = "EM18";
+        config.power_dbm = 20;
+        config.frequencies = "20m";
+        config.gpio_tx_pin = 4;
+        resolve_backend_specific_config(config);
+        set_frequencies(config);
+
+        require(
+            set_config(true),
+            "stop request regression must commit an initial transmit request");
+        wsprTransmitter.backendSetStateValue(WsprTransmitter::State::TRANSMITTING);
+
+        const StopTransmissionResult stop_result =
+            stop_transmission_by_user_request();
+
+        require(
+            stop_result.transmission_active,
+            "user stop helper must detect an active transmission");
+        require(
+            stop_result.transmit_disabled,
+            "user stop helper must disable runtime transmit");
+        require(
+            !config.transmit,
+            "user stop helper must persist live transmit-disabled state");
+        require(
+            current_transmission_request_for_test().actual_rf_frequency_hz == 0.0 &&
+                current_transmission_request_for_test().payload.frames.empty(),
+            "user stop helper must clear the committed transmission request");
+        require(
+            wsprTransmitter.getState() != WsprTransmitter::State::TRANSMITTING,
+            "user stop helper must leave the transmitter out of TRANSMITTING state");
+
+        set_scheduler_execution_suppressed_for_test(false);
+    }
+
+    {
+        const std::string websocket_source =
+            read_text_file("/home/pi/WsprryPi/src/web_socket.cpp");
+        require(
+            websocket_source.find("else if (cmd == \"stop\")") != std::string::npos &&
+                websocket_source.find("stop_transmission_by_user_request();") !=
+                    std::string::npos,
+            "websocket stop command must route through stop_transmission_by_user_request()");
+
+        const std::string ui_source =
+            read_text_file("/home/pi/WsprryPi/WsprryPi-UI/data/index.js");
+        require(
+            ui_source.find("url: CONTROL_STOP_URL") != std::string::npos &&
+                ui_source.find("data: JSON.stringify({ command: \"stop\" })") !=
+                    std::string::npos,
+            "UI Stop button must POST the explicit stop command to the control stop endpoint");
     }
 
     {
