@@ -95,6 +95,7 @@ extern bool exitwspr_ready;
  * Other threads can poll or wait on this flag to terminate safely.
  */
 extern std::atomic<bool> shutdown_flag;
+extern std::atomic<bool> reboot_flag;
 
 /**
  * @brief Callback triggered by a shutdown GPIO event.
