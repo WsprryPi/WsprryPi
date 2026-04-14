@@ -646,6 +646,7 @@ nlohmann::json get_public_config_json();
  * @throws May throw exceptions from internal calls (e.g., parsing or write errors).
  */
 void patch_all_from_web(const nlohmann::json &j);
+void set_patch_all_from_web_runtime_apply_suppressed_for_test(bool suppressed) noexcept;
 
 /**
  * @brief Repairs or restores the configuration from stock defaults.

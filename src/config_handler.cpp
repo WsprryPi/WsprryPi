@@ -50,6 +50,8 @@ nlohmann::json jConfig;
 
 namespace
 {
+    bool g_patch_all_from_web_runtime_apply_suppressed_for_test = false;
+
     std::string trim_copy(const std::string &value);
 
     WsprPlannerPreference parse_wspr_planner_preference(
@@ -262,7 +264,6 @@ namespace
     {
         nlohmann::json public_json;
         public_json["Operation"] = source.at("Operation");
-
         public_json["GPIO"] = source.at("GPIO");
         public_json["Calibration"] = source.at("Calibration");
         public_json["Si5351"] = source.at("Si5351");
@@ -1755,7 +1756,15 @@ void patch_all_from_web(const nlohmann::json &j)
     copy_config(candidate_config, config);
     jConfig = candidate_json;
     json_to_ini();
-    send_ws_message("configuration", "reload");
+    if (!g_patch_all_from_web_runtime_apply_suppressed_for_test)
+    {
+        callback_ini_changed();
+    }
+}
+
+void set_patch_all_from_web_runtime_apply_suppressed_for_test(bool suppressed) noexcept
+{
+    g_patch_all_from_web_runtime_apply_suppressed_for_test = suppressed;
 }
 
 void repair_from_web(bool attempt_repair)

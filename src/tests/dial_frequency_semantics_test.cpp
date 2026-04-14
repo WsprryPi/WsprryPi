@@ -290,6 +290,8 @@ namespace
 
 int main()
 {
+    set_patch_all_from_web_runtime_apply_suppressed_for_test(true);
+
     WSPRBandLookup lookup;
 
     require(
@@ -1647,6 +1649,103 @@ int main()
     }
 
     {
+        init_default_config();
+        config.use_ini = true;
+        config.ini_filename = "/tmp/transmit_toggle_patch.ini";
+        config.mode = ModeType::WSPR;
+        config.transmit = false;
+        config.callsign = "AA0NT";
+        config.grid_square = "EM18";
+        config.power_dbm = 20;
+        config.frequencies = "20m";
+        config.gpio_tx_pin = 4;
+        config.transmit_backend = TransmitBackendKind::SI5351;
+        config.si5351_i2c_bus = 1;
+        config.si5351_i2c_address = 0x60;
+        config.si5351_reference_hz = 27000000;
+        config.si5351_tx_output = 0;
+        config.si5351_power_level = 1;
+        resolve_backend_specific_config(config);
+        config_to_json();
+        wsprTransmitter.backendSetStateValue(WsprTransmitter::State::TRANSMITTING);
+
+        patch_all_from_web({{"Operation", {{"Transmit", true}}}});
+
+        require(
+            config.transmit,
+            "web patch must update live Operation.Transmit immediately");
+        require(
+            jConfig["Operation"].value("Transmit", false),
+            "web patch must persist canonical Operation.Transmit in JSON");
+        const auto enabled_ini = iniFile.getData();
+        require(
+            enabled_ini.at("Operation").at("Transmit") == "true",
+            "web patch must persist canonical Operation.Transmit in INI");
+
+        PreparedConfigCandidate candidate;
+        prepare_ini_config_candidate("/tmp/transmit_toggle_patch.ini", candidate);
+        require(
+            candidate.valid && candidate.normalized_config.transmit,
+            "managed reload must preserve persisted Operation.Transmit");
+
+        patch_all_from_web({{"Operation", {{"Transmit", false}}}});
+
+        require(
+            !config.transmit,
+            "web patch must disable live Operation.Transmit immediately");
+        require(
+            !jConfig["Operation"].value("Transmit", true),
+            "web patch must persist canonical Operation.Transmit=false in JSON");
+        const auto disabled_ini = iniFile.getData();
+        require(
+            disabled_ini.at("Operation").at("Transmit") == "false",
+            "web patch must persist canonical Operation.Transmit=false in INI");
+        wsprTransmitter.backendSetStateValue(WsprTransmitter::State::DISABLED);
+    }
+
+    {
+        init_default_config();
+        config.use_ini = true;
+        config.ini_filename = "/tmp/mode_ntp_patch.ini";
+        config.mode = ModeType::QRSS;
+        config.transmit = false;
+        config.callsign = "AA0NT";
+        config.grid_square = "EM18";
+        config.power_dbm = 20;
+        config.frequencies = "20m";
+        config.gpio_tx_pin = 4;
+        config.gpio_use_ntp = false;
+        config.transmit_backend = TransmitBackendKind::GPIO;
+        resolve_backend_specific_config(config);
+        config_to_json();
+
+        patch_all_from_web(nlohmann::json{
+            {"Operation", {{"Mode", "WSPR"}}},
+            {"GPIO", {{"Use NTP", true}}}});
+
+        require(
+            config.mode == ModeType::WSPR,
+            "web patch must update canonical Operation.Mode immediately");
+        require(
+            config.gpio_use_ntp && config.use_ntp,
+            "web patch must update canonical GPIO.Use NTP immediately");
+        require(
+            jConfig["Operation"].value("Mode", std::string()) == "WSPR",
+            "web patch must persist canonical Operation.Mode in JSON");
+        require(
+            jConfig["GPIO"].value("Use NTP", false),
+            "web patch must persist canonical GPIO.Use NTP in JSON");
+
+        const auto persisted_ini = iniFile.getData();
+        require(
+            persisted_ini.at("Operation").at("Mode") == "WSPR",
+            "web patch must persist canonical Operation.Mode in INI");
+        require(
+            persisted_ini.at("GPIO").at("Use NTP") == "true",
+            "web patch must persist canonical GPIO.Use NTP in INI");
+    }
+
+    {
         const std::string websocket_source =
             read_text_file("/home/pi/WsprryPi/src/web_socket.cpp");
         require(
@@ -1662,6 +1761,46 @@ int main()
                 ui_source.find("data: JSON.stringify({ command: \"stop\" })") !=
                     std::string::npos,
             "UI Stop button must POST the explicit stop command to the control stop endpoint");
+        require(
+            ui_source.find("Operation: {\n                \"Transmit\": enabled,") !=
+                    std::string::npos &&
+                ui_source.find("Runtime: {\n                \"Transmit\": enabled,") ==
+                    std::string::npos,
+            "UI transmit toggle must patch canonical Operation.Transmit only");
+        require(
+            ui_source.find("var Operation = {\n        \"Mode\": mode,") !=
+                    std::string::npos &&
+                ui_source.find("var Meta = {\n        \"Mode\": mode") ==
+                    std::string::npos,
+            "UI save path must use canonical Operation.Mode only");
+        require(
+            ui_source.find("var GPIO = {\n        \"Power Level\": transmit_power,\n        \"Use NTP\": use_ntp,") !=
+                    std::string::npos &&
+                ui_source.find("var Calibration = {\n        \"PPM\": ppm_val,\n        \"Use NTP\": use_ntp,") ==
+                    std::string::npos,
+            "UI save path must use canonical GPIO.Use NTP only");
+
+        const std::string config_handler_source =
+            read_text_file("/home/pi/WsprryPi/src/config_handler.cpp");
+        require(
+            config_handler_source.find("json_to_ini();") != std::string::npos &&
+                config_handler_source.find("callback_ini_changed();") != std::string::npos,
+            "web config patch path must route persisted updates through the managed reload callback");
+
+        const std::string site_source =
+            read_text_file("/home/pi/WsprryPi/WsprryPi-UI/data/site.js");
+        require(
+            site_source.find("getConfigValue(operation, \"Operation\", \"Mode\", \"WSPR\")") !=
+                    std::string::npos &&
+                site_source.find("getConfigValue(meta, \"Meta\", \"Mode\", \"WSPR\")") ==
+                    std::string::npos,
+            "UI load path must read canonical Operation.Mode only");
+        require(
+            site_source.find("getConfigBoolValue(\n                    gpio,\n                    \"GPIO\",\n                    \"Use NTP\",") !=
+                    std::string::npos &&
+                site_source.find("getConfigBoolValue(\n                    calibration,\n                    \"Calibration\",\n                    \"Use NTP\",") ==
+                    std::string::npos,
+            "UI load path must read canonical GPIO.Use NTP only");
     }
 
     {
