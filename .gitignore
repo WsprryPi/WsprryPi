@@ -2,6 +2,7 @@
 wsprrypi
 wsprrypi_test
 executables/
+config/wsprrypi.ini.temp
 
 ## General Rules
 .DS_Store
