@@ -969,6 +969,7 @@ static wsprrypi::EnvelopeSettings cw_envelope_from_config(
     envelope.fade_shape = cw_fade_shape_from_config(cfg.cw_fade_shape);
     envelope.fade_in = std::chrono::milliseconds(cfg.cw_fade_in_ms);
     envelope.fade_out = std::chrono::milliseconds(cfg.cw_fade_out_ms);
+    envelope.fade_slice = std::chrono::milliseconds(cfg.cw_fade_slice_ms);
     return envelope;
 }
 

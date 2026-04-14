@@ -627,6 +627,7 @@ void init_default_config()
     config.cw_fade_shape = "none";
     config.cw_fade_in_ms = 0;
     config.cw_fade_out_ms = 0;
+    config.cw_fade_slice_ms = 5;
     config.schedule_start_minute = 0;
     config.schedule_repeat_minutes = 10;
 
@@ -846,6 +847,7 @@ namespace
                  key == "Fade Shape" ||
                  key == "Fade In Ms" ||
                  key == "Fade Out Ms" ||
+                 key == "Fade Slice Ms" ||
                  key == "Start Minute" ||
                  key == "Repeat Minutes"));
     }
@@ -973,6 +975,7 @@ namespace
             {"Fade Shape", "none"},
             {"Fade In Ms", 0},
             {"Fade Out Ms", 0},
+            {"Fade Slice Ms", 5},
             {"Start Minute", 0},
             {"Repeat Minutes", 10}};
         std::array<BandGPIOConfig, HAM_BAND_COUNT> default_band_gpio{};
@@ -1092,6 +1095,11 @@ namespace
                     source.at("CW").contains("Fade Out Ms")
                 ? source.at("CW").at("Fade Out Ms").get<int>()
                 : target.cw_fade_out_ms;
+        target.cw_fade_slice_ms =
+            source.contains("CW") &&
+                    source.at("CW").contains("Fade Slice Ms")
+                ? source.at("CW").at("Fade Slice Ms").get<int>()
+                : target.cw_fade_slice_ms;
         target.schedule_start_minute =
             source.contains("CW") &&
                     source.at("CW").contains("Start Minute")
@@ -1254,6 +1262,7 @@ namespace
         target["CW"]["Fade Shape"] = source.cw_fade_shape;
         target["CW"]["Fade In Ms"] = source.cw_fade_in_ms;
         target["CW"]["Fade Out Ms"] = source.cw_fade_out_ms;
+        target["CW"]["Fade Slice Ms"] = source.cw_fade_slice_ms;
         target["CW"]["Start Minute"] = source.schedule_start_minute;
         target["CW"]["Repeat Minutes"] = source.schedule_repeat_minutes;
 
@@ -1303,6 +1312,7 @@ namespace
         target.cw_fade_shape = source.cw_fade_shape;
         target.cw_fade_in_ms = source.cw_fade_in_ms;
         target.cw_fade_out_ms = source.cw_fade_out_ms;
+        target.cw_fade_slice_ms = source.cw_fade_slice_ms;
         target.schedule_start_minute = source.schedule_start_minute;
         target.schedule_repeat_minutes = source.schedule_repeat_minutes;
         target.mode = source.mode;
@@ -1589,6 +1599,7 @@ void json_to_ini()
                   key == "Fade Shape" ||
                   key == "Fade In Ms" ||
                   key == "Fade Out Ms" ||
+                  key == "Fade Slice Ms" ||
                   key == "Start Minute" ||
                   key == "Repeat Minutes"));
 

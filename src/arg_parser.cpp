@@ -1240,6 +1240,16 @@ bool validate_config_candidate(
         return false;
     }
 
+    if (candidate.cw_fade_slice_ms <= 0)
+    {
+        if (error_message != nullptr)
+        {
+            *error_message = "CW fade slice duration must be greater than 0.";
+        }
+
+        return false;
+    }
+
     const bool frequencies_ok = set_frequencies(candidate);
     if (!frequencies_ok && !trim_copy_string(candidate.frequencies).empty())
     {

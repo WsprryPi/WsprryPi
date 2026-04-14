@@ -105,6 +105,7 @@ namespace
               {"Fade Shape", "none"},
               {"Fade In Ms", "0"},
               {"Fade Out Ms", "0"},
+              {"Fade Slice Ms", "5"},
               {"Start Minute", "0"},
               {"Repeat Minutes", "10"}}}};
         return data;
@@ -1388,6 +1389,7 @@ int main()
         jConfig["CW"]["Fade Shape"] = "raised-cosine";
         jConfig["CW"]["Fade In Ms"] = 25;
         jConfig["CW"]["Fade Out Ms"] = 40;
+        jConfig["CW"]["Fade Slice Ms"] = 2;
         json_to_config();
 
         require(
@@ -1404,7 +1406,8 @@ int main()
         require(
             config.cw_fade_shape == "raised_cosine" &&
                 config.cw_fade_in_ms == 25 &&
-                config.cw_fade_out_ms == 40,
+                config.cw_fade_out_ms == 40 &&
+                config.cw_fade_slice_ms == 2,
             "json_to_config must parse CW fade settings");
 
         config_to_json();
@@ -1412,7 +1415,8 @@ int main()
             nearly_equal(jConfig["CW"]["Intra Element Gap"].get<double>(), 1.5) &&
                 nearly_equal(jConfig["CW"]["Inter Character Gap"].get<double>(), 4.0) &&
                 nearly_equal(jConfig["CW"]["Inter Word Gap"].get<double>(), 8.0) &&
-                jConfig["CW"]["Fade Shape"].get<std::string>() == "raised_cosine",
+                jConfig["CW"]["Fade Shape"].get<std::string>() == "raised_cosine" &&
+                jConfig["CW"]["Fade Slice Ms"].get<int>() == 2,
             "config_to_json must serialize CW timing and fade settings");
 
         config.use_ini = true;
@@ -1428,7 +1432,8 @@ int main()
                 nearly_equal(std::stod(cw_it->second.at("Inter Word Gap")), 8.0) &&
                 cw_it->second.at("Fade Shape") == "raised_cosine" &&
                 cw_it->second.at("Fade In Ms") == "25" &&
-                cw_it->second.at("Fade Out Ms") == "40",
+                cw_it->second.at("Fade Out Ms") == "40" &&
+                cw_it->second.at("Fade Slice Ms") == "2",
             "json_to_ini must persist CW timing and fade settings");
     }
 
@@ -1448,6 +1453,14 @@ int main()
             !validate_config_candidate(invalid_fade_candidate, &validation_error) &&
                 validation_error == "CW fade durations must be 0 or greater.",
             "validation must reject negative CW fade durations");
+
+        ArgParserConfig invalid_slice_candidate;
+        invalid_slice_candidate.cw_fade_slice_ms = 0;
+        validation_error.clear();
+        require(
+            !validate_config_candidate(invalid_slice_candidate, &validation_error) &&
+                validation_error == "CW fade slice duration must be greater than 0.",
+            "validation must reject non-positive CW fade slice durations");
     }
 
     {
