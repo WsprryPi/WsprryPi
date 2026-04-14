@@ -63,10 +63,9 @@ namespace
         WsprPlannerPreference planner_preference = WsprPlannerPreference::Auto)
     {
         auto data = std::map<std::string, std::unordered_map<std::string, std::string>>{
-            {"Meta",
-             {{"Mode", "WSPR"}}},
-            {"Runtime",
-             {{"Transmit", transmit ? "true" : "false"},
+            {"Operation",
+             {{"Mode", "WSPR"},
+              {"Transmit", transmit ? "true" : "false"},
               {"Transmit Backend", "gpio"},
               {"Use LED", "false"},
               {"LED Pin", "-1"},
@@ -171,7 +170,7 @@ namespace
               {"Planner Preference",
                wspr_planner_preference_to_string(planner_preference)},
               {"Use Random Offset", false}}},
-            {"Runtime", {{"Transmit", true}}}};
+            {"Operation", {{"Transmit", true}}}};
     }
 
     void reset_runtime_planning_state_for_identity_test()
@@ -498,7 +497,7 @@ int main()
             has_direct_tone_startup_request(),
             "--test-tone must create a transient direct-tone startup request");
         require(
-            jConfig["Meta"]["Mode"].get<std::string>() == "WSPR",
+            jConfig["Operation"]["Mode"].get<std::string>() == "WSPR",
             "--test-tone must not persist tone mode into serialized config");
 
         json_to_config();
@@ -1126,6 +1125,30 @@ int main()
     }
 
     {
+        PreparedConfigCandidate candidate;
+        auto data = make_managed_ini_data("W1AW", "FN31", "80m", false);
+        data.erase("Operation");
+        iniFile.setData(data);
+        prepare_ini_config_candidate("/tmp/missing_operation.ini", candidate);
+        require(
+            !candidate.valid &&
+                candidate.error_reason == "Missing [Operation] section.",
+            "managed INI candidate must clearly reject a missing Operation section");
+    }
+
+    {
+        PreparedConfigCandidate candidate;
+        auto data = make_managed_ini_data("W1AW", "FN31", "80m", false);
+        data["Operation"].erase("Mode");
+        iniFile.setData(data);
+        prepare_ini_config_candidate("/tmp/missing_operation_mode.ini", candidate);
+        require(
+            !candidate.valid &&
+                candidate.error_reason == "Missing [Operation] Mode.",
+            "managed INI candidate must clearly reject a missing Operation Mode");
+    }
+
+    {
         require_patch_accepts_and_runtime_plans(
             make_identity_patch("AA0NT", "EM18"),
             "Type1Single",
@@ -1469,7 +1492,7 @@ int main()
         {
             PreparedConfigCandidate candidate;
             auto data = make_managed_ini_data("AA0NT", "EM18", "20m", true);
-            data["Runtime"]["Transmit Backend"] = "si5351";
+            data["Operation"]["Transmit Backend"] = "si5351";
             data["Si5351"]["I2C Address"] = address;
             iniFile.setData(data);
             prepare_ini_config_candidate("/tmp/si5351_i2c_address.ini", candidate);

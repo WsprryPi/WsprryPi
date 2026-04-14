@@ -88,10 +88,10 @@ namespace
     }
 
     TransmitBackendKind parse_transmit_backend_kind(
-        const nlohmann::json &runtime)
+        const nlohmann::json &operation)
     {
         const std::string raw =
-            trim_copy(runtime.value("Transmit Backend", std::string("gpio")));
+            trim_copy(operation.value("Transmit Backend", std::string("gpio")));
         std::string lowered = raw;
         std::transform(
             lowered.begin(),
@@ -108,7 +108,7 @@ namespace
             return TransmitBackendKind::SI5351;
 
         throw std::runtime_error(
-            "Invalid Runtime.Transmit Backend. Expected 'gpio' or 'si5351'.");
+            "Invalid Operation.Transmit Backend. Expected 'gpio' or 'si5351'.");
     }
 
     int parse_integer_config_value(
@@ -187,10 +187,15 @@ namespace
             "Invalid Si5351.TX Output. Expected CLK0, CLK1, CLK2, 0, 1, or 2.");
     }
 
-    ModeType parse_mode_type(const nlohmann::json &meta)
+    ModeType parse_mode_type(const nlohmann::json &operation)
     {
+        if (!operation.contains("Mode"))
+        {
+            throw std::runtime_error("Missing Operation.Mode.");
+        }
+
         const std::string raw =
-            trim_copy(meta.value("Mode", std::string("WSPR")));
+            trim_copy(operation.at("Mode").get<std::string>());
         std::string upper = raw;
         std::transform(
             upper.begin(),
@@ -256,18 +261,7 @@ namespace
     nlohmann::json public_config_from_internal(const nlohmann::json &source)
     {
         nlohmann::json public_json;
-        public_json["Meta"] = {
-            {"Mode", source.at("Meta").at("Mode")}};
-
-        public_json["Runtime"] = {
-            {"Transmit", source.at("Runtime").at("Transmit")},
-            {"Transmit Backend", source.at("Runtime").at("Transmit Backend")},
-            {"Use LED", source.at("Runtime").at("Use LED")},
-            {"LED Pin", source.at("Runtime").at("LED Pin")},
-            {"Web Port", source.at("Runtime").at("Web Port")},
-            {"Socket Port", source.at("Runtime").at("Socket Port")},
-            {"Use Shutdown", source.at("Runtime").at("Use Shutdown")},
-            {"Shutdown Button", source.at("Runtime").at("Shutdown Button")}};
+        public_json["Operation"] = source.at("Operation");
 
         public_json["GPIO"] = source.at("GPIO");
         public_json["Calibration"] = source.at("Calibration");
@@ -282,42 +276,27 @@ namespace
         const nlohmann::json &public_json,
         nlohmann::json &internal_json)
     {
-        if (public_json.contains("Meta"))
+        if (public_json.contains("Operation"))
         {
-            const auto &meta = public_json.at("Meta");
-            if (meta.contains("Mode"))
-                internal_json["Meta"]["Mode"] = meta.at("Mode");
-            if (meta.contains("Use INI"))
-                internal_json["Meta"]["Use INI"] = meta.at("Use INI");
-            if (meta.contains("INI Filename"))
-                internal_json["Meta"]["INI Filename"] = meta.at("INI Filename");
-            if (meta.contains("Date Time Log"))
-                internal_json["Meta"]["Date Time Log"] = meta.at("Date Time Log");
-            if (meta.contains("Loop TX"))
-                internal_json["Meta"]["Loop TX"] = meta.at("Loop TX");
-            if (meta.contains("TX Iterations"))
-                internal_json["Meta"]["TX Iterations"] = meta.at("TX Iterations");
-        }
-
-        if (public_json.contains("Runtime"))
-        {
-            const auto &runtime = public_json.at("Runtime");
-            if (runtime.contains("Transmit"))
-                internal_json["Runtime"]["Transmit"] = runtime.at("Transmit");
-            if (runtime.contains("Transmit Backend"))
-                internal_json["Runtime"]["Transmit Backend"] = runtime.at("Transmit Backend");
-            if (runtime.contains("Use LED"))
-                internal_json["Runtime"]["Use LED"] = runtime.at("Use LED");
-            if (runtime.contains("LED Pin"))
-                internal_json["Runtime"]["LED Pin"] = runtime.at("LED Pin");
-            if (runtime.contains("Web Port"))
-                internal_json["Runtime"]["Web Port"] = runtime.at("Web Port");
-            if (runtime.contains("Socket Port"))
-                internal_json["Runtime"]["Socket Port"] = runtime.at("Socket Port");
-            if (runtime.contains("Use Shutdown"))
-                internal_json["Runtime"]["Use Shutdown"] = runtime.at("Use Shutdown");
-            if (runtime.contains("Shutdown Button"))
-                internal_json["Runtime"]["Shutdown Button"] = runtime.at("Shutdown Button");
+            const auto &operation = public_json.at("Operation");
+            if (operation.contains("Mode"))
+                internal_json["Operation"]["Mode"] = operation.at("Mode");
+            if (operation.contains("Transmit"))
+                internal_json["Operation"]["Transmit"] = operation.at("Transmit");
+            if (operation.contains("Transmit Backend"))
+                internal_json["Operation"]["Transmit Backend"] = operation.at("Transmit Backend");
+            if (operation.contains("Use LED"))
+                internal_json["Operation"]["Use LED"] = operation.at("Use LED");
+            if (operation.contains("LED Pin"))
+                internal_json["Operation"]["LED Pin"] = operation.at("LED Pin");
+            if (operation.contains("Web Port"))
+                internal_json["Operation"]["Web Port"] = operation.at("Web Port");
+            if (operation.contains("Socket Port"))
+                internal_json["Operation"]["Socket Port"] = operation.at("Socket Port");
+            if (operation.contains("Use Shutdown"))
+                internal_json["Operation"]["Use Shutdown"] = operation.at("Use Shutdown");
+            if (operation.contains("Shutdown Button"))
+                internal_json["Operation"]["Shutdown Button"] = operation.at("Shutdown Button");
         }
 
         if (public_json.contains("GPIO"))
@@ -808,8 +787,9 @@ namespace
 
     bool should_warn_if_missing(const std::string &section, const std::string &key)
     {
-        return (section == "Runtime" &&
-                (key == "Transmit" ||
+        return (section == "Operation" &&
+                (key == "Mode" ||
+                 key == "Transmit" ||
                  key == "Transmit Backend" ||
                  key == "Use LED" ||
                  key == "LED Pin" ||
@@ -828,7 +808,6 @@ namespace
                  key == "Frequency" ||
                  key == "Planner Preference" ||
                  key == "Use Random Offset")) ||
-               (section == "Meta" && key == "Mode") ||
                (section == "Calibration" &&
                 key == "PPM") ||
                (section == "Si5351" &&
@@ -924,13 +903,13 @@ namespace
     void init_config_json_impl(nlohmann::json &target)
     {
         target["Meta"] = {
-            {"Mode", "WSPR"},
             {"Use INI", false},
             {"INI Filename", ""},
             {"Date Time Log", false},
             {"Loop TX", false},
             {"TX Iterations", 0}};
-        target["Runtime"] = {
+        target["Operation"] = {
+            {"Mode", "WSPR"},
             {"Transmit", false},
             {"Transmit Backend", "gpio"},
             {"LED Pin", 18},
@@ -997,7 +976,7 @@ namespace
         target.use_ini = source.at("Meta").at("Use INI").get<bool>();
         target.ini_filename = source.at("Meta").at("INI Filename").get<std::string>();
         target.date_time_log = source.at("Meta").at("Date Time Log").get<bool>();
-        target.mode = parse_mode_type(source.at("Meta"));
+        target.mode = parse_mode_type(source.at("Operation"));
         target.wspr_planner_preference =
             parse_wspr_planner_preference(source.at("WSPR"));
         target.loop_tx = source.at("Meta").at("Loop TX").get<bool>();
@@ -1014,9 +993,9 @@ namespace
             target.wspr_dial_freq_set.clear();
         }
 
-        target.transmit = source.at("Runtime").at("Transmit").get<bool>();
+        target.transmit = source.at("Operation").at("Transmit").get<bool>();
         target.transmit_backend =
-            parse_transmit_backend_kind(source.at("Runtime"));
+            parse_transmit_backend_kind(source.at("Operation"));
         const nlohmann::json gpio =
             source.contains("GPIO") ? source.at("GPIO") : nlohmann::json::object();
         target.gpio_tx_pin =
@@ -1149,13 +1128,13 @@ namespace
         target.frequencies = target.wspr.frequencies;
         target.wspr_audio_offset_hz = WSPR_AUDIO_OFFSET_HZ;
         target.wspr_planner_preference = target.wspr.planner_preference;
-        target.use_led = source.at("Runtime").at("Use LED").get<bool>();
-        target.led_pin = source.at("Runtime").at("LED Pin").get<int>();
+        target.use_led = source.at("Operation").at("Use LED").get<bool>();
+        target.led_pin = source.at("Operation").at("LED Pin").get<int>();
 
-        target.web_port = source.at("Runtime").at("Web Port").get<int>();
-        target.socket_port = source.at("Runtime").at("Socket Port").get<int>();
-        target.use_shutdown = source.at("Runtime").at("Use Shutdown").get<bool>();
-        target.shutdown_pin = source.at("Runtime").at("Shutdown Button").get<int>();
+        target.web_port = source.at("Operation").at("Web Port").get<int>();
+        target.socket_port = source.at("Operation").at("Socket Port").get<int>();
+        target.use_shutdown = source.at("Operation").at("Use Shutdown").get<bool>();
+        target.shutdown_pin = source.at("Operation").at("Shutdown Button").get<int>();
         target.use_journald = false;
 
         // Missing Band GPIO data is allowed; seeded defaults stay in place.
@@ -1194,24 +1173,24 @@ namespace
 
     void config_to_json_impl(const ArgParserConfig &source, nlohmann::json &target)
     {
-        target["Meta"]["Mode"] =
-            mode_type_to_string(
-                source.mode == ModeType::TONE ? ModeType::WSPR : source.mode);
         target["Meta"]["Use INI"] = source.use_ini;
         target["Meta"]["INI Filename"] = source.ini_filename;
         target["Meta"]["Date Time Log"] = source.date_time_log;
         target["Meta"]["Loop TX"] = source.loop_tx;
         target["Meta"]["TX Iterations"] = source.tx_iterations.load();
 
-        target["Runtime"]["Transmit"] = source.transmit;
-        target["Runtime"]["Transmit Backend"] =
+        target["Operation"]["Mode"] =
+            mode_type_to_string(
+                source.mode == ModeType::TONE ? ModeType::WSPR : source.mode);
+        target["Operation"]["Transmit"] = source.transmit;
+        target["Operation"]["Transmit Backend"] =
             transmit_backend_kind_to_string(source.transmit_backend);
-        target["Runtime"]["Use LED"] = source.use_led;
-        target["Runtime"]["LED Pin"] = source.led_pin;
-        target["Runtime"]["Web Port"] = source.web_port;
-        target["Runtime"]["Socket Port"] = source.socket_port;
-        target["Runtime"]["Use Shutdown"] = source.use_shutdown;
-        target["Runtime"]["Shutdown Button"] = source.shutdown_pin;
+        target["Operation"]["Use LED"] = source.use_led;
+        target["Operation"]["LED Pin"] = source.led_pin;
+        target["Operation"]["Web Port"] = source.web_port;
+        target["Operation"]["Socket Port"] = source.socket_port;
+        target["Operation"]["Use Shutdown"] = source.use_shutdown;
+        target["Operation"]["Shutdown Button"] = source.shutdown_pin;
 
         target["GPIO"]["Transmit Pin"] = source.gpio_tx_pin;
         target["GPIO"]["Power Level"] = source.gpio_power_level;
@@ -1333,6 +1312,16 @@ namespace
         nlohmann::json patch;
         const auto ini_data = iniFile.getData();
 
+        if (ini_data.find("Operation") == ini_data.end())
+        {
+            throw std::runtime_error("Missing [Operation] section.");
+        }
+
+        if (!ini_has_nonempty_value(ini_data, "Operation", "Mode"))
+        {
+            throw std::runtime_error("Missing [Operation] Mode.");
+        }
+
         for (const auto &section_pair : ini_data)
         {
             const std::string &section = section_pair.first;
@@ -1346,8 +1335,7 @@ namespace
 
             // Canonical persistent sections only. Unknown sections, including
             // pre-2.x legacy sections, are not imported or treated as fallbacks.
-            if (section != "Meta" &&
-                section != "Runtime" &&
+            if (section != "Operation" &&
                 section != "GPIO" &&
                 section != "Calibration" &&
                 section != "Si5351" &&
@@ -1516,8 +1504,7 @@ void json_to_ini()
             continue;
         }
 
-        if (section_name != "Meta" &&
-            section_name != "Runtime" &&
+        if (section_name != "Operation" &&
             section_name != "GPIO" &&
             section_name != "Calibration" &&
             section_name != "Si5351" &&
@@ -1558,10 +1545,9 @@ void json_to_ini()
         {
             const std::string &key = kv.key();
             const bool persist_key =
-                (section_name == "Meta" &&
-                 key == "Mode") ||
-                (section_name == "Runtime" &&
-                 (key == "Transmit" ||
+                (section_name == "Operation" &&
+                 (key == "Mode" ||
+                  key == "Transmit" ||
                   key == "Transmit Backend" ||
                   key == "Use LED" ||
                   key == "LED Pin" ||

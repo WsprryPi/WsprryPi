@@ -464,10 +464,9 @@ void resolve_backend_specific_config(ArgParserConfig &config) noexcept;
  * @details
  * This function sets up a default configuration structure in the global
  * nlohmann::json object, `jConfig`. The JSON object is organized into several
- * sections: "Meta", "Runtime", "GPIO", "Si5351", "Calibration", "WSPR", "CW", and
- * "Band GPIO". Each section contains key/value
- * pairs that represent configuration parameters. In addition, the WSPR
- * dial-frequency list under "Meta" is explicitly initialized as an empty array.
+ * sections: "Operation", "GPIO", "Si5351", "Calibration", "WSPR", "CW", and
+ * "Band GPIO". Each section contains key/value pairs that represent
+ * configuration parameters.
  *
  * @note The JSON values are stored as strings. Adjust the types as needed if numeric
  *       types are required in later processing.
@@ -480,8 +479,8 @@ void init_config_json();
  * @details
  * This function retrieves INI configuration data from the global INI handler object `ini`
  * and converts the data into a JSON object (named `patch`). Each INI section is converted
- * into a JSON object containing key/value pairs. It then adds the filename to the "Meta"
- * section under "INI Filename" and merges the resulting patch into the global JSON
+ * into a JSON object containing key/value pairs. It also records internal INI
+ * bookkeeping metadata and merges the resulting patch into the global JSON
  * configuration object `jConfig` using `merge_patch()`.
  *
  * If any exception is thrown while retrieving the INI data, the function catches the exception
@@ -499,11 +498,10 @@ void ini_to_json(std::string filename);
  * Expected JSON structure (example):
  * @code
  * {
- *   "Meta": {
- *       "Mode": "WSPR"
- *   },
- *   "Runtime": {
+ *   "Operation": {
+ *       "Mode": "WSPR",
  *       "Transmit": false,
+ *       "Transmit Backend": "gpio",
  *       "Use LED": false,
  *       "LED Pin": 18,
  *       "Web Port": 31415,

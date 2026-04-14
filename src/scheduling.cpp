@@ -2187,16 +2187,16 @@ StopTransmissionResult stop_transmission_by_user_request()
     {
         try
         {
-            iniFile.set_bool_value("Runtime", "Transmit", false);
+            iniFile.set_bool_value("Operation", "Transmit", false);
             iniFile.commit_changes();
             result.persisted = true;
-            llog.logS(INFO, "Runtime.Transmit persisted false due to user stop request.");
+            llog.logS(INFO, "Operation.Transmit persisted false due to user stop request.");
         }
         catch (const std::exception &e)
         {
             result.persisted = false;
             result.message =
-                std::string("Transmission stopped but failed to persist Runtime.Transmit=false: ") +
+                std::string("Transmission stopped but failed to persist Operation.Transmit=false: ") +
                 e.what();
             llog.logS(ERROR, result.message);
             return result;
