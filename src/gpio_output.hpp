@@ -34,10 +34,11 @@
 #include <string>
 
 #include "gpio_include.hpp"
+#include "gpio_line_resolver.hpp"
 
 /**
  * @class GPIOOutput
- * @brief Simple GPIO output controller using libgpiod.
+ * @brief Simple resolver-backed GPIO output controller using libgpiod.
  *
  * This helper acquires one GPIO line, keeps it in a known inactive state
  * when enabled or released, and reports setup failures through
@@ -62,13 +63,12 @@ public:
     ~GPIOOutput();
 
     /**
-     * @brief Configures and enables a GPIO pin for output.
+     * @brief Configures and enables a BCM GPIO pin for output.
      *
-     * Opens the default GPIO chip (/dev/gpiochip0), obtains the specified pin,
-     * and requests it as an output. The pin can be configured as active high or
-     * active low (sink).
+     * Resolves the configured BCM GPIO line at runtime, opens the matching GPIO
+     * chip, and requests the resolved line through libgpiod.
      *
-     * @param pin The GPIO pin number (BCM numbering).
+     * @param pin The GPIO pin number in BCM numbering.
      * @param active_high True for active-high operation (default), false for sink.
      * @return True if the pin was successfully configured; false otherwise.
      */
@@ -102,6 +102,7 @@ private:
     bool active_high_;
     bool enabled_;
     std::string last_error_;
+    ResolvedGPIOLine resolved_line_;
 
     // Using unique_ptr to manage the libgpiod chip.
     std::unique_ptr<gpiod::chip> chip_;

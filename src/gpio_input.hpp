@@ -30,6 +30,7 @@
 #define GPIO_INPUT_HPP
 
 #include "gpio_include.hpp"
+#include "gpio_line_resolver.hpp"
 
 #include <atomic>
 #include <condition_variable>
@@ -41,15 +42,15 @@
 
 /**
  * @class GPIOInput
- * @brief Monitors a GPIO pin using libgpiod with thread-based event handling.
+ * @brief Monitors a BCM GPIO pin using libgpiod with thread-based event handling.
  *
  * This class allows for edge-triggered monitoring of a GPIO pin using the
  * libgpiod C++ API. It supports edge detection (rising or falling), optional
  * internal pull-up or pull-down configuration, CPU priority control, debounce
  * management, and thread-safe lifecycle operations.
  *
- * Designed for use on the Raspberry Pi platform with BCM GPIO numbering, the
- * class is thread-based and suitable for global instantiation.
+ * Designed for Raspberry Pi BCM numbering, the class resolves the runtime
+ * chip/offset mapping internally and is suitable for global instantiation.
  *
  * Dependencies: libgpiod >= 1.6.
  *
@@ -117,6 +118,7 @@ private:
     std::condition_variable cv_; ///< Coordinates thread shutdown.
 
     Status status_;                     ///< Current operational state.
+    ResolvedGPIOLine resolved_line_;    ///< Resolved chip/offset metadata.
     std::unique_ptr<gpiod::chip> chip_; ///< GPIO chip handle.
 
 #if GPIOD_API_MAJOR >= 2

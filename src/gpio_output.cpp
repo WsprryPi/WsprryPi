@@ -27,6 +27,7 @@
  */
 
 #include "gpio_output.hpp"
+#include "logging.hpp"
 #include <iostream>
 
 // Global instance for the optional status LED.
@@ -38,16 +39,15 @@ GPIOOutput ledControl;
  *          - pin_ is set to -1 (no pin configured)
  *          - active_high_ is set to true (active-high logic)
  *          - enabled_ is false (GPIO not yet configured)
- *          - chip_ and line_ are initialized to nullptr
+ *          - libgpiod handles are empty until a resolved line is requested
  *
  * The object must be explicitly configured using enableGPIOPin() before use.
  */
-GPIOOutput::GPIOOutput() :
-    pin_(-1),
-    active_high_(true),
-    enabled_(false),
-    last_error_(),
-    chip_(nullptr)
+GPIOOutput::GPIOOutput() : pin_(-1),
+                           active_high_(true),
+                           enabled_(false),
+                           last_error_(),
+                           chip_(nullptr)
 {
 }
 
@@ -62,11 +62,9 @@ GPIOOutput::~GPIOOutput()
 
 /**
  * @brief Enables a GPIO pin for output.
- * @details Configures the specified BCM GPIO pin as an output on the default chip
- *          (/dev/gpiochip0) using libgpiod. If the pin is already enabled, it is first
- *          disabled via stop_gpio_pin(). The function requests the GPIO line for output,
- *          sets its initial value (computed based on the active high/low configuration),
- *          and marks the pin as enabled.
+ * @details Resolves the requested BCM GPIO line at runtime and requests the
+ * corresponding chip/offset through libgpiod. If the pin is already enabled,
+ * it is first released and then re-requested.
  *
  * @param pin The BCM GPIO pin number to be enabled.
  * @param active_high If true, the pin is configured for active-high logic; if false,
@@ -86,10 +84,21 @@ bool GPIOOutput::enableGPIOPin(int pin, bool active_high)
     }
     pin_ = pin;
     active_high_ = active_high;
+    resolved_line_ = ResolvedGPIOLine{};
 
     try
     {
-        chip_ = std::make_unique<gpiod::chip>("/dev/gpiochip0");
+        std::string resolution_error;
+        if (!resolve_gpio_line(pin_, resolved_line_, resolution_error))
+        {
+            last_error_ =
+                "Error resolving GPIO pin " + std::to_string(pin_) + ": " +
+                resolution_error;
+            enabled_ = false;
+            return false;
+        }
+
+        chip_ = std::make_unique<gpiod::chip>(resolved_line_.chip_path);
 
 #if GPIOD_API_MAJOR >= 2
         // ---- libgpiod v2 path (Trixie) ----
@@ -100,16 +109,16 @@ bool GPIOOutput::enableGPIOPin(int pin, bool active_high)
         ls.set_active_low(!active_high_);
 
         auto builder = chip_->prepare_request();
-        builder.set_consumer("GPIOOutput");                     // separate call: no copy
-        const gpiod::line::offset off = static_cast<gpiod::line::offset>(pin_);
+        builder.set_consumer("GPIOOutput"); // separate call: no copy
+        const gpiod::line::offset off = resolved_line_.offset;
         builder.add_line_settings(off, ls);
-        request_ = builder.do_request();                        // move into optional
+        request_ = builder.do_request(); // move into optional
 
         // Initial logical state: inactive (false). Kernel inverts if needed.
         request_->set_value(off, gpiod::line::value::INACTIVE);
 #else
         // ---- libgpiod v1 path (Bookworm) ----
-        line_ = chip_->get_line(pin_);
+        line_ = chip_->get_line(static_cast<unsigned int>(resolved_line_.offset));
 
         gpiod::line_request req;
         req.consumer = "GPIOOutput";
@@ -128,16 +137,25 @@ bool GPIOOutput::enableGPIOPin(int pin, bool active_high)
 #endif
 
         enabled_ = true;
+        llog.logS(
+            DEBUG,
+            "GPIOOutput: request success for ",
+            describe_resolved_gpio_line(resolved_line_),
+            ", active_high ",
+            active_high_ ? "true" : "false",
+            ".");
     }
-    catch (const std::exception& e)
+    catch (const std::exception &e)
     {
         last_error_ =
-            "Error enabling GPIO pin " + std::to_string(pin_) + ": " + e.what();
+            "Error enabling " + describe_resolved_gpio_line(resolved_line_) +
+            ": " + e.what();
         enabled_ = false;
 #if GPIOD_API_MAJOR >= 2
         request_.reset();
 #endif
         chip_.reset();
+        llog.logS(ERROR, "GPIOOutput: request failure. ", last_error_);
         return false;
     }
     return enabled_;
@@ -145,9 +163,9 @@ bool GPIOOutput::enableGPIOPin(int pin, bool active_high)
 
 /**
  * @brief Disables the currently active GPIO pin.
- * @details Releases the GPIO line if it was previously enabled and resets the
- *          internal chip and line handles. After calling this function, the
- *          pin must be re-enabled via enableGPIOPin() before use.
+ * @details Releases the previously resolved GPIO line and resets the internal
+ *          libgpiod handles. After calling this function, the pin must be
+ *          re-enabled via enableGPIOPin() before use.
  *
  * This function is safe to call even if no pin is currently enabled.
  */
@@ -160,6 +178,7 @@ void GPIOOutput::stop()
         request_.reset();
 #endif
         chip_.reset();
+        resolved_line_ = ResolvedGPIOLine{};
         return;
     }
 
@@ -168,7 +187,8 @@ void GPIOOutput::stop()
 
 #if GPIOD_API_MAJOR >= 2
     // v2: Destroys the handle, releasing the line
-    if (request_) {
+    if (request_)
+    {
         // optional reset destroys the handle and releases the line
         request_.reset();
     }
@@ -189,6 +209,7 @@ void GPIOOutput::stop()
     request_.reset();
 #endif
     chip_.reset();
+    resolved_line_ = ResolvedGPIOLine{};
 }
 
 /**
@@ -216,15 +237,31 @@ bool GPIOOutput::toggleGPIO(bool state)
         int physical = compute_physical_state(state);
 
 #if GPIOD_API_MAJOR >= 2
-    const gpiod::line::offset off = static_cast<gpiod::line::offset>(pin_);
-    request_->set_value(off,
-        physical ? gpiod::line::value::ACTIVE : gpiod::line::value::INACTIVE);
+        const gpiod::line::offset off = resolved_line_.offset;
+        request_->set_value(
+            off,
+            physical ? gpiod::line::value::ACTIVE : gpiod::line::value::INACTIVE);
 #else
         line_.set_value(physical);
 #endif
+        llog.logS(
+            DEBUG,
+            "GPIOOutput: write success for ",
+            describe_resolved_gpio_line(resolved_line_),
+            ", logical ",
+            state ? "1" : "0",
+            ", physical ",
+            physical,
+            ".");
     }
-    catch (const std::exception&)
+    catch (const std::exception &e)
     {
+        llog.logS(
+            ERROR,
+            "GPIOOutput: write failure for ",
+            describe_resolved_gpio_line(resolved_line_),
+            ": ",
+            e.what());
         return false;
     }
     return true;
