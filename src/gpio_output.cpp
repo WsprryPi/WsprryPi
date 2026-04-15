@@ -250,7 +250,7 @@ bool GPIOOutput::toggleGPIO(bool state)
             describe_resolved_gpio_line(resolved_line_),
             ", logical ",
             state ? "1" : "0",
-            ", physical ",
+            ", requested line value ",
             physical,
             ".");
     }

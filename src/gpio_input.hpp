@@ -38,6 +38,7 @@
 #include <memory>
 #include <mutex>
 #include <optional>
+#include <string>
 #include <thread>
 
 /**
@@ -99,6 +100,7 @@ public:
     bool setPriority(int schedPolicy, int priority);
 
     Status getStatus() const;
+    const std::string &lastError() const noexcept;
 
 private:
     void monitorLoop();
@@ -117,6 +119,7 @@ private:
     std::mutex monitor_mutex_;   ///< Protects shared state.
     std::condition_variable cv_; ///< Coordinates thread shutdown.
 
+    std::string last_error_;            ///< Last setup/runtime error text.
     Status status_;                     ///< Current operational state.
     ResolvedGPIOLine resolved_line_;    ///< Resolved chip/offset metadata.
     std::unique_ptr<gpiod::chip> chip_; ///< GPIO chip handle.

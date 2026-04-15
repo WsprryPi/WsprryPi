@@ -50,6 +50,7 @@ GPIOInput::GPIOInput()
       monitor_thread_(),
       monitor_mutex_(),
       cv_(),
+      last_error_(),
       status_(Status::NotConfigured),
       resolved_line_(),
       chip_(nullptr)
@@ -92,6 +93,8 @@ bool GPIOInput::enable(int pin,
                        PullMode pull_mode,
                        std::function<void()> callback)
 {
+    last_error_.clear();
+
     if (running_)
     {
         (void)stop();
@@ -121,12 +124,12 @@ bool GPIOInput::enable(int pin,
         std::string resolution_error;
         if (!resolve_gpio_line(gpio_pin_, resolved_line_, resolution_error))
         {
+            last_error_ =
+                "GPIOInput resolution failure for BCM " +
+                std::to_string(gpio_pin_) + ": " + resolution_error;
             llog.logS(
                 ERROR,
-                "GPIOInput: resolution error for BCM ",
-                gpio_pin_,
-                ": ",
-                resolution_error);
+                last_error_);
             status_ = Status::Error;
             running_ = false;
             return false;
@@ -204,13 +207,12 @@ bool GPIOInput::enable(int pin,
     catch (const std::exception& e)
     {
         std::lock_guard<std::mutex> lock(monitor_mutex_);
+        last_error_ =
+            "GPIOInput request failure for " +
+            describe_resolved_gpio_line(resolved_line_) + ": " + e.what();
         releaseGPIOResources();
         resolved_line_ = ResolvedGPIOLine{};
-        llog.logS(ERROR,
-                  "GPIOInput: request failure for BCM ",
-                  gpio_pin_,
-                  ": ",
-                  e.what());
+        llog.logS(ERROR, last_error_);
         status_ = Status::Error;
         running_ = false;
         return false;
@@ -224,7 +226,15 @@ bool GPIOInput::enable(int pin,
     }
     catch (const std::exception& e)
     {
-        llog.logE(ERROR, "GPIOInput: thread start error.", e.what());
+        last_error_ =
+            "GPIOInput thread start failure for " +
+            describe_resolved_gpio_line(resolved_line_) + ": " + e.what();
+        llog.logS(ERROR, last_error_);
+        {
+            std::lock_guard<std::mutex> lock(monitor_mutex_);
+            releaseGPIOResources();
+            resolved_line_ = ResolvedGPIOLine{};
+        }
         status_ = Status::Error;
         running_ = false;
         return false;
@@ -283,6 +293,11 @@ GPIOInput::Status GPIOInput::getStatus() const
     return status_;
 }
 
+const std::string &GPIOInput::lastError() const noexcept
+{
+    return last_error_;
+}
+
 void GPIOInput::monitorLoop()
 {
     while (!stop_thread_)
@@ -329,12 +344,13 @@ void GPIOInput::monitorLoop()
         }
         catch (const std::exception& e)
         {
+            last_error_ =
+                "GPIOInput loop failure for " +
+                describe_resolved_gpio_line(resolved_line_) + ": " + e.what();
             status_ = Status::Error;
-            llog.logS(ERROR,
-                      "GPIOInput: loop error for ",
-                      describe_resolved_gpio_line(resolved_line_),
-                      ": ",
-                      e.what());
+            running_ = false;
+            stop_thread_ = true;
+            llog.logS(ERROR, last_error_);
         }
     }
 }

@@ -1594,7 +1594,8 @@ void apply_runtime_config_side_effects()
             llog.logS(ERROR,
                       "Failed to enable shutdown monitor GPIO ",
                       config.shutdown_pin,
-                      ".");
+                      ": ",
+                      shutdownMonitor.lastError());
         }
         else if (!shutdownMonitor.setPriority(SCHED_RR, 10))
         {
