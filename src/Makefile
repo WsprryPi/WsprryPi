@@ -112,6 +112,7 @@ OUT := $(strip $(EXE_NAME))
 TEST_OUT := $(strip $(EXE_NAME)_debug)
 SEMANTICS_TEST_OUT := dial_frequency_semantics_test
 BAND_GPIO_ROTATION_TEST_OUT := band_gpio_rotation_test
+MONITOR_FILE_REGRESSION_TEST_OUT := monitor_file_regression_test
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Output directories
@@ -143,6 +144,10 @@ SEMANTICS_TEST_DEPS := $(filter-out $(MAIN_DEBUG_OBJECT),$(CPP_DEBUG_OBJECTS))
 BAND_GPIO_ROTATION_TEST_SRC := tests/band_gpio_rotation_test.cpp
 BAND_GPIO_ROTATION_TEST_OBJ := $(OBJ_DIR_DEBUG)/tests/band_gpio_rotation_test.o
 BAND_GPIO_ROTATION_TEST_DEPS := $(filter-out $(MAIN_DEBUG_OBJECT),$(CPP_DEBUG_OBJECTS))
+MONITOR_FILE_REGRESSION_TEST_SRC := tests/monitor_file_regression_test.cpp
+MONITOR_FILE_REGRESSION_TEST_OBJ := $(OBJ_DIR_DEBUG)/tests/monitor_file_regression_test.o
+MONITOR_FILE_DEBUG_OBJ := $(OBJ_DIR_DEBUG)/./MonitorFile/src/monitorfile.o
+MONITOR_FILE_REGRESSION_TEST_DEPS := $(MONITOR_FILE_DEBUG_OBJ)
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Dependency includes
@@ -341,6 +346,17 @@ $(BIN_DIR)/$(BAND_GPIO_ROTATION_TEST_OUT): $(BAND_GPIO_ROTATION_TEST_OBJ) $(BAND
 	$(Q)echo "Linking debug: $(BAND_GPIO_ROTATION_TEST_OUT)"
 	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) $^ -o $@ $(LDFLAGS)
 
+$(MONITOR_FILE_REGRESSION_TEST_OBJ): $(MONITOR_FILE_REGRESSION_TEST_SRC)
+	$(Q)mkdir -p $(dir $@)
+	$(Q)mkdir -p $(DEP_DIR)/tests
+	$(Q)echo "Compiling (debug) $< into $@"
+	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -MF $(DEP_DIR)/tests/monitor_file_regression_test.d -c $< -o $@
+
+$(BIN_DIR)/$(MONITOR_FILE_REGRESSION_TEST_OUT): $(MONITOR_FILE_REGRESSION_TEST_OBJ) $(MONITOR_FILE_REGRESSION_TEST_DEPS)
+	$(Q)mkdir -p $(BIN_DIR)
+	$(Q)echo "Linking debug: $(MONITOR_FILE_REGRESSION_TEST_OUT)"
+	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) $^ -o $@ $(LDFLAGS)
+
 # ─────────────────────────────────────────────────────────────────────────────
 # Compile rules (release)
 # ─────────────────────────────────────────────────────────────────────────────
@@ -370,7 +386,7 @@ $(BIN_DIR)/$(OUT): $(CPP_OBJECTS)
 # Phony targets
 # ─────────────────────────────────────────────────────────────────────────────
 
-.PHONY: clean release debug test test-tone test-oneshot semantics-test gdb install debuginstall uninstall lint macros help
+.PHONY: clean release debug test test-tone test-oneshot semantics-test band-gpio-rotation-test monitor-file-regression-test gdb install debuginstall uninstall lint macros help
 DEBUG: debug
 RELEASE: release
 
@@ -404,6 +420,10 @@ semantics-test: $(BIN_DIR)/$(SEMANTICS_TEST_OUT)
 band-gpio-rotation-test: $(BIN_DIR)/$(BAND_GPIO_ROTATION_TEST_OUT)
 	$(Q)echo "Running band GPIO rotation regression tests."
 	$(Q)./$(BIN_DIR)/$(BAND_GPIO_ROTATION_TEST_OUT)
+
+monitor-file-regression-test: $(BIN_DIR)/$(MONITOR_FILE_REGRESSION_TEST_OUT)
+	$(Q)echo "Running MonitorFile regression tests."
+	$(Q)./$(BIN_DIR)/$(MONITOR_FILE_REGRESSION_TEST_OUT)
 
 gdb: debug
 	$(Q)echo "Running debug session."
