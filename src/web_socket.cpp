@@ -348,8 +348,9 @@ void WebSocketServer::handleMessage(const std::string &raw_message)
             llog.logS(INFO, "Received websocket stop command.");
             const StopTransmissionResult stop_result =
                 stop_transmission_by_user_request();
+            const bool stop_request_succeeded = stop_result.transmit_disabled;
             reply["command"] = "stop";
-            reply["status"] = stop_result.persisted ? "ok" : "error";
+            reply["status"] = stop_request_succeeded ? "ok" : "error";
             reply["transmission_active"] = stop_result.transmission_active;
             reply["stop_performed"] = stop_result.stop_performed;
             reply["transmit_disabled"] = stop_result.transmit_disabled;

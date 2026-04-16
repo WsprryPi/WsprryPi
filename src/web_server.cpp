@@ -314,16 +314,17 @@ void WebServer::start(int port)
 
                     const StopTransmissionResult stop_result =
                         stop_transmission_by_user_request();
+                    const bool stop_request_succeeded = stop_result.transmit_disabled;
                     nlohmann::json ok = {
                         {"command", "stop"},
-                        {"status", stop_result.persisted ? "ok" : "error"},
+                        {"status", stop_request_succeeded ? "ok" : "error"},
                         {"transmission_active", stop_result.transmission_active},
                         {"stop_performed", stop_result.stop_performed},
                         {"transmit_disabled", stop_result.transmit_disabled},
                         {"persisted", stop_result.persisted},
                         {"message", stop_result.message}
                     };
-                    res.status = stop_result.persisted ? 200 : 500;
+                    res.status = stop_request_succeeded ? 200 : 500;
                     res.set_content(ok.dump(4), "application/json");
                 }
                 catch (const nlohmann::json::parse_error &e)
