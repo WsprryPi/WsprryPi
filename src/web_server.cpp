@@ -387,7 +387,6 @@ void WebServer::stop()
         serverThread.join();
     }
 
-    llog.logS(INFO, "Web server stopped.");
 }
 
 /**

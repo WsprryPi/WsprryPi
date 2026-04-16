@@ -166,7 +166,7 @@ bool WebSocketServer::start(uint16_t port, uint32_t keep_alive_secs)
         keep_alive_thread_ = std::thread(&WebSocketServer::keepAliveLoop, this, keep_alive_secs_);
     }
 
-    llog.logS(INFO, "WebSocketServer started on port:", port);
+    llog.logS(INFO, "Socket server started on port:", port);
     return true;
 }
 
@@ -229,7 +229,6 @@ void WebSocketServer::stop()
     if (keep_alive_thread_.joinable())
         keep_alive_thread_.join();
 
-    llog.logS(INFO, "WebSocketServer stopped.");
 }
 
 /**
