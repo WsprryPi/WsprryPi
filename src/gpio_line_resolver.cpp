@@ -4,6 +4,8 @@
 #include <fstream>
 #include <set>
 #include <sstream>
+#include <sys/stat.h>
+#include <sys/sysmacros.h>
 #include <vector>
 
 namespace
@@ -17,25 +19,38 @@ namespace
         std::size_t num_lines = 0;
     };
 
-    std::filesystem::path gpiochip_sysfs_dir(const std::filesystem::path &chip_path)
-    {
-        return std::filesystem::path("/sys/class/gpio") / chip_path.filename();
-    }
-
-    std::filesystem::path gpiochip_backing_device_path(
+    std::filesystem::path gpiochip_sysfs_chip_path(
         const std::filesystem::path &chip_path)
     {
-        const std::filesystem::path device_link =
-            gpiochip_sysfs_dir(chip_path) / "device";
+        struct stat st
+        {
+        };
+        if (::stat(chip_path.c_str(), &st) != 0 || !S_ISCHR(st.st_mode))
+        {
+            return {};
+        }
+
+        std::ostringstream dev_char;
+        dev_char << "/sys/dev/char/"
+                 << major(st.st_rdev)
+                 << ":"
+                 << minor(st.st_rdev);
+
         std::error_code ec;
         const std::filesystem::path canonical =
-            std::filesystem::weakly_canonical(device_link, ec);
+            std::filesystem::canonical(dev_char.str(), ec);
         if (ec)
         {
             return {};
         }
 
         return canonical;
+    }
+
+    std::filesystem::path gpiochip_backing_device_path(
+        const std::filesystem::path &chip_path)
+    {
+        return gpiochip_sysfs_chip_path(chip_path);
     }
 
     int gpiochip_number(const std::filesystem::path &chip_path)
@@ -182,7 +197,7 @@ namespace
             chip_entry.name = filename;
 
             const std::filesystem::path sysfs_dir =
-                gpiochip_sysfs_dir(chip_entry.path);
+                gpiochip_sysfs_chip_path(chip_entry.path);
             if (std::filesystem::exists(sysfs_dir))
             {
                 chip_entry.label = read_trimmed_text_file(sysfs_dir / "label");
