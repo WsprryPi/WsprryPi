@@ -257,6 +257,7 @@ struct ArgParserConfig
     // Command line only
     bool use_journald;              ///< Route logs to journald instead of streams.
     bool date_time_log;             ///< Prefix logs with timestamp.
+    bool debug_logging;             ///< Enable DEBUG-level application logging.
     WsprPlannerPreference wspr_planner_preference; ///< Preferred planner behavior for Type 2/3 pairing.
     bool loop_tx;                   ///< Repeat transmission cycle.
     std::atomic<int> tx_iterations; ///< Number of transmission iterations (0 = infinite).
@@ -318,6 +319,7 @@ struct ArgParserConfig
           shutdown_pin(-1),
           use_journald(false),
           date_time_log(false),
+          debug_logging(false),
           wspr_planner_preference(WsprPlannerPreference::Auto),
           loop_tx(false),
           tx_iterations(0),
@@ -387,6 +389,7 @@ struct ArgParserConfig
         shutdown_pin = other.shutdown_pin;
         use_journald = other.use_journald;
         date_time_log = other.date_time_log;
+        debug_logging = other.debug_logging;
         wspr_planner_preference = other.wspr_planner_preference;
         loop_tx = other.loop_tx;
         tx_iterations.store(other.tx_iterations.load());

@@ -320,7 +320,10 @@ int main(int argc, char *argv[])
         print_usage(error_message, EXIT_FAILURE);
     }
 
-    initialize_logger(config.use_journald, config.date_time_log);
+    initialize_logger(
+        config.use_journald,
+        config.date_time_log,
+        config.debug_logging);
 
     // Display version, Raspberry Pi model, and process ID after CLI parsing so
     // the first backend banner matches the requested logging mode.

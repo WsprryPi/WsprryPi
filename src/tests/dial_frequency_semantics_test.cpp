@@ -40,6 +40,13 @@ namespace
             std::istreambuf_iterator<char>());
     }
 
+    void write_text_file(const std::string &path, const std::string &contents)
+    {
+        std::ofstream out(path, std::ios::trunc);
+        require(out.is_open(), "test helper must write " + path);
+        out << contents;
+    }
+
     bool nearly_equal(double lhs, double rhs, double epsilon = 0.01)
     {
         return std::fabs(lhs - rhs) <= epsilon;
@@ -73,6 +80,8 @@ namespace
         WsprPlannerPreference planner_preference = WsprPlannerPreference::Auto)
     {
         auto data = std::map<std::string, std::unordered_map<std::string, std::string>>{
+            {"Meta",
+             {{"debug_logging", "false"}}},
             {"Operation",
              {{"Mode", "WSPR"},
               {"Transmit", transmit ? "true" : "false"},
@@ -718,6 +727,17 @@ int main()
     }
 
     {
+        init_default_config();
+        require(
+            !config.debug_logging,
+            "default configuration must disable debug logging");
+        require(
+            jConfig["Meta"].contains("debug_logging") &&
+                !jConfig["Meta"]["debug_logging"].get<bool>(),
+            "default JSON config must serialize debug_logging as false");
+    }
+
+    {
         reset_getopt_state();
         std::vector<std::string> args = {
             "wsprrypi",
@@ -744,6 +764,51 @@ int main()
         require(
             config.mode == ModeType::WSPR,
             "persistent config reload must restore WSPR mode rather than tone mode");
+    }
+
+    {
+        reset_getopt_state();
+        std::vector<std::string> args = {
+            "wsprrypi",
+            "--debug-logging",
+            "AA0NT",
+            "EM18",
+            "20",
+            "20m"};
+        std::vector<char *> argv = argv_for(args);
+
+        require(
+            parse_command_line(static_cast<int>(argv.size()), argv.data()),
+            "--debug-logging CLI parsing must succeed");
+        require(
+            config.debug_logging,
+            "--debug-logging must enable persisted debug logging");
+        require(
+            jConfig["Meta"].value("debug_logging", false),
+            "--debug-logging must update serialized config state");
+    }
+
+    {
+        reset_getopt_state();
+        std::vector<std::string> args = {
+            "wsprrypi",
+            "--debug-logging",
+            "--no-debug-logging",
+            "AA0NT",
+            "EM18",
+            "20",
+            "20m"};
+        std::vector<char *> argv = argv_for(args);
+
+        require(
+            parse_command_line(static_cast<int>(argv.size()), argv.data()),
+            "--no-debug-logging CLI parsing must succeed");
+        require(
+            !config.debug_logging,
+            "--no-debug-logging must disable persisted debug logging");
+        require(
+            !jConfig["Meta"].value("debug_logging", true),
+            "--no-debug-logging must update serialized config state");
     }
 
     {
@@ -1606,6 +1671,83 @@ int main()
         require(
             candidate.error_details.value("plan_status", "") == "Type3RequiresSixCharLocator",
             "managed INI candidate rejection must surface planner status details");
+    }
+
+    {
+        init_default_config();
+        config.use_ini = true;
+        config.ini_filename = "/tmp/debug_logging.ini";
+        write_text_file(config.ini_filename, "[Meta]\ndebug_logging=false\n");
+        iniFile.set_filename(config.ini_filename);
+        config.debug_logging = true;
+        config_to_json();
+        json_to_ini();
+
+        const auto persisted_ini = iniFile.getData();
+        const auto meta_it = persisted_ini.find("Meta");
+        require(
+            meta_it != persisted_ini.end(),
+            "json_to_ini must persist the Meta section for debug logging");
+        require(
+            meta_it->second.at("debug_logging") == "true",
+            "json_to_ini must persist debug_logging in the Meta section");
+
+        init_config_json();
+        ini_to_json("/tmp/debug_logging.ini");
+        json_to_config();
+        require(
+            config.debug_logging,
+            "INI plumbing must round-trip persisted debug logging");
+
+        const nlohmann::json public_config = get_public_config_json();
+        require(
+            !public_config.contains("Meta"),
+            "public config JSON must not expose Meta logging controls to the UI");
+
+        init_default_config();
+    }
+
+    {
+        init_default_config();
+        config.use_ini = true;
+        config.ini_filename = "/tmp/debug_logging_patch.ini";
+        write_text_file(
+            config.ini_filename,
+            "[Meta]\ndebug_logging=false\n"
+            "[Operation]\nMode=WSPR\nTransmit=false\nTransmit Backend=gpio\n"
+            "Use LED=false\nLED Pin=-1\nWeb Port=31415\nSocket Port=31416\n"
+            "Use Shutdown=false\nShutdown Button=-1\n"
+            "[GPIO]\nTransmit Pin=4\nPower Level=7\nUse NTP=false\n"
+            "[Calibration]\nPPM=0\n"
+            "[Si5351]\nI2C Bus=1\nI2C Address=96\nReference Frequency=27000000\n"
+            "TX Output=CLK0\nPower Level=1\n"
+            "[WSPR]\nCall Sign=AA0NT\nGrid Square=EM18\nTX Power=20\n"
+            "Frequency=20m\nPlanner Preference=auto\nUse Random Offset=false\n"
+            "[CW]\nMessage=\nBase Frequency=3572000.0\nShift Hz=500.0\n"
+            "Dot Seconds=3.0\nIntra Element Gap=1.0\nInter Character Gap=3.0\n"
+            "Inter Word Gap=7.0\nFade Shape=none\nFade In Ms=0\nFade Out Ms=0\n"
+            "Fade Slice Ms=5\nStart Minute=0\nRepeat Minutes=10\n");
+        iniFile.set_filename(config.ini_filename);
+        config_to_json();
+
+        patch_all_from_web({{"Meta", {{"debug_logging", true}}}});
+
+        require(
+            config.debug_logging,
+            "internal JSON patch path must apply Meta.debug_logging to live config");
+        require(
+            jConfig["Meta"].value("debug_logging", false),
+            "internal JSON patch path must preserve Meta.debug_logging in internal JSON");
+        require(
+            iniFile.getData().at("Meta").at("debug_logging") == "true",
+            "internal JSON patch path must persist Meta.debug_logging to INI");
+
+        const nlohmann::json public_config = get_public_config_json();
+        require(
+            !public_config.contains("Meta"),
+            "public config JSON must still hide Meta after internal debug logging patch");
+
+        init_default_config();
     }
 
     {

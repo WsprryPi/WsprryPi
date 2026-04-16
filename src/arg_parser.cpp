@@ -1069,6 +1069,10 @@ void print_usage(const std::string &message, int exit_code)
               << "    Show the WsprryPi version.\n"
               << "  -i, --ini-file <file>\n"
               << "    Load parameters from an INI file. Provide the path and filename.\n\n"
+              << "  --debug-logging\n"
+              << "    Enable DEBUG-level application logging.\n"
+              << "  --no-debug-logging\n"
+              << "    Disable DEBUG-level application logging.\n\n"
               << "  --backend <gpio|si5351>\n"
               << "    Select the RF transmit backend. Default: gpio.\n"
               << "    GPIO transmission is supported only on Raspberry Pi 1 through 4.\n\n";
@@ -1171,6 +1175,7 @@ void show_config_values(bool reload)
         config.power_level);
     llog.logS(DEBUG, "Use LED:", config.use_led ? "true" : "false");
     llog.logS(DEBUG, "LED on GPIO", config.led_pin);
+    llog.logS(DEBUG, "Debug Logging:", config.debug_logging ? "true" : "false");
     // [Server]
     llog.logS(DEBUG, "Web server runs on port:", config.web_port);
     llog.logS(DEBUG, "Socket server runs on port:", config.socket_port);
@@ -2161,6 +2166,7 @@ bool handle_early_cli_options(int argc, char *argv[])
 {
     bool early_use_journald = config.use_journald;
     bool early_enable_timestamps = config.date_time_log;
+    bool early_debug_logging = config.debug_logging;
     TransmitBackendKind early_backend = config.transmit_backend;
 
     for (int i = 1; i < argc; ++i)
@@ -2175,6 +2181,14 @@ bool handle_early_cli_options(int argc, char *argv[])
         else if (arg == "--date-time-log")
         {
             early_enable_timestamps = true;
+        }
+        else if (arg == "--debug-logging")
+        {
+            early_debug_logging = true;
+        }
+        else if (arg == "--no-debug-logging")
+        {
+            early_debug_logging = false;
         }
         else if (arg == "--backend" && i + 1 < argc)
         {
@@ -2214,7 +2228,10 @@ bool handle_early_cli_options(int argc, char *argv[])
         }
     }
 
-    initialize_logger(early_use_journald, early_enable_timestamps);
+    initialize_logger(
+        early_use_journald,
+        early_enable_timestamps,
+        early_debug_logging);
 
     for (int i = 1; i < argc; ++i)
     {
@@ -2364,6 +2381,8 @@ bool parse_command_line(int argc, char *argv[])
         {"offset", no_argument, nullptr, 'o'},          // Via: [Extended] Offset = True
         {"journald", no_argument, nullptr, 'J'},        // Global: config.use_journald
         {"date-time-log", no_argument, nullptr, 'D'},   // Global: config.date_time_log
+        {"debug-logging", no_argument, nullptr, 1018},  // Global: config.debug_logging
+        {"no-debug-logging", no_argument, nullptr, 1019},
         {"require-paired", no_argument, nullptr, 1001}, // Global: config.wspr_planner_preference
         {"backend", required_argument, nullptr, 1002},
         {"qrss-message", required_argument, nullptr, 1003},
@@ -2402,7 +2421,12 @@ bool parse_command_line(int argc, char *argv[])
     while (true)
     {
         int option_index = 0;
-        int c = getopt_long(argc, argv, "h?vnroJDp:x:t:a:l:s:d:w:k:", long_options, &option_index);
+        int c = getopt_long(
+            argc,
+            argv,
+            "h?vnroJDp:x:t:a:l:s:d:w:k:",
+            long_options,
+            &option_index);
 
         if (c == -1)
             break;
@@ -2444,6 +2468,16 @@ bool parse_command_line(int argc, char *argv[])
         case 'D': // Add date/time stamps to stream logging
         {
             config.date_time_log = true;
+            break;
+        }
+        case 1018:
+        {
+            config.debug_logging = true;
+            break;
+        }
+        case 1019:
+        {
+            config.debug_logging = false;
             break;
         }
         case 1001: // Require paired WSPR planning
