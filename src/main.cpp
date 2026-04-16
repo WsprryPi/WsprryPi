@@ -301,7 +301,7 @@ int main(int argc, char *argv[])
     SingletonProcess singleton(SINGLETON_PORT);
     if (!singleton())
     {
-        llog.logE(FATAL, "Another instance is running on port:", SINGLETON_PORT);
+        llog.logE(FATAL, "Another instance is running on port: ", SINGLETON_PORT);
         std::exit(EXIT_FAILURE);
     }
 
@@ -320,7 +320,10 @@ int main(int argc, char *argv[])
         print_usage(error_message, EXIT_FAILURE);
     }
 
-    initialize_logger(config.use_journald, config.date_time_log);
+    initialize_logger(
+        config.use_journald,
+        config.date_time_log,
+        config.debug_logging);
 
     // Display version, Raspberry Pi model, and process ID after CLI parsing so
     // the first backend banner matches the requested logging mode.
@@ -328,7 +331,7 @@ int main(int argc, char *argv[])
 
     if (!config.use_journald)
     {
-        llog.logS(INFO,
+        llog.logS(DEBUG,
                   "Log timestamps:",
                   config.date_time_log ? "enabled" : "disabled");
     }
@@ -346,7 +349,7 @@ int main(int argc, char *argv[])
         (sizeof(void *) == 8 ? " 64-bit" : " 32-bit"),
         ".");
 
-    llog.logS(INFO, "Process PID:", getpid());
+    llog.logS(DEBUG, "Process PID:", getpid());
 
     // Re-assert the handled signal mask on the main runtime thread before
     // entering the long-lived scheduling loop.

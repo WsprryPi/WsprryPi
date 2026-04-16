@@ -114,7 +114,7 @@ void WebServer::start(int port)
         port_ = port;
     }
 
-    llog.logS(INFO, "Web server started on port:", config.web_port);
+    llog.logS(INFO, "Web server started on port: ", config.web_port);
 
     // Launch the server in a separate thread.
     serverThread = std::thread([this]()
@@ -142,7 +142,7 @@ void WebServer::start(int port)
         }
         catch (const nlohmann::json::parse_error &e)
         {
-            llog.logE(WARN, "Error parsing JSON:", std::string(e.what()));
+            llog.logE(WARN, "Error parsing JSON: ", std::string(e.what()));
             setCORSHeaders(res);
             res.status = 400;
             nlohmann::json err = {{"error", "invalid_json"}, {"message", e.what()}};
@@ -150,7 +150,7 @@ void WebServer::start(int port)
         }
         catch (const ConfigValidationError &e)
         {
-            llog.logE(WARN, "Configuration update rejected:", std::string(e.what()));
+            llog.logE(WARN, "Configuration update rejected: ", std::string(e.what()));
             setCORSHeaders(res);
             res.status = 400;
             nlohmann::json err = e.details();
@@ -164,7 +164,7 @@ void WebServer::start(int port)
         }
         catch (const std::exception &e)
         {
-            llog.logE(WARN, "Configuration update rejected:", std::string(e.what()));
+            llog.logE(WARN, "Configuration update rejected: ", std::string(e.what()));
             setCORSHeaders(res);
             res.status = 400;
             nlohmann::json err = {{"error", "invalid_config"}, {"message", e.what()}};
@@ -269,7 +269,7 @@ void WebServer::start(int port)
                 catch (const nlohmann::json::parse_error &e)
                 {
                     llog.logE(WARN,
-                            "Error parsing JSON:",
+                            "Error parsing JSON: ",
                             std::string(e.what()));
                     setCORSHeaders(res);
                     res.status = 400;
@@ -387,7 +387,6 @@ void WebServer::stop()
         serverThread.join();
     }
 
-    llog.logS(INFO, "Web server stopped.");
 }
 
 /**

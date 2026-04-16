@@ -352,6 +352,16 @@ namespace
         const nlohmann::json &public_json,
         nlohmann::json &internal_json)
     {
+        if (public_json.contains("Meta"))
+        {
+            const auto &meta = public_json.at("Meta");
+            if (meta.contains("debug_logging"))
+            {
+                internal_json["Meta"]["debug_logging"] =
+                    meta.at("debug_logging");
+            }
+        }
+
         if (public_json.contains("Operation"))
         {
             const auto &operation = public_json.at("Operation");
@@ -1035,6 +1045,7 @@ namespace
             {"Use INI", false},
             {"INI Filename", ""},
             {"Date Time Log", false},
+            {"debug_logging", false},
             {"Loop TX", false},
             {"TX Iterations", 0}};
         target["Operation"] = {
@@ -1105,6 +1116,8 @@ namespace
         target.use_ini = source.at("Meta").at("Use INI").get<bool>();
         target.ini_filename = source.at("Meta").at("INI Filename").get<std::string>();
         target.date_time_log = source.at("Meta").at("Date Time Log").get<bool>();
+        target.debug_logging =
+            source.at("Meta").value("debug_logging", false);
         target.mode = parse_mode_type(source.at("Operation"));
         target.wspr_planner_preference =
             parse_wspr_planner_preference(source.at("WSPR"));
@@ -1309,6 +1322,7 @@ namespace
         target["Meta"]["Use INI"] = source.use_ini;
         target["Meta"]["INI Filename"] = source.ini_filename;
         target["Meta"]["Date Time Log"] = source.date_time_log;
+        target["Meta"]["debug_logging"] = source.debug_logging;
         target["Meta"]["Loop TX"] = source.loop_tx;
         target["Meta"]["TX Iterations"] = source.tx_iterations.load();
 
@@ -1418,6 +1432,7 @@ namespace
         target.shutdown_pin = source.shutdown_pin;
         target.use_journald = source.use_journald;
         target.date_time_log = source.date_time_log;
+        target.debug_logging = source.debug_logging;
         target.wspr_planner_preference = source.wspr_planner_preference;
         target.loop_tx = source.loop_tx;
         target.tx_iterations.store(source.tx_iterations.load());
@@ -1474,7 +1489,8 @@ namespace
 
             // Canonical persistent sections only. Unknown sections, including
             // pre-2.x legacy sections, are not imported or treated as fallbacks.
-            if (section != "Operation" &&
+            if (section != "Meta" &&
+                section != "Operation" &&
                 section != "GPIO" &&
                 section != "Calibration" &&
                 section != "Si5351" &&
@@ -1491,6 +1507,15 @@ namespace
 
                 if (trimmed.empty())
                 {
+                    continue;
+                }
+
+                if (section == "Meta")
+                {
+                    if (key == "debug_logging" || key == "Debug Logging")
+                    {
+                        patch["Meta"]["debug_logging"] = parse_ini_value(trimmed);
+                    }
                     continue;
                 }
 
@@ -1644,6 +1669,7 @@ void json_to_ini()
         }
 
         if (section_name != "Operation" &&
+            section_name != "Meta" &&
             section_name != "GPIO" &&
             section_name != "Calibration" &&
             section_name != "Si5351" &&
@@ -1684,6 +1710,8 @@ void json_to_ini()
         {
             const std::string &key = kv.key();
             const bool persist_key =
+                (section_name == "Meta" &&
+                 key == "debug_logging") ||
                 (section_name == "Operation" &&
                  (key == "Mode" ||
                   key == "Transmit" ||
@@ -1821,6 +1849,7 @@ void commit_config_candidate(const PreparedConfigCandidate &candidate)
 
     copy_config(candidate.normalized_config, config);
     jConfig = candidate.normalized_json;
+    refresh_logger_level_from_config();
 }
 
 void copy_runtime_config(const ArgParserConfig &source, ArgParserConfig &target)
@@ -1830,7 +1859,7 @@ void copy_runtime_config(const ArgParserConfig &source, ArgParserConfig &target)
 
 void dump_json(const nlohmann::json &j, std::string tag)
 {
-    llog.logS(DEBUG, tag, "JSON Dump:", j.dump());
+    llog.logS(DEBUG, tag, "JSON Dump: ", j.dump());
 }
 
 void patch_all_from_web(const nlohmann::json &j)
@@ -1889,6 +1918,7 @@ void patch_all_from_web(const nlohmann::json &j)
 
     copy_config(candidate_config, config);
     jConfig = candidate_json;
+    refresh_logger_level_from_config();
     json_to_ini();
     if (!g_patch_all_from_web_runtime_apply_suppressed_for_test)
     {
@@ -1931,7 +1961,7 @@ void repair_from_web(bool attempt_repair)
 
         llog.logS(
             ERROR,
-            "Failed to reload repaired configuration; previous configuration remains loaded:",
+            "Failed to reload repaired configuration; previous configuration remains loaded: ",
             load_error);
         return;
     }

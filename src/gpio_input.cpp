@@ -167,9 +167,9 @@ bool GPIOInput::enable(int pin,
         llog.logS(DEBUG,
                   "GPIOInput: request success for ",
                   describe_resolved_gpio_line(resolved_line_),
-                  " edge:",
+                  " edge: ",
                   trigger_high_ ? "RISING" : "FALLING",
-                  " bias:",
+                  " bias: ",
                   (pull_mode_ == PullMode::PullUp)   ? "PULL_UP" :
                   (pull_mode_ == PullMode::PullDown) ? "PULL_DOWN" :
                                                        "DISABLED", ".");
@@ -196,9 +196,9 @@ bool GPIOInput::enable(int pin,
         llog.logS(DEBUG,
                   "GPIOInput: request success for ",
                   describe_resolved_gpio_line(resolved_line_),
-                  " edge:",
+                  " edge: ",
                   trigger_high_ ? "RISING" : "FALLING",
-                  " bias:",
+                  " bias: ",
                   (pull_mode_ == PullMode::PullUp)   ? "PULL_UP" :
                   (pull_mode_ == PullMode::PullDown) ? "PULL_DOWN" :
                                                        "DISABLED", ".");
