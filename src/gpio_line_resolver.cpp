@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <fstream>
+#include <map>
 #include <set>
 #include <sstream>
 #include <sys/stat.h>
@@ -19,6 +20,23 @@ namespace
         std::size_t num_lines = 0;
     };
 
+    void append_resolution_note(
+        std::string &note,
+        const std::string &fragment)
+    {
+        if (fragment.empty())
+        {
+            return;
+        }
+
+        if (!note.empty())
+        {
+            note += " ";
+        }
+
+        note += fragment;
+    }
+
     std::filesystem::path gpiochip_sysfs_chip_path(
         const std::filesystem::path &chip_path)
     {
@@ -30,15 +48,14 @@ namespace
             return {};
         }
 
-        std::ostringstream dev_char;
-        dev_char << "/sys/dev/char/"
-                 << major(st.st_rdev)
-                 << ": "
-                 << minor(st.st_rdev);
+        const std::filesystem::path dev_char =
+            std::filesystem::path("/sys/dev/char") /
+            (std::to_string(major(st.st_rdev)) + ":" +
+             std::to_string(minor(st.st_rdev)));
 
         std::error_code ec;
         const std::filesystem::path canonical =
-            std::filesystem::canonical(dev_char.str(), ec);
+            std::filesystem::canonical(dev_char, ec);
         if (ec)
         {
             return {};
@@ -50,7 +67,35 @@ namespace
     std::filesystem::path gpiochip_backing_device_path(
         const std::filesystem::path &chip_path)
     {
-        return gpiochip_sysfs_chip_path(chip_path);
+        const std::filesystem::path sysfs_chip_path =
+            gpiochip_sysfs_chip_path(chip_path);
+        if (sysfs_chip_path.empty())
+        {
+            return {};
+        }
+
+        std::error_code ec;
+        const std::filesystem::path backing_device =
+            std::filesystem::canonical(sysfs_chip_path / "device", ec);
+        if (!ec)
+        {
+            return backing_device;
+        }
+
+        const std::filesystem::path parent = sysfs_chip_path.parent_path();
+        if (!parent.empty())
+        {
+            const std::filesystem::path canonical_parent =
+                std::filesystem::canonical(parent, ec);
+            if (!ec)
+            {
+                return canonical_parent;
+            }
+
+            return parent;
+        }
+
+        return sysfs_chip_path;
     }
 
     int gpiochip_number(const std::filesystem::path &chip_path)
@@ -93,46 +138,52 @@ namespace
         return chip_path_less(lhs.chip_path, rhs.chip_path);
     }
 
-    bool collapse_equivalent_candidates(
-        const std::vector<ResolvedGPIOLine> &candidates,
-        ResolvedGPIOLine &resolved_line)
+    std::filesystem::path candidate_identity_key(
+        const ResolvedGPIOLine &candidate)
     {
-        if (candidates.empty())
+        if (!candidate.backing_device_path.empty())
         {
-            return false;
+            return candidate.backing_device_path;
         }
 
-        std::set<std::filesystem::path> backing_devices;
-        for (const ResolvedGPIOLine &candidate : candidates)
-        {
-            if (candidate.backing_device_path.empty())
-            {
-                return false;
-            }
+        return candidate.chip_path;
+    }
 
-            backing_devices.insert(candidate.backing_device_path);
-        }
-
-        if (backing_devices.size() != 1U)
-        {
-            return false;
-        }
-
+    ResolvedGPIOLine canonicalize_candidate_group(
+        const std::vector<ResolvedGPIOLine> &group)
+    {
         const auto canonical_it =
-            std::min_element(candidates.begin(), candidates.end(), resolved_chip_less);
-        if (canonical_it == candidates.end())
+            std::min_element(group.begin(), group.end(), resolved_chip_less);
+        ResolvedGPIOLine canonical = *canonical_it;
+        canonical.equivalent_chip_paths.clear();
+
+        std::set<std::filesystem::path, decltype(&chip_path_less)> unique_paths(
+            &chip_path_less);
+        for (const ResolvedGPIOLine &candidate : group)
         {
-            return false;
+            unique_paths.insert(candidate.chip_path);
         }
 
-        resolved_line = *canonical_it;
-        std::ostringstream note;
-        note << "Multiple gpiochips map to the same backing device '"
-             << resolved_line.backing_device_path
-             << "'. Using '" << resolved_line.chip_path
-             << "' as canonical view.";
-        resolved_line.resolution_note = note.str();
-        return true;
+        canonical.equivalent_chip_paths.assign(
+            unique_paths.begin(),
+            unique_paths.end());
+
+        if (unique_paths.size() > 1U && !canonical.backing_device_path.empty())
+        {
+            std::ostringstream note;
+            note << "Multiple gpiochips";
+            for (const std::filesystem::path &path : canonical.equivalent_chip_paths)
+            {
+                note << " " << path;
+            }
+            note << " map to the same backing device '"
+                 << canonical.backing_device_path
+                 << "'. Using '" << canonical.chip_path
+                 << "' as canonical view.";
+            append_resolution_note(canonical.resolution_note, note.str());
+        }
+
+        return canonical;
     }
 
 #if GPIOD_API_MAJOR < 2
@@ -314,6 +365,78 @@ namespace
     }
 } // namespace
 
+bool canonicalize_resolved_gpio_candidates(
+    int bcm,
+    bool resolved_by_name,
+    const std::vector<ResolvedGPIOLine> &candidates,
+    ResolvedGPIOLine &resolved_line,
+    std::string &diagnostic_message)
+{
+    diagnostic_message.clear();
+    resolved_line = ResolvedGPIOLine{};
+
+    if (candidates.empty())
+    {
+        return false;
+    }
+
+    std::map<std::filesystem::path, std::vector<ResolvedGPIOLine>> grouped_candidates;
+    for (const ResolvedGPIOLine &candidate : candidates)
+    {
+        grouped_candidates[candidate_identity_key(candidate)].push_back(candidate);
+    }
+
+    std::vector<ResolvedGPIOLine> canonical_candidates;
+    canonical_candidates.reserve(grouped_candidates.size());
+    for (const auto &entry : grouped_candidates)
+    {
+        canonical_candidates.push_back(canonicalize_candidate_group(entry.second));
+    }
+
+    std::sort(
+        canonical_candidates.begin(),
+        canonical_candidates.end(),
+        resolved_chip_less);
+
+    if (canonical_candidates.size() == 1U)
+    {
+        resolved_line = canonical_candidates.front();
+        return true;
+    }
+
+    std::ostringstream oss;
+    oss << "BCM GPIO " << bcm;
+    if (resolved_by_name)
+    {
+        oss << " resolved by kernel line name on multiple backing devices:";
+    }
+    else
+    {
+        oss << " could only be mapped by raw offset on multiple backing devices:";
+    }
+
+    for (const ResolvedGPIOLine &candidate : canonical_candidates)
+    {
+        oss << " " << candidate.chip_path;
+        if (!candidate.backing_device_path.empty())
+        {
+            oss << "(device=" << candidate.backing_device_path << ")";
+        }
+    }
+
+    if (resolved_by_name)
+    {
+        oss << ". Chip selection is ambiguous.";
+    }
+    else
+    {
+        oss << ". Refusing ambiguous raw-offset mapping.";
+    }
+
+    diagnostic_message = oss.str();
+    return false;
+}
+
 bool resolve_gpio_line(
     int bcm,
     ResolvedGPIOLine &resolved_line,
@@ -375,39 +498,19 @@ bool resolve_gpio_line(
         }
     }
 
-    if (named_candidates.size() == 1U)
+    if (!named_candidates.empty())
     {
-        resolved_line = named_candidates.front();
-        return true;
-    }
-
-    if (named_candidates.size() > 1U)
-    {
-        if (collapse_equivalent_candidates(named_candidates, resolved_line))
+        if (canonicalize_resolved_gpio_candidates(
+                bcm,
+                true,
+                named_candidates,
+                resolved_line,
+                error_message))
         {
             return true;
         }
 
-        std::ostringstream oss;
-        oss << "BCM GPIO " << bcm
-            << " resolved by kernel line name on multiple gpiochips:";
-        for (const ResolvedGPIOLine &candidate : named_candidates)
-        {
-            oss << " " << candidate.chip_path;
-            if (!candidate.backing_device_path.empty())
-            {
-                oss << "(device=" << candidate.backing_device_path << ")";
-            }
-        }
-        oss << ". Chip selection is ambiguous.";
-        error_message = oss.str();
         return false;
-    }
-
-    if (fallback_candidates.size() == 1U)
-    {
-        resolved_line = fallback_candidates.front();
-        return true;
     }
 
     if (fallback_candidates.empty())
@@ -419,25 +522,12 @@ bool resolve_gpio_line(
         return false;
     }
 
-    if (collapse_equivalent_candidates(fallback_candidates, resolved_line))
-    {
-        return true;
-    }
-
-    std::ostringstream oss;
-    oss << "BCM GPIO " << bcm
-        << " could only be mapped by raw offset on multiple gpiochips:";
-    for (const ResolvedGPIOLine &candidate : fallback_candidates)
-    {
-        oss << " " << candidate.chip_path;
-        if (!candidate.backing_device_path.empty())
-        {
-            oss << "(device=" << candidate.backing_device_path << ")";
-        }
-    }
-    oss << ". Refusing ambiguous raw-offset mapping.";
-    error_message = oss.str();
-    return false;
+    return canonicalize_resolved_gpio_candidates(
+        bcm,
+        false,
+        fallback_candidates,
+        resolved_line,
+        error_message);
 }
 
 std::string describe_resolved_gpio_line(const ResolvedGPIOLine &resolved_line)
@@ -462,6 +552,18 @@ std::string describe_resolved_gpio_line(const ResolvedGPIOLine &resolved_line)
     if (!resolved_line.backing_device_path.empty())
     {
         oss << " backing-device=" << resolved_line.backing_device_path;
+    }
+    if (resolved_line.equivalent_chip_paths.size() > 1U)
+    {
+        oss << " equivalent-chip-views=";
+        for (std::size_t i = 0; i < resolved_line.equivalent_chip_paths.size(); ++i)
+        {
+            if (i != 0U)
+            {
+                oss << ",";
+            }
+            oss << resolved_line.equivalent_chip_paths[i];
+        }
     }
     if (!resolved_line.resolution_note.empty())
     {

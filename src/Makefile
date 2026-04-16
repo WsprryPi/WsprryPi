@@ -115,6 +115,7 @@ BAND_GPIO_ROTATION_TEST_OUT := band_gpio_rotation_test
 MONITOR_FILE_REGRESSION_TEST_OUT := monitor_file_regression_test
 GPIO_LOOPBACK_TEST_OUT := gpio_loopback_test
 BAND_GPIO_LIVE_MONITOR_OUT := band_gpio_live_monitor
+GPIO_LINE_RESOLVER_TEST_OUT := gpio_line_resolver_test
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Output directories
@@ -156,6 +157,11 @@ GPIO_LOOPBACK_TEST_DEPS := $(GPIO_LOOPBACK_TEST_OBJ)
 BAND_GPIO_LIVE_MONITOR_SRC := tests/band_gpio_live_monitor.cpp
 BAND_GPIO_LIVE_MONITOR_OBJ := $(OBJ_DIR_DEBUG)/tests/band_gpio_live_monitor.o
 BAND_GPIO_LIVE_MONITOR_DEPS := $(BAND_GPIO_LIVE_MONITOR_OBJ)
+GPIO_LINE_RESOLVER_TEST_SRC := tests/gpio_line_resolver_test.cpp
+GPIO_LINE_RESOLVER_TEST_OBJ := $(OBJ_DIR_DEBUG)/tests/gpio_line_resolver_test.o
+GPIO_LINE_RESOLVER_TEST_DEPS := \
+	$(GPIO_LINE_RESOLVER_TEST_OBJ) \
+	$(OBJ_DIR_DEBUG)/./gpio_line_resolver.o
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Dependency includes
@@ -371,6 +377,17 @@ $(BIN_DIR)/$(MONITOR_FILE_REGRESSION_TEST_OUT): $(MONITOR_FILE_REGRESSION_TEST_O
 	$(Q)echo "Linking debug: $(MONITOR_FILE_REGRESSION_TEST_OUT)"
 	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) $^ -o $@ $(LDFLAGS)
 
+$(GPIO_LINE_RESOLVER_TEST_OBJ): $(GPIO_LINE_RESOLVER_TEST_SRC)
+	$(Q)mkdir -p $(dir $@)
+	$(Q)mkdir -p $(DEP_DIR)/tests
+	$(Q)echo "Compiling (debug) $< into $@"
+	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -MF $(DEP_DIR)/tests/gpio_line_resolver_test.d -c $< -o $@
+
+$(BIN_DIR)/$(GPIO_LINE_RESOLVER_TEST_OUT): $(GPIO_LINE_RESOLVER_TEST_DEPS)
+	$(Q)mkdir -p $(BIN_DIR)
+	$(Q)echo "Linking debug: $(GPIO_LINE_RESOLVER_TEST_OUT)"
+	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) $^ -o $@ $(LDFLAGS)
+
 ifeq ($(GPIOD_HAS_V2),1)
 $(GPIO_LOOPBACK_TEST_OBJ): $(GPIO_LOOPBACK_TEST_SRC)
 	$(Q)mkdir -p $(dir $@)
@@ -424,7 +441,7 @@ $(BIN_DIR)/$(OUT): $(CPP_OBJECTS)
 # Phony targets
 # ─────────────────────────────────────────────────────────────────────────────
 
-.PHONY: clean release debug test test-tone test-oneshot semantics-test band-gpio-rotation-test monitor-file-regression-test gpio-loopback-test band-gpio-live-monitor gdb install debuginstall uninstall lint macros help
+.PHONY: clean release debug test test-tone test-oneshot semantics-test band-gpio-rotation-test monitor-file-regression-test gpio-line-resolver-test gpio-loopback-test band-gpio-live-monitor gdb install debuginstall uninstall lint macros help
 DEBUG: debug
 RELEASE: release
 
@@ -462,6 +479,10 @@ band-gpio-rotation-test: $(BIN_DIR)/$(BAND_GPIO_ROTATION_TEST_OUT)
 monitor-file-regression-test: $(BIN_DIR)/$(MONITOR_FILE_REGRESSION_TEST_OUT)
 	$(Q)echo "Running MonitorFile regression tests."
 	$(Q)./$(BIN_DIR)/$(MONITOR_FILE_REGRESSION_TEST_OUT)
+
+gpio-line-resolver-test: $(BIN_DIR)/$(GPIO_LINE_RESOLVER_TEST_OUT)
+	$(Q)echo "Running GPIO line resolver regression tests."
+	$(Q)./$(BIN_DIR)/$(GPIO_LINE_RESOLVER_TEST_OUT)
 
 ifeq ($(GPIOD_HAS_V2),1)
 gpio-loopback-test: $(BIN_DIR)/$(GPIO_LOOPBACK_TEST_OUT)
