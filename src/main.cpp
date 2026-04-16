@@ -331,7 +331,7 @@ int main(int argc, char *argv[])
 
     if (!config.use_journald)
     {
-        llog.logS(INFO,
+        llog.logS(DEBUG,
                   "Log timestamps:",
                   config.date_time_log ? "enabled" : "disabled");
     }
@@ -349,7 +349,7 @@ int main(int argc, char *argv[])
         (sizeof(void *) == 8 ? " 64-bit" : " 32-bit"),
         ".");
 
-    llog.logS(INFO, "Process PID:", getpid());
+    llog.logS(DEBUG, "Process PID:", getpid());
 
     // Re-assert the handled signal mask on the main runtime thread before
     // entering the long-lived scheduling loop.

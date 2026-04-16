@@ -1546,11 +1546,11 @@ void apply_runtime_config_side_effects()
         std::ostringstream address;
         address << "0x" << std::hex << std::uppercase
                 << config.si5351_i2c_address;
-        llog.logS(INFO, "Si5351 I2C bus:", config.si5351_i2c_bus);
-        llog.logS(INFO, "Si5351 I2C address:", address.str());
-        llog.logS(INFO, "Si5351 reference frequency Hz:",
+        llog.logS(DEBUG, "Si5351 I2C bus:", config.si5351_i2c_bus);
+        llog.logS(DEBUG, "Si5351 I2C address:", address.str());
+        llog.logS(DEBUG, "Si5351 reference frequency Hz:",
                   config.si5351_reference_hz);
-        llog.logS(INFO, "Si5351 TX output:",
+        llog.logS(DEBUG, "Si5351 TX output:",
                   std::string("CLK") +
                       std::to_string(config.si5351_tx_output));
         if (config.use_ini)
@@ -1569,7 +1569,7 @@ void apply_runtime_config_side_effects()
             }
 
             llog.logS(
-                INFO,
+                DEBUG,
                 "Si5351 unused output parking: ",
                 parked_outputs.str(),
                 " held in a safe non-transmitting state; internal PLL remains parked.");
@@ -1673,15 +1673,13 @@ void apply_runtime_config_side_effects()
             dot_seconds = config.qrss.dot_seconds;
         }
 
+        log_startup_config_message(INFO, "QRSS configuration loaded:");
+        log_startup_config_message(INFO, "- Message: \"", message, "\"");
         log_startup_config_message(
             INFO,
-            "QRSS configuration loaded: message=\"",
-            message,
-            "\" frequency=",
-            lookup.freq_display_string(frequency_hz),
-            " dot=",
-            dot_seconds,
-            "s");
+            "- Base Freq:",
+            lookup.freq_display_string(frequency_hz));
+        log_startup_config_message(INFO, "- Dot Timing:", dot_seconds, "s");
         return;
     }
 
@@ -1709,17 +1707,17 @@ void apply_runtime_config_side_effects()
             dot_seconds = config.fskcw.dot_seconds;
         }
 
+        log_startup_config_message(INFO, "FSKCW configuration loaded:");
+        log_startup_config_message(INFO, "- Message: \"", message, "\"");
         log_startup_config_message(
             INFO,
-            "FSKCW configuration loaded: message=\"",
-            message,
-            "\" mark=",
-            lookup.freq_display_string(mark_frequency_hz),
-            " space=",
-            lookup.freq_display_string(space_frequency_hz),
-            " dot=",
-            dot_seconds,
-            "s");
+            "- Mark Freq:",
+            lookup.freq_display_string(mark_frequency_hz));
+        log_startup_config_message(
+            INFO,
+            "- Space Freq:",
+            lookup.freq_display_string(space_frequency_hz));
+        log_startup_config_message(INFO, "- Dot Timing:", dot_seconds, "s");
         return;
     }
 
@@ -1747,17 +1745,17 @@ void apply_runtime_config_side_effects()
             dot_seconds = config.dfcw.dot_seconds;
         }
 
+        log_startup_config_message(INFO, "DFCW configuration loaded:");
+        log_startup_config_message(INFO, "- Message: \"", message, "\"");
         log_startup_config_message(
             INFO,
-            "DFCW configuration loaded: message=\"",
-            message,
-            "\" dot=",
-            lookup.freq_display_string(dot_frequency_hz),
-            " dash=",
-            lookup.freq_display_string(dash_frequency_hz),
-            " dot=",
-            dot_seconds,
-            "s");
+            "- Dot Freq:",
+            lookup.freq_display_string(dot_frequency_hz));
+        log_startup_config_message(
+            INFO,
+            "- Dash Freq:",
+            lookup.freq_display_string(dash_frequency_hz));
+        log_startup_config_message(INFO, "- Dot Timing:", dot_seconds, "s");
         return;
     }
 
