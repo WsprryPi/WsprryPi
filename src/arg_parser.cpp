@@ -368,6 +368,27 @@ static std::string transmit_gpio_validation_message()
     return oss.str();
 }
 
+bool backend_ready_for_transmission(
+    const ArgParserConfig &candidate,
+    std::string *error_message)
+{
+    if (candidate.transmit_backend == TransmitBackendKind::GPIO)
+    {
+        return platform_supports_gpio_clock_transmission(error_message);
+    }
+
+    if (candidate.transmit_backend == TransmitBackendKind::SI5351)
+    {
+        return si5351_device_detected(
+            candidate.si5351_i2c_bus,
+            candidate.si5351_i2c_address,
+            candidate.si5351_reference_hz,
+            error_message);
+    }
+
+    return true;
+}
+
 /**
  * @brief Rounds an input power level to the nearest valid WSPR power level.
  *
@@ -1048,8 +1069,13 @@ void print_usage(const std::string &message, int exit_code)
               << "    Show the WsprryPi version.\n"
               << "  -i, --ini-file <file>\n"
               << "    Load parameters from an INI file. Provide the path and filename.\n\n"
+              << "  --debug-logging\n"
+              << "    Enable DEBUG-level application logging.\n"
+              << "  --no-debug-logging\n"
+              << "    Disable DEBUG-level application logging.\n\n"
               << "  --backend <gpio|si5351>\n"
-              << "    Select the RF transmit backend. Default: gpio.\n\n";
+              << "    Select the RF transmit backend. Default: gpio.\n"
+              << "    GPIO transmission is supported only on Raspberry Pi 1 through 4.\n\n";
 
     if (config.transmit_backend == TransmitBackendKind::SI5351)
     {
@@ -1113,46 +1139,47 @@ void show_config_values(bool reload)
     // Print current configuration details
     //
     // [Control]
-    llog.logS(DEBUG, "Transmit Enabled:", config.transmit ? "true" : "false");
+    llog.logS(DEBUG, "Transmit Enabled: ", config.transmit ? "true" : "false");
     // [Common]
-    llog.logS(DEBUG, "Call Sign:", config.callsign);
-    llog.logS(DEBUG, "Grid Square:", config.grid_square);
-    llog.logS(DEBUG, "Transmit Power:", config.power_dbm);
-    llog.logS(DEBUG, "WSPR Dial Frequencies:", config.frequencies);
-    llog.logS(DEBUG, "Transmit Backend:",
+    llog.logS(DEBUG, "Call Sign: ", config.callsign);
+    llog.logS(DEBUG, "Grid Square: ", config.grid_square);
+    llog.logS(DEBUG, "Transmit Power: ", config.power_dbm);
+    llog.logS(DEBUG, "WSPR Dial Frequencies: ", config.frequencies);
+    llog.logS(DEBUG, "Transmit Backend: ",
               transmit_backend_kind_to_string(config.transmit_backend));
     if (config.transmit_backend == TransmitBackendKind::SI5351)
     {
         std::ostringstream address;
         address << "0x" << std::hex << std::uppercase
                 << config.si5351_i2c_address;
-        llog.logS(DEBUG, "Si5351 I2C Bus:", config.si5351_i2c_bus);
-        llog.logS(DEBUG, "Si5351 I2C Address:", address.str());
-        llog.logS(DEBUG, "Si5351 Reference Frequency Hz:",
+        llog.logS(DEBUG, "Si5351 I2C Bus: ", config.si5351_i2c_bus);
+        llog.logS(DEBUG, "Si5351 I2C Address: ", address.str());
+        llog.logS(DEBUG, "Si5351 Reference Frequency Hz: ",
                   config.si5351_reference_hz);
-        llog.logS(DEBUG, "Si5351 TX Output:",
+        llog.logS(DEBUG, "Si5351 TX Output: ",
                   std::string("CLK") + std::to_string(config.si5351_tx_output));
     }
     else
 
     {
-        llog.logS(DEBUG, "Transmit GPIO:", config.tx_pin);
+        llog.logS(DEBUG, "Transmit GPIO: ", config.tx_pin);
     }
     // [Extended]
-    llog.logS(DEBUG, "PPM Offset:", config.ppm);
-    llog.logS(DEBUG, "WSPR Audio Offset Hz:", config.wspr.audio_offset_hz);
+    llog.logS(DEBUG, "PPM Offset: ", config.ppm);
+    llog.logS(DEBUG, "WSPR Audio Offset Hz: ", config.wspr.audio_offset_hz);
     llog.logS(
         DEBUG,
         config.transmit_backend == TransmitBackendKind::SI5351
-            ? "Si5351 Drive Level:"
-            : "GPIO Power Level:",
+            ? "Si5351 Drive Level: "
+            : "GPIO Power Level: ",
         config.power_level);
-    llog.logS(DEBUG, "Use LED:", config.use_led ? "true" : "false");
+    llog.logS(DEBUG, "Use LED: ", config.use_led ? "true" : "false");
     llog.logS(DEBUG, "LED on GPIO", config.led_pin);
+    llog.logS(DEBUG, "Debug Logging: ", config.debug_logging ? "true" : "false");
     // [Server]
-    llog.logS(DEBUG, "Web server runs on port:", config.web_port);
-    llog.logS(DEBUG, "Socket server runs on port:", config.socket_port);
-    llog.logS(DEBUG, "Use shutdown button:", config.use_shutdown ? "true" : "false");
+    llog.logS(DEBUG, "Web server runs on port: ", config.web_port);
+    llog.logS(DEBUG, "Socket server runs on port: ", config.socket_port);
+    llog.logS(DEBUG, "Use shutdown button: ", config.use_shutdown ? "true" : "false");
     llog.logS(DEBUG, "Shutdown button GPIO", config.shutdown_pin);
 }
 
@@ -1268,29 +1295,35 @@ bool validate_config_candidate(
         return false;
     }
 
-    const bool requires_valid_transmit_gpio =
-        candidate.transmit_backend == TransmitBackendKind::GPIO &&
-        backend_validation_required;
-
-    if (requires_valid_transmit_gpio &&
-        !platform_supports_gpio_clock_transmission(error_message))
+    if (candidate.transmit_backend == TransmitBackendKind::GPIO)
     {
-        return false;
-    }
-
-    if (requires_valid_transmit_gpio &&
-        !is_valid_runtime_transmit_gpio(candidate.gpio_tx_pin))
-    {
-        if (error_message != nullptr)
+        if (!platform_supports_gpio_clock_transmission(error_message))
         {
-            *error_message = transmit_gpio_validation_message();
+            return false;
         }
 
-        return false;
-    }
+        if (!is_valid_runtime_transmit_gpio(candidate.gpio_tx_pin))
+        {
+            if (error_message != nullptr)
+            {
+                *error_message = transmit_gpio_validation_message();
+            }
 
-    if (candidate.transmit_backend == TransmitBackendKind::SI5351 &&
-        backend_validation_required)
+            return false;
+        }
+
+        if (candidate.gpio_power_level < 0 || candidate.gpio_power_level > 7)
+        {
+            if (error_message != nullptr)
+            {
+                *error_message =
+                    "Invalid GPIO power level. Expected 0 through 7.";
+            }
+
+            return false;
+        }
+    }
+    else if (candidate.transmit_backend == TransmitBackendKind::SI5351)
     {
         if (candidate.si5351_i2c_bus < 0)
         {
@@ -1348,18 +1381,12 @@ bool validate_config_candidate(
 
             return false;
         }
-    }
-    else if (candidate.transmit_backend == TransmitBackendKind::GPIO &&
-             backend_validation_required &&
-             (candidate.gpio_power_level < 0 || candidate.gpio_power_level > 7))
-    {
-        if (error_message != nullptr)
-        {
-            *error_message =
-                "Invalid GPIO power level. Expected 0 through 7.";
-        }
 
-        return false;
+        if (backend_validation_required &&
+            !backend_ready_for_transmission(candidate, error_message))
+        {
+            return false;
+        }
     }
 
     if (candidate.mode == ModeType::TONE)
@@ -1511,7 +1538,7 @@ void apply_runtime_config_side_effects()
     wsprTransmitter.selectBackend(backend_kind, si5351_config);
 
     llog.logS(INFO,
-              "Transmit backend:",
+              "Transmit backend: ",
               transmit_backend_kind_to_string(config.transmit_backend));
 
     if (config.transmit_backend == TransmitBackendKind::SI5351)
@@ -1519,11 +1546,11 @@ void apply_runtime_config_side_effects()
         std::ostringstream address;
         address << "0x" << std::hex << std::uppercase
                 << config.si5351_i2c_address;
-        llog.logS(INFO, "Si5351 I2C bus:", config.si5351_i2c_bus);
-        llog.logS(INFO, "Si5351 I2C address:", address.str());
-        llog.logS(INFO, "Si5351 reference frequency Hz:",
+        llog.logS(DEBUG, "Si5351 I2C bus: ", config.si5351_i2c_bus);
+        llog.logS(DEBUG, "Si5351 I2C address: ", address.str());
+        llog.logS(DEBUG, "Si5351 reference frequency Hz: ",
                   config.si5351_reference_hz);
-        llog.logS(INFO, "Si5351 TX output:",
+        llog.logS(DEBUG, "Si5351 TX output: ",
                   std::string("CLK") +
                       std::to_string(config.si5351_tx_output));
         if (config.use_ini)
@@ -1542,7 +1569,7 @@ void apply_runtime_config_side_effects()
             }
 
             llog.logS(
-                INFO,
+                DEBUG,
                 "Si5351 unused output parking: ",
                 parked_outputs.str(),
                 " held in a safe non-transmitting state; internal PLL remains parked.");
@@ -1550,7 +1577,7 @@ void apply_runtime_config_side_effects()
     }
     else
     {
-        llog.logS(INFO, "Transmit GPIO:", config.tx_pin);
+        llog.logS(INFO, "Transmit GPIO: ", config.tx_pin);
     }
     if (!config.use_ntp && config.ppm != 0.0)
     {
@@ -1623,7 +1650,7 @@ void apply_runtime_config_side_effects()
 
         log_startup_config_message(
             INFO,
-            "A direct RF test tone will be generated at:",
+            "A direct RF test tone will be generated at: ",
             lookup.freq_display_string(actual_rf_frequency_hz));
         return;
     }
@@ -1646,15 +1673,27 @@ void apply_runtime_config_side_effects()
             dot_seconds = config.qrss.dot_seconds;
         }
 
+        log_startup_config_message(INFO, "QRSS configuration loaded:");
+        log_startup_config_message(INFO, "- Message: \"", message, "\"");
         log_startup_config_message(
             INFO,
-            "QRSS configuration loaded: message=\"",
-            message,
-            "\" frequency=",
-            lookup.freq_display_string(frequency_hz),
-            " dot=",
-            dot_seconds,
-            "s");
+            "- Base Freq: ",
+            lookup.freq_display_string(frequency_hz));
+        log_startup_config_message(INFO, "- Dot Timing: ", dot_seconds, "s");
+        if (config.transmit_backend == TransmitBackendKind::GPIO)
+        {
+            log_startup_config_message(
+                INFO,
+                "- Transmit Power:",
+                config.gpio_power_level);
+        }
+        else if (config.transmit_backend == TransmitBackendKind::SI5351)
+        {
+            log_startup_config_message(
+                INFO,
+                "- Transmit Power:",
+                config.si5351_power_level);
+        }
         return;
     }
 
@@ -1682,17 +1721,31 @@ void apply_runtime_config_side_effects()
             dot_seconds = config.fskcw.dot_seconds;
         }
 
+        log_startup_config_message(INFO, "FSKCW configuration loaded: ");
+        log_startup_config_message(INFO, "- Message: \"", message, "\"");
         log_startup_config_message(
             INFO,
-            "FSKCW configuration loaded: message=\"",
-            message,
-            "\" mark=",
-            lookup.freq_display_string(mark_frequency_hz),
-            " space=",
-            lookup.freq_display_string(space_frequency_hz),
-            " dot=",
-            dot_seconds,
-            "s");
+            "- Mark Freq: ",
+            lookup.freq_display_string(mark_frequency_hz));
+        log_startup_config_message(
+            INFO,
+            "- Space Freq: ",
+            lookup.freq_display_string(space_frequency_hz));
+        log_startup_config_message(INFO, "- Dot Timing: ", dot_seconds, "s");
+        if (config.transmit_backend == TransmitBackendKind::GPIO)
+        {
+            log_startup_config_message(
+                INFO,
+                "- Transmit Power:",
+                config.gpio_power_level);
+        }
+        else if (config.transmit_backend == TransmitBackendKind::SI5351)
+        {
+            log_startup_config_message(
+                INFO,
+                "- Transmit Power:",
+                config.si5351_power_level);
+        }
         return;
     }
 
@@ -1720,17 +1773,31 @@ void apply_runtime_config_side_effects()
             dot_seconds = config.dfcw.dot_seconds;
         }
 
+        log_startup_config_message(INFO, "DFCW configuration loaded:");
+        log_startup_config_message(INFO, "- Message: \"", message, "\"");
         log_startup_config_message(
             INFO,
-            "DFCW configuration loaded: message=\"",
-            message,
-            "\" dot=",
-            lookup.freq_display_string(dot_frequency_hz),
-            " dash=",
-            lookup.freq_display_string(dash_frequency_hz),
-            " dot=",
-            dot_seconds,
-            "s");
+            "- Dot Freq: ",
+            lookup.freq_display_string(dot_frequency_hz));
+        log_startup_config_message(
+            INFO,
+            "- Dash Freq: ",
+            lookup.freq_display_string(dash_frequency_hz));
+        log_startup_config_message(INFO, "- Dot Timing: ", dot_seconds, "s");
+        if (config.transmit_backend == TransmitBackendKind::GPIO)
+        {
+            log_startup_config_message(
+                INFO,
+                "- Transmit Power:",
+                config.gpio_power_level);
+        }
+        else if (config.transmit_backend == TransmitBackendKind::SI5351)
+        {
+            log_startup_config_message(
+                INFO,
+                "- Transmit Power:",
+                config.si5351_power_level);
+        }
         return;
     }
 
@@ -1742,9 +1809,23 @@ void apply_runtime_config_side_effects()
     if (config.transmit)
     {
         log_startup_config_message(INFO, "WSPR packet payload:");
-        log_startup_config_message(INFO, "- Callsign:", config.callsign);
-        log_startup_config_message(INFO, "- Locator:", config.grid_square);
-        log_startup_config_message(INFO, "- Power:", config.power_dbm, " dBm");
+        log_startup_config_message(INFO, "- Callsign: ", config.callsign);
+        log_startup_config_message(INFO, "- Locator: ", config.grid_square);
+        log_startup_config_message(INFO, "- Power: ", config.power_dbm, " dBm");
+        if (config.transmit_backend == TransmitBackendKind::GPIO)
+        {
+            log_startup_config_message(
+                INFO,
+                "- Transmit Power:",
+                config.gpio_power_level);
+        }
+        else if (config.transmit_backend == TransmitBackendKind::SI5351)
+        {
+            log_startup_config_message(
+                INFO,
+                "- Transmit Power:",
+                config.si5351_power_level);
+        }
 
         if (config.wspr_frequency_entries.size() > 1)
         {
@@ -1772,13 +1853,13 @@ void apply_runtime_config_side_effects()
 
             if (entry.dial_frequency_hz == 0.0)
             {
-                log_startup_config_message(INFO, "Requested WSPR dial frequency:", "Skip (0.0)");
+                log_startup_config_message(INFO, "Requested WSPR dial frequency: ", "Skip (0.0)");
             }
             else
             {
                 log_startup_config_message(
                     INFO,
-                    "Requested WSPR dial frequency:",
+                    "Requested WSPR dial frequency: ",
                     lookup.freq_display_string(entry.dial_frequency_hz),
                     get_wspr_gpio_suffix_for_entry(entry, config, lookup));
             }
@@ -1809,7 +1890,7 @@ void apply_runtime_config_side_effects()
             }
             log_startup_config_message(
                 INFO,
-                "TX will stop after:",
+                "TX will stop after: ",
                 config.tx_iterations.load(),
                 "iteration(s) of the WSPR dial-frequency list.");
         }
@@ -1871,28 +1952,24 @@ bool validate_config_data()
             (!config.use_ini && config.mode == ModeType::WSPR &&
              !config.loop_tx) ||
             config.transmit;
-        if (backend_validation_required &&
-            config.transmit_backend == TransmitBackendKind::GPIO &&
+        if (config.transmit_backend == TransmitBackendKind::GPIO &&
             !platform_supports_gpio_clock_transmission())
         {
             std::string platform_error;
             (void)platform_supports_gpio_clock_transmission(&platform_error);
             llog.logE(ERROR, " - ", platform_error);
         }
-        if (backend_validation_required &&
-            config.transmit_backend == TransmitBackendKind::GPIO &&
+        if (config.transmit_backend == TransmitBackendKind::GPIO &&
             !is_valid_runtime_transmit_gpio(config.tx_pin))
         {
             llog.logE(ERROR, " - ", transmit_gpio_validation_message());
         }
-        if (backend_validation_required &&
-            config.transmit_backend == TransmitBackendKind::GPIO &&
+        if (config.transmit_backend == TransmitBackendKind::GPIO &&
             (config.gpio_power_level < 0 || config.gpio_power_level > 7))
         {
             llog.logE(ERROR, " - Invalid GPIO power level. Expected 0 through 7.");
         }
-        if (backend_validation_required &&
-            config.transmit_backend == TransmitBackendKind::SI5351)
+        if (config.transmit_backend == TransmitBackendKind::SI5351)
         {
             if (config.si5351_i2c_bus < 0)
             {
@@ -1920,6 +1997,14 @@ bool validate_config_data()
             {
                 llog.logE(ERROR,
                           " - Invalid Si5351 power level. Expected 1 through 4.");
+            }
+            if (backend_validation_required)
+            {
+                std::string si5351_error;
+                if (!backend_ready_for_transmission(config, &si5351_error))
+                {
+                    llog.logE(ERROR, " - ", si5351_error);
+                }
             }
         }
 
@@ -2043,7 +2128,7 @@ bool set_frequencies(ArgParserConfig &target)
     }
     catch (const std::exception &e)
     {
-        llog.logE(WARN, "Failed to read WSPR dial-frequency list:", e.what());
+        llog.logE(WARN, "Failed to read WSPR dial-frequency list: ", e.what());
         raw_list.clear();
     }
 
@@ -2088,7 +2173,7 @@ bool set_frequencies(ArgParserConfig &target)
         }
         catch (const std::invalid_argument &)
         {
-            llog.logE(WARN, "Ignoring invalid WSPR frequency token:", token);
+            llog.logE(WARN, "Ignoring invalid WSPR frequency token: ", token);
         }
     }
 
@@ -2135,6 +2220,7 @@ bool handle_early_cli_options(int argc, char *argv[])
 {
     bool early_use_journald = config.use_journald;
     bool early_enable_timestamps = config.date_time_log;
+    bool early_debug_logging = config.debug_logging;
     TransmitBackendKind early_backend = config.transmit_backend;
 
     for (int i = 1; i < argc; ++i)
@@ -2149,6 +2235,14 @@ bool handle_early_cli_options(int argc, char *argv[])
         else if (arg == "--date-time-log")
         {
             early_enable_timestamps = true;
+        }
+        else if (arg == "--debug-logging")
+        {
+            early_debug_logging = true;
+        }
+        else if (arg == "--no-debug-logging")
+        {
+            early_debug_logging = false;
         }
         else if (arg == "--backend" && i + 1 < argc)
         {
@@ -2188,7 +2282,10 @@ bool handle_early_cli_options(int argc, char *argv[])
         }
     }
 
-    initialize_logger(early_use_journald, early_enable_timestamps);
+    initialize_logger(
+        early_use_journald,
+        early_enable_timestamps,
+        early_debug_logging);
 
     for (int i = 1; i < argc; ++i)
     {
@@ -2338,6 +2435,8 @@ bool parse_command_line(int argc, char *argv[])
         {"offset", no_argument, nullptr, 'o'},          // Via: [Extended] Offset = True
         {"journald", no_argument, nullptr, 'J'},        // Global: config.use_journald
         {"date-time-log", no_argument, nullptr, 'D'},   // Global: config.date_time_log
+        {"debug-logging", no_argument, nullptr, 1018},  // Global: config.debug_logging
+        {"no-debug-logging", no_argument, nullptr, 1019},
         {"require-paired", no_argument, nullptr, 1001}, // Global: config.wspr_planner_preference
         {"backend", required_argument, nullptr, 1002},
         {"qrss-message", required_argument, nullptr, 1003},
@@ -2376,7 +2475,12 @@ bool parse_command_line(int argc, char *argv[])
     while (true)
     {
         int option_index = 0;
-        int c = getopt_long(argc, argv, "h?vnroJDp:x:t:a:l:s:d:w:k:", long_options, &option_index);
+        int c = getopt_long(
+            argc,
+            argv,
+            "h?vnroJDp:x:t:a:l:s:d:w:k:",
+            long_options,
+            &option_index);
 
         if (c == -1)
             break;
@@ -2418,6 +2522,16 @@ bool parse_command_line(int argc, char *argv[])
         case 'D': // Add date/time stamps to stream logging
         {
             config.date_time_log = true;
+            break;
+        }
+        case 1018:
+        {
+            config.debug_logging = true;
+            break;
+        }
+        case 1019:
+        {
+            config.debug_logging = false;
             break;
         }
         case 1001: // Require paired WSPR planning
@@ -2520,7 +2634,7 @@ bool parse_command_line(int argc, char *argv[])
 
                 if (ppm != clamped_ppm)
                 {
-                    llog.logE(ERROR, "PPM value is outside bounds (-200 to 200), applying clamped value:", clamped_ppm);
+                    llog.logE(ERROR, "PPM value is outside bounds (-200 to 200), applying clamped value: ", clamped_ppm);
                 }
 
                 // Apply the clamped value
@@ -2532,7 +2646,7 @@ bool parse_command_line(int argc, char *argv[])
             {
                 config.gpio_use_ntp = true;
                 resolve_backend_specific_config(config);
-                llog.logE(ERROR, "Error parsing PPM value, defaulting to NTP:", optarg);
+                llog.logE(ERROR, "Error parsing PPM value, defaulting to NTP: ", optarg);
             }
             break;
         }
@@ -2546,11 +2660,11 @@ bool parse_command_line(int argc, char *argv[])
                 }
                 catch (const std::invalid_argument &)
                 {
-                    llog.logE(ERROR, "Invalid number format for transmit iterations:", optarg, "- Using default (1).");
+                    llog.logE(ERROR, "Invalid number format for transmit iterations: ", optarg, " - Using default (1).");
                 }
                 catch (const std::out_of_range &)
                 {
-                    llog.logE(ERROR, "Number out of range for transmit iterations:", optarg, "- Using default (1).");
+                    llog.logE(ERROR, "Number out of range for transmit iterations: ", optarg, " - Using default (1).");
                 }
                 // Set config.tx_iterations to at least 1
                 config.tx_iterations.store((config.tx_iterations.load() == 0) ? 1 : config.tx_iterations.load()); // Equal to at least 1
@@ -2954,7 +3068,7 @@ bool parse_command_line(int argc, char *argv[])
                 int rounded_power = round_to_nearest_wspr_power(power);
                 if (power != rounded_power)
                 {
-                    llog.logS(DEBUG, "Power rounded to standard value:", rounded_power);
+                    llog.logS(DEBUG, "Power rounded to standard value: ", rounded_power);
                 }
                 config.power_dbm = rounded_power;
             }

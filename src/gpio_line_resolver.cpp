@@ -33,7 +33,7 @@ namespace
         std::ostringstream dev_char;
         dev_char << "/sys/dev/char/"
                  << major(st.st_rdev)
-                 << ":"
+                 << ": "
                  << minor(st.st_rdev);
 
         std::error_code ec;

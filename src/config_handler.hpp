@@ -257,6 +257,7 @@ struct ArgParserConfig
     // Command line only
     bool use_journald;              ///< Route logs to journald instead of streams.
     bool date_time_log;             ///< Prefix logs with timestamp.
+    bool debug_logging;             ///< Enable DEBUG-level application logging.
     WsprPlannerPreference wspr_planner_preference; ///< Preferred planner behavior for Type 2/3 pairing.
     bool loop_tx;                   ///< Repeat transmission cycle.
     std::atomic<int> tx_iterations; ///< Number of transmission iterations (0 = infinite).
@@ -318,6 +319,7 @@ struct ArgParserConfig
           shutdown_pin(-1),
           use_journald(false),
           date_time_log(false),
+          debug_logging(false),
           wspr_planner_preference(WsprPlannerPreference::Auto),
           loop_tx(false),
           tx_iterations(0),
@@ -387,6 +389,7 @@ struct ArgParserConfig
         shutdown_pin = other.shutdown_pin;
         use_journald = other.use_journald;
         date_time_log = other.date_time_log;
+        debug_logging = other.debug_logging;
         wspr_planner_preference = other.wspr_planner_preference;
         loop_tx = other.loop_tx;
         tx_iterations.store(other.tx_iterations.load());
@@ -457,6 +460,13 @@ private:
 
 void init_default_config();
 void resolve_backend_specific_config(ArgParserConfig &config) noexcept;
+bool si5351_device_detected(
+    int i2c_bus,
+    int i2c_address,
+    int reference_hz,
+    std::string *error_message = nullptr);
+void set_si5351_detection_override_for_test(bool detected) noexcept;
+void clear_si5351_detection_override_for_test() noexcept;
 
 /**
  * @brief Initializes the global configuration JSON object.
@@ -516,7 +526,7 @@ void ini_to_json(std::string filename);
  *   },
  *   "Si5351": {
  *       "I2C Bus": 1,
- *       "I2C Address": 96,
+ *       "I2C Address": "0x60",
  *       "Reference Frequency": 27000000,
  *       "TX Output": "CLK0",
  *       "Power Level": 1

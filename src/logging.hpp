@@ -32,20 +32,21 @@
 #include "lcblog.hpp"
 
 /**
- * @brief Initializes the logger with the appropriate log level.
+ * @brief Initializes the logger from startup logging configuration.
  *
- * This function sets the log level based on the current debug state. If the
- * build is compiled with the DEBUG_BUILD macro, the log level is set to DEBUG.
- * Otherwise, it defaults to INFO.
- *
- * @note Ensure that the `get_debug_state()` function correctly reflects the
- *       build configuration for accurate log level assignment.
- *
- * @example
- * initialize_logger();
- * // Sets llog to DEBUG or INFO depending on the build mode.
+ * This function applies startup logging transport preferences and selects the
+ * application log level from persisted configuration or CLI overrides.
  */
 extern void initialize_logger(bool use_journald = false,
-                              bool enable_timestamps = false);
+                              bool enable_timestamps = false,
+                              bool enable_debug_logging = false);
+
+/**
+ * @brief Re-applies the configured DEBUG vs INFO log level.
+ *
+ * This updates only the logger threshold. It does not change journald or
+ * timestamp routing, which remain startup-scoped runtime choices.
+ */
+extern void refresh_logger_level_from_config();
 
 #endif // _LOGGING_HPP

@@ -114,7 +114,7 @@ void WebServer::start(int port)
         port_ = port;
     }
 
-    llog.logS(INFO, "Web server started on port:", config.web_port);
+    llog.logS(INFO, "Web server started on port: ", config.web_port);
 
     // Launch the server in a separate thread.
     serverThread = std::thread([this]()
@@ -142,7 +142,7 @@ void WebServer::start(int port)
         }
         catch (const nlohmann::json::parse_error &e)
         {
-            llog.logE(WARN, "Error parsing JSON:", std::string(e.what()));
+            llog.logE(WARN, "Error parsing JSON: ", std::string(e.what()));
             setCORSHeaders(res);
             res.status = 400;
             nlohmann::json err = {{"error", "invalid_json"}, {"message", e.what()}};
@@ -150,7 +150,7 @@ void WebServer::start(int port)
         }
         catch (const ConfigValidationError &e)
         {
-            llog.logE(WARN, "Configuration update rejected:", std::string(e.what()));
+            llog.logE(WARN, "Configuration update rejected: ", std::string(e.what()));
             setCORSHeaders(res);
             res.status = 400;
             nlohmann::json err = e.details();
@@ -164,7 +164,7 @@ void WebServer::start(int port)
         }
         catch (const std::exception &e)
         {
-            llog.logE(WARN, "Configuration update rejected:", std::string(e.what()));
+            llog.logE(WARN, "Configuration update rejected: ", std::string(e.what()));
             setCORSHeaders(res);
             res.status = 400;
             nlohmann::json err = {{"error", "invalid_config"}, {"message", e.what()}};
@@ -269,7 +269,7 @@ void WebServer::start(int port)
                 catch (const nlohmann::json::parse_error &e)
                 {
                     llog.logE(WARN,
-                            "Error parsing JSON:",
+                            "Error parsing JSON: ",
                             std::string(e.what()));
                     setCORSHeaders(res);
                     res.status = 400;
@@ -314,16 +314,17 @@ void WebServer::start(int port)
 
                     const StopTransmissionResult stop_result =
                         stop_transmission_by_user_request();
+                    const bool stop_request_succeeded = stop_result.transmit_disabled;
                     nlohmann::json ok = {
                         {"command", "stop"},
-                        {"status", stop_result.persisted ? "ok" : "error"},
+                        {"status", stop_request_succeeded ? "ok" : "error"},
                         {"transmission_active", stop_result.transmission_active},
                         {"stop_performed", stop_result.stop_performed},
                         {"transmit_disabled", stop_result.transmit_disabled},
                         {"persisted", stop_result.persisted},
                         {"message", stop_result.message}
                     };
-                    res.status = stop_result.persisted ? 200 : 500;
+                    res.status = stop_request_succeeded ? 200 : 500;
                     res.set_content(ok.dump(4), "application/json");
                 }
                 catch (const nlohmann::json::parse_error &e)
@@ -386,7 +387,6 @@ void WebServer::stop()
         serverThread.join();
     }
 
-    llog.logS(INFO, "Web server stopped.");
 }
 
 /**

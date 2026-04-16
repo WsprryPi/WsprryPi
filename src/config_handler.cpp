@@ -33,6 +33,8 @@
 #include "json.hpp"
 #include "logging.hpp"
 #include "scheduling.hpp"
+#include "si5351_device.hpp"
+#include "version.hpp"
 
 #include <algorithm>
 #include <cctype>
@@ -40,6 +42,7 @@
 #include <iostream>
 #include <limits>
 #include <map>
+#include <optional>
 #include <stdexcept>
 #include <string>
 #include <unordered_map>
@@ -51,6 +54,20 @@ nlohmann::json jConfig;
 namespace
 {
     bool g_patch_all_from_web_runtime_apply_suppressed_for_test = false;
+    std::optional<bool> g_si5351_detection_override;
+
+    std::string si5351_detection_unavailable_message(
+        const std::string &detail = std::string())
+    {
+        std::string message =
+            "Si5351 transmission is unavailable because no Si5351 device was detected on the I2C bus.";
+        if (!detail.empty())
+        {
+            message += " ";
+            message += detail;
+        }
+        return message;
+    }
 
     std::string trim_copy(const std::string &value);
 
@@ -189,6 +206,21 @@ namespace
             "Invalid Si5351.TX Output. Expected CLK0, CLK1, CLK2, 0, 1, or 2.");
     }
 
+    std::string format_si5351_i2c_address(int address)
+    {
+        static constexpr char kHexDigits[] = "0123456789ABCDEF";
+        unsigned int value = static_cast<unsigned int>(address);
+        std::string formatted = "0x";
+        formatted.push_back(kHexDigits[(value >> 4) & 0xF]);
+        formatted.push_back(kHexDigits[value & 0xF]);
+        return formatted;
+    }
+
+    int normalize_gpio_transmit_pin(int gpio) noexcept
+    {
+        return is_supported_transmit_gpio(gpio) ? gpio : kDefaultTransmitGpio;
+    }
+
     ModeType parse_mode_type(const nlohmann::json &operation)
     {
         if (!operation.contains("Mode"))
@@ -262,6 +294,38 @@ namespace
 
     nlohmann::json public_config_from_internal(const nlohmann::json &source)
     {
+        std::string gpio_support_error;
+        const bool gpio_clock_transmission_supported =
+            platform_supports_gpio_clock_transmission(&gpio_support_error);
+        bool si5351_detected = true;
+        std::string si5351_detection_error;
+        if (source.contains("Si5351") && source.at("Si5351").is_object())
+        {
+            const nlohmann::json &si5351 = source.at("Si5351");
+            const int i2c_bus =
+                si5351.contains("I2C Bus")
+                    ? parse_integer_config_value(si5351.at("I2C Bus"), "Si5351.I2C Bus")
+                    : kDefaultSi5351I2cBus;
+            const int i2c_address =
+                si5351.contains("I2C Address")
+                    ? parse_integer_config_value(
+                          si5351.at("I2C Address"),
+                          "Si5351.I2C Address",
+                          0)
+                    : kDefaultSi5351I2cAddress;
+            const int reference_hz =
+                si5351.contains("Reference Frequency")
+                    ? parse_integer_config_value(
+                          si5351.at("Reference Frequency"),
+                          "Si5351.Reference Frequency")
+                    : kDefaultSi5351ReferenceHz;
+            si5351_detected = si5351_device_detected(
+                i2c_bus,
+                i2c_address,
+                reference_hz,
+                &si5351_detection_error);
+        }
+
         nlohmann::json public_json;
         public_json["Operation"] = source.at("Operation");
         public_json["GPIO"] = source.at("GPIO");
@@ -270,6 +334,17 @@ namespace
         public_json["WSPR"] = source.at("WSPR");
         public_json["CW"] = source.at("CW");
         public_json["Band GPIO"] = source.at("Band GPIO");
+        public_json["Platform"] = {
+            {"Model", get_pi_model()},
+            {"Raspberry Pi Generation", get_raspberry_pi_generation()},
+            {"GPIO Clock Transmission Supported",
+             gpio_clock_transmission_supported},
+            {"GPIO Clock Transmission Error",
+             gpio_clock_transmission_supported ? std::string()
+                                               : gpio_support_error},
+            {"Si5351 Detected", si5351_detected},
+            {"Si5351 Detection Error",
+             si5351_detected ? std::string() : si5351_detection_error}};
         return public_json;
     }
 
@@ -277,6 +352,16 @@ namespace
         const nlohmann::json &public_json,
         nlohmann::json &internal_json)
     {
+        if (public_json.contains("Meta"))
+        {
+            const auto &meta = public_json.at("Meta");
+            if (meta.contains("debug_logging"))
+            {
+                internal_json["Meta"]["debug_logging"] =
+                    meta.at("debug_logging");
+            }
+        }
+
         if (public_json.contains("Operation"))
         {
             const auto &operation = public_json.at("Operation");
@@ -647,6 +732,59 @@ void resolve_backend_specific_config(ArgParserConfig &config) noexcept
     config.use_ntp = config.gpio_use_ntp;
 }
 
+bool si5351_device_detected(
+    int i2c_bus,
+    int i2c_address,
+    int reference_hz,
+    std::string *error_message)
+{
+    if (g_si5351_detection_override.has_value())
+    {
+        if (!*g_si5351_detection_override && error_message != nullptr)
+        {
+            *error_message = si5351_detection_unavailable_message();
+        }
+        return *g_si5351_detection_override;
+    }
+
+    Si5351Device::Config device_config;
+    device_config.i2c_bus = i2c_bus;
+    device_config.i2c_address = static_cast<std::uint8_t>(i2c_address);
+    device_config.reference_hz = static_cast<std::uint32_t>(reference_hz);
+
+    Si5351Device device(device_config);
+    if (!device.open())
+    {
+        if (error_message != nullptr)
+        {
+            *error_message =
+                si5351_detection_unavailable_message(device.getLastError());
+        }
+        return false;
+    }
+
+    const bool detected = device.probe();
+    const std::string detail = device.getLastError();
+    device.close();
+
+    if (!detected && error_message != nullptr)
+    {
+        *error_message = si5351_detection_unavailable_message(detail);
+    }
+
+    return detected;
+}
+
+void set_si5351_detection_override_for_test(bool detected) noexcept
+{
+    g_si5351_detection_override = detected;
+}
+
+void clear_si5351_detection_override_for_test() noexcept
+{
+    g_si5351_detection_override.reset();
+}
+
 namespace
 {
     std::vector<double> parse_wspr_dial_frequency_set(const nlohmann::json &value)
@@ -907,6 +1045,7 @@ namespace
             {"Use INI", false},
             {"INI Filename", ""},
             {"Date Time Log", false},
+            {"debug_logging", false},
             {"Loop TX", false},
             {"TX Iterations", 0}};
         target["Operation"] = {
@@ -930,7 +1069,7 @@ namespace
 
         target["Si5351"] = {
             {"I2C Bus", kDefaultSi5351I2cBus},
-            {"I2C Address", kDefaultSi5351I2cAddress},
+            {"I2C Address", format_si5351_i2c_address(kDefaultSi5351I2cAddress)},
             {"Reference Frequency", kDefaultSi5351ReferenceHz},
             {"TX Output", "CLK0"},
             {"Power Level", 1}};
@@ -977,6 +1116,8 @@ namespace
         target.use_ini = source.at("Meta").at("Use INI").get<bool>();
         target.ini_filename = source.at("Meta").at("INI Filename").get<std::string>();
         target.date_time_log = source.at("Meta").at("Date Time Log").get<bool>();
+        target.debug_logging =
+            source.at("Meta").value("debug_logging", false);
         target.mode = parse_mode_type(source.at("Operation"));
         target.wspr_planner_preference =
             parse_wspr_planner_preference(source.at("WSPR"));
@@ -1003,6 +1144,10 @@ namespace
             gpio.contains("Transmit Pin")
                 ? gpio.at("Transmit Pin").get<int>()
                 : kDefaultTransmitGpio;
+        if (target.transmit_backend == TransmitBackendKind::GPIO)
+        {
+            target.gpio_tx_pin = normalize_gpio_transmit_pin(target.gpio_tx_pin);
+        }
         target.gpio_power_level =
             gpio.contains("Power Level")
                 ? gpio.at("Power Level").get<int>()
@@ -1177,6 +1322,7 @@ namespace
         target["Meta"]["Use INI"] = source.use_ini;
         target["Meta"]["INI Filename"] = source.ini_filename;
         target["Meta"]["Date Time Log"] = source.date_time_log;
+        target["Meta"]["debug_logging"] = source.debug_logging;
         target["Meta"]["Loop TX"] = source.loop_tx;
         target["Meta"]["TX Iterations"] = source.tx_iterations.load();
 
@@ -1193,14 +1339,16 @@ namespace
         target["Operation"]["Use Shutdown"] = source.use_shutdown;
         target["Operation"]["Shutdown Button"] = source.shutdown_pin;
 
-        target["GPIO"]["Transmit Pin"] = source.gpio_tx_pin;
+        target["GPIO"]["Transmit Pin"] =
+            normalize_gpio_transmit_pin(source.gpio_tx_pin);
         target["GPIO"]["Power Level"] = source.gpio_power_level;
         target["GPIO"]["Use NTP"] = source.gpio_use_ntp;
 
         target["Calibration"]["PPM"] = source.ppm;
 
         target["Si5351"]["I2C Bus"] = source.si5351_i2c_bus;
-        target["Si5351"]["I2C Address"] = source.si5351_i2c_address;
+        target["Si5351"]["I2C Address"] =
+            format_si5351_i2c_address(source.si5351_i2c_address);
         target["Si5351"]["Reference Frequency"] = source.si5351_reference_hz;
         target["Si5351"]["TX Output"] =
             std::string("CLK") + std::to_string(source.si5351_tx_output);
@@ -1284,6 +1432,7 @@ namespace
         target.shutdown_pin = source.shutdown_pin;
         target.use_journald = source.use_journald;
         target.date_time_log = source.date_time_log;
+        target.debug_logging = source.debug_logging;
         target.wspr_planner_preference = source.wspr_planner_preference;
         target.loop_tx = source.loop_tx;
         target.tx_iterations.store(source.tx_iterations.load());
@@ -1340,7 +1489,8 @@ namespace
 
             // Canonical persistent sections only. Unknown sections, including
             // pre-2.x legacy sections, are not imported or treated as fallbacks.
-            if (section != "Operation" &&
+            if (section != "Meta" &&
+                section != "Operation" &&
                 section != "GPIO" &&
                 section != "Calibration" &&
                 section != "Si5351" &&
@@ -1357,6 +1507,15 @@ namespace
 
                 if (trimmed.empty())
                 {
+                    continue;
+                }
+
+                if (section == "Meta")
+                {
+                    if (key == "debug_logging" || key == "Debug Logging")
+                    {
+                        patch["Meta"]["debug_logging"] = parse_ini_value(trimmed);
+                    }
                     continue;
                 }
 
@@ -1510,6 +1669,7 @@ void json_to_ini()
         }
 
         if (section_name != "Operation" &&
+            section_name != "Meta" &&
             section_name != "GPIO" &&
             section_name != "Calibration" &&
             section_name != "Si5351" &&
@@ -1550,6 +1710,8 @@ void json_to_ini()
         {
             const std::string &key = kv.key();
             const bool persist_key =
+                (section_name == "Meta" &&
+                 key == "debug_logging") ||
                 (section_name == "Operation" &&
                  (key == "Mode" ||
                   key == "Transmit" ||
@@ -1687,6 +1849,7 @@ void commit_config_candidate(const PreparedConfigCandidate &candidate)
 
     copy_config(candidate.normalized_config, config);
     jConfig = candidate.normalized_json;
+    refresh_logger_level_from_config();
 }
 
 void copy_runtime_config(const ArgParserConfig &source, ArgParserConfig &target)
@@ -1696,7 +1859,7 @@ void copy_runtime_config(const ArgParserConfig &source, ArgParserConfig &target)
 
 void dump_json(const nlohmann::json &j, std::string tag)
 {
-    llog.logS(DEBUG, tag, "JSON Dump:", j.dump());
+    llog.logS(DEBUG, tag, "JSON Dump: ", j.dump());
 }
 
 void patch_all_from_web(const nlohmann::json &j)
@@ -1755,6 +1918,7 @@ void patch_all_from_web(const nlohmann::json &j)
 
     copy_config(candidate_config, config);
     jConfig = candidate_json;
+    refresh_logger_level_from_config();
     json_to_ini();
     if (!g_patch_all_from_web_runtime_apply_suppressed_for_test)
     {
@@ -1797,7 +1961,7 @@ void repair_from_web(bool attempt_repair)
 
         llog.logS(
             ERROR,
-            "Failed to reload repaired configuration; previous configuration remains loaded:",
+            "Failed to reload repaired configuration; previous configuration remains loaded: ",
             load_error);
         return;
     }

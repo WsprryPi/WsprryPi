@@ -249,7 +249,10 @@ void shutdown_machine();
  *
  * @note Requires <nlohmann/json.hpp>, <chrono>, <ctime>, <iomanip>, and <sstream>.
  */
-void send_ws_message(std::string type, std::string state);
+void send_ws_message(
+    std::string type,
+    std::string state,
+    std::string message = std::string());
 
 struct StopTransmissionResult
 {

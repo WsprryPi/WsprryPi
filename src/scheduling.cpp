@@ -738,7 +738,7 @@ void consume_tx_iteration_if_needed()
     }
     else
     {
-        llog.logS(INFO, "WSPR transmissions remaining:", remaining);
+        llog.logS(INFO, "WSPR transmissions remaining: ", remaining);
     }
 }
 
@@ -1544,12 +1544,12 @@ bool request_wspr_shutdown(std::string_view reason)
         if (already_requested)
         {
             llog.logS(INFO,
-                      "Shutdown already in progress; duplicate request:",
+                      "Shutdown already in progress; duplicate request: ",
                       reason);
         }
         else
         {
-            llog.logS(INFO, "Shutdown requested:", reason);
+            llog.logS(INFO, "Shutdown requested: ", reason);
         }
     }
 
@@ -1913,7 +1913,7 @@ bool ppm_init()
  */
 void callback_shutdown_system()
 {
-    llog.logS(INFO, "Shutdown called by GPIO:", config.shutdown_pin);
+    llog.logS(INFO, "Shutdown called by GPIO", config.shutdown_pin);
     shutdown_system();
 }
 
@@ -2069,7 +2069,7 @@ void start_test_tone()
 
         wsprTransmitter.startAsync();
         llog.logS(INFO,
-                  "WSPR-band test tone using dial frequency:",
+                  "WSPR-band test tone using dial frequency: ",
                   lookup.freq_display_string(dial_freq));
         send_ws_message("transmit", "starting");
     }
@@ -2468,47 +2468,47 @@ bool wspr_loop()
                          { return exitwspr_ready; });
     }
 
-    llog.logS(INFO, "WSPR loop termination started.");
+    llog.logS(DEBUG, "WSPR loop termination started.");
 
     // -------------------------------------------------------------------------
     // Shutdown and cleanup
     // -------------------------------------------------------------------------
-    llog.logS(INFO, "Stopping runtime components.");
+    llog.logS(DEBUG, "Stopping runtime components.");
 
-    llog.logS(INFO, "Stopping web server.");
+    llog.logS(DEBUG, "Stopping web server.");
     webServer.stop();
-    llog.logS(INFO, "Web server stopped.");
+    llog.logS(DEBUG, "Web server stopped.");
 
-    llog.logS(INFO, "Stopping socket server.");
+    llog.logS(DEBUG, "Stopping socket server.");
     socketServer.stop();
-    llog.logS(INFO, "Socket server stopped.");
+    llog.logS(DEBUG, "Socket server stopped.");
 
-    llog.logS(INFO, "Stopping configuration monitor.");
+    llog.logS(DEBUG, "Stopping configuration monitor.");
     ini_reload_pending.store(false, std::memory_order_relaxed);
     iniMonitor.stop(); // Stop config file monitor before transmitter teardown.
-    llog.logS(INFO, "Configuration monitor stopped.");
+    llog.logS(DEBUG, "Configuration monitor stopped.");
 
-    llog.logS(INFO, "Stopping shutdown monitor.");
+    llog.logS(DEBUG, "Stopping shutdown monitor.");
     shutdownMonitor.stop(); // Stop the GPIO monitor
-    llog.logS(INFO, "Shutdown monitor stopped.");
+    llog.logS(DEBUG, "Shutdown monitor stopped.");
 
-    llog.logS(INFO, "Stopping PPM manager.");
+    llog.logS(DEBUG, "Stopping PPM manager.");
     ppmManager.stop(); // Stop PPM manager (if active)
-    llog.logS(INFO, "PPM manager stopped.");
+    llog.logS(DEBUG, "PPM manager stopped.");
 
-    llog.logS(INFO, "Stopping transmitter.");
+    llog.logS(DEBUG, "Stopping transmitter.");
     wsprTransmitter.shutdownForProcessExit();
-    llog.logS(INFO, "Transmitter stopped.");
+    llog.logS(DEBUG, "Transmitter stopped.");
 
-    llog.logS(INFO, "Stopping band GPIO selector.");
+    llog.logS(DEBUG, "Stopping band GPIO selector.");
     stop_active_transmission_selectors();
-    llog.logS(INFO, "Band GPIO selector stopped.");
+    llog.logS(DEBUG, "Band GPIO selector stopped.");
 
-    llog.logS(INFO, "Stopping LED driver.");
+    llog.logS(DEBUG, "Stopping LED driver.");
     ledControl.stop(); // Stop LED driver
-    llog.logS(INFO, "LED driver stopped.");
+    llog.logS(DEBUG, "LED driver stopped.");
 
-    llog.logS(INFO, "Runtime components stopped.");
+    llog.logS(DEBUG, "Runtime components stopped.");
 
     llog.logS(INFO, get_project_name(), "exiting.");
     // Flush all file system buffers to disk
@@ -2532,7 +2532,7 @@ void reboot_machine()
     // Attempt to reboot; LINUX_REBOOT_CMD_RESTART is the same as RB_AUTOBOOT
     if (::reboot(LINUX_REBOOT_CMD_RESTART) < 0)
     {
-        llog.logE(ERROR, "Reboot failed:", std::strerror(errno));
+        llog.logE(ERROR, "Reboot failed: ", std::strerror(errno));
     }
 }
 
@@ -2552,7 +2552,7 @@ void shutdown_machine()
     // LINUX_REBOOT_CMD_POWER_OFF is equivalent to RB_POWER_OFF
     if (::reboot(LINUX_REBOOT_CMD_POWER_OFF) < 0)
     {
-        llog.logE(ERROR, "Shutdown failed:", std::strerror(errno));
+        llog.logE(ERROR, "Shutdown failed: ", std::strerror(errno));
     }
 }
 
@@ -2567,7 +2567,10 @@ void shutdown_machine()
  *
  * @note Requires <nlohmann/json.hpp>, <chrono>, <ctime>, <iomanip>, and <sstream>.
  */
-void send_ws_message(std::string type, std::string state)
+void send_ws_message(
+    std::string type,
+    std::string state,
+    std::string message)
 {
     // Build JSON payload
     nlohmann::json j;
@@ -2589,6 +2592,11 @@ void send_ws_message(std::string type, std::string state)
         j["frame_locator"] = snapshot.frame_locator;
     }
 
+    if (!message.empty())
+    {
+        j["message"] = message;
+    }
+
     // Capture current UTC time and format as ISO 8601 (YYYY-MM-DDThh:mm:ssZ)
     auto now = std::chrono::system_clock::now();
     auto now_t = std::chrono::system_clock::to_time_t(now);
@@ -2600,8 +2608,8 @@ void send_ws_message(std::string type, std::string state)
     j["timestamp"] = oss.str();
 
     // Serialize and send to all WebSocket clients
-    const std::string message = j.dump();
-    socketServer.sendAllClients(message);
+    const std::string payload = j.dump();
+    socketServer.sendAllClients(payload);
 }
 
 WsprRuntimeStatusSnapshot current_tx_runtime_status_snapshot()
@@ -2743,9 +2751,12 @@ bool set_config(bool force)
             if (!prepared_candidate.valid)
             {
                 llog.logS(ERROR,
-                          "Invalid configuration reload rejected; previous valid configuration remains loaded:",
+                          "Invalid configuration reload rejected; previous valid configuration remains loaded: ",
                           prepared_candidate.error_reason);
-                send_ws_message("configuration", "reload_failed");
+                send_ws_message(
+                    "configuration",
+                    "reload_failed",
+                    prepared_candidate.error_reason);
                 set_managed_reload_tx_inhibited(
                     true,
                     "Transmit is blocked until a valid configuration is loaded.");
@@ -2771,23 +2782,27 @@ bool set_config(bool force)
         bool do_config = force;
         bool do_random = false;
 
-        std::string backend_platform_error;
-        const bool backend_platform_supported =
+        std::string backend_runtime_error;
+        const bool backend_runtime_ready =
             !(working_config.mode == ModeType::TONE ||
               runtime_transmit_requested(working_config))
-            || working_config.transmit_backend != TransmitBackendKind::GPIO
-            || platform_supports_gpio_clock_transmission(
-                &backend_platform_error);
+            || backend_ready_for_transmission(
+                working_config,
+                &backend_runtime_error);
 
-        if (!backend_platform_supported)
+        if (!backend_runtime_ready)
         {
-            llog.logS(ERROR, backend_platform_error);
+            llog.logS(ERROR, backend_runtime_error);
 
             if (working_config.use_ini)
             {
+                send_ws_message(
+                    "configuration",
+                    "reload_failed",
+                    backend_runtime_error);
                 set_managed_reload_tx_inhibited(
                     true,
-                    "No transmit due to invalid backend/platform combination.");
+                    backend_runtime_error);
                 wsprTransmitter.stopAndJoin();
                 stop_active_transmission_selectors();
                 current_transmission_request = TransmissionRequest{};
@@ -2839,7 +2854,7 @@ bool set_config(bool force)
         }
         if (ppm_update_pending)
         {
-            llog.logS(INFO, "PPM updated:", committed_ppm);
+            llog.logS(INFO, "PPM updated: ", committed_ppm);
             runtime_ppm_changed = true;
             do_config = true;
         }
@@ -3112,7 +3127,10 @@ bool set_config(bool force)
                     set_managed_reload_tx_inhibited(
                         true,
                         "Managed reload planning failed; previous valid configuration remains loaded. Transmit is blocked until a valid configuration is loaded.");
-                    send_ws_message("configuration", "reload_failed");
+                    send_ws_message(
+                        "configuration",
+                        "reload_failed",
+                        "Managed reload planning failed; previous valid configuration remains loaded. Transmit is blocked until a valid configuration is loaded.");
                     wsprTransmitter.stopAndJoin();
                     stop_active_transmission_selectors();
                     current_transmission_request = TransmissionRequest{};
@@ -3149,7 +3167,10 @@ bool set_config(bool force)
                     set_managed_reload_tx_inhibited(
                         true,
                         "Managed reload could not prepare band GPIO; previous valid configuration remains loaded. Transmit is blocked until a valid configuration is loaded.");
-                    send_ws_message("configuration", "reload_failed");
+                    send_ws_message(
+                        "configuration",
+                        "reload_failed",
+                        "Managed reload could not prepare band GPIO; previous valid configuration remains loaded. Transmit is blocked until a valid configuration is loaded.");
                     if (!finalize_reload_pending())
                     {
                         continue;

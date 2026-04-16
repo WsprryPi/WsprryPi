@@ -32,34 +32,27 @@
 #include "lcblog.hpp"
 #include "version.hpp"
 
-/**
- * @brief Initializes the logger with the appropriate log level.
- *
- * This function sets the log level based on the current debug state. If the
- * build is compiled with the DEBUG_BUILD macro, the log level is set to DEBUG.
- * Otherwise, it defaults to INFO.
- *
- * @note Ensure that the `get_debug_state()` function correctly reflects the
- *       build configuration for accurate log level assignment.
- *
- * @example
- * initialize_logger();
- * // Sets llog to DEBUG or INFO depending on the build mode.
- */
-void initialize_logger(bool use_journald, bool enable_timestamps)
+namespace
 {
-    // Determine the log level based on the build mode.
-    const std::string debug_state = get_debug_state();
+    void apply_log_level(bool enable_debug_logging)
+    {
+        llog.setLogLevel(enable_debug_logging ? DEBUG : INFO);
+        config.debug_logging = enable_debug_logging;
+    }
+}
 
-    // Set the appropriate log level.
-    if (debug_state == "DEBUG")
-    {
-        llog.setLogLevel(DEBUG); // Enable detailed debug logging.
-    }
-    else
-    {
-        llog.setLogLevel(INFO); // Default to informational logging.
-    }
+/**
+ * @brief Initializes the logger from startup logging configuration.
+ *
+ * This function applies startup logging transport preferences and selects the
+ * application log level from persisted configuration or CLI overrides.
+ */
+void initialize_logger(
+    bool use_journald,
+    bool enable_timestamps,
+    bool enable_debug_logging)
+{
+    apply_log_level(enable_debug_logging);
 
     if (use_journald)
     {
@@ -83,4 +76,9 @@ void initialize_logger(bool use_journald, bool enable_timestamps)
     {
         llog.setJournaldIdentifier(get_exe_name());
     }
+}
+
+void refresh_logger_level_from_config()
+{
+    apply_log_level(config.debug_logging);
 }
