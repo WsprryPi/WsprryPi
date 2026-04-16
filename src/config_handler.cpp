@@ -199,6 +199,11 @@ namespace
         return formatted;
     }
 
+    int normalize_gpio_transmit_pin(int gpio) noexcept
+    {
+        return is_supported_transmit_gpio(gpio) ? gpio : kDefaultTransmitGpio;
+    }
+
     ModeType parse_mode_type(const nlohmann::json &operation)
     {
         if (!operation.contains("Mode"))
@@ -1013,6 +1018,10 @@ namespace
             gpio.contains("Transmit Pin")
                 ? gpio.at("Transmit Pin").get<int>()
                 : kDefaultTransmitGpio;
+        if (target.transmit_backend == TransmitBackendKind::GPIO)
+        {
+            target.gpio_tx_pin = normalize_gpio_transmit_pin(target.gpio_tx_pin);
+        }
         target.gpio_power_level =
             gpio.contains("Power Level")
                 ? gpio.at("Power Level").get<int>()
@@ -1203,7 +1212,8 @@ namespace
         target["Operation"]["Use Shutdown"] = source.use_shutdown;
         target["Operation"]["Shutdown Button"] = source.shutdown_pin;
 
-        target["GPIO"]["Transmit Pin"] = source.gpio_tx_pin;
+        target["GPIO"]["Transmit Pin"] =
+            normalize_gpio_transmit_pin(source.gpio_tx_pin);
         target["GPIO"]["Power Level"] = source.gpio_power_level;
         target["GPIO"]["Use NTP"] = source.gpio_use_ntp;
 
