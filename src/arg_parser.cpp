@@ -1568,7 +1568,14 @@ void apply_runtime_config_side_effects()
 
     if (config.use_led && (config.led_pin >= 0 && config.led_pin <= 27))
     {
-        ledControl.enableGPIOPin(config.led_pin, true);
+        if (!ledControl.enableGPIOPin(config.led_pin, true))
+        {
+            llog.logS(ERROR,
+                      "Failed to enable TX LED GPIO ",
+                      config.led_pin,
+                      ": ",
+                      ledControl.lastError());
+        }
     }
     else
     {
@@ -1578,12 +1585,25 @@ void apply_runtime_config_side_effects()
 
     if (config.use_shutdown && (config.shutdown_pin >= 0 && config.shutdown_pin <= 27))
     {
-        shutdownMonitor.enable(
+        if (!shutdownMonitor.enable(
             config.shutdown_pin,
             false,
             GPIOInput::PullMode::PullUp,
-            callback_shutdown_system);
-        shutdownMonitor.setPriority(SCHED_RR, 10);
+            callback_shutdown_system))
+        {
+            llog.logS(ERROR,
+                      "Failed to enable shutdown monitor GPIO ",
+                      config.shutdown_pin,
+                      ": ",
+                      shutdownMonitor.lastError());
+        }
+        else if (!shutdownMonitor.setPriority(SCHED_RR, 10))
+        {
+            llog.logS(WARN,
+                      "Shutdown monitor GPIO ",
+                      config.shutdown_pin,
+                      " enabled, but failed to raise thread priority.");
+        }
     }
     else
     {

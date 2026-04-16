@@ -50,7 +50,9 @@ GPIOInput::GPIOInput()
       monitor_thread_(),
       monitor_mutex_(),
       cv_(),
+      last_error_(),
       status_(Status::NotConfigured),
+      resolved_line_(),
       chip_(nullptr)
 #if GPIOD_API_MAJOR >= 2
       ,
@@ -91,6 +93,8 @@ bool GPIOInput::enable(int pin,
                        PullMode pull_mode,
                        std::function<void()> callback)
 {
+    last_error_.clear();
+
     if (running_)
     {
         (void)stop();
@@ -112,12 +116,27 @@ bool GPIOInput::enable(int pin,
         debounce_triggered_ = false;
         stop_thread_ = false;
         status_ = Status::NotConfigured;
+        resolved_line_ = ResolvedGPIOLine{};
     }
 
     try
     {
+        std::string resolution_error;
+        if (!resolve_gpio_line(gpio_pin_, resolved_line_, resolution_error))
+        {
+            last_error_ =
+                "GPIOInput resolution failure for BCM " +
+                std::to_string(gpio_pin_) + ": " + resolution_error;
+            llog.logS(
+                ERROR,
+                last_error_);
+            status_ = Status::Error;
+            running_ = false;
+            return false;
+        }
+
 #if GPIOD_API_MAJOR >= 2
-        chip_ = std::make_unique<gpiod::chip>("/dev/gpiochip0");
+        chip_ = std::make_unique<gpiod::chip>(resolved_line_.chip_path);
 
         gpiod::line_settings ls;
         ls.set_direction(gpiod::line::direction::INPUT);
@@ -142,19 +161,23 @@ bool GPIOInput::enable(int pin,
 
         auto builder = chip_->prepare_request();
         builder.set_consumer("GPIOInput");
-        gpiod::line::offset off = static_cast<gpiod::line::offset>(gpio_pin_);
+        gpiod::line::offset off = resolved_line_.offset;
         request_ = builder.add_line_settings(off, ls).do_request();
 
-        llog.logS(DEBUG, "GPIOInput: v2 request on /dev/gpiochip0. offset:",
-                  gpio_pin_, " edge:", trigger_high_ ? "RISING" : "FALLING",
+        llog.logS(DEBUG,
+                  "GPIOInput: request success for ",
+                  describe_resolved_gpio_line(resolved_line_),
+                  " edge:",
+                  trigger_high_ ? "RISING" : "FALLING",
                   " bias:",
                   (pull_mode_ == PullMode::PullUp)   ? "PULL_UP" :
                   (pull_mode_ == PullMode::PullDown) ? "PULL_DOWN" :
                                                        "DISABLED", ".");
 #else
-        chip_ = std::make_unique<gpiod::chip>("/dev/gpiochip0");
+        chip_ = std::make_unique<gpiod::chip>(resolved_line_.chip_path);
 
-        line_ = chip_->get_line(gpio_pin_);
+        line_ = chip_->get_line(
+            static_cast<unsigned int>(resolved_line_.offset));
 
         gpiod::line_request req;
         req.consumer = "GPIOInput";
@@ -170,8 +193,11 @@ bool GPIOInput::enable(int pin,
 
         line_.request(req);
 
-        llog.logS(DEBUG, "GPIOInput: v1 request on /dev/gpiochip0. offset:",
-                  gpio_pin_, " edge:", trigger_high_ ? "RISING" : "FALLING",
+        llog.logS(DEBUG,
+                  "GPIOInput: request success for ",
+                  describe_resolved_gpio_line(resolved_line_),
+                  " edge:",
+                  trigger_high_ ? "RISING" : "FALLING",
                   " bias:",
                   (pull_mode_ == PullMode::PullUp)   ? "PULL_UP" :
                   (pull_mode_ == PullMode::PullDown) ? "PULL_DOWN" :
@@ -181,8 +207,12 @@ bool GPIOInput::enable(int pin,
     catch (const std::exception& e)
     {
         std::lock_guard<std::mutex> lock(monitor_mutex_);
+        last_error_ =
+            "GPIOInput request failure for " +
+            describe_resolved_gpio_line(resolved_line_) + ": " + e.what();
         releaseGPIOResources();
-        llog.logE(ERROR, "GPIOInput: init error.", e.what());
+        resolved_line_ = ResolvedGPIOLine{};
+        llog.logS(ERROR, last_error_);
         status_ = Status::Error;
         running_ = false;
         return false;
@@ -196,7 +226,15 @@ bool GPIOInput::enable(int pin,
     }
     catch (const std::exception& e)
     {
-        llog.logE(ERROR, "GPIOInput: thread start error.", e.what());
+        last_error_ =
+            "GPIOInput thread start failure for " +
+            describe_resolved_gpio_line(resolved_line_) + ": " + e.what();
+        llog.logS(ERROR, last_error_);
+        {
+            std::lock_guard<std::mutex> lock(monitor_mutex_);
+            releaseGPIOResources();
+            resolved_line_ = ResolvedGPIOLine{};
+        }
         status_ = Status::Error;
         running_ = false;
         return false;
@@ -220,6 +258,7 @@ bool GPIOInput::stop()
     {
         std::lock_guard<std::mutex> lock(monitor_mutex_);
         releaseGPIOResources();
+        resolved_line_ = ResolvedGPIOLine{};
         status_ = Status::Stopped;
     }
 
@@ -254,6 +293,11 @@ GPIOInput::Status GPIOInput::getStatus() const
     return status_;
 }
 
+const std::string &GPIOInput::lastError() const noexcept
+{
+    return last_error_;
+}
+
 void GPIOInput::monitorLoop()
 {
     while (!stop_thread_)
@@ -266,6 +310,12 @@ void GPIOInput::monitorLoop()
                 auto count = request_->read_edge_events(event_buf_);
                 if (count > 0 && !debounce_triggered_)
                 {
+                    llog.logS(DEBUG,
+                              "GPIOInput: edge event on ",
+                              describe_resolved_gpio_line(resolved_line_),
+                              ", count ",
+                              count,
+                              ".");
                     debounce_triggered_ = true;
                     if (callback_)
                     {
@@ -279,6 +329,10 @@ void GPIOInput::monitorLoop()
                 (void)line_.event_read();
                 if (!debounce_triggered_)
                 {
+                    llog.logS(DEBUG,
+                              "GPIOInput: edge event on ",
+                              describe_resolved_gpio_line(resolved_line_),
+                              ".");
                     debounce_triggered_ = true;
                     if (callback_)
                     {
@@ -290,8 +344,13 @@ void GPIOInput::monitorLoop()
         }
         catch (const std::exception& e)
         {
+            last_error_ =
+                "GPIOInput loop failure for " +
+                describe_resolved_gpio_line(resolved_line_) + ": " + e.what();
             status_ = Status::Error;
-            llog.logE(ERROR, "GPIO loop error.", e.what());
+            running_ = false;
+            stop_thread_ = true;
+            llog.logS(ERROR, last_error_);
         }
     }
 }

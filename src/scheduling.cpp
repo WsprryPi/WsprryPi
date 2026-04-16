@@ -264,12 +264,29 @@ static void stop_active_transmission_selectors() noexcept
 {
     if (bandGPIOSelector.currentConfig() != nullptr)
     {
-        bandGPIOSelector.setBandState(false);
+        if (!bandGPIOSelector.setBandState(false))
+        {
+            llog.logS(WARN,
+                      "Band GPIO deassert request did not complete during selector teardown.");
+        }
     }
     bandGPIOSelector.stop();
     active_band_gpio_prepare_status.store(
         BandGPIOPrepareStatus::Inactive,
         std::memory_order_release);
+}
+
+static void set_tx_led_state(bool state, const char *context) noexcept
+{
+    if (!ledControl.toggleGPIO(state))
+    {
+        llog.logS(WARN,
+                  "TX LED ",
+                  (state ? "assert" : "deassert"),
+                  " request did not complete during ",
+                  context,
+                  ".");
+    }
 }
 
 static wsprrypi::BackendKind to_controller_backend(
@@ -1572,7 +1589,7 @@ void transmitter_cb(WsprTransmitter::TransmissionCallbackEvent event,
         }
 
         // Turn on LED.
-        ledControl.toggleGPIO(true);
+        set_tx_led_state(true, "transmission start");
 
         // Notify clients of start.
         send_ws_message("transmit", "starting");
@@ -1684,7 +1701,7 @@ void transmitter_cb(WsprTransmitter::TransmissionCallbackEvent event,
         stop_active_transmission_selectors();
 
         // Turn off LED.
-        ledControl.toggleGPIO(false);
+        set_tx_led_state(false, "transmission completion");
 
         // Notify the websocket clients.
         send_ws_message("transmit", "finished");
@@ -1753,7 +1770,7 @@ void transmitter_cb(WsprTransmitter::TransmissionCallbackEvent event,
                   " seconds.");
 
         stop_active_transmission_selectors();
-        ledControl.toggleGPIO(false);
+        set_tx_led_state(false, "transmission cancellation");
         send_ws_message("transmit", "canceled");
 
         shutdown_after_current_transmission.store(false, std::memory_order_release);
@@ -1777,7 +1794,7 @@ void transmitter_cb(WsprTransmitter::TransmissionCallbackEvent event,
         stop_active_transmission_selectors();
 
         // Turn off LED in case the UI/state expects an idle indication.
-        ledControl.toggleGPIO(false);
+        set_tx_led_state(false, "transmission skip");
 
         if (!msg.empty())
             llog.logS(to_log_level(level), msg, ".");
@@ -1928,10 +1945,10 @@ void shutdown_system()
         // Flash LED three times if configured
         for (int i = 0; i < 3; ++i)
         {
-            ledControl.toggleGPIO(true); // LED ON
+            set_tx_led_state(true, "shutdown blink on");
             std::this_thread::sleep_for(std::chrono::milliseconds(200));
 
-            ledControl.toggleGPIO(false); // LED OFF
+            set_tx_led_state(false, "shutdown blink off");
             if (i < 2)
             {
                 std::this_thread::sleep_for(std::chrono::milliseconds(200));
@@ -1967,10 +1984,10 @@ void reboot_system()
         // Flash LED two times if configured
         for (int i = 0; i < 2; ++i)
         {
-            ledControl.toggleGPIO(true); // LED ON
+            set_tx_led_state(true, "reboot blink on");
             std::this_thread::sleep_for(std::chrono::milliseconds(100));
 
-            ledControl.toggleGPIO(false); // LED OFF
+            set_tx_led_state(false, "reboot blink off");
             if (i < 2)
             {
                 std::this_thread::sleep_for(std::chrono::milliseconds(100));
@@ -2025,7 +2042,7 @@ void start_test_tone()
         {
             std::this_thread::sleep_for(std::chrono::milliseconds(1));
         }
-        ledControl.toggleGPIO(true);
+        set_tx_led_state(true, "test tone start");
         llog.logS(INFO, "Beginning test tone requested by web UI.");
 
         // Switch into tone mode
@@ -2074,7 +2091,7 @@ void end_test_tone()
         wsprTransmitter.stopAndJoin();
         stop_active_transmission_selectors();
         send_ws_message("transmit", "finished");
-        ledControl.toggleGPIO(false);
+        set_tx_led_state(false, "test tone stop");
 
         // Clear the “we’re testing” flag
         web_test_tone.store(false);
@@ -2164,7 +2181,7 @@ StopTransmissionResult stop_transmission_by_user_request()
 
     wsprTransmitter.stopAndJoin();
     stop_active_transmission_selectors();
-    ledControl.toggleGPIO(false);
+    set_tx_led_state(false, "scheduler shutdown");
 
     {
         std::lock_guard<std::mutex> lk(set_config_mtx);
