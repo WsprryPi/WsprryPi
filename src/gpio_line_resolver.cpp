@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <fstream>
+#include <set>
 #include <sstream>
 #include <vector>
 
@@ -10,10 +11,114 @@ namespace
     struct ChipEntry
     {
         std::filesystem::path path;
+        std::filesystem::path backing_device_path;
         std::string name;
         std::string label;
         std::size_t num_lines = 0;
     };
+
+    std::filesystem::path gpiochip_sysfs_dir(const std::filesystem::path &chip_path)
+    {
+        return std::filesystem::path("/sys/class/gpio") / chip_path.filename();
+    }
+
+    std::filesystem::path gpiochip_backing_device_path(
+        const std::filesystem::path &chip_path)
+    {
+        const std::filesystem::path device_link =
+            gpiochip_sysfs_dir(chip_path) / "device";
+        std::error_code ec;
+        const std::filesystem::path canonical =
+            std::filesystem::weakly_canonical(device_link, ec);
+        if (ec)
+        {
+            return {};
+        }
+
+        return canonical;
+    }
+
+    int gpiochip_number(const std::filesystem::path &chip_path)
+    {
+        const std::string filename = chip_path.filename().string();
+        constexpr char prefix[] = "gpiochip";
+        if (filename.rfind(prefix, 0) != 0)
+        {
+            return -1;
+        }
+
+        try
+        {
+            return std::stoi(filename.substr(sizeof(prefix) - 1U));
+        }
+        catch (...)
+        {
+            return -1;
+        }
+    }
+
+    bool chip_path_less(
+        const std::filesystem::path &lhs,
+        const std::filesystem::path &rhs)
+    {
+        const int lhs_num = gpiochip_number(lhs);
+        const int rhs_num = gpiochip_number(rhs);
+        if (lhs_num >= 0 && rhs_num >= 0 && lhs_num != rhs_num)
+        {
+            return lhs_num < rhs_num;
+        }
+
+        return lhs < rhs;
+    }
+
+    bool resolved_chip_less(
+        const ResolvedGPIOLine &lhs,
+        const ResolvedGPIOLine &rhs)
+    {
+        return chip_path_less(lhs.chip_path, rhs.chip_path);
+    }
+
+    bool collapse_equivalent_candidates(
+        const std::vector<ResolvedGPIOLine> &candidates,
+        ResolvedGPIOLine &resolved_line)
+    {
+        if (candidates.empty())
+        {
+            return false;
+        }
+
+        std::set<std::filesystem::path> backing_devices;
+        for (const ResolvedGPIOLine &candidate : candidates)
+        {
+            if (candidate.backing_device_path.empty())
+            {
+                return false;
+            }
+
+            backing_devices.insert(candidate.backing_device_path);
+        }
+
+        if (backing_devices.size() != 1U)
+        {
+            return false;
+        }
+
+        const auto canonical_it =
+            std::min_element(candidates.begin(), candidates.end(), resolved_chip_less);
+        if (canonical_it == candidates.end())
+        {
+            return false;
+        }
+
+        resolved_line = *canonical_it;
+        std::ostringstream note;
+        note << "Multiple gpiochips map to the same backing device '"
+             << resolved_line.backing_device_path
+             << "'. Using '" << resolved_line.chip_path
+             << "' as canonical view.";
+        resolved_line.resolution_note = note.str();
+        return true;
+    }
 
 #if GPIOD_API_MAJOR < 2
     std::string trim_copy(std::string value)
@@ -40,11 +145,6 @@ namespace
         buffer << input.rdbuf();
         return trim_copy(buffer.str());
     }
-
-    std::filesystem::path gpiochip_sysfs_dir(const std::filesystem::path &chip_path)
-    {
-        return std::filesystem::path("/sys/class/gpio") / chip_path.filename();
-    }
 #endif
 
     std::vector<ChipEntry> enumerate_gpiochips()
@@ -70,12 +170,15 @@ namespace
             const gpiod::chip_info info = chip.get_info();
             entries.push_back(ChipEntry{
                 entry.path(),
+                gpiochip_backing_device_path(entry.path()),
                 info.name(),
                 info.label(),
                 info.num_lines()});
 #else
             ChipEntry chip_entry;
             chip_entry.path = entry.path();
+            chip_entry.backing_device_path =
+                gpiochip_backing_device_path(chip_entry.path);
             chip_entry.name = filename;
 
             const std::filesystem::path sysfs_dir =
@@ -109,7 +212,7 @@ namespace
             entries.end(),
             [](const ChipEntry &lhs, const ChipEntry &rhs)
             {
-                return lhs.path < rhs.path;
+                return chip_path_less(lhs.path, rhs.path);
             });
 
         return entries;
@@ -127,6 +230,7 @@ namespace
         resolved_line = ResolvedGPIOLine{};
         resolved_line.bcm = bcm;
         resolved_line.chip_path = entry.path;
+        resolved_line.backing_device_path = entry.backing_device_path;
         resolved_line.chip_name = entry.name;
         resolved_line.chip_label = entry.label;
 
@@ -264,12 +368,21 @@ bool resolve_gpio_line(
 
     if (named_candidates.size() > 1U)
     {
+        if (collapse_equivalent_candidates(named_candidates, resolved_line))
+        {
+            return true;
+        }
+
         std::ostringstream oss;
         oss << "BCM GPIO " << bcm
             << " resolved by kernel line name on multiple gpiochips:";
         for (const ResolvedGPIOLine &candidate : named_candidates)
         {
             oss << " " << candidate.chip_path;
+            if (!candidate.backing_device_path.empty())
+            {
+                oss << "(device=" << candidate.backing_device_path << ")";
+            }
         }
         oss << ". Chip selection is ambiguous.";
         error_message = oss.str();
@@ -291,12 +404,21 @@ bool resolve_gpio_line(
         return false;
     }
 
+    if (collapse_equivalent_candidates(fallback_candidates, resolved_line))
+    {
+        return true;
+    }
+
     std::ostringstream oss;
     oss << "BCM GPIO " << bcm
         << " could only be mapped by raw offset on multiple gpiochips:";
     for (const ResolvedGPIOLine &candidate : fallback_candidates)
     {
         oss << " " << candidate.chip_path;
+        if (!candidate.backing_device_path.empty())
+        {
+            oss << "(device=" << candidate.backing_device_path << ")";
+        }
     }
     oss << ". Refusing ambiguous raw-offset mapping.";
     error_message = oss.str();
@@ -321,6 +443,14 @@ std::string describe_resolved_gpio_line(const ResolvedGPIOLine &resolved_line)
     if (!resolved_line.chip_label.empty())
     {
         oss << " chip-label=\"" << resolved_line.chip_label << "\"";
+    }
+    if (!resolved_line.backing_device_path.empty())
+    {
+        oss << " backing-device=" << resolved_line.backing_device_path;
+    }
+    if (!resolved_line.resolution_note.empty())
+    {
+        oss << " note=\"" << resolved_line.resolution_note << "\"";
     }
     return oss.str();
 }

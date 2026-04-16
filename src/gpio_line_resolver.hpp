@@ -11,11 +11,13 @@ struct ResolvedGPIOLine
 {
     int bcm = -1;
     std::filesystem::path chip_path;
+    std::filesystem::path backing_device_path;
     std::string chip_name;
     std::string chip_label;
     gpiod::line::offset offset{};
     bool resolved_by_name = false;
     std::string kernel_name;
+    std::string resolution_note;
 };
 
 bool resolve_gpio_line(
