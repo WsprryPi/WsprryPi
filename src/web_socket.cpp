@@ -112,7 +112,7 @@ bool WebSocketServer::start(uint16_t port, uint32_t keep_alive_secs)
 {
     if (port < 1024 || port > 49151)
     {
-        llog.logE(ERROR, "Port must be between 1024 and 49151:", port);
+        llog.logE(ERROR, "Port must be between 1024 and 49151: ", port);
         return false;
     }
     keep_alive_secs_ = keep_alive_secs;
@@ -166,7 +166,7 @@ bool WebSocketServer::start(uint16_t port, uint32_t keep_alive_secs)
         keep_alive_thread_ = std::thread(&WebSocketServer::keepAliveLoop, this, keep_alive_secs_);
     }
 
-    llog.logS(INFO, "Socket server started on port:", port);
+    llog.logS(INFO, "Socket server started on port: ", port);
     return true;
 }
 
@@ -762,7 +762,7 @@ void WebSocketServer::serverLoop()
             auto *s6 = reinterpret_cast<sockaddr_in6 *>(&peer_addr);
             inet_ntop(AF_INET6, &s6->sin6_addr, ipstr, sizeof(ipstr));
         }
-        llog.logS(DEBUG, "Client connected from:", ipstr);
+        llog.logS(DEBUG, "Client connected from: ", ipstr);
 
         // Store and spawn handler thread
         {
@@ -822,7 +822,7 @@ void WebSocketServer::clientLoop(int client_fd)
 
             case 0x8: // Close frame
             {
-                llog.logS(DEBUG, "Received Close frame from fd:",
+                llog.logS(DEBUG, "Received Close frame from fd: ",
                           client_fd);
                 const char close_resp[] = {static_cast<char>(0x88), 0x00};
                 send(client_fd, close_resp, sizeof(close_resp), 0);
@@ -832,19 +832,19 @@ void WebSocketServer::clientLoop(int client_fd)
 
             case 0x9: // Ping frame
             {
-                // llog.logS(DEBUG, "Received Ping; sending Pong to fd:", client_fd);
+                // llog.logS(DEBUG, "Received Ping; sending Pong to fd: ", client_fd);
                 const unsigned char pong[2] = {0x8A, 0x00};
                 send(client_fd, pong, sizeof(pong), 0);
             }
             break;
 
             case 0xA: // Pong frame
-                // llog.logS(DEBUG, "Received Pong from fd:", client_fd);
+                // llog.logS(DEBUG, "Received Pong from fd: ", client_fd);
                 break;
 
             default:
                 llog.logS(WARN, "Unhandled opcode", static_cast<int>(opcode),
-                          "from fd:", client_fd);
+                          "from fd: ", client_fd);
             }
         }
     }
@@ -861,7 +861,7 @@ void WebSocketServer::clientLoop(int client_fd)
             client_sockets_.end());
     }
 
-    llog.logS(DEBUG, "Client handler thread exiting for fd:", client_fd);
+    llog.logS(DEBUG, "Client handler thread exiting for fd: ", client_fd);
 }
 
 /**

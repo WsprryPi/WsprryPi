@@ -738,7 +738,7 @@ void consume_tx_iteration_if_needed()
     }
     else
     {
-        llog.logS(INFO, "WSPR transmissions remaining:", remaining);
+        llog.logS(INFO, "WSPR transmissions remaining: ", remaining);
     }
 }
 
@@ -1544,12 +1544,12 @@ bool request_wspr_shutdown(std::string_view reason)
         if (already_requested)
         {
             llog.logS(INFO,
-                      "Shutdown already in progress; duplicate request:",
+                      "Shutdown already in progress; duplicate request: ",
                       reason);
         }
         else
         {
-            llog.logS(INFO, "Shutdown requested:", reason);
+            llog.logS(INFO, "Shutdown requested: ", reason);
         }
     }
 
@@ -1913,7 +1913,7 @@ bool ppm_init()
  */
 void callback_shutdown_system()
 {
-    llog.logS(INFO, "Shutdown called by GPIO:", config.shutdown_pin);
+    llog.logS(INFO, "Shutdown called by GPIO", config.shutdown_pin);
     shutdown_system();
 }
 
@@ -2069,7 +2069,7 @@ void start_test_tone()
 
         wsprTransmitter.startAsync();
         llog.logS(INFO,
-                  "WSPR-band test tone using dial frequency:",
+                  "WSPR-band test tone using dial frequency: ",
                   lookup.freq_display_string(dial_freq));
         send_ws_message("transmit", "starting");
     }
@@ -2468,47 +2468,47 @@ bool wspr_loop()
                          { return exitwspr_ready; });
     }
 
-    llog.logS(INFO, "WSPR loop termination started.");
+    llog.logS(DEBUG, "WSPR loop termination started.");
 
     // -------------------------------------------------------------------------
     // Shutdown and cleanup
     // -------------------------------------------------------------------------
-    llog.logS(INFO, "Stopping runtime components.");
+    llog.logS(DEBUG, "Stopping runtime components.");
 
-    llog.logS(INFO, "Stopping web server.");
+    llog.logS(DEBUG, "Stopping web server.");
     webServer.stop();
-    llog.logS(INFO, "Web server stopped.");
+    llog.logS(DEBUG, "Web server stopped.");
 
-    llog.logS(INFO, "Stopping socket server.");
+    llog.logS(DEBUG, "Stopping socket server.");
     socketServer.stop();
-    llog.logS(INFO, "Socket server stopped.");
+    llog.logS(DEBUG, "Socket server stopped.");
 
-    llog.logS(INFO, "Stopping configuration monitor.");
+    llog.logS(DEBUG, "Stopping configuration monitor.");
     ini_reload_pending.store(false, std::memory_order_relaxed);
     iniMonitor.stop(); // Stop config file monitor before transmitter teardown.
-    llog.logS(INFO, "Configuration monitor stopped.");
+    llog.logS(DEBUG, "Configuration monitor stopped.");
 
-    llog.logS(INFO, "Stopping shutdown monitor.");
+    llog.logS(DEBUG, "Stopping shutdown monitor.");
     shutdownMonitor.stop(); // Stop the GPIO monitor
-    llog.logS(INFO, "Shutdown monitor stopped.");
+    llog.logS(DEBUG, "Shutdown monitor stopped.");
 
-    llog.logS(INFO, "Stopping PPM manager.");
+    llog.logS(DEBUG, "Stopping PPM manager.");
     ppmManager.stop(); // Stop PPM manager (if active)
-    llog.logS(INFO, "PPM manager stopped.");
+    llog.logS(DEBUG, "PPM manager stopped.");
 
-    llog.logS(INFO, "Stopping transmitter.");
+    llog.logS(DEBUG, "Stopping transmitter.");
     wsprTransmitter.shutdownForProcessExit();
-    llog.logS(INFO, "Transmitter stopped.");
+    llog.logS(DEBUG, "Transmitter stopped.");
 
-    llog.logS(INFO, "Stopping band GPIO selector.");
+    llog.logS(DEBUG, "Stopping band GPIO selector.");
     stop_active_transmission_selectors();
-    llog.logS(INFO, "Band GPIO selector stopped.");
+    llog.logS(DEBUG, "Band GPIO selector stopped.");
 
-    llog.logS(INFO, "Stopping LED driver.");
+    llog.logS(DEBUG, "Stopping LED driver.");
     ledControl.stop(); // Stop LED driver
-    llog.logS(INFO, "LED driver stopped.");
+    llog.logS(DEBUG, "LED driver stopped.");
 
-    llog.logS(INFO, "Runtime components stopped.");
+    llog.logS(DEBUG, "Runtime components stopped.");
 
     llog.logS(INFO, get_project_name(), "exiting.");
     // Flush all file system buffers to disk
@@ -2532,7 +2532,7 @@ void reboot_machine()
     // Attempt to reboot; LINUX_REBOOT_CMD_RESTART is the same as RB_AUTOBOOT
     if (::reboot(LINUX_REBOOT_CMD_RESTART) < 0)
     {
-        llog.logE(ERROR, "Reboot failed:", std::strerror(errno));
+        llog.logE(ERROR, "Reboot failed: ", std::strerror(errno));
     }
 }
 
@@ -2552,7 +2552,7 @@ void shutdown_machine()
     // LINUX_REBOOT_CMD_POWER_OFF is equivalent to RB_POWER_OFF
     if (::reboot(LINUX_REBOOT_CMD_POWER_OFF) < 0)
     {
-        llog.logE(ERROR, "Shutdown failed:", std::strerror(errno));
+        llog.logE(ERROR, "Shutdown failed: ", std::strerror(errno));
     }
 }
 
@@ -2751,7 +2751,7 @@ bool set_config(bool force)
             if (!prepared_candidate.valid)
             {
                 llog.logS(ERROR,
-                          "Invalid configuration reload rejected; previous valid configuration remains loaded:",
+                          "Invalid configuration reload rejected; previous valid configuration remains loaded: ",
                           prepared_candidate.error_reason);
                 send_ws_message(
                     "configuration",
@@ -2854,7 +2854,7 @@ bool set_config(bool force)
         }
         if (ppm_update_pending)
         {
-            llog.logS(INFO, "PPM updated:", committed_ppm);
+            llog.logS(INFO, "PPM updated: ", committed_ppm);
             runtime_ppm_changed = true;
             do_config = true;
         }

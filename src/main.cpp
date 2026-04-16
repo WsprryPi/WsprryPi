@@ -301,7 +301,7 @@ int main(int argc, char *argv[])
     SingletonProcess singleton(SINGLETON_PORT);
     if (!singleton())
     {
-        llog.logE(FATAL, "Another instance is running on port:", SINGLETON_PORT);
+        llog.logE(FATAL, "Another instance is running on port: ", SINGLETON_PORT);
         std::exit(EXIT_FAILURE);
     }
 

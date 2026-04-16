@@ -1859,7 +1859,7 @@ void copy_runtime_config(const ArgParserConfig &source, ArgParserConfig &target)
 
 void dump_json(const nlohmann::json &j, std::string tag)
 {
-    llog.logS(DEBUG, tag, "JSON Dump:", j.dump());
+    llog.logS(DEBUG, tag, "JSON Dump: ", j.dump());
 }
 
 void patch_all_from_web(const nlohmann::json &j)
@@ -1961,7 +1961,7 @@ void repair_from_web(bool attempt_repair)
 
         llog.logS(
             ERROR,
-            "Failed to reload repaired configuration; previous configuration remains loaded:",
+            "Failed to reload repaired configuration; previous configuration remains loaded: ",
             load_error);
         return;
     }

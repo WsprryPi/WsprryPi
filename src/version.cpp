@@ -383,7 +383,7 @@ int get_processor_type_int()
     }
 
     // If the type is not found, log a warning and return -1
-    llog.logE(ERROR, "Unknown processor type:", processorType);
+    llog.logE(ERROR, "Unknown processor type: ", processorType);
     return -1;
 }
 
