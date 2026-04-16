@@ -51,6 +51,7 @@
 #include "logging.hpp"
 #include "ppm_manager.hpp"
 #include "signal_handler.hpp"
+#include "execution_plan_compiler.hpp"
 #include "wspr_reference_adapter.hpp"
 #include "web_server.hpp"
 #include "web_socket.hpp"
@@ -62,6 +63,7 @@
 #include <cctype>
 #include <cerrno>
 #include <chrono>
+#include <cmath>
 #include <condition_variable>
 #include <cstring>
 #include <ctime>
@@ -985,6 +987,33 @@ static wsprrypi::EnvelopeSettings cw_envelope_from_config(
     return envelope;
 }
 
+static std::string format_policy_duration(
+    std::chrono::nanoseconds duration)
+{
+    const double total_seconds =
+        std::chrono::duration<double>(duration).count();
+    const auto total_whole_seconds =
+        static_cast<long long>(std::llround(total_seconds));
+    if (std::fabs(total_seconds - static_cast<double>(total_whole_seconds)) <
+        0.0005)
+    {
+        const long long minutes = total_whole_seconds / 60;
+        const long long seconds = total_whole_seconds % 60;
+        std::ostringstream oss;
+        oss << minutes << "m " << std::setw(2) << std::setfill('0') << seconds
+            << "s";
+        return oss.str();
+    }
+
+    const long long minutes = static_cast<long long>(total_seconds / 60.0);
+    const double seconds = total_seconds - static_cast<double>(minutes * 60);
+    std::ostringstream oss;
+    oss << minutes << "m "
+        << std::fixed << std::setprecision(3) << std::setw(6)
+        << std::setfill('0') << seconds << "s";
+    return oss.str();
+}
+
 static wsprrypi::TransmissionRequest make_qrss_controller_request(
     const ArgParserConfig &cfg,
     double committed_ppm)
@@ -1108,6 +1137,87 @@ static TransmissionRequest make_dfcw_legacy_request(
     return request;
 }
 
+bool compute_non_wspr_message_duration(
+    const ArgParserConfig &cfg,
+    std::chrono::nanoseconds &duration_out,
+    std::string *error_message)
+{
+    try
+    {
+        wsprrypi::TransmissionRequest request;
+        if (cfg.mode == ModeType::QRSS)
+        {
+            request = make_qrss_controller_request(cfg, cfg.ppm);
+        }
+        else if (cfg.mode == ModeType::FSKCW)
+        {
+            request = make_fskcw_controller_request(cfg, cfg.ppm);
+        }
+        else if (cfg.mode == ModeType::DFCW)
+        {
+            request = make_dfcw_controller_request(cfg, cfg.ppm);
+        }
+        else
+        {
+            if (error_message != nullptr)
+            {
+                *error_message =
+                    "Timed-message duration is only available for QRSS, FSKCW, and DFCW modes.";
+            }
+            return false;
+        }
+
+        const wsprrypi::ExecutionPlanCompiler compiler;
+        duration_out = compiler.compile(request).summary.total_duration;
+        return true;
+    }
+    catch (const std::exception &e)
+    {
+        if (error_message != nullptr)
+        {
+            *error_message = e.what();
+        }
+        return false;
+    }
+}
+
+bool validate_non_wspr_repeat_interval_policy(
+    const ArgParserConfig &cfg,
+    std::string *error_message)
+{
+    if (!is_non_wspr_runtime_mode(cfg.mode) || cfg.schedule_repeat_minutes <= 0)
+    {
+        return true;
+    }
+
+    std::chrono::nanoseconds message_duration{};
+    if (!compute_non_wspr_message_duration(cfg, message_duration, error_message))
+    {
+        return false;
+    }
+
+    const auto repeat_interval =
+        std::chrono::duration_cast<std::chrono::nanoseconds>(
+            std::chrono::minutes(cfg.schedule_repeat_minutes));
+    if (message_duration <= repeat_interval)
+    {
+        return true;
+    }
+
+    if (error_message != nullptr)
+    {
+        *error_message =
+            "Configured " +
+            std::string(mode_type_name(cfg.mode)) +
+            " message duration of " +
+            format_policy_duration(message_duration) +
+            " exceeds repeat_every interval of " +
+            format_policy_duration(repeat_interval) +
+            ". Reduce the message length, shorten the unit length, or increase repeat_every.";
+    }
+    return false;
+}
+
 static bool start_non_wspr_transmission_now(const ArgParserConfig &cfg)
 {
     if (!runtime_transmit_requested(cfg))
@@ -1117,6 +1227,12 @@ static bool start_non_wspr_transmission_now(const ArgParserConfig &cfg)
     }
 
     const double committed_ppm = cfg.ppm;
+    std::string policy_error;
+    if (!validate_non_wspr_repeat_interval_policy(cfg, &policy_error))
+    {
+        llog.logE(ERROR, policy_error);
+        return false;
+    }
 
     if (cfg.mode == ModeType::QRSS)
     {
@@ -2861,6 +2977,36 @@ bool set_config(bool force)
 
         if (is_non_wspr_runtime_mode(working_config.mode))
         {
+            std::string policy_error;
+            if (!validate_non_wspr_repeat_interval_policy(
+                    working_config,
+                    &policy_error))
+            {
+                llog.logS(ERROR, policy_error);
+
+                if (working_config.use_ini)
+                {
+                    send_ws_message(
+                        "configuration",
+                        "reload_failed",
+                        policy_error);
+                    set_managed_reload_tx_inhibited(
+                        true,
+                        policy_error);
+                    wsprTransmitter.stopAndJoin();
+                    stop_active_transmission_selectors();
+                    current_transmission_request = TransmissionRequest{};
+                    current_dial_frequency = 0.0;
+                    current_frequency_entry = WsprFrequencyEntry{};
+                }
+
+                if (!finalize_reload_pending())
+                {
+                    continue;
+                }
+                return working_config.use_ini;
+            }
+
             if (candidate_ready_to_commit)
             {
                 prepared_candidate.normalized_config.ppm = working_config.ppm;

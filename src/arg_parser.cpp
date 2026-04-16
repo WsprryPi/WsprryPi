@@ -1416,7 +1416,7 @@ bool validate_config_candidate(
             return false;
         }
 
-        return true;
+        return validate_non_wspr_repeat_interval_policy(candidate, error_message);
     }
 
     if (candidate.mode == ModeType::FSKCW)
@@ -1431,7 +1431,7 @@ bool validate_config_candidate(
             return false;
         }
 
-        return true;
+        return validate_non_wspr_repeat_interval_policy(candidate, error_message);
     }
 
     if (candidate.mode == ModeType::DFCW)
@@ -1446,7 +1446,7 @@ bool validate_config_candidate(
             return false;
         }
 
-        return true;
+        return validate_non_wspr_repeat_interval_policy(candidate, error_message);
     }
 
     if (candidate.mode != ModeType::WSPR)
