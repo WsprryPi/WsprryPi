@@ -516,7 +516,7 @@ void ini_to_json(std::string filename);
  *   },
  *   "Si5351": {
  *       "I2C Bus": 1,
- *       "I2C Address": 96,
+ *       "I2C Address": "0x60",
  *       "Reference Frequency": 27000000,
  *       "TX Output": "CLK0",
  *       "Power Level": 1

@@ -189,6 +189,21 @@ namespace
             "Invalid Si5351.TX Output. Expected CLK0, CLK1, CLK2, 0, 1, or 2.");
     }
 
+    std::string format_si5351_i2c_address(int address)
+    {
+        static constexpr char kHexDigits[] = "0123456789ABCDEF";
+        unsigned int value = static_cast<unsigned int>(address);
+        std::string formatted = "0x";
+        formatted.push_back(kHexDigits[(value >> 4) & 0xF]);
+        formatted.push_back(kHexDigits[value & 0xF]);
+        return formatted;
+    }
+
+    int normalize_gpio_transmit_pin(int gpio) noexcept
+    {
+        return is_supported_transmit_gpio(gpio) ? gpio : kDefaultTransmitGpio;
+    }
+
     ModeType parse_mode_type(const nlohmann::json &operation)
     {
         if (!operation.contains("Mode"))
@@ -930,7 +945,7 @@ namespace
 
         target["Si5351"] = {
             {"I2C Bus", kDefaultSi5351I2cBus},
-            {"I2C Address", kDefaultSi5351I2cAddress},
+            {"I2C Address", format_si5351_i2c_address(kDefaultSi5351I2cAddress)},
             {"Reference Frequency", kDefaultSi5351ReferenceHz},
             {"TX Output", "CLK0"},
             {"Power Level", 1}};
@@ -1003,6 +1018,10 @@ namespace
             gpio.contains("Transmit Pin")
                 ? gpio.at("Transmit Pin").get<int>()
                 : kDefaultTransmitGpio;
+        if (target.transmit_backend == TransmitBackendKind::GPIO)
+        {
+            target.gpio_tx_pin = normalize_gpio_transmit_pin(target.gpio_tx_pin);
+        }
         target.gpio_power_level =
             gpio.contains("Power Level")
                 ? gpio.at("Power Level").get<int>()
@@ -1193,14 +1212,16 @@ namespace
         target["Operation"]["Use Shutdown"] = source.use_shutdown;
         target["Operation"]["Shutdown Button"] = source.shutdown_pin;
 
-        target["GPIO"]["Transmit Pin"] = source.gpio_tx_pin;
+        target["GPIO"]["Transmit Pin"] =
+            normalize_gpio_transmit_pin(source.gpio_tx_pin);
         target["GPIO"]["Power Level"] = source.gpio_power_level;
         target["GPIO"]["Use NTP"] = source.gpio_use_ntp;
 
         target["Calibration"]["PPM"] = source.ppm;
 
         target["Si5351"]["I2C Bus"] = source.si5351_i2c_bus;
-        target["Si5351"]["I2C Address"] = source.si5351_i2c_address;
+        target["Si5351"]["I2C Address"] =
+            format_si5351_i2c_address(source.si5351_i2c_address);
         target["Si5351"]["Reference Frequency"] = source.si5351_reference_hz;
         target["Si5351"]["TX Output"] =
             std::string("CLK") + std::to_string(source.si5351_tx_output);
