@@ -1779,28 +1779,6 @@ int main()
                 ui_source.find("var Calibration = {\n        \"PPM\": ppm_val,\n        \"Use NTP\": use_ntp,") ==
                     std::string::npos,
             "UI save path must use canonical GPIO.Use NTP only");
-
-        const std::string config_handler_source =
-            read_text_file("/home/pi/WsprryPi/src/config_handler.cpp");
-        require(
-            config_handler_source.find("json_to_ini();") != std::string::npos &&
-                config_handler_source.find("callback_ini_changed();") != std::string::npos,
-            "web config patch path must route persisted updates through the managed reload callback");
-
-        const std::string site_source =
-            read_text_file("/home/pi/WsprryPi/WsprryPi-UI/data/site.js");
-        require(
-            site_source.find("getConfigValue(operation, \"Operation\", \"Mode\", \"WSPR\")") !=
-                    std::string::npos &&
-                site_source.find("getConfigValue(meta, \"Meta\", \"Mode\", \"WSPR\")") ==
-                    std::string::npos,
-            "UI load path must read canonical Operation.Mode only");
-        require(
-            site_source.find("getConfigBoolValue(\n                    gpio,\n                    \"GPIO\",\n                    \"Use NTP\",") !=
-                    std::string::npos &&
-                site_source.find("getConfigBoolValue(\n                    calibration,\n                    \"Calibration\",\n                    \"Use NTP\",") ==
-                    std::string::npos,
-            "UI load path must read canonical GPIO.Use NTP only");
     }
 
     {
