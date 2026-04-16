@@ -46,6 +46,7 @@
 
 // Standard library headers
 #include <atomic>
+#include <chrono>
 #include <cstddef>
 #include <condition_variable>
 #include <string>
@@ -294,6 +295,13 @@ WsprRuntimeStatusSnapshot current_tx_runtime_status_snapshot();
  *         `configure()`.
  */
 bool set_config(bool force = false);
+bool compute_non_wspr_message_duration(
+    const ArgParserConfig &cfg,
+    std::chrono::nanoseconds &duration_out,
+    std::string *error_message = nullptr);
+bool validate_non_wspr_repeat_interval_policy(
+    const ArgParserConfig &cfg,
+    std::string *error_message = nullptr);
 bool transmitter_reload_should_defer() noexcept;
 void transmitter_cb(WsprTransmissionCallbackEvent event,
                     WsprTransmitLogLevel level,
