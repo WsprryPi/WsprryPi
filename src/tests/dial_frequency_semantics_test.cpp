@@ -202,6 +202,11 @@ namespace
         clear_raspberry_pi_generation_override_for_test();
     }
 
+    void clear_si5351_detection_override_for_scope() noexcept
+    {
+        set_si5351_detection_override_for_test(true);
+    }
+
     void require_patch_accepts_and_runtime_plans(
         const nlohmann::json &patch,
         const std::string &expected_plan_type,
@@ -291,6 +296,7 @@ namespace
 int main()
 {
     set_patch_all_from_web_runtime_apply_suppressed_for_test(true);
+    set_si5351_detection_override_for_test(true);
 
     WSPRBandLookup lookup;
 
@@ -364,6 +370,24 @@ int main()
 
     {
         set_raspberry_pi_generation_override_for_test(5);
+        prime_valid_runtime_identity_config();
+        config.transmit = false;
+
+        std::string validation_error;
+        require(
+            !validate_config_candidate(config, &validation_error),
+            "GPIO backend must remain invalid on Raspberry Pi 5 even when transmit is off");
+        require(
+            validation_error.find(
+                "GPIO transmission mode is unsupported on Raspberry Pi 5 and newer.") !=
+                std::string::npos,
+            "GPIO backend invalidity on Raspberry Pi 5 must not depend on transmit state");
+
+        clear_pi_generation_override_for_scope();
+    }
+
+    {
+        set_raspberry_pi_generation_override_for_test(5);
         reset_current_transmission_request_for_test();
         reset_getopt_state();
 
@@ -407,13 +431,60 @@ int main()
         config.si5351_tx_output = 0;
         config.si5351_power_level = 1;
         resolve_backend_specific_config(config);
+        set_si5351_detection_override_for_test(true);
 
         std::string validation_error;
         require(
             validate_config_candidate(config, &validation_error),
             "non-GPIO backends must remain allowed on Raspberry Pi 5");
 
+        clear_si5351_detection_override_for_scope();
         clear_pi_generation_override_for_scope();
+    }
+
+    {
+        prime_valid_runtime_identity_config();
+        config.transmit_backend = TransmitBackendKind::SI5351;
+        config.si5351_i2c_bus = 1;
+        config.si5351_i2c_address = 0x60;
+        config.si5351_reference_hz = 27000000;
+        config.si5351_tx_output = 0;
+        config.si5351_power_level = 1;
+        resolve_backend_specific_config(config);
+        set_si5351_detection_override_for_test(false);
+
+        std::string validation_error;
+        require(
+            !validate_config_candidate(config, &validation_error),
+            "Si5351 backend must reject transmit-enabled validation when no device is detected");
+        require(
+            validation_error.find(
+                "Si5351 transmission is unavailable because no Si5351 device was detected on the I2C bus.") !=
+                std::string::npos,
+            "Si5351 missing-device validation must explain why transmission is unavailable");
+
+        config.transmit = false;
+        config.use_ini = true;
+        validation_error.clear();
+        require(
+            validate_config_candidate(config, &validation_error),
+            "Si5351 backend must remain config-valid for editing when no device is detected and transmit is off");
+
+        PreparedConfigCandidate candidate;
+        auto managed_ini = make_managed_ini_data("AA0NT", "EM18", "20m", true);
+        managed_ini["Operation"]["Transmit Backend"] = "si5351";
+        iniFile.setData(managed_ini);
+        prepare_ini_config_candidate("/tmp/si5351_missing.ini", candidate);
+        require(
+            !candidate.valid,
+            "managed Si5351 configuration must be rejected when transmit is enabled but no device is detected");
+        require(
+            candidate.error_reason.find(
+                "Si5351 transmission is unavailable because no Si5351 device was detected on the I2C bus.") !=
+                std::string::npos,
+            "managed Si5351 rejection must preserve the missing-device error");
+
+        clear_si5351_detection_override_for_scope();
     }
 
     {
@@ -1539,6 +1610,7 @@ int main()
 
     {
         init_default_config();
+        set_si5351_detection_override_for_test(false);
         config.si5351_tx_output = 2;
         config_to_json();
 
@@ -1552,6 +1624,17 @@ int main()
             public_config["Si5351"].contains("TX Output") &&
                 public_config["Si5351"]["TX Output"].get<std::string>() == "CLK2",
             "public config JSON must include Si5351 TX Output");
+        require(
+            public_config["Platform"].contains("Si5351 Detected") &&
+                public_config["Platform"]["Si5351 Detected"].get<bool>() == false,
+            "public config JSON must surface Si5351 detection state");
+        require(
+            public_config["Platform"].contains("Si5351 Detection Error") &&
+                public_config["Platform"]["Si5351 Detection Error"]
+                        .get<std::string>()
+                        .find("Si5351 transmission is unavailable because no Si5351 device was detected on the I2C bus.") !=
+                    std::string::npos,
+            "public config JSON must surface the Si5351 missing-device message");
 
         jConfig["Si5351"]["TX Output"] = "CLK1";
         json_to_config();
@@ -1570,6 +1653,7 @@ int main()
         require(
             si5351_it->second.at("TX Output") == "CLK2",
             "json_to_ini must persist Si5351 TX Output");
+        clear_si5351_detection_override_for_scope();
     }
 
     {

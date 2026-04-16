@@ -33,6 +33,8 @@
 #include "json.hpp"
 #include "logging.hpp"
 #include "scheduling.hpp"
+#include "si5351_device.hpp"
+#include "version.hpp"
 
 #include <algorithm>
 #include <cctype>
@@ -40,6 +42,7 @@
 #include <iostream>
 #include <limits>
 #include <map>
+#include <optional>
 #include <stdexcept>
 #include <string>
 #include <unordered_map>
@@ -51,6 +54,20 @@ nlohmann::json jConfig;
 namespace
 {
     bool g_patch_all_from_web_runtime_apply_suppressed_for_test = false;
+    std::optional<bool> g_si5351_detection_override;
+
+    std::string si5351_detection_unavailable_message(
+        const std::string &detail = std::string())
+    {
+        std::string message =
+            "Si5351 transmission is unavailable because no Si5351 device was detected on the I2C bus.";
+        if (!detail.empty())
+        {
+            message += " ";
+            message += detail;
+        }
+        return message;
+    }
 
     std::string trim_copy(const std::string &value);
 
@@ -277,6 +294,38 @@ namespace
 
     nlohmann::json public_config_from_internal(const nlohmann::json &source)
     {
+        std::string gpio_support_error;
+        const bool gpio_clock_transmission_supported =
+            platform_supports_gpio_clock_transmission(&gpio_support_error);
+        bool si5351_detected = true;
+        std::string si5351_detection_error;
+        if (source.contains("Si5351") && source.at("Si5351").is_object())
+        {
+            const nlohmann::json &si5351 = source.at("Si5351");
+            const int i2c_bus =
+                si5351.contains("I2C Bus")
+                    ? parse_integer_config_value(si5351.at("I2C Bus"), "Si5351.I2C Bus")
+                    : kDefaultSi5351I2cBus;
+            const int i2c_address =
+                si5351.contains("I2C Address")
+                    ? parse_integer_config_value(
+                          si5351.at("I2C Address"),
+                          "Si5351.I2C Address",
+                          0)
+                    : kDefaultSi5351I2cAddress;
+            const int reference_hz =
+                si5351.contains("Reference Frequency")
+                    ? parse_integer_config_value(
+                          si5351.at("Reference Frequency"),
+                          "Si5351.Reference Frequency")
+                    : kDefaultSi5351ReferenceHz;
+            si5351_detected = si5351_device_detected(
+                i2c_bus,
+                i2c_address,
+                reference_hz,
+                &si5351_detection_error);
+        }
+
         nlohmann::json public_json;
         public_json["Operation"] = source.at("Operation");
         public_json["GPIO"] = source.at("GPIO");
@@ -285,6 +334,17 @@ namespace
         public_json["WSPR"] = source.at("WSPR");
         public_json["CW"] = source.at("CW");
         public_json["Band GPIO"] = source.at("Band GPIO");
+        public_json["Platform"] = {
+            {"Model", get_pi_model()},
+            {"Raspberry Pi Generation", get_raspberry_pi_generation()},
+            {"GPIO Clock Transmission Supported",
+             gpio_clock_transmission_supported},
+            {"GPIO Clock Transmission Error",
+             gpio_clock_transmission_supported ? std::string()
+                                               : gpio_support_error},
+            {"Si5351 Detected", si5351_detected},
+            {"Si5351 Detection Error",
+             si5351_detected ? std::string() : si5351_detection_error}};
         return public_json;
     }
 
@@ -660,6 +720,59 @@ void resolve_backend_specific_config(ArgParserConfig &config) noexcept
 
     config.power_level = config.gpio_power_level;
     config.use_ntp = config.gpio_use_ntp;
+}
+
+bool si5351_device_detected(
+    int i2c_bus,
+    int i2c_address,
+    int reference_hz,
+    std::string *error_message)
+{
+    if (g_si5351_detection_override.has_value())
+    {
+        if (!*g_si5351_detection_override && error_message != nullptr)
+        {
+            *error_message = si5351_detection_unavailable_message();
+        }
+        return *g_si5351_detection_override;
+    }
+
+    Si5351Device::Config device_config;
+    device_config.i2c_bus = i2c_bus;
+    device_config.i2c_address = static_cast<std::uint8_t>(i2c_address);
+    device_config.reference_hz = static_cast<std::uint32_t>(reference_hz);
+
+    Si5351Device device(device_config);
+    if (!device.open())
+    {
+        if (error_message != nullptr)
+        {
+            *error_message =
+                si5351_detection_unavailable_message(device.getLastError());
+        }
+        return false;
+    }
+
+    const bool detected = device.probe();
+    const std::string detail = device.getLastError();
+    device.close();
+
+    if (!detected && error_message != nullptr)
+    {
+        *error_message = si5351_detection_unavailable_message(detail);
+    }
+
+    return detected;
+}
+
+void set_si5351_detection_override_for_test(bool detected) noexcept
+{
+    g_si5351_detection_override = detected;
+}
+
+void clear_si5351_detection_override_for_test() noexcept
+{
+    g_si5351_detection_override.reset();
 }
 
 namespace

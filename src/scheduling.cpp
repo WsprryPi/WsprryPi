@@ -2567,7 +2567,10 @@ void shutdown_machine()
  *
  * @note Requires <nlohmann/json.hpp>, <chrono>, <ctime>, <iomanip>, and <sstream>.
  */
-void send_ws_message(std::string type, std::string state)
+void send_ws_message(
+    std::string type,
+    std::string state,
+    std::string message)
 {
     // Build JSON payload
     nlohmann::json j;
@@ -2589,6 +2592,11 @@ void send_ws_message(std::string type, std::string state)
         j["frame_locator"] = snapshot.frame_locator;
     }
 
+    if (!message.empty())
+    {
+        j["message"] = message;
+    }
+
     // Capture current UTC time and format as ISO 8601 (YYYY-MM-DDThh:mm:ssZ)
     auto now = std::chrono::system_clock::now();
     auto now_t = std::chrono::system_clock::to_time_t(now);
@@ -2600,8 +2608,8 @@ void send_ws_message(std::string type, std::string state)
     j["timestamp"] = oss.str();
 
     // Serialize and send to all WebSocket clients
-    const std::string message = j.dump();
-    socketServer.sendAllClients(message);
+    const std::string payload = j.dump();
+    socketServer.sendAllClients(payload);
 }
 
 WsprRuntimeStatusSnapshot current_tx_runtime_status_snapshot()
@@ -2745,7 +2753,10 @@ bool set_config(bool force)
                 llog.logS(ERROR,
                           "Invalid configuration reload rejected; previous valid configuration remains loaded:",
                           prepared_candidate.error_reason);
-                send_ws_message("configuration", "reload_failed");
+                send_ws_message(
+                    "configuration",
+                    "reload_failed",
+                    prepared_candidate.error_reason);
                 set_managed_reload_tx_inhibited(
                     true,
                     "Transmit is blocked until a valid configuration is loaded.");
@@ -2771,23 +2782,27 @@ bool set_config(bool force)
         bool do_config = force;
         bool do_random = false;
 
-        std::string backend_platform_error;
-        const bool backend_platform_supported =
+        std::string backend_runtime_error;
+        const bool backend_runtime_ready =
             !(working_config.mode == ModeType::TONE ||
               runtime_transmit_requested(working_config))
-            || working_config.transmit_backend != TransmitBackendKind::GPIO
-            || platform_supports_gpio_clock_transmission(
-                &backend_platform_error);
+            || backend_ready_for_transmission(
+                working_config,
+                &backend_runtime_error);
 
-        if (!backend_platform_supported)
+        if (!backend_runtime_ready)
         {
-            llog.logS(ERROR, backend_platform_error);
+            llog.logS(ERROR, backend_runtime_error);
 
             if (working_config.use_ini)
             {
+                send_ws_message(
+                    "configuration",
+                    "reload_failed",
+                    backend_runtime_error);
                 set_managed_reload_tx_inhibited(
                     true,
-                    "No transmit due to invalid backend/platform combination.");
+                    backend_runtime_error);
                 wsprTransmitter.stopAndJoin();
                 stop_active_transmission_selectors();
                 current_transmission_request = TransmissionRequest{};
@@ -3112,7 +3127,10 @@ bool set_config(bool force)
                     set_managed_reload_tx_inhibited(
                         true,
                         "Managed reload planning failed; previous valid configuration remains loaded. Transmit is blocked until a valid configuration is loaded.");
-                    send_ws_message("configuration", "reload_failed");
+                    send_ws_message(
+                        "configuration",
+                        "reload_failed",
+                        "Managed reload planning failed; previous valid configuration remains loaded. Transmit is blocked until a valid configuration is loaded.");
                     wsprTransmitter.stopAndJoin();
                     stop_active_transmission_selectors();
                     current_transmission_request = TransmissionRequest{};
@@ -3149,7 +3167,10 @@ bool set_config(bool force)
                     set_managed_reload_tx_inhibited(
                         true,
                         "Managed reload could not prepare band GPIO; previous valid configuration remains loaded. Transmit is blocked until a valid configuration is loaded.");
-                    send_ws_message("configuration", "reload_failed");
+                    send_ws_message(
+                        "configuration",
+                        "reload_failed",
+                        "Managed reload could not prepare band GPIO; previous valid configuration remains loaded. Transmit is blocked until a valid configuration is loaded.");
                     if (!finalize_reload_pending())
                     {
                         continue;

@@ -457,6 +457,13 @@ private:
 
 void init_default_config();
 void resolve_backend_specific_config(ArgParserConfig &config) noexcept;
+bool si5351_device_detected(
+    int i2c_bus,
+    int i2c_address,
+    int reference_hz,
+    std::string *error_message = nullptr);
+void set_si5351_detection_override_for_test(bool detected) noexcept;
+void clear_si5351_detection_override_for_test() noexcept;
 
 /**
  * @brief Initializes the global configuration JSON object.

@@ -368,6 +368,27 @@ static std::string transmit_gpio_validation_message()
     return oss.str();
 }
 
+bool backend_ready_for_transmission(
+    const ArgParserConfig &candidate,
+    std::string *error_message)
+{
+    if (candidate.transmit_backend == TransmitBackendKind::GPIO)
+    {
+        return platform_supports_gpio_clock_transmission(error_message);
+    }
+
+    if (candidate.transmit_backend == TransmitBackendKind::SI5351)
+    {
+        return si5351_device_detected(
+            candidate.si5351_i2c_bus,
+            candidate.si5351_i2c_address,
+            candidate.si5351_reference_hz,
+            error_message);
+    }
+
+    return true;
+}
+
 /**
  * @brief Rounds an input power level to the nearest valid WSPR power level.
  *
@@ -1049,7 +1070,8 @@ void print_usage(const std::string &message, int exit_code)
               << "  -i, --ini-file <file>\n"
               << "    Load parameters from an INI file. Provide the path and filename.\n\n"
               << "  --backend <gpio|si5351>\n"
-              << "    Select the RF transmit backend. Default: gpio.\n\n";
+              << "    Select the RF transmit backend. Default: gpio.\n"
+              << "    GPIO transmission is supported only on Raspberry Pi 1 through 4.\n\n";
 
     if (config.transmit_backend == TransmitBackendKind::SI5351)
     {
@@ -1268,29 +1290,35 @@ bool validate_config_candidate(
         return false;
     }
 
-    const bool requires_valid_transmit_gpio =
-        candidate.transmit_backend == TransmitBackendKind::GPIO &&
-        backend_validation_required;
-
-    if (requires_valid_transmit_gpio &&
-        !platform_supports_gpio_clock_transmission(error_message))
+    if (candidate.transmit_backend == TransmitBackendKind::GPIO)
     {
-        return false;
-    }
-
-    if (requires_valid_transmit_gpio &&
-        !is_valid_runtime_transmit_gpio(candidate.gpio_tx_pin))
-    {
-        if (error_message != nullptr)
+        if (!platform_supports_gpio_clock_transmission(error_message))
         {
-            *error_message = transmit_gpio_validation_message();
+            return false;
         }
 
-        return false;
-    }
+        if (!is_valid_runtime_transmit_gpio(candidate.gpio_tx_pin))
+        {
+            if (error_message != nullptr)
+            {
+                *error_message = transmit_gpio_validation_message();
+            }
 
-    if (candidate.transmit_backend == TransmitBackendKind::SI5351 &&
-        backend_validation_required)
+            return false;
+        }
+
+        if (candidate.gpio_power_level < 0 || candidate.gpio_power_level > 7)
+        {
+            if (error_message != nullptr)
+            {
+                *error_message =
+                    "Invalid GPIO power level. Expected 0 through 7.";
+            }
+
+            return false;
+        }
+    }
+    else if (candidate.transmit_backend == TransmitBackendKind::SI5351)
     {
         if (candidate.si5351_i2c_bus < 0)
         {
@@ -1348,18 +1376,12 @@ bool validate_config_candidate(
 
             return false;
         }
-    }
-    else if (candidate.transmit_backend == TransmitBackendKind::GPIO &&
-             backend_validation_required &&
-             (candidate.gpio_power_level < 0 || candidate.gpio_power_level > 7))
-    {
-        if (error_message != nullptr)
-        {
-            *error_message =
-                "Invalid GPIO power level. Expected 0 through 7.";
-        }
 
-        return false;
+        if (backend_validation_required &&
+            !backend_ready_for_transmission(candidate, error_message))
+        {
+            return false;
+        }
     }
 
     if (candidate.mode == ModeType::TONE)
@@ -1871,28 +1893,24 @@ bool validate_config_data()
             (!config.use_ini && config.mode == ModeType::WSPR &&
              !config.loop_tx) ||
             config.transmit;
-        if (backend_validation_required &&
-            config.transmit_backend == TransmitBackendKind::GPIO &&
+        if (config.transmit_backend == TransmitBackendKind::GPIO &&
             !platform_supports_gpio_clock_transmission())
         {
             std::string platform_error;
             (void)platform_supports_gpio_clock_transmission(&platform_error);
             llog.logE(ERROR, " - ", platform_error);
         }
-        if (backend_validation_required &&
-            config.transmit_backend == TransmitBackendKind::GPIO &&
+        if (config.transmit_backend == TransmitBackendKind::GPIO &&
             !is_valid_runtime_transmit_gpio(config.tx_pin))
         {
             llog.logE(ERROR, " - ", transmit_gpio_validation_message());
         }
-        if (backend_validation_required &&
-            config.transmit_backend == TransmitBackendKind::GPIO &&
+        if (config.transmit_backend == TransmitBackendKind::GPIO &&
             (config.gpio_power_level < 0 || config.gpio_power_level > 7))
         {
             llog.logE(ERROR, " - Invalid GPIO power level. Expected 0 through 7.");
         }
-        if (backend_validation_required &&
-            config.transmit_backend == TransmitBackendKind::SI5351)
+        if (config.transmit_backend == TransmitBackendKind::SI5351)
         {
             if (config.si5351_i2c_bus < 0)
             {
@@ -1920,6 +1938,14 @@ bool validate_config_data()
             {
                 llog.logE(ERROR,
                           " - Invalid Si5351 power level. Expected 1 through 4.");
+            }
+            if (backend_validation_required)
+            {
+                std::string si5351_error;
+                if (!backend_ready_for_transmission(config, &si5351_error))
+                {
+                    llog.logE(ERROR, " - ", si5351_error);
+                }
             }
         }
 
