@@ -29,6 +29,43 @@
 #include "gpio_output.hpp"
 #include "logging.hpp"
 #include <iostream>
+#include <mutex>
+#include <unordered_map>
+
+namespace
+{
+    std::mutex gpio_output_test_mtx;
+    bool gpio_output_test_mode_enabled = false;
+    std::unordered_map<int, bool> gpio_output_test_states;
+    std::vector<GPIOOutput::TestEvent> gpio_output_test_events;
+
+    void record_gpio_output_test_event(
+        const std::string &action,
+        int pin,
+        bool active_high,
+        bool logical_state)
+    {
+        std::lock_guard<std::mutex> lk(gpio_output_test_mtx);
+        if (!gpio_output_test_mode_enabled)
+        {
+            return;
+        }
+
+        gpio_output_test_events.push_back(GPIOOutput::TestEvent{
+            action,
+            pin,
+            active_high,
+            logical_state});
+
+        if (action == "release")
+        {
+            gpio_output_test_states.erase(pin);
+            return;
+        }
+
+        gpio_output_test_states[pin] = logical_state;
+    }
+}
 
 // Global instance for the optional status LED.
 GPIOOutput ledControl;
@@ -46,6 +83,7 @@ GPIOOutput ledControl;
 GPIOOutput::GPIOOutput() : pin_(-1),
                            active_high_(true),
                            enabled_(false),
+                           last_logical_state_(false),
                            last_error_(),
                            chip_(nullptr)
 {
@@ -84,7 +122,20 @@ bool GPIOOutput::enableGPIOPin(int pin, bool active_high)
     }
     pin_ = pin;
     active_high_ = active_high;
+    last_logical_state_ = false;
     resolved_line_ = ResolvedGPIOLine{};
+
+    bool use_test_mode = false;
+    {
+        std::lock_guard<std::mutex> lk(gpio_output_test_mtx);
+        use_test_mode = gpio_output_test_mode_enabled;
+    }
+    if (use_test_mode)
+    {
+        enabled_ = true;
+        record_gpio_output_test_event("request", pin_, active_high_, false);
+        return true;
+    }
 
     try
     {
@@ -137,6 +188,8 @@ bool GPIOOutput::enableGPIOPin(int pin, bool active_high)
 #endif
 
         enabled_ = true;
+        last_logical_state_ = false;
+        record_gpio_output_test_event("request", pin_, active_high_, false);
         llog.logS(
             DEBUG,
             "GPIOOutput: request success for ",
@@ -210,6 +263,10 @@ void GPIOOutput::stop()
 #endif
     chip_.reset();
     resolved_line_ = ResolvedGPIOLine{};
+    record_gpio_output_test_event("release", pin_, active_high_, false);
+    pin_ = -1;
+    active_high_ = true;
+    last_logical_state_ = false;
 }
 
 /**
@@ -234,6 +291,7 @@ bool GPIOOutput::toggleGPIO(bool state)
 
     try
     {
+        last_logical_state_ = state;
         int physical = compute_physical_state(state);
 
 #if GPIOD_API_MAJOR >= 2
@@ -253,6 +311,7 @@ bool GPIOOutput::toggleGPIO(bool state)
             ", requested line value ",
             physical,
             ".");
+        record_gpio_output_test_event("write", pin_, active_high_, state);
     }
     catch (const std::exception &e)
     {
@@ -279,4 +338,42 @@ bool GPIOOutput::toggleGPIO(bool state)
 int GPIOOutput::compute_physical_state(bool logical_state) const
 {
     return logical_state ? 1 : 0;
+}
+
+void GPIOOutput::setTestMode(bool enabled) noexcept
+{
+    std::lock_guard<std::mutex> lk(gpio_output_test_mtx);
+    gpio_output_test_mode_enabled = enabled;
+    gpio_output_test_states.clear();
+    gpio_output_test_events.clear();
+}
+
+bool GPIOOutput::testModeEnabled() noexcept
+{
+    std::lock_guard<std::mutex> lk(gpio_output_test_mtx);
+    return gpio_output_test_mode_enabled;
+}
+
+void GPIOOutput::clearTestEvents() noexcept
+{
+    std::lock_guard<std::mutex> lk(gpio_output_test_mtx);
+    gpio_output_test_events.clear();
+}
+
+std::vector<GPIOOutput::TestEvent> GPIOOutput::testEvents()
+{
+    std::lock_guard<std::mutex> lk(gpio_output_test_mtx);
+    return gpio_output_test_events;
+}
+
+std::optional<bool> GPIOOutput::testLogicalStateForPin(int pin) noexcept
+{
+    std::lock_guard<std::mutex> lk(gpio_output_test_mtx);
+    const auto it = gpio_output_test_states.find(pin);
+    if (it == gpio_output_test_states.end())
+    {
+        return std::nullopt;
+    }
+
+    return it->second;
 }

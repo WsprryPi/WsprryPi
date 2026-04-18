@@ -99,8 +99,8 @@ int main()
     {
         BandGPIOConfig active_config;
         std::string active_band;
-        require(
-            !current_band_gpio_selection_for_test(active_config, active_band),
+    require(
+        !current_band_gpio_selection_for_test(active_config, active_band),
             "runtime selector teardown must clear the active selector after parking");
     }
     set_band_gpio_selector_for_test(false, false);

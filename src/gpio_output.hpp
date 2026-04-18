@@ -32,6 +32,7 @@
 #include <memory>
 #include <optional>
 #include <string>
+#include <vector>
 
 #include "gpio_include.hpp"
 #include "gpio_line_resolver.hpp"
@@ -48,6 +49,14 @@
 class GPIOOutput
 {
 public:
+    struct TestEvent
+    {
+        std::string action;
+        int pin = -1;
+        bool active_high = true;
+        bool logical_state = false;
+    };
+
     /**
      * @brief Default constructor.
      *
@@ -97,10 +106,17 @@ public:
      */
     const std::string &lastError() const noexcept { return last_error_; }
 
+    static void setTestMode(bool enabled) noexcept;
+    static bool testModeEnabled() noexcept;
+    static void clearTestEvents() noexcept;
+    static std::vector<TestEvent> testEvents();
+    static std::optional<bool> testLogicalStateForPin(int pin) noexcept;
+
 private:
     int pin_;
     bool active_high_;
     bool enabled_;
+    bool last_logical_state_;
     std::string last_error_;
     ResolvedGPIOLine resolved_line_;
 
