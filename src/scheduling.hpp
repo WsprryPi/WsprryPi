@@ -52,6 +52,7 @@
 #include <string>
 #include <string_view>
 #include <thread>
+#include <vector>
 
 /**
  * @brief Mutex to protect access to the shutdown flag for the WSPR loop.
@@ -318,6 +319,9 @@ void set_band_gpio_selector_for_test(bool enabled, bool drive_gpio) noexcept;
 bool current_band_gpio_selection_for_test(
     BandGPIOConfig &config_out,
     std::string &band_label_out) noexcept;
+std::vector<BandGPIOConfig> initialized_selector_gpios_for_test();
+void stop_active_transmission_selectors_for_test() noexcept;
+bool restore_committed_band_gpio_selection_for_test(bool assert_state) noexcept;
 TransmissionRequest current_transmission_request_for_test();
 void reset_current_transmission_request_for_test() noexcept;
 
