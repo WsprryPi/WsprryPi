@@ -322,6 +322,11 @@ bool current_band_gpio_selection_for_test(
 std::vector<BandGPIOConfig> initialized_selector_gpios_for_test();
 void stop_active_transmission_selectors_for_test() noexcept;
 bool restore_committed_band_gpio_selection_for_test(bool assert_state) noexcept;
+std::vector<BandGPIOConfig> selector_shutdown_cleanup_targets_for_test();
+void seed_selector_shutdown_state_for_test(
+    const BandGPIOConfig &active_config,
+    const std::vector<BandGPIOConfig> &idle_configs) noexcept;
+void run_final_selector_gpio_shutdown_cleanup_for_test() noexcept;
 TransmissionRequest current_transmission_request_for_test();
 void reset_current_transmission_request_for_test() noexcept;
 

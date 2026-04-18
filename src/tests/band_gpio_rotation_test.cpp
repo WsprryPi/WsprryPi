@@ -42,6 +42,10 @@ namespace
         config.wspr.audio_offset_hz = WSPR_AUDIO_OFFSET_HZ;
         config.wspr.planner_preference = WsprPlannerPreference::Auto;
         config.wspr_planner_preference = WsprPlannerPreference::Auto;
+        for (int band_index = 0; band_index < HAM_BAND_COUNT; ++band_index)
+        {
+            config.band_gpio[band_index] = BandGPIOConfig{};
+        }
 
         config_to_json();
     }
@@ -156,6 +160,21 @@ namespace
         require(
             actual == expected,
             message + ": initialized selector GPIO set must match expected configured GPIOs");
+    }
+
+    void require_shutdown_cleanup_targets(
+        const std::set<std::pair<int, bool>> &expected,
+        const std::string &message)
+    {
+        std::set<std::pair<int, bool>> actual;
+        for (const BandGPIOConfig &config : selector_shutdown_cleanup_targets_for_test())
+        {
+            actual.emplace(config.gpio, config.active_high);
+        }
+
+        require(
+            actual == expected,
+            message + ": shutdown cleanup must cover the full configured selector GPIO set");
     }
 
     void require_all_selector_gpios_released(const std::string &message)
@@ -379,6 +398,50 @@ int main()
             config.wspr_frequency_entries[1].selector_gpio == kSelectorGpioUnset &&
             !config.wspr_frequency_entries[1].allow_band_gpio_fallback,
         "CLI @GPIO selectors must stay explicit and must not enable band-config fallback");
+
+    prime_valid_ui_config();
+    patch_all_from_web({
+        {"WSPR", {{"Frequency", "20m@16H,30m@20H,40m@21H"}}},
+        {"Band GPIO",
+         {{"20m", {{"GPIO", 5}, {"Enabled", true}, {"Active High", true}}},
+          {"30m", {{"GPIO", 6}, {"Enabled", true}, {"Active High", true}}},
+          {"40m", {{"GPIO", 13}, {"Enabled", true}, {"Active High", false}}}}}});
+    reset_scheduler_test_state();
+
+    require(set_config(true), "scheduler must commit first explicit selector entry");
+    require_current_selector("20m@16H", "20m", 16, true, "first explicit selector entry");
+
+    require(set_config(false), "scheduler must commit second explicit selector entry");
+    require_current_selector("30m@20H", "30m", 20, true, "second explicit selector entry");
+    run_final_selector_gpio_shutdown_cleanup_for_test();
+    require_shutdown_cleanup_targets(
+        {{16, true}, {20, true}, {21, true}, {5, true}, {6, true}, {13, false}},
+        "final shutdown cleanup with explicit and band-config selectors");
+    require_all_selector_gpios_released(
+        "final shutdown cleanup with explicit and band-config selectors");
+
+    patch_all_from_web({
+        {"WSPR", {{"Frequency", "20m,30m"}}},
+        {"Band GPIO",
+         {{"20m", {{"GPIO", 17}, {"Enabled", true}, {"Active High", true}}},
+          {"30m", {{"GPIO", 18}, {"Enabled", true}, {"Active High", false}}}}}});
+    require(set_config(true), "scheduler must reload band GPIO selector set");
+    require_current_selector("20m", "20m", 17, true, "reloaded band GPIO selector set");
+    run_final_selector_gpio_shutdown_cleanup_for_test();
+    require_shutdown_cleanup_targets(
+        {{17, true}, {18, false}},
+        "final shutdown cleanup with band-config-only selectors");
+    require_all_selector_gpios_released(
+        "final shutdown cleanup with band-config-only selectors");
+
+    patch_all_from_web({
+        {"WSPR", {{"Frequency", "20m@17H,30m@17L"}}},
+        {"Band GPIO",
+         {{"20m", {{"GPIO", -1}, {"Enabled", false}, {"Active High", true}}},
+          {"30m", {{"GPIO", -1}, {"Enabled", false}, {"Active High", true}}}}}});
+    require(!set_config(true), "conflicting selector polarity on the same GPIO must be rejected");
+
+    finish_scheduler_test_state();
 
     std::cout << "Band GPIO rotation regression tests passed." << std::endl;
     return EXIT_SUCCESS;
