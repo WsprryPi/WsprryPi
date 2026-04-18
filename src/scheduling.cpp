@@ -95,6 +95,7 @@ static BandGPIOSelector bandGPIOSelector;
 
 struct BandGPIOResolution
 {
+    HamBand band = HamBand::BAND_2200M;
     BandGPIOConfig config{};
     bool selector_enabled = false;
     bool from_band_config = false;
@@ -129,7 +130,11 @@ static BandGPIOPrepareStatus prepare_band_gpio_for_frequency_or_log(
     double source_frequency_hz,
     const WsprFrequencyEntry &entry,
     const ArgParserConfig &cfg,
-    int frequency_entry_index = -1);
+    int frequency_entry_index = -1,
+    BandGPIOResolution *resolution_out = nullptr);
+static BandGPIOPrepareStatus apply_band_gpio_resolution(
+    const BandGPIOResolution &resolution) noexcept;
+static bool refresh_committed_band_gpio_selection() noexcept;
 
 /**
  * @brief Mutex to protect access to the shutdown flag for the WSPR loop.
@@ -276,6 +281,53 @@ static void stop_active_transmission_selectors() noexcept
     active_band_gpio_prepare_status.store(
         BandGPIOPrepareStatus::Inactive,
         std::memory_order_release);
+}
+
+static BandGPIOPrepareStatus apply_band_gpio_resolution(
+    const BandGPIOResolution &resolution) noexcept
+{
+    if (!resolution.selector_enabled)
+    {
+        stop_active_transmission_selectors();
+        return BandGPIOPrepareStatus::Inactive;
+    }
+
+    if (!bandGPIOSelector.prepareBand(resolution.band, resolution.config))
+    {
+        llog.logS(
+            WARN,
+            "Unable to prepare unified scheduler band GPIO for band ",
+            ham_band_to_string(resolution.band),
+            ", GPIO ",
+            resolution.config.gpio,
+            ".");
+        active_band_gpio_prepare_status.store(
+            BandGPIOPrepareStatus::Failed,
+            std::memory_order_release);
+        return BandGPIOPrepareStatus::Failed;
+    }
+
+    active_band_gpio_prepare_status.store(
+        BandGPIOPrepareStatus::Prepared,
+        std::memory_order_release);
+    return BandGPIOPrepareStatus::Prepared;
+}
+
+static bool refresh_committed_band_gpio_selection() noexcept
+{
+    if (!current_transmission_request.hasSelectorGPIO())
+    {
+        active_band_gpio_prepare_status.store(
+            BandGPIOPrepareStatus::Inactive,
+            std::memory_order_release);
+        return true;
+    }
+    return apply_band_gpio_resolution(BandGPIOResolution{
+               current_transmission_request.selector_band,
+               current_transmission_request.selector_gpio_config,
+               true,
+               false,
+               "committed request"}) == BandGPIOPrepareStatus::Prepared;
 }
 
 static void set_tx_led_state(bool state, const char *context) noexcept
@@ -748,8 +800,14 @@ static BandGPIOPrepareStatus prepare_band_gpio_for_frequency_or_log(
     double source_frequency_hz,
     const WsprFrequencyEntry &entry,
     const ArgParserConfig &cfg,
-    int frequency_entry_index)
+    int frequency_entry_index,
+    BandGPIOResolution *resolution_out)
 {
+    if (resolution_out != nullptr)
+    {
+        *resolution_out = BandGPIOResolution{};
+    }
+
     const auto band = lookup.lookup_ham_band(source_frequency_hz);
     if (!band.has_value())
     {
@@ -765,6 +823,7 @@ static BandGPIOPrepareStatus prepare_band_gpio_for_frequency_or_log(
     }
 
     BandGPIOResolution resolution;
+    resolution.band = *band;
     resolution.selector_source = "frequency entry";
     if (entry.selector_gpio != kSelectorGpioUnset)
     {
@@ -782,6 +841,10 @@ static BandGPIOPrepareStatus prepare_band_gpio_for_frequency_or_log(
             resolution.config.enabled && resolution.config.gpio >= 0;
         if (!resolution.selector_enabled)
         {
+            if (resolution_out != nullptr)
+            {
+                *resolution_out = resolution;
+            }
             stop_active_transmission_selectors();
             llog.logS(
                 DEBUG,
@@ -806,6 +869,10 @@ static BandGPIOPrepareStatus prepare_band_gpio_for_frequency_or_log(
     }
     else
     {
+        if (resolution_out != nullptr)
+        {
+            *resolution_out = resolution;
+        }
         stop_active_transmission_selectors();
         llog.logS(
             DEBUG,
@@ -850,23 +917,11 @@ static BandGPIOPrepareStatus prepare_band_gpio_for_frequency_or_log(
         "; committed request token ",
         entry.token,
         ".");
-    if (!bandGPIOSelector.prepareBand(*band, resolution.config))
+    if (resolution_out != nullptr)
     {
-        llog.logS(
-            WARN,
-            "Unable to prepare unified scheduler band GPIO for ",
-            wsprTransmitter.formatFrequencyMHz(source_frequency_hz),
-            " MHz.");
-        active_band_gpio_prepare_status.store(
-            BandGPIOPrepareStatus::Failed,
-            std::memory_order_release);
-        return BandGPIOPrepareStatus::Failed;
+        *resolution_out = resolution;
     }
-
-    active_band_gpio_prepare_status.store(
-        BandGPIOPrepareStatus::Prepared,
-        std::memory_order_release);
-    return BandGPIOPrepareStatus::Prepared;
+    return apply_band_gpio_resolution(resolution);
 }
 
 static double maybe_apply_wspr_random_offset(
@@ -1426,6 +1481,31 @@ static TransmissionRequest make_wspr_request(
     return request;
 }
 
+static void commit_band_gpio_snapshot_to_request(
+    TransmissionRequest &request,
+    const BandGPIOResolution &resolution,
+    BandGPIOPrepareStatus prepare_status) noexcept
+{
+    request.selector_gpio_enabled = false;
+    request.selector_band = HamBand::BAND_2200M;
+    request.selector_gpio_config = BandGPIOConfig{};
+
+    if (prepare_status != BandGPIOPrepareStatus::Prepared)
+    {
+        return;
+    }
+
+    if (!resolution.selector_enabled)
+    {
+        return;
+    }
+
+    request.selector_gpio_enabled =
+        resolution.config.enabled && resolution.config.gpio >= 0;
+    request.selector_band = resolution.band;
+    request.selector_gpio_config = resolution.config;
+}
+
 static std::string format_elapsed(double elapsed)
 {
     if (elapsed == 0.0)
@@ -1695,9 +1775,14 @@ void transmitter_cb(WsprTransmitter::TransmissionCallbackEvent event,
             consume_tx_iteration_if_needed();
         }
 
-        // Assert the scheduler-selected band GPIO when one was prepared.
-        if (active_band_gpio_prepare_status.load(std::memory_order_acquire) ==
-                BandGPIOPrepareStatus::Prepared &&
+        if (!refresh_committed_band_gpio_selection())
+        {
+            llog.logS(DEBUG,
+                      "Band GPIO refresh from committed request did not complete.");
+        }
+
+        // Assert the scheduler-selected band GPIO when one was committed.
+        if (current_transmission_request.hasSelectorGPIO() &&
             !bandGPIOSelector.setBandState(true))
         {
             llog.logS(DEBUG,
@@ -2177,10 +2262,18 @@ void start_test_tone()
         const double committed_ppm = config.ppm;
         TransmissionRequest request =
             make_tone_request(config, committed_ppm, actual_rf_freq, dial_freq, entry);
-        (void)prepare_band_gpio_for_frequency_or_log(
-            dial_freq,
-            entry,
-            config);
+        BandGPIOResolution selector_resolution;
+        const BandGPIOPrepareStatus selector_status =
+            prepare_band_gpio_for_frequency_or_log(
+                dial_freq,
+                entry,
+                config,
+                -1,
+                &selector_resolution);
+        commit_band_gpio_snapshot_to_request(
+            request,
+            selector_resolution,
+            selector_status);
         commit_execution_request(request);
 
         wsprTransmitter.startAsync();
@@ -2251,10 +2344,18 @@ void end_test_tone()
                     config,
                     committed_ppm,
                     actual_rf_frequency_hz);
-            (void)prepare_band_gpio_for_frequency_or_log(
-                entry.dial_frequency_hz,
-                entry,
-                config);
+            BandGPIOResolution selector_resolution;
+            const BandGPIOPrepareStatus selector_status =
+                prepare_band_gpio_for_frequency_or_log(
+                    entry.dial_frequency_hz,
+                    entry,
+                    config,
+                    -1,
+                    &selector_resolution);
+            commit_band_gpio_snapshot_to_request(
+                request,
+                selector_resolution,
+                selector_status);
             commit_execution_request(request);
             wsprTransmitter.startAsync();
 
@@ -3295,11 +3396,15 @@ bool set_config(bool force)
 
             next_transmission_request.applied_offset_hz = applied_offset_hz;
 
-            if (prepare_band_gpio_for_frequency_or_log(
+            BandGPIOResolution selector_resolution;
+            const BandGPIOPrepareStatus selector_status =
+                prepare_band_gpio_for_frequency_or_log(
                     next_current_dial_frequency,
                     next_current_frequency_entry,
                     working_config,
-                    next_frequency_entry_index) == BandGPIOPrepareStatus::Failed)
+                    next_frequency_entry_index,
+                    &selector_resolution);
+            if (selector_status == BandGPIOPrepareStatus::Failed)
             {
                 stop_active_transmission_selectors();
 
@@ -3329,6 +3434,11 @@ bool set_config(bool force)
                 config_to_json();
                 return false;
             }
+
+            commit_band_gpio_snapshot_to_request(
+                next_transmission_request,
+                selector_resolution,
+                selector_status);
 
             if (newer_reload_arrived())
             {
@@ -3464,6 +3574,26 @@ bool current_band_gpio_selection_for_test(
     config_out = *current_config;
     band_label_out = ham_band_to_string(*current_band);
     return true;
+}
+
+void stop_active_transmission_selectors_for_test() noexcept
+{
+    stop_active_transmission_selectors();
+}
+
+bool restore_committed_band_gpio_selection_for_test(bool assert_state) noexcept
+{
+    if (!refresh_committed_band_gpio_selection())
+    {
+        return false;
+    }
+
+    if (!assert_state || !current_transmission_request.hasSelectorGPIO())
+    {
+        return true;
+    }
+
+    return bandGPIOSelector.setBandState(true);
 }
 
 TransmissionRequest current_transmission_request_for_test()
