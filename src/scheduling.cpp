@@ -71,6 +71,7 @@
 #include <fstream>
 #include <iomanip>
 #include <iostream>
+#include <memory>
 #include <random>
 #include <string>
 #include <thread>
@@ -108,9 +109,6 @@ struct SelectorGPIOReservation
 };
 
 static BandGPIOSelector bandGPIOSelector;
-static std::vector<SelectorGPIOReservation> idleSelectorGPIOs;
-static bool selectorGPIOControlEnabled = false;
-static bool selectorGPIODriveEnabled = false;
 
 enum class BandGPIOPrepareStatus
 {
@@ -260,6 +258,10 @@ static bool suppress_scheduler_execution_for_test = false;
 static std::atomic<std::uint64_t> non_wspr_schedule_generation{0};
 static std::atomic<BandGPIOPrepareStatus> active_band_gpio_prepare_status{
     BandGPIOPrepareStatus::Inactive};
+static std::vector<SelectorGPIOReservation> idle_selector_gpio_reservations{};
+static bool selector_gpio_control_enabled = false;
+static bool selector_gpio_drive_enabled = false;
+static std::vector<BandGPIOConfig> last_selector_shutdown_cleanup_targets{};
 /**
  * @brief Scheduler-owned paired WSPR plan being continued across slots.
  *
@@ -299,36 +301,134 @@ static void stop_active_transmission_selectors() noexcept
 
 static void release_idle_selector_gpio_reservations() noexcept
 {
-    for (SelectorGPIOReservation &reservation : idleSelectorGPIOs)
-    {
-        if (reservation.gpio != nullptr)
-        {
-            reservation.gpio->stop();
-        }
-    }
-    idleSelectorGPIOs.clear();
+    idle_selector_gpio_reservations.clear();
 }
 
 static void release_idle_selector_gpio_reservation(int gpio) noexcept
 {
-    idleSelectorGPIOs.erase(
+    idle_selector_gpio_reservations.erase(
         std::remove_if(
-            idleSelectorGPIOs.begin(),
-            idleSelectorGPIOs.end(),
-            [gpio](SelectorGPIOReservation &reservation)
+            idle_selector_gpio_reservations.begin(),
+            idle_selector_gpio_reservations.end(),
+            [gpio](const SelectorGPIOReservation &reservation)
             {
-                if (reservation.config.gpio != gpio)
-                {
-                    return false;
-                }
-
-                if (reservation.gpio != nullptr)
-                {
-                    reservation.gpio->stop();
-                }
-                return true;
+                return reservation.config.gpio == gpio;
             }),
-        idleSelectorGPIOs.end());
+        idle_selector_gpio_reservations.end());
+}
+
+static void append_unique_selector_gpio_config(
+    std::vector<BandGPIOConfig> &configs,
+    const BandGPIOConfig &config) noexcept
+{
+    if (!config.enabled || config.gpio < 0)
+    {
+        return;
+    }
+
+    const auto existing = std::find_if(
+        configs.begin(),
+        configs.end(),
+        [&config](const BandGPIOConfig &candidate)
+        {
+            return candidate.gpio == config.gpio;
+        });
+    if (existing == configs.end())
+    {
+        configs.push_back(config);
+        return;
+    }
+
+    if (existing->active_high != config.active_high)
+    {
+        llog.logS(
+            WARN,
+            "Selector shutdown cleanup saw conflicting polarity for GPIO ",
+            config.gpio,
+            "; keeping the first configured polarity.");
+    }
+}
+
+static std::vector<BandGPIOConfig> collect_selector_gpio_shutdown_targets(
+    const ArgParserConfig &cfg) noexcept
+{
+    std::vector<BandGPIOConfig> targets;
+
+    for (int band_index = 0; band_index < HAM_BAND_COUNT; ++band_index)
+    {
+        append_unique_selector_gpio_config(targets, cfg.band_gpio[band_index]);
+    }
+
+    for (const WsprFrequencyEntry &entry : cfg.wspr_frequency_entries)
+    {
+        if (entry.selector_gpio == kSelectorGpioUnset)
+        {
+            continue;
+        }
+
+        BandGPIOConfig selector_config;
+        selector_config.gpio = entry.selector_gpio;
+        selector_config.enabled = true;
+        selector_config.active_high = entry.selector_gpio_active_high;
+        append_unique_selector_gpio_config(targets, selector_config);
+    }
+
+    const BandGPIOConfig *active_config = bandGPIOSelector.currentConfig();
+    if (active_config != nullptr)
+    {
+        append_unique_selector_gpio_config(targets, *active_config);
+    }
+
+    for (const SelectorGPIOReservation &reservation : idle_selector_gpio_reservations)
+    {
+        append_unique_selector_gpio_config(targets, reservation.config);
+    }
+
+    return targets;
+}
+
+static void shutdown_all_configured_selector_gpios(
+    const ArgParserConfig &cfg) noexcept
+{
+    std::vector<BandGPIOConfig> targets =
+        collect_selector_gpio_shutdown_targets(cfg);
+    last_selector_shutdown_cleanup_targets = targets;
+
+    stop_active_transmission_selectors();
+    release_idle_selector_gpio_reservations();
+
+    if (!selector_gpio_drive_enabled)
+    {
+        return;
+    }
+
+    for (const BandGPIOConfig &selector_config : targets)
+    {
+        GPIOOutput gpio;
+        if (!gpio.enableGPIOPin(
+                selector_config.gpio,
+                selector_config.active_high))
+        {
+            llog.logS(
+                WARN,
+                "Selector shutdown cleanup could not request GPIO ",
+                selector_config.gpio,
+                ": ",
+                gpio.lastError());
+            continue;
+        }
+
+        if (!gpio.toggleGPIO(false))
+        {
+            llog.logS(
+                WARN,
+                "Selector shutdown cleanup could not drive GPIO ",
+                selector_config.gpio,
+                " inactive before release.");
+        }
+
+        gpio.stop();
+    }
 }
 
 static bool collect_configured_selector_gpios(
@@ -336,45 +436,44 @@ static bool collect_configured_selector_gpios(
     std::vector<BandGPIOConfig> &configs_out,
     std::string *error_message = nullptr)
 {
-    configs_out.clear();
-
     std::unordered_map<int, bool> polarity_by_gpio;
-    auto add_configured_gpio =
-        [&](int gpio, bool active_high, const std::string &source) -> bool
+
+    auto append_config = [&](const BandGPIOConfig &config,
+                             std::string_view source_label) -> bool
     {
-        if (gpio < 0)
+        if (!config.enabled || config.gpio < 0)
         {
             return true;
         }
 
-        const auto existing = polarity_by_gpio.find(gpio);
+        const auto existing = polarity_by_gpio.find(config.gpio);
         if (existing != polarity_by_gpio.end())
         {
-            if (existing->second != active_high)
+            if (existing->second != config.active_high)
             {
                 if (error_message != nullptr)
                 {
                     *error_message =
-                        "Selector GPIO " + std::to_string(gpio) +
-                        " has conflicting active polarity definitions in " +
-                        source + ".";
+                        "Conflicting LPF selector polarity configured for GPIO " +
+                        std::to_string(config.gpio) +
+                        " while collecting scheduler selector GPIOs from " +
+                        std::string(source_label) + ".";
                 }
                 return false;
             }
             return true;
         }
 
-        polarity_by_gpio.emplace(gpio, active_high);
-        configs_out.push_back(BandGPIOConfig{gpio, true, active_high});
+        polarity_by_gpio.emplace(config.gpio, config.active_high);
+        configs_out.push_back(config);
         return true;
     };
 
-    for (const BandGPIOConfig &band_config : cfg.band_gpio)
+    configs_out.clear();
+
+    for (int band_index = 0; band_index < HAM_BAND_COUNT; ++band_index)
     {
-        if (band_config.enabled && band_config.gpio >= 0 &&
-            !add_configured_gpio(band_config.gpio,
-                                 band_config.active_high,
-                                 "[Band GPIO]"))
+        if (!append_config(cfg.band_gpio[band_index], "[Band GPIO]"))
         {
             return false;
         }
@@ -382,10 +481,16 @@ static bool collect_configured_selector_gpios(
 
     for (const WsprFrequencyEntry &entry : cfg.wspr_frequency_entries)
     {
-        if (entry.selector_gpio != kSelectorGpioUnset &&
-            !add_configured_gpio(entry.selector_gpio,
-                                 entry.selector_gpio_active_high,
-                                 "frequency entries"))
+        if (entry.selector_gpio == kSelectorGpioUnset)
+        {
+            continue;
+        }
+
+        BandGPIOConfig config;
+        config.gpio = entry.selector_gpio;
+        config.enabled = true;
+        config.active_high = entry.selector_gpio_active_high;
+        if (!append_config(config, "frequency entries"))
         {
             return false;
         }
@@ -396,13 +501,24 @@ static bool collect_configured_selector_gpios(
 
 static bool has_configured_selector_gpios(const ArgParserConfig &cfg) noexcept
 {
-    std::vector<BandGPIOConfig> configured_gpios;
-    std::string error_message;
-    return collect_configured_selector_gpios(
-               cfg,
-               configured_gpios,
-               &error_message) &&
-           !configured_gpios.empty();
+    for (int band_index = 0; band_index < HAM_BAND_COUNT; ++band_index)
+    {
+        const BandGPIOConfig &config = cfg.band_gpio[band_index];
+        if (config.enabled && config.gpio >= 0)
+        {
+            return true;
+        }
+    }
+
+    for (const WsprFrequencyEntry &entry : cfg.wspr_frequency_entries)
+    {
+        if (entry.selector_gpio != kSelectorGpioUnset)
+        {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 static bool sync_configured_selector_gpio_idle_state(
@@ -413,60 +529,56 @@ static bool sync_configured_selector_gpio_idle_state(
     stop_active_transmission_selectors();
     release_idle_selector_gpio_reservations();
 
-    if (!selectorGPIOControlEnabled || !keep_initialized)
+    if (!keep_initialized || !selector_gpio_control_enabled)
     {
         return true;
     }
 
-    std::vector<BandGPIOConfig> configured_gpios;
-    if (!collect_configured_selector_gpios(cfg, configured_gpios, error_message))
+    std::vector<BandGPIOConfig> selector_configs;
+    if (!collect_configured_selector_gpios(cfg, selector_configs, error_message))
     {
         return false;
     }
 
-    for (const BandGPIOConfig &configured_gpio : configured_gpios)
+    for (const BandGPIOConfig &selector_config : selector_configs)
     {
         SelectorGPIOReservation reservation;
-        reservation.config = configured_gpio;
+        reservation.config = selector_config;
 
-        if (!selectorGPIODriveEnabled)
+        if (selector_gpio_drive_enabled)
         {
-            idleSelectorGPIOs.push_back(std::move(reservation));
-            continue;
-        }
-
-        reservation.gpio = std::make_unique<GPIOOutput>();
-        if (!reservation.gpio->enableGPIOPin(
-                configured_gpio.gpio,
-                configured_gpio.active_high))
-        {
-            if (error_message != nullptr)
+            reservation.gpio = std::make_unique<GPIOOutput>();
+            if (!reservation.gpio->enableGPIOPin(
+                    selector_config.gpio,
+                    selector_config.active_high))
             {
-                *error_message =
-                    "Failed to initialize selector GPIO " +
-                    std::to_string(configured_gpio.gpio) + ": " +
-                    reservation.gpio->lastError();
+                if (error_message != nullptr)
+                {
+                    *error_message =
+                        "Unable to initialize LPF selector GPIO " +
+                        std::to_string(selector_config.gpio) +
+                        " inactive: " +
+                        reservation.gpio->lastError();
+                }
+                release_idle_selector_gpio_reservations();
+                return false;
             }
-            release_idle_selector_gpio_reservations();
-            return false;
-        }
 
-        // False drives the configured output to its inactive level:
-        // LOW for active-high and HIGH for active-low.
-        if (!reservation.gpio->toggleGPIO(false))
-        {
-            if (error_message != nullptr)
+            if (!reservation.gpio->toggleGPIO(false))
             {
-                *error_message =
-                    "Failed to drive selector GPIO " +
-                    std::to_string(configured_gpio.gpio) +
-                    " to its inactive level.";
+                if (error_message != nullptr)
+                {
+                    *error_message =
+                        "Unable to drive LPF selector GPIO " +
+                        std::to_string(selector_config.gpio) +
+                        " inactive.";
+                }
+                release_idle_selector_gpio_reservations();
+                return false;
             }
-            release_idle_selector_gpio_reservations();
-            return false;
         }
 
-        idleSelectorGPIOs.push_back(std::move(reservation));
+        idle_selector_gpio_reservations.push_back(std::move(reservation));
     }
 
     return true;
@@ -2655,8 +2767,7 @@ static void stop_runtime_components_for_process_exit() noexcept
     shutdownMonitor.stop();
     ppmManager.stop();
     wsprTransmitter.shutdownForProcessExit();
-    stop_active_transmission_selectors();
-    release_idle_selector_gpio_reservations();
+    shutdown_all_configured_selector_gpios(config);
     ledControl.stop();
 }
 
@@ -2675,10 +2786,11 @@ bool wspr_loop()
 {
     const bool any_selector_gpio_configured =
         has_configured_selector_gpios(config);
-    selectorGPIOControlEnabled = any_selector_gpio_configured;
-    selectorGPIODriveEnabled = any_selector_gpio_configured;
-    bandGPIOSelector.setEnabled(selectorGPIOControlEnabled);
-    bandGPIOSelector.setDriveGPIO(selectorGPIODriveEnabled);
+
+    selector_gpio_control_enabled = any_selector_gpio_configured;
+    selector_gpio_drive_enabled = any_selector_gpio_configured;
+    bandGPIOSelector.setEnabled(selector_gpio_control_enabled);
+    bandGPIOSelector.setDriveGPIO(selector_gpio_drive_enabled);
 
     // Display the final configuration after parsing arguments and INI file.
     show_config_values();
@@ -2905,7 +3017,7 @@ bool wspr_loop()
     llog.logS(DEBUG, "Transmitter stopped.");
 
     llog.logS(DEBUG, "Stopping band GPIO selector.");
-    stop_active_transmission_selectors();
+    shutdown_all_configured_selector_gpios(config);
     llog.logS(DEBUG, "Band GPIO selector stopped.");
 
     llog.logS(DEBUG, "Stopping LED driver.");
@@ -3169,6 +3281,7 @@ bool set_config(bool force)
                 {
                     wsprTransmitter.stopAndJoin();
                     stop_active_transmission_selectors();
+                    release_idle_selector_gpio_reservations();
                     current_transmission_request = TransmissionRequest{};
                 }
 
@@ -3209,6 +3322,7 @@ bool set_config(bool force)
                     backend_runtime_error);
                 wsprTransmitter.stopAndJoin();
                 stop_active_transmission_selectors();
+                release_idle_selector_gpio_reservations();
                 current_transmission_request = TransmissionRequest{};
                 current_dial_frequency = 0.0;
                 current_frequency_entry = WsprFrequencyEntry{};
@@ -3263,6 +3377,62 @@ bool set_config(bool force)
             do_config = true;
         }
 
+        if (!suppress_scheduler_execution_for_test)
+        {
+            const bool any_selector_gpio_configured =
+                has_configured_selector_gpios(working_config);
+            selector_gpio_control_enabled = any_selector_gpio_configured;
+            selector_gpio_drive_enabled = any_selector_gpio_configured;
+            bandGPIOSelector.setEnabled(selector_gpio_control_enabled);
+            bandGPIOSelector.setDriveGPIO(selector_gpio_drive_enabled);
+        }
+        else
+        {
+            selector_gpio_drive_enabled = false;
+            bandGPIOSelector.setDriveGPIO(false);
+        }
+
+        const bool keep_selector_gpio_initialized =
+            working_config.transmit &&
+            runtime_transmit_enabled(working_config);
+
+        std::string selector_gpio_error;
+        if (!sync_configured_selector_gpio_idle_state(
+                working_config,
+                keep_selector_gpio_initialized,
+                &selector_gpio_error))
+        {
+            llog.logS(ERROR, selector_gpio_error);
+
+            if (working_config.use_ini)
+            {
+                send_ws_message(
+                    "configuration",
+                    "reload_failed",
+                    selector_gpio_error);
+                set_managed_reload_tx_inhibited(
+                    true,
+                    selector_gpio_error);
+                wsprTransmitter.stopAndJoin();
+                stop_active_transmission_selectors();
+                release_idle_selector_gpio_reservations();
+                current_transmission_request = TransmissionRequest{};
+                current_dial_frequency = 0.0;
+                current_frequency_entry = WsprFrequencyEntry{};
+
+                if (!finalize_reload_pending())
+                {
+                    continue;
+                }
+                return true;
+            }
+
+            ini_reload_pending.store(false, std::memory_order_relaxed);
+            config.transmit = false;
+            config_to_json();
+            return false;
+        }
+
         if (is_non_wspr_runtime_mode(working_config.mode))
         {
             std::string policy_error;
@@ -3283,6 +3453,7 @@ bool set_config(bool force)
                         policy_error);
                     wsprTransmitter.stopAndJoin();
                     stop_active_transmission_selectors();
+                    release_idle_selector_gpio_reservations();
                     current_transmission_request = TransmissionRequest{};
                     current_dial_frequency = 0.0;
                     current_frequency_entry = WsprFrequencyEntry{};
@@ -3334,6 +3505,7 @@ bool set_config(bool force)
 
             wsprTransmitter.stopAndJoin();
             stop_active_transmission_selectors();
+            release_idle_selector_gpio_reservations();
             current_transmission_request = TransmissionRequest{};
             current_dial_frequency = 0.0;
             current_frequency_entry = WsprFrequencyEntry{};
@@ -3432,17 +3604,26 @@ bool set_config(bool force)
 
             if (!suppress_scheduler_execution_for_test)
             {
-                selectorGPIOControlEnabled =
+                const bool any_selector_gpio_configured =
                     has_configured_selector_gpios(working_config);
-                selectorGPIODriveEnabled = selectorGPIOControlEnabled;
-                bandGPIOSelector.setEnabled(selectorGPIOControlEnabled);
-                bandGPIOSelector.setDriveGPIO(selectorGPIODriveEnabled);
+                selector_gpio_control_enabled = any_selector_gpio_configured;
+                selector_gpio_drive_enabled = any_selector_gpio_configured;
+                bandGPIOSelector.setEnabled(selector_gpio_control_enabled);
+                bandGPIOSelector.setDriveGPIO(selector_gpio_drive_enabled);
+            }
+            else
+            {
+                selector_gpio_drive_enabled = false;
+                bandGPIOSelector.setDriveGPIO(false);
             }
 
+            const bool keep_selector_gpio_initialized =
+                working_config.transmit &&
+                runtime_transmit_enabled(working_config);
             std::string selector_idle_error;
             if (!sync_configured_selector_gpio_idle_state(
                     working_config,
-                    runtime_transmit_enabled(working_config),
+                    keep_selector_gpio_initialized,
                     &selector_idle_error))
             {
                 llog.logS(ERROR, "Failed to synchronize selector GPIO idle state: ",
@@ -3521,6 +3702,7 @@ bool set_config(bool force)
 
                 wsprTransmitter.stopAndJoin();
                 stop_active_transmission_selectors();
+                release_idle_selector_gpio_reservations();
                 current_transmission_request = TransmissionRequest{};
                 current_dial_frequency = 0.0;
                 current_frequency_entry = WsprFrequencyEntry{};
@@ -3606,6 +3788,7 @@ bool set_config(bool force)
                         "Managed reload planning failed; previous valid configuration remains loaded. Transmit is blocked until a valid configuration is loaded.");
                     wsprTransmitter.stopAndJoin();
                     stop_active_transmission_selectors();
+                    release_idle_selector_gpio_reservations();
                     current_transmission_request = TransmissionRequest{};
                     if (!finalize_reload_pending())
                     {
@@ -3669,6 +3852,7 @@ bool set_config(bool force)
             if (newer_reload_arrived())
             {
                 stop_active_transmission_selectors();
+                release_idle_selector_gpio_reservations();
                 continue;
             }
 
@@ -3728,6 +3912,7 @@ bool set_config(bool force)
                 if (!finalize_reload_pending())
                 {
                     stop_active_transmission_selectors();
+                    release_idle_selector_gpio_reservations();
                     continue;
                 }
                 return true;
@@ -3776,20 +3961,26 @@ void reset_managed_reload_runtime_for_test() noexcept
 void set_scheduler_execution_suppressed_for_test(bool suppressed) noexcept
 {
     suppress_scheduler_execution_for_test = suppressed;
+    if (suppressed)
+    {
+        selector_gpio_control_enabled = false;
+        selector_gpio_drive_enabled = false;
+        bandGPIOSelector.setEnabled(false);
+        bandGPIOSelector.setDriveGPIO(false);
+        stop_active_transmission_selectors();
+        release_idle_selector_gpio_reservations();
+    }
 }
 
 void set_band_gpio_selector_for_test(bool enabled, bool drive_gpio) noexcept
 {
-    selectorGPIOControlEnabled = enabled;
-    selectorGPIODriveEnabled = drive_gpio;
-    if (!enabled)
-    {
-        stop_active_transmission_selectors();
-    }
+    selector_gpio_control_enabled = enabled;
+    selector_gpio_drive_enabled = drive_gpio;
     bandGPIOSelector.setEnabled(enabled);
     bandGPIOSelector.setDriveGPIO(drive_gpio);
     if (!enabled)
     {
+        stop_active_transmission_selectors();
         release_idle_selector_gpio_reservations();
     }
 }
@@ -3815,8 +4006,9 @@ bool current_band_gpio_selection_for_test(
 std::vector<BandGPIOConfig> initialized_selector_gpios_for_test()
 {
     std::vector<BandGPIOConfig> configs;
-    configs.reserve(idleSelectorGPIOs.size());
-    for (const SelectorGPIOReservation &reservation : idleSelectorGPIOs)
+    configs.reserve(idle_selector_gpio_reservations.size());
+    for (const SelectorGPIOReservation &reservation :
+         idle_selector_gpio_reservations)
     {
         configs.push_back(reservation.config);
     }
@@ -3846,6 +4038,49 @@ bool restore_committed_band_gpio_selection_for_test(bool assert_state) noexcept
 TransmissionRequest current_transmission_request_for_test()
 {
     return current_transmission_request;
+}
+
+std::vector<BandGPIOConfig> selector_shutdown_cleanup_targets_for_test()
+{
+    return last_selector_shutdown_cleanup_targets;
+}
+
+void seed_selector_shutdown_state_for_test(
+    const BandGPIOConfig &active_config,
+    const std::vector<BandGPIOConfig> &idle_configs) noexcept
+{
+    stop_active_transmission_selectors();
+    release_idle_selector_gpio_reservations();
+
+    bandGPIOSelector.setEnabled(true);
+    bandGPIOSelector.setDriveGPIO(false);
+    selector_gpio_control_enabled = true;
+    selector_gpio_drive_enabled = false;
+
+    if (active_config.enabled && active_config.gpio >= 0)
+    {
+        (void)bandGPIOSelector.prepareBand(HamBand::BAND_20M, active_config);
+        active_band_gpio_prepare_status.store(
+            BandGPIOPrepareStatus::Prepared,
+            std::memory_order_release);
+    }
+
+    for (const BandGPIOConfig &idle_config : idle_configs)
+    {
+        if (!idle_config.enabled || idle_config.gpio < 0)
+        {
+            continue;
+        }
+
+        SelectorGPIOReservation reservation;
+        reservation.config = idle_config;
+        idle_selector_gpio_reservations.push_back(std::move(reservation));
+    }
+}
+
+void run_final_selector_gpio_shutdown_cleanup_for_test() noexcept
+{
+    shutdown_all_configured_selector_gpios(config);
 }
 
 void reset_current_transmission_request_for_test() noexcept
