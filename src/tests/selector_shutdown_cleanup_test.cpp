@@ -79,6 +79,34 @@ int main()
 {
     prime_base_config();
     patch_all_from_web({
+        {"WSPR", {{"Frequency", "20m@21H,30m"}}},
+        {"Band GPIO",
+         {{"20m", {{"GPIO", -1}, {"Enabled", false}, {"Active High", true}}},
+          {"30m", {{"GPIO", 22}, {"Enabled", true}, {"Active High", false}}}}}});
+
+    set_band_gpio_selector_for_test(true, false);
+    seed_selector_shutdown_state_for_test(
+        BandGPIOConfig{.gpio = 21, .enabled = true, .active_high = true},
+        std::vector<BandGPIOConfig>{
+            BandGPIOConfig{.gpio = 22, .enabled = true, .active_high = false}});
+    require(
+        park_active_transmission_selectors_for_test(),
+        "runtime selector teardown must park the active GPIO back into the idle pool");
+    require(
+        selector_set(initialized_selector_gpios_for_test()) ==
+            std::set<std::pair<int, bool>>{{21, true}, {22, false}},
+        "runtime selector teardown must keep every configured selector GPIO actively tracked");
+    {
+        BandGPIOConfig active_config;
+        std::string active_band;
+        require(
+            !current_band_gpio_selection_for_test(active_config, active_band),
+            "runtime selector teardown must clear the active selector after parking");
+    }
+    set_band_gpio_selector_for_test(false, false);
+
+    prime_base_config();
+    patch_all_from_web({
         {"WSPR", {{"Frequency", "20m@16H,30m@20H,40m"}}},
         {"Band GPIO",
          {{"20m", {{"GPIO", 5}, {"Enabled", true}, {"Active High", true}}},

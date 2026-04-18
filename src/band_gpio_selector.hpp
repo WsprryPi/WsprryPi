@@ -64,6 +64,10 @@ public:
      */
     bool prepareBand(HamBand band);
     bool prepareBand(HamBand band, const BandGPIOConfig &config);
+    bool prepareBand(
+        HamBand band,
+        const BandGPIOConfig &config,
+        std::unique_ptr<GPIOOutput> prepared_gpio);
 
     /**
      * @brief Set the currently selected band GPIO enabled or disabled.
@@ -84,6 +88,15 @@ public:
      * are expected to deassert the logical band state before stopping.
      */
     void stop();
+
+    /**
+     * @brief Detach the prepared GPIO without releasing the line.
+     *
+     * The selector state is cleared, but ownership of the already-requested
+     * GPIO handle is returned to the caller so it can remain driven inactive
+     * in another runtime owner such as the idle selector pool.
+     */
+    std::unique_ptr<GPIOOutput> releaseGPIOReservation() noexcept;
 
     /**
      * @brief Return the currently selected band.
@@ -130,7 +143,7 @@ public:
     }
 
 private:
-    GPIOOutput gpio_;
+    std::unique_ptr<GPIOOutput> gpio_;
     bool has_band_ = false;
     HamBand current_band_ = HamBand::BAND_2200M;
     BandGPIOConfig current_config_{};

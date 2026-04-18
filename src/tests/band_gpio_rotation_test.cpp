@@ -19,6 +19,10 @@ namespace
         }
     }
 
+    void require_initialized_selector_set(
+        const std::set<std::pair<int, bool>> &expected,
+        const std::string &message);
+
     void prime_valid_ui_config()
     {
         init_config_json();
@@ -113,15 +117,21 @@ namespace
         const std::string &expected_band,
         int expected_gpio,
         bool expected_active_high,
+        const std::set<std::pair<int, bool>> &expected_idle_set,
         const std::string &message)
     {
         BandGPIOConfig selector_config;
         std::string selector_band;
 
-        stop_active_transmission_selectors_for_test();
+        require(
+            park_active_transmission_selectors_for_test(),
+            message + ": active selector must return to the idle pool");
         require(
             !current_band_gpio_selection_for_test(selector_config, selector_band),
             message + ": selector teardown precondition must clear live selector state");
+        require_initialized_selector_set(
+            expected_idle_set,
+            message + ": active selector teardown must preserve the full configured selector set");
 
         require(
             restore_committed_band_gpio_selection_for_test(true),
@@ -233,6 +243,7 @@ int main()
         "80m",
         17,
         true,
+        {{17, true}, {27, false}, {22, true}},
         "first UI rotation entry");
 
     require(set_config(false), "scheduler must commit second UI band GPIO entry");
@@ -249,6 +260,7 @@ int main()
         "40m",
         27,
         false,
+        {{17, true}, {27, false}, {22, true}},
         "second UI rotation entry");
 
     require(set_config(false), "scheduler must commit third UI band GPIO entry");
@@ -262,6 +274,7 @@ int main()
         "30m",
         22,
         true,
+        {{17, true}, {27, false}, {22, true}},
         "third UI rotation entry");
 
     require(set_config(false), "scheduler must wrap back to first UI band GPIO entry");
@@ -275,6 +288,7 @@ int main()
         "80m",
         17,
         true,
+        {{17, true}, {27, false}, {22, true}},
         "wrapped UI rotation entry");
 
     patch_all_from_web({
@@ -297,6 +311,7 @@ int main()
         "30m",
         5,
         false,
+        {{5, false}, {12, true}},
         "first reloaded UI rotation entry");
 
     require(set_config(false), "scheduler must commit second reloaded UI band GPIO entry");
@@ -310,6 +325,7 @@ int main()
         "20m",
         12,
         true,
+        {{5, false}, {12, true}},
         "second reloaded UI rotation entry");
 
     patch_all_from_web({{"WSPR", {{"Frequency", "20m@16H,30m@20H,40m@21H"}}}});
@@ -328,6 +344,7 @@ int main()
         "20m",
         16,
         true,
+        {{16, true}, {20, true}, {21, true}},
         "first explicit selector rotation entry");
 
     require(set_config(false), "scheduler must commit second explicit selector entry");
@@ -344,6 +361,7 @@ int main()
         "30m",
         20,
         true,
+        {{16, true}, {20, true}, {21, true}},
         "second explicit selector rotation entry");
 
     require(set_config(false), "scheduler must commit third explicit selector entry");
@@ -360,6 +378,7 @@ int main()
         "40m",
         21,
         true,
+        {{16, true}, {20, true}, {21, true}},
         "third explicit selector rotation entry");
 
     patch_all_from_web({{"Operation", {{"Transmit", false}}}});

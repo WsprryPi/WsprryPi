@@ -321,6 +321,7 @@ bool current_band_gpio_selection_for_test(
     std::string &band_label_out) noexcept;
 std::vector<BandGPIOConfig> initialized_selector_gpios_for_test();
 void stop_active_transmission_selectors_for_test() noexcept;
+bool park_active_transmission_selectors_for_test() noexcept;
 bool restore_committed_band_gpio_selection_for_test(bool assert_state) noexcept;
 std::vector<BandGPIOConfig> selector_shutdown_cleanup_targets_for_test();
 void seed_selector_shutdown_state_for_test(

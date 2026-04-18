@@ -50,6 +50,14 @@ bool BandGPIOSelector::prepareBand(
     HamBand band,
     const BandGPIOConfig &config)
 {
+    return prepareBand(band, config, nullptr);
+}
+
+bool BandGPIOSelector::prepareBand(
+    HamBand band,
+    const BandGPIOConfig &config,
+    std::unique_ptr<GPIOOutput> prepared_gpio)
+{
     if (!enabled_)
     {
         llog.logS(DEBUG, tag,
@@ -86,9 +94,24 @@ bool BandGPIOSelector::prepareBand(
         return true;
     }
 
-    if (!gpio_.enableGPIOPin(config.gpio, config.active_high))
+    if (prepared_gpio != nullptr)
     {
-        if (!gpio_.lastError().empty())
+        gpio_ = std::move(prepared_gpio);
+        llog.logS(DEBUG, tag,
+                  "Unified scheduler selector adopted prepared band ",
+                  band_to_string(band),
+                  ", GPIO ",
+                  config.gpio,
+                  ", polarity ",
+                  (config.active_high ? "active high" : "active low"),
+                  ", drive enabled");
+        return true;
+    }
+
+    gpio_ = std::make_unique<GPIOOutput>();
+    if (!gpio_->enableGPIOPin(config.gpio, config.active_high))
+    {
+        if (!gpio_->lastError().empty())
         {
             llog.logS(ERROR, tag,
                       "Unified scheduler selector failed to prepare band ",
@@ -96,7 +119,7 @@ bool BandGPIOSelector::prepareBand(
                       ", GPIO ",
                       config.gpio,
                       ": ",
-                      gpio_.lastError());
+                      gpio_->lastError());
         }
         else
         {
@@ -109,6 +132,7 @@ bool BandGPIOSelector::prepareBand(
         }
         has_band_ = false;
         current_config_ = BandGPIOConfig{};
+        gpio_.reset();
         return false;
     }
 
@@ -158,7 +182,7 @@ bool BandGPIOSelector::setBandState(bool state)
         return true;
     }
 
-    const bool ok = gpio_.toggleGPIO(state);
+    const bool ok = gpio_ != nullptr && gpio_->toggleGPIO(state);
 
     llog.logS(ok ? DEBUG : ERROR,
               tag,
@@ -193,7 +217,11 @@ void BandGPIOSelector::stop()
                       current_config_.gpio,
                       ".");
         }
-        gpio_.stop();
+        if (gpio_ != nullptr)
+        {
+            gpio_->stop();
+            gpio_.reset();
+        }
     }
     else
     {
@@ -207,10 +235,33 @@ void BandGPIOSelector::stop()
                       ", drive ",
                       (drive_gpio_ ? "enabled" : "disabled"));
         }
+        gpio_.reset();
     }
 
     has_band_ = false;
     current_config_ = BandGPIOConfig{};
+}
+
+std::unique_ptr<GPIOOutput> BandGPIOSelector::releaseGPIOReservation() noexcept
+{
+    if (!has_band_)
+    {
+        return nullptr;
+    }
+
+    if (drive_gpio_ && gpio_ != nullptr)
+    {
+        llog.logS(DEBUG, tag,
+                  "Unified scheduler selector transferring band ",
+                  band_to_string(current_band_),
+                  ", GPIO ",
+                  current_config_.gpio,
+                  " to idle ownership.");
+    }
+
+    has_band_ = false;
+    current_config_ = BandGPIOConfig{};
+    return std::move(gpio_);
 }
 
 const HamBand *BandGPIOSelector::currentBand() const
