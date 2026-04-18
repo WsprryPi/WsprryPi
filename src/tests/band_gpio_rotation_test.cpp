@@ -5,6 +5,7 @@
 #include <atomic>
 #include <cstdlib>
 #include <iostream>
+#include <set>
 #include <string>
 
 namespace
@@ -134,6 +135,40 @@ namespace
             selector_config.active_high == expected_active_high,
             message + ": restored selector polarity must match committed request");
     }
+
+    void require_initialized_selector_set(
+        const std::set<std::pair<int, bool>> &expected,
+        const std::string &message)
+    {
+        std::set<std::pair<int, bool>> actual;
+        for (const BandGPIOConfig &config_entry : initialized_selector_gpios_for_test())
+        {
+            actual.emplace(config_entry.gpio, config_entry.active_high);
+        }
+
+        BandGPIOConfig active_config;
+        std::string active_band;
+        if (current_band_gpio_selection_for_test(active_config, active_band))
+        {
+            actual.emplace(active_config.gpio, active_config.active_high);
+        }
+
+        require(
+            actual == expected,
+            message + ": initialized selector GPIO set must match expected configured GPIOs");
+    }
+
+    void require_all_selector_gpios_released(const std::string &message)
+    {
+        BandGPIOConfig active_config;
+        std::string active_band;
+        require(
+            initialized_selector_gpios_for_test().empty(),
+            message + ": idle selector GPIO reservations must be empty");
+        require(
+            !current_band_gpio_selection_for_test(active_config, active_band),
+            message + ": no active selector GPIO may remain prepared");
+    }
 }
 
 int main()
@@ -166,6 +201,9 @@ int main()
     reset_scheduler_test_state();
 
     require(set_config(true), "scheduler must commit first UI band GPIO entry");
+    require_initialized_selector_set(
+        {{17, true}, {27, false}, {22, true}},
+        "first UI rotation entry");
     require_current_selector(
         "80m",
         "80m",
@@ -179,6 +217,9 @@ int main()
         "first UI rotation entry");
 
     require(set_config(false), "scheduler must commit second UI band GPIO entry");
+    require_initialized_selector_set(
+        {{17, true}, {27, false}, {22, true}},
+        "second UI rotation entry");
     require_current_selector(
         "40m",
         "40m",
@@ -224,6 +265,9 @@ int main()
           {"20m", {{"GPIO", 12}, {"Enabled", true}, {"Active High", true}}}}}});
 
     require(set_config(true), "scheduler must commit first reloaded UI band GPIO entry");
+    require_initialized_selector_set(
+        {{5, false}, {12, true}},
+        "first reloaded UI rotation entry");
     require_current_selector(
         "30m",
         "30m",
@@ -252,6 +296,9 @@ int main()
     patch_all_from_web({{"WSPR", {{"Frequency", "20m@16H,30m@20H,40m@21H"}}}});
 
     require(set_config(true), "scheduler must commit first explicit selector entry");
+    require_initialized_selector_set(
+        {{16, true}, {20, true}, {21, true}},
+        "first explicit selector rotation entry");
     require_current_selector(
         "20m",
         "20m",
@@ -265,6 +312,9 @@ int main()
         "first explicit selector rotation entry");
 
     require(set_config(false), "scheduler must commit second explicit selector entry");
+    require_initialized_selector_set(
+        {{16, true}, {20, true}, {21, true}},
+        "second explicit selector rotation entry");
     require_current_selector(
         "30m",
         "30m",
@@ -278,6 +328,9 @@ int main()
         "second explicit selector rotation entry");
 
     require(set_config(false), "scheduler must commit third explicit selector entry");
+    require_initialized_selector_set(
+        {{16, true}, {20, true}, {21, true}},
+        "third explicit selector rotation entry");
     require_current_selector(
         "40m",
         "40m",
@@ -289,6 +342,13 @@ int main()
         21,
         true,
         "third explicit selector rotation entry");
+
+    patch_all_from_web({{"Operation", {{"Transmit", false}}}});
+    require(
+        set_config(true),
+        "scheduler must accept disabling transmit while selector GPIOs are configured");
+    require_all_selector_gpios_released(
+        "disabled transmit");
 
     finish_scheduler_test_state();
 
