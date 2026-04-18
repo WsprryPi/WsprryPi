@@ -79,6 +79,7 @@ bool BandGPIOSelector::prepareBand(
     has_band_ = true;
     current_band_ = band;
     current_config_ = config;
+    band_state_active_ = false;
 
     if (!drive_gpio_)
     {
@@ -170,6 +171,7 @@ bool BandGPIOSelector::setBandState(bool state)
 
     if (!drive_gpio_)
     {
+        band_state_active_ = state;
         llog.logS(DEBUG, tag,
                   "Unified scheduler selector ",
                   (state ? "assert band " : "deassert band "),
@@ -183,6 +185,10 @@ bool BandGPIOSelector::setBandState(bool state)
     }
 
     const bool ok = gpio_ != nullptr && gpio_->toggleGPIO(state);
+    if (ok)
+    {
+        band_state_active_ = state;
+    }
 
     llog.logS(ok ? DEBUG : ERROR,
               tag,
@@ -240,6 +246,7 @@ void BandGPIOSelector::stop()
 
     has_band_ = false;
     current_config_ = BandGPIOConfig{};
+    band_state_active_ = false;
 }
 
 std::unique_ptr<GPIOOutput> BandGPIOSelector::releaseGPIOReservation() noexcept
@@ -261,6 +268,7 @@ std::unique_ptr<GPIOOutput> BandGPIOSelector::releaseGPIOReservation() noexcept
 
     has_band_ = false;
     current_config_ = BandGPIOConfig{};
+    band_state_active_ = false;
     return std::move(gpio_);
 }
 

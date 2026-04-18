@@ -320,6 +320,9 @@ bool current_band_gpio_selection_for_test(
     BandGPIOConfig &config_out,
     std::string &band_label_out) noexcept;
 std::vector<BandGPIOConfig> initialized_selector_gpios_for_test();
+bool selector_gpio_logical_state_for_test(
+    int gpio,
+    bool &logical_state_out) noexcept;
 void stop_active_transmission_selectors_for_test() noexcept;
 bool park_active_transmission_selectors_for_test() noexcept;
 bool restore_committed_band_gpio_selection_for_test(bool assert_state) noexcept;

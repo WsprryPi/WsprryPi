@@ -731,7 +731,7 @@ static BandGPIOPrepareStatus apply_band_gpio_resolution(
 {
     if (suppress_scheduler_execution_for_test)
     {
-        selector_gpio_drive_enabled = false;
+        selector_gpio_drive_enabled = GPIOOutput::testModeEnabled();
     }
     bandGPIOSelector.setEnabled(selector_gpio_control_enabled);
     bandGPIOSelector.setDriveGPIO(selector_gpio_drive_enabled);
@@ -749,6 +749,15 @@ static BandGPIOPrepareStatus apply_band_gpio_resolution(
         *current_band == resolution.band &&
         selector_gpio_config_matches(*current_config, resolution.config))
     {
+        if (bandGPIOSelector.isBandStateActive() &&
+            !bandGPIOSelector.setBandState(false))
+        {
+            active_band_gpio_prepare_status.store(
+                BandGPIOPrepareStatus::Failed,
+                std::memory_order_release);
+            return BandGPIOPrepareStatus::Failed;
+        }
+
         active_band_gpio_prepare_status.store(
             BandGPIOPrepareStatus::Prepared,
             std::memory_order_release);
@@ -3575,8 +3584,8 @@ bool set_config(bool force)
         }
         else
         {
-            selector_gpio_drive_enabled = false;
-            bandGPIOSelector.setDriveGPIO(false);
+            selector_gpio_drive_enabled = GPIOOutput::testModeEnabled();
+            bandGPIOSelector.setDriveGPIO(selector_gpio_drive_enabled);
         }
 
         const bool keep_selector_gpio_initialized =
@@ -3800,8 +3809,8 @@ bool set_config(bool force)
             }
             else
             {
-                selector_gpio_drive_enabled = false;
-                bandGPIOSelector.setDriveGPIO(false);
+                selector_gpio_drive_enabled = GPIOOutput::testModeEnabled();
+                bandGPIOSelector.setDriveGPIO(selector_gpio_drive_enabled);
             }
 
             const bool keep_selector_gpio_initialized =
@@ -4200,6 +4209,33 @@ std::vector<BandGPIOConfig> initialized_selector_gpios_for_test()
         configs.push_back(reservation.config);
     }
     return configs;
+}
+
+bool selector_gpio_logical_state_for_test(
+    int gpio,
+    bool &logical_state_out) noexcept
+{
+    const BandGPIOConfig *current_config = bandGPIOSelector.currentConfig();
+    if (current_config != nullptr && current_config->gpio == gpio)
+    {
+        logical_state_out = bandGPIOSelector.isBandStateActive();
+        return true;
+    }
+
+    const auto it = std::find_if(
+        idle_selector_gpio_reservations.begin(),
+        idle_selector_gpio_reservations.end(),
+        [gpio](const SelectorGPIOReservation &reservation)
+        {
+            return reservation.config.gpio == gpio;
+        });
+    if (it != idle_selector_gpio_reservations.end())
+    {
+        logical_state_out = false;
+        return true;
+    }
+
+    return false;
 }
 
 void stop_active_transmission_selectors_for_test() noexcept

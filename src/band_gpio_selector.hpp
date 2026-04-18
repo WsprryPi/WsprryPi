@@ -112,6 +112,10 @@ public:
      *         selected.
      */
     const BandGPIOConfig *currentConfig() const;
+    bool isBandStateActive() const noexcept
+    {
+        return has_band_ && band_state_active_;
+    }
 
     /**
      * @brief Enable or disable band-based GPIO control.
@@ -149,6 +153,7 @@ private:
     BandGPIOConfig current_config_{};
     bool enabled_ = false;
     bool drive_gpio_ = false;
+    bool band_state_active_ = false;
     static constexpr const char *tag = "[BandGPIO]";
 };
 
