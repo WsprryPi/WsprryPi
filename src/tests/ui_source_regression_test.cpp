@@ -129,12 +129,15 @@ int main()
             site_source.find("nextTransmissionAt") != std::string::npos &&
             site_source.find("cw_message") != std::string::npos &&
             site_source.find("cw_active_char_index") != std::string::npos &&
-            site_source.find("function renderCwRuntimeMessage(node, nextTransmissionAt, message, activeCharIndex)") != std::string::npos &&
+            site_source.find("function renderCwRuntimeMessage(node, message, activeCharIndex)") != std::string::npos &&
+            site_source.find("const isTransmitting =") != std::string::npos &&
+            site_source.find("planLabelNode.textContent = \"Message progression\";") != std::string::npos &&
             site_source.find("planLabelNode.textContent = \"Next message at:\";") != std::string::npos &&
-            site_source.find("scheduleNode.textContent = nextTransmissionAt || \"Not scheduled\";") != std::string::npos &&
+            site_source.find("planNode.textContent = nextTransmissionAt || \"Not scheduled\";") != std::string::npos &&
             site_source.find("charNode.textContent = character;") != std::string::npos &&
+            site_source.find("renderCwRuntimeMessage(planNode, message, activeCharIndex);") != std::string::npos &&
             site_source.find("charNode.textContent = isActive && character === \" \" ? \"_\" : character;") == std::string::npos,
-        "runtime status handling must expose next-transmission timing for CW modes and render the CW message without underscore substitution");
+        "runtime status handling must switch CW runtime detail between next-transmission timing and live message progression without underscore substitution");
     require(
         scheduling_source.find("snapshot.next_transmission_at") != std::string::npos &&
             websocket_source.find("reply[\"next_transmission_at\"] = snapshot.next_transmission_at;") != std::string::npos,
