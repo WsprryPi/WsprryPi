@@ -3453,7 +3453,6 @@ WsprRuntimeStatusSnapshot current_tx_runtime_status_snapshot()
     snapshot.cw_active_char_index = runtime_status.cw_active_char_index;
 
     if (is_non_wspr_runtime_mode(config.mode) &&
-        snapshot.runtime_mode == mode_type_name(config.mode) &&
         runtime_transmit_requested(config) &&
         config.schedule_repeat_minutes > 0)
     {

@@ -171,8 +171,9 @@ int main()
         scheduling_source.find("snapshot.next_transmission_at") != std::string::npos &&
             websocket_source.find("reply[\"next_transmission_at\"] = snapshot.next_transmission_at;") != std::string::npos &&
             scheduling_source.find("if (current_transmission_request.mode != TransmissionMode::WSPR ||\n        current_transmission_request.payload.empty())") != std::string::npos &&
+            scheduling_source.find("snapshot.runtime_mode == mode_type_name(config.mode)") == std::string::npos &&
             scheduling_source.find("if (runtime_status.mode != wsprrypi::TransmissionMode::WSPR ||\n        current_transmission_request.mode != TransmissionMode::WSPR ||") == std::string::npos,
-        "runtime snapshot must expose next_transmission_at for CW display and must expose committed idle WSPR plan data without requiring the transmitter runtime mode to already be WSPR");
+        "runtime snapshot must expose next_transmission_at for CW display, expose committed idle WSPR plan data without requiring runtime mode to already be WSPR, and expose CW next-transmission timing without requiring the transmitter runtime mode string to match first");
     require(
         site_source.find("const TAB_STATE_STORAGE_PREFIX = \"wsprrypi.activeTab\";") != std::string::npos &&
             site_source.find("function shouldRestorePersistedTabState(tabList)") != std::string::npos &&
