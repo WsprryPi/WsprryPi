@@ -3461,8 +3461,7 @@ WsprRuntimeStatusSnapshot current_tx_runtime_status_snapshot()
             format_local_schedule_time(next_non_wspr_schedule_time(config));
     }
 
-    if (runtime_status.mode != wsprrypi::TransmissionMode::WSPR ||
-        current_transmission_request.mode != TransmissionMode::WSPR ||
+    if (current_transmission_request.mode != TransmissionMode::WSPR ||
         current_transmission_request.payload.empty())
     {
         return snapshot;

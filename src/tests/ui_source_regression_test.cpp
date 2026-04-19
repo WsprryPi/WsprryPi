@@ -168,8 +168,10 @@ int main()
         "runtime status handling must switch CW runtime detail between next-transmission timing and live message progression without underscore substitution");
     require(
         scheduling_source.find("snapshot.next_transmission_at") != std::string::npos &&
-            websocket_source.find("reply[\"next_transmission_at\"] = snapshot.next_transmission_at;") != std::string::npos,
-        "runtime snapshot and websocket get_tx_state reply must expose next_transmission_at for CW runtime display");
+            websocket_source.find("reply[\"next_transmission_at\"] = snapshot.next_transmission_at;") != std::string::npos &&
+            scheduling_source.find("if (current_transmission_request.mode != TransmissionMode::WSPR ||\n        current_transmission_request.payload.empty())") != std::string::npos &&
+            scheduling_source.find("if (runtime_status.mode != wsprrypi::TransmissionMode::WSPR ||\n        current_transmission_request.mode != TransmissionMode::WSPR ||") == std::string::npos,
+        "runtime snapshot must expose next_transmission_at for CW display and must expose committed idle WSPR plan data without requiring the transmitter runtime mode to already be WSPR");
     require(
         site_source.find("const TAB_STATE_STORAGE_PREFIX = \"wsprrypi.activeTab\";") != std::string::npos &&
             site_source.find("function shouldRestorePersistedTabState(tabList)") != std::string::npos &&
