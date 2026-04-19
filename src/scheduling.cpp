@@ -2779,7 +2779,6 @@ void start_test_tone()
         llog.logS(INFO,
                   "WSPR-band test tone using dial frequency: ",
                   lookup.freq_display_string(dial_freq));
-        send_ws_message("transmit", "starting");
     }
 }
 
@@ -2798,7 +2797,6 @@ void end_test_tone()
         // Stop current tone
         wsprTransmitter.stopAndJoin();
         stop_active_transmission_selectors();
-        send_ws_message("transmit", "finished");
         set_tx_led_state(false, "test tone stop");
 
         // Clear the “we’re testing” flag
@@ -3292,7 +3290,11 @@ void send_ws_message(
     if (type == "transmit")
     {
         const WsprRuntimeStatusSnapshot snapshot = current_tx_runtime_status_snapshot();
-        j["tx_state"] = snapshot.tx_state;
+        const std::string tx_state = websocket_tx_state_for_message(
+            type,
+            state,
+            snapshot.tx_state);
+        j["tx_state"] = tx_state;
         j["plan_type"] = snapshot.plan_type;
         j["frame_count"] = snapshot.frame_count;
         j["current_frame"] = snapshot.current_frame;
@@ -3321,7 +3323,63 @@ void send_ws_message(
 
     // Serialize and send to all WebSocket clients
     const std::string payload = j.dump();
+    if (type == "transmit")
+    {
+        llog.logS(
+            DEBUG,
+            "WebSocket transmit event prepared: state=",
+            state,
+            ", tx_state=",
+            j.value("tx_state", std::string{}),
+            ", plan_type=",
+            j.value("plan_type", std::string{}),
+            ", current_frame=",
+            j.value("current_frame", 0),
+            "/",
+            j.value("frame_count", 0),
+            ".");
+    }
+    else
+    {
+        llog.logS(
+            DEBUG,
+            "WebSocket event prepared: type=",
+            type,
+            ", state=",
+            state,
+            ".");
+    }
     socketServer.sendAllClients(payload);
+}
+
+std::string websocket_tx_state_for_message(
+    std::string_view type,
+    std::string_view state,
+    std::string_view current_tx_state)
+{
+    if (type != "transmit")
+    {
+        return std::string(current_tx_state);
+    }
+
+    if (state == "starting")
+    {
+        return "transmitting";
+    }
+    if (state == "finished" || state == "skipped")
+    {
+        return "complete";
+    }
+    if (state == "canceled")
+    {
+        return "cancelled";
+    }
+    if (state == "stopped")
+    {
+        return "disabled";
+    }
+
+    return std::string(current_tx_state);
 }
 
 WsprRuntimeStatusSnapshot current_tx_runtime_status_snapshot()

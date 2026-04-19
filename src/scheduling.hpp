@@ -256,6 +256,11 @@ void send_ws_message(
     std::string state,
     std::string message = std::string());
 
+std::string websocket_tx_state_for_message(
+    std::string_view type,
+    std::string_view state,
+    std::string_view current_tx_state);
+
 struct StopTransmissionResult
 {
     bool transmission_active = false;

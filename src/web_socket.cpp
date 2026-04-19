@@ -661,6 +661,19 @@ void WebSocketServer::sendToClient(const std::string &message)
 void WebSocketServer::sendAllClients(const std::string &message)
 {
     std::lock_guard<std::mutex> lock(clients_mutex_);
+    const std::size_t client_count = client_sockets_.size();
+
+    if (client_count == 0U)
+    {
+        llog.logS(DEBUG, "Dropping websocket broadcast; no connected clients.");
+        return;
+    }
+
+    llog.logS(
+        DEBUG,
+        "Broadcasting websocket payload to ",
+        static_cast<int>(client_count),
+        " client(s).");
 
     // Build WebSocket text frame header
     std::string frame;

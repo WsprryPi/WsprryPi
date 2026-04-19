@@ -1643,6 +1643,33 @@ int main()
     }
 
     {
+        require(
+            websocket_tx_state_for_message(
+                "transmit",
+                "starting",
+                "enabled") == "transmitting",
+            "websocket transmit start events must present a transmitting tx_state");
+        require(
+            websocket_tx_state_for_message(
+                "transmit",
+                "finished",
+                "transmitting") == "complete",
+            "websocket transmit finished events must present a non-transmitting terminal tx_state");
+        require(
+            websocket_tx_state_for_message(
+                "transmit",
+                "stopped",
+                "transmitting") == "disabled",
+            "websocket transmit stopped events must present a disabled tx_state");
+        require(
+            websocket_tx_state_for_message(
+                "configuration",
+                "reload",
+                "enabled") == "enabled",
+            "non-transmit websocket messages must preserve the current runtime tx_state");
+    }
+
+    {
         PreparedConfigCandidate candidate;
         iniFile.setData(
             make_managed_ini_data(
