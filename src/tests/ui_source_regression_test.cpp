@@ -62,6 +62,7 @@ int main()
         "UI Stop button must send the explicit stop command over the websocket");
     require(
         ui_source.find("let pendingModeChange = null;") != std::string::npos &&
+            ui_source.find("let pendingPersistedMode = \"\";") != std::string::npos &&
             ui_source.find("function requestConfigModeChange(targetMode)") != std::string::npos &&
             ui_source.find("title: \"Stop transmission to change mode\"") != std::string::npos &&
             ui_source.find("title: \"Disable transmissions to change mode\"") != std::string::npos &&
@@ -73,8 +74,14 @@ int main()
             ui_source.find("suspendConfigAutosave(true);") != std::string::npos &&
             ui_source.find("input:not(#transmit, [name=\"mode_toggle\"], [name=\"qrss_type\"])") != std::string::npos &&
             ui_source.find("configAutosaveNeedsRuntimeRefresh = true;") != std::string::npos &&
+            ui_source.find("pendingPersistedMode = currentConfigModeSelection;") != std::string::npos &&
+            ui_source.find("flushAutosave();") != std::string::npos &&
             ui_source.find("if (configAutosaveNeedsRuntimeRefresh && typeof getTxState === \"function\") {") != std::string::npos,
         "mode changes must be guarded behind stop/disable confirmation, preserve the unsaved target mode through the disable step, exclude mode toggles from generic autosave scheduling, and refresh runtime state after the committed mode save lands");
+    require(
+        ui_source.find("if (enabled && pendingPersistedMode) {") != std::string::npos &&
+            ui_source.find("Wait for the mode change to save before enabling transmissions.") != std::string::npos,
+        "transmit enable must be blocked until a guarded mode change has actually been persisted");
     require(
         ui_source.find("const transmitting = runtimeStatus && runtimeStatus.txState === \"transmitting\";") !=
                 std::string::npos &&
