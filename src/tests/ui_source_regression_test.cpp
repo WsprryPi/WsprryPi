@@ -128,7 +128,8 @@ int main()
         site_source.find("runtime_mode") != std::string::npos &&
             site_source.find("cw_message") != std::string::npos &&
             site_source.find("cw_active_char_index") != std::string::npos &&
-            site_source.find("function renderCwRuntimeMessage(node, message, activeCharIndex)") != std::string::npos,
+            site_source.find("function renderCwRuntimeMessage(node, message, activeCharIndex)") != std::string::npos &&
+            site_source.find("charNode.textContent = isActive && character === \" \" ? \"_\" : character;") != std::string::npos,
         "runtime status handling must expose dedicated CW runtime fields and a renderer for highlighted CW message progress");
     require(
         site_source.find("const TAB_STATE_STORAGE_PREFIX = \"wsprrypi.activeTab\";") != std::string::npos &&
