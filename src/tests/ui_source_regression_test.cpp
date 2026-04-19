@@ -133,8 +133,15 @@ int main()
             config_view_source.find("id=\"stop_transmit\"") != std::string::npos,
         "Configuration header must host the compact Stop transmission control");
     require(
+        config_view_source.find("class=\"config-runtime-header\"") != std::string::npos &&
+            config_view_source.find("<label class=\"form-check-label\" for=\"transmit\">Transmit enabled</label>") != std::string::npos,
+        "Runtime state header must host the primary Transmit enabled control");
+    require(
         config_view_source.find("config-runtime-item config-runtime-item--action") == std::string::npos,
         "Runtime state grid must no longer dedicate a large action tile to Stop transmission");
+    require(
+        config_view_source.find("config-runtime-item config-runtime-item--switch") == std::string::npos,
+        "Runtime state body must no longer dedicate a body tile to the Transmit enabled control");
     require(
         config_view_source.find("id=\"test_tone\"") == std::string::npos &&
             config_view_source.find("id=\"testToneModal\"") == std::string::npos,
