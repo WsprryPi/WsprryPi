@@ -1120,6 +1120,20 @@ static bool runtime_transmit_enabled(const ArgParserConfig &cfg) noexcept
     return runtime_transmit_requested(cfg) && !managed_reload_tx_inhibited;
 }
 
+bool web_server_start_enabled(const ArgParserConfig &cfg) noexcept
+{
+    return cfg.enable_web &&
+           cfg.web_port >= 1024 &&
+           cfg.web_port <= 49151;
+}
+
+bool websocket_server_start_enabled(const ArgParserConfig &cfg) noexcept
+{
+    return cfg.enable_web &&
+           cfg.socket_port >= 1024 &&
+           cfg.socket_port <= 49151;
+}
+
 static wsprrypi::BackendKind to_controller_backend(
     TransmitBackendKind backend) noexcept
 {
@@ -2353,6 +2367,16 @@ void transmitter_cb(WsprTransmitter::TransmissionCallbackEvent event,
         break;
     }
 
+    case WsprTransmitter::TransmissionCallbackEvent::PROGRESS:
+    {
+        send_ws_message(
+            "transmit",
+            "progress",
+            std::string(),
+            static_cast<int>(value));
+        break;
+    }
+
     case WsprTransmitter::TransmissionCallbackEvent::COMPLETE:
     {
         const double elapsed = value;
@@ -3037,8 +3061,12 @@ bool wspr_loop()
         }
     }
 
+    if (!config.enable_web)
+    {
+        llog.logS(INFO, "Web UI disabled via CLI (--no-web)");
+    }
     // Start web server and set priority
-    if (config.web_port >= 1024 && config.web_port <= 49151)
+    else if (web_server_start_enabled(config))
     {
         webServer.start(config.web_port);
         webServer.setThreadPriority(SCHED_RR, 10);
@@ -3049,7 +3077,7 @@ bool wspr_loop()
     }
 
     // Start socket server and set priority
-    if (config.socket_port >= 1024 && config.socket_port <= 49151)
+    if (websocket_server_start_enabled(config))
     {
         socketServer.start(config.socket_port, SOCKET_KEEPALIVE);
         socketServer.setThreadPriority(SCHED_RR, 10);
@@ -3300,7 +3328,8 @@ void shutdown_machine()
 void send_ws_message(
     std::string type,
     std::string state,
-    std::string message)
+    std::string message,
+    std::optional<int> cw_active_char_index_override)
 {
     // Build JSON payload
     nlohmann::json j;
@@ -3315,6 +3344,8 @@ void send_ws_message(
             state,
             snapshot.tx_state);
         j["tx_state"] = tx_state;
+        j["runtime_mode"] = snapshot.runtime_mode;
+        j["next_transmission_at"] = snapshot.next_transmission_at;
         j["plan_type"] = snapshot.plan_type;
         j["frame_count"] = snapshot.frame_count;
         j["current_frame"] = snapshot.current_frame;
@@ -3324,6 +3355,9 @@ void send_ws_message(
         j["locator_normalized"] = snapshot.locator_normalized;
         j["frame_callsign"] = snapshot.frame_callsign;
         j["frame_locator"] = snapshot.frame_locator;
+        j["cw_message"] = snapshot.cw_message;
+        j["cw_active_char_index"] =
+            cw_active_char_index_override.value_or(snapshot.cw_active_char_index);
     }
 
     if (!message.empty())
@@ -3382,7 +3416,7 @@ std::string websocket_tx_state_for_message(
         return std::string(current_tx_state);
     }
 
-    if (state == "starting")
+    if (state == "starting" || state == "progress")
     {
         return "transmitting";
     }
@@ -3402,6 +3436,28 @@ std::string websocket_tx_state_for_message(
     return std::string(current_tx_state);
 }
 
+static std::string runtime_mode_to_string(
+    wsprrypi::TransmissionMode mode)
+{
+    switch (mode)
+    {
+    case wsprrypi::TransmissionMode::WSPR:
+        return "WSPR";
+    case wsprrypi::TransmissionMode::QRSS:
+        return "QRSS";
+    case wsprrypi::TransmissionMode::FSKCW:
+        return "FSKCW";
+    case wsprrypi::TransmissionMode::DFCW:
+        return "DFCW";
+    case wsprrypi::TransmissionMode::CW:
+        return "CW";
+    case wsprrypi::TransmissionMode::TONE:
+        return "TONE";
+    default:
+        return "";
+    }
+}
+
 WsprRuntimeStatusSnapshot current_tx_runtime_status_snapshot()
 {
     std::lock_guard<std::mutex> lk(set_config_mtx);
@@ -3409,8 +3465,28 @@ WsprRuntimeStatusSnapshot current_tx_runtime_status_snapshot()
     WsprRuntimeStatusSnapshot snapshot;
     snapshot.tx_state = wsprTransmitter.stateToStringLower(
         wsprTransmitter.getState());
+    const auto runtime_status = wsprTransmitter.runtimeExecutionStatusSnapshot();
+    if (snapshot.tx_state == "transmitting")
+    {
+        snapshot.runtime_mode = runtime_mode_to_string(runtime_status.mode);
+    }
+    else
+    {
+        snapshot.runtime_mode = mode_type_name(config.mode);
+    }
+    snapshot.cw_message = runtime_status.cw_message;
+    snapshot.cw_active_char_index = runtime_status.cw_active_char_index;
 
-    if (current_transmission_request.mode != TransmissionMode::WSPR ||
+    if (is_non_wspr_runtime_mode(config.mode) &&
+        runtime_transmit_enabled(config) &&
+        config.schedule_repeat_minutes > 0)
+    {
+        snapshot.next_transmission_at =
+            format_local_schedule_time(next_non_wspr_schedule_time(config));
+    }
+
+    if (config.mode != ModeType::WSPR ||
+        current_transmission_request.mode != TransmissionMode::WSPR ||
         current_transmission_request.payload.empty())
     {
         return snapshot;

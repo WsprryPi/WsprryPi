@@ -49,6 +49,7 @@
 #include <chrono>
 #include <cstddef>
 #include <condition_variable>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <thread>
@@ -254,7 +255,8 @@ void shutdown_machine();
 void send_ws_message(
     std::string type,
     std::string state,
-    std::string message = std::string());
+    std::string message = std::string(),
+    std::optional<int> cw_active_char_index_override = std::nullopt);
 
 std::string websocket_tx_state_for_message(
     std::string_view type,
@@ -275,6 +277,8 @@ StopTransmissionResult stop_transmission_by_user_request();
 struct WsprRuntimeStatusSnapshot
 {
     std::string tx_state;
+    std::string runtime_mode;
+    std::string next_transmission_at;
     std::string plan_type;
     std::size_t frame_count = 0;
     std::size_t current_frame = 0; // 1-based, 0 when unavailable
@@ -284,6 +288,8 @@ struct WsprRuntimeStatusSnapshot
     std::string locator_normalized;
     std::string frame_callsign;
     std::string frame_locator;
+    std::string cw_message;
+    int cw_active_char_index = -1;
 };
 
 WsprRuntimeStatusSnapshot current_tx_runtime_status_snapshot();
@@ -308,6 +314,8 @@ bool compute_non_wspr_message_duration(
 bool validate_non_wspr_repeat_interval_policy(
     const ArgParserConfig &cfg,
     std::string *error_message = nullptr);
+bool web_server_start_enabled(const ArgParserConfig &cfg) noexcept;
+bool websocket_server_start_enabled(const ArgParserConfig &cfg) noexcept;
 bool transmitter_reload_should_defer() noexcept;
 void transmitter_cb(WsprTransmissionCallbackEvent event,
                     WsprTransmitLogLevel level,

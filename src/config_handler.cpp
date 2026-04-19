@@ -697,6 +697,7 @@ void init_default_config()
     config.schedule_repeat_minutes = 10;
 
     // Runtime
+    config.enable_web = true;
     config.web_port = 31415;
     config.socket_port = 31416;
     config.use_shutdown = false;
@@ -1112,6 +1113,7 @@ namespace
     void json_to_config_impl(const nlohmann::json &source, ArgParserConfig &target)
     {
         set_default_band_gpio_config(target.band_gpio);
+        target.enable_web = true;
 
         target.use_ini = source.at("Meta").at("Use INI").get<bool>();
         target.ini_filename = source.at("Meta").at("INI Filename").get<std::string>();
@@ -1426,6 +1428,7 @@ namespace
         target.si5351_power_level = source.si5351_power_level;
         target.use_led = source.use_led;
         target.led_pin = source.led_pin;
+        target.enable_web = source.enable_web;
         target.web_port = source.web_port;
         target.socket_port = source.socket_port;
         target.use_shutdown = source.use_shutdown;
@@ -1561,6 +1564,7 @@ namespace
 
             ini_to_json_impl(filename, candidate_json);
             json_to_config_impl(candidate_json, candidate_config);
+            candidate_config.enable_web = config.enable_web;
 
             if (missing_required_tx_item)
             {
@@ -1877,6 +1881,7 @@ void patch_all_from_web(const nlohmann::json &j)
     try
     {
         json_to_config_impl(candidate_json, candidate_config);
+        candidate_config.enable_web = config.enable_web;
 
         if (!validate_config_candidate(candidate_config, &error_message))
         {
