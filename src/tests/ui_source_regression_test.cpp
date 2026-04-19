@@ -153,16 +153,15 @@ int main()
             config_view_source.find("Reload saved") == std::string::npos,
         "configuration view must expose the inline save-status indicator and remove the manual action panel");
     require(
-        config_view_source.find("class=\"row gx-3 gy-2 align-items-end config-wspr-top-row\"") != std::string::npos &&
-            config_view_source.find("class=\"col-12 col-xl-3 mb-2 config-wspr-top-row__field\"") != std::string::npos &&
-            config_view_source.find("class=\"col-6 col-sm-4 col-xl-1 mb-2 config-wspr-top-row__field\"") != std::string::npos &&
-            config_view_source.find("class=\"col-12 col-sm-6 col-xl-2 mb-2 config-wspr-top-row__field config-wspr-top-row__planner\"") != std::string::npos &&
+        config_view_source.find("class=\"config-wspr-top-row\"") != std::string::npos &&
+            config_view_source.find("config-wspr-top-row__item config-wspr-top-row__field config-wspr-top-row__field--wide") != std::string::npos &&
+            config_view_source.find("config-wspr-top-row__item config-wspr-top-row__field config-wspr-top-row__field--dbm") != std::string::npos &&
+            config_view_source.find("config-wspr-top-row__item config-wspr-top-row__field config-wspr-top-row__planner") != std::string::npos &&
             config_view_source.find("for=\"useoffset\">\n                                                    Randomize\n") != std::string::npos &&
             config_view_source.find("id=\"ppm\"") != std::string::npos &&
             config_view_source.find("id=\"use_ntp\"") != std::string::npos &&
             config_view_source.find("id=\"planner_preference\"") != std::string::npos &&
-            config_view_source.find("<select\n                                                id=\"dbm\"") != std::string::npos &&
-            config_view_source.find("class=\"form-select\"") != std::string::npos &&
+            config_view_source.find("id=\"dbm\"") != std::string::npos &&
             config_view_source.find("<option value=\"60\">60</option>") != std::string::npos &&
             config_view_source.find("class=\"form-select config-planner-field__select\"") == std::string::npos,
         "WSPR transmission settings must keep planner_preference in the compact top row and render TX dBm as a fixed-value select");
