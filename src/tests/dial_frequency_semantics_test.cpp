@@ -2086,6 +2086,35 @@ int main()
         require(
             site_source.find("Frequency Control GPIO Polarity") == std::string::npos,
             "UI config schema must not require the obsolete GPIO.Frequency Control GPIO Polarity key");
+
+        const std::string config_view_source =
+            read_text_file("/home/pi/WsprryPi/WsprryPi-UI/data/views/config.php");
+        require(
+            config_view_source.find("id=\"band-gpio-enabled-all\"") != std::string::npos &&
+                config_view_source.find("id=\"band-gpio-active-high-all\"") != std::string::npos,
+            "Band GPIO table must expose bulk-toggle header checkboxes for Enabled and Active High");
+
+        require(
+            ui_source.find("function applyBandGpioColumnToggle(column, checked)") != std::string::npos &&
+                ui_source.find("function syncBandGpioColumnHeaderStates()") != std::string::npos,
+            "Band GPIO bulk-toggle behavior must use shared helper functions");
+        require(
+            ui_source.find("applyBandGpioColumnToggle(\"enabled\"") != std::string::npos &&
+                ui_source.find("applyBandGpioColumnToggle(\"activeHigh\"") != std::string::npos,
+            "Band GPIO header checkbox handlers must route through the shared bulk-toggle helper");
+        require(
+            ui_source.find("syncBandGpioColumnHeaderStates();\n    validateBandGpioFields();") != std::string::npos,
+            "Band GPIO header state must be recomputed when row state changes");
+        require(
+            site_source.find("const TAB_STATE_STORAGE_PREFIX = \"wsprrypi.activeTab\";") != std::string::npos &&
+                site_source.find("function initPersistedTabState()") != std::string::npos &&
+                site_source.find("window.localStorage.setItem(storageKey, selector);") != std::string::npos &&
+                site_source.find("restorePersistedTabState(tabList);") != std::string::npos,
+            "site.js must persist and restore opted-in Bootstrap tab state through localStorage");
+
+        require(
+            config_view_source.find("id=\"configTabs\" role=\"tablist\" data-persist-tab-state=\"true\"") != std::string::npos,
+            "Configuration tab list must opt into persisted sub-tab state");
     }
 
     {
