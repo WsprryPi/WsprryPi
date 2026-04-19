@@ -1073,6 +1073,8 @@ void print_usage(const std::string &message, int exit_code)
               << "    Enable DEBUG-level application logging.\n"
               << "  --no-debug-logging\n"
               << "    Disable DEBUG-level application logging.\n\n"
+              << "  --no-web\n"
+              << "    Disable the HTTP web UI and WebSocket server.\n\n"
               << "  --backend <gpio|si5351>\n"
               << "    Select the RF transmit backend. Default: gpio.\n"
               << "    GPIO transmission is supported only on Raspberry Pi 1 through 4.\n\n";
@@ -1177,6 +1179,7 @@ void show_config_values(bool reload)
     llog.logS(DEBUG, "LED on GPIO", config.led_pin);
     llog.logS(DEBUG, "Debug Logging: ", config.debug_logging ? "true" : "false");
     // [Server]
+    llog.logS(DEBUG, "Web UI enabled: ", config.enable_web ? "true" : "false");
     llog.logS(DEBUG, "Web server runs on port: ", config.web_port);
     llog.logS(DEBUG, "Socket server runs on port: ", config.socket_port);
     llog.logS(DEBUG, "Use shutdown button: ", config.use_shutdown ? "true" : "false");
@@ -2437,6 +2440,7 @@ bool parse_command_line(int argc, char *argv[])
         {"date-time-log", no_argument, nullptr, 'D'},   // Global: config.date_time_log
         {"debug-logging", no_argument, nullptr, 1018},  // Global: config.debug_logging
         {"no-debug-logging", no_argument, nullptr, 1019},
+        {"no-web", no_argument, nullptr, 1020},
         {"require-paired", no_argument, nullptr, 1001}, // Global: config.wspr_planner_preference
         {"backend", required_argument, nullptr, 1002},
         {"qrss-message", required_argument, nullptr, 1003},
@@ -2532,6 +2536,11 @@ bool parse_command_line(int argc, char *argv[])
         case 1019:
         {
             config.debug_logging = false;
+            break;
+        }
+        case 1020:
+        {
+            config.enable_web = false;
             break;
         }
         case 1001: // Require paired WSPR planning

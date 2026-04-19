@@ -362,6 +362,8 @@ void WebSocketServer::handleMessage(const std::string &raw_message)
             const WsprRuntimeStatusSnapshot snapshot =
                 current_tx_runtime_status_snapshot();
             reply["tx_state"] = snapshot.tx_state;
+            reply["runtime_mode"] = snapshot.runtime_mode;
+            reply["next_transmission_at"] = snapshot.next_transmission_at;
             reply["plan_type"] = snapshot.plan_type;
             reply["frame_count"] = snapshot.frame_count;
             reply["current_frame"] = snapshot.current_frame;
@@ -371,6 +373,8 @@ void WebSocketServer::handleMessage(const std::string &raw_message)
             reply["locator_normalized"] = snapshot.locator_normalized;
             reply["frame_callsign"] = snapshot.frame_callsign;
             reply["frame_locator"] = snapshot.frame_locator;
+            reply["cw_message"] = snapshot.cw_message;
+            reply["cw_active_char_index"] = snapshot.cw_active_char_index;
             auto now = std::chrono::system_clock::now();
             auto now_t = std::chrono::system_clock::to_time_t(now);
             std::tm tm_utc{};
@@ -661,6 +665,19 @@ void WebSocketServer::sendToClient(const std::string &message)
 void WebSocketServer::sendAllClients(const std::string &message)
 {
     std::lock_guard<std::mutex> lock(clients_mutex_);
+    const std::size_t client_count = client_sockets_.size();
+
+    if (client_count == 0U)
+    {
+        llog.logS(DEBUG, "Dropping websocket broadcast; no connected clients.");
+        return;
+    }
+
+    llog.logS(
+        DEBUG,
+        "Broadcasting websocket payload to ",
+        static_cast<int>(client_count),
+        " client(s).");
 
     // Build WebSocket text frame header
     std::string frame;

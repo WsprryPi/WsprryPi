@@ -259,6 +259,7 @@ static bool suppress_scheduler_execution_for_test = false;
 static std::atomic<std::uint64_t> non_wspr_schedule_generation{0};
 static std::atomic<BandGPIOPrepareStatus> active_band_gpio_prepare_status{
     BandGPIOPrepareStatus::Inactive};
+static std::atomic<bool> suppress_cancelled_ws_event_for_user_stop{false};
 static std::vector<SelectorGPIOReservation> idle_selector_gpio_reservations{};
 static bool selector_gpio_control_enabled = false;
 static bool selector_gpio_drive_enabled = false;
@@ -1117,6 +1118,20 @@ static bool runtime_transmit_requested(const ArgParserConfig &cfg) noexcept
 static bool runtime_transmit_enabled(const ArgParserConfig &cfg) noexcept
 {
     return runtime_transmit_requested(cfg) && !managed_reload_tx_inhibited;
+}
+
+bool web_server_start_enabled(const ArgParserConfig &cfg) noexcept
+{
+    return cfg.enable_web &&
+           cfg.web_port >= 1024 &&
+           cfg.web_port <= 49151;
+}
+
+bool websocket_server_start_enabled(const ArgParserConfig &cfg) noexcept
+{
+    return cfg.enable_web &&
+           cfg.socket_port >= 1024 &&
+           cfg.socket_port <= 49151;
 }
 
 static wsprrypi::BackendKind to_controller_backend(
@@ -2352,6 +2367,16 @@ void transmitter_cb(WsprTransmitter::TransmissionCallbackEvent event,
         break;
     }
 
+    case WsprTransmitter::TransmissionCallbackEvent::PROGRESS:
+    {
+        send_ws_message(
+            "transmit",
+            "progress",
+            std::string(),
+            static_cast<int>(value));
+        break;
+    }
+
     case WsprTransmitter::TransmissionCallbackEvent::COMPLETE:
     {
         const double elapsed = value;
@@ -2458,6 +2483,10 @@ void transmitter_cb(WsprTransmitter::TransmissionCallbackEvent event,
     {
         const double elapsed = value;
         const std::string s_elapsed = format_elapsed(elapsed);
+        const bool suppress_ws_event =
+            suppress_cancelled_ws_event_for_user_stop.exchange(
+                false,
+                std::memory_order_acq_rel);
 
         llog.logS(to_log_level(level),
                   "Transmission cancelled after ",
@@ -2468,7 +2497,16 @@ void transmitter_cb(WsprTransmitter::TransmissionCallbackEvent event,
             &config,
             runtime_should_hold_selector_gpios_initialized(config));
         set_tx_led_state(false, "transmission cancellation");
-        send_ws_message("transmit", "canceled");
+        if (suppress_ws_event)
+        {
+            llog.logS(
+                DEBUG,
+                "Suppressing websocket canceled event because an explicit user stop will publish stopped.");
+        }
+        else
+        {
+            send_ws_message("transmit", "canceled");
+        }
 
         shutdown_after_current_transmission.store(false, std::memory_order_release);
         shutdown_after_wspr_plan.store(false, std::memory_order_release);
@@ -2779,7 +2817,6 @@ void start_test_tone()
         llog.logS(INFO,
                   "WSPR-band test tone using dial frequency: ",
                   lookup.freq_display_string(dial_freq));
-        send_ws_message("transmit", "starting");
     }
 }
 
@@ -2798,7 +2835,6 @@ void end_test_tone()
         // Stop current tone
         wsprTransmitter.stopAndJoin();
         stop_active_transmission_selectors();
-        send_ws_message("transmit", "finished");
         set_tx_led_state(false, "test tone stop");
 
         // Clear the “we’re testing” flag
@@ -2868,6 +2904,7 @@ StopTransmissionResult stop_transmission_by_user_request()
 {
     StopTransmissionResult result;
     bool persist_to_ini = false;
+    suppress_cancelled_ws_event_for_user_stop.store(false, std::memory_order_release);
 
     {
         std::lock_guard<std::mutex> lk(set_config_mtx);
@@ -2893,6 +2930,11 @@ StopTransmissionResult stop_transmission_by_user_request()
         result.transmit_disabled = true;
         config_to_json();
         persist_to_ini = config.use_ini;
+    }
+
+    if (result.transmission_active)
+    {
+        suppress_cancelled_ws_event_for_user_stop.store(true, std::memory_order_release);
     }
 
     wsprTransmitter.stopAndJoin();
@@ -3019,8 +3061,12 @@ bool wspr_loop()
         }
     }
 
+    if (!config.enable_web)
+    {
+        llog.logS(INFO, "Web UI disabled via CLI (--no-web)");
+    }
     // Start web server and set priority
-    if (config.web_port >= 1024 && config.web_port <= 49151)
+    else if (web_server_start_enabled(config))
     {
         webServer.start(config.web_port);
         webServer.setThreadPriority(SCHED_RR, 10);
@@ -3031,7 +3077,7 @@ bool wspr_loop()
     }
 
     // Start socket server and set priority
-    if (config.socket_port >= 1024 && config.socket_port <= 49151)
+    if (websocket_server_start_enabled(config))
     {
         socketServer.start(config.socket_port, SOCKET_KEEPALIVE);
         socketServer.setThreadPriority(SCHED_RR, 10);
@@ -3282,7 +3328,8 @@ void shutdown_machine()
 void send_ws_message(
     std::string type,
     std::string state,
-    std::string message)
+    std::string message,
+    std::optional<int> cw_active_char_index_override)
 {
     // Build JSON payload
     nlohmann::json j;
@@ -3292,7 +3339,13 @@ void send_ws_message(
     if (type == "transmit")
     {
         const WsprRuntimeStatusSnapshot snapshot = current_tx_runtime_status_snapshot();
-        j["tx_state"] = snapshot.tx_state;
+        const std::string tx_state = websocket_tx_state_for_message(
+            type,
+            state,
+            snapshot.tx_state);
+        j["tx_state"] = tx_state;
+        j["runtime_mode"] = snapshot.runtime_mode;
+        j["next_transmission_at"] = snapshot.next_transmission_at;
         j["plan_type"] = snapshot.plan_type;
         j["frame_count"] = snapshot.frame_count;
         j["current_frame"] = snapshot.current_frame;
@@ -3302,6 +3355,9 @@ void send_ws_message(
         j["locator_normalized"] = snapshot.locator_normalized;
         j["frame_callsign"] = snapshot.frame_callsign;
         j["frame_locator"] = snapshot.frame_locator;
+        j["cw_message"] = snapshot.cw_message;
+        j["cw_active_char_index"] =
+            cw_active_char_index_override.value_or(snapshot.cw_active_char_index);
     }
 
     if (!message.empty())
@@ -3321,7 +3377,85 @@ void send_ws_message(
 
     // Serialize and send to all WebSocket clients
     const std::string payload = j.dump();
+    if (type == "transmit")
+    {
+        llog.logS(
+            DEBUG,
+            "WebSocket transmit event prepared: state=",
+            state,
+            ", tx_state=",
+            j.value("tx_state", std::string{}),
+            ", plan_type=",
+            j.value("plan_type", std::string{}),
+            ", current_frame=",
+            j.value("current_frame", 0),
+            "/",
+            j.value("frame_count", 0),
+            ".");
+    }
+    else
+    {
+        llog.logS(
+            DEBUG,
+            "WebSocket event prepared: type=",
+            type,
+            ", state=",
+            state,
+            ".");
+    }
     socketServer.sendAllClients(payload);
+}
+
+std::string websocket_tx_state_for_message(
+    std::string_view type,
+    std::string_view state,
+    std::string_view current_tx_state)
+{
+    if (type != "transmit")
+    {
+        return std::string(current_tx_state);
+    }
+
+    if (state == "starting" || state == "progress")
+    {
+        return "transmitting";
+    }
+    if (state == "finished" || state == "skipped")
+    {
+        return "complete";
+    }
+    if (state == "canceled")
+    {
+        return "cancelled";
+    }
+    if (state == "stopped")
+    {
+        return "disabled";
+    }
+
+    return std::string(current_tx_state);
+}
+
+static std::string runtime_mode_to_string(
+    wsprrypi::TransmissionMode mode)
+{
+    switch (mode)
+    {
+    case wsprrypi::TransmissionMode::WSPR:
+        return "WSPR";
+    case wsprrypi::TransmissionMode::QRSS:
+        return "QRSS";
+    case wsprrypi::TransmissionMode::FSKCW:
+        return "FSKCW";
+    case wsprrypi::TransmissionMode::DFCW:
+        return "DFCW";
+    case wsprrypi::TransmissionMode::CW:
+        return "CW";
+    case wsprrypi::TransmissionMode::TONE:
+        return "TONE";
+    default:
+        return "";
+    }
 }
 
 WsprRuntimeStatusSnapshot current_tx_runtime_status_snapshot()
@@ -3331,8 +3465,28 @@ WsprRuntimeStatusSnapshot current_tx_runtime_status_snapshot()
     WsprRuntimeStatusSnapshot snapshot;
     snapshot.tx_state = wsprTransmitter.stateToStringLower(
         wsprTransmitter.getState());
+    const auto runtime_status = wsprTransmitter.runtimeExecutionStatusSnapshot();
+    if (snapshot.tx_state == "transmitting")
+    {
+        snapshot.runtime_mode = runtime_mode_to_string(runtime_status.mode);
+    }
+    else
+    {
+        snapshot.runtime_mode = mode_type_name(config.mode);
+    }
+    snapshot.cw_message = runtime_status.cw_message;
+    snapshot.cw_active_char_index = runtime_status.cw_active_char_index;
 
-    if (current_transmission_request.mode != TransmissionMode::WSPR ||
+    if (is_non_wspr_runtime_mode(config.mode) &&
+        runtime_transmit_enabled(config) &&
+        config.schedule_repeat_minutes > 0)
+    {
+        snapshot.next_transmission_at =
+            format_local_schedule_time(next_non_wspr_schedule_time(config));
+    }
+
+    if (config.mode != ModeType::WSPR ||
+        current_transmission_request.mode != TransmissionMode::WSPR ||
         current_transmission_request.payload.empty())
     {
         return snapshot;

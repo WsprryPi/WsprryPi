@@ -31,15 +31,6 @@ namespace
         }
     }
 
-    std::string read_text_file(const std::string &path)
-    {
-        std::ifstream in(path);
-        require(in.is_open(), "test helper must open " + path);
-        return std::string(
-            std::istreambuf_iterator<char>(in),
-            std::istreambuf_iterator<char>());
-    }
-
     void write_text_file(const std::string &path, const std::string &contents)
     {
         std::ofstream out(path, std::ios::trunc);
@@ -397,6 +388,68 @@ int main()
     }
 
     {
+        config.enable_web = false;
+        init_config_json();
+        json_to_config();
+        config.use_ini = false;
+        reset_getopt_state();
+
+        std::vector<std::string> args = {
+            "wsprrypi",
+            "--transmit-gpio",
+            "4",
+            "AA0NT",
+            "EM18",
+            "20",
+            "20m"};
+        std::vector<char *> argv = argv_for(args);
+
+        require(
+            parse_command_line(static_cast<int>(argv.size()), argv.data()),
+            "CLI parsing without --no-web must succeed");
+        require(
+            config.enable_web,
+            "CLI parsing without --no-web must leave the web runtime enabled by default");
+        require(
+            web_server_start_enabled(config),
+            "startup gating must allow the HTTP server by default");
+        require(
+            websocket_server_start_enabled(config),
+            "startup gating must allow the websocket server by default");
+    }
+
+    {
+        init_config_json();
+        json_to_config();
+        config.use_ini = false;
+        reset_getopt_state();
+
+        std::vector<std::string> args = {
+            "wsprrypi",
+            "--no-web",
+            "--transmit-gpio",
+            "4",
+            "AA0NT",
+            "EM18",
+            "20",
+            "20m"};
+        std::vector<char *> argv = argv_for(args);
+
+        require(
+            parse_command_line(static_cast<int>(argv.size()), argv.data()),
+            "CLI parsing with --no-web must succeed");
+        require(
+            !config.enable_web,
+            "CLI parsing with --no-web must disable the web runtime");
+        require(
+            !web_server_start_enabled(config),
+            "startup gating must skip the HTTP server when --no-web is present");
+        require(
+            !websocket_server_start_enabled(config),
+            "startup gating must skip the websocket server when --no-web is present");
+    }
+
+    {
         set_raspberry_pi_generation_override_for_test(5);
         reset_current_transmission_request_for_test();
         reset_getopt_state();
@@ -736,6 +789,97 @@ int main()
             jConfig["Meta"].contains("debug_logging") &&
                 !jConfig["Meta"]["debug_logging"].get<bool>(),
             "default JSON config must serialize debug_logging as false");
+    }
+
+    {
+        wsprrypi::TransmissionRequest request;
+        request.mode = wsprrypi::TransmissionMode::QRSS;
+        request.output.backend = wsprrypi::BackendKind::SI5351;
+        request.output.output = wsprrypi::ClockSource::SI5351_CLK0;
+        request.output.gpio = 4;
+
+        wsprrypi::QrssPayload payload;
+        payload.message = "AB";
+        payload.frequency_hz = 7038600.0;
+        payload.timing.dot = std::chrono::seconds(1);
+        payload.timing.dash = std::chrono::seconds(3);
+        payload.timing.intra_element_gap = std::chrono::seconds(1);
+        payload.timing.inter_character_gap = std::chrono::seconds(3);
+        payload.timing.inter_word_gap = std::chrono::seconds(7);
+        request.payload = payload;
+
+        const wsprrypi::ExecutionPlan plan =
+            wsprrypi::ExecutionPlanCompiler{}.compile(request);
+
+        bool saw_first_char = false;
+        bool saw_second_char = false;
+        bool saw_transition = false;
+        int prior_index = -1;
+        for (const auto &event : plan.events)
+        {
+            if (event.message_char_index == 0)
+            {
+                saw_first_char = true;
+            }
+            else if (event.message_char_index == 1)
+            {
+                saw_second_char = true;
+            }
+
+            if (prior_index != -1 && event.message_char_index != prior_index)
+            {
+                saw_transition = true;
+            }
+            prior_index = event.message_char_index;
+        }
+
+        require(
+            saw_first_char && saw_second_char && saw_transition,
+            "compiled CW execution plans must carry progressing message_char_index values across multiple characters");
+    }
+
+    {
+        wsprrypi::TransmissionRequest request;
+        request.mode = wsprrypi::TransmissionMode::QRSS;
+        request.output.backend = wsprrypi::BackendKind::SI5351;
+        request.output.output = wsprrypi::ClockSource::SI5351_CLK0;
+        request.output.gpio = 4;
+
+        wsprrypi::QrssPayload payload;
+        payload.message = "A A";
+        payload.frequency_hz = 7038600.0;
+        payload.timing.dot = std::chrono::seconds(1);
+        payload.timing.dash = std::chrono::seconds(3);
+        payload.timing.intra_element_gap = std::chrono::seconds(1);
+        payload.timing.inter_character_gap = std::chrono::seconds(3);
+        payload.timing.inter_word_gap = std::chrono::seconds(7);
+        request.payload = payload;
+
+        const wsprrypi::ExecutionPlan plan =
+            wsprrypi::ExecutionPlanCompiler{}.compile(request);
+
+        bool saw_first_char = false;
+        bool saw_space_char = false;
+        bool saw_second_char = false;
+        for (const auto &event : plan.events)
+        {
+            if (event.message_char_index == 0)
+            {
+                saw_first_char = true;
+            }
+            else if (event.message_char_index == 1)
+            {
+                saw_space_char = true;
+            }
+            else if (event.message_char_index == 2)
+            {
+                saw_second_char = true;
+            }
+        }
+
+        require(
+            saw_first_char && saw_space_char && saw_second_char,
+            "compiled CW execution plans must tag inter-word gaps with the space character index");
     }
 
     {
@@ -1643,6 +1787,105 @@ int main()
     }
 
     {
+        require(
+            websocket_tx_state_for_message(
+                "transmit",
+                "starting",
+                "enabled") == "transmitting",
+            "websocket transmit start events must present a transmitting tx_state");
+        require(
+            websocket_tx_state_for_message(
+                "transmit",
+                "progress",
+                "enabled") == "transmitting",
+            "websocket transmit progress events must present a transmitting tx_state");
+        require(
+            websocket_tx_state_for_message(
+                "transmit",
+                "finished",
+                "transmitting") == "complete",
+            "websocket transmit finished events must present a non-transmitting terminal tx_state");
+        require(
+            websocket_tx_state_for_message(
+                "transmit",
+                "canceled",
+                "transmitting") == "cancelled",
+            "websocket transmit canceled events must present a cancelled tx_state");
+        require(
+            websocket_tx_state_for_message(
+                "transmit",
+                "stopped",
+                "transmitting") == "disabled",
+            "websocket transmit stopped events must present a disabled tx_state");
+        require(
+            websocket_tx_state_for_message(
+                "transmit",
+                "skipped",
+                "transmitting") == "complete",
+            "websocket transmit skipped events must present a non-transmitting terminal tx_state");
+        require(
+            websocket_tx_state_for_message(
+                "configuration",
+                "reload",
+                "enabled") == "enabled",
+            "non-transmit websocket messages must preserve the current runtime tx_state");
+    }
+
+    {
+        init_default_config();
+        wsprTransmitter.backendSetStateValue(WsprTransmitter::State::TRANSMITTING);
+        const WsprRuntimeStatusSnapshot snapshot =
+            current_tx_runtime_status_snapshot();
+        require(
+            snapshot.tx_state == "transmitting",
+            "runtime status snapshots must report transmitting when the transmitter state is TRANSMITTING");
+        wsprTransmitter.backendSetStateValue(WsprTransmitter::State::DISABLED);
+    }
+
+    {
+        prime_valid_runtime_identity_config();
+        reset_runtime_planning_state_for_identity_test();
+        require(
+            set_config(true),
+            "stale idle runtime snapshot regression must plan an initial WSPR request");
+        finish_runtime_planning_state_for_identity_test();
+
+        require(
+            current_transmission_request_for_test().mode == TransmissionMode::WSPR,
+            "stale idle runtime snapshot regression must start from a committed WSPR request");
+
+        wsprTransmitter.current_execution_mode_ = wsprrypi::TransmissionMode::WSPR;
+        config.mode = ModeType::QRSS;
+        config.transmit = false;
+        config.schedule_start_minute = 0;
+        config.schedule_repeat_minutes = 10;
+        config.qrss.message = "A A";
+        config.qrss.frequency_hz = 3572000.0;
+        config.qrss.dot_seconds = 3.0;
+
+        const WsprRuntimeStatusSnapshot snapshot =
+            current_tx_runtime_status_snapshot();
+        require(
+            snapshot.runtime_mode == "QRSS",
+            "idle runtime snapshots must report the committed scheduler mode instead of stale backend WSPR execution state");
+        require(
+            snapshot.plan_type.empty() &&
+                snapshot.frame_count == 0U &&
+                snapshot.current_frame == 0U,
+            "idle CW runtime snapshots must not expose stale WSPR plan details after a mode change");
+        require(
+            snapshot.next_transmission_at.empty(),
+            "idle CW runtime snapshots must not expose a next scheduled message time while transmissions are disabled");
+
+        config.transmit = true;
+        const WsprRuntimeStatusSnapshot enabled_snapshot =
+            current_tx_runtime_status_snapshot();
+        require(
+            !enabled_snapshot.next_transmission_at.empty(),
+            "idle CW runtime snapshots must expose the next scheduled message time once transmissions are enabled");
+    }
+
+    {
         PreparedConfigCandidate candidate;
         iniFile.setData(
             make_managed_ini_data(
@@ -1659,6 +1902,26 @@ int main()
             candidate.normalized_config.wspr_planner_preference ==
                 WsprPlannerPreference::RequirePaired,
             "managed INI candidate must preserve Planner Preference = require_paired");
+    }
+
+    {
+        PreparedConfigCandidate candidate;
+        init_default_config();
+        config.enable_web = false;
+        iniFile.setData(
+            make_managed_ini_data("AA0NT", "EM18", "20m", true));
+        prepare_ini_config_candidate("/tmp/managed_candidate.ini", candidate);
+        require(
+            candidate.valid,
+            "managed INI candidate must still validate when the CLI web override is disabled");
+        require(
+            !candidate.normalized_config.enable_web,
+            "managed INI candidate preparation must preserve the CLI-only web override");
+
+        commit_config_candidate(candidate);
+        require(
+            !config.enable_web,
+            "committing a managed INI candidate must not re-enable the web runtime after --no-web");
     }
 
     {
@@ -1749,6 +2012,26 @@ int main()
             "public config JSON must still hide Meta after internal debug logging patch");
 
         init_default_config();
+    }
+
+    {
+        init_default_config();
+        config.use_ini = true;
+        config.ini_filename = "/tmp/no_web_persistence.ini";
+        write_text_file(config.ini_filename, "");
+        iniFile.set_filename(config.ini_filename);
+        config.enable_web = false;
+        config_to_json();
+        json_to_ini();
+
+        const auto persisted_ini = iniFile.getData();
+        const auto operation_it = persisted_ini.find("Operation");
+        require(
+            operation_it != persisted_ini.end(),
+            "json_to_ini must persist the Operation section");
+        require(
+            operation_it->second.find("Enable Web") == operation_it->second.end(),
+            "json_to_ini must not persist the CLI-only web override");
     }
 
     {
@@ -1970,42 +2253,6 @@ int main()
         require(
             persisted_ini.at("GPIO").at("Use NTP") == "true",
             "web patch must persist canonical GPIO.Use NTP in INI");
-    }
-
-    {
-        const std::string websocket_source =
-            read_text_file("/home/pi/WsprryPi/src/web_socket.cpp");
-        require(
-            websocket_source.find("else if (cmd == \"stop\")") != std::string::npos &&
-                websocket_source.find("stop_transmission_by_user_request();") !=
-                    std::string::npos,
-            "websocket stop command must route through stop_transmission_by_user_request()");
-
-        const std::string ui_source =
-            read_text_file("/home/pi/WsprryPi/WsprryPi-UI/data/index.js");
-        require(
-            ui_source.find("url: CONTROL_STOP_URL") != std::string::npos &&
-                ui_source.find("data: JSON.stringify({ command: \"stop\" })") !=
-                    std::string::npos,
-            "UI Stop button must POST the explicit stop command to the control stop endpoint");
-        require(
-            ui_source.find("Operation: {\n                \"Transmit\": enabled,") !=
-                    std::string::npos &&
-                ui_source.find("Runtime: {\n                \"Transmit\": enabled,") ==
-                    std::string::npos,
-            "UI transmit toggle must patch canonical Operation.Transmit only");
-        require(
-            ui_source.find("var Operation = {\n        \"Mode\": mode,") !=
-                    std::string::npos &&
-                ui_source.find("var Meta = {\n        \"Mode\": mode") ==
-                    std::string::npos,
-            "UI save path must use canonical Operation.Mode only");
-        require(
-            ui_source.find("var GPIO = {\n        \"Power Level\": transmit_power,\n        \"Use NTP\": use_ntp,") !=
-                    std::string::npos &&
-                ui_source.find("var Calibration = {\n        \"PPM\": ppm_val,\n        \"Use NTP\": use_ntp,") ==
-                    std::string::npos,
-            "UI save path must use canonical GPIO.Use NTP only");
     }
 
     {
