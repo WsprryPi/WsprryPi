@@ -70,8 +70,10 @@ int main()
             ui_source.find("finalizePendingModeChange(requestedMode);") != std::string::npos &&
             ui_source.find("if (!stopTransmission()) {") != std::string::npos &&
             ui_source.find("suspendConfigAutosave(true);") != std::string::npos &&
-            ui_source.find("input:not(#transmit, [name=\"mode_toggle\"], [name=\"qrss_type\"])") != std::string::npos,
-        "mode changes must be guarded behind stop/disable confirmation and exclude mode toggles from generic autosave scheduling");
+            ui_source.find("input:not(#transmit, [name=\"mode_toggle\"], [name=\"qrss_type\"])") != std::string::npos &&
+            ui_source.find("configAutosaveNeedsRuntimeRefresh = true;") != std::string::npos &&
+            ui_source.find("if (configAutosaveNeedsRuntimeRefresh && typeof getTxState === \"function\") {") != std::string::npos,
+        "mode changes must be guarded behind stop/disable confirmation, exclude mode toggles from generic autosave scheduling, and refresh runtime state after the committed mode save lands");
     require(
         ui_source.find("const transmitting = runtimeStatus && runtimeStatus.txState === \"transmitting\";") !=
                 std::string::npos &&
@@ -154,6 +156,7 @@ int main()
             site_source.find("cw_message") != std::string::npos &&
             site_source.find("cw_active_char_index") != std::string::npos &&
             site_source.find("if (typeof handleRuntimeStatusUpdate === \"function\") {") != std::string::npos &&
+            site_source.find("const selectedMode =\n        typeof selectedConfigMode === \"function\" ? selectedConfigMode() : \"\";") != std::string::npos &&
             site_source.find("function renderCwRuntimeMessage(node, message, activeCharIndex)") != std::string::npos &&
             site_source.find("const isTransmitting =") != std::string::npos &&
             site_source.find("planLabelNode.textContent = \"Message progression\";") != std::string::npos &&
