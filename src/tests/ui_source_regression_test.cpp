@@ -125,6 +125,12 @@ int main()
         site_source.find("Frequency Control GPIO Polarity") == std::string::npos,
         "UI config schema must not require the obsolete GPIO.Frequency Control GPIO Polarity key");
     require(
+        site_source.find("runtime_mode") != std::string::npos &&
+            site_source.find("cw_message") != std::string::npos &&
+            site_source.find("cw_active_char_index") != std::string::npos &&
+            site_source.find("function renderCwRuntimeMessage(node, message, activeCharIndex)") != std::string::npos,
+        "runtime status handling must expose dedicated CW runtime fields and a renderer for highlighted CW message progress");
+    require(
         site_source.find("const TAB_STATE_STORAGE_PREFIX = \"wsprrypi.activeTab\";") != std::string::npos &&
             site_source.find("function shouldRestorePersistedTabState(tabList)") != std::string::npos &&
             site_source.find("getNavigationType() === \"reload\"") != std::string::npos &&
@@ -144,8 +150,9 @@ int main()
         "Configuration header must host the compact Stop transmission control");
     require(
         config_view_source.find("class=\"config-runtime-header\"") != std::string::npos &&
-            config_view_source.find("<label class=\"form-check-label\" for=\"transmit\">Transmit enabled</label>") != std::string::npos,
-        "Runtime state header must host the primary Transmit enabled control");
+            config_view_source.find("<label class=\"form-check-label\" for=\"transmit\">Transmit enabled</label>") != std::string::npos &&
+            config_view_source.find("id=\"runtime_plan_label\"") != std::string::npos,
+        "Runtime state header must host the primary Transmit enabled control and a switchable runtime detail label");
     require(
         config_view_source.find("config-runtime-item config-runtime-item--action") == std::string::npos,
         "Runtime state grid must no longer dedicate a large action tile to Stop transmission");

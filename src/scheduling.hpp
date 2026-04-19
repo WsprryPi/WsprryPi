@@ -275,6 +275,7 @@ StopTransmissionResult stop_transmission_by_user_request();
 struct WsprRuntimeStatusSnapshot
 {
     std::string tx_state;
+    std::string runtime_mode;
     std::string plan_type;
     std::size_t frame_count = 0;
     std::size_t current_frame = 0; // 1-based, 0 when unavailable
@@ -284,6 +285,8 @@ struct WsprRuntimeStatusSnapshot
     std::string locator_normalized;
     std::string frame_callsign;
     std::string frame_locator;
+    std::string cw_message;
+    int cw_active_char_index = -1;
 };
 
 WsprRuntimeStatusSnapshot current_tx_runtime_status_snapshot();

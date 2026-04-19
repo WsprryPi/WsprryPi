@@ -2353,6 +2353,12 @@ void transmitter_cb(WsprTransmitter::TransmissionCallbackEvent event,
         break;
     }
 
+    case WsprTransmitter::TransmissionCallbackEvent::PROGRESS:
+    {
+        send_ws_message("transmit", "progress");
+        break;
+    }
+
     case WsprTransmitter::TransmissionCallbackEvent::COMPLETE:
     {
         const double elapsed = value;
@@ -3315,6 +3321,7 @@ void send_ws_message(
             state,
             snapshot.tx_state);
         j["tx_state"] = tx_state;
+        j["runtime_mode"] = snapshot.runtime_mode;
         j["plan_type"] = snapshot.plan_type;
         j["frame_count"] = snapshot.frame_count;
         j["current_frame"] = snapshot.current_frame;
@@ -3324,6 +3331,8 @@ void send_ws_message(
         j["locator_normalized"] = snapshot.locator_normalized;
         j["frame_callsign"] = snapshot.frame_callsign;
         j["frame_locator"] = snapshot.frame_locator;
+        j["cw_message"] = snapshot.cw_message;
+        j["cw_active_char_index"] = snapshot.cw_active_char_index;
     }
 
     if (!message.empty())
@@ -3402,6 +3411,28 @@ std::string websocket_tx_state_for_message(
     return std::string(current_tx_state);
 }
 
+static std::string runtime_mode_to_string(
+    wsprrypi::TransmissionMode mode)
+{
+    switch (mode)
+    {
+    case wsprrypi::TransmissionMode::WSPR:
+        return "WSPR";
+    case wsprrypi::TransmissionMode::QRSS:
+        return "QRSS";
+    case wsprrypi::TransmissionMode::FSKCW:
+        return "FSKCW";
+    case wsprrypi::TransmissionMode::DFCW:
+        return "DFCW";
+    case wsprrypi::TransmissionMode::CW:
+        return "CW";
+    case wsprrypi::TransmissionMode::TONE:
+        return "TONE";
+    default:
+        return "";
+    }
+}
+
 WsprRuntimeStatusSnapshot current_tx_runtime_status_snapshot()
 {
     std::lock_guard<std::mutex> lk(set_config_mtx);
@@ -3409,8 +3440,13 @@ WsprRuntimeStatusSnapshot current_tx_runtime_status_snapshot()
     WsprRuntimeStatusSnapshot snapshot;
     snapshot.tx_state = wsprTransmitter.stateToStringLower(
         wsprTransmitter.getState());
+    const auto runtime_status = wsprTransmitter.runtimeExecutionStatusSnapshot();
+    snapshot.runtime_mode = runtime_mode_to_string(runtime_status.mode);
+    snapshot.cw_message = runtime_status.cw_message;
+    snapshot.cw_active_char_index = runtime_status.cw_active_char_index;
 
-    if (current_transmission_request.mode != TransmissionMode::WSPR ||
+    if (runtime_status.mode != wsprrypi::TransmissionMode::WSPR ||
+        current_transmission_request.mode != TransmissionMode::WSPR ||
         current_transmission_request.payload.empty())
     {
         return snapshot;
