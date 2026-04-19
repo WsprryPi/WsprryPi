@@ -3397,7 +3397,7 @@ std::string websocket_tx_state_for_message(
         return std::string(current_tx_state);
     }
 
-    if (state == "starting")
+    if (state == "starting" || state == "progress")
     {
         return "transmitting";
     }

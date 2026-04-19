@@ -1690,6 +1690,12 @@ int main()
         require(
             websocket_tx_state_for_message(
                 "transmit",
+                "progress",
+                "enabled") == "transmitting",
+            "websocket transmit progress events must present a transmitting tx_state");
+        require(
+            websocket_tx_state_for_message(
+                "transmit",
                 "finished",
                 "transmitting") == "complete",
             "websocket transmit finished events must present a non-transmitting terminal tx_state");
