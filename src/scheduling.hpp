@@ -314,6 +314,8 @@ bool compute_non_wspr_message_duration(
 bool validate_non_wspr_repeat_interval_policy(
     const ArgParserConfig &cfg,
     std::string *error_message = nullptr);
+bool web_server_start_enabled(const ArgParserConfig &cfg) noexcept;
+bool websocket_server_start_enabled(const ArgParserConfig &cfg) noexcept;
 bool transmitter_reload_should_defer() noexcept;
 void transmitter_cb(WsprTransmissionCallbackEvent event,
                     WsprTransmitLogLevel level,

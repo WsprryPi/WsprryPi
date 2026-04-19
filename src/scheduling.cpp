@@ -1120,6 +1120,20 @@ static bool runtime_transmit_enabled(const ArgParserConfig &cfg) noexcept
     return runtime_transmit_requested(cfg) && !managed_reload_tx_inhibited;
 }
 
+bool web_server_start_enabled(const ArgParserConfig &cfg) noexcept
+{
+    return cfg.enable_web &&
+           cfg.web_port >= 1024 &&
+           cfg.web_port <= 49151;
+}
+
+bool websocket_server_start_enabled(const ArgParserConfig &cfg) noexcept
+{
+    return cfg.enable_web &&
+           cfg.socket_port >= 1024 &&
+           cfg.socket_port <= 49151;
+}
+
 static wsprrypi::BackendKind to_controller_backend(
     TransmitBackendKind backend) noexcept
 {
@@ -3047,8 +3061,12 @@ bool wspr_loop()
         }
     }
 
+    if (!config.enable_web)
+    {
+        llog.logS(INFO, "Web UI disabled via CLI (--no-web)");
+    }
     // Start web server and set priority
-    if (config.web_port >= 1024 && config.web_port <= 49151)
+    else if (web_server_start_enabled(config))
     {
         webServer.start(config.web_port);
         webServer.setThreadPriority(SCHED_RR, 10);
@@ -3059,7 +3077,7 @@ bool wspr_loop()
     }
 
     // Start socket server and set priority
-    if (config.socket_port >= 1024 && config.socket_port <= 49151)
+    if (websocket_server_start_enabled(config))
     {
         socketServer.start(config.socket_port, SOCKET_KEEPALIVE);
         socketServer.setThreadPriority(SCHED_RR, 10);

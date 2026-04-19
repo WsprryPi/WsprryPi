@@ -388,6 +388,68 @@ int main()
     }
 
     {
+        config.enable_web = false;
+        init_config_json();
+        json_to_config();
+        config.use_ini = false;
+        reset_getopt_state();
+
+        std::vector<std::string> args = {
+            "wsprrypi",
+            "--transmit-gpio",
+            "4",
+            "AA0NT",
+            "EM18",
+            "20",
+            "20m"};
+        std::vector<char *> argv = argv_for(args);
+
+        require(
+            parse_command_line(static_cast<int>(argv.size()), argv.data()),
+            "CLI parsing without --no-web must succeed");
+        require(
+            config.enable_web,
+            "CLI parsing without --no-web must leave the web runtime enabled by default");
+        require(
+            web_server_start_enabled(config),
+            "startup gating must allow the HTTP server by default");
+        require(
+            websocket_server_start_enabled(config),
+            "startup gating must allow the websocket server by default");
+    }
+
+    {
+        init_config_json();
+        json_to_config();
+        config.use_ini = false;
+        reset_getopt_state();
+
+        std::vector<std::string> args = {
+            "wsprrypi",
+            "--no-web",
+            "--transmit-gpio",
+            "4",
+            "AA0NT",
+            "EM18",
+            "20",
+            "20m"};
+        std::vector<char *> argv = argv_for(args);
+
+        require(
+            parse_command_line(static_cast<int>(argv.size()), argv.data()),
+            "CLI parsing with --no-web must succeed");
+        require(
+            !config.enable_web,
+            "CLI parsing with --no-web must disable the web runtime");
+        require(
+            !web_server_start_enabled(config),
+            "startup gating must skip the HTTP server when --no-web is present");
+        require(
+            !websocket_server_start_enabled(config),
+            "startup gating must skip the websocket server when --no-web is present");
+    }
+
+    {
         set_raspberry_pi_generation_override_for_test(5);
         reset_current_transmission_request_for_test();
         reset_getopt_state();
@@ -1844,6 +1906,26 @@ int main()
 
     {
         PreparedConfigCandidate candidate;
+        init_default_config();
+        config.enable_web = false;
+        iniFile.setData(
+            make_managed_ini_data("AA0NT", "EM18", "20m", true));
+        prepare_ini_config_candidate("/tmp/managed_candidate.ini", candidate);
+        require(
+            candidate.valid,
+            "managed INI candidate must still validate when the CLI web override is disabled");
+        require(
+            !candidate.normalized_config.enable_web,
+            "managed INI candidate preparation must preserve the CLI-only web override");
+
+        commit_config_candidate(candidate);
+        require(
+            !config.enable_web,
+            "committing a managed INI candidate must not re-enable the web runtime after --no-web");
+    }
+
+    {
+        PreparedConfigCandidate candidate;
         iniFile.setData(
             make_managed_ini_data("<AA0NT>", "EM18", "20m", true));
         prepare_ini_config_candidate("/tmp/managed_candidate.ini", candidate);
@@ -1930,6 +2012,26 @@ int main()
             "public config JSON must still hide Meta after internal debug logging patch");
 
         init_default_config();
+    }
+
+    {
+        init_default_config();
+        config.use_ini = true;
+        config.ini_filename = "/tmp/no_web_persistence.ini";
+        write_text_file(config.ini_filename, "");
+        iniFile.set_filename(config.ini_filename);
+        config.enable_web = false;
+        config_to_json();
+        json_to_ini();
+
+        const auto persisted_ini = iniFile.getData();
+        const auto operation_it = persisted_ini.find("Operation");
+        require(
+            operation_it != persisted_ini.end(),
+            "json_to_ini must persist the Operation section");
+        require(
+            operation_it->second.find("Enable Web") == operation_it->second.end(),
+            "json_to_ini must not persist the CLI-only web override");
     }
 
     {

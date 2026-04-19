@@ -249,6 +249,7 @@ struct ArgParserConfig
     int led_pin;     ///< GPIO pin for LED indicator.
 
     // Runtime
+    bool enable_web;   ///< Enable the HTTP web UI and WebSocket server.
     int web_port;      ///< Web server port number.
     int socket_port;   ///< Socket server port number.
     bool use_shutdown; ///< Enable GPIO-based shutdown feature.
@@ -313,6 +314,7 @@ struct ArgParserConfig
           si5351_power_level(1),
           use_led(false),
           led_pin(-1),
+          enable_web(true),
           web_port(-1),
           socket_port(-1),
           use_shutdown(false),
@@ -383,6 +385,7 @@ struct ArgParserConfig
         si5351_power_level = other.si5351_power_level;
         use_led = other.use_led;
         led_pin = other.led_pin;
+        enable_web = other.enable_web;
         web_port = other.web_port;
         socket_port = other.socket_port;
         use_shutdown = other.use_shutdown;
