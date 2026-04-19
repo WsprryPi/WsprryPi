@@ -1781,6 +1781,42 @@ int main()
     }
 
     {
+        prime_valid_runtime_identity_config();
+        reset_runtime_planning_state_for_identity_test();
+        require(
+            set_config(true),
+            "stale idle runtime snapshot regression must plan an initial WSPR request");
+        finish_runtime_planning_state_for_identity_test();
+
+        require(
+            current_transmission_request_for_test().mode == TransmissionMode::WSPR,
+            "stale idle runtime snapshot regression must start from a committed WSPR request");
+
+        wsprTransmitter.current_execution_mode_ = wsprrypi::TransmissionMode::WSPR;
+        config.mode = ModeType::QRSS;
+        config.transmit = true;
+        config.schedule_start_minute = 0;
+        config.schedule_repeat_minutes = 10;
+        config.qrss.message = "A A";
+        config.qrss.frequency_hz = 3572000.0;
+        config.qrss.dot_seconds = 3.0;
+
+        const WsprRuntimeStatusSnapshot snapshot =
+            current_tx_runtime_status_snapshot();
+        require(
+            snapshot.runtime_mode == "QRSS",
+            "idle runtime snapshots must report the committed scheduler mode instead of stale backend WSPR execution state");
+        require(
+            snapshot.plan_type.empty() &&
+                snapshot.frame_count == 0U &&
+                snapshot.current_frame == 0U,
+            "idle CW runtime snapshots must not expose stale WSPR plan details after a mode change");
+        require(
+            !snapshot.next_transmission_at.empty(),
+            "idle CW runtime snapshots must expose the next scheduled message time from committed config");
+    }
+
+    {
         PreparedConfigCandidate candidate;
         iniFile.setData(
             make_managed_ini_data(

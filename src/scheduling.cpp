@@ -3448,7 +3448,14 @@ WsprRuntimeStatusSnapshot current_tx_runtime_status_snapshot()
     snapshot.tx_state = wsprTransmitter.stateToStringLower(
         wsprTransmitter.getState());
     const auto runtime_status = wsprTransmitter.runtimeExecutionStatusSnapshot();
-    snapshot.runtime_mode = runtime_mode_to_string(runtime_status.mode);
+    if (snapshot.tx_state == "transmitting")
+    {
+        snapshot.runtime_mode = runtime_mode_to_string(runtime_status.mode);
+    }
+    else
+    {
+        snapshot.runtime_mode = mode_type_name(config.mode);
+    }
     snapshot.cw_message = runtime_status.cw_message;
     snapshot.cw_active_char_index = runtime_status.cw_active_char_index;
 
@@ -3460,7 +3467,8 @@ WsprRuntimeStatusSnapshot current_tx_runtime_status_snapshot()
             format_local_schedule_time(next_non_wspr_schedule_time(config));
     }
 
-    if (current_transmission_request.mode != TransmissionMode::WSPR ||
+    if (config.mode != ModeType::WSPR ||
+        current_transmission_request.mode != TransmissionMode::WSPR ||
         current_transmission_request.payload.empty())
     {
         return snapshot;
