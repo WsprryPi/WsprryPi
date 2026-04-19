@@ -2083,6 +2083,9 @@ int main()
                 site_source.find(tx_state_branch) != std::string::npos &&
                 site_source.find(transmit_branch) < site_source.find(tx_state_branch),
             "browser websocket handler must process pushed transmit events before generic tx_state replies");
+        require(
+            site_source.find("Frequency Control GPIO Polarity") == std::string::npos,
+            "UI config schema must not require the obsolete GPIO.Frequency Control GPIO Polarity key");
     }
 
     {
