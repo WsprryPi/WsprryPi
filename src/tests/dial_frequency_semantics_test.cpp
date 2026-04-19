@@ -777,6 +777,50 @@ int main()
     }
 
     {
+        wsprrypi::TransmissionRequest request;
+        request.mode = wsprrypi::TransmissionMode::QRSS;
+        request.output.backend = wsprrypi::BackendKind::SI5351;
+        request.output.output = wsprrypi::ClockSource::SI5351_CLK0;
+        request.output.gpio = 4;
+
+        wsprrypi::QrssPayload payload;
+        payload.message = "A A";
+        payload.frequency_hz = 7038600.0;
+        payload.timing.dot = std::chrono::seconds(1);
+        payload.timing.dash = std::chrono::seconds(3);
+        payload.timing.intra_element_gap = std::chrono::seconds(1);
+        payload.timing.inter_character_gap = std::chrono::seconds(3);
+        payload.timing.inter_word_gap = std::chrono::seconds(7);
+        request.payload = payload;
+
+        const wsprrypi::ExecutionPlan plan =
+            wsprrypi::ExecutionPlanCompiler{}.compile(request);
+
+        bool saw_first_char = false;
+        bool saw_space_char = false;
+        bool saw_second_char = false;
+        for (const auto &event : plan.events)
+        {
+            if (event.message_char_index == 0)
+            {
+                saw_first_char = true;
+            }
+            else if (event.message_char_index == 1)
+            {
+                saw_space_char = true;
+            }
+            else if (event.message_char_index == 2)
+            {
+                saw_second_char = true;
+            }
+        }
+
+        require(
+            saw_first_char && saw_space_char && saw_second_char,
+            "compiled CW execution plans must tag inter-word gaps with the space character index");
+    }
+
+    {
         reset_getopt_state();
         std::vector<std::string> args = {
             "wsprrypi",
