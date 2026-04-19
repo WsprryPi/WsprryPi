@@ -2355,7 +2355,11 @@ void transmitter_cb(WsprTransmitter::TransmissionCallbackEvent event,
 
     case WsprTransmitter::TransmissionCallbackEvent::PROGRESS:
     {
-        send_ws_message("transmit", "progress");
+        send_ws_message(
+            "transmit",
+            "progress",
+            std::string(),
+            static_cast<int>(value));
         break;
     }
 
@@ -3306,7 +3310,8 @@ void shutdown_machine()
 void send_ws_message(
     std::string type,
     std::string state,
-    std::string message)
+    std::string message,
+    std::optional<int> cw_active_char_index_override)
 {
     // Build JSON payload
     nlohmann::json j;
@@ -3332,7 +3337,8 @@ void send_ws_message(
         j["frame_callsign"] = snapshot.frame_callsign;
         j["frame_locator"] = snapshot.frame_locator;
         j["cw_message"] = snapshot.cw_message;
-        j["cw_active_char_index"] = snapshot.cw_active_char_index;
+        j["cw_active_char_index"] =
+            cw_active_char_index_override.value_or(snapshot.cw_active_char_index);
     }
 
     if (!message.empty())

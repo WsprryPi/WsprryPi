@@ -730,6 +730,53 @@ int main()
     }
 
     {
+        wsprrypi::TransmissionRequest request;
+        request.mode = wsprrypi::TransmissionMode::QRSS;
+        request.output.backend = wsprrypi::BackendKind::SI5351;
+        request.output.output = wsprrypi::ClockSource::SI5351_CLK0;
+        request.output.gpio = 4;
+
+        wsprrypi::QrssPayload payload;
+        payload.message = "AB";
+        payload.frequency_hz = 7038600.0;
+        payload.timing.dot = std::chrono::seconds(1);
+        payload.timing.dash = std::chrono::seconds(3);
+        payload.timing.intra_element_gap = std::chrono::seconds(1);
+        payload.timing.inter_character_gap = std::chrono::seconds(3);
+        payload.timing.inter_word_gap = std::chrono::seconds(7);
+        request.payload = payload;
+
+        const wsprrypi::ExecutionPlan plan =
+            wsprrypi::ExecutionPlanCompiler{}.compile(request);
+
+        bool saw_first_char = false;
+        bool saw_second_char = false;
+        bool saw_transition = false;
+        int prior_index = -1;
+        for (const auto &event : plan.events)
+        {
+            if (event.message_char_index == 0)
+            {
+                saw_first_char = true;
+            }
+            else if (event.message_char_index == 1)
+            {
+                saw_second_char = true;
+            }
+
+            if (prior_index != -1 && event.message_char_index != prior_index)
+            {
+                saw_transition = true;
+            }
+            prior_index = event.message_char_index;
+        }
+
+        require(
+            saw_first_char && saw_second_char && saw_transition,
+            "compiled CW execution plans must carry progressing message_char_index values across multiple characters");
+    }
+
+    {
         reset_getopt_state();
         std::vector<std::string> args = {
             "wsprrypi",

@@ -49,6 +49,7 @@
 #include <chrono>
 #include <cstddef>
 #include <condition_variable>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <thread>
@@ -254,7 +255,8 @@ void shutdown_machine();
 void send_ws_message(
     std::string type,
     std::string state,
-    std::string message = std::string());
+    std::string message = std::string(),
+    std::optional<int> cw_active_char_index_override = std::nullopt);
 
 std::string websocket_tx_state_for_message(
     std::string_view type,
