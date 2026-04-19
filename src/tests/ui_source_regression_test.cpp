@@ -66,6 +66,8 @@ int main()
             ui_source.find("title: \"Stop transmission to change mode\"") != std::string::npos &&
             ui_source.find("title: \"Disable transmissions to change mode\"") != std::string::npos &&
             ui_source.find("requestTransmitEnabledChange(false, true") != std::string::npos &&
+            ui_source.find("const requestedMode = normalizedTargetMode;") != std::string::npos &&
+            ui_source.find("finalizePendingModeChange(requestedMode);") != std::string::npos &&
             ui_source.find("if (!stopTransmission()) {") != std::string::npos &&
             ui_source.find("suspendConfigAutosave(true);") != std::string::npos &&
             ui_source.find("input:not(#transmit, [name=\"mode_toggle\"], [name=\"qrss_type\"])") != std::string::npos,
