@@ -259,6 +259,7 @@ static bool suppress_scheduler_execution_for_test = false;
 static std::atomic<std::uint64_t> non_wspr_schedule_generation{0};
 static std::atomic<BandGPIOPrepareStatus> active_band_gpio_prepare_status{
     BandGPIOPrepareStatus::Inactive};
+static std::atomic<bool> suppress_cancelled_ws_event_for_user_stop{false};
 static std::vector<SelectorGPIOReservation> idle_selector_gpio_reservations{};
 static bool selector_gpio_control_enabled = false;
 static bool selector_gpio_drive_enabled = false;
@@ -2458,6 +2459,10 @@ void transmitter_cb(WsprTransmitter::TransmissionCallbackEvent event,
     {
         const double elapsed = value;
         const std::string s_elapsed = format_elapsed(elapsed);
+        const bool suppress_ws_event =
+            suppress_cancelled_ws_event_for_user_stop.exchange(
+                false,
+                std::memory_order_acq_rel);
 
         llog.logS(to_log_level(level),
                   "Transmission cancelled after ",
@@ -2468,7 +2473,16 @@ void transmitter_cb(WsprTransmitter::TransmissionCallbackEvent event,
             &config,
             runtime_should_hold_selector_gpios_initialized(config));
         set_tx_led_state(false, "transmission cancellation");
-        send_ws_message("transmit", "canceled");
+        if (suppress_ws_event)
+        {
+            llog.logS(
+                DEBUG,
+                "Suppressing websocket canceled event because an explicit user stop will publish stopped.");
+        }
+        else
+        {
+            send_ws_message("transmit", "canceled");
+        }
 
         shutdown_after_current_transmission.store(false, std::memory_order_release);
         shutdown_after_wspr_plan.store(false, std::memory_order_release);
@@ -2866,6 +2880,7 @@ StopTransmissionResult stop_transmission_by_user_request()
 {
     StopTransmissionResult result;
     bool persist_to_ini = false;
+    suppress_cancelled_ws_event_for_user_stop.store(false, std::memory_order_release);
 
     {
         std::lock_guard<std::mutex> lk(set_config_mtx);
@@ -2891,6 +2906,11 @@ StopTransmissionResult stop_transmission_by_user_request()
         result.transmit_disabled = true;
         config_to_json();
         persist_to_ini = config.use_ini;
+    }
+
+    if (result.transmission_active)
+    {
+        suppress_cancelled_ws_event_for_user_stop.store(true, std::memory_order_release);
     }
 
     wsprTransmitter.stopAndJoin();

@@ -1658,15 +1658,38 @@ int main()
         require(
             websocket_tx_state_for_message(
                 "transmit",
+                "canceled",
+                "transmitting") == "cancelled",
+            "websocket transmit canceled events must present a cancelled tx_state");
+        require(
+            websocket_tx_state_for_message(
+                "transmit",
                 "stopped",
                 "transmitting") == "disabled",
             "websocket transmit stopped events must present a disabled tx_state");
+        require(
+            websocket_tx_state_for_message(
+                "transmit",
+                "skipped",
+                "transmitting") == "complete",
+            "websocket transmit skipped events must present a non-transmitting terminal tx_state");
         require(
             websocket_tx_state_for_message(
                 "configuration",
                 "reload",
                 "enabled") == "enabled",
             "non-transmit websocket messages must preserve the current runtime tx_state");
+    }
+
+    {
+        init_default_config();
+        wsprTransmitter.backendSetStateValue(WsprTransmitter::State::TRANSMITTING);
+        const WsprRuntimeStatusSnapshot snapshot =
+            current_tx_runtime_status_snapshot();
+        require(
+            snapshot.tx_state == "transmitting",
+            "runtime status snapshots must report transmitting when the transmitter state is TRANSMITTING");
+        wsprTransmitter.backendSetStateValue(WsprTransmitter::State::DISABLED);
     }
 
     {
@@ -2008,13 +2031,30 @@ int main()
                     std::string::npos,
             "websocket stop command must route through stop_transmission_by_user_request()");
 
+        const std::string scheduling_source =
+            read_text_file("/home/pi/WsprryPi/src/scheduling.cpp");
+        require(
+            scheduling_source.find("suppress_cancelled_ws_event_for_user_stop.store(true") != std::string::npos &&
+                scheduling_source.find("Suppressing websocket canceled event because an explicit user stop will publish stopped.") !=
+                    std::string::npos,
+            "explicit user stop must suppress the intermediate canceled websocket event");
+        require(
+            scheduling_source.find("void start_test_tone()") != std::string::npos &&
+                scheduling_source.find("send_ws_message(\"transmit\", \"starting\");") ==
+                    scheduling_source.find("send_ws_message(\"transmit\", \"starting\");", scheduling_source.find("void transmitter_cb(")),
+            "test tone start must rely on transmitter callback websocket ownership only");
+        require(
+            scheduling_source.find("void end_test_tone()") != std::string::npos &&
+                scheduling_source.find("send_ws_message(\"transmit\", \"finished\");") ==
+                    scheduling_source.find("send_ws_message(\"transmit\", \"finished\");", scheduling_source.find("void transmitter_cb(")),
+            "test tone end must rely on transmitter callback websocket ownership only");
+
         const std::string ui_source =
             read_text_file("/home/pi/WsprryPi/WsprryPi-UI/data/index.js");
         require(
-            ui_source.find("url: CONTROL_STOP_URL") != std::string::npos &&
-                ui_source.find("data: JSON.stringify({ command: \"stop\" })") !=
+            ui_source.find("ws.send(JSON.stringify({ command: \"stop\" }))") !=
                     std::string::npos,
-            "UI Stop button must POST the explicit stop command to the control stop endpoint");
+            "UI Stop button must send the explicit stop command over the websocket");
         require(
             ui_source.find("Operation: {\n                \"Transmit\": enabled,") !=
                     std::string::npos &&
@@ -2033,6 +2073,16 @@ int main()
                 ui_source.find("var Calibration = {\n        \"PPM\": ppm_val,\n        \"Use NTP\": use_ntp,") ==
                     std::string::npos,
             "UI save path must use canonical GPIO.Use NTP only");
+
+        const std::string site_source =
+            read_text_file("/home/pi/WsprryPi/WsprryPi-UI/data/site.js");
+        const std::string transmit_branch = "if (msg.type === \"transmit\")";
+        const std::string tx_state_branch = "if (msg.tx_state !== undefined)";
+        require(
+            site_source.find(transmit_branch) != std::string::npos &&
+                site_source.find(tx_state_branch) != std::string::npos &&
+                site_source.find(transmit_branch) < site_source.find(tx_state_branch),
+            "browser websocket handler must process pushed transmit events before generic tx_state replies");
     }
 
     {
