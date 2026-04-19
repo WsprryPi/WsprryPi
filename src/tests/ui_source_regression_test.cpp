@@ -167,9 +167,11 @@ int main()
             site_source.find("const selectedMode =\n        typeof selectedConfigMode === \"function\" ? selectedConfigMode() : \"\";") != std::string::npos &&
             site_source.find("function renderCwRuntimeMessage(node, message, activeCharIndex)") != std::string::npos &&
             site_source.find("const isTransmitting =") != std::string::npos &&
+            site_source.find("const transmitEnabled =") != std::string::npos &&
             site_source.find("planLabelNode.textContent = \"Message progression\";") != std::string::npos &&
             site_source.find("planLabelNode.textContent = \"Next message at:\";") != std::string::npos &&
-            site_source.find("planNode.textContent = nextTransmissionAt || \"Not scheduled\";") != std::string::npos &&
+            site_source.find("const idleValue = transmitEnabled") != std::string::npos &&
+            site_source.find(": \"Disabled\";") != std::string::npos &&
             site_source.find("charNode.textContent = character;") != std::string::npos &&
             site_source.find("renderCwRuntimeMessage(planNode, message, activeCharIndex);") != std::string::npos &&
             site_source.find("charNode.textContent = isActive && character === \" \" ? \"_\" : character;") == std::string::npos,
@@ -179,10 +181,11 @@ int main()
             websocket_source.find("reply[\"next_transmission_at\"] = snapshot.next_transmission_at;") != std::string::npos &&
             scheduling_source.find("if (snapshot.tx_state == \"transmitting\")") != std::string::npos &&
             scheduling_source.find("snapshot.runtime_mode = mode_type_name(config.mode);") != std::string::npos &&
+            scheduling_source.find("runtime_transmit_enabled(config)") != std::string::npos &&
             scheduling_source.find("if (config.mode != ModeType::WSPR ||\n        current_transmission_request.mode != TransmissionMode::WSPR ||") != std::string::npos &&
             scheduling_source.find("snapshot.runtime_mode == mode_type_name(config.mode)") == std::string::npos &&
             scheduling_source.find("if (runtime_status.mode != wsprrypi::TransmissionMode::WSPR ||\n        current_transmission_request.mode != TransmissionMode::WSPR ||") == std::string::npos,
-        "runtime snapshot must expose next_transmission_at for CW display, follow the committed scheduler mode while idle instead of stale backend execution state, suppress stale WSPR plan data after mode changes, expose committed idle WSPR plan data without requiring runtime mode to already be WSPR, and expose CW next-transmission timing without requiring the transmitter runtime mode string to match first");
+        "runtime snapshot must expose next_transmission_at for CW display only when transmissions are actually enabled, follow the committed scheduler mode while idle instead of stale backend execution state, suppress stale WSPR plan data after mode changes, expose committed idle WSPR plan data without requiring runtime mode to already be WSPR, and expose CW next-transmission timing without requiring the transmitter runtime mode string to match first");
     require(
         site_source.find("const TAB_STATE_STORAGE_PREFIX = \"wsprrypi.activeTab\";") != std::string::npos &&
             site_source.find("function shouldRestorePersistedTabState(tabList)") != std::string::npos &&

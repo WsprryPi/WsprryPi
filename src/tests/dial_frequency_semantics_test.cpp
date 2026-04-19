@@ -1794,7 +1794,7 @@ int main()
 
         wsprTransmitter.current_execution_mode_ = wsprrypi::TransmissionMode::WSPR;
         config.mode = ModeType::QRSS;
-        config.transmit = true;
+        config.transmit = false;
         config.schedule_start_minute = 0;
         config.schedule_repeat_minutes = 10;
         config.qrss.message = "A A";
@@ -1812,8 +1812,15 @@ int main()
                 snapshot.current_frame == 0U,
             "idle CW runtime snapshots must not expose stale WSPR plan details after a mode change");
         require(
-            !snapshot.next_transmission_at.empty(),
-            "idle CW runtime snapshots must expose the next scheduled message time from committed config");
+            snapshot.next_transmission_at.empty(),
+            "idle CW runtime snapshots must not expose a next scheduled message time while transmissions are disabled");
+
+        config.transmit = true;
+        const WsprRuntimeStatusSnapshot enabled_snapshot =
+            current_tx_runtime_status_snapshot();
+        require(
+            !enabled_snapshot.next_transmission_at.empty(),
+            "idle CW runtime snapshots must expose the next scheduled message time once transmissions are enabled");
     }
 
     {
