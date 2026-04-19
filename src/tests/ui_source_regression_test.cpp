@@ -61,6 +61,16 @@ int main()
                 std::string::npos,
         "UI Stop button must send the explicit stop command over the websocket");
     require(
+        ui_source.find("let pendingModeChange = null;") != std::string::npos &&
+            ui_source.find("function requestConfigModeChange(targetMode)") != std::string::npos &&
+            ui_source.find("title: \"Stop transmission to change mode\"") != std::string::npos &&
+            ui_source.find("title: \"Disable transmissions to change mode\"") != std::string::npos &&
+            ui_source.find("requestTransmitEnabledChange(false, true") != std::string::npos &&
+            ui_source.find("if (!stopTransmission()) {") != std::string::npos &&
+            ui_source.find("suspendConfigAutosave(true);") != std::string::npos &&
+            ui_source.find("input:not(#transmit, [name=\"mode_toggle\"], [name=\"qrss_type\"])") != std::string::npos,
+        "mode changes must be guarded behind stop/disable confirmation and exclude mode toggles from generic autosave scheduling");
+    require(
         ui_source.find("const transmitting = runtimeStatus && runtimeStatus.txState === \"transmitting\";") !=
                 std::string::npos &&
             ui_source.find("$stop.prop(\"disabled\", stopRequestInFlight || !transmitting);") !=
@@ -141,6 +151,7 @@ int main()
             site_source.find("nextTransmissionAt") != std::string::npos &&
             site_source.find("cw_message") != std::string::npos &&
             site_source.find("cw_active_char_index") != std::string::npos &&
+            site_source.find("if (typeof handleRuntimeStatusUpdate === \"function\") {") != std::string::npos &&
             site_source.find("function renderCwRuntimeMessage(node, message, activeCharIndex)") != std::string::npos &&
             site_source.find("const isTransmitting =") != std::string::npos &&
             site_source.find("planLabelNode.textContent = \"Message progression\";") != std::string::npos &&
@@ -175,8 +186,10 @@ int main()
     require(
         config_view_source.find("class=\"config-runtime-header\"") != std::string::npos &&
             config_view_source.find("<label class=\"form-check-label\" for=\"transmit\">Transmit enabled</label>") != std::string::npos &&
-            config_view_source.find("id=\"runtime_plan_label\"") != std::string::npos,
-        "Runtime state header must host the primary Transmit enabled control and a switchable runtime detail label");
+            config_view_source.find("id=\"runtime_plan_label\"") != std::string::npos &&
+            config_view_source.find("id=\"modeChangeGuardModal\"") != std::string::npos &&
+            config_view_source.find("id=\"modeChangeGuardConfirmBtn\"") != std::string::npos,
+        "Runtime state header must host the primary Transmit enabled control and the config view must expose the guarded mode-change confirmation modal");
     require(
         config_view_source.find("config-runtime-item config-runtime-item--action") == std::string::npos,
         "Runtime state grid must no longer dedicate a large action tile to Stop transmission");
