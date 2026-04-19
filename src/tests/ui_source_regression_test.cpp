@@ -61,6 +61,18 @@ int main()
                 std::string::npos,
         "UI Stop button must send the explicit stop command over the websocket");
     require(
+        ui_source.find("const transmitting = runtimeStatus && runtimeStatus.txState === \"transmitting\";") !=
+                std::string::npos &&
+            ui_source.find("$stop.prop(\"disabled\", stopRequestInFlight || !transmitting);") !=
+                std::string::npos &&
+            ui_source.find("(!transmitEnabled && !transmitting)") == std::string::npos,
+        "UI Stop button must only be enabled during an active transmission, not merely when transmit is enabled");
+    require(
+        ui_source.find("updateRuntimeControlStatusFromForm(null);") != std::string::npos &&
+            ui_source.find("if (typeof getTxState === \"function\") {\n                getTxState();\n            }") !=
+                std::string::npos,
+        "successful transmit-toggle PATCHes must refresh runtime state so CW next-transmission timing updates immediately");
+    require(
         ui_source.find("Operation: {\n                \"Transmit\": enabled,") !=
                 std::string::npos &&
             ui_source.find("Runtime: {\n                \"Transmit\": enabled,") ==
