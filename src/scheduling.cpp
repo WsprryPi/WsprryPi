@@ -3327,6 +3327,7 @@ void send_ws_message(
             snapshot.tx_state);
         j["tx_state"] = tx_state;
         j["runtime_mode"] = snapshot.runtime_mode;
+        j["next_transmission_at"] = snapshot.next_transmission_at;
         j["plan_type"] = snapshot.plan_type;
         j["frame_count"] = snapshot.frame_count;
         j["current_frame"] = snapshot.current_frame;
@@ -3450,6 +3451,15 @@ WsprRuntimeStatusSnapshot current_tx_runtime_status_snapshot()
     snapshot.runtime_mode = runtime_mode_to_string(runtime_status.mode);
     snapshot.cw_message = runtime_status.cw_message;
     snapshot.cw_active_char_index = runtime_status.cw_active_char_index;
+
+    if (is_non_wspr_runtime_mode(config.mode) &&
+        snapshot.runtime_mode == mode_type_name(config.mode) &&
+        runtime_transmit_requested(config) &&
+        config.schedule_repeat_minutes > 0)
+    {
+        snapshot.next_transmission_at =
+            format_local_schedule_time(next_non_wspr_schedule_time(config));
+    }
 
     if (runtime_status.mode != wsprrypi::TransmissionMode::WSPR ||
         current_transmission_request.mode != TransmissionMode::WSPR ||

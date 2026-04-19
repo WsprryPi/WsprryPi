@@ -126,11 +126,19 @@ int main()
         "UI config schema must not require the obsolete GPIO.Frequency Control GPIO Polarity key");
     require(
         site_source.find("runtime_mode") != std::string::npos &&
+            site_source.find("nextTransmissionAt") != std::string::npos &&
             site_source.find("cw_message") != std::string::npos &&
             site_source.find("cw_active_char_index") != std::string::npos &&
-            site_source.find("function renderCwRuntimeMessage(node, message, activeCharIndex)") != std::string::npos &&
-            site_source.find("charNode.textContent = isActive && character === \" \" ? \"_\" : character;") != std::string::npos,
-        "runtime status handling must expose dedicated CW runtime fields and a renderer for highlighted CW message progress");
+            site_source.find("function renderCwRuntimeMessage(node, nextTransmissionAt, message, activeCharIndex)") != std::string::npos &&
+            site_source.find("planLabelNode.textContent = \"Next message at:\";") != std::string::npos &&
+            site_source.find("scheduleNode.textContent = nextTransmissionAt || \"Not scheduled\";") != std::string::npos &&
+            site_source.find("charNode.textContent = character;") != std::string::npos &&
+            site_source.find("charNode.textContent = isActive && character === \" \" ? \"_\" : character;") == std::string::npos,
+        "runtime status handling must expose next-transmission timing for CW modes and render the CW message without underscore substitution");
+    require(
+        scheduling_source.find("snapshot.next_transmission_at") != std::string::npos &&
+            websocket_source.find("reply[\"next_transmission_at\"] = snapshot.next_transmission_at;") != std::string::npos,
+        "runtime snapshot and websocket get_tx_state reply must expose next_transmission_at for CW runtime display");
     require(
         site_source.find("const TAB_STATE_STORAGE_PREFIX = \"wsprrypi.activeTab\";") != std::string::npos &&
             site_source.find("function shouldRestorePersistedTabState(tabList)") != std::string::npos &&

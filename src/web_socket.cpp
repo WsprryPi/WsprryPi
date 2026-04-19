@@ -363,6 +363,7 @@ void WebSocketServer::handleMessage(const std::string &raw_message)
                 current_tx_runtime_status_snapshot();
             reply["tx_state"] = snapshot.tx_state;
             reply["runtime_mode"] = snapshot.runtime_mode;
+            reply["next_transmission_at"] = snapshot.next_transmission_at;
             reply["plan_type"] = snapshot.plan_type;
             reply["frame_count"] = snapshot.frame_count;
             reply["current_frame"] = snapshot.current_frame;

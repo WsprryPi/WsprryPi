@@ -278,6 +278,7 @@ struct WsprRuntimeStatusSnapshot
 {
     std::string tx_state;
     std::string runtime_mode;
+    std::string next_transmission_at;
     std::string plan_type;
     std::size_t frame_count = 0;
     std::size_t current_frame = 0; // 1-based, 0 when unavailable
