@@ -84,9 +84,19 @@ int main()
             ui_source.find("function scheduleAutosave()") != std::string::npos &&
             ui_source.find("function flushAutosave()") != std::string::npos &&
             ui_source.find("payloadJson === lastSavedConfigPayload") != std::string::npos &&
+            ui_source.find("payloadJson === lastFailedConfigPayload") != std::string::npos &&
+            ui_source.find("Suppressing autosave retry for unchanged rejected payload.") != std::string::npos &&
             ui_source.find("setConfigSaveStatus(\"saved\", \"Saved\");") != std::string::npos &&
             ui_source.find("configAutosavePendingAfterFlight") != std::string::npos,
-        "configuration autosave must debounce saves, clear stale invalid state for already-saved payloads, and suppress duplicate writes");
+        "configuration autosave must debounce saves, clear stale invalid state for already-saved payloads, suppress unchanged failed payload retries, and suppress duplicate writes");
+    require(
+        ui_source.find("function validateCwMessage()") != std::string::npos &&
+            ui_source.find("function validateCwShiftHz()") != std::string::npos &&
+            ui_source.find("Enter a positive CW base frequency.") != std::string::npos &&
+            ui_source.find("CW message is required.") != std::string::npos &&
+            ui_source.find("Enter a positive CW frequency offset.") != std::string::npos &&
+            ui_source.find("let cw_message = String($('#qrss_message').val() || \"\").trim();") != std::string::npos,
+        "CW autosave validation must require a trimmed message, a positive base frequency, and a positive shift for FSKCW/DFCW");
     require(
         ui_source.find("bindTestToneControls();") != std::string::npos,
         "configuration view must bind the shared Test Tone controls");
