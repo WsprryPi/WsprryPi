@@ -79,6 +79,18 @@ int main()
                 std::string::npos,
         "UI save path must use canonical GPIO.Use NTP only");
     require(
+        ui_source.find("const CONFIG_AUTOSAVE_DELAY_MS = 800;") != std::string::npos &&
+            ui_source.find("function buildConfigPayload()") != std::string::npos &&
+            ui_source.find("function scheduleAutosave()") != std::string::npos &&
+            ui_source.find("function flushAutosave()") != std::string::npos &&
+            ui_source.find("payloadJson === lastSavedConfigPayload") != std::string::npos &&
+            ui_source.find("setConfigSaveStatus(\"saved\", \"Saved\");") != std::string::npos &&
+            ui_source.find("configAutosavePendingAfterFlight") != std::string::npos,
+        "configuration autosave must debounce saves, clear stale invalid state for already-saved payloads, and suppress duplicate writes");
+    require(
+        ui_source.find("bindTestToneControls();") != std::string::npos,
+        "configuration view must bind the shared Test Tone controls");
+    require(
         ui_source.find("function applyBandGpioColumnToggle(column, checked)") != std::string::npos &&
             ui_source.find("function syncBandGpioColumnHeaderStates()") != std::string::npos,
         "Band GPIO bulk-toggle behavior must use shared helper functions");
@@ -104,20 +116,55 @@ int main()
         "UI config schema must not require the obsolete GPIO.Frequency Control GPIO Polarity key");
     require(
         site_source.find("const TAB_STATE_STORAGE_PREFIX = \"wsprrypi.activeTab\";") != std::string::npos &&
+            site_source.find("function shouldRestorePersistedTabState(tabList)") != std::string::npos &&
+            site_source.find("getNavigationType() === \"reload\"") != std::string::npos &&
+            site_source.find("clearPersistedTabState(tabList);") != std::string::npos &&
+            site_source.find("suspendConfigAutosave(true);") != std::string::npos &&
+            site_source.find("syncConfigAutosaveBaseline();") != std::string::npos &&
             site_source.find("function initPersistedTabState()") != std::string::npos &&
             site_source.find("window.localStorage.setItem(storageKey, selector);") != std::string::npos &&
             site_source.find("restorePersistedTabState(tabList);") != std::string::npos,
-        "site.js must persist and restore opted-in Bootstrap tab state through localStorage");
+        "site.js must support reload-scoped persisted Bootstrap tab state through localStorage");
 
     const std::string config_view_source =
         read_text_file("/home/pi/WsprryPi/WsprryPi-UI/data/views/config.php");
+    require(
+        config_view_source.find("class=\"btn btn-danger btn-sm config-header-stop\"") != std::string::npos &&
+            config_view_source.find("id=\"stop_transmit\"") != std::string::npos,
+        "Configuration header must host the compact Stop transmission control");
+    require(
+        config_view_source.find("config-runtime-item config-runtime-item--action") == std::string::npos,
+        "Runtime state grid must no longer dedicate a large action tile to Stop transmission");
+    require(
+        config_view_source.find("id=\"test_tone\"") == std::string::npos &&
+            config_view_source.find("id=\"testToneModal\"") == std::string::npos,
+        "configuration view must no longer render the Test Tone control inside the config form");
+    require(
+        config_view_source.find("id=\"configSaveStatus\"") != std::string::npos &&
+            config_view_source.find("Next safe action") == std::string::npos &&
+            config_view_source.find("Save changes") == std::string::npos &&
+            config_view_source.find("Reload saved") == std::string::npos,
+        "configuration view must expose the inline save-status indicator and remove the manual action panel");
     require(
         config_view_source.find("id=\"band-gpio-enabled-all\"") != std::string::npos &&
             config_view_source.find("id=\"band-gpio-active-high-all\"") != std::string::npos,
         "Band GPIO table must expose bulk-toggle header checkboxes for Enabled and Active High");
     require(
-        config_view_source.find("id=\"configTabs\" role=\"tablist\" data-persist-tab-state=\"true\"") != std::string::npos,
-        "Configuration tab list must opt into persisted sub-tab state");
+        config_view_source.find("id=\"configTabs\" role=\"tablist\" data-persist-tab-state=\"true\" data-persist-tab-state-scope=\"reload\"") != std::string::npos,
+        "Configuration tab list must opt into reload-scoped persisted sub-tab state");
+
+    const std::string maintenance_source =
+        read_text_file("/home/pi/WsprryPi/WsprryPi-UI/data/views/maintenance.php");
+    require(
+        maintenance_source.find("id=\"test_tone\"") != std::string::npos &&
+            maintenance_source.find("id=\"testToneModal\"") != std::string::npos,
+        "maintenance view must host the relocated Test Tone control and modal");
+
+    const std::string maintenance_script_source =
+        read_text_file("/home/pi/WsprryPi/WsprryPi-UI/data/maintenance.js");
+    require(
+        maintenance_script_source.find("bindTestToneControls();") != std::string::npos,
+        "maintenance view must bind the shared Test Tone controls");
 
     std::cout << "ui_source_regression_test passed" << std::endl;
     return EXIT_SUCCESS;
