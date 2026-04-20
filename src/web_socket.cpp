@@ -345,8 +345,10 @@ void WebSocketServer::handleMessage(const std::string &raw_message)
         else if (cmd == "stop")
         {
             llog.logS(INFO, "Received websocket stop command.");
+            const bool persist_transmit =
+                !j.contains("persist_transmit") || j["persist_transmit"].get<bool>();
             const StopTransmissionResult stop_result =
-                stop_transmission_by_user_request();
+                stop_transmission_by_user_request(persist_transmit);
             const bool stop_request_succeeded = stop_result.transmit_disabled;
             reply["command"] = "stop";
             reply["status"] = stop_request_succeeded ? "ok" : "error";
@@ -354,6 +356,7 @@ void WebSocketServer::handleMessage(const std::string &raw_message)
             reply["stop_performed"] = stop_result.stop_performed;
             reply["transmit_disabled"] = stop_result.transmit_disabled;
             reply["persisted"] = stop_result.persisted;
+            reply["persist_transmit"] = persist_transmit;
             reply["message"] = stop_result.message;
         }
         else if (cmd == "get_tx_state")
