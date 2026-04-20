@@ -2547,6 +2547,52 @@ int main()
 
     {
         init_config_json();
+        jConfig["Calibration"]["PPM"] = 275.5;
+        json_to_config();
+
+        require(
+            nearly_equal(config.ppm, 200.0),
+            "backend normalization must clamp manual Calibration.PPM to the shared upper bound");
+
+        config_to_json();
+        require(
+            nearly_equal(jConfig["Calibration"].at("PPM").get<double>(), 200.0),
+            "clamped manual Calibration.PPM must round-trip through canonical JSON");
+    }
+
+    {
+        init_default_config();
+        config.use_ini = true;
+        config.ini_filename = "/tmp/ppm_patch_clamp.ini";
+        config.mode = ModeType::WSPR;
+        config.transmit = false;
+        config.callsign = "AA0NT";
+        config.grid_square = "EM18";
+        config.power_dbm = 20;
+        config.frequencies = "20m";
+        config.gpio_tx_pin = 4;
+        config.gpio_use_ntp = false;
+        config.transmit_backend = TransmitBackendKind::GPIO;
+        resolve_backend_specific_config(config);
+        config_to_json();
+
+        patch_all_from_web({{"Calibration", {{"PPM", -275.5}}}});
+
+        require(
+            nearly_equal(config.ppm, -200.0),
+            "web patch path must clamp manual Calibration.PPM to the shared lower bound");
+        require(
+            nearly_equal(jConfig["Calibration"].at("PPM").get<double>(), -200.0),
+            "web patch path must persist the clamped manual Calibration.PPM in JSON");
+        require(
+            nearly_equal(
+                std::stod(iniFile.getData().at("Calibration").at("PPM")),
+                -200.0),
+            "web patch path must persist the clamped manual Calibration.PPM in INI");
+    }
+
+    {
+        init_config_json();
         jConfig["CW"]["Dot Seconds"] = 2.0;
         jConfig["CW"]["Intra Element Gap"] = 1.5;
         jConfig["CW"]["Inter Character Gap"] = 4.0;

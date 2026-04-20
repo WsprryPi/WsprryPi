@@ -38,6 +38,7 @@
 
 #include <algorithm>
 #include <cctype>
+#include <cmath>
 #include <cstdlib>
 #include <iostream>
 #include <limits>
@@ -53,6 +54,9 @@ nlohmann::json jConfig;
 
 namespace
 {
+    constexpr double kManualPpmMin = -200.0;
+    constexpr double kManualPpmMax = 200.0;
+
     bool g_patch_all_from_web_runtime_apply_suppressed_for_test = false;
     std::optional<bool> g_si5351_detection_override;
 
@@ -172,6 +176,60 @@ namespace
         }
 
         throw std::runtime_error(context + " must be an integer.");
+    }
+
+    double parse_manual_ppm_value(
+        const nlohmann::json &source,
+        const std::string &context)
+    {
+        double ppm = 0.0;
+        if (source.is_number())
+        {
+            ppm = source.get<double>();
+        }
+        else if (source.is_string())
+        {
+            const std::string raw = trim_copy(source.get<std::string>());
+            std::size_t consumed = 0;
+            try
+            {
+                ppm = std::stod(raw, &consumed);
+            }
+            catch (const std::invalid_argument &)
+            {
+                throw std::runtime_error(context + " must be a number.");
+            }
+            catch (const std::out_of_range &)
+            {
+                throw std::runtime_error(context + " is out of range.");
+            }
+
+            if (consumed != raw.size())
+            {
+                throw std::runtime_error(context + " must be a number.");
+            }
+        }
+        else
+        {
+            throw std::runtime_error(context + " must be a number.");
+        }
+
+        if (!std::isfinite(ppm))
+        {
+            throw std::runtime_error(context + " must be a finite number.");
+        }
+
+        const double clamped_ppm = std::clamp(ppm, kManualPpmMin, kManualPpmMax);
+        if (ppm != clamped_ppm)
+        {
+            llog.logS(
+                WARN,
+                context,
+                " is outside bounds (-200 to 200), applying clamped value: ",
+                clamped_ppm);
+        }
+
+        return clamped_ppm;
     }
 
     int parse_si5351_tx_output(const nlohmann::json &source)
@@ -1183,7 +1241,9 @@ namespace
                 ? si5351.at("Power Level").get<int>()
                 : 1;
         resolve_backend_specific_config(target);
-        target.ppm = source.at("Calibration").at("PPM").get<double>();
+        target.ppm = parse_manual_ppm_value(
+            source.at("Calibration").at("PPM"),
+            "Calibration.PPM");
         target.use_offset = source.at("WSPR").at("Use Random Offset").get<bool>();
         target.modulation_dot_seconds =
             source.contains("CW") &&

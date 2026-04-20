@@ -257,6 +257,8 @@ int main()
             config_view_source.find("config-wspr-top-row__item config-wspr-top-row__field config-wspr-top-row__planner") != std::string::npos &&
             config_view_source.find("for=\"useoffset\">\n                                                    Randomize\n") != std::string::npos &&
             config_view_source.find("id=\"ppm\"") != std::string::npos &&
+            config_view_source.find("min=\"-200\"") != std::string::npos &&
+            config_view_source.find("max=\"200\"") != std::string::npos &&
             config_view_source.find("id=\"use_ntp\"") != std::string::npos &&
             config_view_source.find("id=\"planner_preference\"") != std::string::npos &&
             config_view_source.find("id=\"dbm\"") != std::string::npos &&

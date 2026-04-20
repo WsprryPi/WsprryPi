@@ -11,16 +11,6 @@
 - Confidence: medium
 - Evidence: src/config_handler.cpp:1188, src/config_handler.cpp:1389, src/scheduling.cpp:1524
 
-### F06 Advanced CW.* envelope/gap controls are persisted and used, but hidden in UI
-
-- Brief: Intra/Inter gaps and fade settings are loaded, validated, persisted, and consumed at runtime, but not surfaced on the config page.
-- Why this bucket: The code clearly supports them as advanced persisted settings without UI editors.
-- Authoritative surface: Backend config/runtime in src/config_handler.cpp:1188, src/config_handler.cpp:1389, src/scheduling.cpp:1524.
-- Real runtime behavior difference: Yes, if set through INI/API.
-- User confusion only: Mostly yes for UI-only users.
-- Severity: low
-- Confidence: high
-
 ### F07 WSPR.WSPR Dial Frequency Set is internal/API-visible but not UI-visible or INI-persisted
 
 - Brief: The field exists in internal/public JSON flow, is read if present, but is not shown in UI and is not persisted to INI.
@@ -56,16 +46,6 @@
 - Brief: Internal config seeds many enabled assignments; stock INI leaves them blank; UI markup starts empty.
 - Why this bucket: The mismatch is real, but the intended source of truth is unclear.
 - Authoritative surface: Unclear.
-- Real runtime behavior difference: Yes.
-- User confusion only: Also yes.
-- Severity: medium
-- Confidence: high
-
-### F14 PPM range enforcement differs by entry path
-
-- Brief: CLI and UI constrain around [-200, 200]; backend validation and INI/API do not.
-- Why this bucket: Could be deliberate UX guardrails rather than a bug, but code does not make that policy explicit.
-- Authoritative surface: Backend accepts broader values; UI/CLI are narrower.
 - Real runtime behavior difference: Yes.
 - User confusion only: Also yes.
 - Severity: medium
