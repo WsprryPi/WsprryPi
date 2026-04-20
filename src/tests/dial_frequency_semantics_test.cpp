@@ -64,6 +64,42 @@ namespace
         return argv;
     }
 
+    std::string capture_print_usage_output(int exit_code)
+    {
+        int pipefd[2] = {-1, -1};
+        require(pipe(pipefd) == 0, "help-output test must create a pipe");
+
+        pid_t pid = fork();
+        require(pid >= 0, "help-output test must fork a child process");
+
+        if (pid == 0)
+        {
+            close(pipefd[0]);
+            dup2(pipefd[1], STDOUT_FILENO);
+            dup2(pipefd[1], STDERR_FILENO);
+            close(pipefd[1]);
+            print_usage(exit_code);
+            std::exit(EXIT_SUCCESS);
+        }
+
+        close(pipefd[1]);
+        std::string output;
+        char buffer[4096];
+        ssize_t bytes_read = 0;
+        while ((bytes_read = read(pipefd[0], buffer, sizeof(buffer))) > 0)
+        {
+            output.append(buffer, static_cast<std::size_t>(bytes_read));
+        }
+        close(pipefd[0]);
+
+        int status = 0;
+        require(waitpid(pid, &status, 0) == pid, "help-output test must wait for the child process");
+        require(
+            WIFEXITED(status) && WEXITSTATUS(status) == EXIT_SUCCESS,
+            "help-output test child must exit successfully");
+        return output;
+    }
+
     void require_cli_parse_rejected(
         std::vector<std::string> args,
         const std::string &message)
@@ -126,11 +162,11 @@ namespace
               {"Frequency", frequency},
               {"Planner Preference",
                wspr_planner_preference_to_string(planner_preference)},
-              {"Use Random Offset", "false"}}},
+             {"Use Random Offset", "false"}}},
             {"CW",
              {{"Message", ""},
               {"Base Frequency", "3572000.0"},
-              {"Shift Hz", "500.0"},
+              {"Shift Hz", "5.0"},
               {"Dot Seconds", "3.0"},
               {"Intra Element Gap", "1.0"},
               {"Inter Character Gap", "3.0"},
@@ -1051,6 +1087,23 @@ int main()
             config.wspr_planner_preference == WsprPlannerPreference::RequirePaired &&
                 config.wspr.planner_preference == WsprPlannerPreference::RequirePaired,
             "--planner-preference require_paired must select the canonical require_paired planner preference");
+    }
+
+    {
+        const std::string help_output = capture_print_usage_output(0);
+        require(
+            help_output.find("--use-ntp") != std::string::npos &&
+                help_output.find("--repeat") != std::string::npos &&
+                help_output.find("--offset") != std::string::npos &&
+                help_output.find("--journald") != std::string::npos &&
+                help_output.find("--date-time-log") != std::string::npos &&
+                help_output.find("--terminate <count>") != std::string::npos &&
+                help_output.find("--planner-preference <auto|prefer_paired|require_paired>") != std::string::npos &&
+                help_output.find("--qrss-message <text>") != std::string::npos &&
+                help_output.find("--fskcw-message <text>") != std::string::npos &&
+                help_output.find("--dfcw-message <text>") != std::string::npos &&
+                help_output.find("--require-paired") == std::string::npos,
+            "CLI help output must enumerate the current public option surface and must not mention removed planner flags");
     }
 
     {
@@ -2207,7 +2260,7 @@ int main()
             "TX Output=CLK0\nPower Level=1\n"
             "[WSPR]\nCall Sign=AA0NT\nGrid Square=EM18\nTX Power=20\n"
             "Frequency=20m\nPlanner Preference=auto\nUse Random Offset=false\n"
-            "[CW]\nMessage=\nBase Frequency=3572000.0\nShift Hz=500.0\n"
+            "[CW]\nMessage=\nBase Frequency=3572000.0\nShift Hz=5.0\n"
             "Dot Seconds=3.0\nIntra Element Gap=1.0\nInter Character Gap=3.0\n"
             "Inter Word Gap=7.0\nFade Shape=none\nFade In Ms=0\nFade Out Ms=0\n"
             "Fade Slice Ms=5\nStart Minute=0\nRepeat Minutes=10\n");
@@ -2735,6 +2788,23 @@ int main()
                 malformed_candidate.error_reason ==
                     "Si5351.I2C Address must be an integer.",
             "Si5351 I2C address must reject malformed strings cleanly");
+    }
+
+    {
+        init_config_json();
+        if (jConfig.contains("CW") && jConfig["CW"].is_object())
+        {
+            jConfig["CW"].erase("Shift Hz");
+        }
+        json_to_config();
+
+        require(
+            nearly_equal(config.modulation_fsk_offset_hz, 5.0),
+            "missing CW.Shift Hz must default to 5 Hz in backend normalization");
+        require(
+            nearly_equal(config.fskcw.mark_frequency_hz, config.fskcw.space_frequency_hz + 5.0) &&
+                nearly_equal(config.dfcw.dash_frequency_hz, config.dfcw.dot_frequency_hz + 5.0),
+            "missing CW.Shift Hz must use the 5 Hz default for derived CW mode frequencies");
     }
 
     {

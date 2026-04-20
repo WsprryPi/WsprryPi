@@ -685,7 +685,7 @@ void init_default_config()
     resolve_backend_specific_config(config);
 
     config.modulation_dot_seconds = 3.0;
-    config.modulation_fsk_offset_hz = 500.0;
+    config.modulation_fsk_offset_hz = 5.0;
     config.cw_intra_element_gap = 1.0;
     config.cw_inter_character_gap = 3.0;
     config.cw_inter_word_gap = 7.0;
@@ -1087,7 +1087,7 @@ namespace
         target["CW"] = {
             {"Message", ""},
             {"Base Frequency", 3572000.0},
-            {"Shift Hz", 500.0},
+            {"Shift Hz", 5.0},
             {"Dot Seconds", 3.0},
             {"Intra Element Gap", 1.0},
             {"Inter Character Gap", 3.0},
@@ -1256,7 +1256,7 @@ namespace
         const double cw_base_frequency_hz =
             cw.value("Base Frequency", 0.0);
         const double cw_shift_hz =
-            cw.value("Shift Hz", 0.0);
+            cw.value("Shift Hz", target.modulation_fsk_offset_hz);
         target.qrss.message =
             cw_message;
         target.qrss.frequency_hz = cw_base_frequency_hz;

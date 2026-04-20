@@ -267,6 +267,10 @@ int main()
             config_view_source.find("class=\"form-select config-planner-field__select\"") == std::string::npos,
         "WSPR transmission settings must keep planner_preference in the compact top row and render TX dBm as a fixed-value select");
     require(
+        config_view_source.find("id=\"fsk_offset\"") != std::string::npos &&
+            config_view_source.find("value=\"5\"") != std::string::npos,
+        "configuration view must default CW shift markup to 5 Hz");
+    require(
         config_view_source.find("id=\"band-gpio-enabled-all\"") != std::string::npos &&
             config_view_source.find("id=\"band-gpio-active-high-all\"") != std::string::npos,
         "Band GPIO table must expose bulk-toggle header checkboxes for Enabled and Active High");
