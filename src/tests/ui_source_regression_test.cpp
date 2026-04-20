@@ -380,6 +380,13 @@ int main()
             config_view_source.find("id=\"band-gpio-active-high-all\"") != std::string::npos,
         "Band GPIO table must expose bulk-toggle header checkboxes for Enabled and Active High");
     require(
+        config_view_source.find("class=\"form-check-input band-gpio-enabled\"") != std::string::npos &&
+            config_view_source.find("class=\"form-check-input band-gpio-enabled\"\n                                                                type=\"checkbox\"") != std::string::npos &&
+            config_view_source.find("class=\"form-check-input band-gpio-active-high\"") != std::string::npos &&
+            config_view_source.find("class=\"form-check-input band-gpio-active-high\"\n                                                                type=\"checkbox\"") != std::string::npos &&
+            config_view_source.find("class=\"form-check-input band-gpio-active-high\"\n                                                                type=\"checkbox\"\n                                                                id=\"band-gpio-active-high-<?= htmlspecialchars($band) ?>\"\n                                                                data-band=\"<?= htmlspecialchars($band) ?>\"\n                                                                checked") == std::string::npos,
+        "Band GPIO row defaults must render unchecked and inactive until explicitly configured");
+    require(
         config_view_source.find("id=\"configTabs\" role=\"tablist\" data-persist-tab-state=\"true\" data-persist-tab-state-scope=\"reload\"") != std::string::npos,
         "Configuration tab list must opt into reload-scoped persisted sub-tab state");
 

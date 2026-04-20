@@ -594,22 +594,10 @@ namespace
 
     void set_default_band_gpio_config(std::array<BandGPIOConfig, HAM_BAND_COUNT> &band_gpio)
     {
-        band_gpio[ham_band_index(HamBand::BAND_2200M)] = make_band_gpio_config(17, true);
-        band_gpio[ham_band_index(HamBand::BAND_630M)] = make_band_gpio_config(27, true);
-        band_gpio[ham_band_index(HamBand::BAND_160M)] = make_band_gpio_config(22, true);
-        band_gpio[ham_band_index(HamBand::BAND_80M)] = make_band_gpio_config(23, true);
-        band_gpio[ham_band_index(HamBand::BAND_60M)] = make_band_gpio_config(24, true);
-        band_gpio[ham_band_index(HamBand::BAND_40M)] = make_band_gpio_config(25, true);
-        band_gpio[ham_band_index(HamBand::BAND_30M)] = make_band_gpio_config(5, true);
-        band_gpio[ham_band_index(HamBand::BAND_22M)] = make_band_gpio_config(6, true);
-        band_gpio[ham_band_index(HamBand::BAND_20M)] = make_band_gpio_config(12, true);
-        band_gpio[ham_band_index(HamBand::BAND_17M)] = make_band_gpio_config(13, true);
-        band_gpio[ham_band_index(HamBand::BAND_15M)] = make_band_gpio_config(16, true);
-        band_gpio[ham_band_index(HamBand::BAND_12M)] = make_band_gpio_config(26, true);
-        band_gpio[ham_band_index(HamBand::BAND_10M)] = make_band_gpio_config(20, true);
-        band_gpio[ham_band_index(HamBand::BAND_6M)] = make_band_gpio_config(21, true);
-        band_gpio[ham_band_index(HamBand::BAND_4M)] = make_band_gpio_config(-1, false);
-        band_gpio[ham_band_index(HamBand::BAND_2M)] = make_band_gpio_config(-1, false);
+        for (BandGPIOConfig &band_config : band_gpio)
+        {
+            band_config = make_band_gpio_config(-1, false, false);
+        }
     }
 
     std::string band_gpio_active_high_key(const std::string &band_name)
@@ -1319,7 +1307,7 @@ namespace
         target.shutdown_pin = source.at("Operation").at("Shutdown Button").get<int>();
         target.use_journald = false;
 
-        // Missing Band GPIO data is allowed; seeded defaults stay in place.
+        // Missing Band GPIO data is allowed; explicit disabled defaults stay in place.
         const auto band_gpio_section_it = source.find("Band GPIO");
         if (band_gpio_section_it == source.end() || !band_gpio_section_it->is_object())
         {

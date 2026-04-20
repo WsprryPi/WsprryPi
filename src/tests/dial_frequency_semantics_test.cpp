@@ -133,6 +133,35 @@ namespace
     }
 
     std::map<std::string, std::unordered_map<std::string, std::string>>
+    make_disabled_band_gpio_ini_data()
+    {
+        std::map<std::string, std::unordered_map<std::string, std::string>> data;
+        for (int band_index = 0; band_index < HAM_BAND_COUNT; ++band_index)
+        {
+            const std::string band_name = band_to_string(static_cast<HamBand>(band_index));
+            data["Band GPIO"][band_name] = "";
+            data["Band GPIO"][band_name + " Active High"] = "false";
+        }
+        return data;
+    }
+
+    void require_all_band_gpio_disabled(
+        const std::array<BandGPIOConfig, HAM_BAND_COUNT> &band_gpio,
+        const std::string &message)
+    {
+        for (int band_index = 0; band_index < HAM_BAND_COUNT; ++band_index)
+        {
+            const BandGPIOConfig &band_config = band_gpio[band_index];
+            require(
+                band_config.gpio == -1 &&
+                    !band_config.enabled &&
+                    !band_config.active_high,
+                message + " for " +
+                    std::string(band_to_string(static_cast<HamBand>(band_index))));
+        }
+    }
+
+    std::map<std::string, std::unordered_map<std::string, std::string>>
     make_managed_ini_data(
         const std::string &callsign,
         const std::string &grid_square,
@@ -187,6 +216,8 @@ namespace
               {"Fade Slice Ms", "5"},
               {"Start Minute", "0"},
               {"Repeat Minutes", "10"}}}};
+        const auto disabled_band_gpio = make_disabled_band_gpio_ini_data();
+        data.insert(disabled_band_gpio.begin(), disabled_band_gpio.end());
         return data;
     }
 
@@ -392,6 +423,51 @@ int main()
     require(
         lookup.lookup_ham_band(14095600.0).has_value(),
         "band lookup should still succeed on WSPR dial frequency values");
+
+    {
+        init_default_config();
+        require_all_band_gpio_disabled(
+            config.band_gpio,
+            "init_default_config must leave Band GPIO defaults disabled");
+
+        config_to_json();
+        for (int band_index = 0; band_index < HAM_BAND_COUNT; ++band_index)
+        {
+            const std::string band_name =
+                band_to_string(static_cast<HamBand>(band_index));
+            require(
+                jConfig["Band GPIO"][band_name].value("GPIO", 0) == -1 &&
+                    !jConfig["Band GPIO"][band_name].value("Enabled", true) &&
+                    !jConfig["Band GPIO"][band_name].value("Active High", true),
+                "config_to_json must persist disabled Band GPIO defaults for " + band_name);
+        }
+    }
+
+    {
+        init_config_json();
+        json_to_config();
+        require_all_band_gpio_disabled(
+            config.band_gpio,
+            "init_config_json/json_to_config must normalize Band GPIO defaults to disabled");
+
+        jConfig.erase("Band GPIO");
+        json_to_config();
+        require_all_band_gpio_disabled(
+            config.band_gpio,
+            "missing Band GPIO section must normalize to disabled defaults");
+    }
+
+    {
+        const std::string stock_ini =
+            read_text_file("/home/pi/WsprryPi/config/wsprrypi.ini");
+        require(
+            stock_ini.find("2200m = \n2200m Active High = false") != std::string::npos &&
+                stock_ini.find("20m = \n20m Active High = false") != std::string::npos &&
+                stock_ini.find("2m =\n2m Active High = false") != std::string::npos &&
+                stock_ini.find("Active High = true") == std::string::npos,
+            "stock INI must declare explicit disabled Band GPIO defaults for every band");
+    }
+
     for (const std::string &removed_alias : {
              std::string("lf-15"),
              std::string("2200m-15"),
