@@ -126,11 +126,18 @@ int main()
     require(
         ui_source.find("function validateCwMessage()") != std::string::npos &&
             ui_source.find("function validateCwShiftHz()") != std::string::npos &&
+            ui_source.find("function parseFrequencyWithOptionalUnits(rawValue)") != std::string::npos &&
             ui_source.find("Enter a positive CW base frequency.") != std::string::npos &&
             ui_source.find("CW message is required.") != std::string::npos &&
             ui_source.find("Enter a positive CW frequency offset.") != std::string::npos &&
-            ui_source.find("let cw_message = String($('#qrss_message').val() || \"\").trim();") != std::string::npos,
-        "CW autosave validation must require a trimmed message, a positive base frequency, and a positive shift for FSKCW/DFCW");
+            ui_source.find("let cw_message = String($('#qrss_message').val() || \"\").trim();") != std::string::npos &&
+            ui_source.find("let cw_base_frequency = parseFrequencyWithOptionalUnits($('#qrss_frequency').val());") != std::string::npos &&
+            ui_source.find("let cw_base_frequency = parseFloat($('#qrss_frequency').val());") == std::string::npos &&
+            ui_source.find("return value * 1e6;") != std::string::npos &&
+            ui_source.find("return value * 1e3;") != std::string::npos &&
+            ui_source.find("return value * 1e9;") != std::string::npos &&
+            ui_source.find("const value = parseFrequencyWithOptionalUnits(raw);") != std::string::npos,
+        "CW autosave validation and save-path serialization must share unit-aware base-frequency parsing and reject parseFloat-based truncation");
     require(
         ui_source.find("function splitWsprFrequencyTokens(raw)") != std::string::npos &&
             ui_source.find("function validateWsprFrequencyToken(token)") != std::string::npos &&

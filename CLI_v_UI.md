@@ -13,16 +13,16 @@
 ~~- Confidence: high~~
 ~~- Evidence: WsprryPi-UI/data/index.js:1735, src/arg_parser.cpp:585, src/wspr_band_lookup.cpp:131~~
 
-### T02 UI CW base-frequency units are validated as valid, then serialized incorrectly
+~~### T02 UI CW base-frequency units are validated as valid, then serialized incorrectly~~
 
-- Brief: The UI accepts unit-suffixed CW base frequency input like 7.0401MHz, but buildConfigPayload() uses parseFloat, sending 7.0401 instead of Hz.
-- Why this bucket: This is a direct frontend serialization bug, not a policy difference.
-- Authoritative surface: Backend/API numeric CW.Base Frequency semantics; the UI is supposed to serialize into that contract.
-- Real runtime behavior difference: Yes. It can produce the wrong transmitted frequency.
-- User confusion only: No.
-- Severity: high
-- Confidence: high
-- Evidence: WsprryPi-UI/data/index.js:1790, WsprryPi-UI/data/index.js:1472
+~~- Brief: The UI accepts unit-suffixed CW base frequency input like 7.0401MHz, but buildConfigPayload() uses parseFloat, sending 7.0401 instead of Hz.~~
+~~- Why this bucket: This is a direct frontend serialization bug, not a policy difference.~~
+~~- Authoritative surface: Backend/API numeric CW.Base Frequency semantics; the UI is supposed to serialize into that contract.~~
+~~- Real runtime behavior difference: Yes. It can produce the wrong transmitted frequency.~~
+~~- User confusion only: No.~~
+~~- Severity: high~~
+~~- Confidence: high~~
+~~- Evidence: WsprryPi-UI/data/index.js:1790, WsprryPi-UI/data/index.js:1472~~
 
 ### T03 UI fallback default for GPIO.Use NTP disagrees with backend default
 
