@@ -21,16 +21,6 @@
 - Severity: low
 - Confidence: medium
 
-### F10 CW base-frequency defaults diverge across internal defaults, stock INI, and raw HTML
-
-- Brief: Internal default is 3572000, stock INI is 14096900, raw HTML is 7040000.
-- Why this bucket: The divergence is proven, but the correct authority is not.
-- Authoritative surface: Unclear.
-- Real runtime behavior difference: Yes, in missing-key/repair/offline/degraded flows.
-- User confusion only: Also yes.
-- Severity: medium
-- Confidence: high
-
 ### F15 CW numeric range limits differ between UI and backend
 
 - Brief: UI caps dot/repeat/shift more tightly than backend, which mostly requires positive values plus repeat policy.

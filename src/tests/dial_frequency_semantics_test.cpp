@@ -165,7 +165,7 @@ namespace
              {"Use Random Offset", "false"}}},
             {"CW",
              {{"Message", ""},
-              {"Base Frequency", "3572000.0"},
+              {"Base Frequency", "14096900.0"},
               {"Shift Hz", "5.0"},
               {"Dot Seconds", "3.0"},
               {"Intra Element Gap", "1.0"},
@@ -804,6 +804,28 @@ int main()
                 !config.wspr_frequency_entries[3].selector_gpio_active_high &&
                 nearly_equal(config.wspr_frequency_entries[3].dial_frequency_hz, 14097100.0),
             "unit-qualified frequencies must also support @GPIO with default active-low polarity");
+    }
+
+    {
+        init_config_json();
+        if (jConfig.contains("CW") && jConfig["CW"].is_object())
+        {
+            jConfig["CW"].erase("Base Frequency");
+        }
+        json_to_config();
+
+        require(
+            nearly_equal(config.qrss.frequency_hz, 14096900.0) &&
+                nearly_equal(config.fskcw.space_frequency_hz, 14096900.0) &&
+                nearly_equal(config.fskcw.mark_frequency_hz, 14096905.0) &&
+                nearly_equal(config.dfcw.dot_frequency_hz, 14096900.0) &&
+                nearly_equal(config.dfcw.dash_frequency_hz, 14096905.0),
+            "missing CW.Base Frequency must normalize to the canonical 14096900 Hz default for all CW runtime modes");
+
+        config_to_json();
+        require(
+            nearly_equal(jConfig["CW"].at("Base Frequency").get<double>(), 14096900.0),
+            "canonical JSON defaults must persist the 14096900 Hz CW.Base Frequency default");
     }
 
     {
@@ -2286,7 +2308,7 @@ int main()
             "TX Output=CLK0\nPower Level=1\n"
             "[WSPR]\nCall Sign=AA0NT\nGrid Square=EM18\nTX Power=20\n"
             "Frequency=20m\nPlanner Preference=auto\nUse Random Offset=false\n"
-            "[CW]\nMessage=\nBase Frequency=3572000.0\nShift Hz=5.0\n"
+            "[CW]\nMessage=\nBase Frequency=14096900.0\nShift Hz=5.0\n"
             "Dot Seconds=3.0\nIntra Element Gap=1.0\nInter Character Gap=3.0\n"
             "Inter Word Gap=7.0\nFade Shape=none\nFade In Ms=0\nFade Out Ms=0\n"
             "Fade Slice Ms=5\nStart Minute=0\nRepeat Minutes=10\n");

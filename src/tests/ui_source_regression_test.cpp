@@ -182,6 +182,10 @@ int main()
             site_source.find("\"GPIO\",\n                    \"Use NTP\",\n                    false") == std::string::npos,
         "UI config loader must default GPIO.Use NTP to true to match backend normalization");
     require(
+        site_source.find("let cw_base_frequency = getConfigFloatValue(cw, \"CW\", \"Base Frequency\", 14096900.0);") != std::string::npos &&
+            site_source.find("let cw_base_frequency = getConfigFloatValue(cw, \"CW\", \"Base Frequency\", 3572000.0);") == std::string::npos,
+        "UI config loader must default CW.Base Frequency to 14096900 Hz to match backend normalization");
+    require(
         site_source.find("runtime_mode") != std::string::npos &&
             site_source.find("nextTransmissionAt") != std::string::npos &&
             site_source.find("cw_message") != std::string::npos &&
@@ -272,6 +276,10 @@ int main()
         config_view_source.find("id=\"fsk_offset\"") != std::string::npos &&
             config_view_source.find("value=\"5\"") != std::string::npos,
         "configuration view must default CW shift markup to 5 Hz");
+    require(
+        config_view_source.find("id=\"qrss_frequency\"") != std::string::npos &&
+            config_view_source.find("value=\"14096900.0\"") != std::string::npos,
+        "configuration view must default CW base frequency markup to 14096900 Hz");
     require(
         config_view_source.find("id=\"band-gpio-enabled-all\"") != std::string::npos &&
             config_view_source.find("id=\"band-gpio-active-high-all\"") != std::string::npos,

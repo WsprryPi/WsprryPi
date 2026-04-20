@@ -1144,7 +1144,7 @@ namespace
             {"WSPR Dial Frequency Set", nlohmann::json::array()}};
         target["CW"] = {
             {"Message", ""},
-            {"Base Frequency", 3572000.0},
+            {"Base Frequency", 14096900.0},
             {"Shift Hz", 5.0},
             {"Dot Seconds", 3.0},
             {"Intra Element Gap", 1.0},
@@ -1314,7 +1314,7 @@ namespace
         const std::string cw_message =
             trim_copy(cw.value("Message", std::string("")));
         const double cw_base_frequency_hz =
-            cw.value("Base Frequency", 0.0);
+            cw.value("Base Frequency", 14096900.0);
         const double cw_shift_hz =
             cw.value("Shift Hz", target.modulation_fsk_offset_hz);
         target.qrss.message =
