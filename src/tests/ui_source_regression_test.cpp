@@ -148,14 +148,24 @@ int main()
             ui_source.find("function validateCwDotSeconds()") != std::string::npos &&
             ui_source.find("function validateCwShiftHz()") != std::string::npos &&
             ui_source.find("function validateCwRepeatMinutes()") != std::string::npos &&
+            ui_source.find("function validatePositiveCwField(fieldId, errorMessage)") != std::string::npos &&
             ui_source.find("function parseFrequencyWithOptionalUnits(rawValue)") != std::string::npos &&
             ui_source.find("Enter a positive CW base frequency.") != std::string::npos &&
             ui_source.find("Enter a positive CW dot length.") != std::string::npos &&
             ui_source.find("CW message is required.") != std::string::npos &&
             ui_source.find("Enter a positive CW frequency offset.") != std::string::npos &&
             ui_source.find("Enter a repeat interval of at least 1 minute.") != std::string::npos &&
+            ui_source.find("Enter a positive CW intra-element gap.") != std::string::npos &&
+            ui_source.find("Enter a positive CW inter-character gap.") != std::string::npos &&
+            ui_source.find("Enter a positive CW inter-word gap.") != std::string::npos &&
             ui_source.find("let cw_message = String($('#qrss_message').val() || \"\").trim();") != std::string::npos &&
             ui_source.find("let cw_base_frequency = parseFrequencyWithOptionalUnits($('#qrss_frequency').val());") != std::string::npos &&
+            ui_source.find("let cw_intra_element_gap = parseFloat($('#cw_intra_element_gap').val());") != std::string::npos &&
+            ui_source.find("let cw_inter_character_gap = parseFloat($('#cw_inter_character_gap').val());") != std::string::npos &&
+            ui_source.find("let cw_inter_word_gap = parseFloat($('#cw_inter_word_gap').val());") != std::string::npos &&
+            ui_source.find("\"Intra Element Gap\": cw_intra_element_gap") != std::string::npos &&
+            ui_source.find("\"Inter Character Gap\": cw_inter_character_gap") != std::string::npos &&
+            ui_source.find("\"Inter Word Gap\": cw_inter_word_gap") != std::string::npos &&
             ui_source.find("let cw_base_frequency = parseFloat($('#qrss_frequency').val());") == std::string::npos &&
             ui_source.find("return value * 1e6;") != std::string::npos &&
             ui_source.find("return value * 1e3;") != std::string::npos &&
@@ -209,6 +219,14 @@ int main()
         site_source.find("let cw_base_frequency = getConfigFloatValue(cw, \"CW\", \"Base Frequency\", 14096900.0);") != std::string::npos &&
             site_source.find("let cw_base_frequency = getConfigFloatValue(cw, \"CW\", \"Base Frequency\", 3572000.0);") == std::string::npos,
         "UI config loader must default CW.Base Frequency to 14096900 Hz to match backend normalization");
+    require(
+        site_source.find("let cw_intra_element_gap = getConfigFloatValue(cw, \"CW\", \"Intra Element Gap\", 1.0);") != std::string::npos &&
+            site_source.find("let cw_inter_character_gap = getConfigFloatValue(cw, \"CW\", \"Inter Character Gap\", 3.0);") != std::string::npos &&
+            site_source.find("let cw_inter_word_gap = getConfigFloatValue(cw, \"CW\", \"Inter Word Gap\", 7.0);") != std::string::npos &&
+            site_source.find("$(\"#cw_intra_element_gap\").val(cw_intra_element_gap).trigger(\"change\");") != std::string::npos &&
+            site_source.find("$(\"#cw_inter_character_gap\").val(cw_inter_character_gap).trigger(\"change\");") != std::string::npos &&
+            site_source.find("$(\"#cw_inter_word_gap\").val(cw_inter_word_gap).trigger(\"change\");") != std::string::npos,
+        "UI config loader must round-trip CW gap settings with backend defaults");
     require(
         site_source.find("runtime_mode") != std::string::npos &&
             site_source.find("nextTransmissionAt") != std::string::npos &&
@@ -308,6 +326,12 @@ int main()
         extract_input_tag_by_id(config_view_source, "fsk_offset");
     const std::string tx_repeat_every_input =
         extract_input_tag_by_id(config_view_source, "tx_repeat_every");
+    const std::string cw_intra_element_gap_input =
+        extract_input_tag_by_id(config_view_source, "cw_intra_element_gap");
+    const std::string cw_inter_character_gap_input =
+        extract_input_tag_by_id(config_view_source, "cw_inter_character_gap");
+    const std::string cw_inter_word_gap_input =
+        extract_input_tag_by_id(config_view_source, "cw_inter_word_gap");
     require(
         dot_length_input.find("step=\"any\"") != std::string::npos &&
             dot_length_input.find("min=\"0.000000001\"") != std::string::npos &&
@@ -322,6 +346,31 @@ int main()
         tx_repeat_every_input.find("min=\"1\"") != std::string::npos &&
             tx_repeat_every_input.find("max=\"60\"") == std::string::npos,
         "CW repeat-interval markup must retain the minimum while removing the old UI-only max cap");
+    require(
+        config_view_source.find("id=\"cw_intra_element_gap\"") != std::string::npos &&
+            config_view_source.find("id=\"cw_inter_character_gap\"") != std::string::npos &&
+            config_view_source.find("id=\"cw_inter_word_gap\"") != std::string::npos &&
+            config_view_source.find("Intra-Element Gap:") != std::string::npos &&
+            config_view_source.find("Inter-Character Gap:") != std::string::npos &&
+            config_view_source.find("Inter-Word Gap:") != std::string::npos,
+        "configuration view must expose the three CW gap controls");
+    require(
+        cw_intra_element_gap_input.find("min=\"0.000000001\"") != std::string::npos &&
+            cw_intra_element_gap_input.find("step=\"any\"") != std::string::npos &&
+            cw_intra_element_gap_input.find("value=\"1\"") != std::string::npos &&
+            cw_inter_character_gap_input.find("min=\"0.000000001\"") != std::string::npos &&
+            cw_inter_character_gap_input.find("step=\"any\"") != std::string::npos &&
+            cw_inter_character_gap_input.find("value=\"3\"") != std::string::npos &&
+            cw_inter_word_gap_input.find("min=\"0.000000001\"") != std::string::npos &&
+            cw_inter_word_gap_input.find("step=\"any\"") != std::string::npos &&
+            cw_inter_word_gap_input.find("value=\"7\"") != std::string::npos,
+        "CW gap markup must use strictly positive fractional defaults that match backend config defaults");
+    require(
+        config_view_source.find("Fade Shape") == std::string::npos &&
+            config_view_source.find("Fade In Ms") == std::string::npos &&
+            config_view_source.find("Fade Out Ms") == std::string::npos &&
+            config_view_source.find("Fade Slice Ms") == std::string::npos,
+        "configuration view must keep CW fade settings hidden from the normal UI");
     require(
         config_view_source.find("id=\"qrss_frequency\"") != std::string::npos &&
             config_view_source.find("value=\"14096900.0\"") != std::string::npos,
