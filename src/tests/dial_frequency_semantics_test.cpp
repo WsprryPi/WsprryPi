@@ -13,6 +13,8 @@
 #include <map>
 #include <optional>
 #include <string>
+#include <sys/wait.h>
+#include <unistd.h>
 #include <unordered_map>
 #include <vector>
 
@@ -60,6 +62,28 @@ namespace
             argv.push_back(arg.data());
         }
         return argv;
+    }
+
+    void require_cli_parse_rejected(
+        std::vector<std::string> args,
+        const std::string &message)
+    {
+        pid_t pid = fork();
+        require(pid >= 0, message + " must be able to fork a child process");
+
+        if (pid == 0)
+        {
+            reset_getopt_state();
+            std::vector<char *> argv = argv_for(args);
+            (void)parse_command_line(static_cast<int>(argv.size()), argv.data());
+            std::exit(EXIT_SUCCESS);
+        }
+
+        int status = 0;
+        require(waitpid(pid, &status, 0) == pid, message + " must wait for the child process");
+        require(
+            WIFEXITED(status) && WEXITSTATUS(status) != EXIT_SUCCESS,
+            message + " must reject the CLI input");
     }
 
     std::map<std::string, std::unordered_map<std::string, std::string>>
@@ -1027,6 +1051,32 @@ int main()
             config.wspr_planner_preference == WsprPlannerPreference::RequirePaired &&
                 config.wspr.planner_preference == WsprPlannerPreference::RequirePaired,
             "--planner-preference require_paired must select the canonical require_paired planner preference");
+    }
+
+    {
+        require_cli_parse_rejected(
+            {
+                "wsprrypi",
+                "--planner-preference",
+                "prefer-paired",
+                "AA0NT/12",
+                "EM18IG",
+                "20",
+                "20m"},
+            "--planner-preference prefer-paired");
+    }
+
+    {
+        require_cli_parse_rejected(
+            {
+                "wsprrypi",
+                "--planner-preference",
+                "require-paired",
+                "AA0NT/12",
+                "EM18IG",
+                "20",
+                "20m"},
+            "--planner-preference require-paired");
     }
 
     {

@@ -557,9 +557,9 @@ static WsprPlannerPreference parse_planner_preference_option(const char *raw_val
 
     if (value.empty() || value == "auto")
         return WsprPlannerPreference::Auto;
-    if (value == "prefer_paired" || value == "prefer-paired")
+    if (value == "prefer_paired")
         return WsprPlannerPreference::PreferPaired;
-    if (value == "require_paired" || value == "require-paired")
+    if (value == "require_paired")
         return WsprPlannerPreference::RequirePaired;
 
     throw std::invalid_argument(
