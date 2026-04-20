@@ -177,6 +177,11 @@ int main()
         site_source.find("Frequency Control GPIO Polarity") == std::string::npos,
         "UI config schema must not require the obsolete GPIO.Frequency Control GPIO Polarity key");
     require(
+        site_source.find("let use_ntp = getConfigBoolValue(") != std::string::npos &&
+            site_source.find("\"GPIO\",\n                    \"Use NTP\",\n                    true") != std::string::npos &&
+            site_source.find("\"GPIO\",\n                    \"Use NTP\",\n                    false") == std::string::npos,
+        "UI config loader must default GPIO.Use NTP to true to match backend normalization");
+    require(
         site_source.find("runtime_mode") != std::string::npos &&
             site_source.find("nextTransmissionAt") != std::string::npos &&
             site_source.find("cw_message") != std::string::npos &&

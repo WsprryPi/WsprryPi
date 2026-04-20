@@ -2341,6 +2341,23 @@ int main()
 
     {
         init_config_json();
+        jConfig["Operation"]["Transmit Backend"] = "gpio";
+        if (jConfig.contains("GPIO") && jConfig["GPIO"].is_object())
+        {
+            jConfig["GPIO"].erase("Use NTP");
+        }
+        json_to_config();
+
+        require(
+            config.gpio_use_ntp,
+            "missing GPIO.Use NTP must default true in backend normalization");
+        require(
+            config.use_ntp,
+            "missing GPIO.Use NTP must enable the active GPIO runtime NTP path");
+    }
+
+    {
+        init_config_json();
         jConfig["CW"]["Dot Seconds"] = 2.0;
         jConfig["CW"]["Intra Element Gap"] = 1.5;
         jConfig["CW"]["Inter Character Gap"] = 4.0;

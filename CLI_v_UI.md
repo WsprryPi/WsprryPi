@@ -24,16 +24,16 @@
 ~~- Confidence: high~~
 ~~- Evidence: WsprryPi-UI/data/index.js:1790, WsprryPi-UI/data/index.js:1472~~
 
-### T03 UI fallback default for GPIO.Use NTP disagrees with backend default
+~~### T03 UI fallback default for GPIO.Use NTP disagrees with backend default~~
 
-- Brief: Backend defaults missing GPIO.Use NTP to true, while the UI loader falls back to false.
-- Why this bucket: Missing-key configs can load differently in UI and then be re-saved with changed behavior.
-- Authoritative surface: Backend config normalization in src/config_handler.cpp:1157.
-- Real runtime behavior difference: Yes. A partial or older config can change calibration mode after a UI save.
-- User confusion only: Not only confusion.
-- Severity: medium
-- Confidence: medium
-- Evidence: src/config_handler.cpp:1063, src/config_handler.cpp:1157, WsprryPi-UI/data/site.js:1009
+~~- Brief: Backend defaults missing GPIO.Use NTP to true, while the UI loader falls back to false.~~
+~~- Why this bucket: Missing-key configs can load differently in UI and then be re-saved with changed behavior.~~
+~~- Authoritative surface: Backend config normalization in src/config_handler.cpp:1157.~~
+~~- Real runtime behavior difference: Yes. A partial or older config can change calibration mode after a UI save.~~
+~~- User confusion only: Not only confusion.~~
+~~- Severity: medium~~
+~~- Confidence: medium~~
+~~- Evidence: src/config_handler.cpp:1063, src/config_handler.cpp:1157, WsprryPi-UI/data/site.js:1009~~
 
 ## Intentional asymmetry
 
