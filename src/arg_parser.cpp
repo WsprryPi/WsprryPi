@@ -543,6 +543,29 @@ static int parse_si5351_tx_output_option(const char *raw_value)
         "Invalid Si5351 TX output. Expected CLK0, CLK1, CLK2, 0, 1, or 2.");
 }
 
+static WsprPlannerPreference parse_planner_preference_option(const char *raw_value)
+{
+    std::string value = trim_copy_string(raw_value == nullptr ? "" : raw_value);
+    std::transform(
+        value.begin(),
+        value.end(),
+        value.begin(),
+        [](unsigned char c)
+        {
+            return static_cast<char>(std::tolower(c));
+        });
+
+    if (value.empty() || value == "auto")
+        return WsprPlannerPreference::Auto;
+    if (value == "prefer_paired")
+        return WsprPlannerPreference::PreferPaired;
+    if (value == "require_paired")
+        return WsprPlannerPreference::RequirePaired;
+
+    throw std::invalid_argument(
+        "Invalid planner preference. Expected auto, prefer_paired, or require_paired.");
+}
+
 static bool parse_gpio_number_strict(
     std::string_view raw_value,
     int &gpio_out) noexcept
@@ -1069,10 +1092,26 @@ void print_usage(const std::string &message, int exit_code)
               << "    Show the WsprryPi version.\n"
               << "  -i, --ini-file <file>\n"
               << "    Load parameters from an INI file. Provide the path and filename.\n\n"
+              << "  -n, --use-ntp\n"
+              << "    Enable GPIO-backed NTP/PPM calibration.\n"
+              << "  -p, --ppm <value>\n"
+              << "    Set manual PPM correction for the GPIO backend and disable --use-ntp.\n"
+              << "  -o, --offset\n"
+              << "    Randomize each WSPR transmission around the selected dial frequency.\n"
+              << "  --planner-preference <auto|prefer_paired|require_paired>\n"
+              << "    Select WSPR planning policy. Default: auto.\n"
+              << "  -r, --repeat\n"
+              << "    Repeat transmissions continuously in direct CLI mode.\n"
+              << "  -x, --terminate <count>\n"
+              << "    Stop after the given number of WSPR transmissions in direct CLI mode.\n\n"
               << "  --debug-logging\n"
               << "    Enable DEBUG-level application logging.\n"
               << "  --no-debug-logging\n"
-              << "    Disable DEBUG-level application logging.\n\n"
+              << "    Disable DEBUG-level application logging.\n"
+              << "  -J, --journald\n"
+              << "    Use journald for log output.\n"
+              << "  -D, --date-time-log\n"
+              << "    Prefix stream log output with date/time stamps.\n\n"
               << "  --no-web\n"
               << "    Disable the HTTP web UI and WebSocket server.\n\n"
               << "  --backend <gpio|si5351>\n"
@@ -1107,6 +1146,31 @@ void print_usage(const std::string &message, int exit_code)
                   << "  --si5351-tx-output <CLK0|CLK1|CLK2>\n"
                   << "    Select the Si5351 transmit output when --backend si5351 is used. Default: CLK0.\n\n";
     }
+
+    std::cerr << "  -w, --web-port <port>\n"
+              << "    Set the HTTP web UI port. Default: 31415.\n"
+              << "  -k, --socket-port <port>\n"
+              << "    Set the WebSocket server port. Default: 31416.\n"
+              << "  -l, --led_pin <gpio>\n"
+              << "    Enable the activity LED on the given GPIO.\n"
+              << "  -s, --shutdown_button <gpio>\n"
+              << "    Enable the shutdown button on the given GPIO.\n\n"
+              << "  -t, --test-tone <rf_frequency>\n"
+              << "    Start a transient direct RF test tone instead of WSPR. Invalid with --ini-file.\n\n"
+              << "  --qrss-message <text>\n"
+              << "  --qrss-frequency <hz>\n"
+              << "  --qrss-dot-seconds <seconds>\n"
+              << "    Start transient QRSS mode from the CLI. All three options are required together.\n\n"
+              << "  --fskcw-message <text>\n"
+              << "  --fskcw-mark-frequency <hz>\n"
+              << "  --fskcw-space-frequency <hz>\n"
+              << "  --fskcw-dot-seconds <seconds>\n"
+              << "    Start transient FSKCW mode from the CLI. All four options are required together.\n\n"
+              << "  --dfcw-message <text>\n"
+              << "  --dfcw-dot-frequency <hz>\n"
+              << "  --dfcw-dash-frequency <hz>\n"
+              << "  --dfcw-dot-seconds <seconds>\n"
+              << "    Start transient DFCW mode from the CLI. All four options are required together.\n\n";
 
     std::cerr << "See the documentation for a complete list of available options.\n\n";
 
@@ -1216,6 +1280,19 @@ bool validate_config_candidate(
         if (error_message != nullptr)
         {
             *error_message = "Modulation dot_seconds must be greater than 0.";
+        }
+
+        return false;
+    }
+
+    if ((candidate.mode == ModeType::FSKCW ||
+         candidate.mode == ModeType::DFCW) &&
+        candidate.modulation_fsk_offset_hz <= 0.0)
+    {
+        if (error_message != nullptr)
+        {
+            *error_message =
+                "CW shift_hz must be greater than 0 for FSKCW and DFCW.";
         }
 
         return false;
@@ -2154,7 +2231,7 @@ bool set_frequencies(ArgParserConfig &target)
         {
             const double freq = lookup.parse_string_to_frequency(entry.token, false);
             entry.dial_frequency_hz = freq;
-            entry.allow_band_gpio_fallback = target.use_ini;
+            entry.allow_band_gpio_fallback = false;
             if (token_looks_numeric_frequency(entry.token))
             {
                 const auto legacy_alias =
@@ -2441,7 +2518,7 @@ bool parse_command_line(int argc, char *argv[])
         {"debug-logging", no_argument, nullptr, 1018},  // Global: config.debug_logging
         {"no-debug-logging", no_argument, nullptr, 1019},
         {"no-web", no_argument, nullptr, 1020},
-        {"require-paired", no_argument, nullptr, 1001}, // Global: config.wspr_planner_preference
+        {"planner-preference", required_argument, nullptr, 1001},
         {"backend", required_argument, nullptr, 1002},
         {"qrss-message", required_argument, nullptr, 1003},
         {"qrss-frequency", required_argument, nullptr, 1004},
@@ -2543,9 +2620,17 @@ bool parse_command_line(int argc, char *argv[])
             config.enable_web = false;
             break;
         }
-        case 1001: // Require paired WSPR planning
+        case 1001: // Select WSPR planner preference
         {
-            config.wspr_planner_preference = WsprPlannerPreference::RequirePaired;
+            try
+            {
+                config.wspr_planner_preference =
+                    parse_planner_preference_option(optarg);
+            }
+            catch (const std::exception &e)
+            {
+                print_usage(e.what(), EXIT_FAILURE);
+            }
             break;
         }
         case 1002: // Select transmit backend
@@ -3101,6 +3186,11 @@ bool parse_command_line(int argc, char *argv[])
         }
     }
     resolve_backend_specific_config(config);
+
+    if (config.mode == ModeType::WSPR)
+    {
+        sync_wspr_mode_config(config);
+    }
 
     // Re-save any config changes in the JSON
     config_to_json();

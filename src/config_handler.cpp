@@ -38,6 +38,7 @@
 
 #include <algorithm>
 #include <cctype>
+#include <cmath>
 #include <cstdlib>
 #include <iostream>
 #include <limits>
@@ -53,6 +54,9 @@ nlohmann::json jConfig;
 
 namespace
 {
+    constexpr double kManualPpmMin = -200.0;
+    constexpr double kManualPpmMax = 200.0;
+
     bool g_patch_all_from_web_runtime_apply_suppressed_for_test = false;
     std::optional<bool> g_si5351_detection_override;
 
@@ -172,6 +176,60 @@ namespace
         }
 
         throw std::runtime_error(context + " must be an integer.");
+    }
+
+    double parse_manual_ppm_value(
+        const nlohmann::json &source,
+        const std::string &context)
+    {
+        double ppm = 0.0;
+        if (source.is_number())
+        {
+            ppm = source.get<double>();
+        }
+        else if (source.is_string())
+        {
+            const std::string raw = trim_copy(source.get<std::string>());
+            std::size_t consumed = 0;
+            try
+            {
+                ppm = std::stod(raw, &consumed);
+            }
+            catch (const std::invalid_argument &)
+            {
+                throw std::runtime_error(context + " must be a number.");
+            }
+            catch (const std::out_of_range &)
+            {
+                throw std::runtime_error(context + " is out of range.");
+            }
+
+            if (consumed != raw.size())
+            {
+                throw std::runtime_error(context + " must be a number.");
+            }
+        }
+        else
+        {
+            throw std::runtime_error(context + " must be a number.");
+        }
+
+        if (!std::isfinite(ppm))
+        {
+            throw std::runtime_error(context + " must be a finite number.");
+        }
+
+        const double clamped_ppm = std::clamp(ppm, kManualPpmMin, kManualPpmMax);
+        if (ppm != clamped_ppm)
+        {
+            llog.logS(
+                WARN,
+                context,
+                " is outside bounds (-200 to 200), applying clamped value: ",
+                clamped_ppm);
+        }
+
+        return clamped_ppm;
     }
 
     int parse_si5351_tx_output(const nlohmann::json &source)
@@ -331,7 +389,13 @@ namespace
         public_json["GPIO"] = source.at("GPIO");
         public_json["Calibration"] = source.at("Calibration");
         public_json["Si5351"] = source.at("Si5351");
-        public_json["WSPR"] = source.at("WSPR");
+        public_json["WSPR"] = {
+            {"Call Sign", source.at("WSPR").at("Call Sign")},
+            {"Grid Square", source.at("WSPR").at("Grid Square")},
+            {"TX Power", source.at("WSPR").at("TX Power")},
+            {"Frequency", source.at("WSPR").at("Frequency")},
+            {"Planner Preference", source.at("WSPR").at("Planner Preference")},
+            {"Use Random Offset", source.at("WSPR").at("Use Random Offset")}};
         public_json["CW"] = source.at("CW");
         public_json["Band GPIO"] = source.at("Band GPIO");
         public_json["Platform"] = {
@@ -392,7 +456,25 @@ namespace
         if (public_json.contains("Si5351"))
             internal_json["Si5351"] = public_json.at("Si5351");
         if (public_json.contains("WSPR"))
-            internal_json["WSPR"] = public_json.at("WSPR");
+        {
+            const auto &wspr = public_json.at("WSPR");
+            if (wspr.contains("Call Sign"))
+                internal_json["WSPR"]["Call Sign"] = wspr.at("Call Sign");
+            if (wspr.contains("Grid Square"))
+                internal_json["WSPR"]["Grid Square"] = wspr.at("Grid Square");
+            if (wspr.contains("TX Power"))
+                internal_json["WSPR"]["TX Power"] = wspr.at("TX Power");
+            if (wspr.contains("Frequency"))
+                internal_json["WSPR"]["Frequency"] = wspr.at("Frequency");
+            if (wspr.contains("Planner Preference"))
+                internal_json["WSPR"]["Planner Preference"] = wspr.at("Planner Preference");
+            if (wspr.contains("Use Random Offset"))
+                internal_json["WSPR"]["Use Random Offset"] = wspr.at("Use Random Offset");
+            if (internal_json.contains("WSPR") && internal_json["WSPR"].is_object())
+            {
+                internal_json["WSPR"].erase("WSPR Dial Frequency Set");
+            }
+        }
         if (public_json.contains("CW"))
             internal_json["CW"] = public_json.at("CW");
         if (public_json.contains("Band GPIO"))
@@ -512,22 +594,10 @@ namespace
 
     void set_default_band_gpio_config(std::array<BandGPIOConfig, HAM_BAND_COUNT> &band_gpio)
     {
-        band_gpio[ham_band_index(HamBand::BAND_2200M)] = make_band_gpio_config(17, true);
-        band_gpio[ham_band_index(HamBand::BAND_630M)] = make_band_gpio_config(27, true);
-        band_gpio[ham_band_index(HamBand::BAND_160M)] = make_band_gpio_config(22, true);
-        band_gpio[ham_band_index(HamBand::BAND_80M)] = make_band_gpio_config(23, true);
-        band_gpio[ham_band_index(HamBand::BAND_60M)] = make_band_gpio_config(24, true);
-        band_gpio[ham_band_index(HamBand::BAND_40M)] = make_band_gpio_config(25, true);
-        band_gpio[ham_band_index(HamBand::BAND_30M)] = make_band_gpio_config(5, true);
-        band_gpio[ham_band_index(HamBand::BAND_22M)] = make_band_gpio_config(6, true);
-        band_gpio[ham_band_index(HamBand::BAND_20M)] = make_band_gpio_config(12, true);
-        band_gpio[ham_band_index(HamBand::BAND_17M)] = make_band_gpio_config(13, true);
-        band_gpio[ham_band_index(HamBand::BAND_15M)] = make_band_gpio_config(16, true);
-        band_gpio[ham_band_index(HamBand::BAND_12M)] = make_band_gpio_config(26, true);
-        band_gpio[ham_band_index(HamBand::BAND_10M)] = make_band_gpio_config(20, true);
-        band_gpio[ham_band_index(HamBand::BAND_6M)] = make_band_gpio_config(21, true);
-        band_gpio[ham_band_index(HamBand::BAND_4M)] = make_band_gpio_config(-1, false);
-        band_gpio[ham_band_index(HamBand::BAND_2M)] = make_band_gpio_config(-1, false);
+        for (BandGPIOConfig &band_config : band_gpio)
+        {
+            band_config = make_band_gpio_config(-1, false, false);
+        }
     }
 
     std::string band_gpio_active_high_key(const std::string &band_name)
@@ -685,7 +755,7 @@ void init_default_config()
     resolve_backend_specific_config(config);
 
     config.modulation_dot_seconds = 3.0;
-    config.modulation_fsk_offset_hz = 500.0;
+    config.modulation_fsk_offset_hz = 5.0;
     config.cw_intra_element_gap = 1.0;
     config.cw_inter_character_gap = 3.0;
     config.cw_inter_word_gap = 7.0;
@@ -788,45 +858,6 @@ void clear_si5351_detection_override_for_test() noexcept
 
 namespace
 {
-    std::vector<double> parse_wspr_dial_frequency_set(const nlohmann::json &value)
-    {
-        if (value.is_array())
-        {
-            return value.get<std::vector<double>>();
-        }
-
-        if (value.is_string())
-        {
-            const std::string raw_value = trim_copy(value.get<std::string>());
-
-            if (raw_value.empty())
-            {
-                return {};
-            }
-
-            try
-            {
-                nlohmann::json parsed = nlohmann::json::parse(raw_value);
-
-                if (!parsed.is_array())
-                {
-                    throw std::runtime_error(
-                        "WSPR dial frequency set string did not parse to an array");
-                }
-
-                return parsed.get<std::vector<double>>();
-            }
-            catch (const std::exception &e)
-            {
-                throw std::runtime_error(
-                    std::string("Invalid WSPR.WSPR Dial Frequency Set: ") + e.what());
-            }
-        }
-
-        throw std::runtime_error(
-            "WSPR.WSPR Dial Frequency Set must be an array or JSON array string");
-    }
-
     nlohmann::json parse_ini_value(const std::string &raw_value)
     {
         const std::string trimmed = trim_copy(raw_value);
@@ -1082,12 +1113,11 @@ namespace
             {"TX Power", 20},
             {"Frequency", "20m"},
             {"Planner Preference", "auto"},
-            {"Use Random Offset", true},
-            {"WSPR Dial Frequency Set", nlohmann::json::array()}};
+            {"Use Random Offset", true}};
         target["CW"] = {
             {"Message", ""},
-            {"Base Frequency", 3572000.0},
-            {"Shift Hz", 500.0},
+            {"Base Frequency", 14096900.0},
+            {"Shift Hz", 5.0},
             {"Dot Seconds", 3.0},
             {"Intra Element Gap", 1.0},
             {"Inter Character Gap", 3.0},
@@ -1125,17 +1155,7 @@ namespace
             parse_wspr_planner_preference(source.at("WSPR"));
         target.loop_tx = source.at("Meta").at("Loop TX").get<bool>();
         target.tx_iterations.store(source.at("Meta").at("TX Iterations").get<int>());
-        const auto &wspr = source.at("WSPR");
-        if (wspr.contains("WSPR Dial Frequency Set") &&
-            !wspr.at("WSPR Dial Frequency Set").empty())
-        {
-            target.wspr_dial_freq_set =
-                parse_wspr_dial_frequency_set(wspr.at("WSPR Dial Frequency Set"));
-        }
-        else
-        {
-            target.wspr_dial_freq_set.clear();
-        }
+        target.wspr_dial_freq_set.clear();
 
         target.transmit = source.at("Operation").at("Transmit").get<bool>();
         target.transmit_backend =
@@ -1183,7 +1203,9 @@ namespace
                 ? si5351.at("Power Level").get<int>()
                 : 1;
         resolve_backend_specific_config(target);
-        target.ppm = source.at("Calibration").at("PPM").get<double>();
+        target.ppm = parse_manual_ppm_value(
+            source.at("Calibration").at("PPM"),
+            "Calibration.PPM");
         target.use_offset = source.at("WSPR").at("Use Random Offset").get<bool>();
         target.modulation_dot_seconds =
             source.contains("CW") &&
@@ -1254,9 +1276,9 @@ namespace
         const std::string cw_message =
             trim_copy(cw.value("Message", std::string("")));
         const double cw_base_frequency_hz =
-            cw.value("Base Frequency", 0.0);
+            cw.value("Base Frequency", 14096900.0);
         const double cw_shift_hz =
-            cw.value("Shift Hz", 0.0);
+            cw.value("Shift Hz", target.modulation_fsk_offset_hz);
         target.qrss.message =
             cw_message;
         target.qrss.frequency_hz = cw_base_frequency_hz;
@@ -1285,7 +1307,7 @@ namespace
         target.shutdown_pin = source.at("Operation").at("Shutdown Button").get<int>();
         target.use_journald = false;
 
-        // Missing Band GPIO data is allowed; seeded defaults stay in place.
+        // Missing Band GPIO data is allowed; explicit disabled defaults stay in place.
         const auto band_gpio_section_it = source.find("Band GPIO");
         if (band_gpio_section_it == source.end() || !band_gpio_section_it->is_object())
         {
@@ -1363,7 +1385,6 @@ namespace
         target["WSPR"]["Planner Preference"] =
             wspr_planner_preference_to_string(source.wspr.planner_preference);
         target["WSPR"]["Use Random Offset"] = source.use_offset;
-        target["WSPR"]["WSPR Dial Frequency Set"] = source.wspr_dial_freq_set;
 
         std::string cw_message = source.qrss.message;
         double cw_base_frequency_hz = source.qrss.frequency_hz;
@@ -1894,19 +1915,6 @@ void patch_all_from_web(const nlohmann::json &j)
                 &error_details))
         {
             throw ConfigValidationError(error_message, error_details);
-        }
-
-        const auto band_gpio_section_it = candidate_json.find("Band GPIO");
-        if (band_gpio_section_it != candidate_json.end() &&
-            band_gpio_section_it->is_object())
-        {
-            for (WsprFrequencyEntry &entry : candidate_config.wspr_frequency_entries)
-            {
-                if (entry.selector_gpio == kSelectorGpioUnset)
-                {
-                    entry.allow_band_gpio_fallback = true;
-                }
-            }
         }
 
         config_to_json_impl(candidate_config, candidate_json);

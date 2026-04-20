@@ -24,6 +24,26 @@ namespace
             std::istreambuf_iterator<char>());
     }
 
+    std::string extract_input_tag_by_id(
+        const std::string &source, const std::string &id)
+    {
+        const std::string needle = "id=\"" + id + "\"";
+        const std::size_t id_pos = source.find(needle);
+        require(id_pos != std::string::npos, "test helper must find field " + id);
+
+        const std::size_t tag_start = source.rfind("<input", id_pos);
+        require(
+            tag_start != std::string::npos,
+            "test helper must find input tag start for " + id);
+
+        const std::size_t tag_end = source.find('>', id_pos);
+        require(
+            tag_end != std::string::npos,
+            "test helper must find input tag end for " + id);
+
+        return source.substr(tag_start, (tag_end - tag_start) + 1);
+    }
+
 } // namespace
 
 int main()
@@ -32,9 +52,9 @@ int main()
         read_text_file("/home/pi/WsprryPi/src/web_socket.cpp");
     require(
         websocket_source.find("else if (cmd == \"stop\")") != std::string::npos &&
-            websocket_source.find("stop_transmission_by_user_request();") !=
+            websocket_source.find("stop_transmission_by_user_request(persist_transmit);") !=
                 std::string::npos,
-        "websocket stop command must route through stop_transmission_by_user_request()");
+        "websocket stop command must route through stop_transmission_by_user_request() with persistence control");
 
     const std::string scheduling_source =
         read_text_file("/home/pi/WsprryPi/src/scheduling.cpp");
@@ -57,27 +77,27 @@ int main()
     const std::string ui_source =
         read_text_file("/home/pi/WsprryPi/WsprryPi-UI/data/index.js");
     require(
-        ui_source.find("ws.send(JSON.stringify({ command: \"stop\" }))") !=
+        ui_source.find("persist_transmit: persistTransmit") !=
                 std::string::npos,
-        "UI Stop button must send the explicit stop command over the websocket");
+        "UI Stop button must send the explicit stop command over the websocket with persistence control");
     require(
         ui_source.find("let pendingModeChange = null;") != std::string::npos &&
             ui_source.find("let pendingPersistedMode = \"\";") != std::string::npos &&
             ui_source.find("function requestConfigModeChange(targetMode)") != std::string::npos &&
             ui_source.find("title: \"Stop transmission to change mode\"") != std::string::npos &&
             ui_source.find("title: \"Disable transmissions to change mode\"") != std::string::npos &&
-            ui_source.find("requestTransmitEnabledChange(false, true") != std::string::npos &&
+            ui_source.find("requestTransmitEnabledChange(false, true") == std::string::npos &&
             ui_source.find("const requestedMode = normalizedTargetMode;") != std::string::npos &&
             ui_source.find("finalizePendingModeChange(requestedMode);") != std::string::npos &&
-            ui_source.find("syncAutosaveBaselineOnSuccess: false,") != std::string::npos &&
-            ui_source.find("if (!stopTransmission()) {") != std::string::npos &&
+            ui_source.find("setTransmitFromBackend(false);") != std::string::npos &&
+            ui_source.find("if (!stopTransmission({ persistTransmit: false })) {") != std::string::npos &&
             ui_source.find("suspendConfigAutosave(true);") != std::string::npos &&
             ui_source.find("input:not(#transmit, [name=\"mode_toggle\"], [name=\"qrss_type\"])") != std::string::npos &&
             ui_source.find("configAutosaveNeedsRuntimeRefresh = true;") != std::string::npos &&
             ui_source.find("pendingPersistedMode = currentConfigModeSelection;") != std::string::npos &&
             ui_source.find("flushAutosave();") != std::string::npos &&
             ui_source.find("if (configAutosaveNeedsRuntimeRefresh && typeof getTxState === \"function\") {") != std::string::npos,
-        "mode changes must be guarded behind stop/disable confirmation, preserve the unsaved target mode through the disable step, exclude mode toggles from generic autosave scheduling, and refresh runtime state after the committed mode save lands");
+        "mode changes must be guarded behind stop/disable confirmation, collapse the guarded disable-plus-mode flow into one persisted save, exclude mode toggles from generic autosave scheduling, and refresh runtime state after the committed mode save lands");
     require(
         ui_source.find("if (enabled && pendingPersistedMode) {") != std::string::npos &&
             ui_source.find("Wait for the mode change to save before enabling transmissions.") != std::string::npos,
@@ -125,12 +145,44 @@ int main()
         "configuration autosave must debounce saves, clear stale invalid state for already-saved payloads, suppress unchanged failed payload retries, and suppress duplicate writes");
     require(
         ui_source.find("function validateCwMessage()") != std::string::npos &&
+            ui_source.find("function validateCwDotSeconds()") != std::string::npos &&
             ui_source.find("function validateCwShiftHz()") != std::string::npos &&
+            ui_source.find("function validateCwRepeatMinutes()") != std::string::npos &&
+            ui_source.find("function validatePositiveCwField(fieldId, errorMessage)") != std::string::npos &&
+            ui_source.find("function parseFrequencyWithOptionalUnits(rawValue)") != std::string::npos &&
             ui_source.find("Enter a positive CW base frequency.") != std::string::npos &&
+            ui_source.find("Enter a positive CW dot length.") != std::string::npos &&
             ui_source.find("CW message is required.") != std::string::npos &&
             ui_source.find("Enter a positive CW frequency offset.") != std::string::npos &&
-            ui_source.find("let cw_message = String($('#qrss_message').val() || \"\").trim();") != std::string::npos,
-        "CW autosave validation must require a trimmed message, a positive base frequency, and a positive shift for FSKCW/DFCW");
+            ui_source.find("Enter a repeat interval of at least 1 minute.") != std::string::npos &&
+            ui_source.find("Enter a positive CW intra-element gap.") != std::string::npos &&
+            ui_source.find("Enter a positive CW inter-character gap.") != std::string::npos &&
+            ui_source.find("Enter a positive CW inter-word gap.") != std::string::npos &&
+            ui_source.find("let cw_message = String($('#qrss_message').val() || \"\").trim();") != std::string::npos &&
+            ui_source.find("let cw_base_frequency = parseFrequencyWithOptionalUnits($('#qrss_frequency').val());") != std::string::npos &&
+            ui_source.find("let cw_intra_element_gap = parseFloat($('#cw_intra_element_gap').val());") != std::string::npos &&
+            ui_source.find("let cw_inter_character_gap = parseFloat($('#cw_inter_character_gap').val());") != std::string::npos &&
+            ui_source.find("let cw_inter_word_gap = parseFloat($('#cw_inter_word_gap').val());") != std::string::npos &&
+            ui_source.find("\"Intra Element Gap\": cw_intra_element_gap") != std::string::npos &&
+            ui_source.find("\"Inter Character Gap\": cw_inter_character_gap") != std::string::npos &&
+            ui_source.find("\"Inter Word Gap\": cw_inter_word_gap") != std::string::npos &&
+            ui_source.find("let cw_base_frequency = parseFloat($('#qrss_frequency').val());") == std::string::npos &&
+            ui_source.find("return value * 1e6;") != std::string::npos &&
+            ui_source.find("return value * 1e3;") != std::string::npos &&
+            ui_source.find("return value * 1e9;") != std::string::npos &&
+            ui_source.find("const value = parseFrequencyWithOptionalUnits(raw);") != std::string::npos,
+        "CW autosave validation and save-path serialization must share unit-aware base-frequency parsing and reject parseFloat-based truncation");
+    require(
+        ui_source.find("function splitWsprFrequencyTokens(raw)") != std::string::npos &&
+            ui_source.find("function validateWsprFrequencyToken(token)") != std::string::npos &&
+            ui_source.find("\"2200m\",") != std::string::npos &&
+            ui_source.find("\"630m\",") != std::string::npos &&
+            ui_source.find("\"22m\",") != std::string::npos &&
+            ui_source.find("@GPIO, @GPIOH, or @GPIOL") != std::string::npos &&
+            ui_source.find(".replace(/,/g, \" \")") != std::string::npos &&
+            ui_source.find("const numericRx = /^-?(?:(?:\\\\d+(?:\\\\.\\\\d*)?)|(?:\\\\.\\\\d+))(?:hz|khz|mhz|ghz)?$/i;") == std::string::npos &&
+            ui_source.find("-15") == std::string::npos,
+        "WSPR frequency validation must support remaining band aliases, comma-separated lists, optional @GPIO suffixes, reject negative numeric tokens, and must not retain -15 aliases");
     require(
         ui_source.find("bindTestToneControls();") != std::string::npos,
         "configuration view must bind the shared Test Tone controls");
@@ -158,6 +210,23 @@ int main()
     require(
         site_source.find("Frequency Control GPIO Polarity") == std::string::npos,
         "UI config schema must not require the obsolete GPIO.Frequency Control GPIO Polarity key");
+    require(
+        site_source.find("let use_ntp = getConfigBoolValue(") != std::string::npos &&
+            site_source.find("\"GPIO\",\n                    \"Use NTP\",\n                    true") != std::string::npos &&
+            site_source.find("\"GPIO\",\n                    \"Use NTP\",\n                    false") == std::string::npos,
+        "UI config loader must default GPIO.Use NTP to true to match backend normalization");
+    require(
+        site_source.find("let cw_base_frequency = getConfigFloatValue(cw, \"CW\", \"Base Frequency\", 14096900.0);") != std::string::npos &&
+            site_source.find("let cw_base_frequency = getConfigFloatValue(cw, \"CW\", \"Base Frequency\", 3572000.0);") == std::string::npos,
+        "UI config loader must default CW.Base Frequency to 14096900 Hz to match backend normalization");
+    require(
+        site_source.find("let cw_intra_element_gap = getConfigFloatValue(cw, \"CW\", \"Intra Element Gap\", 1.0);") != std::string::npos &&
+            site_source.find("let cw_inter_character_gap = getConfigFloatValue(cw, \"CW\", \"Inter Character Gap\", 3.0);") != std::string::npos &&
+            site_source.find("let cw_inter_word_gap = getConfigFloatValue(cw, \"CW\", \"Inter Word Gap\", 7.0);") != std::string::npos &&
+            site_source.find("$(\"#cw_intra_element_gap\").val(cw_intra_element_gap).trigger(\"change\");") != std::string::npos &&
+            site_source.find("$(\"#cw_inter_character_gap\").val(cw_inter_character_gap).trigger(\"change\");") != std::string::npos &&
+            site_source.find("$(\"#cw_inter_word_gap\").val(cw_inter_word_gap).trigger(\"change\");") != std::string::npos,
+        "UI config loader must round-trip CW gap settings with backend defaults");
     require(
         site_source.find("runtime_mode") != std::string::npos &&
             site_source.find("nextTransmissionAt") != std::string::npos &&
@@ -234,16 +303,89 @@ int main()
             config_view_source.find("config-wspr-top-row__item config-wspr-top-row__field config-wspr-top-row__planner") != std::string::npos &&
             config_view_source.find("for=\"useoffset\">\n                                                    Randomize\n") != std::string::npos &&
             config_view_source.find("id=\"ppm\"") != std::string::npos &&
+            config_view_source.find("min=\"-200\"") != std::string::npos &&
+            config_view_source.find("max=\"200\"") != std::string::npos &&
             config_view_source.find("id=\"use_ntp\"") != std::string::npos &&
             config_view_source.find("id=\"planner_preference\"") != std::string::npos &&
             config_view_source.find("id=\"dbm\"") != std::string::npos &&
             config_view_source.find("<option value=\"60\">60</option>") != std::string::npos &&
+            config_view_source.find("spaces or commas") != std::string::npos &&
+            config_view_source.find("@GPIO, @GPIOH, or @GPIOL") != std::string::npos &&
+            config_view_source.find("-15") == std::string::npos &&
             config_view_source.find("class=\"form-select config-planner-field__select\"") == std::string::npos,
         "WSPR transmission settings must keep planner_preference in the compact top row and render TX dBm as a fixed-value select");
+    require(
+        config_view_source.find("id=\"fsk_offset\"") != std::string::npos &&
+            config_view_source.find("value=\"5\"") != std::string::npos &&
+            config_view_source.find("id=\"dot_length\"") != std::string::npos &&
+            config_view_source.find("id=\"tx_repeat_every\"") != std::string::npos,
+        "configuration view must keep CW defaults while removing UI-only max caps for dot length, shift, and repeat interval");
+    const std::string dot_length_input =
+        extract_input_tag_by_id(config_view_source, "dot_length");
+    const std::string fsk_offset_input =
+        extract_input_tag_by_id(config_view_source, "fsk_offset");
+    const std::string tx_repeat_every_input =
+        extract_input_tag_by_id(config_view_source, "tx_repeat_every");
+    const std::string cw_intra_element_gap_input =
+        extract_input_tag_by_id(config_view_source, "cw_intra_element_gap");
+    const std::string cw_inter_character_gap_input =
+        extract_input_tag_by_id(config_view_source, "cw_inter_character_gap");
+    const std::string cw_inter_word_gap_input =
+        extract_input_tag_by_id(config_view_source, "cw_inter_word_gap");
+    require(
+        dot_length_input.find("step=\"any\"") != std::string::npos &&
+            dot_length_input.find("min=\"0.000000001\"") != std::string::npos &&
+            dot_length_input.find("max=\"60\"") == std::string::npos &&
+            dot_length_input.find("step=\"1\"") == std::string::npos,
+        "CW dot-length markup must advertise strictly positive fractional input without restoring the old max cap");
+    require(
+        fsk_offset_input.find("min=\"0\"") != std::string::npos &&
+            fsk_offset_input.find("max=\"1000\"") == std::string::npos,
+        "CW shift markup must keep its lower bound while removing the old UI-only max cap");
+    require(
+        tx_repeat_every_input.find("min=\"1\"") != std::string::npos &&
+            tx_repeat_every_input.find("max=\"60\"") == std::string::npos,
+        "CW repeat-interval markup must retain the minimum while removing the old UI-only max cap");
+    require(
+        config_view_source.find("id=\"cw_intra_element_gap\"") != std::string::npos &&
+            config_view_source.find("id=\"cw_inter_character_gap\"") != std::string::npos &&
+            config_view_source.find("id=\"cw_inter_word_gap\"") != std::string::npos &&
+            config_view_source.find("Intra-Element Gap:") != std::string::npos &&
+            config_view_source.find("Inter-Character Gap:") != std::string::npos &&
+            config_view_source.find("Inter-Word Gap:") != std::string::npos,
+        "configuration view must expose the three CW gap controls");
+    require(
+        cw_intra_element_gap_input.find("min=\"0.000000001\"") != std::string::npos &&
+            cw_intra_element_gap_input.find("step=\"any\"") != std::string::npos &&
+            cw_intra_element_gap_input.find("value=\"1\"") != std::string::npos &&
+            cw_inter_character_gap_input.find("min=\"0.000000001\"") != std::string::npos &&
+            cw_inter_character_gap_input.find("step=\"any\"") != std::string::npos &&
+            cw_inter_character_gap_input.find("value=\"3\"") != std::string::npos &&
+            cw_inter_word_gap_input.find("min=\"0.000000001\"") != std::string::npos &&
+            cw_inter_word_gap_input.find("step=\"any\"") != std::string::npos &&
+            cw_inter_word_gap_input.find("value=\"7\"") != std::string::npos,
+        "CW gap markup must use strictly positive fractional defaults that match backend config defaults");
+    require(
+        config_view_source.find("Fade Shape") == std::string::npos &&
+            config_view_source.find("Fade In Ms") == std::string::npos &&
+            config_view_source.find("Fade Out Ms") == std::string::npos &&
+            config_view_source.find("Fade Slice Ms") == std::string::npos,
+        "configuration view must keep CW fade settings hidden from the normal UI");
+    require(
+        config_view_source.find("id=\"qrss_frequency\"") != std::string::npos &&
+            config_view_source.find("value=\"14096900.0\"") != std::string::npos,
+        "configuration view must default CW base frequency markup to 14096900 Hz");
     require(
         config_view_source.find("id=\"band-gpio-enabled-all\"") != std::string::npos &&
             config_view_source.find("id=\"band-gpio-active-high-all\"") != std::string::npos,
         "Band GPIO table must expose bulk-toggle header checkboxes for Enabled and Active High");
+    require(
+        config_view_source.find("class=\"form-check-input band-gpio-enabled\"") != std::string::npos &&
+            config_view_source.find("class=\"form-check-input band-gpio-enabled\"\n                                                                type=\"checkbox\"") != std::string::npos &&
+            config_view_source.find("class=\"form-check-input band-gpio-active-high\"") != std::string::npos &&
+            config_view_source.find("class=\"form-check-input band-gpio-active-high\"\n                                                                type=\"checkbox\"") != std::string::npos &&
+            config_view_source.find("class=\"form-check-input band-gpio-active-high\"\n                                                                type=\"checkbox\"\n                                                                id=\"band-gpio-active-high-<?= htmlspecialchars($band) ?>\"\n                                                                data-band=\"<?= htmlspecialchars($band) ?>\"\n                                                                checked") == std::string::npos,
+        "Band GPIO row defaults must render unchecked and inactive until explicitly configured");
     require(
         config_view_source.find("id=\"configTabs\" role=\"tablist\" data-persist-tab-state=\"true\" data-persist-tab-state-scope=\"reload\"") != std::string::npos,
         "Configuration tab list must opt into reload-scoped persisted sub-tab state");

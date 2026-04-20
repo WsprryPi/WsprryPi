@@ -10,9 +10,12 @@
 #include <fstream>
 #include <getopt.h>
 #include <iostream>
+#include <iterator>
 #include <map>
 #include <optional>
 #include <string>
+#include <sys/wait.h>
+#include <unistd.h>
 #include <unordered_map>
 #include <vector>
 
@@ -38,6 +41,15 @@ namespace
         out << contents;
     }
 
+    std::string read_text_file(const std::string &path)
+    {
+        std::ifstream in(path);
+        require(in.is_open(), "test helper must read " + path);
+        return std::string(
+            std::istreambuf_iterator<char>(in),
+            std::istreambuf_iterator<char>());
+    }
+
     bool nearly_equal(double lhs, double rhs, double epsilon = 0.01)
     {
         return std::fabs(lhs - rhs) <= epsilon;
@@ -60,6 +72,93 @@ namespace
             argv.push_back(arg.data());
         }
         return argv;
+    }
+
+    std::string capture_print_usage_output(int exit_code)
+    {
+        int pipefd[2] = {-1, -1};
+        require(pipe(pipefd) == 0, "help-output test must create a pipe");
+
+        pid_t pid = fork();
+        require(pid >= 0, "help-output test must fork a child process");
+
+        if (pid == 0)
+        {
+            close(pipefd[0]);
+            dup2(pipefd[1], STDOUT_FILENO);
+            dup2(pipefd[1], STDERR_FILENO);
+            close(pipefd[1]);
+            print_usage(exit_code);
+            std::exit(EXIT_SUCCESS);
+        }
+
+        close(pipefd[1]);
+        std::string output;
+        char buffer[4096];
+        ssize_t bytes_read = 0;
+        while ((bytes_read = read(pipefd[0], buffer, sizeof(buffer))) > 0)
+        {
+            output.append(buffer, static_cast<std::size_t>(bytes_read));
+        }
+        close(pipefd[0]);
+
+        int status = 0;
+        require(waitpid(pid, &status, 0) == pid, "help-output test must wait for the child process");
+        require(
+            WIFEXITED(status) && WEXITSTATUS(status) == EXIT_SUCCESS,
+            "help-output test child must exit successfully");
+        return output;
+    }
+
+    void require_cli_parse_rejected(
+        std::vector<std::string> args,
+        const std::string &message)
+    {
+        pid_t pid = fork();
+        require(pid >= 0, message + " must be able to fork a child process");
+
+        if (pid == 0)
+        {
+            reset_getopt_state();
+            std::vector<char *> argv = argv_for(args);
+            (void)parse_command_line(static_cast<int>(argv.size()), argv.data());
+            std::exit(EXIT_SUCCESS);
+        }
+
+        int status = 0;
+        require(waitpid(pid, &status, 0) == pid, message + " must wait for the child process");
+        require(
+            WIFEXITED(status) && WEXITSTATUS(status) != EXIT_SUCCESS,
+            message + " must reject the CLI input");
+    }
+
+    std::map<std::string, std::unordered_map<std::string, std::string>>
+    make_disabled_band_gpio_ini_data()
+    {
+        std::map<std::string, std::unordered_map<std::string, std::string>> data;
+        for (int band_index = 0; band_index < HAM_BAND_COUNT; ++band_index)
+        {
+            const std::string band_name = band_to_string(static_cast<HamBand>(band_index));
+            data["Band GPIO"][band_name] = "";
+            data["Band GPIO"][band_name + " Active High"] = "false";
+        }
+        return data;
+    }
+
+    void require_all_band_gpio_disabled(
+        const std::array<BandGPIOConfig, HAM_BAND_COUNT> &band_gpio,
+        const std::string &message)
+    {
+        for (int band_index = 0; band_index < HAM_BAND_COUNT; ++band_index)
+        {
+            const BandGPIOConfig &band_config = band_gpio[band_index];
+            require(
+                band_config.gpio == -1 &&
+                    !band_config.enabled &&
+                    !band_config.active_high,
+                message + " for " +
+                    std::string(band_to_string(static_cast<HamBand>(band_index))));
+        }
     }
 
     std::map<std::string, std::unordered_map<std::string, std::string>>
@@ -102,11 +201,11 @@ namespace
               {"Frequency", frequency},
               {"Planner Preference",
                wspr_planner_preference_to_string(planner_preference)},
-              {"Use Random Offset", "false"}}},
+             {"Use Random Offset", "false"}}},
             {"CW",
              {{"Message", ""},
-              {"Base Frequency", "3572000.0"},
-              {"Shift Hz", "500.0"},
+              {"Base Frequency", "14096900.0"},
+              {"Shift Hz", "5.0"},
               {"Dot Seconds", "3.0"},
               {"Intra Element Gap", "1.0"},
               {"Inter Character Gap", "3.0"},
@@ -117,6 +216,8 @@ namespace
               {"Fade Slice Ms", "5"},
               {"Start Minute", "0"},
               {"Repeat Minutes", "10"}}}};
+        const auto disabled_band_gpio = make_disabled_band_gpio_ini_data();
+        data.insert(disabled_band_gpio.begin(), disabled_band_gpio.end());
         return data;
     }
 
@@ -305,8 +406,90 @@ int main()
         nearly_equal(lookup.parse_string_to_frequency("20m", false), 14095600.0),
         "20m must resolve to the WSPR dial frequency");
     require(
+        nearly_equal(lookup.parse_string_to_frequency("2200m", false), 136000.0),
+        "2200m must resolve to the WSPR dial frequency");
+    require(
+        nearly_equal(lookup.parse_string_to_frequency("lf", false), 136000.0),
+        "lf must resolve to the 2200m WSPR dial frequency");
+    require(
+        nearly_equal(lookup.parse_string_to_frequency("630m", false), 474200.0),
+        "630m must resolve to the WSPR dial frequency");
+    require(
+        nearly_equal(lookup.parse_string_to_frequency("mf", false), 474200.0),
+        "mf must resolve to the 630m WSPR dial frequency");
+    require(
+        nearly_equal(lookup.parse_string_to_frequency("22m", false), 13551500.0),
+        "22m must resolve to the WSPR dial frequency");
+    require(
         lookup.lookup_ham_band(14095600.0).has_value(),
         "band lookup should still succeed on WSPR dial frequency values");
+
+    {
+        init_default_config();
+        require_all_band_gpio_disabled(
+            config.band_gpio,
+            "init_default_config must leave Band GPIO defaults disabled");
+
+        config_to_json();
+        for (int band_index = 0; band_index < HAM_BAND_COUNT; ++band_index)
+        {
+            const std::string band_name =
+                band_to_string(static_cast<HamBand>(band_index));
+            require(
+                jConfig["Band GPIO"][band_name].value("GPIO", 0) == -1 &&
+                    !jConfig["Band GPIO"][band_name].value("Enabled", true) &&
+                    !jConfig["Band GPIO"][band_name].value("Active High", true),
+                "config_to_json must persist disabled Band GPIO defaults for " + band_name);
+        }
+    }
+
+    {
+        init_config_json();
+        json_to_config();
+        require_all_band_gpio_disabled(
+            config.band_gpio,
+            "init_config_json/json_to_config must normalize Band GPIO defaults to disabled");
+
+        jConfig.erase("Band GPIO");
+        json_to_config();
+        require_all_band_gpio_disabled(
+            config.band_gpio,
+            "missing Band GPIO section must normalize to disabled defaults");
+    }
+
+    {
+        const std::string stock_ini =
+            read_text_file("/home/pi/WsprryPi/config/wsprrypi.ini");
+        require(
+            stock_ini.find("2200m = \n2200m Active High = false") != std::string::npos &&
+                stock_ini.find("20m = \n20m Active High = false") != std::string::npos &&
+                stock_ini.find("2m =\n2m Active High = false") != std::string::npos &&
+                stock_ini.find("Active High = true") == std::string::npos,
+            "stock INI must declare explicit disabled Band GPIO defaults for every band");
+    }
+
+    for (const std::string &removed_alias : {
+             std::string("lf-15"),
+             std::string("2200m-15"),
+             std::string("mf-15"),
+             std::string("630m-15"),
+             std::string("160m-15"),
+         })
+    {
+        bool threw = false;
+        try
+        {
+            (void)lookup.parse_string_to_frequency(removed_alias, false);
+        }
+        catch (const std::invalid_argument &)
+        {
+            threw = true;
+        }
+
+        require(
+            threw,
+            removed_alias + " must no longer resolve as a supported WSPR alias");
+    }
 
     require(
         nearly_equal(
@@ -624,12 +807,14 @@ int main()
         json_to_config();
 
         require(
-            config.wspr_dial_freq_set.size() == 1 &&
-                nearly_equal(config.wspr_dial_freq_set.front(), 14095600.0),
-            "WSPR.WSPR Dial Frequency Set must load as the active WSPR dial-frequency list");
+            config.wspr_dial_freq_set.empty(),
+            "external WSPR.WSPR Dial Frequency Set input must be ignored");
         require(
             nearly_equal(config.wspr_audio_offset_hz, 1500.0),
             "WSPR audio offset must use the runtime constant");
+        require(
+            config.wspr.frequencies == "20m",
+            "WSPR.Frequency must remain the authoritative external WSPR frequency input");
     }
 
     {
@@ -658,6 +843,24 @@ int main()
     }
 
     {
+        init_config_json();
+        config_to_json();
+
+        require(
+            jConfig.contains("WSPR") &&
+                jConfig["WSPR"].is_object() &&
+                !jConfig["WSPR"].contains("WSPR Dial Frequency Set"),
+            "internal config JSON export must not expose WSPR Dial Frequency Set");
+
+        const nlohmann::json public_config = get_public_config_json();
+        require(
+            public_config.contains("WSPR") &&
+                public_config["WSPR"].is_object() &&
+                !public_config["WSPR"].contains("WSPR Dial Frequency Set"),
+            "public config JSON must not expose WSPR Dial Frequency Set");
+    }
+
+    {
         const std::optional<std::string> legacy_alias =
             lookup.legacy_actual_wspr_alias_for_frequency(14097100.0);
         require(
@@ -666,8 +869,17 @@ int main()
     }
 
     {
+        require(
+            !lookup.legacy_actual_wspr_alias_for_frequency(137612.5).has_value() &&
+                !lookup.legacy_actual_wspr_alias_for_frequency(475812.5).has_value() &&
+                !lookup.legacy_actual_wspr_alias_for_frequency(1838212.5).has_value(),
+            "removed -15 aliases must no longer be reported as legacy actual RF aliases");
+    }
+
+    {
         init_config_json();
         json_to_config();
+        config.use_ini = true;
         config.transmit = true;
         config.frequencies = "80m@17H,40m@27L,20m,14.097100MHz@22";
 
@@ -692,12 +904,129 @@ int main()
                 !config.wspr_frequency_entries[2].selector_gpio_active_high &&
                 !config.wspr_frequency_entries[2].allow_band_gpio_fallback &&
                 nearly_equal(config.wspr_frequency_entries[2].dial_frequency_hz, 14095600.0),
-            "CLI entries without @GPIO must remain unmapped, explicit-only, and default active low");
+            "plain frequency entries must remain unmapped, explicit-only, and default active low even on managed/INI paths");
         require(
             config.wspr_frequency_entries[3].selector_gpio == 22 &&
                 !config.wspr_frequency_entries[3].selector_gpio_active_high &&
                 nearly_equal(config.wspr_frequency_entries[3].dial_frequency_hz, 14097100.0),
             "unit-qualified frequencies must also support @GPIO with default active-low polarity");
+    }
+
+    {
+        init_config_json();
+        if (jConfig.contains("CW") && jConfig["CW"].is_object())
+        {
+            jConfig["CW"].erase("Base Frequency");
+        }
+        json_to_config();
+
+        require(
+            nearly_equal(config.qrss.frequency_hz, 14096900.0) &&
+                nearly_equal(config.fskcw.space_frequency_hz, 14096900.0) &&
+                nearly_equal(config.fskcw.mark_frequency_hz, 14096905.0) &&
+                nearly_equal(config.dfcw.dot_frequency_hz, 14096900.0) &&
+                nearly_equal(config.dfcw.dash_frequency_hz, 14096905.0),
+            "missing CW.Base Frequency must normalize to the canonical 14096900 Hz default for all CW runtime modes");
+
+        config_to_json();
+        require(
+            nearly_equal(jConfig["CW"].at("Base Frequency").get<double>(), 14096900.0),
+            "canonical JSON defaults must persist the 14096900 Hz CW.Base Frequency default");
+    }
+
+    {
+        prime_valid_runtime_identity_config();
+        config.use_ini = true;
+        config.enable_web = true;
+        config.transmit = false;
+        config.ini_filename = "/tmp/web_band_gpio_explicit_only.ini";
+        write_text_file(config.ini_filename, "");
+        iniFile.set_filename(config.ini_filename);
+        config_to_json();
+
+        patch_all_from_web({
+            {"WSPR", {{"Frequency", "80m,40m"}}},
+            {"Band GPIO",
+             {{"80m", {{"GPIO", 17}, {"Enabled", true}, {"Active High", true}}},
+              {"40m", {{"GPIO", 27}, {"Enabled", true}, {"Active High", false}}}}}});
+
+        require(
+            config.wspr_frequency_entries.size() == 2U &&
+                config.wspr_frequency_entries[0].selector_gpio == kSelectorGpioUnset &&
+                !config.wspr_frequency_entries[0].allow_band_gpio_fallback &&
+                config.wspr_frequency_entries[1].selector_gpio == kSelectorGpioUnset &&
+                !config.wspr_frequency_entries[1].allow_band_gpio_fallback,
+            "web patch normalization must keep plain frequency entries explicit-only even when Band GPIO config exists");
+    }
+
+    {
+        init_default_config();
+        config.use_ini = true;
+        config.ini_filename = "/tmp/wspr_dial_frequency_set_internal_only.ini";
+        write_text_file(config.ini_filename, "");
+        iniFile.set_filename(config.ini_filename);
+        config.callsign = "AA0NT";
+        config.grid_square = "EM18";
+        config.transmit = false;
+        config.frequencies = "20m";
+        config_to_json();
+
+        patch_all_from_web({
+            {"WSPR",
+             {{"Frequency", "20m"},
+              {"WSPR Dial Frequency Set", nlohmann::json::array({10138700.0})}}}});
+
+        require(
+            config.wspr_dial_freq_set.size() == 1U &&
+                nearly_equal(config.wspr_dial_freq_set.front(), 14095600.0),
+            "web patch input must ignore WSPR Dial Frequency Set and derive the active list from WSPR.Frequency instead");
+        require(
+            jConfig.contains("WSPR") &&
+                jConfig["WSPR"].is_object() &&
+                !jConfig["WSPR"].contains("WSPR Dial Frequency Set"),
+            "web patch persistence must strip WSPR Dial Frequency Set from internal JSON");
+        require(
+            !get_public_config_json()["WSPR"].contains("WSPR Dial Frequency Set"),
+            "public config JSON must stay free of WSPR Dial Frequency Set after ignored patch input");
+    }
+
+    {
+        init_config_json();
+        json_to_config();
+        config.transmit = true;
+        config.frequencies = "0,2200m,630m,22m@17H,20m@27L,14.097100MHz@22";
+
+        require(
+            set_frequencies(config),
+            "comma-separated WSPR lists must accept 0 skip windows, remaining band aliases, and optional @GPIO suffixes");
+        require(
+            config.wspr_frequency_entries.size() == 6,
+            "comma-separated WSPR lists must preserve every supported entry");
+        require(
+            nearly_equal(config.wspr_frequency_entries[0].dial_frequency_hz, 0.0) &&
+                config.wspr_frequency_entries[0].selector_gpio == kSelectorGpioUnset,
+            "0 must remain a skip-window entry");
+        require(
+            nearly_equal(config.wspr_frequency_entries[1].dial_frequency_hz, 136000.0),
+            "2200m must remain a supported WSPR alias");
+        require(
+            nearly_equal(config.wspr_frequency_entries[2].dial_frequency_hz, 474200.0),
+            "630m must remain a supported WSPR alias");
+        require(
+            config.wspr_frequency_entries[3].selector_gpio == 17 &&
+                config.wspr_frequency_entries[3].selector_gpio_active_high &&
+                nearly_equal(config.wspr_frequency_entries[3].dial_frequency_hz, 13551500.0),
+            "22m@17H must retain the GPIO mapping, polarity, and dial frequency");
+        require(
+            config.wspr_frequency_entries[4].selector_gpio == 27 &&
+                !config.wspr_frequency_entries[4].selector_gpio_active_high &&
+                nearly_equal(config.wspr_frequency_entries[4].dial_frequency_hz, 14095600.0),
+            "20m@27L must retain the GPIO mapping, polarity, and dial frequency");
+        require(
+            config.wspr_frequency_entries[5].selector_gpio == 22 &&
+                !config.wspr_frequency_entries[5].selector_gpio_active_high &&
+                nearly_equal(config.wspr_frequency_entries[5].dial_frequency_hz, 14097100.0),
+            "unit-qualified frequencies must remain compatible with comma-separated lists and @GPIO");
     }
 
     {
@@ -886,6 +1215,112 @@ int main()
         reset_getopt_state();
         std::vector<std::string> args = {
             "wsprrypi",
+            "--planner-preference",
+            "auto",
+            "AA0NT",
+            "EM18",
+            "20",
+            "20m"};
+        std::vector<char *> argv = argv_for(args);
+
+        require(
+            parse_command_line(static_cast<int>(argv.size()), argv.data()),
+            "--planner-preference auto CLI parsing must succeed");
+        require(
+            config.wspr_planner_preference == WsprPlannerPreference::Auto &&
+                config.wspr.planner_preference == WsprPlannerPreference::Auto,
+            "--planner-preference auto must select the canonical auto planner preference");
+    }
+
+    {
+        reset_getopt_state();
+        std::vector<std::string> args = {
+            "wsprrypi",
+            "--planner-preference",
+            "prefer_paired",
+            "AA0NT/12",
+            "EM18IG",
+            "20",
+            "20m"};
+        std::vector<char *> argv = argv_for(args);
+
+        require(
+            parse_command_line(static_cast<int>(argv.size()), argv.data()),
+            "--planner-preference prefer_paired CLI parsing must succeed");
+        require(
+            config.wspr_planner_preference == WsprPlannerPreference::PreferPaired &&
+                config.wspr.planner_preference == WsprPlannerPreference::PreferPaired,
+            "--planner-preference prefer_paired must select the canonical prefer_paired planner preference");
+    }
+
+    {
+        reset_getopt_state();
+        std::vector<std::string> args = {
+            "wsprrypi",
+            "--planner-preference",
+            "require_paired",
+            "AA0NT/12",
+            "EM18IG",
+            "20",
+            "20m"};
+        std::vector<char *> argv = argv_for(args);
+
+        require(
+            parse_command_line(static_cast<int>(argv.size()), argv.data()),
+            "--planner-preference require_paired CLI parsing must succeed");
+        require(
+            config.wspr_planner_preference == WsprPlannerPreference::RequirePaired &&
+                config.wspr.planner_preference == WsprPlannerPreference::RequirePaired,
+            "--planner-preference require_paired must select the canonical require_paired planner preference");
+    }
+
+    {
+        const std::string help_output = capture_print_usage_output(0);
+        require(
+            help_output.find("--use-ntp") != std::string::npos &&
+                help_output.find("--repeat") != std::string::npos &&
+                help_output.find("--offset") != std::string::npos &&
+                help_output.find("--journald") != std::string::npos &&
+                help_output.find("--date-time-log") != std::string::npos &&
+                help_output.find("--terminate <count>") != std::string::npos &&
+                help_output.find("--planner-preference <auto|prefer_paired|require_paired>") != std::string::npos &&
+                help_output.find("--qrss-message <text>") != std::string::npos &&
+                help_output.find("--fskcw-message <text>") != std::string::npos &&
+                help_output.find("--dfcw-message <text>") != std::string::npos &&
+                help_output.find("--require-paired") == std::string::npos,
+            "CLI help output must enumerate the current public option surface and must not mention removed planner flags");
+    }
+
+    {
+        require_cli_parse_rejected(
+            {
+                "wsprrypi",
+                "--planner-preference",
+                "prefer-paired",
+                "AA0NT/12",
+                "EM18IG",
+                "20",
+                "20m"},
+            "--planner-preference prefer-paired");
+    }
+
+    {
+        require_cli_parse_rejected(
+            {
+                "wsprrypi",
+                "--planner-preference",
+                "require-paired",
+                "AA0NT/12",
+                "EM18IG",
+                "20",
+                "20m"},
+            "--planner-preference require-paired");
+    }
+
+    {
+        reset_getopt_state();
+        std::vector<std::string> args = {
+            "wsprrypi",
             "--test-tone",
             "730000",
             "--transmit-gpio",
@@ -909,6 +1344,29 @@ int main()
         require(
             config.mode == ModeType::WSPR,
             "persistent config reload must restore WSPR mode rather than tone mode");
+    }
+
+    {
+        init_config_json();
+        json_to_config();
+        config.use_ini = false;
+        reset_getopt_state();
+
+        std::vector<std::string> args = {
+            "wsprrypi",
+            "AA0NT",
+            "EM18",
+            "20",
+            "20m"};
+        std::vector<char *> argv = argv_for(args);
+
+        require(
+            parse_command_line(static_cast<int>(argv.size()), argv.data()),
+            "CLI parsing without --planner-preference must succeed");
+        require(
+            config.wspr_planner_preference == WsprPlannerPreference::Auto &&
+                config.wspr.planner_preference == WsprPlannerPreference::Auto,
+            "CLI planner preference must default to auto when unspecified");
     }
 
     {
@@ -1987,7 +2445,7 @@ int main()
             "TX Output=CLK0\nPower Level=1\n"
             "[WSPR]\nCall Sign=AA0NT\nGrid Square=EM18\nTX Power=20\n"
             "Frequency=20m\nPlanner Preference=auto\nUse Random Offset=false\n"
-            "[CW]\nMessage=\nBase Frequency=3572000.0\nShift Hz=500.0\n"
+            "[CW]\nMessage=\nBase Frequency=14096900.0\nShift Hz=5.0\n"
             "Dot Seconds=3.0\nIntra Element Gap=1.0\nInter Character Gap=3.0\n"
             "Inter Word Gap=7.0\nFade Shape=none\nFade In Ms=0\nFade Out Ms=0\n"
             "Fade Slice Ms=5\nStart Minute=0\nRepeat Minutes=10\n");
@@ -2160,6 +2618,76 @@ int main()
 
     {
         init_default_config();
+        ini_reload_pending.store(false, std::memory_order_relaxed);
+        ini_reload_generation.store(0, std::memory_order_relaxed);
+        exiting_wspr.store(false, std::memory_order_relaxed);
+        reset_current_transmission_request_for_test();
+        set_scheduler_execution_suppressed_for_test(true);
+
+        config.use_ini = true;
+        config.ini_filename = "/tmp/guarded_mode_change_single_persist.ini";
+        config.mode = ModeType::WSPR;
+        config.transmit = true;
+        config.callsign = "AA0NT";
+        config.grid_square = "EM18";
+        config.power_dbm = 20;
+        config.frequencies = "20m";
+        config.gpio_tx_pin = 4;
+        resolve_backend_specific_config(config);
+        config_to_json();
+        write_text_file(config.ini_filename, "");
+        iniFile.set_filename(config.ini_filename);
+        json_to_ini();
+
+        const std::string ini_before_guard = read_text_file(config.ini_filename);
+        const std::uint64_t generation_before_guard =
+            ini_reload_generation.load(std::memory_order_relaxed);
+
+        const StopTransmissionResult guard_stop_result =
+            stop_transmission_by_user_request(false);
+
+        require(
+            guard_stop_result.transmit_disabled && !guard_stop_result.persisted,
+            "guarded mode-change stop must disable runtime transmit without persisting");
+        require(
+            read_text_file(config.ini_filename) == ini_before_guard,
+            "guarded mode-change stop must not rewrite the INI before the final save");
+        require(
+            ini_reload_generation.load(std::memory_order_relaxed) == generation_before_guard,
+            "guarded mode-change stop must not publish an extra persistence generation");
+
+        patch_all_from_web({
+            {"Operation", {{"Mode", "QRSS"}, {"Transmit", false}}},
+            {"CW",
+             {{"Message", "CQ"},
+              {"Base Frequency", 14096900.0},
+              {"Shift Hz", 5.0},
+              {"Dot Seconds", 3.0},
+              {"Intra Element Gap", 1.0},
+              {"Inter Character Gap", 3.0},
+              {"Inter Word Gap", 7.0},
+              {"Start Minute", 0},
+              {"Repeat Minutes", 10}}}
+        });
+
+        const std::string ini_after_guard = read_text_file(config.ini_filename);
+        require(
+            ini_after_guard != ini_before_guard,
+            "guarded mode-change final save must persist the updated mode once");
+        require(
+            ini_reload_generation.load(std::memory_order_relaxed) ==
+                generation_before_guard + 1U,
+            "guarded mode change must produce exactly one persistence generation");
+        require(
+            iniFile.getData().at("Operation").at("Mode") == "QRSS" &&
+                iniFile.getData().at("Operation").at("Transmit") == "false",
+            "guarded mode-change final save must persist the final mode and disabled transmit state");
+
+        set_scheduler_execution_suppressed_for_test(false);
+    }
+
+    {
+        init_default_config();
         config.use_ini = true;
         config.ini_filename = "/tmp/transmit_toggle_patch.ini";
         config.mode = ModeType::WSPR;
@@ -2257,6 +2785,69 @@ int main()
 
     {
         init_config_json();
+        jConfig["Operation"]["Transmit Backend"] = "gpio";
+        if (jConfig.contains("GPIO") && jConfig["GPIO"].is_object())
+        {
+            jConfig["GPIO"].erase("Use NTP");
+        }
+        json_to_config();
+
+        require(
+            config.gpio_use_ntp,
+            "missing GPIO.Use NTP must default true in backend normalization");
+        require(
+            config.use_ntp,
+            "missing GPIO.Use NTP must enable the active GPIO runtime NTP path");
+    }
+
+    {
+        init_config_json();
+        jConfig["Calibration"]["PPM"] = 275.5;
+        json_to_config();
+
+        require(
+            nearly_equal(config.ppm, 200.0),
+            "backend normalization must clamp manual Calibration.PPM to the shared upper bound");
+
+        config_to_json();
+        require(
+            nearly_equal(jConfig["Calibration"].at("PPM").get<double>(), 200.0),
+            "clamped manual Calibration.PPM must round-trip through canonical JSON");
+    }
+
+    {
+        init_default_config();
+        config.use_ini = true;
+        config.ini_filename = "/tmp/ppm_patch_clamp.ini";
+        config.mode = ModeType::WSPR;
+        config.transmit = false;
+        config.callsign = "AA0NT";
+        config.grid_square = "EM18";
+        config.power_dbm = 20;
+        config.frequencies = "20m";
+        config.gpio_tx_pin = 4;
+        config.gpio_use_ntp = false;
+        config.transmit_backend = TransmitBackendKind::GPIO;
+        resolve_backend_specific_config(config);
+        config_to_json();
+
+        patch_all_from_web({{"Calibration", {{"PPM", -275.5}}}});
+
+        require(
+            nearly_equal(config.ppm, -200.0),
+            "web patch path must clamp manual Calibration.PPM to the shared lower bound");
+        require(
+            nearly_equal(jConfig["Calibration"].at("PPM").get<double>(), -200.0),
+            "web patch path must persist the clamped manual Calibration.PPM in JSON");
+        require(
+            nearly_equal(
+                std::stod(iniFile.getData().at("Calibration").at("PPM")),
+                -200.0),
+            "web patch path must persist the clamped manual Calibration.PPM in INI");
+    }
+
+    {
+        init_config_json();
         jConfig["CW"]["Dot Seconds"] = 2.0;
         jConfig["CW"]["Intra Element Gap"] = 1.5;
         jConfig["CW"]["Inter Character Gap"] = 4.0;
@@ -2310,6 +2901,27 @@ int main()
                 cw_it->second.at("Fade Out Ms") == "40" &&
                 cw_it->second.at("Fade Slice Ms") == "2",
             "json_to_ini must persist CW timing and fade settings");
+    }
+
+    {
+        init_config_json();
+        jConfig["Operation"]["Mode"] = "FSKCW";
+        jConfig["CW"]["Message"] = "CQ";
+        jConfig["CW"]["Base Frequency"] = 7030000.0;
+        jConfig["CW"]["Shift Hz"] = 25000.0;
+        jConfig["CW"]["Dot Seconds"] = 90.5;
+        jConfig["CW"]["Repeat Minutes"] = 1440;
+        json_to_config();
+
+        std::string validation_error;
+        require(
+            validate_config_candidate(config, &validation_error),
+            "backend validation must allow large positive CW dot length, shift, and repeat values when runtime constraints are satisfied");
+        require(
+            nearly_equal(config.modulation_dot_seconds, 90.5) &&
+                nearly_equal(config.modulation_fsk_offset_hz, 25000.0) &&
+                config.schedule_repeat_minutes == 1440,
+            "backend normalization must preserve large positive CW numeric values");
     }
 
     {
@@ -2439,6 +3051,15 @@ int main()
                 validation_error == "CW gap settings must be greater than 0.",
             "validation must reject non-positive CW gap settings");
 
+        ArgParserConfig invalid_shift_candidate;
+        invalid_shift_candidate.mode = ModeType::FSKCW;
+        invalid_shift_candidate.modulation_fsk_offset_hz = 0.0;
+        validation_error.clear();
+        require(
+            !validate_config_candidate(invalid_shift_candidate, &validation_error) &&
+                validation_error == "CW shift_hz must be greater than 0 for FSKCW and DFCW.",
+            "validation must reject non-positive CW shift values when the active mode requires a second tone");
+
         ArgParserConfig invalid_fade_candidate;
         invalid_fade_candidate.cw_fade_in_ms = -1;
         validation_error.clear();
@@ -2501,6 +3122,23 @@ int main()
     }
 
     {
+        init_config_json();
+        if (jConfig.contains("CW") && jConfig["CW"].is_object())
+        {
+            jConfig["CW"].erase("Shift Hz");
+        }
+        json_to_config();
+
+        require(
+            nearly_equal(config.modulation_fsk_offset_hz, 5.0),
+            "missing CW.Shift Hz must default to 5 Hz in backend normalization");
+        require(
+            nearly_equal(config.fskcw.mark_frequency_hz, config.fskcw.space_frequency_hz + 5.0) &&
+                nearly_equal(config.dfcw.dash_frequency_hz, config.dfcw.dot_frequency_hz + 5.0),
+            "missing CW.Shift Hz must use the 5 Hz default for derived CW mode frequencies");
+    }
+
+    {
         init_default_config();
         config.use_ini = true;
         config.ini_filename = "/tmp/planner_preference_persist.ini";
@@ -2531,6 +3169,56 @@ int main()
         require(
             wspr_it->second.find("Require Paired Plan") == wspr_it->second.end(),
             "json_to_ini must not persist the removed Require Paired Plan compatibility field");
+    }
+
+    {
+        init_default_config();
+        config.use_ini = true;
+        config.ini_filename = "/tmp/cli_planner_preference_override.ini";
+        iniFile.setData(
+            make_managed_ini_data(
+                "AA0NT/12",
+                "EM18IG",
+                "20m",
+                true,
+                WsprPlannerPreference::RequirePaired));
+        write_managed_ini_file(
+            config.ini_filename,
+            make_managed_ini_data(
+                "AA0NT/12",
+                "EM18IG",
+                "20m",
+                true,
+                WsprPlannerPreference::RequirePaired));
+        reset_getopt_state();
+
+        std::vector<std::string> args = {
+            "wsprrypi",
+            "--ini-file",
+            "/tmp/cli_planner_preference_override.ini",
+            "--planner-preference",
+            "prefer_paired"};
+        std::vector<char *> argv = argv_for(args);
+
+        require(
+            parse_command_line(static_cast<int>(argv.size()), argv.data()),
+            "CLI planner preference override over INI must parse");
+        require(
+            config.use_ini &&
+                config.wspr_planner_preference == WsprPlannerPreference::PreferPaired &&
+                config.wspr.planner_preference == WsprPlannerPreference::PreferPaired,
+            "CLI --planner-preference must override the INI planner preference in canonical runtime config");
+
+        reset_runtime_planning_state_for_identity_test();
+        require(
+            set_config(true),
+            "CLI-overridden planner preference must remain valid through scheduler planning");
+        const TransmissionRequest request = current_transmission_request_for_test();
+        require(
+            request.mode == TransmissionMode::WSPR &&
+                request.payload.plan_type == "Type2Type3Paired",
+            "CLI prefer_paired override must reach the runtime WSPR planning path");
+        finish_runtime_planning_state_for_identity_test();
     }
 
     {

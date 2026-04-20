@@ -2900,7 +2900,7 @@ void end_test_tone()
     }
 }
 
-StopTransmissionResult stop_transmission_by_user_request()
+StopTransmissionResult stop_transmission_by_user_request(bool persist_transmit)
 {
     StopTransmissionResult result;
     bool persist_to_ini = false;
@@ -2929,7 +2929,7 @@ StopTransmissionResult stop_transmission_by_user_request()
         config.transmit = false;
         result.transmit_disabled = true;
         config_to_json();
-        persist_to_ini = config.use_ini;
+        persist_to_ini = config.use_ini && persist_transmit;
     }
 
     if (result.transmission_active)
@@ -2976,8 +2976,9 @@ StopTransmissionResult stop_transmission_by_user_request()
     else
     {
         result.persisted = false;
-        result.message =
-            "Transmission stopped and runtime transmit disabled; no INI file is active.";
+        result.message = persist_transmit
+                             ? "Transmission stopped and runtime transmit disabled; no INI file is active."
+                             : "Transmission stopped and runtime transmit disabled without persisting.";
         llog.logS(INFO, result.message);
         send_ws_message("transmit", "stopped");
         return result;

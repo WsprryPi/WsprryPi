@@ -8,6 +8,45 @@ debug issues efficiently.
 
 ------------------------------------------------------------------------
 
+## Project Structure Additions
+
+- UI lives in submodule: `./WsprryPi-UI`
+- Scripts and installer: `./scripts`
+- Developer notes and release tooling: `./release_tools`
+- Core source directory: `./src/` (contains multiple submodules)
+- Deployment target: systemd-managed service
+- CLI interface available alongside daemon operation
+
+------------------------------------------------------------------------
+
+## System Lifecycle (End-to-End)
+
+    systemd → daemon → config load → scheduler loop
+           → plan → commit_execution_request(...)
+           → backend execution → RF output
+
+### Step-by-step
+
+1. systemd starts the WsprryPi service
+2. Application initializes configuration and subsystems
+3. Scheduler loop begins
+4. Scheduler:
+   - Reads config / reload state
+   - Determines band, timing, and message
+   - Resolves PPM
+   - Builds transmission plan
+5. Scheduler commits execution:
+
+       commit_execution_request(...)
+
+6. Backend:
+   - Consumes immutable request
+   - Configures hardware
+   - Executes transmission with precise timing
+7. RF signal is produced
+
+------------------------------------------------------------------------
+
 ## Core Architecture Layers
 
 ### 1. Input / Configuration Layer
@@ -26,8 +65,12 @@ debug issues efficiently.
 - `src/wspr_band_lookup.cpp` --- Frequency and band resolution
 - `src/band_gpio*.cpp` --- Band GPIO handling
 
-Responsibilities: - Config reloads - Frequency selection - WSPR
-planning - Runtime PPM handling - Request commit boundary
+Responsibilities:
+- Config reloads
+- Frequency selection
+- WSPR planning
+- Runtime PPM handling
+- Request commit boundary
 
 ------------------------------------------------------------------------
 
@@ -35,9 +78,11 @@ planning - Runtime PPM handling - Request commit boundary
 
 - `WSPR-Transmitter/src/wspr_transmit_types.hpp`
 
-Defines: - `WsprTransmissionRequest` - Transmission plan structures
+Defines:
+- `WsprTransmissionRequest`
+- Transmission plan structures
 
-This is the **commit boundary contract** between scheduler and backend.
+This is the commit boundary contract between scheduler and backend.
 
 ------------------------------------------------------------------------
 
@@ -47,21 +92,23 @@ This is the **commit boundary contract** between scheduler and backend.
 - `WSPR-Transmitter/src/wspr_transmit_backend_rpi.cpp` --- Hardware-specific backend
 - `Mailbox/src/mailbox.cpp` --- Low-level Pi interaction
 
-Responsibilities: - Consume committed request - Generate signals -
-Handle timing and hardware
+Responsibilities:
+- Consume committed request
+- Generate signals
+- Handle timing and hardware
 
 ------------------------------------------------------------------------
 
 ### 5. WSPR Reference Layer
 
-- `WSPR-Transmitter/src/wspr_reference_adapter.cpp` --- Integration
-  seam
+- `WSPR-Transmitter/src/wspr_reference_adapter.cpp` --- Integration seam
 - `WSPR-Reference/src/wspr/wspr_ref_plan.cpp` --- Planning logic
 - `WSPR-Reference/src/wspr/wspr_ref_encoder.cpp` --- Encoding
 - `WSPR-Reference/src/wspr/wspr_ref_decoder.cpp` --- Decoding
 
-Purpose: - Clean separation of WSPR protocol logic - Prevent leakage
-into scheduler/backend
+Purpose:
+- Clean separation of WSPR protocol logic
+- Prevent leakage into scheduler/backend
 
 ------------------------------------------------------------------------
 
@@ -70,8 +117,59 @@ into scheduler/backend
 - `PPM-Manager/src/ppm_manager.hpp` --- Interface
 - `PPM-Manager/src/ppm_manager.cpp` --- Implementation
 
-Key concept: - Scheduler snapshots PPM into request - Backend must NOT
-re-fetch PPM
+Key concept:
+- Scheduler snapshots PPM into request
+- Backend must NOT re-fetch PPM
+
+------------------------------------------------------------------------
+
+## Source Composition
+
+The `./src/` directory includes multiple submodules that are compiled
+into the final binary. These represent independently maintained
+components that form the runtime system.
+
+------------------------------------------------------------------------
+
+## Installation & Deployment
+
+### Installation
+
+- Performed via scripts in `./scripts`
+- Primary install method:
+
+  curl | sudo bash (GitHub-hosted installer)
+
+### Runtime Model
+
+- Installed as a system service
+- Managed via systemd
+- Designed for unattended operation
+
+### CLI Mode
+
+- CLI remains available for:
+  - Direct control
+  - Debugging
+  - Development workflows
+
+------------------------------------------------------------------------
+
+## UI Layer
+
+- Located in: `./WsprryPi-UI`
+- Maintained as a separate submodule
+- Interfaces with backend via web server and WebSocket layer
+
+------------------------------------------------------------------------
+
+## Developer Tooling
+
+- Located in: `./release_tools`
+- Contains:
+  - Codebase documentation
+  - Release scripts
+  - Internal developer notes
 
 ------------------------------------------------------------------------
 
@@ -79,12 +177,15 @@ re-fetch PPM
 
 - `src/tests/dial_frequency_semantics_test.cpp`
 
-Validates: - Dial vs RF frequency semantics - Scheduler commit
-correctness - PPM commit behavior - Reload handling
+Validates:
+- Dial vs RF frequency semantics
+- Scheduler commit correctness
+- PPM commit behavior
+- Reload handling
 
 ------------------------------------------------------------------------
 
-## Key Design Principles
+## Critical Invariants (Must Never Break)
 
 ### 1. Single Commit Boundary
 
@@ -92,17 +193,44 @@ All execution must flow through:
 
     commit_execution_request(...)
 
+No bypass paths are allowed.
+
 ### 2. Immutable Execution Snapshot
 
-Once committed: - Request must not change - Backend must not re-derive
-values
+Once committed:
+- Request must not change
+- Backend must not re-derive values
+- Backend must not fetch external state (e.g., PPM)
 
-### 3. Scheduler Owns Policy
+### 3. Scheduler Owns All Policy
 
-Scheduler decides: - What to transmit - When to transmit - With what
-parameters
+Scheduler decides:
+- What to transmit
+- When to transmit
+- With what parameters
 
-Backend only executes.
+Backend is strictly execution-only.
+
+### 4. No Hidden State Coupling
+
+- Backend must not depend on scheduler internals
+- Scheduler must not depend on backend implementation details
+
+Only the request contract is shared.
+
+### 5. PPM Snapshot Correctness (Critical)
+
+- The committed request must contain the authoritative PPM value
+- PPM must be resolved at commit time, not execution time
+- Backend must treat PPM as immutable input
+- Any drift between scheduler and backend PPM is a system bug
+
+### 6. Test and Runtime Must Share Commit Path
+
+- Tests must exercise the same commit path as production
+- No alternate “test-only” request construction paths
+- `commit_execution_request(...)` must be the single source of truth
+- If tests pass but runtime fails (or vice versa), this invariant is broken
 
 ------------------------------------------------------------------------
 
