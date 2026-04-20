@@ -78,31 +78,6 @@ namespace
         return set_config(force);
     }
 
-    void require_selector_logical_state(
-        int gpio,
-        bool expected_active,
-        const std::string &message)
-    {
-        bool state = false;
-        require(
-            selector_gpio_logical_state_for_test(gpio, state),
-            message + ": GPIO test state must exist");
-        require(
-            state == expected_active,
-            message + ": GPIO logical state must match expected active/inactive state");
-    }
-
-    void require_all_selector_states(
-        std::initializer_list<int> gpios,
-        bool expected_active,
-        const std::string &message)
-    {
-        for (const int gpio : gpios)
-        {
-            require_selector_logical_state(gpio, expected_active, message);
-        }
-    }
-
     void require_current_selector(
         const std::string &expected_token,
         const std::string &expected_band,
@@ -144,6 +119,25 @@ namespace
         require(
             selector_config.active_high == expected_active_high,
             message + ": selector polarity must match the selected band");
+    }
+
+    void require_no_current_selector(
+        const std::string &expected_token,
+        const std::string &message)
+    {
+        const TransmissionRequest request = current_transmission_request_for_test();
+        BandGPIOConfig selector_config;
+        std::string selector_band;
+
+        require(
+            request.frequency_entry_label == expected_token,
+            message + ": committed request token must match the selected entry");
+        require(
+            !request.hasSelectorGPIO(),
+            message + ": committed request must not carry selector GPIO state");
+        require(
+            !current_band_gpio_selection_for_test(selector_config, selector_band),
+            message + ": scheduler must not prepare a band GPIO selector");
     }
 
     void require_selector_rehydrates_from_committed_request(
@@ -261,200 +255,80 @@ int main()
     require(
         !config.use_ini &&
             config.wspr_frequency_entries.size() == 3U &&
-            config.wspr_frequency_entries[0].allow_band_gpio_fallback &&
-            config.wspr_frequency_entries[1].allow_band_gpio_fallback &&
-            config.wspr_frequency_entries[2].allow_band_gpio_fallback,
-        "UI Band GPIO patches must enable band-config fallback for every parsed frequency entry");
+            !config.wspr_frequency_entries[0].allow_band_gpio_fallback &&
+            !config.wspr_frequency_entries[1].allow_band_gpio_fallback &&
+            !config.wspr_frequency_entries[2].allow_band_gpio_fallback,
+        "UI Band GPIO patches must keep plain frequency entries explicit-only");
 
     patch_all_from_web({{"WSPR", {{"Frequency", "80m,40m,30m"}}}});
     require(
         !config.use_ini &&
             config.wspr_frequency_entries.size() == 3U &&
-            config.wspr_frequency_entries[0].allow_band_gpio_fallback &&
-            config.wspr_frequency_entries[1].allow_band_gpio_fallback &&
-            config.wspr_frequency_entries[2].allow_band_gpio_fallback,
-        "frequency-only UI patches must preserve band-config fallback for rebuilt frequency entries");
+            !config.wspr_frequency_entries[0].allow_band_gpio_fallback &&
+            !config.wspr_frequency_entries[1].allow_band_gpio_fallback &&
+            !config.wspr_frequency_entries[2].allow_band_gpio_fallback,
+        "frequency-only UI patches must keep rebuilt entries explicit-only");
 
     reset_scheduler_test_state();
 
-    require(apply_scheduler_config_for_test(true), "scheduler must commit first UI band GPIO entry");
+    require(apply_scheduler_config_for_test(true), "scheduler must commit first UI plain frequency entry");
     require_initialized_selector_set(
         {{17, true}, {27, false}, {22, true}},
-        "first UI rotation entry");
-    require_all_selector_states(
-        {17, 27, 22},
-        false,
-        "initial load must drive every configured selector inactive before first TX");
-    require_current_selector(
+        "configured selector set must still be initialized from Band GPIO config");
+    require_no_current_selector(
         "80m",
-        "80m",
-        17,
-        true,
-        "first UI rotation entry");
-    require_selector_rehydrates_from_committed_request(
-        "80m",
-        17,
-        true,
-        {{17, true}, {27, false}, {22, true}},
-        "first UI rotation entry");
-    require_selector_logical_state(
-        17,
-        true,
-        "selector restore must assert the first configured GPIO for TX start");
-    require(
-        restore_committed_band_gpio_selection_for_test(false),
-        "restoring an already-selected committed request must succeed");
-    require_selector_logical_state(
-        17,
-        false,
-        "committed-request restore must force the reused selector back to inactive before reactivation");
+        "plain UI entry must not inherit Band GPIO routing");
 
-    require(
-        park_active_transmission_selectors_for_test(),
-        "first configured GPIO must park back to idle after its slot");
-    require_all_selector_states(
-        {17, 27, 22},
-        false,
-        "first configured GPIO must be inactive before the next selector is prepared");
-    require(apply_scheduler_config_for_test(false), "scheduler must commit second UI band GPIO entry");
-    require_initialized_selector_set(
-        {{17, true}, {27, false}, {22, true}},
-        "second UI rotation entry");
-    require_selector_logical_state(
-        17,
-        false,
-        "previous active GPIO must remain inactive during next-slot preparation");
-    require_selector_logical_state(
-        27,
-        false,
-        "next selected GPIO must still be inactive until transmission start");
-    require_current_selector(
+    require(apply_scheduler_config_for_test(false), "scheduler must commit second UI plain frequency entry");
+    require_no_current_selector(
         "40m",
-        "40m",
-        27,
-        false,
-        "second UI rotation entry");
-    require_selector_rehydrates_from_committed_request(
-        "40m",
-        27,
-        false,
-        {{17, true}, {27, false}, {22, true}},
-        "second UI rotation entry");
-    require_selector_logical_state(
-        27,
-        true,
-        "second slot activation must assert only the selected GPIO");
-    require_selector_logical_state(
-        17,
-        false,
-        "non-active GPIOs must remain inactive during second slot");
+        "second plain UI entry must not inherit Band GPIO routing");
 
-    require(
-        park_active_transmission_selectors_for_test(),
-        "second configured GPIO must park back to idle after its slot");
-    require_all_selector_states(
-        {17, 27, 22},
-        false,
-        "all selectors must be inactive after the second slot completes");
-    require(apply_scheduler_config_for_test(false), "scheduler must commit third UI band GPIO entry");
-    require_all_selector_states(
-        {17, 27, 22},
-        false,
-        "all non-active selectors must stay inactive before third slot activation");
-    require_current_selector(
+    require(apply_scheduler_config_for_test(false), "scheduler must commit third UI plain frequency entry");
+    require_no_current_selector(
         "30m",
-        "30m",
-        22,
-        true,
-        "third UI rotation entry");
-    require_selector_rehydrates_from_committed_request(
-        "30m",
-        22,
-        true,
-        {{17, true}, {27, false}, {22, true}},
-        "third UI rotation entry");
-    require_selector_logical_state(
-        22,
-        true,
-        "third slot activation must assert the selected GPIO");
-    require_selector_logical_state(
-        17,
-        false,
-        "previous selectors must remain inactive during third slot");
-    require_selector_logical_state(
-        27,
-        false,
-        "previous selectors must remain inactive during third slot");
-
-    require(
-        park_active_transmission_selectors_for_test(),
-        "third configured GPIO must park back to idle after its slot");
-    require_all_selector_states(
-        {17, 27, 22},
-        false,
-        "all selectors must be inactive after the third slot completes");
-    require(apply_scheduler_config_for_test(false), "scheduler must wrap back to first UI band GPIO entry");
-    require_all_selector_states(
-        {17, 27, 22},
-        false,
-        "all selectors must still be inactive before the wrapped slot starts");
-    require_current_selector(
-        "80m",
-        "80m",
-        17,
-        true,
-        "wrapped UI rotation entry");
-    require_selector_rehydrates_from_committed_request(
-        "80m",
-        17,
-        true,
-        {{17, true}, {27, false}, {22, true}},
-        "wrapped UI rotation entry");
+        "third plain UI entry must not inherit Band GPIO routing");
 
     patch_all_from_web({
-        {"WSPR", {{"Frequency", "30m,20m"}}},
+        {"WSPR", {{"Frequency", "30m@5L,20m@12H"}}},
         {"Band GPIO",
          {{"30m", {{"GPIO", 5}, {"Enabled", true}, {"Active High", false}}},
           {"20m", {{"GPIO", 12}, {"Enabled", true}, {"Active High", true}}}}}});
     reset_scheduler_test_state();
 
-    require(apply_scheduler_config_for_test(true), "scheduler must commit first reloaded UI band GPIO entry");
+    require(apply_scheduler_config_for_test(true), "scheduler must commit first reloaded explicit UI selector entry");
     require_initialized_selector_set(
         {{5, false}, {12, true}, {17, true}, {27, false}},
-        "first reloaded UI rotation entry");
-    require_all_selector_states(
-        {5, 12},
-        false,
-        "mixed-polarity startup must drive every configured selector inactive");
+        "first reloaded explicit UI selector entry");
     require_current_selector(
-        "30m",
+        "30m@5L",
         "30m",
         5,
         false,
-        "first reloaded UI rotation entry");
+        "first reloaded explicit UI selector entry");
     require_selector_rehydrates_from_committed_request(
         "30m",
         5,
         false,
         {{5, false}, {12, true}, {17, true}, {27, false}},
-        "first reloaded UI rotation entry");
+        "first reloaded explicit UI selector entry");
 
-    require(apply_scheduler_config_for_test(false), "scheduler must commit second reloaded UI band GPIO entry");
+    require(apply_scheduler_config_for_test(false), "scheduler must commit second reloaded explicit UI selector entry");
     require_initialized_selector_set(
         {{5, false}, {12, true}, {17, true}, {27, false}},
-        "second reloaded UI rotation entry");
+        "second reloaded explicit UI selector entry");
     require_current_selector(
-        "20m",
+        "20m@12H",
         "20m",
         12,
         true,
-        "second reloaded UI rotation entry");
+        "second reloaded explicit UI selector entry");
     require_selector_rehydrates_from_committed_request(
         "20m",
         12,
         true,
         {{5, false}, {12, true}, {17, true}, {27, false}},
-        "second reloaded UI rotation entry");
+        "second reloaded explicit UI selector entry");
 
     patch_all_from_web({{"WSPR", {{"Frequency", "20m@16H,30m@20H,40m@21H"}}}});
     reset_scheduler_test_state();
@@ -522,9 +396,11 @@ int main()
         "INI frequency entries must parse before fallback checks");
     require(
         config.wspr_frequency_entries.size() == 2U &&
-            config.wspr_frequency_entries[0].allow_band_gpio_fallback &&
-            config.wspr_frequency_entries[1].allow_band_gpio_fallback,
-        "INI entries without @GPIO must keep band-config GPIO fallback enabled");
+            config.wspr_frequency_entries[0].selector_gpio == kSelectorGpioUnset &&
+            !config.wspr_frequency_entries[0].allow_band_gpio_fallback &&
+            config.wspr_frequency_entries[1].selector_gpio == kSelectorGpioUnset &&
+            !config.wspr_frequency_entries[1].allow_band_gpio_fallback,
+        "INI entries without @GPIO must remain explicit-only");
 
     config.use_ini = false;
     config.frequencies = "80m@17H,40m";
@@ -566,8 +442,8 @@ int main()
         {"Band GPIO",
          {{"20m", {{"GPIO", 17}, {"Enabled", true}, {"Active High", true}}},
           {"30m", {{"GPIO", 18}, {"Enabled", true}, {"Active High", false}}}}}});
-    require(apply_scheduler_config_for_test(true), "scheduler must reload band GPIO selector set");
-    require_current_selector("20m", "20m", 17, true, "reloaded band GPIO selector set");
+    require(apply_scheduler_config_for_test(true), "scheduler must reload plain entries without inheriting band GPIO selectors");
+    require_no_current_selector("20m", "reloaded plain entries must not inherit band GPIO selector set");
     run_final_selector_gpio_shutdown_cleanup_for_test();
     require_shutdown_cleanup_targets(
         {{17, true}, {18, false}},

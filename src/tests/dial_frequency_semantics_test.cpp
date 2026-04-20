@@ -773,6 +773,7 @@ int main()
     {
         init_config_json();
         json_to_config();
+        config.use_ini = true;
         config.transmit = true;
         config.frequencies = "80m@17H,40m@27L,20m,14.097100MHz@22";
 
@@ -797,12 +798,37 @@ int main()
                 !config.wspr_frequency_entries[2].selector_gpio_active_high &&
                 !config.wspr_frequency_entries[2].allow_band_gpio_fallback &&
                 nearly_equal(config.wspr_frequency_entries[2].dial_frequency_hz, 14095600.0),
-            "CLI entries without @GPIO must remain unmapped, explicit-only, and default active low");
+            "plain frequency entries must remain unmapped, explicit-only, and default active low even on managed/INI paths");
         require(
             config.wspr_frequency_entries[3].selector_gpio == 22 &&
                 !config.wspr_frequency_entries[3].selector_gpio_active_high &&
                 nearly_equal(config.wspr_frequency_entries[3].dial_frequency_hz, 14097100.0),
             "unit-qualified frequencies must also support @GPIO with default active-low polarity");
+    }
+
+    {
+        prime_valid_runtime_identity_config();
+        config.use_ini = true;
+        config.enable_web = true;
+        config.transmit = false;
+        config.ini_filename = "/tmp/web_band_gpio_explicit_only.ini";
+        write_text_file(config.ini_filename, "");
+        iniFile.set_filename(config.ini_filename);
+        config_to_json();
+
+        patch_all_from_web({
+            {"WSPR", {{"Frequency", "80m,40m"}}},
+            {"Band GPIO",
+             {{"80m", {{"GPIO", 17}, {"Enabled", true}, {"Active High", true}}},
+              {"40m", {{"GPIO", 27}, {"Enabled", true}, {"Active High", false}}}}}});
+
+        require(
+            config.wspr_frequency_entries.size() == 2U &&
+                config.wspr_frequency_entries[0].selector_gpio == kSelectorGpioUnset &&
+                !config.wspr_frequency_entries[0].allow_band_gpio_fallback &&
+                config.wspr_frequency_entries[1].selector_gpio == kSelectorGpioUnset &&
+                !config.wspr_frequency_entries[1].allow_band_gpio_fallback,
+            "web patch normalization must keep plain frequency entries explicit-only even when Band GPIO config exists");
     }
 
     {

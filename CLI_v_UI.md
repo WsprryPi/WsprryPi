@@ -21,32 +21,12 @@
 - Severity: low
 - Confidence: medium
 
-### F09 Band-GPIO fallback differs by entry path
-
-- Brief: INI/web configs allow band-GPIO fallback for entries without @GPIO; CLI non-INI entries do not.
-- Why this bucket: Tests prove the difference exists, but not whether it is intended policy.
-- Authoritative surface: Unclear; behavior depends on entry path by design, but intent is not explicit enough.
-- Real runtime behavior difference: Yes.
-- User confusion only: Also yes.
-- Severity: medium
-- Confidence: high
-
 ### F10 CW base-frequency defaults diverge across internal defaults, stock INI, and raw HTML
 
 - Brief: Internal default is 3572000, stock INI is 14096900, raw HTML is 7040000.
 - Why this bucket: The divergence is proven, but the correct authority is not.
 - Authoritative surface: Unclear.
 - Real runtime behavior difference: Yes, in missing-key/repair/offline/degraded flows.
-- User confusion only: Also yes.
-- Severity: medium
-- Confidence: high
-
-### F11 Band GPIO defaults diverge between internal defaults and stock INI/UI
-
-- Brief: Internal config seeds many enabled assignments; stock INI leaves them blank; UI markup starts empty.
-- Why this bucket: The mismatch is real, but the intended source of truth is unclear.
-- Authoritative surface: Unclear.
-- Real runtime behavior difference: Yes.
 - User confusion only: Also yes.
 - Severity: medium
 - Confidence: high

@@ -2218,7 +2218,7 @@ bool set_frequencies(ArgParserConfig &target)
         {
             const double freq = lookup.parse_string_to_frequency(entry.token, false);
             entry.dial_frequency_hz = freq;
-            entry.allow_band_gpio_fallback = target.use_ini;
+            entry.allow_band_gpio_fallback = false;
             if (token_looks_numeric_frequency(entry.token))
             {
                 const auto legacy_alias =
