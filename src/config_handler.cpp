@@ -389,7 +389,13 @@ namespace
         public_json["GPIO"] = source.at("GPIO");
         public_json["Calibration"] = source.at("Calibration");
         public_json["Si5351"] = source.at("Si5351");
-        public_json["WSPR"] = source.at("WSPR");
+        public_json["WSPR"] = {
+            {"Call Sign", source.at("WSPR").at("Call Sign")},
+            {"Grid Square", source.at("WSPR").at("Grid Square")},
+            {"TX Power", source.at("WSPR").at("TX Power")},
+            {"Frequency", source.at("WSPR").at("Frequency")},
+            {"Planner Preference", source.at("WSPR").at("Planner Preference")},
+            {"Use Random Offset", source.at("WSPR").at("Use Random Offset")}};
         public_json["CW"] = source.at("CW");
         public_json["Band GPIO"] = source.at("Band GPIO");
         public_json["Platform"] = {
@@ -450,7 +456,25 @@ namespace
         if (public_json.contains("Si5351"))
             internal_json["Si5351"] = public_json.at("Si5351");
         if (public_json.contains("WSPR"))
-            internal_json["WSPR"] = public_json.at("WSPR");
+        {
+            const auto &wspr = public_json.at("WSPR");
+            if (wspr.contains("Call Sign"))
+                internal_json["WSPR"]["Call Sign"] = wspr.at("Call Sign");
+            if (wspr.contains("Grid Square"))
+                internal_json["WSPR"]["Grid Square"] = wspr.at("Grid Square");
+            if (wspr.contains("TX Power"))
+                internal_json["WSPR"]["TX Power"] = wspr.at("TX Power");
+            if (wspr.contains("Frequency"))
+                internal_json["WSPR"]["Frequency"] = wspr.at("Frequency");
+            if (wspr.contains("Planner Preference"))
+                internal_json["WSPR"]["Planner Preference"] = wspr.at("Planner Preference");
+            if (wspr.contains("Use Random Offset"))
+                internal_json["WSPR"]["Use Random Offset"] = wspr.at("Use Random Offset");
+            if (internal_json.contains("WSPR") && internal_json["WSPR"].is_object())
+            {
+                internal_json["WSPR"].erase("WSPR Dial Frequency Set");
+            }
+        }
         if (public_json.contains("CW"))
             internal_json["CW"] = public_json.at("CW");
         if (public_json.contains("Band GPIO"))
@@ -846,45 +870,6 @@ void clear_si5351_detection_override_for_test() noexcept
 
 namespace
 {
-    std::vector<double> parse_wspr_dial_frequency_set(const nlohmann::json &value)
-    {
-        if (value.is_array())
-        {
-            return value.get<std::vector<double>>();
-        }
-
-        if (value.is_string())
-        {
-            const std::string raw_value = trim_copy(value.get<std::string>());
-
-            if (raw_value.empty())
-            {
-                return {};
-            }
-
-            try
-            {
-                nlohmann::json parsed = nlohmann::json::parse(raw_value);
-
-                if (!parsed.is_array())
-                {
-                    throw std::runtime_error(
-                        "WSPR dial frequency set string did not parse to an array");
-                }
-
-                return parsed.get<std::vector<double>>();
-            }
-            catch (const std::exception &e)
-            {
-                throw std::runtime_error(
-                    std::string("Invalid WSPR.WSPR Dial Frequency Set: ") + e.what());
-            }
-        }
-
-        throw std::runtime_error(
-            "WSPR.WSPR Dial Frequency Set must be an array or JSON array string");
-    }
-
     nlohmann::json parse_ini_value(const std::string &raw_value)
     {
         const std::string trimmed = trim_copy(raw_value);
@@ -1140,8 +1125,7 @@ namespace
             {"TX Power", 20},
             {"Frequency", "20m"},
             {"Planner Preference", "auto"},
-            {"Use Random Offset", true},
-            {"WSPR Dial Frequency Set", nlohmann::json::array()}};
+            {"Use Random Offset", true}};
         target["CW"] = {
             {"Message", ""},
             {"Base Frequency", 14096900.0},
@@ -1183,17 +1167,7 @@ namespace
             parse_wspr_planner_preference(source.at("WSPR"));
         target.loop_tx = source.at("Meta").at("Loop TX").get<bool>();
         target.tx_iterations.store(source.at("Meta").at("TX Iterations").get<int>());
-        const auto &wspr = source.at("WSPR");
-        if (wspr.contains("WSPR Dial Frequency Set") &&
-            !wspr.at("WSPR Dial Frequency Set").empty())
-        {
-            target.wspr_dial_freq_set =
-                parse_wspr_dial_frequency_set(wspr.at("WSPR Dial Frequency Set"));
-        }
-        else
-        {
-            target.wspr_dial_freq_set.clear();
-        }
+        target.wspr_dial_freq_set.clear();
 
         target.transmit = source.at("Operation").at("Transmit").get<bool>();
         target.transmit_backend =
@@ -1423,7 +1397,6 @@ namespace
         target["WSPR"]["Planner Preference"] =
             wspr_planner_preference_to_string(source.wspr.planner_preference);
         target["WSPR"]["Use Random Offset"] = source.use_offset;
-        target["WSPR"]["WSPR Dial Frequency Set"] = source.wspr_dial_freq_set;
 
         std::string cw_message = source.qrss.message;
         double cw_base_frequency_hz = source.qrss.frequency_hz;

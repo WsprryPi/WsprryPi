@@ -721,12 +721,14 @@ int main()
         json_to_config();
 
         require(
-            config.wspr_dial_freq_set.size() == 1 &&
-                nearly_equal(config.wspr_dial_freq_set.front(), 14095600.0),
-            "WSPR.WSPR Dial Frequency Set must load as the active WSPR dial-frequency list");
+            config.wspr_dial_freq_set.empty(),
+            "external WSPR.WSPR Dial Frequency Set input must be ignored");
         require(
             nearly_equal(config.wspr_audio_offset_hz, 1500.0),
             "WSPR audio offset must use the runtime constant");
+        require(
+            config.wspr.frequencies == "20m",
+            "WSPR.Frequency must remain the authoritative external WSPR frequency input");
     }
 
     {
@@ -752,6 +754,24 @@ int main()
         require(
             config.wspr_dial_freq_set.empty(),
             "empty WSPR.WSPR Dial Frequency Set must not fall back to a legacy frequency list");
+    }
+
+    {
+        init_config_json();
+        config_to_json();
+
+        require(
+            jConfig.contains("WSPR") &&
+                jConfig["WSPR"].is_object() &&
+                !jConfig["WSPR"].contains("WSPR Dial Frequency Set"),
+            "internal config JSON export must not expose WSPR Dial Frequency Set");
+
+        const nlohmann::json public_config = get_public_config_json();
+        require(
+            public_config.contains("WSPR") &&
+                public_config["WSPR"].is_object() &&
+                !public_config["WSPR"].contains("WSPR Dial Frequency Set"),
+            "public config JSON must not expose WSPR Dial Frequency Set");
     }
 
     {
@@ -851,6 +871,37 @@ int main()
                 config.wspr_frequency_entries[1].selector_gpio == kSelectorGpioUnset &&
                 !config.wspr_frequency_entries[1].allow_band_gpio_fallback,
             "web patch normalization must keep plain frequency entries explicit-only even when Band GPIO config exists");
+    }
+
+    {
+        init_default_config();
+        config.use_ini = true;
+        config.ini_filename = "/tmp/wspr_dial_frequency_set_internal_only.ini";
+        write_text_file(config.ini_filename, "");
+        iniFile.set_filename(config.ini_filename);
+        config.callsign = "AA0NT";
+        config.grid_square = "EM18";
+        config.transmit = false;
+        config.frequencies = "20m";
+        config_to_json();
+
+        patch_all_from_web({
+            {"WSPR",
+             {{"Frequency", "20m"},
+              {"WSPR Dial Frequency Set", nlohmann::json::array({10138700.0})}}}});
+
+        require(
+            config.wspr_dial_freq_set.size() == 1U &&
+                nearly_equal(config.wspr_dial_freq_set.front(), 14095600.0),
+            "web patch input must ignore WSPR Dial Frequency Set and derive the active list from WSPR.Frequency instead");
+        require(
+            jConfig.contains("WSPR") &&
+                jConfig["WSPR"].is_object() &&
+                !jConfig["WSPR"].contains("WSPR Dial Frequency Set"),
+            "web patch persistence must strip WSPR Dial Frequency Set from internal JSON");
+        require(
+            !get_public_config_json()["WSPR"].contains("WSPR Dial Frequency Set"),
+            "public config JSON must stay free of WSPR Dial Frequency Set after ignored patch input");
     }
 
     {

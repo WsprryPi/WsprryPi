@@ -11,16 +11,6 @@
 - Confidence: medium
 - Evidence: src/config_handler.cpp:1188, src/config_handler.cpp:1389, src/scheduling.cpp:1524
 
-### F07 WSPR.WSPR Dial Frequency Set is internal/API-visible but not UI-visible or INI-persisted
-
-- Brief: The field exists in internal/public JSON flow, is read if present, but is not shown in UI and is not persisted to INI.
-- Why this bucket: It may be an internal cache/normalized field rather than a user option, but the public JSON exposure muddies that.
-- Authoritative surface: Unclear.
-- Real runtime behavior difference: Possibly, depending on entry path.
-- User confusion only: Yes.
-- Severity: low
-- Confidence: medium
-
 ### F15 CW numeric range limits differ between UI and backend
 
 - Brief: UI caps dot/repeat/shift more tightly than backend, which mostly requires positive values plus repeat policy.
