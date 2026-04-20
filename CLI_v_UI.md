@@ -37,38 +37,38 @@
 
 ## Intentional asymmetry
 
-### T04 CLI only exposes require_paired, not full planner-preference enum
+~~### T04 CLI only exposes require_paired, not full planner-preference enum~~
 
-- Brief: UI/INI support auto, prefer_paired, require_paired; CLI only adds --require-paired.
-- Why this bucket: The CLI option shape looks deliberately minimal rather than accidentally incomplete.
-- Authoritative surface: Persistent/public setting is WSPR.Planner Preference; CLI is a narrower override surface.
-- Real runtime behavior difference: Yes, but only because CLI intentionally cannot express one persisted state.
-- User confusion only: Mostly, yes.
-- Severity: low
-- Confidence: medium
-- Evidence: src/arg_parser.cpp:2444, src/config_handler.cpp:78, WsprryPi-UI/data/views/config.php:258
+~~- Brief: UI/INI support auto, prefer_paired, require_paired; CLI only adds --require-paired.~~
+~~- Why this bucket: The CLI option shape looks deliberately minimal rather than accidentally incomplete.~~
+~~- Authoritative surface: Persistent/public setting is WSPR.Planner Preference; CLI is a narrower override surface.~~
+~~- Real runtime behavior difference: Yes, but only because CLI intentionally cannot express one persisted state.~~
+~~- User confusion only: Mostly, yes.~~
+~~- Severity: low~~
+~~- Confidence: medium~~
+~~- Evidence: src/arg_parser.cpp:2444, src/config_handler.cpp:78, WsprryPi-UI/data/views/config.php:258~~
 
-### T05 CLI one-shot and test-mode controls are not mirrored in UI/INI
+~~### T05 CLI one-shot and test-mode controls are not mirrored in UI/INI~~
 
-- Brief: --repeat, --terminate, --test-tone, and transient --qrss-* / --fskcw-* / --dfcw-* are CLI-oriented runtime controls, not full cross-surface settings.
-- Why this bucket: The code treats these as transient startup/runtime requests, not durable config.
-- Authoritative surface: CLI for those flows.
-- Real runtime behavior difference: Yes, but by design.
-- User confusion only: Low.
-- Severity: low
-- Confidence: high
-- Evidence: src/arg_parser.hpp:7, src/arg_parser.cpp:2683, src/arg_parser.cpp:2874
+~~- Brief: --repeat, --terminate, --test-tone, and transient --qrss-* / --fskcw-* / --dfcw-* are CLI-oriented runtime controls, not full cross-surface settings.~~
+~~- Why this bucket: The code treats these as transient startup/runtime requests, not durable config.~~
+~~- Authoritative surface: CLI for those flows.~~
+~~- Real runtime behavior difference: Yes, but by design.~~
+~~- User confusion only: Low.~~
+~~- Severity: low~~
+~~- Confidence: high~~
+~~- Evidence: src/arg_parser.hpp:7, src/arg_parser.cpp:2683, src/arg_parser.cpp:2874~~
 
-### T06 Operation.Mode=TONE is internal/transient, not a normal persisted/public mode
+~~### T06 Operation.Mode=TONE is internal/transient, not a normal persisted/public mode~~
 
-- Brief: Internal code can parse TONE, but normal serialization maps runtime tone mode back to WSPR, and the UI does not expose TONE.
-- Why this bucket: The code clearly treats tone mode as transient runtime behavior.
-- Authoritative surface: Internal scheduler/runtime only.
-- Real runtime behavior difference: No mismatch bug in normal user config flow.
-- User confusion only: Possibly, if someone patches API manually.
-- Severity: low
-- Confidence: high
-- Evidence: src/config_handler.cpp:224, src/config_handler.cpp:1331, src/scheduling.hpp:170
+~~- Brief: Internal code can parse TONE, but normal serialization maps runtime tone mode back to WSPR, and the UI does not expose TONE.~~
+~~- Why this bucket: The code clearly treats tone mode as transient runtime behavior.~~
+~~- Authoritative surface: Internal scheduler/runtime only.~~
+~~- Real runtime behavior difference: No mismatch bug in normal user config flow.~~
+~~- User confusion only: Possibly, if someone patches API manually.~~
+~~- Severity: low~~
+~~- Confidence: high~~
+~~- Evidence: src/config_handler.cpp:224, src/config_handler.cpp:1331, src/scheduling.hpp:170~~
 
 ## Documentation/help-text gap
 

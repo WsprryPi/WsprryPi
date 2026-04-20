@@ -543,6 +543,29 @@ static int parse_si5351_tx_output_option(const char *raw_value)
         "Invalid Si5351 TX output. Expected CLK0, CLK1, CLK2, 0, 1, or 2.");
 }
 
+static WsprPlannerPreference parse_planner_preference_option(const char *raw_value)
+{
+    std::string value = trim_copy_string(raw_value == nullptr ? "" : raw_value);
+    std::transform(
+        value.begin(),
+        value.end(),
+        value.begin(),
+        [](unsigned char c)
+        {
+            return static_cast<char>(std::tolower(c));
+        });
+
+    if (value.empty() || value == "auto")
+        return WsprPlannerPreference::Auto;
+    if (value == "prefer_paired" || value == "prefer-paired")
+        return WsprPlannerPreference::PreferPaired;
+    if (value == "require_paired" || value == "require-paired")
+        return WsprPlannerPreference::RequirePaired;
+
+    throw std::invalid_argument(
+        "Invalid planner preference. Expected auto, prefer_paired, or require_paired.");
+}
+
 static bool parse_gpio_number_strict(
     std::string_view raw_value,
     int &gpio_out) noexcept
@@ -2441,7 +2464,7 @@ bool parse_command_line(int argc, char *argv[])
         {"debug-logging", no_argument, nullptr, 1018},  // Global: config.debug_logging
         {"no-debug-logging", no_argument, nullptr, 1019},
         {"no-web", no_argument, nullptr, 1020},
-        {"require-paired", no_argument, nullptr, 1001}, // Global: config.wspr_planner_preference
+        {"planner-preference", required_argument, nullptr, 1001},
         {"backend", required_argument, nullptr, 1002},
         {"qrss-message", required_argument, nullptr, 1003},
         {"qrss-frequency", required_argument, nullptr, 1004},
@@ -2543,9 +2566,17 @@ bool parse_command_line(int argc, char *argv[])
             config.enable_web = false;
             break;
         }
-        case 1001: // Require paired WSPR planning
+        case 1001: // Select WSPR planner preference
         {
-            config.wspr_planner_preference = WsprPlannerPreference::RequirePaired;
+            try
+            {
+                config.wspr_planner_preference =
+                    parse_planner_preference_option(optarg);
+            }
+            catch (const std::exception &e)
+            {
+                print_usage(e.what(), EXIT_FAILURE);
+            }
             break;
         }
         case 1002: // Select transmit backend
@@ -3101,6 +3132,11 @@ bool parse_command_line(int argc, char *argv[])
         }
     }
     resolve_backend_specific_config(config);
+
+    if (config.mode == ModeType::WSPR)
+    {
+        sync_wspr_mode_config(config);
+    }
 
     // Re-save any config changes in the JSON
     config_to_json();

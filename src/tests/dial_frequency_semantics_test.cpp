@@ -970,6 +970,69 @@ int main()
         reset_getopt_state();
         std::vector<std::string> args = {
             "wsprrypi",
+            "--planner-preference",
+            "auto",
+            "AA0NT",
+            "EM18",
+            "20",
+            "20m"};
+        std::vector<char *> argv = argv_for(args);
+
+        require(
+            parse_command_line(static_cast<int>(argv.size()), argv.data()),
+            "--planner-preference auto CLI parsing must succeed");
+        require(
+            config.wspr_planner_preference == WsprPlannerPreference::Auto &&
+                config.wspr.planner_preference == WsprPlannerPreference::Auto,
+            "--planner-preference auto must select the canonical auto planner preference");
+    }
+
+    {
+        reset_getopt_state();
+        std::vector<std::string> args = {
+            "wsprrypi",
+            "--planner-preference",
+            "prefer_paired",
+            "AA0NT/12",
+            "EM18IG",
+            "20",
+            "20m"};
+        std::vector<char *> argv = argv_for(args);
+
+        require(
+            parse_command_line(static_cast<int>(argv.size()), argv.data()),
+            "--planner-preference prefer_paired CLI parsing must succeed");
+        require(
+            config.wspr_planner_preference == WsprPlannerPreference::PreferPaired &&
+                config.wspr.planner_preference == WsprPlannerPreference::PreferPaired,
+            "--planner-preference prefer_paired must select the canonical prefer_paired planner preference");
+    }
+
+    {
+        reset_getopt_state();
+        std::vector<std::string> args = {
+            "wsprrypi",
+            "--planner-preference",
+            "require_paired",
+            "AA0NT/12",
+            "EM18IG",
+            "20",
+            "20m"};
+        std::vector<char *> argv = argv_for(args);
+
+        require(
+            parse_command_line(static_cast<int>(argv.size()), argv.data()),
+            "--planner-preference require_paired CLI parsing must succeed");
+        require(
+            config.wspr_planner_preference == WsprPlannerPreference::RequirePaired &&
+                config.wspr.planner_preference == WsprPlannerPreference::RequirePaired,
+            "--planner-preference require_paired must select the canonical require_paired planner preference");
+    }
+
+    {
+        reset_getopt_state();
+        std::vector<std::string> args = {
+            "wsprrypi",
             "--test-tone",
             "730000",
             "--transmit-gpio",
@@ -993,6 +1056,29 @@ int main()
         require(
             config.mode == ModeType::WSPR,
             "persistent config reload must restore WSPR mode rather than tone mode");
+    }
+
+    {
+        init_config_json();
+        json_to_config();
+        config.use_ini = false;
+        reset_getopt_state();
+
+        std::vector<std::string> args = {
+            "wsprrypi",
+            "AA0NT",
+            "EM18",
+            "20",
+            "20m"};
+        std::vector<char *> argv = argv_for(args);
+
+        require(
+            parse_command_line(static_cast<int>(argv.size()), argv.data()),
+            "CLI parsing without --planner-preference must succeed");
+        require(
+            config.wspr_planner_preference == WsprPlannerPreference::Auto &&
+                config.wspr.planner_preference == WsprPlannerPreference::Auto,
+            "CLI planner preference must default to auto when unspecified");
     }
 
     {
@@ -2632,6 +2718,56 @@ int main()
         require(
             wspr_it->second.find("Require Paired Plan") == wspr_it->second.end(),
             "json_to_ini must not persist the removed Require Paired Plan compatibility field");
+    }
+
+    {
+        init_default_config();
+        config.use_ini = true;
+        config.ini_filename = "/tmp/cli_planner_preference_override.ini";
+        iniFile.setData(
+            make_managed_ini_data(
+                "AA0NT/12",
+                "EM18IG",
+                "20m",
+                true,
+                WsprPlannerPreference::RequirePaired));
+        write_managed_ini_file(
+            config.ini_filename,
+            make_managed_ini_data(
+                "AA0NT/12",
+                "EM18IG",
+                "20m",
+                true,
+                WsprPlannerPreference::RequirePaired));
+        reset_getopt_state();
+
+        std::vector<std::string> args = {
+            "wsprrypi",
+            "--ini-file",
+            "/tmp/cli_planner_preference_override.ini",
+            "--planner-preference",
+            "prefer_paired"};
+        std::vector<char *> argv = argv_for(args);
+
+        require(
+            parse_command_line(static_cast<int>(argv.size()), argv.data()),
+            "CLI planner preference override over INI must parse");
+        require(
+            config.use_ini &&
+                config.wspr_planner_preference == WsprPlannerPreference::PreferPaired &&
+                config.wspr.planner_preference == WsprPlannerPreference::PreferPaired,
+            "CLI --planner-preference must override the INI planner preference in canonical runtime config");
+
+        reset_runtime_planning_state_for_identity_test();
+        require(
+            set_config(true),
+            "CLI-overridden planner preference must remain valid through scheduler planning");
+        const TransmissionRequest request = current_transmission_request_for_test();
+        require(
+            request.mode == TransmissionMode::WSPR &&
+                request.payload.plan_type == "Type2Type3Paired",
+            "CLI prefer_paired override must reach the runtime WSPR planning path");
+        finish_runtime_planning_state_for_identity_test();
     }
 
     {
