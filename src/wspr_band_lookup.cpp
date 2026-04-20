@@ -76,11 +76,8 @@ namespace
     // The scheduler converts dial frequency to actual RF exactly once before
     // configuring the RF-only transmitter/backend layer.
     constexpr double FREQ_2200M = 136000.0;
-    constexpr double FREQ_2200M_15 = 136112.5;
     constexpr double FREQ_630M = 474200.0;
-    constexpr double FREQ_630M_15 = 474312.5;
     constexpr double FREQ_160M = 1836600.0;
-    constexpr double FREQ_160M_15 = 1836712.5;
     constexpr double FREQ_80M = 3568600.0;
     constexpr double FREQ_60M = 5287200.0;
     constexpr double FREQ_40M = 7038600.0;
@@ -128,17 +125,12 @@ namespace
             {"1MM", 241000000000LL, 250000000000LL},
         }};
 
-    constexpr std::array<WSPRAliasDefinition, 23> WSPR_ALIASES = {{
+    constexpr std::array<WSPRAliasDefinition, 18> WSPR_ALIASES = {{
         {"lf", FREQ_2200M},
         {"2200m", FREQ_2200M},
-        {"lf-15", FREQ_2200M_15},
-        {"2200m-15", FREQ_2200M_15},
         {"mf", FREQ_630M},
         {"630m", FREQ_630M},
-        {"mf-15", FREQ_630M_15},
-        {"630m-15", FREQ_630M_15},
         {"160m", FREQ_160M},
-        {"160m-15", FREQ_160M_15},
         {"80m", FREQ_80M},
         {"60m", FREQ_60M},
         {"40m", FREQ_40M},
@@ -154,17 +146,12 @@ namespace
         {"2m", FREQ_2M},
     }};
 
-    constexpr std::array<LegacyActualWSPRAliasDefinition, 23> LEGACY_ACTUAL_WSPR_ALIASES = {{
+    constexpr std::array<LegacyActualWSPRAliasDefinition, 18> LEGACY_ACTUAL_WSPR_ALIASES = {{
         {"lf", 137500.0},
         {"2200m", 137500.0},
-        {"lf-15", 137612.5},
-        {"2200m-15", 137612.5},
         {"mf", 475700.0},
         {"630m", 475700.0},
-        {"mf-15", 475812.5},
-        {"630m-15", 475812.5},
         {"160m", 1838100.0},
-        {"160m-15", 1838212.5},
         {"80m", 3570100.0},
         {"60m", 5288700.0},
         {"40m", 7040100.0},

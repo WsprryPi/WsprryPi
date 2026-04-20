@@ -305,8 +305,45 @@ int main()
         nearly_equal(lookup.parse_string_to_frequency("20m", false), 14095600.0),
         "20m must resolve to the WSPR dial frequency");
     require(
+        nearly_equal(lookup.parse_string_to_frequency("2200m", false), 136000.0),
+        "2200m must resolve to the WSPR dial frequency");
+    require(
+        nearly_equal(lookup.parse_string_to_frequency("lf", false), 136000.0),
+        "lf must resolve to the 2200m WSPR dial frequency");
+    require(
+        nearly_equal(lookup.parse_string_to_frequency("630m", false), 474200.0),
+        "630m must resolve to the WSPR dial frequency");
+    require(
+        nearly_equal(lookup.parse_string_to_frequency("mf", false), 474200.0),
+        "mf must resolve to the 630m WSPR dial frequency");
+    require(
+        nearly_equal(lookup.parse_string_to_frequency("22m", false), 13551500.0),
+        "22m must resolve to the WSPR dial frequency");
+    require(
         lookup.lookup_ham_band(14095600.0).has_value(),
         "band lookup should still succeed on WSPR dial frequency values");
+    for (const std::string &removed_alias : {
+             std::string("lf-15"),
+             std::string("2200m-15"),
+             std::string("mf-15"),
+             std::string("630m-15"),
+             std::string("160m-15"),
+         })
+    {
+        bool threw = false;
+        try
+        {
+            (void)lookup.parse_string_to_frequency(removed_alias, false);
+        }
+        catch (const std::invalid_argument &)
+        {
+            threw = true;
+        }
+
+        require(
+            threw,
+            removed_alias + " must no longer resolve as a supported WSPR alias");
+    }
 
     require(
         nearly_equal(
@@ -666,6 +703,14 @@ int main()
     }
 
     {
+        require(
+            !lookup.legacy_actual_wspr_alias_for_frequency(137612.5).has_value() &&
+                !lookup.legacy_actual_wspr_alias_for_frequency(475812.5).has_value() &&
+                !lookup.legacy_actual_wspr_alias_for_frequency(1838212.5).has_value(),
+            "removed -15 aliases must no longer be reported as legacy actual RF aliases");
+    }
+
+    {
         init_config_json();
         json_to_config();
         config.transmit = true;
@@ -698,6 +743,45 @@ int main()
                 !config.wspr_frequency_entries[3].selector_gpio_active_high &&
                 nearly_equal(config.wspr_frequency_entries[3].dial_frequency_hz, 14097100.0),
             "unit-qualified frequencies must also support @GPIO with default active-low polarity");
+    }
+
+    {
+        init_config_json();
+        json_to_config();
+        config.transmit = true;
+        config.frequencies = "0,2200m,630m,22m@17H,20m@27L,14.097100MHz@22";
+
+        require(
+            set_frequencies(config),
+            "comma-separated WSPR lists must accept 0 skip windows, remaining band aliases, and optional @GPIO suffixes");
+        require(
+            config.wspr_frequency_entries.size() == 6,
+            "comma-separated WSPR lists must preserve every supported entry");
+        require(
+            nearly_equal(config.wspr_frequency_entries[0].dial_frequency_hz, 0.0) &&
+                config.wspr_frequency_entries[0].selector_gpio == kSelectorGpioUnset,
+            "0 must remain a skip-window entry");
+        require(
+            nearly_equal(config.wspr_frequency_entries[1].dial_frequency_hz, 136000.0),
+            "2200m must remain a supported WSPR alias");
+        require(
+            nearly_equal(config.wspr_frequency_entries[2].dial_frequency_hz, 474200.0),
+            "630m must remain a supported WSPR alias");
+        require(
+            config.wspr_frequency_entries[3].selector_gpio == 17 &&
+                config.wspr_frequency_entries[3].selector_gpio_active_high &&
+                nearly_equal(config.wspr_frequency_entries[3].dial_frequency_hz, 13551500.0),
+            "22m@17H must retain the GPIO mapping, polarity, and dial frequency");
+        require(
+            config.wspr_frequency_entries[4].selector_gpio == 27 &&
+                !config.wspr_frequency_entries[4].selector_gpio_active_high &&
+                nearly_equal(config.wspr_frequency_entries[4].dial_frequency_hz, 14095600.0),
+            "20m@27L must retain the GPIO mapping, polarity, and dial frequency");
+        require(
+            config.wspr_frequency_entries[5].selector_gpio == 22 &&
+                !config.wspr_frequency_entries[5].selector_gpio_active_high &&
+                nearly_equal(config.wspr_frequency_entries[5].dial_frequency_hz, 14097100.0),
+            "unit-qualified frequencies must remain compatible with comma-separated lists and @GPIO");
     }
 
     {
