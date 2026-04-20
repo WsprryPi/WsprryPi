@@ -24,6 +24,26 @@ namespace
             std::istreambuf_iterator<char>());
     }
 
+    std::string extract_input_tag_by_id(
+        const std::string &source, const std::string &id)
+    {
+        const std::string needle = "id=\"" + id + "\"";
+        const std::size_t id_pos = source.find(needle);
+        require(id_pos != std::string::npos, "test helper must find field " + id);
+
+        const std::size_t tag_start = source.rfind("<input", id_pos);
+        require(
+            tag_start != std::string::npos,
+            "test helper must find input tag start for " + id);
+
+        const std::size_t tag_end = source.find('>', id_pos);
+        require(
+            tag_end != std::string::npos,
+            "test helper must find input tag end for " + id);
+
+        return source.substr(tag_start, (tag_end - tag_start) + 1);
+    }
+
 } // namespace
 
 int main()
@@ -125,11 +145,15 @@ int main()
         "configuration autosave must debounce saves, clear stale invalid state for already-saved payloads, suppress unchanged failed payload retries, and suppress duplicate writes");
     require(
         ui_source.find("function validateCwMessage()") != std::string::npos &&
+            ui_source.find("function validateCwDotSeconds()") != std::string::npos &&
             ui_source.find("function validateCwShiftHz()") != std::string::npos &&
+            ui_source.find("function validateCwRepeatMinutes()") != std::string::npos &&
             ui_source.find("function parseFrequencyWithOptionalUnits(rawValue)") != std::string::npos &&
             ui_source.find("Enter a positive CW base frequency.") != std::string::npos &&
+            ui_source.find("Enter a positive CW dot length.") != std::string::npos &&
             ui_source.find("CW message is required.") != std::string::npos &&
             ui_source.find("Enter a positive CW frequency offset.") != std::string::npos &&
+            ui_source.find("Enter a repeat interval of at least 1 minute.") != std::string::npos &&
             ui_source.find("let cw_message = String($('#qrss_message').val() || \"\").trim();") != std::string::npos &&
             ui_source.find("let cw_base_frequency = parseFrequencyWithOptionalUnits($('#qrss_frequency').val());") != std::string::npos &&
             ui_source.find("let cw_base_frequency = parseFloat($('#qrss_frequency').val());") == std::string::npos &&
@@ -274,8 +298,30 @@ int main()
         "WSPR transmission settings must keep planner_preference in the compact top row and render TX dBm as a fixed-value select");
     require(
         config_view_source.find("id=\"fsk_offset\"") != std::string::npos &&
-            config_view_source.find("value=\"5\"") != std::string::npos,
-        "configuration view must default CW shift markup to 5 Hz");
+            config_view_source.find("value=\"5\"") != std::string::npos &&
+            config_view_source.find("id=\"dot_length\"") != std::string::npos &&
+            config_view_source.find("id=\"tx_repeat_every\"") != std::string::npos,
+        "configuration view must keep CW defaults while removing UI-only max caps for dot length, shift, and repeat interval");
+    const std::string dot_length_input =
+        extract_input_tag_by_id(config_view_source, "dot_length");
+    const std::string fsk_offset_input =
+        extract_input_tag_by_id(config_view_source, "fsk_offset");
+    const std::string tx_repeat_every_input =
+        extract_input_tag_by_id(config_view_source, "tx_repeat_every");
+    require(
+        dot_length_input.find("step=\"any\"") != std::string::npos &&
+            dot_length_input.find("min=\"0.000000001\"") != std::string::npos &&
+            dot_length_input.find("max=\"60\"") == std::string::npos &&
+            dot_length_input.find("step=\"1\"") == std::string::npos,
+        "CW dot-length markup must advertise strictly positive fractional input without restoring the old max cap");
+    require(
+        fsk_offset_input.find("min=\"0\"") != std::string::npos &&
+            fsk_offset_input.find("max=\"1000\"") == std::string::npos,
+        "CW shift markup must keep its lower bound while removing the old UI-only max cap");
+    require(
+        tx_repeat_every_input.find("min=\"1\"") != std::string::npos &&
+            tx_repeat_every_input.find("max=\"60\"") == std::string::npos,
+        "CW repeat-interval markup must retain the minimum while removing the old UI-only max cap");
     require(
         config_view_source.find("id=\"qrss_frequency\"") != std::string::npos &&
             config_view_source.find("value=\"14096900.0\"") != std::string::npos,

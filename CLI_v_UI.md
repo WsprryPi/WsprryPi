@@ -1,4 +1,4 @@
- # WsprryPi Option Consistency Triage
+Let's work on this one next:
 
 ### T10 Advanced CW envelope/gap settings are persisted and consumed, but hidden in UI
 
@@ -11,12 +11,16 @@
 - Confidence: medium
 - Evidence: src/config_handler.cpp:1188, src/config_handler.cpp:1389, src/scheduling.cpp:1524
 
-### F15 CW numeric range limits differ between UI and backend
 
-- Brief: UI caps dot/repeat/shift more tightly than backend, which mostly requires positive values plus repeat policy.
-- Why this bucket: Could be intentional UI guardrails, but not proven.
-- Authoritative surface: Backend runtime/validation.
-- Real runtime behavior difference: Yes.
-- User confusion only: Also yes.
-- Severity: medium
-- Confidence: high
+### Expected outcome:
+
+I want to add these to the UI:
+
+- CW.Intra Element Gap
+- Inter Character Gap
+- Inter Word Gap
+
+I want to leave these as CLI and INI only and leave them out of the UI intentionally:
+
+- Fade Shape
+- Fade In/Out/Slice Ms

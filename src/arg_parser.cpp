@@ -1285,6 +1285,19 @@ bool validate_config_candidate(
         return false;
     }
 
+    if ((candidate.mode == ModeType::FSKCW ||
+         candidate.mode == ModeType::DFCW) &&
+        candidate.modulation_fsk_offset_hz <= 0.0)
+    {
+        if (error_message != nullptr)
+        {
+            *error_message =
+                "CW shift_hz must be greater than 0 for FSKCW and DFCW.";
+        }
+
+        return false;
+    }
+
     if (candidate.schedule_start_minute < 0 ||
         candidate.schedule_start_minute > 59)
     {

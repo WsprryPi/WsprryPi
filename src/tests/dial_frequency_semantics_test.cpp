@@ -2749,6 +2749,27 @@ int main()
 
     {
         init_config_json();
+        jConfig["Operation"]["Mode"] = "FSKCW";
+        jConfig["CW"]["Message"] = "CQ";
+        jConfig["CW"]["Base Frequency"] = 7030000.0;
+        jConfig["CW"]["Shift Hz"] = 25000.0;
+        jConfig["CW"]["Dot Seconds"] = 90.5;
+        jConfig["CW"]["Repeat Minutes"] = 1440;
+        json_to_config();
+
+        std::string validation_error;
+        require(
+            validate_config_candidate(config, &validation_error),
+            "backend validation must allow large positive CW dot length, shift, and repeat values when runtime constraints are satisfied");
+        require(
+            nearly_equal(config.modulation_dot_seconds, 90.5) &&
+                nearly_equal(config.modulation_fsk_offset_hz, 25000.0) &&
+                config.schedule_repeat_minutes == 1440,
+            "backend normalization must preserve large positive CW numeric values");
+    }
+
+    {
+        init_config_json();
         jConfig["CW"]["Message"] = "  HELLO WORLD  ";
         json_to_config();
 
@@ -2873,6 +2894,15 @@ int main()
             !validate_config_candidate(invalid_gap_candidate, &validation_error) &&
                 validation_error == "CW gap settings must be greater than 0.",
             "validation must reject non-positive CW gap settings");
+
+        ArgParserConfig invalid_shift_candidate;
+        invalid_shift_candidate.mode = ModeType::FSKCW;
+        invalid_shift_candidate.modulation_fsk_offset_hz = 0.0;
+        validation_error.clear();
+        require(
+            !validate_config_candidate(invalid_shift_candidate, &validation_error) &&
+                validation_error == "CW shift_hz must be greater than 0 for FSKCW and DFCW.",
+            "validation must reject non-positive CW shift values when the active mode requires a second tone");
 
         ArgParserConfig invalid_fade_candidate;
         invalid_fade_candidate.cw_fade_in_ms = -1;
