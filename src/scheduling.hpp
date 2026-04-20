@@ -272,7 +272,7 @@ struct StopTransmissionResult
     std::string message;
 };
 
-StopTransmissionResult stop_transmission_by_user_request();
+StopTransmissionResult stop_transmission_by_user_request(bool persist_transmit = true);
 
 struct WsprRuntimeStatusSnapshot
 {

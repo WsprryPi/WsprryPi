@@ -52,9 +52,9 @@ int main()
         read_text_file("/home/pi/WsprryPi/src/web_socket.cpp");
     require(
         websocket_source.find("else if (cmd == \"stop\")") != std::string::npos &&
-            websocket_source.find("stop_transmission_by_user_request();") !=
+            websocket_source.find("stop_transmission_by_user_request(persist_transmit);") !=
                 std::string::npos,
-        "websocket stop command must route through stop_transmission_by_user_request()");
+        "websocket stop command must route through stop_transmission_by_user_request() with persistence control");
 
     const std::string scheduling_source =
         read_text_file("/home/pi/WsprryPi/src/scheduling.cpp");
@@ -77,27 +77,27 @@ int main()
     const std::string ui_source =
         read_text_file("/home/pi/WsprryPi/WsprryPi-UI/data/index.js");
     require(
-        ui_source.find("ws.send(JSON.stringify({ command: \"stop\" }))") !=
+        ui_source.find("persist_transmit: persistTransmit") !=
                 std::string::npos,
-        "UI Stop button must send the explicit stop command over the websocket");
+        "UI Stop button must send the explicit stop command over the websocket with persistence control");
     require(
         ui_source.find("let pendingModeChange = null;") != std::string::npos &&
             ui_source.find("let pendingPersistedMode = \"\";") != std::string::npos &&
             ui_source.find("function requestConfigModeChange(targetMode)") != std::string::npos &&
             ui_source.find("title: \"Stop transmission to change mode\"") != std::string::npos &&
             ui_source.find("title: \"Disable transmissions to change mode\"") != std::string::npos &&
-            ui_source.find("requestTransmitEnabledChange(false, true") != std::string::npos &&
+            ui_source.find("requestTransmitEnabledChange(false, true") == std::string::npos &&
             ui_source.find("const requestedMode = normalizedTargetMode;") != std::string::npos &&
             ui_source.find("finalizePendingModeChange(requestedMode);") != std::string::npos &&
-            ui_source.find("syncAutosaveBaselineOnSuccess: false,") != std::string::npos &&
-            ui_source.find("if (!stopTransmission()) {") != std::string::npos &&
+            ui_source.find("setTransmitFromBackend(false);") != std::string::npos &&
+            ui_source.find("if (!stopTransmission({ persistTransmit: false })) {") != std::string::npos &&
             ui_source.find("suspendConfigAutosave(true);") != std::string::npos &&
             ui_source.find("input:not(#transmit, [name=\"mode_toggle\"], [name=\"qrss_type\"])") != std::string::npos &&
             ui_source.find("configAutosaveNeedsRuntimeRefresh = true;") != std::string::npos &&
             ui_source.find("pendingPersistedMode = currentConfigModeSelection;") != std::string::npos &&
             ui_source.find("flushAutosave();") != std::string::npos &&
             ui_source.find("if (configAutosaveNeedsRuntimeRefresh && typeof getTxState === \"function\") {") != std::string::npos,
-        "mode changes must be guarded behind stop/disable confirmation, preserve the unsaved target mode through the disable step, exclude mode toggles from generic autosave scheduling, and refresh runtime state after the committed mode save lands");
+        "mode changes must be guarded behind stop/disable confirmation, collapse the guarded disable-plus-mode flow into one persisted save, exclude mode toggles from generic autosave scheduling, and refresh runtime state after the committed mode save lands");
     require(
         ui_source.find("if (enabled && pendingPersistedMode) {") != std::string::npos &&
             ui_source.find("Wait for the mode change to save before enabling transmissions.") != std::string::npos,
