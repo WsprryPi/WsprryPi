@@ -2260,7 +2260,7 @@ int main()
                 "AA0NT",
                 "EM18",
                 WsprPlannerPreference::RequirePaired),
-            "PairedTransmissionRequiresExtendedIdentity",
+            "PairedTransmissionUnavailable",
             "RequirePaired config patch with a plain Type 1 identity");
     }
 

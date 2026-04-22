@@ -1099,7 +1099,7 @@ void print_usage(const std::string &message, int exit_code)
               << "  -o, --offset\n"
               << "    Randomize each WSPR transmission around the selected dial frequency.\n"
               << "  --planner-preference <auto|prefer_paired|require_paired>\n"
-              << "    Select WSPR planning policy. Default: auto.\n"
+              << "    Select WSPR planning policy. prefer_paired uses paired planning when available; require_paired fails if paired planning is unavailable. Default: auto.\n"
               << "  -r, --repeat\n"
               << "    Repeat transmissions continuously in direct CLI mode.\n"
               << "  -x, --terminate <count>\n"
