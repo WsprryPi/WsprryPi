@@ -935,6 +935,97 @@ int main()
     }
 
     {
+        init_default_config();
+        config.mode = ModeType::WSPR;
+        config.qrss.frequency_hz = 0.0;
+        config_to_json();
+
+        require(
+            nearly_equal(jConfig["CW"].at("Base Frequency").get<double>(), 14096900.0),
+            "config_to_json must preserve the canonical CW.Base Frequency default when runtime CW state is unset");
+    }
+
+    for (const auto &[raw_value, expected_hz] : std::vector<std::pair<std::string, double>>{
+             {"14096900", 14096900.0},
+             {"14096900.0", 14096900.0},
+             {"14096900Hz", 14096900.0},
+             {"14096.9kHz", 14096900.0},
+             {"14.0969MHz", 14096900.0},
+             {"0.0140969GHz", 14096900.0},
+             {"  14.0969MHz  ", 14096900.0},
+         })
+    {
+        init_config_json();
+        jConfig["CW"]["Base Frequency"] = raw_value;
+        json_to_config();
+
+        require(
+            nearly_equal(config.qrss.frequency_hz, expected_hz) &&
+                nearly_equal(config.fskcw.space_frequency_hz, expected_hz) &&
+                nearly_equal(config.dfcw.dot_frequency_hz, expected_hz),
+            "CW.Base Frequency string forms must normalize to the expected Hz value");
+
+        config_to_json();
+        require(
+            nearly_equal(jConfig["CW"].at("Base Frequency").get<double>(), expected_hz),
+            "normalized CW.Base Frequency must round-trip back to canonical numeric Hz");
+    }
+
+    for (const std::string &raw_value : {
+             std::string("14.0969"),
+             std::string("14096900xb"),
+             std::string("14.0969m"),
+             std::string("14..0969MHz"),
+         })
+    {
+        init_config_json();
+        jConfig["CW"]["Base Frequency"] = raw_value;
+
+        bool threw = false;
+        try
+        {
+            json_to_config();
+        }
+        catch (const std::runtime_error &)
+        {
+            threw = true;
+        }
+
+        require(
+            threw,
+            "invalid CW.Base Frequency string forms must be rejected during backend normalization");
+    }
+
+    {
+        init_default_config();
+        config.use_ini = true;
+        config.ini_filename = "/tmp/cw_base_frequency_units.ini";
+        write_text_file(
+            config.ini_filename,
+            "[Meta]\nUse INI=true\nDate Time Log=false\ndebug_logging=false\nLoop TX=false\nTX Iterations=0\n"
+            "[Operation]\nMode=QRSS\nTransmit=false\nTransmit Backend=gpio\nUse LED=false\nLED Pin=-1\nWeb Port=31415\nSocket Port=31416\nUse Shutdown=false\nShutdown Button=-1\n"
+            "[GPIO]\nTransmit Pin=4\nPower Level=7\nUse NTP=false\n"
+            "[Calibration]\nPPM=0\n"
+            "[Si5351]\nI2C Bus=1\nI2C Address=96\nReference Frequency=27000000\nTX Output=CLK0\nPower Level=1\n"
+            "[WSPR]\nCall Sign=AA0NT\nGrid Square=EM18\nTX Power=20\nFrequency=20m\nPlanner Preference=auto\nUse Random Offset=false\n"
+            "[CW]\nMessage=CQ\nBase Frequency= 14.0969MHz \nShift Hz=5\nDot Seconds=3.0\nIntra Element Gap=1.0\nInter Character Gap=3.0\nInter Word Gap=7.0\nFade Shape=none\nFade In Ms=0\nFade Out Ms=0\nFade Slice Ms=5\nStart Minute=0\nRepeat Minutes=10\n");
+        iniFile.set_filename(config.ini_filename);
+
+        std::string load_error;
+        require(
+            load_json(config.ini_filename, &load_error, nullptr),
+            "load_json must accept unit-qualified CW.Base Frequency values from INI");
+        require(
+            nearly_equal(config.qrss.frequency_hz, 14096900.0),
+            "INI-backed CW.Base Frequency values must normalize to numeric Hz");
+
+        config_to_json();
+        require(
+            nearly_equal(jConfig["CW"].at("Base Frequency").get<double>(), 14096900.0),
+            "INI-backed CW.Base Frequency values must round-trip through JSON as numeric Hz");
+    }
+
+    {
         prime_valid_runtime_identity_config();
         config.use_ini = true;
         config.enable_web = true;

@@ -140,7 +140,7 @@ int main()
             ui_source.find("payloadJson === lastSavedConfigPayload") != std::string::npos &&
             ui_source.find("payloadJson === lastFailedConfigPayload") != std::string::npos &&
             ui_source.find("Suppressing autosave retry for unchanged rejected payload.") != std::string::npos &&
-            ui_source.find("setConfigSaveStatus(\"saved\", \"Saved\");") != std::string::npos &&
+            ui_source.find("setConfigSaveStatus(\"saved\", \"Saved\", \"\");") != std::string::npos &&
             ui_source.find("configAutosavePendingAfterFlight") != std::string::npos,
         "configuration autosave must debounce saves, clear stale invalid state for already-saved payloads, suppress unchanged failed payload retries, and suppress duplicate writes");
     require(
@@ -150,10 +150,10 @@ int main()
             ui_source.find("function validateCwRepeatMinutes()") != std::string::npos &&
             ui_source.find("function validatePositiveCwField(fieldId, errorMessage)") != std::string::npos &&
             ui_source.find("function parseFrequencyWithOptionalUnits(rawValue)") != std::string::npos &&
-            ui_source.find("Enter a positive CW base frequency.") != std::string::npos &&
+            ui_source.find("Enter CW base frequency as whole-number Hz or as a value with Hz, kHz, MHz, or GHz.") != std::string::npos &&
             ui_source.find("Enter a positive CW dot length.") != std::string::npos &&
             ui_source.find("CW message is required.") != std::string::npos &&
-            ui_source.find("Enter a positive CW frequency offset.") != std::string::npos &&
+            ui_source.find("Enter a whole-number CW frequency offset in Hz.") != std::string::npos &&
             ui_source.find("Enter a repeat interval of at least 1 minute.") != std::string::npos &&
             ui_source.find("Enter a positive CW intra-element gap.") != std::string::npos &&
             ui_source.find("Enter a positive CW inter-character gap.") != std::string::npos &&
@@ -167,11 +167,14 @@ int main()
             ui_source.find("\"Inter Character Gap\": cw_inter_character_gap") != std::string::npos &&
             ui_source.find("\"Inter Word Gap\": cw_inter_word_gap") != std::string::npos &&
             ui_source.find("let cw_base_frequency = parseFloat($('#qrss_frequency').val());") == std::string::npos &&
-            ui_source.find("return value * 1e6;") != std::string::npos &&
-            ui_source.find("return value * 1e3;") != std::string::npos &&
-            ui_source.find("return value * 1e9;") != std::string::npos &&
-            ui_source.find("const value = parseFrequencyWithOptionalUnits(raw);") != std::string::npos,
-        "CW autosave validation and save-path serialization must share unit-aware base-frequency parsing and reject parseFloat-based truncation");
+            ui_source.find("normalizedValue = value * 1e6;") != std::string::npos &&
+            ui_source.find("normalizedValue = value * 1e3;") != std::string::npos &&
+            ui_source.find("normalizedValue = value * 1e9;") != std::string::npos &&
+            ui_source.find("const value = parseFrequencyWithOptionalUnits(raw);") != std::string::npos &&
+            ui_source.find("if (!unit && numericPart.includes(\".\"))") != std::string::npos &&
+            ui_source.find("const roundedValue = Math.round(normalizedValue);") != std::string::npos &&
+            ui_source.find("Math.abs(normalizedValue - roundedValue) > 1e-6") != std::string::npos,
+        "CW autosave validation and save-path serialization must share unit-aware base-frequency parsing, reject parseFloat-based truncation, and require explicit units for decimal inputs");
     require(
         ui_source.find("function splitWsprFrequencyTokens(raw)") != std::string::npos &&
             ui_source.find("function validateWsprFrequencyToken(token)") != std::string::npos &&
@@ -373,7 +376,10 @@ int main()
         "configuration view must keep CW fade settings hidden from the normal UI");
     require(
         config_view_source.find("id=\"qrss_frequency\"") != std::string::npos &&
-            config_view_source.find("value=\"14096900.0\"") != std::string::npos,
+            config_view_source.find("value=\"14096900\"") != std::string::npos &&
+            config_view_source.find("14.0969MHz") != std::string::npos &&
+            config_view_source.find("14096.9kHz") != std::string::npos &&
+            config_view_source.find("0.0140969GHz") != std::string::npos,
         "configuration view must default CW base frequency markup to 14096900 Hz");
     require(
         config_view_source.find("id=\"band-gpio-enabled-all\"") != std::string::npos &&

@@ -232,6 +232,144 @@ namespace
         return clamped_ppm;
     }
 
+    double parse_cw_base_frequency_value(
+        const nlohmann::json &source,
+        const std::string &context)
+    {
+        auto normalize_frequency_hz = [&](double value) -> double
+        {
+            if (!std::isfinite(value) || value <= 0.0)
+            {
+                throw std::runtime_error(
+                    context +
+                    " must be a positive whole-number Hz value or a value with Hz, kHz, MHz, or GHz.");
+            }
+
+            const double rounded = std::round(value);
+            if (std::fabs(value - rounded) > 1e-6)
+            {
+                throw std::runtime_error(
+                    context +
+                    " must resolve to a whole-number frequency in Hz.");
+            }
+
+            return rounded;
+        };
+
+        if (source.is_number())
+        {
+            return normalize_frequency_hz(source.get<double>());
+        }
+
+        if (source.is_string())
+        {
+            const std::string raw = trim_copy(source.get<std::string>());
+            if (raw.empty())
+            {
+                throw std::runtime_error(
+                    context +
+                    " must be a whole-number Hz value or a value with Hz, kHz, MHz, or GHz.");
+            }
+
+            const std::size_t unit_start = raw.find_first_not_of("0123456789.");
+            const std::string numeric_part =
+                unit_start == std::string::npos ? raw : raw.substr(0, unit_start);
+            const std::string unit_part =
+                unit_start == std::string::npos ? std::string() : trim_copy(raw.substr(unit_start));
+
+            if (numeric_part.empty())
+            {
+                throw std::runtime_error(
+                    context +
+                    " must start with a numeric frequency value.");
+            }
+
+            double value = 0.0;
+            std::size_t consumed = 0;
+            try
+            {
+                value = std::stod(numeric_part, &consumed);
+            }
+            catch (const std::invalid_argument &)
+            {
+                throw std::runtime_error(
+                    context +
+                    " must be a whole-number Hz value or a value with Hz, kHz, MHz, or GHz.");
+            }
+            catch (const std::out_of_range &)
+            {
+                throw std::runtime_error(context + " is out of range.");
+            }
+
+            if (consumed != numeric_part.size())
+            {
+                throw std::runtime_error(
+                    context +
+                    " must be a whole-number Hz value or a value with Hz, kHz, MHz, or GHz.");
+            }
+
+            std::string lowered_unit = unit_part;
+            std::transform(
+                lowered_unit.begin(),
+                lowered_unit.end(),
+                lowered_unit.begin(),
+                [](unsigned char c)
+                {
+                    return static_cast<char>(std::tolower(c));
+                });
+
+            if (lowered_unit.empty())
+            {
+                if (numeric_part.find('.') != std::string::npos)
+                {
+                    const std::size_t decimal_point = numeric_part.find('.');
+                    const std::string fractional_part = numeric_part.substr(decimal_point + 1);
+                    const bool zero_fraction =
+                        !fractional_part.empty() &&
+                        std::all_of(
+                            fractional_part.begin(),
+                            fractional_part.end(),
+                            [](char c)
+                            {
+                                return c == '0';
+                            });
+                    if (!zero_fraction)
+                    {
+                        throw std::runtime_error(
+                            context +
+                            " must use Hz, kHz, MHz, or GHz when the value includes a decimal point.");
+                    }
+                }
+                return normalize_frequency_hz(value);
+            }
+
+            if (lowered_unit == "ghz")
+            {
+                value *= 1e9;
+            }
+            else if (lowered_unit == "mhz")
+            {
+                value *= 1e6;
+            }
+            else if (lowered_unit == "khz")
+            {
+                value *= 1e3;
+            }
+            else if (lowered_unit != "hz")
+            {
+                throw std::runtime_error(
+                    context +
+                    " must use a supported unit suffix: Hz, kHz, MHz, or GHz.");
+            }
+
+            return normalize_frequency_hz(value);
+        }
+
+        throw std::runtime_error(
+            context +
+            " must be a whole-number Hz value or a value with Hz, kHz, MHz, or GHz.");
+    }
+
     int parse_si5351_tx_output(const nlohmann::json &source)
     {
         if (source.is_number_integer() || source.is_number_unsigned())
@@ -1276,7 +1414,9 @@ namespace
         const std::string cw_message =
             trim_copy(cw.value("Message", std::string("")));
         const double cw_base_frequency_hz =
-            cw.value("Base Frequency", 14096900.0);
+            cw.contains("Base Frequency")
+                ? parse_cw_base_frequency_value(cw.at("Base Frequency"), "CW.Base Frequency")
+                : 14096900.0;
         const double cw_shift_hz =
             cw.value("Shift Hz", target.modulation_fsk_offset_hz);
         target.qrss.message =
@@ -1402,6 +1542,10 @@ namespace
             cw_base_frequency_hz = source.dfcw.dot_frequency_hz;
             cw_shift_hz =
                 source.dfcw.dash_frequency_hz - source.dfcw.dot_frequency_hz;
+        }
+        if (!std::isfinite(cw_base_frequency_hz) || cw_base_frequency_hz <= 0.0)
+        {
+            cw_base_frequency_hz = 14096900.0;
         }
         target["CW"]["Message"] = cw_message;
         target["CW"]["Base Frequency"] = cw_base_frequency_hz;
