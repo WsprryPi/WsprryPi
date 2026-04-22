@@ -200,6 +200,12 @@ int main()
     require(
         ui_source.find("syncBandGpioColumnHeaderStates();\n    validateBandGpioFields();") != std::string::npos,
         "Band GPIO header state must be recomputed when row state changes");
+    require(
+        ui_source.find("Paired planning requires a compound callsign and 6-character locator.") != std::string::npos &&
+            ui_source.find("detailActionLabel: \"More\"") != std::string::npos &&
+            ui_source.find("title: \"Setup details\"") != std::string::npos &&
+            ui_source.find("preserveLineBreaks: true") != std::string::npos,
+        "paired planning save failures must collapse to a short setup-card message with a More dialog trigger that preserves full diagnostic line breaks");
 
     const std::string site_source =
         read_text_file("/home/pi/WsprryPi/WsprryPi-UI/data/site.js");
@@ -269,6 +275,10 @@ int main()
             site_source.find("window.localStorage.setItem(storageKey, selector);") != std::string::npos &&
             site_source.find("restorePersistedTabState(tabList);") != std::string::npos,
         "site.js must support reload-scoped persisted Bootstrap tab state through localStorage");
+    require(
+        site_source.find("confirm-modal-body--preformatted") != std::string::npos &&
+            site_source.find("preserveLineBreaks = options.preserveLineBreaks === true") != std::string::npos,
+        "shared confirm modal must support preserving diagnostic line breaks for detail dialogs");
 
     const std::string config_view_source =
         read_text_file("/home/pi/WsprryPi/WsprryPi-UI/data/views/config.php");
