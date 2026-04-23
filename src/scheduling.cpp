@@ -2763,7 +2763,7 @@ void shutdown_system()
 void reboot_system()
 {
     reboot_flag.store(true, std::memory_order_relaxed);
-    request_wspr_shutdown("system reboot requested");
+    request_wspr_shutdown("System reboot requested");
 
     if (config.use_led)
     {
