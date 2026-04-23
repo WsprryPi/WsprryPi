@@ -120,6 +120,7 @@ GPIO_LOOPBACK_TEST_OUT := gpio_loopback_test
 BAND_GPIO_LIVE_MONITOR_OUT := band_gpio_live_monitor
 GPIO_LINE_RESOLVER_TEST_OUT := gpio_line_resolver_test
 NON_WSPR_REPEAT_POLICY_TEST_OUT := non_wspr_repeat_policy_test
+QRSS_EXECUTION_REGRESSION_TEST_OUT := qrss_execution_regression_test
 SELECTOR_SHUTDOWN_CLEANUP_TEST_OUT := selector_shutdown_cleanup_test
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -179,6 +180,9 @@ GPIO_LINE_RESOLVER_TEST_DEPS := \
 NON_WSPR_REPEAT_POLICY_TEST_SRC := tests/non_wspr_repeat_policy_test.cpp
 NON_WSPR_REPEAT_POLICY_TEST_OBJ := $(OBJ_DIR_DEBUG)/tests/non_wspr_repeat_policy_test.o
 NON_WSPR_REPEAT_POLICY_TEST_DEPS := $(filter-out $(MAIN_DEBUG_OBJECT),$(CPP_DEBUG_OBJECTS))
+QRSS_EXECUTION_REGRESSION_TEST_SRC := tests/qrss_execution_regression_test.cpp
+QRSS_EXECUTION_REGRESSION_TEST_OBJ := $(OBJ_DIR_DEBUG)/tests/qrss_execution_regression_test.o
+QRSS_EXECUTION_REGRESSION_TEST_DEPS := $(filter-out $(MAIN_DEBUG_OBJECT),$(CPP_DEBUG_OBJECTS))
 SELECTOR_SHUTDOWN_CLEANUP_TEST_SRC := tests/selector_shutdown_cleanup_test.cpp
 SELECTOR_SHUTDOWN_CLEANUP_TEST_OBJ := $(OBJ_DIR_DEBUG)/tests/selector_shutdown_cleanup_test.o
 SELECTOR_SHUTDOWN_CLEANUP_TEST_DEPS := $(filter-out $(MAIN_DEBUG_OBJECT),$(CPP_DEBUG_OBJECTS))
@@ -450,6 +454,17 @@ $(NON_WSPR_REPEAT_POLICY_TEST_OBJ): $(NON_WSPR_REPEAT_POLICY_TEST_SRC)
 $(BIN_DIR)/$(NON_WSPR_REPEAT_POLICY_TEST_OUT): $(NON_WSPR_REPEAT_POLICY_TEST_OBJ) $(NON_WSPR_REPEAT_POLICY_TEST_DEPS)
 	$(Q)mkdir -p $(BIN_DIR)
 	$(Q)echo "Linking debug: $(NON_WSPR_REPEAT_POLICY_TEST_OUT)"
+	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) $^ -o $@ $(LDFLAGS)
+
+$(QRSS_EXECUTION_REGRESSION_TEST_OBJ): $(QRSS_EXECUTION_REGRESSION_TEST_SRC)
+	$(Q)mkdir -p $(dir $@)
+	$(Q)mkdir -p $(DEP_DIR)/tests
+	$(Q)echo "Compiling (debug) $< into $@"
+	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -MF $(DEP_DIR)/tests/qrss_execution_regression_test.d -c $< -o $@
+
+$(BIN_DIR)/$(QRSS_EXECUTION_REGRESSION_TEST_OUT): $(QRSS_EXECUTION_REGRESSION_TEST_OBJ) $(QRSS_EXECUTION_REGRESSION_TEST_DEPS)
+	$(Q)mkdir -p $(BIN_DIR)
+	$(Q)echo "Linking debug: $(QRSS_EXECUTION_REGRESSION_TEST_OUT)"
 	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) $^ -o $@ $(LDFLAGS)
 
 $(SELECTOR_SHUTDOWN_CLEANUP_TEST_OBJ): $(SELECTOR_SHUTDOWN_CLEANUP_TEST_SRC)
