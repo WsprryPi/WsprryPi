@@ -66,6 +66,7 @@ debug issues efficiently.
 - `src/band_gpio*.cpp` --- Band GPIO handling
 
 Responsibilities:
+
 - Config reloads
 - Frequency selection
 - WSPR planning
@@ -79,6 +80,7 @@ Responsibilities:
 - `WSPR-Transmitter/src/wspr_transmit_types.hpp`
 
 Defines:
+
 - `WsprTransmissionRequest`
 - Transmission plan structures
 
@@ -93,6 +95,7 @@ This is the commit boundary contract between scheduler and backend.
 - `Mailbox/src/mailbox.cpp` --- Low-level Pi interaction
 
 Responsibilities:
+
 - Consume committed request
 - Generate signals
 - Handle timing and hardware
@@ -107,6 +110,7 @@ Responsibilities:
 - `WSPR-Reference/src/wspr/wspr_ref_decoder.cpp` --- Decoding
 
 Purpose:
+
 - Clean separation of WSPR protocol logic
 - Prevent leakage into scheduler/backend
 
@@ -118,6 +122,7 @@ Purpose:
 - `PPM-Manager/src/ppm_manager.cpp` --- Implementation
 
 Key concept:
+
 - Scheduler snapshots PPM into request
 - Backend must NOT re-fetch PPM
 
@@ -178,6 +183,7 @@ components that form the runtime system.
 - `src/tests/dial_frequency_semantics_test.cpp`
 
 Validates:
+
 - Dial vs RF frequency semantics
 - Scheduler commit correctness
 - PPM commit behavior
@@ -198,6 +204,7 @@ No bypass paths are allowed.
 ### 2. Immutable Execution Snapshot
 
 Once committed:
+
 - Request must not change
 - Backend must not re-derive values
 - Backend must not fetch external state (e.g., PPM)
@@ -205,6 +212,7 @@ Once committed:
 ### 3. Scheduler Owns All Policy
 
 Scheduler decides:
+
 - What to transmit
 - When to transmit
 - With what parameters

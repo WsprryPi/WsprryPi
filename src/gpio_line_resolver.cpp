@@ -304,8 +304,8 @@ namespace
         const int named_offset = chip.get_line_offset_from_name(expected_name);
         if (named_offset >= 0)
         {
-            resolved_line.offset =
-                gpiod::line::offset(static_cast<unsigned int>(named_offset));
+            resolved_line.offset = gpio_line_offset(
+                static_cast<unsigned int>(named_offset));
             resolved_line.resolved_by_name = true;
             resolved_line.kernel_name = expected_name;
             used_offset_fallback = false;
@@ -317,8 +317,7 @@ namespace
             return false;
         }
 
-        resolved_line.offset =
-            gpiod::line::offset(static_cast<unsigned int>(bcm));
+        resolved_line.offset = gpio_line_offset(static_cast<unsigned int>(bcm));
         resolved_line.resolved_by_name = false;
         try
         {
@@ -355,8 +354,7 @@ namespace
             return false;
         }
 
-        resolved_line.offset =
-            gpiod::line::offset(static_cast<unsigned int>(bcm));
+        resolved_line.offset = gpio_line_offset(static_cast<unsigned int>(bcm));
         resolved_line.resolved_by_name = false;
         resolved_line.kernel_name.clear();
         used_offset_fallback = true;

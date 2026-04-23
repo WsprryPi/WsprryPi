@@ -92,7 +92,7 @@ int main(int argc, char **argv)
             gpio_test::resolve_chip_and_lines(bcm_lines, chip_arg);
         gpio_test::print_selected_chip(selected);
 
-        std::vector<gpiod::line::offset> input_offsets;
+        std::vector<GpioLineOffset> input_offsets;
         input_offsets.reserve(selected.lines.size());
         for (const auto &line : selected.lines)
         {
