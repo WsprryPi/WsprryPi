@@ -3456,6 +3456,19 @@ static std::string runtime_mode_to_string(
     }
 }
 
+static double first_configured_wspr_dial_frequency_hz() noexcept
+{
+    for (const WsprFrequencyEntry &entry : config.wspr_frequency_entries)
+    {
+        if (entry.dial_frequency_hz > 0.0)
+        {
+            return entry.dial_frequency_hz;
+        }
+    }
+
+    return 0.0;
+}
+
 WsprRuntimeStatusSnapshot current_tx_runtime_status_snapshot()
 {
     std::lock_guard<std::mutex> lk(set_config_mtx);
@@ -3474,6 +3487,36 @@ WsprRuntimeStatusSnapshot current_tx_runtime_status_snapshot()
     }
     snapshot.cw_message = runtime_status.cw_message;
     snapshot.cw_active_char_index = runtime_status.cw_active_char_index;
+
+    if (config.mode == ModeType::WSPR)
+    {
+        snapshot.frequency_hz = current_transmission_request.dial_frequency_hz;
+        if (snapshot.frequency_hz <= 0.0)
+        {
+            snapshot.frequency_hz = current_dial_frequency;
+        }
+        if (snapshot.frequency_hz <= 0.0)
+        {
+            snapshot.frequency_hz = first_configured_wspr_dial_frequency_hz();
+        }
+        snapshot.offset_hz = current_transmission_request.applied_offset_hz;
+    }
+    else if (config.mode == ModeType::QRSS)
+    {
+        snapshot.frequency_hz = config.qrss.frequency_hz;
+    }
+    else if (config.mode == ModeType::FSKCW)
+    {
+        snapshot.frequency_hz = config.fskcw.space_frequency_hz;
+        snapshot.offset_hz =
+            config.fskcw.mark_frequency_hz - config.fskcw.space_frequency_hz;
+    }
+    else if (config.mode == ModeType::DFCW)
+    {
+        snapshot.frequency_hz = config.dfcw.dot_frequency_hz;
+        snapshot.offset_hz =
+            config.dfcw.dash_frequency_hz - config.dfcw.dot_frequency_hz;
+    }
 
     if (is_non_wspr_runtime_mode(config.mode) &&
         runtime_transmit_enabled(config) &&

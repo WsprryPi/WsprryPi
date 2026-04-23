@@ -239,10 +239,16 @@ int main()
     require(
         site_source.find("runtime_mode") != std::string::npos &&
             site_source.find("nextTransmissionAt") != std::string::npos &&
+            site_source.find("frequencyHz") != std::string::npos &&
+            site_source.find("offsetHz") != std::string::npos &&
             site_source.find("cw_message") != std::string::npos &&
             site_source.find("cw_active_char_index") != std::string::npos &&
             site_source.find("if (typeof handleRuntimeStatusUpdate === \"function\") {") != std::string::npos &&
             site_source.find("const selectedMode =\n        typeof selectedConfigMode === \"function\" ? selectedConfigMode() : \"\";") != std::string::npos &&
+            site_source.find("renderRuntimeFrequencyPane(frequencyNode, currentMode, currentRuntimeStatus);") != std::string::npos &&
+            site_source.find("function buildRuntimeFrequencyItems(currentMode, status)") != std::string::npos &&
+            site_source.find("function formatDisplayFrequency(valueHz, options = {})") != std::string::npos &&
+            site_source.find("forceUnit: \"Hz\"") != std::string::npos &&
             site_source.find("function renderCwRuntimeMessage(node, message, activeCharIndex)") != std::string::npos &&
             site_source.find("const isTransmitting =") != std::string::npos &&
             site_source.find("const transmitEnabled =") != std::string::npos &&
@@ -256,14 +262,21 @@ int main()
         "runtime status handling must switch CW runtime detail between next-transmission timing and live message progression without underscore substitution");
     require(
         scheduling_source.find("snapshot.next_transmission_at") != std::string::npos &&
+            scheduling_source.find("snapshot.frequency_hz = current_transmission_request.dial_frequency_hz;") != std::string::npos &&
+            scheduling_source.find("snapshot.offset_hz = current_transmission_request.applied_offset_hz;") != std::string::npos &&
+            scheduling_source.find("snapshot.frequency_hz = config.qrss.frequency_hz;") != std::string::npos &&
+            scheduling_source.find("snapshot.frequency_hz = config.fskcw.space_frequency_hz;") != std::string::npos &&
+            scheduling_source.find("snapshot.frequency_hz = config.dfcw.dot_frequency_hz;") != std::string::npos &&
             websocket_source.find("reply[\"next_transmission_at\"] = snapshot.next_transmission_at;") != std::string::npos &&
+            websocket_source.find("reply[\"frequency_hz\"] = snapshot.frequency_hz;") != std::string::npos &&
+            websocket_source.find("reply[\"offset_hz\"] = snapshot.offset_hz;") != std::string::npos &&
             scheduling_source.find("if (snapshot.tx_state == \"transmitting\")") != std::string::npos &&
             scheduling_source.find("snapshot.runtime_mode = mode_type_name(config.mode);") != std::string::npos &&
             scheduling_source.find("runtime_transmit_enabled(config)") != std::string::npos &&
             scheduling_source.find("if (config.mode != ModeType::WSPR ||\n        current_transmission_request.mode != TransmissionMode::WSPR ||") != std::string::npos &&
             scheduling_source.find("snapshot.runtime_mode == mode_type_name(config.mode)") == std::string::npos &&
             scheduling_source.find("if (runtime_status.mode != wsprrypi::TransmissionMode::WSPR ||\n        current_transmission_request.mode != TransmissionMode::WSPR ||") == std::string::npos,
-        "runtime snapshot must expose next_transmission_at for CW display only when transmissions are actually enabled, follow the committed scheduler mode while idle instead of stale backend execution state, suppress stale WSPR plan data after mode changes, expose committed idle WSPR plan data without requiring runtime mode to already be WSPR, and expose CW next-transmission timing without requiring the transmitter runtime mode string to match first");
+        "runtime snapshot must expose active frequency fields alongside next_transmission_at, follow the committed scheduler mode while idle instead of stale backend execution state, suppress stale WSPR plan data after mode changes, expose committed idle WSPR plan data without requiring runtime mode to already be WSPR, and expose CW next-transmission timing without requiring the transmitter runtime mode string to match first");
     require(
         site_source.find("const TAB_STATE_STORAGE_PREFIX = \"wsprrypi.activeTab\";") != std::string::npos &&
             site_source.find("function shouldRestorePersistedTabState(tabList)") != std::string::npos &&
@@ -293,6 +306,25 @@ int main()
             config_view_source.find("id=\"modeChangeGuardModal\"") != std::string::npos &&
             config_view_source.find("id=\"modeChangeGuardConfirmBtn\"") != std::string::npos,
         "Runtime state header must host the primary Transmit enabled control and the config view must expose the guarded mode-change confirmation modal");
+
+    const std::string operation_view_source =
+        read_text_file("/home/pi/WsprryPi/WsprryPi-UI/data/views/operation.php");
+    require(
+        operation_view_source.find("id=\"runtime_mode_value\"") != std::string::npos &&
+            operation_view_source.find("id=\"runtime_frequency_value\"") != std::string::npos &&
+            operation_view_source.find("id=\"runtime_plan_label\"") != std::string::npos &&
+            operation_view_source.find("<div class=\"operation-panel__label\">Frequency</div>") != std::string::npos,
+        "Operation view must place the Frequency pane between the Current mode and mode-specific runtime panes");
+
+    const std::string operation_css_source =
+        read_text_file("/home/pi/WsprryPi/WsprryPi-UI/data/operation.css");
+    require(
+        operation_css_source.find("grid-template-columns: minmax(0, 0.85fr) minmax(0, 1fr) minmax(0, 1.25fr);") != std::string::npos &&
+            operation_css_source.find(".operation-panel__stack") != std::string::npos &&
+            operation_css_source.find(".operation-panel__item-label") != std::string::npos &&
+            operation_css_source.find(".operation-panel__item-value") != std::string::npos &&
+            operation_css_source.find(".operation-panel--wide {\n        grid-column: 1 / -1;") != std::string::npos,
+        "Operation page styles must support the native Frequency pane and preserve responsive summary-grid layout");
     require(
         config_view_source.find("config-runtime-item config-runtime-item--action") == std::string::npos,
         "Runtime state grid must no longer dedicate a large action tile to Stop transmission");
