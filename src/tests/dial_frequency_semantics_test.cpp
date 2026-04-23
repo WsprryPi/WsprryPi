@@ -2298,11 +2298,33 @@ int main()
         {
             const WsprRuntimeStatusSnapshot snapshot =
                 current_tx_runtime_status_snapshot();
+            const TransmissionRequest request =
+                current_transmission_request_for_test();
             require(
                 snapshot.plan_type == "Type2Type3Paired" &&
                     snapshot.frame_count == 2U &&
                     snapshot.current_frame == 1U,
                 "paired runtime snapshot must expose first-frame progress");
+            require(
+                request.payload.frames.size() == 1U &&
+                    request.payload.current_frame == 1U &&
+                    request.payload.total_frame_count == 1U,
+                "paired first-slot request must carry a self-consistent slot-scoped payload");
+            wsprrypi::TransmissionRequest controller_request;
+            controller_request.mode = wsprrypi::TransmissionMode::WSPR;
+            controller_request.output.backend = wsprrypi::BackendKind::SI5351;
+            controller_request.output.output = wsprrypi::ClockSource::SI5351_CLK0;
+            controller_request.output.gpio = request.tx_gpio;
+            controller_request.calibration.ppm = request.ppm;
+            wsprrypi::WsprPayload first_payload;
+            first_payload.prepared = request.payload;
+            first_payload.base_frequency_hz = request.actual_rf_frequency_hz;
+            controller_request.payload = first_payload;
+            const wsprrypi::ExecutionPlan first_frame_plan =
+                wsprrypi::ExecutionPlanCompiler{}.compile(controller_request);
+            require(
+                first_frame_plan.events.size() == WSPR_SYMBOL_COUNT,
+                "paired first-slot request must compile into one WSPR frame");
             require(
                 snapshot.callsign_normalized == "AA0NT/12" &&
                     snapshot.locator_normalized == "EM18IG" &&
@@ -2320,11 +2342,33 @@ int main()
         {
             const WsprRuntimeStatusSnapshot snapshot =
                 current_tx_runtime_status_snapshot();
+            const TransmissionRequest request =
+                current_transmission_request_for_test();
             require(
                 snapshot.plan_type == "Type2Type3Paired" &&
                     snapshot.frame_count == 2U &&
                     snapshot.current_frame == 2U,
                 "paired runtime snapshot must advance to the second frame after completion");
+            require(
+                request.payload.frames.size() == 1U &&
+                    request.payload.current_frame == 1U &&
+                    request.payload.total_frame_count == 1U,
+                "paired second-slot request must remain slot-local while scheduler runtime status tracks overall paired progress");
+            wsprrypi::TransmissionRequest controller_request;
+            controller_request.mode = wsprrypi::TransmissionMode::WSPR;
+            controller_request.output.backend = wsprrypi::BackendKind::SI5351;
+            controller_request.output.output = wsprrypi::ClockSource::SI5351_CLK0;
+            controller_request.output.gpio = request.tx_gpio;
+            controller_request.calibration.ppm = request.ppm;
+            wsprrypi::WsprPayload second_payload;
+            second_payload.prepared = request.payload;
+            second_payload.base_frequency_hz = request.actual_rf_frequency_hz;
+            controller_request.payload = second_payload;
+            const wsprrypi::ExecutionPlan second_frame_plan =
+                wsprrypi::ExecutionPlanCompiler{}.compile(controller_request);
+            require(
+                second_frame_plan.events.size() == WSPR_SYMBOL_COUNT,
+                "paired second-slot request must compile into one WSPR frame without crashing");
             require(
                 snapshot.callsign_normalized == "AA0NT/12" &&
                     snapshot.locator_normalized == "EM18IG" &&

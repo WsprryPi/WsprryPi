@@ -1228,11 +1228,8 @@ static PreparedWsprTransmission slot_plan_for_frame(
     slot_plan.locator_raw = plan.locator_raw;
     slot_plan.callsign_normalized = plan.callsign_normalized;
     slot_plan.locator_normalized = plan.locator_normalized;
-    slot_plan.frame_callsigns = plan.frame_callsigns;
-    slot_plan.frame_locators = plan.frame_locators;
-    slot_plan.total_frame_count =
-        plan.total_frame_count != 0U ? plan.total_frame_count : plan.frameCount();
-    slot_plan.current_frame = frame_index + 1U;
+    slot_plan.total_frame_count = 1U;
+    slot_plan.current_frame = 1U;
     if (frame_index < plan.frame_callsigns.size())
     {
         slot_plan.frame_callsign = plan.frame_callsigns.at(frame_index);
@@ -3495,15 +3492,45 @@ WsprRuntimeStatusSnapshot current_tx_runtime_status_snapshot()
 
     const PreparedWsprTransmission &plan = current_transmission_request.payload;
     snapshot.plan_type = plan.plan_type;
-    snapshot.frame_count =
-        plan.total_frame_count != 0U ? plan.total_frame_count : plan.frameCount();
-    snapshot.current_frame = plan.current_frame;
     snapshot.callsign_raw = plan.callsign_raw;
     snapshot.callsign_normalized =
         !plan.callsign_normalized.empty() ? plan.callsign_normalized : plan.callsign;
     snapshot.locator_raw = plan.locator_raw;
     snapshot.locator_normalized =
         !plan.locator_normalized.empty() ? plan.locator_normalized : plan.locator;
+
+    if (active_wspr_plan_in_progress && !active_wspr_plan.empty())
+    {
+        const PreparedWsprTransmission &active_plan = active_wspr_plan;
+        snapshot.frame_count =
+            active_plan.total_frame_count != 0U
+                ? active_plan.total_frame_count
+                : active_plan.frameCount();
+        snapshot.current_frame = active_wspr_frame_index + 1U;
+        if (active_wspr_frame_index < active_plan.frame_callsigns.size())
+        {
+            snapshot.frame_callsign =
+                active_plan.frame_callsigns.at(active_wspr_frame_index);
+        }
+        else
+        {
+            snapshot.frame_callsign = snapshot.callsign_normalized;
+        }
+        if (active_wspr_frame_index < active_plan.frame_locators.size())
+        {
+            snapshot.frame_locator =
+                active_plan.frame_locators.at(active_wspr_frame_index);
+        }
+        else
+        {
+            snapshot.frame_locator = snapshot.locator_normalized;
+        }
+        return snapshot;
+    }
+
+    snapshot.frame_count =
+        plan.total_frame_count != 0U ? plan.total_frame_count : plan.frameCount();
+    snapshot.current_frame = plan.current_frame;
     snapshot.frame_callsign =
         !plan.frame_callsign.empty() ? plan.frame_callsign : snapshot.callsign_normalized;
     snapshot.frame_locator =
