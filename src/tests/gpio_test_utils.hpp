@@ -27,7 +27,7 @@ namespace gpio_test
     struct LineResolution
     {
         int bcm = -1;
-        gpiod::line::offset offset{};
+        GpioLineOffset offset{};
         bool resolved_by_name = false;
         std::string kernel_name;
     };
@@ -166,7 +166,7 @@ namespace gpio_test
         {
             return LineResolution{
                 bcm,
-                gpiod::line::offset(static_cast<unsigned int>(named_offset)),
+                gpio_line_offset(static_cast<unsigned int>(named_offset)),
                 true,
                 expected_name};
         }
@@ -184,7 +184,7 @@ namespace gpio_test
         try
         {
             kernel_name = chip.get_line_info(
-                                  gpiod::line::offset(
+                                  gpio_line_offset(
                                       static_cast<unsigned int>(bcm)))
                               .name();
         }
@@ -195,7 +195,7 @@ namespace gpio_test
 
         return LineResolution{
             bcm,
-            gpiod::line::offset(static_cast<unsigned int>(bcm)),
+            gpio_line_offset(static_cast<unsigned int>(bcm)),
             false,
             kernel_name};
     }

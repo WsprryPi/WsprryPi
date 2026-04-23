@@ -60,7 +60,7 @@ namespace
     }
 
     void ensure_unique_offsets(
-        const std::vector<gpiod::line::offset> &offsets,
+        const std::vector<GpioLineOffset> &offsets,
         const std::string &label)
     {
         std::vector<unsigned int> raw;
@@ -170,8 +170,8 @@ int main(int argc, char **argv)
             print_pair_mapping(pairs[i], output_lines.back(), input_lines.back());
         }
 
-        std::vector<gpiod::line::offset> output_offsets;
-        std::vector<gpiod::line::offset> input_offsets;
+        std::vector<GpioLineOffset> output_offsets;
+        std::vector<GpioLineOffset> input_offsets;
         output_offsets.reserve(output_lines.size());
         input_offsets.reserve(input_lines.size());
         for (const auto &line : output_lines)

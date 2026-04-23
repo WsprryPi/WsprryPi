@@ -161,7 +161,7 @@ bool GPIOOutput::enableGPIOPin(int pin, bool active_high)
 
         auto builder = chip_->prepare_request();
         builder.set_consumer("GPIOOutput"); // separate call: no copy
-        const gpiod::line::offset off = resolved_line_.offset;
+        const GpioLineOffset off = resolved_line_.offset;
         builder.add_line_settings(off, ls);
         request_ = builder.do_request(); // move into optional
 
@@ -295,7 +295,7 @@ bool GPIOOutput::toggleGPIO(bool state)
         int physical = compute_physical_state(state);
 
 #if GPIOD_API_MAJOR >= 2
-        const gpiod::line::offset off = resolved_line_.offset;
+        const GpioLineOffset off = resolved_line_.offset;
         request_->set_value(
             off,
             physical ? gpiod::line::value::ACTIVE : gpiod::line::value::INACTIVE);

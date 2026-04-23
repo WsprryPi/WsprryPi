@@ -161,7 +161,7 @@ bool GPIOInput::enable(int pin,
 
         auto builder = chip_->prepare_request();
         builder.set_consumer("GPIOInput");
-        gpiod::line::offset off = resolved_line_.offset;
+        const GpioLineOffset off = resolved_line_.offset;
         request_ = builder.add_line_settings(off, ls).do_request();
 
         llog.logS(DEBUG,

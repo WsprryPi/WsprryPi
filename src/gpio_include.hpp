@@ -25,6 +25,22 @@
 #  define GPIOD_API_MAJOR 1
 #endif
 
+#if GPIOD_API_MAJOR >= 2
+using GpioLineOffset = gpiod::line::offset;
+
+inline GpioLineOffset gpio_line_offset(unsigned int offset)
+{
+    return gpiod::line::offset(offset);
+}
+#else
+using GpioLineOffset = unsigned int;
+
+inline GpioLineOffset gpio_line_offset(unsigned int offset)
+{
+    return offset;
+}
+#endif
+
 // #ifdef DEBUG_WSPR
 // #  ifndef __PRINTED_GPIOD_VERSION
 // #    define __PRINTED_GPIOD_VERSION 1

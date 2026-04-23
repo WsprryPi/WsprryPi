@@ -27,7 +27,7 @@ namespace
         candidate.bcm = bcm;
         candidate.chip_path = chip_path;
         candidate.backing_device_path = backing_device_path;
-        candidate.offset = gpiod::line::offset(offset);
+        candidate.offset = gpio_line_offset(offset);
         candidate.resolved_by_name = resolved_by_name;
         candidate.kernel_name = resolved_by_name ? ("GPIO" + std::to_string(bcm)) : "";
         return candidate;
