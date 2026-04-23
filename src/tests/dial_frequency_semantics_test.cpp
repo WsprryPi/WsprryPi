@@ -2462,6 +2462,10 @@ int main()
             snapshot.runtime_mode == "QRSS",
             "idle runtime snapshots must report the committed scheduler mode instead of stale backend WSPR execution state");
         require(
+            nearly_equal(snapshot.frequency_hz, 3572000.0) &&
+                snapshot.offset_hz == 0.0,
+            "idle QRSS runtime snapshots must expose the active base frequency without an offset");
+        require(
             snapshot.plan_type.empty() &&
                 snapshot.frame_count == 0U &&
                 snapshot.current_frame == 0U,
@@ -2476,6 +2480,48 @@ int main()
         require(
             !enabled_snapshot.next_transmission_at.empty(),
             "idle CW runtime snapshots must expose the next scheduled message time once transmissions are enabled");
+
+        config.mode = ModeType::FSKCW;
+        config.fskcw.space_frequency_hz = 10140100.0;
+        config.fskcw.mark_frequency_hz = 10140120.0;
+        const WsprRuntimeStatusSnapshot fskcw_snapshot =
+            current_tx_runtime_status_snapshot();
+        require(
+            nearly_equal(fskcw_snapshot.frequency_hz, 10140100.0) &&
+                nearly_equal(fskcw_snapshot.offset_hz, 20.0),
+            "runtime snapshots must expose FSKCW base frequency and offset");
+
+        config.mode = ModeType::DFCW;
+        config.dfcw.dot_frequency_hz = 10140100.0;
+        config.dfcw.dash_frequency_hz = 10140120.0;
+        const WsprRuntimeStatusSnapshot dfcw_snapshot =
+            current_tx_runtime_status_snapshot();
+        require(
+            nearly_equal(dfcw_snapshot.frequency_hz, 10140100.0) &&
+                nearly_equal(dfcw_snapshot.offset_hz, 20.0),
+            "runtime snapshots must expose DFCW base frequency and offset");
+    }
+
+    {
+        prime_valid_runtime_identity_config();
+        reset_runtime_planning_state_for_identity_test();
+        require(
+            set_config(true),
+            "WSPR frequency runtime snapshot regression must plan an initial WSPR request");
+        const WsprRuntimeStatusSnapshot snapshot =
+            current_tx_runtime_status_snapshot();
+        require(
+            snapshot.frequency_hz > 0.0,
+            "runtime snapshots must expose the active WSPR dial frequency");
+        config.transmit = false;
+        current_transmission_request = TransmissionRequest{};
+        current_dial_frequency = 0.0;
+        const WsprRuntimeStatusSnapshot disabled_snapshot =
+            current_tx_runtime_status_snapshot();
+        require(
+            disabled_snapshot.frequency_hz > 0.0,
+            "idle disabled WSPR runtime snapshots must still expose the next configured dial frequency");
+        finish_runtime_planning_state_for_identity_test();
     }
 
     {
