@@ -329,7 +329,10 @@ void callback_ini_changed()
     {
         llog.logS(
             INFO,
-            "INI file changed during transmission; deferring managed reload until the current TX completes (generation ",
+            "INI file changed during transmission.");
+        llog.logS(
+            INFO,
+            "Deferring managed reload until the current TX completes (generation ",
             generation,
             ").");
         return;
@@ -1764,14 +1767,14 @@ void apply_runtime_config_side_effects()
         {
             log_startup_config_message(
                 INFO,
-                "- Transmit Power:",
+                "- GPIO Transmit Power: ",
                 config.gpio_power_level);
         }
         else if (config.transmit_backend == TransmitBackendKind::SI5351)
         {
             log_startup_config_message(
                 INFO,
-                "- Transmit Power:",
+                "- Si5351 Transmit Power: ",
                 config.si5351_power_level);
         }
         return;
@@ -1816,14 +1819,14 @@ void apply_runtime_config_side_effects()
         {
             log_startup_config_message(
                 INFO,
-                "- Transmit Power:",
+                "- GPIO Transmit Power: ",
                 config.gpio_power_level);
         }
         else if (config.transmit_backend == TransmitBackendKind::SI5351)
         {
             log_startup_config_message(
                 INFO,
-                "- Transmit Power:",
+                "- Si5351 Transmit Power: ",
                 config.si5351_power_level);
         }
         return;
@@ -1868,14 +1871,14 @@ void apply_runtime_config_side_effects()
         {
             log_startup_config_message(
                 INFO,
-                "- Transmit Power:",
+                "- GPIO Transmit Power: ",
                 config.gpio_power_level);
         }
         else if (config.transmit_backend == TransmitBackendKind::SI5351)
         {
             log_startup_config_message(
                 INFO,
-                "- Transmit Power:",
+                "- Si5351 Transmit Power: ",
                 config.si5351_power_level);
         }
         return;
@@ -1896,14 +1899,14 @@ void apply_runtime_config_side_effects()
         {
             log_startup_config_message(
                 INFO,
-                "- Transmit Power:",
+                "- GPIO Transmit Power: ",
                 config.gpio_power_level);
         }
         else if (config.transmit_backend == TransmitBackendKind::SI5351)
         {
             log_startup_config_message(
                 INFO,
-                "- Transmit Power:",
+                "- Si5351 Transmit Power: ",
                 config.si5351_power_level);
         }
 

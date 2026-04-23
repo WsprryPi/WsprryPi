@@ -1066,6 +1066,18 @@ static std::string format_local_schedule_time(
     return oss.str();
 }
 
+static std::string format_utc_schedule_time(
+    const std::chrono::system_clock::time_point &tp)
+{
+    std::time_t time_t_value = std::chrono::system_clock::to_time_t(tp);
+    std::tm utc_tm{};
+    gmtime_r(&time_t_value, &utc_tm);
+
+    std::ostringstream oss;
+    oss << std::put_time(&utc_tm, "%Y-%m-%dT%H:%M:%S") << " UTC";
+    return oss.str();
+}
+
 static void reset_active_wspr_plan_state()
 {
     active_wspr_plan = PreparedWsprTransmission{};
@@ -1807,17 +1819,23 @@ static bool start_non_wspr_transmission_now(const ArgParserConfig &cfg)
             make_qrss_controller_request(cfg, committed_ppm),
             make_qrss_legacy_request(cfg, committed_ppm));
         wsprTransmitter.startAsync();
-        llog.logS(
-            INFO,
-            "transmitting QRSS message \"",
-            message,
-            "\" at ",
-            frequency_hz,
-            " Hz (",
-            wsprTransmitter.formatFrequencyMHz(frequency_hz),
-            " MHz), dot length ",
-            dot_seconds,
-            " s.");
+        llog.logS(DEBUG, "Transmitting QRSS message.");
+
+        llog.logS(DEBUG,
+                  "- Message: ",
+                  message);
+
+        llog.logS(DEBUG,
+                  "- Frequency (Hz): ",
+                  frequency_hz);
+
+        llog.logS(DEBUG,
+                  "- Frequency (MHz): ",
+                  wsprTransmitter.formatFrequencyMHz(frequency_hz));
+
+        llog.logS(DEBUG,
+                  "- Dot length (s): ",
+                  dot_seconds);
         return true;
     }
 
@@ -1842,21 +1860,31 @@ static bool start_non_wspr_transmission_now(const ArgParserConfig &cfg)
             make_fskcw_controller_request(cfg, committed_ppm),
             make_fskcw_legacy_request(cfg, committed_ppm));
         wsprTransmitter.startAsync();
-        llog.logS(
-            INFO,
-            "transmitting FSKCW message \"",
-            message,
-            "\" mark=",
-            mark_frequency_hz,
-            " Hz (",
-            wsprTransmitter.formatFrequencyMHz(mark_frequency_hz),
-            " MHz), space=",
-            space_frequency_hz,
-            " Hz (",
-            wsprTransmitter.formatFrequencyMHz(space_frequency_hz),
-            " MHz), dot length ",
-            dot_seconds,
-            " s.");
+        llog.logS(DEBUG, "Transmitting FSKCW message.");
+
+        llog.logS(DEBUG,
+                  "- Message: ",
+                  message);
+
+        llog.logS(DEBUG,
+                  "- Mark frequency (Hz): ",
+                  mark_frequency_hz);
+
+        llog.logS(DEBUG,
+                  "- Mark frequency (MHz): ",
+                  wsprTransmitter.formatFrequencyMHz(mark_frequency_hz));
+
+        llog.logS(DEBUG,
+                  "- Space frequency (Hz): ",
+                  space_frequency_hz);
+
+        llog.logS(DEBUG,
+                  "- Space frequency (MHz): ",
+                  wsprTransmitter.formatFrequencyMHz(space_frequency_hz));
+
+        llog.logS(DEBUG,
+                  "- Dot length (s): ",
+                  dot_seconds);
         return true;
     }
 
@@ -1881,21 +1909,31 @@ static bool start_non_wspr_transmission_now(const ArgParserConfig &cfg)
             make_dfcw_controller_request(cfg, committed_ppm),
             make_dfcw_legacy_request(cfg, committed_ppm));
         wsprTransmitter.startAsync();
-        llog.logS(
-            INFO,
-            "transmitting DFCW message \"",
-            message,
-            "\" dot=",
-            dot_frequency_hz,
-            " Hz (",
-            wsprTransmitter.formatFrequencyMHz(dot_frequency_hz),
-            " MHz), dash=",
-            dash_frequency_hz,
-            " Hz (",
-            wsprTransmitter.formatFrequencyMHz(dash_frequency_hz),
-            " MHz), dot length ",
-            dot_seconds,
-            " s.");
+        llog.logS(DEBUG, "Transmitting DFCW message.");
+
+        llog.logS(DEBUG,
+                  "- Message: ",
+                  message);
+
+        llog.logS(DEBUG,
+                  "- Dot frequency (Hz): ",
+                  dot_frequency_hz);
+
+        llog.logS(DEBUG,
+                  "- Dot frequency (MHz): ",
+                  wsprTransmitter.formatFrequencyMHz(dot_frequency_hz));
+
+        llog.logS(DEBUG,
+                  "- Dash frequency (Hz): ",
+                  dash_frequency_hz);
+
+        llog.logS(DEBUG,
+                  "- Dash frequency (MHz): ",
+                  wsprTransmitter.formatFrequencyMHz(dash_frequency_hz));
+
+        llog.logS(DEBUG,
+                  "- Dot length (s): ",
+                  dot_seconds);
         return true;
     }
 
@@ -1922,17 +1960,23 @@ static void schedule_next_non_wspr_launch(const ArgParserConfig &cfg)
     const std::uint64_t generation =
         non_wspr_schedule_generation.fetch_add(1, std::memory_order_acq_rel) + 1U;
 
-    llog.logS(
-        INFO,
-        "Scheduled ",
-        mode_type_name(cfg.mode),
-        " runtime: next start minute ",
-        cfg.schedule_start_minute,
-        ", repeat interval ",
-        cfg.schedule_repeat_minutes,
-        " minute(s), next launch at ",
-        format_local_schedule_time(next_launch),
-        ".");
+    llog.logS(INFO,
+              "Next ",
+              mode_type_name(cfg.mode),
+              " launch at: ",
+              format_utc_schedule_time(next_launch));
+
+    llog.logS(DEBUG,
+              "- Start minute: ",
+              cfg.schedule_start_minute);
+
+    llog.logS(DEBUG,
+              "- Repeat interval (minutes): ",
+              cfg.schedule_repeat_minutes);
+
+    llog.logS(DEBUG,
+              "- Mode type: ",
+              mode_type_name(cfg.mode));
 
     std::thread(
         [generation, next_launch]()
@@ -2187,16 +2231,23 @@ static bool configure_current_wspr_transmission(
             slot_plan = slot_plan_for_frame(plan, active_frame_index);
         }
 
-        llog.logS(INFO,
-                  "Selected WSPR plan: ",
-                  plan.plan_type,
-                  ", frames: ",
-                  static_cast<int>(plan.frames.size()),
-                  ", preference: ",
-                  wspr_planner_preference_to_string(cfg.wspr.planner_preference),
-                  ", auto-upgraded: ",
-                  auto_upgraded ? "true" : "false",
-                  ".");
+        llog.logS(DEBUG, "Selected WSPR plan.");
+
+        llog.logS(DEBUG,
+                  "- Plan type: ",
+                  plan.plan_type);
+
+        llog.logS(DEBUG,
+                  "- Frames: ",
+                  static_cast<int>(plan.frames.size()));
+
+        llog.logS(DEBUG,
+                  "- Preference: ",
+                  wspr_planner_preference_to_string(cfg.wspr.planner_preference));
+
+        llog.logS(DEBUG,
+                  "- Auto-upgraded: ",
+                  auto_upgraded ? "true" : "false");
 
         request_out = make_wspr_request(
             cfg,
@@ -2210,7 +2261,7 @@ static bool configure_current_wspr_transmission(
         if (plan.frameCount() > 1U)
         {
             llog.logS(
-                INFO,
+                DEBUG,
                 "Prepared paired WSPR transmission with ",
                 static_cast<int>(plan.frameCount()),
                 " frames using plan ",
@@ -2315,7 +2366,7 @@ void transmitter_cb(WsprTransmitter::TransmissionCallbackEvent event,
             if (config.mode == ModeType::QRSS)
             {
                 llog.logS(to_log_level(level),
-                          "Started QRSS test transmission: ",
+                          "Started QRSS transmission at frequency: ",
                           wsprTransmitter.formatFrequencyMHz(config.qrss.frequency_hz),
                           " MHz",
                           get_active_gpio_suffix(),
@@ -2324,7 +2375,7 @@ void transmitter_cb(WsprTransmitter::TransmissionCallbackEvent event,
             else if (config.mode == ModeType::FSKCW)
             {
                 llog.logS(to_log_level(level),
-                          "Started FSKCW test transmission at mark frequency: ",
+                          "Started FSKCW transmission at mark frequency: ",
                           wsprTransmitter.formatFrequencyMHz(config.fskcw.mark_frequency_hz),
                           " MHz",
                           get_active_gpio_suffix(),
@@ -2333,7 +2384,7 @@ void transmitter_cb(WsprTransmitter::TransmissionCallbackEvent event,
             else if (config.mode == ModeType::DFCW)
             {
                 llog.logS(to_log_level(level),
-                          "Started DFCW test transmission at dot frequency: ",
+                          "Started DFCW transmission at dot frequency: ",
                           wsprTransmitter.formatFrequencyMHz(config.dfcw.dot_frequency_hz),
                           " MHz",
                           get_active_gpio_suffix(),
@@ -3723,8 +3774,8 @@ bool set_config(bool force)
         std::string backend_runtime_error;
         const bool backend_runtime_ready =
             !(working_config.mode == ModeType::TONE ||
-              runtime_transmit_requested(working_config))
-            || backend_ready_for_transmission(
+              runtime_transmit_requested(working_config)) ||
+            backend_ready_for_transmission(
                 working_config,
                 &backend_runtime_error);
 
