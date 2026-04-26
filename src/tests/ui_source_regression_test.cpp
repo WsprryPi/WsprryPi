@@ -296,24 +296,37 @@ int main()
     const std::string config_view_source =
         read_text_file("/home/pi/WsprryPi/WsprryPi-UI/data/views/config.php");
     require(
-        config_view_source.find("class=\"btn btn-danger btn-sm config-header-stop\"") != std::string::npos &&
-            config_view_source.find("id=\"stop_transmit\"") != std::string::npos,
-        "Configuration header must host the compact Stop transmission control");
-    require(
-        config_view_source.find("class=\"config-runtime-header\"") != std::string::npos &&
-            config_view_source.find("<label class=\"form-check-label\" for=\"transmit\">Transmit enabled</label>") != std::string::npos &&
-            config_view_source.find("id=\"runtime_plan_label\"") != std::string::npos &&
-            config_view_source.find("id=\"modeChangeGuardModal\"") != std::string::npos &&
+        config_view_source.find("id=\"modeChangeGuardModal\"") != std::string::npos &&
             config_view_source.find("id=\"modeChangeGuardConfirmBtn\"") != std::string::npos,
-        "Runtime state header must host the primary Transmit enabled control and the config view must expose the guarded mode-change confirmation modal");
+        "Configuration view must expose the guarded mode-change confirmation modal");
 
     const std::string operation_view_source =
         read_text_file("/home/pi/WsprryPi/WsprryPi-UI/data/views/operation.php");
     require(
-        operation_view_source.find("id=\"runtime_mode_value\"") != std::string::npos &&
-            operation_view_source.find("id=\"runtime_frequency_value\"") != std::string::npos &&
+        operation_view_source.find("class=\"btn btn-danger operation-stop-button\"") != std::string::npos &&
+            operation_view_source.find("id=\"stop_transmit\"") != std::string::npos &&
+            operation_view_source.find("aria-label=\"Runtime controls\"") != std::string::npos &&
+            operation_view_source.find("operation-hero__controls") != std::string::npos,
+        "Operation view must host the Stop transmission control in the runtime controls section");
+    require(
+        operation_view_source.find("<label class=\"form-check-label\" for=\"transmit\">Transmit enabled</label>") != std::string::npos &&
             operation_view_source.find("id=\"runtime_plan_label\"") != std::string::npos &&
-            operation_view_source.find("<div class=\"operation-panel__label\">Frequency</div>") != std::string::npos,
+            operation_view_source.find("operation-hero__controls") != std::string::npos,
+        "Operation view must host the primary Transmit enabled control and runtime plan label in the runtime controls context");
+    const std::size_t runtime_mode_position =
+        operation_view_source.find("id=\"runtime_mode_value\"");
+    const std::size_t runtime_frequency_position =
+        operation_view_source.find("id=\"runtime_frequency_value\"");
+    const std::size_t runtime_plan_position =
+        operation_view_source.find("id=\"runtime_plan_label\"");
+    require(
+        runtime_mode_position != std::string::npos &&
+            runtime_frequency_position != std::string::npos &&
+            runtime_plan_position != std::string::npos &&
+            operation_view_source.find("operation-panel__label operation-panel__label--split") != std::string::npos &&
+            operation_view_source.find("<span>Frequency</span>") != std::string::npos &&
+            runtime_mode_position < runtime_frequency_position &&
+            runtime_frequency_position < runtime_plan_position,
         "Operation view must place the Frequency pane between the Current mode and mode-specific runtime panes");
 
     const std::string operation_css_source =
@@ -345,8 +358,9 @@ int main()
         config_view_source.find("class=\"config-wspr-top-row\"") != std::string::npos &&
             config_view_source.find("config-wspr-top-row__item config-wspr-top-row__field config-wspr-top-row__field--wide") != std::string::npos &&
             config_view_source.find("config-wspr-top-row__item config-wspr-top-row__field config-wspr-top-row__field--dbm") != std::string::npos &&
+            config_view_source.find("class=\"config-wspr-secondary-row\"") != std::string::npos &&
             config_view_source.find("config-wspr-top-row__item config-wspr-top-row__field config-wspr-top-row__planner") != std::string::npos &&
-            config_view_source.find("for=\"useoffset\">\n                                                    Randomize\n") != std::string::npos &&
+            config_view_source.find("for=\"useoffset\">\n                                                Random offset\n") != std::string::npos &&
             config_view_source.find("id=\"ppm\"") != std::string::npos &&
             config_view_source.find("min=\"-200\"") != std::string::npos &&
             config_view_source.find("max=\"200\"") != std::string::npos &&
@@ -358,7 +372,7 @@ int main()
             config_view_source.find("@GPIO, @GPIOH, or @GPIOL") != std::string::npos &&
             config_view_source.find("-15") == std::string::npos &&
             config_view_source.find("class=\"form-select config-planner-field__select\"") == std::string::npos,
-        "WSPR transmission settings must keep planner_preference in the compact top row and render TX dBm as a fixed-value select");
+        "WSPR transmission settings must keep TX dBm as a fixed-value select and expose planner_preference in the WSPR planning controls");
     require(
         config_view_source.find("id=\"fsk_offset\"") != std::string::npos &&
             config_view_source.find("value=\"5\"") != std::string::npos &&
@@ -384,9 +398,10 @@ int main()
             dot_length_input.find("step=\"1\"") == std::string::npos,
         "CW dot-length markup must advertise strictly positive fractional input without restoring the old max cap");
     require(
-        fsk_offset_input.find("min=\"0\"") != std::string::npos &&
+        fsk_offset_input.find("min=\"1\"") != std::string::npos &&
+            fsk_offset_input.find("step=\"1\"") != std::string::npos &&
             fsk_offset_input.find("max=\"1000\"") == std::string::npos,
-        "CW shift markup must keep its lower bound while removing the old UI-only max cap");
+        "CW shift markup must require a positive whole-number lower bound while removing the old UI-only max cap");
     require(
         tx_repeat_every_input.find("min=\"1\"") != std::string::npos &&
             tx_repeat_every_input.find("max=\"60\"") == std::string::npos,
@@ -435,7 +450,11 @@ int main()
             config_view_source.find("class=\"form-check-input band-gpio-active-high\"\n                                                                type=\"checkbox\"\n                                                                id=\"band-gpio-active-high-<?= htmlspecialchars($band) ?>\"\n                                                                data-band=\"<?= htmlspecialchars($band) ?>\"\n                                                                checked") == std::string::npos,
         "Band GPIO row defaults must render unchecked and inactive until explicitly configured");
     require(
-        config_view_source.find("id=\"configTabs\" role=\"tablist\" data-persist-tab-state=\"true\" data-persist-tab-state-scope=\"reload\"") != std::string::npos,
+        config_view_source.find("id=\"configTabs\"") != std::string::npos &&
+            config_view_source.find("role=\"tablist\"") != std::string::npos &&
+            config_view_source.find("data-persist-tab-state=\"true\"") != std::string::npos &&
+            config_view_source.find("data-persist-tab-state-scope=\"reload\"") != std::string::npos &&
+            config_view_source.find("data-persist-tab-query-param=\"setup_tab\"") != std::string::npos,
         "Configuration tab list must opt into reload-scoped persisted sub-tab state");
 
     const std::string maintenance_source =
