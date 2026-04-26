@@ -11,6 +11,7 @@
 #include <getopt.h>
 #include <iostream>
 #include <iterator>
+#include <limits.h>
 #include <map>
 #include <optional>
 #include <string>
@@ -78,21 +79,31 @@ namespace
     {
         int pipefd[2] = {-1, -1};
         require(pipe(pipefd) == 0, "help-output test must create a pipe");
+        const int saved_stdout = dup(STDOUT_FILENO);
+        const int saved_stderr = dup(STDERR_FILENO);
+        require(
+            saved_stdout >= 0 && saved_stderr >= 0,
+            "help-output test must duplicate stdout and stderr");
 
-        pid_t pid = fork();
-        require(pid >= 0, "help-output test must fork a child process");
-
-        if (pid == 0)
-        {
-            close(pipefd[0]);
-            dup2(pipefd[1], STDOUT_FILENO);
-            dup2(pipefd[1], STDERR_FILENO);
-            close(pipefd[1]);
-            print_usage(exit_code);
-            std::exit(EXIT_SUCCESS);
-        }
-
+        require(
+            dup2(pipefd[1], STDOUT_FILENO) >= 0 &&
+                dup2(pipefd[1], STDERR_FILENO) >= 0,
+            "help-output test must redirect stdout and stderr to the pipe");
         close(pipefd[1]);
+
+        // `print_usage(0)` exits, but this test only needs the help text.
+        // Use the non-exiting path so capture works safely in-process.
+        print_usage(exit_code == 0 ? 3 : exit_code);
+        std::cout.flush();
+        std::cerr.flush();
+
+        require(
+            dup2(saved_stdout, STDOUT_FILENO) >= 0 &&
+                dup2(saved_stderr, STDERR_FILENO) >= 0,
+            "help-output test must restore stdout and stderr");
+        close(saved_stdout);
+        close(saved_stderr);
+
         std::string output;
         char buffer[4096];
         ssize_t bytes_read = 0;
@@ -101,12 +112,6 @@ namespace
             output.append(buffer, static_cast<std::size_t>(bytes_read));
         }
         close(pipefd[0]);
-
-        int status = 0;
-        require(waitpid(pid, &status, 0) == pid, "help-output test must wait for the child process");
-        require(
-            WIFEXITED(status) && WEXITSTATUS(status) == EXIT_SUCCESS,
-            "help-output test child must exit successfully");
         return output;
     }
 
@@ -114,15 +119,25 @@ namespace
         std::vector<std::string> args,
         const std::string &message)
     {
+        char exe_path[PATH_MAX] = {0};
+        const ssize_t exe_path_length =
+            readlink("/proc/self/exe", exe_path, sizeof(exe_path) - 1);
+        require(
+            exe_path_length > 0,
+            message + " must resolve the current test binary path");
+        exe_path[exe_path_length] = '\0';
+
         pid_t pid = fork();
         require(pid >= 0, message + " must be able to fork a child process");
 
         if (pid == 0)
         {
-            reset_getopt_state();
+            setenv("DIAL_FREQUENCY_SEMANTICS_CLI_CHECK", "1", 1);
             std::vector<char *> argv = argv_for(args);
-            (void)parse_command_line(static_cast<int>(argv.size()), argv.data());
-            std::exit(EXIT_SUCCESS);
+            argv.insert(argv.begin(), exe_path);
+            argv.push_back(nullptr);
+            execv(exe_path, argv.data());
+            _exit(127);
         }
 
         int status = 0;
@@ -298,6 +313,20 @@ namespace
         set_scheduler_execution_suppressed_for_test(false);
     }
 
+    void cleanup_scheduler_regression_test_state()
+    {
+        stop_runtime_components_for_test();
+        wsprTransmitter.backendSetStateValue(WsprTransmitter::State::DISABLED);
+        set_band_gpio_selector_for_test(false, false);
+        set_scheduler_execution_suppressed_for_test(false);
+        reset_managed_reload_runtime_for_test();
+        clear_current_wspr_runtime_state_for_test();
+        reset_current_transmission_request_for_test();
+        ini_reload_pending.store(false, std::memory_order_relaxed);
+        ppm_reload_pending.store(false, std::memory_order_relaxed);
+        exiting_wspr.store(false, std::memory_order_relaxed);
+    }
+
     void clear_pi_generation_override_for_scope() noexcept
     {
         set_raspberry_pi_generation_override_for_test(4);
@@ -395,8 +424,17 @@ namespace
 
 } // namespace
 
-int main()
+int main(int argc, char *argv[])
 {
+    if (const char *cli_check = std::getenv("DIAL_FREQUENCY_SEMANTICS_CLI_CHECK");
+        cli_check != nullptr && std::string(cli_check) == "1")
+    {
+        init_config_json();
+        json_to_config();
+        reset_getopt_state();
+        return parse_command_line(argc, argv) ? EXIT_SUCCESS : EXIT_FAILURE;
+    }
+
     set_patch_all_from_web_runtime_apply_suppressed_for_test(true);
     set_si5351_detection_override_for_test(true);
     set_raspberry_pi_generation_override_for_test(4);
@@ -1203,210 +1241,6 @@ int main()
     }
 
     {
-        init_config_json();
-        json_to_config();
-        ini_reload_pending.store(false, std::memory_order_relaxed);
-        exiting_wspr.store(false, std::memory_order_relaxed);
-        reset_managed_reload_runtime_for_test();
-        reset_current_transmission_request_for_test();
-        set_scheduler_execution_suppressed_for_test(true);
-        set_band_gpio_selector_for_test(true, false);
-
-        config.use_ini = false;
-        config.mode = ModeType::WSPR;
-        config.transmit = true;
-        config.callsign = "AA0NT";
-        config.grid_square = "EM18";
-        config.power_dbm = 20;
-        config.frequencies = "0,20m@17H";
-        config.use_offset = false;
-        config.gpio_tx_pin = 4;
-        config.gpio_use_ntp = false;
-        resolve_backend_specific_config(config);
-
-        require(
-            set_frequencies(config),
-            "runtime skip-window regression must accept explicit 0 and per-entry selector GPIO syntax");
-        require(
-            set_config(true),
-            "runtime skip-window regression must commit an initial WSPR request");
-
-        const TransmissionRequest skip_request =
-            current_transmission_request_for_test();
-        require(
-            skip_request.isSkipWindow(),
-            "normal runtime scheduling must commit 0 Hz WSPR periods as skip-window requests");
-        require(
-            nearly_equal(skip_request.dial_frequency_hz, 0.0) &&
-                nearly_equal(skip_request.actual_rf_frequency_hz, 0.0),
-            "normal runtime scheduling must keep 0 Hz skip windows at 0 Hz");
-        require(
-            !skip_request.hasSelectorGPIO(),
-            "normal runtime scheduling must not prepare selector GPIO for 0 Hz skip windows");
-        BandGPIOConfig active_selector_config;
-        std::string active_selector_band;
-        require(
-            !current_band_gpio_selection_for_test(
-                active_selector_config,
-                active_selector_band),
-            "normal runtime scheduling must not map 0 Hz skip windows to a ham band");
-
-        transmitter_cb(
-            WsprTransmissionCallbackEvent::SKIPPED,
-            WsprTransmitLogLevel::INFO,
-            "runtime skip window regression",
-            0.0);
-
-        const TransmissionRequest next_request =
-            current_transmission_request_for_test();
-        require(
-            !next_request.isSkipWindow() &&
-                nearly_equal(next_request.dial_frequency_hz, 14095600.0) &&
-                nearly_equal(next_request.actual_rf_frequency_hz, 14097100.0),
-            "normal runtime scheduling must advance from a skip window to the next valid WSPR period");
-        require(
-            next_request.hasSelectorGPIO() &&
-                next_request.selector_band == HamBand::BAND_20M &&
-                next_request.selector_gpio_config.gpio == 17 &&
-                next_request.selector_gpio_config.active_high,
-            "normal runtime scheduling must preserve selector GPIO preparation for the next valid nonzero entry");
-
-        set_band_gpio_selector_for_test(false, false);
-        set_scheduler_execution_suppressed_for_test(false);
-    }
-
-    {
-        init_config_json();
-        json_to_config();
-        ini_reload_pending.store(false, std::memory_order_relaxed);
-        exiting_wspr.store(false, std::memory_order_relaxed);
-        reset_managed_reload_runtime_for_test();
-        reset_current_transmission_request_for_test();
-        set_scheduler_execution_suppressed_for_test(true);
-        set_band_gpio_selector_for_test(true, false);
-
-        config.use_ini = true;
-        config.ini_filename = "/tmp/managed_reload_skip_window.ini";
-        config.mode = ModeType::WSPR;
-        config.transmit = true;
-        config.callsign = "AA0NT";
-        config.grid_square = "EM18";
-        config.power_dbm = 20;
-        config.frequencies = "20m";
-        config.gpio_tx_pin = 4;
-        resolve_backend_specific_config(config);
-        set_frequencies(config);
-
-        auto managed_ini = make_managed_ini_data("AA0NT", "EM18", "0,20m@17H", true);
-        iniFile.setData(managed_ini);
-
-        require(
-            set_config(true),
-            "managed reload with a 0 Hz skip window must remain valid");
-
-        const TransmissionRequest skip_request =
-            current_transmission_request_for_test();
-        require(
-            skip_request.isSkipWindow(),
-            "0 Hz WSPR periods must commit an explicit skip-window request");
-        require(
-            nearly_equal(skip_request.dial_frequency_hz, 0.0) &&
-                nearly_equal(skip_request.actual_rf_frequency_hz, 0.0),
-            "0 Hz skip windows must remain at 0 Hz in the committed request");
-        require(
-            !skip_request.hasSelectorGPIO(),
-            "0 Hz skip windows must not commit any band-selector GPIO");
-        BandGPIOConfig active_selector_config;
-        std::string active_selector_band;
-        require(
-            !current_band_gpio_selection_for_test(
-                active_selector_config,
-                active_selector_band),
-            "0 Hz skip windows must not prepare a band-selector GPIO");
-        require(
-            !managed_reload_tx_inhibited_for_test(),
-            "0 Hz skip windows must not inhibit future transmissions");
-        require(
-            config.frequencies == "0,20m@17H",
-            "valid managed 0 Hz skip reloads must replace the live WSPR frequency list");
-
-        transmitter_cb(
-            WsprTransmissionCallbackEvent::SKIPPED,
-            WsprTransmitLogLevel::INFO,
-            "managed skip window regression",
-            0.0);
-
-        const TransmissionRequest next_request =
-            current_transmission_request_for_test();
-        require(
-            !next_request.isSkipWindow() &&
-                nearly_equal(next_request.actual_rf_frequency_hz, 14097100.0),
-            "skip-window completion must leave the scheduler ready for the next valid WSPR period");
-        require(
-            next_request.hasSelectorGPIO() &&
-                next_request.selector_band == HamBand::BAND_20M &&
-                next_request.selector_gpio_config.gpio == 17 &&
-                next_request.selector_gpio_config.active_high,
-            "the next valid WSPR period must still prepare the configured band-selector GPIO");
-
-        set_band_gpio_selector_for_test(false, false);
-        set_scheduler_execution_suppressed_for_test(false);
-    }
-
-    {
-        init_config_json();
-        json_to_config();
-        ini_reload_pending.store(false, std::memory_order_relaxed);
-        exiting_wspr.store(false, std::memory_order_relaxed);
-        reset_managed_reload_runtime_for_test();
-        reset_current_transmission_request_for_test();
-        set_scheduler_execution_suppressed_for_test(true);
-        set_band_gpio_selector_for_test(true, false);
-
-        config.use_ini = true;
-        config.ini_filename = "/tmp/managed_reload_invalid_frequency.ini";
-        config.mode = ModeType::WSPR;
-        config.transmit = true;
-        config.callsign = "AA0NT";
-        config.grid_square = "EM18";
-        config.power_dbm = 20;
-        config.frequencies = "20m@17H";
-        config.gpio_tx_pin = 4;
-        resolve_backend_specific_config(config);
-        set_frequencies(config);
-
-        auto valid_managed_ini = make_managed_ini_data("AA0NT", "EM18", "20m@17H", true);
-        iniFile.setData(valid_managed_ini);
-
-        require(
-            set_config(true),
-            "managed invalid-frequency regression must start from a valid live configuration");
-
-        iniFile.setData(
-            make_managed_ini_data("AA0NT", "EM18", "1234567", true));
-
-        require(
-            set_config(true),
-            "invalid nonzero managed reloads must remain recoverable");
-        require(
-            config.frequencies == "20m@17H",
-            "invalid nonzero managed reloads must preserve the previous live frequency list");
-        require(
-            managed_reload_tx_inhibited_for_test(),
-            "invalid nonzero managed reloads must still inhibit future transmissions");
-        const TransmissionRequest preserved_request =
-            current_transmission_request_for_test();
-        require(
-            !preserved_request.isSkipWindow() &&
-                nearly_equal(preserved_request.actual_rf_frequency_hz, 14097100.0),
-            "invalid nonzero managed reloads must preserve the previously committed valid WSPR request");
-
-        set_band_gpio_selector_for_test(false, false);
-        set_scheduler_execution_suppressed_for_test(false);
-    }
-
-
-    {
         init_default_config();
         require(
             !config.debug_logging,
@@ -1772,6 +1606,206 @@ int main()
         require(
             !validate_config_candidate(invalid_wspr_candidate, &validation_error),
             "normal WSPR validation must still reject missing callsign even after tone usage");
+    }
+
+    {
+        init_config_json();
+        json_to_config();
+        ini_reload_pending.store(false, std::memory_order_relaxed);
+        exiting_wspr.store(false, std::memory_order_relaxed);
+        reset_managed_reload_runtime_for_test();
+        reset_current_transmission_request_for_test();
+        set_scheduler_execution_suppressed_for_test(true);
+        set_band_gpio_selector_for_test(true, false);
+
+        config.use_ini = false;
+        config.mode = ModeType::WSPR;
+        config.transmit = true;
+        config.callsign = "AA0NT";
+        config.grid_square = "EM18";
+        config.power_dbm = 20;
+        config.frequencies = "0,20m@17H";
+        config.use_offset = false;
+        config.gpio_tx_pin = 4;
+        config.gpio_use_ntp = false;
+        resolve_backend_specific_config(config);
+
+        require(
+            set_frequencies(config),
+            "runtime skip-window regression must accept explicit 0 and per-entry selector GPIO syntax");
+        require(
+            set_config(true),
+            "runtime skip-window regression must commit an initial WSPR request");
+
+        const TransmissionRequest skip_request =
+            current_transmission_request_for_test();
+        require(
+            skip_request.isSkipWindow(),
+            "normal runtime scheduling must commit 0 Hz WSPR periods as skip-window requests");
+        require(
+            nearly_equal(skip_request.dial_frequency_hz, 0.0) &&
+                nearly_equal(skip_request.actual_rf_frequency_hz, 0.0),
+            "normal runtime scheduling must keep 0 Hz skip windows at 0 Hz");
+        require(
+            !skip_request.hasSelectorGPIO(),
+            "normal runtime scheduling must not prepare selector GPIO for 0 Hz skip windows");
+        BandGPIOConfig active_selector_config;
+        std::string active_selector_band;
+        require(
+            !current_band_gpio_selection_for_test(
+                active_selector_config,
+                active_selector_band),
+            "normal runtime scheduling must not map 0 Hz skip windows to a ham band");
+
+        transmitter_cb(
+            WsprTransmissionCallbackEvent::SKIPPED,
+            WsprTransmitLogLevel::INFO,
+            "runtime skip window regression",
+            0.0);
+
+        const TransmissionRequest next_request =
+            current_transmission_request_for_test();
+        require(
+            !next_request.isSkipWindow() &&
+                nearly_equal(next_request.dial_frequency_hz, 14095600.0) &&
+                nearly_equal(next_request.actual_rf_frequency_hz, 14097100.0),
+            "normal runtime scheduling must advance from a skip window to the next valid WSPR period");
+        require(
+            next_request.hasSelectorGPIO() &&
+                next_request.selector_band == HamBand::BAND_20M &&
+                next_request.selector_gpio_config.gpio == 17 &&
+                next_request.selector_gpio_config.active_high,
+            "normal runtime scheduling must preserve selector GPIO preparation for the next valid nonzero entry");
+
+        cleanup_scheduler_regression_test_state();
+    }
+
+    {
+        init_config_json();
+        json_to_config();
+        ini_reload_pending.store(false, std::memory_order_relaxed);
+        exiting_wspr.store(false, std::memory_order_relaxed);
+        reset_managed_reload_runtime_for_test();
+        reset_current_transmission_request_for_test();
+        set_scheduler_execution_suppressed_for_test(true);
+        set_band_gpio_selector_for_test(true, false);
+
+        config.use_ini = true;
+        config.ini_filename = "/tmp/managed_reload_skip_window.ini";
+        config.mode = ModeType::WSPR;
+        config.transmit = true;
+        config.callsign = "AA0NT";
+        config.grid_square = "EM18";
+        config.power_dbm = 20;
+        config.frequencies = "20m@17H";
+        config.gpio_tx_pin = 4;
+        resolve_backend_specific_config(config);
+        set_frequencies(config);
+
+        auto managed_ini = make_managed_ini_data("AA0NT", "EM18", "0,20m@17H", true);
+        iniFile.setData(managed_ini);
+
+        require(
+            set_config(true),
+            "managed reload with a 0 Hz skip window must remain valid");
+
+        const TransmissionRequest skip_request =
+            current_transmission_request_for_test();
+        require(
+            skip_request.isSkipWindow(),
+            "0 Hz WSPR periods must commit an explicit skip-window request");
+        require(
+            nearly_equal(skip_request.dial_frequency_hz, 0.0) &&
+                nearly_equal(skip_request.actual_rf_frequency_hz, 0.0),
+            "0 Hz skip windows must remain at 0 Hz in the committed request");
+        require(
+            !skip_request.hasSelectorGPIO(),
+            "0 Hz skip windows must not commit any band-selector GPIO");
+        BandGPIOConfig active_selector_config;
+        std::string active_selector_band;
+        require(
+            !current_band_gpio_selection_for_test(
+                active_selector_config,
+                active_selector_band),
+            "0 Hz skip windows must not prepare a band-selector GPIO");
+        require(
+            !managed_reload_tx_inhibited_for_test(),
+            "0 Hz skip windows must not inhibit future transmissions");
+        require(
+            config.frequencies == "0,20m@17H",
+            "valid managed 0 Hz skip reloads must replace the live WSPR frequency list");
+
+        transmitter_cb(
+            WsprTransmissionCallbackEvent::SKIPPED,
+            WsprTransmitLogLevel::INFO,
+            "managed skip window regression",
+            0.0);
+
+        const TransmissionRequest next_request =
+            current_transmission_request_for_test();
+        require(
+            !next_request.isSkipWindow() &&
+                nearly_equal(next_request.actual_rf_frequency_hz, 14097100.0),
+            "skip-window completion must leave the scheduler ready for the next valid WSPR period");
+        require(
+            next_request.hasSelectorGPIO() &&
+                next_request.selector_band == HamBand::BAND_20M &&
+                next_request.selector_gpio_config.gpio == 17 &&
+                next_request.selector_gpio_config.active_high,
+            "the next valid WSPR period must still prepare the configured band-selector GPIO");
+
+        cleanup_scheduler_regression_test_state();
+    }
+
+    {
+        init_config_json();
+        json_to_config();
+        ini_reload_pending.store(false, std::memory_order_relaxed);
+        exiting_wspr.store(false, std::memory_order_relaxed);
+        reset_managed_reload_runtime_for_test();
+        reset_current_transmission_request_for_test();
+        set_scheduler_execution_suppressed_for_test(true);
+        set_band_gpio_selector_for_test(true, false);
+
+        config.use_ini = true;
+        config.ini_filename = "/tmp/managed_reload_invalid_frequency.ini";
+        config.mode = ModeType::WSPR;
+        config.transmit = true;
+        config.callsign = "AA0NT";
+        config.grid_square = "EM18";
+        config.power_dbm = 20;
+        config.frequencies = "20m@17H";
+        config.gpio_tx_pin = 4;
+        resolve_backend_specific_config(config);
+        set_frequencies(config);
+
+        auto valid_managed_ini = make_managed_ini_data("AA0NT", "EM18", "20m@17H", true);
+        iniFile.setData(valid_managed_ini);
+
+        require(
+            set_config(true),
+            "managed invalid-frequency regression must start from a valid live configuration");
+
+        iniFile.setData(
+            make_managed_ini_data("AA0NT", "EM18", "1234567", true));
+
+        require(
+            set_config(true),
+            "invalid nonzero managed reloads must remain recoverable");
+        require(
+            config.frequencies == "20m@17H",
+            "invalid nonzero managed reloads must preserve the previous live frequency list");
+        require(
+            managed_reload_tx_inhibited_for_test(),
+            "invalid nonzero managed reloads must still inhibit future transmissions");
+        const TransmissionRequest preserved_request =
+            current_transmission_request_for_test();
+        require(
+            !preserved_request.isSkipWindow() &&
+                nearly_equal(preserved_request.actual_rf_frequency_hz, 14097100.0),
+            "invalid nonzero managed reloads must preserve the previously committed valid WSPR request");
+
+        cleanup_scheduler_regression_test_state();
     }
 
 
@@ -3057,6 +3091,7 @@ int main()
             ini_reload_generation.load(std::memory_order_relaxed) == generation_before_guard,
             "guarded mode-change stop must not publish an extra persistence generation");
 
+        set_patch_all_from_web_runtime_apply_suppressed_for_test(false);
         patch_all_from_web({
             {"Operation", {{"Mode", "QRSS"}, {"Transmit", false}}},
             {"CW",
@@ -3070,6 +3105,7 @@ int main()
               {"Start Minute", 0},
               {"Repeat Minutes", 10}}}
         });
+        set_patch_all_from_web_runtime_apply_suppressed_for_test(true);
 
         const std::string ini_after_guard = read_text_file(config.ini_filename);
         require(
