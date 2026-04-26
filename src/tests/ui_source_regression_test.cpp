@@ -44,6 +44,25 @@ namespace
         return source.substr(tag_start, (tag_end - tag_start) + 1);
     }
 
+    std::size_t count_occurrences(
+        const std::string &source, const std::string &needle)
+    {
+        if (needle.empty())
+        {
+            return 0;
+        }
+
+        std::size_t count = 0;
+        std::size_t pos = 0;
+        while ((pos = source.find(needle, pos)) != std::string::npos)
+        {
+            ++count;
+            pos += needle.size();
+        }
+
+        return count;
+    }
+
 } // namespace
 
 int main()
@@ -76,6 +95,10 @@ int main()
 
     const std::string ui_source =
         read_text_file("/home/pi/WsprryPi/WsprryPi-UI/data/index.js");
+    const std::string maintenance_script_source =
+        read_text_file("/home/pi/WsprryPi/WsprryPi-UI/data/maintenance.js");
+    const std::string operation_script_source =
+        read_text_file("/home/pi/WsprryPi/WsprryPi-UI/data/operation.js");
     require(
         ui_source.find("persist_transmit: persistTransmit") !=
                 std::string::npos,
@@ -224,8 +247,10 @@ int main()
             site_source.find("function normalizeSameOriginPath(path, fallback)") != std::string::npos &&
             site_source.find("function buildDirectRestFallbackUrl(path)") != std::string::npos &&
             site_source.find("function buildDirectWebSocketFallbackUrl(path)") != std::string::npos &&
-            site_source.find("http://${window.location.hostname}:31415${path}") != std::string::npos &&
-            site_source.find("ws://${window.location.hostname}:31416${path}") != std::string::npos &&
+            site_source.find("window.location.protocol === \"https:\" ? \"https:\" : \"http:\"") != std::string::npos &&
+            site_source.find("window.location.protocol === \"https:\" ? \"wss:\" : \"ws:\"") != std::string::npos &&
+            site_source.find("${protocol}//${window.location.hostname}:31415${path}") != std::string::npos &&
+            site_source.find("${protocol}//${window.location.hostname}:31416${path}") != std::string::npos &&
             site_source.find("const SETTINGS_ENDPOINT = createEndpointDefinition(") != std::string::npos &&
             site_source.find("const VERSION_ENDPOINT = createEndpointDefinition(") != std::string::npos &&
             site_source.find("const REPAIR_ENDPOINT = createEndpointDefinition(") != std::string::npos &&
@@ -233,12 +258,13 @@ int main()
             site_source.find("const SETTINGS_URL = SETTINGS_ENDPOINT.proxyUrl;") != std::string::npos &&
             site_source.find("const VERSION_URL = VERSION_ENDPOINT.proxyUrl;") != std::string::npos &&
             site_source.find("const REPAIR_URL = REPAIR_ENDPOINT.proxyUrl;") != std::string::npos &&
-            site_source.find("const WEBSOCKET_URL = WEBSOCKET_ENDPOINT.proxyUrl;") != std::string::npos &&
             site_source.find("function ajaxWithEndpointFallback(endpoint, options = {})") != std::string::npos &&
             site_source.find("function fetchWithEndpointFallback(endpoint, init = {})") != std::string::npos &&
             site_source.find("function getJsonWithEndpointFallback(endpoint)") != std::string::npos &&
             site_source.find("warnRestFallback(endpoint, reason);") != std::string::npos &&
             site_source.find("warnWebSocketFallback(endpointConfig, reason);") != std::string::npos &&
+            site_source.find("warnWebSocketFallbackAttempt(endpointConfig);") != std::string::npos &&
+            site_source.find("warnWebSocketFallbackFailure(endpointConfig, reason);") != std::string::npos &&
             site_source.find("connectWebSocket(WEBSOCKET_ENDPOINT, WS_RECONNECT);") != std::string::npos &&
             site_source.find("getJsonWithEndpointFallback(SETTINGS_ENDPOINT)") != std::string::npos &&
             site_source.find("getJsonWithEndpointFallback(VERSION_ENDPOINT)") != std::string::npos &&
@@ -251,8 +277,19 @@ int main()
             site_source.find("const SETTINGS_URL = SETTINGS_PATH;") == std::string::npos &&
             site_source.find("const VERSION_URL = VERSION_PATH;") == std::string::npos &&
             site_source.find("const REPAIR_URL = REPAIR_PATH;") == std::string::npos &&
+            site_source.find("const WEBSOCKET_URL = WEBSOCKET_ENDPOINT.proxyUrl;") == std::string::npos &&
             site_source.find("const WEBSOCKET_URL = buildWebSocketUrl(WEBSOCKET_PATH);") == std::string::npos,
         "UI endpoint construction must remain proxy-first, allow direct ports only in centralized fallback helpers, and derive proxy websocket URLs from the current page protocol instead of rebuilding backend host:port origins");
+    require(
+        count_occurrences(site_source, ":31415") == 1 &&
+            count_occurrences(site_source, ":31416") == 1,
+        "site.js must mention direct backend ports only in the centralized fallback URL builders");
+    require(
+        ui_source.find("ajaxWithEndpointFallback(SETTINGS_ENDPOINT, {") != std::string::npos &&
+            operation_script_source.find("ajaxWithEndpointFallback(SETTINGS_ENDPOINT, {") != std::string::npos &&
+            maintenance_script_source.find("fetchWithEndpointFallback(SETTINGS_ENDPOINT, {") != std::string::npos &&
+            maintenance_script_source.find("fetchWithEndpointFallback(REPAIR_ENDPOINT, {") != std::string::npos,
+        "UI REST callers must route requests through centralized endpoint fallback helpers");
     require(
         site_source.find("Frequency Control GPIO Polarity") == std::string::npos,
         "UI config schema must not require the obsolete GPIO.Frequency Control GPIO Polarity key");
@@ -557,10 +594,10 @@ int main()
             maintenance_source.find("id=\"testToneModal\"") != std::string::npos,
         "maintenance view must host the relocated Test Tone control and modal");
 
-    const std::string maintenance_script_source =
+    const std::string maintenance_test_tone_script_source =
         read_text_file("/home/pi/WsprryPi/WsprryPi-UI/data/maintenance.js");
     require(
-        maintenance_script_source.find("bindTestToneControls();") != std::string::npos,
+        maintenance_test_tone_script_source.find("bindTestToneControls();") != std::string::npos,
         "maintenance view must bind the shared Test Tone controls");
 
     std::cout << "ui_source_regression_test passed" << std::endl;
