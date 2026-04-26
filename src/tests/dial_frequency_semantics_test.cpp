@@ -1745,6 +1745,343 @@ int main(int argc, char *argv[])
         init_config_json();
         json_to_config();
         ini_reload_pending.store(false, std::memory_order_relaxed);
+        ppm_reload_pending.store(false, std::memory_order_relaxed);
+        exiting_wspr.store(false, std::memory_order_relaxed);
+        reset_managed_reload_runtime_for_test();
+        reset_current_transmission_request_for_test();
+        set_scheduler_execution_suppressed_for_test(true);
+        set_band_gpio_selector_for_test(true, false);
+        reset_band_gpio_prepare_call_count_for_test();
+
+        config.use_ini = false;
+        config.mode = ModeType::WSPR;
+        config.transmit = true;
+        config.callsign = "AA0NT";
+        config.grid_square = "EM18";
+        config.power_dbm = 20;
+        config.frequencies = "30m@17H,0,0,0";
+        config.use_offset = false;
+        config.gpio_tx_pin = 4;
+        config.gpio_use_ntp = false;
+        config.ppm = 12.5;
+        resolve_backend_specific_config(config);
+
+        require(
+            set_frequencies(config),
+            "runtime repeated skip regression must accept a 30m slot followed by three explicit 0 Hz slots");
+        require(
+            set_config(true),
+            "runtime repeated skip regression must commit the initial 30m request");
+
+        const std::size_t prepare_calls_after_first_commit =
+            band_gpio_prepare_call_count_for_test();
+        const TransmissionRequest first_request =
+            current_transmission_request_for_test();
+        require(
+            !first_request.isSkipWindow() &&
+                nearly_equal(first_request.dial_frequency_hz, 10138700.0) &&
+                nearly_equal(first_request.actual_rf_frequency_hz, 10140200.0),
+            "runtime repeated skip regression must start on the valid 30m slot");
+        require(
+            nearly_equal(first_request.ppm, 12.5),
+            "runtime repeated skip regression must snapshot PPM into the committed 30m request");
+        require(
+            first_request.hasSelectorGPIO() &&
+                first_request.selector_band == HamBand::BAND_30M &&
+                first_request.selector_gpio_config.gpio == 17 &&
+                first_request.selector_gpio_config.active_high,
+            "runtime repeated skip regression must prepare selector GPIO for the valid 30m slot");
+        require(
+            prepare_calls_after_first_commit == 1U,
+            "runtime repeated skip regression must perform exactly one band-correlation pass for the initial valid slot");
+
+        transmitter_cb(
+            WsprTransmissionCallbackEvent::COMPLETE,
+            WsprTransmitLogLevel::INFO,
+            "runtime repeated skip first transmit regression",
+            110.6);
+
+        const std::size_t prepare_calls_after_first_skip =
+            band_gpio_prepare_call_count_for_test();
+        const TransmissionRequest first_skip_request =
+            current_transmission_request_for_test();
+        require(
+            first_skip_request.isSkipWindow() &&
+                nearly_equal(first_skip_request.dial_frequency_hz, 0.0) &&
+                nearly_equal(first_skip_request.actual_rf_frequency_hz, 0.0),
+            "runtime repeated skip regression must commit the first 0 Hz slot as a skip-window request");
+        require(
+            nearly_equal(first_skip_request.ppm, 12.5),
+            "runtime repeated skip regression must snapshot PPM into committed skip requests");
+        require(
+            !first_skip_request.hasSelectorGPIO(),
+            "runtime repeated skip regression must not commit selector GPIO for the first 0 Hz slot");
+        require(
+            band_gpio_prepare_call_count_for_test() == prepare_calls_after_first_skip,
+            "runtime repeated skip regression must not call band correlation for the first 0 Hz slot");
+
+        transmitter_cb(
+            WsprTransmissionCallbackEvent::SKIPPED,
+            WsprTransmitLogLevel::INFO,
+            "runtime repeated skip second slot regression",
+            0.0);
+
+        const TransmissionRequest second_skip_request =
+            current_transmission_request_for_test();
+        require(
+            second_skip_request.isSkipWindow() &&
+                nearly_equal(second_skip_request.dial_frequency_hz, 0.0) &&
+                nearly_equal(second_skip_request.actual_rf_frequency_hz, 0.0),
+            "runtime repeated skip regression must advance to the second 0 Hz slot");
+        require(
+            !second_skip_request.hasSelectorGPIO(),
+            "runtime repeated skip regression must not commit selector GPIO for the second 0 Hz slot");
+        require(
+            band_gpio_prepare_call_count_for_test() == prepare_calls_after_first_skip,
+            "runtime repeated skip regression must not call band correlation for the second 0 Hz slot");
+
+        transmitter_cb(
+            WsprTransmissionCallbackEvent::SKIPPED,
+            WsprTransmitLogLevel::INFO,
+            "runtime repeated skip third slot regression",
+            0.0);
+
+        const TransmissionRequest third_skip_request =
+            current_transmission_request_for_test();
+        require(
+            third_skip_request.isSkipWindow() &&
+                nearly_equal(third_skip_request.dial_frequency_hz, 0.0) &&
+                nearly_equal(third_skip_request.actual_rf_frequency_hz, 0.0),
+            "runtime repeated skip regression must advance to the third 0 Hz slot");
+        require(
+            !third_skip_request.hasSelectorGPIO(),
+            "runtime repeated skip regression must not commit selector GPIO for the third 0 Hz slot");
+        require(
+            band_gpio_prepare_call_count_for_test() == prepare_calls_after_first_skip,
+            "runtime repeated skip regression must not call band correlation for the third 0 Hz slot");
+
+        transmitter_cb(
+            WsprTransmissionCallbackEvent::SKIPPED,
+            WsprTransmitLogLevel::INFO,
+            "runtime repeated skip wrap regression",
+            0.0);
+
+        const TransmissionRequest wrapped_request =
+            current_transmission_request_for_test();
+        require(
+            !wrapped_request.isSkipWindow() &&
+                nearly_equal(wrapped_request.dial_frequency_hz, 10138700.0) &&
+                nearly_equal(wrapped_request.actual_rf_frequency_hz, 10140200.0),
+            "runtime repeated skip regression must wrap back to the valid 30m slot after three skips");
+        require(
+            nearly_equal(wrapped_request.ppm, 12.5),
+            "runtime repeated skip regression must preserve the committed PPM snapshot when the valid slot resumes");
+        require(
+            wrapped_request.hasSelectorGPIO() &&
+                wrapped_request.selector_band == HamBand::BAND_30M &&
+                wrapped_request.selector_gpio_config.gpio == 17 &&
+                wrapped_request.selector_gpio_config.active_high,
+            "runtime repeated skip regression must restore selector GPIO when the valid 30m slot resumes");
+        require(
+            band_gpio_prepare_call_count_for_test() == prepare_calls_after_first_skip + 1U,
+            "runtime repeated skip regression must call band correlation again only when the valid 30m slot resumes");
+
+        cleanup_scheduler_regression_test_state();
+    }
+
+    {
+        init_config_json();
+        json_to_config();
+        ini_reload_pending.store(false, std::memory_order_relaxed);
+        ppm_reload_pending.store(false, std::memory_order_relaxed);
+        exiting_wspr.store(false, std::memory_order_relaxed);
+        reset_managed_reload_runtime_for_test();
+        reset_current_transmission_request_for_test();
+        set_scheduler_execution_suppressed_for_test(true);
+        set_band_gpio_selector_for_test(false, false);
+        reset_band_gpio_prepare_call_count_for_test();
+
+        config.use_ini = false;
+        config.mode = ModeType::WSPR;
+        config.transmit = true;
+        config.callsign = "AA0NT";
+        config.grid_square = "EM18";
+        config.power_dbm = 20;
+        config.frequencies = "30m,30m,20m";
+        config.use_offset = false;
+        config.gpio_tx_pin = 4;
+        config.gpio_use_ntp = false;
+        resolve_backend_specific_config(config);
+
+        require(
+            set_frequencies(config),
+            "runtime repeated valid-slot regression must accept repeated valid WSPR entries");
+        require(
+            set_config(true),
+            "runtime repeated valid-slot regression must commit the first 30m slot");
+
+        TransmissionRequest first_request =
+            current_transmission_request_for_test();
+        require(
+            !first_request.isSkipWindow() &&
+                nearly_equal(first_request.dial_frequency_hz, 10138700.0) &&
+                nearly_equal(first_request.actual_rf_frequency_hz, 10140200.0),
+            "runtime repeated valid-slot regression must start on the first 30m slot");
+        require(
+            band_gpio_prepare_call_count_for_test() == 1U,
+            "runtime repeated valid-slot regression must correlate band GPIO once for the initial valid slot");
+
+        transmitter_cb(
+            WsprTransmissionCallbackEvent::COMPLETE,
+            WsprTransmitLogLevel::INFO,
+            "runtime repeated valid-slot first transmit regression",
+            110.6);
+
+        TransmissionRequest second_request =
+            current_transmission_request_for_test();
+        require(
+            !second_request.isSkipWindow() &&
+                nearly_equal(second_request.dial_frequency_hz, 10138700.0) &&
+                nearly_equal(second_request.actual_rf_frequency_hz, 10140200.0),
+            "runtime repeated valid-slot regression must commit the second 30m slot separately");
+        require(
+            band_gpio_prepare_call_count_for_test() == 2U,
+            "runtime repeated valid-slot regression must produce a fresh scheduling decision for the repeated 30m slot");
+
+        transmitter_cb(
+            WsprTransmissionCallbackEvent::COMPLETE,
+            WsprTransmitLogLevel::INFO,
+            "runtime repeated valid-slot second transmit regression",
+            110.6);
+
+        TransmissionRequest third_request =
+            current_transmission_request_for_test();
+        require(
+            !third_request.isSkipWindow() &&
+                nearly_equal(third_request.dial_frequency_hz, 14095600.0) &&
+                nearly_equal(third_request.actual_rf_frequency_hz, 14097100.0),
+            "runtime repeated valid-slot regression must advance from the repeated 30m slots to 20m");
+        require(
+            band_gpio_prepare_call_count_for_test() == 3U,
+            "runtime repeated valid-slot regression must re-run band correlation for the following 20m slot");
+
+        transmitter_cb(
+            WsprTransmissionCallbackEvent::COMPLETE,
+            WsprTransmitLogLevel::INFO,
+            "runtime repeated valid-slot wrap regression",
+            110.6);
+
+        TransmissionRequest wrapped_request =
+            current_transmission_request_for_test();
+        require(
+            !wrapped_request.isSkipWindow() &&
+                nearly_equal(wrapped_request.dial_frequency_hz, 10138700.0) &&
+                nearly_equal(wrapped_request.actual_rf_frequency_hz, 10140200.0),
+            "runtime repeated valid-slot regression must wrap from 20m back to the first 30m slot");
+
+        cleanup_scheduler_regression_test_state();
+    }
+
+    {
+        init_config_json();
+        json_to_config();
+        ini_reload_pending.store(false, std::memory_order_relaxed);
+        ppm_reload_pending.store(false, std::memory_order_relaxed);
+        exiting_wspr.store(false, std::memory_order_relaxed);
+        reset_managed_reload_runtime_for_test();
+        reset_current_transmission_request_for_test();
+        set_scheduler_execution_suppressed_for_test(true);
+        set_band_gpio_selector_for_test(false, false);
+        reset_band_gpio_prepare_call_count_for_test();
+
+        config.use_ini = false;
+        config.mode = ModeType::WSPR;
+        config.transmit = true;
+        config.callsign = "AA0NT";
+        config.grid_square = "EM18";
+        config.power_dbm = 20;
+        config.frequencies = "20m,20m,0";
+        config.use_offset = false;
+        config.gpio_tx_pin = 4;
+        config.gpio_use_ntp = false;
+        resolve_backend_specific_config(config);
+
+        require(
+            set_frequencies(config),
+            "runtime valid-valid-skip regression must accept repeated valid entries followed by a skip");
+        require(
+            set_config(true),
+            "runtime valid-valid-skip regression must commit the first 20m slot");
+
+        TransmissionRequest first_request =
+            current_transmission_request_for_test();
+        require(
+            !first_request.isSkipWindow() &&
+                nearly_equal(first_request.dial_frequency_hz, 14095600.0) &&
+                nearly_equal(first_request.actual_rf_frequency_hz, 14097100.0),
+            "runtime valid-valid-skip regression must start on the first 20m slot");
+        require(
+            band_gpio_prepare_call_count_for_test() == 1U,
+            "runtime valid-valid-skip regression must correlate band GPIO once for the initial valid slot");
+
+        transmitter_cb(
+            WsprTransmissionCallbackEvent::COMPLETE,
+            WsprTransmitLogLevel::INFO,
+            "runtime valid-valid-skip first transmit regression",
+            110.6);
+
+        TransmissionRequest second_request =
+            current_transmission_request_for_test();
+        require(
+            !second_request.isSkipWindow() &&
+                nearly_equal(second_request.dial_frequency_hz, 14095600.0) &&
+                nearly_equal(second_request.actual_rf_frequency_hz, 14097100.0),
+            "runtime valid-valid-skip regression must commit the second 20m slot separately");
+        require(
+            band_gpio_prepare_call_count_for_test() == 2U,
+            "runtime valid-valid-skip regression must advance the schedule across repeated valid 20m slots");
+
+        transmitter_cb(
+            WsprTransmissionCallbackEvent::COMPLETE,
+            WsprTransmitLogLevel::INFO,
+            "runtime valid-valid-skip second transmit regression",
+            110.6);
+
+        TransmissionRequest skip_request =
+            current_transmission_request_for_test();
+        require(
+            skip_request.isSkipWindow() &&
+                nearly_equal(skip_request.dial_frequency_hz, 0.0) &&
+                nearly_equal(skip_request.actual_rf_frequency_hz, 0.0),
+            "runtime valid-valid-skip regression must commit the trailing 0 Hz slot as a skip-window request");
+        require(
+            band_gpio_prepare_call_count_for_test() == 2U,
+            "runtime valid-valid-skip regression must not run band correlation for the 0 Hz slot");
+
+        transmitter_cb(
+            WsprTransmissionCallbackEvent::SKIPPED,
+            WsprTransmitLogLevel::INFO,
+            "runtime valid-valid-skip wrap regression",
+            0.0);
+
+        TransmissionRequest wrapped_request =
+            current_transmission_request_for_test();
+        require(
+            !wrapped_request.isSkipWindow() &&
+                nearly_equal(wrapped_request.dial_frequency_hz, 14095600.0) &&
+                nearly_equal(wrapped_request.actual_rf_frequency_hz, 14097100.0),
+            "runtime valid-valid-skip regression must wrap from the skip slot back to 20m");
+        require(
+            band_gpio_prepare_call_count_for_test() == 3U,
+            "runtime valid-valid-skip regression must resume normal band correlation after the skip slot");
+
+        cleanup_scheduler_regression_test_state();
+    }
+
+    {
+        init_config_json();
+        json_to_config();
+        ini_reload_pending.store(false, std::memory_order_relaxed);
         exiting_wspr.store(false, std::memory_order_relaxed);
         reset_managed_reload_runtime_for_test();
         reset_current_transmission_request_for_test();

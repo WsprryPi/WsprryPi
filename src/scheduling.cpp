@@ -264,6 +264,7 @@ static std::vector<SelectorGPIOReservation> idle_selector_gpio_reservations{};
 static bool selector_gpio_control_enabled = false;
 static bool selector_gpio_drive_enabled = false;
 static std::vector<BandGPIOConfig> last_selector_shutdown_cleanup_targets{};
+static std::atomic<std::size_t> band_gpio_prepare_call_counter_for_test{0U};
 /**
  * @brief Scheduler-owned paired WSPR plan being continued across slots.
  *
@@ -1318,6 +1319,8 @@ static BandGPIOPrepareStatus prepare_band_gpio_for_frequency_or_log(
     int frequency_entry_index,
     BandGPIOResolution *resolution_out)
 {
+    band_gpio_prepare_call_counter_for_test.fetch_add(1U, std::memory_order_relaxed);
+
     if (resolution_out != nullptr)
     {
         *resolution_out = BandGPIOResolution{};
@@ -4095,8 +4098,17 @@ bool set_config(bool force)
             next_current_frequency_entry.token != last_frequency_entry.token ||
             next_current_frequency_entry.selector_gpio != last_frequency_entry.selector_gpio ||
             next_current_frequency_entry.selector_gpio_active_high != last_frequency_entry.selector_gpio_active_high;
+        const bool advanced_to_new_frequency_entry =
+            !working_config.wspr_frequency_entries.empty() &&
+            next_freq_iterator != freq_iterator;
+        const bool advanced_to_new_wspr_slot =
+            (next_active_wspr_plan_in_progress &&
+             next_active_wspr_frame_index != active_wspr_frame_index) ||
+            advanced_to_new_frequency_entry;
 
-        if (next_current_dial_frequency != last_freq || frequency_entry_changed)
+        if (advanced_to_new_wspr_slot ||
+            next_current_dial_frequency != last_freq ||
+            frequency_entry_changed)
         {
             do_config = true;
         }
@@ -4502,6 +4514,16 @@ void set_scheduler_execution_suppressed_for_test(bool suppressed) noexcept
         stop_active_transmission_selectors();
         release_idle_selector_gpio_reservations();
     }
+}
+
+void reset_band_gpio_prepare_call_count_for_test() noexcept
+{
+    band_gpio_prepare_call_counter_for_test.store(0U, std::memory_order_relaxed);
+}
+
+std::size_t band_gpio_prepare_call_count_for_test() noexcept
+{
+    return band_gpio_prepare_call_counter_for_test.load(std::memory_order_relaxed);
 }
 
 void set_band_gpio_selector_for_test(bool enabled, bool drive_gpio) noexcept
