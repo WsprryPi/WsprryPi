@@ -4563,6 +4563,19 @@ void stop_active_transmission_selectors_for_test() noexcept
     stop_active_transmission_selectors();
 }
 
+void stop_runtime_components_for_test() noexcept
+{
+    webServer.stop();
+    socketServer.stop();
+    iniMonitor.stop();
+    shutdownMonitor.stop();
+    ppmManager.stop();
+    wsprTransmitter.stopAndJoin();
+    ledControl.stop();
+    stop_active_transmission_selectors();
+    release_idle_selector_gpio_reservations();
+}
+
 bool park_active_transmission_selectors_for_test() noexcept
 {
     const BandGPIOConfig *active_config_ptr = bandGPIOSelector.currentConfig();
