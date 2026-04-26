@@ -318,6 +318,7 @@ namespace
         stop_runtime_components_for_test();
         wsprTransmitter.backendSetStateValue(WsprTransmitter::State::DISABLED);
         set_band_gpio_selector_for_test(false, false);
+        set_raspberry_pi_generation_override_for_test(4);
         set_scheduler_execution_suppressed_for_test(false);
         reset_managed_reload_runtime_for_test();
         clear_current_wspr_runtime_state_for_test();
@@ -335,6 +336,16 @@ namespace
     void clear_si5351_detection_override_for_scope() noexcept
     {
         set_si5351_detection_override_for_test(true);
+    }
+
+    void sync_wspr_fields_for_test() noexcept
+    {
+        config.wspr.callsign = config.callsign;
+        config.wspr.grid_square = config.grid_square;
+        config.wspr.power_dbm = config.power_dbm;
+        config.wspr.frequencies = config.frequencies;
+        config.wspr.audio_offset_hz = config.wspr_audio_offset_hz;
+        config.wspr.planner_preference = config.wspr_planner_preference;
     }
 
     void require_patch_accepts_and_runtime_plans(
@@ -1814,6 +1825,7 @@ int main(int argc, char *argv[])
         json_to_config();
         ini_reload_pending.store(false, std::memory_order_relaxed);
         exiting_wspr.store(false, std::memory_order_relaxed);
+        set_raspberry_pi_generation_override_for_test(4);
 
         config.use_ini = false;
         config.mode = ModeType::WSPR;
@@ -1824,6 +1836,7 @@ int main(int argc, char *argv[])
         config.frequencies = "20m";
         config.gpio_tx_pin = 4;
         resolve_backend_specific_config(config);
+        sync_wspr_fields_for_test();
 
         require(
             !set_config(true),
@@ -1838,6 +1851,7 @@ int main(int argc, char *argv[])
         json_to_config();
         ini_reload_pending.store(false, std::memory_order_relaxed);
         exiting_wspr.store(false, std::memory_order_relaxed);
+        set_raspberry_pi_generation_override_for_test(4);
 
         config.use_ini = false;
         config.mode = ModeType::WSPR;
@@ -1848,6 +1862,7 @@ int main(int argc, char *argv[])
         config.frequencies = "20m";
         config.gpio_tx_pin = 4;
         resolve_backend_specific_config(config);
+        sync_wspr_fields_for_test();
         set_frequencies(config);
 
         set_scheduler_execution_suppressed_for_test(true);
