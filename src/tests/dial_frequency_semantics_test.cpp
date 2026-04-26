@@ -1249,6 +1249,56 @@ int main(int argc, char *argv[])
         require(
             committed_request.isSkipWindow(),
             "skip-window requests must be explicitly marked by the scheduler");
+
+        committed_request.payload.frames.clear();
+        committed_request.dial_frequency_hz = 0.0;
+        committed_request.actual_rf_frequency_hz = 0.0;
+
+        bool saw_skipped_callback = false;
+        transmitter.setTransmissionCallbacks(
+            [&](WsprTransmitter::TransmissionCallbackEvent event,
+                WsprTransmitter::LogLevel,
+                const std::string &,
+                double)
+            {
+                if (event == WsprTransmitter::TransmissionCallbackEvent::SKIPPED)
+                {
+                    saw_skipped_callback = true;
+                }
+            });
+        transmitter.configureExecution(committed_request);
+        transmitter.transmit();
+
+        const auto skip_wait_deadline =
+            std::chrono::steady_clock::now() + std::chrono::milliseconds(250);
+        while (!saw_skipped_callback &&
+               std::chrono::steady_clock::now() < skip_wait_deadline)
+        {
+            usleep(1000);
+        }
+
+        require(
+            saw_skipped_callback,
+            "explicit skip-window requests must emit the SKIPPED callback even without WSPR frames");
+        require(
+            transmitter.getState() == WsprTransmitter::State::COMPLETE,
+            "skip-window execution must complete cleanly without backend RF setup");
+
+        committed_request.skip_window = false;
+        bool rejected_empty_wspr = false;
+        try
+        {
+            transmitter.configureExecution(committed_request);
+        }
+        catch (const std::invalid_argument &ex)
+        {
+            rejected_empty_wspr =
+                std::string(ex.what()) ==
+                "WSPR transmission request contains no frames.";
+        }
+        require(
+            rejected_empty_wspr,
+            "ordinary WSPR requests with no frames must still be rejected");
     }
 
     {
@@ -1687,6 +1737,91 @@ int main(int argc, char *argv[])
                 next_request.selector_gpio_config.gpio == 17 &&
                 next_request.selector_gpio_config.active_high,
             "normal runtime scheduling must preserve selector GPIO preparation for the next valid nonzero entry");
+
+        cleanup_scheduler_regression_test_state();
+    }
+
+    {
+        init_config_json();
+        json_to_config();
+        ini_reload_pending.store(false, std::memory_order_relaxed);
+        exiting_wspr.store(false, std::memory_order_relaxed);
+        reset_managed_reload_runtime_for_test();
+        reset_current_transmission_request_for_test();
+        set_scheduler_execution_suppressed_for_test(true);
+        set_band_gpio_selector_for_test(false, false);
+
+        config.use_ini = false;
+        config.mode = ModeType::WSPR;
+        config.transmit = true;
+        config.callsign = "AA0NT";
+        config.grid_square = "EM18";
+        config.power_dbm = 20;
+        config.frequencies = "20m,30m,0";
+        config.use_offset = false;
+        config.gpio_tx_pin = 4;
+        config.gpio_use_ntp = false;
+        resolve_backend_specific_config(config);
+
+        require(
+            set_frequencies(config),
+            "runtime multi-slot skip regression must accept a trailing 0 Hz WSPR entry");
+        require(
+            set_config(true),
+            "runtime multi-slot skip regression must commit the first WSPR request");
+
+        TransmissionRequest first_request =
+            current_transmission_request_for_test();
+        require(
+            !first_request.isSkipWindow() &&
+                nearly_equal(first_request.dial_frequency_hz, 14095600.0) &&
+                nearly_equal(first_request.actual_rf_frequency_hz, 14097100.0),
+            "runtime multi-slot skip regression must start on the first valid 20m entry");
+
+        transmitter_cb(
+            WsprTransmissionCallbackEvent::COMPLETE,
+            WsprTransmitLogLevel::INFO,
+            "runtime multi-slot first transmit regression",
+            110.6);
+
+        TransmissionRequest second_request =
+            current_transmission_request_for_test();
+        require(
+            !second_request.isSkipWindow() &&
+                nearly_equal(second_request.dial_frequency_hz, 10138700.0) &&
+                nearly_equal(second_request.actual_rf_frequency_hz, 10140200.0),
+            "runtime multi-slot skip regression must advance to the second valid 30m entry");
+
+        transmitter_cb(
+            WsprTransmissionCallbackEvent::COMPLETE,
+            WsprTransmitLogLevel::INFO,
+            "runtime multi-slot second transmit regression",
+            110.6);
+
+        const TransmissionRequest skip_request =
+            current_transmission_request_for_test();
+        require(
+            skip_request.isSkipWindow() &&
+                nearly_equal(skip_request.dial_frequency_hz, 0.0) &&
+                nearly_equal(skip_request.actual_rf_frequency_hz, 0.0),
+            "runtime multi-slot skip regression must commit the trailing 0 Hz slot as a skip-window request");
+        require(
+            !skip_request.hasSelectorGPIO(),
+            "runtime multi-slot skip regression must not prepare selector GPIO for the trailing skip window");
+
+        transmitter_cb(
+            WsprTransmissionCallbackEvent::SKIPPED,
+            WsprTransmitLogLevel::INFO,
+            "runtime multi-slot skip regression",
+            0.0);
+
+        const TransmissionRequest wrapped_request =
+            current_transmission_request_for_test();
+        require(
+            !wrapped_request.isSkipWindow() &&
+                nearly_equal(wrapped_request.dial_frequency_hz, 14095600.0) &&
+                nearly_equal(wrapped_request.actual_rf_frequency_hz, 14097100.0),
+            "runtime multi-slot skip regression must wrap cleanly to the next valid transmission after SKIPPED");
 
         cleanup_scheduler_regression_test_state();
     }
