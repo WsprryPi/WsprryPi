@@ -241,12 +241,17 @@ int main()
             site_source.find("nextTransmissionAt") != std::string::npos &&
             site_source.find("frequencyHz") != std::string::npos &&
             site_source.find("offsetHz") != std::string::npos &&
+            site_source.find("frequencyIsSkip") != std::string::npos &&
             site_source.find("cw_message") != std::string::npos &&
             site_source.find("cw_active_char_index") != std::string::npos &&
             site_source.find("if (typeof handleRuntimeStatusUpdate === \"function\") {") != std::string::npos &&
             site_source.find("const selectedMode =\n        typeof selectedConfigMode === \"function\" ? selectedConfigMode() : \"\";") != std::string::npos &&
             site_source.find("renderRuntimeFrequencyPane(frequencyNode, currentMode, currentRuntimeStatus);") != std::string::npos &&
             site_source.find("function buildRuntimeFrequencyItems(currentMode, status)") != std::string::npos &&
+            site_source.find("function runtimeFrequencyPrimaryLabel(currentMode, status)") != std::string::npos &&
+            site_source.find("return \"Next Frequency\";") != std::string::npos &&
+            site_source.find("return \"(Skip)\";") != std::string::npos &&
+            site_source.find("queueRuntimeStatusRefresh();") != std::string::npos &&
             site_source.find("function formatDisplayFrequency(valueHz, options = {})") != std::string::npos &&
             site_source.find("forceUnit: \"Hz\"") != std::string::npos &&
             site_source.find("function renderCwRuntimeMessage(node, message, activeCharIndex)") != std::string::npos &&
@@ -264,12 +269,17 @@ int main()
         scheduling_source.find("snapshot.next_transmission_at") != std::string::npos &&
             scheduling_source.find("snapshot.frequency_hz = current_transmission_request.dial_frequency_hz;") != std::string::npos &&
             scheduling_source.find("snapshot.offset_hz = current_transmission_request.applied_offset_hz;") != std::string::npos &&
+            scheduling_source.find("snapshot.frequency_is_skip =") != std::string::npos &&
             scheduling_source.find("snapshot.frequency_hz = config.qrss.frequency_hz;") != std::string::npos &&
             scheduling_source.find("snapshot.frequency_hz = config.fskcw.space_frequency_hz;") != std::string::npos &&
             scheduling_source.find("snapshot.frequency_hz = config.dfcw.dot_frequency_hz;") != std::string::npos &&
             websocket_source.find("reply[\"next_transmission_at\"] = snapshot.next_transmission_at;") != std::string::npos &&
             websocket_source.find("reply[\"frequency_hz\"] = snapshot.frequency_hz;") != std::string::npos &&
             websocket_source.find("reply[\"offset_hz\"] = snapshot.offset_hz;") != std::string::npos &&
+            websocket_source.find("reply[\"frequency_is_skip\"] = snapshot.frequency_is_skip;") != std::string::npos &&
+            scheduling_source.find("j[\"frequency_hz\"] = snapshot.frequency_hz;") != std::string::npos &&
+            scheduling_source.find("j[\"offset_hz\"] = snapshot.offset_hz;") != std::string::npos &&
+            scheduling_source.find("j[\"frequency_is_skip\"] = snapshot.frequency_is_skip;") != std::string::npos &&
             scheduling_source.find("if (snapshot.tx_state == \"transmitting\")") != std::string::npos &&
             scheduling_source.find("snapshot.runtime_mode = mode_type_name(config.mode);") != std::string::npos &&
             scheduling_source.find("runtime_transmit_enabled(config)") != std::string::npos &&
@@ -320,11 +330,12 @@ int main()
     const std::size_t runtime_plan_position =
         operation_view_source.find("id=\"runtime_plan_label\"");
     require(
-        runtime_mode_position != std::string::npos &&
+            runtime_mode_position != std::string::npos &&
             runtime_frequency_position != std::string::npos &&
             runtime_plan_position != std::string::npos &&
             operation_view_source.find("operation-panel__label operation-panel__label--split") != std::string::npos &&
-            operation_view_source.find("<span>Frequency</span>") != std::string::npos &&
+            operation_view_source.find("id=\"runtime_frequency_primary_label\"") != std::string::npos &&
+            operation_view_source.find(">Frequency</span>") != std::string::npos &&
             runtime_mode_position < runtime_frequency_position &&
             runtime_frequency_position < runtime_plan_position,
         "Operation view must place the Frequency pane between the Current mode and mode-specific runtime panes");
