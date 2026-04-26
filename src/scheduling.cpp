@@ -2028,6 +2028,24 @@ static TransmissionRequest make_wspr_request(
     return request;
 }
 
+static TransmissionRequest make_skip_window_request(
+    const ArgParserConfig &cfg,
+    double committed_ppm,
+    double dial_frequency_hz,
+    const WsprFrequencyEntry &entry)
+{
+    TransmissionRequest request;
+    request.mode = TransmissionMode::WSPR;
+    request.dial_frequency_hz = dial_frequency_hz;
+    request.actual_rf_frequency_hz = 0.0;
+    request.ppm = committed_ppm;
+    request.power_level = cfg.power_level;
+    request.tx_gpio = cfg.tx_pin;
+    request.frequency_entry_label = entry.token;
+    request.skip_window = true;
+    return request;
+}
+
 static void commit_band_gpio_snapshot_to_request(
     TransmissionRequest &request,
     const BandGPIOResolution &resolution,
@@ -4212,114 +4230,140 @@ bool set_config(bool force)
                 return true;
             }
 
-            const double base_actual_rf_frequency_hz = resolve_actual_rf_frequency_hz(
-                next_current_dial_frequency,
-                working_config.wspr.audio_offset_hz,
-                FrequencyPath::WsprDial);
-            const double actual_rf_frequency_hz =
-                maybe_apply_wspr_random_offset(base_actual_rf_frequency_hz,
-                                               working_config);
-            const double applied_offset_hz =
-                actual_rf_frequency_hz - base_actual_rf_frequency_hz;
+            if (next_current_dial_frequency == 0.0)
+            {
+                llog.logS(
+                    INFO,
+                    "Skipping transmission period because the planned frequency is 0 Hz.");
 
-            llog.logS(
-                DEBUG,
-                "Resolved WSPR dial frequency ",
-                lookup.freq_display_string(next_current_dial_frequency),
-                " to actual RF ",
-                lookup.freq_display_string(actual_rf_frequency_hz),
-                " using audio offset ",
-                working_config.wspr.audio_offset_hz,
-                " Hz.");
-            if (!configure_current_wspr_transmission(
+                next_active_wspr_plan = PreparedWsprTransmission{};
+                next_active_wspr_frame_index = 0U;
+                next_active_wspr_plan_dial_frequency = 0.0;
+                next_active_wspr_plan_frequency_entry = WsprFrequencyEntry{};
+                next_active_wspr_plan_in_progress = false;
+
+                next_transmission_request = make_skip_window_request(
                     working_config,
                     committed_ppm,
                     next_current_dial_frequency,
-                    next_current_frequency_entry,
-                    next_active_wspr_plan,
-                    next_active_wspr_frame_index,
-                    next_active_wspr_plan_dial_frequency,
-                    next_active_wspr_plan_frequency_entry,
-                    next_active_wspr_plan_in_progress,
-                    actual_rf_frequency_hz,
-                    next_transmission_request))
-            {
-                if (newer_reload_arrived())
-                {
-                    continue;
-                }
-
-                if (is_managed_persistent_mode())
-                {
-                    set_managed_reload_tx_inhibited(
-                        true,
-                        "Managed reload planning failed; previous valid configuration remains loaded. Transmit is blocked until a valid configuration is loaded.");
-                    send_ws_message(
-                        "configuration",
-                        "reload_failed",
-                        "Managed reload planning failed; previous valid configuration remains loaded. Transmit is blocked until a valid configuration is loaded.");
-                    wsprTransmitter.stopAndJoin();
-                    stop_active_transmission_selectors();
-                    release_idle_selector_gpio_reservations();
-                    current_transmission_request = TransmissionRequest{};
-                    if (!finalize_reload_pending())
-                    {
-                        continue;
-                    }
-                    return true;
-                }
-
-                ini_reload_pending.store(false, std::memory_order_relaxed);
-                config.transmit = false;
-                config_to_json();
-                return false;
-            }
-
-            next_transmission_request.applied_offset_hz = applied_offset_hz;
-
-            BandGPIOResolution selector_resolution;
-            const BandGPIOPrepareStatus selector_status =
-                prepare_band_gpio_for_frequency_or_log(
-                    next_current_dial_frequency,
-                    next_current_frequency_entry,
-                    working_config,
-                    next_frequency_entry_index,
-                    &selector_resolution);
-            if (selector_status == BandGPIOPrepareStatus::Failed)
-            {
+                    next_current_frequency_entry);
                 stop_active_transmission_selectors();
+                commit_band_gpio_snapshot_to_request(
+                    next_transmission_request,
+                    BandGPIOResolution{},
+                    BandGPIOPrepareStatus::Inactive);
+            }
+            else
+            {
+                const double base_actual_rf_frequency_hz = resolve_actual_rf_frequency_hz(
+                    next_current_dial_frequency,
+                    working_config.wspr.audio_offset_hz,
+                    FrequencyPath::WsprDial);
+                const double actual_rf_frequency_hz =
+                    maybe_apply_wspr_random_offset(base_actual_rf_frequency_hz,
+                                                   working_config);
+                const double applied_offset_hz =
+                    actual_rf_frequency_hz - base_actual_rf_frequency_hz;
 
-                if (newer_reload_arrived())
+                llog.logS(
+                    DEBUG,
+                    "Resolved WSPR dial frequency ",
+                    lookup.freq_display_string(next_current_dial_frequency),
+                    " to actual RF ",
+                    lookup.freq_display_string(actual_rf_frequency_hz),
+                    " using audio offset ",
+                    working_config.wspr.audio_offset_hz,
+                    " Hz.");
+                if (!configure_current_wspr_transmission(
+                        working_config,
+                        committed_ppm,
+                        next_current_dial_frequency,
+                        next_current_frequency_entry,
+                        next_active_wspr_plan,
+                        next_active_wspr_frame_index,
+                        next_active_wspr_plan_dial_frequency,
+                        next_active_wspr_plan_frequency_entry,
+                        next_active_wspr_plan_in_progress,
+                        actual_rf_frequency_hz,
+                        next_transmission_request))
                 {
-                    continue;
-                }
-
-                if (is_managed_persistent_mode())
-                {
-                    set_managed_reload_tx_inhibited(
-                        true,
-                        "Managed reload could not prepare band GPIO; previous valid configuration remains loaded. Transmit is blocked until a valid configuration is loaded.");
-                    send_ws_message(
-                        "configuration",
-                        "reload_failed",
-                        "Managed reload could not prepare band GPIO; previous valid configuration remains loaded. Transmit is blocked until a valid configuration is loaded.");
-                    if (!finalize_reload_pending())
+                    if (newer_reload_arrived())
                     {
                         continue;
                     }
-                    return true;
+
+                    if (is_managed_persistent_mode())
+                    {
+                        set_managed_reload_tx_inhibited(
+                            true,
+                            "Managed reload planning failed; previous valid configuration remains loaded. Transmit is blocked until a valid configuration is loaded.");
+                        send_ws_message(
+                            "configuration",
+                            "reload_failed",
+                            "Managed reload planning failed; previous valid configuration remains loaded. Transmit is blocked until a valid configuration is loaded.");
+                        wsprTransmitter.stopAndJoin();
+                        stop_active_transmission_selectors();
+                        release_idle_selector_gpio_reservations();
+                        current_transmission_request = TransmissionRequest{};
+                        if (!finalize_reload_pending())
+                        {
+                            continue;
+                        }
+                        return true;
+                    }
+
+                    ini_reload_pending.store(false, std::memory_order_relaxed);
+                    config.transmit = false;
+                    config_to_json();
+                    return false;
                 }
 
-                ini_reload_pending.store(false, std::memory_order_relaxed);
-                config.transmit = false;
-                config_to_json();
-                return false;
-            }
+                next_transmission_request.applied_offset_hz = applied_offset_hz;
 
-            commit_band_gpio_snapshot_to_request(
-                next_transmission_request,
-                selector_resolution,
-                selector_status);
+                BandGPIOResolution selector_resolution;
+                const BandGPIOPrepareStatus selector_status =
+                    prepare_band_gpio_for_frequency_or_log(
+                        next_current_dial_frequency,
+                        next_current_frequency_entry,
+                        working_config,
+                        next_frequency_entry_index,
+                        &selector_resolution);
+                if (selector_status == BandGPIOPrepareStatus::Failed)
+                {
+                    stop_active_transmission_selectors();
+
+                    if (newer_reload_arrived())
+                    {
+                        continue;
+                    }
+
+                    if (is_managed_persistent_mode())
+                    {
+                        set_managed_reload_tx_inhibited(
+                            true,
+                            "Managed reload could not prepare band GPIO; previous valid configuration remains loaded. Transmit is blocked until a valid configuration is loaded.");
+                        send_ws_message(
+                            "configuration",
+                            "reload_failed",
+                            "Managed reload could not prepare band GPIO; previous valid configuration remains loaded. Transmit is blocked until a valid configuration is loaded.");
+                        if (!finalize_reload_pending())
+                        {
+                            continue;
+                        }
+                        return true;
+                    }
+
+                    ini_reload_pending.store(false, std::memory_order_relaxed);
+                    config.transmit = false;
+                    config_to_json();
+                    return false;
+                }
+
+                commit_band_gpio_snapshot_to_request(
+                    next_transmission_request,
+                    selector_resolution,
+                    selector_status);
+            }
 
             if (newer_reload_arrived())
             {
