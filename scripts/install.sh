@@ -6691,7 +6691,7 @@ manage_apache() {
 
     # Declare local variables after debug initialization
     local status=0
-    local config_file source_path site_conf server_name
+    local config_file source_path site_conf server_name target_conf
 
     config_file="wsprrypi.conf"
     source_path="${LOCAL_CONFIG_DIR}/${config_file}"
@@ -6704,6 +6704,51 @@ manage_apache() {
             exec_command "Insert ServerName directive" \
                 sed -i "1i $server_name" "$APACHE_CONF" \
                 "$debug"
+        fi
+
+        # Preserve existing custom sites by installing only the WsprryPi UI
+        # files and adding the required proxy rules to the active vhost.
+        if has_custom_apache_webroot "$debug"; then
+            logW "Existing custom web content detected in /var/www/html."
+            logW "Installing WsprryPi in copy-only Apache integration mode."
+
+            exec_command "Enable proxy modules" \
+                a2enmod proxy proxy_http proxy_wstunnel \
+                "$debug" || {
+                logE "Failed to enable proxy modules."
+                debug_end "$debug"
+                return 1
+            }
+
+            if ! find_active_apache_site_confs "$debug"; then
+                logW "No active Apache vhost config was found to amend."
+                logW "WsprryPi files were copied, but Apache routing was not changed."
+                debug_end "$debug"
+                return 0
+            fi
+
+            for target_conf in "${APACHE_ACTIVE_SITE_CONFS[@]}"; do
+                if ! install_wsprrypi_proxy_block "$target_conf" "$debug"; then
+                    logE "Failed to update Apache vhost '$target_conf'."
+                    debug_end "$debug"
+                    return 1
+                fi
+            done
+
+            exec_command "Test Apache configuration" apache2ctl configtest "$debug" || {
+                logE "Apache test failed."
+                debug_end "$debug"
+                return 1
+            }
+
+            exec_command "Reload Apache" systemctl reload apache2 "$debug" || {
+                logE "Failed to reload Apache."
+                debug_end "$debug"
+                return 1
+            }
+
+            debug_end "$debug"
+            return 0
         fi
 
         # Copy vhost config to sites-available
@@ -6720,8 +6765,8 @@ manage_apache() {
             return 1
         }
 
-        # If stock page, comment out log lines in the vhost before enabling
-        if is_stock_apache_page "${site_conf}" "$debug"; then
+        # If stock page, comment out log lines in the vhost before enabling.
+        if is_stock_apache_page "/var/www/html/index.html" "$debug"; then
             modify_comment_lines "${site_conf}" ".log" comment "$debug"
         fi
 
@@ -6747,10 +6792,22 @@ manage_apache() {
         }
 
     else
-        # Uninstall path
-        exec_command "Disable wsprrypi site" a2dissite wsprrypi.conf "$debug"
+        # Uninstall path. If WsprryPi owns the active vhost, restore the
+        # default Apache site. If it was integrated into an existing site,
+        # remove only the managed proxy block and leave that site enabled.
+        if [[ -e "/etc/apache2/sites-enabled/wsprrypi.conf" ]]; then
+            exec_command "Disable wsprrypi site" a2dissite wsprrypi.conf "$debug"
 
-        exec_command "Enable default site" a2ensite 000-default.conf "$debug"
+            exec_command "Enable default site" a2ensite 000-default.conf "$debug"
+        elif find_active_apache_site_confs "$debug"; then
+            for target_conf in "${APACHE_ACTIVE_SITE_CONFS[@]}"; do
+                remove_wsprrypi_proxy_block "$target_conf" "$debug" || {
+                    logE "Failed to remove WsprryPi proxy block from '$target_conf'."
+                    debug_end "$debug"
+                    return 1
+                }
+            done
+        fi
 
         exec_command "Remove wsprrypi available config" rm -f "${site_conf}" "$debug"
 
@@ -6788,8 +6845,11 @@ is_stock_apache_page() {
 
     local file="${1:-/var/www/html/index.html}"
 
-    # Must exist and be readable
-    [[ -r "$file" ]] || return 1
+    # Must exist and be readable.
+    if [[ ! -r "$file" ]]; then
+        debug_end "$debug"
+        return 1
+    fi
 
     # Common stock-page phrases (Ubuntu/Debian, RHEL/CentOS, generic)
     if grep -qiE \
@@ -6801,6 +6861,365 @@ is_stock_apache_page() {
         debug_end "$debug"
         return 1
     fi
+}
+
+# -----------------------------------------------------------------------------
+# @brief Check whether Apache document root contains a custom website.
+# @details Returns success when /var/www/html contains files that do not
+#          appear to be only the default Apache landing page.
+#
+# @param $1 Optional debug flag.
+#
+# @return 0 if custom content is detected, 1 otherwise.
+# -----------------------------------------------------------------------------
+# shellcheck disable=SC2317
+# shellcheck disable=SC2329
+has_custom_apache_webroot() {
+    local debug
+    debug=$(debug_start "$@")
+    eval set -- "$(debug_filter "$@")"
+
+    local webroot="/var/www/html"
+    local default_index="${webroot}/index.html"
+    local item_count=0
+
+    if [[ ! -d "$webroot" ]]; then
+        debug_end "$debug"
+        return 1
+    fi
+
+    item_count=$(find "$webroot" -mindepth 1 -maxdepth 1 | wc -l)
+
+    if [[ "$item_count" -eq 0 ]]; then
+        debug_end "$debug"
+        return 1
+    fi
+
+    if [[ "$item_count" -eq 1 ]] && is_stock_apache_page "$default_index" "$debug"; then
+        debug_end "$debug"
+        return 1
+    fi
+
+    logW "Existing non-default website content was found in $webroot."
+    debug_print "Apache webroot contains custom content." "$debug"
+
+    debug_end "$debug"
+    return 0
+}
+
+
+# -----------------------------------------------------------------------------
+# @brief Locate active Apache vhost configs to amend.
+# @details Sets APACHE_ACTIVE_SITE_CONFS to enabled Apache site configs that are
+#          not the WsprryPi config. HTTP vhosts are included first, followed by
+#          SSL vhosts, so an existing custom site can serve WsprryPi under both
+#          http://host/wsprrypi/ and https://host/wsprrypi/ when HTTPS exists.
+#
+# @param $1 Optional debug flag.
+#
+# @return 0 when at least one config is found, 1 otherwise.
+# -----------------------------------------------------------------------------
+# shellcheck disable=SC2317
+# shellcheck disable=SC2329
+find_active_apache_site_confs() {
+    local debug
+    debug=$(debug_start "$@")
+    eval set -- "$(debug_filter "$@")"
+
+    local enabled_dir="/etc/apache2/sites-enabled"
+    local candidate
+    local resolved
+    local found=false
+    local http_confs=()
+    local ssl_confs=()
+
+    APACHE_ACTIVE_SITE_CONF=""
+    APACHE_ACTIVE_SITE_CONFS=()
+
+    if [[ ! -d "$enabled_dir" ]]; then
+        debug_print "Apache sites-enabled directory was not found." "$debug"
+        debug_end "$debug"
+        return 1
+    fi
+
+    for candidate in "$enabled_dir"/*.conf; do
+        [[ -e "$candidate" ]] || continue
+
+        resolved=$(readlink -f "$candidate")
+
+        if [[ "$(basename "$resolved")" == "wsprrypi.conf" ]]; then
+            continue
+        fi
+
+        [[ -f "$resolved" ]] || continue
+
+        if grep -qiE '<VirtualHost[[:space:]][^>]*(:|\*)80([^0-9]|>)' "$resolved"; then
+            http_confs+=("$resolved")
+        fi
+
+        if grep -qiE '<VirtualHost[[:space:]][^>]*(:|\*)443([^0-9]|>)' "$resolved"; then
+            ssl_confs+=("$resolved")
+        fi
+    done
+
+    for resolved in "${http_confs[@]}" "${ssl_confs[@]}"; do
+        [[ -n "$resolved" ]] || continue
+
+        if [[ " ${APACHE_ACTIVE_SITE_CONFS[*]} " != *" $resolved "* ]]; then
+            APACHE_ACTIVE_SITE_CONFS+=("$resolved")
+        fi
+    done
+
+    if (( ${#APACHE_ACTIVE_SITE_CONFS[@]} == 0 )); then
+        for candidate in "$enabled_dir"/*.conf; do
+            [[ -e "$candidate" ]] || continue
+
+            resolved=$(readlink -f "$candidate")
+
+            if [[ "$(basename "$resolved")" == "wsprrypi.conf" ]]; then
+                continue
+            fi
+
+            if [[ -f "$resolved" ]]; then
+                APACHE_ACTIVE_SITE_CONFS+=("$resolved")
+                debug_print "Selected fallback Apache vhost: $resolved" "$debug"
+                break
+            fi
+        done
+    fi
+
+    if (( ${#APACHE_ACTIVE_SITE_CONFS[@]} == 0 )); then
+        debug_print "No suitable active Apache vhost was found." "$debug"
+        debug_end "$debug"
+        return 1
+    fi
+
+    APACHE_ACTIVE_SITE_CONF="${APACHE_ACTIVE_SITE_CONFS[0]}"
+
+    for resolved in "${APACHE_ACTIVE_SITE_CONFS[@]}"; do
+        found=true
+        debug_print "Selected active Apache vhost: $resolved" "$debug"
+    done
+
+    if [[ "$found" == true ]]; then
+        debug_end "$debug"
+        return 0
+    fi
+
+    debug_end "$debug"
+    return 1
+}
+
+# -----------------------------------------------------------------------------
+# @brief Locate the first active Apache vhost config to amend.
+# @details Compatibility wrapper for callers that expect APACHE_ACTIVE_SITE_CONF.
+#
+# @param $1 Optional debug flag.
+#
+# @return 0 when a config is found, 1 otherwise.
+# -----------------------------------------------------------------------------
+# shellcheck disable=SC2317
+# shellcheck disable=SC2329
+find_active_apache_site_conf() {
+    local debug
+    debug=$(debug_start "$@")
+    eval set -- "$(debug_filter "$@")"
+
+    if find_active_apache_site_confs "$debug"; then
+        debug_end "$debug"
+        return 0
+    fi
+
+    debug_end "$debug"
+    return 1
+}
+
+# -----------------------------------------------------------------------------
+# @brief Add or update the WsprryPi proxy block in an Apache vhost.
+# @details Removes any existing managed WsprryPi proxy block, then inserts the
+#          current block before each closing VirtualHost tag. If no VirtualHost
+#          tag is present, the block is appended to the file.
+#
+# @param $1 Apache vhost config path to update.
+# @param $2 Optional debug flag.
+#
+# @return 0 on success, 1 otherwise.
+# -----------------------------------------------------------------------------
+# shellcheck disable=SC2317
+# shellcheck disable=SC2329
+install_wsprrypi_proxy_block() {
+    local debug
+    debug=$(debug_start "$@")
+    eval set -- "$(debug_filter "$@")"
+
+    local config_file="${1:-}"
+    local tmp_file
+    local backup_file
+    local proxy_block
+
+    if [[ -z "$config_file" || ! -f "$config_file" ]]; then
+        logE "Apache vhost config '$config_file' was not found."
+        debug_end "$debug"
+        return 1
+    fi
+
+    proxy_block=$(cat <<'EOF'
+    # BEGIN WsprryPi proxy configuration
+    # REST API (port 31415)
+    ProxyPass        /wsprrypi/config  http://127.0.0.1:31415/config
+    ProxyPassReverse /wsprrypi/config  http://127.0.0.1:31415/config
+    ProxyPass        /wsprrypi/version http://127.0.0.1:31415/version
+    ProxyPassReverse /wsprrypi/version http://127.0.0.1:31415/version
+
+    # WebSocket (port 31416)
+    ProxyPass        /wsprrypi/socket  ws://127.0.0.1:31416/socket
+    ProxyPassReverse /wsprrypi/socket  ws://127.0.0.1:31416/socket
+
+    <Proxy "http://127.0.0.1:31415/*">
+        Require all granted
+    </Proxy>
+    <Proxy "ws://127.0.0.1:31416/*">
+        Require all granted
+    </Proxy>
+    # END WsprryPi proxy configuration
+EOF
+)
+
+    if [[ "$DRY_RUN" == "true" ]]; then
+        logD "Exec: update managed WsprryPi proxy block in $config_file"
+        debug_end "$debug"
+        return 0
+    fi
+
+    tmp_file=$(mktemp) || {
+        logE "Failed to create temporary file."
+        debug_end "$debug"
+        return 1
+    }
+
+    backup_file="${config_file}.wsprrypi.bak"
+    if [[ ! -f "$backup_file" ]]; then
+        cp "$config_file" "$backup_file" || {
+            rm -f "$tmp_file"
+            logE "Failed to back up '$config_file'."
+            debug_end "$debug"
+            return 1
+        }
+    fi
+
+    awk -v block="$proxy_block" '
+        /^[[:space:]]*# BEGIN WsprryPi proxy configuration[[:space:]]*$/ {
+            in_block = 1
+            next
+        }
+
+        /^[[:space:]]*# END WsprryPi proxy configuration[[:space:]]*$/ {
+            in_block = 0
+            next
+        }
+
+        !in_block {
+            if ($0 ~ /^[[:space:]]*<\/VirtualHost>[[:space:]]*$/) {
+                print block
+                inserted = 1
+            }
+            print
+        }
+
+        END {
+            if (!inserted) {
+                print ""
+                print block
+            }
+        }
+    ' "$config_file" >"$tmp_file" || {
+        rm -f "$tmp_file"
+        logE "Failed to build updated Apache config."
+        debug_end "$debug"
+        return 1
+    }
+
+    mv "$tmp_file" "$config_file" || {
+        rm -f "$tmp_file"
+        logE "Failed to install updated Apache config."
+        debug_end "$debug"
+        return 1
+    }
+
+    debug_print "Installed WsprryPi proxy block in $config_file." "$debug"
+    debug_end "$debug"
+    return 0
+}
+
+
+# -----------------------------------------------------------------------------
+# @brief Remove the managed WsprryPi proxy block from an Apache vhost.
+# @details Removes only the lines between the WsprryPi BEGIN and END markers.
+#
+# @param $1 Apache vhost config path to update.
+# @param $2 Optional debug flag.
+#
+# @return 0 on success, 1 otherwise.
+# -----------------------------------------------------------------------------
+# shellcheck disable=SC2317
+# shellcheck disable=SC2329
+remove_wsprrypi_proxy_block() {
+    local debug
+    debug=$(debug_start "$@")
+    eval set -- "$(debug_filter "$@")"
+
+    local config_file="${1:-}"
+    local tmp_file
+
+    if [[ -z "$config_file" || ! -f "$config_file" ]]; then
+        logE "Apache vhost config '$config_file' was not found."
+        debug_end "$debug"
+        return 1
+    fi
+
+    if [[ "$DRY_RUN" == "true" ]]; then
+        logD "Exec: remove managed WsprryPi proxy block from $config_file"
+        debug_end "$debug"
+        return 0
+    fi
+
+    tmp_file=$(mktemp) || {
+        logE "Failed to create temporary file."
+        debug_end "$debug"
+        return 1
+    }
+
+    awk '
+        /^[[:space:]]*# BEGIN WsprryPi proxy configuration[[:space:]]*$/ {
+            in_block = 1
+            next
+        }
+
+        /^[[:space:]]*# END WsprryPi proxy configuration[[:space:]]*$/ {
+            in_block = 0
+            next
+        }
+
+        !in_block {
+            print
+        }
+    ' "$config_file" >"$tmp_file" || {
+        rm -f "$tmp_file"
+        logE "Failed to remove managed WsprryPi proxy block."
+        debug_end "$debug"
+        return 1
+    }
+
+    mv "$tmp_file" "$config_file" || {
+        rm -f "$tmp_file"
+        logE "Failed to install updated Apache config."
+        debug_end "$debug"
+        return 1
+    }
+
+    debug_print "Removed WsprryPi proxy block from $config_file." "$debug"
+    debug_end "$debug"
+    return 0
 }
 
 # -----------------------------------------------------------------------------
