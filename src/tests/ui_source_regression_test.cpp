@@ -340,6 +340,19 @@ int main()
         footer_source.find("<details class=\"footer-meta\">") != std::string::npos &&
             footer_source.find("<summary>About</summary>") != std::string::npos,
         "footer markup must keep the native click-based About disclosure");
+    const std::string fetch_spots_source =
+        read_text_file("/home/pi/WsprryPi/WsprryPi-UI/data/fetch_spots.php");
+    require(
+        fetch_spots_source.find("function normalizeLookupBaseCallsign(string $value): string") != std::string::npos &&
+            fetch_spots_source.find("function buildLookupCallsignCandidates(string $value): array") != std::string::npos &&
+            fetch_spots_source.find("'%/' . $baseCallsign") != std::string::npos &&
+            fetch_spots_source.find("$baseCallsign . '/%'") != std::string::npos &&
+            fetch_spots_source.find("'<' . $baseCallsign . '>'") != std::string::npos &&
+            fetch_spots_source.find("function fetchDownloaderData(array $txCandidates, string $rxSign, string $start, string $end, string $format): array") != std::string::npos &&
+            fetch_spots_source.find("function fetchClickhouseData(array $txRegexes, ?string $rxSign, DateTimeImmutable $start, DateTimeImmutable $end): array") != std::string::npos &&
+            fetch_spots_source.find("$txLookup = buildLookupCallsignCandidates($txSignRaw);") != std::string::npos &&
+            fetch_spots_source.find("$txLookupBase = sanitizeClickhouseCallsign($txLookup['base'], 'Transmitter callsign');") != std::string::npos,
+        "spot lookup must normalize compound configured callsigns into shared downloader and clickhouse lookup candidates without changing non-lookup callsign handling");
 
     const std::string operation_view_source =
         read_text_file("/home/pi/WsprryPi/WsprryPi-UI/data/views/operation.php");
