@@ -212,8 +212,8 @@ declare REPO_NAME="WsprryPi"      # Case Sensitive
 declare UI_REPO_DIR="WsprryPi-UI" # Case Sensitive
 declare REPO_TITLE="${REPO_TITLE:-Wsprry Pi}"
 declare REPO_BRANCH="${REPO_BRANCH:-devel}"
-declare GIT_TAG="${GIT_TAG:-v3.0.0-rc.1}"
-declare SEM_VER="${SEM_VER:-3.0.0-rc.1}"
+declare GIT_TAG="${GIT_TAG:-v3.0.0-rc.2}"
+declare SEM_VER="${SEM_VER:-3.0.0-rc.2}"
 declare GIT_RAW_BASE="https://raw.githubusercontent.com"
 declare GIT_API_BASE="https://api.github.com/repos"
 declare GIT_CLONE_BASE="https://github.com"
@@ -890,6 +890,32 @@ declare APACHE_CONF="${APACHE_CONF:-$DEFAULT_APACHE_CONF}"
 # @example SERVERNAME_DIRECTIVE="ServerName example.com" ./install.sh
 # -----------------------------------------------------------------------------
 declare SERVERNAME_DIRECTIVE="${SERVERNAME_DIRECTIVE:-$DEFAULT_SERVERNAME}"
+
+# -----------------------------------------------------------------------------
+# @var APACHE_WEB_MODE
+# @type string
+# @brief Detected Apache integration mode for the current system.
+# @details Populated by `detect_apache_web_mode()` during the preflight phase
+#          and reused by `manage_apache()` during the action phase.
+# @values stock | existing_wsprrypi | custom_site | no_apache | unknown
+# -----------------------------------------------------------------------------
+declare APACHE_WEB_MODE="${APACHE_WEB_MODE:-unknown}"
+
+# -----------------------------------------------------------------------------
+# @var APACHE_WEB_MODE_DETECTED
+# @type bool
+# @brief Indicates whether Apache mode detection has already been performed.
+# -----------------------------------------------------------------------------
+declare APACHE_WEB_MODE_DETECTED="${APACHE_WEB_MODE_DETECTED:-false}"
+
+# -----------------------------------------------------------------------------
+# @var NO_WEB
+# @type bool
+# @brief Disable installation and runtime configuration of the web UI.
+# @details When set to `true`, the installer skips web asset and Apache
+#          integration steps and configures the service to start with `--no-web`.
+# -----------------------------------------------------------------------------
+declare NO_WEB="${NO_WEB:-false}"
 
 # -----------------------------------------------------------------------------
 # @var WAS_RUNNING
@@ -2212,19 +2238,7 @@ print_version() {
     local debug
     debug=$(debug_start "$@")
     eval set -- "$(debug_filter "$@")"
-
-    # Check the name of the calling function
-    local caller="${FUNCNAME[1]}"
-
-    if [[ "$caller" == "process_args" ]]; then
-        printf "%s: version %s\n" "$REPO_TITLE" "$SEM_VER" # Display the script name and version
-    else
-        if [[ "$THIS_SCRIPT" == "piped_script" ]]; then
-            logI "Running ${REPO_TITLE}'s install script, version $SEM_VER."
-        else
-            logI "Running ${REPO_TITLE}'s '${THIS_SCRIPT}', version $SEM_VER"
-        fi
-    fi
+    logI "Wsprry Pi version: ${SEM_VER}"
 
     debug_end "$debug"
     return 0
@@ -2417,8 +2431,18 @@ enforce_sudo() {
     local debug
     debug=$(debug_start "$@")
     eval set -- "$(debug_filter "$@")"
+    local arg
 
     if [[ "$REQUIRE_SUDO" == true ]]; then
+        for arg in "$@"; do
+            case "$arg" in
+                -h|--help|-v|--version)
+                    debug_end "$debug"
+                    return 0
+                    ;;
+            esac
+        done
+
         if [[ "$EUID" -eq 0 && -n "$SUDO_USER" && "$SUDO_COMMAND" == *"$0"* ]]; then
             debug_print "Sudo conditions met. Proceeding." "$debug"
             # Script is properly executed with `sudo`
@@ -5065,7 +5089,8 @@ ARGUMENTS_LIST=(
 # -----------------------------------------------------------------------------
 OPTIONS_LIST=(
     "-h|--help 0 usage Show these instructions 1"
-    "-v|--version 0 version Display $WSPR_SERVICE version 1"
+    "-v|--version 0 print_version Display $WSPR_SERVICE version 1"
+    "--no-web 0 set_no_web Disable web UI installation and Apache integration (service will run with --no-web) 0"
     "--release 0 set_release_build Build as release regardless of branch 0"
 )
 
@@ -5113,6 +5138,26 @@ set_release_build() {
     if [[ "${LOG_LEVEL_SET_FROM_ENV}" != "true" ]]; then
         LOG_LEVEL="INFO"
     fi
+
+    debug_end "$debug"
+    return 0
+}
+
+# -----------------------------------------------------------------------------
+# @brief Disable web UI installation and runtime.
+# @details Sets the installer state so web assets and Apache integration are
+#          skipped and the installed service starts with `--no-web`.
+#
+# @param $@ Optional debug flag.
+#
+# @return 0 on success.
+# -----------------------------------------------------------------------------
+set_no_web() {
+    local debug
+    debug=$(debug_start "$@")
+    eval set -- "$(debug_filter "$@")"
+
+    NO_WEB="true"
 
     debug_end "$debug"
     return 0
@@ -6692,7 +6737,6 @@ manage_apache() {
     # Declare local variables after debug initialization
     local status=0
     local config_file source_path site_conf server_name target_conf
-    local apache_mode="stock"
 
     config_file="wsprrypi.conf"
     source_path="${LOCAL_CONFIG_DIR}/${config_file}"
@@ -6701,26 +6745,20 @@ manage_apache() {
 
     if [[ -z "$ACTION" || "$ACTION" == install ]]; then
         # Ensure ServerName is present in the main Apache config
+        if [[ "${APACHE_WEB_MODE:-unknown}" == "unknown" ]]; then
+            detect_apache_web_mode "$debug" || true
+        fi
+
         if ! grep -qF "$server_name" "$APACHE_CONF"; then
             exec_command "Insert ServerName directive" \
                 sed -i "1i $server_name" "$APACHE_CONF" \
                 "$debug"
         fi
 
-        if existing_wsprrypi_apache_install_detected "$debug"; then
-            apache_mode="existing_wsprrypi"
-            logW "Existing WsprryPi web installation detected."
-            logW "Updating WsprryPi Apache configuration."
-        elif has_custom_apache_webroot "$debug"; then
-            apache_mode="custom_site"
-            logW "Existing custom web content detected in /var/www/html."
-            logW "Installing WsprryPi in copy-only Apache integration mode."
-        fi
-
         # Preserve existing unrelated custom sites by installing only the
         # WsprryPi UI files and adding the required proxy rules to the
         # selected active vhost configs.
-        if [[ "$apache_mode" == "custom_site" ]]; then
+        if [[ "${APACHE_WEB_MODE:-unknown}" == "custom_site" ]]; then
 
             exec_command "Enable proxy modules" \
                 a2enmod proxy proxy_http proxy_wstunnel \
@@ -6776,7 +6814,7 @@ manage_apache() {
         }
 
         # If stock page, comment out log lines in the vhost before enabling.
-        if [[ "$apache_mode" == "stock" ]] && is_stock_apache_page "/var/www/html/index.html" "$debug"; then
+        if [[ "${APACHE_WEB_MODE:-unknown}" == "stock" ]] && is_stock_apache_page "/var/www/html/index.html" "$debug"; then
             modify_comment_lines "${site_conf}" ".log" comment "$debug"
         fi
 
@@ -6789,7 +6827,7 @@ manage_apache() {
 
         # Disable the stock Apache default site only when the install is
         # stock/default-owned or WsprryPi-owned.
-        if [[ "$apache_mode" != "custom_site" ]]; then
+        if [[ "${APACHE_WEB_MODE:-unknown}" != "custom_site" ]]; then
             exec_command "Disable default site" a2dissite 000-default.conf "$debug" || {
                 logE "Failed to disable default site."
                 debug_end "$debug"
@@ -6913,7 +6951,6 @@ has_custom_apache_webroot() {
         return 1
     fi
 
-    logW "Existing non-default website content was found in $webroot."
     debug_print "Apache webroot contains custom content." "$debug"
 
     debug_end "$debug"
@@ -7046,6 +7083,94 @@ existing_wsprrypi_apache_install_detected() {
 
     debug_end "$debug"
     return 1
+}
+
+# -----------------------------------------------------------------------------
+# @brief Detect and record the Apache web integration mode.
+# @details Determines whether Apache is unavailable, currently serving a stock
+#          site, already hosting a WsprryPi-owned install, or hosting an
+#          unrelated custom site. Logs exactly one mode message during the
+#          preflight phase and stores the result in APACHE_WEB_MODE.
+#
+# @param $1 Optional debug flag.
+#
+# @return 0 on successful detection, 1 when Apache is unavailable.
+# -----------------------------------------------------------------------------
+# shellcheck disable=SC2317
+# shellcheck disable=SC2329
+detect_apache_web_mode() {
+    local debug
+    debug=$(debug_start "$@")
+    eval set -- "$(debug_filter "$@")"
+
+    if [[ "${APACHE_WEB_MODE_DETECTED:-false}" == "true" && "${APACHE_WEB_MODE:-unknown}" != "unknown" ]]; then
+        debug_end "$debug"
+        return 0
+    fi
+
+    APACHE_WEB_MODE="unknown"
+    APACHE_WEB_MODE_DETECTED="false"
+
+    if existing_wsprrypi_apache_install_detected "$debug"; then
+        APACHE_WEB_MODE="existing_wsprrypi"
+        APACHE_WEB_MODE_DETECTED="true"
+        logI "Apache web mode: existing WsprryPi installation."
+        debug_end "$debug"
+        return 0
+    fi
+
+    if has_custom_apache_webroot "$debug"; then
+        APACHE_WEB_MODE="custom_site"
+        APACHE_WEB_MODE_DETECTED="true"
+        logW "Apache web mode: existing non-WsprryPi website detected."
+        logW "WsprryPi will be installed under /wsprrypi without disabling the existing site."
+        debug_end "$debug"
+        return 0
+    fi
+
+    APACHE_WEB_MODE="stock"
+    APACHE_WEB_MODE_DETECTED="true"
+    logI "Apache web mode: stock/default site."
+    debug_end "$debug"
+    return 0
+}
+
+# -----------------------------------------------------------------------------
+# @brief Validate Apache availability after package management.
+# @details Confirms Apache tooling and expected config directories exist once
+#          package installation has completed. Fails web-enabled installs when
+#          Apache is still unavailable, but allows `--no-web` installs to
+#          proceed.
+#
+# @param $1 Optional debug flag.
+#
+# @return 0 when Apache is available or web is disabled, 1 otherwise.
+# -----------------------------------------------------------------------------
+# shellcheck disable=SC2317
+# shellcheck disable=SC2329
+validate_apache_web_availability() {
+    local debug
+    debug=$(debug_start "$@")
+    eval set -- "$(debug_filter "$@")"
+
+    if command -v apache2ctl >/dev/null 2>&1 && \
+        [[ -d "/etc/apache2" ]] && \
+        [[ -d "/etc/apache2/sites-available" ]]; then
+        debug_end "$debug"
+        return 0
+    fi
+
+    APACHE_WEB_MODE="no_apache"
+
+    if [[ "${NO_WEB:-false}" != "true" ]]; then
+        logE "Apache is not installed or not available; web UI cannot be configured."
+        debug_end "$debug"
+        return 1
+    fi
+
+    logI "Apache unavailable, but --no-web is set; continuing without web UI."
+    debug_end "$debug"
+    return 0
 }
 
 # -----------------------------------------------------------------------------
@@ -7652,7 +7777,7 @@ finish_script() {
     fi
 
     # Display follow-up instructions only if install was successful
-    if [[ "$ACTION" == "install" && "$overall_status" -eq 0 ]]; then
+    if [[ "$ACTION" == "install" && "$overall_status" -eq 0 && "${NO_WEB:-false}" != "true" ]]; then
         local repo_name="${REPO_NAME,,}"
         printf "\n"
         printf "To configure %s, open the following URL in your browser:\n\n" "$REPO_TITLE"
@@ -7664,6 +7789,11 @@ finish_script() {
         printf "Ensure your device is on the same network and that mDNS is\n"
         printf "supported by your system.\n\n"
 
+        if [[ "${REBOOT:-false}" == "true" ]] && ! is_pi5; then
+            printf "Remember to reboot to disable your soundcard before transmission.\n\n"
+        fi
+    elif [[ "$ACTION" == "install" && "$overall_status" -eq 0 ]]; then
+        printf "\n%s installed with the web UI disabled (--no-web).\n\n" "$REPO_TITLE"
         if [[ "${REBOOT:-false}" == "true" ]] && ! is_pi5; then
             printf "Remember to reboot to disable your soundcard before transmission.\n\n"
         fi
@@ -7708,6 +7838,11 @@ manage_wsprry_pi() {
     debug=$(debug_start "$@")
     eval set -- "$(debug_filter "$@")"
 
+    local service_command="/usr/local/bin/$WSPR_EXE -J -i /usr/local/etc/$WSPR_INI"
+    if [[ "${NO_WEB:-false}" == "true" ]]; then
+        service_command+=" --no-web"
+    fi
+
     # Define the group of functions to install/uninstall
     local install_group=(
         "git_clone"
@@ -7717,7 +7852,7 @@ manage_wsprry_pi() {
         "manage_exe \"$WSPR_EXE\""
         "manage_config \"$WSPR_INI\" \"/usr/local/etc/\""
         "manage_i2c"
-        "manage_service \"/usr/bin/$WSPR_EXE\" \"/usr/local/bin/$WSPR_EXE -J -i /usr/local/etc/$WSPR_INI\" \"false\""
+        "manage_service \"/usr/bin/$WSPR_EXE\" \"$service_command\" \"false\""
         "manage_web"
         "manage_apache"
         "manage_sound"
@@ -7751,6 +7886,12 @@ manage_wsprry_pi() {
     install)
         debug_print "(INSTALL) Creating group_to_execute list (after processing):" "$debug"
         group_to_execute=("${install_group[@]}")
+        if [[ "${NO_WEB:-false}" == "true" ]]; then
+            mapfile -t group_to_execute < <(
+                printf '%s\n' "${group_to_execute[@]}" |
+                    grep -v -E '^(manage_web|manage_apache)( |$)'
+            )
+        fi
         ;;
     uninstall)
         debug_print "(UNINSTALL) Reversing and filtering install_group…" "$debug"
@@ -7843,9 +7984,25 @@ manage_wsprry_pi() {
 # shellcheck disable=SC2317
 _main() {
     local debug
+    local arg
     debug=$(debug_start "$@")
     eval set -- "$(debug_filter "$@")"
     [[ "$debug" != "debug" ]] && printf "\n" # Just a visual when not in debug.
+
+    for arg in "$@"; do
+        case "$arg" in
+            -h|--help)
+                usage
+                debug_end "$debug"
+                return 0
+                ;;
+            -v|--version)
+                printf "%s: version %s\n" "$REPO_TITLE" "$SEM_VER"
+                debug_end "$debug"
+                return 0
+                ;;
+        esac
+    done
 
     # Check and set up the environment
     handle_execution_context "$debug" # Get execution context and set environment variables
@@ -7887,11 +8044,26 @@ _main() {
     # Feedback on multi-proc compilation
     [[ "$ACTION" != "uninstall" ]] && display_compilation_resource_notes "$debug"
 
+    # Detect Apache web mode intent before package management or other
+    # installation actions begin so the user sees the mode early.
+    if [[ "$ACTION" != "uninstall" ]]; then
+        detect_apache_web_mode "$debug"
+    fi
+
     # Install dependencies after system checks
     [[ "$ACTION" != "uninstall" ]] && handle_apt_packages "$debug"
 
     # Handle correcting timezone
     [[ "$ACTION" != "uninstall" ]] && set_time "$debug"
+
+    # After package management, Apache must actually be available unless web
+    # installation has been explicitly disabled.
+    if [[ "$ACTION" != "uninstall" ]]; then
+        if ! validate_apache_web_availability "$debug"; then
+            debug_end "$debug"
+            return 1
+        fi
+    fi
 
     # Install or uninstall Wsprry Pi services
     manage_wsprry_pi "$debug"
