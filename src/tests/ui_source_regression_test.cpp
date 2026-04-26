@@ -307,6 +307,15 @@ int main()
         site_source.find("confirm-modal-body--preformatted") != std::string::npos &&
             site_source.find("preserveLineBreaks = options.preserveLineBreaks === true") != std::string::npos,
         "shared confirm modal must support preserving diagnostic line breaks for detail dialogs");
+    require(
+        ui_source.find("function isWsprConfigMode()") != std::string::npos &&
+            ui_source.find("const useNtp = isWsprMode && $(\"#use_ntp\").is(\":checked\");") != std::string::npos &&
+            ui_source.find("backend === \"gpio\" && $(\"#use_ntp\").is(\":checked\");") == std::string::npos &&
+            ui_source.find("$(\"#ntp_calibration_control\")") != std::string::npos &&
+            ui_source.find("$ppm.prop(\"disabled\", !isWsprMode || useNtp);") != std::string::npos &&
+            ui_source.find("$ppmCw.prop(\"disabled\", isWsprMode);") != std::string::npos &&
+            ui_source.find("syncCalibrationControls();") != std::string::npos,
+        "config UI must make calibration controls mode-aware so WSPR follows NTP while CW keeps PPM editable");
 
     const std::string config_view_source =
         read_text_file("/home/pi/WsprryPi/WsprryPi-UI/data/views/config.php");
@@ -357,6 +366,10 @@ int main()
     require(
         config_view_source.find("config-runtime-item config-runtime-item--action") == std::string::npos,
         "Runtime state grid must no longer dedicate a large action tile to Stop transmission");
+    require(
+        config_view_source.find("id=\"ntp_calibration_control\"") != std::string::npos &&
+            config_view_source.find("id=\"use_ntp\"") != std::string::npos,
+        "Configuration view must expose the dedicated NTP calibration control wrapper without changing the existing field binding");
     require(
         config_view_source.find("config-runtime-item config-runtime-item--switch") == std::string::npos,
         "Runtime state body must no longer dedicate a body tile to the Transmit enabled control");
