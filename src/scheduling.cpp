@@ -3183,7 +3183,6 @@ bool wspr_loop()
     // same reload-safe path that handles validation, setup, and scheduling.
     if (config.mode == ModeType::WSPR)
     {
-        log_scheduler_path_selection(config.mode);
         ini_reload_pending.store(!startup_config_handoff, std::memory_order_relaxed);
         if (!set_config(startup_config_handoff ? false : true))
         {
@@ -4090,8 +4089,6 @@ bool set_config(bool force)
 
         if (do_config || do_random)
         {
-            log_scheduler_path_selection(working_config.mode);
-
             if (!suppress_scheduler_execution_for_test)
             {
                 const bool any_selector_gpio_configured =
@@ -4421,6 +4418,7 @@ bool set_config(bool force)
             active_wspr_plan_in_progress = next_active_wspr_plan_in_progress;
             last_freq = next_current_dial_frequency;
             last_frequency_entry = next_current_frequency_entry;
+            log_scheduler_path_selection(working_config.mode);
             commit_execution_request(next_transmission_request);
 
             if (suppress_scheduler_execution_for_test)
