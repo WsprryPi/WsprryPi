@@ -283,6 +283,7 @@ struct WsprRuntimeStatusSnapshot
     double offset_hz = 0.0;
     bool frequency_is_skip = false;
     std::string plan_type;
+    int power_dbm = 0;
     std::size_t frame_count = 0;
     std::size_t current_frame = 0; // 1-based, 0 when unavailable
     std::string callsign_raw;

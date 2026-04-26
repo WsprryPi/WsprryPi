@@ -242,6 +242,7 @@ int main()
             site_source.find("frequencyHz") != std::string::npos &&
             site_source.find("offsetHz") != std::string::npos &&
             site_source.find("frequencyIsSkip") != std::string::npos &&
+            site_source.find("powerDbm") != std::string::npos &&
             site_source.find("cw_message") != std::string::npos &&
             site_source.find("cw_active_char_index") != std::string::npos &&
             site_source.find("if (typeof handleRuntimeStatusUpdate === \"function\") {") != std::string::npos &&
@@ -261,6 +262,7 @@ int main()
             site_source.find("planLabelNode.textContent = \"Next message at:\";") != std::string::npos &&
             site_source.find("const idleValue = transmitEnabled") != std::string::npos &&
             site_source.find(": \"Disabled\";") != std::string::npos &&
+            site_source.find("summary += ` ${currentRuntimeStatus.powerDbm}dBm`;") != std::string::npos &&
             site_source.find("charNode.textContent = character;") != std::string::npos &&
             site_source.find("renderCwRuntimeMessage(planNode, message, activeCharIndex);") != std::string::npos &&
             site_source.find("charNode.textContent = isActive && character === \" \" ? \"_\" : character;") == std::string::npos,
@@ -277,9 +279,12 @@ int main()
             websocket_source.find("reply[\"frequency_hz\"] = snapshot.frequency_hz;") != std::string::npos &&
             websocket_source.find("reply[\"offset_hz\"] = snapshot.offset_hz;") != std::string::npos &&
             websocket_source.find("reply[\"frequency_is_skip\"] = snapshot.frequency_is_skip;") != std::string::npos &&
+            websocket_source.find("reply[\"power_dbm\"] = snapshot.power_dbm;") != std::string::npos &&
             scheduling_source.find("j[\"frequency_hz\"] = snapshot.frequency_hz;") != std::string::npos &&
             scheduling_source.find("j[\"offset_hz\"] = snapshot.offset_hz;") != std::string::npos &&
             scheduling_source.find("j[\"frequency_is_skip\"] = snapshot.frequency_is_skip;") != std::string::npos &&
+            scheduling_source.find("j[\"power_dbm\"] = snapshot.power_dbm;") != std::string::npos &&
+            scheduling_source.find("snapshot.power_dbm = plan.power_dbm;") != std::string::npos &&
             scheduling_source.find("if (snapshot.tx_state == \"transmitting\")") != std::string::npos &&
             scheduling_source.find("snapshot.runtime_mode = mode_type_name(config.mode);") != std::string::npos &&
             scheduling_source.find("runtime_transmit_enabled(config)") != std::string::npos &&
