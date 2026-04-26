@@ -1808,6 +1808,12 @@ int main(int argc, char *argv[])
         require(
             !skip_request.hasSelectorGPIO(),
             "runtime multi-slot skip regression must not prepare selector GPIO for the trailing skip window");
+        const WsprRuntimeStatusSnapshot skip_snapshot =
+            current_tx_runtime_status_snapshot();
+        require(
+            skip_snapshot.frequency_is_skip &&
+                nearly_equal(skip_snapshot.frequency_hz, 0.0),
+            "runtime snapshots must expose a committed 0 Hz WSPR slot as an explicit skip window");
 
         transmitter_cb(
             WsprTransmissionCallbackEvent::SKIPPED,
@@ -1822,6 +1828,12 @@ int main(int argc, char *argv[])
                 nearly_equal(wrapped_request.dial_frequency_hz, 14095600.0) &&
                 nearly_equal(wrapped_request.actual_rf_frequency_hz, 14097100.0),
             "runtime multi-slot skip regression must wrap cleanly to the next valid transmission after SKIPPED");
+        const WsprRuntimeStatusSnapshot wrapped_snapshot =
+            current_tx_runtime_status_snapshot();
+        require(
+            !wrapped_snapshot.frequency_is_skip &&
+                nearly_equal(wrapped_snapshot.frequency_hz, 14095600.0),
+            "runtime snapshots must return to the next committed WSPR dial frequency after a skip completes");
 
         cleanup_scheduler_regression_test_state();
     }
