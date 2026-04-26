@@ -220,6 +220,40 @@ int main()
             site_source.find(transmit_branch) < site_source.find(tx_state_branch),
         "browser websocket handler must process pushed transmit events before generic tx_state replies");
     require(
+        site_source.find("const PATHS = window.WSPRRYPI_PATHS || {};") != std::string::npos &&
+            site_source.find("function normalizeSameOriginPath(path, fallback)") != std::string::npos &&
+            site_source.find("function buildDirectRestFallbackUrl(path)") != std::string::npos &&
+            site_source.find("function buildDirectWebSocketFallbackUrl(path)") != std::string::npos &&
+            site_source.find("http://${window.location.hostname}:31415${path}") != std::string::npos &&
+            site_source.find("ws://${window.location.hostname}:31416${path}") != std::string::npos &&
+            site_source.find("const SETTINGS_ENDPOINT = createEndpointDefinition(") != std::string::npos &&
+            site_source.find("const VERSION_ENDPOINT = createEndpointDefinition(") != std::string::npos &&
+            site_source.find("const REPAIR_ENDPOINT = createEndpointDefinition(") != std::string::npos &&
+            site_source.find("const WEBSOCKET_ENDPOINT = createEndpointDefinition(") != std::string::npos &&
+            site_source.find("const SETTINGS_URL = SETTINGS_ENDPOINT.proxyUrl;") != std::string::npos &&
+            site_source.find("const VERSION_URL = VERSION_ENDPOINT.proxyUrl;") != std::string::npos &&
+            site_source.find("const REPAIR_URL = REPAIR_ENDPOINT.proxyUrl;") != std::string::npos &&
+            site_source.find("const WEBSOCKET_URL = WEBSOCKET_ENDPOINT.proxyUrl;") != std::string::npos &&
+            site_source.find("function ajaxWithEndpointFallback(endpoint, options = {})") != std::string::npos &&
+            site_source.find("function fetchWithEndpointFallback(endpoint, init = {})") != std::string::npos &&
+            site_source.find("function getJsonWithEndpointFallback(endpoint)") != std::string::npos &&
+            site_source.find("warnRestFallback(endpoint, reason);") != std::string::npos &&
+            site_source.find("warnWebSocketFallback(endpointConfig, reason);") != std::string::npos &&
+            site_source.find("connectWebSocket(WEBSOCKET_ENDPOINT, WS_RECONNECT);") != std::string::npos &&
+            site_source.find("getJsonWithEndpointFallback(SETTINGS_ENDPOINT)") != std::string::npos &&
+            site_source.find("getJsonWithEndpointFallback(VERSION_ENDPOINT)") != std::string::npos &&
+            site_source.find("new URL(path, window.location.href)") != std::string::npos &&
+            site_source.find("url.protocol = window.location.protocol === \"https:\" ? \"wss:\" : \"ws:\";") != std::string::npos &&
+            site_source.find("const HTTP_ORIGIN =") == std::string::npos &&
+            site_source.find("const WS_ORIGIN =") == std::string::npos &&
+            site_source.find("const HOSTNAME = window.location.hostname;") == std::string::npos &&
+            site_source.find("const PORT = window.location.port ? `:${window.location.port}` : \"\";") == std::string::npos &&
+            site_source.find("const SETTINGS_URL = SETTINGS_PATH;") == std::string::npos &&
+            site_source.find("const VERSION_URL = VERSION_PATH;") == std::string::npos &&
+            site_source.find("const REPAIR_URL = REPAIR_PATH;") == std::string::npos &&
+            site_source.find("const WEBSOCKET_URL = buildWebSocketUrl(WEBSOCKET_PATH);") == std::string::npos,
+        "UI endpoint construction must remain proxy-first, allow direct ports only in centralized fallback helpers, and derive proxy websocket URLs from the current page protocol instead of rebuilding backend host:port origins");
+    require(
         site_source.find("Frequency Control GPIO Polarity") == std::string::npos,
         "UI config schema must not require the obsolete GPIO.Frequency Control GPIO Polarity key");
     require(
