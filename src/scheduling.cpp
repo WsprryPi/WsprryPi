@@ -4659,6 +4659,13 @@ void run_final_selector_gpio_shutdown_cleanup_for_test() noexcept
     shutdown_all_configured_selector_gpios(config);
 }
 
+void clear_current_wspr_runtime_state_for_test() noexcept
+{
+    current_transmission_request = TransmissionRequest{};
+    current_dial_frequency = 0.0;
+    current_frequency_entry = WsprFrequencyEntry{};
+}
+
 void reset_current_transmission_request_for_test() noexcept
 {
     current_transmission_request = TransmissionRequest{};

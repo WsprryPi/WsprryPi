@@ -346,6 +346,7 @@ void seed_selector_shutdown_state_for_test(
     const BandGPIOConfig &active_config,
     const std::vector<BandGPIOConfig> &idle_configs) noexcept;
 void run_final_selector_gpio_shutdown_cleanup_for_test() noexcept;
+void clear_current_wspr_runtime_state_for_test() noexcept;
 TransmissionRequest current_transmission_request_for_test();
 void reset_current_transmission_request_for_test() noexcept;
 
