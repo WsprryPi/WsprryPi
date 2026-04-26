@@ -84,11 +84,14 @@ int main()
         ui_source.find("let pendingModeChange = null;") != std::string::npos &&
             ui_source.find("let pendingPersistedMode = \"\";") != std::string::npos &&
             ui_source.find("function requestConfigModeChange(targetMode)") != std::string::npos &&
-            ui_source.find("title: \"Stop transmission to change mode\"") != std::string::npos &&
             ui_source.find("title: \"Disable transmissions to change mode\"") != std::string::npos &&
+            ui_source.find("function persistDisabledModeChange(targetMode, previousMode = currentConfigModeSelection)") != std::string::npos &&
+            ui_source.find("\"Mode\": normalizedTargetMode,") != std::string::npos &&
+            ui_source.find("\"Transmit\": false,") != std::string::npos &&
+            ui_source.find("applyCommittedConfigMode(normalizedTargetMode, { skipAutosave: true });") != std::string::npos &&
+            ui_source.find("clearPendingModeChange();") != std::string::npos &&
+            ui_source.find("pendingModeChange.awaitingRuntimeIdle === false") != std::string::npos &&
             ui_source.find("requestTransmitEnabledChange(false, true") == std::string::npos &&
-            ui_source.find("const requestedMode = normalizedTargetMode;") != std::string::npos &&
-            ui_source.find("finalizePendingModeChange(requestedMode);") != std::string::npos &&
             ui_source.find("setTransmitFromBackend(false);") != std::string::npos &&
             ui_source.find("if (!stopTransmission({ persistTransmit: false })) {") != std::string::npos &&
             ui_source.find("suspendConfigAutosave(true);") != std::string::npos &&
