@@ -3416,6 +3416,7 @@ void send_ws_message(
         j["offset_hz"] = snapshot.offset_hz;
         j["frequency_is_skip"] = snapshot.frequency_is_skip;
         j["plan_type"] = snapshot.plan_type;
+        j["power_dbm"] = snapshot.power_dbm;
         j["frame_count"] = snapshot.frame_count;
         j["current_frame"] = snapshot.current_frame;
         j["callsign_raw"] = snapshot.callsign_raw;
@@ -3561,6 +3562,7 @@ WsprRuntimeStatusSnapshot current_tx_runtime_status_snapshot()
 
     if (config.mode == ModeType::WSPR)
     {
+        snapshot.power_dbm = config.wspr.power_dbm;
         snapshot.frequency_is_skip =
             current_transmission_request.isSkipWindow() ||
             (current_dial_frequency == 0.0 &&
@@ -3618,6 +3620,7 @@ WsprRuntimeStatusSnapshot current_tx_runtime_status_snapshot()
 
     const PreparedWsprTransmission &plan = current_transmission_request.payload;
     snapshot.plan_type = plan.plan_type;
+    snapshot.power_dbm = plan.power_dbm;
     snapshot.callsign_raw = plan.callsign_raw;
     snapshot.callsign_normalized =
         !plan.callsign_normalized.empty() ? plan.callsign_normalized : plan.callsign;

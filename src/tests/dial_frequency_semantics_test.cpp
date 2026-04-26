@@ -2929,6 +2929,9 @@ int main(int argc, char *argv[])
         require(
             snapshot.frequency_hz > 0.0,
             "runtime snapshots must expose the active WSPR dial frequency");
+        require(
+            snapshot.power_dbm == 20,
+            "runtime snapshots must expose the committed WSPR transmit power in dBm");
         config.transmit = false;
         clear_current_wspr_runtime_state_for_test();
         const WsprRuntimeStatusSnapshot disabled_snapshot =
@@ -2936,6 +2939,9 @@ int main(int argc, char *argv[])
         require(
             disabled_snapshot.frequency_hz > 0.0,
             "idle disabled WSPR runtime snapshots must still expose the next configured dial frequency");
+        require(
+            disabled_snapshot.power_dbm == 20,
+            "idle WSPR runtime snapshots must retain the configured WSPR transmit power in dBm");
         finish_runtime_planning_state_for_identity_test();
     }
 
