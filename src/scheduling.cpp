@@ -3412,6 +3412,9 @@ void send_ws_message(
         j["tx_state"] = tx_state;
         j["runtime_mode"] = snapshot.runtime_mode;
         j["next_transmission_at"] = snapshot.next_transmission_at;
+        j["frequency_hz"] = snapshot.frequency_hz;
+        j["offset_hz"] = snapshot.offset_hz;
+        j["frequency_is_skip"] = snapshot.frequency_is_skip;
         j["plan_type"] = snapshot.plan_type;
         j["frame_count"] = snapshot.frame_count;
         j["current_frame"] = snapshot.current_frame;
@@ -3558,16 +3561,28 @@ WsprRuntimeStatusSnapshot current_tx_runtime_status_snapshot()
 
     if (config.mode == ModeType::WSPR)
     {
-        snapshot.frequency_hz = current_transmission_request.dial_frequency_hz;
-        if (snapshot.frequency_hz <= 0.0)
+        snapshot.frequency_is_skip =
+            current_transmission_request.isSkipWindow() ||
+            (current_dial_frequency == 0.0 &&
+             !current_frequency_entry.token.empty());
+        if (snapshot.frequency_is_skip)
         {
-            snapshot.frequency_hz = current_dial_frequency;
+            snapshot.frequency_hz = 0.0;
+            snapshot.offset_hz = 0.0;
         }
-        if (snapshot.frequency_hz <= 0.0)
+        else
         {
-            snapshot.frequency_hz = first_configured_wspr_dial_frequency_hz();
+            snapshot.frequency_hz = current_transmission_request.dial_frequency_hz;
+            if (snapshot.frequency_hz <= 0.0)
+            {
+                snapshot.frequency_hz = current_dial_frequency;
+            }
+            if (snapshot.frequency_hz <= 0.0)
+            {
+                snapshot.frequency_hz = first_configured_wspr_dial_frequency_hz();
+            }
+            snapshot.offset_hz = current_transmission_request.applied_offset_hz;
         }
-        snapshot.offset_hz = current_transmission_request.applied_offset_hz;
     }
     else if (config.mode == ModeType::QRSS)
     {
