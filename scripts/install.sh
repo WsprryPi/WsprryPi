@@ -6692,6 +6692,7 @@ manage_apache() {
     # Declare local variables after debug initialization
     local status=0
     local config_file source_path site_conf server_name target_conf
+    local apache_mode="stock"
 
     config_file="wsprrypi.conf"
     source_path="${LOCAL_CONFIG_DIR}/${config_file}"
@@ -6706,11 +6707,20 @@ manage_apache() {
                 "$debug"
         fi
 
-        # Preserve existing custom sites by installing only the WsprryPi UI
-        # files and adding the required proxy rules to the active vhost.
-        if has_custom_apache_webroot "$debug"; then
+        if existing_wsprrypi_apache_install_detected "$debug"; then
+            apache_mode="existing_wsprrypi"
+            logW "Existing WsprryPi web installation detected."
+            logW "Updating WsprryPi Apache configuration."
+        elif has_custom_apache_webroot "$debug"; then
+            apache_mode="custom_site"
             logW "Existing custom web content detected in /var/www/html."
             logW "Installing WsprryPi in copy-only Apache integration mode."
+        fi
+
+        # Preserve existing unrelated custom sites by installing only the
+        # WsprryPi UI files and adding the required proxy rules to the
+        # selected active vhost configs.
+        if [[ "$apache_mode" == "custom_site" ]]; then
 
             exec_command "Enable proxy modules" \
                 a2enmod proxy proxy_http proxy_wstunnel \
@@ -6766,7 +6776,7 @@ manage_apache() {
         }
 
         # If stock page, comment out log lines in the vhost before enabling.
-        if is_stock_apache_page "/var/www/html/index.html" "$debug"; then
+        if [[ "$apache_mode" == "stock" ]] && is_stock_apache_page "/var/www/html/index.html" "$debug"; then
             modify_comment_lines "${site_conf}" ".log" comment "$debug"
         fi
 
@@ -6777,12 +6787,15 @@ manage_apache() {
             return 1
         }
 
-        # Disable default site
-        exec_command "Disable default site" a2dissite 000-default.conf "$debug" || {
-            logE "Failed to disable default site."
-            debug_end "$debug"
-            return 1
-        }
+        # Disable the stock Apache default site only when the install is
+        # stock/default-owned or WsprryPi-owned.
+        if [[ "$apache_mode" != "custom_site" ]]; then
+            exec_command "Disable default site" a2dissite 000-default.conf "$debug" || {
+                logE "Failed to disable default site."
+                debug_end "$debug"
+                return 1
+            }
+        fi
 
         # Enable wsprrypi site
         exec_command "Enable wsprrypi site" a2ensite wsprrypi.conf "$debug" || {
@@ -6909,6 +6922,189 @@ has_custom_apache_webroot() {
 
 
 # -----------------------------------------------------------------------------
+# @brief Check whether the installed webroot already contains WsprryPi UI files.
+# @details Detects a prior WsprryPi web install in /var/www/html/wsprrypi by
+#          looking for recognizable UI files and directories.
+#
+# @param $1 Optional debug flag.
+#
+# @return 0 if a WsprryPi webroot is detected, 1 otherwise.
+# -----------------------------------------------------------------------------
+# shellcheck disable=SC2317
+# shellcheck disable=SC2329
+wsprrypi_webroot_present() {
+    local debug
+    debug=$(debug_start "$@")
+    eval set -- "$(debug_filter "$@")"
+
+    local webroot="/var/www/html/wsprrypi"
+
+    if [[ -f "${webroot}/index.php" && -f "${webroot}/site.js" && -d "${webroot}/views" ]]; then
+        debug_print "Detected existing WsprryPi webroot at ${webroot}." "$debug"
+        debug_end "$debug"
+        return 0
+    fi
+
+    debug_end "$debug"
+    return 1
+}
+
+# -----------------------------------------------------------------------------
+# @brief Check whether an Apache config contains WsprryPi-managed routing.
+# @details Detects either the managed BEGIN/END marker block or explicit
+#          /wsprrypi proxy routes that indicate prior WsprryPi integration.
+#
+# @param $1 Apache config path.
+# @param $2 Optional debug flag.
+#
+# @return 0 if WsprryPi routing markers are present, 1 otherwise.
+# -----------------------------------------------------------------------------
+# shellcheck disable=SC2317
+# shellcheck disable=SC2329
+apache_config_contains_wsprrypi_routes() {
+    local debug
+    debug=$(debug_start "$@")
+    eval set -- "$(debug_filter "$@")"
+
+    local config_path="${1:-}"
+
+    if [[ -z "$config_path" || ! -f "$config_path" ]]; then
+        debug_end "$debug"
+        return 1
+    fi
+
+    if grep -qE \
+        '# BEGIN WsprryPi proxy configuration|/wsprrypi/config|/wsprrypi/version|/wsprrypi/socket|wsprrypi\.conf' \
+        "$config_path"; then
+        debug_print "Detected WsprryPi Apache routing in ${config_path}." "$debug"
+        debug_end "$debug"
+        return 0
+    fi
+
+    debug_end "$debug"
+    return 1
+}
+
+# -----------------------------------------------------------------------------
+# @brief Check whether Apache already has a WsprryPi-managed installation.
+# @details Returns success if any of the expected WsprryPi Apache ownership
+#          signals are present: wsprrypi.conf in sites-available, wsprrypi.conf
+#          enabled, an existing WsprryPi webroot, or existing WsprryPi proxy
+#          routing markers in Apache config files.
+#
+# @param $1 Optional debug flag.
+#
+# @return 0 if an existing WsprryPi install is detected, 1 otherwise.
+# -----------------------------------------------------------------------------
+# shellcheck disable=SC2317
+# shellcheck disable=SC2329
+existing_wsprrypi_apache_install_detected() {
+    local debug
+    debug=$(debug_start "$@")
+    eval set -- "$(debug_filter "$@")"
+
+    local enabled_entry
+    local resolved_entry
+    local apache_config
+
+    if [[ -f "/etc/apache2/sites-available/wsprrypi.conf" ]]; then
+        debug_print "Detected existing /etc/apache2/sites-available/wsprrypi.conf." "$debug"
+        debug_end "$debug"
+        return 0
+    fi
+
+    if [[ -e "/etc/apache2/sites-enabled/wsprrypi.conf" ]]; then
+        debug_print "Detected existing /etc/apache2/sites-enabled/wsprrypi.conf." "$debug"
+        debug_end "$debug"
+        return 0
+    fi
+
+    for enabled_entry in /etc/apache2/sites-enabled/*.conf; do
+        [[ -e "$enabled_entry" ]] || continue
+        resolved_entry=$(readlink -f "$enabled_entry")
+        if [[ "$(basename "$resolved_entry")" == "wsprrypi.conf" ]]; then
+            debug_print "Detected enabled WsprryPi Apache site via ${enabled_entry}." "$debug"
+            debug_end "$debug"
+            return 0
+        fi
+    done
+
+    if wsprrypi_webroot_present "$debug"; then
+        debug_end "$debug"
+        return 0
+    fi
+
+    for apache_config in /etc/apache2/sites-available/*.conf /etc/apache2/sites-enabled/*.conf; do
+        [[ -e "$apache_config" ]] || continue
+        resolved_entry=$(readlink -f "$apache_config")
+        [[ -f "$resolved_entry" ]] || continue
+        if apache_config_contains_wsprrypi_routes "$resolved_entry" "$debug"; then
+            debug_end "$debug"
+            return 0
+        fi
+    done
+
+    debug_end "$debug"
+    return 1
+}
+
+# -----------------------------------------------------------------------------
+# @brief Select a single preferred Apache vhost for a given port.
+# @details Evaluates a list of enabled config files and returns success only
+#          when exactly one file can be selected safely for the requested port.
+#          Preference order is `*:port` first, then `_default_:port`.
+#
+# @param $1 Name of the array variable holding candidate config paths.
+# @param $2 Target port (`80` or `443`).
+# @param $3 Name of the output variable to receive the selected config path.
+# @param $4 Optional debug flag.
+#
+# @return 0 when a single preferred config is found, 1 otherwise.
+# -----------------------------------------------------------------------------
+# shellcheck disable=SC2317
+# shellcheck disable=SC2329
+select_preferred_apache_vhost_for_port() {
+    local debug
+    debug=$(debug_start "$@")
+    eval set -- "$(debug_filter "$@")"
+
+    local array_name="${1:-}"
+    local port="${2:-}"
+    local output_var="${3:-}"
+    local pattern
+    local resolved
+    local -n candidates_ref="$array_name"
+    local matches=()
+
+    if [[ -z "$array_name" || -z "$port" || -z "$output_var" ]]; then
+        debug_end "$debug"
+        return 1
+    fi
+
+    for pattern in \
+        "<VirtualHost[[:space:]]+\\*:${port}>" \
+        "<VirtualHost[[:space:]]+_default_:${port}>"; do
+        matches=()
+
+        for resolved in "${candidates_ref[@]}"; do
+            if grep -qiE "$pattern" "$resolved"; then
+                matches+=("$resolved")
+            fi
+        done
+
+        if (( ${#matches[@]} == 1 )); then
+            printf -v "$output_var" '%s' "${matches[0]}"
+            debug_end "$debug"
+            return 0
+        fi
+    done
+
+    debug_end "$debug"
+    return 1
+}
+
+
+# -----------------------------------------------------------------------------
 # @brief Locate active Apache vhost configs to amend.
 # @details Sets APACHE_ACTIVE_SITE_CONFS to enabled Apache site configs that are
 #          not the WsprryPi config. HTTP vhosts are included first, followed by
@@ -6929,9 +7125,9 @@ find_active_apache_site_confs() {
     local enabled_dir="/etc/apache2/sites-enabled"
     local candidate
     local resolved
-    local found=false
-    local http_confs=()
-    local ssl_confs=()
+    local unique_enabled=()
+    local selected_http=""
+    local selected_ssl=""
 
     APACHE_ACTIVE_SITE_CONF=""
     APACHE_ACTIVE_SITE_CONFS=()
@@ -6953,61 +7149,51 @@ find_active_apache_site_confs() {
 
         [[ -f "$resolved" ]] || continue
 
-        if grep -qiE '<VirtualHost[[:space:]][^>]*(:|\*)80([^0-9]|>)' "$resolved"; then
-            http_confs+=("$resolved")
-        fi
-
-        if grep -qiE '<VirtualHost[[:space:]][^>]*(:|\*)443([^0-9]|>)' "$resolved"; then
-            ssl_confs+=("$resolved")
+        if [[ " ${unique_enabled[*]} " != *" $resolved "* ]]; then
+            unique_enabled+=("$resolved")
         fi
     done
 
-    for resolved in "${http_confs[@]}" "${ssl_confs[@]}"; do
-        [[ -n "$resolved" ]] || continue
+    if (( ${#unique_enabled[@]} == 0 )); then
+        debug_print "No suitable active Apache vhost was found." "$debug"
+        debug_end "$debug"
+        return 1
+    fi
 
-        if [[ " ${APACHE_ACTIVE_SITE_CONFS[*]} " != *" $resolved "* ]]; then
-            APACHE_ACTIVE_SITE_CONFS+=("$resolved")
+    if (( ${#unique_enabled[@]} == 1 )); then
+        APACHE_ACTIVE_SITE_CONFS=("${unique_enabled[0]}")
+        APACHE_ACTIVE_SITE_CONF="${APACHE_ACTIVE_SITE_CONFS[0]}"
+        debug_print "Selected sole enabled Apache vhost: ${APACHE_ACTIVE_SITE_CONF}" "$debug"
+        debug_end "$debug"
+        return 0
+    fi
+
+    if select_preferred_apache_vhost_for_port unique_enabled 80 selected_http "$debug"; then
+        if [[ -n "$selected_http" ]]; then
+            APACHE_ACTIVE_SITE_CONFS+=("$selected_http")
+            debug_print "Selected HTTP Apache vhost: ${selected_http}" "$debug"
         fi
-    done
+    fi
 
-    if (( ${#APACHE_ACTIVE_SITE_CONFS[@]} == 0 )); then
-        for candidate in "$enabled_dir"/*.conf; do
-            [[ -e "$candidate" ]] || continue
-
-            resolved=$(readlink -f "$candidate")
-
-            if [[ "$(basename "$resolved")" == "wsprrypi.conf" ]]; then
-                continue
-            fi
-
-            if [[ -f "$resolved" ]]; then
-                APACHE_ACTIVE_SITE_CONFS+=("$resolved")
-                debug_print "Selected fallback Apache vhost: $resolved" "$debug"
-                break
-            fi
-        done
+    if select_preferred_apache_vhost_for_port unique_enabled 443 selected_ssl "$debug"; then
+        if [[ -n "$selected_ssl" && " ${APACHE_ACTIVE_SITE_CONFS[*]} " != *" $selected_ssl "* ]]; then
+            APACHE_ACTIVE_SITE_CONFS+=("$selected_ssl")
+        fi
+        if [[ -n "$selected_ssl" ]]; then
+            debug_print "Selected HTTPS Apache vhost: ${selected_ssl}" "$debug"
+        fi
     fi
 
     if (( ${#APACHE_ACTIVE_SITE_CONFS[@]} == 0 )); then
-        debug_print "No suitable active Apache vhost was found." "$debug"
+        debug_print "Multiple enabled Apache vhosts were found, but none matched a safe HTTP/HTTPS selection pattern." "$debug"
         debug_end "$debug"
         return 1
     fi
 
     APACHE_ACTIVE_SITE_CONF="${APACHE_ACTIVE_SITE_CONFS[0]}"
 
-    for resolved in "${APACHE_ACTIVE_SITE_CONFS[@]}"; do
-        found=true
-        debug_print "Selected active Apache vhost: $resolved" "$debug"
-    done
-
-    if [[ "$found" == true ]]; then
-        debug_end "$debug"
-        return 0
-    fi
-
     debug_end "$debug"
-    return 1
+    return 0
 }
 
 # -----------------------------------------------------------------------------
