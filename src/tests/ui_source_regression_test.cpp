@@ -309,7 +309,8 @@ int main()
         "shared confirm modal must support preserving diagnostic line breaks for detail dialogs");
     require(
         ui_source.find("function isWsprConfigMode()") != std::string::npos &&
-            ui_source.find("const useNtp = isWsprMode && backend === \"gpio\" && $(\"#use_ntp\").is(\":checked\");") != std::string::npos &&
+            ui_source.find("const useNtp = isWsprMode && $(\"#use_ntp\").is(\":checked\");") != std::string::npos &&
+            ui_source.find("backend === \"gpio\" && $(\"#use_ntp\").is(\":checked\");") == std::string::npos &&
             ui_source.find("$(\"#ntp_calibration_control\")") != std::string::npos &&
             ui_source.find("$ppm.prop(\"disabled\", !isWsprMode || useNtp);") != std::string::npos &&
             ui_source.find("$ppmCw.prop(\"disabled\", isWsprMode);") != std::string::npos &&
