@@ -308,6 +308,14 @@ int main()
             site_source.find("preserveLineBreaks = options.preserveLineBreaks === true") != std::string::npos,
         "shared confirm modal must support preserving diagnostic line breaks for detail dialogs");
     require(
+        site_source.find("function initFooterMetaPanelInteractions()") != std::string::npos &&
+            site_source.find("document.addEventListener(\"click\", function (event) {") != std::string::npos &&
+            site_source.find("footerMeta.contains(event.target)") != std::string::npos &&
+            site_source.find("document.addEventListener(\"keydown\", function (event) {") != std::string::npos &&
+            site_source.find("event.key !== \"Escape\"") != std::string::npos &&
+            site_source.find("closeFooterMetaPanel();") != std::string::npos,
+        "site.js must close the footer About panel on outside click and Escape while keeping click-based toggling");
+    require(
         ui_source.find("function isWsprConfigMode()") != std::string::npos &&
             ui_source.find("const useNtp = isWsprMode && $(\"#use_ntp\").is(\":checked\");") != std::string::npos &&
             ui_source.find("backend === \"gpio\" && $(\"#use_ntp\").is(\":checked\");") == std::string::npos &&
@@ -323,6 +331,12 @@ int main()
         config_view_source.find("id=\"modeChangeGuardModal\"") != std::string::npos &&
             config_view_source.find("id=\"modeChangeGuardConfirmBtn\"") != std::string::npos,
         "Configuration view must expose the guarded mode-change confirmation modal");
+    const std::string footer_source =
+        read_text_file("/home/pi/WsprryPi/WsprryPi-UI/data/footer.php");
+    require(
+        footer_source.find("<details class=\"footer-meta\">") != std::string::npos &&
+            footer_source.find("<summary>About</summary>") != std::string::npos,
+        "footer markup must keep the native click-based About disclosure");
 
     const std::string operation_view_source =
         read_text_file("/home/pi/WsprryPi/WsprryPi-UI/data/views/operation.php");
