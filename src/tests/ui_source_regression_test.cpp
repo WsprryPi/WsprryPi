@@ -216,6 +216,16 @@ int main()
         ui_source.find("bindTestToneControls();") != std::string::npos,
         "configuration view must bind the shared Test Tone controls");
     require(
+        ui_source.find("function si5351UiSupported()") != std::string::npos &&
+            ui_source.find("function getSi5351OptionLabel(detected)") != std::string::npos &&
+            ui_source.find("const si5351Supported = si5351UiSupported();") != std::string::npos &&
+            ui_source.find("const si5351Detected = platform.si5351Detected !== false;") != std::string::npos &&
+            ui_source.find("$si5351Option.text(getSi5351OptionLabel(si5351Detected));") != std::string::npos &&
+            ui_source.find("$si5351Option.prop(\"disabled\", !si5351Supported);") != std::string::npos &&
+            ui_source.find("$si5351Option.text(si5351Supported ? \"Si5351\" : \"Si5351 (Not detected)\");") ==
+                std::string::npos,
+        "Si5351 backend selection must remain available when the UI supports it, while detection only controls the option label");
+    require(
         ui_source.find("function applyBandGpioColumnToggle(column, checked)") != std::string::npos &&
             ui_source.find("function syncBandGpioColumnHeaderStates()") != std::string::npos,
         "Band GPIO bulk-toggle behavior must use shared helper functions");
