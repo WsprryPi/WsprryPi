@@ -393,14 +393,29 @@ void WebSocketServer::handleMessage(const std::string &raw_message)
         else if (cmd == "tone_start")
         {
             llog.logS(DEBUG, "Received JSON test_tone_start command.");
-            start_test_tone();
-            reply["tone_start"] = "ok";
+            const TestToneStartResult start_result = start_test_tone();
+            reply["command"] = "tone_start";
+            reply["started"] = start_result.started;
+            reply["already_active"] = start_result.already_active;
+            reply["blocked_by_active_transmission"] =
+                start_result.blocked_by_active_transmission;
+            reply["message"] = start_result.message;
+            reply["tone_start"] = start_result.started ? "ok" : "rejected";
+            reply["status"] = start_result.started ? "ok" : "error";
         }
         else if (cmd == "tone_end")
         {
             llog.logS(DEBUG, "Received JSON test_tone_stop command.");
-            end_test_tone();
-            reply["tone_end"] = "ok";
+            const TestToneStopResult stop_result = end_test_tone();
+            reply["command"] = "tone_end";
+            reply["stopped"] = stop_result.stopped;
+            reply["tone_was_active"] = stop_result.tone_was_active;
+            reply["scheduler_restored"] = stop_result.scheduler_restored;
+            reply["deferred_reload_reconciled"] =
+                stop_result.deferred_reload_reconciled;
+            reply["message"] = stop_result.message;
+            reply["tone_end"] = stop_result.stopped ? "ok" : "rejected";
+            reply["status"] = stop_result.stopped ? "ok" : "error";
         }
         else if (cmd == "echo")
         {
