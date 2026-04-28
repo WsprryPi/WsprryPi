@@ -83,12 +83,12 @@ int main()
                 std::string::npos,
         "explicit user stop must suppress the intermediate canceled websocket event");
     require(
-        scheduling_source.find("void start_test_tone()") != std::string::npos &&
+        scheduling_source.find("TestToneStartResult start_test_tone()") != std::string::npos &&
             scheduling_source.find("send_ws_message(\"transmit\", \"starting\");") ==
                 scheduling_source.find("send_ws_message(\"transmit\", \"starting\");", scheduling_source.find("void transmitter_cb(")),
         "test tone start must rely on transmitter callback websocket ownership only");
     require(
-        scheduling_source.find("void end_test_tone()") != std::string::npos &&
+        scheduling_source.find("TestToneStopResult end_test_tone()") != std::string::npos &&
             scheduling_source.find("send_ws_message(\"transmit\", \"finished\");") ==
                 scheduling_source.find("send_ws_message(\"transmit\", \"finished\");", scheduling_source.find("void transmitter_cb(")),
         "test tone end must rely on transmitter callback websocket ownership only");
@@ -609,6 +609,14 @@ int main()
     require(
         maintenance_test_tone_script_source.find("bindTestToneControls();") != std::string::npos,
         "maintenance view must bind the shared Test Tone controls");
+    require(
+        site_source.find("function hasActiveManagedTransmissionForTestTone()") != std::string::npos &&
+            site_source.find("function handleTestToneCommandResponse(message)") != std::string::npos &&
+            site_source.find("if (hasActiveManagedTransmissionForTestTone()) {") != std::string::npos &&
+            site_source.find("showTestToneBlockedModal();") != std::string::npos &&
+            site_source.find("You have to stop and disable transmissions before starting a test tone.") != std::string::npos &&
+            site_source.find("if (msg.command === \"tone_start\" || msg.command === \"tone_end\")") != std::string::npos,
+        "shared Test Tone controls must reject unsafe starts with the existing modal path and reconcile websocket command replies");
 
     std::cout << "ui_source_regression_test passed" << std::endl;
     return EXIT_SUCCESS;

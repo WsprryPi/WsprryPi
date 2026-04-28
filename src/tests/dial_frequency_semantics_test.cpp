@@ -3630,6 +3630,125 @@ int main(int argc, char *argv[])
 
     {
         init_default_config();
+        ini_reload_pending.store(false, std::memory_order_relaxed);
+        exiting_wspr.store(false, std::memory_order_relaxed);
+        reset_current_transmission_request_for_test();
+        set_scheduler_execution_suppressed_for_test(true);
+
+        config.mode = ModeType::WSPR;
+        config.transmit = true;
+        config.callsign = "AA0NT";
+        config.grid_square = "EM18";
+        config.power_dbm = 20;
+        config.frequencies = "20m";
+        config.gpio_tx_pin = 4;
+        resolve_backend_specific_config(config);
+        set_frequencies(config);
+
+        wsprTransmitter.backendSetStateValue(WsprTransmitter::State::TRANSMITTING);
+        const TestToneStartResult blocked_start = start_test_tone();
+
+        require(
+            !blocked_start.started && blocked_start.blocked_by_active_transmission,
+            "test tone start must reject an active scheduler-managed transmission");
+        require(
+            current_transmission_request_for_test().mode != TransmissionMode::TONE,
+            "rejected test tone start must not commit a tone request");
+        require(
+            wsprTransmitter.getState() == WsprTransmitter::State::TRANSMITTING,
+            "rejected test tone start must not disturb the active transmission");
+
+        wsprTransmitter.backendSetStateValue(WsprTransmitter::State::DISABLED);
+        set_scheduler_execution_suppressed_for_test(false);
+    }
+
+    {
+        init_default_config();
+        ini_reload_pending.store(false, std::memory_order_relaxed);
+        ini_reload_generation.store(0, std::memory_order_relaxed);
+        exiting_wspr.store(false, std::memory_order_relaxed);
+        reset_managed_reload_runtime_for_test();
+        reset_current_transmission_request_for_test();
+        set_scheduler_execution_suppressed_for_test(true);
+
+        config.use_ini = true;
+        config.ini_filename = "/tmp/test_tone_reload_recovery.ini";
+        config.mode = ModeType::WSPR;
+        config.transmit = true;
+        config.callsign = "AA0NT";
+        config.grid_square = "EM18";
+        config.power_dbm = 20;
+        config.frequencies = "20m";
+        config.gpio_tx_pin = 4;
+        resolve_backend_specific_config(config);
+        set_frequencies(config);
+
+        iniFile.setData(
+            make_managed_ini_data("AA0NT", "EM18", "20m", true));
+        require(
+            set_config(true),
+            "test tone recovery regression must commit an initial WSPR request");
+        const TransmissionRequest wspr_request_before_tone =
+            current_transmission_request_for_test();
+
+        const TestToneStartResult tone_start_result = start_test_tone();
+        require(
+            tone_start_result.started,
+            "test tone recovery regression must start the transient tone");
+        require(
+            current_transmission_request_for_test().mode == TransmissionMode::TONE,
+            "test tone start must commit a tone request through the scheduler");
+
+        wsprTransmitter.backendSetStateValue(WsprTransmitter::State::TRANSMITTING);
+        iniFile.setData(
+            make_managed_ini_data("AA0NT", "EM18", "20m", false));
+        callback_ini_changed();
+
+        require(
+            ini_reload_pending.load(std::memory_order_relaxed),
+            "test tone reload regression must defer managed reload while the tone is active");
+
+        const TestToneStopResult tone_stop_result = end_test_tone();
+        require(
+            tone_stop_result.stopped && tone_stop_result.scheduler_restored,
+            "test tone stop must restore scheduler ownership");
+        require(
+            tone_stop_result.deferred_reload_reconciled,
+            "test tone stop must reconcile deferred reload state");
+        require(
+            !ini_reload_pending.load(std::memory_order_relaxed),
+            "test tone stop must consume deferred reload work");
+        require(
+            !config.transmit,
+            "deferred managed reload after test tone stop must commit the latest disabled config");
+        require(
+            wsprTransmitter.getState() == WsprTransmitter::State::DISABLED,
+            "test tone stop must clear the transmitter busy state");
+        require(
+            current_transmission_request_for_test().actual_rf_frequency_hz == 0.0,
+            "disabled reload after test tone stop must clear the committed request");
+
+        iniFile.setData(
+            make_managed_ini_data("AA0NT", "EM18", "20m", true));
+        callback_ini_changed();
+
+        require(
+            set_config(true),
+            "scheduler must remain able to resume normal beaconing after tone recovery");
+        require(
+            config.transmit,
+            "scheduler resume after tone recovery must restore enabled live config");
+        require(
+            current_transmission_request_for_test().mode == TransmissionMode::WSPR &&
+                current_transmission_request_for_test().actual_rf_frequency_hz ==
+                    wspr_request_before_tone.actual_rf_frequency_hz,
+            "scheduler resume after tone recovery must recommit the normal WSPR request");
+
+        set_scheduler_execution_suppressed_for_test(false);
+    }
+
+    {
+        init_default_config();
         config.use_ini = true;
         config.ini_filename = "/tmp/transmit_toggle_patch.ini";
         config.mode = ModeType::WSPR;

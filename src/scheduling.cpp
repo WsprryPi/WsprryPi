@@ -1198,6 +1198,18 @@ bool transmitter_reload_should_defer() noexcept
            wsprTransmitter.activeExecutionIsTone();
 }
 
+static bool scheduler_managed_transmission_active_for_test_tone() noexcept
+{
+    const WsprTransmitter::State state = wsprTransmitter.getState();
+    if (state != WsprTransmitter::State::TRANSMITTING &&
+        state != WsprTransmitter::State::RECOVERING)
+    {
+        return false;
+    }
+
+    return !wsprTransmitter.activeExecutionIsTone();
+}
+
 static WsprFrequencyEntry next_frequency_entry_from(
     const std::vector<WsprFrequencyEntry> &entries,
     int &iterator,
@@ -2810,83 +2822,94 @@ void reboot_system()
  * frequency entry, prepares band-selector GPIO state, commits a tone request,
  * and starts the transmitter. Tone mode here is runtime-only behavior.
  */
-void start_test_tone()
+TestToneStartResult start_test_tone()
 {
-    if (!web_test_tone.load())
+    TestToneStartResult result;
+
+    if (web_test_tone.load())
     {
-        if (!runtime_transmit_requested(config))
-        {
-            log_transmit_disabled_skip();
-            return;
-        }
-
-        web_test_tone.store(true);
-
-        // Save previous mode so we can restore it later
-        lastMode = config.mode;
-
-        // Tear down any ongoing WSPR/transmission
-        if (wsprTransmitter.getState() == WsprTransmitter::State::TRANSMITTING)
-        {
-            llog.logS(INFO, "Stopping an in-process message early.");
-        }
-        wsprTransmitter.stopAndJoin();
-
-        // Pick the first configured scheduler frequency entry, then commit
-        // the resolved RF frequency into the request before execution.
-        const WsprFrequencyEntry entry =
-            next_frequency_entry(/*restart=*/true);
-        const double dial_freq = entry.dial_frequency_hz;
-        current_frequency_entry = entry;
-        const double actual_rf_freq = resolve_actual_rf_frequency_hz(
-            dial_freq,
-            config.wspr.audio_offset_hz,
-            FrequencyPath::WsprDial);
-
-        while (
-            wsprTransmitter.getState() ==
-            WsprTransmitter::State::TRANSMITTING)
-        {
-            std::this_thread::sleep_for(std::chrono::milliseconds(1));
-        }
-        set_tx_led_state(true, "test tone start");
-        llog.logS(INFO, "Beginning test tone requested by web UI.");
-
-        // Switch into tone mode
-        config.mode = ModeType::TONE;
-
-        // Set up and start the tone
-        llog.logS(
-            DEBUG,
-            "Resolved WSPR dial frequency ",
-            lookup.freq_display_string(dial_freq),
-            " to actual RF ",
-            lookup.freq_display_string(actual_rf_freq),
-            " using audio offset ",
-            config.wspr.audio_offset_hz,
-            " Hz.");
-        const double committed_ppm = config.ppm;
-        TransmissionRequest request =
-            make_tone_request(config, committed_ppm, actual_rf_freq, dial_freq, entry);
-        BandGPIOResolution selector_resolution;
-        const BandGPIOPrepareStatus selector_status =
-            prepare_band_gpio_for_frequency_or_log(
-                dial_freq,
-                entry,
-                config,
-                -1,
-                &selector_resolution);
-        commit_band_gpio_snapshot_to_request(
-            request,
-            selector_resolution,
-            selector_status);
-        commit_execution_request(request);
-
-        wsprTransmitter.startAsync();
-        llog.logS(INFO,
-                  "WSPR-band test tone using dial frequency: ",
-                  lookup.freq_display_string(dial_freq));
+        result.already_active = true;
+        result.message = "Test tone is already active.";
+        return result;
     }
+
+    if (!runtime_transmit_requested(config))
+    {
+        log_transmit_disabled_skip();
+        result.message = "Transmit is disabled.";
+        return result;
+    }
+
+    if (scheduler_managed_transmission_active_for_test_tone())
+    {
+        result.blocked_by_active_transmission = true;
+        result.message =
+            "Stop and disable the current transmission before starting a test tone.";
+        llog.logS(WARN, result.message);
+        return result;
+    }
+
+    web_test_tone.store(true);
+
+    // Save previous mode so we can restore it later.
+    lastMode = config.mode;
+
+    wsprTransmitter.stopAndJoin();
+
+    // Pick the first configured scheduler frequency entry, then commit
+    // the resolved RF frequency into the request before execution.
+    const WsprFrequencyEntry entry =
+        next_frequency_entry(/*restart=*/true);
+    const double dial_freq = entry.dial_frequency_hz;
+    current_frequency_entry = entry;
+    const double actual_rf_freq = resolve_actual_rf_frequency_hz(
+        dial_freq,
+        config.wspr.audio_offset_hz,
+        FrequencyPath::WsprDial);
+
+    set_tx_led_state(true, "test tone start");
+    llog.logS(INFO, "Beginning test tone requested by web UI.");
+
+    // Switch into tone mode.
+    config.mode = ModeType::TONE;
+
+    llog.logS(
+        DEBUG,
+        "Resolved WSPR dial frequency ",
+        lookup.freq_display_string(dial_freq),
+        " to actual RF ",
+        lookup.freq_display_string(actual_rf_freq),
+        " using audio offset ",
+        config.wspr.audio_offset_hz,
+        " Hz.");
+    const double committed_ppm = config.ppm;
+    TransmissionRequest request =
+        make_tone_request(config, committed_ppm, actual_rf_freq, dial_freq, entry);
+    BandGPIOResolution selector_resolution;
+    const BandGPIOPrepareStatus selector_status =
+        prepare_band_gpio_for_frequency_or_log(
+            dial_freq,
+            entry,
+            config,
+            -1,
+            &selector_resolution);
+    commit_band_gpio_snapshot_to_request(
+        request,
+        selector_resolution,
+        selector_status);
+    commit_execution_request(request);
+
+    if (!suppress_scheduler_execution_for_test)
+    {
+        wsprTransmitter.startAsync();
+    }
+
+    llog.logS(INFO,
+              "WSPR-band test tone using dial frequency: ",
+              lookup.freq_display_string(dial_freq));
+    result.started = true;
+    result.message = "Test tone started.";
+    return result;
 }
 
 /**
@@ -2895,78 +2918,98 @@ void start_test_tone()
  * This stops the current tone, tears down selector lifecycle state through
  * the scheduler helper, and then resumes the pre-tone runtime mode.
  */
-void end_test_tone()
+TestToneStopResult end_test_tone()
 {
-    if (web_test_tone.load())
+    TestToneStopResult result;
+    result.tone_was_active = web_test_tone.load();
+
+    if (!result.tone_was_active)
     {
-        llog.logS(INFO, "Ending test tone requested by Web UI.");
-
-        // Stop current tone
-        wsprTransmitter.stopAndJoin();
-        stop_active_transmission_selectors();
-        set_tx_led_state(false, "test tone stop");
-
-        // Clear the “we’re testing” flag
-        web_test_tone.store(false);
-
-        // Restore whatever mode we were in before
-        config.mode = lastMode;
-
-        if (config.mode == ModeType::WSPR)
-        {
-            // Re-initialize WSPR with next frequency, PPM, etc.
-            if (!validate_config_data())
-            {
-                llog.logE(ERROR, "Initial configuration validation failed.");
-                return;
-            }
-        }
-        else
-        {
-            WsprFrequencyEntry entry;
-            double actual_rf_frequency_hz = 0.0;
-            if (!try_get_direct_tone_startup_request(
-                    entry,
-                    actual_rf_frequency_hz))
-            {
-                llog.logE(ERROR,
-                          "Unable to restore direct test tone; no "
-                          "transient tone request is active.");
-                return;
-            }
-
-            validate_config_data();
-            if (!runtime_transmit_requested(config))
-            {
-                log_transmit_disabled_skip();
-                return;
-            }
-
-            const double committed_ppm = config.ppm;
-            TransmissionRequest request =
-                make_direct_tone_request(
-                    config,
-                    committed_ppm,
-                    actual_rf_frequency_hz);
-            BandGPIOResolution selector_resolution;
-            const BandGPIOPrepareStatus selector_status =
-                prepare_band_gpio_for_frequency_or_log(
-                    entry.dial_frequency_hz,
-                    entry,
-                    config,
-                    -1,
-                    &selector_resolution);
-            commit_band_gpio_snapshot_to_request(
-                request,
-                selector_resolution,
-                selector_status);
-            commit_execution_request(request);
-            wsprTransmitter.startAsync();
-
-            llog.logS(INFO,
-                      "Transmitting tone, hit Ctrl-C to terminate tone.");
-        }
+        result.message = "No active test tone.";
+        return result;
     }
+
+    llog.logS(INFO, "Ending test tone requested by Web UI.");
+
+    wsprTransmitter.stopAndJoin();
+    stop_active_transmission_selectors();
+    set_tx_led_state(false, "test tone stop");
+
+    const bool deferred_reload_pending =
+        ini_reload_pending.load(std::memory_order_acquire);
+
+    web_test_tone.store(false);
+    config.mode = lastMode;
+
+    if (config.mode == ModeType::WSPR)
+    {
+        if (!set_config(true))
+        {
+            result.message = "Unable to restore scheduler state after test tone stop.";
+            return result;
+        }
+
+        result.stopped = true;
+        result.scheduler_restored = true;
+        result.deferred_reload_reconciled =
+            deferred_reload_pending &&
+            !ini_reload_pending.load(std::memory_order_acquire);
+        result.message = "Test tone stopped and scheduler restored.";
+        return result;
+    }
+
+    WsprFrequencyEntry entry;
+    double actual_rf_frequency_hz = 0.0;
+    if (!try_get_direct_tone_startup_request(
+            entry,
+            actual_rf_frequency_hz))
+    {
+        llog.logE(ERROR,
+                  "Unable to restore direct test tone; no "
+                  "transient tone request is active.");
+        result.message =
+            "Unable to restore direct test tone; no transient tone request is active.";
+        return result;
+    }
+
+    validate_config_data();
+    if (!runtime_transmit_requested(config))
+    {
+        log_transmit_disabled_skip();
+        result.stopped = true;
+        result.message = "Test tone stopped with transmit disabled.";
+        return result;
+    }
+
+    const double committed_ppm = config.ppm;
+    TransmissionRequest request =
+        make_direct_tone_request(
+            config,
+            committed_ppm,
+            actual_rf_frequency_hz);
+    BandGPIOResolution selector_resolution;
+    const BandGPIOPrepareStatus selector_status =
+        prepare_band_gpio_for_frequency_or_log(
+            entry.dial_frequency_hz,
+            entry,
+            config,
+            -1,
+            &selector_resolution);
+    commit_band_gpio_snapshot_to_request(
+        request,
+        selector_resolution,
+        selector_status);
+    commit_execution_request(request);
+    if (!suppress_scheduler_execution_for_test)
+    {
+        wsprTransmitter.startAsync();
+    }
+
+    llog.logS(INFO,
+              "Transmitting tone, hit Ctrl-C to terminate tone.");
+    result.stopped = true;
+    result.message = "Test tone stopped and direct tone restored.";
+    return result;
 }
 
 StopTransmissionResult stop_transmission_by_user_request(bool persist_transmit)
