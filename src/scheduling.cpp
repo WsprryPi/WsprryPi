@@ -2949,6 +2949,14 @@ TestToneStopResult end_test_tone()
             return result;
         }
 
+        if (runtime_transmit_enabled(config))
+        {
+            // Re-arm the committed WSPR wait loop even if the tone stop
+            // interrupted a scheduler thread that had already been torn down.
+            wsprTransmitter.clearSoftOff();
+            wsprTransmitter.startAsync();
+        }
+
         result.stopped = true;
         result.scheduler_restored = true;
         result.deferred_reload_reconciled =
