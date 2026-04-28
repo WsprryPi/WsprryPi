@@ -2833,18 +2833,11 @@ TestToneStartResult start_test_tone()
         return result;
     }
 
-    if (!runtime_transmit_requested(config))
-    {
-        log_transmit_disabled_skip();
-        result.message = "Transmit is disabled.";
-        return result;
-    }
-
     if (scheduler_managed_transmission_active_for_test_tone())
     {
         result.blocked_by_active_transmission = true;
         result.message =
-            "Stop and disable the current transmission before starting a test tone.";
+            "Stop and disable the current scheduled transmission before starting a test tone.";
         llog.logS(WARN, result.message);
         return result;
     }
@@ -2949,7 +2942,8 @@ TestToneStopResult end_test_tone()
             return result;
         }
 
-        if (runtime_transmit_enabled(config))
+        if (runtime_transmit_enabled(config) &&
+            !suppress_scheduler_execution_for_test)
         {
             // Re-arm the committed WSPR wait loop even if the tone stop
             // interrupted a scheduler thread that had already been torn down.
@@ -3081,7 +3075,7 @@ StopTransmissionResult stop_transmission_by_user_request(bool persist_transmit)
             iniFile.set_bool_value("Operation", "Transmit", false);
             iniFile.commit_changes();
             result.persisted = true;
-            llog.logS(INFO, "Operation.Transmit persisted false due to user stop request.");
+            llog.logS(INFO, "Transmit disabled due to user stop request.");
         }
         catch (const std::exception &e)
         {

@@ -3670,6 +3670,122 @@ int main(int argc, char *argv[])
         reset_managed_reload_runtime_for_test();
         reset_current_transmission_request_for_test();
         set_scheduler_execution_suppressed_for_test(true);
+        set_si5351_detection_override_for_test(true);
+
+        config.use_ini = true;
+        config.ini_filename = "/tmp/test_tone_disabled_runtime.ini";
+        config.mode = ModeType::WSPR;
+        config.transmit = false;
+        config.callsign = "AA0NT";
+        config.grid_square = "EM18";
+        config.power_dbm = 20;
+        config.frequencies = "20m";
+        config.transmit_backend = TransmitBackendKind::SI5351;
+        config.si5351_i2c_bus = 1;
+        config.si5351_i2c_address = 0x60;
+        config.si5351_reference_hz = 27000000;
+        config.si5351_tx_output = 0;
+        config.si5351_power_level = 1;
+        resolve_backend_specific_config(config);
+        set_frequencies(config);
+        iniFile.setData(
+            make_managed_ini_data("AA0NT", "EM18", "20m", false));
+        require(
+            set_config(true),
+            "disabled scheduler tone regression must load a stable WSPR runtime config");
+
+        const TestToneStartResult tone_start_result = start_test_tone();
+        require(
+            tone_start_result.started,
+            "test tone start must succeed when scheduler transmit is disabled and no managed TX is active");
+        const TransmissionRequest tone_request =
+            current_transmission_request_for_test();
+        require(
+            tone_request.mode == TransmissionMode::TONE &&
+                tone_request.actual_rf_frequency_hz > 0.0,
+            "disabled-scheduler test tone start must still commit a runnable tone request");
+
+        wsprTransmitter.backendSetStateValue(WsprTransmitter::State::TRANSMITTING);
+        const TestToneStopResult tone_stop_result = end_test_tone();
+        require(
+            tone_stop_result.stopped && tone_stop_result.scheduler_restored,
+            "test tone stop must still restore scheduler ownership when transmit stays disabled");
+        require(
+            !config.transmit,
+            "test tone stop must preserve disabled scheduler state");
+        require(
+            current_transmission_request_for_test().actual_rf_frequency_hz == 0.0,
+            "test tone stop with transmit disabled must leave the committed scheduler request disabled");
+        require(
+            wsprTransmitter.getState() == WsprTransmitter::State::DISABLED,
+            "test tone stop with transmit disabled must not leave the transmitter busy");
+
+        clear_si5351_detection_override_for_scope();
+        set_scheduler_execution_suppressed_for_test(false);
+    }
+
+    {
+        init_default_config();
+        ini_reload_pending.store(false, std::memory_order_relaxed);
+        ini_reload_generation.store(0, std::memory_order_relaxed);
+        exiting_wspr.store(false, std::memory_order_relaxed);
+        reset_managed_reload_runtime_for_test();
+        reset_current_transmission_request_for_test();
+        set_scheduler_execution_suppressed_for_test(true);
+
+        config.use_ini = true;
+        config.ini_filename = "/tmp/test_tone_idle_runtime.ini";
+        config.mode = ModeType::WSPR;
+        config.transmit = true;
+        config.callsign = "AA0NT";
+        config.grid_square = "EM18";
+        config.power_dbm = 20;
+        config.frequencies = "20m";
+        config.gpio_tx_pin = 4;
+        resolve_backend_specific_config(config);
+        set_frequencies(config);
+        iniFile.setData(
+            make_managed_ini_data("AA0NT", "EM18", "20m", true));
+
+        require(
+            set_config(true),
+            "idle WSPR scheduler regression must commit the normal waiting request");
+        const TransmissionRequest wspr_request_before_tone =
+            current_transmission_request_for_test();
+
+        const TestToneStartResult tone_start_result = start_test_tone();
+        require(
+            tone_start_result.started,
+            "test tone start must succeed during idle WSPR wait periods");
+        require(
+            current_transmission_request_for_test().mode == TransmissionMode::TONE,
+            "idle WSPR test tone start must replace the committed waiting request with tone execution");
+
+        wsprTransmitter.backendSetStateValue(WsprTransmitter::State::TRANSMITTING);
+        const TestToneStopResult tone_stop_result = end_test_tone();
+        require(
+            tone_stop_result.stopped && tone_stop_result.scheduler_restored,
+            "idle WSPR test tone stop must restore the scheduler path");
+        require(
+            config.transmit,
+            "idle WSPR test tone stop must preserve enabled scheduler state");
+        require(
+            current_transmission_request_for_test().mode == TransmissionMode::WSPR &&
+                current_transmission_request_for_test().actual_rf_frequency_hz ==
+                    wspr_request_before_tone.actual_rf_frequency_hz,
+            "idle WSPR test tone stop must recommit the waiting WSPR request when transmit remains enabled");
+
+        set_scheduler_execution_suppressed_for_test(false);
+    }
+
+    {
+        init_default_config();
+        ini_reload_pending.store(false, std::memory_order_relaxed);
+        ini_reload_generation.store(0, std::memory_order_relaxed);
+        exiting_wspr.store(false, std::memory_order_relaxed);
+        reset_managed_reload_runtime_for_test();
+        reset_current_transmission_request_for_test();
+        set_scheduler_execution_suppressed_for_test(true);
 
         config.use_ini = true;
         config.ini_filename = "/tmp/test_tone_reload_recovery.ini";

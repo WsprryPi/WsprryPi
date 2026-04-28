@@ -619,7 +619,7 @@ int main()
             site_source.find("function handleTestToneCommandResponse(message)") != std::string::npos &&
             site_source.find("if (hasActiveManagedTransmissionForTestTone()) {") != std::string::npos &&
             site_source.find("showTestToneBlockedModal();") != std::string::npos &&
-            site_source.find("You have to stop and disable transmissions before starting a test tone.") != std::string::npos &&
+            site_source.find("You have to stop and disable the active scheduled transmission before starting a test tone.") != std::string::npos &&
             site_source.find("if (msg.command === \"tone_start\" || msg.command === \"tone_end\")") != std::string::npos,
         "shared Test Tone controls must reject unsafe starts with the existing modal path and reconcile websocket command replies");
     require(
