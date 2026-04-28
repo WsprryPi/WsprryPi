@@ -42,6 +42,7 @@
 // Project headers
 #include "arg_parser.hpp"
 #include "ppm_manager.hpp"
+#include "transmission_request.hpp"
 #include "wspr_transmit_types.hpp"
 
 // Standard library headers
@@ -195,7 +196,15 @@ bool ppm_init();
  * frequency entry. This is transient runtime behavior; it does not
  * persist tone mode into configuration files.
  */
-extern void start_test_tone();
+struct TestToneStartResult
+{
+    bool started = false;
+    bool already_active = false;
+    bool blocked_by_active_transmission = false;
+    std::string message;
+};
+
+TestToneStartResult start_test_tone();
 
 /**
  * @brief End the transient runtime test tone and restore prior flow.
@@ -205,7 +214,16 @@ extern void start_test_tone();
  * orchestration or the transient direct-tone startup request that was
  * active before the web-triggered tone.
  */
-extern void end_test_tone();
+struct TestToneStopResult
+{
+    bool stopped = false;
+    bool tone_was_active = false;
+    bool scheduler_restored = false;
+    bool deferred_reload_reconciled = false;
+    std::string message;
+};
+
+TestToneStopResult end_test_tone();
 
 /**
  * @brief Run the main orchestration loop.
@@ -353,6 +371,8 @@ void seed_selector_shutdown_state_for_test(
 void run_final_selector_gpio_shutdown_cleanup_for_test() noexcept;
 void clear_current_wspr_runtime_state_for_test() noexcept;
 TransmissionRequest current_transmission_request_for_test();
+std::optional<wsprrypi::TransmissionRequest> current_controller_request_for_test();
 void reset_current_transmission_request_for_test() noexcept;
+void reset_current_controller_request_for_test() noexcept;
 
 #endif // _SCHEDULING_HPP

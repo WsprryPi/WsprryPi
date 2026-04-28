@@ -83,15 +83,20 @@ int main()
                 std::string::npos,
         "explicit user stop must suppress the intermediate canceled websocket event");
     require(
-        scheduling_source.find("void start_test_tone()") != std::string::npos &&
+        scheduling_source.find("TestToneStartResult start_test_tone()") != std::string::npos &&
             scheduling_source.find("send_ws_message(\"transmit\", \"starting\");") ==
                 scheduling_source.find("send_ws_message(\"transmit\", \"starting\");", scheduling_source.find("void transmitter_cb(")),
         "test tone start must rely on transmitter callback websocket ownership only");
     require(
-        scheduling_source.find("void end_test_tone()") != std::string::npos &&
+        scheduling_source.find("TestToneStopResult end_test_tone()") != std::string::npos &&
             scheduling_source.find("send_ws_message(\"transmit\", \"finished\");") ==
                 scheduling_source.find("send_ws_message(\"transmit\", \"finished\");", scheduling_source.find("void transmitter_cb(")),
         "test tone end must rely on transmitter callback websocket ownership only");
+    require(
+        scheduling_source.find("wsprTransmitter.clearSoftOff();") != std::string::npos &&
+            scheduling_source.find("wsprTransmitter.startAsync();", scheduling_source.find("TestToneStopResult end_test_tone()")) !=
+                std::string::npos,
+        "WSPR test tone stop recovery must explicitly re-arm the committed scheduler wait path");
 
     const std::string ui_source =
         read_text_file("/home/pi/WsprryPi/WsprryPi-UI/data/index.js");
@@ -609,6 +614,24 @@ int main()
     require(
         maintenance_test_tone_script_source.find("bindTestToneControls();") != std::string::npos,
         "maintenance view must bind the shared Test Tone controls");
+    require(
+        site_source.find("function hasActiveManagedTransmissionForTestTone()") != std::string::npos &&
+            site_source.find("function handleTestToneCommandResponse(message)") != std::string::npos &&
+            site_source.find("const startButton = document.getElementById(\"testToneStart\");") != std::string::npos &&
+            site_source.find("toggleButtonLoading(startButton, false);") != std::string::npos &&
+            site_source.find("toggleButtonLoading(endButton, false);") != std::string::npos &&
+            site_source.find("if (response.started === true) {\n            syncTestToneControlState(true);") != std::string::npos &&
+            site_source.find("if (response.stopped !== true) {") != std::string::npos &&
+            site_source.find("if (hasActiveManagedTransmissionForTestTone()) {") != std::string::npos &&
+            site_source.find("showTestToneBlockedModal();") != std::string::npos &&
+            site_source.find("You have to stop and disable the active scheduled transmission before starting a test tone.") != std::string::npos &&
+            site_source.find("if (msg.command === \"tone_start\" || msg.command === \"tone_end\")") != std::string::npos,
+        "shared Test Tone controls must reject unsafe starts with the existing modal path and reconcile websocket command replies");
+    require(
+        site_source.find("const normalizedArgs = args.map((arg) => {") != std::string::npos &&
+            site_source.find("return JSON.stringify(arg);") != std::string::npos &&
+            site_source.find("return Object.prototype.toString.call(arg);") != std::string::npos,
+        "debug console logging must serialize array and object payloads into useful text");
 
     std::cout << "ui_source_regression_test passed" << std::endl;
     return EXIT_SUCCESS;
