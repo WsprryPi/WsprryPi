@@ -199,6 +199,8 @@ int freq_iterator = 0;
 double current_dial_frequency = 0.0;
 WsprFrequencyEntry current_frequency_entry{};
 TransmissionRequest current_transmission_request{};
+static std::optional<wsprrypi::TransmissionRequest>
+    current_controller_request_for_test_storage{};
 
 /**
  * @brief File-scope self-pipe descriptors for signal notifications.
@@ -840,7 +842,7 @@ static wsprrypi::BackendKind to_controller_backend(
     TransmitBackendKind backend) noexcept;
 
 static wsprrypi::ClockSource to_controller_clock_source(
-    TransmitBackendKind backend) noexcept;
+    const ArgParserConfig &cfg) noexcept;
 
 /**
  * @brief Commit the single execution request consumed by the transmitter.
@@ -855,28 +857,62 @@ static void commit_execution_request(
     const TransmissionRequest &request)
 {
     current_transmission_request = request;
+    current_controller_request_for_test_storage.reset();
+
+    auto build_controller_request =
+        [&](wsprrypi::TransmissionMode mode) -> wsprrypi::TransmissionRequest
+    {
+        wsprrypi::TransmissionRequest controller_request;
+        controller_request.mode = mode;
+        controller_request.output.backend =
+            to_controller_backend(config.transmit_backend);
+        controller_request.output.output =
+            to_controller_clock_source(config);
+        controller_request.output.gpio = current_transmission_request.tx_gpio;
+        controller_request.calibration.ppm = current_transmission_request.ppm;
+        controller_request.id.value = 1;
+        controller_request.metadata.label =
+            current_transmission_request.frequency_entry_label;
+        controller_request.metadata.origin = "scheduler";
+        return controller_request;
+    };
+
+    if (current_transmission_request.isTone())
+    {
+        wsprrypi::TransmissionRequest controller_request =
+            build_controller_request(wsprrypi::TransmissionMode::TONE);
+        wsprrypi::TonePayload payload;
+        payload.frequency_hz =
+            current_transmission_request.actual_rf_frequency_hz;
+        controller_request.payload = payload;
+        current_controller_request_for_test_storage = controller_request;
+
+        if (suppress_scheduler_execution_for_test)
+        {
+            return;
+        }
+
+        wsprTransmitter.configureExecution(
+            controller_request,
+            current_transmission_request);
+        return;
+    }
+
     if (suppress_scheduler_execution_for_test)
     {
         return;
     }
-    if (!current_transmission_request.isTone() &&
-        !current_transmission_request.isSkipWindow())
+    if (!current_transmission_request.isSkipWindow())
     {
-        wsprrypi::TransmissionRequest controller_request;
-        controller_request.mode = wsprrypi::TransmissionMode::WSPR;
-        controller_request.output.backend =
-            to_controller_backend(config.transmit_backend);
-        controller_request.output.output =
-            to_controller_clock_source(config.transmit_backend);
-        controller_request.output.gpio = current_transmission_request.tx_gpio;
-        controller_request.calibration.ppm = current_transmission_request.ppm;
-        controller_request.id.value = 1;
+        wsprrypi::TransmissionRequest controller_request =
+            build_controller_request(wsprrypi::TransmissionMode::WSPR);
 
         wsprrypi::WsprPayload payload;
         payload.prepared = current_transmission_request.payload;
         payload.base_frequency_hz =
             current_transmission_request.actual_rf_frequency_hz;
         controller_request.payload = payload;
+        current_controller_request_for_test_storage = controller_request;
 
         wsprTransmitter.configureExecution(
             controller_request,
@@ -892,6 +928,7 @@ static void commit_execution_request(
     const TransmissionRequest &legacy_request)
 {
     current_transmission_request = legacy_request;
+    current_controller_request_for_test_storage = controller_request;
     if (suppress_scheduler_execution_for_test)
     {
         return;
@@ -1156,11 +1193,22 @@ static wsprrypi::BackendKind to_controller_backend(
 }
 
 static wsprrypi::ClockSource to_controller_clock_source(
-    TransmitBackendKind backend) noexcept
+    const ArgParserConfig &cfg) noexcept
 {
-    return backend == TransmitBackendKind::SI5351
-               ? wsprrypi::ClockSource::SI5351_CLK0
-               : wsprrypi::ClockSource::GPIO_CLK;
+    if (cfg.transmit_backend != TransmitBackendKind::SI5351)
+    {
+        return wsprrypi::ClockSource::GPIO_CLK;
+    }
+
+    switch (cfg.si5351_tx_output)
+    {
+    case 1:
+        return wsprrypi::ClockSource::SI5351_CLK1;
+    case 2:
+        return wsprrypi::ClockSource::SI5351_CLK2;
+    default:
+        return wsprrypi::ClockSource::SI5351_CLK0;
+    }
 }
 
 static bool managed_reload_generation_changed(
@@ -1607,7 +1655,7 @@ static wsprrypi::TransmissionRequest make_qrss_controller_request(
     request.id.value = 1;
     request.mode = wsprrypi::TransmissionMode::QRSS;
     request.output.backend = to_controller_backend(cfg.transmit_backend);
-    request.output.output = to_controller_clock_source(cfg.transmit_backend);
+    request.output.output = to_controller_clock_source(cfg);
     request.output.gpio = cfg.tx_pin;
     request.calibration.ppm = committed_ppm;
     request.metadata.label = "qrss-cli-test";
@@ -1646,7 +1694,7 @@ static wsprrypi::TransmissionRequest make_fskcw_controller_request(
     request.id.value = 1;
     request.mode = wsprrypi::TransmissionMode::FSKCW;
     request.output.backend = to_controller_backend(cfg.transmit_backend);
-    request.output.output = to_controller_clock_source(cfg.transmit_backend);
+    request.output.output = to_controller_clock_source(cfg);
     request.output.gpio = cfg.tx_pin;
     request.calibration.ppm = committed_ppm;
     request.metadata.label = "fskcw-cli-test";
@@ -1688,7 +1736,7 @@ static wsprrypi::TransmissionRequest make_dfcw_controller_request(
     request.id.value = 1;
     request.mode = wsprrypi::TransmissionMode::DFCW;
     request.output.backend = to_controller_backend(cfg.transmit_backend);
-    request.output.output = to_controller_clock_source(cfg.transmit_backend);
+    request.output.output = to_controller_clock_source(cfg);
     request.output.gpio = cfg.tx_pin;
     request.calibration.ppm = committed_ppm;
     request.metadata.label = "dfcw-cli-test";
@@ -4712,6 +4760,11 @@ TransmissionRequest current_transmission_request_for_test()
     return current_transmission_request;
 }
 
+std::optional<wsprrypi::TransmissionRequest> current_controller_request_for_test()
+{
+    return current_controller_request_for_test_storage;
+}
+
 std::vector<BandGPIOConfig> selector_shutdown_cleanup_targets_for_test()
 {
     return last_selector_shutdown_cleanup_targets;
@@ -4765,4 +4818,9 @@ void clear_current_wspr_runtime_state_for_test() noexcept
 void reset_current_transmission_request_for_test() noexcept
 {
     current_transmission_request = TransmissionRequest{};
+}
+
+void reset_current_controller_request_for_test() noexcept
+{
+    current_controller_request_for_test_storage.reset();
 }

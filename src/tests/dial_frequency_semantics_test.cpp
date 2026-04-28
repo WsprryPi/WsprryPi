@@ -1,5 +1,6 @@
 #include "arg_parser.hpp"
 #include "config_handler.hpp"
+#include "execution_plan_compiler.hpp"
 #include "frequency_semantics.hpp"
 #include "scheduling.hpp"
 #include "wspr_band_lookup.hpp"
@@ -724,7 +725,7 @@ int main(int argc, char *argv[])
         config.si5351_i2c_bus = 1;
         config.si5351_i2c_address = 0x60;
         config.si5351_reference_hz = 27000000;
-        config.si5351_tx_output = 0;
+        config.si5351_tx_output = 2;
         config.si5351_power_level = 1;
         resolve_backend_specific_config(config);
         set_si5351_detection_override_for_test(true);
@@ -3669,6 +3670,7 @@ int main(int argc, char *argv[])
         exiting_wspr.store(false, std::memory_order_relaxed);
         reset_managed_reload_runtime_for_test();
         reset_current_transmission_request_for_test();
+        reset_current_controller_request_for_test();
         set_scheduler_execution_suppressed_for_test(true);
         set_si5351_detection_override_for_test(true);
 
@@ -3684,12 +3686,15 @@ int main(int argc, char *argv[])
         config.si5351_i2c_bus = 1;
         config.si5351_i2c_address = 0x60;
         config.si5351_reference_hz = 27000000;
-        config.si5351_tx_output = 0;
+        config.si5351_tx_output = 2;
         config.si5351_power_level = 1;
         resolve_backend_specific_config(config);
         set_frequencies(config);
-        iniFile.setData(
-            make_managed_ini_data("AA0NT", "EM18", "20m", false));
+        auto managed_ini =
+            make_managed_ini_data("AA0NT", "EM18", "20m", false);
+        managed_ini["Operation"]["Transmit Backend"] = "si5351";
+        managed_ini["Si5351"]["TX Output"] = "CLK2";
+        iniFile.setData(managed_ini);
         require(
             set_config(true),
             "disabled scheduler tone regression must load a stable WSPR runtime config");
@@ -3704,6 +3709,50 @@ int main(int argc, char *argv[])
             tone_request.mode == TransmissionMode::TONE &&
                 tone_request.actual_rf_frequency_hz > 0.0,
             "disabled-scheduler test tone start must still commit a runnable tone request");
+        const auto controller_request = current_controller_request_for_test();
+        require(
+            controller_request.has_value(),
+            "disabled-scheduler test tone start must commit controller metadata for backend-selected execution");
+        require(
+            controller_request->mode == wsprrypi::TransmissionMode::TONE &&
+                controller_request->output.backend == wsprrypi::BackendKind::SI5351 &&
+                controller_request->output.output == wsprrypi::ClockSource::SI5351_CLK2,
+            "disabled-scheduler Si5351 test tone start must carry SI5351 tone output metadata");
+        const auto *tone_payload =
+            std::get_if<wsprrypi::TonePayload>(&controller_request->payload);
+        require(
+            tone_payload != nullptr &&
+                nearly_equal(tone_payload->frequency_hz, tone_request.actual_rf_frequency_hz),
+            "disabled-scheduler Si5351 test tone start must expose the committed tone frequency through the controller request");
+
+        set_raspberry_pi_generation_override_for_test(5);
+        wsprrypi::ExecutionPlan plan =
+            wsprrypi::ExecutionPlanCompiler{}.compile(*controller_request);
+        require(
+            plan.mode == wsprrypi::TransmissionMode::TONE &&
+                plan.backend == wsprrypi::BackendKind::SI5351,
+            "disabled-scheduler Si5351 test tone controller request must compile into a Si5351 tone execution plan");
+        WsprSi5351Backend::Config si5351_config;
+        si5351_config.device.i2c_bus = 1;
+        si5351_config.device.i2c_address = 0x60;
+        si5351_config.device.reference_hz = 27000000;
+        si5351_config.planner.reference_hz = 27000000;
+        si5351_config.planner.tx_output = Si5351Device::Output::CLK2;
+        si5351_config.power_level = 1;
+        si5351_config.dry_run = true;
+        WsprSi5351Backend backend(wsprTransmitter, si5351_config);
+        wsprrypi::BackendExecutionInputs inputs;
+        inputs.power_level = 1;
+        const wsprrypi::BackendCompileResult compile_result =
+            backend.configure(plan, inputs);
+        require(
+            compile_result.ok,
+            "disabled-scheduler Si5351 test tone must use the backend-selected execution path instead of the legacy GPIO-only tone path");
+        const wsprrypi::ExecutionResult execute_result = backend.execute(plan);
+        require(
+            execute_result.ok,
+            "disabled-scheduler Si5351 test tone dry-run execution must not fail through the canonical backend path");
+        clear_pi_generation_override_for_scope();
 
         wsprTransmitter.backendSetStateValue(WsprTransmitter::State::TRANSMITTING);
         const TestToneStopResult tone_stop_result = end_test_tone();
@@ -3731,6 +3780,7 @@ int main(int argc, char *argv[])
         exiting_wspr.store(false, std::memory_order_relaxed);
         reset_managed_reload_runtime_for_test();
         reset_current_transmission_request_for_test();
+        reset_current_controller_request_for_test();
         set_scheduler_execution_suppressed_for_test(true);
 
         config.use_ini = true;
