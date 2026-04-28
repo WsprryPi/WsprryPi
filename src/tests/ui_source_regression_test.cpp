@@ -617,6 +617,11 @@ int main()
     require(
         site_source.find("function hasActiveManagedTransmissionForTestTone()") != std::string::npos &&
             site_source.find("function handleTestToneCommandResponse(message)") != std::string::npos &&
+            site_source.find("const startButton = document.getElementById(\"testToneStart\");") != std::string::npos &&
+            site_source.find("toggleButtonLoading(startButton, false);") != std::string::npos &&
+            site_source.find("toggleButtonLoading(endButton, false);") != std::string::npos &&
+            site_source.find("if (response.started === true) {\n            syncTestToneControlState(true);") != std::string::npos &&
+            site_source.find("if (response.stopped !== true) {") != std::string::npos &&
             site_source.find("if (hasActiveManagedTransmissionForTestTone()) {") != std::string::npos &&
             site_source.find("showTestToneBlockedModal();") != std::string::npos &&
             site_source.find("You have to stop and disable the active scheduled transmission before starting a test tone.") != std::string::npos &&
