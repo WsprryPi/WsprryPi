@@ -3678,6 +3678,7 @@ int main(int argc, char *argv[])
         ini_reload_pending.store(false, std::memory_order_relaxed);
         exiting_wspr.store(false, std::memory_order_relaxed);
         reset_current_transmission_request_for_test();
+        reset_committed_execution_route_for_test();
         set_scheduler_execution_suppressed_for_test(true);
 
         config.mode = ModeType::WSPR;
@@ -3715,6 +3716,7 @@ int main(int argc, char *argv[])
         reset_managed_reload_runtime_for_test();
         reset_current_transmission_request_for_test();
         reset_current_controller_request_for_test();
+        reset_committed_execution_route_for_test();
         set_scheduler_execution_suppressed_for_test(true);
         set_si5351_detection_override_for_test(true);
 
@@ -3762,6 +3764,10 @@ int main(int argc, char *argv[])
                 controller_request->output.backend == wsprrypi::BackendKind::SI5351 &&
                 controller_request->output.output == wsprrypi::ClockSource::SI5351_CLK2,
             "disabled-scheduler Si5351 test tone start must carry SI5351 tone output metadata");
+        require(
+            committed_execution_route_for_test() ==
+                CommittedExecutionRouteForTest::CONTROLLER_TONE,
+            "disabled-scheduler Si5351 test tone start must commit through the controller tone route");
         const auto *tone_payload =
             std::get_if<wsprrypi::TonePayload>(&controller_request->payload);
         require(
@@ -3825,6 +3831,7 @@ int main(int argc, char *argv[])
         reset_managed_reload_runtime_for_test();
         reset_current_transmission_request_for_test();
         reset_current_controller_request_for_test();
+        reset_committed_execution_route_for_test();
         set_scheduler_execution_suppressed_for_test(true);
 
         config.use_ini = true;
@@ -3857,6 +3864,10 @@ int main(int argc, char *argv[])
         require(
             !current_controller_request_for_test().has_value(),
             "disabled-scheduler GPIO test tone start must remain on the legacy GPIO tone execution path");
+        require(
+            committed_execution_route_for_test() ==
+                CommittedExecutionRouteForTest::LEGACY,
+            "disabled-scheduler GPIO test tone start must commit through the legacy execution route");
 
         wsprTransmitter.backendSetStateValue(WsprTransmitter::State::TRANSMITTING);
         const TestToneStopResult tone_stop_result = end_test_tone();
@@ -3884,6 +3895,7 @@ int main(int argc, char *argv[])
         reset_managed_reload_runtime_for_test();
         reset_current_transmission_request_for_test();
         reset_current_controller_request_for_test();
+        reset_committed_execution_route_for_test();
         set_scheduler_execution_suppressed_for_test(true);
 
         config.use_ini = true;
@@ -3916,6 +3928,10 @@ int main(int argc, char *argv[])
         require(
             !current_controller_request_for_test().has_value(),
             "idle GPIO WSPR test tone start must remain on the legacy GPIO tone execution path");
+        require(
+            committed_execution_route_for_test() ==
+                CommittedExecutionRouteForTest::LEGACY,
+            "idle GPIO WSPR test tone start must commit through the legacy execution route");
 
         wsprTransmitter.backendSetStateValue(WsprTransmitter::State::TRANSMITTING);
         const TestToneStopResult tone_stop_result = end_test_tone();

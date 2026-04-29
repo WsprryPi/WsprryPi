@@ -201,6 +201,9 @@ WsprFrequencyEntry current_frequency_entry{};
 TransmissionRequest current_transmission_request{};
 static std::optional<wsprrypi::TransmissionRequest>
     current_controller_request_for_test_storage{};
+static CommittedExecutionRouteForTest
+    committed_execution_route_for_test_storage =
+        CommittedExecutionRouteForTest::NONE;
 
 /**
  * @brief File-scope self-pipe descriptors for signal notifications.
@@ -858,6 +861,8 @@ static void commit_execution_request(
 {
     current_transmission_request = request;
     current_controller_request_for_test_storage.reset();
+    committed_execution_route_for_test_storage =
+        CommittedExecutionRouteForTest::NONE;
 
     auto build_controller_request =
         [&](wsprrypi::TransmissionMode mode) -> wsprrypi::TransmissionRequest
@@ -887,6 +892,8 @@ static void commit_execution_request(
             current_transmission_request.actual_rf_frequency_hz;
         controller_request.payload = payload;
         current_controller_request_for_test_storage = controller_request;
+        committed_execution_route_for_test_storage =
+            CommittedExecutionRouteForTest::CONTROLLER_TONE;
 
         if (suppress_scheduler_execution_for_test)
         {
@@ -896,6 +903,20 @@ static void commit_execution_request(
         wsprTransmitter.configureExecution(
             controller_request,
             current_transmission_request);
+        return;
+    }
+
+    if (current_transmission_request.isTone())
+    {
+        committed_execution_route_for_test_storage =
+            CommittedExecutionRouteForTest::LEGACY;
+
+        if (suppress_scheduler_execution_for_test)
+        {
+            return;
+        }
+
+        wsprTransmitter.configureExecution(current_transmission_request);
         return;
     }
 
@@ -914,6 +935,8 @@ static void commit_execution_request(
             current_transmission_request.actual_rf_frequency_hz;
         controller_request.payload = payload;
         current_controller_request_for_test_storage = controller_request;
+        committed_execution_route_for_test_storage =
+            CommittedExecutionRouteForTest::CONTROLLER_WSPR;
 
         wsprTransmitter.configureExecution(
             controller_request,
@@ -921,6 +944,8 @@ static void commit_execution_request(
         return;
     }
 
+    committed_execution_route_for_test_storage =
+        CommittedExecutionRouteForTest::LEGACY;
     wsprTransmitter.configureExecution(current_transmission_request);
 }
 
@@ -4589,6 +4614,17 @@ bool managed_reload_tx_inhibited_for_test() noexcept
 bool managed_reload_tx_inhibited_state() noexcept
 {
     return managed_reload_tx_inhibited;
+}
+
+CommittedExecutionRouteForTest committed_execution_route_for_test() noexcept
+{
+    return committed_execution_route_for_test_storage;
+}
+
+void reset_committed_execution_route_for_test() noexcept
+{
+    committed_execution_route_for_test_storage =
+        CommittedExecutionRouteForTest::NONE;
 }
 
 void reset_managed_reload_runtime_for_test() noexcept
