@@ -201,6 +201,7 @@ struct TestToneStartResult
     bool started = false;
     bool already_active = false;
     bool blocked_by_active_transmission = false;
+    bool blocked_by_enabled_transmission = false;
     std::string message;
 };
 

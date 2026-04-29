@@ -1365,6 +1365,37 @@ static bool scheduler_managed_transmission_active_for_test_tone() noexcept
     return !wsprTransmitter.activeExecutionIsTone();
 }
 
+static bool scheduler_managed_transmission_enabled_for_test_tone() noexcept
+{
+    return runtime_transmit_enabled(config);
+}
+
+static void finalize_transmission_stop_cleanup(
+    const ArgParserConfig *selector_config,
+    bool keep_selector_gpio_initialized,
+    const char *led_reason,
+    bool clear_scheduler_latches = false,
+    bool emit_debug_log = false)
+{
+    if (emit_debug_log)
+    {
+        llog.logS(
+            DEBUG,
+            "Finalizing scheduler cleanup after transmitter stop.");
+    }
+
+    stop_active_transmission_selectors(
+        selector_config,
+        keep_selector_gpio_initialized);
+    set_tx_led_state(false, led_reason);
+    if (clear_scheduler_latches)
+    {
+        shutdown_after_current_transmission.store(false, std::memory_order_release);
+        shutdown_after_wspr_plan.store(false, std::memory_order_release);
+        reset_active_wspr_plan_state();
+    }
+}
+
 static WsprFrequencyEntry next_frequency_entry_from(
     const std::vector<WsprFrequencyEntry> &entries,
     int &iterator,
@@ -2650,14 +2681,10 @@ void transmitter_cb(WsprTransmitter::TransmissionCallbackEvent event,
                       "Completed transmission.");
         }
 
-        // Return the active selector to the idle pool so it remains driven
-        // inactive until the next handoff or final shutdown.
-        stop_active_transmission_selectors(
+        finalize_transmission_stop_cleanup(
             &config,
-            runtime_should_hold_selector_gpios_initialized(config));
-
-        // Turn off LED.
-        set_tx_led_state(false, "transmission completion");
+            runtime_should_hold_selector_gpios_initialized(config),
+            "transmission completion");
 
         // Notify the websocket clients.
         send_ws_message("transmit", "finished");
@@ -2729,10 +2756,11 @@ void transmitter_cb(WsprTransmitter::TransmissionCallbackEvent event,
                   s_elapsed,
                   " seconds.");
 
-        stop_active_transmission_selectors(
+        finalize_transmission_stop_cleanup(
             &config,
-            runtime_should_hold_selector_gpios_initialized(config));
-        set_tx_led_state(false, "transmission cancellation");
+            runtime_should_hold_selector_gpios_initialized(config),
+            "transmission cancellation",
+            true);
         if (suppress_ws_event)
         {
             llog.logS(
@@ -2743,10 +2771,6 @@ void transmitter_cb(WsprTransmitter::TransmissionCallbackEvent event,
         {
             send_ws_message("transmit", "canceled");
         }
-
-        shutdown_after_current_transmission.store(false, std::memory_order_release);
-        shutdown_after_wspr_plan.store(false, std::memory_order_release);
-        reset_active_wspr_plan_state();
 
         break;
     }
@@ -2992,7 +3016,16 @@ TestToneStartResult start_test_tone()
     {
         result.blocked_by_active_transmission = true;
         result.message =
-            "Stop and disable the current scheduled transmission before starting a test tone.";
+            "Stop transmissions before starting a test tone. Disable transmissions after the active transmission stops.";
+        llog.logS(WARN, result.message);
+        return result;
+    }
+
+    if (scheduler_managed_transmission_enabled_for_test_tone())
+    {
+        result.blocked_by_enabled_transmission = true;
+        result.message =
+            "Disable transmissions before starting a test tone.";
         llog.logS(WARN, result.message);
         return result;
     }
@@ -3079,8 +3112,13 @@ TestToneStopResult end_test_tone()
     llog.logS(INFO, "Ending test tone requested by Web UI.");
 
     wsprTransmitter.stopAndJoin();
+    finalize_transmission_stop_cleanup(
+        &config,
+        runtime_should_hold_selector_gpios_initialized(config),
+        "test tone stop",
+        true,
+        true);
     (void)reconcile_tx_led_after_transmitter_stop("test tone stop");
-    stop_active_transmission_selectors();
 
     const bool deferred_reload_pending =
         ini_reload_pending.load(std::memory_order_acquire);

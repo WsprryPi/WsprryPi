@@ -93,10 +93,11 @@ int main()
                 scheduling_source.find("send_ws_message(\"transmit\", \"finished\");", scheduling_source.find("void transmitter_cb(")),
         "test tone end must rely on transmitter callback websocket ownership only");
     require(
-        scheduling_source.find("wsprTransmitter.clearSoftOff();") != std::string::npos &&
+        scheduling_source.find("finalize_transmission_stop_cleanup(") != std::string::npos &&
+            scheduling_source.find("wsprTransmitter.clearSoftOff();") != std::string::npos &&
             scheduling_source.find("wsprTransmitter.startAsync();", scheduling_source.find("TestToneStopResult end_test_tone()")) !=
                 std::string::npos,
-        "WSPR test tone stop recovery must explicitly re-arm the committed scheduler wait path");
+        "WSPR test tone stop recovery must route through shared stop cleanup and explicitly re-arm the committed scheduler wait path");
 
     const std::string ui_source =
         read_text_file("/home/pi/WsprryPi/WsprryPi-UI/data/index.js");
@@ -616,6 +617,7 @@ int main()
         "maintenance view must bind the shared Test Tone controls");
     require(
         site_source.find("function hasActiveManagedTransmissionForTestTone()") != std::string::npos &&
+            site_source.find("function hasEnabledManagedTransmissionForTestTone()") != std::string::npos &&
             site_source.find("function handleTestToneCommandResponse(message)") != std::string::npos &&
             site_source.find("const startButton = document.getElementById(\"testToneStart\");") != std::string::npos &&
             site_source.find("toggleButtonLoading(startButton, false);") != std::string::npos &&
@@ -623,10 +625,14 @@ int main()
             site_source.find("if (response.started === true) {\n            syncTestToneControlState(true);") != std::string::npos &&
             site_source.find("if (response.stopped !== true) {") != std::string::npos &&
             site_source.find("if (hasActiveManagedTransmissionForTestTone()) {") != std::string::npos &&
-            site_source.find("showTestToneBlockedModal();") != std::string::npos &&
-            site_source.find("You have to stop and disable the active scheduled transmission before starting a test tone.") != std::string::npos &&
+            site_source.find("if (hasEnabledManagedTransmissionForTestTone()) {") != std::string::npos &&
+            site_source.find("showTestToneBlockedModal(\"active\");") != std::string::npos &&
+            site_source.find("showTestToneBlockedModal(\"enabled\");") != std::string::npos &&
+            site_source.find("Stop transmissions before starting a test tone. Disable transmissions after the active transmission stops.") != std::string::npos &&
+            site_source.find("Disable transmissions before starting a test tone.") != std::string::npos &&
+            site_source.find("currentRuntimeConfigStatus.transmitEnabled === true") != std::string::npos &&
             site_source.find("if (msg.command === \"tone_start\" || msg.command === \"tone_end\")") != std::string::npos,
-        "shared Test Tone controls must reject unsafe starts with the existing modal path and reconcile websocket command replies");
+        "shared Test Tone controls must reject active and merely enabled scheduled transmissions with the existing modal path and reconcile websocket command replies");
     require(
         site_source.find("const normalizedArgs = args.map((arg) => {") != std::string::npos &&
             site_source.find("return JSON.stringify(arg);") != std::string::npos &&

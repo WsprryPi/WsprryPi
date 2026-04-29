@@ -399,6 +399,8 @@ void WebSocketServer::handleMessage(const std::string &raw_message)
             reply["already_active"] = start_result.already_active;
             reply["blocked_by_active_transmission"] =
                 start_result.blocked_by_active_transmission;
+            reply["blocked_by_enabled_transmission"] =
+                start_result.blocked_by_enabled_transmission;
             reply["message"] = start_result.message;
             reply["tone_start"] = start_result.started ? "ok" : "rejected";
             reply["status"] = start_result.started ? "ok" : "error";
