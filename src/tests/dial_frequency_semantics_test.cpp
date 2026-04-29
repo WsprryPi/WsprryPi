@@ -834,6 +834,50 @@ int main(int argc, char *argv[])
     }
 
     {
+        WsprTransmitter transmitter;
+
+        wsprrypi::TransmissionRequest controller_request;
+        controller_request.mode = wsprrypi::TransmissionMode::TONE;
+        controller_request.output.backend = wsprrypi::BackendKind::RPI_CLOCK_GPIO;
+        controller_request.output.output = wsprrypi::ClockSource::GPIO_CLK;
+        controller_request.output.gpio = 4;
+        controller_request.calibration.ppm = 0.0;
+        controller_request.id.value = 1;
+
+        wsprrypi::TonePayload tone_payload;
+        tone_payload.frequency_hz = 14097100.0;
+        controller_request.payload = tone_payload;
+
+        TransmissionRequest legacy_request;
+        legacy_request.mode = TransmissionMode::TONE;
+        legacy_request.actual_rf_frequency_hz = 14097100.0;
+        legacy_request.tx_gpio = 4;
+        legacy_request.ppm = 0.0;
+        legacy_request.power_level = 7;
+
+        bool threw = false;
+        std::string error_message;
+        try
+        {
+            transmitter.configureExecution(controller_request, legacy_request);
+        }
+        catch (const std::invalid_argument &ex)
+        {
+            threw = true;
+            error_message = ex.what();
+        }
+
+        require(
+            threw,
+            "non-SI5351 controller tone execution must be rejected before backend preparation");
+        require(
+            error_message.find(
+                "Controller tone execution is only supported for the SI5351 backend; received GPIO.") !=
+                std::string::npos,
+            "non-SI5351 controller tone execution must fail with the specific backend-routing diagnostic");
+    }
+
+    {
         init_config_json();
         jConfig["WSPR"]["Frequency"] = "20m";
         jConfig["Meta"][std::string("Center ") + "Frequency Set"] =
