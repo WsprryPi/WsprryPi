@@ -289,6 +289,18 @@ bool GPIOOutput::toggleGPIO(bool state)
         return false;
     }
 
+    bool use_test_mode = false;
+    {
+        std::lock_guard<std::mutex> lk(gpio_output_test_mtx);
+        use_test_mode = gpio_output_test_mode_enabled;
+    }
+    if (use_test_mode)
+    {
+        last_logical_state_ = state;
+        record_gpio_output_test_event("write", pin_, active_high_, state);
+        return true;
+    }
+
     try
     {
         last_logical_state_ = state;

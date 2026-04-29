@@ -359,6 +359,12 @@ enum class CommittedExecutionRouteForTest
 
 CommittedExecutionRouteForTest committed_execution_route_for_test() noexcept;
 void reset_committed_execution_route_for_test() noexcept;
+std::size_t tx_led_assert_request_count_for_test() noexcept;
+std::size_t tx_led_deassert_request_count_for_test() noexcept;
+std::size_t tx_led_failure_count_for_test() noexcept;
+void reset_tx_led_request_counts_for_test() noexcept;
+bool tx_led_active_for_test() noexcept;
+bool reconcile_tx_led_after_transmitter_stop_for_test(const char *context) noexcept;
 
 void reset_band_gpio_prepare_call_count_for_test() noexcept;
 std::size_t band_gpio_prepare_call_count_for_test() noexcept;

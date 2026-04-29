@@ -204,6 +204,12 @@ static std::optional<wsprrypi::TransmissionRequest>
 static CommittedExecutionRouteForTest
     committed_execution_route_for_test_storage =
         CommittedExecutionRouteForTest::NONE;
+static std::atomic<std::size_t> tx_led_assert_request_count_for_test_storage{0U};
+static std::atomic<std::size_t> tx_led_deassert_request_count_for_test_storage{0U};
+static std::atomic<std::size_t> tx_led_failure_count_for_test_storage{0U};
+static std::mutex tx_led_state_mtx;
+static std::condition_variable tx_led_state_cv;
+static bool tx_led_active = false;
 
 /**
  * @brief File-scope self-pipe descriptors for signal notifications.
@@ -828,17 +834,92 @@ static bool refresh_committed_band_gpio_selection() noexcept
                "committed request"}) == BandGPIOPrepareStatus::Prepared;
 }
 
+static bool tx_led_configured(const ArgParserConfig &cfg) noexcept
+{
+    return cfg.use_led && cfg.led_pin >= 0 && cfg.led_pin <= 27;
+}
+
+static bool should_control_tx_led() noexcept
+{
+    return tx_led_configured(config);
+}
+
+static void mark_tx_led_active_state(bool active) noexcept
+{
+    {
+        std::lock_guard<std::mutex> lk(tx_led_state_mtx);
+        tx_led_active = active;
+    }
+    tx_led_state_cv.notify_all();
+}
+
 static void set_tx_led_state(bool state, const char *context) noexcept
 {
+    if (!should_control_tx_led())
+    {
+        return;
+    }
+
+    if (state)
+    {
+        tx_led_assert_request_count_for_test_storage.fetch_add(
+            1U,
+            std::memory_order_relaxed);
+    }
+    else
+    {
+        tx_led_deassert_request_count_for_test_storage.fetch_add(
+            1U,
+            std::memory_order_relaxed);
+    }
+
     if (!ledControl.toggleGPIO(state))
     {
+        tx_led_failure_count_for_test_storage.fetch_add(
+            1U,
+            std::memory_order_relaxed);
         llog.logS(WARN,
                   "TX LED ",
                   (state ? "assert" : "deassert"),
                   " request did not complete during ",
                   context,
                   ".");
+        return;
     }
+
+    mark_tx_led_active_state(state);
+}
+
+static bool reconcile_tx_led_after_transmitter_stop(const char *context) noexcept
+{
+    if (!should_control_tx_led())
+    {
+        return false;
+    }
+
+    {
+        std::unique_lock<std::mutex> lk(tx_led_state_mtx);
+        tx_led_state_cv.wait_for(
+            lk,
+            std::chrono::milliseconds(100),
+            []
+            {
+                return !tx_led_active;
+            });
+
+        if (!tx_led_active)
+        {
+            return false;
+        }
+    }
+
+    llog.logS(
+        DEBUG,
+        "TX LED remained asserted after transmitter stop; applying shutdown fallback during ",
+        context,
+        ".");
+    set_tx_led_state(false, context);
+    return true;
 }
 
 static wsprrypi::BackendKind to_controller_backend(
@@ -2934,7 +3015,6 @@ TestToneStartResult start_test_tone()
         config.wspr.audio_offset_hz,
         FrequencyPath::WsprDial);
 
-    set_tx_led_state(true, "test tone start");
     llog.logS(INFO, "Beginning test tone requested by web UI.");
 
     // Switch into tone mode.
@@ -2999,8 +3079,8 @@ TestToneStopResult end_test_tone()
     llog.logS(INFO, "Ending test tone requested by Web UI.");
 
     wsprTransmitter.stopAndJoin();
+    (void)reconcile_tx_led_after_transmitter_stop("test tone stop");
     stop_active_transmission_selectors();
-    set_tx_led_state(false, "test tone stop");
 
     const bool deferred_reload_pending =
         ini_reload_pending.load(std::memory_order_acquire);
@@ -3126,9 +3206,9 @@ StopTransmissionResult stop_transmission_by_user_request(bool persist_transmit)
     }
 
     wsprTransmitter.stopAndJoin();
+    (void)reconcile_tx_led_after_transmitter_stop("scheduler shutdown");
     stop_active_transmission_selectors();
     release_idle_selector_gpio_reservations();
-    set_tx_led_state(false, "scheduler shutdown");
 
     {
         std::lock_guard<std::mutex> lk(set_config_mtx);
@@ -3194,6 +3274,7 @@ static void stop_runtime_components_for_process_exit() noexcept
     shutdownMonitor.stop();
     ppmManager.stop();
     wsprTransmitter.shutdownForProcessExit();
+    (void)reconcile_tx_led_after_transmitter_stop("process-exit shutdown");
     shutdown_all_configured_selector_gpios(config);
     ledControl.stop();
 }
@@ -3444,6 +3525,7 @@ bool wspr_loop()
 
     llog.logS(DEBUG, "Stopping transmitter.");
     wsprTransmitter.shutdownForProcessExit();
+    (void)reconcile_tx_led_after_transmitter_stop("scheduler process shutdown");
     llog.logS(DEBUG, "Transmitter stopped.");
 
     llog.logS(DEBUG, "Stopping band GPIO selector.");
@@ -4625,6 +4707,53 @@ void reset_committed_execution_route_for_test() noexcept
 {
     committed_execution_route_for_test_storage =
         CommittedExecutionRouteForTest::NONE;
+}
+
+std::size_t tx_led_assert_request_count_for_test() noexcept
+{
+    return tx_led_assert_request_count_for_test_storage.load(
+        std::memory_order_relaxed);
+}
+
+std::size_t tx_led_deassert_request_count_for_test() noexcept
+{
+    return tx_led_deassert_request_count_for_test_storage.load(
+        std::memory_order_relaxed);
+}
+
+std::size_t tx_led_failure_count_for_test() noexcept
+{
+    return tx_led_failure_count_for_test_storage.load(
+        std::memory_order_relaxed);
+}
+
+void reset_tx_led_request_counts_for_test() noexcept
+{
+    tx_led_assert_request_count_for_test_storage.store(
+        0U,
+        std::memory_order_relaxed);
+    tx_led_deassert_request_count_for_test_storage.store(
+        0U,
+        std::memory_order_relaxed);
+    tx_led_failure_count_for_test_storage.store(
+        0U,
+        std::memory_order_relaxed);
+    {
+        std::lock_guard<std::mutex> lk(tx_led_state_mtx);
+        tx_led_active = false;
+    }
+    tx_led_state_cv.notify_all();
+}
+
+bool tx_led_active_for_test() noexcept
+{
+    std::lock_guard<std::mutex> lk(tx_led_state_mtx);
+    return tx_led_active;
+}
+
+bool reconcile_tx_led_after_transmitter_stop_for_test(const char *context) noexcept
+{
+    return reconcile_tx_led_after_transmitter_stop(context);
 }
 
 void reset_managed_reload_runtime_for_test() noexcept

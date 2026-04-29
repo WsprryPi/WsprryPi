@@ -2,6 +2,7 @@
 #include "config_handler.hpp"
 #include "execution_plan_compiler.hpp"
 #include "frequency_semantics.hpp"
+#include "gpio_output.hpp"
 #include "scheduling.hpp"
 #include "wspr_band_lookup.hpp"
 #include "wspr_transmit_backend_si5351.hpp"
@@ -3556,6 +3557,166 @@ int main(int argc, char *argv[])
     }
 
     {
+        GPIOOutput::setTestMode(true);
+        init_default_config();
+        config.use_led = false;
+        config.led_pin = -1;
+        reset_tx_led_request_counts_for_test();
+        GPIOOutput::clearTestEvents();
+
+        transmitter_cb(
+            WsprTransmissionCallbackEvent::STARTING,
+            WsprTransmitLogLevel::INFO,
+            std::string(),
+            14097100.0);
+        transmitter_cb(
+            WsprTransmissionCallbackEvent::CANCELLED,
+            WsprTransmitLogLevel::INFO,
+            std::string(),
+            1.0);
+
+        require(
+            tx_led_assert_request_count_for_test() == 0 &&
+                tx_led_deassert_request_count_for_test() == 0 &&
+                tx_led_failure_count_for_test() == 0,
+            "disabled TX LED configuration must not issue assert or deassert requests");
+        require(
+            GPIOOutput::testEvents().empty(),
+            "disabled TX LED configuration must not write any GPIO LED events");
+
+        GPIOOutput::setTestMode(false);
+    }
+
+    {
+        GPIOOutput::setTestMode(true);
+        init_default_config();
+        config.use_led = true;
+        config.led_pin = 18;
+        require(
+            ledControl.enableGPIOPin(config.led_pin, true),
+            "TX LED lifecycle regression must enable the LED test GPIO");
+        reset_tx_led_request_counts_for_test();
+        GPIOOutput::clearTestEvents();
+
+        transmitter_cb(
+            WsprTransmissionCallbackEvent::STARTING,
+            WsprTransmitLogLevel::INFO,
+            std::string(),
+            14097100.0);
+        transmitter_cb(
+            WsprTransmissionCallbackEvent::CANCELLED,
+            WsprTransmitLogLevel::INFO,
+            std::string(),
+            1.0);
+
+        const auto led_events = GPIOOutput::testEvents();
+        std::size_t led_write_events = 0;
+        for (const auto &event : led_events)
+        {
+            if (event.action == "write" && event.pin == 18)
+            {
+                ++led_write_events;
+            }
+        }
+
+        require(
+            tx_led_assert_request_count_for_test() == 1 &&
+                tx_led_deassert_request_count_for_test() == 1 &&
+                tx_led_failure_count_for_test() == 0,
+            "enabled TX LED lifecycle must issue exactly one assert and one deassert without failures");
+        require(
+            led_write_events == 2,
+            "enabled TX LED lifecycle must produce exactly one GPIO write for assert and one for deassert");
+
+        ledControl.stop();
+        GPIOOutput::setTestMode(false);
+    }
+
+    {
+        GPIOOutput::setTestMode(true);
+        init_default_config();
+        config.use_led = true;
+        config.led_pin = 18;
+        require(
+            ledControl.enableGPIOPin(config.led_pin, true),
+            "TX LED shutdown fallback regression must enable the LED test GPIO");
+        reset_tx_led_request_counts_for_test();
+        GPIOOutput::clearTestEvents();
+
+        transmitter_cb(
+            WsprTransmissionCallbackEvent::STARTING,
+            WsprTransmitLogLevel::INFO,
+            std::string(),
+            14097100.0);
+
+        require(
+            tx_led_active_for_test(),
+            "TX LED must remain marked active after a start without a terminal callback");
+
+        const bool first_fallback =
+            reconcile_tx_led_after_transmitter_stop_for_test(
+                "test shutdown fallback");
+        const bool second_fallback =
+            reconcile_tx_led_after_transmitter_stop_for_test(
+                "test shutdown fallback duplicate");
+
+        const auto led_events = GPIOOutput::testEvents();
+        std::size_t led_write_events = 0;
+        for (const auto &event : led_events)
+        {
+            if (event.action == "write" && event.pin == 18)
+            {
+                ++led_write_events;
+            }
+        }
+
+        require(
+            first_fallback && !second_fallback,
+            "TX LED shutdown fallback must deassert exactly once when no terminal callback arrived");
+        require(
+            tx_led_assert_request_count_for_test() == 1 &&
+                tx_led_deassert_request_count_for_test() == 1 &&
+                tx_led_failure_count_for_test() == 0,
+            "TX LED shutdown fallback must add exactly one deassert without duplicate requests");
+        require(
+            !tx_led_active_for_test(),
+            "TX LED shutdown fallback must clear the active LED state");
+        require(
+            led_write_events == 2,
+            "TX LED shutdown fallback must leave exactly one assert and one deassert GPIO write");
+
+        ledControl.stop();
+        GPIOOutput::setTestMode(false);
+    }
+
+    {
+        GPIOOutput::setTestMode(true);
+        init_default_config();
+        config.use_led = false;
+        config.led_pin = -1;
+        reset_tx_led_request_counts_for_test();
+        GPIOOutput::clearTestEvents();
+
+        const bool fallback_used =
+            reconcile_tx_led_after_transmitter_stop_for_test(
+                "disabled shutdown fallback");
+
+        require(
+            !fallback_used,
+            "disabled TX LED configuration must skip shutdown fallback handling");
+        require(
+            tx_led_assert_request_count_for_test() == 0 &&
+                tx_led_deassert_request_count_for_test() == 0 &&
+                tx_led_failure_count_for_test() == 0,
+            "disabled TX LED shutdown fallback must not issue LED requests");
+        require(
+            GPIOOutput::testEvents().empty(),
+            "disabled TX LED shutdown fallback must not touch GPIO test events");
+
+        GPIOOutput::setTestMode(false);
+    }
+
+    {
         init_config_json();
         json_to_config();
         reset_current_transmission_request_for_test();
@@ -3744,6 +3905,7 @@ int main(int argc, char *argv[])
         require(
             set_config(true),
             "disabled scheduler tone regression must load a stable WSPR runtime config");
+        reset_tx_led_request_counts_for_test();
 
         const TestToneStartResult tone_start_result = start_test_tone();
         require(
@@ -3768,6 +3930,10 @@ int main(int argc, char *argv[])
             committed_execution_route_for_test() ==
                 CommittedExecutionRouteForTest::CONTROLLER_TONE,
             "disabled-scheduler Si5351 test tone start must commit through the controller tone route");
+        require(
+            tx_led_assert_request_count_for_test() == 0 &&
+                tx_led_deassert_request_count_for_test() == 0,
+            "test tone wrappers must not manipulate the TX LED directly");
         const auto *tone_payload =
             std::get_if<wsprrypi::TonePayload>(&controller_request->payload);
         require(
@@ -3850,6 +4016,7 @@ int main(int argc, char *argv[])
         require(
             set_config(true),
             "disabled GPIO scheduler tone regression must load a stable WSPR runtime config");
+        reset_tx_led_request_counts_for_test();
 
         const TestToneStartResult tone_start_result = start_test_tone();
         require(
@@ -3868,6 +4035,10 @@ int main(int argc, char *argv[])
             committed_execution_route_for_test() ==
                 CommittedExecutionRouteForTest::LEGACY,
             "disabled-scheduler GPIO test tone start must commit through the legacy execution route");
+        require(
+            tx_led_assert_request_count_for_test() == 0 &&
+                tx_led_deassert_request_count_for_test() == 0,
+            "GPIO test tone wrappers must not manipulate the TX LED directly");
 
         wsprTransmitter.backendSetStateValue(WsprTransmitter::State::TRANSMITTING);
         const TestToneStopResult tone_stop_result = end_test_tone();
