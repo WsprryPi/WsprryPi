@@ -877,7 +877,8 @@ static void commit_execution_request(
         return controller_request;
     };
 
-    if (current_transmission_request.isTone())
+    if (current_transmission_request.isTone() &&
+        config.transmit_backend == TransmitBackendKind::SI5351)
     {
         wsprrypi::TransmissionRequest controller_request =
             build_controller_request(wsprrypi::TransmissionMode::TONE);
