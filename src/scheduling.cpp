@@ -91,7 +91,7 @@
  *
  * This object is used by the transmission callback path to assert the
  * correct GPIO when transmission begins and to release it when the
- * transmission completes, is skipped, or is cancelled.
+ * transmission completes, is skipped, or is canceled.
  */
 struct BandGPIOResolution
 {
@@ -2725,7 +2725,7 @@ void transmitter_cb(WsprTransmitter::TransmissionCallbackEvent event,
                 std::memory_order_acq_rel);
 
         llog.logS(to_log_level(level),
-                  "Transmission cancelled after ",
+                  "Transmission canceled after ",
                   s_elapsed,
                   " seconds.");
 
@@ -3700,7 +3700,7 @@ std::string websocket_tx_state_for_message(
     }
     if (state == "canceled")
     {
-        return "cancelled";
+        return "canceled";
     }
     if (state == "stopped")
     {

@@ -3201,8 +3201,8 @@ int main(int argc, char *argv[])
             websocket_tx_state_for_message(
                 "transmit",
                 "canceled",
-                "transmitting") == "cancelled",
-            "websocket transmit canceled events must present a cancelled tx_state");
+                "transmitting") == "canceled",
+            "websocket transmit canceled events must present a canceled tx_state");
         require(
             websocket_tx_state_for_message(
                 "transmit",
