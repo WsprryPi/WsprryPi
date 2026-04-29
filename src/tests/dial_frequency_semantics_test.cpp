@@ -4092,6 +4092,20 @@ int main(int argc, char *argv[])
             wsprTransmitter.getState() == WsprTransmitter::State::DISABLED,
             "GPIO test tone stop with transmit disabled must not leave the transmitter busy");
 
+        iniFile.setData(
+            make_managed_ini_data("AA0NT", "EM18", "20m", true));
+        callback_ini_changed();
+        require(
+            !ini_reload_pending.load(std::memory_order_relaxed),
+            "GPIO test tone stop must not leave managed reload deferred after a later INI change");
+        require(
+            config.transmit,
+            "GPIO test tone stop must allow a later INI reload to apply immediately");
+        require(
+            current_transmission_request_for_test().mode == TransmissionMode::WSPR &&
+                current_transmission_request_for_test().actual_rf_frequency_hz > 0.0,
+            "GPIO test tone stop must allow a later INI reload to recommit the scheduler request immediately");
+
         set_scheduler_execution_suppressed_for_test(false);
     }
 
