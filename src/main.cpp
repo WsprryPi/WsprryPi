@@ -171,19 +171,6 @@ std::string shutdown_reason_for_signal(int signum)
            " signal";
 }
 
-int signal_exit_code(int signum) noexcept
-{
-    switch (signum)
-    {
-    case SIGHUP:
-    case SIGINT:
-    case SIGQUIT:
-    case SIGTERM:
-        return 128 + signum;
-    default:
-        return EXIT_SUCCESS;
-    }
-}
 } // namespace
 
 /**
@@ -395,18 +382,6 @@ int main(int argc, char *argv[])
         llog.logS(INFO, "Shutting down.");
         std::cerr << "[INFO ] Shutting down." << std::endl;
         shutdown_machine();
-    }
-
-    // Graceful shutdown preserves Unix signal semantics by returning 128 +
-    // signum after cleanup completes.
-    if (retval == EXIT_SUCCESS)
-    {
-        const int signum = g_shutdown_exit_signal.load(std::memory_order_acquire);
-        const int mapped_signal_exit = signal_exit_code(signum);
-        if (mapped_signal_exit != EXIT_SUCCESS)
-        {
-            retval = mapped_signal_exit;
-        }
     }
 
     return retval;
