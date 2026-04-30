@@ -692,11 +692,73 @@ int main()
             site_source.find("if (hasEnabledManagedTransmissionForTestTone()) {") != std::string::npos &&
             site_source.find("showTestToneBlockedModal(\"active\");") != std::string::npos &&
             site_source.find("showTestToneBlockedModal(\"enabled\");") != std::string::npos &&
-            site_source.find("Stop transmissions before starting a test tone. Disable transmissions after the active transmission stops.") != std::string::npos &&
-            site_source.find("Disable transmissions before starting a test tone.") != std::string::npos &&
+            site_source.find("Stop and disable transmissions") != std::string::npos &&
+            site_source.find("Disable transmissions") != std::string::npos &&
+            site_source.find("Test tones require scheduled transmissions to be stopped and disabled first.") != std::string::npos &&
+            site_source.find("const confirmLabel = blockedByActive ? \"Stop and Disable\" : \"Disable\";") != std::string::npos &&
             site_source.find("currentRuntimeConfigStatus.transmitEnabled === true") != std::string::npos &&
             site_source.find("if (msg.command === \"tone_start\" || msg.command === \"tone_end\")") != std::string::npos,
         "shared Test Tone controls must reject active and merely enabled scheduled transmissions with the existing modal path and reconcile websocket command replies");
+    require(
+        site_source.find("let pendingTestToneStartRequest = false;") != std::string::npos &&
+            site_source.find("let pendingTestToneStartTimeoutHandle = null;") != std::string::npos &&
+            site_source.find("const TEST_TONE_COMMAND_TIMEOUT_MS = 15000;") != std::string::npos &&
+            site_source.find("TEST_TONE_DISABLE_REQUEST_TIMEOUT_MS") == std::string::npos &&
+            site_source.find("function markPendingTestToneStartRequest()") != std::string::npos &&
+            site_source.find("function clearPendingTestToneStartRequest()") != std::string::npos &&
+            site_source.find("pendingTestToneStartTimeoutHandle = window.setTimeout(() => {\n        clearPendingTestToneStartRequest();\n    }, TEST_TONE_COMMAND_TIMEOUT_MS);") != std::string::npos &&
+            site_source.find("markPendingTestToneStartRequest();\n    if (!sendCommand(\"tone_start\"))") != std::string::npos &&
+            site_source.find("clearPendingTestToneStartRequest();\n        toggleButtonLoading(btn, false);") != std::string::npos &&
+            site_source.find("clearPendingTestToneStartRequest();\n        communicationInterrupted = true;") != std::string::npos,
+        "Test Tone start requests must use a local per-tab pending flag that is set before sending and cleared on send failure or websocket disconnect");
+    require(
+        site_source.find("const locallyRequested = pendingTestToneStartRequest === true;") != std::string::npos &&
+            site_source.find("clearPendingTestToneStartRequest();\n        if (response.started === true)") != std::string::npos &&
+            site_source.find("if (locallyRequested && response.blocked_by_active_transmission === true)") != std::string::npos &&
+            site_source.find("} else if (locallyRequested && response.blocked_by_enabled_transmission === true)") != std::string::npos,
+        "Test Tone blocked modal handling must be gated by the local pending tone_start request flag");
+    require(
+        site_source.find("!locallyRequested &&") != std::string::npos &&
+            site_source.find("response.blocked_by_active_transmission === true ||\n                    response.blocked_by_enabled_transmission === true") != std::string::npos &&
+            site_source.find("Passive test tone start rejection received:") != std::string::npos &&
+            site_source.find("syncTestToneControlState(false);") != std::string::npos,
+        "passive websocket tone_start rejections must still update Test Tone state without showing blocked modals");
+    require(
+        site_source.find("function disableScheduledTransmissionsForTestTone(reason, actionButton = null)") != std::string::npos &&
+            site_source.find("function handleTestToneStopDisableResponse(message)") != std::string::npos &&
+            site_source.find("handleTestToneStopDisableResponse(msg);") != std::string::npos &&
+            site_source.find("timeout: TEST_TONE_COMMAND_TIMEOUT_MS") != std::string::npos &&
+            site_source.find("}, TEST_TONE_COMMAND_TIMEOUT_MS);") != std::string::npos &&
+            site_source.find("response.transmit_disabled === true || response.stop_performed === true") != std::string::npos &&
+            site_source.find("command: \"stop\",") != std::string::npos &&
+            site_source.find("persist_transmit: true,") != std::string::npos &&
+            site_source.find("finishTestToneStopDisableAction(stopSucceeded, responseMessage);") != std::string::npos &&
+            websocket_source.find("reply[\"stop_performed\"] = stop_result.stop_performed;") != std::string::npos &&
+            websocket_source.find("reply[\"transmit_disabled\"] = stop_result.transmit_disabled;") != std::string::npos &&
+            websocket_source.find("reply[\"persist_transmit\"] = persist_transmit;") != std::string::npos &&
+            websocket_source.find("reply[\"status\"] = stop_request_succeeded ? \"ok\" : \"error\";") != std::string::npos,
+        "active-transmission Test Tone blocked action must use the existing websocket stop command and its stable stop_performed/transmit_disabled response fields");
+    require(
+        site_source.find("function requestTestToneTransmitDisable()") != std::string::npos &&
+            site_source.find("ajaxWithEndpointFallback(SETTINGS_ENDPOINT, {") != std::string::npos &&
+            site_source.find("contentType: \"application/merge-patch+json\"") != std::string::npos &&
+            site_source.find("\"Transmit\": false,") != std::string::npos &&
+            site_source.find("requestTestToneTransmitDisable()\n        .done(function () {\n            finishTestToneStopDisableAction(true);") != std::string::npos,
+        "enabled-idle Test Tone blocked action must disable Operation.Transmit through the existing settings PATCH path");
+    require(
+        site_source.find("cancelLabel: \"Cancel\"") != std::string::npos &&
+            site_source.find("onCancel() {\n            },") != std::string::npos &&
+            site_source.find("sendCommand(\"tone_start\")") != std::string::npos &&
+            site_source.find("disableScheduledTransmissionsForTestTone(\n                    reason,") != std::string::npos &&
+            site_source.find("disableScheduledTransmissionsForTestTone(\n                    reason,") <
+                site_source.find("sendCommand(\"tone_start\")"),
+        "Test Tone blocked modal Cancel must make no state changes and the stop/disable action must not automatically start the test tone");
+    require(
+        scheduling_source.find("scheduler_managed_transmission_active_for_test_tone()") != std::string::npos &&
+            scheduling_source.find("result.blocked_by_active_transmission = true;") != std::string::npos &&
+            scheduling_source.find("scheduler_managed_transmission_enabled_for_test_tone()") != std::string::npos &&
+            scheduling_source.find("result.blocked_by_enabled_transmission = true;") != std::string::npos,
+        "backend-side Test Tone rejection must remain present for active and enabled scheduled transmissions");
     require(
         site_source.find("const normalizedArgs = args.map((arg) => {") != std::string::npos &&
             site_source.find("return JSON.stringify(arg);") != std::string::npos &&
