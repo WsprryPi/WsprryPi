@@ -213,6 +213,7 @@ void WebServer::start(int port)
               // Build a JSON object
               nlohmann::json j;
               j["wspr_version"] = version;
+              j["ui_version"] = get_raw_version_string();
               res.set_content(j.dump(4), "application/json");
             });
 

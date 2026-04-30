@@ -69,6 +69,8 @@ int main()
 {
     const std::string websocket_source =
         read_text_file("/home/pi/WsprryPi/src/web_socket.cpp");
+    const std::string web_server_source =
+        read_text_file("/home/pi/WsprryPi/src/web_server.cpp");
     require(
         websocket_source.find("else if (cmd == \"stop\")") != std::string::npos &&
             websocket_source.find("stop_transmission_by_user_request(persist_transmit);") !=
@@ -398,6 +400,30 @@ int main()
             site_source.find("preserveLineBreaks = options.preserveLineBreaks === true") != std::string::npos,
         "shared confirm modal must support preserving diagnostic line breaks for detail dialogs");
     require(
+        site_source.find("let dismissedUiRefreshVersion = null;") != std::string::npos &&
+            site_source.find("window.WSPRRYPI_UI_VERSION") != std::string::npos &&
+            site_source.find("function maybePromptForUiRefresh(serverVersion)") != std::string::npos &&
+            site_source.find("maybePromptForUiRefresh(response.ui_version);") != std::string::npos &&
+            site_source.find("normalizedServerVersion === dismissedUiRefreshVersion") != std::string::npos &&
+            web_server_source.find("j[\"ui_version\"] = get_raw_version_string();") != std::string::npos,
+        "site.js must detect backend UI version changes using the existing /version response without repeatedly prompting for a dismissed version");
+    require(
+        site_source.find("title: \"UI refresh required\"") != std::string::npos &&
+            site_source.find("The WsprryPi web interface has been updated. Refresh this page to load the new web pages, CSS, and JavaScript.") != std::string::npos &&
+            site_source.find("confirmLabel: \"Refresh\"") != std::string::npos &&
+            site_source.find("cancelLabel: \"Cancel\"") != std::string::npos &&
+            site_source.find("showConfirmationDialog({") != std::string::npos,
+        "UI refresh prompt must use the shared Bootstrap confirmation modal path with the required copy and labels");
+    require(
+        site_source.find("function refreshUiForVersion(serverVersion)") != std::string::npos &&
+            site_source.find("const url = new URL(window.location.href);") != std::string::npos &&
+            site_source.find("url.searchParams.set(\n        \"ui_refresh\",") != std::string::npos &&
+            site_source.find("window.location.replace(url.toString());") != std::string::npos &&
+            site_source.find("refreshUiForVersion(normalizedServerVersion);") != std::string::npos &&
+            site_source.find("onCancel: () => {\n            dismissedUiRefreshVersion = normalizedServerVersion;") != std::string::npos &&
+            site_source.find("if (typeof options.onCancel === \"function\")") != std::string::npos,
+        "UI refresh prompt must replace the current URL with a ui_refresh cache-busting query parameter on OK and suppress repeat prompts for the same server version on Cancel");
+    require(
         site_source.find("function initFooterMetaPanelInteractions()") != std::string::npos &&
             site_source.find("document.addEventListener(\"click\", function (event) {") != std::string::npos &&
             site_source.find("footerMeta.contains(event.target)") != std::string::npos &&
@@ -423,12 +449,50 @@ int main()
         "Configuration view must expose the guarded mode-change confirmation modal");
     const std::string footer_source =
         read_text_file("/home/pi/WsprryPi/WsprryPi-UI/data/footer.php");
+    const std::string header_source =
+        read_text_file("/home/pi/WsprryPi/WsprryPi-UI/data/header.php");
+    const std::string index_page_source =
+        read_text_file("/home/pi/WsprryPi/WsprryPi-UI/data/index.php");
+    const std::string script_include_source =
+        read_text_file("/home/pi/WsprryPi/WsprryPi-UI/data/site.js.includes.php");
+    const std::string ui_version_source =
+        read_text_file("/home/pi/WsprryPi/WsprryPi-UI/data/ui_version.php");
+    const std::string html_cache_headers_source =
+        read_text_file("/home/pi/WsprryPi/WsprryPi-UI/data/html_cache_headers.php");
+    const std::string version_endpoint_source =
+        read_text_file("/home/pi/WsprryPi/WsprryPi-UI/data/version.php");
+    const std::string fetch_spots_source =
+        read_text_file("/home/pi/WsprryPi/WsprryPi-UI/data/fetch_spots.php");
+    const std::string log_stream_source =
+        read_text_file("/home/pi/WsprryPi/WsprryPi-UI/data/log_stream.php");
+    const std::string diagnostic_logs_source =
+        read_text_file("/home/pi/WsprryPi/WsprryPi-UI/data/view_diag_logs.php");
     require(
         footer_source.find("<details class=\"footer-meta\">") != std::string::npos &&
             footer_source.find("<summary>About</summary>") != std::string::npos,
         "footer markup must keep the native click-based About disclosure");
-    const std::string fetch_spots_source =
-        read_text_file("/home/pi/WsprryPi/WsprryPi-UI/data/fetch_spots.php");
+    require(
+        header_source.find("window.WSPRRYPI_UI_VERSION = <?= json_encode(getWsprryPiUiVersion()) ?>;") != std::string::npos &&
+            ui_version_source.find("function getWsprryPiUiVersion(): string") != std::string::npos &&
+            ui_version_source.find("function wsprrypiAssetUrl(string $path): string") != std::string::npos &&
+            ui_version_source.find("'v=' . rawurlencode($version)") != std::string::npos &&
+            header_source.find("wsprrypiAssetUrl('site.css')") != std::string::npos &&
+            footer_source.find("wsprrypiAssetUrl('site.js')") != std::string::npos &&
+            index_page_source.find("wsprrypiAssetUrl($stylesheet)") != std::string::npos &&
+            index_page_source.find("wsprrypiAssetUrl($script)") != std::string::npos &&
+            script_include_source.find("wsprrypiAssetUrl('vendor/js/jquery-3.7.1.min.js')") != std::string::npos &&
+            script_include_source.find("wsprrypiAssetUrl('vendor/js/bootstrap.bundle-5.3.8.min.js')") != std::string::npos,
+        "PHP template assets must use the centralized WsprryPi UI version query string for CSS and JS cache busting");
+    require(
+        html_cache_headers_source.find("header('Cache-Control: no-cache, must-revalidate');") != std::string::npos &&
+            index_page_source.find("<?php require_once __DIR__ . '/html_cache_headers.php'; ?>") == 0 &&
+            diagnostic_logs_source.find("require_once __DIR__ . '/html_cache_headers.php';") != std::string::npos &&
+            diagnostic_logs_source.find("require_once __DIR__ . '/html_cache_headers.php';") < diagnostic_logs_source.find("<!doctype html>") &&
+            read_text_file("/home/pi/WsprryPi/WsprryPi-UI/data/template.php").find("<?php require_once __DIR__ . '/html_cache_headers.php'; ?>") == 0 &&
+            version_endpoint_source.find("html_cache_headers.php") == std::string::npos &&
+            fetch_spots_source.find("html_cache_headers.php") == std::string::npos &&
+            log_stream_source.find("html_cache_headers.php") == std::string::npos,
+        "HTML PHP shell pages must send no-cache revalidation headers before output while JSON/API endpoints keep their existing cache behavior");
     require(
         fetch_spots_source.find("function normalizeLookupBaseCallsign(string $value): string") != std::string::npos &&
             fetch_spots_source.find("function buildLookupCallsignCandidates(string $value): array") != std::string::npos &&
