@@ -69,6 +69,8 @@ int main()
 {
     const std::string websocket_source =
         read_text_file("/home/pi/WsprryPi/src/web_socket.cpp");
+    const std::string web_server_source =
+        read_text_file("/home/pi/WsprryPi/src/web_server.cpp");
     require(
         websocket_source.find("else if (cmd == \"stop\")") != std::string::npos &&
             websocket_source.find("stop_transmission_by_user_request(persist_transmit);") !=
@@ -93,10 +95,11 @@ int main()
                 scheduling_source.find("send_ws_message(\"transmit\", \"finished\");", scheduling_source.find("void transmitter_cb(")),
         "test tone end must rely on transmitter callback websocket ownership only");
     require(
-        scheduling_source.find("wsprTransmitter.clearSoftOff();") != std::string::npos &&
+        scheduling_source.find("finalize_transmission_stop_cleanup(") != std::string::npos &&
+            scheduling_source.find("wsprTransmitter.clearSoftOff();") != std::string::npos &&
             scheduling_source.find("wsprTransmitter.startAsync();", scheduling_source.find("TestToneStopResult end_test_tone()")) !=
                 std::string::npos,
-        "WSPR test tone stop recovery must explicitly re-arm the committed scheduler wait path");
+        "WSPR test tone stop recovery must route through shared stop cleanup and explicitly re-arm the committed scheduler wait path");
 
     const std::string ui_source =
         read_text_file("/home/pi/WsprryPi/WsprryPi-UI/data/index.js");
@@ -397,6 +400,30 @@ int main()
             site_source.find("preserveLineBreaks = options.preserveLineBreaks === true") != std::string::npos,
         "shared confirm modal must support preserving diagnostic line breaks for detail dialogs");
     require(
+        site_source.find("let dismissedUiRefreshVersion = null;") != std::string::npos &&
+            site_source.find("window.WSPRRYPI_UI_VERSION") != std::string::npos &&
+            site_source.find("function maybePromptForUiRefresh(serverVersion)") != std::string::npos &&
+            site_source.find("maybePromptForUiRefresh(response.ui_version);") != std::string::npos &&
+            site_source.find("normalizedServerVersion === dismissedUiRefreshVersion") != std::string::npos &&
+            web_server_source.find("j[\"ui_version\"] = get_raw_version_string();") != std::string::npos,
+        "site.js must detect backend UI version changes using the existing /version response without repeatedly prompting for a dismissed version");
+    require(
+        site_source.find("title: \"UI refresh required\"") != std::string::npos &&
+            site_source.find("The WsprryPi web interface has been updated. Refresh this page to load the new web pages, CSS, and JavaScript.") != std::string::npos &&
+            site_source.find("confirmLabel: \"Refresh\"") != std::string::npos &&
+            site_source.find("cancelLabel: \"Cancel\"") != std::string::npos &&
+            site_source.find("showConfirmationDialog({") != std::string::npos,
+        "UI refresh prompt must use the shared Bootstrap confirmation modal path with the required copy and labels");
+    require(
+        site_source.find("function refreshUiForVersion(serverVersion)") != std::string::npos &&
+            site_source.find("const url = new URL(window.location.href);") != std::string::npos &&
+            site_source.find("url.searchParams.set(\n        \"ui_refresh\",") != std::string::npos &&
+            site_source.find("window.location.replace(url.toString());") != std::string::npos &&
+            site_source.find("refreshUiForVersion(normalizedServerVersion);") != std::string::npos &&
+            site_source.find("onCancel: () => {\n            dismissedUiRefreshVersion = normalizedServerVersion;") != std::string::npos &&
+            site_source.find("if (typeof options.onCancel === \"function\")") != std::string::npos,
+        "UI refresh prompt must replace the current URL with a ui_refresh cache-busting query parameter on OK and suppress repeat prompts for the same server version on Cancel");
+    require(
         site_source.find("function initFooterMetaPanelInteractions()") != std::string::npos &&
             site_source.find("document.addEventListener(\"click\", function (event) {") != std::string::npos &&
             site_source.find("footerMeta.contains(event.target)") != std::string::npos &&
@@ -422,12 +449,50 @@ int main()
         "Configuration view must expose the guarded mode-change confirmation modal");
     const std::string footer_source =
         read_text_file("/home/pi/WsprryPi/WsprryPi-UI/data/footer.php");
+    const std::string header_source =
+        read_text_file("/home/pi/WsprryPi/WsprryPi-UI/data/header.php");
+    const std::string index_page_source =
+        read_text_file("/home/pi/WsprryPi/WsprryPi-UI/data/index.php");
+    const std::string script_include_source =
+        read_text_file("/home/pi/WsprryPi/WsprryPi-UI/data/site.js.includes.php");
+    const std::string ui_version_source =
+        read_text_file("/home/pi/WsprryPi/WsprryPi-UI/data/ui_version.php");
+    const std::string html_cache_headers_source =
+        read_text_file("/home/pi/WsprryPi/WsprryPi-UI/data/html_cache_headers.php");
+    const std::string version_endpoint_source =
+        read_text_file("/home/pi/WsprryPi/WsprryPi-UI/data/version.php");
+    const std::string fetch_spots_source =
+        read_text_file("/home/pi/WsprryPi/WsprryPi-UI/data/fetch_spots.php");
+    const std::string log_stream_source =
+        read_text_file("/home/pi/WsprryPi/WsprryPi-UI/data/log_stream.php");
+    const std::string diagnostic_logs_source =
+        read_text_file("/home/pi/WsprryPi/WsprryPi-UI/data/view_diag_logs.php");
     require(
         footer_source.find("<details class=\"footer-meta\">") != std::string::npos &&
             footer_source.find("<summary>About</summary>") != std::string::npos,
         "footer markup must keep the native click-based About disclosure");
-    const std::string fetch_spots_source =
-        read_text_file("/home/pi/WsprryPi/WsprryPi-UI/data/fetch_spots.php");
+    require(
+        header_source.find("window.WSPRRYPI_UI_VERSION = <?= json_encode(getWsprryPiUiVersion()) ?>;") != std::string::npos &&
+            ui_version_source.find("function getWsprryPiUiVersion(): string") != std::string::npos &&
+            ui_version_source.find("function wsprrypiAssetUrl(string $path): string") != std::string::npos &&
+            ui_version_source.find("'v=' . rawurlencode($version)") != std::string::npos &&
+            header_source.find("wsprrypiAssetUrl('site.css')") != std::string::npos &&
+            footer_source.find("wsprrypiAssetUrl('site.js')") != std::string::npos &&
+            index_page_source.find("wsprrypiAssetUrl($stylesheet)") != std::string::npos &&
+            index_page_source.find("wsprrypiAssetUrl($script)") != std::string::npos &&
+            script_include_source.find("wsprrypiAssetUrl('vendor/js/jquery-3.7.1.min.js')") != std::string::npos &&
+            script_include_source.find("wsprrypiAssetUrl('vendor/js/bootstrap.bundle-5.3.8.min.js')") != std::string::npos,
+        "PHP template assets must use the centralized WsprryPi UI version query string for CSS and JS cache busting");
+    require(
+        html_cache_headers_source.find("header('Cache-Control: no-cache, must-revalidate');") != std::string::npos &&
+            index_page_source.find("<?php require_once __DIR__ . '/html_cache_headers.php'; ?>") == 0 &&
+            diagnostic_logs_source.find("require_once __DIR__ . '/html_cache_headers.php';") != std::string::npos &&
+            diagnostic_logs_source.find("require_once __DIR__ . '/html_cache_headers.php';") < diagnostic_logs_source.find("<!doctype html>") &&
+            read_text_file("/home/pi/WsprryPi/WsprryPi-UI/data/template.php").find("<?php require_once __DIR__ . '/html_cache_headers.php'; ?>") == 0 &&
+            version_endpoint_source.find("html_cache_headers.php") == std::string::npos &&
+            fetch_spots_source.find("html_cache_headers.php") == std::string::npos &&
+            log_stream_source.find("html_cache_headers.php") == std::string::npos,
+        "HTML PHP shell pages must send no-cache revalidation headers before output while JSON/API endpoints keep their existing cache behavior");
     require(
         fetch_spots_source.find("function normalizeLookupBaseCallsign(string $value): string") != std::string::npos &&
             fetch_spots_source.find("function buildLookupCallsignCandidates(string $value): array") != std::string::npos &&
@@ -616,6 +681,7 @@ int main()
         "maintenance view must bind the shared Test Tone controls");
     require(
         site_source.find("function hasActiveManagedTransmissionForTestTone()") != std::string::npos &&
+            site_source.find("function hasEnabledManagedTransmissionForTestTone()") != std::string::npos &&
             site_source.find("function handleTestToneCommandResponse(message)") != std::string::npos &&
             site_source.find("const startButton = document.getElementById(\"testToneStart\");") != std::string::npos &&
             site_source.find("toggleButtonLoading(startButton, false);") != std::string::npos &&
@@ -623,10 +689,76 @@ int main()
             site_source.find("if (response.started === true) {\n            syncTestToneControlState(true);") != std::string::npos &&
             site_source.find("if (response.stopped !== true) {") != std::string::npos &&
             site_source.find("if (hasActiveManagedTransmissionForTestTone()) {") != std::string::npos &&
-            site_source.find("showTestToneBlockedModal();") != std::string::npos &&
-            site_source.find("You have to stop and disable the active scheduled transmission before starting a test tone.") != std::string::npos &&
+            site_source.find("if (hasEnabledManagedTransmissionForTestTone()) {") != std::string::npos &&
+            site_source.find("showTestToneBlockedModal(\"active\");") != std::string::npos &&
+            site_source.find("showTestToneBlockedModal(\"enabled\");") != std::string::npos &&
+            site_source.find("Stop and disable transmissions") != std::string::npos &&
+            site_source.find("Disable transmissions") != std::string::npos &&
+            site_source.find("Test tones require scheduled transmissions to be stopped and disabled first.") != std::string::npos &&
+            site_source.find("const confirmLabel = blockedByActive ? \"Stop and Disable\" : \"Disable\";") != std::string::npos &&
+            site_source.find("currentRuntimeConfigStatus.transmitEnabled === true") != std::string::npos &&
             site_source.find("if (msg.command === \"tone_start\" || msg.command === \"tone_end\")") != std::string::npos,
-        "shared Test Tone controls must reject unsafe starts with the existing modal path and reconcile websocket command replies");
+        "shared Test Tone controls must reject active and merely enabled scheduled transmissions with the existing modal path and reconcile websocket command replies");
+    require(
+        site_source.find("let pendingTestToneStartRequest = false;") != std::string::npos &&
+            site_source.find("let pendingTestToneStartTimeoutHandle = null;") != std::string::npos &&
+            site_source.find("const TEST_TONE_COMMAND_TIMEOUT_MS = 15000;") != std::string::npos &&
+            site_source.find("TEST_TONE_DISABLE_REQUEST_TIMEOUT_MS") == std::string::npos &&
+            site_source.find("function markPendingTestToneStartRequest()") != std::string::npos &&
+            site_source.find("function clearPendingTestToneStartRequest()") != std::string::npos &&
+            site_source.find("pendingTestToneStartTimeoutHandle = window.setTimeout(() => {\n        clearPendingTestToneStartRequest();\n    }, TEST_TONE_COMMAND_TIMEOUT_MS);") != std::string::npos &&
+            site_source.find("markPendingTestToneStartRequest();\n    if (!sendCommand(\"tone_start\"))") != std::string::npos &&
+            site_source.find("clearPendingTestToneStartRequest();\n        toggleButtonLoading(btn, false);") != std::string::npos &&
+            site_source.find("clearPendingTestToneStartRequest();\n        communicationInterrupted = true;") != std::string::npos,
+        "Test Tone start requests must use a local per-tab pending flag that is set before sending and cleared on send failure or websocket disconnect");
+    require(
+        site_source.find("const locallyRequested = pendingTestToneStartRequest === true;") != std::string::npos &&
+            site_source.find("clearPendingTestToneStartRequest();\n        if (response.started === true)") != std::string::npos &&
+            site_source.find("if (locallyRequested && response.blocked_by_active_transmission === true)") != std::string::npos &&
+            site_source.find("} else if (locallyRequested && response.blocked_by_enabled_transmission === true)") != std::string::npos,
+        "Test Tone blocked modal handling must be gated by the local pending tone_start request flag");
+    require(
+        site_source.find("!locallyRequested &&") != std::string::npos &&
+            site_source.find("response.blocked_by_active_transmission === true ||\n                    response.blocked_by_enabled_transmission === true") != std::string::npos &&
+            site_source.find("Passive test tone start rejection received:") != std::string::npos &&
+            site_source.find("syncTestToneControlState(false);") != std::string::npos,
+        "passive websocket tone_start rejections must still update Test Tone state without showing blocked modals");
+    require(
+        site_source.find("function disableScheduledTransmissionsForTestTone(reason, actionButton = null)") != std::string::npos &&
+            site_source.find("function handleTestToneStopDisableResponse(message)") != std::string::npos &&
+            site_source.find("handleTestToneStopDisableResponse(msg);") != std::string::npos &&
+            site_source.find("timeout: TEST_TONE_COMMAND_TIMEOUT_MS") != std::string::npos &&
+            site_source.find("}, TEST_TONE_COMMAND_TIMEOUT_MS);") != std::string::npos &&
+            site_source.find("response.transmit_disabled === true || response.stop_performed === true") != std::string::npos &&
+            site_source.find("command: \"stop\",") != std::string::npos &&
+            site_source.find("persist_transmit: true,") != std::string::npos &&
+            site_source.find("finishTestToneStopDisableAction(stopSucceeded, responseMessage);") != std::string::npos &&
+            websocket_source.find("reply[\"stop_performed\"] = stop_result.stop_performed;") != std::string::npos &&
+            websocket_source.find("reply[\"transmit_disabled\"] = stop_result.transmit_disabled;") != std::string::npos &&
+            websocket_source.find("reply[\"persist_transmit\"] = persist_transmit;") != std::string::npos &&
+            websocket_source.find("reply[\"status\"] = stop_request_succeeded ? \"ok\" : \"error\";") != std::string::npos,
+        "active-transmission Test Tone blocked action must use the existing websocket stop command and its stable stop_performed/transmit_disabled response fields");
+    require(
+        site_source.find("function requestTestToneTransmitDisable()") != std::string::npos &&
+            site_source.find("ajaxWithEndpointFallback(SETTINGS_ENDPOINT, {") != std::string::npos &&
+            site_source.find("contentType: \"application/merge-patch+json\"") != std::string::npos &&
+            site_source.find("\"Transmit\": false,") != std::string::npos &&
+            site_source.find("requestTestToneTransmitDisable()\n        .done(function () {\n            finishTestToneStopDisableAction(true);") != std::string::npos,
+        "enabled-idle Test Tone blocked action must disable Operation.Transmit through the existing settings PATCH path");
+    require(
+        site_source.find("cancelLabel: \"Cancel\"") != std::string::npos &&
+            site_source.find("onCancel() {\n            },") != std::string::npos &&
+            site_source.find("sendCommand(\"tone_start\")") != std::string::npos &&
+            site_source.find("disableScheduledTransmissionsForTestTone(\n                    reason,") != std::string::npos &&
+            site_source.find("disableScheduledTransmissionsForTestTone(\n                    reason,") <
+                site_source.find("sendCommand(\"tone_start\")"),
+        "Test Tone blocked modal Cancel must make no state changes and the stop/disable action must not automatically start the test tone");
+    require(
+        scheduling_source.find("scheduler_managed_transmission_active_for_test_tone()") != std::string::npos &&
+            scheduling_source.find("result.blocked_by_active_transmission = true;") != std::string::npos &&
+            scheduling_source.find("scheduler_managed_transmission_enabled_for_test_tone()") != std::string::npos &&
+            scheduling_source.find("result.blocked_by_enabled_transmission = true;") != std::string::npos,
+        "backend-side Test Tone rejection must remain present for active and enabled scheduled transmissions");
     require(
         site_source.find("const normalizedArgs = args.map((arg) => {") != std::string::npos &&
             site_source.find("return JSON.stringify(arg);") != std::string::npos &&

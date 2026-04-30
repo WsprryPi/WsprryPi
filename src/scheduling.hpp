@@ -201,6 +201,7 @@ struct TestToneStartResult
     bool started = false;
     bool already_active = false;
     bool blocked_by_active_transmission = false;
+    bool blocked_by_enabled_transmission = false;
     std::string message;
 };
 
@@ -339,6 +340,7 @@ bool validate_non_wspr_repeat_interval_policy(
 bool web_server_start_enabled(const ArgParserConfig &cfg) noexcept;
 bool websocket_server_start_enabled(const ArgParserConfig &cfg) noexcept;
 bool transmitter_reload_should_defer() noexcept;
+std::string transmitter_reload_defer_debug_snapshot();
 void transmitter_cb(WsprTransmissionCallbackEvent event,
                     WsprTransmitLogLevel level,
                     const std::string &msg,

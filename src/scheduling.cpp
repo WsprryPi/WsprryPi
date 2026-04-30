@@ -1353,6 +1353,127 @@ bool transmitter_reload_should_defer() noexcept
            wsprTransmitter.activeExecutionIsTone();
 }
 
+std::string transmitter_reload_defer_debug_snapshot()
+{
+    auto mode_name =
+        [](wsprrypi::TransmissionMode mode) noexcept
+    {
+        switch (mode)
+        {
+        case wsprrypi::TransmissionMode::WSPR:
+            return "WSPR";
+        case wsprrypi::TransmissionMode::QRSS:
+            return "QRSS";
+        case wsprrypi::TransmissionMode::FSKCW:
+            return "FSKCW";
+        case wsprrypi::TransmissionMode::DFCW:
+            return "DFCW";
+        case wsprrypi::TransmissionMode::CW:
+            return "CW";
+        case wsprrypi::TransmissionMode::TONE:
+            return "TONE";
+        default:
+            return "UNKNOWN";
+        }
+    };
+
+    auto committed_mode_name =
+        [](TransmissionMode mode) noexcept
+    {
+        switch (mode)
+        {
+        case TransmissionMode::WSPR:
+            return "WSPR";
+        case TransmissionMode::TONE:
+            return "TONE";
+        default:
+            return "UNKNOWN";
+        }
+    };
+
+    auto backend_name =
+        [](wsprrypi::BackendKind backend) noexcept
+    {
+        switch (backend)
+        {
+        case wsprrypi::BackendKind::RPI_CLOCK_GPIO:
+            return "GPIO";
+        case wsprrypi::BackendKind::SI5351:
+            return "SI5351";
+        default:
+            return "UNKNOWN";
+        }
+    };
+
+    std::ostringstream oss;
+    const WsprTransmitter::State state = wsprTransmitter.getState();
+    const bool state_transmitting =
+        state == WsprTransmitter::State::TRANSMITTING;
+    const bool state_recovering =
+        state == WsprTransmitter::State::RECOVERING;
+    const bool state_enabled =
+        state == WsprTransmitter::State::ENABLED;
+    const bool active_execution_is_tone =
+        wsprTransmitter.activeExecutionIsTone();
+    const bool defer =
+        state_transmitting ||
+        state_recovering ||
+        (state_enabled && active_execution_is_tone);
+    const auto runtime_status = wsprTransmitter.runtimeExecutionStatusSnapshot();
+    const TransmissionRequest committed_request =
+        current_transmission_request_for_test();
+    const std::optional<wsprrypi::TransmissionRequest> controller_request =
+        current_controller_request_for_test();
+    const WsprRuntimeStatusSnapshot runtime_snapshot =
+        current_tx_runtime_status_snapshot();
+
+    oss << "defer=" << (defer ? "true" : "false")
+        << ", state_transmitting=" << (state_transmitting ? "true" : "false")
+        << ", state_recovering=" << (state_recovering ? "true" : "false")
+        << ", state_enabled=" << (state_enabled ? "true" : "false")
+        << ", web_test_tone=" << (web_test_tone.load(std::memory_order_acquire) ? "true" : "false")
+        << ", managed_reload_tx_inhibited=" << (managed_reload_tx_inhibited_state() ? "true" : "false")
+        << ", shutdown_after_current_transmission=" << (shutdown_after_current_transmission.load(std::memory_order_acquire) ? "true" : "false")
+        << ", shutdown_after_wspr_plan=" << (shutdown_after_wspr_plan.load(std::memory_order_acquire) ? "true" : "false")
+        << ", active_wspr_plan_in_progress=" << (active_wspr_plan_in_progress ? "true" : "false")
+        << ", runtime_tx_state=" << runtime_snapshot.tx_state
+        << ", runtime_mode=" << runtime_snapshot.runtime_mode
+        << ", runtime_frequency_hz=" << runtime_snapshot.frequency_hz
+        << ", runtime_frequency_is_skip=" << (runtime_snapshot.frequency_is_skip ? "true" : "false")
+        << ", runtime_snapshot_mode=" << mode_name(runtime_status.mode)
+        << ", committed_request_mode=" << committed_mode_name(committed_request.mode)
+        << ", committed_request_rf_hz=" << committed_request.actual_rf_frequency_hz
+        << ", committed_request_dial_hz=" << committed_request.dial_frequency_hz
+        << ", committed_request_skip=" << (committed_request.isSkipWindow() ? "true" : "false")
+        << ", committed_request_token=" << committed_request.frequency_entry_label
+        << ", current_dial_frequency=" << current_dial_frequency
+        << ", current_frequency_token=" << current_frequency_entry.token
+        << ", controller_request_active=" << (controller_request.has_value() ? "true" : "false")
+        << ", controller_request_mode=";
+
+    if (controller_request.has_value())
+    {
+        oss << mode_name(controller_request->mode);
+    }
+    else
+    {
+        oss << "NONE";
+    }
+
+    oss << ", controller_request_backend=";
+    if (controller_request.has_value())
+    {
+        oss << backend_name(controller_request->output.backend);
+    }
+    else
+    {
+        oss << "NONE";
+    }
+
+    oss << ", transmitter_snapshot={" << wsprTransmitter.reloadDeferDebugState() << "}";
+    return oss.str();
+}
+
 static bool scheduler_managed_transmission_active_for_test_tone() noexcept
 {
     const WsprTransmitter::State state = wsprTransmitter.getState();
@@ -1363,6 +1484,37 @@ static bool scheduler_managed_transmission_active_for_test_tone() noexcept
     }
 
     return !wsprTransmitter.activeExecutionIsTone();
+}
+
+static bool scheduler_managed_transmission_enabled_for_test_tone() noexcept
+{
+    return runtime_transmit_enabled(config);
+}
+
+static void finalize_transmission_stop_cleanup(
+    const ArgParserConfig *selector_config,
+    bool keep_selector_gpio_initialized,
+    const char *led_reason,
+    bool clear_scheduler_latches = false,
+    bool emit_debug_log = false)
+{
+    if (emit_debug_log)
+    {
+        llog.logS(
+            DEBUG,
+            "Finalizing scheduler cleanup after transmitter stop.");
+    }
+
+    stop_active_transmission_selectors(
+        selector_config,
+        keep_selector_gpio_initialized);
+    set_tx_led_state(false, led_reason);
+    if (clear_scheduler_latches)
+    {
+        shutdown_after_current_transmission.store(false, std::memory_order_release);
+        shutdown_after_wspr_plan.store(false, std::memory_order_release);
+        reset_active_wspr_plan_state();
+    }
 }
 
 static WsprFrequencyEntry next_frequency_entry_from(
@@ -2650,14 +2802,10 @@ void transmitter_cb(WsprTransmitter::TransmissionCallbackEvent event,
                       "Completed transmission.");
         }
 
-        // Return the active selector to the idle pool so it remains driven
-        // inactive until the next handoff or final shutdown.
-        stop_active_transmission_selectors(
+        finalize_transmission_stop_cleanup(
             &config,
-            runtime_should_hold_selector_gpios_initialized(config));
-
-        // Turn off LED.
-        set_tx_led_state(false, "transmission completion");
+            runtime_should_hold_selector_gpios_initialized(config),
+            "transmission completion");
 
         // Notify the websocket clients.
         send_ws_message("transmit", "finished");
@@ -2729,10 +2877,11 @@ void transmitter_cb(WsprTransmitter::TransmissionCallbackEvent event,
                   s_elapsed,
                   " seconds.");
 
-        stop_active_transmission_selectors(
+        finalize_transmission_stop_cleanup(
             &config,
-            runtime_should_hold_selector_gpios_initialized(config));
-        set_tx_led_state(false, "transmission cancellation");
+            runtime_should_hold_selector_gpios_initialized(config),
+            "transmission cancellation",
+            true);
         if (suppress_ws_event)
         {
             llog.logS(
@@ -2743,10 +2892,6 @@ void transmitter_cb(WsprTransmitter::TransmissionCallbackEvent event,
         {
             send_ws_message("transmit", "canceled");
         }
-
-        shutdown_after_current_transmission.store(false, std::memory_order_release);
-        shutdown_after_wspr_plan.store(false, std::memory_order_release);
-        reset_active_wspr_plan_state();
 
         break;
     }
@@ -2992,7 +3137,16 @@ TestToneStartResult start_test_tone()
     {
         result.blocked_by_active_transmission = true;
         result.message =
-            "Stop and disable the current scheduled transmission before starting a test tone.";
+            "Stop transmissions before starting a test tone. Disable transmissions after the active transmission stops.";
+        llog.logS(WARN, result.message);
+        return result;
+    }
+
+    if (scheduler_managed_transmission_enabled_for_test_tone())
+    {
+        result.blocked_by_enabled_transmission = true;
+        result.message =
+            "Disable transmissions before starting a test tone.";
         llog.logS(WARN, result.message);
         return result;
     }
@@ -3079,8 +3233,18 @@ TestToneStopResult end_test_tone()
     llog.logS(INFO, "Ending test tone requested by Web UI.");
 
     wsprTransmitter.stopAndJoin();
+    wsprTransmitter.clearExecutionStateAfterStop();
+    finalize_transmission_stop_cleanup(
+        &config,
+        runtime_should_hold_selector_gpios_initialized(config),
+        "test tone stop",
+        true,
+        true);
+    llog.logS(
+        DEBUG,
+        "Post-test-tone stop transmitter snapshot: ",
+        transmitter_reload_defer_debug_snapshot());
     (void)reconcile_tx_led_after_transmitter_stop("test tone stop");
-    stop_active_transmission_selectors();
 
     const bool deferred_reload_pending =
         ini_reload_pending.load(std::memory_order_acquire);

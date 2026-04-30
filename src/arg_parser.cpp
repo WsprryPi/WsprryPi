@@ -325,7 +325,13 @@ void callback_ini_changed()
         ini_reload_generation.fetch_add(1, std::memory_order_acq_rel) + 1U;
     ini_reload_pending.store(true, std::memory_order_release);
 
-    if (transmitter_reload_should_defer())
+    const bool should_defer = transmitter_reload_should_defer();
+    llog.logS(
+        DEBUG,
+        "INI reload defer predicate snapshot: ",
+        transmitter_reload_defer_debug_snapshot());
+
+    if (should_defer)
     {
         llog.logS(
             INFO,
