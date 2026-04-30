@@ -43,6 +43,7 @@
 #include <algorithm>
 #include <atomic>
 #include <cctype>
+#include <cmath>
 #include <cstring>
 #include <iomanip>
 #include <mutex>
@@ -185,6 +186,17 @@ namespace
         cfg.wspr.frequencies = cfg.frequencies;
         cfg.wspr.audio_offset_hz = cfg.wspr_audio_offset_hz;
         cfg.wspr.planner_preference = cfg.wspr_planner_preference;
+    }
+
+    void sync_cw_mode_config(ArgParserConfig &cfg)
+    {
+        cfg.qrss.dot_seconds = cfg.modulation_dot_seconds;
+        cfg.fskcw.dot_seconds = cfg.modulation_dot_seconds;
+        cfg.dfcw.dot_seconds = cfg.modulation_dot_seconds;
+        cfg.fskcw.mark_frequency_hz =
+            cfg.fskcw.space_frequency_hz + cfg.modulation_fsk_offset_hz;
+        cfg.dfcw.dash_frequency_hz =
+            cfg.dfcw.dot_frequency_hz + cfg.modulation_fsk_offset_hz;
     }
 
     bool persisted_qrss_config_available(const ArgParserConfig &cfg) noexcept
@@ -529,6 +541,135 @@ static int parse_integer_option(
     return parsed;
 }
 
+static double parse_double_option(
+    const char *raw_value,
+    const std::string &option_name)
+{
+    std::size_t consumed = 0;
+    const std::string value(raw_value == nullptr ? "" : raw_value);
+    const double parsed = std::stod(value, &consumed);
+    if (consumed != value.size() || !std::isfinite(parsed))
+    {
+        throw std::invalid_argument(option_name + " must be a finite number.");
+    }
+
+    return parsed;
+}
+
+static double parse_frequency_hz_option(
+    const char *raw_value,
+    const std::string &option_name)
+{
+    const std::string raw = trim_copy_string(raw_value == nullptr ? "" : raw_value);
+    if (raw.empty())
+    {
+        throw std::invalid_argument(
+            option_name +
+            " must be a whole-number Hz value or a value with Hz, kHz, MHz, or GHz.");
+    }
+
+    const std::size_t unit_start = raw.find_first_not_of("0123456789.");
+    const std::string numeric_part =
+        unit_start == std::string::npos ? raw : raw.substr(0, unit_start);
+    std::string unit_part =
+        unit_start == std::string::npos ? std::string() : trim_copy_string(raw.substr(unit_start));
+
+    if (numeric_part.empty())
+    {
+        throw std::invalid_argument(option_name + " must start with a numeric frequency value.");
+    }
+
+    std::size_t consumed = 0;
+    double value = std::stod(numeric_part, &consumed);
+    if (consumed != numeric_part.size() || !std::isfinite(value) || value <= 0.0)
+    {
+        throw std::invalid_argument(
+            option_name +
+            " must be a positive whole-number Hz value or a value with Hz, kHz, MHz, or GHz.");
+    }
+
+    std::transform(
+        unit_part.begin(),
+        unit_part.end(),
+        unit_part.begin(),
+        [](unsigned char c)
+        {
+            return static_cast<char>(std::tolower(c));
+        });
+
+    if (unit_part == "ghz")
+    {
+        value *= 1e9;
+    }
+    else if (unit_part == "mhz")
+    {
+        value *= 1e6;
+    }
+    else if (unit_part == "khz")
+    {
+        value *= 1e3;
+    }
+    else if (!unit_part.empty() && unit_part != "hz")
+    {
+        throw std::invalid_argument(
+            option_name + " must use a supported unit suffix: Hz, kHz, MHz, or GHz.");
+    }
+    else if (unit_part.empty() && numeric_part.find('.') != std::string::npos)
+    {
+        const std::size_t decimal_point = numeric_part.find('.');
+        const std::string fractional_part = numeric_part.substr(decimal_point + 1);
+        const bool zero_fraction =
+            !fractional_part.empty() &&
+            std::all_of(
+                fractional_part.begin(),
+                fractional_part.end(),
+                [](char c)
+                {
+                    return c == '0';
+                });
+        if (!zero_fraction)
+        {
+            throw std::invalid_argument(
+                option_name +
+                " must use Hz, kHz, MHz, or GHz when the value includes a decimal point.");
+        }
+    }
+
+    const double rounded = std::round(value);
+    if (std::fabs(value - rounded) > 1e-6)
+    {
+        throw std::invalid_argument(
+            option_name + " must resolve to a whole-number frequency in Hz.");
+    }
+
+    return rounded;
+}
+
+static ModeType parse_mode_option(const char *raw_value)
+{
+    std::string value = trim_copy_string(raw_value == nullptr ? "" : raw_value);
+    std::transform(
+        value.begin(),
+        value.end(),
+        value.begin(),
+        [](unsigned char c)
+        {
+            return static_cast<char>(std::toupper(c));
+        });
+
+    if (value.empty() || value == "WSPR")
+        return ModeType::WSPR;
+    if (value == "QRSS")
+        return ModeType::QRSS;
+    if (value == "FSKCW")
+        return ModeType::FSKCW;
+    if (value == "DFCW")
+        return ModeType::DFCW;
+
+    throw std::invalid_argument(
+        "Invalid mode. Expected WSPR, QRSS, FSKCW, or DFCW.");
+}
+
 static int parse_si5351_tx_output_option(const char *raw_value)
 {
     std::string value = trim_copy_string(raw_value == nullptr ? "" : raw_value);
@@ -573,6 +714,29 @@ static WsprPlannerPreference parse_planner_preference_option(const char *raw_val
 
     throw std::invalid_argument(
         "Invalid planner preference. Expected auto, prefer_paired, or require_paired.");
+}
+
+static std::string parse_cw_fade_shape_option(const char *raw_value)
+{
+    std::string value = trim_copy_string(raw_value == nullptr ? "" : raw_value);
+    std::transform(
+        value.begin(),
+        value.end(),
+        value.begin(),
+        [](unsigned char c)
+        {
+            return static_cast<char>(std::tolower(c));
+        });
+    std::replace(value.begin(), value.end(), '-', '_');
+
+    if (value.empty() || value == "none" ||
+        value == "linear" || value == "raised_cosine")
+    {
+        return value.empty() ? std::string("none") : value;
+    }
+
+    throw std::invalid_argument(
+        "Invalid CW fade shape. Expected none, linear, or raised_cosine.");
 }
 
 static bool parse_gpio_number_strict(
@@ -1085,103 +1249,88 @@ void print_usage(const std::string &message, int exit_code)
     }
 
     std::cerr << "\nUsage:\n"
-              << "  (sudo) wsprrypi [options] callsign gridsquare transmit_power dial_frequency <f2> <f3> ...\n"
-              << "    OR\n"
-              << "  (sudo) wsprrypi --test-tone {rf_frequency}\n"
-              << "    OR\n"
-              << "  (sudo) wsprrypi --qrss-message \"TEXT\" --qrss-frequency {hz} --qrss-dot-seconds {seconds}\n"
-              << "    OR\n"
-              << "  (sudo) wsprrypi --fskcw-message \"TEXT\" --fskcw-mark-frequency {hz} --fskcw-space-frequency {hz} --fskcw-dot-seconds {seconds}\n\n"
-              << "    OR\n"
-              << "  (sudo) wsprrypi --dfcw-message \"TEXT\" --dfcw-dot-frequency {hz} --dfcw-dash-frequency {hz} --dfcw-dot-seconds {seconds}\n\n"
-              << "Options:\n"
-              << "  -h, --help\n"
-              << "    Display this help message.\n"
-              << "  -v, --version\n"
-              << "    Show the WsprryPi version.\n"
-              << "  -i, --ini-file <file>\n"
-              << "    Load parameters from an INI file. Provide the path and filename.\n\n"
-              << "  -n, --use-ntp\n"
-              << "    Enable GPIO-backed NTP/PPM calibration.\n"
-              << "  -p, --ppm <value>\n"
-              << "    Set manual PPM correction for the GPIO backend and disable --use-ntp.\n"
-              << "  -o, --offset\n"
-              << "    Randomize each WSPR transmission around the selected dial frequency.\n"
+              << "  (sudo) wsprrypi [options] CALLSIGN GRID POWER FREQ [FREQ...]\n"
+              << "  (sudo) wsprrypi -i /path/to/wsprrypi.ini\n"
+              << "  (sudo) wsprrypi --test-tone RF_FREQ [backend/options]\n"
+              << "  (sudo) wsprrypi --mode QRSS --cw-message TEXT --cw-base-frequency FREQ [cw/options]\n"
+              << "  (sudo) wsprrypi --qrss-message TEXT --qrss-frequency HZ --qrss-dot-seconds SEC\n"
+              << "  (sudo) wsprrypi --fskcw-message TEXT --fskcw-mark-frequency HZ --fskcw-space-frequency HZ --fskcw-dot-seconds SEC\n"
+              << "  (sudo) wsprrypi --dfcw-message TEXT --dfcw-dot-frequency HZ --dfcw-dash-frequency HZ --dfcw-dot-seconds SEC\n\n"
+              << "General:\n"
+              << "  -h, --help                         Display this help message.\n"
+              << "  -v, --version                      Show the WsprryPi version.\n"
+              << "  -i, --ini-file <file>              Load and monitor an INI file for daemon/service style operation.\n"
+              << "  -r, --repeat                       Repeat direct CLI transmissions until stopped.\n"
+              << "  -x, --terminate <count>            Stop after count iterations of the direct CLI WSPR frequency list.\n"
+              << "  -J, --journald                     Use journald for log output.\n"
+              << "  -D, --date-time-log                Prefix stream log output with date/time stamps.\n"
+              << "  --debug-logging, --no-debug-logging\n"
+              << "                                     Enable or disable DEBUG-level application logging.\n\n"
+              << "WSPR Identity And Frequency:\n"
+              << "  Positional CALLSIGN GRID POWER FREQ [FREQ...]\n"
+              << "                                     Transmit WSPR directly from CLI. POWER is rounded to a standard WSPR dBm value.\n"
+              << "  FREQ                               Band aliases such as 20m, numeric dial frequencies, or 0 to skip a slot.\n"
+              << "                                     Append @GPIO, @GPIOH, or @GPIOL for one-slot selector GPIO overrides.\n"
               << "  --planner-preference <auto|prefer_paired|require_paired>\n"
-              << "    Select WSPR planning policy. prefer_paired uses paired planning when available; require_paired fails if paired planning is unavailable. Default: auto.\n"
-              << "  -r, --repeat\n"
-              << "    Repeat transmissions continuously in direct CLI mode.\n"
-              << "  -x, --terminate <count>\n"
-              << "    Stop after the given number of WSPR transmissions in direct CLI mode.\n\n"
-              << "  --debug-logging\n"
-              << "    Enable DEBUG-level application logging.\n"
-              << "  --no-debug-logging\n"
-              << "    Disable DEBUG-level application logging.\n"
-              << "  -J, --journald\n"
-              << "    Use journald for log output.\n"
-              << "  -D, --date-time-log\n"
-              << "    Prefix stream log output with date/time stamps.\n\n"
-              << "  --no-web\n"
-              << "    Disable the HTTP web UI and WebSocket server.\n\n"
-              << "  --backend <gpio|si5351>\n"
-              << "    Select the RF transmit backend. Default: gpio.\n"
-              << "    GPIO transmission is supported only on Raspberry Pi 1 through 4.\n\n";
-
-    if (config.transmit_backend == TransmitBackendKind::SI5351)
-    {
-        std::cerr << "  --power-level <level>\n"
-                  << "    Select Si5351 drive-strength level (1-4).\n\n"
-                  << "  --si5351-i2c-bus <bus>\n"
-                  << "    Select the Si5351 I2C bus. Default: 1.\n"
-                  << "  --si5351-i2c-address <addr>\n"
-                  << "    Select the Si5351 I2C address. Default: 0x60.\n"
-                  << "  --si5351-reference-frequency <hz>\n"
-                  << "    Select the Si5351 reference frequency. Default: 27000000.\n"
-                  << "  --si5351-tx-output <CLK0|CLK1|CLK2>\n"
-                  << "    Select the Si5351 transmit output. Default: CLK0.\n\n";
-    }
-    else
-    {
-        std::cerr << "  -a, --transmit-gpio <gpio>\n"
-                  << "    Select the RF transmit GPIO (supported: 4 or 20).\n\n"
-                  << "  --power-level <level>\n"
-                  << "    Select GPIO RF power level (0-7).\n\n"
-                  << "  --si5351-i2c-bus <bus>\n"
-                  << "    Select the Si5351 I2C bus when --backend si5351 is used. Default: 1.\n"
-                  << "  --si5351-i2c-address <addr>\n"
-                  << "    Select the Si5351 I2C address when --backend si5351 is used. Default: 0x60.\n"
-                  << "  --si5351-reference-frequency <hz>\n"
-                  << "    Select the Si5351 reference frequency when --backend si5351 is used. Default: 27000000.\n"
-                  << "  --si5351-tx-output <CLK0|CLK1|CLK2>\n"
-                  << "    Select the Si5351 transmit output when --backend si5351 is used. Default: CLK0.\n\n";
-    }
-
-    std::cerr << "  -w, --web-port <port>\n"
-              << "    Set the HTTP web UI port. Default: 31415.\n"
-              << "  -k, --socket-port <port>\n"
-              << "    Set the WebSocket server port. Default: 31416.\n"
-              << "  -l, --led_pin <gpio>\n"
-              << "    Enable the activity LED on the given GPIO.\n"
-              << "  -s, --shutdown_button <gpio>\n"
-              << "    Enable the shutdown button on the given GPIO.\n\n"
-              << "  -t, --test-tone <rf_frequency>\n"
-              << "    Start a transient direct RF test tone instead of WSPR. Invalid with --ini-file.\n\n"
-              << "  --qrss-message <text>\n"
-              << "  --qrss-frequency <hz>\n"
-              << "  --qrss-dot-seconds <seconds>\n"
-              << "    Start transient QRSS mode from the CLI. All three options are required together.\n\n"
-              << "  --fskcw-message <text>\n"
-              << "  --fskcw-mark-frequency <hz>\n"
-              << "  --fskcw-space-frequency <hz>\n"
-              << "  --fskcw-dot-seconds <seconds>\n"
-              << "    Start transient FSKCW mode from the CLI. All four options are required together.\n\n"
-              << "  --dfcw-message <text>\n"
-              << "  --dfcw-dot-frequency <hz>\n"
-              << "  --dfcw-dash-frequency <hz>\n"
-              << "  --dfcw-dot-seconds <seconds>\n"
-              << "    Start transient DFCW mode from the CLI. All four options are required together.\n\n";
-
-    std::cerr << "See the documentation for a complete list of available options.\n\n";
+              << "                                     Select single-frame or paired WSPR planning policy.\n"
+              << "  -o, --offset                       Enable random WSPR transmit offset.\n"
+              << "  --no-offset                        Disable random WSPR transmit offset.\n\n"
+              << "Backend Selection:\n"
+              << "  --backend <gpio|si5351>            Select the RF transmit backend. Default: gpio.\n"
+              << "                                     GPIO RF is supported only on Raspberry Pi 1 through 4.\n"
+              << "  --power-level <level>\n"
+              << "    Set transmit power level for the active backend:\n"
+              << "      GPIO: 0-7\n"
+              << "      Si5351: 1-4\n"
+              << "  --gpio-power-level <0-7>           Set GPIO backend RF power level.\n"
+              << "  --si5351-power-level <1-4>         Set Si5351 drive-strength level.\n\n"
+              << "GPIO Backend:\n"
+              << "  -a, --transmit-gpio <4|20>         Select the RF transmit GPIO.\n"
+              << "      --transmit-pin <4|20>          Legacy alias for --transmit-gpio.\n"
+              << "  -n, --use-ntp                      Enable GPIO-backed NTP/PPM calibration.\n"
+              << "      --no-use-ntp                   Disable GPIO NTP calibration and use manual PPM.\n"
+              << "  -p, --ppm <value>                  Set manual PPM correction (-200 through 200) and disable --use-ntp.\n\n"
+              << "Si5351 Backend:\n"
+              << "  --si5351-i2c-bus <bus>             Linux I2C bus number. Default: 1.\n"
+              << "  --si5351-i2c-address <addr>        I2C address, decimal or 0x-prefixed hex. Valid: 0x03 through 0x77.\n"
+              << "  --si5351-reference-frequency <hz>  Reference oscillator frequency in Hz.\n"
+              << "  --si5351-tx-output <CLK0|CLK1|CLK2>\n"
+              << "                                     Transmit clock output. CLI/INI only; not exposed in the Web UI.\n\n"
+              << "CW, QRSS, FSKCW, And DFCW:\n"
+              << "  --mode <WSPR|QRSS|FSKCW|DFCW>      Select direct CLI mode. Non-WSPR modes use the CW options below.\n"
+              << "  --cw-message <text>                Message for QRSS, FSKCW, or DFCW.\n"
+              << "  --cw-base-frequency <freq>         Base RF frequency. Accepts whole-number Hz or Hz/kHz/MHz/GHz suffixes.\n"
+              << "  --cw-shift-hz <hz>                 FSKCW/DFCW frequency shift in Hz.\n"
+              << "  --cw-dot-seconds <seconds>         Dot length in seconds.\n"
+              << "  --cw-start-minute <0-59>           Scheduled non-WSPR start minute.\n"
+              << "  --cw-repeat-minutes <minutes>      Scheduled non-WSPR repeat interval.\n"
+              << "  --cw-intra-element-gap <multiple>  Gap between Morse elements.\n"
+              << "  --cw-inter-character-gap <multiple>\n"
+              << "                                     Gap between Morse characters.\n"
+              << "  --cw-inter-word-gap <multiple>     Gap between Morse words.\n"
+              << "  --cw-fade-shape <none|linear|raised_cosine>\n"
+              << "                                     Envelope fade shape. Advanced CLI/INI control hidden from normal Web UI.\n"
+              << "  --cw-fade-in-ms <ms>, --cw-fade-out-ms <ms>, --cw-fade-slice-ms <ms>\n"
+              << "                                     Advanced CW envelope timing controls.\n"
+              << "  --qrss-message/--qrss-frequency/--qrss-dot-seconds\n"
+              << "                                     Legacy transient QRSS startup options; all three are required together.\n"
+              << "  --fskcw-message/--fskcw-mark-frequency/--fskcw-space-frequency/--fskcw-dot-seconds\n"
+              << "                                     Legacy transient FSKCW startup options; all four are required together.\n"
+              << "  --dfcw-message/--dfcw-dot-frequency/--dfcw-dash-frequency/--dfcw-dot-seconds\n"
+              << "                                     Legacy transient DFCW startup options; all four are required together.\n\n"
+              << "GPIO Controls And Service Ports:\n"
+              << "  --no-web                           Disable the HTTP web UI and WebSocket server for this run.\n"
+              << "  -w, --web-port <port>              HTTP REST/Web UI port. Default: 31415.\n"
+              << "  -k, --socket-port <port>           WebSocket server port. Default: 31416.\n"
+              << "  -l, --led_pin <gpio>               Enable the TX LED on the given GPIO.\n"
+              << "      --led-pin <gpio>               Alias for --led_pin.\n"
+              << "      --use-led, --no-led            Enable or disable the TX LED using the configured/default pin.\n"
+              << "  -s, --shutdown_button <gpio>       Enable shutdown button monitoring on the given GPIO.\n"
+              << "      --shutdown-button <gpio>       Alias for --shutdown_button.\n"
+              << "      --use-shutdown, --no-shutdown  Enable or disable shutdown button monitoring.\n"
+              << "  Band GPIO                          Configure per-band selector GPIOs in INI or with FREQ @GPIO suffixes.\n\n"
+              << "Test Tone:\n"
+              << "  -t, --test-tone <rf_frequency>     Start a transient direct RF test tone. Invalid with --ini-file.\n\n";
 
     // Handle exit behavior
     switch (exit_code)
@@ -2005,6 +2154,29 @@ bool validate_config_data_for_test(
         return false;
     }
 
+    if (config.mode == ModeType::WSPR)
+    {
+        const std::string trimmed_callsign = trim_copy_string(config.callsign);
+        const std::string trimmed_locator = trim_copy_string(config.grid_square);
+        if (!trimmed_callsign.empty() && !trimmed_locator.empty())
+        {
+            const auto plan = wspr::plan_transmission(
+                config.callsign,
+                config.grid_square,
+                config.power_dbm,
+                wspr_planner_preference_to_plan_preference(
+                    config.wspr_planner_preference));
+            if (!plan.ok)
+            {
+                if (validation_error != nullptr)
+                {
+                    *validation_error = plan.message;
+                }
+                return false;
+            }
+        }
+    }
+
     return true;
 }
 
@@ -2527,6 +2699,28 @@ bool parse_command_line(int argc, char *argv[])
         {"debug-logging", no_argument, nullptr, 1018},  // Global: config.debug_logging
         {"no-debug-logging", no_argument, nullptr, 1019},
         {"no-web", no_argument, nullptr, 1020},
+        {"no-offset", no_argument, nullptr, 1021},
+        {"no-use-ntp", no_argument, nullptr, 1022},
+        {"mode", required_argument, nullptr, 1023},
+        {"cw-message", required_argument, nullptr, 1024},
+        {"cw-base-frequency", required_argument, nullptr, 1025},
+        {"cw-shift-hz", required_argument, nullptr, 1026},
+        {"cw-dot-seconds", required_argument, nullptr, 1027},
+        {"cw-intra-element-gap", required_argument, nullptr, 1028},
+        {"cw-inter-character-gap", required_argument, nullptr, 1029},
+        {"cw-inter-word-gap", required_argument, nullptr, 1030},
+        {"cw-fade-shape", required_argument, nullptr, 1031},
+        {"cw-fade-in-ms", required_argument, nullptr, 1032},
+        {"cw-fade-out-ms", required_argument, nullptr, 1033},
+        {"cw-fade-slice-ms", required_argument, nullptr, 1034},
+        {"cw-start-minute", required_argument, nullptr, 1035},
+        {"cw-repeat-minutes", required_argument, nullptr, 1036},
+        {"use-led", no_argument, nullptr, 1037},
+        {"no-led", no_argument, nullptr, 1038},
+        {"use-shutdown", no_argument, nullptr, 1039},
+        {"no-shutdown", no_argument, nullptr, 1040},
+        {"gpio-power-level", required_argument, nullptr, 1041},
+        {"si5351-power-level", required_argument, nullptr, 1042},
         {"planner-preference", required_argument, nullptr, 1001},
         {"backend", required_argument, nullptr, 1002},
         {"qrss-message", required_argument, nullptr, 1003},
@@ -2555,7 +2749,9 @@ bool parse_command_line(int argc, char *argv[])
         {"transmit-gpio", required_argument, nullptr, 'a'}, // Via: [GPIO] Transmit Pin = 4
         {"transmit-pin", required_argument, nullptr, 'a'},
         {"led_pin", required_argument, nullptr, 'l'},         // Via: [Extended] LED Pin = 18
+        {"led-pin", required_argument, nullptr, 'l'},
         {"shutdown_button", required_argument, nullptr, 's'}, // Via: [Server] Shutdown Button = 19
+        {"shutdown-button", required_argument, nullptr, 's'},
         {"power_level", required_argument, nullptr, 'd'},     // Via: [GPIO]/[Si5351] Power Level
         {"power-level", required_argument, nullptr, 'd'},
         {"web-port", required_argument, nullptr, 'w'},    // Via: [Server] Port = 31415
@@ -2627,6 +2823,330 @@ bool parse_command_line(int argc, char *argv[])
         case 1020:
         {
             config.enable_web = false;
+            break;
+        }
+        case 1021:
+        {
+            config.use_offset = false;
+            break;
+        }
+        case 1022:
+        {
+            config.gpio_use_ntp = false;
+            resolve_backend_specific_config(config);
+            break;
+        }
+        case 1023:
+        {
+            try
+            {
+                if (config.use_ini)
+                {
+                    print_usage("--mode is invalid when using INI file.", EXIT_FAILURE);
+                }
+                config.mode = parse_mode_option(optarg);
+            }
+            catch (const std::exception &e)
+            {
+                print_usage(e.what(), EXIT_FAILURE);
+            }
+            break;
+        }
+        case 1024:
+        {
+            if (config.use_ini)
+            {
+                print_usage("--cw-message is invalid when using INI file.", EXIT_FAILURE);
+            }
+            const std::string message = trim_copy_string(optarg == nullptr ? "" : optarg);
+            if (message.empty())
+            {
+                print_usage("CW message cannot be empty.", EXIT_FAILURE);
+            }
+            config.qrss.message = message;
+            config.fskcw.message = message;
+            config.dfcw.message = message;
+            break;
+        }
+        case 1025:
+        {
+            try
+            {
+                if (config.use_ini)
+                {
+                    print_usage("--cw-base-frequency is invalid when using INI file.", EXIT_FAILURE);
+                }
+                const double frequency_hz =
+                    parse_frequency_hz_option(optarg, "--cw-base-frequency");
+                if (frequency_hz <= 0.0)
+                {
+                    print_usage("CW base frequency must be greater than 0.", EXIT_FAILURE);
+                }
+                config.qrss.frequency_hz = frequency_hz;
+                config.fskcw.space_frequency_hz = frequency_hz;
+                config.dfcw.dot_frequency_hz = frequency_hz;
+                sync_cw_mode_config(config);
+            }
+            catch (const std::exception &e)
+            {
+                print_usage(e.what(), EXIT_FAILURE);
+            }
+            break;
+        }
+        case 1026:
+        {
+            try
+            {
+                if (config.use_ini)
+                {
+                    print_usage("--cw-shift-hz is invalid when using INI file.", EXIT_FAILURE);
+                }
+                config.modulation_fsk_offset_hz =
+                    parse_double_option(optarg, "--cw-shift-hz");
+                sync_cw_mode_config(config);
+            }
+            catch (const std::exception &e)
+            {
+                print_usage(e.what(), EXIT_FAILURE);
+            }
+            break;
+        }
+        case 1027:
+        {
+            try
+            {
+                if (config.use_ini)
+                {
+                    print_usage("--cw-dot-seconds is invalid when using INI file.", EXIT_FAILURE);
+                }
+                config.modulation_dot_seconds =
+                    parse_double_option(optarg, "--cw-dot-seconds");
+                sync_cw_mode_config(config);
+            }
+            catch (const std::exception &e)
+            {
+                print_usage(e.what(), EXIT_FAILURE);
+            }
+            break;
+        }
+        case 1028:
+        {
+            try
+            {
+                if (config.use_ini)
+                {
+                    print_usage("--cw-intra-element-gap is invalid when using INI file.", EXIT_FAILURE);
+                }
+                config.cw_intra_element_gap =
+                    parse_double_option(optarg, "--cw-intra-element-gap");
+            }
+            catch (const std::exception &e)
+            {
+                print_usage(e.what(), EXIT_FAILURE);
+            }
+            break;
+        }
+        case 1029:
+        {
+            try
+            {
+                if (config.use_ini)
+                {
+                    print_usage("--cw-inter-character-gap is invalid when using INI file.", EXIT_FAILURE);
+                }
+                config.cw_inter_character_gap =
+                    parse_double_option(optarg, "--cw-inter-character-gap");
+            }
+            catch (const std::exception &e)
+            {
+                print_usage(e.what(), EXIT_FAILURE);
+            }
+            break;
+        }
+        case 1030:
+        {
+            try
+            {
+                if (config.use_ini)
+                {
+                    print_usage("--cw-inter-word-gap is invalid when using INI file.", EXIT_FAILURE);
+                }
+                config.cw_inter_word_gap =
+                    parse_double_option(optarg, "--cw-inter-word-gap");
+            }
+            catch (const std::exception &e)
+            {
+                print_usage(e.what(), EXIT_FAILURE);
+            }
+            break;
+        }
+        case 1031:
+        {
+            try
+            {
+                if (config.use_ini)
+                {
+                    print_usage("--cw-fade-shape is invalid when using INI file.", EXIT_FAILURE);
+                }
+                config.cw_fade_shape = parse_cw_fade_shape_option(optarg);
+            }
+            catch (const std::exception &e)
+            {
+                print_usage(e.what(), EXIT_FAILURE);
+            }
+            break;
+        }
+        case 1032:
+        {
+            try
+            {
+                if (config.use_ini)
+                {
+                    print_usage("--cw-fade-in-ms is invalid when using INI file.", EXIT_FAILURE);
+                }
+                config.cw_fade_in_ms =
+                    parse_integer_option(optarg, "--cw-fade-in-ms");
+            }
+            catch (const std::exception &e)
+            {
+                print_usage(e.what(), EXIT_FAILURE);
+            }
+            break;
+        }
+        case 1033:
+        {
+            try
+            {
+                if (config.use_ini)
+                {
+                    print_usage("--cw-fade-out-ms is invalid when using INI file.", EXIT_FAILURE);
+                }
+                config.cw_fade_out_ms =
+                    parse_integer_option(optarg, "--cw-fade-out-ms");
+            }
+            catch (const std::exception &e)
+            {
+                print_usage(e.what(), EXIT_FAILURE);
+            }
+            break;
+        }
+        case 1034:
+        {
+            try
+            {
+                if (config.use_ini)
+                {
+                    print_usage("--cw-fade-slice-ms is invalid when using INI file.", EXIT_FAILURE);
+                }
+                config.cw_fade_slice_ms =
+                    parse_integer_option(optarg, "--cw-fade-slice-ms");
+            }
+            catch (const std::exception &e)
+            {
+                print_usage(e.what(), EXIT_FAILURE);
+            }
+            break;
+        }
+        case 1035:
+        {
+            try
+            {
+                if (config.use_ini)
+                {
+                    print_usage("--cw-start-minute is invalid when using INI file.", EXIT_FAILURE);
+                }
+                config.schedule_start_minute =
+                    parse_integer_option(optarg, "--cw-start-minute");
+            }
+            catch (const std::exception &e)
+            {
+                print_usage(e.what(), EXIT_FAILURE);
+            }
+            break;
+        }
+        case 1036:
+        {
+            try
+            {
+                if (config.use_ini)
+                {
+                    print_usage("--cw-repeat-minutes is invalid when using INI file.", EXIT_FAILURE);
+                }
+                config.schedule_repeat_minutes =
+                    parse_integer_option(optarg, "--cw-repeat-minutes");
+            }
+            catch (const std::exception &e)
+            {
+                print_usage(e.what(), EXIT_FAILURE);
+            }
+            break;
+        }
+        case 1037:
+        {
+            config.use_led = true;
+            if (config.led_pin < 0)
+            {
+                config.led_pin = 18;
+            }
+            break;
+        }
+        case 1038:
+        {
+            config.use_led = false;
+            break;
+        }
+        case 1039:
+        {
+            config.use_shutdown = true;
+            if (config.shutdown_pin < 0)
+            {
+                config.shutdown_pin = 19;
+            }
+            break;
+        }
+        case 1040:
+        {
+            config.use_shutdown = false;
+            break;
+        }
+        case 1041:
+        {
+            try
+            {
+                const int power =
+                    parse_integer_option(optarg, "--gpio-power-level");
+                if (power < 0 || power > 7)
+                {
+                    print_usage("Invalid GPIO power level. Expected 0 through 7.", EXIT_FAILURE);
+                }
+                config.gpio_power_level = power;
+                resolve_backend_specific_config(config);
+                explicit_power_level = true;
+            }
+            catch (const std::exception &e)
+            {
+                print_usage(e.what(), EXIT_FAILURE);
+            }
+            break;
+        }
+        case 1042:
+        {
+            try
+            {
+                const int power =
+                    parse_integer_option(optarg, "--si5351-power-level");
+                if (power < 1 || power > 4)
+                {
+                    print_usage("Invalid Si5351 power level. Expected 1 through 4.", EXIT_FAILURE);
+                }
+                config.si5351_power_level = power;
+                resolve_backend_specific_config(config);
+                explicit_power_level = true;
+            }
+            catch (const std::exception &e)
+            {
+                print_usage(e.what(), EXIT_FAILURE);
+            }
             break;
         }
         case 1001: // Select WSPR planner preference
@@ -2733,6 +3253,10 @@ bool parse_command_line(int argc, char *argv[])
             try
             {
                 double ppm = std::stod(optarg);
+                if (!std::isfinite(ppm))
+                {
+                    print_usage("Calibration.PPM must be a finite number.", EXIT_FAILURE);
+                }
                 double clamped_ppm = std::clamp(ppm, -200.0, 200.0);
 
                 if (ppm != clamped_ppm)
@@ -2749,7 +3273,7 @@ bool parse_command_line(int argc, char *argv[])
             {
                 config.gpio_use_ntp = true;
                 resolve_backend_specific_config(config);
-                llog.logE(ERROR, "Error parsing PPM value, defaulting to NTP: ", optarg);
+                print_usage("Calibration.PPM must be a number.", EXIT_FAILURE);
             }
             break;
         }
@@ -2932,17 +3456,17 @@ bool parse_command_line(int argc, char *argv[])
                 if (port < 1024 || port > 49151)
                 {
                     llog.logS(WARN, "Invalid socket port number. Using default: 31416.");
-                    config.web_port = 31416;
+                    config.socket_port = 31416;
                 }
                 else
                 {
-                    config.web_port = port;
+                    config.socket_port = port;
                 }
             }
             catch (const std::exception &)
             {
                 llog.logE(WARN, "Invalid socket port, defaulting to 31416.");
-                config.web_port = 31415;
+                config.socket_port = 31416;
             }
             break;
         }
