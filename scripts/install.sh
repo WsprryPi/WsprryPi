@@ -47,6 +47,9 @@ IFS=$'\n\t'
 #
 # -----------------------------------------------------------------------------
 
+declare DEFAULT_REPO_BRANCH="devel"
+declare DEFAULT_SEM_VER="3.0.0-rc.3"
+
 # -----------------------------------------------------------------------------
 # @brief Trap unexpected errors during script execution.
 # @details Captures any errors (via the ERR signal) that occur during script
@@ -211,9 +214,9 @@ declare REPO_ORG="${REPO_ORG:-WsprryPi}"
 declare REPO_NAME="WsprryPi"      # Case Sensitive
 declare UI_REPO_DIR="WsprryPi-UI" # Case Sensitive
 declare REPO_TITLE="${REPO_TITLE:-Wsprry Pi}"
-declare REPO_BRANCH="${REPO_BRANCH:-devel}"
-declare GIT_TAG="${GIT_TAG:-v3.0.0-rc.3}"
-declare SEM_VER="${SEM_VER:-3.0.0-rc.3}"
+declare REPO_BRANCH="${REPO_BRANCH:-$DEFAULT_REPO_BRANCH}"
+declare SEM_VER="${SEM_VER:-$DEFAULT_SEM_VER}"
+declare GIT_TAG="${GIT_TAG:-v$SEM_VER}"
 declare GIT_RAW_BASE="https://raw.githubusercontent.com"
 declare GIT_API_BASE="https://api.github.com/repos"
 declare GIT_CLONE_BASE="https://github.com"
