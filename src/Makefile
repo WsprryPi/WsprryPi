@@ -98,7 +98,8 @@ SUBMODULE_SRCDIRS += $(wildcard ./WSPR-Transmitter/src)
 
 PRJ := $(strip $(shell 	url="$$(git remote get-url origin 2>/dev/null)"; 	if [ -n "$$url" ]; then 		echo "$$url" 		| sed -E 's#.*/##; s#\.git$$##'; 	else 		echo unknown; 	fi ))
 EXE_NAME := $(shell echo $(PRJ) | tr '[:upper:]' '[:lower:]')
-BRH := $(shell git rev-parse --abbrev-ref HEAD 2>/dev/null | awk '{ gsub(/[^[:alnum:]]+/, "-"); sub(/-$$/, ""); print }' || echo unknown)
+RAW_BRH := $(shell git rev-parse --abbrev-ref HEAD 2>/dev/null || echo unknown)
+BRH := $(shell printf '%s\n' "$(RAW_BRH)" | awk '{ gsub(/[^[:alnum:]]+/, "-"); sub(/-$$/, ""); print }' || echo unknown)
 RAW_TAG := $(strip $(shell git describe --tags --match "v[0-9]*" --match "[0-9]*" --abbrev=0 2>/dev/null))
 BASE_VER := $(if $(RAW_TAG),$(patsubst v%,%,$(RAW_TAG)),0.0.0)
 
@@ -106,6 +107,7 @@ PRE := $(shell if [ "$(BRH)" != "main" ] && [ "$(BRH)" != "master" ]; then echo 
 VER := $(BASE_VER)$(PRE)
 
 COMMIT := $(shell git rev-parse --short HEAD 2>/dev/null || echo "unknown")
+FULL_COMMIT := $(shell git rev-parse HEAD 2>/dev/null || echo "unknown")
 VER := $(shell if ! git describe --tags --exact-match >/dev/null 2>&1; then echo "$(VER)+$(COMMIT)"; else echo "$(VER)"; fi)
 
 OUT := $(strip $(EXE_NAME))
@@ -320,6 +322,8 @@ CXXFLAGS += -I$(abspath ./WSPR-Reference/src/wspr)
 # Build metadata defines
 CXXFLAGS += -DMAKE_TAG=\"$(VER)\" \
             -DMAKE_BRH=\"$(BRH)\" \
+            -DMAKE_RAW_BRH=\"$(RAW_BRH)\" \
+            -DMAKE_COMMIT=\"$(FULL_COMMIT)\" \
             -DMAKE_EXE=\"$(OUT)\" \
             -DMAKE_PRJ=\"$(PRJ)\"
 

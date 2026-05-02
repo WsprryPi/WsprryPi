@@ -142,6 +142,14 @@ constexpr std::string_view to_string_view(T value) noexcept
 #define MAKE_BRH "unknown" ///< Fallback for the branch name.
 #endif
 
+#ifndef MAKE_RAW_BRH
+#define MAKE_RAW_BRH "unknown" ///< Fallback for the raw branch name.
+#endif
+
+#ifndef MAKE_COMMIT
+#define MAKE_COMMIT "unknown" ///< Fallback for the commit SHA.
+#endif
+
 #ifndef MAKE_EXE
 #define MAKE_EXE "unknown" ///< Fallback for the executable name.
 #endif
@@ -153,6 +161,8 @@ constexpr std::string_view to_string_view(T value) noexcept
 // Compile-time string views for sanitized values
 constexpr std::string_view SANITIZED_TAG = to_string_view(MAKE_TAG); ///< Sanitized build tag.
 constexpr std::string_view SANITIZED_BRH = to_string_view(MAKE_BRH); ///< Sanitized branch name.
+constexpr std::string_view RAW_BRH = to_string_view(MAKE_RAW_BRH); ///< Raw branch name.
+constexpr std::string_view SANITIZED_COMMIT = to_string_view(MAKE_COMMIT); ///< Sanitized commit SHA.
 constexpr std::string_view SANITIZED_EXE = to_string_view(MAKE_EXE); ///< Sanitized executable name.
 constexpr std::string_view SANITIZED_PRJ = to_string_view(MAKE_PRJ); ///< Sanitized project name.
 
@@ -180,6 +190,32 @@ std::string get_exe_version()
 std::string get_exe_branch()
 {
     return std::string(SANITIZED_BRH);
+}
+
+/**
+ * @brief Retrieves the raw branch name.
+ *
+ * This function returns the Git branch name associated with the build.
+ * If the `MAKE_RAW_BRH` macro is not defined, it returns "unknown".
+ *
+ * @return A `std::string` representing the raw build branch name.
+ */
+std::string get_exe_raw_branch()
+{
+    return std::string(RAW_BRH);
+}
+
+/**
+ * @brief Retrieves the current commit SHA.
+ *
+ * This function returns the Git commit SHA associated with the build.
+ * If the `MAKE_COMMIT` macro is not defined, it returns "unknown".
+ *
+ * @return A `std::string` representing the build commit SHA.
+ */
+std::string get_exe_commit()
+{
+    return std::string(SANITIZED_COMMIT);
 }
 
 /**

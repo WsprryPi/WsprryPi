@@ -52,6 +52,34 @@ extern std::string get_project_name();
 extern std::string get_exe_name();
 
 /**
+ * @brief Retrieves the executable semantic version.
+ *
+ * @return A `std::string` representing the executable version.
+ */
+extern std::string get_exe_version();
+
+/**
+ * @brief Retrieves the build branch name.
+ *
+ * @return A `std::string` representing the build branch name.
+ */
+extern std::string get_exe_branch();
+
+/**
+ * @brief Retrieves the raw build branch name.
+ *
+ * @return A `std::string` representing the raw build branch name.
+ */
+extern std::string get_exe_raw_branch();
+
+/**
+ * @brief Retrieves the build commit SHA.
+ *
+ * @return A `std::string` representing the build commit SHA.
+ */
+extern std::string get_exe_commit();
+
+/**
  * @brief Retrieves the current debug state based on the build configuration.
  *
  * This function determines whether the current build is a debug or release

@@ -71,6 +71,8 @@ int main()
         read_text_file("/home/pi/WsprryPi/src/web_socket.cpp");
     const std::string web_server_source =
         read_text_file("/home/pi/WsprryPi/src/web_server.cpp");
+    const std::string makefile_source =
+        read_text_file("/home/pi/WsprryPi/src/Makefile");
     require(
         websocket_source.find("else if (cmd == \"stop\")") != std::string::npos &&
             websocket_source.find("stop_transmission_by_user_request(persist_transmit);") !=
@@ -405,8 +407,12 @@ int main()
             site_source.find("function maybePromptForUiRefresh(serverVersion)") != std::string::npos &&
             site_source.find("maybePromptForUiRefresh(response.ui_version);") != std::string::npos &&
             site_source.find("normalizedServerVersion === dismissedUiRefreshVersion") != std::string::npos &&
-            web_server_source.find("j[\"ui_version\"] = get_raw_version_string();") != std::string::npos,
-        "site.js must detect backend UI version changes using the existing /version response without repeatedly prompting for a dismissed version");
+            web_server_source.find("j[\"ui_version\"] = get_raw_version_string();") != std::string::npos &&
+            web_server_source.find("j[\"wspr_branch\"] = get_exe_raw_branch();") != std::string::npos &&
+            web_server_source.find("j[\"wspr_display_branch\"] = get_exe_branch();") != std::string::npos &&
+            web_server_source.find("j[\"wspr_exe_version\"] = get_exe_version();") != std::string::npos &&
+            web_server_source.find("j[\"wspr_commit\"] = get_exe_commit();") != std::string::npos,
+        "site.js must detect backend UI version changes using the existing /version response, and backend /version must expose raw branch, executable version, and commit metadata");
     require(
         site_source.find("title: \"UI refresh required\"") != std::string::npos &&
             site_source.find("The WsprryPi web interface has been updated. Refresh this page to load the new web pages, CSS, and JavaScript.") != std::string::npos &&
@@ -431,6 +437,87 @@ int main()
             site_source.find("event.key !== \"Escape\"") != std::string::npos &&
             site_source.find("closeFooterMetaPanel();") != std::string::npos,
         "site.js must close the footer About panel on outside click and Escape while keeping click-based toggling");
+    const std::string version_check_display_branch = "version-check";
+    const std::string version_check_raw_branch = "version_check";
+    const std::string version_check_short_sha = "7b05546";
+    const std::string version_check_head_sha =
+        "7b05546abcdef0123456789abcdef0123456789";
+    require(
+        version_check_head_sha.rfind(version_check_short_sha, 0) == 0 &&
+            version_check_display_branch == "version-check" &&
+            version_check_raw_branch == "version_check",
+        "test fixture must model a displayed version-check branch, raw version_check branch, and matching GitHub HEAD short SHA");
+    require(
+        makefile_source.find("RAW_BRH :=") != std::string::npos &&
+            makefile_source.find("BRH := $(shell printf '%s\\n' \"$(RAW_BRH)\"") != std::string::npos &&
+            makefile_source.find("-DMAKE_BRH=\\\"$(BRH)\\\"") != std::string::npos &&
+            makefile_source.find("-DMAKE_RAW_BRH=\\\"$(RAW_BRH)\\\"") != std::string::npos &&
+            makefile_source.find("-DMAKE_COMMIT=\\\"$(FULL_COMMIT)\\\"") != std::string::npos,
+        "build metadata must pass sanitized MAKE_BRH for display, raw MAKE_RAW_BRH for update lookup, and full commit to version.cpp");
+    require(
+        site_source.find("const UPDATE_CHECK_CACHE_SCHEMA_VERSION = 5;") != std::string::npos &&
+            site_source.find("function updateCheckShaMatches(currentSha, targetHeadSha)") != std::string::npos &&
+            site_source.find("return normalizedHead.startsWith(normalizedCurrent);") != std::string::npos &&
+            site_source.find("function updateCheckNoUpdateComparison()") != std::string::npos &&
+            site_source.find("updateCheckShaMatches(versionInfo.currentSha, selectedBranch.headSha)") != std::string::npos &&
+            site_source.find("? updateCheckNoUpdateComparison()") != std::string::npos &&
+            site_source.find(": await compareGithubCommits(versionInfo.currentSha, selectedBranch.headSha)") != std::string::npos &&
+            site_source.find("if (error.status === 404)") != std::string::npos &&
+            site_source.find("updateAvailable: !updateCheckShaMatches(currentSha, headSha)") != std::string::npos &&
+            site_source.find("throw error;") != std::string::npos,
+        "update checker must invalidate stale fallback cache entries and short-circuit matching full or short SHAs before GitHub compare");
+    require(
+        site_source.find("async function isCurrentShaInBranch(currentSha, branchInfo)") != std::string::npos &&
+            site_source.find("return status === \"identical\" || status === \"behind\";") != std::string::npos &&
+            site_source.find("async function selectGithubUpdateBranch(versionInfo)") != std::string::npos &&
+            site_source.find("const currentBranch = versionInfo.currentBranch;") != std::string::npos &&
+            site_source.find("const mainBranch = await lookupGithubBranch(\"main\");") != std::string::npos &&
+            site_source.find("await isCurrentShaInBranch(versionInfo.currentSha, mainBranch)") != std::string::npos &&
+            site_source.find("main membership probe failed") != std::string::npos &&
+            site_source.find("return Object.assign(mainBranch, { fallbackUsed: false });") != std::string::npos &&
+            site_source.find("return Object.assign(develBranch, { fallbackUsed: false });") != std::string::npos &&
+            site_source.find("return Object.assign(await lookupGithubBranch(\"main\"), { fallbackUsed: true });") != std::string::npos &&
+            site_source.find("return Object.assign(await lookupGithubBranch(\"main\"), { fallbackUsed: false });") != std::string::npos &&
+            site_source.find("return Object.assign(await lookupGithubBranch(currentBranch), { fallbackUsed: false });") != std::string::npos &&
+            site_source.find("const selectedBranch = await selectGithubUpdateBranch(versionInfo);") != std::string::npos,
+        "update checker must select upstream main for local devel only when current SHA is part of main, fall back to main when upstream devel is missing, and keep main/feature branch behavior unchanged");
+    require(
+        site_source.find("local devel falling back to upstream main because upstream devel returned HTTP 404") != std::string::npos &&
+            site_source.find("local devel resolved to upstream main because the current SHA is part of main") != std::string::npos &&
+            site_source.find("local devel staying on upstream devel because the current SHA is not part of main") != std::string::npos,
+        "update checker must log devel fallback, devel-to-main resolution, and devel-stays-devel decisions");
+    require(
+        site_source.find("async function resolveReleaseTargetSha(targetCommitish, memo = null)") != std::string::npos &&
+            site_source.find("if (memo instanceof Map && memo.has(target))") != std::string::npos &&
+            site_source.find("return memo.get(target);") != std::string::npos &&
+            site_source.find("return rememberResolvedTarget((await lookupGithubBranch(target)).headSha);") != std::string::npos &&
+            site_source.find("`${UPDATE_CHECK_API_BASE}/git/ref/tags/${encodeURIComponent(target)}`") != std::string::npos &&
+            site_source.find("const resolvedTargets = new Map();") != std::string::npos &&
+            site_source.find("resolvedSha = await resolveReleaseTargetSha(target, resolvedTargets);") != std::string::npos,
+        "release matching must resolve each target_commitish once per scan, try branch lookup before tag lookup, and preserve tag dereferencing");
+    require(
+        site_source.find("const rawBackendBranch = typeof response?.wspr_branch === \"string\"") != std::string::npos &&
+            site_source.find("const rawBackendCommit = typeof response?.wspr_commit === \"string\"") != std::string::npos &&
+            site_source.find("const currentDisplayVersion = rawDisplayVersion || rawUiVersion;") != std::string::npos &&
+            site_source.find("const displayBranch = branchMatch ? branchMatch[1].trim() : \"\";") != std::string::npos &&
+            site_source.find("const currentBranch = rawBackendBranch || displayBranch;") != std::string::npos &&
+            site_source.find("displayBranch,") != std::string::npos &&
+            site_source.find("rawBranch=${versionInfo.currentBranch}") != std::string::npos &&
+            site_source.find("version-check") == std::string::npos &&
+            site_source.find("version_check") == std::string::npos,
+        "update checker must prefer backend wspr_branch/wspr_commit, keep display text independent, and avoid hard-coded branch normalization or branch-name guessing");
+    require(
+        site_source.find("return Object.assign(await lookupGithubBranch(currentBranch), { fallbackUsed: false });") != std::string::npos &&
+            site_source.find("if (error.status !== 404)") != std::string::npos &&
+            site_source.find("return Object.assign(await lookupGithubBranch(\"devel\"), { fallbackUsed: true });") != std::string::npos,
+        "update checker must compare existing non-main/non-devel branches against that branch and fall back to devel only on a true 404");
+    require(
+        site_source.find("Update check parsed displayBranch=") != std::string::npos &&
+            site_source.find("Update check branch lookup:") != std::string::npos &&
+            site_source.find("Update check branch lookup failed for") != std::string::npos &&
+            site_source.find("Update check branch lookup result for") != std::string::npos &&
+            site_source.find("Update check selected targetBranch=") != std::string::npos,
+        "update checker must log parsed display branch, raw branch/SHA, branch lookup URL/status/result, selected target branch, fallback state, and target HEAD for debugging");
     require(
         ui_source.find("function isWsprConfigMode()") != std::string::npos &&
             ui_source.find("const useNtp = isWsprMode && $(\"#use_ntp\").is(\":checked\");") != std::string::npos &&
