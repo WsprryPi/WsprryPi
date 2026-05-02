@@ -498,7 +498,9 @@ int main()
     require(
         site_source.find("const rawBackendBranch = typeof response?.wspr_branch === \"string\"") != std::string::npos &&
             site_source.find("const rawBackendCommit = typeof response?.wspr_commit === \"string\"") != std::string::npos &&
+            site_source.find("const rawExeVersion = typeof response?.wspr_exe_version === \"string\"") != std::string::npos &&
             site_source.find("const currentDisplayVersion = rawDisplayVersion || rawUiVersion;") != std::string::npos &&
+            site_source.find("currentModalVersion: rawExeVersion || rawUiVersion || rawDisplayVersion,") != std::string::npos &&
             site_source.find("const displayBranch = branchMatch ? branchMatch[1].trim() : \"\";") != std::string::npos &&
             site_source.find("const currentBranch = rawBackendBranch || displayBranch;") != std::string::npos &&
             site_source.find("displayBranch,") != std::string::npos &&
@@ -506,6 +508,14 @@ int main()
             site_source.find("version-check") == std::string::npos &&
             site_source.find("version_check") == std::string::npos,
         "update checker must prefer backend wspr_branch/wspr_commit, keep display text independent, and avoid hard-coded branch normalization or branch-name guessing");
+    require(
+        site_source.find("`${versionInfo.currentModalVersion} is behind ${result.targetBranch} ${targetShaLabel}.`") != std::string::npos &&
+            site_source.find("`${versionInfo.currentDisplayVersion} is behind ${result.targetBranch} ${targetShaLabel}.`") == std::string::npos &&
+            site_source.find("The current branch is not available upstream. Updates are being checked against ${result.targetBranch}.") != std::string::npos &&
+            site_source.find("const exactRelease = result.fallbackUsed !== true && Boolean(result.releaseTitle);") != std::string::npos &&
+            site_source.find("Review the latest releases. ") != std::string::npos &&
+            site_source.find("Review the latest WsprryPi releases before updating.") == std::string::npos,
+        "update modal must use wspr_exe_version in the summary, explain fallback checks, and suppress exact-release wording when fallback is used");
     require(
         site_source.find("return Object.assign(await lookupGithubBranch(currentBranch), { fallbackUsed: false });") != std::string::npos &&
             site_source.find("if (error.status !== 404)") != std::string::npos &&
