@@ -468,11 +468,16 @@ int main()
         "update checker must invalidate stale fallback cache entries and short-circuit matching full or short SHAs before GitHub compare");
     require(
         site_source.find("async function isCurrentShaInBranch(currentSha, branchInfo)") != std::string::npos &&
-            site_source.find("return status === \"identical\" || status === \"behind\";") != std::string::npos &&
+            site_source.find("isInBranch: true,") != std::string::npos &&
+            site_source.find("status: \"identical\"") != std::string::npos &&
+            site_source.find("if (status === \"ahead\" || status === \"diverged\")") != std::string::npos &&
+            site_source.find("isInBranch: status === \"identical\" || status === \"behind\",") != std::string::npos &&
             site_source.find("async function selectGithubUpdateBranch(versionInfo)") != std::string::npos &&
             site_source.find("const currentBranch = versionInfo.currentBranch;") != std::string::npos &&
             site_source.find("const mainBranch = await lookupGithubBranch(\"main\");") != std::string::npos &&
-            site_source.find("await isCurrentShaInBranch(versionInfo.currentSha, mainBranch)") != std::string::npos &&
+            site_source.find("const mainMembership = await isCurrentShaInBranch(versionInfo.currentSha, mainBranch);") != std::string::npos &&
+            site_source.find("if (mainMembership.isInBranch)") != std::string::npos &&
+            site_source.find("main compare status is ${mainMembership.status || \"unknown\"}") != std::string::npos &&
             site_source.find("main membership probe failed") != std::string::npos &&
             site_source.find("return Object.assign(mainBranch, { fallbackUsed: false });") != std::string::npos &&
             site_source.find("return Object.assign(develBranch, { fallbackUsed: false });") != std::string::npos &&
@@ -484,6 +489,7 @@ int main()
     require(
         site_source.find("local devel falling back to upstream main because upstream devel returned HTTP 404") != std::string::npos &&
             site_source.find("local devel resolved to upstream main because the current SHA is part of main") != std::string::npos &&
+            site_source.find("local devel staying on upstream devel because main compare status is") != std::string::npos &&
             site_source.find("local devel staying on upstream devel because the current SHA is not part of main") != std::string::npos,
         "update checker must log devel fallback, devel-to-main resolution, and devel-stays-devel decisions");
     require(
