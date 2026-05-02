@@ -1527,9 +1527,9 @@ int main(int argc, char *argv[])
                 help_output.find("--date-time-log") != std::string::npos &&
                 help_output.find("--terminate <count>") != std::string::npos &&
                 help_output.find("--planner-preference <auto|prefer_paired|require_paired>") != std::string::npos &&
-                help_output.find("--qrss-message <text>") != std::string::npos &&
-                help_output.find("--fskcw-message <text>") != std::string::npos &&
-                help_output.find("--dfcw-message <text>") != std::string::npos &&
+                help_output.find("--qrss-message/--qrss-frequency/--qrss-dot-seconds") != std::string::npos &&
+                help_output.find("--fskcw-message/--fskcw-mark-frequency/--fskcw-space-frequency/--fskcw-dot-seconds") != std::string::npos &&
+                help_output.find("--dfcw-message/--dfcw-dot-frequency/--dfcw-dash-frequency/--dfcw-dot-seconds") != std::string::npos &&
                 help_output.find("--require-paired") == std::string::npos,
             "CLI help output must enumerate the current public option surface and must not mention removed planner flags");
     }
@@ -3903,6 +3903,58 @@ int main(int argc, char *argv[])
             "enabled-idle test tone rejection must not disturb the idle scheduler state");
 
         wsprTransmitter.backendSetStateValue(WsprTransmitter::State::DISABLED);
+        set_scheduler_execution_suppressed_for_test(false);
+    }
+
+    {
+        init_default_config();
+        ini_reload_pending.store(false, std::memory_order_relaxed);
+        exiting_wspr.store(false, std::memory_order_relaxed);
+        reset_current_transmission_request_for_test();
+        reset_committed_execution_route_for_test();
+        set_scheduler_execution_suppressed_for_test(true);
+
+        config.mode = ModeType::WSPR;
+        config.transmit = false;
+        config.callsign = "AA0NT";
+        config.grid_square = "EM18";
+        config.power_dbm = 20;
+        config.frequencies = "20m";
+        config.gpio_tx_pin = 4;
+        resolve_backend_specific_config(config);
+        set_frequencies(config);
+
+        constexpr std::uint64_t override_frequency_hz = 14097123;
+        const TestToneStartResult tone_start_result =
+            start_test_tone(override_frequency_hz);
+        require(
+            tone_start_result.started,
+            "test tone start must accept an explicit web frequency override");
+
+        const TransmissionRequest tone_request =
+            current_transmission_request_for_test();
+        require(
+            tone_request.mode == TransmissionMode::TONE &&
+                nearly_equal(
+                    tone_request.actual_rf_frequency_hz,
+                    static_cast<double>(override_frequency_hz)),
+            "web test tone override must become the exact committed RF frequency");
+        require(
+            nearly_equal(tone_request.dial_frequency_hz, 14095600.0),
+            "web test tone override must preserve the configured scheduler dial frequency metadata");
+        require(
+            !nearly_equal(
+                tone_request.actual_rf_frequency_hz,
+                resolve_actual_rf_frequency_hz(
+                    tone_request.dial_frequency_hz,
+                    config.wspr.audio_offset_hz,
+                    FrequencyPath::WsprDial)),
+            "web test tone override must not receive the WSPR 1500 Hz dial-frequency offset again");
+
+        const TestToneStopResult tone_stop_result = end_test_tone();
+        require(
+            tone_stop_result.stopped,
+            "test tone override regression must stop the transient tone cleanly");
         set_scheduler_execution_suppressed_for_test(false);
     }
 

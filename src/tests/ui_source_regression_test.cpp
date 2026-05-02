@@ -85,7 +85,7 @@ int main()
                 std::string::npos,
         "explicit user stop must suppress the intermediate canceled websocket event");
     require(
-        scheduling_source.find("TestToneStartResult start_test_tone()") != std::string::npos &&
+        scheduling_source.find("TestToneStartResult start_test_tone(") != std::string::npos &&
             scheduling_source.find("send_ws_message(\"transmit\", \"starting\");") ==
                 scheduling_source.find("send_ws_message(\"transmit\", \"starting\");", scheduling_source.find("void transmitter_cb(")),
         "test tone start must rely on transmitter callback websocket ownership only");
@@ -671,8 +671,10 @@ int main()
         read_text_file("/home/pi/WsprryPi/WsprryPi-UI/data/views/maintenance.php");
     require(
         maintenance_source.find("id=\"test_tone\"") != std::string::npos &&
-            maintenance_source.find("id=\"testToneModal\"") != std::string::npos,
-        "maintenance view must host the relocated Test Tone control and modal");
+            maintenance_source.find("id=\"testToneModal\"") != std::string::npos &&
+            maintenance_source.find("id=\"testToneFrequencyHz\"") != std::string::npos &&
+            maintenance_source.find("Test tone transmit frequency, Hz") != std::string::npos,
+        "maintenance view must host the relocated Test Tone control, modal, and editable transmit-frequency field");
 
     const std::string maintenance_test_tone_script_source =
         read_text_file("/home/pi/WsprryPi/WsprryPi-UI/data/maintenance.js");
@@ -707,10 +709,12 @@ int main()
             site_source.find("function markPendingTestToneStartRequest()") != std::string::npos &&
             site_source.find("function clearPendingTestToneStartRequest()") != std::string::npos &&
             site_source.find("pendingTestToneStartTimeoutHandle = window.setTimeout(() => {\n        clearPendingTestToneStartRequest();\n    }, TEST_TONE_COMMAND_TIMEOUT_MS);") != std::string::npos &&
-            site_source.find("markPendingTestToneStartRequest();\n    if (!sendCommand(\"tone_start\"))") != std::string::npos &&
+            site_source.find("function testToneFrequencyOverridePayload()") != std::string::npos &&
+            site_source.find("const toneStartPayload = {\n        command: \"tone_start\",\n        ...testToneFrequencyOverridePayload()\n    };") != std::string::npos &&
+            site_source.find("if (!sendCommand(toneStartPayload))") != std::string::npos &&
             site_source.find("clearPendingTestToneStartRequest();\n        toggleButtonLoading(btn, false);") != std::string::npos &&
             site_source.find("clearPendingTestToneStartRequest();\n        communicationInterrupted = true;") != std::string::npos,
-        "Test Tone start requests must use a local per-tab pending flag that is set before sending and cleared on send failure or websocket disconnect");
+        "Test Tone start requests must use a local per-tab pending flag, include optional frequency override payload data, and clear state on send failure or websocket disconnect");
     require(
         site_source.find("const locallyRequested = pendingTestToneStartRequest === true;") != std::string::npos &&
             site_source.find("clearPendingTestToneStartRequest();\n        if (response.started === true)") != std::string::npos &&
@@ -748,10 +752,10 @@ int main()
     require(
         site_source.find("cancelLabel: \"Cancel\"") != std::string::npos &&
             site_source.find("onCancel() {\n            },") != std::string::npos &&
-            site_source.find("sendCommand(\"tone_start\")") != std::string::npos &&
+            site_source.find("sendCommand(toneStartPayload)") != std::string::npos &&
             site_source.find("disableScheduledTransmissionsForTestTone(\n                    reason,") != std::string::npos &&
             site_source.find("disableScheduledTransmissionsForTestTone(\n                    reason,") <
-                site_source.find("sendCommand(\"tone_start\")"),
+                site_source.find("sendCommand(toneStartPayload)"),
         "Test Tone blocked modal Cancel must make no state changes and the stop/disable action must not automatically start the test tone");
     require(
         scheduling_source.find("scheduler_managed_transmission_active_for_test_tone()") != std::string::npos &&

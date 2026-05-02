@@ -49,6 +49,7 @@
 #include <atomic>
 #include <chrono>
 #include <cstddef>
+#include <cstdint>
 #include <condition_variable>
 #include <optional>
 #include <string>
@@ -193,8 +194,9 @@ bool ppm_init();
  *
  * Stops any ongoing execution, preserves the previous runtime mode, and
  * commits a tone request built from the first configured scheduler
- * frequency entry. This is transient runtime behavior; it does not
- * persist tone mode into configuration files.
+ * frequency entry. An optional override supplies the final RF frequency
+ * directly. This is transient runtime behavior; it does not persist tone mode
+ * or frequency into configuration files.
  */
 struct TestToneStartResult
 {
@@ -205,7 +207,8 @@ struct TestToneStartResult
     std::string message;
 };
 
-TestToneStartResult start_test_tone();
+TestToneStartResult start_test_tone(
+    std::optional<std::uint64_t> frequency_hz_override = std::nullopt);
 
 /**
  * @brief End the transient runtime test tone and restore prior flow.

@@ -3120,9 +3120,12 @@ void reboot_system()
  *
  * The scheduler stops any active run, reuses the first configured
  * frequency entry, prepares band-selector GPIO state, commits a tone request,
- * and starts the transmitter. Tone mode here is runtime-only behavior.
+ * and starts the transmitter. When provided, the override is the final RF
+ * frequency and does not receive WSPR dial-frequency offset. Tone mode here is
+ * runtime-only behavior.
  */
-TestToneStartResult start_test_tone()
+TestToneStartResult start_test_tone(
+    std::optional<std::uint64_t> frequency_hz_override)
 {
     TestToneStartResult result;
 
@@ -3164,10 +3167,13 @@ TestToneStartResult start_test_tone()
         next_frequency_entry(/*restart=*/true);
     const double dial_freq = entry.dial_frequency_hz;
     current_frequency_entry = entry;
-    const double actual_rf_freq = resolve_actual_rf_frequency_hz(
+    const double configured_actual_rf_freq = resolve_actual_rf_frequency_hz(
         dial_freq,
         config.wspr.audio_offset_hz,
         FrequencyPath::WsprDial);
+    const double actual_rf_freq = frequency_hz_override.has_value()
+        ? static_cast<double>(*frequency_hz_override)
+        : configured_actual_rf_freq;
 
     llog.logS(INFO, "Beginning test tone requested by web UI.");
 
@@ -3179,10 +3185,17 @@ TestToneStartResult start_test_tone()
         "Resolved WSPR dial frequency ",
         lookup.freq_display_string(dial_freq),
         " to actual RF ",
-        lookup.freq_display_string(actual_rf_freq),
+        lookup.freq_display_string(configured_actual_rf_freq),
         " using audio offset ",
         config.wspr.audio_offset_hz,
         " Hz.");
+    if (frequency_hz_override.has_value())
+    {
+        llog.logS(
+            INFO,
+            "Using web UI test tone RF frequency override: ",
+            lookup.freq_display_string(actual_rf_freq));
+    }
     const double committed_ppm = config.ppm;
     TransmissionRequest request =
         make_tone_request(config, committed_ppm, actual_rf_freq, dial_freq, entry);

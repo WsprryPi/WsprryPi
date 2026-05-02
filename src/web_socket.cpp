@@ -32,6 +32,7 @@
 #include "logging.hpp"
 #include "sha1.hpp"
 #include "scheduling.hpp"
+#include "wspr_band_lookup.hpp"
 #include "wspr_transmit.hpp"
 
 #include <algorithm>
@@ -39,8 +40,11 @@
 #include <cstdint>
 #include <cstring>
 #include <iostream>
+#include <limits>
+#include <optional>
 #include <sstream>
 #include <thread>
+#include <variant>
 #include <vector>
 
 #include <arpa/inet.h>
@@ -393,17 +397,88 @@ void WebSocketServer::handleMessage(const std::string &raw_message)
         else if (cmd == "tone_start")
         {
             llog.logS(DEBUG, "Received JSON test_tone_start command.");
-            const TestToneStartResult start_result = start_test_tone();
-            reply["command"] = "tone_start";
-            reply["started"] = start_result.started;
-            reply["already_active"] = start_result.already_active;
-            reply["blocked_by_active_transmission"] =
-                start_result.blocked_by_active_transmission;
-            reply["blocked_by_enabled_transmission"] =
-                start_result.blocked_by_enabled_transmission;
-            reply["message"] = start_result.message;
-            reply["tone_start"] = start_result.started ? "ok" : "rejected";
-            reply["status"] = start_result.started ? "ok" : "error";
+            std::optional<std::uint64_t> frequency_hz_override;
+            std::string frequency_error;
+
+            if (j.contains("frequency_hz"))
+            {
+                std::uint64_t candidate_frequency_hz = 0;
+                if (j["frequency_hz"].is_number_unsigned())
+                {
+                    candidate_frequency_hz =
+                        j["frequency_hz"].get<std::uint64_t>();
+                }
+                else if (j["frequency_hz"].is_number_integer())
+                {
+                    const auto signed_frequency_hz =
+                        j["frequency_hz"].get<std::int64_t>();
+                    if (signed_frequency_hz > 0)
+                    {
+                        candidate_frequency_hz =
+                            static_cast<std::uint64_t>(signed_frequency_hz);
+                    }
+                }
+
+                if (candidate_frequency_hz == 0)
+                {
+                    frequency_error =
+                        "frequency_hz must be a positive integer.";
+                }
+                else if (
+                    candidate_frequency_hz >
+                    static_cast<std::uint64_t>(
+                        std::numeric_limits<long long>::max()))
+                {
+                    frequency_error =
+                        "frequency_hz is outside the supported RF range.";
+                }
+                else
+                {
+                    const WSPRBandLookup frequency_lookup;
+                    const auto validation = frequency_lookup.lookup(
+                        static_cast<double>(candidate_frequency_hz));
+                    const auto *validation_text =
+                        std::get_if<std::string>(&validation);
+
+                    if (validation_text == nullptr ||
+                        *validation_text == "Invalid Frequency")
+                    {
+                        frequency_error =
+                            "frequency_hz is outside the supported RF range.";
+                    }
+                    else
+                    {
+                        frequency_hz_override = candidate_frequency_hz;
+                    }
+                }
+            }
+
+            if (!frequency_error.empty())
+            {
+                reply["command"] = "tone_start";
+                reply["started"] = false;
+                reply["already_active"] = false;
+                reply["blocked_by_active_transmission"] = false;
+                reply["blocked_by_enabled_transmission"] = false;
+                reply["message"] = frequency_error;
+                reply["tone_start"] = "rejected";
+                reply["status"] = "error";
+            }
+            else
+            {
+                const TestToneStartResult start_result =
+                    start_test_tone(frequency_hz_override);
+                reply["command"] = "tone_start";
+                reply["started"] = start_result.started;
+                reply["already_active"] = start_result.already_active;
+                reply["blocked_by_active_transmission"] =
+                    start_result.blocked_by_active_transmission;
+                reply["blocked_by_enabled_transmission"] =
+                    start_result.blocked_by_enabled_transmission;
+                reply["message"] = start_result.message;
+                reply["tone_start"] = start_result.started ? "ok" : "rejected";
+                reply["status"] = start_result.started ? "ok" : "error";
+            }
         }
         else if (cmd == "tone_end")
         {
