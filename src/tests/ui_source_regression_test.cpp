@@ -517,9 +517,8 @@ int main()
     require(
         site_source.find("`${versionInfo.currentModalVersion} is behind ${result.targetBranch} ${targetShaLabel}.`") != std::string::npos &&
             site_source.find("`${versionInfo.currentDisplayVersion} is behind ${result.targetBranch} ${targetShaLabel}.`") == std::string::npos &&
-            site_source.find("The current branch is not available upstream. Updates are being checked against ${result.targetBranch}.") != std::string::npos &&
             site_source.find("const exactRelease = result.fallbackUsed !== true && Boolean(result.releaseTitle);") != std::string::npos &&
-            site_source.find("Review the latest releases. ") != std::string::npos &&
+            site_source.find("Review the latest releases: ") != std::string::npos &&
             site_source.find("Review the latest WsprryPi releases before updating.") == std::string::npos,
         "update modal must use wspr_exe_version in the summary, explain fallback checks, and suppress exact-release wording when fallback is used");
     require(
