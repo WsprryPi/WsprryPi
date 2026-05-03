@@ -961,11 +961,11 @@ static void deassert_transmit_gpio_outputs(
 
 static bool reconcile_transmit_gpio_after_transmitter_stop(const char *context) noexcept
 {
-    std::lock_guard<std::mutex> lifecycle_lk(transmit_gpio_lifecycle_mtx);
     bool fallback_used = false;
 
     if (should_control_amp_gpio())
     {
+        std::lock_guard<std::mutex> lifecycle_lk(transmit_gpio_lifecycle_mtx);
         set_amp_gpio_state(false, context);
         fallback_used = true;
     }

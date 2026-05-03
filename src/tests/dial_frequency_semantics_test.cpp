@@ -3716,6 +3716,7 @@ int main(int argc, char *argv[])
         ampControl.stop();
         ledControl.stop();
         set_band_gpio_selector_for_test(false, false);
+        reset_current_transmission_request_for_test();
         GPIOOutput::setTestMode(false);
     }
 
