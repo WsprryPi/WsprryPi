@@ -412,12 +412,14 @@ int main()
             site_source.find("maybePromptForUiRefresh(response.ui_version);") != std::string::npos &&
             site_source.find("normalizedServerVersion === dismissedUiRefreshVersion") != std::string::npos &&
             web_server_source.find("j[\"ui_version\"] = get_raw_version_string();") != std::string::npos &&
+            web_server_source.find("j[\"wspr_version_raw\"] = get_exe_version();") != std::string::npos &&
+            web_server_source.find("j[\"wspr_version_parsed\"] = parse_version_for_update_metadata(get_exe_version());") != std::string::npos &&
             web_server_source.find("j[\"wspr_branch\"] = get_exe_raw_branch();") != std::string::npos &&
             web_server_source.find("j[\"wspr_branch_state\"] = get_exe_branch_state();") != std::string::npos &&
             web_server_source.find("j[\"wspr_display_branch\"] = get_exe_branch();") != std::string::npos &&
             web_server_source.find("j[\"wspr_exe_version\"] = get_exe_version();") != std::string::npos &&
             web_server_source.find("j[\"wspr_commit\"] = get_exe_commit();") != std::string::npos,
-        "site.js must detect backend UI version changes using the existing /version response, and backend /version must expose raw branch, executable version, and commit metadata");
+        "site.js must detect backend UI version changes using the existing /version response, and backend /version must expose raw and parsed executable version, raw branch, branch state, executable version, and commit metadata");
     require(
         site_source.find("title: \"UI refresh required\"") != std::string::npos &&
             site_source.find("The WsprryPi web interface has been updated. Refresh this page to load the new web pages, CSS, and JavaScript.") != std::string::npos &&
@@ -475,8 +477,13 @@ int main()
             version_source.find("std::string get_exe_build_dirty()") != std::string::npos &&
             version_source.find("It does not indicate whether a remote update exists.") != std::string::npos &&
             version_header_source.find("extern std::string get_exe_build_dirty();") != std::string::npos &&
-            web_server_source.find("j[\"wspr_build_dirty\"] = get_exe_build_dirty();") != std::string::npos,
-        "build metadata must pass sanitized MAKE_BRH for display, raw MAKE_RAW_BRH and branch-state for update lookup, full commit and build-time dirty state to version.cpp, and expose wspr_branch_state and wspr_build_dirty in /version");
+            web_server_source.find("nlohmann::json parse_version_for_update_metadata(const std::string &version)") != std::string::npos &&
+            web_server_source.find("{\"valid\", false}") != std::string::npos &&
+            web_server_source.find("{\"major\", nullptr}") != std::string::npos &&
+            web_server_source.find("{\"prerelease\", nlohmann::json::array()}") != std::string::npos &&
+            web_server_source.find("j[\"wspr_build_dirty\"] = get_exe_build_dirty();") != std::string::npos &&
+            web_server_source.find("j[\"wspr_build_dirty_state\"] = build_dirty_metadata(get_exe_build_dirty());") != std::string::npos,
+        "build metadata must pass sanitized MAKE_BRH for display, raw MAKE_RAW_BRH and branch-state for update lookup, full commit and build-time dirty state to version.cpp, and expose structured version, branch, commit, and dirty metadata in /version");
     require(
         site_source.find("const UPDATE_CHECK_CACHE_SCHEMA_VERSION = 6;") != std::string::npos &&
             site_source.find("function updateCheckShaMatches(currentSha, targetHeadSha)") != std::string::npos &&
@@ -497,6 +504,8 @@ int main()
     require(
         site_source.find("Dirty means the local source tree had uncommitted or staged modifications") != std::string::npos &&
             site_source.find("function parseBuildDirtyState(response, rawDisplayVersion, rawUiVersion, rawExeVersion)") != std::string::npos &&
+            site_source.find("const structuredDirtyState = response?.wspr_build_dirty_state;") != std::string::npos &&
+            site_source.find("structuredDirtyState.known === true") != std::string::npos &&
             site_source.find("response?.wspr_build_dirty ?? response?.wspr_dirty") != std::string::npos &&
             site_source.find("source: \"structured\"") != std::string::npos &&
             site_source.find("source: \"version_text\"") != std::string::npos &&
@@ -544,7 +553,10 @@ int main()
             site_source.find("lookupGithubBranch(currentBranch)") != std::string::npos,
         "detached HEAD or unknown branch-state builds must keep valid semver as the primary path, avoid treating HEAD/unknown as same-name upstream branches in commit fallback, target main/devel only when reachability is proven with an explicit reason, and report check-failed/unknown when no safe target exists");
     require(
-        site_source.find("function parseSemanticVersion(value)") != std::string::npos &&
+            site_source.find("function parseSemanticVersion(value)") != std::string::npos &&
+            site_source.find("function parseStructuredSemanticVersion(value)") != std::string::npos &&
+            site_source.find("value.valid !== true") != std::string::npos &&
+            site_source.find("const localVersion = versionInfo.localVersionParsedObject ||") != std::string::npos &&
             site_source.find("function normalizeSemanticIdentifiers(value, allowLeadingZeroNumeric = false)") != std::string::npos &&
             site_source.find("return identifiers.map((identifier) => identifier.toLowerCase());") != std::string::npos &&
             site_source.find("!identifier ||") != std::string::npos &&
@@ -737,20 +749,29 @@ int main()
             site_source.find("resolvedSha = await resolveReleaseTargetSha(target, resolvedTargets);") != std::string::npos,
         "release matching must resolve each target_commitish once per scan, try branch lookup before tag lookup, and preserve tag dereferencing");
     require(
-            site_source.find("const rawBackendBranch = typeof response?.wspr_branch === \"string\"") != std::string::npos &&
+        site_source.find("const rawBackendBranch = typeof response?.wspr_branch === \"string\"") != std::string::npos &&
+            site_source.find("const rawVersion = typeof response?.wspr_version_raw === \"string\"") != std::string::npos &&
+            site_source.find("const branchFieldPresent = Object.prototype.hasOwnProperty.call(response || {}, \"wspr_branch\");") != std::string::npos &&
+            site_source.find("const commitFieldPresent = Object.prototype.hasOwnProperty.call(response || {}, \"wspr_commit\");") != std::string::npos &&
+            site_source.find("const branchStateFieldPresent = Object.prototype.hasOwnProperty.call(response || {}, \"wspr_branch_state\");") != std::string::npos &&
             site_source.find("const branchState = parseBranchState(response, currentBranch);") != std::string::npos &&
             site_source.find("const rawBackendCommit = typeof response?.wspr_commit === \"string\"") != std::string::npos &&
-            site_source.find("const rawExeVersion = typeof response?.wspr_exe_version === \"string\"") != std::string::npos &&
+            site_source.find("const rawExeVersion = rawVersion || (typeof response?.wspr_exe_version === \"string\"") != std::string::npos &&
             site_source.find("const currentDisplayVersion = rawDisplayVersion || rawUiVersion;") != std::string::npos &&
+            site_source.find("Update-check precedence is structured backend metadata first.") != std::string::npos &&
             site_source.find("currentModalVersion: rawExeVersion || rawUiVersion || rawDisplayVersion,") != std::string::npos &&
             site_source.find("const displayBranch = branchMatch ? branchMatch[1].trim() : \"\";") != std::string::npos &&
             site_source.find("const currentBranch = rawBackendBranch || displayBranch;") != std::string::npos &&
+            site_source.find("if (branchFieldPresent && !rawBackendBranch)") != std::string::npos &&
+            site_source.find("if (commitFieldPresent && !backendCommit)") != std::string::npos &&
+            site_source.find("rawBranchState !== \"branch\"") != std::string::npos &&
+            site_source.find("localVersionParsedObject,") != std::string::npos &&
             site_source.find("branchState,") != std::string::npos &&
             site_source.find("displayBranch,") != std::string::npos &&
             site_source.find("rawBranch=${versionInfo.currentBranch}") != std::string::npos &&
             site_source.find("version-check") == std::string::npos &&
             site_source.find("version_check") == std::string::npos,
-        "update checker must prefer backend wspr_branch/wspr_commit, keep display text independent, and avoid hard-coded branch normalization or branch-name guessing");
+        "update checker must prefer structured backend version, branch, branch-state, commit, and dirty fields, keep display text independent, use display-string parsing only as a legacy fallback when structured fields are absent, and fail malformed present structured fields instead of guessing");
     require(
         site_source.find("const summaryText = result.versionComparisonUsed === \"semver\" && result.remoteVersionSelected") != std::string::npos &&
             site_source.find("`${result.localVersionParsed || versionInfo.currentModalVersion} is behind release ${result.remoteVersionSelected}.`") != std::string::npos &&
