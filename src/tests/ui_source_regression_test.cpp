@@ -682,8 +682,12 @@ int main()
             site_source.find("activeUpdateModalIdentity = updateModalIdentity(versionInfo, result);") != std::string::npos &&
             site_source.find("writeUpdateModalState(versionInfo, result, \"dismissed\");") != std::string::npos &&
             site_source.find("window.localStorage.setItem(UPDATE_MODAL_STATE_KEY, JSON.stringify(state));") != std::string::npos &&
-            site_source.find("Never check again") != std::string::npos &&
+            site_source.find("Never check again (re-enable in About)") != std::string::npos &&
             site_source.find("setUpdateCheckDisabled(true);") != std::string::npos &&
+            site_source.find("Site-global localStorage preference. When enabled, checkForWsprryPiUpdate()") != std::string::npos &&
+            site_source.find("returns before any GitHub update-check API calls are made.") != std::string::npos &&
+            site_source.find("Footer About is the user-facing re-enable path after \"Never check again\".") != std::string::npos &&
+            site_source.find("The footer About toggle can remove this state and re-enable checks.") != std::string::npos &&
             site_source.find("if (isUpdateCheckDisabled())") != std::string::npos &&
             site_source.find("Update checks disabled by user preference.") != std::string::npos &&
             site_source.find("function markWsprryPiUpdateChecksDisabled()") != std::string::npos &&
@@ -857,6 +861,7 @@ int main()
             footer_source.find("<summary>About</summary>") != std::string::npos &&
             footer_source.find("id=\"updateCheckToggle\"") != std::string::npos &&
             footer_source.find("Disable update checks") != std::string::npos &&
+            site_source.find("toggle.textContent = disabled ? \"Enable update checks\" : \"Disable update checks\";") != std::string::npos &&
             site_css_source.find(".footer-meta__action") != std::string::npos,
         "footer markup must keep the native click-based About disclosure and provide a site-global update-check toggle for disabling or re-enabling checks");
     require(
