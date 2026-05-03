@@ -470,9 +470,19 @@ int main()
         "update checker must invalidate stale fallback cache entries, short-circuit matching full or short SHAs before GitHub compare, and avoid misleading unused comparison fields");
     require(
         site_source.find("function parseSemanticVersion(value)") != std::string::npos &&
+            site_source.find("function normalizeSemanticIdentifiers(value, allowLeadingZeroNumeric = false)") != std::string::npos &&
+            site_source.find("return identifiers.map((identifier) => identifier.toLowerCase());") != std::string::npos &&
+            site_source.find("!identifier ||") != std::string::npos &&
+            site_source.find("identifier.length > 1 && identifier.startsWith(\"0\")") != std::string::npos &&
+            site_source.find("if (prerelease === null || build === null)") != std::string::npos &&
             site_source.find("v?(\\d+)\\.(\\d+)\\.(\\d+)") != std::string::npos &&
             site_source.find("function compareSemanticVersions(left, right)") != std::string::npos &&
             site_source.find("function comparePrereleaseIdentifier(left, right)") != std::string::npos &&
+            site_source.find("return Number(left) - Number(right);") != std::string::npos &&
+            site_source.find("[\"alpha\", 0]") != std::string::npos &&
+            site_source.find("[\"beta\", 1]") != std::string::npos &&
+            site_source.find("[\"rc\", 2]") != std::string::npos &&
+            site_source.find("Unknown channels still fall back to normal lexical SemVer ordering.") != std::string::npos &&
             site_source.find("function fetchGithubReleases()") != std::string::npos &&
             site_source.find("`${UPDATE_CHECK_API_BASE}/releases?per_page=100`") != std::string::npos &&
             site_source.find("function summarizeSemanticReleases(releases)") != std::string::npos &&
@@ -484,8 +494,11 @@ int main()
             site_source.find("local semantic version has build metadata/commits past tag") != std::string::npos &&
             site_source.find("local semantic version could not be parsed") != std::string::npos &&
             site_source.find("GitHub release data unavailable") != std::string::npos &&
-            site_source.find("Stable builds compare only with latest stable release.") != std::string::npos &&
-            site_source.find("Prerelease\n    // builds compare with newer stable releases first, then newer prereleases") != std::string::npos &&
+            site_source.find("Stable builds compare only with latest stable release and never") != std::string::npos &&
+            site_source.find("upgrade to a prerelease.") != std::string::npos &&
+            site_source.find("Prerelease builds compare with newer stable") != std::string::npos &&
+            site_source.find("from the same prerelease channel") != std::string::npos &&
+            site_source.find("Different\n    // prerelease channels are intentionally ignored by default.") != std::string::npos &&
             site_source.find("const channel = localVersion.prerelease[0];") != std::string::npos &&
             site_source.find("summary.prereleasesByChannel.get(channel)") != std::string::npos &&
             site_source.find("versionComparisonUsed: \"semver\"") != std::string::npos &&
@@ -498,7 +511,7 @@ int main()
             site_source.find("if (!semanticResult.useCommitFallback)") != std::string::npos &&
             site_source.find("Update check using commit fallback: ${semanticResult.reason}") != std::string::npos &&
             site_source.find("return buildCommitBasedWsprryPiUpdateResult(versionInfo, semanticResult);") != std::string::npos,
-        "update checker must use GitHub release semver as the primary update signal, handle stable/prerelease ordering, treat local newer versions as no-update/local-ahead, fall back to commit checks for extra commits, invalid local semver, or unavailable release data, and expose comparison metadata");
+        "update checker must use GitHub release semver as the primary update signal, normalize and validate prerelease identifiers, handle stable/prerelease ordering and numeric prerelease segments, keep prerelease updates on the same channel by default, treat local newer versions as no-update/local-ahead, fall back to commit checks for extra commits, invalid local semver, malformed prerelease semver, or unavailable release data, and expose comparison metadata");
     require(
         site_source.find("const UPDATE_CHECK_ERROR_MESSAGES = Object.freeze({") != std::string::npos &&
             site_source.find("missing_version_data: \"Update check failed: local version metadata is incomplete.\"") != std::string::npos &&
@@ -551,7 +564,7 @@ int main()
             site_source.find("GitHub compare response did not include a status") != std::string::npos &&
             site_source.find("GitHub branch ${branch} did not include a HEAD SHA") != std::string::npos &&
             site_source.find("Semantic version flow is primary when the local build is at a parseable") != std::string::npos &&
-            site_source.find("Commit/branch comparison is fallback") != std::string::npos,
+            site_source.find("comparison is fallback only and must not override a valid semantic") != std::string::npos,
         "update checker must surface GitHub network, rate-limit, malformed JSON, malformed compare, and malformed branch responses while documenting that semver is primary and commit/branch comparison is fallback");
     require(
         site_source.find("async function isCurrentShaReachableFromBranchHead(currentSha, branchInfo)") != std::string::npos &&
