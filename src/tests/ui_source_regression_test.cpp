@@ -535,10 +535,14 @@ int main()
             site_source.find("contained: status === \"identical\" || status === \"ahead\",") != std::string::npos &&
             site_source.find("contained: status === \"identical\" || status === \"behind\",") == std::string::npos &&
             site_source.find("if (status === \"ahead\" || status === \"diverged\")") == std::string::npos &&
+            site_source.find("function selectedUpdateBranch(branchInfo, reason, fallbackUsed = false)") != std::string::npos &&
+            site_source.find("selectionReason: reason") != std::string::npos &&
             site_source.find("async function selectGithubUpdateBranch(versionInfo)") != std::string::npos &&
             site_source.find("const currentBranch = versionInfo.currentBranch;") != std::string::npos &&
+            site_source.find("Rule 1: local main tracks upstream main directly.") != std::string::npos &&
             site_source.find("if (currentBranch === \"main\")") != std::string::npos &&
-            site_source.find("return Object.assign(await lookupGithubBranch(\"main\"), { fallbackUsed: false });") != std::string::npos &&
+            site_source.find("selectedUpdateBranch(await lookupGithubBranch(\"main\"), \"local main targets upstream main\")") != std::string::npos &&
+            site_source.find("Rule 2: local devel tracks upstream devel unless the local commit is") != std::string::npos &&
             site_source.find("if (currentBranch === \"devel\")") != std::string::npos &&
             site_source.find("develBranch = await lookupGithubBranch(\"devel\");") != std::string::npos &&
             site_source.find("const mainBranch = await lookupGithubBranch(\"main\");") != std::string::npos &&
@@ -548,13 +552,21 @@ int main()
             site_source.find("current SHA is not reachable from main") != std::string::npos &&
             site_source.find("main containment probe failed") != std::string::npos &&
             site_source.find("Update check local devel target remains upstream devel.") != std::string::npos &&
-            site_source.find("return Object.assign(mainBranch, { fallbackUsed: false });") != std::string::npos &&
-            site_source.find("return Object.assign(develBranch, { fallbackUsed: false });") != std::string::npos &&
-            site_source.find("return Object.assign(await lookupGithubBranch(\"main\"), { fallbackUsed: true });") != std::string::npos &&
-            site_source.find("return Object.assign(await lookupGithubBranch(currentBranch), { fallbackUsed: false });") != std::string::npos &&
+            site_source.find("upstream devel missing; explicit fallback to upstream main") != std::string::npos &&
+            site_source.find("local devel commit reachable from upstream main") != std::string::npos &&
+            site_source.find("selectedUpdateBranch(develBranch, \"local devel targets upstream devel\")") != std::string::npos &&
+            site_source.find("Rule 3: feature, release, and unknown local branches target the same-name") != std::string::npos &&
+            site_source.find("await lookupGithubBranch(currentBranch),") != std::string::npos &&
+            site_source.find("local branch targets same-name upstream branch") != std::string::npos &&
+            site_source.find("Rule 4: if a non-main/non-devel branch is missing upstream,") != std::string::npos &&
+            site_source.find("missing; explicit fallback to upstream devel") != std::string::npos &&
+            site_source.find("missing branch alone does not imply an update") != std::string::npos &&
+            site_source.find("fallbackUsed: selectedBranch.fallbackUsed === true,") != std::string::npos &&
+            site_source.find("selectionReason: selectedBranch.selectionReason || \"\"") != std::string::npos &&
+            site_source.find("? { updateAvailable: true }") == std::string::npos &&
             site_source.find("const selectedBranch = await selectGithubUpdateBranch(versionInfo);") != std::string::npos &&
-            site_source.find("Missing feature/release branches intentionally fall back to devel") != std::string::npos,
-        "update checker must target upstream main for local main, target upstream devel by default for local devel, switch devel to main only when compare current...main proves reachability, avoid treating ahead/diverged/malformed/404 containment probes as contained, prefer full SHA exact matches, explicitly mark short-SHA containment as uncertain, and keep documented feature-branch fallback behavior");
+            site_source.find("reason=${result.selectionReason || \"unspecified\"}") != std::string::npos,
+        "update checker must target upstream main for local main, target upstream devel by default for local devel, switch devel to main only when compare current...main proves reachability, avoid treating ahead/diverged/malformed/404 containment probes as contained, prefer full SHA exact matches, explicitly mark short-SHA containment as uncertain, target same-name upstream branches for feature branches, and make missing-branch fallback explicit and reasoned without forcing a false update");
     require(
         site_source.find("local devel falling back to upstream main because upstream devel returned HTTP 404") != std::string::npos &&
             site_source.find("local devel resolved to upstream main because current SHA is reachable from main") != std::string::npos &&
@@ -591,10 +603,11 @@ int main()
             site_source.find("Review the latest WsprryPi releases before updating.") == std::string::npos,
         "update modal must use wspr_exe_version in the summary, explain fallback checks, and suppress exact-release wording when fallback is used");
     require(
-        site_source.find("return Object.assign(await lookupGithubBranch(currentBranch), { fallbackUsed: false });") != std::string::npos &&
+        site_source.find("await lookupGithubBranch(currentBranch),") != std::string::npos &&
             site_source.find("if (error.status !== 404)") != std::string::npos &&
-            site_source.find("return Object.assign(await lookupGithubBranch(\"devel\"), { fallbackUsed: true });") != std::string::npos,
-        "update checker must compare existing non-main/non-devel branches against that branch and fall back to devel only on a true 404");
+            site_source.find("await lookupGithubBranch(\"devel\"),") != std::string::npos &&
+            site_source.find("same-name upstream branch '${currentBranch}' missing; explicit fallback to upstream devel") != std::string::npos,
+        "update checker must compare existing non-main/non-devel branches against that branch and fall back to devel only on a true 404 with an explicit reason");
     require(
         site_source.find("Update check parsed displayBranch=") != std::string::npos &&
             site_source.find("Update check branch lookup:") != std::string::npos &&
