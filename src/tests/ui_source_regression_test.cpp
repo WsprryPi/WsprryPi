@@ -523,31 +523,44 @@ int main()
             site_source.find("Semantic versions,") != std::string::npos,
         "update checker must surface GitHub network, rate-limit, malformed JSON, malformed compare, and malformed branch responses while documenting that update detection remains branch/commit based");
     require(
-        site_source.find("async function isCurrentShaInBranch(currentSha, branchInfo)") != std::string::npos &&
-            site_source.find("isInBranch: true,") != std::string::npos &&
+        site_source.find("async function isCurrentShaReachableFromBranchHead(currentSha, branchInfo)") != std::string::npos &&
+            site_source.find("normalizedCurrent.length >= 40 && normalizedHead.length >= 40 && normalizedCurrent === normalizedHead") != std::string::npos &&
+            site_source.find("status: \"short_sha_match\"") != std::string::npos &&
+            site_source.find("uncertain: true") != std::string::npos &&
+            site_source.find("GitHub compare direction is base=currentSha, head=branch HEAD.") != std::string::npos &&
+            site_source.find("status \"ahead\" means the branch HEAD is ahead of") != std::string::npos &&
+            site_source.find("Status\n        // \"behind\" means currentSha is ahead of the branch and is not contained.") != std::string::npos &&
+            site_source.find("contained: true,") != std::string::npos &&
             site_source.find("status: \"identical\"") != std::string::npos &&
-            site_source.find("if (status === \"ahead\" || status === \"diverged\")") != std::string::npos &&
-            site_source.find("isInBranch: status === \"identical\" || status === \"behind\",") != std::string::npos &&
+            site_source.find("contained: status === \"identical\" || status === \"ahead\",") != std::string::npos &&
+            site_source.find("contained: status === \"identical\" || status === \"behind\",") == std::string::npos &&
+            site_source.find("if (status === \"ahead\" || status === \"diverged\")") == std::string::npos &&
             site_source.find("async function selectGithubUpdateBranch(versionInfo)") != std::string::npos &&
             site_source.find("const currentBranch = versionInfo.currentBranch;") != std::string::npos &&
+            site_source.find("if (currentBranch === \"main\")") != std::string::npos &&
+            site_source.find("return Object.assign(await lookupGithubBranch(\"main\"), { fallbackUsed: false });") != std::string::npos &&
+            site_source.find("if (currentBranch === \"devel\")") != std::string::npos &&
+            site_source.find("develBranch = await lookupGithubBranch(\"devel\");") != std::string::npos &&
             site_source.find("const mainBranch = await lookupGithubBranch(\"main\");") != std::string::npos &&
-            site_source.find("const mainMembership = await isCurrentShaInBranch(versionInfo.currentSha, mainBranch);") != std::string::npos &&
-            site_source.find("if (mainMembership.isInBranch)") != std::string::npos &&
-            site_source.find("main compare status is ${mainMembership.status || \"unknown\"}") != std::string::npos &&
-            site_source.find("main membership probe failed") != std::string::npos &&
+            site_source.find("const mainContainment = await isCurrentShaReachableFromBranchHead(versionInfo.currentSha, mainBranch);") != std::string::npos &&
+            site_source.find("if (mainContainment.contained)") != std::string::npos &&
+            site_source.find("current SHA is reachable from main") != std::string::npos &&
+            site_source.find("current SHA is not reachable from main") != std::string::npos &&
+            site_source.find("main containment probe failed") != std::string::npos &&
+            site_source.find("Update check local devel target remains upstream devel.") != std::string::npos &&
             site_source.find("return Object.assign(mainBranch, { fallbackUsed: false });") != std::string::npos &&
             site_source.find("return Object.assign(develBranch, { fallbackUsed: false });") != std::string::npos &&
             site_source.find("return Object.assign(await lookupGithubBranch(\"main\"), { fallbackUsed: true });") != std::string::npos &&
-            site_source.find("return Object.assign(await lookupGithubBranch(\"main\"), { fallbackUsed: false });") != std::string::npos &&
             site_source.find("return Object.assign(await lookupGithubBranch(currentBranch), { fallbackUsed: false });") != std::string::npos &&
-            site_source.find("const selectedBranch = await selectGithubUpdateBranch(versionInfo);") != std::string::npos,
-        "update checker must select upstream main for local devel only when current SHA is part of main, fall back to main when upstream devel is missing, and keep main/feature branch behavior unchanged");
+            site_source.find("const selectedBranch = await selectGithubUpdateBranch(versionInfo);") != std::string::npos &&
+            site_source.find("Missing feature/release branches intentionally fall back to devel") != std::string::npos,
+        "update checker must target upstream main for local main, target upstream devel by default for local devel, switch devel to main only when compare current...main proves reachability, avoid treating ahead/diverged/malformed/404 containment probes as contained, prefer full SHA exact matches, explicitly mark short-SHA containment as uncertain, and keep documented feature-branch fallback behavior");
     require(
         site_source.find("local devel falling back to upstream main because upstream devel returned HTTP 404") != std::string::npos &&
-            site_source.find("local devel resolved to upstream main because the current SHA is part of main") != std::string::npos &&
-            site_source.find("local devel staying on upstream devel because main compare status is") != std::string::npos &&
-            site_source.find("local devel staying on upstream devel because the current SHA is not part of main") != std::string::npos,
-        "update checker must log devel fallback, devel-to-main resolution, and devel-stays-devel decisions");
+            site_source.find("local devel resolved to upstream main because current SHA is reachable from main") != std::string::npos &&
+            site_source.find("local devel staying on upstream devel because current SHA is not reachable from main") != std::string::npos &&
+            site_source.find("local devel target remains upstream devel") != std::string::npos,
+        "update checker must log devel fallback, devel-to-main reachability resolution, and devel-stays-devel decisions");
     require(
         site_source.find("async function resolveReleaseTargetSha(targetCommitish, memo = null)") != std::string::npos &&
             site_source.find("if (memo instanceof Map && memo.has(target))") != std::string::npos &&
