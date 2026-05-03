@@ -458,14 +458,41 @@ int main()
         site_source.find("const UPDATE_CHECK_CACHE_SCHEMA_VERSION = 5;") != std::string::npos &&
             site_source.find("function updateCheckShaMatches(currentSha, targetHeadSha)") != std::string::npos &&
             site_source.find("return normalizedHead.startsWith(normalizedCurrent);") != std::string::npos &&
-            site_source.find("function updateCheckNoUpdateComparison()") != std::string::npos &&
+            site_source.find("function updateCheckNoUpdateResult()") != std::string::npos &&
             site_source.find("updateCheckShaMatches(versionInfo.currentSha, selectedBranch.headSha)") != std::string::npos &&
-            site_source.find("? updateCheckNoUpdateComparison()") != std::string::npos &&
+            site_source.find("? updateCheckNoUpdateResult()") != std::string::npos &&
             site_source.find(": await compareGithubCommits(versionInfo.currentSha, selectedBranch.headSha)") != std::string::npos &&
             site_source.find("if (error.status === 404)") != std::string::npos &&
             site_source.find("updateAvailable: !updateCheckShaMatches(currentSha, headSha)") != std::string::npos &&
-            site_source.find("throw error;") != std::string::npos,
-        "update checker must invalidate stale fallback cache entries and short-circuit matching full or short SHAs before GitHub compare");
+            site_source.find("throw error;") != std::string::npos &&
+            site_source.find("completed:") == std::string::npos &&
+            site_source.find("currentShaLabel") == std::string::npos,
+        "update checker must invalidate stale fallback cache entries, short-circuit matching full or short SHAs before GitHub compare, and avoid misleading unused comparison fields");
+    require(
+        site_source.find("const UPDATE_CHECK_ERROR_MESSAGES = Object.freeze({") != std::string::npos &&
+            site_source.find("missing_version_data: \"Update check failed: local version metadata is incomplete.\"") != std::string::npos &&
+            site_source.find("missing_commit: \"Update check failed: local commit metadata is missing.\"") != std::string::npos &&
+            site_source.find("missing_branch: \"Update check failed: local branch metadata is missing.\"") != std::string::npos &&
+            site_source.find("branch_missing: \"Update check failed: the update branch could not be found on GitHub.\"") != std::string::npos &&
+            site_source.find("rate_limited: \"Update check failed: GitHub API rate limit reached.\"") != std::string::npos &&
+            site_source.find("network: \"Update check failed: GitHub could not be reached.\"") != std::string::npos &&
+            site_source.find("malformed_response: \"Update check failed: GitHub returned malformed update data.\"") != std::string::npos &&
+            site_source.find("function buildUpdateCheckFailure(code, detail = \"\")") != std::string::npos &&
+            site_source.find("function normalizeUpdateCheckFailure(error)") != std::string::npos &&
+            site_source.find("function markWsprryPiUpdateCheckFailed(error)") != std::string::npos &&
+            site_source.find("versionElement.classList.add(\"update-check-failed\");") != std::string::npos &&
+            site_source.find("markWsprryPiUpdateCheckFailed(error);") != std::string::npos &&
+            site_source.find("writeFailedUpdateCheckCache") == std::string::npos,
+        "update checker failures must have explicit UI and console states, must classify local metadata, branch, network, rate-limit, and malformed-response failures, and must not cache failed checks as no-update results");
+    require(
+        site_source.find("GitHub network request failed") != std::string::npos &&
+            site_source.find("response.headers.get(\"x-ratelimit-remaining\") === \"0\"") != std::string::npos &&
+            site_source.find("GitHub returned malformed JSON") != std::string::npos &&
+            site_source.find("GitHub compare response did not include a status") != std::string::npos &&
+            site_source.find("GitHub branch ${branch} did not include a HEAD SHA") != std::string::npos &&
+            site_source.find("Update detection is intentionally branch/commit based.") != std::string::npos &&
+            site_source.find("Semantic versions,") != std::string::npos,
+        "update checker must surface GitHub network, rate-limit, malformed JSON, malformed compare, and malformed branch responses while documenting that update detection remains branch/commit based");
     require(
         site_source.find("async function isCurrentShaInBranch(currentSha, branchInfo)") != std::string::npos &&
             site_source.find("isInBranch: true,") != std::string::npos &&
