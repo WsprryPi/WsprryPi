@@ -515,7 +515,8 @@ int main()
             site_source.find("dirty means local modifications, not a remote update") != std::string::npos &&
             site_source.find("return applyDirtyBuildMetadata(versionInfo, semanticResult);") != std::string::npos &&
             site_source.find("return applyDirtyBuildMetadata(versionInfo, commitResult);") != std::string::npos &&
-            site_source.find("if (!result || result.updateAvailable !== true)") != std::string::npos,
+            site_source.find("if (!result || result.updateAvailable !== true)") != std::string::npos &&
+            site_source.find("markWsprryPiLocalUpdateState(result);") != std::string::npos,
         "update checker must prefer structured wspr_build_dirty metadata over display-string parsing, keep unknown dirty metadata from changing behavior, separate clean/dirty cache entries for the same branch and SHA, mark dirty no-update results as local_modified/dirty_build, preserve dirty older-commit update-available results, and avoid showing footer/modal updates solely because a build is dirty");
     require(
         site_source.find("detached_target_unknown: \"Update check failed: detached or unknown branch state has no safe update target.\"") != std::string::npos &&
@@ -603,6 +604,22 @@ int main()
             site_source.find("markWsprryPiUpdateCheckFailed(error);") != std::string::npos &&
             site_source.find("writeFailedUpdateCheckCache") == std::string::npos,
         "update checker failures must have explicit UI and console states, must classify local metadata, branch, network, rate-limit, and malformed-response failures, and must not cache failed checks as no-update results");
+    require(
+        site_source.find("function buildLocalUpdateStateTitle(result)") != std::string::npos &&
+            site_source.find("result?.versionComparisonStatus === \"local_modified\"") != std::string::npos &&
+            site_source.find("result?.localBuildState === \"dirty_build\"") != std::string::npos &&
+            site_source.find("Local build has modifications. No remote update is being shown.") != std::string::npos &&
+            site_source.find("result?.versionComparisonStatus === \"local_ahead\"") != std::string::npos &&
+            site_source.find("Local build is newer than the selected remote version. No update is available.") != std::string::npos &&
+            site_source.find("function markWsprryPiLocalUpdateState(result)") != std::string::npos &&
+            site_source.find("clearWsprryPiUpdateFooter();\n        return;") != std::string::npos &&
+            site_source.find("versionElement.classList.remove(\"update-available\");\n        versionElement.classList.remove(\"update-check-failed\");\n        versionElement.title = title;") != std::string::npos &&
+            site_source.find("updateLink.classList.add(\"d-none\");\n        updateLink.href = UPDATE_CHECK_RELEASES_URL;\n        updateLink.title = title;\n        updateLink.setAttribute(\"aria-label\", title);") != std::string::npos &&
+            site_source.find("displayState=${localStateTitle}") != std::string::npos &&
+            site_source.find("markWsprryPiLocalUpdateState(result);\n        return;\n    }\n\n    markWsprryPiUpdateFooter(result);\n    showWsprryPiUpdateModal(versionInfo, result);") != std::string::npos &&
+            site_source.find("markWsprryPiUpdateCheckFailed(error);") != std::string::npos &&
+            site_source.find("writeUpdateCheckCache(versionInfo, result);") != std::string::npos,
+        "footer update display must keep update-available behavior and modal timing unchanged, clear warning/update indicators for clean no-update, label dirty/local-modified and local-ahead states distinctly in title/ARIA without showing the modal, show failed/unknown checks through the failed-check path, and avoid caching check failures as no-update");
     const std::size_t update_footer_pos =
         site_source.find("markWsprryPiUpdateFooter(result);");
     const std::size_t update_modal_pos =
