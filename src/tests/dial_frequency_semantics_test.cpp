@@ -3635,6 +3635,93 @@ int main(int argc, char *argv[])
     {
         GPIOOutput::setTestMode(true);
         init_default_config();
+        ini_reload_pending.store(false, std::memory_order_relaxed);
+        exiting_wspr.store(false, std::memory_order_relaxed);
+        reset_current_transmission_request_for_test();
+        set_band_gpio_selector_for_test(true, true);
+
+        config.mode = ModeType::WSPR;
+        config.transmit = true;
+        config.use_led = true;
+        config.led_pin = 18;
+        config.amp_pin = 23;
+        config.amp_pin_active_high = false;
+
+        require(
+            ledControl.enableGPIOPin(config.led_pin, true),
+            "central transmit GPIO lifecycle regression must enable LED test GPIO");
+        require(
+            ampControl.enableGPIOPin(config.amp_pin, config.amp_pin_active_high),
+            "central transmit GPIO lifecycle regression must enable Amp Control test GPIO");
+        TransmissionRequest request;
+        request.mode = TransmissionMode::WSPR;
+        request.dial_frequency_hz = 14095600.0;
+        request.actual_rf_frequency_hz = 14097100.0;
+        request.selector_gpio_enabled = true;
+        request.selector_band = HamBand::BAND_20M;
+        request.selector_gpio_config.gpio = 21;
+        request.selector_gpio_config.enabled = true;
+        request.selector_gpio_config.active_high = true;
+        set_current_transmission_request_for_test(request);
+
+        reset_tx_led_request_counts_for_test();
+        GPIOOutput::clearTestEvents();
+
+        transmitter_cb(
+            WsprTransmissionCallbackEvent::STARTING,
+            WsprTransmitLogLevel::INFO,
+            std::string(),
+            14097100.0);
+        transmitter_cb(
+            WsprTransmissionCallbackEvent::CANCELLED,
+            WsprTransmitLogLevel::INFO,
+            std::string(),
+            1.0);
+
+        std::vector<GPIOOutput::TestEvent> writes;
+        for (const auto &event : GPIOOutput::testEvents())
+        {
+            if (event.action == "write")
+            {
+                writes.push_back(event);
+            }
+        }
+
+        require(
+            writes.size() >= 6,
+            "central transmit GPIO lifecycle must write selector, amp, and LED on assert and deassert");
+        require(
+            writes[0].pin == 21 && writes[0].logical_state &&
+                writes[1].pin == 23 && writes[1].logical_state &&
+                !writes[1].active_high &&
+                writes[2].pin == 18 && writes[2].logical_state,
+            "central transmit GPIO assert order must be LPF/Band GPIO, Amp Control, then TX LED");
+        require(
+            writes[3].pin == 23 && !writes[3].logical_state &&
+                !writes[3].active_high &&
+                writes[4].pin == 18 && !writes[4].logical_state &&
+                writes[5].pin == 21 && !writes[5].logical_state,
+            "central transmit GPIO deassert order must be Amp Control, TX LED, then LPF/Band GPIO");
+
+        require(
+            GPIOOutput::testLogicalStateForPin(23).has_value() &&
+                GPIOOutput::testLogicalStateForPin(23).value() == false,
+            "Amp Control must be inactive after terminal transmit cleanup");
+        require(
+            tx_led_assert_request_count_for_test() == 1 &&
+                tx_led_deassert_request_count_for_test() == 1 &&
+                tx_led_failure_count_for_test() == 0,
+            "central transmit GPIO lifecycle must keep LED accounting on the shared path");
+
+        ampControl.stop();
+        ledControl.stop();
+        set_band_gpio_selector_for_test(false, false);
+        GPIOOutput::setTestMode(false);
+    }
+
+    {
+        GPIOOutput::setTestMode(true);
+        init_default_config();
         config.use_led = true;
         config.led_pin = 18;
         require(

@@ -67,8 +67,9 @@ namespace
     }
 }
 
-// Global instance for the optional status LED.
+// Global instances for optional transmit-related GPIO outputs.
 GPIOOutput ledControl;
+GPIOOutput ampControl;
 
 /**
  * @brief Default constructor for GPIOOutput.

@@ -1862,6 +1862,25 @@ void apply_runtime_config_side_effects()
         ledControl.stop();
     }
 
+    if (config.amp_pin >= 0 && config.amp_pin <= 27)
+    {
+        if (!ampControl.enableGPIOPin(
+                config.amp_pin,
+                config.amp_pin_active_high))
+        {
+            llog.logS(ERROR,
+                      "Failed to enable Amp Control GPIO ",
+                      config.amp_pin,
+                      ": ",
+                      ampControl.lastError());
+        }
+    }
+    else
+    {
+        llog.logS(DEBUG, "Invalid or disabled Amp Control settings, turning off Amp Control.");
+        ampControl.stop();
+    }
+
     if (config.use_shutdown && (config.shutdown_pin >= 0 && config.shutdown_pin <= 27))
     {
         if (!shutdownMonitor.enable(
