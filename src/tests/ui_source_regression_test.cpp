@@ -698,6 +698,27 @@ int main()
             site_source.find("function renderUpdateCheckPanelFailure(error, versionInfo = null)") != std::string::npos &&
             site_source.find("function renderUpdateCheckPanelDisabled()") != std::string::npos &&
             site_source.find("function getUserFacingUpdateSummary(result = null)") != std::string::npos &&
+            site_source.find("function updateCheckPanelTitleText(result = null)") != std::string::npos &&
+            site_source.find("function updateCheckPanelHasReleaseLink(result = null)") != std::string::npos &&
+            site_source.find("function renderUpdateCheckPanelTitle(elements, result = null, overrideText = \"\")") != std::string::npos &&
+            site_source.find("title: document.getElementById(\"updateCheckPanelTitle\"),") != std::string::npos &&
+            site_source.find("return \"You are on the current version\";") != std::string::npos &&
+            site_source.find("return \"An update is available\";") != std::string::npos &&
+            site_source.find("return \"Local build has modifications\";") != std::string::npos &&
+            site_source.find("return \"Local build is newer than the latest published version\";") != std::string::npos &&
+            site_source.find("elements.title.appendChild(document.createTextNode(\"An update is available: \"));") != std::string::npos &&
+            site_source.find("link.href = result.releaseUrl;") != std::string::npos &&
+            site_source.find("link.textContent = result.remoteVersionSelected;") != std::string::npos &&
+            site_source.find("result.versionComparisonUsed === \"semver\"") != std::string::npos &&
+            site_source.find("renderUpdateCheckPanelTitle(elements, result);") != std::string::npos &&
+            site_source.find("renderUpdateCheckPanelTitle(elements, null, \"Unable to check for updates\");") != std::string::npos &&
+            site_source.find("renderUpdateCheckPanelTitle(elements, null, \"Update checks are disabled\");") != std::string::npos &&
+            site_source.find("return \"You are on the current version.\";") == std::string::npos &&
+            site_source.find("return \"An update is available.\";") == std::string::npos &&
+            site_source.find("return \"Local build has modifications.\";") == std::string::npos &&
+            site_source.find("return \"Local build is newer than the latest published version.\";") == std::string::npos &&
+            site_source.find("renderUpdateCheckPanelTitle(elements, null, \"Unable to check for updates.\");") == std::string::npos &&
+            site_source.find("renderUpdateCheckPanelTitle(elements, null, \"Update checks are disabled.\");") == std::string::npos &&
             site_source.find("function buildTechnicalDetails(versionInfo = null, result = null, failure = null)") != std::string::npos &&
             site_source.find("function renderUpdateCheckTechnicalDetails(elements, details)") != std::string::npos &&
             site_source.find("function appendUpdateCheckCodeText(parent, value)") != std::string::npos &&
@@ -1114,6 +1135,9 @@ int main()
             maintenance_source.find("class=\"maintenance-action maintenance-action--start\"") != std::string::npos &&
             maintenance_source.find("maintenance-action maintenance-action--end") == std::string::npos &&
             maintenance_source.find("id=\"updateCheckPanel\"") != std::string::npos &&
+            maintenance_source.find("id=\"updateCheckPanelTitle\"") != std::string::npos &&
+            maintenance_source.find("Review web UI update status.") == std::string::npos &&
+            maintenance_source.find("Checking update status</h2>") != std::string::npos &&
             maintenance_source.find("id=\"updateCheckStatus\"") != std::string::npos &&
             maintenance_source.find("class=\"maintenance-update-status visually-hidden\"") != std::string::npos &&
             maintenance_source.find("id=\"updateCheckCurrent\"") == std::string::npos &&
