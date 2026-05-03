@@ -622,7 +622,7 @@ int main()
             site_source.find("Date.now() - Number(cached.checkedAt || 0) >= UPDATE_CHECK_FAILURE_RATE_LIMIT_MS") != std::string::npos &&
             site_source.find("function writeUpdateCheckFailureCache(versionInfo, error)") != std::string::npos &&
             site_source.find("window.localStorage.removeItem(updateCheckFailureCacheKey(versionInfo));") != std::string::npos &&
-            site_source.find("const cachedFailure = readUpdateCheckFailureCache(versionInfo);") != std::string::npos &&
+            site_source.find("const cachedFailure = options.bypassCache === true ? null : readUpdateCheckFailureCache(versionInfo);") != std::string::npos &&
             site_source.find("Update check failure rate limit active") != std::string::npos &&
             site_source.find("markWsprryPiUpdateCheckFailed(cachedFailure);") != std::string::npos &&
             site_source.find("const failure = writeUpdateCheckFailureCache(versionInfo, error);") != std::string::npos &&
@@ -646,7 +646,9 @@ int main()
             site_source.find("versionElement.classList.remove(\"update-available\");\n        versionElement.classList.remove(\"update-check-failed\");\n        versionElement.title = title;") != std::string::npos &&
             site_source.find("updateLink.classList.add(\"d-none\");\n        updateLink.href = UPDATE_CHECK_RELEASES_URL;\n        updateLink.title = title;\n        updateLink.setAttribute(\"aria-label\", title);") != std::string::npos &&
             site_source.find("displayState=${localStateTitle}") != std::string::npos &&
-            site_source.find("markWsprryPiLocalUpdateState(result);\n        return;\n    }\n\n    markWsprryPiUpdateFooter(result);\n    showWsprryPiUpdateModal(versionInfo, result);") != std::string::npos &&
+            site_source.find("markWsprryPiLocalUpdateState(result);\n        return;\n    }\n\n    markWsprryPiUpdateFooter(result);") != std::string::npos &&
+            site_source.find("if (options.suppressModal !== true)") != std::string::npos &&
+            site_source.find("showWsprryPiUpdateModal(versionInfo, result);") != std::string::npos &&
             site_source.find("markWsprryPiUpdateCheckFailed(failure);") != std::string::npos &&
             site_source.find("writeUpdateCheckCache(versionInfo, result);") != std::string::npos,
         "footer update display must keep update-available behavior and modal timing unchanged, clear warning/update indicators for clean no-update, label dirty/local-modified and local-ahead states distinctly in title/ARIA without showing the modal, show failed/unknown checks through the failed-check path, and avoid caching check failures as no-update");
@@ -692,6 +694,18 @@ int main()
             site_source.find("Update checks disabled by user preference.") != std::string::npos &&
             site_source.find("function markWsprryPiUpdateChecksDisabled()") != std::string::npos &&
             site_source.find("function initUpdateCheckControls()") != std::string::npos &&
+            site_source.find("function renderUpdateCheckPanel(versionInfo = null, result = null)") != std::string::npos &&
+            site_source.find("function renderUpdateCheckPanelFailure(error, versionInfo = null)") != std::string::npos &&
+            site_source.find("function renderUpdateCheckPanelDisabled()") != std::string::npos &&
+            site_source.find("function forceUpdateCheckNow()") != std::string::npos &&
+            site_source.find("bypassCache: true") != std::string::npos &&
+            site_source.find("suppressModal: true") != std::string::npos &&
+            site_source.find("const checkNowButton = document.getElementById(\"updateCheckNowBtn\");") != std::string::npos &&
+            site_source.find("checkNowButton.addEventListener(\"click\", forceUpdateCheckNow);") != std::string::npos &&
+            site_source.find("renderUpdateCheckPanel(versionInfo, result);") != std::string::npos &&
+            site_source.find("renderUpdateCheckPanelFailure(failure, versionInfo);") != std::string::npos &&
+            site_source.find("lastWsprryPiVersionResponse = response;") != std::string::npos &&
+            site_source.find("event.key?.startsWith(`${UPDATE_CHECK_CACHE_PREFIX}:`)") != std::string::npos &&
             site_source.find("window.addEventListener(\"storage\", handleUpdateCheckStorageEvent);") != std::string::npos &&
             site_source.find("fallbackUpdateModalState = state;") != std::string::npos &&
             update_footer_pos != std::string::npos &&
@@ -1062,12 +1076,30 @@ int main()
 
     const std::string maintenance_source =
         read_text_file("/home/pi/WsprryPi/WsprryPi-UI/data/views/maintenance.php");
+    const std::string maintenance_css_source =
+        read_text_file("/home/pi/WsprryPi/WsprryPi-UI/data/maintenance.css");
     require(
         maintenance_source.find("id=\"test_tone\"") != std::string::npos &&
             maintenance_source.find("id=\"testToneModal\"") != std::string::npos &&
             maintenance_source.find("id=\"testToneFrequencyHz\"") != std::string::npos &&
             maintenance_source.find("Test tone transmit frequency, Hz") != std::string::npos,
         "maintenance view must host the relocated Test Tone control, modal, and editable transmit-frequency field");
+    require(
+        maintenance_source.find("class=\"maintenance-utility__grid\"") != std::string::npos &&
+            maintenance_source.find("class=\"maintenance-pane maintenance-pane--utility\"") != std::string::npos &&
+            maintenance_source.find("class=\"maintenance-action maintenance-action--start\"") != std::string::npos &&
+            maintenance_source.find("maintenance-action maintenance-action--end") == std::string::npos &&
+            maintenance_source.find("id=\"updateCheckPanel\"") != std::string::npos &&
+            maintenance_source.find("id=\"updateCheckStatus\"") != std::string::npos &&
+            maintenance_source.find("id=\"updateCheckDetails\"") != std::string::npos &&
+            maintenance_source.find("id=\"updateCheckAction\"") != std::string::npos &&
+            maintenance_source.find("id=\"updateCheckNowBtn\"") != std::string::npos &&
+            maintenance_source.find("id=\"updateCheckToggleBtn\"") != std::string::npos &&
+            maintenance_source.find("aria-live=\"polite\"") != std::string::npos &&
+            maintenance_css_source.find(".maintenance-utility__grid") != std::string::npos &&
+            maintenance_css_source.find("grid-template-columns: repeat(2, minmax(0, 1fr));") != std::string::npos &&
+            maintenance_css_source.find(".maintenance-update-status") != std::string::npos,
+        "maintenance view must split Utility into side-by-side Test Tone and Update Check panels, keep Test Tone left-aligned, expose update-check panel hooks and controls, and stack through the existing responsive grid");
 
     const std::string maintenance_test_tone_script_source =
         read_text_file("/home/pi/WsprryPi/WsprryPi-UI/data/maintenance.js");
