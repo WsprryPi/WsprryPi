@@ -722,15 +722,27 @@ int main()
             site_source.find("function buildTechnicalDetails(versionInfo = null, result = null, failure = null)") != std::string::npos &&
             site_source.find("function renderUpdateCheckTechnicalDetails(elements, details)") != std::string::npos &&
             site_source.find("function appendUpdateCheckCodeText(parent, value)") != std::string::npos &&
+            site_source.find("function appendUpdateCheckLinkText(parent, value)") != std::string::npos &&
+            site_source.find("function formatUpdateCheckTitleCase(value)") != std::string::npos &&
+            site_source.find("function formatUpdateCheckSentence(value)") != std::string::npos &&
             site_source.find("function buildUpdateCheckTargetParts(result = null)") != std::string::npos &&
             site_source.find("const code = document.createElement(\"code\");") != std::string::npos &&
+            site_source.find("const link = document.createElement(\"a\");") != std::string::npos &&
+            site_source.find("link.href = value;") != std::string::npos &&
             site_source.find("label: \"Branch\", value: result.targetBranch") != std::string::npos &&
             site_source.find("label: \"Commit\", value: shortSha(result.targetHeadSha)") != std::string::npos &&
             site_source.find("appendUpdateCheckTechnicalDetail(\n        details,\n        \"Current\",\n        updateCheckPanelCurrentText(versionInfo),\n        { code: true }\n    );") != std::string::npos &&
+            site_source.find("appendUpdateCheckTechnicalDetail(\n        details,\n        \"Branch\",\n        versionInfo?.currentBranch || result?.currentBranch,\n        { code: true }\n    );") != std::string::npos &&
+            site_source.find("appendUpdateCheckTechnicalDetail(\n        details,\n        \"Current SHA\",\n        versionInfo?.currentSha || result?.currentSha,\n        { code: true }\n    );") != std::string::npos &&
+            site_source.find("appendUpdateCheckTechnicalDetail(details, \"Update URL\", result?.releaseUrl, { link: true });") != std::string::npos &&
+            site_source.find("formatUpdateCheckTitleCase(result?.versionComparisonUsed)") != std::string::npos &&
+            site_source.find("formatUpdateCheckSentence(result?.versionComparisonStatus)") != std::string::npos &&
+            site_source.find("result?.localVersionParsed || formatUpdateCheckSemver(versionInfo?.localVersionParsedObject),\n        { code: true }") != std::string::npos &&
             site_source.find("appendUpdateCheckTechnicalParts(details, \"Target\", targetParts);") != std::string::npos &&
             site_source.find("description.appendChild(document.createTextNode(\" - \"));") != std::string::npos &&
             site_source.find("description.appendChild(document.createTextNode(`${part.label}: `));") != std::string::npos &&
             site_source.find("appendUpdateCheckCodeText(description, part.value);") != std::string::npos &&
+            site_source.find("appendUpdateCheckLinkText(description, detail.value);") != std::string::npos &&
             site_source.find("label: \"Summary\"") != std::string::npos &&
             site_source.find("Technical details ▼") != std::string::npos &&
             site_source.find("Technical details ▲") != std::string::npos &&
