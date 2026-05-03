@@ -99,6 +99,7 @@ SUBMODULE_SRCDIRS += $(wildcard ./WSPR-Transmitter/src)
 PRJ := $(strip $(shell 	url="$$(git remote get-url origin 2>/dev/null)"; 	if [ -n "$$url" ]; then 		echo "$$url" 		| sed -E 's#.*/##; s#\.git$$##'; 	else 		echo unknown; 	fi ))
 EXE_NAME := $(shell echo $(PRJ) | tr '[:upper:]' '[:lower:]')
 RAW_BRH := $(shell git rev-parse --abbrev-ref HEAD 2>/dev/null || echo unknown)
+BRANCH_STATE := $(shell if ! git rev-parse --is-inside-work-tree >/dev/null 2>&1; then echo unknown; elif git symbolic-ref --quiet --short HEAD >/dev/null 2>&1; then echo branch; else echo detached; fi)
 BRH := $(shell printf '%s\n' "$(RAW_BRH)" | awk '{ gsub(/[^[:alnum:]]+/, "-"); sub(/-$$/, ""); print }' || echo unknown)
 RAW_TAG := $(strip $(shell git describe --tags --match "v[0-9]*" --match "[0-9]*" --abbrev=0 2>/dev/null))
 BASE_VER := $(if $(RAW_TAG),$(patsubst v%,%,$(RAW_TAG)),0.0.0)
@@ -324,6 +325,7 @@ CXXFLAGS += -I$(abspath ./WSPR-Reference/src/wspr)
 CXXFLAGS += -DMAKE_TAG=\"$(VER)\" \
             -DMAKE_BRH=\"$(BRH)\" \
             -DMAKE_RAW_BRH=\"$(RAW_BRH)\" \
+            -DMAKE_BRANCH_STATE=\"$(BRANCH_STATE)\" \
             -DMAKE_COMMIT=\"$(FULL_COMMIT)\" \
             -DMAKE_DIRTY=\"$(GIT_DIRTY)\" \
             -DMAKE_EXE=\"$(OUT)\" \

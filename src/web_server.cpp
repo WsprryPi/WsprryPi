@@ -215,6 +215,7 @@ void WebServer::start(int port)
               j["wspr_version"] = version;
               j["ui_version"] = get_raw_version_string();
               j["wspr_branch"] = get_exe_raw_branch();
+              j["wspr_branch_state"] = get_exe_branch_state();
               j["wspr_display_branch"] = get_exe_branch();
               j["wspr_exe_version"] = get_exe_version();
               j["wspr_commit"] = get_exe_commit();

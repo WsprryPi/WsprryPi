@@ -413,6 +413,7 @@ int main()
             site_source.find("normalizedServerVersion === dismissedUiRefreshVersion") != std::string::npos &&
             web_server_source.find("j[\"ui_version\"] = get_raw_version_string();") != std::string::npos &&
             web_server_source.find("j[\"wspr_branch\"] = get_exe_raw_branch();") != std::string::npos &&
+            web_server_source.find("j[\"wspr_branch_state\"] = get_exe_branch_state();") != std::string::npos &&
             web_server_source.find("j[\"wspr_display_branch\"] = get_exe_branch();") != std::string::npos &&
             web_server_source.find("j[\"wspr_exe_version\"] = get_exe_version();") != std::string::npos &&
             web_server_source.find("j[\"wspr_commit\"] = get_exe_commit();") != std::string::npos,
@@ -453,26 +454,37 @@ int main()
         "test fixture must model a displayed version-check branch, raw version_check branch, and matching GitHub HEAD short SHA");
     require(
         makefile_source.find("RAW_BRH :=") != std::string::npos &&
+            makefile_source.find("BRANCH_STATE :=") != std::string::npos &&
+            makefile_source.find("git symbolic-ref --quiet --short HEAD") != std::string::npos &&
             makefile_source.find("BRH := $(shell printf '%s\\n' \"$(RAW_BRH)\"") != std::string::npos &&
             makefile_source.find("-DMAKE_BRH=\\\"$(BRH)\\\"") != std::string::npos &&
             makefile_source.find("-DMAKE_RAW_BRH=\\\"$(RAW_BRH)\\\"") != std::string::npos &&
+            makefile_source.find("-DMAKE_BRANCH_STATE=\\\"$(BRANCH_STATE)\\\"") != std::string::npos &&
             makefile_source.find("-DMAKE_COMMIT=\\\"$(FULL_COMMIT)\\\"") != std::string::npos &&
             makefile_source.find("GIT_DIRTY :=") != std::string::npos &&
             makefile_source.find("git rev-parse --is-inside-work-tree") != std::string::npos &&
             makefile_source.find("git status --porcelain --untracked-files=no") != std::string::npos &&
             makefile_source.find("-DMAKE_DIRTY=\\\"$(GIT_DIRTY)\\\"") != std::string::npos &&
+            version_source.find("#define MAKE_BRANCH_STATE \"unknown\"") != std::string::npos &&
+            version_source.find("constexpr std::string_view BRANCH_STATE = to_string_view(MAKE_BRANCH_STATE);") != std::string::npos &&
+            version_source.find("std::string get_exe_branch_state()") != std::string::npos &&
+            version_source.find("does not treat \"HEAD\" as an upstream") != std::string::npos &&
+            version_header_source.find("extern std::string get_exe_branch_state();") != std::string::npos &&
             version_source.find("#define MAKE_DIRTY \"unknown\"") != std::string::npos &&
             version_source.find("constexpr std::string_view BUILD_DIRTY = to_string_view(MAKE_DIRTY);") != std::string::npos &&
             version_source.find("std::string get_exe_build_dirty()") != std::string::npos &&
             version_source.find("It does not indicate whether a remote update exists.") != std::string::npos &&
             version_header_source.find("extern std::string get_exe_build_dirty();") != std::string::npos &&
             web_server_source.find("j[\"wspr_build_dirty\"] = get_exe_build_dirty();") != std::string::npos,
-        "build metadata must pass sanitized MAKE_BRH for display, raw MAKE_RAW_BRH for update lookup, full commit and build-time dirty state to version.cpp, and expose wspr_build_dirty in /version");
+        "build metadata must pass sanitized MAKE_BRH for display, raw MAKE_RAW_BRH and branch-state for update lookup, full commit and build-time dirty state to version.cpp, and expose wspr_branch_state and wspr_build_dirty in /version");
     require(
         site_source.find("const UPDATE_CHECK_CACHE_SCHEMA_VERSION = 6;") != std::string::npos &&
             site_source.find("function updateCheckShaMatches(currentSha, targetHeadSha)") != std::string::npos &&
             site_source.find("return normalizedHead.startsWith(normalizedCurrent);") != std::string::npos &&
             site_source.find("function updateCheckNoUpdateResult()") != std::string::npos &&
+            site_source.find("${versionInfo.branchState || \"branch\"}:${versionInfo.currentBranch}") != std::string::npos &&
+            site_source.find("cached.branchState !== versionInfo.branchState") != std::string::npos &&
+            site_source.find("branchState: versionInfo.branchState || \"branch\"") != std::string::npos &&
             site_source.find("updateCheckShaMatches(versionInfo.currentSha, selectedBranch.headSha)") != std::string::npos &&
             site_source.find("? updateCheckNoUpdateResult()") != std::string::npos &&
             site_source.find(": await compareGithubCommits(versionInfo.currentSha, selectedBranch.headSha)") != std::string::npos &&
@@ -505,6 +517,31 @@ int main()
             site_source.find("return applyDirtyBuildMetadata(versionInfo, commitResult);") != std::string::npos &&
             site_source.find("if (!result || result.updateAvailable !== true)") != std::string::npos,
         "update checker must prefer structured wspr_build_dirty metadata over display-string parsing, keep unknown dirty metadata from changing behavior, separate clean/dirty cache entries for the same branch and SHA, mark dirty no-update results as local_modified/dirty_build, preserve dirty older-commit update-available results, and avoid showing footer/modal updates solely because a build is dirty");
+    require(
+        site_source.find("detached_target_unknown: \"Update check failed: detached or unknown branch state has no safe update target.\"") != std::string::npos &&
+            site_source.find("function parseBranchState(response, currentBranch)") != std::string::npos &&
+            site_source.find("response?.wspr_branch_state") != std::string::npos &&
+            site_source.find("if (currentBranch === \"HEAD\")") != std::string::npos &&
+            site_source.find("return \"detached\";") != std::string::npos &&
+            site_source.find("return \"unknown\";") != std::string::npos &&
+            site_source.find("branchState,") != std::string::npos &&
+            site_source.find("branchState=${versionInfo.branchState}") != std::string::npos &&
+            site_source.find("function isDetachedOrUnknownBranchBuild(versionInfo)") != std::string::npos &&
+            site_source.find("versionInfo.currentBranch === \"HEAD\"") != std::string::npos &&
+            site_source.find("versionInfo.currentBranch === \"unknown\"") != std::string::npos &&
+            site_source.find("async function selectDetachedOrUnknownUpdateBranch(versionInfo)") != std::string::npos &&
+            site_source.find("const candidates = [\"main\", \"devel\"];") != std::string::npos &&
+            site_source.find("Detached HEAD and unknown-branch builds do not have a trustworthy") != std::string::npos &&
+            site_source.find("same-name upstream branch. Commit fallback is allowed only after proving") != std::string::npos &&
+            site_source.find("detached/unknown branch commit reachable from upstream") != std::string::npos &&
+            site_source.find("Update check detached/unknown build resolved to upstream") != std::string::npos &&
+            site_source.find("Update check detached/unknown build is not reachable from upstream") != std::string::npos &&
+            site_source.find("buildUpdateCheckFailure(\n        \"detached_target_unknown\"") != std::string::npos &&
+            site_source.find("is not reachable from upstream main or devel") != std::string::npos &&
+            site_source.find("if (isDetachedOrUnknownBranchBuild(versionInfo))") != std::string::npos &&
+            site_source.find("return selectDetachedOrUnknownUpdateBranch(versionInfo);") != std::string::npos &&
+            site_source.find("lookupGithubBranch(currentBranch)") != std::string::npos,
+        "detached HEAD or unknown branch-state builds must keep valid semver as the primary path, avoid treating HEAD/unknown as same-name upstream branches in commit fallback, target main/devel only when reachability is proven with an explicit reason, and report check-failed/unknown when no safe target exists");
     require(
         site_source.find("function parseSemanticVersion(value)") != std::string::npos &&
             site_source.find("function normalizeSemanticIdentifiers(value, allowLeadingZeroNumeric = false)") != std::string::npos &&
@@ -558,6 +595,7 @@ int main()
             site_source.find("rate_limited: \"Update check failed: GitHub API rate limit reached.\"") != std::string::npos &&
             site_source.find("network: \"Update check failed: GitHub could not be reached.\"") != std::string::npos &&
             site_source.find("malformed_response: \"Update check failed: GitHub returned malformed update data.\"") != std::string::npos &&
+            site_source.find("detached_target_unknown: \"Update check failed: detached or unknown branch state has no safe update target.\"") != std::string::npos &&
             site_source.find("function buildUpdateCheckFailure(code, detail = \"\")") != std::string::npos &&
             site_source.find("function normalizeUpdateCheckFailure(error)") != std::string::npos &&
             site_source.find("function markWsprryPiUpdateCheckFailed(error)") != std::string::npos &&
@@ -636,7 +674,8 @@ int main()
             site_source.find("upstream devel missing; explicit fallback to upstream main") != std::string::npos &&
             site_source.find("local devel commit reachable from upstream main") != std::string::npos &&
             site_source.find("selectedUpdateBranch(develBranch, \"local devel targets upstream devel\")") != std::string::npos &&
-            site_source.find("Rule 3: feature, release, and unknown local branches target the same-name") != std::string::npos &&
+            site_source.find("Rule 3: feature and release local branches target the same-name upstream") != std::string::npos &&
+            site_source.find("Detached HEAD and unknown branch-state builds are handled") != std::string::npos &&
             site_source.find("await lookupGithubBranch(currentBranch),") != std::string::npos &&
             site_source.find("local branch targets same-name upstream branch") != std::string::npos &&
             site_source.find("Rule 4: if a non-main/non-devel branch is missing upstream,") != std::string::npos &&
@@ -647,7 +686,7 @@ int main()
             site_source.find("? { updateAvailable: true }") == std::string::npos &&
             site_source.find("const selectedBranch = await selectGithubUpdateBranch(versionInfo);") != std::string::npos &&
             site_source.find("reason=${result.selectionReason || \"unspecified\"}") != std::string::npos,
-        "update checker must target upstream main for local main, target upstream devel by default for local devel, switch devel to main only when compare current...main proves reachability, avoid treating ahead/diverged/malformed/404 containment probes as contained, prefer full SHA exact matches, explicitly mark short-SHA containment as uncertain, target same-name upstream branches for feature branches, and make missing-branch fallback explicit and reasoned without forcing a false update");
+        "update checker must target upstream main for local main, target upstream devel by default for local devel, switch devel to main only when compare current...main proves reachability, avoid treating ahead/diverged/malformed/404 containment probes as contained, prefer full SHA exact matches, explicitly mark short-SHA containment as uncertain, target same-name upstream branches for feature branches, keep detached/unknown branch-state builds out of same-name branch lookup, and make missing-branch fallback explicit and reasoned without forcing a false update");
     require(
         site_source.find("local devel falling back to upstream main because upstream devel returned HTTP 404") != std::string::npos &&
             site_source.find("local devel resolved to upstream main because current SHA is reachable from main") != std::string::npos &&
@@ -664,13 +703,15 @@ int main()
             site_source.find("resolvedSha = await resolveReleaseTargetSha(target, resolvedTargets);") != std::string::npos,
         "release matching must resolve each target_commitish once per scan, try branch lookup before tag lookup, and preserve tag dereferencing");
     require(
-        site_source.find("const rawBackendBranch = typeof response?.wspr_branch === \"string\"") != std::string::npos &&
+            site_source.find("const rawBackendBranch = typeof response?.wspr_branch === \"string\"") != std::string::npos &&
+            site_source.find("const branchState = parseBranchState(response, currentBranch);") != std::string::npos &&
             site_source.find("const rawBackendCommit = typeof response?.wspr_commit === \"string\"") != std::string::npos &&
             site_source.find("const rawExeVersion = typeof response?.wspr_exe_version === \"string\"") != std::string::npos &&
             site_source.find("const currentDisplayVersion = rawDisplayVersion || rawUiVersion;") != std::string::npos &&
             site_source.find("currentModalVersion: rawExeVersion || rawUiVersion || rawDisplayVersion,") != std::string::npos &&
             site_source.find("const displayBranch = branchMatch ? branchMatch[1].trim() : \"\";") != std::string::npos &&
             site_source.find("const currentBranch = rawBackendBranch || displayBranch;") != std::string::npos &&
+            site_source.find("branchState,") != std::string::npos &&
             site_source.find("displayBranch,") != std::string::npos &&
             site_source.find("rawBranch=${versionInfo.currentBranch}") != std::string::npos &&
             site_source.find("version-check") == std::string::npos &&
