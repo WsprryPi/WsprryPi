@@ -469,6 +469,37 @@ int main()
             site_source.find("currentShaLabel") == std::string::npos,
         "update checker must invalidate stale fallback cache entries, short-circuit matching full or short SHAs before GitHub compare, and avoid misleading unused comparison fields");
     require(
+        site_source.find("function parseSemanticVersion(value)") != std::string::npos &&
+            site_source.find("v?(\\d+)\\.(\\d+)\\.(\\d+)") != std::string::npos &&
+            site_source.find("function compareSemanticVersions(left, right)") != std::string::npos &&
+            site_source.find("function comparePrereleaseIdentifier(left, right)") != std::string::npos &&
+            site_source.find("function fetchGithubReleases()") != std::string::npos &&
+            site_source.find("`${UPDATE_CHECK_API_BASE}/releases?per_page=100`") != std::string::npos &&
+            site_source.find("function summarizeSemanticReleases(releases)") != std::string::npos &&
+            site_source.find("latestStable") != std::string::npos &&
+            site_source.find("latestPrerelease") != std::string::npos &&
+            site_source.find("prereleasesByChannel") != std::string::npos &&
+            site_source.find("async function buildSemanticVersionUpdateResult(versionInfo)") != std::string::npos &&
+            site_source.find("semantic version compared against GitHub release") != std::string::npos &&
+            site_source.find("local semantic version has build metadata/commits past tag") != std::string::npos &&
+            site_source.find("local semantic version could not be parsed") != std::string::npos &&
+            site_source.find("GitHub release data unavailable") != std::string::npos &&
+            site_source.find("Stable builds compare only with latest stable release.") != std::string::npos &&
+            site_source.find("Prerelease\n    // builds compare with newer stable releases first, then newer prereleases") != std::string::npos &&
+            site_source.find("const channel = localVersion.prerelease[0];") != std::string::npos &&
+            site_source.find("summary.prereleasesByChannel.get(channel)") != std::string::npos &&
+            site_source.find("versionComparisonUsed: \"semver\"") != std::string::npos &&
+            site_source.find("versionComparisonStatus: comparison === 0 ? \"equal\" : \"local_ahead\"") != std::string::npos &&
+            site_source.find("remoteVersionSelected: summary.latestStable.normalized") != std::string::npos &&
+            site_source.find("remoteVersionSelected: latestSameChannelPrerelease.normalized") != std::string::npos &&
+            site_source.find("async function buildCommitBasedWsprryPiUpdateResult(versionInfo, semanticFallback = null)") != std::string::npos &&
+            site_source.find("versionComparisonUsed: \"commit\"") != std::string::npos &&
+            site_source.find("const semanticResult = await buildSemanticVersionUpdateResult(versionInfo);") != std::string::npos &&
+            site_source.find("if (!semanticResult.useCommitFallback)") != std::string::npos &&
+            site_source.find("Update check using commit fallback: ${semanticResult.reason}") != std::string::npos &&
+            site_source.find("return buildCommitBasedWsprryPiUpdateResult(versionInfo, semanticResult);") != std::string::npos,
+        "update checker must use GitHub release semver as the primary update signal, handle stable/prerelease ordering, treat local newer versions as no-update/local-ahead, fall back to commit checks for extra commits, invalid local semver, or unavailable release data, and expose comparison metadata");
+    require(
         site_source.find("const UPDATE_CHECK_ERROR_MESSAGES = Object.freeze({") != std::string::npos &&
             site_source.find("missing_version_data: \"Update check failed: local version metadata is incomplete.\"") != std::string::npos &&
             site_source.find("missing_commit: \"Update check failed: local commit metadata is missing.\"") != std::string::npos &&
@@ -495,7 +526,7 @@ int main()
             site_source.find("function updateModalIdentity(versionInfo, result)") != std::string::npos &&
             site_source.find("branch: result.targetBranch || \"\",") != std::string::npos &&
             site_source.find("currentSha: versionInfo.currentSha || result.currentSha || \"\",") != std::string::npos &&
-            site_source.find("targetSha: result.targetHeadSha || \"\",") != std::string::npos &&
+            site_source.find("targetSha: result.targetHeadSha || result.remoteVersionSelected || \"\",") != std::string::npos &&
             site_source.find("updateUrl: result.releaseUrl || UPDATE_CHECK_RELEASES_URL") != std::string::npos &&
             site_source.find("function updateModalStateMatches(state, identity)") != std::string::npos &&
             site_source.find("state.targetSha === identity.targetSha") != std::string::npos &&
@@ -519,9 +550,9 @@ int main()
             site_source.find("GitHub returned malformed JSON") != std::string::npos &&
             site_source.find("GitHub compare response did not include a status") != std::string::npos &&
             site_source.find("GitHub branch ${branch} did not include a HEAD SHA") != std::string::npos &&
-            site_source.find("Update detection is intentionally branch/commit based.") != std::string::npos &&
-            site_source.find("Semantic versions,") != std::string::npos,
-        "update checker must surface GitHub network, rate-limit, malformed JSON, malformed compare, and malformed branch responses while documenting that update detection remains branch/commit based");
+            site_source.find("Semantic version flow is primary when the local build is at a parseable") != std::string::npos &&
+            site_source.find("Commit/branch comparison is fallback") != std::string::npos,
+        "update checker must surface GitHub network, rate-limit, malformed JSON, malformed compare, and malformed branch responses while documenting that semver is primary and commit/branch comparison is fallback");
     require(
         site_source.find("async function isCurrentShaReachableFromBranchHead(currentSha, branchInfo)") != std::string::npos &&
             site_source.find("normalizedCurrent.length >= 40 && normalizedHead.length >= 40 && normalizedCurrent === normalizedHead") != std::string::npos &&
@@ -596,12 +627,14 @@ int main()
             site_source.find("version_check") == std::string::npos,
         "update checker must prefer backend wspr_branch/wspr_commit, keep display text independent, and avoid hard-coded branch normalization or branch-name guessing");
     require(
-        site_source.find("`${versionInfo.currentModalVersion} is behind ${result.targetBranch} ${targetShaLabel}.`") != std::string::npos &&
+        site_source.find("const summaryText = result.versionComparisonUsed === \"semver\" && result.remoteVersionSelected") != std::string::npos &&
+            site_source.find("`${result.localVersionParsed || versionInfo.currentModalVersion} is behind release ${result.remoteVersionSelected}.`") != std::string::npos &&
+            site_source.find("`${versionInfo.currentModalVersion} is behind ${result.targetBranch} ${targetShaLabel}.`") != std::string::npos &&
             site_source.find("`${versionInfo.currentDisplayVersion} is behind ${result.targetBranch} ${targetShaLabel}.`") == std::string::npos &&
             site_source.find("const exactRelease = result.fallbackUsed !== true && Boolean(result.releaseTitle);") != std::string::npos &&
             site_source.find("Review the latest releases: ") != std::string::npos &&
             site_source.find("Review the latest WsprryPi releases before updating.") == std::string::npos,
-        "update modal must use wspr_exe_version in the summary, explain fallback checks, and suppress exact-release wording when fallback is used");
+        "update modal must use semantic release wording for semver updates, preserve wspr_exe_version in commit fallback summaries, explain fallback checks, and suppress exact-release wording when fallback is used");
     require(
         site_source.find("await lookupGithubBranch(currentBranch),") != std::string::npos &&
             site_source.find("if (error.status !== 404)") != std::string::npos &&
