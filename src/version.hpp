@@ -73,11 +73,25 @@ extern std::string get_exe_branch();
 extern std::string get_exe_raw_branch();
 
 /**
+ * @brief Retrieves the Git branch state captured at build time.
+ *
+ * @return A `std::string` containing "branch", "detached", or "unknown".
+ */
+extern std::string get_exe_branch_state();
+
+/**
  * @brief Retrieves the build commit SHA.
  *
  * @return A `std::string` representing the build commit SHA.
  */
 extern std::string get_exe_commit();
+
+/**
+ * @brief Retrieves whether the source tree had local modifications at build time.
+ *
+ * @return A `std::string` containing "true", "false", or "unknown".
+ */
+extern std::string get_exe_build_dirty();
 
 /**
  * @brief Retrieves the current debug state based on the build configuration.

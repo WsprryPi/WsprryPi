@@ -146,8 +146,16 @@ constexpr std::string_view to_string_view(T value) noexcept
 #define MAKE_RAW_BRH "unknown" ///< Fallback for the raw branch name.
 #endif
 
+#ifndef MAKE_BRANCH_STATE
+#define MAKE_BRANCH_STATE "unknown" ///< Fallback for the Git branch state.
+#endif
+
 #ifndef MAKE_COMMIT
 #define MAKE_COMMIT "unknown" ///< Fallback for the commit SHA.
+#endif
+
+#ifndef MAKE_DIRTY
+#define MAKE_DIRTY "unknown" ///< Fallback for the build dirty state.
 #endif
 
 #ifndef MAKE_EXE
@@ -162,7 +170,9 @@ constexpr std::string_view to_string_view(T value) noexcept
 constexpr std::string_view SANITIZED_TAG = to_string_view(MAKE_TAG); ///< Sanitized build tag.
 constexpr std::string_view SANITIZED_BRH = to_string_view(MAKE_BRH); ///< Sanitized branch name.
 constexpr std::string_view RAW_BRH = to_string_view(MAKE_RAW_BRH); ///< Raw branch name.
+constexpr std::string_view BRANCH_STATE = to_string_view(MAKE_BRANCH_STATE); ///< Git branch state.
 constexpr std::string_view SANITIZED_COMMIT = to_string_view(MAKE_COMMIT); ///< Sanitized commit SHA.
+constexpr std::string_view BUILD_DIRTY = to_string_view(MAKE_DIRTY); ///< Build-time dirty state.
 constexpr std::string_view SANITIZED_EXE = to_string_view(MAKE_EXE); ///< Sanitized executable name.
 constexpr std::string_view SANITIZED_PRJ = to_string_view(MAKE_PRJ); ///< Sanitized project name.
 
@@ -206,6 +216,20 @@ std::string get_exe_raw_branch()
 }
 
 /**
+ * @brief Retrieves the Git branch state captured at build time.
+ *
+ * This distinguishes normal branch builds from detached HEAD or unavailable
+ * Git metadata so the update checker does not treat "HEAD" as an upstream
+ * branch name.
+ *
+ * @return A `std::string` containing "branch", "detached", or "unknown".
+ */
+std::string get_exe_branch_state()
+{
+    return std::string(BRANCH_STATE);
+}
+
+/**
  * @brief Retrieves the current commit SHA.
  *
  * This function returns the Git commit SHA associated with the build.
@@ -216,6 +240,19 @@ std::string get_exe_raw_branch()
 std::string get_exe_commit()
 {
     return std::string(SANITIZED_COMMIT);
+}
+
+/**
+ * @brief Retrieves whether the source tree had local modifications at build time.
+ *
+ * The value is captured by the build system and describes local modifications
+ * at compile time. It does not indicate whether a remote update exists.
+ *
+ * @return A `std::string` containing "true", "false", or "unknown".
+ */
+std::string get_exe_build_dirty()
+{
+    return std::string(BUILD_DIRTY);
 }
 
 /**
