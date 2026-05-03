@@ -654,8 +654,10 @@ int main()
         site_source.find("showWsprryPiUpdateModal(versionInfo, result);");
     require(
         site_source.find("const UPDATE_MODAL_STATE_KEY = \"wsprrypi.updateModalState\";") != std::string::npos &&
+            site_source.find("const UPDATE_CHECK_DISABLED_KEY = \"wsprrypi.updateCheckDisabled\";") != std::string::npos &&
             site_source.find("const UPDATE_MODAL_RATE_LIMIT_MS = 2 * 60 * 60 * 1000;") != std::string::npos &&
             site_source.find("let fallbackUpdateModalState = null;") != std::string::npos &&
+            site_source.find("let activeUpdateModalIdentity = null;") != std::string::npos &&
             site_source.find("function updateModalIdentity(versionInfo, result)") != std::string::npos &&
             site_source.find("Modal rate limiting is also site-global; the current page path is not") != std::string::npos &&
             site_source.find("branch: result.targetBranch || \"\",") != std::string::npos &&
@@ -667,17 +669,31 @@ int main()
             site_source.find("state.updateUrl === identity.updateUrl") != std::string::npos &&
             site_source.find("function shouldShowUpdateModal(versionInfo, result)") != std::string::npos &&
             site_source.find("if (!updateModalStateMatches(state, identity))") != std::string::npos &&
-            site_source.find("return Date.now() - Number(state.lastSeenAt || 0) >= UPDATE_MODAL_RATE_LIMIT_MS;") != std::string::npos &&
+            site_source.find("if (lastSeenAt > Date.now())") != std::string::npos &&
+            site_source.find("return Date.now() - lastSeenAt >= UPDATE_MODAL_RATE_LIMIT_MS;") != std::string::npos &&
+            site_source.find("function handleUpdateCheckStorageEvent(event)") != std::string::npos &&
+            site_source.find("event.key === UPDATE_CHECK_DISABLED_KEY") != std::string::npos &&
+            site_source.find("event.key !== UPDATE_MODAL_STATE_KEY || !activeUpdateModalIdentity") != std::string::npos &&
+            site_source.find("updateModalStateMatches(state, activeUpdateModalIdentity)") != std::string::npos &&
+            site_source.find("state.reason === \"dismissed\" || state.reason === \"opened\"") != std::string::npos &&
             site_source.find("writeUpdateModalState(versionInfo, result, \"shown\");") != std::string::npos &&
+            site_source.find("activeUpdateModalIdentity = updateModalIdentity(versionInfo, result);") != std::string::npos &&
             site_source.find("writeUpdateModalState(versionInfo, result, \"dismissed\");") != std::string::npos &&
             site_source.find("window.localStorage.setItem(UPDATE_MODAL_STATE_KEY, JSON.stringify(state));") != std::string::npos &&
+            site_source.find("Never check again") != std::string::npos &&
+            site_source.find("setUpdateCheckDisabled(true);") != std::string::npos &&
+            site_source.find("if (isUpdateCheckDisabled())") != std::string::npos &&
+            site_source.find("Update checks disabled by user preference.") != std::string::npos &&
+            site_source.find("function markWsprryPiUpdateChecksDisabled()") != std::string::npos &&
+            site_source.find("function initUpdateCheckControls()") != std::string::npos &&
+            site_source.find("window.addEventListener(\"storage\", handleUpdateCheckStorageEvent);") != std::string::npos &&
             site_source.find("fallbackUpdateModalState = state;") != std::string::npos &&
             update_footer_pos != std::string::npos &&
             update_modal_pos != std::string::npos &&
             update_footer_pos < update_modal_pos &&
             site_source.find("const UPDATE_CHECK_DISMISS_PREFIX") == std::string::npos &&
             site_source.find("updateDismissalKey") == std::string::npos,
-        "update-available modal display must use a separate two-hour localStorage state keyed by branch/current SHA/target SHA/update URL, allow immediate display when the target changes, fall back safely when localStorage is unavailable, and keep the footer indicator independent from modal suppression");
+        "update-available modal display must use a separate two-hour site-global localStorage state keyed by branch/current SHA/target SHA/update URL, treat future timestamps as expired, allow immediate display when the update URL changes or after unrelated failures, fall back safely when localStorage is unavailable, propagate matching dismissal across tabs, support a site-global never-check-again state, and keep the footer indicator independent from modal suppression");
     require(
         site_source.find("GitHub network request failed") != std::string::npos &&
             site_source.find("response.headers.get(\"x-ratelimit-remaining\") === \"0\"") != std::string::npos &&
@@ -812,6 +828,8 @@ int main()
         "Configuration view must expose the guarded mode-change confirmation modal");
     const std::string footer_source =
         read_text_file("/home/pi/WsprryPi/WsprryPi-UI/data/footer.php");
+    const std::string site_css_source =
+        read_text_file("/home/pi/WsprryPi/WsprryPi-UI/data/site.css");
     const std::string header_source =
         read_text_file("/home/pi/WsprryPi/WsprryPi-UI/data/header.php");
     const std::string index_page_source =
@@ -832,8 +850,11 @@ int main()
         read_text_file("/home/pi/WsprryPi/WsprryPi-UI/data/view_diag_logs.php");
     require(
         footer_source.find("<details class=\"footer-meta\">") != std::string::npos &&
-            footer_source.find("<summary>About</summary>") != std::string::npos,
-        "footer markup must keep the native click-based About disclosure");
+            footer_source.find("<summary>About</summary>") != std::string::npos &&
+            footer_source.find("id=\"updateCheckToggle\"") != std::string::npos &&
+            footer_source.find("Disable update checks") != std::string::npos &&
+            site_css_source.find(".footer-meta__action") != std::string::npos,
+        "footer markup must keep the native click-based About disclosure and provide a site-global update-check toggle for disabling or re-enabling checks");
     require(
         header_source.find("window.WSPRRYPI_UI_VERSION = <?= json_encode(getWsprryPiUiVersion()) ?>;") != std::string::npos &&
             ui_version_source.find("function getWsprryPiUiVersion(): string") != std::string::npos &&
