@@ -80,6 +80,13 @@ extern std::string get_exe_raw_branch();
 extern std::string get_exe_commit();
 
 /**
+ * @brief Retrieves whether the source tree had local modifications at build time.
+ *
+ * @return A `std::string` containing "true", "false", or "unknown".
+ */
+extern std::string get_exe_build_dirty();
+
+/**
  * @brief Retrieves the current debug state based on the build configuration.
  *
  * This function determines whether the current build is a debug or release

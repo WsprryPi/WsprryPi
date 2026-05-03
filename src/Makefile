@@ -108,6 +108,7 @@ VER := $(BASE_VER)$(PRE)
 
 COMMIT := $(shell git rev-parse --short HEAD 2>/dev/null || echo "unknown")
 FULL_COMMIT := $(shell git rev-parse HEAD 2>/dev/null || echo "unknown")
+GIT_DIRTY := $(shell if ! git rev-parse --is-inside-work-tree >/dev/null 2>&1; then echo unknown; elif [ -n "$$(git status --porcelain --untracked-files=no 2>/dev/null)" ]; then echo true; else echo false; fi)
 VER := $(shell if ! git describe --tags --exact-match >/dev/null 2>&1; then echo "$(VER)+$(COMMIT)"; else echo "$(VER)"; fi)
 
 OUT := $(strip $(EXE_NAME))
@@ -324,6 +325,7 @@ CXXFLAGS += -DMAKE_TAG=\"$(VER)\" \
             -DMAKE_BRH=\"$(BRH)\" \
             -DMAKE_RAW_BRH=\"$(RAW_BRH)\" \
             -DMAKE_COMMIT=\"$(FULL_COMMIT)\" \
+            -DMAKE_DIRTY=\"$(GIT_DIRTY)\" \
             -DMAKE_EXE=\"$(OUT)\" \
             -DMAKE_PRJ=\"$(PRJ)\"
 

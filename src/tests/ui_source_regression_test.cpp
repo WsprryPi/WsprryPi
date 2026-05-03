@@ -73,6 +73,10 @@ int main()
         read_text_file("/home/pi/WsprryPi/src/web_server.cpp");
     const std::string makefile_source =
         read_text_file("/home/pi/WsprryPi/src/Makefile");
+    const std::string version_source =
+        read_text_file("/home/pi/WsprryPi/src/version.cpp");
+    const std::string version_header_source =
+        read_text_file("/home/pi/WsprryPi/src/version.hpp");
     require(
         websocket_source.find("else if (cmd == \"stop\")") != std::string::npos &&
             websocket_source.find("stop_transmission_by_user_request(persist_transmit);") !=
@@ -452,10 +456,20 @@ int main()
             makefile_source.find("BRH := $(shell printf '%s\\n' \"$(RAW_BRH)\"") != std::string::npos &&
             makefile_source.find("-DMAKE_BRH=\\\"$(BRH)\\\"") != std::string::npos &&
             makefile_source.find("-DMAKE_RAW_BRH=\\\"$(RAW_BRH)\\\"") != std::string::npos &&
-            makefile_source.find("-DMAKE_COMMIT=\\\"$(FULL_COMMIT)\\\"") != std::string::npos,
-        "build metadata must pass sanitized MAKE_BRH for display, raw MAKE_RAW_BRH for update lookup, and full commit to version.cpp");
+            makefile_source.find("-DMAKE_COMMIT=\\\"$(FULL_COMMIT)\\\"") != std::string::npos &&
+            makefile_source.find("GIT_DIRTY :=") != std::string::npos &&
+            makefile_source.find("git rev-parse --is-inside-work-tree") != std::string::npos &&
+            makefile_source.find("git status --porcelain --untracked-files=no") != std::string::npos &&
+            makefile_source.find("-DMAKE_DIRTY=\\\"$(GIT_DIRTY)\\\"") != std::string::npos &&
+            version_source.find("#define MAKE_DIRTY \"unknown\"") != std::string::npos &&
+            version_source.find("constexpr std::string_view BUILD_DIRTY = to_string_view(MAKE_DIRTY);") != std::string::npos &&
+            version_source.find("std::string get_exe_build_dirty()") != std::string::npos &&
+            version_source.find("It does not indicate whether a remote update exists.") != std::string::npos &&
+            version_header_source.find("extern std::string get_exe_build_dirty();") != std::string::npos &&
+            web_server_source.find("j[\"wspr_build_dirty\"] = get_exe_build_dirty();") != std::string::npos,
+        "build metadata must pass sanitized MAKE_BRH for display, raw MAKE_RAW_BRH for update lookup, full commit and build-time dirty state to version.cpp, and expose wspr_build_dirty in /version");
     require(
-        site_source.find("const UPDATE_CHECK_CACHE_SCHEMA_VERSION = 5;") != std::string::npos &&
+        site_source.find("const UPDATE_CHECK_CACHE_SCHEMA_VERSION = 6;") != std::string::npos &&
             site_source.find("function updateCheckShaMatches(currentSha, targetHeadSha)") != std::string::npos &&
             site_source.find("return normalizedHead.startsWith(normalizedCurrent);") != std::string::npos &&
             site_source.find("function updateCheckNoUpdateResult()") != std::string::npos &&
@@ -468,6 +482,29 @@ int main()
             site_source.find("completed:") == std::string::npos &&
             site_source.find("currentShaLabel") == std::string::npos,
         "update checker must invalidate stale fallback cache entries, short-circuit matching full or short SHAs before GitHub compare, and avoid misleading unused comparison fields");
+    require(
+        site_source.find("Dirty means the local source tree had uncommitted or staged modifications") != std::string::npos &&
+            site_source.find("function parseBuildDirtyState(response, rawDisplayVersion, rawUiVersion, rawExeVersion)") != std::string::npos &&
+            site_source.find("response?.wspr_build_dirty ?? response?.wspr_dirty") != std::string::npos &&
+            site_source.find("source: \"structured\"") != std::string::npos &&
+            site_source.find("source: \"version_text\"") != std::string::npos &&
+            site_source.find("source: \"unavailable\"") != std::string::npos &&
+            site_source.find("buildDirtyKnown: dirtyState.known") != std::string::npos &&
+            site_source.find("buildDirty: dirtyState.dirty") != std::string::npos &&
+            site_source.find("buildDirtySource: dirtyState.source") != std::string::npos &&
+            site_source.find("versionInfo.buildDirtyKnown") != std::string::npos &&
+            site_source.find("? versionInfo.buildDirty ? \"dirty\" : \"clean\"") != std::string::npos &&
+            site_source.find(": \"dirty-unknown\"") != std::string::npos &&
+            site_source.find("function applyDirtyBuildMetadata(versionInfo, result)") != std::string::npos &&
+            site_source.find("if (!versionInfo.buildDirtyKnown)") != std::string::npos &&
+            site_source.find("if (!versionInfo.buildDirty)") != std::string::npos &&
+            site_source.find("localBuildState: \"dirty_build\"") != std::string::npos &&
+            site_source.find("versionComparisonStatus: result.updateAvailable ? result.versionComparisonStatus : \"local_modified\"") != std::string::npos &&
+            site_source.find("dirty means local modifications, not a remote update") != std::string::npos &&
+            site_source.find("return applyDirtyBuildMetadata(versionInfo, semanticResult);") != std::string::npos &&
+            site_source.find("return applyDirtyBuildMetadata(versionInfo, commitResult);") != std::string::npos &&
+            site_source.find("if (!result || result.updateAvailable !== true)") != std::string::npos,
+        "update checker must prefer structured wspr_build_dirty metadata over display-string parsing, keep unknown dirty metadata from changing behavior, separate clean/dirty cache entries for the same branch and SHA, mark dirty no-update results as local_modified/dirty_build, preserve dirty older-commit update-available results, and avoid showing footer/modal updates solely because a build is dirty");
     require(
         site_source.find("function parseSemanticVersion(value)") != std::string::npos &&
             site_source.find("function normalizeSemanticIdentifiers(value, allowLeadingZeroNumeric = false)") != std::string::npos &&
@@ -510,7 +547,7 @@ int main()
             site_source.find("const semanticResult = await buildSemanticVersionUpdateResult(versionInfo);") != std::string::npos &&
             site_source.find("if (!semanticResult.useCommitFallback)") != std::string::npos &&
             site_source.find("Update check using commit fallback: ${semanticResult.reason}") != std::string::npos &&
-            site_source.find("return buildCommitBasedWsprryPiUpdateResult(versionInfo, semanticResult);") != std::string::npos,
+            site_source.find("const commitResult = await buildCommitBasedWsprryPiUpdateResult(versionInfo, semanticResult);") != std::string::npos,
         "update checker must use GitHub release semver as the primary update signal, normalize and validate prerelease identifiers, handle stable/prerelease ordering and numeric prerelease segments, keep prerelease updates on the same channel by default, treat local newer versions as no-update/local-ahead, fall back to commit checks for extra commits, invalid local semver, malformed prerelease semver, or unavailable release data, and expose comparison metadata");
     require(
         site_source.find("const UPDATE_CHECK_ERROR_MESSAGES = Object.freeze({") != std::string::npos &&

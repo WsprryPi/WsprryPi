@@ -218,6 +218,7 @@ void WebServer::start(int port)
               j["wspr_display_branch"] = get_exe_branch();
               j["wspr_exe_version"] = get_exe_version();
               j["wspr_commit"] = get_exe_commit();
+              j["wspr_build_dirty"] = get_exe_build_dirty();
               res.set_content(j.dump(4), "application/json");
             });
 

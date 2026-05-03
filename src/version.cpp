@@ -150,6 +150,10 @@ constexpr std::string_view to_string_view(T value) noexcept
 #define MAKE_COMMIT "unknown" ///< Fallback for the commit SHA.
 #endif
 
+#ifndef MAKE_DIRTY
+#define MAKE_DIRTY "unknown" ///< Fallback for the build dirty state.
+#endif
+
 #ifndef MAKE_EXE
 #define MAKE_EXE "unknown" ///< Fallback for the executable name.
 #endif
@@ -163,6 +167,7 @@ constexpr std::string_view SANITIZED_TAG = to_string_view(MAKE_TAG); ///< Saniti
 constexpr std::string_view SANITIZED_BRH = to_string_view(MAKE_BRH); ///< Sanitized branch name.
 constexpr std::string_view RAW_BRH = to_string_view(MAKE_RAW_BRH); ///< Raw branch name.
 constexpr std::string_view SANITIZED_COMMIT = to_string_view(MAKE_COMMIT); ///< Sanitized commit SHA.
+constexpr std::string_view BUILD_DIRTY = to_string_view(MAKE_DIRTY); ///< Build-time dirty state.
 constexpr std::string_view SANITIZED_EXE = to_string_view(MAKE_EXE); ///< Sanitized executable name.
 constexpr std::string_view SANITIZED_PRJ = to_string_view(MAKE_PRJ); ///< Sanitized project name.
 
@@ -216,6 +221,19 @@ std::string get_exe_raw_branch()
 std::string get_exe_commit()
 {
     return std::string(SANITIZED_COMMIT);
+}
+
+/**
+ * @brief Retrieves whether the source tree had local modifications at build time.
+ *
+ * The value is captured by the build system and describes local modifications
+ * at compile time. It does not indicate whether a remote update exists.
+ *
+ * @return A `std::string` containing "true", "false", or "unknown".
+ */
+std::string get_exe_build_dirty()
+{
+    return std::string(BUILD_DIRTY);
 }
 
 /**
