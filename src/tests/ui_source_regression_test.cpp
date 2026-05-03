@@ -700,14 +700,16 @@ int main()
             site_source.find("function getUserFacingUpdateSummary(result = null)") != std::string::npos &&
             site_source.find("function buildTechnicalDetails(versionInfo = null, result = null, failure = null)") != std::string::npos &&
             site_source.find("function renderUpdateCheckTechnicalDetails(elements, details)") != std::string::npos &&
-            site_source.find("function renderUpdateCheckPanelTarget(elements, result = null)") != std::string::npos &&
             site_source.find("function appendUpdateCheckCodeText(parent, value)") != std::string::npos &&
+            site_source.find("function buildUpdateCheckTargetParts(result = null)") != std::string::npos &&
             site_source.find("const code = document.createElement(\"code\");") != std::string::npos &&
             site_source.find("label: \"Branch\", value: result.targetBranch") != std::string::npos &&
             site_source.find("label: \"Commit\", value: shortSha(result.targetHeadSha)") != std::string::npos &&
-            site_source.find("elements.target.appendChild(document.createTextNode(\" - \"));") != std::string::npos &&
-            site_source.find("elements.target.appendChild(document.createTextNode(`${part.label}: `));") != std::string::npos &&
-            site_source.find("appendUpdateCheckCodeText(elements.target, part.value);") != std::string::npos &&
+            site_source.find("appendUpdateCheckTechnicalDetail(\n        details,\n        \"Current\",\n        updateCheckPanelCurrentText(versionInfo),\n        { code: true }\n    );") != std::string::npos &&
+            site_source.find("appendUpdateCheckTechnicalParts(details, \"Target\", targetParts);") != std::string::npos &&
+            site_source.find("description.appendChild(document.createTextNode(\" - \"));") != std::string::npos &&
+            site_source.find("description.appendChild(document.createTextNode(`${part.label}: `));") != std::string::npos &&
+            site_source.find("appendUpdateCheckCodeText(description, part.value);") != std::string::npos &&
             site_source.find("label: \"Summary\"") != std::string::npos &&
             site_source.find("Technical details ▼") != std::string::npos &&
             site_source.find("Technical details ▲") != std::string::npos &&
@@ -1113,7 +1115,12 @@ int main()
             maintenance_source.find("maintenance-action maintenance-action--end") == std::string::npos &&
             maintenance_source.find("id=\"updateCheckPanel\"") != std::string::npos &&
             maintenance_source.find("id=\"updateCheckStatus\"") != std::string::npos &&
+            maintenance_source.find("class=\"maintenance-update-status visually-hidden\"") != std::string::npos &&
+            maintenance_source.find("id=\"updateCheckCurrent\"") == std::string::npos &&
+            maintenance_source.find("id=\"updateCheckTarget\"") == std::string::npos &&
             maintenance_source.find("id=\"updateCheckSummary\"") == std::string::npos &&
+            maintenance_source.find("<dt>Current</dt>") == std::string::npos &&
+            maintenance_source.find("<dt>Target</dt>") == std::string::npos &&
             maintenance_source.find("<dt>Summary</dt>") == std::string::npos &&
             maintenance_source.find("id=\"updateCheckDetails\"") == std::string::npos &&
             maintenance_source.find("id=\"updateCheckTechnical\"") != std::string::npos &&
