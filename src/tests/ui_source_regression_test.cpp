@@ -588,6 +588,8 @@ int main()
             site_source.find("const commitResult = await buildCommitBasedWsprryPiUpdateResult(versionInfo, semanticResult);") != std::string::npos,
         "update checker must use GitHub release semver as the primary update signal, normalize and validate prerelease identifiers, handle stable/prerelease ordering and numeric prerelease segments, keep prerelease updates on the same channel by default, treat local newer versions as no-update/local-ahead, fall back to commit checks for extra commits, invalid local semver, malformed prerelease semver, or unavailable release data, and expose comparison metadata");
     require(
+        site_source.find("const UPDATE_CHECK_FAILURE_CACHE_PREFIX = \"wsprrypi.updateCheckFailure\";") != std::string::npos &&
+            site_source.find("const UPDATE_CHECK_FAILURE_RATE_LIMIT_MS = 5 * 60 * 1000;") != std::string::npos &&
         site_source.find("const UPDATE_CHECK_ERROR_MESSAGES = Object.freeze({") != std::string::npos &&
             site_source.find("missing_version_data: \"Update check failed: local version metadata is incomplete.\"") != std::string::npos &&
             site_source.find("missing_commit: \"Update check failed: local commit metadata is missing.\"") != std::string::npos &&
@@ -599,11 +601,25 @@ int main()
             site_source.find("detached_target_unknown: \"Update check failed: detached or unknown branch state has no safe update target.\"") != std::string::npos &&
             site_source.find("function buildUpdateCheckFailure(code, detail = \"\")") != std::string::npos &&
             site_source.find("function normalizeUpdateCheckFailure(error)") != std::string::npos &&
+            site_source.find("function updateCheckFailureCacheKey(versionInfo)") != std::string::npos &&
+            site_source.find("`${UPDATE_CHECK_FAILURE_CACHE_PREFIX}:`") != std::string::npos &&
+            site_source.find("function readUpdateCheckFailureCache(versionInfo)") != std::string::npos &&
+            site_source.find("cached.updateCheckFailed !== true") != std::string::npos &&
+            site_source.find("Date.now() - Number(cached.checkedAt || 0) >= UPDATE_CHECK_FAILURE_RATE_LIMIT_MS") != std::string::npos &&
+            site_source.find("function writeUpdateCheckFailureCache(versionInfo, error)") != std::string::npos &&
+            site_source.find("window.localStorage.removeItem(updateCheckFailureCacheKey(versionInfo));") != std::string::npos &&
+            site_source.find("const cachedFailure = readUpdateCheckFailureCache(versionInfo);") != std::string::npos &&
+            site_source.find("Update check failure rate limit active") != std::string::npos &&
+            site_source.find("markWsprryPiUpdateCheckFailed(cachedFailure);") != std::string::npos &&
+            site_source.find("const failure = writeUpdateCheckFailureCache(versionInfo, error);") != std::string::npos &&
             site_source.find("function markWsprryPiUpdateCheckFailed(error)") != std::string::npos &&
             site_source.find("versionElement.classList.add(\"update-check-failed\");") != std::string::npos &&
-            site_source.find("markWsprryPiUpdateCheckFailed(error);") != std::string::npos &&
-            site_source.find("writeFailedUpdateCheckCache") == std::string::npos,
-        "update checker failures must have explicit UI and console states, must classify local metadata, branch, network, rate-limit, and malformed-response failures, and must not cache failed checks as no-update results");
+            site_source.find("markWsprryPiUpdateCheckFailed(failure);") != std::string::npos &&
+            site_source.find("writeFailedUpdateCheckCache") == std::string::npos &&
+            site_source.find("Site-global key: do not include page path") != std::string::npos &&
+            site_source.find("return `${UPDATE_CHECK_CACHE_PREFIX}:${versionInfo.branchState || \"branch\"}:${versionInfo.currentBranch}:${versionInfo.currentSha}:${dirtyKey}`;") != std::string::npos &&
+            site_source.find("Use the same site-global identity as successful checks") != std::string::npos,
+        "update checker failures must have explicit UI and console states, must classify local metadata, branch, network, rate-limit, malformed-response, and detached-target failures, must not cache failed checks as no-update results, may rate-limit repeated failed checks while preserving failed state, and must clear matching failure state when a successful result is cached");
     require(
         site_source.find("function buildLocalUpdateStateTitle(result)") != std::string::npos &&
             site_source.find("result?.versionComparisonStatus === \"local_modified\"") != std::string::npos &&
@@ -617,7 +633,7 @@ int main()
             site_source.find("updateLink.classList.add(\"d-none\");\n        updateLink.href = UPDATE_CHECK_RELEASES_URL;\n        updateLink.title = title;\n        updateLink.setAttribute(\"aria-label\", title);") != std::string::npos &&
             site_source.find("displayState=${localStateTitle}") != std::string::npos &&
             site_source.find("markWsprryPiLocalUpdateState(result);\n        return;\n    }\n\n    markWsprryPiUpdateFooter(result);\n    showWsprryPiUpdateModal(versionInfo, result);") != std::string::npos &&
-            site_source.find("markWsprryPiUpdateCheckFailed(error);") != std::string::npos &&
+            site_source.find("markWsprryPiUpdateCheckFailed(failure);") != std::string::npos &&
             site_source.find("writeUpdateCheckCache(versionInfo, result);") != std::string::npos,
         "footer update display must keep update-available behavior and modal timing unchanged, clear warning/update indicators for clean no-update, label dirty/local-modified and local-ahead states distinctly in title/ARIA without showing the modal, show failed/unknown checks through the failed-check path, and avoid caching check failures as no-update");
     const std::size_t update_footer_pos =
@@ -629,6 +645,7 @@ int main()
             site_source.find("const UPDATE_MODAL_RATE_LIMIT_MS = 2 * 60 * 60 * 1000;") != std::string::npos &&
             site_source.find("let fallbackUpdateModalState = null;") != std::string::npos &&
             site_source.find("function updateModalIdentity(versionInfo, result)") != std::string::npos &&
+            site_source.find("Modal rate limiting is also site-global; the current page path is not") != std::string::npos &&
             site_source.find("branch: result.targetBranch || \"\",") != std::string::npos &&
             site_source.find("currentSha: versionInfo.currentSha || result.currentSha || \"\",") != std::string::npos &&
             site_source.find("targetSha: result.targetHeadSha || result.remoteVersionSelected || \"\",") != std::string::npos &&
