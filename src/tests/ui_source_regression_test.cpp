@@ -484,6 +484,35 @@ int main()
             site_source.find("markWsprryPiUpdateCheckFailed(error);") != std::string::npos &&
             site_source.find("writeFailedUpdateCheckCache") == std::string::npos,
         "update checker failures must have explicit UI and console states, must classify local metadata, branch, network, rate-limit, and malformed-response failures, and must not cache failed checks as no-update results");
+    const std::size_t update_footer_pos =
+        site_source.find("markWsprryPiUpdateFooter(result);");
+    const std::size_t update_modal_pos =
+        site_source.find("showWsprryPiUpdateModal(versionInfo, result);");
+    require(
+        site_source.find("const UPDATE_MODAL_STATE_KEY = \"wsprrypi.updateModalState\";") != std::string::npos &&
+            site_source.find("const UPDATE_MODAL_RATE_LIMIT_MS = 2 * 60 * 60 * 1000;") != std::string::npos &&
+            site_source.find("let fallbackUpdateModalState = null;") != std::string::npos &&
+            site_source.find("function updateModalIdentity(versionInfo, result)") != std::string::npos &&
+            site_source.find("branch: result.targetBranch || \"\",") != std::string::npos &&
+            site_source.find("currentSha: versionInfo.currentSha || result.currentSha || \"\",") != std::string::npos &&
+            site_source.find("targetSha: result.targetHeadSha || \"\",") != std::string::npos &&
+            site_source.find("updateUrl: result.releaseUrl || UPDATE_CHECK_RELEASES_URL") != std::string::npos &&
+            site_source.find("function updateModalStateMatches(state, identity)") != std::string::npos &&
+            site_source.find("state.targetSha === identity.targetSha") != std::string::npos &&
+            site_source.find("state.updateUrl === identity.updateUrl") != std::string::npos &&
+            site_source.find("function shouldShowUpdateModal(versionInfo, result)") != std::string::npos &&
+            site_source.find("if (!updateModalStateMatches(state, identity))") != std::string::npos &&
+            site_source.find("return Date.now() - Number(state.lastSeenAt || 0) >= UPDATE_MODAL_RATE_LIMIT_MS;") != std::string::npos &&
+            site_source.find("writeUpdateModalState(versionInfo, result, \"shown\");") != std::string::npos &&
+            site_source.find("writeUpdateModalState(versionInfo, result, \"dismissed\");") != std::string::npos &&
+            site_source.find("window.localStorage.setItem(UPDATE_MODAL_STATE_KEY, JSON.stringify(state));") != std::string::npos &&
+            site_source.find("fallbackUpdateModalState = state;") != std::string::npos &&
+            update_footer_pos != std::string::npos &&
+            update_modal_pos != std::string::npos &&
+            update_footer_pos < update_modal_pos &&
+            site_source.find("const UPDATE_CHECK_DISMISS_PREFIX") == std::string::npos &&
+            site_source.find("updateDismissalKey") == std::string::npos,
+        "update-available modal display must use a separate two-hour localStorage state keyed by branch/current SHA/target SHA/update URL, allow immediate display when the target changes, fall back safely when localStorage is unavailable, and keep the footer indicator independent from modal suppression");
     require(
         site_source.find("GitHub network request failed") != std::string::npos &&
             site_source.find("response.headers.get(\"x-ratelimit-remaining\") === \"0\"") != std::string::npos &&
