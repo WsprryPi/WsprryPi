@@ -697,6 +697,19 @@ int main()
             site_source.find("function renderUpdateCheckPanel(versionInfo = null, result = null)") != std::string::npos &&
             site_source.find("function renderUpdateCheckPanelFailure(error, versionInfo = null)") != std::string::npos &&
             site_source.find("function renderUpdateCheckPanelDisabled()") != std::string::npos &&
+            site_source.find("function getUserFacingUpdateSummary(result = null)") != std::string::npos &&
+            site_source.find("function buildTechnicalDetails(versionInfo = null, result = null, failure = null)") != std::string::npos &&
+            site_source.find("function renderUpdateCheckTechnicalDetails(elements, details)") != std::string::npos &&
+            site_source.find("elements.summary.textContent = getUserFacingUpdateSummary(result);") != std::string::npos &&
+            site_source.find("Technical details ▼") != std::string::npos &&
+            site_source.find("Technical details ▲") != std::string::npos &&
+            site_source.find("A newer version is available.") != std::string::npos &&
+            site_source.find("You are running the latest version.") != std::string::npos &&
+            site_source.find("This build includes local modifications.") != std::string::npos &&
+            site_source.find("This build is newer than the latest published version.") != std::string::npos &&
+            site_source.find("Unable to check for updates.") != std::string::npos &&
+            site_source.find("Update checks are disabled.") != std::string::npos &&
+            site_source.find("dedupeUpdateCheckTechnicalDetails") != std::string::npos &&
             site_source.find("function forceUpdateCheckNow()") != std::string::npos &&
             site_source.find("bypassCache: true") != std::string::npos &&
             site_source.find("suppressModal: true") != std::string::npos &&
@@ -712,7 +725,8 @@ int main()
             update_modal_pos != std::string::npos &&
             update_footer_pos < update_modal_pos &&
             site_source.find("const UPDATE_CHECK_DISMISS_PREFIX") == std::string::npos &&
-            site_source.find("updateDismissalKey") == std::string::npos,
+            site_source.find("updateDismissalKey") == std::string::npos &&
+            site_source.find("${status.details} ${result.selectionReason}") == std::string::npos,
         "update-available modal display must use a separate two-hour site-global localStorage state keyed by branch/current SHA/target SHA/update URL, treat future timestamps as expired, allow immediate display when the update URL changes or after unrelated failures, fall back safely when localStorage is unavailable, propagate matching dismissal across tabs, support a site-global never-check-again state, and keep the footer indicator independent from modal suppression");
     require(
         site_source.find("GitHub network request failed") != std::string::npos &&
@@ -1091,15 +1105,24 @@ int main()
             maintenance_source.find("maintenance-action maintenance-action--end") == std::string::npos &&
             maintenance_source.find("id=\"updateCheckPanel\"") != std::string::npos &&
             maintenance_source.find("id=\"updateCheckStatus\"") != std::string::npos &&
-            maintenance_source.find("id=\"updateCheckDetails\"") != std::string::npos &&
+            maintenance_source.find("id=\"updateCheckSummary\"") != std::string::npos &&
+            maintenance_source.find("id=\"updateCheckDetails\"") == std::string::npos &&
+            maintenance_source.find("id=\"updateCheckTechnical\"") != std::string::npos &&
+            maintenance_source.find("id=\"updateCheckTechnicalSummary\"") != std::string::npos &&
+            maintenance_source.find("id=\"updateCheckTechnicalList\"") != std::string::npos &&
+            maintenance_source.find("Technical details ▼") != std::string::npos &&
+            maintenance_source.find("id=\"updateCheckTechnical\" class=\"maintenance-update-technical d-none\"") != std::string::npos &&
+            maintenance_source.find("id=\"updateCheckTechnical\" open") == std::string::npos &&
             maintenance_source.find("id=\"updateCheckAction\"") != std::string::npos &&
             maintenance_source.find("id=\"updateCheckNowBtn\"") != std::string::npos &&
             maintenance_source.find("id=\"updateCheckToggleBtn\"") != std::string::npos &&
             maintenance_source.find("aria-live=\"polite\"") != std::string::npos &&
             maintenance_css_source.find(".maintenance-utility__grid") != std::string::npos &&
             maintenance_css_source.find("grid-template-columns: repeat(2, minmax(0, 1fr));") != std::string::npos &&
-            maintenance_css_source.find(".maintenance-update-status") != std::string::npos,
-        "maintenance view must split Utility into side-by-side Test Tone and Update Check panels, keep Test Tone left-aligned, expose update-check panel hooks and controls, and stack through the existing responsive grid");
+            maintenance_css_source.find(".maintenance-update-status") != std::string::npos &&
+            maintenance_css_source.find(".maintenance-update-summary") != std::string::npos &&
+            maintenance_css_source.find(".maintenance-update-technical summary") != std::string::npos,
+        "maintenance view must split Utility into side-by-side Test Tone and Update Check panels, keep Test Tone left-aligned, expose update-check panel hooks and controls, show user-facing summary text, and keep technical details collapsed by default");
 
     const std::string maintenance_test_tone_script_source =
         read_text_file("/home/pi/WsprryPi/WsprryPi-UI/data/maintenance.js");
