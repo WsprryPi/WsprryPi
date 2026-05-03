@@ -556,6 +556,8 @@ int main()
             site_source.find("function parseSemanticVersion(value)") != std::string::npos &&
             site_source.find("function parseStructuredSemanticVersion(value)") != std::string::npos &&
             site_source.find("value.valid !== true") != std::string::npos &&
+            site_source.find("const normalizedPrerelease = normalizeSemanticIdentifiers(prerelease.join(\".\"));") != std::string::npos &&
+            site_source.find("const normalizedBuild = normalizeSemanticIdentifiers(build.join(\".\"), true);") != std::string::npos &&
             site_source.find("const localVersion = versionInfo.localVersionParsedObject ||") != std::string::npos &&
             site_source.find("function normalizeSemanticIdentifiers(value, allowLeadingZeroNumeric = false)") != std::string::npos &&
             site_source.find("return identifiers.map((identifier) => identifier.toLowerCase());") != std::string::npos &&
@@ -770,6 +772,7 @@ int main()
             site_source.find("const branchFieldPresent = Object.prototype.hasOwnProperty.call(response || {}, \"wspr_branch\");") != std::string::npos &&
             site_source.find("const commitFieldPresent = Object.prototype.hasOwnProperty.call(response || {}, \"wspr_commit\");") != std::string::npos &&
             site_source.find("const branchStateFieldPresent = Object.prototype.hasOwnProperty.call(response || {}, \"wspr_branch_state\");") != std::string::npos &&
+            site_source.find("const structuredVersionPresent = Object.prototype.hasOwnProperty.call(response || {}, \"wspr_version_parsed\");") != std::string::npos &&
             site_source.find("const branchState = parseBranchState(response, currentBranch);") != std::string::npos &&
             site_source.find("const rawBackendCommit = typeof response?.wspr_commit === \"string\"") != std::string::npos &&
             site_source.find("const rawExeVersion = rawVersion || (typeof response?.wspr_exe_version === \"string\"") != std::string::npos &&
@@ -780,6 +783,7 @@ int main()
             site_source.find("const currentBranch = rawBackendBranch || displayBranch;") != std::string::npos &&
             site_source.find("if (branchFieldPresent && !rawBackendBranch)") != std::string::npos &&
             site_source.find("if (commitFieldPresent && !backendCommit)") != std::string::npos &&
+            site_source.find("structuredVersionPresent && response?.wspr_version_parsed?.valid === true && !localVersionParsedObject") != std::string::npos &&
             site_source.find("rawBranchState !== \"branch\"") != std::string::npos &&
             site_source.find("localVersionParsedObject,") != std::string::npos &&
             site_source.find("branchState,") != std::string::npos &&
