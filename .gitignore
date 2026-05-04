@@ -95,3 +95,10 @@ package-lock.json
 
 # Codex
 .codex
+
+# Codex / agent artifacts
+.agents/
+skills-lock.json
+
+# Optional local lint config
+.markdownlint.json

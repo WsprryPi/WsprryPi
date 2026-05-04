@@ -407,10 +407,17 @@ int main()
         "shared confirm modal must support preserving diagnostic line breaks for detail dialogs");
     require(
         site_source.find("let dismissedUiRefreshVersion = null;") != std::string::npos &&
+            site_source.find("let dismissedUiRefreshBuildId = null;") != std::string::npos &&
+            site_source.find("const UI_BUILD_POLL_INTERVAL_MS = 60 * 1000;") != std::string::npos &&
             site_source.find("window.WSPRRYPI_UI_VERSION") != std::string::npos &&
-            site_source.find("function maybePromptForUiRefresh(serverVersion)") != std::string::npos &&
-            site_source.find("maybePromptForUiRefresh(response.ui_version);") != std::string::npos &&
-            site_source.find("normalizedServerVersion === dismissedUiRefreshVersion") != std::string::npos &&
+            site_source.find("window.WSPRRYPI_UI_BUILD_ID") != std::string::npos &&
+            site_source.find("function checkUiBuildVersion()") != std::string::npos &&
+            site_source.find("function initUiBuildChangePolling()") != std::string::npos &&
+            site_source.find("document.addEventListener(\"visibilitychange\"") != std::string::npos &&
+            site_source.find("function maybePromptForUiRefresh(versionResponse)") != std::string::npos &&
+            site_source.find("maybePromptForUiRefresh(response);") != std::string::npos &&
+            site_source.find("const canCompareBuildId = loadedBuildId && normalizedServerBuildId;") != std::string::npos &&
+            site_source.find("normalizedServerBuildId === dismissedUiRefreshBuildId") != std::string::npos &&
             web_server_source.find("j[\"ui_version\"] = get_raw_version_string();") != std::string::npos &&
             web_server_source.find("j[\"wspr_version_raw\"] = get_exe_version();") != std::string::npos &&
             web_server_source.find("j[\"wspr_version_parsed\"] = parse_version_for_update_metadata(get_exe_version());") != std::string::npos &&
@@ -428,14 +435,16 @@ int main()
             site_source.find("showConfirmationDialog({") != std::string::npos,
         "UI refresh prompt must use the shared Bootstrap confirmation modal path with the required copy and labels");
     require(
-        site_source.find("function refreshUiForVersion(serverVersion)") != std::string::npos &&
+        site_source.find("function refreshUiForVersion(serverVersion, serverBuildId = \"\")") != std::string::npos &&
             site_source.find("const url = new URL(window.location.href);") != std::string::npos &&
             site_source.find("url.searchParams.set(\n        \"ui_refresh\",") != std::string::npos &&
             site_source.find("window.location.replace(url.toString());") != std::string::npos &&
-            site_source.find("refreshUiForVersion(normalizedServerVersion);") != std::string::npos &&
-            site_source.find("onCancel: () => {\n            dismissedUiRefreshVersion = normalizedServerVersion;") != std::string::npos &&
-            site_source.find("if (typeof options.onCancel === \"function\")") != std::string::npos,
-        "UI refresh prompt must replace the current URL with a ui_refresh cache-busting query parameter on OK and suppress repeat prompts for the same server version on Cancel");
+            site_source.find("normalizedBuildId || normalizedVersion || Date.now().toString()") != std::string::npos &&
+            site_source.find("refreshUiForVersion(normalizedServerVersion, normalizedServerBuildId);") != std::string::npos &&
+            site_source.find("dismissedUiRefreshBuildId = normalizedServerBuildId;") != std::string::npos &&
+            site_source.find("if (typeof options.onCancel === \"function\")") != std::string::npos &&
+            site_source.find("if (typeof options.onHidden === \"function\")") != std::string::npos,
+        "UI refresh prompt must replace the current URL with a ui_refresh cache-busting query parameter on OK and suppress repeat prompts for the same server build id on Cancel or dismiss");
     require(
         site_source.find("function initFooterMetaPanelInteractions()") != std::string::npos &&
             site_source.find("document.addEventListener(\"click\", function (event) {") != std::string::npos &&
@@ -907,11 +916,11 @@ int main()
         "Configuration view must expose the guarded mode-change confirmation modal");
     require(
         config_view_source.find("Amp Control") != std::string::npos &&
-            config_view_source.find("Use Amp") != std::string::npos &&
+            config_view_source.find("Activate Amp:") != std::string::npos &&
             config_view_source.find("Amp Pin") != std::string::npos &&
             config_view_source.find("Active High") != std::string::npos &&
-            config_view_source.find("Activates prior to transmitting then deactivates after the transmission is complete to control an external amplifier") != std::string::npos,
-        "Configuration Pi I/O view must expose Use Amp, Amp Pin, Active High, and the full amplifier-control description");
+            config_view_source.find("Control an external amplifier by activating it prior to transmitting and deactivating it after the transmission is complete.") != std::string::npos,
+        "Configuration Pi I/O view must expose Activate Amp, Amp Pin, Active High, and the full amplifier-control description");
     require(
         site_source.find("\"Use Amp\": { required: false, type: \"boolean\" }") != std::string::npos &&
             site_source.find("\"Amp Pin\": { required: false, type: \"number\" }") != std::string::npos &&
@@ -959,16 +968,26 @@ int main()
         "footer markup must keep the native click-based About disclosure and provide a site-global update-check toggle for disabling or re-enabling checks");
     require(
         header_source.find("window.WSPRRYPI_UI_VERSION = <?= json_encode(getWsprryPiUiVersion()) ?>;") != std::string::npos &&
+            header_source.find("window.WSPRRYPI_UI_BUILD_ID = <?= json_encode(getWsprryPiUiBuildId()) ?>;") != std::string::npos &&
             ui_version_source.find("function getWsprryPiUiVersion(): string") != std::string::npos &&
+            ui_version_source.find("function wsprrypiUiBuildFileRecords(): array") != std::string::npos &&
+            ui_version_source.find("function getWsprryPiUiBuildId(): string") != std::string::npos &&
+            ui_version_source.find("'view_diag_logs.php' => true") != std::string::npos &&
+            ui_version_source.find("'cache' => true") != std::string::npos &&
+            ui_version_source.find("'%s|%d|%d'") != std::string::npos &&
+            ui_version_source.find("'mtime-' . substr(hash('sha256', implode(\"\\n\", $records)), 0, 16)") != std::string::npos &&
             ui_version_source.find("function wsprrypiAssetUrl(string $path): string") != std::string::npos &&
-            ui_version_source.find("'v=' . rawurlencode($version)") != std::string::npos &&
+            ui_version_source.find("'v=' . rawurlencode($buildId)") != std::string::npos &&
+            version_endpoint_source.find("'ui_build_id' => $uiBuildId") != std::string::npos &&
+            version_endpoint_source.find("Cache-Control") != std::string::npos &&
+            version_endpoint_source.find("no-store") != std::string::npos &&
             header_source.find("wsprrypiAssetUrl('site.css')") != std::string::npos &&
             footer_source.find("wsprrypiAssetUrl('site.js')") != std::string::npos &&
             index_page_source.find("wsprrypiAssetUrl($stylesheet)") != std::string::npos &&
             index_page_source.find("wsprrypiAssetUrl($script)") != std::string::npos &&
             script_include_source.find("wsprrypiAssetUrl('vendor/js/jquery-3.7.1.min.js')") != std::string::npos &&
             script_include_source.find("wsprrypiAssetUrl('vendor/js/bootstrap.bundle-5.3.8.min.js')") != std::string::npos,
-        "PHP template assets must use the centralized WsprryPi UI version query string for CSS and JS cache busting");
+        "PHP template assets must use the centralized WsprryPi UI build id query string for CSS and JS cache busting, and /version must expose the same no-store UI build id while excluding diagnostic logs and transient paths");
     require(
         html_cache_headers_source.find("header('Cache-Control: no-cache, must-revalidate');") != std::string::npos &&
             index_page_source.find("<?php require_once __DIR__ . '/html_cache_headers.php'; ?>") == 0 &&
