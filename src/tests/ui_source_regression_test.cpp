@@ -504,7 +504,7 @@ int main()
             site_source.find("cached.branchState !== versionInfo.branchState") != std::string::npos &&
             site_source.find("branchState: versionInfo.branchState || \"branch\"") != std::string::npos &&
             site_source.find("updateCheckShaMatches(versionInfo.currentSha, selectedBranch.headSha)") != std::string::npos &&
-            site_source.find("? updateCheckNoUpdateResult()") != std::string::npos &&
+            site_source.find("? updateCheckCommitComparisonResult(versionInfo.currentSha, selectedBranch.headSha, \"identical\")") != std::string::npos &&
             site_source.find(": await compareGithubCommits(versionInfo.currentSha, selectedBranch.headSha)") != std::string::npos &&
             site_source.find("if (error.status === 404)") != std::string::npos &&
             site_source.find("updateAvailable: !updateCheckShaMatches(currentSha, headSha)") != std::string::npos &&
@@ -608,6 +608,9 @@ int main()
             site_source.find("async function buildCommitBasedWsprryPiUpdateResult(versionInfo, semanticFallback = null)") != std::string::npos &&
             site_source.find("versionComparisonUsed: \"commit\"") != std::string::npos &&
             site_source.find("const semanticResult = await buildSemanticVersionUpdateResult(versionInfo);") != std::string::npos &&
+            site_source.find("const branchCommitComparisonHasPriority = versionInfo.branchState === \"branch\"") != std::string::npos &&
+            site_source.find("commitResult.targetBranch === versionInfo.currentBranch") != std::string::npos &&
+            site_source.find("Update check using same-branch commit comparison priority over semantic version metadata.") != std::string::npos &&
             site_source.find("if (!semanticResult.useCommitFallback)") != std::string::npos &&
             site_source.find("Update check using commit fallback: ${semanticResult.reason}") != std::string::npos &&
             site_source.find("const commitResult = await buildCommitBasedWsprryPiUpdateResult(versionInfo, semanticResult);") != std::string::npos,
