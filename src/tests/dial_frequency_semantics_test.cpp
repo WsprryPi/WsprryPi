@@ -195,6 +195,9 @@ namespace
               {"Transmit Backend", "gpio"},
               {"Use LED", "false"},
               {"LED Pin", "-1"},
+              {"Use Amp", "false"},
+              {"Amp Pin", "-1"},
+              {"Amp Pin Active High", "false"},
               {"Web Port", "-1"},
               {"Socket Port", "-1"},
               {"Use Shutdown", "false"},
@@ -3480,6 +3483,83 @@ int main(int argc, char *argv[])
 
     {
         init_default_config();
+        config.use_ini = true;
+        config.ini_filename = "/tmp/amp_config_persistence.ini";
+        write_text_file(config.ini_filename, "");
+        iniFile.set_filename(config.ini_filename);
+
+        config.use_amp = false;
+        config.amp_pin = -1;
+        config.amp_pin_active_high = false;
+        config_to_json();
+        json_to_ini();
+
+        auto persisted_ini = iniFile.getData();
+        auto operation_it = persisted_ini.find("Operation");
+        require(
+            operation_it != persisted_ini.end(),
+            "json_to_ini must persist the Operation section for Amp config");
+        require(
+            operation_it->second.at("Use Amp") == "false" &&
+                operation_it->second.at("Amp Pin").empty() &&
+                operation_it->second.at("Amp Pin Active High") == "false",
+            "json_to_ini must persist disabled Amp config as Use Amp=false, blank Amp Pin, and inactive polarity");
+
+        config.use_amp = true;
+        config.amp_pin = 23;
+        config.amp_pin_active_high = false;
+        config_to_json();
+        json_to_ini();
+
+        persisted_ini = iniFile.getData();
+        operation_it = persisted_ini.find("Operation");
+        require(
+            operation_it->second.at("Use Amp") == "true" &&
+                operation_it->second.at("Amp Pin") == "23" &&
+                operation_it->second.at("Amp Pin Active High") == "false",
+            "json_to_ini must persist enabled Amp config as Use Amp=true, Amp Pin=23, and explicit polarity");
+
+        config.use_amp = false;
+        config.amp_pin = 23;
+        config.amp_pin_active_high = false;
+        config_to_json();
+        json_to_ini();
+
+        persisted_ini = iniFile.getData();
+        operation_it = persisted_ini.find("Operation");
+        require(
+            jConfig["Operation"].value("Use Amp", true) == false &&
+                jConfig["Operation"].value("Amp Pin", -1) == 23 &&
+                operation_it->second.at("Use Amp") == "false" &&
+                operation_it->second.at("Amp Pin") == "23",
+            "disabled Amp config must retain Amp Pin as data while Use Amp remains the runtime enable flag");
+    }
+
+    {
+        init_config_json();
+        auto legacy_amp_ini = make_managed_ini_data("AA0NT", "EM18", "20m", true);
+        legacy_amp_ini["Operation"].erase("Use Amp");
+        legacy_amp_ini["Operation"]["Amp Pin"] = "23";
+        legacy_amp_ini["Operation"]["Amp Pin Active High"] = "false";
+        iniFile.setData(legacy_amp_ini);
+        ini_to_json("/tmp/legacy_amp_enabled.ini");
+        json_to_config();
+        require(
+            config.use_amp && config.amp_pin == 23 && !config.amp_pin_active_high,
+            "legacy INI without Use Amp must infer enabled Amp control from a valid Amp Pin");
+
+        init_config_json();
+        legacy_amp_ini["Operation"]["Amp Pin"] = "";
+        iniFile.setData(legacy_amp_ini);
+        ini_to_json("/tmp/legacy_amp_disabled.ini");
+        json_to_config();
+        require(
+            !config.use_amp && config.amp_pin == -1,
+            "legacy INI without Use Amp must infer disabled Amp control from a blank Amp Pin");
+    }
+
+    {
+        init_default_config();
         set_si5351_detection_override_for_test(false);
         config.si5351_tx_output = 2;
         config_to_json();
@@ -3717,6 +3797,56 @@ int main(int argc, char *argv[])
         ampControl.stop();
         ledControl.stop();
         set_band_gpio_selector_for_test(false, false);
+        reset_current_transmission_request_for_test();
+        GPIOOutput::setTestMode(false);
+    }
+
+    {
+        GPIOOutput::setTestMode(true);
+        init_default_config();
+        ini_reload_pending.store(false, std::memory_order_relaxed);
+        exiting_wspr.store(false, std::memory_order_relaxed);
+        reset_current_transmission_request_for_test();
+
+        config.mode = ModeType::WSPR;
+        config.transmit = true;
+        config.use_led = false;
+        config.led_pin = -1;
+        config.use_amp = false;
+        config.amp_pin = 23;
+        config.amp_pin_active_high = false;
+
+        require(
+            ampControl.enableGPIOPin(config.amp_pin, config.amp_pin_active_high),
+            "disabled Amp runtime gate regression must initialize the Amp test GPIO");
+        GPIOOutput::clearTestEvents();
+
+        transmitter_cb(
+            WsprTransmissionCallbackEvent::STARTING,
+            WsprTransmitLogLevel::INFO,
+            std::string(),
+            14097100.0);
+        transmitter_cb(
+            WsprTransmissionCallbackEvent::CANCELLED,
+            WsprTransmitLogLevel::INFO,
+            std::string(),
+            1.0);
+
+        bool amp_write_seen = false;
+        for (const auto &event : GPIOOutput::testEvents())
+        {
+            if (event.action == "write" && event.pin == 23)
+            {
+                amp_write_seen = true;
+                break;
+            }
+        }
+
+        require(
+            !amp_write_seen,
+            "Use Amp=false with a retained Amp Pin must not issue Amp GPIO writes");
+
+        ampControl.stop();
         reset_current_transmission_request_for_test();
         GPIOOutput::setTestMode(false);
     }

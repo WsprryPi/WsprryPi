@@ -1118,6 +1118,9 @@ namespace
                  key == "Transmit Backend" ||
                  key == "Use LED" ||
                  key == "LED Pin" ||
+                 key == "Use Amp" ||
+                 key == "Amp Pin" ||
+                 key == "Amp Pin Active High" ||
                  key == "Web Port" ||
                  key == "Socket Port" ||
                  key == "Use Shutdown" ||
@@ -1177,6 +1180,13 @@ namespace
         const std::string &section,
         const std::string &key)
     {
+        if (section == "Operation" && key == "Amp Pin")
+        {
+            const auto section_it = ini_data.find(section);
+            return section_it != ini_data.end() &&
+                   section_it->second.find(key) != section_it->second.end();
+        }
+
         return ini_has_nonempty_value(ini_data, section, key);
     }
 
@@ -1533,10 +1543,10 @@ namespace
             transmit_backend_kind_to_string(source.transmit_backend);
         target["Operation"]["Use LED"] = source.use_led;
         target["Operation"]["LED Pin"] = source.led_pin;
-        const bool use_amp = source.use_amp && source.amp_pin >= 0;
+        const bool use_amp =
+            source.use_amp && source.amp_pin >= 0 && source.amp_pin <= 27;
         target["Operation"]["Use Amp"] = use_amp;
-        target["Operation"]["Amp Pin"] =
-            use_amp ? source.amp_pin : -1;
+        target["Operation"]["Amp Pin"] = source.amp_pin;
         target["Operation"]["Amp Pin Active High"] = source.amp_pin_active_high;
         target["Operation"]["Web Port"] = source.web_port;
         target["Operation"]["Socket Port"] = source.socket_port;

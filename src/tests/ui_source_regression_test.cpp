@@ -259,6 +259,8 @@ int main()
 
     const std::string site_source =
         read_text_file("/home/pi/WsprryPi/WsprryPi-UI/data/site.js");
+    const std::string stock_ini_source =
+        read_text_file("/home/pi/WsprryPi/config/wsprrypi.ini");
     const std::string transmit_branch = "if (msg.type === \"transmit\")";
     const std::string tx_state_branch = "if (msg.tx_state !== undefined)";
     require(
@@ -927,15 +929,20 @@ int main()
             site_source.find("\"Amp Pin Active High\": { required: false, type: \"boolean\" }") != std::string::npos,
         "site.js config schema must accept Use Amp, Amp Pin, and Amp Pin Active High");
     require(
+        stock_ini_source.find("Use Amp = false") != std::string::npos &&
+            stock_ini_source.find("Amp Pin =") != std::string::npos &&
+            stock_ini_source.find("Amp Pin Active High = false") != std::string::npos,
+        "stock INI must explicitly include disabled Use Amp, Amp Pin, and Amp Pin Active High fields");
+    require(
         ui_source.find("function setUseAmp(enabled)") != std::string::npos &&
             ui_source.find("function getUseAmp()") != std::string::npos &&
             ui_source.find("\"Use Amp\": use_amp") != std::string::npos &&
             ui_source.find("\"Amp Pin\": amp_pin") != std::string::npos &&
             ui_source.find("\"Amp Pin Active High\": amp_pin_active_high") != std::string::npos &&
-            ui_source.find("const amp_pin = use_amp && Number.isInteger(amp_pin_value) ? amp_pin_value : -1;") != std::string::npos &&
+            ui_source.find("const amp_pin = Number.isInteger(amp_pin_value) ? amp_pin_value : -1;") != std::string::npos &&
             ui_source.find("getUseAmp() ? getAmpPin() : null") != std::string::npos &&
             ui_source.find("function validateGpioConflictFields()") != std::string::npos,
-        "index.js must serialize Use Amp, disable Amp Pin as -1, include Amp Pin Active High, and validate Amp GPIO conflicts only when enabled");
+        "index.js must serialize Use Amp, retain Amp Pin as data, include Amp Pin Active High, and validate Amp GPIO conflicts only when enabled");
     const std::string footer_source =
         read_text_file("/home/pi/WsprryPi/WsprryPi-UI/data/footer.php");
     const std::string site_css_source =
