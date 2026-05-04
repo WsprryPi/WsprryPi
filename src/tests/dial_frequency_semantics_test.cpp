@@ -1099,7 +1099,7 @@ int main(int argc, char *argv[])
         write_text_file(
             config.ini_filename,
             "[Meta]\nUse INI=true\nDate Time Log=false\ndebug_logging=false\nLoop TX=false\nTX Iterations=0\n"
-            "[Operation]\nMode=QRSS\nTransmit=false\nTransmit Backend=si5351\nUse LED=false\nLED Pin=-1\nWeb Port=31415\nSocket Port=31416\nUse Shutdown=false\nShutdown Button=-1\n"
+            "[Operation]\nMode=QRSS\nTransmit=false\nTransmit Backend=si5351\nUse LED=false\nLED Pin=-1\nUse Amp=false\nAmp Pin=-1\nAmp Pin Active High=false\nWeb Port=31415\nSocket Port=31416\nUse Shutdown=false\nShutdown Button=-1\n"
             "[GPIO]\nTransmit Pin=4\nPower Level=7\nUse NTP=false\n"
             "[Calibration]\nPPM=0\n"
             "[Si5351]\nI2C Bus=1\nI2C Address=96\nReference Frequency=27000000\nTX Output=CLK0\nPower Level=1\n"
@@ -3423,7 +3423,7 @@ int main(int argc, char *argv[])
             config.ini_filename,
             "[Meta]\ndebug_logging=false\n"
             "[Operation]\nMode=WSPR\nTransmit=false\nTransmit Backend=gpio\n"
-            "Use LED=false\nLED Pin=-1\nWeb Port=31415\nSocket Port=31416\n"
+            "Use LED=false\nLED Pin=-1\nUse Amp=false\nAmp Pin=-1\nAmp Pin Active High=false\nWeb Port=31415\nSocket Port=31416\n"
             "Use Shutdown=false\nShutdown Button=-1\n"
             "[GPIO]\nTransmit Pin=4\nPower Level=7\nUse NTP=false\n"
             "[Calibration]\nPPM=0\n"
@@ -3644,6 +3644,7 @@ int main(int argc, char *argv[])
         config.transmit = true;
         config.use_led = true;
         config.led_pin = 18;
+        config.use_amp = true;
         config.amp_pin = 23;
         config.amp_pin_active_high = false;
 

@@ -577,8 +577,17 @@ namespace
                 internal_json["Operation"]["Use LED"] = operation.at("Use LED");
             if (operation.contains("LED Pin"))
                 internal_json["Operation"]["LED Pin"] = operation.at("LED Pin");
+            if (operation.contains("Use Amp"))
+                internal_json["Operation"]["Use Amp"] = operation.at("Use Amp");
             if (operation.contains("Amp Pin"))
                 internal_json["Operation"]["Amp Pin"] = operation.at("Amp Pin");
+            if (!operation.contains("Use Amp") && operation.contains("Amp Pin"))
+            {
+                internal_json["Operation"]["Use Amp"] =
+                    parse_integer_config_value(
+                        operation.at("Amp Pin"),
+                        "Operation.Amp Pin") >= 0;
+            }
             if (operation.contains("Amp Pin Active High"))
                 internal_json["Operation"]["Amp Pin Active High"] = operation.at("Amp Pin Active High");
             if (operation.contains("Web Port"))
@@ -886,6 +895,7 @@ void init_default_config()
     config.use_offset = true;
     config.use_led = false;
     config.led_pin = 18;
+    config.use_amp = false;
     config.amp_pin = -1;
     config.amp_pin_active_high = false;
     config.gpio_tx_pin = kDefaultTransmitGpio;
@@ -1230,6 +1240,7 @@ namespace
             {"Transmit Backend", "gpio"},
             {"LED Pin", 18},
             {"Use LED", false},
+            {"Use Amp", false},
             {"Amp Pin", -1},
             {"Amp Pin Active High", false},
             {"Web Port", 31415},
@@ -1454,6 +1465,14 @@ namespace
                       source.at("Operation").at("Amp Pin"),
                       "Operation.Amp Pin")
                 : -1;
+        target.use_amp =
+            source.at("Operation").contains("Use Amp")
+                ? source.at("Operation").value("Use Amp", false)
+                : target.amp_pin >= 0;
+        if (target.amp_pin < 0)
+        {
+            target.use_amp = false;
+        }
         target.amp_pin_active_high =
             source.at("Operation").value("Amp Pin Active High", false);
 
@@ -1514,8 +1533,10 @@ namespace
             transmit_backend_kind_to_string(source.transmit_backend);
         target["Operation"]["Use LED"] = source.use_led;
         target["Operation"]["LED Pin"] = source.led_pin;
+        const bool use_amp = source.use_amp && source.amp_pin >= 0;
+        target["Operation"]["Use Amp"] = use_amp;
         target["Operation"]["Amp Pin"] =
-            source.amp_pin >= 0 ? source.amp_pin : -1;
+            use_amp ? source.amp_pin : -1;
         target["Operation"]["Amp Pin Active High"] = source.amp_pin_active_high;
         target["Operation"]["Web Port"] = source.web_port;
         target["Operation"]["Socket Port"] = source.socket_port;
@@ -1612,6 +1633,7 @@ namespace
         target.si5351_power_level = source.si5351_power_level;
         target.use_led = source.use_led;
         target.led_pin = source.led_pin;
+        target.use_amp = source.use_amp;
         target.amp_pin = source.amp_pin;
         target.amp_pin_active_high = source.amp_pin_active_high;
         target.enable_web = source.enable_web;
@@ -1720,6 +1742,16 @@ namespace
 
         patch["Meta"]["INI Filename"] = filename;
         patch["Meta"]["Use INI"] = true;
+        if (patch.contains("Operation") &&
+            patch.at("Operation").is_object() &&
+            patch.at("Operation").contains("Amp Pin") &&
+            !patch.at("Operation").contains("Use Amp"))
+        {
+            patch["Operation"]["Use Amp"] =
+                parse_integer_config_value(
+                    patch.at("Operation").at("Amp Pin"),
+                    "Operation.Amp Pin") >= 0;
+        }
         target.merge_patch(patch);
     }
 
@@ -1914,6 +1946,7 @@ void json_to_ini()
                   key == "Transmit Backend" ||
                   key == "Use LED" ||
                   key == "LED Pin" ||
+                  key == "Use Amp" ||
                   key == "Amp Pin" ||
                   key == "Amp Pin Active High" ||
                   key == "Web Port" ||

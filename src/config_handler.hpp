@@ -247,6 +247,7 @@ struct ArgParserConfig
     int si5351_power_level; ///< Si5351 drive-strength level (1-4).
     bool use_led;    ///< Enable TX LED indicator.
     int led_pin;     ///< GPIO pin for LED indicator.
+    bool use_amp;    ///< Enable external amplifier control GPIO.
     int amp_pin;     ///< Optional GPIO pin for external amplifier control (-1 = disabled).
     bool amp_pin_active_high; ///< External amplifier GPIO polarity.
 
@@ -316,6 +317,7 @@ struct ArgParserConfig
           si5351_power_level(1),
           use_led(false),
           led_pin(-1),
+          use_amp(false),
           amp_pin(-1),
           amp_pin_active_high(false),
           enable_web(true),
@@ -389,6 +391,7 @@ struct ArgParserConfig
         si5351_power_level = other.si5351_power_level;
         use_led = other.use_led;
         led_pin = other.led_pin;
+        use_amp = other.use_amp;
         amp_pin = other.amp_pin;
         amp_pin_active_high = other.amp_pin_active_high;
         enable_web = other.enable_web;

@@ -852,7 +852,7 @@ static bool should_control_tx_led() noexcept
 
 static bool amp_gpio_configured(const ArgParserConfig &cfg) noexcept
 {
-    return cfg.amp_pin >= 0 && cfg.amp_pin <= 27;
+    return cfg.use_amp && cfg.amp_pin >= 0 && cfg.amp_pin <= 27;
 }
 
 static bool should_control_amp_gpio() noexcept

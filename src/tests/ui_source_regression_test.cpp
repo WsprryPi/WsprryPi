@@ -907,20 +907,26 @@ int main()
         "Configuration view must expose the guarded mode-change confirmation modal");
     require(
         config_view_source.find("Amp Control") != std::string::npos &&
+            config_view_source.find("Use Amp") != std::string::npos &&
             config_view_source.find("Amp Pin") != std::string::npos &&
             config_view_source.find("Active High") != std::string::npos &&
             config_view_source.find("Activates prior to transmitting then deactivates after the transmission is complete to control an external amplifier") != std::string::npos,
-        "Configuration Pi I/O view must expose Amp Control with Amp Pin, Active High, and the full amplifier-control description");
+        "Configuration Pi I/O view must expose Use Amp, Amp Pin, Active High, and the full amplifier-control description");
     require(
-        site_source.find("\"Amp Pin\": { required: false, type: \"number\" }") != std::string::npos &&
+        site_source.find("\"Use Amp\": { required: false, type: \"boolean\" }") != std::string::npos &&
+            site_source.find("\"Amp Pin\": { required: false, type: \"number\" }") != std::string::npos &&
             site_source.find("\"Amp Pin Active High\": { required: false, type: \"boolean\" }") != std::string::npos,
-        "site.js config schema must accept Amp Pin and Amp Pin Active High");
+        "site.js config schema must accept Use Amp, Amp Pin, and Amp Pin Active High");
     require(
-        ui_source.find("\"Amp Pin\": amp_pin") != std::string::npos &&
+        ui_source.find("function setUseAmp(enabled)") != std::string::npos &&
+            ui_source.find("function getUseAmp()") != std::string::npos &&
+            ui_source.find("\"Use Amp\": use_amp") != std::string::npos &&
+            ui_source.find("\"Amp Pin\": amp_pin") != std::string::npos &&
             ui_source.find("\"Amp Pin Active High\": amp_pin_active_high") != std::string::npos &&
-            ui_source.find("const amp_pin = Number.isInteger(amp_pin_value) ? amp_pin_value : -1;") != std::string::npos &&
+            ui_source.find("const amp_pin = use_amp && Number.isInteger(amp_pin_value) ? amp_pin_value : -1;") != std::string::npos &&
+            ui_source.find("getUseAmp() ? getAmpPin() : null") != std::string::npos &&
             ui_source.find("function validateGpioConflictFields()") != std::string::npos,
-        "index.js must serialize disabled Amp Pin as -1, include Amp Pin Active High, and validate GPIO conflicts");
+        "index.js must serialize Use Amp, disable Amp Pin as -1, include Amp Pin Active High, and validate Amp GPIO conflicts only when enabled");
     const std::string footer_source =
         read_text_file("/home/pi/WsprryPi/WsprryPi-UI/data/footer.php");
     const std::string site_css_source =

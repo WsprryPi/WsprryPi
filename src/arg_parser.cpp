@@ -1526,6 +1526,16 @@ bool validate_config_candidate(
         return false;
     }
 
+    if (candidate.use_amp && (candidate.amp_pin < 0 || candidate.amp_pin > 27))
+    {
+        if (error_message != nullptr)
+        {
+            *error_message = "Invalid Amp Pin. Expected GPIO 0 through 27 when Use Amp is enabled.";
+        }
+
+        return false;
+    }
+
     if (candidate.amp_pin < -1 || candidate.amp_pin > 27)
     {
         if (error_message != nullptr)
@@ -1862,7 +1872,7 @@ void apply_runtime_config_side_effects()
         ledControl.stop();
     }
 
-    if (config.amp_pin >= 0 && config.amp_pin <= 27)
+    if (config.use_amp && config.amp_pin >= 0 && config.amp_pin <= 27)
     {
         if (!ampControl.enableGPIOPin(
                 config.amp_pin,
@@ -2266,6 +2276,10 @@ bool validate_config_data()
         if (config.amp_pin < -1 || config.amp_pin > 27)
         {
             llog.logE(ERROR, " - Invalid Amp Pin. Expected -1 or GPIO 0 through 27.");
+        }
+        if (config.use_amp && (config.amp_pin < 0 || config.amp_pin > 27))
+        {
+            llog.logE(ERROR, " - Invalid Amp Pin. Expected GPIO 0 through 27 when Use Amp is enabled.");
         }
         if (config.transmit_backend == TransmitBackendKind::SI5351)
         {
@@ -3200,6 +3214,7 @@ bool parse_command_line(int argc, char *argv[])
                 {
                     print_usage("Invalid Amp Pin. Expected GPIO 0 through 27.", EXIT_FAILURE);
                 }
+                config.use_amp = true;
                 config.amp_pin = amp_pin;
             }
             catch (const std::exception &e)
@@ -3220,6 +3235,7 @@ bool parse_command_line(int argc, char *argv[])
         }
         case 1046:
         {
+            config.use_amp = false;
             config.amp_pin = -1;
             break;
         }
