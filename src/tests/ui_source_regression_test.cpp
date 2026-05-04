@@ -791,7 +791,7 @@ int main()
             site_source.find("dedupeUpdateCheckTechnicalDetails") != std::string::npos &&
             site_source.find("function forceUpdateCheckNow()") != std::string::npos &&
             site_source.find("bypassCache: true") != std::string::npos &&
-            site_source.find("suppressModal: true") != std::string::npos &&
+            site_source.find("suppressModal: true") == std::string::npos &&
             site_source.find("const checkNowButton = document.getElementById(\"updateCheckNowBtn\");") != std::string::npos &&
             site_source.find("checkNowButton.addEventListener(\"click\", forceUpdateCheckNow);") != std::string::npos &&
             site_source.find("renderUpdateCheckPanel(versionInfo, result);") != std::string::npos &&

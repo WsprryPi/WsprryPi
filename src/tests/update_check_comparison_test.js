@@ -276,6 +276,66 @@ async function runBuildPriorityCase({
 
     context.document.getElementById = originalGetElementById;
 
+    const versionInfo = {
+        currentSha,
+        currentModalVersion: "3.0.0-gpio_for_amp+a8079bc",
+    };
+    const updateResult = {
+        currentSha,
+        targetBranch: "gpio_for_amp",
+        targetHeadSha: targetSha,
+        updateAvailable: true,
+        releaseUrl: "https://github.com/WsprryPi/WsprryPi/releases",
+        releaseTitle: "",
+        fallbackUsed: false,
+        versionComparisonUsed: "commit",
+        versionComparisonStatus: "update_available",
+    };
+    let modalCalls = 0;
+    let footerCalls = 0;
+    context.showWsprryPiUpdateModal = (modalVersionInfo, modalResult) => {
+        modalCalls += 1;
+        assert.strictEqual(modalVersionInfo, versionInfo);
+        assert.strictEqual(modalResult, updateResult);
+    };
+    context.markWsprryPiUpdateFooter = (footerResult) => {
+        footerCalls += 1;
+        assert.strictEqual(footerResult, updateResult);
+    };
+    context.applyWsprryPiUpdateResult(versionInfo, updateResult);
+    assert.strictEqual(footerCalls, 1);
+    assert.strictEqual(
+        modalCalls,
+        1,
+        "fresh updateAvailable=true results must show the app update modal from the same path that updates the footer"
+    );
+
+    modalCalls = 0;
+    footerCalls = 0;
+    context.applyWsprryPiUpdateResult(versionInfo, updateResult, { suppressModal: true });
+    assert.strictEqual(footerCalls, 1);
+    assert.strictEqual(modalCalls, 0);
+
+    const originalDateNow = Date.now;
+    let now = 1000000;
+    Date.now = () => now;
+    context.writeUpdateModalState(versionInfo, updateResult, "dismissed");
+    assert.strictEqual(
+        context.shouldShowUpdateModal(versionInfo, updateResult),
+        false,
+        "dismissed update modal state must suppress repeats for the same target"
+    );
+
+    const nextUpdateResult = Object.assign({}, updateResult, {
+        targetHeadSha: "20a9bafef7e486c389aa2026c46d1d9cd2b87b2b",
+    });
+    assert.strictEqual(
+        context.shouldShowUpdateModal(versionInfo, nextUpdateResult),
+        true,
+        "a new target SHA must be eligible to show the update modal again"
+    );
+    Date.now = originalDateNow;
+
     console.log("update_check_comparison_test passed");
 })().catch((error) => {
     console.error(error);
