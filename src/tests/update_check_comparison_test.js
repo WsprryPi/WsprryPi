@@ -293,6 +293,8 @@ async function runBuildPriorityCase({
     };
     let modalCalls = 0;
     let footerCalls = 0;
+    const originalShowWsprryPiUpdateModal = context.showWsprryPiUpdateModal;
+    const originalMarkWsprryPiUpdateFooter = context.markWsprryPiUpdateFooter;
     context.showWsprryPiUpdateModal = (modalVersionInfo, modalResult) => {
         modalCalls += 1;
         assert.strictEqual(modalVersionInfo, versionInfo);
@@ -335,6 +337,136 @@ async function runBuildPriorityCase({
         "a new target SHA must be eligible to show the update modal again"
     );
     Date.now = originalDateNow;
+    context.showWsprryPiUpdateModal = originalShowWsprryPiUpdateModal;
+    context.markWsprryPiUpdateFooter = originalMarkWsprryPiUpdateFooter;
+
+    function createFakeElement(tagName = "div") {
+        const classes = new Set();
+        return {
+            tagName,
+            children: [],
+            dataset: {},
+            textContent: "",
+            href: "",
+            target: "",
+            rel: "",
+            type: "",
+            className: "",
+            classList: {
+                add: (...names) => names.forEach((name) => classes.add(name)),
+                remove: (...names) => names.forEach((name) => classes.delete(name)),
+                contains: (name) => classes.has(name),
+                toggle: (name, force) => {
+                    if (force === false) {
+                        classes.delete(name);
+                        return false;
+                    }
+                    classes.add(name);
+                    return true;
+                },
+            },
+            appendChild(child) {
+                this.children.push(child);
+                return child;
+            },
+            setAttribute(name, value) {
+                this[name] = value;
+            },
+            addEventListener() {},
+        };
+    }
+
+    const originalCreateElement = context.document.createElement;
+    const originalCreateTextNode = context.document.createTextNode;
+    const originalBootstrap = context.bootstrap;
+    const originalJquery = context.$;
+    let confirmButtonHidden = null;
+    let confirmButtonText = "";
+    let modalShows = 0;
+    const modalEl = createFakeElement("div");
+    const labelEl = createFakeElement("h3");
+    const bodyEl = createFakeElement("p");
+    context.document.getElementById = (id) => {
+        if (id === "confirmModal") return modalEl;
+        if (id === "confirmModalLabel") return labelEl;
+        if (id === "confirmModalBody") return bodyEl;
+        return originalGetElementById(id);
+    };
+    context.document.createElement = (tagName) => createFakeElement(tagName);
+    context.document.createTextNode = (text) => ({
+        tagName: "#text",
+        textContent: text,
+    });
+    context.bootstrap = {
+        Modal: {
+            getOrCreateInstance: () => ({
+                hide: () => {},
+                show: () => {
+                    modalShows += 1;
+                },
+            }),
+        },
+    };
+    context.$ = (selector) => {
+        const chain = jqueryStub();
+        if (selector === "#confirmActionBtn") {
+            chain.toggleClass = (className, force) => {
+                if (className === "d-none") {
+                    confirmButtonHidden = force === true;
+                }
+                return chain;
+            };
+            chain.text = (value) => {
+                confirmButtonText = value;
+                return chain;
+            };
+        }
+        return chain;
+    };
+
+    context.showWsprryPiUpdateModal(versionInfo, Object.assign({}, updateResult, {
+        targetHeadSha: "30a9bafef7e486c389aa2026c46d1d9cd2b87b2b",
+        remoteVersionSelected: "",
+        releaseTitle: "",
+        versionComparisonUsed: "commit",
+    }));
+    const commitModalText = bodyEl.children.map((child) => child.textContent || "").join("");
+    assert.ok(commitModalText.includes("gpio_for_amp+30a9baf"));
+    assert.ok(commitModalText.includes("Review the update channel given to you for this pre-release version."));
+    assert.ok(!commitModalText.includes("GitHub releases"));
+    assert.strictEqual(
+        bodyEl.children.some((child) => child.tagName === "a"),
+        false,
+        "commit/branch update modal must not append a GitHub releases link"
+    );
+    assert.strictEqual(confirmButtonHidden, true);
+
+    bodyEl.children = [];
+    bodyEl.textContent = "";
+    confirmButtonHidden = null;
+    confirmButtonText = "";
+    context.showWsprryPiUpdateModal(versionInfo, Object.assign({}, updateResult, {
+        targetHeadSha: "40a9bafef7e486c389aa2026c46d1d9cd2b87b2b",
+        releaseTitle: "WsprryPi 3.0.1",
+        remoteVersionSelected: "3.0.1",
+        versionComparisonUsed: "semver",
+    }));
+    const taggedModalText = bodyEl.children.map((child) => child.textContent || "").join("");
+    assert.ok(taggedModalText.includes("A release is available for this update: "));
+    assert.strictEqual(
+        bodyEl.children.some((child) => child.tagName === "a" && child.textContent === "WsprryPi 3.0.1"),
+        true,
+        "tagged release update modal must keep the release link"
+    );
+    assert.strictEqual(confirmButtonHidden, false);
+    assert.strictEqual(confirmButtonText, "View release");
+    assert.strictEqual(modalShows >= 2, true);
+
+    context.document.getElementById = originalGetElementById;
+    context.document.createElement = originalCreateElement;
+    context.document.createTextNode = originalCreateTextNode;
+    context.bootstrap = originalBootstrap;
+    context.$ = originalJquery;
 
     console.log("update_check_comparison_test passed");
 })().catch((error) => {

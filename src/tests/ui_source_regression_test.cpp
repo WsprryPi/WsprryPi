@@ -906,10 +906,19 @@ int main()
     require(
         site_source.find("const summaryText = result.versionComparisonUsed === \"semver\" && result.remoteVersionSelected") != std::string::npos &&
             site_source.find("`${result.localVersionParsed || versionInfo.currentModalVersion} is behind release ${result.remoteVersionSelected}.`") != std::string::npos &&
-            site_source.find("`${versionInfo.currentModalVersion} is behind ${result.targetBranch} ${targetShaLabel}.`") != std::string::npos &&
+            site_source.find("`${versionInfo.currentModalVersion} is behind ${formatUpdateModalBranchTarget(result)}.`") != std::string::npos &&
             site_source.find("`${versionInfo.currentDisplayVersion} is behind ${result.targetBranch} ${targetShaLabel}.`") == std::string::npos &&
-            site_source.find("const exactRelease = result.fallbackUsed !== true && Boolean(result.releaseTitle);") != std::string::npos &&
-            site_source.find("Review the latest releases: ") != std::string::npos &&
+            site_source.find("function isTaggedReleaseUpdate(result)") != std::string::npos &&
+            site_source.find("Boolean(result?.releaseTitle)") != std::string::npos &&
+            site_source.find("Boolean(result?.remoteVersionSelected)") != std::string::npos &&
+            site_source.find("function formatUpdateModalBranchTarget(result)") != std::string::npos &&
+            site_source.find("return sha ? `${branch}+${sha}` : branch;") != std::string::npos &&
+            site_source.find("const taggedReleaseUpdate = isTaggedReleaseUpdate(result);") != std::string::npos &&
+            site_source.find("Review the update channel given to you for this pre-release version.") != std::string::npos &&
+            site_source.find("if (taggedReleaseUpdate) {\n        appendUpdateModalBodyLink(body, result, taggedReleaseUpdate);") != std::string::npos &&
+            site_source.find(".toggleClass(\"d-none\", !taggedReleaseUpdate)") != std::string::npos &&
+            site_source.find(".text(\"View release\")") != std::string::npos &&
+            site_source.find("Review the latest releases: ") == std::string::npos &&
             site_source.find("Review the latest WsprryPi releases before updating.") == std::string::npos,
         "update modal must use semantic release wording for semver updates, preserve wspr_exe_version in commit fallback summaries, explain fallback checks, and suppress exact-release wording when fallback is used");
     require(
