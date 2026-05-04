@@ -411,10 +411,15 @@ int main()
         site_source.find("let dismissedUiRefreshVersion = null;") != std::string::npos &&
             site_source.find("let dismissedUiRefreshBuildId = null;") != std::string::npos &&
             site_source.find("const UI_BUILD_POLL_INTERVAL_MS = 60 * 1000;") != std::string::npos &&
+            site_source.find("const GITHUB_UPDATE_POLL_INTERVAL_MS = 60 * 60 * 1000;") != std::string::npos &&
             site_source.find("window.WSPRRYPI_UI_VERSION") != std::string::npos &&
             site_source.find("window.WSPRRYPI_UI_BUILD_ID") != std::string::npos &&
+            site_source.find("let githubUpdatePollTimer = null;") != std::string::npos &&
             site_source.find("function checkUiBuildVersion()") != std::string::npos &&
             site_source.find("function initUiBuildChangePolling()") != std::string::npos &&
+            site_source.find("function initGithubUpdatePolling()") != std::string::npos &&
+            site_source.find("if (githubUpdatePollTimer !== null)") != std::string::npos &&
+            site_source.find("githubUpdatePollTimer = window.setInterval(\n        updateWsprryPiVersion,\n        GITHUB_UPDATE_POLL_INTERVAL_MS\n    );") != std::string::npos &&
             site_source.find("document.addEventListener(\"visibilitychange\"") != std::string::npos &&
             site_source.find("function maybePromptForUiRefresh(versionResponse)") != std::string::npos &&
             site_source.find("function sharedConfirmModalIsVisible()") != std::string::npos &&
@@ -424,8 +429,9 @@ int main()
             site_source.find("uiRefreshPromptActive = promptShown === true;") != std::string::npos &&
             site_source.find("getJsonWithEndpointFallback(VERSION_ENDPOINT)\n        .done(function (response) {\n            if (response && (response.ui_build_id || response.ui_version)) {\n                maybePromptForUiRefresh(response);") != std::string::npos &&
             site_source.find("// Start UI build polling from global script initialization as soon as site.js") != std::string::npos &&
-            site_source.find("initUiBuildChangePolling();\n\nfunction getPersistedTabStorageKey") != std::string::npos &&
-            site_source.find("initUiBuildChangePolling();\n    populateConfig();") != std::string::npos &&
+            site_source.find("initUiBuildChangePolling();\ninitGithubUpdatePolling();\n\nfunction getPersistedTabStorageKey") != std::string::npos &&
+            site_source.find("initUiBuildChangePolling();\n    initGithubUpdatePolling();\n    populateConfig();") != std::string::npos &&
+            site_source.find("initGithubUpdatePolling();\n    populateConfig();") != std::string::npos &&
             site_source.find("if (uiBuildPollTimer !== null)") != std::string::npos &&
             site_source.find("const canCompareBuildId = loadedBuildId && normalizedServerBuildId;") != std::string::npos &&
             site_source.find("normalizedServerBuildId === dismissedUiRefreshBuildId") != std::string::npos &&
