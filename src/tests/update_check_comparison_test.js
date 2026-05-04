@@ -234,6 +234,47 @@ async function runBuildPriorityCase({
     assert.strictEqual(result.versionComparisonStatus, "local_ahead");
     assert.strictEqual(result.updateAvailable, false);
 
+    const originalGetElementById = context.document.getElementById;
+    let promptAttempts = 0;
+    let promptReturnValue = false;
+    context.window.WSPRRYPI_UI_BUILD_ID = "loaded-build";
+    context.window.WSPRRYPI_UI_VERSION = "3.0.0";
+    context.document.getElementById = (id) => {
+        if (id === "confirmModal") {
+            return {
+                classList: {
+                    contains: () => false,
+                },
+            };
+        }
+        return originalGetElementById(id);
+    };
+    context.showConfirmationDialog = (options) => {
+        promptAttempts += 1;
+        assert.strictEqual(options.title, "UI refresh required");
+        assert.strictEqual(options.confirmLabel, "Refresh");
+        promptReturnValue = promptAttempts > 1;
+        return promptReturnValue;
+    };
+
+    context.maybePromptForUiRefresh({
+        ui_build_id: "server-build",
+        ui_version: "3.0.1",
+    });
+    assert.strictEqual(promptAttempts, 1);
+
+    context.maybePromptForUiRefresh({
+        ui_build_id: "server-build",
+        ui_version: "3.0.1",
+    });
+    assert.strictEqual(
+        promptAttempts,
+        2,
+        "polling must retry the UI refresh prompt when the first modal show attempt does not become active"
+    );
+
+    context.document.getElementById = originalGetElementById;
+
     console.log("update_check_comparison_test passed");
 })().catch((error) => {
     console.error(error);

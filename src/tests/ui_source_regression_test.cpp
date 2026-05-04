@@ -417,7 +417,12 @@ int main()
             site_source.find("function initUiBuildChangePolling()") != std::string::npos &&
             site_source.find("document.addEventListener(\"visibilitychange\"") != std::string::npos &&
             site_source.find("function maybePromptForUiRefresh(versionResponse)") != std::string::npos &&
-            site_source.find("maybePromptForUiRefresh(response);") != std::string::npos &&
+            site_source.find("function sharedConfirmModalIsVisible()") != std::string::npos &&
+            site_source.find("uiRefreshPromptActive && !sharedConfirmModalIsVisible()") != std::string::npos &&
+            site_source.find("const modalEl = document.getElementById(\"confirmModal\");") != std::string::npos &&
+            site_source.find("const promptShown = showConfirmationDialog({") != std::string::npos &&
+            site_source.find("uiRefreshPromptActive = promptShown === true;") != std::string::npos &&
+            site_source.find("getJsonWithEndpointFallback(VERSION_ENDPOINT)\n        .done(function (response) {\n            if (response && (response.ui_build_id || response.ui_version)) {\n                maybePromptForUiRefresh(response);") != std::string::npos &&
             site_source.find("const canCompareBuildId = loadedBuildId && normalizedServerBuildId;") != std::string::npos &&
             site_source.find("normalizedServerBuildId === dismissedUiRefreshBuildId") != std::string::npos &&
             web_server_source.find("j[\"ui_version\"] = get_raw_version_string();") != std::string::npos &&
@@ -445,7 +450,9 @@ int main()
             site_source.find("refreshUiForVersion(normalizedServerVersion, normalizedServerBuildId);") != std::string::npos &&
             site_source.find("dismissedUiRefreshBuildId = normalizedServerBuildId;") != std::string::npos &&
             site_source.find("if (typeof options.onCancel === \"function\")") != std::string::npos &&
-            site_source.find("if (typeof options.onHidden === \"function\")") != std::string::npos,
+            site_source.find("if (typeof options.onHidden === \"function\")") != std::string::npos &&
+            site_source.find("confirmModal.show();\n        return true;") != std::string::npos &&
+            site_source.find("return false;") != std::string::npos,
         "UI refresh prompt must replace the current URL with a ui_refresh cache-busting query parameter on OK and suppress repeat prompts for the same server build id on Cancel or dismiss");
     require(
         site_source.find("function initFooterMetaPanelInteractions()") != std::string::npos &&
