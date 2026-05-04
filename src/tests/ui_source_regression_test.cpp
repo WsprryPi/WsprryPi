@@ -589,7 +589,7 @@ int main()
             site_source.find("latestStable") != std::string::npos &&
             site_source.find("latestPrerelease") != std::string::npos &&
             site_source.find("prereleasesByChannel") != std::string::npos &&
-            site_source.find("async function buildSemanticVersionUpdateResult(versionInfo)") != std::string::npos &&
+            site_source.find("async function buildSemanticVersionUpdateResult(versionInfo, options = {})") != std::string::npos &&
             site_source.find("semantic version compared against GitHub release") != std::string::npos &&
             site_source.find("local semantic version has build metadata/commits past tag") != std::string::npos &&
             site_source.find("local semantic version could not be parsed") != std::string::npos &&
@@ -607,7 +607,12 @@ int main()
             site_source.find("remoteVersionSelected: latestSameChannelPrerelease.normalized") != std::string::npos &&
             site_source.find("async function buildCommitBasedWsprryPiUpdateResult(versionInfo, semanticFallback = null)") != std::string::npos &&
             site_source.find("versionComparisonUsed: \"commit\"") != std::string::npos &&
-            site_source.find("const semanticResult = await buildSemanticVersionUpdateResult(versionInfo);") != std::string::npos &&
+            site_source.find("function branchAllowsCommitUpdate(branch)") != std::string::npos &&
+            site_source.find("return branch !== \"main\";") != std::string::npos &&
+            site_source.find("const commitUpdatesAllowed = branchAllowsCommitUpdate(versionInfo.currentBranch);") != std::string::npos &&
+            site_source.find("ignoreLocalBuildMetadata: !commitUpdatesAllowed") != std::string::npos &&
+            site_source.find("main branch requires a newer tagged release for update notification") != std::string::npos &&
+            site_source.find("main_commit_diff_without_release") != std::string::npos &&
             site_source.find("const branchCommitComparisonHasPriority = versionInfo.branchState === \"branch\"") != std::string::npos &&
             site_source.find("commitResult.targetBranch === versionInfo.currentBranch") != std::string::npos &&
             site_source.find("Update check using same-branch commit comparison priority over semantic version metadata.") != std::string::npos &&
