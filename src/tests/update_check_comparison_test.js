@@ -40,6 +40,7 @@ const context = {
             hostname: "localhost",
         },
         addEventListener: () => {},
+        setInterval: () => 0,
         localStorage: {
             getItem: () => null,
             setItem: () => {},

@@ -423,6 +423,10 @@ int main()
             site_source.find("const promptShown = showConfirmationDialog({") != std::string::npos &&
             site_source.find("uiRefreshPromptActive = promptShown === true;") != std::string::npos &&
             site_source.find("getJsonWithEndpointFallback(VERSION_ENDPOINT)\n        .done(function (response) {\n            if (response && (response.ui_build_id || response.ui_version)) {\n                maybePromptForUiRefresh(response);") != std::string::npos &&
+            site_source.find("// Start UI build polling from global script initialization as soon as site.js") != std::string::npos &&
+            site_source.find("initUiBuildChangePolling();\n\nfunction getPersistedTabStorageKey") != std::string::npos &&
+            site_source.find("initUiBuildChangePolling();\n    populateConfig();") != std::string::npos &&
+            site_source.find("if (uiBuildPollTimer !== null)") != std::string::npos &&
             site_source.find("const canCompareBuildId = loadedBuildId && normalizedServerBuildId;") != std::string::npos &&
             site_source.find("normalizedServerBuildId === dismissedUiRefreshBuildId") != std::string::npos &&
             web_server_source.find("j[\"ui_version\"] = get_raw_version_string();") != std::string::npos &&
