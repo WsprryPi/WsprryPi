@@ -577,6 +577,19 @@ namespace
                 internal_json["Operation"]["Use LED"] = operation.at("Use LED");
             if (operation.contains("LED Pin"))
                 internal_json["Operation"]["LED Pin"] = operation.at("LED Pin");
+            if (operation.contains("Use Amp"))
+                internal_json["Operation"]["Use Amp"] = operation.at("Use Amp");
+            if (operation.contains("Amp Pin"))
+                internal_json["Operation"]["Amp Pin"] = operation.at("Amp Pin");
+            if (!operation.contains("Use Amp") && operation.contains("Amp Pin"))
+            {
+                internal_json["Operation"]["Use Amp"] =
+                    parse_integer_config_value(
+                        operation.at("Amp Pin"),
+                        "Operation.Amp Pin") >= 0;
+            }
+            if (operation.contains("Amp Pin Active High"))
+                internal_json["Operation"]["Amp Pin Active High"] = operation.at("Amp Pin Active High");
             if (operation.contains("Web Port"))
                 internal_json["Operation"]["Web Port"] = operation.at("Web Port");
             if (operation.contains("Socket Port"))
@@ -882,6 +895,9 @@ void init_default_config()
     config.use_offset = true;
     config.use_led = false;
     config.led_pin = 18;
+    config.use_amp = false;
+    config.amp_pin = -1;
+    config.amp_pin_active_high = false;
     config.gpio_tx_pin = kDefaultTransmitGpio;
     config.gpio_power_level = 7;
     config.gpio_use_ntp = true;
@@ -1102,6 +1118,9 @@ namespace
                  key == "Transmit Backend" ||
                  key == "Use LED" ||
                  key == "LED Pin" ||
+                 key == "Use Amp" ||
+                 key == "Amp Pin" ||
+                 key == "Amp Pin Active High" ||
                  key == "Web Port" ||
                  key == "Socket Port" ||
                  key == "Use Shutdown" ||
@@ -1161,6 +1180,13 @@ namespace
         const std::string &section,
         const std::string &key)
     {
+        if (section == "Operation" && key == "Amp Pin")
+        {
+            const auto section_it = ini_data.find(section);
+            return section_it != ini_data.end() &&
+                   section_it->second.find(key) != section_it->second.end();
+        }
+
         return ini_has_nonempty_value(ini_data, section, key);
     }
 
@@ -1224,6 +1250,9 @@ namespace
             {"Transmit Backend", "gpio"},
             {"LED Pin", 18},
             {"Use LED", false},
+            {"Use Amp", false},
+            {"Amp Pin", -1},
+            {"Amp Pin Active High", false},
             {"Web Port", 31415},
             {"Socket Port", 31416},
             {"Use Shutdown", false},
@@ -1440,6 +1469,22 @@ namespace
         target.wspr_planner_preference = target.wspr.planner_preference;
         target.use_led = source.at("Operation").at("Use LED").get<bool>();
         target.led_pin = source.at("Operation").at("LED Pin").get<int>();
+        target.amp_pin =
+            source.at("Operation").contains("Amp Pin")
+                ? parse_integer_config_value(
+                      source.at("Operation").at("Amp Pin"),
+                      "Operation.Amp Pin")
+                : -1;
+        target.use_amp =
+            source.at("Operation").contains("Use Amp")
+                ? source.at("Operation").value("Use Amp", false)
+                : target.amp_pin >= 0;
+        if (target.amp_pin < 0)
+        {
+            target.use_amp = false;
+        }
+        target.amp_pin_active_high =
+            source.at("Operation").value("Amp Pin Active High", false);
 
         target.web_port = source.at("Operation").at("Web Port").get<int>();
         target.socket_port = source.at("Operation").at("Socket Port").get<int>();
@@ -1498,6 +1543,11 @@ namespace
             transmit_backend_kind_to_string(source.transmit_backend);
         target["Operation"]["Use LED"] = source.use_led;
         target["Operation"]["LED Pin"] = source.led_pin;
+        const bool use_amp =
+            source.use_amp && source.amp_pin >= 0 && source.amp_pin <= 27;
+        target["Operation"]["Use Amp"] = use_amp;
+        target["Operation"]["Amp Pin"] = source.amp_pin;
+        target["Operation"]["Amp Pin Active High"] = source.amp_pin_active_high;
         target["Operation"]["Web Port"] = source.web_port;
         target["Operation"]["Socket Port"] = source.socket_port;
         target["Operation"]["Use Shutdown"] = source.use_shutdown;
@@ -1593,6 +1643,9 @@ namespace
         target.si5351_power_level = source.si5351_power_level;
         target.use_led = source.use_led;
         target.led_pin = source.led_pin;
+        target.use_amp = source.use_amp;
+        target.amp_pin = source.amp_pin;
+        target.amp_pin_active_high = source.amp_pin_active_high;
         target.enable_web = source.enable_web;
         target.web_port = source.web_port;
         target.socket_port = source.socket_port;
@@ -1673,6 +1726,12 @@ namespace
                 const std::string &key = kv.first;
                 const std::string trimmed = trim_copy(kv.second);
 
+                if (section == "Operation" && key == "Amp Pin" && trimmed.empty())
+                {
+                    patch["Operation"]["Amp Pin"] = -1;
+                    continue;
+                }
+
                 if (trimmed.empty())
                 {
                     continue;
@@ -1693,6 +1752,16 @@ namespace
 
         patch["Meta"]["INI Filename"] = filename;
         patch["Meta"]["Use INI"] = true;
+        if (patch.contains("Operation") &&
+            patch.at("Operation").is_object() &&
+            patch.at("Operation").contains("Amp Pin") &&
+            !patch.at("Operation").contains("Use Amp"))
+        {
+            patch["Operation"]["Use Amp"] =
+                parse_integer_config_value(
+                    patch.at("Operation").at("Amp Pin"),
+                    "Operation.Amp Pin") >= 0;
+        }
         target.merge_patch(patch);
     }
 
@@ -1887,6 +1956,9 @@ void json_to_ini()
                   key == "Transmit Backend" ||
                   key == "Use LED" ||
                   key == "LED Pin" ||
+                  key == "Use Amp" ||
+                  key == "Amp Pin" ||
+                  key == "Amp Pin Active High" ||
                   key == "Web Port" ||
                   key == "Socket Port" ||
                   key == "Use Shutdown" ||
@@ -1939,6 +2011,12 @@ void json_to_ini()
             else if (kv.value().is_string())
             {
                 out_val = kv.value().get<std::string>();
+            }
+            else if (section_name == "Operation" && key == "Amp Pin")
+            {
+                const int amp_pin =
+                    parse_integer_config_value(kv.value(), "Operation.Amp Pin");
+                out_val = amp_pin >= 0 ? std::to_string(amp_pin) : "";
             }
             else
             {

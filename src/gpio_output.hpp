@@ -134,7 +134,8 @@ private:
     int compute_physical_state(bool logical_state) const;
 };
 
-// Global instance
+// Global instances for optional transmit-related GPIO outputs.
 extern GPIOOutput ledControl;
+extern GPIOOutput ampControl;
 
 #endif // GPIO_OUTPUT_HPP

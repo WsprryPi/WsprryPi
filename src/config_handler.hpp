@@ -247,6 +247,9 @@ struct ArgParserConfig
     int si5351_power_level; ///< Si5351 drive-strength level (1-4).
     bool use_led;    ///< Enable TX LED indicator.
     int led_pin;     ///< GPIO pin for LED indicator.
+    bool use_amp;    ///< Enable external amplifier control GPIO.
+    int amp_pin;     ///< Optional GPIO pin for external amplifier control (-1 = disabled).
+    bool amp_pin_active_high; ///< External amplifier GPIO polarity.
 
     // Runtime
     bool enable_web;   ///< Enable the HTTP web UI and WebSocket server.
@@ -314,6 +317,9 @@ struct ArgParserConfig
           si5351_power_level(1),
           use_led(false),
           led_pin(-1),
+          use_amp(false),
+          amp_pin(-1),
+          amp_pin_active_high(false),
           enable_web(true),
           web_port(-1),
           socket_port(-1),
@@ -385,6 +391,9 @@ struct ArgParserConfig
         si5351_power_level = other.si5351_power_level;
         use_led = other.use_led;
         led_pin = other.led_pin;
+        use_amp = other.use_amp;
+        amp_pin = other.amp_pin;
+        amp_pin_active_high = other.amp_pin_active_high;
         enable_web = other.enable_web;
         web_port = other.web_port;
         socket_port = other.socket_port;
@@ -517,6 +526,9 @@ void ini_to_json(std::string filename);
  *       "Transmit Backend": "gpio",
  *       "Use LED": false,
  *       "LED Pin": 18,
+ *       "Use Amp": false,
+ *       "Amp Pin": -1,
+ *       "Amp Pin Active High": false,
  *       "Web Port": 31415,
  *       "Socket Port": 31416,
  *       "Use Shutdown": false,

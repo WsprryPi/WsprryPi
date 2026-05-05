@@ -259,6 +259,8 @@ int main()
 
     const std::string site_source =
         read_text_file("/home/pi/WsprryPi/WsprryPi-UI/data/site.js");
+    const std::string stock_ini_source =
+        read_text_file("/home/pi/WsprryPi/config/wsprrypi.ini");
     const std::string transmit_branch = "if (msg.type === \"transmit\")";
     const std::string tx_state_branch = "if (msg.tx_state !== undefined)";
     require(
@@ -407,10 +409,32 @@ int main()
         "shared confirm modal must support preserving diagnostic line breaks for detail dialogs");
     require(
         site_source.find("let dismissedUiRefreshVersion = null;") != std::string::npos &&
+            site_source.find("let dismissedUiRefreshBuildId = null;") != std::string::npos &&
+            site_source.find("const UI_BUILD_POLL_INTERVAL_MS = 60 * 1000;") != std::string::npos &&
+            site_source.find("const GITHUB_UPDATE_POLL_INTERVAL_MS = 60 * 60 * 1000;") != std::string::npos &&
             site_source.find("window.WSPRRYPI_UI_VERSION") != std::string::npos &&
-            site_source.find("function maybePromptForUiRefresh(serverVersion)") != std::string::npos &&
-            site_source.find("maybePromptForUiRefresh(response.ui_version);") != std::string::npos &&
-            site_source.find("normalizedServerVersion === dismissedUiRefreshVersion") != std::string::npos &&
+            site_source.find("window.WSPRRYPI_UI_BUILD_ID") != std::string::npos &&
+            site_source.find("let githubUpdatePollTimer = null;") != std::string::npos &&
+            site_source.find("function checkUiBuildVersion()") != std::string::npos &&
+            site_source.find("function initUiBuildChangePolling()") != std::string::npos &&
+            site_source.find("function initGithubUpdatePolling()") != std::string::npos &&
+            site_source.find("if (githubUpdatePollTimer !== null)") != std::string::npos &&
+            site_source.find("githubUpdatePollTimer = window.setInterval(\n        updateWsprryPiVersion,\n        GITHUB_UPDATE_POLL_INTERVAL_MS\n    );") != std::string::npos &&
+            site_source.find("document.addEventListener(\"visibilitychange\"") != std::string::npos &&
+            site_source.find("function maybePromptForUiRefresh(versionResponse)") != std::string::npos &&
+            site_source.find("function sharedConfirmModalIsVisible()") != std::string::npos &&
+            site_source.find("uiRefreshPromptActive && !sharedConfirmModalIsVisible()") != std::string::npos &&
+            site_source.find("const modalEl = document.getElementById(\"confirmModal\");") != std::string::npos &&
+            site_source.find("const promptShown = showConfirmationDialog({") != std::string::npos &&
+            site_source.find("uiRefreshPromptActive = promptShown === true;") != std::string::npos &&
+            site_source.find("getJsonWithEndpointFallback(VERSION_ENDPOINT)\n        .done(function (response) {\n            if (response && (response.ui_build_id || response.ui_version)) {\n                maybePromptForUiRefresh(response);") != std::string::npos &&
+            site_source.find("// Start UI build polling from global script initialization as soon as site.js") != std::string::npos &&
+            site_source.find("initUiBuildChangePolling();\ninitGithubUpdatePolling();\n\nfunction getPersistedTabStorageKey") != std::string::npos &&
+            site_source.find("initUiBuildChangePolling();\n    initGithubUpdatePolling();\n    populateConfig();") != std::string::npos &&
+            site_source.find("initGithubUpdatePolling();\n    populateConfig();") != std::string::npos &&
+            site_source.find("if (uiBuildPollTimer !== null)") != std::string::npos &&
+            site_source.find("const canCompareBuildId = loadedBuildId && normalizedServerBuildId;") != std::string::npos &&
+            site_source.find("normalizedServerBuildId === dismissedUiRefreshBuildId") != std::string::npos &&
             web_server_source.find("j[\"ui_version\"] = get_raw_version_string();") != std::string::npos &&
             web_server_source.find("j[\"wspr_version_raw\"] = get_exe_version();") != std::string::npos &&
             web_server_source.find("j[\"wspr_version_parsed\"] = parse_version_for_update_metadata(get_exe_version());") != std::string::npos &&
@@ -428,14 +452,18 @@ int main()
             site_source.find("showConfirmationDialog({") != std::string::npos,
         "UI refresh prompt must use the shared Bootstrap confirmation modal path with the required copy and labels");
     require(
-        site_source.find("function refreshUiForVersion(serverVersion)") != std::string::npos &&
+        site_source.find("function refreshUiForVersion(serverVersion, serverBuildId = \"\")") != std::string::npos &&
             site_source.find("const url = new URL(window.location.href);") != std::string::npos &&
             site_source.find("url.searchParams.set(\n        \"ui_refresh\",") != std::string::npos &&
             site_source.find("window.location.replace(url.toString());") != std::string::npos &&
-            site_source.find("refreshUiForVersion(normalizedServerVersion);") != std::string::npos &&
-            site_source.find("onCancel: () => {\n            dismissedUiRefreshVersion = normalizedServerVersion;") != std::string::npos &&
-            site_source.find("if (typeof options.onCancel === \"function\")") != std::string::npos,
-        "UI refresh prompt must replace the current URL with a ui_refresh cache-busting query parameter on OK and suppress repeat prompts for the same server version on Cancel");
+            site_source.find("normalizedBuildId || normalizedVersion || Date.now().toString()") != std::string::npos &&
+            site_source.find("refreshUiForVersion(normalizedServerVersion, normalizedServerBuildId);") != std::string::npos &&
+            site_source.find("dismissedUiRefreshBuildId = normalizedServerBuildId;") != std::string::npos &&
+            site_source.find("if (typeof options.onCancel === \"function\")") != std::string::npos &&
+            site_source.find("if (typeof options.onHidden === \"function\")") != std::string::npos &&
+            site_source.find("confirmModal.show();\n        return true;") != std::string::npos &&
+            site_source.find("return false;") != std::string::npos,
+        "UI refresh prompt must replace the current URL with a ui_refresh cache-busting query parameter on OK and suppress repeat prompts for the same server build id on Cancel or dismiss");
     require(
         site_source.find("function initFooterMetaPanelInteractions()") != std::string::npos &&
             site_source.find("document.addEventListener(\"click\", function (event) {") != std::string::npos &&
@@ -493,7 +521,7 @@ int main()
             site_source.find("cached.branchState !== versionInfo.branchState") != std::string::npos &&
             site_source.find("branchState: versionInfo.branchState || \"branch\"") != std::string::npos &&
             site_source.find("updateCheckShaMatches(versionInfo.currentSha, selectedBranch.headSha)") != std::string::npos &&
-            site_source.find("? updateCheckNoUpdateResult()") != std::string::npos &&
+            site_source.find("? updateCheckCommitComparisonResult(versionInfo.currentSha, selectedBranch.headSha, \"identical\")") != std::string::npos &&
             site_source.find(": await compareGithubCommits(versionInfo.currentSha, selectedBranch.headSha)") != std::string::npos &&
             site_source.find("if (error.status === 404)") != std::string::npos &&
             site_source.find("updateAvailable: !updateCheckShaMatches(currentSha, headSha)") != std::string::npos &&
@@ -578,7 +606,7 @@ int main()
             site_source.find("latestStable") != std::string::npos &&
             site_source.find("latestPrerelease") != std::string::npos &&
             site_source.find("prereleasesByChannel") != std::string::npos &&
-            site_source.find("async function buildSemanticVersionUpdateResult(versionInfo)") != std::string::npos &&
+            site_source.find("async function buildSemanticVersionUpdateResult(versionInfo, options = {})") != std::string::npos &&
             site_source.find("semantic version compared against GitHub release") != std::string::npos &&
             site_source.find("local semantic version has build metadata/commits past tag") != std::string::npos &&
             site_source.find("local semantic version could not be parsed") != std::string::npos &&
@@ -596,7 +624,15 @@ int main()
             site_source.find("remoteVersionSelected: latestSameChannelPrerelease.normalized") != std::string::npos &&
             site_source.find("async function buildCommitBasedWsprryPiUpdateResult(versionInfo, semanticFallback = null)") != std::string::npos &&
             site_source.find("versionComparisonUsed: \"commit\"") != std::string::npos &&
-            site_source.find("const semanticResult = await buildSemanticVersionUpdateResult(versionInfo);") != std::string::npos &&
+            site_source.find("function branchAllowsCommitUpdate(branch)") != std::string::npos &&
+            site_source.find("return branch !== \"main\";") != std::string::npos &&
+            site_source.find("const commitUpdatesAllowed = branchAllowsCommitUpdate(versionInfo.currentBranch);") != std::string::npos &&
+            site_source.find("ignoreLocalBuildMetadata: !commitUpdatesAllowed") != std::string::npos &&
+            site_source.find("main branch requires a newer tagged release for update notification") != std::string::npos &&
+            site_source.find("main_commit_diff_without_release") != std::string::npos &&
+            site_source.find("const branchCommitComparisonHasPriority = versionInfo.branchState === \"branch\"") != std::string::npos &&
+            site_source.find("commitResult.targetBranch === versionInfo.currentBranch") != std::string::npos &&
+            site_source.find("Update check using same-branch commit comparison priority over semantic version metadata.") != std::string::npos &&
             site_source.find("if (!semanticResult.useCommitFallback)") != std::string::npos &&
             site_source.find("Update check using commit fallback: ${semanticResult.reason}") != std::string::npos &&
             site_source.find("const commitResult = await buildCommitBasedWsprryPiUpdateResult(versionInfo, semanticResult);") != std::string::npos,
@@ -755,7 +791,7 @@ int main()
             site_source.find("dedupeUpdateCheckTechnicalDetails") != std::string::npos &&
             site_source.find("function forceUpdateCheckNow()") != std::string::npos &&
             site_source.find("bypassCache: true") != std::string::npos &&
-            site_source.find("suppressModal: true") != std::string::npos &&
+            site_source.find("suppressModal: true") == std::string::npos &&
             site_source.find("const checkNowButton = document.getElementById(\"updateCheckNowBtn\");") != std::string::npos &&
             site_source.find("checkNowButton.addEventListener(\"click\", forceUpdateCheckNow);") != std::string::npos &&
             site_source.find("renderUpdateCheckPanel(versionInfo, result);") != std::string::npos &&
@@ -870,10 +906,19 @@ int main()
     require(
         site_source.find("const summaryText = result.versionComparisonUsed === \"semver\" && result.remoteVersionSelected") != std::string::npos &&
             site_source.find("`${result.localVersionParsed || versionInfo.currentModalVersion} is behind release ${result.remoteVersionSelected}.`") != std::string::npos &&
-            site_source.find("`${versionInfo.currentModalVersion} is behind ${result.targetBranch} ${targetShaLabel}.`") != std::string::npos &&
+            site_source.find("`${versionInfo.currentModalVersion} is behind ${formatUpdateModalBranchTarget(result)}.`") != std::string::npos &&
             site_source.find("`${versionInfo.currentDisplayVersion} is behind ${result.targetBranch} ${targetShaLabel}.`") == std::string::npos &&
-            site_source.find("const exactRelease = result.fallbackUsed !== true && Boolean(result.releaseTitle);") != std::string::npos &&
-            site_source.find("Review the latest releases: ") != std::string::npos &&
+            site_source.find("function isTaggedReleaseUpdate(result)") != std::string::npos &&
+            site_source.find("Boolean(result?.releaseTitle)") != std::string::npos &&
+            site_source.find("Boolean(result?.remoteVersionSelected)") != std::string::npos &&
+            site_source.find("function formatUpdateModalBranchTarget(result)") != std::string::npos &&
+            site_source.find("return sha ? `${branch}+${sha}` : branch;") != std::string::npos &&
+            site_source.find("const taggedReleaseUpdate = isTaggedReleaseUpdate(result);") != std::string::npos &&
+            site_source.find("Review the update channel given to you for this pre-release version.") != std::string::npos &&
+            site_source.find("if (taggedReleaseUpdate) {\n        appendUpdateModalBodyLink(body, result, taggedReleaseUpdate);") != std::string::npos &&
+            site_source.find(".toggleClass(\"d-none\", !taggedReleaseUpdate)") != std::string::npos &&
+            site_source.find(".text(\"View release\")") != std::string::npos &&
+            site_source.find("Review the latest releases: ") == std::string::npos &&
             site_source.find("Review the latest WsprryPi releases before updating.") == std::string::npos,
         "update modal must use semantic release wording for semver updates, preserve wspr_exe_version in commit fallback summaries, explain fallback checks, and suppress exact-release wording when fallback is used");
     require(
@@ -905,6 +950,33 @@ int main()
         config_view_source.find("id=\"modeChangeGuardModal\"") != std::string::npos &&
             config_view_source.find("id=\"modeChangeGuardConfirmBtn\"") != std::string::npos,
         "Configuration view must expose the guarded mode-change confirmation modal");
+    require(
+        config_view_source.find("Amp Control") != std::string::npos &&
+            config_view_source.find("Activate Amp:") != std::string::npos &&
+            config_view_source.find("Amp Pin") != std::string::npos &&
+            config_view_source.find("Active High") != std::string::npos &&
+            config_view_source.find("Control an external amplifier by activating it prior to transmitting and deactivating it after the transmission is complete.") != std::string::npos,
+        "Configuration Pi I/O view must expose Activate Amp, Amp Pin, Active High, and the full amplifier-control description");
+    require(
+        site_source.find("\"Use Amp\": { required: false, type: \"boolean\" }") != std::string::npos &&
+            site_source.find("\"Amp Pin\": { required: false, type: \"number\" }") != std::string::npos &&
+            site_source.find("\"Amp Pin Active High\": { required: false, type: \"boolean\" }") != std::string::npos,
+        "site.js config schema must accept Use Amp, Amp Pin, and Amp Pin Active High");
+    require(
+        stock_ini_source.find("Use Amp = false") != std::string::npos &&
+            stock_ini_source.find("Amp Pin =") != std::string::npos &&
+            stock_ini_source.find("Amp Pin Active High = false") != std::string::npos,
+        "stock INI must explicitly include disabled Use Amp, Amp Pin, and Amp Pin Active High fields");
+    require(
+        ui_source.find("function setUseAmp(enabled)") != std::string::npos &&
+            ui_source.find("function getUseAmp()") != std::string::npos &&
+            ui_source.find("\"Use Amp\": use_amp") != std::string::npos &&
+            ui_source.find("\"Amp Pin\": amp_pin") != std::string::npos &&
+            ui_source.find("\"Amp Pin Active High\": amp_pin_active_high") != std::string::npos &&
+            ui_source.find("const amp_pin = Number.isInteger(amp_pin_value) ? amp_pin_value : -1;") != std::string::npos &&
+            ui_source.find("getUseAmp() ? getAmpPin() : null") != std::string::npos &&
+            ui_source.find("function validateGpioConflictFields()") != std::string::npos,
+        "index.js must serialize Use Amp, retain Amp Pin as data, include Amp Pin Active High, and validate Amp GPIO conflicts only when enabled");
     const std::string footer_source =
         read_text_file("/home/pi/WsprryPi/WsprryPi-UI/data/footer.php");
     const std::string site_css_source =
@@ -937,16 +1009,26 @@ int main()
         "footer markup must keep the native click-based About disclosure and provide a site-global update-check toggle for disabling or re-enabling checks");
     require(
         header_source.find("window.WSPRRYPI_UI_VERSION = <?= json_encode(getWsprryPiUiVersion()) ?>;") != std::string::npos &&
+            header_source.find("window.WSPRRYPI_UI_BUILD_ID = <?= json_encode(getWsprryPiUiBuildId()) ?>;") != std::string::npos &&
             ui_version_source.find("function getWsprryPiUiVersion(): string") != std::string::npos &&
+            ui_version_source.find("function wsprrypiUiBuildFileRecords(): array") != std::string::npos &&
+            ui_version_source.find("function getWsprryPiUiBuildId(): string") != std::string::npos &&
+            ui_version_source.find("'view_diag_logs.php' => true") != std::string::npos &&
+            ui_version_source.find("'cache' => true") != std::string::npos &&
+            ui_version_source.find("'%s|%d|%d'") != std::string::npos &&
+            ui_version_source.find("'mtime-' . substr(hash('sha256', implode(\"\\n\", $records)), 0, 16)") != std::string::npos &&
             ui_version_source.find("function wsprrypiAssetUrl(string $path): string") != std::string::npos &&
-            ui_version_source.find("'v=' . rawurlencode($version)") != std::string::npos &&
+            ui_version_source.find("'v=' . rawurlencode($buildId)") != std::string::npos &&
+            version_endpoint_source.find("'ui_build_id' => $uiBuildId") != std::string::npos &&
+            version_endpoint_source.find("Cache-Control") != std::string::npos &&
+            version_endpoint_source.find("no-store") != std::string::npos &&
             header_source.find("wsprrypiAssetUrl('site.css')") != std::string::npos &&
             footer_source.find("wsprrypiAssetUrl('site.js')") != std::string::npos &&
             index_page_source.find("wsprrypiAssetUrl($stylesheet)") != std::string::npos &&
             index_page_source.find("wsprrypiAssetUrl($script)") != std::string::npos &&
             script_include_source.find("wsprrypiAssetUrl('vendor/js/jquery-3.7.1.min.js')") != std::string::npos &&
             script_include_source.find("wsprrypiAssetUrl('vendor/js/bootstrap.bundle-5.3.8.min.js')") != std::string::npos,
-        "PHP template assets must use the centralized WsprryPi UI version query string for CSS and JS cache busting");
+        "PHP template assets must use the centralized WsprryPi UI build id query string for CSS and JS cache busting, and /version must expose the same no-store UI build id while excluding diagnostic logs and transient paths");
     require(
         html_cache_headers_source.find("header('Cache-Control: no-cache, must-revalidate');") != std::string::npos &&
             index_page_source.find("<?php require_once __DIR__ . '/html_cache_headers.php'; ?>") == 0 &&

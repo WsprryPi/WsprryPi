@@ -1325,6 +1325,10 @@ void print_usage(const std::string &message, int exit_code)
               << "  -l, --led_pin <gpio>               Enable the TX LED on the given GPIO.\n"
               << "      --led-pin <gpio>               Alias for --led_pin.\n"
               << "      --use-led, --no-led            Enable or disable the TX LED using the configured/default pin.\n"
+              << "      --amp-pin <gpio>               Configure external amplifier control GPIO.\n"
+              << "      --amp-pin-active-high          Set Amp Pin polarity active-high.\n"
+              << "      --amp-pin-active-low           Set Amp Pin polarity active-low. Default.\n"
+              << "      --no-amp-pin                   Disable external amplifier control.\n"
               << "  -s, --shutdown_button <gpio>       Enable shutdown button monitoring on the given GPIO.\n"
               << "      --shutdown-button <gpio>       Alias for --shutdown_button.\n"
               << "      --use-shutdown, --no-shutdown  Enable or disable shutdown button monitoring.\n"
@@ -1517,6 +1521,26 @@ bool validate_config_candidate(
         if (error_message != nullptr)
         {
             *error_message = "CW fade slice duration must be greater than 0.";
+        }
+
+        return false;
+    }
+
+    if (candidate.use_amp && (candidate.amp_pin < 0 || candidate.amp_pin > 27))
+    {
+        if (error_message != nullptr)
+        {
+            *error_message = "Invalid Amp Pin. Expected GPIO 0 through 27 when Use Amp is enabled.";
+        }
+
+        return false;
+    }
+
+    if (candidate.amp_pin < -1 || candidate.amp_pin > 27)
+    {
+        if (error_message != nullptr)
+        {
+            *error_message = "Invalid Amp Pin. Expected -1 or GPIO 0 through 27.";
         }
 
         return false;
@@ -1846,6 +1870,25 @@ void apply_runtime_config_side_effects()
     {
         llog.logS(DEBUG, "Invalid or disabled LED settings, turning off LED.");
         ledControl.stop();
+    }
+
+    if (config.use_amp && config.amp_pin >= 0 && config.amp_pin <= 27)
+    {
+        if (!ampControl.enableGPIOPin(
+                config.amp_pin,
+                config.amp_pin_active_high))
+        {
+            llog.logS(ERROR,
+                      "Failed to enable Amp Control GPIO ",
+                      config.amp_pin,
+                      ": ",
+                      ampControl.lastError());
+        }
+    }
+    else
+    {
+        llog.logS(DEBUG, "Invalid or disabled Amp Control settings, turning off Amp Control.");
+        ampControl.stop();
     }
 
     if (config.use_shutdown && (config.shutdown_pin >= 0 && config.shutdown_pin <= 27))
@@ -2229,6 +2272,14 @@ bool validate_config_data()
             (config.gpio_power_level < 0 || config.gpio_power_level > 7))
         {
             llog.logE(ERROR, " - Invalid GPIO power level. Expected 0 through 7.");
+        }
+        if (config.amp_pin < -1 || config.amp_pin > 27)
+        {
+            llog.logE(ERROR, " - Invalid Amp Pin. Expected -1 or GPIO 0 through 27.");
+        }
+        if (config.use_amp && (config.amp_pin < 0 || config.amp_pin > 27))
+        {
+            llog.logE(ERROR, " - Invalid Amp Pin. Expected GPIO 0 through 27 when Use Amp is enabled.");
         }
         if (config.transmit_backend == TransmitBackendKind::SI5351)
         {
@@ -2721,6 +2772,10 @@ bool parse_command_line(int argc, char *argv[])
         {"no-shutdown", no_argument, nullptr, 1040},
         {"gpio-power-level", required_argument, nullptr, 1041},
         {"si5351-power-level", required_argument, nullptr, 1042},
+        {"amp-pin", required_argument, nullptr, 1043},
+        {"amp-pin-active-high", no_argument, nullptr, 1044},
+        {"amp-pin-active-low", no_argument, nullptr, 1045},
+        {"no-amp-pin", no_argument, nullptr, 1046},
         {"planner-preference", required_argument, nullptr, 1001},
         {"backend", required_argument, nullptr, 1002},
         {"qrss-message", required_argument, nullptr, 1003},
@@ -3147,6 +3202,41 @@ bool parse_command_line(int argc, char *argv[])
             {
                 print_usage(e.what(), EXIT_FAILURE);
             }
+            break;
+        }
+        case 1043:
+        {
+            try
+            {
+                const int amp_pin =
+                    parse_integer_option(optarg, "--amp-pin");
+                if (amp_pin < 0 || amp_pin > 27)
+                {
+                    print_usage("Invalid Amp Pin. Expected GPIO 0 through 27.", EXIT_FAILURE);
+                }
+                config.use_amp = true;
+                config.amp_pin = amp_pin;
+            }
+            catch (const std::exception &e)
+            {
+                print_usage(e.what(), EXIT_FAILURE);
+            }
+            break;
+        }
+        case 1044:
+        {
+            config.amp_pin_active_high = true;
+            break;
+        }
+        case 1045:
+        {
+            config.amp_pin_active_high = false;
+            break;
+        }
+        case 1046:
+        {
+            config.use_amp = false;
+            config.amp_pin = -1;
             break;
         }
         case 1001: // Select WSPR planner preference

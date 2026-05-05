@@ -47,7 +47,7 @@ IFS=$'\n\t'
 #
 # -----------------------------------------------------------------------------
 
-declare DEFAULT_REPO_BRANCH="devel"
+declare DEFAULT_REPO_BRANCH="gpio_for_amp"
 declare DEFAULT_SEM_VER="3.0.0-rc.3"
 
 # -----------------------------------------------------------------------------

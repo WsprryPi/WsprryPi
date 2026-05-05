@@ -195,6 +195,9 @@ namespace
               {"Transmit Backend", "gpio"},
               {"Use LED", "false"},
               {"LED Pin", "-1"},
+              {"Use Amp", "false"},
+              {"Amp Pin", "-1"},
+              {"Amp Pin Active High", "false"},
               {"Web Port", "-1"},
               {"Socket Port", "-1"},
               {"Use Shutdown", "false"},
@@ -1099,7 +1102,7 @@ int main(int argc, char *argv[])
         write_text_file(
             config.ini_filename,
             "[Meta]\nUse INI=true\nDate Time Log=false\ndebug_logging=false\nLoop TX=false\nTX Iterations=0\n"
-            "[Operation]\nMode=QRSS\nTransmit=false\nTransmit Backend=si5351\nUse LED=false\nLED Pin=-1\nWeb Port=31415\nSocket Port=31416\nUse Shutdown=false\nShutdown Button=-1\n"
+            "[Operation]\nMode=QRSS\nTransmit=false\nTransmit Backend=si5351\nUse LED=false\nLED Pin=-1\nUse Amp=false\nAmp Pin=-1\nAmp Pin Active High=false\nWeb Port=31415\nSocket Port=31416\nUse Shutdown=false\nShutdown Button=-1\n"
             "[GPIO]\nTransmit Pin=4\nPower Level=7\nUse NTP=false\n"
             "[Calibration]\nPPM=0\n"
             "[Si5351]\nI2C Bus=1\nI2C Address=96\nReference Frequency=27000000\nTX Output=CLK0\nPower Level=1\n"
@@ -3423,7 +3426,7 @@ int main(int argc, char *argv[])
             config.ini_filename,
             "[Meta]\ndebug_logging=false\n"
             "[Operation]\nMode=WSPR\nTransmit=false\nTransmit Backend=gpio\n"
-            "Use LED=false\nLED Pin=-1\nWeb Port=31415\nSocket Port=31416\n"
+            "Use LED=false\nLED Pin=-1\nUse Amp=false\nAmp Pin=-1\nAmp Pin Active High=false\nWeb Port=31415\nSocket Port=31416\n"
             "Use Shutdown=false\nShutdown Button=-1\n"
             "[GPIO]\nTransmit Pin=4\nPower Level=7\nUse NTP=false\n"
             "[Calibration]\nPPM=0\n"
@@ -3476,6 +3479,83 @@ int main(int argc, char *argv[])
         require(
             operation_it->second.find("Enable Web") == operation_it->second.end(),
             "json_to_ini must not persist the CLI-only web override");
+    }
+
+    {
+        init_default_config();
+        config.use_ini = true;
+        config.ini_filename = "/tmp/amp_config_persistence.ini";
+        write_text_file(config.ini_filename, "");
+        iniFile.set_filename(config.ini_filename);
+
+        config.use_amp = false;
+        config.amp_pin = -1;
+        config.amp_pin_active_high = false;
+        config_to_json();
+        json_to_ini();
+
+        auto persisted_ini = iniFile.getData();
+        auto operation_it = persisted_ini.find("Operation");
+        require(
+            operation_it != persisted_ini.end(),
+            "json_to_ini must persist the Operation section for Amp config");
+        require(
+            operation_it->second.at("Use Amp") == "false" &&
+                operation_it->second.at("Amp Pin").empty() &&
+                operation_it->second.at("Amp Pin Active High") == "false",
+            "json_to_ini must persist disabled Amp config as Use Amp=false, blank Amp Pin, and inactive polarity");
+
+        config.use_amp = true;
+        config.amp_pin = 23;
+        config.amp_pin_active_high = false;
+        config_to_json();
+        json_to_ini();
+
+        persisted_ini = iniFile.getData();
+        operation_it = persisted_ini.find("Operation");
+        require(
+            operation_it->second.at("Use Amp") == "true" &&
+                operation_it->second.at("Amp Pin") == "23" &&
+                operation_it->second.at("Amp Pin Active High") == "false",
+            "json_to_ini must persist enabled Amp config as Use Amp=true, Amp Pin=23, and explicit polarity");
+
+        config.use_amp = false;
+        config.amp_pin = 23;
+        config.amp_pin_active_high = false;
+        config_to_json();
+        json_to_ini();
+
+        persisted_ini = iniFile.getData();
+        operation_it = persisted_ini.find("Operation");
+        require(
+            jConfig["Operation"].value("Use Amp", true) == false &&
+                jConfig["Operation"].value("Amp Pin", -1) == 23 &&
+                operation_it->second.at("Use Amp") == "false" &&
+                operation_it->second.at("Amp Pin") == "23",
+            "disabled Amp config must retain Amp Pin as data while Use Amp remains the runtime enable flag");
+    }
+
+    {
+        init_config_json();
+        auto legacy_amp_ini = make_managed_ini_data("AA0NT", "EM18", "20m", true);
+        legacy_amp_ini["Operation"].erase("Use Amp");
+        legacy_amp_ini["Operation"]["Amp Pin"] = "23";
+        legacy_amp_ini["Operation"]["Amp Pin Active High"] = "false";
+        iniFile.setData(legacy_amp_ini);
+        ini_to_json("/tmp/legacy_amp_enabled.ini");
+        json_to_config();
+        require(
+            config.use_amp && config.amp_pin == 23 && !config.amp_pin_active_high,
+            "legacy INI without Use Amp must infer enabled Amp control from a valid Amp Pin");
+
+        init_config_json();
+        legacy_amp_ini["Operation"]["Amp Pin"] = "";
+        iniFile.setData(legacy_amp_ini);
+        ini_to_json("/tmp/legacy_amp_disabled.ini");
+        json_to_config();
+        require(
+            !config.use_amp && config.amp_pin == -1,
+            "legacy INI without Use Amp must infer disabled Amp control from a blank Amp Pin");
     }
 
     {
@@ -3629,6 +3709,145 @@ int main(int argc, char *argv[])
             "enabled TX LED lifecycle must produce exactly one GPIO write for assert and one for deassert");
 
         ledControl.stop();
+        GPIOOutput::setTestMode(false);
+    }
+
+    {
+        GPIOOutput::setTestMode(true);
+        init_default_config();
+        ini_reload_pending.store(false, std::memory_order_relaxed);
+        exiting_wspr.store(false, std::memory_order_relaxed);
+        reset_current_transmission_request_for_test();
+        set_band_gpio_selector_for_test(true, true);
+
+        config.mode = ModeType::WSPR;
+        config.transmit = true;
+        config.use_led = true;
+        config.led_pin = 18;
+        config.use_amp = true;
+        config.amp_pin = 23;
+        config.amp_pin_active_high = false;
+
+        require(
+            ledControl.enableGPIOPin(config.led_pin, true),
+            "central transmit GPIO lifecycle regression must enable LED test GPIO");
+        require(
+            ampControl.enableGPIOPin(config.amp_pin, config.amp_pin_active_high),
+            "central transmit GPIO lifecycle regression must enable Amp Control test GPIO");
+        TransmissionRequest request;
+        request.mode = TransmissionMode::WSPR;
+        request.dial_frequency_hz = 14095600.0;
+        request.actual_rf_frequency_hz = 14097100.0;
+        request.selector_gpio_enabled = true;
+        request.selector_band = HamBand::BAND_20M;
+        request.selector_gpio_config.gpio = 21;
+        request.selector_gpio_config.enabled = true;
+        request.selector_gpio_config.active_high = true;
+        set_current_transmission_request_for_test(request);
+
+        reset_tx_led_request_counts_for_test();
+        GPIOOutput::clearTestEvents();
+
+        transmitter_cb(
+            WsprTransmissionCallbackEvent::STARTING,
+            WsprTransmitLogLevel::INFO,
+            std::string(),
+            14097100.0);
+        transmitter_cb(
+            WsprTransmissionCallbackEvent::CANCELLED,
+            WsprTransmitLogLevel::INFO,
+            std::string(),
+            1.0);
+
+        std::vector<GPIOOutput::TestEvent> writes;
+        for (const auto &event : GPIOOutput::testEvents())
+        {
+            if (event.action == "write")
+            {
+                writes.push_back(event);
+            }
+        }
+
+        require(
+            writes.size() >= 6,
+            "central transmit GPIO lifecycle must write selector, amp, and LED on assert and deassert");
+        require(
+            writes[0].pin == 21 && writes[0].logical_state &&
+                writes[1].pin == 23 && writes[1].logical_state &&
+                !writes[1].active_high &&
+                writes[2].pin == 18 && writes[2].logical_state,
+            "central transmit GPIO assert order must be LPF/Band GPIO, Amp Control, then TX LED");
+        require(
+            writes[3].pin == 23 && !writes[3].logical_state &&
+                !writes[3].active_high &&
+                writes[4].pin == 18 && !writes[4].logical_state &&
+                writes[5].pin == 21 && !writes[5].logical_state,
+            "central transmit GPIO deassert order must be Amp Control, TX LED, then LPF/Band GPIO");
+
+        require(
+            GPIOOutput::testLogicalStateForPin(23).has_value() &&
+                GPIOOutput::testLogicalStateForPin(23).value() == false,
+            "Amp Control must be inactive after terminal transmit cleanup");
+        require(
+            tx_led_assert_request_count_for_test() == 1 &&
+                tx_led_deassert_request_count_for_test() == 1 &&
+                tx_led_failure_count_for_test() == 0,
+            "central transmit GPIO lifecycle must keep LED accounting on the shared path");
+
+        ampControl.stop();
+        ledControl.stop();
+        set_band_gpio_selector_for_test(false, false);
+        reset_current_transmission_request_for_test();
+        GPIOOutput::setTestMode(false);
+    }
+
+    {
+        GPIOOutput::setTestMode(true);
+        init_default_config();
+        ini_reload_pending.store(false, std::memory_order_relaxed);
+        exiting_wspr.store(false, std::memory_order_relaxed);
+        reset_current_transmission_request_for_test();
+
+        config.mode = ModeType::WSPR;
+        config.transmit = true;
+        config.use_led = false;
+        config.led_pin = -1;
+        config.use_amp = false;
+        config.amp_pin = 23;
+        config.amp_pin_active_high = false;
+
+        require(
+            ampControl.enableGPIOPin(config.amp_pin, config.amp_pin_active_high),
+            "disabled Amp runtime gate regression must initialize the Amp test GPIO");
+        GPIOOutput::clearTestEvents();
+
+        transmitter_cb(
+            WsprTransmissionCallbackEvent::STARTING,
+            WsprTransmitLogLevel::INFO,
+            std::string(),
+            14097100.0);
+        transmitter_cb(
+            WsprTransmissionCallbackEvent::CANCELLED,
+            WsprTransmitLogLevel::INFO,
+            std::string(),
+            1.0);
+
+        bool amp_write_seen = false;
+        for (const auto &event : GPIOOutput::testEvents())
+        {
+            if (event.action == "write" && event.pin == 23)
+            {
+                amp_write_seen = true;
+                break;
+            }
+        }
+
+        require(
+            !amp_write_seen,
+            "Use Amp=false with a retained Amp Pin must not issue Amp GPIO writes");
+
+        ampControl.stop();
+        reset_current_transmission_request_for_test();
         GPIOOutput::setTestMode(false);
     }
 

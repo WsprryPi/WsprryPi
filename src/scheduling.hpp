@@ -394,6 +394,8 @@ void seed_selector_shutdown_state_for_test(
 void run_final_selector_gpio_shutdown_cleanup_for_test() noexcept;
 void clear_current_wspr_runtime_state_for_test() noexcept;
 TransmissionRequest current_transmission_request_for_test();
+void set_current_transmission_request_for_test(
+    const TransmissionRequest &request) noexcept;
 std::optional<wsprrypi::TransmissionRequest> current_controller_request_for_test();
 void reset_current_transmission_request_for_test() noexcept;
 void reset_current_controller_request_for_test() noexcept;

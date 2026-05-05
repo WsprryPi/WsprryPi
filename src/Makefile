@@ -539,7 +539,7 @@ $(BIN_DIR)/$(OUT): $(CPP_OBJECTS)
 # Phony targets
 # ─────────────────────────────────────────────────────────────────────────────
 
-.PHONY: clean release debug test test-tone test-oneshot semantics-test guarded-mode-change-persistence-test band-gpio-default-convergence-test band-gpio-rotation-test selector-shutdown-cleanup-test monitor-file-regression-test gpio-line-resolver-test non-wspr-repeat-policy-test gpio-loopback-test band-gpio-live-monitor gdb install debuginstall uninstall lint macros help
+.PHONY: clean release debug test test-tone test-oneshot semantics-test update-check-comparison-test guarded-mode-change-persistence-test band-gpio-default-convergence-test band-gpio-rotation-test selector-shutdown-cleanup-test monitor-file-regression-test gpio-line-resolver-test non-wspr-repeat-policy-test gpio-loopback-test band-gpio-live-monitor gdb install debuginstall uninstall lint macros help
 DEBUG: debug
 RELEASE: release
 
@@ -571,6 +571,11 @@ semantics-test: $(BIN_DIR)/$(SEMANTICS_TEST_OUT) $(BIN_DIR)/$(UI_SOURCE_REGRESSI
 	$(Q)./$(BIN_DIR)/$(SEMANTICS_TEST_OUT)
 	$(Q)echo "Running UI/source regression tests."
 	$(Q)./$(BIN_DIR)/$(UI_SOURCE_REGRESSION_TEST_OUT)
+	$(Q)echo "Running update-check comparison tests."
+	$(Q)node tests/update_check_comparison_test.js
+
+update-check-comparison-test:
+	$(Q)node tests/update_check_comparison_test.js
 
 guarded-mode-change-persistence-test: $(BIN_DIR)/$(GUARDED_MODE_CHANGE_PERSISTENCE_TEST_OUT)
 	$(Q)echo "Running guarded mode-change persistence regression test."

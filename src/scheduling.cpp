@@ -147,6 +147,11 @@ static bool sync_configured_selector_gpio_idle_state(
 static BandGPIOPrepareStatus apply_band_gpio_resolution(
     const BandGPIOResolution &resolution) noexcept;
 static bool refresh_committed_band_gpio_selection() noexcept;
+static void assert_transmit_gpio_outputs(const char *context) noexcept;
+static void deassert_transmit_gpio_outputs(
+    const ArgParserConfig *selector_config,
+    bool keep_selector_gpio_initialized,
+    const char *context) noexcept;
 static bool runtime_transmit_enabled(const ArgParserConfig &cfg) noexcept;
 
 /**
@@ -210,6 +215,7 @@ static std::atomic<std::size_t> tx_led_failure_count_for_test_storage{0U};
 static std::mutex tx_led_state_mtx;
 static std::condition_variable tx_led_state_cv;
 static bool tx_led_active = false;
+static std::mutex transmit_gpio_lifecycle_mtx;
 
 /**
  * @brief File-scope self-pipe descriptors for signal notifications.
@@ -844,6 +850,16 @@ static bool should_control_tx_led() noexcept
     return tx_led_configured(config);
 }
 
+static bool amp_gpio_configured(const ArgParserConfig &cfg) noexcept
+{
+    return cfg.use_amp && cfg.amp_pin >= 0 && cfg.amp_pin <= 27;
+}
+
+static bool should_control_amp_gpio() noexcept
+{
+    return amp_gpio_configured(config);
+}
+
 static void mark_tx_led_active_state(bool active) noexcept
 {
     {
@@ -890,11 +906,73 @@ static void set_tx_led_state(bool state, const char *context) noexcept
     mark_tx_led_active_state(state);
 }
 
-static bool reconcile_tx_led_after_transmitter_stop(const char *context) noexcept
+static void set_amp_gpio_state(bool state, const char *context) noexcept
 {
+    if (!should_control_amp_gpio())
+    {
+        return;
+    }
+
+    if (!ampControl.toggleGPIO(state))
+    {
+        llog.logS(WARN,
+                  "Amp Control ",
+                  (state ? "assert" : "deassert"),
+                  " request did not complete during ",
+                  context,
+                  ".");
+    }
+}
+
+static void assert_transmit_gpio_outputs(const char *context) noexcept
+{
+    std::lock_guard<std::mutex> lk(transmit_gpio_lifecycle_mtx);
+
+    if (!refresh_committed_band_gpio_selection())
+    {
+        llog.logS(DEBUG,
+                  "Band GPIO refresh from committed request did not complete.");
+    }
+
+    if (current_transmission_request.hasSelectorGPIO() &&
+        !bandGPIOSelector.setBandState(true))
+    {
+        llog.logS(DEBUG,
+                  "Band GPIO assert request was issued but did not complete.");
+    }
+
+    set_amp_gpio_state(true, context);
+    set_tx_led_state(true, context);
+}
+
+static void deassert_transmit_gpio_outputs(
+    const ArgParserConfig *selector_config,
+    bool keep_selector_gpio_initialized,
+    const char *context) noexcept
+{
+    std::lock_guard<std::mutex> lk(transmit_gpio_lifecycle_mtx);
+
+    set_amp_gpio_state(false, context);
+    set_tx_led_state(false, context);
+    stop_active_transmission_selectors(
+        selector_config,
+        keep_selector_gpio_initialized);
+}
+
+static bool reconcile_transmit_gpio_after_transmitter_stop(const char *context) noexcept
+{
+    bool fallback_used = false;
+
+    if (should_control_amp_gpio())
+    {
+        std::lock_guard<std::mutex> lifecycle_lk(transmit_gpio_lifecycle_mtx);
+        set_amp_gpio_state(false, context);
+        fallback_used = true;
+    }
+
     if (!should_control_tx_led())
     {
-        return false;
+        return fallback_used;
     }
 
     {
@@ -909,7 +987,7 @@ static bool reconcile_tx_led_after_transmitter_stop(const char *context) noexcep
 
         if (!tx_led_active)
         {
-            return false;
+            return fallback_used;
         }
     }
 
@@ -919,6 +997,27 @@ static bool reconcile_tx_led_after_transmitter_stop(const char *context) noexcep
         context,
         ".");
     set_tx_led_state(false, context);
+    fallback_used = true;
+    return fallback_used;
+}
+
+static bool reconcile_tx_led_after_transmitter_stop(const char *context) noexcept
+{
+    if (!should_control_tx_led())
+    {
+        return false;
+    }
+
+    bool was_active = false;
+    {
+        std::lock_guard<std::mutex> lk(tx_led_state_mtx);
+        was_active = tx_led_active;
+    }
+    (void)reconcile_transmit_gpio_after_transmitter_stop(context);
+    if (!was_active)
+    {
+        return false;
+    }
     return true;
 }
 
@@ -1505,10 +1604,10 @@ static void finalize_transmission_stop_cleanup(
             "Finalizing scheduler cleanup after transmitter stop.");
     }
 
-    stop_active_transmission_selectors(
+    deassert_transmit_gpio_outputs(
         selector_config,
-        keep_selector_gpio_initialized);
-    set_tx_led_state(false, led_reason);
+        keep_selector_gpio_initialized,
+        led_reason);
     if (clear_scheduler_latches)
     {
         shutdown_after_current_transmission.store(false, std::memory_order_release);
@@ -2669,22 +2768,7 @@ void transmitter_cb(WsprTransmitter::TransmissionCallbackEvent event,
             consume_tx_iteration_if_needed();
         }
 
-        if (!refresh_committed_band_gpio_selection())
-        {
-            llog.logS(DEBUG,
-                      "Band GPIO refresh from committed request did not complete.");
-        }
-
-        // Assert the scheduler-selected band GPIO when one was committed.
-        if (current_transmission_request.hasSelectorGPIO() &&
-            !bandGPIOSelector.setBandState(true))
-        {
-            llog.logS(DEBUG,
-                      "Band GPIO assert request was issued but did not complete.");
-        }
-
-        // Turn on LED.
-        set_tx_led_state(true, "transmission start");
+        assert_transmit_gpio_outputs("transmission start");
 
         // Notify clients of start.
         send_ws_message("transmit", "starting");
@@ -2906,14 +2990,12 @@ void transmitter_cb(WsprTransmitter::TransmissionCallbackEvent event,
             break;
         }
 
-        // Return the active selector to the idle pool so skipped windows do
-        // not leave the configured selector set floating.
-        stop_active_transmission_selectors(
+        // Return transmit GPIO outputs to the same idle path used by every
+        // terminal transmitter event.
+        deassert_transmit_gpio_outputs(
             &config,
-            runtime_should_hold_selector_gpios_initialized(config));
-
-        // Turn off LED in case the UI/state expects an idle indication.
-        set_tx_led_state(false, "transmission skip");
+            runtime_should_hold_selector_gpios_initialized(config),
+            "transmission skip");
 
         if (!msg.empty())
             llog.logS(to_log_level(level), msg, ".");
@@ -3383,8 +3465,10 @@ StopTransmissionResult stop_transmission_by_user_request(bool persist_transmit)
     }
 
     wsprTransmitter.stopAndJoin();
-    (void)reconcile_tx_led_after_transmitter_stop("scheduler shutdown");
-    stop_active_transmission_selectors();
+    deassert_transmit_gpio_outputs(
+        &config,
+        false,
+        "scheduler shutdown");
     release_idle_selector_gpio_reservations();
 
     {
@@ -3451,8 +3535,12 @@ static void stop_runtime_components_for_process_exit() noexcept
     shutdownMonitor.stop();
     ppmManager.stop();
     wsprTransmitter.shutdownForProcessExit();
-    (void)reconcile_tx_led_after_transmitter_stop("process-exit shutdown");
+    deassert_transmit_gpio_outputs(
+        &config,
+        false,
+        "process-exit shutdown");
     shutdown_all_configured_selector_gpios(config);
+    ampControl.stop();
     ledControl.stop();
 }
 
@@ -3594,10 +3682,19 @@ bool wspr_loop()
                     config,
                     committed_ppm,
                     actual_rf_frequency_hz);
-            (void)prepare_band_gpio_for_frequency_or_log(
-                entry.dial_frequency_hz,
-                entry,
-                config);
+            BandGPIOResolution selector_resolution;
+            const BandGPIOPrepareStatus selector_status =
+                prepare_band_gpio_for_frequency_or_log(
+                    entry.dial_frequency_hz,
+                    entry,
+                    config,
+                    -1,
+                    &selector_resolution);
+            commit_band_gpio_snapshot_to_request(
+                request,
+                selector_resolution,
+                selector_status);
+            commit_execution_request(request);
             wsprTransmitter.startAsync();
             llog.logS(INFO, "transmitting tone, hit Ctrl-C to terminate tone.");
         }
@@ -3702,12 +3799,19 @@ bool wspr_loop()
 
     llog.logS(DEBUG, "Stopping transmitter.");
     wsprTransmitter.shutdownForProcessExit();
-    (void)reconcile_tx_led_after_transmitter_stop("scheduler process shutdown");
+    deassert_transmit_gpio_outputs(
+        &config,
+        false,
+        "scheduler process shutdown");
     llog.logS(DEBUG, "Transmitter stopped.");
 
     llog.logS(DEBUG, "Stopping band GPIO selector.");
     shutdown_all_configured_selector_gpios(config);
     llog.logS(DEBUG, "Band GPIO selector stopped.");
+
+    llog.logS(DEBUG, "Stopping Amp Control driver.");
+    ampControl.stop();
+    llog.logS(DEBUG, "Amp Control driver stopped.");
 
     llog.logS(DEBUG, "Stopping LED driver.");
     ledControl.stop(); // Stop LED driver
@@ -4168,7 +4272,10 @@ bool set_config(bool force)
                 if (wsprTransmitter.getState() != WsprTransmitter::State::TRANSMITTING)
                 {
                     wsprTransmitter.stopAndJoin();
-                    stop_active_transmission_selectors();
+                    deassert_transmit_gpio_outputs(
+                        &config,
+                        false,
+                        "invalid configuration reload");
                     release_idle_selector_gpio_reservations();
                     current_transmission_request = TransmissionRequest{};
                 }
@@ -4209,7 +4316,10 @@ bool set_config(bool force)
                     true,
                     backend_runtime_error);
                 wsprTransmitter.stopAndJoin();
-                stop_active_transmission_selectors();
+                deassert_transmit_gpio_outputs(
+                    &config,
+                    false,
+                    "backend unavailable");
                 release_idle_selector_gpio_reservations();
                 current_transmission_request = TransmissionRequest{};
                 current_dial_frequency = 0.0;
@@ -4302,7 +4412,10 @@ bool set_config(bool force)
                     true,
                     selector_gpio_error);
                 wsprTransmitter.stopAndJoin();
-                stop_active_transmission_selectors();
+                deassert_transmit_gpio_outputs(
+                    &config,
+                    false,
+                    "selector GPIO synchronization failure");
                 release_idle_selector_gpio_reservations();
                 current_transmission_request = TransmissionRequest{};
                 current_dial_frequency = 0.0;
@@ -4340,7 +4453,10 @@ bool set_config(bool force)
                         true,
                         policy_error);
                     wsprTransmitter.stopAndJoin();
-                    stop_active_transmission_selectors();
+                    deassert_transmit_gpio_outputs(
+                        &config,
+                        false,
+                        "non-WSPR policy failure");
                     release_idle_selector_gpio_reservations();
                     current_transmission_request = TransmissionRequest{};
                     current_dial_frequency = 0.0;
@@ -4392,7 +4508,10 @@ bool set_config(bool force)
             }
 
             wsprTransmitter.stopAndJoin();
-            stop_active_transmission_selectors();
+            deassert_transmit_gpio_outputs(
+                &config,
+                false,
+                "non-WSPR reconfiguration");
             release_idle_selector_gpio_reservations();
             current_transmission_request = TransmissionRequest{};
             current_dial_frequency = 0.0;
@@ -4596,7 +4715,10 @@ bool set_config(bool force)
                 }
 
                 wsprTransmitter.stopAndJoin();
-                stop_active_transmission_selectors();
+                deassert_transmit_gpio_outputs(
+                    &config,
+                    false,
+                    "transmit disabled reconfiguration");
                 release_idle_selector_gpio_reservations();
                 current_transmission_request = TransmissionRequest{};
                 current_dial_frequency = 0.0;
@@ -4707,7 +4829,10 @@ bool set_config(bool force)
                             "reload_failed",
                             "Managed reload planning failed; previous valid configuration remains loaded. Transmit is blocked until a valid configuration is loaded.");
                         wsprTransmitter.stopAndJoin();
-                        stop_active_transmission_selectors();
+                        deassert_transmit_gpio_outputs(
+                            &config,
+                            false,
+                            "managed reload planning failure");
                         release_idle_selector_gpio_reservations();
                         current_transmission_request = TransmissionRequest{};
                         if (!finalize_reload_pending())
@@ -4735,7 +4860,10 @@ bool set_config(bool force)
                         &selector_resolution);
                 if (selector_status == BandGPIOPrepareStatus::Failed)
                 {
-                    stop_active_transmission_selectors();
+                    deassert_transmit_gpio_outputs(
+                        &config,
+                        false,
+                        "band GPIO preparation failure");
 
                     if (newer_reload_arrived())
                     {
@@ -4772,7 +4900,10 @@ bool set_config(bool force)
 
             if (newer_reload_arrived())
             {
-                stop_active_transmission_selectors();
+                deassert_transmit_gpio_outputs(
+                    &config,
+                    false,
+                    "newer reload superseded reconfiguration");
                 release_idle_selector_gpio_reservations();
                 continue;
             }
@@ -4833,7 +4964,10 @@ bool set_config(bool force)
             {
                 if (!finalize_reload_pending())
                 {
-                    stop_active_transmission_selectors();
+                    deassert_transmit_gpio_outputs(
+                        &config,
+                        false,
+                        "suppressed scheduler execution reload");
                     release_idle_selector_gpio_reservations();
                     continue;
                 }
@@ -5045,8 +5179,12 @@ void stop_runtime_components_for_test() noexcept
     shutdownMonitor.stop();
     ppmManager.stop();
     wsprTransmitter.stopAndJoin();
+    deassert_transmit_gpio_outputs(
+        &config,
+        false,
+        "test runtime stop");
+    ampControl.stop();
     ledControl.stop();
-    stop_active_transmission_selectors();
     release_idle_selector_gpio_reservations();
 }
 
@@ -5101,6 +5239,12 @@ bool restore_committed_band_gpio_selection_for_test(bool assert_state) noexcept
 TransmissionRequest current_transmission_request_for_test()
 {
     return current_transmission_request;
+}
+
+void set_current_transmission_request_for_test(
+    const TransmissionRequest &request) noexcept
+{
+    current_transmission_request = request;
 }
 
 std::optional<wsprrypi::TransmissionRequest> current_controller_request_for_test()
