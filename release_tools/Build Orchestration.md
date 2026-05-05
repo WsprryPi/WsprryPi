@@ -4,7 +4,7 @@ Wsprry Pi builds require the tag and branch to be consistent for use in the inst
 
 This guide outlines the precise steps to prepare a release where the Git **branch** and **tag** share the same name. In this situation, Git can be ambiguous when resolving references. We resolve this by being explicit with `refs/heads/` (branches) and `refs/tags/` (tags) in all commands.
 
-Globally search/replace `2.2.1` and `v2.2.1` with your desired version.
+Globally search/replace `3.0.0-rc.4` and `v3.0.0-rc.4` with your desired version.
 
 ---
 
@@ -25,9 +25,8 @@ Globally search/replace `2.2.1` and `v2.2.1` with your desired version.
     * Update `scripts\install.sh` with proper version:
 
         ```bash
-        declare REPO_BRANCH="${REPO_BRANCH:-main}"
-        declare GIT_TAG="${GIT_TAG:-v2.2.1}"
-        declare SEM_VER="${SEM_VER:-2.2.1}"
+        declare DEFAULT_REPO_BRANCH="devel"
+        declare DEFAULT_SEM_VER="3.0.0-rc.4"
         ```
 
     * Apply any required feature changes or bug fixes.
@@ -36,43 +35,41 @@ Globally search/replace `2.2.1` and `v2.2.1` with your desired version.
 
    ```bash
    git add scripts/install.sh
-   git add "release_tools/Build Orchestration.md"
-   git commit -m "Prepare 2.2.1 release"
+   git add "release_tools/Build Orchestration.md" # This file because you updated the tags
+   git commit -m "Prepare 3.0.0-rc.4 release"
    ```
 
 4. **Create an annotated tag on that commit**
 
    ```bash
-   git tag -a v2.2.1 -m "Release 2.2.1"
+   git tag -a v3.0.0-rc.4 -m "Release 3.0.0-rc.4"
    ```
 
-5. **Compilation**
+5. **Compilation**: If a version-specific compile or any other process depends on the tag, execute that process now
 
-   * If a version-specific compile or any other process depends on the tag, execute that process now
+   * **Stage any additional changes**: If you need to use the tag locaally such as with compiled executables, do these now.
 
-6. **Stage any additional changes**
+      ```bash
+      git add ./executables/
+      ```
 
-   ```bash
-   git add ./executables/
-   ```
+   * **Amend the previous commit to include the binary**
 
-7. **Amend the previous commit to include the binary**
+      ```bash
+      git commit --amend --no-edit
+      ```
 
-   ```bash
-   git commit --amend --no-edit
-   ```
+   * **Force the tag to point to the amended commit**
 
-8. **Force the tag to point to the amended commit**
+      ```bash
+      git tag -f v3.0.0-rc.4
+      ```
 
-   ```bash
-   git tag -f v2.2.1
-   ```
-
-9. **Push the branch and tag to the origin**
+6. **Push the branch and tag to the origin** (with -f if needed)
 
    ```bash
    git push origin HEAD:refs/heads/main
-   git push origin tag v2.2.1
+   git push origin tag v3.0.0-rc.4
    ```
 
 ---
