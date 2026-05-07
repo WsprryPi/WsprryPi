@@ -1547,7 +1547,9 @@ bool validate_config_candidate(
     }
 
     const bool frequencies_ok = set_frequencies(candidate);
-    if (!frequencies_ok && !trim_copy_string(candidate.frequencies).empty())
+    if (candidate.transmit &&
+        !frequencies_ok &&
+        !trim_copy_string(candidate.frequencies).empty())
     {
         if (error_message != nullptr && error_message->empty())
         {
@@ -1668,7 +1670,10 @@ bool validate_config_candidate(
 
     if (candidate.mode == ModeType::QRSS)
     {
-        if (!has_qrss_startup_request() &&
+        const bool transmit_validation_required =
+            candidate.transmit || has_qrss_startup_request();
+        if (transmit_validation_required &&
+            !has_qrss_startup_request() &&
             !persisted_qrss_config_available(candidate))
         {
             if (error_message != nullptr)
@@ -1678,12 +1683,17 @@ bool validate_config_candidate(
             return false;
         }
 
-        return validate_non_wspr_repeat_interval_policy(candidate, error_message);
+        return transmit_validation_required
+                   ? validate_non_wspr_repeat_interval_policy(candidate, error_message)
+                   : true;
     }
 
     if (candidate.mode == ModeType::FSKCW)
     {
-        if (!has_fskcw_startup_request() &&
+        const bool transmit_validation_required =
+            candidate.transmit || has_fskcw_startup_request();
+        if (transmit_validation_required &&
+            !has_fskcw_startup_request() &&
             !persisted_fskcw_config_available(candidate))
         {
             if (error_message != nullptr)
@@ -1693,12 +1703,17 @@ bool validate_config_candidate(
             return false;
         }
 
-        return validate_non_wspr_repeat_interval_policy(candidate, error_message);
+        return transmit_validation_required
+                   ? validate_non_wspr_repeat_interval_policy(candidate, error_message)
+                   : true;
     }
 
     if (candidate.mode == ModeType::DFCW)
     {
-        if (!has_dfcw_startup_request() &&
+        const bool transmit_validation_required =
+            candidate.transmit || has_dfcw_startup_request();
+        if (transmit_validation_required &&
+            !has_dfcw_startup_request() &&
             !persisted_dfcw_config_available(candidate))
         {
             if (error_message != nullptr)
@@ -1708,7 +1723,9 @@ bool validate_config_candidate(
             return false;
         }
 
-        return validate_non_wspr_repeat_interval_policy(candidate, error_message);
+        return transmit_validation_required
+                   ? validate_non_wspr_repeat_interval_policy(candidate, error_message)
+                   : true;
     }
 
     if (candidate.mode != ModeType::WSPR)
