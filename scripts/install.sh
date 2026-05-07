@@ -6935,31 +6935,29 @@ has_custom_apache_webroot() {
 
     local webroot="/var/www/html"
     local default_index="${webroot}/index.html"
-    local item_count=0
 
     if [[ ! -d "$webroot" ]]; then
         debug_end "$debug"
         return 1
     fi
 
-    item_count=$(find "$webroot" -mindepth 1 -maxdepth 1 | wc -l)
-
-    if [[ "$item_count" -eq 0 ]]; then
+    if [[ ! -f "$default_index" ]]; then
+        debug_print "Apache webroot has no root index.html." "$debug"
         debug_end "$debug"
         return 1
     fi
 
-    if [[ "$item_count" -eq 1 ]] && is_stock_apache_page "$default_index" "$debug"; then
+    if is_stock_apache_page "$default_index" "$debug"; then
+        debug_print "Apache root index.html is the stock Apache page." "$debug"
         debug_end "$debug"
         return 1
     fi
 
-    debug_print "Apache webroot contains custom content." "$debug"
+    debug_print "Apache root index.html appears to be custom content." "$debug"
 
     debug_end "$debug"
     return 0
 }
-
 
 # -----------------------------------------------------------------------------
 # @brief Check whether the installed webroot already contains WsprryPi UI files.
