@@ -1828,7 +1828,8 @@ namespace
             }
 
             nlohmann::json semantic_error_details;
-            if (!validate_wspr_semantics(
+            if (candidate_config.transmit &&
+                !validate_wspr_semantics(
                     candidate_config,
                     &validation_error,
                     &semantic_error_details))
@@ -2131,7 +2132,8 @@ void patch_all_from_web(const nlohmann::json &j)
             throw std::runtime_error(error_message);
         }
 
-        if (!validate_wspr_semantics(
+        if (candidate_config.transmit &&
+            !validate_wspr_semantics(
                 candidate_config,
                 &error_message,
                 &error_details))

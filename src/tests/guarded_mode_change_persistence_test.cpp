@@ -3,6 +3,7 @@
 #include "scheduling.hpp"
 
 #include <cstdlib>
+#include <exception>
 #include <fstream>
 #include <iostream>
 #include <iterator>
@@ -44,6 +45,7 @@ int main()
     exiting_wspr.store(false, std::memory_order_relaxed);
     reset_current_transmission_request_for_test();
     set_scheduler_execution_suppressed_for_test(true);
+    set_si5351_detection_override_for_test(true);
 
     config.use_ini = true;
     config.ini_filename = "/tmp/guarded_mode_change_single_persist.ini";
@@ -53,7 +55,7 @@ int main()
     config.grid_square = "EM18";
     config.power_dbm = 20;
     config.frequencies = "20m";
-    config.gpio_tx_pin = 4;
+    config.transmit_backend = TransmitBackendKind::SI5351;
     resolve_backend_specific_config(config);
     config_to_json();
     write_text_file(config.ini_filename, "");
@@ -78,17 +80,7 @@ int main()
         "guarded mode-change stop must not publish an extra persistence generation");
 
     patch_all_from_web({
-        {"Operation", {{"Mode", "QRSS"}, {"Transmit", false}}},
-        {"CW",
-         {{"Message", "CQ"},
-          {"Base Frequency", 14096900.0},
-          {"Shift Hz", 5.0},
-          {"Dot Seconds", 3.0},
-          {"Intra Element Gap", 1.0},
-          {"Inter Character Gap", 3.0},
-          {"Inter Word Gap", 7.0},
-          {"Start Minute", 0},
-          {"Repeat Minutes", 10}}}
+        {"Operation", {{"Mode", "QRSS"}, {"Transmit", false}}}
     });
 
     const std::string ini_after_guard = read_text_file(config.ini_filename);
@@ -104,7 +96,25 @@ int main()
             iniFile.getData().at("Operation").at("Transmit") == "false",
         "guarded mode-change final save must persist the final mode and disabled transmit state");
 
+    bool transmit_enable_rejected = false;
+    try
+    {
+        patch_all_from_web({
+            {"Operation", {{"Transmit", true}}}
+        });
+    }
+    catch (const std::exception &e)
+    {
+        transmit_enable_rejected =
+            std::string(e.what()).find("Missing QRSS configuration") !=
+            std::string::npos;
+    }
+    require(
+        transmit_enable_rejected,
+        "missing QRSS configuration must still prevent enabling transmit");
+
     set_scheduler_execution_suppressed_for_test(false);
+    clear_si5351_detection_override_for_test();
     std::cout << "guarded_mode_change_persistence_test passed" << std::endl;
     return EXIT_SUCCESS;
 }

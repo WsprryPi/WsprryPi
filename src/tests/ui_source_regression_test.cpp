@@ -125,12 +125,18 @@ int main()
             ui_source.find("function persistDisabledModeChange(targetMode, previousMode = currentConfigModeSelection)") != std::string::npos &&
             ui_source.find("\"Mode\": normalizedTargetMode,") != std::string::npos &&
             ui_source.find("\"Transmit\": false,") != std::string::npos &&
-            ui_source.find("applyCommittedConfigMode(normalizedTargetMode, { skipAutosave: true });") != std::string::npos &&
+            ui_source.find("applyCommittedConfigMode(normalizedTargetMode, {\n                skipAutosave: true,\n                keepAutosaveSuspended: true,\n            });") != std::string::npos &&
+            ui_source.find("options.keepAutosaveSuspended !== true") != std::string::npos &&
+            ui_source.find("function suppressNextPersistedConfigDraftRestore()") != std::string::npos &&
+            ui_source.find("populateConfig();") != std::string::npos &&
+            ui_source.find("shouldSuppressDisabledModeSwitchReloadFailure(message)") != std::string::npos &&
             ui_source.find("clearPendingModeChange();") != std::string::npos &&
             ui_source.find("pendingModeChange.awaitingRuntimeIdle === false") != std::string::npos &&
             ui_source.find("requestTransmitEnabledChange(false, true") == std::string::npos &&
             ui_source.find("setTransmitFromBackend(false);") != std::string::npos &&
-            ui_source.find("if (!stopTransmission({ persistTransmit: false })) {") != std::string::npos &&
+            ui_source.find("function startGuardedActiveModeChange()") != std::string::npos &&
+            ui_source.find("completeGuardedActiveModeChange();") != std::string::npos &&
+            ui_source.find("guardedActiveModeChange: true,") != std::string::npos &&
             ui_source.find("suspendConfigAutosave(true);") != std::string::npos &&
             ui_source.find("input:not(#transmit, [name=\"mode_toggle\"], [name=\"qrss_type\"])") != std::string::npos &&
             ui_source.find("configAutosaveNeedsRuntimeRefresh = true;") != std::string::npos &&
