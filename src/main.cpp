@@ -40,10 +40,15 @@
 
 // Standard headers
 #include <atomic>
+#include <cerrno>
+#include <csignal>
+#include <mutex>
 #include <string_view>
+#include <thread>
 
 // System headers
 #include <fcntl.h>  // fcntl()
+#include <poll.h>
 #include <unistd.h> // pipe(), read(), write()
 
 /**
@@ -61,6 +66,113 @@ constexpr int SINGLETON_PORT = 1234;
 // Global unique instance of SignalHandler.
 SignalHandler signalHandler;
 
+namespace
+{
+std::atomic<int> g_async_shutdown_signal{0};
+std::atomic<int> g_shutdown_exit_signal{0};
+int g_async_shutdown_pipe[2] = {-1, -1};
+
+void notify_async_shutdown_signal(int signum) noexcept
+{
+    if (signum != 0 && signum != SIGUSR1)
+    {
+        int expected = 0;
+        (void)g_shutdown_exit_signal.compare_exchange_strong(
+            expected,
+            signum,
+            std::memory_order_acq_rel,
+            std::memory_order_acquire);
+    }
+
+    g_async_shutdown_signal.store(signum, std::memory_order_release);
+
+    const std::uint8_t wake = 1;
+    if (g_async_shutdown_pipe[1] >= 0)
+    {
+        (void)::write(g_async_shutdown_pipe[1], &wake, sizeof(wake));
+    }
+}
+
+void async_shutdown_signal_handler(int signum) noexcept
+{
+    notify_async_shutdown_signal(signum);
+}
+
+bool install_async_shutdown_handlers()
+{
+    if (::pipe(g_async_shutdown_pipe) != 0)
+    {
+        return false;
+    }
+
+    for (int fd : g_async_shutdown_pipe)
+    {
+        const int flags = ::fcntl(fd, F_GETFL, 0);
+        if (flags >= 0)
+        {
+            (void)::fcntl(fd, F_SETFL, flags | O_NONBLOCK);
+        }
+    }
+
+    struct sigaction sa{};
+    sigemptyset(&sa.sa_mask);
+    sa.sa_handler = async_shutdown_signal_handler;
+    sa.sa_flags = 0;
+
+    constexpr int kSignals[] = {SIGINT, SIGTERM, SIGHUP, SIGQUIT};
+    for (int signum : kSignals)
+    {
+        if (::sigaction(signum, &sa, nullptr) != 0)
+        {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+void close_async_shutdown_pipe() noexcept
+{
+    if (g_async_shutdown_pipe[0] >= 0)
+    {
+        ::close(g_async_shutdown_pipe[0]);
+        g_async_shutdown_pipe[0] = -1;
+    }
+
+    if (g_async_shutdown_pipe[1] >= 0)
+    {
+        ::close(g_async_shutdown_pipe[1]);
+        g_async_shutdown_pipe[1] = -1;
+    }
+}
+
+void drain_async_shutdown_pipe() noexcept
+{
+    if (g_async_shutdown_pipe[0] < 0)
+    {
+        return;
+    }
+
+    std::uint8_t discard[32];
+    while (::read(g_async_shutdown_pipe[0], discard, sizeof(discard)) > 0)
+    {
+    }
+}
+
+std::string shutdown_reason_for_signal(int signum)
+{
+    if (signum == 0)
+    {
+        return "external signal requested shutdown";
+    }
+
+    return std::string("received ") +
+           std::string(SignalHandler::signalToString(signum)) +
+           " signal";
+}
+
+} // namespace
+
 /**
  * @brief Custom signal handling function.
  *
@@ -72,20 +184,13 @@ SignalHandler signalHandler;
  */
 void callback_signal_handler(int signum, bool is_critical)
 {
-    std::string_view signal_name = SignalHandler::signalToString(signum);
     if (!is_critical)
     {
-        exiting_wspr.store(true, std::memory_order_relaxed);
-        llog.logS(DEBUG, "Intercepted signal, shutdown will proceed:", signal_name);
-        {
-            exiting_wspr.store(true, std::memory_order_seq_cst);
-            std::lock_guard<std::mutex> lk(exitwspr_mtx);
-            exitwspr_ready = true;
-        }
-        exitwspr_cv.notify_one();
+        notify_async_shutdown_signal(signum);
     }
     else
     {
+        std::string_view signal_name = SignalHandler::signalToString(signum);
         std::cerr << "[FATAL] Critical signal received: " << signal_name << ". Performing immediate shutdown." << std::endl;
         std::quick_exit(signum);
     }
@@ -113,6 +218,54 @@ int main(int argc, char *argv[])
     // Maintain retval for main()
     int retval = EXIT_SUCCESS;
 
+    if (!install_async_shutdown_handlers())
+    {
+        std::perror("sigaction/pipe");
+        return EXIT_FAILURE;
+    }
+
+    std::thread async_shutdown_monitor(
+        []
+        {
+            while (true)
+            {
+                struct pollfd pfd{};
+                pfd.fd = g_async_shutdown_pipe[0];
+                pfd.events = POLLIN;
+
+                const int rc = ::poll(&pfd, 1, -1);
+                if (rc < 0)
+                {
+                    if (errno == EINTR)
+                    {
+                        continue;
+                    }
+                    return;
+                }
+
+                if ((pfd.revents & (POLLERR | POLLHUP | POLLNVAL)) != 0)
+                {
+                    return;
+                }
+
+                if ((pfd.revents & POLLIN) == 0)
+                {
+                    continue;
+                }
+
+                drain_async_shutdown_pipe();
+
+                const int signum =
+                    g_async_shutdown_signal.exchange(0, std::memory_order_acq_rel);
+                if (signum == SIGUSR1)
+                {
+                    return;
+                }
+
+                request_wspr_shutdown(shutdown_reason_for_signal(signum));
+            }
+        });
+
     // Register signal handlers for safe shutdown and terminal management.
     block_signals();
     signalHandler.setCallback(callback_signal_handler);
@@ -123,6 +276,23 @@ int main(int argc, char *argv[])
     initialize_logger();
 
     // Parse command line first allowing calls for -h or -v
+    handle_early_cli_options(argc, argv);
+
+    // Make sure we are running as root
+    if (getuid() != 0)
+    {
+        print_usage("This program must be run as root or with sudo.", EXIT_FAILURE);
+    }
+
+    // Enforce Singleton
+    SingletonProcess singleton(SINGLETON_PORT);
+    if (!singleton())
+    {
+        llog.logE(FATAL, "Another instance is running on port: ", SINGLETON_PORT);
+        std::exit(EXIT_FAILURE);
+    }
+
+    // Now do the full arguments check
     try
     {
         if (!parse_command_line(argc, argv))
@@ -137,22 +307,21 @@ int main(int argc, char *argv[])
         print_usage(error_message, EXIT_FAILURE);
     }
 
-    // Make sure we are running as root
-    if (getuid() != 0)
-    {
-        print_usage("This program must be run as root or with sudo.", EXIT_FAILURE);
-    }
+    initialize_logger(
+        config.use_journald,
+        config.date_time_log,
+        config.debug_logging);
 
-    // Enforce Singleton
-    SingletonProcess singleton(SINGLETON_PORT);
-    if (!singleton())
-    {
-        llog.logE(FATAL, "Another instance is running on port:", SINGLETON_PORT);
-        std::exit(EXIT_FAILURE);
-    }
-
-    // Display version, Raspberry Pi model, and process ID for context.
+    // Display version, Raspberry Pi model, and process ID after CLI parsing so
+    // the first backend banner matches the requested logging mode.
     llog.logS(INFO, get_version_string());
+
+    if (!config.use_journald)
+    {
+        llog.logS(DEBUG,
+                  "Log timestamps:",
+                  config.date_time_log ? "enabled" : "disabled");
+    }
 
     llog.logS(
         INFO,
@@ -167,7 +336,11 @@ int main(int argc, char *argv[])
         (sizeof(void *) == 8 ? " 64-bit" : " 32-bit"),
         ".");
 
-    llog.logS(INFO, "Process PID:", getpid());
+    llog.logS(DEBUG, "Process PID:", getpid());
+
+    // Re-assert the handled signal mask on the main runtime thread before
+    // entering the long-lived scheduling loop.
+    block_signals();
 
     // Startup WSPR loop
     try
@@ -190,6 +363,26 @@ int main(int argc, char *argv[])
 
     // Stop the SignalHandler.
     signalHandler.stop();
+
+    notify_async_shutdown_signal(SIGUSR1);
+    if (async_shutdown_monitor.joinable())
+    {
+        async_shutdown_monitor.join();
+    }
+    close_async_shutdown_pipe();
+
+    if (reboot_flag.load(std::memory_order_acquire))
+    {
+        llog.logS(INFO, "Rebooting.");
+        std::cerr << "[INFO ] Rebooting." << std::endl;
+        reboot_machine();
+    }
+    if (shutdown_flag.load(std::memory_order_acquire))
+    {
+        llog.logS(INFO, "Shutting down.");
+        std::cerr << "[INFO ] Shutting down." << std::endl;
+        shutdown_machine();
+    }
 
     return retval;
 }

@@ -1,11 +1,9 @@
-# Git Hooks
+# Git Hooks (Submodule Safe)
 
-These hooks are version-controlled in `.githooks/` for team and project consistency.
+This hook set prevents bad commits caused by submodule drift.
 
-## Setup (one-time per clone)
-
-To activate these hooks locally, run:
+## Install
 
 ```bash
-scripts/setup-hooks.sh
+~/WsprryPi/.githooks/install-hooks.sh
 ```

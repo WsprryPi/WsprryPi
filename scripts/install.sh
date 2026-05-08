@@ -39,12 +39,16 @@ IFS=$'\n\t'
 # sudo ./install.sh debug
 # sudo DRY_RUN=true ./install.sh debug
 # sudo ACTION=uninstall ./install.sh
+# REPO_BRANCH=dev ./install.sh --debug
 # curl -fsSL {url} | sudo bash
 # curl -fsSL {url} | sudo bash -s -- debug
 # curl -fsSL {url} | sudo env DRY_RUN=true bash -s -- debug
 # curl -fsSL {url} | sudo env ACTION=uninstall bash -s -- debug
 #
 # -----------------------------------------------------------------------------
+
+declare DEFAULT_REPO_BRANCH="devel"
+declare DEFAULT_SEM_VER="3.0.0-rc.4"
 
 # -----------------------------------------------------------------------------
 # @brief Trap unexpected errors during script execution.
@@ -210,9 +214,9 @@ declare REPO_ORG="${REPO_ORG:-WsprryPi}"
 declare REPO_NAME="WsprryPi"      # Case Sensitive
 declare UI_REPO_DIR="WsprryPi-UI" # Case Sensitive
 declare REPO_TITLE="${REPO_TITLE:-Wsprry Pi}"
-declare REPO_BRANCH="${REPO_BRANCH:-main}"
-declare GIT_TAG="${GIT_TAG:-v2.2.1}"
-declare SEM_VER="${SEM_VER:-2.2.1}"
+declare REPO_BRANCH="${REPO_BRANCH:-$DEFAULT_REPO_BRANCH}"
+declare SEM_VER="${SEM_VER:-$DEFAULT_SEM_VER}"
+declare GIT_TAG="${GIT_TAG:-v$SEM_VER}"
 declare GIT_RAW_BASE="https://raw.githubusercontent.com"
 declare GIT_API_BASE="https://api.github.com/repos"
 declare GIT_CLONE_BASE="https://github.com"
@@ -240,28 +244,98 @@ readonly GIT_DIRS="${GIT_DIRS:-("config" "WsprryPi-UI/data" "executables" "syste
 # @details This variable holds the name of the main WsprryPi service that
 #          will be installed in `/etc/systemd/system/`.
 #
+# @var NON_MAIN_AS_RELEASE
+# @brief Controls whether non-main branches build as release.
+# @details When set to `"true"`, branches other than `main` or `master`
+#          build as release and use the standard executable name. When set to
+#          `"false"`, non-main branches follow the default build policy unless
+#          overridden explicitly.
+#
+# @var BUILD_TYPE_OVERRIDE
+# @brief Optional explicit build type override.
+# @details When set to `"DEBUG"` or `"RELEASE"`, this overrides the branch-
+#          based build selection logic.
+#
+# @var WSPR_BUILD_TYPE
+# @brief The resolved build type for WsprryPi.
+# @details This value is resolved by `resolve_build_settings()`.
+#
 # @var WSPR_EXE
 # @brief The executable name for WsprryPi.
 # @details This variable holds the name of the main WsprryPi executable that
 #          will be installed in `/usr/local/bin/` and used for signal
-#          processing.  Branches != main will use the debug version.
+#          processing. Debug builds use the `_debug` suffix.
 #
 # @var WSPR_INI
 # @brief The configuration file for WsprryPi.
 # @details This variable specifies the name of the WsprryPi configuration file,
 #          typically stored in `/usr/local/etc/`, containing user settings.
-#
-# @var LOG_ROTATE
-# @brief The log rotation configuration file.
-# @details This variable defines the logrotate configuration file, used to
-#          manage WsprryPi logs under `/var/log/wsprrypi/` by limiting file
-#          size and retention.
 # -----------------------------------------------------------------------------
 readonly WSPR_SERVICE="wsprrypi"
-# shellcheck disable=SC2155
-readonly WSPR_EXE="${WSPR_SERVICE}$([[ "${REPO_BRANCH}" != "main" ]] && printf '_debug')"
+declare NON_MAIN_AS_RELEASE="${NON_MAIN_AS_RELEASE:-false}"
+declare BUILD_TYPE_OVERRIDE="${BUILD_TYPE_OVERRIDE:-}"
+declare WSPR_BUILD_TYPE=""
+declare WSPR_EXE=""
 readonly WSPR_INI="wsprrypi.ini"
-readonly LOG_ROTATE="logrotate.conf"
+
+# -----------------------------------------------------------------------------
+# @brief Resolve the effective build type and executable name.
+# @details Applies `BUILD_TYPE_OVERRIDE` first. Otherwise, defaults to release
+#          builds. Non-main branch behavior may still be controlled with
+#          `NON_MAIN_AS_RELEASE` if desired.
+#
+# @global BUILD_TYPE_OVERRIDE Optional explicit build override.
+# @global NON_MAIN_AS_RELEASE Whether non-main branches should build as release.
+# @global REPO_BRANCH The selected repository branch.
+# @global WSPR_BUILD_TYPE The resolved build type.
+# @global WSPR_EXE The resolved executable name.
+#
+# @param $@ Optional debug flag.
+#
+# @return 0 on success.
+# -----------------------------------------------------------------------------
+resolve_build_settings() {
+    local debug
+    debug=$(debug_start "$@")
+    eval set -- "$(debug_filter "$@")"
+    local branch
+    local build_type
+
+    branch="${REPO_BRANCH:-main}"
+    build_type="${BUILD_TYPE_OVERRIDE^^}"
+
+    if [[ -n "${build_type}" ]]; then
+        case "${build_type}" in
+            DEBUG|RELEASE)
+                ;;
+            *)
+                printf "%s\n" \
+                    "Error: BUILD_TYPE_OVERRIDE must be DEBUG or RELEASE." >&2
+                debug_end "$debug"
+                return 1
+                ;;
+        esac
+    else
+        build_type="RELEASE"
+
+        if [[ "${branch}" != "main" && "${branch}" != "master" ]]; then
+            if [[ "${NON_MAIN_AS_RELEASE}" != "true" ]]; then
+                build_type="RELEASE"
+            fi
+        fi
+    fi
+
+    WSPR_BUILD_TYPE="${build_type}"
+
+    if [[ "${WSPR_BUILD_TYPE}" == "DEBUG" ]]; then
+        WSPR_EXE="${WSPR_SERVICE}_debug"
+    else
+        WSPR_EXE="${WSPR_SERVICE}"
+    fi
+
+    debug_end "$debug"
+    return 0
+}
 
 # -----------------------------------------------------------------------------
 # @var USER_HOME
@@ -454,9 +528,8 @@ declare -A SUPPORTED_MODELS
 if [[ -z "${SUPPORTED_MODELS+x}" || ${#SUPPORTED_MODELS[@]} -eq 0 ]]; then
     # If SUPPORTED_MODELS is not set or empty, define the default supported models
     SUPPORTED_MODELS=(
-        # Unsupported models
-        ["Raspberry Pi 5|5-model-b|bcm2712"]="Unsupported"
         # Supported models
+        ["Raspberry Pi 5|5-model-b|bcm2712"]="Supported"
         ["Raspberry Pi 400|400|bcm2711"]="Supported"
         ["Raspberry Pi Compute Module 4|4-compute-module|bcm2711"]="Supported"
         ["Raspberry Pi Compute Module 3|3-compute-module|bcm2837"]="Supported"
@@ -521,20 +594,26 @@ declare LOG_FILE="${LOG_FILE:-$USER_HOME/$WSPR_SERVICE.log}"
 # @details Defines the verbosity level for logging messages. This variable
 #          controls which messages are logged based on their severity.
 #          It defaults to:
-#            - `"INFO"` when running on the `main` or `master` branch.
-#            - `"DEBUG"` on any other branch.
+#            - `"INFO"` for release builds.
+#            - `"DEBUG"` for debug builds.
 #
-# @default "INFO" on main/master; "DEBUG" on any other branch
+# @default "INFO" for release builds; "DEBUG" for debug builds
 #
 # @example
 # LOG_LEVEL="ERROR" ./install.sh  # Force log level to ERROR.
 # -----------------------------------------------------------------------------
-: "${LOG_LEVEL:=$(if git rev-parse --abbrev-ref HEAD 2>/dev/null |
-    grep -Eq '^(main|master)$'; then
-    echo INFO
+declare LOG_LEVEL_SET_FROM_ENV="false"
+if [[ -n "${LOG_LEVEL+x}" ]]; then
+    LOG_LEVEL_SET_FROM_ENV="true"
 else
-    echo DEBUG
-fi)}"
+    LOG_LEVEL="$(if [[ "${WSPR_BUILD_TYPE}" == "RELEASE" ]]; then
+        printf "%s
+" "INFO"
+    else
+        printf "%s
+" "DEBUG"
+    fi)"
+fi
 declare LOG_LEVEL
 
 # -----------------------------------------------------------------------------
@@ -814,6 +893,32 @@ declare APACHE_CONF="${APACHE_CONF:-$DEFAULT_APACHE_CONF}"
 # @example SERVERNAME_DIRECTIVE="ServerName example.com" ./install.sh
 # -----------------------------------------------------------------------------
 declare SERVERNAME_DIRECTIVE="${SERVERNAME_DIRECTIVE:-$DEFAULT_SERVERNAME}"
+
+# -----------------------------------------------------------------------------
+# @var APACHE_WEB_MODE
+# @type string
+# @brief Detected Apache integration mode for the current system.
+# @details Populated by `detect_apache_web_mode()` during the preflight phase
+#          and reused by `manage_apache()` during the action phase.
+# @values stock | existing_wsprrypi | custom_site | no_apache | unknown
+# -----------------------------------------------------------------------------
+declare APACHE_WEB_MODE="${APACHE_WEB_MODE:-unknown}"
+
+# -----------------------------------------------------------------------------
+# @var APACHE_WEB_MODE_DETECTED
+# @type bool
+# @brief Indicates whether Apache mode detection has already been performed.
+# -----------------------------------------------------------------------------
+declare APACHE_WEB_MODE_DETECTED="${APACHE_WEB_MODE_DETECTED:-false}"
+
+# -----------------------------------------------------------------------------
+# @var NO_WEB
+# @type bool
+# @brief Disable installation and runtime configuration of the web UI.
+# @details When set to `true`, the installer skips web asset and Apache
+#          integration steps and configures the service to start with `--no-web`.
+# -----------------------------------------------------------------------------
+declare NO_WEB="${NO_WEB:-false}"
 
 # -----------------------------------------------------------------------------
 # @var WAS_RUNNING
@@ -2057,6 +2162,17 @@ print_model_name() {
     die 1 "Detected Raspberry Pi model '$detected_model' is not recognized."
 }
 
+is_pi5() {
+    local detected_model
+
+    if ! detected_model=$(tr '\0' '\n' </proc/device-tree/compatible 2>/dev/null \
+        | sed -n 's/raspberrypi,//p'); then
+        return 1
+    fi
+
+    [[ "${detected_model:-}" == "5-model-b" ]]
+}
+
 # -----------------------------------------------------------------------------
 # @brief Print the system information to the log.
 # @details Extracts and logs the system's name and version using information
@@ -2125,19 +2241,7 @@ print_version() {
     local debug
     debug=$(debug_start "$@")
     eval set -- "$(debug_filter "$@")"
-
-    # Check the name of the calling function
-    local caller="${FUNCNAME[1]}"
-
-    if [[ "$caller" == "process_args" ]]; then
-        printf "%s: version %s\n" "$REPO_TITLE" "$SEM_VER" # Display the script name and version
-    else
-        if [[ "$THIS_SCRIPT" == "piped_script" ]]; then
-            logI "Running ${REPO_TITLE}'s install script, version $SEM_VER."
-        else
-            logI "Running ${REPO_TITLE}'s '${THIS_SCRIPT}', version $SEM_VER"
-        fi
-    fi
+    logI "Wsprry Pi version: ${SEM_VER}"
 
     debug_end "$debug"
     return 0
@@ -2330,8 +2434,18 @@ enforce_sudo() {
     local debug
     debug=$(debug_start "$@")
     eval set -- "$(debug_filter "$@")"
+    local arg
 
     if [[ "$REQUIRE_SUDO" == true ]]; then
+        for arg in "$@"; do
+            case "$arg" in
+                -h|--help|-v|--version)
+                    debug_end "$debug"
+                    return 0
+                    ;;
+            esac
+        done
+
         if [[ "$EUID" -eq 0 && -n "$SUDO_USER" && "$SUDO_COMMAND" == *"$0"* ]]; then
             debug_print "Sudo conditions met. Proceeding." "$debug"
             # Script is properly executed with `sudo`
@@ -4978,7 +5092,9 @@ ARGUMENTS_LIST=(
 # -----------------------------------------------------------------------------
 OPTIONS_LIST=(
     "-h|--help 0 usage Show these instructions 1"
-    "-v|--version 0 version Display $WSPR_SERVICE version 1"
+    "-v|--version 0 print_version Display $WSPR_SERVICE version 1"
+    "--no-web 0 set_no_web Disable web UI installation and Apache integration (service will run with --no-web) 0"
+    "--release 0 set_release_build Build as release regardless of branch 0"
 )
 
 # -----------------------------------------------------------------------------
@@ -4999,6 +5115,57 @@ OPTIONS_LIST=(
 #
 # @return 0 on success, or the status code of the last executed command.
 # -----------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
+# @brief Force a release build from the command line.
+# @details Sets `BUILD_TYPE_OVERRIDE` to `RELEASE`, re-resolves the effective
+#          build settings, and updates the default log level when the user did
+#          not explicitly provide `LOG_LEVEL` in the environment.
+#
+# @global BUILD_TYPE_OVERRIDE Optional explicit build override.
+# @global LOG_LEVEL Current logging level.
+# @global LOG_LEVEL_SET_FROM_ENV Tracks whether LOG_LEVEL came from the
+#                                environment.
+# @global WSPR_BUILD_TYPE The resolved build type.
+#
+# @param $@ Optional debug flag.
+#
+# @return 0 on success.
+# -----------------------------------------------------------------------------
+set_release_build() {
+    local debug
+    debug=$(debug_start "$@")
+    eval set -- "$(debug_filter "$@")"
+
+    BUILD_TYPE_OVERRIDE="RELEASE"
+    resolve_build_settings "$debug"
+    if [[ "${LOG_LEVEL_SET_FROM_ENV}" != "true" ]]; then
+        LOG_LEVEL="INFO"
+    fi
+
+    debug_end "$debug"
+    return 0
+}
+
+# -----------------------------------------------------------------------------
+# @brief Disable web UI installation and runtime.
+# @details Sets the installer state so web assets and Apache integration are
+#          skipped and the installed service starts with `--no-web`.
+#
+# @param $@ Optional debug flag.
+#
+# @return 0 on success.
+# -----------------------------------------------------------------------------
+set_no_web() {
+    local debug
+    debug=$(debug_start "$@")
+    eval set -- "$(debug_filter "$@")"
+
+    NO_WEB="true"
+
+    debug_end "$debug"
+    return 0
+}
+
 # shellcheck disable=SC2317
 process_args() {
     local debug
@@ -5329,6 +5496,7 @@ remove_legacy_files_and_dirs() {
         "/var/log/wspr/"
         "/var/log/WsprryPi/"
         "/etc/logrotate.d/wspr"
+        "/etc/logrotate.d/wsprrypi"
     )
 
     for item in "${files_and_dirs[@]}"; do
@@ -5571,7 +5739,7 @@ compile_binary() {
     # Ensure the executable argument is provided
     if [[ -z "$1" ]]; then
         logE "Error: Missing required arguments."
-        logE "Usage: compile_binary <type>"
+        logE "Usage: compile_binary <executable>"
         debug_end "$debug"
         return 1
     fi
@@ -5594,10 +5762,11 @@ compile_binary() {
         die 1 "Executables source directory does not exist."
     fi
 
-    if [[ "$executable" == *_debug ]]; then
-        type=DEBUG
-    else
-        type=RELEASE
+    type="${WSPR_BUILD_TYPE}"
+    if [[ "${type}" != "DEBUG" && "${type}" != "RELEASE" ]]; then
+        logE "Error: Invalid WSPR_BUILD_TYPE '${type}'."
+        debug_end "$debug"
+        return 1
     fi
 
     # Stop Daemon
@@ -5755,24 +5924,31 @@ manage_exe() {
 # @details This function installs or removes a configuration file. During
 #          installation, it validates the source file, updates the semantic
 #          version placeholder, and sets appropriate permissions. During
-#          uninstallation, it removes the configuration file.
+#          uninstallation, it removes the configuration file. For the main
+#          WSPR INI file, it also installs a stock copy with ".stock"
+#          appended to the destination filename.
 #
-# @global ACTION Specifies whether the function runs in 'install' or 'uninstall' mode.
+# @global ACTION Specifies whether the function runs in 'install' or
+#         'uninstall' mode.
 # @global USER_HOME The user's home directory path.
 # @global REPO_NAME The name of the repository.
-# @global DRY_RUN If set to "true", performs a dry-run without making changes.
+# @global DRY_RUN If set to "true", performs a dry-run without making
+#         changes.
+# @global LOCAL_CONFIG_DIR The local configuration directory path.
+# @global WSPR_INI The primary WSPR INI filename.
 #
 # @param $1 The name of the configuration file.
 # @param $2 The destination directory for the configuration file.
 # @param $3 Debug flag for enabling or disabling debug output.
 #
-# @throws Exits with status 1 if required arguments are missing, the source file
-#         is not found, or the target directory does not exist.
+# @throws Exits with status 1 if required arguments are missing, the
+#         source file is not found, or the target directory does not
+#         exist.
 #
 # @return Returns 0 on success, or 1 if any operation fails.
 #
 # @example
-#   manage_config "wsprrypi.ini" "/usr/local/etc" "debug"
+# manage_config "wsprrypi.ini" "/usr/local/etc" "debug"
 # -----------------------------------------------------------------------------
 # shellcheck disable=SC2317
 # shellcheck disable=SC2329
@@ -5780,6 +5956,14 @@ manage_config() {
     local debug
     debug=$(debug_start "$@")
     eval set -- "$(debug_filter "$@")"
+
+    local config_file
+    local config_name
+    local config_path
+    local source_path
+    local stock_source_path=""
+    local stock_config_path=""
+    local retval=0
 
     # Ensure the configuration arguments are provided
     if [[ -z "$1" || -z "$2" ]]; then
@@ -5789,22 +5973,14 @@ manage_config() {
         return 1
     fi
 
-    # Declare local variables
-    local config_file config_name config_path source_path
-    local retval=0 # Initialize return value
-
     # Get from args or associative array
     config_file="$1"
     config_path="$2"
-    config_name="${config_file##*/}"                 # Remove path
-    config_name="${config_name%.*}"                  # Remove extension (if present)
-    source_path="${LOCAL_CONFIG_DIR}/${config_file}" # Config files source
-    # If config file is logrotate then rename it to repo_name
-    if [[ "${config_file}" != "logrotate.conf" ]]; then
-        config_path="${config_path}/${config_file}"
-    else
-        config_path="${config_path}/${REPO_NAME,,}"
-    fi
+    config_name="${config_file##*/}"
+    config_name="${config_name%.*}"
+    source_path="${LOCAL_CONFIG_DIR}/${config_file}"
+
+    config_path="${config_path}/${config_file}"
 
     if [[ "$ACTION" == "install" ]]; then
         # Validate source file exists
@@ -5821,58 +5997,141 @@ manage_config() {
             return 1
         fi
 
+        # Save the stock source and stock destination for the primary INI
+        if [[ "${config_file}" == "$WSPR_INI" ]]; then
+            stock_source_path="$source_path"
+            stock_config_path="${config_path}.stock"
+        fi
+
         # If we are doing the INI file, see if we can merge
         if [[ "${config_file}" == "$WSPR_INI" ]]; then
-            local old_path
+            local old_path=""
+            local merged_ini=""
+
             if [[ -f "/usr/local/etc/wspr.ini" ]]; then
                 old_path="/usr/local/etc/wspr.ini"
             elif [[ -f "/usr/local/etc/wsprrypi.ini" ]]; then
                 old_path="/usr/local/etc/wsprrypi.ini"
-            else
-                old_path=""
             fi
 
             if [[ -n "$old_path" ]]; then
-                local merged_ini="${LOCAL_CONFIG_DIR}/wsprrypi_merged.ini"
-                upgrade_ini "$old_path" "$source_path" "${merged_ini}" "$debug"
+                merged_ini="${LOCAL_CONFIG_DIR}/wsprrypi_merged.ini"
+                upgrade_ini "$old_path" "$source_path" "$merged_ini" "$debug"
                 source_path="$merged_ini"
             fi
         fi
 
-        # Install the configuration
-        debug_print "Copying configuration from $source_path to $config_path." "$debug"
+        # Install the active configuration
+        debug_print \
+            "Copying configuration from $source_path to $config_path." \
+            "$debug"
         if [[ "$DRY_RUN" == "true" ]]; then
             logD "Exec: cp -f $source_path $config_path"
         else
-            exec_command "Install configuration" cp -f "${source_path}" "${config_path}" "$debug" || retval=1
+            exec_command \
+                "Install configuration" \
+                cp -f "${source_path}" "${config_path}" "$debug" \
+                || retval=1
         fi
 
-        # Update version
-        replace_string_in_script "$config_path" "SEMANTIC_VERSION" "$(get_sem_ver "$debug")" "$debug"
+        # Update version in the active configuration
+        replace_string_in_script \
+            "$config_path" \
+            "SEMANTIC_VERSION" \
+            "$(get_sem_ver "$debug")" \
+            "$debug"
 
-        # Change ownership on the configuration
+        # Install the stock configuration copy for the primary INI
+        if [[ -n "$stock_source_path" && -n "$stock_config_path" ]]; then
+            debug_print \
+                "Copying stock configuration from $stock_source_path to $stock_config_path." \
+                "$debug"
+            if [[ "$DRY_RUN" == "true" ]]; then
+                logD "Exec: cp -f $stock_source_path $stock_config_path"
+            else
+                exec_command \
+                    "Install stock configuration" \
+                    cp -f "${stock_source_path}" "${stock_config_path}" "$debug" \
+                    || retval=1
+            fi
+
+            replace_string_in_script \
+                "$stock_config_path" \
+                "SEMANTIC_VERSION" \
+                "$(get_sem_ver "$debug")" \
+                "$debug"
+
+            debug_print \
+                "Changing ownership on stock configuration." \
+                "$debug"
+            if [[ "$DRY_RUN" == "true" ]]; then
+                logD "Exec: chown root:root $stock_config_path"
+            else
+                exec_command \
+                    "Change ownership on stock configuration" \
+                    chown root:root "${stock_config_path}" "$debug" \
+                    || retval=1
+            fi
+
+            debug_print \
+                "Changing permissions on stock configuration." \
+                "$debug"
+            if [[ "$DRY_RUN" == "true" ]]; then
+                logD "Exec: chmod 644 $stock_config_path"
+            else
+                exec_command \
+                    "Set stock config permissions" \
+                    chmod 644 "${stock_config_path}" "$debug" \
+                    || retval=1
+            fi
+        fi
+
+        # Change ownership on the active configuration
         debug_print "Changing ownership on configuration." "$debug"
         if [[ "$DRY_RUN" == "true" ]]; then
             logD "Exec: chown root:root $config_path"
         else
-            exec_command "Change ownership on configuration" chown root:root "${config_path}" "$debug" || retval=1
+            exec_command \
+                "Change ownership on configuration" \
+                chown root:root "${config_path}" "$debug" \
+                || retval=1
         fi
 
-        # Change permissions on the configuration
+        # Change permissions on the active configuration
         debug_print "Changing permissions on configuration." "$debug"
         if [[ "$DRY_RUN" == "true" ]]; then
             logD "Exec: chmod 644 $config_path"
         else
-            exec_command "Set config permissions" chmod 644 "${config_path}" "$debug" || retval=1
+            exec_command \
+                "Set config permissions" \
+                chmod 644 "${config_path}" "$debug" \
+                || retval=1
         fi
 
     elif [[ "$ACTION" == "uninstall" ]]; then
-        # Remove the configuration
+        # Remove the active configuration
         debug_print "Removing configuration." "$debug"
         if [[ "$DRY_RUN" == "true" ]]; then
-            logD "Exec: rm -rf $config_path"
+            logD "Exec: rm -f $config_path"
         else
-            exec_command "Remove configuration" rm -f "${config_path}" "$debug" || retval=1
+            exec_command \
+                "Remove configuration" \
+                rm -f "${config_path}" "$debug" \
+                || retval=1
+        fi
+
+        # Remove the stock configuration copy for the primary INI
+        if [[ "${config_file}" == "$WSPR_INI" ]]; then
+            stock_config_path="${config_path}.stock"
+            debug_print "Removing stock configuration." "$debug"
+            if [[ "$DRY_RUN" == "true" ]]; then
+                logD "Exec: rm -f $stock_config_path"
+            else
+                exec_command \
+                    "Remove stock configuration" \
+                    rm -f "${stock_config_path}" "$debug" \
+                    || retval=1
+            fi
         fi
     else
         die 1 "Invalid action. Use 'install' or 'uninstall'."
@@ -5885,9 +6144,10 @@ manage_config() {
 # -----------------------------------------------------------------------------
 # @brief Migrate values from an old INI into a new INI file.
 # @details Reads values from an old INI file, ignores comments there, and merges
-#   those values into a new INI file, preserving the new file's formatting
-#   and inline comments. Only keys present in the new INI will have their
-#   values updated.
+#   those values into a new INI file while preserving the new file's formatting
+#   and inline comments. Matching is section-aware, so repeated key names in
+#   different sections do not overwrite each other. A backup of the previous
+#   INI is retained alongside the original file before the merged file is used.
 #
 # @param $1 Path to the old INI file containing original values.
 # @param $2 Path to the new INI file to merge into.
@@ -5898,71 +6158,167 @@ manage_config() {
 # shellcheck disable=SC2317
 # shellcheck disable=SC2329
 upgrade_ini() {
-    local debug old_ini new_ini merged_ini rc
+    local debug old_ini new_ini merged_ini rc backup_ini tmp_merged err_details
     debug=$(debug_start "$@")
     eval set -- "$(debug_filter "$@")"
 
     old_ini="$1"
     new_ini="$2"
     merged_ini="$3"
+    backup_ini="${old_ini}.pre_migration.bak"
+    tmp_merged="${merged_ini}.tmp"
 
-    debug_print "Merging $old_ini → $merged_ini." "$debug"
+    debug_print "Merging $old_ini -> $merged_ini." "$debug"
 
-    # run mawk and capture any stderr
-    rc=0
-    if ! mawk '
-    # Phase 1: read old.ini → overrides[key]=value
-    NR==FNR {
-      if ($0 ~ /^[[:space:]]*([;#]|$)/) next
-      l = $0; sub(/[;#].*$/, "", l)
-      key = l; sub(/=.*/, "", key)
-      val = l; sub(/^[^=]*=[ \t]*/, "", val)
-      sub(/[ \t]*$/, "", val)
-      gsub(/^[ \t]+|[ \t]+$/, "", key)
-      overrides[key] = val
-      next
-    }
-    # Phase 2: walk new.ini
-    {
-      if ($0 ~ /^[[:space:]]*([;#]|\[)/) { print; next }
-      line = $0; comment = ""
-      p = match(line, /;|#/)
-      if (p) {
-        comment = substr(line,p); line = substr(line,1,p-1)
-      }
-      eq = match(line,/=/)
-      if (eq) {
-        left = substr(line,1,eq-1)
-        orig=substr(line,eq+1)
-        keytrim=left; gsub(/^[ \t]+|[ \t]+$/, "",keytrim)
-        if (keytrim in overrides) {
-          # preserve whitespace
-          tmp=orig; gsub(/^[ \t]*/,"",tmp)
-          leadWS=substr(orig,1,length(orig)-length(tmp))
-          tmp2=tmp; gsub(/[ \t]*$/,"",tmp2)
-          trailerWS=substr(tmp,length(tmp2)+1)
-          printf("%s=%s%s%s%s\n", left, leadWS, overrides[keytrim], trailerWS, comment)
-          next
-        }
-      }
-      print
-    }
-    ' "$old_ini" "$new_ini" >"$merged_ini" 2>/tmp/upgrade_ini.err; then
-        rc=$?
-        # Capture the errors
-        local err_details
-        err_details=$(sed 's/^/  > /' /tmp/upgrade_ini.err)
-
-        # log summary + details
-        logE "INI merge failed (mawk exited $rc)." "$err_details"
-        rm -f /tmp/upgrade_ini.err
+    if [[ ! -f "$new_ini" ]]; then
+        logE "New INI file not found: $new_ini"
         debug_end "$debug"
         return 1
     fi
 
-    exec_command "Remove old INI after merge" rm "${old_ini}" "$debug" || retval=1
+    if [[ ! -s "$new_ini" ]]; then
+        logE "New INI file is empty: $new_ini"
+        debug_end "$debug"
+        return 1
+    fi
 
-    rm -f /tmp/upgrade_ini.err
+    if [[ -f "$old_ini" ]]; then
+        exec_command \
+            "Backup existing INI" \
+            cp -f "$old_ini" "$backup_ini" "$debug" || {
+            logE "INI backup failed."
+            debug_end "$debug"
+            return 1
+        }
+    fi
+
+    rm -f /tmp/upgrade_ini.err "$tmp_merged"
+
+    mawk '
+    function trim(value) {
+      gsub(/^[ \t]+|[ \t]+$/, "", value)
+      return value
+    }
+
+    # Phase 1: read old.ini → overrides[section,key]=value
+    NR == FNR {
+      if ($0 ~ /^[[:space:]]*([;#]|$)/) next
+
+      if ($0 ~ /^[[:space:]]*\[/) {
+        section = $0
+        sub(/^[[:space:]]*\[/, "", section)
+        sub(/\][[:space:]]*$/, "", section)
+        section = trim(section)
+        current_section = section
+        next
+      }
+
+      l = $0
+      sub(/[;#].*$/, "", l)
+      if (l !~ /=/) next
+
+      key = l
+      sub(/=.*/, "", key)
+      key = trim(key)
+
+      val = l
+      sub(/^[^=]*=[ \t]*/, "", val)
+      sub(/[ \t]*$/, "", val)
+
+      overrides[current_section SUBSEP key] = val
+      next
+    }
+
+    # Phase 2: walk new.ini
+    {
+      if ($0 ~ /^[[:space:]]*[;#]/ || $0 ~ /^[[:space:]]*$/) {
+        print
+        next
+      }
+
+      if ($0 ~ /^[[:space:]]*\[/) {
+        section = $0
+        sub(/^[[:space:]]*\[/, "", section)
+        sub(/\][[:space:]]*$/, "", section)
+        section = trim(section)
+        current_section = section
+        print
+        next
+      }
+
+      line = $0
+      comment = ""
+      p = match(line, /;|#/)
+      if (p) {
+        comment = substr(line, p)
+        line = substr(line, 1, p - 1)
+      }
+
+      eq = match(line, /=/)
+      if (eq) {
+        left = substr(line, 1, eq - 1)
+        orig = substr(line, eq + 1)
+        keytrim = trim(left)
+        composite = current_section SUBSEP keytrim
+
+        if (composite in overrides) {
+          tmp = orig
+          gsub(/^[ \t]*/, "", tmp)
+          leadWS = substr(orig, 1, length(orig) - length(tmp))
+
+          tmp2 = tmp
+          gsub(/[ \t]*$/, "", tmp2)
+          trailerWS = substr(tmp, length(tmp2) + 1)
+
+          printf("%s=%s%s%s%s\n",
+                 left, leadWS, overrides[composite], trailerWS, comment)
+          next
+        }
+      }
+
+      print
+    }
+    ' "$old_ini" "$new_ini" >"$tmp_merged" 2>/tmp/upgrade_ini.err
+
+    rc=$?
+
+    if (( rc != 0 )); then
+        err_details=$(sed 's/^/  > /' /tmp/upgrade_ini.err)
+        logE "INI merge failed (mawk exited $rc). Falling back to default INI." "$err_details"
+
+        if [[ -s "$new_ini" ]]; then
+            cp -f "$new_ini" "$merged_ini"
+            rm -f /tmp/upgrade_ini.err "$tmp_merged"
+            debug_print "Fallback to installer INI succeeded." "$debug"
+            debug_end "$debug"
+            return 0
+        else
+            logE "Fallback failed: installer INI is also empty."
+            rm -f /tmp/upgrade_ini.err "$tmp_merged"
+            debug_end "$debug"
+            return 1
+        fi
+    fi
+
+    if [[ ! -s "$tmp_merged" ]]; then
+        logE "INI merge produced an empty file. Falling back to default INI."
+
+        if [[ -s "$new_ini" ]]; then
+            cp -f "$new_ini" "$merged_ini"
+            debug_print "Fallback to installer INI succeeded." "$debug"
+        else
+            logE "Fallback failed: installer INI is also empty."
+            rm -f /tmp/upgrade_ini.err "$tmp_merged"
+            debug_end "$debug"
+            return 1
+        fi
+    else
+        mv -f "$tmp_merged" "$merged_ini"
+        debug_print "INI merge successful." "$debug"
+    fi
+
+    rm -f /tmp/upgrade_ini.err "$tmp_merged"
+
     debug_end "$debug"
     return 0
 }
@@ -5989,7 +6345,7 @@ upgrade_ini() {
 # @return Returns 0 on success, or 1 if any operation fails.
 #
 # @example
-#   manage_service "/usr/bin/mydaemon" "/usr/local/bin/mydaemon -D" "false" "debug"
+#   manage_service "/usr/bin/mydaemon" "/usr/local/bin/mydaemon -J" "false" "debug"
 # -----------------------------------------------------------------------------
 # shellcheck disable=SC2317
 # shellcheck disable=SC2329
@@ -6249,7 +6605,6 @@ manage_sound() {
             REBOOT="true"
             debug_print "Added blacklist entry to $file." "$debug"
         else
-            REBOOT="false"
             debug_print "Sound is already disabled." "$debug"
         fi
 
@@ -6268,12 +6623,83 @@ manage_sound() {
             fi
             REBOOT="true"
         else
-            REBOOT="false"
             debug_print "Sound is already enabled or no blacklist file exists." "$debug"
         fi
     else
         die 1 "Invalid action. Use 'install' or 'uninstall'."
     fi
+
+    debug_end "$debug"
+    return 0
+}
+
+# -----------------------------------------------------------------------------
+# @brief Enable Raspberry Pi I2C support during installation.
+# @details Uses raspi-config when available, otherwise updates the active boot
+#          config file directly and ensures `dtparam=i2c_arm=on` exists exactly
+#          once. The change is idempotent and requests a reboot only when the
+#          script makes a boot-configuration change.
+#
+# @global ACTION Specifies whether the function runs in 'install' or 'uninstall' mode.
+# @global REBOOT Indicates whether a system reboot is required.
+#
+# @param $1 Debug flag for enabling or disabling debug output.
+#
+# @return Returns 0 on success.
+# -----------------------------------------------------------------------------
+# shellcheck disable=SC2317
+# shellcheck disable=SC2329
+manage_i2c() {
+    local debug
+    debug=$(debug_start "$@")
+    eval set -- "$(debug_filter "$@")"
+
+    if [[ "$ACTION" != "install" ]]; then
+        debug_end "$debug"
+        return 0
+    fi
+
+    local boot_config=""
+    local i2c_setting="dtparam=i2c_arm=on"
+
+    if [[ -f "/boot/firmware/config.txt" ]]; then
+        boot_config="/boot/firmware/config.txt"
+    elif [[ -f "/boot/config.txt" ]]; then
+        boot_config="/boot/config.txt"
+    else
+        debug_end "$debug"
+        die 1 "Could not locate Raspberry Pi boot config file."
+    fi
+
+    if grep -Eq '^[[:space:]]*dtparam=i2c_arm=on([[:space:]]*(#.*)?)?$' "$boot_config"; then
+        debug_print "I2C already enabled in $boot_config." "$debug"
+        debug_end "$debug"
+        return 0
+    fi
+
+    if command -v raspi-config >/dev/null 2>&1; then
+        if exec_command "Enable I2C" raspi-config nonint do_i2c 0 "$debug"; then
+            debug_end "$debug"
+            return 0
+        fi
+    fi
+
+    if grep -Eq '^[[:space:]#]*dtparam=i2c_arm=' "$boot_config"; then
+        if [[ "$DRY_RUN" == "true" ]]; then
+            logD "Exec: sed -i 's|^[[:space:]#]*dtparam=i2c_arm=.*|$i2c_setting|' $boot_config"
+        else
+            sed -i "s|^[[:space:]#]*dtparam=i2c_arm=.*|$i2c_setting|" "$boot_config"
+        fi
+    else
+        if [[ "$DRY_RUN" == "true" ]]; then
+            logD "Exec: printf '\\n%s\\n' '$i2c_setting' >> $boot_config"
+        else
+            printf "\n%s\n" "$i2c_setting" >>"$boot_config"
+        fi
+    fi
+
+    REBOOT="true"
+    debug_print "Enabled I2C in $boot_config." "$debug"
 
     debug_end "$debug"
     return 0
@@ -6313,7 +6739,7 @@ manage_apache() {
 
     # Declare local variables after debug initialization
     local status=0
-    local config_file source_path site_conf server_name
+    local config_file source_path site_conf server_name target_conf
 
     config_file="wsprrypi.conf"
     source_path="${LOCAL_CONFIG_DIR}/${config_file}"
@@ -6322,10 +6748,58 @@ manage_apache() {
 
     if [[ -z "$ACTION" || "$ACTION" == install ]]; then
         # Ensure ServerName is present in the main Apache config
+        if [[ "${APACHE_WEB_MODE:-unknown}" == "unknown" ]]; then
+            detect_apache_web_mode "$debug" || true
+        fi
+
         if ! grep -qF "$server_name" "$APACHE_CONF"; then
             exec_command "Insert ServerName directive" \
                 sed -i "1i $server_name" "$APACHE_CONF" \
                 "$debug"
+        fi
+
+        # Preserve existing unrelated custom sites by installing only the
+        # WsprryPi UI files and adding the required proxy rules to the
+        # selected active vhost configs.
+        if [[ "${APACHE_WEB_MODE:-unknown}" == "custom_site" ]]; then
+
+            exec_command "Enable proxy modules" \
+                a2enmod proxy proxy_http proxy_wstunnel \
+                "$debug" || {
+                logE "Failed to enable proxy modules."
+                debug_end "$debug"
+                return 1
+            }
+
+            if ! find_active_apache_site_confs "$debug"; then
+                logW "No active Apache vhost config was found to amend."
+                logW "WsprryPi files were copied, but Apache routing was not changed."
+                debug_end "$debug"
+                return 0
+            fi
+
+            for target_conf in "${APACHE_ACTIVE_SITE_CONFS[@]}"; do
+                if ! install_wsprrypi_proxy_block "$target_conf" "$debug"; then
+                    logE "Failed to update Apache vhost '$target_conf'."
+                    debug_end "$debug"
+                    return 1
+                fi
+            done
+
+            exec_command "Test Apache configuration" apache2ctl configtest "$debug" || {
+                logE "Apache test failed."
+                debug_end "$debug"
+                return 1
+            }
+
+            exec_command "Reload Apache" systemctl reload apache2 "$debug" || {
+                logE "Failed to reload Apache."
+                debug_end "$debug"
+                return 1
+            }
+
+            debug_end "$debug"
+            return 0
         fi
 
         # Copy vhost config to sites-available
@@ -6342,8 +6816,8 @@ manage_apache() {
             return 1
         }
 
-        # If stock page, comment out log lines in the vhost before enabling
-        if is_stock_apache_page "${site_conf}" "$debug"; then
+        # If stock page, comment out log lines in the vhost before enabling.
+        if [[ "${APACHE_WEB_MODE:-unknown}" == "stock" ]] && is_stock_apache_page "/var/www/html/index.html" "$debug"; then
             modify_comment_lines "${site_conf}" ".log" comment "$debug"
         fi
 
@@ -6354,12 +6828,15 @@ manage_apache() {
             return 1
         }
 
-        # Disable default site
-        exec_command "Disable default site" a2dissite 000-default.conf "$debug" || {
-            logE "Failed to disable default site."
-            debug_end "$debug"
-            return 1
-        }
+        # Disable the stock Apache default site only when the install is
+        # stock/default-owned or WsprryPi-owned.
+        if [[ "${APACHE_WEB_MODE:-unknown}" != "custom_site" ]]; then
+            exec_command "Disable default site" a2dissite 000-default.conf "$debug" || {
+                logE "Failed to disable default site."
+                debug_end "$debug"
+                return 1
+            }
+        fi
 
         # Enable wsprrypi site
         exec_command "Enable wsprrypi site" a2ensite wsprrypi.conf "$debug" || {
@@ -6369,10 +6846,22 @@ manage_apache() {
         }
 
     else
-        # Uninstall path
-        exec_command "Disable wsprrypi site" a2dissite wsprrypi.conf "$debug"
+        # Uninstall path. If WsprryPi owns the active vhost, restore the
+        # default Apache site. If it was integrated into an existing site,
+        # remove only the managed proxy block and leave that site enabled.
+        if [[ -e "/etc/apache2/sites-enabled/wsprrypi.conf" ]]; then
+            exec_command "Disable wsprrypi site" a2dissite wsprrypi.conf "$debug"
 
-        exec_command "Enable default site" a2ensite 000-default.conf "$debug"
+            exec_command "Enable default site" a2ensite 000-default.conf "$debug"
+        elif find_active_apache_site_confs "$debug"; then
+            for target_conf in "${APACHE_ACTIVE_SITE_CONFS[@]}"; do
+                remove_wsprrypi_proxy_block "$target_conf" "$debug" || {
+                    logE "Failed to remove WsprryPi proxy block from '$target_conf'."
+                    debug_end "$debug"
+                    return 1
+                }
+            done
+        fi
 
         exec_command "Remove wsprrypi available config" rm -f "${site_conf}" "$debug"
 
@@ -6410,8 +6899,11 @@ is_stock_apache_page() {
 
     local file="${1:-/var/www/html/index.html}"
 
-    # Must exist and be readable
-    [[ -r "$file" ]] || return 1
+    # Must exist and be readable.
+    if [[ ! -r "$file" ]]; then
+        debug_end "$debug"
+        return 1
+    fi
 
     # Common stock-page phrases (Ubuntu/Debian, RHEL/CentOS, generic)
     if grep -qiE \
@@ -6423,6 +6915,623 @@ is_stock_apache_page() {
         debug_end "$debug"
         return 1
     fi
+}
+
+# -----------------------------------------------------------------------------
+# @brief Check whether Apache document root contains a custom website.
+# @details Returns success when /var/www/html contains files that do not
+#          appear to be only the default Apache landing page.
+#
+# @param $1 Optional debug flag.
+#
+# @return 0 if custom content is detected, 1 otherwise.
+# -----------------------------------------------------------------------------
+# shellcheck disable=SC2317
+# shellcheck disable=SC2329
+has_custom_apache_webroot() {
+    local debug
+    debug=$(debug_start "$@")
+    eval set -- "$(debug_filter "$@")"
+
+    local webroot="/var/www/html"
+    local default_index="${webroot}/index.html"
+
+    if [[ ! -d "$webroot" ]]; then
+        debug_end "$debug"
+        return 1
+    fi
+
+    if [[ ! -f "$default_index" ]]; then
+        debug_print "Apache webroot has no root index.html." "$debug"
+        debug_end "$debug"
+        return 1
+    fi
+
+    if is_stock_apache_page "$default_index" "$debug"; then
+        debug_print "Apache root index.html is the stock Apache page." "$debug"
+        debug_end "$debug"
+        return 1
+    fi
+
+    debug_print "Apache root index.html appears to be custom content." "$debug"
+
+    debug_end "$debug"
+    return 0
+}
+
+# -----------------------------------------------------------------------------
+# @brief Check whether the installed webroot already contains WsprryPi UI files.
+# @details Detects a prior WsprryPi web install in /var/www/html/wsprrypi by
+#          looking for recognizable UI files and directories.
+#
+# @param $1 Optional debug flag.
+#
+# @return 0 if a WsprryPi webroot is detected, 1 otherwise.
+# -----------------------------------------------------------------------------
+# shellcheck disable=SC2317
+# shellcheck disable=SC2329
+wsprrypi_webroot_present() {
+    local debug
+    debug=$(debug_start "$@")
+    eval set -- "$(debug_filter "$@")"
+
+    local webroot="/var/www/html/wsprrypi"
+
+    if [[ -f "${webroot}/index.php" && -f "${webroot}/site.js" && -d "${webroot}/views" ]]; then
+        debug_print "Detected existing WsprryPi webroot at ${webroot}." "$debug"
+        debug_end "$debug"
+        return 0
+    fi
+
+    debug_end "$debug"
+    return 1
+}
+
+# -----------------------------------------------------------------------------
+# @brief Check whether an Apache config contains WsprryPi-managed routing.
+# @details Detects either the managed BEGIN/END marker block or explicit
+#          /wsprrypi proxy routes that indicate prior WsprryPi integration.
+#
+# @param $1 Apache config path.
+# @param $2 Optional debug flag.
+#
+# @return 0 if WsprryPi routing markers are present, 1 otherwise.
+# -----------------------------------------------------------------------------
+# shellcheck disable=SC2317
+# shellcheck disable=SC2329
+apache_config_contains_wsprrypi_routes() {
+    local debug
+    debug=$(debug_start "$@")
+    eval set -- "$(debug_filter "$@")"
+
+    local config_path="${1:-}"
+
+    if [[ -z "$config_path" || ! -f "$config_path" ]]; then
+        debug_end "$debug"
+        return 1
+    fi
+
+    if grep -qE \
+        '# BEGIN WsprryPi proxy configuration|/wsprrypi/config|/wsprrypi/version|/wsprrypi/socket|wsprrypi\.conf' \
+        "$config_path"; then
+        debug_print "Detected WsprryPi Apache routing in ${config_path}." "$debug"
+        debug_end "$debug"
+        return 0
+    fi
+
+    debug_end "$debug"
+    return 1
+}
+
+# -----------------------------------------------------------------------------
+# @brief Check whether Apache already has a WsprryPi-managed installation.
+# @details Returns success if any of the expected WsprryPi Apache ownership
+#          signals are present: wsprrypi.conf in sites-available, wsprrypi.conf
+#          enabled, an existing WsprryPi webroot, or existing WsprryPi proxy
+#          routing markers in Apache config files.
+#
+# @param $1 Optional debug flag.
+#
+# @return 0 if an existing WsprryPi install is detected, 1 otherwise.
+# -----------------------------------------------------------------------------
+# shellcheck disable=SC2317
+# shellcheck disable=SC2329
+existing_wsprrypi_apache_install_detected() {
+    local debug
+    debug=$(debug_start "$@")
+    eval set -- "$(debug_filter "$@")"
+
+    local enabled_entry
+    local resolved_entry
+    local apache_config
+
+    if [[ -f "/etc/apache2/sites-available/wsprrypi.conf" ]]; then
+        debug_print "Detected existing /etc/apache2/sites-available/wsprrypi.conf." "$debug"
+        debug_end "$debug"
+        return 0
+    fi
+
+    if [[ -e "/etc/apache2/sites-enabled/wsprrypi.conf" ]]; then
+        debug_print "Detected existing /etc/apache2/sites-enabled/wsprrypi.conf." "$debug"
+        debug_end "$debug"
+        return 0
+    fi
+
+    for enabled_entry in /etc/apache2/sites-enabled/*.conf; do
+        [[ -e "$enabled_entry" ]] || continue
+        resolved_entry=$(readlink -f "$enabled_entry")
+        if [[ "$(basename "$resolved_entry")" == "wsprrypi.conf" ]]; then
+            debug_print "Detected enabled WsprryPi Apache site via ${enabled_entry}." "$debug"
+            debug_end "$debug"
+            return 0
+        fi
+    done
+
+    if wsprrypi_webroot_present "$debug"; then
+        debug_end "$debug"
+        return 0
+    fi
+
+    for apache_config in /etc/apache2/sites-available/*.conf /etc/apache2/sites-enabled/*.conf; do
+        [[ -e "$apache_config" ]] || continue
+        resolved_entry=$(readlink -f "$apache_config")
+        [[ -f "$resolved_entry" ]] || continue
+        if apache_config_contains_wsprrypi_routes "$resolved_entry" "$debug"; then
+            debug_end "$debug"
+            return 0
+        fi
+    done
+
+    debug_end "$debug"
+    return 1
+}
+
+# -----------------------------------------------------------------------------
+# @brief Detect and record the Apache web integration mode.
+# @details Determines whether Apache is unavailable, currently serving a stock
+#          site, already hosting a WsprryPi-owned install, or hosting an
+#          unrelated custom site. Logs exactly one mode message during the
+#          preflight phase and stores the result in APACHE_WEB_MODE.
+#
+# @param $1 Optional debug flag.
+#
+# @return 0 on successful detection, 1 when Apache is unavailable.
+# -----------------------------------------------------------------------------
+# shellcheck disable=SC2317
+# shellcheck disable=SC2329
+detect_apache_web_mode() {
+    local debug
+    debug=$(debug_start "$@")
+    eval set -- "$(debug_filter "$@")"
+
+    if [[ "${APACHE_WEB_MODE_DETECTED:-false}" == "true" && "${APACHE_WEB_MODE:-unknown}" != "unknown" ]]; then
+        debug_end "$debug"
+        return 0
+    fi
+
+    APACHE_WEB_MODE="unknown"
+    APACHE_WEB_MODE_DETECTED="false"
+
+    if existing_wsprrypi_apache_install_detected "$debug"; then
+        APACHE_WEB_MODE="existing_wsprrypi"
+        APACHE_WEB_MODE_DETECTED="true"
+        logI "Apache web mode: existing WsprryPi installation."
+        debug_end "$debug"
+        return 0
+    fi
+
+    if has_custom_apache_webroot "$debug"; then
+        APACHE_WEB_MODE="custom_site"
+        APACHE_WEB_MODE_DETECTED="true"
+        logW "Apache web mode: existing non-WsprryPi website detected."
+        logW "WsprryPi will be installed under /wsprrypi without disabling the existing site."
+        debug_end "$debug"
+        return 0
+    fi
+
+    APACHE_WEB_MODE="stock"
+    APACHE_WEB_MODE_DETECTED="true"
+    logI "Apache web mode: stock/default site."
+    debug_end "$debug"
+    return 0
+}
+
+# -----------------------------------------------------------------------------
+# @brief Validate Apache availability after package management.
+# @details Confirms Apache tooling and expected config directories exist once
+#          package installation has completed. Fails web-enabled installs when
+#          Apache is still unavailable, but allows `--no-web` installs to
+#          proceed.
+#
+# @param $1 Optional debug flag.
+#
+# @return 0 when Apache is available or web is disabled, 1 otherwise.
+# -----------------------------------------------------------------------------
+# shellcheck disable=SC2317
+# shellcheck disable=SC2329
+validate_apache_web_availability() {
+    local debug
+    debug=$(debug_start "$@")
+    eval set -- "$(debug_filter "$@")"
+
+    if command -v apache2ctl >/dev/null 2>&1 && \
+        [[ -d "/etc/apache2" ]] && \
+        [[ -d "/etc/apache2/sites-available" ]]; then
+        debug_end "$debug"
+        return 0
+    fi
+
+    APACHE_WEB_MODE="no_apache"
+
+    if [[ "${NO_WEB:-false}" != "true" ]]; then
+        logE "Apache is not installed or not available; web UI cannot be configured."
+        debug_end "$debug"
+        return 1
+    fi
+
+    logI "Apache unavailable, but --no-web is set; continuing without web UI."
+    debug_end "$debug"
+    return 0
+}
+
+# -----------------------------------------------------------------------------
+# @brief Select a single preferred Apache vhost for a given port.
+# @details Evaluates a list of enabled config files and returns success only
+#          when exactly one file can be selected safely for the requested port.
+#          Preference order is `*:port` first, then `_default_:port`.
+#
+# @param $1 Name of the array variable holding candidate config paths.
+# @param $2 Target port (`80` or `443`).
+# @param $3 Name of the output variable to receive the selected config path.
+# @param $4 Optional debug flag.
+#
+# @return 0 when a single preferred config is found, 1 otherwise.
+# -----------------------------------------------------------------------------
+# shellcheck disable=SC2317
+# shellcheck disable=SC2329
+select_preferred_apache_vhost_for_port() {
+    local debug
+    debug=$(debug_start "$@")
+    eval set -- "$(debug_filter "$@")"
+
+    local array_name="${1:-}"
+    local port="${2:-}"
+    local output_var="${3:-}"
+    local pattern
+    local resolved
+    local -n candidates_ref="$array_name"
+    local matches=()
+
+    if [[ -z "$array_name" || -z "$port" || -z "$output_var" ]]; then
+        debug_end "$debug"
+        return 1
+    fi
+
+    for pattern in \
+        "<VirtualHost[[:space:]]+\\*:${port}>" \
+        "<VirtualHost[[:space:]]+_default_:${port}>"; do
+        matches=()
+
+        for resolved in "${candidates_ref[@]}"; do
+            if grep -qiE "$pattern" "$resolved"; then
+                matches+=("$resolved")
+            fi
+        done
+
+        if (( ${#matches[@]} == 1 )); then
+            printf -v "$output_var" '%s' "${matches[0]}"
+            debug_end "$debug"
+            return 0
+        fi
+    done
+
+    debug_end "$debug"
+    return 1
+}
+
+
+# -----------------------------------------------------------------------------
+# @brief Locate active Apache vhost configs to amend.
+# @details Sets APACHE_ACTIVE_SITE_CONFS to enabled Apache site configs that are
+#          not the WsprryPi config. HTTP vhosts are included first, followed by
+#          SSL vhosts, so an existing custom site can serve WsprryPi under both
+#          http://host/wsprrypi/ and https://host/wsprrypi/ when HTTPS exists.
+#
+# @param $1 Optional debug flag.
+#
+# @return 0 when at least one config is found, 1 otherwise.
+# -----------------------------------------------------------------------------
+# shellcheck disable=SC2317
+# shellcheck disable=SC2329
+find_active_apache_site_confs() {
+    local debug
+    debug=$(debug_start "$@")
+    eval set -- "$(debug_filter "$@")"
+
+    local enabled_dir="/etc/apache2/sites-enabled"
+    local candidate
+    local resolved
+    local unique_enabled=()
+    local selected_http=""
+    local selected_ssl=""
+
+    APACHE_ACTIVE_SITE_CONF=""
+    APACHE_ACTIVE_SITE_CONFS=()
+
+    if [[ ! -d "$enabled_dir" ]]; then
+        debug_print "Apache sites-enabled directory was not found." "$debug"
+        debug_end "$debug"
+        return 1
+    fi
+
+    for candidate in "$enabled_dir"/*.conf; do
+        [[ -e "$candidate" ]] || continue
+
+        resolved=$(readlink -f "$candidate")
+
+        if [[ "$(basename "$resolved")" == "wsprrypi.conf" ]]; then
+            continue
+        fi
+
+        [[ -f "$resolved" ]] || continue
+
+        if [[ " ${unique_enabled[*]} " != *" $resolved "* ]]; then
+            unique_enabled+=("$resolved")
+        fi
+    done
+
+    if (( ${#unique_enabled[@]} == 0 )); then
+        debug_print "No suitable active Apache vhost was found." "$debug"
+        debug_end "$debug"
+        return 1
+    fi
+
+    if (( ${#unique_enabled[@]} == 1 )); then
+        APACHE_ACTIVE_SITE_CONFS=("${unique_enabled[0]}")
+        APACHE_ACTIVE_SITE_CONF="${APACHE_ACTIVE_SITE_CONFS[0]}"
+        debug_print "Selected sole enabled Apache vhost: ${APACHE_ACTIVE_SITE_CONF}" "$debug"
+        debug_end "$debug"
+        return 0
+    fi
+
+    if select_preferred_apache_vhost_for_port unique_enabled 80 selected_http "$debug"; then
+        if [[ -n "$selected_http" ]]; then
+            APACHE_ACTIVE_SITE_CONFS+=("$selected_http")
+            debug_print "Selected HTTP Apache vhost: ${selected_http}" "$debug"
+        fi
+    fi
+
+    if select_preferred_apache_vhost_for_port unique_enabled 443 selected_ssl "$debug"; then
+        if [[ -n "$selected_ssl" && " ${APACHE_ACTIVE_SITE_CONFS[*]} " != *" $selected_ssl "* ]]; then
+            APACHE_ACTIVE_SITE_CONFS+=("$selected_ssl")
+        fi
+        if [[ -n "$selected_ssl" ]]; then
+            debug_print "Selected HTTPS Apache vhost: ${selected_ssl}" "$debug"
+        fi
+    fi
+
+    if (( ${#APACHE_ACTIVE_SITE_CONFS[@]} == 0 )); then
+        debug_print "Multiple enabled Apache vhosts were found, but none matched a safe HTTP/HTTPS selection pattern." "$debug"
+        debug_end "$debug"
+        return 1
+    fi
+
+    APACHE_ACTIVE_SITE_CONF="${APACHE_ACTIVE_SITE_CONFS[0]}"
+
+    debug_end "$debug"
+    return 0
+}
+
+# -----------------------------------------------------------------------------
+# @brief Locate the first active Apache vhost config to amend.
+# @details Compatibility wrapper for callers that expect APACHE_ACTIVE_SITE_CONF.
+#
+# @param $1 Optional debug flag.
+#
+# @return 0 when a config is found, 1 otherwise.
+# -----------------------------------------------------------------------------
+# shellcheck disable=SC2317
+# shellcheck disable=SC2329
+find_active_apache_site_conf() {
+    local debug
+    debug=$(debug_start "$@")
+    eval set -- "$(debug_filter "$@")"
+
+    if find_active_apache_site_confs "$debug"; then
+        debug_end "$debug"
+        return 0
+    fi
+
+    debug_end "$debug"
+    return 1
+}
+
+# -----------------------------------------------------------------------------
+# @brief Add or update the WsprryPi proxy block in an Apache vhost.
+# @details Removes any existing managed WsprryPi proxy block, then inserts the
+#          current block before each closing VirtualHost tag. If no VirtualHost
+#          tag is present, the block is appended to the file.
+#
+# @param $1 Apache vhost config path to update.
+# @param $2 Optional debug flag.
+#
+# @return 0 on success, 1 otherwise.
+# -----------------------------------------------------------------------------
+# shellcheck disable=SC2317
+# shellcheck disable=SC2329
+install_wsprrypi_proxy_block() {
+    local debug
+    debug=$(debug_start "$@")
+    eval set -- "$(debug_filter "$@")"
+
+    local config_file="${1:-}"
+    local tmp_file
+    local backup_file
+    local proxy_block
+
+    if [[ -z "$config_file" || ! -f "$config_file" ]]; then
+        logE "Apache vhost config '$config_file' was not found."
+        debug_end "$debug"
+        return 1
+    fi
+
+    proxy_block=$(cat <<'EOF'
+    # BEGIN WsprryPi proxy configuration
+    # REST API (port 31415)
+    ProxyPass        /wsprrypi/config  http://127.0.0.1:31415/config
+    ProxyPassReverse /wsprrypi/config  http://127.0.0.1:31415/config
+    ProxyPass        /wsprrypi/version http://127.0.0.1:31415/version
+    ProxyPassReverse /wsprrypi/version http://127.0.0.1:31415/version
+
+    # WebSocket (port 31416)
+    ProxyPass        /wsprrypi/socket  ws://127.0.0.1:31416/socket
+    ProxyPassReverse /wsprrypi/socket  ws://127.0.0.1:31416/socket
+
+    <Proxy "http://127.0.0.1:31415/*">
+        Require all granted
+    </Proxy>
+    <Proxy "ws://127.0.0.1:31416/*">
+        Require all granted
+    </Proxy>
+    # END WsprryPi proxy configuration
+EOF
+)
+
+    if [[ "$DRY_RUN" == "true" ]]; then
+        logD "Exec: update managed WsprryPi proxy block in $config_file"
+        debug_end "$debug"
+        return 0
+    fi
+
+    tmp_file=$(mktemp) || {
+        logE "Failed to create temporary file."
+        debug_end "$debug"
+        return 1
+    }
+
+    backup_file="${config_file}.wsprrypi.bak"
+    if [[ ! -f "$backup_file" ]]; then
+        cp "$config_file" "$backup_file" || {
+            rm -f "$tmp_file"
+            logE "Failed to back up '$config_file'."
+            debug_end "$debug"
+            return 1
+        }
+    fi
+
+    awk -v block="$proxy_block" '
+        /^[[:space:]]*# BEGIN WsprryPi proxy configuration[[:space:]]*$/ {
+            in_block = 1
+            next
+        }
+
+        /^[[:space:]]*# END WsprryPi proxy configuration[[:space:]]*$/ {
+            in_block = 0
+            next
+        }
+
+        !in_block {
+            if ($0 ~ /^[[:space:]]*<\/VirtualHost>[[:space:]]*$/) {
+                print block
+                inserted = 1
+            }
+            print
+        }
+
+        END {
+            if (!inserted) {
+                print ""
+                print block
+            }
+        }
+    ' "$config_file" >"$tmp_file" || {
+        rm -f "$tmp_file"
+        logE "Failed to build updated Apache config."
+        debug_end "$debug"
+        return 1
+    }
+
+    mv "$tmp_file" "$config_file" || {
+        rm -f "$tmp_file"
+        logE "Failed to install updated Apache config."
+        debug_end "$debug"
+        return 1
+    }
+
+    debug_print "Installed WsprryPi proxy block in $config_file." "$debug"
+    debug_end "$debug"
+    return 0
+}
+
+
+# -----------------------------------------------------------------------------
+# @brief Remove the managed WsprryPi proxy block from an Apache vhost.
+# @details Removes only the lines between the WsprryPi BEGIN and END markers.
+#
+# @param $1 Apache vhost config path to update.
+# @param $2 Optional debug flag.
+#
+# @return 0 on success, 1 otherwise.
+# -----------------------------------------------------------------------------
+# shellcheck disable=SC2317
+# shellcheck disable=SC2329
+remove_wsprrypi_proxy_block() {
+    local debug
+    debug=$(debug_start "$@")
+    eval set -- "$(debug_filter "$@")"
+
+    local config_file="${1:-}"
+    local tmp_file
+
+    if [[ -z "$config_file" || ! -f "$config_file" ]]; then
+        logE "Apache vhost config '$config_file' was not found."
+        debug_end "$debug"
+        return 1
+    fi
+
+    if [[ "$DRY_RUN" == "true" ]]; then
+        logD "Exec: remove managed WsprryPi proxy block from $config_file"
+        debug_end "$debug"
+        return 0
+    fi
+
+    tmp_file=$(mktemp) || {
+        logE "Failed to create temporary file."
+        debug_end "$debug"
+        return 1
+    }
+
+    awk '
+        /^[[:space:]]*# BEGIN WsprryPi proxy configuration[[:space:]]*$/ {
+            in_block = 1
+            next
+        }
+
+        /^[[:space:]]*# END WsprryPi proxy configuration[[:space:]]*$/ {
+            in_block = 0
+            next
+        }
+
+        !in_block {
+            print
+        }
+    ' "$config_file" >"$tmp_file" || {
+        rm -f "$tmp_file"
+        logE "Failed to remove managed WsprryPi proxy block."
+        debug_end "$debug"
+        return 1
+    }
+
+    mv "$tmp_file" "$config_file" || {
+        rm -f "$tmp_file"
+        logE "Failed to install updated Apache config."
+        debug_end "$debug"
+        return 1
+    }
+
+    debug_print "Removed WsprryPi proxy block from $config_file." "$debug"
+    debug_end "$debug"
+    return 0
 }
 
 # -----------------------------------------------------------------------------
@@ -6669,7 +7778,7 @@ finish_script() {
     fi
 
     # Display follow-up instructions only if install was successful
-    if [[ "$ACTION" == "install" && "$overall_status" -eq 0 ]]; then
+    if [[ "$ACTION" == "install" && "$overall_status" -eq 0 && "${NO_WEB:-false}" != "true" ]]; then
         local repo_name="${REPO_NAME,,}"
         printf "\n"
         printf "To configure %s, open the following URL in your browser:\n\n" "$REPO_TITLE"
@@ -6681,7 +7790,12 @@ finish_script() {
         printf "Ensure your device is on the same network and that mDNS is\n"
         printf "supported by your system.\n\n"
 
-        if [[ "${REBOOT:-false}" == "true" ]]; then
+        if [[ "${REBOOT:-false}" == "true" ]] && ! is_pi5; then
+            printf "Remember to reboot to disable your soundcard before transmission.\n\n"
+        fi
+    elif [[ "$ACTION" == "install" && "$overall_status" -eq 0 ]]; then
+        printf "\n%s installed with the web UI disabled (--no-web).\n\n" "$REPO_TITLE"
+        if [[ "${REBOOT:-false}" == "true" ]] && ! is_pi5; then
             printf "Remember to reboot to disable your soundcard before transmission.\n\n"
         fi
     elif [[ "$ACTION" == "uninstall" && "$overall_status" -eq 0 ]]; then
@@ -6725,6 +7839,11 @@ manage_wsprry_pi() {
     debug=$(debug_start "$@")
     eval set -- "$(debug_filter "$@")"
 
+    local service_command="/usr/local/bin/$WSPR_EXE -J -i /usr/local/etc/$WSPR_INI"
+    if [[ "${NO_WEB:-false}" == "true" ]]; then
+        service_command+=" --no-web"
+    fi
+
     # Define the group of functions to install/uninstall
     local install_group=(
         "git_clone"
@@ -6733,8 +7852,8 @@ manage_wsprry_pi() {
         "compile_binary \"$WSPR_EXE\""
         "manage_exe \"$WSPR_EXE\""
         "manage_config \"$WSPR_INI\" \"/usr/local/etc/\""
-        "manage_service \"/usr/bin/$WSPR_EXE\" \"/usr/local/bin/$WSPR_EXE -D -i /usr/local/etc/$WSPR_INI\" \"false\""
-        "manage_config \"$LOG_ROTATE\" \"/etc/logrotate.d\""
+        "manage_i2c"
+        "manage_service \"/usr/bin/$WSPR_EXE\" \"$service_command\" \"false\""
         "manage_web"
         "manage_apache"
         "manage_sound"
@@ -6768,6 +7887,12 @@ manage_wsprry_pi() {
     install)
         debug_print "(INSTALL) Creating group_to_execute list (after processing):" "$debug"
         group_to_execute=("${install_group[@]}")
+        if [[ "${NO_WEB:-false}" == "true" ]]; then
+            mapfile -t group_to_execute < <(
+                printf '%s\n' "${group_to_execute[@]}" |
+                    grep -v -E '^(manage_web|manage_apache)( |$)'
+            )
+        fi
         ;;
     uninstall)
         debug_print "(UNINSTALL) Reversing and filtering install_group…" "$debug"
@@ -6860,9 +7985,25 @@ manage_wsprry_pi() {
 # shellcheck disable=SC2317
 _main() {
     local debug
+    local arg
     debug=$(debug_start "$@")
     eval set -- "$(debug_filter "$@")"
     [[ "$debug" != "debug" ]] && printf "\n" # Just a visual when not in debug.
+
+    for arg in "$@"; do
+        case "$arg" in
+            -h|--help)
+                usage
+                debug_end "$debug"
+                return 0
+                ;;
+            -v|--version)
+                printf "%s: version %s\n" "$REPO_TITLE" "$SEM_VER"
+                debug_end "$debug"
+                return 0
+                ;;
+        esac
+    done
 
     # Check and set up the environment
     handle_execution_context "$debug" # Get execution context and set environment variables
@@ -6876,6 +8017,15 @@ _main() {
     validate_sys_accs "$debug" # Verify critical system files are accessible
     validate_env_vars "$debug" # Check for required environment variables
     get_proj_params "$debug"   # Get project and git parameters
+    resolve_build_settings "$debug"
+    if [[ "${LOG_LEVEL_SET_FROM_ENV}" != "true" ]]; then
+        if [[ "${WSPR_BUILD_TYPE}" == "RELEASE" ]]; then
+            LOG_LEVEL="INFO"
+        else
+            LOG_LEVEL="DEBUG"
+        fi
+    fi
+    logI "Resolved build type: ${WSPR_BUILD_TYPE} for branch ${REPO_BRANCH:-main}."
 
     check_bash "$debug"        # Ensure the script is executed in a Bash shell
     check_sh_ver "$debug"      # Verify the Bash version meets minimum requirements
@@ -6895,11 +8045,26 @@ _main() {
     # Feedback on multi-proc compilation
     [[ "$ACTION" != "uninstall" ]] && display_compilation_resource_notes "$debug"
 
+    # Detect Apache web mode intent before package management or other
+    # installation actions begin so the user sees the mode early.
+    if [[ "$ACTION" != "uninstall" ]]; then
+        detect_apache_web_mode "$debug"
+    fi
+
     # Install dependencies after system checks
     [[ "$ACTION" != "uninstall" ]] && handle_apt_packages "$debug"
 
     # Handle correcting timezone
     [[ "$ACTION" != "uninstall" ]] && set_time "$debug"
+
+    # After package management, Apache must actually be available unless web
+    # installation has been explicitly disabled.
+    if [[ "$ACTION" != "uninstall" ]]; then
+        if ! validate_apache_web_availability "$debug"; then
+            debug_end "$debug"
+            return 1
+        fi
+    fi
 
     # Install or uninstall Wsprry Pi services
     manage_wsprry_pi "$debug"

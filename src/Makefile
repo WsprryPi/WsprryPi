@@ -27,7 +27,11 @@
 # ─────────────────────────────────────────────────────────────────────────────
 
 # Debug flags (add/remove as needed)
+# 	"DEBUG_WSPR" handles the primary `llog.logS(DEBUG, "string");` debugging
+# 	All other is specifically guarded within the submodules and does not
+#	(should not) use LCBLog.
 DEBUG_DEFS := -DDEBUG_WSPR
+# DEBUG_DEFS := -DDEBUG_TRANS_SYMBOL
 # DEBUG_DEFS += -DDEBUG_PPMMANAGER
 # DEBUG_DEFS += -DDEBUG_SIGNAL_HANDLER
 
@@ -69,7 +73,7 @@ WSPR_PARAMS := AA0NT EM18 20 40m
 TEST_FREQ := 730000
 
 # Install location
-# If you prefer the old behavior (PREFIX=/usr/local/bin), set it on the command
+# If you prefer a different location, set it on the command
 # line: make PREFIX=/usr/local/bin install
 PREFIX ?= /usr/local/bin
 
@@ -85,7 +89,7 @@ SUBMODULE_SRCDIRS += $(wildcard ./MonitorFile/src)
 SUBMODULE_SRCDIRS += $(wildcard ./PPM-Manager/src)
 SUBMODULE_SRCDIRS += $(wildcard ./Signal-Handler/src)
 SUBMODULE_SRCDIRS += $(wildcard ./Singleton/src)
-SUBMODULE_SRCDIRS += $(wildcard ./WSPR-Message/src)
+SUBMODULE_SRCDIRS += $(wildcard ./WSPR-Reference/src/wspr)
 SUBMODULE_SRCDIRS += $(wildcard ./WSPR-Transmitter/src)
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -94,7 +98,9 @@ SUBMODULE_SRCDIRS += $(wildcard ./WSPR-Transmitter/src)
 
 PRJ := $(strip $(shell 	url="$$(git remote get-url origin 2>/dev/null)"; 	if [ -n "$$url" ]; then 		echo "$$url" 		| sed -E 's#.*/##; s#\.git$$##'; 	else 		echo unknown; 	fi ))
 EXE_NAME := $(shell echo $(PRJ) | tr '[:upper:]' '[:lower:]')
-BRH := $(shell git rev-parse --abbrev-ref HEAD 2>/dev/null | awk '{ gsub(/[^[:alnum:]]+/, "-"); sub(/-$$/, ""); print }' || echo unknown)
+RAW_BRH := $(shell git rev-parse --abbrev-ref HEAD 2>/dev/null || echo unknown)
+BRANCH_STATE := $(shell if ! git rev-parse --is-inside-work-tree >/dev/null 2>&1; then echo unknown; elif git symbolic-ref --quiet --short HEAD >/dev/null 2>&1; then echo branch; else echo detached; fi)
+BRH := $(shell printf '%s\n' "$(RAW_BRH)" | awk '{ gsub(/[^[:alnum:]]+/, "-"); sub(/-$$/, ""); print }' || echo unknown)
 RAW_TAG := $(strip $(shell git describe --tags --match "v[0-9]*" --match "[0-9]*" --abbrev=0 2>/dev/null))
 BASE_VER := $(if $(RAW_TAG),$(patsubst v%,%,$(RAW_TAG)),0.0.0)
 
@@ -102,10 +108,24 @@ PRE := $(shell if [ "$(BRH)" != "main" ] && [ "$(BRH)" != "master" ]; then echo 
 VER := $(BASE_VER)$(PRE)
 
 COMMIT := $(shell git rev-parse --short HEAD 2>/dev/null || echo "unknown")
+FULL_COMMIT := $(shell git rev-parse HEAD 2>/dev/null || echo "unknown")
+GIT_DIRTY := $(shell if ! git rev-parse --is-inside-work-tree >/dev/null 2>&1; then echo unknown; elif [ -n "$$(git status --porcelain --untracked-files=no 2>/dev/null)" ]; then echo true; else echo false; fi)
 VER := $(shell if ! git describe --tags --exact-match >/dev/null 2>&1; then echo "$(VER)+$(COMMIT)"; else echo "$(VER)"; fi)
 
 OUT := $(strip $(EXE_NAME))
 TEST_OUT := $(strip $(EXE_NAME)_debug)
+SEMANTICS_TEST_OUT := dial_frequency_semantics_test
+UI_SOURCE_REGRESSION_TEST_OUT := ui_source_regression_test
+GUARDED_MODE_CHANGE_PERSISTENCE_TEST_OUT := guarded_mode_change_persistence_test
+BAND_GPIO_DEFAULT_CONVERGENCE_TEST_OUT := band_gpio_default_convergence_test
+BAND_GPIO_ROTATION_TEST_OUT := band_gpio_rotation_test
+MONITOR_FILE_REGRESSION_TEST_OUT := monitor_file_regression_test
+GPIO_LOOPBACK_TEST_OUT := gpio_loopback_test
+BAND_GPIO_LIVE_MONITOR_OUT := band_gpio_live_monitor
+GPIO_LINE_RESOLVER_TEST_OUT := gpio_line_resolver_test
+NON_WSPR_REPEAT_POLICY_TEST_OUT := non_wspr_repeat_policy_test
+QRSS_EXECUTION_REGRESSION_TEST_OUT := qrss_execution_regression_test
+SELECTOR_SHUTDOWN_CLEANUP_TEST_OUT := selector_shutdown_cleanup_test
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Output directories
@@ -122,12 +142,54 @@ BIN_DIR         := build/bin
 
 LOCAL_CPP_SOURCES := $(shell find . -maxdepth 1 -type f -name '*.cpp' 2>/dev/null)
 SUBMODULE_CPP_SOURCES := $(shell find $(SUBMODULE_SRCDIRS) -type f -name '*.cpp' ! -name 'main.cpp' 2>/dev/null)
+SI5351_TEST_SOURCE := ./WSPR-Transmitter/src/si5351_backend_harness.cpp
+SUBMODULE_CPP_SOURCES := $(filter-out $(SI5351_TEST_SOURCE),$(SUBMODULE_CPP_SOURCES))
 
 CPP_SOURCES := $(LOCAL_CPP_SOURCES) $(SUBMODULE_CPP_SOURCES)
 REL_CPP_SOURCES := $(patsubst ../../%,%,$(CPP_SOURCES))
 
 CPP_OBJECTS       := $(patsubst %.cpp, $(OBJ_DIR_RELEASE)/%.o,$(REL_CPP_SOURCES))
 CPP_DEBUG_OBJECTS := $(patsubst %.cpp, $(OBJ_DIR_DEBUG)/%.o,$(REL_CPP_SOURCES))
+MAIN_DEBUG_OBJECT := $(OBJ_DIR_DEBUG)/./main.o
+SEMANTICS_TEST_SRC := tests/dial_frequency_semantics_test.cpp
+SEMANTICS_TEST_OBJ := $(OBJ_DIR_DEBUG)/tests/dial_frequency_semantics_test.o
+SEMANTICS_TEST_DEPS := $(filter-out $(MAIN_DEBUG_OBJECT),$(CPP_DEBUG_OBJECTS))
+UI_SOURCE_REGRESSION_TEST_SRC := tests/ui_source_regression_test.cpp
+UI_SOURCE_REGRESSION_TEST_OBJ := $(OBJ_DIR_DEBUG)/tests/ui_source_regression_test.o
+UI_SOURCE_REGRESSION_TEST_DEPS := $(UI_SOURCE_REGRESSION_TEST_OBJ)
+GUARDED_MODE_CHANGE_PERSISTENCE_TEST_SRC := tests/guarded_mode_change_persistence_test.cpp
+GUARDED_MODE_CHANGE_PERSISTENCE_TEST_OBJ := $(OBJ_DIR_DEBUG)/tests/guarded_mode_change_persistence_test.o
+GUARDED_MODE_CHANGE_PERSISTENCE_TEST_DEPS := $(filter-out $(MAIN_DEBUG_OBJECT),$(CPP_DEBUG_OBJECTS))
+BAND_GPIO_DEFAULT_CONVERGENCE_TEST_SRC := tests/band_gpio_default_convergence_test.cpp
+BAND_GPIO_DEFAULT_CONVERGENCE_TEST_OBJ := $(OBJ_DIR_DEBUG)/tests/band_gpio_default_convergence_test.o
+BAND_GPIO_DEFAULT_CONVERGENCE_TEST_DEPS := $(filter-out $(MAIN_DEBUG_OBJECT),$(CPP_DEBUG_OBJECTS))
+BAND_GPIO_ROTATION_TEST_SRC := tests/band_gpio_rotation_test.cpp
+BAND_GPIO_ROTATION_TEST_OBJ := $(OBJ_DIR_DEBUG)/tests/band_gpio_rotation_test.o
+BAND_GPIO_ROTATION_TEST_DEPS := $(filter-out $(MAIN_DEBUG_OBJECT),$(CPP_DEBUG_OBJECTS))
+MONITOR_FILE_REGRESSION_TEST_SRC := tests/monitor_file_regression_test.cpp
+MONITOR_FILE_REGRESSION_TEST_OBJ := $(OBJ_DIR_DEBUG)/tests/monitor_file_regression_test.o
+MONITOR_FILE_DEBUG_OBJ := $(OBJ_DIR_DEBUG)/./MonitorFile/src/monitorfile.o
+MONITOR_FILE_REGRESSION_TEST_DEPS := $(MONITOR_FILE_DEBUG_OBJ)
+GPIO_LOOPBACK_TEST_SRC := tests/gpio_loopback_test.cpp
+GPIO_LOOPBACK_TEST_OBJ := $(OBJ_DIR_DEBUG)/tests/gpio_loopback_test.o
+GPIO_LOOPBACK_TEST_DEPS := $(GPIO_LOOPBACK_TEST_OBJ)
+BAND_GPIO_LIVE_MONITOR_SRC := tests/band_gpio_live_monitor.cpp
+BAND_GPIO_LIVE_MONITOR_OBJ := $(OBJ_DIR_DEBUG)/tests/band_gpio_live_monitor.o
+BAND_GPIO_LIVE_MONITOR_DEPS := $(BAND_GPIO_LIVE_MONITOR_OBJ)
+GPIO_LINE_RESOLVER_TEST_SRC := tests/gpio_line_resolver_test.cpp
+GPIO_LINE_RESOLVER_TEST_OBJ := $(OBJ_DIR_DEBUG)/tests/gpio_line_resolver_test.o
+GPIO_LINE_RESOLVER_TEST_DEPS := \
+	$(GPIO_LINE_RESOLVER_TEST_OBJ) \
+	$(OBJ_DIR_DEBUG)/./gpio_line_resolver.o
+NON_WSPR_REPEAT_POLICY_TEST_SRC := tests/non_wspr_repeat_policy_test.cpp
+NON_WSPR_REPEAT_POLICY_TEST_OBJ := $(OBJ_DIR_DEBUG)/tests/non_wspr_repeat_policy_test.o
+NON_WSPR_REPEAT_POLICY_TEST_DEPS := $(filter-out $(MAIN_DEBUG_OBJECT),$(CPP_DEBUG_OBJECTS))
+QRSS_EXECUTION_REGRESSION_TEST_SRC := tests/qrss_execution_regression_test.cpp
+QRSS_EXECUTION_REGRESSION_TEST_OBJ := $(OBJ_DIR_DEBUG)/tests/qrss_execution_regression_test.o
+QRSS_EXECUTION_REGRESSION_TEST_DEPS := $(filter-out $(MAIN_DEBUG_OBJECT),$(CPP_DEBUG_OBJECTS))
+SELECTOR_SHUTDOWN_CLEANUP_TEST_SRC := tests/selector_shutdown_cleanup_test.cpp
+SELECTOR_SHUTDOWN_CLEANUP_TEST_OBJ := $(OBJ_DIR_DEBUG)/tests/selector_shutdown_cleanup_test.o
+SELECTOR_SHUTDOWN_CLEANUP_TEST_DEPS := $(filter-out $(MAIN_DEBUG_OBJECT),$(CPP_DEBUG_OBJECTS))
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Dependency includes
@@ -234,6 +296,12 @@ ifeq ($(GPIOD_API_MAJOR),)
 GPIOD_API_MAJOR := 1
 endif
 
+ifeq ($(shell [ "$(GPIOD_API_MAJOR)" -ge 2 ] 2>/dev/null && echo yes),yes)
+GPIOD_HAS_V2 := 1
+else
+GPIOD_HAS_V2 := 0
+endif
+
 # ─────────────────────────────────────────────────────────────────────────────
 # Flags
 # ─────────────────────────────────────────────────────────────────────────────
@@ -251,10 +319,15 @@ CXXFLAGS := -Wno-psabi -std=c++$(CXXVER) \
 # Include paths
 CXXFLAGS += -I$(abspath .)
 CXXFLAGS += $(foreach dir,$(SUBMODULE_SRCDIRS),-I$(abspath $(dir)))
+CXXFLAGS += -I$(abspath ./WSPR-Reference/src/wspr)
 
 # Build metadata defines
 CXXFLAGS += -DMAKE_TAG=\"$(VER)\" \
             -DMAKE_BRH=\"$(BRH)\" \
+            -DMAKE_RAW_BRH=\"$(RAW_BRH)\" \
+            -DMAKE_BRANCH_STATE=\"$(BRANCH_STATE)\" \
+            -DMAKE_COMMIT=\"$(FULL_COMMIT)\" \
+            -DMAKE_DIRTY=\"$(GIT_DIRTY)\" \
             -DMAKE_EXE=\"$(OUT)\" \
             -DMAKE_PRJ=\"$(PRJ)\"
 
@@ -303,6 +376,140 @@ $(BIN_DIR)/$(TEST_OUT): $(CPP_DEBUG_OBJECTS)
 	$(Q)echo "Linking debug: $(TEST_OUT) (libgpiod major: $(GPIOD_API_MAJOR))"
 	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) $^ -o $@ $(LDFLAGS)
 
+$(SEMANTICS_TEST_OBJ): $(SEMANTICS_TEST_SRC)
+	$(Q)mkdir -p $(dir $@)
+	$(Q)mkdir -p $(DEP_DIR)/tests
+	$(Q)echo "Compiling (debug) $< into $@"
+	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -MF $(DEP_DIR)/tests/dial_frequency_semantics_test.d -c $< -o $@
+
+$(BIN_DIR)/$(SEMANTICS_TEST_OUT): $(SEMANTICS_TEST_OBJ) $(SEMANTICS_TEST_DEPS)
+	$(Q)mkdir -p $(BIN_DIR)
+	$(Q)echo "Linking debug: $(SEMANTICS_TEST_OUT)"
+	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) $^ -o $@ $(LDFLAGS)
+
+$(UI_SOURCE_REGRESSION_TEST_OBJ): $(UI_SOURCE_REGRESSION_TEST_SRC)
+	$(Q)mkdir -p $(dir $@)
+	$(Q)mkdir -p $(DEP_DIR)/tests
+	$(Q)echo "Compiling (debug) $< into $@"
+	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -MF $(DEP_DIR)/tests/ui_source_regression_test.d -c $< -o $@
+
+$(BIN_DIR)/$(UI_SOURCE_REGRESSION_TEST_OUT): $(UI_SOURCE_REGRESSION_TEST_DEPS)
+	$(Q)mkdir -p $(BIN_DIR)
+	$(Q)echo "Linking debug: $(UI_SOURCE_REGRESSION_TEST_OUT)"
+	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) $^ -o $@ $(LDFLAGS)
+
+$(GUARDED_MODE_CHANGE_PERSISTENCE_TEST_OBJ): $(GUARDED_MODE_CHANGE_PERSISTENCE_TEST_SRC)
+	$(Q)mkdir -p $(dir $@)
+	$(Q)mkdir -p $(DEP_DIR)/tests
+	$(Q)echo "Compiling (debug) $< into $@"
+	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -MF $(DEP_DIR)/tests/guarded_mode_change_persistence_test.d -c $< -o $@
+
+$(BIN_DIR)/$(GUARDED_MODE_CHANGE_PERSISTENCE_TEST_OUT): $(GUARDED_MODE_CHANGE_PERSISTENCE_TEST_OBJ) $(GUARDED_MODE_CHANGE_PERSISTENCE_TEST_DEPS)
+	$(Q)mkdir -p $(BIN_DIR)
+	$(Q)echo "Linking debug: $(GUARDED_MODE_CHANGE_PERSISTENCE_TEST_OUT)"
+	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) $^ -o $@ $(LDFLAGS)
+
+$(BAND_GPIO_DEFAULT_CONVERGENCE_TEST_OBJ): $(BAND_GPIO_DEFAULT_CONVERGENCE_TEST_SRC)
+	$(Q)mkdir -p $(dir $@)
+	$(Q)mkdir -p $(DEP_DIR)/tests
+	$(Q)echo "Compiling (debug) $< into $@"
+	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -MF $(DEP_DIR)/tests/band_gpio_default_convergence_test.d -c $< -o $@
+
+$(BIN_DIR)/$(BAND_GPIO_DEFAULT_CONVERGENCE_TEST_OUT): $(BAND_GPIO_DEFAULT_CONVERGENCE_TEST_OBJ) $(BAND_GPIO_DEFAULT_CONVERGENCE_TEST_DEPS)
+	$(Q)mkdir -p $(BIN_DIR)
+	$(Q)echo "Linking debug: $(BAND_GPIO_DEFAULT_CONVERGENCE_TEST_OUT)"
+	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) $^ -o $@ $(LDFLAGS)
+
+$(BAND_GPIO_ROTATION_TEST_OBJ): $(BAND_GPIO_ROTATION_TEST_SRC)
+	$(Q)mkdir -p $(dir $@)
+	$(Q)mkdir -p $(DEP_DIR)/tests
+	$(Q)echo "Compiling (debug) $< into $@"
+	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -MF $(DEP_DIR)/tests/band_gpio_rotation_test.d -c $< -o $@
+
+$(BIN_DIR)/$(BAND_GPIO_ROTATION_TEST_OUT): $(BAND_GPIO_ROTATION_TEST_OBJ) $(BAND_GPIO_ROTATION_TEST_DEPS)
+	$(Q)mkdir -p $(BIN_DIR)
+	$(Q)echo "Linking debug: $(BAND_GPIO_ROTATION_TEST_OUT)"
+	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) $^ -o $@ $(LDFLAGS)
+
+$(MONITOR_FILE_REGRESSION_TEST_OBJ): $(MONITOR_FILE_REGRESSION_TEST_SRC)
+	$(Q)mkdir -p $(dir $@)
+	$(Q)mkdir -p $(DEP_DIR)/tests
+	$(Q)echo "Compiling (debug) $< into $@"
+	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -MF $(DEP_DIR)/tests/monitor_file_regression_test.d -c $< -o $@
+
+$(BIN_DIR)/$(MONITOR_FILE_REGRESSION_TEST_OUT): $(MONITOR_FILE_REGRESSION_TEST_OBJ) $(MONITOR_FILE_REGRESSION_TEST_DEPS)
+	$(Q)mkdir -p $(BIN_DIR)
+	$(Q)echo "Linking debug: $(MONITOR_FILE_REGRESSION_TEST_OUT)"
+	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) $^ -o $@ $(LDFLAGS)
+
+$(GPIO_LINE_RESOLVER_TEST_OBJ): $(GPIO_LINE_RESOLVER_TEST_SRC)
+	$(Q)mkdir -p $(dir $@)
+	$(Q)mkdir -p $(DEP_DIR)/tests
+	$(Q)echo "Compiling (debug) $< into $@"
+	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -MF $(DEP_DIR)/tests/gpio_line_resolver_test.d -c $< -o $@
+
+$(BIN_DIR)/$(GPIO_LINE_RESOLVER_TEST_OUT): $(GPIO_LINE_RESOLVER_TEST_DEPS)
+	$(Q)mkdir -p $(BIN_DIR)
+	$(Q)echo "Linking debug: $(GPIO_LINE_RESOLVER_TEST_OUT)"
+	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) $^ -o $@ $(LDFLAGS)
+
+$(NON_WSPR_REPEAT_POLICY_TEST_OBJ): $(NON_WSPR_REPEAT_POLICY_TEST_SRC)
+	$(Q)mkdir -p $(dir $@)
+	$(Q)mkdir -p $(DEP_DIR)/tests
+	$(Q)echo "Compiling (debug) $< into $@"
+	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -MF $(DEP_DIR)/tests/non_wspr_repeat_policy_test.d -c $< -o $@
+
+$(BIN_DIR)/$(NON_WSPR_REPEAT_POLICY_TEST_OUT): $(NON_WSPR_REPEAT_POLICY_TEST_OBJ) $(NON_WSPR_REPEAT_POLICY_TEST_DEPS)
+	$(Q)mkdir -p $(BIN_DIR)
+	$(Q)echo "Linking debug: $(NON_WSPR_REPEAT_POLICY_TEST_OUT)"
+	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) $^ -o $@ $(LDFLAGS)
+
+$(QRSS_EXECUTION_REGRESSION_TEST_OBJ): $(QRSS_EXECUTION_REGRESSION_TEST_SRC)
+	$(Q)mkdir -p $(dir $@)
+	$(Q)mkdir -p $(DEP_DIR)/tests
+	$(Q)echo "Compiling (debug) $< into $@"
+	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -MF $(DEP_DIR)/tests/qrss_execution_regression_test.d -c $< -o $@
+
+$(BIN_DIR)/$(QRSS_EXECUTION_REGRESSION_TEST_OUT): $(QRSS_EXECUTION_REGRESSION_TEST_OBJ) $(QRSS_EXECUTION_REGRESSION_TEST_DEPS)
+	$(Q)mkdir -p $(BIN_DIR)
+	$(Q)echo "Linking debug: $(QRSS_EXECUTION_REGRESSION_TEST_OUT)"
+	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) $^ -o $@ $(LDFLAGS)
+
+$(SELECTOR_SHUTDOWN_CLEANUP_TEST_OBJ): $(SELECTOR_SHUTDOWN_CLEANUP_TEST_SRC)
+	$(Q)mkdir -p $(dir $@)
+	$(Q)mkdir -p $(DEP_DIR)/tests
+	$(Q)echo "Compiling (debug) $< into $@"
+	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -MF $(DEP_DIR)/tests/selector_shutdown_cleanup_test.d -c $< -o $@
+
+$(BIN_DIR)/$(SELECTOR_SHUTDOWN_CLEANUP_TEST_OUT): $(SELECTOR_SHUTDOWN_CLEANUP_TEST_OBJ) $(SELECTOR_SHUTDOWN_CLEANUP_TEST_DEPS)
+	$(Q)mkdir -p $(BIN_DIR)
+	$(Q)echo "Linking debug: $(SELECTOR_SHUTDOWN_CLEANUP_TEST_OUT)"
+	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) $^ -o $@ $(LDFLAGS)
+
+ifeq ($(GPIOD_HAS_V2),1)
+$(GPIO_LOOPBACK_TEST_OBJ): $(GPIO_LOOPBACK_TEST_SRC)
+	$(Q)mkdir -p $(dir $@)
+	$(Q)mkdir -p $(DEP_DIR)/tests
+	$(Q)echo "Compiling (debug) $< into $@"
+	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -MF $(DEP_DIR)/tests/gpio_loopback_test.d -c $< -o $@
+
+$(BIN_DIR)/$(GPIO_LOOPBACK_TEST_OUT): $(GPIO_LOOPBACK_TEST_DEPS)
+	$(Q)mkdir -p $(BIN_DIR)
+	$(Q)echo "Linking debug: $(GPIO_LOOPBACK_TEST_OUT)"
+	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) $^ -o $@ $(LDFLAGS)
+
+$(BAND_GPIO_LIVE_MONITOR_OBJ): $(BAND_GPIO_LIVE_MONITOR_SRC)
+	$(Q)mkdir -p $(dir $@)
+	$(Q)mkdir -p $(DEP_DIR)/tests
+	$(Q)echo "Compiling (debug) $< into $@"
+	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -MF $(DEP_DIR)/tests/band_gpio_live_monitor.d -c $< -o $@
+
+$(BIN_DIR)/$(BAND_GPIO_LIVE_MONITOR_OUT): $(BAND_GPIO_LIVE_MONITOR_DEPS)
+	$(Q)mkdir -p $(BIN_DIR)
+	$(Q)echo "Linking debug: $(BAND_GPIO_LIVE_MONITOR_OUT)"
+	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) $^ -o $@ $(LDFLAGS)
+endif
+
 # ─────────────────────────────────────────────────────────────────────────────
 # Compile rules (release)
 # ─────────────────────────────────────────────────────────────────────────────
@@ -332,7 +539,7 @@ $(BIN_DIR)/$(OUT): $(CPP_OBJECTS)
 # Phony targets
 # ─────────────────────────────────────────────────────────────────────────────
 
-.PHONY: clean release debug test test-tone test-oneshot gdb install uninstall lint macros help
+.PHONY: clean release debug test test-tone test-oneshot semantics-test update-check-comparison-test guarded-mode-change-persistence-test band-gpio-default-convergence-test band-gpio-rotation-test selector-shutdown-cleanup-test monitor-file-regression-test gpio-line-resolver-test non-wspr-repeat-policy-test gpio-loopback-test band-gpio-live-monitor gdb install debuginstall uninstall lint macros help
 DEBUG: debug
 RELEASE: release
 
@@ -359,15 +566,87 @@ test-oneshot: debug
 	$(Q)echo "Running test oneshot with sudo privileges."
 	$(Q)$(SUDO) ./$(BIN_DIR)/$(TEST_OUT) -D -x 1 $(WSPR_PARAMS)
 
+semantics-test: $(BIN_DIR)/$(SEMANTICS_TEST_OUT) $(BIN_DIR)/$(UI_SOURCE_REGRESSION_TEST_OUT)
+	$(Q)echo "Running runtime semantics tests."
+	$(Q)./$(BIN_DIR)/$(SEMANTICS_TEST_OUT)
+	$(Q)echo "Running UI/source regression tests."
+	$(Q)./$(BIN_DIR)/$(UI_SOURCE_REGRESSION_TEST_OUT)
+	$(Q)echo "Running update-check comparison tests."
+	$(Q)node tests/update_check_comparison_test.js
+
+update-check-comparison-test:
+	$(Q)node tests/update_check_comparison_test.js
+
+guarded-mode-change-persistence-test: $(BIN_DIR)/$(GUARDED_MODE_CHANGE_PERSISTENCE_TEST_OUT)
+	$(Q)echo "Running guarded mode-change persistence regression test."
+	$(Q)./$(BIN_DIR)/$(GUARDED_MODE_CHANGE_PERSISTENCE_TEST_OUT)
+
+band-gpio-default-convergence-test: $(BIN_DIR)/$(BAND_GPIO_DEFAULT_CONVERGENCE_TEST_OUT)
+	$(Q)echo "Running Band GPIO default convergence regression test."
+	$(Q)./$(BIN_DIR)/$(BAND_GPIO_DEFAULT_CONVERGENCE_TEST_OUT)
+
+band-gpio-rotation-test: $(BIN_DIR)/$(BAND_GPIO_ROTATION_TEST_OUT)
+	$(Q)echo "Running band GPIO rotation regression tests."
+	$(Q)./$(BIN_DIR)/$(BAND_GPIO_ROTATION_TEST_OUT)
+
+selector-shutdown-cleanup-test: $(BIN_DIR)/$(SELECTOR_SHUTDOWN_CLEANUP_TEST_OUT)
+	$(Q)echo "Running selector shutdown cleanup regression tests."
+	$(Q)./$(BIN_DIR)/$(SELECTOR_SHUTDOWN_CLEANUP_TEST_OUT)
+
+monitor-file-regression-test: $(BIN_DIR)/$(MONITOR_FILE_REGRESSION_TEST_OUT)
+	$(Q)echo "Running MonitorFile regression tests."
+	$(Q)./$(BIN_DIR)/$(MONITOR_FILE_REGRESSION_TEST_OUT)
+
+gpio-line-resolver-test: $(BIN_DIR)/$(GPIO_LINE_RESOLVER_TEST_OUT)
+	$(Q)echo "Running GPIO line resolver regression tests."
+	$(Q)./$(BIN_DIR)/$(GPIO_LINE_RESOLVER_TEST_OUT)
+
+non-wspr-repeat-policy-test: $(BIN_DIR)/$(NON_WSPR_REPEAT_POLICY_TEST_OUT)
+	$(Q)echo "Running non-WSPR repeat policy regression tests."
+	$(Q)./$(BIN_DIR)/$(NON_WSPR_REPEAT_POLICY_TEST_OUT)
+
+ifeq ($(GPIOD_HAS_V2),1)
+gpio-loopback-test: $(BIN_DIR)/$(GPIO_LOOPBACK_TEST_OUT)
+	$(Q)echo "Built $(GPIO_LOOPBACK_TEST_OUT). Run it manually on Pi hardware."
+
+band-gpio-live-monitor: $(BIN_DIR)/$(BAND_GPIO_LIVE_MONITOR_OUT)
+	$(Q)echo "Built $(BAND_GPIO_LIVE_MONITOR_OUT). Run it manually on Pi hardware."
+else
+gpio-loopback-test:
+	$(Q)echo "$(GPIO_LOOPBACK_TEST_OUT) requires libgpiod v2 (detected major $(GPIOD_API_MAJOR))."
+	$(Q)exit 1
+
+band-gpio-live-monitor:
+	$(Q)echo "$(BAND_GPIO_LIVE_MONITOR_OUT) requires libgpiod v2 (detected major $(GPIOD_API_MAJOR))."
+	$(Q)exit 1
+endif
+
 gdb: debug
 	$(Q)echo "Running debug session."
 	$(Q)$(SUDO) gdb --args ./$(BIN_DIR)/$(TEST_OUT) -D -i $(INI_FILE)
 
 install: release
 	$(Q)echo "Installing $(OUT) to $(PREFIX)."
+	$(Q)echo "$(PREFIX)/$(OUT) status before install:"
+	$(Q) ls -al $(PREFIX)/$(OUT) || { $(Q)echo "Error: Daemon binary not found at $(PREFIX)/$(OUT)."; }
 	$(Q)$(SUDO) systemctl stop $(OUT).service || true
 	$(Q)$(SUDO) install -d $(PREFIX)
 	$(Q)$(SUDO) install -m 755 $(BIN_DIR)/$(OUT) $(PREFIX)/$(OUT)
+	$(Q)echo "$(PREFIX)/$(OUT) status after install:"
+	$(Q)$(SUDO) ls -al $(PREFIX)/$(OUT) || { echo "Error: Daemon binary not found at $(PREFIX)/$(OUT)."; }
+	$(Q)$(SUDO) systemctl enable $(OUT).service || true
+	$(Q)$(SUDO) systemctl start $(OUT).service || true
+	$(Q)echo "Installation complete."
+
+debuginstall: debug
+	$(Q)echo "Installing DEBUG $(OUT) to $(PREFIX)."
+	$(Q)echo "$(PREFIX)/$(OUT) status before install:"
+	$(Q) ls -al $(PREFIX)/$(OUT) || { $(Q)echo "Error: Daemon binary not found at $(PREFIX)/$(OUT)."; }
+	$(Q)$(SUDO) systemctl stop $(OUT).service || true
+	$(Q)$(SUDO) install -d $(PREFIX)
+	$(Q)$(SUDO) install -m 755 $(BIN_DIR)/$(TEST_OUT) $(PREFIX)/$(OUT)
+	$(Q)echo "$(PREFIX)/$(OUT) status after install:"
+	$(Q)$(SUDO) ls -al $(PREFIX)/$(OUT) || { echo "Error: Daemon binary not found at $(PREFIX)/$(OUT)."; }
 	$(Q)$(SUDO) systemctl enable $(OUT).service || true
 	$(Q)$(SUDO) systemctl start $(OUT).service || true
 	$(Q)echo "Installation complete."
@@ -396,6 +675,7 @@ help:
 	$(Q)echo "  test-tone    Run the binary with a test tone"
 	$(Q)echo "  test-oneshot Run the binary with one iteration"
 	$(Q)echo "  install      Install the binary to $(PREFIX)"
+	$(Q)echo "  debuginstall Install the debug binary to $(PREFIX)"
 	$(Q)echo "  uninstall    Remove the installed binary"
 	$(Q)echo "  lint         Run static analysis"
 	$(Q)echo "  macros       Show macros"

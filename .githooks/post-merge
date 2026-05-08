@@ -1,8 +1,13 @@
 #!/usr/bin/env bash
+set -u
+set -o pipefail
 
-# -----------------------------------------------------------------------------
-# @brief Hook run after a successful git merge (e.g. from git pull)
-# -----------------------------------------------------------------------------
+cd "$(git rev-parse --show-toplevel)" || exit 1
+source ".githooks/lib/common.sh"
 
-echo "[githook: post-merge] Syncing submodules."
-./post-checkout
+log "[post-merge] Updating submodules"
+
+sync_submodules || {
+    log "[post-merge] FAILED to sync submodules"
+    exit 1
+}

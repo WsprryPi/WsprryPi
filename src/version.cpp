@@ -33,13 +33,88 @@
 
 // Standard library headers
 #include <algorithm>
+#include <cctype>
 #include <cstdio>
 #include <cstring>
 #include <iostream>
 #include <fstream>
+#include <optional>
 #include <sstream>
 #include <string>
 #include <unordered_map>
+
+#ifdef DEBUG_WSPR
+constexpr bool kDebugWspr = true;
+#else
+constexpr bool kDebugWspr = false;
+#endif
+
+namespace
+{
+    std::optional<int> g_pi_generation_override;
+
+    std::optional<int> parse_generation_from_pi_model(
+        const std::string &model)
+    {
+        const std::size_t pi_pos = model.find("Raspberry Pi");
+        if (pi_pos == std::string::npos)
+        {
+            return std::nullopt;
+        }
+
+        for (std::size_t i = pi_pos; i < model.size(); ++i)
+        {
+            if (!std::isdigit(static_cast<unsigned char>(model[i])))
+            {
+                continue;
+            }
+
+            std::size_t end = i;
+            while (end < model.size() &&
+                   std::isdigit(static_cast<unsigned char>(model[end])))
+            {
+                ++end;
+            }
+
+            int generation = std::stoi(model.substr(i, end - i));
+            if (generation >= 100 && generation % 100 == 0)
+            {
+                generation /= 100;
+            }
+            return generation;
+        }
+
+        return std::nullopt;
+    }
+
+    std::optional<int> parse_generation_from_processor_string(
+        const std::string &processor)
+    {
+        if (processor.find("BCM2712") != std::string::npos)
+        {
+            return 5;
+        }
+        if (processor.find("BCM2711") != std::string::npos ||
+            processor.find("BCM2838") != std::string::npos)
+        {
+            return 4;
+        }
+        if (processor.find("BCM2837") != std::string::npos)
+        {
+            return 3;
+        }
+        if (processor.find("BCM2836") != std::string::npos)
+        {
+            return 2;
+        }
+        if (processor.find("BCM2835") != std::string::npos)
+        {
+            return 1;
+        }
+
+        return std::nullopt;
+    }
+}
 
 /**
  * @brief Converts a value to a string view.
@@ -67,6 +142,22 @@ constexpr std::string_view to_string_view(T value) noexcept
 #define MAKE_BRH "unknown" ///< Fallback for the branch name.
 #endif
 
+#ifndef MAKE_RAW_BRH
+#define MAKE_RAW_BRH "unknown" ///< Fallback for the raw branch name.
+#endif
+
+#ifndef MAKE_BRANCH_STATE
+#define MAKE_BRANCH_STATE "unknown" ///< Fallback for the Git branch state.
+#endif
+
+#ifndef MAKE_COMMIT
+#define MAKE_COMMIT "unknown" ///< Fallback for the commit SHA.
+#endif
+
+#ifndef MAKE_DIRTY
+#define MAKE_DIRTY "unknown" ///< Fallback for the build dirty state.
+#endif
+
 #ifndef MAKE_EXE
 #define MAKE_EXE "unknown" ///< Fallback for the executable name.
 #endif
@@ -78,6 +169,10 @@ constexpr std::string_view to_string_view(T value) noexcept
 // Compile-time string views for sanitized values
 constexpr std::string_view SANITIZED_TAG = to_string_view(MAKE_TAG); ///< Sanitized build tag.
 constexpr std::string_view SANITIZED_BRH = to_string_view(MAKE_BRH); ///< Sanitized branch name.
+constexpr std::string_view RAW_BRH = to_string_view(MAKE_RAW_BRH); ///< Raw branch name.
+constexpr std::string_view BRANCH_STATE = to_string_view(MAKE_BRANCH_STATE); ///< Git branch state.
+constexpr std::string_view SANITIZED_COMMIT = to_string_view(MAKE_COMMIT); ///< Sanitized commit SHA.
+constexpr std::string_view BUILD_DIRTY = to_string_view(MAKE_DIRTY); ///< Build-time dirty state.
 constexpr std::string_view SANITIZED_EXE = to_string_view(MAKE_EXE); ///< Sanitized executable name.
 constexpr std::string_view SANITIZED_PRJ = to_string_view(MAKE_PRJ); ///< Sanitized project name.
 
@@ -105,6 +200,59 @@ std::string get_exe_version()
 std::string get_exe_branch()
 {
     return std::string(SANITIZED_BRH);
+}
+
+/**
+ * @brief Retrieves the raw branch name.
+ *
+ * This function returns the Git branch name associated with the build.
+ * If the `MAKE_RAW_BRH` macro is not defined, it returns "unknown".
+ *
+ * @return A `std::string` representing the raw build branch name.
+ */
+std::string get_exe_raw_branch()
+{
+    return std::string(RAW_BRH);
+}
+
+/**
+ * @brief Retrieves the Git branch state captured at build time.
+ *
+ * This distinguishes normal branch builds from detached HEAD or unavailable
+ * Git metadata so the update checker does not treat "HEAD" as an upstream
+ * branch name.
+ *
+ * @return A `std::string` containing "branch", "detached", or "unknown".
+ */
+std::string get_exe_branch_state()
+{
+    return std::string(BRANCH_STATE);
+}
+
+/**
+ * @brief Retrieves the current commit SHA.
+ *
+ * This function returns the Git commit SHA associated with the build.
+ * If the `MAKE_COMMIT` macro is not defined, it returns "unknown".
+ *
+ * @return A `std::string` representing the build commit SHA.
+ */
+std::string get_exe_commit()
+{
+    return std::string(SANITIZED_COMMIT);
+}
+
+/**
+ * @brief Retrieves whether the source tree had local modifications at build time.
+ *
+ * The value is captured by the build system and describes local modifications
+ * at compile time. It does not indicate whether a remote update exists.
+ *
+ * @return A `std::string` containing "true", "false", or "unknown".
+ */
+std::string get_exe_build_dirty()
+{
+    return std::string(BUILD_DIRTY);
 }
 
 /**
@@ -153,11 +301,7 @@ std::string get_project_name()
  */
 std::string get_debug_state()
 {
-#ifdef DEBUG_WSPR
-    return "DEBUG"; // Debug mode enabled.
-#else
-    return "INFO"; // Default to INFO for non-debug builds.
-#endif
+    return kDebugWspr ? "DEBUG" : "INFO";
 }
 
 /**
@@ -312,7 +456,7 @@ int get_processor_type_int()
     }
 
     // If the type is not found, log a warning and return -1
-    llog.logE(ERROR, "Unknown processor type:", processorType);
+    llog.logE(ERROR, "Unknown processor type: ", processorType);
     return -1;
 }
 
@@ -358,6 +502,85 @@ std::string get_pi_model()
         model.pop_back();
 
     return model;
+}
+
+int get_raspberry_pi_generation()
+{
+    if (g_pi_generation_override.has_value())
+    {
+        return *g_pi_generation_override;
+    }
+
+    if (const auto model_generation =
+            parse_generation_from_pi_model(get_pi_model());
+        model_generation.has_value())
+    {
+        return *model_generation;
+    }
+
+    if (const auto processor_generation =
+            parse_generation_from_processor_string(get_processor_string());
+        processor_generation.has_value())
+    {
+        return *processor_generation;
+    }
+
+    return -1;
+}
+
+bool platform_supports_gpio_clock_transmission(
+    std::string *error_message)
+{
+    const int generation = get_raspberry_pi_generation();
+    if (generation >= 1 && generation <= 4)
+    {
+        return true;
+    }
+
+    if (generation >= 5)
+    {
+        std::string message =
+            "GPIO transmission mode is unsupported on Raspberry Pi 5 and newer.";
+        const std::string model = get_pi_model();
+        if (!model.empty())
+        {
+            message += " Detected platform: " + model + ".";
+        }
+
+        if (error_message != nullptr)
+        {
+            *error_message = message;
+        }
+        return false;
+    }
+
+    if (error_message != nullptr)
+    {
+        std::string message =
+            "GPIO transmission mode is supported only on Raspberry Pi 1 through 4.";
+        const std::string model = get_pi_model();
+        if (!model.empty())
+        {
+            message += " Detected platform: " + model + ".";
+        }
+        else
+        {
+            message += " Platform generation could not be confirmed.";
+        }
+        *error_message = message;
+    }
+
+    return false;
+}
+
+void set_raspberry_pi_generation_override_for_test(int generation) noexcept
+{
+    g_pi_generation_override = generation;
+}
+
+void clear_raspberry_pi_generation_override_for_test() noexcept
+{
+    g_pi_generation_override.reset();
 }
 
 /**

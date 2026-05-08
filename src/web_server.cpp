@@ -30,7 +30,112 @@
 
 #include "config_handler.hpp"
 #include "logging.hpp"
+#include "scheduling.hpp"
 #include "version.hpp"
+
+#include <algorithm>
+#include <cctype>
+#include <sstream>
+#include <vector>
+
+namespace
+{
+    std::vector<std::string> split_version_identifiers(const std::string &value)
+    {
+        std::vector<std::string> identifiers;
+        std::stringstream stream(value);
+        std::string item;
+
+        while (std::getline(stream, item, '.')) {
+            if (item.empty()) {
+                identifiers.clear();
+                return identifiers;
+            }
+            identifiers.push_back(item);
+        }
+
+        return identifiers;
+    }
+
+    bool is_numeric_identifier(const std::string &value)
+    {
+        return !value.empty()
+               && std::all_of(value.begin(), value.end(), [](unsigned char ch) {
+                    return std::isdigit(ch) != 0;
+                  });
+    }
+
+    nlohmann::json parse_version_for_update_metadata(const std::string &version)
+    {
+        nlohmann::json parsed = {
+            {"valid", false},
+            {"raw", version},
+            {"major", nullptr},
+            {"minor", nullptr},
+            {"patch", nullptr},
+            {"prerelease", nlohmann::json::array()},
+            {"build", nlohmann::json::array()}
+        };
+        std::string source = version;
+        if (!source.empty() && source.front() == 'v') {
+            source.erase(source.begin());
+        }
+
+        const std::size_t build_pos = source.find('+');
+        const std::string build = build_pos == std::string::npos ? "" : source.substr(build_pos + 1);
+        source = build_pos == std::string::npos ? source : source.substr(0, build_pos);
+
+        const std::size_t prerelease_pos = source.find('-');
+        const std::string prerelease = prerelease_pos == std::string::npos ? "" : source.substr(prerelease_pos + 1);
+        source = prerelease_pos == std::string::npos ? source : source.substr(0, prerelease_pos);
+
+        const std::vector<std::string> core = split_version_identifiers(source);
+        if (
+            core.size() != 3 ||
+            !is_numeric_identifier(core[0]) ||
+            !is_numeric_identifier(core[1]) ||
+            !is_numeric_identifier(core[2])
+        ) {
+            return parsed;
+        }
+
+        parsed["valid"] = true;
+        parsed["major"] = std::stoul(core[0]);
+        parsed["minor"] = std::stoul(core[1]);
+        parsed["patch"] = std::stoul(core[2]);
+        parsed["prerelease"] = prerelease.empty()
+            ? nlohmann::json::array()
+            : nlohmann::json(split_version_identifiers(prerelease));
+        parsed["build"] = build.empty()
+            ? nlohmann::json::array()
+            : nlohmann::json(split_version_identifiers(build));
+        return parsed;
+    }
+
+    nlohmann::json build_dirty_metadata(const std::string &dirty)
+    {
+        if (dirty == "true") {
+            return {
+                {"known", true},
+                {"dirty", true},
+                {"raw", dirty}
+            };
+        }
+        if (dirty == "false") {
+            return {
+                {"known", true},
+                {"dirty", false},
+                {"raw", dirty}
+            };
+        }
+
+        return {
+            {"known", false},
+            {"dirty", nullptr},
+            {"raw", dirty}
+        };
+    }
+} // namespace
 
 /**
  * @brief Global instance of the WebServer class.
@@ -113,7 +218,7 @@ void WebServer::start(int port)
         port_ = port;
     }
 
-    llog.logS(INFO, "Web server started on port:", config.web_port);
+    llog.logS(INFO, "Web server started on port: ", config.web_port);
 
     // Launch the server in a separate thread.
     serverThread = std::thread([this]()
@@ -139,11 +244,34 @@ void WebServer::start(int port)
             setCORSHeaders(res);
             res.set_content("Ok", "text/plain");
         }
-        catch (nlohmann::json::parse_error &e)
+        catch (const nlohmann::json::parse_error &e)
         {
-            llog.logE(WARN, "Error parsing JSON:", std::string(e.what()));
+            llog.logE(WARN, "Error parsing JSON: ", std::string(e.what()));
+            setCORSHeaders(res);
             res.status = 400;
             nlohmann::json err = {{"error", "invalid_json"}, {"message", e.what()}};
+            res.set_content(err.dump(4), "application/json");
+        }
+        catch (const ConfigValidationError &e)
+        {
+            llog.logE(WARN, "Configuration update rejected: ", std::string(e.what()));
+            setCORSHeaders(res);
+            res.status = 400;
+            nlohmann::json err = e.details();
+            if (!err.is_object())
+            {
+                err = nlohmann::json::object();
+            }
+            err["error"] = "invalid_config";
+            err["message"] = e.what();
+            res.set_content(err.dump(4), "application/json");
+        }
+        catch (const std::exception &e)
+        {
+            llog.logE(WARN, "Configuration update rejected: ", std::string(e.what()));
+            setCORSHeaders(res);
+            res.status = 400;
+            nlohmann::json err = {{"error", "invalid_config"}, {"message", e.what()}};
             res.set_content(err.dump(4), "application/json");
         }
     };
@@ -166,7 +294,7 @@ void WebServer::start(int port)
     svr.Get("/config",
             [this](const httplib::Request &req, httplib::Response &res) {
               setCORSHeaders(res);
-              res.set_content(jConfig.dump(4), "application/json");
+              res.set_content(get_public_config_json().dump(4), "application/json");
             });
 
     svr.Put("/config", handlePutPatch);
@@ -189,7 +317,139 @@ void WebServer::start(int port)
               // Build a JSON object
               nlohmann::json j;
               j["wspr_version"] = version;
+              j["ui_version"] = get_raw_version_string();
+              j["wspr_version_raw"] = get_exe_version();
+              j["wspr_version_parsed"] = parse_version_for_update_metadata(get_exe_version());
+              j["wspr_branch"] = get_exe_raw_branch();
+              j["wspr_branch_state"] = get_exe_branch_state();
+              j["wspr_display_branch"] = get_exe_branch();
+              j["wspr_exe_version"] = get_exe_version();
+              j["wspr_commit"] = get_exe_commit();
+              j["wspr_build_dirty"] = get_exe_build_dirty();
+              j["wspr_build_dirty_state"] = build_dirty_metadata(get_exe_build_dirty());
               res.set_content(j.dump(4), "application/json");
+            });
+
+    // INI repair handler: Allow repair or restore
+    svr.Post("/config/repair",
+            [this](const httplib::Request &req, httplib::Response &res) {
+                try
+                {
+                    nlohmann::json j = nlohmann::json::parse(req.body);
+
+                    if (!j.contains("verb") || !j["verb"].is_string())
+                    {
+                        setCORSHeaders(res);
+                        res.status = 400;
+                        nlohmann::json err = {
+                            {"error", "invalid_request"},
+                            {"message", "Missing or invalid 'verb'."}
+                        };
+                        res.set_content(err.dump(4), "application/json");
+                        return;
+                    }
+
+                    const std::string verb = j["verb"].get<std::string>();
+
+                    if (verb == "repair")
+                    {
+                        repair_from_web(true);
+                    }
+                    else if (verb == "restore")
+                    {
+                        repair_from_web(false);
+                    }
+                    else
+                    {
+                        setCORSHeaders(res);
+                        res.status = 400;
+                        nlohmann::json err = {
+                            {"error", "invalid_verb"},
+                            {"message", "Verb must be 'repair' or 'restore'."}
+                        };
+                        res.set_content(err.dump(4), "application/json");
+                        return;
+                    }
+
+                    setCORSHeaders(res);
+                    res.status = 200;
+                    nlohmann::json ok = {
+                        {"status", "ok"},
+                        {"message", "Configuration operation completed."}
+                    };
+                    res.set_content(ok.dump(4), "application/json");
+                    return;
+                }
+                catch (const nlohmann::json::parse_error &e)
+                {
+                    llog.logE(WARN,
+                            "Error parsing JSON: ",
+                            std::string(e.what()));
+                    setCORSHeaders(res);
+                    res.status = 400;
+                    nlohmann::json err = {
+                        {"error", "invalid_json"},
+                        {"message", e.what()}
+                    };
+                    res.set_content(err.dump(4), "application/json");
+                }
+            });
+
+    svr.Post("/control/stop",
+            [this](const httplib::Request &req, httplib::Response &res) {
+                setCORSHeaders(res);
+
+                if (req.body.empty())
+                {
+                    res.status = 400;
+                    nlohmann::json err = {
+                        {"error", "invalid_request"},
+                        {"message", "Request body must explicitly contain {\"command\":\"stop\"}."}
+                    };
+                    res.set_content(err.dump(4), "application/json");
+                    return;
+                }
+
+                try
+                {
+                    nlohmann::json j = nlohmann::json::parse(req.body);
+                    if (!j.contains("command") ||
+                        !j["command"].is_string() ||
+                        j["command"].get<std::string>() != "stop")
+                    {
+                        res.status = 400;
+                        nlohmann::json err = {
+                            {"error", "invalid_request"},
+                            {"message", "Request body must explicitly contain {\"command\":\"stop\"}."}
+                        };
+                        res.set_content(err.dump(4), "application/json");
+                        return;
+                    }
+
+                    const StopTransmissionResult stop_result =
+                        stop_transmission_by_user_request();
+                    const bool stop_request_succeeded = stop_result.transmit_disabled;
+                    nlohmann::json ok = {
+                        {"command", "stop"},
+                        {"status", stop_request_succeeded ? "ok" : "error"},
+                        {"transmission_active", stop_result.transmission_active},
+                        {"stop_performed", stop_result.stop_performed},
+                        {"transmit_disabled", stop_result.transmit_disabled},
+                        {"persisted", stop_result.persisted},
+                        {"message", stop_result.message}
+                    };
+                    res.status = stop_request_succeeded ? 200 : 500;
+                    res.set_content(ok.dump(4), "application/json");
+                }
+                catch (const nlohmann::json::parse_error &e)
+                {
+                    res.status = 400;
+                    nlohmann::json err = {
+                        {"error", "invalid_json"},
+                        {"message", e.what()}
+                    };
+                    res.set_content(err.dump(4), "application/json");
+                }
             });
 
     // Accept connections from any network interface.
@@ -241,7 +501,6 @@ void WebServer::stop()
         serverThread.join();
     }
 
-    llog.logS(INFO, "Web server stopped.");
 }
 
 /**

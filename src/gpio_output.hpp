@@ -1,6 +1,6 @@
 /**
  * @file gpio_output.hpp
- * @brief Handles LED output.
+ * @brief Safe libgpiod-backed GPIO output helper.
  *
  * This project is is licensed under the MIT License. See LICENSE.md
  * for more information.
@@ -32,29 +32,31 @@
 #include <memory>
 #include <optional>
 #include <string>
+#include <vector>
 
 #include "gpio_include.hpp"
+#include "gpio_line_resolver.hpp"
 
 /**
  * @class GPIOOutput
- * @brief Simple GPIO output controller using libgpiod.
+ * @brief Simple resolver-backed GPIO output controller using libgpiod.
  *
- * This class configures a specified GPIO pin as an output. The pin can be
- * configured as active high (default) or as an active low sink. Methods are provided
- * to enable (configure) the pin, disable (release) it, and toggle its output state.
- *
- * Example:
- * @code
- * GPIOOutput gpio;
- * gpio.enableGPIOPin(17, true); // enable pin 17 as active high output
- * gpio.toggleGPIO(true);         // set pin high (active)
- * gpio.toggleGPIO(false);        // set pin low (inactive)
- * gpio.stop_gpio_pin();        // release the pin
- * @endcode
+ * This helper acquires one GPIO line, keeps it in a known inactive state
+ * when enabled or released, and reports setup failures through
+ * `lastError()`. Higher-level policy such as LED behavior, band selection,
+ * or per-frequency selector ownership lives elsewhere.
  */
 class GPIOOutput
 {
 public:
+    struct TestEvent
+    {
+        std::string action;
+        int pin = -1;
+        bool active_high = true;
+        bool logical_state = false;
+    };
+
     /**
      * @brief Default constructor.
      *
@@ -70,13 +72,12 @@ public:
     ~GPIOOutput();
 
     /**
-     * @brief Configures and enables a GPIO pin for output.
+     * @brief Configures and enables a BCM GPIO pin for output.
      *
-     * Opens the default GPIO chip (/dev/gpiochip0), obtains the specified pin,
-     * and requests it as an output. The pin can be configured as active high or
-     * active low (sink).
+     * Resolves the configured BCM GPIO line at runtime, opens the matching GPIO
+     * chip, and requests the resolved line through libgpiod.
      *
-     * @param pin The GPIO pin number (BCM numbering).
+     * @param pin The GPIO pin number in BCM numbering.
      * @param active_high True for active-high operation (default), false for sink.
      * @return True if the pin was successfully configured; false otherwise.
      */
@@ -100,10 +101,24 @@ public:
      */
     bool toggleGPIO(bool state);
 
+    /**
+     * @brief Returns the most recent GPIO setup error, if any.
+     */
+    const std::string &lastError() const noexcept { return last_error_; }
+
+    static void setTestMode(bool enabled) noexcept;
+    static bool testModeEnabled() noexcept;
+    static void clearTestEvents() noexcept;
+    static std::vector<TestEvent> testEvents();
+    static std::optional<bool> testLogicalStateForPin(int pin) noexcept;
+
 private:
     int pin_;
     bool active_high_;
     bool enabled_;
+    bool last_logical_state_;
+    std::string last_error_;
+    ResolvedGPIOLine resolved_line_;
 
     // Using unique_ptr to manage the libgpiod chip.
     std::unique_ptr<gpiod::chip> chip_;
@@ -119,7 +134,8 @@ private:
     int compute_physical_state(bool logical_state) const;
 };
 
-// Global instance
+// Global instances for optional transmit-related GPIO outputs.
 extern GPIOOutput ledControl;
+extern GPIOOutput ampControl;
 
 #endif // GPIO_OUTPUT_HPP

@@ -2,6 +2,7 @@
 wsprrypi
 wsprrypi_test
 executables/
+config/wsprrypi.ini.temp
 
 ## General Rules
 .DS_Store
@@ -86,3 +87,18 @@ docs/_build/
 *~
 *.bak
 *.old
+
+# Node stuff
+node_modules/
+package.json
+package-lock.json
+
+# Codex
+.codex
+
+# Codex / agent artifacts
+.agents/
+skills-lock.json
+
+# Optional local lint config
+.markdownlint.json

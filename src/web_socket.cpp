@@ -32,6 +32,7 @@
 #include "logging.hpp"
 #include "sha1.hpp"
 #include "scheduling.hpp"
+#include "wspr_band_lookup.hpp"
 #include "wspr_transmit.hpp"
 
 #include <algorithm>
@@ -39,8 +40,11 @@
 #include <cstdint>
 #include <cstring>
 #include <iostream>
+#include <limits>
+#include <optional>
 #include <sstream>
 #include <thread>
+#include <variant>
 #include <vector>
 
 #include <arpa/inet.h>
@@ -112,7 +116,7 @@ bool WebSocketServer::start(uint16_t port, uint32_t keep_alive_secs)
 {
     if (port < 1024 || port > 49151)
     {
-        llog.logE(ERROR, "Port must be between 1024 and 49151:", port);
+        llog.logE(ERROR, "Port must be between 1024 and 49151: ", port);
         return false;
     }
     keep_alive_secs_ = keep_alive_secs;
@@ -166,7 +170,7 @@ bool WebSocketServer::start(uint16_t port, uint32_t keep_alive_secs)
         keep_alive_thread_ = std::thread(&WebSocketServer::keepAliveLoop, this, keep_alive_secs_);
     }
 
-    llog.logS(INFO, "WebSocketServer started on port:", port);
+    llog.logS(INFO, "Socket server started on port: ", port);
     return true;
 }
 
@@ -229,7 +233,6 @@ void WebSocketServer::stop()
     if (keep_alive_thread_.joinable())
         keep_alive_thread_.join();
 
-    llog.logS(INFO, "WebSocketServer stopped.");
 }
 
 /**
@@ -311,7 +314,7 @@ std::string WebSocketServer::computeWebSocketAccept(const std::string &client_ke
  * - "tx_status" → Responds with transmission status acknowledgment.
  * - "shutdown"  → Responds with shutdown acknowledgment.
  * - "reboot"    → Responds with reboot acknowledgment.
- * - "stop_tx"   → Responds with stop transmission acknowledgment.
+ * - "stop"      → Stops active transmission and disables transmit persistently.
  *
  * All other messages are echoed back with a generic reply.
  *
@@ -343,24 +346,153 @@ void WebSocketServer::handleMessage(const std::string &raw_message)
             reply["command"] = "reboot";
             reboot_system();
         }
+        else if (cmd == "stop")
+        {
+            llog.logS(INFO, "Received websocket stop command.");
+            const bool persist_transmit =
+                !j.contains("persist_transmit") || j["persist_transmit"].get<bool>();
+            const StopTransmissionResult stop_result =
+                stop_transmission_by_user_request(persist_transmit);
+            const bool stop_request_succeeded = stop_result.transmit_disabled;
+            reply["command"] = "stop";
+            reply["status"] = stop_request_succeeded ? "ok" : "error";
+            reply["transmission_active"] = stop_result.transmission_active;
+            reply["stop_performed"] = stop_result.stop_performed;
+            reply["transmit_disabled"] = stop_result.transmit_disabled;
+            reply["persisted"] = stop_result.persisted;
+            reply["persist_transmit"] = persist_transmit;
+            reply["message"] = stop_result.message;
+        }
         else if (cmd == "get_tx_state")
         {
             llog.logS(DEBUG, "Received JSON get_tx_state command.");
-            // Report current TX state
-            reply["tx_state"] = wsprTransmitter.stateToStringLower(
-                wsprTransmitter.getState());
+            const WsprRuntimeStatusSnapshot snapshot =
+                current_tx_runtime_status_snapshot();
+            reply["tx_state"] = snapshot.tx_state;
+            reply["runtime_mode"] = snapshot.runtime_mode;
+            reply["next_transmission_at"] = snapshot.next_transmission_at;
+            reply["frequency_hz"] = snapshot.frequency_hz;
+            reply["offset_hz"] = snapshot.offset_hz;
+            reply["frequency_is_skip"] = snapshot.frequency_is_skip;
+            reply["plan_type"] = snapshot.plan_type;
+            reply["power_dbm"] = snapshot.power_dbm;
+            reply["frame_count"] = snapshot.frame_count;
+            reply["current_frame"] = snapshot.current_frame;
+            reply["callsign_raw"] = snapshot.callsign_raw;
+            reply["callsign_normalized"] = snapshot.callsign_normalized;
+            reply["locator_raw"] = snapshot.locator_raw;
+            reply["locator_normalized"] = snapshot.locator_normalized;
+            reply["frame_callsign"] = snapshot.frame_callsign;
+            reply["frame_locator"] = snapshot.frame_locator;
+            reply["cw_message"] = snapshot.cw_message;
+            reply["cw_active_char_index"] = snapshot.cw_active_char_index;
+            auto now = std::chrono::system_clock::now();
+            auto now_t = std::chrono::system_clock::to_time_t(now);
+            std::tm tm_utc{};
+            gmtime_r(&now_t, &tm_utc);
+            std::ostringstream oss;
+            oss << std::put_time(&tm_utc, "%Y-%m-%dT%H:%M:%SZ");
+            reply["timestamp"] = oss.str();
         }
         else if (cmd == "tone_start")
         {
             llog.logS(DEBUG, "Received JSON test_tone_start command.");
-            start_test_tone();
-            reply["tone_start"] = "ok";
+            std::optional<std::uint64_t> frequency_hz_override;
+            std::string frequency_error;
+
+            if (j.contains("frequency_hz"))
+            {
+                std::uint64_t candidate_frequency_hz = 0;
+                if (j["frequency_hz"].is_number_unsigned())
+                {
+                    candidate_frequency_hz =
+                        j["frequency_hz"].get<std::uint64_t>();
+                }
+                else if (j["frequency_hz"].is_number_integer())
+                {
+                    const auto signed_frequency_hz =
+                        j["frequency_hz"].get<std::int64_t>();
+                    if (signed_frequency_hz > 0)
+                    {
+                        candidate_frequency_hz =
+                            static_cast<std::uint64_t>(signed_frequency_hz);
+                    }
+                }
+
+                if (candidate_frequency_hz == 0)
+                {
+                    frequency_error =
+                        "frequency_hz must be a positive integer.";
+                }
+                else if (
+                    candidate_frequency_hz >
+                    static_cast<std::uint64_t>(
+                        std::numeric_limits<long long>::max()))
+                {
+                    frequency_error =
+                        "frequency_hz is outside the supported RF range.";
+                }
+                else
+                {
+                    const WSPRBandLookup frequency_lookup;
+                    const auto validation = frequency_lookup.lookup(
+                        static_cast<double>(candidate_frequency_hz));
+                    const auto *validation_text =
+                        std::get_if<std::string>(&validation);
+
+                    if (validation_text == nullptr ||
+                        *validation_text == "Invalid Frequency")
+                    {
+                        frequency_error =
+                            "frequency_hz is outside the supported RF range.";
+                    }
+                    else
+                    {
+                        frequency_hz_override = candidate_frequency_hz;
+                    }
+                }
+            }
+
+            if (!frequency_error.empty())
+            {
+                reply["command"] = "tone_start";
+                reply["started"] = false;
+                reply["already_active"] = false;
+                reply["blocked_by_active_transmission"] = false;
+                reply["blocked_by_enabled_transmission"] = false;
+                reply["message"] = frequency_error;
+                reply["tone_start"] = "rejected";
+                reply["status"] = "error";
+            }
+            else
+            {
+                const TestToneStartResult start_result =
+                    start_test_tone(frequency_hz_override);
+                reply["command"] = "tone_start";
+                reply["started"] = start_result.started;
+                reply["already_active"] = start_result.already_active;
+                reply["blocked_by_active_transmission"] =
+                    start_result.blocked_by_active_transmission;
+                reply["blocked_by_enabled_transmission"] =
+                    start_result.blocked_by_enabled_transmission;
+                reply["message"] = start_result.message;
+                reply["tone_start"] = start_result.started ? "ok" : "rejected";
+                reply["status"] = start_result.started ? "ok" : "error";
+            }
         }
         else if (cmd == "tone_end")
         {
             llog.logS(DEBUG, "Received JSON test_tone_stop command.");
-            end_test_tone();
-            reply["tone_end"] = "ok";
+            const TestToneStopResult stop_result = end_test_tone();
+            reply["command"] = "tone_end";
+            reply["stopped"] = stop_result.stopped;
+            reply["tone_was_active"] = stop_result.tone_was_active;
+            reply["scheduler_restored"] = stop_result.scheduler_restored;
+            reply["deferred_reload_reconciled"] =
+                stop_result.deferred_reload_reconciled;
+            reply["message"] = stop_result.message;
+            reply["tone_end"] = stop_result.stopped ? "ok" : "rejected";
+            reply["status"] = stop_result.stopped ? "ok" : "error";
         }
         else if (cmd == "echo")
         {
@@ -632,6 +764,19 @@ void WebSocketServer::sendToClient(const std::string &message)
 void WebSocketServer::sendAllClients(const std::string &message)
 {
     std::lock_guard<std::mutex> lock(clients_mutex_);
+    const std::size_t client_count = client_sockets_.size();
+
+    if (client_count == 0U)
+    {
+        llog.logS(DEBUG, "Dropping websocket broadcast; no connected clients.");
+        return;
+    }
+
+    llog.logS(
+        DEBUG,
+        "Broadcasting websocket payload to ",
+        static_cast<int>(client_count),
+        " client(s).");
 
     // Build WebSocket text frame header
     std::string frame;
@@ -733,7 +878,7 @@ void WebSocketServer::serverLoop()
             auto *s6 = reinterpret_cast<sockaddr_in6 *>(&peer_addr);
             inet_ntop(AF_INET6, &s6->sin6_addr, ipstr, sizeof(ipstr));
         }
-        llog.logS(DEBUG, "Client connected from:", ipstr);
+        llog.logS(DEBUG, "Client connected from: ", ipstr);
 
         // Store and spawn handler thread
         {
@@ -793,7 +938,7 @@ void WebSocketServer::clientLoop(int client_fd)
 
             case 0x8: // Close frame
             {
-                llog.logS(DEBUG, "Received Close frame from fd:",
+                llog.logS(DEBUG, "Received Close frame from fd: ",
                           client_fd);
                 const char close_resp[] = {static_cast<char>(0x88), 0x00};
                 send(client_fd, close_resp, sizeof(close_resp), 0);
@@ -803,19 +948,19 @@ void WebSocketServer::clientLoop(int client_fd)
 
             case 0x9: // Ping frame
             {
-                // llog.logS(DEBUG, "Received Ping; sending Pong to fd:", client_fd);
+                // llog.logS(DEBUG, "Received Ping; sending Pong to fd: ", client_fd);
                 const unsigned char pong[2] = {0x8A, 0x00};
                 send(client_fd, pong, sizeof(pong), 0);
             }
             break;
 
             case 0xA: // Pong frame
-                // llog.logS(DEBUG, "Received Pong from fd:", client_fd);
+                // llog.logS(DEBUG, "Received Pong from fd: ", client_fd);
                 break;
 
             default:
                 llog.logS(WARN, "Unhandled opcode", static_cast<int>(opcode),
-                          "from fd:", client_fd);
+                          "from fd: ", client_fd);
             }
         }
     }
@@ -832,7 +977,7 @@ void WebSocketServer::clientLoop(int client_fd)
             client_sockets_.end());
     }
 
-    llog.logS(DEBUG, "Client handler thread exiting for fd:", client_fd);
+    llog.logS(DEBUG, "Client handler thread exiting for fd: ", client_fd);
 }
 
 /**

@@ -1,6 +1,16 @@
 /**
  * @file scheduling.hpp
- * @brief Manages transmit, INI monitoring and scheduling for Wsprry Pi
+ * @brief Orchestration layer for planning and committing transmissions.
+ *
+ * This layer owns scheduling and request construction for the current
+ * architecture. It decides whether a slot runs WSPR or direct tone,
+ * applies any random WSPR offset, resolves band-selector GPIO state from
+ * the scheduler source frequency, and commits the single execution
+ * request consumed by the transmitter.
+ *
+ * The transmitter executes only already-committed requests. Hardware
+ * realization remains inside the backend. All execution must cross the
+ * scheduler-to-transmitter boundary as a committed request.
  *
  * This project is is licensed under the MIT License. See LICENSE.md
  * for more information.
@@ -32,12 +42,20 @@
 // Project headers
 #include "arg_parser.hpp"
 #include "ppm_manager.hpp"
+#include "transmission_request.hpp"
+#include "wspr_transmit_types.hpp"
 
 // Standard library headers
 #include <atomic>
+#include <chrono>
+#include <cstddef>
+#include <cstdint>
 #include <condition_variable>
+#include <optional>
 #include <string>
+#include <string_view>
 #include <thread>
+#include <vector>
 
 /**
  * @brief Mutex to protect access to the shutdown flag for the WSPR loop.
@@ -72,11 +90,6 @@ extern std::atomic<bool> exiting_wspr;
 extern bool exitwspr_ready;
 
 /**
- * @brief Atomic bool used to signal other functions that we are shutting down.
- */
-extern std::atomic<bool> exiting;
-
-/**
  * @brief Flag indicating if a system shutdown is in progress.
  *
  * @details
@@ -87,6 +100,7 @@ extern std::atomic<bool> exiting;
  * Other threads can poll or wait on this flag to terminate safely.
  */
 extern std::atomic<bool> shutdown_flag;
+extern std::atomic<bool> reboot_flag;
 
 /**
  * @brief Callback triggered by a shutdown GPIO event.
@@ -99,28 +113,6 @@ extern std::atomic<bool> shutdown_flag;
  * @note This is usually registered with a GPIO monitor.
  */
 extern void callback_shutdown_system();
-
-/**
- * @brief Callback function for housekeeping tasks between transmissions.
- *
- * This function checks whether there are pending PPM or INI changes that need
- * to be integrated. If a pending PPM change is detected, it logs the event and
- * resets the flag. Similarly, if a pending INI change is detected, it applies the
- * deferred changes, logs the integration, and resets the flag. If any changes were
- * integrated, a flag is set to indicate that DMA/Symbol reconfiguration is required.
- */
-void callback_transmission_started(const std::string &msg, double frequency);
-
-/**
- * @brief Callback function for housekeeping tasks between transmissions.
- *
- * This function checks whether there are pending PPM or INI changes that need
- * to be integrated. If a pending PPM change is detected, it logs the event and
- * resets the flag. Similarly, if a pending INI change is detected, it applies the
- * deferred changes, logs the integration, and resets the flag. If any changes were
- * integrated, a flag is set to indicate that DMA/Symbol reconfiguration is required.
- */
-void callback_transmission_complete(const std::string &msg, double elapsed);
 
 /**
  * @brief Perform a system shutdown sequence.
@@ -141,6 +133,20 @@ void callback_transmission_complete(const std::string &msg, double elapsed);
  * supports it.
  */
 void shutdown_system();
+
+/**
+ * @brief Request a coordinated WSPR loop shutdown and emit an early log.
+ *
+ * This helper is safe to call from normal thread context, including the
+ * dedicated signal-wait thread. It records that shutdown is in progress,
+ * emits an INFO-level reason, and wakes the main loop so cleanup starts
+ * before later teardown steps can suppress logs.
+ *
+ * @param reason Human-readable source of the shutdown request.
+ * @return true if this call initiated shutdown, false if shutdown was
+ *         already in progress.
+ */
+bool request_wspr_shutdown(std::string_view reason);
 
 /**
  * @brief Perform a system reboot sequence.
@@ -184,31 +190,55 @@ void reboot_system();
 bool ppm_init();
 
 /**
- * @brief   Initiates a continuous test‐tone transmission.
+ * @brief Start a transient runtime test tone from the orchestration layer.
  *
- * Stops any ongoing transmission, saves the current mode,
- * switches into TONE mode, and transmits on the first
- * configured frequency using the current power and PPM.
+ * Stops any ongoing execution, preserves the previous runtime mode, and
+ * commits a tone request built from the first configured scheduler
+ * frequency entry. An optional override supplies the final RF frequency
+ * directly. This is transient runtime behavior; it does not persist tone mode
+ * or frequency into configuration files.
  */
-extern void start_test_tone();
+struct TestToneStartResult
+{
+    bool started = false;
+    bool already_active = false;
+    bool blocked_by_active_transmission = false;
+    bool blocked_by_enabled_transmission = false;
+    std::string message;
+};
+
+TestToneStartResult start_test_tone(
+    std::optional<std::uint64_t> frequency_hz_override = std::nullopt);
 
 /**
- * @brief   Ends the test‐tone and restores the previous mode.
+ * @brief End the transient runtime test tone and restore prior flow.
  *
- * If we’re in test‐tone, shut it down, clear the flag,
- * restore lastMode, and re-configure either WSPR or
- * (if it wasn’t WSPR) another tone on config.test_tone.
+ * Stops the active tone, tears down scheduler-owned selector GPIO state,
+ * restores the previous runtime mode, and then resumes either normal WSPR
+ * orchestration or the transient direct-tone startup request that was
+ * active before the web-triggered tone.
  */
-extern void end_test_tone();
+struct TestToneStopResult
+{
+    bool stopped = false;
+    bool tone_was_active = false;
+    bool scheduler_restored = false;
+    bool deferred_reload_reconciled = false;
+    std::string message;
+};
+
+TestToneStopResult end_test_tone();
 
 /**
- * @brief Runs the main WSPR scheduler and transmission loop.
+ * @brief Run the main orchestration loop.
  *
  * @details
  * Coordinates all core runtime components:
+ * - Validates startup configuration.
  * - Initializes optional NTP/PPM drift correction.
  * - Starts the TCP command server and sets its priority.
- * - Launches the WSPR transmission thread.
+ * - Commits the initial execution request for WSPR or direct tone.
+ * - Launches the transmitter using only committed requests.
  * - Performs full cleanup and shutdown sequence before exiting.
  *
  * @note This function blocks and runs until `exitwspr_cv` notifies.
@@ -244,24 +274,51 @@ void shutdown_machine();
  *
  * @note Requires <nlohmann/json.hpp>, <chrono>, <ctime>, <iomanip>, and <sstream>.
  */
-void send_ws_message(std::string type, std::string state);
+void send_ws_message(
+    std::string type,
+    std::string state,
+    std::string message = std::string(),
+    std::optional<int> cw_active_char_index_override = std::nullopt);
 
-/**
- * @brief Retrieve the next center frequency, cycling through the configured list.
- *
- * This method returns the next frequency from `config.center_freq_set` in a
- * round-robin fashion.  It uses `freq_iterator_` modulo the list size to
- * index into the vector, then increments `freq_iterator_` for the subsequent call.
- *
- * @return double
- *   - Next frequency in Hz from the list.
- *   - Returns 0.0 if the list is empty.
- *
- * @note
- *   - `freq_iterator_` should be initialized to 0.
- *   - Wrapping is handled via the modulo operation.
- */
-double next_frequency(bool reset = false);
+std::string websocket_tx_state_for_message(
+    std::string_view type,
+    std::string_view state,
+    std::string_view current_tx_state);
+
+struct StopTransmissionResult
+{
+    bool transmission_active = false;
+    bool stop_performed = false;
+    bool transmit_disabled = false;
+    bool persisted = false;
+    std::string message;
+};
+
+StopTransmissionResult stop_transmission_by_user_request(bool persist_transmit = true);
+
+struct WsprRuntimeStatusSnapshot
+{
+    std::string tx_state;
+    std::string runtime_mode;
+    std::string next_transmission_at;
+    double frequency_hz = 0.0;
+    double offset_hz = 0.0;
+    bool frequency_is_skip = false;
+    std::string plan_type;
+    int power_dbm = 0;
+    std::size_t frame_count = 0;
+    std::size_t current_frame = 0; // 1-based, 0 when unavailable
+    std::string callsign_raw;
+    std::string callsign_normalized;
+    std::string locator_raw;
+    std::string locator_normalized;
+    std::string frame_callsign;
+    std::string frame_locator;
+    std::string cw_message;
+    int cw_active_char_index = -1;
+};
+
+WsprRuntimeStatusSnapshot current_tx_runtime_status_snapshot();
 
 /**
  * @brief Apply updated transmission parameters and reinitialize DMA.
@@ -275,6 +332,72 @@ double next_frequency(bool reset = false);
  * @throws std::runtime_error if DMA setup or mailbox operations fail within
  *         `configure()`.
  */
-void set_config(bool force = false);
+bool set_config(bool force = false);
+bool compute_non_wspr_message_duration(
+    const ArgParserConfig &cfg,
+    std::chrono::nanoseconds &duration_out,
+    std::string *error_message = nullptr);
+bool validate_non_wspr_repeat_interval_policy(
+    const ArgParserConfig &cfg,
+    std::string *error_message = nullptr);
+bool web_server_start_enabled(const ArgParserConfig &cfg) noexcept;
+bool websocket_server_start_enabled(const ArgParserConfig &cfg) noexcept;
+bool transmitter_reload_should_defer() noexcept;
+std::string transmitter_reload_defer_debug_snapshot();
+void transmitter_cb(WsprTransmissionCallbackEvent event,
+                    WsprTransmitLogLevel level,
+                    const std::string &msg,
+                    double value);
+
+bool managed_reload_tx_inhibited_state() noexcept;
+bool managed_reload_tx_inhibited_for_test() noexcept;
+void reset_managed_reload_runtime_for_test() noexcept;
+void set_scheduler_execution_suppressed_for_test(bool suppressed) noexcept;
+
+enum class CommittedExecutionRouteForTest
+{
+    NONE = 0,
+    LEGACY,
+    CONTROLLER_WSPR,
+    CONTROLLER_TONE,
+};
+
+CommittedExecutionRouteForTest committed_execution_route_for_test() noexcept;
+void reset_committed_execution_route_for_test() noexcept;
+std::size_t tx_led_assert_request_count_for_test() noexcept;
+std::size_t tx_led_deassert_request_count_for_test() noexcept;
+std::size_t tx_led_failure_count_for_test() noexcept;
+void reset_tx_led_request_counts_for_test() noexcept;
+bool tx_led_active_for_test() noexcept;
+bool reconcile_tx_led_after_transmitter_stop_for_test(const char *context) noexcept;
+
+void reset_band_gpio_prepare_call_count_for_test() noexcept;
+std::size_t band_gpio_prepare_call_count_for_test() noexcept;
+
+void set_band_gpio_selector_for_test(bool enabled, bool drive_gpio) noexcept;
+
+bool current_band_gpio_selection_for_test(
+    BandGPIOConfig &config_out,
+    std::string &band_label_out) noexcept;
+std::vector<BandGPIOConfig> initialized_selector_gpios_for_test();
+bool selector_gpio_logical_state_for_test(
+    int gpio,
+    bool &logical_state_out) noexcept;
+void stop_active_transmission_selectors_for_test() noexcept;
+void stop_runtime_components_for_test() noexcept;
+bool park_active_transmission_selectors_for_test() noexcept;
+bool restore_committed_band_gpio_selection_for_test(bool assert_state) noexcept;
+std::vector<BandGPIOConfig> selector_shutdown_cleanup_targets_for_test();
+void seed_selector_shutdown_state_for_test(
+    const BandGPIOConfig &active_config,
+    const std::vector<BandGPIOConfig> &idle_configs) noexcept;
+void run_final_selector_gpio_shutdown_cleanup_for_test() noexcept;
+void clear_current_wspr_runtime_state_for_test() noexcept;
+TransmissionRequest current_transmission_request_for_test();
+void set_current_transmission_request_for_test(
+    const TransmissionRequest &request) noexcept;
+std::optional<wsprrypi::TransmissionRequest> current_controller_request_for_test();
+void reset_current_transmission_request_for_test() noexcept;
+void reset_current_controller_request_for_test() noexcept;
 
 #endif // _SCHEDULING_HPP

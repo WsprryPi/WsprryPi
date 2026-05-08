@@ -1,6 +1,12 @@
 /**
  * @file arg_parser.hpp
- * @brief Command-line argument parser and configuration handler.
+ * @brief Parse runtime startup choices and frequency-entry syntax.
+ *
+ * This layer translates CLI input into runtime configuration and transient
+ * startup requests. Persistent configuration remains in `config_handler.*`.
+ * In particular, `--test-tone` creates a transient startup request rather
+ * than persistent config, and frequency tokens may carry optional
+ * `@GPIO[H|L]` selector suffixes.
  *
  * This project is is licensed under the MIT License. See LICENSE.md
  * for more information.
@@ -30,15 +36,16 @@
 #define ARG_PARSER_HPP
 
 // Project headers
+#include "config_handler.hpp"
 #include "ini_file.hpp"
 #include "lcblog.hpp"
 #include "monitorfile.hpp"
 #include "version.hpp"
-#include "wspr_message.hpp"
 #include "wspr_band_lookup.hpp"
 
 // Standard library headers
 #include <atomic>
+#include <cstdint>
 #include <optional>
 #include <thread>
 
@@ -73,17 +80,6 @@ extern MonitorFile iniMonitor;
 extern WSPRBandLookup lookup;
 
 /**
- * @brief Pointer to a WSPR message.
- *
- * This pointer is used to reference a WsprMessage object, which constructs a WSPR message
- * from a callsign, grid location, and power level. It is initialized to nullptr until
- * a valid WsprMessage instance is created.
- *
- * @note Remember to allocate memory for this pointer before use.
- */
-extern WsprMessage *message;
-
-/**
  * @brief Atomic variable representing the current WSPR transmission interval.
  *
  * This variable defines the transmission interval for WSPR signals.
@@ -116,6 +112,7 @@ extern std::atomic<int> wspr_interval;
  * @note The atomic nature ensures thread-safe access across multiple threads.
  */
 extern std::atomic<bool> ini_reload_pending;
+extern std::atomic<std::uint64_t> ini_reload_generation;
 
 /**
  * @brief Atomic flag indicating that a new PPM value needs to be applied.
@@ -124,6 +121,8 @@ extern std::atomic<bool> ini_reload_pending;
  * subsystems should reload or reconfigure based on the new frequency offset.
  */
 extern std::atomic<bool> ppm_reload_pending;
+
+void apply_runtime_config_side_effects();
 
 /**
  * @brief Called when the INI file is modified.
@@ -173,32 +172,85 @@ extern void show_config_values(bool reload = false);
  * @return false if validation fails (application exits).
  */
 extern bool validate_config_data();
+bool validate_config_data_for_test(
+    std::string *validation_error = nullptr) noexcept;
+
+bool validate_config_candidate(
+    ArgParserConfig &candidate,
+    std::string *error_message = nullptr);
+bool backend_ready_for_transmission(
+    const ArgParserConfig &candidate,
+    std::string *error_message = nullptr);
 
 bool set_frequencies();
+bool set_frequencies(ArgParserConfig &target);
+
+bool set_direct_tone_startup_request(
+    const std::string &raw_token,
+    std::string *error_message = nullptr);
+bool has_direct_tone_startup_request() noexcept;
+bool try_get_direct_tone_startup_request(
+    WsprFrequencyEntry &entry_out,
+    double &actual_rf_frequency_hz_out) noexcept;
+void clear_direct_tone_startup_request() noexcept;
+bool set_qrss_startup_request(
+    const std::string &message,
+    const std::string &frequency_hz,
+    const std::string &dot_seconds,
+    std::string *error_message = nullptr);
+bool has_qrss_startup_request() noexcept;
+bool try_get_qrss_startup_request(
+    std::string &message_out,
+    double &frequency_hz_out,
+    double &dot_seconds_out) noexcept;
+void clear_qrss_startup_request() noexcept;
+bool set_fskcw_startup_request(
+    const std::string &message,
+    const std::string &mark_frequency_hz,
+    const std::string &space_frequency_hz,
+    const std::string &dot_seconds,
+    std::string *error_message = nullptr);
+bool has_fskcw_startup_request() noexcept;
+bool try_get_fskcw_startup_request(
+    std::string &message_out,
+    double &mark_frequency_hz_out,
+    double &space_frequency_hz_out,
+    double &dot_seconds_out) noexcept;
+void clear_fskcw_startup_request() noexcept;
+bool set_dfcw_startup_request(
+    const std::string &message,
+    const std::string &dot_frequency_hz,
+    const std::string &dash_frequency_hz,
+    const std::string &dot_seconds,
+    std::string *error_message = nullptr);
+bool has_dfcw_startup_request() noexcept;
+bool try_get_dfcw_startup_request(
+    std::string &message_out,
+    double &dot_frequency_hz_out,
+    double &dash_frequency_hz_out,
+    double &dot_seconds_out) noexcept;
+void clear_dfcw_startup_request() noexcept;
 
 /**
- * @brief Loads configuration values from an INI file.
+ * @brief Parses command-line arguments and configures the program settings.
  *
- * This function attempts to load settings from an INI file using the global `ini` object
- * and populates the global `config` structure with values retrieved from it.
+ * This function processes command-line options using `getopt_long()`, applying
+ * values to the program configuration. It first checks for an INI file (`-i`)
+ * before processing other options to ensure that command-line arguments can
+ * override INI file settings.
  *
- * If `config.use_ini` is false or if the INI file fails to load, the function immediately
- * returns false. Otherwise, it attempts to read values from various INI sections:
+ * It validates required parameters and logs any errors, ensuring proper
+ * configuration before execution.
  *
- * - **[Control]**: Transmit flag.
- * - **[Common]**: Callsign, Grid Square, TX Power, Frequency, Transmit Pin.
- * - **[Extended]**: PPM, Use NTP, Offset, Power Level, Use LED, LED Pin.
- * - **[Server]**: Web Port, Socket Port, Use Shutdown, Shutdown Button.
- *
- * Each key is read inside a `try` block to allow partial loading—if a key is missing or
- * causes an exception, it is silently skipped, and loading continues.
- *
- * After successful loading, the global `jConfig` JSON object is updated to reflect the
- * contents of the `config` structure.
- *
- * @return true if the INI file was used and loaded successfully, false otherwise.
+ * @param argc The number of command-line arguments.
+ * @param argv The array of command-line argument strings.
+ * @return true if parsing is successful, false if an error occurs.
  */
-extern bool load_from_ini();
+bool handle_early_cli_options(int argc, char *argv[]);
+
+bool consume_startup_config_handoff() noexcept;
+void set_startup_diagnostic_deferral(bool enabled) noexcept;
+void emit_deferred_startup_diagnostics();
 
 /**
  * @brief Parses command-line arguments and applies overrides.

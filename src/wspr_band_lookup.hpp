@@ -1,11 +1,15 @@
 /**
- * @file wspr_band_lookup.cpp
- * @brief A C++ class designed to translate Hx to a higher order like Mhz,
- *        and back to Hz, validate frequencies, and translate terms like
- *        "20m" to a valid WSPR frequency.
+ * @file wspr_band_lookup.hpp
+ * @brief Provides WSPR frequency lookup, formatting, and band correlation.
  *
- * This project is is licensed under the MIT License. See LICENSE.md
- * for more information.
+ * This class translates frequencies to band names, band names to default WSPR
+ * dial frequencies, and frequency strings to Hz. Band edge definitions are used to
+ * correlate a manually entered frequency to a band for feature selection, such
+ * as LPF GPIO control. These band edge definitions are not intended to enforce
+ * legal operating privileges.
+ *
+ * This project is licensed under the MIT License. See LICENSE.md for more
+ * information.
  *
  * Copyright © 2025 - 2026 Lee C. Bussy (@LBussy). All rights reserved.
  *
@@ -32,133 +36,146 @@
 #define WSPR_BAND_LOOKUP_HPP
 
 #include <iostream>
-#include <unordered_map>
-#include <unordered_set>
-#include <tuple>
+#include <optional>
 #include <string>
+#include <string_view>
+#include <tuple>
+#include <unordered_map>
 #include <variant>
-#include <sstream>
-#include <iomanip>
+#include <vector>
+
+#include "band_gpio.hpp"
 
 /**
  * @class WSPRBandLookup
- * @brief Provides methods for WSPR frequency lookup, validation, and formatting.
+ * @brief Provides methods for WSPR frequency lookup, validation, and display.
  */
 class WSPRBandLookup
 {
 private:
     /**
-     * @brief Stores predefined WSPR frequencies mapped by their band name.
-     */
-    std::unordered_map<std::string, double> wsprFrequencies;
-
-    /**
-     * @brief Defines a frequency range tuple (start, end, band name).
+     * @brief Defines a frequency range tuple of lower edge, upper edge, and
+     *        display name.
      */
     using FrequencyRange = std::tuple<long long, long long, std::string>;
 
     /**
-     * @struct TupleHash
-     * @brief Custom hash function for tuple hashing in an unordered_set.
+     * @brief Stores default WSPR dial frequencies by normalized band name or alias.
      */
-    struct TupleHash
-    {
-        template <typename T1, typename T2, typename T3>
-        std::size_t operator()(const std::tuple<T1, T2, T3> &t) const
-        {
-            return std::hash<T1>()(std::get<0>(t)) ^
-                   (std::hash<T2>()(std::get<1>(t)) << 1);
-        }
-    };
+    std::unordered_map<std::string, double> wsprFrequencies;
 
     /**
-     * @brief Stores valid ham radio frequency ranges and their band names.
+     * @brief Stores band ranges used to correlate a frequency to a band.
      */
-    const std::unordered_set<FrequencyRange, TupleHash> validHamFrequencies;
+    std::vector<FrequencyRange> validHamFrequencies;
 
 protected:
     /**
-     * @brief Normalizes a given key (band name) to lowercase for case-
-     *        insensitive lookups.
-     * @param key The input string to normalize.
-     * @return A lowercase version of the input string.
+     * @brief Normalizes a lookup key to lowercase.
+     *
+     * @param key Input band name or alias.
+     * @return Lowercase copy of the input key.
      */
     std::string normalize_key(const std::string &key) const;
 
     /**
-     * @brief Validates if a given frequency belongs to a known ham band.
-     * @param frequency The frequency in Hz.
-     * @return The name of the corresponding ham band, or "Invalid Frequency"
-     *         if not found.
+     * @brief Correlates a frequency to a known band bucket.
+     *
+     * @param frequency Frequency in Hz.
+     * @return Matching band name, or "Invalid Frequency" if no band matches.
      */
     std::string validate_frequency(long long frequency) const;
 
 public:
     /**
-     * @brief Constructs the WSPRBandLookup object and initializes the
-     *        frequency tables.
+     * @brief Constructs the lookup object and initializes band tables.
      */
     WSPRBandLookup();
 
     /**
-     * @brief Looks up either a WSPR frequency by band name or validates a
-     *        given numeric frequency.
-     * @param input The band name (std::string) or frequency (double/int)
-     *              in Hz.
-     * @return If given a band name, returns the WSPR frequency (double).
-     *         If given a frequency, returns the corresponding ham band
-     *         (std::string).
+     * @brief Return the correlated HamBand for a numeric frequency.
+     *
+     * @param frequency Frequency in Hz.
+     * @return Matching HamBand, or std::nullopt if no band matches.
      */
-    std::variant<double, std::string> lookup(const std::variant<std::string, double, int> &input) const;
+    std::optional<HamBand> lookup_ham_band(long long frequency) const;
 
     /**
-     * @brief Converts a numeric frequency into a formatted string representation.
-     * @param frequency The frequency in Hz.
-     * @return A human-readable string representation of the frequency (GHz, MHz,
-     *         kHz, Hz).
+     * @brief Return the correlated HamBand for a numeric frequency.
+     *
+     * @param frequency Frequency in Hz.
+     * @return Matching HamBand, or std::nullopt if no band matches.
+     */
+    std::optional<HamBand> lookup_ham_band(double frequency) const;
+
+    /**
+     * @brief Looks up a default WSPR dial frequency or validates a numeric value.
+     *
+     * @param input Band name, alias, or numeric frequency in Hz.
+     * @return Default WSPR frequency for string input or a band name for
+     *         numeric input.
+     */
+    std::variant<double, std::string> lookup(
+        const std::variant<std::string, double, int> &input) const;
+
+    /**
+     * @brief Formats a frequency into a human-readable string.
+     *
+     * @param frequency Frequency in Hz.
+     * @return String formatted in GHz, MHz, kHz, or Hz.
      */
     std::string freq_display_string(long long frequency) const;
 
     /**
-     * @brief Parses a frequency string (e.g., "7.040 MHz") and converts it to Hz.
-     * @param freq_str The frequency string with units (GHz, MHz, kHz, Hz).
-     * @return The frequency value in Hz.
-     * @throws std::invalid_argument if the input format is incorrect.
+     * @brief Parses a frequency string and converts it to Hz.
+     *
+     * @param freq_str Frequency string such as "7.040100 MHz".
+     * @return Frequency value in Hz.
+     * @throws std::invalid_argument If the format is invalid.
      */
     long long parse_frequency_string(const std::string &freq_str) const;
 
     /**
-     * @brief Parses an input string as a frequency, with optional validation.
+     * @brief Parses an input string as a band alias or numeric frequency.
      *
-     * This function first checks if the input is a known WSPR band name (e.g., "20m").
-     * If found, it returns the associated WSPR frequency in Hz.
-     *
-     * If not a known band, the function attempts to parse the input as a frequency
-     * string with a unit (e.g., "7.040100 MHz"). If parsing succeeds, the resulting
-     * frequency is returned in Hz.
-     *
-     * If the input is a plain numeric value (e.g., "7040100"), it can either be
-     * validated against known ham bands or returned as-is, depending on the `validate` flag.
-     *
-     * @param input The input string, which can be:
-     *              - A WSPR band name (e.g., "20m")
-     *              - A frequency string with a unit (e.g., "7.040100 MHz")
-     *              - A raw numeric value (e.g., "7040100")
-     * @param validate If `true`, checks raw numeric values against known ham bands
-     *                 and rejects unrecognized frequencies.
-     *                 If `false`, returns the frequency as-is without validation.
-     *
-     * @return A `double` representing the frequency in Hz.
-     *
-     * @throws std::invalid_argument If the input is invalid, or if validation is enabled
-     *         and the frequency does not match any known ham band.
+     * @param input Band alias, unit-qualified frequency, or raw numeric value.
+     * @param validate If true, validates numeric values against known bands.
+     * @return Frequency in Hz.
+     * @throws std::invalid_argument If the input is invalid.
      */
-    double parse_string_to_frequency(std::string_view input, bool validate = true) const;
+    double parse_string_to_frequency(
+        std::string_view input,
+        bool validate = true) const;
+
+    /**
+     * @brief Detect whether a numeric frequency exactly matches a legacy
+     *        built-in actual-RF WSPR alias value.
+     *
+     * @details
+     * This is intended only for conservative compatibility warnings. It does
+     * not reinterpret user input automatically.
+     *
+     * @param frequency Frequency in Hz.
+     * @return Matching WSPR alias such as "20m", or std::nullopt if no exact
+     *         legacy built-in actual frequency matches.
+     */
+    std::optional<std::string> legacy_actual_wspr_alias_for_frequency(
+        double frequency) const;
 
     /**
      * @brief Prints all predefined WSPR frequencies to standard output.
      */
     void print_wspr_frequencies() const;
 };
+
+/**
+ * @brief Convert a HamBand enum value to its string representation.
+ *
+ * This is used for logging, debugging, and user-facing messages.
+ *
+ * @param band The HamBand enum value.
+ * @return Null-terminated string representing the band.
+ */
+const char *ham_band_to_string(HamBand band);
 
 #endif // WSPR_BAND_LOOKUP_HPP

@@ -52,6 +52,48 @@ extern std::string get_project_name();
 extern std::string get_exe_name();
 
 /**
+ * @brief Retrieves the executable semantic version.
+ *
+ * @return A `std::string` representing the executable version.
+ */
+extern std::string get_exe_version();
+
+/**
+ * @brief Retrieves the build branch name.
+ *
+ * @return A `std::string` representing the build branch name.
+ */
+extern std::string get_exe_branch();
+
+/**
+ * @brief Retrieves the raw build branch name.
+ *
+ * @return A `std::string` representing the raw build branch name.
+ */
+extern std::string get_exe_raw_branch();
+
+/**
+ * @brief Retrieves the Git branch state captured at build time.
+ *
+ * @return A `std::string` containing "branch", "detached", or "unknown".
+ */
+extern std::string get_exe_branch_state();
+
+/**
+ * @brief Retrieves the build commit SHA.
+ *
+ * @return A `std::string` representing the build commit SHA.
+ */
+extern std::string get_exe_commit();
+
+/**
+ * @brief Retrieves whether the source tree had local modifications at build time.
+ *
+ * @return A `std::string` containing "true", "false", or "unknown".
+ */
+extern std::string get_exe_build_dirty();
+
+/**
  * @brief Retrieves the current debug state based on the build configuration.
  *
  * This function determines whether the current build is a debug or release
@@ -92,6 +134,11 @@ extern std::string get_debug_state();
  * ```
  */
 extern std::string get_pi_model();
+int get_raspberry_pi_generation();
+bool platform_supports_gpio_clock_transmission(
+    std::string *error_message = nullptr);
+void set_raspberry_pi_generation_override_for_test(int generation) noexcept;
+void clear_raspberry_pi_generation_override_for_test() noexcept;
 
 /**
  * @brief Return the operating system version name.
