@@ -167,6 +167,17 @@ int main()
                 std::string::npos,
         "UI transmit toggle must patch canonical Operation.Transmit only");
     require(
+        operation_script_source.find("function rebootBehaviorConfigValueFromRadio(value)") !=
+                std::string::npos &&
+            operation_script_source.find("return \"Always\";") !=
+                std::string::npos &&
+            operation_script_source.find("\"Enable on Boot\": nextValue,") !=
+                std::string::npos &&
+            operation_script_source.find("input[name=\"operation_reboot_behavior\"]") !=
+                std::string::npos &&
+            operation_script_source.find("Aways") == std::string::npos,
+        "Operation page reboot behavior radios must patch canonical Operation.Enable on Boot and preserve the Always spelling");
+    require(
         ui_source.find("var Operation = {\n        \"Mode\": mode,") !=
                 std::string::npos &&
             ui_source.find("var Meta = {\n        \"Mode\": mode") ==
