@@ -2200,6 +2200,11 @@ int main(int argc, char *argv[])
             skip_snapshot.frequency_is_skip &&
                 nearly_equal(skip_snapshot.frequency_hz, 0.0),
             "runtime snapshots must expose a committed 0 Hz WSPR slot as an explicit skip window");
+        require(
+            !skip_snapshot.selector_gpio_enabled &&
+                skip_snapshot.selector_gpio == kSelectorGpioUnset &&
+                !skip_snapshot.selector_gpio_active_high,
+            "runtime snapshots must not expose a selector suffix for skip windows without committed selector GPIO");
 
         transmitter_cb(
             WsprTransmissionCallbackEvent::SKIPPED,
@@ -3744,6 +3749,15 @@ int main(int argc, char *argv[])
         request.selector_gpio_config.enabled = true;
         request.selector_gpio_config.active_high = true;
         set_current_transmission_request_for_test(request);
+        {
+            const WsprRuntimeStatusSnapshot snapshot =
+                current_tx_runtime_status_snapshot();
+            require(
+                snapshot.selector_gpio_enabled &&
+                    snapshot.selector_gpio == 21 &&
+                    snapshot.selector_gpio_active_high,
+                "runtime snapshots must expose committed selector GPIO and polarity");
+        }
 
         reset_tx_led_request_counts_for_test();
         GPIOOutput::clearTestEvents();

@@ -3992,6 +3992,9 @@ void send_ws_message(
         j["frequency_hz"] = snapshot.frequency_hz;
         j["offset_hz"] = snapshot.offset_hz;
         j["frequency_is_skip"] = snapshot.frequency_is_skip;
+        j["selector_gpio_enabled"] = snapshot.selector_gpio_enabled;
+        j["selector_gpio"] = snapshot.selector_gpio;
+        j["selector_gpio_active_high"] = snapshot.selector_gpio_active_high;
         j["plan_type"] = snapshot.plan_type;
         j["power_dbm"] = snapshot.power_dbm;
         j["frame_count"] = snapshot.frame_count;
@@ -4136,6 +4139,14 @@ WsprRuntimeStatusSnapshot current_tx_runtime_status_snapshot()
     }
     snapshot.cw_message = runtime_status.cw_message;
     snapshot.cw_active_char_index = runtime_status.cw_active_char_index;
+    snapshot.selector_gpio_enabled =
+        current_transmission_request.hasSelectorGPIO();
+    if (snapshot.selector_gpio_enabled)
+    {
+        snapshot.selector_gpio = current_transmission_request.selector_gpio_config.gpio;
+        snapshot.selector_gpio_active_high =
+            current_transmission_request.selector_gpio_config.active_high;
+    }
 
     if (config.mode == ModeType::WSPR)
     {

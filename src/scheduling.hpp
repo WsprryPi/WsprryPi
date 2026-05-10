@@ -304,6 +304,9 @@ struct WsprRuntimeStatusSnapshot
     double frequency_hz = 0.0;
     double offset_hz = 0.0;
     bool frequency_is_skip = false;
+    bool selector_gpio_enabled = false;
+    int selector_gpio = kSelectorGpioUnset;
+    bool selector_gpio_active_high = false;
     std::string plan_type;
     int power_dbm = 0;
     std::size_t frame_count = 0;
