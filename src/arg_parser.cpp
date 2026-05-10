@@ -239,24 +239,6 @@ namespace
             active_high = entry.selector_gpio_active_high;
             enabled = true;
         }
-        else if (entry.allow_band_gpio_fallback)
-        {
-            const std::optional<HamBand> band =
-                lookup.lookup_ham_band(entry.dial_frequency_hz);
-
-            if (band.has_value())
-            {
-                const BandGPIOConfig &band_cfg =
-                    config.band_gpio[ham_band_index(*band)];
-
-                if (band_cfg.enabled && band_cfg.gpio >= 0)
-                {
-                    gpio = band_cfg.gpio;
-                    active_high = band_cfg.active_high;
-                    enabled = true;
-                }
-            }
-        }
 
         if (!enabled)
         {
@@ -2480,7 +2462,8 @@ bool set_frequencies(ArgParserConfig &target)
         {
             const double freq = lookup.parse_string_to_frequency(entry.token, false);
             entry.dial_frequency_hz = freq;
-            entry.allow_band_gpio_fallback = false;
+            entry.allow_band_gpio_fallback =
+                entry.selector_gpio == kSelectorGpioUnset;
             if (token_looks_numeric_frequency(entry.token))
             {
                 const auto legacy_alias =

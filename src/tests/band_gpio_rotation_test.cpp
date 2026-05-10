@@ -1,6 +1,8 @@
 #include "arg_parser.hpp"
 #include "config_handler.hpp"
+#include "gpio_output.hpp"
 #include "scheduling.hpp"
+#include "version.hpp"
 
 #include <atomic>
 #include <cstdlib>
@@ -36,6 +38,7 @@ namespace
         config.power_dbm = 20;
         config.frequencies = "20m";
         config.tx_pin = 4;
+        set_raspberry_pi_generation_override_for_test(4);
         config.ppm = 0.0;
         config.use_ntp = false;
         config.use_offset = false;
@@ -61,6 +64,7 @@ namespace
         exiting_wspr.store(false, std::memory_order_relaxed);
         reset_managed_reload_runtime_for_test();
         reset_current_transmission_request_for_test();
+        GPIOOutput::setTestMode(true);
         set_scheduler_execution_suppressed_for_test(true);
         set_band_gpio_selector_for_test(true, false);
     }
@@ -69,6 +73,8 @@ namespace
     {
         set_band_gpio_selector_for_test(false, false);
         set_scheduler_execution_suppressed_for_test(false);
+        GPIOOutput::setTestMode(false);
+        clear_raspberry_pi_generation_override_for_test();
     }
 
     bool apply_scheduler_config_for_test(bool force)
@@ -119,25 +125,6 @@ namespace
         require(
             selector_config.active_high == expected_active_high,
             message + ": selector polarity must match the selected band");
-    }
-
-    void require_no_current_selector(
-        const std::string &expected_token,
-        const std::string &message)
-    {
-        const TransmissionRequest request = current_transmission_request_for_test();
-        BandGPIOConfig selector_config;
-        std::string selector_band;
-
-        require(
-            request.frequency_entry_label == expected_token,
-            message + ": committed request token must match the selected entry");
-        require(
-            !request.hasSelectorGPIO(),
-            message + ": committed request must not carry selector GPIO state");
-        require(
-            !current_band_gpio_selection_for_test(selector_config, selector_band),
-            message + ": scheduler must not prepare a band GPIO selector");
     }
 
     void require_selector_rehydrates_from_committed_request(
@@ -224,6 +211,21 @@ namespace
             actual.emplace(config.gpio, config.active_high);
         }
 
+        if (actual != expected)
+        {
+            std::cerr << "EXPECTED CLEANUP:";
+            for (const auto &[gpio, active_high] : expected)
+            {
+                std::cerr << ' ' << gpio << (active_high ? 'H' : 'L');
+            }
+            std::cerr << "\nACTUAL CLEANUP:";
+            for (const auto &[gpio, active_high] : actual)
+            {
+                std::cerr << ' ' << gpio << (active_high ? 'H' : 'L');
+            }
+            std::cerr << std::endl;
+        }
+
         require(
             actual == expected,
             message + ": shutdown cleanup must cover the full configured selector GPIO set");
@@ -255,19 +257,19 @@ int main()
     require(
         !config.use_ini &&
             config.wspr_frequency_entries.size() == 3U &&
-            !config.wspr_frequency_entries[0].allow_band_gpio_fallback &&
-            !config.wspr_frequency_entries[1].allow_band_gpio_fallback &&
-            !config.wspr_frequency_entries[2].allow_band_gpio_fallback,
-        "UI Band GPIO patches must keep plain frequency entries explicit-only");
+            config.wspr_frequency_entries[0].allow_band_gpio_fallback &&
+            config.wspr_frequency_entries[1].allow_band_gpio_fallback &&
+            config.wspr_frequency_entries[2].allow_band_gpio_fallback,
+        "UI Band GPIO patches must allow plain frequency entries to inherit Band GPIO mappings");
 
     patch_all_from_web({{"WSPR", {{"Frequency", "80m,40m,30m"}}}});
     require(
         !config.use_ini &&
             config.wspr_frequency_entries.size() == 3U &&
-            !config.wspr_frequency_entries[0].allow_band_gpio_fallback &&
-            !config.wspr_frequency_entries[1].allow_band_gpio_fallback &&
-            !config.wspr_frequency_entries[2].allow_band_gpio_fallback,
-        "frequency-only UI patches must keep rebuilt entries explicit-only");
+            config.wspr_frequency_entries[0].allow_band_gpio_fallback &&
+            config.wspr_frequency_entries[1].allow_band_gpio_fallback &&
+            config.wspr_frequency_entries[2].allow_band_gpio_fallback,
+        "frequency-only UI patches must keep rebuilt plain entries eligible for Band GPIO fallback");
 
     reset_scheduler_test_state();
 
@@ -275,19 +277,28 @@ int main()
     require_initialized_selector_set(
         {{17, true}, {27, false}, {22, true}},
         "configured selector set must still be initialized from Band GPIO config");
-    require_no_current_selector(
+    require_current_selector(
         "80m",
-        "plain UI entry must not inherit Band GPIO routing");
+        "80m",
+        17,
+        true,
+        "plain UI entry must inherit Band GPIO routing");
 
     require(apply_scheduler_config_for_test(false), "scheduler must commit second UI plain frequency entry");
-    require_no_current_selector(
+    require_current_selector(
         "40m",
-        "second plain UI entry must not inherit Band GPIO routing");
+        "40m",
+        27,
+        false,
+        "second plain UI entry must inherit Band GPIO routing");
 
     require(apply_scheduler_config_for_test(false), "scheduler must commit third UI plain frequency entry");
-    require_no_current_selector(
+    require_current_selector(
         "30m",
-        "third plain UI entry must not inherit Band GPIO routing");
+        "30m",
+        22,
+        true,
+        "third plain UI entry must inherit Band GPIO routing");
 
     patch_all_from_web({
         {"WSPR", {{"Frequency", "30m@5L,20m@12H"}}},
@@ -301,7 +312,7 @@ int main()
         {{5, false}, {12, true}, {17, true}, {27, false}},
         "first reloaded explicit UI selector entry");
     require_current_selector(
-        "30m@5L",
+        "30m",
         "30m",
         5,
         false,
@@ -318,7 +329,7 @@ int main()
         {{5, false}, {12, true}, {17, true}, {27, false}},
         "second reloaded explicit UI selector entry");
     require_current_selector(
-        "20m@12H",
+        "20m",
         "20m",
         12,
         true,
@@ -397,10 +408,10 @@ int main()
     require(
         config.wspr_frequency_entries.size() == 2U &&
             config.wspr_frequency_entries[0].selector_gpio == kSelectorGpioUnset &&
-            !config.wspr_frequency_entries[0].allow_band_gpio_fallback &&
+            config.wspr_frequency_entries[0].allow_band_gpio_fallback &&
             config.wspr_frequency_entries[1].selector_gpio == kSelectorGpioUnset &&
-            !config.wspr_frequency_entries[1].allow_band_gpio_fallback,
-        "INI entries without @GPIO must remain explicit-only");
+            config.wspr_frequency_entries[1].allow_band_gpio_fallback,
+        "INI entries without @GPIO must inherit configured Band GPIO when available");
 
     config.use_ini = false;
     config.frequencies = "80m@17H,40m";
@@ -413,8 +424,8 @@ int main()
             config.wspr_frequency_entries[0].selector_gpio_active_high &&
             !config.wspr_frequency_entries[0].allow_band_gpio_fallback &&
             config.wspr_frequency_entries[1].selector_gpio == kSelectorGpioUnset &&
-            !config.wspr_frequency_entries[1].allow_band_gpio_fallback,
-        "CLI @GPIO selectors must stay explicit and must not enable band-config fallback");
+            config.wspr_frequency_entries[1].allow_band_gpio_fallback,
+        "CLI @GPIO selectors must stay explicit while plain entries allow band-config fallback");
 
     prime_valid_ui_config();
     patch_all_from_web({
@@ -426,10 +437,10 @@ int main()
     reset_scheduler_test_state();
 
     require(apply_scheduler_config_for_test(true), "scheduler must commit first explicit selector entry");
-    require_current_selector("20m@16H", "20m", 16, true, "first explicit selector entry");
+    require_current_selector("20m", "20m", 16, true, "first explicit selector entry");
 
     require(apply_scheduler_config_for_test(false), "scheduler must commit second explicit selector entry");
-    require_current_selector("30m@20H", "30m", 20, true, "second explicit selector entry");
+    require_current_selector("30m", "30m", 20, true, "second explicit selector entry");
     run_final_selector_gpio_shutdown_cleanup_for_test();
     require_shutdown_cleanup_targets(
         {{16, true}, {20, true}, {21, true}, {5, true}, {6, true}, {13, false}},
@@ -442,20 +453,58 @@ int main()
         {"Band GPIO",
          {{"20m", {{"GPIO", 17}, {"Enabled", true}, {"Active High", true}}},
           {"30m", {{"GPIO", 18}, {"Enabled", true}, {"Active High", false}}}}}});
-    require(apply_scheduler_config_for_test(true), "scheduler must reload plain entries without inheriting band GPIO selectors");
-    require_no_current_selector("20m", "reloaded plain entries must not inherit band GPIO selector set");
+    require(apply_scheduler_config_for_test(true), "scheduler must reload plain entries with band GPIO selector fallback");
+    require_current_selector(
+        "20m",
+        "20m",
+        17,
+        true,
+        "reloaded plain entries must inherit band GPIO selector set");
     run_final_selector_gpio_shutdown_cleanup_for_test();
     require_shutdown_cleanup_targets(
-        {{17, true}, {18, false}},
+        {{13, false}, {17, true}, {18, false}},
         "final shutdown cleanup with band-config-only selectors");
     require_all_selector_gpios_released(
         "final shutdown cleanup with band-config-only selectors");
+
+    prime_valid_ui_config();
+    patch_all_from_web({
+        {"Operation", {{"Mode", "QRSS"}, {"Transmit", true}}},
+        {"CW",
+         {{"Message", "CQ"},
+          {"Base Frequency", 14096900.0},
+          {"Shift Hz", 5.0},
+          {"Dot Seconds", 3.0}}},
+        {"Band GPIO",
+         {{"20m", {{"GPIO", 7}, {"Enabled", true}, {"Active High", false}}}}}});
+    config.mode = ModeType::QRSS;
+    config.transmit = true;
+    config.qrss.message = "CQ";
+    config.qrss.frequency_hz = 14096900.0;
+    config.qrss.dot_seconds = 3.0;
+    reset_scheduler_test_state();
+    require(
+        start_non_wspr_transmission_now_for_test(config),
+        "QRSS plain frequency must commit with Band GPIO fallback");
+    require_current_selector(
+        "qrss-cli-test",
+        "20m",
+        7,
+        false,
+        "QRSS plain frequency must inherit Band GPIO routing");
+    run_final_selector_gpio_shutdown_cleanup_for_test();
+    require_shutdown_cleanup_targets(
+        {{7, false}},
+        "QRSS final shutdown cleanup with band-config selector");
+    require_all_selector_gpios_released(
+        "QRSS final shutdown cleanup with band-config selector");
 
     patch_all_from_web({
         {"WSPR", {{"Frequency", "20m@17H,30m@17L"}}},
         {"Band GPIO",
          {{"20m", {{"GPIO", -1}, {"Enabled", false}, {"Active High", true}}},
           {"30m", {{"GPIO", -1}, {"Enabled", false}, {"Active High", true}}}}}});
+    config.mode = ModeType::WSPR;
     require(!apply_scheduler_config_for_test(true), "conflicting selector polarity on the same GPIO must be rejected");
 
     finish_scheduler_test_state();

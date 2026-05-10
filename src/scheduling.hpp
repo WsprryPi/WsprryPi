@@ -337,6 +337,7 @@ bool compute_non_wspr_message_duration(
     const ArgParserConfig &cfg,
     std::chrono::nanoseconds &duration_out,
     std::string *error_message = nullptr);
+bool start_non_wspr_transmission_now_for_test(const ArgParserConfig &cfg);
 bool validate_non_wspr_repeat_interval_policy(
     const ArgParserConfig &cfg,
     std::string *error_message = nullptr);

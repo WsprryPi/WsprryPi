@@ -1001,9 +1001,9 @@ int main(int argc, char *argv[])
         require(
             config.wspr_frequency_entries[2].selector_gpio == kSelectorGpioUnset &&
                 !config.wspr_frequency_entries[2].selector_gpio_active_high &&
-                !config.wspr_frequency_entries[2].allow_band_gpio_fallback &&
+                config.wspr_frequency_entries[2].allow_band_gpio_fallback &&
                 nearly_equal(config.wspr_frequency_entries[2].dial_frequency_hz, 14095600.0),
-            "plain frequency entries must remain unmapped, explicit-only, and default active low even on managed/INI paths");
+            "plain frequency entries must remain unmapped, eligible for Band GPIO fallback, and default active low even on managed/INI paths");
         require(
             config.wspr_frequency_entries[3].selector_gpio == 22 &&
                 !config.wspr_frequency_entries[3].selector_gpio_active_high &&
@@ -1144,10 +1144,10 @@ int main(int argc, char *argv[])
         require(
             config.wspr_frequency_entries.size() == 2U &&
                 config.wspr_frequency_entries[0].selector_gpio == kSelectorGpioUnset &&
-                !config.wspr_frequency_entries[0].allow_band_gpio_fallback &&
+                config.wspr_frequency_entries[0].allow_band_gpio_fallback &&
                 config.wspr_frequency_entries[1].selector_gpio == kSelectorGpioUnset &&
-                !config.wspr_frequency_entries[1].allow_band_gpio_fallback,
-            "web patch normalization must keep plain frequency entries explicit-only even when Band GPIO config exists");
+                config.wspr_frequency_entries[1].allow_band_gpio_fallback,
+            "web patch normalization must allow plain frequency entries to inherit Band GPIO config");
     }
 
     {
