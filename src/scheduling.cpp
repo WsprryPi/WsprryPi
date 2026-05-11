@@ -3569,6 +3569,7 @@ bool wspr_loop()
     show_config_values();
 
     const bool startup_config_handoff = consume_startup_config_handoff();
+    apply_managed_startup_policy_if_requested(startup_config_handoff);
     set_startup_diagnostic_deferral(true);
 
     if (config.mode != ModeType::WSPR)

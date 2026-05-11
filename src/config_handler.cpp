@@ -134,6 +134,37 @@ namespace
             "Invalid Operation.Transmit Backend. Expected 'gpio' or 'si5351'.");
     }
 
+    EnableOnBootBehavior parse_enable_on_boot_behavior(
+        const nlohmann::json &operation)
+    {
+        if (!operation.contains("Enable on Boot"))
+        {
+            return EnableOnBootBehavior::Never;
+        }
+
+        const std::string raw =
+            trim_copy(operation.at("Enable on Boot").get<std::string>());
+        std::string lowered = raw;
+        std::transform(
+            lowered.begin(),
+            lowered.end(),
+            lowered.begin(),
+            [](unsigned char c)
+            {
+                return static_cast<char>(std::tolower(c));
+            });
+
+        if (lowered == "never")
+            return EnableOnBootBehavior::Never;
+        if (lowered == "follow")
+            return EnableOnBootBehavior::Follow;
+        if (lowered == "always")
+            return EnableOnBootBehavior::Always;
+
+        throw std::runtime_error(
+            "Invalid Operation.Enable on Boot. Expected 'Never', 'Follow', or 'Always'.");
+    }
+
     int parse_integer_config_value(
         const nlohmann::json &source,
         const std::string &context,
@@ -573,6 +604,8 @@ namespace
                 internal_json["Operation"]["Transmit"] = operation.at("Transmit");
             if (operation.contains("Transmit Backend"))
                 internal_json["Operation"]["Transmit Backend"] = operation.at("Transmit Backend");
+            if (operation.contains("Enable on Boot"))
+                internal_json["Operation"]["Enable on Boot"] = operation.at("Enable on Boot");
             if (operation.contains("Use LED"))
                 internal_json["Operation"]["Use LED"] = operation.at("Use LED");
             if (operation.contains("LED Pin"))
@@ -882,6 +915,7 @@ void init_default_config()
     // Runtime
     config.transmit = false;
     config.transmit_backend = TransmitBackendKind::GPIO;
+    config.enable_on_boot = EnableOnBootBehavior::Never;
 
     // WSPR
     config.callsign = "NXXX";
@@ -1116,6 +1150,7 @@ namespace
                 (key == "Mode" ||
                  key == "Transmit" ||
                  key == "Transmit Backend" ||
+                 key == "Enable on Boot" ||
                  key == "Use LED" ||
                  key == "LED Pin" ||
                  key == "Use Amp" ||
@@ -1248,6 +1283,7 @@ namespace
             {"Mode", "WSPR"},
             {"Transmit", false},
             {"Transmit Backend", "gpio"},
+            {"Enable on Boot", "Never"},
             {"LED Pin", 18},
             {"Use LED", false},
             {"Use Amp", false},
@@ -1325,6 +1361,8 @@ namespace
         target.wspr_dial_freq_set.clear();
 
         target.transmit = source.at("Operation").at("Transmit").get<bool>();
+        target.enable_on_boot =
+            parse_enable_on_boot_behavior(source.at("Operation"));
         target.transmit_backend =
             parse_transmit_backend_kind(source.at("Operation"));
         const nlohmann::json gpio =
@@ -1541,6 +1579,8 @@ namespace
         target["Operation"]["Transmit"] = source.transmit;
         target["Operation"]["Transmit Backend"] =
             transmit_backend_kind_to_string(source.transmit_backend);
+        target["Operation"]["Enable on Boot"] =
+            enable_on_boot_behavior_to_string(source.enable_on_boot);
         target["Operation"]["Use LED"] = source.use_led;
         target["Operation"]["LED Pin"] = source.led_pin;
         const bool use_amp =
@@ -1623,6 +1663,7 @@ namespace
     void copy_config(const ArgParserConfig &source, ArgParserConfig &target)
     {
         target.transmit = source.transmit;
+        target.enable_on_boot = source.enable_on_boot;
         target.callsign = source.callsign;
         target.grid_square = source.grid_square;
         target.power_dbm = source.power_dbm;
@@ -1955,6 +1996,7 @@ void json_to_ini()
                  (key == "Mode" ||
                   key == "Transmit" ||
                   key == "Transmit Backend" ||
+                  key == "Enable on Boot" ||
                   key == "Use LED" ||
                   key == "LED Pin" ||
                   key == "Use Amp" ||
@@ -2030,6 +2072,38 @@ void json_to_ini()
 
     iniFile.setData(new_data);
     iniFile.save();
+}
+
+bool apply_enable_on_boot_startup_policy()
+{
+    switch (config.enable_on_boot)
+    {
+    case EnableOnBootBehavior::Never:
+        llog.logS(
+            INFO,
+            "Operation.Enable on Boot policy Never: setting Operation.Transmit=false for startup.");
+        config.transmit = false;
+        config_to_json();
+        json_to_ini();
+        return true;
+    case EnableOnBootBehavior::Follow:
+        llog.logS(
+            INFO,
+            "Operation.Enable on Boot policy Follow: leaving Operation.Transmit=",
+            config.transmit ? "true" : "false",
+            ".");
+        return false;
+    case EnableOnBootBehavior::Always:
+        llog.logS(
+            INFO,
+            "Operation.Enable on Boot policy Always: setting Operation.Transmit=true for startup.");
+        config.transmit = true;
+        config_to_json();
+        json_to_ini();
+        return true;
+    }
+
+    return false;
 }
 
 bool load_json(

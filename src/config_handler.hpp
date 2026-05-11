@@ -128,6 +128,13 @@ enum class TransmitBackendKind
     SI5351
 };
 
+enum class EnableOnBootBehavior
+{
+    Never = 0,
+    Follow,
+    Always
+};
+
 inline constexpr const char *transmit_backend_kind_to_string(
     TransmitBackendKind backend) noexcept
 {
@@ -140,6 +147,22 @@ inline constexpr const char *transmit_backend_kind_to_string(
     }
 
     return "gpio";
+}
+
+inline constexpr const char *enable_on_boot_behavior_to_string(
+    EnableOnBootBehavior behavior) noexcept
+{
+    switch (behavior)
+    {
+    case EnableOnBootBehavior::Never:
+        return "Never";
+    case EnableOnBootBehavior::Follow:
+        return "Follow";
+    case EnableOnBootBehavior::Always:
+        return "Always";
+    }
+
+    return "Never";
 }
 
 struct WsprModeConfig
@@ -221,6 +244,7 @@ struct ArgParserConfig
 {
     // Runtime
     bool transmit; ///< Transmission mode enabled.
+    EnableOnBootBehavior enable_on_boot; ///< Persisted transmit behavior after reboot.
 
     // WSPR
     std::string callsign;    ///< WSPR callsign.
@@ -297,6 +321,7 @@ struct ArgParserConfig
      */
     ArgParserConfig()
         : transmit(true),
+          enable_on_boot(EnableOnBootBehavior::Never),
           callsign(""),
           grid_square(""),
           power_dbm(0),
@@ -371,6 +396,7 @@ struct ArgParserConfig
         }
 
         transmit = other.transmit;
+        enable_on_boot = other.enable_on_boot;
         callsign = other.callsign;
         grid_square = other.grid_square;
         power_dbm = other.power_dbm;
@@ -524,6 +550,7 @@ void ini_to_json(std::string filename);
  *       "Mode": "WSPR",
  *       "Transmit": false,
  *       "Transmit Backend": "gpio",
+ *       "Enable on Boot": "Never",
  *       "Use LED": false,
  *       "LED Pin": 18,
  *       "Use Amp": false,
@@ -608,6 +635,16 @@ extern void config_to_json();
  * @note This function assumes that all JSON values can be represented as strings.
  */
 extern void json_to_ini();
+
+/**
+ * @brief Applies the startup policy for Operation.Enable on Boot.
+ *
+ * Never and Always update Operation.Transmit and persist through the normal
+ * JSON-to-INI path. Follow leaves the loaded Transmit setting unchanged.
+ *
+ * @return true when Operation.Transmit was set and persisted by the policy.
+ */
+bool apply_enable_on_boot_startup_policy();
 
 /**
  * @brief Loads the global JSON configuration by merging default JSON and INI file data.
