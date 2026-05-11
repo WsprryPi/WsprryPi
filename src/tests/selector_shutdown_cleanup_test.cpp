@@ -1,6 +1,8 @@
 #include "arg_parser.hpp"
 #include "config_handler.hpp"
+#include "gpio_output.hpp"
 #include "scheduling.hpp"
+#include "version.hpp"
 
 #include <cstdlib>
 #include <iostream>
@@ -49,12 +51,13 @@ namespace
 
         config.use_ini = false;
         config.mode = ModeType::WSPR;
-        config.transmit = true;
+        config.transmit = false;
         config.callsign = "AA0NT";
         config.grid_square = "EM18";
         config.power_dbm = 20;
         config.frequencies = "20m";
         config.tx_pin = 4;
+        set_raspberry_pi_generation_override_for_test(4);
         config.ppm = 0.0;
         config.use_ntp = false;
         config.use_offset = false;
@@ -71,6 +74,8 @@ namespace
         }
 
         config_to_json();
+        GPIOOutput::setTestMode(true);
+        set_scheduler_execution_suppressed_for_test(true);
         set_band_gpio_selector_for_test(false, false);
     }
 }
@@ -151,5 +156,8 @@ int main()
         "shutdown cleanup after band-config-only selectors");
 
     std::cout << "Selector shutdown cleanup regression tests passed." << std::endl;
+    set_scheduler_execution_suppressed_for_test(false);
+    GPIOOutput::setTestMode(false);
+    clear_raspberry_pi_generation_override_for_test();
     return EXIT_SUCCESS;
 }

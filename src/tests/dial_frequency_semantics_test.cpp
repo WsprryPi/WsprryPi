@@ -1003,9 +1003,9 @@ int main(int argc, char *argv[])
         require(
             config.wspr_frequency_entries[2].selector_gpio == kSelectorGpioUnset &&
                 !config.wspr_frequency_entries[2].selector_gpio_active_high &&
-                !config.wspr_frequency_entries[2].allow_band_gpio_fallback &&
+                config.wspr_frequency_entries[2].allow_band_gpio_fallback &&
                 nearly_equal(config.wspr_frequency_entries[2].dial_frequency_hz, 14095600.0),
-            "plain frequency entries must remain unmapped, explicit-only, and default active low even on managed/INI paths");
+            "plain frequency entries must remain unmapped, eligible for Band GPIO fallback, and default active low even on managed/INI paths");
         require(
             config.wspr_frequency_entries[3].selector_gpio == 22 &&
                 !config.wspr_frequency_entries[3].selector_gpio_active_high &&
@@ -1146,10 +1146,10 @@ int main(int argc, char *argv[])
         require(
             config.wspr_frequency_entries.size() == 2U &&
                 config.wspr_frequency_entries[0].selector_gpio == kSelectorGpioUnset &&
-                !config.wspr_frequency_entries[0].allow_band_gpio_fallback &&
+                config.wspr_frequency_entries[0].allow_band_gpio_fallback &&
                 config.wspr_frequency_entries[1].selector_gpio == kSelectorGpioUnset &&
-                !config.wspr_frequency_entries[1].allow_band_gpio_fallback,
-            "web patch normalization must keep plain frequency entries explicit-only even when Band GPIO config exists");
+                config.wspr_frequency_entries[1].allow_band_gpio_fallback,
+            "web patch normalization must allow plain frequency entries to inherit Band GPIO config");
     }
 
     {
@@ -2202,6 +2202,11 @@ int main(int argc, char *argv[])
             skip_snapshot.frequency_is_skip &&
                 nearly_equal(skip_snapshot.frequency_hz, 0.0),
             "runtime snapshots must expose a committed 0 Hz WSPR slot as an explicit skip window");
+        require(
+            !skip_snapshot.selector_gpio_enabled &&
+                skip_snapshot.selector_gpio == kSelectorGpioUnset &&
+                !skip_snapshot.selector_gpio_active_high,
+            "runtime snapshots must not expose a selector suffix for skip windows without committed selector GPIO");
 
         transmitter_cb(
             WsprTransmissionCallbackEvent::SKIPPED,
@@ -4022,6 +4027,15 @@ int main(int argc, char *argv[])
         request.selector_gpio_config.enabled = true;
         request.selector_gpio_config.active_high = true;
         set_current_transmission_request_for_test(request);
+        {
+            const WsprRuntimeStatusSnapshot snapshot =
+                current_tx_runtime_status_snapshot();
+            require(
+                snapshot.selector_gpio_enabled &&
+                    snapshot.selector_gpio == 21 &&
+                    snapshot.selector_gpio_active_high,
+                "runtime snapshots must expose committed selector GPIO and polarity");
+        }
 
         reset_tx_led_request_counts_for_test();
         GPIOOutput::clearTestEvents();

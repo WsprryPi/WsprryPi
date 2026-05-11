@@ -76,6 +76,7 @@
 #include <string>
 #include <thread>
 #include <unordered_map>
+#include <utility>
 #include <vector>
 #include <mutex>
 
@@ -146,6 +147,13 @@ static bool sync_configured_selector_gpio_idle_state(
     std::string *error_message = nullptr);
 static BandGPIOPrepareStatus apply_band_gpio_resolution(
     const BandGPIOResolution &resolution) noexcept;
+static void commit_band_gpio_snapshot_to_request(
+    TransmissionRequest &request,
+    const BandGPIOResolution &resolution,
+    BandGPIOPrepareStatus prepare_status) noexcept;
+static void commit_execution_request(
+    const wsprrypi::TransmissionRequest &controller_request,
+    const TransmissionRequest &legacy_request);
 static bool refresh_committed_band_gpio_selection() noexcept;
 static void assert_transmit_gpio_outputs(const char *context) noexcept;
 static void deassert_transmit_gpio_outputs(
@@ -2128,6 +2136,46 @@ static TransmissionRequest make_dfcw_legacy_request(
     return request;
 }
 
+static WsprFrequencyEntry make_non_wspr_band_gpio_frequency_entry(
+    std::string token,
+    double frequency_hz)
+{
+    WsprFrequencyEntry entry;
+    entry.token = std::move(token);
+    entry.dial_frequency_hz = frequency_hz;
+    entry.selector_gpio = kSelectorGpioUnset;
+    entry.selector_gpio_active_high = false;
+    entry.allow_band_gpio_fallback = true;
+    return entry;
+}
+
+static bool prepare_and_commit_non_wspr_request(
+    const ArgParserConfig &cfg,
+    const wsprrypi::TransmissionRequest &controller_request,
+    TransmissionRequest legacy_request,
+    const WsprFrequencyEntry &frequency_entry)
+{
+    BandGPIOResolution selector_resolution;
+    const BandGPIOPrepareStatus selector_status =
+        prepare_band_gpio_for_frequency_or_log(
+            frequency_entry.dial_frequency_hz,
+            frequency_entry,
+            cfg,
+            -1,
+            &selector_resolution);
+    if (selector_status == BandGPIOPrepareStatus::Failed)
+    {
+        return false;
+    }
+
+    commit_band_gpio_snapshot_to_request(
+        legacy_request,
+        selector_resolution,
+        selector_status);
+    commit_execution_request(controller_request, legacy_request);
+    return true;
+}
+
 bool compute_non_wspr_message_duration(
     const ArgParserConfig &cfg,
     std::chrono::nanoseconds &duration_out,
@@ -2236,10 +2284,23 @@ static bool start_non_wspr_transmission_now(const ArgParserConfig &cfg)
             return false;
         }
 
-        commit_execution_request(
-            make_qrss_controller_request(cfg, committed_ppm),
-            make_qrss_legacy_request(cfg, committed_ppm));
-        wsprTransmitter.startAsync();
+        const WsprFrequencyEntry selector_entry =
+            make_non_wspr_band_gpio_frequency_entry(
+                "qrss-cli-test",
+                frequency_hz);
+        if (!prepare_and_commit_non_wspr_request(
+                cfg,
+                make_qrss_controller_request(cfg, committed_ppm),
+                make_qrss_legacy_request(cfg, committed_ppm),
+                selector_entry))
+        {
+            llog.logE(ERROR, "QRSS mode could not prepare band GPIO selector.");
+            return false;
+        }
+        if (!suppress_scheduler_execution_for_test)
+        {
+            wsprTransmitter.startAsync();
+        }
         llog.logS(DEBUG, "Transmitting QRSS message.");
 
         llog.logS(DEBUG,
@@ -2277,10 +2338,23 @@ static bool start_non_wspr_transmission_now(const ArgParserConfig &cfg)
             return false;
         }
 
-        commit_execution_request(
-            make_fskcw_controller_request(cfg, committed_ppm),
-            make_fskcw_legacy_request(cfg, committed_ppm));
-        wsprTransmitter.startAsync();
+        const WsprFrequencyEntry selector_entry =
+            make_non_wspr_band_gpio_frequency_entry(
+                "fskcw-cli-test",
+                mark_frequency_hz);
+        if (!prepare_and_commit_non_wspr_request(
+                cfg,
+                make_fskcw_controller_request(cfg, committed_ppm),
+                make_fskcw_legacy_request(cfg, committed_ppm),
+                selector_entry))
+        {
+            llog.logE(ERROR, "FSKCW mode could not prepare band GPIO selector.");
+            return false;
+        }
+        if (!suppress_scheduler_execution_for_test)
+        {
+            wsprTransmitter.startAsync();
+        }
         llog.logS(DEBUG, "Transmitting FSKCW message.");
 
         llog.logS(DEBUG,
@@ -2326,10 +2400,23 @@ static bool start_non_wspr_transmission_now(const ArgParserConfig &cfg)
             return false;
         }
 
-        commit_execution_request(
-            make_dfcw_controller_request(cfg, committed_ppm),
-            make_dfcw_legacy_request(cfg, committed_ppm));
-        wsprTransmitter.startAsync();
+        const WsprFrequencyEntry selector_entry =
+            make_non_wspr_band_gpio_frequency_entry(
+                "dfcw-cli-test",
+                dot_frequency_hz);
+        if (!prepare_and_commit_non_wspr_request(
+                cfg,
+                make_dfcw_controller_request(cfg, committed_ppm),
+                make_dfcw_legacy_request(cfg, committed_ppm),
+                selector_entry))
+        {
+            llog.logE(ERROR, "DFCW mode could not prepare band GPIO selector.");
+            return false;
+        }
+        if (!suppress_scheduler_execution_for_test)
+        {
+            wsprTransmitter.startAsync();
+        }
         llog.logS(DEBUG, "Transmitting DFCW message.");
 
         llog.logS(DEBUG,
@@ -2359,6 +2446,11 @@ static bool start_non_wspr_transmission_now(const ArgParserConfig &cfg)
     }
 
     return false;
+}
+
+bool start_non_wspr_transmission_now_for_test(const ArgParserConfig &cfg)
+{
+    return start_non_wspr_transmission_now(cfg);
 }
 
 static void schedule_next_non_wspr_launch(const ArgParserConfig &cfg)
@@ -3901,6 +3993,9 @@ void send_ws_message(
         j["frequency_hz"] = snapshot.frequency_hz;
         j["offset_hz"] = snapshot.offset_hz;
         j["frequency_is_skip"] = snapshot.frequency_is_skip;
+        j["selector_gpio_enabled"] = snapshot.selector_gpio_enabled;
+        j["selector_gpio"] = snapshot.selector_gpio;
+        j["selector_gpio_active_high"] = snapshot.selector_gpio_active_high;
         j["plan_type"] = snapshot.plan_type;
         j["power_dbm"] = snapshot.power_dbm;
         j["frame_count"] = snapshot.frame_count;
@@ -4045,6 +4140,14 @@ WsprRuntimeStatusSnapshot current_tx_runtime_status_snapshot()
     }
     snapshot.cw_message = runtime_status.cw_message;
     snapshot.cw_active_char_index = runtime_status.cw_active_char_index;
+    snapshot.selector_gpio_enabled =
+        current_transmission_request.hasSelectorGPIO();
+    if (snapshot.selector_gpio_enabled)
+    {
+        snapshot.selector_gpio = current_transmission_request.selector_gpio_config.gpio;
+        snapshot.selector_gpio_active_high =
+            current_transmission_request.selector_gpio_config.active_high;
+    }
 
     if (config.mode == ModeType::WSPR)
     {
