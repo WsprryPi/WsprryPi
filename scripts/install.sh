@@ -48,7 +48,7 @@ IFS=$'\n\t'
 # -----------------------------------------------------------------------------
 
 declare DEFAULT_REPO_BRANCH="main"
-declare DEFAULT_SEM_VER="3.0.0"
+declare DEFAULT_SEM_VER="3.1.0"
 
 # -----------------------------------------------------------------------------
 # @brief Trap unexpected errors during script execution.
