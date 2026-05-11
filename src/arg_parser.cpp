@@ -3842,3 +3842,13 @@ bool consume_startup_config_handoff() noexcept
 {
     return startup_config_handoff_ready.exchange(false, std::memory_order_acq_rel);
 }
+
+bool apply_managed_startup_policy_if_requested(bool startup_config_handoff)
+{
+    if (!startup_config_handoff || !config.use_ini)
+    {
+        return false;
+    }
+
+    return apply_enable_on_boot_startup_policy();
+}

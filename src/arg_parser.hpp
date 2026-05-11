@@ -249,6 +249,18 @@ void clear_dfcw_startup_request() noexcept;
 bool handle_early_cli_options(int argc, char *argv[]);
 
 bool consume_startup_config_handoff() noexcept;
+
+/**
+ * @brief Applies INI-managed daemon startup policy when the startup handoff is active.
+ *
+ * This gates Operation.Enable on Boot to daemon/service startup only. Direct CLI
+ * modes, including WSPR, test tone, QRSS, FSKCW, and DFCW, do not receive this
+ * policy because they do not produce an INI startup handoff.
+ *
+ * @return true when Operation.Transmit was changed and persisted by the policy.
+ */
+bool apply_managed_startup_policy_if_requested(bool startup_config_handoff);
+
 void set_startup_diagnostic_deferral(bool enabled) noexcept;
 void emit_deferred_startup_diagnostics();
 
