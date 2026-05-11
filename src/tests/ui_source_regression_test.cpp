@@ -268,7 +268,7 @@ int main()
         ui_source.find("syncBandGpioColumnHeaderStates();\n    validateBandGpioFields();") != std::string::npos,
         "Band GPIO header state must be recomputed when row state changes");
     require(
-        ui_source.find("Paired planning requires a compound callsign and 6-character locator.") != std::string::npos &&
+        ui_source.find("Paired planning requires an encodable companion frame and 6-character locator.") != std::string::npos &&
             ui_source.find("detailActionLabel: \"More\"") != std::string::npos &&
             ui_source.find("title: \"Setup details\"") != std::string::npos &&
             ui_source.find("preserveLineBreaks: true") != std::string::npos,

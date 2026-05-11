@@ -2982,6 +2982,12 @@ int main(int argc, char *argv[])
             "valid explicit Type 3 config patch");
     }
 
+    {
+        require_patch_rejects_with_plan_status(
+            make_identity_patch("AA0NT", "EM18IG"),
+            "BareLongCallsignRequiresExplicitType3",
+            "bare standard callsign with a 6-character locator under default planner policy");
+    }
 
     {
         require_patch_accepts_and_runtime_plans(
@@ -3064,6 +3070,38 @@ int main(int argc, char *argv[])
     }
 
     {
+        require_patch_accepts_and_runtime_plans(
+            make_identity_patch(
+                "<AA0NT>",
+                "EM18IG",
+                WsprPlannerPreference::RequirePaired),
+            "Type1Type3Paired",
+            "<AA0NT>",
+            "EM18IG",
+            "RequirePaired config patch with an explicit Type 3 standard identity",
+            2U,
+            1U,
+            "AA0NT",
+            "EM18");
+    }
+
+    {
+        require_patch_accepts_and_runtime_plans(
+            make_identity_patch(
+                "<AA0NT/12>",
+                "EM18IG",
+                WsprPlannerPreference::RequirePaired),
+            "Type2Type3Paired",
+            "<AA0NT/12>",
+            "EM18IG",
+            "RequirePaired config patch with an explicit Type 3 compound identity",
+            2U,
+            1U,
+            "AA0NT/12",
+            "EM18");
+    }
+
+    {
         require_patch_rejects_with_plan_status(
             make_identity_patch(
                 "AA0NT",
@@ -3071,6 +3109,26 @@ int main(int argc, char *argv[])
                 WsprPlannerPreference::RequirePaired),
             "PairedTransmissionUnavailable",
             "RequirePaired config patch with a plain Type 1 identity");
+    }
+
+    {
+        require_patch_rejects_with_plan_status(
+            make_identity_patch(
+                "<AA0NT>>",
+                "EM18IG",
+                WsprPlannerPreference::RequirePaired),
+            "InvalidCallsign",
+            "invalid explicit Type 3 config patch with nested close marker");
+    }
+
+    {
+        require_patch_rejects_with_plan_status(
+            make_identity_patch(
+                "<AA0NT>",
+                "EM18I9",
+                WsprPlannerPreference::RequirePaired),
+            "InvalidLocator",
+            "explicit Type 3 config patch with invalid 6-character locator");
     }
 
     {
