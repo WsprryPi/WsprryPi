@@ -167,6 +167,17 @@ int main()
                 std::string::npos,
         "UI transmit toggle must patch canonical Operation.Transmit only");
     require(
+        operation_script_source.find("function rebootBehaviorConfigValueFromRadio(value)") !=
+                std::string::npos &&
+            operation_script_source.find("return \"Always\";") !=
+                std::string::npos &&
+            operation_script_source.find("\"Enable on Boot\": nextValue,") !=
+                std::string::npos &&
+            operation_script_source.find("input[name=\"operation_reboot_behavior\"]") !=
+                std::string::npos &&
+            operation_script_source.find("Aways") == std::string::npos,
+        "Operation page reboot behavior radios must patch canonical Operation.Enable on Boot and preserve the Always spelling");
+    require(
         ui_source.find("var Operation = {\n        \"Mode\": mode,") !=
                 std::string::npos &&
             ui_source.find("var Meta = {\n        \"Mode\": mode") ==
@@ -257,7 +268,7 @@ int main()
         ui_source.find("syncBandGpioColumnHeaderStates();\n    validateBandGpioFields();") != std::string::npos,
         "Band GPIO header state must be recomputed when row state changes");
     require(
-        ui_source.find("Paired planning requires a compound callsign and 6-character locator.") != std::string::npos &&
+        ui_source.find("Paired planning requires an encodable companion frame and 6-character locator.") != std::string::npos &&
             ui_source.find("detailActionLabel: \"More\"") != std::string::npos &&
             ui_source.find("title: \"Setup details\"") != std::string::npos &&
             ui_source.find("preserveLineBreaks: true") != std::string::npos,
@@ -348,6 +359,9 @@ int main()
             site_source.find("frequencyHz") != std::string::npos &&
             site_source.find("offsetHz") != std::string::npos &&
             site_source.find("frequencyIsSkip") != std::string::npos &&
+            site_source.find("selectorGpioEnabled") != std::string::npos &&
+            site_source.find("selectorGpio") != std::string::npos &&
+            site_source.find("selectorGpioActiveHigh") != std::string::npos &&
             site_source.find("powerDbm") != std::string::npos &&
             site_source.find("cw_message") != std::string::npos &&
             site_source.find("cw_active_char_index") != std::string::npos &&
@@ -360,6 +374,10 @@ int main()
             site_source.find("return \"(Skip)\";") != std::string::npos &&
             site_source.find("queueRuntimeStatusRefresh();") != std::string::npos &&
             site_source.find("function formatDisplayFrequency(valueHz, options = {})") != std::string::npos &&
+            site_source.find("function formatDisplayFrequencyWithSelector(valueHz, status, options = {})") != std::string::npos &&
+            site_source.find("function formatSelectorGpioSuffix(status)") != std::string::npos &&
+            site_source.find("status.selectorGpioEnabled !== true") != std::string::npos &&
+            site_source.find("return ` @ GPIO${status.selectorGpio}${status.selectorGpioActiveHigh ? \"H\" : \"L\"}`;") != std::string::npos &&
             site_source.find("forceUnit: \"Hz\"") != std::string::npos &&
             site_source.find("function renderCwRuntimeMessage(node, message, activeCharIndex)") != std::string::npos &&
             site_source.find("const isTransmitting =") != std::string::npos &&
@@ -385,11 +403,18 @@ int main()
             websocket_source.find("reply[\"frequency_hz\"] = snapshot.frequency_hz;") != std::string::npos &&
             websocket_source.find("reply[\"offset_hz\"] = snapshot.offset_hz;") != std::string::npos &&
             websocket_source.find("reply[\"frequency_is_skip\"] = snapshot.frequency_is_skip;") != std::string::npos &&
+            websocket_source.find("reply[\"selector_gpio_enabled\"] = snapshot.selector_gpio_enabled;") != std::string::npos &&
+            websocket_source.find("reply[\"selector_gpio\"] = snapshot.selector_gpio;") != std::string::npos &&
+            websocket_source.find("reply[\"selector_gpio_active_high\"] = snapshot.selector_gpio_active_high;") != std::string::npos &&
             websocket_source.find("reply[\"power_dbm\"] = snapshot.power_dbm;") != std::string::npos &&
             scheduling_source.find("j[\"frequency_hz\"] = snapshot.frequency_hz;") != std::string::npos &&
             scheduling_source.find("j[\"offset_hz\"] = snapshot.offset_hz;") != std::string::npos &&
             scheduling_source.find("j[\"frequency_is_skip\"] = snapshot.frequency_is_skip;") != std::string::npos &&
+            scheduling_source.find("j[\"selector_gpio_enabled\"] = snapshot.selector_gpio_enabled;") != std::string::npos &&
+            scheduling_source.find("j[\"selector_gpio\"] = snapshot.selector_gpio;") != std::string::npos &&
+            scheduling_source.find("j[\"selector_gpio_active_high\"] = snapshot.selector_gpio_active_high;") != std::string::npos &&
             scheduling_source.find("j[\"power_dbm\"] = snapshot.power_dbm;") != std::string::npos &&
+            scheduling_source.find("snapshot.selector_gpio_enabled =\n        current_transmission_request.hasSelectorGPIO();") != std::string::npos &&
             scheduling_source.find("snapshot.power_dbm = plan.power_dbm;") != std::string::npos &&
             scheduling_source.find("if (snapshot.tx_state == \"transmitting\")") != std::string::npos &&
             scheduling_source.find("snapshot.runtime_mode = mode_type_name(config.mode);") != std::string::npos &&

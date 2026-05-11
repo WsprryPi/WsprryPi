@@ -184,7 +184,8 @@ namespace
         const std::string &grid_square,
         const std::string &frequency,
         bool transmit,
-        WsprPlannerPreference planner_preference = WsprPlannerPreference::Auto)
+        WsprPlannerPreference planner_preference = WsprPlannerPreference::Auto,
+        const std::string &enable_on_boot = "Never")
     {
         auto data = std::map<std::string, std::unordered_map<std::string, std::string>>{
             {"Meta",
@@ -193,6 +194,7 @@ namespace
              {{"Mode", "WSPR"},
               {"Transmit", transmit ? "true" : "false"},
               {"Transmit Backend", "gpio"},
+              {"Enable on Boot", enable_on_boot},
               {"Use LED", "false"},
               {"LED Pin", "-1"},
               {"Use Amp", "false"},
@@ -1001,9 +1003,9 @@ int main(int argc, char *argv[])
         require(
             config.wspr_frequency_entries[2].selector_gpio == kSelectorGpioUnset &&
                 !config.wspr_frequency_entries[2].selector_gpio_active_high &&
-                !config.wspr_frequency_entries[2].allow_band_gpio_fallback &&
+                config.wspr_frequency_entries[2].allow_band_gpio_fallback &&
                 nearly_equal(config.wspr_frequency_entries[2].dial_frequency_hz, 14095600.0),
-            "plain frequency entries must remain unmapped, explicit-only, and default active low even on managed/INI paths");
+            "plain frequency entries must remain unmapped, eligible for Band GPIO fallback, and default active low even on managed/INI paths");
         require(
             config.wspr_frequency_entries[3].selector_gpio == 22 &&
                 !config.wspr_frequency_entries[3].selector_gpio_active_high &&
@@ -1102,7 +1104,7 @@ int main(int argc, char *argv[])
         write_text_file(
             config.ini_filename,
             "[Meta]\nUse INI=true\nDate Time Log=false\ndebug_logging=false\nLoop TX=false\nTX Iterations=0\n"
-            "[Operation]\nMode=QRSS\nTransmit=false\nTransmit Backend=si5351\nUse LED=false\nLED Pin=-1\nUse Amp=false\nAmp Pin=-1\nAmp Pin Active High=false\nWeb Port=31415\nSocket Port=31416\nUse Shutdown=false\nShutdown Button=-1\n"
+            "[Operation]\nMode=QRSS\nTransmit=false\nTransmit Backend=si5351\nEnable on Boot=Never\nUse LED=false\nLED Pin=-1\nUse Amp=false\nAmp Pin=-1\nAmp Pin Active High=false\nWeb Port=31415\nSocket Port=31416\nUse Shutdown=false\nShutdown Button=-1\n"
             "[GPIO]\nTransmit Pin=4\nPower Level=7\nUse NTP=false\n"
             "[Calibration]\nPPM=0\n"
             "[Si5351]\nI2C Bus=1\nI2C Address=96\nReference Frequency=27000000\nTX Output=CLK0\nPower Level=1\n"
@@ -1144,10 +1146,10 @@ int main(int argc, char *argv[])
         require(
             config.wspr_frequency_entries.size() == 2U &&
                 config.wspr_frequency_entries[0].selector_gpio == kSelectorGpioUnset &&
-                !config.wspr_frequency_entries[0].allow_band_gpio_fallback &&
+                config.wspr_frequency_entries[0].allow_band_gpio_fallback &&
                 config.wspr_frequency_entries[1].selector_gpio == kSelectorGpioUnset &&
-                !config.wspr_frequency_entries[1].allow_band_gpio_fallback,
-            "web patch normalization must keep plain frequency entries explicit-only even when Band GPIO config exists");
+                config.wspr_frequency_entries[1].allow_band_gpio_fallback,
+            "web patch normalization must allow plain frequency entries to inherit Band GPIO config");
     }
 
     {
@@ -2200,6 +2202,11 @@ int main(int argc, char *argv[])
             skip_snapshot.frequency_is_skip &&
                 nearly_equal(skip_snapshot.frequency_hz, 0.0),
             "runtime snapshots must expose a committed 0 Hz WSPR slot as an explicit skip window");
+        require(
+            !skip_snapshot.selector_gpio_enabled &&
+                skip_snapshot.selector_gpio == kSelectorGpioUnset &&
+                !skip_snapshot.selector_gpio_active_high,
+            "runtime snapshots must not expose a selector suffix for skip windows without committed selector GPIO");
 
         transmitter_cb(
             WsprTransmissionCallbackEvent::SKIPPED,
@@ -2975,6 +2982,12 @@ int main(int argc, char *argv[])
             "valid explicit Type 3 config patch");
     }
 
+    {
+        require_patch_rejects_with_plan_status(
+            make_identity_patch("AA0NT", "EM18IG"),
+            "BareLongCallsignRequiresExplicitType3",
+            "bare standard callsign with a 6-character locator under default planner policy");
+    }
 
     {
         require_patch_accepts_and_runtime_plans(
@@ -3057,6 +3070,38 @@ int main(int argc, char *argv[])
     }
 
     {
+        require_patch_accepts_and_runtime_plans(
+            make_identity_patch(
+                "<AA0NT>",
+                "EM18IG",
+                WsprPlannerPreference::RequirePaired),
+            "Type1Type3Paired",
+            "<AA0NT>",
+            "EM18IG",
+            "RequirePaired config patch with an explicit Type 3 standard identity",
+            2U,
+            1U,
+            "AA0NT",
+            "EM18");
+    }
+
+    {
+        require_patch_accepts_and_runtime_plans(
+            make_identity_patch(
+                "<AA0NT/12>",
+                "EM18IG",
+                WsprPlannerPreference::RequirePaired),
+            "Type2Type3Paired",
+            "<AA0NT/12>",
+            "EM18IG",
+            "RequirePaired config patch with an explicit Type 3 compound identity",
+            2U,
+            1U,
+            "AA0NT/12",
+            "EM18");
+    }
+
+    {
         require_patch_rejects_with_plan_status(
             make_identity_patch(
                 "AA0NT",
@@ -3064,6 +3109,26 @@ int main(int argc, char *argv[])
                 WsprPlannerPreference::RequirePaired),
             "PairedTransmissionUnavailable",
             "RequirePaired config patch with a plain Type 1 identity");
+    }
+
+    {
+        require_patch_rejects_with_plan_status(
+            make_identity_patch(
+                "<AA0NT>>",
+                "EM18IG",
+                WsprPlannerPreference::RequirePaired),
+            "InvalidCallsign",
+            "invalid explicit Type 3 config patch with nested close marker");
+    }
+
+    {
+        require_patch_rejects_with_plan_status(
+            make_identity_patch(
+                "<AA0NT>",
+                "EM18I9",
+                WsprPlannerPreference::RequirePaired),
+            "InvalidLocator",
+            "explicit Type 3 config patch with invalid 6-character locator");
     }
 
     {
@@ -3426,6 +3491,7 @@ int main(int argc, char *argv[])
             config.ini_filename,
             "[Meta]\ndebug_logging=false\n"
             "[Operation]\nMode=WSPR\nTransmit=false\nTransmit Backend=gpio\n"
+            "Enable on Boot=Never\n"
             "Use LED=false\nLED Pin=-1\nUse Amp=false\nAmp Pin=-1\nAmp Pin Active High=false\nWeb Port=31415\nSocket Port=31416\n"
             "Use Shutdown=false\nShutdown Button=-1\n"
             "[GPIO]\nTransmit Pin=4\nPower Level=7\nUse NTP=false\n"
@@ -3479,6 +3545,223 @@ int main(int argc, char *argv[])
         require(
             operation_it->second.find("Enable Web") == operation_it->second.end(),
             "json_to_ini must not persist the CLI-only web override");
+    }
+
+    {
+        init_config_json();
+        json_to_config();
+        require(
+            config.enable_on_boot == EnableOnBootBehavior::Never,
+            "missing Operation.Enable on Boot must default to Never");
+
+        jConfig["Operation"]["Enable on Boot"] = "Follow";
+        json_to_config();
+        require(
+            config.enable_on_boot == EnableOnBootBehavior::Follow,
+            "Operation.Enable on Boot must parse Follow");
+
+        jConfig["Operation"]["Enable on Boot"] = "Always";
+        json_to_config();
+        require(
+            config.enable_on_boot == EnableOnBootBehavior::Always,
+            "Operation.Enable on Boot must preserve and parse Always spelling");
+
+        config.use_ini = true;
+        config.ini_filename = "/tmp/enable_on_boot_persistence.ini";
+        write_text_file(config.ini_filename, "");
+        iniFile.set_filename(config.ini_filename);
+        config_to_json();
+        json_to_ini();
+        require(
+            iniFile.getData().at("Operation").at("Enable on Boot") == "Always",
+            "json_to_ini must persist Operation.Enable on Boot using canonical Always spelling");
+
+        patch_all_from_web({{"Operation", {{"Enable on Boot", "Never"}}}});
+        require(
+            config.enable_on_boot == EnableOnBootBehavior::Never &&
+                jConfig["Operation"].value("Enable on Boot", std::string()) == "Never" &&
+                iniFile.getData().at("Operation").at("Enable on Boot") == "Never",
+            "web patch must persist canonical Operation.Enable on Boot in live config, JSON, and INI");
+
+        jConfig["Operation"]["Enable on Boot"] = "Aways";
+        bool rejected_invalid_enable_on_boot = false;
+        try
+        {
+            json_to_config();
+        }
+        catch (const std::exception &e)
+        {
+            rejected_invalid_enable_on_boot =
+                std::string(e.what()).find("Invalid Operation.Enable on Boot") !=
+                std::string::npos;
+        }
+        require(
+            rejected_invalid_enable_on_boot,
+            "Operation.Enable on Boot must reject values other than Never, Follow, or Always");
+    }
+
+    {
+        auto exercise_startup_policy =
+            [](EnableOnBootBehavior behavior,
+               bool initial_transmit,
+               bool expected_transmit,
+               const std::string &ini_filename,
+               const char *message)
+        {
+            init_default_config();
+            config.use_ini = true;
+            config.ini_filename = ini_filename;
+            write_text_file(config.ini_filename, "");
+            iniFile.set_filename(config.ini_filename);
+            config.enable_on_boot = behavior;
+            config.transmit = initial_transmit;
+            config_to_json();
+            json_to_ini();
+
+            apply_enable_on_boot_startup_policy();
+
+            require(config.transmit == expected_transmit, message);
+            require(
+                iniFile.getData().at("Operation").at("Transmit") ==
+                    std::string(expected_transmit ? "true" : "false"),
+                message);
+        };
+
+        exercise_startup_policy(
+            EnableOnBootBehavior::Never,
+            true,
+            false,
+            "/tmp/enable_on_boot_startup_never.ini",
+            "Enable on Boot Never must disable and persist Operation.Transmit on startup");
+        exercise_startup_policy(
+            EnableOnBootBehavior::Follow,
+            true,
+            true,
+            "/tmp/enable_on_boot_startup_follow_true.ini",
+            "Enable on Boot Follow must preserve a true Operation.Transmit on startup");
+        exercise_startup_policy(
+            EnableOnBootBehavior::Follow,
+            false,
+            false,
+            "/tmp/enable_on_boot_startup_follow_false.ini",
+            "Enable on Boot Follow must preserve a false Operation.Transmit on startup");
+        exercise_startup_policy(
+            EnableOnBootBehavior::Always,
+            false,
+            true,
+            "/tmp/enable_on_boot_startup_always.ini",
+            "Enable on Boot Always must enable and persist Operation.Transmit on startup");
+
+        auto exercise_managed_startup_gate =
+            [](EnableOnBootBehavior behavior,
+               bool startup_config_handoff,
+               bool use_ini,
+               bool initial_transmit,
+               bool expected_transmit,
+               const std::string &ini_filename,
+               const char *message)
+        {
+            init_default_config();
+            config.use_ini = use_ini;
+            config.ini_filename = ini_filename;
+            write_text_file(config.ini_filename, "");
+            iniFile.set_filename(config.ini_filename);
+            config.enable_on_boot = behavior;
+            config.transmit = initial_transmit;
+            config_to_json();
+            json_to_ini();
+
+            apply_managed_startup_policy_if_requested(startup_config_handoff);
+
+            require(config.transmit == expected_transmit, message);
+            if (use_ini)
+            {
+                require(
+                    iniFile.getData().at("Operation").at("Transmit") ==
+                        std::string(expected_transmit ? "true" : "false"),
+                    message);
+            }
+        };
+
+        exercise_managed_startup_gate(
+            EnableOnBootBehavior::Never,
+            true,
+            true,
+            true,
+            false,
+            "/tmp/enable_on_boot_managed_gate_never.ini",
+            "managed INI startup must apply Enable on Boot Never");
+        exercise_managed_startup_gate(
+            EnableOnBootBehavior::Follow,
+            true,
+            true,
+            true,
+            true,
+            "/tmp/enable_on_boot_managed_gate_follow_true.ini",
+            "managed INI startup must leave Operation.Transmit unchanged for Follow=true");
+        exercise_managed_startup_gate(
+            EnableOnBootBehavior::Follow,
+            true,
+            true,
+            false,
+            false,
+            "/tmp/enable_on_boot_managed_gate_follow_false.ini",
+            "managed INI startup must leave Operation.Transmit unchanged for Follow=false");
+        exercise_managed_startup_gate(
+            EnableOnBootBehavior::Always,
+            true,
+            true,
+            false,
+            true,
+            "/tmp/enable_on_boot_managed_gate_always.ini",
+            "managed INI startup must apply Enable on Boot Always");
+        exercise_managed_startup_gate(
+            EnableOnBootBehavior::Never,
+            false,
+            true,
+            true,
+            true,
+            "/tmp/enable_on_boot_no_handoff.ini",
+            "Enable on Boot policy must not apply without managed startup handoff");
+        exercise_managed_startup_gate(
+            EnableOnBootBehavior::Always,
+            true,
+            false,
+            false,
+            false,
+            "/tmp/enable_on_boot_direct_cli.ini",
+            "Enable on Boot policy must not apply outside INI-managed mode");
+
+        auto exercise_direct_mode_no_startup_policy =
+            [](ModeType mode, const char *message)
+        {
+            init_default_config();
+            config.use_ini = false;
+            config.mode = mode;
+            config.enable_on_boot = EnableOnBootBehavior::Always;
+            config.transmit = false;
+            config_to_json();
+
+            apply_managed_startup_policy_if_requested(true);
+
+            require(!config.transmit, message);
+        };
+
+        exercise_direct_mode_no_startup_policy(
+            ModeType::WSPR,
+            "Enable on Boot policy must not apply to direct CLI WSPR mode");
+        exercise_direct_mode_no_startup_policy(
+            ModeType::TONE,
+            "Enable on Boot policy must not apply to direct CLI test tone mode");
+        exercise_direct_mode_no_startup_policy(
+            ModeType::QRSS,
+            "Enable on Boot policy must not apply to direct CLI QRSS mode");
+        exercise_direct_mode_no_startup_policy(
+            ModeType::FSKCW,
+            "Enable on Boot policy must not apply to direct CLI FSKCW mode");
+        exercise_direct_mode_no_startup_policy(
+            ModeType::DFCW,
+            "Enable on Boot policy must not apply to direct CLI DFCW mode");
     }
 
     {
@@ -3744,6 +4027,15 @@ int main(int argc, char *argv[])
         request.selector_gpio_config.enabled = true;
         request.selector_gpio_config.active_high = true;
         set_current_transmission_request_for_test(request);
+        {
+            const WsprRuntimeStatusSnapshot snapshot =
+                current_tx_runtime_status_snapshot();
+            require(
+                snapshot.selector_gpio_enabled &&
+                    snapshot.selector_gpio == 21 &&
+                    snapshot.selector_gpio_active_high,
+                "runtime snapshots must expose committed selector GPIO and polarity");
+        }
 
         reset_tx_led_request_counts_for_test();
         GPIOOutput::clearTestEvents();
@@ -5027,6 +5319,10 @@ int main(int argc, char *argv[])
         require(
             parse_command_line(static_cast<int>(argv.size()), argv.data()),
             "CLI planner preference override over INI must parse");
+        require(
+            config.transmit &&
+                iniFile.getData().at("Operation").at("Transmit") == "true",
+            "CLI planner preference override must not receive Enable on Boot startup policy during parsing");
         require(
             config.use_ini &&
                 config.wspr_planner_preference == WsprPlannerPreference::PreferPaired &&

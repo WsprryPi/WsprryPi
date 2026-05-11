@@ -374,6 +374,9 @@ void WebSocketServer::handleMessage(const std::string &raw_message)
             reply["frequency_hz"] = snapshot.frequency_hz;
             reply["offset_hz"] = snapshot.offset_hz;
             reply["frequency_is_skip"] = snapshot.frequency_is_skip;
+            reply["selector_gpio_enabled"] = snapshot.selector_gpio_enabled;
+            reply["selector_gpio"] = snapshot.selector_gpio;
+            reply["selector_gpio_active_high"] = snapshot.selector_gpio_active_high;
             reply["plan_type"] = snapshot.plan_type;
             reply["power_dbm"] = snapshot.power_dbm;
             reply["frame_count"] = snapshot.frame_count;
