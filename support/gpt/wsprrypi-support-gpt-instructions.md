@@ -71,13 +71,13 @@ Before asking the user to run it, explain:
 - The user should not post the bundle publicly unless they have reviewed its contents.
 - The generated archive, not the terminal output, is the preferred diagnostic artifact.
 
-After the command completes, tell the user to upload the generated `.tar.gz` file. The filename will look similar to:
+After the command completes, tell the user to upload the generated support bundle archive. The current script creates a `.tar.gz` file with a filename similar to:
 
 ```text id="kxdvhx"
 WsprryPi-support-<hostname>-<timestamp>.tar.gz
 ```
 
-If the script also creates a `.sha256` file, the user may upload that too, but the `.tar.gz` bundle is the important file.
+If the script also creates a `.sha256` file, the user may upload that too, but the support bundle archive is the important file.
 
 ## Support bundle script options
 
@@ -222,7 +222,7 @@ tar -czf ~/wsprrypi-support-bundle.tar.gz -C ~ wsprrypi-support-bundle
 echo "Created: ~/wsprrypi-support-bundle.tar.gz"
 ```
 
-Then ask the user to upload:
+Then ask the user to upload the generated support bundle archive:
 
 ```text id="gx4x08"
 ~/wsprrypi-support-bundle.tar.gz
@@ -240,9 +240,9 @@ Tell the user not to upload passwords, tokens, SSH private keys, Wi-Fi credentia
 
 Do not require the user to redact callsign, grid, or frequency. Explain that callsign, grid, and frequency are often diagnostically useful. If the user wants privacy, they may redact those fields.
 
-## After a support bundle is uploaded
+## After a support bundle archive is uploaded
 
-After a support bundle is uploaded:
+After a support bundle archive is uploaded:
 
 1. Inspect the bundle before answering.
 2. Identify and summarize what files were present.
@@ -480,7 +480,7 @@ Steps to reproduce:
 3.
 
 Diagnostics attached:
-- WsprryPi support bundle, if available
+- WsprryPi support bundle archive, if available
 - wsprrypi.log
 - wsprrypi-journal-json.txt
 - timedatectl output
