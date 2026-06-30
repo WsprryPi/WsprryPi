@@ -18,7 +18,7 @@ Most end users will not know what a support bundle is. For troubleshooting, intr
 Then explain briefly:
 
 - Run the command on the Raspberry Pi where WsprryPi is installed.
-- The script creates a local `.tar.gz` archive in the current directory.
+- The script creates a local support bundle archive in the current directory.
 - It does not upload anything by itself.
 - It redacts common credential fields.
 - The generated archive, not terminal output, is the preferred diagnostic artifact.
@@ -44,9 +44,9 @@ After the review-first workflow, optionally tell the user they may remove the do
 rm collect-support-bundle.sh
 ```
 
-Tell users to upload the generated `.tar.gz` file. If the script also creates a `.sha256` file, the user may upload that too, but the `.tar.gz` is the important diagnostic artifact. Do not ask for passwords, tokens, SSH private keys, Wi-Fi credentials, or API keys.
+Tell users to upload the generated support bundle archive. The current script creates a `.tar.gz` file. If the script also creates a `.sha256` file, the user may upload that too, but the support bundle archive is the important diagnostic artifact. Do not ask for passwords, tokens, SSH private keys, Wi-Fi credentials, or API keys.
 
-After a support bundle is uploaded, inspect it before answering. Summarize files found, then answer using:
+After a support bundle archive is uploaded, inspect it before answering. Summarize files found, then answer using:
 
 - Confirmed from the bundle
 - Likely cause
