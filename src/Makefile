@@ -587,6 +587,8 @@ semantics-test: $(BIN_DIR)/$(SEMANTICS_TEST_OUT) $(BIN_DIR)/$(UI_SOURCE_REGRESSI
 	$(Q)./$(BIN_DIR)/$(SEMANTICS_TEST_OUT)
 	$(Q)echo "Running UI/source regression tests."
 	$(Q)./$(BIN_DIR)/$(UI_SOURCE_REGRESSION_TEST_OUT)
+	$(Q)echo "Running log timestamp display regression tests."
+	$(Q)node tests/log_timestamp_display_test.js
 	$(Q)echo "Running update-check comparison tests."
 	$(Q)node tests/update_check_comparison_test.js
 
