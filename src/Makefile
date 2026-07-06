@@ -70,7 +70,7 @@ INI_FILE := /usr/local/etc/wsprrypi.ini
 WSPR_PARAMS := AA0NT EM18 20 40m
 
 # Test Frequency
-TEST_FREQ := 730000
+TEST_FREQ := 14095600
 
 # Install location
 # If you prefer a different location, set it on the command
@@ -96,7 +96,8 @@ SUBMODULE_SRCDIRS += $(wildcard ./WSPR-Transmitter/src)
 # Project naming/versioning (from Git)
 # ─────────────────────────────────────────────────────────────────────────────
 
-PRJ := $(strip $(shell 	url="$$(git remote get-url origin 2>/dev/null)"; 	if [ -n "$$url" ]; then 		echo "$$url" 		| sed -E 's#.*/##; s#\.git$$##'; 	else 		echo unknown; 	fi ))
+PRJ_RAW := $(strip $(basename $(notdir $(shell git remote get-url origin 2>/dev/null))))
+PRJ := $(if $(PRJ_RAW),$(PRJ_RAW),unknown)
 EXE_NAME := $(shell echo $(PRJ) | tr '[:upper:]' '[:lower:]')
 RAW_BRH := $(shell git rev-parse --abbrev-ref HEAD 2>/dev/null || echo unknown)
 BRANCH_STATE := $(shell if ! git rev-parse --is-inside-work-tree >/dev/null 2>&1; then echo unknown; elif git symbolic-ref --quiet --short HEAD >/dev/null 2>&1; then echo branch; else echo detached; fi)
@@ -125,6 +126,7 @@ BAND_GPIO_LIVE_MONITOR_OUT := band_gpio_live_monitor
 GPIO_LINE_RESOLVER_TEST_OUT := gpio_line_resolver_test
 NON_WSPR_REPEAT_POLICY_TEST_OUT := non_wspr_repeat_policy_test
 QRSS_EXECUTION_REGRESSION_TEST_OUT := qrss_execution_regression_test
+WSPR_TONE_REGRESSION_TEST_OUT := wspr_tone_regression_test
 SELECTOR_SHUTDOWN_CLEANUP_TEST_OUT := selector_shutdown_cleanup_test
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -140,8 +142,8 @@ BIN_DIR         := build/bin
 # Source discovery (C++ only)
 # ─────────────────────────────────────────────────────────────────────────────
 
-LOCAL_CPP_SOURCES := $(shell find . -maxdepth 1 -type f -name '*.cpp' 2>/dev/null)
-SUBMODULE_CPP_SOURCES := $(shell find $(SUBMODULE_SRCDIRS) -type f -name '*.cpp' ! -name 'main.cpp' 2>/dev/null)
+LOCAL_CPP_SOURCES := $(shell find . -maxdepth 1 -type f -name '*.cpp' ! -name '._*' 2>/dev/null)
+SUBMODULE_CPP_SOURCES := $(shell find $(SUBMODULE_SRCDIRS) -type f -name '*.cpp' ! -name '._*' ! -name 'main.cpp' 2>/dev/null)
 SI5351_TEST_SOURCE := ./WSPR-Transmitter/src/si5351_backend_harness.cpp
 SUBMODULE_CPP_SOURCES := $(filter-out $(SI5351_TEST_SOURCE),$(SUBMODULE_CPP_SOURCES))
 
@@ -187,6 +189,9 @@ NON_WSPR_REPEAT_POLICY_TEST_DEPS := $(filter-out $(MAIN_DEBUG_OBJECT),$(CPP_DEBU
 QRSS_EXECUTION_REGRESSION_TEST_SRC := tests/qrss_execution_regression_test.cpp
 QRSS_EXECUTION_REGRESSION_TEST_OBJ := $(OBJ_DIR_DEBUG)/tests/qrss_execution_regression_test.o
 QRSS_EXECUTION_REGRESSION_TEST_DEPS := $(filter-out $(MAIN_DEBUG_OBJECT),$(CPP_DEBUG_OBJECTS))
+WSPR_TONE_REGRESSION_TEST_SRC := tests/wspr_tone_regression_test.cpp
+WSPR_TONE_REGRESSION_TEST_OBJ := $(OBJ_DIR_DEBUG)/tests/wspr_tone_regression_test.o
+WSPR_TONE_REGRESSION_TEST_DEPS := $(filter-out $(MAIN_DEBUG_OBJECT),$(CPP_DEBUG_OBJECTS))
 SELECTOR_SHUTDOWN_CLEANUP_TEST_SRC := tests/selector_shutdown_cleanup_test.cpp
 SELECTOR_SHUTDOWN_CLEANUP_TEST_OBJ := $(OBJ_DIR_DEBUG)/tests/selector_shutdown_cleanup_test.o
 SELECTOR_SHUTDOWN_CLEANUP_TEST_DEPS := $(filter-out $(MAIN_DEBUG_OBJECT),$(CPP_DEBUG_OBJECTS))
@@ -475,6 +480,17 @@ $(BIN_DIR)/$(QRSS_EXECUTION_REGRESSION_TEST_OUT): $(QRSS_EXECUTION_REGRESSION_TE
 	$(Q)echo "Linking debug: $(QRSS_EXECUTION_REGRESSION_TEST_OUT)"
 	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) $^ -o $@ $(LDFLAGS)
 
+$(WSPR_TONE_REGRESSION_TEST_OBJ): $(WSPR_TONE_REGRESSION_TEST_SRC)
+	$(Q)mkdir -p $(dir $@)
+	$(Q)mkdir -p $(DEP_DIR)/tests
+	$(Q)echo "Compiling (debug) $< into $@"
+	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -MF $(DEP_DIR)/tests/wspr_tone_regression_test.d -c $< -o $@
+
+$(BIN_DIR)/$(WSPR_TONE_REGRESSION_TEST_OUT): $(WSPR_TONE_REGRESSION_TEST_OBJ) $(WSPR_TONE_REGRESSION_TEST_DEPS)
+	$(Q)mkdir -p $(BIN_DIR)
+	$(Q)echo "Linking debug: $(WSPR_TONE_REGRESSION_TEST_OUT)"
+	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) $^ -o $@ $(LDFLAGS)
+
 $(SELECTOR_SHUTDOWN_CLEANUP_TEST_OBJ): $(SELECTOR_SHUTDOWN_CLEANUP_TEST_SRC)
 	$(Q)mkdir -p $(dir $@)
 	$(Q)mkdir -p $(DEP_DIR)/tests
@@ -539,7 +555,7 @@ $(BIN_DIR)/$(OUT): $(CPP_OBJECTS)
 # Phony targets
 # ─────────────────────────────────────────────────────────────────────────────
 
-.PHONY: clean release debug test test-tone test-oneshot semantics-test update-check-comparison-test guarded-mode-change-persistence-test band-gpio-default-convergence-test band-gpio-rotation-test selector-shutdown-cleanup-test monitor-file-regression-test gpio-line-resolver-test non-wspr-repeat-policy-test gpio-loopback-test band-gpio-live-monitor gdb install debuginstall uninstall lint macros help
+.PHONY: clean release debug test test-tone test-oneshot semantics-test update-check-comparison-test guarded-mode-change-persistence-test band-gpio-default-convergence-test band-gpio-rotation-test selector-shutdown-cleanup-test monitor-file-regression-test gpio-line-resolver-test non-wspr-repeat-policy-test qrss-execution-regression-test qrss_execution_regression_test wspr-tone-regression-test wspr_tone_regression_test gpio-loopback-test band-gpio-live-monitor gdb install debuginstall uninstall lint macros help
 DEBUG: debug
 RELEASE: release
 
@@ -604,6 +620,14 @@ gpio-line-resolver-test: $(BIN_DIR)/$(GPIO_LINE_RESOLVER_TEST_OUT)
 non-wspr-repeat-policy-test: $(BIN_DIR)/$(NON_WSPR_REPEAT_POLICY_TEST_OUT)
 	$(Q)echo "Running non-WSPR repeat policy regression tests."
 	$(Q)./$(BIN_DIR)/$(NON_WSPR_REPEAT_POLICY_TEST_OUT)
+
+qrss-execution-regression-test qrss_execution_regression_test: $(BIN_DIR)/$(QRSS_EXECUTION_REGRESSION_TEST_OUT)
+	$(Q)echo "Running QRSS/WSPR execution regression tests."
+	$(Q)./$(BIN_DIR)/$(QRSS_EXECUTION_REGRESSION_TEST_OUT)
+
+wspr-tone-regression-test wspr_tone_regression_test: $(BIN_DIR)/$(WSPR_TONE_REGRESSION_TEST_OUT)
+	$(Q)echo "Running WSPR tone regression tests."
+	$(Q)./$(BIN_DIR)/$(WSPR_TONE_REGRESSION_TEST_OUT)
 
 ifeq ($(GPIOD_HAS_V2),1)
 gpio-loopback-test: $(BIN_DIR)/$(GPIO_LOOPBACK_TEST_OUT)
