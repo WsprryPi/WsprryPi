@@ -1,69 +1,95 @@
-# GitIgnore for WsprryPi
+# Repo-specific ignores
 wsprrypi
 wsprrypi_test
 executables/
 config/wsprrypi.ini.temp
-
-# macOS metadata on network/shared mounts
-._*
-.AppleDouble/
-.DS_Store
-
-# General Rules
-Thumbs.db
-*.log
-*.bak
-*.zip
-
-# Ignore all files without extensions in src/
 src/[^/]*[^.][^/]*$
-
-# Allow the src/ directory itself
 !src/
-
-# Ensure .o and .d files remain ignored even with the rule above
 src/*.o
 src/*.d
-
-# Ignore build
-src/build/
-
-## Allow specific files in /src
 !/src/Makefile
+.codex/
+.agents/
+skills-lock.json
+package.json
+package-lock.json
 
-## C/C++ Ignores
-*.d            # Dependency files
-*.o            # Compiled object files
-*.obj
-*.so           # Shared objects
-*.dll
-*.dylib
-*.a            # Static libraries
-*.lib
-*.exe          # Executables
-*.out
-*.app
-*.gch          # Precompiled headers
-*.pch
-*.pdb          # Program database files
-*.ilk          # Incremental linker files
-*.map          # Linker map files
-*.sbr
-*.idb
-*.ipch         # IntelliSense precompiled headers
-*.sdf          # SQL Server Compact files
-*.tlog         # Task logs
-*.vcxproj.user
+# macOS / AppleDouble files
+.DS_Store
+._*
+.AppleDouble/
+.LSOverride
 
-## Build Directories
+# Editor / IDE files
+.idea/
+.vscode/
+*.code-workspace
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Temporary files
+*.tmp
+*.swp
+*.swo
+*~
+*.bak
+*.old
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Build artifacts
 [bB]in/
 [Oo]bj/
 build/
 dist/
+dist-ssr/
+install/
 x64/
 x86/
 
-## Python Ignores
+# Object / library / binary outputs
+*.d
+*.o
+*.obj
+*.slo
+*.lo
+*.so
+*.dll
+*.dylib
+*.a
+*.lib
+*.exe
+*.out
+*.app
+
+# C/C++ / CMake outputs
+*.gch
+*.pch
+*.pdb
+*.ilk
+*.map
+*.sbr
+*.idb
+*.ipch
+*.sdf
+*.tlog
+*.vcxproj.user
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+compile_commands.json
+
+# Python outputs
 __pycache__/
 *.pyc
 *.pyo
@@ -72,37 +98,11 @@ __pycache__/
 *.egg-info/
 *.manifest
 *.spec
-
-# Python virtual environment
 .venv/
 venv/
 
-## Sphinx Documentation
+# Documentation outputs
 docs/_build/
 
-## Ignore IDE/editor-specific files
-.idea/
-*.code-workspace
-
-## Backup Files
-*.tmp
-*.swp
-*.swo
-*~
-*.bak
-*.old
-
-# Node stuff
+# Node outputs
 node_modules/
-package.json
-package-lock.json
-
-# Codex
-.codex
-
-# Codex / agent artifacts
-.agents/
-skills-lock.json
-
-# Optional local lint config
-.markdownlint.json
