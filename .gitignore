@@ -4,8 +4,12 @@ wsprrypi_test
 executables/
 config/wsprrypi.ini.temp
 
-## General Rules
+# macOS metadata on network/shared mounts
+._*
+.AppleDouble/
 .DS_Store
+
+# General Rules
 Thumbs.db
 *.log
 *.bak
