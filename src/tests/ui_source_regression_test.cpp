@@ -109,10 +109,18 @@ int main()
 
     const std::string ui_source =
         read_text_file("/home/pi/WsprryPi/WsprryPi-UI/data/index.js");
+    const std::string config_view_source =
+        read_text_file("/home/pi/WsprryPi/WsprryPi-UI/data/views/config.php");
     const std::string maintenance_script_source =
         read_text_file("/home/pi/WsprryPi/WsprryPi-UI/data/maintenance.js");
     const std::string operation_script_source =
         read_text_file("/home/pi/WsprryPi/WsprryPi-UI/data/operation.js");
+    const std::string cw_message_input =
+        extract_input_tag_by_id(config_view_source, "qrss_message");
+    require(
+        cw_message_input.find("type=\"text\"") != std::string::npos &&
+            cw_message_input.find("step=") == std::string::npos,
+        "CW message input must remain textual so numeric-only operator messages such as 73 are not treated as numbers");
     require(
         ui_source.find("persist_transmit: persistTransmit") !=
                 std::string::npos,
@@ -216,6 +224,7 @@ int main()
             ui_source.find("Enter a positive CW inter-character gap.") != std::string::npos &&
             ui_source.find("Enter a positive CW inter-word gap.") != std::string::npos &&
             ui_source.find("let cw_message = String($('#qrss_message').val() || \"\").trim();") != std::string::npos &&
+            ui_source.find("\"Message\": cw_message,") != std::string::npos &&
             ui_source.find("let cw_base_frequency = parseFrequencyWithOptionalUnits($('#qrss_frequency').val());") != std::string::npos &&
             ui_source.find("let cw_intra_element_gap = parseFloat($('#cw_intra_element_gap').val());") != std::string::npos &&
             ui_source.find("let cw_inter_character_gap = parseFloat($('#cw_inter_character_gap').val());") != std::string::npos &&
@@ -268,8 +277,14 @@ int main()
         ui_source.find("syncBandGpioColumnHeaderStates();\n    validateBandGpioFields();") != std::string::npos,
         "Band GPIO header state must be recomputed when row state changes");
     require(
-        ui_source.find("Paired planning requires an encodable companion frame and 6-character locator.") != std::string::npos &&
+        ui_source.find("const PAIRED_PLANNING_SHORT_MESSAGE =") != std::string::npos &&
+            ui_source.find("Paired planning requires a compound callsign and 6-character locator.") != std::string::npos &&
+            ui_source.find("function isPairedPlanningUnavailableError(data)") != std::string::npos &&
+            ui_source.find("data.plan_status.trim() === \"PairedTransmissionUnavailable\"") != std::string::npos &&
+            ui_source.find("const isPairedPlanningFailure =\n                isPairedPlanningUnavailableError(parsedError);") != std::string::npos &&
+            ui_source.find("PAIRED_PLANNING_SHORT_MESSAGE,\n                    message,") != std::string::npos &&
             ui_source.find("detailActionLabel: \"More\"") != std::string::npos &&
+            ui_source.find("onDetailAction: () => openSetupDetailsDialog(message)") != std::string::npos &&
             ui_source.find("title: \"Setup details\"") != std::string::npos &&
             ui_source.find("preserveLineBreaks: true") != std::string::npos,
         "paired planning save failures must collapse to a short setup-card message with a More dialog trigger that preserves full diagnostic line breaks");
@@ -975,8 +990,6 @@ int main()
             ui_source.find("syncCalibrationControls();") != std::string::npos,
         "config UI must make calibration controls mode-aware so WSPR follows NTP while CW keeps PPM editable");
 
-    const std::string config_view_source =
-        read_text_file("/home/pi/WsprryPi/WsprryPi-UI/data/views/config.php");
     require(
         config_view_source.find("id=\"modeChangeGuardModal\"") != std::string::npos &&
             config_view_source.find("id=\"modeChangeGuardConfirmBtn\"") != std::string::npos,

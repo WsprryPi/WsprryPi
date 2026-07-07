@@ -440,6 +440,48 @@ namespace
             message + " must not mutate live config after rejection");
     }
 
+    void require_patch_rejects_with_plan_status_and_message(
+        const nlohmann::json &patch,
+        const std::string &expected_plan_status,
+        const std::string &expected_message,
+        const std::string &message)
+    {
+        prime_valid_runtime_identity_config();
+        const std::string original_callsign = config.callsign;
+        const std::string original_locator = config.grid_square;
+        const WsprPlannerPreference original_planner_preference =
+            config.wspr_planner_preference;
+
+        bool threw = false;
+        try
+        {
+            patch_all_from_web(patch);
+        }
+        catch (const ConfigValidationError &e)
+        {
+            threw = true;
+            require(
+                std::string(e.what()) == expected_message,
+                message + " must report the expected planner validation message");
+            require(
+                e.details().is_object(),
+                message + " must expose structured planner validation details");
+            require(
+                e.details().value("plan_status", "") == expected_plan_status,
+                message + " must report the expected planner status");
+            require(
+                e.details().value("message", "") == expected_message,
+                message + " must preserve the planner validation message in details");
+        }
+
+        require(threw, message + " must be rejected at config acceptance time");
+        require(
+            config.callsign == original_callsign &&
+                config.grid_square == original_locator &&
+                config.wspr_planner_preference == original_planner_preference,
+            message + " must not mutate live config after rejection");
+    }
+
 } // namespace
 
 int main(int argc, char *argv[])
@@ -3070,35 +3112,25 @@ int main(int argc, char *argv[])
     }
 
     {
-        require_patch_accepts_and_runtime_plans(
+        require_patch_rejects_with_plan_status_and_message(
             make_identity_patch(
                 "<AA0NT>",
                 "EM18IG",
                 WsprPlannerPreference::RequirePaired),
-            "Type1Type3Paired",
-            "<AA0NT>",
-            "EM18IG",
-            "RequirePaired config patch with an explicit Type 3 standard identity",
-            2U,
-            1U,
-            "AA0NT",
-            "EM18");
+            "PairedTransmissionUnavailable",
+            "RequirePaired cannot be satisfied for explicit Type 3 callsigns.",
+            "RequirePaired config patch with an explicit Type 3 standard identity");
     }
 
     {
-        require_patch_accepts_and_runtime_plans(
+        require_patch_rejects_with_plan_status_and_message(
             make_identity_patch(
                 "<AA0NT/12>",
                 "EM18IG",
                 WsprPlannerPreference::RequirePaired),
-            "Type2Type3Paired",
-            "<AA0NT/12>",
-            "EM18IG",
-            "RequirePaired config patch with an explicit Type 3 compound identity",
-            2U,
-            1U,
-            "AA0NT/12",
-            "EM18");
+            "PairedTransmissionUnavailable",
+            "RequirePaired cannot be satisfied for explicit Type 3 callsigns.",
+            "RequirePaired config patch with an explicit Type 3 compound identity");
     }
 
     {
@@ -3112,13 +3144,24 @@ int main(int argc, char *argv[])
     }
 
     {
-        require_patch_rejects_with_plan_status(
+        require_patch_rejects_with_plan_status_and_message(
             make_identity_patch(
                 "<AA0NT>>",
                 "EM18IG",
                 WsprPlannerPreference::RequirePaired),
+            "PairedTransmissionUnavailable",
+            "RequirePaired cannot be satisfied for explicit Type 3 callsigns.",
+            "explicit Type 3 config patch with nested close marker under RequirePaired");
+    }
+
+    {
+        require_patch_rejects_with_plan_status(
+            make_identity_patch(
+                "<AA0NT!>",
+                "EM18IG",
+                WsprPlannerPreference::RequirePaired),
             "InvalidCallsign",
-            "invalid explicit Type 3 config patch with nested close marker");
+            "invalid explicit Type 3 config patch with unsupported syntax");
     }
 
     {
@@ -5065,6 +5108,108 @@ int main(int argc, char *argv[])
             cw_it != persisted_ini.end() &&
                 cw_it->second.at("Message") == "HELLO WORLD",
             "json_to_ini must persist trimmed CW messages without leading or trailing spaces");
+    }
+
+    {
+        init_config_json();
+        jConfig["CW"]["Message"] = "73";
+        json_to_config();
+
+        require(
+            config.qrss.message == "73" &&
+                config.fskcw.message == "73" &&
+                config.dfcw.message == "73",
+            "json_to_config must accept numeric-only CW message strings");
+
+        jConfig["CW"]["Message"] = "599";
+        json_to_config();
+        require(
+            config.qrss.message == "599",
+            "json_to_config must accept report-like numeric CW message strings");
+
+        jConfig["CW"]["Message"] = "5NN";
+        json_to_config();
+        require(
+            config.qrss.message == "5NN",
+            "json_to_config must preserve mixed alphanumeric CW message strings");
+
+        jConfig["CW"]["Message"] = "CQ AA0NT 73";
+        json_to_config();
+        require(
+            config.qrss.message == "CQ AA0NT 73",
+            "json_to_config must preserve existing valid CW messages with spaces and digits");
+    }
+
+    {
+        init_config_json();
+        jConfig["CW"]["Message"] = 73;
+        json_to_config();
+
+        require(
+            config.qrss.message == "73" &&
+                config.fskcw.message == "73" &&
+                config.dfcw.message == "73",
+            "json_to_config must normalize legacy integer CW.Message values to text");
+
+        config_to_json();
+        require(
+            jConfig["CW"]["Message"].is_string() &&
+                jConfig["CW"]["Message"].get<std::string>() == "73",
+            "config_to_json must reserialize normalized integer CW.Message values as strings");
+    }
+
+    {
+        auto data = make_managed_ini_data("AA0NT", "EM18", "20m", false);
+        data["CW"]["Message"] = "73";
+        iniFile.setData(data);
+
+        PreparedConfigCandidate candidate;
+        prepare_ini_config_candidate("/tmp/cw_numeric_message.ini", candidate);
+        require(
+            candidate.valid &&
+                candidate.normalized_config.qrss.message == "73" &&
+                candidate.normalized_config.fskcw.message == "73" &&
+                candidate.normalized_config.dfcw.message == "73",
+            "managed INI candidate preparation must normalize unquoted numeric CW.Message values to text");
+        require(
+            candidate.normalized_json["CW"]["Message"].is_string() &&
+                candidate.normalized_json["CW"]["Message"].get<std::string>() == "73",
+            "managed INI candidate preparation must reserialize normalized numeric CW.Message values as strings");
+    }
+
+    {
+        const auto assert_invalid_cw_message_type =
+            [](const nlohmann::json &value, const std::string &description)
+        {
+            init_config_json();
+            jConfig["CW"]["Message"] = value;
+
+            bool threw = false;
+            std::string error_message;
+            try
+            {
+                json_to_config();
+            }
+            catch (const std::exception &e)
+            {
+                threw = true;
+                error_message = e.what();
+            }
+
+            require(
+                threw &&
+                    error_message ==
+                        "Invalid CW.Message. Expected a string or integer number.",
+                "json_to_config must reject " + description + " CW.Message values with a field-specific error");
+        };
+
+        assert_invalid_cw_message_type(73.5, "non-integer numeric");
+        assert_invalid_cw_message_type(true, "boolean");
+        assert_invalid_cw_message_type(nullptr, "null");
+        assert_invalid_cw_message_type(nlohmann::json::array({73}), "array");
+        assert_invalid_cw_message_type(
+            nlohmann::json::object({{"Message", 73}}),
+            "object");
     }
 
     {

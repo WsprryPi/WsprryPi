@@ -1125,6 +1125,22 @@ namespace
         return j.dump();
     }
 
+    std::string parse_cw_message_value(const nlohmann::json &value)
+    {
+        if (value.is_string())
+        {
+            return trim_copy(value.get<std::string>());
+        }
+
+        if (value.is_number_integer() || value.is_number_unsigned())
+        {
+            return value.dump();
+        }
+
+        throw std::runtime_error(
+            "Invalid CW.Message. Expected a string or integer number.");
+    }
+
     std::string default_json_value_to_string(const nlohmann::json &value)
     {
         if (value.is_string())
@@ -1479,7 +1495,9 @@ namespace
             parse_wspr_planner_preference(source.at("WSPR"));
         const auto &cw = source.at("CW");
         const std::string cw_message =
-            trim_copy(cw.value("Message", std::string("")));
+            cw.contains("Message")
+                ? parse_cw_message_value(cw.at("Message"))
+                : std::string();
         const double cw_base_frequency_hz =
             cw.contains("Base Frequency")
                 ? parse_cw_base_frequency_value(cw.at("Base Frequency"), "CW.Base Frequency")
