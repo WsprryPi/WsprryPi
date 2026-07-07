@@ -947,6 +947,9 @@ void init_default_config()
     config.cw_intra_element_gap = 1.0;
     config.cw_inter_character_gap = 3.0;
     config.cw_inter_word_gap = 7.0;
+    config.dfcw_intra_element_gap = kDefaultDfcwIntraElementGap;
+    config.dfcw_inter_character_gap = kDefaultDfcwInterCharacterGap;
+    config.dfcw_inter_word_gap = kDefaultDfcwInterWordGap;
     config.cw_fade_shape = "none";
     config.cw_fade_in_ms = 0;
     config.cw_fade_out_ms = 0;
@@ -1202,6 +1205,9 @@ namespace
                  key == "Intra Element Gap" ||
                  key == "Inter Character Gap" ||
                  key == "Inter Word Gap" ||
+                 key == "DFCW Intra Element Gap" ||
+                 key == "DFCW Inter Character Gap" ||
+                 key == "DFCW Inter Word Gap" ||
                  key == "Fade Shape" ||
                  key == "Fade In Ms" ||
                  key == "Fade Out Ms" ||
@@ -1341,6 +1347,9 @@ namespace
             {"Intra Element Gap", 1.0},
             {"Inter Character Gap", 3.0},
             {"Inter Word Gap", 7.0},
+            {"DFCW Intra Element Gap", kDefaultDfcwIntraElementGap},
+            {"DFCW Inter Character Gap", kDefaultDfcwInterCharacterGap},
+            {"DFCW Inter Word Gap", kDefaultDfcwInterWordGap},
             {"Fade Shape", "none"},
             {"Fade In Ms", 0},
             {"Fade Out Ms", 0},
@@ -1453,6 +1462,21 @@ namespace
                     source.at("CW").contains("Inter Word Gap")
                 ? source.at("CW").at("Inter Word Gap").get<double>()
                 : target.cw_inter_word_gap;
+        target.dfcw_intra_element_gap =
+            source.contains("CW") &&
+                    source.at("CW").contains("DFCW Intra Element Gap")
+                ? source.at("CW").at("DFCW Intra Element Gap").get<double>()
+                : kDefaultDfcwIntraElementGap;
+        target.dfcw_inter_character_gap =
+            source.contains("CW") &&
+                    source.at("CW").contains("DFCW Inter Character Gap")
+                ? source.at("CW").at("DFCW Inter Character Gap").get<double>()
+                : kDefaultDfcwInterCharacterGap;
+        target.dfcw_inter_word_gap =
+            source.contains("CW") &&
+                    source.at("CW").contains("DFCW Inter Word Gap")
+                ? source.at("CW").at("DFCW Inter Word Gap").get<double>()
+                : kDefaultDfcwInterWordGap;
         target.cw_fade_shape =
             source.contains("CW") ? parse_cw_fade_shape(source.at("CW")) : "none";
         target.cw_fade_in_ms =
@@ -1662,6 +1686,9 @@ namespace
         target["CW"]["Intra Element Gap"] = source.cw_intra_element_gap;
         target["CW"]["Inter Character Gap"] = source.cw_inter_character_gap;
         target["CW"]["Inter Word Gap"] = source.cw_inter_word_gap;
+        target["CW"]["DFCW Intra Element Gap"] = source.dfcw_intra_element_gap;
+        target["CW"]["DFCW Inter Character Gap"] = source.dfcw_inter_character_gap;
+        target["CW"]["DFCW Inter Word Gap"] = source.dfcw_inter_word_gap;
         target["CW"]["Fade Shape"] = source.cw_fade_shape;
         target["CW"]["Fade In Ms"] = source.cw_fade_in_ms;
         target["CW"]["Fade Out Ms"] = source.cw_fade_out_ms;
@@ -1722,6 +1749,9 @@ namespace
         target.cw_intra_element_gap = source.cw_intra_element_gap;
         target.cw_inter_character_gap = source.cw_inter_character_gap;
         target.cw_inter_word_gap = source.cw_inter_word_gap;
+        target.dfcw_intra_element_gap = source.dfcw_intra_element_gap;
+        target.dfcw_inter_character_gap = source.dfcw_inter_character_gap;
+        target.dfcw_inter_word_gap = source.dfcw_inter_word_gap;
         target.cw_fade_shape = source.cw_fade_shape;
         target.cw_fade_in_ms = source.cw_fade_in_ms;
         target.cw_fade_out_ms = source.cw_fade_out_ms;
@@ -2051,6 +2081,9 @@ void json_to_ini()
                   key == "Intra Element Gap" ||
                   key == "Inter Character Gap" ||
                   key == "Inter Word Gap" ||
+                  key == "DFCW Intra Element Gap" ||
+                  key == "DFCW Inter Character Gap" ||
+                  key == "DFCW Inter Word Gap" ||
                   key == "Fade Shape" ||
                   key == "Fade In Ms" ||
                   key == "Fade Out Ms" ||

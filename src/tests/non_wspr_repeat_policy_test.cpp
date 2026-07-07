@@ -224,6 +224,44 @@ int main()
                     make_qrss_policy_config("SOS", 5.0, 1),
                     &validation_error),
             "different unit lengths must change whether the same QRSS message passes the repeat_every policy");
+
+        ArgParserConfig dfcw_gap_config =
+            make_dfcw_policy_config("LE E", 1.0, 10);
+        dfcw_gap_config.dfcw_intra_element_gap = 0.5;
+        dfcw_gap_config.dfcw_inter_character_gap = 1.25;
+        dfcw_gap_config.dfcw_inter_word_gap = 3.5;
+        std::chrono::nanoseconds dfcw_baseline{};
+        validation_error.clear();
+        require(
+            compute_non_wspr_message_duration(
+                dfcw_gap_config,
+                dfcw_baseline,
+                &validation_error),
+            "DFCW duration helper must succeed with DFCW-specific gaps");
+
+        ArgParserConfig dfcw_shared_changed = dfcw_gap_config;
+        dfcw_shared_changed.cw_intra_element_gap = 9.0;
+        dfcw_shared_changed.cw_inter_character_gap = 9.0;
+        dfcw_shared_changed.cw_inter_word_gap = 9.0;
+        std::chrono::nanoseconds dfcw_shared_changed_duration{};
+        require(
+            compute_non_wspr_message_duration(
+                dfcw_shared_changed,
+                dfcw_shared_changed_duration,
+                &validation_error) &&
+                dfcw_shared_changed_duration == dfcw_baseline,
+            "DFCW duration helper must ignore shared CW gap settings");
+
+        ArgParserConfig dfcw_specific_changed = dfcw_gap_config;
+        dfcw_specific_changed.dfcw_inter_word_gap = 4.5;
+        std::chrono::nanoseconds dfcw_specific_changed_duration{};
+        require(
+            compute_non_wspr_message_duration(
+                dfcw_specific_changed,
+                dfcw_specific_changed_duration,
+                &validation_error) &&
+                dfcw_specific_changed_duration != dfcw_baseline,
+            "DFCW duration helper must honor DFCW-specific gap settings");
     }
 
     {

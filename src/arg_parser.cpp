@@ -1290,6 +1290,11 @@ void print_usage(const std::string &message, int exit_code)
               << "  --cw-inter-character-gap <multiple>\n"
               << "                                     Gap between Morse characters.\n"
               << "  --cw-inter-word-gap <multiple>     Gap between Morse words.\n"
+              << "  --dfcw-intra-element-gap <multiple>\n"
+              << "                                     DFCW off gap between dot/dash symbols.\n"
+              << "  --dfcw-inter-character-gap <multiple>\n"
+              << "                                     DFCW off gap between characters.\n"
+              << "  --dfcw-inter-word-gap <multiple>   DFCW off gap between words.\n"
               << "  --cw-fade-shape <none|linear|raised_cosine>\n"
               << "                                     Envelope fade shape. Advanced CLI/INI control hidden from normal Web UI.\n"
               << "  --cw-fade-in-ms <ms>, --cw-fade-out-ms <ms>, --cw-fade-slice-ms <ms>\n"
@@ -1470,6 +1475,21 @@ bool validate_config_candidate(
         if (error_message != nullptr)
         {
             *error_message = "CW gap settings must be greater than 0.";
+        }
+
+        return false;
+    }
+
+    if (!std::isfinite(candidate.dfcw_intra_element_gap) ||
+        !std::isfinite(candidate.dfcw_inter_character_gap) ||
+        !std::isfinite(candidate.dfcw_inter_word_gap) ||
+        candidate.dfcw_intra_element_gap <= 0.0 ||
+        candidate.dfcw_inter_character_gap <= 0.0 ||
+        candidate.dfcw_inter_word_gap <= 0.0)
+    {
+        if (error_message != nullptr)
+        {
+            *error_message = "DFCW gap settings must be greater than 0.";
         }
 
         return false;
@@ -2776,6 +2796,9 @@ bool parse_command_line(int argc, char *argv[])
         {"amp-pin-active-high", no_argument, nullptr, 1044},
         {"amp-pin-active-low", no_argument, nullptr, 1045},
         {"no-amp-pin", no_argument, nullptr, 1046},
+        {"dfcw-intra-element-gap", required_argument, nullptr, 1047},
+        {"dfcw-inter-character-gap", required_argument, nullptr, 1048},
+        {"dfcw-inter-word-gap", required_argument, nullptr, 1049},
         {"planner-preference", required_argument, nullptr, 1001},
         {"backend", required_argument, nullptr, 1002},
         {"qrss-message", required_argument, nullptr, 1003},
@@ -3237,6 +3260,57 @@ bool parse_command_line(int argc, char *argv[])
         {
             config.use_amp = false;
             config.amp_pin = -1;
+            break;
+        }
+        case 1047:
+        {
+            try
+            {
+                if (config.use_ini)
+                {
+                    print_usage("--dfcw-intra-element-gap is invalid when using INI file.", EXIT_FAILURE);
+                }
+                config.dfcw_intra_element_gap =
+                    parse_double_option(optarg, "--dfcw-intra-element-gap");
+            }
+            catch (const std::exception &e)
+            {
+                print_usage(e.what(), EXIT_FAILURE);
+            }
+            break;
+        }
+        case 1048:
+        {
+            try
+            {
+                if (config.use_ini)
+                {
+                    print_usage("--dfcw-inter-character-gap is invalid when using INI file.", EXIT_FAILURE);
+                }
+                config.dfcw_inter_character_gap =
+                    parse_double_option(optarg, "--dfcw-inter-character-gap");
+            }
+            catch (const std::exception &e)
+            {
+                print_usage(e.what(), EXIT_FAILURE);
+            }
+            break;
+        }
+        case 1049:
+        {
+            try
+            {
+                if (config.use_ini)
+                {
+                    print_usage("--dfcw-inter-word-gap is invalid when using INI file.", EXIT_FAILURE);
+                }
+                config.dfcw_inter_word_gap =
+                    parse_double_option(optarg, "--dfcw-inter-word-gap");
+            }
+            catch (const std::exception &e)
+            {
+                print_usage(e.what(), EXIT_FAILURE);
+            }
             break;
         }
         case 1001: // Select WSPR planner preference

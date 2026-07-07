@@ -54,6 +54,9 @@ inline constexpr int kDefaultSi5351I2cBus = 1;
 inline constexpr int kDefaultSi5351I2cAddress = 0x60;
 inline constexpr int kDefaultSi5351ReferenceHz = 27000000;
 inline constexpr int kDefaultSi5351TxOutput = 0;
+inline constexpr double kDefaultDfcwIntraElementGap = 0.333333;
+inline constexpr double kDefaultDfcwInterCharacterGap = 1.0;
+inline constexpr double kDefaultDfcwInterWordGap = 3.0;
 
 inline constexpr bool is_supported_transmit_gpio(int gpio) noexcept
 {
@@ -295,6 +298,9 @@ struct ArgParserConfig
     double cw_intra_element_gap; ///< CW intra-element gap in dot-length multiples.
     double cw_inter_character_gap; ///< CW inter-character gap in dot-length multiples.
     double cw_inter_word_gap; ///< CW inter-word gap in dot-length multiples.
+    double dfcw_intra_element_gap; ///< DFCW intra-element gap in dot-length multiples.
+    double dfcw_inter_character_gap; ///< DFCW inter-character gap in dot-length multiples.
+    double dfcw_inter_word_gap; ///< DFCW inter-word gap in dot-length multiples.
     std::string cw_fade_shape; ///< CW envelope fade shape.
     int cw_fade_in_ms; ///< CW envelope fade-in duration in milliseconds.
     int cw_fade_out_ms; ///< CW envelope fade-out duration in milliseconds.
@@ -362,6 +368,9 @@ struct ArgParserConfig
           cw_intra_element_gap(1.0),
           cw_inter_character_gap(3.0),
           cw_inter_word_gap(7.0),
+          dfcw_intra_element_gap(kDefaultDfcwIntraElementGap),
+          dfcw_inter_character_gap(kDefaultDfcwInterCharacterGap),
+          dfcw_inter_word_gap(kDefaultDfcwInterWordGap),
           cw_fade_shape("none"),
           cw_fade_in_ms(0),
           cw_fade_out_ms(0),
@@ -437,6 +446,9 @@ struct ArgParserConfig
         cw_intra_element_gap = other.cw_intra_element_gap;
         cw_inter_character_gap = other.cw_inter_character_gap;
         cw_inter_word_gap = other.cw_inter_word_gap;
+        dfcw_intra_element_gap = other.dfcw_intra_element_gap;
+        dfcw_inter_character_gap = other.dfcw_inter_character_gap;
+        dfcw_inter_word_gap = other.dfcw_inter_word_gap;
         cw_fade_shape = other.cw_fade_shape;
         cw_fade_in_ms = other.cw_fade_in_ms;
         cw_fade_out_ms = other.cw_fade_out_ms;
@@ -592,6 +604,9 @@ void ini_to_json(std::string filename);
  *       "Intra Element Gap": 1.0,
  *       "Inter Character Gap": 3.0,
  *       "Inter Word Gap": 7.0,
+ *       "DFCW Intra Element Gap": 0.333333,
+ *       "DFCW Inter Character Gap": 1.0,
+ *       "DFCW Inter Word Gap": 3.0,
  *       "Fade Shape": "none",
  *       "Fade In Ms": 0,
  *       "Fade Out Ms": 0,

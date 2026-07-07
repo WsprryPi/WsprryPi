@@ -180,6 +180,28 @@ namespace
         return wsprrypi::ExecutionPlanCompiler{}.compile(request);
     }
 
+    wsprrypi::ExecutionPlan compile_dfcw_plan(const std::string& message)
+    {
+        wsprrypi::TransmissionRequest request;
+        request.mode = wsprrypi::TransmissionMode::DFCW;
+        request.output.backend = wsprrypi::BackendKind::SI5351;
+        request.output.output = wsprrypi::ClockSource::SI5351_CLK0;
+        request.output.gpio = 4;
+
+        wsprrypi::DfcwPayload payload;
+        payload.message = message;
+        payload.dot_frequency_hz = 7038600.0;
+        payload.dash_frequency_hz = 7038605.0;
+        payload.timing.dot = std::chrono::milliseconds(5);
+        payload.timing.dash = std::chrono::milliseconds(17);
+        payload.timing.intra_element_gap = std::chrono::milliseconds(2);
+        payload.timing.inter_character_gap = std::chrono::milliseconds(7);
+        payload.timing.inter_word_gap = std::chrono::milliseconds(11);
+        request.payload = payload;
+
+        return wsprrypi::ExecutionPlanCompiler{}.compile(request);
+    }
+
     std::size_t first_event_for_char(
         const std::vector<std::size_t>& visited_event_indexes,
         const wsprrypi::ExecutionPlan& plan,
@@ -341,6 +363,54 @@ int main()
             plan,
             probe.elapsed,
             "FSKCW \"AT\" execution");
+    }
+
+    {
+        const wsprrypi::ExecutionPlan plan = compile_dfcw_plan("LE E");
+
+        bool saw_dot = false;
+        bool saw_dash = false;
+        bool saw_intra_gap = false;
+        bool saw_character_gap = false;
+        bool saw_word_gap = false;
+
+        for (const auto& event : plan.events)
+        {
+            if (event.rf_on)
+            {
+                require(
+                    event.duration == std::chrono::milliseconds(5),
+                    "DFCW dot and dash symbols must both use dot duration");
+                if (event.frequency_hz == 7038600.0)
+                    saw_dot = true;
+                if (event.frequency_hz == 7038605.0)
+                    saw_dash = true;
+            }
+            else
+            {
+                require(
+                    event.frequency_hz == 0.0,
+                    "DFCW spacing gaps must be RF-off events");
+                if (event.duration == std::chrono::milliseconds(2))
+                    saw_intra_gap = true;
+                if (event.duration == std::chrono::milliseconds(7))
+                    saw_character_gap = true;
+                if (event.duration == std::chrono::milliseconds(11))
+                    saw_word_gap = true;
+            }
+        }
+
+        require(saw_dot, "DFCW plans must emit dot-frequency symbols");
+        require(saw_dash, "DFCW plans must emit dash-frequency symbols");
+        require(
+            saw_intra_gap,
+            "DFCW plans must use the DFCW intra-element gap duration");
+        require(
+            saw_character_gap,
+            "DFCW plans must use the DFCW inter-character gap duration");
+        require(
+            saw_word_gap,
+            "DFCW plans must use the DFCW inter-word gap duration");
     }
 
     {

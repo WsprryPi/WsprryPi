@@ -1975,6 +1975,22 @@ static wsprrypi::MorseTiming cw_timing_from_config(
     return timing;
 }
 
+static wsprrypi::MorseTiming dfcw_timing_from_config(
+    double dot_seconds,
+    const ArgParserConfig &cfg)
+{
+    wsprrypi::MorseTiming timing;
+    timing.dot = seconds_to_nanoseconds(dot_seconds);
+    timing.dash = timing.dot;
+    timing.intra_element_gap =
+        seconds_to_nanoseconds(dot_seconds * cfg.dfcw_intra_element_gap);
+    timing.inter_character_gap =
+        seconds_to_nanoseconds(dot_seconds * cfg.dfcw_inter_character_gap);
+    timing.inter_word_gap =
+        seconds_to_nanoseconds(dot_seconds * cfg.dfcw_inter_word_gap);
+    return timing;
+}
+
 static wsprrypi::EnvelopeSettings cw_envelope_from_config(
     const ArgParserConfig &cfg)
 {
@@ -2113,7 +2129,7 @@ static wsprrypi::TransmissionRequest make_dfcw_controller_request(
     payload.message = cfg.dfcw.message;
     payload.dot_frequency_hz = cfg.dfcw.dot_frequency_hz;
     payload.dash_frequency_hz = cfg.dfcw.dash_frequency_hz;
-    payload.timing = cw_timing_from_config(cfg.dfcw.dot_seconds, cfg);
+    payload.timing = dfcw_timing_from_config(cfg.dfcw.dot_seconds, cfg);
     payload.envelope = cw_envelope_from_config(cfg);
     request.payload = payload;
     return request;

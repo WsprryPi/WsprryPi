@@ -232,6 +232,9 @@ namespace
               {"Intra Element Gap", "1.0"},
               {"Inter Character Gap", "3.0"},
               {"Inter Word Gap", "7.0"},
+              {"DFCW Intra Element Gap", "0.333333"},
+              {"DFCW Inter Character Gap", "1.0"},
+              {"DFCW Inter Word Gap", "3.0"},
               {"Fade Shape", "none"},
               {"Fade In Ms", "0"},
               {"Fade Out Ms", "0"},
@@ -1151,7 +1154,7 @@ int main(int argc, char *argv[])
             "[Calibration]\nPPM=0\n"
             "[Si5351]\nI2C Bus=1\nI2C Address=96\nReference Frequency=27000000\nTX Output=CLK0\nPower Level=1\n"
             "[WSPR]\nCall Sign=AA0NT\nGrid Square=EM18\nTX Power=20\nFrequency=20m\nPlanner Preference=auto\nUse Random Offset=false\n"
-            "[CW]\nMessage=CQ\nBase Frequency= 14.0969MHz \nShift Hz=5\nDot Seconds=3.0\nIntra Element Gap=1.0\nInter Character Gap=3.0\nInter Word Gap=7.0\nFade Shape=none\nFade In Ms=0\nFade Out Ms=0\nFade Slice Ms=5\nStart Minute=0\nRepeat Minutes=10\n");
+            "[CW]\nMessage=CQ\nBase Frequency= 14.0969MHz \nShift Hz=5\nDot Seconds=3.0\nIntra Element Gap=1.0\nInter Character Gap=3.0\nInter Word Gap=7.0\nDFCW Intra Element Gap=0.333333\nDFCW Inter Character Gap=1.0\nDFCW Inter Word Gap=3.0\nFade Shape=none\nFade In Ms=0\nFade Out Ms=0\nFade Slice Ms=5\nStart Minute=0\nRepeat Minutes=10\n");
         iniFile.set_filename(config.ini_filename);
 
         std::string load_error;
@@ -3545,7 +3548,9 @@ int main(int argc, char *argv[])
             "Frequency=20m\nPlanner Preference=auto\nUse Random Offset=false\n"
             "[CW]\nMessage=\nBase Frequency=14096900.0\nShift Hz=5.0\n"
             "Dot Seconds=3.0\nIntra Element Gap=1.0\nInter Character Gap=3.0\n"
-            "Inter Word Gap=7.0\nFade Shape=none\nFade In Ms=0\nFade Out Ms=0\n"
+            "Inter Word Gap=7.0\nDFCW Intra Element Gap=0.333333\n"
+            "DFCW Inter Character Gap=1.0\nDFCW Inter Word Gap=3.0\n"
+            "Fade Shape=none\nFade In Ms=0\nFade Out Ms=0\n"
             "Fade Slice Ms=5\nStart Minute=0\nRepeat Minutes=10\n");
         iniFile.set_filename(config.ini_filename);
         config_to_json();
@@ -4367,6 +4372,9 @@ int main(int argc, char *argv[])
               {"Intra Element Gap", 1.0},
               {"Inter Character Gap", 3.0},
               {"Inter Word Gap", 7.0},
+              {"DFCW Intra Element Gap", 0.333333},
+              {"DFCW Inter Character Gap", 1.0},
+              {"DFCW Inter Word Gap", 3.0},
               {"Start Minute", 0},
               {"Repeat Minutes", 10}}}
         });
@@ -5011,6 +5019,9 @@ int main(int argc, char *argv[])
         jConfig["CW"]["Intra Element Gap"] = 1.5;
         jConfig["CW"]["Inter Character Gap"] = 4.0;
         jConfig["CW"]["Inter Word Gap"] = 8.0;
+        jConfig["CW"]["DFCW Intra Element Gap"] = 0.25;
+        jConfig["CW"]["DFCW Inter Character Gap"] = 1.25;
+        jConfig["CW"]["DFCW Inter Word Gap"] = 3.5;
         jConfig["CW"]["Fade Shape"] = "raised-cosine";
         jConfig["CW"]["Fade In Ms"] = 25;
         jConfig["CW"]["Fade Out Ms"] = 40;
@@ -5021,7 +5032,10 @@ int main(int argc, char *argv[])
             nearly_equal(config.modulation_dot_seconds, 2.0) &&
                 nearly_equal(config.cw_intra_element_gap, 1.5) &&
                 nearly_equal(config.cw_inter_character_gap, 4.0) &&
-                nearly_equal(config.cw_inter_word_gap, 8.0),
+                nearly_equal(config.cw_inter_word_gap, 8.0) &&
+                nearly_equal(config.dfcw_intra_element_gap, 0.25) &&
+                nearly_equal(config.dfcw_inter_character_gap, 1.25) &&
+                nearly_equal(config.dfcw_inter_word_gap, 3.5),
             "json_to_config must parse CW timing gap multipliers");
         require(
             config.qrss.dot_seconds == config.modulation_dot_seconds &&
@@ -5040,6 +5054,9 @@ int main(int argc, char *argv[])
             nearly_equal(jConfig["CW"]["Intra Element Gap"].get<double>(), 1.5) &&
                 nearly_equal(jConfig["CW"]["Inter Character Gap"].get<double>(), 4.0) &&
                 nearly_equal(jConfig["CW"]["Inter Word Gap"].get<double>(), 8.0) &&
+                nearly_equal(jConfig["CW"]["DFCW Intra Element Gap"].get<double>(), 0.25) &&
+                nearly_equal(jConfig["CW"]["DFCW Inter Character Gap"].get<double>(), 1.25) &&
+                nearly_equal(jConfig["CW"]["DFCW Inter Word Gap"].get<double>(), 3.5) &&
                 jConfig["CW"]["Fade Shape"].get<std::string>() == "raised_cosine" &&
                 jConfig["CW"]["Fade Slice Ms"].get<int>() == 2,
             "config_to_json must serialize CW timing and fade settings");
@@ -5055,11 +5072,44 @@ int main(int argc, char *argv[])
             nearly_equal(std::stod(cw_it->second.at("Intra Element Gap")), 1.5) &&
                 nearly_equal(std::stod(cw_it->second.at("Inter Character Gap")), 4.0) &&
                 nearly_equal(std::stod(cw_it->second.at("Inter Word Gap")), 8.0) &&
+                nearly_equal(std::stod(cw_it->second.at("DFCW Intra Element Gap")), 0.25) &&
+                nearly_equal(std::stod(cw_it->second.at("DFCW Inter Character Gap")), 1.25) &&
+                nearly_equal(std::stod(cw_it->second.at("DFCW Inter Word Gap")), 3.5) &&
                 cw_it->second.at("Fade Shape") == "raised_cosine" &&
                 cw_it->second.at("Fade In Ms") == "25" &&
                 cw_it->second.at("Fade Out Ms") == "40" &&
                 cw_it->second.at("Fade Slice Ms") == "2",
             "json_to_ini must persist CW timing and fade settings");
+    }
+
+    {
+        init_config_json();
+        jConfig["CW"]["Intra Element Gap"] = 9.0;
+        jConfig["CW"]["Inter Character Gap"] = 9.0;
+        jConfig["CW"]["Inter Word Gap"] = 9.0;
+        jConfig["CW"].erase("DFCW Intra Element Gap");
+        jConfig["CW"].erase("DFCW Inter Character Gap");
+        jConfig["CW"].erase("DFCW Inter Word Gap");
+        json_to_config();
+
+        require(
+            nearly_equal(config.dfcw_intra_element_gap, kDefaultDfcwIntraElementGap) &&
+                nearly_equal(config.dfcw_inter_character_gap, kDefaultDfcwInterCharacterGap) &&
+                nearly_equal(config.dfcw_inter_word_gap, kDefaultDfcwInterWordGap),
+            "missing DFCW gaps must use DFCW defaults instead of shared CW gaps");
+
+        config_to_json();
+        require(
+            nearly_equal(
+                jConfig["CW"]["DFCW Intra Element Gap"].get<double>(),
+                kDefaultDfcwIntraElementGap) &&
+                nearly_equal(
+                    jConfig["CW"]["DFCW Inter Character Gap"].get<double>(),
+                    kDefaultDfcwInterCharacterGap) &&
+                nearly_equal(
+                    jConfig["CW"]["DFCW Inter Word Gap"].get<double>(),
+                    kDefaultDfcwInterWordGap),
+            "config_to_json must materialize missing DFCW gap defaults");
     }
 
     {
@@ -5311,6 +5361,14 @@ int main(int argc, char *argv[])
             !validate_config_candidate(invalid_gap_candidate, &validation_error) &&
                 validation_error == "CW gap settings must be greater than 0.",
             "validation must reject non-positive CW gap settings");
+
+        ArgParserConfig invalid_dfcw_gap_candidate;
+        invalid_dfcw_gap_candidate.dfcw_inter_word_gap = 0.0;
+        validation_error.clear();
+        require(
+            !validate_config_candidate(invalid_dfcw_gap_candidate, &validation_error) &&
+                validation_error == "DFCW gap settings must be greater than 0.",
+            "validation must reject non-positive DFCW gap settings");
 
         ArgParserConfig invalid_shift_candidate;
         invalid_shift_candidate.mode = ModeType::FSKCW;
