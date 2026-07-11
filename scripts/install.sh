@@ -48,7 +48,7 @@ IFS=$'\n\t'
 # -----------------------------------------------------------------------------
 
 declare DEFAULT_REPO_BRANCH="main"
-declare DEFAULT_SEM_VER="3.1.2"
+declare DEFAULT_SEM_VER="3.1.3"
 
 # -----------------------------------------------------------------------------
 # @brief Trap unexpected errors during script execution.
@@ -5131,6 +5131,7 @@ OPTIONS_LIST=(
 #
 # @return 0 on success.
 # -----------------------------------------------------------------------------
+# shellcheck disable=SC2329
 set_release_build() {
     local debug
     debug=$(debug_start "$@")
@@ -5155,6 +5156,7 @@ set_release_build() {
 #
 # @return 0 on success.
 # -----------------------------------------------------------------------------
+# shellcheck disable=SC2329
 set_no_web() {
     local debug
     debug=$(debug_start "$@")

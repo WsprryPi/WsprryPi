@@ -4,7 +4,7 @@ Wsprry Pi builds require the tag and branch to be consistent for use in the inst
 
 This guide outlines the precise steps to prepare a release where the Git **branch** and **tag** share the same name. In this situation, Git can be ambiguous when resolving references. We resolve this by being explicit with `refs/heads/` (branches) and `refs/tags/` (tags) in all commands.
 
-Globally search/replace `3.1.0` and `v3.1.0` with your desired version.
+Globally search/replace `3.1.3` and `v3.1.3` with your desired version.
 
 ---
 
@@ -26,7 +26,7 @@ Globally search/replace `3.1.0` and `v3.1.0` with your desired version.
 
         ```bash
         declare DEFAULT_REPO_BRANCH="devel"
-        declare DEFAULT_SEM_VER="3.1.0"
+        declare DEFAULT_SEM_VER="3.1.3"
         ```
 
     * Apply any required feature changes or bug fixes.
@@ -36,18 +36,18 @@ Globally search/replace `3.1.0` and `v3.1.0` with your desired version.
    ```bash
    git add scripts/install.sh
    git add "release_tools/Build Orchestration.md" # This file because you updated the tags
-   git commit -m "Prepare 3.1.0 release"
+   git commit -m "Prepare 3.1.3 release"
    ```
 
 4. **Create an annotated tag on that commit**
 
    ```bash
-   git tag -a v3.1.0 -m "Release 3.1.0"
+   git tag -a v3.1.3 -m "Release 3.1.3"
    ```
 
 5. **Compilation**: If a version-specific compile or any other process depends on the tag, execute that process now
 
-   * **Stage any additional changes**: If you need to use the tag locaally such as with compiled executables, do these now.
+   * **Stage any additional changes**: If you need to use the tag locally such as with compiled executables, do these now.
 
       ```bash
       git add ./executables/
@@ -62,14 +62,14 @@ Globally search/replace `3.1.0` and `v3.1.0` with your desired version.
    * **Force the tag to point to the amended commit**
 
       ```bash
-      git tag -f v3.1.0
+      git tag -f v3.1.3
       ```
 
 6. **Push the branch and tag to the origin** (with -f if needed)
 
    ```bash
    git push origin HEAD:refs/heads/main
-   git push origin tag v3.1.0
+   git push origin tag v3.1.3
    ```
 
 ---
