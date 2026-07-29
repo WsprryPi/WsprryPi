@@ -2,7 +2,7 @@
 
 ## Status
 
-Active — Steps 1.1 through 3 complete; adoption measurement is next.
+Active — Steps 1.1 through 4 complete; offline interoperability experiments are next.
 
 Current authorized activity is research and documentation only.
 
@@ -72,14 +72,14 @@ The [decision log](decision-log.md) separates accepted process decisions, provis
 | 1.2 | Define the comparison and evidence framework | Documentary and methodology research complete | [Report](steps/1.2-comparison-framework.md) | HELL-DEC-0008 through HELL-DEC-0012 | 2026-07-29 |
 | 2 | Build the mode taxonomy | Documentary taxonomy complete | [Report](steps/2-mode-taxonomy.md) | HELL-DEC-0013 through HELL-DEC-0018 | 2026-07-29 |
 | 3 | Freeze the font evidence | Documentary evidence complete; research references frozen | [Report](steps/3-font-evidence.md) | HELL-DEC-0019 through HELL-DEC-0022 | 2026-07-29 |
-| 4 | Measure real adoption | Not started | Not yet created | None yet | 2026-07-29 |
+| 4 | Measure real adoption | Public documentary research complete; no representative worldwide mode-share ranking available | [Report](steps/4-adoption.md) | HELL-DEC-0023, HELL-DEC-0024 | 2026-07-29 |
 | 5 | Perform offline interoperability experiments | Not started | Not yet created | None yet | 2026-07-29 |
 | 6 | Evaluate Wsprry Pi feasibility | Not started | Not yet created | None yet | 2026-07-29 |
 | 7 | Make a gated recommendation | Not started | Not yet created | None yet | 2026-07-29 |
 
 ## Important unresolved questions
 
-- Which Hellschreiber variants have meaningful current amateur interoperability and activity?
+- What privacy-preserving, mode-coded observations could establish actual Hellschreiber mode shares beyond schedules and organizer summaries?
 - Can the authoritative 105-baud and historical Hell-80 bitmap tables be recovered with clear licenses?
 - Can the external historical drum transcription be independently verified and licensed for archival redistribution?
 - What compatibility class does current fldigi Hell-80 have with the historical Siemens 9x7, 315-baud protocol?
