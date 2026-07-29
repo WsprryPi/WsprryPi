@@ -75,7 +75,7 @@ Rates use source terminology unless explicitly normalized. A `?` marks a materia
 | Canonical entry | Class | Defining on-air characteristic | Raster/timing | Synchronization/framing | Alias and interoperability treatment | Confidence |
 | --- | --- | --- | --- | --- | --- | --- |
 | Presse-Hell / F-Hell | Historical family | Sequential current/OOK tone raster used for press service | Common high-speed profile: 14x7 transmitted field, 245 intervals/s, 5 char/s; equipment also supported slower service profiles | Quasi-synchronous continuous printing | `F-Hell` is the early press-format name; `Presse-Hell` can denote the broader service/equipment family, so qualify the rate | Moderate–high |
-| Standard Feld-Hell | Reference protocol | Sequential OOK/ASK raster | 7x7 logical cells, 122.5 baud, 2.5 char/s; paired 7x14 at 245 samples/s is equivalent representation | Continuous asynchronous raster; no character start/stop; double printing at receiver | `Feldhell`, `Feld Hell`, `Feld-Hell`; Step 1.1 governs | High |
+| Standard Feld-Hell | Reference protocol | Sequential OOK/ASK raster | Historical 7x14 physical raster at 245 positions/s with two-position minimum runs; conventional 122.5 baud, 2.5 char/s; fixed-pair 7x7 is a compatible simplification | Continuous asynchronous raster; no character start/stop; double printing at receiver | `Feldhell`, `Feld Hell`, `Feld-Hell`; corrected Step 1.1 contract governs | High |
 | fldigi Slow Hell | Feld profile | Same sequential Feld mechanism at 1/8 column rate | 2.1875 columns/s; 14 samples/column; 30.625 samples/s; about 0.3125 char/s under seven-column timing | Same continuous Feld behavior | Not the same as G3PPT Slow-Feld beacon operation | High for fldigi |
 | Feld X5 | Feld profile | Standard Feld mechanism at 5x rate | 87.5 columns/s; 1,225 samples/s in fldigi's paired representation; 12.5 char/s | Same continuous Feld behavior | ADIF `HELLX5`; speed compatibility requires a matching profile | High for fldigi |
 | Feld X9 | Feld profile | Standard Feld mechanism at 9x rate | 157.5 columns/s; 2,205 samples/s in fldigi's paired representation; 22.5 char/s | Same continuous Feld behavior | ADIF `HELLX9`; speed compatibility requires a matching profile | High for fldigi |
@@ -150,7 +150,7 @@ Current software breadth is uneven: fldigi offers seven documented profiles; Mul
 
 | Disagreement | Resolution for this taxonomy |
 | --- | --- |
-| `122.5 baud` versus `245 pixels/s` for Feld | Step 1.1 resolution stands: 122.5 independently selectable cells/s; 245 constrained samples/s when rows are duplicated |
+| `122.5 baud` versus `245 positions/s` for Feld | Step 3 refinement governs: the historical drum advances through 245 physical positions/s; ordinary marks/spaces have a two-position minimum, yielding the conventional 122.5-baud description, but their phase is not restricted to fixed pairs |
 | fldigi table's rounded Slow Hell values versus source constants | Source constants control the implementation profile; derived char rate is labeled calculation |
 | `FSK Hell-105` versus `FM Hell-105` | Treat as an implementation-context alias for the 105-baud continuous-phase profile; do not merge generic FSK and FM families globally |
 | Historical Hell-80 at 315 baud versus software Hell-80 at 245 baud | Preserve separate historical protocol and fldigi implementation profile; compatibility remains untested |
@@ -172,7 +172,7 @@ Confidence is **high** for standard Feld-Hell, the current fldigi profiles, the 
 
 ## Remaining questions
 
-- Which exact glyph tables belong to each historical and current profile? Step 3 must keep font geometry separate from signaling geometry.
+- Step 3 froze the actual-drum Feld and GL references plus immutable modern revisions, while leaving the authoritative 105-baud and historical Hell-80 bitmaps unresolved.
 - Which profiles are actually used on amateur bands, and in what proportions? Step 4 needs time-bounded observations and denominators.
 - Can current decoders cross-read historical Hell-80, FSK/FM labels, and multi-tone profiles? Step 5 must use offline captures and declared versions.
 - Which candidate can fit Wsprry Pi's scheduler and output backends safely and maintainably? Step 6 remains a read-only feasibility analysis.

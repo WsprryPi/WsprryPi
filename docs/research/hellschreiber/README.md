@@ -2,7 +2,7 @@
 
 ## Status
 
-Active — Steps 1.1, 1.2, and 2 complete; font evidence is next.
+Active — Steps 1.1 through 3 complete; adoption measurement is next.
 
 Current authorized activity is research and documentation only.
 
@@ -68,10 +68,10 @@ The [decision log](decision-log.md) separates accepted process decisions, provis
 
 | Step | Title | Status | Report | Decision impact | Last updated |
 | --- | --- | --- | --- | --- | --- |
-| 1.1 | Define the reference mode | Documentary research complete | [Report](steps/1.1-reference-mode.md) | HELL-DEC-0002, HELL-DEC-0006, HELL-DEC-0007 | 2026-07-29 |
+| 1.1 | Define the reference mode | Documentary research complete; raster model refined by Step 3 | [Report](steps/1.1-reference-mode.md) | HELL-DEC-0002, HELL-DEC-0006 (superseded), HELL-DEC-0007, HELL-DEC-0019 | 2026-07-29 |
 | 1.2 | Define the comparison and evidence framework | Documentary and methodology research complete | [Report](steps/1.2-comparison-framework.md) | HELL-DEC-0008 through HELL-DEC-0012 | 2026-07-29 |
 | 2 | Build the mode taxonomy | Documentary taxonomy complete | [Report](steps/2-mode-taxonomy.md) | HELL-DEC-0013 through HELL-DEC-0018 | 2026-07-29 |
-| 3 | Freeze the font evidence | Not started | Not yet created | None yet | 2026-07-29 |
+| 3 | Freeze the font evidence | Documentary evidence complete; research references frozen | [Report](steps/3-font-evidence.md) | HELL-DEC-0019 through HELL-DEC-0022 | 2026-07-29 |
 | 4 | Measure real adoption | Not started | Not yet created | None yet | 2026-07-29 |
 | 5 | Perform offline interoperability experiments | Not started | Not yet created | None yet | 2026-07-29 |
 | 6 | Evaluate Wsprry Pi feasibility | Not started | Not yet created | None yet | 2026-07-29 |
@@ -80,7 +80,8 @@ The [decision log](decision-log.md) separates accepted process decisions, provis
 ## Important unresolved questions
 
 - Which Hellschreiber variants have meaningful current amateur interoperability and activity?
-- Which historical or modern font should serve as the reproducible reference?
+- Can the authoritative 105-baud and historical Hell-80 bitmap tables be recovered with clear licenses?
+- Can the external historical drum transcription be independently verified and licensed for archival redistribution?
 - What compatibility class does current fldigi Hell-80 have with the historical Siemens 9x7, 315-baud protocol?
 - Which modes fit Wsprry Pi without requiring incompatible RF behavior?
 - What offline and later hardware evidence would be required before implementation or transmission?
