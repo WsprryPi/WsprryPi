@@ -1,0 +1,67 @@
+[
+  {
+    "path": "README.md",
+    "sha256": "2b3b8524afe999c6642df95a7ab7c76b99adbb6169868cd10d018366e2abd335",
+    "bytes": 3017
+  },
+  {
+    "path": "audio/fldigi-fskh105-source-contract.wav",
+    "sha256": "5be94ad3f2e2fd1387ed9d6f8ad4ceddec9c95814529eb97d117cdf861dafdcd",
+    "bytes": 164616
+  },
+  {
+    "path": "audio/xfhell-fmhell105-source-contract.wav",
+    "sha256": "b622e5e20c78af27454ac2ca2507589a8e0a830543a39500346cbb0c5ac0b8a0",
+    "bytes": 279816
+  },
+  {
+    "path": "corpus/corpus.txt",
+    "sha256": "2900c3cb1ddfcd7ea415b4c568b7b3612af5f674638b66523b213950ddfb6f04",
+    "bytes": 109
+  },
+  {
+    "path": "measurements/impairment-results.csv",
+    "sha256": "13708d2cf2e7b5e0335ef6c0b5f6cea74e25b5320ffe2a098fe3fdee23245e2e",
+    "bytes": 3575
+  },
+  {
+    "path": "measurements/raster-comparison.csv",
+    "sha256": "32b641ee8252bdb195e8a9ce36c9aae246e4f7a8e043b1513bf722b933a5b9f1",
+    "bytes": 14311
+  },
+  {
+    "path": "measurements/summary.json",
+    "sha256": "15214aa431e9e4ee4d2d7bdeb24c122509502c227922107d0af0f4d8a7bb853d",
+    "bytes": 3381
+  },
+  {
+    "path": "rasters/fldigi-7x7-focus.pbm",
+    "sha256": "1722b2e9e32a18099fa7c790f796759a158d47d71cbc6e2411c65a2928671ee7",
+    "bytes": 11098
+  },
+  {
+    "path": "rasters/fldigi-real-focus.pbm",
+    "sha256": "9791abd28b03b26d52bcf93701b3685fef72da0f7b7596cdf94ec2d34d907da1",
+    "bytes": 10874
+  },
+  {
+    "path": "rasters/radiolib-focus.pbm",
+    "sha256": "f89fb5840f3f68ae76b3f496b65a5725afd28b62e3dc6245e8014be279a83771",
+    "bytes": 5834
+  },
+  {
+    "path": "rasters/xfhell-fm105-focus.pbm",
+    "sha256": "ec5d8a70e2ebd47b17d26f60c64f571a2ad9031c8c7bf7694effbf9e22d8068d",
+    "bytes": 9994
+  },
+  {
+    "path": "rasters/xfhell-real-focus.pbm",
+    "sha256": "666aa8242bcff2e46103c67ff7b9a39639bf89e0a0adcfbae0e7310e29d9de37",
+    "bytes": 9642
+  },
+  {
+    "path": "scripts/analyze_interop.py",
+    "sha256": "0b1310fe8f256431a3ab9c84ef7fa2409c03f547650e3452c2dbcbe947e9725e",
+    "bytes": 18984
+  }
+]
