@@ -2,7 +2,7 @@
 
 ## Status
 
-Active — setup complete; Step 1.1 not yet executed.
+Active — Step 1.1 documentary research complete; later research steps not yet executed.
 
 Current authorized activity is research and documentation only.
 
@@ -54,7 +54,7 @@ Claims must use the hierarchy, citation requirements, confidence labels, and con
 
 ## Decision status
 
-The [decision log](decision-log.md) separates accepted process decisions, provisional hypotheses, deferred decisions, rejected alternatives, and superseded conclusions. Feld-Hell is the first proposed reference to investigate; it is not yet an accepted Wsprry Pi implementation choice.
+The [decision log](decision-log.md) separates accepted process decisions, provisional hypotheses, deferred decisions, rejected alternatives, and superseded conclusions. Standard Feld-Hell is now accepted as the spike's comparison baseline; it remains explicitly unselected as a Wsprry Pi implementation choice.
 
 ## Repository and branch
 
@@ -68,7 +68,7 @@ The [decision log](decision-log.md) separates accepted process decisions, provis
 
 | Step | Title | Status | Report | Decision impact | Last updated |
 | --- | --- | --- | --- | --- | --- |
-| 1.1 | Define the reference mode | Prompt prepared; not executed | Not yet created | None yet | 2026-07-29 |
+| 1.1 | Define the reference mode | Documentary research complete | [Report](steps/1.1-reference-mode.md) | HELL-DEC-0002, HELL-DEC-0006, HELL-DEC-0007 | 2026-07-29 |
 | 2 | Build the mode taxonomy | Not started | Not yet created | None yet | 2026-07-29 |
 | 3 | Freeze the font evidence | Not started | Not yet created | None yet | 2026-07-29 |
 | 4 | Measure real adoption | Not started | Not yet created | None yet | 2026-07-29 |
@@ -78,7 +78,6 @@ The [decision log](decision-log.md) separates accepted process decisions, provis
 
 ## Important unresolved questions
 
-- What exact historical and on-air contract should define the Feld-Hell reference baseline?
 - Which Hellschreiber variants have meaningful current amateur interoperability and activity?
 - Which historical or modern font should serve as the reproducible reference?
 - Which modes fit Wsprry Pi without requiring incompatible RF behavior?
