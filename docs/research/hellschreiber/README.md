@@ -2,7 +2,7 @@
 
 ## Status
 
-Active — Step 1.1 documentary research complete; later research steps not yet executed.
+Active — Steps 1.1 and 1.2 complete; the authoritative mode taxonomy is next.
 
 Current authorized activity is research and documentation only.
 
@@ -26,7 +26,7 @@ The spike may research historical methodology, amateur-radio variants, fonts, ad
 
 1. Establish the reference baseline
    - 1.1 Define the reference mode
-   - Additional 1.x work will be named only when its scope is approved.
+   - 1.2 Define the comparison and evidence framework
 2. Build the mode taxonomy
 3. Freeze the font evidence
 4. Measure real adoption
@@ -69,6 +69,7 @@ The [decision log](decision-log.md) separates accepted process decisions, provis
 | Step | Title | Status | Report | Decision impact | Last updated |
 | --- | --- | --- | --- | --- | --- |
 | 1.1 | Define the reference mode | Documentary research complete | [Report](steps/1.1-reference-mode.md) | HELL-DEC-0002, HELL-DEC-0006, HELL-DEC-0007 | 2026-07-29 |
+| 1.2 | Define the comparison and evidence framework | Documentary and methodology research complete | [Report](steps/1.2-comparison-framework.md) | HELL-DEC-0008 through HELL-DEC-0012 | 2026-07-29 |
 | 2 | Build the mode taxonomy | Not started | Not yet created | None yet | 2026-07-29 |
 | 3 | Freeze the font evidence | Not started | Not yet created | None yet | 2026-07-29 |
 | 4 | Measure real adoption | Not started | Not yet created | None yet | 2026-07-29 |
