@@ -2,7 +2,7 @@
 
 ## Status
 
-**Phase 1.1 complete — protocol core frozen; Gate A remains open pending asset-bound fixtures.**
+**Phase 2 complete — immutable font and spacing policy frozen; Gate B satisfied; Gate A remains open pending Phase 1.2 fixtures.**
 
 This record continues the completed generic [Hellschreiber research spike](../hellschreiber/README.md) for Standard Feld-Hell alone. It defines a proposed product protocol and later qualification work without authorizing implementation, hardware operation, RF output, or release.
 
@@ -37,6 +37,9 @@ The ordering intentionally places asset selection before glyph-bearing fixtures.
 ## Documents
 
 - [Normative protocol](protocol.md)
+- [Font selection](font.md)
+- [Spacing and input policy](spacing-policy.md)
+- [Selected asset](assets/README.md)
 - [Fixture contract](fixtures/README.md)
 - [Decision log](decision-log.md)
 - [Evidence register](evidence-register.md)
@@ -45,9 +48,9 @@ The ordering intentionally places asset selection before glyph-bearing fixtures.
 
 | Readiness class | Current result |
 | --- | --- |
-| Protocol-core design | Frozen for Phase 1.1 |
-| Gate A protocol contract | Open: asset-bound rules and exact fixtures remain |
-| Font and licensing | Not selected |
+| Protocol-core design | Frozen for Phase 1.1 and reconciled to Phase 2 asset |
+| Gate A protocol contract | Open: exact raster/event/duration/cancellation fixtures remain |
+| Font and licensing | Gate B satisfied: immutable MIT asset and spacing policy frozen |
 | Exact-asset interoperability | Not run |
 | Production implementation | Not authorized |
 | Hardware qualification | Not assessed |
@@ -57,3 +60,7 @@ The ordering intentionally places asset selection before glyph-bearing fixtures.
 ## Phase 1.1 conclusion
 
 `PHASE 1.1 PASS — PROTOCOL CORE FROZEN; GATE A REMAINS OPEN PENDING ASSET-BOUND FIXTURES`
+
+## Phase 2 conclusion
+
+`PHASE 2 PASS — IMMUTABLE FONT AND SPACING POLICY FROZEN; GATE B SATISFIED; GATE A REMAINS OPEN PENDING PHASE 1.2 FIXTURES`

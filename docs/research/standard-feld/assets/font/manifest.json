@@ -1,0 +1,54 @@
+{
+  "schema_version": "standard-feld-asset-manifest-v1",
+  "asset_id": "wsprry-standard-feld-radiolib-5x5-v1",
+  "name": "Wsprry Pi Standard Feld RadioLib Simplified 5x5 Font v1",
+  "canonical_asset_path": "docs/research/standard-feld/assets/font/font.json",
+  "canonical_asset_sha256": "025c4ee1227a6d2043b460c973a98b3c5f875b64c1ee96d20a71ad2e78091227",
+  "checksum_procedure": "SHA-256 over the committed UTF-8 file bytes",
+  "provenance": {
+    "upstream_project": "RadioLib",
+    "upstream_repository": "https://github.com/jgromes/RadioLib",
+    "upstream_commit": "0795caa41c6350a2f862137cfc22528c2aaad2bc",
+    "upstream_path": "src/protocols/Hellschreiber/Hellschreiber.cpp",
+    "upstream_file_sha256": "44e1e4fd22d130d018e8e02745845fe2cf059eb6730a813190f8a2b30486c3cb",
+    "derivation": "All 64 five-row source records transcribed byte-for-byte into JSON; expansion adds one blank logical row above and below, then duplicates every logical row into two physical positions"
+  },
+  "license": {
+    "spdx": "MIT",
+    "copyright": "Copyright (c) 2018 Jan Gromeš",
+    "path": "docs/research/standard-feld/assets/font/LICENSE-RadioLib.txt",
+    "sha256": "025378110a5679f82e8a59c19cf91b8ed760dc8752e5504596ef0c0592b8a3e8"
+  },
+  "stored_geometry": {
+    "image_rows": 5,
+    "bits_per_row": 7,
+    "row_order": "top-to-bottom",
+    "bit_order": "left-to-right"
+  },
+  "transmitted_geometry": {
+    "columns_per_character": 7,
+    "logical_rows_per_column": 7,
+    "physical_positions_per_column": 14,
+    "column_order": "left-to-right",
+    "position_order": "bottom-to-top",
+    "expansion": "blank logical row, five stored image rows, blank logical row; duplicate each logical row into two physical positions"
+  },
+  "repertoire": {
+    "stored_code_points": "U+0020 through U+005F inclusive",
+    "accepted_additional_input": "U+0061 through U+007A normalized to U+0041 through U+005A",
+    "input_encoding": "UTF-8 restricted after decoding to the stated ASCII repertoire",
+    "unsupported_behavior": "reject the complete message before output"
+  },
+  "normalization_policy_id": "standard-feld-ascii-uppercase-v1",
+  "substitution_policy_id": "standard-feld-no-substitution-v1",
+  "spacing_policy_id": "standard-feld-fixed-cell-spacing-v1",
+  "leader_policy": "one all-zero seven-column character cell",
+  "trailer_policy": "one all-zero seven-column character cell",
+  "wsprry_research_revision": "the containing WsprryPi Git commit",
+  "known_limitations": [
+    "Simplified modern artwork, not a historical Tbs 24a drum transcription",
+    "All vertical logical pixels use fixed physical-position pairs even though the protocol permits arbitrary half-position placement",
+    "The prior fldigi-to-xfhell F3 result does not transfer to this asset",
+    "Exact-asset clean and impaired interoperability remains Phase 3 work"
+  ]
+}
