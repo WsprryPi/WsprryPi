@@ -1,0 +1,44 @@
+{
+  "schema_version": 1,
+  "gate": "gate-d",
+  "generated_at": "2026-07-30T11:20:29Z",
+  "image": {
+    "id": "sha256:5c711cbab5c3c8d7a2c1d3e52fb7605849a99910ad23342f7101e16b890f9653",
+    "architecture": "arm64/linux"
+  },
+  "applications": {
+    "fldigi": "4.2.12",
+    "xfhell": "3.5.2"
+  },
+  "sources": {
+    "fldigi_sha256": "028bcb1c100cb790cad36324b8063c13594e160743f9378320ceabcf16dbc44a",
+    "xfhell_sha256": "7b16ecdaa425ebc19f7e555fe28473e0228ea344e0203062a4e408346e75b209"
+  },
+  "audio": {
+    "sample_rate_hz": 48000,
+    "route": "private PulseAudio null sink and monitor",
+    "host_audio": false
+  },
+  "corpus": "HELL TEST 0123456789 DE WSPRY WSPRY 73",
+  "artifacts": {
+    "fldigi_transmit_wav": {
+      "path": "fldigi-transmit.wav",
+      "sha256": "a953899d76b0234429395cf4e810d1de2f6fa2c8ad3ab4ab1f59ef3de51bf472"
+    },
+    "xfhell_transmit_wav": {
+      "path": "xfhell-transmit.wav",
+      "sha256": "fda1b933d0756d960c214d826cdfe1f42a746f40d16d0dd3c579589a69ae8be3"
+    },
+    "fldigi_receive_png": {
+      "path": "fldigi-receive.png",
+      "sha256": "c4049e115a2eb48b8b051c3c64f651a66d8bc1585bd8c9a49f9df80ec031db30"
+    },
+    "xfhell_receive_png": {
+      "path": "xfhell-receive.png",
+      "sha256": "64bff5d8f4f9dfdf6871a557db3b5a881ff2ae2b83ea907412330a713bc30521"
+    }
+  },
+  "automation": "scripted application control; receive rasters manually interpreted",
+  "classification": "CONTROL PASS",
+  "summary": "Both applications produced non-silent transmit audio and consumed contained receive audio."
+}

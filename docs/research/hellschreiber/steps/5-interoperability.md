@@ -2,9 +2,9 @@
 
 ## Status
 
-**Source-level checkpoint complete; application-level interoperability remains open.** Reproducible raster, timing, tone-contract, waveform-fixture, and bounded impairment comparisons were completed offline for fldigi 4.2.12, xfhell 3.5.2, RadioLib commit `0795caa`, and the checksum-frozen historical Feld-Hell drum transcription.
+**Complete for the scoped Standard Feld application matrix.** Reproducible source comparisons were supplemented by contained fldigi 4.2.12 ↔ xfhell 3.5.2 application tests. Both Standard Feld directions rendered the distinctive corpus readably and are classified F3. The two 105-labelled profiles cannot represent one another's exact receiver contract and were therefore classified `NOT CONFIGURABLE`, not cross-tested under a misleading nearest-label setting. [HELL-EVID-0040] [HELL-EVID-0041] [HELL-EVID-0042] [HELL-EVID-0043]
 
-No installed application transmitter was captured and no application receiver rendered a counterpart's WAV file. Accordingly, this report establishes exact source-contract matches and mismatches, not full A→B/B→A application interoperability or human readability. No audio device, GPIO, service, radio hardware, RF output, or over-the-air operation was used.
+The application work used a contained Linux arm64 Docker/Xvfb/PulseAudio rig, without host audio devices, GPIO, radio hardware, RF output, or over-the-air operation. Raster interpretation was manual rather than blind; robustness and impairment qualification remain outside this result.
 
 ## Technical summary
 
@@ -19,7 +19,8 @@ The safe outcome for Step 6 is therefore implementation-qualified:
 - Wsprry Pi feasibility may use the Step 1.1 Feld timing model as a stable reference.
 - It may not assume a generic FSK/FM Hell-105 contract.
 - It may not treat a font name or visual similarity as raster identity.
-- It may not claim current-software interoperability until actual application A→B and B→A file tests close this step.
+- It may treat Standard Feld as F3 across fldigi 4.2.12 and xfhell 3.5.2 in the clean, contained bidirectional test.
+- It may not extend that result to the non-equivalent 105-labelled profiles, robustness, blind scoring, or hardware behavior.
 
 ## Research questions
 
@@ -37,8 +38,8 @@ The historical drum transcription was downloaded temporarily, verified against t
 
 | Identifier | Source identity | License | Inspected transmit profiles | Receiver execution |
 | --- | --- | --- | --- | --- |
-| `FLDIGI-4.2.12` | Official `fldigi-4.2.12.tar.gz`; SHA-256 `028bcb1c…dbc44a` | GPL-3.0-or-later | `FSKH105`, `FELDHELL`; `7x7` and `real` fonts | Not executed |
-| `XFHELL-3.5.2` | Official `xfhell-3.5.2.tar.bz2`; SHA-256 `7b16ecda…5b209` | GPL-3.0-or-later | `FMHell` at 105; standard FeldHell; packaged BDF fonts | Not executed |
+| `FLDIGI-4.2.12` | Official `fldigi-4.2.12.tar.gz`; SHA-256 `028bcb1c…dbc44a` | GPL-3.0-or-later | `FSKH105`, `FELDHELL`; `7x7` and `real` fonts | Standard Feld self and cross receive executed |
+| `XFHELL-3.5.2` | Official `xfhell-3.5.2.tar.bz2`; SHA-256 `7b16ecda…5b209` | GPL-3.0-or-later | `FMHell` at 105; standard FeldHell; packaged BDF fonts | Standard Feld self and cross receive executed |
 | `RADIOLIB-0795CAA` | GitHub commit archive `0795caa41c6350a2f862137cfc22528c2aaad2bc`; SHA-256 `6bf3c679…6150` | MIT | Direct/AFSK Feld-style 7×7 at default 122.5 | Transmit-only library; not executed |
 | `HELL-FONT-HIST-FELD-01` | External drum transcription; SHA-256 `1dc94ee5…3d5` | Redistribution permission not established | Historical 7×14 raster reference | Parsed temporarily; not retained |
 
@@ -64,6 +65,8 @@ The deterministic corpus contains:
 - Fixture audio: PCM signed 16-bit little-endian, mono, 48,000 samples/s, 1,500 Hz nominal center
 - Source archives: downloaded from official project locations and checksum-frozen before analysis
 - Historical source: temporary checksum verification only
+- Application rig: private [`WsprryPi/hellschreiber-interoperability-rig`](https://github.com/WsprryPi/hellschreiber-interoperability-rig) repository at commit `dc48555df88019d0f268e6e2b2d3bbfcca8707bd`; Linux arm64 container with Xvfb and isolated PulseAudio null sinks; repository access requires authorization
+- Application corpus: `HELL TEST 0123456789 DE WSPRY WSPRY 73`
 
 ## Fixture and artifact manifest
 
@@ -77,6 +80,8 @@ The two audio fixtures are:
 | `xfhell-fmhell105-source-contract.wav` | `CQ TEST`; `FMFatLoEn.bdf` | 2.914292 s | 210/s | 210 Hz | `b622e5e2…b6c` |
 
 These are source-derived CPFSK fixtures, not audio captured from the applications.
+
+The compact application evidence subset is in [`../artifacts/step-5/application-rig/`](../artifacts/step-5/application-rig/README.md). It retains the Gate D/E/F manifests and four receiver screenshots; the private rig at commit `dc48555df88019d0f268e6e2b2d3bbfcca8707bd` contains the scripts needed for authorized users to reproduce the trials. [HELL-EVID-0040] [HELL-EVID-0041] [HELL-EVID-0042]
 
 ## Compatibility definitions
 
@@ -130,9 +135,9 @@ Uncompensated tone reversal produced 100% binary inversion in both self-contract
 ### Track A disposition
 
 - fldigi `FSKH105` ↔ xfhell `FMHell105`: **not F1 and not F2**.
-- Application A→B: **not assessed**.
-- Application B→A: **not assessed**.
-- Human readability under correct tuning: **not assessed**.
+- Exact reciprocal receiver configuration: **not configurable** (14 vs 12 positions, 245 vs 210 decisions/s, and 55 vs 210 Hz separation).
+- Application A→B/B→A: **not run**, because selecting the nearest shared label would not test the opposite transmitter's actual contract.
+- Human readability under a substituted setting: **not assessed and not required to reject exact profile equivalence**.
 - Generic “FSK/FM Hell-105 compatible” claim: **rejected** unless both implementation profiles are named and tested.
 
 ## Track B — Feld timing converges, fonts and spacing do not
@@ -147,7 +152,7 @@ This is F1 for those 27 individual cells, not for the complete repertoire. It do
 
 After removing exterior blank rows and columns solely for glyph-shape comparison, 36 of 40 shared glyphs are exact. The four shape differences are `I`, `K`, `0`, and `6`. At the actual transmitted-cell layer, none of the 40 cells is exact because fldigi adds both a leading and trailing blank column while xfhell's BDF loading adds a trailing character-space column.
 
-This pair therefore has strong glyph lineage but not F1 transmitted-cell identity. Since both standard Feld paths use 14 positions/column and 17.5 columns/s, the difference is likely compatible with asynchronous visual reception, but F3 remains untested. [HELL-EVID-0038]
+This pair therefore has strong glyph lineage but not F1 transmitted-cell identity. Both standard Feld paths use 14 positions/column and 17.5 columns/s, and the contained application trial confirmed F3 readability in both directions. [HELL-EVID-0038] [HELL-EVID-0042]
 
 ### fldigi `7x7` and RadioLib
 
@@ -157,14 +162,14 @@ Both preserve the conventional 7×7/122.5-cell timing relationship, but the glyp
 
 ### Pulse shaping
 
-fldigi's standard Feld path selects square or configured shaped OOK edges; xfhell uses a half-dot cosine rise/fall at transitions; RadioLib's direct client starts and stops the underlying physical layer without a declared Hell-specific shaping envelope. These are not sample-identical waveforms. Their effect on practical cross-readability and occupied bandwidth remains a Step 5 application/measurement gap.
+fldigi's standard Feld path selects square or configured shaped OOK edges; xfhell uses a half-dot cosine rise/fall at transitions; RadioLib's direct client starts and stops the underlying physical layer without a declared Hell-specific shaping envelope. These are not sample-identical waveforms. The scoped clean-path Standard Feld application matrix is complete; pulse-shaping, impairment, practical-bandwidth, and occupied-bandwidth measurements remain optional robustness or spectral-characterization extensions, not prerequisites for the current F3 result. They may still inform Step 6 feasibility or later implementation qualification.
 
 ### Track B disposition
 
 | Pair | F1 raster | F2 waveform | F3 readability |
 | --- | --- | --- | --- |
 | Historical drum ↔ fldigi `real` | Partial: 27/40 exact cells | Not assessed | Not assessed |
-| fldigi `real` ↔ xfhell `FeldRealEn` | No complete cells exact; 36/40 trimmed shapes exact | No, spacing/shaping differ | Not assessed; plausible only |
+| fldigi `real` ↔ xfhell `FeldRealEn` | No complete cells exact; 36/40 trimmed shapes exact | No, spacing/shaping differ | **F3 bidirectional** in the clean application trial |
 | fldigi `7x7` ↔ RadioLib | Partial: 11/40 exact cells | No, font and keying implementation differ | Not assessed |
 
 ## Failures and rejected interpretations
@@ -174,12 +179,12 @@ fldigi's standard Feld path selects square or configured shaped OOK edges; xfhel
 - **Rejected:** Treat identical column rate as raster identity.
 - **Rejected:** Treat matching trimmed glyph shape as matching transmitted timing.
 - **Rejected:** Treat source loopback as independent A→B/B→A interoperability.
-- **Not completed:** Installed fldigi playback/capture and xfhell receiver execution. xfhell is a Linux/GTK/ALSA application; no approved, faithful application-level environment with audio-file routing was established on this macOS host.
-- **Not completed:** Human-blind readability scoring, dropouts, impulsive noise, leading/trailing truncation, or application clock-error testing. Without actual renderer output these would add precision to the wrong layer.
+- **Resolved for Standard Feld:** Contained application transmission and receiver rendering completed in both directions. A fldigi startup-script warning remained visible in screenshots but did not obscure the decoded raster.
+- **Not completed:** Human-blind scoring, repeated-run statistics, dropouts, impulsive noise, leading/trailing truncation, or application clock-error testing. These are robustness extensions, not prerequisites for the scoped clean-path F3 result.
 
 ## Reproducibility
 
-Follow the commands and archive checksums in the [artifact README](../artifacts/step-5/README.md). The final reproduction run regenerated every retained fixture and verified every entry in `manifest.json`. `ffprobe` independently confirmed both WAV files as mono 48 kHz signed 16-bit PCM with the durations recorded above.
+Follow the commands and archive checksums in the [artifact README](../artifacts/step-5/README.md). The source-level reproduction regenerated every retained fixture. The private application rig is frozen at remotely reachable commit `dc48555df88019d0f268e6e2b2d3bbfcca8707bd`; Gate E recorded `CONTROL PASS` for both self-decodes and Gate F retained both cross-receiver renders. The documentation subset is checksum-indexed and intentionally omits bulky WAVs and full logs. Reproducing the application trials requires authorization to access the private rig repository. [HELL-EVID-0040] [HELL-EVID-0041] [HELL-EVID-0042]
 
 ## Confidence assessment
 
@@ -187,10 +192,11 @@ Follow the commands and archive checksums in the [artifact README](../artifacts/
 | --- | --- | --- |
 | fldigi and xfhell 105-labelled transmit contracts differ in rate, rows, and shift | `OBS` from source plus `CALC` | High |
 | They are not F1 or F2 compatible as inspected | `CALC` from deterministic contracts | High |
-| Either can reliably render the other's text | `NOT-ASSESSED` | No conclusion |
+| fldigi and xfhell render each other's Standard Feld text | `OBS` plus manual raster interpretation | Moderate–high for the clean single-run F3 result |
+| Exact cross-configuration of the two 105-labelled profiles | `NOT CONFIGURABLE` from inspected and exposed contracts | High |
 | Standard Feld timing is shared at 17.5 columns/s and compatible 122.5/245 representation | `OBS` | High |
 | Standard Feld fonts/cells are bit-identical across implementations | Rejected by `CALC` | High |
-| Differing Feld fonts remain mutually human-readable | `INFER`, not tested | Low; do not promote |
+| Historical/RadioLib Feld font differences remain mutually human-readable | `INFER`, not tested | Low; do not extend the fldigi↔xfhell result |
 
 ## Decisions affected
 
@@ -198,14 +204,14 @@ Follow the commands and archive checksums in the [artifact README](../artifacts/
 - HELL-DEC-0024 is superseded as a simple test ordering. “FSK Hell-105” must first be split into concrete fldigi and xfhell/IZ8BLY-lineage profiles.
 - HELL-DEC-0025 records the implementation-qualified naming rule.
 - HELL-DEC-0026 records the rejected generic compatibility claim.
-- HELL-DEC-0027 keeps Step 5 open for actual application A→B/B→A tests while allowing Step 6 to use only the bounded source-contract results.
+- HELL-DEC-0027 is superseded by the completed contained application gate.
+- HELL-DEC-0028 records bidirectional Standard Feld F3 and closes the scoped Step 5 matrix.
+- HELL-DEC-0029 records that the two 105-labelled application profiles are not exact reciprocal configurations.
 
 ## Unresolved questions
 
-- Can fldigi 4.2.12 be driven with deterministic file input/output without involving a live audio device?
-- Can xfhell 3.5.2 be exercised in a contained Linux environment with faithful ALSA file routing and no device access?
-- Does fldigi render xfhell's 210-position/s, 210 Hz-shift FMHell105 intelligibly?
-- Does xfhell render fldigi's 245-position/s, 55 Hz-shift FSKH105 intelligibly?
+- Would a deliberately substituted 105-labelled setting yield merely recognizable fragments, and would that exploratory result be useful despite testing a different contract?
+- Does blind multi-operator scoring reproduce the Standard Feld F3 classification?
 - Which current program, if any, implements the original six-row/105-baud/55-Hz profile exactly?
 - How do square, raised-cosine, and xfhell half-dot edge shaping affect practical bandwidth under one named measurement criterion?
 - At what clock error do the three Feld implementations move from F3 to F4?
@@ -214,7 +220,7 @@ Follow the commands and archive checksums in the [artifact README](../artifacts/
 
 Step 6 may now evaluate separate candidate contracts:
 
-1. standard Feld-Hell timing with an explicit font and spacing policy;
+1. standard Feld-Hell timing with an explicit font and spacing policy, application-qualified F3 between fldigi 4.2.12 and xfhell 3.5.2 in the clean contained trial;
 2. fldigi 4.2.12 `FSKH105` implementation profile;
 3. xfhell 3.5.2 `FMHell105` implementation profile;
 4. the documentary original 105-baud/six-row profile, still requiring a verified current implementation.
@@ -223,8 +229,8 @@ Step 6 must not combine items 2–4 into one candidate. Any Wsprry Pi feasibilit
 
 ## Recommended next step
 
-Close the remaining Step 5 gate with actual offline application playback/capture in both directions for fldigi and xfhell. If that environment cannot be established safely, retain the compatibility class as `NOT-ASSESSED` and proceed to Step 6 only as a conditional feasibility study—not as an interoperability-qualified design.
+Proceed to Step 6 using Standard Feld as the application-qualified interoperability baseline. Treat the fldigi and xfhell 105-labelled implementations as separate contracts; any substituted-setting or robustness work is a separate optional experiment, not a blocker for this scoped conclusion.
 
 ## Explicit non-claims
 
-This report does not establish receiver sensitivity, occupied bandwidth, hardware timing, GPIO safety, transmitter linearity, RF spectral compliance, on-air performance, regulatory suitability, deployment readiness, or a Wsprry Pi implementation choice.
+This report does not establish receiver sensitivity, occupied bandwidth, hardware timing, GPIO safety, transmitter linearity, RF spectral compliance, on-air performance, regulatory suitability, deployment readiness, blind/operator-independent readability, robustness under impairments, or a Wsprry Pi implementation choice.

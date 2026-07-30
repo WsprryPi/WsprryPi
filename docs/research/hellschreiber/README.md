@@ -2,7 +2,7 @@
 
 ## Status
 
-Active — Steps 1.1 through 4 complete; Step 5 has a reproducible source-level checkpoint with application cross-decoding still open.
+Active — Steps 1.1 through 5 complete for their scoped research questions; Step 6 has not started. Standard Feld passed the clean contained fldigi 4.2.12 ↔ xfhell 3.5.2 application matrix bidirectionally at F3. The result is limited to one deterministic, manually reviewed, non-blind run; the two 105-labelled profiles remain separate, non-equivalent implementation contracts that are not exactly cross-configurable.
 
 Current authorized activity is research and documentation only.
 
@@ -73,14 +73,15 @@ The [decision log](decision-log.md) separates accepted process decisions, provis
 | 2 | Build the mode taxonomy | Documentary taxonomy complete | [Report](steps/2-mode-taxonomy.md) | HELL-DEC-0013 through HELL-DEC-0018 | 2026-07-29 |
 | 3 | Freeze the font evidence | Documentary evidence complete; research references frozen | [Report](steps/3-font-evidence.md) | HELL-DEC-0019 through HELL-DEC-0022 | 2026-07-29 |
 | 4 | Measure real adoption | Public documentary research complete; no representative worldwide mode-share ranking available | [Report](steps/4-adoption.md) | HELL-DEC-0023, HELL-DEC-0024 | 2026-07-29 |
-| 5 | Perform offline interoperability experiments | Source-level checkpoint complete; application A→B/B→A tests remain open | [Report](steps/5-interoperability.md) | HELL-DEC-0025 through HELL-DEC-0027 | 2026-07-29 |
+| 5 | Perform offline interoperability experiments | Scoped matrix complete: Standard Feld F3 bidirectional; 105-labelled profiles `NOT CONFIGURABLE` as exact reciprocal contracts | [Report](steps/5-interoperability.md) | HELL-DEC-0025 through HELL-DEC-0029 | 2026-07-30 |
 | 6 | Evaluate Wsprry Pi feasibility | Not started | Not yet created | None yet | 2026-07-29 |
 | 7 | Make a gated recommendation | Not started | Not yet created | None yet | 2026-07-29 |
 
 ## Important unresolved questions
 
 - What privacy-preserving, mode-coded observations could establish actual Hellschreiber mode shares beyond schedules and organizer summaries?
-- Can fldigi and xfhell be exercised with deterministic offline file routing to close the FSKH105/FM105 and Feld application-level compatibility gates?
+- Would a deliberately substituted 105-labelled receiver setting produce useful F3/F4 output despite testing a different contract?
+- Would blind or repeated operator scoring reproduce the clean single-run Standard Feld F3 result?
 - Can the authoritative 105-baud and historical Hell-80 bitmap tables be recovered with clear licenses?
 - Can the external historical drum transcription be independently verified and licensed for archival redistribution?
 - What compatibility class does current fldigi Hell-80 have with the historical Siemens 9x7, 315-baud protocol?

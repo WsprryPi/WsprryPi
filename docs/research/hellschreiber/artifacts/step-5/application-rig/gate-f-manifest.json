@@ -1,0 +1,44 @@
+{
+  "schema_version": 1,
+  "gate": "gate-f",
+  "generated_at": "2026-07-30T11:20:29Z",
+  "image": {
+    "id": "sha256:5c711cbab5c3c8d7a2c1d3e52fb7605849a99910ad23342f7101e16b890f9653",
+    "architecture": "arm64/linux"
+  },
+  "applications": {
+    "fldigi": "4.2.12",
+    "xfhell": "3.5.2"
+  },
+  "sources": {
+    "fldigi_sha256": "028bcb1c100cb790cad36324b8063c13594e160743f9378320ceabcf16dbc44a",
+    "xfhell_sha256": "7b16ecdaa425ebc19f7e555fe28473e0228ea344e0203062a4e408346e75b209"
+  },
+  "audio": {
+    "sample_rate_hz": 48000,
+    "route": "private PulseAudio null sink and monitor",
+    "host_audio": false
+  },
+  "corpus": "HELL TEST 0123456789 DE WSPRY WSPRY 73",
+  "artifacts": {
+    "fldigi_transmit_wav": {
+      "path": "fldigi-transmit.wav",
+      "sha256": "2e9f8b7989c9943ca2367a30da43e6f5bdb8e27f96078dfb1245fa5d61cc94a3"
+    },
+    "xfhell_transmit_wav": {
+      "path": "xfhell-transmit.wav",
+      "sha256": "25fa2356c874098af50677d4a31c57a54948c933a3534ba4315fa5d8581e27f6"
+    },
+    "fldigi_receive_png": {
+      "path": "fldigi-receive.png",
+      "sha256": "649b7735a4d3de243f34926516e508aa8a894ddd9cb5ac868fd2385122c4f55f"
+    },
+    "xfhell_receive_png": {
+      "path": "xfhell-receive.png",
+      "sha256": "49a8e199b9f991103327a086913862cf32cd30c3d4debd71461e606c056500b7"
+    }
+  },
+  "automation": "scripted application control; receive rasters manually interpreted",
+  "classification": "F3",
+  "summary": "Standard Feld was dependably readable in both directions; the two nominal 105 profiles are NOT CONFIGURABLE as equivalent receiver contracts."
+}

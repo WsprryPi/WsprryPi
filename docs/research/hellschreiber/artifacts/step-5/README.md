@@ -1,5 +1,7 @@
 # Step 5 offline interoperability artifacts
 
+The [`application-rig/`](application-rig/README.md) directory contains the compact Gate D/E/F application evidence subset tied to commit `dc48555df88019d0f268e6e2b2d3bbfcca8707bd` in the private [`WsprryPi/hellschreiber-interoperability-rig`](https://github.com/WsprryPi/hellschreiber-interoperability-rig) repository. It supplements the source-derived fixtures below; it does not replace or modify them. Repository access requires authorization.
+
 This directory contains the minimal reproducible fixtures used by Step 5. Nothing here opens an audio device, accesses GPIO, keys a transmitter, or produces RF.
 
 ## Reproduction
