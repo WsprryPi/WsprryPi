@@ -2,11 +2,11 @@
 
 ## Status
 
-This document defines the Phase 1.1 fixture schema as constrained by the Phase 2 asset. It does not yet provide expanded production glyph fixtures and does not authorize a generator, application implementation, rig change, audio output, hardware access, or RF output.
+This document defines the fixture schema implemented and independently reproduced by Phase 1.2. It does not authorize application implementation, rig changes, audio output, hardware access, or RF output.
 
-Schema identifier: `standard-feld-fixture-v1-draft`
+Schema identifier: `standard-feld-fixture-v1`
 
-The suffix remains `draft` until a canonical machine-readable serialization is implemented and independently reproduced.
+The Phase 1.1 review identifier `standard-feld-fixture-v1-draft` is superseded. Canonical machine-readable serialization is implemented by the research generator and independently checked by the separate validator.
 
 ## Fixture classes
 
@@ -16,7 +16,7 @@ The suffix remains `draft` until a canonical machine-readable serialization is i
 4. `cancellation`: a message fixture plus each required cancellation checkpoint and terminal state.
 5. `impairment-source`: a clean exact-contract fixture and a declarative transformation used by the offline rig.
 
-The selected asset is `wsprry-standard-feld-radiolib-5x5-v1`, and the spacing policy is `standard-feld-fixed-cell-spacing-v1`. Phase 1.2 MUST use those exact identities and checksums. Synthetic all-off, all-on, and alternating-position patterns MUST remain labelled synthetic and MUST NOT be presented as production glyphs.
+The selected asset is `wsprry-standard-feld-radiolib-5x5-v1`, and the spacing policy is `standard-feld-fixed-cell-spacing-v1`. The retained [`generated/v1`](generated/v1/) set uses those exact identities and checksums. Synthetic all-off, all-on, and alternating-position patterns remain labelled synthetic and are not presented as production glyphs.
 
 ## Required manifest fields
 
@@ -74,7 +74,9 @@ The eventual machine-readable form SHOULD be UTF-8 JSON with:
 - no floating-point value used as normative time;
 - exactly one trailing LF.
 
-SHA-256 covers the complete canonical manifest bytes. The value MUST be stored outside the manifest in a checksum index using the repository-relative path and lowercase digest. This avoids a self-referential manifest. A later generator design MUST implement and independently test canonical serialization before the schema loses its `draft` suffix.
+SHA-256 covers each complete canonical file. Values are stored in `SHA256SUMS` using fixture-directory-relative paths and lowercase digests. This avoids a self-referential manifest. Canonical serialization uses UTF-8, sorted object keys, ordered arrays, LF endings, and exactly one trailing LF; no timestamp is serialized.
+
+Message positions are retained as tab-separated strings inside JSON to keep the complete fixture reviewable. The `position_field_order` array defines all ten fields, and an empty field means null. This compact representation preserves every required index, state, attribution, rational offset, and nanosecond offset.
 
 ## Duration and cancellation checks
 
@@ -93,14 +95,16 @@ When a rig result informs a product conclusion, the rig capability/evidence comm
 
 ## Phase 1.2 acceptance
 
-After Phase 2, Phase 1.2 must provide at minimum:
+Phase 1.2 provides:
 
 - one fixture for every supported glyph;
 - normalization, rejection, and substitution cases;
 - leading/trailing spacing and word-space cases;
 - an empty-input rejection case;
 - a corpus fixture retaining `HELL TEST 0123456789 DE WSPRY WSPRY 73` where supported;
-- boundary glyphs that exercise arbitrary half-position placement;
+- paired production glyphs plus a synthetic single-position mechanics fixture representing the protocol's more general half-position capability;
 - all-off, all-on, and rapid-alternation worst-case mechanics fixtures;
 - exact event expansion, total duration, repeat-equality, cancellation, and safe-terminal-state cases;
 - manifests and checksums reproducible without hardware.
+
+See the [Phase 1.2 report](../phase-1.2-fixtures.md) for the passing results and Gate A disposition.

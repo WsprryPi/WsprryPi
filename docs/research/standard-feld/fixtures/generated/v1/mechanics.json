@@ -1,0 +1,85 @@
+{
+  "asset_id": "wsprry-standard-feld-radiolib-5x5-v1",
+  "asset_sha256": "025c4ee1227a6d2043b460c973a98b3c5f875b64c1ee96d20a71ad2e78091227",
+  "fixture_class": "protocol-mechanics",
+  "generator_revision": "the containing WsprryPi Git commit",
+  "normalization_policy_id": "standard-feld-ascii-uppercase-v1",
+  "patterns": [
+    {
+      "duration": {
+        "denominator": 35,
+        "numerator": 4
+      },
+      "fixture_id": "all-off",
+      "production_glyph": false,
+      "states": "0000000000000000000000000000",
+      "total_positions": 28
+    },
+    {
+      "duration": {
+        "denominator": 35,
+        "numerator": 8
+      },
+      "fixture_id": "all-on-bracketed",
+      "production_glyph": false,
+      "states": "00000000000000111111111111111111111111111100000000000000",
+      "total_positions": 56
+    },
+    {
+      "duration": {
+        "denominator": 35,
+        "numerator": 8
+      },
+      "fixture_id": "single-position-alternation-synthetic",
+      "production_glyph": false,
+      "states": "01010101010101010101010101010101010101010101010101010101",
+      "total_positions": 56
+    },
+    {
+      "duration": {
+        "denominator": 35,
+        "numerator": 8
+      },
+      "fixture_id": "paired-alternation",
+      "production_glyph": false,
+      "states": "00110011001100110011001100110011001100110011001100110011",
+      "total_positions": 56
+    },
+    {
+      "duration": {
+        "denominator": 35,
+        "numerator": 4
+      },
+      "fixture_id": "column-boundary-transition",
+      "production_glyph": false,
+      "states": "0000000000000110000000000000",
+      "total_positions": 28
+    },
+    {
+      "duration": {
+        "denominator": 5,
+        "numerator": 4
+      },
+      "fixture_id": "character-boundary-transition-synthetic",
+      "production_glyph": false,
+      "states": "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+      "total_positions": 196
+    },
+    {
+      "duration": {
+        "denominator": 5,
+        "numerator": 4
+      },
+      "fixture_id": "character-boundary-merge-synthetic",
+      "production_glyph": false,
+      "states": "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+      "total_positions": 196
+    }
+  ],
+  "positions_per_second": 245,
+  "profile_id": "standard-feld-wsprry-v1",
+  "schema_id": "standard-feld-fixture-v1",
+  "spacing_policy_id": "standard-feld-fixed-cell-spacing-v1",
+  "substitution_policy_id": "standard-feld-no-substitution-v1",
+  "time_conversion": "round_half_up(n * 1000000000 / 245) using integer arithmetic"
+}

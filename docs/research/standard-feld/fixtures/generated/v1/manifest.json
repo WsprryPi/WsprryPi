@@ -1,0 +1,24 @@
+{
+  "asset_id": "wsprry-standard-feld-radiolib-5x5-v1",
+  "asset_sha256": "025c4ee1227a6d2043b460c973a98b3c5f875b64c1ee96d20a71ad2e78091227",
+  "files": {
+    "cancellation.json": "1402389b2461ce1e4f293236e7c2b51c570e81232fb02a55b42a6260612db261",
+    "glyphs.json": "1d82294c800cf79ac115f4765de6645b5d33ee7f4b5e5de7ced366a7c40fac60",
+    "input-cases.json": "4cb43931a8b7d252319f0306517e2e7b3ca79435db14fba74fd48d65d793e8c7",
+    "mechanics.json": "15da8f166da02a9e75a68544beef4d6be0dbefc3d9cc6ddaab236643afd34f31",
+    "messages.json": "6ce3ec82b97af539c3188df1fd8d6f53b96e25c9c3fb97223964ac89f5c8f003",
+    "safety.json": "b0029564217f5e0d12765cfdb0bd4ab2fbc75cf9075af05ec8f02a0a567c7127"
+  },
+  "fixture_set_id": "standard-feld-exact-asset-v1",
+  "generator_revision": "the containing WsprryPi Git commit",
+  "normalization_policy_id": "standard-feld-ascii-uppercase-v1",
+  "positions_per_second": 245,
+  "profile_id": "standard-feld-wsprry-v1",
+  "reproducibility": "canonical UTF-8 JSON, sorted object keys, ordered arrays, LF, one trailing LF, no timestamps",
+  "schema_id": "standard-feld-fixture-v1",
+  "source_asset_path": "assets/font/font.json",
+  "spacing_policy_id": "standard-feld-fixed-cell-spacing-v1",
+  "substitution_policy_id": "standard-feld-no-substitution-v1",
+  "terminal_rf_state": "off",
+  "time_conversion": "round_half_up(n * 1000000000 / 245) using integer arithmetic"
+}
