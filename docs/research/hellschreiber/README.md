@@ -2,7 +2,7 @@
 
 ## Status
 
-Active — Steps 1.1 through 6 complete for their scoped research questions; Step 7 has not started. Step 6 advances Standard Feld with explicit font, interoperability-retest, backend-timing, safety, and spectral conditions. fldigi `FSKH105` and xfhell `FMHell105` are deferred as separate continuous-phase implementation contracts; the documentary six-row/105-baud profile remains insufficient evidence.
+Complete — Steps 1.1 through 7 are complete for their scoped research questions. Step 7 recommends Standard Feld-Hell as the sole subject of a separately authorized implementation-design and qualification-planning spike, subject to seven mandatory gates. This closes the research question; it does not authorize implementation or establish hardware, RF, regulatory, release, or deployment readiness. fldigi `FSKH105` and xfhell `FMHell105` remain separate deferred contracts, a blended generic “Hell 105” contract is rejected, and the documentary six-row/105-baud profile remains insufficient evidence.
 
 Current authorized activity is research and documentation only.
 
@@ -54,7 +54,7 @@ Claims must use the hierarchy, citation requirements, confidence labels, and con
 
 ## Decision status
 
-The [decision log](decision-log.md) separates accepted process decisions, provisional hypotheses, deferred decisions, rejected alternatives, and superseded conclusions. Standard Feld-Hell is the comparison baseline and the sole Step 6 candidate advancing with conditions; it remains explicitly unselected and unimplemented in Wsprry Pi.
+The [decision log](decision-log.md) separates accepted process decisions, provisional hypotheses, deferred decisions, rejected alternatives, and superseded conclusions. Standard Feld-Hell is the comparison baseline and the sole candidate recommended for a later design-and-qualification-planning spike; it remains explicitly unselected and unimplemented in Wsprry Pi.
 
 ## Repository and branch
 
@@ -75,18 +75,17 @@ The [decision log](decision-log.md) separates accepted process decisions, provis
 | 4 | Measure real adoption | Public documentary research complete; no representative worldwide mode-share ranking available | [Report](steps/4-adoption.md) | HELL-DEC-0023, HELL-DEC-0024 | 2026-07-29 |
 | 5 | Perform offline interoperability experiments | Scoped matrix complete: Standard Feld F3 bidirectional; 105-labelled profiles `NOT CONFIGURABLE` as exact reciprocal contracts | [Report](steps/5-interoperability.md) | HELL-DEC-0025 through HELL-DEC-0029 | 2026-07-30 |
 | 6 | Evaluate Wsprry Pi feasibility | Source-level feasibility complete; Standard Feld advances with conditions | [Report](steps/6-wsprry-pi-feasibility.md) | HELL-DEC-0030 through HELL-DEC-0035 | 2026-07-30 |
-| 7 | Make a gated recommendation | Not started | Not yet created | None yet | 2026-07-29 |
+| 7 | Make a gated recommendation | Complete; Standard Feld recommended only for a separately authorized design-and-qualification-planning spike | [Report](steps/7-gated-recommendation.md) | HELL-DEC-0036 through HELL-DEC-0042 | 2026-07-30 |
 
-## Important unresolved questions
+## Questions transferred to the proposed next spike
 
-- What privacy-preserving, mode-coded observations could establish actual Hellschreiber mode shares beyond schedules and organizer summaries?
-- Would a deliberately substituted 105-labelled receiver setting produce useful F3/F4 output despite testing a different contract?
-- Would blind or repeated operator scoring reproduce the clean single-run Standard Feld F3 result?
-- Can the authoritative 105-baud and historical Hell-80 bitmap tables be recovered with clear licenses?
-- Can the external historical drum transcription be independently verified and licensed for archival redistribution?
-- What compatibility class does current fldigi Hell-80 have with the historical Siemens 9x7, 315-baud protocol?
-- Which immutable, redistributable Standard Feld font and spacing policy should Step 7 gate on, and does it retain F3 with the tested applications?
-- Can either current RF backend meet the required raster timing, safe-stop, phase, and spectral gates on the supported Raspberry Pi range?
+- Which immutable, redistributable Standard Feld font and spacing policy should Wsprry Pi propose?
+- Does that exact asset retain F3, or achieve F4, with named receiver versions under repeatable scoring?
+- Can an existing backend meet objective timing, jitter, cancellation, safe-idle, and spectral criteria on the proposed supported Raspberry Pi matrix, or is a new backend required?
+- What named occupied-bandwidth or emission criterion and worst-case raster pattern should govern later RF qualification?
+- What product, operator, validation, and release contracts must a future implementation satisfy?
+
+Longer-term research remains open for representative mode-share observations, deliberately substituted 105-profile trials, licensed 105/Hell-80 assets and endpoints, and independent verification or redistribution permission for the historical drum transcription.
 
 ## Explicit non-goals
 
