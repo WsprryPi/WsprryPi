@@ -4,9 +4,9 @@
 
 This document freezes the font-independent protocol core for the proposed Wsprry Pi profile. The words **MUST**, **MUST NOT**, **SHOULD**, and **MAY** are normative within this research specification. An implementation is not authorized by this document.
 
-Profile identifier: `standard-feld-wsprry-v1-draft`
+Profile identifier: `standard-feld-wsprry-v1`
 
-The `draft` suffix MUST remain until the asset, spacing policy, and exact fixtures pass the remaining Gate A and Gate B work. A future incompatible change MUST receive a new profile version; it MUST NOT silently reuse this identifier.
+The Phase 1.1 review identifier `standard-feld-wsprry-v1-draft` is superseded by this identifier after Gates A and B passed. A future incompatible change MUST receive a new profile version; it MUST NOT silently reuse this identifier.
 
 ## Physical raster and timebase
 
@@ -134,4 +134,4 @@ This profile does not include or authorize:
 
 ## Gate status
 
-The protocol core, asset, repertoire, normalization, and spacing rules are frozen. Gate B is satisfied. Gate A remains open until Phase 1.2 produces reviewable exact-asset raster, event, duration, rejection, repeat, and cancellation fixtures.
+The protocol core, asset, repertoire, normalization, and spacing rules are frozen. The exact raster, event, duration, rejection, repeat, cancellation, and terminal-state fixtures are independently reproducible. Gates A and B are satisfied. Gate C exact-asset application interoperability remains open.

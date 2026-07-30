@@ -1,0 +1,59 @@
+{
+  "asset_id": "wsprry-standard-feld-radiolib-5x5-v1",
+  "asset_sha256": "025c4ee1227a6d2043b460c973a98b3c5f875b64c1ee96d20a71ad2e78091227",
+  "backend_latency_claim": null,
+  "cases": [
+    {
+      "expected_initial_rf_state": "off",
+      "expected_terminal_rf_state": "off",
+      "fixture_id": "valid-completion",
+      "partial_plan_exposed": false,
+      "plan_committed": true
+    },
+    {
+      "expected_initial_rf_state": "off",
+      "expected_terminal_rf_state": "off",
+      "fixture_id": "atomic-input-rejection",
+      "partial_plan_exposed": false,
+      "plan_committed": false
+    },
+    {
+      "expected_initial_rf_state": "off",
+      "expected_terminal_rf_state": "off",
+      "fixture_id": "asset-checksum-failure",
+      "partial_plan_exposed": false,
+      "plan_committed": false
+    },
+    {
+      "expected_initial_rf_state": "off",
+      "expected_terminal_rf_state": "off",
+      "fixture_id": "compilation-failure",
+      "partial_plan_exposed": false,
+      "plan_committed": false
+    },
+    {
+      "expected_initial_rf_state": "off",
+      "expected_terminal_rf_state": "off",
+      "fixture_id": "cancellation-at-any-position-boundary",
+      "partial_plan_exposed": false,
+      "plan_committed": true
+    },
+    {
+      "expected_initial_rf_state": "off",
+      "expected_terminal_rf_state": "off",
+      "fixture_id": "repeat-boundary",
+      "next_repeat_begins_with": "leader",
+      "partial_plan_exposed": false,
+      "plan_committed": true
+    }
+  ],
+  "fixture_class": "safe-terminal-and-fault",
+  "generator_revision": "the containing WsprryPi Git commit",
+  "normalization_policy_id": "standard-feld-ascii-uppercase-v1",
+  "positions_per_second": 245,
+  "profile_id": "standard-feld-wsprry-v1",
+  "schema_id": "standard-feld-fixture-v1",
+  "spacing_policy_id": "standard-feld-fixed-cell-spacing-v1",
+  "substitution_policy_id": "standard-feld-no-substitution-v1",
+  "time_conversion": "round_half_up(n * 1000000000 / 245) using integer arithmetic"
+}

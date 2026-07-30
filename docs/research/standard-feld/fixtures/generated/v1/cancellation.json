@@ -1,0 +1,1222 @@
+{
+  "asset_id": "wsprry-standard-feld-radiolib-5x5-v1",
+  "asset_sha256": "025c4ee1227a6d2043b460c973a98b3c5f875b64c1ee96d20a71ad2e78091227",
+  "exhaustive_small": {
+    "checkpoints": [
+      {
+        "boundary": 0,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 1,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 2,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 3,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 4,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 5,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 6,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 7,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 8,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 9,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 10,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 11,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 12,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 13,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 14,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 15,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 16,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 17,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 18,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 19,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 20,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 21,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 22,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 23,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 24,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 25,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 26,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 27,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 28,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 29,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 30,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 31,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 32,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 33,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 34,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 35,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 36,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 37,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 38,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 39,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 40,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 41,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 42,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 43,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 44,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 45,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 46,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 47,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 48,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 49,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 50,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 51,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 52,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 53,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 54,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 55,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 56,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 57,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 58,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 59,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 60,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 61,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 62,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 63,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 64,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 65,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 66,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 67,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 68,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 69,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 70,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 71,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 72,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 73,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 74,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 75,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 76,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 77,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 78,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 79,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 80,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 81,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 82,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 83,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 84,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 85,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 86,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 87,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 88,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 89,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 90,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 91,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 92,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 93,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 94,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 95,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 96,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 97,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 98,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 99,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 100,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 101,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 102,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 103,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 104,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 105,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 106,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 107,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 108,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 109,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 110,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 111,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 112,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 113,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 114,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 115,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 116,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 117,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 118,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 119,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 120,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 121,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 122,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 123,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 124,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 125,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 126,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 127,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 128,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 129,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 130,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 131,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 132,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 133,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 134,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 135,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 136,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 137,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 138,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 139,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 140,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 141,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 142,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 143,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 144,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 145,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 146,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 147,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 148,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 149,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 150,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 151,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 152,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 153,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 154,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 155,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 156,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 157,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 158,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 159,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 160,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 161,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 162,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 163,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 164,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 165,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 166,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 167,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 168,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 169,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 170,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 171,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 172,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 173,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 174,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 175,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 176,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 177,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 178,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 179,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 180,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 181,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 182,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 183,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 184,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 185,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 186,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 187,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 188,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 189,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 190,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 191,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 192,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 193,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 194,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 195,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 196,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 197,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 198,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 199,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 200,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 201,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 202,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 203,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 204,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 205,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 206,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 207,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 208,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 209,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 210,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 211,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 212,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 213,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 214,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 215,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 216,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 217,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 218,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 219,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 220,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 221,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 222,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 223,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 224,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 225,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 226,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 227,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 228,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 229,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 230,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 231,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 232,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 233,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 234,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 235,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 236,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 237,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 238,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 239,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 240,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 241,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 242,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 243,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 244,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 245,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 246,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 247,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 248,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 249,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 250,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 251,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 252,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 253,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 254,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 255,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 256,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 257,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 258,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 259,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 260,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 261,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 262,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 263,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 264,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 265,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 266,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 267,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 268,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 269,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 270,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 271,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 272,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 273,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 274,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 275,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 276,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 277,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 278,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 279,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 280,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 281,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 282,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 283,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 284,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 285,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 286,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 287,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 288,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 289,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 290,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 291,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 292,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 293,
+        "expected_rf_state": "off"
+      },
+      {
+        "boundary": 294,
+        "expected_rf_state": "off"
+      }
+    ],
+    "fixture_id": "single-A-repeat-equal"
+  },
+  "fixture_class": "cancellation",
+  "generator_revision": "the containing WsprryPi Git commit",
+  "large_rule": {
+    "all_boundaries_inclusive": [
+      0,
+      3920
+    ],
+    "automated_exhaustive_count": 3921,
+    "expected_rf_state": "off",
+    "fixture_id": "interoperability-corpus",
+    "representative_checkpoints": [
+      0,
+      98,
+      196,
+      294,
+      490,
+      980,
+      1470,
+      1960,
+      2450,
+      2940,
+      3430,
+      3920
+    ]
+  },
+  "latency_claim": null,
+  "normalization_policy_id": "standard-feld-ascii-uppercase-v1",
+  "positions_per_second": 245,
+  "profile_id": "standard-feld-wsprry-v1",
+  "schema_id": "standard-feld-fixture-v1",
+  "spacing_policy_id": "standard-feld-fixed-cell-spacing-v1",
+  "substitution_policy_id": "standard-feld-no-substitution-v1",
+  "time_conversion": "round_half_up(n * 1000000000 / 245) using integer arithmetic"
+}
