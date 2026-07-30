@@ -2,7 +2,7 @@
 
 ## Status
 
-Active — Steps 1.1 through 5 complete for their scoped research questions; Step 6 has not started. Standard Feld passed the clean contained fldigi 4.2.12 ↔ xfhell 3.5.2 application matrix bidirectionally at F3. The result is limited to one deterministic, manually reviewed, non-blind run; the two 105-labelled profiles remain separate, non-equivalent implementation contracts that are not exactly cross-configurable.
+Active — Steps 1.1 through 6 complete for their scoped research questions; Step 7 has not started. Step 6 advances Standard Feld with explicit font, interoperability-retest, backend-timing, safety, and spectral conditions. fldigi `FSKH105` and xfhell `FMHell105` are deferred as separate continuous-phase implementation contracts; the documentary six-row/105-baud profile remains insufficient evidence.
 
 Current authorized activity is research and documentation only.
 
@@ -54,7 +54,7 @@ Claims must use the hierarchy, citation requirements, confidence labels, and con
 
 ## Decision status
 
-The [decision log](decision-log.md) separates accepted process decisions, provisional hypotheses, deferred decisions, rejected alternatives, and superseded conclusions. Standard Feld-Hell is now accepted as the spike's comparison baseline; it remains explicitly unselected as a Wsprry Pi implementation choice.
+The [decision log](decision-log.md) separates accepted process decisions, provisional hypotheses, deferred decisions, rejected alternatives, and superseded conclusions. Standard Feld-Hell is the comparison baseline and the sole Step 6 candidate advancing with conditions; it remains explicitly unselected and unimplemented in Wsprry Pi.
 
 ## Repository and branch
 
@@ -74,7 +74,7 @@ The [decision log](decision-log.md) separates accepted process decisions, provis
 | 3 | Freeze the font evidence | Documentary evidence complete; research references frozen | [Report](steps/3-font-evidence.md) | HELL-DEC-0019 through HELL-DEC-0022 | 2026-07-29 |
 | 4 | Measure real adoption | Public documentary research complete; no representative worldwide mode-share ranking available | [Report](steps/4-adoption.md) | HELL-DEC-0023, HELL-DEC-0024 | 2026-07-29 |
 | 5 | Perform offline interoperability experiments | Scoped matrix complete: Standard Feld F3 bidirectional; 105-labelled profiles `NOT CONFIGURABLE` as exact reciprocal contracts | [Report](steps/5-interoperability.md) | HELL-DEC-0025 through HELL-DEC-0029 | 2026-07-30 |
-| 6 | Evaluate Wsprry Pi feasibility | Not started | Not yet created | None yet | 2026-07-29 |
+| 6 | Evaluate Wsprry Pi feasibility | Source-level feasibility complete; Standard Feld advances with conditions | [Report](steps/6-wsprry-pi-feasibility.md) | HELL-DEC-0030 through HELL-DEC-0035 | 2026-07-30 |
 | 7 | Make a gated recommendation | Not started | Not yet created | None yet | 2026-07-29 |
 
 ## Important unresolved questions
@@ -85,8 +85,8 @@ The [decision log](decision-log.md) separates accepted process decisions, provis
 - Can the authoritative 105-baud and historical Hell-80 bitmap tables be recovered with clear licenses?
 - Can the external historical drum transcription be independently verified and licensed for archival redistribution?
 - What compatibility class does current fldigi Hell-80 have with the historical Siemens 9x7, 315-baud protocol?
-- Which modes fit Wsprry Pi without requiring incompatible RF behavior?
-- What offline and later hardware evidence would be required before implementation or transmission?
+- Which immutable, redistributable Standard Feld font and spacing policy should Step 7 gate on, and does it retain F3 with the tested applications?
+- Can either current RF backend meet the required raster timing, safe-stop, phase, and spectral gates on the supported Raspberry Pi range?
 
 ## Explicit non-goals
 

@@ -1,0 +1,5 @@
+candidate,corpus_characters,columns_per_character,logical_rows,physical_positions_per_column,physical_decision_rate_per_s,position_duration_ms,columns_per_s,corpus_duration_s,physical_positions,event_memory_upper_bound_bytes,event_memory_upper_bound_kib,notes
+standard-feld,38,7,7,14,245,4.081633,17.5,15.2,3724,476672,465.5,"Historical physical raster; two-position minimum is not necessarily fixed-pair aligned"
+fldigi-4.2.12-fskh105,38,7,7,14,245,4.081633,17.5,15.2,3724,476672,465.5,"fldigi common 14-position font path; 55 Hz tone separation"
+xfhell-3.5.2-fmhell105,38,7,6,12,210,4.761905,17.5,15.2,3192,408576,399.0,"Six logical rows represented as physical pairs; 210 Hz tone separation"
+documentary-six-row-105,38,7,6,6,105,9.523810,17.5,15.2,1596,204288,199.5,"Logical contract only; authoritative licensed bitmap and verified current implementation unresolved"

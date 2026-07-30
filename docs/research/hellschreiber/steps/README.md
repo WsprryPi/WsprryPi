@@ -10,6 +10,7 @@ steps/2-mode-taxonomy.md
 steps/3-font-evidence.md
 steps/4-adoption.md
 steps/5-interoperability.md
+steps/6-wsprry-pi-feasibility.md
 ```
 
 Reports may expand the template, but they must preserve the distinction among evidence, inference, provisional hypotheses, accepted decisions, rejected alternatives, unresolved questions, and validation still required.
