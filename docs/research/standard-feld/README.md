@@ -2,7 +2,7 @@
 
 ## Status
 
-**Phase 3 complete for the bounded exact-corpus objective — offline F3 passed through the pinned application adapter; Gate C is partially satisfied and Phase 4 architecture design may begin.**
+**Phase 4 architecture complete — a first-class Standard Feld payload/compiler over the shared execution-plan abstraction is selected; implementation remains unauthorized and Gates C–G remain open as recorded.**
 
 This record continues the completed generic [Hellschreiber research spike](../hellschreiber/README.md) for Standard Feld-Hell alone. It defines a proposed product protocol and later qualification work without authorizing implementation, hardware operation, RF output, or release.
 
@@ -43,6 +43,7 @@ The ordering intentionally places asset selection before glyph-bearing fixtures.
 - [Fixture contract](fixtures/README.md)
 - [Phase 1.2 fixture report](phase-1.2-fixtures.md)
 - [Phase 3 offline qualification](phase-3-offline-qualification.md)
+- [Phase 4 product architecture](phase-4-architecture.md)
 - [Research tools](tools/README.md)
 - [Decision log](decision-log.md)
 - [Evidence register](evidence-register.md)
@@ -55,7 +56,8 @@ The ordering intentionally places asset selection before glyph-bearing fixtures.
 | Gate A protocol contract | Satisfied: exact fixtures independently reproduced |
 | Font and licensing | Gate B satisfied: immutable MIT asset and spacing policy frozen |
 | Gate C exact-asset interoperability | Partially satisfied: corrected exact-corpus clean F3 passed in both named receivers; exact-contract direction coverage, repertoire coverage, F4 feasibility, and independent scoring remain open |
-| Phase 4 architecture design | Ready to begin; no Phase 3 result invalidates the frozen raster or event contract |
+| Phase 4 architecture design | Passed: first-class raster payload/compiler over the shared execution plan; no new hardware backend |
+| First implementation slice | May be proposed for separate authorization; not authorized by this record |
 | Production implementation | Not authorized |
 | Hardware qualification | Not assessed |
 | RF/spectral qualification | Not assessed |
@@ -76,3 +78,7 @@ The ordering intentionally places asset selection before glyph-bearing fixtures.
 ## Phase 3 conclusion
 
 `PHASE 3 PASS — EXACT-CORPUS OFFLINE RECEIVE F3 QUALIFIED THROUGH THE PINNED APPLICATION ADAPTER; GATE C PARTIAL; INDEPENDENT REVIEW PENDING`
+
+## Phase 4 conclusion
+
+`PHASE 4 PASS — ARCHITECTURE SELECTED; FIRST IMPLEMENTATION SLICE MAY BE PROPOSED FOR SEPARATE AUTHORIZATION; GATES C–G REMAIN OPEN AS RECORDED`
