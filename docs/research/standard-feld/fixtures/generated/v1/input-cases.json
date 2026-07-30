@@ -1,0 +1,1115 @@
+{
+  "asset_id": "wsprry-standard-feld-radiolib-5x5-v1",
+  "asset_sha256": "025c4ee1227a6d2043b460c973a98b3c5f875b64c1ee96d20a71ad2e78091227",
+  "fixture_class": "input-cases",
+  "generator_revision": "the containing WsprryPi Git commit",
+  "lowercase_normalization": [
+    {
+      "accepted": true,
+      "emitted_plan": true,
+      "normalizations": [
+        {
+          "from": "a",
+          "index": 0,
+          "to": "A"
+        }
+      ],
+      "normalized_input": "A",
+      "original_utf8_hex": "61",
+      "rejection_reason": null,
+      "substitutions": []
+    },
+    {
+      "accepted": true,
+      "emitted_plan": true,
+      "normalizations": [
+        {
+          "from": "b",
+          "index": 0,
+          "to": "B"
+        }
+      ],
+      "normalized_input": "B",
+      "original_utf8_hex": "62",
+      "rejection_reason": null,
+      "substitutions": []
+    },
+    {
+      "accepted": true,
+      "emitted_plan": true,
+      "normalizations": [
+        {
+          "from": "c",
+          "index": 0,
+          "to": "C"
+        }
+      ],
+      "normalized_input": "C",
+      "original_utf8_hex": "63",
+      "rejection_reason": null,
+      "substitutions": []
+    },
+    {
+      "accepted": true,
+      "emitted_plan": true,
+      "normalizations": [
+        {
+          "from": "d",
+          "index": 0,
+          "to": "D"
+        }
+      ],
+      "normalized_input": "D",
+      "original_utf8_hex": "64",
+      "rejection_reason": null,
+      "substitutions": []
+    },
+    {
+      "accepted": true,
+      "emitted_plan": true,
+      "normalizations": [
+        {
+          "from": "e",
+          "index": 0,
+          "to": "E"
+        }
+      ],
+      "normalized_input": "E",
+      "original_utf8_hex": "65",
+      "rejection_reason": null,
+      "substitutions": []
+    },
+    {
+      "accepted": true,
+      "emitted_plan": true,
+      "normalizations": [
+        {
+          "from": "f",
+          "index": 0,
+          "to": "F"
+        }
+      ],
+      "normalized_input": "F",
+      "original_utf8_hex": "66",
+      "rejection_reason": null,
+      "substitutions": []
+    },
+    {
+      "accepted": true,
+      "emitted_plan": true,
+      "normalizations": [
+        {
+          "from": "g",
+          "index": 0,
+          "to": "G"
+        }
+      ],
+      "normalized_input": "G",
+      "original_utf8_hex": "67",
+      "rejection_reason": null,
+      "substitutions": []
+    },
+    {
+      "accepted": true,
+      "emitted_plan": true,
+      "normalizations": [
+        {
+          "from": "h",
+          "index": 0,
+          "to": "H"
+        }
+      ],
+      "normalized_input": "H",
+      "original_utf8_hex": "68",
+      "rejection_reason": null,
+      "substitutions": []
+    },
+    {
+      "accepted": true,
+      "emitted_plan": true,
+      "normalizations": [
+        {
+          "from": "i",
+          "index": 0,
+          "to": "I"
+        }
+      ],
+      "normalized_input": "I",
+      "original_utf8_hex": "69",
+      "rejection_reason": null,
+      "substitutions": []
+    },
+    {
+      "accepted": true,
+      "emitted_plan": true,
+      "normalizations": [
+        {
+          "from": "j",
+          "index": 0,
+          "to": "J"
+        }
+      ],
+      "normalized_input": "J",
+      "original_utf8_hex": "6a",
+      "rejection_reason": null,
+      "substitutions": []
+    },
+    {
+      "accepted": true,
+      "emitted_plan": true,
+      "normalizations": [
+        {
+          "from": "k",
+          "index": 0,
+          "to": "K"
+        }
+      ],
+      "normalized_input": "K",
+      "original_utf8_hex": "6b",
+      "rejection_reason": null,
+      "substitutions": []
+    },
+    {
+      "accepted": true,
+      "emitted_plan": true,
+      "normalizations": [
+        {
+          "from": "l",
+          "index": 0,
+          "to": "L"
+        }
+      ],
+      "normalized_input": "L",
+      "original_utf8_hex": "6c",
+      "rejection_reason": null,
+      "substitutions": []
+    },
+    {
+      "accepted": true,
+      "emitted_plan": true,
+      "normalizations": [
+        {
+          "from": "m",
+          "index": 0,
+          "to": "M"
+        }
+      ],
+      "normalized_input": "M",
+      "original_utf8_hex": "6d",
+      "rejection_reason": null,
+      "substitutions": []
+    },
+    {
+      "accepted": true,
+      "emitted_plan": true,
+      "normalizations": [
+        {
+          "from": "n",
+          "index": 0,
+          "to": "N"
+        }
+      ],
+      "normalized_input": "N",
+      "original_utf8_hex": "6e",
+      "rejection_reason": null,
+      "substitutions": []
+    },
+    {
+      "accepted": true,
+      "emitted_plan": true,
+      "normalizations": [
+        {
+          "from": "o",
+          "index": 0,
+          "to": "O"
+        }
+      ],
+      "normalized_input": "O",
+      "original_utf8_hex": "6f",
+      "rejection_reason": null,
+      "substitutions": []
+    },
+    {
+      "accepted": true,
+      "emitted_plan": true,
+      "normalizations": [
+        {
+          "from": "p",
+          "index": 0,
+          "to": "P"
+        }
+      ],
+      "normalized_input": "P",
+      "original_utf8_hex": "70",
+      "rejection_reason": null,
+      "substitutions": []
+    },
+    {
+      "accepted": true,
+      "emitted_plan": true,
+      "normalizations": [
+        {
+          "from": "q",
+          "index": 0,
+          "to": "Q"
+        }
+      ],
+      "normalized_input": "Q",
+      "original_utf8_hex": "71",
+      "rejection_reason": null,
+      "substitutions": []
+    },
+    {
+      "accepted": true,
+      "emitted_plan": true,
+      "normalizations": [
+        {
+          "from": "r",
+          "index": 0,
+          "to": "R"
+        }
+      ],
+      "normalized_input": "R",
+      "original_utf8_hex": "72",
+      "rejection_reason": null,
+      "substitutions": []
+    },
+    {
+      "accepted": true,
+      "emitted_plan": true,
+      "normalizations": [
+        {
+          "from": "s",
+          "index": 0,
+          "to": "S"
+        }
+      ],
+      "normalized_input": "S",
+      "original_utf8_hex": "73",
+      "rejection_reason": null,
+      "substitutions": []
+    },
+    {
+      "accepted": true,
+      "emitted_plan": true,
+      "normalizations": [
+        {
+          "from": "t",
+          "index": 0,
+          "to": "T"
+        }
+      ],
+      "normalized_input": "T",
+      "original_utf8_hex": "74",
+      "rejection_reason": null,
+      "substitutions": []
+    },
+    {
+      "accepted": true,
+      "emitted_plan": true,
+      "normalizations": [
+        {
+          "from": "u",
+          "index": 0,
+          "to": "U"
+        }
+      ],
+      "normalized_input": "U",
+      "original_utf8_hex": "75",
+      "rejection_reason": null,
+      "substitutions": []
+    },
+    {
+      "accepted": true,
+      "emitted_plan": true,
+      "normalizations": [
+        {
+          "from": "v",
+          "index": 0,
+          "to": "V"
+        }
+      ],
+      "normalized_input": "V",
+      "original_utf8_hex": "76",
+      "rejection_reason": null,
+      "substitutions": []
+    },
+    {
+      "accepted": true,
+      "emitted_plan": true,
+      "normalizations": [
+        {
+          "from": "w",
+          "index": 0,
+          "to": "W"
+        }
+      ],
+      "normalized_input": "W",
+      "original_utf8_hex": "77",
+      "rejection_reason": null,
+      "substitutions": []
+    },
+    {
+      "accepted": true,
+      "emitted_plan": true,
+      "normalizations": [
+        {
+          "from": "x",
+          "index": 0,
+          "to": "X"
+        }
+      ],
+      "normalized_input": "X",
+      "original_utf8_hex": "78",
+      "rejection_reason": null,
+      "substitutions": []
+    },
+    {
+      "accepted": true,
+      "emitted_plan": true,
+      "normalizations": [
+        {
+          "from": "y",
+          "index": 0,
+          "to": "Y"
+        }
+      ],
+      "normalized_input": "Y",
+      "original_utf8_hex": "79",
+      "rejection_reason": null,
+      "substitutions": []
+    },
+    {
+      "accepted": true,
+      "emitted_plan": true,
+      "normalizations": [
+        {
+          "from": "z",
+          "index": 0,
+          "to": "Z"
+        }
+      ],
+      "normalized_input": "Z",
+      "original_utf8_hex": "7a",
+      "rejection_reason": null,
+      "substitutions": []
+    }
+  ],
+  "negative": [
+    {
+      "accepted": false,
+      "emitted_plan": false,
+      "fixture_id": "empty",
+      "normalizations": [],
+      "normalized_input": null,
+      "original_utf8_hex": "",
+      "rejection_reason": "empty-input",
+      "substitutions": []
+    },
+    {
+      "accepted": false,
+      "emitted_plan": false,
+      "fixture_id": "invalid-utf8",
+      "normalizations": [],
+      "normalized_input": null,
+      "original_utf8_hex": "ff",
+      "rejection_reason": "invalid-utf8",
+      "substitutions": []
+    },
+    {
+      "accepted": false,
+      "emitted_plan": false,
+      "fixture_id": "tab",
+      "normalizations": [],
+      "normalized_input": null,
+      "original_utf8_hex": "09",
+      "rejection_reason": "unsupported-U+0009",
+      "substitutions": []
+    },
+    {
+      "accepted": false,
+      "emitted_plan": false,
+      "fixture_id": "cr",
+      "normalizations": [],
+      "normalized_input": null,
+      "original_utf8_hex": "0d",
+      "rejection_reason": "unsupported-U+000D",
+      "substitutions": []
+    },
+    {
+      "accepted": false,
+      "emitted_plan": false,
+      "fixture_id": "lf",
+      "normalizations": [],
+      "normalized_input": null,
+      "original_utf8_hex": "0a",
+      "rejection_reason": "unsupported-U+000A",
+      "substitutions": []
+    },
+    {
+      "accepted": false,
+      "emitted_plan": false,
+      "fixture_id": "nul",
+      "normalizations": [],
+      "normalized_input": null,
+      "original_utf8_hex": "00",
+      "rejection_reason": "unsupported-U+0000",
+      "substitutions": []
+    },
+    {
+      "accepted": false,
+      "emitted_plan": false,
+      "fixture_id": "backtick",
+      "normalizations": [],
+      "normalized_input": null,
+      "original_utf8_hex": "60",
+      "rejection_reason": "unsupported-U+0060",
+      "substitutions": []
+    },
+    {
+      "accepted": false,
+      "emitted_plan": false,
+      "fixture_id": "left-brace",
+      "normalizations": [],
+      "normalized_input": null,
+      "original_utf8_hex": "7b",
+      "rejection_reason": "unsupported-U+007B",
+      "substitutions": []
+    },
+    {
+      "accepted": false,
+      "emitted_plan": false,
+      "fixture_id": "vertical-bar",
+      "normalizations": [],
+      "normalized_input": null,
+      "original_utf8_hex": "7c",
+      "rejection_reason": "unsupported-U+007C",
+      "substitutions": []
+    },
+    {
+      "accepted": false,
+      "emitted_plan": false,
+      "fixture_id": "right-brace",
+      "normalizations": [],
+      "normalized_input": null,
+      "original_utf8_hex": "7d",
+      "rejection_reason": "unsupported-U+007D",
+      "substitutions": []
+    },
+    {
+      "accepted": false,
+      "emitted_plan": false,
+      "fixture_id": "tilde",
+      "normalizations": [],
+      "normalized_input": null,
+      "original_utf8_hex": "7e",
+      "rejection_reason": "unsupported-U+007E",
+      "substitutions": []
+    },
+    {
+      "accepted": false,
+      "emitted_plan": false,
+      "fixture_id": "non-ascii",
+      "normalizations": [],
+      "normalized_input": null,
+      "original_utf8_hex": "c3a9",
+      "rejection_reason": "unsupported-U+00E9",
+      "substitutions": []
+    },
+    {
+      "accepted": false,
+      "emitted_plan": false,
+      "fixture_id": "atomic-prefix",
+      "normalizations": [],
+      "normalized_input": null,
+      "original_utf8_hex": "414243c3a9",
+      "rejection_reason": "unsupported-U+00E9",
+      "substitutions": []
+    }
+  ],
+  "normalization_policy_id": "standard-feld-ascii-uppercase-v1",
+  "positions_per_second": 245,
+  "profile_id": "standard-feld-wsprry-v1",
+  "schema_id": "standard-feld-fixture-v1",
+  "spacing_policy_id": "standard-feld-fixed-cell-spacing-v1",
+  "stored_repertoire_positive": [
+    {
+      "accepted": true,
+      "emitted_plan": true,
+      "normalizations": [],
+      "normalized_input": " ",
+      "original_utf8_hex": "20",
+      "rejection_reason": null,
+      "substitutions": []
+    },
+    {
+      "accepted": true,
+      "emitted_plan": true,
+      "normalizations": [],
+      "normalized_input": "!",
+      "original_utf8_hex": "21",
+      "rejection_reason": null,
+      "substitutions": []
+    },
+    {
+      "accepted": true,
+      "emitted_plan": true,
+      "normalizations": [],
+      "normalized_input": "\"",
+      "original_utf8_hex": "22",
+      "rejection_reason": null,
+      "substitutions": []
+    },
+    {
+      "accepted": true,
+      "emitted_plan": true,
+      "normalizations": [],
+      "normalized_input": "#",
+      "original_utf8_hex": "23",
+      "rejection_reason": null,
+      "substitutions": []
+    },
+    {
+      "accepted": true,
+      "emitted_plan": true,
+      "normalizations": [],
+      "normalized_input": "$",
+      "original_utf8_hex": "24",
+      "rejection_reason": null,
+      "substitutions": []
+    },
+    {
+      "accepted": true,
+      "emitted_plan": true,
+      "normalizations": [],
+      "normalized_input": "%",
+      "original_utf8_hex": "25",
+      "rejection_reason": null,
+      "substitutions": []
+    },
+    {
+      "accepted": true,
+      "emitted_plan": true,
+      "normalizations": [],
+      "normalized_input": "&",
+      "original_utf8_hex": "26",
+      "rejection_reason": null,
+      "substitutions": []
+    },
+    {
+      "accepted": true,
+      "emitted_plan": true,
+      "normalizations": [],
+      "normalized_input": "'",
+      "original_utf8_hex": "27",
+      "rejection_reason": null,
+      "substitutions": []
+    },
+    {
+      "accepted": true,
+      "emitted_plan": true,
+      "normalizations": [],
+      "normalized_input": "(",
+      "original_utf8_hex": "28",
+      "rejection_reason": null,
+      "substitutions": []
+    },
+    {
+      "accepted": true,
+      "emitted_plan": true,
+      "normalizations": [],
+      "normalized_input": ")",
+      "original_utf8_hex": "29",
+      "rejection_reason": null,
+      "substitutions": []
+    },
+    {
+      "accepted": true,
+      "emitted_plan": true,
+      "normalizations": [],
+      "normalized_input": "*",
+      "original_utf8_hex": "2a",
+      "rejection_reason": null,
+      "substitutions": []
+    },
+    {
+      "accepted": true,
+      "emitted_plan": true,
+      "normalizations": [],
+      "normalized_input": "+",
+      "original_utf8_hex": "2b",
+      "rejection_reason": null,
+      "substitutions": []
+    },
+    {
+      "accepted": true,
+      "emitted_plan": true,
+      "normalizations": [],
+      "normalized_input": ",",
+      "original_utf8_hex": "2c",
+      "rejection_reason": null,
+      "substitutions": []
+    },
+    {
+      "accepted": true,
+      "emitted_plan": true,
+      "normalizations": [],
+      "normalized_input": "-",
+      "original_utf8_hex": "2d",
+      "rejection_reason": null,
+      "substitutions": []
+    },
+    {
+      "accepted": true,
+      "emitted_plan": true,
+      "normalizations": [],
+      "normalized_input": ".",
+      "original_utf8_hex": "2e",
+      "rejection_reason": null,
+      "substitutions": []
+    },
+    {
+      "accepted": true,
+      "emitted_plan": true,
+      "normalizations": [],
+      "normalized_input": "/",
+      "original_utf8_hex": "2f",
+      "rejection_reason": null,
+      "substitutions": []
+    },
+    {
+      "accepted": true,
+      "emitted_plan": true,
+      "normalizations": [],
+      "normalized_input": "0",
+      "original_utf8_hex": "30",
+      "rejection_reason": null,
+      "substitutions": []
+    },
+    {
+      "accepted": true,
+      "emitted_plan": true,
+      "normalizations": [],
+      "normalized_input": "1",
+      "original_utf8_hex": "31",
+      "rejection_reason": null,
+      "substitutions": []
+    },
+    {
+      "accepted": true,
+      "emitted_plan": true,
+      "normalizations": [],
+      "normalized_input": "2",
+      "original_utf8_hex": "32",
+      "rejection_reason": null,
+      "substitutions": []
+    },
+    {
+      "accepted": true,
+      "emitted_plan": true,
+      "normalizations": [],
+      "normalized_input": "3",
+      "original_utf8_hex": "33",
+      "rejection_reason": null,
+      "substitutions": []
+    },
+    {
+      "accepted": true,
+      "emitted_plan": true,
+      "normalizations": [],
+      "normalized_input": "4",
+      "original_utf8_hex": "34",
+      "rejection_reason": null,
+      "substitutions": []
+    },
+    {
+      "accepted": true,
+      "emitted_plan": true,
+      "normalizations": [],
+      "normalized_input": "5",
+      "original_utf8_hex": "35",
+      "rejection_reason": null,
+      "substitutions": []
+    },
+    {
+      "accepted": true,
+      "emitted_plan": true,
+      "normalizations": [],
+      "normalized_input": "6",
+      "original_utf8_hex": "36",
+      "rejection_reason": null,
+      "substitutions": []
+    },
+    {
+      "accepted": true,
+      "emitted_plan": true,
+      "normalizations": [],
+      "normalized_input": "7",
+      "original_utf8_hex": "37",
+      "rejection_reason": null,
+      "substitutions": []
+    },
+    {
+      "accepted": true,
+      "emitted_plan": true,
+      "normalizations": [],
+      "normalized_input": "8",
+      "original_utf8_hex": "38",
+      "rejection_reason": null,
+      "substitutions": []
+    },
+    {
+      "accepted": true,
+      "emitted_plan": true,
+      "normalizations": [],
+      "normalized_input": "9",
+      "original_utf8_hex": "39",
+      "rejection_reason": null,
+      "substitutions": []
+    },
+    {
+      "accepted": true,
+      "emitted_plan": true,
+      "normalizations": [],
+      "normalized_input": ":",
+      "original_utf8_hex": "3a",
+      "rejection_reason": null,
+      "substitutions": []
+    },
+    {
+      "accepted": true,
+      "emitted_plan": true,
+      "normalizations": [],
+      "normalized_input": ";",
+      "original_utf8_hex": "3b",
+      "rejection_reason": null,
+      "substitutions": []
+    },
+    {
+      "accepted": true,
+      "emitted_plan": true,
+      "normalizations": [],
+      "normalized_input": "<",
+      "original_utf8_hex": "3c",
+      "rejection_reason": null,
+      "substitutions": []
+    },
+    {
+      "accepted": true,
+      "emitted_plan": true,
+      "normalizations": [],
+      "normalized_input": "=",
+      "original_utf8_hex": "3d",
+      "rejection_reason": null,
+      "substitutions": []
+    },
+    {
+      "accepted": true,
+      "emitted_plan": true,
+      "normalizations": [],
+      "normalized_input": ">",
+      "original_utf8_hex": "3e",
+      "rejection_reason": null,
+      "substitutions": []
+    },
+    {
+      "accepted": true,
+      "emitted_plan": true,
+      "normalizations": [],
+      "normalized_input": "?",
+      "original_utf8_hex": "3f",
+      "rejection_reason": null,
+      "substitutions": []
+    },
+    {
+      "accepted": true,
+      "emitted_plan": true,
+      "normalizations": [],
+      "normalized_input": "@",
+      "original_utf8_hex": "40",
+      "rejection_reason": null,
+      "substitutions": []
+    },
+    {
+      "accepted": true,
+      "emitted_plan": true,
+      "normalizations": [],
+      "normalized_input": "A",
+      "original_utf8_hex": "41",
+      "rejection_reason": null,
+      "substitutions": []
+    },
+    {
+      "accepted": true,
+      "emitted_plan": true,
+      "normalizations": [],
+      "normalized_input": "B",
+      "original_utf8_hex": "42",
+      "rejection_reason": null,
+      "substitutions": []
+    },
+    {
+      "accepted": true,
+      "emitted_plan": true,
+      "normalizations": [],
+      "normalized_input": "C",
+      "original_utf8_hex": "43",
+      "rejection_reason": null,
+      "substitutions": []
+    },
+    {
+      "accepted": true,
+      "emitted_plan": true,
+      "normalizations": [],
+      "normalized_input": "D",
+      "original_utf8_hex": "44",
+      "rejection_reason": null,
+      "substitutions": []
+    },
+    {
+      "accepted": true,
+      "emitted_plan": true,
+      "normalizations": [],
+      "normalized_input": "E",
+      "original_utf8_hex": "45",
+      "rejection_reason": null,
+      "substitutions": []
+    },
+    {
+      "accepted": true,
+      "emitted_plan": true,
+      "normalizations": [],
+      "normalized_input": "F",
+      "original_utf8_hex": "46",
+      "rejection_reason": null,
+      "substitutions": []
+    },
+    {
+      "accepted": true,
+      "emitted_plan": true,
+      "normalizations": [],
+      "normalized_input": "G",
+      "original_utf8_hex": "47",
+      "rejection_reason": null,
+      "substitutions": []
+    },
+    {
+      "accepted": true,
+      "emitted_plan": true,
+      "normalizations": [],
+      "normalized_input": "H",
+      "original_utf8_hex": "48",
+      "rejection_reason": null,
+      "substitutions": []
+    },
+    {
+      "accepted": true,
+      "emitted_plan": true,
+      "normalizations": [],
+      "normalized_input": "I",
+      "original_utf8_hex": "49",
+      "rejection_reason": null,
+      "substitutions": []
+    },
+    {
+      "accepted": true,
+      "emitted_plan": true,
+      "normalizations": [],
+      "normalized_input": "J",
+      "original_utf8_hex": "4a",
+      "rejection_reason": null,
+      "substitutions": []
+    },
+    {
+      "accepted": true,
+      "emitted_plan": true,
+      "normalizations": [],
+      "normalized_input": "K",
+      "original_utf8_hex": "4b",
+      "rejection_reason": null,
+      "substitutions": []
+    },
+    {
+      "accepted": true,
+      "emitted_plan": true,
+      "normalizations": [],
+      "normalized_input": "L",
+      "original_utf8_hex": "4c",
+      "rejection_reason": null,
+      "substitutions": []
+    },
+    {
+      "accepted": true,
+      "emitted_plan": true,
+      "normalizations": [],
+      "normalized_input": "M",
+      "original_utf8_hex": "4d",
+      "rejection_reason": null,
+      "substitutions": []
+    },
+    {
+      "accepted": true,
+      "emitted_plan": true,
+      "normalizations": [],
+      "normalized_input": "N",
+      "original_utf8_hex": "4e",
+      "rejection_reason": null,
+      "substitutions": []
+    },
+    {
+      "accepted": true,
+      "emitted_plan": true,
+      "normalizations": [],
+      "normalized_input": "O",
+      "original_utf8_hex": "4f",
+      "rejection_reason": null,
+      "substitutions": []
+    },
+    {
+      "accepted": true,
+      "emitted_plan": true,
+      "normalizations": [],
+      "normalized_input": "P",
+      "original_utf8_hex": "50",
+      "rejection_reason": null,
+      "substitutions": []
+    },
+    {
+      "accepted": true,
+      "emitted_plan": true,
+      "normalizations": [],
+      "normalized_input": "Q",
+      "original_utf8_hex": "51",
+      "rejection_reason": null,
+      "substitutions": []
+    },
+    {
+      "accepted": true,
+      "emitted_plan": true,
+      "normalizations": [],
+      "normalized_input": "R",
+      "original_utf8_hex": "52",
+      "rejection_reason": null,
+      "substitutions": []
+    },
+    {
+      "accepted": true,
+      "emitted_plan": true,
+      "normalizations": [],
+      "normalized_input": "S",
+      "original_utf8_hex": "53",
+      "rejection_reason": null,
+      "substitutions": []
+    },
+    {
+      "accepted": true,
+      "emitted_plan": true,
+      "normalizations": [],
+      "normalized_input": "T",
+      "original_utf8_hex": "54",
+      "rejection_reason": null,
+      "substitutions": []
+    },
+    {
+      "accepted": true,
+      "emitted_plan": true,
+      "normalizations": [],
+      "normalized_input": "U",
+      "original_utf8_hex": "55",
+      "rejection_reason": null,
+      "substitutions": []
+    },
+    {
+      "accepted": true,
+      "emitted_plan": true,
+      "normalizations": [],
+      "normalized_input": "V",
+      "original_utf8_hex": "56",
+      "rejection_reason": null,
+      "substitutions": []
+    },
+    {
+      "accepted": true,
+      "emitted_plan": true,
+      "normalizations": [],
+      "normalized_input": "W",
+      "original_utf8_hex": "57",
+      "rejection_reason": null,
+      "substitutions": []
+    },
+    {
+      "accepted": true,
+      "emitted_plan": true,
+      "normalizations": [],
+      "normalized_input": "X",
+      "original_utf8_hex": "58",
+      "rejection_reason": null,
+      "substitutions": []
+    },
+    {
+      "accepted": true,
+      "emitted_plan": true,
+      "normalizations": [],
+      "normalized_input": "Y",
+      "original_utf8_hex": "59",
+      "rejection_reason": null,
+      "substitutions": []
+    },
+    {
+      "accepted": true,
+      "emitted_plan": true,
+      "normalizations": [],
+      "normalized_input": "Z",
+      "original_utf8_hex": "5a",
+      "rejection_reason": null,
+      "substitutions": []
+    },
+    {
+      "accepted": true,
+      "emitted_plan": true,
+      "normalizations": [],
+      "normalized_input": "[",
+      "original_utf8_hex": "5b",
+      "rejection_reason": null,
+      "substitutions": []
+    },
+    {
+      "accepted": true,
+      "emitted_plan": true,
+      "normalizations": [],
+      "normalized_input": "\\",
+      "original_utf8_hex": "5c",
+      "rejection_reason": null,
+      "substitutions": []
+    },
+    {
+      "accepted": true,
+      "emitted_plan": true,
+      "normalizations": [],
+      "normalized_input": "]",
+      "original_utf8_hex": "5d",
+      "rejection_reason": null,
+      "substitutions": []
+    },
+    {
+      "accepted": true,
+      "emitted_plan": true,
+      "normalizations": [],
+      "normalized_input": "^",
+      "original_utf8_hex": "5e",
+      "rejection_reason": null,
+      "substitutions": []
+    },
+    {
+      "accepted": true,
+      "emitted_plan": true,
+      "normalizations": [],
+      "normalized_input": "_",
+      "original_utf8_hex": "5f",
+      "rejection_reason": null,
+      "substitutions": []
+    }
+  ],
+  "substitution_policy_id": "standard-feld-no-substitution-v1",
+  "time_conversion": "round_half_up(n * 1000000000 / 245) using integer arithmetic"
+}
