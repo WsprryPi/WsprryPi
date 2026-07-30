@@ -2,7 +2,7 @@
 
 ## Status
 
-This document defines the Phase 1.1 fixture schema. It does not provide production glyph fixtures and does not authorize a generator, application implementation, rig change, audio output, hardware access, or RF output.
+This document defines the Phase 1.1 fixture schema as constrained by the Phase 2 asset. It does not yet provide expanded production glyph fixtures and does not authorize a generator, application implementation, rig change, audio output, hardware access, or RF output.
 
 Schema identifier: `standard-feld-fixture-v1-draft`
 
@@ -16,7 +16,7 @@ The suffix remains `draft` until a canonical machine-readable serialization is i
 4. `cancellation`: a message fixture plus each required cancellation checkpoint and terminal state.
 5. `impairment-source`: a clean exact-contract fixture and a declarative transformation used by the offline rig.
 
-Only `protocol-mechanics` fixtures can be normative before the font and spacing policy are selected. Synthetic all-off, all-on, and alternating-position patterns MUST be labelled synthetic and MUST NOT be presented as production glyphs.
+The selected asset is `wsprry-standard-feld-radiolib-5x5-v1`, and the spacing policy is `standard-feld-fixed-cell-spacing-v1`. Phase 1.2 MUST use those exact identities and checksums. Synthetic all-off, all-on, and alternating-position patterns MUST remain labelled synthetic and MUST NOT be presented as production glyphs.
 
 ## Required manifest fields
 

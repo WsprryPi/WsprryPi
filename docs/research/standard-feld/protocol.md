@@ -25,9 +25,9 @@ Absolute timestamps may be rendered in integer nanoseconds only by a specified d
 
 Standard Feld permits features to begin on either physical-position phase while preserving an ordinary minimum run of two positions. A fixed pairing of positions `(0,1)`, `(2,3)`, and so on is not historically equivalent to all actual-drum patterns.
 
-The proposed profile therefore preserves arbitrary half-position placement: a run MAY begin at any physical-position index, but a production glyph MUST NOT introduce an isolated one-position RF-on or RF-off feature inside its image solely as a result of font encoding. Exact treatment of boundary runs joining spacing columns is asset-dependent and remains open.
+The proposed profile therefore preserves arbitrary half-position placement: a run MAY begin at any physical-position index, but a production glyph MUST NOT introduce an isolated one-position RF-on or RF-off feature inside its image solely as a result of font encoding. The selected v1 asset uses paired physical positions for every logical row, so every within-column run has at least two positions; identical states MAY merge across cell boundaries without changing position attribution.
 
-A paired 7-by-7 representation MAY be evaluated later only as a separately named compatibility representation. It MUST NOT be described as bit-identical to this profile or substituted without a versioned decision and interoperability evidence.
+An asset MAY happen to use paired artwork, as the selected v1 asset does, but the transmitted contract remains 14 individually indexed physical positions per column. An implementation MUST NOT replace the 245-position/s schedule with seven 122.5-decision/s logical rows, discard physical-position attribution, or claim that paired artwork is bit-identical to the historical drum repertoire.
 
 ## Modulation and polarity
 
@@ -70,7 +70,7 @@ The normative stream pipeline is:
 
 Normalization and substitution are different operations and MUST be reported separately. Neither MAY silently discard, transliterate, uppercase, or replace input unless the later asset contract explicitly authorizes that transformation.
 
-The exact input encoding, repertoire, normalization, substitution, image-bearing glyph widths and placement within the fixed seven-column cell, word spacing, leader length, and trailer length are asset-bound decisions listed below. Until they are frozen, a glyph-bearing message does not have an authoritative raster or complete stream duration.
+The Phase 2 asset and spacing policy freeze UTF-8 input restricted to ASCII `U+0020`–`U+005F`, lowercase-to-uppercase normalization, no substitution, centered five-row artwork in fixed seven-column cells, one-cell spaces, and one blank-cell leader and trailer. See [font selection](font.md) and [spacing policy](spacing-policy.md). Exact expanded fixtures remain Phase 1.2 work.
 
 An empty normalized message MUST be rejected before output unless a later explicit product decision defines a useful no-content operation. It MUST NOT produce an RF-on event.
 
@@ -106,22 +106,20 @@ The following identities are independent and MUST be recorded together:
 
 Changing a glyph bitmap, repertoire, normalization, substitution, glyph width, spacing, leader/trailer, traversal, timing, polarity, or terminal-state rule changes the contract. Such a change requires a reviewed compatibility decision and renewed affected fixtures and interoperability evidence.
 
-## Asset-dependent requirements blocking Gate A
+## Frozen asset-dependent requirements
 
-| Requirement | Why asset-dependent | Phase 2 decision | Required later evidence | Blocks Gate A |
-| --- | --- | --- | --- | --- |
-| Input encoding and glyph repertoire | A table cannot encode characters it does not contain | Exact accepted input and glyph set | Full repertoire manifest and lookup fixtures | Yes |
-| Glyph bitmaps | Shape and half-position placement are font data | One immutable font and checksum | Raster fixture for every glyph | Yes |
-| Image-bearing glyph width and placement | Candidate artwork occupies different portions of a cell | Exact placement within one fixed seven-column transmitted cell | Placement manifest and raster cases | Yes |
-| Leading/trailing glyph columns | Spacing may be stored in the asset or transmitter-added, but the result must total seven columns | Exact ownership and count | Boundary raster fixtures | Yes |
-| Word space | Historical and software implementations differ | Exact blank-column/cell policy | Multiword fixture | Yes |
-| Normalization | Lowercase and control handling vary | Versioned normalization rules | Original-to-normalized cases | Yes |
-| Unsupported characters | Rejection and substitution have operator consequences | Reject or exact substitution map | Negative and substitution fixtures | Yes |
-| Boundary minimum runs | Glyph edges may join spacing zeros | Exact conformance interpretation | Edge-case raster review | Yes |
-| Leader and trailer lengths | Affects acquisition and duration | Exact zero-position counts | Stream-boundary fixture | Yes |
-| Exact message duration | Character cells are fixed, but normalization, word spaces, leaders, and trailers remain open | Derived from selected contract | Reviewed position/event fixture | Yes |
+| Requirement | Phase 2 decision | Phase 1.2 evidence still required |
+| --- | --- | --- |
+| Asset | `wsprry-standard-feld-radiolib-5x5-v1`; SHA-256 `025c4ee1227a6d2043b460c973a98b3c5f875b64c1ee96d20a71ad2e78091227` | Recompute checksum and expand every glyph |
+| Input and repertoire | Decode UTF-8; store `U+0020`–`U+005F`; accept lowercase only by recorded ASCII uppercase normalization | Positive lookup and negative decoding cases |
+| Glyph geometry | Center five stored image rows between blank logical rows; duplicate logical rows to physical-position pairs | Exact 7-by-14 raster for all 64 glyphs |
+| Cell spacing | Fixed seven columns; outer columns remain blank; no proportional trimming or extra inter-character column | Adjacent-character boundary cases |
+| Word spacing | Each ASCII space is one all-zero seven-column cell; preserve multiples | Multiword and repeated-space cases |
+| Unsupported input | Reject complete message; no substitution or valid-prefix transmission | Negative and atomic-rejection fixtures |
+| Leader and trailer | One all-zero seven-column cell each | Stream-boundary and duration fixtures |
+| Duration | For `C` normalized characters, `98 × (C + 2)` positions and `2 × (C + 2) / 5` seconds | Exact compiled-event and repeat-equality fixtures |
 
-None of these values is inherited from fldigi, xfhell, RadioLib, or the historical transcription merely because that source is readable or familiar.
+The asset was selected explicitly from immutable RadioLib source under its MIT license. It is not inherited from application readability, is not a historical transcription, and does not inherit the prior F3 result.
 
 ## Explicit exclusions and non-claims
 
@@ -136,4 +134,4 @@ This profile does not include or authorize:
 
 ## Gate status
 
-The font-independent protocol core is frozen for Phase 1.1. Gate A remains open until Phase 2 freezes the asset and spacing policy and Phase 1.2 produces reviewable exact-asset raster, event, duration, and cancellation fixtures.
+The protocol core, asset, repertoire, normalization, and spacing rules are frozen. Gate B is satisfied. Gate A remains open until Phase 1.2 produces reviewable exact-asset raster, event, duration, rejection, repeat, and cancellation fixtures.
