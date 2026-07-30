@@ -4,7 +4,7 @@
 
 **Selected:** `wsprry-standard-feld-radiolib-5x5-v1`.
 
-This is a proposed immutable product asset for the design spike. It is not production implementation and has not yet been tested in the interoperability rig.
+This is a proposed immutable product asset for the design spike. It is not production implementation. Phase 3 qualified the pinned exact corpus to application-level receive F3 through the documented rig adapter; broader Gate C coverage remains open.
 
 ## Selection
 
@@ -68,4 +68,4 @@ Generated exact-asset fixtures may be redistributed with the research record und
 
 The selected glyphs differ materially from the historical transcription and the fldigi `real` table. Distinctive digits, punctuation, narrow strokes, and the compact five-by-five artwork require explicit scoring. The earlier clean F3 result used application-native fonts and does not establish readability for this asset.
 
-Phase 3 must test the selected checksum against fldigi 4.2.12 and xfhell 3.5.2, retain exact settings and renders, repeat trials, and score distinctive characters independently. Phase 2 makes no F3 or F4 claim.
+Phase 2 itself made no F3 or F4 claim. Phase 3 subsequently tested this checksum as Wsprry-derived audio received by fldigi 4.2.12 and xfhell 3.5.2 with retained settings, renders, repeated clean trials, and a fixed impairment matrix. The exact corpus reached receive F3; exact-contract application-direction coverage, independent scoring, repertoire/substitution coverage, and F4 feasibility remain open. See the [Phase 3 report](phase-3-offline-qualification.md).

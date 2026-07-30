@@ -77,4 +77,4 @@ The RadioLib-derived asset uses paired physical positions for every logical pixe
 
 Gate A's required versioned protocol and deterministic raster, event, duration, rejection, repeat, cancellation, and terminal-state fixtures now exist and reproduce independently. Gate A is satisfied.
 
-Gate B remains satisfied by the immutable MIT-licensed asset and spacing policy. Gate C remains open: the exact asset has not been transmitted through or decoded by fldigi or xfhell, and no prior F3 result transfers to it.
+At Phase 1.2 completion, Gate B remained satisfied and Gate C was open because no prior F3 result transferred to the new asset. Phase 3 later qualified the pinned exact corpus to receive F3 through the documented rig adapter; Gate C is now partially satisfied, with exact-contract application-direction coverage, repertoire/substitution coverage, F4 feasibility, and independent scoring still open. See the [Phase 3 report](phase-3-offline-qualification.md).

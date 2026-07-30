@@ -2,7 +2,7 @@
 
 ## Status
 
-**Phase 1.2 complete — exact-asset fixtures frozen; Gates A and B satisfied; Gate C remains open.**
+**Phase 3 complete for the bounded exact-corpus objective — offline F3 passed through the pinned application adapter; Gate C is partially satisfied and Phase 4 architecture design may begin.**
 
 This record continues the completed generic [Hellschreiber research spike](../hellschreiber/README.md) for Standard Feld-Hell alone. It defines a proposed product protocol and later qualification work without authorizing implementation, hardware operation, RF output, or release.
 
@@ -19,9 +19,9 @@ This record continues the completed generic [Hellschreiber research spike](../he
 | Repository | Branch inspected | Commit | Phase 1.1 use |
 | --- | --- | --- | --- |
 | `WsprryPi/WsprryPi` | `research/hellschreiber-review` | `708bace20374a367f54801f1a87ff814f5b1f117` | Completed generic research baseline; new work is on `research/standard-feld-design` |
-| `WsprryPi/hellschreiber-interoperability-rig` | `main` | `9e37756758e1d59eeb7b3b8a01dd477a66dd9309` | Read-only reproducibility and fixture-consumer baseline |
+| `WsprryPi/hellschreiber-interoperability-rig` | `research/standard-feld-contract` | `088bbaecb1afe0f55be13cfb90f1496c031a24fb` | Committed Phase 3 exact-asset adapter, protocol, and result record |
 
-Both repositories were clean and even with their upstreams at inspection. All WsprryPi submodules were initialized, clean, detached at their recorded commits, and neither dirty nor mismatched. The rig was not changed or executed.
+At Phase 3 closeout, both repositories were clean and even with their upstreams. All WsprryPi submodules were initialized, clean, detached at their recorded commits, and neither dirty nor mismatched. The rig remained read-only during product-record reconciliation.
 
 ## Phase path
 
@@ -42,6 +42,7 @@ The ordering intentionally places asset selection before glyph-bearing fixtures.
 - [Selected asset](assets/README.md)
 - [Fixture contract](fixtures/README.md)
 - [Phase 1.2 fixture report](phase-1.2-fixtures.md)
+- [Phase 3 offline qualification](phase-3-offline-qualification.md)
 - [Research tools](tools/README.md)
 - [Decision log](decision-log.md)
 - [Evidence register](evidence-register.md)
@@ -53,7 +54,8 @@ The ordering intentionally places asset selection before glyph-bearing fixtures.
 | Protocol-core design | Frozen for Phase 1.1 and reconciled to Phase 2 asset |
 | Gate A protocol contract | Satisfied: exact fixtures independently reproduced |
 | Font and licensing | Gate B satisfied: immutable MIT asset and spacing policy frozen |
-| Exact-asset interoperability | Not run |
+| Gate C exact-asset interoperability | Partially satisfied: corrected exact-corpus clean F3 passed in both named receivers; exact-contract direction coverage, repertoire coverage, F4 feasibility, and independent scoring remain open |
+| Phase 4 architecture design | Ready to begin; no Phase 3 result invalidates the frozen raster or event contract |
 | Production implementation | Not authorized |
 | Hardware qualification | Not assessed |
 | RF/spectral qualification | Not assessed |
@@ -70,3 +72,7 @@ The ordering intentionally places asset selection before glyph-bearing fixtures.
 ## Phase 1.2 conclusion
 
 `PHASE 1.2 PASS — EXACT-ASSET FIXTURES FROZEN; GATE A SATISFIED`
+
+## Phase 3 conclusion
+
+`PHASE 3 PASS — EXACT-CORPUS OFFLINE RECEIVE F3 QUALIFIED THROUGH THE PINNED APPLICATION ADAPTER; GATE C PARTIAL; INDEPENDENT REVIEW PENDING`

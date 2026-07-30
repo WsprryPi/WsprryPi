@@ -134,4 +134,4 @@ This profile does not include or authorize:
 
 ## Gate status
 
-The protocol core, asset, repertoire, normalization, and spacing rules are frozen. The exact raster, event, duration, rejection, repeat, cancellation, and terminal-state fixtures are independently reproducible. Gates A and B are satisfied. Gate C exact-asset application interoperability remains open.
+The protocol core, asset, repertoire, normalization, and spacing rules are frozen. The exact raster, event, duration, rejection, repeat, cancellation, and terminal-state fixtures are independently reproducible. Gates A and B are satisfied. Phase 3 qualified the pinned exact corpus to application-level receive F3 through the documented rig adapter; Gate C remains partially open for exact-contract application-direction coverage, repertoire/substitution coverage, F4 feasibility, and independent scoring. See the [Phase 3 report](phase-3-offline-qualification.md).
