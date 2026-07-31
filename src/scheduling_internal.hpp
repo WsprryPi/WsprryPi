@@ -87,6 +87,9 @@ void set_tx_led_state(bool, const char *) noexcept;
 bool reconcile_tx_led_after_transmitter_stop(const char *) noexcept;
 void shutdown_all_configured_selector_gpios(
     const ArgParserConfig &) noexcept;
+// Caller holds set_config_mtx during suppressed Standard Feld stop handling.
+bool mark_suppressed_standard_feld_cancelled() noexcept;
+void clear_suppressed_standard_feld_request() noexcept;
 void reset_active_wspr_plan_state();
 bool active_wspr_plan_has_more_frames_after_current() noexcept;
 bool is_managed_persistent_mode() noexcept;

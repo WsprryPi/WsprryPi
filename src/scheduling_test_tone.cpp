@@ -828,6 +828,7 @@ StopTransmissionResult stop_transmission_by_user_request(bool persist_transmit)
     publish_status("unknown", false, "Operator Stop requested; awaiting cleanup.", "not_resumed");
     const bool remote_stopped = wsprrypi::wtp_pi_stop_remote_work();
     bool persist_to_ini = false;
+    bool suppressed_standard_feld = false;
     suppress_cancelled_ws_event_for_user_stop.store(false, std::memory_order_release);
 
     {
@@ -851,10 +852,15 @@ StopTransmissionResult stop_transmission_by_user_request(bool persist_transmit)
         shutdown_after_wspr_plan.store(false, std::memory_order_release);
         reset_active_wspr_plan_state();
 
+        suppressed_standard_feld = mark_suppressed_standard_feld_cancelled();
         config.transmit = false;
         result.transmit_disabled = true;
-        config_to_json();
-        persist_to_ini = config.use_ini && persist_transmit;
+        if (!suppressed_standard_feld)
+            config_to_json();
+        persist_to_ini =
+            !suppressed_standard_feld && config.use_ini && persist_transmit;
+        if (suppressed_standard_feld)
+            result.transmission_active = true;
     }
 
     if (result.transmission_active)
@@ -881,6 +887,8 @@ StopTransmissionResult stop_transmission_by_user_request(bool persist_transmit)
         std::lock_guard<std::mutex> lk(set_config_mtx);
 
         current_transmission_request = TransmissionRequest{};
+        if (suppressed_standard_feld)
+            clear_suppressed_standard_feld_request();
         current_dial_frequency = 0.0;
         current_frequency_entry = WsprFrequencyEntry{};
         freq_iterator = 0;
