@@ -655,6 +655,7 @@ namespace
         case ModeType::FSKCW: return "FSKCW";
         case ModeType::DFCW: return "DFCW";
         case ModeType::TONE: return "TONE";
+        case ModeType::STANDARD_FELD: return "UNSUPPORTED_INTERNAL_MODE";
         }
 
         return "WSPR";
@@ -2140,6 +2141,7 @@ namespace
         target.qrss = source.qrss;
         target.fskcw = source.fskcw;
         target.dfcw = source.dfcw;
+        target.standard_feld = source.standard_feld;
         target.use_ini = source.use_ini;
         target.ini_filename = source.ini_filename;
         target.wspr_dial_freq_set = source.wspr_dial_freq_set;

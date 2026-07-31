@@ -125,7 +125,8 @@ enum class ModeType
     TONE, ///< Test tone generation mode
     QRSS, ///< Temporary QRSS test mode
     FSKCW, ///< Temporary FSKCW test mode
-    DFCW ///< Temporary DFCW test mode
+    DFCW, ///< Temporary DFCW test mode
+    STANDARD_FELD ///< Internal-only Standard Feld source integration
 };
 
 enum class WsprPlannerPreference
@@ -219,6 +220,13 @@ struct DfcwModeConfig
     double dot_frequency_hz = 0.0;
     double dash_frequency_hz = 0.0;
     double dot_seconds = 0.0;
+};
+
+struct StandardFeldModeConfig
+{
+    std::string message;
+    double frequency_hz = 0.0;
+    std::string profile_id = "standard-feld-wsprry-v1";
 };
 
 inline constexpr const char *wspr_planner_preference_to_string(
@@ -344,6 +352,7 @@ struct ArgParserConfig
     QrssModeConfig qrss;                 ///< Long-term QRSS mode configuration.
     FskcwModeConfig fskcw;               ///< Long-term FSKCW mode configuration.
     DfcwModeConfig dfcw;                 ///< Long-term DFCW mode configuration.
+    StandardFeldModeConfig standard_feld; ///< Internal-only Standard Feld configuration.
     bool use_ini;                        ///< Load configuration from INI file.
     std::string ini_filename;            ///< INI file name and path.
     std::vector<double> wspr_dial_freq_set; ///< Parsed WSPR dial frequencies.
@@ -422,6 +431,7 @@ struct ArgParserConfig
           qrss({}),
           fskcw({}),
           dfcw({}),
+          standard_feld({}),
           use_ini(false),
           ini_filename(""),
           wspr_dial_freq_set({}),
@@ -510,6 +520,7 @@ struct ArgParserConfig
         qrss = other.qrss;
         fskcw = other.fskcw;
         dfcw = other.dfcw;
+        standard_feld = other.standard_feld;
         use_ini = other.use_ini;
         ini_filename = other.ini_filename;
         wspr_dial_freq_set = other.wspr_dial_freq_set;

@@ -264,6 +264,23 @@ No slice is authorized by this document. If implementation is approved, use thes
 
 Each submodule change must be reviewed and committed in its own repository before the parent pointer is advanced. Each slice stops for diff and evidence review before commit or push.
 
+### Phase 5 parent source seam
+
+The first parent-integration slice deliberately stops before operator or backend
+enablement. `ModeType::STANDARD_FELD` and its dedicated configuration exist only
+in memory; CLI, INI, JSON, web, WebSocket, and UI selection or persistence do
+not recognize the mode. Parent validation delegates normalization, repertoire,
+raster compilation, and exact duration to the committed transmitter compiler.
+
+A Standard Feld controller request may be committed only through the
+test-execution-suppressed source seam. That snapshot owns the message, carrier,
+fixed profile, output selection, calibration, policy, and Standard Feld-specific
+metadata. Source-level scheduling generation, cancellation, and additive status
+totals can therefore be tested without selector GPIO preparation, transmitter
+dispatch, or backend acceptance. Progress coordinates remain explicitly
+unavailable until a later authorized runtime seam can report `RasterProgress`;
+neither existing hardware backend is enabled by this parent slice.
+
 ## Readiness assessment
 
 | Question | Result |
@@ -280,4 +297,3 @@ Each submodule change must be reviewed and committed in its own repository befor
 ## Phase 4 conclusion
 
 `PHASE 4 PASS — ARCHITECTURE SELECTED; FIRST IMPLEMENTATION SLICE MAY BE PROPOSED FOR SEPARATE AUTHORIZATION; GATES C–G REMAIN OPEN AS RECORDED`
-
