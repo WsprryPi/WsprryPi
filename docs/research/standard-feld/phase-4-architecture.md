@@ -281,6 +281,23 @@ dispatch, or backend acceptance. Progress coordinates remain explicitly
 unavailable until a later authorized runtime seam can report `RasterProgress`;
 neither existing hardware backend is enabled by this parent slice.
 
+### Phase 5 Slice 3 GPIO dry-run seam
+
+The transmitter now contains an explicitly test-only, pure Raspberry Pi plan
+interpreter for `STANDARD_FELD`. It validates the complete backend-neutral plan
+atomically, then records every compiled physical-position event without
+recompiling raster data or changing its absolute integer-derived timestamp,
+progress identity, RF intent, or carrier intent. Completion, representative
+position-boundary cancellation, and injected interpretation failure append an
+explicit safe RF-off/idle trace record.
+
+This seam has no controller bridge, GPIO, device, clock, DMA, mailbox, wait, or
+hardware-adapter dependency and is not referenced by ordinary runtime code.
+The production Raspberry Pi execution guard, parent execution-suppression
+boundary, and explicit Si5351 rejection remain unchanged. The trace establishes
+only deterministic source-level interpretation; it makes no physical timing,
+cancellation-latency, GPIO, spectral, or RF claim.
+
 ## Readiness assessment
 
 | Question | Result |
