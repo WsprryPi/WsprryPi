@@ -2,17 +2,17 @@
 
 ## Status
 
-**Phase 5 Slice 2 complete — the immutable compiler now has a validated internal parent source seam; operator selection, backend execution, hardware, RF, operator, and release gates remain open.**
+**Phase 5 Slice 3 complete — the compiled plan now has a validated GPIO-backend-adjacent non-transmitting dry-run seam; production backend execution, operator selection, hardware, RF, operator, and release gates remain open.**
 
-This record continues the completed generic [Hellschreiber research spike](../hellschreiber/README.md) for Standard Feld-Hell alone. It records the frozen product protocol, the separately authorized compiler and internal parent slices, and later qualification work without authorizing backend execution, hardware operation, RF output, operator exposure, or release.
+This record continues the completed generic [Hellschreiber research spike](../hellschreiber/README.md) for Standard Feld-Hell alone. It records the frozen product protocol, the separately authorized compiler, internal parent, and non-transmitting GPIO dry-run slices, and later qualification work without authorizing production backend execution, hardware operation, RF output, operator exposure, or release.
 
 ## Scope
 
-- Research, specification, architecture, bounded compiler and internal parent-source implementation, and qualification planning.
+- Research, specification, architecture, bounded compiler and internal parent-source implementation, non-transmitting backend interpretation, and qualification planning.
 - Standard Feld-Hell is the sole candidate.
 - The generic mode-selection question remains closed unless material new evidence invalidates the prior record.
 - fldigi 4.2.12 `FSKH105`, xfhell 3.5.2 `FMHell105`, the documentary six-row profile, Hell-80, GL-Hell, and private variants are excluded.
-- The transmitter submodule contains the bounded production asset/compiler slice. The parent now contains an internal, execution-suppressed Standard Feld model, validation, committed request, scheduling, cancellation, and source-status seam. CLI, INI, JSON, web, WebSocket, UI, backend execution, operator documentation, services, hardware, audio devices, and RF behavior remain unavailable or unchanged.
+- The transmitter submodule contains the bounded production asset/compiler and a test-only GPIO dry-run interpreter. The parent contains an internal, execution-suppressed Standard Feld model plus a focused dry-run test target. CLI, INI, JSON, web, WebSocket, UI, production backend execution, operator documentation, services, hardware, audio devices, and RF behavior remain unavailable or unchanged.
 
 ## Baseline
 
@@ -30,7 +30,7 @@ At Phase 3 closeout, both repositories were clean and even with their upstreams.
 3. **Phase 1.2:** generate exact-asset raster, event, duration, and cancellation fixtures.
 4. **Phase 3:** qualify the exact contract in the contained interoperability rig.
 5. **Phase 4:** design architecture and product behavior.
-6. **Phase 5:** implement separately authorized, bounded source slices; Slice 1 supplies the immutable asset/compiler and Slice 2 supplies the execution-suppressed parent seam.
+6. **Phase 5:** implement separately authorized, bounded source slices; Slice 1 supplies the immutable asset/compiler, Slice 2 supplies the execution-suppressed parent seam, and Slice 3 supplies non-transmitting GPIO plan interpretation.
 7. **Phases 6–7:** define and execute separately authorized backend, spectral, RF, operator, and release qualification.
 8. **Phase 8:** make a bounded product go/no-go decision, distinct from hardware, RF, and release readiness.
 
@@ -48,6 +48,7 @@ The ordering intentionally places asset selection before glyph-bearing fixtures.
 - [Phase 4 product architecture](phase-4-architecture.md)
 - [Phase 5 Slice 1 production compiler](phase-5-slice-1-compiler.md)
 - [Phase 5 Slice 2 parent integration](phase-5-slice-2-parent-integration.md)
+- [Phase 5 Slice 3 GPIO dry-run](phase-5-slice-3-gpio-dry-run.md)
 - [Research tools](tools/README.md)
 - [Decision log](decision-log.md)
 - [Evidence register](evidence-register.md)
@@ -63,8 +64,9 @@ The ordering intentionally places asset selection before glyph-bearing fixtures.
 | Phase 4 architecture design | Passed: first-class raster payload/compiler over the shared execution plan; no new hardware backend |
 | Phase 5 Slice 1 | Passed: immutable production asset and backend-neutral compiler implemented and validated |
 | Phase 5 Slice 2 | Passed: internal parent validation, request, scheduling, cancellation, and source status integrated under test execution suppression |
+| Phase 5 Slice 3 | Passed: exact test-only GPIO plan interpretation and terminal safe-idle intent validated without hardware enablement |
 | Operator-facing parent integration | Not implemented: CLI, INI, JSON, web, WebSocket, and UI remain unavailable |
-| Backend execution | Disabled: Raspberry Pi acceptance guard unchanged; Si5351 explicitly rejects Standard Feld |
+| Production backend execution | Disabled: Raspberry Pi acceptance guard unchanged; Si5351 explicitly rejects Standard Feld |
 | Regression debt | `guarded-mode-change-persistence-test` has a baseline-reproduced pre-Slice-2 QRSS empty-message failure |
 | Standalone transmitter build | Pre-existing parent-header include-boundary limitation remains documented |
 | Hardware qualification | Not assessed |
@@ -98,3 +100,7 @@ The ordering intentionally places asset selection before glyph-bearing fixtures.
 ## Phase 5 Slice 2 conclusion
 
 `PHASE 5 SLICE 2 PASS — PARENT STANDARD FELD MODE, VALIDATION, REQUEST, SCHEDULING, CANCELLATION, AND SOURCE STATUS INTEGRATED WITHOUT BACKEND ENABLEMENT`
+
+## Phase 5 Slice 3 conclusion
+
+`PHASE 5 SLICE 3 PASS — GPIO BACKEND STANDARD FELD PLAN ACCEPTANCE AND NON-TRANSMITTING DRY-RUN TRACE IMPLEMENTED WITHOUT HARDWARE ENABLEMENT`
