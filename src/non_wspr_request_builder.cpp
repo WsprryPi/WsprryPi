@@ -336,7 +336,8 @@ bool is_non_wspr_runtime_mode(ModeType mode) noexcept
 {
     return mode == ModeType::QRSS ||
         mode == ModeType::FSKCW ||
-        mode == ModeType::DFCW;
+        mode == ModeType::DFCW ||
+        mode == ModeType::STANDARD_FELD;
 }
 
 const char *mode_type_name(ModeType mode) noexcept
@@ -348,6 +349,7 @@ const char *mode_type_name(ModeType mode) noexcept
     case ModeType::QRSS: return "QRSS";
     case ModeType::FSKCW: return "FSKCW";
     case ModeType::DFCW: return "DFCW";
+    case ModeType::STANDARD_FELD: return "STANDARD_FELD";
     }
     return "UNKNOWN";
 }
@@ -373,12 +375,32 @@ bool compute_non_wspr_message_duration(
         {
             request = scheduling_detail::make_dfcw_controller_request(cfg, cfg.ppm);
         }
+        else if (cfg.mode == ModeType::STANDARD_FELD)
+        {
+            if (!std::isfinite(cfg.standard_feld.frequency_hz) ||
+                cfg.standard_feld.frequency_hz <= 0.0)
+            {
+                throw std::runtime_error(
+                    "Standard Feld carrier frequency must be finite and greater than zero.");
+            }
+            wsprrypi::StandardFeldPayload payload;
+            payload.message = cfg.standard_feld.message;
+            payload.frequency_hz = cfg.standard_feld.frequency_hz;
+            payload.profile_id = cfg.standard_feld.profile_id;
+            request.id.value = 1;
+            request.mode = wsprrypi::TransmissionMode::STANDARD_FELD;
+            request.output.backend = scheduling_detail::to_controller_backend(cfg.transmit_backend);
+            request.output.output = scheduling_detail::to_controller_clock_source(cfg);
+            request.output.gpio = cfg.tx_pin;
+            request.calibration.ppm = cfg.ppm;
+            request.payload = payload;
+        }
         else
         {
             if (error_message != nullptr)
             {
                 *error_message =
-                    "Timed-message duration is only available for QRSS, FSKCW, and DFCW modes.";
+                    "Timed-message duration is only available for QRSS, FSKCW, DFCW, and Standard Feld modes.";
             }
             return false;
         }
@@ -429,7 +451,9 @@ bool validate_non_wspr_repeat_interval_policy(
             scheduling_detail::format_policy_duration(message_duration) +
             " exceeds repeat_every interval of " +
             scheduling_detail::format_policy_duration(repeat_interval) +
-            ". Reduce the message length, shorten the unit length, or increase repeat_every.";
+            (cfg.mode == ModeType::STANDARD_FELD
+                 ? ". Shorten the message or increase repeat_every."
+                 : ". Reduce the message length, shorten the unit length, or increase repeat_every.");
     }
     return false;
 }

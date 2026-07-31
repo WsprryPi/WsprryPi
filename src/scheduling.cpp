@@ -59,6 +59,8 @@
 #include "ppm_manager.hpp"
 #include "system_clock_frequency_estimate.hpp"
 #include "execution_plan_compiler.hpp"
+#include "standard_feld.hpp"
+#include "standard_feld_asset.hpp"
 #include "wspr_reference_adapter.hpp"
 #include "transmitter_runtime_bridge.hpp"
 #include "wtp_runtime_bridge.hpp"
@@ -478,6 +480,8 @@ static DirectToneStartInvokerForTest direct_tone_start_invoker_for_test{};
 static std::mutex direct_tone_confirmation_mtx;
 static std::optional<std::string> claimed_direct_tone_confirmation;
 std::atomic<std::uint64_t> non_wspr_schedule_generation{0};
+static std::optional<wsprrypi::ExecutionPlan> committed_standard_feld_plan{};
+static std::string standard_feld_terminal_reason{};
 
 std::uint64_t non_wspr_schedule_generation_for_test() noexcept
 {
@@ -1515,6 +1519,11 @@ static void commit_execution_request(
     freeze_gpio_correction_provenance(
         current_transmission_request, exact_range);
     current_controller_request_for_test_storage = controller_request;
+    if (controller_request.mode == wsprrypi::TransmissionMode::STANDARD_FELD)
+    {
+        committed_execution_route_for_test_storage =
+            CommittedExecutionRouteForTest::CONTROLLER_STANDARD_FELD;
+    }
     if (suppress_scheduler_execution_for_test)
     {
         return;
@@ -1653,6 +1662,8 @@ static const char *mode_type_name(ModeType mode) noexcept
         return "FSKCW";
     case ModeType::DFCW:
         return "DFCW";
+    case ModeType::STANDARD_FELD:
+        return "STANDARD_FELD";
     case ModeType::WSPR:
         return "WSPR";
     case ModeType::TONE:
@@ -1666,7 +1677,8 @@ bool is_non_wspr_runtime_mode(ModeType mode) noexcept
 {
     return mode == ModeType::QRSS ||
            mode == ModeType::FSKCW ||
-           mode == ModeType::DFCW;
+           mode == ModeType::DFCW ||
+           mode == ModeType::STANDARD_FELD;
 }
 
 void log_scheduler_path_selection(ModeType mode)
@@ -2918,6 +2930,110 @@ bool launch_scheduled_non_wspr_if_current(std::uint64_t generation)
     return true;
 }
 
+bool mark_suppressed_standard_feld_cancelled() noexcept
+{
+    if (!suppress_scheduler_execution_for_test ||
+        !current_controller_request_for_test_storage.has_value() ||
+        current_controller_request_for_test_storage->mode !=
+            wsprrypi::TransmissionMode::STANDARD_FELD)
+        return false;
+    standard_feld_terminal_reason = "cancelled";
+    return true;
+}
+
+void clear_suppressed_standard_feld_request() noexcept
+{
+    current_controller_request_for_test_storage.reset();
+    committed_standard_feld_plan.reset();
+}
+
+bool validate_standard_feld_candidate(
+    const ArgParserConfig &cfg,
+    std::string *error_message)
+{
+    if (cfg.mode != ModeType::STANDARD_FELD)
+    {
+        if (error_message != nullptr)
+            *error_message = "Standard Feld validation requires STANDARD_FELD mode.";
+        return false;
+    }
+    if (cfg.standard_feld.profile_id != wsprrypi::standard_feld::kProfileId)
+    {
+        if (error_message != nullptr)
+            *error_message = "Standard Feld profile is unsupported.";
+        return false;
+    }
+    if (cfg.schedule_start_minute < 0 || cfg.schedule_start_minute > 59 ||
+        cfg.schedule_start_second < 0 || cfg.schedule_start_second > 59 ||
+        cfg.schedule_repeat_minutes <= 0)
+    {
+        if (error_message != nullptr)
+            *error_message =
+                "Standard Feld schedule requires start minute/second in 0..59 and a positive repeat interval.";
+        return false;
+    }
+    return validate_non_wspr_repeat_interval_policy(cfg, error_message);
+}
+
+bool commit_standard_feld_request_for_test(
+    const ArgParserConfig &cfg,
+    std::string *error_message)
+{
+    if (!suppress_scheduler_execution_for_test)
+    {
+        if (error_message != nullptr)
+            *error_message = "Standard Feld commitment requires test execution suppression.";
+        return false;
+    }
+
+    std::chrono::nanoseconds ignored{};
+    if (!validate_standard_feld_candidate(cfg, error_message) ||
+        !compute_non_wspr_message_duration(cfg, ignored, error_message))
+        return false;
+
+    try
+    {
+        wsprrypi::TransmissionRequest request;
+        request.id.value = 1;
+        request.slot.start_time = next_non_wspr_schedule_time(cfg);
+        request.mode = wsprrypi::TransmissionMode::STANDARD_FELD;
+        request.output.backend = to_controller_backend(cfg.transmit_backend);
+        request.output.output = to_controller_clock_source(cfg);
+        request.output.gpio = cfg.tx_pin;
+        request.calibration.ppm = cfg.ppm;
+        request.metadata.label = "standard-feld";
+        request.metadata.origin = "internal-standard-feld-scheduler";
+        request.metadata.note = "backend execution disabled";
+        wsprrypi::StandardFeldPayload payload;
+        payload.message = cfg.standard_feld.message;
+        payload.frequency_hz = cfg.standard_feld.frequency_hz;
+        payload.profile_id = cfg.standard_feld.profile_id;
+        request.payload = payload;
+
+        const wsprrypi::ExecutionPlanCompiler compiler;
+        wsprrypi::ExecutionPlan plan = compiler.compile(request);
+
+        TransmissionRequest legacy;
+        legacy.actual_rf_frequency_hz = cfg.standard_feld.frequency_hz;
+        legacy.dial_frequency_hz = cfg.standard_feld.frequency_hz;
+        legacy.ppm = cfg.ppm;
+        legacy.power_level = cfg.power_level;
+        legacy.tx_gpio = cfg.tx_pin;
+        legacy.frequency_entry_label = "standard-feld";
+        commit_execution_request(request, legacy);
+        committed_standard_feld_plan = std::move(plan);
+        standard_feld_terminal_reason.clear();
+        non_wspr_schedule_generation.fetch_add(1, std::memory_order_acq_rel);
+        return true;
+    }
+    catch (const std::exception &e)
+    {
+        if (error_message != nullptr)
+            *error_message = std::string("Standard Feld request rejected: ") + e.what();
+        return false;
+    }
+}
+
 void schedule_next_non_wspr_launch(const ArgParserConfig &cfg)
 {
     if (cfg.mode != ModeType::QRSS &&
@@ -3473,6 +3589,30 @@ WsprRuntimeStatusSnapshot current_tx_runtime_status_snapshot()
         snapshot.offset_hz =
             config.dfcw.dash_frequency_hz - config.dfcw.dot_frequency_hz;
     }
+    else if (config.mode == ModeType::STANDARD_FELD)
+    {
+        snapshot.standard_feld_asset_id =
+            std::string(wsprrypi::standard_feld::kAssetId);
+        snapshot.standard_feld_asset_checksum_prefix =
+            std::string(wsprrypi::standard_feld::kCanonicalAssetSha256.substr(0, 12));
+        snapshot.standard_feld_terminal_reason = standard_feld_terminal_reason;
+        if (committed_standard_feld_plan.has_value() &&
+            current_controller_request_for_test_storage.has_value())
+        {
+            const auto &payload = std::get<wsprrypi::StandardFeldPayload>(
+                current_controller_request_for_test_storage->payload);
+            snapshot.standard_feld_available = true;
+            snapshot.frequency_hz = payload.frequency_hz;
+            snapshot.standard_feld_profile_id = payload.profile_id;
+            snapshot.standard_feld_raw_character_count = payload.message.size();
+            snapshot.standard_feld_normalized_character_count =
+                wsprrypi::standard_feld::normalize_message(payload.message).size();
+            snapshot.standard_feld_total_physical_positions =
+                committed_standard_feld_plan->events.size();
+            snapshot.standard_feld_total_duration =
+                committed_standard_feld_plan->summary.total_duration;
+        }
+    }
 
     if (is_non_wspr_runtime_mode(config.mode) &&
         runtime_transmit_enabled(config) &&
@@ -3911,6 +4051,8 @@ void set_current_frequency_estimate_for_test(
 void reset_current_controller_request_for_test() noexcept
 {
     current_controller_request_for_test_storage.reset();
+    committed_standard_feld_plan.reset();
+    standard_feld_terminal_reason.clear();
 }
 
 void set_test_tone_commit_invoker_for_test(

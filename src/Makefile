@@ -150,6 +150,7 @@ RP1_GPCLK_ROUTE_SERVICE_TEST_OUT := rp1_gpclk_route_service_test
 RP1_GPCLK_TRANSMIT_BACKEND_TEST_OUT := rp1_gpclk_transmit_backend_test
 RP1_GPCLK_ADMIN_PROBE_OUT := rp1_gpclk_admin_probe
 SELECTOR_SHUTDOWN_CLEANUP_TEST_OUT := selector_shutdown_cleanup_test
+STANDARD_FELD_PARENT_INTEGRATION_TEST_OUT := standard_feld_parent_integration_test
 QUALIFICATION_GPIO_TEST_MODE_TEST_OUT := qualification_gpio_test_mode_test
 SUPPORT_REQUEST_GUARD_TEST_OUT := support_request_guard_test
 PRIVILEGED_NETWORK_POLICY_TEST_OUT := privileged_network_policy_test
@@ -404,6 +405,9 @@ $(GPIO_BAND_POLICY_TEST_OBJ): $(BACKEND_CAPABILITIES_HEADER)
 SELECTOR_SHUTDOWN_CLEANUP_TEST_SRC := tests/selector_shutdown_cleanup_test.cpp
 SELECTOR_SHUTDOWN_CLEANUP_TEST_OBJ := $(OBJ_DIR_DEBUG)/tests/selector_shutdown_cleanup_test.o
 SELECTOR_SHUTDOWN_CLEANUP_TEST_DEPS := $(filter-out $(MAIN_DEBUG_OBJECT),$(CPP_DEBUG_OBJECTS))
+STANDARD_FELD_PARENT_INTEGRATION_TEST_SRC := tests/standard_feld_parent_integration_test.cpp
+STANDARD_FELD_PARENT_INTEGRATION_TEST_OBJ := $(OBJ_DIR_DEBUG)/tests/standard_feld_parent_integration_test.o
+STANDARD_FELD_PARENT_INTEGRATION_TEST_DEPS := $(filter-out $(MAIN_DEBUG_OBJECT),$(CPP_DEBUG_OBJECTS))
 STARTUP_QUIESCE_PARENT_TEST_SRC := tests/startup_quiesce_parent_test.cpp
 STARTUP_QUIESCE_PARENT_TEST_OBJ := $(OBJ_DIR_DEBUG)/tests/startup_quiesce_parent_test.o
 STARTUP_QUIESCE_PARENT_TEST_DEPS := $(filter-out $(MAIN_DEBUG_OBJECT),$(CPP_DEBUG_OBJECTS))
@@ -922,6 +926,17 @@ $(BIN_DIR)/$(SELECTOR_SHUTDOWN_CLEANUP_TEST_OUT): $(SELECTOR_SHUTDOWN_CLEANUP_TE
 	$(Q)echo "Linking debug: $(SELECTOR_SHUTDOWN_CLEANUP_TEST_OUT)"
 	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) $^ -o $@ $(LDFLAGS)
 
+$(STANDARD_FELD_PARENT_INTEGRATION_TEST_OBJ): $(STANDARD_FELD_PARENT_INTEGRATION_TEST_SRC)
+	$(Q)mkdir -p $(dir $@)
+	$(Q)mkdir -p $(DEP_DIR)/tests
+	$(Q)echo "Compiling (debug) $< into $@"
+	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -MF $(DEP_DIR)/tests/standard_feld_parent_integration_test.d -c $< -o $@
+
+$(BIN_DIR)/$(STANDARD_FELD_PARENT_INTEGRATION_TEST_OUT): $(STANDARD_FELD_PARENT_INTEGRATION_TEST_OBJ) $(STANDARD_FELD_PARENT_INTEGRATION_TEST_DEPS)
+	$(Q)mkdir -p $(BIN_DIR)
+	$(Q)echo "Linking debug: $(STANDARD_FELD_PARENT_INTEGRATION_TEST_OUT)"
+	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) $^ -o $@ $(LDFLAGS)
+
 $(STARTUP_QUIESCE_PARENT_TEST_OBJ): $(STARTUP_QUIESCE_PARENT_TEST_SRC)
 	$(Q)mkdir -p $(dir $@)
 	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -MF $(@:.o=.d) -c $< -o $@
@@ -1177,7 +1192,7 @@ $(BIN_DIR)/$(OUT): $(PROFILE_RELEASE_BIN) FORCE_PROFILE_BINARY
 .PHONY: support-bundle-intake-controller-test support-bundle-intake-runtime-test support-bundle-intake-production-test
 .PHONY: build-dependency-regression-test backend-capabilities-regression-test backend-capabilities-make-regression-test semantics-make-regression-test
 .PHONY: backend-profile-factory-test update-check-comparison-test guarded-mode-change-persistence-test
-.PHONY: band-gpio-default-convergence-test band-gpio-rotation-test selector-shutdown-cleanup-test
+.PHONY: band-gpio-default-convergence-test band-gpio-rotation-test selector-shutdown-cleanup-test standard-feld-parent-integration-test
 .PHONY: qualification-gpio-test-mode-test monitor-file-regression-test gpio-w
 .PHONY: rp1-gpclk-planner-test rp1-gpclk-lifecycle-test rp1-gpclk-transition-test rp1-gpclk-development-policy-test rp1-gpclk-route-runtime-wiring-test rp1-gpclk-route-service-test
 .PHONY: rp1-gpclk-diagnostics-test
@@ -1729,6 +1744,10 @@ band-gpio-rotation-test: $(BIN_DIR)/$(BAND_GPIO_ROTATION_TEST_OUT)
 selector-shutdown-cleanup-test: $(BIN_DIR)/$(SELECTOR_SHUTDOWN_CLEANUP_TEST_OUT)
 	$(Q)echo "Running selector shutdown cleanup regression tests."
 	$(Q)./$(BIN_DIR)/$(SELECTOR_SHUTDOWN_CLEANUP_TEST_OUT)
+
+standard-feld-parent-integration-test: $(BIN_DIR)/$(STANDARD_FELD_PARENT_INTEGRATION_TEST_OUT)
+	$(Q)echo "Running Standard Feld parent source integration tests."
+	$(Q)./$(BIN_DIR)/$(STANDARD_FELD_PARENT_INTEGRATION_TEST_OUT)
 
 startup-quiesce-parent-test: $(BIN_DIR)/startup_quiesce_parent_test
 	$(Q)./$(BIN_DIR)/startup_quiesce_parent_test

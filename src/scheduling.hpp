@@ -409,6 +409,19 @@ struct WsprRuntimeStatusSnapshot
     std::string rp1_eligibility;
     std::string rp1_cleanup_state;
     std::string rp1_journal_state;
+    bool standard_feld_available = false;
+    std::string standard_feld_profile_id;
+    std::string standard_feld_asset_id;
+    std::string standard_feld_asset_checksum_prefix;
+    std::optional<std::size_t> standard_feld_raw_character_count;
+    std::optional<std::size_t> standard_feld_normalized_character_count;
+    std::optional<std::uint64_t> standard_feld_total_physical_positions;
+    std::optional<std::uint64_t> standard_feld_current_absolute_position;
+    std::optional<int> standard_feld_normalized_character_index;
+    std::optional<std::uint8_t> standard_feld_cell_column;
+    std::optional<std::uint8_t> standard_feld_physical_position;
+    std::optional<std::chrono::nanoseconds> standard_feld_total_duration;
+    std::string standard_feld_terminal_reason;
 };
 
 WsprRuntimeStatusSnapshot current_tx_runtime_status_snapshot();
@@ -434,6 +447,12 @@ bool compute_non_wspr_message_duration(
     std::chrono::nanoseconds &duration_out,
     std::string *error_message = nullptr);
 bool start_non_wspr_transmission_now_for_test(const ArgParserConfig &cfg);
+bool validate_standard_feld_candidate(
+    const ArgParserConfig &cfg,
+    std::string *error_message = nullptr);
+bool commit_standard_feld_request_for_test(
+    const ArgParserConfig &cfg,
+    std::string *error_message = nullptr);
 bool validate_non_wspr_repeat_interval_policy(
     const ArgParserConfig &cfg,
     std::string *error_message = nullptr);
@@ -476,6 +495,7 @@ enum class CommittedExecutionRouteForTest
     LEGACY,
     CONTROLLER_WSPR,
     CONTROLLER_TONE,
+    CONTROLLER_STANDARD_FELD,
 };
 
 CommittedExecutionRouteForTest committed_execution_route_for_test() noexcept;
