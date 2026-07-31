@@ -2,17 +2,17 @@
 
 ## Status
 
-**Phase 4 architecture complete — a first-class Standard Feld payload/compiler over the shared execution-plan abstraction is selected; implementation remains unauthorized and Gates C–G remain open as recorded.**
+**Phase 5 Slice 1 complete — the immutable production asset and backend-neutral Standard Feld compiler are implemented and validated; parent integration and all backend, hardware, RF, operator, and release gates remain open.**
 
 This record continues the completed generic [Hellschreiber research spike](../hellschreiber/README.md) for Standard Feld-Hell alone. It defines a proposed product protocol and later qualification work without authorizing implementation, hardware operation, RF output, or release.
 
 ## Scope
 
-- Research, specification, architecture design, and qualification planning only.
+- Research, specification, architecture, bounded compiler implementation, and qualification planning.
 - Standard Feld-Hell is the sole candidate.
 - The generic mode-selection question remains closed unless material new evidence invalidates the prior record.
 - fldigi 4.2.12 `FSKH105`, xfhell 3.5.2 `FMHell105`, the documentary six-row profile, Hell-80, GL-Hell, and private variants are excluded.
-- Application code, tests, configuration, CLI, scheduling, persistence, UI, submodules, operator documentation, dependencies, services, hardware, audio devices, and RF behavior remain unchanged.
+- The transmitter submodule now contains the bounded production asset/compiler slice. Parent configuration, CLI, scheduling integration, persistence, UI, operator documentation, services, hardware, audio devices, and RF behavior remain unchanged.
 
 ## Baseline
 
@@ -29,8 +29,10 @@ At Phase 3 closeout, both repositories were clean and even with their upstreams.
 2. **Phase 2:** select one immutable redistributable font, repertoire, and spacing policy.
 3. **Phase 1.2:** generate exact-asset raster, event, duration, and cancellation fixtures.
 4. **Phase 3:** qualify the exact contract in the contained interoperability rig.
-5. **Phases 4–7:** design architecture and product behavior, then define backend, spectral, RF, operator, and release qualification.
-6. **Phase 8:** make a bounded implementation go/no-go decision, distinct from hardware, RF, and release readiness.
+5. **Phase 4:** design architecture and product behavior.
+6. **Phase 5:** implement separately authorized, bounded source slices; Slice 1 supplies the immutable asset/compiler.
+7. **Phases 6–7:** define and execute separately authorized backend, spectral, RF, operator, and release qualification.
+8. **Phase 8:** make a bounded product go/no-go decision, distinct from hardware, RF, and release readiness.
 
 The ordering intentionally places asset selection before glyph-bearing fixtures. A protocol-mechanics fixture can be font-independent; a production character fixture cannot.
 
@@ -44,6 +46,7 @@ The ordering intentionally places asset selection before glyph-bearing fixtures.
 - [Phase 1.2 fixture report](phase-1.2-fixtures.md)
 - [Phase 3 offline qualification](phase-3-offline-qualification.md)
 - [Phase 4 product architecture](phase-4-architecture.md)
+- [Phase 5 Slice 1 production compiler](phase-5-slice-1-compiler.md)
 - [Research tools](tools/README.md)
 - [Decision log](decision-log.md)
 - [Evidence register](evidence-register.md)
@@ -57,8 +60,9 @@ The ordering intentionally places asset selection before glyph-bearing fixtures.
 | Font and licensing | Gate B satisfied: immutable MIT asset and spacing policy frozen |
 | Gate C exact-asset interoperability | Partially satisfied: corrected exact-corpus clean F3 passed in both named receivers; exact-contract direction coverage, repertoire coverage, F4 feasibility, and independent scoring remain open |
 | Phase 4 architecture design | Passed: first-class raster payload/compiler over the shared execution plan; no new hardware backend |
-| First implementation slice | May be proposed for separate authorization; not authorized by this record |
-| Production implementation | Not authorized |
+| Phase 5 Slice 1 | Passed: immutable production asset and backend-neutral compiler implemented and validated |
+| Parent product integration | Not implemented; Slice 2 may be proposed separately |
+| Standalone transmitter build | Pre-existing parent-header include-boundary limitation remains documented |
 | Hardware qualification | Not assessed |
 | RF/spectral qualification | Not assessed |
 | Release readiness | Not ready |
@@ -82,3 +86,7 @@ The ordering intentionally places asset selection before glyph-bearing fixtures.
 ## Phase 4 conclusion
 
 `PHASE 4 PASS — ARCHITECTURE SELECTED; FIRST IMPLEMENTATION SLICE MAY BE PROPOSED FOR SEPARATE AUTHORIZATION; GATES C–G REMAIN OPEN AS RECORDED`
+
+## Phase 5 Slice 1 conclusion
+
+`PHASE 5 SLICE 1 PASS — IMMUTABLE PRODUCTION ASSET AND BACKEND-NEUTRAL STANDARD FELD COMPILER IMPLEMENTED AND VALIDATED`
