@@ -1124,7 +1124,7 @@ $(BIN_DIR)/$(OUT): $(PROFILE_RELEASE_BIN) FORCE_PROFILE_BINARY
 .PHONY: support-bundle-intake-controller-test support-bundle-intake-runtime-test support-bundle-intake-production-test
 .PHONY: build-dependency-regression-test backend-capabilities-regression-test backend-capabilities-make-regression-test
 .PHONY: backend-profile-factory-test update-check-comparison-test guarded-mode-change-persistence-test
-.PHONY: band-gpio-default-convergence-test band-gpio-rotation-test selector-shutdown-cleanup-test standard-feld-parent-integration-test standard-feld-gpio-dry-run-test
+.PHONY: band-gpio-default-convergence-test band-gpio-rotation-test selector-shutdown-cleanup-test standard-feld-parent-integration-test standard-feld-gpio-dry-run-test standard-feld-rpi-execution-test
 .PHONY: qualification-gpio-test-mode-test monitor-file-regression-test gpio-w
 .PHONY: rp1-gpclk-planner-test rp1-gpclk-lifecycle-test rp1-gpclk-transition-test
 DEBUG: debug
@@ -1423,6 +1423,9 @@ standard-feld-parent-integration-test: $(BIN_DIR)/$(STANDARD_FELD_PARENT_INTEGRA
 
 standard-feld-gpio-dry-run-test:
 	$(Q)$(MAKE) -C WSPR-Transmitter/src standard-feld-gpio-dry-run-test
+
+standard-feld-rpi-execution-test:
+	$(Q)$(MAKE) -C WSPR-Transmitter/src standard-feld-rpi-execution-test
 
 startup-quiesce-parent-test: $(BIN_DIR)/startup_quiesce_parent_test
 	$(Q)./$(BIN_DIR)/startup_quiesce_parent_test

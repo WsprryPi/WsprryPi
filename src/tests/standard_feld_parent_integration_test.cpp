@@ -75,11 +75,12 @@ int main()
     require(websocket_source.find("STANDARD_FELD") == std::string::npos &&
                 websocket_source.find("standard_feld_") == std::string::npos,
             "WebSocket serialization must not expose Standard Feld fields");
-    require(rpi_backend_source.find("TransmissionMode::STANDARD_FELD") == std::string::npos &&
+    require(rpi_backend_source.find("TransmissionMode::STANDARD_FELD") !=
+                std::string::npos &&
                 rpi_backend_source.find(
-                    "Only WSPR, QRSS, FSKCW, and DFCW execution plans are currently supported.") !=
+                    "RpiStandardFeldExecution::execute(plan, adapter)") !=
                     std::string::npos,
-            "Raspberry Pi backend must retain its mode rejection guard");
+            "Raspberry Pi backend must delegate Standard Feld to its production execution core");
     const std::size_t si5351_rejection = si5351_backend_source.find(
         "case wsprrypi::TransmissionMode::STANDARD_FELD:");
     require(si5351_rejection != std::string::npos &&

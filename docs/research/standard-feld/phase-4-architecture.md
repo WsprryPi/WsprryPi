@@ -298,6 +298,62 @@ boundary, and explicit Si5351 rejection remain unchanged. The trace establishes
 only deterministic source-level interpretation; it makes no physical timing,
 cancellation-latency, GPIO, spectral, or RF claim.
 
+### Phase 5 Slice 4 internal Raspberry Pi execution seam
+
+The Raspberry Pi backend now delegates valid compiled `STANDARD_FELD` plans to
+a production-owned event core. The core validates the complete plan before any
+adapter call, preserves each compiled physical-position deadline and carrier/RF
+intent, passes complete typed `RasterProgress` internally once and only once
+after each completed physical position, and requires a safe state before
+execution plus complete terminal shutdown on completion, cancellation,
+watchdog fault, adapter failure, or exception. Raster progress is not exposed
+to any operator-facing status or protocol in this slice. The
+concrete backend adapter retains the existing DMA/GPCLK/GPIO ownership; focused
+tests inject a deterministic non-device adapter into the same core and neither
+link nor construct the concrete backend.
+
+Cancellation is observed once at each physical-position boundary, rechecked
+after carrier application, and classified again by the concrete adapter while
+holding the Standard Feld RF-transition gate at the last safe point before an
+RF-enable edge. All real Standard Feld user-stop publication and watchdog fault
+publication use that same short gate; joins, callbacks, allocation, and cleanup
+are outside it. Once publication returns, a later RF-enable edge cannot begin.
+This does not promise zero physical cancellation latency for RF that was
+already enabled. The documented lock order is: the stop/RF gate is outermost
+and is not nested with execution, configuration, progress, cleanup, watchdog
+join, or callback locks.
+
+Initial safety and intra-plan RF-off gating are distinct from terminal cleanup.
+The execution core structurally attempts terminal finalization after startup on
+normal completion, cancellation, ordinary adapter/callback exception, or
+failure. Cleanup exceptions are caught, the primary and cleanup diagnostics are
+retained separately, and safe idle is unconfirmed on cleanup failure. A latched
+watchdog/backend safety fault has precedence over adapter failure, cancellation,
+and normal completion; cleanup failure does not erase that classification.
+
+The concrete adapter makes one aggregate backend shutdown request, then checks
+only backend-visible state: watchdog stop plus DMA-active, PWM-control,
+PWM-DMA, and GPCLK-busy registers when a mapping exists. “RF envelope off” in
+this note means that aggregate shutdown was requested and the observable output
+state passed; it is not a claim of physical RF-off confirmation. The internal,
+type-safe RasterProgress store reserves active-plan capacity, validates plan and
+position identity under one mutex, accepts one ordered update per physical
+position, and clears on replacement, cancellation, failure, completion, and
+reset so history cannot leak to another plan.
+
+Deadlines remain absolute offsets from one monotonic origin. If event
+application reaches a deadline late, the existing interruptible absolute wait
+returns immediately; the backend does not add a relative sleep or shift later
+deadlines, so lateness is not converted into cumulative schedule drift.
+
+This internal capability does not change the parent execution-suppression
+boundary or add CLI, persistence, web, WebSocket, UI, or Si5351 exposure. Tests
+establish logical deadline, cancellation classification, and backend-visible
+cleanup behavior only. No physical timing, GPIO, RF-off latency, jitter,
+spectral, or RF qualification occurred. Si5351 continues to reject Standard
+Feld and remains separately roadmapped. Physical qualification requires
+separately authorized hardware work.
+
 ## Readiness assessment
 
 | Question | Result |
