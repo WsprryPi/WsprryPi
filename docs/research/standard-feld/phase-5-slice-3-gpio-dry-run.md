@@ -135,6 +135,11 @@ Two optional Low observations remain:
 3 contract. Correct both at the start of the next transmitter code slice and
 rerun the focused test rather than losing them from the follow-up record.
 
+**FOLLOW-UP:** Slice 4 closed both observations in transmitter `5350dc0`: the
+dry-run implementation now includes `<utility>` directly, and the redundant
+maximum-representation comparison was removed. The focused dry-run regression
+passed in the Slice 4 validation matrix.
+
 ## Pi validation evidence
 
 The following targets and checks passed independently on `pi@wspr5`:
