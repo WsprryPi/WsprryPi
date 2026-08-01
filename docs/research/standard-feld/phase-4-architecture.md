@@ -338,8 +338,10 @@ this note means that aggregate shutdown was requested and the observable output
 state passed; it is not a claim of physical RF-off confirmation. The internal,
 type-safe RasterProgress store reserves active-plan capacity, validates plan and
 position identity under one mutex, accepts one ordered update per physical
-position, and clears on replacement, cancellation, failure, completion, and
-reset so history cannot leak to another plan.
+position, and records a generation-bound terminal state with its completed
+prefix. Replacement installs a new coherent identity, and shutdown clears the
+store only after the transmit thread joins, so history cannot leak to another
+plan.
 
 Deadlines remain absolute offsets from one monotonic origin. If event
 application reaches a deadline late, the existing interruptible absolute wait
@@ -362,7 +364,7 @@ separately authorized hardware work.
 | Payload/compiler ownership selected | PASS |
 | Hardware backend strategy selected | PASS — shared plan, no new backend |
 | Configuration/CLI/UI/status/test contracts defined | PASS |
-| Production implementation authorized | NO |
+| Bounded production source implementation | PASS — compiler, internal parent seam, and Raspberry Pi execution core; no operator exposure |
 | Existing backends physically qualified for Standard Feld | NO |
 | Gate C complete | NO — remains partial |
 | RF/spectral, operator, or release ready | NO |
