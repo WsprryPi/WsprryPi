@@ -8,6 +8,66 @@ mailbox, DMA, PWM, and clock hardware to emit RF. The codebase has been
 refactored so transmission control and scheduling live in a generic controller,
 while platform-specific hardware work lives behind a backend interface.
 
+## Standard Feld compiler contract
+
+The backend-neutral compiler supports the immutable
+`standard-feld-wsprry-v1` profile. This is a production data and execution-plan
+contract only; neither hardware backend is qualified for Standard Feld by this
+source-level implementation.
+
+The profile uses the MIT-licensed
+`wsprry-standard-feld-radiolib-5x5-v1` asset derived from RadioLib commit
+`0795caa41c6350a2f862137cfc22528c2aaad2bc`. Its retained license is in
+`third_party/RadioLib-Hellschreiber-LICENSE.txt`. The canonical asset SHA-256 is
+`025c4ee1227a6d2043b460c973a98b3c5f875b64c1ee96d20a71ad2e78091227`.
+
+The compiler:
+
+- accepts ASCII space through underscore and normalizes lowercase ASCII to
+  uppercase;
+- rejects an empty message or any other byte before constructing a plan;
+- preserves fixed seven-column cells and every accepted space;
+- adds one blank leader and trailer cell;
+- scans columns left to right and 14 physical positions bottom to top;
+- derives every boundary from integer position counts at exactly 245
+  positions per second;
+- emits one event per physical position so every position remains an explicit
+  cancellation and progress boundary;
+- finishes in the RF-disabled state.
+
+For `C` normalized characters the plan contains `98 × (C + 2)` positions and
+has exact duration `2 × (C + 2) / 5` seconds. Absolute nanosecond boundaries
+use integer round-half-up of `n × 1,000,000,000 / 245`; rounded per-position
+durations are never accumulated.
+
+To verify the checked-in production table against the canonical research JSON:
+
+```bash
+python3 tools/check_standard_feld_asset.py \
+  --asset ../../docs/research/standard-feld/assets/font/font.json
+```
+
+Use `--emit` to print the deterministic initializer for maintainer review.
+The compiler test is available as `make standard-feld-test` where the
+standalone Makefile is supported.
+
+This slice does not add parent configuration, scheduling, CLI, persistence,
+status, UI, backend enablement, physical timing tests, RF tests, or release
+support. Those remain separate integration and qualification work.
+
+- **EVIDENCE:** The production table checker matches all 64 stored glyphs to
+  the checksum-pinned canonical asset, and the compiler test covers frozen
+  input, raster, timing, duration, progress, cancellation-boundary, and
+  terminal-state contracts.
+- **DESIGN DECISION:** One event is retained per physical position so every
+  frozen position boundary is directly addressable for cancellation and
+  progress reporting.
+- **INFERENCE:** The existing backend-neutral event vocabulary can represent
+  the compiled raster without another hardware primitive.
+- **UNRESOLVED QUALIFICATION:** Neither existing hardware backend accepts or
+  physically realizes this mode yet. Timing, cancellation latency, safe idle,
+  spectral behavior, RF behavior, and operator behavior remain unassessed.
+
 ## What The Project Does
 
 The component can:

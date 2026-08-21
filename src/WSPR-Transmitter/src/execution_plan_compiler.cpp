@@ -1,7 +1,10 @@
 #include "execution_plan_compiler.hpp"
+#include "standard_feld.hpp"
+#include "standard_feld_asset.hpp"
 
 #include <chrono>
 #include <cctype>
+#include <limits>
 #include <stdexcept>
 #include <string_view>
 #include <variant>
@@ -242,8 +245,10 @@ ExecutionPlan ExecutionPlanCompiler::compile(
                 return compile_dfcw(request, payload);
             else if constexpr (std::is_same_v<PayloadT, CwPayload>)
                 return compile_cw(request, payload);
-            else
+            else if constexpr (std::is_same_v<PayloadT, TonePayload>)
                 return compile_tone(request, payload);
+            else
+                return compile_standard_feld(request, payload);
         },
         request.payload);
 }
@@ -591,6 +596,106 @@ ExecutionPlan ExecutionPlanCompiler::compile_tone(
     off_event.rf_on = false;
     off_event.envelope = payload.envelope;
     plan.events.push_back(off_event);
+
+    plan.summary = build_summary(plan.events);
+    return plan;
+}
+
+ExecutionPlan ExecutionPlanCompiler::compile_standard_feld(
+    const TransmissionRequest& request,
+    const StandardFeldPayload& payload) const
+{
+    if (payload.frequency_hz <= 0.0)
+        throw std::runtime_error("Standard Feld payload frequency is invalid.");
+
+    if (payload.profile_id != standard_feld::kProfileId)
+        throw std::runtime_error("Standard Feld payload profile is unsupported.");
+
+    // Validate and normalize the complete input before constructing any plan.
+    const std::string normalized =
+        standard_feld::normalize_message(payload.message);
+
+    constexpr std::uint64_t max_message_size =
+        std::numeric_limits<std::uint64_t>::max() /
+            standard_feld::kPositionsPerCell -
+        2U;
+    if (normalized.size() > max_message_size)
+        throw std::runtime_error("Standard Feld payload message is too large.");
+
+    ExecutionPlan plan;
+    plan.request_id = request.id;
+    plan.mode = request.mode;
+    plan.backend = request.output.backend;
+    plan.reference_frequency_hz = payload.frequency_hz;
+    plan.calibration = request.calibration;
+    plan.policy = request.policy;
+
+    const std::uint64_t cell_count = normalized.size() + 2U;
+    const std::uint64_t total_positions =
+        cell_count * standard_feld::kPositionsPerCell;
+    plan.events.reserve(static_cast<std::size_t>(total_positions));
+
+    const auto boundary_ns = [](std::uint64_t position)
+    {
+        // Exact integer round-half-up of n * 1,000,000,000 / 245.
+        constexpr std::uint64_t numerator = 1'000'000'000ULL;
+        constexpr std::uint64_t denominator =
+            standard_feld::kPositionsPerSecond;
+        return std::chrono::nanoseconds{
+            static_cast<std::chrono::nanoseconds::rep>(
+                (position * numerator + denominator / 2U) / denominator)};
+    };
+
+    for (std::uint64_t absolute = 0; absolute < total_positions; ++absolute)
+    {
+        const std::uint64_t cell =
+            absolute / standard_feld::kPositionsPerCell;
+        const std::uint64_t within_cell =
+            absolute % standard_feld::kPositionsPerCell;
+        const auto column = static_cast<std::uint8_t>(
+            within_cell / standard_feld::kPhysicalPositionsPerColumn);
+        const auto physical_position = static_cast<std::uint8_t>(
+            within_cell % standard_feld::kPhysicalPositionsPerColumn);
+
+        RfEvent::RasterProgress progress;
+        if (cell == 0U)
+        {
+            progress.cell_kind = RfEvent::RasterProgress::CellKind::LEADER;
+        }
+        else if (cell + 1U == cell_count)
+        {
+            progress.cell_kind = RfEvent::RasterProgress::CellKind::TRAILER;
+        }
+        else
+        {
+            progress.cell_kind = RfEvent::RasterProgress::CellKind::MESSAGE;
+            progress.normalized_char_index = static_cast<int>(cell - 1U);
+        }
+        progress.cell_column = column;
+        progress.physical_position = physical_position;
+        progress.absolute_position = absolute;
+
+        bool rf_on = false;
+        if (progress.cell_kind ==
+            RfEvent::RasterProgress::CellKind::MESSAGE)
+        {
+            rf_on = standard_feld::physical_pixel(
+                static_cast<unsigned char>(
+                    normalized[static_cast<std::size_t>(cell - 1U)]),
+                column,
+                physical_position);
+        }
+
+        RfEvent event;
+        event.offset_from_start = boundary_ns(absolute);
+        event.duration = boundary_ns(absolute + 1U) - event.offset_from_start;
+        event.type = rf_on ? RfEventType::RF_ON : RfEventType::RF_OFF;
+        event.frequency_hz = payload.frequency_hz;
+        event.rf_on = rf_on;
+        event.message_char_index = progress.normalized_char_index;
+        event.raster_progress = progress;
+        plan.events.push_back(event);
+    }
 
     plan.summary = build_summary(plan.events);
     return plan;

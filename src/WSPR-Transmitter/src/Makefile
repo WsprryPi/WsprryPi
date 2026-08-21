@@ -33,6 +33,7 @@ BIN_DIR		 	= build/bin
 LOCAL_C_SOURCES   := $(shell find . -type f -name '*.c')
 LOCAL_CPP_SOURCES := $(shell find . -type f -name '*.cpp')
 SI5351_TEST_SOURCE := ./si5351_backend_harness.cpp
+STANDARD_FELD_TEST_SOURCE := ../tests/standard_feld_compiler_test.cpp
 SI5351_PLANNER_TEST_SOURCE := ./si5351_planner_test.cpp
 SI5351_TRANSITION_TEST_SOURCE := ./si5351_transition_test.cpp
 SIMULATED_BACKEND_TEST_SOURCE := ./simulated_transmit_backend_test.cpp
@@ -52,7 +53,7 @@ GPIO_QUALIFICATION_TEST_SOURCE := ./gpio_startup_quiesce_qualification_test.cc
 SI5351_MIN_DRIVE_SOURCE := ./si5351_min_drive_qualification.cc
 SI5351_MIN_DRIVE_MAIN_SOURCE := ./si5351_min_drive_qualification_main.cc
 SI5351_MIN_DRIVE_TEST_SOURCE := ./si5351_min_drive_qualification_test.cc
-LOCAL_CPP_SOURCES := $(filter-out $(SI5351_TEST_SOURCE) $(SI5351_PLANNER_TEST_SOURCE) $(SI5351_TRANSITION_TEST_SOURCE) $(SIMULATED_BACKEND_TEST_SOURCE) $(SIMULATED_BACKEND_REALTIME_TEST_SOURCE) $(TRANSMISSION_CONTROLLER_CONTRACT_TEST_SOURCE) $(THREAD_AFFINITY_UNAVAILABLE_TEST_SOURCE) $(STARTUP_QUIESCE_TEST_SOURCE) $(SI5351_QUALIFICATION_SOURCE) $(SI5351_QUALIFICATION_MAIN_SOURCE) $(SI5351_QUALIFICATION_TEST_SOURCE),$(LOCAL_CPP_SOURCES))
+LOCAL_CPP_SOURCES := $(filter-out $(SI5351_TEST_SOURCE) $(STANDARD_FELD_TEST_SOURCE) $(SI5351_PLANNER_TEST_SOURCE) $(SI5351_TRANSITION_TEST_SOURCE) $(SIMULATED_BACKEND_TEST_SOURCE) $(SIMULATED_BACKEND_REALTIME_TEST_SOURCE) $(TRANSMISSION_CONTROLLER_CONTRACT_TEST_SOURCE) $(THREAD_AFFINITY_UNAVAILABLE_TEST_SOURCE) $(STARTUP_QUIESCE_TEST_SOURCE) $(SI5351_QUALIFICATION_SOURCE) $(SI5351_QUALIFICATION_MAIN_SOURCE) $(SI5351_QUALIFICATION_TEST_SOURCE),$(LOCAL_CPP_SOURCES))
 
 # Find sources in each sibling component, explicitly skipping demo entry points.
 COMPONENT_C_SOURCES   := $(shell find $(COMPONENT_SRCDIRS) -type f -name '*.c'   ! -name 'main.c')
@@ -248,6 +249,11 @@ build/bin/si5351_backend_harness: $(SI5351_TEST_OBJECTS)
 	$(Q)echo "Linking debug: si5351_backend_harness"
 	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) $^ -o $@ $(LDFLAGS)
 
+build/bin/standard_feld_compiler_test: ../tests/standard_feld_compiler_test.cpp \
+		execution_plan_compiler.cpp standard_feld.cpp
+	$(Q)mkdir -p $(BIN_DIR)
+	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) $^ -o $@ $(LDFLAGS)
+
 build/bin/si5351_planner_test: $(SI5351_PLANNER_TEST_OBJECTS)
 	$(Q)mkdir -p $(BIN_DIR)
 	$(Q)echo "Linking debug: si5351_planner_test"
@@ -349,7 +355,7 @@ build/bin/$(OUT): $(CPP_OBJECTS) $(C_OBJECTS)
 ##
 # Phony targets
 ##
-.PHONY: clean release debug test si5351-test si5351-planner-test si5351-transition-test simulated-backend-test simulated-backend-realtime-test transmission-controller-contract-test startup-quiesce-test si5351-startup-quiesce-qualification si5351-startup-quiesce-qualification-test si5351-min-drive-qualification si5351-min-drive-qualification-test gpio-startup-quiesce-qualification gpio-startup-quiesce-qualification-test watchdog gdb lint macros help
+.PHONY: clean release debug test si5351-test standard-feld-test si5351-planner-test si5351-transition-test simulated-backend-test simulated-backend-realtime-test transmission-controller-contract-test startup-quiesce-test si5351-startup-quiesce-qualification si5351-startup-quiesce-qualification-test si5351-min-drive-qualification si5351-min-drive-qualification-test gpio-startup-quiesce-qualification gpio-startup-quiesce-qualification-test watchdog gdb lint macros help
 
 clean:
 	$(Q)echo "Cleaning up build artifacts."
@@ -366,6 +372,9 @@ test: simulated-backend-test simulated-backend-realtime-test transmission-contro
 
 si5351-test: build/bin/si5351_backend_harness
 	$(Q)echo "Si5351 backend harness built successfully."
+
+standard-feld-test: build/bin/standard_feld_compiler_test
+	$(Q)./build/bin/standard_feld_compiler_test
 
 si5351-planner-test: build/bin/si5351_planner_test
 	$(Q)./build/bin/si5351_planner_test
@@ -436,6 +445,7 @@ help:
 	$(Q)echo "  debug      Build debug binary"
 	$(Q)echo "  test       Run the hardware-free component suite"
 	$(Q)echo "  si5351-test Build temporary Si5351 backend harness"
+	$(Q)echo "  standard-feld-test Build and run backend-neutral Standard Feld tests"
 	$(Q)echo "  si5351-planner-test Build and run non-hardware planner tests"
 	$(Q)echo "  si5351-transition-test Build and run fake-I2C transition tests"
 	$(Q)echo "  startup-quiesce-test Build and run non-hardware startup-quiesce tests"

@@ -60,6 +60,8 @@ namespace
                 return "CW";
             case wsprrypi::TransmissionMode::TONE:
                 return "TONE";
+            case wsprrypi::TransmissionMode::STANDARD_FELD:
+                return "STANDARD_FELD";
         }
 
         return "UNKNOWN";
@@ -858,6 +860,7 @@ bool WsprSi5351Backend::mapPlannerMode(
             planner_mode = Si5351Planner::Mode::WSPR;
             return true;
         case wsprrypi::TransmissionMode::CW:
+        case wsprrypi::TransmissionMode::STANDARD_FELD:
             return false;
     }
 
