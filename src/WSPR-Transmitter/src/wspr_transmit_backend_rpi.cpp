@@ -51,6 +51,187 @@
 
 namespace
 {
+static inline timespec add_ns(timespec t, int64_t ns);
+static bool wait_until_interruptible(
+    IControllerBridge& owner,
+    clockid_t clock_id,
+    const timespec& target);
+}
+
+class WsprRpiBackend::StandardFeldExecutionAdapter final
+    : public wsprrypi::IRpiStandardFeldExecutionAdapter
+{
+public:
+    StandardFeldExecutionAdapter(
+        WsprRpiBackend& backend,
+        const WsprTransmissionPlan& compatibility_plan,
+        wsprrypi::StandardFeldExecutionGate::Generation generation)
+        : backend_(backend),
+          compatibility_plan_(compatibility_plan), generation_(generation)
+    {
+    }
+
+    bool cancellation_requested() const override
+    {
+        return backend_.standard_feld_gate_.stop_requested(generation_) ||
+            backend_.owner_.backendShouldStop();
+    }
+
+    bool watchdog_faulted() const override
+    {
+        return backend_.standard_feld_gate_.watchdog_faulted(generation_) ||
+            backend_.watchdog_faulted_.load(std::memory_order_acquire);
+    }
+
+    std::string watchdog_diagnostic() const override
+    {
+        return "Standard Feld DMA watchdog fault latched.";
+    }
+
+    wsprrypi::RpiStandardFeldAdapterResult establish_initial_safe_state() override
+    {
+        return shutdown_and_verify("initial safe-state establishment");
+    }
+
+    wsprrypi::RpiStandardFeldAdapterResult wait_until(
+        std::chrono::nanoseconds absolute_deadline) override
+    {
+        if (!origin_.has_value())
+        {
+            struct timespec now{};
+            if (clock_gettime(CLOCK_MONOTONIC, &now) != 0)
+            {
+                return wsprrypi::RpiStandardFeldAdapterResult::failure(
+                    "CLOCK_MONOTONIC origin acquisition failed.");
+            }
+            origin_ = now;
+        }
+        const timespec target = add_ns(
+            *origin_,
+            absolute_deadline.count());
+        if (!wait_until_interruptible(
+                backend_.owner_, CLOCK_MONOTONIC, target))
+            return wsprrypi::RpiStandardFeldAdapterResult::cancelled();
+        return wsprrypi::RpiStandardFeldAdapterResult::success();
+    }
+
+    wsprrypi::RpiStandardFeldAdapterResult apply_carrier(
+        double frequency_hz,
+        std::size_t) override
+    {
+        const double configured_carrier_hz =
+            compatibility_plan_.frequency_hz -
+            1.5 * compatibility_plan_.tone_spacing_hz;
+        if (frequency_hz != configured_carrier_hz)
+        {
+            return wsprrypi::RpiStandardFeldAdapterResult::failure(
+                "Compiled carrier does not match the configured GPIO clock carrier.");
+        }
+        return wsprrypi::RpiStandardFeldAdapterResult::success();
+    }
+
+    wsprrypi::RpiStandardFeldAdapterResult apply_rf_checked(
+        const wsprrypi::RfEvent& event,
+        std::size_t event_index) override
+    {
+        if (!event.rf_on)
+        {
+            // RF-off is intrinsically safe. Release before joining the
+            // watchdog so a concurrently faulting watchdog can publish its
+            // stop under the same transition mutex and exit.
+            if (rf_enabled_)
+            {
+                backend_.stop_watchdog();
+                backend_.disable_clock();
+                rf_enabled_ = false;
+            }
+            return wsprrypi::RpiStandardFeldAdapterResult::success();
+        }
+
+        if (!rf_enabled_)
+        {
+            const auto authorization = backend_.standard_feld_gate_.authorize_rf_on(
+                generation_, [this]() { backend_.transmit_on(compatibility_plan_); });
+            if (authorization != wsprrypi::StandardFeldExecutionGate::RfAuthorization::GRANTED)
+                return wsprrypi::RpiStandardFeldAdapterResult::cancelled();
+            rf_enabled_ = true;
+        }
+        backend_.start_watchdog();
+        backend_.transmit_symbol(
+            compatibility_plan_,
+            0U,
+            std::chrono::duration<double>(event.duration).count(),
+            static_cast<int>(event_index));
+        return wsprrypi::RpiStandardFeldAdapterResult::success();
+    }
+
+    wsprrypi::RpiStandardFeldAdapterResult report_progress(
+        std::size_t event_index,
+        const wsprrypi::RfEvent::RasterProgress& progress) override
+    {
+        if (progress.absolute_position != event_index)
+        {
+            return wsprrypi::RpiStandardFeldAdapterResult::failure(
+                "Raster progress identity disagrees with its event index.");
+        }
+        if (!backend_.owner_.backendReportRasterProgress(
+                generation_.value, event_index, progress))
+            return wsprrypi::RpiStandardFeldAdapterResult::failure(
+                "Internal Standard Feld progress storage rejected an update.");
+        return wsprrypi::RpiStandardFeldAdapterResult::success();
+    }
+
+    wsprrypi::RpiStandardFeldAdapterResult complete_terminal_shutdown() override
+    {
+        return shutdown_and_verify("complete terminal shutdown");
+    }
+
+private:
+    wsprrypi::RpiStandardFeldAdapterResult shutdown_and_verify(
+        const char* context)
+    {
+        backend_.stop_watchdog();
+        backend_.disable_hardware_sequence();
+        rf_enabled_ = false;
+
+        if (!backend_.watchdog_stop_.load(std::memory_order_acquire))
+            return wsprrypi::RpiStandardFeldAdapterResult::failure(
+                std::string(context) + ": watchdog did not stop.");
+        if (backend_.dma_config_.peripheral_base_virtual == nullptr)
+            return wsprrypi::RpiStandardFeldAdapterResult::success();
+
+        const std::uint32_t dma_cs = static_cast<std::uint32_t>(
+            backend_.access_bus_address(WsprRpiBackend::DMA_BUS_BASE + 0x00));
+        const std::uint32_t pwm_ctl = static_cast<std::uint32_t>(
+            backend_.access_bus_address(WsprRpiBackend::PWM_BUS_BASE + 0x00));
+        const std::uint32_t pwm_dmac = static_cast<std::uint32_t>(
+            backend_.access_bus_address(WsprRpiBackend::PWM_BUS_BASE + 0x08));
+        const std::uint32_t gp0ctl = static_cast<std::uint32_t>(
+            backend_.access_bus_address(WsprRpiBackend::CM_GP0CTL_BUS));
+        std::string failures;
+        const auto add = [&failures](const char* component) {
+            if (!failures.empty()) failures += ", ";
+            failures += component;
+        };
+        if ((dma_cs & 1U) != 0U) add("DMA remains active");
+        if (pwm_ctl != 0U) add("PWM control remains enabled");
+        if (pwm_dmac != 0U) add("PWM DMA remains enabled");
+        if ((gp0ctl & (1U << 7U)) != 0U) add("GPCLK busy remains asserted");
+        if (!failures.empty())
+            return wsprrypi::RpiStandardFeldAdapterResult::failure(
+                std::string(context) + ": " + failures + ".");
+        return wsprrypi::RpiStandardFeldAdapterResult::success();
+    }
+
+    WsprRpiBackend& backend_;
+    const WsprTransmissionPlan& compatibility_plan_;
+    wsprrypi::StandardFeldExecutionGate::Generation generation_{};
+    std::optional<timespec> origin_{};
+    bool rf_enabled_{false};
+};
+
+namespace
+{
     static constexpr size_t NUM_PAGES = 4096;
     static constexpr double kWsprSymbolPeriodSeconds = 8192.0 / 12000.0;
     static constexpr double kWsprToneSpacingHz = 1.0 / kWsprSymbolPeriodSeconds;
@@ -697,9 +878,15 @@ wsprrypi::BackendCompileResult WsprRpiBackend::configure(
         return result;
     }
 
-    if (!platform_supports_gpio_clock_transmission(&result.error))
+    if (plan.mode == wsprrypi::TransmissionMode::STANDARD_FELD)
     {
-        return result;
+        const auto validation =
+            wsprrypi::RpiStandardFeldExecution::validate(plan);
+        if (!validation.ok)
+        {
+            result.error = validation.error;
+            return result;
+        }
     }
 
     auto compat = build_execution_plan_config(plan, inputs, &result);
@@ -710,6 +897,9 @@ wsprrypi::BackendCompileResult WsprRpiBackend::configure(
         return result;
     }
 
+    if (!platform_supports_gpio_clock_transmission(&result.error))
+        return result;
+
     const WsprTransmissionConfigureResult applied =
         setup_dma_freq_table(compat->compatibility_plan);
 
@@ -719,11 +909,22 @@ wsprrypi::BackendCompileResult WsprRpiBackend::configure(
     if (applied.applied_frequency_hz !=
         compat->compatibility_plan.frequency_hz)
     {
+        const double requested_frequency_hz =
+            plan.mode == wsprrypi::TransmissionMode::STANDARD_FELD
+                ? plan.reference_frequency_hz
+                : compat->compatibility_plan.frequency_hz;
+        const double actual_frequency_hz =
+            plan.mode == wsprrypi::TransmissionMode::STANDARD_FELD
+                ? applied.applied_frequency_hz -
+                    1.5 * compat->compatibility_plan.tone_spacing_hz
+                : applied.applied_frequency_hz;
         result.adjustments.push_back(wsprrypi::BackendAdjustment{
             0,
-            compat->compatibility_plan.frequency_hz,
-            applied.applied_frequency_hz,
-            "Center frequency quantized by Raspberry Pi clock divisor."});
+            requested_frequency_hz,
+            actual_frequency_hz,
+            plan.mode == wsprrypi::TransmissionMode::STANDARD_FELD
+                ? "Standard Feld carrier quantized by Raspberry Pi clock divisor."
+                : "Center frequency quantized by Raspberry Pi clock divisor."});
         configured_plan_->compatibility_plan.frequency_hz =
             applied.applied_frequency_hz;
     }
@@ -741,6 +942,51 @@ wsprrypi::ExecutionResult WsprRpiBackend::execute(
         return result;
     }
     const auto& compat = configured_plan_;
+
+    if (plan.mode == wsprrypi::TransmissionMode::STANDARD_FELD)
+    {
+        dma_buf_ptr_ = 0;
+        const auto generation = standard_feld_gate_.activate(plan.id.value);
+        struct GateDeactivation final
+        {
+            wsprrypi::StandardFeldExecutionGate& gate;
+            wsprrypi::StandardFeldExecutionGate::Generation generation;
+            ~GateDeactivation() { gate.deactivate(generation); }
+        } deactivate{standard_feld_gate_, generation};
+        if (!owner_.backendActivateRasterProgress(plan, generation.value))
+        {
+            result.error =
+                "Standard Feld internal progress storage could not be prepared.";
+            result.faulted = true;
+            return result;
+        }
+        StandardFeldExecutionAdapter adapter{
+            *this,
+            compat->compatibility_plan,
+            generation};
+        const auto execution =
+            wsprrypi::RpiStandardFeldExecution::execute(plan, adapter);
+        if (!owner_.backendFinalizeRasterProgress(
+                generation.value, execution.terminal, execution.watchdog_faulted))
+        {
+            result.error = execution.error.empty()
+                ? "Standard Feld internal progress storage rejected terminal state."
+                : execution.error + " Standard Feld internal progress storage rejected terminal state.";
+            result.faulted = true;
+            return result;
+        }
+        result.ok = execution.terminal ==
+            wsprrypi::RpiStandardFeldExecutionTerminal::COMPLETED;
+        result.stopped = execution.terminal ==
+            wsprrypi::RpiStandardFeldExecutionTerminal::CANCELLED;
+        result.faulted =
+            execution.terminal ==
+                wsprrypi::RpiStandardFeldExecutionTerminal::FAILED ||
+            execution.terminal ==
+                wsprrypi::RpiStandardFeldExecutionTerminal::REJECTED;
+        result.error = execution.error;
+        return result;
+    }
 
     try
     {
@@ -1101,7 +1347,18 @@ bool WsprRpiBackend::set_mapped_transmit_gpio_safe(std::string &error) noexcept
 
 void WsprRpiBackend::stop() noexcept
 {
-    owner_.backendRequestStopTxNoJoin();
+    if (!publishStandardFeldStop())
+        owner_.backendRequestStopTxNoJoin();
+}
+
+bool WsprRpiBackend::publishStandardFeldStop(bool watchdog_fault) noexcept
+{
+    const bool published = standard_feld_gate_.publish_stop(watchdog_fault);
+    if (published && watchdog_fault)
+        watchdog_faulted_.store(true, std::memory_order_release);
+    if (published)
+        owner_.backendSignalStopRequest();
+    return published;
 }
 
 wsprrypi::CleanupResult WsprRpiBackend::cleanup() noexcept
@@ -1119,10 +1376,11 @@ WsprRpiBackend::build_execution_plan_config(
     if (plan.mode != wsprrypi::TransmissionMode::WSPR &&
         plan.mode != wsprrypi::TransmissionMode::QRSS &&
         plan.mode != wsprrypi::TransmissionMode::FSKCW &&
-        plan.mode != wsprrypi::TransmissionMode::DFCW)
+        plan.mode != wsprrypi::TransmissionMode::DFCW &&
+        plan.mode != wsprrypi::TransmissionMode::STANDARD_FELD)
     {
         if (result)
-            result->error = "Only WSPR, QRSS, FSKCW, and DFCW execution plans are currently supported.";
+            result->error = "Only WSPR, QRSS, FSKCW, DFCW, and Standard Feld execution plans are currently supported.";
         return std::nullopt;
     }
 
@@ -1134,8 +1392,18 @@ WsprRpiBackend::build_execution_plan_config(
     }
 
     ExecutionPlanConfig config;
+    config.standard_feld =
+        plan.mode == wsprrypi::TransmissionMode::STANDARD_FELD;
     config.compatibility_plan.frequency_hz = plan.reference_frequency_hz;
     config.compatibility_plan.tone_spacing_hz = kWsprToneSpacingHz;
+    if (plan.mode == wsprrypi::TransmissionMode::STANDARD_FELD)
+    {
+        // The compatibility table places symbol zero 1.5 tone spacings below
+        // its center. Standard Feld holds that stable symbol at its compiled
+        // carrier without regenerating any raster decisions here.
+        config.compatibility_plan.frequency_hz =
+            plan.reference_frequency_hz + 1.5 * kWsprToneSpacingHz;
+    }
     if (plan.mode == wsprrypi::TransmissionMode::FSKCW ||
         plan.mode == wsprrypi::TransmissionMode::DFCW)
     {
@@ -1865,7 +2133,14 @@ void WsprRpiBackend::start_watchdog()
 
                 if (stalled_for >= kStallTimeout)
                 {
-                    watchdog_faulted_.store(true, std::memory_order_release);
+                    // Serialize fault latching/stop publication with the
+                    // Standard Feld checked RF-enable edge.  Cleanup and the
+                    // watchdog join occur after this short critical section.
+                    const bool standard_feld = publishStandardFeldStop(true);
+                    if (!standard_feld)
+                    {
+                        watchdog_faulted_.store(true, std::memory_order_release);
+                    }
                     owner_.backendSetStateValue(WsprTransmitState::HUNG);
 
                     {
@@ -1932,7 +2207,8 @@ void WsprRpiBackend::start_watchdog()
                     {
                     }
 
-                    owner_.backendRequestStopTxNoJoin();
+                    if (!standard_feld)
+                        owner_.backendRequestStopTxNoJoin();
                     force_dma_reset_sequence();
                     request_watchdog_recovery();
                     return;
@@ -2440,7 +2716,8 @@ void WsprRpiBackend::transmit_symbol(
                     oss.str(),
                     0.0);
 
-                owner_.backendSignalStopRequest();
+                if (!publishStandardFeldStop())
+                    owner_.backendSignalStopRequest();
                 return false;
             }
 

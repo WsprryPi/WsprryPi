@@ -40,7 +40,9 @@
 #include <vector>
 
 #include "transmission_backend.hpp"
+#include "rpi_standard_feld_execution.hpp"
 #include "wspr_transmit_backend.hpp"
+#include "standard_feld_execution_gate.hpp"
 #include "wspr_transmit.hpp"
 
 /**
@@ -203,6 +205,11 @@ public:
     void stop() noexcept override;
     wsprrypi::CleanupResult cleanup() noexcept override;
 
+    // The sole Standard Feld stop publisher.  It shares the short gate used
+    // by the checked RF-on edge; it never joins, allocates, calls callbacks,
+    // or performs hardware cleanup while that gate is held.
+    bool publishStandardFeldStop(bool watchdog_fault = false) noexcept;
+
     /**
      * @brief Start the Raspberry Pi DMA watchdog.
      */
@@ -314,12 +321,15 @@ public:
     }
 
 private:
+    class StandardFeldExecutionAdapter;
+
     struct ExecutionPlanConfig
     {
         // Temporary bridge for the legacy DMA/tuning pipeline. The public
         // backend path is ExecutionPlan-based, but the low-level emitter still
         // consumes this reduced WSPR-specific shape.
         WsprTransmissionPlan compatibility_plan{};
+        bool standard_feld{false};
     };
 
     struct PageInfo
@@ -471,6 +481,9 @@ private:
     std::atomic<bool> watchdog_stop_{true};
     std::atomic<bool> watchdog_faulted_{false};
     std::atomic<bool> watchdog_auto_recover_{true};
+    // Sole Standard Feld lifecycle and RF-enable synchronization. It is never
+    // held across joins, callbacks, allocation, progress, or cleanup.
+    wsprrypi::StandardFeldExecutionGate standard_feld_gate_{};
     std::atomic<bool> recovery_stop_{false};
     std::atomic<bool> recovery_pending_{false};
     std::atomic<bool> recovery_in_progress_{false};

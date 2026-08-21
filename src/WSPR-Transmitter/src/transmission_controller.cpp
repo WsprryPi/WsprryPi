@@ -134,7 +134,8 @@ void TransmissionController::apply_adjustments(
     prepared_plan_->reference_frequency_hz += delta_hz;
     for (auto& event : prepared_plan_->events)
     {
-        if (event.rf_on)
+        if (event.rf_on ||
+            prepared_plan_->mode == TransmissionMode::STANDARD_FELD)
             event.frequency_hz += delta_hz;
     }
     prepared_plan_->summary.min_frequency_hz += delta_hz;

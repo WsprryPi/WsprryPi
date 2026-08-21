@@ -49,6 +49,7 @@
 // Project headers
 #include "execution_plan.hpp"
 #include "execution_plan_compiler.hpp"
+#include "rpi_standard_feld_progress_bridge.hpp"
 #include "transmission_controller.hpp"
 #include "prepared_wspr_transmission.hpp"
 #include "wspr_transmit_types.hpp"
@@ -81,6 +82,20 @@ public:
         return std::chrono::duration_cast<std::chrono::nanoseconds>(
             std::chrono::steady_clock::now().time_since_epoch());
     }
+    virtual bool backendReportRasterProgress(
+        std::uint64_t generation,
+        std::size_t event_index,
+        const wsprrypi::RfEvent::RasterProgress& progress)
+    {
+        (void)event_index;
+        (void)generation;
+        (void)progress;
+        return false;
+    }
+    virtual bool backendActivateRasterProgress(
+        const wsprrypi::ExecutionPlan&, std::uint64_t) { return false; }
+    virtual bool backendFinalizeRasterProgress(
+        std::uint64_t, wsprrypi::RpiStandardFeldExecutionTerminal, bool) { return false; }
     virtual void backendFireTransmitCallback(WsprTransmissionCallbackEvent event,
                                              WsprTransmitLogLevel level,
                                              const std::string &msg,
@@ -539,6 +554,14 @@ public:
     void backendThrowIfStopRequested(const char *context) override;
 
     void backendReportExecutionProgress(std::size_t event_index) noexcept override;
+    bool backendReportRasterProgress(
+        std::uint64_t generation,
+        std::size_t event_index,
+        const wsprrypi::RfEvent::RasterProgress& progress) override;
+    bool backendActivateRasterProgress(
+        const wsprrypi::ExecutionPlan&, std::uint64_t) override;
+    bool backendFinalizeRasterProgress(
+        std::uint64_t, wsprrypi::RpiStandardFeldExecutionTerminal, bool) override;
 
     void backendFireTransmitCallback(WsprTransmissionCallbackEvent event,
                                      WsprTransmitLogLevel level,
@@ -796,6 +819,9 @@ private:
         wsprrypi::TransmissionMode::WSPR};
     std::string current_cw_message_{};
     std::atomic<int> current_cw_active_char_index_{-1};
+    // Internal-only completed-position stream. It is deliberately absent from
+    // public callbacks, status serialization, and operator protocols.
+    wsprrypi::RpiStandardFeldProgressBridge standard_feld_progress_{};
 
     /**
      * @brief Invoke the configured transmission callback.
