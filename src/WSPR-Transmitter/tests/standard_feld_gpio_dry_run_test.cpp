@@ -351,9 +351,7 @@ int main()
         RpiStandardFeldDryRunInterpreter::maximum_representable_position();
     std::chrono::nanoseconds maximum_boundary{};
     require(RpiStandardFeldDryRunInterpreter::exact_boundary(
-                maximum_position, maximum_boundary) &&
-                maximum_boundary.count() <=
-                    std::numeric_limits<std::chrono::nanoseconds::rep>::max(),
+                maximum_position, maximum_boundary),
             "largest representable position boundary must be accepted");
     std::chrono::nanoseconds overflow_boundary{};
     require(!RpiStandardFeldDryRunInterpreter::exact_boundary(

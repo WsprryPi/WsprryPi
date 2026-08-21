@@ -887,6 +887,7 @@ void WsprTransmitter::configureExecution(
 
     current_request_ = legacy_request;
     current_execution_plan_ = wsprrypi::ExecutionPlan{};
+    standard_feld_progress_.clear();
     current_execution_mode_ = request.mode;
     current_cw_message_ = current_cw_message_for_payload(request.payload);
     current_cw_active_char_index_.store(-1, std::memory_order_release);
@@ -1088,7 +1089,8 @@ void WsprTransmitter::shutdown()
 {
     // Set the stop flag first so a newly spawned transmit thread
     // will abort before it touches DMA/PWM state.
-    stop_requested_.store(true, std::memory_order_release);
+    if (rpi_backend_ == nullptr || !rpi_backend_->publishStandardFeldStop())
+        stop_requested_.store(true, std::memory_order_release);
     stop_cv_.notify_all();
 
     // Stop the scheduler thread. Note: do not set soft_off_ here.
@@ -1109,6 +1111,10 @@ void WsprTransmitter::shutdown()
             tx_thread_.join();
         }
     }
+
+    // The execution thread owns reporting until it has joined above.  Clear
+    // the internal Standard Feld history only after that quiescence point.
+    standard_feld_progress_.clear();
 
     stopFaultMonitoring();
 
@@ -1132,7 +1138,8 @@ void WsprTransmitter::shutdown()
 
 void WsprTransmitter::requestStopTx()
 {
-    stop_requested_.store(true, std::memory_order_release);
+    if (rpi_backend_ == nullptr || !rpi_backend_->publishStandardFeldStop())
+        stop_requested_.store(true, std::memory_order_release);
     stop_cv_.notify_all();
 
     // Synchronize with the scheduler so it cannot race a join/start while
@@ -1149,7 +1156,8 @@ void WsprTransmitter::requestStopTx()
 
 void WsprTransmitter::requestStopTxNoJoin() noexcept
 {
-    stop_requested_.store(true, std::memory_order_release);
+    if (rpi_backend_ == nullptr || !rpi_backend_->publishStandardFeldStop())
+        stop_requested_.store(true, std::memory_order_release);
     stop_cv_.notify_all();
 }
 
@@ -1515,6 +1523,37 @@ void WsprTransmitter::backendReportExecutionProgress(
         LogLevel::DEBUG,
         "",
         static_cast<double>(message_char_index));
+}
+
+bool WsprTransmitter::backendReportRasterProgress(
+    const std::uint64_t generation,
+    std::size_t event_index,
+    const wsprrypi::RfEvent::RasterProgress& progress)
+{
+    // The store owns an immutable plan snapshot installed before execution;
+    // this bridge therefore never reads mutable execution state on the event path.
+    return standard_feld_progress_.report(generation, event_index, progress);
+}
+
+bool WsprTransmitter::backendActivateRasterProgress(
+    const wsprrypi::ExecutionPlan& plan, const std::uint64_t generation)
+{
+    return standard_feld_progress_.prepare(plan, generation);
+}
+
+bool WsprTransmitter::backendFinalizeRasterProgress(
+    const std::uint64_t generation,
+    const wsprrypi::RpiStandardFeldExecutionTerminal terminal,
+    const bool watchdog_faulted)
+{
+    wsprrypi::RpiStandardFeldExecutionResult result;
+    result.terminal = terminal;
+    result.watchdog_faulted = watchdog_faulted;
+    // A completed terminal supplied by the backend is already classified;
+    // otherwise the bridge conservatively records failure rather than success.
+    result.safe_idle_confirmed = terminal ==
+        wsprrypi::RpiStandardFeldExecutionTerminal::COMPLETED;
+    return standard_feld_progress_.finalize(generation, result);
 }
 
 void WsprTransmitter::backendFireTransmitCallback(
