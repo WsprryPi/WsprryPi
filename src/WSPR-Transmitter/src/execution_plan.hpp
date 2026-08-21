@@ -2,6 +2,7 @@
 
 #include <chrono>
 #include <cstdint>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -34,6 +35,24 @@ struct RfEvent
     double frequency_hz{0.0};
     bool rf_on{false};
     int message_char_index{-1};
+
+    struct RasterProgress
+    {
+        enum class CellKind
+        {
+            LEADER,
+            MESSAGE,
+            TRAILER
+        };
+
+        CellKind cell_kind{CellKind::MESSAGE};
+        int normalized_char_index{-1};
+        std::uint8_t cell_column{0};
+        std::uint8_t physical_position{0};
+        std::uint64_t absolute_position{0};
+    };
+
+    std::optional<RasterProgress> raster_progress{};
 
     EnvelopeSettings envelope{};
 };
