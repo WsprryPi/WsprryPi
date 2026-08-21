@@ -19,7 +19,8 @@ enum class TransmissionMode
     FSKCW,
     DFCW,
     CW,
-    TONE
+    TONE,
+    STANDARD_FELD
 };
 
 enum class FadeShape
@@ -107,12 +108,20 @@ struct TonePayload
     EnvelopeSettings envelope{};
 };
 
+struct StandardFeldPayload
+{
+    std::string message;
+    double frequency_hz{0.0};
+    std::string profile_id{"standard-feld-wsprry-v1"};
+};
+
 using TransmissionPayload = std::variant<
     WsprPayload,
     QrssPayload,
     FskcwPayload,
     DfcwPayload,
     CwPayload,
-    TonePayload>;
+    TonePayload,
+    StandardFeldPayload>;
 
 } // namespace wsprrypi

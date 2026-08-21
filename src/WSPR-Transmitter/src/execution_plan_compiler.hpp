@@ -36,6 +36,10 @@ private:
 
     ExecutionPlan compile_tone(const TransmissionRequest& request,
                                const TonePayload& payload) const;
+
+    ExecutionPlan compile_standard_feld(
+        const TransmissionRequest& request,
+        const StandardFeldPayload& payload) const;
 };
 
 } // namespace wsprrypi
