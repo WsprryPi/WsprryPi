@@ -145,6 +145,9 @@ wsprrypi::TransmissionRequest request_for_mode(
         request.payload = payload;
         break;
     }
+    case wsprrypi::TransmissionMode::STANDARD_FELD:
+        require(false, "internal Standard Feld is outside this policy test matrix");
+        break;
     case wsprrypi::TransmissionMode::CW:
         require(false, "generic CW compilation is not implemented");
         break;

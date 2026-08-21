@@ -46,7 +46,10 @@ public:
     }
     BackendCapabilities capabilities() const override
     {
-        return {};
+        BackendCapabilities capabilities;
+        capabilities.output_class = BackendOutputClass::PHYSICAL_GPIO_RF;
+        capabilities.supported_modes = transmission_mode_bit(TransmissionMode::STANDARD_FELD);
+        return capabilities;
     }
     BackendCompileResult configure(
         const ExecutionPlan& plan,
@@ -64,8 +67,9 @@ public:
         executed = plan;
         return {true, false, false, {}};
     }
+    StartupQuiesceResult quiesceForStartup() override { return {true, {}}; }
     void stop() noexcept override {}
-    void cleanup() noexcept override {}
+    CleanupResult cleanup() noexcept override { return {true, {}}; }
 
     std::optional<ExecutionPlan> executed{};
 };

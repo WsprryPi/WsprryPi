@@ -2,7 +2,7 @@
 #include <fstream>
 #include <iomanip>
 #include <sstream>
-namespace wsprrypi { namespace {std::string esc(const std::string&s){std::string o;for(char c:s){if(c=='"'||c=='\\')o+='\\';o+=c;}return o;}const char* mode_name(TransmissionMode m){switch(m){case TransmissionMode::WSPR:return "WSPR";case TransmissionMode::QRSS:return "QRSS";case TransmissionMode::FSKCW:return "FSKCW";case TransmissionMode::DFCW:return "DFCW";case TransmissionMode::CW:return "CW";case TransmissionMode::TONE:return "TONE";}return "UNKNOWN";}}
+namespace wsprrypi { namespace {std::string esc(const std::string&s){std::string o;for(char c:s){if(c=='"'||c=='\\')o+='\\';o+=c;}return o;}const char* mode_name(TransmissionMode m){switch(m){case TransmissionMode::WSPR:return "WSPR";case TransmissionMode::QRSS:return "QRSS";case TransmissionMode::FSKCW:return "FSKCW";case TransmissionMode::DFCW:return "DFCW";case TransmissionMode::CW:return "CW";case TransmissionMode::TONE:return "TONE";case TransmissionMode::STANDARD_FELD:return "STANDARD_FELD";}return "UNKNOWN";}}
 SimulatedTransmitBackend::SimulatedTransmitBackend(IExecutionContext&c,SimulatedBackendConfig x):context_(c),config_(std::move(x)){}
 BackendInfo SimulatedTransmitBackend::info()const{return{BackendKind::SIMULATED,"simulated","Hardware-free non-RF execution backend"};}
 BackendCapabilities SimulatedTransmitBackend::capabilities()const{BackendCapabilities c;c.output_class=BackendOutputClass::NON_RF_SIMULATION;c.supported_modes=0xffffffffu;c.supports_fade_shape=true;c.supports_precomputed_execution=true;return c;}
