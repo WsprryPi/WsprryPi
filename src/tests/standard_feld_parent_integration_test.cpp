@@ -41,7 +41,7 @@ ArgParserConfig candidate(std::string message = "A")
     cfg.transmit_backend = TransmitBackendKind::GPIO;
     cfg.gpio_tx_pin = 4;
     cfg.gpio_power_level = 7;
-    cfg.ppm = 1.25;
+    cfg.gpio_manual_ppm = 1.25;
     cfg.standard_feld.message = std::move(message);
     cfg.standard_feld.frequency_hz = 10140100.0;
     cfg.schedule_start_minute = 12;
@@ -253,15 +253,19 @@ int main()
             "committed request must retain first-class Standard Feld identity");
     const auto payload = std::get<wsprrypi::StandardFeldPayload>(request->payload);
     require(payload.message == "a  b " && payload.frequency_hz == 10140100.0 &&
-                payload.profile_id == wsprrypi::standard_feld::kProfileId &&
-                request->output.gpio == 4 && request->calibration.ppm == 1.25 &&
-                request->slot.start_time > std::chrono::system_clock::now() &&
-                request->policy.allow_truncation_on_stop &&
+                payload.profile_id == wsprrypi::standard_feld::kProfileId,
+            "request must snapshot the Standard Feld payload");
+    require(request->output.gpio == 4 && request->calibration.ppm == 1.25,
+            "request must snapshot output and calibration");
+    require(request->slot.start_time > std::chrono::system_clock::now(),
+            "request must snapshot a future slot start");
+    require(request->policy.allow_truncation_on_stop &&
                 !request->policy.allow_quantization &&
-                !request->policy.allow_backend_approximation &&
-                request->metadata.label == "standard-feld" &&
+                !request->policy.allow_backend_approximation,
+            "request must snapshot the exact Standard Feld policy");
+    require(request->metadata.label == "standard-feld" &&
                 request->metadata.origin == "internal-standard-feld-scheduler",
-            "request must snapshot payload, output, calibration, policy, and metadata");
+            "request must snapshot Standard Feld metadata");
 
     config.standard_feld.message = "MUTATED";
     config.standard_feld.frequency_hz = 1.0;

@@ -1240,6 +1240,7 @@ static wsprrypi::TransmissionMode to_controller_mode(ModeType mode) noexcept
     case ModeType::FSKCW: return wsprrypi::TransmissionMode::FSKCW;
     case ModeType::DFCW: return wsprrypi::TransmissionMode::DFCW;
     case ModeType::WSPR: return wsprrypi::TransmissionMode::WSPR;
+    case ModeType::STANDARD_FELD: return wsprrypi::TransmissionMode::STANDARD_FELD;
     }
     return wsprrypi::TransmissionMode::WSPR;
 }

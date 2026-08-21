@@ -134,4 +134,3 @@ Phase 5 Slice 2 should integrate the compiler into parent source only:
 6. add focused parent tests and regressions.
 
 CLI, persistence, web API, UI, services, hardware, RF, and backend enablement remain excluded unless source inspection proves a configuration-lifecycle dependency inseparable from safe parent mode introduction. Such a dependency requires a revised proposal, not silent scope expansion.
-

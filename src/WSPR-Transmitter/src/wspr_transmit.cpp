@@ -1074,7 +1074,9 @@ void WsprTransmitter::shutdown()
 {
     // Set the stop flag first so a newly spawned transmit thread
     // will abort before it touches DMA/PWM state.
+#if WSPRRYPI_BACKEND_RPI_GPIO
     if (rpi_backend_ == nullptr || !rpi_backend_->publishStandardFeldStop())
+#endif
         stop_requested_.store(true, std::memory_order_release);
     stop_cv_.notify_all();
 
@@ -1123,7 +1125,9 @@ void WsprTransmitter::shutdown()
 
 void WsprTransmitter::requestStopTx()
 {
+#if WSPRRYPI_BACKEND_RPI_GPIO
     if (rpi_backend_ == nullptr || !rpi_backend_->publishStandardFeldStop())
+#endif
         stop_requested_.store(true, std::memory_order_release);
     stop_cv_.notify_all();
 
@@ -1141,7 +1145,9 @@ void WsprTransmitter::requestStopTx()
 
 void WsprTransmitter::requestStopTxNoJoin() noexcept
 {
+#if WSPRRYPI_BACKEND_RPI_GPIO
     if (rpi_backend_ == nullptr || !rpi_backend_->publishStandardFeldStop())
+#endif
         stop_requested_.store(true, std::memory_order_release);
     stop_cv_.notify_all();
 }

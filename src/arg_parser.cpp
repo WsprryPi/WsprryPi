@@ -1658,6 +1658,12 @@ bool validate_config_candidate(
     ArgParserConfig &candidate,
     std::string *error_message)
 {
+    // Standard Feld is an internal-only source seam in this slice. Validate it
+    // before legacy CW timing and backend readiness checks so no Morse field or
+    // hardware probe becomes part of its contract.
+    if (candidate.mode == ModeType::STANDARD_FELD)
+        return validate_standard_feld_candidate(candidate, error_message);
+
     if (!transmit_backend_is_compiled(candidate.transmit_backend))
     {
         if (error_message != nullptr)
@@ -1690,12 +1696,6 @@ bool validate_config_candidate(
     }
 
     resolve_backend_specific_config(candidate);
-
-    // Standard Feld is an internal-only source seam in this slice. Validate it
-    // before legacy CW timing and backend readiness checks so no Morse field or
-    // hardware probe becomes part of its contract.
-    if (candidate.mode == ModeType::STANDARD_FELD)
-        return validate_standard_feld_candidate(candidate, error_message);
 
     const bool backend_validation_required =
         candidate.mode == ModeType::TONE ||
