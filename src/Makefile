@@ -394,6 +394,7 @@ GPIO_BAND_POLICY_TEST_OBJ := $(OBJ_DIR_DEBUG)/tests/gpio_band_policy_test.o
 GPIO_BAND_POLICY_TEST_DEPS := \
 	$(GPIO_BAND_POLICY_TEST_OBJ) \
 	$(OBJ_DIR_DEBUG)/./WSPR-Transmitter/src/execution_plan_compiler.o \
+	$(OBJ_DIR_DEBUG)/./WSPR-Transmitter/src/standard_feld.o \
 	$(OBJ_DIR_DEBUG)/./WSPR-Transmitter/src/transmission_controller.o
 # These explicitly defined semantics-test objects can include production
 # headers that consume generated capability macros. Make their generation
