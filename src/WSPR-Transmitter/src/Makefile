@@ -77,6 +77,8 @@ SI5351_TEST_OBJECTS := \
 	$(OBJ_DIR_DEBUG)/./wspr_transmit_backend_si5351.o \
 	$(OBJ_DIR_DEBUG)/./si5351_device.o \
 	$(OBJ_DIR_DEBUG)/./si5351_planner.o
+STANDARD_FELD_TEST_OUT := build/bin/standard_feld_compiler_test
+STANDARD_FELD_GPIO_DRY_RUN_TEST_OUT := build/bin/standard_feld_gpio_dry_run_test
 SI5351_PLANNER_TEST_OBJECTS := \
 	$(OBJ_DIR_DEBUG)/./si5351_planner_test.o \
 	$(OBJ_DIR_DEBUG)/./si5351_planner.o
@@ -249,10 +251,25 @@ build/bin/si5351_backend_harness: $(SI5351_TEST_OBJECTS)
 	$(Q)echo "Linking debug: si5351_backend_harness"
 	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) $^ -o $@ $(LDFLAGS)
 
-build/bin/standard_feld_compiler_test: ../tests/standard_feld_compiler_test.cpp \
+$(STANDARD_FELD_TEST_OUT): ../tests/standard_feld_compiler_test.cpp \
 		execution_plan_compiler.cpp standard_feld.cpp
 	$(Q)mkdir -p $(BIN_DIR)
 	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) $^ -o $@ $(LDFLAGS)
+
+$(STANDARD_FELD_GPIO_DRY_RUN_TEST_OUT): \
+		../tests/standard_feld_gpio_dry_run_test.cpp \
+		../tests/rpi_standard_feld_dry_run.cpp \
+		../tests/rpi_standard_feld_dry_run.hpp \
+		execution_plan_compiler.cpp standard_feld.cpp \
+		execution_plan.hpp execution_plan_compiler.hpp \
+		standard_feld.hpp standard_feld_asset.hpp \
+		transmission_payloads.hpp transmission_request.hpp
+	$(Q)mkdir -p $(BIN_DIR)
+	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) \
+		../tests/standard_feld_gpio_dry_run_test.cpp \
+		../tests/rpi_standard_feld_dry_run.cpp \
+		execution_plan_compiler.cpp standard_feld.cpp \
+		-o $@ $(LDFLAGS)
 
 build/bin/si5351_planner_test: $(SI5351_PLANNER_TEST_OBJECTS)
 	$(Q)mkdir -p $(BIN_DIR)
@@ -355,7 +372,7 @@ build/bin/$(OUT): $(CPP_OBJECTS) $(C_OBJECTS)
 ##
 # Phony targets
 ##
-.PHONY: clean release debug test si5351-test standard-feld-test si5351-planner-test si5351-transition-test simulated-backend-test simulated-backend-realtime-test transmission-controller-contract-test startup-quiesce-test si5351-startup-quiesce-qualification si5351-startup-quiesce-qualification-test si5351-min-drive-qualification si5351-min-drive-qualification-test gpio-startup-quiesce-qualification gpio-startup-quiesce-qualification-test watchdog gdb lint macros help
+.PHONY: clean release debug test si5351-test standard-feld-test standard-feld-gpio-dry-run-test si5351-planner-test si5351-transition-test simulated-backend-test simulated-backend-realtime-test transmission-controller-contract-test startup-quiesce-test si5351-startup-quiesce-qualification si5351-startup-quiesce-qualification-test si5351-min-drive-qualification si5351-min-drive-qualification-test gpio-startup-quiesce-qualification gpio-startup-quiesce-qualification-test watchdog gdb lint macros help
 
 clean:
 	$(Q)echo "Cleaning up build artifacts."
@@ -373,8 +390,11 @@ test: simulated-backend-test simulated-backend-realtime-test transmission-contro
 si5351-test: build/bin/si5351_backend_harness
 	$(Q)echo "Si5351 backend harness built successfully."
 
-standard-feld-test: build/bin/standard_feld_compiler_test
-	$(Q)./build/bin/standard_feld_compiler_test
+standard-feld-test: $(STANDARD_FELD_TEST_OUT)
+	$(Q)./$(STANDARD_FELD_TEST_OUT)
+
+standard-feld-gpio-dry-run-test: $(STANDARD_FELD_GPIO_DRY_RUN_TEST_OUT)
+	$(Q)./$(STANDARD_FELD_GPIO_DRY_RUN_TEST_OUT)
 
 si5351-planner-test: build/bin/si5351_planner_test
 	$(Q)./build/bin/si5351_planner_test
