@@ -222,7 +222,7 @@ std::string wtp_runtime_json() {
   if (r->settings.transport == "network") {
     const auto n = r->tls.observation();
     j["network"] = {{"hostname", r->settings.hostname}, {"port", r->settings.tcp_port},
-        {"expected_identity", r->settings.tls_identity.empty() ? r->settings.hostname : r->settings.tls_identity},
+        {"expected_identity", wsprrypi::canonical_network_identity(r->settings.tls_identity.empty() ? r->settings.hostname : r->settings.tls_identity).value_or("")},
         {"resolved_address", n.address}, {"authenticated_identity", n.authenticated_identity},
         {"state", n.state}, {"diagnostic", n.diagnostic}, {"observed_ms", std::to_string(n.observed_ms)}};
   }

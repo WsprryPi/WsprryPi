@@ -8,6 +8,7 @@
 #include "pico/time.h"
 
 #include <algorithm>
+#include <arpa/inet.h>
 #include <array>
 #include <cerrno>
 #include <chrono>
@@ -51,7 +52,9 @@ tcp_pcb* tcp_new_ip_type(int) {
 err_t tcp_bind(tcp_pcb* pcb, const void*, unsigned port) {
     sockaddr_in address{};
     address.sin_family = AF_INET;
-    address.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+    const auto *test_address = std::getenv("WSPRRY_TEST_LISTEN_ADDRESS");
+    if (test_address && std::string(test_address) != "127.0.0.1" && std::string(test_address) != "127.0.0.2") return ERR_ABRT;
+    if (inet_pton(AF_INET, test_address ? test_address : "127.0.0.1", &address.sin_addr) != 1) return ERR_ABRT;
     address.sin_port = htons(port);
     return bind(pcb->fd, reinterpret_cast<sockaddr*>(&address), sizeof(address)) ? ERR_ABRT
                                                                                  : ERR_OK;

@@ -11,6 +11,14 @@ using namespace wsprrypi;
 using namespace std::chrono_literals;
 #define CHECK(x) do { if (!(x)) throw std::runtime_error(std::string(#x) + " at " + std::to_string(__LINE__)); } while (false)
 namespace {
+struct Resolver : TlsResolver {
+  std::vector<std::string> addresses{"127.0.0.1"};
+  std::string host;
+  unsigned calls{};
+  bool begin(const std::string &value, unsigned) override { host = value; ++calls; return true; }
+  auto poll() -> std::optional<std::vector<std::string>> override { return addresses; }
+  void cancel() noexcept override {}
+};
 struct Clock : WtpScheduleClock {
   std::uint64_t now_ms() const override { return std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now().time_since_epoch()).count(); }
   std::optional<std::uint64_t> utc_now_ns() const override { return std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::system_clock::now().time_since_epoch()).count(); }
@@ -23,8 +31,13 @@ struct Filter : wtp::ByteStream {
   std::deque<std::uint8_t> queued;
   std::string drop;
   bool dropped{};
+  std::size_t accepted_bytes{};
   Filter(TlsStream &s, Clock &c) : tls(s), clock(c) {}
-  wtp::IoResult write(std::span<const std::uint8_t> bytes) override { return tls.write(bytes.first(std::min<std::size_t>(bytes.size(), 37))); }
+  wtp::IoResult write(std::span<const std::uint8_t> bytes) override {
+    auto result = tls.write(bytes.first(std::min<std::size_t>(bytes.size(), 37)));
+    if (result.state == wtp::IoState::Progress) accepted_bytes += result.count;
+    return result;
+  }
   wtp::IoResult read(std::span<std::uint8_t> bytes) override {
     if (queued.empty()) {
       std::array<std::uint8_t, 113> input{};
@@ -54,9 +67,11 @@ int main(int argc, char **argv) {
   try {
     Clock clock;
     const std::string directory = argv[1];
-    TlsSelection selection{"127.0.0.1", "127.0.0.1", directory + "/client-ca.crt", directory + "/client.crt", directory + "/client.key", 18443};
+    const std::string hostname = "wsprrypico-" + std::string(32, 'a') + ".local";
+    TlsSelection selection{"WSPRRYpico-" + std::string(32, 'a') + ".LOCAL.", "", directory + "/client-ca.crt", directory + "/client.crt", directory + "/client.key", 18443};
     auto credentials = std::make_shared<TlsCredentials>(selection);
-    TlsStream tls([&] { return clock.now_ms(); }, TlsStream::Access::LoopbackTest);
+    auto resolver = std::make_unique<Resolver>(); auto *resolution = resolver.get();
+    TlsStream tls([&] { return clock.now_ms(); }, TlsStream::Access::LoopbackTest, std::move(resolver));
     Filter stream(tls, clock);
     const auto open = [&] {
       stream.close();
@@ -64,12 +79,36 @@ int main(int argc, char **argv) {
       while (tls.opening()) { tls.poll_open(); clock.wait_ms(1); }
       return tls.ready();
     };
-    // Test the actual shared API including revision and redaction, before WTP
-    // occupies the server's single slot. No parallel management connections.
+    // Actual TLS/server management using explicit injected loopback resolution.
+    // This seam neither implements nor qualifies Linux NSS or mDNS.
     const auto http = [&](const std::string &resource, const std::string &method = "GET", const std::string &body = "", const std::string &revision = "") {
       return pico_http_request(tls, selection, credentials, [&] { return clock.now_ms(); }, resource, method, body, revision);
     };
+    const auto restart = [](const char *which) {
+      std::cout << "RESTART " << which << std::endl;
+      std::string ready; std::getline(std::cin, ready); CHECK(ready == "READY");
+    };
     auto config = http("config"); CHECK(config.status == 200 && !config.etag.empty());
+    CHECK(resolution->host == hostname && tls.observation().authenticated_identity == hostname);
+    selection.host = "127.0.0.1"; selection.expected_identity = hostname;
+    CHECK(http("network").status == 200 && tls.observation().authenticated_identity == hostname);
+    selection.expected_identity = "127.0.0.1";
+    CHECK(http("network").status == 200 && tls.observation().authenticated_identity == "127.0.0.1");
+    selection.expected_identity = "127.0.0.2";
+    CHECK(http("network").status == 503 && tls.observation().authenticated_identity.empty());
+    selection.expected_identity = "wrong.local";
+    CHECK(http("network").status == 503 && tls.observation().authenticated_identity.empty());
+    selection.host = hostname; selection.expected_identity.clear();
+    if (std::getenv("WSPRRY_TEST_SECOND_LOOPBACK")) {
+      restart("address2"); resolution->addresses = {"127.0.0.2"};
+      CHECK(http("network").status == 200);
+      CHECK(tls.observation().address == "127.0.0.2" && tls.observation().authenticated_identity == hostname);
+      restart("address1"); resolution->addresses = {"127.0.0.1"};
+      CHECK(http("network").status == 200 && tls.observation().address == "127.0.0.1");
+      std::cout << "Actual changed IPv4 loopback address with unchanged DNS TLS identity passed\n";
+    }
+    config = http("config"); CHECK(config.status == 200);
+
     const std::string body = R"({"version":1,"enabled":false,"station":{"callsign":"AA0NT","locator":"EM18","power_dbm":20},"wifi":{"ssid":"test","password":"never-echo-this","ntp_ipv4":"192.0.2.1"},"schedules":[{"period_s":120,"phase_s":0}]})";
     CHECK(http("config", "PUT", body).status == 428);
     auto saved = http("config", "PUT", body, config.etag);
@@ -110,6 +149,14 @@ int main(int argc, char **argv) {
       auto result = finish();
       CHECK(stream.dropped && result.outcome == WtpScheduleOutcome::Blocked);
       CHECK(!app.replaceable() && !app.ready());
+      const auto before_failed_reconnect = stream.accepted_bytes;
+      resolution->addresses.clear();
+      CHECK(!app.recover().ok && !app.replaceable() && !app.ready());
+      CHECK(stream.accepted_bytes == before_failed_reconnect && tls.observation().authenticated_identity.empty());
+      resolution->addresses = {"127.0.0.1"}; selection.expected_identity = "wrong.local";
+      CHECK(!app.recover().ok && !app.replaceable() && !app.ready());
+      CHECK(stream.accepted_bytes == before_failed_reconnect && tls.observation().authenticated_identity.empty());
+      selection.expected_identity.clear();
       const auto recovered = app.recover();
       if (!recovered.ok) std::cerr << operation << ": " << recovered.error << "\n" << wtp_runtime_status_json(app.status()) << "\n";
       CHECK(recovered.ok && app.ready());
@@ -163,20 +210,16 @@ int main(int argc, char **argv) {
     CHECK(send(wtp::Operation::Abort, wtp::AbortRequest{job}) == wtp::ResultKind::Acknowledged);
     CHECK(send(wtp::Operation::Release, wtp::Empty{}) == wtp::ResultKind::Acknowledged);
     session.disconnect();
-    const auto restart = [](const char *which) {
-      std::cout << "RESTART " << which << std::endl;
-      std::string ready; std::getline(std::cin, ready); CHECK(ready == "READY");
-    };
     restart("boot"); connect();
     CHECK(session.phase() == wtp::SessionPhase::IdentityChanged && !session.owns());
     session.disconnect();
     restart("device");
-    wtp::Session different({sid, owner, settings.device_id});
+    wtp::Session different({sid, owner, std::string(32, 'b')});
     CHECK(open()); CHECK(different.connect(stream, clock.now_ms()));
     const auto deadline2 = clock.now_ms() + 15000;
     while (different.busy() && clock.now_ms() < deadline2) { different.poll(clock.now_ms()); clock.wait_ms(1); }
     CHECK(different.phase() == wtp::SessionPhase::IdentityChanged && !different.owns());
     different.disconnect();
-    std::cout << "Actual Pico TLS: shared management, finite application job, partial I/O, lost LOAD/ARM/ABORT same-request replay, foreign ownership, boot/device changes and same-session recovery passed\n";
+    std::cout << "Actual Pico TLS: named and explicit-IP identities, failed-resolution/handshake recovery, shared management, finite application job, partial I/O, lost LOAD/ARM/ABORT same-request replay, foreign ownership, boot change/device mismatch and same-session recovery passed\n";
   } catch (const std::exception &error) { std::cerr << error.what() << '\n'; return 1; }
 }

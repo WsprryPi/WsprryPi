@@ -47,7 +47,10 @@
             const etag = response.headers.get("ETag") || "";
             if (resource === "network") {
                 networkRevision = etag;
-                feedback.textContent = `Pico Wi-Fi: ${data.enabled ? "enabled" : "disabled"}. ${method === "PUT" ? "Network control may now disconnect; use USB Console or restart to reconnect." : "This is a remote observation."}`;
+                const discovery = data.mdns_state ? ` Discovery: ${data.mdns_state}. Configured hostname: ${data.configured_hostname || "none"}. Advertised hostname: ${data.advertised_hostname || "none"}. Current address: ${data.ipv4 || "unavailable"}.` : "";
+                const problem = data.mdns_state === "conflict" ? " Resolve the name conflict, then retry the same certified name with an idle disable/re-enable or restart. No automatic rename occurred."
+                    : data.mdns_state === "failed" ? ` Discovery failed (${data.mdns_reason || "unconfirmed reason"}); inspect the Pico deployment before retrying.` : "";
+                feedback.textContent = `Pico Wi-Fi: ${data.enabled ? "enabled" : "disabled"}.${discovery}${problem} ${method === "PUT" ? "Network control may now disconnect; use USB Console or restart to reconnect." : "This is a remote observation."}`;
                 if (method === "PUT") networkRevision = "";
             } else {
                 configRevision = etag;

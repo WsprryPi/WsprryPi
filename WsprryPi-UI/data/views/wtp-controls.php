@@ -47,8 +47,8 @@
             </div>
             <div class="col-12 col-lg-6 config-stacked-field" data-wtp-transport="network" hidden>
                 <label class="form-label" for="wtp_hostname">Hostname or IP address</label>
-                <input class="form-control" id="wtp_hostname" type="text" maxlength="512" placeholder="wsprrypico-&lt;device-id&gt;.local" data-wtp-key="Hostname" aria-describedby="wtp_hostname-hint" disabled>
-                <div class="form-text" id="wtp_hostname-hint">Resolve the current DHCP address. No reservation is required.</div>
+                <input class="form-control" id="wtp_hostname" type="text" maxlength="254" placeholder="wsprrypico-&lt;device-id&gt;.local" data-wtp-key="Hostname" aria-describedby="wtp_hostname-hint" disabled>
+                <div class="form-text" id="wtp_hostname-hint">Use the certified Pico hostname for DHCP. The host must support .local resolution; no reservation is required.</div>
             </div>
             <div class="col-12 col-lg-6 config-stacked-field" data-wtp-transport="network" hidden>
                 <label class="form-label" for="wtp_tcp_port">TLS port</label>
@@ -57,8 +57,8 @@
             </div>
             <div class="col-12 col-lg-6 config-stacked-field" data-wtp-transport="network" hidden>
                 <label class="form-label" for="wtp_tls_identity">Expected certificate identity</label>
-                <input class="form-control" id="wtp_tls_identity" type="text" maxlength="512" placeholder="" data-wtp-key="TLS Server Identity" aria-describedby="wtp_tls_identity-hint" disabled>
-                <div class="form-text" id="wtp_tls_identity-hint">Leave blank to verify the hostname or IP above. For a direct-IP connection, an explicit hostname is allowed.</div>
+                <input class="form-control" id="wtp_tls_identity" type="text" maxlength="254" placeholder="" data-wtp-key="TLS Server Identity" aria-describedby="wtp_tls_identity-hint" disabled>
+                <div class="form-text" id="wtp_tls_identity-hint">Leave blank to verify the hostname or IP above. For a direct-IP connection, enter its certified hostname here. A literal-IP identity requires a matching IP certificate entry.</div>
             </div>
             <div class="col-12 col-lg-6 config-stacked-field" data-wtp-transport="network" hidden>
                 <label class="form-label" for="wtp_ca">Trusted CA file</label>

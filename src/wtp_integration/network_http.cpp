@@ -28,9 +28,9 @@ PicoHttpResponse pico_http_request(TlsStream &stream, const TlsSelection &select
     stream.poll_open(); std::this_thread::sleep_for(std::chrono::milliseconds(2));
   }
   if (!stream.ready()) return error(503, "tls_authentication_or_connection_failed");
-  // Current Pico validates numeric HTTP authority. This does not influence
-  // certificate verification, which used the separately configured identity.
-  auto authority = stream.observation().address;
+  // The successful handshake authenticated the canonical configured reference
+  // identity. Resolution chooses only the TCP address, never HTTP authority.
+  auto authority = stream.observation().authenticated_identity;
   if (authority.find(':') != std::string::npos) authority = '[' + authority + ']';
   if (selection.port != 443) authority += ':' + std::to_string(selection.port);
   std::string request = method + " /api/v1/" + resource + " HTTP/1.1\r\nHost: " + authority + "\r\n";

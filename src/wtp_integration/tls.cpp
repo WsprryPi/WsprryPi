@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Lee Bussy
 #include "tls.hpp"
+#include "identity.hpp"
 #include <openssl/err.h>
 #include <openssl/pem.h>
 #include <openssl/ssl.h>
@@ -278,11 +279,14 @@ bool TlsStream::begin_open(const TlsSelection &s, std::shared_ptr<TlsCredentials
     const char *disabled = std::getenv("WSPRRYPI_DISABLE_HARDWARE_ACCESS");
     if (disabled && std::string(disabled) == "1") { p.fail("Hardware access disabled; network transmitter access is prohibited"); return false; }
   }
-  if (!credentials || s.host.empty() || !s.port || s.port > 65535 ||
+  const auto host = canonical_network_identity(s.host);
+  const auto identity = canonical_network_identity(s.expected_identity.empty() ? s.host : s.expected_identity);
+  if (!credentials || !host || !identity || !s.port || s.port > 65535 ||
       (alpn != "wtp/1" && alpn != "http/1.1")) { p.fail("Invalid TLS endpoint"); return false; }
-  p.selection = s; p.credentials = std::move(credentials); p.alpn = std::move(alpn);
+  p.selection = s; p.selection.host = *host; p.selection.expected_identity = *identity;
+  p.credentials = std::move(credentials); p.alpn = std::move(alpn);
   p.deadline = p.clock() + resolve_timeout_ms;
-  if (!p.resolver->begin(s.host, s.port)) { p.fail("Resolver unavailable; another lookup is outstanding"); return false; }
+  if (!p.resolver->begin(p.selection.host, s.port)) { p.fail("Resolver unavailable; another lookup is outstanding"); return false; }
   p.state("resolving"); return true;
 }
 void TlsStream::poll_open() {
@@ -310,7 +314,7 @@ void TlsStream::poll_open() {
     SSL_set_connect_state(p.ssl);
     const auto name = p.selection.expected_identity.empty() ? p.selection.host : p.selection.expected_identity;
     auto *parameters = SSL_get0_param(p.ssl);
-    X509_VERIFY_PARAM_set_hostflags(parameters, X509_CHECK_FLAG_NO_PARTIAL_WILDCARDS);
+    X509_VERIFY_PARAM_set_hostflags(parameters, X509_CHECK_FLAG_NO_WILDCARDS | X509_CHECK_FLAG_NEVER_CHECK_SUBJECT);
     const bool identity = literal(name) ? X509_VERIFY_PARAM_set1_ip_asc(parameters, name.c_str()) == 1
         : SSL_set1_host(p.ssl, name.c_str()) == 1 && SSL_set_tlsext_host_name(p.ssl, name.c_str()) == 1;
     std::string wire(1, static_cast<char>(p.alpn.size())); wire += p.alpn;

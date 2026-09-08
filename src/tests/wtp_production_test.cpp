@@ -74,7 +74,7 @@ void run(const std::string &credentials) {
   const auto revision = resource->get_header_value("ETag");
   httplib::Headers headers{{"Host", authority}, {"Origin", "http://" + authority},
     {"X-WsprryPico-Request", "1"}, {"If-Match", revision}};
-  const std::string patch = R"({"Operation":{"Transmit Backend":"wtp"},"WTP":{"Endpoint":"/dev/ttyACM1","USB Serial":"000012345678","USB Vendor ID":51966,"USB Product ID":16402,"Device ID":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","Hostname":"preserved.local","TCP Port":18443,"TLS Server Identity":"certificate.local","TLS CA File":"/etc/pico/ca.crt","TLS Client Certificate":"/etc/pico/client.crt","TLS Client Key":"/etc/pico/client.key"}})";
+  const std::string patch = R"({"Operation":{"Transmit Backend":"wtp"},"WTP":{"Endpoint":"/dev/ttyACM1","USB Serial":"000012345678","USB Vendor ID":51966,"USB Product ID":16402,"Device ID":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","Hostname":"PrEsErVeD.LoCaL.","TCP Port":18443,"TLS Server Identity":"CeRtIfIcAtE.LoCaL.","TLS CA File":"/etc/pico/ca.crt","TLS Client Certificate":"/etc/pico/client.crt","TLS Client Key":"/etc/pico/client.key"}})";
   auto updated = browser.Put("/api/v1/host/config", headers, patch, "application/json");
   if (updated && updated->status != 200) {
     std::cerr << updated->status << " " << updated->body << "\n";
@@ -84,8 +84,8 @@ void run(const std::string &credentials) {
   CHECK(stale && stale->status == 412);
   RuntimeConfigCandidate network_candidate;
   prepare_runtime_config_candidate(filename, network_candidate);
-  CHECK(network_candidate.valid && network_candidate.normalized_config.wtp.hostname == "preserved.local");
-  CHECK(network_candidate.normalized_config.wtp.tls_identity == "certificate.local");
+  CHECK(network_candidate.valid && network_candidate.normalized_config.wtp.hostname == "PrEsErVeD.LoCaL.");
+  CHECK(network_candidate.normalized_config.wtp.tls_identity == "CeRtIfIcAtE.LoCaL.");
   CHECK(network_candidate.normalized_config.wtp.tls_key == "/etc/pico/client.key");
   headers.erase("If-Match");
   auto missing = browser.Put("/api/v1/host/config", headers, "{}", "application/json");

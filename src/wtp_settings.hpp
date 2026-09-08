@@ -2,7 +2,7 @@
 // Copyright (c) 2026 Lee Bussy
 #pragma once
 #include <algorithm>
-#include <arpa/inet.h>
+#include "wtp_integration/identity.hpp"
 #include <cstdint>
 #include <stdexcept>
 #include <string>
@@ -29,26 +29,8 @@ inline void validate_wtp_settings(const WtpSettings &s, bool selected) {
       s.start_uncertainty_ns > 1000000000)
     throw std::runtime_error(
         "Invalid WTP endpoint or start uncertainty (1–1000000000 ns).");
-  const auto name = [&](const std::string &v) {
-    if (v.empty()) return true; // Inactive fields and default TLS identity.
-    if (!text(v, 253)) return false;
-    in6_addr address{};
-    if (inet_pton(AF_INET, v.c_str(), &address) == 1 ||
-        inet_pton(AF_INET6, v.c_str(), &address) == 1) return true;
-    if (v.find(':') != std::string::npos ||
-        std::all_of(v.begin(), v.end(), [](char c) { return (c >= '0' && c <= '9') || c == '.'; })) return false;
-    std::size_t start = 0;
-    while (start < v.size()) {
-      auto end = v.find('.', start); if (end == std::string::npos) end = v.size();
-      if (end == start || end - start > 63 || v[start] == '-' || v[end - 1] == '-') return false;
-      for (auto i = start; i < end; ++i) {
-        const auto c = v[i];
-        if (!((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') ||
-              (c >= '0' && c <= '9') || c == '-')) return false;
-      }
-      start = end + 1;
-    }
-    return v.back() != '.';
+  const auto name = [](const std::string &v) {
+    return v.empty() || wsprrypi::canonical_network_identity(v).has_value();
   };
   if ((s.transport != "usb" && s.transport != "network") ||
       !name(s.hostname) || !name(s.tls_identity) ||

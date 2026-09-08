@@ -75,4 +75,20 @@ material. Host config exposes local credential references only. Remote config
 retains Pico's password redaction; new passwords are submitted only by an explicit
 save, kept out of browser storage and cleared after full-config success. A
 schedule-only save keeps password and other unrelated drafts. Management never
-runs periodically and never releases host ownership to poll the sole Pico TLS slot.
+runs periodically and never releases host ownership to poll Pico TLS sessions.
+
+
+Outbound management authenticates the canonical configured expected TLS identity
+(or configured target when blank) and uses it for both Host and Origin. An
+explicit IP destination with expected hostname therefore retains hostname HTTP
+authority. Numeric identity remains compatible with a corresponding certificate
+IP SAN. Resolver results never grant HTTP authority. Pico independently validates
+its hostname/current-IP allowlist and requires Host/Origin to match each other;
+this does not relax the WsprryPi host proxy's own security policy.
+
+Copied host network status distinguishes saved `hostname`, canonical
+`expected_identity`, numeric `resolved_address` and `authenticated_identity`
+from the last successful handshake. A new failed connection clears authenticated
+identity; transport closure cannot establish inactive output. The remote network
+resource additionally exposes Pico discovery state, separate from this host's
+resolver/TLS observations. None of these fields installs or changes Linux NSS.

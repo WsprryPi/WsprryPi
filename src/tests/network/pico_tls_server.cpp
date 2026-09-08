@@ -38,7 +38,8 @@ int main(int argc, char **argv) {
   std::cout << "READY " << server.port() << std::endl;
   while (true) {
     mock_tcp_poll();
-    server.poll(network.enabled, "127.0.0.1:" + std::to_string(server.port()));
+    const auto *test_address = std::getenv("WSPRRY_TEST_LISTEN_ADDRESS");
+    server.poll(network.enabled, std::string(test_address ? test_address : "127.0.0.1") + ":" + std::to_string(server.port()));
     std::this_thread::sleep_for(std::chrono::microseconds(100));
   }
 }

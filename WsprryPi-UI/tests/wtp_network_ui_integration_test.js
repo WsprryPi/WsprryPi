@@ -129,6 +129,7 @@ async function main() {
             window.__requests = [];
             window.__remoteFailure = false;
             window.__statusFailure = false;
+            window.__discoveryState = "active";
             window.__snapshot = { selected:true, transport:'network', ready:true, host_utc_valid:true, phase:'idle', session_phase:'ready', now_ms:'10000', status_observed_ms:'1000',
                 remote:{output_active:false}, owns:false, network:{hostname:'wsprrypico-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.local',port:18443,expected_identity:'wsprrypico-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.local',resolved_address:'192.0.2.27',authenticated_identity:'wsprrypico-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.local',state:'ready',observed_ms:'9000'} };
             window.fetch = async (url, options = {}) => {
@@ -138,6 +139,7 @@ async function main() {
                     return {ok:true, json:async()=>({host:window.__snapshot})};
                 }
                 if (String(url).endsWith('/jobs')) { window.__snapshot.owns=false; window.__snapshot.job_id=''; return {ok:true,json:async()=>({ok:true,result:{cleanup_ok:true}})}; }
+                if (String(url).endsWith('/network')) return {ok:true,headers:{get:()=> '\"network-r1\"'},json:async()=>({enabled:true,ipv4:'192.0.2.27',configured_hostname:window.__snapshot.network.hostname,advertised_hostname:window.__discoveryState==='active'?window.__snapshot.network.hostname:'',mdns_state:window.__discoveryState,mdns_reason:window.__discoveryState==='conflict'?'name_conflict':''})};
                 if (window.__remoteFailure) return {ok:false,status:412,json:async()=>({error:{code:'revision_conflict'}})};
                 return {ok:true,headers:{get:()=> '"remote-r1"'},json:async()=>({config:{version:1,enabled:false,station:{callsign:'AA0NT',locator:'EM18',power_dbm:20},wifi:{ssid:'Bench Wi-Fi',password:null,ntp_ipv4:'192.0.2.1'},schedules:[{period_s:120,phase_s:0}]}})};
             };
@@ -168,6 +170,18 @@ async function main() {
                 fs.writeFileSync(path.join(output,`${viewport.name}-schedule-${section}.png`),Buffer.from(shot.data,'base64'));
             }
         }
+        for (const discovery of ['active', 'conflict', 'failed']) {
+            await evaluate(`window.__discoveryState='${discovery}'; document.getElementById('wtp-network-load').click();`);
+            await waitFor(async () => await evaluate(`document.getElementById('wtp-management-feedback').textContent.includes('Discovery: ${discovery}.')`), 'discovery feedback');
+            assert.equal(await evaluate('document.getElementById("wtp-remote-password").value'), 'unsaved-secret');
+            for (const viewport of [{name:'desktop',width:1280,height:900},{name:'mobile',width:390,height:844}]) {
+                await client.send('Emulation.setDeviceMetricsOverride', {...viewport,deviceScaleFactor:1,mobile:viewport.name==='mobile'});
+                await evaluate(`document.getElementById('wtp-management-feedback').scrollIntoView({block:'center',behavior:'instant'});`);
+                const shot = await client.send('Page.captureScreenshot',{format:'png'});
+                fs.writeFileSync(path.join(output,`${viewport.name}-discovery-${discovery}.png`),Buffer.from(shot.data,'base64'));
+                assert(await evaluate('document.documentElement.scrollWidth <= window.innerWidth + 1'), 'discovery horizontal overflow');
+            }
+        }
         await evaluate(`window.__snapshot.owns=true; window.__snapshot.job_id='b'.repeat(32); window.WtpUi.select(true);`);
         await waitFor(async () => await evaluate('!document.getElementById("wtp-cancel").disabled'), 'owned cancellation');
         await evaluate(`document.getElementById('wtp-cancel').click();`);
@@ -193,9 +207,9 @@ async function main() {
             }
             assert(await evaluate('document.documentElement.scrollWidth <= window.innerWidth + 1'), 'horizontal overflow');
         }
-        await evaluate(`document.getElementById('wtp_hostname').value='draft.local'; window.__statusFailure=true;`);
+        await evaluate(`document.getElementById('wtp_hostname').value='DrAfT.LoCaL.'; window.__statusFailure=true;`);
         await waitFor(async () => await evaluate('document.getElementById("wtp-feedback").textContent.includes("Connection interrupted")'), 'status failure');
-        assert.equal(await evaluate('window.WtpUi.read().Hostname'), 'draft.local');
+        assert.equal(await evaluate('window.WtpUi.read().Hostname'), 'DrAfT.LoCaL.');
         assert.equal(await evaluate('document.getElementById("wtp-output").textContent'), 'Unknown');
         assert.equal(await evaluate('document.getElementById("wtp-recover").disabled'),true);
         await evaluate(`document.getElementById('wtp-status-heading').scrollIntoView({block:'start',behavior:'instant'}); window.scrollBy(0,-140);`);

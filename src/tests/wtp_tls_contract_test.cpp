@@ -9,7 +9,8 @@ using namespace wsprrypi;
 struct Resolver : TlsResolver {
   std::optional<std::vector<std::string>> result;
   unsigned calls{}, cancellations{};
-  bool begin(const std::string &, unsigned) override { ++calls; return true; }
+  std::string last_host;
+  bool begin(const std::string &host, unsigned) override { last_host = host; ++calls; return true; }
   auto poll() -> std::optional<std::vector<std::string>> override { return result; }
   void cancel() noexcept override { ++cancellations; }
 };
@@ -54,6 +55,24 @@ int main(int argc, char **argv) {
       stream.close();
     }
     CHECK(fake->calls == 6);
+    auto spelled = selection; spelled.host = "PiCo-Test.LoCaL.";
+    CHECK(stream.begin_open(spelled, credentials));
+    CHECK(fake->last_host == "pico-test.local"); stream.close();
+    for (const std::string invalid : {"", "pico..local", "pico.local..", "-pico.local", "pico-.local",
+         "pico_local", "pico.local:443", "pico.local/", "pico.local\r\nHost: evil",
+         "*.local", "127.1", "0127.0.0.1", "0x7f000001", "0x7f000001.", "127.0.0.1.", "256.0.0.1", "[::1]", "::g"}) {
+      const auto before = fake->calls;
+      auto bad = selection; bad.host = invalid;
+      CHECK(!stream.begin_open(bad, credentials) && fake->calls == before);
+      bad = selection; bad.expected_identity = invalid.empty() ? "*.local" : invalid;
+      CHECK(!stream.begin_open(bad, credentials) && fake->calls == before);
+    }
+    CHECK(!canonical_network_identity(std::string("::1\0evil", 8)));
+    CHECK(canonical_network_identity("PICO.LOCAL.") == "pico.local");
+    CHECK(canonical_network_identity("2001:0DB8::1") == "2001:db8::1");
+    CHECK(!canonical_network_identity(std::string(64, 'a') + ".local"));
+    CHECK(canonical_network_identity(std::string(63, 'a') + ".local"));
+
     fake->result = std::vector<std::string>{};
     CHECK(stream.begin_open(selection, credentials)); stream.poll_open();
     const auto diagnostic = stream.observation().diagnostic; stream.close();
@@ -66,6 +85,9 @@ int main(int argc, char **argv) {
     s.device_id = std::string(32, 'a'); s.tls_ca = selection.ca_file; s.tls_certificate = selection.certificate_file; s.tls_key = selection.key_file;
     s.path = "/dev/preserved"; s.usb_serial = "00000001";
     CHECK(parse_wtp_settings(wtp_settings_json(s), true) == s);
+    s.hostname = "PiCo-Test.LoCaL."; s.tls_identity = "PICO-TEST.LOCAL.";
+    CHECK(parse_wtp_settings(wtp_settings_json(s), true) == s);
+    CHECK(parse_wtp_settings(wtp_settings_json(s), false) == s);
     auto old = wtp_settings_json(s); old.erase("Transport");
     CHECK(parse_wtp_settings(old, false).transport == "usb");
     for (auto key : {"Hostname", "TLS CA File", "TLS Client Certificate", "TLS Client Key", "Device ID"}) {

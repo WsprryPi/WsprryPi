@@ -29,6 +29,12 @@ for name, usage in [('server', 'serverAuth'), ('client', 'clientAuth'), ('other'
     (credentials / (name + '.ext')).write_text('basicConstraints=CA:FALSE\nkeyUsage=digitalSignature\nextendedKeyUsage=' + usage + '\nsubjectAltName=IP:127.0.0.1,DNS:localhost,DNS:pico-test.local\n')
     openssl('x509', '-req', '-in', name + '.csr', '-CA', 'ca.crt', '-CAkey', 'ca.key', '-CAcreateserial',
             '-out', name + '.crt', '-days', '1', '-extfile', name + '.ext')
+for name, san in [('dns-only', 'DNS:pico-test.local'), ('cn-only', ''), ('wildcard', 'DNS:*.local')]:
+    openssl('req', '-new', '-newkey', 'ec', '-pkeyopt', 'ec_paramgen_curve:P-256', '-nodes',
+            '-keyout', name + '.key', '-out', name + '.csr', '-subj', '/CN=pico-test.local')
+    (credentials / (name + '.ext')).write_text('basicConstraints=CA:FALSE\nkeyUsage=digitalSignature\nextendedKeyUsage=serverAuth\n' + ('subjectAltName=' + san + '\n' if san else ''))
+    openssl('x509', '-req', '-in', name + '.csr', '-CA', 'ca.crt', '-CAkey', 'ca.key', '-CAcreateserial',
+            '-out', name + '.crt', '-days', '1', '-extfile', name + '.ext')
 for name in ['rogue', 'rogue-client']:
     openssl('req', '-x509', '-newkey', 'ec', '-pkeyopt', 'ec_paramgen_curve:P-256', '-nodes',
             '-keyout', name + '.key', '-out', name + '.crt', '-days', '1', '-subj', '/CN=Untrusted',
@@ -121,6 +127,13 @@ with contextlib.closing(Server()) as server:
     (credentials / 'client.key').chmod(0o600)
     probe(server, True)
     probe(server, False, host='invalid.invalid')
+with contextlib.closing(Server(certificate='dns-only')) as server:
+    probe(server, True, identity='PiCo-TeSt.LoCaL.')
+    probe(server, False, identity='127.0.0.1')
+    probe(server, False, identity='wrong.local')
+for name in ['cn-only', 'wildcard']:
+    with contextlib.closing(Server(certificate=name)) as server:
+        probe(server, False, identity='pico-test.local')
 for options in [dict(certificate='expired'), dict(certificate='future'), dict(certificate='rogue'), dict(protocol='wrong'), dict(tls12=True), dict(abrupt=True), dict(stall=True)]:
     with contextlib.closing(Server(**options)) as server:
         began = time.monotonic()

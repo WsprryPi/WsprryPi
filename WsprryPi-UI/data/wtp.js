@@ -9,6 +9,27 @@
         "USB Vendor ID": 0, "USB Product ID": 0,
         "Start Uncertainty ns": 1000000, "Allow Frequency Adjustment": false
     });
+    function validNetworkIdentity(value) {
+        if (typeof value !== "string" || !value || value.length > 254 || /[^\x21-\x7e]/.test(value)) return false;
+        const ipv4 = v => /^(0|[1-9][0-9]{0,2})(\.(0|[1-9][0-9]{0,2})){3}$/.test(v) && v.split(".").every(n => Number(n) <= 255);
+        if (ipv4(value)) return true;
+        if (value.includes(":")) {
+            if (!/^[0-9a-fA-F:.]+$/.test(value) || value.split("::").length > 2 || (value.startsWith(":") && !value.startsWith("::")) || (value.endsWith(":") && !value.endsWith("::"))) return false;
+            const groups = value.split(":").filter(Boolean);
+            let count = 0;
+            for (let i = 0; i < groups.length; ++i) {
+                if (groups[i].includes(".")) {
+                    if (i !== groups.length - 1 || !value.endsWith(groups[i]) || !ipv4(groups[i])) return false;
+                    count += 2;
+                } else { if (!/^[0-9a-fA-F]{1,4}$/.test(groups[i])) return false; ++count; }
+            }
+            return value.includes("::") ? count < 8 && !value.includes(":::")
+                : count === 8 && !value.startsWith(":") && !value.endsWith(":");
+        }
+        const name = value.endsWith(".") ? value.slice(0, -1) : value;
+        if (/^[0-9.]+$/.test(name) || name.split(".").every(label => /^(?:[0-9]+|0x[0-9a-f]+)$/i.test(label))) return false;
+        return name.length <= 253 && name.split(".").every(label => /^[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?$/.test(label));
+    }
     function errors(settings, selected) {
         const result = {};
         for (const [key, max] of [["Endpoint", 512], ["USB Serial", 128], ["Device ID", 32]]) {
@@ -18,14 +39,16 @@
         }
         if (!["usb", "network"].includes(settings.Transport)) result.Transport = "Choose USB or network.";
         const network = settings.Transport === "network";
-        for (const key of ["Hostname", "TLS Server Identity", "TLS CA File", "TLS Client Certificate", "TLS Client Key"]) {
+        for (const key of ["Hostname", "TLS Server Identity"]) {
+            if (settings[key] !== "" && !validNetworkIdentity(settings[key]))
+                result[key] = "Enter a DNS hostname or literal IP address, without a URL or port.";
+        }
+        for (const key of ["TLS CA File", "TLS Client Certificate", "TLS Client Key"]) {
             const value = settings[key];
-            if (typeof value !== "string" || value.length > (key.includes("TLS C") ? 512 : 253) || /[\x00-\x1f\x7f]/.test(value)) result[key] = "Enter a valid local reference or identity.";
+            if (typeof value !== "string" || value.length > 512 || /[\x00-\x1f\x7f]/.test(value)) result[key] = "Enter a valid local file reference.";
+            else if (selected && network && !value.startsWith("/")) result[key] = "Enter an absolute file path on the WsprryPi host.";
         }
-        if (selected && network) {
-            if (!settings.Hostname || !/^[a-zA-Z0-9.:-]+$/.test(settings.Hostname)) result.Hostname = "Enter a hostname or literal IP address, without a URL or port.";
-            for (const key of ["TLS CA File", "TLS Client Certificate", "TLS Client Key"]) if (!settings[key].startsWith("/")) result[key] = "Enter an absolute file path on the WsprryPi host.";
-        }
+        if (selected && network && !settings.Hostname) result.Hostname = "Enter the Pico's configured hostname or literal IP address.";
         if (!Number.isInteger(settings["TCP Port"]) || settings["TCP Port"] < (selected && network ? 1 : 0) || settings["TCP Port"] > 65535) result["TCP Port"] = "Enter the configured TLS port (1–65535).";
         if (selected) {
             if (!network && !String(settings.Endpoint).startsWith("/dev/") || (!network && settings.Endpoint.includes("/../"))) result.Endpoint = "Select the dedicated WTP device path under /dev/.";
@@ -63,7 +86,7 @@
             history: s.last_report ? `${s.last_report.outcome} · ${s.last_report.job_id || "no remote job"}${s.last_report.error ? ` · ${s.last_report.error}` : ""}` : "None",
             recover: !s.worker_active && ["idle", "blocked"].includes(s.phase) && !["identity_changed", "fault"].includes(s.session_phase) };
     }
-    if (typeof module !== "undefined" && module.exports) module.exports = { defaults, errors, summarize };
+    if (typeof module !== "undefined" && module.exports) module.exports = { defaults, errors, summarize, validNetworkIdentity };
     if (!root.document) return;
     const byId = id => root.document.getElementById(id);
     let saved = { ...defaults }, snapshot = null, busy = false, timer = null, initialized = false, visible = false, closed = false, statusReadFailed = false, hostRevision = "", cancelling = false;
@@ -93,7 +116,7 @@
         root.document.querySelectorAll("[data-wtp-transport]").forEach(group => { group.hidden = group.dataset.wtpTransport !== (network ? "network" : "usb"); });
         const n = snapshot?.network;
         if (byId("wtp-network-state")) byId("wtp-network-state").textContent = n
-            ? `${n.hostname}:${n.port} · ${n.state}. Address: ${n.resolved_address || "unresolved"}. Last authenticated identity: ${n.authenticated_identity || "unconfirmed"}. Observation age: ${n.observed_ms && snapshot.now_ms ? Math.max(0, Number(BigInt(snapshot.now_ms) - BigInt(n.observed_ms))) + " ms" : "unknown"}. ${n.diagnostic || ""}`
+            ? `Configured target: ${n.hostname}:${n.port} · ${n.state}. Expected identity: ${n.expected_identity || "unconfirmed"}. Resolved address: ${n.resolved_address || "unresolved"}. Last authenticated identity: ${n.authenticated_identity || "unconfirmed"}. Observation age: ${n.observed_ms && snapshot.now_ms ? Math.max(0, Number(BigInt(snapshot.now_ms) - BigInt(n.observed_ms))) + " ms" : "unknown"}. ${n.diagnostic || ""}`
             : "Network connection is unconfirmed.";
         root.WtpManagement?.setAvailability(visible && selected() && network && snapshot?.selected === true && snapshot.ready === true && snapshot.phase === "idle" && !snapshot.worker_active && !snapshot.recovery_required && !snapshot.owns);
         const state = summarize(snapshot);

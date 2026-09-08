@@ -42,8 +42,10 @@ incompatible with WTP. The CLI remains `--backend wtp --ini-file <file>`.
 configured hostname or literal IP. For a direct-IP connection, an explicit DNS
 identity can instead authenticate a certificate for that name. IP identities
 require a certificate IP SAN. DNS names use ASCII labels (IDNs must be provided
-as A-labels); URL schemes, ports in names, trailing dots, wildcard input and IPv6
-zone identifiers are rejected. Configure the TCP port separately.
+as A-labels). ASCII case and one final root dot are accepted; connection, TLS
+and HTTP use lowercase without that dot, while saved values retain their spelling.
+URL schemes, ports in names, wildcard input, ambiguous abbreviated/octal IP
+forms and IPv6 zone identifiers are rejected. Configure the TCP port separately.
 
 DHCP plus mDNS is the intended normal deployment; address reservations are not
 required. Every fresh connection resolves again through the host's system
@@ -52,7 +54,53 @@ NSS resolver for `.local` multicast DNS, commonly Avahi plus `libnss-mdns` and a
 appropriate `hosts` policy. WsprryPi does not install those services, alter
 `/etc/hosts`, edit resolver configuration, use reverse DNS as identity, or change
 system trust stores. A host lacking `.local` resolution reports connection
-failure. Real joint name-resolution acceptance belongs to 11.3.
+failure; a successful `getaddrinfo` call elsewhere does not establish this host's
+mDNS readiness. Pico remains IPv4-only even though the existing host adapter
+accepts IPv6 configurations for compatible peers.
+
+The Pico deployment's public `deployment.json` and exact certificate DNS SAN
+establish its hostname, normally `wsprrypico-<32-hex-device-id>.local`. Provision
+using Pico's certificate helper, then build/reflash under the explicit local
+deployment procedure. Its mDNS responder announces the DHCP address; it does not
+supply trusted identity. A name conflict stops advertisement without renaming or
+interrupting a finite job. Resolve the conflict before explicitly retrying the
+same certified name through the idle-only disable/re-enable or reboot workflow.
+
+For a known address with hostname authentication, retain the same CA/client
+files and device ID and set:
+
+```ini
+Hostname = 192.0.2.27
+TLS Server Identity = wsprrypico-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.local
+```
+
+This sends the expected hostname as HTTP Host/Origin after TLS authentication.
+If the IP changes, this explicit address must be updated; use the hostname in
+`Hostname` for automatic re-resolution. Leaving identity blank with a literal IP
+instead requires that exact IP SAN. A browser's literal-IP URL also requires its
+matching IP SAN. A hostname certificate never authenticates arbitrary changing
+IP URLs. Legacy IP-only bundles/configurations retain numeric authority; adding a
+hostname requires a corresponding certified Pico deployment.
+
+DHCP changes do not require certificate renewal for hostname access. Server
+renewal under the same per-device CA with the unchanged hostname leaves host
+settings intact. A deliberately changed hostname requires a new deployment
+certificate, rebuild/reflash and matching host settings. These actions are
+separate from the runtime client credential-rotation safeguards below.
+
+### Linux resolver checks
+
+On the intended host, read-only `getent ahostsv4 <hostname>.local` tests its NSS
+address path; `resolvectl query <hostname>.local` is useful where systemd-resolved
+is already configured, and `avahi-resolve-host-name -4 <hostname>.local` is useful
+where Avahi tools already exist. The latter tools alone do not establish that the
+application's NSS path works. Inspect `/etc/nsswitch.conf`, the existing resolver
+service status and multicast restrictions when resolution fails. mDNS uses
+link-local multicast UDP 5353 and usually does not cross routed/VLAN boundaries.
+Do not add static hosts entries to conceal stale DHCP resolution. A conflict may
+require direct-IP plus expected hostname access to inspect the intended device;
+TLS and WTP device checks remain mandatory. Physical Mac/Linux `.local`, DHCP
+reassignment and browser trust acceptance are Phase 11.4 gates.
 
 ## Credentials and TLS policy
 
@@ -60,7 +108,7 @@ Use maintained OS OpenSSL 3 development/runtime packages (`libssl-dev` and
 `pkg-config` on Debian). The parent now discovers `openssl`, linking both libssl
 and libcrypto; existing installer dependencies already include libssl-dev.
 The build rejects older headers. TLS 1.3, server-chain and expected-name/IP
-verification, a matching client certificate/key and exact ALPN `wtp/1` are
+verification against exact DNS SAN or IP SAN (no CN fallback or wildcard), a matching client certificate/key and exact ALPN `wtp/1` are
 mandatory. Idle management uses the same credentials with ALPN `http/1.1`.
 There is no plaintext mode, trust-on-first-use, verification bypass, session
 resumption cache or early-data submission.
@@ -118,7 +166,7 @@ loopback results; no CLI, INI, browser or environment option enables that seam.
 The development visibility boolean still controls the existing Transmitter panel.
 **Use Pico** selects the backend; **Connection** selects USB or Network (TLS).
 Fields, validation failures and status polling preserve drafts. Network status
-separates the configured endpoint, resolved address, last authenticated identity,
+separates the configured endpoint, canonical expected identity, resolved address, last authenticated identity,
 connection state/diagnostic and observation age. These are historical software
 observations; failed polling explicitly presents output as unknown.
 
@@ -132,22 +180,19 @@ requires a Pico restart; this interface does not request one. Disabling Pico
 Wi-Fi can disconnect control; restoring network access then requires its supported
 Console/restart workflow.
 
-The pinned unmodified Pico revision is
-`a34a9a4342013d41379242f1e456ca3e3760b8db`. It defaults network control off
-and supports two TLS sessions with one waiting TCP connection and one computing
-handshake, including concurrent browser management during physical jobs.
-WsprryPi idle management still acquires the same
-host operation lock, obtains fresh unowned/inactive WTP status, disconnects the
-idle stream without RELEASE, performs one HTTP exchange, then re-inspects WTP.
-It never releases a job merely to obtain HTTP status.
+The clean Pico implementation revision is pinned in `src/tests/network/CMakeLists.txt`
+and the network CI checkout. Pico defaults network control off and supports two
+TLS sessions with one waiting TCP connection and one computing handshake.
+WsprryPi idle management still acquires the same host operation lock, obtains
+fresh unowned/inactive WTP status, disconnects the idle stream without RELEASE,
+performs one HTTP exchange, then re-inspects WTP. It never releases a job merely
+to obtain HTTP status.
 
-That Pico revision requires numeric HTTP Host/Origin authority and its certificate
-helper requires an IP address. The host uses the resolved numeric HTTP authority
-while still authenticating the separately configured TLS identity. Present-server
-interop uses loopback IP SAN; separate TLS fixtures test hostname identities.
-Pico mDNS and hostname certificate provisioning are not implemented by this host
-work. Concurrent physical-job browser servicing belongs to the Pico firmware;
-the host loopback tests below do not qualify its physical timing or RF behavior.
+HTTP Host and mutation Origin use the canonical configured TLS reference
+identity, never the resolved TCP address or reverse lookup. Pico accepts its
+certified hostname and current IPv4 separately, then requires the same canonical
+Host/Origin authority. Non-443 ports are required; 443 is omitted. This preserves
+numeric legacy access while preventing name/IP cross-origin combinations.
 
 ## Hardware-free validation
 
@@ -167,6 +212,10 @@ Mbed TLS pin: `0bebf8b8c7f07abe3571ded48a11aa907a1ffb20`, including its SDK
 submodules. CMake verifies both clean tracked source trees and pins; no download
 or sibling modification occurs. Ephemeral keys, generated credential headers,
 server/client binaries and screenshots stay in ignored `src/build/wtp-network`.
+The build root is owner-only because its executable embeds the test key. The
+`credentials-v3` bundle is reused only after validation; existing or expired
+identities are never silently overwritten. Choose a new `WTP_NETWORK_BUILD_DIR`
+when fresh ephemeral credentials are needed.
 The WsprryPi-owned server harness supplies a valid 32-hex device identity and
 inhibited software engine, and explicitly enables the Pico standalone image's
 active-job connection policy. Its POSIX adapter handles fatal socket errors with
@@ -176,9 +225,9 @@ Use a different `WTP_NETWORK_BUILD_DIR` for sanitizer flags; pass matching
 `CMAKE_C_FLAGS`/`CMAKE_CXX_FLAGS` to that CMake directory and
 `WTP_NETWORK_CXXFLAGS`/`WTP_NETWORK_LDFLAGS` to Make. The CI loopback job includes
 TLS, actual Pico interop and rendered browser tests. Local execution is not a CI
-run. See the [acceptance record](development/phase11-1-review.md) for exact results.
+run. See the [Phase 11.3 acceptance record](development/phase11-3-review.md) for exact results.
 
-11.2 concurrent physical-job service, 11.3 joint DHCP/mDNS/certificates, 11.4
-inhibited physical acceptance, 11.5 target resources/contention, 11.6 conducted RF
-and 11.7 final cross-repository closure remain separate. This is software evidence,
+Phase 11.1 and 11.2 retain their closed software scopes. Phase 11.3 software
+acceptance does not close 11.4 inhibited physical acceptance, 11.5 target
+resources/contention, 11.6 conducted RF or 11.7 final cross-repository closure. This is software evidence,
 not physical USB, GPIO, timing, RF, installation or service qualification.

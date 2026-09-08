@@ -52,7 +52,7 @@ jobs:
         uses: actions/checkout@v7
         with:
           repository: WsprryPi/WsprryPico
-          ref: a34a9a4342013d41379242f1e456ca3e3760b8db
+          ref: d8cde03f8127b3c2aaf727f2c21c20960f658e84
           path: src/build/network-reference/pico
           persist-credentials: false
       - name: Read-only pinned Pico TLS dependency
