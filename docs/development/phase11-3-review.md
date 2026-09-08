@@ -103,6 +103,50 @@ from the host-client viewpoint for manifest, authority and board-binding
 agreement; no contract disagreement remained. Live NSS/mDNS, physical operation
 and the Mac-unavailable second IPv4 case are not claimed by these passes.
 
+## Linux CI orchestration repair
+
+Initial client implementation `efcc792cb45780c8b87ebfa83838ecb9eb9cdf47`
+was committed and pushed to `devel` with exact remote parity. GitHub Actions
+[run 34284241406](https://github.com/WsprryPi/WsprryPi/actions/runs/34284241406),
+network job `102255976179`, failed at the unchanged 180-second interop deadline.
+The Linux log explicitly records address2/address1 server restarts and
+“Actual changed IPv4 loopback address with unchanged DNS TLS identity passed”
+before the stall. That socket/address-change acceptance passed; the full network
+job failed and its later browser step did not run. The failed log is retained at
+`/tmp/phase11-3-ci-network.log` (independent copy
+`/tmp/phase11-3-ci-network-agent.log`).
+
+The driver mixed OS selector readiness with Python buffered text `readline()`.
+An informational line and the next `RESTART boot` flushed together could be
+prefetched into that text buffer: the first line was consumed, the second became
+invisible to OS readiness, and the client waited for `READY` until the deadline.
+The repair uses unbuffered binary pipes, one bounded OS read and explicit line
+framing that consumes every complete line while retaining at most a 4096-byte
+tail. It drains output through EOF, rejects incomplete/oversized control lines,
+and bounds process-exit waiting by the original deadline. Server startup uses the
+same framing with its existing 15-second deadline; a partial readiness line
+cannot block `readline()`, and startup exceptions terminate the owned child.
+No production C++, TLS/identity behavior, source pin or Linux second-address
+acceptance is changed.
+
+`make wtp-network-process-test SUDO=` adds five deterministic tests, including an
+actual child that atomically writes a notice and `RESTART`, then waits for the
+parent's `READY` before continuing. Fragmented/coalesced lines, partial EOF,
+oversized lines, successful readiness, stalled partial readiness and closed
+stdout while the child stays alive are covered. This target is a prerequisite
+of the existing CI interop target. Full normal and ASan+UBSan driver reruns use
+the already built, clean-input `d8cde03` Pico and `efcc792` client binaries because
+the coordinator's Pico checkout now contains only later test/metadata work.
+New CI still rebuilds against the unchanged exact clean Pico source gate.
+All five Make-wired subprocess tests and both final driver reruns passed;
+ASan+UBSan reported no finding. The local second-IPv4 case remains explicitly
+skipped on macOS. Independent review closed the buffering, startup and EOF
+findings, reran all five tests and found no remaining actionable issue.
+Regression evidence is `/tmp/phase11-3-pi-process-regression.log`.
+Repair logs are `/tmp/phase11-3-pi-interop-pipe-repair.log` and
+`/tmp/phase11-3-pi-interop-pipe-repair-asan.log`; fresh full CI remains a required
+gate after this repair.
+
 ## Documentation Impact
 
 Updated: `docs/wtp-network.md`, `docs/wtp-browser-api.md` and this review record.
@@ -132,7 +176,8 @@ Required follow-up under separate authorization:
 No live Pico, USB control, flashing, services, router/NSS/trust changes, target
 contention/timing or RF was exercised. Phase 11.4–11.7 remain open; loopback TLS,
 injected resolution, actual responder packets and physical NSS/mDNS acceptance
-must not be conflated. Commit/push/parity and remote CI evidence are pending.
+must not be conflated. Initial commit/push/parity are verified above; fresh
+remote CI after the orchestration repair remains pending.
 
 
 Primary source review: OpenSSL's documented

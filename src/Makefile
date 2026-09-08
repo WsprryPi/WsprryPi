@@ -1879,7 +1879,9 @@ WTP_NETWORK_BUILD_DIR ?= build/wtp-network
 WTP_NETWORK_CXXFLAGS ?= -O2 -g
 WTP_NETWORK_LDFLAGS ?=
 WTP_NETWORK_FLAGS = -std=c++20 -pthread -Wall -Wextra -Wpedantic -Werror $(WTP_NETWORK_CXXFLAGS) -I. -IWTP-Client/include $(OPENSSL_CFLAGS)
-.PHONY: wtp-api-test wtp-tls-build wtp-network-interop-test
+.PHONY: wtp-api-test wtp-tls-build wtp-network-interop-test wtp-network-process-test
+wtp-network-process-test:
+	$(Q)python3 -B tests/wtp_network_process_test.py
 wtp-api-test:
 	$(Q)mkdir -p "$(WTP_NETWORK_BUILD_DIR)"
 	$(Q)$(CXX) $(WTP_NETWORK_FLAGS) tests/wtp_browser_api_test.cpp wtp_integration/browser_api.cpp privileged_network_policy.cpp $(WTP_NETWORK_LDFLAGS) -o "$(WTP_NETWORK_BUILD_DIR)/wtp_browser_api_test"
@@ -1894,7 +1896,7 @@ wtp-tls-build:
 		wtp_integration/application.cpp wtp_integration/status.cpp wtp_integration/scheduler.cpp wtp_integration/backend.cpp wtp_integration/execution_plan.cpp \
 		WSPR-Transmitter/src/execution_plan_compiler.cpp WSPR-Transmitter/src/transmission_controller.cpp \
 		"$(WTP_NETWORK_BUILD_DIR)/client/libwtp_client.a" $(OPENSSL_LIBS) $(WTP_NETWORK_LDFLAGS) -o "$(WTP_NETWORK_BUILD_DIR)/wtp_network_interop_test"
-wtp-network-interop-test: wtp-tls-build wtp-api-test
+wtp-network-interop-test: wtp-tls-build wtp-api-test wtp-network-process-test
 	$(Q)cmake -S tests/network -B "$(WTP_NETWORK_BUILD_DIR)" -DPICO_SOURCE="$(abspath $(PICO_SOURCE))" -DMBEDTLS_SOURCE="$(abspath $(MBEDTLS_SOURCE))"
 	$(Q)cmake --build "$(WTP_NETWORK_BUILD_DIR)" -j 4
 	$(Q)python3 -B tests/wtp_network_interop_test.py "$(abspath $(WTP_NETWORK_BUILD_DIR))"
