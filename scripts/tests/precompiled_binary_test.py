@@ -58,6 +58,43 @@ class BinaryTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 m.inspect(self.binary, 'armv6', 'bookworm')
 
+    def inspect_libraries(self, cpu, release, libraries):
+        data = self.data.copy()
+        if cpu == 'aarch64':
+            data[4] = 2
+            struct.pack_into('<H', data, 18, 183)
+        self.binary.write_bytes(data)
+        loader = 'armhf' if cpu == 'armv6' else 'aarch64'
+        responses = [f'[Requesting program interpreter: /lib/ld-linux-{loader}.so.{3 if cpu == "armv6" else 1}]',
+                     '\n'.join(f'(NEEDED) Shared library: [{name}]' for name in libraries)]
+        if cpu == 'armv6':
+            responses.insert(0, 'Tag_CPU_arch: v6\nTag_FP_arch: VFPv2\nTag_ABI_VFP_args: VFP registers\n')
+        with patch.object(m, 'output', side_effect=responses):
+            return m.inspect(self.binary, cpu, release)
+
+    def test_current_release_libraries(self):
+        for cpu in ('armv6', 'aarch64'):
+            for release in ('bookworm', 'trixie'):
+                with self.subTest(cpu=cpu, release=release):
+                    gpiod = '1' if release == 'bookworm' else '2'
+                    libraries = ['libatomic.so.1', f'libgpiodcxx.so.{gpiod}',
+                                 'libssl.so.3', 'libcrypto.so.3', 'libsystemd.so.0',
+                                 'libstdc++.so.6', 'libm.so.6', 'libgcc_s.so.1', 'libc.so.6']
+                    expected = ['libatomic1', 'libc6', 'libgcc-s1', 'libstdc++6', 'libsystemd0',
+                                'libgpiod2' if release == 'bookworm' else 'libgpiod3',
+                                'libssl3' if release == 'bookworm' else 'libssl3t64']
+                    self.assertEqual(self.inspect_libraries(cpu, release, libraries), sorted(expected))
+
+    def test_unknown_library_still_rejected(self):
+        for release in ('bookworm', 'trixie'):
+            with self.subTest(release=release), self.assertRaises(ValueError) as error:
+                self.inspect_libraries('armv6', release, ['libcrypto.so.3', 'libunknown.so.1'])
+            self.assertEqual(str(error.exception), f"unsupported libraries for {release}: ['libunknown.so.1']")
+
+    def test_missing_libraries_still_rejected(self):
+        with self.assertRaisesRegex(ValueError, 'no required shared libraries'):
+            self.inspect_libraries('armv6', 'bookworm', [])
+
     def test_missing_runtime_symbols(self):
         import subprocess
         argv = ['helper', 'check', '--binary', str(self.binary), '--full', '--runtime-user', 'pi', '--field', 'version']

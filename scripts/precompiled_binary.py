@@ -58,13 +58,17 @@ def inspect(binary, cpu, release):
                'libgcc_s.so.1': 'libgcc-s1', 'libc.so.6': 'libc6', 'libm.so.6': 'libc6',
                'libpthread.so.0': 'libc6', 'librt.so.1': 'libc6', 'libdl.so.2': 'libc6',
                'libsystemd.so.0': 'libsystemd0',
+               'libssl.so.3': 'libssl3' if release == 'bookworm' else 'libssl3t64',
                'libcrypto.so.3': 'libssl3' if release == 'bookworm' else 'libssl3t64'}
     generation = ('1', '2', 'libgpiod2') if release == 'bookworm' else ('2', '3', 'libgpiod3')
     mapping['libgpiodcxx.so.' + generation[0]] = generation[2]
     mapping['libgpiod.so.' + generation[1]] = generation[2]
     needed = re.findall(r'\(NEEDED\).*\[(.*?)\]', dynamic)
-    if not needed or any(name not in mapping for name in needed):
-        raise ValueError(f'unsupported libraries for {release}: {needed}')
+    if not needed:
+        raise ValueError('executable has no required shared libraries')
+    unsupported = [name for name in needed if name not in mapping]
+    if unsupported:
+        raise ValueError(f'unsupported libraries for {release}: {unsupported}')
     return sorted({mapping[name] for name in needed})
 
 

@@ -4,6 +4,7 @@
 set -euo pipefail
 SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 source "$SCRIPT_DIR/../install.sh"
+precompiled_original_loge=$(declare -f logE)
 fixture=$(mktemp -d)
 trap 'rm -rf "$fixture"' EXIT
 logI() { :; }; logE() { :; }; logW() { :; }
@@ -96,4 +97,62 @@ DRY_RUN=false
 flag_need_reboot </dev/null >"$fixture/reboot-notice" 2>"$fixture/reboot-errors"
 [[ ! -s "$fixture/reboot-errors" ]]
 grep -q 'sudo reboot' "$fixture/reboot-notice"
+# Exercise helper failures through the real logger, without running the
+# installer, package manager, application, or system services.
+(
+    eval "$precompiled_original_loge"
+    LOG_FILE="$fixture/precompiled.log"
+    LOG_OUTPUT=both
+    LOG_LEVEL=INFO
+    USE_CONSOLE=true
+    export TERM=xterm
+    init_log() { :; }
+    setup_log
+    BINARY_SOURCE=local
+    BINARY_STAGE="$fixture/stage"
+    LOCAL_REPO_DIR="$fixture/repo"
+    SUDO_USER=pi
+    DRY_RUN=false
+    python3() {
+        printf 'partial result\n'
+        printf 'Precompiled executable rejected: unsupported libraries for bookworm: [libunknown.so.1]\nsecond diagnostic\n' >&2
+        return 23
+    }
+    BINARY_VERSION=stale
+    if validate_precompiled_runtime >"$fixture/helper-console" 2>"$fixture/helper-stderr"; then
+        echo 'Expected runtime validation failure' >&2
+        exit 1
+    fi
+    [[ -z "$BINARY_VERSION" && ! -s "$fixture/helper-stderr" ]]
+    for destination in "$fixture/helper-console" "$LOG_FILE"; do
+        grep -Eq '\[ERROR\].*unsupported libraries for bookworm' "$destination"
+        grep -Eq '\[ERROR\].*second diagnostic' "$destination"
+    done
+    # Dry-run basic checks use the same error route.
+    mkdir -p "$LOCAL_REPO_DIR/scripts"
+    touch "$LOCAL_REPO_DIR/scripts/precompiled_binary.py"
+    DRY_RUN=true
+    if prepare_precompiled_executable >"$fixture/dry-console" 2>"$fixture/dry-stderr"; then
+        echo 'Expected dry-run validation failure' >&2
+        exit 1
+    fi
+    [[ ! -s "$fixture/dry-stderr" ]]
+    grep -Eq '\[ERROR\].*unsupported libraries' "$fixture/dry-console"
+    # Successful multiline fields retain exact argv and contain no log text.
+    python3() {
+        [[ "$1" == 'helper path' && "$2" == 'argument with spaces' ]]
+        printf 'libgpiod2\nlibssl3\n'
+    }
+    packages=''
+    run_precompiled_helper packages 'helper path' 'argument with spaces' >"$fixture/success-console" 2>"$fixture/success-stderr"
+    [[ "$packages" == $'libgpiod2\nlibssl3' ]]
+    [[ ! -s "$fixture/success-console" && ! -s "$fixture/success-stderr" ]]
+    # Silent helper failures still produce a logged explanation and preserve
+    # their status while clearing any stale result.
+    python3() { return 23; }
+    helper_status=0
+    run_precompiled_helper packages helper >"$fixture/silent-console" || helper_status=$?
+    [[ "$helper_status" == 23 && -z "$packages" ]]
+    grep -Eq '\[ERROR\].*helper failed \(status 23\)' "$fixture/silent-console"
+)
 printf 'precompiled installer tests: PASS\n'

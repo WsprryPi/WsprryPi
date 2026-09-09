@@ -6917,6 +6917,32 @@ set_binary_source() { BINARY_SOURCE="$1"; }
 set_binary_path() { BINARY_PATH="$1"; }
 set_binary_release_tag() { BINARY_RELEASE_TAG="$1"; }
 
+# Keep helper diagnostics in the installer logger and successful field values
+# separate from console output. An empty first argument discards helper output.
+run_precompiled_helper() {
+    local precompiled_output_var="$1" precompiled_output precompiled_status precompiled_line
+    shift
+    if [[ -n "$precompiled_output_var" ]]; then
+        printf -v "$precompiled_output_var" '%s' ''
+    fi
+    if precompiled_output=$(python3 "$@" 2>&1); then
+        if [[ -n "$precompiled_output_var" ]]; then
+            printf -v "$precompiled_output_var" '%s' "$precompiled_output"
+        fi
+        return 0
+    else
+        precompiled_status=$?
+    fi
+    if [[ -n "$precompiled_output" ]]; then
+        while IFS= read -r precompiled_line; do
+            [[ -z "$precompiled_line" ]] || logE "$precompiled_line"
+        done <<<"$precompiled_output"
+    else
+        logE "Precompiled executable helper failed (status $precompiled_status)."
+    fi
+    return "$precompiled_status"
+}
+
 validate_binary_options() {
     case "$BINARY_SOURCE" in
         build)
@@ -6977,9 +7003,9 @@ prepare_precompiled_executable() {
     if [[ "$DRY_RUN" == "true" ]]; then
         logI "Dry run: would validate and stage the $BINARY_SOURCE executable; no download or copy performed."
         if [[ "$BINARY_SOURCE" == "local" && -f "$helper" ]]; then
-            python3 "$helper" check --binary "$binary" || return 1
+            run_precompiled_helper '' "$helper" check --binary "$binary" || return 1
             BINARY_VERSION="dry-run-unvalidated"
-            packages=$(python3 "$helper" check --binary "$binary" --field runtime_packages) || return 1
+            run_precompiled_helper packages "$helper" check --binary "$binary" --field runtime_packages || return 1
             mapfile -t BINARY_RUNTIME_PACKAGES <<<"$packages"
         else
             BINARY_VERSION="dry-run-unvalidated"
@@ -6998,10 +7024,10 @@ prepare_precompiled_executable() {
         # Caller-owned files are copied, never removed, and checked after copying.
         cp -- "$binary" "$BINARY_STAGE/wsprrypi" || return 1
     else
-        python3 "$helper" fetch --repo "$REPO_ORG/$REPO_NAME" --tag "$BINARY_RELEASE_TAG" --directory "$BINARY_STAGE" || return 1
+        run_precompiled_helper '' "$helper" fetch --repo "$REPO_ORG/$REPO_NAME" --tag "$BINARY_RELEASE_TAG" --directory "$BINARY_STAGE" || return 1
     fi
     chmod 755 "$BINARY_STAGE/wsprrypi" || return 1
-    packages=$(python3 "$helper" check --binary "$BINARY_STAGE/wsprrypi" --field runtime_packages) || return 1
+    run_precompiled_helper packages "$helper" check --binary "$BINARY_STAGE/wsprrypi" --field runtime_packages || return 1
     mapfile -t BINARY_RUNTIME_PACKAGES <<<"$packages"
     logI "Checked $BINARY_SOURCE executable architecture; application build disabled."
 }
@@ -7009,8 +7035,8 @@ prepare_precompiled_executable() {
 validate_precompiled_runtime() {
     [[ "$BINARY_SOURCE" != "build" ]] || return 0
     [[ "$DRY_RUN" != "true" ]] || { logI "Dry run: runtime library checks await installed dependencies."; return 0; }
-    BINARY_VERSION=$(python3 "$LOCAL_REPO_DIR/scripts/precompiled_binary.py" check \
-        --binary "$BINARY_STAGE/wsprrypi" --full --runtime-user "$SUDO_USER" --field version) || return 1
+    run_precompiled_helper BINARY_VERSION "$LOCAL_REPO_DIR/scripts/precompiled_binary.py" check \
+        --binary "$BINARY_STAGE/wsprrypi" --full --runtime-user "$SUDO_USER" --field version || return 1
 }
 
 prepare_install_executable() {
