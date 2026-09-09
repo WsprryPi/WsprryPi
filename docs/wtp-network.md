@@ -66,6 +66,14 @@ supply trusted identity. A name conflict stops advertisement without renaming or
 interrupting a finite job. Resolve the conflict before explicitly retrying the
 same certified name through the idle-only disable/re-enable or reboot workflow.
 
+A shorter certified alias is also supported, for example
+`wsprrypico-0a60df.local` using the last six hex characters of an observed Wi-Fi
+station MAC. Issue it explicitly with Pico's `--hostname` option and repeat that
+option on renewal. Configure the exact manifest/SAN name here; keep the full
+32-hex expected WTP device ID. MAC suffixes can collide and are not trust anchors.
+The Pico's normal conflict handling still applies. Its `stable_hostname` may
+show the full-ID default while `configured_hostname` identifies the alias in use.
+
 For a known address with hostname authentication, retain the same CA/client
 files and device ID and set:
 
@@ -87,6 +95,11 @@ renewal under the same per-device CA with the unchanged hostname leaves host
 settings intact. A deliberately changed hostname requires a new deployment
 certificate, rebuild/reflash and matching host settings. These actions are
 separate from the runtime client credential-rotation safeguards below.
+
+When preparing an isolated production acceptance run, account for the
+application's singleton on port 1234 as well as its web/socket ports. Use a
+separate suitable host or an explicitly planned service pause; changing only the
+web ports does not allow a second instance beside the installed application.
 
 ### Linux resolver checks
 
