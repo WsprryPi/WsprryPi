@@ -3,7 +3,90 @@
 Status: **OPEN**. The coordinating Pico repository owns the sole case matrix in
 `docs/development/phase11-4-plan.md` and consolidated `phase11-4-review.md`.
 This record separates actual host software checks, physical preparation and
-unexecuted production cases. One Pico is available; two-board acceptance is open.
+completed production cases and remaining physical gates. One Pico is available;
+two-board acceptance is open.
+
+## Single-board execution continuation
+
+Starting published Pi head was 6ca7d82319ccf3c5776a45975734992299985757;
+reviewed runtime and isolated executable remain the exact identities above.
+The user authorized all tests, then specifically authorized a bounded pause of
+`wsprrypi.service` on wspr5 after automatic approval review rejected service
+interruption under the broader grant. The rejection was resolved by that grant.
+No permission blocker is asserted for the executed production tests.
+
+The isolated GPIO-free executable SHA-256 remains
+`3acd44dd6a8933cc816604a4514d8517e7586a2da40bff628378e080af5c6857`.
+Actual production hostname startup, explicit IP plus expected DNS startup and
+management GET passed: resolved .47, authenticated wsprrypico-0a60df.local,
+full WTP device fd6127d11d6aca42a9905fa3fb1bf1d5, boot
+88091dc74738f0070d3d7fe44744a3d4 and inhibited engine. The exact private INI
+kept GPIO/LED/amplifier/selectors/fades disabled and used HTTP 31425 with IPv4
+loopback WebSocket 31426. Singleton 1234 required the approved service pause.
+The installed checkout, executable and INI were not replaced.
+
+One actual finite production QRSS E job, three-second dots at nominal 3,570,100 Hz,
+completed as `ea375a1be909a78d0000000000000001`, scheduled UTC ns
+1788920524000000000. The reviewed per-run `--allow-unqualified-frequency` option
+permitted this inhibited nominal-frequency test; it changed no qualification
+policy or installed setting. The ten-minute repeat was bounded by terminating
+the candidate before the next slot. Retained `host.last_report.job` proves matching
+authoritative completion, inactive device output and successful cleanup. Independent
+USB STATUS confirms the terminal record and empty/unowned/inactive state.
+
+Retain all wrapper failures: key-case exception before launch (attempt 1), wrong
+network envelope assumption after successful hostname startup (2), expected
+unqualified-band rejection before job preparation (3), and a null preparing-job
+observer exception causing graceful cancellation of a loaded job (4). Attempt 5's
+runtime job completed, but its observer expected the already-cleared current job
+instead of `host.last_report.job`; it exited 1. Offline assessment of retained
+report plus USB, not another physical run, established the completed outcome.
+The observer fixes retain unknown snapshots and do not fabricate device inactivity.
+
+The service was restored after each attempt. Final root-only provider query reports
+runtime profile, gpio20 and outputEnabled:false. Its rendered HTTP safety fields
+had been Unknown; the authoritative Unix-socket query requires write-side EOF and
+supplied the actual admission/cleanup evidence. Final installed binary hash remains
+`0c8d2a578a766d2b8292467a0c41babd39ae27196a707d8cc701565815f52bdf`;
+INI hash remains `795ce11848a20e03bb82c373e93f068d65bd0630d39761ac96ca2f832a724ebd`.
+Service is active, no candidate/capture process remains, and PID preservation is
+not claimed after approved pauses. Saved Transmit=false and boot Never persist.
+
+Pico-owned direct tests separately passed six inhibited lifecycle/cancellation/
+clock-budget cases, stale-revision Chrome drafts and restoration, server renewal,
+wrong-board fail-closed deployment, literal-IP TLS/HTTP clients and changed-value
+persistence. Original inhibited image/settings/trust were restored. These are not
+production-host fault, principal-rotation or Chrome job-submission results.
+
+Further production restart/fault packets were prepared but not invoked after
+baseline reachability failed. Mac TCP timeout and Linux No route to host occurred
+before CLAIM in independent fault-driver attempts. Linux captures retain delayed
+successful ARP/TLS earlier and unanswered ARP later; NSS was intermittent and failed
+after a Console off/on cycle. No TTL-zero goodbye was captured. Missing/untrusted/
+expired TLS clients closed before HTTP but produced unexpected record-layer errors;
+those remain unresolved. Router administration details, native Chrome access after
+relocking and a second Pico also remain missing prerequisites. Broad test authority
+and shared Wi-Fi/DHCP do not resolve those physical gaps.
+
+The sole current matrix remains in WsprryPico. Its new
+`docs/development/phase11-4-single-board-prompt.md`,
+`docs/development/phase11-4-single-board-run.md` and hashed evidence index distinguish
+passes, failed attempts, prepared packets and open gates. Raw logs/captures stay in
+the coordinating ignored `build/phase11-4-single-board-evidence/` tree.
+
+Repeated adversarial review fixed the observer/evidence distinctions above,
+verified source/executable binding and final provider state, and retained all open
+physical failures. No Pi runtime/component/CI pin/UI source changed; this update
+is documentation only. Pico's four affected deterministic CTest suites passed;
+prior Pi test results above are not represented as new tests. No remote CI,
+RF, timing, resource or release qualification is claimed. Operator-documentation
+follow-ups remain the listed read-only paths; no third repository was edited.
+
+## Historical baseline and preparation
+
+The remaining sections preserve the earlier baseline period. Statements there
+that no service action or production invocation occurred do not describe the
+subsequently approved continuation above.
 
 ## Source and tests
 
