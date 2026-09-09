@@ -61,6 +61,65 @@ struct Fixture {
     return std::count(peer.operations.begin(), peer.operations.end(), op);
   }
 };
+void long_wait_connection_budget() {
+  Fixture f;
+  const auto start = f.future(60000);
+  f.submit(start);
+  auto progress = f.peer.now;
+  unsigned waiting_status = 0;
+  f.peer.before_handle = [&](Operation op) {
+    progress = f.peer.now;
+    if (f.scheduler.phase() == WtpSchedulePhase::Waiting) {
+      CHECK(op == Operation::Status);
+      ++waiting_status;
+      CHECK(!f.peer.owner && !f.peer.job);
+    }
+  };
+  f.clock.tick = [&] {
+    if (f.peer.now - progress >= 30000)
+      f.peer.close();
+  };
+  auto result = f.scheduler.run();
+  CHECK(result.outcome == WtpScheduleOutcome::Complete);
+  CHECK(waiting_status >= 10);
+  CHECK(result.start_utc_ns == *wtp_slot_utc_ns(start.slot));
+  CHECK(f.count(Operation::Claim) == 1 && f.count(Operation::Load) == 1 &&
+        f.count(Operation::Arm) == 1 && f.peer.executions == 1);
+}
+void waiting_status_failures() {
+  for (int fault = 0; fault < 5; ++fault) {
+    Fixture f;
+    f.submit(f.future(60000));
+    bool injected = false;
+    f.peer.before_handle = [&](Operation op) {
+      if (injected || f.scheduler.phase() != WtpSchedulePhase::Waiting ||
+          op != Operation::Status)
+        return;
+      injected = true;
+      if (fault == 0) f.peer.lose_reply = Operation::Status;
+      if (fault == 1) f.peer.boot_id = std::string(32, '9');
+      if (fault == 2) f.scheduler.request_stop();
+      if (fault == 3) f.scheduler.invalidate_pending();
+      if (fault == 4) f.peer.advance(f.peer.now + 60000);
+    };
+    const auto result = f.scheduler.run();
+    CHECK(injected);
+    CHECK(f.count(Operation::Claim) == 0 && f.count(Operation::Load) == 0 &&
+          f.count(Operation::Arm) == 0 && !result.arm_handed_off);
+    if (fault < 2) {
+      CHECK(result.outcome == WtpScheduleOutcome::Blocked);
+      CHECK(!f.scheduler.submit(f.future(), std::string(32, 'b'), 1000));
+    } else if (fault == 2) {
+      CHECK(result.outcome == WtpScheduleOutcome::Cancelled);
+      f.submit(f.future(60000), 'b');
+      CHECK(f.scheduler.run().outcome == WtpScheduleOutcome::Complete);
+    } else if (fault == 3) {
+      CHECK(result.outcome == WtpScheduleOutcome::Invalidated);
+    } else {
+      CHECK(result.outcome != WtpScheduleOutcome::Complete);
+    }
+  }
+}
 void arithmetic() {
   CHECK(wtp_slot_utc_ns(slot(1000000000, 1)) == 1000000001);
   CHECK(wtp_slot_utc_ns(slot(1000000000, -1)) == 999999999);
@@ -386,6 +445,8 @@ void blocked_recovery() {
 } // namespace
 int main() {
   try {
+    long_wait_connection_budget();
+    waiting_status_failures();
     arithmetic();
     early_and_frozen();
     wspr_slot_and_complete_plan();

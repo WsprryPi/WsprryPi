@@ -294,6 +294,7 @@ WtpScheduleReport WtpScheduler::run() {
             "No runnable WTP request"};
   error_.clear();
   try {
+    auto last_wait_status = backend_.status_observed_ms_.value_or(clock_.now_ms());
     for (;;) {
       publish();
       if (stopped_)
@@ -311,6 +312,20 @@ WtpScheduleReport WtpScheduler::run() {
           return finish(WtpScheduleOutcome::Failed,
                         "WTP dispatch missed the preparation window");
         break;
+      }
+      // Keep the sole owner's connection alive without claiming a future job.
+      // Pico closes streams after 30 seconds without transport progress.
+      // Finish this read-only transaction before processing stop/reload; using
+      // the normal bounded deadline also avoids abandoning a pending response.
+      const auto monotonic = clock_.now_ms();
+      if (monotonic >= last_wait_status &&
+          monotonic - last_wait_status >= 5000) {
+        if (!backend_.fresh(backend_.deadline(), false))
+          return finish(WtpScheduleOutcome::Blocked, backend_.diagnostic());
+        last_wait_status = clock_.now_ms();
+        // Recheck stop/reload and UTC after potentially slow I/O. Never move
+        // the requested start or proceed directly to CLAIM/LOAD/ARM here.
+        continue;
       }
       auto before = clock_.now_ms();
       clock_.wait_ms(std::min<std::uint64_t>(

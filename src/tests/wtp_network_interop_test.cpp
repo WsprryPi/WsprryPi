@@ -129,8 +129,8 @@ int main(int argc, char **argv) {
       r.policy.allow_unqualified_frequency = true;
       return r;
     };
-    const auto finish = [&] {
-      const auto deadline = clock.now_ms() + 30000;
+    const auto finish = [&](std::uint64_t budget_ms = 30000) {
+      const auto deadline = clock.now_ms() + budget_ms;
       while (clock.now_ms() < deadline) { if (auto r = app.take_completion()) return *r; clock.wait_ms(2); }
       throw std::runtime_error("application completion deadline");
     };
@@ -139,6 +139,16 @@ int main(int argc, char **argv) {
     if (completed.outcome != WtpScheduleOutcome::Complete) std::cerr << completed.error << '\n';
     CHECK(completed.outcome == WtpScheduleOutcome::Complete && completed.job && completed.job->completed());
     CHECK(app.replaceable());
+    auto future = request();
+    future.slot.start_time = std::chrono::system_clock::now() + 60s;
+    const auto requested_start = *wtp_slot_utc_ns(future.slot);
+    app.prepare(future); app.start();
+    auto waited = finish(90000);
+    CHECK(waited.outcome == WtpScheduleOutcome::Complete && waited.job &&
+          waited.job->completed() && waited.execution.cleanup.ok);
+    CHECK(waited.start_utc_ns == requested_start && waited.arm_handed_off);
+    CHECK(app.replaceable());
+    std::cout << "Actual TLS 60-second scheduled wait completed at the requested slot\n";
     unsigned management_calls = 0;
     CHECK(app.idle_management([&] { CHECK(http("network").status == 200); ++management_calls; }));
     CHECK(management_calls == 1 && app.ready());

@@ -90,7 +90,13 @@ not measured USB latency guarantees. Slow operations may still miss the window
 and fail safely. The pinned fragmented-endpoint test uses an explicit 8,000 ms
 preparation allowance while retaining the 1,000 ms ARM reserve.
 
-Waiting uses at most 10 ms increments and is bounded by the requested slot.
+Waiting uses at most 10 ms increments and is bounded by the requested slot. The
+sole session owner refreshes STATUS every five seconds during this wait, keeping
+the connection within the Pico's 30-second idle budget without early ownership
+or job submission. Each read uses the normal bounded transaction deadline; stop
+and reload are rechecked after that read completes. A failed observation blocks
+new work until explicit recovery. Slow reads still consume the original slot's
+preparation allowance and cannot shift its start.
 Host UTC is checked against its committed monotonic anchor during waiting and
 again at the backend's final ARM gate, after any status reconciliation. A host
 clock jump, invalid observation, stalled/regressing time or exhausted submission
