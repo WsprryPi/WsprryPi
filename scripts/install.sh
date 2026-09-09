@@ -6690,7 +6690,7 @@ create_temp_build_swap() {
 # shellcheck disable=SC2317
 preflight_build_resources() {
     if [[ "$BINARY_SOURCE" != "build" ]] && ! rp1_gpclk_dkms_installation_selected; then
-        logI "Using a precompiled executable; application compilation and build swap are skipped."
+        logI "Precompiled executable: skipping application build and build swap."
         return 0
     fi
     local mem_total_kb
@@ -7003,7 +7003,7 @@ prepare_precompiled_executable() {
     chmod 755 "$BINARY_STAGE/wsprrypi" || return 1
     packages=$(python3 "$helper" check --binary "$BINARY_STAGE/wsprrypi" --field runtime_packages) || return 1
     mapfile -t BINARY_RUNTIME_PACKAGES <<<"$packages"
-    logI "Checked $BINARY_SOURCE executable architecture. Application compilation is disabled."
+    logI "Checked $BINARY_SOURCE executable architecture; application build disabled."
 }
 
 validate_precompiled_runtime() {
