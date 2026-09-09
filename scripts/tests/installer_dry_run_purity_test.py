@@ -57,6 +57,7 @@ class InstallerDryRunPurityTest(unittest.TestCase):
     def run_shell(self, source: str, **values: Path | str) -> subprocess.CompletedProcess[str]:
         environment = os.environ.copy()
         environment.update({"INSTALLER": str(INSTALLER)})
+        environment.update({name: '' for name in ('FGGLD', 'RESET', 'FGGRN', 'FGRED', 'MOVE_UP', 'CLEAR_LINE')})
         environment.update({name: str(value) for name, value in values.items()})
         result = subprocess.run(
             ["bash", "-c", source],
@@ -810,6 +811,72 @@ finish_script 1 debug
         self.assertNotIn("successful", result.stdout.lower())
         self.assertNotIn("completed", result.stdout.lower())
 
+    def test_sound_file_contains_only_configuration_not_wrapper_output(self) -> None:
+        sound_file = self.root / 'alsa-blacklist.conf'
+        result = self.run_shell(r'''
+source "$INSTALLER"
+definition=$(declare -f manage_sound)
+definition=${definition/'file="/etc/modprobe.d/alsa-blacklist.conf"'/'file="$SOUND_FILE"'}
+eval "$definition"
+is_pi5() { return 1; }
+ACTION=install
+DRY_RUN=false
+REBOOT=false
+manage_sound
+[[ "$REBOOT" == true ]]
+''', SOUND_FILE=sound_file)
+        self.assertEqual(sound_file.read_text(), 'blacklist snd_bcm2835\n')
+        self.assertIn('Complete: Disable legacy analogue audio.', result.stdout)
+
+    def test_i2c_fallback_logs_the_write_and_preserves_file_content(self) -> None:
+        boot_config = self.root / 'config.txt'
+        boot_config.write_text('# existing configuration\n')
+        result = self.run_shell(r'''
+source "$INSTALLER"
+definition=$(declare -f manage_i2c)
+definition=${definition//\/boot\/firmware\/config.txt/$BOOT_CONFIG}
+definition=${definition//\/boot\/config.txt/$BOOT_CONFIG}
+eval "$definition"
+command() {
+    if [[ "${1:-}" == -v && "${2:-}" == raspi-config ]]; then return 1; fi
+    builtin command "$@"
+}
+ACTION=install
+DRY_RUN=false
+REBOOT=false
+manage_i2c
+[[ "$REBOOT" == true ]]
+REBOOT=false
+manage_i2c
+[[ "$REBOOT" == false ]]
+''', BOOT_CONFIG=boot_config)
+        self.assertEqual(boot_config.read_text(), '# existing configuration\n\ndtparam=i2c_arm=on\n')
+        self.assertEqual(result.stdout.count('Complete: Enable I2C in boot configuration.'), 1)
+
+    def test_i2c_write_failure_has_no_completion_or_reboot_claim(self) -> None:
+        boot_config = self.root / 'config.txt'
+        boot_config.write_text('# original\n')
+        result = self.run_shell(r'''
+source "$INSTALLER"
+definition=$(declare -f manage_i2c)
+definition=${definition//\/boot\/firmware\/config.txt/$BOOT_CONFIG}
+definition=${definition//\/boot\/config.txt/$BOOT_CONFIG}
+eval "$definition"
+command() {
+    if [[ "${1:-}" == -v && "${2:-}" == raspi-config ]]; then return 1; fi
+    builtin command "$@"
+}
+tee() { return 33; }
+ACTION=install
+DRY_RUN=false
+REBOOT=false
+if manage_i2c; then exit 1; fi
+[[ "$REBOOT" == false ]]
+''', BOOT_CONFIG=boot_config)
+        self.assertEqual(boot_config.read_text(), '# original\n')
+        self.assertIn('Failed: Enable I2C in boot configuration.', result.stdout)
+        self.assertNotIn('Complete: Enable I2C', result.stdout)
+
     def test_direct_mutation_paths_have_dry_run_guards(self) -> None:
         source = INSTALLER.read_text(encoding="utf-8")
 
@@ -818,7 +885,7 @@ finish_script 1 debug
             return source[start : source.index("\n}\n", start) + 3]
 
         sound = function("manage_sound")
-        self.assertLess(sound.index('if [[ "$DRY_RUN" == "true" ]]'), sound.index('echo "$blacklist"'))
+        self.assertLess(sound.index('if [[ "$DRY_RUN" == "true" ]]'), sound.index('exec_command "Disable legacy analogue audio"'))
         reboot = function("flag_need_reboot")
         self.assertLess(reboot.index('if [[ "$DRY_RUN" == "true" ]]'), reboot.index("read -rp"))
         ini = function("upgrade_ini")

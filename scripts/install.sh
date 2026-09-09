@@ -2193,7 +2193,7 @@ modify_comment_lines() {
         logD "Exec: sed -i '$sed_script' '$file'"
     else
         # Actually apply it
-        sed -i "$sed_script" "$file" || {
+        exec_command "Update log directives in $file" sed -i "$sed_script" "$file" "$debug" || {
             logE "sed failed on $file"
             debug_end "$debug"; return 1
         }
@@ -2254,7 +2254,8 @@ replace_string_in_script() {
     # Use sed to replace all occurrences of %SEARCH_STRING% with REPLACE_STRING.
     # Propagate failure so callers staging privileged files cannot continue with
     # an incomplete render.
-    if ! sed -i "s|${pattern}|${replace_string}|g" "$file_path"; then
+    if ! exec_command "Set $search_string in $file_path" \
+        sed -i "s|${pattern}|${replace_string}|g" "$file_path" "$debug"; then
         logE "Failed to replace '${pattern}' in '$file_path'."
         debug_end "$debug"
         return 1
@@ -2592,20 +2593,20 @@ prepare_rp1_gpclk_dkms_installation() {
         RP1_GPCLK_DKMS_HELPER="${local_helper:-dry-run:no-helper-downloaded}"
     else
         RP1_GPCLK_DKMS_STATE_DIR=$(mktemp -d /tmp/wsprrypi-rp1-gpclk-dkms.XXXXXX)
-        chmod 0700 "$RP1_GPCLK_DKMS_STATE_DIR"
+        exec_command "Protect RP1 helper staging directory" chmod 0700 "$RP1_GPCLK_DKMS_STATE_DIR" "$debug" || return 1
         RP1_GPCLK_DKMS_HELPER="$RP1_GPCLK_DKMS_STATE_DIR/rp1_gpclk_dkms_install.py"
         if [[ -n "$local_helper" && -f "$local_helper" && ! -L "$local_helper" ]]; then
-            cp -- "$local_helper" "$RP1_GPCLK_DKMS_HELPER"
-            chmod 0700 "$RP1_GPCLK_DKMS_HELPER"
+            exec_command "Stage RP1 installer helper" cp -- "$local_helper" "$RP1_GPCLK_DKMS_HELPER" "$debug" || return 1
+            exec_command "Protect RP1 installer helper" chmod 0700 "$RP1_GPCLK_DKMS_HELPER" "$debug" || return 1
         else
             local helper_url="${GIT_RAW_BASE}/${REPO_ORG}/${REPO_NAME}/${REPO_BRANCH}/scripts/rp1_gpclk_dkms_install.py"
-            if ! curl --proto '=https' --tlsv1.2 --fail --silent --show-error \
-                --output "$RP1_GPCLK_DKMS_HELPER" "$helper_url"; then
+            if ! exec_command "Download RP1 installer helper" curl --proto '=https' --tlsv1.2 --fail --silent --show-error \
+                --output "$RP1_GPCLK_DKMS_HELPER" "$helper_url" "$debug"; then
                 warn "Unable to retrieve the RP1-GPCLK-DKMS installer helper from $helper_url."
                 cleanup_rp1_gpclk_dkms_state
                 return 1
             fi
-            chmod 0700 "$RP1_GPCLK_DKMS_HELPER"
+            exec_command "Protect RP1 installer helper" chmod 0700 "$RP1_GPCLK_DKMS_HELPER" "$debug" || return 1
         fi
     fi
 
@@ -2791,20 +2792,20 @@ prepare_owned_rp1_gpclk_runtime_removal() {
         return 0
     fi
     state_dir=$(mktemp -d /tmp/wsprrypi-rp1-gpclk-dkms.XXXXXX)
-    chmod 0700 "$state_dir"
+    exec_command "Protect RP1 helper staging directory" chmod 0700 "$state_dir" "$debug" || return 1
     local helper="$state_dir/rp1_gpclk_dkms_install.py"
     if [[ -n "$local_helper" && -f "$local_helper" && ! -L "$local_helper" ]]; then
-        cp -- "$local_helper" "$helper"
-        chmod 0700 "$helper"
+        exec_command "Stage RP1 installer helper" cp -- "$local_helper" "$helper" "$debug" || return 1
+        exec_command "Protect RP1 installer helper" chmod 0700 "$helper" "$debug" || return 1
     else
         local helper_url="${GIT_RAW_BASE}/${REPO_ORG}/${REPO_NAME}/${REPO_BRANCH}/scripts/rp1_gpclk_dkms_install.py"
-        if ! curl --proto '=https' --tlsv1.2 --fail --silent --show-error \
-            --output "$helper" "$helper_url"; then
+        if ! exec_command "Download RP1 installer helper" curl --proto '=https' --tlsv1.2 --fail --silent --show-error \
+            --output "$helper" "$helper_url" "$debug"; then
             warn "Unable to retrieve the RP1-GPCLK-DKMS installer helper from $helper_url."
             rm -rf -- "$state_dir"
             return 1
         fi
-        chmod 0700 "$helper"
+        exec_command "Protect RP1 installer helper" chmod 0700 "$helper" "$debug" || return 1
     fi
     local update_args=(prepare-runtime-removal)
     local failure_output_file="$state_dir/runtime-removal-output.log"
@@ -2862,20 +2863,20 @@ remove_owned_rp1_gpclk_dkms_provider() {
         RP1_GPCLK_DKMS_HELPER="${local_helper:-dry-run:no-helper-downloaded}"
     else
         RP1_GPCLK_DKMS_STATE_DIR=$(mktemp -d /tmp/wsprrypi-rp1-gpclk-dkms.XXXXXX)
-        chmod 0700 "$RP1_GPCLK_DKMS_STATE_DIR"
+        exec_command "Protect RP1 helper staging directory" chmod 0700 "$RP1_GPCLK_DKMS_STATE_DIR" "$debug" || return 1
         RP1_GPCLK_DKMS_HELPER="$RP1_GPCLK_DKMS_STATE_DIR/rp1_gpclk_dkms_install.py"
         if [[ -n "$local_helper" && -f "$local_helper" && ! -L "$local_helper" ]]; then
-            cp -- "$local_helper" "$RP1_GPCLK_DKMS_HELPER"
-            chmod 0700 "$RP1_GPCLK_DKMS_HELPER"
+            exec_command "Stage RP1 installer helper" cp -- "$local_helper" "$RP1_GPCLK_DKMS_HELPER" "$debug" || return 1
+            exec_command "Protect RP1 installer helper" chmod 0700 "$RP1_GPCLK_DKMS_HELPER" "$debug" || return 1
         else
             local helper_url="${GIT_RAW_BASE}/${REPO_ORG}/${REPO_NAME}/${REPO_BRANCH}/scripts/rp1_gpclk_dkms_install.py"
-            if ! curl --proto '=https' --tlsv1.2 --fail --silent --show-error \
-                --output "$RP1_GPCLK_DKMS_HELPER" "$helper_url"; then
+            if ! exec_command "Download RP1 installer helper" curl --proto '=https' --tlsv1.2 --fail --silent --show-error \
+                --output "$RP1_GPCLK_DKMS_HELPER" "$helper_url" "$debug"; then
                 warn "Unable to retrieve the RP1-GPCLK-DKMS installer helper from $helper_url."
                 cleanup_rp1_gpclk_dkms_state
                 return 1
             fi
-            chmod 0700 "$RP1_GPCLK_DKMS_HELPER"
+            exec_command "Protect RP1 installer helper" chmod 0700 "$RP1_GPCLK_DKMS_HELPER" "$debug" || return 1
         fi
     fi
 
@@ -6529,7 +6530,7 @@ cleanup_temp_build_swap() {
 
     if [[ "${TEMP_BUILD_SWAP_ACTIVE:-false}" == "true" ]] ||
         temp_build_swap_is_active "$path"; then
-        if ! swapoff "$path"; then
+        if ! exec_command "Disable temporary build swap" swapoff "$path"; then
             logE "Unable to disable installer-owned temporary build swap: $path"
             logE "The active file was preserved. Recover with: sudo swapoff '$path' && sudo rm -f '$path'"
             return 1
@@ -6544,7 +6545,7 @@ cleanup_temp_build_swap() {
     fi
 
     if [[ -e "$path" ]]; then
-        rm -f -- "$path"
+        exec_command "Remove temporary build swap file" rm -f -- "$path" || return 1
     fi
     if [[ -e "$path" ]]; then
         logE "Unable to remove installer-owned temporary build swap: $path"
@@ -6647,7 +6648,8 @@ create_temp_build_swap() {
             return 1
         fi
     else
-        install -d -m 0700 "$BUILD_RESOURCE_SWAP_ROOT" || return 1
+        exec_command "Create temporary build swap directory" \
+            install -d -m 0700 "$BUILD_RESOURCE_SWAP_ROOT" || return 1
         TEMP_BUILD_SWAP_ROOT_OWNED="true"
     fi
 
@@ -6656,19 +6658,19 @@ create_temp_build_swap() {
         return 1
     }
     TEMP_BUILD_SWAP_OWNED="true"
-    chmod 0600 "$TEMP_BUILD_SWAP_PATH" || {
+    exec_command "Protect temporary build swap file" chmod 0600 "$TEMP_BUILD_SWAP_PATH" || {
         cleanup_temp_build_swap || true
         return 1
     }
-    fallocate -l "${allocation_kb}K" -- "$TEMP_BUILD_SWAP_PATH" || {
+    exec_command "Allocate temporary build swap" fallocate -l "${allocation_kb}K" -- "$TEMP_BUILD_SWAP_PATH" || {
         cleanup_temp_build_swap || true
         return 1
     }
-    mkswap "$TEMP_BUILD_SWAP_PATH" >/dev/null || {
+    exec_command "Format temporary build swap" mkswap "$TEMP_BUILD_SWAP_PATH" || {
         cleanup_temp_build_swap || true
         return 1
     }
-    swapon -p 10 "$TEMP_BUILD_SWAP_PATH" || {
+    exec_command "Enable temporary build swap" swapon -p 10 "$TEMP_BUILD_SWAP_PATH" || {
         cleanup_temp_build_swap || true
         return 1
     }
@@ -6979,17 +6981,20 @@ cleanup_precompiled_executable() {
 rollback_executable() {
     [[ "$BINARY_INSTALLED" == "true" ]] || return 0
     if systemctl is-active --quiet "$WSPR_SERVICE" 2>/dev/null; then
-        systemctl stop "$WSPR_SERVICE" || { BINARY_INSTALLED="recovery-failed"; return 1; }
+        exec_command "Stop $WSPR_SERVICE for executable recovery" \
+            systemctl stop "$WSPR_SERVICE" || { BINARY_INSTALLED="recovery-failed"; return 1; }
     fi
     if [[ -n "$BINARY_PREVIOUS" ]]; then
-        if ! mv -f -- "$BINARY_PREVIOUS" "$BINARY_DESTINATION"; then
+        if ! exec_command "Restore previous executable at $BINARY_DESTINATION" \
+            mv -f -- "$BINARY_PREVIOUS" "$BINARY_DESTINATION"; then
             logE "Executable recovery failed; previous executable retained at $BINARY_PREVIOUS."
             BINARY_INSTALLED="recovery-failed"
             return 1
         fi
         BINARY_PREVIOUS=""
     else
-        rm -f -- "$BINARY_DESTINATION" || return 1
+        exec_command "Remove failed executable at $BINARY_DESTINATION" \
+            rm -f -- "$BINARY_DESTINATION" || return 1
     fi
     BINARY_INSTALLED="false"
     logI "Restored the previous executable after installation failure."
@@ -7016,17 +7021,17 @@ prepare_precompiled_executable() {
     git_clone "$@" || return 1
     [[ -f "$helper" ]] || { logE "Missing precompiled validation helper in the source checkout."; return 1; }
     BINARY_STAGE=$(mktemp -d /var/tmp/wsprrypi-binary.XXXXXXXX) || return 1
-    chmod 755 "$BINARY_STAGE" || return 1
+    exec_command "Set precompiled staging directory permissions" chmod 755 "$BINARY_STAGE" "$@" || return 1
     if [[ "$BINARY_SOURCE" == "local" ]]; then
         [[ -f "$binary" ]] || {
             logE "Provide the executable at $binary."; return 1;
         }
         # Caller-owned files are copied, never removed, and checked after copying.
-        cp -- "$binary" "$BINARY_STAGE/wsprrypi" || return 1
+        exec_command "Stage precompiled executable" cp -- "$binary" "$BINARY_STAGE/wsprrypi" "$@" || return 1
     else
         run_precompiled_helper '' "$helper" fetch --repo "$REPO_ORG/$REPO_NAME" --tag "$BINARY_RELEASE_TAG" --directory "$BINARY_STAGE" || return 1
     fi
-    chmod 755 "$BINARY_STAGE/wsprrypi" || return 1
+    exec_command "Set precompiled executable permissions" chmod 755 "$BINARY_STAGE/wsprrypi" "$@" || return 1
     run_precompiled_helper packages "$helper" check --binary "$BINARY_STAGE/wsprrypi" --field runtime_packages || return 1
     mapfile -t BINARY_RUNTIME_PACKAGES <<<"$packages"
     logI "Checked $BINARY_SOURCE executable architecture; application build disabled."
@@ -7183,20 +7188,23 @@ manage_exe() {
         [[ -f "$source_path" ]] || { logE "Executable is missing: $source_path"; return 1; }
         local pending
         pending=$(mktemp "${exe_path}.new.XXXXXXXX") || return 1
-        if ! install -o root -g root -m 755 "$source_path" "$pending"; then
+        if ! exec_command "Stage executable for $exe_path" \
+            install -o root -g root -m 755 "$source_path" "$pending" "$debug"; then
             rm -f -- "$pending"
             return 1
         fi
         BINARY_DESTINATION="$exe_path"
         if [[ -e "$exe_path" || -L "$exe_path" ]]; then
             BINARY_PREVIOUS=$(mktemp "${exe_path}.previous.XXXXXXXX") || { rm -f -- "$pending"; return 1; }
-            cp -p -- "$exe_path" "$BINARY_PREVIOUS" || { rm -f -- "$pending" "$BINARY_PREVIOUS"; BINARY_PREVIOUS=""; return 1; }
+            exec_command "Back up existing executable at $exe_path" \
+                cp -p -- "$exe_path" "$BINARY_PREVIOUS" "$debug" || { rm -f -- "$pending" "$BINARY_PREVIOUS"; BINARY_PREVIOUS=""; return 1; }
         fi
         if ! stop_binary_service "$debug"; then
             rm -f -- "$pending"
             return 1
         fi
-        if ! mv -f -- "$pending" "$exe_path"; then
+        if ! exec_command "Install executable at $exe_path" \
+            mv -f -- "$pending" "$exe_path" "$debug"; then
             rm -f -- "$pending"
             restore_daemon_state "$debug"
             return 1
@@ -7250,13 +7258,17 @@ manage_support_bundle_runtime() {
 
 # Install the application-owned route companion from the selected checkout.
 manage_route_application() {
-    if [[ "$ACTION" == "install" && "$DRY_RUN" != "true" ]]; then
-        install -d -o root -g root -m 0755 /usr/local/lib/wsprrypi || return 1
-        install -o root -g root -m 0755 "${LOCAL_REPO_DIR}/scripts/route_application.py" \
-            /usr/local/lib/wsprrypi/route_application.py || return 1
-        python3 "${LOCAL_REPO_DIR}/scripts/install_runtime_reconcile.py" install || return 1
-    elif [[ "$ACTION" == "uninstall" && "$DRY_RUN" != "true" ]]; then
-        python3 "${LOCAL_REPO_DIR}/scripts/install_runtime_reconcile.py" remove || return 1
+    if [[ "$ACTION" == "install" ]]; then
+        exec_command "Create route-runtime directory" \
+            install -d -o root -g root -m 0755 /usr/local/lib/wsprrypi "$@" || return 1
+        exec_command "Install route application companion" \
+            install -o root -g root -m 0755 "${LOCAL_REPO_DIR}/scripts/route_application.py" \
+            /usr/local/lib/wsprrypi/route_application.py "$@" || return 1
+        exec_command "Install runtime reconciliation support" \
+            python3 "${LOCAL_REPO_DIR}/scripts/install_runtime_reconcile.py" install "$@" || return 1
+    elif [[ "$ACTION" == "uninstall" ]]; then
+        exec_command "Remove runtime reconciliation support" \
+            python3 "${LOCAL_REPO_DIR}/scripts/install_runtime_reconcile.py" remove "$@" || return 1
     fi
 }
 
@@ -7645,7 +7657,8 @@ upgrade_ini() {
         logE "INI merge failed (mawk exited $rc). Falling back to default INI." "$err_details"
 
         if [[ -s "$new_ini" ]]; then
-            cp -f "$new_ini" "$merged_ini"
+            exec_command "Use default INI after merge failure" \
+                cp -f "$new_ini" "$merged_ini" "$debug" || return 1
             rm -f /tmp/upgrade_ini.err "$tmp_merged"
             debug_print "Fallback to installer INI succeeded." "$debug"
             debug_end "$debug"
@@ -7662,7 +7675,8 @@ upgrade_ini() {
         logE "INI merge produced an empty file. Falling back to default INI."
 
         if [[ -s "$new_ini" ]]; then
-            cp -f "$new_ini" "$merged_ini"
+            exec_command "Use default INI after empty merge" \
+                cp -f "$new_ini" "$merged_ini" "$debug" || return 1
             debug_print "Fallback to installer INI succeeded." "$debug"
         else
             logE "Fallback failed: installer INI is also empty."
@@ -7671,7 +7685,7 @@ upgrade_ini() {
             return 1
         fi
     else
-        mv -f "$tmp_merged" "$merged_ini"
+        exec_command "Publish merged INI" mv -f "$tmp_merged" "$merged_ini" "$debug" || return 1
         debug_print "INI merge successful." "$debug"
     fi
 
@@ -8364,12 +8378,12 @@ manage_sound() {
     if [[ "$ACTION" == "install" ]]; then
         if [[ ! -f "$file" ]]; then
             # Create file and add the blacklist line
-            echo "$blacklist" >"$file"
+            exec_command "Disable legacy analogue audio" tee -- "$file" "$debug" <<<"$blacklist" || return 1
             REBOOT="true"
             debug_print "Created $file and disabled sound." "$debug"
         elif ! grep -Fxq "$blacklist" "$file"; then
             # Append blacklist line if it doesn't exist
-            echo "$blacklist" >>"$file"
+            exec_command "Disable legacy analogue audio" tee -a -- "$file" "$debug" <<<"$blacklist" || return 1
             REBOOT="true"
             debug_print "Added blacklist entry to $file." "$debug"
         else
@@ -8382,7 +8396,7 @@ manage_sound() {
 
             if [[ "$line_count" -eq 1 ]]; then
                 # If it's the only line, delete the file
-                rm -f "$file"
+                exec_command "Remove legacy audio blacklist file" rm -f "$file" "$debug" || return 1
                 if [[ "$sound_reboot_required" == "true" ]]; then
                     debug_print "Removed $file and re-enabled sound." "$debug"
                 else
@@ -8390,7 +8404,8 @@ manage_sound() {
                 fi
             else
                 # Otherwise, remove just the blacklist line
-                sed -i "\|$blacklist|d" "$file"
+                exec_command "Remove legacy audio blacklist entry" \
+                    sed -i "\|$blacklist|d" "$file" "$debug" || return 1
                 debug_print "Removed blacklist entry from $file." "$debug"
             fi
             if [[ "$sound_reboot_required" == "true" ]]; then
@@ -8462,13 +8477,15 @@ manage_i2c() {
         if [[ "$DRY_RUN" == "true" ]]; then
             logD "Exec: sed -i 's|^[[:space:]#]*dtparam=i2c_arm=.*|$i2c_setting|' $boot_config"
         else
-            sed -i "s|^[[:space:]#]*dtparam=i2c_arm=.*|$i2c_setting|" "$boot_config"
+            exec_command "Enable I2C in boot configuration" \
+                sed -i "s|^[[:space:]#]*dtparam=i2c_arm=.*|$i2c_setting|" "$boot_config" "$debug" || return 1
         fi
     else
         if [[ "$DRY_RUN" == "true" ]]; then
             logD "Exec: printf '\\n%s\\n' '$i2c_setting' >> $boot_config"
         else
-            printf "\n%s\n" "$i2c_setting" >>"$boot_config"
+            exec_command "Enable I2C in boot configuration" \
+                tee -a -- "$boot_config" "$debug" <<<$'\n'"$i2c_setting" || return 1
         fi
     fi
 
@@ -9244,7 +9261,7 @@ EOF
 
     backup_file="${config_file}.wsprrypi.bak"
     if [[ ! -f "$backup_file" ]]; then
-        cp "$config_file" "$backup_file" || {
+        exec_command "Back up Apache proxy configuration" cp "$config_file" "$backup_file" "$debug" || {
             rm -f "$tmp_file" "$block_file"
             logE "Failed to back up '$config_file'."
             debug_end "$debug"
@@ -9252,7 +9269,7 @@ EOF
         }
     fi
 
-    cp -p "$config_file" "$tmp_file" || {
+    exec_command "Stage Apache proxy configuration" cp -p "$config_file" "$tmp_file" "$debug" || {
         rm -f "$tmp_file" "$block_file"
         logE "Failed to preserve Apache config metadata."
         debug_end "$debug"
@@ -9296,7 +9313,7 @@ EOF
         return 1
     }
 
-    mv "$tmp_file" "$config_file" || {
+    exec_command "Install Apache proxy configuration" mv "$tmp_file" "$config_file" "$debug" || {
         rm -f "$tmp_file" "$block_file"
         logE "Failed to install updated Apache config."
         debug_end "$debug"
@@ -9368,7 +9385,7 @@ remove_wsprrypi_proxy_block() {
         return 1
     }
 
-    mv "$tmp_file" "$config_file" || {
+    exec_command "Remove WsprryPi Apache proxy configuration" mv "$tmp_file" "$config_file" "$debug" || {
         rm -f "$tmp_file"
         logE "Failed to install updated Apache config."
         debug_end "$debug"

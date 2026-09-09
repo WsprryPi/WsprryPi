@@ -2324,8 +2324,9 @@ source "$INSTALL_SCRIPT"
 ACTION=uninstall
 DRY_RUN=false
 REMOVE_RP1_GPCLK_DKMS=auto
-exec_command() {
-    printf '%s\n' "$HELPER_OUTPUT" >"$EXEC_COMMAND_FAILURE_OUTPUT_FILE"
+FGGLD= RESET= FGGRN= FGRED= MOVE_UP= CLEAR_LINE=
+python3() {
+    printf '%s\n' "$HELPER_OUTPUT"
 }
 remove_owned_rp1_gpclk_dkms_provider
 printf '%s\n' "$RP1_GPCLK_DKMS_PROVIDER_REMOVAL_UNPROVEN"

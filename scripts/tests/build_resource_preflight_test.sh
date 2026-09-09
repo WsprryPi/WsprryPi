@@ -10,6 +10,7 @@ trap 'rm -rf -- "$FIXTURE"' EXIT
 # shellcheck source=../install.sh
 # shellcheck disable=SC1091
 source "$INSTALLER"
+FGGLD='' RESET='' FGGRN='' FGRED='' MOVE_UP='' CLEAR_LINE=''
 
 TEST_LOG="$FIXTURE/log"
 MEMINFO="$FIXTURE/meminfo"

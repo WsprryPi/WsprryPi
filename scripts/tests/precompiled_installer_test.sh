@@ -5,6 +5,7 @@ set -euo pipefail
 SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 source "$SCRIPT_DIR/../install.sh"
 precompiled_original_loge=$(declare -f logE)
+precompiled_original_exec=$(declare -f exec_command)
 fixture=$(mktemp -d)
 trap 'rm -rf "$fixture"' EXIT
 logI() { :; }; logE() { :; }; logW() { :; }
@@ -97,6 +98,43 @@ DRY_RUN=false
 flag_need_reboot </dev/null >"$fixture/reboot-notice" 2>"$fixture/reboot-errors"
 [[ ! -s "$fixture/reboot-errors" ]]
 grep -q 'sudo reboot' "$fixture/reboot-notice"
+# Real wrapper output must track actual executable publication and recovery.
+# Only ownership installation and service calls are mocked; file movement is real.
+(
+    eval "$precompiled_original_exec"
+    FGGLD='' RESET='' FGGRN='' FGRED='' MOVE_UP='' CLEAR_LINE=''
+    ACTION=install
+    DRY_RUN=false
+    BINARY_SOURCE=local
+    BINARY_STAGE="$fixture/logging-stage"
+    BINARY_INSTALL_DIR="$fixture/logging-bin"
+    BINARY_INSTALLED=false
+    mkdir -p "$BINARY_STAGE" "$BINARY_INSTALL_DIR"
+    printf new >"$BINARY_STAGE/wsprrypi"
+    printf old >"$BINARY_INSTALL_DIR/wsprrypi"
+    systemctl() { printf '%s\n' "$1" >>"$fixture/logging-services"; }
+    manage_exe wsprrypi >"$fixture/publication-console"
+    [[ $(cat "$BINARY_INSTALL_DIR/wsprrypi") == new && "$BINARY_INSTALLED" == true ]]
+    grep -Fq "Complete: Stage executable for $BINARY_INSTALL_DIR/wsprrypi." "$fixture/publication-console"
+    grep -Fq "Complete: Back up existing executable at $BINARY_INSTALL_DIR/wsprrypi." "$fixture/publication-console"
+    grep -Fq "Complete: Install executable at $BINARY_INSTALL_DIR/wsprrypi." "$fixture/publication-console"
+    rollback_executable >"$fixture/recovery-console"
+    [[ $(cat "$BINARY_INSTALL_DIR/wsprrypi") == old && "$BINARY_INSTALLED" == false ]]
+    grep -Fq "Complete: Restore previous executable at $BINARY_INSTALL_DIR/wsprrypi." "$fixture/recovery-console"
+    # A failed rename must report failure without claiming publication.
+    mv() { return 27; }
+    restore_daemon_state() { printf restored >"$fixture/logging-restored"; }
+    expect_failure manage_exe wsprrypi >"$fixture/publication-failure" 2>"$fixture/publication-error"
+    [[ $(cat "$BINARY_INSTALL_DIR/wsprrypi") == old && "$BINARY_INSTALLED" == false ]]
+    [[ -f "$fixture/logging-restored" ]]
+    grep -Fq "Failed: Install executable at $BINARY_INSTALL_DIR/wsprrypi." "$fixture/publication-failure"
+    if grep -Fq "Complete: Install executable at $BINARY_INSTALL_DIR/wsprrypi." "$fixture/publication-failure"; then
+        echo 'Failed publication claimed completion' >&2
+        exit 1
+    fi
+    unset -f mv
+    cleanup_precompiled_executable
+)
 # Exercise helper failures through the real logger, without running the
 # installer, package manager, application, or system services.
 (

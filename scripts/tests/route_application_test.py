@@ -100,19 +100,24 @@ class Tests(unittest.TestCase):
             with self.assertRaises(ValueError): app.inspect_service()
 
     def test_bootstrap_installer_uses_selected_checkout_and_honors_dry_run(self):
-        source = (SOURCE/'scripts/install.sh').read_text()
-        function = source.split('manage_route_application() {', 1)[1].split('\n}\n', 1)[0]
-        function = 'manage_route_application() {'+function+'\n}\n'
         for dry_run in ('true', 'false'):
-            script = ('python3() { printf "%s\\n" "$*"; }\n'+'install() { printf "%s\\n" "$*"; }\n'+function+
+            script = ('source "$INSTALLER"\n'
+                'FGGLD= RESET= FGGRN= FGRED= MOVE_UP= CLEAR_LINE=\n'
+                'python3() { printf "%s\\n" "$*" >>"$CALLS"; }\n'
+                'install() { printf "%s\\n" "$*" >>"$CALLS"; }\n'+
                 'ACTION=install\nLOCAL_REPO_DIR=/selected-checkout\nDRY_RUN='+dry_run+
                 '\nmanage_route_application\n')
-            result = subprocess.check_output(['bash', '-c', script], text=True, cwd='/tmp')
-            if dry_run == 'true':
-                self.assertEqual(result, '')
-            else:
-                self.assertIn('/selected-checkout/scripts/route_application.py', result)
-                self.assertIn('/usr/local/lib/wsprrypi/route_application.py', result)
+            with tempfile.TemporaryDirectory() as directory:
+                calls = Path(directory)/'calls'
+                result = subprocess.check_output(['bash', '-c', script], text=True, cwd='/tmp',
+                    env={**os.environ, 'INSTALLER': str(SOURCE/'scripts/install.sh'), 'CALLS': str(calls)})
+                self.assertIn('Install route application companion.', result)
+                self.assertIn('Install runtime reconciliation support.', result)
+                if dry_run == 'true':
+                    self.assertFalse(calls.exists())
+                else:
+                    self.assertIn('/selected-checkout/scripts/route_application.py', calls.read_text())
+                    self.assertIn('/usr/local/lib/wsprrypi/route_application.py', calls.read_text())
 
 
 if __name__ == '__main__': unittest.main()
