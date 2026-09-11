@@ -189,3 +189,31 @@ pin. Production WTP/USB/TLS behavior, browser API/UI and normative protocol are
 unchanged. Wsprry_Pi_Docs stays read-only; its operating-envelope publication
 waits for physical acceptance. Phase 11.5/11.6/13 ownership and all open resource
 and conducted-RF gates remain as previously recorded.
+
+## Authorized P2 physical result
+
+The user subsequently authorized the frozen P2 flashing/RF packet. Pico A ran
+exactly three 10-second 135.5 kHz Tone jobs on clean 0d9bb44a6b91, SRAM renderer,
+138 MHz, divider 1, and passed all frozen pilot checks. Minimum full-buffer
+reserve was 7674/16384 (46.84%; minimum 25%), short reserve 2060/2312 (89.10%),
+and maximum worker service gap 2.176 ms (limit 2.849391 ms). All three jobs
+completed and released, with 7,902 DMA IRQs, three tail completions, 7,896 matched
+running refills and no recorded DMA errors or fault events.
+
+Pico A was restored to original inhibited 802c91a7b86e-dirty, new boot
+0b1cb103440c63757e5f326660be75d2. Pico B remained on original inhibited firmware
+and boot 4e2fb851c08b278dd4b977104d2c2aaa. Independent readbacks verified both
+empty, unowned and output false. Host boot/radios/services remained unchanged;
+the new bounded supervisor finished successfully. No repeat RF run was needed.
+
+Pico's phase11-5-remediation-result.json and updated review bind exact image,
+packet, device/boot, raw evidence and final restoration. Independent raw-wire
+and Console reconstruction passed, as did six adversarial evidence mutations.
+Original failed attempts remain retained. This passes only the three-job
+resource diagnostic; it does not accept a clock, close full A-G/resource gates,
+prove an isolated XIP cause, or qualify spectra, filters, other bands/modes or
+clocks. The accepted-configuration list remains empty.
+
+Documentation Impact: updated the companion evidence record only. No production,
+protocol, browser API/UI or operator-documentation behavior changed. Full
+resource acceptance and the previously listed Wsprry_Pi_Docs follow-up remain.
