@@ -20,7 +20,7 @@ Transmit = false
 
 [WTP]
 Transport = network
-Hostname = wsprrypico-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.local
+Hostname = wsprrypico-0a60df.local
 TCP Port = 18443
 TLS Server Identity =
 TLS CA File = /etc/wsprrypi/pico/ca.crt
@@ -59,27 +59,29 @@ mDNS readiness. Pico remains IPv4-only even though the existing host adapter
 accepts IPv6 configurations for compatible peers.
 
 The Pico deployment's public `deployment.json` and exact certificate DNS SAN
-establish its hostname, normally `wsprrypico-<32-hex-device-id>.local`. Provision
-using Pico's certificate helper, then build/reflash under the explicit local
-deployment procedure. Its mDNS responder announces the DHCP address; it does not
-supply trusted identity. A name conflict stops advertisement without renaming or
-interrupting a finite job. Resolve the conflict before explicitly retrying the
-same certified name through the idle-only disable/re-enable or reboot workflow.
+establish its hostname. The default is
+`wsprrypico-<last-six-station-MAC-hex>.local`, for example
+`wsprrypico-0a60df.local`. Supply the observed station MAC to Pico's certificate
+helper, then build/reflash under the explicit local deployment procedure.
+Keep the full 32-hex expected WTP device ID independently configured and checked;
+the MAC suffix is not a trust anchor.
 
-A shorter certified alias is also supported, for example
-`wsprrypico-0a60df.local` using the last six hex characters of an observed Wi-Fi
-station MAC. Issue it explicitly with Pico's `--hostname` option and repeat that
-option on renewal. Configure the exact manifest/SAN name here; keep the full
-32-hex expected WTP device ID. MAC suffixes can collide and are not trust anchors.
-The Pico's normal conflict handling still applies. Its `stable_hostname` may
-show the full-ID default while `configured_hostname` identifies the alias in use.
+DHCP plus mDNS is the normal workflow; no address reservation or static address
+is required. mDNS announces the DHCP address and does not supply trusted
+identity. A name conflict stops advertisement without renaming or interrupting a
+finite job. Resolve the conflict before explicitly retrying the same certified
+name through idle-only disable/re-enable or reboot.
+
+An explicitly provisioned certified alias remains supported. Repeat its exact
+`--hostname` option on renewal and configure the manifest/SAN name here. The
+normal collision and TLS identity checks still apply.
 
 For a known address with hostname authentication, retain the same CA/client
 files and device ID and set:
 
 ```ini
 Hostname = 192.0.2.27
-TLS Server Identity = wsprrypico-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.local
+TLS Server Identity = wsprrypico-0a60df.local
 ```
 
 This sends the expected hostname as HTTP Host/Origin after TLS authentication.
