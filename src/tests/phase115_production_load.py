@@ -38,6 +38,8 @@ def digest(path): return hashlib.sha256(path.read_bytes()).hexdigest()
 
 def validate_ini(path):
     config=configparser.ConfigParser(interpolation=None,strict=True)
+    # Match the application parser: canonical INI keys are case-sensitive.
+    config.optionxform=str
     require(config.read(path)==[str(path)],'INI unavailable')
     require(all(config.get('Operation',key).lower()=='false'
                 for key in ('Transmit','Use LED','Use Amp','Use Shutdown')) and

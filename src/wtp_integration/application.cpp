@@ -88,7 +88,12 @@ bool WtpApplication::observe_idle_if_due() {
   if (last_idle_poll_ms_ && now >= *last_idle_poll_ms_ &&
       now - *last_idle_poll_ms_ < 1000)
     return false;
-  last_idle_poll_ms_ = now;
+  // Keep the one-second cadence anchored across reply and caller-loop delay.
+  // Skip missed slots after a stall; issue at most one observation per call.
+  if (last_idle_poll_ms_ && now >= *last_idle_poll_ms_)
+    last_idle_poll_ms_ = now - (now - *last_idle_poll_ms_) % 1000;
+  else
+    last_idle_poll_ms_ = now;
   ready_ = scheduler_.inspect_idle().ok;
   return true;
 }

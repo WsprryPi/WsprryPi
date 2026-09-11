@@ -16,6 +16,7 @@ import phase115_production_load as load
 
 def settings():
     config=configparser.ConfigParser()
+    config.optionxform=str
     config.read_dict({'Operation':{'Transmit':'false','Use LED':'false','Use Amp':'false',
         'Use Shutdown':'false','Enable on Boot':'Never','Transmit Backend':'wtp',
         'Web Port':'31425','Socket Port':'31426'},'WTP':{'Transport':'network','Hostname':load.NAME,
@@ -49,6 +50,20 @@ class LoadTests(unittest.TestCase):
             write(settings())
             with path.open('a') as stream: stream.write('\n[Operation]\nTransmit = true\n')
             with self.assertRaises(configparser.Error):load.validate_ini(path)
+
+    def test_lowercased_or_shadowed_keys_fail_before_launch(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path=Path(directory)/'test.ini'
+            original=settings()
+            for section in ('Operation','WTP','GPIO','Calibration','Experimental'):
+                changed=settings()
+                for key in list(changed[section]):
+                    value=changed[section].pop(key);changed[section][key.lower()]=value
+                with path.open('w') as stream: changed.write(stream)
+                with self.subTest(section=section),self.assertRaises((ValueError,configparser.Error)):
+                    load.validate_ini(path)
+            with path.open('w') as stream: original.write(stream)
+            load.validate_ini(path)
 
     def test_no_run_does_not_resolve_or_spawn(self):
         with patch.object(sys,'argv',['load','--root','/absent','--seconds','180','--boot','a'*32]), \

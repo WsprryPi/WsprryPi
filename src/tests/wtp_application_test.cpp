@@ -113,6 +113,25 @@ void idle_observation() {
   CHECK(!f.app.poll_idle());
   CHECK(f.clock.peer.operations.size() == disconnected_count);
 }
+void idle_cadence_with_reply_delay() {
+  Fixture f;
+  auto count = [&] { return std::count(f.clock.peer.operations.begin(),
+      f.clock.peer.operations.end(), Operation::Status); };
+  const auto initial = count();
+  const auto start = f.clock.peer.now;
+  while (f.clock.peer.now + 100 <= start + 180000) {
+    f.clock.peer.advance(f.clock.peer.now + 100);
+    if (f.app.poll_idle())
+      f.clock.peer.advance(f.clock.peer.now + 25); // reply and foreground work
+  }
+  CHECK(count() - initial >= 179 && count() - initial <= 180);
+  const auto before_stall = count();
+  f.clock.peer.advance(f.clock.peer.now + 5010);
+  CHECK(f.app.poll_idle());
+  CHECK(!f.app.poll_idle());
+  CHECK(count() == before_stall + 1); // no catch-up burst after a stall
+  CHECK(f.clock.peer.executions == 0 && f.clock.peer.prepares == 0);
+}
 void jobs() {
   Fixture f;
   CHECK(f.app.ready() && f.app.replaceable());
@@ -182,6 +201,7 @@ int main() {
   try {
     config();
     idle_observation();
+    idle_cadence_with_reply_delay();
     jobs();
     recovery();
     std::cout << checks << " WTP application checks passed\n";

@@ -329,3 +329,39 @@ sustained mixed load and physical restoration acceptance remain open. No clock
 configuration is accepted. No browser API/UI, WTP identity contract or operator
 manual was changed; the previously listed operator-documentation follow-up
 remains pending actual acceptance.
+
+## N1 inhibited execution and host corrections
+
+The first N1 attempt loaded the exact 6e2ddc9 inhibited image and passed a
+360-second quiet observation with reconstructed USB evidence. The actual
+fb0a2eb application then exited before readiness: the private INI generator had
+lowercased canonical keys, and its Python preflight was case-insensitive. Both
+boards and the host fixture were restored. No RF job was submitted. The load
+validator now uses exact key spelling; regression cases reject lowercased
+sections. The actual Linux executable also round-tripped the corrected WTP
+settings and inactive policy through its config API in an isolated loopback
+namespace with the simulated runtime override. Two regression-harness assertion
+failures were corrected and retained separately from the device campaign.
+
+The corrected N1 continuation retained the prior configuration-write counts
+and original six-hour deadline. Its fresh inhibited quiet observation passed.
+The actual controller then completed 180 seconds with no device/observer fault,
+but independent plaintext analysis found only 175 nominal STATUS requests
+(0.9722 Hz). Median spacing was 1.025904 s, maximum 1.087699 s. The acceptance
+sequence stopped before browser load or RF; this failed rate result is retained.
+
+The production idle scheduler now anchors its one-second slots instead of
+shifting each slot by reply and caller-loop delay. It skips missed slots after
+a stall and performs at most one observation per invocation. It preserves the
+existing no-reconnect, no-submission, foreign-owner and active-work gates.
+A 180-second simulated-clock regression with 25 ms per-exchange foreground cost
+requires at least 179 observations and checks that a long stall causes no burst.
+The affected suites pass: 39,834 application checks, 6,853 production checks,
+existing UI source tests, and four load-validator tests. New target execution
+must bind to the rebuilt executable; the fb0a2eb result cannot qualify it.
+
+Documentation Impact: this development review and the Pico-owned N1 evidence
+and continuation records. Product configuration/API contracts and operator UI
+are unchanged. Operator-manual follow-up remains in the joint Phase 11.5 plan;
+that repository is unchanged. Phase 11.5 and physical clock acceptance remain
+OPEN.
