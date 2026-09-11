@@ -17,12 +17,13 @@ def require(value, message):
 
 
 def decode(data):
-    rows = []; active = {}; next_id = 1; last = 0
+    rows = []; active = {}; writes = {}; next_id = 1; last = 0; version = None
     while data:
         require(len(data) >= 64, 'Truncated record header')
         magic, sequence, kind, identity, mono, utc, pid, length = struct.unpack('>8s7Q', data[:64])
-        require(magic == b'P115TLS1' and sequence == len(rows) and mono >= last and
-                pid > 0 and utc > 0 and length <= 65536 and len(data) >= 64+length,
+        if version is None: version = magic
+        require(magic == version and magic in (b'P115TLS1', b'P115TLS2') and sequence == len(rows) and mono >= last and
+                pid > 0 and utc > 0 and length <= (65536 if magic == b'P115TLS1' else 65552) and len(data) >= 64+length,
                 'Record identity, sequence, time or size')
         payload = data[64:64+length]; data = data[64+length:]; last = mono
         if not rows: require(kind == identity == length == 0, 'Missing observer start')
@@ -32,19 +33,47 @@ def decode(data):
         elif kind == 2:
             require(identity in active and length == 32, 'Certificate record')
             active[identity] = True
+        elif kind == 7:
+            require(magic == b'P115TLS2' and active.get(identity) is True and length > 0 and
+                    identity not in writes, 'Invalid write entry')
+            writes[identity] = payload
+        elif kind == 8:
+            require(magic == b'P115TLS2' and identity in writes and length == 0, 'Invalid failed write')
+            del writes[identity]
         elif kind in (3,4):
             require(active.get(identity) is True and length > 0, 'Unauthenticated or empty I/O record')
+            if kind == 3 and magic == b'P115TLS2':
+                require(identity in writes and writes.pop(identity).startswith(payload), 'Write entry/result mismatch')
         elif kind == 5:
-            require(identity in active and length == 0, 'Unknown connection close')
+            require(identity in active and identity not in writes and length == 0, 'Unknown connection close or unfinished write')
             del active[identity]
         elif kind == 6:
             require(identity == length == 0 and not data and not active, 'Incomplete observer finish')
         else: raise ValueError('Unexpected observer record')
         rows.append(dict(sequence=sequence,kind=kind,connection_id=identity,
-                         monotonic_ns=mono,utc_ns=utc,pid=pid,payload=payload))
+                         monotonic_ns=mono,utc_ns=utc,pid=pid,payload=payload,version=magic.decode()))
     require(rows and rows[-1]['kind'] == 6, 'Missing final record')
     require(len({row['pid'] for row in rows}) == 1, 'Mixed process identity')
     return rows
+
+
+def decode_regressions():
+    def encoded(records, version=b'P115TLS2'):
+        return b''.join(struct.pack('>8s7Q',version,n,k,c,n+1,n+1,1,len(b))+b
+                        for n,(k,c,b) in enumerate(records))
+    start=[(0,0,b''),(1,1,b''),(2,1,b'x'*32)]
+    end=[(5,1,b''),(6,0,b'')]
+    valid=start+[(7,1,b'hello'),(8,1,b''),(7,1,b'hello'),(3,1,b'hello')]+end
+    decode(encoded(valid))
+    decode(encoded(start+[(3,1,b'hello')]+end,b'P115TLS1'))
+    decode(encoded(start+[(7,1,b'x'*65552),(3,1,b'x'*65552)]+end))
+    invalid=[[(3,1,b'hello')],[(7,1,b'hello'),(3,1,b'wrong')],
+             [(7,1,b'hello')],[(8,1,b'')],[(7,1,b'hello'),(7,1,b'hello')],
+             [(7,1,b'x'*65553),(3,1,b'x'*65553)]]
+    for records in invalid:
+        try: decode(encoded(start+records+end))
+        except ValueError: pass
+        else: raise ValueError('Invalid write lifecycle accepted')
 
 
 def child(directory):
@@ -59,7 +88,7 @@ def child(directory):
     listener = socket.socket(); listener.bind(('127.0.0.1',0)); listener.listen(8)
     listener.settimeout(10); address = listener.getsockname()
     errors = []; accepted = []
-    message = bytes(range(256))*32
+    message = bytes(range(256))*256 + bytes(range(16))
     def handle(raw):
         try:
             with server.wrap_socket(raw,server_side=True) as stream:
@@ -79,7 +108,7 @@ def child(directory):
             with client.wrap_socket(socket.create_connection(address,timeout=10),
                                     server_hostname='localhost') as stream:
                 stream.settimeout(10)
-                for start in range(0,len(message),271): stream.sendall(message[start:start+271])
+                stream.sendall(message)
                 data = b''
                 while len(data) < len(message):
                     part = stream.recv(193);require(part,'Client EOF');data += part
@@ -99,6 +128,7 @@ def main():
     parser.add_argument('--observer',type=Path)
     parser.add_argument('--child',type=Path)
     args=parser.parse_args()
+    decode_regressions()
     if args.child: child(args.child);return
     require(sys.platform == 'linux' and args.observer and args.observer.is_file(),
             'Linux observer library required')
@@ -118,10 +148,10 @@ def main():
             for kind in (3,4):
                 body=b''.join(row['payload'] for row in rows
                               if row['connection_id']==identity and row['kind']==kind)
-                require(body==bytes(range(256))*32,'Reconstructed observer bytes differ')
+                require(body==bytes(range(256))*256+bytes(range(16)),'Reconstructed observer bytes differ')
         for mutation in (data[:-1],data[64:],data[:30],data[:-64],
                          data[:8]+struct.pack('>Q',999)+data[16:],
-                         data[:56]+struct.pack('>Q',65537)+data[64:]):
+                         data[:56]+struct.pack('>Q',65553)+data[64:]):
             try: decode(mutation)
             except ValueError: pass
             else: raise ValueError('Invalid observer evidence accepted')

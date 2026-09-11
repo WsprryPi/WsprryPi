@@ -365,3 +365,36 @@ and continuation records. Product configuration/API contracts and operator UI
 are unchanged. Operator-manual follow-up remains in the joint Phase 11.5 plan;
 that repository is unchanged. Phase 11.5 and physical clock acceptance remain
 OPEN.
+
+
+The corrected executable SHA-256 is
+`122ed0e4bd752e457419c4df5433c3fca1a4a88677a3db3ebd7e60e783ba5d1c`.
+On inhibited Pico 6e2ddc9, it achieved 179 STATUS reads in 180 seconds and a
+0.638056-second maximum native-write-entry-to-response interval. The first
+browser interval then failed: its serial status/page/style/script burst took
+6.437 seconds and delayed the next five-second status poll. That attempt is
+retained. The load scheduler now services status first and fetches one reload
+asset per five-second slot, keeping all declared request counts and thresholds.
+A regression uses the measured reply costs and rejects overload. The corrected
+combined interval passed raw-wire auditing: 179 controller STATUS reads, 36
+browser status reads and six requests each for page/style/script; maximum
+controller response interval 1.311965149 seconds. The inhibited quiet-memory comparison also passed (568 bytes retained delta).
+Physical A2 later failed when a USB INFO reply took 2.964660695 seconds under
+nominal TLS load; the Pico-owned reply-priority repair requires target repetition.
+This is not a physical RF qualification claim.
+
+Observer format 2 records native write entry, success/failure and successful
+read bytes. It supports the complete 65,552-byte WTP frame and retains version-1
+decoding. Eight concurrent Linux loopback streams and corrupted/lifecycle records
+were checked. Scheduler queue time remains outside this observer's latency
+metric. Adversarial review also required preserving errno after logging a failed
+write; the frozen nominal capture observer predates that correction and records
+no failed writes. Negative-call testing must use the corrected observer.
+
+The corrected observer passed its Linux loopback regression: 3,450 durable
+records across eight TLS streams, complete 65,552-byte payloads, and six rejected
+corruptions. All six load-driver regressions passed. The optional shared browser
+control slots are prepared for A3; their fake-clock regression preserves all 36
+status requests and six complete reloads while scheduling 13 control requests.
+That regression does not establish physical A3 acceptance. The actual A2 rerun
+continues to use the previously frozen browser-priority driver and observer.

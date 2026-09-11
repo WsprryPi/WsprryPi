@@ -8,6 +8,8 @@ USB and host-health observers are independent campaign workers.
 """
 import argparse
 import configparser
+import contextlib
+import fcntl
 import hashlib
 import http.client
 import json
@@ -25,7 +27,6 @@ from phase115_tls_observer_test import decode
 
 DEVICE='fd6127d11d6aca42a9905fa3fb1bf1d5'
 NAME='wsprrypico-0a60df.local'
-BINARY_SHA='08af5ad6dd21592a7ff90d898dd971a1e740cbb3836f65e74ba3816b960f4507'
 PEER_SHA='06496fe4d7a1ab45791d85cb0797fa55f76b8dc7ee931f9c7fa70823fef46016'
 
 
@@ -41,6 +42,7 @@ def validate_ini(path):
     # Match the application parser: canonical INI keys are case-sensitive.
     config.optionxform=str
     require(config.read(path)==[str(path)],'INI unavailable')
+    require(not config.defaults(),'INI DEFAULT values cannot stand in for explicit settings')
     require(all(config.get('Operation',key).lower()=='false'
                 for key in ('Transmit','Use LED','Use Amp','Use Shutdown')) and
             config.get('Operation','Enable on Boot')=='Never' and
@@ -61,6 +63,24 @@ def validate_ini(path):
     require(config.getboolean('Experimental','Allow Unqualified Frequency') and
             config.getboolean('Experimental','Allow Non-Amateur Frequency'),
             '135.5 kHz fixture policy must be explicit')
+
+
+def browser_schedule(start,end,stop,get,clock=time.monotonic,grant_control=None):
+    """Preserve 0.2 Hz status while spreading each reload's assets over its next slots."""
+    status_at=page_at=start;pages=[]
+    while clock()<end and not stop.is_set():
+        now=clock()
+        if now>=page_at:
+            require(not pages,'Previous browser page reload incomplete')
+            pages.extend(('/', '/style.css', '/app.js'));page_at+=30
+        if now>=status_at:
+            require(now-status_at<=1,'Browser nominal sampling fell behind')
+            get('/api/v1/status');status_at+=5
+            slots_left=round((page_at-status_at)/5)+1
+            granted=(grant_control is not None and len(pages)<slots_left and grant_control(status_at))
+            if pages and not granted:get(pages.pop(0))
+        stop.wait(max(0,min(.1,status_at-clock(),end-clock())))
+    require(not pages,'Final browser page reload incomplete')
 
 
 def main():
@@ -84,7 +104,7 @@ def main():
     require(os.readlink('/proc/self/ns/net')==plan['netns'] and
             os.readlink('/proc/self/ns/mnt')==plan['mountns'],'Wrong client namespaces')
     binary,ini,observer=[Path(plan[key]) for key in ('binary','ini','observer')]
-    require(digest(binary)==BINARY_SHA and digest(ini)==plan['ini_sha256'] and
+    require(digest(binary)==plan['binary_sha256'] and digest(ini)==plan['ini_sha256'] and
             digest(observer)==plan['observer_sha256'],'Application/input identity changed')
     validate_ini(ini)
     ctx=ssl.create_default_context(cafile=plan['ca'])
@@ -109,7 +129,23 @@ def main():
             value=json.loads(data)
         note('production_host_status',dict(began_monotonic_ns=began,value=value))
         return value
+    @contextlib.contextmanager
+    def browser_lane():
+        if 'browser_lock' not in plan:
+            yield;return
+        path=Path(plan['browser_lock'])
+        require(path==root/'browser.lock','Shared browser lane path')
+        with path.open('a') as lane:
+            deadline=time.monotonic()+1
+            while True:
+                try: fcntl.flock(lane,fcntl.LOCK_EX|fcntl.LOCK_NB);break
+                except BlockingIOError:
+                    require(time.monotonic()<deadline,'Browser sampling lane delayed')
+                    time.sleep(.01)
+            yield
     def pico_get(path):
+        with browser_lane(): pico_get_locked(path)
+    def pico_get_locked(path):
         began=time.monotonic_ns();end=time.monotonic()+15
         raw=socket.create_connection((plan['address'],18443),timeout=15)
         try:
@@ -137,18 +173,25 @@ def main():
                 note('browser_get',dict(path=path,began_monotonic_ns=began,status=response.status,
                                        body_hex=body.hex(),peer_sha256=PEER_SHA))
         finally: raw.close()
+    def grant_control(until):
+        pending=root/'browser-control-pending.json'
+        if not pending.exists():return False
+        value=json.loads(pending.read_text())
+        require(set(value)=={'request_id','boot_id'} and value['boot_id']==args.boot and
+                len(value['request_id'])==32 and all(c in '0123456789abcdef' for c in value['request_id']),
+                'Invalid browser control intent')
+        permit=root/'browser-control-permit.json'
+        require(not permit.exists() or json.loads(permit.read_text())['request_id']!=value['request_id'],
+                'Previous browser control did not consume its permit')
+        temporary=permit.with_suffix('.tmp')
+        with temporary.open('w') as out:
+            json.dump(dict(value,end_monotonic_ns=int(until*1e9)),out);out.flush();os.fsync(out.fileno())
+        temporary.replace(permit)
+        note('browser_control_permit',dict(value,end_monotonic_ns=int(until*1e9)))
+        return True
     def browser(start,end):
         try:
-            status_at=page_at=start
-            while time.monotonic()<end and not stop.is_set():
-                now=time.monotonic()
-                if now>=status_at:
-                    require(now-status_at<=1,'Browser nominal sampling fell behind')
-                    pico_get('/api/v1/status');status_at+=5
-                if now>=page_at:
-                    for path in ('/','/style.css','/app.js'): pico_get(path)
-                    page_at+=30
-                stop.wait(max(0,min(.1,status_at-time.monotonic(),end-time.monotonic())))
+            browser_schedule(start,end,stop,pico_get,grant_control=grant_control if plan.get('browser_control_lane') else None)
             note('browser_finish',{'completed':not stop.is_set()})
         except BaseException as error:
             failures.append(str(error));note('browser_failure',{'type':type(error).__name__,'error':str(error)})

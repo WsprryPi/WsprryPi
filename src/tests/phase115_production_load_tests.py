@@ -65,6 +65,44 @@ class LoadTests(unittest.TestCase):
             with path.open('w') as stream: original.write(stream)
             load.validate_ini(path)
 
+    def test_browser_reload_does_not_starve_five_second_status(self):
+        now=[0.0];requests=[]
+        class Stop:
+            def is_set(self):return False
+            def wait(self,seconds):now[0]+=seconds
+        def get(path):
+            requests.append((path,now[0]))
+            now[0]+=2.022 if path=='/' else 1.498
+        load.browser_schedule(0,180,Stop(),get,clock=lambda:now[0])
+        status=[t for path,t in requests if path=='/api/v1/status']
+        self.assertEqual(len(status),36)
+        self.assertLess(max(abs(t-i*5) for i,t in enumerate(status)),.101)
+        for path in ('/','/style.css','/app.js'):
+            self.assertEqual(sum(p==path for p,t in requests),6)
+        now[0]=0
+        def too_slow(path):now[0]+=4
+        with self.assertRaisesRegex(ValueError,'fell behind'):
+            load.browser_schedule(0,180,Stop(),too_slow,clock=lambda:now[0])
+
+    def test_control_slots_preserve_all_status_and_reload_requests(self):
+        now=[0.0];requests=[];controls=[]
+        class Stop:
+            def is_set(self):return False
+            def wait(self,seconds):now[0]+=seconds
+        def get(path):
+            requests.append((path,now[0]));now[0]+=2.022 if path=='/' else 1.498
+        def grant(deadline):
+            if len(controls)==13:return False
+            controls.append(now[0]);now[0]+=2
+            self.assertLess(now[0],deadline)
+            return True
+        load.browser_schedule(0,180,Stop(),get,clock=lambda:now[0],grant_control=grant)
+        self.assertEqual(len(controls),13)
+        self.assertEqual(sum(p=='/api/v1/status' for p,t in requests),36)
+        for begin in range(0,180,30):
+            self.assertEqual(sorted(p for p,t in requests if begin<=t<begin+30 and p!='/api/v1/status'),
+                             ['/','/app.js','/style.css'])
+
     def test_no_run_does_not_resolve_or_spawn(self):
         with patch.object(sys,'argv',['load','--root','/absent','--seconds','180','--boot','a'*32]), \
              patch.object(load.subprocess,'Popen',side_effect=AssertionError('spawned')), \
@@ -80,7 +118,7 @@ class LoadTests(unittest.TestCase):
             with ini.open('w') as stream: settings().write(stream)
             plan=dict(boot_id='a'*32,seconds=1,browser=False,device_id=load.DEVICE,
                 address='10.77.15.10',netns='net-test',mountns='mount-test',binary=str(binary),
-                observer=str(observer),ini=str(ini),ini_sha256=load.digest(ini),
+                observer=str(observer),binary_sha256=load.digest(binary),ini=str(ini),ini_sha256=load.digest(ini),
                 observer_sha256=load.digest(observer),ca='test',browser_cert='test',browser_key='test')
             (root/'load.json').write_text(json.dumps(plan))
             status={'host':{'identity':{'device_id':load.DEVICE,'boot_id':'b'*32},
@@ -103,7 +141,6 @@ class LoadTests(unittest.TestCase):
                                           set_alpn_protocols=lambda *args:None)
             opener=types.SimpleNamespace(open=lambda *args,**kwargs:Response())
             with patch.object(sys,'argv',['load','--root',str(root),'--seconds','1','--boot','a'*32,'--run']), \
-                 patch.object(load,'BINARY_SHA',load.digest(binary)), \
                  patch.object(load.os,'readlink',side_effect=readlink), \
                  patch.object(load.os,'umask'),patch.object(load.signal,'signal'), \
                  patch.object(load.ssl,'create_default_context',return_value=context), \

@@ -11,7 +11,7 @@
 #include <unistd.h>
 
 /* Opt-in acceptance observer; never linked into or installed with the app.
- * Records successful plaintext I/O after OpenSSL returns, with connection and
+ * Records write entry and successful plaintext I/O, with connection and
  * monotonic identities. Logging is synchronous and its cost belongs to the
  * observed host workload. A failed/truncated log terminates this private app;
  * it is never evidence that the independently timed Pico output is inactive. */
@@ -45,8 +45,8 @@ static void all(const void *buffer, size_t length) {
     }
 }
 static void record(uint64_t kind, uint64_t id, const void *buffer, size_t length) {
-    if (output < 0 || length > 65536) _exit(93);
-    unsigned char header[64] = "P115TLS1";
+    if (output < 0 || length > 65552) _exit(93);
+    unsigned char header[64] = "P115TLS2";
     pthread_mutex_lock(&records);
     put64(header+8, sequence++); put64(header+16, kind); put64(header+24, id);
     put64(header+32, stamp(CLOCK_MONOTONIC)); put64(header+40, stamp(CLOCK_REALTIME));
@@ -107,8 +107,13 @@ void SSL_free(SSL *ssl) {
 }
 int SSL_write_ex(SSL *ssl, const void *buffer, size_t size, size_t *written) {
     pthread_once(&once, initialize);
+    uint64_t id = identity(ssl);
+    record(7, id, buffer, size);
     int result = next_write(ssl, buffer, size, written);
-    if (result == 1) record(3, identity(ssl), buffer, *written);
+    int saved_errno = errno;
+    if (result == 1) record(3, id, buffer, *written);
+    else record(8, id, NULL, 0);
+    errno = saved_errno;
     return result;
 }
 int SSL_read_ex(SSL *ssl, void *buffer, size_t size, size_t *received) {
