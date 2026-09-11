@@ -159,3 +159,33 @@ second-address macOS skip remains open. Reciprocal Pico-owned gates both PASS
 against clean Pi 76fd101 (86.04 seconds). Main-checkout changes since that pin
 are evidence and test configuration only; production sources are unchanged.
 All repaired Pico builds remain unflashed and unaccepted.
+
+## SRAM remediation candidate, September 11
+
+Pico clean `0d9bb44a6b91679bd174c39ac068d5d9cc74e9c5` places the finite waveform
+renderer in initialized SRAM, retaining the 138 MHz clock, original sample
+algorithm, diagnostic workload and thresholds. Its linked checker rejects
+flash dependencies and incomplete instruction coverage. Console INFO and the
+new pilot-v2 packet bind renderer placement explicitly. This is a candidate,
+not a physical pass; the failed P1 result and inhibited restoration remain
+unchanged. No new clock/configuration is accepted.
+
+The companion actual-server fixture now pins that clean Pico revision. Its
+native host gate passed the actual 60-second scheduled wait and finite-job,
+shared-management, ownership, partial-I/O, lost-request replay and changed-identity
+cases. macOS actual second-IPv4 address rebind remains skipped (Errno 49); the
+injected-address checks passed. An initial invocation from the repository root
+found no Make target; the documented `src` invocation passed. Neither invocation
+opened hardware. Pico-owned client gates used unchanged clean Pi production
+source `76fd1018868551b93ca46bef2e7c2ef28fb75993` and also passed.
+
+Pico's `phase11-5-remediation-review.md` records three adversarial assessments,
+repairs and negative tests; `phase11-5-remediation-images.json` binds artifacts.
+The prepared `phase11-5-remediation-pilot.md` requires new explicit flash/RF
+authorization. Prior P1/recovery approvals do not cover its new image/jobs.
+
+Documentation Impact: updated this evidence record and the actual-server source
+pin. Production WTP/USB/TLS behavior, browser API/UI and normative protocol are
+unchanged. Wsprry_Pi_Docs stays read-only; its operating-envelope publication
+waits for physical acceptance. Phase 11.5/11.6/13 ownership and all open resource
+and conducted-RF gates remain as previously recorded.
