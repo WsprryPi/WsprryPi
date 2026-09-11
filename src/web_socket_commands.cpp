@@ -376,8 +376,8 @@ void WebSocketServer::handleMessage(const std::string &raw_message)
                             {
                                 const std::string request_id =
                                     parsed.request->request_id;
-                                const auto duration = std::chrono::milliseconds(
-                                    parsed.request->duration_ms);
+                                const auto duration = start_result.bounded_cleanup_delay.value_or(
+                                    std::chrono::milliseconds(parsed.request->duration_ms));
                                 bounded_tone_watchdog_ = std::thread(
                                     [this, request_id, duration] {
                                         {

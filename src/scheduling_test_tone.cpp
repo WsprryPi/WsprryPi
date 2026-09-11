@@ -19,6 +19,7 @@
 #include "test_tone_selector_plan.hpp"
 #include "transmitter_runtime_bridge.hpp"
 #include "version.hpp"
+#include "wtp_runtime_bridge.hpp"
 
 #include <atomic>
 #include <exception>
@@ -369,6 +370,17 @@ TestToneStartResult start_test_tone(const TestToneRequest &tone_request)
     {
         apply_test_tone_rp1_development_confirmation_bridge(
             tone_request.rp1_development, config, request);
+    }
+    if (config.transmit_backend == TransmitBackendKind::WTP)
+    {
+        // WTP's RF duration starts at the future device slot. The WebSocket
+        // cleanup timer starts only after this function returns. Include the
+        // preparation lead and the nominal five-second status/cleanup allowance
+        // so a finite job can complete before host cleanup requests a stop.
+        const auto allowance = wtp_runtime_preparation_lead() + std::chrono::seconds(5);
+        if (*tone_request.duration > std::chrono::nanoseconds::max() - allowance)
+            throw std::runtime_error("Bounded Pico tone cleanup deadline overflows");
+        result.bounded_cleanup_delay = *tone_request.duration + allowance;
     }
     commit_execution_request(request);
     result.actual_rf_frequency_hz = static_cast<std::uint64_t>(actual_rf_freq);

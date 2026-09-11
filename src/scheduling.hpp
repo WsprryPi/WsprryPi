@@ -227,6 +227,8 @@ struct TestToneStartResult
     bool selector_gpio_enabled = false;
     int selector_gpio = -1;
     bool selector_gpio_active_high = false;
+    // Host cleanup deadline only; the committed RF duration remains unchanged.
+    std::optional<std::chrono::nanoseconds> bounded_cleanup_delay;
     std::string message;
 };
 

@@ -217,3 +217,47 @@ clocks. The accepted-configuration list remains empty.
 Documentation Impact: updated the companion evidence record only. No production,
 protocol, browser API/UI or operator-documentation behavior changed. Full
 resource acceptance and the previously listed Wsprry_Pi_Docs follow-up remain.
+
+
+## Closure continuation: instrumentation and production timer
+
+Pico clean source `3eac6ec030963a5318515ce5f4683acf6fa88506` instruments the linked
+newlib entry points, including stdio and transient realloc paths, and provides
+idle-only nullable allocation probes. The companion actual-server fixture pins
+that source. The first companion interop attempt reported a host dry-run missed
+start; its original failure is retained. The fixture now logs missed-start timing
+without changing the simulator or acceptance thresholds. The diagnostic repeat
+passed the complete finite-job, 60-second wait, replay/ownership/identity cases.
+The first miss remains unclassified beyond the host dry-run terminal report; a
+passing repeat does not erase it. macOS second-IPv4 rebind is still skipped.
+
+Review found the bounded-tone WebSocket watchdog used RF duration as a deadline
+from host submission even though WTP schedules the RF start at least eight seconds
+later. The scheduling result now supplies a WTP-specific host cleanup delay:
+finite RF duration plus the negotiated preparation lead and five-second nominal
+confirmation allowance. The committed RF duration and one-nanosecond off tail
+remain unchanged. Other backends retain their previous duration-based timer;
+explicit operator stop remains immediate. Overflow rejects before committing.
+
+A new production regression exercises the actual tone scheduler, parent bridge,
+WTP application and scripted peer: ten seconds RF-on completes at its scheduled
+slot, before the adjusted cleanup deadline, with the original off-tail encoding.
+Fixture iterations corrected the explicit unqualified-mode setting, ensured the
+injected runtime dies before its fake clock, and asserted the actual LOAD body
+and off-tail schema. Failed test attempts are retained; they were hardware-free.
+
+The tone response regression then exposed a real build dependency collision:
+`build/dep/test_tone_response.d` named the release object, so changing the shared
+result header did not rebuild the older debug object. Dependency files now live
+beside each debug/release/backend-profile object. Existing objects missing those
+files rebuild once. A real-compiler regression extracts the production Make rules
+and verifies both modes, two profiles, header ABI changes and missing-file
+migration. Rebuilt production (6,847 checks), tone request/response, WebSocket
+lifecycle and WTP UI tests pass. Historical shared dependency files are retained.
+
+Pico P3 subsequently ran three finite ten-second 135.5 kHz Tone jobs at 138 MHz
+on that instrumented image and restored its original inhibited firmware. The
+Pico-owned raw audit and final independent readbacks are separate evidence.
+This remains a bounded diagnostic; full A-G/N, stack/heap gates and the accepted
+configuration list remain open. No installed WsprryPi binary/configuration,
+existing service, radio, GPSDO or operator-manual repository was changed.

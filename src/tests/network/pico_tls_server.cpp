@@ -15,6 +15,37 @@ struct Clock : wsprrypico::wtp::Clock {
       static_cast<std::uint64_t>(duration_cast<nanoseconds>(system_clock::now().time_since_epoch()).count()),
       time_us_64() * 1000, 1000000, 0, wsprrypico::wtp::LeapState::Normal, {}};
   }
+ };
+// Preserve the production dry-run engine's timing policy. Diagnose a host OS
+// scheduling miss instead of treating a later retry as evidence it never happened.
+struct ObservedEngine final : wsprrypico::wtp::RfEngine {
+  wsprrypico::standalone::DryRunEngine engine;
+  std::uint64_t start{}, allowance{};
+  bool reported{};
+  wsprrypico::wtp::PrepareResult prepare(const wsprrypico::wtp::Job &job) override {
+    return engine.prepare(job);
+  }
+  bool schedules_locally() const override { return true; }
+  bool schedule(const wsprrypico::wtp::Job &job, std::uint64_t when,
+                const wsprrypico::wtp::LocalStartConditions &conditions) override {
+    start = when; allowance = conditions.maximum_uncertainty_ns; reported = false;
+    return engine.schedule(job, when, conditions);
+  }
+  bool begin(const wsprrypico::wtp::Job &job, std::uint64_t when) override {
+    return engine.begin(job, when);
+  }
+  wsprrypico::wtp::EngineReport poll(std::uint64_t now) override {
+    const auto result = engine.poll(now);
+    if (!reported && result.state == wsprrypico::wtp::EngineState::Missed) {
+      reported = true;
+      std::cerr << "HOST_DRY_RUN_MISSED start_ns=" << start << " poll_ns=" << now
+                << " elapsed_ns=" << (now >= start ? now - start : 0)
+                << " allowance_ns=" << allowance << std::endl;
+    }
+    return result;
+  }
+  bool disable(std::uint64_t when) override { return engine.disable(when); }
+  bool output_active() const override { return false; }
 };
 }
 int main(int argc, char **argv) {
@@ -25,7 +56,7 @@ int main(int argc, char **argv) {
   Clock clock;
   network_test::Identity identities;
   if (argc > 1) identities.boot = static_cast<unsigned>(std::stoul(argv[1]));
-  wsprrypico::standalone::DryRunEngine engine;
+  ObservedEngine engine;
   wsprrypico::wtp::JobService service{clock, engine, identities};
   wsprrypico::standalone::Scheduler scheduler{store, service};
   network_test::Network network;

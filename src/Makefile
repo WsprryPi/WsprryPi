@@ -477,8 +477,16 @@ SUPPORT_BUNDLE_INTAKE_PRODUCTION_TEST_DEPS := $(SUPPORT_BUNDLE_INTAKE_PRODUCTION
 # Dependency includes
 # ─────────────────────────────────────────────────────────────────────────────
 
-DEPFILES := $(wildcard $(DEP_DIR)/*.d $(DEP_DIR)/*/*.d)
+# Keep dependency files beside each object, isolated by debug/release and backend
+# profile. A shared .d file can otherwise hide a header ABI change from one build.
+DEPENDENCY_OBJECTS := $(sort $(CPP_OBJECTS) $(CPP_DEBUG_OBJECTS) $(filter %.o,$(foreach variable,$(filter %_OBJ %_DEBUG_OBJ,$(.VARIABLES)),$($(variable)))))
+DEPFILES := $(wildcard $(DEPENDENCY_OBJECTS:.o=.d))
 -include $(DEPFILES)
+# Migrate an existing object which has only a legacy shared dependency file.
+MISSING_DEP_OBJECTS := $(foreach object,$(DEPENDENCY_OBJECTS),$(if $(wildcard $(object:.o=.d)),,$(object)))
+.PHONY: FORCE_OBJECT_DEPENDENCIES
+FORCE_OBJECT_DEPENDENCIES:
+$(MISSING_DEP_OBJECTS): FORCE_OBJECT_DEPENDENCIES
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Toolchain
@@ -672,16 +680,14 @@ endif
 
 $(OBJ_DIR_DEBUG)/%.o: %.cpp
 	$(Q)mkdir -p $(dir $@)
-	$(Q)mkdir -p $(DEP_DIR)/$(dir $*)
 	$(Q)echo "Compiling (debug) $< into $@"
-	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -MF $(DEP_DIR)/$*.d -c $< -o $@
+	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -MF $(@:.o=.d) -c $< -o $@
 
 define MAKE_DEBUG_COMPONENT_RULES
 $(OBJ_DIR_DEBUG)/$(patsubst ../../%,%,$(1))/%.o: $(1)/%.cpp
 	$(Q)mkdir -p $$(@D)
-	$(Q)mkdir -p $(DEP_DIR)/$(dir $$*)
 	$(Q)echo "Compiling (debug) $$< into $$@"
-	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -MF $(DEP_DIR)/$$*.d -c $$< -o $$@
+	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -MF $$(@:.o=.d) -c $$< -o $$@
 endef
 $(foreach dir,$(COMPONENT_SRCDIRS),$(eval $(call MAKE_DEBUG_COMPONENT_RULES,$(dir))))
 
@@ -700,9 +706,8 @@ $(BIN_DIR)/$(TEST_OUT): $(PROFILE_DEBUG_BIN) FORCE_PROFILE_BINARY
 
 $(SEMANTICS_TEST_OBJ): $(SEMANTICS_TEST_SRC)
 	$(Q)mkdir -p $(dir $@)
-	$(Q)mkdir -p $(DEP_DIR)/tests
 	$(Q)echo "Compiling (debug) $< into $@"
-	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -MF $(DEP_DIR)/tests/dial_frequency_semantics_test.d -c $< -o $@
+	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -MF $(@:.o=.d) -c $< -o $@
 
 $(BIN_DIR)/$(SEMANTICS_TEST_OUT): $(SEMANTICS_TEST_OBJ) $(SEMANTICS_TEST_DEPS)
 	$(Q)mkdir -p $(BIN_DIR)
@@ -711,9 +716,8 @@ $(BIN_DIR)/$(SEMANTICS_TEST_OUT): $(SEMANTICS_TEST_OBJ) $(SEMANTICS_TEST_DEPS)
 
 $(CLEANUP_LIFECYCLE_TEST_OBJ): $(CLEANUP_LIFECYCLE_TEST_SRC)
 	$(Q)mkdir -p $(dir $@)
-	$(Q)mkdir -p $(DEP_DIR)/tests
 	$(Q)echo "Compiling (debug) $< into $@"
-	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -MF $(DEP_DIR)/tests/cleanup_lifecycle_test.d -c $< -o $@
+	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -MF $(@:.o=.d) -c $< -o $@
 
 $(BIN_DIR)/$(CLEANUP_LIFECYCLE_TEST_OUT): $(CLEANUP_LIFECYCLE_TEST_DEPS)
 	$(Q)mkdir -p $(BIN_DIR)
@@ -722,9 +726,8 @@ $(BIN_DIR)/$(CLEANUP_LIFECYCLE_TEST_OUT): $(CLEANUP_LIFECYCLE_TEST_DEPS)
 
 $(UI_SOURCE_REGRESSION_TEST_OBJ): $(UI_SOURCE_REGRESSION_TEST_SRC)
 	$(Q)mkdir -p $(dir $@)
-	$(Q)mkdir -p $(DEP_DIR)/tests
 	$(Q)echo "Compiling (debug) $< into $@"
-	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -MF $(DEP_DIR)/tests/ui_source_regression_test.d -c $< -o $@
+	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -MF $(@:.o=.d) -c $< -o $@
 
 $(BIN_DIR)/$(UI_SOURCE_REGRESSION_TEST_OUT): $(UI_SOURCE_REGRESSION_TEST_DEPS)
 	$(Q)mkdir -p $(BIN_DIR)
@@ -741,9 +744,8 @@ $(BIN_DIR)/$(WEB_SERVER_NETWORK_LIFECYCLE_TEST_OUT): $(WEB_SERVER_NETWORK_LIFECY
 
 $(WSPR_BAND_CATALOG_TEST_OBJ): $(WSPR_BAND_CATALOG_TEST_SRC)
 	$(Q)mkdir -p $(dir $@)
-	$(Q)mkdir -p $(DEP_DIR)/tests
 	$(Q)echo "Compiling (debug) $< into $@"
-	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -MF $(DEP_DIR)/tests/wspr_band_catalog_test.d -c $< -o $@
+	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -MF $(@:.o=.d) -c $< -o $@
 
 $(BIN_DIR)/$(WSPR_BAND_CATALOG_TEST_OUT): $(WSPR_BAND_CATALOG_TEST_DEPS)
 	$(Q)mkdir -p $(BIN_DIR)
@@ -774,9 +776,8 @@ $(BIN_DIR)/$(TEST_TONE_RESPONSE_TEST_OUT): tests/test_tone_response_test.cpp $(f
 
 $(GUARDED_MODE_CHANGE_PERSISTENCE_TEST_OBJ): $(GUARDED_MODE_CHANGE_PERSISTENCE_TEST_SRC)
 	$(Q)mkdir -p $(dir $@)
-	$(Q)mkdir -p $(DEP_DIR)/tests
 	$(Q)echo "Compiling (debug) $< into $@"
-	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -MF $(DEP_DIR)/tests/guarded_mode_change_persistence_test.d -c $< -o $@
+	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -MF $(@:.o=.d) -c $< -o $@
 
 $(BIN_DIR)/$(GUARDED_MODE_CHANGE_PERSISTENCE_TEST_OUT): $(GUARDED_MODE_CHANGE_PERSISTENCE_TEST_OBJ) $(GUARDED_MODE_CHANGE_PERSISTENCE_TEST_DEPS)
 	$(Q)mkdir -p $(BIN_DIR)
@@ -785,9 +786,8 @@ $(BIN_DIR)/$(GUARDED_MODE_CHANGE_PERSISTENCE_TEST_OUT): $(GUARDED_MODE_CHANGE_PE
 
 $(BAND_GPIO_DEFAULT_CONVERGENCE_TEST_OBJ): $(BAND_GPIO_DEFAULT_CONVERGENCE_TEST_SRC)
 	$(Q)mkdir -p $(dir $@)
-	$(Q)mkdir -p $(DEP_DIR)/tests
 	$(Q)echo "Compiling (debug) $< into $@"
-	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -MF $(DEP_DIR)/tests/band_gpio_default_convergence_test.d -c $< -o $@
+	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -MF $(@:.o=.d) -c $< -o $@
 
 $(BIN_DIR)/$(BAND_GPIO_DEFAULT_CONVERGENCE_TEST_OUT): $(BAND_GPIO_DEFAULT_CONVERGENCE_TEST_OBJ) $(BAND_GPIO_DEFAULT_CONVERGENCE_TEST_DEPS)
 	$(Q)mkdir -p $(BIN_DIR)
@@ -796,9 +796,8 @@ $(BIN_DIR)/$(BAND_GPIO_DEFAULT_CONVERGENCE_TEST_OUT): $(BAND_GPIO_DEFAULT_CONVER
 
 $(BAND_GPIO_ROTATION_TEST_OBJ): $(BAND_GPIO_ROTATION_TEST_SRC)
 	$(Q)mkdir -p $(dir $@)
-	$(Q)mkdir -p $(DEP_DIR)/tests
 	$(Q)echo "Compiling (debug) $< into $@"
-	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -MF $(DEP_DIR)/tests/band_gpio_rotation_test.d -c $< -o $@
+	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -MF $(@:.o=.d) -c $< -o $@
 
 $(BIN_DIR)/$(BAND_GPIO_ROTATION_TEST_OUT): $(BAND_GPIO_ROTATION_TEST_OBJ) $(BAND_GPIO_ROTATION_TEST_DEPS)
 	$(Q)mkdir -p $(BIN_DIR)
@@ -807,9 +806,8 @@ $(BIN_DIR)/$(BAND_GPIO_ROTATION_TEST_OUT): $(BAND_GPIO_ROTATION_TEST_OBJ) $(BAND
 
 $(MONITOR_FILE_REGRESSION_TEST_OBJ): $(MONITOR_FILE_REGRESSION_TEST_SRC)
 	$(Q)mkdir -p $(dir $@)
-	$(Q)mkdir -p $(DEP_DIR)/tests
 	$(Q)echo "Compiling (debug) $< into $@"
-	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -MF $(DEP_DIR)/tests/monitor_file_regression_test.d -c $< -o $@
+	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -MF $(@:.o=.d) -c $< -o $@
 
 $(BIN_DIR)/$(MONITOR_FILE_REGRESSION_TEST_OUT): $(MONITOR_FILE_REGRESSION_TEST_OBJ) $(MONITOR_FILE_REGRESSION_TEST_DEPS)
 	$(Q)mkdir -p $(BIN_DIR)
@@ -818,9 +816,8 @@ $(BIN_DIR)/$(MONITOR_FILE_REGRESSION_TEST_OUT): $(MONITOR_FILE_REGRESSION_TEST_O
 
 $(GPIO_LINE_RESOLVER_TEST_OBJ): $(GPIO_LINE_RESOLVER_TEST_SRC)
 	$(Q)mkdir -p $(dir $@)
-	$(Q)mkdir -p $(DEP_DIR)/tests
 	$(Q)echo "Compiling (debug) $< into $@"
-	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -MF $(DEP_DIR)/tests/gpio_line_resolver_test.d -c $< -o $@
+	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -MF $(@:.o=.d) -c $< -o $@
 
 $(BIN_DIR)/$(GPIO_LINE_RESOLVER_TEST_OUT): $(GPIO_LINE_RESOLVER_TEST_DEPS)
 	$(Q)mkdir -p $(BIN_DIR)
@@ -829,9 +826,8 @@ $(BIN_DIR)/$(GPIO_LINE_RESOLVER_TEST_OUT): $(GPIO_LINE_RESOLVER_TEST_DEPS)
 
 $(NON_WSPR_REPEAT_POLICY_TEST_OBJ): $(NON_WSPR_REPEAT_POLICY_TEST_SRC)
 	$(Q)mkdir -p $(dir $@)
-	$(Q)mkdir -p $(DEP_DIR)/tests
 	$(Q)echo "Compiling (debug) $< into $@"
-	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -MF $(DEP_DIR)/tests/non_wspr_repeat_policy_test.d -c $< -o $@
+	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -MF $(@:.o=.d) -c $< -o $@
 
 $(BIN_DIR)/$(NON_WSPR_REPEAT_POLICY_TEST_OUT): $(NON_WSPR_REPEAT_POLICY_TEST_OBJ) $(NON_WSPR_REPEAT_POLICY_TEST_DEPS)
 	$(Q)mkdir -p $(BIN_DIR)
@@ -840,9 +836,8 @@ $(BIN_DIR)/$(NON_WSPR_REPEAT_POLICY_TEST_OUT): $(NON_WSPR_REPEAT_POLICY_TEST_OBJ
 
 $(QRSS_EXECUTION_REGRESSION_TEST_OBJ): $(QRSS_EXECUTION_REGRESSION_TEST_SRC)
 	$(Q)mkdir -p $(dir $@)
-	$(Q)mkdir -p $(DEP_DIR)/tests
 	$(Q)echo "Compiling (debug) $< into $@"
-	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -MF $(DEP_DIR)/tests/qrss_execution_regression_test.d -c $< -o $@
+	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -MF $(@:.o=.d) -c $< -o $@
 
 $(BIN_DIR)/$(QRSS_EXECUTION_REGRESSION_TEST_OUT): $(QRSS_EXECUTION_REGRESSION_TEST_OBJ) $(QRSS_EXECUTION_REGRESSION_TEST_DEPS)
 	$(Q)mkdir -p $(BIN_DIR)
@@ -851,9 +846,8 @@ $(BIN_DIR)/$(QRSS_EXECUTION_REGRESSION_TEST_OUT): $(QRSS_EXECUTION_REGRESSION_TE
 
 $(WSPR_TONE_REGRESSION_TEST_OBJ): $(WSPR_TONE_REGRESSION_TEST_SRC)
 	$(Q)mkdir -p $(dir $@)
-	$(Q)mkdir -p $(DEP_DIR)/tests
 	$(Q)echo "Compiling (debug) $< into $@"
-	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -MF $(DEP_DIR)/tests/wspr_tone_regression_test.d -c $< -o $@
+	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -MF $(@:.o=.d) -c $< -o $@
 
 $(BIN_DIR)/$(WSPR_TONE_REGRESSION_TEST_OUT): $(WSPR_TONE_REGRESSION_TEST_OBJ) $(WSPR_TONE_REGRESSION_TEST_DEPS)
 	$(Q)mkdir -p $(BIN_DIR)
@@ -862,9 +856,8 @@ $(BIN_DIR)/$(WSPR_TONE_REGRESSION_TEST_OUT): $(WSPR_TONE_REGRESSION_TEST_OBJ) $(
 
 $(GPIO_BAND_POLICY_TEST_OBJ): $(GPIO_BAND_POLICY_TEST_SRC)
 	$(Q)mkdir -p $(dir $@)
-	$(Q)mkdir -p $(DEP_DIR)/tests
 	$(Q)echo "Compiling (debug) $< into $@"
-	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -MF $(DEP_DIR)/tests/gpio_band_policy_test.d -c $< -o $@
+	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -MF $(@:.o=.d) -c $< -o $@
 
 $(BIN_DIR)/$(GPIO_BAND_POLICY_TEST_OUT): $(GPIO_BAND_POLICY_TEST_DEPS)
 	$(Q)mkdir -p $(BIN_DIR)
@@ -873,9 +866,8 @@ $(BIN_DIR)/$(GPIO_BAND_POLICY_TEST_OUT): $(GPIO_BAND_POLICY_TEST_DEPS)
 
 $(SELECTOR_SHUTDOWN_CLEANUP_TEST_OBJ): $(SELECTOR_SHUTDOWN_CLEANUP_TEST_SRC)
 	$(Q)mkdir -p $(dir $@)
-	$(Q)mkdir -p $(DEP_DIR)/tests
 	$(Q)echo "Compiling (debug) $< into $@"
-	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -MF $(DEP_DIR)/tests/selector_shutdown_cleanup_test.d -c $< -o $@
+	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -MF $(@:.o=.d) -c $< -o $@
 
 $(BIN_DIR)/$(SELECTOR_SHUTDOWN_CLEANUP_TEST_OUT): $(SELECTOR_SHUTDOWN_CLEANUP_TEST_OBJ) $(SELECTOR_SHUTDOWN_CLEANUP_TEST_DEPS)
 	$(Q)mkdir -p $(BIN_DIR)
@@ -884,8 +876,7 @@ $(BIN_DIR)/$(SELECTOR_SHUTDOWN_CLEANUP_TEST_OUT): $(SELECTOR_SHUTDOWN_CLEANUP_TE
 
 $(STARTUP_QUIESCE_PARENT_TEST_OBJ): $(STARTUP_QUIESCE_PARENT_TEST_SRC)
 	$(Q)mkdir -p $(dir $@)
-	$(Q)mkdir -p $(DEP_DIR)/tests
-	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -MF $(DEP_DIR)/tests/startup_quiesce_parent_test.d -c $< -o $@
+	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -MF $(@:.o=.d) -c $< -o $@
 
 $(BIN_DIR)/startup_quiesce_parent_test: $(STARTUP_QUIESCE_PARENT_TEST_OBJ) $(STARTUP_QUIESCE_PARENT_TEST_DEPS)
 	$(Q)mkdir -p $(BIN_DIR)
@@ -893,8 +884,7 @@ $(BIN_DIR)/startup_quiesce_parent_test: $(STARTUP_QUIESCE_PARENT_TEST_OBJ) $(STA
 
 $(BACKEND_PROFILE_FACTORY_TEST_OBJ): $(BACKEND_PROFILE_FACTORY_TEST_SRC) $(BACKEND_CAPABILITIES_HEADER)
 	$(Q)mkdir -p $(dir $@)
-	$(Q)mkdir -p $(DEP_DIR)/tests
-	$(Q)$(CXX) $(CXX_RELEASE_FLAGS) -MF $(DEP_DIR)/tests/backend_profile_factory_test.d -c $< -o $@
+	$(Q)$(CXX) $(CXX_RELEASE_FLAGS) -MF $(@:.o=.d) -c $< -o $@
 
 $(BACKEND_PROFILE_FACTORY_TEST_BIN): $(BACKEND_PROFILE_FACTORY_TEST_DEPS)
 	$(Q)mkdir -p $(PROFILE_BIN_DIR)
@@ -902,9 +892,8 @@ $(BACKEND_PROFILE_FACTORY_TEST_BIN): $(BACKEND_PROFILE_FACTORY_TEST_DEPS)
 
 $(QUALIFICATION_GPIO_TEST_MODE_TEST_OBJ): $(QUALIFICATION_GPIO_TEST_MODE_TEST_SRC)
 	$(Q)mkdir -p $(dir $@)
-	$(Q)mkdir -p $(DEP_DIR)/tests
 	$(Q)echo "Compiling (debug) $< into $@"
-	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -MF $(DEP_DIR)/tests/qualification_gpio_test_mode_test.d -c $< -o $@
+	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -MF $(@:.o=.d) -c $< -o $@
 
 $(BIN_DIR)/$(QUALIFICATION_GPIO_TEST_MODE_TEST_OUT): $(QUALIFICATION_GPIO_TEST_MODE_TEST_DEPS)
 	$(Q)mkdir -p $(BIN_DIR)
@@ -969,11 +958,11 @@ $(BIN_DIR)/$(SUPPORT_BUNDLE_STARTUP_CLEANUP_TEST_OUT): $(SUPPORT_BUNDLE_STARTUP_
 
 $(SUPPORT_BUNDLE_PRIVATE_ARTIFACT_TEST_OBJ): $(SUPPORT_BUNDLE_PRIVATE_ARTIFACT_TEST_SRC)
 	$(Q)mkdir -p $(dir $@) $(DEP_DIR)/tests
-	$(Q)$(CXX) $(SUPPORT_BUNDLE_PRIVATE_ARTIFACT_TEST_FLAGS) -MF $(DEP_DIR)/tests/support_bundle_private_artifact_test.d -c $< -o $@
+	$(Q)$(CXX) $(SUPPORT_BUNDLE_PRIVATE_ARTIFACT_TEST_FLAGS) -MF $(@:.o=.d) -c $< -o $@
 
 $(OBJ_DIR_DEBUG)/./support_bundle_private_artifact.o: support_bundle_private_artifact.cpp
 	$(Q)mkdir -p $(dir $@) $(DEP_DIR)/.
-	$(Q)$(CXX) $(SUPPORT_BUNDLE_PRIVATE_ARTIFACT_TEST_FLAGS) -MF $(DEP_DIR)/support_bundle_private_artifact.d -c $< -o $@
+	$(Q)$(CXX) $(SUPPORT_BUNDLE_PRIVATE_ARTIFACT_TEST_FLAGS) -MF $(@:.o=.d) -c $< -o $@
 
 $(BIN_DIR)/$(SUPPORT_BUNDLE_PRIVATE_ARTIFACT_TEST_OUT): $(SUPPORT_BUNDLE_PRIVATE_ARTIFACT_TEST_DEPS)
 	$(Q)mkdir -p $(BIN_DIR)
@@ -981,7 +970,7 @@ $(BIN_DIR)/$(SUPPORT_BUNDLE_PRIVATE_ARTIFACT_TEST_OUT): $(SUPPORT_BUNDLE_PRIVATE
 
 $(SUPPORT_BUNDLE_AGE_ROUNDTRIP_TEST_OBJ): $(SUPPORT_BUNDLE_AGE_ROUNDTRIP_TEST_SRC)
 	$(Q)mkdir -p $(dir $@) $(DEP_DIR)/tests
-	$(Q)$(CXX) $(SUPPORT_BUNDLE_PRIVATE_ARTIFACT_TEST_FLAGS) -MF $(DEP_DIR)/tests/support_bundle_age_roundtrip_test.d -c $< -o $@
+	$(Q)$(CXX) $(SUPPORT_BUNDLE_PRIVATE_ARTIFACT_TEST_FLAGS) -MF $(@:.o=.d) -c $< -o $@
 
 $(BIN_DIR)/$(SUPPORT_BUNDLE_AGE_ROUNDTRIP_TEST_OUT): $(SUPPORT_BUNDLE_AGE_ROUNDTRIP_TEST_DEPS)
 	$(Q)mkdir -p $(BIN_DIR)
@@ -989,11 +978,11 @@ $(BIN_DIR)/$(SUPPORT_BUNDLE_AGE_ROUNDTRIP_TEST_OUT): $(SUPPORT_BUNDLE_AGE_ROUNDT
 
 $(SUPPORT_BUNDLE_INTAKE_VALIDATION_TEST_OBJ): $(SUPPORT_BUNDLE_INTAKE_VALIDATION_TEST_SRC)
 	$(Q)mkdir -p $(dir $@) $(DEP_DIR)/tests
-	$(Q)$(CXX) $(SUPPORT_BUNDLE_INTAKE_VALIDATION_TEST_FLAGS) -MF $(DEP_DIR)/tests/support_bundle_intake_validation_test.d -c $< -o $@
+	$(Q)$(CXX) $(SUPPORT_BUNDLE_INTAKE_VALIDATION_TEST_FLAGS) -MF $(@:.o=.d) -c $< -o $@
 
 $(OBJ_DIR_DEBUG)/./support_bundle_intake_validation.o: support_bundle_intake_validation.cpp
 	$(Q)mkdir -p $(dir $@) $(DEP_DIR)/.
-	$(Q)$(CXX) $(SUPPORT_BUNDLE_INTAKE_VALIDATION_TEST_FLAGS) -MF $(DEP_DIR)/support_bundle_intake_validation.d -c $< -o $@
+	$(Q)$(CXX) $(SUPPORT_BUNDLE_INTAKE_VALIDATION_TEST_FLAGS) -MF $(@:.o=.d) -c $< -o $@
 
 $(BIN_DIR)/$(SUPPORT_BUNDLE_INTAKE_VALIDATION_TEST_OUT): $(SUPPORT_BUNDLE_INTAKE_VALIDATION_TEST_DEPS)
 	$(Q)mkdir -p $(BIN_DIR)
@@ -1001,11 +990,11 @@ $(BIN_DIR)/$(SUPPORT_BUNDLE_INTAKE_VALIDATION_TEST_OUT): $(SUPPORT_BUNDLE_INTAKE
 
 $(SUPPORT_BUNDLE_INTAKE_STATE_TEST_OBJ): $(SUPPORT_BUNDLE_INTAKE_STATE_TEST_SRC)
 	$(Q)mkdir -p $(dir $@) $(DEP_DIR)/tests
-	$(Q)$(CXX) $(SUPPORT_BUNDLE_INTAKE_VALIDATION_TEST_FLAGS) -MF $(DEP_DIR)/tests/support_bundle_intake_state_test.d -c $< -o $@
+	$(Q)$(CXX) $(SUPPORT_BUNDLE_INTAKE_VALIDATION_TEST_FLAGS) -MF $(@:.o=.d) -c $< -o $@
 
 $(OBJ_DIR_DEBUG)/./support_bundle_intake_state.o: support_bundle_intake_state.cpp
 	$(Q)mkdir -p $(dir $@) $(DEP_DIR)/.
-	$(Q)$(CXX) $(SUPPORT_BUNDLE_INTAKE_VALIDATION_TEST_FLAGS) -MF $(DEP_DIR)/support_bundle_intake_state.d -c $< -o $@
+	$(Q)$(CXX) $(SUPPORT_BUNDLE_INTAKE_VALIDATION_TEST_FLAGS) -MF $(@:.o=.d) -c $< -o $@
 
 $(BIN_DIR)/$(SUPPORT_BUNDLE_INTAKE_STATE_TEST_OUT): $(SUPPORT_BUNDLE_INTAKE_STATE_TEST_DEPS)
 	$(Q)mkdir -p $(BIN_DIR)
@@ -1013,15 +1002,15 @@ $(BIN_DIR)/$(SUPPORT_BUNDLE_INTAKE_STATE_TEST_OUT): $(SUPPORT_BUNDLE_INTAKE_STAT
 
 $(SUPPORT_BUNDLE_INTAKE_RETRIEVAL_TEST_OBJ): $(SUPPORT_BUNDLE_INTAKE_RETRIEVAL_TEST_SRC)
 	$(Q)mkdir -p $(dir $@) $(DEP_DIR)/tests
-	$(Q)$(CXX) $(SUPPORT_BUNDLE_INTAKE_VALIDATION_TEST_FLAGS) -MF $(DEP_DIR)/tests/support_bundle_intake_retrieval_test.d -c $< -o $@
+	$(Q)$(CXX) $(SUPPORT_BUNDLE_INTAKE_VALIDATION_TEST_FLAGS) -MF $(@:.o=.d) -c $< -o $@
 
 $(SUPPORT_BUNDLE_INTAKE_RETRIEVAL_HELPER_OBJ): $(SUPPORT_BUNDLE_INTAKE_RETRIEVAL_HELPER_SRC)
 	$(Q)mkdir -p $(dir $@) $(DEP_DIR)/tests
-	$(Q)$(CXX) $(SUPPORT_BUNDLE_INTAKE_VALIDATION_TEST_FLAGS) -MF $(DEP_DIR)/tests/support_bundle_intake_retrieval_helper.d -c $< -o $@
+	$(Q)$(CXX) $(SUPPORT_BUNDLE_INTAKE_VALIDATION_TEST_FLAGS) -MF $(@:.o=.d) -c $< -o $@
 
 $(OBJ_DIR_DEBUG)/./support_bundle_intake_retrieval.o: support_bundle_intake_retrieval.cpp
 	$(Q)mkdir -p $(dir $@) $(DEP_DIR)/.
-	$(Q)$(CXX) $(SUPPORT_BUNDLE_INTAKE_VALIDATION_TEST_FLAGS) -MF $(DEP_DIR)/support_bundle_intake_retrieval.d -c $< -o $@
+	$(Q)$(CXX) $(SUPPORT_BUNDLE_INTAKE_VALIDATION_TEST_FLAGS) -MF $(@:.o=.d) -c $< -o $@
 
 $(BIN_DIR)/$(SUPPORT_BUNDLE_INTAKE_RETRIEVAL_HELPER_OUT): $(SUPPORT_BUNDLE_INTAKE_RETRIEVAL_HELPER_OBJ)
 	$(Q)mkdir -p $(BIN_DIR)
@@ -1033,11 +1022,11 @@ $(BIN_DIR)/$(SUPPORT_BUNDLE_INTAKE_RETRIEVAL_TEST_OUT): $(SUPPORT_BUNDLE_INTAKE_
 
 $(SUPPORT_BUNDLE_INTAKE_CONTROLLER_TEST_OBJ): $(SUPPORT_BUNDLE_INTAKE_CONTROLLER_TEST_SRC)
 	$(Q)mkdir -p $(dir $@) $(DEP_DIR)/tests
-	$(Q)$(CXX) $(SUPPORT_BUNDLE_INTAKE_VALIDATION_TEST_FLAGS) -MF $(DEP_DIR)/tests/support_bundle_intake_controller_test.d -c $< -o $@
+	$(Q)$(CXX) $(SUPPORT_BUNDLE_INTAKE_VALIDATION_TEST_FLAGS) -MF $(@:.o=.d) -c $< -o $@
 
 $(OBJ_DIR_DEBUG)/./support_bundle_intake_controller.o: support_bundle_intake_controller.cpp
 	$(Q)mkdir -p $(dir $@) $(DEP_DIR)/.
-	$(Q)$(CXX) $(SUPPORT_BUNDLE_INTAKE_VALIDATION_TEST_FLAGS) -MF $(DEP_DIR)/support_bundle_intake_controller.d -c $< -o $@
+	$(Q)$(CXX) $(SUPPORT_BUNDLE_INTAKE_VALIDATION_TEST_FLAGS) -MF $(@:.o=.d) -c $< -o $@
 
 $(BIN_DIR)/$(SUPPORT_BUNDLE_INTAKE_CONTROLLER_TEST_OUT): $(SUPPORT_BUNDLE_INTAKE_CONTROLLER_TEST_DEPS)
 	$(Q)mkdir -p $(BIN_DIR)
@@ -1045,15 +1034,15 @@ $(BIN_DIR)/$(SUPPORT_BUNDLE_INTAKE_CONTROLLER_TEST_OUT): $(SUPPORT_BUNDLE_INTAKE
 
 $(SUPPORT_BUNDLE_INTAKE_RUNTIME_TEST_OBJ): $(SUPPORT_BUNDLE_INTAKE_RUNTIME_TEST_SRC)
 	$(Q)mkdir -p $(dir $@) $(DEP_DIR)/tests
-	$(Q)$(CXX) $(SUPPORT_BUNDLE_INTAKE_VALIDATION_TEST_FLAGS) -MF $(DEP_DIR)/tests/support_bundle_intake_runtime_test.d -c $< -o $@
+	$(Q)$(CXX) $(SUPPORT_BUNDLE_INTAKE_VALIDATION_TEST_FLAGS) -MF $(@:.o=.d) -c $< -o $@
 
 $(OBJ_DIR_DEBUG)/./support_bundle_intake_runtime.o: support_bundle_intake_runtime.cpp
 	$(Q)mkdir -p $(dir $@) $(DEP_DIR)/.
-	$(Q)$(CXX) $(SUPPORT_BUNDLE_INTAKE_VALIDATION_TEST_FLAGS) -MF $(DEP_DIR)/support_bundle_intake_runtime.d -c $< -o $@
+	$(Q)$(CXX) $(SUPPORT_BUNDLE_INTAKE_VALIDATION_TEST_FLAGS) -MF $(@:.o=.d) -c $< -o $@
 
 $(OBJ_DIR_DEBUG)/./support_bundle_intake_production.o: support_bundle_intake_production.cpp
 	$(Q)mkdir -p $(dir $@) $(DEP_DIR)/.
-	$(Q)$(CXX) $(SUPPORT_BUNDLE_INTAKE_VALIDATION_TEST_FLAGS) -MF $(DEP_DIR)/support_bundle_intake_production.d -c $< -o $@
+	$(Q)$(CXX) $(SUPPORT_BUNDLE_INTAKE_VALIDATION_TEST_FLAGS) -MF $(@:.o=.d) -c $< -o $@
 
 $(BIN_DIR)/$(SUPPORT_BUNDLE_INTAKE_RUNTIME_TEST_OUT): $(SUPPORT_BUNDLE_INTAKE_RUNTIME_TEST_DEPS)
 	$(Q)mkdir -p $(BIN_DIR)
@@ -1061,7 +1050,7 @@ $(BIN_DIR)/$(SUPPORT_BUNDLE_INTAKE_RUNTIME_TEST_OUT): $(SUPPORT_BUNDLE_INTAKE_RU
 
 $(SUPPORT_BUNDLE_INTAKE_PRODUCTION_TEST_OBJ): $(SUPPORT_BUNDLE_INTAKE_PRODUCTION_TEST_SRC)
 	$(Q)mkdir -p $(dir $@) $(DEP_DIR)/tests
-	$(Q)$(CXX) $(SUPPORT_BUNDLE_INTAKE_VALIDATION_TEST_FLAGS) -MF $(DEP_DIR)/tests/support_bundle_intake_production_test.d -c $< -o $@
+	$(Q)$(CXX) $(SUPPORT_BUNDLE_INTAKE_VALIDATION_TEST_FLAGS) -MF $(@:.o=.d) -c $< -o $@
 
 $(BIN_DIR)/$(SUPPORT_BUNDLE_INTAKE_PRODUCTION_TEST_OUT): $(SUPPORT_BUNDLE_INTAKE_PRODUCTION_TEST_DEPS)
 	$(Q)mkdir -p $(BIN_DIR)
@@ -1070,9 +1059,8 @@ $(BIN_DIR)/$(SUPPORT_BUNDLE_INTAKE_PRODUCTION_TEST_OUT): $(SUPPORT_BUNDLE_INTAKE
 ifeq ($(GPIOD_HAS_V2),1)
 $(GPIO_LOOPBACK_TEST_OBJ): $(GPIO_LOOPBACK_TEST_SRC)
 	$(Q)mkdir -p $(dir $@)
-	$(Q)mkdir -p $(DEP_DIR)/tests
 	$(Q)echo "Compiling (debug) $< into $@"
-	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -MF $(DEP_DIR)/tests/gpio_loopback_test.d -c $< -o $@
+	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -MF $(@:.o=.d) -c $< -o $@
 
 $(BIN_DIR)/$(GPIO_LOOPBACK_TEST_OUT): $(GPIO_LOOPBACK_TEST_DEPS)
 	$(Q)mkdir -p $(BIN_DIR)
@@ -1081,9 +1069,8 @@ $(BIN_DIR)/$(GPIO_LOOPBACK_TEST_OUT): $(GPIO_LOOPBACK_TEST_DEPS)
 
 $(BAND_GPIO_LIVE_MONITOR_OBJ): $(BAND_GPIO_LIVE_MONITOR_SRC)
 	$(Q)mkdir -p $(dir $@)
-	$(Q)mkdir -p $(DEP_DIR)/tests
 	$(Q)echo "Compiling (debug) $< into $@"
-	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -MF $(DEP_DIR)/tests/band_gpio_live_monitor.d -c $< -o $@
+	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -MF $(@:.o=.d) -c $< -o $@
 
 $(BIN_DIR)/$(BAND_GPIO_LIVE_MONITOR_OUT): $(BAND_GPIO_LIVE_MONITOR_DEPS)
 	$(Q)mkdir -p $(BIN_DIR)
@@ -1097,16 +1084,14 @@ endif
 
 $(OBJ_DIR_RELEASE)/%.o: %.cpp
 	$(Q)mkdir -p $(dir $@)
-	$(Q)mkdir -p $(DEP_DIR)/$(dir $*)
 	$(Q)echo "Compiling (release) $< into $@"
-	$(Q)$(CXX) $(CXX_RELEASE_FLAGS) -MF $(DEP_DIR)/$*.d -c $< -o $@
+	$(Q)$(CXX) $(CXX_RELEASE_FLAGS) -MF $(@:.o=.d) -c $< -o $@
 
 define MAKE_RELEASE_COMPONENT_RULES
 $(OBJ_DIR_RELEASE)/$(patsubst ../../%,%,$(1))/%.o: $(1)/%.cpp
 	$(Q)mkdir -p $$(@D)
-	$(Q)mkdir -p $(DEP_DIR)/$(dir $$*)
 	$(Q)echo "Compiling (release) $$< into $$@"
-	$(Q)$(CXX) $(CXX_RELEASE_FLAGS) -MF $(DEP_DIR)/$$*.d -c $$< -o $$@
+	$(Q)$(CXX) $(CXX_RELEASE_FLAGS) -MF $$(@:.o=.d) -c $$< -o $$@
 endef
 $(foreach dir,$(COMPONENT_SRCDIRS),$(eval $(call MAKE_RELEASE_COMPONENT_RULES,$(dir))))
 
@@ -1910,3 +1895,8 @@ wtp-tls-test: wtp-tls-build
 # Runtime certificate-rotation cases consume the fixtures generated by TLS tests.
 wtp-network-runtime-test: wtp-tls-test $(BIN_DIR)/wtp_production_test
 	$(Q)WSPRRYPI_DISABLE_HARDWARE_ACCESS=1 ./$(BIN_DIR)/wtp_production_test "$(abspath $(WTP_NETWORK_BUILD_DIR)/tls-fixtures)"
+
+# Header ABI changes must invalidate every selected object configuration.
+.PHONY: object-dependency-test
+object-dependency-test:
+	$(Q)python3 ../scripts/tests/object_dependency_make_regression_test.py

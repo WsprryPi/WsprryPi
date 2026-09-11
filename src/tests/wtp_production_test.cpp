@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Lee Bussy
 #include "arg_parser.hpp"
+#include "scheduling.hpp"
 #include "config_handler.hpp"
 #include "runtime_config_bridge.hpp"
 #include "transmitter_runtime_bridge.hpp"
@@ -214,6 +215,64 @@ void run(const std::string &credentials) {
   transmitter_stop_and_join();
   select_wtp_runtime(std::nullopt);
   CHECK(!wtp_runtime_selected());
+  // A bounded tone's host timer must cover WTP's future slot and finite RF
+  // duration. Exercise the actual scheduler request/parent bridge with the peer.
+  Clock tone_clock;
+  struct ToneRuntimeGuard {
+    ~ToneRuntimeGuard() {
+      transmitter_stop_and_join();
+      select_wtp_runtime(std::nullopt);
+    }
+  } tone_runtime_guard;
+  set_wtp_runtime_for_test(settings, tone_clock, tone_clock.peer,
+      {backend_test::sid, backend_test::owner_id, backend_test::device}, [&] {
+        tone_clock.peer.open(); return true;
+      });
+  CHECK(wtp_runtime_inspect().ok);
+  config.transmit_backend = TransmitBackendKind::WTP;
+  config.mode = ModeType::WSPR;
+  config.transmit = false;
+  config.frequencies = "20m";
+  config.allow_unqualified_frequency = true;
+  config.ppm = 0;
+  config.use_led = config.use_amp = config.use_shutdown = false;
+  complete = false;
+  transmitter_set_callbacks([&](auto event, auto, const auto &, auto) {
+    CHECK(event == WsprTransmissionCallbackEvent::COMPLETE);
+    complete = true;
+  });
+  TestToneRequest bounded;
+  bounded.frequency_hz = 14097100;
+  bounded.duration = 10s;
+  const auto tone_started = start_test_tone(bounded);
+  if (!tone_started.started) std::cerr << tone_started.message << '\n';
+  CHECK(tone_started.started && tone_started.bounded_cleanup_delay);
+  const auto tone_deadline = std::chrono::steady_clock::now() + 10s;
+  while (!complete && std::chrono::steady_clock::now() < tone_deadline) {
+    transmitter_poll_events();
+    std::this_thread::sleep_for(1ms);
+  }
+  CHECK(complete && tone_clock.peer.executions == 1);
+  CHECK(tone_clock.peer.records.front().state == wsprrypi::wtp::State::Complete);
+  CHECK(tone_clock.peer.records.front().ended >= tone_clock.peer.start + 10000000000ULL);
+  CHECK(tone_started.bounded_cleanup_delay->count() >
+        static_cast<std::int64_t>(tone_clock.peer.records.front().ended));
+  // RF-on stays exactly ten seconds; the compiler retains its one-nanosecond
+  // off tail despite the later host cleanup timer.
+  bool exact_duration = false;
+  for (const auto &payload : tone_clock.peer.payloads) {
+    const auto wire = nlohmann::json::parse(payload);
+    if (wire.value("op", "") == "LOAD")
+      exact_duration = wire.at("body").at("total_duration_ns") == "10000000001" &&
+          wire.at("body").at("events").size() == 2 &&
+          wire.at("body").at("events").at(0).at("duration_ns") == "10000000000" &&
+          wire.at("body").at("events").at(0).at("rf_on") == true &&
+          wire.at("body").at("events").at(1).at("duration_ns") == "1" &&
+          wire.at("body").at("events").at(1).at("rf_on") == false;
+  }
+  CHECK(exact_duration);
+  CHECK(end_test_tone().stopped);
+  select_wtp_runtime(std::nullopt);
   if (!credentials.empty()) {
     auto network = settings;
     network.transport = "network"; network.hostname = "pico-test.local"; network.tcp_port = 18444;
