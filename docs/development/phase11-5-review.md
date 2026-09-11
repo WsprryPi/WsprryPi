@@ -261,3 +261,19 @@ Pico-owned raw audit and final independent readbacks are separate evidence.
 This remains a bounded diagnostic; full A-G/N, stack/heap gates and the accepted
 configuration list remain open. No installed WsprryPi binary/configuration,
 existing service, radio, GPSDO or operator-manual repository was changed.
+
+## Production idle session repair
+
+The parent event loop now observes a healthy Idle/Ready WTP session at most once
+per second. Skipped WSPR windows use the existing serialized worker for the same
+read-only observation. This prevents the device's five-second idle connection
+timeout while preserving explicit recovery, foreign ownership and pending-job
+policy. No reconnect, LOAD, ARM, ABORT or RELEASE is added by this poll.
+
+Application regressions passed 39,276 checks, and production regressions passed
+6,853 checks. They cover the actual bounded-tone scheduling bridge, skipped
+windows, idle refresh, foreign ownership and transport failure. The native
+server fixture now pins the clean stack-guard Pico source `598a5ad7fa827f24029949fae684dc837127e599`.
+Native TLS and final clean executable validation follow this source freeze.
+
+The actual native TLS suite passed against Pico `598a5ad7fa827f24029949fae684dc837127e599`, including an eight-second idle connection retained by production STATUS, the unchanged 60-second scheduled wait, finite jobs, replay, ownership and identity recovery. Two prior invocations stopped at source-pin validation before any interoperability case; their logs are retained. Native second-IPv4 rebind remains unavailable on macOS and requires the isolated Linux fixture. No additional actionable issue remained in the source re-review.

@@ -122,6 +122,18 @@ int main(int argc, char **argv) {
     WtpApplication app(clock, stream, settings, {std::string(32, '1'), std::string(32, '2'), settings.device_id}, open);
     CHECK(app.inspect().ok);
     CHECK(app.status().identity->device_id == settings.device_id);
+    const auto idle_session = app.status().session_id;
+    const auto idle_started = clock.now_ms();
+    unsigned idle_polls = 0;
+    while (clock.now_ms() - idle_started < 8000) {
+      if (app.poll_idle()) ++idle_polls;
+      CHECK(app.ready() && app.status().session_id == idle_session);
+      clock.wait_ms(25);
+    }
+    CHECK(idle_polls >= 7 && app.status().status_observed_ms &&
+          clock.now_ms() - *app.status().status_observed_ms < 1500);
+    std::cout << "Actual Pico TLS idle connection retained beyond five-second timeout by production STATUS polling\n";
+
     const auto request = [&] {
       TransmissionRequest r;
       r.output.backend = BackendKind::WTP; r.mode = TransmissionMode::TONE;

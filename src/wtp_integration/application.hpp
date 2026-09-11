@@ -15,6 +15,7 @@ public:
                  wtp::SessionOptions, std::function<bool()> reopen);
   ~WtpApplication();
   StartupQuiesceResult inspect();
+  bool poll_idle(); // Bounded read-only STATUS, at most once per second while idle.
   void prepare(TransmissionRequest);
   void prepare_skip();
   std::uint64_t preparation_lead_ns() const;
@@ -34,6 +35,7 @@ public:
 
 private:
   StartupQuiesceResult connect_idle();
+  bool observe_idle_if_due(); // Called only by the serialized transport owner.
   void join();
   WtpScheduleReport run_skip();
   WtpScheduleClock &clock_;
@@ -46,6 +48,7 @@ private:
   std::atomic_bool active_{false}, ready_{false}, skip_pending_{false},
       skip_stop_{false};
   bool idle_detached_{};
+  std::optional<std::uint64_t> last_idle_poll_ms_;
   std::uint64_t skip_start_ns_{};
   std::atomic<TransmissionMode> mode_{TransmissionMode::WSPR};
   std::mutex completion_mutex_;

@@ -5,7 +5,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 find_package(Python3 REQUIRED COMPONENTS Interpreter)
 # The executable embeds the ephemeral private key as well as its generated header.
 file(CHMOD "${CMAKE_BINARY_DIR}" PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE)
-foreach(pair IN ITEMS "PICO_SOURCE|3eac6ec030963a5318515ce5f4683acf6fa88506" "MBEDTLS_SOURCE|0bebf8b8c7f07abe3571ded48a11aa907a1ffb20")
+foreach(pair IN ITEMS "PICO_SOURCE|598a5ad7fa827f24029949fae684dc837127e599" "MBEDTLS_SOURCE|0bebf8b8c7f07abe3571ded48a11aa907a1ffb20")
   string(REPLACE "|" ";" fields "${pair}")
   list(GET fields 0 var)
   list(GET fields 1 pin)

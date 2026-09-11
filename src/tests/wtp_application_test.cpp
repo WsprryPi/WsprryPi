@@ -74,6 +74,45 @@ void config() {
     CHECK(rejected);
   }
 }
+void idle_observation() {
+  Fixture f;
+  auto count = [&] { return std::count(f.clock.peer.operations.begin(),
+      f.clock.peer.operations.end(), Operation::Status); };
+  const auto initial = count();
+  CHECK(!f.app.poll_idle());
+  for (int second = 0; second < 8; ++second) {
+    f.clock.peer.advance(f.clock.peer.now + 1000);
+    CHECK(f.app.poll_idle());
+    CHECK(!f.app.poll_idle());
+    CHECK(f.app.ready() && f.app.status().session_id == sid);
+  }
+  CHECK(count() == initial + 8);
+  CHECK(f.clock.peer.executions == 0 && f.clock.peer.prepares == 0);
+  // Read-only observation of a foreign owner must neither claim nor clean it.
+  f.clock.peer.owner = std::string(32, '8');
+  f.clock.peer.expiry = f.clock.peer.mono() + 60000000000ULL;
+  f.clock.peer.advance(f.clock.peer.now + 1000);
+  CHECK(f.app.poll_idle() && !f.app.ready());
+  CHECK(f.clock.peer.owner == std::string(32, '8'));
+  CHECK(std::count(f.clock.peer.operations.begin(), f.clock.peer.operations.end(), Operation::Abort) == 0);
+  CHECK(std::count(f.clock.peer.operations.begin(), f.clock.peer.operations.end(), Operation::Release) == 0);
+  f.clock.peer.owner.reset();
+  f.clock.peer.advance(f.clock.peer.now + 1000);
+  CHECK(f.app.poll_idle() && f.app.ready());
+  f.app.prepare(f.tone());
+  const auto prepared_count = count();
+  f.clock.peer.advance(f.clock.peer.now + 1000);
+  CHECK(!f.app.poll_idle() && count() == prepared_count);
+  CHECK(f.app.stop().ok);
+  // A broken established transport cannot trigger automatic reconnect/replay.
+  f.clock.peer.close();
+  f.clock.peer.advance(f.clock.peer.now + 1000);
+  CHECK(f.app.poll_idle() && !f.app.ready());
+  const auto disconnected_count = f.clock.peer.operations.size();
+  f.clock.peer.advance(f.clock.peer.now + 2000);
+  CHECK(!f.app.poll_idle());
+  CHECK(f.clock.peer.operations.size() == disconnected_count);
+}
 void jobs() {
   Fixture f;
   CHECK(f.app.ready() && f.app.replaceable());
@@ -81,7 +120,10 @@ void jobs() {
   f.app.prepare_skip();
   CHECK(!f.app.replaceable());
   f.app.start();
-  CHECK(f.finish().skipped && f.clock.peer.operations.size() == before);
+  CHECK(f.finish().skipped);
+  CHECK(std::all_of(f.clock.peer.operations.begin() + before, f.clock.peer.operations.end(),
+      [](Operation op) { return op == Operation::Status; }));
+  CHECK(f.clock.peer.operations.size() > before && f.app.ready());
   f.app.prepare_skip();
   CHECK(f.app.stop().ok && !f.app.skipping());
   f.app.prepare(f.tone());
@@ -139,6 +181,7 @@ void recovery() {
 int main() {
   try {
     config();
+    idle_observation();
     jobs();
     recovery();
     std::cout << checks << " WTP application checks passed\n";

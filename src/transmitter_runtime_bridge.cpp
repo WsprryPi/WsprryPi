@@ -113,6 +113,7 @@ void transmitter_clear_soft_off() noexcept
 
 void transmitter_poll_events()
 {
+    wtp_runtime_poll_idle();
     auto result = wtp_runtime_completion();
     if (!result) return;
     TransmitterRuntimeCallback callback;

@@ -20,6 +20,7 @@ std::chrono::nanoseconds wtp_runtime_preparation_lead();
 void wtp_runtime_start();
 wsprrypi::CleanupResult wtp_runtime_stop();
 wsprrypi::StartupQuiesceResult wtp_runtime_inspect();
+void wtp_runtime_poll_idle();
 wsprrypi::CleanupResult wtp_runtime_recover();
 std::string wtp_runtime_json();
 wsprrypi::PicoHttpResponse wtp_runtime_management(const std::string &resource,

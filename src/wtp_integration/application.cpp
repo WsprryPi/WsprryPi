@@ -58,6 +58,7 @@ StartupQuiesceResult WtpApplication::connect_idle() {
     }
   }
   auto result = scheduler_.inspect_idle();
+  last_idle_poll_ms_ = clock_.now_ms();
   ready_ = result.ok;
   if (result.ok) idle_detached_ = false;
   return result;
@@ -68,6 +69,28 @@ StartupQuiesceResult WtpApplication::inspect() {
     return {false, "Pico work is active"};
   join();
   return connect_idle();
+}
+bool WtpApplication::poll_idle() {
+  std::unique_lock lock(control_, std::try_to_lock);
+  if (!lock || active_ || skip_pending_ ||
+      scheduler_.phase() != WtpSchedulePhase::Idle)
+    return false;
+  join();
+  return observe_idle_if_due();
+}
+bool WtpApplication::observe_idle_if_due() {
+  // A healthy negotiated session may be observed, including a foreign owner.
+  // Disconnection, identity/fault latches and unresolved work still need the
+  // existing explicit inspection/recovery path; never reconnect or resubmit here.
+  if (scheduler_.status().session_phase != wtp::SessionPhase::Ready)
+    return false;
+  const auto now = clock_.now_ms();
+  if (last_idle_poll_ms_ && now >= *last_idle_poll_ms_ &&
+      now - *last_idle_poll_ms_ < 1000)
+    return false;
+  last_idle_poll_ms_ = now;
+  ready_ = scheduler_.inspect_idle().ok;
+  return true;
 }
 std::uint64_t WtpApplication::preparation_lead_ns() const {
   const auto s = scheduler_.status();
@@ -159,6 +182,7 @@ WtpScheduleReport WtpApplication::run_skip() {
   result.start_utc_ns = skip_start_ns_;
   const auto deadline = clock_.now_ms() + 130000;
   while (!skip_stop_) {
+    (void)observe_idle_if_due(); // A skipped slot submits no job, but retains its idle session.
     const auto utc = clock_.utc_now_ns();
     if (!utc || clock_.now_ms() > deadline) {
       result.error = "Host UTC unavailable or changed during skipped window";

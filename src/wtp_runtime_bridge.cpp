@@ -204,6 +204,12 @@ wsprrypi::StartupQuiesceResult wtp_runtime_inspect() {
   std::lock_guard operation(operation_mutex);
   return require()->app->inspect();
 }
+void wtp_runtime_poll_idle() {
+  std::unique_lock operation(operation_mutex, std::try_to_lock);
+  if (!operation) return;
+  auto r = get();
+  if (r) (void)r->app->poll_idle();
+}
 wsprrypi::CleanupResult wtp_runtime_recover() {
   std::lock_guard operation(operation_mutex);
   auto r = get();
