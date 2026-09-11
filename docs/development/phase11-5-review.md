@@ -277,3 +277,55 @@ server fixture now pins the clean stack-guard Pico source `598a5ad7fa827f2402994
 Native TLS and final clean executable validation follow this source freeze.
 
 The actual native TLS suite passed against Pico `598a5ad7fa827f24029949fae684dc837127e599`, including an eight-second idle connection retained by production STATUS, the unchanged 60-second scheduled wait, finite jobs, replay, ownership and identity recovery. Two prior invocations stopped at source-pin validation before any interoperability case; their logs are retained. Native second-IPv4 rebind remains unavailable on macOS and requires the isolated Linux fixture. No additional actionable issue remained in the source re-review.
+
+## Final prepared pair and isolated load tooling
+
+The actual-server pin now selects clean Pico
+`6e2ddc9e476986046de74d18cbcc3a2f6b64d142`. Both native interoperability
+directions passed with the production application from clean
+`fb0a2eb50c1ea1792324139412990341592db452`; detached source snapshots preserve
+that pair while test/evidence metadata advances. The separate Linux build at
+`/home/pi/phase11-5-closure-fb0a2eb/source/src/build/bin/phase115-pi-fb0a2eb`
+has SHA-256 `08af5ad6dd21592a7ff90d898dd971a1e740cbb3836f65e74ba3816b960f4507`.
+It was built with `BACKENDS=simulated ANCILLARY_GPIO=0` and has not been installed
+or connected to a Pico in this stage.
+
+The opt-in `src/tests/phase115_production_load.py` launches that exact program
+inside the approved client namespaces, with a validated private WTP INI, zero
+correction, ancillary outputs disabled, and separate host API ports. It observes
+the host API and generates manual-equivalent authenticated Pico status/page/asset
+GETs. It submits no RF jobs. A clean exit is explicitly only a capture requiring
+an independent WTP wire/rate audit. USB and host health remain independent.
+
+`src/tests/network/phase115_tls_observer.c` is a separately built LD_PRELOAD
+evidence observer, never a production link or installed component. It records
+connection identities, timestamps, successful plaintext I/O and peer fingerprints
+with serialized durable writes. Synchronous logging is part of host observer
+cost. It does not turn process exit or a missing record into inactive output.
+On wspr5, its library SHA-256 is
+`4e9586fbe7be90936c503359bd7fdd6355247aff264323df74a3653d9bb9adc0`.
+The Linux loopback test passed eight concurrent mutual-TLS streams and exact
+plaintext reconstruction; six corrupted-log variants were rejected. The first
+fixture omitted mutual client authentication and failed the peer-certificate
+requirement; the corrected fixture passed. This was hardware-free.
+
+Adversarial review repaired a false-success finish after an exception with a
+zero-exit child, bounded browser response time independently of partial input,
+and validated the explicit 135.5 kHz policy and correction settings. Three
+load-driver regression methods pass, including scope drift, default no-op and
+wrong-peer failure with a clean child exit. Neither the load driver nor its
+observer has produced physical N/A-G acceptance yet.
+
+Pico's N0 fixture was restored after a retained asynchronous-cleanup verification
+failure and read-only reconciliation. Both Picos retain their original inhibited
+boots and are empty, unowned and output false. Installed WsprryPi remains PID
+1957, with unchanged binary/INI, and the recovery timer and both test radios'
+power saving are restored. The separate N1 lifecycle/management packet awaits
+the missing authorization required by section 5 of the original request.
+
+Repeat source/evidence review found no additional actionable issue in this
+prepared scope. Full A-G execution, resource/stack/timing/observer-cost evidence,
+sustained mixed load and physical restoration acceptance remain open. No clock
+configuration is accepted. No browser API/UI, WTP identity contract or operator
+manual was changed; the previously listed operator-documentation follow-up
+remains pending actual acceptance.
