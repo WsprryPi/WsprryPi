@@ -113,3 +113,22 @@ Wsprry_Pi_Docs repository:
 `docs/User_Interface/Operations/index.md`, `docs/Advanced_Operations/rest_api.md`
 and `docs/User_Interface/Maintenance/network_safety.md`.
 Only measured supported combinations should be published there.
+
+
+## Coordinated physical pilot disposition
+
+Pico P1b at clean firmware ce1c339a976e/138 MHz submitted one finite 10-second
+135.5 kHz Tone job. It failed the frozen 25% predecessor reserve requirement
+(1,910/16,384 words) and later reported Failed/DEVICE_FAULT, with authoritative
+output false and no owner. The maximum worker service gap also exceeded its
+2,849,391 ns budget. The two remaining jobs were not submitted. The actual Pi
+production client was not the pilot controller; no Pi executable or service
+change was involved. Both source/interop validation and this failed physical
+USB diagnostic remain distinct evidence.
+
+Pico B retained its original inhibited firmware and boot, empty/unowned/inactive.
+The normal restorer refused the failed pilot. Recovery-only authorization is
+pending in the coordinating task; the failed state and original captures are
+preserved. The authoritative records are Pico phase11-5-pilot-attempt1.json
+(host parser failure before flashing) and phase11-5-pilot-attempt2.json (physical
+margin and terminal failure). No clock is accepted and no threshold was relaxed.
