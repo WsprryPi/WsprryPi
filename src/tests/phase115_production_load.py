@@ -67,7 +67,7 @@ def validate_ini(path):
 
 def browser_schedule(start,end,stop,get,clock=time.monotonic,grant_control=None):
     """Preserve 0.2 Hz status while spreading each reload's assets over its next slots."""
-    status_at=page_at=start;pages=[]
+    status_at=page_at=start;pages=[];asset_budget=0.0
     while clock()<end and not stop.is_set():
         now=clock()
         if now>=page_at:
@@ -81,7 +81,12 @@ def browser_schedule(start,end,stop,get,clock=time.monotonic,grant_control=None)
             # Keep its due successor ahead of assets or control; do not drop either.
             granted=(grant_control is not None and clock()<status_at and
                      len(pages)<slots_left and grant_control(status_at))
-            if pages and not granted and clock()<status_at:get(pages.pop(0))
+            # Do not create sampling debt by starting an asset that its measured
+            # cost predicts will exceed the existing one-second status allowance. All assets must
+            # still finish in their original thirty-second reload window.
+            if pages and not granted and clock()<status_at and clock()+asset_budget<=status_at+1:
+                asset_start=clock();get(pages.pop(0))
+                asset_budget=max(asset_budget,clock()-asset_start)
         stop.wait(max(0,min(.1,status_at-clock(),end-clock())))
     require(not pages,'Final browser page reload incomplete')
 

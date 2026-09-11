@@ -122,6 +122,30 @@ class LoadTests(unittest.TestCase):
             self.assertEqual(sorted(p for p,t in requests if begin<=t<begin+30 and p!='/api/v1/status'),
                              ['/','/app.js','/style.css'])
 
+    def test_measured_rf_latency_defers_assets_without_dropping_work(self):
+        now=[0.0];requests=[];controls=[]
+        status_times=iter([1.701,1.589,1.623,1.673,1.979,1.645,1.738,2.893,2.285,3.331])
+        asset_times=iter([2.163,2.172,1.629,2.401,2.934,2.508])
+        class Stop:
+            def is_set(self):return False
+            def wait(self,seconds):now[0]+=seconds
+        def get(path):
+            requests.append((path,now[0]))
+            now[0]+=next(status_times,1.6) if path=='/api/v1/status' else next(asset_times,1.6)
+        def grant(deadline):
+            if len(controls)>=4 or (len(controls)==3 and now[0]<30):return False
+            controls.append(now[0]);now[0]+=1.6
+            self.assertLess(now[0],deadline)
+            return True
+        load.browser_schedule(0,180,Stop(),get,clock=lambda:now[0],grant_control=grant)
+        self.assertEqual(len(controls),4)
+        status=[t for path,t in requests if path=='/api/v1/status']
+        self.assertEqual(len(status),36)
+        self.assertLessEqual(max(t-i*5 for i,t in enumerate(status)),1)
+        for begin in range(0,180,30):
+            self.assertEqual(sorted(p for p,t in requests if begin<=t<begin+30 and p!='/api/v1/status'),
+                             ['/','/app.js','/style.css'])
+
     def test_no_run_does_not_resolve_or_spawn(self):
         with patch.object(sys,'argv',['load','--root','/absent','--seconds','180','--boot','a'*32]), \
              patch.object(load.subprocess,'Popen',side_effect=AssertionError('spawned')), \

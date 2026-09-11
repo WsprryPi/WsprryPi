@@ -422,3 +422,21 @@ not relabel the failed target result. New target evidence remains required.
 Documentation Impact: records the N1s failure and the corrected scheduling
 order. The installed application, production binary, protocol limits and RF
 acceptance status are unchanged.
+
+
+## Asset scheduling during physical RF
+
+The Pico A3 run preserved a real browser scheduling failure: an asset took
+2.508 seconds after starting with only 1.139 seconds before the next status
+slot. Status polling then exceeded its unchanged one-second lateness bound.
+A regression using the measured response sequence fails the previous runner.
+The correction defers an asset when its observed maximum duration will not fit
+within the existing one-second status scheduling allowance. It still requires all status polls and every asset
+inside the same thirty-second reload window; it does not reduce load, change
+the lateness threshold or excuse a response that exceeds the status deadline.
+Eight hardware-free runner regressions pass, including the preserved 6.013-second
+response failure. The existing production binary is unchanged.
+
+Documentation impact: this note records the evidence, scheduling-only scope and
+unchanged acceptance thresholds. Actual target acceptance remains in the Pico
+case register; this source change does not mark a hardware case passed.
