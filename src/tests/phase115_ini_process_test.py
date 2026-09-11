@@ -16,7 +16,9 @@ def main():
     p.add_argument('--ini',type=Path,required=True);p.add_argument('--output',type=Path,required=True)
     p.add_argument('--run',action='store_true');args=p.parse_args()
     if not args.run:print('Plan only; no executable or network accessed');return
-    from phase115_production_load import validate_ini,DEVICE,BINARY_SHA
+    from phase115_production_load import validate_ini,DEVICE
+    # This regression retains its original, independently pinned executable.
+    BINARY_SHA="08af5ad6dd21592a7ff90d898dd971a1e740cbb3836f65e74ba3816b960f4507"
     assert os.geteuid()==0 and {name for index,name in socket.if_nameindex()}=={'lo'},'Isolated network namespace required'
     validate_ini(args.ini)
     binary=Path('/home/pi/phase11-5-closure-fb0a2eb/source/src/build/bin/phase115-pi-fb0a2eb')

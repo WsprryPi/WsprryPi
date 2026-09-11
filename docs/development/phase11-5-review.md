@@ -398,3 +398,11 @@ control slots are prepared for A3; their fake-clock regression preserves all 36
 status requests and six complete reloads while scheduling 13 control requests.
 That regression does not establish physical A3 acceptance. The actual A2 rerun
 continues to use the previously frozen browser-priority driver and observer.
+
+A follow-up review found the isolated configuration regression still imported
+the removed global binary hash. It now retains its original fb0a2eb artifact
+pin locally. Its run-entry import and namespace rejection were exercised; the
+previous actual fb0a2eb configuration round-trip remains historical evidence.
+The later candidate staging failure was file ownership: a root tar extraction
+preserved the Mac owner ID on TLS credentials. Contents were unchanged; the
+Pico campaign records the corrected owner and preserved failed process.
