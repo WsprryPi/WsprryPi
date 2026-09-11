@@ -70,7 +70,8 @@ Hardware-free checks run on the Mac from `src`:
   physical-backend semantics profile.
 - `make -j1 wtp-network-interop-test SUDO= WTP_NETWORK_BUILD_DIR=build/phase11-5-network`
   with explicit Pico and Mbed TLS source paths: PASS against clean Pico
-  `ab87031b5e82b643479dc1f2001443da9e3c2cb8` and Mbed TLS
+  `ce1c339a976e795e90c38c4a57578f9c8ed75615` (repeated after the initial
+  ab87031 pass) and Mbed TLS
   `0bebf8b8c7f07abe3571ded48a11aa907a1ffb20`. The build uses Pico's hash-checked
   alert-delivery overlay, not an unpatched upstream TLS approximation. Named
   and direct-IP identities, shared management, finite jobs, lost-response replay,
@@ -78,7 +79,10 @@ Hardware-free checks run on the Mac from `src`:
   the actual 60-second future scheduled wait. macOS could not bind the second
   loopback IPv4 address; that actual rebind subcase was explicitly skipped while
   injected-address checks ran. It remains a native-Linux/physical fixture gate.
-- Reciprocal Pico-owned actual-client run: pending.
+- Reciprocal Pico-owned actual-client and network interop: both PASS against
+  clean Pi `76fd1018868551b93ca46bef2e7c2ef28fb75993` (85.98 seconds).
+  The later companion changes update only this evidence and the Pico source pin;
+  the production client and scheduler sources are unchanged.
 
 Logs and original failed attempts remain in the coordinating checkout's ignored
 `build/phase11-5`. Injected transport failures and host device-tree diagnostics
