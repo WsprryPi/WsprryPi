@@ -77,8 +77,11 @@ def browser_schedule(start,end,stop,get,clock=time.monotonic,grant_control=None)
             require(now-status_at<=1,'Browser nominal sampling fell behind')
             get('/api/v1/status');status_at+=5
             slots_left=round((page_at-status_at)/5)+1
-            granted=(grant_control is not None and len(pages)<slots_left and grant_control(status_at))
-            if pages and not granted:get(pages.pop(0))
+            # A completed status may already have consumed the next polling slot.
+            # Keep its due successor ahead of assets or control; do not drop either.
+            granted=(grant_control is not None and clock()<status_at and
+                     len(pages)<slots_left and grant_control(status_at))
+            if pages and not granted and clock()<status_at:get(pages.pop(0))
         stop.wait(max(0,min(.1,status_at-clock(),end-clock())))
     require(not pages,'Final browser page reload incomplete')
 

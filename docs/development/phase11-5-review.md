@@ -406,3 +406,19 @@ previous actual fb0a2eb configuration round-trip remains historical evidence.
 The later candidate staging failure was file ownership: a root tar extraction
 preserved the Mac owner ID on TLS credentials. Contents were unchanged; the
 Pico campaign records the corrected owner and preserved failed process.
+
+
+The preserved N1s physical A2 attempt failed browser cadence on Pico firmware
+4ca4494 at 138 MHz: the first status request took 6.013358513 seconds, followed
+by a 2.103315077-second page fetch. No RF job was submitted; Pico and host
+restoration completed. The next load-runner revision prioritizes an already-due
+status poll over an asset or control grant after a slow response. It preserves
+all 36 status and 18 asset requests per N180 interval and the existing one-second
+sampling lateness limit. Seven deterministic runner tests pass, including one
+5.5-second status response with all requests retained. The observed 6.013-second
+response still fails the unchanged timing check; this scheduling repair does
+not relabel the failed target result. New target evidence remains required.
+
+Documentation Impact: records the N1s failure and the corrected scheduling
+order. The installed application, production binary, protocol limits and RF
+acceptance status are unchanged.

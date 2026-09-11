@@ -84,6 +84,25 @@ class LoadTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError,'fell behind'):
             load.browser_schedule(0,180,Stop(),too_slow,clock=lambda:now[0])
 
+    def test_due_status_precedes_assets_after_one_slow_response(self):
+        now=[0.0];requests=[]
+        class Stop:
+            def is_set(self):return False
+            def wait(self,seconds):now[0]+=seconds
+        def get(path):
+            requests.append((path,now[0]))
+            now[0]+=5.5 if len(requests)==1 else 1
+        load.browser_schedule(0,180,Stop(),get,clock=lambda:now[0])
+        self.assertEqual(requests[:2],[('/api/v1/status',0.0),('/api/v1/status',5.5)])
+        self.assertEqual(sum(path=='/api/v1/status' for path,t in requests),36)
+        for begin in range(0,180,30):
+            self.assertEqual(sorted(path for path,t in requests
+                if begin<=t<begin+30 and path!='/api/v1/status'),['/','/app.js','/style.css'])
+        now[0]=0
+        def failed_measurement(path):now[0]+=6.013358513
+        with self.assertRaisesRegex(ValueError,'fell behind'):
+            load.browser_schedule(0,180,Stop(),failed_measurement,clock=lambda:now[0])
+
     def test_control_slots_preserve_all_status_and_reload_requests(self):
         now=[0.0];requests=[];controls=[]
         class Stop:
