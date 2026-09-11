@@ -132,3 +132,30 @@ pending in the coordinating task; the failed state and original captures are
 preserved. The authoritative records are Pico phase11-5-pilot-attempt1.json
 (host parser failure before flashing) and phase11-5-pilot-attempt2.json (physical
 margin and terminal failure). No clock is accepted and no threshold was relaxed.
+
+
+## Recovery completed; unqualified terminal repair
+
+Separately authorized recovery restored Pico A's original inhibited firmware
+802c91a7b86e-dirty with boot 4571042e06f139bc185e862482082291. Both boards are
+empty, unowned and authoritatively output inactive; Pico B's original boot is
+unchanged. Host interfaces/routes, boot, installed executable and PID 1957 match
+preflight; the Wi-Fi recovery timer remains active/enabled. Failed pilot evidence
+and units remain preserved. Pico's phase11-5-recovery-result.json is authoritative.
+
+A new host regression reproduced the mismatch between the physical stream's
+existing 100-microsecond finite-tail acknowledgement allowance and JobService's
+nominal-end watchdog. Pico repairs this internal contract with a capped local
+engine allowance; nonlocal engines retain their old watchdog and no extra
+waveform samples are permitted. The refill reserve/service-gap budgets remain
+unchanged. This repair is not flashed or physically qualified; 11.5 remains OPEN.
+
+
+Final actual-server interoperability also PASS against clean repaired Pico
+713cb16749c5647b6ac1326c18d97add9c975935. An overlapping invocation failed TLS
+initialization while the reciprocal fixture occupied the same fixed loopback
+port; its isolated rerun passed, and both attempts remain recorded. The actual
+second-address macOS skip remains open. Reciprocal Pico-owned gates both PASS
+against clean Pi 76fd101 (86.04 seconds). Main-checkout changes since that pin
+are evidence and test configuration only; production sources are unchanged.
+All repaired Pico builds remain unflashed and unaccepted.
