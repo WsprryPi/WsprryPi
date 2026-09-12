@@ -498,3 +498,63 @@ unchanged retry is claimed.
 Documentation Impact: development outcome/evidence updated in both repositories;
 operator behavior and settings are unchanged. No operator-documentation change
 is required for this result.
+
+
+## N1v–N1y: timing audit repairs and observed delivery gaps
+
+The coordinating Pico execution prompt and result are in
+`docs/development/phase11-5-status-stall-prompt.md`,
+`docs/development/phase11-5-status-stall-review.md` and
+`docs/development/phase11-5-status-trace-result.json` in WsprryPico.
+Three Pico-owned tooling defects were repaired: STATUS start cadence used TLS
+write returns, Console diagnostics inherited WTP's signed 32-bit numeric limit,
+and an added internal-trace reader could consume INFO sampling time while
+reading a burst. WTP parsing and all acceptance thresholds remain unchanged.
+Return-only observer evidence cannot establish request-start cadence.
+
+The actual Pi production binary remains source `6f65d5c7d202`, SHA-256
+`122ed0e4bd752e457419c4df5433c3fca1a4a88677a3db3ebd7e60e783ba5d1c`,
+with load driver `6703818`. Pico firmware remains exact inhibited source
+`4058d3a4a951`, 150 MHz, UF2 SHA-256
+`0a7d54673e7171ee10275272701de5fbb3cecdc91c097a18eeae496c0922c7b9`.
+No production-client or firmware behavior was changed in this repair.
+
+N1v completed a dual-capture N300/USB360 diagnostic. N1w failed before load
+startup on the Console parser defect. N1x collected 568 continuous trace events
+but stopped after a trace burst delayed an INFO cycle. Those failed attempts
+and their successful restorations remain preserved. The repaired N1y reader
+completed N300/USB360 with 3846 consecutive trace events and passed independent
+load/USB audits: 300 nominal production STATUS starts, maximum start gap
+1.090124856 s, maximum native write-to-response delay 0.821016690 s, and maximum
+INFO start gap 1.186896401 s. Browser counts were 60 status requests and ten of
+each page/asset. Additional NETTRACE traffic makes this diagnostic distinct from
+the frozen A2 workload; it earns no acceptance credit.
+
+The internal and host traces identify three browser response segments across
+N1x/N1y that were submitted successfully at the Pico boundary, absent from both
+host captures, then delivered on retransmission. N1y also captured four client
+output packets absent at both the AP capture and the continuous DUT input
+boundary. This localizes delivery gaps without identifying the responsible
+driver/radio/AP component. The original N1u STATUS stall was not reproduced and
+remains unattributed. Its corrected start gap is 2.696674577 s and still fails;
+all six historical N1t load intervals pass the corrected audit.
+
+Final A boot is `bbabf4bdffb92c6bb0f04f11929c2262`, original inhibited firmware
+and configuration restored, Empty/inactive/unowned. B remains unchanged and
+inactive. Normal host networking and the recovery timer are restored; installed
+service PID 1957 is unchanged. Cumulative configuration writes are eighteen.
+No RF jobs were submitted; all diagnostic fixtures retained the original N1u
+absolute cleanup deadline. Final archive SHA-256:
+`b7308d25a27ee1abd511120a18a33201961a9667bb261c823df0964749570269`.
+
+The coordinating repository's 57-test host suite and affected follow-up tests
+pass. Adversarial review findings were repaired and reassessed. Zero new
+acceptance cases closed: historical A1/A2 remain 2/20, no configuration is
+accepted, and affected A2/A3 plus the remaining Phase 11.5 cases stay open.
+Selected physical 138 MHz remains distinct from the inhibited 150 MHz reference;
+physical 132/150 MHz remain untested. Clock changes during 11.6 repeat affected
+11.5 checks; systematic band/mode/clock and filter qualification remains Phase 13.
+
+Documentation Impact: development tooling/evidence in Pico and this companion
+review. Operator settings, production behavior and normal workflow are unchanged;
+no separate operator-documentation change is required.
