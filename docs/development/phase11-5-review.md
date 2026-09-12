@@ -1,5 +1,35 @@
 # Phase 11.5 target resource and contention review
 
+Latest execution, September 12, 2026: the coordinating Pico
+`phase11-5-r2-amended-review.md` records R1 5/5 on clean firmware
+049cc929143bdec6ec32817f6df0c73a9637cdf5 at physical 138 MHz/divider 1/RAM/listener
+on. Three browser-owned ten-second Tone jobs passed the full N300/USB360 audit.
+R2 remains 3/7 jobs complete; four modes and actual production-owned/USB-reference
+submission remain open. Phase 11.5 remains 1/6 families with no accepted configuration.
+
+The unchanged production source 6f65d5c7d202569102459ab68d7c9ea079b96f35 observed
+317 STATUS requests in N300, maximum start gap 1.914 s and native TLS
+write-to-response 1.797 s. All eight browser actions/fourteen GETs were captured.
+The three launch delays were 15, 8 and 8 microseconds of post-enable software
+telemetry. This does not qualify electrical-edge UTC accuracy or spectral output.
+The installed executable and PID 1957 were unchanged. Both Picos, original
+configurations, host networking and permanent time.local/GPS-PPS were restored;
+cumulative configuration writes are 30/32.
+
+The full R1 repeat was broader than the requested affected-check revalidation.
+Future fixes must identify invalidated assertion IDs and reuse unaffected evidence;
+a helper/documentation change or new revision label does not automatically restart
+R1. Remaining R2 work should reuse the unchanged frozen candidate's valid baseline.
+
+Validation: eleven Pi load-helper tests passed; coordinating Pico validation
+passed 129 local tests and one private evidence test on wspr5, including nine
+completed-evidence mutations and repeated intact audits. Historical failures below
+remain preserved. Documentation Impact: this companion review records the new
+measurements and evidence-reuse rule; no Pi source, operator UI, installed service
+or separate operator-documentation repository changed.
+
+The following entries retain their original historical scope.
+
 Current R1 execution, September 12, 2026: R1 remains blocked in the coordinating
 WsprryPico `docs/development/phase11-5-r1-review.md` and result JSON. Four exact
 artifact/layout checks passed; inhibited startup acquired its address but failed
