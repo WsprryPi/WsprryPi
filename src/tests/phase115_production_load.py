@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Opt-in isolated actual-production/browser load; never submits RF jobs.
+"""Opt-in isolated actual-production/browser load; RF off unless exact R2 QRSS plan.
 
 Run inside the approved client network/mount namespace. The production program
 owns its WTP connection and ordinary scheduler policy. This worker observes its
@@ -37,21 +37,29 @@ def require(value,message):
 def digest(path): return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
-def validate_ini(path):
+def validate_ini(path, production_job=False):
     config=configparser.ConfigParser(interpolation=None,strict=True)
     # Match the application parser: canonical INI keys are case-sensitive.
     config.optionxform=str
     require(config.read(path)==[str(path)],'INI unavailable')
     require(not config.defaults(),'INI DEFAULT values cannot stand in for explicit settings')
     require(all(config.get('Operation',key).lower()=='false'
-                for key in ('Transmit','Use LED','Use Amp','Use Shutdown')) and
-            config.get('Operation','Enable on Boot')=='Never' and
+                for key in ('Use LED','Use Amp','Use Shutdown')) and
+            config.getboolean('Operation','Transmit') is production_job and
+            config.get('Operation','Enable on Boot')==('Follow' if production_job else 'Never') and
             config.get('Operation','Transmit Backend')=='wtp','Ancillary/output policy')
     require(config.get('WTP','Transport')=='network' and config.get('WTP','Hostname')==NAME and
             config.get('WTP','TLS Server Identity')==NAME and config.get('WTP','Device ID')==DEVICE and
             config.getint('WTP','TCP Port')==18443 and not config.get('WTP','Endpoint') and
             config.get('WTP','Allow Frequency Adjustment').lower()=='true' and
             config.getint('WTP','Start Uncertainty ns')==500000000,'WTP admission')
+    if production_job:
+        require(config.get('Operation','Mode')=='QRSS' and
+                config.get('CW','Message')=='ETE' and config.getfloat('CW','Base Frequency')==135500 and
+                config.getfloat('CW','Dot Seconds')==3 and
+                config.getfloat('CW','Inter Character Gap')==3 and
+                config.get('CW','Fade Shape')=='none' and
+                config.getint('CW','Repeat Minutes')==60, 'Exact production QRSS job')
     require(config.getint('Operation','Web Port')==31425 and
             config.getint('Operation','Socket Port')==31426,'Isolated host ports')
     require(all(not value.strip() for key,value in config['Band GPIO'].items()
@@ -151,7 +159,7 @@ def main():
     binary,ini,observer=[Path(plan[key]) for key in ('binary','ini','observer')]
     require(digest(binary)==plan['binary_sha256'] and digest(ini)==plan['ini_sha256'] and
             digest(observer)==plan['observer_sha256'],'Application/input identity changed')
-    validate_ini(ini)
+    validate_ini(ini, plan.get('production_job') == 'QRSS-ETE-33s')
     ctx=ssl.create_default_context(cafile=plan['ca'])
     ctx.minimum_version=ctx.maximum_version=ssl.TLSVersion.TLSv1_3
     ctx.load_cert_chain(plan['browser_cert'],plan['browser_key']);ctx.set_alpn_protocols(['http/1.1'])
@@ -270,6 +278,26 @@ def main():
             require(identity['device_id']==DEVICE and identity['boot_id']==args.boot and
                     network['resolved_address']==plan['address'] and
                     network['authenticated_identity']==NAME,'Production peer identity')
+            if plan.get('production_job'):
+                require(plan['production_job']=='QRSS-ETE-33s' and args.seconds==300,
+                        'Unfrozen production job')
+                binding=status['host']
+                while binding['phase']=='idle':
+                    require(process.poll() is None and time.monotonic()<deadline,
+                            'Production did not prepare its scheduled job')
+                    time.sleep(.05);binding=host_status()['host']
+                require(binding['phase']=='waiting' and
+                        time.time_ns()+30_000_000_000<int(binding['dispatch_utc_ns']) and
+                        int(binding['start_utc_ns'])==plan['production_start_utc_ns'],
+                        'Production must bind first job before dispatch')
+                temporary = root/'production-bound.tmp'
+                temporary.write_text(json.dumps(binding)+'\n')
+                temporary.replace(root/'production-bound.json')
+                limit=time.monotonic()+15
+                while not (root/'observation-ready.json').exists():
+                    require(process.poll() is None and time.monotonic()<limit,
+                            'Production observation not armed before dispatch')
+                    time.sleep(.05)
             start=time.monotonic();end=start+args.seconds
             (root/'ready.json').write_text(json.dumps(dict(start_monotonic_ns=time.monotonic_ns(),
                                                           boot_id=args.boot))+'\n')
@@ -316,6 +344,8 @@ def main():
         note('finish',{'result':'CAPTURED_REQUIRES_INDEPENDENT_AUDIT' if completed and not failures and exitcode==0
                       else 'FAILED','failures':failures,'exit':exitcode})
         log.close()
+        if failures or not completed or exitcode!=0:
+            (root/'load-failed.json').write_text(json.dumps(dict(failures=failures,exit=exitcode))+'\n')
     require(completed and not failures and exitcode==0,'Production load did not finish cleanly')
 
 

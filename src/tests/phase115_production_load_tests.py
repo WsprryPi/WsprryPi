@@ -29,6 +29,23 @@ def settings():
 
 
 class LoadTests(unittest.TestCase):
+    def test_production_qrss_requires_exact_opt_in_and_finite_native_shape(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path=Path(directory)/'production.ini'
+            config=settings()
+            config['Operation'].update({'Transmit':'true','Enable on Boot':'Follow','Mode':'QRSS'})
+            config['CW']={'Message':'ETE','Base Frequency':'135500','Dot Seconds':'3',
+                'Inter Character Gap':'3','Fade Shape':'none','Repeat Minutes':'60'}
+            def write():
+                with path.open('w') as out:config.write(out)
+            write();load.validate_ini(path,True)
+            with self.assertRaises(ValueError):load.validate_ini(path)
+            for key,bad in [('Message','ETET'),('Base Frequency','14097100'),('Dot Seconds','4'),
+                            ('Inter Character Gap','1'),('Repeat Minutes','1'),('Fade Shape','linear')]:
+                old=config['CW'][key];config['CW'][key]=bad;write()
+                with self.assertRaises(ValueError):load.validate_ini(path,True)
+                config['CW'][key]=old
+
     def test_normal_browser_records_every_action_without_stress_assets(self):
         for seconds in (180,300):
             now=[0.0];requests=[];events=[]

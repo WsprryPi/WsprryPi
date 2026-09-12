@@ -1,6 +1,51 @@
 # Phase 11.5 target resource and contention review
 
-Latest execution, September 12, 2026: the coordinating Pico
+Latest R2 closure, September 12, 2026: WsprryPico's coordinating
+`docs/development/phase11-5-r2-continuation-review.md` and `phase11-5-r2-closure-result.json`
+close **R2 7/7 jobs** and retain **R1 5/5** through an explicit source-impact
+assessment. Phase 11.5 is **2/6 families**, with R3–R6 open and no full accepted
+configuration. The selected candidate is Pico source
+2e43110f05304efdc2ae25c298baa0ef6426955b, physical 138 MHz/divider 1/RAM/listener on.
+
+Three browser Tone jobs and actual production-owned QRSS ETE/33 s retain their
+049cc929 firmware identities. The latter used unchanged production source
+6f65d5c7d202569102459ab68d7c9ea079b96f35 and executable SHA-256
+122ed0e4bd752e457419c4df5433c3fca1a4a88677a3db3ebd7e60e783ba5d1c.
+After a WSPR LOAD OOM exposed transient Pico buffer allocations, the repaired
+2e43110 image completed USB FSKCW/35 s, DFCW/17 s and WSPR/110.592 s during
+full N300/USB360 observation. Both failed original assessments remain preserved.
+
+The final run's administrative STATUS response took at most 2.218080153 s,
+within its five-second deadline, while its largest request-start gap was
+2.322236389 s. The host sent the next request 104.156236 ms after the delayed
+reply. The user explicitly accepted one-Hz polling while no reply is outstanding,
+with in-flight delays retained as telemetry. A separate amended offline audit
+passed, retaining the original strict two-second-gap failure. This changes the
+campaign's administrative assessment; the production scheduler and RF timing
+implementation were unchanged. All eight browser actions and fourteen GETs passed.
+
+The opt-in helper now admits only the exact QRSS ETE production plan when
+explicitly requested, publishes its pre-dispatch binding atomically, and records
+failed load completion for the observer. Default invocation remains RF-off.
+Twelve helper tests passed. Coordinating Pico checks passed all 53 CTest groups;
+147 Phase 11.5 Python tests were discovered, 146 passed and one private-fixture
+test was skipped locally. The new-image private audit passed on wspr5; all nine
+mutations were rejected and intact evidence passed again. The production QRSS
+review separately rejected nine mutations. Final assessment found no open
+R2 findings.
+
+Both Picos and original configurations were restored, Empty/inactive/unowned.
+A boot: 587c672d4267e467649bb43765542284; B unchanged:
+feffcd075ab6cb0b74e7e0c2fde6c87f. Host networking, permanent time.local/GPS-PPS
+and installed WsprryPi PID 1957 were verified restored/unchanged. CONFIG writes
+are 34/34. No SDR calibration, per-band RF or spectral qualification is claimed.
+Documentation Impact: this companion report, opt-in test helper and its tests
+changed; the production application, installed binary and operator UI did not.
+
+The following entries retain their original historical scope.
+
+
+Earlier three-Tone execution, September 12, 2026: the coordinating Pico
 `phase11-5-r2-amended-review.md` records R1 5/5 on clean firmware
 049cc929143bdec6ec32817f6df0c73a9637cdf5 at physical 138 MHz/divider 1/RAM/listener
 on. Three browser-owned ten-second Tone jobs passed the full N300/USB360 audit.
