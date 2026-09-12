@@ -558,3 +558,46 @@ physical 132/150 MHz remain untested. Clock changes during 11.6 repeat affected
 Documentation Impact: development tooling/evidence in Pico and this companion
 review. Operator settings, production behavior and normal workflow are unchanged;
 no separate operator-documentation change is required.
+
+## N1z: one bounded A2/A3 attempt, stopped at STATUS cadence
+
+The user authorized the proposed single attempt using a fresh two-hour host
+cleanup ceiling. The exact production binary `6f65d5c7d202` and browser driver
+`6703818` were unchanged. All four A2 inhibited intervals on Pico firmware
+`4058d3a4a951`, 150 MHz, passed, including a +16-byte matched quiet heap delta.
+The exact 138 MHz physical candidate then failed its single N180 conditioning
+interval: 177 nominal STATUS requests versus the minimum 178, and maximum
+request-start gap 2,684,961,482 ns versus the two-second limit. No threshold
+changed. The coordinated attempt stopped before physical A2 or A3; no RF jobs
+were submitted and no retry was performed.
+
+The physical USB240 audit passed. All 36 browser status requests and six each
+page/style/script requests completed with HTTP 200 and met their timing bounds.
+Two production STATUS responses took 2.581 and 2.470 seconds. Passive AP/client
+captures show advanced server TCP sequence numbers before the corresponding
+341-byte reply payloads first arrive, consistent with delayed retransmission
+recovery. Additional device NETTRACE reads were deliberately absent; the exact
+original submission/loss boundary and historical N1u cause remain unproven.
+The coordinating result and evidence hashes are in WsprryPico:
+`docs/development/phase11-5-single-attempt-result.json` and
+`docs/development/phase11-5-single-attempt.md`.
+
+Both boards are verified empty, inactive and unowned. A's original inhibited
+firmware/configuration are restored, boot `5b1ae867c8b6888a7a671b7170d66aba`;
+B remains unchanged. Host cleanup recorded no failures, the test radios and
+namespace are restored, the recovery timer is active and installed service
+PID 1957 is unchanged. Cumulative configuration writes are twenty. The complete
+private evidence remains on wspr5, archive SHA-256
+`c77e802e6eb8ea1f0dc5d9534681459d83de8c45c73caa6a7384754a71da0974`.
+
+Zero new full acceptance cases closed; historical 2/20 remains, with no
+accepted physical clock. The complete inhibited result is useful exact-image
+progress, but does not substitute for physical A2 or resolve earlier failures.
+The next unfinished step is the STATUS delivery blocker before another attempt.
+The Pico host suite passed all 57 tests; offline audits reproduced the failed
+criteria and checked restoration. Review found no further actionable evidence
+record defect. No production implementation or operator behavior changed.
+
+Documentation Impact: coordinating Pico development evidence and this companion
+review updated. Operator documentation and UI are unchanged; no change to the
+separate operator-documentation repository is required.
