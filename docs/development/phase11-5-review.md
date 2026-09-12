@@ -1,5 +1,45 @@
 # Phase 11.5 target resource and contention review
 
+
+Current R3 A1 preparation, September 12, 2026: coordinating Pico
+`phase11-5-r3-tls-execution.md` now provides a concrete two-job TLS/slot packet,
+with `phase11-5-r3-tls-review.md` and `phase11-5-r3-tls-prepared.json` recording
+its audit and hashes. No A1 hardware operation or new remote staging has run.
+Phase 11.5 remains **2/6 families closed**, R1 5/5, R2 7/7; R3 physical acceptance
+is zero and the full accepted-configuration list is empty. P0 remains complete
+at 4/4 read-only inventories. CONFIG remains 34/34 and probes six.
+
+A1 proposes two USB-owned 100-second Tone jobs at 135,500 Hz on unchanged Pico
+2e43110/138 MHz/divider 1/RAM/listener-on firmware. The same pinned production
+6f65d5c executable runs RF-off for 300 seconds, preserving one WTP
+connection/session and the accepted single-flight administrative cadence.
+The ordinary browser workload is disabled; a separate pressure actor owns six
+fresh HTTPS controls/recoveries and twelve total TCP connections. Target alert
+116, handshake timeout counters, supported/pending slots and excess rejection,
+and duplicate-WTP closure are distinct assertions under independently observed
+Running RF. Other R3 mechanisms and reclamation cycles remain open.
+
+The new packet requires its own staging/fixture/RF approval and exactly two
+additional CONFIG writes, carrying 34 to 36. The source allowance is scoped to
+setup/restoration only; it does not widen the old R2 packet or permit probes,
+Wi-Fi fault cycles or R5 schedule/journal work. The global 110.592-second job cap
+also affects QRSS and remains an unresolved expanded-duration proposal.
+
+Validation: 12 existing Pi helper tests passed. Coordinating Pico validation
+passed 167 of 169 discovered tests, with two opt-in private-fixture tests skipped;
+12 new R3 tests include fourteen pressure-evidence and six observer mutations.
+The updated common audit also passed the preserved three-job 2e43110 R2 evidence
+without rewriting its identities or the historical strict-gap failure.
+The new live executor and target pressure assertions remain unqualified.
+
+Documentation Impact: this companion report and the coordinating packet/review,
+result and ledger/index changed. Pi application/helper source, installed service,
+operator UI and separate operator manuals are unchanged. No UI review applies.
+The final missing preparation step is approval of the exact new packet and
+confirmation that the documented conducted wiring still holds.
+
+The following entries retain their original historical scope.
+
 Latest R2 closure, September 12, 2026: WsprryPico's coordinating
 `docs/development/phase11-5-r2-continuation-review.md` and `phase11-5-r2-closure-result.json`
 close **R2 7/7 jobs** and retain **R1 5/5** through an explicit source-impact
