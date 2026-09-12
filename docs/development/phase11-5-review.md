@@ -817,3 +817,35 @@ preparation/prompt/result, ledger and index. Product UI, protocol, configuration
 and operator manuals are unchanged. The joint plan retains operator-documentation
 follow-up after measured acceptance. R3 RF tooling and its concrete
 fixture/flashing/RF/configuration grant remain outstanding.
+
+
+## R3 P0 completed — four read-only inventories
+
+The user explicitly approved the previously blocked staging transfer and exact
+P0 USB packet. All 4/4 captures completed on wspr5: A-before, B-before, A-after,
+B-after, with twenty WTP reads and four INFO requests. The capture window from
+run intent through the final record was 0.641234699 seconds. The coordinating
+result/review are `docs/development/phase11-5-r3-preflight-result.json` and
+`docs/development/phase11-5-r3-preflight-review.md` in WsprryPico.
+
+A remains original inhibited 802c91a7b86e-dirty, boot
+587c672d4267e467649bb43765542284; B remains inhibited dbf1d86f0885-dirty, boot
+feffcd075ab6cb0b74e7e0c2fde6c87f. Both were authoritatively Empty/inactive/unowned,
+with no job or terminal records. These old INFO formats do not expose the system
+clock. Both advertise the 110.592-second/162-event limit; these are inhibited
+CAPS, not new physical-candidate acceptance. Visible configuration and CAPS were
+unchanged during P0; full private configuration bytes and journal position were
+not measured.
+
+The local raw audit matched the target-host result. Twelve mutations of the
+actual evidence were rejected, and intact evidence passed again. Host boot,
+installed WsprryPi PID 1957, active chrony/GPSD/Avahi and radio identities/states
+remained unchanged; the USB endpoints had no remaining users. No firmware,
+fixture, RF, configuration write, probe, reset or service mutation occurred.
+Cumulative CONFIG writes stay 34/34 and probes stay six. P0 is consumed.
+
+Documentation Impact: updated coordinating ledger/result/review and this report.
+No source, production binary, load helper, protocol, UI or operator-manual change.
+R1 stays 5/5, R2 stays 7/7; Phase 11.5 stays 2/6 with zero R3 physical assertions
+and no accepted configuration. Next is R3 TLS/slot tooling and its new concrete
+fixture/RF/write packet; longer QRSS remains an unresolved duration-envelope issue.
