@@ -469,3 +469,32 @@ replaced, and no Phase 11.6/13 RF qualification is inferred.
 Documentation Impact: updated this development evidence and the coordinating
 Pico result/register. Operator settings, protocol and normal workflow are
 unchanged, so no operator-documentation change is required for this repair.
+
+
+## N1u: inhibited conditioning failed production cadence
+
+The approved activity-candidate retest used exact Pico source `4058d3a4a951`,
+its inhibited 150 MHz image, the unchanged `6f65d5c7d202` production binary and
+`6703818` load driver. The load process completed, but the unchanged raw auditor
+rejected a 2.696719-second production STATUS gap against the two-second bound.
+There were 179 STATUS requests within N180, one connection and one logical
+session. The slowest native TLS write-entry-to-response interval was 2.592629 s.
+
+Independent USB240 checks passed, as did all 36 browser status requests and
+six root/style/script requests apiece. These do not waive the production failure.
+Full A2/A3 work stopped; the physical candidate was not flashed and no RF job
+was submitted. Original inhibited A, unchanged B and normal host networking were
+verified restored. The installed service retained PID 1957.
+
+The private archive `phase115-n1u-preserved-final.tar.gz` has SHA-256
+`636cf62e56264d3856bfe0202772b907e793ba5c28453c7f1800b4e409624d69`.
+A hash-verified local copy reproduced the same auditor failure. The coordinating
+Pico result is `docs/development/phase11-5-n1u-result.json`. No new case closed;
+the older candidate's A1/A2 passes remain historical and no configuration is
+accepted. Packet-level evidence is absent, so the isolated stall cannot yet be
+attributed to retransmission or firmware servicing. No root-cause repair or
+unchanged retry is claimed.
+
+Documentation Impact: development outcome/evidence updated in both repositories;
+operator behavior and settings are unchanged. No operator-documentation change
+is required for this result.
