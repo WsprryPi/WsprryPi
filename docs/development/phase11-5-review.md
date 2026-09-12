@@ -1,5 +1,40 @@
 # Phase 11.5 target resource and contention review
 
+Current planning update, September 12, 2026: WsprryPico's authoritative
+`docs/development/phase11-5-plan.md` now groups the work into six families:
+resources/baseline; normal RF execution; saturation/reclamation;
+authority/interruption; network/storage/autonomous lifecycle; sustained mixed
+operation. Its `phase11-5-acceptance-ledger.md` records 0 of 6 revised families
+closed and no accepted configuration. The historical 2/20 count belongs to the
+older exact image; it is not a current acceptance count.
+
+The candidate source is `e20ae8bea2d5237af017dbd5f73bfe9332ce144e`, physical
+138 MHz. Its bounded RF-idle check passed, using production source
+`6f65d5c7d202569102459ab68d7c9ea079b96f35`; TX credit-wait/preservation counters
+were zero. Active RF contention and historical STATUS-stall causation remain
+open. The latest recorded setup was restored; this documentation task performs
+no live-device verification or operational action.
+
+Normal operator interaction is separate from the old synthetic page/CSS/JS
+reload and periodic browser polling stress. Idle production 1 Hz cadence and
+state-specific scheduler keepalives remain distinct. Per-request service,
+resource, authority and RF timing requirements remain; earlier failures keep
+their original criteria. All 20 legacy cases are mapped in the Pico plan, with
+physical coverage focused on distinct resource and contention paths.
+
+**Implementation remains outstanding.** This update changes documentation only.
+The Pi production load driver and Pico helpers/20-case validator still implement
+the legacy campaign. A later code-authorized slice must add the revised profiles,
+subcase evidence/closure accounting and concrete packets without bypassing old
+safety checks. Current source/executable identities must be bound deliberately;
+metadata-only edits do not require rebuilding firmware or repeating hardware.
+
+Documentation Impact: this companion development review and the coordinating
+Pico plan/ledger/review pointers are updated. WTP/network/browser API contracts,
+operator behavior, source, tests, runners and installed services are unchanged.
+The separate operator-documentation follow-up remains the paths listed in the
+Pico plan, after measured acceptance. The chronological evidence below is retained.
+
 Status: **OPEN**. WsprryPico coordinates the joint plan, case register and target
 measurement definitions in its `docs/development/phase11-5-*.md` and
 `phase11-5-register.json`. No physical configuration is accepted yet.
