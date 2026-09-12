@@ -661,3 +661,49 @@ record defect. No production implementation or operator behavior changed.
 Documentation Impact: coordinating Pico development evidence and this companion
 review updated. Operator documentation and UI are unchanged; no change to the
 separate operator-documentation repository is required.
+
+
+## R2 normal mutation lane and first execution — September 12, 2026
+
+Current coordinating status: R1 closed 5/5 on e20ae8b; Phase 11.5 1/6 families.
+R2 completed 0/7 jobs: its first Tone became MISSED_START, and six did not run.
+There is no accepted configuration. The older R1 failure entries above remain
+historical; Pico's current acceptance ledger and R2 review are authoritative.
+
+The user explicitly confirmed unchanged wiring and authorized the bounded R2
+host fixture. The first packet attempted three browser-owned finite Tone jobs
+under N300/USB360 on physical 138 MHz/RAM/listener firmware. Only the first was
+loaded/armed. Its shared local launch guard rejected it, the observer detected
+the missed state, and dependent actor work stopped without retry. The normal
+host load finished its bounded interval; this is not RF contention acceptance.
+Pico A and original configurations were restored; Pico B remained unchanged.
+Host networking and permanent time.local/GPS-PPS were restored; installed
+WsprryPi PID 1957 and its binary remained unchanged. Counts reached 28/32 writes.
+
+`src/tests/phase115_production_load.py` permits an explicitly identified R2
+normal browser mutation lane. Mutations use gaps before the next scheduled
+normal action, reserving five seconds for the transaction and one second margin.
+All normal page/config/capability/status actions retain their original schedule,
+request counts and deadlines. Pending grants are not repeatedly regenerated.
+R1 normal observation and the historical synthetic stress profile remain distinct.
+This does not implement or qualify production-owned R2 job submission.
+
+Adversarial review checked starvation, final-interval release opportunities,
+missing/late actions and legacy compatibility. Eleven helper tests passed,
+including a simulated full-duration mutation schedule preserving all fourteen
+GETs and every action deadline. Pico's independent raw-evidence audit confirmed
+the missed job and guarded restoration; all twelve evidence mutations failed.
+
+The user subsequently selected a launch window ending at the next UTC-second
+boundary, with smaller delays reported as telemetry. Pico's shared contract and
+firmware implement that rule and preserve full waveform duration after a late
+start. The old frozen e20ae8b image retains its old strict guard. New source is
+host-tested/cross-linked only; affected R1 and new R2 target checks remain before
+acceptance. No new firmware was installed and no new RF job followed the miss.
+The WsprryPi production application and installed service are unchanged.
+
+Documentation Impact: this development review and Pico's R2 execution prompt,
+packet/evidence records, review/result, ledger and WTP timing contract were
+updated. No operator UI changed; visual review was not applicable.
+Wsprry_Pi_Docs was considered and remains unchanged pending physically accepted
+backend timing/resource limits. No unmeasured acceptance claim was published.

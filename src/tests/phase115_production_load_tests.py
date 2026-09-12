@@ -45,6 +45,29 @@ class LoadTests(unittest.TestCase):
             self.assertEqual(len(events),16)
             self.assertEqual(sum(v['action']=='refresh' for k,v in events if k=='browser_action_start'),6)
 
+    def test_normal_mutation_lane_preserves_every_due_action(self):
+        now=[0.0];requests=[];events=[];grants=[]
+        class Stop:
+            def is_set(self):return False
+            def wait(self,duration):now[0]+=duration
+        def get(path):requests.append(path);now[0]+=.2
+        # Model requests admitted only once every eight seconds. Consuming a
+        # full five-second request must never cross the reserved due boundary.
+        next_request=[5.0]
+        def grant(until):
+            if now[0]<next_request[0]:return False
+            self.assertGreaterEqual(until-now[0],5.99)
+            grants.append((now[0],until));now[0]+=5;next_request[0]=now[0]+8
+            self.assertLessEqual(now[0],until-1+.001)
+            return True
+        load.normal_browser_schedule(0,300,Stop(),get,
+            lambda kind,value:events.append((kind,value,now[0])),clock=lambda:now[0],grant_control=grant)
+        self.assertEqual(len(requests),14);self.assertEqual(len(events),16)
+        self.assertTrue(grants);self.assertGreaterEqual(now[0],300)
+        for kind,value,when in events:
+            if kind=='browser_action_start':
+                self.assertLessEqual(when-value['scheduled_monotonic_ns']/1e9,15)
+
     def test_normal_browser_does_not_drop_late_or_interrupted_action(self):
         class Stop:
             def is_set(self):return False

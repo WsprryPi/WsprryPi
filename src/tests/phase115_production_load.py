@@ -100,11 +100,15 @@ def normal_actions(seconds):
                   [(offset, 'refresh', ('/api/v1/status',)) for offset in refresh])
 
 
-def normal_browser_schedule(start, seconds, stop, get, note, clock=time.monotonic):
+def normal_browser_schedule(start, seconds, stop, get, note, clock=time.monotonic, grant_control=None):
     for index, (offset, action, paths) in enumerate(normal_actions(seconds)):
         due = start + offset
         while clock() < due and not stop.is_set():
-            stop.wait(min(.1, due - clock()))
+            # Job mutations share the browser lane; admit only a complete
+            # five-second request plus one second margin before the next action.
+            if grant_control is not None and due - clock() >= 6:
+                grant_control(min(due, clock() + 6))
+            stop.wait(max(0, min(.1, due - clock())))
         require(not stop.is_set() and 0 <= clock() - due <= 15, 'Normal browser action late/stopped')
         began = clock()
         note('browser_action_start', dict(index=index, action=action,
@@ -115,6 +119,11 @@ def normal_browser_schedule(start, seconds, stop, get, note, clock=time.monotoni
         require(clock() <= start + seconds and clock() - began <= len(paths) * 15,
                 'Normal browser action deadline')
         note('browser_action_finish', dict(index=index, action=action))
+    # Preserve the final gap for finite job completion/release.
+    while grant_control is not None and clock() < start + seconds and not stop.is_set():
+        if start + seconds - clock() >= 6:
+            grant_control(min(start + seconds, clock() + 6))
+        stop.wait(min(.1, max(0, start + seconds - clock())))
 
 
 def main():
@@ -217,8 +226,10 @@ def main():
                 len(value['request_id'])==32 and all(c in '0123456789abcdef' for c in value['request_id']),
                 'Invalid browser control intent')
         permit=root/'browser-control-permit.json'
-        require(not permit.exists() or json.loads(permit.read_text())['request_id']!=value['request_id'],
-                'Previous browser control did not consume its permit')
+        if permit.exists() and json.loads(permit.read_text())['request_id']==value['request_id']:
+            require(time.monotonic_ns() < json.loads(permit.read_text())['end_monotonic_ns'],
+                    'Previous browser control did not consume its permit')
+            return False
         temporary=permit.with_suffix('.tmp')
         with temporary.open('w') as out:
             json.dump(dict(value,end_monotonic_ns=int(until*1e9)),out);out.flush();os.fsync(out.fileno())
@@ -228,8 +239,10 @@ def main():
     def browser(start,end):
         try:
             if plan.get('browser_profile', 'S') == 'N':
-                require(not plan.get('browser_control_lane'), 'R1 N has no browser mutation lane')
-                normal_browser_schedule(start, args.seconds, stop, pico_get, note)
+                require(not plan.get('browser_control_lane') or plan.get('rf_family') == 'R2',
+                        'Normal mutation lane requires explicit R2 scope')
+                normal_browser_schedule(start, args.seconds, stop, pico_get, note,
+                    grant_control=grant_control if plan.get('browser_control_lane') else None)
             else:
                 browser_schedule(start,end,stop,pico_get,grant_control=grant_control if plan.get('browser_control_lane') else None)
             note('browser_finish',{'completed':not stop.is_set()})
