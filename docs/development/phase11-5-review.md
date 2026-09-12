@@ -1,5 +1,37 @@
 # Phase 11.5 target resource and contention review
 
+Current R3 A1 failure and repair, September 12, 2026: the explicitly approved
+packet failed in the pressure helper before any CLAIM, LOAD or ARM. The helper
+incorrectly assumed Console INFO's scheduler status contained WTP `job_id` and
+`owner_id`; its synthetic tests and pressure auditor shared that assumption.
+This was a tooling/review error, not a protocol or target failure. The source
+and existing captures already showed the distinction. Pico now documents the
+field ownership explicitly and tests recorded Empty/Running/Complete responses.
+
+The frozen failed packet and raw evidence are preserved in coordinating Pico
+`phase11-5-r3-tls-failure-review.md` and `phase11-5-r3-tls-failure-result.json`.
+Its raw audit confirms 360 INFO and 72 STATUS samples with no RF launch, no
+submitted job and zero pressure connections. The RF-off production client made
+its initial connection and was terminated after the pressure helper failed.
+This grants no TLS/slot or physical contention acceptance credit.
+
+Guarded restoration passed. A is back on original inhibited `802c91a7b86e-dirty`,
+boot `7a772a4eb283b23afdd1e25acbc449cd`; B remains inhibited and unchanged at boot
+`feffcd075ab6cb0b74e7e0c2fde6c87f`. Both are authoritatively Empty/inactive/unowned.
+Host interfaces/routes, installed PID 1957 and permanent time.local/GPS-PPS were
+preserved. CONFIG is now **36/36**, probes six. The packet is consumed and was
+not retried. Phase 11.5 remains 2/6 closed, with no accepted configuration.
+
+The repaired observer binding uses WTP for job/owner authority and INFO for
+boot, RF state and launch epoch. Coordinating validation passed 170 of 172 tests,
+with two unrelated private-fixture tests skipped; eleven mutations of the actual
+failed evidence were rejected. Corrected tooling has not been rerun on hardware.
+Documentation Impact: this companion report and Pico field reference, failure
+report/result and ledger/index changed. No Pi source, installed application,
+UI or separate operator manuals changed.
+
+The following entries retain their original historical scope.
+
 
 Current R3 A1 preparation, September 12, 2026: coordinating Pico
 `phase11-5-r3-tls-execution.md` now provides a concrete two-job TLS/slot packet,
