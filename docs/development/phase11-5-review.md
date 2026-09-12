@@ -1,6 +1,39 @@
 # Phase 11.5 target resource and contention review
 
-Current R3 A1 failure and repair, September 12, 2026: the explicitly approved
+Current R3 A1b preparation, September 12, 2026: coordinating Pico has frozen
+`phase11-5-r3-tls-a1b-execution.md`, its review and prepared JSON. Packet SHA-256
+is `590da5a47dc37c1d4c8addea4713ca0cfcb25872a3daaff46a4c9abb9702b218`.
+The corrected driver uses recorded INFO/WTP STATUS field shapes. A separate
+CONFIG 36→38 scope is tied to the consumed A1 packet's exact restoration hashes
+and A/B boots; the supervisor re-audits the preserved failure before host setup.
+The old scopes remain exhausted. The user's unchanged-wiring confirmation is
+retained, but this fresh staging/fixture/RF window awaits explicit approval.
+
+Two newly identified 100-second Tone jobs at 135,500 Hz retain the same bounded
+TLS/slot pressure and 300-second RF-off production client, with 360-second USB
+observation and guarded restoration. The pinned firmware and production binary
+are unchanged. No A1b staging or hardware operations have occurred. Actual counts
+remain CONFIG 36 and probes six; Phase 11.5 remains 2/6 closed, R3 physical
+acceptance is zero and the accepted-configuration list remains empty.
+
+Validation: 172 of 174 coordinating Pico tests passed, with two unrelated private
+fixtures skipped. Sixteen R3 tooling tests cover recorded shapes, pressure-loop
+transitions and old/new cumulative scopes; the failed raw evidence still passes
+only its failure/restoration classification and rejects eleven mutations.
+Pi production helper tests passed 12/12. Archive/helper/image hashes, new job
+identities, RF-off INI and documentation checks passed locally. These checks do
+not qualify corrected live TLS pressure or RF contention.
+
+Documentation Impact: updated this companion report and Pico's current
+ledger/index; added the A1b execution packet, review and prepared record. The
+historical failed packet remains preserved. Pi runtime source, installed
+application, UI and protocol contracts are unchanged. Separate operator manuals
+are outside this task's scope; longer QRSS limits still require a resolved
+product envelope and the previously recorded operator-documentation follow-up.
+
+Historical A1 failure and repair follows.
+
+R3 A1 failure and repair, September 12, 2026: the explicitly approved
 packet failed in the pressure helper before any CLAIM, LOAD or ARM. The helper
 incorrectly assumed Console INFO's scheduler status contained WTP `job_id` and
 `owner_id`; its synthetic tests and pressure auditor shared that assumption.
