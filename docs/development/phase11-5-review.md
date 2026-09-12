@@ -782,3 +782,38 @@ packet/evidence records, review/result, ledger and WTP timing contract were
 updated. No operator UI changed; visual review was not applicable.
 Wsprry_Pi_Docs was considered and remains unchanged pending physically accepted
 backend timing/resource limits. No unmeasured acceptance claim was published.
+
+
+## R3 preparation and read-only admission packet — September 12, 2026
+
+Current Pico ledger: R1 closed 5/5, R2 closed 7/7, Phase 11.5 open at 2/6
+families, no accepted configuration. Physical candidate remains 2e43110 at
+138 MHz/divider 1/RAM/listener on. R3 has no accepted physical assertions.
+
+Pico's `scripts/phase11_5_r3_preflight.py` and
+`docs/development/phase11-5-r3-preflight-prompt.md` prepare four read-only
+serial-bound inventories, one reused administration session per board, five
+minutes maximum, zero CONFIG writes, heap probes or RF jobs. They await
+explicit staging/USB authorization; 0/4 fresh captures have run. Counts remain
+CONFIG 34/34 and six probes. Automatic approval review rejected the attempted
+remote staging transfer before it executed.
+
+Read-only SSH verified the handoff host boot, four radio MACs, installed
+WsprryPi PID 1957 and active chrony/GPSD/Avahi. It did not establish fresh
+device state or RF wiring. Pico's 15 relevant tests passed, including raw-wire
+and cross-capture evidence mutations; four preserved R2 inventories passed
+the new offline raw auditor. No production binary, service, client, load
+helper or component source changed. No R3 RF executor is claimed implemented.
+
+Source review found the selected Pico globally limits jobs to 110.592 seconds
+and 162 events. The user correctly noted that QRSS can take longer. WsprryPi
+respects negotiated CAPS; advertising a longer duration alone cannot fix
+Pico's waveform and PIO/DMA enforcement. Expanded duration remains unresolved;
+no new limit or firmware is selected. Existing evidence retains its original
+short-job identities. Future changes need an assertion-level impact review.
+
+Documentation Impact: this companion development report and Pico's R3
+preparation/prompt/result, ledger and index. Product UI, protocol, configuration
+and operator manuals are unchanged. The joint plan retains operator-documentation
+follow-up after measured acceptance. R3 RF tooling and its concrete
+fixture/flashing/RF/configuration grant remain outstanding.
