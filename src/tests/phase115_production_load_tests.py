@@ -29,6 +29,31 @@ def settings():
 
 
 class LoadTests(unittest.TestCase):
+    def test_normal_browser_records_every_action_without_stress_assets(self):
+        for seconds in (180,300):
+            now=[0.0];requests=[];events=[]
+            class Stop:
+                def is_set(self):return False
+                def wait(self,duration):now[0]+=duration
+            def get(path):requests.append(path);now[0]+=.2
+            load.normal_browser_schedule(0,seconds,Stop(),get,
+                lambda kind,value:events.append((kind,value)),clock=lambda:now[0])
+            self.assertEqual(len(requests),14)
+            self.assertEqual(requests.count('/api/v1/status'),8)
+            self.assertNotIn('/style.css',requests)
+            self.assertNotIn('/app.js',requests)
+            self.assertEqual(len(events),16)
+            self.assertEqual(sum(v['action']=='refresh' for k,v in events if k=='browser_action_start'),6)
+
+    def test_normal_browser_does_not_drop_late_or_interrupted_action(self):
+        class Stop:
+            def is_set(self):return False
+            def wait(self,duration):pass
+        with self.assertRaisesRegex(ValueError,'late/stopped'):
+            load.normal_browser_schedule(0,300,Stop(),lambda path:None,
+                lambda k,v:None,clock=lambda:16)
+        with self.assertRaises(ValueError):load.normal_actions(299)
+
     def test_reject_scope_drift(self):
         with tempfile.TemporaryDirectory() as directory:
             path=Path(directory)/'test.ini'

@@ -1,5 +1,30 @@
 # Phase 11.5 target resource and contention review
 
+Current R1 execution, September 12, 2026: R1 remains blocked in the coordinating
+WsprryPico `docs/development/phase11-5-r1-review.md` and result JSON. Four exact
+artifact/layout checks passed; inhibited startup acquired its address but failed
+time-server DNS readiness before production/browser intervals began. Counts are
+1/5 R1 assertions passed, 1 blocked, 3 not run; the overall phase remains 0/6
+families closed with no accepted configuration. A native client also timed out;
+a later captured query succeeded. The intermittent cause remains unresolved.
+Both Picos and host networking were restored; installed WsprryPi PID 1957 was
+preserved. No RF jobs ran.
+
+This R1 slice adds an explicit N browser profile to
+`src/tests/phase115_production_load.py`: page/capabilities/status/config
+initialization, six distributed Refresh actions and one reload, with action
+start/finish records. The old periodic status plus page/CSS/JS workload remains
+S and retains its original behavior. Ten hardware-free load-driver tests pass;
+the new profile was not exercised on target because readiness failed first.
+The production executable remains source 6f65d5c7d202569102459ab68d7c9ea079b96f35,
+SHA-256 122ed0e4bd752e457419c4df5433c3fca1a4a88677a3db3ebd7e60e783ba5d1c;
+no production application or installed executable changed.
+
+Documentation Impact: this companion review and Pico R1 plan/evidence pointers
+changed. Operator behavior and WTP/browser API contracts are unchanged. The
+historical planning and implementation records below retain their original scope.
+
+
 Current planning update, September 12, 2026: WsprryPico's authoritative
 `docs/development/phase11-5-plan.md` now groups the work into six families:
 resources/baseline; normal RF execution; saturation/reclamation;

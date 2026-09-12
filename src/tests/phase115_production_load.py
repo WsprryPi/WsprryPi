@@ -91,6 +91,32 @@ def browser_schedule(start,end,stop,get,clock=time.monotonic,grant_control=None)
     require(not pages,'Final browser page reload incomplete')
 
 
+def normal_actions(seconds):
+    """Source-reviewed manual browser actions; legacy browser_schedule remains S."""
+    require(seconds in (180, 300), 'Normal browser interval is not frozen')
+    refresh = (20, 40, 60, 100, 130, 160) if seconds == 180 else (30, 70, 110, 190, 230, 270)
+    page = ('/', '/api/v1/capabilities', '/api/v1/status', '/api/v1/config')
+    return sorted([(0, 'initialize', page), (seconds // 2, 'reload', page)] +
+                  [(offset, 'refresh', ('/api/v1/status',)) for offset in refresh])
+
+
+def normal_browser_schedule(start, seconds, stop, get, note, clock=time.monotonic):
+    for index, (offset, action, paths) in enumerate(normal_actions(seconds)):
+        due = start + offset
+        while clock() < due and not stop.is_set():
+            stop.wait(min(.1, due - clock()))
+        require(not stop.is_set() and 0 <= clock() - due <= 15, 'Normal browser action late/stopped')
+        began = clock()
+        note('browser_action_start', dict(index=index, action=action,
+            scheduled_monotonic_ns=int(due * 1e9), paths=list(paths)))
+        for path in paths:
+            require(not stop.is_set(), 'Normal browser action interrupted')
+            get(path)
+        require(clock() <= start + seconds and clock() - began <= len(paths) * 15,
+                'Normal browser action deadline')
+        note('browser_action_finish', dict(index=index, action=action))
+
+
 def main():
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--root',type=Path,required=True)
@@ -108,6 +134,8 @@ def main():
     plan=json.loads((root/'load.json').read_text())
     require(plan['boot_id']==args.boot and type(plan['seconds']) is int and plan['seconds']==args.seconds and
             plan['browser'] is args.browser and plan['device_id']==DEVICE,'Frozen workload differs')
+    require(plan.get('browser_profile', 'S') in ('N', 'S'), 'Unknown browser profile')
+    require(plan.get('browser_profile') != 'N' or args.seconds in (180, 300), 'Unfrozen N duration')
     require(plan['address'] in ('10.77.15.10','10.77.15.20'),'Isolated DUT address')
     require(os.readlink('/proc/self/ns/net')==plan['netns'] and
             os.readlink('/proc/self/ns/mnt')==plan['mountns'],'Wrong client namespaces')
@@ -199,7 +227,11 @@ def main():
         return True
     def browser(start,end):
         try:
-            browser_schedule(start,end,stop,pico_get,grant_control=grant_control if plan.get('browser_control_lane') else None)
+            if plan.get('browser_profile', 'S') == 'N':
+                require(not plan.get('browser_control_lane'), 'R1 N has no browser mutation lane')
+                normal_browser_schedule(start, args.seconds, stop, pico_get, note)
+            else:
+                browser_schedule(start,end,stop,pico_get,grant_control=grant_control if plan.get('browser_control_lane') else None)
             note('browser_finish',{'completed':not stop.is_set()})
         except BaseException as error:
             failures.append(str(error));note('browser_failure',{'type':type(error).__name__,'error':str(error)})
@@ -228,7 +260,7 @@ def main():
             start=time.monotonic();end=start+args.seconds
             (root/'ready.json').write_text(json.dumps(dict(start_monotonic_ns=time.monotonic_ns(),
                                                           boot_id=args.boot))+'\n')
-            note('nominal_begin',{'seconds':args.seconds})
+            note('nominal_begin',{'seconds':args.seconds, 'schedule_start_monotonic_ns':int(start*1e9)})
             if args.browser:
                 thread=threading.Thread(target=browser,args=(start,end));thread.start()
             next_status=start
