@@ -440,3 +440,32 @@ response failure. The existing production binary is unchanged.
 Documentation impact: this note records the evidence, scheduling-only scope and
 unchanged acceptance thresholds. Actual target acceptance remains in the Pico
 case register; this source change does not mark a hardware case passed.
+
+
+## N1t final failed attempt and restoration
+
+The follow-up `asset-slack` attempt using driver source `6703818` also failed
+browser cadence: a stylesheet request at N+42.899 seconds took 3.260 seconds,
+so the N+45-second status poll exceeded the unchanged one-second allowance.
+Previous measured asset cost did not bound the next response. The scheduling
+change is not a demonstrated solution to the remaining contention failure.
+No further unchanged RF retry followed.
+
+One job completed in each of three failed A3 attempts. Exact reconciliation
+confirmed Complete/inactive/unowned, and guarded release retained all three
+records before restoring Pico A's original inhibited image and configuration.
+Pico B remained unchanged. Normal host networking and the recovery timer were
+restored; installed `wsprrypi.service` retained PID 1957. The full private archive
+`phase115-n1t-preserved-final.tar.gz` has SHA-256
+`e13a5388017d2a2065e1028c823abd509a0f7028b07ed5192014c660a50b8cb6`.
+
+The coordinating Pico repository records `phase11-5-n1t-result.json` and the
+subsequent activity-snapshot source repair. Its main loop no longer copies full
+status/history merely to read current activity. Host checks pass; new target
+measurements remain necessary. Phase 11.5 remains OPEN with A1/A2 closed (2/20),
+A3 failed and no accepted clock configuration. The production binary was not
+replaced, and no Phase 11.6/13 RF qualification is inferred.
+
+Documentation Impact: updated this development evidence and the coordinating
+Pico result/register. Operator settings, protocol and normal workflow are
+unchanged, so no operator-documentation change is required for this repair.
