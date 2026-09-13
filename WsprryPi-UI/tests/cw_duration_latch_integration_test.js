@@ -4,6 +4,7 @@ const assert = require("node:assert/strict");
 const http = require("node:http");
 const net = require("node:net");
 const path = require("node:path");
+const fs = require("node:fs");
 const { spawn } = require("node:child_process");
 const WebSocket = require("ws");
 
@@ -296,6 +297,54 @@ async function browserTest() {
         equal(field("configSaveStatus").textContent, "Save failed", "inline short status");
         includes(field("configSaveStatusDetail").textContent, "calculated", "inline detail must explain duration");
     };
+
+    // Pico limits are independent of the repeat interval and preserve the draft.
+    const realWtpUi = window.WtpUi;
+    window.WtpUi = { selected: () => true, maximumJobDurationSeconds: 3600, maximumJobEvents: 512 };
+    for (const mode of ["QRSS", "FSKCW", "DFCW"]) {
+        reset(mode); field("tx_repeat_every").value = "120";
+        for (const count of [31, 32]) {
+            field("qrss_message").value = "?".repeat(count);
+            ok(validateCwMessage(), mode + " must accept " + count + " complex characters");
+        }
+        field("qrss_message").value = "?".repeat(33);
+        ok(!validateCwMessage(), mode + " must reject 33 characters");
+        equal(field("qrss_message").value.length, 33, "Pico validation must not truncate");
+        includes(field("qrss_message").validationMessage, "32 characters including spaces", "length explanation");
+        field("qrss_message").value = " ".repeat(31) + "E";
+        ok(validateCwMessage(), "spaces count within 32");
+        field("qrss_message").value = " ".repeat(32) + "E";
+        ok(!validateCwMessage(), "spaces count at 33");
+        field("qrss_message").value = "E";
+        for (const dot of [3599.999999999, 3600]) {
+            field("dot_length").value = String(dot);
+            ok(validateCwMessage(), "Pico duration accepts boundary " + dot);
+        }
+        field("dot_length").value = "3600.000001";
+        ok(!validateCwMessage(), "Pico duration above 60 minutes rejected");
+        includes(field("qrss_message").validationMessage, "This Pico allows", "duration names actual device limit");
+        field("dot_length").value = "0.1";field("qrss_message").value = "?".repeat(32);
+        window.WtpUi.maximumJobEvents = 162;
+        ok(!validateCwMessage(), "old event CAPS reject complex message");
+        includes(field("qrss_message").validationMessage, "383 events", "event explanation is distinct");
+        window.WtpUi.maximumJobEvents = 512;
+        window.WtpUi.maximumJobDurationSeconds = 110.592;
+        field("dot_length").value = "111";field("qrss_message").value = "E";
+        ok(!validateCwMessage(), "old duration CAPS remain authoritative");
+        window.WtpUi.maximumJobDurationSeconds = 3600;
+    }
+    reset();field("tx_repeat_every").value="120";
+    field("dot_length").value="0.3333333339";field("qrss_message").value="T";
+    updateCwMessageLengthEstimate();
+    includes(field("cw_message_length_estimate").textContent,"0.999999999 s","quantize dot before multiplying dash");
+    includes(field("cw_message_length_estimate").textContent,"1 / 512 events","normal preview names event ceiling");
+    field("dot_length").value="3600.000000001";field("qrss_message").value="E";
+    ok(!validateCwMessage(),"one ns above duration rejected");
+    includes(field("qrss_message").validationMessage,"3600.000000001 s","rejection preserves exact calculated duration");
+    window.WtpUi = { selected: () => false };
+    reset();field("tx_repeat_every").value="120";field("qrss_message").value="E".repeat(33);
+    ok(validateCwMessage(), "Pico character limit must not affect another backend");
+    window.WtpUi = realWtpUi;
 
     // 1 and 2: local overlong input and repeated overlong edits.
     reset();
@@ -780,6 +829,36 @@ async function main() {
                     pausedMetric.detailTextHeight <= pausedMetric.detailLineHeight + 0.5,
                     `desktop paused-save detail must use the available width: ${JSON.stringify(pausedMetric)}`
                 );
+            }
+        }
+        if (process.env.WSPRRYPI_UI_CAPTURE_DIR) {
+            fs.mkdirSync(process.env.WSPRRYPI_UI_CAPTURE_DIR, { recursive: true });
+            for (const viewport of [{name:"desktop",width:1280,height:900},{name:"mobile",width:375,height:812}]) {
+                await client.send("Emulation.setDeviceMetricsOverride", {width:viewport.width,height:viewport.height,deviceScaleFactor:1,mobile:viewport.name==="mobile"});
+                const prepared = await client.send("Runtime.evaluate", {expression:`(() => {
+                    window.WtpUi = {...window.WtpUi,selected:()=>true,maximumJobDurationSeconds:3600,maximumJobEvents:512};
+                    document.getElementById("qrss_mode").checked=true;
+                    document.getElementById("mode_qrss").checked=true;
+                    document.getElementById("mode_fskcw").checked=false;
+                    document.getElementById("mode_dfcw").checked=false;
+                    document.getElementById("dot_length").value="3";
+                    document.getElementById("tx_repeat_every").value="60";
+                    document.getElementById("qrss_message").value="?".repeat(32);
+                    clickQRSSModeToggle();updateCwMessageLengthEstimate();validateCwMessage();
+                    setConfigSaveStatus("", "", "");window.scrollTo(0,0);
+                    return {overflow:document.documentElement.scrollWidth>innerWidth,valid:document.getElementById("qrss_message").checkValidity(),estimate:document.getElementById("cw_message_length_estimate").textContent};
+                })()`,returnByValue:true});
+                if (prepared.exceptionDetails) throw new Error(prepared.exceptionDetails.exception?.description || prepared.exceptionDetails.text);
+                assert.equal(prepared.result.value.overflow,false);
+                assert.equal(prepared.result.value.valid,true);
+                assert.match(prepared.result.value.estimate,/32 \/ 32 characters/);
+                const layout = await client.send("Page.getLayoutMetrics");
+                const size = layout.cssContentSize || layout.contentSize;
+                const full = await client.send("Page.captureScreenshot",{format:"png",captureBeyondViewport:true,clip:{x:0,y:0,width:size.width,height:size.height,scale:1}});
+                fs.writeFileSync(path.join(process.env.WSPRRYPI_UI_CAPTURE_DIR,viewport.name+"-pi-message-32.png"),Buffer.from(full.data,"base64"));
+                const bounds = await client.send("Runtime.evaluate",{expression:`(() => { const b=document.getElementById("qrss_message_set").getBoundingClientRect();return {x:Math.max(0,b.x),y:Math.max(0,b.y+scrollY),width:b.width,height:b.height,scale:1};})()`,returnByValue:true});
+                const detail = await client.send("Page.captureScreenshot",{format:"png",captureBeyondViewport:true,clip:bounds.result.value});
+                fs.writeFileSync(path.join(process.env.WSPRRYPI_UI_CAPTURE_DIR,viewport.name+"-pi-message-detail.png"),Buffer.from(detail.data,"base64"));
             }
         }
         console.log("cw_duration_latch_integration_test passed");

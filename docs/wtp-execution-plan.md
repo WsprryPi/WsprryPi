@@ -146,3 +146,30 @@ implemented in Slices 5 and 6. Slice 7 supplies status/recovery, and the parent
 an owned worker and UI controls with a temporary default-off development toggle.
 Physical USB behavior,
 device timing, RF output and release readiness remain unqualified by these tests.
+
+## Selected Pico message limits (Phase 11.5 R3 v2)
+
+On the WTP backend, QRSS, FSKCW and DFCW accept at most 32 characters,
+including spaces. The shared compiler rejects 33 without truncating or splitting;
+other hardware backends retain their existing message behavior. Existing Morse
+alphabet, case/spacing rules and WSPR framing remain unchanged. A worst-case
+32-character native plan has 383 events (192 marks and 191 gaps), below the
+unchanged 512-event rf-events/1 ceiling. The Pico's separate compact browser
+message compiler adds a 1,000 ns off tail and therefore uses 384 events.
+
+The selected Pico firmware permits 3,600 seconds total per finite job. Actual
+negotiated CAPS remain authoritative: the converter still rejects a job above
+an older device's smaller event or duration limits and checks encoded payload
+size independently. Errors report the actual count/duration and advertised
+limit. Message length alone cannot guarantee that slow timing fits one hour.
+Raw event plans carry their explicit constraints, with no inferred text length.
+The native Tone stop marker is included in its total duration; requesting an
+RF-on interval of exactly 3,600 seconds plus that marker exceeds a one-hour cap.
+
+The request builder checks finite positive timing and nanosecond conversion
+bounds before casting or multiplying durations. The WTP compiler checks event
+sum overflow. Host regressions include 31/32/33 characters and counted spaces
+in every mode, smaller CAPS, exact duration boundaries and integer overflow.
+The parent WTP production tests exercise the request builder. These checks
+qualify software behavior; final physical long-job and R3 acceptance is tracked
+in WsprryPico's Phase 11.5 ledger and remains open during implementation.

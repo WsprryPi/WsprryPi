@@ -39,7 +39,14 @@ struct Fixture {
   WtpTransmitBackend backend{clock, {sid, owner_id, device}};
   ExecutionPlanCompiler compiler;
   TransmissionController controller{compiler, backend};
-  Fixture() {
+  explicit Fixture(bool extended = false) {
+    if (extended) peer.filter = [](Operation op, std::string& reply) {
+      if (op != Operation::Caps) return;
+      auto j = Json::parse(reply);
+      j["body"]["max_events"] = 512;
+      j["body"]["max_job_duration_ns"] = "3600000000000";
+      reply = j.dump();
+    };
     CHECK(backend.capabilities().supported_modes == 0);
     CHECK(backend.connect(peer));
   }
@@ -87,6 +94,38 @@ void complete_and_repeat() {
   CHECK(f.controller.execute_prepared().ok);
   CHECK(f.peer.executions == 2 && f.peer.prepares == 2 &&
         f.count(Operation::Arm) == 2);
+}
+void hour_job_completion_and_abort() {
+  for (unsigned scenario : {0U, 1U, 2U}) {
+    Fixture f(true);
+    f.schedule();
+    auto input = request();
+    std::get<TonePayload>(input.payload).duration = 3600s - 1ns;
+    CHECK(f.controller.prepare(input).ok);
+    CHECK(f.peer.job->total_duration_ns == 3'600'000'000'000ULL);
+    f.clock.tick = [&] {
+      if ((scenario == 1 && f.peer.state == State::Armed) ||
+          (scenario == 2 && f.peer.state == State::Running &&
+           f.peer.mono() >= f.peer.start + 120'000'000'000ULL))
+        f.backend.stop();
+    };
+    const auto result = f.controller.execute_prepared();
+    CHECK(result.cleanup.ok && !result.faulted && !f.peer.active && !f.peer.owner);
+    CHECK(f.count(Operation::Load) == 1 && f.count(Operation::Arm) == 1);
+    if (scenario == 0) {
+      CHECK(result.ok && !result.stopped);
+      CHECK(!f.peer.records.empty() && f.peer.records.front().state == State::Complete);
+      CHECK(f.peer.records.front().ended >= f.peer.start + 3'600'000'000'000ULL);
+      CHECK(f.count(Operation::Renew) > 100);
+      CHECK(f.count(Operation::Abort) == 0);
+    } else {
+      CHECK(!result.ok && result.stopped && f.count(Operation::Abort) == 1);
+      if (scenario == 2) {
+        CHECK(f.peer.mono() >= f.peer.start + 120'000'000'000ULL);
+        CHECK(f.count(Operation::Renew) > 2);
+      }
+    }
+  }
 }
 void rejection_before_mutation() {
   for (int kind = 0; kind < 12; ++kind) {
@@ -463,6 +502,7 @@ void bounded_waits() {
 int main() {
   try {
     complete_and_repeat();
+    hour_job_completion_and_abort();
     rejection_before_mutation();
     foreign_and_fault();
     clocks();

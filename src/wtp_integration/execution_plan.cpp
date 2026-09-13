@@ -135,13 +135,14 @@ WtpPlanResult prepare_wtp_plan(const ExecutionPlan &plan,
         "Plan summary must describe a nonempty positive-duration timeline");
   if (plan.events.size() > static_cast<std::size_t>(caps.max_events))
     return fail(WtpPlanError::EventLimit,
-                "Plan exceeds the advertised event limit; splitting and "
-                "truncation are not permitted");
+                "Plan has " + std::to_string(plan.events.size()) + " events; device limit is " +
+                std::to_string(caps.max_events) + ". Reduce repetition or message complexity");
   const auto total =
       static_cast<std::uint64_t>(plan.summary.total_duration.count());
   if (total > caps.max_job_duration_ns)
     return fail(WtpPlanError::DurationLimit,
-                "Plan exceeds the advertised finite-job duration");
+                "Plan duration is " + std::to_string(total) + " ns; device limit is " +
+                std::to_string(caps.max_job_duration_ns) + " ns. Shorten timing or reduce repetition");
   if (total > maximum - options.start_utc_ns ||
       options.max_start_uncertainty_ns > caps.maximum_arm_uncertainty_ns)
     return fail(WtpPlanError::Schedule, "UTC job end overflows or requested "

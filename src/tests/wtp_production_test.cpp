@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Lee Bussy
 #include "arg_parser.hpp"
+#include "non_wspr_request_builder.hpp"
+#include <limits>
 #include "scheduling.hpp"
 #include "config_handler.hpp"
 #include "runtime_config_bridge.hpp"
@@ -26,6 +28,26 @@ struct Clock : wsprrypi::WtpScheduleClock {
   }
   void wait_ms(std::uint64_t n) override { peer.advance(peer.now + n); }
 };
+void finite_message_request_inputs() {
+  ArgParserConfig cfg{};
+  cfg.transmit_backend = TransmitBackendKind::WTP;
+  cfg.cw_intra_element_gap = cfg.dfcw_intra_element_gap = 1;
+  cfg.cw_inter_character_gap = cfg.dfcw_inter_character_gap = 3;
+  cfg.cw_inter_word_gap = cfg.dfcw_inter_word_gap = 7;
+  cfg.qrss.message = cfg.fskcw.message = cfg.dfcw.message = "E";
+  for (double dot : {1.0, 3600.0, 1e20, std::numeric_limits<double>::infinity(),
+                     std::numeric_limits<double>::quiet_NaN(), 0.0}) {
+    cfg.qrss.dot_seconds = cfg.fskcw.dot_seconds = cfg.dfcw.dot_seconds = dot;
+    for (auto builder : {scheduling_detail::make_qrss_controller_request,
+                         scheduling_detail::make_fskcw_controller_request,
+                         scheduling_detail::make_dfcw_controller_request}) {
+      bool rejected = false;
+      try { (void)builder(cfg, 0); }
+      catch (const std::runtime_error&) { rejected = true; }
+      CHECK(rejected == !(dot == 1.0 || dot == 3600.0));
+    }
+  }
+}
 void run(const std::string &credentials) {
   char filename[] = "/tmp/wtp-production-config-XXXXXX";
   const int fd = mkstemp(filename);
@@ -303,6 +325,7 @@ void run(const std::string &credentials) {
 } // namespace
 int main(int argc, char **argv) {
   try {
+    finite_message_request_inputs();
     run(argc > 1 ? argv[1] : "");
   } catch (const std::exception &e) {
     std::cerr << e.what() << '\n';

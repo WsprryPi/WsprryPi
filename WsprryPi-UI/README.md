@@ -71,3 +71,20 @@ covered UI tree. Backup failure prevents replacement; customizations are never
 merged automatically. `--fail-on-ui-modifications` makes the installer refuse
 replacement instead. The installer relists the affected files, backup and
 report locations, and actual replacement status as its final output block.
+
+### Pico finite CW messages
+
+When Pico is selected, the CW message form shows the exact calculated integer-
+nanosecond duration, character count out of 32, event count against the connected
+device's limit, and the finite-job duration ceiling (at most 60 minutes). Spaces
+count toward 32; invalid drafts remain intact. Duration, event and message-length
+errors are distinct, and a refreshed smaller capability updates validation.
+Other backends retain their existing message limits and duration display.
+
+The calculation quantizes timing fields to nanoseconds before summing events,
+matching the parent WTP request builder; QRSS/FSKCW dash length is three quantized
+dots. One repetition is a complete native job. The existing repeat interval is
+scheduler spacing, not permission to exceed a device's finite-job duration.
+Local Chromium tests cover both desktop/mobile layouts, 31/32/33 and spaces,
+exact duration boundaries, smaller CAPS and fractional timing. They use simulated
+controller responses; live-device R3 acceptance remains separately required.

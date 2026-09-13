@@ -162,6 +162,8 @@
             clearTimeout(timeout);
             busy = false;
             render();
+            root.updateCwMessageLengthEstimate?.();
+            root.validateCwMessage?.();
             if (!closed && (visible || selected())) timer = setTimeout(() => request(), 3000);
         }
     }
@@ -175,6 +177,16 @@
         render();
     }
     root.WtpUi = { selected, read, validate, populate,
+        get maximumJobDurationNs() {
+            const value = snapshot?.capabilities?.max_job_duration_ns;
+            const ns = typeof value === "string" && /^\d+$/.test(value) ? BigInt(value) : 0n;
+            return (ns > 0n && ns < 3600000000000n ? ns : 3600000000000n).toString();
+        },
+        get maximumJobDurationSeconds() { return Number(this.maximumJobDurationNs) / 1e9; },
+        get maximumJobEvents() {
+            const count = snapshot?.capabilities?.max_events;
+            return Number.isInteger(count) && count > 0 ? Math.min(512, count) : 512;
+        },
         get hostRevision() { return hostRevision; },
         setHostRevision(value) { if (typeof value === "string" && value) hostRevision = value; },
         get developmentControlsVisible() { return visible; },
@@ -221,7 +233,7 @@
         if (!byId("wtp-controls")) return;
         initialized = true;
         populate(saved);
-        byId("wtp_use").addEventListener("change", () => { render(); root.clickTransmitBackend?.(); request(); });
+        byId("wtp_use").addEventListener("change", () => { render(); root.clickTransmitBackend?.(); root.updateCwMessageLengthEstimate?.(); root.validateCwMessage?.(); request(); });
         root.document.querySelectorAll("[data-wtp-key]").forEach(field => field.addEventListener("change", () => { render(); validate(); }));
         byId("wtp-cancel")?.addEventListener("click", cancelJob);
         byId("wtp-recover").addEventListener("click", () => request(true));

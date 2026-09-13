@@ -148,3 +148,15 @@ configuration and the Impeccable-reviewed gated UI. [Network integration](wtp-ne
 extends the existing backend through TLS. Actual Linux USB/DTR/unplug and
 firmware functional validation, process/service lifecycle, RF qualification and
 release readiness require separate evidence and authorization.
+
+## Extended finite jobs
+
+The execution monitor derives its deadline from the admitted full job duration
+and launch time with bounded 64-bit arithmetic. Transaction, progress and abort
+budgets retain their existing short bounds. STATUS and acknowledged-lease renewal
+continue throughout an hour-long job; there is no 110.592-second host cutoff.
+The scripted-peer regression now completes a full virtual hour with continuing
+renewals, aborts while Armed and aborts after 120 seconds Running. It verifies
+one LOAD/ARM per attempt and inactive cleanup, and uses retained completion
+records after RELEASE clears current state. This is hardware-free regression
+evidence, not a physical hour-long acceptance result.

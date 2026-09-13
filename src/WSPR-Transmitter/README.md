@@ -324,3 +324,12 @@ planning and full inhibited 2 m transitions. No persisted setting or UI control
 was added. Same-path conducted evidence for wspr4 CLK0 at 40 m and 2 m is linked
 from `docs/development/si5351-results` in the parent repository. It does not
 qualify other hardware, full encoded WSPR frames, or temperature extremes.
+
+### WTP-facing message validation
+
+The execution-plan compiler limits QRSS, FSKCW and DFCW text to 32 characters
+including spaces when `request.output.backend` is `BackendKind::WTP`. It rejects
+longer messages without modifying them and checks signed nanosecond event-sum
+overflow. Other backends retain their existing behavior. The parent WTP adapter
+owns negotiated device duration, event and encoded-payload admission; this
+component neither starts RF nor claims physical qualification.

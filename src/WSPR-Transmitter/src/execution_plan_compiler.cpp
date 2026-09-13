@@ -2,6 +2,7 @@
 
 #include <chrono>
 #include <cctype>
+#include <limits>
 #include <stdexcept>
 #include <string_view>
 #include <variant>
@@ -95,6 +96,9 @@ void append_event(
     if (duration <= std::chrono::nanoseconds::zero())
         return;
 
+    if (plan.backend == BackendKind::WTP &&
+        duration.count() > std::numeric_limits<std::int64_t>::max() - offset.count())
+        throw std::runtime_error("WTP finite-job duration overflows nanosecond accounting.");
     RfEvent event;
     event.offset_from_start = offset;
     event.duration = duration;
@@ -301,6 +305,8 @@ ExecutionPlan ExecutionPlanCompiler::compile_qrss(
 {
     if (payload.message.empty())
         throw std::runtime_error("QRSS payload message is empty.");
+    if (request.output.backend == BackendKind::WTP && payload.message.size() > 32)
+        throw std::runtime_error("Pico QRSS messages allow at most 32 characters, including spaces.");
 
     if (payload.frequency_hz <= 0.0)
         throw std::runtime_error("QRSS payload frequency is invalid.");
@@ -380,6 +386,8 @@ ExecutionPlan ExecutionPlanCompiler::compile_fskcw(
 {
     if (payload.message.empty())
         throw std::runtime_error("FSKCW payload message is empty.");
+    if (request.output.backend == BackendKind::WTP && payload.message.size() > 32)
+        throw std::runtime_error("Pico FSKCW messages allow at most 32 characters, including spaces.");
 
     if (payload.mark_frequency_hz <= 0.0)
         throw std::runtime_error("FSKCW payload mark frequency is invalid.");
@@ -466,6 +474,8 @@ ExecutionPlan ExecutionPlanCompiler::compile_dfcw(
 {
     if (payload.message.empty())
         throw std::runtime_error("DFCW payload message is empty.");
+    if (request.output.backend == BackendKind::WTP && payload.message.size() > 32)
+        throw std::runtime_error("Pico DFCW messages allow at most 32 characters, including spaces.");
 
     if (payload.dot_frequency_hz <= 0.0)
         throw std::runtime_error("DFCW payload dot frequency is invalid.");

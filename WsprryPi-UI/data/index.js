@@ -1306,9 +1306,72 @@ function updateCwMessageLengthEstimate() {
         ? `Estimated Message Length: ${formatCwMessageLengthEstimate(estimate.seconds)}`
         : `Estimated Message Length: ${estimate.reason}`;
 
+    if (typeof WtpUi !== "undefined" && WtpUi.selected()) {
+        const count = String($("#qrss_message").val() || "").length;
+        const plan = picoCwMessagePlan(String($("#qrss_message").val() || ""),mode,currentCwMessageTiming(mode));
+        display.textContent = plan.ok ? `Calculated Message Length: ${formatPicoDuration(plan.duration)} · ${count} / 32 characters · ${plan.events} / ${WtpUi.maximumJobEvents || 512} events · finite-job limit ${formatPicoDuration(picoDurationLimitNs())}` : `Calculated Message Length: ${plan.reason}`;
+    }
+    const messageHint = document.getElementById("qrss-message-hint");
+    if (messageHint) messageHint.textContent = typeof WtpUi !== "undefined" && WtpUi.selected()
+        ? "Pico: up to 32 characters including spaces. Duration and event limits also apply; the message is never split or truncated."
+        : "Enter the exact CW message to send. This field cannot be empty.";
     updateCwDurationPolicyLatch();
 
     return estimate;
+}
+
+// Match the parent compiler: quantize each timing field to integer ns first,
+// then sum marks/gaps. Conventional dash is three quantized dots.
+function picoCwMessagePlan(message, mode, timing) {
+    try {
+        const ns = seconds => {
+            if (!Number.isFinite(seconds) || seconds <= 0) throw new Error("Use positive finite timing values");
+            const value = BigInt(Math.trunc(seconds * 1e9));
+            if (value <= 0n || value > 9223372036854775807n) throw new Error("Timing is outside the finite nanosecond range");
+            return value;
+        };
+        const dot=ns(timing.dotSeconds), dash=mode==="DFCW"?dot:dot*3n;
+        const intra=ns(timing.intraElementGapSeconds), character=ns(timing.interCharacterGapSeconds), word=ns(timing.interWordGapSeconds);
+        if (dash>9223372036854775807n) throw new Error("Dash timing is outside the finite nanosecond range");
+        let duration=0n, events=0;
+        for (let i=0;i<message.length;++i) {
+            if (/[ \t\r\n\f\v]/.test(message[i])) continue;
+            const code=CW_MESSAGE_MORSE_TABLE[message[i].toUpperCase()];
+            if (!code || message.charCodeAt(i)>127) throw new Error("Use the supported Morse alphabet");
+            for (let n=0;n<code.length;++n) {
+                duration += mode==="DFCW" || code[n]==="." ? dot : dash; ++events;
+                if (n+1<code.length) {duration+=intra;++events;}
+            }
+            let next=i+1;while(next<message.length && /[ \t\r\n\f\v]/.test(message[next])) ++next;
+            if(next<message.length) {duration+=next===i+1?character:word;++events;}
+        }
+        if (!events) throw new Error("Include at least one Morse character");
+        return {ok:true,duration,events};
+    } catch(error) {return {ok:false,reason:error.message};}
+}
+function picoDurationLimitNs() {
+    return BigInt(WtpUi.maximumJobDurationNs || Math.round((WtpUi.maximumJobDurationSeconds || 3600)*1e9));
+}
+function formatPicoDuration(ns) {
+    const fraction=(ns%1000000000n).toString().padStart(9,"0").replace(/0+$/,"");
+    const exact=(ns/1000000000n).toString()+(fraction?"."+fraction:"")+" s";
+    const compact=formatCompactDuration(Math.floor(Number(ns)/1e9));
+    return exact+(compact?" ("+compact+")":"");
+}
+
+function picoCwMessageConstraint() {
+    if (typeof WtpUi === "undefined" || !WtpUi.selected() ||
+        !["QRSS", "FSKCW", "DFCW"].includes(selectedConfigMode())) return null;
+    const message = String($("#qrss_message").val() || "");
+    if ([...message].some(character => character.charCodeAt(0) > 127)) return "Use the supported Morse alphabet; non-ASCII characters are not supported by the Pico.";
+    const limit = picoDurationLimitNs();
+    const eventLimit = WtpUi.maximumJobEvents || 512;
+    if (message.length > 32) return `Pico messages allow 32 characters including spaces; this message has ${message.length}. Shorten the message.`;
+    const plan = picoCwMessagePlan(message,selectedConfigMode(),currentCwMessageTiming(selectedConfigMode()));
+    if (!plan.ok) return plan.reason;
+    if (plan.duration > limit) return `Calculated duration: ${formatPicoDuration(plan.duration)}. This Pico allows ${formatPicoDuration(limit)} per finite job. Shorten the timing or message.`;
+    if (plan.events > eventLimit) return `This message needs ${plan.events} events; the connected Pico allows ${eventLimit}. Use a simpler message or firmware with sufficient capacity.`;
+    return "";
 }
 
 function cwMessageOrdinaryValidation(message) {
@@ -5155,12 +5218,13 @@ function validateCwMessage() {
     const constraint = currentCwDurationConstraint();
     const durationInvalid = constraint.applicable && constraint.overLimit;
     updateCwDurationPolicyLatch();
-    const valid = ordinary.valid && !durationInvalid;
+    const picoConstraint = picoCwMessageConstraint();
+    const valid = ordinary.valid && !durationInvalid && !picoConstraint;
 
     fld.setCustomValidity(
         !ordinary.valid
             ? ordinary.message
-            : (durationInvalid ? cwDurationPolicyDetail(constraint) : "")
+            : (picoConstraint || (durationInvalid ? cwDurationPolicyDetail(constraint) : ""))
     );
     setFieldValidationState(fld, valid);
 

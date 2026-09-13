@@ -11,6 +11,8 @@
 
 #include <cmath>
 #include <iomanip>
+#include <limits>
+#include <stdexcept>
 #include <optional>
 #include <sstream>
 
@@ -97,10 +99,24 @@ static wsprrypi::FadeShape cw_fade_shape_from_config(const std::string &shape)
     return wsprrypi::FadeShape::NONE;
 }
 
+static void validate_wtp_timing(double dot, const ArgParserConfig& cfg, bool dfcw) {
+    if (cfg.transmit_backend != TransmitBackendKind::WTP) return;
+    const double maximum = std::nextafter(
+        static_cast<double>(std::numeric_limits<std::int64_t>::max()) / 1e9, 0.0);
+    const double values[] = {dot, dfcw ? dot : dot * 3,
+        dot * (dfcw ? cfg.dfcw_intra_element_gap : cfg.cw_intra_element_gap),
+        dot * (dfcw ? cfg.dfcw_inter_character_gap : cfg.cw_inter_character_gap),
+        dot * (dfcw ? cfg.dfcw_inter_word_gap : cfg.cw_inter_word_gap)};
+    for (double seconds : values)
+        if (!std::isfinite(seconds) || seconds <= 0 || seconds > maximum)
+            throw std::runtime_error("Pico message timing exceeds finite nanosecond accounting.");
+}
+
 static wsprrypi::MorseTiming cw_timing_from_config(
     double dot_seconds,
     const ArgParserConfig &cfg)
 {
+    validate_wtp_timing(dot_seconds, cfg, false);
     wsprrypi::MorseTiming timing;
     timing.dot = seconds_to_nanoseconds(dot_seconds);
     timing.dash = timing.dot * 3;
@@ -117,6 +133,7 @@ static wsprrypi::MorseTiming dfcw_timing_from_config(
     double dot_seconds,
     const ArgParserConfig &cfg)
 {
+    validate_wtp_timing(dot_seconds, cfg, true);
     wsprrypi::MorseTiming timing;
     timing.dot = seconds_to_nanoseconds(dot_seconds);
     timing.dash = timing.dot;

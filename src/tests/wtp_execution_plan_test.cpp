@@ -68,6 +68,60 @@ void rejected(const ExecutionPlan &p, WtpPlanError e,
   CHECK(!result && !result.prepared && result.error == e &&
         !result.explanation.empty());
 }
+void extended_message_boundaries() {
+  ExecutionPlanCompiler compiler;
+  TransmissionRequest r;
+  r.output.backend = BackendKind::WTP;
+  MorseTiming timing{1s, 3s, 1s, 3s, 7s};
+  auto current = caps();
+  current.max_job_duration_ns = 3'600'000'000'000ULL;
+  for (auto mode : {TransmissionMode::QRSS, TransmissionMode::FSKCW, TransmissionMode::DFCW}) {
+    r.mode = mode;
+    for (unsigned count : {31U,32U,33U}) {
+      const std::string text(count,'?');
+      if (mode == TransmissionMode::QRSS) r.payload = QrssPayload{text,135500,timing,{}};
+      else if (mode == TransmissionMode::FSKCW) r.payload = FskcwPayload{text,135500,135495,timing,{}};
+      else r.payload = DfcwPayload{text,135500,135495,timing,{}};
+      bool refused = false;
+      try {
+        auto plan = compiler.compile(r);
+        CHECK(plan.events.size() == count * 12 - 1);
+        CHECK(prepare_wtp_plan(plan,current,options()));
+        auto old = current; old.max_events = 162;
+        CHECK(!prepare_wtp_plan(plan,old,options()));
+      } catch (const std::runtime_error&) { refused = true; }
+      CHECK(refused == (count > 32));
+      r.output.backend = BackendKind::SIMULATED;
+      CHECK(compiler.compile(r).events.size() == count * 12 - 1);
+      r.output.backend = BackendKind::WTP;
+    }
+  }
+  for (auto mode : {TransmissionMode::QRSS, TransmissionMode::FSKCW, TransmissionMode::DFCW}) {
+    r.mode = mode;
+    for (unsigned spaces : {31U, 32U}) {
+      const auto text = std::string(spaces, ' ') + "E";
+      if (mode == TransmissionMode::QRSS) r.payload = QrssPayload{text,135500,timing,{}};
+      else if (mode == TransmissionMode::FSKCW) r.payload = FskcwPayload{text,135500,135495,timing,{}};
+      else r.payload = DfcwPayload{text,135500,135495,timing,{}};
+      bool refused = false;
+      try { CHECK(compiler.compile(r).events.size() == 1); }
+      catch (const std::runtime_error&) { refused = true; }
+      CHECK(refused == (spaces == 32));
+    }
+  }
+  for (auto duration : {3'599'999'999'999LL,3'600'000'000'000LL,3'600'000'000'001LL}) {
+    auto p = plan(); p.events[0].duration = std::chrono::nanoseconds(duration);
+    p.summary.total_duration = p.events[0].duration;
+    CHECK(bool(prepare_wtp_plan(p,current,options())) == (duration <= 3'600'000'000'000LL));
+  }
+  r.mode = TransmissionMode::QRSS;
+  timing.dot = std::chrono::nanoseconds::max();
+  r.payload = QrssPayload{"EE",135500,timing,{}};
+  bool overflow = false;
+  try { (void)compiler.compile(r); } catch (const std::runtime_error&) { overflow = true; }
+  CHECK(overflow);
+}
+
 void compiler_plans() {
   ExecutionPlanCompiler compiler;
   TransmissionRequest r;
@@ -375,6 +429,7 @@ int main(int argc, char **argv) {
       return 0;
     }
     compiler_plans();
+    extended_message_boundaries();
     boundaries();
     wire_and_atomicity();
     std::cout << "WTP execution-plan checks passed: " << checks << '\n';
