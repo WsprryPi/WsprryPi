@@ -1,5 +1,88 @@
 # Phase 11.5 target resource and contention review
 
+Current coordinating Pico source/evidence commit:
+`481da3c3ff171bae53d6c7d1d2e30525ae748f4b`.
+Prepared D0 packet/report commit: `c3782ccfe810889f2d8b6bc7e7b870c19d47e8f5`.
+
+R3 remains **OPEN**. B2 passed all fourteen additional transport pressure cases
+on physical source `2e43110f05304efdc2ae25c298baa0ef6426955b` at 138 MHz,
+divider 1, RAM rendering and listener on. Together with A1h2 this closes five
+of fourteen R3 register groups: TLS-VALID, TLS-SLOW, TLS-FAIL, SLOT and
+HTTP-PARTIAL. The 24 passing pressure cases include control/recovery cases;
+they are not 24 register groups. PROGRESS is partial and nine groups remain.
+R1 remains 5/5, R2 7/7, Phase 11.5 2/6 families closed, with no full accepted
+configuration.
+
+B1's two Tones completed, but its pressure attempt receives no acceptance
+credit. The assistant's ACK filter was installed before the server flight had
+been delivered, so the intended failed-alert condition never existed. B2 uses
+a prospective policy that acknowledges the complete server flight first and
+drops only zero-payload ACKs afterward. A Linux loopback test passed 55 data or
+control packets and dropped all 11 intended ACK variants. The independent B2
+audit verifies the actual nft rules and raw TCP/RF chronology. Sixteen altered
+evidence cases were rejected, then intact evidence passed again. B1's eight
+failure-audit mutations also failed as intended; its historical failure remains.
+
+C0 then attempted one idle 65,536-byte USB STATUS request and the target suffered
+an allocation panic and watchdog reboot. The pinned SDK panic format hashes to
+3833354787, matching the retained fault record in the exact physical image.
+The precise failing allocation and complete request delivery remain unknown;
+the original transfer did not log each successful partial write. C0 therefore
+receives no capacity acceptance. Eight raw-evidence mutations were rejected and
+the intact independent failure classification passed again.
+
+Read-only reconciliation found A Empty, inactive and unowned in recovery boot
+`bccea7c09794539c4f64bc22b0e76c56`. B stayed unchanged, inactive and unowned;
+the host fixture was restored. The test configuration remains the baseline,
+with cumulative CONFIG saves 37 and heap probes six. This completion effort
+has consumed nine Tones / 900 seconds and four approved Wi-Fi cycles. The C0
+watchdog reboot was unexpected; no commanded flash or reboot occurred.
+The remaining RF envelope is at most 31 jobs / 3,523.68 seconds, subject to the
+existing exact frequency, wiring and admission requirements.
+
+Pico instrumentation now preserves each core's last completed allocation size
+and NULL result if the SDK allocation panic occurs. This is diagnostic code,
+not a verified allocation repair. The D0 packet in the Pico checkout describes
+one proposed diagnostic flash and one idle maximum request, with no RF, CONFIG
+save or Wi-Fi cycle. D0 has not been approved or executed. A fresh-boot pass
+would not prove that the old allocation failure is repaired. Existing physical
+acceptance remains bound to the old image; any future firmware change needs
+an affected-check assessment before carrying evidence forward.
+
+Validation: 239 Phase 11.5 Python tests, 237 passed and two unrelated private
+fixtures skipped, with eleven R3 archives supplied; 62 host CTests passed across
+the full run and affected reruns, including the TLS test with localhost access.
+Expired ephemeral host-test credentials and sandbox socket restrictions were
+classified as test-environment failures, separately from C0's target panic.
+Pico source review also repaired USB cleanup masking the primary failure,
+independent final A/B inventory attempts, per-write transfer evidence, and
+D0's distinction between acknowledged BOOTSEL disconnection and failed commands.
+
+The current Pico files are `docs/development/phase11-5-r3-completion-review.md`,
+`phase11-5-r3-completion-result.json`, `phase11-5-r3-b1-failure-result.json`,
+`phase11-5-r3-b2-result.json`, `phase11-5-r3-c0-failure-result.json`, and
+`phase11-5-r3-allocation-d0-execution.md`. The comprehensive completion prompt
+is `phase11-5-r3-final-completion-prompt.md`.
+
+B2 evidence SHA-256:
+`b2359326fe3faa870ec800e2f5f2a5a24fd709c25a5e073a4cff6c435de39c44`
+(168 files, 10,854,400 bytes). C0 evidence SHA-256:
+`7fea4b144454fc7c4ffe909dc61450f1078f2753f564ad4916229047602cd06d`
+(84 files, 1,085,440 bytes), plus independently collected read-only reconciliation.
+Private captures, credentials, configurations and generated images remain outside Git.
+
+## Documentation impact
+
+Only this Pi companion report changed. No Pi runtime, services, configuration,
+operator flow or installed binary changed. Operator documentation and
+`Wsprry_Pi_Docs` require no change for this qualification report. Pi runtime
+builds and tests were not rerun. The installed production executable retains
+its original recorded identity; this report does not identify a tested runtime.
+
+## Historical A1h2 report
+
+The following preserves the earlier result and its then-current status.
+
 Current coordinating Pico tooling/report commit: `79498e96c6334f5bfacf81fdbe573be9ca14d72a`.
 
 R3 remains **OPEN**, but the initial A1 TLS/slot subset now passes **10/10**.
