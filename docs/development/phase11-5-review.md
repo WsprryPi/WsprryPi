@@ -1,5 +1,49 @@
 # Phase 11.5 target resource and contention review
 
+Current A1b outcome and baseline choice, September 12, 2026: the approved packet
+failed in the first HTTPS check. The pressure parser required the literal
+`HTTP/1.1 200 OK`, while Pico's actual serializer emits `200 Response`. The
+previous source review missed the serializer, and synthetic tests used the wrong
+phrase. Actual failing HTTP bytes were not retained, so their status/body cannot
+be independently verified. The mismatch is reproduced with the unchanged C++
+serializer on the host. This is another tooling/review error, not a target failure.
+
+One USB-owned 100-second Tone at 135,500 Hz completed; the second never started.
+Raw WTP confirms completion, inactive output and terminal owner release. The
+observer then rejected unowned Complete and stopped at 125.137594288 seconds,
+short of the required 360 seconds. No TLS/slot pressure assertion passed.
+Coordinating Pico records the exact failure, archives and diagnostic-only timing
+in `phase11-5-r3-tls-a1b-failure-review.md` and `phase11-5-r3-tls-a1b-result.json`.
+The original A1b packet and executed helpers remain preserved and consumed.
+
+Host cleanup passed. Pico restoration stopped at its read-only admission because
+Complete was not Empty. The user subsequently chose **Keep the test configuration**
+as the baseline between future runs. The owned restoration timer was stopped to
+honor that choice. Fresh raw-audited inventories confirm A remains physical
+2e43110/138 MHz/divider 1/RAM/listener on, boot
+`9c5aec394269e0b57ca16d73ad3d12b6`, inactive/unowned with the completed job retained;
+B is unchanged. Original configuration/image restoration is not claimed. Actual
+cumulative CONFIG saves remain 37 and probes six. Future packets should retain
+the test baseline and explicitly reconcile the completed job before execution.
+
+Local repairs validate the HTTP status code independently of its reason phrase,
+record completed response bytes before semantic validation, and allow known
+inactive/unowned Complete only during failed-load R3 observation. Normal
+acceptance stays strict and no automatic terminal cleanup or RF retry is added.
+Coordinating tests: 178 discovered, 176 passed, two unrelated private fixtures
+skipped; ten mutations of actual A1b evidence rejected. Nineteen R3 tooling tests
+include source-generated HTTP bytes, response retention and terminal-release
+observation. These repairs have not been staged or run on hardware. Phase 11.5
+remains 2/6 closed, R3 physical acceptance zero, accepted configurations empty.
+
+Documentation Impact: updated this report and Pico plan/ledger/index; added the
+A1b failure report/result and marked its preparation as historical. Firmware,
+Pi runtime, installed application, UI and protocol contracts are unchanged.
+The separate operator manuals remain outside scope; expanded QRSS duration and
+accepted resource limits still need the previously recorded follow-up.
+
+The following entries retain their historical scope.
+
 Current R3 A1b preparation, September 12, 2026: coordinating Pico has frozen
 `phase11-5-r3-tls-a1b-execution.md`, its review and prepared JSON. Packet SHA-256
 is `590da5a47dc37c1d4c8addea4713ca0cfcb25872a3daaff46a4c9abb9702b218`.
