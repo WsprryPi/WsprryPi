@@ -1,5 +1,83 @@
 # Phase 11.5 target resource and contention review
 
+Current coordinating Pico tooling/report commit: `79498e96c6334f5bfacf81fdbe573be9ca14d72a`.
+
+R3 remains **OPEN**, but the initial A1 TLS/slot subset now passes **10/10**.
+The approved A1h2 run completed two 100-second Tones at 135,500 Hz on unchanged
+physical source 2e43110, 138 MHz/divider 1/RAM/listener on. All ten pressure cases,
+the 300-second RF-off native production load and 360-second USB observation passed
+both the frozen on-host audit and independent raw replay. Final A was Empty,
+inactive and unowned, B unchanged and host restored. The retained test
+configuration remains the baseline. Phase 11.5 stays 2/6 families closed, R1 5/5,
+R2 7/7; no full accepted configuration.
+
+A1g had failed network admission before RF despite AP handshake completion. Its
+older terminal record expired at its normal advertised target age; the record
+was not lost and no reboot occurred. A1h then stopped before any Wi-Fi command
+or RF because its admission harness rejected a transient JOINING sample. Early
+capture and live AP diagnostics showed the DUT authenticated and associated;
+the underlying device IP/driver/radio cause remains unlocalized.
+
+The user explicitly approved one additional idle Wi-Fi OFF/ON and two conditional
+Tones. A1h2 continued that still-unused allowance after A1h's zero-command/zero-RF
+stop. One cycle restored IP and synchronized clock admission, followed by both
+Tones. DHCP requests/replies and renewals are present in the early capture.
+Recovery succeeded; this does not isolate the earlier join failure's cause.
+No CONFIG save, flash, reboot or heap probe occurred in the completion effort.
+Five Tones (500 seconds) completed across A1e/A1f/A1h2; earlier A1b evidence remains
+separate. Cumulative CONFIG saves remain 37 and heap probes six.
+
+The approved prospective observer rule preserves INFO/STATUS request cadence
+and the individual five-second read deadline. It never changes the scoring of
+A1f or another old failed attempt. In A1h2, observer samples were 360/72/72 and
+all raw timing/resource gates passed. The production TLS trace reconstructed one
+connection and logical session, 313 STATUS operations overall, 310 during the
+nominal interval, and maximum write-to-response time 0.773262535 seconds against
+five seconds. Scheduler queue time is outside that metric. Both Tones retained
+exact DMA/launch/tail accounting; minimum sampled heap reserve was 128,264 bytes.
+
+Only TLS-VALID and TLS-SLOW are complete at this scope. TLS-FAIL and SLOT remain
+partial; failed-alert lifetimes and pending expiry are not claimed. Partial HTTP,
+stalled I/O, maximum job/frame/body/browser boundaries, combined overload, USB
+pressure, retained capacities/expiry/reuse and three equivalent measured
+reclamation cycles remain unexecuted R3 work. No R4–R6 or Phase 11.6/13 acceptance
+is implied. Historical failures below remain unchanged.
+
+A1h2 packet SHA-256:
+`474e315dee1d7ba7527105a8c34b572508536224be010d9133ec2aaf8998b0d3`.
+Collected archive: 154 files, 9,922,560 bytes, SHA-256
+`6c6c34d81048bdd07a970899dfbff845711d3c52f924d373ae00756785fe63f3`.
+Exact results and causal evidence are in the coordinating Pico checkout's
+`docs/development/phase11-5-r3-completion-review.md`,
+`phase11-5-r3-a1h2-result.json`, `phase11-5-r3-network-diagnosis.md` and
+`phase11-5-r3-diagnosis.json`. Credentials/private configurations remain excluded
+from Git and evidence publication. Physical firmware and the tested production
+binary retain their original recorded identities; this report commit does not
+become a new tested runtime build.
+
+Adversarial replay rejected thirteen A1g, thirteen A1h and twelve A1h2 altered
+evidence cases. The intact accepted archive passed again. Pico validation:
+210 Phase 11.5 tests, 208 passed, two unrelated private evidence tests skipped;
+eight R3 execution archives supplied. Changes distinguish normal expiry,
+transient admission, assistant defects and unresolved device prerequisites.
+The final post-read admission deadline check is host-tested; A1h2 did not enter
+that wait path. No further actionable finding remained in the reviewed changes.
+
+## Documentation Impact
+
+Updated only this Pi companion development report; no Pi runtime, component,
+configuration or operator behavior changed. Pico tooling, tests, execution
+packets, results and development status were updated separately. Operator docs
+and `Wsprry_Pi_Docs` were considered and remain unchanged because this is
+qualification evidence/tooling, not an operator behavior change. Remaining
+work is development evidence for the unexecuted R3 register. No Pi runtime or
+firmware build was rerun for this documentation-only companion change.
+
+## Historical reports
+
+The following preserves the earlier report and its then-current status. The
+current disposition above supersedes that status without altering old evidence.
+
 Coordinating Pico tooling/report commit: `143ca94c3fc3091500593570d70c9266a13621e1`.
 
 Current R3 execution and causal diagnosis, September 12, 2026: the coordinating
