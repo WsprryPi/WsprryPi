@@ -1,5 +1,78 @@
 # Phase 11.5 target resource and contention review
 
+Coordinating Pico tooling/report commit: `143ca94c3fc3091500593570d70c9266a13621e1`.
+
+Current R3 execution and causal diagnosis, September 12, 2026: the coordinating
+Pico work executed A1c, A1e and A1f on unchanged physical 2e43110, 138 MHz/divider
+1/RAM/listener on. R3 remains OPEN with zero accepted complete pressure assertions.
+Phase 11.5 remains 2/6 families closed, R1 5/5 and R2 7/7; no full configuration
+is accepted. The comprehensive R3 completion work remains unfinished.
+
+A1c failed network readiness before RF; the authentication failure's root cause
+remains unresolved. A1d was staged but never launched because automatic approval
+review required explicit authority for its added Wi-Fi cycle. The assistant had
+not asked the user; this was not a user refusal. The user then explicitly approved
+A1e. Its one idle OFF/ON cycle restored network and clock readiness, followed by
+one completed 100-second Tone. A confirmed harness bug stopped pressure while a
+valid INFO read was in flight. That read took 1.739071744 seconds, within its
+five-second deadline; request starts retained the two-second cadence. The second
+job was not submitted, and observation continued for the full 360 seconds.
+
+A1f used no further Wi-Fi cycle and completed both 100-second Tones at 135,500 Hz,
+all ten TLS/slot cases, the 300-second RF-off production load and 360-second USB
+observation. The frozen audit failed. Raw reconstruction found three audit
+integration defects: requiring event IDs to restart at zero after reconnect,
+restricting the predeclared cadence adapter to R2, and expecting the R2 result
+envelope. USB events 14 through 25 were consecutive; the counter is boot-scoped.
+The repaired raw component audits pass finite lifecycle, timing, resource,
+production-wire and final-release checks.
+
+A separate frozen observation gate still missed once: the following INFO reply
+completed 2.262550925 seconds after a pressure case, beyond its two-second
+completion bracket. That request started 0.656231927 seconds after the case and
+took 1.606318998 seconds. Its five-second deadline and request cadence passed.
+This does not establish a firmware timing violation. The failed assessment and
+zero acceptance remain. A proposed request-cadence/read-deadline rule is applied
+to A1f only as DIAGNOSTIC_ONLY. The concrete A1g packet is prepared locally,
+unexecuted, awaiting agreement on that prospective observation criterion.
+
+Pico's read-only diagnostic tool reconstructs five raw attempts before assigning
+fault. It separates primary harness defects, consequential shutdown messages,
+independently missed gates and unlocalized causes. Unknown or altered evidence
+cannot acquire a device-safety or fault conclusion from an exception string, and
+no diagnosis automatically retries hardware. Completed RF remains visible without
+becoming acceptance credit.
+
+A1e packet: `27cd914815b8af8933fb134b44a923add1f09c8748afd0082115e4b1f202a518`;
+evidence archive `ff602a675d1fc887cd8306025103b675238366f3608635ce2361352729bb073e`.
+A1f packet: `cc557f977c655ac974c60c8343f1e8ba52dbd40b7837fdac9eb8561a63910236`;
+evidence archive `78c8005e7e2d94b2db9f222e46772e9801f6fd47da23ccb747f7f7fc5633b363`.
+At A1f cleanup, A was Empty/inactive/unowned on unchanged boot
+`9c5aec394269e0b57ca16d73ad3d12b6`, B retained boot
+`feffcd075ab6cb0b74e7e0c2fde6c87f` and configuration, and the host was restored.
+The user's test configuration remains; CONFIG saves remain 37 and heap probes
+six. No CONFIG save, flash or reboot occurred in A1c/A1e/A1f.
+
+Validation in Pico: 198 Phase 11.5 tests, 196 passed, two unrelated private
+fixtures skipped; all five R3 archives supplied. Repeated adversarial review
+covered corrupt raw evidence, valid-CRC internal event gaps, observer deadlines,
+failed worker outcomes, partial asynchronous cleanup framing and final authority.
+The final review also fixed R3 USB actor freshness, deferred completion-INFO
+release without blocking observation, and published STATUS before mutation.
+The prospective observation policy is not physically accepted. R3's remaining
+TLS/timeout, maximum-allocation, USB/retained-state and reclamation register is
+still open; a passing initial TLS packet alone cannot close it.
+
+Documentation Impact: this Pi companion report and Pico's completion prompt,
+ledger/index, execution history, causal review/result and diagnostic policy/register
+are updated. See Pico `docs/development/phase11-5-r3-completion-review.md`,
+`phase11-5-failure-triage.md` and `phase11-5-r3-retained-a1g-execution.md`.
+No Pi runtime/component implementation, firmware, installed application, UI,
+protocol or excluded operator-manual repository changed. C++/Pi runtime tests
+were not rerun for this documentation-only companion change.
+
+The following entries retain their historical scope.
+
 Current A1b outcome and baseline choice, September 12, 2026: the approved packet
 failed in the first HTTPS check. The pressure parser required the literal
 `HTTP/1.1 200 OK`, while Pico's actual serializer emits `200 Response`. The
