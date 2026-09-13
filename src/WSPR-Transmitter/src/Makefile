@@ -90,6 +90,7 @@ STARTUP_QUIESCE_TEST_OBJECTS := \
 	$(OBJ_DIR_DEBUG)/./legacy_gpio_clock_model.o \
 	$(OBJ_DIR_DEBUG)/./transmission_controller.o \
 	$(OBJ_DIR_DEBUG)/./wspr_transmit_backend_rpi.o \
+	$(OBJ_DIR_DEBUG)/./gpio_frequency_plan.o \
 	$(OBJ_DIR_DEBUG)/./wspr_transmit_backend_si5351.o \
 	$(OBJ_DIR_DEBUG)/./si5351_device.o \
 	$(OBJ_DIR_DEBUG)/./si5351_planner.o \
@@ -120,6 +121,7 @@ $(OBJ_DIR_DEBUG)/./si5351_min_drive_qualification_test.o: \
 GPIO_QUALIFICATION_OBJECTS := \
 	$(OBJ_DIR_DEBUG)/./gpio_startup_quiesce_qualification.o \
 	$(OBJ_DIR_DEBUG)/./wspr_transmit_backend_rpi.o \
+	$(OBJ_DIR_DEBUG)/./gpio_frequency_plan.o \
 	$(OBJ_DIR_DEBUG)/Mailbox/src/mailbox.o
 # ────────────────────────────────────────────────────────────────────────────────
 
@@ -364,7 +366,7 @@ release: build/bin/$(OUT)
 debug: build/bin/$(TEST_OUT)
 	$(Q)echo "Debug build completed successfully."
 
-test: simulated-backend-test simulated-backend-realtime-test transmission-controller-contract-test si5351-planner-test si5351-transition-test startup-quiesce-test
+test: legacy-tone-frequency-test simulated-backend-test simulated-backend-realtime-test transmission-controller-contract-test si5351-planner-test si5351-transition-test startup-quiesce-test
 	$(Q)echo "Hardware-free component tests completed successfully."
 
 si5351-test: build/bin/si5351_backend_harness
@@ -392,6 +394,14 @@ simulated-backend-realtime-test: build/bin/simulated_transmit_backend_realtime_t
 
 startup-quiesce-test: build/bin/startup_quiesce_test
 	$(Q)./build/bin/startup_quiesce_test
+
+.PHONY: legacy-tone-frequency-test
+legacy-tone-frequency-test: build/bin/legacy_tone_frequency_test
+	$(Q)./build/bin/legacy_tone_frequency_test
+
+build/bin/legacy_tone_frequency_test: legacy_tone_frequency_test.cc gpio_frequency_plan.cpp gpio_frequency_plan.hpp legacy_gpio_clock_model.cpp legacy_gpio_clock_model.hpp execution_plan_compiler.cpp execution_plan_compiler.hpp transmission_payloads.hpp transmission_request.hpp wspr_transmit_types.hpp ../../Chipset-Offsets/src/chipset_offsets.hpp
+	$(Q)mkdir -p $(BIN_DIR)
+	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) $(filter %.cc %.cpp,$^) -o $@ $(LDFLAGS)
 
 si5351-startup-quiesce-qualification: build/bin/si5351_startup_quiesce_qualification
 	$(Q)echo "Built live qualification executable; it is not run by this target."

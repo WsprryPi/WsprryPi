@@ -3,6 +3,20 @@
 `WSPR-Transmitter` is a C++20 component for generating WSPR (Weak Signal
 Propagation Reporter) RF transmissions with precise symbol timing.
 
+Legacy GPIO TONE treats the committed RF frequency as the carrier. Its
+single-frequency table has zero spacing, so the continuous symbol-zero emitter
+does not subtract the WSPR half-span. A request that would require dithering
+across an integer-divider boundary is rejected during configuration instead of
+silently moving the carrier. The reported frequency is a synthesis target, not
+a measurement; clock error and quantization still require separate validation.
+WSPR's four centered tones and QRSS/FSKCW/DFCW reference compensation retain
+their existing semantics.
+
+Run `make legacy-tone-frequency-test SUDO=` from this component's `src`
+directory for hardware-free table and frequency-contract coverage. See the
+[frequency correction and validation note](../../docs/issue-446-validation.md)
+for historical test-tone calibration handling and physical-validation limits.
+
 On Raspberry Pi 5, RP1 output exclusively uses the externally provisioned
 endpoint `/dev/rp1-gpclk`; it never falls back to the legacy DMA backend.
 WsprryPi does not install or attest the provider. Runtime protocol and

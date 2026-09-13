@@ -1541,13 +1541,7 @@ WsprTransmissionPlan WsprTransmitter::buildTransmissionPlan() const noexcept
 {
     // Reduce the committed request to the hardware-facing fields consumed by
     // the backend. Policy and scheduler metadata stay out of the backend.
-    return WsprTransmissionPlan{
-        current_request_.actual_rf_frequency_hz,
-        1.0 / WSPR_SYMTIME,
-        current_request_.power_level,
-        current_request_.ppm,
-        current_request_.tx_gpio,
-        current_request_.totalSymbolCount()};
+    return makeLegacyGpioTransmissionPlan(current_request_);
 }
 
 bool WsprTransmitter::shouldStop() const noexcept

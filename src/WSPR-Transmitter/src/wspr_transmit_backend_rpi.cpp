@@ -486,18 +486,6 @@ double gpioCorrectedPlldFrequency(double nominal_hz, double source_rate_ppm)
 namespace
 {
     constexpr std::uint32_t kGpclkDividerMask = 0x00FFFFFFu;
-    constexpr double kGpclkDividerScale = 4096.0;
-
-    bool gpioClockCanRepresent(
-        double source_hz,
-        double minimum_tone_hz,
-        double maximum_tone_hz)
-    {
-        return wsprrypi::legacyGpioClockCanRepresent(
-            source_hz,
-            minimum_tone_hz,
-            maximum_tone_hz);
-    }
 }
 
 GpioRfClockPlan gpioPlanRfClock(
@@ -531,26 +519,6 @@ bool gpioHardwareProfileMatchesProcessor(
     return wsprrypi::legacyHardwareProfileMatches(
         committed_profile,
         detected_processor);
-}
-
-std::uint32_t gpioBuildDividerWord(
-    double source_hz,
-    double tone_hz,
-    bool round_up_one_lsb)
-{
-    if (!gpioClockCanRepresent(source_hz, tone_hz, tone_hz))
-    {
-        throw std::out_of_range(
-            "GPIO RF tuning word is outside the GPCLK 12.12 divisor range.");
-    }
-    const double scaled = source_hz / tone_hz * kGpclkDividerScale;
-    const double word = std::floor(scaled) + (round_up_one_lsb ? 1.0 : 0.0);
-    if (word < 0.0 || word > static_cast<double>(kGpclkDividerMask))
-    {
-        throw std::out_of_range(
-            "GPIO RF tuning word exceeds the GPCLK divider field.");
-    }
-    return static_cast<std::uint32_t>(word);
 }
 
 std::int64_t gpioDitherLowerClockCount(
@@ -2414,9 +2382,7 @@ void WsprRpiBackend::transmit_symbol(
         (static_cast<double>(
              reinterpret_cast<std::uint32_t *>(const_page_.v)[f1_idx] & 0x00FFFFFFu) /
          std::pow(2.0, 12));
-    const double tone_freq =
-        plan.frequency_hz - 1.5 * plan.tone_spacing_hz +
-        static_cast<double>(sym_num) * plan.tone_spacing_hz;
+    const double tone_freq = plan.symbolFrequencyHz(sym_num);
     const double f0_ratio = std::clamp(
         1.0 - (tone_freq - f0_freq) / (f1_freq - f0_freq),
         0.0,
@@ -2641,12 +2607,6 @@ void WsprRpiBackend::transmit_symbol_with_envelope(
         symbol_index);
 }
 
-double WsprRpiBackend::bit_trunc(const double &d, const int &lsb)
-{
-    const double factor = std::pow(2.0, lsb);
-    return std::floor(d / factor) * factor;
-}
-
 void WsprRpiBackend::create_dma_pages(
     PageInfo &const_page,
     PageInfo &instr_page,
@@ -2869,17 +2829,16 @@ WsprTransmissionConfigureResult WsprRpiBackend::setup_dma_freq_table(
     WsprTransmissionConfigureResult result{};
     result.applied_frequency_hz = plan.frequency_hz;
 
-    configure_transmit_gpio(plan.tx_gpio);
-
-    const double minimum_tone_hz =
-        plan.frequency_hz - 1.5 * plan.tone_spacing_hz;
-    const double maximum_tone_hz =
-        plan.frequency_hz + 1.5 * plan.tone_spacing_hz;
+    const double minimum_tone_hz = plan.symbolFrequencyHz(0);
+    const double maximum_tone_hz = plan.frequency_hz + 1.5 * plan.tone_spacing_hz;
     const GpioRfClockPlan rf_clock = gpioPlanRfClock(
         dma_config_.processor_profile,
         minimum_tone_hz,
         maximum_tone_hz,
         plan.ppm);
+    // Validate the complete table before routing GPIO or programming it.
+    const auto table = gpioPlanDividerTable(rf_clock.corrected_hz, plan);
+    configure_transmit_gpio(plan.tx_gpio);
     // Intrinsic RF correction does not belong to the PWM/DMA timebase.
     dma_config_.plld_clock_frequency = gpioCorrectedPlldFrequency(
         dma_config_.plld_nominal_freq,
@@ -2926,21 +2885,9 @@ WsprTransmissionConfigureResult WsprRpiBackend::setup_dma_freq_table(
 
     pwm_clock_init_ = dma_config_.plld_clock_frequency / double(divisor);
 
-    double div_lo = bit_trunc(
-                        dma_config_.gpclk_clock_frequency /
-                            (plan.frequency_hz - 1.5 * plan.tone_spacing_hz),
-                        -12) +
-                    std::pow(2.0, -12);
-    double div_hi = bit_trunc(
-        dma_config_.gpclk_clock_frequency /
-            (plan.frequency_hz + 1.5 * plan.tone_spacing_hz),
-        -12);
-
-    if (std::floor(div_lo) != std::floor(div_hi))
+    result.applied_frequency_hz = table.applied_frequency_hz;
+    if (result.applied_frequency_hz != plan.frequency_hz)
     {
-        result.applied_frequency_hz =
-            dma_config_.gpclk_clock_frequency / std::floor(div_lo) -
-            1.6 * plan.tone_spacing_hz;
         if (plan.frequency_hz != 0.0)
         {
             std::stringstream temp;
@@ -2963,11 +2910,7 @@ WsprTransmissionConfigureResult WsprRpiBackend::setup_dma_freq_table(
 
     for (int i = 0; i < 8; i++)
     {
-        double tone_freq = tone0_freq + (i >> 1) * plan.tone_spacing_hz;
-        tuning_word[i] = gpioBuildDividerWord(
-            dma_config_.gpclk_clock_frequency,
-            tone_freq,
-            i % 2 == 0);
+        tuning_word[i] = table.words[i];
         active_gpclk_words_[i] = tuning_word[i];
     }
 

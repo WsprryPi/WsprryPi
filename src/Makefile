@@ -252,6 +252,7 @@ TRANSMITTER_SHARED_CPP_SOURCES := \
 	./WSPR-Transmitter/src/wspr_transmit.cpp
 RPI_GPIO_BACKEND_CPP_SOURCES := \
 	./Mailbox/src/mailbox.cpp \
+	./WSPR-Transmitter/src/gpio_frequency_plan.cpp \
 	./WSPR-Transmitter/src/wspr_transmit_backend_rpi.cpp
 RP1_GPCLK_BACKEND_CPP_SOURCES := \
 	./WSPR-Transmitter/src/rp1_gpclk_backend.cpp \
@@ -1224,6 +1225,12 @@ test-oneshot: debug
 	$(Q)$(SUDO) ./$(BIN_DIR)/$(TEST_OUT) -D -x 1 $(WSPR_PARAMS)
 
 .PHONY: semantics-test semantics-test-full semantics-test-portable semantics-test-portable-profile
+
+.PHONY: legacy-tone-frequency-test
+legacy-tone-frequency-test:
+	$(Q)$(MAKE) -C WSPR-Transmitter/src legacy-tone-frequency-test SUDO=
+
+semantics-test-full semantics-test-portable-profile: legacy-tone-frequency-test
 
 # Keep one stable meaning for the broad suite: Linux compilation and policy
 # coverage for the default physical and simulated backends. The recipe performs

@@ -33,6 +33,7 @@
 #include "band_gpio.hpp"
 #include "prepared_wspr_transmission.hpp"
 #include "rp1_gpclk_development_inputs.hpp"
+#include "transmission_request.hpp"
 
 /**
  * @enum WsprTransmitState
@@ -264,7 +265,7 @@ struct WsprTransmissionPlan
     double frequency_hz = 0.0;
 
     /**
-     * @brief Tone spacing in hertz (Hz) between adjacent WSPR tones.
+     * @brief Tone spacing in hertz (Hz); zero selects a single RF frequency.
      */
     double tone_spacing_hz = 0.0;
 
@@ -306,7 +307,28 @@ struct WsprTransmissionPlan
     {
         return total_symbol_count;
     }
+
+    double symbolFrequencyHz(std::uint32_t symbol) const noexcept
+    {
+        return frequency_hz - 1.5 * tone_spacing_hz +
+            static_cast<double>(symbol) * tone_spacing_hz;
+    }
 };
+
+// The legacy TONE emitter holds symbol zero. A zero-spacing table keeps that
+// symbol at the committed carrier without changing request/status frequency.
+// Configuration, emission, and restart must all use this same adaptation.
+inline WsprTransmissionPlan makeLegacyGpioTransmissionPlan(
+    const TransmissionRequest& request) noexcept
+{
+    return WsprTransmissionPlan{
+        request.actual_rf_frequency_hz,
+        request.isTone() ? 0.0 : 12000.0 / 8192.0,
+        request.power_level,
+        request.ppm,
+        request.tx_gpio,
+        request.totalSymbolCount()};
+}
 
 /**
  * @struct WsprTransmissionConfigureResult

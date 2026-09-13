@@ -26,6 +26,8 @@
 #ifndef WSPR_TRANSMIT_BACKEND_RPI_HPP
 #define WSPR_TRANSMIT_BACKEND_RPI_HPP
 
+#include "gpio_frequency_plan.hpp"
+
 #include <array>
 #include <atomic>
 #include <chrono>
@@ -146,11 +148,6 @@ GpioRfClockPlan gpioPlanRfClock(
 bool gpioHardwareProfileMatchesProcessor(
     wsprrypi::HardwareProfile committed_profile,
     wsprrypi::LegacyGpioProcessorProfile detected_processor) noexcept;
-
-std::uint32_t gpioBuildDividerWord(
-    double source_hz,
-    double tone_hz,
-    bool round_up_one_lsb);
 
 std::int64_t gpioDitherLowerClockCount(
     double lower_ratio,
@@ -437,7 +434,6 @@ private:
     void deallocate_memory_pool();
     void disable_hardware_sequence();
     void disable_clock();
-    double bit_trunc(const double &d, const int &lsb);
     void create_dma_pages(PageInfo &const_page, PageInfo &instr_page, PageInfo instructions[]);
     void request_watchdog_recovery() noexcept;
     void recovery_worker();
