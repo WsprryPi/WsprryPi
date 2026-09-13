@@ -1,0 +1,468 @@
+[
+  {
+    "event": "before",
+    "time_unix": 1789308895.1233242,
+    "monotonic": 253395.864760274,
+    "value": {
+      "serial": "0673ED0FA107",
+      "sat_lock": true,
+      "pll_lock": true,
+      "ant_ok": true,
+      "out1": false,
+      "out2": false,
+      "pps1": false,
+      "f1": 10000000,
+      "f2": 10000000,
+      "fll": false,
+      "out1low": true,
+      "out2low": true
+    }
+  },
+  {
+    "event": "reference_ready",
+    "time_unix": 1789308903.4343357,
+    "monotonic": 253404.175772147,
+    "value": {
+      "serial": "0673ED0FA107",
+      "sat_lock": true,
+      "pll_lock": true,
+      "ant_ok": true,
+      "out1": true,
+      "out2": false,
+      "pps1": false,
+      "f1": 7050100,
+      "f2": 10000000,
+      "fll": false,
+      "out1low": true,
+      "out2low": true
+    }
+  },
+  {
+    "event": "capture_arguments",
+    "time_unix": 1789308903.434777,
+    "monotonic": 253404.176213219,
+    "value": [
+      "/home/pi/wsprrypi-qualification-runs/complete-test-deployment-284c7e04a3fdd079c46e782b/wspq-capture-soapy",
+      "--enable-physical-sdr",
+      "sdrplay",
+      "2404058C60",
+      "7015100",
+      "11250000",
+      "20",
+      "250000",
+      "200000",
+      "0",
+      "false",
+      "false",
+      "500000",
+      "55",
+      "/home/pi/issue446-rf/7040100/capture.cf32",
+      "/home/pi/issue446-rf/7040100/metadata.json",
+      "issue446-7040100"
+    ]
+  },
+  {
+    "event": "capture_samples_ready",
+    "time_unix": 1789308905.1591237,
+    "monotonic": 253405.900560105,
+    "value": true
+  },
+  {
+    "event": "reference_step_high",
+    "time_unix": 1789308911.466609,
+    "monotonic": 253412.208044709,
+    "value": {
+      "serial": "0673ED0FA107",
+      "sat_lock": true,
+      "pll_lock": true,
+      "ant_ok": true,
+      "out1": true,
+      "out2": false,
+      "pps1": false,
+      "f1": 7060100,
+      "f2": 10000000,
+      "fll": false,
+      "out1low": true,
+      "out2low": true
+    }
+  },
+  {
+    "event": "reference_step_return",
+    "time_unix": 1789308917.7742667,
+    "monotonic": 253418.515702378,
+    "value": {
+      "serial": "0673ED0FA107",
+      "sat_lock": true,
+      "pll_lock": true,
+      "ant_ok": true,
+      "out1": true,
+      "out2": false,
+      "pps1": false,
+      "f1": 7050100,
+      "f2": 10000000,
+      "fll": false,
+      "out1low": true,
+      "out2low": true
+    }
+  },
+  {
+    "event": "ready_for_tone",
+    "time_unix": 1789308920.7750297,
+    "monotonic": 253421.516466366,
+    "value": true
+  },
+  {
+    "event": "lock_check",
+    "time_unix": 1789308922.776241,
+    "monotonic": 253423.517676869,
+    "value": {
+      "serial": "0673ED0FA107",
+      "sat_lock": true,
+      "pll_lock": true,
+      "ant_ok": true,
+      "out1": true,
+      "out2": false,
+      "pps1": false,
+      "f1": 7050100,
+      "f2": 10000000,
+      "fll": false,
+      "out1low": true,
+      "out2low": true
+    }
+  },
+  {
+    "event": "lock_check",
+    "time_unix": 1789308924.777463,
+    "monotonic": 253425.518898742,
+    "value": {
+      "serial": "0673ED0FA107",
+      "sat_lock": true,
+      "pll_lock": true,
+      "ant_ok": true,
+      "out1": true,
+      "out2": false,
+      "pps1": false,
+      "f1": 7050100,
+      "f2": 10000000,
+      "fll": false,
+      "out1low": true,
+      "out2low": true
+    }
+  },
+  {
+    "event": "lock_check",
+    "time_unix": 1789308926.778683,
+    "monotonic": 253427.520118781,
+    "value": {
+      "serial": "0673ED0FA107",
+      "sat_lock": true,
+      "pll_lock": true,
+      "ant_ok": true,
+      "out1": true,
+      "out2": false,
+      "pps1": false,
+      "f1": 7050100,
+      "f2": 10000000,
+      "fll": false,
+      "out1low": true,
+      "out2low": true
+    }
+  },
+  {
+    "event": "lock_check",
+    "time_unix": 1789308928.7798975,
+    "monotonic": 253429.521333395,
+    "value": {
+      "serial": "0673ED0FA107",
+      "sat_lock": true,
+      "pll_lock": true,
+      "ant_ok": true,
+      "out1": true,
+      "out2": false,
+      "pps1": false,
+      "f1": 7050100,
+      "f2": 10000000,
+      "fll": false,
+      "out1low": true,
+      "out2low": true
+    }
+  },
+  {
+    "event": "lock_check",
+    "time_unix": 1789308930.7811162,
+    "monotonic": 253431.522551777,
+    "value": {
+      "serial": "0673ED0FA107",
+      "sat_lock": true,
+      "pll_lock": true,
+      "ant_ok": true,
+      "out1": true,
+      "out2": false,
+      "pps1": false,
+      "f1": 7050100,
+      "f2": 10000000,
+      "fll": false,
+      "out1low": true,
+      "out2low": true
+    }
+  },
+  {
+    "event": "lock_check",
+    "time_unix": 1789308932.7823253,
+    "monotonic": 253433.523761048,
+    "value": {
+      "serial": "0673ED0FA107",
+      "sat_lock": true,
+      "pll_lock": true,
+      "ant_ok": true,
+      "out1": true,
+      "out2": false,
+      "pps1": false,
+      "f1": 7050100,
+      "f2": 10000000,
+      "fll": false,
+      "out1low": true,
+      "out2low": true
+    }
+  },
+  {
+    "event": "lock_check",
+    "time_unix": 1789308934.7834115,
+    "monotonic": 253435.524847505,
+    "value": {
+      "serial": "0673ED0FA107",
+      "sat_lock": true,
+      "pll_lock": true,
+      "ant_ok": true,
+      "out1": true,
+      "out2": false,
+      "pps1": false,
+      "f1": 7050100,
+      "f2": 10000000,
+      "fll": false,
+      "out1low": true,
+      "out2low": true
+    }
+  },
+  {
+    "event": "lock_check",
+    "time_unix": 1789308936.7846339,
+    "monotonic": 253437.526069369,
+    "value": {
+      "serial": "0673ED0FA107",
+      "sat_lock": true,
+      "pll_lock": true,
+      "ant_ok": true,
+      "out1": true,
+      "out2": false,
+      "pps1": false,
+      "f1": 7050100,
+      "f2": 10000000,
+      "fll": false,
+      "out1low": true,
+      "out2low": true
+    }
+  },
+  {
+    "event": "lock_check",
+    "time_unix": 1789308938.7858665,
+    "monotonic": 253439.527302029,
+    "value": {
+      "serial": "0673ED0FA107",
+      "sat_lock": true,
+      "pll_lock": true,
+      "ant_ok": true,
+      "out1": true,
+      "out2": false,
+      "pps1": false,
+      "f1": 7050100,
+      "f2": 10000000,
+      "fll": false,
+      "out1low": true,
+      "out2low": true
+    }
+  },
+  {
+    "event": "lock_check",
+    "time_unix": 1789308940.7870822,
+    "monotonic": 253441.528517875,
+    "value": {
+      "serial": "0673ED0FA107",
+      "sat_lock": true,
+      "pll_lock": true,
+      "ant_ok": true,
+      "out1": true,
+      "out2": false,
+      "pps1": false,
+      "f1": 7050100,
+      "f2": 10000000,
+      "fll": false,
+      "out1low": true,
+      "out2low": true
+    }
+  },
+  {
+    "event": "lock_check",
+    "time_unix": 1789308942.7883022,
+    "monotonic": 253443.529737857,
+    "value": {
+      "serial": "0673ED0FA107",
+      "sat_lock": true,
+      "pll_lock": true,
+      "ant_ok": true,
+      "out1": true,
+      "out2": false,
+      "pps1": false,
+      "f1": 7050100,
+      "f2": 10000000,
+      "fll": false,
+      "out1low": true,
+      "out2low": true
+    }
+  },
+  {
+    "event": "lock_check",
+    "time_unix": 1789308944.7896438,
+    "monotonic": 253445.531079433,
+    "value": {
+      "serial": "0673ED0FA107",
+      "sat_lock": true,
+      "pll_lock": true,
+      "ant_ok": true,
+      "out1": true,
+      "out2": false,
+      "pps1": false,
+      "f1": 7050100,
+      "f2": 10000000,
+      "fll": false,
+      "out1low": true,
+      "out2low": true
+    }
+  },
+  {
+    "event": "lock_check",
+    "time_unix": 1789308946.7909825,
+    "monotonic": 253447.532418143,
+    "value": {
+      "serial": "0673ED0FA107",
+      "sat_lock": true,
+      "pll_lock": true,
+      "ant_ok": true,
+      "out1": true,
+      "out2": false,
+      "pps1": false,
+      "f1": 7050100,
+      "f2": 10000000,
+      "fll": false,
+      "out1low": true,
+      "out2low": true
+    }
+  },
+  {
+    "event": "lock_check",
+    "time_unix": 1789308948.7923307,
+    "monotonic": 253449.533766388,
+    "value": {
+      "serial": "0673ED0FA107",
+      "sat_lock": true,
+      "pll_lock": true,
+      "ant_ok": true,
+      "out1": true,
+      "out2": false,
+      "pps1": false,
+      "f1": 7050100,
+      "f2": 10000000,
+      "fll": false,
+      "out1low": true,
+      "out2low": true
+    }
+  },
+  {
+    "event": "lock_check",
+    "time_unix": 1789308950.793531,
+    "monotonic": 253451.534966559,
+    "value": {
+      "serial": "0673ED0FA107",
+      "sat_lock": true,
+      "pll_lock": true,
+      "ant_ok": true,
+      "out1": true,
+      "out2": false,
+      "pps1": false,
+      "f1": 7050100,
+      "f2": 10000000,
+      "fll": false,
+      "out1low": true,
+      "out2low": true
+    }
+  },
+  {
+    "event": "lock_check",
+    "time_unix": 1789308952.7946234,
+    "monotonic": 253453.536059027,
+    "value": {
+      "serial": "0673ED0FA107",
+      "sat_lock": true,
+      "pll_lock": true,
+      "ant_ok": true,
+      "out1": true,
+      "out2": false,
+      "pps1": false,
+      "f1": 7050100,
+      "f2": 10000000,
+      "fll": false,
+      "out1low": true,
+      "out2low": true
+    }
+  },
+  {
+    "event": "capture_exit",
+    "time_unix": 1789308952.795042,
+    "monotonic": 253453.536477933,
+    "value": 0
+  },
+  {
+    "event": "disabled",
+    "time_unix": 1789308958.7990346,
+    "monotonic": 253459.540470277,
+    "value": {
+      "serial": "0673ED0FA107",
+      "sat_lock": true,
+      "pll_lock": true,
+      "ant_ok": true,
+      "out1": false,
+      "out2": false,
+      "pps1": false,
+      "f1": 7050100,
+      "f2": 10000000,
+      "fll": false,
+      "out1low": true,
+      "out2low": true
+    }
+  },
+  {
+    "event": "restored",
+    "time_unix": 1789308964.106155,
+    "monotonic": 253464.847590784,
+    "value": {
+      "serial": "0673ED0FA107",
+      "sat_lock": true,
+      "pll_lock": true,
+      "ant_ok": true,
+      "out1": false,
+      "out2": false,
+      "pps1": false,
+      "f1": 10000000,
+      "f2": 10000000,
+      "fll": false,
+      "out1low": true,
+      "out2low": true
+    }
+  },
+  {
+    "event": "complete",
+    "time_unix": 1789308964.1267688,
+    "monotonic": 253464.86820505,
+    "value": true
+  }
+]

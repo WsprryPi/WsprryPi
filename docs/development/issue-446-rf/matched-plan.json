@@ -1,0 +1,14 @@
+{
+  "scope": "Issue 446 fixed tone offset; not absolute clock calibration or general RF qualification",
+  "frequency_hz": 14097100,
+  "sequence": ["old_spacing_control", "installed_fixed", "installed_fixed", "old_spacing_control"],
+  "duration_ms_each": 5000,
+  "maximum_total_gpio_rf_ms": 20000,
+  "manual_ppm": 0.0,
+  "gpio": 4,
+  "power_level": 0,
+  "reference_frequency_hz": 14107100,
+  "expected_fixed_minus_control_hz": 2.197265625,
+  "acceptance_error_hz": 0.3,
+  "analysis": "One-second Hann-window interpolated FFT peaks; simultaneous reference subtraction; retain interior windows of each burst; fit offset = baseline + linear time drift + fixed-build indicator * effect. Require all four burst identities and at least two interior windows per burst, effect within 0.3 Hz of expectation, and residual RMS below 0.15 Hz. Preserve exploratory captures as inconclusive."
+}

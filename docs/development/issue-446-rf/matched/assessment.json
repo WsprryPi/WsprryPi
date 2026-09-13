@@ -1,0 +1,75 @@
+{
+  "scope": "Issue 446 old-spacing control versus installed fix, not absolute transmitter calibration",
+  "sequence": [
+    "old",
+    "new",
+    "new",
+    "old"
+  ],
+  "burst_statistics": [
+    {
+      "index": 0,
+      "build": "old",
+      "interior_seconds": [
+        7,
+        8,
+        9
+      ],
+      "mean_reference_relative_offset_hz": 144.57764463118778,
+      "stddev_hz": 0.18860716126548652
+    },
+    {
+      "index": 1,
+      "build": "new",
+      "interior_seconds": [
+        13,
+        14,
+        15,
+        16
+      ],
+      "mean_reference_relative_offset_hz": 146.87750022586624,
+      "stddev_hz": 0.07655418631617564
+    },
+    {
+      "index": 2,
+      "build": "new",
+      "interior_seconds": [
+        20,
+        21,
+        22
+      ],
+      "mean_reference_relative_offset_hz": 146.84379799271724,
+      "stddev_hz": 0.08221521243047901
+    },
+    {
+      "index": 3,
+      "build": "old",
+      "interior_seconds": [
+        26,
+        27,
+        28
+      ],
+      "mean_reference_relative_offset_hz": 144.57718012645879,
+      "stddev_hz": 0.12597105038696324
+    }
+  ],
+  "fit_model": "reference-relative offset = baseline + drift_hz_per_s * elapsed_s + fixed_build_shift_hz * is_fixed_build",
+  "fit_baseline_hz": 144.5668507903239,
+  "fit_drift_hz_per_s": 0.001005865571375275,
+  "fixed_minus_control_hz": 2.2858595754586575,
+  "expected_shift_hz": 2.197265625,
+  "difference_from_expected_hz": 0.08859395045865748,
+  "effect_standard_error_hz": 0.06472091569763504,
+  "fit_residual_rms_hz": 0.10201743587569613,
+  "steady_window_count": 13,
+  "acceptance_error_hz": 0.3,
+  "maximum_residual_rms_hz": 0.15,
+  "capture_integrity_passed": true,
+  "passed": true,
+  "limitations": [
+    "No absolute GPIO calibration claim; manual correction was fixed at 0 PPM.",
+    "Reference subtraction removes common receiver tuning drift; no receiver correction profile was applied.",
+    "A 10 ppm sample-rate error changes a 2.2 Hz matched difference by only 0.000022 Hz.",
+    "Control is current source with only legacy TONE spacing restored, not a historical released binary."
+  ]
+}

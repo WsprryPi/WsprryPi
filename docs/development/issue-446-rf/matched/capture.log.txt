@@ -1,0 +1,7 @@
+[INFO] devIdx: 0
+[INFO] SerNo: 2404058C60
+[INFO] hwVer: 6
+[INFO] rspDuoMode: 0
+[INFO] tuner: 1
+[INFO] rspDuoSampleFreq: 0.000000
+[INFO] Using format CF32.

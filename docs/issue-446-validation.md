@@ -2,6 +2,11 @@
 
 ## Behavior and scope
 
+Follow-up status: the separately authorized September 13, 2026
+[conducted RF comparison](development/issue-446-rf/README.md) passed, and the
+operator-documentation follow-up was completed in `Wsprry_Pi_Docs`. The
+hardware-free evidence below records the original implementation phase.
+
 Issue #446 corrects the legacy GPIO TONE path in `WSPR-Transmitter`. The
 committed frequency stays in the RF-carrier domain. The legacy plan adapter
 uses zero spacing for TONE, so every table entry and the continuous symbol-zero
@@ -56,10 +61,10 @@ An isolated mutation check restored the old WSPR spacing for TONE. The test
 failed at the intended assertion that symbol zero must equal requested RF;
 the working source was not modified for that check.
 
-All runtime tests in this work are hardware-free. Pi access uses
-the `wspr4` SSH alias outside the sandbox and the isolated directory
+All runtime tests in the original implementation phase were hardware-free. Pi
+access used the `wspr4` SSH alias outside the sandbox and the isolated directory
 `/tmp/wsprrypi-issue446.vepaDN`; its installed executable and normal checkout
-are not changed.
+were not changed during that phase.
 
 ## Adversarial assessment
 
@@ -90,8 +95,9 @@ dependencies, backend-specific source selection, unchanged modulated-table
 arithmetic, exact-tone failure before routing, recovery reconstruction,
 calibration ownership, caller conversion paths, and test sensitivity. All
 first-pass findings are resolved. No further actionable source-scope findings
-remain. Conducted RF acceptance and the separate operator-documentation update
-remain explicit external gates.
+remain. At that implementation-stage assessment, conducted RF acceptance and
+the separate operator-documentation update remained external gates; the linked
+follow-up records their completion.
 
 ## Final validation results
 
@@ -140,8 +146,8 @@ and the separate operator documentation. No UI source or screenshots changed,
 so no interface rendering or Impeccable review was required for this backend
 change.
 
-Operator-documentation follow-up in `../Wsprry_Pi_Docs`, requiring separate
-cross-repository authorization:
+Operator-documentation follow-up in `../Wsprry_Pi_Docs`, subsequently authorized
+and completed after the matched RF check:
 
 - `docs/User_Interface/Maintenance/index.md`: retain the exact-RF description
   and explain that a legacy GPIO tone can be rejected at a divider boundary.
@@ -150,13 +156,15 @@ cross-repository authorization:
 - `docs/Advanced_Operations/timing_calibration.md`: distinguish affected-build
   symbol-zero displacement from clock correction and corrected-build results.
 
-## Outstanding physical acceptance
+## Original physical-acceptance boundary
 
-No transmissions were authorized or performed. No GPIO manipulation,
-installation, service operation, reboot, or RF measurement was performed.
+During the implementation phase, no transmissions were authorized or performed.
+No GPIO manipulation, installation, service operation, reboot, or RF measurement
+was performed.
 Hardware-free Pi tests establish software behavior on that CPU/toolchain, not
-physical output. Issue #446's conducted RF gate remains outstanding: separately
-authorize the exact source/binary, processor, parent, GPIO route, frequencies,
-finite duration, fixed correction, reference/receiver, conducted path, stop
-procedure, and cleanup evidence. No issue closure, merge, or release-readiness
-claim follows from this source change.
+physical output. The later installation and separately authorized RF session
+are documented in the [conducted validation record](development/issue-446-rf/README.md).
+That record identifies the source/binary, processor, parent, GPIO route,
+frequency, finite duration, fixed correction, reference/receiver, conducted
+path, and stop/cleanup evidence. Its pass applies to the focused frequency
+mapping fix, not general hardware or release qualification.

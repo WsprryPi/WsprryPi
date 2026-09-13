@@ -1,0 +1,11 @@
+diff --git a/src/WSPR-Transmitter/src/wspr_transmit.cpp b/src/WSPR-Transmitter/src/wspr_transmit.cpp
+index 46e56cb..030b142 100644
+--- a/src/WSPR-Transmitter/src/wspr_transmit.cpp
++++ b/src/WSPR-Transmitter/src/wspr_transmit.cpp
+@@ -1543,3 +1543,5 @@ WsprTransmissionPlan WsprTransmitter::buildTransmissionPlan() const noexcept
+     // the backend. Policy and scheduler metadata stay out of the backend.
+-    return makeLegacyGpioTransmissionPlan(current_request_);
++    auto plan = makeLegacyGpioTransmissionPlan(current_request_);
++    plan.tone_spacing_hz = 12000.0 / 8192.0; // Issue 446 old-behavior RF control only.
++    return plan;
+ }

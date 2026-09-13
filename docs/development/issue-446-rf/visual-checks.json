@@ -1,0 +1,62 @@
+[
+  {
+    "name": "maintenance",
+    "size": "desktop",
+    "layout": {
+      "viewport": 1440,
+      "document": 1440,
+      "bodyFont": "\"Source Sans 3\", \"Segoe UI\", sans-serif"
+    },
+    "links": 1
+  },
+  {
+    "name": "cli",
+    "size": "desktop",
+    "layout": {
+      "viewport": 1440,
+      "document": 1440,
+      "bodyFont": "\"Source Sans 3\", \"Segoe UI\", sans-serif"
+    },
+    "links": 1
+  },
+  {
+    "name": "calibration",
+    "size": "desktop",
+    "layout": {
+      "viewport": 1440,
+      "document": 1440,
+      "bodyFont": "\"Source Sans 3\", \"Segoe UI\", sans-serif"
+    },
+    "links": 1
+  },
+  {
+    "name": "maintenance",
+    "size": "mobile",
+    "layout": {
+      "viewport": 390,
+      "document": 390,
+      "bodyFont": "\"Source Sans 3\", \"Segoe UI\", sans-serif"
+    },
+    "links": 1
+  },
+  {
+    "name": "cli",
+    "size": "mobile",
+    "layout": {
+      "viewport": 390,
+      "document": 390,
+      "bodyFont": "\"Source Sans 3\", \"Segoe UI\", sans-serif"
+    },
+    "links": 1
+  },
+  {
+    "name": "calibration",
+    "size": "mobile",
+    "layout": {
+      "viewport": 390,
+      "document": 390,
+      "bodyFont": "\"Source Sans 3\", \"Segoe UI\", sans-serif"
+    },
+    "links": 1
+  }
+]

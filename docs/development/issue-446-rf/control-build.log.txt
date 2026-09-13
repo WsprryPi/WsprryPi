@@ -1,0 +1,9 @@
+make: Entering directory '/home/pi/issue446-rf/control-source/src'
+build metadata updated: build/generated/build_metadata.hpp
+build metadata unchanged: build/generated/build_metadata.hpp
+backend capabilities unchanged: build/generated/backend_capabilities.hpp
+Compiling (release) version.cpp into build/obj/release/rpi-gpio+rp1-gpclk+si5351+simulated+ancillary-gpio1/./version.o
+Compiling (release) WSPR-Transmitter/src/wspr_transmit.cpp into build/obj/release/rpi-gpio+rp1-gpclk+si5351+simulated+ancillary-gpio1/./WSPR-Transmitter/src/wspr_transmit.o
+Linking release: wsprrypi (libgpiod major: 2)
+Release build completed successfully.
+make: Leaving directory '/home/pi/issue446-rf/control-source/src'

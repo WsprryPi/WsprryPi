@@ -1,0 +1,213 @@
+{
+  "frequency_hz": 14097100,
+  "duration_ms": 10000,
+  "manual_ppm": 0.0,
+  "binary_sha256": "b21fa9200b0671232c88b28595ef591f96825dd8a60f1e22e6a6d516faccc674",
+  "source_commit": "ef9a76a5be4d8223b89bcd64df1e1a376d48a0a5",
+  "config_before_sha256": "cdab1a816495325ebe4dfe8d3f453c2ce89f430f7e9d84befda4fc9ff12ff5cb",
+  "events": [
+    {
+      "event": "gpio_before",
+      "time_unix": 1789309097.9020953,
+      "value": "4: ip    pu | lo // GPIO4 = input"
+    },
+    {
+      "event": "arguments",
+      "time_unix": 1789309097.976415,
+      "value": [
+        "/usr/local/bin/wsprrypi",
+        "-i",
+        "/home/pi/issue446-rf/14097100/test.ini",
+        "--backend",
+        "gpio",
+        "--transmit-gpio",
+        "4",
+        "--gpio-power-level",
+        "0",
+        "--no-system-clock-frequency-estimate",
+        "--gpio-manual-ppm",
+        "0",
+        "--no-led",
+        "--no-shutdown",
+        "--no-amp-pin",
+        "--no-http",
+        "--socket-loopback-only",
+        "--socket-loopback-family",
+        "ipv4",
+        "--socket-port",
+        "41726",
+        "--debug-logging",
+        "--date-time-log"
+      ]
+    },
+    {
+      "event": "request_begin",
+      "time_unix": 1789309098.0842655,
+      "value": 14097100
+    },
+    {
+      "event": "bounded_tone",
+      "time_unix": 1789309108.1253726,
+      "value": {
+        "schema_version": 1,
+        "evidence_type": "bounded_tone_control",
+        "request_id": "issue446-14097100",
+        "frequency_hz": 14097100,
+        "duration_ms": 10000,
+        "outer_timeout_s": 20,
+        "loopback_host": "127.0.0.1",
+        "port": 41726,
+        "path": "/",
+        "maximum_frame_bytes": 16384,
+        "start_response": {
+          "actual_rf_frequency_hz": 14097100,
+          "already_active": false,
+          "band": "20m",
+          "blocked_by_active_transmission": false,
+          "blocked_by_enabled_transmission": false,
+          "command": "bounded_tone",
+          "duration_ms": 10000,
+          "frequency_source": "custom_rf",
+          "message": "Test tone started.",
+          "request_id": "issue446-14097100",
+          "resolution_source": "custom_rf",
+          "selector_gpio": -1,
+          "selector_gpio_active_high": false,
+          "selector_gpio_enabled": false,
+          "started": true,
+          "status": "ok",
+          "tone_start": "ok"
+        },
+        "terminal_response": {
+          "command": "bounded_tone",
+          "event": "completed",
+          "message": "Test tone stopped and scheduler restored.",
+          "request_id": "issue446-14097100",
+          "scheduler_restored": true,
+          "status": "ok",
+          "stopped": true
+        },
+        "observed_responses": [
+          {
+            "actual_rf_frequency_hz": 14097100,
+            "already_active": false,
+            "band": "20m",
+            "blocked_by_active_transmission": false,
+            "blocked_by_enabled_transmission": false,
+            "command": "bounded_tone",
+            "duration_ms": 10000,
+            "frequency_source": "custom_rf",
+            "message": "Test tone started.",
+            "request_id": "issue446-14097100",
+            "resolution_source": "custom_rf",
+            "selector_gpio": -1,
+            "selector_gpio_active_high": false,
+            "selector_gpio_enabled": false,
+            "started": true,
+            "status": "ok",
+            "tone_start": "ok"
+          },
+          {
+            "callsign_normalized": "",
+            "callsign_raw": "",
+            "current_frame": 0,
+            "cw_active_char_index": -1,
+            "cw_message": "",
+            "effective_gpio_ppm": 0.0,
+            "frame_callsign": "",
+            "frame_count": 0,
+            "frame_locator": "",
+            "frequency_correction_mode": "fixed_manual",
+            "frequency_estimate_age_seconds": 0.0,
+            "frequency_estimate_ppm": null,
+            "frequency_estimate_provenance": "",
+            "frequency_estimate_provider": "",
+            "frequency_estimate_qualification": "unavailable",
+            "frequency_estimate_reason": "",
+            "frequency_hz": 0.0,
+            "frequency_is_skip": false,
+            "gpio_correction_candidate": {
+              "active": false,
+              "available": true,
+              "conducted_residual_ppm": 0.0,
+              "correction_mode": "fixed_manual",
+              "correction_ppm": 0.0,
+              "execution_identity": "",
+              "nominal_rate_hz": 750000000.0,
+              "processor_profile": "BCM2711",
+              "provider_name": "",
+              "provider_snapshot_time": "",
+              "provider_source_signature": "",
+              "selected_component_ppm": 0.0,
+              "selected_parent": "PLLD"
+            },
+            "gpio_correction_committed": {
+              "active": true,
+              "available": true,
+              "conducted_residual_ppm": 0.0,
+              "correction_mode": "fixed_manual",
+              "correction_ppm": 0.0,
+              "execution_identity": "gpio-execution-1",
+              "nominal_rate_hz": 750000000.0,
+              "processor_profile": "BCM2711",
+              "provider_name": "",
+              "provider_snapshot_time": "",
+              "provider_source_signature": "",
+              "selected_component_ppm": 0.0,
+              "selected_parent": "PLLD"
+            },
+            "gpio_frequency_residual_ppm": 0.0,
+            "locator_normalized": "",
+            "locator_raw": "",
+            "next_transmission_at": "",
+            "offset_hz": 0.0,
+            "plan_type": "",
+            "power_dbm": 0,
+            "runtime_mode": "TONE",
+            "selector_gpio": -1,
+            "selector_gpio_active_high": false,
+            "selector_gpio_enabled": false,
+            "state": "starting",
+            "timestamp": "2026-09-13T14:18:18Z",
+            "transmit_backend": "gpio",
+            "tx_state": "transmitting",
+            "type": "transmit"
+          },
+          {
+            "command": "bounded_tone",
+            "event": "completed",
+            "message": "Test tone stopped and scheduler restored.",
+            "request_id": "issue446-14097100",
+            "scheduler_restored": true,
+            "status": "ok",
+            "stopped": true
+          }
+        ],
+        "cleanup_attempted": false,
+        "completed": true,
+        "qualification_claim": false
+      }
+    },
+    {
+      "event": "process_exit",
+      "time_unix": 1789309108.1583803,
+      "value": 0
+    },
+    {
+      "event": "gpio_after",
+      "time_unix": 1789309108.1642063,
+      "value": "4: ip    pu | lo // GPIO4 = input"
+    },
+    {
+      "event": "service_restored",
+      "time_unix": 1789309108.7321105,
+      "value": "active"
+    },
+    {
+      "event": "installed_config_unchanged",
+      "time_unix": 1789309108.733124,
+      "value": true
+    }
+  ],
+  "passed_lifecycle": true
+}
