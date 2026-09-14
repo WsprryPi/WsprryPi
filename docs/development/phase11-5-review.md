@@ -1,5 +1,79 @@
 # Phase 11.5 target resource and contention review
 
+## Current bounded Group 2 outcome, 2026-09-14
+
+Group 2 remains **OPEN** at Pico checkpoint 047. Group 1 remains closed at its
+recorded checkpoint 043; Group 3 was not started. The sole diagnostic C4 reported
+MISSED_START after ARM and before RF launch or maximum-input stimulus. Its full
+90-second ARM charge remains recorded; launch epoch and capacity bytes are zero.
+The original STOPPED_FINAL_STATE_UNVERIFIED runner result is preserved. Separate
+raw Console/WTP replay and post-restoration inventories establish inactive,
+unowned final authority without granting RF or capacity acceptance.
+
+C2/C3's original supported-input failures remain unrepaired and the failed
+allocator call is still unknown. No speculative parser redesign was continued.
+The unfinished input refactor was archived byte-for-byte with a manifest and
+withdrawn from the active candidate. One diagnostic firmware adds retained failed
+allocation size/entry/caller information; no allocation repair was selected.
+E5's seven idle boundary assertions passed on that image. Idle admission does
+not establish capacity during RF or combined allocation support.
+
+| Sub-issue | Current disposition |
+| --- | --- |
+| 2.1 Maximum capacity | E5 idle job/WTP boundaries pass. Prior C1 completion and BF4 B HTTP bounds retain their identity limits. A RF WTP/HTTP maxima and complete maximum-job evidence applicability remain open. |
+| 2.2 Combined load and overload | C2 supported allocation failed. Intended overload and final-image resource applicability of prior TLS/slot/HTTP pressure remain open. |
+| 2.3 Timeouts and USB pressure | Distinct 30-second WTP inactivity, five-second input/output mechanisms, actual USB parser/unread-output pressure and required RF/recovery evidence remain unexecuted. |
+
+The complete 18-assertion matrix and source-impact assessment are in Pico's
+`docs/development/phase11-5-r3-v2-capacity-coordination.md`; results and checkpoint
+047 are committed with the replay helpers in Pico commit `9eb5acdf616cb01437f0791b1bae6ed604e266be`.
+Diagnostic firmware source is `4da36726ac6809bdf4e73d281fe13b2393dd3b31`.
+
+Final A: serial `0BF4B4AEC9FFB344`, device
+`fd6127d11d6aca42a9905fa3fb1bf1d5`, Pico 2 W/RP2350, PIO/DMA GP2,
+138 MHz/divider 1/RAM rendering; diagnostic UF2 SHA-256
+`0153107c517b673bfad7850957c8387a7dbfb12ddb0a3b1e90edb94b804b9a9f`,
+ELF `8855dd77cb0057ff8f33f91d02a3447cf39ca96cb2782b606c51f2e44e4f7353`,
+boot `0bd82f1324920c360d796988cf31cb5b`, job
+`9f0ae5cb9bf19c6366c53c33a75d86e0`, Missed/inactive/unowned. The diagnostic
+image is retained; scheduling is disabled and saved configuration unchanged.
+Final B remains Empty/inactive/unowned on source
+`8921a70081839f168edef5926e92445f251d8e1d`, boot
+`6684b4b197d80cfa0ce83b3aaf205cb0`; no B ARM or RF operation occurred.
+
+F3 was restored before fresh F4. Both cleanup records have zero failures and
+unchanged protected-file hashes; neither deadline was extended. F4 is restored,
+fixture units/namespace/subnet removed and temporary radios down. Permanent
+time.local, chrony, GPSD/PPS and Avahi checks passed. Host boot remains
+`220e53ca-ca95-4206-9581-dbe28aa1eeb8`; installed WsprryPi is still PID 1957,
+executable SHA-256
+`c19461bc6d2ebe7cae61798ad9acae8d43dfbec3ee57c288e4ef41e9c82b8273`.
+
+This bounded attempt used one diagnostic candidate, zero repair candidates,
+one A flash and BOOTSEL, zero extra reboots, one 90-second ARM charge, zero RF
+launches/completions, and zero configuration writes, commanded Wi-Fi cycles or
+heap probes. Earlier failures and counters are retained separately across boots.
+The attempt stopped early after the failed diagnostic, within its original
+four-hour budget. Another diagnostic work period requires user direction.
+
+Validation on Pico: both firmware targets built with the pinned dependencies;
+70/70 host CTests; WTP contract checks; 101 R3 v2 Python tests (85 passes,
+16 private-evidence skips). An isolated publication replay passed 61 tests with
+14 skips; selected E5 and R4 raw replays rejected ten and four altered evidence
+cases respectively. RF/resource equivalence of the diagnostic remains unproven.
+
+## Documentation impact for checkpoint 047
+
+Only this Pi companion report changed. No Pi runtime source, installed service,
+configuration, binary, operator flow or Wsprry_Pi_Docs content changed. Pi builds
+and runtime tests were not rerun for this documentation-only update. This report
+claims the recorded Pico/host evidence only; it does not qualify a Pi runtime.
+
+## Historical report before the bounded Group 2 closeout
+
+The following retains earlier status and counters. They are not current fixture
+or device admission authority; the checkpoint 047 summary above supersedes them.
+
 Current coordinating Pico source/evidence commit:
 `481da3c3ff171bae53d6c7d1d2e30525ae748f4b`.
 Prepared D0 packet/report commit: `c3782ccfe810889f2d8b6bc7e7b870c19d47e8f5`.
