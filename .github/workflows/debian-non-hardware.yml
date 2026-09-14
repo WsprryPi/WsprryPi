@@ -48,11 +48,18 @@ jobs:
       - name: Install UI development dependencies
         working-directory: WsprryPi-UI
         run: npm ci --ignore-scripts
+      - name: Read Pico reference revision
+        id: pico-reference
+        shell: bash
+        run: |
+          revision=$(cat src/tests/network/pico-reference-revision.txt)
+          [[ "$revision" =~ ^[0-9a-f]{40}$ ]]
+          echo "revision=$revision" >> "$GITHUB_OUTPUT"
       - name: Read-only pinned Pico reference
         uses: actions/checkout@v7
         with:
           repository: WsprryPi/WsprryPico
-          ref: d8cde03f8127b3c2aaf727f2c21c20960f658e84
+          ref: ${{ steps.pico-reference.outputs.revision }}
           path: src/build/network-reference/pico
           persist-credentials: false
       - name: Read-only pinned Pico TLS dependency

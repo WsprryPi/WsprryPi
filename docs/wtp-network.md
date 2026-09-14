@@ -195,8 +195,14 @@ requires a Pico restart; this interface does not request one. Disabling Pico
 Wi-Fi can disconnect control; restoring network access then requires its supported
 Console/restart workflow.
 
-The clean Pico implementation revision is pinned in `src/tests/network/CMakeLists.txt`
-and the network CI checkout. Pico defaults network control off and supports two
+The clean Pico implementation revision is pinned once in
+`src/tests/network/pico-reference-revision.txt`. Both the network CI checkout and
+`src/tests/network/CMakeLists.txt` read that full commit SHA. Update that file to
+advance the reference, publish the Pico commit before CI tries to fetch it, and
+run `wtp-network-interop-test` against a clean checkout of that revision. This
+host-only reference pin does not establish physical RF or resource qualification.
+
+Pico defaults network control off and supports two
 TLS sessions with one waiting TCP connection and one computing handshake.
 WsprryPi idle management still acquires the same host operation lock, obtains
 fresh unowned/inactive WTP status, disconnects the idle stream without RELEASE,
