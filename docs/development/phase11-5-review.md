@@ -1,6 +1,85 @@
 # Phase 11.5 target resource and contention review
 
-## Current bounded Group 2 outcome, 2026-09-14
+## Current diagnostic period 2 outcome, checkpoint 048, 2026-09-14
+
+**One new assertion closed: 2.1d, valid maximum WTP input during RF.** Group 2
+remains OPEN; none of sub-issues 2.1, 2.2 or 2.3 closes. Group 1 remains closed at
+043 and Group 3 was not started. Pico's independently audited C5 transferred all
+65552 frame bytes (65536-byte valid STATUS payload), received an owned Running
+response in 2.058418207 seconds and completed one 90-second Tone at 135500 Hz.
+The frozen-before-ARM auditor verifies raw protocol, cadence, launch/refill/tail
+accounting and final release; ten altered-evidence cases are rejected.
+
+**The allocation failure did not reproduce.** All 141 INFO samples report zero
+allocator failures; retained failure size, allocator entry, caller PC, input caller
+and core stay zero. No failed allocation could be symbolized. C2/C3 remain failed
+historical results on their earlier image/boot; C5 does not prove a repair or
+invalidate those observations. No allocator/parser repair, new firmware, flash,
+BOOTSEL, reboot, CONFIG save, commanded Wi-Fi cycle or heap probe occurred.
+One RF job and 90 seconds were charged, launched and completed. No replacement
+attempt was made. The four-hour period stopped after approximately 27 minutes of
+execution, audit and restoration; publication followed within the same budget.
+
+C4's missed launch has a supported mechanism: four pre-launch INFO samples show
+a 25.805 ms mapping refinement exceeding approximately 9.63 ms uncertainty.
+Production-guard host replay reproduces Missed with zero launch; the unchanged
+mapping control launches. The historical interrupt snapshot/branch was not
+captured, so that precise cause remains unproved. R5 safely returned the exact
+inactive C4 slot to Empty while preserving its terminal record. C5 admitted a
+recent accepted SNTP sample before ARM; clock policy and guards are unchanged.
+
+| Sub-issue | Current disposition |
+| --- | --- |
+| 2.1 Maximum capacity | 2.1b and now 2.1d PASS. E5 idle bounds remain accepted. WTP oversized rejection/recovery during RF, A HTTP bounds during RF and remaining maximum-job applicability remain open. |
+| 2.2 Combined load and overload | Final-workload supported allocation, intended overload and current-image applicability of TLS/slot/HTTP pressure remain open. C5's Tone and single USB input do not close the final combined-load requirement. |
+| 2.3 Timeouts and USB pressure | Distinct 30-second WTP inactivity, five-second input/output mechanisms and actual USB parser/unread-output pressure with required recovery remain open. |
+
+C5 is bound to A serial `0BF4B4AEC9FFB344`, device
+`fd6127d11d6aca42a9905fa3fb1bf1d5`, Pico 2 W/RP2350, PIO/DMA GP2,
+138 MHz/divider 1/RAM; source `4da36726ac6809bdf4e73d281fe13b2393dd3b31`,
+UF2 `0153107c517b673bfad7850957c8387a7dbfb12ddb0a3b1e90edb94b804b9a9f`,
+ELF `8855dd77cb0057ff8f33f91d02a3447cf39ca96cb2782b606c51f2e44e4f7353`,
+boot `0bd82f1324920c360d796988cf31cb5b`, job
+`0ec6f9c02e30398015c359eb3610497a`. Launch delay 8000 ns, worst refill-to-ready
+2088000 ns, worst service gap 2129000 ns and short-predecessor reserve 4164/4424
+words meet unchanged gates. Same-boot cumulative sampled allocator peak 140152
+of 220328 bytes leaves an 80176-byte aggregate reserve; this is not a largest
+allocatable block measurement or complete transient-peak guarantee.
+
+F5 was a fresh one-hour fixture, restored at host monotonic 350807833112278 ns,
+before its unchanged deadline 354040071090000 ns. Cleanup has zero failures;
+independent checks confirm original host networking/protected files and permanent
+time.local, chrony, GPSD/PPS and Avahi services. Installed WsprryPi remains PID
+1957, SHA-256 `c19461bc6d2ebe7cae61798ad9acae8d43dfbec3ee57c288e4ef41e9c82b8273`,
+host boot `220e53ca-ca95-4206-9581-dbe28aa1eeb8`. Temporary fixture units are
+inactive and temporary radios down. Final independent A/B inventories confirm
+Empty/inactive/unowned, scheduling disabled and saved configurations unchanged.
+B remains source `8921a70081839f168edef5926e92445f251d8e1d`, boot
+`6684b4b197d80cfa0ce83b3aaf205cb0`, with no B ARM/RF operation.
+
+Pico commit `1d75d376e13236f763f1d2682c88023fa9f2d701` records the complete current 18-assertion matrix,
+C5/R5 results, source-impact review and checkpoint 048. C5 raw archive SHA-256
+`28b20f6a1ef757f1bc9b32fd29283ebca182b26337ce3a206affea8d3b677963`.
+Affected validation passed: PIO/DMA host replay, 24 isolated-publication Python
+tests with zero skips, C5 raw audit/ten mutations, R5 raw audit/four missing-file
+mutations and WTP contract checks. The improved failure-capture path is
+host-tested; C5 exercised success only. Firmware source and build configuration
+were unchanged, so no firmware rebuild or E5 physical rerun was needed. No
+remaining actionable review finding exists in the scoped harness/evidence change.
+
+The smallest next decision is whether to authorize a bounded comparison of the
+C2/C3 and C5 heap/boot conditions before further failure reproduction, or address
+remaining acceptance assertions separately. No further physical action is admitted
+by this consumed period, and a parser repair still lacks a demonstrated defect.
+
+### Documentation impact for checkpoint 048
+
+Only this Pi development report changes. Pico harness/tests and development
+evidence are updated in its independent repository. Pi runtime, installed binary,
+operator behavior and Wsprry_Pi_Docs are unaffected; no Pi build/runtime tests or
+UI review is needed for this report-only change.
+
+## Historical bounded Group 2 outcome, checkpoint 047, 2026-09-14
 
 Group 2 remains **OPEN** at Pico checkpoint 047. Group 1 remains closed at its
 recorded checkpoint 043; Group 3 was not started. The sole diagnostic C4 reported
