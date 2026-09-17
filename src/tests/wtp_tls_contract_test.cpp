@@ -1,8 +1,13 @@
 // SPDX-License-Identifier: MIT
 #include "wtp_integration/tls.hpp"
 #include "wtp_settings_json.hpp"
+#include <algorithm>
+#include <chrono>
+#include <condition_variable>
 #include <iostream>
 #include <filesystem>
+#include <mutex>
+#include <thread>
 #include <sys/stat.h>
 using namespace wsprrypi;
 #define CHECK(x) do { if (!(x)) throw std::runtime_error(#x); } while (false)
@@ -72,6 +77,57 @@ int main(int argc, char **argv) {
     CHECK(canonical_network_identity("2001:0DB8::1") == "2001:db8::1");
     CHECK(!canonical_network_identity(std::string(64, 'a') + ".local"));
     CHECK(canonical_network_identity(std::string(63, 'a') + ".local"));
+
+    struct LookupState {
+      std::mutex mutex;
+      std::condition_variable changed;
+      unsigned active{}, calls{}, maximum_active{};
+      bool release_first{};
+      std::vector<std::string> hosts;
+    };
+    auto lookup_state = std::make_shared<LookupState>();
+    auto lookup = [lookup_state](const std::string &host, unsigned) {
+      std::unique_lock lock(lookup_state->mutex);
+      ++lookup_state->calls;
+      ++lookup_state->active;
+      lookup_state->maximum_active = std::max(lookup_state->maximum_active,
+                                               lookup_state->active);
+      lookup_state->hosts.push_back(host);
+      lookup_state->changed.notify_all();
+      if (lookup_state->calls == 1)
+        lookup_state->changed.wait(lock, [&] { return lookup_state->release_first; });
+      --lookup_state->active;
+      lookup_state->changed.notify_all();
+      return std::vector<std::string>{"127.0.0.1"};
+    };
+    auto first = system_tls_resolver_for_test(lookup);
+    auto replacement = system_tls_resolver_for_test(lookup);
+    CHECK(first->begin("first.local", 18444));
+    {
+      std::unique_lock lock(lookup_state->mutex);
+      CHECK(lookup_state->changed.wait_for(lock, std::chrono::seconds(1),
+                                           [&] { return lookup_state->calls == 1; }));
+    }
+    first->cancel();
+    CHECK(replacement->begin("replacement.local", 18444));
+    CHECK(!replacement->poll().has_value());
+    {
+      std::lock_guard lock(lookup_state->mutex);
+      lookup_state->release_first = true;
+      lookup_state->changed.notify_all();
+    }
+    std::optional<std::vector<std::string>> replacement_result;
+    for (unsigned attempt = 0; attempt < 1000 && !replacement_result; ++attempt) {
+      replacement_result = replacement->poll();
+      std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    }
+    CHECK(replacement_result == std::vector<std::string>{"127.0.0.1"});
+    {
+      std::lock_guard lock(lookup_state->mutex);
+      CHECK(lookup_state->calls == 2);
+      CHECK(lookup_state->maximum_active == 1);
+      CHECK((lookup_state->hosts == std::vector<std::string>{"first.local", "replacement.local"}));
+    }
 
     fake->result = std::vector<std::string>{};
     CHECK(stream.begin_open(selection, credentials)); stream.poll_open();

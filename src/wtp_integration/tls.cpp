@@ -32,45 +32,81 @@ struct Resolution {
   std::mutex mutex;
   std::optional<std::vector<std::string>> addresses;
 };
+std::vector<std::string> resolve_system(const std::string &host, unsigned port) {
+  std::vector<std::string> addresses;
+  addrinfo hints{}, *found = nullptr;
+  hints.ai_family = AF_UNSPEC;
+  hints.ai_socktype = SOCK_STREAM;
+  hints.ai_protocol = IPPROTO_TCP;
+  struct FreeAddresses {
+    addrinfo *&value;
+    ~FreeAddresses() { if (value) freeaddrinfo(value); }
+  } cleanup{found};
+  if (getaddrinfo(host.c_str(), std::to_string(port).c_str(), &hints, &found) == 0) {
+    for (auto p = found; p && addresses.size() < 8; p = p->ai_next) {
+      char address[NI_MAXHOST]{};
+      if (getnameinfo(p->ai_addr, p->ai_addrlen, address, sizeof(address),
+                      nullptr, 0, NI_NUMERICHOST) == 0 &&
+          std::find(addresses.begin(), addresses.end(), address) == addresses.end())
+        addresses.emplace_back(address);
+    }
+  }
+  return addresses;
+}
 class SystemResolver final : public TlsResolver {
+  struct Request { std::string host; unsigned port; };
   std::shared_ptr<Resolution> result_;
-public:
-  bool begin(const std::string &host, unsigned port) override {
-    cancel();
-    if (resolver_busy.exchange(true)) return false;
-    try {
-      result_ = std::make_shared<Resolution>();
-      std::thread([result = result_, host, port] {
-        std::vector<std::string> addresses;
-        try {
-        addrinfo hints{}, *found = nullptr;
-        hints.ai_family = AF_UNSPEC;
-        hints.ai_socktype = SOCK_STREAM;
-        hints.ai_protocol = IPPROTO_TCP;
-        struct FreeAddresses { addrinfo *&value; ~FreeAddresses() { if (value) freeaddrinfo(value); } } cleanup{found};
-        if (getaddrinfo(host.c_str(), std::to_string(port).c_str(), &hints, &found) == 0) {
-          for (auto p = found; p && addresses.size() < 8; p = p->ai_next) {
-            char address[NI_MAXHOST]{};
-            if (getnameinfo(p->ai_addr, p->ai_addrlen, address, sizeof(address),
-                            nullptr, 0, NI_NUMERICHOST) == 0 &&
-                std::find(addresses.begin(), addresses.end(), address) == addresses.end())
-              addresses.emplace_back(address);
-          }
+  std::optional<Request> pending_;
+  TlsResolverLookup lookup_;
 
-        }
-        } catch (...) { addresses.clear(); }
-        { std::lock_guard lock(result->mutex); result->addresses = std::move(addresses); }
-        resolver_busy = false;
+  bool start_pending() {
+    if (!pending_) return true;
+    bool expected = false;
+    if (!resolver_busy.compare_exchange_strong(expected, true)) return true;
+    try {
+      auto result = std::make_shared<Resolution>();
+      auto request = std::move(*pending_);
+      auto lookup = lookup_;
+      pending_.reset();
+      result_ = result;
+      std::thread([result = std::move(result), request = std::move(request),
+                   lookup = std::move(lookup)] {
+        struct Release {
+          ~Release() { resolver_busy.store(false); }
+        } release;
+        std::vector<std::string> addresses;
+        try { addresses = lookup(request.host, request.port); }
+        catch (...) { addresses.clear(); }
+        std::lock_guard lock(result->mutex);
+        result->addresses = std::move(addresses);
       }).detach();
-    } catch (...) { resolver_busy = false; result_.reset(); return false; }
+    } catch (...) {
+      resolver_busy.store(false);
+      result_.reset();
+      pending_.reset();
+      return false;
+    }
     return true;
   }
+public:
+  explicit SystemResolver(TlsResolverLookup lookup = resolve_system)
+      : lookup_(std::move(lookup)) {}
+  bool begin(const std::string &host, unsigned port) override {
+    cancel();
+    try { pending_ = Request{host, port}; }
+    catch (...) { return false; }
+    return start_pending();
+  }
   std::optional<std::vector<std::string>> poll() override {
+    if (pending_) {
+      if (!start_pending()) return std::vector<std::string>{};
+      if (pending_) return std::nullopt;
+    }
     if (!result_) return std::vector<std::string>{};
     std::lock_guard lock(result_->mutex);
     return result_->addresses;
   }
-  void cancel() noexcept override { result_.reset(); }
+  void cancel() noexcept override { pending_.reset(); result_.reset(); }
 };
 std::vector<unsigned char> read_credential(const std::string &path, bool key) {
   const int fd = ::open(path.c_str(), O_RDONLY | O_CLOEXEC | O_NOFOLLOW | O_NONBLOCK);
@@ -129,6 +165,9 @@ BIO_METHOD *socket_method() {
 }
 } // namespace
 std::unique_ptr<TlsResolver> system_tls_resolver() { return std::make_unique<SystemResolver>(); }
+std::unique_ptr<TlsResolver> system_tls_resolver_for_test(TlsResolverLookup lookup) {
+  return std::make_unique<SystemResolver>(std::move(lookup));
+}
 struct TlsCredentials::Impl {
   SSL_CTX *context{};
   std::array<unsigned char, 32> fingerprint{};
@@ -286,7 +325,7 @@ bool TlsStream::begin_open(const TlsSelection &s, std::shared_ptr<TlsCredentials
   p.selection = s; p.selection.host = *host; p.selection.expected_identity = *identity;
   p.credentials = std::move(credentials); p.alpn = std::move(alpn);
   p.deadline = p.clock() + resolve_timeout_ms;
-  if (!p.resolver->begin(p.selection.host, s.port)) { p.fail("Resolver unavailable; another lookup is outstanding"); return false; }
+  if (!p.resolver->begin(p.selection.host, s.port)) { p.fail("Resolver unavailable"); return false; }
   p.state("resolving"); return true;
 }
 void TlsStream::poll_open() {

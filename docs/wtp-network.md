@@ -153,10 +153,14 @@ responses expose only the administrator's file references.
 ## Bounds and output authority
 
 System resolution runs outside the WTP worker with one process-wide outstanding
-lookup. The caller stops waiting after 3 seconds or cancellation; an unresponsive
+lookup. If a cancelled lookup is still leaving that slot, its replacement waits
+for the same slot instead of failing immediately. The replacement's wait remains
+inside its existing 3-second resolution deadline. The caller stops waiting after
+3 seconds or cancellation; an unresponsive
 platform NSS call cannot be forcibly interrupted and may occupy that one slot
-until it returns. Further opens fail closed while it remains outstanding. This
-bounds worker shutdown and resource growth without claiming NSS itself is killed.
+until it returns. A queued replacement fails closed at its deadline if the slot
+does not become available. This bounds worker shutdown and resource growth
+without claiming NSS itself is killed.
 TCP connection attempts share a 3-second budget and at most eight resolved
 addresses; TLS handshake has 10 seconds. The TLS stream owns at most 4096 queued
 plaintext bytes with an 8-second write deadline. Session supplies bounded read/

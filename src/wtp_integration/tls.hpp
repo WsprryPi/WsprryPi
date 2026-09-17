@@ -20,7 +20,8 @@ struct TlsObservation {
   std::uint64_t observed_ms{};
 };
 // System resolution runs outside the calling worker with a process-wide bound
-// of one outstanding lookup. Cancelling destroys no resolver-owned memory.
+// of one outstanding lookup. A replacement waits for a cancelled lookup to
+// leave that slot; cancelling destroys no resolver-owned memory.
 class TlsResolver {
 public:
   virtual ~TlsResolver() = default;
@@ -29,6 +30,10 @@ public:
   virtual void cancel() noexcept = 0;
 };
 std::unique_ptr<TlsResolver> system_tls_resolver();
+// Deterministic host-test seam for the process-wide resolver serialization.
+// Production configuration cannot select or replace this lookup function.
+using TlsResolverLookup = std::function<std::vector<std::string>(const std::string &, unsigned)>;
+std::unique_ptr<TlsResolver> system_tls_resolver_for_test(TlsResolverLookup);
 
 // Opaque, validated immutable credential snapshot. No material is serialized.
 class TlsCredentials {
