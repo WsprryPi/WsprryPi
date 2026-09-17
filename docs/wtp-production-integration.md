@@ -82,11 +82,14 @@ explicitly bounded Tone request is supported by the runtime API; the existing
 continuous Test Tone workflow is rejected for WTP. No per-symbol transport control,
 local output fallback or implicit infinite repeat is used.
 
-New automatic jobs have at least eight seconds' preparation lead, increased to
-the negotiated minimum ARM lead plus seven seconds when needed. WSPR uses an
-eligible 120-second boundary plus one second. Scheduled non-WSPR work retains
-the configured repeat grid and advances whole intervals when necessary to leave
-enough preparation time. Once submitted, a request's RF timestamp is immutable;
+Production jobs dispatch before the requested RF start by a fixed 12-second
+preparation allowance, a one-second ARM-submission reserve and the Pico's
+negotiated minimum ARM lead. New automatic jobs add a further two-second
+submission margin. WSPR uses an eligible 120-second boundary plus one second.
+Scheduled non-WSPR work retains the configured repeat grid and advances whole
+intervals when necessary to leave enough preparation time. These intervals only
+bound CLAIM, complete-job LOAD, validation and ARM; the Pico executes all RF
+events locally after ARM. Once submitted, a request's RF timestamp is immutable;
 late or invalid admission fails instead of silently moving its start. A
 zero-frequency WSPR skip waits on the host and sends no remote job.
 

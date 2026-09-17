@@ -89,6 +89,12 @@ rejected, never shifted into another slot. Timing allowances are host policy,
 not measured USB latency guarantees. Slow operations may still miss the window
 and fail safely. The pinned fragmented-endpoint test uses an explicit 8,000 ms
 preparation allowance while retaining the 1,000 ms ARM reserve.
+The production `WtpApplication` uses a separate 12,000 ms preparation allowance
+and the same 1,000 ms ARM-submission reserve. This covers bounded complete-job
+upload and response processing before handoff while preserving the final device
+lead. It does not put RF event timing on the host: after ARM, the Pico executes
+the complete job locally. Preparation that consumes the production allowance
+still fails before ARM and never shifts or shortens the job.
 
 Waiting uses at most 10 ms increments and is bounded by the requested slot. The
 sole session owner refreshes STATUS every five seconds during this wait, keeping

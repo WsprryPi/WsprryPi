@@ -176,6 +176,58 @@ void jobs() {
   CHECK(last_load["mode"] == "wspr" && last_load["events"].size() == 162);
   CHECK(last_load["events"][0]["frequency_nhz"] != "14097100000000000");
 }
+void bounded_large_load_preparation() {
+  {
+    Fixture f;
+    bool status_delayed = false;
+    f.clock.peer.before_handle = [&](Operation op) {
+      if (op == Operation::Status && !status_delayed) {
+        status_delayed = true;
+        f.clock.peer.advance(f.clock.peer.now + 1500);
+      }
+      if (op == Operation::Claim)
+        f.clock.peer.advance(f.clock.peer.now + 1500);
+      if (op == Operation::Load)
+        f.clock.peer.advance(f.clock.peer.now + 3500);
+      if (op == Operation::GetClock)
+        f.clock.peer.advance(f.clock.peer.now + 1500);
+    };
+    f.app.prepare(f.tone());
+    f.app.start();
+    const auto result = f.finish();
+    CHECK(result.outcome == WtpScheduleOutcome::Complete);
+    CHECK(result.start_utc_ns - result.dispatch_utc_ns == 13001000000ULL);
+    CHECK(std::count(f.clock.peer.operations.begin(),
+                     f.clock.peer.operations.end(), Operation::Arm) == 1);
+    CHECK(f.clock.peer.executions == 1);
+  }
+  {
+    Fixture f;
+    bool status_delayed = false;
+    f.clock.peer.before_handle = [&](Operation op) {
+      if (op == Operation::Status && !status_delayed) {
+        status_delayed = true;
+        f.clock.peer.advance(f.clock.peer.now + 3500);
+      }
+      if (op == Operation::Claim)
+        f.clock.peer.advance(f.clock.peer.now + 3500);
+      if (op == Operation::Load)
+        f.clock.peer.advance(f.clock.peer.now + 3500);
+      if (op == Operation::GetClock)
+        f.clock.peer.advance(f.clock.peer.now + 3500);
+    };
+    f.app.prepare(f.tone());
+    f.app.start();
+    const auto result = f.finish();
+    CHECK(result.outcome == WtpScheduleOutcome::Failed);
+    CHECK(result.execution.cleanup.ok);
+    CHECK(!result.arm_handed_off);
+    CHECK(std::count(f.clock.peer.operations.begin(),
+                     f.clock.peer.operations.end(), Operation::Arm) == 0);
+    CHECK(f.clock.peer.executions == 0);
+    CHECK(f.app.ready() && !f.clock.peer.owner && !f.clock.peer.job);
+  }
+}
 void recovery() {
   Fixture f;
   f.clock.peer.lose_reply = Operation::Arm;
@@ -203,6 +255,7 @@ int main() {
     idle_observation();
     idle_cadence_with_reply_delay();
     jobs();
+    bounded_large_load_preparation();
     recovery();
     std::cout << checks << " WTP application checks passed\n";
   } catch (const std::exception &e) {

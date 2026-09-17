@@ -37,7 +37,7 @@ std::string state_name(State state) {
   return names.at(static_cast<std::size_t>(state));
 }
 const std::string caps_body =
-    R"({"profiles":["rf-events/1"],"modes":["tone","wspr"],"engine":"scripted-test","frequency_ranges":[{"minimum_nhz":"1","maximum_nhz":"30000000000000000"}],"max_payload_bytes":65536,"max_events":162,"max_job_duration_ns":"110592000000","minimum_arm_lead_ns":"1000000","maximum_arm_ahead_ns":"10000000000","maximum_arm_uncertainty_ns":"1000000","maximum_holdover_age_ns":"1000000000","output_disable_timeout_ns":"1000000","minimum_lease_ms":5000,"maximum_lease_ms":60000,"response_cache_entries":8,"response_cache_ttl_seconds":300,"terminal_record_entries":8,"terminal_record_ttl_seconds":3600})";
+    R"({"profiles":["rf-events/1"],"modes":["tone","wspr"],"engine":"scripted-test","frequency_ranges":[{"minimum_nhz":"1","maximum_nhz":"30000000000000000"}],"max_payload_bytes":65536,"max_events":162,"max_job_duration_ns":"110592000000","minimum_arm_lead_ns":"1000000","maximum_arm_ahead_ns":"30000000000","maximum_arm_uncertainty_ns":"1000000","maximum_holdover_age_ns":"1000000000","output_disable_timeout_ns":"1000000","minimum_lease_ms":5000,"maximum_lease_ms":60000,"response_cache_entries":8,"response_cache_ttl_seconds":300,"terminal_record_entries":8,"terminal_record_ttl_seconds":3600})";
 
 // Independent small server model. It uses the wire codec to receive frames,
 // but implements test lifecycle/cache effects and response expectations here.

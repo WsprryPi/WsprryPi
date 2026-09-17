@@ -8,6 +8,12 @@
 #endif
 
 namespace wsprrypi {
+namespace {
+constexpr WtpSchedulePolicy production_schedule_policy{12000, 1000, 100,
+                                                       86400000};
+constexpr std::uint64_t automatic_schedule_margin_ns = 2000000000ULL;
+} // namespace
+
 std::string wtp_random_identity() {
   std::random_device random;
   static constexpr char hex[] = "0123456789abcdef";
@@ -100,11 +106,19 @@ bool WtpApplication::observe_idle_if_due() {
 std::uint64_t WtpApplication::preparation_lead_ns() const {
   const auto s = scheduler_.status();
   if (!s.capabilities ||
-      s.capabilities->minimum_arm_lead_ns > 86400000000000ULL - 8000000000ULL)
+      s.capabilities->minimum_arm_lead_ns >
+          86400000000000ULL -
+              (production_schedule_policy.preparation_ms +
+               production_schedule_policy.arm_submission_ms) *
+                  1000000ULL -
+              automatic_schedule_margin_ns)
     throw std::runtime_error(
         "Pico preparation lead is unavailable or exceeds one day");
-  return std::max<std::uint64_t>(
-      8000000000ULL, s.capabilities->minimum_arm_lead_ns + 7000000000ULL);
+  return s.capabilities->minimum_arm_lead_ns +
+         (production_schedule_policy.preparation_ms +
+          production_schedule_policy.arm_submission_ms) *
+             1000000ULL +
+         automatic_schedule_margin_ns;
 }
 void WtpApplication::prepare(TransmissionRequest request) {
   std::lock_guard lock(control_);
@@ -161,7 +175,8 @@ void WtpApplication::prepare(TransmissionRequest request) {
   }
   mode_ = request.mode;
   if (!scheduler_.submit(std::move(request), job_prefix_ + suffix,
-                         settings_.start_uncertainty_ns))
+                         settings_.start_uncertainty_ns,
+                         production_schedule_policy))
     throw std::runtime_error(scheduler_.diagnostic());
 }
 void WtpApplication::prepare_skip() {
