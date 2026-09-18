@@ -171,26 +171,34 @@ void compiler_plans() {
   r.mode = TransmissionMode::QRSS;
   r.payload = QrssPayload{"A", 137500, timing, {}};
   auto qrss = convert(compiler.compile(r));
-  CHECK(qrss.job.mode == wtp::Mode::Qrss && qrss.job.events.size() == 3);
-  CHECK(qrss.job.total_duration_ns == 5'000'000'000ULL);
+  CHECK(qrss.job.mode == wtp::Mode::Qrss && qrss.job.events.size() == 4);
+  CHECK(qrss.job.total_duration_ns == 5'000'001'000ULL);
   CHECK(qrss.job.events[0].frequency_nhz == 137'500'000'000'000ULL);
   CHECK(!qrss.job.events[1].rf_on && !qrss.job.events[1].frequency_nhz);
   CHECK(qrss.job.events[2].offset_ns == 2'000'000'000ULL &&
         qrss.job.events[2].duration_ns == 3'000'000'000ULL);
+  CHECK(qrss.job.events[3].offset_ns == 5'000'000'000ULL &&
+        qrss.job.events[3].duration_ns == 1'000 &&
+        !qrss.job.events[3].rf_on && !qrss.job.events[3].frequency_nhz);
   r.mode = TransmissionMode::FSKCW;
   r.payload = FskcwPayload{"A", 137501, 137500, timing, {}};
   auto fskcw = convert(compiler.compile(r));
-  CHECK(fskcw.job.mode == wtp::Mode::Fskcw && fskcw.job.events.size() == 3);
+  CHECK(fskcw.job.mode == wtp::Mode::Fskcw && fskcw.job.events.size() == 4);
   CHECK(fskcw.job.events[0].frequency_nhz == 137'501'000'000'000ULL);
   CHECK(fskcw.job.events[1].rf_on &&
         fskcw.job.events[1].frequency_nhz == 137'500'000'000'000ULL);
+  CHECK(fskcw.job.total_duration_ns == 5'000'001'000ULL &&
+        !fskcw.job.events.back().rf_on &&
+        fskcw.job.events.back().duration_ns == 1'000);
   r.mode = TransmissionMode::DFCW;
   r.payload = DfcwPayload{"A", 137500, 137501, timing, {}};
   auto dfcw = convert(compiler.compile(r));
   CHECK(dfcw.job.mode == wtp::Mode::Dfcw &&
-        dfcw.job.total_duration_ns == 3'000'000'000ULL);
+        dfcw.job.total_duration_ns == 3'000'001'000ULL);
   CHECK(!dfcw.job.events[1].frequency_nhz && !dfcw.job.events[1].rf_on);
   CHECK(dfcw.job.events[2].frequency_nhz == 137'501'000'000'000ULL);
+  CHECK(dfcw.job.events.size() == 4 && !dfcw.job.events.back().rf_on &&
+        dfcw.job.events.back().duration_ns == 1'000);
   r.mode = TransmissionMode::TONE;
   r.payload = TonePayload{137500, 1s, {}};
   auto tone = convert(compiler.compile(r));

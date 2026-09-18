@@ -82,6 +82,21 @@ explicitly bounded Tone request is supported by the runtime API; the existing
 continuous Test Tone workflow is rejected for WTP. No per-symbol transport control,
 local output fallback or implicit infinite repeat is used.
 
+For a finite operator-invoked QRSS, FSKCW or DFCW startup request, `-i` may be
+combined with the complete legacy explicit request only when that INI selects
+the WTP backend. The INI supplies the authenticated endpoint and ordinary
+policy; the explicit message, frequency or frequencies, and dot duration bind
+one transient request. Other physical backends continue to reject this mixture,
+and partial requests remain invalid. This path does not persist the transient
+content or change the configured DFCW convention: explicit DFCW dot and dash
+frequencies are used exactly as supplied.
+
+For QRSS, FSKCW and DFCW, the WTP conversion appends the protocol's explicit
+1 microsecond RF-off message tail when the native execution plan ends on an
+RF-on element. The added tail participates in event-count and total-duration
+validation. This matches Pico `LOAD_MESSAGE` compilation without changing the
+native GPIO, RP1 or Si5351 execution plans.
+
 Production jobs dispatch before the requested RF start by a fixed 12-second
 preparation allowance, a one-second ARM-submission reserve and the Pico's
 negotiated minimum ARM lead. New automatic jobs add a further two-second

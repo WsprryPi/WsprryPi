@@ -3766,7 +3766,9 @@ bool parse_command_line(int argc, char *argv[])
         !qrss_dot_seconds_arg.empty();
     if (any_qrss_arg)
     {
-        if (config.use_ini)
+        // A managed WTP run may take its authenticated transport identity
+        // from the INI while binding one explicit finite startup request.
+        if (config.use_ini && config.transmit_backend != TransmitBackendKind::WTP)
         {
             print_usage("QRSS test mode is invalid when using INI file.", EXIT_FAILURE);
         }
@@ -3806,7 +3808,7 @@ bool parse_command_line(int argc, char *argv[])
         !fskcw_dot_seconds_arg.empty();
     if (any_fskcw_arg)
     {
-        if (config.use_ini)
+        if (config.use_ini && config.transmit_backend != TransmitBackendKind::WTP)
         {
             print_usage("FSKCW test mode is invalid when using INI file.", EXIT_FAILURE);
         }
@@ -3857,7 +3859,7 @@ bool parse_command_line(int argc, char *argv[])
     }
     if (any_dfcw_arg)
     {
-        if (config.use_ini)
+        if (config.use_ini && config.transmit_backend != TransmitBackendKind::WTP)
         {
             print_usage("DFCW test mode is invalid when using INI file.", EXIT_FAILURE);
         }

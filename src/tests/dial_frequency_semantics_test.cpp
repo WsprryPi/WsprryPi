@@ -693,6 +693,58 @@ void test_idle_startup_overrides()
 
 int main(int argc, char *argv[])
 {
+    if (argc == 2 && std::string(argv[1]) == "--wtp-transient-ini-only")
+    {
+        ScopedTemporaryFile ini("/tmp/wsprrypi-wtp-transient-XXXXXX");
+        auto data = make_managed_ini_data(
+            "AA0NT", "EM18", "20m", true, WsprPlannerPreference::Auto, "Follow");
+        data["Operation"]["Transmit Backend"] = "wtp";
+        data["Operation"]["Use LED"] = "false";
+        data["Operation"]["Use Amp"] = "false";
+        data["Operation"]["Use Shutdown"] = "false";
+        data["Experimental"] = {
+            {"Allow Unqualified Frequency", "true"},
+            {"Allow Non-Amateur Frequency", "true"}};
+        data["WTP"] = {
+            {"Transport", "network"},
+            {"Hostname", "wsprrypico-0a60df.local"},
+            {"TCP Port", "18443"},
+            {"TLS Server Identity", "wsprrypico-0a60df.local"},
+            {"TLS CA File", "/tmp/ca.crt"},
+            {"TLS Client Certificate", "/tmp/client.crt"},
+            {"TLS Client Key", "/tmp/client.key"},
+            {"Endpoint", ""},
+            {"USB Serial", ""},
+            {"USB Vendor ID", "0"},
+            {"USB Product ID", "0"},
+            {"Device ID", "fd6127d11d6aca42a9905fa3fb1bf1d5"},
+            {"Allow Frequency Adjustment", "true"},
+            {"Start Uncertainty ns", "500000000"}};
+        write_managed_ini_file(ini.path(), data);
+        reset_getopt_state();
+        std::vector<std::string> args = {
+            "wsprrypi", "-i", ini.path(),
+            "--dfcw-message", "ET E",
+            "--dfcw-dot-frequency", "137505",
+            "--dfcw-dash-frequency", "137500",
+            "--dfcw-dot-seconds", "3"};
+        std::vector<char *> parsed_argv = argv_for(args);
+        require(
+            parse_command_line(static_cast<int>(parsed_argv.size()), parsed_argv.data()),
+            "managed WTP INI plus complete transient DFCW request must parse");
+        std::string message;
+        double dot_hz = 0.0;
+        double dash_hz = 0.0;
+        double dot_seconds = 0.0;
+        require(
+            config.use_ini && config.transmit_backend == TransmitBackendKind::WTP &&
+                try_get_dfcw_startup_request(message, dot_hz, dash_hz, dot_seconds) &&
+                message == "ET E" && nearly_equal(dot_hz, 137505.0) &&
+                nearly_equal(dash_hz, 137500.0) && nearly_equal(dot_seconds, 3.0),
+            "managed WTP transient DFCW must preserve explicit reverse-profile frequencies");
+        std::cout << "Managed WTP transient INI parsing passed" << std::endl;
+        return EXIT_SUCCESS;
+    }
     if (argc == 2 && std::string(argv[1]) == "--calibration-roundtrip-only")
     {
         init_config_json();
@@ -7058,6 +7110,56 @@ int main(int argc, char *argv[])
         require(
             config.dfcw.message == "CQ DX",
             "DFCW CLI parsing must trim CW message edges and preserve internal spaces");
+    }
+
+    {
+        ScopedTemporaryFile ini("/tmp/wsprrypi-wtp-transient-XXXXXX");
+        auto data = make_managed_ini_data(
+            "AA0NT", "EM18", "20m", true, WsprPlannerPreference::Auto, "Follow");
+        data["Operation"]["Transmit Backend"] = "wtp";
+        data["Operation"]["Use LED"] = "false";
+        data["Operation"]["Use Amp"] = "false";
+        data["Operation"]["Use Shutdown"] = "false";
+        data["Experimental"] = {
+            {"Allow Unqualified Frequency", "true"},
+            {"Allow Non-Amateur Frequency", "true"}};
+        data["WTP"] = {
+            {"Transport", "network"},
+            {"Hostname", "wsprrypico-0a60df.local"},
+            {"TCP Port", "18443"},
+            {"TLS Server Identity", "wsprrypico-0a60df.local"},
+            {"TLS CA File", "/tmp/ca.crt"},
+            {"TLS Client Certificate", "/tmp/client.crt"},
+            {"TLS Client Key", "/tmp/client.key"},
+            {"Endpoint", ""},
+            {"USB Serial", ""},
+            {"USB Vendor ID", "0"},
+            {"USB Product ID", "0"},
+            {"Device ID", "fd6127d11d6aca42a9905fa3fb1bf1d5"},
+            {"Allow Frequency Adjustment", "true"},
+            {"Start Uncertainty ns", "500000000"}};
+        write_managed_ini_file(ini.path(), data);
+        reset_getopt_state();
+        std::vector<std::string> args = {
+            "wsprrypi", "-i", ini.path(),
+            "--dfcw-message", "ET E",
+            "--dfcw-dot-frequency", "137505",
+            "--dfcw-dash-frequency", "137500",
+            "--dfcw-dot-seconds", "3"};
+        std::vector<char *> argv = argv_for(args);
+        require(
+            parse_command_line(static_cast<int>(argv.size()), argv.data()),
+            "managed WTP INI plus complete transient DFCW request must parse");
+        std::string message;
+        double dot_hz = 0.0;
+        double dash_hz = 0.0;
+        double dot_seconds = 0.0;
+        require(
+            config.use_ini && config.transmit_backend == TransmitBackendKind::WTP &&
+                try_get_dfcw_startup_request(message, dot_hz, dash_hz, dot_seconds) &&
+                message == "ET E" && nearly_equal(dot_hz, 137505.0) &&
+                nearly_equal(dash_hz, 137500.0) && nearly_equal(dot_seconds, 3.0),
+            "managed WTP transient DFCW must preserve explicit reverse-profile frequencies");
     }
 
     {

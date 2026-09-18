@@ -11,6 +11,7 @@ namespace wsprrypi {
 namespace {
 constexpr std::uint64_t maximum = std::numeric_limits<std::uint64_t>::max();
 constexpr std::uint64_t maximum_duration = 86'400'000'000'000ULL;
+constexpr std::uint64_t message_tail_ns = 1'000;
 
 bool valid_id(const std::string &id) {
   return id.size() == 32 && std::all_of(id.begin(), id.end(), [](char c) {
@@ -133,12 +134,22 @@ WtpPlanResult prepare_wtp_plan(const ExecutionPlan &plan,
     return fail(
         WtpPlanError::Timeline,
         "Plan summary must describe a nonempty positive-duration timeline");
-  if (plan.events.size() > static_cast<std::size_t>(caps.max_events))
+  const bool keyed_message =
+      plan.mode == TransmissionMode::QRSS ||
+      plan.mode == TransmissionMode::FSKCW ||
+      plan.mode == TransmissionMode::DFCW;
+  const bool needs_message_tail = keyed_message && plan.events.back().rf_on;
+  const std::size_t wire_event_count =
+      plan.events.size() + (needs_message_tail ? 1U : 0U);
+  if (wire_event_count > static_cast<std::size_t>(caps.max_events))
     return fail(WtpPlanError::EventLimit,
-                "Plan has " + std::to_string(plan.events.size()) + " events; device limit is " +
+                "WTP job has " + std::to_string(wire_event_count) + " events; device limit is " +
                 std::to_string(caps.max_events) + ". Reduce repetition or message complexity");
-  const auto total =
+  const auto source_total =
       static_cast<std::uint64_t>(plan.summary.total_duration.count());
+  if (needs_message_tail && source_total > maximum - message_tail_ns)
+    return fail(WtpPlanError::Timeline, "WTP message tail overflows job duration");
+  const auto total = source_total + (needs_message_tail ? message_tail_ns : 0U);
   if (total > caps.max_job_duration_ns)
     return fail(WtpPlanError::DurationLimit,
                 "Plan duration is " + std::to_string(total) + " ns; device limit is " +
@@ -157,7 +168,7 @@ WtpPlanResult prepare_wtp_plan(const ExecutionPlan &plan,
        {},
        plan.policy.allow_quantization},
       {options.job_id, options.start_utc_ns, options.max_start_uncertainty_ns}};
-  prepared.job.events.reserve(plan.events.size());
+  prepared.job.events.reserve(wire_event_count);
   std::uint64_t end{};
   for (std::size_t i = 0; i < plan.events.size(); ++i) {
     const auto &source = plan.events[i];
@@ -194,6 +205,11 @@ WtpPlanResult prepare_wtp_plan(const ExecutionPlan &plan,
     }
     prepared.job.events.push_back(event);
     end += event.duration_ns;
+  }
+  if (needs_message_tail) {
+    prepared.job.events.push_back(
+        wtp::RfEvent{end, message_tail_ns, false, {}});
+    end += message_tail_ns;
   }
   if (end != total)
     return fail(WtpPlanError::Timeline,
