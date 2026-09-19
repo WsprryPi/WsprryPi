@@ -2197,7 +2197,7 @@ static bool is_auto_paired_upgrade_eligible(const ArgParserConfig &cfg) noexcept
 
 void consume_tx_iteration_if_needed()
 {
-    if (config.use_ini || config.loop_tx)
+    if (config.loop_tx)
     {
         return;
     }

@@ -82,6 +82,14 @@ explicitly bounded Tone request is supported by the runtime API; the existing
 continuous Test Tone workflow is rejected for WTP. No per-symbol transport control,
 local output fallback or implicit infinite repeat is used.
 
+Managed INI WSPR can be bounded without converting the request to the direct
+CLI path. With `Meta.Loop TX = false`, a positive `Meta.TX Iterations` value
+counts complete WSPR dial-frequency-list iterations and requests an orderly
+process shutdown after the final frame (or after the complete paired plan when
+one iteration expands to two frames). `TX Iterations = 0` retains the existing
+unlimited managed scheduling behavior, and `Loop TX = true` continues to
+override the counter. These fields do not bound scheduled non-WSPR operation.
+
 For a finite operator-invoked QRSS, FSKCW or DFCW startup request, `-i` may be
 combined with the complete legacy explicit request only when that INI selects
 the WTP backend. The INI supplies the authenticated endpoint and ordinary

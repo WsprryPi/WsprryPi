@@ -8,6 +8,7 @@
 #include "gpio_band_policy.hpp"
 #include "gpio_output.hpp"
 #include "scheduling.hpp"
+#include "scheduling_internal.hpp"
 #include "scheduling_rp1_test_support.hpp"
 #include "system_clock_frequency_estimate.hpp"
 #include "ppm_manager.hpp"
@@ -8610,6 +8611,57 @@ int main(int argc, char *argv[])
                 network.source_signature != mixed.source_signature &&
                 mixed.source_signature != reselected.source_signature,
             "fake chrony reports must distinguish network, local-reference, mixed composition, and selected-source changes");
+    }
+
+    {
+        init_default_config();
+        config.use_ini = true;
+        config.loop_tx = false;
+        config.tx_iterations.store(1, std::memory_order_release);
+        shutdown_after_current_transmission.store(false, std::memory_order_release);
+        shutdown_after_wspr_plan.store(false, std::memory_order_release);
+        reset_active_wspr_plan_state();
+
+        consume_tx_iteration_if_needed();
+
+        require(
+            config.tx_iterations.load(std::memory_order_acquire) == 0 &&
+                shutdown_after_current_transmission.load(std::memory_order_acquire) &&
+                !shutdown_after_wspr_plan.load(std::memory_order_acquire),
+            "a finite managed-INI WSPR run must request shutdown after its final frame");
+
+        shutdown_after_current_transmission.store(false, std::memory_order_release);
+        config.tx_iterations.store(0, std::memory_order_release);
+        consume_tx_iteration_if_needed();
+        require(
+            config.tx_iterations.load(std::memory_order_acquire) == 0 &&
+                !shutdown_after_current_transmission.load(std::memory_order_acquire) &&
+                !shutdown_after_wspr_plan.load(std::memory_order_acquire),
+            "managed-INI TX Iterations=0 must retain unlimited scheduling semantics");
+
+        config.loop_tx = true;
+        config.tx_iterations.store(1, std::memory_order_release);
+        consume_tx_iteration_if_needed();
+        require(
+            config.tx_iterations.load(std::memory_order_acquire) == 1 &&
+                !shutdown_after_current_transmission.load(std::memory_order_acquire) &&
+                !shutdown_after_wspr_plan.load(std::memory_order_acquire),
+            "managed-INI Loop TX must override a finite iteration value");
+
+        config.loop_tx = false;
+        config.tx_iterations.store(1, std::memory_order_release);
+        active_wspr_plan_in_progress = true;
+        active_wspr_frame_index = 0;
+        active_wspr_plan.frames.resize(2);
+        consume_tx_iteration_if_needed();
+        require(
+            config.tx_iterations.load(std::memory_order_acquire) == 0 &&
+                !shutdown_after_current_transmission.load(std::memory_order_acquire) &&
+                shutdown_after_wspr_plan.load(std::memory_order_acquire),
+            "a finite managed-INI paired WSPR run must defer shutdown until the complete plan finishes");
+
+        shutdown_after_wspr_plan.store(false, std::memory_order_release);
+        reset_active_wspr_plan_state();
     }
 
     std::cout << "dial_frequency_semantics_test passed" << std::endl;
