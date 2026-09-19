@@ -402,7 +402,12 @@ void WtpTransmitBackend::stop() noexcept { stopped_ = true; }
 CleanupResult WtpTransmitBackend::clean() {
   const auto end =
       deadline(); // One budget across observation, ABORT and RELEASE.
-  if (!fresh(end, false))
+  // execute() returns a successful result only after a fresh STATUS/event
+  // reduction has established terminal_safe().  While this session still owns
+  // that terminal job no other principal can mutate it, so repeating STATUS
+  // here adds latency without strengthening the proof.  All other cleanup
+  // entries still obtain a fresh observation before deciding whether to abort.
+  if (!terminal_safe() && !fresh(end, false))
     return {false, error_};
   if (loaded_ && !terminal_safe()) {
     if (!prepared_ || !session_.owns() || !session_.status()->job_id ||

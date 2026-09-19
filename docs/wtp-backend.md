@@ -52,7 +52,10 @@ and inspection of its result are required before destruction.
 6. Inspect the execution and cleanup results. The shared controller always calls
    cleanup. A direct backend caller must call it on configuration failure,
    execution failure, success or abandonment of a loaded plan. Cleanup uses fresh
-   STATUS, only this client's tracked ABORT, and owned inactive RELEASE.
+   STATUS, only this client's tracked ABORT, and owned inactive RELEASE. When
+   `execute` has just established the exact authoritative terminal/inactive state,
+   cleanup reuses that proof and proceeds to RELEASE; it still requires the fresh
+   post-RELEASE STATUS. Every other cleanup entry obtains fresh STATUS first.
    Repeated cleanup rechecks current state and cannot clear a latched fault.
 
 After an acknowledged RELEASE, the follow-up STATUS may already show an

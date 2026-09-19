@@ -95,6 +95,19 @@ void complete_and_repeat() {
   CHECK(f.peer.executions == 2 && f.peer.prepares == 2 &&
         f.count(Operation::Arm) == 2);
 }
+void completed_execution_reuses_fresh_terminal_proof_for_cleanup() {
+  Fixture f;
+  f.prepare();
+  const auto plan = *f.controller.prepared_plan();
+  const auto execution = f.backend.execute(plan);
+  CHECK(execution.ok && !execution.stopped && !execution.faulted);
+  const auto statuses = f.count(Operation::Status);
+  const auto cleanup = f.backend.cleanup();
+  CHECK(cleanup.ok && f.count(Operation::Release) == 1);
+  // RELEASE itself requires one fresh post-release STATUS.  Cleanup must not
+  // insert a second pre-release STATUS after execute() just proved terminal.
+  CHECK(f.count(Operation::Status) == statuses + 1);
+}
 void hour_job_completion_and_abort() {
   for (unsigned scenario : {0U, 1U, 2U}) {
     Fixture f(true);
@@ -546,6 +559,7 @@ void bounded_waits() {
 int main() {
   try {
     complete_and_repeat();
+    completed_execution_reuses_fresh_terminal_proof_for_cleanup();
     hour_job_completion_and_abort();
     rejection_before_mutation();
     foreign_and_fault();
