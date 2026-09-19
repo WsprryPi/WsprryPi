@@ -56,7 +56,15 @@ void lifecycle() {
   CHECK(f.scheduler.status().phase == WtpSchedulePhase::Waiting &&
         !f.scheduler.status().job && !f.scheduler.status().last_report);
   bool loaded = false, armed = false, running = false, unknown = false;
+  auto last_peer_state = f.peer.state;
+  std::uint64_t event_id = 0;
   f.clock.tick = [&] {
+    if (f.peer.state != last_peer_state) {
+      last_peer_state = f.peer.state;
+      if (last_peer_state == State::Running ||
+          last_peer_state == State::Complete)
+        f.peer.advisory(++event_id);
+    }
     auto s = f.scheduler.status();
     CHECK(s.observed_ms <= f.clock.now_ms());
     if (s.status_observed_ms)

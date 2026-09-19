@@ -108,6 +108,40 @@ void completed_execution_reuses_fresh_terminal_proof_for_cleanup() {
   // insert a second pre-release STATUS after execute() just proved terminal.
   CHECK(f.count(Operation::Status) == statuses + 1);
 }
+void execution_avoids_continuous_status_transactions() {
+  Fixture f;
+  f.prepare();
+  const auto before = f.count(Operation::Status);
+  const auto execution = f.backend.execute(*f.controller.prepared_plan());
+  CHECK(execution.ok && !execution.stopped && !execution.faulted);
+  // This peer intentionally emits no JOB_STATE events, so one post-completion
+  // fallback STATUS is required.  Monitoring must not create a STATUS request
+  // every 10 ms while the job is otherwise unchanged.
+  CHECK(f.count(Operation::Status) <= before + 3);
+  CHECK(f.backend.cleanup().ok);
+}
+void execution_uses_advisory_terminal_handoff() {
+  Fixture f;
+  f.prepare();
+  auto last = f.peer.state;
+  std::uint64_t event_id = 0;
+  f.clock.tick = [&] {
+    if (f.peer.state != last) {
+      last = f.peer.state;
+      if (last == State::Running || last == State::Complete)
+        f.peer.advisory(++event_id);
+    }
+  };
+  const auto before = f.count(Operation::Status);
+  const auto execution = f.backend.execute(*f.controller.prepared_plan());
+  CHECK(execution.ok && !execution.stopped && !execution.faulted);
+  CHECK(f.peer.state == State::Complete);
+  // ARM reconciliation plus Running and Complete advisories each require one
+  // authoritative STATUS. No polling STATUS may already be in flight across
+  // either event.
+  CHECK(f.count(Operation::Status) == before + 3);
+  CHECK(f.backend.cleanup().ok);
+}
 void hour_job_completion_and_abort() {
   for (unsigned scenario : {0U, 1U, 2U}) {
     Fixture f(true);
@@ -560,6 +594,8 @@ int main() {
   try {
     complete_and_repeat();
     completed_execution_reuses_fresh_terminal_proof_for_cleanup();
+    execution_avoids_continuous_status_transactions();
+    execution_uses_advisory_terminal_handoff();
     hour_job_completion_and_abort();
     rejection_before_mutation();
     foreign_and_fault();

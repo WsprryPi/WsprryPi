@@ -46,9 +46,15 @@ and inspection of its result are required before destruction.
 5. Call `execute` / `execute_prepared` **early**, while sufficient ARM lead time
    remains. It verifies the immutable RF job and plan/request identity, renews
    the acknowledged lease if needed, observes GET_CLOCK and submits ARM once.
-   RP2350 owns all RF boundaries. The backend observes STATUS and renews the
-   lease while waiting; it issues no per-symbol commands or inferred symbol
-   progress. ARM acknowledgment alone is never reported as execution success.
+   RP2350 owns all RF boundaries. The backend consumes advisory JOB_STATE events
+   and renews the lease while waiting; it issues no per-symbol commands or
+   inferred symbol progress. A JOB_STATE invalidates the earlier snapshot, and
+   Session obtains one authoritative STATUS before accepting the new state. If
+   the terminal event is absent, a bounded STATUS fallback begins one second
+   after the expected job end. Long executions also receive a paced STATUS
+   every five seconds, except during the final full transaction allowance
+   before expected completion. ARM acknowledgment alone is never reported as
+   execution success.
 6. Inspect the execution and cleanup results. The shared controller always calls
    cleanup. A direct backend caller must call it on configuration failure,
    execution failure, success or abandonment of a loaded plan. Cleanup uses fresh
@@ -86,6 +92,12 @@ Session validates the returned ARM clock and exact UTC-to-monotonic mapping.
 A rejection or uncertainty never causes late execution, reload or rearm.
 
 The backend advances I/O in bounded turns separated by waits of at most 10 ms.
+It does not keep a STATUS transaction continuously in flight during execution:
+such a request could straddle the terminal JOB_STATE, be correctly discarded as
+an older snapshot, and add an avoidable round trip before RELEASE. Event-driven
+monitoring, paced long-job observations outside the completion quiet window and
+the post-completion fallback preserve fail-closed terminal proof without that
+handoff delay.
 Each transaction plus follow-up observation has the configured Session transaction
 budget plus 2 seconds (10 seconds with defaults). Cleanup shares one such budget
 across observation, ABORT and RELEASE. Completion monitoring ends at the estimated

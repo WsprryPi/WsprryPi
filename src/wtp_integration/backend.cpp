@@ -10,6 +10,8 @@ namespace wsprrypi {
 namespace {
 constexpr std::uint64_t maximum = std::numeric_limits<std::uint64_t>::max();
 constexpr std::uint64_t grace_ms = 2000;
+constexpr std::uint64_t monitor_status_interval_ms = 5000;
+constexpr std::uint64_t completion_fallback_delay_ms = 1000;
 std::uint64_t add(std::uint64_t a, std::uint64_t b) {
   return b > maximum - a ? maximum : a + b;
 }
@@ -358,6 +360,17 @@ ExecutionResult WtpTransmitBackend::execute(const ExecutionPlan &plan) {
       add(observed, add(ceil_ms(prepared_->arm.start_utc_ns - clock.utc_now_ns),
                         add(ceil_ms(prepared_->job.total_duration_ns),
                             add(options_.transaction_timeout_ms, grace_ms))));
+  const auto expected_completion =
+      add(observed, add(ceil_ms(prepared_->arm.start_utc_ns - clock.utc_now_ns),
+                        ceil_ms(prepared_->job.total_duration_ns)));
+  const auto quiet_window_ms = add(options_.transaction_timeout_ms, grace_ms);
+  const auto quiet_window_start =
+      expected_completion > quiet_window_ms
+          ? expected_completion - quiet_window_ms
+          : observed;
+  auto next_monitor_status = add(observed, monitor_status_interval_ms);
+  auto next_fallback_status =
+      add(expected_completion, completion_fallback_delay_ms);
   if (!transact(wtp::Operation::Arm, prepared_->arm, deadline(), true)) {
     if (!stopped_)
       return failure();
@@ -365,7 +378,26 @@ ExecutionResult WtpTransmitBackend::execute(const ExecutionPlan &plan) {
   for (;;) {
     if (stopped_)
       return cancel_execution();
-    if (!fresh(std::min(deadline(), monitor_end), true))
+    const auto end = std::min(deadline(), monitor_end);
+    // JOB_STATE invalidates the last STATUS and Session immediately obtains a
+    // new authoritative STATUS.  Poll the stream without continuously placing
+    // another STATUS in flight: a request that straddles the terminal event
+    // must be discarded as an older snapshot and otherwise delays RELEASE.
+    // Paced observations stop for one full transaction allowance before the
+    // predicted completion.  A bounded post-completion fallback retains
+    // fail-closed completion when an event is absent.
+    if (clock_.now_ms() >= next_fallback_status) {
+      if (!fresh(end, true))
+        return failure();
+      next_fallback_status =
+          add(clock_.now_ms(), completion_fallback_delay_ms);
+    } else if (clock_.now_ms() >= next_monitor_status &&
+               clock_.now_ms() < quiet_window_start) {
+      if (!fresh(end, true))
+        return failure();
+      next_monitor_status =
+          add(clock_.now_ms(), monitor_status_interval_ms);
+    } else if (!settle(end, true))
       return failure();
     if (terminal_safe()) {
       const auto &e = *session_.job_evidence();
