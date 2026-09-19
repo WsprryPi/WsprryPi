@@ -4861,6 +4861,20 @@ int main(int argc, char *argv[])
 
     {
         PreparedConfigCandidate candidate;
+        auto data = make_managed_ini_data("AA0NT", "EM18", "20m", true);
+        data["Meta"]["Loop TX"] = "false";
+        data["Meta"]["TX Iterations"] = "1";
+        iniFile.setData(data);
+        prepare_ini_config_candidate("/tmp/managed_finite_candidate.ini", candidate);
+        require(
+            candidate.valid &&
+                !candidate.normalized_config.loop_tx &&
+                candidate.normalized_config.tx_iterations.load() == 1,
+            "managed INI candidate must preserve a finite WSPR iteration contract");
+    }
+
+    {
+        PreparedConfigCandidate candidate;
         init_default_config();
         config.enable_web = false;
         iniFile.setData(

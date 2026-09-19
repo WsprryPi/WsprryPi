@@ -1356,6 +1356,10 @@ namespace
                     {
                         patch["Meta"]["debug_logging"] = parse_ini_value(trimmed);
                     }
+                    else if (key == "Loop TX" || key == "TX Iterations")
+                    {
+                        patch["Meta"][key] = parse_ini_value(trimmed);
+                    }
                     continue;
                 }
 
