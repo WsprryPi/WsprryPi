@@ -432,6 +432,50 @@ void cleanup_races_and_faults() {
   CHECK(!h.backend.execute(h.compiler.compile(request())).ok &&
         h.count(Operation::Arm) == 1);
 }
+void acknowledged_release_allows_inactive_successor() {
+  Fixture f;
+  f.prepare();
+  const auto successor = std::string(32, 'f');
+  f.peer.filter = [&](Operation op, std::string &) {
+    if (op != Operation::Release)
+      return;
+    f.peer.owner = successor;
+    f.peer.expiry = f.peer.mono() + 60'000'000'000ULL;
+    f.peer.job = Job{std::string(32, 'e'),
+                     Mode::Tone,
+                     10'000'000'000ULL,
+                     {{0, 10'000'000'000ULL, true, 14'097'100'000'000'000ULL}},
+                     {}};
+    f.peer.state = State::Loaded;
+    f.peer.active = false;
+  };
+  auto result = f.controller.execute_prepared();
+  CHECK(result.ok && result.cleanup.ok);
+  CHECK(f.peer.owner == successor && f.peer.job &&
+        f.peer.job->job_id == std::string(32, 'e'));
+  CHECK(f.count(Operation::Release) == 1 && f.count(Operation::Abort) == 0);
+
+  Fixture g;
+  g.prepare();
+  g.peer.filter = [&](Operation op, std::string &) {
+    if (op != Operation::Release)
+      return;
+    g.peer.owner = successor;
+    g.peer.expiry = g.peer.mono() + 60'000'000'000ULL;
+    g.peer.job = Job{std::string(32, 'd'),
+                     Mode::Tone,
+                     10'000'000'000ULL,
+                     {{0, 10'000'000'000ULL, true, 14'097'100'000'000'000ULL}},
+                     {}};
+    g.peer.start = g.peer.mono();
+    g.peer.state = State::Running;
+    g.peer.active = true;
+  };
+  auto active = g.controller.execute_prepared();
+  CHECK(!active.ok && active.faulted && !active.cleanup.ok);
+  CHECK(g.peer.owner == successor && g.count(Operation::Release) == 1 &&
+        g.count(Operation::Abort) == 0);
+}
 void missed_is_not_cancelled() {
   Fixture f;
   f.prepare();
@@ -510,6 +554,7 @@ int main() {
     unknown_and_reconnect();
     adjustments_and_renewal();
     cleanup_races_and_faults();
+    acknowledged_release_allows_inactive_successor();
     missed_is_not_cancelled();
     nonuniform_adjustments();
     bounded_waits();

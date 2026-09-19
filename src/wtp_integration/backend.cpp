@@ -423,14 +423,26 @@ CleanupResult WtpTransmitBackend::clean() {
       (session_.status()->state != wtp::State::Empty &&
        !terminal(session_.status()->state)))
     return {false, "WTP output or transaction unresolved"};
-  if (session_.owns() &&
-      !transact(wtp::Operation::Release, wtp::Empty{}, end, false))
-    return {false, error_};
+  bool release_acknowledged = false;
+  if (session_.owns()) {
+    if (!transact(wtp::Operation::Release, wtp::Empty{}, end, false))
+      return {false, error_};
+    release_acknowledged = true;
+  }
+  // A different authenticated principal may legitimately claim the endpoint
+  // immediately after our acknowledged RELEASE.  That successor must not make
+  // our completed, explicitly inactive job look like a cleanup failure.  Never
+  // tolerate active/faulted output, uncertainty, or missing retained evidence,
+  // and never abort or release the successor's work.
+  const bool inactive_successor =
+      release_acknowledged && session_.status()->owner_id &&
+      !session_.owns() && terminal_safe();
   if (session_.safety_fault() || session_.uncertain() ||
-      session_.needs_status() || session_.status()->owner_id ||
-      session_.status()->output_active ||
-      (session_.status()->state != wtp::State::Empty &&
-       !terminal(session_.status()->state)))
+      session_.needs_status() || session_.status()->output_active ||
+      ((session_.status()->owner_id ||
+        (session_.status()->state != wtp::State::Empty &&
+         !terminal(session_.status()->state))) &&
+       !inactive_successor))
     return {false, "WTP endpoint is owned or active after cleanup"};
   prepared_.reset();
   schedule_.reset();

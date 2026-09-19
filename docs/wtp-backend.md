@@ -55,6 +55,13 @@ and inspection of its result are required before destruction.
    STATUS, only this client's tracked ABORT, and owned inactive RELEASE.
    Repeated cleanup rechecks current state and cannot clear a latched fault.
 
+After an acknowledged RELEASE, the follow-up STATUS may already show an
+inactive job owned by another authenticated principal. Cleanup accepts that
+handoff only when retained authoritative evidence still proves this backend's
+own terminal job inactive and current device output is inactive. It never
+ABORTs or RELEASEs the successor. Active output, fault evidence, uncertainty or
+missing retained evidence remains a cleanup failure.
+
 Generic `BackendCompileResult.adjustments` remains empty: the existing controller
 interprets its first entry as a uniform frequency shift. Exact per-event WTP
 nanohertz adjustments are instead retained by `adjustments()`, including after
