@@ -4,6 +4,33 @@ Date: 2026-09-08. Scope: WsprryPi host network integration only. Baseline clean
 `devel` at `dff597467f8ec8aebaf30e4361c985c073953eab`, equal to refreshed origin.
 Execution plan: [phase11-1-plan.md](phase11-1-plan.md), written before implementation.
 
+## Phase 11.7 current-source addendum
+
+Updated 2026-09-20. The original 11.1 implementation and validation narrative
+below remains historical. The final joint review tested Pico
+`95aac22bf7cc31b67fe5773761708d743d8a6473` with Pi
+`2298a268d8139409ed650d2311d794b3813d99ab`. Pi's latter commit changes only
+the actual-Pico interoperability harness and its immutable Pico pin relative to
+the Phase 11.6 companion source `c39fae35...`; production WTP client,
+backend/scheduler/status/application and transmitter-plan sources are unchanged.
+
+Fresh hardware-free validation exercised the actual current Pico TLS server and
+Pi client/application paths, including DNS and explicit-IP identities, mTLS,
+credential and connection failure recovery, shared management, finite jobs,
+partial I/O, same-request replay after lost LOAD/ARM/ABORT acknowledgements,
+foreign ownership, boot/device changes and same-session recovery. The host could
+not bind a second loopback IPv4 address; the injected-address contract passed.
+This does not qualify a physical network or RF path.
+
+The authoritative closure is WsprryPico
+[`docs/development/phase11-7-review.md`](https://github.com/WsprryPi/WsprryPico/blob/devel/docs/development/phase11-7-review.md).
+It closes Phase 11 within its documented software, bounded physical and scoped
+conducted-RF acceptance. Exactly 13 Phase 11.6 rows are retained as accepted;
+no Phase 11.6 WSPR row is accepted. Phase 12 provisioning and Phase 13 broad
+hardware/release qualification remain open. The original "Remaining roadmap and
+qualification" section below is a contemporaneous 11.1 checkpoint and is
+superseded for current Phase 11 status by this addendum.
+
 Pico reference remained read-only at
 `0fd8191c5218d3b5f2da9122a2ae55bf728ae3f2`; Mbed TLS at
 `0bebf8b8c7f07abe3571ded48a11aa907a1ffb20`. The portable WTP-Client provenance

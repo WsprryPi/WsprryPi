@@ -51,7 +51,9 @@ boundary](docs/wtp-status-recovery.md) publishes coherent observations and retai
 explicit recovery results. [Production integration](docs/wtp-production-integration.md)
 adds persisted endpoint selection, an owned runtime worker and explicit status/
 recovery controls behind a default-off UI development toggle. Physical USB,
-target operation and RF qualification remain outstanding.
+target operation and RF qualification are accepted only within the bounded
+Phase 10/11 records; broad mode/band/clock, timing, spectral, reliability and
+release qualification remain outstanding in Phase 13.
 
 For containerized ARMv6 and AArch64 builds targeting Raspberry Pi OS Bookworm
 and Trixie, including 32-bit Pi 1/A+ and Pi Zero support, see the
@@ -88,4 +90,7 @@ Authenticated Pico network integration is documented in
 [WTP network configuration](docs/wtp-network.md) and the
 [shared browser API](docs/wtp-browser-api.md). See the
 [Phase 11.1 software acceptance record](docs/development/phase11-1-review.md)
-for tests and remaining physical/Phase 11 dependencies.
+for the original host-software review and its Phase 11.7 addendum. WsprryPico's
+[authoritative joint closure](https://github.com/WsprryPi/WsprryPico/blob/devel/docs/development/phase11-7-review.md)
+closes Phase 11 within its documented software, bounded physical and scoped
+conducted-RF acceptance; it does not claim release qualification.

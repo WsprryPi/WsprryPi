@@ -252,7 +252,9 @@ Use a different `WTP_NETWORK_BUILD_DIR` for sanitizer flags; pass matching
 TLS, actual Pico interop and rendered browser tests. Local execution is not a CI
 run. See the [Phase 11.3 acceptance record](development/phase11-3-review.md) for exact results.
 
-Phase 11.1 and 11.2 retain their closed software scopes. Phase 11.3 software
-acceptance does not close 11.4 inhibited physical acceptance, 11.5 target
-resources/contention, 11.6 conducted RF or 11.7 final cross-repository closure. This is software evidence,
-not physical USB, GPIO, timing, RF, installation or service qualification.
+Phase 11 is now closed within its documented software, bounded physical and
+scoped conducted-RF acceptance. WsprryPico's Phase 11.7 joint record is the
+authority for the assertion-level applicability ledger, exact 13-row conducted
+scope and retained exclusions. This guide's loopback results remain software
+evidence, not physical USB, GPIO, timing, RF, installation or service
+qualification; Phase 13 retains broad hardware and release qualification.
