@@ -19,7 +19,7 @@ foreach(pair IN ITEMS "PICO_SOURCE|${pico_pin}" "MBEDTLS_SOURCE|0bebf8b8c7f07abe
   list(GET fields 0 var)
   list(GET fields 1 pin)
   execute_process(COMMAND git -C "${${var}}" rev-parse HEAD OUTPUT_VARIABLE revision OUTPUT_STRIP_TRAILING_WHITESPACE COMMAND_ERROR_IS_FATAL ANY)
-  execute_process(COMMAND git -C "${${var}}" status --porcelain --untracked-files=no OUTPUT_VARIABLE dirty OUTPUT_STRIP_TRAILING_WHITESPACE COMMAND_ERROR_IS_FATAL ANY)
+  execute_process(COMMAND git -C "${${var}}" status --porcelain --untracked-files=normal OUTPUT_VARIABLE dirty OUTPUT_STRIP_TRAILING_WHITESPACE COMMAND_ERROR_IS_FATAL ANY)
   if(NOT revision STREQUAL pin OR NOT dirty STREQUAL "")
     message(FATAL_ERROR "${var} must be an unmodified checkout at ${pin}")
   endif()
@@ -66,6 +66,8 @@ add_executable(pico_tls_server pico_tls_server.cpp ${core}
   "${PICO_SOURCE}/src/network/pico/server.cpp")
 target_include_directories(pico_tls_server PRIVATE "${PICO_SOURCE}/src" "${PICO_SOURCE}/tests"
   "${PICO_SOURCE}/tests/network_mock" "${CMAKE_BINARY_DIR}/generated")
-target_compile_definitions(pico_tls_server PRIVATE MBEDTLS_CONFIG_FILE="${MBEDTLS_CONFIG_FILE}")
+target_compile_definitions(pico_tls_server PRIVATE
+  MBEDTLS_CONFIG_FILE="${MBEDTLS_CONFIG_FILE}"
+  WSPRRY_PICO_STANDALONE_WSPR_BASE_FREQUENCY_HZ=3570100)
 target_link_libraries(pico_tls_server PRIVATE mbedtls mbedx509 mbedcrypto)
 target_compile_options(pico_tls_server PRIVATE -Wall -Wextra -Wpedantic -Werror)
