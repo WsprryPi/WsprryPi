@@ -17,6 +17,7 @@ struct SessionOptions {
     std::string session_id, owner_id, expected_device_id;
     std::string client_name{"WsprryPi"}, client_version{"development"};
     std::uint64_t transaction_timeout_ms{8000}, idle_timeout_ms{5000};
+    bool learn_device_identity{false}; // Explicit Plain LAN binding only.
 };
 struct JobEvidence {
     std::string device_id, boot_id, job_id;

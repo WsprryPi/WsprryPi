@@ -6,12 +6,12 @@
             <input class="form-check-input" type="checkbox" role="switch" id="wtp_use" aria-controls="wtp-settings" aria-describedby="wtp-selection-hint">
             <label class="form-check-label" for="wtp_use">Use Pico</label>
         </div>
-        <p class="form-text" id="wtp-selection-hint">Uses the selected authenticated WTP connection. Disable TX LED, amplifier, shutdown-button and band GPIO controls before selecting Pico. Host GPIO calibration and CW fades do not apply.</p>
+        <p class="form-text" id="wtp-selection-hint">Uses the selected WTP connection. Plain LAN allows other clients on the same network to control the Pico. Disable TX LED, amplifier, shutdown-button and band GPIO controls before selecting Pico. Host GPIO calibration and CW fades do not apply.</p>
         <div id="wtp-settings" class="row gx-3 gy-3">
             <div class="col-12 config-stacked-field">
                 <label class="form-label" for="wtp_transport">Connection</label>
                 <select class="form-select" id="wtp_transport" data-wtp-key="Transport" disabled>
-                    <option value="usb">USB</option><option value="network">Network (TLS)</option>
+                    <option value="usb">USB</option><option value="network_plain">Plain LAN</option><option value="network">Network (TLS, advanced)</option>
                 </select>
             </div>
             <div class="col-12 col-lg-6 config-stacked-field" data-wtp-transport="usb">
@@ -24,8 +24,18 @@
                 <input class="form-control" id="wtp_serial" type="text" maxlength="128" data-wtp-key="USB Serial" aria-describedby="wtp-serial-hint" disabled>
                 <div class="form-text" id="wtp-serial-hint"></div>
             </div>
+            <div class="col-12 col-lg-6 config-stacked-field" data-wtp-transport="network" hidden>
+                <label class="form-label" for="wtp_hostname">Hostname or IP address</label>
+                <input class="form-control" id="wtp_hostname" type="text" maxlength="254" placeholder="wsprrypico-&lt;device-id&gt;.local" data-wtp-key="Hostname" aria-describedby="wtp_hostname-hint" disabled>
+                <div class="form-text" id="wtp_hostname-hint">Use the Pico hostname or its current local IP address. The host must support .local resolution to use a .local name.</div>
+            </div>
+            <div class="col-12 col-lg-6 config-stacked-field" data-wtp-transport="network" hidden>
+                <label class="form-label" for="wtp_tcp_port">WTP port</label>
+                <input class="form-control" id="wtp_tcp_port" type="number" min="1" max="65535" step="1" placeholder="" data-wtp-key="TCP Port" aria-describedby="wtp_tcp_port-hint" disabled>
+                <div class="form-text" id="wtp_tcp_port-hint">Plain LAN uses 31417 on the standard Pico image. TLS uses the configured TLS port.</div>
+            </div>
             <div class="col-12 col-lg-6 config-stacked-field">
-                <label class="form-label" for="wtp_device">Device identity</label>
+                <label class="form-label" for="wtp_device" id="wtp-device-label">Device identity</label>
                 <input class="form-control" id="wtp_device" type="text" maxlength="32" pattern="[0-9a-f]{32}" data-wtp-key="Device ID" aria-describedby="wtp-device-hint" disabled>
                 <div class="form-text" id="wtp-device-hint">32 lowercase hexadecimal characters from Pico HELLO.</div>
             </div>
@@ -44,32 +54,22 @@
                 <input class="form-control" id="wtp_uncertainty" type="number" min="1" max="1000000000" step="1" value="1000000" data-wtp-key="Start Uncertainty ns" aria-describedby="wtp-uncertainty-hint" disabled>
                 <div class="form-text" id="wtp-uncertainty-hint">1,000,000 ns = 1 ms. Device clock evidence must meet this limit.</div>
             </div>
-            <div class="col-12 col-lg-6 config-stacked-field" data-wtp-transport="network" hidden>
-                <label class="form-label" for="wtp_hostname">Hostname or IP address</label>
-                <input class="form-control" id="wtp_hostname" type="text" maxlength="254" placeholder="wsprrypico-&lt;device-id&gt;.local" data-wtp-key="Hostname" aria-describedby="wtp_hostname-hint" disabled>
-                <div class="form-text" id="wtp_hostname-hint">Use the certified Pico hostname for DHCP. The host must support .local resolution; no reservation is required.</div>
-            </div>
-            <div class="col-12 col-lg-6 config-stacked-field" data-wtp-transport="network" hidden>
-                <label class="form-label" for="wtp_tcp_port">TLS port</label>
-                <input class="form-control" id="wtp_tcp_port" type="number" min="1" max="65535" step="1" placeholder="" data-wtp-key="TCP Port" aria-describedby="wtp_tcp_port-hint" disabled>
-                <div class="form-text" id="wtp_tcp_port-hint">Use the port configured on this Pico; there is no default WTP port.</div>
-            </div>
-            <div class="col-12 col-lg-6 config-stacked-field" data-wtp-transport="network" hidden>
+            <div class="col-12 col-lg-6 config-stacked-field" data-wtp-security="tls" hidden>
                 <label class="form-label" for="wtp_tls_identity">Expected certificate identity</label>
                 <input class="form-control" id="wtp_tls_identity" type="text" maxlength="254" placeholder="" data-wtp-key="TLS Server Identity" aria-describedby="wtp_tls_identity-hint" disabled>
                 <div class="form-text" id="wtp_tls_identity-hint">Leave blank to verify the hostname or IP above. For a direct-IP connection, enter its certified hostname here. A literal-IP identity requires a matching IP certificate entry.</div>
             </div>
-            <div class="col-12 col-lg-6 config-stacked-field" data-wtp-transport="network" hidden>
+            <div class="col-12 col-lg-6 config-stacked-field" data-wtp-security="tls" hidden>
                 <label class="form-label" for="wtp_ca">Trusted CA file</label>
                 <input class="form-control" id="wtp_ca" type="text" maxlength="512" placeholder="/etc/wsprrypi/pico/ca.crt" data-wtp-key="TLS CA File" aria-describedby="wtp_ca-hint" disabled>
                 <div class="form-text" id="wtp_ca-hint">Administrator-managed file on the WsprryPi host.</div>
             </div>
-            <div class="col-12 col-lg-6 config-stacked-field" data-wtp-transport="network" hidden>
+            <div class="col-12 col-lg-6 config-stacked-field" data-wtp-security="tls" hidden>
                 <label class="form-label" for="wtp_certificate">Client certificate file</label>
                 <input class="form-control" id="wtp_certificate" type="text" maxlength="512" placeholder="/etc/wsprrypi/pico/client.crt" data-wtp-key="TLS Client Certificate" aria-describedby="wtp_certificate-hint" disabled>
                 <div class="form-text" id="wtp_certificate-hint">Administrator-managed certificate for this controller.</div>
             </div>
-            <div class="col-12 col-lg-6 config-stacked-field" data-wtp-transport="network" hidden>
+            <div class="col-12 col-lg-6 config-stacked-field" data-wtp-security="tls" hidden>
                 <label class="form-label" for="wtp_key">Client private-key file</label>
                 <input class="form-control" id="wtp_key" type="text" maxlength="512" placeholder="/etc/wsprrypi/pico/client.key" data-wtp-key="TLS Client Key" aria-describedby="wtp_key-hint" disabled>
                 <div class="form-text" id="wtp_key-hint">Path only; never paste key material. The key must have owner-only permissions.</div>

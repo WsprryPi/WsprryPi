@@ -32,21 +32,26 @@ inline void validate_wtp_settings(const WtpSettings &s, bool selected) {
   const auto name = [](const std::string &v) {
     return v.empty() || wsprrypi::canonical_network_identity(v).has_value();
   };
-  if ((s.transport != "usb" && s.transport != "network") ||
-      !name(s.hostname) || !name(s.tls_identity) ||
+  if ((s.transport != "usb" && s.transport != "network" &&
+       s.transport != "network_plain") ||
+      !name(s.hostname) || (s.transport == "network" && !name(s.tls_identity)) ||
       !text(s.tls_ca, 512) || !text(s.tls_certificate, 512) || !text(s.tls_key, 512) ||
       s.tcp_port < 0 || s.tcp_port > 65535)
     throw std::runtime_error("Invalid WTP transport or network settings.");
   if (!selected)
     return;
-  if (s.device_id.size() != 32 ||
-      !std::all_of(s.device_id.begin(), s.device_id.end(), [](char c) {
+  if (!(s.transport == "network_plain" && s.device_id.empty()) &&
+      (s.device_id.size() != 32 ||
+       !std::all_of(s.device_id.begin(), s.device_id.end(), [](char c) {
         return (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f');
-      })) throw std::runtime_error("Pico requires a 32 lowercase hex device ID.");
-  if (s.transport == "network") {
-    if (s.hostname.empty() || !s.tcp_port || !s.tls_ca.starts_with("/") ||
-        !s.tls_certificate.starts_with("/") || !s.tls_key.starts_with("/"))
-      throw std::runtime_error("Network Pico requires a hostname/IP, TCP port and absolute local CA, client certificate and private-key references.");
+      }))) throw std::runtime_error("Pico requires a 32 lowercase hex device ID.");
+  if (s.transport == "network" || s.transport == "network_plain") {
+    if (s.hostname.empty() || !s.tcp_port ||
+        (s.transport == "network" && (!s.tls_ca.starts_with("/") ||
+         !s.tls_certificate.starts_with("/") || !s.tls_key.starts_with("/"))))
+      throw std::runtime_error(s.transport == "network"
+          ? "TLS Pico requires a hostname/IP, TCP port and absolute local CA, client certificate and private-key references."
+          : "Plain LAN Pico requires a hostname/IP and TCP port.");
     return;
   }
   if (!s.path.starts_with("/dev/") ||

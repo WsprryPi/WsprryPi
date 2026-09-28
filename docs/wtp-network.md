@@ -1,4 +1,15 @@
-# Authenticated WTP network integration
+# WTP network integration
+
+The explicit `network_plain` transport connects WsprryPi to the standard
+consumer Pico's station-only WTP listener without certificate files. It uses
+the same portable WTP client and job lifecycle as USB and TLS. Select Plain LAN
+only for a local network whose connected clients you allow to control the Pico;
+an optional configured WTP device ID is checked; without one, the first
+`HELLO` supplies the runtime identity, which is checked on reconnect. This
+binding does not authenticate the client or encrypt traffic. There is no
+automatic fallback between bindings. The current
+Pico consumer default uses TCP port 31417 after station IPv4 and accepted SNTP.
+New-image physical Pico-to-WsprryPi interoperability remains to be checked.
 
 Phase 11.1 adds the parent-owned OpenSSL `TlsStream` behind the existing portable
 WTP-Client `ByteStream`. The same application, scheduler, backend, Session,
@@ -11,7 +22,23 @@ transport fallback or browser-owned scheduler.
 Legacy `[WTP]` sections without `Transport` mean `usb`. Their existing endpoint,
 serial, VID/PID and device-ID requirements are unchanged. Network fields and USB
 fields persist while inactive. The existing uncertainty and frequency-adjustment
-consent apply to both transports. A complete network section looks like:
+consent apply to every transport. A complete Plain LAN section looks like:
+
+```ini
+[Operation]
+Transmit Backend = wtp
+Transmit = false
+
+[WTP]
+Transport = network_plain
+Hostname = wsprrypico-0a60df.local
+TCP Port = 31417
+Start Uncertainty ns = 1000000
+Allow Frequency Adjustment = false
+```
+
+The legacy `network` selection retains its TLS meaning. A complete TLS section
+looks like:
 
 ```ini
 [Operation]
@@ -183,7 +210,9 @@ loopback results; no CLI, INI, browser or environment option enables that seam.
 ## Browser and present Pico limits
 
 The development visibility boolean still controls the existing Transmitter panel.
-**Use Pico** selects the backend; **Connection** selects USB or Network (TLS).
+**Use Pico** selects the backend; **Connection** selects USB, Plain LAN or
+Network (TLS, advanced). Choosing Plain LAN presents host and port without
+certificate fields. Existing TLS configurations retain their selection.
 Fields, validation failures and status polling preserve drafts. Network status
 separates the configured endpoint, canonical expected identity, resolved address, last authenticated identity,
 connection state/diagnostic and observation age. These are historical software
@@ -206,8 +235,9 @@ advance the reference, publish the Pico commit before CI tries to fetch it, and
 run `wtp-network-interop-test` against a clean checkout of that revision. This
 host-only reference pin does not establish physical RF or resource qualification.
 
-Pico defaults network control off and supports two
-TLS sessions with one waiting TCP connection and one computing handshake.
+The Pico engineering TLS binding defaults off; the standard consumer image
+defaults to Plain LAN. TLS mode supports two TLS sessions with one waiting TCP
+connection and one computing handshake.
 WsprryPi idle management still acquires the same host operation lock, obtains
 fresh unowned/inactive WTP status, disconnects the idle stream without RELEASE,
 performs one HTTP exchange, then re-inspects WTP. It never releases a job merely

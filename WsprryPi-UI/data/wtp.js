@@ -3,7 +3,7 @@
 (function (root) {
     "use strict";
     const defaults = Object.freeze({
-        "Transport": "usb", "Hostname": "", "TCP Port": 0, "TLS Server Identity": "",
+        "Transport": "usb", "Hostname": "", "TCP Port": 31417, "TLS Server Identity": "",
         "TLS CA File": "", "TLS Client Certificate": "", "TLS Client Key": "",
         "Endpoint": "", "USB Serial": "", "Device ID": "",
         "USB Vendor ID": 0, "USB Product ID": 0,
@@ -37,23 +37,26 @@
             if (typeof value !== "string" || value.length > max || /[\x00-\x1f\x7f]/.test(value))
                 result[key] = `Enter a valid ${key.toLowerCase()}.`;
         }
-        if (!["usb", "network"].includes(settings.Transport)) result.Transport = "Choose USB or network.";
-        const network = settings.Transport === "network";
-        for (const key of ["Hostname", "TLS Server Identity"]) {
+        if (!["usb", "network_plain", "network"].includes(settings.Transport)) result.Transport = "Choose USB, Plain LAN or TLS.";
+        const network = settings.Transport === "network" || settings.Transport === "network_plain";
+        const tls = settings.Transport === "network";
+        for (const key of ["Hostname", ...(tls ? ["TLS Server Identity"] : [])]) {
             if (settings[key] !== "" && !validNetworkIdentity(settings[key]))
                 result[key] = "Enter a DNS hostname or literal IP address, without a URL or port.";
         }
         for (const key of ["TLS CA File", "TLS Client Certificate", "TLS Client Key"]) {
             const value = settings[key];
             if (typeof value !== "string" || value.length > 512 || /[\x00-\x1f\x7f]/.test(value)) result[key] = "Enter a valid local file reference.";
-            else if (selected && network && !value.startsWith("/")) result[key] = "Enter an absolute file path on the WsprryPi host.";
+            else if (selected && tls && !value.startsWith("/")) result[key] = "Enter an absolute file path on the WsprryPi host.";
         }
         if (selected && network && !settings.Hostname) result.Hostname = "Enter the Pico's configured hostname or literal IP address.";
-        if (!Number.isInteger(settings["TCP Port"]) || settings["TCP Port"] < (selected && network ? 1 : 0) || settings["TCP Port"] > 65535) result["TCP Port"] = "Enter the configured TLS port (1–65535).";
+        if (!Number.isInteger(settings["TCP Port"]) || settings["TCP Port"] < (selected && network ? 1 : 0) || settings["TCP Port"] > 65535) result["TCP Port"] = "Enter the configured WTP port (1–65535).";
         if (selected) {
             if (!network && !String(settings.Endpoint).startsWith("/dev/") || (!network && settings.Endpoint.includes("/../"))) result.Endpoint = "Select the dedicated WTP device path under /dev/.";
             if (!network && !settings["USB Serial"]) result["USB Serial"] = "Enter the selected device's USB serial.";
-            if (!/^[0-9a-f]{32}$/.test(settings["Device ID"])) result["Device ID"] = "Enter 32 lowercase hexadecimal characters.";
+            if (!(settings.Transport === "network_plain" && settings["Device ID"] === "") &&
+                !/^[0-9a-f]{32}$/.test(settings["Device ID"]))
+                result["Device ID"] = "Enter 32 lowercase hexadecimal characters.";
         }
         for (const key of ["USB Vendor ID", "USB Product ID", "Start Uncertainty ns"]) {
             const value = settings[key];
@@ -122,13 +125,25 @@
         byId("wtp-development").hidden = !visible;
         byId("wtp_use").disabled = !visible;
         root.document.querySelectorAll("[data-wtp-key]").forEach(field => { field.disabled = !visible || !selected(); });
-        const network = read().Transport === "network";
-        root.document.querySelectorAll("[data-wtp-transport]").forEach(group => { group.hidden = group.dataset.wtpTransport !== (network ? "network" : "usb"); });
+        const transport = read().Transport;
+        const network = transport === "network" || transport === "network_plain";
+        if (byId("wtp-device-label")) byId("wtp-device-label").textContent =
+            transport === "network_plain" ? "Device identity (optional)" : "Device identity";
+        if (byId("wtp-device-hint")) byId("wtp-device-hint").textContent =
+            transport === "network_plain"
+                ? "Leave blank to learn this Pico's identity on first connect; later connections in this session check it."
+                : "32 lowercase hexadecimal characters from Pico HELLO.";
+        root.document.querySelectorAll("[data-wtp-transport]").forEach(group => {
+            group.hidden = group.dataset.wtpTransport !== (network ? "network" : "usb");
+        });
+        root.document.querySelectorAll("[data-wtp-security]").forEach(group => {
+            group.hidden = group.dataset.wtpSecurity !== (transport === "network" ? "tls" : "none");
+        });
         const n = snapshot?.network;
         if (byId("wtp-network-state")) byId("wtp-network-state").textContent = n
-            ? `Configured target: ${n.hostname}:${n.port} · ${n.state}. Expected identity: ${n.expected_identity || "unconfirmed"}. Resolved address: ${n.resolved_address || "unresolved"}. Last authenticated identity: ${n.authenticated_identity || "unconfirmed"}. Observation age: ${n.observed_ms && snapshot.now_ms ? Math.max(0, Number(BigInt(snapshot.now_ms) - BigInt(n.observed_ms))) + " ms" : "unknown"}. ${n.diagnostic || ""}`
+            ? `Configured target: ${n.hostname}:${n.port} · ${n.state}. ${n.security === "plain_lan" ? "Plain LAN; clients on this network can control the Pico." : `Expected identity: ${n.expected_identity || "unconfirmed"}. Last authenticated identity: ${n.authenticated_identity || "unconfirmed"}.`} Resolved address: ${n.resolved_address || "unresolved"}. Observation age: ${n.observed_ms && snapshot.now_ms ? Math.max(0, Number(BigInt(snapshot.now_ms) - BigInt(n.observed_ms))) + " ms" : "unknown"}. ${n.diagnostic || ""}`
             : "Network connection is unconfirmed.";
-        root.WtpManagement?.setAvailability(visible && selected() && network && snapshot?.selected === true && snapshot.ready === true && snapshot.phase === "idle" && !snapshot.worker_active && !snapshot.recovery_required && !snapshot.owns);
+        root.WtpManagement?.setAvailability(visible && selected() && transport === "network" && snapshot?.selected === true && snapshot.ready === true && snapshot.phase === "idle" && !snapshot.worker_active && !snapshot.recovery_required && !snapshot.owns);
         const state = summarize(snapshot);
         for (const [id, value] of [["wtp-status-text", state.text], ["wtp-output", state.output], ["wtp-clock", state.clock], ["wtp-identity", state.identity], ["wtp-history", state.history]]) byId(id).textContent = value;
         if (byId("wtp-cancel")) byId("wtp-cancel").disabled = cancelling || !selected() || snapshot?.selected !== true || !snapshot?.job_id || !(snapshot.owns || snapshot.phase === "waiting");
@@ -250,7 +265,12 @@
         };
         byId("fleet-tab")?.addEventListener("shown.bs.tab", keepFleetTabVisible);
         root.addEventListener("resize", keepFleetTabVisible);
-        root.document.querySelectorAll("[data-wtp-key]").forEach(field => field.addEventListener("change", () => { render(); validate(); }));
+        root.document.querySelectorAll("[data-wtp-key]").forEach(field => field.addEventListener("change", () => {
+            if (field.dataset.wtpKey === "Transport" && field.value === "network_plain" &&
+                Number(byId("wtp_tcp_port")?.value) === 0)
+                byId("wtp_tcp_port").value = "31417";
+            render(); validate();
+        }));
         byId("wtp-cancel")?.addEventListener("click", cancelJob);
         byId("wtp-recover").addEventListener("click", () => request(true));
         root.addEventListener("pagehide", () => { closed = true; clearTimeout(timer); });

@@ -4,6 +4,7 @@
 #include "json.hpp"
 #include "wtp_integration/usb_cdc.hpp"
 #include "wtp_integration/tls.hpp"
+#include "wtp_integration/plain_tcp.hpp"
 #include <cstdlib>
 #include <memory>
 #include <mutex>
@@ -15,6 +16,7 @@ struct NativeRuntime {
   wsprrypi::PosixCdcSystem system;
   wsprrypi::UsbCdcStream stream{system};
   wsprrypi::TlsStream tls{[this] { return clock.now_ms(); }};
+  wsprrypi::PlainTcpStream plain{[this] { return clock.now_ms(); }};
   std::shared_ptr<wsprrypi::TlsCredentials> credentials;
   wsprrypi::TlsSelection network_selection() const {
     return {settings.hostname, settings.tls_identity, settings.tls_ca,
@@ -36,6 +38,17 @@ struct NativeRuntime {
         return tls.ready();
       } catch (...) { return false; }
     }
+    if (settings.transport == "network_plain") {
+      try {
+        if (!plain.begin_open(settings.hostname, static_cast<unsigned>(settings.tcp_port)))
+          return false;
+        while (plain.opening()) {
+          plain.poll_open();
+          if (plain.opening()) clock.wait_ms(5);
+        }
+        return plain.ready();
+      } catch (...) { plain.close(); return false; }
+    }
     stream.close();
     if (!stream.begin_open({settings.path, settings.usb_serial,
                             static_cast<std::uint16_t>(settings.vendor_id),
@@ -52,12 +65,16 @@ struct NativeRuntime {
     if (settings.transport == "network")
       credentials = std::make_shared<wsprrypi::TlsCredentials>(network_selection());
     wsprrypi::wtp::ByteStream &selected = settings.transport == "network"
-        ? static_cast<wsprrypi::wtp::ByteStream &>(tls) : stream;
+        ? static_cast<wsprrypi::wtp::ByteStream &>(tls)
+        : settings.transport == "network_plain"
+            ? static_cast<wsprrypi::wtp::ByteStream &>(plain)
+            : static_cast<wsprrypi::wtp::ByteStream &>(stream);
+    wsprrypi::wtp::SessionOptions options{wsprrypi::wtp_random_identity(),
+                                         wsprrypi::wtp_random_identity(), settings.device_id};
+    options.learn_device_identity = settings.transport == "network_plain" &&
+                                    settings.device_id.empty();
     app = std::make_unique<wsprrypi::WtpApplication>(
-        clock, selected, settings,
-        wsprrypi::wtp::SessionOptions{wsprrypi::wtp_random_identity(),
-                                    wsprrypi::wtp_random_identity(), settings.device_id},
-        [this] { return reopen(); });
+        clock, selected, settings, std::move(options), [this] { return reopen(); });
   }
   NativeRuntime(WtpSettings s, wsprrypi::WtpScheduleClock &c,
                 wsprrypi::wtp::ByteStream &b,
@@ -101,9 +118,9 @@ wtp_runtime_selection_error(const std::optional<WtpSettings> &settings) {
   std::lock_guard operation(operation_mutex);
   auto r = get();
   try {
+    if (settings) validate_wtp_settings(*settings, true);
     bool changed = r && (!settings || r->settings != *settings);
     if (settings && settings->transport == "network") {
-      validate_wtp_settings(*settings, true);
       wsprrypi::TlsCredentials candidate({settings->hostname, settings->tls_identity,
           settings->tls_ca, settings->tls_certificate, settings->tls_key,
           static_cast<unsigned>(settings->tcp_port)});
@@ -225,11 +242,14 @@ std::string wtp_runtime_json() {
   j["now_ms"] = std::to_string(r->clock.now_ms());
   j["selected"] = true;
   j["transport"] = r->settings.transport;
-  if (r->settings.transport == "network") {
-    const auto n = r->tls.observation();
+  if (r->settings.transport == "network" || r->settings.transport == "network_plain") {
+    const auto n = r->settings.transport == "network" ? r->tls.observation()
+                                                       : r->plain.observation();
     j["network"] = {{"hostname", r->settings.hostname}, {"port", r->settings.tcp_port},
-        {"expected_identity", wsprrypi::canonical_network_identity(r->settings.tls_identity.empty() ? r->settings.hostname : r->settings.tls_identity).value_or("")},
+        {"expected_identity", r->settings.transport == "network"
+            ? wsprrypi::canonical_network_identity(r->settings.tls_identity.empty() ? r->settings.hostname : r->settings.tls_identity).value_or("") : ""},
         {"resolved_address", n.address}, {"authenticated_identity", n.authenticated_identity},
+        {"security", r->settings.transport == "network" ? "tls" : "plain_lan"},
         {"state", n.state}, {"diagnostic", n.diagnostic}, {"observed_ms", std::to_string(n.observed_ms)}};
   }
   j["worker_active"] = r->app->active();

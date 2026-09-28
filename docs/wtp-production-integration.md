@@ -2,7 +2,7 @@
 
 WsprryPi can explicitly select a Pico WTP/1 endpoint using persisted settings
 and `--backend wtp`. The parent application owns the complete-job scheduler,
-worker, Linux USB CDC or authenticated TLS network adapter and explicit recovery lifecycle.
+worker, Linux USB CDC, Plain LAN or authenticated TLS network adapter and explicit recovery lifecycle.
 See [network configuration and credentials](wtp-network.md) and
 [shared browser API](wtp-browser-api.md) for Phase 11.1. The web interface
 can reveal Pico settings through a browser-console boolean. This is

@@ -156,6 +156,37 @@ async function main() {
         await waitFor(async () => await evaluate('document.getElementById("wtp-network-state").textContent.includes("192.0.2.27")'), 'network snapshot');
         assert.equal(await evaluate('document.getElementById("fleet-tab").classList.contains("active")'), true);
         assert.equal(await evaluate('window.WtpUi.validate()'), true);
+        await evaluate(`(() => {
+            window.__snapshot.transport='network_plain';
+            window.__snapshot.network.security='plain_lan';
+            document.getElementById('wtp_transport').value='network_plain';
+            document.getElementById('wtp_transport').dispatchEvent(new Event('change',{bubbles:true}));
+            document.getElementById('wtp_tcp_port').value='31417';
+            document.getElementById('wtp_device').value='';
+        })()`);
+        assert.equal(await evaluate('window.WtpUi.validate()'), true);
+        assert.equal(await evaluate('document.querySelector("[data-wtp-security=tls]").hidden'), true);
+        assert.equal(await evaluate('document.querySelector("[data-wtp-transport=network]").hidden'), false);
+        assert.equal(await evaluate('document.getElementById("wtp-device-label").textContent.includes("optional")'), true);
+        assert.equal(await evaluate('document.getElementById("wtp-management").hidden'), true);
+        for (const viewport of [{name:'desktop',width:1280,height:900},{name:'mobile',width:390,height:844}]) {
+            await client.send('Emulation.setDeviceMetricsOverride', {...viewport,deviceScaleFactor:1,mobile:viewport.name==='mobile'});
+            await evaluate('window.scrollTo({top:0,behavior:"instant"})');
+            await evaluate(`document.getElementById('wtp_transport').scrollIntoView({block:'center',behavior:'instant'});`);
+            await new Promise(resolve=>setTimeout(resolve,200));
+            assert(await evaluate('(() => { const r=document.getElementById("wtp_transport").getBoundingClientRect(); return r.height > 0 && r.top >= 0 && r.bottom <= window.innerHeight; })()'), 'Plain LAN selector visible');
+            const shot=await client.send('Page.captureScreenshot',{format:'png'});
+            fs.writeFileSync(path.join(output,`${viewport.name}-plain-lan.png`),Buffer.from(shot.data,'base64'));
+            assert(await evaluate('document.documentElement.scrollWidth <= window.innerWidth + 1'), 'Plain LAN horizontal overflow');
+        }
+        await evaluate(`(() => {
+            window.__snapshot.transport='network';
+            window.__snapshot.network.security='tls';
+            document.getElementById('wtp_transport').value='network';
+            document.getElementById('wtp_transport').dispatchEvent(new Event('change',{bubbles:true}));
+            document.getElementById('wtp_tcp_port').value='18443';
+            document.getElementById('wtp_device').value='a'.repeat(32);
+        })()`);
         await evaluate(`document.getElementById('wtp_transport').value='usb'; document.getElementById('wtp_transport').dispatchEvent(new Event('change',{bubbles:true}));`);
         assert.equal(await evaluate('window.WtpUi.read().Hostname'), 'wsprrypico-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.local');
         await evaluate(`document.getElementById('wtp_transport').value='network'; document.getElementById('wtp_transport').dispatchEvent(new Event('change',{bubbles:true})); document.getElementById('wtp-management').open=true; document.getElementById('wtp-remote-load').click();`);

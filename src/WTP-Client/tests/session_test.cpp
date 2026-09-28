@@ -492,6 +492,29 @@ void identity_and_events() {
     CHECK(device_change.client.phase() == SessionPhase::IdentityChanged &&
           device_change.peer.operations.size() == 1);
 }
+void learned_plain_identity() {
+    SessionOptions options{sid, owner_id, ""};
+    options.learn_device_identity = true;
+    Session client{options};
+    Peer peer;
+    peer.open();
+    CHECK(client.connect(peer, peer.now));
+    for (unsigned i = 0; i < 1000 && client.phase() != SessionPhase::Ready; ++i)
+        client.poll(peer.now);
+    CHECK(client.phase() == SessionPhase::Ready);
+    CHECK(client.identity() && client.identity()->device_id == device);
+    client.disconnect();
+    peer.device_id = std::string(32, '9');
+    peer.open();
+    CHECK(client.connect(peer, peer.now));
+    for (unsigned i = 0; i < 1000 && client.phase() != SessionPhase::IdentityChanged; ++i)
+        client.poll(peer.now);
+    CHECK(client.phase() == SessionPhase::IdentityChanged);
+    bool rejected = false;
+    try { Session invalid{{sid, owner_id, ""}}; }
+    catch (const std::invalid_argument &) { rejected = true; }
+    CHECK(rejected);
+}
 void stalls_and_faults() {
     Fixture f;
     f.connect();
@@ -883,6 +906,7 @@ int main() {
         ownership_and_lease();
         uncertain_jobs();
         identity_and_events();
+        learned_plain_identity();
         stalls_and_faults();
         correlation();
         adversarial_recovery();

@@ -36,7 +36,9 @@ bool valid_io(IoResult result, std::size_t limit) {
 Session::Session(SessionOptions options) : options_(std::move(options)) {
     Request hello{options_.session_id, std::string(32, '0'), Operation::Hello,
                   HelloRequest{{"WTP/1"}, options_.client_name, options_.client_version}};
-    if (!valid_id(options_.owner_id) || !valid_id(options_.expected_device_id) ||
+    if (!valid_id(options_.owner_id) ||
+        !(valid_id(options_.expected_device_id) ||
+          (options_.learn_device_identity && options_.expected_device_id.empty())) ||
         !encode_request(hello) || !options_.transaction_timeout_ms || !options_.idle_timeout_ms)
         throw std::invalid_argument("Invalid WTP session options");
 }
@@ -428,6 +430,8 @@ void Session::response(const Response &r, std::uint64_t now) {
     if (r.ok()) {
         // Validate boot identity while the pending transaction is still retained.
         if (auto hello = std::get_if<HelloResponse>(&r.body)) {
+            if (options_.learn_device_identity && options_.expected_device_id.empty())
+                options_.expected_device_id = hello->device_id;
             if (hello->device_id != options_.expected_device_id ||
                 (identity_ && hello->boot_id != identity_->boot_id)) {
                 lose_stream("Device or boot identity changed", SessionPhase::IdentityChanged);

@@ -190,5 +190,10 @@ transitions. No full protocol/firmware conformance claim is made.
 Phase 11.1 supplies authenticated TLS in the parent integration layer, alongside
 USB, through this same byte-stream contract. TLS, resolution, credentials, worker
 ownership and shared browser resources remain outside this portable library.
+An explicitly selected parent Plain LAN binding may create a session with an
+empty expected device ID and `learn_device_identity=true`. The first valid
+`HELLO` binds that ID for the lifetime of the session; a reconnect with another
+ID enters `IdentityChanged`. USB and TLS still require an expected ID at
+construction. This changes no WTP/1 frame or server operation.
 See [parent network contract](../../docs/wtp-network.md). The existing provenance
 pin and normative protocol ownership are unchanged.

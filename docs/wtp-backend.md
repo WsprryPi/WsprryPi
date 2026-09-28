@@ -4,7 +4,7 @@ Phase 10 Slice 5 implements `WtpTransmitBackend` in
 [`src/wtp_integration`](../src/wtp_integration/backend.hpp), using the existing
 `ITransmissionBackend` interface and `TransmissionController`. It composes
 WTP-Client Session with the execution-plan converter. Its explicit stream input
-accepts the [USB CDC adapter](wtp-usb-cdc.md), [TLS network adapter](wtp-network.md), or an injected test transport.
+accepts the [USB CDC adapter](wtp-usb-cdc.md), [Plain LAN or TLS network adapter](wtp-network.md), or an injected test transport.
 The [production application](wtp-production-integration.md) now owns this backend
 through a dedicated complete-job scheduler and worker. The reusable transmitter
 component's generic factory still reports `BackendKind::WTP` unavailable: its
@@ -167,7 +167,7 @@ adjustments and unresolved-output recovery.
 Slice 6 adds the [early scheduler and absolute-UTC handoff](wtp-scheduling.md).
 [Production integration](wtp-production-integration.md) supplies status,
 configuration and the Impeccable-reviewed gated UI. [Network integration](wtp-network.md)
-extends the existing backend through TLS. Actual Linux USB/DTR/unplug and
+extends the existing backend through explicit Plain LAN and TLS bindings. Actual Linux USB/DTR/unplug and
 firmware functional validation, process/service lifecycle, RF qualification and
 release readiness require separate evidence and authorization.
 

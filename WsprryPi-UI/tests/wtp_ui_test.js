@@ -14,6 +14,11 @@ for (const value of ["PiCo.LoCaL.", "pico.local", "localhost", "127.0.0.1", "::1
 for (const value of ["", "pico.local..", "pico.local\n", "127.0.0.1\n", "pico.local\u2028", "pico..local", "-pico.local", "pico-.local", "pico_local", "pico.local:443", "*.local", "pico.local/", "127.1", "0127.0.0.1", "0x7f000001", "0x7f000001.", "256.0.0.1", "127.0.0.1.", "[::1]", "::g", "1:::2", "a".repeat(64) + ".local"]) assert(!validNetworkIdentity(value), value);
 const named = { ...settings, Transport: "network", Hostname: "PiCo.LoCaL.", "TLS Server Identity": "PICO.LOCAL.", "TCP Port": 18443, "TLS CA File": "/ca.crt", "TLS Client Certificate": "/client.crt", "TLS Client Key": "/client.key" };
 assert.deepEqual(errors(named, true), {});
+const plain = { ...settings, Transport: "network_plain", Hostname: "pico.local", "TCP Port": 31417, "Device ID": "" };
+assert.deepEqual(errors(plain, true), {});
+assert.deepEqual(errors({ ...plain, "TLS Server Identity": "stale:invalid" }, true), {});
+assert(errors({ ...plain, "TCP Port": 0 }, true)["TCP Port"]);
+assert.equal(defaults["TCP Port"], 31417);
 assert.equal(named.Hostname, "PiCo.LoCaL.");
 assert(errors({ ...named, "TLS Server Identity": "pico.local:443" }, true)["TLS Server Identity"]);
 assert(errors({ ...named, Transport: "usb", Hostname: "pico..local" }, false).Hostname);
@@ -25,6 +30,8 @@ assert.equal(summarize({ ...status, worker_active: true }).recover, false);
 assert.equal(summarize({ ...status, session_phase: "identity_changed" }).recover, false);
 assert.match(summarize({ ...status, remote: { output_active: true } }).output, /^Active/); // historical completion cannot override current output
 const markup = fs.readFileSync(path.join(__dirname, "../data/views/wtp-controls.php"), "utf8");
+assert.match(markup, /value="network_plain">Plain LAN/);
+assert.match(markup, /data-wtp-security="tls"/);
 assert.doesNotMatch(markup, /wtp_visible|Show Pico development controls|wtp-visibility-hint/);
 function browser(storage = new Map(), storageBlocked = false) {
     const fields = new Map();

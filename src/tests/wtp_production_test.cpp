@@ -136,6 +136,19 @@ void run(const std::string &credentials) {
   if (!candidate.valid)
     throw std::runtime_error(candidate.error_reason);
   CHECK(candidate.normalized_config.wtp == settings);
+  auto plain_settings = settings;
+  plain_settings.transport = "network_plain";
+  plain_settings.hostname = "pico.local";
+  plain_settings.tcp_port = 31417;
+  plain_settings.device_id.clear();
+  patch_all_from_web({{"WTP", wtp_settings_json(plain_settings)}});
+  RuntimeConfigCandidate plain_candidate;
+  prepare_runtime_config_candidate(filename, plain_candidate);
+  CHECK(plain_candidate.valid && plain_candidate.normalized_config.wtp == plain_settings);
+  patch_all_from_web({{"WTP", wtp_settings_json(settings)}});
+  auto invalid_plain = plain_settings;
+  invalid_plain.tcp_port = 0;
+  CHECK(!wtp_runtime_selection_error(invalid_plain).empty());
   for (auto patch : {nlohmann::json{{"WTP", {{"USB Serial", ""}}}},
                      nlohmann::json{{"WTP", {{"USB Vendor ID", 1.5}}}},
                      nlohmann::json{{"WTP", {{"Unknown", 1}}}},
@@ -294,6 +307,19 @@ void run(const std::string &credentials) {
   }
   CHECK(exact_duration);
   CHECK(end_test_tone().stopped);
+  select_wtp_runtime(std::nullopt);
+  Clock plain_clock;
+  set_wtp_runtime_for_test(plain_settings, plain_clock, plain_clock.peer,
+      {backend_test::sid, backend_test::owner_id, backend_test::device}, [&] {
+        plain_clock.peer.open(); return true;
+      });
+  CHECK(wtp_runtime_inspect().ok);
+  const auto plain_status = nlohmann::json::parse(wtp_runtime_json());
+  CHECK(plain_status.at("transport") == "network_plain");
+  CHECK(plain_status.at("network").at("security") == "plain_lan");
+  select_wtp_runtime(std::nullopt);
+  select_wtp_runtime(plain_settings);
+  CHECK(nlohmann::json::parse(wtp_runtime_json()).at("transport") == "network_plain");
   select_wtp_runtime(std::nullopt);
   if (!credentials.empty()) {
     auto network = settings;
