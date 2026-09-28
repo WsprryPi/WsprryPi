@@ -135,6 +135,16 @@ async function captureConflictScreenshot(client, outputPath, tabId, selector) {
                 pane.classList.toggle("show", selected);
             });
             document.querySelectorAll(".toast.show").forEach((toast) => toast.classList.remove("show"));
+            if (${JSON.stringify(selector)} === "#gpio-backend-panel .backend-calibration-section") {
+                document.querySelectorAll(".modal.show").forEach((modal) => {
+                    bootstrap.Modal.getInstance(modal)?.hide();
+                    modal.classList.remove("show");
+                    modal.style.display = "none";
+                });
+                document.querySelectorAll(".modal-backdrop").forEach((backdrop) => backdrop.remove());
+                document.body.classList.remove("modal-open");
+                populateGpioManualPpm(Number.MIN_VALUE);
+            }
         })()`,
     });
     await new Promise((resolve) => setTimeout(resolve, 350));
@@ -144,6 +154,11 @@ async function captureConflictScreenshot(client, outputPath, tabId, selector) {
         captureBeyondViewport: true,
     });
     fs.writeFileSync(outputPath, screenshot.data, "base64");
+    if (selector === "#gpio-backend-panel .backend-calibration-section") {
+        await client.send("Runtime.evaluate", {
+            expression: "populateGpioManualPpm(0)",
+        });
+    }
 }
 
 async function captureRp1DriveScreenshot(client, outputPath, theme) {
@@ -713,12 +728,38 @@ async function browserTest() {
     equal(field("gpio_manual_ppm").disabled, false,
         "GPIO manual fallback must remain editable while estimation is enabled");
 
+    populateGpioManualPpm(Number.MIN_VALUE);
+    equal(field("gpio_manual_ppm").value, "",
+        "saved subnormal fallback must not be displayed in the number control");
+    ok(!field("gpio-manual-ppm-error").hidden &&
+        field("gpio-manual-ppm-error").textContent.includes("Enter 0"),
+        "saved subnormal fallback must show an adjacent repair instruction");
+    ok(!field("gpio_manual_ppm").checkValidity(),
+        "saved subnormal fallback must prevent a silent configuration save");
+    field("gpio_manual_ppm").value = "0";
+    field("gpio_manual_ppm").dispatchEvent(new Event("input", { bubbles: true }));
+    equal(field("gpio-manual-ppm-error").hidden, true,
+        "entering zero must clear the recovery instruction");
+    equal(field("gpio_manual_ppm").checkValidity(), true,
+        "entering zero must restore native form validity");
+    equal(buildConfigPayload().GPIO["Manual PPM"], 0,
+        "zero repair must be sent as numeric zero");
+    populateGpioManualPpm(1.75);
+
     field("transmit_backend").checked = true;
     clickTransmitBackend();
     equal(field("rp1_gpio_drive_ma").disabled, true,
         "Si5351 must disable the inactive RP1 drive selector without clearing it");
     equal(field("si5351-backend-panel").hidden, false,
         "Si5351 selection must show calibration in the matching backend panel");
+    populateGpioManualPpm(Number.MIN_VALUE);
+    equal(field("gpio-backend-panel").hidden, false,
+        "an invalid retained fallback must remain reachable while Si5351 is selected");
+    equal(field("si5351-backend-panel").hidden, false,
+        "fallback recovery must not change the selected Si5351 backend");
+    populateGpioManualPpm(1.75);
+    equal(field("gpio-backend-panel").hidden, true,
+        "repairing an inactive fallback must restore the selected backend layout");
     equal(field("ppm").disabled, false,
         "Si5351 reference calibration must remain editable independently");
     equal(field("use_system_clock_frequency_estimate").checked, true,

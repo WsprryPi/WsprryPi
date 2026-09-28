@@ -1289,6 +1289,55 @@ function getConfigFloatValue(section, sectionName, key, fallback) {
     return value;
 }
 
+function isSubnormalPpm(value) {
+    return Number.isFinite(value) && value !== 0 && Math.abs(value) < 2 ** -1022;
+}
+
+function markSubnormalGpioManualPpm(field, savedValue) {
+    const error = document.getElementById("gpio-manual-ppm-error");
+    field.value = "";
+    field.dataset.invalidSubnormalPpm = "true";
+    field.setCustomValidity("Enter 0 or a measured Fallback PPM value.");
+    if (typeof setFieldValidationState === "function") {
+        setFieldValidationState(field, false);
+    }
+    if (error) {
+        error.textContent = savedValue
+            ? "The saved Fallback PPM is too small to use. Enter 0 or a measured value to repair it."
+            : "Fallback PPM is too small to use. Enter 0 or a measured value.";
+        error.hidden = false;
+    }
+}
+
+function clearSubnormalGpioManualPpm(field) {
+    const wasSubnormal = field.dataset.invalidSubnormalPpm === "true";
+    delete field.dataset.invalidSubnormalPpm;
+    field.setCustomValidity("");
+    if (wasSubnormal && typeof clearFieldValidationState === "function") {
+        clearFieldValidationState(field);
+    }
+    const error = document.getElementById("gpio-manual-ppm-error");
+    if (error) {
+        error.textContent = "";
+        error.hidden = true;
+    }
+}
+
+function populateGpioManualPpm(value) {
+    const field = document.getElementById("gpio_manual_ppm");
+    if (!field) return;
+    if (isSubnormalPpm(Number(value))) {
+        markSubnormalGpioManualPpm(field, true);
+    } else {
+        field.value = String(value);
+        clearSubnormalGpioManualPpm(field);
+    }
+    $(field).trigger("change");
+    if (typeof syncBackendPanelVisibility === "function") {
+        syncBackendPanelVisibility();
+    }
+}
+
 function getConfigTimingValue(section, sectionName, key, fallback) {
     const rawValue = getConfigValue(section, sectionName, key, fallback);
     return typeof rawValue === "number" ? rawValue : Number(String(rawValue).trim());
@@ -2016,7 +2065,7 @@ function populateConfig(callback = null) {
                     // Frequency Calibration
                     $("#use_system_clock_frequency_estimate").prop("checked", use_system_clock_frequency_estimate).trigger("change");
                     $("#gpio_frequency_residual_ppm").val(gpio_frequency_residual_ppm).trigger("change");
-                    $("#gpio_manual_ppm").val(gpio_manual_ppm).trigger("change");
+                    populateGpioManualPpm(gpio_manual_ppm);
                     $("#ppm").val(ppm).trigger("change");
 
                     $("#gpio-power-range").val(power_level).trigger("input");

@@ -121,6 +121,15 @@ namespace
     std::optional<bool> g_si5351_detection_override;
     std::optional<Si5351AddressInventory> g_si5351_address_inventory_override;
 
+    void require_persistable_gpio_manual_ppm(double ppm)
+    {
+        if (std::fpclassify(ppm) == FP_SUBNORMAL)
+        {
+            throw std::runtime_error(
+                "GPIO.Manual PPM is too small to use. Enter 0 or a measured value.");
+        }
+    }
+
     void publish_test_tone_planning_config(const ArgParserConfig &source)
     {
         TestTonePlanningConfigSnapshot snapshot;
@@ -1364,9 +1373,22 @@ namespace
                 }
 
                 if (section == "WTP" && wtp_settings_json(WtpSettings{}).value(key, nlohmann::json()).is_string())
+                {
                     patch[section][key] = trimmed;
+                }
                 else
-                    patch[section][key] = parse_ini_value(trimmed);
+                {
+                    nlohmann::json value = parse_ini_value(trimmed);
+                    if (section == "GPIO" && key == "Manual PPM" &&
+                        value.is_number() &&
+                        std::fpclassify(value.get<double>()) == FP_SUBNORMAL)
+                    {
+                        llog.logS(WARN,
+                            "GPIO.Manual PPM contains an unusably small saved value; using 0.");
+                        value = 0.0;
+                    }
+                    patch[section][key] = std::move(value);
+                }
             }
         }
 
@@ -1694,6 +1716,13 @@ build_persistent_ini_data(const nlohmann::json &source)
 
 void persist_config_json(const nlohmann::json &source)
 {
+    if (source.contains("GPIO") && source.at("GPIO").is_object() &&
+        source.at("GPIO").contains("Manual PPM") &&
+        source.at("GPIO").at("Manual PPM").is_number())
+    {
+        require_persistable_gpio_manual_ppm(
+            source.at("GPIO").at("Manual PPM").get<double>());
+    }
     const auto previous_data = iniFile.getData();
     try
     {

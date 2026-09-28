@@ -1,6 +1,7 @@
 #include "arg_parser.hpp"
 #include "backend_capabilities.hpp"
 #include "config_handler.hpp"
+#include "config_handler_deserialization.hpp"
 #include "config_handler_serialization.hpp"
 #include "i2c_bus_inventory.hpp"
 #include "execution_plan_compiler.hpp"
@@ -778,6 +779,59 @@ int main(int argc, char *argv[])
                     serialized["GPIO"]["Manual PPM"].get<double>() == value &&
                     serialized["GPIO"]["Frequency Residual PPM"].get<double>() == value,
                     "calibration serialization must not introduce an exponent artifact");
+        }
+        {
+            auto data = make_managed_ini_data("AA0NT", "EM18", "20m", false);
+            data["Operation"]["Transmit Backend"] = "wtp";
+            data["WTP"] = {{"Endpoint", "/dev/calibration-test"},
+                {"USB Serial", "calibration-test"}, {"USB Vendor ID", "1"},
+                {"USB Product ID", "2"}, {"Device ID", std::string(32, 'a')}};
+            data["GPIO"]["Manual PPM"] = "5e-324";
+            iniFile.setData(data);
+            PreparedConfigCandidate candidate;
+            prepare_ini_config_candidate("/tmp/calibration_roundtrip.ini", candidate);
+            require(candidate.valid &&
+                    candidate.normalized_config.gpio_manual_ppm == 0.0 &&
+                    candidate.normalized_json["GPIO"]["Manual PPM"].get<double>() == 0.0,
+                "legacy subnormal fallback must load as zero without surfacing the artifact");
+            candidate.normalized_json["GPIO"]["Manual PPM"] =
+                std::numeric_limits<double>::denorm_min();
+            ArgParserConfig rejected_config;
+            bool rejected = false;
+            try
+            {
+                config_handler_deserialization::deserialize_json_to_runtime_config(
+                    candidate.normalized_json, rejected_config);
+            }
+            catch (const std::exception &error)
+            {
+                rejected = std::string(error.what()).find("too small to use") !=
+                    std::string::npos;
+            }
+            require(rejected,
+                "new subnormal fallback values must be rejected before configuration update");
+        }
+        {
+            ScopedTemporaryFile ini("/tmp/wsprrypi-subnormal-ppm-XXXXXX");
+            iniFile.set_filename(ini.path());
+            init_config_json();
+            config.use_ini = true;
+            json_to_ini();
+            const auto before_subnormal = read_text_file(ini.path());
+            jConfig["GPIO"]["Manual PPM"] =
+                std::numeric_limits<double>::denorm_min();
+            bool rejected = false;
+            try
+            {
+                json_to_ini();
+            }
+            catch (const std::exception &error)
+            {
+                rejected = std::string(error.what()).find("too small to use") !=
+                    std::string::npos;
+            }
+            require(rejected && read_text_file(ini.path()) == before_subnormal,
+                "subnormal fallback must not be persisted to INI");
         }
         ArgParserConfig defaults;
         require(defaults.si5351_ppm == 0.0 && defaults.gpio_manual_ppm == 0.0 &&
@@ -6657,6 +6711,46 @@ int main(int argc, char *argv[])
                 nearly_equal(std::stod(persisted_ini.at("GPIO").at("Frequency Residual PPM")), -0.125) &&
                 nearly_equal(std::stod(persisted_ini.at("GPIO").at("Manual PPM")), 3.5),
             "web patch must persist all canonical GPIO correction settings in INI");
+
+        const auto before_subnormal_json = jConfig;
+        const auto before_subnormal_ini = iniFile.getData();
+        bool subnormal_rejected = false;
+        try
+        {
+            patch_all_from_web({{"GPIO", {{"Manual PPM",
+                std::numeric_limits<double>::denorm_min()}}}});
+        }
+        catch (const std::exception &error)
+        {
+            subnormal_rejected =
+                std::string(error.what()).find("too small to use") != std::string::npos;
+        }
+        require(subnormal_rejected && jConfig == before_subnormal_json &&
+                iniFile.getData() == before_subnormal_ini &&
+                config.gpio_manual_ppm == 3.5,
+            "subnormal fallback patch must be rejected without changing saved or active configuration");
+
+        jConfig["GPIO"]["Manual PPM"] =
+            std::numeric_limits<double>::denorm_min();
+        subnormal_rejected = false;
+        try
+        {
+            json_to_ini();
+        }
+        catch (const std::exception &error)
+        {
+            subnormal_rejected =
+                std::string(error.what()).find("too small to use") != std::string::npos;
+        }
+        require(subnormal_rejected && iniFile.getData() == before_subnormal_ini,
+            "subnormal fallback must not reach the INI persistence path");
+        jConfig = before_subnormal_json;
+
+        patch_all_from_web({{"GPIO", {{"Manual PPM", 0.0}}}});
+        require(config.gpio_manual_ppm == 0.0 &&
+                jConfig["GPIO"]["Manual PPM"].get<double>() == 0.0 &&
+                std::stod(iniFile.getData().at("GPIO").at("Manual PPM")) == 0.0,
+            "explicit zero must replace an earlier fallback through runtime, JSON, and INI");
     }
 
     {

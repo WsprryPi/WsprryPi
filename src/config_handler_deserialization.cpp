@@ -251,6 +251,11 @@ double parse_gpio_ppm_value(
     {
         throw std::runtime_error(context + " must be within -200 to 200 PPM.");
     }
+    if (context == "GPIO.Manual PPM" && std::fpclassify(ppm) == FP_SUBNORMAL)
+    {
+        throw std::runtime_error(
+            "GPIO.Manual PPM is too small to use. Enter 0 or a measured value.");
+    }
     return ppm;
 }
 

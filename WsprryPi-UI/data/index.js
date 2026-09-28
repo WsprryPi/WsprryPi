@@ -501,7 +501,7 @@ function restorePersistedConfigDraft() {
         gpio["Use System Clock Frequency Estimate"] !== false
     ).trigger("change");
     $("#gpio_frequency_residual_ppm").val(Number(gpio["Frequency Residual PPM"] ?? 0)).trigger("change");
-    $("#gpio_manual_ppm").val(Number(gpio["Manual PPM"] ?? 0)).trigger("change");
+    populateGpioManualPpm(Number(gpio["Manual PPM"] ?? 0));
     $("#ppm").val(Number(calibration.PPM)).trigger("change");
 
     $("#gpio-power-range").val(Number(gpio["Power Level"])).trigger("input");
@@ -566,6 +566,14 @@ function bindIndexActions() {
 
     // Bind the GPIO system-clock frequency-estimate switch.
     $("#use_system_clock_frequency_estimate").on("change", clickUseSystemClockFrequencyEstimate);
+    $("#gpio_manual_ppm").on("input", function () {
+        if (isSubnormalPpm(Number(this.value))) {
+            markSubnormalGpioManualPpm(this, false);
+        } else {
+            clearSubnormalGpioManualPpm(this);
+        }
+        syncBackendPanelVisibility();
+    });
     $("#transmit_backend").on("change", clickTransmitBackend);
     $("#tx_pin").on("change", clickTransmitPin);
     initializeRp1RouteUi();
@@ -2509,7 +2517,9 @@ function syncBackendPanelVisibility() {
     const rp1RecoveryRequired = rp1GpioOperatorVisible() &&
         document.getElementById("rp1_gpio_drive_ma")
         ?.getAttribute("data-invalid-source-value") !== null;
-    $("#gpio-backend-panel").prop("hidden", !gpioActive && !rp1RecoveryRequired);
+    const calibrationRecoveryRequired = document.getElementById("gpio_manual_ppm")
+        ?.dataset.invalidSubnormalPpm === "true";
+    $("#gpio-backend-panel").prop("hidden", !gpioActive && !rp1RecoveryRequired && !calibrationRecoveryRequired);
     $("#si5351-backend-panel").prop(
         "hidden",
         gpioActive || selectedTransmitBackend() !== "si5351"
@@ -4213,6 +4223,16 @@ function validateTransmitterHardwareFields() {
     const backend = selectedTransmitBackend();
     const gpioOperatorActive = gpioBackendOperatorActive();
     let invalidCount = 0;
+
+    const manualPpmField = document.getElementById("gpio_manual_ppm");
+    if (manualPpmField &&
+        (manualPpmField.dataset.invalidSubnormalPpm === "true" ||
+            !manualPpmField.checkValidity())) {
+        setFieldValidationState(manualPpmField, false);
+        invalidCount++;
+    } else {
+        setFieldValidationState(manualPpmField, true);
+    }
 
     const gpioPower = normalizeIntegerInputValue("#gpio-power-range", 7);
     const rp1GpioDrive = normalizeIntegerInputValue("#rp1_gpio_drive_ma", 2);
