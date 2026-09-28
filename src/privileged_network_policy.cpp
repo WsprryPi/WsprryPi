@@ -97,6 +97,12 @@ PrivilegedOperationClass classify_privileged_http_operation(
         if ((method == "GET" || method == "PUT") &&
             (path == "/api/v1/config" || path == "/api/v1/schedules" || path == "/api/v1/network" || path == "/api/v1/host/config"))
             return PrivilegedOperationClass::protected_operation;
+        if ((method == "GET" && (path == "/api/v1/host/devices" ||
+                                 path == "/api/v1/host/discovery")) ||
+            (method == "POST" && (path == "/api/v1/host/devices" ||
+                                  path == "/api/v1/host/devices/use" ||
+                                  path == "/api/v1/host/discovery/identify")))
+            return PrivilegedOperationClass::protected_operation;
         if (method == "POST" && (path == "/api/v1/jobs" ||
             (path.starts_with("/api/v1/jobs/") && path.ends_with("/abort") && path.size() == 51)))
             return PrivilegedOperationClass::protected_operation;

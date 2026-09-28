@@ -5,6 +5,7 @@
 #include "wspr_transmit_types.hpp"
 #include "wtp_integration/application.hpp"
 #include "wtp_integration/network_http.hpp"
+#include "json.hpp"
 #include <optional>
 std::string wtp_runtime_selection_error(const std::optional<WtpSettings> &);
 void wtp_runtime_prepare_skip();
@@ -26,6 +27,10 @@ std::string wtp_runtime_json();
 wsprrypi::PicoHttpResponse wtp_runtime_management(const std::string &resource,
     const std::string &method, const std::string &body, const std::string &revision);
 wsprrypi::CleanupResult wtp_runtime_cancel_job(const std::string &job_id);
+// Holds the runtime operation gate while a bounded read-only identification
+// callback runs. It never claims or changes the active endpoint.
+nlohmann::json wtp_runtime_safe_probe(const std::function<nlohmann::json()> &probe);
+bool wtp_runtime_switch_allowed() noexcept;
 std::optional<wsprrypi::WtpScheduleReport> wtp_runtime_completion();
 
 // Typed injection only: no configuration, environment or HTTP selector exposes

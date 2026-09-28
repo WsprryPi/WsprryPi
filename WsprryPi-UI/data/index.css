@@ -138,6 +138,20 @@
 
 #fleet-tab-item[hidden],
 #fleet-pane[hidden] { display: none !important; }
+.fleet-catalog {
+    border: 1px solid var(--bs-border-color);
+    border-radius: var(--bs-border-radius);
+    background: color-mix(in srgb, var(--bs-secondary-bg) 35%, var(--bs-body-bg));
+    padding: 1rem;
+}
+.fleet-catalog .form-text { overflow-wrap: anywhere; }
+.fleet-catalog .font-monospace { font-variant-numeric: tabular-nums; }
+.fleet-editor { border-top: 1px solid var(--bs-border-color); padding-top: 1rem; }
+.fleet-editor[hidden], .fleet-catalog [hidden] { display: none !important; }
+@media (max-width: 575.98px) {
+    .fleet-catalog { padding: .8rem; }
+    .fleet-catalog .d-flex > .btn { flex: 1 1 100%; }
+}
 
 #configTabs .nav-link.active {
     background-color: color-mix(in srgb, var(--bs-body-bg) 90%, var(--bs-secondary-bg) 10%);

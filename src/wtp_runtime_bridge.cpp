@@ -131,6 +131,18 @@ wtp_runtime_selection_error(const std::optional<WtpSettings> &settings) {
   } catch (const std::exception &error) { return error.what(); }
   return {};
 }
+nlohmann::json wtp_runtime_safe_probe(const std::function<nlohmann::json()> &probe) {
+  std::lock_guard operation(operation_mutex);
+  auto r = get();
+  if (r && !r->app->replaceable())
+    throw std::runtime_error("Resolve Pico ownership and output before identifying another device");
+  return probe();
+}
+bool wtp_runtime_switch_allowed() noexcept {
+  std::lock_guard operation(operation_mutex);
+  auto r = get();
+  return !r || r->app->replaceable();
+}
 void wtp_runtime_prepare_skip() {
   std::lock_guard operation(operation_mutex);
   require()->app->prepare_skip();

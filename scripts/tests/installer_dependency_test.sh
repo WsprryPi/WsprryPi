@@ -45,6 +45,25 @@ if ! awk '
     exit 1
 fi
 
+if ! awk '
+    /^readonly BUILD_APT_PACKAGES=\(/ { in_packages = 1; next }
+    in_packages && /^\)/ { in_packages = 0; next }
+    in_packages && /^[[:space:]]*"libavahi-client-dev"[[:space:]]*$/ { found = 1 }
+    END { exit(found ? 0 : 1) }
+' "$INSTALLER"; then
+    echo "libavahi-client-dev must remain in the build dependency group" >&2
+    exit 1
+fi
+if ! awk '
+    /^readonly RUNTIME_APT_PACKAGES=\(/ { in_packages = 1; next }
+    in_packages && /^\)/ { in_packages = 0; next }
+    in_packages && /^[[:space:]]*"libavahi-client3"[[:space:]]*$/ { found = 1 }
+    END { exit(found ? 0 : 1) }
+' "$INSTALLER"; then
+    echo "libavahi-client3 must remain in the runtime dependency group" >&2
+    exit 1
+fi
+
 for package in build-essential python3; do
     if ! awk -v required="$package" '
         /^readonly (RUNTIME|BUILD)_APT_PACKAGES=\(/ { in_packages = 1; next }

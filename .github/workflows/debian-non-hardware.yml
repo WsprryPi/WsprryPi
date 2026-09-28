@@ -44,7 +44,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - name: Install host-only TLS and UI test dependencies
-        run: sudo apt-get update && sudo apt-get install -y libssl-dev libsystemd-dev pkg-config cmake python3 nodejs php-cli
+        run: sudo apt-get update && sudo apt-get install -y libssl-dev libavahi-client-dev libsystemd-dev pkg-config cmake python3 nodejs php-cli
       - name: Install UI development dependencies
         working-directory: WsprryPi-UI
         run: npm ci --ignore-scripts
@@ -72,6 +72,7 @@ jobs:
       - name: Parent TLS, shared API and actual Pico interoperability
         working-directory: src
         run: |
+          make wtp-catalog-test SUDO=
           make wtp-tls-test SUDO=
           make wtp-network-runtime-test BACKENDS=simulated ANCILLARY_GPIO=0 SUDO=
           make wtp-network-interop-test SUDO= PICO_SOURCE=build/network-reference/pico MBEDTLS_SOURCE=build/network-reference/mbedtls
@@ -92,7 +93,7 @@ jobs:
         run: |
           apt-get update
           DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
-            build-essential ca-certificates git libssl-dev libsystemd-dev pkg-config \
+            build-essential ca-certificates git libssl-dev libavahi-client-dev libsystemd-dev pkg-config \
             python3 strace
 
       - name: Check out source
@@ -120,7 +121,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
-            build-essential git libgpiod-dev libssl-dev libsystemd-dev pkg-config python3
+            build-essential git libgpiod-dev libssl-dev libavahi-client-dev libsystemd-dev pkg-config python3
 
       - name: Check out source
         uses: actions/checkout@v7
@@ -163,7 +164,7 @@ jobs:
         run: |
           apt-get update
           DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
-            age build-essential ca-certificates chromium cmake git libgpiod-dev libssl-dev \
+            age build-essential ca-certificates chromium cmake git libgpiod-dev libssl-dev libavahi-client-dev \
             libsystemd-dev nodejs npm php-cli pkg-config python3 strace
 
       - name: Check out source

@@ -47,6 +47,9 @@ HAVE_JOURNALD  := 0
 
 OPENSSL_CFLAGS := $(strip $(shell pkg-config --cflags openssl 2>/dev/null))
 OPENSSL_LIBS   := $(strip $(shell pkg-config --libs openssl 2>/dev/null))
+AVAHI_AVAILABLE := $(shell pkg-config --exists avahi-client && echo 1)
+AVAHI_CFLAGS := $(if $(filter Linux,$(shell uname -s 2>/dev/null)),$(if $(AVAHI_AVAILABLE),$(shell pkg-config --cflags avahi-client) -DWSPRRYPI_HAVE_AVAHI))
+AVAHI_LIBS := $(if $(filter Linux,$(shell uname -s 2>/dev/null)),$(if $(AVAHI_AVAILABLE),$(shell pkg-config --libs avahi-client)))
 
 # Prefer pkg-config for libsystemd, but also allow header-only detection as fallback.
 ifeq ($(shell pkg-config --exists libsystemd 2>/dev/null && echo yes),yes)
@@ -637,6 +640,7 @@ CXXFLAGS := -Wno-psabi -std=c++$(CXXVER) \
            $(COMMON_FLAGS) \
            $(PKG_CFLAGS) \
            $(OPENSSL_CFLAGS) \
+           $(AVAHI_CFLAGS) \
            $(SYSTEMD_CFLAGS) \
            -DGPIOD_API_MAJOR=$(GPIOD_API_MAJOR) \
            -DLIB_JOURNALD=$(HAVE_JOURNALD)
@@ -662,6 +666,7 @@ endif
 LDFLAGS := -lpthread $(ATOMIC_LIB) \
            $(PKG_LIBS) \
            $(OPENSSL_LIBS) \
+           $(AVAHI_LIBS) \
            $(SYSTEMD_LIBS)
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -1858,6 +1863,14 @@ wtp-application-test:
 	$(Q)"$(WTP_APPLICATION_BUILD_DIR)/wtp_application_test"
 
 .PHONY: wtp-production-test
+WTP_CATALOG_BUILD_DIR ?= build/wtp-catalog
+.PHONY: wtp-catalog-test
+wtp-catalog-test:
+	$(Q)mkdir -p "$(WTP_CATALOG_BUILD_DIR)"
+	$(Q)$(CXX) -std=c++20 -Wall -Wextra -Werror -O2 $(OPENSSL_CFLAGS) -I. \
+		tests/wtp_catalog_discovery_test.cpp wtp_integration/catalog.cpp wtp_integration/discovery.cpp \
+		$(OPENSSL_LIBS) -o "$(WTP_CATALOG_BUILD_DIR)/wtp_catalog_discovery_test"
+	$(Q)"$(WTP_CATALOG_BUILD_DIR)/wtp_catalog_discovery_test"
 $(BIN_DIR)/wtp_production_test: tests/wtp_production_test.cpp $(SEMANTICS_TEST_DEPS)
 	$(Q)mkdir -p $(BIN_DIR)
 	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -Itests $^ -o $@ $(LDFLAGS)

@@ -17,6 +17,11 @@ complete-job conversion, cancellation and recovery paths serve USB and network.
 The portable component and its provenance/fixtures are unchanged. There is no
 transport fallback or browser-owned scheduler.
 
+The host's local DNS-SD browser and known-device catalog are described in
+[WTP Fleet](wtp-fleet.md). Saved discovery profiles do not replace `[WTP]` as
+the active runtime endpoint. Direct/manual network settings retain their
+existing resolution and reconnection behavior.
+
 ## Configuration and migration
 
 Legacy `[WTP]` sections without `Transport` mean `usb`. Their existing endpoint,
@@ -209,7 +214,7 @@ loopback results; no CLI, INI, browser or environment option enables that seam.
 
 ## Browser and present Pico limits
 
-The development visibility boolean still controls the existing Transmitter panel.
+The development visibility boolean still controls the hidden Fleet pane.
 **Use Pico** selects the backend; **Connection** selects USB, Plain LAN or
 Network (TLS, advanced). Choosing Plain LAN presents host and port without
 certificate fields. Existing TLS configurations retain their selection.

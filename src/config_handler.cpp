@@ -2043,11 +2043,15 @@ std::string patch_all_from_web_revision(const nlohmann::json &j, const std::stri
             std::string("Configuration update rejected: ") + e.what());
     }
 
+    // A failed INI write must not publish a new active [WTP] endpoint in
+    // memory while the previous endpoint remains on disk. The catalog is a
+    // separate saved list and never acts as a second runtime authority.
+    if (candidate_config.use_ini)
+        persist_config_json(candidate_json);
     copy_config(candidate_config, config);
     publish_test_tone_planning_config(config);
     jConfig = candidate_json;
     refresh_logger_level_from_config();
-    json_to_ini();
     if (!g_patch_all_from_web_runtime_apply_suppressed_for_test)
     {
         callback_ini_changed();

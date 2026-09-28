@@ -821,6 +821,7 @@ readonly RUNTIME_APT_PACKAGES=(
     "libgcc-s1"
     "libc6"
     "libsystemd0"
+    "libavahi-client3"
 )
 readonly WEB_APT_PACKAGES=("apache2" "php")
 readonly BUILD_APT_PACKAGES=(
@@ -828,6 +829,7 @@ readonly BUILD_APT_PACKAGES=(
     "libgpiod-dev"
     "libsystemd-dev"
     "libssl-dev"
+    "libavahi-client-dev"
 )
 # readelf inspects supplied files; it does not compile or execute WsprryPi.
 readonly BINARY_VALIDATION_APT_PACKAGES=("binutils")

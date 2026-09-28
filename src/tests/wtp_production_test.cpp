@@ -16,6 +16,7 @@
 #include <fstream>
 #include <filesystem>
 #include <thread>
+#include <sys/stat.h>
 #include <unistd.h>
 using namespace std::chrono_literals;
 using backend_test::checks;
@@ -54,8 +55,8 @@ void run(const std::string &credentials) {
   CHECK(fd >= 0);
   close(fd);
   struct Remove {
-    const char *path;
-    ~Remove() { unlink(path); }
+    std::string path;
+    ~Remove() { unlink(path.c_str()); unlink((path + ".wtp-devices.json").c_str()); }
   } remove{filename};
   init_config_json();
   json_to_config();
@@ -146,6 +147,49 @@ void run(const std::string &credentials) {
   prepare_runtime_config_candidate(filename, plain_candidate);
   CHECK(plain_candidate.valid && plain_candidate.normalized_config.wtp == plain_settings);
   patch_all_from_web({{"WTP", wtp_settings_json(settings)}});
+  {
+    const auto before = get_public_config_snapshot();
+    const auto active_before = config.wtp;
+    const std::string blocked_temp = std::string(filename) + ".tmp";
+    CHECK(mkdir(blocked_temp.c_str(), 0700) == 0);
+    bool failed = false;
+    try {
+      (void)patch_all_from_web_revision(
+          {{"WTP", {{"Start Uncertainty ns", 1234}}}}, before.second);
+    } catch (...) { failed = true; }
+    CHECK(rmdir(blocked_temp.c_str()) == 0);
+    CHECK(failed && config.wtp == active_before &&
+          get_public_config_snapshot() == before);
+  }
+  auto discovered = browser.Get("/api/v1/host/discovery", read_headers);
+  CHECK(discovered && discovered->status == 200 &&
+        nlohmann::json::parse(discovered->body).at("scope") == "wtp-dns-sd/1");
+  auto known = browser.Get("/api/v1/host/devices", read_headers);
+  CHECK(known && known->status == 200 && known->has_header("ETag"));
+  const auto known_json = nlohmann::json::parse(known->body);
+  CHECK(known_json.at("profiles").size() == 1 &&
+        known_json.at("profiles")[0].at("settings") == wtp_settings_json(settings) &&
+        !known_json.at("active_id").get<std::string>().empty());
+  auto catalog_headers = httplib::Headers{{"Host", authority},
+      {"Origin", "http://" + authority}, {"X-WsprryPico-Request", "1"},
+      {"If-Match", known->get_header_value("ETag")}};
+  auto catalog_conflict = catalog_headers;
+  catalog_conflict.erase("If-Match");
+  auto missing_catalog_revision = browser.Post("/api/v1/host/devices", catalog_conflict,
+      R"({"operation":"remove","id":"00000000000000000000000000000000"})", "application/json");
+  CHECK(missing_catalog_revision && missing_catalog_revision->status == 428);
+  catalog_conflict.erase("Origin");
+  auto missing_catalog_origin = browser.Post("/api/v1/host/devices", catalog_conflict,
+      R"({"operation":"remove","id":"00000000000000000000000000000000"})", "application/json");
+  CHECK(missing_catalog_origin && missing_catalog_origin->status == 403);
+  auto active_host = browser.Get("/api/v1/host/config", read_headers);
+  CHECK(active_host && active_host->status == 200);
+  catalog_headers.erase("If-Match");
+  catalog_headers.emplace("If-Match", active_host->get_header_value("ETag"));
+  auto use_current = browser.Post("/api/v1/host/devices/use", catalog_headers,
+      nlohmann::json{{"id", known_json.at("active_id")},
+                     {"catalog_revision", known->get_header_value("ETag")}}.dump(), "application/json");
+  CHECK(use_current && use_current->status == 200 && config.wtp == settings);
   auto invalid_plain = plain_settings;
   invalid_plain.tcp_port = 0;
   CHECK(!wtp_runtime_selection_error(invalid_plain).empty());
@@ -190,6 +234,23 @@ void run(const std::string &credentials) {
   request.payload = wsprrypi::TonePayload{14097100, 200ms, {}};
   request.policy.allow_unqualified_frequency = true;
   transmitter_configure_execution(request, {});
+  {
+    bool probe_ran = false;
+    bool probe_refused = false;
+    try {
+      (void)wtp_runtime_safe_probe([&] { probe_ran = true; return nlohmann::json::object(); });
+    } catch (...) { probe_refused = true; }
+    CHECK(probe_refused && !probe_ran);
+    auto pending_config = browser.Get("/api/v1/host/config", read_headers);
+    CHECK(pending_config && pending_config->status == 200);
+    catalog_headers.erase("If-Match");
+    catalog_headers.emplace("If-Match", pending_config->get_header_value("ETag"));
+    auto blocked_use = browser.Post("/api/v1/host/devices/use", catalog_headers,
+        nlohmann::json{{"id", known_json.at("active_id")},
+                       {"catalog_revision", known->get_header_value("ETag")}}.dump(),
+        "application/json");
+    CHECK(blocked_use && blocked_use->status == 409);
+  }
   CHECK(!wtp_runtime_invalidate_for_reload());
   CHECK(clock.peer.executions == 0 &&
         std::count(clock.peer.operations.begin(), clock.peer.operations.end(),

@@ -139,6 +139,8 @@ async function main() {
                 remote:{output_active:false}, owns:false, network:{hostname:'wsprrypico-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.local',port:18443,expected_identity:'wsprrypico-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.local',resolved_address:'192.0.2.27',authenticated_identity:'wsprrypico-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.local',state:'ready',observed_ms:'9000'} };
             window.fetch = async (url, options = {}) => {
                 window.__requests.push({url,options});
+                if (String(url).endsWith('/host/devices')) return {ok:true,headers:{get:()=> '"catalog-r1"'},json:async()=>({scope:'wsprrypi-wtp-catalog/1',version:1,active_id:'c'.repeat(32),active_unmatched:false,profiles:[{id:'c'.repeat(32),name:'Bench Pico',method:'manual',discovery_id:'',legacy_unverified:false,settings:{Transport:'network',Hostname:'wsprrypico-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.local','TCP Port':18443,'TLS Server Identity':'pico.local','TLS CA File':'/etc/wsprrypi/pico/ca.crt','TLS Client Certificate':'/etc/wsprrypi/pico/client.crt','TLS Client Key':'/etc/wsprrypi/pico/client.key',Endpoint:'', 'USB Serial':'','USB Vendor ID':0,'USB Product ID':0,'Device ID':'a'.repeat(32),'Start Uncertainty ns':1000000,'Allow Frequency Adjustment':false}}]})};
+                if (String(url).endsWith('/host/discovery')) return {ok:true,json:async()=>({available:true,reason:'',candidates:[{id:'service-nearby',interface:2,protocol:0,instance:'Nearby Pico',domain:'local',target:'nearby.local',port:40123,binding:'plain',state:'online',first_seen_ms:1,last_seen_ms:2}]})};
                 if (String(url).endsWith('/status')) {
                     if (window.__statusFailure) throw new Error('Connection interrupted');
                     return {ok:true, json:async()=>({host:window.__snapshot})};
@@ -155,6 +157,25 @@ async function main() {
         })()`);
         await waitFor(async () => await evaluate('document.getElementById("wtp-network-state").textContent.includes("192.0.2.27")'), 'network snapshot');
         assert.equal(await evaluate('document.getElementById("fleet-tab").classList.contains("active")'), true);
+        await waitFor(async () => await evaluate('document.getElementById("fleet-device").options.length === 2'), 'Fleet catalog');
+        assert.equal(await evaluate('document.getElementById("fleet-device").value'), 'known:'+'c'.repeat(32));
+        await evaluate(`(() => { const selector=document.getElementById('fleet-device'); selector.value='nearby:service-nearby'; selector.dispatchEvent(new Event('change',{bubbles:true})); document.getElementById('fleet-add').click(); document.getElementById('fleet-name').value='Nearby draft'; })()`);
+        assert.equal(await evaluate('document.getElementById("fleet-host").value'), 'nearby.local');
+        assert.equal(await evaluate('document.getElementById("fleet-port").value'), '40123');
+        assert.equal(await evaluate('window.WtpUi.read().Hostname'), 'wsprrypico-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.local');
+        assert.equal(await evaluate('window.__requests.filter(r => r.url.endsWith("/host/devices") && r.options.method === "POST").length'), 0);
+        for (const viewport of [{name:'desktop',width:1280,height:900},{name:'mobile',width:390,height:844}]) {
+            await client.send('Emulation.setDeviceMetricsOverride', {...viewport,deviceScaleFactor:1,mobile:viewport.name==='mobile'});
+            await evaluate(`document.getElementById('fleet-device').scrollIntoView({block:'center',behavior:'instant'});`);
+            await new Promise(resolve=>setTimeout(resolve,200));
+            const shot=await client.send('Page.captureScreenshot',{format:'png'});
+            fs.writeFileSync(path.join(output,`${viewport.name}-fleet-selector.png`),Buffer.from(shot.data,'base64'));
+            assert(await evaluate('document.documentElement.scrollWidth <= window.innerWidth + 1'), 'Fleet horizontal overflow');
+            await evaluate('document.getElementById("fleet-binding").scrollIntoView({block:"center",behavior:"instant"})');
+            const editorShot=await client.send('Page.captureScreenshot',{format:'png'});
+            fs.writeFileSync(path.join(output,`${viewport.name}-fleet-editor.png`),Buffer.from(editorShot.data,'base64'));
+        }
+        await evaluate(`document.getElementById('fleet-editor-cancel').click()`);
         assert.equal(await evaluate('window.WtpUi.validate()'), true);
         await evaluate(`(() => {
             window.__snapshot.transport='network_plain';
@@ -171,10 +192,10 @@ async function main() {
         assert.equal(await evaluate('document.getElementById("wtp-management").hidden'), true);
         for (const viewport of [{name:'desktop',width:1280,height:900},{name:'mobile',width:390,height:844}]) {
             await client.send('Emulation.setDeviceMetricsOverride', {...viewport,deviceScaleFactor:1,mobile:viewport.name==='mobile'});
-            await evaluate('window.scrollTo({top:0,behavior:"instant"})');
-            await evaluate(`document.getElementById('wtp_transport').scrollIntoView({block:'center',behavior:'instant'});`);
             await new Promise(resolve=>setTimeout(resolve,200));
-            assert(await evaluate('(() => { const r=document.getElementById("wtp_transport").getBoundingClientRect(); return r.height > 0 && r.top >= 0 && r.bottom <= window.innerHeight; })()'), 'Plain LAN selector visible');
+            await evaluate('document.getElementById("wtp_transport").scrollIntoView({block:"center",behavior:"instant"})');
+            const transportVisible = await evaluate('(() => { const r=document.getElementById("wtp_transport").getBoundingClientRect(); return {height:r.height,top:r.top,bottom:r.bottom,viewport:window.innerHeight}; })()');
+            assert(transportVisible.height > 0 && transportVisible.top >= 0 && transportVisible.bottom <= transportVisible.viewport, `Plain LAN selector visible: ${JSON.stringify(transportVisible)}`);
             const shot=await client.send('Page.captureScreenshot',{format:'png'});
             fs.writeFileSync(path.join(output,`${viewport.name}-plain-lan.png`),Buffer.from(shot.data,'base64'));
             assert(await evaluate('document.documentElement.scrollWidth <= window.innerWidth + 1'), 'Plain LAN horizontal overflow');

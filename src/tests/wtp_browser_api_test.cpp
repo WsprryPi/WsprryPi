@@ -32,6 +32,14 @@ int main() {
       CHECK(classify_privileged_http_operation("PUT", path) == PrivilegedOperationClass::protected_operation);
       CHECK(classify_privileged_http_operation("DELETE", path) == PrivilegedOperationClass::reject);
     }
+    for (const auto path : {"/api/v1/host/devices", "/api/v1/host/discovery"}) {
+      CHECK(classify_privileged_http_operation("GET", path) == PrivilegedOperationClass::protected_operation);
+      CHECK(classify_privileged_http_operation("PUT", path) == PrivilegedOperationClass::reject);
+    }
+    for (const auto path : {"/api/v1/host/devices", "/api/v1/host/devices/use", "/api/v1/host/discovery/identify"}) {
+      CHECK(classify_privileged_http_operation("POST", path) == PrivilegedOperationClass::protected_operation);
+      CHECK(classify_privileged_http_operation("GET", std::string(path) + "/other") == PrivilegedOperationClass::reject);
+    }
     CHECK(classify_privileged_http_operation("POST", "/api/v1/jobs/" + std::string(32, 'a') + "/abort") == PrivilegedOperationClass::protected_operation);
     CHECK(classify_privileged_http_operation("GET", "/api/v1/unknown") == PrivilegedOperationClass::reject);
     std::cout << "Shared API shapes, precision, revisions, bounded parsing, cancellation replay and route classification passed\n";

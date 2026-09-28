@@ -14,6 +14,10 @@ prefix `/wsprrypi`; the table below shows backend paths.
 | GET/PUT `/api/v1/schedules` | Pico standalone schedule subresource, sharing Pico config revisions. |
 | GET/PUT `/api/v1/network` | Pico network status/control, with its own remote revision. |
 | GET/PUT `/api/v1/host/config` | Explicit `wsprrypi-host-config/1` application and transport settings. PUT applies a merge patch. |
+| GET `/api/v1/host/discovery` | Bounded local Avahi snapshot; no WTP connection. |
+| GET/POST `/api/v1/host/devices` | Host-owned known-device catalog, revision-guarded add/edit/rename/remove. |
+| POST `/api/v1/host/discovery/identify` | Explicit bounded read-only HELLO/STATUS/CAPS for one selected candidate. |
+| POST `/api/v1/host/devices/use` | Applies a saved profile through the active host config/runtime path, with both catalog and config revisions. |
 
 The host does not redefine Pico `/config` as WsprryPi configuration. WsprryPi's
 schedule remains owned by its existing application; remote standalone schedules
@@ -58,6 +62,9 @@ revision. Conflict responses preserve the browser draft; load the saved settings
 before retrying. Remote PUT passes through the Pico resource's exact If-Match and
 ETag, without replacing its revision with a host-generated value. A lost remote
 write result is unconfirmed; explicitly read saved state before retrying.
+The [Fleet catalog](wtp-fleet.md) has a separate ETag for saved profiles; its
+selection action still uses the host config ETag and never stores a second
+active-endpoint authority.
 
 The existing trusted-LAN peer, Host, Origin and proxy-identity guard applies both
 to direct backend requests and deployed proxy traffic. Shared mutations also
