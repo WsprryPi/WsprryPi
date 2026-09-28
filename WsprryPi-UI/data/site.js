@@ -850,10 +850,11 @@ function findTabTriggerBySelector(tabList, selector) {
     }
 
     const normalizedSelector = selector.trim();
-    return tabList.querySelector(
+    const trigger = tabList.querySelector(
         `[data-bs-toggle="tab"][data-bs-target="${normalizedSelector}"], ` +
         `[data-bs-toggle="tab"][href="${normalizedSelector}"]`
     );
+    return trigger && !trigger.disabled && !trigger.closest("[hidden]") ? trigger : null;
 }
 
 function restorePersistedTabState(tabList) {

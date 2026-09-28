@@ -107,9 +107,19 @@
     }
     function render() {
         if (!byId("wtp-controls")) return;
+        // Fleet is a session-only feature flag and starts hidden on every load.
+        const fleetTab = byId("fleet-tab");
+        const fleetPane = byId("fleet-pane");
+        if (!visible && fleetTab?.classList?.contains("active"))
+            root.bootstrap?.Tab?.getOrCreateInstance(byId("transmitter-hardware-tab"))?.show();
+        if (fleetTab) {
+            fleetTab.disabled = !visible;
+            fleetTab.parentElement.hidden = !visible;
+        }
+        if (fleetPane) fleetPane.hidden = !visible;
         byId("wtp-controls").hidden = !visible;
         byId("wtp-hidden-selection").hidden = visible || !selected();
-        byId("wtp-development").hidden = !visible && !selected();
+        byId("wtp-development").hidden = !visible;
         byId("wtp_use").disabled = !visible;
         root.document.querySelectorAll("[data-wtp-key]").forEach(field => { field.disabled = !visible || !selected(); });
         const network = read().Transport === "network";
@@ -234,6 +244,12 @@
         initialized = true;
         populate(saved);
         byId("wtp_use").addEventListener("change", () => { render(); root.clickTransmitBackend?.(); root.updateCwMessageLengthEstimate?.(); root.validateCwMessage?.(); request(); });
+        const keepFleetTabVisible = () => {
+            const tab = byId("fleet-tab");
+            if (tab?.classList.contains("active")) tab.scrollIntoView({ block: "nearest", inline: "nearest" });
+        };
+        byId("fleet-tab")?.addEventListener("shown.bs.tab", keepFleetTabVisible);
+        root.addEventListener("resize", keepFleetTabVisible);
         root.document.querySelectorAll("[data-wtp-key]").forEach(field => field.addEventListener("change", () => { render(); validate(); }));
         byId("wtp-cancel")?.addEventListener("click", cancelJob);
         byId("wtp-recover").addEventListener("click", () => request(true));

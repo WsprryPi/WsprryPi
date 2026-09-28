@@ -136,6 +136,9 @@
     background-color: color-mix(in srgb, var(--bs-body-bg) 94%, transparent);
 }
 
+#fleet-tab-item[hidden],
+#fleet-pane[hidden] { display: none !important; }
+
 #configTabs .nav-link.active {
     background-color: color-mix(in srgb, var(--bs-body-bg) 90%, var(--bs-secondary-bg) 10%);
     border-color: color-mix(in srgb, var(--bs-border-color) 88%, transparent);
@@ -1346,7 +1349,7 @@ legend {
 .rp1-route-actions { justify-content: flex-start; }
 @media (max-width: 575.98px) { .rp1-route-identities { grid-template-columns: 1fr; } .rp1-route-actions > .btn, .rp1-route-control-row .btn { min-height: 44px; } .rp1-route-control-row { align-items: stretch; flex-direction: column; } .rp1-route-control-row .form-select, .rp1-route-control-row .btn { flex-basis: auto; width: 100%; } .rp1-route-state { align-self: flex-start; } .rp1-route-progress-heading { align-items: flex-start; flex-direction: column; } .rp1-route-progress-retry { text-align: start; } }
 
-/* Pico development controls follow the existing flat transmitter sections. */
+/* Pico development controls use the existing flat Fleet sections. */
 .wtp-observations { display: grid; gap: .75rem; margin-block: 1rem; }
 .wtp-observations > div { display: grid; grid-template-columns: minmax(8rem, 1fr) minmax(0, 3fr); gap: 1rem; }
 .wtp-observations dd { margin: 0; overflow-wrap: anywhere; }

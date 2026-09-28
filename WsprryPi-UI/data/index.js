@@ -2409,7 +2409,7 @@ function updateBackendPlatformSupportUi() {
     $backend.prop("disabled", currentBackend === "wtp" || !anyBackendSupported);
     $selectorHint.text(
         currentBackend === "wtp" ? (window.WtpUi.developmentControlsVisible
-            ? "Pico is selected below. Turn off Use Pico to choose GPIO or Si5351."
+            ? "Pico is selected on Fleet. Turn off Use Pico there to choose GPIO or Si5351."
             : "GPIO and Si5351 selection is unavailable while Pico is in use.") :
         rp1RouteSelectable && !gpioSupported
             ? rp1RouteSelectorHint()

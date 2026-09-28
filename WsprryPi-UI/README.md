@@ -72,6 +72,16 @@ merged automatically. `--fail-on-ui-modifications` makes the installer refuse
 replacement instead. The installer relists the affected files, backup and
 report locations, and actual replacement status as its final output block.
 
+### Fleet staging flag
+
+The Setup > Fleet tab contains the existing single-Pico connection, status and
+standalone-management controls. It starts hidden and disabled on every page load.
+For a local UI review, set `window.WtpUi.developmentControlsVisible = true` in
+the browser console; the flag lasts only for that page session. Turning it off
+while Fleet is active returns to Transmitter. A saved Fleet URL cannot reveal
+it while the flag is off. This flag does not create a known-device registry or
+a multi-Pico selector.
+
 ### Pico finite CW messages
 
 When Pico is selected, the CW message form shows the exact calculated integer-

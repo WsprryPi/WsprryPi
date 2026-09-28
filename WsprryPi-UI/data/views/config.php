@@ -70,6 +70,20 @@ $bandGpioBands = ['2200m', '630m', '160m', '80m', '60m', '40m', '30m', '20m', '1
                             Pi I/O
                         </button>
                     </li>
+                    <li class="nav-item" id="fleet-tab-item" role="presentation" hidden>
+                        <button
+                            class="nav-link"
+                            id="fleet-tab"
+                            data-bs-toggle="tab"
+                            data-bs-target="#fleet-pane"
+                            type="button"
+                            role="tab"
+                            aria-controls="fleet-pane"
+                            aria-selected="false"
+                            disabled>
+                            Fleet
+                        </button>
+                    </li>
                 </ul>
             </div>
 
@@ -733,8 +747,7 @@ $bandGpioBands = ['2200m', '630m', '160m', '80m', '60m', '40m', '30m', '20m', '1
                                     </div>
                                 </div>
                                 <div id="backendStatus" class="alert mt-3 mb-0" role="alert" aria-live="assertive" aria-atomic="true" hidden></div>
-
-                                <?php require __DIR__ . '/wtp-controls.php'; ?>
+                                <p id="wtp-hidden-selection" class="form-text mt-2 mb-0" hidden>Pico is selected. Fleet controls are hidden.</p>
 
                                 <div class="transmitter-backend-fields" id="gpio-backend-panel" role="group" aria-labelledby="gpio-output-heading">
 
@@ -1228,6 +1241,19 @@ $bandGpioBands = ['2200m', '630m', '160m', '80m', '60m', '40m', '30m', '20m', '1
                                     </table>
                                 </div>
                             </fieldset>
+                        </div>
+                        <div
+                            class="tab-pane fade"
+                            id="fleet-pane"
+                            role="tabpanel"
+                            aria-labelledby="fleet-tab"
+                            tabindex="0"
+                            hidden>
+                            <div class="config-pane-intro">
+                                <span class="config-pane-intro__label">Fleet</span>
+                                <p class="mb-0">Configure and inspect the Pico connected to this WsprryPi host.</p>
+                            </div>
+                            <?php require __DIR__ . '/wtp-controls.php'; ?>
                         </div>
                     </div>
 

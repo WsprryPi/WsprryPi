@@ -1,6 +1,5 @@
 <?php // SPDX-License-Identifier: MIT ?>
-<div id="wtp-development" class="wtp-development mt-3" hidden>
-    <p id="wtp-hidden-selection" class="form-text mt-2 mb-0" hidden>Pico is selected. Its development controls are hidden.</p>
+<div id="wtp-development" class="wtp-development" hidden>
     <section id="wtp-controls" class="transmitter-backend-fields" aria-labelledby="wtp-heading" hidden>
         <h3 id="wtp-heading" class="transmitter-backend-fields__title">Pico output</h3>
         <div class="form-check form-switch mb-3">

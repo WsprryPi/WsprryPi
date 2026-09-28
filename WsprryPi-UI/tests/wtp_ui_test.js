@@ -32,7 +32,8 @@ function browser(storage = new Map(), storageBlocked = false) {
         const f = { id, dataset: key ? { wtpKey: key } : {}, type, value: "", checked: false, disabled: false, hidden: false, listeners: {}, textContent: "", setCustomValidity(v) { this.validityMessage = v; }, setAttribute() {}, addEventListener(name, fn) { this.listeners[name] = fn; } };
         fields.set(id, f); return f;
     }
-    for (const id of ["wtp-development", "wtp_use", "wtp-controls", "wtp-hidden-selection", "wtp-status-text", "wtp-output", "wtp-clock", "wtp-identity", "wtp-history", "wtp-recover", "wtp-feedback"]) field(id);
+    for (const id of ["wtp-development", "wtp_use", "wtp-controls", "wtp-hidden-selection", "fleet-tab", "fleet-pane", "wtp-status-text", "wtp-output", "wtp-clock", "wtp-identity", "wtp-history", "wtp-recover", "wtp-feedback"]) field(id);
+    fields.get("fleet-tab").parentElement = { hidden: true };
     for (const [key, value] of Object.entries(defaults)) field(key, key, typeof value === "number" ? "number" : typeof value === "boolean" ? "checkbox" : "text");
     const writes = [], calls = [], events = {}, timers = new Map();
     let nextTimer = 0;
@@ -48,6 +49,9 @@ function browser(storage = new Map(), storageBlocked = false) {
     events.DOMContentLoaded();
     assert.equal(root.WtpUi.developmentControlsVisible, false);
     assert.equal(fields.get("wtp-development").hidden, true);
+    assert.equal(fields.get("fleet-tab").parentElement.hidden, true);
+    assert.equal(fields.get("fleet-tab").disabled, true);
+    assert.equal(fields.get("fleet-pane").hidden, true);
     assert.equal(calls.length, 0);
     for (const invalid of ["false", "true", 0, 1, null, undefined, {}, []]) {
         assert.throws(() => { root.WtpUi.developmentControlsVisible = invalid; }, /must be a boolean/);
@@ -64,6 +68,9 @@ function browser(storage = new Map(), storageBlocked = false) {
         root.WtpUi.developmentControlsVisible = visible;
         assert.equal(root.WtpUi.developmentControlsVisible, visible);
         assert.equal(fields.get("wtp-controls").hidden, !visible);
+        assert.equal(fields.get("fleet-tab").parentElement.hidden, !visible);
+        assert.equal(fields.get("fleet-tab").disabled, !visible);
+        assert.equal(fields.get("fleet-pane").hidden, !visible);
         assert.equal(fields.get("wtp_use").disabled, !visible);
         assert.equal(fields.get("wtp-hidden-selection").hidden, visible);
         await new Promise(setImmediate);

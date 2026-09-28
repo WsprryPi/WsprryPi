@@ -103,7 +103,7 @@ async function main() {
     const fs = require('node:fs');
     const phpPort = await freePort(), debugPort = await freePort();
     const php = spawn('php', ['-S', `127.0.0.1:${phpPort}`, '-t', 'data'], { cwd: UI_ROOT, stdio: 'ignore' });
-    const url = `http://127.0.0.1:${phpPort}/index.php?page=config`;
+    const url = `http://127.0.0.1:${phpPort}/index.php?page=config&setup_tab=%23fleet-pane`;
     const profileDir = `/tmp/wsprrypi-network-ui-${process.pid}`;
     const output = path.resolve(UI_ROOT, '../src/build/wtp-network/ui');
     fs.mkdirSync(output, { recursive: true });
@@ -120,6 +120,11 @@ async function main() {
             return result.result.value;
         };
         await waitFor(async () => await evaluate('document.readyState === "complete" && !!window.WtpUi && !!window.WtpManagement'), 'WTP scripts');
+        assert.equal(await evaluate('document.getElementById("fleet-tab-item").hidden'), true);
+        assert.equal(await evaluate('document.getElementById("fleet-tab").classList.contains("active")'), false);
+        assert.equal(await evaluate('new URL(location.href).searchParams.has("setup_tab")'), false);
+        assert.equal(await evaluate('document.getElementById("fleet-tab").disabled'), true);
+        assert.equal(await evaluate('document.getElementById("wtp-controls").closest("[role=tabpanel]").id'), 'fleet-pane');
         await evaluate(`(() => {
             configAutosaveSuspended = true;
             clearPendingPopulateConfigRetry(); clearWebSocketReconnectTimer();
@@ -146,9 +151,10 @@ async function main() {
             window.WtpUi.populate({Transport:'network',Hostname:window.__snapshot.network.hostname,'TCP Port':18443,'Device ID':'a'.repeat(32),'TLS CA File':'/etc/wsprrypi/pico/ca.crt','TLS Client Certificate':'/etc/wsprrypi/pico/client.crt','TLS Client Key':'/etc/wsprrypi/pico/client.key','TLS Server Identity':'','Start Uncertainty ns':1000000,'Allow Frequency Adjustment':false,Endpoint:'/dev/preserved','USB Serial':'00001234','USB Vendor ID':51966,'USB Product ID':16402});
             window.WtpUi.developmentControlsVisible = true;
             window.WtpUi.select(true);
-            document.getElementById('transmitter-hardware-tab').click();
+            document.getElementById('fleet-tab').click();
         })()`);
         await waitFor(async () => await evaluate('document.getElementById("wtp-network-state").textContent.includes("192.0.2.27")'), 'network snapshot');
+        assert.equal(await evaluate('document.getElementById("fleet-tab").classList.contains("active")'), true);
         assert.equal(await evaluate('window.WtpUi.validate()'), true);
         await evaluate(`document.getElementById('wtp_transport').value='usb'; document.getElementById('wtp_transport').dispatchEvent(new Event('change',{bubbles:true}));`);
         assert.equal(await evaluate('window.WtpUi.read().Hostname'), 'wsprrypico-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.local');
@@ -163,6 +169,7 @@ async function main() {
         assert.equal(await evaluate('document.getElementById("wtp-remote-password").value'),'unsaved-secret');
         for (const viewport of [{name:'desktop',width:1280,height:900},{name:'mobile',width:390,height:844}]) {
             await client.send('Emulation.setDeviceMetricsOverride', {...viewport, deviceScaleFactor:1,mobile:viewport.name==='mobile'});
+            await waitFor(async () => await evaluate('(() => { const tab=document.getElementById("fleet-tab").getBoundingClientRect(); const list=document.getElementById("configTabs").getBoundingClientRect(); return tab.left >= list.left - 1 && tab.right <= list.right + 1; })()'), 'Fleet tab in view');
             for (const section of ['wtp-remote-password','wtp-management-feedback']) {
                 await evaluate(`document.getElementById('${section}').scrollIntoView({block:'center',behavior:'instant'});`);
                 await new Promise(resolve=>setTimeout(resolve,200));
@@ -217,6 +224,10 @@ async function main() {
         await new Promise(resolve=>setTimeout(resolve,200));
         const failure=await client.send('Page.captureScreenshot',{format:'png'});
         fs.writeFileSync(path.join(output,'mobile-status-failure.png'),Buffer.from(failure.data,'base64'));
+        await evaluate('window.WtpUi.developmentControlsVisible = false');
+        await waitFor(async () => await evaluate('document.getElementById("transmitter-hardware-tab").classList.contains("active")'), 'Transmitter tab after hiding Fleet');
+        assert.equal(await evaluate('document.getElementById("fleet-tab-item").hidden && document.getElementById("fleet-pane").hidden'), true);
+        assert.equal(await evaluate('window.WtpUi.read().Hostname'), 'DrAfT.LoCaL.');
         console.log('Rendered desktop/mobile: transport selection, preserved inactive settings, management revision failure, status failure and drafts passed');
         console.log('Screenshots: '+output);
     } finally {
