@@ -767,6 +767,7 @@ async function main() {
         for (const viewport of [
             { name: "desktop", width: 1280, height: 900 },
             { name: "mobile", width: 375, height: 812 },
+            { name: "narrow-mobile", width: 320, height: 700 },
         ]) {
             await client.send("Emulation.setDeviceMetricsOverride", {
                 width: viewport.width,
@@ -789,18 +790,25 @@ async function main() {
                         setConfigSaveStatus(state, message, detail, options);
                         const detailNode = document.getElementById("configSaveStatusDetail");
                         const hintNode = document.getElementById("configSaveStatusHint");
+                        const tabs = document.getElementById("configTabs");
                         const detailRange = document.createRange();
                         detailRange.selectNodeContents(detailNode);
                         return {
                             state,
-                            tabsTop: document.getElementById("configTabs").getBoundingClientRect().top,
+                            tabsTop: tabs.getBoundingClientRect().top,
+                            tabsBottom: tabs.getBoundingClientRect().bottom,
+                            detailTop: detailNode.getBoundingClientRect().top,
                             detailHeight: detailNode.getBoundingClientRect().height,
                             detailWidth: detailNode.getBoundingClientRect().width,
                             detailScrollHeight: detailNode.scrollHeight,
                             detailTextHeight: detailRange.getBoundingClientRect().height,
                             detailLineHeight: Number.parseFloat(getComputedStyle(detailNode).lineHeight),
-                            hintWidth: hintNode.getBoundingClientRect().width,
+                            headerActionsTop: document.querySelector(".config-header-actions").getBoundingClientRect().top,
+                            hintBottom: hintNode.getBoundingClientRect().bottom,
+                            detailInTabContent: detailNode.parentElement.id === "configTabsContent",
+                            hasReviewAction: !!detailNode.querySelector("button"),
                             detailHidden: detailNode.hidden,
+                            horizontalOverflow: document.documentElement.scrollWidth > innerWidth,
                         };
                     });
                 })()`,
@@ -813,22 +821,49 @@ async function main() {
                 `${viewport.name} Setup tabs must not move across save states: ${JSON.stringify(metrics)}`
             );
             metrics.forEach((metric) => {
-                assert.equal(metric.detailHidden, false, `${viewport.name} detail slot must remain in layout`);
-                assert.ok(
-                    metric.detailHeight + 0.5 >= metric.detailScrollHeight,
-                    `${viewport.name} detail slot must contain ${metric.state} feedback without growth: ${JSON.stringify(metric)}`
-                );
-                assert.ok(
-                    Math.abs(metric.detailWidth - metric.hintWidth) <= 0.5,
-                    `${viewport.name} detail and autosave hint must share a wrapping width: ${JSON.stringify(metric)}`
-                );
+                const hasDetail = metric.state === "error" || metric.state === "warning";
+                assert.equal(metric.detailInTabContent, true, `${viewport.name} detail belongs above the active pane`);
+                assert.equal(metric.detailHidden, !hasDetail, `${viewport.name} only detailed feedback takes space`);
+                assert.equal(metric.horizontalOverflow, false, `${viewport.name} Setup must fit the viewport`);
+                if (hasDetail) {
+                    assert.ok(metric.detailTop >= metric.tabsBottom,
+                        `${viewport.name} detailed feedback must appear below stable tabs: ${JSON.stringify(metric)}`);
+                    assert.ok(metric.detailHeight + 0.5 >= metric.detailScrollHeight,
+                        `${viewport.name} detail must contain ${metric.state} feedback: ${JSON.stringify(metric)}`);
+                    assert.ok(metric.detailWidth > 0, `${viewport.name} detail must be visible`);
+                } else {
+                    assert.equal(metric.detailHeight, 0, `${viewport.name} empty detail must use no height`);
+                }
             });
+            assert.equal(metrics.find(({ state }) => state === "warning").hasReviewAction, true,
+                `${viewport.name} recovery action must remain available`);
             if (viewport.name === "desktop") {
+                assert.ok(metrics[0].headerActionsTop < metrics[0].hintBottom,
+                    `desktop controls should share the header row: ${JSON.stringify(metrics[0])}`);
                 const pausedMetric = metrics.find(({ state }) => state === "error");
                 assert.ok(
                     pausedMetric.detailTextHeight <= pausedMetric.detailLineHeight + 0.5,
                     `desktop paused-save detail must use the available width: ${JSON.stringify(pausedMetric)}`
                 );
+            }
+            if (process.env.WSPRRYPI_UI_CAPTURE_DIR) {
+                fs.mkdirSync(process.env.WSPRRYPI_UI_CAPTURE_DIR, { recursive: true });
+                for (const theme of ["light", "dark"]) {
+                    await client.send("Runtime.evaluate", {
+                        expression: `document.documentElement.setAttribute("data-bs-theme", ${JSON.stringify(theme)}); setConfigSaveStatus("error", "Save paused", "The controller could not be reached for this save. Changes stay local until retry."); window.scrollTo(0, 0);`,
+                    });
+                    const screenshot = await client.send("Page.captureScreenshot", {
+                        format: "png",
+                        captureBeyondViewport: false,
+                    });
+                    fs.writeFileSync(
+                        path.join(process.env.WSPRRYPI_UI_CAPTURE_DIR, `${viewport.name}-${theme}-save-error.png`),
+                        Buffer.from(screenshot.data, "base64")
+                    );
+                }
+                await client.send("Runtime.evaluate", {
+                    expression: `document.documentElement.setAttribute("data-bs-theme", "light"); setConfigSaveStatus("", "", "");`,
+                });
             }
         }
         if (process.env.WSPRRYPI_UI_CAPTURE_DIR) {

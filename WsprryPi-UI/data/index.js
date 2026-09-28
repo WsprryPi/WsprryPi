@@ -4623,7 +4623,7 @@ function setConfigSaveStatus(state, message = "", detail = "", options = {}) {
                 : "";
 
         detailNode.innerHTML = "";
-        detailNode.hidden = false;
+        detailNode.hidden = !detail && !(detailActionLabel && onDetailAction);
         detailNode.tabIndex = -1;
         detailNode.removeAttribute("role");
         detailNode.removeAttribute("aria-label");
@@ -4646,7 +4646,7 @@ function setConfigSaveStatus(state, message = "", detail = "", options = {}) {
             detailNode.appendChild(actionButton);
         } else {
             detailNode.textContent = detail;
-            const isActionable = state === "invalid" && !!firstInvalidConfigControl();
+            const isActionable = state === "invalid" && !!detail && !!firstInvalidConfigControl();
             detailNode.tabIndex = isActionable ? 0 : -1;
             if (isActionable) {
                 detailNode.setAttribute("role", "button");
@@ -4664,7 +4664,7 @@ function setConfigSaveStatus(state, message = "", detail = "", options = {}) {
             node.dataset.state = "";
             node.classList.remove("is-visible");
             if (detailNode) {
-                detailNode.hidden = false;
+                detailNode.hidden = true;
                 detailNode.textContent = "";
                 detailNode.tabIndex = -1;
                 detailNode.removeAttribute("role");
