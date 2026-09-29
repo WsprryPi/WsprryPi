@@ -27,6 +27,9 @@
  */
 
 #include "wtp_settings_json.hpp"
+#include "wtp_server_settings_json.hpp"
+#include "wtp_pi_control.hpp"
+#include "wtp_endpoint/runtime.hpp"
 #include "wtp_runtime_bridge.hpp"
 #include "config_handler.hpp"
 #include "i2c_bus_inventory.hpp"
@@ -61,6 +64,7 @@
 #include <string>
 #include <unordered_map>
 #include <vector>
+#include <sys/stat.h>
 
 ArgParserConfig config;
 nlohmann::json jConfig;
@@ -120,6 +124,27 @@ namespace
     TestTonePlanningConfigSnapshot g_test_tone_planning_snapshot{};
     std::optional<bool> g_si5351_detection_override;
     std::optional<Si5351AddressInventory> g_si5351_address_inventory_override;
+    std::string interactive_enable_file_stamp;
+
+    // Identify our own persisted interactive Enable across file-monitor reloads.
+    // An external rewrite (even to identical values), a direct HTTP mutation,
+    // or process restart removes this exception and uses immediate cancellation.
+    std::string config_file_stamp(const std::string &path)
+    {
+        struct stat info{};
+        if (stat(path.c_str(), &info) != 0) return {};
+#if defined(__APPLE__)
+        const auto modified = info.st_mtimespec;
+        const auto changed = info.st_ctimespec;
+#else
+        const auto modified = info.st_mtim;
+        const auto changed = info.st_ctim;
+#endif
+        return path + ":" + std::to_string(info.st_dev) + ":" +
+            std::to_string(info.st_ino) + ":" + std::to_string(info.st_size) + ":" +
+            std::to_string(modified.tv_sec) + ":" + std::to_string(modified.tv_nsec) + ":" +
+            std::to_string(changed.tv_sec) + ":" + std::to_string(changed.tv_nsec);
+    }
 
     void require_persistable_gpio_manual_ppm(double ppm)
     {
@@ -553,7 +578,10 @@ void init_default_config()
     // Runtime
     config.transmit = false;
     config.transmit_backend = TransmitBackendKind::GPIO;
+    config.simulated_backend_override = false;
     config.wtp = WtpSettings{};
+    config.wtp_server = WtpServerSettings{};
+    config.wtp_server_port_override.reset();
     config.enable_on_boot = EnableOnBootBehavior::Never;
 
     // WSPR
@@ -1079,6 +1107,7 @@ namespace
             {"Use Shutdown", false},
             {"Shutdown Button", 19}};
         target["WTP"] = wtp_settings_json(WtpSettings{});
+        target["WTP Server"] = wtp_server_settings_json(WtpServerSettings{});
         target["Experimental"] = {
             {"Allow Unqualified Frequency", false},
             {"Allow Non-Amateur Frequency", false}};
@@ -1158,7 +1187,10 @@ namespace
         target.use_offset = source.use_offset;
         target.power_level = source.power_level;
         target.transmit_backend = source.transmit_backend;
+        target.simulated_backend_override = source.simulated_backend_override;
         target.wtp = source.wtp;
+        target.wtp_server = source.wtp_server;
+        target.wtp_server_port_override = source.wtp_server_port_override;
         target.gpio_tx_pin = source.gpio_tx_pin;
         target.gpio_power_level = source.gpio_power_level;
         target.rp1_gpio_drive_ma = source.rp1_gpio_drive_ma;
@@ -1338,6 +1370,7 @@ namespace
                 section != "WSPR" &&
                 section != "CW" &&
                 section != "WTP" &&
+                section != "WTP Server" &&
                 section != "Experimental")
             {
                 continue;
@@ -1372,7 +1405,8 @@ namespace
                     continue;
                 }
 
-                if (section == "WTP" && wtp_settings_json(WtpSettings{}).value(key, nlohmann::json()).is_string())
+                if ((section == "WTP" && wtp_settings_json(WtpSettings{}).value(key, nlohmann::json()).is_string()) ||
+                    (section == "WTP Server" && key == "Interface"))
                 {
                     patch[section][key] = trimmed;
                 }
@@ -1444,6 +1478,9 @@ namespace
             config_handler_deserialization::deserialize_json_to_runtime_config(
                 candidate_json, candidate_config);
             candidate_config.enable_web = config.enable_web;
+            candidate_config.simulated_backend_override = config.simulated_backend_override;
+            if (candidate_config.simulated_backend_override)
+                candidate_config.transmit_backend = TransmitBackendKind::SIMULATED;
 
             if (missing_required_tx_item)
             {
@@ -1581,6 +1618,7 @@ build_persistent_ini_data(const nlohmann::json &source)
             section_name != "CW" &&
             section_name != "Experimental" &&
             section_name != "WTP" &&
+            section_name != "WTP Server" &&
             section_name != "Band GPIO")
         {
             continue;
@@ -1617,6 +1655,8 @@ build_persistent_ini_data(const nlohmann::json &source)
             const std::string &key = kv.key();
             const bool persist_key =
                 (section_name == "WTP" && wtp_settings_json(WtpSettings{}).contains(key)) ||
+                (section_name == "WTP Server" &&
+                 wtp_server_settings_json(WtpServerSettings{}).contains(key)) ||
                 (section_name == "Meta" &&
                  key == "debug_logging") ||
                 (section_name == "Operation" &&
@@ -1834,6 +1874,8 @@ void prepare_ini_config_candidate(
     const std::string &filename,
     PreparedConfigCandidate &candidate_out)
 {
+    std::lock_guard update_lock(config_update_mutex());
+    const auto file_stamp = config_file_stamp(filename);
     candidate_out = PreparedConfigCandidate{};
 
     if (!build_candidate_from_ini(
@@ -1864,6 +1906,8 @@ void prepare_ini_config_candidate(
 
     candidate_out.valid = true;
     candidate_out.transmit_enabled = candidate_out.normalized_config.transmit;
+    candidate_out.preserve_interactive_takeover = !file_stamp.empty() &&
+        file_stamp == interactive_enable_file_stamp && file_stamp == config_file_stamp(filename);
 }
 
 void commit_config_candidate(const PreparedConfigCandidate &candidate)
@@ -1884,7 +1928,12 @@ void commit_config_candidate(const PreparedConfigCandidate &candidate)
         persist_config_json(candidate.normalized_json);
     }
 
+    const auto process_wtp_port = config.wtp_server_port_override;
     copy_config(candidate.normalized_config, config);
+    config.wtp_server_port_override = process_wtp_port;
+    wsprrypi::wtp_pi_configuration_committed(config);
+    if (!candidate.preserve_interactive_takeover || !config.transmit)
+        wtp_pi_config_transmit_committed(config.transmit);
     publish_test_tone_planning_config(config);
     jConfig = candidate.normalized_json;
     refresh_logger_level_from_config();
@@ -1906,11 +1955,21 @@ void dump_json(const nlohmann::json &j, std::string tag)
 
 void patch_all_from_web(const nlohmann::json &j) { (void)patch_all_from_web_revision(j, {}); }
 
-std::string patch_all_from_web_revision(const nlohmann::json &j, const std::string &expected_revision)
+std::string patch_all_from_web_revision(const nlohmann::json &j, const std::string &expected_revision,
+    LocalEnableAction action, bool confirmed,
+    const std::string& observed_owner, const std::string& observed_job)
 {
-    std::lock_guard update_lock(config_update_mutex());
+    std::unique_lock update_lock(config_update_mutex());
     if (!expected_revision.empty() && expected_revision != config_revision_locked())
         throw std::runtime_error("revision_conflict");
+    const bool interactive = action != LocalEnableAction::Noninteractive;
+    const bool writes_enable = j.contains("Operation") && j.at("Operation").is_object() &&
+                               j.at("Operation").contains("Transmit");
+    const bool retain_interactive_choice = !writes_enable &&
+        !interactive_enable_file_stamp.empty() &&
+        config_file_stamp(config.ini_filename) == interactive_enable_file_stamp;
+    if (interactive && j != nlohmann::json{{"Operation", {{"Transmit", true}}}})
+        throw std::runtime_error("Interactive Enable only changes local output enable");
     nlohmann::json candidate_public_json =
         config_handler_serialization::public_config_from_internal_json(jConfig);
     candidate_public_json.merge_patch(j);
@@ -1928,6 +1987,10 @@ std::string patch_all_from_web_revision(const nlohmann::json &j, const std::stri
         config_handler_deserialization::deserialize_json_to_runtime_config(
             candidate_json, candidate_config);
         candidate_config.enable_web = config.enable_web;
+        candidate_config.simulated_backend_override = config.simulated_backend_override;
+        if (candidate_config.simulated_backend_override)
+            candidate_config.transmit_backend = TransmitBackendKind::SIMULATED;
+        candidate_config.wtp_server_port_override = config.wtp_server_port_override;
 
         // Validate new selections against fresh host metadata, never client Platform data.
         // An unchanged unavailable bus must not prevent recovery to another backend.
@@ -2046,17 +2109,29 @@ std::string patch_all_from_web_revision(const nlohmann::json &j, const std::stri
     // A failed INI write must not publish a new active [WTP] endpoint in
     // memory while the previous endpoint remains on disk. The catalog is a
     // separate saved list and never acts as a second runtime authority.
-    if (candidate_config.use_ini)
-        persist_config_json(candidate_json);
+    auto persist = [&] {
+        if (candidate_config.use_ini) persist_config_json(candidate_json);
+        interactive_enable_file_stamp = (interactive || retain_interactive_choice) && candidate_config.use_ini
+            ? config_file_stamp(candidate_config.ini_filename) : std::string{};
+    };
+    if (interactive)
+        wsprrypi::wtp_pi_enable_interactive(action == LocalEnableAction::FinishCurrent,
+                                           confirmed, persist, observed_owner, observed_job);
+    else persist();
     copy_config(candidate_config, config);
+    wsprrypi::wtp_pi_configuration_committed(config);
+    if (!interactive && (writes_enable || !config.transmit))
+        wtp_pi_config_transmit_committed(config.transmit);
     publish_test_tone_planning_config(config);
     jConfig = candidate_json;
     refresh_logger_level_from_config();
+    const auto revision = config_revision_locked();
+    update_lock.unlock(); // set_config takes its own lock before reading config.
     if (!g_patch_all_from_web_runtime_apply_suppressed_for_test)
     {
         callback_ini_changed();
     }
-    return config_revision_locked();
+    return revision;
 }
 
 void set_patch_all_from_web_runtime_apply_suppressed_for_test(bool suppressed) noexcept

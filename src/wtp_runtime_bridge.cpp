@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Lee Bussy
 #include "wtp_runtime_bridge.hpp"
+#include "wtp_integration/target_runtime.hpp"
 #include "json.hpp"
 #include "wtp_integration/usb_cdc.hpp"
 #include "wtp_integration/tls.hpp"
@@ -10,83 +11,7 @@
 #include <mutex>
 #include <stdexcept>
 namespace {
-struct NativeRuntime {
-  WtpSettings settings;
-  wsprrypi::WtpSystemScheduleClock clock{wsprrypi::wtp_host_utc_valid};
-  wsprrypi::PosixCdcSystem system;
-  wsprrypi::UsbCdcStream stream{system};
-  wsprrypi::TlsStream tls{[this] { return clock.now_ms(); }};
-  wsprrypi::PlainTcpStream plain{[this] { return clock.now_ms(); }};
-  std::shared_ptr<wsprrypi::TlsCredentials> credentials;
-  wsprrypi::TlsSelection network_selection() const {
-    return {settings.hostname, settings.tls_identity, settings.tls_ca,
-            settings.tls_certificate, settings.tls_key,
-            static_cast<unsigned>(settings.tcp_port)};
-  }
-  std::unique_ptr<wsprrypi::WtpApplication> app;
-  bool credentials_current() const {
-    return settings.transport != "network" ||
-           (credentials && credentials->matches(wsprrypi::TlsCredentials(network_selection())));
-  }
-  bool reopen() {
-    if (const char *disabled = std::getenv("WSPRRYPI_DISABLE_HARDWARE_ACCESS");
-        disabled && std::string(disabled) == "1") return false;
-    if (settings.transport == "network") {
-      try {
-        if (!credentials_current() || !tls.begin_open(network_selection(), credentials)) return false;
-        while (tls.opening()) { tls.poll_open(); if (tls.opening()) clock.wait_ms(5); }
-        return tls.ready();
-      } catch (...) { return false; }
-    }
-    if (settings.transport == "network_plain") {
-      try {
-        if (!plain.begin_open(settings.hostname, static_cast<unsigned>(settings.tcp_port)))
-          return false;
-        while (plain.opening()) {
-          plain.poll_open();
-          if (plain.opening()) clock.wait_ms(5);
-        }
-        return plain.ready();
-      } catch (...) { plain.close(); return false; }
-    }
-    stream.close();
-    if (!stream.begin_open({settings.path, settings.usb_serial,
-                            static_cast<std::uint16_t>(settings.vendor_id),
-                            static_cast<std::uint16_t>(settings.product_id)}, clock.now_ms()))
-      return false;
-    while (stream.state() == wsprrypi::CdcState::Resetting) {
-      stream.poll_open(clock.now_ms());
-      if (stream.state() == wsprrypi::CdcState::Resetting) clock.wait_ms(10);
-    }
-    return stream.state() == wsprrypi::CdcState::Ready;
-  }
-  explicit NativeRuntime(WtpSettings s) : settings(std::move(s)) {
-    validate_wtp_settings(settings, true);
-    if (settings.transport == "network")
-      credentials = std::make_shared<wsprrypi::TlsCredentials>(network_selection());
-    wsprrypi::wtp::ByteStream &selected = settings.transport == "network"
-        ? static_cast<wsprrypi::wtp::ByteStream &>(tls)
-        : settings.transport == "network_plain"
-            ? static_cast<wsprrypi::wtp::ByteStream &>(plain)
-            : static_cast<wsprrypi::wtp::ByteStream &>(stream);
-    wsprrypi::wtp::SessionOptions options{wsprrypi::wtp_random_identity(),
-                                         wsprrypi::wtp_random_identity(), settings.device_id};
-    options.learn_device_identity = settings.transport == "network_plain" &&
-                                    settings.device_id.empty();
-    app = std::make_unique<wsprrypi::WtpApplication>(
-        clock, selected, settings, std::move(options), [this] { return reopen(); });
-  }
-  NativeRuntime(WtpSettings s, wsprrypi::WtpScheduleClock &c,
-                wsprrypi::wtp::ByteStream &b,
-                wsprrypi::wtp::SessionOptions options,
-                std::function<bool()> reopen)
-      : settings(std::move(s)),
-        app(std::make_unique<wsprrypi::WtpApplication>(
-            c, b, settings, std::move(options), std::move(reopen))) {
-    if (settings.transport == "network")
-      credentials = std::make_shared<wsprrypi::TlsCredentials>(network_selection());
-  }
-};
+using NativeRuntime = wsprrypi::WtpTargetRuntime;
 std::mutex operation_mutex, runtime_mutex;
 std::shared_ptr<NativeRuntime> runtime;
 std::shared_ptr<NativeRuntime> get() {
@@ -119,6 +44,10 @@ wtp_runtime_selection_error(const std::optional<WtpSettings> &settings) {
   auto r = get();
   try {
     if (settings) validate_wtp_settings(*settings, true);
+    if (settings && !settings->device_id.empty() &&
+        (!r || r->settings.device_id != settings->device_id) &&
+        wsprrypi::wtp_output_identity_in_use(settings->device_id))
+      return "This WTP output already has an independent fleet assignment";
     bool changed = r && (!settings || r->settings != *settings);
     if (settings && settings->transport == "network") {
       wsprrypi::TlsCredentials candidate({settings->hostname, settings->tls_identity,
@@ -156,7 +85,9 @@ void select_wtp_runtime(const std::optional<WtpSettings> &settings) {
   if (runtime && !runtime->app->replaceable())
     throw std::runtime_error("Resolve Pico ownership and output before "
                              "changing the backend or endpoint");
-  runtime = settings ? std::make_shared<NativeRuntime>(*settings) : nullptr;
+  auto lease = runtime && settings && runtime->settings.device_id == settings->device_id
+      ? runtime->output_lease : std::shared_ptr<void>{};
+  runtime = settings ? std::make_shared<NativeRuntime>(*settings, std::function<bool()>{}, std::move(lease)) : nullptr;
 }
 bool wtp_runtime_selected() noexcept { return static_cast<bool>(get()); }
 bool wtp_runtime_ready() noexcept {

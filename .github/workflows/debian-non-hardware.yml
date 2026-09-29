@@ -32,6 +32,10 @@ jobs:
         run: |
           make wtp-protocol-test wtp-plan-test wtp-usb-test wtp-backend-test wtp-scheduler-test wtp-status-test wtp-application-test SUDO=
           make wtp-production-test BACKENDS=simulated ANCILLARY_GPIO=0 SUDO=
+          make wtp-pi-authority-test wtp-pi-listener-test wtp-pi-revocation-test \
+            wtp-pi-tone-engine-test wtp-pi-identity-test wtp-pi-interface-selection-test \
+            wtp-pi-si5351-realization-test wtp-pi-control-test wtp-pi-config-transaction-test \
+            wtp-fleet-test BACKENDS=simulated ANCILLARY_GPIO=0 SUDO=
 
       - name: Check container build export handling
         run: python3 scripts/tests/container_build_test.py
@@ -80,7 +84,9 @@ jobs:
         working-directory: WsprryPi-UI
         env:
           CHROME_BIN: /usr/bin/google-chrome
-        run: node tests/wtp_network_ui_integration_test.js
+        run: |
+          node tests/wtp_network_ui_integration_test.js
+          node tests/wtp_pi_fleet_ui_integration_test.js
 
   strict-i2c-profile:
     runs-on: ubuntu-24.04
@@ -183,7 +189,12 @@ jobs:
 
       - name: Run WTP component, plan, USB adapter, backend, scheduler and status tests
         working-directory: src
-        run: make wtp-protocol-test wtp-plan-test wtp-usb-test wtp-backend-test wtp-scheduler-test wtp-status-test wtp-application-test wtp-production-test SUDO=
+        run: |
+          make wtp-protocol-test wtp-plan-test wtp-usb-test wtp-backend-test wtp-scheduler-test wtp-status-test wtp-application-test wtp-production-test SUDO=
+          make wtp-pi-authority-test wtp-pi-listener-test wtp-pi-revocation-test \
+            wtp-pi-tone-engine-test wtp-pi-identity-test wtp-pi-interface-selection-test \
+            wtp-pi-si5351-realization-test wtp-pi-control-test wtp-pi-config-transaction-test \
+            wtp-fleet-test SUDO=
 
       - name: Run parent semantics and cleanup lifecycle tests
         working-directory: src

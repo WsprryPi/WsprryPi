@@ -61,7 +61,7 @@ The available controls depend on how the simulator is constructed:
 
 `--backend simulated` is intentionally the only simulator control exposed by the production application CLI. Simulation timing, trace-path overrides, and lifecycle fault injection are transient typed C++ test/developer APIs. They are not parsed from CLI arguments, INI configuration, environment variables, or the UI, and they never apply to physical backends. Additional shell-facing controls require a separately reviewed developer-harness use case.
 
-The CLI selection is transient, is never persisted, and is never selected automatically after hardware initialization fails. The application calls the public three-argument `WsprTransmitter::selectBackend()` overload internally with default simulator settings.
+The CLI selection is transient, is never persisted, and is never selected automatically after hardware initialization fails. In managed mode it remains selected across INI reloads and HTTP configuration writes until the process exits. The managed WTP endpoint uses real-time simulation through its typed C++ construction so remotely armed jobs follow wall-clock scheduling; direct local simulated jobs retain the existing virtual-time behavior. The application calls the public three-argument `WsprTransmitter::selectBackend()` overload internally with default simulator settings.
 
 `WsprTransmitter` owns a small private construction switch rather than a dynamic plugin system. Tests that need the application lifecycle can inject typed settings through the public overload:
 

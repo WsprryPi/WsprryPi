@@ -61,6 +61,7 @@
 #include "wspr_reference_adapter.hpp"
 #include "transmitter_runtime_bridge.hpp"
 #include "wtp_runtime_bridge.hpp"
+#include "wtp_pi_control.hpp"
 #include "version.hpp"
 #include "non_wspr_request_builder.hpp"
 
@@ -1826,6 +1827,8 @@ bool runtime_transmit_requested(const ArgParserConfig &cfg) noexcept
 bool runtime_transmit_enabled(const ArgParserConfig &cfg) noexcept
 {
     return runtime_transmit_requested(cfg) &&
+           (cfg.transmit_backend == TransmitBackendKind::WTP ||
+            !cfg.use_ini || wtp_pi_local_effective()) &&
            (cfg.transmit_backend != TransmitBackendKind::WTP || wtp_runtime_ready()) &&
            !managed_reload_tx_inhibited &&
            !startup_quiesce_inhibited.load(std::memory_order_acquire) &&

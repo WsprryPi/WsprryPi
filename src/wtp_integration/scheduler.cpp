@@ -52,8 +52,10 @@ std::optional<std::uint64_t> WtpSystemScheduleClock::utc_now_ns() const {
   return utc_valid_() ? epoch_ns(std::chrono::system_clock::now())
                       : std::nullopt;
 }
-WtpScheduler::WtpScheduler(WtpScheduleClock &clock, wtp::SessionOptions options)
+WtpScheduler::WtpScheduler(WtpScheduleClock &clock, wtp::SessionOptions options,
+                           std::function<bool()> dispatch_admission)
     : clock_(clock),
+      dispatch_admission_(std::move(dispatch_admission)),
       backend_(clock, std::move(options), [this] { return admit_arm(); }),
       controller_(compiler_, backend_) {
   backend_.observation_ = [this] { publish(); };
@@ -241,6 +243,8 @@ std::optional<std::uint64_t> WtpScheduler::observe() {
 bool WtpScheduler::admit_arm() {
   if (!pending_ || stopped_)
     return fail("WTP stop requested before ARM handoff");
+  if (dispatch_admission_ && !dispatch_admission_())
+    return fail("Output assignment was revoked or could not be reconciled before ARM");
   const auto now = observe();
   if (!now)
     return false;
@@ -342,6 +346,9 @@ WtpScheduleReport WtpScheduler::run() {
       return finish(WtpScheduleOutcome::Invalidated,
                     "Pending WTP request invalidated before commit");
     publish();
+    if (dispatch_admission_ && !dispatch_admission_())
+      return finish(WtpScheduleOutcome::Invalidated,
+                    "Output assignment was revoked or could not be reconciled before CLAIM");
     if (!backend_.schedule(pending_->options))
       return finish(WtpScheduleOutcome::Failed, backend_.diagnostic());
     if (stopped_) {

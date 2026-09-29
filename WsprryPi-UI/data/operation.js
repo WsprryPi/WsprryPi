@@ -458,7 +458,8 @@ function requestTransmitEnabledChange(enabled, previousEnabled) {
 
     $transmit.prop("disabled", true);
 
-    return ajaxWithEndpointFallback(SETTINGS_ENDPOINT, {
+    const interactiveEnable = enabled && !(currentRuntimeTransmitBackend === "wtp") && window.LocalWtp;
+    return (interactiveEnable ? window.LocalWtp.enable() : ajaxWithEndpointFallback(SETTINGS_ENDPOINT, {
         type: "PATCH",
         contentType: "application/merge-patch+json",
         timeout: CONFIG_REQUEST_TIMEOUT_MS,
@@ -467,7 +468,7 @@ function requestTransmitEnabledChange(enabled, previousEnabled) {
                 "Transmit": enabled,
             },
         }),
-    })
+    }))
         .done(function () {
             lastSaveTimestamp = Date.now();
             setTransmitFromBackend(enabled);
@@ -477,6 +478,7 @@ function requestTransmitEnabledChange(enabled, previousEnabled) {
             }
         })
         .fail(function (xhr, textStatus) {
+            if (textStatus === "declined") { setTransmitFromBackend(previousEnabled); return; }
             let message = "Failed to update transmit state.";
 
             if (isTransientNetworkFailure(xhr, textStatus)) {

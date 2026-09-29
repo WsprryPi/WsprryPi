@@ -35,6 +35,7 @@
 #define CONFIG_TYPES_HPP
 
 #include "wtp_settings.hpp"
+#include "wtp_server_settings.hpp"
 #include "band_gpio.hpp"
 #include "band_lookup.hpp"
 #include "wspr_ref_plan.hpp"
@@ -42,6 +43,7 @@
 
 #include <array>
 #include <atomic>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -279,7 +281,10 @@ struct ArgParserConfig
     bool use_offset; ///< Enable WSPR random frequency offset.
     int power_level; ///< Active backend RF power level.
     TransmitBackendKind transmit_backend; ///< RF hardware backend.
+    bool simulated_backend_override = false; ///< Explicit process-only CLI selection.
     WtpSettings wtp;
+    WtpServerSettings wtp_server; ///< Independent inbound WTP listener settings.
+    std::optional<std::uint16_t> wtp_server_port_override; ///< Transient CLI port.
     int gpio_tx_pin; ///< GPIO backend transmit pin.
     int gpio_power_level; ///< GPIO backend power level (0-7).
     int rp1_gpio_drive_ma; ///< RP1 GPIO pad drive selection in mA.
@@ -458,7 +463,10 @@ struct ArgParserConfig
         use_offset = other.use_offset;
         power_level = other.power_level;
         transmit_backend = other.transmit_backend;
+        simulated_backend_override = other.simulated_backend_override;
         wtp = other.wtp;
+        wtp_server = other.wtp_server;
+        wtp_server_port_override = other.wtp_server_port_override;
         gpio_tx_pin = other.gpio_tx_pin;
         gpio_power_level = other.gpio_power_level;
         rp1_gpio_drive_ma = other.rp1_gpio_drive_ma;

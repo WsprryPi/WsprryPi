@@ -10,7 +10,7 @@ $viewMetadata = [
         'bodyClass' => '',
         'htmlTheme' => 'light',
         'css' => ['index.css', 'operation.css'],
-        'js' => ['operation.js'],
+        'js' => ['local-wtp.js', 'operation.js'],
         'partial' => __DIR__ . '/views/operation.php',
     ],
     'config' => [
@@ -22,7 +22,7 @@ $viewMetadata = [
         'bodyClass' => '',
         'htmlTheme' => 'light',
         'css' => ['index.css'],
-        'js' => ['cw_timing_state.js', 'wtp.js', 'wtp-management.js', 'index.js'],
+        'js' => ['cw_timing_state.js', 'local-wtp.js', 'wtp.js', 'wtp-management.js', 'fleet-schedules.js', 'index.js'],
         'partial' => __DIR__ . '/views/config.php',
     ],
     'logs' => [

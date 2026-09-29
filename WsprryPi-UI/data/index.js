@@ -830,7 +830,8 @@ function requestTransmitEnabledChange(enabled, previousEnabled, options = {}) {
 
     $transmit.prop("disabled", true);
 
-    return ajaxWithEndpointFallback(SETTINGS_ENDPOINT, {
+    const interactiveEnable = enabled && !(selectedTransmitBackend() === "wtp") && window.LocalWtp;
+    return (interactiveEnable ? window.LocalWtp.enable() : ajaxWithEndpointFallback(SETTINGS_ENDPOINT, {
         type: "PATCH",
         headers: window.WtpUi?.hostRevision ? { "If-Match": window.WtpUi.hostRevision } : {},
         contentType: "application/merge-patch+json",
@@ -840,7 +841,7 @@ function requestTransmitEnabledChange(enabled, previousEnabled, options = {}) {
                 "Transmit": enabled,
             },
         }),
-    })
+    }))
         .done(function (data, textStatus, xhr) {
             window.WtpUi?.setHostRevision(xhr?.getResponseHeader?.("ETag"));
             lastSaveTimestamp = Date.now();
@@ -861,6 +862,7 @@ function requestTransmitEnabledChange(enabled, previousEnabled, options = {}) {
             }
         })
         .fail(function (xhr, textStatus) {
+            if (textStatus === "declined") { setTransmitFromBackend(previousEnabled); return; }
             let message = "Failed to update transmit state.";
             console.error("Failed to update Operation.Transmit:", xhr);
 

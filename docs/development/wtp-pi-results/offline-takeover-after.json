@@ -1,0 +1,18 @@
+{
+  "assignments": [],
+  "maximum_outputs": 8,
+  "now_ms": "846502904",
+  "outputs": {},
+  "removals": [
+    {
+      "device_id": "74d12151aff03c45cfcb15a45bd8e037",
+      "revocation_generation": "4"
+    },
+    {
+      "device_id": "e2a4d273f7d8f24f6696f7c6fb95ff11",
+      "revocation_generation": "2"
+    }
+  ],
+  "scope": "wsprrypi-wtp-fleet/1",
+  "version": 1
+}

@@ -168,6 +168,7 @@ void print_usage(const std::string &message, int exit_code)
               << "  --no-http                          Disable only the HTTP web UI for this run.\n"
               << "  -w, --web-port <port>              HTTP REST/Web UI port. Default: 31415.\n"
               << "  -k, --socket-port <port>           WebSocket server port. Default: 31416.\n"
+              << "      --wtp-server-port <port>       WTP Plain LAN listener port for this process. Default: 31417.\n"
               << "      --socket-loopback-only        Bind WebSocket control to loopback only.\n"
               << "      --socket-loopback-family <auto|ipv6|ipv4>\n"
               << "                                     Select loopback family; auto prefers IPv6.\n"

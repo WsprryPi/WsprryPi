@@ -1,0 +1,17 @@
+{
+  "repository": "https://github.com/WsprryPi/WsprryPico",
+  "revision": "c13fc16819749e9b53a42609f31702c3aca9931c",
+  "upstream_directory": "src/wtp",
+  "local_directories": [
+    "include/wtp_server",
+    "src"
+  ],
+  "adaptations": [
+    "Private include prefix wtp_server/ allows coexistence with the client component.",
+    "IJobService facade and admission callback after replay resolution support atomic parent arbitration without changing wire replay outcomes.",
+    "Endpoint product argument defaults to WsprryPico; Pi supplies WsprryPi.",
+    "Optional shared event ID source makes event sequence unique across connections for one server boot.",
+    "Explicit session replacement closes the older same-principal transport.",
+    "Completion acknowledgement allowance is 100 ms for bounded Linux backend shutdown, distinct from RF start uncertainty and CAPS output-disable timeout."
+  ]
+}

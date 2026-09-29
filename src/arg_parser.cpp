@@ -51,6 +51,7 @@
 #include <regex>
 #include <sstream>
 #include <stdexcept>
+#include <charconv>
 #include <string>
 #include <utility>
 #include <vector>
@@ -2505,6 +2506,24 @@ bool parse_command_line(int argc, char *argv[])
         print_usage("No arguments provided.", EXIT_FAILURE);
     }
 
+    // Explicit simulation is a process lifetime boundary, including managed
+    // reloads and web transactions. It is never written to the INI.
+    for (int i = 1; i < argc; ++i) {
+        const std::string option = argv[i];
+        std::optional<std::string> backend;
+        if (option == "--backend" && i + 1 < argc) backend = argv[++i];
+        else if (option.rfind("--backend=", 0) == 0) backend = option.substr(10);
+        if (backend) {
+            try {
+                config.simulated_backend_override =
+                    parse_transmit_backend_option(*backend, false) == TransmitBackendKind::SIMULATED;
+            } catch (const std::invalid_argument&) {
+                // The normal option pass reports invalid values. This early
+                // scan only establishes the boundary before INI validation.
+                config.simulated_backend_override = false;
+            }
+        }
+    }
     // Create original JSON
     init_config_json();
     json_to_config();
@@ -2727,6 +2746,7 @@ bool parse_command_line(int argc, char *argv[])
         {"socket-loopback-only", no_argument, nullptr, 1060},
         {"socket-loopback-family", required_argument, nullptr, 1062},
         {"rp1-development-confirmation-json", required_argument, nullptr, 1063},
+        {"wtp-server-port", required_argument, nullptr, 1064},
         {nullptr, 0, nullptr, 0}};
 
     while (true)
@@ -2745,6 +2765,19 @@ bool parse_command_line(int argc, char *argv[])
         switch (c)
         {
         // No arguments
+        case 1064:
+        {
+            const std::string value = optarg;
+            unsigned int parsed = 0;
+            const auto result = std::from_chars(value.data(),
+                                                value.data() + value.size(), parsed);
+            if (result.ec != std::errc{} ||
+                result.ptr != value.data() + value.size() ||
+                parsed == 0 || parsed > 65535)
+                print_usage("WTP server port must be 1 through 65535.", EXIT_FAILURE);
+            config.wtp_server_port_override = static_cast<std::uint16_t>(parsed);
+            break;
+        }
         case 1060:
             config.socket_loopback_only = true;
             break;
@@ -3352,6 +3385,7 @@ bool parse_command_line(int argc, char *argv[])
             {
                 config.transmit_backend =
                     parse_transmit_backend_option(optarg);
+                config.simulated_backend_override = config.transmit_backend == TransmitBackendKind::SIMULATED;
                 if (config.transmit_backend == TransmitBackendKind::SI5351 &&
                     !explicit_power_level)
                 {

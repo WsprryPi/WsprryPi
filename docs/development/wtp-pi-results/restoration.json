@@ -1,0 +1,30 @@
+{
+  "checked_utc": "2026-09-29T20:51:39.258784+00:00",
+  "hosts": {
+    "wspr4": {
+      "service": "active",
+      "ExecMainStatus": 0,
+      "MainPID": 1255985,
+      "isolated_processes": []
+    },
+    "wspr2": {
+      "service": "active",
+      "ExecMainStatus": 0,
+      "MainPID": 1351478,
+      "isolated_processes": []
+    },
+    "wspr5": {
+      "service": "active",
+      "ExecMainStatus": 0,
+      "MainPID": 1348573,
+      "isolated_processes": []
+    }
+  },
+  "final_launchers": {
+    "wspr4_physical": 0,
+    "wspr5_central": 0
+  },
+  "installed_binary_replaced": false,
+  "installed_ini_replaced": false,
+  "takeover_journals_preserved": true
+}

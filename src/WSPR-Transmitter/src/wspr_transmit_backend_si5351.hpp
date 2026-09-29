@@ -6,7 +6,9 @@
 #include "transmission_backend.hpp"
 
 #include <cstddef>
+#include <functional>
 #include <memory>
+#include <optional>
 #include <string>
 #include <time.h>
 #include <vector>
@@ -59,6 +61,14 @@ public:
         // Maintainer opt-in: adjacent compatible integer-MS plans may retune
         // PLLA without reset/inhibition. First/incompatible tones remain guarded.
         bool pll_only_updates = false;
+
+        // Typed integration hooks for a finite scheduled tone. Admission runs
+        // after the output-enable register read, immediately before its write.
+        // The observer runs after the first successful enable transaction.
+        std::function<bool()> output_enable_admission;
+        std::function<void()> first_output_enabled;
+        bool anchor_finite_tone_to_enable = false;
+        bool confirm_output_disable = false;
     };
 
     /**
@@ -137,6 +147,8 @@ public:
     const Config& getConfig() const noexcept;
 
 private:
+    bool outputIsDisabled();
+    std::optional<timespec> first_enable_time_;
     /**
      * @brief Map a generic transmission mode to the Si5351 planner mode.
      *

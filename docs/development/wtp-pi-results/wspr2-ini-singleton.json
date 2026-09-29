@@ -1,0 +1,95 @@
+{
+  "running": {
+    "address": "192.168.1.123",
+    "boot_id": "815695da5834206464b9b11cf53a27dd",
+    "device_id": "e2a4d273f7d8f24f6696f7c6fb95ff11",
+    "dns_sd_published": true,
+    "enabled": true,
+    "finishing_remote_job": false,
+    "launch_observed_monotonic_ns": "844759862544761",
+    "launch_target_monotonic_ns": "844759862429940",
+    "listener_error": "",
+    "listener_running": true,
+    "local_effective": false,
+    "local_requested": false,
+    "local_work_active": false,
+    "output_unknown": false,
+    "port": 31417,
+    "remote_admission_closed": false,
+    "remote_job_id": "df8531ded66b4a11b288a6e4ce92b594",
+    "remote_output_active": true,
+    "remote_owner": "7fbe70cabe1e4d8795296841b4932c27",
+    "remote_state": "running",
+    "revocation_generation": "0",
+    "revocation_unavailable": false,
+    "schema": "wsprrypi-wtp-endpoint/1"
+  },
+  "singleton": {
+    "code": 1,
+    "stdout": "",
+    "stderr": "2026-09-29 19:54:37.868 UTC\t[FATAL] Another instance is running on port: 1234\n"
+  },
+  "after": {
+    "address": "192.168.1.123",
+    "boot_id": "815695da5834206464b9b11cf53a27dd",
+    "device_id": "e2a4d273f7d8f24f6696f7c6fb95ff11",
+    "dns_sd_published": true,
+    "enabled": true,
+    "finishing_remote_job": false,
+    "launch_observed_monotonic_ns": "844759862544761",
+    "launch_target_monotonic_ns": "844759862429940",
+    "listener_error": "",
+    "listener_running": true,
+    "local_effective": true,
+    "local_requested": true,
+    "local_work_active": true,
+    "output_unknown": false,
+    "port": 31417,
+    "remote_admission_closed": true,
+    "remote_job_id": "df8531ded66b4a11b288a6e4ce92b594",
+    "remote_output_active": false,
+    "remote_owner": "",
+    "remote_state": "aborted",
+    "revocation_generation": "1",
+    "revocation_unavailable": false,
+    "schema": "wsprrypi-wtp-endpoint/1"
+  },
+  "caps": {
+    "type": "response",
+    "protocol": "WTP/1",
+    "session_id": "936186688371487aa8378343c81ec26d",
+    "request_id": "4d6ac31967cf42a99f738ccac081a838",
+    "op": "CAPS",
+    "ok": true,
+    "body": {
+      "profiles": [
+        "rf-events/1"
+      ],
+      "modes": [
+        "tone"
+      ],
+      "engine": "simulated-finite-tone",
+      "frequency_ranges": [
+        {
+          "minimum_nhz": "14000000000000000",
+          "maximum_nhz": "14350000000000000"
+        }
+      ],
+      "max_payload_bytes": 65536,
+      "max_events": 1,
+      "max_job_duration_ns": "10000000000",
+      "minimum_arm_lead_ns": "2000000000",
+      "maximum_arm_ahead_ns": "604800000000000",
+      "maximum_arm_uncertainty_ns": "500000000",
+      "maximum_holdover_age_ns": "0",
+      "output_disable_timeout_ns": "5000000000",
+      "minimum_lease_ms": 5000,
+      "maximum_lease_ms": 60000,
+      "response_cache_entries": 8,
+      "response_cache_ttl_seconds": 300,
+      "terminal_record_entries": 8,
+      "terminal_record_ttl_seconds": 3600
+    }
+  },
+  "passed": true
+}

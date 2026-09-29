@@ -95,7 +95,7 @@ std::string wtp_runtime_status_json(const WtpRuntimeStatus &);
 // outlive this object. No threads, devices or fallback are created.
 class WtpScheduler {
 public:
-  WtpScheduler(WtpScheduleClock &, wtp::SessionOptions);
+  WtpScheduler(WtpScheduleClock &, wtp::SessionOptions, std::function<bool()> dispatch_admission = {});
   bool connect(wtp::ByteStream &);
   bool disconnect(); // local closure only, while Idle/Blocked
   bool submit(TransmissionRequest, std::string job_id,
@@ -126,6 +126,7 @@ private:
   WtpScheduleReport finish(WtpScheduleOutcome, std::string,
                            ExecutionResult = {});
   WtpScheduleClock &clock_;
+  std::function<bool()> dispatch_admission_;
   WtpTransmitBackend backend_;
   ExecutionPlanCompiler compiler_;
   TransmissionController controller_;

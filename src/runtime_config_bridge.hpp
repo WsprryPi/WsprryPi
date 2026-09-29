@@ -23,6 +23,7 @@ struct RuntimeConfigCandidate
     std::string error_reason{};
     std::vector<std::string> warnings{};
     bool migration_required = false;
+    bool preserve_interactive_takeover = false;
 };
 
 void prepare_runtime_config_candidate(

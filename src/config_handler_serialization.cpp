@@ -4,6 +4,7 @@
  */
 
 #include "wtp_settings_json.hpp"
+#include "wtp_server_settings_json.hpp"
 #include "config_handler.hpp"
 #include "config_handler_serialization.hpp"
 #include "arg_parser.hpp"
@@ -34,6 +35,7 @@ void serialize_runtime_config_to_json(
         source.mode == ModeType::TONE ? ModeType::WSPR : source.mode);
     target["Operation"]["Transmit"] = source.transmit;
     target["WTP"] = wtp_settings_json(source.wtp);
+    target["WTP Server"] = wtp_server_settings_json(source.wtp_server);
     if (source.transmit_backend != TransmitBackendKind::SIMULATED)
         target["Operation"]["Transmit Backend"] =
             transmit_backend_kind_to_string(source.transmit_backend);
@@ -206,6 +208,8 @@ nlohmann::json public_config_from_internal_json(const nlohmann::json &source)
 
     nlohmann::json public_json;
     public_json["WTP"] = source.value("WTP", wtp_settings_json(WtpSettings{}));
+    public_json["WTP Server"] =
+        source.value("WTP Server", wtp_server_settings_json(WtpServerSettings{}));
     public_json["Operation"] = source.at("Operation");
     public_json["GPIO"] = source.at("GPIO");
     public_json["Calibration"] = source.at("Calibration");
@@ -260,6 +264,15 @@ void apply_public_config_to_internal_json(
             if (!wtp_settings_json(WtpSettings{}).contains(item.key()))
                 throw std::runtime_error("Unknown WTP setting: " + item.key());
             internal_json["WTP"][item.key()] = item.value();
+        }
+    }
+    if (public_json.contains("WTP Server")) {
+        if (!public_json.at("WTP Server").is_object())
+            throw std::runtime_error("WTP Server settings must be an object.");
+        for (const auto &item : public_json.at("WTP Server").items()) {
+            if (!wtp_server_settings_json(WtpServerSettings{}).contains(item.key()))
+                throw std::runtime_error("Unknown WTP Server setting: " + item.key());
+            internal_json["WTP Server"][item.key()] = item.value();
         }
     }
     if (public_json.contains("Meta"))

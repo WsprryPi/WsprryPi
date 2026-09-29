@@ -1,7 +1,7 @@
 <?php // SPDX-License-Identifier: MIT ?>
 <div id="wtp-development" class="wtp-development" hidden>
     <section id="wtp-controls" class="transmitter-backend-fields" aria-labelledby="wtp-heading" hidden>
-        <h3 id="wtp-heading" class="transmitter-backend-fields__title">Pico output</h3>
+        <h3 id="wtp-heading" class="transmitter-backend-fields__title">WTP outputs</h3>
         <section class="fleet-catalog mb-4" aria-labelledby="fleet-catalog-heading">
             <h4 id="fleet-catalog-heading" class="cw-control-section__title">Known and nearby devices</h4>
             <label class="form-label" for="fleet-device">Device</label>
@@ -96,6 +96,7 @@
                 <p id="fleet-editor-feedback" class="form-text mt-2" role="status" aria-live="polite"></p>
             </div>
         </section>
+        <?php require __DIR__ . '/fleet-schedules.php'; ?>
         <div class="form-check form-switch mb-3">
             <input class="form-check-input" type="checkbox" role="switch" id="wtp_use" aria-controls="wtp-settings" aria-describedby="wtp-selection-hint">
             <label class="form-check-label" for="wtp_use">Use Pico</label>

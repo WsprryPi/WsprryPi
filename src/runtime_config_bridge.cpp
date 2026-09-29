@@ -37,6 +37,7 @@ void prepare_runtime_config_candidate(
     candidate_out.error_reason = storage->prepared.error_reason;
     candidate_out.warnings = storage->prepared.warnings;
     candidate_out.migration_required = storage->prepared.migration_required;
+    candidate_out.preserve_interactive_takeover = storage->prepared.preserve_interactive_takeover;
 }
 
 void commit_runtime_config_candidate(const RuntimeConfigCandidate &candidate)

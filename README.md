@@ -54,6 +54,12 @@ recovery controls behind a default-off UI development toggle. Physical USB,
 target operation and RF qualification are accepted only within the bounded
 Phase 10/11 records; broad mode/band/clock, timing, spectral, reliability and
 release qualification remain outstanding in Phase 13.
+The [Pi WTP endpoint](docs/wtp-pi-operation.md) provides a Plain LAN WTP/1
+server, DNS-SD advertisement, local takeover and up to eight independent remote
+output schedules alongside the central Pi’s own schedule. The initial Pi server
+route is finite 20 m Si5351 TONE; Fleet remains development-gated. See the
+[implementation contract](docs/wtp-pi-endpoint-contract.md) and
+[execution record](docs/development/wtp-pi-execution-report.md) for acceptance scope and evidence.
 
 For containerized ARMv6 and AArch64 builds targeting Raspberry Pi OS Bookworm
 and Trixie, including 32-bit Pi 1/A+ and Pi Zero support, see the

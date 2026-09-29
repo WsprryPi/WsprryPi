@@ -123,6 +123,7 @@
         byId("wtp-controls").hidden = !visible;
         byId("wtp-hidden-selection").hidden = visible || !selected();
         byId("wtp-development").hidden = !visible;
+        root.FleetSchedules?.setVisible(visible);
         byId("wtp_use").disabled = !visible;
         root.document.querySelectorAll("[data-wtp-key]").forEach(field => { field.disabled = !visible || !selected(); });
         const transport = read().Transport;

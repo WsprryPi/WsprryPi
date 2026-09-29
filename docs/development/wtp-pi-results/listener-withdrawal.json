@@ -1,0 +1,73 @@
+{
+  "saved_settings": {
+    "Enabled": false,
+    "Interface": "wlan0",
+    "Port": 31417
+  },
+  "disabled": {
+    "boot_id": "782505402aacf24d7566bf1886a47264",
+    "device_id": "74d12151aff03c45cfcb15a45bd8e037",
+    "dns_sd_published": false,
+    "enabled": false,
+    "finishing_remote_job": false,
+    "launch_observed_monotonic_ns": null,
+    "launch_target_monotonic_ns": "0",
+    "listener_error": "",
+    "listener_running": false,
+    "local_effective": false,
+    "local_requested": false,
+    "local_work_active": false,
+    "output_unknown": false,
+    "remote_admission_closed": false,
+    "remote_job_id": "",
+    "remote_output_active": false,
+    "remote_owner": "",
+    "remote_state": "empty",
+    "revocation_generation": "5",
+    "revocation_unavailable": false,
+    "schema": "wsprrypi-wtp-endpoint/1"
+  },
+  "tcp_withdrawn": true,
+  "cache_note": "Controller eth0 observed withdrawal; another interface can retain an mDNS cache entry until Avahi expiry. Discovery is never authority for connection or transmission.",
+  "withdrawn_discovery": [
+    {
+      "binding": "plain",
+      "domain": "local",
+      "first_seen_ms": 1790713392245,
+      "id": "service-4e85a290a7cd968292c4480ad9439369",
+      "instance": "WsprryPi wspr4 74d12151",
+      "interface": 2,
+      "last_seen_ms": 1790714758882,
+      "port": 31418,
+      "protocol": 0,
+      "reason": "Service was withdrawn",
+      "state": "removed",
+      "state_changed_ms": 1790714897503,
+      "target": "wtp-74d12151aff03c45cfcb15a45bd8e037.local",
+      "txt": [
+        "txtvers=1",
+        "binding=plain"
+      ]
+    },
+    {
+      "binding": "plain",
+      "domain": "local",
+      "first_seen_ms": 1790713392244,
+      "id": "service-f8d32a2d50ff93e9ae6ac94d112c0306",
+      "instance": "WsprryPi wspr4 74d12151",
+      "interface": 8,
+      "last_seen_ms": 1790714760033,
+      "port": 31418,
+      "protocol": 0,
+      "reason": "",
+      "state": "online",
+      "state_changed_ms": 1790714760033,
+      "target": "wtp-74d12151aff03c45cfcb15a45bd8e037.local",
+      "txt": [
+        "txtvers=1",
+        "binding=plain"
+      ]
+    }
+  ],
+  "passed": true
+}

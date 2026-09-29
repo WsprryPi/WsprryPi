@@ -41,6 +41,13 @@
 }
 
 /* Connection indicator */
+#fleet-output-list .btn:disabled {
+    color: var(--bs-secondary-color);
+    background-color: var(--bs-secondary-bg);
+    border-color: var(--bs-border-color);
+    opacity: 1;
+}
+
 /* target by ID + state-class */
 #connIcon.state-disconnected {
     color: var(--wspr-state-danger);

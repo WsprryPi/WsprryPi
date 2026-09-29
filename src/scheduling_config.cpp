@@ -15,6 +15,7 @@
 #include "wspr_transmit.hpp"
 #include "transmitter_runtime_bridge.hpp"
 #include "wtp_runtime_bridge.hpp"
+#include "wtp_pi_control.hpp"
 
 #include <atomic>
 #include <chrono>
@@ -22,6 +23,17 @@
 #include <optional>
 #include <string>
 #include <utility>
+
+namespace {
+class WtpLocalConfigurationReservation {
+public:
+    WtpLocalConfigurationReservation() : held_(wtp_pi_begin_configuration()) {}
+    ~WtpLocalConfigurationReservation() { if (held_) wtp_pi_end_configuration(); }
+    explicit operator bool() const noexcept { return held_; }
+private:
+    bool held_;
+};
+}
 
 bool set_config(bool force)
 {
@@ -102,6 +114,7 @@ bool set_config(bool force)
 
             if (!prepared_candidate.valid)
             {
+                WtpLocalConfigurationReservation local_configuration;
                 llog.logS(ERROR,
                           "Invalid configuration reload rejected; previous valid configuration remains loaded: ",
                           prepared_candidate.error_reason);
@@ -113,7 +126,8 @@ bool set_config(bool force)
                     true,
                     "Transmit is blocked until a valid configuration is loaded.");
 
-                if (transmitter_state() != WsprTransmitter::State::TRANSMITTING)
+                if (local_configuration &&
+                    transmitter_state() != WsprTransmitter::State::TRANSMITTING)
                 {
                     transmitter_stop_and_join();
                     deassert_transmit_gpio_outputs(
@@ -133,6 +147,20 @@ bool set_config(bool force)
 
             working_config = prepared_candidate.normalized_config;
             candidate_ready_to_commit = true;
+        }
+
+        // A valid noninteractive Enable takes local priority before any local
+        // backend reconfiguration. Other changes wait while a WTP owner uses
+        // the same output, including idle time within that ownership lease.
+        if (working_config.transmit && managed_candidate_requested &&
+            !prepared_candidate.preserve_interactive_takeover)
+            wtp_pi_config_transmit_committed(true);
+        WtpLocalConfigurationReservation local_configuration;
+        if (!local_configuration)
+        {
+            if (managed_candidate_requested)
+                ini_reload_pending.store(true, std::memory_order_release);
+            return true;
         }
 
         bool do_config = force;

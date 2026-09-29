@@ -1,0 +1,112 @@
+{
+  "target": {
+    "address": "192.168.1.123",
+    "boot_id": "4b8fadda7b961da3fccff69631bf79f5",
+    "device_id": "e2a4d273f7d8f24f6696f7c6fb95ff11",
+    "dns_sd_published": true,
+    "enabled": true,
+    "finishing_remote_job": false,
+    "launch_observed_monotonic_ns": "846389862551251",
+    "launch_target_monotonic_ns": "846389862429940",
+    "listener_error": "",
+    "listener_running": true,
+    "local_effective": false,
+    "local_requested": false,
+    "local_work_active": false,
+    "output_unknown": false,
+    "port": 31417,
+    "remote_admission_closed": false,
+    "remote_job_id": "",
+    "remote_output_active": false,
+    "remote_owner": "",
+    "remote_state": "empty",
+    "revocation_generation": "1",
+    "revocation_unavailable": false,
+    "schema": "wsprrypi-wtp-endpoint/1"
+  },
+  "fleet": {
+    "assignments": [
+      {
+        "device_id": "e2a4d273f7d8f24f6696f7c6fb95ff11",
+        "enabled": false,
+        "in_flight": false,
+        "last_start_ns": "0",
+        "management_port": 31415,
+        "name": "Offline takeover validation",
+        "product": "WsprryPi",
+        "revocation_generation": "1",
+        "schedule": {
+          "duration_ms": 3000,
+          "frequency_hz": 14097100,
+          "mode": "tone",
+          "period_seconds": 60,
+          "phase_seconds": 0
+        },
+        "settings": {
+          "Allow Frequency Adjustment": true,
+          "Device ID": "e2a4d273f7d8f24f6696f7c6fb95ff11",
+          "Endpoint": "",
+          "Hostname": "wtp-e2a4d273f7d8f24f6696f7c6fb95ff11.local",
+          "Start Uncertainty ns": 500000000,
+          "TCP Port": 31417,
+          "TLS CA File": "",
+          "TLS Client Certificate": "",
+          "TLS Client Key": "",
+          "TLS Server Identity": "",
+          "Transport": "network_plain",
+          "USB Product ID": 0,
+          "USB Serial": "",
+          "USB Vendor ID": 0
+        }
+      }
+    ],
+    "maximum_outputs": 8,
+    "now_ms": "846403336",
+    "outputs": {
+      "e2a4d273f7d8f24f6696f7c6fb95ff11": {
+        "message": "",
+        "revoked": false,
+        "state": "starting",
+        "wtp": {
+          "adjustments": [],
+          "arm_handed_off": false,
+          "capabilities": null,
+          "diagnostic": "",
+          "dispatch_utc_ns": "0",
+          "identity": null,
+          "job": null,
+          "job_id": "",
+          "last_recovery": null,
+          "last_report": null,
+          "lease_valid": false,
+          "observed_ms": "846403309",
+          "owner_id": "da1db43c7d29e7e4ede5ca2337f98d28",
+          "owns": false,
+          "phase": "idle",
+          "recovery_required": false,
+          "reload_requested": false,
+          "remote": null,
+          "request_id": "0",
+          "revision": "1",
+          "safety_fault": false,
+          "schema": "wsprrypi.wtp-runtime/1",
+          "session_diagnostic": "",
+          "session_id": "ca2dac905d19ba6f8c186bb6c61e4fc8",
+          "session_phase": "disconnected",
+          "start_utc_ns": "0",
+          "status_observed_ms": null,
+          "stop_requested": false,
+          "uncertain": false
+        }
+      }
+    },
+    "removals": [
+      {
+        "device_id": "74d12151aff03c45cfcb15a45bd8e037",
+        "revocation_generation": "4"
+      }
+    ],
+    "scope": "wsprrypi-wtp-fleet/1",
+    "version": 1
+  }
+}

@@ -8,36 +8,11 @@
 #include <map>
 #include <thread>
 namespace wsprrypi {
-PicoHttpResponse pico_http_request(TlsStream &stream, const TlsSelection &selection,
-    std::shared_ptr<TlsCredentials> credentials, TlsStream::Clock clock,
-    const std::string &resource, const std::string &method,
-    const std::string &body, const std::string &revision) {
+PicoHttpResponse wtp_json_http_exchange(wtp::ByteStream& stream, TlsStream::Clock clock,
+    const std::string& request, std::uint64_t deadline, bool mutation) {
   const auto error = [](unsigned status, const char *code) {
     return PicoHttpResponse{status, nlohmann::json{{"error", {{"code", code}}}}.dump(), {}};
   };
-  if ((resource != "config" && resource != "schedules" && resource != "network" && resource != "capabilities" && resource != "status") ||
-      (method != "GET" && method != "PUT") || (method == "PUT" && (resource == "status" || resource == "capabilities")))
-    return error(404, "not_found");
-  if (body.size() > 32768 || revision.size() > 128 || revision.find_first_of("\r\n") != std::string::npos)
-    return error(400, "invalid_request");
-  if (method == "PUT" && revision.empty()) return error(428, "revision_required");
-  if (!stream.begin_open(selection, std::move(credentials), "http/1.1")) return error(503, "network_unavailable");
-  struct Close { TlsStream &stream; ~Close() { stream.close(); } } close{stream};
-  const auto deadline = clock() + 20000;
-  while (stream.opening() && clock() < deadline) {
-    stream.poll_open(); std::this_thread::sleep_for(std::chrono::milliseconds(2));
-  }
-  if (!stream.ready()) return error(503, "tls_authentication_or_connection_failed");
-  // The successful handshake authenticated the canonical configured reference
-  // identity. Resolution chooses only the TCP address, never HTTP authority.
-  auto authority = stream.observation().authenticated_identity;
-  if (authority.find(':') != std::string::npos) authority = '[' + authority + ']';
-  if (selection.port != 443) authority += ':' + std::to_string(selection.port);
-  std::string request = method + " /api/v1/" + resource + " HTTP/1.1\r\nHost: " + authority + "\r\n";
-  if (method == "PUT") request += "Origin: https://" + authority +
-      "\r\nContent-Type: application/json\r\nX-WsprryPico-Request: 1\r\nIf-Match: " + revision +
-      "\r\nContent-Length: " + std::to_string(body.size()) + "\r\n";
-  request += "\r\n" + body;
   std::size_t sent = 0;
   std::string response;
   while (clock() < deadline) {
@@ -83,9 +58,43 @@ PicoHttpResponse pico_http_request(TlsStream &stream, const TlsSelection &select
       }
     }
     if (result.state == wtp::IoState::Closed || result.state == wtp::IoState::Failed)
-      return error(503, method == "PUT" ? "management_outcome_unknown" : "network_unavailable");
+      return error(503, mutation ? "management_outcome_unknown" : "network_unavailable");
     std::this_thread::sleep_for(std::chrono::milliseconds(2));
   }
-  return error(503, method == "PUT" ? "management_outcome_unknown" : "network_deadline");
+  return error(503, mutation ? "management_outcome_unknown" : "network_deadline");
 }
+
+PicoHttpResponse pico_http_request(TlsStream &stream, const TlsSelection &selection,
+    std::shared_ptr<TlsCredentials> credentials, TlsStream::Clock clock,
+    const std::string &resource, const std::string &method,
+    const std::string &body, const std::string &revision) {
+  const auto error = [](unsigned status, const char *code) {
+    return PicoHttpResponse{status, nlohmann::json{{"error", {{"code", code}}}}.dump(), {}};
+  };
+  if ((resource != "config" && resource != "schedules" && resource != "network" && resource != "capabilities" && resource != "status") ||
+      (method != "GET" && method != "PUT") || (method == "PUT" && (resource == "status" || resource == "capabilities")))
+    return error(404, "not_found");
+  if (body.size() > 32768 || revision.size() > 128 || revision.find_first_of("\r\n") != std::string::npos)
+    return error(400, "invalid_request");
+  if (method == "PUT" && revision.empty()) return error(428, "revision_required");
+  if (!stream.begin_open(selection, std::move(credentials), "http/1.1")) return error(503, "network_unavailable");
+  struct Close { TlsStream &stream; ~Close() { stream.close(); } } close{stream};
+  const auto deadline = clock() + 20000;
+  while (stream.opening() && clock() < deadline) {
+    stream.poll_open(); std::this_thread::sleep_for(std::chrono::milliseconds(2));
+  }
+  if (!stream.ready()) return error(503, "tls_authentication_or_connection_failed");
+  // The successful handshake authenticated the canonical configured reference
+  // identity. Resolution chooses only the TCP address, never HTTP authority.
+  auto authority = stream.observation().authenticated_identity;
+  if (authority.find(':') != std::string::npos) authority = '[' + authority + ']';
+  if (selection.port != 443) authority += ':' + std::to_string(selection.port);
+  std::string request = method + " /api/v1/" + resource + " HTTP/1.1\r\nHost: " + authority + "\r\n";
+  if (method == "PUT") request += "Origin: https://" + authority +
+      "\r\nContent-Type: application/json\r\nX-WsprryPico-Request: 1\r\nIf-Match: " + revision +
+      "\r\nContent-Length: " + std::to_string(body.size()) + "\r\n";
+  request += "\r\n" + body;
+  return wtp_json_http_exchange(stream, clock, request, deadline, method == "PUT");
+}
+
 } // namespace wsprrypi

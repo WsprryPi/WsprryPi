@@ -32,11 +32,11 @@ int main() {
       CHECK(classify_privileged_http_operation("PUT", path) == PrivilegedOperationClass::protected_operation);
       CHECK(classify_privileged_http_operation("DELETE", path) == PrivilegedOperationClass::reject);
     }
-    for (const auto path : {"/api/v1/host/devices", "/api/v1/host/discovery"}) {
+    for (const auto path : {"/api/v1/host/devices", "/api/v1/host/discovery", "/api/v1/host/wtp-endpoint", "/api/v1/host/fleet"}) {
       CHECK(classify_privileged_http_operation("GET", path) == PrivilegedOperationClass::protected_operation);
       CHECK(classify_privileged_http_operation("PUT", path) == PrivilegedOperationClass::reject);
     }
-    for (const auto path : {"/api/v1/host/devices", "/api/v1/host/devices/use", "/api/v1/host/discovery/identify"}) {
+    for (const auto path : {"/api/v1/host/devices", "/api/v1/host/devices/use", "/api/v1/host/discovery/identify", "/api/v1/host/fleet", "/api/v1/host/wtp-endpoint/enable", "/api/v1/host/wtp-endpoint/recover"}) {
       CHECK(classify_privileged_http_operation("POST", path) == PrivilegedOperationClass::protected_operation);
       CHECK(classify_privileged_http_operation("GET", std::string(path) + "/other") == PrivilegedOperationClass::reject);
     }

@@ -162,6 +162,15 @@ void run(const std::string &credentials) {
           get_public_config_snapshot() == before);
   }
   auto discovered = browser.Get("/api/v1/host/discovery", read_headers);
+  auto pi_endpoint = browser.Get("/api/v1/host/wtp-endpoint", read_headers);
+  CHECK(pi_endpoint && pi_endpoint->status == 200 &&
+        nlohmann::json::parse(pi_endpoint->body).at("schema") == "wsprrypi-wtp-endpoint/1");
+  auto fleet_unstarted = browser.Get("/api/v1/host/fleet", read_headers);
+  CHECK(fleet_unstarted && fleet_unstarted->status == 503 &&
+        nlohmann::json::parse(fleet_unstarted->body).at("error").at("code") == "fleet_unavailable");
+  auto pi_missing_origin = browser.Post("/api/v1/host/wtp-endpoint/recover", read_headers,
+      R"({"confirmed":true})", "application/json");
+  CHECK(pi_missing_origin && pi_missing_origin->status == 403);
   CHECK(discovered && discovered->status == 200 &&
         nlohmann::json::parse(discovered->body).at("scope") == "wtp-dns-sd/1");
   auto known = browser.Get("/api/v1/host/devices", read_headers);

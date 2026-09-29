@@ -20,6 +20,8 @@
 #include "transmitter_runtime_bridge.hpp"
 #include "version.hpp"
 #include "wtp_runtime_bridge.hpp"
+#include "wtp_pi_control.hpp"
+#include "wtp_endpoint/runtime.hpp"
 
 #include <atomic>
 #include <exception>
@@ -29,6 +31,20 @@
 
 namespace
 {
+class LocalToneReservation
+{
+public:
+    explicit LocalToneReservation(bool held) : held_(held) {}
+    ~LocalToneReservation()
+    {
+        if (held_)
+            wtp_pi_end_local(transmitter_output_inactive_confirmed());
+    }
+    void transfer_to_running_tone() noexcept { held_ = false; }
+private:
+    bool held_;
+};
+
 wsprrypi::BackendKind to_controller_backend(
     TransmitBackendKind backend) noexcept
 {
@@ -233,6 +249,12 @@ TestToneStartResult start_test_tone(const TestToneRequest &tone_request)
         }
     }
 
+    if (!wtp_pi_begin_test_tone())
+    {
+        result.message = "The local output is owned by a remote WTP job or is not confirmed idle.";
+        return result;
+    }
+    LocalToneReservation local_tone_reservation(true);
     web_test_tone.store(true);
 
     // Save previous mode so we can restore it later.
@@ -403,6 +425,7 @@ TestToneStartResult start_test_tone(const TestToneRequest &tone_request)
               lookup.freq_display_string(dial_freq));
     result.started = true;
     result.message = "Test tone started.";
+    local_tone_reservation.transfer_to_running_tone();
     return result;
     }
     catch (const std::exception &error)
@@ -473,6 +496,7 @@ TestToneStopResult end_test_tone()
         "Post-test-tone stop transmitter snapshot: ",
         transmitter_reload_defer_debug_snapshot());
     (void)reconcile_tx_led_after_transmitter_stop("test tone stop");
+    wtp_pi_end_local(transmitter_output_inactive_confirmed());
 
     const bool deferred_reload_pending =
         ini_reload_pending.load(std::memory_order_acquire);
@@ -571,6 +595,7 @@ TestToneStopResult end_test_tone()
 StopTransmissionResult stop_transmission_by_user_request(bool persist_transmit)
 {
     StopTransmissionResult result;
+    const bool remote_stopped = wsprrypi::wtp_pi_stop_remote_work();
     bool persist_to_ini = false;
     suppress_cancelled_ws_event_for_user_stop.store(false, std::memory_order_release);
 
@@ -611,6 +636,7 @@ StopTransmissionResult stop_transmission_by_user_request(bool persist_transmit)
         false,
         "scheduler shutdown");
     release_idle_selector_gpio_reservations();
+    wtp_pi_end_local(transmitter_output_inactive_confirmed());
 
     {
         std::lock_guard<std::mutex> lk(set_config_mtx);
@@ -645,7 +671,9 @@ StopTransmissionResult stop_transmission_by_user_request(bool persist_transmit)
     else
     {
         result.persisted = false;
-        result.message = persist_transmit
+        result.message = !remote_stopped
+                             ? "Remote output state is unknown; local output remains inhibited. Use local recovery."
+                             : persist_transmit
                              ? "Transmission stopped and runtime transmit disabled; no INI file is active."
                              : "Transmission stopped and runtime transmit disabled without persisting.";
         llog.logS(INFO, result.message);
@@ -659,7 +687,9 @@ StopTransmissionResult stop_transmission_by_user_request(bool persist_transmit)
     }
     send_ws_message("transmit", "stopped");
 
-    result.message = result.transmission_active
+    result.message = !remote_stopped
+                         ? "Remote output state is unknown; local output remains inhibited. Use local recovery."
+                         : result.transmission_active
                          ? "Active transmission stopped and transmit disabled."
                          : "Transmit disabled; no active transmission was running.";
     return result;

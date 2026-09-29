@@ -98,9 +98,14 @@ PrivilegedOperationClass classify_privileged_http_operation(
             (path == "/api/v1/config" || path == "/api/v1/schedules" || path == "/api/v1/network" || path == "/api/v1/host/config"))
             return PrivilegedOperationClass::protected_operation;
         if ((method == "GET" && (path == "/api/v1/host/devices" ||
-                                 path == "/api/v1/host/discovery")) ||
+                                 path == "/api/v1/host/discovery" ||
+                                 path == "/api/v1/host/fleet" ||
+                                 path == "/api/v1/host/wtp-endpoint")) ||
             (method == "POST" && (path == "/api/v1/host/devices" ||
                                   path == "/api/v1/host/devices/use" ||
+                                  path == "/api/v1/host/fleet" ||
+                                  path == "/api/v1/host/wtp-endpoint/enable" ||
+                                  path == "/api/v1/host/wtp-endpoint/recover" ||
                                   path == "/api/v1/host/discovery/identify")))
             return PrivilegedOperationClass::protected_operation;
         if (method == "POST" && (path == "/api/v1/jobs" ||

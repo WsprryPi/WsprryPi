@@ -51,8 +51,8 @@ class AvahiBrowser {
         if (bytes && size <= 255) entries.emplace_back(reinterpret_cast<const char *>(bytes), size);
         else { entries.clear(); break; }
       }
-      // Avahi prepends parsed TXT entries; restore the on-wire order for txtvers validation.
-      std::reverse(entries.begin(), entries.end());
+      // The client resolver callback already presents the daemon's TXT array
+      // in wire order. Reversing it rejects valid txtvers-first Pi/Pico records.
       wtp_discovery().resolved(key, host ? host : "", port, entries, now_ms());
     } else {
       wtp_discovery().failed(key, "Avahi resolver failed", now_ms());
@@ -136,6 +136,9 @@ void start_wtp_discovery() {
     wtp_discovery().available(false, "Discovery disabled for hardware-free validation");
     return;
   }
+  // Construct the observation store before the browser. Static destruction
+  // then joins its worker before destroying the map that worker updates.
+  (void)wtp_discovery();
   static AvahiBrowser browser; browser.start();
 }
 } // namespace wsprrypi

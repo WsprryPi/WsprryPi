@@ -261,6 +261,16 @@ wsprrypi::BackendCompileResult WsprSi5351Backend::configure(
     wsprrypi::BackendCompileResult result;
     result.ok = false;
 
+    if (config_.anchor_finite_tone_to_enable &&
+        (plan.mode != wsprrypi::TransmissionMode::TONE ||
+         !plan.duration_was_explicit || plan.events.size() != 1 ||
+         !plan.events.front().rf_on ||
+         plan.events.front().envelope.fade_shape != wsprrypi::FadeShape::NONE))
+    {
+        result.error = "Output-enable anchoring requires one finite tone event.";
+        return result;
+    }
+
     const int requested_power_level =
         (inputs.power_level == 0) ? config_.power_level : inputs.power_level;
     if (!mapPowerLevelToDriveStrength(
@@ -408,7 +418,12 @@ wsprrypi::StartupQuiesceResult WsprSi5351Backend::quiesceForStartup()
         return result;
     }
 
-    const bool disabled = device_.disableAllOutputs();
+    bool disabled = device_.disableAllOutputs();
+    if (disabled && config_.confirm_output_disable)
+    {
+        std::uint8_t value = 0;
+        disabled = device_.readRegister(3, value) && value == 0xff;
+    }
     if (!disabled)
     {
         result.error = device_error_or(
@@ -449,11 +464,12 @@ wsprrypi::ExecutionResult WsprSi5351Backend::execute(
     auto idle_device = [this]() {
         const bool disabled = disableTransmitOutput();
         const bool idle_programmed = applyIdleProgramming();
+        const bool confirmed = !config_.confirm_output_disable || outputIsDisabled();
         device_.close();
         execution_cleanup_completed_ = true;
-        execution_cleanup_result_.ok = disabled && idle_programmed;
+        execution_cleanup_result_.ok = disabled && idle_programmed && confirmed;
         execution_cleanup_result_.error.clear();
-        if (!disabled)
+        if (!disabled || !confirmed)
             execution_cleanup_result_.error =
                 "Could not disable Si5351 output.";
         if (!idle_programmed)
@@ -643,6 +659,8 @@ wsprrypi::ExecutionResult WsprSi5351Backend::execute(
                 idle_device();
                 return result;
             }
+            if (i == 0 && config_.anchor_finite_tone_to_enable && first_enable_time_)
+                start_time = *first_enable_time_;
         }
 
         if (!execution_interrupted &&
@@ -851,6 +869,13 @@ wsprrypi::CleanupResult WsprSi5351Backend::cleanup() noexcept
     {
         device_.close();
         return {true, {}};
+    }
+
+    if (config_.confirm_output_disable && !device_.isOpen())
+    {
+        const auto quiesced = quiesceForStartup();
+        resetState();
+        return {quiesced.ok, quiesced.error};
     }
 
     const bool disabled = disableTransmitOutput();
@@ -1088,6 +1113,7 @@ std::size_t WsprSi5351Backend::expectedToneCount(
 
 void WsprSi5351Backend::resetState()
 {
+    first_enable_time_.reset();
     current_plan_ = wsprrypi::ExecutionPlan{};
     unique_tone_frequencies_.clear();
     event_tone_indexes_.clear();
@@ -1241,10 +1267,26 @@ bool WsprSi5351Backend::waitForPllReady()
 
 bool WsprSi5351Backend::enableTransmitOutput()
 {
-    if (config_.dry_run)
-        return true;
-
-    return device_.enableOutput(config_.planner.tx_output);
+    bool enabled = false;
+    if (config_.output_enable_admission)
+    {
+        std::uint8_t value = 0xff;
+        if (!config_.dry_run && !device_.readRegister(3, value)) return false;
+        if (!config_.output_enable_admission()) return false;
+        value &= static_cast<std::uint8_t>(~(1u << static_cast<unsigned>(config_.planner.tx_output)));
+        enabled = config_.dry_run || device_.writeRegister(3, value);
+    }
+    else
+        enabled = config_.dry_run || device_.enableOutput(config_.planner.tx_output);
+    if (enabled && !first_enable_time_ &&
+        (config_.anchor_finite_tone_to_enable || config_.first_output_enabled))
+    {
+        timespec now{};
+        if (::clock_gettime(CLOCK_MONOTONIC, &now) != 0) return false;
+        first_enable_time_ = now;
+        if (config_.first_output_enabled) config_.first_output_enabled();
+    }
+    return enabled;
 }
 
 bool WsprSi5351Backend::disableTransmitOutput()
@@ -1252,5 +1294,14 @@ bool WsprSi5351Backend::disableTransmitOutput()
     if (config_.dry_run)
         return true;
 
-    return device_.disableOutput(config_.planner.tx_output);
+    const bool disabled = device_.disableOutput(config_.planner.tx_output);
+    return disabled && (!config_.confirm_output_disable || outputIsDisabled());
+}
+
+bool WsprSi5351Backend::outputIsDisabled()
+{
+    if (config_.dry_run) return true;
+    std::uint8_t value = 0;
+    return device_.readRegister(3, value) &&
+           (value & (1u << static_cast<unsigned>(config_.planner.tx_output))) != 0;
 }

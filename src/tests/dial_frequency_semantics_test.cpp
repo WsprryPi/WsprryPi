@@ -6666,6 +6666,38 @@ int main(int argc, char *argv[])
     {
         init_default_config();
         config.use_ini = true;
+        config.ini_filename = "/tmp/wtp_server_settings_patch.ini";
+        config.wtp_server_port_override = 31419;
+        config_to_json();
+        require(config.wtp_server.enabled && config.wtp_server.port == 31417 &&
+                    config.wtp_server.interface == "auto",
+                "WTP server defaults must enable Plain LAN on port 31417");
+        patch_all_from_web({{"WTP Server", {{"Enabled", false},
+                                               {"Port", 31418},
+                                               {"Interface", "eth0"}}}});
+        require(!config.wtp_server.enabled && config.wtp_server.port == 31418 &&
+                    config.wtp_server.interface == "eth0" &&
+                    config.wtp_server_port_override == 31419,
+                "WTP server settings must apply through HTTP config writes");
+        const auto saved = iniFile.getData();
+        require(saved.at("WTP Server").at("Enabled") == "false" &&
+                    saved.at("WTP Server").at("Port") == "31418" &&
+                    saved.at("WTP Server").at("Interface") == "eth0",
+                "WTP server settings must persist in INI");
+        PreparedConfigCandidate candidate;
+        prepare_ini_config_candidate(config.ini_filename, candidate);
+        require(candidate.valid && !candidate.normalized_config.wtp_server.enabled &&
+                    candidate.normalized_config.wtp_server.port == 31418 &&
+                    candidate.normalized_config.wtp_server.interface == "eth0",
+                "WTP server settings must survive managed INI reload");
+        commit_config_candidate(candidate);
+        require(config.wtp_server_port_override == 31419,
+                "managed INI reload must retain transient WTP server port override");
+    }
+
+    {
+        init_default_config();
+        config.use_ini = true;
         config.ini_filename = "/tmp/mode_clock_estimate_patch.ini";
         config.mode = ModeType::QRSS;
         config.transmit = false;

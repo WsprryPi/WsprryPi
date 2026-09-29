@@ -7,6 +7,7 @@
 
 #include "wspr_transmit.hpp"
 #include "wtp_runtime_bridge.hpp"
+#include "wtp_pi_control.hpp"
 #include "logging.hpp"
 #include <mutex>
 #include <stdexcept>
@@ -87,7 +88,15 @@ std::string transmitter_format_frequency_mhz(double frequency_hz)
 void transmitter_start_async()
 {
     if (wtp_runtime_selected()) { wtp_runtime_start(); return; }
-    wsprTransmitter.startAsync();
+    if (!wtp_pi_begin_scheduled())
+        throw std::runtime_error("Local output is not available for transmission");
+    try {
+        wsprTransmitter.startAsync();
+    } catch (...) {
+        wsprTransmitter.stopAndJoin();
+        wtp_pi_end_scheduled(transmitter_output_inactive_confirmed());
+        throw;
+    }
 }
 
 void transmitter_stop_and_join()
@@ -98,12 +107,21 @@ void transmitter_stop_and_join()
         return;
     }
     wsprTransmitter.stopAndJoin();
+    wtp_pi_end_scheduled(transmitter_output_inactive_confirmed());
+}
+
+bool transmitter_output_inactive_confirmed() noexcept
+{
+    if (wtp_runtime_selected()) return false;
+    return wsprTransmitter.lastCleanupResult().ok &&
+           wsprTransmitter.getState() != WsprTransmitState::TRANSMITTING;
 }
 
 void transmitter_shutdown_for_process_exit()
 {
     if (wtp_runtime_selected()) { transmitter_stop_and_join(); return; }
     wsprTransmitter.shutdownForProcessExit();
+    wtp_pi_end_scheduled(transmitter_output_inactive_confirmed());
 }
 
 void transmitter_clear_soft_off() noexcept

@@ -79,6 +79,7 @@ struct PreparedConfigCandidate
     nlohmann::json error_details{};
     std::vector<std::string> warnings{};
     bool migration_required = false;
+    bool preserve_interactive_takeover = false;
 };
 
 struct Si5351AddressInventory
@@ -348,7 +349,10 @@ nlohmann::json get_public_config_json();
  * @throws May throw exceptions from internal calls (e.g., parsing or write errors).
  */
 void patch_all_from_web(const nlohmann::json &j);
-std::string patch_all_from_web_revision(const nlohmann::json &j, const std::string &expected_revision);
+enum class LocalEnableAction { Noninteractive, EndNow, FinishCurrent };
+std::string patch_all_from_web_revision(const nlohmann::json &j, const std::string &expected_revision,
+    LocalEnableAction action = LocalEnableAction::Noninteractive, bool confirmed = false,
+    const std::string& observed_owner = {}, const std::string& observed_job = {});
 std::pair<nlohmann::json, std::string> get_public_config_snapshot();
 void set_patch_all_from_web_runtime_apply_suppressed_for_test(bool suppressed) noexcept;
 bool persist_rp1_gpclk_route_config(int gpio, std::string *error_message = nullptr) noexcept;

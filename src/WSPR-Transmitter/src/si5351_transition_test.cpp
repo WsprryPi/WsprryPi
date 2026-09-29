@@ -929,6 +929,68 @@ void test_all_ordered_pll_transitions()
 
 int main()
 {
+    // WTP initializes during ARM lead, then admits only the final enable write.
+    // Duration must begin at that write rather than at device initialization.
+    for (bool admit : {false, true})
+    {
+        TestBridge bridge;
+        bridge.real_waits = true;
+        auto adapter = std::make_shared<FakeI2CAdapter>();
+        auto cfg = config(adapter);
+        unsigned observed = 0;
+        bool programmed_before_admission = false;
+        cfg.anchor_finite_tone_to_enable = true;
+        cfg.confirm_output_disable = true;
+        cfg.output_enable_admission = [&] {
+            programmed_before_admission = adapter->address_attempts[177] != 0 &&
+                adapter->registers[3] == 255;
+            std::this_thread::sleep_for(std::chrono::milliseconds(40));
+            return admit;
+        };
+        cfg.first_output_enabled = [&] {
+            ++observed;
+            expect(adapter->registers[3] == 254, "launch observed after enable write");
+        };
+        WsprSi5351Backend backend(bridge, cfg);
+        auto plan = single_tone_plan();
+        plan.duration_was_explicit = true;
+        plan.events[0].duration = std::chrono::milliseconds(30);
+        plan.summary.total_duration = plan.events[0].duration;
+        std::chrono::steady_clock::time_point on{}, off{};
+        adapter->after_write = [&](std::uint8_t r, std::uint8_t v, std::size_t) {
+            if (r == 3 && v == 254) on = std::chrono::steady_clock::now();
+            if (r == 3 && v == 255 && on.time_since_epoch().count() != 0)
+                off = std::chrono::steady_clock::now();
+        };
+        expect(configure(backend, plan), "scheduled finite tone configures");
+        const auto result = backend.execute(plan);
+        expect(programmed_before_admission, "programming completes before admission");
+        expect(result.ok == admit && observed == (admit ? 1U : 0U),
+               "denied admission never enables or reports launch");
+        if (admit)
+            expect(off - on >= std::chrono::milliseconds(30),
+                   "ARM lead does not shorten finite tone duration");
+        expect(backend.cleanup().ok && adapter->registers[3] == 255,
+               "scheduled tone cleanup confirms output disabled");
+    }
+    {
+        TestBridge bridge;
+        auto adapter = std::make_shared<FakeI2CAdapter>();
+        auto cfg = config(adapter);
+        cfg.confirm_output_disable = true;
+        WsprSi5351Backend backend(bridge, cfg);
+        auto plan = single_tone_plan();
+        expect(configure(backend, plan), "loaded tone configures without open device");
+        expect(backend.cleanup().ok && adapter->open_calls != 0 &&
+                   adapter->registers[3] == 255,
+               "aborting loaded job confirms disable through real readback");
+        expect(configure(backend, plan), "failed-readback tone configures");
+        adapter->after_write = [&](std::uint8_t r, std::uint8_t, std::size_t) {
+            if (r == 3) adapter->registers[3] = 254;
+        };
+        expect(!backend.cleanup().ok, "stuck enabled output fails cleanup readback");
+        adapter->after_write = {};
+    }
     test_all_ordered_pll_transitions();
     test_envelope_deadlines_and_off_retune_readiness();
     test_burst_and_cache_failure_contract();

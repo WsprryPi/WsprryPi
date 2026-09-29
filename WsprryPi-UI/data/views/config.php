@@ -6,6 +6,7 @@ $bandGpioBands = ['2200m', '630m', '160m', '80m', '60m', '40m', '30m', '20m', '1
 ?>
 
             <div class="card-header pb-0">
+                <?php require __DIR__ . '/local-wtp-control.php'; ?>
                 <div class="config-header-bar mb-2">
                     <div class="config-header-context">
                         <div class="config-header-copy">
@@ -1251,7 +1252,7 @@ $bandGpioBands = ['2200m', '630m', '160m', '80m', '60m', '40m', '30m', '20m', '1
                             hidden>
                             <div class="config-pane-intro">
                                 <span class="config-pane-intro__label">Fleet</span>
-                                <p class="mb-0">Configure and inspect the Pico connected to this WsprryPi host.</p>
+                                <p class="mb-0">Manage saved Pi and Pico outputs and assign their schedules.</p>
                             </div>
                             <?php require __DIR__ . '/wtp-controls.php'; ?>
                         </div>

@@ -5,8 +5,9 @@ disabled on every page load until the existing `WtpUi.developmentControlsVisible
 boolean is explicitly set for that browser session. Hiding Fleet does not
 change the selected backend, `[WTP]`, a pending job, or saved drafts.
 
-The host keeps one active endpoint authority: the existing `[WTP]` INI section
-and runtime configuration. A separate version 1 catalog at
+The compatibility route keeps one selected endpoint in the existing `[WTP]`
+INI section and runtime configuration. Independent output assignments, described
+below, use separate target contexts and do not replace that selection. A separate version 1 catalog at
 `<active-INI-path>.wtp-devices.json` stores up to 64 named profiles with random
 local IDs, a manual or DNS-SD connection method, a complete endpoint/settings
 snapshot, expected full WTP device ID, and host paths to TLS files. The private
@@ -31,6 +32,56 @@ work, or recover old work. The INI write happens before the in-memory active
 endpoint is published. A write failure leaves the old endpoint active; an
 unexpected failure after persistence is reported as `runtime_apply_unconfirmed`
 and requires a fresh config/status read before further work.
+
+## Independent output schedules
+
+**Output schedules** supports zero through eight remote outputs alongside this
+Pi's own schedule. Select a verified saved Pi/Pico profile, assign a finite job,
+and save it explicitly. The assignment starts paused unless **Start this output's
+schedule after saving** is selected. **Resume**, **Pause and stop**, **Edit schedule**,
+**Reconcile**, and **Remove assignment** act on that output only. Editing requires
+a paused, reconciled output. Removing a catalog profile does not silently remove
+an assignment; remove the assignment explicitly.
+
+Each assignment stores its own mode, RF base frequency in Hz, repeat period and
+UTC phase. Finite tones use duration in seconds in the UI (integer milliseconds
+on the API). QRSS, FSKCW and DFCW use a message and dot duration. FSKCW and DFCW
+also specify shift. WSPR accepts a single-frame callsign/locator and dBm; its
+period and phase align to two minutes and transmission starts at second one.
+The target's current CAPS must accept the compiled job. The first Pi endpoint
+supports only finite 20 m tones up to 10 seconds. Pico modes depend on its CAPS.
+
+Assignments obey the controller's current frequency-policy settings.
+WTP remains an unqualified physical route in that policy, so starting remote
+work requires the explicit `--allow-unqualified-frequency` option on the
+controller, or `Allow Unqualified Frequency = true` in `[Experimental]` of its
+INI. Policy is checked again before CLAIM and ARM, including after an INI
+reload. Non-amateur frequencies additionally require the existing separate
+authorization. CAPS acceptance and a saved assignment do not silently grant
+either override. A policy rejection is returned before saving the assignment.
+
+`<active-INI-path>.wtp-assignments.json` is a private atomic file, independent of
+the profile catalog and `[WTP]`. It records up to eight assignments, the last
+consumed UTC slot, in-flight state, and up to 32 local-takeover removal notices.
+A slot is consumed before dispatch and is never automatically retried. Failed
+or uncertain work pauses that assignment. After an interrupted process with
+in-flight work, use **Reconcile**, inspect the result, then **Resume**. Other
+outputs and local scheduling remain independent. Duplicate full identities and
+self-targeting are rejected, including collision with the compatibility route.
+
+Pi assignments explicitly select Plain LAN and a status HTTP port (default
+31415). Before CLAIM and ARM, the controller reads the target's durable takeover
+generation at `/api/v1/host/wtp-endpoint`. A changed generation deletes that
+output's saved assignment even when takeover happened while the controller was
+offline. Local Enable never waits for this controller. Losing network contact
+pauses progress; it does not prove output-off, select another device, or remove
+an assignment as if the operator had taken over.
+
+`GET/POST /api/v1/host/fleet` returns the assignment document, per-output runtime
+observations and a quoted ETag. POST requires `If-Match` and the existing host
+request guard. Operations are `assign`, `enable`, `pause`, `schedule`, `recover`,
+and `remove`. See [Pi endpoint operation](wtp-pi-operation.md) for inbound
+listener and target-side takeover controls.
 
 ## DNS-SD observations
 
@@ -101,5 +152,7 @@ The network interop reference at `src/tests/network/pico-reference-revision.txt`
 still pins `95aac22bf7cc31b67fe5773761708d743d8a6473`; its WTP wire
 coverage does not exercise the later published DNS-SD advertisement commit
 `c13fc16819749e9b53a42609f31702c3aca9931c`. Use that published Pico
-revision for a separately authorized live/adapter discovery campaign before
-claiming advertisement interoperability.
+revision when comparing the published profile with live advertisements. The
+[Pi endpoint execution record](development/wtp-pi-execution-report.md) records
+this implementation's live LAN observations separately from the older interop
+fixture; it does not change that fixture's source pin or qualify new Pico firmware.

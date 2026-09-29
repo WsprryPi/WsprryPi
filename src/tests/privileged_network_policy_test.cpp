@@ -40,6 +40,16 @@ int main() {
     expect_http("GET", "/api/wtp", Classification::read_only);
     expect_http("GET", "/api/wtp/recover", Classification::reject);
     expect_http("PUT", "/api/wtp", Classification::reject);
+    for (const auto* path : {"/api/v1/host/fleet", "/api/v1/host/wtp-endpoint"}) {
+        expect_http("GET", path, Classification::protected_operation);
+        expect_http("DELETE", path, Classification::reject);
+    }
+    for (const auto* path : {"/api/v1/host/fleet", "/api/v1/host/wtp-endpoint/enable", "/api/v1/host/wtp-endpoint/recover"}) {
+        expect_http("POST", path, Classification::protected_operation);
+        expect_http("PUT", path, Classification::reject);
+    }
+    expect_http("GET", "/api/v1/host/wtp-endpoint/enable", Classification::reject);
+    expect_http("POST", "/api/v1/host/wtp-endpoint", Classification::reject);
     expect_http("POST", "/api/network-safety", Classification::protected_operation);
     expect_http("GET", "/api/network-safety", Classification::read_only);
     expect_http("PUT", "/api/network-safety", Classification::reject);

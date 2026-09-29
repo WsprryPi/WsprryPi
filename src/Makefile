@@ -311,6 +311,9 @@ COMPONENT_CPP_SOURCES := $(filter-out $(PPM_MANAGER_TEST_SOURCE) $(SIGNAL_HANDLE
 COMPONENT_CPP_SOURCES := $(filter-out $(TRANSMITTER_SHARED_CPP_SOURCES) $(TRANSMITTER_BACKEND_CPP_SOURCES),$(COMPONENT_CPP_SOURCES))
 
 WTP_APPLICATION_SOURCES := $(wildcard wtp_integration/*.cpp) $(wildcard WTP-Client/src/*.cpp) WTP-Client/src/detail/json.cpp
+WTP_APPLICATION_SOURCES += $(wildcard WTP-Server/src/*.cpp)
+WTP_APPLICATION_SOURCES += $(filter-out wtp_endpoint/si5351_bridge.cpp wtp_endpoint/si5351_realization.cpp,$(wildcard wtp_endpoint/*.cpp))
+WTP_APPLICATION_SOURCES += $(if $(filter si5351,$(BACKEND_LIST)),wtp_endpoint/si5351_bridge.cpp wtp_endpoint/si5351_realization.cpp)
 CPP_SOURCES := $(WTP_APPLICATION_SOURCES) $(LOCAL_CPP_SOURCES) $(COMPONENT_CPP_SOURCES) $(TRANSMITTER_SHARED_CPP_SOURCES) $(SELECTED_BACKEND_CPP_SOURCES)
 REL_CPP_SOURCES := $(patsubst ../../%,%,$(CPP_SOURCES))
 
@@ -647,6 +650,7 @@ CXXFLAGS := -Wno-psabi -std=c++$(CXXVER) \
 
 # Include paths
 CXXFLAGS += -I$(abspath ./WTP-Client/include) -I$(abspath ./WTP-Client/src)
+CXXFLAGS += -I$(abspath ./WTP-Server/include)
 CXXFLAGS += -I$(abspath .)
 CXXFLAGS += -I$(abspath $(BUILD_METADATA_DIR))
 CXXFLAGS += $(foreach dir,$(COMPONENT_SRCDIRS),-I$(abspath $(dir)))
@@ -1174,6 +1178,72 @@ semantics-make-regression-test:
 .PHONY: wtp-protocol-test
 wtp-protocol-test:
 	$(Q)$(MAKE) --no-print-directory -C WTP-Client test
+
+# Portable Pi WTP ownership model; inhibited engine and injected clock only.
+.PHONY: wtp-pi-authority-test
+wtp-pi-authority-test:
+	$(Q)$(MAKE) --no-print-directory -C WTP-Server test
+	$(Q)$(CXX) -std=c++20 -Wall -Wextra -Wpedantic -Werror -I. -IWTP-Server/include \
+		tests/wtp_pi_authority_test.cpp wtp_endpoint/authority.cpp \
+		wtp_endpoint/revocation_journal.cpp \
+		WTP-Server/build/libwtp_server.a -o build/wtp_pi_authority_test
+	$(Q)build/wtp_pi_authority_test
+
+.PHONY: wtp-pi-listener-test
+wtp-pi-listener-test:
+	$(Q)$(MAKE) --no-print-directory -C WTP-Server all
+	$(Q)$(MAKE) --no-print-directory -C WTP-Client all
+	$(Q)$(CXX) -std=c++20 -pthread -Wall -Wextra -Wpedantic -Werror \
+		-I. -IWTP-Server/include -IWTP-Client/include \
+		tests/wtp_pi_plain_listener_test.cpp wtp_endpoint/authority.cpp \
+		wtp_endpoint/revocation_journal.cpp wtp_endpoint/plain_listener.cpp \
+		WTP-Server/build/libwtp_server.a \
+		WTP-Client/build/libwtp_client.a -o build/wtp_pi_plain_listener_test
+	$(Q)build/wtp_pi_plain_listener_test
+
+.PHONY: wtp-pi-revocation-test
+wtp-pi-revocation-test:
+	$(Q)$(CXX) -std=c++20 -Wall -Wextra -Wpedantic -Werror -I. \
+		tests/wtp_pi_revocation_journal_test.cpp \
+		wtp_endpoint/revocation_journal.cpp -o build/wtp_pi_revocation_journal_test
+	$(Q)build/wtp_pi_revocation_journal_test
+
+.PHONY: wtp-pi-tone-engine-test
+wtp-pi-tone-engine-test:
+	$(Q)$(CXX) -std=c++20 -Wall -Wextra -Wpedantic -Werror -I. -IWTP-Server/include \
+		tests/wtp_pi_tone_engine_test.cpp wtp_endpoint/tone_engine.cpp \
+		-o build/wtp_pi_tone_engine_test
+	$(Q)build/wtp_pi_tone_engine_test
+
+.PHONY: wtp-pi-identity-test
+wtp-pi-identity-test:
+	$(Q)$(CXX) -std=c++20 -Wall -Wextra -Wpedantic -Werror -I. -IWTP-Server/include \
+		tests/wtp_pi_identity_test.cpp wtp_endpoint/identity.cpp \
+		WTP-Server/src/sha256.cpp -o build/wtp_pi_identity_test
+	$(Q)build/wtp_pi_identity_test
+
+.PHONY: wtp-pi-interface-selection-test
+wtp-pi-interface-selection-test:
+	$(Q)$(CXX) -std=c++20 -Wall -Wextra -Wpedantic -Werror -I. \
+		tests/wtp_pi_interface_selection_test.cpp \
+		wtp_endpoint/interface_selection.cpp -o build/wtp_pi_interface_selection_test
+	$(Q)build/wtp_pi_interface_selection_test
+
+.PHONY: wtp-pi-si5351-realization-test
+wtp-pi-si5351-realization-test:
+	$(Q)$(CXX) -std=c++20 -Wall -Wextra -Wpedantic -Werror -I. \
+		tests/wtp_pi_si5351_realization_test.cpp \
+		wtp_endpoint/si5351_realization.cpp \
+		WSPR-Transmitter/src/si5351_planner.cpp \
+		-o build/wtp_pi_si5351_realization_test
+	$(Q)build/wtp_pi_si5351_realization_test
+
+.PHONY: wtp-pi-control-test
+wtp-pi-control-test:
+	$(Q)$(CXX) -std=c++20 -Wall -Wextra -Wpedantic -Werror -I. \
+		tests/wtp_pi_control_test.cpp wtp_pi_control.cpp \
+		-o build/wtp_pi_control_test
+	$(Q)build/wtp_pi_control_test
 
 # Pure parent adapter tests. Kept outside automatic production source discovery
 # until WTP backend integration is approved. No transport or hardware is opened.
@@ -1926,3 +1996,17 @@ wtp-network-runtime-test: wtp-tls-test wtp-plain-tcp-test $(BIN_DIR)/wtp_product
 .PHONY: object-dependency-test
 object-dependency-test:
 	$(Q)python3 ../scripts/tests/object_dependency_make_regression_test.py
+
+.PHONY: wtp-fleet-test
+$(BIN_DIR)/wtp_fleet_test: tests/wtp_fleet_test.cpp $(SEMANTICS_TEST_DEPS)
+	$(Q)mkdir -p $(BIN_DIR)
+	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -Itests $^ -o $@ $(LDFLAGS)
+wtp-fleet-test: $(BIN_DIR)/wtp_fleet_test
+	$(Q)WSPRRYPI_DISABLE_HARDWARE_ACCESS=1 ./$(BIN_DIR)/wtp_fleet_test
+
+.PHONY: wtp-pi-config-transaction-test
+$(BIN_DIR)/wtp_pi_config_transaction_test: tests/wtp_pi_config_transaction_test.cpp $(SEMANTICS_TEST_DEPS)
+	$(Q)mkdir -p $(BIN_DIR)
+	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -Itests $^ -o $@ $(LDFLAGS)
+wtp-pi-config-transaction-test: $(BIN_DIR)/wtp_pi_config_transaction_test
+	$(Q)WSPRRYPI_DISABLE_HARDWARE_ACCESS=1 ./$(BIN_DIR)/wtp_pi_config_transaction_test

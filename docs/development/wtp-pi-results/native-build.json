@@ -1,0 +1,9 @@
+{
+  "source_base": "b28d01333744f8562fd8a9ad28908cedc61d98c3",
+  "profile": "si5351,simulated; ancillary GPIO disabled; native Avahi",
+  "source_files_checked": 519,
+  "source_mismatches": [],
+  "source_manifest_sha256": "13ad437cf00c00f5c40cc9c216ed48b027c74d329a6dee417ce7359d8cd94891",
+  "binary_sha256": "375a2fa4efc86dceab58db93fa362d5b16af0ebab563b30f97fccba45b0b6866",
+  "build_metadata": "#pragma once\n\n#define MAKE_TAG \"3.2.0-devel+b28d013\"\n#define MAKE_BRH \"devel\"\n#define MAKE_RAW_BRH \"devel\"\n#define MAKE_BRANCH_STATE \"branch\"\n#define MAKE_COMMIT \"b28d01333744f8562fd8a9ad28908cedc61d98c3\"\n#define MAKE_DIRTY \"true\"\n#define MAKE_EXE \"wsprrypi\"\n#define MAKE_PRJ \"WsprryPi\"\n"
+}

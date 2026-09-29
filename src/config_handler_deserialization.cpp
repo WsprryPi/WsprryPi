@@ -4,6 +4,7 @@
  */
 
 #include "wtp_settings_json.hpp"
+#include "wtp_server_settings_json.hpp"
 #include "config_handler_deserialization.hpp"
 #include "config_handler.hpp"
 #include "config_handler_serialization.hpp"
@@ -554,6 +555,8 @@ void deserialize_json_to_runtime_config(const nlohmann::json &source, ArgParserC
         parse_transmit_backend_kind(source.at("Operation"));
     target.wtp = parse_wtp_settings(source.value("WTP", nlohmann::json::object()),
                                     target.transmit_backend == TransmitBackendKind::WTP);
+    target.wtp_server = parse_wtp_server_settings(
+        source.value("WTP Server", nlohmann::json::object()));
     const nlohmann::json gpio =
         source.contains("GPIO") ? source.at("GPIO") : nlohmann::json::object();
     target.gpio_tx_pin =

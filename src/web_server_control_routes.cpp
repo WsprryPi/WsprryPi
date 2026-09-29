@@ -7,10 +7,12 @@
 
 #include "httplib.hpp"
 #include "wtp_runtime_bridge.hpp"
+#include "wtp_endpoint/runtime.hpp"
 #include "json.hpp"
 #include "config_handler.hpp"
 #include "wtp_integration/browser_api.hpp"
 #include "wtp_integration/catalog.hpp"
+#include "wtp_integration/fleet_runtime.hpp"
 #include "wtp_integration/discovery.hpp"
 #include "wtp_integration/identity_probe.hpp"
 #include "wtp_settings_json.hpp"
@@ -216,7 +218,48 @@ void register_control(
             request.get_header_value("X-WsprryPico-Request") == "1" &&
             (fetch.empty() || fetch == "same-origin" || fetch == "none");
         wsprrypi::PicoHttpResponse result;
-        if (request.path == "/api/v1/host/discovery" ||
+        if (request.path == "/api/v1/host/fleet") {
+            result = request.method == "GET" || context
+                ? wsprrypi::wtp_fleet_api(request.method, request.body, request.get_header_value("If-Match"))
+                : wsprrypi::PicoHttpResponse{403, R"({"error":{"code":"origin_or_content_type"}})", {}};
+        } else if (request.path == "/api/v1/host/wtp-endpoint" && request.method == "GET") {
+            result = {200, wsprrypi::wtp_pi_endpoint_status_json(), {}};
+        } else if (request.path == "/api/v1/host/wtp-endpoint/recover" && request.method == "POST") {
+            if (!context) result = {403, R"({"error":{"code":"origin_or_content_type"}})", {}};
+            else try {
+                if (wsprrypi::strict_browser_json(request.body) != nlohmann::json{{"confirmed", true}})
+                    throw std::runtime_error("Recovery requires local confirmation");
+                const bool ok = wsprrypi::wtp_pi_recover_remote_output();
+                result = {ok ? 200U : 409U, wsprrypi::wtp_pi_endpoint_status_json(), {}};
+            } catch (const std::exception &error) {
+                result = {409, nlohmann::json{{"error", {{"message", error.what()}}}}.dump(), {}};
+            }
+        } else if (request.path == "/api/v1/host/wtp-endpoint/enable" && request.method == "POST") {
+            if (!context) result = {403, R"({"error":{"code":"origin_or_content_type"}})", {}};
+            else if (request.get_header_value("If-Match").empty())
+                result = {428, R"({"error":{"code":"revision_required"}})", {}};
+            else try {
+                const auto body = wsprrypi::strict_browser_json(request.body);
+                if (!body.is_object() || body.size() != 4 ||
+                    !body.contains("choice") || !body.contains("confirmed") ||
+                    !body.at("confirmed").is_boolean())
+                    throw std::runtime_error("invalid_enable_request");
+                const auto choice = body.at("choice").get<std::string>();
+                if (choice != "end_now" && choice != "finish_current")
+                    throw std::runtime_error("invalid_enable_choice");
+                const auto revision = patch_all_from_web_revision(
+                    {{"Operation", {{"Transmit", true}}}}, request.get_header_value("If-Match"),
+                    choice == "end_now" ? LocalEnableAction::EndNow : LocalEnableAction::FinishCurrent,
+                    body.at("confirmed").get<bool>(),
+                    body.at("observed_owner").get<std::string>(), body.at("observed_job").get<std::string>());
+                result = {200, wsprrypi::wtp_pi_endpoint_status_json(), revision};
+            } catch (const std::exception &error) {
+                const std::string reason = error.what();
+                result = {reason == "revision_conflict" ? 412U : 409U,
+                    nlohmann::json{{"error", {{"code", reason}}},
+                        {"status", nlohmann::json::parse(wsprrypi::wtp_pi_endpoint_status_json())}}.dump(), {}};
+            }
+        } else if (request.path == "/api/v1/host/discovery" ||
             request.path == "/api/v1/host/discovery/identify" ||
             request.path == "/api/v1/host/devices" ||
             request.path == "/api/v1/host/devices/use") {

@@ -5,6 +5,9 @@
 
 #include "scheduling.hpp"
 #include "wtp_runtime_bridge.hpp"
+#include "wtp_endpoint/runtime.hpp"
+#include "wtp_integration/fleet_runtime.hpp"
+#include "wtp_pi_control.hpp"
 #include "transmitter_runtime_bridge.hpp"
 #include "scheduling_internal.hpp"
 
@@ -550,6 +553,8 @@ void stop_runtime_components_for_process_exit() noexcept
     webServer.stop();
     socketServer.stop();
     stop_runtime_config_monitor();
+    wsprrypi::stop_wtp_fleet();
+    wsprrypi::stop_wtp_pi_endpoint();
     shutdownMonitor.stop();
     ppmManager.stop();
     transmitter_shutdown_for_process_exit();
@@ -567,6 +572,8 @@ void stop_runtime_components_for_test() noexcept
     webServer.stop();
     socketServer.stop();
     stop_runtime_config_monitor();
+    wsprrypi::stop_wtp_fleet();
+    wsprrypi::stop_wtp_pi_endpoint();
     shutdownMonitor.stop();
     ppmManager.stop();
     transmitter_stop_and_join();
@@ -663,6 +670,14 @@ bool wspr_loop()
         }
     }
 
+    if (config.use_ini && !startup_quiesce_inhibited_state())
+    {
+        std::string endpoint_error;
+        if (!wsprrypi::start_wtp_pi_endpoint(config, &endpoint_error))
+            llog.logS(ERROR, "WTP Pi endpoint unavailable: ", endpoint_error);
+    }
+
+    if (config.use_ini) wsprrypi::start_wtp_fleet(config.ini_filename);
     const bool start_web = web_server_start_enabled(config);
     const bool start_websocket = websocket_server_start_enabled(config);
     const int startup_web_port = config.web_port;
@@ -898,12 +913,21 @@ bool wspr_loop()
     // -------------------------------------------------------------------------
     // Loop (block wspr_loop only) until shutdown is triggered
     // -------------------------------------------------------------------------
+    wsprrypi::activate_wtp_pi_endpoint();
     {
         std::unique_lock<std::mutex> lk(exitwspr_mtx);
         while (!exitwspr_ready) {
             exitwspr_cv.wait_for(lk, std::chrono::milliseconds(100));
             lk.unlock();
             transmitter_poll_events();
+            wsprrypi::poll_wtp_pi_endpoint();
+            if (ini_reload_pending.load(std::memory_order_acquire) &&
+                !web_test_tone.load() && !transmitter_reload_should_defer() &&
+                wtp_pi_begin_configuration())
+            {
+                wtp_pi_end_configuration();
+                (void)set_config(false);
+            }
             lk.lock();
         }
     }
@@ -926,6 +950,8 @@ bool wspr_loop()
     llog.logS(DEBUG, "Stopping configuration monitor.");
     ini_reload_pending.store(false, std::memory_order_relaxed);
     stop_runtime_config_monitor(); // Stop config file monitor before transmitter teardown.
+    wsprrypi::stop_wtp_fleet();
+    wsprrypi::stop_wtp_pi_endpoint();
     llog.logS(DEBUG, "Configuration monitor stopped.");
 
     llog.logS(DEBUG, "Stopping shutdown monitor.");

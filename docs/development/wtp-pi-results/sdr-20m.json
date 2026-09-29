@@ -1,0 +1,35 @@
+{
+  "acceptance": "Corresponding time-separated SDR signals at the two commanded 20m tone settings; no calibrated RF accuracy or full-chain qualification claimed.",
+  "capture_start_utc": "2026-09-29T20:46:05.483Z",
+  "sample_count": 7500000,
+  "iq_sha256": "c8a230052303c85e29d76ddd0a54a9100ba96c5e05296510280157eed032c74e",
+  "fft_samples": 32768,
+  "frequency_bin_hz": 7.62939453125,
+  "time_bin_s": 0.131072,
+  "first_carrier_sdr_peak_hz": 14097063.37890625,
+  "jobs": [
+    {
+      "requested_frequency_hz": 14097100,
+      "commanded_start_s_from_capture": 7.516999959945679,
+      "peak_above_prejob_baseline_db": 8.709223916443506,
+      "launch_observed_monotonic_ns": "847853887612263",
+      "output_off_confirmed": true
+    },
+    {
+      "requested_frequency_hz": 14097200,
+      "commanded_start_s_from_capture": 17.51699995994568,
+      "peak_above_prejob_baseline_db": 7.215920199322497,
+      "launch_observed_monotonic_ns": "847863887569529",
+      "output_off_confirmed": true
+    }
+  ],
+  "sdr_cleanup": {
+    "outcome": "verified",
+    "attempted_steps": [
+      "deactivate_stream",
+      "close_stream",
+      "release_device"
+    ],
+    "failed_steps": []
+  }
+}

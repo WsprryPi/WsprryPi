@@ -12,7 +12,8 @@ namespace wsprrypi {
 class WtpApplication {
 public:
   WtpApplication(WtpScheduleClock &, wtp::ByteStream &, WtpSettings,
-                 wtp::SessionOptions, std::function<bool()> reopen);
+                 wtp::SessionOptions, std::function<bool()> reopen,
+                 std::function<bool()> dispatch_admission = {});
   ~WtpApplication();
   StartupQuiesceResult inspect();
   bool poll_idle(); // Bounded read-only STATUS, at most once per second while idle.

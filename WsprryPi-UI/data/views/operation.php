@@ -50,6 +50,7 @@ require __DIR__ . '/../card_header.php';
                                 <input class="form-check-input" type="checkbox" role="switch" id="transmit" aria-describedby="transmitAvailabilityHint operationControlHint">
                                 <label class="form-check-label" for="transmit">Transmit enabled</label>
                             </div>
+                            <?php require __DIR__ . '/local-wtp-control.php'; ?>
                             <div id="transmitAvailabilityHint" class="form-text mt-2" aria-live="polite" aria-atomic="true" hidden></div>
                         </div>
 

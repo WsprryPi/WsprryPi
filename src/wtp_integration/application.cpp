@@ -36,9 +36,10 @@ bool wtp_host_utc_valid() noexcept {
 WtpApplication::WtpApplication(WtpScheduleClock &clock, wtp::ByteStream &stream,
                                WtpSettings settings,
                                wtp::SessionOptions options,
-                               std::function<bool()> reopen)
+                               std::function<bool()> reopen,
+                               std::function<bool()> dispatch_admission)
     : clock_(clock), stream_(stream), settings_(std::move(settings)),
-      reopen_(std::move(reopen)), scheduler_(clock, std::move(options)),
+      reopen_(std::move(reopen)), scheduler_(clock, std::move(options), std::move(dispatch_admission)),
       job_prefix_(wtp_random_identity().substr(0, 16)) {}
 WtpApplication::~WtpApplication() {
   stop();
