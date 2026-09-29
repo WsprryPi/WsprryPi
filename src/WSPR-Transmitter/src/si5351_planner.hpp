@@ -25,6 +25,9 @@
 class Si5351Planner
 {
 public:
+    // Numerical planner envelope; individual tone sets still require planning.
+    static constexpr double minimum_output_hz = 1'000'000.0 / 128.0;
+    static constexpr double maximum_output_hz = 200'000'000.0;
     /**
      * @brief Transmission mode understood by the planner
      */
@@ -50,6 +53,9 @@ public:
         bool disable_tx_output_when_idle = true;
         // Append optional fields to preserve existing aggregate initialization.
         bool prefer_integer_multisynth = false;
+        // Disable only for pure MultiSynth analysis; normal execution retains
+        // the guarded PLL-retune path for every supported mode.
+        bool allow_guarded_pll_retune = true;
     };
 
     /**

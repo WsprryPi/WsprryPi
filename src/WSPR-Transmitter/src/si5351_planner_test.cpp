@@ -131,6 +131,7 @@ namespace
         Si5351Planner::Config config;
         config.reference_hz = 27000000;
         config.parked_pll_hz = parked_pll_hz;
+        config.allow_guarded_pll_retune = false;
         config.tx_output = output;
 
         const double requested_hz =
@@ -662,13 +663,13 @@ namespace
                  Si5351Planner::Mode::FSKCW,
                  Si5351Planner::Mode::DFCW})
         {
-            const Si5351Planner::Plan nonqualified =
+            const Si5351Planner::Plan cw_plan =
                 Si5351Planner(config).buildPlan(
                     mode,
                     {Si5351Planner::ToneEntry{tones_hz[0]}});
-            expect(!nonqualified.tone_sets.front().pll_retune_candidate.valid,
-                "unqualified CW modes should not receive a PLL-retune "
-                "candidate");
+            expect(cw_plan.tone_sets.front().pll_retune_candidate.valid &&
+                       cw_plan.tone_sets.front().requires_output_inhibit,
+                "qualified CW modes receive the guarded PLL-retune path");
         }
     }
 

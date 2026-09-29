@@ -1,0 +1,134 @@
+[
+  {
+    "campaign": "first",
+    "capture_start": "2026-09-29T22:42:26.403Z",
+    "iq_sha256": "de6135529b9f7d19fa97645d02dd490a37290d269bdd6e9eed671daaa0058059",
+    "sample_count": 25000000,
+    "cleanup": {
+      "outcome": "verified",
+      "attempted_steps": [
+        "deactivate_stream",
+        "close_stream",
+        "release_device"
+      ],
+      "failed_steps": []
+    },
+    "jobs": [
+      {
+        "case": "tone-job",
+        "frequency_hz": 14097100,
+        "sdr_peak_hz": 14097063.37890625,
+        "peak_above_prejob_baseline_db": 13.094688373632192,
+        "corresponding_signal": true,
+        "protocol_complete": true,
+        "failure": null,
+        "output_off_confirmed": true,
+        "protocol_outcome": "complete",
+        "case_passed": true
+      },
+      {
+        "case": "qrss-job",
+        "frequency_hz": 14097200,
+        "sdr_peak_hz": 14097162.561035156,
+        "peak_above_prejob_baseline_db": 12.44897131524143,
+        "corresponding_signal": true,
+        "protocol_complete": true,
+        "failure": null,
+        "output_off_confirmed": true,
+        "protocol_outcome": "complete",
+        "case_passed": true
+      },
+      {
+        "case": "fskcw-job",
+        "frequency_hz": 14097300,
+        "sdr_peak_hz": 14097269.372558594,
+        "peak_above_prejob_baseline_db": 12.329238292903211,
+        "corresponding_signal": true,
+        "protocol_complete": true,
+        "failure": null,
+        "output_off_confirmed": true,
+        "protocol_outcome": "complete",
+        "case_passed": true
+      },
+      {
+        "case": "dfcw-job",
+        "frequency_hz": 14097400,
+        "sdr_peak_hz": 14097368.5546875,
+        "peak_above_prejob_baseline_db": 12.151717809290481,
+        "corresponding_signal": true,
+        "protocol_complete": true,
+        "failure": null,
+        "output_off_confirmed": true,
+        "protocol_outcome": "complete",
+        "case_passed": true
+      },
+      {
+        "case": "wspr-job",
+        "frequency_hz": 14097500,
+        "sdr_peak_hz": 14097467.736816406,
+        "peak_above_prejob_baseline_db": 13.410649571154796,
+        "corresponding_signal": true,
+        "protocol_complete": false,
+        "failure": "{'address': '192.168.1.68', 'boot_id': '79d37d08d962befab9783c62bb8c9bdd', 'device_id': '74d12151aff03c45cfcb15a45bd8e037', 'dns_sd_published': True, 'enabled': True, 'finishing_remote_job': False, 'launch_observed_monotonic_ns': '3745509783020', 'launch_target_monotonic_ns': '3745509376203', 'listener_error': '', 'listener_running': True, 'local_effective': False, 'local_requested': False, 'local_work_active': False, 'output_unknown': False, 'port': 31418, 'remote_admission_closed': False, 'remote_job_id': '4d59871854794b528bb223f3b0506971', 'remote_output_active': False, 'remote_owner': '519379d798c149c89689cc75b1df0703', 'remote_state': 'failed', 'revocation_generation': '5', 'revocation_unavailable': False, 'schema': 'wsprrypi-wtp-endpoint/1'}",
+        "output_off_confirmed": true,
+        "protocol_outcome": "failed",
+        "case_passed": false
+      }
+    ],
+    "acceptance_method": "Visual review of corresponding time/frequency signals; no minimum dB threshold was required by the operator."
+  },
+  {
+    "campaign": "takeover",
+    "capture_start": "2026-09-29T22:53:16.297Z",
+    "iq_sha256": "46f3588a83176253cce18e68675533da53356534988a126d34aae6ced9603a77",
+    "sample_count": 10000000,
+    "cleanup": {
+      "outcome": "verified",
+      "attempted_steps": [
+        "deactivate_stream",
+        "close_stream",
+        "release_device"
+      ],
+      "failed_steps": []
+    },
+    "jobs": [
+      {
+        "case": "qrss-end-now",
+        "frequency_hz": 14097100,
+        "sdr_peak_hz": 14097063.37890625,
+        "peak_above_prejob_baseline_db": 9.957107921615913,
+        "corresponding_signal": true,
+        "protocol_complete": false,
+        "failure": null,
+        "output_off_confirmed": true,
+        "protocol_outcome": "aborted",
+        "case_passed": true
+      },
+      {
+        "case": "dfcw-finish",
+        "frequency_hz": 14097200,
+        "sdr_peak_hz": 14097162.561035156,
+        "peak_above_prejob_baseline_db": 11.933442757042839,
+        "corresponding_signal": true,
+        "protocol_complete": true,
+        "failure": null,
+        "output_off_confirmed": true,
+        "protocol_outcome": "complete",
+        "case_passed": true
+      },
+      {
+        "case": "tone-http-enable",
+        "frequency_hz": 14097300,
+        "sdr_peak_hz": 14097261.743164062,
+        "peak_above_prejob_baseline_db": 7.50351670325445,
+        "corresponding_signal": true,
+        "protocol_complete": false,
+        "failure": null,
+        "output_off_confirmed": true,
+        "protocol_outcome": "aborted",
+        "case_passed": true
+      }
+    ],
+    "acceptance_method": "Visual review of corresponding time/frequency signals; no minimum dB threshold was required by the operator."
+  }
+]

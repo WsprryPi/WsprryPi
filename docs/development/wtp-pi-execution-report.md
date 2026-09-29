@@ -1,5 +1,8 @@
 # Pi WTP implementation and acceptance record
 
+Historical first-adapter acceptance. The initial tone-only limits below are
+superseded by the [backend capability correction](wtp-backend-capabilities-report.md).
+
 Execution date: 2026-09-29. Repository branch: `devel`.
 Starting revision: `b28d01333744f8562fd8a9ad28908cedc61d98c3`.
 

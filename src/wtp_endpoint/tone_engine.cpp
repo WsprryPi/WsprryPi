@@ -1,4 +1,6 @@
 #include "wtp_endpoint/tone_engine.hpp"
+#include "wtp_endpoint/capabilities.hpp"
+#include "WSPR-Transmitter/src/gpio_band_policy.hpp"
 
 #include <chrono>
 #include <cmath>
@@ -9,7 +11,6 @@ namespace wsprrypi {
 namespace {
 using namespace wsprrypico::wtp;
 constexpr std::uint64_t kNanosecondsPerSecond = 1'000'000'000;
-constexpr std::uint64_t kMaximumToneDurationNs = 10'000'000'000;
 
 std::chrono::steady_clock::time_point steady_at(std::uint64_t ns) {
     return std::chrono::steady_clock::time_point(
@@ -23,10 +24,14 @@ WtpPiToneEngine::WtpPiToneEngine(ITransmissionBackend& backend,
                                  double calibration_ppm,
                                  std::function<void()> reset_execution_context,
                                  bool backend_controls_enable,
-                                 std::function<void()> stop_execution_context)
+                                 std::function<void()> stop_execution_context,
+                                 bool allow_unqualified_frequency,
+                                 bool allow_non_amateur_frequency)
     : backend_(backend), inputs_(std::move(inputs)), kind_(kind),
       clock_(clock), realize_(std::move(realize)),
       calibration_ppm_(calibration_ppm),
+      allow_unqualified_frequency_(allow_unqualified_frequency),
+      allow_non_amateur_frequency_(allow_non_amateur_frequency),
       reset_execution_context_(std::move(reset_execution_context)),
       stop_execution_context_(std::move(stop_execution_context)),
       backend_controls_enable_(backend_controls_enable) {
@@ -47,56 +52,85 @@ void WtpPiToneEngine::join_finished() {
 PrepareResult WtpPiToneEngine::prepare(const Job& job) {
     std::lock_guard lock(mutex_);
     join_finished();
-    if (!startup_safe_ || !worker_done_ || output_active_ ||
-        !realize_ || job.mode != "tone" || job.events.empty() || job.events.size() > 2 ||
+    if (!worker_done_ || output_active_) return {};
+    plan_.reset();
+    prepared_job_id_.clear();
+    const auto mode = wtp_transmission_mode(job.mode);
+    const auto caps = backend_.capabilities();
+    if (!startup_safe_ || !realize_ || !mode || !supports_mode(caps, *mode) ||
+        job.profile != "rf-events/1" || !job.events.valid() || job.events.empty() ||
+        job.events.size() > EventList::maximum_events ||
         job.total_duration_ns == 0 ||
-        job.total_duration_ns > kMaximumToneDurationNs + 1)
+        job.total_duration_ns > wtp_max_job_duration_ns)
         return {};
-    const auto& event = job.events[0];
-    const bool has_tail = job.events.size() == 2;
-    if (has_tail) {
-        const auto& tail = job.events[1];
-        if (tail.rf_on || tail.frequency_nhz || tail.duration_ns != 1 ||
-            tail.offset_ns != event.duration_ns) return {};
-    }
-    if (event.offset_ns != 0 || !event.rf_on || !event.frequency_nhz ||
-        event.duration_ns == 0 || event.duration_ns > kMaximumToneDurationNs ||
-        event.duration_ns + (has_tail ? 1ULL : 0ULL) != job.total_duration_ns ||
-        event.duration_ns > static_cast<std::uint64_t>(std::numeric_limits<std::int64_t>::max()))
-        return {};
-    const auto realized = realize_(*event.frequency_nhz);
-    if (!realized || *realized == 0 ||
-        (!job.allow_frequency_adjustment && *realized != *event.frequency_nhz))
-        return {};
-    const double frequency_hz = static_cast<double>(
-        static_cast<long double>(*event.frequency_nhz) / kNanosecondsPerSecond);
-    if (!std::isfinite(frequency_hz) || frequency_hz <= 0) return {};
+
     ExecutionPlan candidate;
     candidate.id = {1};
     candidate.request_id = {1};
-    candidate.mode = TransmissionMode::TONE;
+    candidate.mode = *mode;
     candidate.backend = kind_;
-    candidate.reference_frequency_hz = frequency_hz;
     candidate.calibration.ppm = calibration_ppm_;
     candidate.duration_was_explicit = true;
-    candidate.events.push_back({std::chrono::nanoseconds{0},
-                                std::chrono::nanoseconds{
-                                    static_cast<std::int64_t>(event.duration_ns)},
-                                RfEventType::HOLD, frequency_hz, true});
-    candidate.summary = {std::chrono::nanoseconds{
-                             static_cast<std::int64_t>(event.duration_ns)},
-                         1, frequency_hz, frequency_hz};
+    std::uint64_t offset = 0;
+    for (const auto& event : job.events) {
+        if (event.offset_ns != offset || event.duration_ns == 0 ||
+            event.duration_ns > wtp_max_job_duration_ns - offset ||
+            event.rf_on != event.frequency_nhz.has_value()) return {};
+        double hz = 0;
+        if (event.frequency_nhz) {
+            hz = static_cast<double>(static_cast<long double>(*event.frequency_nhz) /
+                                     kNanosecondsPerSecond);
+            if (!std::isfinite(hz) || hz <= 0 ||
+                (caps.min_frequency_hz > 0 && hz < caps.min_frequency_hz) ||
+                (caps.max_frequency_hz > 0 && hz > caps.max_frequency_hz)) return {};
+            if (caps.output_class != BackendOutputClass::NON_RF_SIMULATION &&
+                !evaluate_frequency_policy(kind_, *mode, hz,
+                    allow_unqualified_frequency_, allow_non_amateur_frequency_).allowed)
+                return {};
+            if (!candidate.reference_frequency_hz) candidate.reference_frequency_hz = hz;
+            if (!candidate.summary.min_frequency_hz || hz < candidate.summary.min_frequency_hz)
+                candidate.summary.min_frequency_hz = hz;
+            candidate.summary.max_frequency_hz = std::max(candidate.summary.max_frequency_hz, hz);
+        }
+        candidate.events.push_back({std::chrono::nanoseconds{static_cast<std::int64_t>(offset)},
+            std::chrono::nanoseconds{static_cast<std::int64_t>(event.duration_ns)},
+            event.rf_on ? RfEventType::HOLD : RfEventType::RF_OFF, hz, event.rf_on});
+        offset += event.duration_ns;
+    }
+    if (offset != job.total_duration_ns) return {};
+    candidate.summary.total_duration = std::chrono::nanoseconds{static_cast<std::int64_t>(offset)};
+    candidate.summary.event_count = candidate.events.size();
     if (reset_execution_context_) reset_execution_context_();
     const auto configured = backend_.configure(candidate, inputs_);
-    if (!configured.ok || !configured.adjustments.empty()) {
-        (void)backend_.cleanup();
+    const auto realized = configured.ok ? realize_(job) : std::nullopt;
+    auto reject = [this]() -> PrepareResult {
+        if (!backend_.cleanup().ok) output_active_ = true;
         return {};
+    };
+    if (!configured.ok || !configured.adjustments.empty() || !realized ||
+        realized->size() != job.events.size()) return reject();
+    PrepareResult result{true, {}};
+    for (std::size_t i = 0; i < job.events.size(); ++i) {
+        const auto& event = job.events[i];
+        const auto actual = (*realized)[i];
+        if (!event.rf_on) { if (actual != 0) return reject(); continue; }
+        const double actual_hz = static_cast<double>(static_cast<long double>(actual) /
+                                                     kNanosecondsPerSecond);
+        if (!actual || (caps.min_frequency_hz > 0 && actual_hz < caps.min_frequency_hz) ||
+            (caps.max_frequency_hz > 0 && actual_hz > caps.max_frequency_hz) ||
+            (caps.output_class != BackendOutputClass::NON_RF_SIMULATION &&
+             !evaluate_frequency_policy(kind_, *mode, actual_hz,
+                 allow_unqualified_frequency_, allow_non_amateur_frequency_).allowed))
+            return reject();
+        if (actual != *event.frequency_nhz) {
+            if (!job.allow_frequency_adjustment) return reject();
+            result.adjustments.push_back({i, *event.frequency_nhz, actual});
+        }
     }
     plan_ = std::move(candidate);
+    prepared_job_id_ = job.job_id;
+    prepared_duration_ns_ = job.total_duration_ns;
     report_ = {};
-    PrepareResult result{true, {}};
-    if (*realized != *event.frequency_nhz)
-        result.adjustments.push_back({0, *event.frequency_nhz, *realized});
     return result;
 }
 
@@ -105,7 +139,8 @@ bool WtpPiToneEngine::schedule(const Job& job, std::uint64_t start_monotonic_ns,
     std::lock_guard lock(mutex_);
     join_finished();
     if (!plan_ || !startup_safe_ || !worker_done_ ||
-        job.events.empty() || job.events.size() > 2 || conditions.clock != &clock_ ||
+        job.job_id != prepared_job_id_ || job.total_duration_ns != prepared_duration_ns_ ||
+        conditions.clock != &clock_ ||
         start_monotonic_ns > static_cast<std::uint64_t>(std::numeric_limits<std::int64_t>::max()))
         return false;
     stop_requested_ = false;
@@ -127,6 +162,7 @@ bool WtpPiToneEngine::schedule(const Job& job, std::uint64_t start_monotonic_ns,
 
 bool WtpPiToneEngine::admit_output_enable() {
     std::unique_lock lock(mutex_);
+    if (report_.launch_monotonic_ns) return !stop_requested_;
     cv_.wait_until(lock, steady_at(start_monotonic_ns_),
                    [this] { return stop_requested_; });
     if (stop_requested_) return false;
@@ -156,6 +192,7 @@ bool WtpPiToneEngine::admit_output_enable() {
 
 void WtpPiToneEngine::observe_output_enable() {
     std::lock_guard lock(mutex_);
+    if (report_.launch_monotonic_ns) return;
     const auto now = clock_.snapshot();
     report_.state = EngineState::Running;
     report_.launch_monotonic_ns = now.monotonic_now_ns;

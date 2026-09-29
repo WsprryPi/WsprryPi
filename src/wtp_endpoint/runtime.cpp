@@ -30,12 +30,12 @@
 #include <tuple>
 
 #include "backend_capabilities.hpp"
+#include "wtp_endpoint/capabilities.hpp"
 #if WSPRRYPI_BACKEND_SIMULATED
 #include "WSPR-Transmitter/src/simulated_transmit_backend.hpp"
 #endif
 #if WSPRRYPI_BACKEND_SI5351
 #include "wtp_endpoint/si5351_bridge.hpp"
-#include "wtp_endpoint/si5351_realization.hpp"
 #endif
 
 namespace wsprrypi {
@@ -54,20 +54,6 @@ std::string private_state_path() {
     return directory + "/revocation-v1";
 }
 
-wsprrypico::wtp::ServiceConfig tone_caps() {
-    wsprrypico::wtp::ServiceConfig caps;
-    caps.capability_engine = "si5351-finite-tone";
-    caps.supported_modes = {"tone"};
-    caps.minimum_frequency_nhz = 14'000'000'000'000'000ULL;
-    caps.maximum_frequency_nhz = 14'350'000'000'000'000ULL;
-    caps.max_events = 2; // One tone plus the controller's optional 1 ns RF-off tail.
-    caps.max_job_duration_ns = 10'000'000'001ULL;
-    caps.minimum_arm_lead_ns = 2'000'000'000ULL;
-    caps.maximum_arm_uncertainty_ns = 500'000'000ULL;
-    caps.output_disable_timeout_ns = 5'000'000'000ULL;
-    return caps;
-}
-
 class Runtime {
 public:
     explicit Runtime(const ArgParserConfig& settings)
@@ -76,7 +62,7 @@ public:
           selected_interface_(settings.wtp_server.interface),
           port_(settings.wtp_server_port_override.value_or(settings.wtp_server.port)),
           settings_(settings) {
-        auto caps = tone_caps();
+        wsprrypico::wtp::ServiceConfig caps;
 #if WSPRRYPI_BACKEND_SI5351
         if (settings.transmit_backend == TransmitBackendKind::SI5351) {
         auto config = wtp_pi_si5351_backend_config(
@@ -87,20 +73,33 @@ public:
             settings.si5351_tx_output, settings.si5351_power_level);
         config.output_enable_admission = [this] { return engine_->admit_output_enable(); };
         config.first_output_enabled = [this] { engine_->observe_output_enable(); };
-        config.anchor_finite_tone_to_enable = true;
+        config.silent_start_admission = [this] {
+            if (!engine_->admit_output_enable()) return false;
+            engine_->observe_output_enable(); // The timeline begins with RF off.
+            return true;
+        };
+        config.anchor_plan_to_enable = true;
         config.confirm_output_disable = true;
         backend_ = std::make_unique<WsprSi5351Backend>(bridge_, config);
         BackendExecutionInputs inputs;
         inputs.power_level = settings.si5351_power_level;
-        const auto reference_hz = static_cast<std::uint32_t>(settings.si5351_reference_hz);
-        const auto output = settings.si5351_tx_output;
         const auto ppm = settings.si5351_ppm;
+        auto* physical = static_cast<WsprSi5351Backend*>(backend_.get());
         engine_ = std::make_unique<WtpPiToneEngine>(
             *backend_, inputs, BackendKind::SI5351, clock_,
-            [reference_hz, output, ppm](std::uint64_t requested) {
-                return wtp_si5351_tone_frequency_nhz(
-                    requested, reference_hz, ppm, output);
-            }, ppm, [this] { bridge_.reset_stop(); }, true);
+            [physical](const wsprrypico::wtp::Job&)
+                -> std::optional<std::vector<std::uint64_t>> {
+                std::vector<std::uint64_t> realized;
+                for (double hz : physical->realizedEventFrequencies()) {
+                    if (hz == 0) { realized.push_back(0); continue; }
+                    const auto value = wtp_frequency_nhz(hz);
+                    if (!value) return std::nullopt;
+                    realized.push_back(*value);
+                }
+                return realized;
+            }, ppm, [this] { bridge_.reset_stop(); }, true,
+            [this] { bridge_.request_stop(); },
+            settings.allow_unqualified_frequency, settings.allow_non_amateur_frequency);
         }
 #endif
 #if WSPRRYPI_BACKEND_SIMULATED
@@ -110,12 +109,18 @@ public:
             backend_ = std::make_unique<SimulatedTransmitBackend>(simulation_context_, simulation);
             engine_ = std::make_unique<WtpPiToneEngine>(*backend_, BackendExecutionInputs{},
                 BackendKind::SIMULATED, clock_,
-                [](std::uint64_t value) { return std::optional<std::uint64_t>(value); },
+                [](const wsprrypico::wtp::Job& job)
+                    -> std::optional<std::vector<std::uint64_t>> {
+                    std::vector<std::uint64_t> realized;
+                    for (const auto& event : job.events)
+                        realized.push_back(event.frequency_nhz.value_or(0));
+                    return realized;
+                },
                 0.0, [this] { simulation_context_.reset(); }, false,
                 [this] { simulation_context_.stop(); });
-            caps.capability_engine = "simulated-finite-tone";
         }
 #endif
+        if (backend_) caps = wtp_backend_caps(*backend_);
         if (engine_ && !engine_->startup_safe())
             throw std::runtime_error("WTP startup output quiescence failed");
         if (!engine_) listener_error_ = "WTP server supports Si5351 and explicit simulation; selected route is unavailable";
@@ -278,7 +283,8 @@ auto output_settings(const ArgParserConfig& s) {
     return std::tuple{s.transmit_backend, s.si5351_i2c_bus, s.si5351_i2c_address,
         s.si5351_reference_hz, s.si5351_reference_source, s.si5351_crystal_load_capacitance_pf,
         s.si5351_tx_output, s.si5351_power_level, s.si5351_ppm, s.wtp_server,
-        s.wtp_server_port_override};
+        s.wtp_server_port_override, s.allow_unqualified_frequency,
+        s.allow_non_amateur_frequency};
 }
 } // namespace
 

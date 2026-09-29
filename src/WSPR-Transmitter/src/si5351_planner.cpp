@@ -26,8 +26,8 @@ namespace
     // QRP Labs' documented low-frequency practice keeps the MultiSynth at or
     // above 1 MHz and uses the final R-divider below that point.  This leaves
     // margin above the Si5351's absolute 500 kHz MultiSynth floor.
-    static constexpr double kMinMultisynthOutputHz = 1000000.0;
-    static constexpr double kMaxMultisynthOutputHz = 200000000.0;
+    static constexpr double kMinMultisynthOutputHz = Si5351Planner::minimum_output_hz * 128.0;
+    static constexpr double kMaxMultisynthOutputHz = Si5351Planner::maximum_output_hz;
     static constexpr double kMaxCalibrationPpm = 200.0;
 
     struct DividerParameters
@@ -440,7 +440,8 @@ Si5351Planner::Plan Si5351Planner::buildPlan(
         plan.tone_sets.push_back(buildToneRegisterSet(
             tone.frequency_hz,
             r_divider,
-            mode == Mode::WSPR || mode == Mode::TONE,
+            config_.allow_guarded_pll_retune &&
+                (!config_.prefer_integer_multisynth || mode == Mode::WSPR || mode == Mode::TONE),
             integer_multisynth));
     }
 

@@ -12,19 +12,20 @@
 
 namespace wsprrypi {
 
-// One finite TONE with an optional terminal RF-off marker on an explicitly
-// selected backend. The caller supplies
-// frequency realization from that backend's planner; the wire value is never
-// inferred from a rounded double or an unmeasured nominal resolution.
+// Finite WTP RF-event execution through the selected native backend.
+// The historical class/file name remains for source compatibility.
 class WtpPiToneEngine final : public wsprrypico::wtp::RfEngine {
 public:
-    using RealizeFrequency = std::function<std::optional<std::uint64_t>(std::uint64_t)>;
+    using RealizeFrequency = std::function<std::optional<std::vector<std::uint64_t>>(
+        const wsprrypico::wtp::Job&)>;
     WtpPiToneEngine(ITransmissionBackend& backend, BackendExecutionInputs inputs,
                     BackendKind kind, wsprrypico::wtp::Clock& clock,
                     RealizeFrequency realize, double calibration_ppm = 0.0,
                     std::function<void()> reset_execution_context = {},
                     bool backend_controls_enable = false,
-                    std::function<void()> stop_execution_context = {});
+                    std::function<void()> stop_execution_context = {},
+                    bool allow_unqualified_frequency = false,
+                    bool allow_non_amateur_frequency = false);
     ~WtpPiToneEngine() override;
     WtpPiToneEngine(const WtpPiToneEngine&) = delete;
     WtpPiToneEngine& operator=(const WtpPiToneEngine&) = delete;
@@ -60,6 +61,8 @@ private:
     wsprrypico::wtp::Clock& clock_;
     RealizeFrequency realize_;
     double calibration_ppm_ = 0.0;
+    bool allow_unqualified_frequency_ = false;
+    bool allow_non_amateur_frequency_ = false;
     std::function<void()> reset_execution_context_;
     std::function<void()> stop_execution_context_;
     bool backend_controls_enable_ = false;
@@ -67,6 +70,8 @@ private:
     std::uint64_t start_monotonic_ns_ = 0;
     wsprrypico::wtp::LocalStartConditions start_conditions_{};
     std::optional<ExecutionPlan> plan_;
+    std::string prepared_job_id_;
+    std::uint64_t prepared_duration_ns_ = 0;
     mutable std::mutex mutex_;
     std::condition_variable cv_;
     std::thread worker_;

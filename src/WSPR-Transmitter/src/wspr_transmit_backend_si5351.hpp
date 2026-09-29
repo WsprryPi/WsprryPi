@@ -62,13 +62,17 @@ public:
         // PLLA without reset/inhibition. First/incompatible tones remain guarded.
         bool pll_only_updates = false;
 
-        // Typed integration hooks for a finite scheduled tone. Admission runs
+        // Typed integration hooks for a finite scheduled execution plan. Admission runs
         // after the output-enable register read, immediately before its write.
         // The observer runs after the first successful enable transaction.
         std::function<bool()> output_enable_admission;
         std::function<void()> first_output_enabled;
         bool anchor_finite_tone_to_enable = false;
         bool confirm_output_disable = false;
+        bool anchor_plan_to_enable = false;
+        // For scheduled plans beginning with an RF-off interval, admit the
+        // timeline before its monotonic origin is sampled.
+        std::function<bool()> silent_start_admission;
     };
 
     /**
@@ -105,6 +109,10 @@ public:
      * @return Conservative Si5351 backend capability details.
      */
     wsprrypi::BackendCapabilities capabilities() const override;
+
+    // Actual frequencies from the configured joint planner; zero for RF-off.
+    // Empty when no valid plan is configured. This never accesses hardware.
+    std::vector<double> realizedEventFrequencies() const;
 
     /**
      * @brief Configure the backend for a compiled execution plan

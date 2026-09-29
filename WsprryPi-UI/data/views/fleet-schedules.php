@@ -28,7 +28,7 @@
             <div class="col-12 col-lg-6 config-stacked-field" data-schedule-modes="tone">
                 <label for="fleet-schedule-duration" class="form-label">Tone duration (seconds)</label>
                 <input id="fleet-schedule-duration" class="form-control" type="number" min="0.001" max="600" step="0.001" value="3" form="wtp-independent">
-                <div class="form-text">The initial Pi server supports finite tones up to 10 seconds.</div>
+                <div class="form-text">The selected output must support the duration, frequency, and mode.</div>
             </div>
             <div class="col-12 col-lg-6 config-stacked-field" data-schedule-modes="wspr">
                 <label for="fleet-schedule-callsign" class="form-label">Callsign</label>

@@ -927,8 +927,58 @@ void test_all_ordered_pll_transitions()
     expect(adapter->registers[3]==255, "arbitrary transition cleanup");
 }
 
+void test_backend_capabilities_and_scheduled_modes()
+{
+    using namespace wsprrypi;
+    for (const auto mode : {wsprrypi::TransmissionMode::WSPR, wsprrypi::TransmissionMode::TONE,
+                           wsprrypi::TransmissionMode::QRSS, wsprrypi::TransmissionMode::FSKCW, wsprrypi::TransmissionMode::DFCW})
+    for (const double hz : {137500., 475700., 1838100., 3570100., 5364700.,
+         7040100., 10140200., 14097100., 18106100., 21096100., 24926100.,
+         28126100., 50294500., 70092500., 144490000.})
+    {
+        TestBridge bridge;
+        auto adapter = std::make_shared<FakeI2CAdapter>();
+        auto cfg = config(adapter);
+        cfg.anchor_plan_to_enable = true;
+        cfg.confirm_output_disable = true;
+        unsigned enables = 0, observed = 0;
+        cfg.output_enable_admission = [&] { ++enables; return true; };
+        cfg.first_output_enabled = [&] { ++observed; };
+        WsprSi5351Backend backend(bridge, cfg);
+        const auto caps = backend.capabilities();
+        expect(supports_mode(caps, mode) && hz >= caps.min_frequency_hz &&
+               hz <= caps.max_frequency_hz, "backend CAPS covers qualified band and mode");
+        auto plan = single_tone_plan(0.0);
+        plan.mode = mode;
+        plan.duration_was_explicit = true;
+        plan.events.clear();
+        const int count = mode == wsprrypi::TransmissionMode::WSPR ? 4 :
+            (mode == wsprrypi::TransmissionMode::FSKCW || mode == wsprrypi::TransmissionMode::DFCW ? 2 : 1);
+        for (int i = 0; i < count * 2; ++i) {
+            const bool on = i % 2 == 0;
+            plan.events.push_back({std::chrono::nanoseconds{i * 2}, std::chrono::nanoseconds{2},
+                on ? RfEventType::HOLD : RfEventType::RF_OFF,
+                on ? hz + (i / 2) * 1.46484375 : 0.0, on});
+        }
+        plan.summary.total_duration = std::chrono::nanoseconds{count * 4};
+        plan.summary.event_count = plan.events.size();
+        expect(configure(backend, plan), "all qualified band/mode scheduled plans configure");
+        const auto actual = backend.realizedEventFrequencies();
+        expect(actual.size() == plan.events.size(), "realization covers each configured event");
+        for (std::size_t i = 0; i < actual.size(); ++i)
+            expect(plan.events[i].rf_on ? actual[i] > 0 : actual[i] == 0,
+                   "realization distinguishes frequencies from RF-off");
+        const auto result = backend.execute(plan);
+        expect(result.ok && !result.stopped && observed == 1 && enables >= unsigned(count),
+               "multi-event execution observes one launch and admits later gates");
+        expect(backend.cleanup().ok && adapter->registers[3] == 255,
+               "each scheduled mode finishes with confirmed output-off");
+    }
+}
+
 int main()
 {
+    test_backend_capabilities_and_scheduled_modes();
     // WTP initializes during ARM lead, then admits only the final enable write.
     // Duration must begin at that write rather than at device initialization.
     for (bool admit : {false, true})
@@ -990,6 +1040,75 @@ int main()
         };
         expect(!backend.cleanup().ok, "stuck enabled output fails cleanup readback");
         adapter->after_write = {};
+    }
+    {
+        TestBridge bridge;
+        bridge.real_waits = true;
+        auto adapter = std::make_shared<FakeI2CAdapter>();
+        auto cfg = config(adapter);
+        cfg.anchor_plan_to_enable = true;
+        cfg.confirm_output_disable = true;
+        unsigned observed = 0;
+        cfg.output_enable_admission = [&] {
+            if (!observed) std::this_thread::sleep_for(std::chrono::milliseconds(40));
+            return true;
+        };
+        cfg.first_output_enabled = [&] { ++observed; };
+        WsprSi5351Backend backend(bridge, cfg);
+        auto plan = single_tone_plan(0.0);
+        plan.mode = wsprrypi::TransmissionMode::QRSS;
+        plan.events.clear();
+        for (int i = 0; i < 3; ++i)
+            plan.events.push_back({std::chrono::milliseconds(i * 30), std::chrono::milliseconds(30),
+                wsprrypi::RfEventType::HOLD, i == 1 ? 0.0 : 14097100.0, i != 1});
+        plan.summary.total_duration = std::chrono::milliseconds(90);
+        plan.summary.event_count = 3;
+        std::vector<std::chrono::steady_clock::time_point> ons;
+        std::chrono::steady_clock::time_point off{};
+        adapter->after_write = [&](std::uint8_t reg, std::uint8_t value, std::size_t) {
+            if (reg == 3 && value == 254) ons.push_back(std::chrono::steady_clock::now());
+            if (reg == 3 && value == 255 && !ons.empty()) off = std::chrono::steady_clock::now();
+        };
+        expect(configure(backend, plan), "anchored gated plan configures");
+        expect(backend.execute(plan).ok && observed == 1 && ons.size() == 2,
+               "gated plan executes two marks with one launch observation");
+        if (ons.size() == 2)
+            expect(ons[1] - ons[0] >= std::chrono::milliseconds(60) &&
+                   off - ons[0] >= std::chrono::milliseconds(90),
+                   "later marks and final off remain anchored after ARM lead");
+        expect(backend.cleanup().ok, "gated plan confirms cleanup");
+    }
+    {
+        TestBridge bridge;
+        bridge.real_waits = true;
+        auto adapter = std::make_shared<FakeI2CAdapter>();
+        auto cfg = config(adapter);
+        cfg.anchor_plan_to_enable = true;
+        unsigned admitted = 0;
+        std::chrono::steady_clock::time_point start{}, on{};
+        cfg.silent_start_admission = [&] {
+            ++admitted;
+            expect(adapter->registers[3] == 255, "silent timeline begins with output disabled");
+            start = std::chrono::steady_clock::now();
+            return true;
+        };
+        auto plan = single_tone_plan(0.0);
+        const auto mark = plan.events[0];
+        plan.events = {{std::chrono::nanoseconds{0}, std::chrono::milliseconds{30},
+                        wsprrypi::RfEventType::RF_OFF, 0.0, false}, mark};
+        plan.events[1].offset_from_start = std::chrono::milliseconds{30};
+        plan.events[1].duration = std::chrono::milliseconds{10};
+        plan.summary.total_duration = std::chrono::milliseconds{40};
+        plan.summary.event_count = 2;
+        adapter->after_write = [&](std::uint8_t reg, std::uint8_t value, std::size_t) {
+            if (reg == 3 && value == 254) on = std::chrono::steady_clock::now();
+        };
+        WsprSi5351Backend backend(bridge, cfg);
+        expect(configure(backend, plan) && backend.execute(plan).ok,
+               "scheduled leading RF-off interval executes");
+        expect(admitted == 1 && on - start >= std::chrono::milliseconds{30},
+               "leading RF-off retains the requested silent duration");
+        expect(backend.cleanup().ok, "silent-prefix plan cleans up");
     }
     test_all_ordered_pll_transitions();
     test_envelope_deadlines_and_off_retune_readiness();

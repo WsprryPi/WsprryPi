@@ -1,0 +1,7 @@
+accelerated-failure
+2026-09-29 22:43:25.003 UTC	[ERROR] WTP Si5351: Si5351 active readiness failure, register 0=193; inhibiting output.
+2026-09-29 22:43:25.006 UTC	[ERROR] WTP Si5351: Could not apply Si5351 tone programming.
+
+normal-runtime
+2026-09-29 22:48:44.513 UTC	[ERROR] WTP Si5351: Si5351 active readiness failure, register 0=193; inhibiting output.
+2026-09-29 22:48:44.514 UTC	[ERROR] WTP Si5351: Could not apply Si5351 tone programming.

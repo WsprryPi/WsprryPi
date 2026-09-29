@@ -1,0 +1,2774 @@
+{
+  "cases": [
+    {
+      "frequency_hz": 137500,
+      "mode": "tone",
+      "load": {
+        "type": "response",
+        "protocol": "WTP/1",
+        "session_id": "9713c0d112ec429eb2b13e0bc619fcf0",
+        "request_id": "39bcd4e37b1c40dd937e567212025d9f",
+        "op": "LOAD",
+        "ok": true,
+        "body": {
+          "job_id": "adc2899c21f14035bcdc3cc6f1ed8476",
+          "state": "loaded",
+          "adjustments": []
+        }
+      },
+      "abort": {
+        "type": "response",
+        "protocol": "WTP/1",
+        "session_id": "9713c0d112ec429eb2b13e0bc619fcf0",
+        "request_id": "83499f5c428547aeba4da1ae96d2e05e",
+        "op": "ABORT",
+        "ok": true,
+        "body": {
+          "job_id": "adc2899c21f14035bcdc3cc6f1ed8476",
+          "state": "aborted",
+          "output_active": false
+        }
+      }
+    },
+    {
+      "frequency_hz": 137500,
+      "mode": "wspr",
+      "load": {
+        "type": "response",
+        "protocol": "WTP/1",
+        "session_id": "9713c0d112ec429eb2b13e0bc619fcf0",
+        "request_id": "7ade889cc69241cba2c2d04f2332da3b",
+        "op": "LOAD",
+        "ok": true,
+        "body": {
+          "job_id": "375fdbc976164a31a3d027664847ea44",
+          "state": "loaded",
+          "adjustments": []
+        }
+      },
+      "abort": {
+        "type": "response",
+        "protocol": "WTP/1",
+        "session_id": "9713c0d112ec429eb2b13e0bc619fcf0",
+        "request_id": "96fa214e535e4dd9935919e6d711d3a2",
+        "op": "ABORT",
+        "ok": true,
+        "body": {
+          "job_id": "375fdbc976164a31a3d027664847ea44",
+          "state": "aborted",
+          "output_active": false
+        }
+      }
+    },
+    {
+      "frequency_hz": 137500,
+      "mode": "qrss",
+      "load": {
+        "type": "response",
+        "protocol": "WTP/1",
+        "session_id": "9713c0d112ec429eb2b13e0bc619fcf0",
+        "request_id": "0a9d3813ea68491db145d814c48a18a5",
+        "op": "LOAD",
+        "ok": true,
+        "body": {
+          "job_id": "d74813ccaeac4d7ea27c5e0255dfab1f",
+          "state": "loaded",
+          "adjustments": []
+        }
+      },
+      "abort": {
+        "type": "response",
+        "protocol": "WTP/1",
+        "session_id": "9713c0d112ec429eb2b13e0bc619fcf0",
+        "request_id": "c184557930a34d1693bb2e4fe672b343",
+        "op": "ABORT",
+        "ok": true,
+        "body": {
+          "job_id": "d74813ccaeac4d7ea27c5e0255dfab1f",
+          "state": "aborted",
+          "output_active": false
+        }
+      }
+    },
+    {
+      "frequency_hz": 137500,
+      "mode": "fskcw",
+      "load": {
+        "type": "response",
+        "protocol": "WTP/1",
+        "session_id": "9713c0d112ec429eb2b13e0bc619fcf0",
+        "request_id": "d5e29311652d49249c4d471c86b35e2b",
+        "op": "LOAD",
+        "ok": true,
+        "body": {
+          "job_id": "8d26b52432304ba7ade20655d7fde7dd",
+          "state": "loaded",
+          "adjustments": []
+        }
+      },
+      "abort": {
+        "type": "response",
+        "protocol": "WTP/1",
+        "session_id": "9713c0d112ec429eb2b13e0bc619fcf0",
+        "request_id": "d94d2c52638e467d995b999275aa8396",
+        "op": "ABORT",
+        "ok": true,
+        "body": {
+          "job_id": "8d26b52432304ba7ade20655d7fde7dd",
+          "state": "aborted",
+          "output_active": false
+        }
+      }
+    },
+    {
+      "frequency_hz": 137500,
+      "mode": "dfcw",
+      "load": {
+        "type": "response",
+        "protocol": "WTP/1",
+        "session_id": "9713c0d112ec429eb2b13e0bc619fcf0",
+        "request_id": "e60ef462b0254790b65760cec8a1cb56",
+        "op": "LOAD",
+        "ok": true,
+        "body": {
+          "job_id": "8597790c56f340d68281cbb718e06a81",
+          "state": "loaded",
+          "adjustments": []
+        }
+      },
+      "abort": {
+        "type": "response",
+        "protocol": "WTP/1",
+        "session_id": "9713c0d112ec429eb2b13e0bc619fcf0",
+        "request_id": "e5edf1a06bd943e18790290efddb64a9",
+        "op": "ABORT",
+        "ok": true,
+        "body": {
+          "job_id": "8597790c56f340d68281cbb718e06a81",
+          "state": "aborted",
+          "output_active": false
+        }
+      }
+    },
+    {
+      "frequency_hz": 475700,
+      "mode": "tone",
+      "load": {
+        "type": "response",
+        "protocol": "WTP/1",
+        "session_id": "9713c0d112ec429eb2b13e0bc619fcf0",
+        "request_id": "17abe5ab0c5c45f3b1ab5c71794c50e6",
+        "op": "LOAD",
+        "ok": true,
+        "body": {
+          "job_id": "df2198c80cb04462be49dfc77cf33a2d",
+          "state": "loaded",
+          "adjustments": []
+        }
+      },
+      "abort": {
+        "type": "response",
+        "protocol": "WTP/1",
+        "session_id": "9713c0d112ec429eb2b13e0bc619fcf0",
+        "request_id": "c24e063b7c2e48c18bab8ab8f77e30bd",
+        "op": "ABORT",
+        "ok": true,
+        "body": {
+          "job_id": "df2198c80cb04462be49dfc77cf33a2d",
+          "state": "aborted",
+          "output_active": false
+        }
+      }
+    },
+    {
+      "frequency_hz": 475700,
+      "mode": "wspr",
+      "load": {
+        "type": "response",
+        "protocol": "WTP/1",
+        "session_id": "9713c0d112ec429eb2b13e0bc619fcf0",
+        "request_id": "b55b83523c4d4ad9a0892c11b7af2a0c",
+        "op": "LOAD",
+        "ok": true,
+        "body": {
+          "job_id": "80f1b80713df46d09a81554fb4d04284",
+          "state": "loaded",
+          "adjustments": [
+            {
+              "event_index": 1,
+              "requested_frequency_nhz": "475701464843750",
+              "realized_frequency_nhz": "475701464843749"
+            },
+            {
+              "event_index": 2,
+              "requested_frequency_nhz": "475702929687500",
+              "realized_frequency_nhz": "475702929687501"
+            },
+            {
+              "event_index": 3,
+              "requested_frequency_nhz": "475704394531250",
+              "realized_frequency_nhz": "475704394531251"
+            }
+          ]
+        }
+      },
+      "abort": {
+        "type": "response",
+        "protocol": "WTP/1",
+        "session_id": "9713c0d112ec429eb2b13e0bc619fcf0",
+        "request_id": "21c89d678ce64dcb9482102777a9a8b6",
+        "op": "ABORT",
+        "ok": true,
+        "body": {
+          "job_id": "80f1b80713df46d09a81554fb4d04284",
+          "state": "aborted",
+          "output_active": false
+        }
+      }
+    },
+    {
+      "frequency_hz": 475700,
+      "mode": "qrss",
+      "load": {
+        "type": "response",
+        "protocol": "WTP/1",
+        "session_id": "9713c0d112ec429eb2b13e0bc619fcf0",
+        "request_id": "354a7284e6994b3881f55a103415c345",
+        "op": "LOAD",
+        "ok": true,
+        "body": {
+          "job_id": "05157c87a3c8442e9041c45619c11526",
+          "state": "loaded",
+          "adjustments": []
+        }
+      },
+      "abort": {
+        "type": "response",
+        "protocol": "WTP/1",
+        "session_id": "9713c0d112ec429eb2b13e0bc619fcf0",
+        "request_id": "0888cf58bca24e3a9e3e97e816d0014e",
+        "op": "ABORT",
+        "ok": true,
+        "body": {
+          "job_id": "05157c87a3c8442e9041c45619c11526",
+          "state": "aborted",
+          "output_active": false
+        }
+      }
+    },
+    {
+      "frequency_hz": 475700,
+      "mode": "fskcw",
+      "load": {
+        "type": "response",
+        "protocol": "WTP/1",
+        "session_id": "9713c0d112ec429eb2b13e0bc619fcf0",
+        "request_id": "0d2724a61e414011a47135dc32b1d1f8",
+        "op": "LOAD",
+        "ok": true,
+        "body": {
+          "job_id": "7475aa4ed8a2451ba925077615669485",
+          "state": "loaded",
+          "adjustments": [
+            {
+              "event_index": 1,
+              "requested_frequency_nhz": "475701464843750",
+              "realized_frequency_nhz": "475701464843749"
+            }
+          ]
+        }
+      },
+      "abort": {
+        "type": "response",
+        "protocol": "WTP/1",
+        "session_id": "9713c0d112ec429eb2b13e0bc619fcf0",
+        "request_id": "5bcd0a2f22b84216a71772cba8e5a023",
+        "op": "ABORT",
+        "ok": true,
+        "body": {
+          "job_id": "7475aa4ed8a2451ba925077615669485",
+          "state": "aborted",
+          "output_active": false
+        }
+      }
+    },
+    {
+      "frequency_hz": 475700,
+      "mode": "dfcw",
+      "load": {
+        "type": "response",
+        "protocol": "WTP/1",
+        "session_id": "9713c0d112ec429eb2b13e0bc619fcf0",
+        "request_id": "44e6b989cc904ce78530e30f1792f9d8",
+        "op": "LOAD",
+        "ok": true,
+        "body": {
+          "job_id": "770ccefa3bf047c3a08300f406a9d857",
+          "state": "loaded",
+          "adjustments": [
+            {
+              "event_index": 1,
+              "requested_frequency_nhz": "475701464843750",
+              "realized_frequency_nhz": "475701464843749"
+            }
+          ]
+        }
+      },
+      "abort": {
+        "type": "response",
+        "protocol": "WTP/1",
+        "session_id": "9713c0d112ec429eb2b13e0bc619fcf0",
+        "request_id": "a4b33fc0f95c4e10896dc301f82686e2",
+        "op": "ABORT",
+        "ok": true,
+        "body": {
+          "job_id": "770ccefa3bf047c3a08300f406a9d857",
+          "state": "aborted",
+          "output_active": false
+        }
+      }
+    },
+    {
+      "frequency_hz": 1838100,
+      "mode": "tone",
+      "load": {
+        "type": "response",
+        "protocol": "WTP/1",
+        "session_id": "9713c0d112ec429eb2b13e0bc619fcf0",
+        "request_id": "263eaf3bf4054b8bb3a4a5437daeb0c6",
+        "op": "LOAD",
+        "ok": true,
+        "body": {
+          "job_id": "a72a0ee211094e1bbd3b872abab58782",
+          "state": "loaded",
+          "adjustments": []
+        }
+      },
+      "abort": {
+        "type": "response",
+        "protocol": "WTP/1",
+        "session_id": "9713c0d112ec429eb2b13e0bc619fcf0",
+        "request_id": "a689568e3a18458f9452aa36e8f4f423",
+        "op": "ABORT",
+        "ok": true,
+        "body": {
+          "job_id": "a72a0ee211094e1bbd3b872abab58782",
+          "state": "aborted",
+          "output_active": false
+        }
+      }
+    },
+    {
+      "frequency_hz": 1838100,
+      "mode": "wspr",
+      "load": {
+        "type": "response",
+        "protocol": "WTP/1",
+        "session_id": "9713c0d112ec429eb2b13e0bc619fcf0",
+        "request_id": "b7b93661f5d84107960a320eee2c341c",
+        "op": "LOAD",
+        "ok": true,
+        "body": {
+          "job_id": "b54ec02fcb1c4ab5a407398eecbd602e",
+          "state": "loaded",
+          "adjustments": [
+            {
+              "event_index": 1,
+              "requested_frequency_nhz": "1838101464843750",
+              "realized_frequency_nhz": "1838101464843754"
+            },
+            {
+              "event_index": 2,
+              "requested_frequency_nhz": "1838102929687500",
+              "realized_frequency_nhz": "1838102929687497"
+            },
+            {
+              "event_index": 3,
+              "requested_frequency_nhz": "1838104394531250",
+              "realized_frequency_nhz": "1838104394531253"
+            }
+          ]
+        }
+      },
+      "abort": {
+        "type": "response",
+        "protocol": "WTP/1",
+        "session_id": "9713c0d112ec429eb2b13e0bc619fcf0",
+        "request_id": "899b2c889b734cddab2a2349470b5c5a",
+        "op": "ABORT",
+        "ok": true,
+        "body": {
+          "job_id": "b54ec02fcb1c4ab5a407398eecbd602e",
+          "state": "aborted",
+          "output_active": false
+        }
+      }
+    },
+    {
+      "frequency_hz": 1838100,
+      "mode": "qrss",
+      "load": {
+        "type": "response",
+        "protocol": "WTP/1",
+        "session_id": "9713c0d112ec429eb2b13e0bc619fcf0",
+        "request_id": "0039bf0378e74b0b9e67ad1b1fe10e53",
+        "op": "LOAD",
+        "ok": true,
+        "body": {
+          "job_id": "6530bb6e17154984b72e5b39c576e8fd",
+          "state": "loaded",
+          "adjustments": []
+        }
+      },
+      "abort": {
+        "type": "response",
+        "protocol": "WTP/1",
+        "session_id": "9713c0d112ec429eb2b13e0bc619fcf0",
+        "request_id": "a6cba8ef963e43ac87866efca01c5e28",
+        "op": "ABORT",
+        "ok": true,
+        "body": {
+          "job_id": "6530bb6e17154984b72e5b39c576e8fd",
+          "state": "aborted",
+          "output_active": false
+        }
+      }
+    },
+    {
+      "frequency_hz": 1838100,
+      "mode": "fskcw",
+      "load": {
+        "type": "response",
+        "protocol": "WTP/1",
+        "session_id": "9713c0d112ec429eb2b13e0bc619fcf0",
+        "request_id": "2f18b3872c144c2b845ab001ae42616b",
+        "op": "LOAD",
+        "ok": true,
+        "body": {
+          "job_id": "4ff5c33a819b47919c0e18e76c08b7e1",
+          "state": "loaded",
+          "adjustments": [
+            {
+              "event_index": 1,
+              "requested_frequency_nhz": "1838101464843750",
+              "realized_frequency_nhz": "1838101464843754"
+            }
+          ]
+        }
+      },
+      "abort": {
+        "type": "response",
+        "protocol": "WTP/1",
+        "session_id": "9713c0d112ec429eb2b13e0bc619fcf0",
+        "request_id": "420165befaed4ab2b054018a37531b02",
+        "op": "ABORT",
+        "ok": true,
+        "body": {
+          "job_id": "4ff5c33a819b47919c0e18e76c08b7e1",
+          "state": "aborted",
+          "output_active": false
+        }
+      }
+    },
+    {
+      "frequency_hz": 1838100,
+      "mode": "dfcw",
+      "load": {
+        "type": "response",
+        "protocol": "WTP/1",
+        "session_id": "9713c0d112ec429eb2b13e0bc619fcf0",
+        "request_id": "d505d126f179423f9bc3f0f3113ed4f0",
+        "op": "LOAD",
+        "ok": true,
+        "body": {
+          "job_id": "f41dbbab355745ef8f6021b7b2d248db",
+          "state": "loaded",
+          "adjustments": [
+            {
+              "event_index": 1,
+              "requested_frequency_nhz": "1838101464843750",
+              "realized_frequency_nhz": "1838101464843754"
+            }
+          ]
+        }
+      },
+      "abort": {
+        "type": "response",
+        "protocol": "WTP/1",
+        "session_id": "9713c0d112ec429eb2b13e0bc619fcf0",
+        "request_id": "3b7082c8d017407c8814393d5118e269",
+        "op": "ABORT",
+        "ok": true,
+        "body": {
+          "job_id": "f41dbbab355745ef8f6021b7b2d248db",
+          "state": "aborted",
+          "output_active": false
+        }
+      }
+    },
+    {
+      "frequency_hz": 3570100,
+      "mode": "tone",
+      "load": {
+        "type": "response",
+        "protocol": "WTP/1",
+        "session_id": "9713c0d112ec429eb2b13e0bc619fcf0",
+        "request_id": "561aa48912ea49f8ab65babb389a5176",
+        "op": "LOAD",
+        "ok": true,
+        "body": {
+          "job_id": "cef8ad2e87554c0494474166f853fea7",
+          "state": "loaded",
+          "adjustments": []
+        }
+      },
+      "abort": {
+        "type": "response",
+        "protocol": "WTP/1",
+        "session_id": "9713c0d112ec429eb2b13e0bc619fcf0",
+        "request_id": "a591aed6fd4c46cbb86e4353e5d1e228",
+        "op": "ABORT",
+        "ok": true,
+        "body": {
+          "job_id": "cef8ad2e87554c0494474166f853fea7",
+          "state": "aborted",
+          "output_active": false
+        }
+      }
+    },
+    {
+      "frequency_hz": 3570100,
+      "mode": "wspr",
+      "load": {
+        "type": "response",
+        "protocol": "WTP/1",
+        "session_id": "9713c0d112ec429eb2b13e0bc619fcf0",
+        "request_id": "04a34727c8f746be966dd66833ddb2bc",
+        "op": "LOAD",
+        "ok": true,
+        "body": {
+          "job_id": "4ac06399219d4d10b24d73181f2fd01d",
+          "state": "loaded",
+          "adjustments": [
+            {
+              "event_index": 1,
+              "requested_frequency_nhz": "3570101464843750",
+              "realized_frequency_nhz": "3570101464843761"
+            },
+            {
+              "event_index": 2,
+              "requested_frequency_nhz": "3570102929687500",
+              "realized_frequency_nhz": "3570102929687481"
+            },
+            {
+              "event_index": 3,
+              "requested_frequency_nhz": "3570104394531250",
+              "realized_frequency_nhz": "3570104394531228"
+            }
+          ]
+        }
+      },
+      "abort": {
+        "type": "response",
+        "protocol": "WTP/1",
+        "session_id": "9713c0d112ec429eb2b13e0bc619fcf0",
+        "request_id": "1e031e8724204443bd0314ec102fad61",
+        "op": "ABORT",
+        "ok": true,
+        "body": {
+          "job_id": "4ac06399219d4d10b24d73181f2fd01d",
+          "state": "aborted",
+          "output_active": false
+        }
+      }
+    },
+    {
+      "frequency_hz": 3570100,
+      "mode": "qrss",
+      "load": {
+        "type": "response",
+        "protocol": "WTP/1",
+        "session_id": "9713c0d112ec429eb2b13e0bc619fcf0",
+        "request_id": "25c468454e0e48e8a45284f35b0c156e",
+        "op": "LOAD",
+        "ok": true,
+        "body": {
+          "job_id": "765e0d4792ab44258ca8dcbb3421add9",
+          "state": "loaded",
+          "adjustments": []
+        }
+      },
+      "abort": {
+        "type": "response",
+        "protocol": "WTP/1",
+        "session_id": "9713c0d112ec429eb2b13e0bc619fcf0",
+        "request_id": "b7e5310567e44af799378773a0e46836",
+        "op": "ABORT",
+        "ok": true,
+        "body": {
+          "job_id": "765e0d4792ab44258ca8dcbb3421add9",
+          "state": "aborted",
+          "output_active": false
+        }
+      }
+    },
+    {
+      "frequency_hz": 3570100,
+      "mode": "fskcw",
+      "load": {
+        "type": "response",
+        "protocol": "WTP/1",
+        "session_id": "9713c0d112ec429eb2b13e0bc619fcf0",
+        "request_id": "63dcc39c9bec4c0495dcc8c0ccf7aa50",
+        "op": "LOAD",
+        "ok": true,
+        "body": {
+          "job_id": "f15dcadc2985476abed90218de84855a",
+          "state": "loaded",
+          "adjustments": [
+            {
+              "event_index": 1,
+              "requested_frequency_nhz": "3570101464843750",
+              "realized_frequency_nhz": "3570101464843761"
+            }
+          ]
+        }
+      },
+      "abort": {
+        "type": "response",
+        "protocol": "WTP/1",
+        "session_id": "9713c0d112ec429eb2b13e0bc619fcf0",
+        "request_id": "912008e3eaf042a382bf6e7e78c63d0b",
+        "op": "ABORT",
+        "ok": true,
+        "body": {
+          "job_id": "f15dcadc2985476abed90218de84855a",
+          "state": "aborted",
+          "output_active": false
+        }
+      }
+    },
+    {
+      "frequency_hz": 3570100,
+      "mode": "dfcw",
+      "load": {
+        "type": "response",
+        "protocol": "WTP/1",
+        "session_id": "9713c0d112ec429eb2b13e0bc619fcf0",
+        "request_id": "bed519779dd34accba3dde0e0afde2c9",
+        "op": "LOAD",
+        "ok": true,
+        "body": {
+          "job_id": "f9bac8d8485940ccb864f7c0b1201abd",
+          "state": "loaded",
+          "adjustments": [
+            {
+              "event_index": 1,
+              "requested_frequency_nhz": "3570101464843750",
+              "realized_frequency_nhz": "3570101464843761"
+            }
+          ]
+        }
+      },
+      "abort": {
+        "type": "response",
+        "protocol": "WTP/1",
+        "session_id": "9713c0d112ec429eb2b13e0bc619fcf0",
+        "request_id": "4e0ab1a1a4ff4cedaef0d341650c4454",
+        "op": "ABORT",
+        "ok": true,
+        "body": {
+          "job_id": "f9bac8d8485940ccb864f7c0b1201abd",
+          "state": "aborted",
+          "output_active": false
+        }
+      }
+    },
+    {
+      "frequency_hz": 5364700,
+      "mode": "tone",
+      "load": {
+        "type": "response",
+        "protocol": "WTP/1",
+        "session_id": "9713c0d112ec429eb2b13e0bc619fcf0",
+        "request_id": "488d7174a8a6482ba0b4cd72ffdaf3db",
+        "op": "LOAD",
+        "ok": true,
+        "body": {
+          "job_id": "a39caeaeaede4b20be7cce4682fcbc69",
+          "state": "loaded",
+          "adjustments": []
+        }
+      },
+      "abort": {
+        "type": "response",
+        "protocol": "WTP/1",
+        "session_id": "9713c0d112ec429eb2b13e0bc619fcf0",
+        "request_id": "dde5d14040a047fdbf0c7d5262b5ae55",
+        "op": "ABORT",
+        "ok": true,
+        "body": {
+          "job_id": "a39caeaeaede4b20be7cce4682fcbc69",
+          "state": "aborted",
+          "output_active": false
+        }
+      }
+    },
+    {
+      "frequency_hz": 5364700,
+      "mode": "wspr",
+      "load": {
+        "type": "response",
+        "protocol": "WTP/1",
+        "session_id": "9713c0d112ec429eb2b13e0bc619fcf0",
+        "request_id": "16d113fcde514a128f4ed69f597a34ea",
+        "op": "LOAD",
+        "ok": true,
+        "body": {
+          "job_id": "d5a082ce683a4dcb9f7b185bf263cb76",
+          "state": "loaded",
+          "adjustments": [
+            {
+              "event_index": 1,
+              "requested_frequency_nhz": "5364701464843750",
+              "realized_frequency_nhz": "5364701464843765"
+            },
+            {
+              "event_index": 2,
+              "requested_frequency_nhz": "5364702929687500",
+              "realized_frequency_nhz": "5364702929687458"
+            },
+            {
+              "event_index": 3,
+              "requested_frequency_nhz": "5364704394531250",
+              "realized_frequency_nhz": "5364704394531260"
+            }
+          ]
+        }
+      },
+      "abort": {
+        "type": "response",
+        "protocol": "WTP/1",
+        "session_id": "9713c0d112ec429eb2b13e0bc619fcf0",
+        "request_id": "d875c7ae9f784ee8a0d03e2f9a938922",
+        "op": "ABORT",
+        "ok": true,
+        "body": {
+          "job_id": "d5a082ce683a4dcb9f7b185bf263cb76",
+          "state": "aborted",
+          "output_active": false
+        }
+      }
+    },
+    {
+      "frequency_hz": 5364700,
+      "mode": "qrss",
+      "load": {
+        "type": "response",
+        "protocol": "WTP/1",
+        "session_id": "9713c0d112ec429eb2b13e0bc619fcf0",
+        "request_id": "ccddbb5700d84f00add08ba5ab4b4df9",
+        "op": "LOAD",
+        "ok": true,
+        "body": {
+          "job_id": "8ebc59f2373e4b06b212fc3847359eba",
+          "state": "loaded",
+          "adjustments": []
+        }
+      },
+      "abort": {
+        "type": "response",
+        "protocol": "WTP/1",
+        "session_id": "9713c0d112ec429eb2b13e0bc619fcf0",
+        "request_id": "6d52b16e3d654bd1bb2e9eb986e2fda7",
+        "op": "ABORT",
+        "ok": true,
+        "body": {
+          "job_id": "8ebc59f2373e4b06b212fc3847359eba",
+          "state": "aborted",
+          "output_active": false
+        }
+      }
+    },
+    {
+      "frequency_hz": 5364700,
+      "mode": "fskcw",
+      "load": {
+        "type": "response",
+        "protocol": "WTP/1",
+        "session_id": "9713c0d112ec429eb2b13e0bc619fcf0",
+        "request_id": "be32873701df4591b9303f298e57bb1f",
+        "op": "LOAD",
+        "ok": true,
+        "body": {
+          "job_id": "62a45aa84ae44e40a98d77eaa872653a",
+          "state": "loaded",
+          "adjustments": [
+            {
+              "event_index": 1,
+              "requested_frequency_nhz": "5364701464843750",
+              "realized_frequency_nhz": "5364701464843765"
+            }
+          ]
+        }
+      },
+      "abort": {
+        "type": "response",
+        "protocol": "WTP/1",
+        "session_id": "9713c0d112ec429eb2b13e0bc619fcf0",
+        "request_id": "59152460868a41c2801ecc612eb874a4",
+        "op": "ABORT",
+        "ok": true,
+        "body": {
+          "job_id": "62a45aa84ae44e40a98d77eaa872653a",
+          "state": "aborted",
+          "output_active": false
+        }
+      }
+    },
+    {
+      "frequency_hz": 5364700,
+      "mode": "dfcw",
+      "load": {
+        "type": "response",
+        "protocol": "WTP/1",
+        "session_id": "9713c0d112ec429eb2b13e0bc619fcf0",
+        "request_id": "72a53c8ebd3e4219a9a5c8a15d444bcf",
+        "op": "LOAD",
+        "ok": true,
+        "body": {
+          "job_id": "020089f958cf46c3990f33ddd0da9179",
+          "state": "loaded",
+          "adjustments": [
+            {
+              "event_index": 1,
+              "requested_frequency_nhz": "5364701464843750",
+              "realized_frequency_nhz": "5364701464843765"
+            }
+          ]
+        }
+      },
+      "abort": {
+        "type": "response",
+        "protocol": "WTP/1",
+        "session_id": "9713c0d112ec429eb2b13e0bc619fcf0",
+        "request_id": "937b6c015bc043a09d7cd94ee2f00f90",
+        "op": "ABORT",
+        "ok": true,
+        "body": {
+          "job_id": "020089f958cf46c3990f33ddd0da9179",
+          "state": "aborted",
+          "output_active": false
+        }
+      }
+    },
+    {
+      "frequency_hz": 7040100,
+      "mode": "tone",
+      "load": {
+        "type": "response",
+        "protocol": "WTP/1",
+        "session_id": "9713c0d112ec429eb2b13e0bc619fcf0",
+        "request_id": "15f6c5abd42448cf946b7ba2fad51073",
+        "op": "LOAD",
+        "ok": true,
+        "body": {
+          "job_id": "7bdeae5501dc4fd086ad02ef7143f81c",
+          "state": "loaded",
+          "adjustments": []
+        }
+      },
+      "abort": {
+        "type": "response",
+        "protocol": "WTP/1",
+        "session_id": "9713c0d112ec429eb2b13e0bc619fcf0",
+        "request_id": "f8bf278e75b84e5bb1bde0b82c462153",
+        "op": "ABORT",
+        "ok": true,
+        "body": {
+          "job_id": "7bdeae5501dc4fd086ad02ef7143f81c",
+          "state": "aborted",
+          "output_active": false
+        }
+      }
+    },
+    {
+      "frequency_hz": 7040100,
+      "mode": "wspr",
+      "load": {
+        "type": "response",
+        "protocol": "WTP/1",
+        "session_id": "9713c0d112ec429eb2b13e0bc619fcf0",
+        "request_id": "c7315023d0a84879b975dcc365b1e2c1",
+        "op": "LOAD",
+        "ok": true,
+        "body": {
+          "job_id": "c2efb4155a4d40c4b58baf2374d9128f",
+          "state": "loaded",
+          "adjustments": [
+            {
+              "event_index": 1,
+              "requested_frequency_nhz": "7040101464843750",
+              "realized_frequency_nhz": "7040101464843676"
+            },
+            {
+              "event_index": 2,
+              "requested_frequency_nhz": "7040102929687500",
+              "realized_frequency_nhz": "7040102929687483"
+            },
+            {
+              "event_index": 3,
+              "requested_frequency_nhz": "7040104394531250",
+              "realized_frequency_nhz": "7040104394531619"
+            }
+          ]
+        }
+      },
+      "abort": {
+        "type": "response",
+        "protocol": "WTP/1",
+        "session_id": "9713c0d112ec429eb2b13e0bc619fcf0",
+        "request_id": "b808f5e0200d4a8696a859385575808d",
+        "op": "ABORT",
+        "ok": true,
+        "body": {
+          "job_id": "c2efb4155a4d40c4b58baf2374d9128f",
+          "state": "aborted",
+          "output_active": false
+        }
+      }
+    },
+    {
+      "frequency_hz": 7040100,
+      "mode": "qrss",
+      "load": {
+        "type": "response",
+        "protocol": "WTP/1",
+        "session_id": "9713c0d112ec429eb2b13e0bc619fcf0",
+        "request_id": "53cfae1ab22b4920805a9dc4f95e6736",
+        "op": "LOAD",
+        "ok": true,
+        "body": {
+          "job_id": "6067e3bd8a36433796d42d106341c62d",
+          "state": "loaded",
+          "adjustments": []
+        }
+      },
+      "abort": {
+        "type": "response",
+        "protocol": "WTP/1",
+        "session_id": "9713c0d112ec429eb2b13e0bc619fcf0",
+        "request_id": "834f083a0cf94e9cad3abcc32535739e",
+        "op": "ABORT",
+        "ok": true,
+        "body": {
+          "job_id": "6067e3bd8a36433796d42d106341c62d",
+          "state": "aborted",
+          "output_active": false
+        }
+      }
+    },
+    {
+      "frequency_hz": 7040100,
+      "mode": "fskcw",
+      "load": {
+        "type": "response",
+        "protocol": "WTP/1",
+        "session_id": "9713c0d112ec429eb2b13e0bc619fcf0",
+        "request_id": "71f2f306b50e4c90b6ca3c863dcac8d7",
+        "op": "LOAD",
+        "ok": true,
+        "body": {
+          "job_id": "a89fe1f0d07d4ac8ace3eed87fd6b0a9",
+          "state": "loaded",
+          "adjustments": [
+            {
+              "event_index": 1,
+              "requested_frequency_nhz": "7040101464843750",
+              "realized_frequency_nhz": "7040101464843676"
+            }
+          ]
+        }
+      },
+      "abort": {
+        "type": "response",
+        "protocol": "WTP/1",
+        "session_id": "9713c0d112ec429eb2b13e0bc619fcf0",
+        "request_id": "6214f6e5cd4347958b5bd175aee66e08",
+        "op": "ABORT",
+        "ok": true,
+        "body": {
+          "job_id": "a89fe1f0d07d4ac8ace3eed87fd6b0a9",
+          "state": "aborted",
+          "output_active": false
+        }
+      }
+    },
+    {
+      "frequency_hz": 7040100,
+      "mode": "dfcw",
+      "load": {
+        "type": "response",
+        "protocol": "WTP/1",
+        "session_id": "9713c0d112ec429eb2b13e0bc619fcf0",
+        "request_id": "a78053f88c18473397d606c48ada4d9b",
+        "op": "LOAD",
+        "ok": true,
+        "body": {
+          "job_id": "9e5459cdd80f4207a40cff2d1e799464",
+          "state": "loaded",
+          "adjustments": [
+            {
+              "event_index": 1,
+              "requested_frequency_nhz": "7040101464843750",
+              "realized_frequency_nhz": "7040101464843676"
+            }
+          ]
+        }
+      },
+      "abort": {
+        "type": "response",
+        "protocol": "WTP/1",
+        "session_id": "9713c0d112ec429eb2b13e0bc619fcf0",
+        "request_id": "318f35f5c57945d594d3ba9ea848a3a0",
+        "op": "ABORT",
+        "ok": true,
+        "body": {
+          "job_id": "9e5459cdd80f4207a40cff2d1e799464",
+          "state": "aborted",
+          "output_active": false
+        }
+      }
+    },
+    {
+      "frequency_hz": 10140200,
+      "mode": "tone",
+      "load": {
+        "type": "response",
+        "protocol": "WTP/1",
+        "session_id": "9713c0d112ec429eb2b13e0bc619fcf0",
+        "request_id": "ffdd9c822e8d49abac2263ce5c16c3cc",
+        "op": "LOAD",
+        "ok": true,
+        "body": {
+          "job_id": "9bcc4c00167242b686698de3d13b623a",
+          "state": "loaded",
+          "adjustments": []
+        }
+      },
+      "abort": {
+        "type": "response",
+        "protocol": "WTP/1",
+        "session_id": "9713c0d112ec429eb2b13e0bc619fcf0",
+        "request_id": "0d2f1f55a0804acfb8a9501400fd4dcc",
+        "op": "ABORT",
+        "ok": true,
+        "body": {
+          "job_id": "9bcc4c00167242b686698de3d13b623a",
+          "state": "aborted",
+          "output_active": false
+        }
+      }
+    },
+    {
+      "frequency_hz": 10140200,
+      "mode": "wspr",
+      "load": {
+        "type": "response",
+        "protocol": "WTP/1",
+        "session_id": "9713c0d112ec429eb2b13e0bc619fcf0",
+        "request_id": "6c4a56147c9b4ddeb775024f0567f001",
+        "op": "LOAD",
+        "ok": true,
+        "body": {
+          "job_id": "35a1a64e2eb24df3ac43c15215847995",
+          "state": "loaded",
+          "adjustments": [
+            {
+              "event_index": 1,
+              "requested_frequency_nhz": "10140201464843750",
+              "realized_frequency_nhz": "10140201464843852"
+            },
+            {
+              "event_index": 2,
+              "requested_frequency_nhz": "10140202929687500",
+              "realized_frequency_nhz": "10140202929687617"
+            },
+            {
+              "event_index": 3,
+              "requested_frequency_nhz": "10140204394531250",
+              "realized_frequency_nhz": "10140204394531410"
+            }
+          ]
+        }
+      },
+      "abort": {
+        "type": "response",
+        "protocol": "WTP/1",
+        "session_id": "9713c0d112ec429eb2b13e0bc619fcf0",
+        "request_id": "1de665fa01034ce7a79806596d04f5ce",
+        "op": "ABORT",
+        "ok": true,
+        "body": {
+          "job_id": "35a1a64e2eb24df3ac43c15215847995",
+          "state": "aborted",
+          "output_active": false
+        }
+      }
+    },
+    {
+      "frequency_hz": 10140200,
+      "mode": "qrss",
+      "load": {
+        "type": "response",
+        "protocol": "WTP/1",
+        "session_id": "9713c0d112ec429eb2b13e0bc619fcf0",
+        "request_id": "ce3424f160654ff7a530922e669d60aa",
+        "op": "LOAD",
+        "ok": true,
+        "body": {
+          "job_id": "36bee2c463354ad999cca39930b61222",
+          "state": "loaded",
+          "adjustments": []
+        }
+      },
+      "abort": {
+        "type": "response",
+        "protocol": "WTP/1",
+        "session_id": "9713c0d112ec429eb2b13e0bc619fcf0",
+        "request_id": "446b8bd5ce694383a8b3d04c82b8b359",
+        "op": "ABORT",
+        "ok": true,
+        "body": {
+          "job_id": "36bee2c463354ad999cca39930b61222",
+          "state": "aborted",
+          "output_active": false
+        }
+      }
+    },
+    {
+      "frequency_hz": 10140200,
+      "mode": "fskcw",
+      "load": {
+        "type": "response",
+        "protocol": "WTP/1",
+        "session_id": "9713c0d112ec429eb2b13e0bc619fcf0",
+        "request_id": "2fed34beb4fb4dfb9dcf4e7b92ff77ec",
+        "op": "LOAD",
+        "ok": true,
+        "body": {
+          "job_id": "fc519a2f8bc74331833f65d8eb611e62",
+          "state": "loaded",
+          "adjustments": [
+            {
+              "event_index": 1,
+              "requested_frequency_nhz": "10140201464843750",
+              "realized_frequency_nhz": "10140201464843852"
+            }
+          ]
+        }
+      },
+      "abort": {
+        "type": "response",
+        "protocol": "WTP/1",
+        "session_id": "9713c0d112ec429eb2b13e0bc619fcf0",
+        "request_id": "42eabbd43a394f39bb6ff9d20f03bb7f",
+        "op": "ABORT",
+        "ok": true,
+        "body": {
+          "job_id": "fc519a2f8bc74331833f65d8eb611e62",
+          "state": "aborted",
+          "output_active": false
+        }
+      }
+    },
+    {
+      "frequency_hz": 10140200,
+      "mode": "dfcw",
+      "load": {
+        "type": "response",
+        "protocol": "WTP/1",
+        "session_id": "9713c0d112ec429eb2b13e0bc619fcf0",
+        "request_id": "a020ff88a47242e4954ccbdc724326d9",
+        "op": "LOAD",
+        "ok": true,
+        "body": {
+          "job_id": "88aced8ded104330841b32a15e33c13f",
+          "state": "loaded",
+          "adjustments": [
+            {
+              "event_index": 1,
+              "requested_frequency_nhz": "10140201464843750",
+              "realized_frequency_nhz": "10140201464843852"
+            }
+          ]
+        }
+      },
+      "abort": {
+        "type": "response",
+        "protocol": "WTP/1",
+        "session_id": "9713c0d112ec429eb2b13e0bc619fcf0",
+        "request_id": "f0d8c497d3414be2994e63978ea3cb17",
+        "op": "ABORT",
+        "ok": true,
+        "body": {
+          "job_id": "88aced8ded104330841b32a15e33c13f",
+          "state": "aborted",
+          "output_active": false
+        }
+      }
+    },
+    {
+      "frequency_hz": 14097100,
+      "mode": "tone",
+      "load": {
+        "type": "response",
+        "protocol": "WTP/1",
+        "session_id": "9713c0d112ec429eb2b13e0bc619fcf0",
+        "request_id": "e2e91c45db9e47d5b0f565e080847927",
+        "op": "LOAD",
+        "ok": true,
+        "body": {
+          "job_id": "ee21581c0acb4e8d8f83f6e59162edbe",
+          "state": "loaded",
+          "adjustments": []
+        }
+      },
+      "abort": {
+        "type": "response",
+        "protocol": "WTP/1",
+        "session_id": "9713c0d112ec429eb2b13e0bc619fcf0",
+        "request_id": "37248a425c0142f4a2f68dbc6d39e1d8",
+        "op": "ABORT",
+        "ok": true,
+        "body": {
+          "job_id": "ee21581c0acb4e8d8f83f6e59162edbe",
+          "state": "aborted",
+          "output_active": false
+        }
+      }
+    },
+    {
+      "frequency_hz": 14097100,
+      "mode": "wspr",
+      "load": {
+        "type": "response",
+        "protocol": "WTP/1",
+        "session_id": "9713c0d112ec429eb2b13e0bc619fcf0",
+        "request_id": "03690e310dcb4650800ecccf0fca5a95",
+        "op": "LOAD",
+        "ok": true,
+        "body": {
+          "job_id": "0fba012d4c204170aef1159a493d70db",
+          "state": "loaded",
+          "adjustments": [
+            {
+              "event_index": 1,
+              "requested_frequency_nhz": "14097101464843750",
+              "realized_frequency_nhz": "14097101464843772"
+            },
+            {
+              "event_index": 2,
+              "requested_frequency_nhz": "14097102929687500",
+              "realized_frequency_nhz": "14097102929687263"
+            },
+            {
+              "event_index": 3,
+              "requested_frequency_nhz": "14097104394531250",
+              "realized_frequency_nhz": "14097104394531347"
+            }
+          ]
+        }
+      },
+      "abort": {
+        "type": "response",
+        "protocol": "WTP/1",
+        "session_id": "9713c0d112ec429eb2b13e0bc619fcf0",
+        "request_id": "b825d43e3949407db4b0b6c33f75abb0",
+        "op": "ABORT",
+        "ok": true,
+        "body": {
+          "job_id": "0fba012d4c204170aef1159a493d70db",
+          "state": "aborted",
+          "output_active": false
+        }
+      }
+    },
+    {
+      "frequency_hz": 14097100,
+      "mode": "qrss",
+      "load": {
+        "type": "response",
+        "protocol": "WTP/1",
+        "session_id": "9713c0d112ec429eb2b13e0bc619fcf0",
+        "request_id": "7f6a6d037b254ff89fcb18e5d8f06252",
+        "op": "LOAD",
+        "ok": true,
+        "body": {
+          "job_id": "7dc60ec8bd6a4fb0be14772383bd2856",
+          "state": "loaded",
+          "adjustments": []
+        }
+      },
+      "abort": {
+        "type": "response",
+        "protocol": "WTP/1",
+        "session_id": "9713c0d112ec429eb2b13e0bc619fcf0",
+        "request_id": "cdbaa81c90674c7eb9d4fc8d2e587022",
+        "op": "ABORT",
+        "ok": true,
+        "body": {
+          "job_id": "7dc60ec8bd6a4fb0be14772383bd2856",
+          "state": "aborted",
+          "output_active": false
+        }
+      }
+    },
+    {
+      "frequency_hz": 14097100,
+      "mode": "fskcw",
+      "load": {
+        "type": "response",
+        "protocol": "WTP/1",
+        "session_id": "9713c0d112ec429eb2b13e0bc619fcf0",
+        "request_id": "668f83f3c24c4fb1956dc552c5ca31ab",
+        "op": "LOAD",
+        "ok": true,
+        "body": {
+          "job_id": "91978fc1ac1f41509cc55f8197752922",
+          "state": "loaded",
+          "adjustments": [
+            {
+              "event_index": 1,
+              "requested_frequency_nhz": "14097101464843750",
+              "realized_frequency_nhz": "14097101464843772"
+            }
+          ]
+        }
+      },
+      "abort": {
+        "type": "response",
+        "protocol": "WTP/1",
+        "session_id": "9713c0d112ec429eb2b13e0bc619fcf0",
+        "request_id": "46c30b802a5c44fe8cfd3a62771dd4c5",
+        "op": "ABORT",
+        "ok": true,
+        "body": {
+          "job_id": "91978fc1ac1f41509cc55f8197752922",
+          "state": "aborted",
+          "output_active": false
+        }
+      }
+    },
+    {
+      "frequency_hz": 14097100,
+      "mode": "dfcw",
+      "load": {
+        "type": "response",
+        "protocol": "WTP/1",
+        "session_id": "9713c0d112ec429eb2b13e0bc619fcf0",
+        "request_id": "241bbdf33dac461ba9b202942538ed84",
+        "op": "LOAD",
+        "ok": true,
+        "body": {
+          "job_id": "0fea20b4e0fc4ffe9f1174bec8b1ae09",
+          "state": "loaded",
+          "adjustments": [
+            {
+              "event_index": 1,
+              "requested_frequency_nhz": "14097101464843750",
+              "realized_frequency_nhz": "14097101464843772"
+            }
+          ]
+        }
+      },
+      "abort": {
+        "type": "response",
+        "protocol": "WTP/1",
+        "session_id": "9713c0d112ec429eb2b13e0bc619fcf0",
+        "request_id": "623c32e8dcc14dc89e4b59d288e95a59",
+        "op": "ABORT",
+        "ok": true,
+        "body": {
+          "job_id": "0fea20b4e0fc4ffe9f1174bec8b1ae09",
+          "state": "aborted",
+          "output_active": false
+        }
+      }
+    },
+    {
+      "frequency_hz": 18106100,
+      "mode": "tone",
+      "load": {
+        "type": "response",
+        "protocol": "WTP/1",
+        "session_id": "9713c0d112ec429eb2b13e0bc619fcf0",
+        "request_id": "7cc4c1766d5b4dbe9c47e1d0fb119ffc",
+        "op": "LOAD",
+        "ok": true,
+        "body": {
+          "job_id": "f1cd7a378f4343ae86ecfb4e251df23a",
+          "state": "loaded",
+          "adjustments": []
+        }
+      },
+      "abort": {
+        "type": "response",
+        "protocol": "WTP/1",
+        "session_id": "9713c0d112ec429eb2b13e0bc619fcf0",
+        "request_id": "788ae5fc334e47a288e2fe487607c4b4",
+        "op": "ABORT",
+        "ok": true,
+        "body": {
+          "job_id": "f1cd7a378f4343ae86ecfb4e251df23a",
+          "state": "aborted",
+          "output_active": false
+        }
+      }
+    },
+    {
+      "frequency_hz": 18106100,
+      "mode": "wspr",
+      "load": {
+        "type": "response",
+        "protocol": "WTP/1",
+        "session_id": "9713c0d112ec429eb2b13e0bc619fcf0",
+        "request_id": "a7193c868e0b4254a5bb9f5a32c4d49b",
+        "op": "LOAD",
+        "ok": true,
+        "body": {
+          "job_id": "27875565a3d7405584dabcdd64eb315b",
+          "state": "loaded",
+          "adjustments": [
+            {
+              "event_index": 1,
+              "requested_frequency_nhz": "18106101464843750",
+              "realized_frequency_nhz": "18106101464843757"
+            },
+            {
+              "event_index": 2,
+              "requested_frequency_nhz": "18106102929687500",
+              "realized_frequency_nhz": "18106102929687154"
+            },
+            {
+              "event_index": 3,
+              "requested_frequency_nhz": "18106104394531250",
+              "realized_frequency_nhz": "18106104394532155"
+            }
+          ]
+        }
+      },
+      "abort": {
+        "type": "response",
+        "protocol": "WTP/1",
+        "session_id": "9713c0d112ec429eb2b13e0bc619fcf0",
+        "request_id": "d64f37d3be62461291ebac60b7819bf8",
+        "op": "ABORT",
+        "ok": true,
+        "body": {
+          "job_id": "27875565a3d7405584dabcdd64eb315b",
+          "state": "aborted",
+          "output_active": false
+        }
+      }
+    },
+    {
+      "frequency_hz": 18106100,
+      "mode": "qrss",
+      "load": {
+        "type": "response",
+        "protocol": "WTP/1",
+        "session_id": "9713c0d112ec429eb2b13e0bc619fcf0",
+        "request_id": "06e50f383d85479b8fcc004ab18a146f",
+        "op": "LOAD",
+        "ok": true,
+        "body": {
+          "job_id": "d4985d0ade9c4a408c2807b7332cf693",
+          "state": "loaded",
+          "adjustments": []
+        }
+      },
+      "abort": {
+        "type": "response",
+        "protocol": "WTP/1",
+        "session_id": "9713c0d112ec429eb2b13e0bc619fcf0",
+        "request_id": "0f4fa27779854c03b1bc0241db674bbd",
+        "op": "ABORT",
+        "ok": true,
+        "body": {
+          "job_id": "d4985d0ade9c4a408c2807b7332cf693",
+          "state": "aborted",
+          "output_active": false
+        }
+      }
+    },
+    {
+      "frequency_hz": 18106100,
+      "mode": "fskcw",
+      "load": {
+        "type": "response",
+        "protocol": "WTP/1",
+        "session_id": "9713c0d112ec429eb2b13e0bc619fcf0",
+        "request_id": "61000b16a46947d2a34aefa7ec6af4c6",
+        "op": "LOAD",
+        "ok": true,
+        "body": {
+          "job_id": "e577770bf55141ed886ee1c5c6111e98",
+          "state": "loaded",
+          "adjustments": [
+            {
+              "event_index": 1,
+              "requested_frequency_nhz": "18106101464843750",
+              "realized_frequency_nhz": "18106101464843757"
+            }
+          ]
+        }
+      },
+      "abort": {
+        "type": "response",
+        "protocol": "WTP/1",
+        "session_id": "9713c0d112ec429eb2b13e0bc619fcf0",
+        "request_id": "aef49ba6b72c4f82a3271c5ac4f9c2ec",
+        "op": "ABORT",
+        "ok": true,
+        "body": {
+          "job_id": "e577770bf55141ed886ee1c5c6111e98",
+          "state": "aborted",
+          "output_active": false
+        }
+      }
+    },
+    {
+      "frequency_hz": 18106100,
+      "mode": "dfcw",
+      "load": {
+        "type": "response",
+        "protocol": "WTP/1",
+        "session_id": "9713c0d112ec429eb2b13e0bc619fcf0",
+        "request_id": "49cca355508b4aaea72cdbe385a6c021",
+        "op": "LOAD",
+        "ok": true,
+        "body": {
+          "job_id": "6e276e005e714f6a9453510321189d76",
+          "state": "loaded",
+          "adjustments": [
+            {
+              "event_index": 1,
+              "requested_frequency_nhz": "18106101464843750",
+              "realized_frequency_nhz": "18106101464843757"
+            }
+          ]
+        }
+      },
+      "abort": {
+        "type": "response",
+        "protocol": "WTP/1",
+        "session_id": "9713c0d112ec429eb2b13e0bc619fcf0",
+        "request_id": "3dd6dc0e5b914b81911a272e4a62d490",
+        "op": "ABORT",
+        "ok": true,
+        "body": {
+          "job_id": "6e276e005e714f6a9453510321189d76",
+          "state": "aborted",
+          "output_active": false
+        }
+      }
+    },
+    {
+      "frequency_hz": 21096100,
+      "mode": "tone",
+      "load": {
+        "type": "response",
+        "protocol": "WTP/1",
+        "session_id": "9713c0d112ec429eb2b13e0bc619fcf0",
+        "request_id": "33cd557a90244692bc6aa902e84eab73",
+        "op": "LOAD",
+        "ok": true,
+        "body": {
+          "job_id": "0562fce1198844d6957afeeb5c819779",
+          "state": "loaded",
+          "adjustments": []
+        }
+      },
+      "abort": {
+        "type": "response",
+        "protocol": "WTP/1",
+        "session_id": "9713c0d112ec429eb2b13e0bc619fcf0",
+        "request_id": "8139d273358545fe93965e0d218c126e",
+        "op": "ABORT",
+        "ok": true,
+        "body": {
+          "job_id": "0562fce1198844d6957afeeb5c819779",
+          "state": "aborted",
+          "output_active": false
+        }
+      }
+    },
+    {
+      "frequency_hz": 21096100,
+      "mode": "wspr",
+      "load": {
+        "type": "response",
+        "protocol": "WTP/1",
+        "session_id": "9713c0d112ec429eb2b13e0bc619fcf0",
+        "request_id": "cfdfdabd2c21426cb0ab69ee3fd015ae",
+        "op": "LOAD",
+        "ok": true,
+        "body": {
+          "job_id": "f7fe3bab07794a5cbeff9e474e2d4207",
+          "state": "loaded",
+          "adjustments": [
+            {
+              "event_index": 1,
+              "requested_frequency_nhz": "21096101464843750",
+              "realized_frequency_nhz": "21096101464843493"
+            },
+            {
+              "event_index": 2,
+              "requested_frequency_nhz": "21096102929687500",
+              "realized_frequency_nhz": "21096102929687265"
+            },
+            {
+              "event_index": 3,
+              "requested_frequency_nhz": "21096104394531250",
+              "realized_frequency_nhz": "21096104394530982"
+            }
+          ]
+        }
+      },
+      "abort": {
+        "type": "response",
+        "protocol": "WTP/1",
+        "session_id": "9713c0d112ec429eb2b13e0bc619fcf0",
+        "request_id": "3646e38b922d450984a15b2b84347891",
+        "op": "ABORT",
+        "ok": true,
+        "body": {
+          "job_id": "f7fe3bab07794a5cbeff9e474e2d4207",
+          "state": "aborted",
+          "output_active": false
+        }
+      }
+    },
+    {
+      "frequency_hz": 21096100,
+      "mode": "qrss",
+      "load": {
+        "type": "response",
+        "protocol": "WTP/1",
+        "session_id": "9713c0d112ec429eb2b13e0bc619fcf0",
+        "request_id": "47f9b3b8124a4c6d9138cb89243093b2",
+        "op": "LOAD",
+        "ok": true,
+        "body": {
+          "job_id": "8464799427274af9a459fa1d0b957369",
+          "state": "loaded",
+          "adjustments": []
+        }
+      },
+      "abort": {
+        "type": "response",
+        "protocol": "WTP/1",
+        "session_id": "9713c0d112ec429eb2b13e0bc619fcf0",
+        "request_id": "c538c179f67b4a7f9f97528d469f3062",
+        "op": "ABORT",
+        "ok": true,
+        "body": {
+          "job_id": "8464799427274af9a459fa1d0b957369",
+          "state": "aborted",
+          "output_active": false
+        }
+      }
+    },
+    {
+      "frequency_hz": 21096100,
+      "mode": "fskcw",
+      "load": {
+        "type": "response",
+        "protocol": "WTP/1",
+        "session_id": "9713c0d112ec429eb2b13e0bc619fcf0",
+        "request_id": "d780864dd00a432a8d163df717e59fb4",
+        "op": "LOAD",
+        "ok": true,
+        "body": {
+          "job_id": "2f5131b2b0c74bf0afa591b51b996312",
+          "state": "loaded",
+          "adjustments": [
+            {
+              "event_index": 1,
+              "requested_frequency_nhz": "21096101464843750",
+              "realized_frequency_nhz": "21096101464843493"
+            }
+          ]
+        }
+      },
+      "abort": {
+        "type": "response",
+        "protocol": "WTP/1",
+        "session_id": "9713c0d112ec429eb2b13e0bc619fcf0",
+        "request_id": "442053d74bc9453db1182df5104fc5d8",
+        "op": "ABORT",
+        "ok": true,
+        "body": {
+          "job_id": "2f5131b2b0c74bf0afa591b51b996312",
+          "state": "aborted",
+          "output_active": false
+        }
+      }
+    },
+    {
+      "frequency_hz": 21096100,
+      "mode": "dfcw",
+      "load": {
+        "type": "response",
+        "protocol": "WTP/1",
+        "session_id": "9713c0d112ec429eb2b13e0bc619fcf0",
+        "request_id": "312fe553b4ea47d3886ee7d3059b46c2",
+        "op": "LOAD",
+        "ok": true,
+        "body": {
+          "job_id": "c8dcfd9f16ad4c8a8588201497c1912e",
+          "state": "loaded",
+          "adjustments": [
+            {
+              "event_index": 1,
+              "requested_frequency_nhz": "21096101464843750",
+              "realized_frequency_nhz": "21096101464843493"
+            }
+          ]
+        }
+      },
+      "abort": {
+        "type": "response",
+        "protocol": "WTP/1",
+        "session_id": "9713c0d112ec429eb2b13e0bc619fcf0",
+        "request_id": "0f229ee815194f12957a970067012e17",
+        "op": "ABORT",
+        "ok": true,
+        "body": {
+          "job_id": "c8dcfd9f16ad4c8a8588201497c1912e",
+          "state": "aborted",
+          "output_active": false
+        }
+      }
+    },
+    {
+      "frequency_hz": 24926100,
+      "mode": "tone",
+      "load": {
+        "type": "response",
+        "protocol": "WTP/1",
+        "session_id": "9713c0d112ec429eb2b13e0bc619fcf0",
+        "request_id": "68eb44376f5245e2b2f468af17202d7a",
+        "op": "LOAD",
+        "ok": true,
+        "body": {
+          "job_id": "b38ba3e6edb74dc78173eeb6af3c5d35",
+          "state": "loaded",
+          "adjustments": []
+        }
+      },
+      "abort": {
+        "type": "response",
+        "protocol": "WTP/1",
+        "session_id": "9713c0d112ec429eb2b13e0bc619fcf0",
+        "request_id": "05162140a19944258ce5983a6bf23cd2",
+        "op": "ABORT",
+        "ok": true,
+        "body": {
+          "job_id": "b38ba3e6edb74dc78173eeb6af3c5d35",
+          "state": "aborted",
+          "output_active": false
+        }
+      }
+    },
+    {
+      "frequency_hz": 24926100,
+      "mode": "wspr",
+      "load": {
+        "type": "response",
+        "protocol": "WTP/1",
+        "session_id": "9713c0d112ec429eb2b13e0bc619fcf0",
+        "request_id": "a30c189a1ee4449f94af3bc596ba1746",
+        "op": "LOAD",
+        "ok": true,
+        "body": {
+          "job_id": "9f5d3c3582fb42a59c8278f3a5a06acb",
+          "state": "loaded",
+          "adjustments": [
+            {
+              "event_index": 1,
+              "requested_frequency_nhz": "24926101464843750",
+              "realized_frequency_nhz": "24926101464843214"
+            },
+            {
+              "event_index": 2,
+              "requested_frequency_nhz": "24926102929687500",
+              "realized_frequency_nhz": "24926102929687064"
+            },
+            {
+              "event_index": 3,
+              "requested_frequency_nhz": "24926104394531250",
+              "realized_frequency_nhz": "24926104394530278"
+            }
+          ]
+        }
+      },
+      "abort": {
+        "type": "response",
+        "protocol": "WTP/1",
+        "session_id": "9713c0d112ec429eb2b13e0bc619fcf0",
+        "request_id": "4425c916d88444209373c8d60c8c1d9a",
+        "op": "ABORT",
+        "ok": true,
+        "body": {
+          "job_id": "9f5d3c3582fb42a59c8278f3a5a06acb",
+          "state": "aborted",
+          "output_active": false
+        }
+      }
+    },
+    {
+      "frequency_hz": 24926100,
+      "mode": "qrss",
+      "load": {
+        "type": "response",
+        "protocol": "WTP/1",
+        "session_id": "9713c0d112ec429eb2b13e0bc619fcf0",
+        "request_id": "f11ea93a0d9946a39cc0d89d0d3d09d1",
+        "op": "LOAD",
+        "ok": true,
+        "body": {
+          "job_id": "e4b82635a31a47e6a36844c641b42fbc",
+          "state": "loaded",
+          "adjustments": []
+        }
+      },
+      "abort": {
+        "type": "response",
+        "protocol": "WTP/1",
+        "session_id": "9713c0d112ec429eb2b13e0bc619fcf0",
+        "request_id": "b6433be9cbe041a58c33b3a71084aeb8",
+        "op": "ABORT",
+        "ok": true,
+        "body": {
+          "job_id": "e4b82635a31a47e6a36844c641b42fbc",
+          "state": "aborted",
+          "output_active": false
+        }
+      }
+    },
+    {
+      "frequency_hz": 24926100,
+      "mode": "fskcw",
+      "load": {
+        "type": "response",
+        "protocol": "WTP/1",
+        "session_id": "9713c0d112ec429eb2b13e0bc619fcf0",
+        "request_id": "83ee781ba92f4a2f8fda601b2a40b764",
+        "op": "LOAD",
+        "ok": true,
+        "body": {
+          "job_id": "d84fee1601a14901b8b6f7ecd1d139db",
+          "state": "loaded",
+          "adjustments": [
+            {
+              "event_index": 1,
+              "requested_frequency_nhz": "24926101464843750",
+              "realized_frequency_nhz": "24926101464843214"
+            }
+          ]
+        }
+      },
+      "abort": {
+        "type": "response",
+        "protocol": "WTP/1",
+        "session_id": "9713c0d112ec429eb2b13e0bc619fcf0",
+        "request_id": "9d6b16e4e67e4f0f9102daaf4cc46a0c",
+        "op": "ABORT",
+        "ok": true,
+        "body": {
+          "job_id": "d84fee1601a14901b8b6f7ecd1d139db",
+          "state": "aborted",
+          "output_active": false
+        }
+      }
+    },
+    {
+      "frequency_hz": 24926100,
+      "mode": "dfcw",
+      "load": {
+        "type": "response",
+        "protocol": "WTP/1",
+        "session_id": "9713c0d112ec429eb2b13e0bc619fcf0",
+        "request_id": "9ce42ee600b64c0eac1658d60075daaf",
+        "op": "LOAD",
+        "ok": true,
+        "body": {
+          "job_id": "533256016bdf4c6eae8c4fb1ae56aac5",
+          "state": "loaded",
+          "adjustments": [
+            {
+              "event_index": 1,
+              "requested_frequency_nhz": "24926101464843750",
+              "realized_frequency_nhz": "24926101464843214"
+            }
+          ]
+        }
+      },
+      "abort": {
+        "type": "response",
+        "protocol": "WTP/1",
+        "session_id": "9713c0d112ec429eb2b13e0bc619fcf0",
+        "request_id": "636b18a3d1f24a159354ffb1e07cb061",
+        "op": "ABORT",
+        "ok": true,
+        "body": {
+          "job_id": "533256016bdf4c6eae8c4fb1ae56aac5",
+          "state": "aborted",
+          "output_active": false
+        }
+      }
+    },
+    {
+      "frequency_hz": 28126100,
+      "mode": "tone",
+      "load": {
+        "type": "response",
+        "protocol": "WTP/1",
+        "session_id": "9713c0d112ec429eb2b13e0bc619fcf0",
+        "request_id": "02f47dec6e424476b4da97eb00bd6db0",
+        "op": "LOAD",
+        "ok": true,
+        "body": {
+          "job_id": "9364adb1675a41d9bea79ebb0f8416e8",
+          "state": "loaded",
+          "adjustments": []
+        }
+      },
+      "abort": {
+        "type": "response",
+        "protocol": "WTP/1",
+        "session_id": "9713c0d112ec429eb2b13e0bc619fcf0",
+        "request_id": "bfc3545bcd7f457794ad3ccd26ed893d",
+        "op": "ABORT",
+        "ok": true,
+        "body": {
+          "job_id": "9364adb1675a41d9bea79ebb0f8416e8",
+          "state": "aborted",
+          "output_active": false
+        }
+      }
+    },
+    {
+      "frequency_hz": 28126100,
+      "mode": "wspr",
+      "load": {
+        "type": "response",
+        "protocol": "WTP/1",
+        "session_id": "9713c0d112ec429eb2b13e0bc619fcf0",
+        "request_id": "39d7448ea12b45f5b456ade32756737c",
+        "op": "LOAD",
+        "ok": true,
+        "body": {
+          "job_id": "39ae32a3f781404898a6435eae924202",
+          "state": "loaded",
+          "adjustments": [
+            {
+              "event_index": 1,
+              "requested_frequency_nhz": "28126101464843750",
+              "realized_frequency_nhz": "28126101464849271"
+            },
+            {
+              "event_index": 2,
+              "requested_frequency_nhz": "28126102929687500",
+              "realized_frequency_nhz": "28126102929686476"
+            },
+            {
+              "event_index": 3,
+              "requested_frequency_nhz": "28126104394531250",
+              "realized_frequency_nhz": "28126104394531745"
+            }
+          ]
+        }
+      },
+      "abort": {
+        "type": "response",
+        "protocol": "WTP/1",
+        "session_id": "9713c0d112ec429eb2b13e0bc619fcf0",
+        "request_id": "46a78108c72449c7afef3b6f60f40d18",
+        "op": "ABORT",
+        "ok": true,
+        "body": {
+          "job_id": "39ae32a3f781404898a6435eae924202",
+          "state": "aborted",
+          "output_active": false
+        }
+      }
+    },
+    {
+      "frequency_hz": 28126100,
+      "mode": "qrss",
+      "load": {
+        "type": "response",
+        "protocol": "WTP/1",
+        "session_id": "9713c0d112ec429eb2b13e0bc619fcf0",
+        "request_id": "cacd877634ff4f739176af1d3f2241b8",
+        "op": "LOAD",
+        "ok": true,
+        "body": {
+          "job_id": "274b27cab2d4430891688b276f174763",
+          "state": "loaded",
+          "adjustments": []
+        }
+      },
+      "abort": {
+        "type": "response",
+        "protocol": "WTP/1",
+        "session_id": "9713c0d112ec429eb2b13e0bc619fcf0",
+        "request_id": "6eec4ec61e3040649041b053232decce",
+        "op": "ABORT",
+        "ok": true,
+        "body": {
+          "job_id": "274b27cab2d4430891688b276f174763",
+          "state": "aborted",
+          "output_active": false
+        }
+      }
+    },
+    {
+      "frequency_hz": 28126100,
+      "mode": "fskcw",
+      "load": {
+        "type": "response",
+        "protocol": "WTP/1",
+        "session_id": "9713c0d112ec429eb2b13e0bc619fcf0",
+        "request_id": "45650f70ff8f49b58d4071c9107d77da",
+        "op": "LOAD",
+        "ok": true,
+        "body": {
+          "job_id": "e0e7cac7635c4856bb220a2dbcd1821f",
+          "state": "loaded",
+          "adjustments": [
+            {
+              "event_index": 1,
+              "requested_frequency_nhz": "28126101464843750",
+              "realized_frequency_nhz": "28126101464849271"
+            }
+          ]
+        }
+      },
+      "abort": {
+        "type": "response",
+        "protocol": "WTP/1",
+        "session_id": "9713c0d112ec429eb2b13e0bc619fcf0",
+        "request_id": "61cd0b31a6e24b37b93b8bc31f55931b",
+        "op": "ABORT",
+        "ok": true,
+        "body": {
+          "job_id": "e0e7cac7635c4856bb220a2dbcd1821f",
+          "state": "aborted",
+          "output_active": false
+        }
+      }
+    },
+    {
+      "frequency_hz": 28126100,
+      "mode": "dfcw",
+      "load": {
+        "type": "response",
+        "protocol": "WTP/1",
+        "session_id": "9713c0d112ec429eb2b13e0bc619fcf0",
+        "request_id": "3c8be65446d342cab0a36a5ec5ca033a",
+        "op": "LOAD",
+        "ok": true,
+        "body": {
+          "job_id": "5075abd4f45d444e98ab73fd58c14cf2",
+          "state": "loaded",
+          "adjustments": [
+            {
+              "event_index": 1,
+              "requested_frequency_nhz": "28126101464843750",
+              "realized_frequency_nhz": "28126101464849271"
+            }
+          ]
+        }
+      },
+      "abort": {
+        "type": "response",
+        "protocol": "WTP/1",
+        "session_id": "9713c0d112ec429eb2b13e0bc619fcf0",
+        "request_id": "22ccf57005bb4a42b7144fefb8e67018",
+        "op": "ABORT",
+        "ok": true,
+        "body": {
+          "job_id": "5075abd4f45d444e98ab73fd58c14cf2",
+          "state": "aborted",
+          "output_active": false
+        }
+      }
+    },
+    {
+      "frequency_hz": 50294500,
+      "mode": "tone",
+      "load": {
+        "type": "response",
+        "protocol": "WTP/1",
+        "session_id": "9713c0d112ec429eb2b13e0bc619fcf0",
+        "request_id": "c9230b095508408294fab36d2cd46041",
+        "op": "LOAD",
+        "ok": true,
+        "body": {
+          "job_id": "348f882d5aa240729a1262d327838b8b",
+          "state": "loaded",
+          "adjustments": []
+        }
+      },
+      "abort": {
+        "type": "response",
+        "protocol": "WTP/1",
+        "session_id": "9713c0d112ec429eb2b13e0bc619fcf0",
+        "request_id": "c36a18db98834370ac36fe802a30bf86",
+        "op": "ABORT",
+        "ok": true,
+        "body": {
+          "job_id": "348f882d5aa240729a1262d327838b8b",
+          "state": "aborted",
+          "output_active": false
+        }
+      }
+    },
+    {
+      "frequency_hz": 50294500,
+      "mode": "wspr",
+      "load": {
+        "type": "response",
+        "protocol": "WTP/1",
+        "session_id": "9713c0d112ec429eb2b13e0bc619fcf0",
+        "request_id": "e20817bb76aa4dcfbefb0cfd10d4594f",
+        "op": "LOAD",
+        "ok": true,
+        "body": {
+          "job_id": "a4f75b9c4ca94a0291bc807663ceecb1",
+          "state": "loaded",
+          "adjustments": [
+            {
+              "event_index": 1,
+              "requested_frequency_nhz": "50294501464843750",
+              "realized_frequency_nhz": "50294501464852296"
+            },
+            {
+              "event_index": 2,
+              "requested_frequency_nhz": "50294502929687500",
+              "realized_frequency_nhz": "50294502929688476"
+            },
+            {
+              "event_index": 3,
+              "requested_frequency_nhz": "50294504394531250",
+              "realized_frequency_nhz": "50294504394548543"
+            }
+          ]
+        }
+      },
+      "abort": {
+        "type": "response",
+        "protocol": "WTP/1",
+        "session_id": "9713c0d112ec429eb2b13e0bc619fcf0",
+        "request_id": "7aab060e96114ced83c313504320fb5a",
+        "op": "ABORT",
+        "ok": true,
+        "body": {
+          "job_id": "a4f75b9c4ca94a0291bc807663ceecb1",
+          "state": "aborted",
+          "output_active": false
+        }
+      }
+    },
+    {
+      "frequency_hz": 50294500,
+      "mode": "qrss",
+      "load": {
+        "type": "response",
+        "protocol": "WTP/1",
+        "session_id": "9713c0d112ec429eb2b13e0bc619fcf0",
+        "request_id": "2549eda2c44846e890ab5908ef50e85b",
+        "op": "LOAD",
+        "ok": true,
+        "body": {
+          "job_id": "878c120600df4251b70722b54ed83bc9",
+          "state": "loaded",
+          "adjustments": []
+        }
+      },
+      "abort": {
+        "type": "response",
+        "protocol": "WTP/1",
+        "session_id": "9713c0d112ec429eb2b13e0bc619fcf0",
+        "request_id": "e58ecb71935f46d4b57a8665e8bd7a60",
+        "op": "ABORT",
+        "ok": true,
+        "body": {
+          "job_id": "878c120600df4251b70722b54ed83bc9",
+          "state": "aborted",
+          "output_active": false
+        }
+      }
+    },
+    {
+      "frequency_hz": 50294500,
+      "mode": "fskcw",
+      "load": {
+        "type": "response",
+        "protocol": "WTP/1",
+        "session_id": "9713c0d112ec429eb2b13e0bc619fcf0",
+        "request_id": "f451d2f5450c442e86c57d7299fd8227",
+        "op": "LOAD",
+        "ok": true,
+        "body": {
+          "job_id": "ba8c8b756b4e4affa698ebf5cb33f74c",
+          "state": "loaded",
+          "adjustments": [
+            {
+              "event_index": 1,
+              "requested_frequency_nhz": "50294501464843750",
+              "realized_frequency_nhz": "50294501464852296"
+            }
+          ]
+        }
+      },
+      "abort": {
+        "type": "response",
+        "protocol": "WTP/1",
+        "session_id": "9713c0d112ec429eb2b13e0bc619fcf0",
+        "request_id": "936e20e566ca4434a4e9cce457ec2c84",
+        "op": "ABORT",
+        "ok": true,
+        "body": {
+          "job_id": "ba8c8b756b4e4affa698ebf5cb33f74c",
+          "state": "aborted",
+          "output_active": false
+        }
+      }
+    },
+    {
+      "frequency_hz": 50294500,
+      "mode": "dfcw",
+      "load": {
+        "type": "response",
+        "protocol": "WTP/1",
+        "session_id": "9713c0d112ec429eb2b13e0bc619fcf0",
+        "request_id": "9b8ca26afa2b4d73860b0179ce55552f",
+        "op": "LOAD",
+        "ok": true,
+        "body": {
+          "job_id": "d7695fa7b9434d80a9aa9d0ff247287f",
+          "state": "loaded",
+          "adjustments": [
+            {
+              "event_index": 1,
+              "requested_frequency_nhz": "50294501464843750",
+              "realized_frequency_nhz": "50294501464852296"
+            }
+          ]
+        }
+      },
+      "abort": {
+        "type": "response",
+        "protocol": "WTP/1",
+        "session_id": "9713c0d112ec429eb2b13e0bc619fcf0",
+        "request_id": "dc7a234d5ce54ded8701951149f879f4",
+        "op": "ABORT",
+        "ok": true,
+        "body": {
+          "job_id": "d7695fa7b9434d80a9aa9d0ff247287f",
+          "state": "aborted",
+          "output_active": false
+        }
+      }
+    },
+    {
+      "frequency_hz": 70092500,
+      "mode": "tone",
+      "load": {
+        "type": "response",
+        "protocol": "WTP/1",
+        "session_id": "9713c0d112ec429eb2b13e0bc619fcf0",
+        "request_id": "9bd11654d816458cb366e425fe56b2df",
+        "op": "LOAD",
+        "ok": true,
+        "body": {
+          "job_id": "4e35e52cc29d477ca1fec959c9f897ae",
+          "state": "loaded",
+          "adjustments": []
+        }
+      },
+      "abort": {
+        "type": "response",
+        "protocol": "WTP/1",
+        "session_id": "9713c0d112ec429eb2b13e0bc619fcf0",
+        "request_id": "135dc3f7f92f46ad9de036ed90ca3384",
+        "op": "ABORT",
+        "ok": true,
+        "body": {
+          "job_id": "4e35e52cc29d477ca1fec959c9f897ae",
+          "state": "aborted",
+          "output_active": false
+        }
+      }
+    },
+    {
+      "frequency_hz": 70092500,
+      "mode": "wspr",
+      "load": {
+        "type": "response",
+        "protocol": "WTP/1",
+        "session_id": "9713c0d112ec429eb2b13e0bc619fcf0",
+        "request_id": "3687335cb2b540e0815d70dd559fa4de",
+        "op": "LOAD",
+        "ok": true,
+        "body": {
+          "job_id": "d5815797642d423a9c8c389fc7bd93a5",
+          "state": "loaded",
+          "adjustments": [
+            {
+              "event_index": 1,
+              "requested_frequency_nhz": "70092501464843750",
+              "realized_frequency_nhz": "70092501464853719"
+            },
+            {
+              "event_index": 2,
+              "requested_frequency_nhz": "70092502929687500",
+              "realized_frequency_nhz": "70092502929689169"
+            },
+            {
+              "event_index": 3,
+              "requested_frequency_nhz": "70092504394531250",
+              "realized_frequency_nhz": "70092504394530699"
+            }
+          ]
+        }
+      },
+      "abort": {
+        "type": "response",
+        "protocol": "WTP/1",
+        "session_id": "9713c0d112ec429eb2b13e0bc619fcf0",
+        "request_id": "d06bfada6afb42f9b2895592d70d2574",
+        "op": "ABORT",
+        "ok": true,
+        "body": {
+          "job_id": "d5815797642d423a9c8c389fc7bd93a5",
+          "state": "aborted",
+          "output_active": false
+        }
+      }
+    },
+    {
+      "frequency_hz": 70092500,
+      "mode": "qrss",
+      "load": {
+        "type": "response",
+        "protocol": "WTP/1",
+        "session_id": "9713c0d112ec429eb2b13e0bc619fcf0",
+        "request_id": "f2ed407c3af14cfdb05ea99a5570c188",
+        "op": "LOAD",
+        "ok": true,
+        "body": {
+          "job_id": "60dcff87d3b3472fb4a21f45356f4725",
+          "state": "loaded",
+          "adjustments": []
+        }
+      },
+      "abort": {
+        "type": "response",
+        "protocol": "WTP/1",
+        "session_id": "9713c0d112ec429eb2b13e0bc619fcf0",
+        "request_id": "0ed8aac9ed1f4d5d8660b0bfbf377d08",
+        "op": "ABORT",
+        "ok": true,
+        "body": {
+          "job_id": "60dcff87d3b3472fb4a21f45356f4725",
+          "state": "aborted",
+          "output_active": false
+        }
+      }
+    },
+    {
+      "frequency_hz": 70092500,
+      "mode": "fskcw",
+      "load": {
+        "type": "response",
+        "protocol": "WTP/1",
+        "session_id": "9713c0d112ec429eb2b13e0bc619fcf0",
+        "request_id": "de80f66dff8a49e09cbf8c6f559f2a57",
+        "op": "LOAD",
+        "ok": true,
+        "body": {
+          "job_id": "74aea59efead4eeebc3a95a9bcc4f745",
+          "state": "loaded",
+          "adjustments": [
+            {
+              "event_index": 1,
+              "requested_frequency_nhz": "70092501464843750",
+              "realized_frequency_nhz": "70092501464853719"
+            }
+          ]
+        }
+      },
+      "abort": {
+        "type": "response",
+        "protocol": "WTP/1",
+        "session_id": "9713c0d112ec429eb2b13e0bc619fcf0",
+        "request_id": "6b44b6a6e1504ad997068d525cac2fa6",
+        "op": "ABORT",
+        "ok": true,
+        "body": {
+          "job_id": "74aea59efead4eeebc3a95a9bcc4f745",
+          "state": "aborted",
+          "output_active": false
+        }
+      }
+    },
+    {
+      "frequency_hz": 70092500,
+      "mode": "dfcw",
+      "load": {
+        "type": "response",
+        "protocol": "WTP/1",
+        "session_id": "9713c0d112ec429eb2b13e0bc619fcf0",
+        "request_id": "405008869bd8422d8d021366d984fb2b",
+        "op": "LOAD",
+        "ok": true,
+        "body": {
+          "job_id": "38caf1169a6f4eb1b27c15601d161c00",
+          "state": "loaded",
+          "adjustments": [
+            {
+              "event_index": 1,
+              "requested_frequency_nhz": "70092501464843750",
+              "realized_frequency_nhz": "70092501464853719"
+            }
+          ]
+        }
+      },
+      "abort": {
+        "type": "response",
+        "protocol": "WTP/1",
+        "session_id": "9713c0d112ec429eb2b13e0bc619fcf0",
+        "request_id": "5df114acf70444a5997a0ffe8e51d265",
+        "op": "ABORT",
+        "ok": true,
+        "body": {
+          "job_id": "38caf1169a6f4eb1b27c15601d161c00",
+          "state": "aborted",
+          "output_active": false
+        }
+      }
+    },
+    {
+      "frequency_hz": 144490000,
+      "mode": "tone",
+      "load": {
+        "type": "response",
+        "protocol": "WTP/1",
+        "session_id": "9713c0d112ec429eb2b13e0bc619fcf0",
+        "request_id": "a8b34bba4ebf4057b0a2b0e0c5068c56",
+        "op": "LOAD",
+        "ok": true,
+        "body": {
+          "job_id": "cfcb35c3526c42b7a80d559f06238854",
+          "state": "loaded",
+          "adjustments": [
+            {
+              "event_index": 0,
+              "requested_frequency_nhz": "144490000000000000",
+              "realized_frequency_nhz": "144490000000000030"
+            }
+          ]
+        }
+      },
+      "abort": {
+        "type": "response",
+        "protocol": "WTP/1",
+        "session_id": "9713c0d112ec429eb2b13e0bc619fcf0",
+        "request_id": "ac0a0dc40a614ea69a847d8ac0b0f440",
+        "op": "ABORT",
+        "ok": true,
+        "body": {
+          "job_id": "cfcb35c3526c42b7a80d559f06238854",
+          "state": "aborted",
+          "output_active": false
+        }
+      }
+    },
+    {
+      "frequency_hz": 144490000,
+      "mode": "wspr",
+      "load": {
+        "type": "response",
+        "protocol": "WTP/1",
+        "session_id": "9713c0d112ec429eb2b13e0bc619fcf0",
+        "request_id": "787714b46b91432a84693dcfe5b8c7f0",
+        "op": "LOAD",
+        "ok": true,
+        "body": {
+          "job_id": "09566334151747409fc1350e7e7cf76b",
+          "state": "loaded",
+          "adjustments": [
+            {
+              "event_index": 0,
+              "requested_frequency_nhz": "144490000000000000",
+              "realized_frequency_nhz": "144490000000000030"
+            },
+            {
+              "event_index": 1,
+              "requested_frequency_nhz": "144490001464843750",
+              "realized_frequency_nhz": "144490001464841813"
+            },
+            {
+              "event_index": 2,
+              "requested_frequency_nhz": "144490002929687500",
+              "realized_frequency_nhz": "144490002929691404"
+            },
+            {
+              "event_index": 3,
+              "requested_frequency_nhz": "144490004394531250",
+              "realized_frequency_nhz": "144490004394524962"
+            }
+          ]
+        }
+      },
+      "abort": {
+        "type": "response",
+        "protocol": "WTP/1",
+        "session_id": "9713c0d112ec429eb2b13e0bc619fcf0",
+        "request_id": "367f1f18b07a4105b938f4a3b819943a",
+        "op": "ABORT",
+        "ok": true,
+        "body": {
+          "job_id": "09566334151747409fc1350e7e7cf76b",
+          "state": "aborted",
+          "output_active": false
+        }
+      }
+    },
+    {
+      "frequency_hz": 144490000,
+      "mode": "qrss",
+      "load": {
+        "type": "response",
+        "protocol": "WTP/1",
+        "session_id": "9713c0d112ec429eb2b13e0bc619fcf0",
+        "request_id": "5cef86e58c51455bbefcfd52f1030823",
+        "op": "LOAD",
+        "ok": true,
+        "body": {
+          "job_id": "ec4276ea664f46ab9f74582974fb8c31",
+          "state": "loaded",
+          "adjustments": [
+            {
+              "event_index": 0,
+              "requested_frequency_nhz": "144490000000000000",
+              "realized_frequency_nhz": "144490000000000030"
+            }
+          ]
+        }
+      },
+      "abort": {
+        "type": "response",
+        "protocol": "WTP/1",
+        "session_id": "9713c0d112ec429eb2b13e0bc619fcf0",
+        "request_id": "5e09b7a1cab942d4b4014a0c6a648f87",
+        "op": "ABORT",
+        "ok": true,
+        "body": {
+          "job_id": "ec4276ea664f46ab9f74582974fb8c31",
+          "state": "aborted",
+          "output_active": false
+        }
+      }
+    },
+    {
+      "frequency_hz": 144490000,
+      "mode": "fskcw",
+      "load": {
+        "type": "response",
+        "protocol": "WTP/1",
+        "session_id": "9713c0d112ec429eb2b13e0bc619fcf0",
+        "request_id": "0d6eb8e4b4c845258a7e9833ce56845e",
+        "op": "LOAD",
+        "ok": true,
+        "body": {
+          "job_id": "965884e410654b01b794a1c4aed08997",
+          "state": "loaded",
+          "adjustments": [
+            {
+              "event_index": 0,
+              "requested_frequency_nhz": "144490000000000000",
+              "realized_frequency_nhz": "144490000000000030"
+            },
+            {
+              "event_index": 1,
+              "requested_frequency_nhz": "144490001464843750",
+              "realized_frequency_nhz": "144490001464841813"
+            }
+          ]
+        }
+      },
+      "abort": {
+        "type": "response",
+        "protocol": "WTP/1",
+        "session_id": "9713c0d112ec429eb2b13e0bc619fcf0",
+        "request_id": "0af476b1e8134a1294c637dffcbda95c",
+        "op": "ABORT",
+        "ok": true,
+        "body": {
+          "job_id": "965884e410654b01b794a1c4aed08997",
+          "state": "aborted",
+          "output_active": false
+        }
+      }
+    },
+    {
+      "frequency_hz": 144490000,
+      "mode": "dfcw",
+      "load": {
+        "type": "response",
+        "protocol": "WTP/1",
+        "session_id": "9713c0d112ec429eb2b13e0bc619fcf0",
+        "request_id": "def55d8f0d5149c79880e025617c95db",
+        "op": "LOAD",
+        "ok": true,
+        "body": {
+          "job_id": "7bae3c7664444b1b8c80a8842cb59089",
+          "state": "loaded",
+          "adjustments": [
+            {
+              "event_index": 0,
+              "requested_frequency_nhz": "144490000000000000",
+              "realized_frequency_nhz": "144490000000000030"
+            },
+            {
+              "event_index": 1,
+              "requested_frequency_nhz": "144490001464843750",
+              "realized_frequency_nhz": "144490001464841813"
+            }
+          ]
+        }
+      },
+      "abort": {
+        "type": "response",
+        "protocol": "WTP/1",
+        "session_id": "9713c0d112ec429eb2b13e0bc619fcf0",
+        "request_id": "6f5f1c0617b64118ac8903028bbfb93d",
+        "op": "ABORT",
+        "ok": true,
+        "body": {
+          "job_id": "7bae3c7664444b1b8c80a8842cb59089",
+          "state": "aborted",
+          "output_active": false
+        }
+      }
+    }
+  ],
+  "starts_rf": false,
+  "passed": true,
+  "caps": {
+    "profiles": [
+      "rf-events/1"
+    ],
+    "modes": [
+      "wspr",
+      "tone",
+      "qrss",
+      "fskcw",
+      "dfcw"
+    ],
+    "engine": "si5351",
+    "frequency_ranges": [
+      {
+        "minimum_nhz": "7812500000000",
+        "maximum_nhz": "200000000000000000"
+      }
+    ],
+    "max_payload_bytes": 65536,
+    "max_events": 512,
+    "max_job_duration_ns": "86400000000000",
+    "minimum_arm_lead_ns": "2000000000",
+    "maximum_arm_ahead_ns": "604800000000000",
+    "maximum_arm_uncertainty_ns": "500000000",
+    "maximum_holdover_age_ns": "0",
+    "output_disable_timeout_ns": "5000000000",
+    "minimum_lease_ms": 5000,
+    "maximum_lease_ms": 60000,
+    "response_cache_entries": 8,
+    "response_cache_ttl_seconds": 300,
+    "terminal_record_entries": 8,
+    "terminal_record_ttl_seconds": 3600
+  },
+  "partial_tone_set_and_silent_prefix_cases": 3,
+  "final_status": {
+    "type": "response",
+    "protocol": "WTP/1",
+    "session_id": "9713c0d112ec429eb2b13e0bc619fcf0",
+    "request_id": "ba4114c6e9b443f6b8f435ca5915ef32",
+    "op": "STATUS",
+    "ok": true,
+    "body": {
+      "boot_id": "79d37d08d962befab9783c62bb8c9bdd",
+      "state": "empty",
+      "output_active": false,
+      "owner_id": null,
+      "job_id": null,
+      "terminal_records": [
+        {
+          "job_id": "74a844ee00254745a9cf4c4d1f82bbe3",
+          "state": "aborted",
+          "ended_monotonic_ns": "3668769600538",
+          "output_active": false
+        },
+        {
+          "job_id": "b9ba015d011e4b5d83d97153ffa4f736",
+          "state": "aborted",
+          "ended_monotonic_ns": "3668737765864",
+          "output_active": false
+        },
+        {
+          "job_id": "d1a511b3d7214e82be1665241960fa22",
+          "state": "aborted",
+          "ended_monotonic_ns": "3668704459901",
+          "output_active": false
+        },
+        {
+          "job_id": "7bae3c7664444b1b8c80a8842cb59089",
+          "state": "aborted",
+          "ended_monotonic_ns": "3668674686417",
+          "output_active": false
+        },
+        {
+          "job_id": "965884e410654b01b794a1c4aed08997",
+          "state": "aborted",
+          "ended_monotonic_ns": "3668640996773",
+          "output_active": false
+        },
+        {
+          "job_id": "ec4276ea664f46ab9f74582974fb8c31",
+          "state": "aborted",
+          "ended_monotonic_ns": "3668612260703",
+          "output_active": false
+        },
+        {
+          "job_id": "09566334151747409fc1350e7e7cf76b",
+          "state": "aborted",
+          "ended_monotonic_ns": "3668579161905",
+          "output_active": false
+        },
+        {
+          "job_id": "cfcb35c3526c42b7a80d559f06238854",
+          "state": "aborted",
+          "ended_monotonic_ns": "3668544035350",
+          "output_active": false
+        }
+      ]
+    }
+  }
+}

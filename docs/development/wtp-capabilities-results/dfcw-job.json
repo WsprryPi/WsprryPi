@@ -1,0 +1,601 @@
+{
+  "host": "192.168.1.68",
+  "port": 31418,
+  "case": "job",
+  "started_at": 1790721784.460808,
+  "before": {
+    "address": "192.168.1.68",
+    "boot_id": "79d37d08d962befab9783c62bb8c9bdd",
+    "device_id": "74d12151aff03c45cfcb15a45bd8e037",
+    "dns_sd_published": true,
+    "enabled": true,
+    "finishing_remote_job": false,
+    "launch_observed_monotonic_ns": "3725509837030",
+    "launch_target_monotonic_ns": "3725509376204",
+    "listener_error": "",
+    "listener_running": true,
+    "local_effective": false,
+    "local_requested": false,
+    "local_work_active": false,
+    "output_unknown": false,
+    "port": 31418,
+    "remote_admission_closed": false,
+    "remote_job_id": "",
+    "remote_output_active": false,
+    "remote_owner": "",
+    "remote_state": "empty",
+    "revocation_generation": "5",
+    "revocation_unavailable": false,
+    "schema": "wsprrypi-wtp-endpoint/1"
+  },
+  "hello": {
+    "type": "response",
+    "protocol": "WTP/1",
+    "session_id": "2b6b3466e4de4218b2e1a12ccbd33a5a",
+    "request_id": "f78a6cc4b18942039768521abeec8c94",
+    "op": "HELLO",
+    "ok": true,
+    "body": {
+      "selected_version": "WTP/1",
+      "device_id": "74d12151aff03c45cfcb15a45bd8e037",
+      "boot_id": "79d37d08d962befab9783c62bb8c9bdd",
+      "product": "WsprryPi",
+      "firmware_version": "3.2.0-devel+90cae38"
+    }
+  },
+  "caps": {
+    "type": "response",
+    "protocol": "WTP/1",
+    "session_id": "2b6b3466e4de4218b2e1a12ccbd33a5a",
+    "request_id": "b4cda774cee24d2fbf0cc2c3cc4cc324",
+    "op": "CAPS",
+    "ok": true,
+    "body": {
+      "profiles": [
+        "rf-events/1"
+      ],
+      "modes": [
+        "wspr",
+        "tone",
+        "qrss",
+        "fskcw",
+        "dfcw"
+      ],
+      "engine": "si5351",
+      "frequency_ranges": [
+        {
+          "minimum_nhz": "7812500000000",
+          "maximum_nhz": "200000000000000000"
+        }
+      ],
+      "max_payload_bytes": 65536,
+      "max_events": 512,
+      "max_job_duration_ns": "86400000000000",
+      "minimum_arm_lead_ns": "2000000000",
+      "maximum_arm_ahead_ns": "604800000000000",
+      "maximum_arm_uncertainty_ns": "500000000",
+      "maximum_holdover_age_ns": "0",
+      "output_disable_timeout_ns": "5000000000",
+      "minimum_lease_ms": 5000,
+      "maximum_lease_ms": 60000,
+      "response_cache_entries": 8,
+      "response_cache_ttl_seconds": 300,
+      "terminal_record_entries": 8,
+      "terminal_record_ttl_seconds": 3600
+    }
+  },
+  "status": {
+    "type": "response",
+    "protocol": "WTP/1",
+    "session_id": "2b6b3466e4de4218b2e1a12ccbd33a5a",
+    "request_id": "b5f0f5a89339493a9cb1ac0b24ee8d69",
+    "op": "STATUS",
+    "ok": true,
+    "body": {
+      "boot_id": "79d37d08d962befab9783c62bb8c9bdd",
+      "state": "empty",
+      "output_active": false,
+      "owner_id": null,
+      "job_id": null,
+      "terminal_records": [
+        {
+          "job_id": "65475ff222bb4334ba59ce984bb54a42",
+          "state": "complete",
+          "ended_monotonic_ns": "3730529833766",
+          "output_active": false
+        },
+        {
+          "job_id": "48704c7b73844328935980157738ec79",
+          "state": "complete",
+          "ended_monotonic_ns": "3720525190402",
+          "output_active": false
+        },
+        {
+          "job_id": "75668fd3fb944e35b23011c05010979d",
+          "state": "complete",
+          "ended_monotonic_ns": "3710514006417",
+          "output_active": false
+        },
+        {
+          "job_id": "74a844ee00254745a9cf4c4d1f82bbe3",
+          "state": "aborted",
+          "ended_monotonic_ns": "3668769600538",
+          "output_active": false
+        },
+        {
+          "job_id": "b9ba015d011e4b5d83d97153ffa4f736",
+          "state": "aborted",
+          "ended_monotonic_ns": "3668737765864",
+          "output_active": false
+        },
+        {
+          "job_id": "d1a511b3d7214e82be1665241960fa22",
+          "state": "aborted",
+          "ended_monotonic_ns": "3668704459901",
+          "output_active": false
+        },
+        {
+          "job_id": "7bae3c7664444b1b8c80a8842cb59089",
+          "state": "aborted",
+          "ended_monotonic_ns": "3668674686417",
+          "output_active": false
+        },
+        {
+          "job_id": "965884e410654b01b794a1c4aed08997",
+          "state": "aborted",
+          "ended_monotonic_ns": "3668640996773",
+          "output_active": false
+        }
+      ]
+    }
+  },
+  "clock": {
+    "type": "response",
+    "protocol": "WTP/1",
+    "session_id": "2b6b3466e4de4218b2e1a12ccbd33a5a",
+    "request_id": "1d9610097a69455aaa5fe24c2a0de370",
+    "op": "GET_CLOCK",
+    "ok": true,
+    "body": {
+      "state": "synchronized",
+      "utc_now_ns": "1790721784577350957",
+      "monotonic_now_ns": "3731086727160",
+      "uncertainty_ns": "126234129",
+      "sync_age_ns": "0",
+      "leap": "normal"
+    }
+  },
+  "chosen": {
+    "frequency_hz": 14097400,
+    "duration_s": 5,
+    "job_id": "46f7b98fcda341e09c4bc8cbe99be9ca",
+    "mode": "dfcw",
+    "event_count": 5,
+    "start_utc_ns": "1790721789000000000"
+  },
+  "load": {
+    "type": "response",
+    "protocol": "WTP/1",
+    "session_id": "2b6b3466e4de4218b2e1a12ccbd33a5a",
+    "request_id": "47f3aa329d2847f68db9656dc67b2904",
+    "op": "LOAD",
+    "ok": true,
+    "body": {
+      "job_id": "46f7b98fcda341e09c4bc8cbe99be9ca",
+      "state": "loaded",
+      "adjustments": [
+        {
+          "event_index": 2,
+          "requested_frequency_nhz": "14097404000000000",
+          "realized_frequency_nhz": "14097403999999715"
+        }
+      ]
+    }
+  },
+  "arm": {
+    "type": "response",
+    "protocol": "WTP/1",
+    "session_id": "2b6b3466e4de4218b2e1a12ccbd33a5a",
+    "request_id": "2b2bfa3ab200487b82d0ca3c47175a4e",
+    "op": "ARM",
+    "ok": true,
+    "body": {
+      "job_id": "46f7b98fcda341e09c4bc8cbe99be9ca",
+      "state": "armed",
+      "start_utc_ns": "1790721789000000000",
+      "start_monotonic_ns": "3735509376204",
+      "clock": {
+        "state": "synchronized",
+        "utc_now_ns": "1790721784828509147",
+        "monotonic_now_ns": "3731337885351",
+        "uncertainty_ns": "126234055",
+        "sync_age_ns": "0",
+        "leap": "normal"
+      }
+    }
+  },
+  "running": {
+    "address": "192.168.1.68",
+    "boot_id": "79d37d08d962befab9783c62bb8c9bdd",
+    "device_id": "74d12151aff03c45cfcb15a45bd8e037",
+    "dns_sd_published": true,
+    "enabled": true,
+    "finishing_remote_job": false,
+    "launch_observed_monotonic_ns": "3735509779631",
+    "launch_target_monotonic_ns": "3735509376204",
+    "listener_error": "",
+    "listener_running": true,
+    "local_effective": false,
+    "local_requested": false,
+    "local_work_active": false,
+    "output_unknown": false,
+    "port": 31418,
+    "remote_admission_closed": false,
+    "remote_job_id": "46f7b98fcda341e09c4bc8cbe99be9ca",
+    "remote_output_active": true,
+    "remote_owner": "78b5a72eb1e04ee5b4804a27c38f787d",
+    "remote_state": "running",
+    "revocation_generation": "5",
+    "revocation_unavailable": false,
+    "schema": "wsprrypi-wtp-endpoint/1"
+  },
+  "after": {
+    "address": "192.168.1.68",
+    "boot_id": "79d37d08d962befab9783c62bb8c9bdd",
+    "device_id": "74d12151aff03c45cfcb15a45bd8e037",
+    "dns_sd_published": true,
+    "enabled": true,
+    "finishing_remote_job": false,
+    "launch_observed_monotonic_ns": "3735509779631",
+    "launch_target_monotonic_ns": "3735509376204",
+    "listener_error": "",
+    "listener_running": true,
+    "local_effective": false,
+    "local_requested": false,
+    "local_work_active": false,
+    "output_unknown": false,
+    "port": 31418,
+    "remote_admission_closed": false,
+    "remote_job_id": "46f7b98fcda341e09c4bc8cbe99be9ca",
+    "remote_output_active": false,
+    "remote_owner": "78b5a72eb1e04ee5b4804a27c38f787d",
+    "remote_state": "complete",
+    "revocation_generation": "5",
+    "revocation_unavailable": false,
+    "schema": "wsprrypi-wtp-endpoint/1"
+  },
+  "cleanup": {
+    "http_status": 200,
+    "endpoint": {
+      "address": "192.168.1.68",
+      "boot_id": "79d37d08d962befab9783c62bb8c9bdd",
+      "device_id": "74d12151aff03c45cfcb15a45bd8e037",
+      "dns_sd_published": true,
+      "enabled": true,
+      "finishing_remote_job": false,
+      "launch_observed_monotonic_ns": "3735509779631",
+      "launch_target_monotonic_ns": "3735509376204",
+      "listener_error": "",
+      "listener_running": true,
+      "local_effective": false,
+      "local_requested": false,
+      "local_work_active": false,
+      "output_unknown": false,
+      "port": 31418,
+      "remote_admission_closed": false,
+      "remote_job_id": "",
+      "remote_output_active": false,
+      "remote_owner": "",
+      "remote_state": "empty",
+      "revocation_generation": "5",
+      "revocation_unavailable": false,
+      "schema": "wsprrypi-wtp-endpoint/1"
+    }
+  },
+  "wire": [
+    {
+      "at": 1790721784.546071,
+      "message": {
+        "type": "response",
+        "protocol": "WTP/1",
+        "session_id": "2b6b3466e4de4218b2e1a12ccbd33a5a",
+        "request_id": "f78a6cc4b18942039768521abeec8c94",
+        "op": "HELLO",
+        "ok": true,
+        "body": {
+          "selected_version": "WTP/1",
+          "device_id": "74d12151aff03c45cfcb15a45bd8e037",
+          "boot_id": "79d37d08d962befab9783c62bb8c9bdd",
+          "product": "WsprryPi",
+          "firmware_version": "3.2.0-devel+90cae38"
+        }
+      }
+    },
+    {
+      "at": 1790721784.5609758,
+      "message": {
+        "type": "response",
+        "protocol": "WTP/1",
+        "session_id": "2b6b3466e4de4218b2e1a12ccbd33a5a",
+        "request_id": "b4cda774cee24d2fbf0cc2c3cc4cc324",
+        "op": "CAPS",
+        "ok": true,
+        "body": {
+          "profiles": [
+            "rf-events/1"
+          ],
+          "modes": [
+            "wspr",
+            "tone",
+            "qrss",
+            "fskcw",
+            "dfcw"
+          ],
+          "engine": "si5351",
+          "frequency_ranges": [
+            {
+              "minimum_nhz": "7812500000000",
+              "maximum_nhz": "200000000000000000"
+            }
+          ],
+          "max_payload_bytes": 65536,
+          "max_events": 512,
+          "max_job_duration_ns": "86400000000000",
+          "minimum_arm_lead_ns": "2000000000",
+          "maximum_arm_ahead_ns": "604800000000000",
+          "maximum_arm_uncertainty_ns": "500000000",
+          "maximum_holdover_age_ns": "0",
+          "output_disable_timeout_ns": "5000000000",
+          "minimum_lease_ms": 5000,
+          "maximum_lease_ms": 60000,
+          "response_cache_entries": 8,
+          "response_cache_ttl_seconds": 300,
+          "terminal_record_entries": 8,
+          "terminal_record_ttl_seconds": 3600
+        }
+      }
+    },
+    {
+      "at": 1790721784.573611,
+      "message": {
+        "type": "response",
+        "protocol": "WTP/1",
+        "session_id": "2b6b3466e4de4218b2e1a12ccbd33a5a",
+        "request_id": "b5f0f5a89339493a9cb1ac0b24ee8d69",
+        "op": "STATUS",
+        "ok": true,
+        "body": {
+          "boot_id": "79d37d08d962befab9783c62bb8c9bdd",
+          "state": "empty",
+          "output_active": false,
+          "owner_id": null,
+          "job_id": null,
+          "terminal_records": [
+            {
+              "job_id": "65475ff222bb4334ba59ce984bb54a42",
+              "state": "complete",
+              "ended_monotonic_ns": "3730529833766",
+              "output_active": false
+            },
+            {
+              "job_id": "48704c7b73844328935980157738ec79",
+              "state": "complete",
+              "ended_monotonic_ns": "3720525190402",
+              "output_active": false
+            },
+            {
+              "job_id": "75668fd3fb944e35b23011c05010979d",
+              "state": "complete",
+              "ended_monotonic_ns": "3710514006417",
+              "output_active": false
+            },
+            {
+              "job_id": "74a844ee00254745a9cf4c4d1f82bbe3",
+              "state": "aborted",
+              "ended_monotonic_ns": "3668769600538",
+              "output_active": false
+            },
+            {
+              "job_id": "b9ba015d011e4b5d83d97153ffa4f736",
+              "state": "aborted",
+              "ended_monotonic_ns": "3668737765864",
+              "output_active": false
+            },
+            {
+              "job_id": "d1a511b3d7214e82be1665241960fa22",
+              "state": "aborted",
+              "ended_monotonic_ns": "3668704459901",
+              "output_active": false
+            },
+            {
+              "job_id": "7bae3c7664444b1b8c80a8842cb59089",
+              "state": "aborted",
+              "ended_monotonic_ns": "3668674686417",
+              "output_active": false
+            },
+            {
+              "job_id": "965884e410654b01b794a1c4aed08997",
+              "state": "aborted",
+              "ended_monotonic_ns": "3668640996773",
+              "output_active": false
+            }
+          ]
+        }
+      }
+    },
+    {
+      "at": 1790721784.586296,
+      "message": {
+        "type": "response",
+        "protocol": "WTP/1",
+        "session_id": "2b6b3466e4de4218b2e1a12ccbd33a5a",
+        "request_id": "1d9610097a69455aaa5fe24c2a0de370",
+        "op": "GET_CLOCK",
+        "ok": true,
+        "body": {
+          "state": "synchronized",
+          "utc_now_ns": "1790721784577350957",
+          "monotonic_now_ns": "3731086727160",
+          "uncertainty_ns": "126234129",
+          "sync_age_ns": "0",
+          "leap": "normal"
+        }
+      }
+    },
+    {
+      "at": 1790721784.809165,
+      "message": {
+        "type": "response",
+        "protocol": "WTP/1",
+        "session_id": "2b6b3466e4de4218b2e1a12ccbd33a5a",
+        "request_id": "799945dc329c4b2c8302a02821bae79b",
+        "op": "CLAIM",
+        "ok": true,
+        "body": {
+          "owner_id": "78b5a72eb1e04ee5b4804a27c38f787d",
+          "granted_lease_ms": 60000,
+          "expires_monotonic_ns": "3791309345298"
+        }
+      }
+    },
+    {
+      "at": 1790721784.824964,
+      "message": {
+        "type": "response",
+        "protocol": "WTP/1",
+        "session_id": "2b6b3466e4de4218b2e1a12ccbd33a5a",
+        "request_id": "47f3aa329d2847f68db9656dc67b2904",
+        "op": "LOAD",
+        "ok": true,
+        "body": {
+          "job_id": "46f7b98fcda341e09c4bc8cbe99be9ca",
+          "state": "loaded",
+          "adjustments": [
+            {
+              "event_index": 2,
+              "requested_frequency_nhz": "14097404000000000",
+              "realized_frequency_nhz": "14097403999999715"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "at": 1790721784.827203,
+      "message": {
+        "type": "event",
+        "protocol": "WTP/1",
+        "session_id": "2b6b3466e4de4218b2e1a12ccbd33a5a",
+        "boot_id": "79d37d08d962befab9783c62bb8c9bdd",
+        "event_id": "176",
+        "event": "JOB_STATE",
+        "body": {
+          "job_id": "46f7b98fcda341e09c4bc8cbe99be9ca",
+          "state": "loaded",
+          "output_active": false
+        }
+      }
+    },
+    {
+      "at": 1790721784.9446511,
+      "message": {
+        "type": "response",
+        "protocol": "WTP/1",
+        "session_id": "2b6b3466e4de4218b2e1a12ccbd33a5a",
+        "request_id": "2b2bfa3ab200487b82d0ca3c47175a4e",
+        "op": "ARM",
+        "ok": true,
+        "body": {
+          "job_id": "46f7b98fcda341e09c4bc8cbe99be9ca",
+          "state": "armed",
+          "start_utc_ns": "1790721789000000000",
+          "start_monotonic_ns": "3735509376204",
+          "clock": {
+            "state": "synchronized",
+            "utc_now_ns": "1790721784828509147",
+            "monotonic_now_ns": "3731337885351",
+            "uncertainty_ns": "126234055",
+            "sync_age_ns": "0",
+            "leap": "normal"
+          }
+        }
+      }
+    },
+    {
+      "at": 1790721794.120826,
+      "message": {
+        "type": "event",
+        "protocol": "WTP/1",
+        "session_id": "2b6b3466e4de4218b2e1a12ccbd33a5a",
+        "boot_id": "79d37d08d962befab9783c62bb8c9bdd",
+        "event_id": "177",
+        "event": "JOB_STATE",
+        "body": {
+          "job_id": "46f7b98fcda341e09c4bc8cbe99be9ca",
+          "state": "armed",
+          "output_active": false
+        }
+      }
+    },
+    {
+      "at": 1790721794.121505,
+      "message": {
+        "type": "event",
+        "protocol": "WTP/1",
+        "session_id": "2b6b3466e4de4218b2e1a12ccbd33a5a",
+        "boot_id": "79d37d08d962befab9783c62bb8c9bdd",
+        "event_id": "178",
+        "event": "JOB_STATE",
+        "body": {
+          "job_id": "46f7b98fcda341e09c4bc8cbe99be9ca",
+          "state": "running",
+          "output_active": true
+        }
+      }
+    },
+    {
+      "at": 1790721794.122106,
+      "message": {
+        "type": "event",
+        "protocol": "WTP/1",
+        "session_id": "2b6b3466e4de4218b2e1a12ccbd33a5a",
+        "boot_id": "79d37d08d962befab9783c62bb8c9bdd",
+        "event_id": "179",
+        "event": "JOB_STATE",
+        "body": {
+          "job_id": "46f7b98fcda341e09c4bc8cbe99be9ca",
+          "state": "complete",
+          "output_active": false
+        }
+      }
+    },
+    {
+      "at": 1790721794.132874,
+      "message": {
+        "type": "response",
+        "protocol": "WTP/1",
+        "session_id": "2b6b3466e4de4218b2e1a12ccbd33a5a",
+        "request_id": "4e726866d58c49829802eb38c0e7642f",
+        "op": "ABORT",
+        "ok": false,
+        "error": {
+          "code": "INVALID_STATE",
+          "message": "INVALID_STATE",
+          "retryable": false
+        }
+      }
+    },
+    {
+      "at": 1790721794.1436422,
+      "message": {
+        "type": "response",
+        "protocol": "WTP/1",
+        "session_id": "2b6b3466e4de4218b2e1a12ccbd33a5a",
+        "request_id": "64aeecb6b43f4177a567484daf14822f",
+        "op": "RELEASE",
+        "ok": true,
+        "body": {}
+      }
+    }
+  ]
+}

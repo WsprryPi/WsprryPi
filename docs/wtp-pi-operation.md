@@ -77,15 +77,28 @@ An unreadable or malformed journal inhibits admission. Preserve this file and
 run managed instances under a consistent user; removing persistent state can
 erase takeover history.
 
-## Initial endpoint capability
+## Backend-derived endpoint capability
 
-The first physical route is Si5351, using the existing bus/address/reference,
-CLK output, drive and Si5351 PPM settings. It accepts one finite `tone` RF-on event,
-14.000–14.350 MHz, with duration at most 10 seconds. It reports integer-nanohertz
-planner realization and requires explicit permission for frequency adjustment.
-The controller's canonical 1 ns terminal RF-off event is also accepted; CAPS
-therefore permits two events and a total duration of 10 seconds plus 1 ns.
-Unsupported modes/routes fail before ARM and never select another backend.
+The Si5351 endpoint reports the selected backend's WSPR, TONE, QRSS, FSKCW and
+DFCW capabilities, using the existing bus/address/reference, CLK output, drive
+and PPM settings. CAPS modes and numerical frequency envelope come from
+`WsprSi5351Backend::capabilities()`, with planner-owned bounds. Existing frequency
+policy remains authoritative: the qualified bands from 2200m through 2m retain
+their status; 8m/5m retain their separate experimental policy. A numerical
+frequency envelope is not a claim that every intervening frequency is authorized.
+
+The server accepts finite contiguous RF-event plans within the protocol's 512
+events and 24-hour total duration limits, including terminal RF-off. These are
+protocol resource limits, not restrictions to a single band or a ten-second
+tone. For an initial RF-on event, launch is observed at its output-enable transaction;
+for an initial RF-off interval, launch observes admission of the silent timeline.
+Unsupported modes and invalid tone sets fail before ARM.
+
+Realized frequencies come from the backend's configured joint multi-tone planner
+and are reported per event in integer nanohertz. Explicit adjustment consent is
+required when realization differs from the requested value. The native backend
+executes the same precomputed event plan, including frequency changes and RF-off
+gaps. GPIO/RP1 server adapters remain unavailable; no backend fallback occurs.
 
 The server reads Linux kernel UTC synchronization, leap state and accumulated
 maximum error through `adjtimex`, adding the UTC/monotonic sample bracket.
@@ -94,7 +107,7 @@ use 2 seconds minimum ARM lead, 500 ms maximum admitted UTC uncertainty and
 5 seconds output-disable timeout. These are enforced limits; SDR visibility
 does not establish frequency accuracy, spectral quality or long-term timing.
 The backend initializes during ARM lead, admits the final output-enable write
-at the requested start, anchors tone duration to successful enable, and reads
+at the requested start, anchors the finite event timeline to successful enable, and reads
 back the Si5351 disable register during cleanup. Actual launch observations are
 available on the status resource. Physical validation evidence is recorded
 separately from simulated tests.

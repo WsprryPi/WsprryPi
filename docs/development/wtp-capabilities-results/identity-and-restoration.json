@@ -1,0 +1,14 @@
+{
+  "native_host": "wspr4",
+  "stage": "/home/pi/wtp-caps-validation.wglNdL",
+  "source_files_verified": 526,
+  "source_mismatches": [],
+  "rf_binary_sha256": "cdd9064e6d041ff911ef3f5ee8236921688b0d386653ee1580c24d42e045bce9",
+  "final_binary_sha256": "222bff75ecab5205619a425fd139fdf097c33c2d4d6678b611b5edfc075f7615",
+  "post_rf_change": "Explicit standard <limits> header include only; native rebuild and engine test passed.",
+  "wspr4_service": "active",
+  "wspr4_ExecMainStatus": 0,
+  "wspr4_test_process": "exited",
+  "wspr5_service": "active",
+  "wspr5_capture_process": "exited"
+}

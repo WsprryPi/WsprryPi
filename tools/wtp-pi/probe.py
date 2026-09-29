@@ -107,11 +107,27 @@ def run(args):
         wire.request('CLAIM', {'owner_id': wire.owner, 'lease_ms': 60000})
         job = uuid.uuid4().hex
         result['chosen'] = {'frequency_hz': args.frequency, 'duration_s': args.duration, 'job_id': job}
-        duration = args.duration * 1_000_000_000
-        loaded = wire.request('LOAD', {'job_id': job, 'profile': 'rf-events/1', 'mode': 'tone',
+        duration = round(args.duration * 1_000_000_000)
+        # RF-event fixtures exercise backend execution, not message encoding.
+        # The WSPR fixture contains all four tones; it is not a callsign frame.
+        pattern = {'tone': [0], 'qrss': [0, None, 0, None, 0],
+                   'fskcw': [0, 1, 0, 1, 0], 'dfcw': [0, None, 1, None, 0],
+                   'wspr': [i % 4 for i in range(162)]}[args.mode]
+        events = []
+        for i, tone in enumerate(pattern):
+            offset = duration * i // len(pattern)
+            event = {'offset_ns': str(offset),
+                     'duration_ns': str(duration * (i + 1) // len(pattern) - offset),
+                     'rf_on': tone is not None}
+            if tone is not None:
+                step = 1_464_843_750 if args.mode == 'wspr' else 4_000_000_000
+                event['frequency_nhz'] = str(args.frequency * 1_000_000_000 + tone * step)
+            events.append(event)
+        result['chosen']['mode'] = args.mode
+        result['chosen']['event_count'] = len(events)
+        loaded = wire.request('LOAD', {'job_id': job, 'profile': 'rf-events/1', 'mode': args.mode,
                          'total_duration_ns': str(duration), 'allow_frequency_adjustment': True,
-                         'events': [{'offset_ns': '0', 'duration_ns': str(duration), 'rf_on': True,
-                                     'frequency_nhz': str(args.frequency * 1_000_000_000)}]})
+                         'events': events})
         result['load'] = loaded
         start = (int(time.time()) + 5) * 1_000_000_000
         result['arm'] = wire.request('ARM', {'job_id': job, 'start_utc_ns': str(start),
@@ -146,13 +162,19 @@ def run(args):
             else:
                 assert not immediate['remote_owner'] and not immediate['remote_output_active'], immediate
         deadline = time.monotonic() + args.duration + 8
+        renew_at = time.monotonic() + 15
         while time.monotonic() < deadline:
+            if time.monotonic() >= renew_at:
+                wire.request('RENEW', {'owner_id': wire.owner, 'lease_ms': 60000})
+                renew_at = time.monotonic() + 15
             state = endpoint()
             if not state['remote_output_active'] and state['remote_state'] not in ('armed', 'running'):
                 break
             time.sleep(.1)
         result['after'] = state
         assert not state['remote_output_active'] and not state['output_unknown'], state
+        if args.case == 'job':
+            assert state['remote_state'] == 'complete', state
         if args.case == 'finish':
             assert state['local_effective'] and not state['remote_owner'], state
         return result
@@ -185,11 +207,15 @@ def main():
     parser.add_argument('--http-port', type=int, default=31415)
     parser.add_argument('--case', choices=['inspect', 'job', 'end-now', 'finish', 'http-enable'], default='inspect')
     parser.add_argument('--frequency', type=int, default=14097100)
-    parser.add_argument('--duration', type=int, choices=range(1, 11), default=3)
+    parser.add_argument('--duration', type=float, default=3,
+                        help='Seconds, from 1 through 120; standard WSPR timing is 110.592')
+    parser.add_argument('--mode', choices=['tone','wspr','qrss','fskcw','dfcw'], default='tone')
     parser.add_argument('--execute', action='store_true')
     parser.add_argument('--allow-rf', action='store_true')
     parser.add_argument('--output', required=True)
     args = parser.parse_args()
+    if not 1 <= args.duration <= 120:
+        parser.error('--duration must be from 1 through 120 seconds')
     record = run(args)
     Path(args.output).write_text(json.dumps(record, indent=2) + '\n')
     print(json.dumps({'case': args.case, 'passed': True, 'output': args.output}))

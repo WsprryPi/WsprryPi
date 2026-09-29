@@ -408,10 +408,11 @@ without its separate authorization.
 
 ## Selected implementation decisions
 
-- First physical route: Si5351, one finite TONE RF-on event, 20 m, at most 10 seconds
-  (plus the canonical optional 1 ns RF-off tail).
-  Explicit simulated arbitration uses the same endpoint policy. Other physical
-  routes and modes require separate qualification before advertisement.
+- Physical Si5351 route: derive CAPS from the selected backend capability
+  metadata and planner envelope. Execute WSPR, TONE, QRSS, FSKCW and DFCW through
+  native finite event plans; preserve existing band qualification and policy.
+  The protocol bounds remain 512 events and 24 hours. Per-event realization must
+  come from the same configured multi-tone planner used for execution.
 - Plain LAN only for the Pi listener. Default 31417 with INI/CLI overrides;
   automatic selection requires one eligible physical RFC1918 IPv4 station-LAN
   address. An explicit interface resolves multiple-interface ambiguity.

@@ -238,10 +238,21 @@ wsprrypi::BackendCapabilities WsprSi5351Backend::capabilities() const
     caps.supports_rf_gating = true;
     caps.supports_fade_shape = true;
     caps.supports_precomputed_execution = true;
-    caps.min_frequency_hz = 0.0;
-    caps.max_frequency_hz = 0.0;
+    caps.min_frequency_hz = Si5351Planner::minimum_output_hz;
+    caps.max_frequency_hz = Si5351Planner::maximum_output_hz;
     caps.nominal_frequency_resolution_hz = 0.0;
     return caps;
+}
+
+std::vector<double> WsprSi5351Backend::realizedEventFrequencies() const
+{
+    if (!configured_) return {};
+    std::vector<double> result;
+    result.reserve(event_tone_indexes_.size());
+    for (const auto index : event_tone_indexes_)
+        result.push_back(index == invalid_tone_index() ? 0.0 :
+                         si5351_plan_.tone_sets.at(index).actual_hz);
+    return result;
 }
 
 wsprrypi::BackendCompileResult WsprSi5351Backend::configure(
@@ -268,6 +279,14 @@ wsprrypi::BackendCompileResult WsprSi5351Backend::configure(
          plan.events.front().envelope.fade_shape != wsprrypi::FadeShape::NONE))
     {
         result.error = "Output-enable anchoring requires one finite tone event.";
+        return result;
+    }
+
+    if (config_.anchor_plan_to_enable &&
+        (plan.events.empty() || plan.events.front().offset_from_start.count() != 0 ||
+         (!plan.events.front().rf_on && !config_.silent_start_admission)))
+    {
+        result.error = "Scheduled output anchoring requires an admitted initial event.";
         return result;
     }
 
@@ -312,12 +331,12 @@ wsprrypi::BackendCompileResult WsprSi5351Backend::configure(
     }
 
     const std::size_t expected_tones = expectedToneCount(planner_mode);
-    if (unique_tone_frequencies_.size() != expected_tones)
+    if (unique_tone_frequencies_.empty() || unique_tone_frequencies_.size() > expected_tones)
     {
         std::ostringstream stream;
         stream << "Execution plan contains "
                << unique_tone_frequencies_.size()
-               << " unique Si5351 tone frequencies, expected "
+               << " unique Si5351 tone frequencies, maximum "
                << expected_tones << ".";
         result.error = stream.str();
         log_si5351(owner_, WsprTransmitLogLevel::ERROR, result.error);
@@ -358,7 +377,7 @@ wsprrypi::BackendCompileResult WsprSi5351Backend::configure(
         log_si5351(owner_, WsprTransmitLogLevel::DEBUG, stream.str());
     }
 
-    if (!validatePlannerOutput(si5351_plan_, expected_tones, error))
+    if (!validatePlannerOutput(si5351_plan_, unique_tone_frequencies_.size(), error))
     {
         result.error = error;
         log_si5351(owner_, WsprTransmitLogLevel::ERROR, result.error);
@@ -572,6 +591,13 @@ wsprrypi::ExecutionResult WsprSi5351Backend::execute(
                 "Si5351 drive strength applied.");
         }
 
+        if (!plan.events.empty() && !plan.events.front().rf_on &&
+            config_.silent_start_admission && !config_.silent_start_admission())
+        {
+            result.stopped = true;
+            idle_device();
+            return result;
+        }
         struct timespec start_time{};
         if (::clock_gettime(CLOCK_MONOTONIC, &start_time) != 0)
         {
@@ -659,7 +685,8 @@ wsprrypi::ExecutionResult WsprSi5351Backend::execute(
                 idle_device();
                 return result;
             }
-            if (i == 0 && config_.anchor_finite_tone_to_enable && first_enable_time_)
+            if (i == 0 && (config_.anchor_finite_tone_to_enable ||
+                           config_.anchor_plan_to_enable) && first_enable_time_)
                 start_time = *first_enable_time_;
         }
 
@@ -1279,7 +1306,8 @@ bool WsprSi5351Backend::enableTransmitOutput()
     else
         enabled = config_.dry_run || device_.enableOutput(config_.planner.tx_output);
     if (enabled && !first_enable_time_ &&
-        (config_.anchor_finite_tone_to_enable || config_.first_output_enabled))
+        (config_.anchor_finite_tone_to_enable || config_.anchor_plan_to_enable ||
+         config_.first_output_enabled))
     {
         timespec now{};
         if (::clock_gettime(CLOCK_MONOTONIC, &now) != 0) return false;
