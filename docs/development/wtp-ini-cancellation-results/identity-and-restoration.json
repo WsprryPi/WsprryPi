@@ -1,0 +1,46 @@
+{
+  "source_revision": "ff632d58dfcd6ada32470467e45769d0ba4aa218",
+  "native_binary_sha256": "222bff75ecab5205619a425fd139fdf097c33c2d4d6678b611b5edfc075f7615",
+  "native_stage": "/home/pi/wtp-caps-validation.wglNdL",
+  "source_files_compared": 526,
+  "files_changed_since_native_build": [
+    "src/tests/wtp_fleet_test.cpp"
+  ],
+  "production_source_matches_current": true,
+  "wspr4_service_before": {
+    "active": true,
+    "pid": 12388,
+    "ExecMainStatus": 0
+  },
+  "wspr4_service_after": {
+    "active": true,
+    "pid": 82090,
+    "ExecMainStatus": 0
+  },
+  "wspr4_installed_ini_sha256": "cdab1a816495325ebe4dfe8d3f453c2ce89f430f7e9d84befda4fc9ff12ff5cb",
+  "wspr4_installed_ini_unchanged": true,
+  "wspr5_service_before_and_after": {
+    "active": true,
+    "pid": 1966,
+    "ExecMainStatus": 0
+  },
+  "wspr5_installed_ini_sha256_before_and_after": "ecc1e3ad1713c35e976e64a7503094fe80b942da66d8f30ab1a3817690917ad6",
+  "isolated_transmitter_exited": true,
+  "receiver_capture_exited": true,
+  "acceptance": {
+    "protocol_passed": true,
+    "si5351_board_connected_to_wspr4_operator_confirmed": true,
+    "rf_output_connected_to_sdr": false,
+    "corresponding_sdr_signal_visually_confirmed": true,
+    "sdr_signal_matches_scheduled_start_and_cancellation": true,
+    "physical_ini_cancellation_passed": true,
+    "criterion": "Operator accepts a corresponding SDR signal; no complete RF-chain qualification required.",
+    "rf_observation_interpretation": "Coincident narrowband signal consistent with pickup from the uncabled output; no conducted RF-path claim."
+  },
+  "notes": [
+    "The cleanup INI Disable write had not yet been reloaded at its one-second status snapshot; the isolated process then exited cleanly and the original service was restored.",
+    "No installed binary or INI was replaced; wspr5 service was never stopped.",
+    "After the run, the operator reported that wspr4 Si5351 is not connected. Physical RF acceptance is withheld pending clarification of whether the board or its RF output is disconnected. The observed signal alone is not attributed to this endpoint.",
+    "Operator clarified that only the RF output is disconnected. The board remains connected to wspr4. The SDR signal matches the frequency neighborhood, scheduled start and cancellation; the requested visibility criterion is met. Physical cancellation acceptance is restored with that limitation explicitly recorded."
+  ]
+}

@@ -1,0 +1,74 @@
+
+[INFO ] Checking environment.
+[INFO ] Resolved build type: RELEASE for branch main.
+[INFO ] Wsprry Pi installation beginning.
+[INFO ] Precompiled executable: skipping application build and build swap.
+[INFO ] Dry run: would validate and stage the local executable; no download or copy performed.
+[INFO ] Detected model: Raspberry Pi 4 Model B.
+[INFO ] System: Debian GNU/Linux 13 (trixie) on 64-bit OS.
+[INFO ] Wsprry Pi version: v3.2.0-main+684.ff632d5
+[INFO ] Apache web mode: existing WsprryPi installation.
+[INFO ] Updating and managing required packages (this may take a few minutes).
+[  -  ] Running: (dry) Update local package index.
+[✔] Complete: (dry) Update local package index.
+[  -  ] Running: (dry) Fix broken or incomplete package installations.
+[✔] Complete: (dry) Fix broken or incomplete package installations.
+[  -  ] Running: (dry) Install required packages.
+[✔] Complete: (dry) Install required packages.
+[  -  ] Running: (dry) Validate support-bundle encryption tools.
+[✔] Complete: (dry) Validate support-bundle encryption tools.
+[INFO ] Dry run: runtime library checks await installed dependencies.
+[  -  ] Running: (dry) Reset systemd states.
+[✔] Complete: (dry) Reset systemd states.
+[  -  ] Running: (dry) Reload systemd daemon.
+[✔] Complete: (dry) Reload systemd daemon.
+[INFO ] Dry run: runtime library checks await installed dependencies.
+[INFO ] Dry run: would install the validated executable at /usr/local/bin/wsprrypi.
+[  -  ] Running: (dry) Create support-bundle collector directory.
+[✔] Complete: (dry) Create support-bundle collector directory.
+[  -  ] Running: (dry) Set support-bundle collector directory ownership.
+[✔] Complete: (dry) Set support-bundle collector directory ownership.
+[  -  ] Running: (dry) Set support-bundle collector directory permissions.
+[✔] Complete: (dry) Set support-bundle collector directory permissions.
+[  -  ] Running: (dry) Create support-bundle storage directory.
+[✔] Complete: (dry) Create support-bundle storage directory.
+[  -  ] Running: (dry) Set support-bundle storage ownership.
+[✔] Complete: (dry) Set support-bundle storage ownership.
+[  -  ] Running: (dry) Set support-bundle storage permissions.
+[✔] Complete: (dry) Set support-bundle storage permissions.
+[  -  ] Running: (dry) Copy support-bundle collector.
+[✔] Complete: (dry) Copy support-bundle collector.
+[  -  ] Running: (dry) Set support-bundle collector ownership.
+[✔] Complete: (dry) Set support-bundle collector ownership.
+[  -  ] Running: (dry) Set support-bundle collector permissions.
+[✔] Complete: (dry) Set support-bundle collector permissions.
+[  -  ] Running: (dry) Publish support-bundle collector.
+[✔] Complete: (dry) Publish support-bundle collector.
+[  -  ] Running: (dry) Create route-runtime directory.
+[✔] Complete: (dry) Create route-runtime directory.
+[  -  ] Running: (dry) Install route application companion.
+[✔] Complete: (dry) Install route application companion.
+[  -  ] Running: (dry) Install runtime reconciliation support.
+[✔] Complete: (dry) Install runtime reconciliation support.
+[  -  ] Running: (dry) Reload systemd.
+[✔] Complete: (dry) Reload systemd.
+[  -  ] Running: (dry) Enable systemd service.
+[✔] Complete: (dry) Enable systemd service.
+[  -  ] Running: (dry) Start systemd service.
+[✔] Complete: (dry) Start systemd service.
+[  -  ] Running: (dry) Render Apache privileged-network policy.
+[✔] Complete: (dry) Render Apache privileged-network policy.
+[  -  ] Running: (dry) Copy Apache vhost to sites-available.
+[✔] Complete: (dry) Copy Apache vhost to sites-available.
+[  -  ] Running: (dry) Enable proxy modules.
+[✔] Complete: (dry) Enable proxy modules.
+[  -  ] Running: (dry) Disable default site.
+[✔] Complete: (dry) Disable default site.
+[  -  ] Running: (dry) Enable wsprrypi site.
+[✔] Complete: (dry) Enable wsprrypi site.
+[  -  ] Running: (dry) Test Apache configuration.
+[✔] Complete: (dry) Test Apache configuration.
+[  -  ] Running: (dry) Reload Apache.
+[✔] Complete: (dry) Reload Apache.
+
+Dry run complete. No changes were applied.

@@ -1,0 +1,30 @@
+2026-09-30 11:59:01.636 UTC	[INFO ] WsprryPi version 3.2.0-devel+90cae38 (devel).
+2026-09-30 11:59:01.641 UTC	[INFO ] Platform: Raspberry Pi 4 Model B Rev 1.1.
+2026-09-30 11:59:01.641 UTC	[INFO ] OS: Debian GNU/Linux 13 (trixie) 64-bit.
+2026-09-30 11:59:01.641 UTC	[INFO ] Operation.Enable on Boot policy Never: setting Operation.Transmit=false for startup.
+2026-09-30 11:59:01.648 UTC	[INFO ] Transmit backend: si5351
+2026-09-30 11:59:01.655 UTC	[INFO ] Web server started on port: 31415
+2026-09-30 11:59:01.678 UTC	[INFO ] HTTP listener started on port 31415.
+2026-09-30 11:59:01.679 UTC	[INFO ] Socket server started on address::: 31416
+2026-09-30 11:59:01.680 UTC	[INFO ] WSPR loop running.
+2026-09-30 11:59:01.680 UTC	[WARN ] System-clock frequency estimate disabled and manual GPIO PPM is zero.
+2026-09-30 11:59:01.681 UTC	[INFO ] QRSS configuration loaded:
+2026-09-30 11:59:01.681 UTC	[INFO ] - Message: "E"
+2026-09-30 11:59:01.681 UTC	[INFO ] - Base Freq: 14.097100 MHz
+2026-09-30 11:59:01.681 UTC	[INFO ] - Dot Timing: 3s
+2026-09-30 11:59:01.682 UTC	[INFO ] - Si5351 Transmit Power: 1
+2026-09-30 11:59:01.682 UTC	[INFO ] Scheduling path selected: QRSS.
+2026-09-30 11:59:01.682 UTC	[INFO ] No transmission requested; skipping transmission and scheduling.
+2026-09-30 11:59:43.086 UTC	[INFO ] INI file changed, reloading.
+2026-09-30 11:59:43.112 UTC	[INFO ] Transmit backend: si5351
+2026-09-30 11:59:43.112 UTC	[WARN ] System-clock frequency estimate disabled and manual GPIO PPM is zero.
+2026-09-30 11:59:43.113 UTC	[INFO ] QRSS configuration loaded:
+2026-09-30 11:59:43.113 UTC	[INFO ] - Message: "E"
+2026-09-30 11:59:43.113 UTC	[INFO ] - Base Freq: 14.097100 MHz
+2026-09-30 11:59:43.113 UTC	[INFO ] - Dot Timing: 3.0 s
+2026-09-30 11:59:43.113 UTC	[INFO ] - Si5351 Transmit Power: 1
+2026-09-30 11:59:43.114 UTC	[INFO ] PPM Manager disabled.
+2026-09-30 11:59:43.114 UTC	[INFO ] Scheduling path selected: QRSS.
+2026-09-30 11:59:43.114 UTC	[INFO ] Next QRSS launch at: 2026-09-30T12:29:00 UTC
+2026-09-30 11:59:59.870 UTC	[INFO ] Shutdown requested: received SIGINT signal
+2026-09-30 12:00:00.018 UTC	[INFO ] WsprryPi exiting.

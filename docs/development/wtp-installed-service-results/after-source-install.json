@@ -1,0 +1,276 @@
+{
+  "/etc/systemd/system/wsprrypi.service": {
+    "before": {
+      "mode": "0o644",
+      "uid": 0,
+      "gid": 0,
+      "sha256": "63d00797a2a2d5d7ec1482836e4a94e5acd3005bc2737667d621af4dcd8dc134"
+    },
+    "after": {
+      "mode": "0o644",
+      "uid": 0,
+      "gid": 0,
+      "sha256": "d4f29f99bfb670af0743f99325aeed9c6a5ebc5ac739c88436f8b75f9d1f22f8"
+    }
+  },
+  "/usr/local/bin/wsprrypi": {
+    "before": {
+      "mode": "0o755",
+      "uid": 0,
+      "gid": 0,
+      "sha256": "c9c9b94cf5299b66a1764706a26d4af92928c563ad527ceb6002db19244dd176"
+    },
+    "after": {
+      "mode": "0o755",
+      "uid": 0,
+      "gid": 0,
+      "sha256": "0611a539a403e6e15dbc5b500b0d685e920ad21071d953cf825f6792fe96315f"
+    }
+  },
+  "/usr/local/etc/wsprrypi.ini": {
+    "before": {
+      "mode": "0o644",
+      "uid": 0,
+      "gid": 0,
+      "sha256": "cdab1a816495325ebe4dfe8d3f453c2ce89f430f7e9d84befda4fc9ff12ff5cb"
+    },
+    "after": {
+      "mode": "0o644",
+      "uid": 0,
+      "gid": 0,
+      "sha256": "0ae4e3c1e0f9e14f93006d6d2ac658508153d29a0d147d0430287a1395d5bd09"
+    }
+  },
+  "/usr/local/etc/wsprrypi.ini.pre_migration.bak": {
+    "before": {
+      "mode": "0o644",
+      "uid": 0,
+      "gid": 0,
+      "sha256": "049ecd85880ce82fe02c5c56d651ab498f7a08ba9d21068c166cf426ab4dd16e"
+    },
+    "after": {
+      "mode": "0o644",
+      "uid": 0,
+      "gid": 0,
+      "sha256": "cdab1a816495325ebe4dfe8d3f453c2ce89f430f7e9d84befda4fc9ff12ff5cb"
+    }
+  },
+  "/usr/local/etc/wsprrypi.ini.stock": {
+    "before": {
+      "mode": "0o644",
+      "uid": 0,
+      "gid": 0,
+      "sha256": "7550dab8a6eb5fad3ab107b2e3bfe8c8c5485b52739cd60096cb5922fc9bc02f"
+    },
+    "after": {
+      "mode": "0o644",
+      "uid": 0,
+      "gid": 0,
+      "sha256": "c746ea84940a1cc1a9ced127ddc98b30fdddd00cf644860388bb9379a830980a"
+    }
+  },
+  "/usr/local/lib/wsprrypi/__pycache__/route_application.cpython-313.pyc": {
+    "before": {
+      "mode": "0o644",
+      "uid": 0,
+      "gid": 0,
+      "sha256": "c626ebe14ff5c1485c6dc3e447be064a0704c6fbf2ae5d34c5360e80866c38cc"
+    },
+    "after": {
+      "mode": "0o644",
+      "uid": 0,
+      "gid": 0,
+      "sha256": "7e0205d0244254ed427888f3b6fcb0a28e35ce43c7c3fce16c4e7c6ec1f061b3"
+    }
+  },
+  "/usr/local/lib/wsprrypi/__pycache__/rp1_gpclk_dkms_install.cpython-313.pyc": {
+    "before": {
+      "mode": "0o644",
+      "uid": 0,
+      "gid": 0,
+      "sha256": "e761197d0a1741473d8c5b1ee44919b80d937b60807f11f2d76711931aea0976"
+    },
+    "after": {
+      "mode": "0o644",
+      "uid": 0,
+      "gid": 0,
+      "sha256": "6067b3794ca07ce43b3fce20a0a4a174cff88fc61c92f111faa27b862eacf678"
+    }
+  },
+  "/var/www/html/wsprrypi/app_state.php": {
+    "before": {
+      "mode": "0o644",
+      "uid": 0,
+      "gid": 0,
+      "sha256": "d286c213e781d7fd60567ccc7986ad8016dfb148f6f04000cf3da05372256334"
+    },
+    "after": {
+      "mode": "0o644",
+      "uid": 0,
+      "gid": 0,
+      "sha256": "817d10968a00a19e95a11f5bf63ee459093962a9b3e69a705185bc2110e2dd40"
+    }
+  },
+  "/var/www/html/wsprrypi/fleet-schedules.js": {
+    "before": null,
+    "after": {
+      "mode": "0o644",
+      "uid": 0,
+      "gid": 0,
+      "sha256": "bff347e1312298770a650bbf8f79e588ebfc463646047ef710b13877c1426c36"
+    }
+  },
+  "/var/www/html/wsprrypi/index.css": {
+    "before": {
+      "mode": "0o644",
+      "uid": 0,
+      "gid": 0,
+      "sha256": "62718a4b4a2aa9dd3e64cffafe7a47924cc0cfbbe7aef74a86c12ec2d0332e0f"
+    },
+    "after": {
+      "mode": "0o644",
+      "uid": 0,
+      "gid": 0,
+      "sha256": "75a75538aa90eb9686713135019849a8a7bd00f89a715da406aa7cec811dde94"
+    }
+  },
+  "/var/www/html/wsprrypi/index.js": {
+    "before": {
+      "mode": "0o644",
+      "uid": 0,
+      "gid": 0,
+      "sha256": "bf354b74e6d002d9be829842bc8550c9899ead2ad8163cd72f69622a802b8635"
+    },
+    "after": {
+      "mode": "0o644",
+      "uid": 0,
+      "gid": 0,
+      "sha256": "cbccf79115f10783c3e76bc921584c8edb3ccd2f4774c782f64459075d014be4"
+    }
+  },
+  "/var/www/html/wsprrypi/local-wtp.js": {
+    "before": null,
+    "after": {
+      "mode": "0o644",
+      "uid": 0,
+      "gid": 0,
+      "sha256": "564033ec3200aef9f1655eca596e1c3498b7f36a78432acc240ac8f5905dcd2c"
+    }
+  },
+  "/var/www/html/wsprrypi/operation.js": {
+    "before": {
+      "mode": "0o644",
+      "uid": 0,
+      "gid": 0,
+      "sha256": "e5d8668710e83319174a868aad9f66fc152499974f6a67f25b902fe8be125c14"
+    },
+    "after": {
+      "mode": "0o644",
+      "uid": 0,
+      "gid": 0,
+      "sha256": "225fa4c791efdaa26a2f59e6049b6ac5155eb234ed38c4cca9c1881c9ab6c2b5"
+    }
+  },
+  "/var/www/html/wsprrypi/site.css": {
+    "before": {
+      "mode": "0o644",
+      "uid": 0,
+      "gid": 0,
+      "sha256": "2e1163355f042a521ca413cd1717260a40f17db0ac91a6158d40f08d721711cf"
+    },
+    "after": {
+      "mode": "0o644",
+      "uid": 0,
+      "gid": 0,
+      "sha256": "4f68bb1293bda0e824b91df5bf9eac9508b54ce16de86d4d442714c2cffa7157"
+    }
+  },
+  "/var/www/html/wsprrypi/ui-manifest.json": {
+    "before": {
+      "mode": "0o444",
+      "uid": 0,
+      "gid": 0,
+      "sha256": "a1fe59428572ae39094a1fab79f7ff842d3361fa3654b1f6ffda045e9d167298"
+    },
+    "after": {
+      "mode": "0o444",
+      "uid": 0,
+      "gid": 0,
+      "sha256": "7eaf395c0a470c84dec4bfb4f7570fe2798302c1e37948c14befc322074bde00"
+    }
+  },
+  "/var/www/html/wsprrypi/views/config.php": {
+    "before": {
+      "mode": "0o644",
+      "uid": 0,
+      "gid": 0,
+      "sha256": "30a0c08f26195a562a54f39d7dc1db4d83213e07775f1b647d2b8a1a5fa4ae83"
+    },
+    "after": {
+      "mode": "0o644",
+      "uid": 0,
+      "gid": 0,
+      "sha256": "5b763e4651ba470ed42cd62ba7354fb7287590bc7b734ba0019b4ed55ebb5da3"
+    }
+  },
+  "/var/www/html/wsprrypi/views/fleet-schedules.php": {
+    "before": null,
+    "after": {
+      "mode": "0o644",
+      "uid": 0,
+      "gid": 0,
+      "sha256": "217b0dbdf8483359c1a6a81cec437a43888b57819fc5cc322913d73aca3885a9"
+    }
+  },
+  "/var/www/html/wsprrypi/views/local-wtp-control.php": {
+    "before": null,
+    "after": {
+      "mode": "0o644",
+      "uid": 0,
+      "gid": 0,
+      "sha256": "4dcfa6062a70944aaab8156febb588e5e969eb3dec688ab2f0e3cdbc34f4d988"
+    }
+  },
+  "/var/www/html/wsprrypi/views/operation.php": {
+    "before": {
+      "mode": "0o644",
+      "uid": 0,
+      "gid": 0,
+      "sha256": "8c46fa89e341b6190a60519b0831d1c257a3de3a3f9dafb45e7b8abef7a38044"
+    },
+    "after": {
+      "mode": "0o644",
+      "uid": 0,
+      "gid": 0,
+      "sha256": "7c4464295e2e7790a119518c8ed21e183bc0e64477d40eb581088f133ba40374"
+    }
+  },
+  "/var/www/html/wsprrypi/views/wtp-controls.php": {
+    "before": {
+      "mode": "0o644",
+      "uid": 0,
+      "gid": 0,
+      "sha256": "6475c10ef7c7900e7ff49ac002062430d00a278b953d7a1d3a08f7d69e510349"
+    },
+    "after": {
+      "mode": "0o644",
+      "uid": 0,
+      "gid": 0,
+      "sha256": "752b2905f1c95e8c5a964bf83ae4e198088097aeff0a1e1cc4844342a343d8bb"
+    }
+  },
+  "/var/www/html/wsprrypi/wtp.js": {
+    "before": {
+      "mode": "0o644",
+      "uid": 0,
+      "gid": 0,
+      "sha256": "ed70c69e8f130ea4c2994bd7310f0420a8a4780c161b57bb5a7b06db56633f6a"
+    },
+    "after": {
+      "mode": "0o644",
+      "uid": 0,
+      "gid": 0,
+      "sha256": "0e82551d10956800c4f8e67266884b7ab52b8943d53576ccaa5588d990331b94"
+    }
+  }
+}

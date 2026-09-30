@@ -1,0 +1,22 @@
+{
+  "passed": false,
+  "frequency_hz": 14097100,
+  "sdr_peak_hz_uncalibrated": 14097063.37890625,
+  "signal_above_prejob_baseline_db": 8.748181871849543,
+  "signal_drop_after_cancellation_db": 9.005804607263968,
+  "post_cancellation_vs_prejob_baseline_db": -0.25762273541442443,
+  "capture_start_utc": "2026-09-30T11:59:30.583Z",
+  "fft_window_seconds": 0.131072,
+  "signal_first_window_center_s": 6.094848,
+  "signal_last_window_center_s": 16.71168,
+  "scheduled_start_s": 6.41700005531311,
+  "ini_write_s": 9.078585863113403,
+  "abort_observed_s": 12.564295053482056,
+  "uncancelled_end_s": 16.41700005531311,
+  "sample_count": 6250000,
+  "iq_sha256": "c1c433ef1ddd9f27670edb2ec5e6abab263daa465acd62b4e8d21c72eed64e1c",
+  "overflow_count": 0,
+  "clipped_sample_count": 0,
+  "receiver_cleanup": "verified",
+  "boundary": "SDR visibility and cancellation only; uncalibrated frequency/power and approximate capture-to-host time alignment."
+}

@@ -1,0 +1,201 @@
+Aug 14 18:26:24 wspr4 systemd[1]: Starting wsprrypi.service - WsprryPi daemon for: wsprrypi...
+Aug 14 18:26:24 wspr4 systemd[1]: Started wsprrypi.service - WsprryPi daemon for: wsprrypi.
+Aug 14 18:26:25 wspr4 wsprrypi[678]: WsprryPi version 3.2.0-devel+ff632d5 (devel).
+Aug 14 18:26:25 wspr4 wsprrypi[678]: Platform: Raspberry Pi 4 Model B Rev 1.1.
+Aug 14 18:26:25 wspr4 wsprrypi[678]: OS: Debian GNU/Linux 13 (trixie) 64-bit.
+Aug 14 18:26:25 wspr4 wsprrypi[678]: Operation.Enable on Boot policy Follow: leaving Operation.Transmit= true.
+Aug 14 18:26:25 wspr4 wsprrypi[678]: Transmit backend: si5351
+Aug 14 18:26:25 wspr4 wsprrypi[678]: Web server started on port: 31415
+Aug 14 18:26:25 wspr4 wsprrypi[678]: HTTP listener started on port 31415.
+Aug 14 18:26:25 wspr4 wsprrypi[678]: Socket server started on address::: 31416
+Aug 14 18:26:25 wspr4 wsprrypi[678]: Privileged network safety is enforced with no eligible LAN. Listeners remain available for loopback; protected non-loopback clients are rejected.
+Aug 14 18:26:25 wspr4 wsprrypi[678]: WSPR loop running.
+Aug 14 18:26:25 wspr4 wsprrypi[678]: System-clock frequency estimate disabled and manual GPIO PPM is zero.
+Aug 14 18:26:25 wspr4 wsprrypi[678]: QRSS configuration loaded:
+Aug 14 18:26:25 wspr4 wsprrypi[678]: - Message: "E"
+Aug 14 18:26:25 wspr4 wsprrypi[678]: - Base Freq: 14.097100 MHz
+Aug 14 18:26:25 wspr4 wsprrypi[678]: - Dot Timing: 3s
+Aug 14 18:26:25 wspr4 wsprrypi[678]: - Si5351 Transmit Power: 1
+Aug 14 18:26:25 wspr4 wsprrypi[678]: Scheduling path selected: QRSS.
+Aug 14 18:26:25 wspr4 wsprrypi[678]: Next QRSS launch at: 2026-08-14T23:56:00 UTC
+Aug 14 18:26:46 wspr4 wsprrypi[678]: INI file changed, reloading.
+Aug 14 18:26:46 wspr4 wsprrypi[678]: Transmit backend: si5351
+Aug 14 18:26:46 wspr4 wsprrypi[678]: System-clock frequency estimate disabled and manual GPIO PPM is zero.
+Aug 14 18:26:46 wspr4 wsprrypi[678]: QRSS configuration loaded:
+Aug 14 18:26:46 wspr4 wsprrypi[678]: - Message: "E"
+Aug 14 18:26:46 wspr4 wsprrypi[678]: - Base Freq: 14.097100 MHz
+Aug 14 18:26:46 wspr4 wsprrypi[678]: - Dot Timing: 3.0 s
+Aug 14 18:26:46 wspr4 wsprrypi[678]: - Si5351 Transmit Power: 1
+Aug 14 18:26:46 wspr4 wsprrypi[678]: PPM Manager disabled.
+Aug 14 18:26:46 wspr4 wsprrypi[678]: Scheduling path selected: QRSS.
+Aug 14 18:26:46 wspr4 wsprrypi[678]: No transmission requested; skipping transmission and scheduling.
+Sep 30 07:44:10 wspr4 wsprrypi[678]: Shutdown requested: received SIGTERM signal
+Sep 30 07:44:10 wspr4 systemd[1]: Stopping wsprrypi.service - WsprryPi daemon for: wsprrypi...
+Sep 30 07:44:10 wspr4 wsprrypi[678]: WsprryPi exiting.
+Sep 30 07:44:11 wspr4 systemd[1]: wsprrypi.service: Deactivated successfully.
+Sep 30 07:44:11 wspr4 systemd[1]: Stopped wsprrypi.service - WsprryPi daemon for: wsprrypi.
+Sep 30 07:44:11 wspr4 systemd[1]: Starting wsprrypi.service - WsprryPi daemon for: wsprrypi...
+Sep 30 07:44:11 wspr4 wsprrypi[1667]: WsprryPi version 3.2.0-devel+ff632d5 (devel).
+Sep 30 07:44:11 wspr4 wsprrypi[1667]: Platform: Raspberry Pi 4 Model B Rev 1.1.
+Sep 30 07:44:11 wspr4 wsprrypi[1667]: OS: Debian GNU/Linux 13 (trixie) 64-bit.
+Sep 30 07:44:11 wspr4 wsprrypi[1667]: Operation.Enable on Boot policy Follow: leaving Operation.Transmit= false.
+Sep 30 07:44:11 wspr4 wsprrypi[1667]: Transmit backend: si5351
+Sep 30 07:44:11 wspr4 wsprrypi[1667]: Web server started on port: 31415
+Sep 30 07:44:11 wspr4 wsprrypi[1667]: HTTP listener started on port 31415.
+Sep 30 07:44:11 wspr4 wsprrypi[1667]: Socket server started on address::: 31416
+Sep 30 07:44:11 wspr4 wsprrypi[1667]: WSPR loop running.
+Sep 30 07:44:11 wspr4 wsprrypi[1667]: System-clock frequency estimate disabled and manual GPIO PPM is zero.
+Sep 30 07:44:11 wspr4 wsprrypi[1667]: QRSS configuration loaded:
+Sep 30 07:44:11 wspr4 wsprrypi[1667]: - Message: "E"
+Sep 30 07:44:11 wspr4 wsprrypi[1667]: - Base Freq: 14.097100 MHz
+Sep 30 07:44:11 wspr4 wsprrypi[1667]: - Dot Timing: 3s
+Sep 30 07:44:11 wspr4 wsprrypi[1667]: - Si5351 Transmit Power: 1
+Sep 30 07:44:11 wspr4 wsprrypi[1667]: Scheduling path selected: QRSS.
+Sep 30 07:44:11 wspr4 wsprrypi[1667]: No transmission requested; skipping transmission and scheduling.
+Sep 30 07:44:11 wspr4 systemd[1]: Started wsprrypi.service - WsprryPi daemon for: wsprrypi.
+Sep 30 07:44:24 wspr4 wsprrypi[1667]: Shutdown requested: received SIGTERM signal
+Sep 30 07:44:24 wspr4 systemd[1]: Stopping wsprrypi.service - WsprryPi daemon for: wsprrypi...
+Sep 30 07:44:24 wspr4 wsprrypi[1667]: WsprryPi exiting.
+Sep 30 07:44:24 wspr4 systemd[1]: wsprrypi.service: Deactivated successfully.
+Sep 30 07:44:24 wspr4 systemd[1]: Stopped wsprrypi.service - WsprryPi daemon for: wsprrypi.
+Sep 30 07:44:24 wspr4 systemd[1]: Starting wsprrypi.service - WsprryPi daemon for: wsprrypi...
+Sep 30 07:44:24 wspr4 wsprrypi[1846]: WsprryPi version 3.2.0-devel+ff632d5 (devel).
+Sep 30 07:44:24 wspr4 wsprrypi[1846]: Platform: Raspberry Pi 4 Model B Rev 1.1.
+Sep 30 07:44:24 wspr4 wsprrypi[1846]: OS: Debian GNU/Linux 13 (trixie) 64-bit.
+Sep 30 07:44:24 wspr4 wsprrypi[1846]: Operation.Enable on Boot policy Follow: leaving Operation.Transmit= false.
+Sep 30 07:44:24 wspr4 wsprrypi[1846]: Transmit backend: si5351
+Sep 30 07:44:24 wspr4 wsprrypi[1846]: Web server started on port: 31415
+Sep 30 07:44:24 wspr4 wsprrypi[1846]: HTTP listener started on port 31415.
+Sep 30 07:44:24 wspr4 wsprrypi[1846]: Socket server started on address::: 31416
+Sep 30 07:44:24 wspr4 wsprrypi[1846]: WSPR loop running.
+Sep 30 07:44:24 wspr4 wsprrypi[1846]: System-clock frequency estimate disabled and manual GPIO PPM is zero.
+Sep 30 07:44:24 wspr4 wsprrypi[1846]: QRSS configuration loaded:
+Sep 30 07:44:24 wspr4 wsprrypi[1846]: - Message: "E"
+Sep 30 07:44:24 wspr4 wsprrypi[1846]: - Base Freq: 14.097100 MHz
+Sep 30 07:44:24 wspr4 wsprrypi[1846]: - Dot Timing: 3s
+Sep 30 07:44:24 wspr4 wsprrypi[1846]: - Si5351 Transmit Power: 1
+Sep 30 07:44:24 wspr4 wsprrypi[1846]: Scheduling path selected: QRSS.
+Sep 30 07:44:24 wspr4 wsprrypi[1846]: No transmission requested; skipping transmission and scheduling.
+Sep 30 07:44:24 wspr4 systemd[1]: Started wsprrypi.service - WsprryPi daemon for: wsprrypi.
+Sep 30 07:44:46 wspr4 wsprrypi[1846]: Shutdown requested: received SIGTERM signal
+Sep 30 07:44:46 wspr4 systemd[1]: Stopping wsprrypi.service - WsprryPi daemon for: wsprrypi...
+Sep 30 07:44:46 wspr4 wsprrypi[1846]: WTP Si5351: Could not enable Si5351 transmit output.
+Sep 30 07:44:46 wspr4 wsprrypi[1846]: WsprryPi exiting.
+Sep 30 07:44:46 wspr4 systemd[1]: wsprrypi.service: Deactivated successfully.
+Sep 30 07:44:46 wspr4 systemd[1]: Stopped wsprrypi.service - WsprryPi daemon for: wsprrypi.
+Sep 30 07:44:46 wspr4 systemd[1]: Starting wsprrypi.service - WsprryPi daemon for: wsprrypi...
+Sep 30 07:44:47 wspr4 wsprrypi[1989]: WsprryPi version 3.2.0-devel+ff632d5 (devel).
+Sep 30 07:44:47 wspr4 wsprrypi[1989]: Platform: Raspberry Pi 4 Model B Rev 1.1.
+Sep 30 07:44:47 wspr4 wsprrypi[1989]: OS: Debian GNU/Linux 13 (trixie) 64-bit.
+Sep 30 07:44:47 wspr4 wsprrypi[1989]: Operation.Enable on Boot policy Follow: leaving Operation.Transmit= false.
+Sep 30 07:44:47 wspr4 wsprrypi[1989]: Transmit backend: si5351
+Sep 30 07:44:47 wspr4 wsprrypi[1989]: Web server started on port: 31415
+Sep 30 07:44:47 wspr4 wsprrypi[1989]: HTTP listener started on port 31415.
+Sep 30 07:44:47 wspr4 wsprrypi[1989]: Socket server started on address::: 31416
+Sep 30 07:44:47 wspr4 wsprrypi[1989]: WSPR loop running.
+Sep 30 07:44:47 wspr4 wsprrypi[1989]: System-clock frequency estimate disabled and manual GPIO PPM is zero.
+Sep 30 07:44:47 wspr4 wsprrypi[1989]: QRSS configuration loaded:
+Sep 30 07:44:47 wspr4 wsprrypi[1989]: - Message: "E"
+Sep 30 07:44:47 wspr4 wsprrypi[1989]: - Base Freq: 14.097100 MHz
+Sep 30 07:44:47 wspr4 wsprrypi[1989]: - Dot Timing: 3s
+Sep 30 07:44:47 wspr4 wsprrypi[1989]: - Si5351 Transmit Power: 1
+Sep 30 07:44:47 wspr4 wsprrypi[1989]: Scheduling path selected: QRSS.
+Sep 30 07:44:47 wspr4 wsprrypi[1989]: No transmission requested; skipping transmission and scheduling.
+Sep 30 07:44:47 wspr4 systemd[1]: Started wsprrypi.service - WsprryPi daemon for: wsprrypi.
+Sep 30 07:45:05 wspr4 wsprrypi[1989]: Shutdown requested: received SIGTERM signal
+Sep 30 07:45:05 wspr4 systemd[1]: Stopping wsprrypi.service - WsprryPi daemon for: wsprrypi...
+Sep 30 07:45:05 wspr4 wsprrypi[1989]: WsprryPi exiting.
+Sep 30 07:45:05 wspr4 systemd[1]: wsprrypi.service: Deactivated successfully.
+Sep 30 07:45:05 wspr4 systemd[1]: Stopped wsprrypi.service - WsprryPi daemon for: wsprrypi.
+Sep 30 07:45:06 wspr4 systemd[1]: Starting wsprrypi.service - WsprryPi daemon for: wsprrypi...
+Sep 30 07:45:07 wspr4 wsprrypi[2199]: WsprryPi version 3.2.0-devel+ff632d5 (devel).
+Sep 30 07:45:07 wspr4 wsprrypi[2199]: Platform: Raspberry Pi 4 Model B Rev 1.1.
+Sep 30 07:45:07 wspr4 wsprrypi[2199]: OS: Debian GNU/Linux 13 (trixie) 64-bit.
+Sep 30 07:45:07 wspr4 wsprrypi[2199]: Operation.Enable on Boot policy Follow: leaving Operation.Transmit= false.
+Sep 30 07:45:07 wspr4 wsprrypi[2199]: Transmit backend: si5351
+Sep 30 07:45:07 wspr4 wsprrypi[2199]: WTP Pi endpoint unavailable: WTP takeover revocation journal unavailable
+Sep 30 07:45:07 wspr4 wsprrypi[2199]: Web server started on port: 31415
+Sep 30 07:45:07 wspr4 wsprrypi[2199]: HTTP listener started on port 31415.
+Sep 30 07:45:07 wspr4 systemd[1]: Started wsprrypi.service - WsprryPi daemon for: wsprrypi.
+Sep 30 07:45:07 wspr4 wsprrypi[2199]: Socket server started on address::: 31416
+Sep 30 07:45:07 wspr4 wsprrypi[2199]: WSPR loop running.
+Sep 30 07:45:07 wspr4 wsprrypi[2199]: System-clock frequency estimate disabled and manual GPIO PPM is zero.
+Sep 30 07:45:07 wspr4 wsprrypi[2199]: QRSS configuration loaded:
+Sep 30 07:45:07 wspr4 wsprrypi[2199]: - Message: "E"
+Sep 30 07:45:07 wspr4 wsprrypi[2199]: - Base Freq: 14.097100 MHz
+Sep 30 07:45:07 wspr4 wsprrypi[2199]: - Dot Timing: 3s
+Sep 30 07:45:07 wspr4 wsprrypi[2199]: - Si5351 Transmit Power: 1
+Sep 30 07:45:07 wspr4 wsprrypi[2199]: Scheduling path selected: QRSS.
+Sep 30 07:45:07 wspr4 wsprrypi[2199]: No transmission requested; skipping transmission and scheduling.
+Sep 30 07:45:13 wspr4 wsprrypi[2199]: Shutdown requested: received SIGTERM signal
+Sep 30 07:45:13 wspr4 systemd[1]: Stopping wsprrypi.service - WsprryPi daemon for: wsprrypi...
+Sep 30 07:45:13 wspr4 wsprrypi[2199]: WsprryPi exiting.
+Sep 30 07:45:13 wspr4 systemd[1]: wsprrypi.service: Deactivated successfully.
+Sep 30 07:45:13 wspr4 systemd[1]: Stopped wsprrypi.service - WsprryPi daemon for: wsprrypi.
+Sep 30 07:45:14 wspr4 systemd[1]: Starting wsprrypi.service - WsprryPi daemon for: wsprrypi...
+Sep 30 07:45:14 wspr4 wsprrypi[2332]: WsprryPi version 3.2.0-devel+ff632d5 (devel).
+Sep 30 07:45:14 wspr4 wsprrypi[2332]: Platform: Raspberry Pi 4 Model B Rev 1.1.
+Sep 30 07:45:14 wspr4 wsprrypi[2332]: OS: Debian GNU/Linux 13 (trixie) 64-bit.
+Sep 30 07:45:14 wspr4 wsprrypi[2332]: Operation.Enable on Boot policy Follow: leaving Operation.Transmit= false.
+Sep 30 07:45:14 wspr4 wsprrypi[2332]: Transmit backend: si5351
+Sep 30 07:45:14 wspr4 wsprrypi[2332]: Web server started on port: 31415
+Sep 30 07:45:14 wspr4 wsprrypi[2332]: HTTP listener started on port 31415.
+Sep 30 07:45:14 wspr4 wsprrypi[2332]: Socket server started on address::: 31416
+Sep 30 07:45:14 wspr4 wsprrypi[2332]: WSPR loop running.
+Sep 30 07:45:14 wspr4 wsprrypi[2332]: System-clock frequency estimate disabled and manual GPIO PPM is zero.
+Sep 30 07:45:14 wspr4 wsprrypi[2332]: QRSS configuration loaded:
+Sep 30 07:45:14 wspr4 wsprrypi[2332]: - Message: "E"
+Sep 30 07:45:14 wspr4 wsprrypi[2332]: - Base Freq: 14.097100 MHz
+Sep 30 07:45:14 wspr4 wsprrypi[2332]: - Dot Timing: 3s
+Sep 30 07:45:14 wspr4 wsprrypi[2332]: - Si5351 Transmit Power: 1
+Sep 30 07:45:14 wspr4 wsprrypi[2332]: Scheduling path selected: QRSS.
+Sep 30 07:45:14 wspr4 wsprrypi[2332]: No transmission requested; skipping transmission and scheduling.
+Sep 30 07:45:14 wspr4 systemd[1]: Started wsprrypi.service - WsprryPi daemon for: wsprrypi.
+Sep 30 07:45:15 wspr4 wsprrypi[2332]: Shutdown requested: received SIGTERM signal
+Sep 30 07:45:15 wspr4 systemd[1]: Stopping wsprrypi.service - WsprryPi daemon for: wsprrypi...
+Sep 30 07:45:15 wspr4 wsprrypi[2332]: WsprryPi exiting.
+Sep 30 07:45:15 wspr4 systemd[1]: wsprrypi.service: Deactivated successfully.
+Sep 30 07:45:15 wspr4 systemd[1]: Stopped wsprrypi.service - WsprryPi daemon for: wsprrypi.
+Sep 30 07:45:16 wspr4 systemd[1]: Starting wsprrypi.service - WsprryPi daemon for: wsprrypi...
+Sep 30 07:45:16 wspr4 wsprrypi[2467]: WsprryPi version 3.2.0-devel+ff632d5 (devel).
+Sep 30 07:45:16 wspr4 wsprrypi[2467]: Platform: Raspberry Pi 4 Model B Rev 1.1.
+Sep 30 07:45:16 wspr4 wsprrypi[2467]: OS: Debian GNU/Linux 13 (trixie) 64-bit.
+Sep 30 07:45:16 wspr4 wsprrypi[2467]: Operation.Enable on Boot policy Follow: leaving Operation.Transmit= false.
+Sep 30 07:45:16 wspr4 wsprrypi[2467]: Transmit backend: si5351
+Sep 30 07:45:16 wspr4 wsprrypi[2467]: Web server started on port: 31415
+Sep 30 07:45:16 wspr4 systemd[1]: Started wsprrypi.service - WsprryPi daemon for: wsprrypi.
+Sep 30 07:45:16 wspr4 wsprrypi[2467]: HTTP listener started on port 31415.
+Sep 30 07:45:16 wspr4 wsprrypi[2467]: Socket server started on address::: 31416
+Sep 30 07:45:16 wspr4 wsprrypi[2467]: WSPR loop running.
+Sep 30 07:45:16 wspr4 wsprrypi[2467]: System-clock frequency estimate disabled and manual GPIO PPM is zero.
+Sep 30 07:45:16 wspr4 wsprrypi[2467]: QRSS configuration loaded:
+Sep 30 07:45:16 wspr4 wsprrypi[2467]: - Message: "E"
+Sep 30 07:45:16 wspr4 wsprrypi[2467]: - Base Freq: 14.097100 MHz
+Sep 30 07:45:16 wspr4 wsprrypi[2467]: - Dot Timing: 3s
+Sep 30 07:45:16 wspr4 wsprrypi[2467]: - Si5351 Transmit Power: 1
+Sep 30 07:45:16 wspr4 wsprrypi[2467]: Scheduling path selected: QRSS.
+Sep 30 07:45:16 wspr4 wsprrypi[2467]: No transmission requested; skipping transmission and scheduling.
+Sep 30 07:45:19 wspr4 wsprrypi[2467]: Shutdown requested: received SIGTERM signal
+Sep 30 07:45:19 wspr4 systemd[1]: Stopping wsprrypi.service - WsprryPi daemon for: wsprrypi...
+Sep 30 07:45:19 wspr4 wsprrypi[2467]: WsprryPi exiting.
+Sep 30 07:45:19 wspr4 systemd[1]: wsprrypi.service: Deactivated successfully.
+Sep 30 07:45:19 wspr4 systemd[1]: Stopped wsprrypi.service - WsprryPi daemon for: wsprrypi.
+Sep 30 07:45:19 wspr4 systemd[1]: Starting wsprrypi.service - WsprryPi daemon for: wsprrypi...
+Sep 30 07:45:20 wspr4 wsprrypi[2535]: WsprryPi version 3.2.0-devel+ff632d5 (devel).
+Sep 30 07:45:20 wspr4 wsprrypi[2535]: Platform: Raspberry Pi 4 Model B Rev 1.1.
+Sep 30 07:45:20 wspr4 wsprrypi[2535]: OS: Debian GNU/Linux 13 (trixie) 64-bit.
+Sep 30 07:45:20 wspr4 wsprrypi[2535]: Operation.Enable on Boot policy Follow: leaving Operation.Transmit= false.
+Sep 30 07:45:20 wspr4 wsprrypi[2535]: Transmit backend: si5351
+Sep 30 07:45:20 wspr4 wsprrypi[2535]: Web server started on port: 31415
+Sep 30 07:45:20 wspr4 wsprrypi[2535]: HTTP listener started on port 31415.
+Sep 30 07:45:20 wspr4 wsprrypi[2535]: Socket server started on address::: 31416
+Sep 30 07:45:20 wspr4 wsprrypi[2535]: WSPR loop running.
+Sep 30 07:45:20 wspr4 wsprrypi[2535]: System-clock frequency estimate disabled and manual GPIO PPM is zero.
+Sep 30 07:45:20 wspr4 wsprrypi[2535]: QRSS configuration loaded:
+Sep 30 07:45:20 wspr4 wsprrypi[2535]: - Message: "E"
+Sep 30 07:45:20 wspr4 wsprrypi[2535]: - Base Freq: 14.097100 MHz
+Sep 30 07:45:20 wspr4 wsprrypi[2535]: - Dot Timing: 3s
+Sep 30 07:45:20 wspr4 wsprrypi[2535]: - Si5351 Transmit Power: 1
+Sep 30 07:45:20 wspr4 wsprrypi[2535]: Scheduling path selected: QRSS.
+Sep 30 07:45:20 wspr4 wsprrypi[2535]: No transmission requested; skipping transmission and scheduling.
+Sep 30 07:45:20 wspr4 systemd[1]: Started wsprrypi.service - WsprryPi daemon for: wsprrypi.

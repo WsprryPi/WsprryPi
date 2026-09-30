@@ -1,0 +1,21 @@
+{
+  "frequency_hz": 14097100,
+  "uncalibrated_peak_hz": 14097063.37890625,
+  "signal_above_baseline_db": 6.176710617741762,
+  "signal_drop_after_restart_db": 6.006852991722029,
+  "post_restart_vs_baseline_db": 0.16985762601973253,
+  "capture_start_utc": "2026-09-30T12:44:13.418Z",
+  "scheduled_start_s": 6.582000017166138,
+  "restart_requested_s": 9.740328073501587,
+  "service_ready_s": 11.402003049850464,
+  "uncancelled_end_s": 36.58200001716614,
+  "fft_window_seconds": 0.131072,
+  "sample_count": 7500000,
+  "iq_sha256": "03e66a2554bfed0f6f9b5355c5bd9c18bc8496ac288e96b660cb8c4bbb51117e",
+  "overflow_count": 0,
+  "clipped_sample_count": 0,
+  "receiver_cleanup": "verified",
+  "boundary": "Corresponding signal visibility and disappearance on service restart; approximate host/capture time alignment and uncalibrated frequency/power.",
+  "visual_review_passed": true,
+  "visual_review": "Corresponding narrow signal appears during the remote tone and disappears during service restart; observed on the saved waterfall and signal trace."
+}

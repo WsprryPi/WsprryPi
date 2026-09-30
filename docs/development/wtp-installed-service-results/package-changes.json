@@ -1,0 +1,30 @@
+{
+  "libavahi-client-dev:arm64": {
+    "before": null,
+    "after": "0.8-16"
+  },
+  "libavahi-common-dev:arm64": {
+    "before": null,
+    "after": "0.8-16"
+  },
+  "libdbus-1-dev:arm64": {
+    "before": null,
+    "after": "1.16.2-2"
+  },
+  "libssl-dev:arm64": {
+    "before": "3.5.7-1~deb13u2+rpt1",
+    "after": "3.5.7-1~deb13u3"
+  },
+  "libssl3t64:arm64": {
+    "before": "3.5.7-1~deb13u2+rpt1",
+    "after": "3.5.7-1~deb13u3"
+  },
+  "openssl": {
+    "before": "3.5.7-1~deb13u2+rpt1",
+    "after": "3.5.7-1~deb13u3"
+  },
+  "openssl-provider-legacy": {
+    "before": "3.5.7-1~deb13u2+rpt1",
+    "after": "3.5.7-1~deb13u3"
+  }
+}

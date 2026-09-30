@@ -1,0 +1,10 @@
+{"differences": 21}
+0611a539a403e6e15dbc5b500b0d685e920ad21071d953cf825f6792fe96315f  /usr/local/bin/wsprrypi
+WsprryPi version 3.2.0-devel+ff632d5 (devel).
+Compiled backends: si5351,simulated,wtp
+Ancillary GPIO: disabled
+MainPID=95631
+ExecMainStatus=0
+ActiveState=active
+FragmentPath=/etc/systemd/system/wsprrypi.service
+## devel...origin/devel

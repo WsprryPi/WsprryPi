@@ -1,0 +1,5 @@
+MainPID=1966
+ExecMainStatus=0
+ActiveState=active
+ecc1e3ad1713c35e976e64a7503094fe80b942da66d8f30ab1a3817690917ad6  /usr/local/etc/wsprrypi.ini
+2f178004-f3d0-4e86-abc2-b00fff038e66

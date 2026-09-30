@@ -1,0 +1,26 @@
+
+[INFO ] Checking environment.
+[INFO ] Resolved build type: RELEASE for branch main.
+[INFO ] Wsprry Pi installation beginning.
+[INFO ] Precompiled executable: skipping application build and build swap.
+[  -  ] Running: Set precompiled staging directory permissions.
+[  ✔  ] Complete: Set precompiled staging directory permissions.
+[  -  ] Running: Stage precompiled executable.
+[  ✔  ] Complete: Stage precompiled executable.
+[  -  ] Running: Set precompiled executable permissions.
+[  ✔  ] Complete: Set precompiled executable permissions.
+[INFO ] Checked local executable architecture; application build disabled.
+[INFO ] Detected model: Raspberry Pi 4 Model B.
+[INFO ] System: Debian GNU/Linux 13 (trixie) on 64-bit OS.
+[INFO ] Wsprry Pi version: v3.2.0-main+684.ff632d5
+[INFO ] Apache web mode: existing WsprryPi installation.
+[INFO ] Updating and managing required packages (this may take a few minutes).
+[  -  ] Running: Update local package index.
+[  ✔  ] Complete: Update local package index.
+[  -  ] Running: Fix broken or incomplete package installations.
+[  ✔  ] Complete: Fix broken or incomplete package installations.
+[  -  ] Running: Install required packages.
+[  ✔  ] Complete: Install required packages.
+[  -  ] Running: Validate support-bundle encryption tools.
+[  ✔  ] Complete: Validate support-bundle encryption tools.
+[ERROR] Precompiled executable rejected: unsupported libraries for trixie: ['libavahi-client.so.3', 'libavahi-common.so.3']

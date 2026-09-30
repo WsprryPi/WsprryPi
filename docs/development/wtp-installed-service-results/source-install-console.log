@@ -1,0 +1,156 @@
+
+[INFO ] Checking environment.
+[INFO ] Resolved build type: RELEASE for branch devel.
+[INFO ] Wsprry Pi installation beginning.
+[INFO ] Build resources:
+[INFO ]   MemTotal=3886900 KiB
+[INFO ]   MemAvailable=3612456 KiB
+[INFO ]   swap-free=2097148 KiB
+[INFO ] Build swap classification:
+[INFO ]   zram-free=2097148 KiB
+[INFO ]   file-free=0 KiB
+[INFO ]   partition-free=0 KiB
+[INFO ]   other-independent-free=0 KiB
+[INFO ] Build swap independently-backed-free=0 KiB.
+[INFO ] Detected model: Raspberry Pi 4 Model B.
+[INFO ] System: Debian GNU/Linux 13 (trixie) on 64-bit OS.
+[INFO ] Wsprry Pi version: v3.2.0-devel+684.ff632d5
+[INFO ] JOBS override detected: 2.
+[INFO ] Compilation should typically complete in around 5m.
+[INFO ] Estimated effective parallelism: 2 job(s).
+[INFO ] Apache web mode: existing WsprryPi installation.
+[INFO ] Updating and managing required packages (this may take a few minutes).
+[  -  ] Running: Update local package index.
+[  ✔  ] Complete: Update local package index.
+[  -  ] Running: Fix broken or incomplete package installations.
+[  ✔  ] Complete: Fix broken or incomplete package installations.
+[  -  ] Running: Install required packages.
+[  ✔  ] Complete: Install required packages.
+[  -  ] Running: Validate support-bundle encryption tools.
+[  ✔  ] Complete: Validate support-bundle encryption tools.
+[  -  ] Running: Reset systemd states.
+[  ✔  ] Complete: Reset systemd states.
+[  -  ] Running: Reload systemd daemon.
+[  ✔  ] Complete: Reload systemd daemon.
+[  -  ] Running: Create executable staging directory.
+[  ✔  ] Complete: Create executable staging directory.
+[  -  ] Running: Compile release binary.
+[  ✔  ] Complete: Compile release binary.
+[  -  ] Running: Move binary to staging.
+[  ✔  ] Complete: Move binary to staging.
+[  -  ] Running: Stage executable for /usr/local/bin/wsprrypi.
+[  ✔  ] Complete: Stage executable for /usr/local/bin/wsprrypi.
+[  -  ] Running: Back up existing executable at /usr/local/bin/wsprrypi.
+[  ✔  ] Complete: Back up existing executable at /usr/local/bin/wsprrypi.
+[  -  ] Running: Stop wsprrypi.service.
+[  ✔  ] Complete: Stop wsprrypi.service.
+[  -  ] Running: Install executable at /usr/local/bin/wsprrypi.
+[  ✔  ] Complete: Install executable at /usr/local/bin/wsprrypi.
+[  -  ] Running: Create support-bundle collector directory.
+[  ✔  ] Complete: Create support-bundle collector directory.
+[  -  ] Running: Set support-bundle collector directory ownership.
+[  ✔  ] Complete: Set support-bundle collector directory ownership.
+[  -  ] Running: Set support-bundle collector directory permissions.
+[  ✔  ] Complete: Set support-bundle collector directory permissions.
+[  -  ] Running: Create support-bundle storage directory.
+[  ✔  ] Complete: Create support-bundle storage directory.
+[  -  ] Running: Set support-bundle storage ownership.
+[  ✔  ] Complete: Set support-bundle storage ownership.
+[  -  ] Running: Set support-bundle storage permissions.
+[  ✔  ] Complete: Set support-bundle storage permissions.
+[  -  ] Running: Copy support-bundle collector.
+[  ✔  ] Complete: Copy support-bundle collector.
+[  -  ] Running: Set support-bundle collector ownership.
+[  ✔  ] Complete: Set support-bundle collector ownership.
+[  -  ] Running: Set support-bundle collector permissions.
+[  ✔  ] Complete: Set support-bundle collector permissions.
+[  -  ] Running: Publish support-bundle collector.
+[  ✔  ] Complete: Publish support-bundle collector.
+[  -  ] Running: Create route-runtime directory.
+[  ✔  ] Complete: Create route-runtime directory.
+[  -  ] Running: Install route application companion.
+[  ✔  ] Complete: Install route application companion.
+[  -  ] Running: Install runtime reconciliation support.
+[  ✔  ] Complete: Install runtime reconciliation support.
+[  -  ] Running: Backup existing INI.
+[  ✔  ] Complete: Backup existing INI.
+[  -  ] Running: Publish merged INI.
+[  ✔  ] Complete: Publish merged INI.
+[  -  ] Running: Install configuration.
+[  ✔  ] Complete: Install configuration.
+[  -  ] Running: Set SEMANTIC_VERSION in /usr/local/etc//wsprrypi.ini.
+[  ✔  ] Complete: Set SEMANTIC_VERSION in /usr/local/etc//wsprrypi.ini.
+[  -  ] Running: Install stock configuration.
+[  ✔  ] Complete: Install stock configuration.
+[  -  ] Running: Set SEMANTIC_VERSION in /usr/local/etc//wsprrypi.ini.stock.
+[  ✔  ] Complete: Set SEMANTIC_VERSION in /usr/local/etc//wsprrypi.ini.stock.
+[  -  ] Running: Change ownership on stock configuration.
+[  ✔  ] Complete: Change ownership on stock configuration.
+[  -  ] Running: Set stock config permissions.
+[  ✔  ] Complete: Set stock config permissions.
+[  -  ] Running: Change ownership on configuration.
+[  ✔  ] Complete: Change ownership on configuration.
+[  -  ] Running: Set config permissions.
+[  ✔  ] Complete: Set config permissions.
+[  -  ] Running: Disable systemd service.
+[  ✔  ] Complete: Disable systemd service.
+[  -  ] Running: Stage systemd service unit.
+[  ✔  ] Complete: Stage systemd service unit.
+[  -  ] Running: Set SEMANTIC_VERSION in /etc/systemd/system/wsprrypi.service.tmp.WmHcgg.
+[  ✔  ] Complete: Set SEMANTIC_VERSION in /etc/systemd/system/wsprrypi.service.tmp.WmHcgg.
+[  -  ] Running: Set DAEMON_NAME in /etc/systemd/system/wsprrypi.service.tmp.WmHcgg.
+[  ✔  ] Complete: Set DAEMON_NAME in /etc/systemd/system/wsprrypi.service.tmp.WmHcgg.
+[  -  ] Running: Set EXEC_START in /etc/systemd/system/wsprrypi.service.tmp.WmHcgg.
+[  ✔  ] Complete: Set EXEC_START in /etc/systemd/system/wsprrypi.service.tmp.WmHcgg.
+[  -  ] Running: Set SYSLOG_IDENTIFIER in /etc/systemd/system/wsprrypi.service.tmp.WmHcgg.
+[  ✔  ] Complete: Set SYSLOG_IDENTIFIER in /etc/systemd/system/wsprrypi.service.tmp.WmHcgg.
+[  -  ] Running: Change ownership on staged systemd unit.
+[  ✔  ] Complete: Change ownership on staged systemd unit.
+[  -  ] Running: Change permissions on staged systemd unit.
+[  ✔  ] Complete: Change permissions on staged systemd unit.
+[  -  ] Running: Atomically install systemd service unit.
+[  ✔  ] Complete: Atomically install systemd service unit.
+[  -  ] Running: Reload systemd.
+[  ✔  ] Complete: Reload systemd.
+[  -  ] Running: Enable systemd service.
+[  ✔  ] Complete: Enable systemd service.
+[  -  ] Running: Start systemd service.
+[  ✔  ] Complete: Start systemd service.
+[  -  ] Running: Publish validated UI artifact.
+[  ✔  ] Complete: Publish validated UI artifact.
+[  -  ] Running: Set log permissions.
+[  ✔  ] Complete: Set log permissions.
+[  -  ] Running: Render Apache privileged-network policy.
+[  ✔  ] Complete: Render Apache privileged-network policy.
+[  -  ] Running: Copy Apache vhost to sites-available.
+[  ✔  ] Complete: Copy Apache vhost to sites-available.
+[  -  ] Running: Stage Apache proxy configuration.
+[  ✔  ] Complete: Stage Apache proxy configuration.
+[  -  ] Running: Install Apache proxy configuration.
+[  ✔  ] Complete: Install Apache proxy configuration.
+[  -  ] Running: Enable proxy modules.
+[  ✔  ] Complete: Enable proxy modules.
+[  -  ] Running: Disable default site.
+[  ✔  ] Complete: Disable default site.
+[  -  ] Running: Enable wsprrypi site.
+[  ✔  ] Complete: Enable wsprrypi site.
+[  -  ] Running: Test Apache configuration.
+[  ✔  ] Complete: Test Apache configuration.
+[  -  ] Running: Reload Apache.
+[  ✔  ] Complete: Reload Apache.
+[  -  ] Running: Delete merged INI source.
+[  ✔  ] Complete: Delete merged INI source.
+[  -  ] Running: Restart wsprrypi.
+[  ✔  ] Complete: Restart wsprrypi.
+[INFO ] WsprryPi runtime readiness verified.
+
+Installation successful: Wsprry Pi.
+
+To configure Wsprry Pi, open the following URL in your browser:
+
+  http://wspr4.local/wsprrypi/
+  http://192.168.1.68/wsprrypi/
+
+If the hostname URL does not work, try using the IP address.
+Ensure your device is on the same network and that mDNS is
+supported by your system.

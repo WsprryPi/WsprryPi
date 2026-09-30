@@ -1,0 +1,4398 @@
+{
+  "started_utc_ns": "1790772140954287000",
+  "cases": {
+    "installed-start": {
+      "passed": true,
+      "state": {
+        "address": "192.168.1.68",
+        "boot_id": "6ca9f06ce6210795b0a7ab5428865def",
+        "device_id": "74d12151aff03c45cfcb15a45bd8e037",
+        "dns_sd_published": false,
+        "enabled": true,
+        "finishing_remote_job": false,
+        "launch_observed_monotonic_ns": null,
+        "launch_target_monotonic_ns": "0",
+        "listener_error": "",
+        "listener_running": true,
+        "local_effective": false,
+        "local_requested": false,
+        "local_work_active": false,
+        "output_unknown": false,
+        "port": 31417,
+        "remote_admission_closed": false,
+        "remote_job_id": "",
+        "remote_output_active": false,
+        "remote_owner": "",
+        "remote_state": "empty",
+        "revocation_generation": "10",
+        "revocation_unavailable": false,
+        "schema": "wsprrypi-wtp-endpoint/1"
+      },
+      "info": {
+        "host_boot_id": "522d9aa1-8a52-4bf9-b058-be069a1bb366",
+        "pid": "96191",
+        "endpoint": {
+          "address": "192.168.1.68",
+          "boot_id": "6ca9f06ce6210795b0a7ab5428865def",
+          "device_id": "74d12151aff03c45cfcb15a45bd8e037",
+          "dns_sd_published": true,
+          "enabled": true,
+          "finishing_remote_job": false,
+          "launch_observed_monotonic_ns": null,
+          "launch_target_monotonic_ns": "0",
+          "listener_error": "",
+          "listener_running": true,
+          "local_effective": false,
+          "local_requested": false,
+          "local_work_active": false,
+          "output_unknown": false,
+          "port": 31417,
+          "remote_admission_closed": false,
+          "remote_job_id": "",
+          "remote_output_active": false,
+          "remote_owner": "",
+          "remote_state": "empty",
+          "revocation_generation": "10",
+          "revocation_unavailable": false,
+          "schema": "wsprrypi-wtp-endpoint/1"
+        }
+      },
+      "binary_sha256": "0611a539a403e6e15dbc5b500b0d685e920ad21071d953cf825f6792fe96315f  /usr/local/bin/wsprrypi"
+    },
+    "boot-local-disabled": {
+      "passed": true,
+      "before": {
+        "host_boot_id": "522d9aa1-8a52-4bf9-b058-be069a1bb366",
+        "pid": "96191",
+        "endpoint": {
+          "address": "192.168.1.68",
+          "boot_id": "6ca9f06ce6210795b0a7ab5428865def",
+          "device_id": "74d12151aff03c45cfcb15a45bd8e037",
+          "dns_sd_published": true,
+          "enabled": true,
+          "finishing_remote_job": false,
+          "launch_observed_monotonic_ns": null,
+          "launch_target_monotonic_ns": "0",
+          "listener_error": "",
+          "listener_running": true,
+          "local_effective": false,
+          "local_requested": false,
+          "local_work_active": false,
+          "output_unknown": false,
+          "port": 31417,
+          "remote_admission_closed": false,
+          "remote_job_id": "",
+          "remote_output_active": false,
+          "remote_owner": "",
+          "remote_state": "empty",
+          "revocation_generation": "10",
+          "revocation_unavailable": false,
+          "schema": "wsprrypi-wtp-endpoint/1"
+        }
+      },
+      "after": {
+        "host_boot_id": "848e9ebb-b75f-4dd3-a2aa-ce1249e31c1d",
+        "pid": "686",
+        "endpoint": {
+          "address": "192.168.1.68",
+          "boot_id": "6105b6d9f9fcf6f18c407290db95c401",
+          "device_id": "74d12151aff03c45cfcb15a45bd8e037",
+          "dns_sd_published": true,
+          "enabled": true,
+          "finishing_remote_job": false,
+          "launch_observed_monotonic_ns": null,
+          "launch_target_monotonic_ns": "0",
+          "listener_error": "",
+          "listener_running": true,
+          "local_effective": false,
+          "local_requested": false,
+          "local_work_active": false,
+          "output_unknown": false,
+          "port": 31417,
+          "remote_admission_closed": false,
+          "remote_job_id": "",
+          "remote_output_active": false,
+          "remote_owner": "",
+          "remote_state": "empty",
+          "revocation_generation": "10",
+          "revocation_unavailable": false,
+          "schema": "wsprrypi-wtp-endpoint/1"
+        }
+      },
+      "claim": {
+        "type": "response",
+        "protocol": "WTP/1",
+        "session_id": "869ec5b99a4d49c5b7c53b3794c88cd5",
+        "request_id": "6d0df32865654890bef8aba50b2547b8",
+        "op": "CLAIM",
+        "ok": true,
+        "body": {
+          "owner_id": "a197fb5a0d3749d597995bcbcc0195c7",
+          "granted_lease_ms": 60000,
+          "expires_monotonic_ns": "89803608017"
+        }
+      }
+    },
+    "boot-local-enabled": {
+      "passed": true,
+      "before": {
+        "host_boot_id": "848e9ebb-b75f-4dd3-a2aa-ce1249e31c1d",
+        "pid": "686",
+        "endpoint": {
+          "address": "192.168.1.68",
+          "boot_id": "6105b6d9f9fcf6f18c407290db95c401",
+          "device_id": "74d12151aff03c45cfcb15a45bd8e037",
+          "dns_sd_published": true,
+          "enabled": true,
+          "finishing_remote_job": false,
+          "launch_observed_monotonic_ns": null,
+          "launch_target_monotonic_ns": "0",
+          "listener_error": "",
+          "listener_running": true,
+          "local_effective": true,
+          "local_requested": true,
+          "local_work_active": false,
+          "output_unknown": false,
+          "port": 31417,
+          "remote_admission_closed": true,
+          "remote_job_id": "",
+          "remote_output_active": false,
+          "remote_owner": "",
+          "remote_state": "empty",
+          "revocation_generation": "11",
+          "revocation_unavailable": false,
+          "schema": "wsprrypi-wtp-endpoint/1"
+        }
+      },
+      "after": {
+        "host_boot_id": "fbc9c1f5-1801-40d3-8e3d-8e282b565649",
+        "pid": "678",
+        "endpoint": {
+          "address": "192.168.1.68",
+          "boot_id": "11890e672d1a28e993efdb9730165e1d",
+          "device_id": "74d12151aff03c45cfcb15a45bd8e037",
+          "dns_sd_published": true,
+          "enabled": true,
+          "finishing_remote_job": false,
+          "launch_observed_monotonic_ns": null,
+          "launch_target_monotonic_ns": "0",
+          "listener_error": "",
+          "listener_running": true,
+          "local_effective": true,
+          "local_requested": true,
+          "local_work_active": false,
+          "output_unknown": false,
+          "port": 31417,
+          "remote_admission_closed": true,
+          "remote_job_id": "",
+          "remote_output_active": false,
+          "remote_owner": "",
+          "remote_state": "empty",
+          "revocation_generation": "12",
+          "revocation_unavailable": false,
+          "schema": "wsprrypi-wtp-endpoint/1"
+        }
+      },
+      "claim": {
+        "type": "response",
+        "protocol": "WTP/1",
+        "session_id": "ca40a212f87041309c6e387477a0e316",
+        "request_id": "45ffd993e0da4a768513d37d44e3c3d1",
+        "op": "CLAIM",
+        "ok": false,
+        "error": {
+          "code": "BUSY",
+          "message": "BUSY",
+          "retryable": true
+        }
+      },
+      "journal_before": "wtp-pi-revocation-v1 74d12151aff03c45cfcb15a45bd8e037 11",
+      "journal_after": "wtp-pi-revocation-v1 74d12151aff03c45cfcb15a45bd8e037 12"
+    },
+    "restart-owned-idle": {
+      "passed": true,
+      "before": {
+        "host_boot_id": "fbc9c1f5-1801-40d3-8e3d-8e282b565649",
+        "pid": "678",
+        "endpoint": {
+          "address": "192.168.1.68",
+          "boot_id": "11890e672d1a28e993efdb9730165e1d",
+          "device_id": "74d12151aff03c45cfcb15a45bd8e037",
+          "dns_sd_published": true,
+          "enabled": true,
+          "finishing_remote_job": false,
+          "launch_observed_monotonic_ns": null,
+          "launch_target_monotonic_ns": "0",
+          "listener_error": "",
+          "listener_running": true,
+          "local_effective": false,
+          "local_requested": false,
+          "local_work_active": false,
+          "output_unknown": false,
+          "port": 31417,
+          "remote_admission_closed": false,
+          "remote_job_id": "",
+          "remote_output_active": false,
+          "remote_owner": "2edd7a7cc85f487ebbb8c7c2da2d4ba8",
+          "remote_state": "empty",
+          "revocation_generation": "12",
+          "revocation_unavailable": false,
+          "schema": "wsprrypi-wtp-endpoint/1"
+        }
+      },
+      "after": {
+        "host_boot_id": "fbc9c1f5-1801-40d3-8e3d-8e282b565649",
+        "pid": "1667",
+        "endpoint": {
+          "address": "192.168.1.68",
+          "boot_id": "0c25afb2f08afb5352cacb6d96de6c0b",
+          "device_id": "74d12151aff03c45cfcb15a45bd8e037",
+          "dns_sd_published": false,
+          "enabled": true,
+          "finishing_remote_job": false,
+          "launch_observed_monotonic_ns": null,
+          "launch_target_monotonic_ns": "0",
+          "listener_error": "",
+          "listener_running": true,
+          "local_effective": false,
+          "local_requested": false,
+          "local_work_active": false,
+          "output_unknown": false,
+          "port": 31417,
+          "remote_admission_closed": false,
+          "remote_job_id": "",
+          "remote_output_active": false,
+          "remote_owner": "",
+          "remote_state": "empty",
+          "revocation_generation": "12",
+          "revocation_unavailable": false,
+          "schema": "wsprrypi-wtp-endpoint/1"
+        }
+      },
+      "new_claim": {
+        "type": "response",
+        "protocol": "WTP/1",
+        "session_id": "dca3c55d71a046fe91b569db7ccc5834",
+        "request_id": "2d5b7ec46b3a42ae8286fece41eadbc4",
+        "op": "CLAIM",
+        "ok": true,
+        "body": {
+          "owner_id": "a4ef21d2971b4b2db4ec42ed2c32ba17",
+          "granted_lease_ms": 60000,
+          "expires_monotonic_ns": "97202116441"
+        }
+      }
+    },
+    "restart-running-physical-job": {
+      "wire": {
+        "hello": {
+          "type": "response",
+          "protocol": "WTP/1",
+          "session_id": "ca7a13ddcda8438ca1f48e9bdb4c915c",
+          "request_id": "a2f3269a927246d7927cf8ae684300bd",
+          "op": "HELLO",
+          "ok": true,
+          "body": {
+            "selected_version": "WTP/1",
+            "device_id": "74d12151aff03c45cfcb15a45bd8e037",
+            "boot_id": "0c25afb2f08afb5352cacb6d96de6c0b",
+            "product": "WsprryPi",
+            "firmware_version": "3.2.0-devel+ff632d5"
+          }
+        },
+        "owner": "c889f430963243e8b45c08b10ec47c61",
+        "session": "ca7a13ddcda8438ca1f48e9bdb4c915c"
+      },
+      "claim": {
+        "type": "response",
+        "protocol": "WTP/1",
+        "session_id": "ca7a13ddcda8438ca1f48e9bdb4c915c",
+        "request_id": "091f5a307ca24f6391c2dbc61238afcb",
+        "op": "CLAIM",
+        "ok": true,
+        "body": {
+          "owner_id": "c889f430963243e8b45c08b10ec47c61",
+          "granted_lease_ms": 60000,
+          "expires_monotonic_ns": "100492888372"
+        }
+      },
+      "job_id": "fb77fd3b6831437592c50c7ba6a3aeb4",
+      "load": {
+        "type": "response",
+        "protocol": "WTP/1",
+        "session_id": "ca7a13ddcda8438ca1f48e9bdb4c915c",
+        "request_id": "2b45c9dea1154623af45f476fda17677",
+        "op": "LOAD",
+        "ok": true,
+        "body": {
+          "job_id": "fb77fd3b6831437592c50c7ba6a3aeb4",
+          "state": "loaded",
+          "adjustments": []
+        }
+      },
+      "arm": {
+        "type": "response",
+        "protocol": "WTP/1",
+        "session_id": "ca7a13ddcda8438ca1f48e9bdb4c915c",
+        "request_id": "7e41f1340ba74decb09d91a021d46597",
+        "op": "ARM",
+        "ok": true,
+        "body": {
+          "job_id": "fb77fd3b6831437592c50c7ba6a3aeb4",
+          "state": "armed",
+          "start_utc_ns": "1790772260000000000",
+          "start_monotonic_ns": "44763999120",
+          "clock": {
+            "state": "synchronized",
+            "utc_now_ns": "1790772255842299105",
+            "monotonic_now_ns": "40606298225",
+            "uncertainty_ns": "51433055",
+            "sync_age_ns": "0",
+            "leap": "normal"
+          }
+        }
+      },
+      "start_utc_ns": "1790772260000000000",
+      "frequency_hz": 14097100,
+      "duration_s": 30,
+      "running": {
+        "address": "192.168.1.68",
+        "boot_id": "0c25afb2f08afb5352cacb6d96de6c0b",
+        "device_id": "74d12151aff03c45cfcb15a45bd8e037",
+        "dns_sd_published": true,
+        "enabled": true,
+        "finishing_remote_job": false,
+        "launch_observed_monotonic_ns": "44764388801",
+        "launch_target_monotonic_ns": "44763999120",
+        "listener_error": "",
+        "listener_running": true,
+        "local_effective": false,
+        "local_requested": false,
+        "local_work_active": false,
+        "output_unknown": false,
+        "port": 31417,
+        "remote_admission_closed": false,
+        "remote_job_id": "fb77fd3b6831437592c50c7ba6a3aeb4",
+        "remote_output_active": true,
+        "remote_owner": "c889f430963243e8b45c08b10ec47c61",
+        "remote_state": "running",
+        "revocation_generation": "12",
+        "revocation_unavailable": false,
+        "schema": "wsprrypi-wtp-endpoint/1"
+      },
+      "restart_requested_utc_ns": "1790772263158328000",
+      "after": {
+        "address": "192.168.1.68",
+        "boot_id": "64f213a17bd9f30e4bcd84df3f128b35",
+        "device_id": "74d12151aff03c45cfcb15a45bd8e037",
+        "dns_sd_published": false,
+        "enabled": true,
+        "finishing_remote_job": false,
+        "launch_observed_monotonic_ns": null,
+        "launch_target_monotonic_ns": "0",
+        "listener_error": "",
+        "listener_running": true,
+        "local_effective": false,
+        "local_requested": false,
+        "local_work_active": false,
+        "output_unknown": false,
+        "port": 31417,
+        "remote_admission_closed": false,
+        "remote_job_id": "",
+        "remote_output_active": false,
+        "remote_owner": "",
+        "remote_state": "empty",
+        "revocation_generation": "12",
+        "revocation_unavailable": false,
+        "schema": "wsprrypi-wtp-endpoint/1"
+      },
+      "restart_observed_utc_ns": "1790772264820003000",
+      "old_job_arm": {
+        "type": "response",
+        "protocol": "WTP/1",
+        "session_id": "87675413bd20451282ae944d1384d264",
+        "request_id": "986f099ef7a94b2ba7336021a5dc7782",
+        "op": "ARM",
+        "ok": false,
+        "error": {
+          "code": "LEASE_EXPIRED",
+          "message": "LEASE_EXPIRED",
+          "retryable": false
+        }
+      },
+      "later": {
+        "address": "192.168.1.68",
+        "boot_id": "64f213a17bd9f30e4bcd84df3f128b35",
+        "device_id": "74d12151aff03c45cfcb15a45bd8e037",
+        "dns_sd_published": true,
+        "enabled": true,
+        "finishing_remote_job": false,
+        "launch_observed_monotonic_ns": null,
+        "launch_target_monotonic_ns": "0",
+        "listener_error": "",
+        "listener_running": true,
+        "local_effective": false,
+        "local_requested": false,
+        "local_work_active": false,
+        "output_unknown": false,
+        "port": 31417,
+        "remote_admission_closed": false,
+        "remote_job_id": "",
+        "remote_output_active": false,
+        "remote_owner": "",
+        "remote_state": "empty",
+        "revocation_generation": "12",
+        "revocation_unavailable": false,
+        "schema": "wsprrypi-wtp-endpoint/1"
+      },
+      "passed": true
+    },
+    "restart-armed-job": {
+      "wire": {
+        "hello": {
+          "type": "response",
+          "protocol": "WTP/1",
+          "session_id": "5a271c135d8e4cc18015a84e5b861157",
+          "request_id": "259bb541a3c04572a1035f5bad45a219",
+          "op": "HELLO",
+          "ok": true,
+          "body": {
+            "selected_version": "WTP/1",
+            "device_id": "74d12151aff03c45cfcb15a45bd8e037",
+            "boot_id": "64f213a17bd9f30e4bcd84df3f128b35",
+            "product": "WsprryPi",
+            "firmware_version": "3.2.0-devel+ff632d5"
+          }
+        },
+        "owner": "9f2faf540dfc4c4580250402b88cca5d",
+        "session": "5a271c135d8e4cc18015a84e5b861157"
+      },
+      "claim": {
+        "type": "response",
+        "protocol": "WTP/1",
+        "session_id": "5a271c135d8e4cc18015a84e5b861157",
+        "request_id": "ffc4632d8b8c48e891902db289c4ce6b",
+        "op": "CLAIM",
+        "ok": true,
+        "body": {
+          "owner_id": "9f2faf540dfc4c4580250402b88cca5d",
+          "granted_lease_ms": 60000,
+          "expires_monotonic_ns": "130179159042"
+        }
+      },
+      "job_id": "ebc017ef62004af09fd967fac8401c08",
+      "load": {
+        "type": "response",
+        "protocol": "WTP/1",
+        "session_id": "5a271c135d8e4cc18015a84e5b861157",
+        "request_id": "996908119df24f18bc1cd9d4cb71a816",
+        "op": "LOAD",
+        "ok": true,
+        "body": {
+          "job_id": "ebc017ef62004af09fd967fac8401c08",
+          "state": "loaded",
+          "adjustments": []
+        }
+      },
+      "arm": {
+        "type": "response",
+        "protocol": "WTP/1",
+        "session_id": "5a271c135d8e4cc18015a84e5b861157",
+        "request_id": "894fb53496394dcf9e97dc551c08ff1c",
+        "op": "ARM",
+        "ok": true,
+        "body": {
+          "job_id": "ebc017ef62004af09fd967fac8401c08",
+          "state": "armed",
+          "start_utc_ns": "1790772300000000000",
+          "start_monotonic_ns": "84763999120",
+          "clock": {
+            "state": "synchronized",
+            "utc_now_ns": "1790772285529825058",
+            "monotonic_now_ns": "70293824178",
+            "uncertainty_ns": "66433130",
+            "sync_age_ns": "0",
+            "leap": "normal"
+          }
+        }
+      },
+      "start_utc_ns": "1790772300000000000",
+      "frequency_hz": 14097100,
+      "duration_s": 3,
+      "before": {
+        "address": "192.168.1.68",
+        "boot_id": "64f213a17bd9f30e4bcd84df3f128b35",
+        "device_id": "74d12151aff03c45cfcb15a45bd8e037",
+        "dns_sd_published": true,
+        "enabled": true,
+        "finishing_remote_job": false,
+        "launch_observed_monotonic_ns": null,
+        "launch_target_monotonic_ns": "84763999120",
+        "listener_error": "",
+        "listener_running": true,
+        "local_effective": false,
+        "local_requested": false,
+        "local_work_active": false,
+        "output_unknown": false,
+        "port": 31417,
+        "remote_admission_closed": false,
+        "remote_job_id": "ebc017ef62004af09fd967fac8401c08",
+        "remote_output_active": false,
+        "remote_owner": "9f2faf540dfc4c4580250402b88cca5d",
+        "remote_state": "armed",
+        "revocation_generation": "12",
+        "revocation_unavailable": false,
+        "schema": "wsprrypi-wtp-endpoint/1"
+      },
+      "after": {
+        "address": "192.168.1.68",
+        "boot_id": "7fc341bb539880c21b0bb561bfd87063",
+        "device_id": "74d12151aff03c45cfcb15a45bd8e037",
+        "dns_sd_published": false,
+        "enabled": true,
+        "finishing_remote_job": false,
+        "launch_observed_monotonic_ns": null,
+        "launch_target_monotonic_ns": "0",
+        "listener_error": "",
+        "listener_running": true,
+        "local_effective": false,
+        "local_requested": false,
+        "local_work_active": false,
+        "output_unknown": false,
+        "port": 31417,
+        "remote_admission_closed": false,
+        "remote_job_id": "",
+        "remote_output_active": false,
+        "remote_owner": "",
+        "remote_state": "empty",
+        "revocation_generation": "12",
+        "revocation_unavailable": false,
+        "schema": "wsprrypi-wtp-endpoint/1"
+      },
+      "later": {
+        "address": "192.168.1.68",
+        "boot_id": "7fc341bb539880c21b0bb561bfd87063",
+        "device_id": "74d12151aff03c45cfcb15a45bd8e037",
+        "dns_sd_published": true,
+        "enabled": true,
+        "finishing_remote_job": false,
+        "launch_observed_monotonic_ns": null,
+        "launch_target_monotonic_ns": "0",
+        "listener_error": "",
+        "listener_running": true,
+        "local_effective": false,
+        "local_requested": false,
+        "local_work_active": false,
+        "output_unknown": false,
+        "port": 31417,
+        "remote_admission_closed": false,
+        "remote_job_id": "",
+        "remote_output_active": false,
+        "remote_owner": "",
+        "remote_state": "empty",
+        "revocation_generation": "12",
+        "revocation_unavailable": false,
+        "schema": "wsprrypi-wtp-endpoint/1"
+      },
+      "passed": true
+    },
+    "invalid-journal-inhibits-admission": {
+      "passed": true,
+      "state": {
+        "device_id": "74d12151aff03c45cfcb15a45bd8e037",
+        "enabled": false,
+        "error": "WTP takeover revocation journal unavailable",
+        "schema": "wsprrypi-wtp-endpoint/1"
+      }
+    },
+    "persisted-fleet-recovery-barrier": {
+      "passed": true,
+      "fixture": true,
+      "before": {
+        "assignments": [
+          {
+            "device_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "enabled": true,
+            "in_flight": true,
+            "last_start_ns": "1800000000000000000",
+            "management_port": 31415,
+            "name": "Installed recovery fixture",
+            "product": "WsprryPico",
+            "revocation_generation": null,
+            "schedule": {
+              "duration_ms": 1000,
+              "frequency_hz": 14097100,
+              "mode": "tone",
+              "period_seconds": 60,
+              "phase_seconds": 0
+            },
+            "settings": {
+              "Allow Frequency Adjustment": true,
+              "Device ID": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+              "Hostname": "192.0.2.123",
+              "Start Uncertainty ns": 500000000,
+              "TCP Port": 31417,
+              "Transport": "network_plain"
+            }
+          }
+        ],
+        "maximum_outputs": 8,
+        "now_ms": "103630",
+        "outputs": {
+          "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb": {
+            "message": "A previous process may have dispatched this job. Reconcile before resuming.",
+            "observed_ms": 103573,
+            "revoked": false,
+            "state": "recovery_required",
+            "wtp": {
+              "adjustments": [],
+              "arm_handed_off": false,
+              "capabilities": null,
+              "diagnostic": "",
+              "dispatch_utc_ns": "0",
+              "identity": null,
+              "job": null,
+              "job_id": "",
+              "last_recovery": null,
+              "last_report": null,
+              "lease_valid": false,
+              "observed_ms": "101571",
+              "owner_id": "571040e6cd8162189fa7d4aad4d74873",
+              "owns": false,
+              "phase": "idle",
+              "recovery_required": false,
+              "reload_requested": false,
+              "remote": null,
+              "request_id": "0",
+              "revision": "1",
+              "safety_fault": false,
+              "schema": "wsprrypi.wtp-runtime/1",
+              "session_diagnostic": "",
+              "session_id": "d53e83772d14dd78b23e179c2ce5b9d1",
+              "session_phase": "disconnected",
+              "start_utc_ns": "0",
+              "status_observed_ms": null,
+              "stop_requested": false,
+              "uncertain": false
+            }
+          }
+        },
+        "removals": [],
+        "scope": "wsprrypi-wtp-fleet/1",
+        "version": 1
+      },
+      "after": {
+        "assignments": [
+          {
+            "device_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "enabled": true,
+            "in_flight": true,
+            "last_start_ns": "1800000000000000000",
+            "management_port": 31415,
+            "name": "Installed recovery fixture",
+            "product": "WsprryPico",
+            "revocation_generation": null,
+            "schedule": {
+              "duration_ms": 1000,
+              "frequency_hz": 14097100,
+              "mode": "tone",
+              "period_seconds": 60,
+              "phase_seconds": 0
+            },
+            "settings": {
+              "Allow Frequency Adjustment": true,
+              "Device ID": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+              "Hostname": "192.0.2.123",
+              "Start Uncertainty ns": 500000000,
+              "TCP Port": 31417,
+              "Transport": "network_plain"
+            }
+          }
+        ],
+        "maximum_outputs": 8,
+        "now_ms": "106886",
+        "outputs": {
+          "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb": {
+            "message": "A previous process may have dispatched this job. Reconcile before resuming.",
+            "observed_ms": 106812,
+            "revoked": false,
+            "state": "recovery_required",
+            "wtp": {
+              "adjustments": [],
+              "arm_handed_off": false,
+              "capabilities": null,
+              "diagnostic": "",
+              "dispatch_utc_ns": "0",
+              "identity": null,
+              "job": null,
+              "job_id": "",
+              "last_recovery": null,
+              "last_report": null,
+              "lease_valid": false,
+              "observed_ms": "104811",
+              "owner_id": "e29e544a8ec6f6a1c73db8e5f0059bd7",
+              "owns": false,
+              "phase": "idle",
+              "recovery_required": false,
+              "reload_requested": false,
+              "remote": null,
+              "request_id": "0",
+              "revision": "1",
+              "safety_fault": false,
+              "schema": "wsprrypi.wtp-runtime/1",
+              "session_diagnostic": "",
+              "session_id": "d62416ee0f880ba418ef25a85b645d2a",
+              "session_phase": "disconnected",
+              "start_utc_ns": "0",
+              "status_observed_ms": null,
+              "stop_requested": false,
+              "uncertain": false
+            }
+          }
+        },
+        "removals": [],
+        "scope": "wsprrypi-wtp-fleet/1",
+        "version": 1
+      }
+    }
+  },
+  "rpc": [
+    {
+      "request": {
+        "op": "http",
+        "host": "192.168.1.68",
+        "path": "wtp-endpoint",
+        "method": "GET",
+        "body": null,
+        "revision": null
+      },
+      "reply": {
+        "ok": true,
+        "at_utc_ns": "1790772143721317264",
+        "value": [
+          200,
+          {
+            "Connection": "close",
+            "Content-Length": "626",
+            "Content-Type": "application/json",
+            "X-Content-Type-Options": "nosniff",
+            "Cache-Control": "no-store"
+          },
+          {
+            "address": "192.168.1.68",
+            "boot_id": "6ca9f06ce6210795b0a7ab5428865def",
+            "device_id": "74d12151aff03c45cfcb15a45bd8e037",
+            "dns_sd_published": false,
+            "enabled": true,
+            "finishing_remote_job": false,
+            "launch_observed_monotonic_ns": null,
+            "launch_target_monotonic_ns": "0",
+            "listener_error": "",
+            "listener_running": true,
+            "local_effective": false,
+            "local_requested": false,
+            "local_work_active": false,
+            "output_unknown": false,
+            "port": 31417,
+            "remote_admission_closed": false,
+            "remote_job_id": "",
+            "remote_output_active": false,
+            "remote_owner": "",
+            "remote_state": "empty",
+            "revocation_generation": "10",
+            "revocation_unavailable": false,
+            "schema": "wsprrypi-wtp-endpoint/1"
+          }
+        ]
+      }
+    },
+    {
+      "request": {
+        "op": "http",
+        "host": "192.168.1.68",
+        "path": "wtp-endpoint",
+        "method": "GET",
+        "body": null,
+        "revision": null
+      },
+      "reply": {
+        "ok": true,
+        "at_utc_ns": "1790772144544617341",
+        "value": [
+          200,
+          {
+            "Connection": "close",
+            "Content-Length": "625",
+            "Content-Type": "application/json",
+            "X-Content-Type-Options": "nosniff",
+            "Cache-Control": "no-store"
+          },
+          {
+            "address": "192.168.1.68",
+            "boot_id": "6ca9f06ce6210795b0a7ab5428865def",
+            "device_id": "74d12151aff03c45cfcb15a45bd8e037",
+            "dns_sd_published": true,
+            "enabled": true,
+            "finishing_remote_job": false,
+            "launch_observed_monotonic_ns": null,
+            "launch_target_monotonic_ns": "0",
+            "listener_error": "",
+            "listener_running": true,
+            "local_effective": false,
+            "local_requested": false,
+            "local_work_active": false,
+            "output_unknown": false,
+            "port": 31417,
+            "remote_admission_closed": false,
+            "remote_job_id": "",
+            "remote_output_active": false,
+            "remote_owner": "",
+            "remote_state": "empty",
+            "revocation_generation": "10",
+            "revocation_unavailable": false,
+            "schema": "wsprrypi-wtp-endpoint/1"
+          }
+        ]
+      }
+    },
+    {
+      "request": {
+        "op": "open",
+        "name": "first",
+        "host": "192.168.1.68"
+      },
+      "reply": {
+        "ok": true,
+        "at_utc_ns": "1790772145035463253",
+        "value": {
+          "hello": {
+            "type": "response",
+            "protocol": "WTP/1",
+            "session_id": "c25c9fdefe964cdaa8c1149bd332762a",
+            "request_id": "3be4b126d45e4f72a73a041b15cf7501",
+            "op": "HELLO",
+            "ok": true,
+            "body": {
+              "selected_version": "WTP/1",
+              "device_id": "74d12151aff03c45cfcb15a45bd8e037",
+              "boot_id": "6ca9f06ce6210795b0a7ab5428865def",
+              "product": "WsprryPi",
+              "firmware_version": "3.2.0-devel+ff632d5"
+            }
+          },
+          "owner": "4feda31af4c74a71bff32aff6c6f710c",
+          "session": "c25c9fdefe964cdaa8c1149bd332762a"
+        }
+      }
+    },
+    {
+      "request": {
+        "op": "request",
+        "name": "first",
+        "command": "CLAIM",
+        "body": {
+          "owner_id": "4feda31af4c74a71bff32aff6c6f710c",
+          "lease_ms": 60000
+        },
+        "okay": true
+      },
+      "reply": {
+        "ok": true,
+        "at_utc_ns": "1790772145092517987",
+        "value": {
+          "type": "response",
+          "protocol": "WTP/1",
+          "session_id": "c25c9fdefe964cdaa8c1149bd332762a",
+          "request_id": "b3aedf37c3bb46ae8dbc5ea57713527b",
+          "op": "CLAIM",
+          "ok": true,
+          "body": {
+            "owner_id": "4feda31af4c74a71bff32aff6c6f710c",
+            "granted_lease_ms": 60000,
+            "expires_monotonic_ns": "54151549848553"
+          }
+        }
+      }
+    },
+    {
+      "request": {
+        "op": "request",
+        "name": "first",
+        "command": "CAPS",
+        "body": null,
+        "okay": true
+      },
+      "reply": {
+        "ok": true,
+        "at_utc_ns": "1790772145148965482",
+        "value": {
+          "type": "response",
+          "protocol": "WTP/1",
+          "session_id": "c25c9fdefe964cdaa8c1149bd332762a",
+          "request_id": "05a05236b93b4754a30d805716d93500",
+          "op": "CAPS",
+          "ok": true,
+          "body": {
+            "profiles": [
+              "rf-events/1"
+            ],
+            "modes": [
+              "wspr",
+              "tone",
+              "qrss",
+              "fskcw",
+              "dfcw"
+            ],
+            "engine": "si5351",
+            "frequency_ranges": [
+              {
+                "minimum_nhz": "7812500000000",
+                "maximum_nhz": "200000000000000000"
+              }
+            ],
+            "max_payload_bytes": 65536,
+            "max_events": 512,
+            "max_job_duration_ns": "86400000000000",
+            "minimum_arm_lead_ns": "2000000000",
+            "maximum_arm_ahead_ns": "604800000000000",
+            "maximum_arm_uncertainty_ns": "500000000",
+            "maximum_holdover_age_ns": "0",
+            "output_disable_timeout_ns": "5000000000",
+            "minimum_lease_ms": 5000,
+            "maximum_lease_ms": 60000,
+            "response_cache_entries": 8,
+            "response_cache_ttl_seconds": 300,
+            "terminal_record_entries": 8,
+            "terminal_record_ttl_seconds": 3600
+          }
+        }
+      }
+    },
+    {
+      "request": {
+        "op": "request",
+        "name": "first",
+        "command": "RELEASE",
+        "body": null,
+        "okay": true
+      },
+      "reply": {
+        "ok": true,
+        "at_utc_ns": "1790772145201862225",
+        "value": {
+          "type": "response",
+          "protocol": "WTP/1",
+          "session_id": "c25c9fdefe964cdaa8c1149bd332762a",
+          "request_id": "1988ba230e86413685fcb6ef879b4da1",
+          "op": "RELEASE",
+          "ok": true,
+          "body": {}
+        }
+      }
+    },
+    {
+      "request": {
+        "op": "close",
+        "name": "first"
+      },
+      "reply": {
+        "ok": true,
+        "at_utc_ns": "1790772145205107107",
+        "value": [
+          {
+            "at": 1790772145.0354543,
+            "message": {
+              "type": "response",
+              "protocol": "WTP/1",
+              "session_id": "c25c9fdefe964cdaa8c1149bd332762a",
+              "request_id": "3be4b126d45e4f72a73a041b15cf7501",
+              "op": "HELLO",
+              "ok": true,
+              "body": {
+                "selected_version": "WTP/1",
+                "device_id": "74d12151aff03c45cfcb15a45bd8e037",
+                "boot_id": "6ca9f06ce6210795b0a7ab5428865def",
+                "product": "WsprryPi",
+                "firmware_version": "3.2.0-devel+ff632d5"
+              }
+            }
+          },
+          {
+            "at": 1790772145.092512,
+            "message": {
+              "type": "response",
+              "protocol": "WTP/1",
+              "session_id": "c25c9fdefe964cdaa8c1149bd332762a",
+              "request_id": "b3aedf37c3bb46ae8dbc5ea57713527b",
+              "op": "CLAIM",
+              "ok": true,
+              "body": {
+                "owner_id": "4feda31af4c74a71bff32aff6c6f710c",
+                "granted_lease_ms": 60000,
+                "expires_monotonic_ns": "54151549848553"
+              }
+            }
+          },
+          {
+            "at": 1790772145.1489604,
+            "message": {
+              "type": "response",
+              "protocol": "WTP/1",
+              "session_id": "c25c9fdefe964cdaa8c1149bd332762a",
+              "request_id": "05a05236b93b4754a30d805716d93500",
+              "op": "CAPS",
+              "ok": true,
+              "body": {
+                "profiles": [
+                  "rf-events/1"
+                ],
+                "modes": [
+                  "wspr",
+                  "tone",
+                  "qrss",
+                  "fskcw",
+                  "dfcw"
+                ],
+                "engine": "si5351",
+                "frequency_ranges": [
+                  {
+                    "minimum_nhz": "7812500000000",
+                    "maximum_nhz": "200000000000000000"
+                  }
+                ],
+                "max_payload_bytes": 65536,
+                "max_events": 512,
+                "max_job_duration_ns": "86400000000000",
+                "minimum_arm_lead_ns": "2000000000",
+                "maximum_arm_ahead_ns": "604800000000000",
+                "maximum_arm_uncertainty_ns": "500000000",
+                "maximum_holdover_age_ns": "0",
+                "output_disable_timeout_ns": "5000000000",
+                "minimum_lease_ms": 5000,
+                "maximum_lease_ms": 60000,
+                "response_cache_entries": 8,
+                "response_cache_ttl_seconds": 300,
+                "terminal_record_entries": 8,
+                "terminal_record_ttl_seconds": 3600
+              }
+            }
+          },
+          {
+            "at": 1790772145.2018569,
+            "message": {
+              "type": "response",
+              "protocol": "WTP/1",
+              "session_id": "c25c9fdefe964cdaa8c1149bd332762a",
+              "request_id": "1988ba230e86413685fcb6ef879b4da1",
+              "op": "RELEASE",
+              "ok": true,
+              "body": {}
+            }
+          }
+        ]
+      }
+    },
+    {
+      "request": {
+        "op": "http",
+        "host": "192.168.1.68",
+        "path": "wtp-endpoint",
+        "method": "GET",
+        "body": null,
+        "revision": null
+      },
+      "reply": {
+        "ok": true,
+        "at_utc_ns": "1790772145992938331",
+        "value": [
+          200,
+          {
+            "Connection": "close",
+            "Content-Length": "625",
+            "Content-Type": "application/json",
+            "X-Content-Type-Options": "nosniff",
+            "Cache-Control": "no-store"
+          },
+          {
+            "address": "192.168.1.68",
+            "boot_id": "6ca9f06ce6210795b0a7ab5428865def",
+            "device_id": "74d12151aff03c45cfcb15a45bd8e037",
+            "dns_sd_published": true,
+            "enabled": true,
+            "finishing_remote_job": false,
+            "launch_observed_monotonic_ns": null,
+            "launch_target_monotonic_ns": "0",
+            "listener_error": "",
+            "listener_running": true,
+            "local_effective": false,
+            "local_requested": false,
+            "local_work_active": false,
+            "output_unknown": false,
+            "port": 31417,
+            "remote_admission_closed": false,
+            "remote_job_id": "",
+            "remote_output_active": false,
+            "remote_owner": "",
+            "remote_state": "empty",
+            "revocation_generation": "10",
+            "revocation_unavailable": false,
+            "schema": "wsprrypi-wtp-endpoint/1"
+          }
+        ]
+      }
+    },
+    {
+      "request": {
+        "op": "http",
+        "host": "192.168.1.68",
+        "path": "wtp-endpoint",
+        "method": "GET",
+        "body": null,
+        "revision": null
+      },
+      "reply": {
+        "ok": true,
+        "at_utc_ns": "1790772192936193420",
+        "value": [
+          200,
+          {
+            "Connection": "close",
+            "Content-Length": "625",
+            "Content-Type": "application/json",
+            "X-Content-Type-Options": "nosniff",
+            "Cache-Control": "no-store"
+          },
+          {
+            "address": "192.168.1.68",
+            "boot_id": "6105b6d9f9fcf6f18c407290db95c401",
+            "device_id": "74d12151aff03c45cfcb15a45bd8e037",
+            "dns_sd_published": true,
+            "enabled": true,
+            "finishing_remote_job": false,
+            "launch_observed_monotonic_ns": null,
+            "launch_target_monotonic_ns": "0",
+            "listener_error": "",
+            "listener_running": true,
+            "local_effective": false,
+            "local_requested": false,
+            "local_work_active": false,
+            "output_unknown": false,
+            "port": 31417,
+            "remote_admission_closed": false,
+            "remote_job_id": "",
+            "remote_output_active": false,
+            "remote_owner": "",
+            "remote_state": "empty",
+            "revocation_generation": "10",
+            "revocation_unavailable": false,
+            "schema": "wsprrypi-wtp-endpoint/1"
+          }
+        ]
+      }
+    },
+    {
+      "request": {
+        "op": "http",
+        "host": "192.168.1.68",
+        "path": "wtp-endpoint",
+        "method": "GET",
+        "body": null,
+        "revision": null
+      },
+      "reply": {
+        "ok": true,
+        "at_utc_ns": "1790772193925667151",
+        "value": [
+          200,
+          {
+            "Connection": "close",
+            "Content-Length": "625",
+            "Content-Type": "application/json",
+            "X-Content-Type-Options": "nosniff",
+            "Cache-Control": "no-store"
+          },
+          {
+            "address": "192.168.1.68",
+            "boot_id": "6105b6d9f9fcf6f18c407290db95c401",
+            "device_id": "74d12151aff03c45cfcb15a45bd8e037",
+            "dns_sd_published": true,
+            "enabled": true,
+            "finishing_remote_job": false,
+            "launch_observed_monotonic_ns": null,
+            "launch_target_monotonic_ns": "0",
+            "listener_error": "",
+            "listener_running": true,
+            "local_effective": false,
+            "local_requested": false,
+            "local_work_active": false,
+            "output_unknown": false,
+            "port": 31417,
+            "remote_admission_closed": false,
+            "remote_job_id": "",
+            "remote_output_active": false,
+            "remote_owner": "",
+            "remote_state": "empty",
+            "revocation_generation": "10",
+            "revocation_unavailable": false,
+            "schema": "wsprrypi-wtp-endpoint/1"
+          }
+        ]
+      }
+    },
+    {
+      "request": {
+        "op": "open",
+        "name": "boot-off",
+        "host": "192.168.1.68"
+      },
+      "reply": {
+        "ok": true,
+        "at_utc_ns": "1790772193940726303",
+        "value": {
+          "hello": {
+            "type": "response",
+            "protocol": "WTP/1",
+            "session_id": "869ec5b99a4d49c5b7c53b3794c88cd5",
+            "request_id": "d37bad392b634119a0cd1f292c50a556",
+            "op": "HELLO",
+            "ok": true,
+            "body": {
+              "selected_version": "WTP/1",
+              "device_id": "74d12151aff03c45cfcb15a45bd8e037",
+              "boot_id": "6105b6d9f9fcf6f18c407290db95c401",
+              "product": "WsprryPi",
+              "firmware_version": "3.2.0-devel+ff632d5"
+            }
+          },
+          "owner": "a197fb5a0d3749d597995bcbcc0195c7",
+          "session": "869ec5b99a4d49c5b7c53b3794c88cd5"
+        }
+      }
+    },
+    {
+      "request": {
+        "op": "request",
+        "name": "boot-off",
+        "command": "CLAIM",
+        "body": {
+          "owner_id": "a197fb5a0d3749d597995bcbcc0195c7",
+          "lease_ms": 60000
+        },
+        "okay": true
+      },
+      "reply": {
+        "ok": true,
+        "at_utc_ns": "1790772193995848832",
+        "value": {
+          "type": "response",
+          "protocol": "WTP/1",
+          "session_id": "869ec5b99a4d49c5b7c53b3794c88cd5",
+          "request_id": "6d0df32865654890bef8aba50b2547b8",
+          "op": "CLAIM",
+          "ok": true,
+          "body": {
+            "owner_id": "a197fb5a0d3749d597995bcbcc0195c7",
+            "granted_lease_ms": 60000,
+            "expires_monotonic_ns": "89803608017"
+          }
+        }
+      }
+    },
+    {
+      "request": {
+        "op": "request",
+        "name": "boot-off",
+        "command": "RELEASE",
+        "body": null,
+        "okay": true
+      },
+      "reply": {
+        "ok": true,
+        "at_utc_ns": "1790772194053722300",
+        "value": {
+          "type": "response",
+          "protocol": "WTP/1",
+          "session_id": "869ec5b99a4d49c5b7c53b3794c88cd5",
+          "request_id": "c3f11eb32a6e40259a3b55ac3e81ad0d",
+          "op": "RELEASE",
+          "ok": true,
+          "body": {}
+        }
+      }
+    },
+    {
+      "request": {
+        "op": "close",
+        "name": "boot-off"
+      },
+      "reply": {
+        "ok": true,
+        "at_utc_ns": "1790772194074112441",
+        "value": [
+          {
+            "at": 1790772193.9407036,
+            "message": {
+              "type": "response",
+              "protocol": "WTP/1",
+              "session_id": "869ec5b99a4d49c5b7c53b3794c88cd5",
+              "request_id": "d37bad392b634119a0cd1f292c50a556",
+              "op": "HELLO",
+              "ok": true,
+              "body": {
+                "selected_version": "WTP/1",
+                "device_id": "74d12151aff03c45cfcb15a45bd8e037",
+                "boot_id": "6105b6d9f9fcf6f18c407290db95c401",
+                "product": "WsprryPi",
+                "firmware_version": "3.2.0-devel+ff632d5"
+              }
+            }
+          },
+          {
+            "at": 1790772193.9958453,
+            "message": {
+              "type": "response",
+              "protocol": "WTP/1",
+              "session_id": "869ec5b99a4d49c5b7c53b3794c88cd5",
+              "request_id": "6d0df32865654890bef8aba50b2547b8",
+              "op": "CLAIM",
+              "ok": true,
+              "body": {
+                "owner_id": "a197fb5a0d3749d597995bcbcc0195c7",
+                "granted_lease_ms": 60000,
+                "expires_monotonic_ns": "89803608017"
+              }
+            }
+          },
+          {
+            "at": 1790772194.053719,
+            "message": {
+              "type": "response",
+              "protocol": "WTP/1",
+              "session_id": "869ec5b99a4d49c5b7c53b3794c88cd5",
+              "request_id": "c3f11eb32a6e40259a3b55ac3e81ad0d",
+              "op": "RELEASE",
+              "ok": true,
+              "body": {}
+            }
+          }
+        ]
+      }
+    },
+    {
+      "request": {
+        "op": "http",
+        "host": "192.168.1.68",
+        "path": "wtp-endpoint",
+        "method": "GET",
+        "body": null,
+        "revision": null
+      },
+      "reply": {
+        "ok": true,
+        "at_utc_ns": "1790772194667448139",
+        "value": [
+          200,
+          {
+            "Connection": "close",
+            "Content-Length": "625",
+            "Content-Type": "application/json",
+            "X-Content-Type-Options": "nosniff",
+            "Cache-Control": "no-store"
+          },
+          {
+            "address": "192.168.1.68",
+            "boot_id": "6105b6d9f9fcf6f18c407290db95c401",
+            "device_id": "74d12151aff03c45cfcb15a45bd8e037",
+            "dns_sd_published": true,
+            "enabled": true,
+            "finishing_remote_job": false,
+            "launch_observed_monotonic_ns": null,
+            "launch_target_monotonic_ns": "0",
+            "listener_error": "",
+            "listener_running": true,
+            "local_effective": false,
+            "local_requested": false,
+            "local_work_active": false,
+            "output_unknown": false,
+            "port": 31417,
+            "remote_admission_closed": false,
+            "remote_job_id": "",
+            "remote_output_active": false,
+            "remote_owner": "",
+            "remote_state": "empty",
+            "revocation_generation": "10",
+            "revocation_unavailable": false,
+            "schema": "wsprrypi-wtp-endpoint/1"
+          }
+        ]
+      }
+    },
+    {
+      "request": {
+        "op": "http",
+        "host": "192.168.1.68",
+        "path": "wtp-endpoint",
+        "method": "GET",
+        "body": null,
+        "revision": null
+      },
+      "reply": {
+        "ok": true,
+        "at_utc_ns": "1790772195688944930",
+        "value": [
+          200,
+          {
+            "Connection": "close",
+            "Content-Length": "625",
+            "Content-Type": "application/json",
+            "X-Content-Type-Options": "nosniff",
+            "Cache-Control": "no-store"
+          },
+          {
+            "address": "192.168.1.68",
+            "boot_id": "6105b6d9f9fcf6f18c407290db95c401",
+            "device_id": "74d12151aff03c45cfcb15a45bd8e037",
+            "dns_sd_published": true,
+            "enabled": true,
+            "finishing_remote_job": false,
+            "launch_observed_monotonic_ns": null,
+            "launch_target_monotonic_ns": "0",
+            "listener_error": "",
+            "listener_running": true,
+            "local_effective": false,
+            "local_requested": false,
+            "local_work_active": false,
+            "output_unknown": false,
+            "port": 31417,
+            "remote_admission_closed": false,
+            "remote_job_id": "",
+            "remote_output_active": false,
+            "remote_owner": "",
+            "remote_state": "empty",
+            "revocation_generation": "10",
+            "revocation_unavailable": false,
+            "schema": "wsprrypi-wtp-endpoint/1"
+          }
+        ]
+      }
+    },
+    {
+      "request": {
+        "op": "http",
+        "host": "192.168.1.68",
+        "path": "wtp-endpoint",
+        "method": "GET",
+        "body": null,
+        "revision": null
+      },
+      "reply": {
+        "ok": true,
+        "at_utc_ns": "1790772196705647454",
+        "value": [
+          200,
+          {
+            "Connection": "close",
+            "Content-Length": "625",
+            "Content-Type": "application/json",
+            "X-Content-Type-Options": "nosniff",
+            "Cache-Control": "no-store"
+          },
+          {
+            "address": "192.168.1.68",
+            "boot_id": "6105b6d9f9fcf6f18c407290db95c401",
+            "device_id": "74d12151aff03c45cfcb15a45bd8e037",
+            "dns_sd_published": true,
+            "enabled": true,
+            "finishing_remote_job": false,
+            "launch_observed_monotonic_ns": null,
+            "launch_target_monotonic_ns": "0",
+            "listener_error": "",
+            "listener_running": true,
+            "local_effective": false,
+            "local_requested": false,
+            "local_work_active": false,
+            "output_unknown": false,
+            "port": 31417,
+            "remote_admission_closed": false,
+            "remote_job_id": "",
+            "remote_output_active": false,
+            "remote_owner": "",
+            "remote_state": "empty",
+            "revocation_generation": "10",
+            "revocation_unavailable": false,
+            "schema": "wsprrypi-wtp-endpoint/1"
+          }
+        ]
+      }
+    },
+    {
+      "request": {
+        "op": "http",
+        "host": "192.168.1.68",
+        "path": "wtp-endpoint",
+        "method": "GET",
+        "body": null,
+        "revision": null
+      },
+      "reply": {
+        "ok": true,
+        "at_utc_ns": "1790772197723703935",
+        "value": [
+          200,
+          {
+            "Connection": "close",
+            "Content-Length": "625",
+            "Content-Type": "application/json",
+            "X-Content-Type-Options": "nosniff",
+            "Cache-Control": "no-store"
+          },
+          {
+            "address": "192.168.1.68",
+            "boot_id": "6105b6d9f9fcf6f18c407290db95c401",
+            "device_id": "74d12151aff03c45cfcb15a45bd8e037",
+            "dns_sd_published": true,
+            "enabled": true,
+            "finishing_remote_job": false,
+            "launch_observed_monotonic_ns": null,
+            "launch_target_monotonic_ns": "0",
+            "listener_error": "",
+            "listener_running": true,
+            "local_effective": false,
+            "local_requested": false,
+            "local_work_active": false,
+            "output_unknown": false,
+            "port": 31417,
+            "remote_admission_closed": false,
+            "remote_job_id": "",
+            "remote_output_active": false,
+            "remote_owner": "",
+            "remote_state": "empty",
+            "revocation_generation": "10",
+            "revocation_unavailable": false,
+            "schema": "wsprrypi-wtp-endpoint/1"
+          }
+        ]
+      }
+    },
+    {
+      "request": {
+        "op": "http",
+        "host": "192.168.1.68",
+        "path": "wtp-endpoint",
+        "method": "GET",
+        "body": null,
+        "revision": null
+      },
+      "reply": {
+        "ok": true,
+        "at_utc_ns": "1790772198743148380",
+        "value": [
+          200,
+          {
+            "Connection": "close",
+            "Content-Length": "625",
+            "Content-Type": "application/json",
+            "X-Content-Type-Options": "nosniff",
+            "Cache-Control": "no-store"
+          },
+          {
+            "address": "192.168.1.68",
+            "boot_id": "6105b6d9f9fcf6f18c407290db95c401",
+            "device_id": "74d12151aff03c45cfcb15a45bd8e037",
+            "dns_sd_published": true,
+            "enabled": true,
+            "finishing_remote_job": false,
+            "launch_observed_monotonic_ns": null,
+            "launch_target_monotonic_ns": "0",
+            "listener_error": "",
+            "listener_running": true,
+            "local_effective": false,
+            "local_requested": false,
+            "local_work_active": false,
+            "output_unknown": false,
+            "port": 31417,
+            "remote_admission_closed": false,
+            "remote_job_id": "",
+            "remote_output_active": false,
+            "remote_owner": "",
+            "remote_state": "empty",
+            "revocation_generation": "10",
+            "revocation_unavailable": false,
+            "schema": "wsprrypi-wtp-endpoint/1"
+          }
+        ]
+      }
+    },
+    {
+      "request": {
+        "op": "http",
+        "host": "192.168.1.68",
+        "path": "wtp-endpoint",
+        "method": "GET",
+        "body": null,
+        "revision": null
+      },
+      "reply": {
+        "ok": true,
+        "at_utc_ns": "1790772199760440200",
+        "value": [
+          200,
+          {
+            "Connection": "close",
+            "Content-Length": "622",
+            "Content-Type": "application/json",
+            "X-Content-Type-Options": "nosniff",
+            "Cache-Control": "no-store"
+          },
+          {
+            "address": "192.168.1.68",
+            "boot_id": "6105b6d9f9fcf6f18c407290db95c401",
+            "device_id": "74d12151aff03c45cfcb15a45bd8e037",
+            "dns_sd_published": true,
+            "enabled": true,
+            "finishing_remote_job": false,
+            "launch_observed_monotonic_ns": null,
+            "launch_target_monotonic_ns": "0",
+            "listener_error": "",
+            "listener_running": true,
+            "local_effective": true,
+            "local_requested": true,
+            "local_work_active": false,
+            "output_unknown": false,
+            "port": 31417,
+            "remote_admission_closed": true,
+            "remote_job_id": "",
+            "remote_output_active": false,
+            "remote_owner": "",
+            "remote_state": "empty",
+            "revocation_generation": "11",
+            "revocation_unavailable": false,
+            "schema": "wsprrypi-wtp-endpoint/1"
+          }
+        ]
+      }
+    },
+    {
+      "request": {
+        "op": "http",
+        "host": "192.168.1.68",
+        "path": "wtp-endpoint",
+        "method": "GET",
+        "body": null,
+        "revision": null
+      },
+      "reply": {
+        "ok": true,
+        "at_utc_ns": "1790772201038150759",
+        "value": [
+          200,
+          {
+            "Connection": "close",
+            "Content-Length": "622",
+            "Content-Type": "application/json",
+            "X-Content-Type-Options": "nosniff",
+            "Cache-Control": "no-store"
+          },
+          {
+            "address": "192.168.1.68",
+            "boot_id": "6105b6d9f9fcf6f18c407290db95c401",
+            "device_id": "74d12151aff03c45cfcb15a45bd8e037",
+            "dns_sd_published": true,
+            "enabled": true,
+            "finishing_remote_job": false,
+            "launch_observed_monotonic_ns": null,
+            "launch_target_monotonic_ns": "0",
+            "listener_error": "",
+            "listener_running": true,
+            "local_effective": true,
+            "local_requested": true,
+            "local_work_active": false,
+            "output_unknown": false,
+            "port": 31417,
+            "remote_admission_closed": true,
+            "remote_job_id": "",
+            "remote_output_active": false,
+            "remote_owner": "",
+            "remote_state": "empty",
+            "revocation_generation": "11",
+            "revocation_unavailable": false,
+            "schema": "wsprrypi-wtp-endpoint/1"
+          }
+        ]
+      }
+    },
+    {
+      "request": {
+        "op": "http",
+        "host": "192.168.1.68",
+        "path": "wtp-endpoint",
+        "method": "GET",
+        "body": null,
+        "revision": null
+      },
+      "reply": {
+        "ok": true,
+        "at_utc_ns": "1790772243195052709",
+        "value": [
+          200,
+          {
+            "Connection": "close",
+            "Content-Length": "622",
+            "Content-Type": "application/json",
+            "X-Content-Type-Options": "nosniff",
+            "Cache-Control": "no-store"
+          },
+          {
+            "address": "192.168.1.68",
+            "boot_id": "11890e672d1a28e993efdb9730165e1d",
+            "device_id": "74d12151aff03c45cfcb15a45bd8e037",
+            "dns_sd_published": true,
+            "enabled": true,
+            "finishing_remote_job": false,
+            "launch_observed_monotonic_ns": null,
+            "launch_target_monotonic_ns": "0",
+            "listener_error": "",
+            "listener_running": true,
+            "local_effective": true,
+            "local_requested": true,
+            "local_work_active": false,
+            "output_unknown": false,
+            "port": 31417,
+            "remote_admission_closed": true,
+            "remote_job_id": "",
+            "remote_output_active": false,
+            "remote_owner": "",
+            "remote_state": "empty",
+            "revocation_generation": "12",
+            "revocation_unavailable": false,
+            "schema": "wsprrypi-wtp-endpoint/1"
+          }
+        ]
+      }
+    },
+    {
+      "request": {
+        "op": "http",
+        "host": "192.168.1.68",
+        "path": "wtp-endpoint",
+        "method": "GET",
+        "body": null,
+        "revision": null
+      },
+      "reply": {
+        "ok": true,
+        "at_utc_ns": "1790772244010309665",
+        "value": [
+          200,
+          {
+            "Connection": "close",
+            "Content-Length": "622",
+            "Content-Type": "application/json",
+            "X-Content-Type-Options": "nosniff",
+            "Cache-Control": "no-store"
+          },
+          {
+            "address": "192.168.1.68",
+            "boot_id": "11890e672d1a28e993efdb9730165e1d",
+            "device_id": "74d12151aff03c45cfcb15a45bd8e037",
+            "dns_sd_published": true,
+            "enabled": true,
+            "finishing_remote_job": false,
+            "launch_observed_monotonic_ns": null,
+            "launch_target_monotonic_ns": "0",
+            "listener_error": "",
+            "listener_running": true,
+            "local_effective": true,
+            "local_requested": true,
+            "local_work_active": false,
+            "output_unknown": false,
+            "port": 31417,
+            "remote_admission_closed": true,
+            "remote_job_id": "",
+            "remote_output_active": false,
+            "remote_owner": "",
+            "remote_state": "empty",
+            "revocation_generation": "12",
+            "revocation_unavailable": false,
+            "schema": "wsprrypi-wtp-endpoint/1"
+          }
+        ]
+      }
+    },
+    {
+      "request": {
+        "op": "open",
+        "name": "boot-on",
+        "host": "192.168.1.68"
+      },
+      "reply": {
+        "ok": true,
+        "at_utc_ns": "1790772244026659296",
+        "value": {
+          "hello": {
+            "type": "response",
+            "protocol": "WTP/1",
+            "session_id": "ca40a212f87041309c6e387477a0e316",
+            "request_id": "79ed7ec29037408c88b233a1b1ebc6ae",
+            "op": "HELLO",
+            "ok": true,
+            "body": {
+              "selected_version": "WTP/1",
+              "device_id": "74d12151aff03c45cfcb15a45bd8e037",
+              "boot_id": "11890e672d1a28e993efdb9730165e1d",
+              "product": "WsprryPi",
+              "firmware_version": "3.2.0-devel+ff632d5"
+            }
+          },
+          "owner": "b2c6827806e74559a71d478ff528deeb",
+          "session": "ca40a212f87041309c6e387477a0e316"
+        }
+      }
+    },
+    {
+      "request": {
+        "op": "request",
+        "name": "boot-on",
+        "command": "CLAIM",
+        "body": {
+          "owner_id": "b2c6827806e74559a71d478ff528deeb",
+          "lease_ms": 60000
+        },
+        "okay": false
+      },
+      "reply": {
+        "ok": true,
+        "at_utc_ns": "1790772244082170730",
+        "value": {
+          "type": "response",
+          "protocol": "WTP/1",
+          "session_id": "ca40a212f87041309c6e387477a0e316",
+          "request_id": "45ffd993e0da4a768513d37d44e3c3d1",
+          "op": "CLAIM",
+          "ok": false,
+          "error": {
+            "code": "BUSY",
+            "message": "BUSY",
+            "retryable": true
+          }
+        }
+      }
+    },
+    {
+      "request": {
+        "op": "close",
+        "name": "boot-on"
+      },
+      "reply": {
+        "ok": true,
+        "at_utc_ns": "1790772244086909238",
+        "value": [
+          {
+            "at": 1790772244.026647,
+            "message": {
+              "type": "response",
+              "protocol": "WTP/1",
+              "session_id": "ca40a212f87041309c6e387477a0e316",
+              "request_id": "79ed7ec29037408c88b233a1b1ebc6ae",
+              "op": "HELLO",
+              "ok": true,
+              "body": {
+                "selected_version": "WTP/1",
+                "device_id": "74d12151aff03c45cfcb15a45bd8e037",
+                "boot_id": "11890e672d1a28e993efdb9730165e1d",
+                "product": "WsprryPi",
+                "firmware_version": "3.2.0-devel+ff632d5"
+              }
+            }
+          },
+          {
+            "at": 1790772244.0821683,
+            "message": {
+              "type": "response",
+              "protocol": "WTP/1",
+              "session_id": "ca40a212f87041309c6e387477a0e316",
+              "request_id": "45ffd993e0da4a768513d37d44e3c3d1",
+              "op": "CLAIM",
+              "ok": false,
+              "error": {
+                "code": "BUSY",
+                "message": "BUSY",
+                "retryable": true
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "request": {
+        "op": "http",
+        "host": "192.168.1.68",
+        "path": "wtp-endpoint",
+        "method": "GET",
+        "body": null,
+        "revision": null
+      },
+      "reply": {
+        "ok": true,
+        "at_utc_ns": "1790772245442693937",
+        "value": [
+          200,
+          {
+            "Connection": "close",
+            "Content-Length": "622",
+            "Content-Type": "application/json",
+            "X-Content-Type-Options": "nosniff",
+            "Cache-Control": "no-store"
+          },
+          {
+            "address": "192.168.1.68",
+            "boot_id": "11890e672d1a28e993efdb9730165e1d",
+            "device_id": "74d12151aff03c45cfcb15a45bd8e037",
+            "dns_sd_published": true,
+            "enabled": true,
+            "finishing_remote_job": false,
+            "launch_observed_monotonic_ns": null,
+            "launch_target_monotonic_ns": "0",
+            "listener_error": "",
+            "listener_running": true,
+            "local_effective": true,
+            "local_requested": true,
+            "local_work_active": false,
+            "output_unknown": false,
+            "port": 31417,
+            "remote_admission_closed": true,
+            "remote_job_id": "",
+            "remote_output_active": false,
+            "remote_owner": "",
+            "remote_state": "empty",
+            "revocation_generation": "12",
+            "revocation_unavailable": false,
+            "schema": "wsprrypi-wtp-endpoint/1"
+          }
+        ]
+      }
+    },
+    {
+      "request": {
+        "op": "http",
+        "host": "192.168.1.68",
+        "path": "wtp-endpoint",
+        "method": "GET",
+        "body": null,
+        "revision": null
+      },
+      "reply": {
+        "ok": true,
+        "at_utc_ns": "1790772246461006874",
+        "value": [
+          200,
+          {
+            "Connection": "close",
+            "Content-Length": "622",
+            "Content-Type": "application/json",
+            "X-Content-Type-Options": "nosniff",
+            "Cache-Control": "no-store"
+          },
+          {
+            "address": "192.168.1.68",
+            "boot_id": "11890e672d1a28e993efdb9730165e1d",
+            "device_id": "74d12151aff03c45cfcb15a45bd8e037",
+            "dns_sd_published": true,
+            "enabled": true,
+            "finishing_remote_job": false,
+            "launch_observed_monotonic_ns": null,
+            "launch_target_monotonic_ns": "0",
+            "listener_error": "",
+            "listener_running": true,
+            "local_effective": true,
+            "local_requested": true,
+            "local_work_active": false,
+            "output_unknown": false,
+            "port": 31417,
+            "remote_admission_closed": true,
+            "remote_job_id": "",
+            "remote_output_active": false,
+            "remote_owner": "",
+            "remote_state": "empty",
+            "revocation_generation": "12",
+            "revocation_unavailable": false,
+            "schema": "wsprrypi-wtp-endpoint/1"
+          }
+        ]
+      }
+    },
+    {
+      "request": {
+        "op": "http",
+        "host": "192.168.1.68",
+        "path": "wtp-endpoint",
+        "method": "GET",
+        "body": null,
+        "revision": null
+      },
+      "reply": {
+        "ok": true,
+        "at_utc_ns": "1790772247482301688",
+        "value": [
+          200,
+          {
+            "Connection": "close",
+            "Content-Length": "622",
+            "Content-Type": "application/json",
+            "X-Content-Type-Options": "nosniff",
+            "Cache-Control": "no-store"
+          },
+          {
+            "address": "192.168.1.68",
+            "boot_id": "11890e672d1a28e993efdb9730165e1d",
+            "device_id": "74d12151aff03c45cfcb15a45bd8e037",
+            "dns_sd_published": true,
+            "enabled": true,
+            "finishing_remote_job": false,
+            "launch_observed_monotonic_ns": null,
+            "launch_target_monotonic_ns": "0",
+            "listener_error": "",
+            "listener_running": true,
+            "local_effective": true,
+            "local_requested": true,
+            "local_work_active": false,
+            "output_unknown": false,
+            "port": 31417,
+            "remote_admission_closed": true,
+            "remote_job_id": "",
+            "remote_output_active": false,
+            "remote_owner": "",
+            "remote_state": "empty",
+            "revocation_generation": "12",
+            "revocation_unavailable": false,
+            "schema": "wsprrypi-wtp-endpoint/1"
+          }
+        ]
+      }
+    },
+    {
+      "request": {
+        "op": "http",
+        "host": "192.168.1.68",
+        "path": "wtp-endpoint",
+        "method": "GET",
+        "body": null,
+        "revision": null
+      },
+      "reply": {
+        "ok": true,
+        "at_utc_ns": "1790772248503222396",
+        "value": [
+          200,
+          {
+            "Connection": "close",
+            "Content-Length": "622",
+            "Content-Type": "application/json",
+            "X-Content-Type-Options": "nosniff",
+            "Cache-Control": "no-store"
+          },
+          {
+            "address": "192.168.1.68",
+            "boot_id": "11890e672d1a28e993efdb9730165e1d",
+            "device_id": "74d12151aff03c45cfcb15a45bd8e037",
+            "dns_sd_published": true,
+            "enabled": true,
+            "finishing_remote_job": false,
+            "launch_observed_monotonic_ns": null,
+            "launch_target_monotonic_ns": "0",
+            "listener_error": "",
+            "listener_running": true,
+            "local_effective": true,
+            "local_requested": true,
+            "local_work_active": false,
+            "output_unknown": false,
+            "port": 31417,
+            "remote_admission_closed": true,
+            "remote_job_id": "",
+            "remote_output_active": false,
+            "remote_owner": "",
+            "remote_state": "empty",
+            "revocation_generation": "12",
+            "revocation_unavailable": false,
+            "schema": "wsprrypi-wtp-endpoint/1"
+          }
+        ]
+      }
+    },
+    {
+      "request": {
+        "op": "http",
+        "host": "192.168.1.68",
+        "path": "wtp-endpoint",
+        "method": "GET",
+        "body": null,
+        "revision": null
+      },
+      "reply": {
+        "ok": true,
+        "at_utc_ns": "1790772249519599410",
+        "value": [
+          200,
+          {
+            "Connection": "close",
+            "Content-Length": "625",
+            "Content-Type": "application/json",
+            "X-Content-Type-Options": "nosniff",
+            "Cache-Control": "no-store"
+          },
+          {
+            "address": "192.168.1.68",
+            "boot_id": "11890e672d1a28e993efdb9730165e1d",
+            "device_id": "74d12151aff03c45cfcb15a45bd8e037",
+            "dns_sd_published": true,
+            "enabled": true,
+            "finishing_remote_job": false,
+            "launch_observed_monotonic_ns": null,
+            "launch_target_monotonic_ns": "0",
+            "listener_error": "",
+            "listener_running": true,
+            "local_effective": false,
+            "local_requested": false,
+            "local_work_active": false,
+            "output_unknown": false,
+            "port": 31417,
+            "remote_admission_closed": false,
+            "remote_job_id": "",
+            "remote_output_active": false,
+            "remote_owner": "",
+            "remote_state": "empty",
+            "revocation_generation": "12",
+            "revocation_unavailable": false,
+            "schema": "wsprrypi-wtp-endpoint/1"
+          }
+        ]
+      }
+    },
+    {
+      "request": {
+        "op": "open",
+        "name": "owned",
+        "host": "192.168.1.68"
+      },
+      "reply": {
+        "ok": true,
+        "at_utc_ns": "1790772249531743237",
+        "value": {
+          "hello": {
+            "type": "response",
+            "protocol": "WTP/1",
+            "session_id": "61beb3e9a0344a34b2b2175ee500ad33",
+            "request_id": "29d01f21aca0427d8c37dd5615f4eaba",
+            "op": "HELLO",
+            "ok": true,
+            "body": {
+              "selected_version": "WTP/1",
+              "device_id": "74d12151aff03c45cfcb15a45bd8e037",
+              "boot_id": "11890e672d1a28e993efdb9730165e1d",
+              "product": "WsprryPi",
+              "firmware_version": "3.2.0-devel+ff632d5"
+            }
+          },
+          "owner": "2edd7a7cc85f487ebbb8c7c2da2d4ba8",
+          "session": "61beb3e9a0344a34b2b2175ee500ad33"
+        }
+      }
+    },
+    {
+      "request": {
+        "op": "request",
+        "name": "owned",
+        "command": "CLAIM",
+        "body": {
+          "owner_id": "2edd7a7cc85f487ebbb8c7c2da2d4ba8",
+          "lease_ms": 60000
+        },
+        "okay": true
+      },
+      "reply": {
+        "ok": true,
+        "at_utc_ns": "1790772249582961850",
+        "value": {
+          "type": "response",
+          "protocol": "WTP/1",
+          "session_id": "61beb3e9a0344a34b2b2175ee500ad33",
+          "request_id": "5f9c02220f2e4fe4accc77c47e61ab2f",
+          "op": "CLAIM",
+          "ok": true,
+          "body": {
+            "owner_id": "2edd7a7cc85f487ebbb8c7c2da2d4ba8",
+            "granted_lease_ms": 60000,
+            "expires_monotonic_ns": "94300517448"
+          }
+        }
+      }
+    },
+    {
+      "request": {
+        "op": "http",
+        "host": "192.168.1.68",
+        "path": "wtp-endpoint",
+        "method": "GET",
+        "body": null,
+        "revision": null
+      },
+      "reply": {
+        "ok": true,
+        "at_utc_ns": "1790772250440078591",
+        "value": [
+          200,
+          {
+            "Connection": "close",
+            "Content-Length": "657",
+            "Content-Type": "application/json",
+            "X-Content-Type-Options": "nosniff",
+            "Cache-Control": "no-store"
+          },
+          {
+            "address": "192.168.1.68",
+            "boot_id": "11890e672d1a28e993efdb9730165e1d",
+            "device_id": "74d12151aff03c45cfcb15a45bd8e037",
+            "dns_sd_published": true,
+            "enabled": true,
+            "finishing_remote_job": false,
+            "launch_observed_monotonic_ns": null,
+            "launch_target_monotonic_ns": "0",
+            "listener_error": "",
+            "listener_running": true,
+            "local_effective": false,
+            "local_requested": false,
+            "local_work_active": false,
+            "output_unknown": false,
+            "port": 31417,
+            "remote_admission_closed": false,
+            "remote_job_id": "",
+            "remote_output_active": false,
+            "remote_owner": "2edd7a7cc85f487ebbb8c7c2da2d4ba8",
+            "remote_state": "empty",
+            "revocation_generation": "12",
+            "revocation_unavailable": false,
+            "schema": "wsprrypi-wtp-endpoint/1"
+          }
+        ]
+      }
+    },
+    {
+      "request": {
+        "op": "http",
+        "host": "192.168.1.68",
+        "path": "wtp-endpoint",
+        "method": "GET",
+        "body": null,
+        "revision": null
+      },
+      "reply": {
+        "ok": true,
+        "at_utc_ns": "1790772251582960060",
+        "value": [
+          200,
+          {
+            "Connection": "close",
+            "Content-Length": "626",
+            "Content-Type": "application/json",
+            "X-Content-Type-Options": "nosniff",
+            "Cache-Control": "no-store"
+          },
+          {
+            "address": "192.168.1.68",
+            "boot_id": "0c25afb2f08afb5352cacb6d96de6c0b",
+            "device_id": "74d12151aff03c45cfcb15a45bd8e037",
+            "dns_sd_published": false,
+            "enabled": true,
+            "finishing_remote_job": false,
+            "launch_observed_monotonic_ns": null,
+            "launch_target_monotonic_ns": "0",
+            "listener_error": "",
+            "listener_running": true,
+            "local_effective": false,
+            "local_requested": false,
+            "local_work_active": false,
+            "output_unknown": false,
+            "port": 31417,
+            "remote_admission_closed": false,
+            "remote_job_id": "",
+            "remote_output_active": false,
+            "remote_owner": "",
+            "remote_state": "empty",
+            "revocation_generation": "12",
+            "revocation_unavailable": false,
+            "schema": "wsprrypi-wtp-endpoint/1"
+          }
+        ]
+      }
+    },
+    {
+      "request": {
+        "op": "http",
+        "host": "192.168.1.68",
+        "path": "wtp-endpoint",
+        "method": "GET",
+        "body": null,
+        "revision": null
+      },
+      "reply": {
+        "ok": true,
+        "at_utc_ns": "1790772252415670143",
+        "value": [
+          200,
+          {
+            "Connection": "close",
+            "Content-Length": "626",
+            "Content-Type": "application/json",
+            "X-Content-Type-Options": "nosniff",
+            "Cache-Control": "no-store"
+          },
+          {
+            "address": "192.168.1.68",
+            "boot_id": "0c25afb2f08afb5352cacb6d96de6c0b",
+            "device_id": "74d12151aff03c45cfcb15a45bd8e037",
+            "dns_sd_published": false,
+            "enabled": true,
+            "finishing_remote_job": false,
+            "launch_observed_monotonic_ns": null,
+            "launch_target_monotonic_ns": "0",
+            "listener_error": "",
+            "listener_running": true,
+            "local_effective": false,
+            "local_requested": false,
+            "local_work_active": false,
+            "output_unknown": false,
+            "port": 31417,
+            "remote_admission_closed": false,
+            "remote_job_id": "",
+            "remote_output_active": false,
+            "remote_owner": "",
+            "remote_state": "empty",
+            "revocation_generation": "12",
+            "revocation_unavailable": false,
+            "schema": "wsprrypi-wtp-endpoint/1"
+          }
+        ]
+      }
+    },
+    {
+      "request": {
+        "op": "close",
+        "name": "owned"
+      },
+      "reply": {
+        "ok": true,
+        "at_utc_ns": "1790772252420440706",
+        "value": [
+          {
+            "at": 1790772249.531727,
+            "message": {
+              "type": "response",
+              "protocol": "WTP/1",
+              "session_id": "61beb3e9a0344a34b2b2175ee500ad33",
+              "request_id": "29d01f21aca0427d8c37dd5615f4eaba",
+              "op": "HELLO",
+              "ok": true,
+              "body": {
+                "selected_version": "WTP/1",
+                "device_id": "74d12151aff03c45cfcb15a45bd8e037",
+                "boot_id": "11890e672d1a28e993efdb9730165e1d",
+                "product": "WsprryPi",
+                "firmware_version": "3.2.0-devel+ff632d5"
+              }
+            }
+          },
+          {
+            "at": 1790772249.5829573,
+            "message": {
+              "type": "response",
+              "protocol": "WTP/1",
+              "session_id": "61beb3e9a0344a34b2b2175ee500ad33",
+              "request_id": "5f9c02220f2e4fe4accc77c47e61ab2f",
+              "op": "CLAIM",
+              "ok": true,
+              "body": {
+                "owner_id": "2edd7a7cc85f487ebbb8c7c2da2d4ba8",
+                "granted_lease_ms": 60000,
+                "expires_monotonic_ns": "94300517448"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "request": {
+        "op": "open",
+        "name": "fresh",
+        "host": "192.168.1.68"
+      },
+      "reply": {
+        "ok": true,
+        "at_utc_ns": "1790772252433636416",
+        "value": {
+          "hello": {
+            "type": "response",
+            "protocol": "WTP/1",
+            "session_id": "dca3c55d71a046fe91b569db7ccc5834",
+            "request_id": "9d353fbc44e743cda92b440ef09920f4",
+            "op": "HELLO",
+            "ok": true,
+            "body": {
+              "selected_version": "WTP/1",
+              "device_id": "74d12151aff03c45cfcb15a45bd8e037",
+              "boot_id": "0c25afb2f08afb5352cacb6d96de6c0b",
+              "product": "WsprryPi",
+              "firmware_version": "3.2.0-devel+ff632d5"
+            }
+          },
+          "owner": "a4ef21d2971b4b2db4ec42ed2c32ba17",
+          "session": "dca3c55d71a046fe91b569db7ccc5834"
+        }
+      }
+    },
+    {
+      "request": {
+        "op": "request",
+        "name": "fresh",
+        "command": "CLAIM",
+        "body": {
+          "owner_id": "a4ef21d2971b4b2db4ec42ed2c32ba17",
+          "lease_ms": 60000
+        },
+        "okay": true
+      },
+      "reply": {
+        "ok": true,
+        "at_utc_ns": "1790772252487832235",
+        "value": {
+          "type": "response",
+          "protocol": "WTP/1",
+          "session_id": "dca3c55d71a046fe91b569db7ccc5834",
+          "request_id": "2d5b7ec46b3a42ae8286fece41eadbc4",
+          "op": "CLAIM",
+          "ok": true,
+          "body": {
+            "owner_id": "a4ef21d2971b4b2db4ec42ed2c32ba17",
+            "granted_lease_ms": 60000,
+            "expires_monotonic_ns": "97202116441"
+          }
+        }
+      }
+    },
+    {
+      "request": {
+        "op": "request",
+        "name": "fresh",
+        "command": "RELEASE",
+        "body": null,
+        "okay": true
+      },
+      "reply": {
+        "ok": true,
+        "at_utc_ns": "1790772252538882098",
+        "value": {
+          "type": "response",
+          "protocol": "WTP/1",
+          "session_id": "dca3c55d71a046fe91b569db7ccc5834",
+          "request_id": "0a843631fb9b475399adf768d993db38",
+          "op": "RELEASE",
+          "ok": true,
+          "body": {}
+        }
+      }
+    },
+    {
+      "request": {
+        "op": "close",
+        "name": "fresh"
+      },
+      "reply": {
+        "ok": true,
+        "at_utc_ns": "1790772252543012996",
+        "value": [
+          {
+            "at": 1790772252.433628,
+            "message": {
+              "type": "response",
+              "protocol": "WTP/1",
+              "session_id": "dca3c55d71a046fe91b569db7ccc5834",
+              "request_id": "9d353fbc44e743cda92b440ef09920f4",
+              "op": "HELLO",
+              "ok": true,
+              "body": {
+                "selected_version": "WTP/1",
+                "device_id": "74d12151aff03c45cfcb15a45bd8e037",
+                "boot_id": "0c25afb2f08afb5352cacb6d96de6c0b",
+                "product": "WsprryPi",
+                "firmware_version": "3.2.0-devel+ff632d5"
+              }
+            }
+          },
+          {
+            "at": 1790772252.4878294,
+            "message": {
+              "type": "response",
+              "protocol": "WTP/1",
+              "session_id": "dca3c55d71a046fe91b569db7ccc5834",
+              "request_id": "2d5b7ec46b3a42ae8286fece41eadbc4",
+              "op": "CLAIM",
+              "ok": true,
+              "body": {
+                "owner_id": "a4ef21d2971b4b2db4ec42ed2c32ba17",
+                "granted_lease_ms": 60000,
+                "expires_monotonic_ns": "97202116441"
+              }
+            }
+          },
+          {
+            "at": 1790772252.5388794,
+            "message": {
+              "type": "response",
+              "protocol": "WTP/1",
+              "session_id": "dca3c55d71a046fe91b569db7ccc5834",
+              "request_id": "0a843631fb9b475399adf768d993db38",
+              "op": "RELEASE",
+              "ok": true,
+              "body": {}
+            }
+          }
+        ]
+      }
+    },
+    {
+      "request": {
+        "op": "open",
+        "name": "clock",
+        "host": "192.168.1.68"
+      },
+      "reply": {
+        "ok": true,
+        "at_utc_ns": "1790772252555396022",
+        "value": {
+          "hello": {
+            "type": "response",
+            "protocol": "WTP/1",
+            "session_id": "c9b2f4cb8b6a43cb9b39d02f225ef0c2",
+            "request_id": "87114999728f49fca5a5b30ca2c4a5f7",
+            "op": "HELLO",
+            "ok": true,
+            "body": {
+              "selected_version": "WTP/1",
+              "device_id": "74d12151aff03c45cfcb15a45bd8e037",
+              "boot_id": "0c25afb2f08afb5352cacb6d96de6c0b",
+              "product": "WsprryPi",
+              "firmware_version": "3.2.0-devel+ff632d5"
+            }
+          },
+          "owner": "4e28e9d471864b44ba273b15456282cd",
+          "session": "c9b2f4cb8b6a43cb9b39d02f225ef0c2"
+        }
+      }
+    },
+    {
+      "request": {
+        "op": "request",
+        "name": "clock",
+        "command": "GET_CLOCK",
+        "body": null,
+        "okay": true
+      },
+      "reply": {
+        "ok": true,
+        "at_utc_ns": "1790772252607672938",
+        "value": {
+          "type": "response",
+          "protocol": "WTP/1",
+          "session_id": "c9b2f4cb8b6a43cb9b39d02f225ef0c2",
+          "request_id": "7d5e188e65674ae0927fb74253e49cea",
+          "op": "GET_CLOCK",
+          "ok": true,
+          "body": {
+            "state": "synchronized",
+            "utc_now_ns": "1790772252558824896",
+            "monotonic_now_ns": "37322824015",
+            "uncertainty_ns": "49933055",
+            "sync_age_ns": "0",
+            "leap": "normal"
+          }
+        }
+      }
+    },
+    {
+      "request": {
+        "op": "close",
+        "name": "clock"
+      },
+      "reply": {
+        "ok": true,
+        "at_utc_ns": "1790772252611583466",
+        "value": [
+          {
+            "at": 1790772252.5553885,
+            "message": {
+              "type": "response",
+              "protocol": "WTP/1",
+              "session_id": "c9b2f4cb8b6a43cb9b39d02f225ef0c2",
+              "request_id": "87114999728f49fca5a5b30ca2c4a5f7",
+              "op": "HELLO",
+              "ok": true,
+              "body": {
+                "selected_version": "WTP/1",
+                "device_id": "74d12151aff03c45cfcb15a45bd8e037",
+                "boot_id": "0c25afb2f08afb5352cacb6d96de6c0b",
+                "product": "WsprryPi",
+                "firmware_version": "3.2.0-devel+ff632d5"
+              }
+            }
+          },
+          {
+            "at": 1790772252.6076705,
+            "message": {
+              "type": "response",
+              "protocol": "WTP/1",
+              "session_id": "c9b2f4cb8b6a43cb9b39d02f225ef0c2",
+              "request_id": "7d5e188e65674ae0927fb74253e49cea",
+              "op": "GET_CLOCK",
+              "ok": true,
+              "body": {
+                "state": "synchronized",
+                "utc_now_ns": "1790772252558824896",
+                "monotonic_now_ns": "37322824015",
+                "uncertainty_ns": "49933055",
+                "sync_age_ns": "0",
+                "leap": "normal"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "request": {
+        "op": "open",
+        "name": "running",
+        "host": "192.168.1.68"
+      },
+      "reply": {
+        "ok": true,
+        "at_utc_ns": "1790772255722775825",
+        "value": {
+          "hello": {
+            "type": "response",
+            "protocol": "WTP/1",
+            "session_id": "ca7a13ddcda8438ca1f48e9bdb4c915c",
+            "request_id": "a2f3269a927246d7927cf8ae684300bd",
+            "op": "HELLO",
+            "ok": true,
+            "body": {
+              "selected_version": "WTP/1",
+              "device_id": "74d12151aff03c45cfcb15a45bd8e037",
+              "boot_id": "0c25afb2f08afb5352cacb6d96de6c0b",
+              "product": "WsprryPi",
+              "firmware_version": "3.2.0-devel+ff632d5"
+            }
+          },
+          "owner": "c889f430963243e8b45c08b10ec47c61",
+          "session": "ca7a13ddcda8438ca1f48e9bdb4c915c"
+        }
+      }
+    },
+    {
+      "request": {
+        "op": "request",
+        "name": "running",
+        "command": "CLAIM",
+        "body": {
+          "owner_id": "c889f430963243e8b45c08b10ec47c61",
+          "lease_ms": 60000
+        },
+        "okay": true
+      },
+      "reply": {
+        "ok": true,
+        "at_utc_ns": "1790772255779406075",
+        "value": {
+          "type": "response",
+          "protocol": "WTP/1",
+          "session_id": "ca7a13ddcda8438ca1f48e9bdb4c915c",
+          "request_id": "091f5a307ca24f6391c2dbc61238afcb",
+          "op": "CLAIM",
+          "ok": true,
+          "body": {
+            "owner_id": "c889f430963243e8b45c08b10ec47c61",
+            "granted_lease_ms": 60000,
+            "expires_monotonic_ns": "100492888372"
+          }
+        }
+      }
+    },
+    {
+      "request": {
+        "op": "request",
+        "name": "running",
+        "command": "LOAD",
+        "body": {
+          "job_id": "fb77fd3b6831437592c50c7ba6a3aeb4",
+          "profile": "rf-events/1",
+          "mode": "tone",
+          "total_duration_ns": "30000000000",
+          "allow_frequency_adjustment": true,
+          "events": [
+            {
+              "offset_ns": "0",
+              "duration_ns": "30000000000",
+              "rf_on": true,
+              "frequency_nhz": "14097100000000000"
+            }
+          ]
+        },
+        "okay": true
+      },
+      "reply": {
+        "ok": true,
+        "at_utc_ns": "1790772255835924640",
+        "value": {
+          "type": "response",
+          "protocol": "WTP/1",
+          "session_id": "ca7a13ddcda8438ca1f48e9bdb4c915c",
+          "request_id": "2b45c9dea1154623af45f476fda17677",
+          "op": "LOAD",
+          "ok": true,
+          "body": {
+            "job_id": "fb77fd3b6831437592c50c7ba6a3aeb4",
+            "state": "loaded",
+            "adjustments": []
+          }
+        }
+      }
+    },
+    {
+      "request": {
+        "op": "request",
+        "name": "running",
+        "command": "ARM",
+        "body": {
+          "job_id": "fb77fd3b6831437592c50c7ba6a3aeb4",
+          "start_utc_ns": "1790772260000000000",
+          "max_start_uncertainty_ns": "500000000"
+        },
+        "okay": true
+      },
+      "reply": {
+        "ok": true,
+        "at_utc_ns": "1790772255891781317",
+        "value": {
+          "type": "response",
+          "protocol": "WTP/1",
+          "session_id": "ca7a13ddcda8438ca1f48e9bdb4c915c",
+          "request_id": "7e41f1340ba74decb09d91a021d46597",
+          "op": "ARM",
+          "ok": true,
+          "body": {
+            "job_id": "fb77fd3b6831437592c50c7ba6a3aeb4",
+            "state": "armed",
+            "start_utc_ns": "1790772260000000000",
+            "start_monotonic_ns": "44763999120",
+            "clock": {
+              "state": "synchronized",
+              "utc_now_ns": "1790772255842299105",
+              "monotonic_now_ns": "40606298225",
+              "uncertainty_ns": "51433055",
+              "sync_age_ns": "0",
+              "leap": "normal"
+            }
+          }
+        }
+      }
+    },
+    {
+      "request": {
+        "op": "http",
+        "host": "192.168.1.68",
+        "path": "wtp-endpoint",
+        "method": "GET",
+        "body": null,
+        "revision": null
+      },
+      "reply": {
+        "ok": true,
+        "at_utc_ns": "1790772263164570551",
+        "value": [
+          200,
+          {
+            "Connection": "close",
+            "Content-Length": "709",
+            "Content-Type": "application/json",
+            "X-Content-Type-Options": "nosniff",
+            "Cache-Control": "no-store"
+          },
+          {
+            "address": "192.168.1.68",
+            "boot_id": "0c25afb2f08afb5352cacb6d96de6c0b",
+            "device_id": "74d12151aff03c45cfcb15a45bd8e037",
+            "dns_sd_published": true,
+            "enabled": true,
+            "finishing_remote_job": false,
+            "launch_observed_monotonic_ns": "44764388801",
+            "launch_target_monotonic_ns": "44763999120",
+            "listener_error": "",
+            "listener_running": true,
+            "local_effective": false,
+            "local_requested": false,
+            "local_work_active": false,
+            "output_unknown": false,
+            "port": 31417,
+            "remote_admission_closed": false,
+            "remote_job_id": "fb77fd3b6831437592c50c7ba6a3aeb4",
+            "remote_output_active": true,
+            "remote_owner": "c889f430963243e8b45c08b10ec47c61",
+            "remote_state": "running",
+            "revocation_generation": "12",
+            "revocation_unavailable": false,
+            "schema": "wsprrypi-wtp-endpoint/1"
+          }
+        ]
+      }
+    },
+    {
+      "request": {
+        "op": "http",
+        "host": "192.168.1.68",
+        "path": "wtp-endpoint",
+        "method": "GET",
+        "body": null,
+        "revision": null
+      },
+      "reply": {
+        "ok": true,
+        "at_utc_ns": "1790772264827543505",
+        "value": [
+          200,
+          {
+            "Connection": "close",
+            "Content-Length": "626",
+            "Content-Type": "application/json",
+            "X-Content-Type-Options": "nosniff",
+            "Cache-Control": "no-store"
+          },
+          {
+            "address": "192.168.1.68",
+            "boot_id": "64f213a17bd9f30e4bcd84df3f128b35",
+            "device_id": "74d12151aff03c45cfcb15a45bd8e037",
+            "dns_sd_published": false,
+            "enabled": true,
+            "finishing_remote_job": false,
+            "launch_observed_monotonic_ns": null,
+            "launch_target_monotonic_ns": "0",
+            "listener_error": "",
+            "listener_running": true,
+            "local_effective": false,
+            "local_requested": false,
+            "local_work_active": false,
+            "output_unknown": false,
+            "port": 31417,
+            "remote_admission_closed": false,
+            "remote_job_id": "",
+            "remote_output_active": false,
+            "remote_owner": "",
+            "remote_state": "empty",
+            "revocation_generation": "12",
+            "revocation_unavailable": false,
+            "schema": "wsprrypi-wtp-endpoint/1"
+          }
+        ]
+      }
+    },
+    {
+      "request": {
+        "op": "close",
+        "name": "running"
+      },
+      "reply": {
+        "ok": true,
+        "at_utc_ns": "1790772264830311166",
+        "value": [
+          {
+            "at": 1790772255.722761,
+            "message": {
+              "type": "response",
+              "protocol": "WTP/1",
+              "session_id": "ca7a13ddcda8438ca1f48e9bdb4c915c",
+              "request_id": "a2f3269a927246d7927cf8ae684300bd",
+              "op": "HELLO",
+              "ok": true,
+              "body": {
+                "selected_version": "WTP/1",
+                "device_id": "74d12151aff03c45cfcb15a45bd8e037",
+                "boot_id": "0c25afb2f08afb5352cacb6d96de6c0b",
+                "product": "WsprryPi",
+                "firmware_version": "3.2.0-devel+ff632d5"
+              }
+            }
+          },
+          {
+            "at": 1790772255.7793999,
+            "message": {
+              "type": "response",
+              "protocol": "WTP/1",
+              "session_id": "ca7a13ddcda8438ca1f48e9bdb4c915c",
+              "request_id": "091f5a307ca24f6391c2dbc61238afcb",
+              "op": "CLAIM",
+              "ok": true,
+              "body": {
+                "owner_id": "c889f430963243e8b45c08b10ec47c61",
+                "granted_lease_ms": 60000,
+                "expires_monotonic_ns": "100492888372"
+              }
+            }
+          },
+          {
+            "at": 1790772255.8359199,
+            "message": {
+              "type": "response",
+              "protocol": "WTP/1",
+              "session_id": "ca7a13ddcda8438ca1f48e9bdb4c915c",
+              "request_id": "2b45c9dea1154623af45f476fda17677",
+              "op": "LOAD",
+              "ok": true,
+              "body": {
+                "job_id": "fb77fd3b6831437592c50c7ba6a3aeb4",
+                "state": "loaded",
+                "adjustments": []
+              }
+            }
+          },
+          {
+            "at": 1790772255.8410883,
+            "message": {
+              "type": "event",
+              "protocol": "WTP/1",
+              "session_id": "ca7a13ddcda8438ca1f48e9bdb4c915c",
+              "boot_id": "0c25afb2f08afb5352cacb6d96de6c0b",
+              "event_id": "1",
+              "event": "JOB_STATE",
+              "body": {
+                "job_id": "fb77fd3b6831437592c50c7ba6a3aeb4",
+                "state": "loaded",
+                "output_active": false
+              }
+            }
+          },
+          {
+            "at": 1790772255.891777,
+            "message": {
+              "type": "response",
+              "protocol": "WTP/1",
+              "session_id": "ca7a13ddcda8438ca1f48e9bdb4c915c",
+              "request_id": "7e41f1340ba74decb09d91a021d46597",
+              "op": "ARM",
+              "ok": true,
+              "body": {
+                "job_id": "fb77fd3b6831437592c50c7ba6a3aeb4",
+                "state": "armed",
+                "start_utc_ns": "1790772260000000000",
+                "start_monotonic_ns": "44763999120",
+                "clock": {
+                  "state": "synchronized",
+                  "utc_now_ns": "1790772255842299105",
+                  "monotonic_now_ns": "40606298225",
+                  "uncertainty_ns": "51433055",
+                  "sync_age_ns": "0",
+                  "leap": "normal"
+                }
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "request": {
+        "op": "open",
+        "name": "stale",
+        "host": "192.168.1.68"
+      },
+      "reply": {
+        "ok": true,
+        "at_utc_ns": "1790772264849666513",
+        "value": {
+          "hello": {
+            "type": "response",
+            "protocol": "WTP/1",
+            "session_id": "87675413bd20451282ae944d1384d264",
+            "request_id": "39b99a8534a34562a0f2a77a20ab3491",
+            "op": "HELLO",
+            "ok": true,
+            "body": {
+              "selected_version": "WTP/1",
+              "device_id": "74d12151aff03c45cfcb15a45bd8e037",
+              "boot_id": "64f213a17bd9f30e4bcd84df3f128b35",
+              "product": "WsprryPi",
+              "firmware_version": "3.2.0-devel+ff632d5"
+            }
+          },
+          "owner": "997b0d28623848d78578e8da6e93b62f",
+          "session": "87675413bd20451282ae944d1384d264"
+        }
+      }
+    },
+    {
+      "request": {
+        "op": "request",
+        "name": "stale",
+        "command": "ARM",
+        "body": {
+          "job_id": "fb77fd3b6831437592c50c7ba6a3aeb4",
+          "start_utc_ns": "1790772269000000000",
+          "max_start_uncertainty_ns": "500000000"
+        },
+        "okay": false
+      },
+      "reply": {
+        "ok": true,
+        "at_utc_ns": "1790772264900132146",
+        "value": {
+          "type": "response",
+          "protocol": "WTP/1",
+          "session_id": "87675413bd20451282ae944d1384d264",
+          "request_id": "986f099ef7a94b2ba7336021a5dc7782",
+          "op": "ARM",
+          "ok": false,
+          "error": {
+            "code": "LEASE_EXPIRED",
+            "message": "LEASE_EXPIRED",
+            "retryable": false
+          }
+        }
+      }
+    },
+    {
+      "request": {
+        "op": "close",
+        "name": "stale"
+      },
+      "reply": {
+        "ok": true,
+        "at_utc_ns": "1790772264903635269",
+        "value": [
+          {
+            "at": 1790772264.8496497,
+            "message": {
+              "type": "response",
+              "protocol": "WTP/1",
+              "session_id": "87675413bd20451282ae944d1384d264",
+              "request_id": "39b99a8534a34562a0f2a77a20ab3491",
+              "op": "HELLO",
+              "ok": true,
+              "body": {
+                "selected_version": "WTP/1",
+                "device_id": "74d12151aff03c45cfcb15a45bd8e037",
+                "boot_id": "64f213a17bd9f30e4bcd84df3f128b35",
+                "product": "WsprryPi",
+                "firmware_version": "3.2.0-devel+ff632d5"
+              }
+            }
+          },
+          {
+            "at": 1790772264.900128,
+            "message": {
+              "type": "response",
+              "protocol": "WTP/1",
+              "session_id": "87675413bd20451282ae944d1384d264",
+              "request_id": "986f099ef7a94b2ba7336021a5dc7782",
+              "op": "ARM",
+              "ok": false,
+              "error": {
+                "code": "LEASE_EXPIRED",
+                "message": "LEASE_EXPIRED",
+                "retryable": false
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "request": {
+        "op": "http",
+        "host": "192.168.1.68",
+        "path": "wtp-endpoint",
+        "method": "GET",
+        "body": null,
+        "revision": null
+      },
+      "reply": {
+        "ok": true,
+        "at_utc_ns": "1790772285392255656",
+        "value": [
+          200,
+          {
+            "Connection": "close",
+            "Content-Length": "625",
+            "Content-Type": "application/json",
+            "X-Content-Type-Options": "nosniff",
+            "Cache-Control": "no-store"
+          },
+          {
+            "address": "192.168.1.68",
+            "boot_id": "64f213a17bd9f30e4bcd84df3f128b35",
+            "device_id": "74d12151aff03c45cfcb15a45bd8e037",
+            "dns_sd_published": true,
+            "enabled": true,
+            "finishing_remote_job": false,
+            "launch_observed_monotonic_ns": null,
+            "launch_target_monotonic_ns": "0",
+            "listener_error": "",
+            "listener_running": true,
+            "local_effective": false,
+            "local_requested": false,
+            "local_work_active": false,
+            "output_unknown": false,
+            "port": 31417,
+            "remote_admission_closed": false,
+            "remote_job_id": "",
+            "remote_output_active": false,
+            "remote_owner": "",
+            "remote_state": "empty",
+            "revocation_generation": "12",
+            "revocation_unavailable": false,
+            "schema": "wsprrypi-wtp-endpoint/1"
+          }
+        ]
+      }
+    },
+    {
+      "request": {
+        "op": "open",
+        "name": "armed",
+        "host": "192.168.1.68"
+      },
+      "reply": {
+        "ok": true,
+        "at_utc_ns": "1790772285410878120",
+        "value": {
+          "hello": {
+            "type": "response",
+            "protocol": "WTP/1",
+            "session_id": "5a271c135d8e4cc18015a84e5b861157",
+            "request_id": "259bb541a3c04572a1035f5bad45a219",
+            "op": "HELLO",
+            "ok": true,
+            "body": {
+              "selected_version": "WTP/1",
+              "device_id": "74d12151aff03c45cfcb15a45bd8e037",
+              "boot_id": "64f213a17bd9f30e4bcd84df3f128b35",
+              "product": "WsprryPi",
+              "firmware_version": "3.2.0-devel+ff632d5"
+            }
+          },
+          "owner": "9f2faf540dfc4c4580250402b88cca5d",
+          "session": "5a271c135d8e4cc18015a84e5b861157"
+        }
+      }
+    },
+    {
+      "request": {
+        "op": "request",
+        "name": "armed",
+        "command": "CLAIM",
+        "body": {
+          "owner_id": "9f2faf540dfc4c4580250402b88cca5d",
+          "lease_ms": 60000
+        },
+        "okay": true
+      },
+      "reply": {
+        "ok": true,
+        "at_utc_ns": "1790772285465168275",
+        "value": {
+          "type": "response",
+          "protocol": "WTP/1",
+          "session_id": "5a271c135d8e4cc18015a84e5b861157",
+          "request_id": "ffc4632d8b8c48e891902db289c4ce6b",
+          "op": "CLAIM",
+          "ok": true,
+          "body": {
+            "owner_id": "9f2faf540dfc4c4580250402b88cca5d",
+            "granted_lease_ms": 60000,
+            "expires_monotonic_ns": "130179159042"
+          }
+        }
+      }
+    },
+    {
+      "request": {
+        "op": "request",
+        "name": "armed",
+        "command": "LOAD",
+        "body": {
+          "job_id": "ebc017ef62004af09fd967fac8401c08",
+          "profile": "rf-events/1",
+          "mode": "tone",
+          "total_duration_ns": "3000000000",
+          "allow_frequency_adjustment": true,
+          "events": [
+            {
+              "offset_ns": "0",
+              "duration_ns": "3000000000",
+              "rf_on": true,
+              "frequency_nhz": "14097100000000000"
+            }
+          ]
+        },
+        "okay": true
+      },
+      "reply": {
+        "ok": true,
+        "at_utc_ns": "1790772285524219717",
+        "value": {
+          "type": "response",
+          "protocol": "WTP/1",
+          "session_id": "5a271c135d8e4cc18015a84e5b861157",
+          "request_id": "996908119df24f18bc1cd9d4cb71a816",
+          "op": "LOAD",
+          "ok": true,
+          "body": {
+            "job_id": "ebc017ef62004af09fd967fac8401c08",
+            "state": "loaded",
+            "adjustments": []
+          }
+        }
+      }
+    },
+    {
+      "request": {
+        "op": "request",
+        "name": "armed",
+        "command": "ARM",
+        "body": {
+          "job_id": "ebc017ef62004af09fd967fac8401c08",
+          "start_utc_ns": "1790772300000000000",
+          "max_start_uncertainty_ns": "500000000"
+        },
+        "okay": true
+      },
+      "reply": {
+        "ok": true,
+        "at_utc_ns": "1790772285580020739",
+        "value": {
+          "type": "response",
+          "protocol": "WTP/1",
+          "session_id": "5a271c135d8e4cc18015a84e5b861157",
+          "request_id": "894fb53496394dcf9e97dc551c08ff1c",
+          "op": "ARM",
+          "ok": true,
+          "body": {
+            "job_id": "ebc017ef62004af09fd967fac8401c08",
+            "state": "armed",
+            "start_utc_ns": "1790772300000000000",
+            "start_monotonic_ns": "84763999120",
+            "clock": {
+              "state": "synchronized",
+              "utc_now_ns": "1790772285529825058",
+              "monotonic_now_ns": "70293824178",
+              "uncertainty_ns": "66433130",
+              "sync_age_ns": "0",
+              "leap": "normal"
+            }
+          }
+        }
+      }
+    },
+    {
+      "request": {
+        "op": "http",
+        "host": "192.168.1.68",
+        "path": "wtp-endpoint",
+        "method": "GET",
+        "body": null,
+        "revision": null
+      },
+      "reply": {
+        "ok": true,
+        "at_utc_ns": "1790772285593880139",
+        "value": [
+          200,
+          {
+            "Connection": "close",
+            "Content-Length": "699",
+            "Content-Type": "application/json",
+            "X-Content-Type-Options": "nosniff",
+            "Cache-Control": "no-store"
+          },
+          {
+            "address": "192.168.1.68",
+            "boot_id": "64f213a17bd9f30e4bcd84df3f128b35",
+            "device_id": "74d12151aff03c45cfcb15a45bd8e037",
+            "dns_sd_published": true,
+            "enabled": true,
+            "finishing_remote_job": false,
+            "launch_observed_monotonic_ns": null,
+            "launch_target_monotonic_ns": "84763999120",
+            "listener_error": "",
+            "listener_running": true,
+            "local_effective": false,
+            "local_requested": false,
+            "local_work_active": false,
+            "output_unknown": false,
+            "port": 31417,
+            "remote_admission_closed": false,
+            "remote_job_id": "ebc017ef62004af09fd967fac8401c08",
+            "remote_output_active": false,
+            "remote_owner": "9f2faf540dfc4c4580250402b88cca5d",
+            "remote_state": "armed",
+            "revocation_generation": "12",
+            "revocation_unavailable": false,
+            "schema": "wsprrypi-wtp-endpoint/1"
+          }
+        ]
+      }
+    },
+    {
+      "request": {
+        "op": "http",
+        "host": "192.168.1.68",
+        "path": "wtp-endpoint",
+        "method": "GET",
+        "body": null,
+        "revision": null
+      },
+      "reply": {
+        "ok": true,
+        "at_utc_ns": "1790772287359021136",
+        "value": [
+          200,
+          {
+            "Connection": "close",
+            "Content-Length": "626",
+            "Content-Type": "application/json",
+            "X-Content-Type-Options": "nosniff",
+            "Cache-Control": "no-store"
+          },
+          {
+            "address": "192.168.1.68",
+            "boot_id": "7fc341bb539880c21b0bb561bfd87063",
+            "device_id": "74d12151aff03c45cfcb15a45bd8e037",
+            "dns_sd_published": false,
+            "enabled": true,
+            "finishing_remote_job": false,
+            "launch_observed_monotonic_ns": null,
+            "launch_target_monotonic_ns": "0",
+            "listener_error": "",
+            "listener_running": true,
+            "local_effective": false,
+            "local_requested": false,
+            "local_work_active": false,
+            "output_unknown": false,
+            "port": 31417,
+            "remote_admission_closed": false,
+            "remote_job_id": "",
+            "remote_output_active": false,
+            "remote_owner": "",
+            "remote_state": "empty",
+            "revocation_generation": "12",
+            "revocation_unavailable": false,
+            "schema": "wsprrypi-wtp-endpoint/1"
+          }
+        ]
+      }
+    },
+    {
+      "request": {
+        "op": "close",
+        "name": "armed"
+      },
+      "reply": {
+        "ok": true,
+        "at_utc_ns": "1790772287364086496",
+        "value": [
+          {
+            "at": 1790772285.410866,
+            "message": {
+              "type": "response",
+              "protocol": "WTP/1",
+              "session_id": "5a271c135d8e4cc18015a84e5b861157",
+              "request_id": "259bb541a3c04572a1035f5bad45a219",
+              "op": "HELLO",
+              "ok": true,
+              "body": {
+                "selected_version": "WTP/1",
+                "device_id": "74d12151aff03c45cfcb15a45bd8e037",
+                "boot_id": "64f213a17bd9f30e4bcd84df3f128b35",
+                "product": "WsprryPi",
+                "firmware_version": "3.2.0-devel+ff632d5"
+              }
+            }
+          },
+          {
+            "at": 1790772285.4651654,
+            "message": {
+              "type": "response",
+              "protocol": "WTP/1",
+              "session_id": "5a271c135d8e4cc18015a84e5b861157",
+              "request_id": "ffc4632d8b8c48e891902db289c4ce6b",
+              "op": "CLAIM",
+              "ok": true,
+              "body": {
+                "owner_id": "9f2faf540dfc4c4580250402b88cca5d",
+                "granted_lease_ms": 60000,
+                "expires_monotonic_ns": "130179159042"
+              }
+            }
+          },
+          {
+            "at": 1790772285.5242136,
+            "message": {
+              "type": "response",
+              "protocol": "WTP/1",
+              "session_id": "5a271c135d8e4cc18015a84e5b861157",
+              "request_id": "996908119df24f18bc1cd9d4cb71a816",
+              "op": "LOAD",
+              "ok": true,
+              "body": {
+                "job_id": "ebc017ef62004af09fd967fac8401c08",
+                "state": "loaded",
+                "adjustments": []
+              }
+            }
+          },
+          {
+            "at": 1790772285.5297658,
+            "message": {
+              "type": "event",
+              "protocol": "WTP/1",
+              "session_id": "5a271c135d8e4cc18015a84e5b861157",
+              "boot_id": "64f213a17bd9f30e4bcd84df3f128b35",
+              "event_id": "0",
+              "event": "JOB_STATE",
+              "body": {
+                "job_id": "ebc017ef62004af09fd967fac8401c08",
+                "state": "loaded",
+                "output_active": false
+              }
+            }
+          },
+          {
+            "at": 1790772285.580015,
+            "message": {
+              "type": "response",
+              "protocol": "WTP/1",
+              "session_id": "5a271c135d8e4cc18015a84e5b861157",
+              "request_id": "894fb53496394dcf9e97dc551c08ff1c",
+              "op": "ARM",
+              "ok": true,
+              "body": {
+                "job_id": "ebc017ef62004af09fd967fac8401c08",
+                "state": "armed",
+                "start_utc_ns": "1790772300000000000",
+                "start_monotonic_ns": "84763999120",
+                "clock": {
+                  "state": "synchronized",
+                  "utc_now_ns": "1790772285529825058",
+                  "monotonic_now_ns": "70293824178",
+                  "uncertainty_ns": "66433130",
+                  "sync_age_ns": "0",
+                  "leap": "normal"
+                }
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "request": {
+        "op": "http",
+        "host": "192.168.1.68",
+        "path": "wtp-endpoint",
+        "method": "GET",
+        "body": null,
+        "revision": null
+      },
+      "reply": {
+        "ok": true,
+        "at_utc_ns": "1790772304305999185",
+        "value": [
+          200,
+          {
+            "Connection": "close",
+            "Content-Length": "625",
+            "Content-Type": "application/json",
+            "X-Content-Type-Options": "nosniff",
+            "Cache-Control": "no-store"
+          },
+          {
+            "address": "192.168.1.68",
+            "boot_id": "7fc341bb539880c21b0bb561bfd87063",
+            "device_id": "74d12151aff03c45cfcb15a45bd8e037",
+            "dns_sd_published": true,
+            "enabled": true,
+            "finishing_remote_job": false,
+            "launch_observed_monotonic_ns": null,
+            "launch_target_monotonic_ns": "0",
+            "listener_error": "",
+            "listener_running": true,
+            "local_effective": false,
+            "local_requested": false,
+            "local_work_active": false,
+            "output_unknown": false,
+            "port": 31417,
+            "remote_admission_closed": false,
+            "remote_job_id": "",
+            "remote_output_active": false,
+            "remote_owner": "",
+            "remote_state": "empty",
+            "revocation_generation": "12",
+            "revocation_unavailable": false,
+            "schema": "wsprrypi-wtp-endpoint/1"
+          }
+        ]
+      }
+    },
+    {
+      "request": {
+        "op": "http",
+        "host": "192.168.1.68",
+        "path": "wtp-endpoint",
+        "method": "GET",
+        "body": null,
+        "revision": null
+      },
+      "reply": {
+        "ok": true,
+        "at_utc_ns": "1790772312598911834",
+        "value": [
+          200,
+          {
+            "Connection": "close",
+            "Content-Length": "153",
+            "Content-Type": "application/json",
+            "X-Content-Type-Options": "nosniff",
+            "Cache-Control": "no-store"
+          },
+          {
+            "device_id": "74d12151aff03c45cfcb15a45bd8e037",
+            "enabled": false,
+            "error": "WTP takeover revocation journal unavailable",
+            "schema": "wsprrypi-wtp-endpoint/1"
+          }
+        ]
+      }
+    },
+    {
+      "request": {
+        "op": "open",
+        "name": "bad-journal",
+        "host": "192.168.1.68"
+      },
+      "reply": {
+        "ok": false,
+        "error": "ConnectionRefusedError(111, 'Connection refused')"
+      }
+    },
+    {
+      "request": {
+        "op": "http",
+        "host": "192.168.1.68",
+        "path": "wtp-endpoint",
+        "method": "GET",
+        "body": null,
+        "revision": null
+      },
+      "reply": {
+        "ok": true,
+        "at_utc_ns": "1790772314611957047",
+        "value": [
+          200,
+          {
+            "Connection": "close",
+            "Content-Length": "626",
+            "Content-Type": "application/json",
+            "X-Content-Type-Options": "nosniff",
+            "Cache-Control": "no-store"
+          },
+          {
+            "address": "192.168.1.68",
+            "boot_id": "632ff245c451f57a9544c5200ecf48ae",
+            "device_id": "74d12151aff03c45cfcb15a45bd8e037",
+            "dns_sd_published": false,
+            "enabled": true,
+            "finishing_remote_job": false,
+            "launch_observed_monotonic_ns": null,
+            "launch_target_monotonic_ns": "0",
+            "listener_error": "",
+            "listener_running": true,
+            "local_effective": false,
+            "local_requested": false,
+            "local_work_active": false,
+            "output_unknown": false,
+            "port": 31417,
+            "remote_admission_closed": false,
+            "remote_job_id": "",
+            "remote_output_active": false,
+            "remote_owner": "",
+            "remote_state": "empty",
+            "revocation_generation": "12",
+            "revocation_unavailable": false,
+            "schema": "wsprrypi-wtp-endpoint/1"
+          }
+        ]
+      }
+    },
+    {
+      "request": {
+        "op": "http",
+        "host": "192.168.1.68",
+        "path": "wtp-endpoint",
+        "method": "GET",
+        "body": null,
+        "revision": null
+      },
+      "reply": {
+        "ok": true,
+        "at_utc_ns": "1790772316844986416",
+        "value": [
+          200,
+          {
+            "Connection": "close",
+            "Content-Length": "626",
+            "Content-Type": "application/json",
+            "X-Content-Type-Options": "nosniff",
+            "Cache-Control": "no-store"
+          },
+          {
+            "address": "192.168.1.68",
+            "boot_id": "df89127e37ef2852118be747a19c5d07",
+            "device_id": "74d12151aff03c45cfcb15a45bd8e037",
+            "dns_sd_published": false,
+            "enabled": true,
+            "finishing_remote_job": false,
+            "launch_observed_monotonic_ns": null,
+            "launch_target_monotonic_ns": "0",
+            "listener_error": "",
+            "listener_running": true,
+            "local_effective": false,
+            "local_requested": false,
+            "local_work_active": false,
+            "output_unknown": false,
+            "port": 31417,
+            "remote_admission_closed": false,
+            "remote_job_id": "",
+            "remote_output_active": false,
+            "remote_owner": "",
+            "remote_state": "empty",
+            "revocation_generation": "12",
+            "revocation_unavailable": false,
+            "schema": "wsprrypi-wtp-endpoint/1"
+          }
+        ]
+      }
+    },
+    {
+      "request": {
+        "op": "http",
+        "host": "192.168.1.68",
+        "path": "fleet",
+        "method": "GET",
+        "body": null,
+        "revision": null
+      },
+      "reply": {
+        "ok": true,
+        "at_utc_ns": "1790772318869264317",
+        "value": [
+          200,
+          {
+            "Connection": "close",
+            "Content-Length": "1493",
+            "Content-Type": "application/json",
+            "ETag": "\"4afedbfb5170c2c34d3ffba8200d14456008bd7f1931ce1cca6921379c553f1d\"",
+            "X-Content-Type-Options": "nosniff",
+            "Cache-Control": "no-store"
+          },
+          {
+            "assignments": [
+              {
+                "device_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                "enabled": true,
+                "in_flight": true,
+                "last_start_ns": "1800000000000000000",
+                "management_port": 31415,
+                "name": "Installed recovery fixture",
+                "product": "WsprryPico",
+                "revocation_generation": null,
+                "schedule": {
+                  "duration_ms": 1000,
+                  "frequency_hz": 14097100,
+                  "mode": "tone",
+                  "period_seconds": 60,
+                  "phase_seconds": 0
+                },
+                "settings": {
+                  "Allow Frequency Adjustment": true,
+                  "Device ID": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                  "Hostname": "192.0.2.123",
+                  "Start Uncertainty ns": 500000000,
+                  "TCP Port": 31417,
+                  "Transport": "network_plain"
+                }
+              }
+            ],
+            "maximum_outputs": 8,
+            "now_ms": "103630",
+            "outputs": {
+              "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb": {
+                "message": "A previous process may have dispatched this job. Reconcile before resuming.",
+                "observed_ms": 103573,
+                "revoked": false,
+                "state": "recovery_required",
+                "wtp": {
+                  "adjustments": [],
+                  "arm_handed_off": false,
+                  "capabilities": null,
+                  "diagnostic": "",
+                  "dispatch_utc_ns": "0",
+                  "identity": null,
+                  "job": null,
+                  "job_id": "",
+                  "last_recovery": null,
+                  "last_report": null,
+                  "lease_valid": false,
+                  "observed_ms": "101571",
+                  "owner_id": "571040e6cd8162189fa7d4aad4d74873",
+                  "owns": false,
+                  "phase": "idle",
+                  "recovery_required": false,
+                  "reload_requested": false,
+                  "remote": null,
+                  "request_id": "0",
+                  "revision": "1",
+                  "safety_fault": false,
+                  "schema": "wsprrypi.wtp-runtime/1",
+                  "session_diagnostic": "",
+                  "session_id": "d53e83772d14dd78b23e179c2ce5b9d1",
+                  "session_phase": "disconnected",
+                  "start_utc_ns": "0",
+                  "status_observed_ms": null,
+                  "stop_requested": false,
+                  "uncertain": false
+                }
+              }
+            },
+            "removals": [],
+            "scope": "wsprrypi-wtp-fleet/1",
+            "version": 1
+          }
+        ]
+      }
+    },
+    {
+      "request": {
+        "op": "http",
+        "host": "192.168.1.68",
+        "path": "wtp-endpoint",
+        "method": "GET",
+        "body": null,
+        "revision": null
+      },
+      "reply": {
+        "ok": true,
+        "at_utc_ns": "1790772320090272955",
+        "value": [
+          200,
+          {
+            "Connection": "close",
+            "Content-Length": "626",
+            "Content-Type": "application/json",
+            "X-Content-Type-Options": "nosniff",
+            "Cache-Control": "no-store"
+          },
+          {
+            "address": "192.168.1.68",
+            "boot_id": "18a0f6368fa9272f590fafd01c177e9d",
+            "device_id": "74d12151aff03c45cfcb15a45bd8e037",
+            "dns_sd_published": false,
+            "enabled": true,
+            "finishing_remote_job": false,
+            "launch_observed_monotonic_ns": null,
+            "launch_target_monotonic_ns": "0",
+            "listener_error": "",
+            "listener_running": true,
+            "local_effective": false,
+            "local_requested": false,
+            "local_work_active": false,
+            "output_unknown": false,
+            "port": 31417,
+            "remote_admission_closed": false,
+            "remote_job_id": "",
+            "remote_output_active": false,
+            "remote_owner": "",
+            "remote_state": "empty",
+            "revocation_generation": "12",
+            "revocation_unavailable": false,
+            "schema": "wsprrypi-wtp-endpoint/1"
+          }
+        ]
+      }
+    },
+    {
+      "request": {
+        "op": "http",
+        "host": "192.168.1.68",
+        "path": "fleet",
+        "method": "GET",
+        "body": null,
+        "revision": null
+      },
+      "reply": {
+        "ok": true,
+        "at_utc_ns": "1790772322124043761",
+        "value": [
+          200,
+          {
+            "Connection": "close",
+            "Content-Length": "1493",
+            "Content-Type": "application/json",
+            "ETag": "\"4afedbfb5170c2c34d3ffba8200d14456008bd7f1931ce1cca6921379c553f1d\"",
+            "X-Content-Type-Options": "nosniff",
+            "Cache-Control": "no-store"
+          },
+          {
+            "assignments": [
+              {
+                "device_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                "enabled": true,
+                "in_flight": true,
+                "last_start_ns": "1800000000000000000",
+                "management_port": 31415,
+                "name": "Installed recovery fixture",
+                "product": "WsprryPico",
+                "revocation_generation": null,
+                "schedule": {
+                  "duration_ms": 1000,
+                  "frequency_hz": 14097100,
+                  "mode": "tone",
+                  "period_seconds": 60,
+                  "phase_seconds": 0
+                },
+                "settings": {
+                  "Allow Frequency Adjustment": true,
+                  "Device ID": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                  "Hostname": "192.0.2.123",
+                  "Start Uncertainty ns": 500000000,
+                  "TCP Port": 31417,
+                  "Transport": "network_plain"
+                }
+              }
+            ],
+            "maximum_outputs": 8,
+            "now_ms": "106886",
+            "outputs": {
+              "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb": {
+                "message": "A previous process may have dispatched this job. Reconcile before resuming.",
+                "observed_ms": 106812,
+                "revoked": false,
+                "state": "recovery_required",
+                "wtp": {
+                  "adjustments": [],
+                  "arm_handed_off": false,
+                  "capabilities": null,
+                  "diagnostic": "",
+                  "dispatch_utc_ns": "0",
+                  "identity": null,
+                  "job": null,
+                  "job_id": "",
+                  "last_recovery": null,
+                  "last_report": null,
+                  "lease_valid": false,
+                  "observed_ms": "104811",
+                  "owner_id": "e29e544a8ec6f6a1c73db8e5f0059bd7",
+                  "owns": false,
+                  "phase": "idle",
+                  "recovery_required": false,
+                  "reload_requested": false,
+                  "remote": null,
+                  "request_id": "0",
+                  "revision": "1",
+                  "safety_fault": false,
+                  "schema": "wsprrypi.wtp-runtime/1",
+                  "session_diagnostic": "",
+                  "session_id": "d62416ee0f880ba418ef25a85b645d2a",
+                  "session_phase": "disconnected",
+                  "start_utc_ns": "0",
+                  "status_observed_ms": null,
+                  "stop_requested": false,
+                  "uncertain": false
+                }
+              }
+            },
+            "removals": [],
+            "scope": "wsprrypi-wtp-fleet/1",
+            "version": 1
+          }
+        ]
+      }
+    }
+  ],
+  "passed": true,
+  "commands": [
+    {
+      "command": "test -f /home/pi/finished && sudo -n test -s /home/pi/wtp-installed-validation.yTbN3G/baseline.tar",
+      "host": "wspr4",
+      "at_utc_ns": "1790772141351886000",
+      "code": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "command": "sudo -n systemctl stop wsprrypi",
+      "host": "wspr4",
+      "at_utc_ns": "1790772142005588000",
+      "code": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "command": "sudo -n python3 /home/pi/wtp-installed-validation.yTbN3G/config.py off",
+      "host": "wspr4",
+      "at_utc_ns": "1790772142512411000",
+      "code": 0,
+      "stdout": "{\"enabled\": false, \"at_utc_ns\": \"1790772142490171175\"}\n",
+      "stderr": ""
+    },
+    {
+      "command": "sudo -n systemctl start wsprrypi",
+      "host": "wspr4",
+      "at_utc_ns": "1790772143412735000",
+      "code": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "command": "cat /proc/sys/kernel/random/boot_id",
+      "host": "wspr4",
+      "at_utc_ns": "1790772144102544000",
+      "code": 0,
+      "stdout": "522d9aa1-8a52-4bf9-b058-be069a1bb366\n",
+      "stderr": ""
+    },
+    {
+      "command": "systemctl show wsprrypi -p MainPID --value",
+      "host": "wspr4",
+      "at_utc_ns": "1790772144515865000",
+      "code": 0,
+      "stdout": "96191\n",
+      "stderr": ""
+    },
+    {
+      "command": "sha256sum /usr/local/bin/wsprrypi",
+      "host": "wspr4",
+      "at_utc_ns": "1790772145009578000",
+      "code": 0,
+      "stdout": "0611a539a403e6e15dbc5b500b0d685e920ad21071d953cf825f6792fe96315f  /usr/local/bin/wsprrypi\n",
+      "stderr": ""
+    },
+    {
+      "command": "cat /proc/sys/kernel/random/boot_id",
+      "host": "wspr4",
+      "at_utc_ns": "1790772145568966000",
+      "code": 0,
+      "stdout": "522d9aa1-8a52-4bf9-b058-be069a1bb366\n",
+      "stderr": ""
+    },
+    {
+      "command": "systemctl show wsprrypi -p MainPID --value",
+      "host": "wspr4",
+      "at_utc_ns": "1790772145968733000",
+      "code": 0,
+      "stdout": "96191\n",
+      "stderr": ""
+    },
+    {
+      "command": "cat /proc/sys/kernel/random/boot_id",
+      "host": "wspr4",
+      "at_utc_ns": "1790772146357642000",
+      "code": 0,
+      "stdout": "522d9aa1-8a52-4bf9-b058-be069a1bb366\n",
+      "stderr": ""
+    },
+    {
+      "command": "sudo -n systemctl reboot",
+      "host": "wspr4",
+      "at_utc_ns": "1790772146780733000",
+      "code": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "command": "cat /proc/sys/kernel/random/boot_id",
+      "host": "wspr4",
+      "at_utc_ns": "1790772154801866000",
+      "code": 255,
+      "stdout": "",
+      "stderr": "ssh: Could not resolve hostname wspr4.local: nodename nor servname provided, or not known\n"
+    },
+    {
+      "command": "cat /proc/sys/kernel/random/boot_id",
+      "host": "wspr4",
+      "at_utc_ns": "1790772162821006000",
+      "code": 255,
+      "stdout": "",
+      "stderr": "ssh: Could not resolve hostname wspr4.local: nodename nor servname provided, or not known\n"
+    },
+    {
+      "command": "cat /proc/sys/kernel/random/boot_id",
+      "host": "wspr4",
+      "at_utc_ns": "1790772170861782000",
+      "code": 255,
+      "stdout": "",
+      "stderr": "ssh: Could not resolve hostname wspr4.local: nodename nor servname provided, or not known\n"
+    },
+    {
+      "command": "cat /proc/sys/kernel/random/boot_id",
+      "host": "wspr4",
+      "at_utc_ns": "1790772178887158000",
+      "code": 255,
+      "stdout": "",
+      "stderr": "ssh: Could not resolve hostname wspr4.local: nodename nor servname provided, or not known\n"
+    },
+    {
+      "command": "cat /proc/sys/kernel/random/boot_id",
+      "host": "wspr4",
+      "at_utc_ns": "1790772186922608000",
+      "code": 255,
+      "stdout": "",
+      "stderr": "ssh: Could not resolve hostname wspr4.local: nodename nor servname provided, or not known\n"
+    },
+    {
+      "command": "cat /proc/sys/kernel/random/boot_id",
+      "host": "wspr4",
+      "at_utc_ns": "1790772192917541000",
+      "code": 0,
+      "stdout": "848e9ebb-b75f-4dd3-a2aa-ce1249e31c1d\n",
+      "stderr": ""
+    },
+    {
+      "command": "cat /proc/sys/kernel/random/boot_id",
+      "host": "wspr4",
+      "at_utc_ns": "1790772193521188000",
+      "code": 0,
+      "stdout": "848e9ebb-b75f-4dd3-a2aa-ce1249e31c1d\n",
+      "stderr": ""
+    },
+    {
+      "command": "systemctl show wsprrypi -p MainPID --value",
+      "host": "wspr4",
+      "at_utc_ns": "1790772193900177000",
+      "code": 0,
+      "stdout": "686\n",
+      "stderr": ""
+    },
+    {
+      "command": "sudo -n python3 /home/pi/wtp-installed-validation.yTbN3G/config.py on",
+      "host": "wspr4",
+      "at_utc_ns": "1790772194639746000",
+      "code": 0,
+      "stdout": "{\"enabled\": true, \"at_utc_ns\": \"1786750002317008303\"}\n",
+      "stderr": ""
+    },
+    {
+      "command": "sudo -n cat /root/.wsprrypi-wtp/revocation-v1",
+      "host": "wspr4",
+      "at_utc_ns": "1790772200211730000",
+      "code": 0,
+      "stdout": "wtp-pi-revocation-v1 74d12151aff03c45cfcb15a45bd8e037 11\n",
+      "stderr": ""
+    },
+    {
+      "command": "cat /proc/sys/kernel/random/boot_id",
+      "host": "wspr4",
+      "at_utc_ns": "1790772200613698000",
+      "code": 0,
+      "stdout": "848e9ebb-b75f-4dd3-a2aa-ce1249e31c1d\n",
+      "stderr": ""
+    },
+    {
+      "command": "systemctl show wsprrypi -p MainPID --value",
+      "host": "wspr4",
+      "at_utc_ns": "1790772201013357000",
+      "code": 0,
+      "stdout": "686\n",
+      "stderr": ""
+    },
+    {
+      "command": "cat /proc/sys/kernel/random/boot_id",
+      "host": "wspr4",
+      "at_utc_ns": "1790772201392254000",
+      "code": 0,
+      "stdout": "848e9ebb-b75f-4dd3-a2aa-ce1249e31c1d\n",
+      "stderr": ""
+    },
+    {
+      "command": "sudo -n systemctl reboot",
+      "host": "wspr4",
+      "at_utc_ns": "1790772201802435000",
+      "code": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "command": "cat /proc/sys/kernel/random/boot_id",
+      "host": "wspr4",
+      "at_utc_ns": "1790772209825193000",
+      "code": 255,
+      "stdout": "",
+      "stderr": "ssh: Could not resolve hostname wspr4.local: nodename nor servname provided, or not known\n"
+    },
+    {
+      "command": "cat /proc/sys/kernel/random/boot_id",
+      "host": "wspr4",
+      "at_utc_ns": "1790772217850300000",
+      "code": 255,
+      "stdout": "",
+      "stderr": "ssh: Could not resolve hostname wspr4.local: nodename nor servname provided, or not known\n"
+    },
+    {
+      "command": "cat /proc/sys/kernel/random/boot_id",
+      "host": "wspr4",
+      "at_utc_ns": "1790772225881606000",
+      "code": 255,
+      "stdout": "",
+      "stderr": "ssh: Could not resolve hostname wspr4.local: nodename nor servname provided, or not known\n"
+    },
+    {
+      "command": "cat /proc/sys/kernel/random/boot_id",
+      "host": "wspr4",
+      "at_utc_ns": "1790772233906588000",
+      "code": 255,
+      "stdout": "",
+      "stderr": "ssh: Could not resolve hostname wspr4.local: nodename nor servname provided, or not known\n"
+    },
+    {
+      "command": "cat /proc/sys/kernel/random/boot_id",
+      "host": "wspr4",
+      "at_utc_ns": "1790772243174449000",
+      "code": 0,
+      "stdout": "fbc9c1f5-1801-40d3-8e3d-8e282b565649\n",
+      "stderr": ""
+    },
+    {
+      "command": "cat /proc/sys/kernel/random/boot_id",
+      "host": "wspr4",
+      "at_utc_ns": "1790772243574464000",
+      "code": 0,
+      "stdout": "fbc9c1f5-1801-40d3-8e3d-8e282b565649\n",
+      "stderr": ""
+    },
+    {
+      "command": "systemctl show wsprrypi -p MainPID --value",
+      "host": "wspr4",
+      "at_utc_ns": "1790772243988768000",
+      "code": 0,
+      "stdout": "678\n",
+      "stderr": ""
+    },
+    {
+      "command": "sudo -n cat /root/.wsprrypi-wtp/revocation-v1",
+      "host": "wspr4",
+      "at_utc_ns": "1790772244542236000",
+      "code": 0,
+      "stdout": "wtp-pi-revocation-v1 74d12151aff03c45cfcb15a45bd8e037 12\n",
+      "stderr": ""
+    },
+    {
+      "command": "sudo -n python3 /home/pi/wtp-installed-validation.yTbN3G/config.py off",
+      "host": "wspr4",
+      "at_utc_ns": "1790772245418091000",
+      "code": 0,
+      "stdout": "{\"enabled\": false, \"at_utc_ns\": \"1786750002962196766\"}\n",
+      "stderr": ""
+    },
+    {
+      "command": "cat /proc/sys/kernel/random/boot_id",
+      "host": "wspr4",
+      "at_utc_ns": "1790772250007960000",
+      "code": 0,
+      "stdout": "fbc9c1f5-1801-40d3-8e3d-8e282b565649\n",
+      "stderr": ""
+    },
+    {
+      "command": "systemctl show wsprrypi -p MainPID --value",
+      "host": "wspr4",
+      "at_utc_ns": "1790772250419069000",
+      "code": 0,
+      "stdout": "678\n",
+      "stderr": ""
+    },
+    {
+      "command": "sudo -n systemctl restart wsprrypi",
+      "host": "wspr4",
+      "at_utc_ns": "1790772251561411000",
+      "code": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "command": "cat /proc/sys/kernel/random/boot_id",
+      "host": "wspr4",
+      "at_utc_ns": "1790772252006717000",
+      "code": 0,
+      "stdout": "fbc9c1f5-1801-40d3-8e3d-8e282b565649\n",
+      "stderr": ""
+    },
+    {
+      "command": "systemctl show wsprrypi -p MainPID --value",
+      "host": "wspr4",
+      "at_utc_ns": "1790772252394979000",
+      "code": 0,
+      "stdout": "1667\n",
+      "stderr": ""
+    },
+    {
+      "command": "sudo -n systemctl restart wsprrypi",
+      "host": "wspr4",
+      "at_utc_ns": "1790772264807020000",
+      "code": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "command": "sudo -n systemctl restart wsprrypi",
+      "host": "wspr4",
+      "at_utc_ns": "1790772287338569000",
+      "code": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "command": "sudo -n systemctl stop wsprrypi",
+      "host": "wspr4",
+      "at_utc_ns": "1790772305612221000",
+      "code": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "command": "sudo -n cp -p /root/.wsprrypi-wtp/revocation-v1 /home/pi/wtp-installed-validation.yTbN3G/valid-current-revocation-v1",
+      "host": "wspr4",
+      "at_utc_ns": "1790772306005943000",
+      "code": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "command": "sudo -n sh -c 'printf invalid-test-journal > /root/.wsprrypi-wtp/revocation-v1'",
+      "host": "wspr4",
+      "at_utc_ns": "1790772306406528000",
+      "code": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "command": "sudo -n systemctl start wsprrypi",
+      "host": "wspr4",
+      "at_utc_ns": "1790772307304899000",
+      "code": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "command": "sudo -n systemctl stop wsprrypi",
+      "host": "wspr4",
+      "at_utc_ns": "1790772313301943000",
+      "code": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "command": "sudo -n cp -p /home/pi/wtp-installed-validation.yTbN3G/valid-current-revocation-v1 /root/.wsprrypi-wtp/revocation-v1",
+      "host": "wspr4",
+      "at_utc_ns": "1790772313695950000",
+      "code": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "command": "sudo -n systemctl start wsprrypi",
+      "host": "wspr4",
+      "at_utc_ns": "1790772314590429000",
+      "code": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "command": "sudo -n systemctl stop wsprrypi",
+      "host": "wspr4",
+      "at_utc_ns": "1790772315456070000",
+      "code": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "command": "sudo -n python3 /home/pi/wtp-installed-validation.yTbN3G/fleet-fixture.py",
+      "host": "wspr4",
+      "at_utc_ns": "1790772315955259000",
+      "code": 0,
+      "stdout": "private in-flight fixture saved; no target connection or RF expected\n",
+      "stderr": ""
+    },
+    {
+      "command": "sudo -n systemctl start wsprrypi",
+      "host": "wspr4",
+      "at_utc_ns": "1790772316816451000",
+      "code": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "command": "sudo -n systemctl restart wsprrypi",
+      "host": "wspr4",
+      "at_utc_ns": "1790772320061614000",
+      "code": 0,
+      "stdout": "",
+      "stderr": ""
+    }
+  ],
+  "installed_caps": {
+    "type": "response",
+    "protocol": "WTP/1",
+    "session_id": "c25c9fdefe964cdaa8c1149bd332762a",
+    "request_id": "05a05236b93b4754a30d805716d93500",
+    "op": "CAPS",
+    "ok": true,
+    "body": {
+      "profiles": [
+        "rf-events/1"
+      ],
+      "modes": [
+        "wspr",
+        "tone",
+        "qrss",
+        "fskcw",
+        "dfcw"
+      ],
+      "engine": "si5351",
+      "frequency_ranges": [
+        {
+          "minimum_nhz": "7812500000000",
+          "maximum_nhz": "200000000000000000"
+        }
+      ],
+      "max_payload_bytes": 65536,
+      "max_events": 512,
+      "max_job_duration_ns": "86400000000000",
+      "minimum_arm_lead_ns": "2000000000",
+      "maximum_arm_ahead_ns": "604800000000000",
+      "maximum_arm_uncertainty_ns": "500000000",
+      "maximum_holdover_age_ns": "0",
+      "output_disable_timeout_ns": "5000000000",
+      "minimum_lease_ms": 5000,
+      "maximum_lease_ms": 60000,
+      "response_cache_entries": 8,
+      "response_cache_ttl_seconds": 300,
+      "terminal_record_entries": 8,
+      "terminal_record_ttl_seconds": 3600
+    }
+  }
+}

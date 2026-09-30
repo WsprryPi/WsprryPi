@@ -1,0 +1,13 @@
+MainPID=3279
+ExecMainStatus=0
+ActiveState=active
+SubState=running
+enabled
+active
+enabled
+c9c9b94cf5299b66a1764706a26d4af92928c563ad527ceb6002db19244dd176  /usr/local/bin/wsprrypi
+cdab1a816495325ebe4dfe8d3f453c2ce89f430f7e9d84befda4fc9ff12ff5cb  /usr/local/etc/wsprrypi.ini
+wtp-pi-revocation-v1 74d12151aff03c45cfcb15a45bd8e037 12
+600 root root
+## devel...origin/devel
+## devel...origin/devel

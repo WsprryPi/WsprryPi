@@ -1,0 +1,22 @@
+2026-09-30 07:21:48 [INFO ] [install.sh:4377] Checking environment.
+2026-09-30 07:21:48 [INFO ] [install.sh:4377] Resolved build type: RELEASE for branch devel.
+2026-09-30 07:21:54 [INFO ] [install.sh:4377] Wsprry Pi installation beginning.
+2026-09-30 07:21:54 [INFO ] [install.sh:4377] Build resources:
+2026-09-30 07:21:54 [INFO ] [install.sh:4377]   MemTotal=3886900 KiB
+2026-09-30 07:21:54 [INFO ] [install.sh:4377]   MemAvailable=3612456 KiB
+2026-09-30 07:21:54 [INFO ] [install.sh:4377]   swap-free=2097148 KiB
+2026-09-30 07:21:55 [INFO ] [install.sh:4377] Build swap classification:
+2026-09-30 07:21:55 [INFO ] [install.sh:4377]   zram-free=2097148 KiB
+2026-09-30 07:21:55 [INFO ] [install.sh:4377]   file-free=0 KiB
+2026-09-30 07:21:55 [INFO ] [install.sh:4377]   partition-free=0 KiB
+2026-09-30 07:21:55 [INFO ] [install.sh:4377]   other-independent-free=0 KiB
+2026-09-30 07:21:55 [INFO ] [install.sh:4377] Build swap independently-backed-free=0 KiB.
+2026-09-30 07:21:55 [INFO ] [install.sh:4377] Detected model: Raspberry Pi 4 Model B.
+2026-09-30 07:21:55 [INFO ] [install.sh:4377] System: Debian GNU/Linux 13 (trixie) on 64-bit OS.
+2026-09-30 07:21:56 [INFO ] [install.sh:4377] Wsprry Pi version: v3.2.0-devel+684.ff632d5
+2026-09-30 07:21:56 [INFO ] [install.sh:4377] JOBS override detected: 2.
+2026-09-30 07:21:56 [INFO ] [install.sh:4377] Compilation should typically complete in around 5m.
+2026-09-30 07:21:56 [INFO ] [install.sh:4377] Estimated effective parallelism: 2 job(s).
+2026-09-30 07:21:56 [INFO ] [install.sh:4377] Apache web mode: existing WsprryPi installation.
+2026-09-30 07:21:56 [INFO ] [install.sh:4377] Updating and managing required packages (this may take a few minutes).
+2026-09-30 07:41:35 [INFO ] [install.sh:4377] WsprryPi runtime readiness verified.

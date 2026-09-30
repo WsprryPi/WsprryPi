@@ -1,0 +1,5 @@
+Specifying boot ID or boot offset has no effect, no persistent journal was found.
+Synchronizing state of apache2.service with SysV service script with /usr/lib/systemd/systemd-sysv-install.
+Executing: /usr/lib/systemd/systemd-sysv-install enable apache2
+RESTORED; persistent revocation journal intentionally retained at current generation
+{"differences": 0}

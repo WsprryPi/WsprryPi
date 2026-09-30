@@ -1,0 +1,11 @@
+2026-09-30 07:19:39 [INFO ] [install.sh:4377] Checking environment.
+2026-09-30 07:19:40 [INFO ] [install.sh:4377] Resolved build type: RELEASE for branch main.
+2026-09-30 07:19:45 [INFO ] [install.sh:4377] Wsprry Pi installation beginning.
+2026-09-30 07:19:45 [INFO ] [install.sh:4377] Precompiled executable: skipping application build and build swap.
+2026-09-30 07:19:46 [INFO ] [install.sh:4377] Checked local executable architecture; application build disabled.
+2026-09-30 07:19:46 [INFO ] [install.sh:4377] Detected model: Raspberry Pi 4 Model B.
+2026-09-30 07:19:46 [INFO ] [install.sh:4377] System: Debian GNU/Linux 13 (trixie) on 64-bit OS.
+2026-09-30 07:19:46 [INFO ] [install.sh:4377] Wsprry Pi version: v3.2.0-main+684.ff632d5
+2026-09-30 07:19:46 [INFO ] [install.sh:4377] Apache web mode: existing WsprryPi installation.
+2026-09-30 07:19:46 [INFO ] [install.sh:4377] Updating and managing required packages (this may take a few minutes).
+2026-09-30 07:20:31 [ERROR] [install.sh:4383] Precompiled executable rejected: unsupported libraries for trixie: ['libavahi-client.so.3', 'libavahi-common.so.3']
