@@ -29,11 +29,17 @@ int main(){
     WtpFleetStore store(file,self);
     auto [empty,first]=store.snapshot();check(empty.at("assignments").empty(),"zero targets valid");
     auto a=assignment('a'),b=assignment('b');b["schedule"]["phase_seconds"]=30;
-    auto [two,revision]=store.update(first,[&](Json& d){d["assignments"]={a,b};});
+    auto [two,revision]=store.update(first,[&](Json& d){d["assignments"]=Json::array({a,b});});
     check(two.at("assignments").size()==2,"independent outputs saved");
     rejects([&]{store.update(first,[](Json& d){d["assignments"].clear();});},"stale revision rejected");
     rejects([&]{store.update(revision,[&](Json& d){d["assignments"].push_back(a);});},"duplicate identity rejected");
     rejects([&]{store.update(revision,[&](Json& d){d["assignments"].push_back(assignment('f'));});},"self target rejected");
+    rejects([&]{store.update(revision,[&](Json& d){d["assignments"]=b;});},
+            "a single assignment object is not an assignment array");
+    check(store.snapshot().first==two && store.snapshot().second==revision,
+          "rejected assignment shape preserves the document and revision");
+    WtpFleetStore unchanged(file,self);
+    check(unchanged.snapshot().first==two,"rejected assignment shape is never persisted");
     check(wtp_fleet_next_slot(a.at("schedule"),61000000000ULL,0)==120000000000ULL,"next future slot");
     check(wtp_fleet_next_slot(b.at("schedule"),61000000000ULL,0)==90000000000ULL,"independent phase");
     check(wtp_fleet_next_slot(a.at("schedule"),61000000000ULL,120000000000ULL)==180000000000ULL,"consumed slot never repeats after restart");
@@ -70,7 +76,13 @@ int main(){
     const auto ini=std::string(path)+"/runtime.ini";
     WtpFleetStore crash(ini+".wtp-assignments.json",self);
     b["enabled"]=false;b["in_flight"]=true;
-    crash.update({},[&](Json& d){d["assignments"]={b};});
+    // A bare {b} can select JSON's copy constructor on older Clang versions.
+    // Request the array explicitly, including for this single-output fixture.
+    const auto crash_saved=crash.update({},[&](Json& d){d["assignments"]=Json::array({b});});
+    check(crash_saved.first.at("assignments").is_array() &&
+          crash_saved.first.at("assignments").size()==1 &&
+          crash_saved.first.at("assignments").at(0)==b,
+          "crash fixture saves exactly one complete assignment in an array");
     start_wtp_fleet(ini,self);
     const auto running=wtp_fleet_api("GET","","");
     check(running.status==200,"real fleet manager started");
