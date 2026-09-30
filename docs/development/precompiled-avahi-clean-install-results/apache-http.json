@@ -1,0 +1,52 @@
+{
+  "page": {
+    "status": 200,
+    "content_type": "text/html; charset=UTF-8",
+    "bytes": 27985,
+    "sha256": "f7415dad83ba7c36c3350568327060940bf6433186495a6369f6423cc91b8e53"
+  },
+  "version": {
+    "status": 200,
+    "content_type": "application/json",
+    "bytes": 936,
+    "sha256": "5751a95bc7c380e0aa77605fed5f3c8af104c05b250f9a217a15121768956320",
+    "body": {
+      "ancillary_gpio": true,
+      "compiled_backends": "rpi-gpio,rp1-gpclk,si5351,simulated,wtp",
+      "ui_version": "3.2.0-devel+2f67b00 (devel)",
+      "wspr_branch": "devel",
+      "wspr_branch_state": "branch",
+      "wspr_build_dirty": "false",
+      "wspr_build_dirty_state": {
+        "dirty": false,
+        "known": true,
+        "raw": "false"
+      },
+      "wspr_commit": "2f67b0003f055bb4a7cc7c72fdf71a2b9c4cab19",
+      "wspr_display_branch": "devel",
+      "wspr_exe_version": "3.2.0-devel+2f67b00",
+      "wspr_version": "3.2.0-devel+2f67b00 (devel) on a Raspberry Pi 4 Model B Rev 1.1, Debian GNU/Linux 13 (trixie) 64-bit OS.",
+      "wspr_version_parsed": {
+        "build": [
+          "2f67b00"
+        ],
+        "major": 3,
+        "minor": 2,
+        "patch": 0,
+        "prerelease": [
+          "devel"
+        ],
+        "raw": "3.2.0-devel+2f67b00",
+        "valid": true
+      },
+      "wspr_version_raw": "3.2.0-devel+2f67b00"
+    }
+  },
+  "config": {
+    "status": 200,
+    "content_type": "application/json",
+    "bytes": 5372,
+    "sha256": "e3209950a123bbc6548b99bdcb127432812d20316ca1b59720a5ce0c5bafe57e"
+  },
+  "passed": true
+}

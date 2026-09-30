@@ -1,0 +1,145 @@
+
+[32m[INFO ](B[m Checking environment.
+[32m[INFO ](B[m Resolved build type: RELEASE for branch devel.
+[32m[INFO ](B[m Wsprry Pi installation beginning.
+[32m[INFO ](B[m Precompiled executable: skipping application build and build swap.
+[3220m[  -  ](B[m Running: Set precompiled staging directory permissions.
+[A[K[32m[  ✔  ](B[m Complete: Set precompiled staging directory permissions.
+[3220m[  -  ](B[m Running: Stage precompiled executable.
+[A[K[32m[  ✔  ](B[m Complete: Stage precompiled executable.
+[3220m[  -  ](B[m Running: Set precompiled executable permissions.
+[A[K[32m[  ✔  ](B[m Complete: Set precompiled executable permissions.
+[32m[INFO ](B[m Checked local executable architecture; application build disabled.
+[32m[INFO ](B[m Detected model: Raspberry Pi 4 Model B.
+[32m[INFO ](B[m System: Debian GNU/Linux 13 (trixie) on 64-bit OS.
+[32m[INFO ](B[m Wsprry Pi version: v3.2.0-devel.2f67b00-dirty
+[32m[INFO ](B[m Apache web mode: existing WsprryPi installation.
+[32m[INFO ](B[m Updating and managing required packages (this may take a few minutes).
+[3220m[  -  ](B[m Running: Update local package index.
+[A[K[32m[  ✔  ](B[m Complete: Update local package index.
+[3220m[  -  ](B[m Running: Fix broken or incomplete package installations.
+[A[K[32m[  ✔  ](B[m Complete: Fix broken or incomplete package installations.
+[3220m[  -  ](B[m Running: Install required packages.
+[A[K[32m[  ✔  ](B[m Complete: Install required packages.
+[3220m[  -  ](B[m Running: Validate support-bundle encryption tools.
+[A[K[32m[  ✔  ](B[m Complete: Validate support-bundle encryption tools.
+[3220m[  -  ](B[m Running: Reset systemd states.
+[A[K[32m[  ✔  ](B[m Complete: Reset systemd states.
+[3220m[  -  ](B[m Running: Reload systemd daemon.
+[A[K[32m[  ✔  ](B[m Complete: Reload systemd daemon.
+[3220m[  -  ](B[m Running: Stage executable for /usr/local/bin/wsprrypi.
+[A[K[32m[  ✔  ](B[m Complete: Stage executable for /usr/local/bin/wsprrypi.
+[3220m[  -  ](B[m Running: Back up existing executable at /usr/local/bin/wsprrypi.
+[A[K[32m[  ✔  ](B[m Complete: Back up existing executable at /usr/local/bin/wsprrypi.
+[3220m[  -  ](B[m Running: Stop wsprrypi.service.
+[A[K[32m[  ✔  ](B[m Complete: Stop wsprrypi.service.
+[3220m[  -  ](B[m Running: Install executable at /usr/local/bin/wsprrypi.
+[A[K[32m[  ✔  ](B[m Complete: Install executable at /usr/local/bin/wsprrypi.
+[3220m[  -  ](B[m Running: Create support-bundle collector directory.
+[A[K[32m[  ✔  ](B[m Complete: Create support-bundle collector directory.
+[3220m[  -  ](B[m Running: Set support-bundle collector directory ownership.
+[A[K[32m[  ✔  ](B[m Complete: Set support-bundle collector directory ownership.
+[3220m[  -  ](B[m Running: Set support-bundle collector directory permissions.
+[A[K[32m[  ✔  ](B[m Complete: Set support-bundle collector directory permissions.
+[3220m[  -  ](B[m Running: Create support-bundle storage directory.
+[A[K[32m[  ✔  ](B[m Complete: Create support-bundle storage directory.
+[3220m[  -  ](B[m Running: Set support-bundle storage ownership.
+[A[K[32m[  ✔  ](B[m Complete: Set support-bundle storage ownership.
+[3220m[  -  ](B[m Running: Set support-bundle storage permissions.
+[A[K[32m[  ✔  ](B[m Complete: Set support-bundle storage permissions.
+[3220m[  -  ](B[m Running: Copy support-bundle collector.
+[A[K[32m[  ✔  ](B[m Complete: Copy support-bundle collector.
+[3220m[  -  ](B[m Running: Set support-bundle collector ownership.
+[A[K[32m[  ✔  ](B[m Complete: Set support-bundle collector ownership.
+[3220m[  -  ](B[m Running: Set support-bundle collector permissions.
+[A[K[32m[  ✔  ](B[m Complete: Set support-bundle collector permissions.
+[3220m[  -  ](B[m Running: Publish support-bundle collector.
+[A[K[32m[  ✔  ](B[m Complete: Publish support-bundle collector.
+[3220m[  -  ](B[m Running: Create route-runtime directory.
+[A[K[32m[  ✔  ](B[m Complete: Create route-runtime directory.
+[3220m[  -  ](B[m Running: Install route application companion.
+[A[K[32m[  ✔  ](B[m Complete: Install route application companion.
+[3220m[  -  ](B[m Running: Install runtime reconciliation support.
+[A[K[32m[  ✔  ](B[m Complete: Install runtime reconciliation support.
+[3220m[  -  ](B[m Running: Backup existing INI.
+[A[K[32m[  ✔  ](B[m Complete: Backup existing INI.
+[3220m[  -  ](B[m Running: Publish merged INI.
+[A[K[32m[  ✔  ](B[m Complete: Publish merged INI.
+[3220m[  -  ](B[m Running: Install configuration.
+[A[K[32m[  ✔  ](B[m Complete: Install configuration.
+[3220m[  -  ](B[m Running: Set SEMANTIC_VERSION in /usr/local/etc//wsprrypi.ini.
+[A[K[32m[  ✔  ](B[m Complete: Set SEMANTIC_VERSION in /usr/local/etc//wsprrypi.ini.
+[3220m[  -  ](B[m Running: Install stock configuration.
+[A[K[32m[  ✔  ](B[m Complete: Install stock configuration.
+[3220m[  -  ](B[m Running: Set SEMANTIC_VERSION in /usr/local/etc//wsprrypi.ini.stock.
+[A[K[32m[  ✔  ](B[m Complete: Set SEMANTIC_VERSION in /usr/local/etc//wsprrypi.ini.stock.
+[3220m[  -  ](B[m Running: Change ownership on stock configuration.
+[A[K[32m[  ✔  ](B[m Complete: Change ownership on stock configuration.
+[3220m[  -  ](B[m Running: Set stock config permissions.
+[A[K[32m[  ✔  ](B[m Complete: Set stock config permissions.
+[3220m[  -  ](B[m Running: Change ownership on configuration.
+[A[K[32m[  ✔  ](B[m Complete: Change ownership on configuration.
+[3220m[  -  ](B[m Running: Set config permissions.
+[A[K[32m[  ✔  ](B[m Complete: Set config permissions.
+[3220m[  -  ](B[m Running: Disable systemd service.
+[A[K[32m[  ✔  ](B[m Complete: Disable systemd service.
+[3220m[  -  ](B[m Running: Stage systemd service unit.
+[A[K[32m[  ✔  ](B[m Complete: Stage systemd service unit.
+[3220m[  -  ](B[m Running: Set SEMANTIC_VERSION in /etc/systemd/system/wsprrypi.service.tmp.5u2M4m.
+[A[K[32m[  ✔  ](B[m Complete: Set SEMANTIC_VERSION in /etc/systemd/system/wsprrypi.service.tmp.5u2M4m.
+[3220m[  -  ](B[m Running: Set DAEMON_NAME in /etc/systemd/system/wsprrypi.service.tmp.5u2M4m.
+[A[K[32m[  ✔  ](B[m Complete: Set DAEMON_NAME in /etc/systemd/system/wsprrypi.service.tmp.5u2M4m.
+[3220m[  -  ](B[m Running: Set EXEC_START in /etc/systemd/system/wsprrypi.service.tmp.5u2M4m.
+[A[K[32m[  ✔  ](B[m Complete: Set EXEC_START in /etc/systemd/system/wsprrypi.service.tmp.5u2M4m.
+[3220m[  -  ](B[m Running: Set SYSLOG_IDENTIFIER in /etc/systemd/system/wsprrypi.service.tmp.5u2M4m.
+[A[K[32m[  ✔  ](B[m Complete: Set SYSLOG_IDENTIFIER in /etc/systemd/system/wsprrypi.service.tmp.5u2M4m.
+[3220m[  -  ](B[m Running: Change ownership on staged systemd unit.
+[A[K[32m[  ✔  ](B[m Complete: Change ownership on staged systemd unit.
+[3220m[  -  ](B[m Running: Change permissions on staged systemd unit.
+[A[K[32m[  ✔  ](B[m Complete: Change permissions on staged systemd unit.
+[3220m[  -  ](B[m Running: Atomically install systemd service unit.
+[A[K[32m[  ✔  ](B[m Complete: Atomically install systemd service unit.
+[3220m[  -  ](B[m Running: Reload systemd.
+[A[K[32m[  ✔  ](B[m Complete: Reload systemd.
+[3220m[  -  ](B[m Running: Enable systemd service.
+[A[K[32m[  ✔  ](B[m Complete: Enable systemd service.
+[3220m[  -  ](B[m Running: Start systemd service.
+[A[K[32m[  ✔  ](B[m Complete: Start systemd service.
+[3220m[  -  ](B[m Running: Publish validated UI artifact.
+[A[K[32m[  ✔  ](B[m Complete: Publish validated UI artifact.
+[3220m[  -  ](B[m Running: Set log permissions.
+[A[K[32m[  ✔  ](B[m Complete: Set log permissions.
+[3220m[  -  ](B[m Running: Render Apache privileged-network policy.
+[A[K[32m[  ✔  ](B[m Complete: Render Apache privileged-network policy.
+[3220m[  -  ](B[m Running: Copy Apache vhost to sites-available.
+[A[K[32m[  ✔  ](B[m Complete: Copy Apache vhost to sites-available.
+[3220m[  -  ](B[m Running: Stage Apache proxy configuration.
+[A[K[32m[  ✔  ](B[m Complete: Stage Apache proxy configuration.
+[3220m[  -  ](B[m Running: Install Apache proxy configuration.
+[A[K[32m[  ✔  ](B[m Complete: Install Apache proxy configuration.
+[3220m[  -  ](B[m Running: Enable proxy modules.
+[A[K[32m[  ✔  ](B[m Complete: Enable proxy modules.
+[3220m[  -  ](B[m Running: Disable default site.
+[A[K[32m[  ✔  ](B[m Complete: Disable default site.
+[3220m[  -  ](B[m Running: Enable wsprrypi site.
+[A[K[32m[  ✔  ](B[m Complete: Enable wsprrypi site.
+[3220m[  -  ](B[m Running: Test Apache configuration.
+[A[K[32m[  ✔  ](B[m Complete: Test Apache configuration.
+[3220m[  -  ](B[m Running: Reload Apache.
+[A[K[32m[  ✔  ](B[m Complete: Reload Apache.
+[3220m[  -  ](B[m Running: Delete merged INI source.
+[A[K[32m[  ✔  ](B[m Complete: Delete merged INI source.
+[3220m[  -  ](B[m Running: Restart wsprrypi.
+[A[K[32m[  ✔  ](B[m Complete: Restart wsprrypi.
+[32m[INFO ](B[m WsprryPi runtime readiness verified.
+
+Installation successful: Wsprry Pi.
+
+To configure Wsprry Pi, open the following URL in your browser:
+
+  [34mhttp://wspr4.local/wsprrypi/(B[m
+  [34mhttp://192.168.1.120/wsprrypi/(B[m
+
+If the hostname URL does not work, try using the IP address.
+Ensure your device is on the same network and that mDNS is
+supported by your system.

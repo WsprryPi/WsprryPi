@@ -35,6 +35,11 @@ mode installs runtime libraries and inspection tools, omits application
 compilers and development headers, and skips application compilation and its
 swap preparation. Existing development packages are not removed.
 
+Executables built with DNS-SD support use the Avahi runtime libraries
+`libavahi-client3` and `libavahi-common3`. The installer includes
+`libavahi-client3`; its package dependencies provide `libavahi-common3`.
+Avahi development headers are needed only when building from source.
+
 Web packages are installed unless `--no-web` is selected. Optional RP1 GPCLK
 DKMS installation still requires its own compiler, kernel headers, DKMS tools,
 and build-resource checks, even with a precompiled application.

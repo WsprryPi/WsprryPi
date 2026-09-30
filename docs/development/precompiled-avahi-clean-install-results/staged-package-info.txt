@@ -1,0 +1,103 @@
+ new Debian package, version 2.0.
+ size 57516 bytes: control archive=1172 bytes.
+     875 bytes,    20 lines      control
+     890 bytes,    11 lines      md5sums
+ Package: libavahi-client-dev
+ Source: avahi
+ Version: 0.8-16
+ Architecture: arm64
+ Maintainer: Utopia Maintenance Team <pkg-utopia-maintainers@lists.alioth.debian.org>
+ Installed-Size: 226
+ Depends: libavahi-client3 (= 0.8-16), libavahi-common-dev (= 0.8-16), libdbus-1-dev
+ Section: libdevel
+ Priority: optional
+ Multi-Arch: same
+ Homepage: https://avahi.org/
+ Description: Development files for the Avahi client library
+  Avahi is a fully LGPL framework for Multicast DNS Service Discovery.
+  It allows programs to publish and discover services and hosts
+  running on a local network with no specific configuration. For
+  example you can plug into a network and instantly find printers to
+  print to, files to look at and people to talk to.
+  .
+  This package contains the development headers for Avahi's C API which
+  allows you to integrate mDNS/DNS-SD functionality into your application.
+ new Debian package, version 2.0.
+ size 46740 bytes: control archive=1524 bytes.
+     824 bytes,    20 lines      control
+     390 bytes,     5 lines      md5sums
+      44 bytes,     1 lines      shlibs
+    2671 bytes,    64 lines      symbols
+      66 bytes,     2 lines      triggers
+ Package: libavahi-client3
+ Source: avahi
+ Version: 0.8-16
+ Architecture: arm64
+ Maintainer: Utopia Maintenance Team <pkg-utopia-maintainers@lists.alioth.debian.org>
+ Installed-Size: 175
+ Depends: libavahi-common3 (= 0.8-16), libc6 (>= 2.34), libdbus-1-3 (>= 1.10)
+ Section: libs
+ Priority: optional
+ Multi-Arch: same
+ Homepage: https://avahi.org/
+ Description: Avahi client library
+  Avahi is a fully LGPL framework for Multicast DNS Service Discovery.
+  It allows programs to publish and discover services and hosts
+  running on a local network with no specific configuration. For
+  example you can plug into a network and instantly find printers to
+  print to, files to look at and people to talk to.
+  .
+  This package contains the library for Avahi's C API which  allows you
+  to integrate mDNS/DNS-SD functionality into your application.
+ new Debian package, version 2.0.
+ size 60048 bytes: control archive=1388 bytes.
+     872 bytes,    21 lines      control
+    1429 bytes,    20 lines      md5sums
+ Package: libavahi-common-dev
+ Source: avahi
+ Version: 0.8-16
+ Architecture: arm64
+ Maintainer: Utopia Maintenance Team <pkg-utopia-maintainers@lists.alioth.debian.org>
+ Installed-Size: 215
+ Depends: libavahi-common3 (= 0.8-16)
+ Section: libdevel
+ Priority: optional
+ Multi-Arch: same
+ Homepage: https://avahi.org/
+ Description: Development files for the Avahi common library
+  Avahi is a fully LGPL framework for Multicast DNS Service Discovery.
+  It allows programs to publish and discover services and hosts
+  running on a local network with no specific configuration. For
+  example you can plug into a network and instantly find printers to
+  print to, files to look at and people to talk to.
+  .
+  This package contains the development headers for the Avahi common
+  library, which is a set of common functions and definitions used by many
+  of Avahis components and client applications.
+ new Debian package, version 2.0.
+ size 43340 bytes: control archive=1676 bytes.
+     815 bytes,    20 lines      control
+     390 bytes,     5 lines      md5sums
+      44 bytes,     1 lines      shlibs
+    3419 bytes,    93 lines      symbols
+      66 bytes,     2 lines      triggers
+ Package: libavahi-common3
+ Source: avahi
+ Version: 0.8-16
+ Architecture: arm64
+ Maintainer: Utopia Maintenance Team <pkg-utopia-maintainers@lists.alioth.debian.org>
+ Installed-Size: 112
+ Depends: libc6 (>= 2.38), libavahi-common-data (= 0.8-16)
+ Section: libs
+ Priority: optional
+ Multi-Arch: same
+ Homepage: https://avahi.org/
+ Description: Avahi common library
+  Avahi is a fully LGPL framework for Multicast DNS Service Discovery.
+  It allows programs to publish and discover services and hosts
+  running on a local network with no specific configuration. For
+  example you can plug into a network and instantly find printers to
+  print to, files to look at and people to talk to.
+  .
+  This package contains the Avahi common library, which is a set of common
+  functions used by many of Avahis components and client applications.

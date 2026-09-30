@@ -1,0 +1,3 @@
+WsprryPi version 3.2.0-devel+2f67b00 (devel).
+Compiled backends: rpi-gpio,rp1-gpclk,si5351,simulated,wtp
+Ancillary GPIO: enabled

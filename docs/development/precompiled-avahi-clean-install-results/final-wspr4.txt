@@ -1,0 +1,10 @@
+MainPID=694
+ExecMainStatus=0
+ActiveState=active
+SubState=running
+65d7ccb3da27b0255d94714bcca80b6f21fe8faf7ef1212308a9d37d67081d19  /usr/local/bin/wsprrypi
+## devel...origin/devel
+ M docs/precompiled-installation.md
+ M scripts/precompiled_binary.py
+ M scripts/tests/precompiled_binary_test.py
+ M scripts/tests/precompiled_installer_test.sh

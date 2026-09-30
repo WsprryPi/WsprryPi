@@ -14,13 +14,15 @@ contains_pkg() { printf '%s\n' "${RESOLVED_APT_PACKAGES[@]}" | grep -Fxq -- "$1"
 INSTALL_RP1_GPCLK_DKMS=false
 NO_WEB=true
 BINARY_SOURCE=local
-BINARY_RUNTIME_PACKAGES=(libgpiod2 libssl3)
-resolve_apt_package_list
-for bad in build-essential libssl-dev libsystemd-dev libgpiod-dev apache2 php; do
-    ! contains_pkg "$bad" || exit 1
-done
-for good in python3 age chrony binutils libgpiod2 libssl3; do
-    contains_pkg "$good" || exit 1
+for runtime_packages in 'libgpiod2 libssl3' 'libgpiod3 libssl3t64'; do
+    read -r -a BINARY_RUNTIME_PACKAGES <<<"$runtime_packages"
+    resolve_apt_package_list
+    for bad in build-essential libssl-dev libsystemd-dev libgpiod-dev libavahi-client-dev libavahi-common-dev apache2 php; do
+        ! contains_pkg "$bad" || exit 1
+    done
+    for good in python3 age chrony binutils libavahi-client3 "${BINARY_RUNTIME_PACKAGES[@]}"; do
+        contains_pkg "$good" || exit 1
+    done
 done
 BUILD_RESOURCE_MEMINFO_PATH=/does/not/exist
 preflight_build_resources

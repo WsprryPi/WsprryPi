@@ -1,0 +1,29 @@
+{
+  "original": {
+    "exit_status": 1,
+    "stdout": "",
+    "stderr": "Precompiled executable rejected: unsupported libraries for trixie: ['libavahi-common.so.3', 'libavahi-client.so.3']\n"
+  },
+  "corrected": {
+    "exit_status": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  "host": {
+    "cpu": "aarch64",
+    "release": "trixie"
+  },
+  "needed_runtime_packages": [
+    "libavahi-client3",
+    "libavahi-common3",
+    "libc6",
+    "libgcc-s1",
+    "libgpiod3",
+    "libssl3t64",
+    "libstdc++6",
+    "libsystemd0"
+  ],
+  "binary_sha256": "65d7ccb3da27b0255d94714bcca80b6f21fe8faf7ef1212308a9d37d67081d19",
+  "binary_version": "WsprryPi version 3.2.0-devel+2f67b00 (devel).\nCompiled backends: rpi-gpio,rp1-gpclk,si5351,simulated,wtp\nAncillary GPIO: enabled",
+  "wspr5_installed_state_unchanged": true
+}

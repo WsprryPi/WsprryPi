@@ -1,0 +1,427 @@
+build metadata unchanged: build/generated/build_metadata.hpp
+......Precompiled executable rejected: required libraries or symbol versions are missing: GLIBC_2.38 => not found
+.........
+----------------------------------------------------------------------
+Ran 15 tests in 0.018s
+
+OK
+precompiled installer tests: PASS
+INI upgrade schema lifecycle test: PASS
+.....................................
+----------------------------------------------------------------------
+Ran 37 tests in 2.269s
+
+OK
+.............
+----------------------------------------------------------------------
+Ran 13 tests in 3.025s
+
+OK
+[  -  ] Running: Create temporary build swap directory.
+[  ✔  ] Complete: Create temporary build swap directory.
+[  -  ] Running: Protect temporary build swap file.
+[  ✔  ] Complete: Protect temporary build swap file.
+[  -  ] Running: Allocate temporary build swap.
+[  ✔  ] Complete: Allocate temporary build swap.
+[  -  ] Running: Format temporary build swap.
+[  ✔  ] Complete: Format temporary build swap.
+[  -  ] Running: Enable temporary build swap.
+[  ✔  ] Complete: Enable temporary build swap.
+[  -  ] Running: Disable temporary build swap.
+[  ✔  ] Complete: Disable temporary build swap.
+[  -  ] Running: Remove temporary build swap file.
+[  ✔  ] Complete: Remove temporary build swap file.
+[  -  ] Running: Create temporary build swap directory.
+[  ✔  ] Complete: Create temporary build swap directory.
+[  -  ] Running: Protect temporary build swap file.
+[  ✔  ] Complete: Protect temporary build swap file.
+[  -  ] Running: Allocate temporary build swap.
+[  ✔  ] Complete: Allocate temporary build swap.
+[  -  ] Running: Format temporary build swap.
+[  ✔  ] Complete: Format temporary build swap.
+[  -  ] Running: Enable temporary build swap.
+[  ✔  ] Complete: Enable temporary build swap.
+[  -  ] Running: Disable temporary build swap.
+[  ✔  ] Complete: Disable temporary build swap.
+[  -  ] Running: Remove temporary build swap file.
+[  ✔  ] Complete: Remove temporary build swap file.
+[  -  ] Running: Create temporary build swap directory.
+[  ✔  ] Complete: Create temporary build swap directory.
+[  -  ] Running: Protect temporary build swap file.
+[  ✔  ] Complete: Protect temporary build swap file.
+[  -  ] Running: Allocate temporary build swap.
+[  ✔  ] Complete: Allocate temporary build swap.
+[  -  ] Running: Format temporary build swap.
+[  ✔  ] Complete: Format temporary build swap.
+[  -  ] Running: Enable temporary build swap.
+[  ✔  ] Complete: Enable temporary build swap.
+[  -  ] Running: Disable temporary build swap.
+[  ✔  ] Complete: Disable temporary build swap.
+[  -  ] Running: Remove temporary build swap file.
+[  ✔  ] Complete: Remove temporary build swap file.
+[  -  ] Running: Create temporary build swap directory.
+[  ✔  ] Complete: Create temporary build swap directory.
+[  -  ] Running: Protect temporary build swap file.
+[  ✔  ] Complete: Protect temporary build swap file.
+[  -  ] Running: Allocate temporary build swap.
+[  ✔  ] Complete: Allocate temporary build swap.
+[  -  ] Running: Format temporary build swap.
+[  ✔  ] Complete: Format temporary build swap.
+[  -  ] Running: Enable temporary build swap.
+[  ✔  ] Complete: Enable temporary build swap.
+[  -  ] Running: Disable temporary build swap.
+[  ✔  ] Complete: Disable temporary build swap.
+[  -  ] Running: Remove temporary build swap file.
+[  ✔  ] Complete: Remove temporary build swap file.
+[  -  ] Running: Create temporary build swap directory.
+[  ✔  ] Complete: Create temporary build swap directory.
+[  -  ] Running: Protect temporary build swap file.
+[  ✔  ] Complete: Protect temporary build swap file.
+[  -  ] Running: Allocate temporary build swap.
+[  ✔  ] Complete: Allocate temporary build swap.
+[  -  ] Running: Format temporary build swap.
+[  ✔  ] Complete: Format temporary build swap.
+[  -  ] Running: Enable temporary build swap.
+[  ✔  ] Complete: Enable temporary build swap.
+[  -  ] Running: Disable temporary build swap.
+[  ✔  ] Complete: Disable temporary build swap.
+[  -  ] Running: Remove temporary build swap file.
+[  ✔  ] Complete: Remove temporary build swap file.
+[  -  ] Running: Create temporary build swap directory.
+[  ✔  ] Complete: Create temporary build swap directory.
+[  -  ] Running: Protect temporary build swap file.
+[  ✔  ] Complete: Protect temporary build swap file.
+[  -  ] Running: Allocate temporary build swap.
+[  ✔  ] Complete: Allocate temporary build swap.
+[  -  ] Running: Format temporary build swap.
+[  ✔  ] Complete: Format temporary build swap.
+[  -  ] Running: Enable temporary build swap.
+[  ✔  ] Complete: Enable temporary build swap.
+[  -  ] Running: Disable temporary build swap.
+[  ✔  ] Complete: Disable temporary build swap.
+[  -  ] Running: Remove temporary build swap file.
+[  ✔  ] Complete: Remove temporary build swap file.
+[  -  ] Running: Create temporary build swap directory.
+[  ✔  ] Complete: Create temporary build swap directory.
+[  -  ] Running: Protect temporary build swap file.
+[  ✔  ] Complete: Protect temporary build swap file.
+[  -  ] Running: Allocate temporary build swap.
+[  ✔  ] Complete: Allocate temporary build swap.
+[  -  ] Running: Format temporary build swap.
+[  ✔  ] Complete: Format temporary build swap.
+[  -  ] Running: Enable temporary build swap.
+[  ✔  ] Complete: Enable temporary build swap.
+[  -  ] Running: Disable temporary build swap.
+[  ✔  ] Complete: Disable temporary build swap.
+[  -  ] Running: Remove temporary build swap file.
+[  ✔  ] Complete: Remove temporary build swap file.
+[  -  ] Running: Create temporary build swap directory.
+[  ✔  ] Complete: Create temporary build swap directory.
+[  -  ] Running: Protect temporary build swap file.
+[  ✔  ] Complete: Protect temporary build swap file.
+[  -  ] Running: Allocate temporary build swap.
+[  ✔  ] Complete: Allocate temporary build swap.
+[  -  ] Running: Format temporary build swap.
+[  ✔  ] Complete: Format temporary build swap.
+[  -  ] Running: Enable temporary build swap.
+[  ✔  ] Complete: Enable temporary build swap.
+[  -  ] Running: Disable temporary build swap.
+[  ✔  ] Complete: Disable temporary build swap.
+[  -  ] Running: Remove temporary build swap file.
+[  ✔  ] Complete: Remove temporary build swap file.
+[  -  ] Running: Create temporary build swap directory.
+[  ✔  ] Complete: Create temporary build swap directory.
+[  -  ] Running: Protect temporary build swap file.
+[  ✔  ] Complete: Protect temporary build swap file.
+[  -  ] Running: Allocate temporary build swap.
+[  ✔  ] Complete: Allocate temporary build swap.
+[  -  ] Running: Format temporary build swap.
+[  ✔  ] Complete: Format temporary build swap.
+[  -  ] Running: Enable temporary build swap.
+[  ✔  ] Complete: Enable temporary build swap.
+[  -  ] Running: Disable temporary build swap.
+[  ✔  ] Complete: Disable temporary build swap.
+[  -  ] Running: Remove temporary build swap file.
+[  ✔  ] Complete: Remove temporary build swap file.
+[  -  ] Running: Create temporary build swap directory.
+[  ✔  ] Complete: Create temporary build swap directory.
+[  -  ] Running: Protect temporary build swap file.
+[  ✔  ] Complete: Protect temporary build swap file.
+[  -  ] Running: Allocate temporary build swap.
+[  ✔  ] Complete: Allocate temporary build swap.
+[  -  ] Running: Format temporary build swap.
+[  ✔  ] Complete: Format temporary build swap.
+[  -  ] Running: Enable temporary build swap.
+[  ✔  ] Complete: Enable temporary build swap.
+[  -  ] Running: Disable temporary build swap.
+[  ✔  ] Complete: Disable temporary build swap.
+[  -  ] Running: Remove temporary build swap file.
+[  ✔  ] Complete: Remove temporary build swap file.
+[  -  ] Running: Create temporary build swap directory.
+[  ✔  ] Complete: Create temporary build swap directory.
+[  -  ] Running: Protect temporary build swap file.
+[  ✔  ] Complete: Protect temporary build swap file.
+[  -  ] Running: Allocate temporary build swap.
+[  ✔  ] Complete: Allocate temporary build swap.
+[  -  ] Running: Format temporary build swap.
+[  ✔  ] Complete: Format temporary build swap.
+[  -  ] Running: Enable temporary build swap.
+[  ✔  ] Complete: Enable temporary build swap.
+[  -  ] Running: Disable temporary build swap.
+[  ✔  ] Complete: Disable temporary build swap.
+[  -  ] Running: Remove temporary build swap file.
+[  ✔  ] Complete: Remove temporary build swap file.
+[  -  ] Running: Create temporary build swap directory.
+[  ✔  ] Complete: Create temporary build swap directory.
+[  -  ] Running: Protect temporary build swap file.
+[  ✔  ] Complete: Protect temporary build swap file.
+[  -  ] Running: Allocate temporary build swap.
+[  ✔  ] Complete: Allocate temporary build swap.
+[  -  ] Running: Format temporary build swap.
+[  ✔  ] Complete: Format temporary build swap.
+[  -  ] Running: Enable temporary build swap.
+[  ✔  ] Complete: Enable temporary build swap.
+[  -  ] Running: Disable temporary build swap.
+[  ✔  ] Complete: Disable temporary build swap.
+[  -  ] Running: Remove temporary build swap file.
+[  ✔  ] Complete: Remove temporary build swap file.
+[  -  ] Running: Create temporary build swap directory.
+[  ✔  ] Complete: Create temporary build swap directory.
+[  -  ] Running: Protect temporary build swap file.
+[  ✔  ] Complete: Protect temporary build swap file.
+[  -  ] Running: Allocate temporary build swap.
+[  ✔  ] Complete: Allocate temporary build swap.
+[  -  ] Running: Format temporary build swap.
+[  ✔  ] Complete: Format temporary build swap.
+[  -  ] Running: Enable temporary build swap.
+[  ✔  ] Complete: Enable temporary build swap.
+[  -  ] Running: Disable temporary build swap.
+[  ✔  ] Complete: Disable temporary build swap.
+[  -  ] Running: Remove temporary build swap file.
+[  ✔  ] Complete: Remove temporary build swap file.
+[  -  ] Running: Create temporary build swap directory.
+[  ✔  ] Complete: Create temporary build swap directory.
+[  -  ] Running: Protect temporary build swap file.
+[  ✔  ] Complete: Protect temporary build swap file.
+[  -  ] Running: Allocate temporary build swap.
+[  ✔  ] Complete: Allocate temporary build swap.
+[  -  ] Running: Format temporary build swap.
+[  ✔  ] Complete: Format temporary build swap.
+[  -  ] Running: Enable temporary build swap.
+[  ✔  ] Complete: Enable temporary build swap.
+[  -  ] Running: Disable temporary build swap.
+[  ✔  ] Complete: Disable temporary build swap.
+[  -  ] Running: Remove temporary build swap file.
+[  ✔  ] Complete: Remove temporary build swap file.
+[  -  ] Running: Create temporary build swap directory.
+[  ✔  ] Complete: Create temporary build swap directory.
+[  -  ] Running: Protect temporary build swap file.
+[  ✔  ] Complete: Protect temporary build swap file.
+[  -  ] Running: Allocate temporary build swap.
+[  ✔  ] Complete: Allocate temporary build swap.
+[  -  ] Running: Format temporary build swap.
+[  ✔  ] Complete: Format temporary build swap.
+[  -  ] Running: Enable temporary build swap.
+[  ✔  ] Complete: Enable temporary build swap.
+[  -  ] Running: Disable temporary build swap.
+[  ✔  ] Complete: Disable temporary build swap.
+[  -  ] Running: Remove temporary build swap file.
+[  ✔  ] Complete: Remove temporary build swap file.
+[  -  ] Running: Create temporary build swap directory.
+[  ✔  ] Complete: Create temporary build swap directory.
+[  -  ] Running: Protect temporary build swap file.
+[  ✔  ] Complete: Protect temporary build swap file.
+[  -  ] Running: Allocate temporary build swap.
+[  ✔  ] Complete: Allocate temporary build swap.
+[  -  ] Running: Format temporary build swap.
+[  ✔  ] Complete: Format temporary build swap.
+[  -  ] Running: Enable temporary build swap.
+[  ✔  ] Complete: Enable temporary build swap.
+[  -  ] Running: Disable temporary build swap.
+[  ✔  ] Complete: Disable temporary build swap.
+[  -  ] Running: Remove temporary build swap file.
+[  ✔  ] Complete: Remove temporary build swap file.
+[  -  ] Running: Protect temporary build swap file.
+[  ✔  ] Complete: Protect temporary build swap file.
+[  -  ] Running: Allocate temporary build swap.
+[  ✔  ] Complete: Allocate temporary build swap.
+[  -  ] Running: Format temporary build swap.
+[  ✔  ] Complete: Format temporary build swap.
+[  -  ] Running: Enable temporary build swap.
+[  ✔  ] Complete: Enable temporary build swap.
+[  -  ] Running: Disable temporary build swap.
+[  ✔  ] Complete: Disable temporary build swap.
+[  -  ] Running: Remove temporary build swap file.
+[  ✔  ] Complete: Remove temporary build swap file.
+[  -  ] Running: Create temporary build swap directory.
+[  ✔  ] Complete: Create temporary build swap directory.
+[  -  ] Running: Protect temporary build swap file.
+[  ✔  ] Complete: Protect temporary build swap file.
+[  -  ] Running: Allocate temporary build swap.
+[  ✔  ] Complete: Allocate temporary build swap.
+[  -  ] Running: Format temporary build swap.
+[  ✘  ] Failed: Format temporary build swap.
+[1m[38;5;220m[WARN ][0m [1m[install.sh:exec_command:2116][0m Command failed with status 7: mkswap…
+[1m[36m[EXTND][0m [1m[install.sh:exec_command:2116][0m …/var/folders/0f/yql6nmgj0v1gw2fs4hkpjbzc…
+[1m[36m[EXTND][0m [1m[install.sh:exec_command:2116][0m …0000gn/T//wsprrypi-build-resource.gwFhUo…
+[1m[36m[EXTND][0m [1m[install.sh:exec_command:2116][0m …/build-swap/wsprrypi-build.XXXXXXXX.swap
+[  -  ] Running: Remove temporary build swap file.
+[  ✔  ] Complete: Remove temporary build swap file.
+[  -  ] Running: Create temporary build swap directory.
+[  ✔  ] Complete: Create temporary build swap directory.
+[  -  ] Running: Protect temporary build swap file.
+[  ✔  ] Complete: Protect temporary build swap file.
+[  -  ] Running: Allocate temporary build swap.
+[  ✔  ] Complete: Allocate temporary build swap.
+[  -  ] Running: Format temporary build swap.
+[  ✔  ] Complete: Format temporary build swap.
+[  -  ] Running: Enable temporary build swap.
+[  ✘  ] Failed: Enable temporary build swap.
+[1m[38;5;220m[WARN ][0m [1m[install.sh:exec_command:2116][0m Command failed with status 8: swapon -p…
+[1m[36m[EXTND][0m [1m[install.sh:exec_command:2116][0m …10…
+[1m[36m[EXTND][0m [1m[install.sh:exec_command:2116][0m …/var/folders/0f/yql6nmgj0v1gw2fs4hkpjbzc…
+[1m[36m[EXTND][0m [1m[install.sh:exec_command:2116][0m …0000gn/T//wsprrypi-build-resource.gwFhUo…
+[1m[36m[EXTND][0m [1m[install.sh:exec_command:2116][0m …/build-swap/wsprrypi-build.XXXXXXXX.swap
+[  -  ] Running: Remove temporary build swap file.
+[  ✔  ] Complete: Remove temporary build swap file.
+[  -  ] Running: Create temporary build swap directory.
+[  ✔  ] Complete: Create temporary build swap directory.
+[  -  ] Running: Protect temporary build swap file.
+[  ✔  ] Complete: Protect temporary build swap file.
+[  -  ] Running: Allocate temporary build swap.
+[  ✔  ] Complete: Allocate temporary build swap.
+[  -  ] Running: Format temporary build swap.
+[  ✔  ] Complete: Format temporary build swap.
+[  -  ] Running: Enable temporary build swap.
+[  ✔  ] Complete: Enable temporary build swap.
+[  -  ] Running: Disable temporary build swap.
+[  ✘  ] Failed: Disable temporary build swap.
+[1m[38;5;220m[WARN ][0m [1m[install.sh:exec_command:2116][0m Command failed with status 9: swapoff…
+[1m[36m[EXTND][0m [1m[install.sh:exec_command:2116][0m …/var/folders/0f/yql6nmgj0v1gw2fs4hkpjbzc…
+[1m[36m[EXTND][0m [1m[install.sh:exec_command:2116][0m …0000gn/T//wsprrypi-build-resource.gwFhUo…
+[1m[36m[EXTND][0m [1m[install.sh:exec_command:2116][0m …/build-swap/wsprrypi-build.XXXXXXXX.swap
+[  -  ] Running: Disable temporary build swap.
+[  ✔  ] Complete: Disable temporary build swap.
+[  -  ] Running: Remove temporary build swap file.
+[  ✔  ] Complete: Remove temporary build swap file.
+[  -  ] Running: Create temporary build swap directory.
+[  ✔  ] Complete: Create temporary build swap directory.
+[  -  ] Running: Protect temporary build swap file.
+[  ✔  ] Complete: Protect temporary build swap file.
+[  -  ] Running: Allocate temporary build swap.
+[  ✔  ] Complete: Allocate temporary build swap.
+[  -  ] Running: Format temporary build swap.
+[  ✔  ] Complete: Format temporary build swap.
+[  -  ] Running: Enable temporary build swap.
+[  ✔  ] Complete: Enable temporary build swap.
+[  -  ] Running: Disable temporary build swap.
+[  ✔  ] Complete: Disable temporary build swap.
+[  -  ] Running: Remove temporary build swap file.
+[  ✔  ] Complete: Remove temporary build swap file.
+[  -  ] Running: Create temporary build swap directory.
+[  ✔  ] Complete: Create temporary build swap directory.
+[  -  ] Running: Protect temporary build swap file.
+[  ✔  ] Complete: Protect temporary build swap file.
+[  -  ] Running: Allocate temporary build swap.
+[  ✔  ] Complete: Allocate temporary build swap.
+[  -  ] Running: Format temporary build swap.
+[  ✔  ] Complete: Format temporary build swap.
+[  -  ] Running: Enable temporary build swap.
+[  ✔  ] Complete: Enable temporary build swap.
+[  -  ] Running: Disable temporary build swap.
+[  ✔  ] Complete: Disable temporary build swap.
+[  -  ] Running: Remove temporary build swap file.
+[  ✔  ] Complete: Remove temporary build swap file.
+[  -  ] Running: Create temporary build swap directory.
+[  ✔  ] Complete: Create temporary build swap directory.
+[  -  ] Running: Protect temporary build swap file.
+[  ✔  ] Complete: Protect temporary build swap file.
+[  -  ] Running: Allocate temporary build swap.
+[  ✔  ] Complete: Allocate temporary build swap.
+[  -  ] Running: Format temporary build swap.
+[  ✔  ] Complete: Format temporary build swap.
+[  -  ] Running: Enable temporary build swap.
+[  ✔  ] Complete: Enable temporary build swap.
+[  -  ] Running: Disable temporary build swap.
+[  ✔  ] Complete: Disable temporary build swap.
+[  -  ] Running: Remove temporary build swap file.
+[  ✔  ] Complete: Remove temporary build swap file.
+[  -  ] Running: Protect temporary build swap file.
+[  ✔  ] Complete: Protect temporary build swap file.
+[  -  ] Running: Allocate temporary build swap.
+[  ✔  ] Complete: Allocate temporary build swap.
+[  -  ] Running: Format temporary build swap.
+[  ✔  ] Complete: Format temporary build swap.
+[  -  ] Running: Enable temporary build swap.
+[  ✔  ] Complete: Enable temporary build swap.
+[  -  ] Running: Disable temporary build swap.
+[  ✔  ] Complete: Disable temporary build swap.
+[  -  ] Running: Remove temporary build swap file.
+[  ✔  ] Complete: Remove temporary build swap file.
+[  -  ] Running: Create temporary build swap directory.
+[  ✔  ] Complete: Create temporary build swap directory.
+[  -  ] Running: Protect temporary build swap file.
+[  ✔  ] Complete: Protect temporary build swap file.
+[  -  ] Running: Allocate temporary build swap.
+[  ✔  ] Complete: Allocate temporary build swap.
+[  -  ] Running: Format temporary build swap.
+[  ✘  ] Failed: Format temporary build swap.
+[1m[38;5;220m[WARN ][0m [1m[install.sh:exec_command:2116][0m Command failed with status 7: mkswap…
+[1m[36m[EXTND][0m [1m[install.sh:exec_command:2116][0m …/var/folders/0f/yql6nmgj0v1gw2fs4hkpjbzc…
+[1m[36m[EXTND][0m [1m[install.sh:exec_command:2116][0m …0000gn/T//wsprrypi-build-resource.gwFhUo…
+[1m[36m[EXTND][0m [1m[install.sh:exec_command:2116][0m …/build-swap/wsprrypi-build.XXXXXXXX.swap
+[  -  ] Running: Remove temporary build swap file.
+[  ✔  ] Complete: Remove temporary build swap file.
+[  -  ] Running: Create temporary build swap directory.
+[  ✔  ] Complete: Create temporary build swap directory.
+[  -  ] Running: Protect temporary build swap file.
+[  ✔  ] Complete: Protect temporary build swap file.
+[  -  ] Running: Allocate temporary build swap.
+[  ✔  ] Complete: Allocate temporary build swap.
+[  -  ] Running: Format temporary build swap.
+[  ✔  ] Complete: Format temporary build swap.
+[  -  ] Running: Enable temporary build swap.
+[  ✘  ] Failed: Enable temporary build swap.
+[1m[38;5;220m[WARN ][0m [1m[install.sh:exec_command:2116][0m Command failed with status 8: swapon -p…
+[1m[36m[EXTND][0m [1m[install.sh:exec_command:2116][0m …10…
+[1m[36m[EXTND][0m [1m[install.sh:exec_command:2116][0m …/var/folders/0f/yql6nmgj0v1gw2fs4hkpjbzc…
+[1m[36m[EXTND][0m [1m[install.sh:exec_command:2116][0m …0000gn/T//wsprrypi-build-resource.gwFhUo…
+[1m[36m[EXTND][0m [1m[install.sh:exec_command:2116][0m …/build-swap/wsprrypi-build.XXXXXXXX.swap
+[  -  ] Running: Remove temporary build swap file.
+[  ✔  ] Complete: Remove temporary build swap file.
+[  -  ] Running: Create temporary build swap directory.
+[  ✔  ] Complete: Create temporary build swap directory.
+[  -  ] Running: Protect temporary build swap file.
+[  ✔  ] Complete: Protect temporary build swap file.
+[  -  ] Running: Allocate temporary build swap.
+[  ✔  ] Complete: Allocate temporary build swap.
+[  -  ] Running: Format temporary build swap.
+[  ✔  ] Complete: Format temporary build swap.
+[  -  ] Running: Enable temporary build swap.
+[  ✔  ] Complete: Enable temporary build swap.
+[  -  ] Running: Disable temporary build swap.
+[  ✘  ] Failed: Disable temporary build swap.
+[1m[38;5;220m[WARN ][0m [1m[install.sh:exec_command:2116][0m Command failed with status 9: swapoff…
+[1m[36m[EXTND][0m [1m[install.sh:exec_command:2116][0m …/var/folders/0f/yql6nmgj0v1gw2fs4hkpjbzc…
+[1m[36m[EXTND][0m [1m[install.sh:exec_command:2116][0m …0000gn/T//wsprrypi-build-resource.gwFhUo…
+[1m[36m[EXTND][0m [1m[install.sh:exec_command:2116][0m …/build-swap/wsprrypi-build.XXXXXXXX.swap
+[  -  ] Running: Disable temporary build swap.
+[  ✔  ] Complete: Disable temporary build swap.
+[  -  ] Running: Remove temporary build swap file.
+[  ✔  ] Complete: Remove temporary build swap file.
+[  -  ] Running: Create temporary build swap directory.
+[  ✔  ] Complete: Create temporary build swap directory.
+[  -  ] Running: Protect temporary build swap file.
+[  ✔  ] Complete: Protect temporary build swap file.
+[  -  ] Running: Allocate temporary build swap.
+[  ✔  ] Complete: Allocate temporary build swap.
+[  -  ] Running: Format temporary build swap.
+[  ✔  ] Complete: Format temporary build swap.
+[  -  ] Running: Enable temporary build swap.
+[  ✔  ] Complete: Enable temporary build swap.
+[  -  ] Running: Disable temporary build swap.
+[  ✔  ] Complete: Disable temporary build swap.
+[  -  ] Running: Remove temporary build swap file.
+[  ✔  ] Complete: Remove temporary build swap file.
+build resource preflight tests: PASS
+installer dependency tests: PASS

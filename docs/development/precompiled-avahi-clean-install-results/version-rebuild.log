@@ -1,0 +1,23 @@
+Package avahi-client was not found in the pkg-config search path.
+Perhaps you should add the directory containing `avahi-client.pc'
+to the PKG_CONFIG_PATH environment variable
+Package 'avahi-client', required by 'virtual:world', not found
+Package avahi-client was not found in the pkg-config search path.
+Perhaps you should add the directory containing `avahi-client.pc'
+to the PKG_CONFIG_PATH environment variable
+Package 'avahi-client', required by 'virtual:world', not found
+build metadata updated: build/generated/build_metadata.hpp
+Package avahi-client was not found in the pkg-config search path.
+Perhaps you should add the directory containing `avahi-client.pc'
+to the PKG_CONFIG_PATH environment variable
+Package 'avahi-client', required by 'virtual:world', not found
+Package avahi-client was not found in the pkg-config search path.
+Perhaps you should add the directory containing `avahi-client.pc'
+to the PKG_CONFIG_PATH environment variable
+Package 'avahi-client', required by 'virtual:world', not found
+build metadata unchanged: build/generated/build_metadata.hpp
+backend capabilities unchanged: build/generated/backend_capabilities.hpp
+Compiling (release) version.cpp into build/obj/release/rpi-gpio+rp1-gpclk+si5351+simulated+ancillary-gpio1/./version.o
+Compiling (release) support_bundle_runtime.cpp into build/obj/release/rpi-gpio+rp1-gpclk+si5351+simulated+ancillary-gpio1/./support_bundle_runtime.o
+Linking release: wsprrypi (libgpiod major: 2)
+Release build completed successfully.

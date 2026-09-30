@@ -1,0 +1,2 @@
++;eth0;IPv4;wsprrypico-0a9d89;_wtp._tcp;local
+=;eth0;IPv4;wsprrypico-0a9d89;_wtp._tcp;local;wsprrypico-0a9d89.local;192.168.1.53;31417;"binding=plain" "txtvers=1"

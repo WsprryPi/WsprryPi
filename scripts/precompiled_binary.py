@@ -58,6 +58,7 @@ def inspect(binary, cpu, release):
                'libgcc_s.so.1': 'libgcc-s1', 'libc.so.6': 'libc6', 'libm.so.6': 'libc6',
                'libpthread.so.0': 'libc6', 'librt.so.1': 'libc6', 'libdl.so.2': 'libc6',
                'libsystemd.so.0': 'libsystemd0',
+               'libavahi-client.so.3': 'libavahi-client3', 'libavahi-common.so.3': 'libavahi-common3',
                'libssl.so.3': 'libssl3' if release == 'bookworm' else 'libssl3t64',
                'libcrypto.so.3': 'libssl3' if release == 'bookworm' else 'libssl3t64'}
     generation = ('1', '2', 'libgpiod2') if release == 'bookworm' else ('2', '3', 'libgpiod3')

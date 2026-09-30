@@ -1,0 +1,5 @@
+MainPID=1966
+ExecMainStatus=0
+ActiveState=active
+SubState=running
+7c3387141fe5f8b674d94f20ba31db557908c8b674d18f91a6ad208f30e9fb31  /usr/local/bin/wsprrypi

@@ -1,0 +1,53 @@
+{
+  "host": "192.168.1.120",
+  "request": {
+    "Operation": {
+      "Transmit": false,
+      "Transmit Backend": "si5351"
+    },
+    "WTP Server": {
+      "Enabled": true,
+      "Port": 31417,
+      "Interface": "wlan1"
+    }
+  },
+  "reply": [
+    200,
+    {
+      "Connection": "close",
+      "Content-Length": "11",
+      "Content-Type": "application/json",
+      "ETag": "\"77dcfc9cf41a2ff52ff6a470c2f2276cf5cc59967b3c92671699ccc64ff36ab6\"",
+      "X-Content-Type-Options": "nosniff",
+      "Cache-Control": "no-store"
+    },
+    {
+      "ok": true
+    }
+  ],
+  "endpoint": {
+    "address": "192.168.1.120",
+    "boot_id": "db019d81b8ef06d2f18baba3534af1be",
+    "device_id": "f21e530af8a4a210ec57898c0ebd32d2",
+    "dns_sd_published": true,
+    "enabled": true,
+    "finishing_remote_job": false,
+    "launch_observed_monotonic_ns": null,
+    "launch_target_monotonic_ns": "0",
+    "listener_error": "",
+    "listener_running": true,
+    "local_effective": false,
+    "local_requested": false,
+    "local_work_active": false,
+    "output_unknown": false,
+    "port": 31417,
+    "remote_admission_closed": false,
+    "remote_job_id": "",
+    "remote_output_active": false,
+    "remote_owner": "",
+    "remote_state": "empty",
+    "revocation_generation": "0",
+    "revocation_unavailable": false,
+    "schema": "wsprrypi-wtp-endpoint/1"
+  }
+}

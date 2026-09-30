@@ -92,6 +92,12 @@ It is not added to the repository.
 
 ## Unresolved installer finding
 
+**2026-09-30 closure:** The Avahi allowlist correction, full installer regression
+coverage, clean Trixie arm64 installation on the replacement wspr4 SD card,
+repeat installation and post-reboot WTP admission/DNS-SD checks passed. See the
+[precompiled clean-install acceptance record](../precompiled-avahi-clean-install-results/README.md).
+The rejection below is the historical observation from this campaign.
+
 **The supported precompiled/local-binary path rejects DNS-SD-enabled binaries.**
 The first live installation attempt stopped before replacing the application:
 

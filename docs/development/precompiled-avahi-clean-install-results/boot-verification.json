@@ -1,0 +1,38 @@
+{
+  "passed": true,
+  "checks": {
+    "new_host_boot": true,
+    "same_machine_identity": true,
+    "same_device_identity": true,
+    "new_wtp_boot": true,
+    "configuration_retained": true,
+    "packages_unchanged": true,
+    "binary_unchanged": true,
+    "service_running": true,
+    "local_disabled": true,
+    "claim_release_passed": true,
+    "no_remote_work": true,
+    "output_known_inactive": true,
+    "dns_sd_recovered": true,
+    "runtime_resolution": true,
+    "apache_config": true,
+    "apache_service": true,
+    "avahi_service": true,
+    "chrony_service": true,
+    "fresh_independent_dns_sd": true,
+    "repeat_independent_dns_sd": true,
+    "boot_independent_dns_sd": true
+  },
+  "before_host_boot_id": "5f819509-a5b0-433f-864f-6a392a650a6d",
+  "after_host_boot_id": "a88742df-1813-43d1-b505-e6b601241eda",
+  "device_id": "f21e530af8a4a210ec57898c0ebd32d2",
+  "clock_after_boot": {
+    "state": "synchronized",
+    "utc_now_ns": "1790786889735398516",
+    "monotonic_now_ns": "365731608897",
+    "uncertainty_ns": "40308055",
+    "sync_age_ns": "0",
+    "leap": "normal"
+  },
+  "job_requests": 0
+}

@@ -1,0 +1,99 @@
+ELF Header:
+  Magic:   7f 45 4c 46 02 01 01 03 00 00 00 00 00 00 00 00
+  Class:                             ELF64
+  Data:                              2's complement, little endian
+  Version:                           1 (current)
+  OS/ABI:                            UNIX - GNU
+  ABI Version:                       0
+  Type:                              DYN (Position-Independent Executable file)
+  Machine:                           AArch64
+  Version:                           0x1
+  Entry point address:               0x29b80
+  Start of program headers:          64 (bytes into file)
+  Start of section headers:          5755408 (bytes into file)
+  Flags:                             0x0
+  Size of this header:               64 (bytes)
+  Size of program headers:           56 (bytes)
+  Number of program headers:         11
+  Size of section headers:           64 (bytes)
+  Number of section headers:         32
+  Section header string table index: 31
+
+Program Headers:
+  Type           Offset             VirtAddr           PhysAddr
+                 FileSiz            MemSiz              Flags  Align
+  PHDR           0x0000000000000040 0x0000000000000040 0x0000000000000040
+                 0x0000000000000268 0x0000000000000268  R      0x8
+  INTERP         0x00000000000002cc 0x00000000000002cc 0x00000000000002cc
+                 0x000000000000001b 0x000000000000001b  R      0x1
+      [Requesting program interpreter: /lib/ld-linux-aarch64.so.1]
+  LOAD           0x0000000000000000 0x0000000000000000 0x0000000000000000
+                 0x000000000047d4e8 0x000000000047d4e8  R E    0x10000
+  LOAD           0x000000000048b9c0 0x000000000048b9c0 0x000000000048b9c0
+                 0x0000000000007580 0x000000000000abc0  RW     0x10000
+  DYNAMIC        0x000000000048f968 0x000000000048f968 0x000000000048f968
+                 0x0000000000000270 0x0000000000000270  RW     0x8
+  NOTE           0x00000000000002a8 0x00000000000002a8 0x00000000000002a8
+                 0x0000000000000024 0x0000000000000024  R      0x4
+  NOTE           0x000000000047d4c8 0x000000000047d4c8 0x000000000047d4c8
+                 0x0000000000000020 0x0000000000000020  R      0x4
+  TLS            0x000000000048b9c0 0x000000000048b9c0 0x000000000048b9c0
+                 0x0000000000000000 0x00000000000014e8  R      0x10
+  GNU_EH_FRAME   0x00000000003e0378 0x00000000003e0378 0x00000000003e0378
+                 0x000000000000aa3c 0x000000000000aa3c  R      0x4
+  GNU_STACK      0x0000000000000000 0x0000000000000000 0x0000000000000000
+                 0x0000000000000000 0x0000000000000000  RW     0x10
+  GNU_RELRO      0x000000000048b9c0 0x000000000048b9c0 0x000000000048b9c0
+                 0x0000000000004640 0x0000000000004640  R      0x1
+
+ Section to Segment mapping:
+  Segment Sections...
+   00
+   01     .interp
+   02     .note.gnu.build-id .interp .gnu.hash .dynsym .dynstr .gnu.version .gnu.version_r .rela.dyn .rela.plt .init .plt .text .fini .rodata .eh_frame_hdr .eh_frame .gcc_except_table .note.ABI-tag
+   03     .init_array .fini_array .data.rel.ro .dynamic .got .got.plt .data .bss
+   04     .dynamic
+   05     .note.gnu.build-id
+   06     .note.ABI-tag
+   07     .tbss
+   08     .eh_frame_hdr
+   09
+   10     .init_array .fini_array .data.rel.ro .dynamic .got
+
+Dynamic section at offset 0x48f968 contains 35 entries:
+  Tag        Type                         Name/Value
+ 0x0000000000000001 (NEEDED)             Shared library: [libgpiodcxx.so.2]
+ 0x0000000000000001 (NEEDED)             Shared library: [libssl.so.3]
+ 0x0000000000000001 (NEEDED)             Shared library: [libcrypto.so.3]
+ 0x0000000000000001 (NEEDED)             Shared library: [libavahi-common.so.3]
+ 0x0000000000000001 (NEEDED)             Shared library: [libavahi-client.so.3]
+ 0x0000000000000001 (NEEDED)             Shared library: [libsystemd.so.0]
+ 0x0000000000000001 (NEEDED)             Shared library: [libstdc++.so.6]
+ 0x0000000000000001 (NEEDED)             Shared library: [libm.so.6]
+ 0x0000000000000001 (NEEDED)             Shared library: [libgcc_s.so.1]
+ 0x0000000000000001 (NEEDED)             Shared library: [libc.so.6]
+ 0x000000000000000c (INIT)               0x17e28
+ 0x000000000000000d (FINI)               0x3a6f1c
+ 0x0000000000000019 (INIT_ARRAY)         0x48b9c0
+ 0x000000000000001b (INIT_ARRAYSZ)       312 (bytes)
+ 0x000000000000001a (FINI_ARRAY)         0x48baf8
+ 0x000000000000001c (FINI_ARRAYSZ)       8 (bytes)
+ 0x000000006ffffef5 (GNU_HASH)           0x2e8
+ 0x0000000000000005 (STRTAB)             0x38c0
+ 0x0000000000000006 (SYMTAB)             0x3e0
+ 0x000000000000000a (STRSZ)              16287 (bytes)
+ 0x000000000000000b (SYMENT)             24 (bytes)
+ 0x0000000000000015 (DEBUG)              0x0
+ 0x0000000000000003 (PLTGOT)             0x48ffe8
+ 0x0000000000000002 (PLTRELSZ)           11328 (bytes)
+ 0x0000000000000014 (PLTREL)             RELA
+ 0x0000000000000017 (JMPREL)             0x151e8
+ 0x0000000000000007 (RELA)               0x7f88
+ 0x0000000000000008 (RELASZ)             53856 (bytes)
+ 0x0000000000000009 (RELAENT)            24 (bytes)
+ 0x000000006ffffffb (FLAGS_1)            Flags: PIE
+ 0x000000006ffffffe (VERNEED)            0x7cc8
+ 0x000000006fffffff (VERNEEDNUM)         7
+ 0x000000006ffffff0 (VERSYM)             0x7860
+ 0x000000006ffffff9 (RELACOUNT)          1784
+ 0x0000000000000000 (NULL)               0x0

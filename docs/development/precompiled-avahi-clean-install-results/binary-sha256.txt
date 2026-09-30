@@ -1,0 +1,1 @@
+65d7ccb3da27b0255d94714bcca80b6f21fe8faf7ef1212308a9d37d67081d19  /home/pi/precompiled-avahi-build.Ilbhvf/wsprrypi

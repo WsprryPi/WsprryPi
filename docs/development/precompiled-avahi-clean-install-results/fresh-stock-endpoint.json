@@ -1,0 +1,260 @@
+{
+  "endpoint": [
+    200,
+    {
+      "Connection": "close",
+      "Content-Length": "600",
+      "Content-Type": "application/json",
+      "X-Content-Type-Options": "nosniff",
+      "Cache-Control": "no-store"
+    },
+    {
+      "boot_id": "a5ac2e47a26a75975f146cff0ef423c9",
+      "device_id": "f21e530af8a4a210ec57898c0ebd32d2",
+      "dns_sd_published": false,
+      "enabled": true,
+      "finishing_remote_job": false,
+      "listener_error": "WTP server supports Si5351 and explicit simulation; selected route is unavailable",
+      "listener_running": false,
+      "local_effective": false,
+      "local_requested": false,
+      "local_work_active": false,
+      "output_unknown": false,
+      "remote_admission_closed": false,
+      "remote_job_id": "",
+      "remote_output_active": false,
+      "remote_owner": "",
+      "remote_state": "empty",
+      "revocation_generation": "0",
+      "revocation_unavailable": false,
+      "schema": "wsprrypi-wtp-endpoint/1"
+    }
+  ],
+  "config": [
+    200,
+    {
+      "Connection": "close",
+      "Content-Length": "3116",
+      "Content-Type": "application/json",
+      "ETag": "\"119fcbab8090d644b9210760c48ef96c4f852bafbe295381fdcd90f8f2a3a4f1\"",
+      "X-Content-Type-Options": "nosniff",
+      "Cache-Control": "no-store"
+    },
+    {
+      "config": {
+        "Band GPIO": {
+          "1.25m": {
+            "Active High": false,
+            "Enabled": false,
+            "GPIO": -1
+          },
+          "10m": {
+            "Active High": false,
+            "Enabled": false,
+            "GPIO": -1
+          },
+          "12m": {
+            "Active High": false,
+            "Enabled": false,
+            "GPIO": -1
+          },
+          "15m": {
+            "Active High": false,
+            "Enabled": false,
+            "GPIO": -1
+          },
+          "160m": {
+            "Active High": false,
+            "Enabled": false,
+            "GPIO": -1
+          },
+          "17m": {
+            "Active High": false,
+            "Enabled": false,
+            "GPIO": -1
+          },
+          "20m": {
+            "Active High": false,
+            "Enabled": false,
+            "GPIO": -1
+          },
+          "2200m": {
+            "Active High": false,
+            "Enabled": false,
+            "GPIO": -1
+          },
+          "2m": {
+            "Active High": false,
+            "Enabled": false,
+            "GPIO": -1
+          },
+          "30m": {
+            "Active High": false,
+            "Enabled": false,
+            "GPIO": -1
+          },
+          "40m": {
+            "Active High": false,
+            "Enabled": false,
+            "GPIO": -1
+          },
+          "4m": {
+            "Active High": false,
+            "Enabled": false,
+            "GPIO": -1
+          },
+          "5m": {
+            "Active High": false,
+            "Enabled": false,
+            "GPIO": -1
+          },
+          "60m": {
+            "Active High": false,
+            "Enabled": false,
+            "GPIO": -1
+          },
+          "630m": {
+            "Active High": false,
+            "Enabled": false,
+            "GPIO": -1
+          },
+          "6m": {
+            "Active High": false,
+            "Enabled": false,
+            "GPIO": -1
+          },
+          "70cm": {
+            "Active High": false,
+            "Enabled": false,
+            "GPIO": -1
+          },
+          "80m": {
+            "Active High": false,
+            "Enabled": false,
+            "GPIO": -1
+          },
+          "8m": {
+            "Active High": false,
+            "Enabled": false,
+            "GPIO": -1
+          }
+        },
+        "CW": {
+          "Base Frequency": 14096900.0,
+          "DFCW Inter Character Gap": 1.0,
+          "DFCW Inter Word Gap": 3.0,
+          "DFCW Intra Element Gap": 0.333333,
+          "Dot Seconds": 3.0,
+          "Fade In Ms": 20,
+          "Fade Out Ms": 20,
+          "Fade Shape": "raised_cosine",
+          "Fade Slice Ms": 2,
+          "Inter Character Gap": 3.0,
+          "Inter Word Gap": 7.0,
+          "Intra Element Gap": 1.0,
+          "Message": "HELLO",
+          "Repeat Minutes": 10,
+          "Shift Hz": 5.0,
+          "Start Minute": 0,
+          "Start Second": 5
+        },
+        "Calibration": {
+          "PPM": 0.0
+        },
+        "GPIO": {
+          "Frequency Residual PPM": 0.0,
+          "Manual PPM": 0.0,
+          "Power Level": 7,
+          "RP1 Drive mA": 2,
+          "Transmit Pin": 4,
+          "Use System Clock Frequency Estimate": true
+        },
+        "Operation": {
+          "Amp Pin": -1,
+          "Amp Pin Active High": false,
+          "Enable on Boot": "Never",
+          "LED Pin": 18,
+          "Mode": "WSPR",
+          "Shutdown Button": 19,
+          "Socket Port": 31416,
+          "Transmit": false,
+          "Transmit Backend": "gpio",
+          "Use Amp": false,
+          "Use LED": false,
+          "Use Shutdown": false,
+          "Web Port": 31415
+        },
+        "Platform": {
+          "GPIO Clock Transmission Error": "",
+          "GPIO Clock Transmission Supported": true,
+          "I2C Bus Discovery Error": "",
+          "I2C Buses": [
+            {
+              "Name": "bcm2835 (i2c@7e804000)",
+              "Number": 1
+            },
+            {
+              "Name": "fef04500.i2c",
+              "Number": 20
+            },
+            {
+              "Name": "fef09500.i2c",
+              "Number": 21
+            }
+          ],
+          "Model": "Raspberry Pi 4 Model B Rev 1.1",
+          "RP1 GPIO Operator Visible": false,
+          "Raspberry Pi Generation": 4,
+          "Si5351 Address Bus": 1,
+          "Si5351 Address Discovery Error": "",
+          "Si5351 Addresses": [
+            "0x60"
+          ],
+          "Si5351 Detected": true,
+          "Si5351 Detection Error": ""
+        },
+        "Si5351": {
+          "Crystal Load Capacitance": 10,
+          "I2C Address": "0x60",
+          "I2C Bus": 1,
+          "Power Level": 1,
+          "Reference Frequency": 27000000,
+          "Reference Source": "external_tcxo",
+          "TX Output": "CLK0"
+        },
+        "WSPR": {
+          "Band Preferences": {},
+          "Call Sign": "NXXX",
+          "Frequency": "20m",
+          "Frequency Profile": "existing_common",
+          "Grid Square": "ZZ99",
+          "Planner Preference": "auto",
+          "TX Power": 20,
+          "Use Random Offset": true
+        },
+        "WTP": {
+          "Allow Frequency Adjustment": false,
+          "Device ID": "",
+          "Endpoint": "",
+          "Hostname": "",
+          "Start Uncertainty ns": 1000000,
+          "TCP Port": 0,
+          "TLS CA File": "",
+          "TLS Client Certificate": "",
+          "TLS Client Key": "",
+          "TLS Server Identity": "",
+          "Transport": "usb",
+          "USB Product ID": 0,
+          "USB Serial": "",
+          "USB Vendor ID": 0
+        },
+        "WTP Server": {
+          "Enabled": true,
+          "Interface": "auto",
+          "Port": 31417
+        }
+      },
+      "scope": "wsprrypi-host-config/1"
+    }
+  ]
+}

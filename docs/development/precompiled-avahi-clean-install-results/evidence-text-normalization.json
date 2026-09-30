@@ -1,0 +1,25 @@
+{
+  "policy": "Remove trailing horizontal whitespace and excess blank lines at EOF only; raw originals remain in the retained Pi stage directories.",
+  "files": {
+    "compiler.txt": {
+      "raw_sha256": "5f6798e87440f1e8b88bf6822c33bebe434f83374640a7f8ba967902ee1ea098",
+      "committed_sha256": "c9fe8ccceb627a797e421245679933f33e743d6731c1f65b2341e01ba544abed",
+      "non_whitespace_content_unchanged": true
+    },
+    "elf.txt": {
+      "raw_sha256": "b00684607694ea79a1d958d82c90181e907e713488df5a5dec4214ead727c4aa",
+      "committed_sha256": "e909b4d6c34abe645fce95ffef57b3fd9906deedff384e079e3a07cfaf355a41",
+      "non_whitespace_content_unchanged": true
+    },
+    "fresh-install.log": {
+      "raw_sha256": "2d2ea6b0e2fd3fdba906d85fefa469773b1f6f81ce21564c0c0e9c9d83eace90",
+      "committed_sha256": "a64486f281ab035477895f1be88a03e57622daf071292f3a503564b99c7d2045",
+      "non_whitespace_content_unchanged": true
+    },
+    "repeat-install.log": {
+      "raw_sha256": "21dd2ecb42c3b79e55607d3379b2eeee0cdaca12037338b689a414738c87278a",
+      "committed_sha256": "61510375d2dde664fc7bf8ebc3cb99173e502070fd5ecc3850d22d976f7d69c3",
+      "non_whitespace_content_unchanged": true
+    }
+  }
+}

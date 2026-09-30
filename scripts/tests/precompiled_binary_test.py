@@ -79,17 +79,34 @@ class BinaryTests(unittest.TestCase):
                     gpiod = '1' if release == 'bookworm' else '2'
                     libraries = ['libatomic.so.1', f'libgpiodcxx.so.{gpiod}',
                                  'libssl.so.3', 'libcrypto.so.3', 'libsystemd.so.0',
+                                 'libavahi-client.so.3', 'libavahi-common.so.3',
                                  'libstdc++.so.6', 'libm.so.6', 'libgcc_s.so.1', 'libc.so.6']
                     expected = ['libatomic1', 'libc6', 'libgcc-s1', 'libstdc++6', 'libsystemd0',
+                                'libavahi-client3', 'libavahi-common3',
                                 'libgpiod2' if release == 'bookworm' else 'libgpiod3',
                                 'libssl3' if release == 'bookworm' else 'libssl3t64']
                     self.assertEqual(self.inspect_libraries(cpu, release, libraries), sorted(expected))
 
+    def test_avahi_runtime_libraries(self):
+        cases = [(['libavahi-client.so.3'], ['libavahi-client3']),
+                 (['libavahi-common.so.3'], ['libavahi-common3']),
+                 (['libavahi-client.so.3', 'libavahi-common.so.3', 'libavahi-client.so.3'],
+                  ['libavahi-client3', 'libavahi-common3'])]
+        for cpu in ('armv6', 'aarch64'):
+            for release in ('bookworm', 'trixie'):
+                for libraries, packages in cases:
+                    with self.subTest(cpu=cpu, release=release, libraries=libraries):
+                        self.assertEqual(self.inspect_libraries(cpu, release, libraries), packages)
+
     def test_unknown_library_still_rejected(self):
-        for release in ('bookworm', 'trixie'):
-            with self.subTest(release=release), self.assertRaises(ValueError) as error:
-                self.inspect_libraries('armv6', release, ['libcrypto.so.3', 'libunknown.so.1'])
-            self.assertEqual(str(error.exception), f"unsupported libraries for {release}: ['libunknown.so.1']")
+        for cpu in ('armv6', 'aarch64'):
+            for release in ('bookworm', 'trixie'):
+                for unknown in ('libunknown.so.1', 'libavahi-client.so.4', 'libavahi-common.so.4'):
+                    with self.subTest(cpu=cpu, release=release, unknown=unknown):
+                        with self.assertRaises(ValueError) as error:
+                            self.inspect_libraries(cpu, release, ['libcrypto.so.3', 'libavahi-client.so.3',
+                                                                  'libavahi-common.so.3', unknown])
+                        self.assertEqual(str(error.exception), f"unsupported libraries for {release}: ['{unknown}']")
 
     def test_missing_libraries_still_rejected(self):
         with self.assertRaisesRegex(ValueError, 'no required shared libraries'):

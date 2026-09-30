@@ -1,0 +1,15 @@
+{
+  "passed": true,
+  "checks": {
+    "configuration_retained": true,
+    "packages_unchanged": true,
+    "binary_unchanged": true,
+    "stock_unchanged": true,
+    "service_unit_unchanged": true,
+    "web_files_unchanged": true,
+    "service_running": true,
+    "home_marker_refreshed": true
+  },
+  "configuration_differences": {},
+  "web_file_differences": []
+}

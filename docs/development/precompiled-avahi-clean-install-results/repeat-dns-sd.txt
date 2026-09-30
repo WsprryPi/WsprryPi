@@ -1,0 +1,8 @@
++;wlan1;IPv4;wsprrypico-0a9d89;_wtp._tcp;local
++;wlan1;IPv4;WsprryPi\032wspr4\032f21e530a;_wtp._tcp;local
++;eth0;IPv4;WsprryPi\032wspr4\032f21e530a;_wtp._tcp;local
++;eth0;IPv4;wsprrypico-0a9d89;_wtp._tcp;local
+=;wlan1;IPv4;wsprrypico-0a9d89;_wtp._tcp;local;wsprrypico-0a9d89.local;192.168.1.53;31417;"binding=plain" "txtvers=1"
+=;wlan1;IPv4;WsprryPi\032wspr4\032f21e530a;_wtp._tcp;local;wtp-f21e530af8a4a210ec57898c0ebd32d2.local;192.168.1.120;31417;"binding=plain" "txtvers=1"
+=;eth0;IPv4;WsprryPi\032wspr4\032f21e530a;_wtp._tcp;local;wtp-f21e530af8a4a210ec57898c0ebd32d2.local;192.168.1.120;31417;"binding=plain" "txtvers=1"
+=;eth0;IPv4;wsprrypico-0a9d89;_wtp._tcp;local;wsprrypico-0a9d89.local;192.168.1.53;31417;"binding=plain" "txtvers=1"

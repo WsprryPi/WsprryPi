@@ -1,0 +1,304 @@
+{
+  "phase": "after-reboot",
+  "host": "192.168.1.120",
+  "passed": true,
+  "captured_utc_ns": "1790786889594607000",
+  "job_requests": 0,
+  "before": {
+    "address": "192.168.1.120",
+    "boot_id": "87d31a3f3efe5ce27e6343498a3a2492",
+    "device_id": "f21e530af8a4a210ec57898c0ebd32d2",
+    "dns_sd_published": true,
+    "enabled": true,
+    "finishing_remote_job": false,
+    "launch_observed_monotonic_ns": null,
+    "launch_target_monotonic_ns": "0",
+    "listener_error": "",
+    "listener_running": true,
+    "local_effective": false,
+    "local_requested": false,
+    "local_work_active": false,
+    "output_unknown": false,
+    "port": 31417,
+    "remote_admission_closed": false,
+    "remote_job_id": "",
+    "remote_output_active": false,
+    "remote_owner": "",
+    "remote_state": "empty",
+    "revocation_generation": "0",
+    "revocation_unavailable": false,
+    "schema": "wsprrypi-wtp-endpoint/1"
+  },
+  "hello": {
+    "type": "response",
+    "protocol": "WTP/1",
+    "session_id": "f2c70d6517dd433995fdcb0b6a4c924a",
+    "request_id": "9b6c1a01133c4855a08050ceaa4a3bc9",
+    "op": "HELLO",
+    "ok": true,
+    "body": {
+      "selected_version": "WTP/1",
+      "device_id": "f21e530af8a4a210ec57898c0ebd32d2",
+      "boot_id": "87d31a3f3efe5ce27e6343498a3a2492",
+      "product": "WsprryPi",
+      "firmware_version": "3.2.0-devel+2f67b00"
+    }
+  },
+  "caps": {
+    "type": "response",
+    "protocol": "WTP/1",
+    "session_id": "f2c70d6517dd433995fdcb0b6a4c924a",
+    "request_id": "fbf2ea1879a547c8b967ae9ff7aa6eb1",
+    "op": "CAPS",
+    "ok": true,
+    "body": {
+      "profiles": [
+        "rf-events/1"
+      ],
+      "modes": [
+        "wspr",
+        "tone",
+        "qrss",
+        "fskcw",
+        "dfcw"
+      ],
+      "engine": "si5351",
+      "frequency_ranges": [
+        {
+          "minimum_nhz": "7812500000000",
+          "maximum_nhz": "200000000000000000"
+        }
+      ],
+      "max_payload_bytes": 65536,
+      "max_events": 512,
+      "max_job_duration_ns": "86400000000000",
+      "minimum_arm_lead_ns": "2000000000",
+      "maximum_arm_ahead_ns": "604800000000000",
+      "maximum_arm_uncertainty_ns": "500000000",
+      "maximum_holdover_age_ns": "0",
+      "output_disable_timeout_ns": "5000000000",
+      "minimum_lease_ms": 5000,
+      "maximum_lease_ms": 60000,
+      "response_cache_entries": 8,
+      "response_cache_ttl_seconds": 300,
+      "terminal_record_entries": 8,
+      "terminal_record_ttl_seconds": 3600
+    }
+  },
+  "status": {
+    "type": "response",
+    "protocol": "WTP/1",
+    "session_id": "f2c70d6517dd433995fdcb0b6a4c924a",
+    "request_id": "cc194561d4ac407db2ece5eae8cad8a9",
+    "op": "STATUS",
+    "ok": true,
+    "body": {
+      "boot_id": "87d31a3f3efe5ce27e6343498a3a2492",
+      "state": "empty",
+      "output_active": false,
+      "owner_id": null,
+      "job_id": null,
+      "terminal_records": []
+    }
+  },
+  "get_clock": {
+    "type": "response",
+    "protocol": "WTP/1",
+    "session_id": "f2c70d6517dd433995fdcb0b6a4c924a",
+    "request_id": "fb1b7eff5f8d42bc9b4b48a69a681fc4",
+    "op": "GET_CLOCK",
+    "ok": true,
+    "body": {
+      "state": "synchronized",
+      "utc_now_ns": "1790786889735398516",
+      "monotonic_now_ns": "365731608897",
+      "uncertainty_ns": "40308055",
+      "sync_age_ns": "0",
+      "leap": "normal"
+    }
+  },
+  "claim": {
+    "type": "response",
+    "protocol": "WTP/1",
+    "session_id": "f2c70d6517dd433995fdcb0b6a4c924a",
+    "request_id": "4d4cf0dd60e4438b907385fab8ea3ab3",
+    "op": "CLAIM",
+    "ok": true,
+    "body": {
+      "owner_id": "21221b7bbad043b7b5a0d2c0c7d5b55a",
+      "granted_lease_ms": 60000,
+      "expires_monotonic_ns": "425741204423"
+    }
+  },
+  "owned": {
+    "address": "192.168.1.120",
+    "boot_id": "87d31a3f3efe5ce27e6343498a3a2492",
+    "device_id": "f21e530af8a4a210ec57898c0ebd32d2",
+    "dns_sd_published": true,
+    "enabled": true,
+    "finishing_remote_job": false,
+    "launch_observed_monotonic_ns": null,
+    "launch_target_monotonic_ns": "0",
+    "listener_error": "",
+    "listener_running": true,
+    "local_effective": false,
+    "local_requested": false,
+    "local_work_active": false,
+    "output_unknown": false,
+    "port": 31417,
+    "remote_admission_closed": false,
+    "remote_job_id": "",
+    "remote_output_active": false,
+    "remote_owner": "21221b7bbad043b7b5a0d2c0c7d5b55a",
+    "remote_state": "empty",
+    "revocation_generation": "0",
+    "revocation_unavailable": false,
+    "schema": "wsprrypi-wtp-endpoint/1"
+  },
+  "release": {
+    "type": "response",
+    "protocol": "WTP/1",
+    "session_id": "f2c70d6517dd433995fdcb0b6a4c924a",
+    "request_id": "95751dbd6ade4d498166929151d37bf8",
+    "op": "RELEASE",
+    "ok": true,
+    "body": {}
+  },
+  "after": {
+    "address": "192.168.1.120",
+    "boot_id": "87d31a3f3efe5ce27e6343498a3a2492",
+    "device_id": "f21e530af8a4a210ec57898c0ebd32d2",
+    "dns_sd_published": true,
+    "enabled": true,
+    "finishing_remote_job": false,
+    "launch_observed_monotonic_ns": null,
+    "launch_target_monotonic_ns": "0",
+    "listener_error": "",
+    "listener_running": true,
+    "local_effective": false,
+    "local_requested": false,
+    "local_work_active": false,
+    "output_unknown": false,
+    "port": 31417,
+    "remote_admission_closed": false,
+    "remote_job_id": "",
+    "remote_output_active": false,
+    "remote_owner": "",
+    "remote_state": "empty",
+    "revocation_generation": "0",
+    "revocation_unavailable": false,
+    "schema": "wsprrypi-wtp-endpoint/1"
+  },
+  "wire_messages": [
+    {
+      "type": "response",
+      "protocol": "WTP/1",
+      "session_id": "f2c70d6517dd433995fdcb0b6a4c924a",
+      "request_id": "9b6c1a01133c4855a08050ceaa4a3bc9",
+      "op": "HELLO",
+      "ok": true,
+      "body": {
+        "selected_version": "WTP/1",
+        "device_id": "f21e530af8a4a210ec57898c0ebd32d2",
+        "boot_id": "87d31a3f3efe5ce27e6343498a3a2492",
+        "product": "WsprryPi",
+        "firmware_version": "3.2.0-devel+2f67b00"
+      }
+    },
+    {
+      "type": "response",
+      "protocol": "WTP/1",
+      "session_id": "f2c70d6517dd433995fdcb0b6a4c924a",
+      "request_id": "fbf2ea1879a547c8b967ae9ff7aa6eb1",
+      "op": "CAPS",
+      "ok": true,
+      "body": {
+        "profiles": [
+          "rf-events/1"
+        ],
+        "modes": [
+          "wspr",
+          "tone",
+          "qrss",
+          "fskcw",
+          "dfcw"
+        ],
+        "engine": "si5351",
+        "frequency_ranges": [
+          {
+            "minimum_nhz": "7812500000000",
+            "maximum_nhz": "200000000000000000"
+          }
+        ],
+        "max_payload_bytes": 65536,
+        "max_events": 512,
+        "max_job_duration_ns": "86400000000000",
+        "minimum_arm_lead_ns": "2000000000",
+        "maximum_arm_ahead_ns": "604800000000000",
+        "maximum_arm_uncertainty_ns": "500000000",
+        "maximum_holdover_age_ns": "0",
+        "output_disable_timeout_ns": "5000000000",
+        "minimum_lease_ms": 5000,
+        "maximum_lease_ms": 60000,
+        "response_cache_entries": 8,
+        "response_cache_ttl_seconds": 300,
+        "terminal_record_entries": 8,
+        "terminal_record_ttl_seconds": 3600
+      }
+    },
+    {
+      "type": "response",
+      "protocol": "WTP/1",
+      "session_id": "f2c70d6517dd433995fdcb0b6a4c924a",
+      "request_id": "cc194561d4ac407db2ece5eae8cad8a9",
+      "op": "STATUS",
+      "ok": true,
+      "body": {
+        "boot_id": "87d31a3f3efe5ce27e6343498a3a2492",
+        "state": "empty",
+        "output_active": false,
+        "owner_id": null,
+        "job_id": null,
+        "terminal_records": []
+      }
+    },
+    {
+      "type": "response",
+      "protocol": "WTP/1",
+      "session_id": "f2c70d6517dd433995fdcb0b6a4c924a",
+      "request_id": "fb1b7eff5f8d42bc9b4b48a69a681fc4",
+      "op": "GET_CLOCK",
+      "ok": true,
+      "body": {
+        "state": "synchronized",
+        "utc_now_ns": "1790786889735398516",
+        "monotonic_now_ns": "365731608897",
+        "uncertainty_ns": "40308055",
+        "sync_age_ns": "0",
+        "leap": "normal"
+      }
+    },
+    {
+      "type": "response",
+      "protocol": "WTP/1",
+      "session_id": "f2c70d6517dd433995fdcb0b6a4c924a",
+      "request_id": "4d4cf0dd60e4438b907385fab8ea3ab3",
+      "op": "CLAIM",
+      "ok": true,
+      "body": {
+        "owner_id": "21221b7bbad043b7b5a0d2c0c7d5b55a",
+        "granted_lease_ms": 60000,
+        "expires_monotonic_ns": "425741204423"
+      }
+    },
+    {
+      "type": "response",
+      "protocol": "WTP/1",
+      "session_id": "f2c70d6517dd433995fdcb0b6a4c924a",
+      "request_id": "95751dbd6ade4d498166929151d37bf8",
+      "op": "RELEASE",
+      "ok": true,
+      "body": {}
+    }
+  ]
+}
