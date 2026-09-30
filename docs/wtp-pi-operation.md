@@ -77,15 +77,28 @@ An unreadable or malformed journal inhibits admission. Preserve this file and
 run managed instances under a consistent user; removing persistent state can
 erase takeover history.
 
+The output-disable timeout applies while the process is responsive. Forcibly
+terminating the legacy GPIO process can leave its clock output active until
+startup quiescence runs on restart. A killed process or closed connection does
+not confirm output-off; inspect the restored endpoint and reconcile its output.
+
 ## Backend-derived endpoint capability
 
-The Si5351 endpoint reports the selected backend's WSPR, TONE, QRSS, FSKCW and
-DFCW capabilities, using the existing bus/address/reference, CLK output, drive
-and PPM settings. CAPS modes and numerical frequency envelope come from
-`WsprSi5351Backend::capabilities()`, with planner-owned bounds. Existing frequency
-policy remains authoritative: the qualified bands from 2200m through 2m retain
-their status; 8m/5m retain their separate experimental policy. A numerical
-frequency envelope is not a claim that every intervening frequency is authorized.
+The endpoint uses the selected native GPIO, RP1 GPCLK or Si5351 backend, or the
+explicit simulated backend. Native backends expose WSPR, TONE, QRSS, FSKCW and
+DFCW through the same WTP ownership, scheduling and local takeover path. CAPS
+modes and numerical frequency envelope come from the selected backend's
+`capabilities()`. Backend selection remains explicit.
+
+GPIO uses the selected pin, drive and existing system-clock/manual correction
+settings, with the exact processor clock model and frequency policy. RP1 uses
+its kernel provider, selected GPIO4/GPIO20 route and drive, retaining its existing
+development authorization. An RP1 WTP job requires the existing host-side
+development confirmation for that exact WTP job ID; ordinary Fleet scheduling
+does not create that confirmation. Si5351 uses its existing bus/address/reference,
+CLK output, drive and PPM settings. Its qualified bands from 2200m through 2m
+retain their status; 8m/5m retain their separate experimental policy. A numerical
+frequency envelope does not authorize every intervening frequency.
 
 The server accepts finite contiguous RF-event plans within the protocol's 512
 events and 24-hour total duration limits, including terminal RF-off. These are
@@ -94,11 +107,13 @@ tone. For an initial RF-on event, launch is observed at its output-enable transa
 for an initial RF-off interval, launch observes admission of the silent timeline.
 Unsupported modes and invalid tone sets fail before ARM.
 
-Realized frequencies come from the backend's configured joint multi-tone planner
+Realized frequencies come from the backend's configured native clock/tone plan
 and are reported per event in integer nanohertz. Explicit adjustment consent is
 required when realization differs from the requested value. The native backend
 executes the same precomputed event plan, including frequency changes and RF-off
-gaps. GPIO/RP1 server adapters remain unavailable; no backend fallback occurs.
+gaps. GPIO realization includes the finite DMA dither counts; RP1 uses its
+provider tone program and Si5351 uses its joint multi-tone planner. These are
+planned frequencies, not measured RF accuracy.
 
 The server reads Linux kernel UTC synchronization, leap state and accumulated
 maximum error through `adjtimex`, adding the UTC/monotonic sample bracket.
@@ -108,7 +123,9 @@ use 2 seconds minimum ARM lead, 500 ms maximum admitted UTC uncertainty and
 does not establish frequency accuracy, spectral quality or long-term timing.
 The backend initializes during ARM lead, admits the final output-enable write
 at the requested start, anchors the finite event timeline to successful enable, and reads
-back the Si5351 disable register during cleanup. Actual launch observations are
+back the selected route's output-off state during cleanup: fresh GPCLK/DMA/PWM
+quiescence for GPIO, bounded provider stop/drain for RP1, and the output-disable
+register for Si5351. Actual launch observations are
 available on the status resource. Physical validation evidence is recorded
 separately from simulated tests.
 

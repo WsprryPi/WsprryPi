@@ -261,6 +261,48 @@ void test_direct_band_range()
 int main()
 {
     test_direct_band_range();
+    {
+        Owner scheduled_owner;
+        auto scheduled_provider = std::make_unique<Provider>();
+        auto* physical = scheduled_provider.get();
+        WsprRp1GpclkBackend scheduled(scheduled_owner, std::move(scheduled_provider));
+        bool allow_launch = false;
+        unsigned admissions = 0, launches = 0;
+        expect(scheduled.setScheduledExecutionHooks({[&] { ++admissions; return allow_launch; },
+            [&] { ++launches; }, [] { return false; }, true}),
+            "RP1 accepts native scheduled hooks");
+        auto finite = framePlan();
+        finite.summary.total_duration = finite.events.back().offset_from_start +
+            finite.events.back().duration;
+        wsprrypi::RfEvent tail;
+        tail.offset_from_start = finite.summary.total_duration;
+        tail.duration = std::chrono::nanoseconds{1};
+        finite.events.push_back(tail);
+        finite.summary.total_duration += tail.duration;
+        expect(scheduled.configure(finite, developmentInputs()).ok,
+            "WTP terminal RF-off is accepted without a short provider event");
+        const auto realized = scheduled.realizedEventFrequencies();
+        expect(realized.size() == finite.events.size() && realized.back() == 0 &&
+            std::fabs(realized.front() - finite.events.front().frequency_hz) <= 0.01,
+            "RP1 realization comes from the configured divider/count plan");
+        expect(!scheduled.execute(finite).ok && admissions == 1 && launches == 0 &&
+            !physical->submitted && physical->released,
+            "declined launch never submits output and releases the provider");
+        allow_launch = true;
+        expect(scheduled.configure(finite, developmentInputs()).ok &&
+            scheduled.execute(finite).ok && launches == 1 && physical->submitted &&
+            physical->event_program.events.size() == 162,
+            "admitted scheduled WSPR submits one complete frame and observes launch");
+        auto bad = finite;
+        bad.events.back().offset_from_start += std::chrono::nanoseconds{1};
+        expect(!scheduled.configure(bad, developmentInputs()).ok,
+            "inconsistent terminal-off offset is rejected");
+        auto gated = tonePlan(true);
+        expect(scheduled.configure(gated, developmentInputs()).ok &&
+            scheduled.realizedEventFrequencies().size() == 2,
+            "scheduled TONE preserves its finite RF-off interval");
+        expect(scheduled.cleanup().ok, "scheduled provider cleanup remains explicit");
+    }
     Owner owner;
     auto provider=std::make_unique<Provider>();
     Provider* observed=provider.get();

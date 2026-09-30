@@ -1,0 +1,408 @@
+{
+  "rf-tone": {
+    "iq_sha256": "3b7c1e2394d2bda7312977bb868896e1bdd0046713359e98c5bb50897168c877",
+    "sample_count": 7500000,
+    "method": {
+      "fft_samples": 65536,
+      "step_s": 0.25,
+      "carrier_search_hz": 200,
+      "noise_hz": [
+        500,
+        2000
+      ],
+      "signal_threshold_db": 30
+    },
+    "capture_timestamps": {
+      "helper_start_utc": "2026-09-30T22:03:24.523Z",
+      "configuration_start_utc": "2026-09-30T22:03:24.523Z",
+      "configuration_complete_utc": "2026-09-30T22:03:25.045Z",
+      "first_read_start_utc": "2026-09-30T22:03:25.045Z",
+      "first_read_complete_utc": "2026-09-30T22:03:25.110Z",
+      "retained_capture_start_utc": "2026-09-30T22:03:25.110Z",
+      "retained_capture_complete_utc": "2026-09-30T22:03:55.150Z",
+      "cleanup_start_utc": "2026-09-30T22:03:55.746Z",
+      "cleanup_complete_utc": "2026-09-30T22:03:56.863Z",
+      "helper_complete_utc": "2026-09-30T22:03:56.863Z"
+    },
+    "signal_intervals": [
+      {
+        "first_utc_s": 1790805810.86,
+        "last_utc_s": 1790805820.86,
+        "windows": 41,
+        "method": "FFT-window start timestamps; not calibrated RF-edge timing"
+      }
+    ],
+    "max_snr_db": 89.167,
+    "cleanup": {
+      "outcome": "verified",
+      "attempted_steps": [
+        "deactivate_stream",
+        "close_stream",
+        "release_device"
+      ],
+      "failed_steps": []
+    }
+  },
+  "rf-wspr": {
+    "iq_sha256": "d39779e0b482e00481c54866316344937df9bdda5faef94fe3c9ea57bd5f30e7",
+    "sample_count": 32500000,
+    "method": {
+      "fft_samples": 65536,
+      "step_s": 0.25,
+      "carrier_search_hz": 200,
+      "noise_hz": [
+        500,
+        2000
+      ],
+      "signal_threshold_db": 30
+    },
+    "capture_timestamps": {
+      "helper_start_utc": "2026-09-30T22:06:04.154Z",
+      "configuration_start_utc": "2026-09-30T22:06:04.154Z",
+      "configuration_complete_utc": "2026-09-30T22:06:04.674Z",
+      "first_read_start_utc": "2026-09-30T22:06:04.674Z",
+      "first_read_complete_utc": "2026-09-30T22:06:04.739Z",
+      "retained_capture_start_utc": "2026-09-30T22:06:04.740Z",
+      "retained_capture_complete_utc": "2026-09-30T22:08:14.764Z",
+      "cleanup_start_utc": "2026-09-30T22:08:17.208Z",
+      "cleanup_complete_utc": "2026-09-30T22:08:18.324Z",
+      "helper_complete_utc": "2026-09-30T22:08:18.324Z"
+    },
+    "signal_intervals": [
+      {
+        "first_utc_s": 1790805969.99,
+        "last_utc_s": 1790806080.49,
+        "windows": 443,
+        "method": "FFT-window start timestamps; not calibrated RF-edge timing"
+      }
+    ],
+    "max_snr_db": 89.67,
+    "cleanup": {
+      "outcome": "verified",
+      "attempted_steps": [
+        "deactivate_stream",
+        "close_stream",
+        "release_device"
+      ],
+      "failed_steps": []
+    }
+  },
+  "rf-cw": {
+    "iq_sha256": "d1e896547f62cd4ec20ce0752d402289cd999fad1310744f9fcd913cb71c5c55",
+    "sample_count": 11250000,
+    "method": {
+      "fft_samples": 65536,
+      "step_s": 0.25,
+      "carrier_search_hz": 200,
+      "noise_hz": [
+        500,
+        2000
+      ],
+      "signal_threshold_db": 30
+    },
+    "capture_timestamps": {
+      "helper_start_utc": "2026-09-30T22:10:33.680Z",
+      "configuration_start_utc": "2026-09-30T22:10:33.680Z",
+      "configuration_complete_utc": "2026-09-30T22:10:34.203Z",
+      "first_read_start_utc": "2026-09-30T22:10:34.203Z",
+      "first_read_complete_utc": "2026-09-30T22:10:34.268Z",
+      "retained_capture_start_utc": "2026-09-30T22:10:34.268Z",
+      "retained_capture_complete_utc": "2026-09-30T22:11:19.298Z",
+      "cleanup_start_utc": "2026-09-30T22:11:20.161Z",
+      "cleanup_complete_utc": "2026-09-30T22:11:21.277Z",
+      "helper_complete_utc": "2026-09-30T22:11:21.277Z"
+    },
+    "signal_intervals": [
+      {
+        "first_utc_s": 1790806248.018,
+        "last_utc_s": 1790806249.018,
+        "windows": 5,
+        "method": "FFT-window start timestamps; not calibrated RF-edge timing"
+      },
+      {
+        "first_utc_s": 1790806250.018,
+        "last_utc_s": 1790806251.018,
+        "windows": 5,
+        "method": "FFT-window start timestamps; not calibrated RF-edge timing"
+      },
+      {
+        "first_utc_s": 1790806252.018,
+        "last_utc_s": 1790806253.018,
+        "windows": 5,
+        "method": "FFT-window start timestamps; not calibrated RF-edge timing"
+      },
+      {
+        "first_utc_s": 1790806258.018,
+        "last_utc_s": 1790806263.018,
+        "windows": 21,
+        "method": "FFT-window start timestamps; not calibrated RF-edge timing"
+      },
+      {
+        "first_utc_s": 1790806268.018,
+        "last_utc_s": 1790806269.018,
+        "windows": 5,
+        "method": "FFT-window start timestamps; not calibrated RF-edge timing"
+      },
+      {
+        "first_utc_s": 1790806270.018,
+        "last_utc_s": 1790806271.018,
+        "windows": 5,
+        "method": "FFT-window start timestamps; not calibrated RF-edge timing"
+      },
+      {
+        "first_utc_s": 1790806272.018,
+        "last_utc_s": 1790806273.018,
+        "windows": 5,
+        "method": "FFT-window start timestamps; not calibrated RF-edge timing"
+      }
+    ],
+    "max_snr_db": 88.268,
+    "cleanup": {
+      "outcome": "verified",
+      "attempted_steps": [
+        "deactivate_stream",
+        "close_stream",
+        "release_device"
+      ],
+      "failed_steps": []
+    }
+  },
+  "rf-fleet-lease": {
+    "iq_sha256": "0991311f0abd759adc0a19fc7c892725c12fc902d4514371c2d306874b222b9d",
+    "sample_count": 21250000,
+    "method": {
+      "fft_samples": 65536,
+      "step_s": 0.25,
+      "carrier_search_hz": 200,
+      "noise_hz": [
+        500,
+        2000
+      ],
+      "signal_threshold_db": 30
+    },
+    "capture_timestamps": {
+      "helper_start_utc": "2026-09-30T22:32:44.108Z",
+      "configuration_start_utc": "2026-09-30T22:32:44.108Z",
+      "configuration_complete_utc": "2026-09-30T22:32:44.632Z",
+      "first_read_start_utc": "2026-09-30T22:32:44.632Z",
+      "first_read_complete_utc": "2026-09-30T22:32:44.697Z",
+      "retained_capture_start_utc": "2026-09-30T22:32:44.697Z",
+      "retained_capture_complete_utc": "2026-09-30T22:34:09.734Z",
+      "cleanup_start_utc": "2026-09-30T22:34:11.329Z",
+      "cleanup_complete_utc": "2026-09-30T22:34:12.445Z",
+      "helper_complete_utc": "2026-09-30T22:34:12.445Z"
+    },
+    "signal_intervals": [
+      {
+        "first_utc_s": 1790807564.697,
+        "last_utc_s": 1790807649.197,
+        "windows": 339,
+        "method": "FFT-window start timestamps; not calibrated RF-edge timing"
+      }
+    ],
+    "max_snr_db": 90.223,
+    "cleanup": {
+      "outcome": "verified",
+      "attempted_steps": [
+        "deactivate_stream",
+        "close_stream",
+        "release_device"
+      ],
+      "failed_steps": []
+    }
+  },
+  "rf-fleet-finite-end": {
+    "iq_sha256": "7e99ee9cd177912026cde028e30ffbc426193c256e638c194a53e2f4529b61de",
+    "sample_count": 17500000,
+    "method": {
+      "fft_samples": 65536,
+      "step_s": 0.25,
+      "carrier_search_hz": 200,
+      "noise_hz": [
+        500,
+        2000
+      ],
+      "signal_threshold_db": 30
+    },
+    "capture_timestamps": {
+      "helper_start_utc": "2026-09-30T22:35:33.424Z",
+      "configuration_start_utc": "2026-09-30T22:35:33.424Z",
+      "configuration_complete_utc": "2026-09-30T22:35:33.945Z",
+      "first_read_start_utc": "2026-09-30T22:35:33.945Z",
+      "first_read_complete_utc": "2026-09-30T22:35:34.010Z",
+      "retained_capture_start_utc": "2026-09-30T22:35:34.010Z",
+      "retained_capture_complete_utc": "2026-09-30T22:36:44.048Z",
+      "cleanup_start_utc": "2026-09-30T22:36:45.380Z",
+      "cleanup_complete_utc": "2026-09-30T22:36:46.506Z",
+      "helper_complete_utc": "2026-09-30T22:36:46.506Z"
+    },
+    "signal_intervals": [
+      {
+        "first_utc_s": 1790807734.01,
+        "last_utc_s": 1790807744.01,
+        "windows": 41,
+        "method": "FFT-window start timestamps; not calibrated RF-edge timing"
+      }
+    ],
+    "max_snr_db": 89.882,
+    "cleanup": {
+      "outcome": "verified",
+      "attempted_steps": [
+        "deactivate_stream",
+        "close_stream",
+        "release_device"
+      ],
+      "failed_steps": []
+    }
+  },
+  "rf-live-failures": {
+    "iq_sha256": "793926299b7dd6a058a96fac097df4c7e1c19a985473358f11a0424e781a4d36",
+    "sample_count": 42500000,
+    "method": {
+      "fft_samples": 65536,
+      "step_s": 0.25,
+      "carrier_search_hz": 200,
+      "noise_hz": [
+        500,
+        2000
+      ],
+      "signal_threshold_db": 30
+    },
+    "capture_timestamps": {
+      "helper_start_utc": "2026-09-30T22:41:34.685Z",
+      "configuration_start_utc": "2026-09-30T22:41:34.685Z",
+      "configuration_complete_utc": "2026-09-30T22:41:35.206Z",
+      "first_read_start_utc": "2026-09-30T22:41:35.206Z",
+      "first_read_complete_utc": "2026-09-30T22:41:35.271Z",
+      "retained_capture_start_utc": "2026-09-30T22:41:35.271Z",
+      "retained_capture_complete_utc": "2026-09-30T22:44:25.293Z",
+      "cleanup_start_utc": "2026-09-30T22:44:28.475Z",
+      "cleanup_complete_utc": "2026-09-30T22:44:29.601Z",
+      "helper_complete_utc": "2026-09-30T22:44:29.601Z"
+    },
+    "signal_intervals": [
+      {
+        "first_utc_s": 1790808103.021,
+        "last_utc_s": 1790808108.021,
+        "windows": 21,
+        "method": "FFT-window start timestamps; not calibrated RF-edge timing"
+      },
+      {
+        "first_utc_s": 1790808114.021,
+        "last_utc_s": 1790808132.021,
+        "windows": 73,
+        "method": "FFT-window start timestamps; not calibrated RF-edge timing"
+      },
+      {
+        "first_utc_s": 1790808152.021,
+        "last_utc_s": 1790808186.521,
+        "windows": 139,
+        "method": "FFT-window start timestamps; not calibrated RF-edge timing"
+      }
+    ],
+    "max_snr_db": 89.441,
+    "cleanup": {
+      "outcome": "verified",
+      "attempted_steps": [
+        "deactivate_stream",
+        "close_stream",
+        "release_device"
+      ],
+      "failed_steps": []
+    }
+  },
+  "rf-injected-failures": {
+    "iq_sha256": "fbf2ed8b84ba7c6afa462dd36cf23330aa41f6778694535c73d10a06e781a66d",
+    "sample_count": 13750000,
+    "method": {
+      "fft_samples": 65536,
+      "step_s": 0.25,
+      "carrier_search_hz": 200,
+      "noise_hz": [
+        500,
+        2000
+      ],
+      "signal_threshold_db": 30
+    },
+    "capture_timestamps": {
+      "helper_start_utc": "2026-09-30T22:46:35.587Z",
+      "configuration_start_utc": "2026-09-30T22:46:35.587Z",
+      "configuration_complete_utc": "2026-09-30T22:46:36.105Z",
+      "first_read_start_utc": "2026-09-30T22:46:36.105Z",
+      "first_read_complete_utc": "2026-09-30T22:46:36.170Z",
+      "retained_capture_start_utc": "2026-09-30T22:46:36.170Z",
+      "retained_capture_complete_utc": "2026-09-30T22:47:31.200Z",
+      "cleanup_start_utc": "2026-09-30T22:47:32.257Z",
+      "cleanup_complete_utc": "2026-09-30T22:47:33.373Z",
+      "helper_complete_utc": "2026-09-30T22:47:33.373Z"
+    },
+    "signal_intervals": [
+      {
+        "first_utc_s": 1790808407.92,
+        "last_utc_s": 1790808412.92,
+        "windows": 21,
+        "method": "FFT-window start timestamps; not calibrated RF-edge timing"
+      }
+    ],
+    "max_snr_db": 87.877,
+    "cleanup": {
+      "outcome": "verified",
+      "attempted_steps": [
+        "deactivate_stream",
+        "close_stream",
+        "release_device"
+      ],
+      "failed_steps": []
+    }
+  },
+  "rf-noninteractive": {
+    "iq_sha256": "f1e7fe4b1a3b6b3600b537f8f17cc3092d92e94d6cf170ce1f9ee14e7a8a0d98",
+    "sample_count": 16250000,
+    "method": {
+      "fft_samples": 65536,
+      "step_s": 0.25,
+      "carrier_search_hz": 200,
+      "noise_hz": [
+        500,
+        2000
+      ],
+      "signal_threshold_db": 30
+    },
+    "capture_timestamps": {
+      "helper_start_utc": "2026-09-30T22:54:18.699Z",
+      "configuration_start_utc": "2026-09-30T22:54:18.699Z",
+      "configuration_complete_utc": "2026-09-30T22:54:19.224Z",
+      "first_read_start_utc": "2026-09-30T22:54:19.224Z",
+      "first_read_complete_utc": "2026-09-30T22:54:19.289Z",
+      "retained_capture_start_utc": "2026-09-30T22:54:19.289Z",
+      "retained_capture_complete_utc": "2026-09-30T22:55:24.317Z",
+      "cleanup_start_utc": "2026-09-30T22:55:25.558Z",
+      "cleanup_complete_utc": "2026-09-30T22:55:26.684Z",
+      "helper_complete_utc": "2026-09-30T22:55:26.684Z"
+    },
+    "signal_intervals": [
+      {
+        "first_utc_s": 1790808865.789,
+        "last_utc_s": 1790808869.039,
+        "windows": 14,
+        "method": "FFT-window start timestamps; not calibrated RF-edge timing"
+      },
+      {
+        "first_utc_s": 1790808873.789,
+        "last_utc_s": 1790808881.789,
+        "windows": 33,
+        "method": "FFT-window start timestamps; not calibrated RF-edge timing"
+      }
+    ],
+    "max_snr_db": 88.836,
+    "cleanup": {
+      "outcome": "verified",
+      "attempted_steps": [
+        "deactivate_stream",
+        "close_stream",
+        "release_device"
+      ],
+      "failed_steps": []
+    }
+  }
+}

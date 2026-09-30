@@ -60,6 +60,8 @@ public:
 
     wsprrypi::BackendInfo info() const override;
     wsprrypi::BackendCapabilities capabilities() const override;
+    bool setScheduledExecutionHooks(wsprrypi::ScheduledExecutionHooks hooks) override;
+    std::vector<double> realizedEventFrequencies() const override;
     wsprrypi::BackendCompileResult configure(
         const wsprrypi::ExecutionPlan& plan,
         const wsprrypi::BackendExecutionInputs& inputs) override;
@@ -79,9 +81,11 @@ private:
         std::uint32_t route{0};
         std::uint64_t required_capabilities{0};
         wsprrypi::Rp1GpclkDevelopmentPolicyInputs development_policy{};
+        std::vector<double> realized_frequencies;
     };
 
     IControllerBridge& owner_;
+    wsprrypi::ScheduledExecutionHooks execution_hooks_;
     std::unique_ptr<wsprrypi::Rp1GpclkIo> io_;
     std::unique_ptr<wsprrypi::Rp1GpclkProvider> provider_;
     std::unique_ptr<wsprrypi::Rp1GpclkBackend> backend_;

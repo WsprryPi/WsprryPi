@@ -1,0 +1,29 @@
+{
+  "base_commit": "2f67b00",
+  "parent_baseline_commit": "fba2b384a21eec55acb8db9ad80ece239bb056ac",
+  "baseline_src_equivalent": true,
+  "candidate_binary_sha256": "7f8bff3fffd9a3cd3a87efcc6d66c419590398e153c956244605ef29e42c3ad9",
+  "source_overlay_sha256": {
+    "src/WSPR-Transmitter/src/Makefile": "adcf5c5ff7bcbf220d103652d2f87799ea4b9ebd9698732e9e08841c02a242f4",
+    "src/WSPR-Transmitter/src/rp1_gpclk_event_program.cpp": "02c061625835b5883826cc1fe64d86bc25165c6a722ce66e42f9332a8e47518d",
+    "src/WSPR-Transmitter/src/rp1_gpclk_event_program.hpp": "d3ede0c8ee3ad6cb113340e7bd89343f9dff33561b888652bb3278a937d4a0f3",
+    "src/WSPR-Transmitter/src/rp1_gpclk_transmit_backend.cpp": "cb807f756b3ead7629218b91342148db8a3004d1a0f4a7d054928dbe11c90d93",
+    "src/WSPR-Transmitter/src/rp1_gpclk_transmit_backend.hpp": "90ef89a170dbfaeec063ae49b6291c8eb9f64aab26dda3085e7b8bed3d1c8557",
+    "src/WSPR-Transmitter/src/rp1_gpclk_transmit_backend_test.cpp": "ad050001de1ef84ecce7a25e906c2368b6fea8c7b67b9b13a2108d2aa725698f",
+    "src/WSPR-Transmitter/src/startup_quiesce_test.cpp": "0f7bfb2c40f27849f6b17cb25cd4db4674d63b7bc83db0fa1e77ee2600fcbe66",
+    "src/WSPR-Transmitter/src/transmission_backend.hpp": "f9dc7ae80e701ca819cdbd4b9cf361b20f1d952dc320acc84da557522afb2a5a",
+    "src/WSPR-Transmitter/src/wspr_transmit_backend_rpi.cpp": "fd623fdf06269cefd11fa165f1f5fa00bf4f10bb194e5f1f35b1d754523dbda4",
+    "src/WSPR-Transmitter/src/wspr_transmit_backend_rpi.hpp": "959c048ed957ab82016350baee15a4b075cf6c8319e60b805b7a435b81e6e422",
+    "src/WSPR-Transmitter/src/wspr_transmit_backend_si5351.hpp": "44ecce42d069b008f91135e10c9e611a69cd05818f289c17e791028cb023b3a5",
+    "src/scheduling.cpp": "cadcfad1c778d66ba0dc0defb9491714223909121214929306475af4dd68c4fc",
+    "src/scheduling.hpp": "3f81562c189ee2b0f08ce432775ab76812b4cc94b3a82f3e5de86be47117313a",
+    "src/tests/wtp_pi_tone_engine_test.cpp": "97dba819d8275e81c35dfe41b4f0cf95b759d177d3e6dc5ecd493e520faff514",
+    "src/wtp_endpoint/runtime.cpp": "1eb699db2842f7d187cbf1768c7dc1b78852b234046e4a558cbac6b6f3512d1a",
+    "src/wtp_endpoint/si5351_bridge.cpp": "37f3438536536b003cf89ecb3df085cff69b3c46259f4286f45071d8867f650b",
+    "src/wtp_endpoint/si5351_bridge.hpp": "67a03969839fefbb7148cad4311c37a12190400cf0a76b5792bba382399dcb5b",
+    "src/wtp_endpoint/tone_engine.cpp": "cdf3c1f70b613d3d753436ceed7e70461740972ce98632aff8ea2ebd49c089ce",
+    "src/wtp_endpoint/tone_engine.hpp": "b6f34484d49428478069297a78f8a565e604225c934787487b11efe935345473",
+    "src/WSPR-Transmitter/src/scheduled_execution.hpp": "b1b17537d2205d7d703839072a179e0fee5d6df4df4e8298c8b66e68fe1e9440",
+    "src/wtp_endpoint/native_bridge.hpp": "a01c80d92388aeabe4c85d95884d5d62a43944108a9e7b34e5f57b9678951411"
+  }
+}

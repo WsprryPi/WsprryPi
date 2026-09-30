@@ -26,12 +26,15 @@ WtpPiToneEngine::WtpPiToneEngine(ITransmissionBackend& backend,
                                  bool backend_controls_enable,
                                  std::function<void()> stop_execution_context,
                                  bool allow_unqualified_frequency,
-                                 bool allow_non_amateur_frequency)
+                                 bool allow_non_amateur_frequency,
+                                 HardwareProfile hardware_profile,
+                                 std::function<bool(const Job&, ExecutionPlan&, BackendExecutionInputs&)> prepare_inputs)
     : backend_(backend), inputs_(std::move(inputs)), kind_(kind),
       clock_(clock), realize_(std::move(realize)),
       calibration_ppm_(calibration_ppm),
       allow_unqualified_frequency_(allow_unqualified_frequency),
       allow_non_amateur_frequency_(allow_non_amateur_frequency),
+      hardware_profile_(hardware_profile), prepare_inputs_(std::move(prepare_inputs)),
       reset_execution_context_(std::move(reset_execution_context)),
       stop_execution_context_(std::move(stop_execution_context)),
       backend_controls_enable_(backend_controls_enable) {
@@ -69,6 +72,9 @@ PrepareResult WtpPiToneEngine::prepare(const Job& job) {
     candidate.request_id = {1};
     candidate.mode = *mode;
     candidate.backend = kind_;
+    candidate.policy.hardware_profile = hardware_profile_;
+    candidate.policy.allow_unqualified_frequency = allow_unqualified_frequency_;
+    candidate.policy.allow_non_amateur_frequency = allow_non_amateur_frequency_;
     candidate.calibration.ppm = calibration_ppm_;
     candidate.duration_was_explicit = true;
     std::uint64_t offset = 0;
@@ -85,7 +91,7 @@ PrepareResult WtpPiToneEngine::prepare(const Job& job) {
                 (caps.max_frequency_hz > 0 && hz > caps.max_frequency_hz)) return {};
             if (caps.output_class != BackendOutputClass::NON_RF_SIMULATION &&
                 !evaluate_frequency_policy(kind_, *mode, hz,
-                    allow_unqualified_frequency_, allow_non_amateur_frequency_).allowed)
+                    allow_unqualified_frequency_, allow_non_amateur_frequency_, hardware_profile_).allowed)
                 return {};
             if (!candidate.reference_frequency_hz) candidate.reference_frequency_hz = hz;
             if (!candidate.summary.min_frequency_hz || hz < candidate.summary.min_frequency_hz)
@@ -100,13 +106,28 @@ PrepareResult WtpPiToneEngine::prepare(const Job& job) {
     if (offset != job.total_duration_ns) return {};
     candidate.summary.total_duration = std::chrono::nanoseconds{static_cast<std::int64_t>(offset)};
     candidate.summary.event_count = candidate.events.size();
+    // Native GPIO clock tables use a center frequency; WTP events carry the
+    // actual tone frequencies. Keep normalization in the parent adapter.
+    if (kind_ == BackendKind::RPI_CLOCK_GPIO || kind_ == BackendKind::RP1_GPCLK) {
+        constexpr double spacing = 12000.0 / 8192.0;
+        if (*mode == TransmissionMode::WSPR || *mode == TransmissionMode::QRSS)
+            candidate.reference_frequency_hz = candidate.summary.min_frequency_hz + 1.5 * spacing;
+        else if (*mode == TransmissionMode::FSKCW || *mode == TransmissionMode::DFCW)
+            candidate.reference_frequency_hz = candidate.summary.min_frequency_hz +
+                1.5 * (candidate.summary.max_frequency_hz - candidate.summary.min_frequency_hz);
+    }
     if (reset_execution_context_) reset_execution_context_();
-    const auto configured = backend_.configure(candidate, inputs_);
-    const auto realized = configured.ok ? realize_(job) : std::nullopt;
     auto reject = [this]() -> PrepareResult {
         if (!backend_.cleanup().ok) output_active_ = true;
         return {};
     };
+    BackendCompileResult configured;
+    std::optional<std::vector<std::uint64_t>> realized;
+    try {
+        if (prepare_inputs_ && !prepare_inputs_(job, candidate, inputs_)) return reject();
+        configured = backend_.configure(candidate, inputs_);
+        if (configured.ok) realized = realize_(job);
+    } catch (...) { return reject(); }
     if (!configured.ok || !configured.adjustments.empty() || !realized ||
         realized->size() != job.events.size()) return reject();
     PrepareResult result{true, {}};
@@ -120,12 +141,13 @@ PrepareResult WtpPiToneEngine::prepare(const Job& job) {
             (caps.max_frequency_hz > 0 && actual_hz > caps.max_frequency_hz) ||
             (caps.output_class != BackendOutputClass::NON_RF_SIMULATION &&
              !evaluate_frequency_policy(kind_, *mode, actual_hz,
-                 allow_unqualified_frequency_, allow_non_amateur_frequency_).allowed))
+                 allow_unqualified_frequency_, allow_non_amateur_frequency_, hardware_profile_).allowed))
             return reject();
         if (actual != *event.frequency_nhz) {
             if (!job.allow_frequency_adjustment) return reject();
             result.adjustments.push_back({i, *event.frequency_nhz, actual});
         }
+        candidate.events[i].frequency_hz = actual_hz;
     }
     plan_ = std::move(candidate);
     prepared_job_id_ = job.job_id;

@@ -96,9 +96,21 @@ wsprrypi::BackendCapabilities WsprRp1GpclkBackend::capabilities() const
     caps.supports_precomputed_execution = true;
     caps.supports_frequency_switching = true;
     caps.supports_rf_gating = true;
-    caps.min_event_duration = std::chrono::nanoseconds{682666667};
-    caps.max_frequency_hz = 40000000.0;
+    caps.min_event_duration = std::chrono::nanoseconds{RP1_GPCLK_EVENT_DURATION_NS_MIN};
+    caps.min_frequency_hz = wsprrypi::kRp1GpclkNominalParentFrequencyHz / 65535.99998474121;
+    caps.max_frequency_hz = wsprrypi::kRp1GpclkMaximumDirectOutputHz;
     return caps;
+}
+
+bool WsprRp1GpclkBackend::setScheduledExecutionHooks(wsprrypi::ScheduledExecutionHooks hooks)
+{
+    execution_hooks_ = std::move(hooks);
+    return true;
+}
+
+std::vector<double> WsprRp1GpclkBackend::realizedEventFrequencies() const
+{
+    return configured_ ? configured_->realized_frequencies : std::vector<double>{};
 }
 
 wsprrypi::BackendCompileResult WsprRp1GpclkBackend::configure(
@@ -125,7 +137,8 @@ wsprrypi::BackendCompileResult WsprRp1GpclkBackend::configure(
         return result;
     }
 
-    const auto compiled = wsprrypi::compileRp1GpclkEventProgram(plan);
+    const auto compiled = wsprrypi::compileRp1GpclkEventProgram(plan,
+        static_cast<bool>(execution_hooks_.admit_output_enable));
     if (!compiled.ok)
     {
         result.error = compiled.error;
@@ -169,6 +182,7 @@ wsprrypi::BackendCompileResult WsprRp1GpclkBackend::configure(
     ConfiguredFrame frame;
     frame.plan_id = plan.id;
     frame.event_program = compiled.program;
+    frame.realized_frequencies = compiled.realized_frequencies;
     frame.continuous_tone =
         plan.mode == wsprrypi::TransmissionMode::TONE &&
         !plan.duration_was_explicit;
@@ -268,8 +282,14 @@ wsprrypi::ExecutionResult WsprRp1GpclkBackend::execute(
         record.endpoint_closed = false;
         record.state = "acquired";
         update_record(record);
-        const bool submitted = backend_->emitEvents(
+        bool admitted = true;
+        if (execution_hooks_.admit_output_enable) {
+            admitted = plan.events.front().rf_on ? execution_hooks_.admit_output_enable() :
+                execution_hooks_.admit_silent_start && execution_hooks_.admit_silent_start();
+        }
+        const bool submitted = admitted && backend_->emitEvents(
             configured_->event_program, error);
+        if (!admitted) error = "Scheduled RP1 launch was not admitted.";
         if (!submitted)
         {
             const std::string submit_error = error;
@@ -288,6 +308,8 @@ wsprrypi::ExecutionResult WsprRp1GpclkBackend::execute(
         record.generation = backend_->generation();
         record.state = "running";
         update_record(record);
+        if (plan.events.front().rf_on && execution_hooks_.observe_output_enable)
+            execution_hooks_.observe_output_enable();
     }
 
     bool stop_sent = false;

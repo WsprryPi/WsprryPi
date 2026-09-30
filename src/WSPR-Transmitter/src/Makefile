@@ -121,8 +121,10 @@ $(OBJ_DIR_DEBUG)/./si5351_min_drive_qualification_test.o: \
 GPIO_QUALIFICATION_OBJECTS := \
 	$(OBJ_DIR_DEBUG)/./gpio_startup_quiesce_qualification.o \
 	$(OBJ_DIR_DEBUG)/./wspr_transmit_backend_rpi.o \
+	$(OBJ_DIR_DEBUG)/./legacy_gpio_clock_model.o \
 	$(OBJ_DIR_DEBUG)/./gpio_frequency_plan.o \
-	$(OBJ_DIR_DEBUG)/Mailbox/src/mailbox.o
+	$(OBJ_DIR_DEBUG)/Mailbox/src/mailbox.o \
+	$(OBJ_DIR_DEBUG)/Mailbox/src/mailbox_revision.o
 # ────────────────────────────────────────────────────────────────────────────────
 
 # Linker Flags

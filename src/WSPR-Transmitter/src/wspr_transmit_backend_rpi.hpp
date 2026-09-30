@@ -188,7 +188,8 @@ public:
     WsprRpiBackend(
         IControllerBridge &owner,
         std::shared_ptr<IRpiStartupQuiesceAccess> startup_quiesce_access,
-        int startup_quiesce_gpio);
+        int startup_quiesce_gpio,
+        std::optional<wsprrypi::LegacyGpioProcessorProfile> processor_profile = std::nullopt);
 
     /**
      * @brief Destroy the backend and release backend-owned resources.
@@ -197,6 +198,8 @@ public:
 
     wsprrypi::BackendInfo info() const override;
     wsprrypi::BackendCapabilities capabilities() const override;
+    bool setScheduledExecutionHooks(wsprrypi::ScheduledExecutionHooks hooks) override;
+    std::vector<double> realizedEventFrequencies() const override;
     wsprrypi::BackendCompileResult configure(
         const wsprrypi::ExecutionPlan &plan,
         const wsprrypi::BackendExecutionInputs &inputs) override;
@@ -467,6 +470,9 @@ private:
         int symbol_index);
 
     IControllerBridge &owner_;
+    wsprrypi::ScheduledExecutionHooks execution_hooks_;
+    std::vector<double> realized_event_frequencies_;
+    std::optional<timespec> first_enable_time_;
     std::shared_ptr<IRpiStartupQuiesceAccess> startup_quiesce_access_;
 
     std::thread watchdog_thread_{};

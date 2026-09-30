@@ -31,11 +31,20 @@
 
 #include "backend_capabilities.hpp"
 #include "wtp_endpoint/capabilities.hpp"
+#include "wtp_endpoint/native_bridge.hpp"
+#include "scheduling.hpp"
+#include "rp1_route_bridge.hpp"
 #if WSPRRYPI_BACKEND_SIMULATED
 #include "WSPR-Transmitter/src/simulated_transmit_backend.hpp"
 #endif
 #if WSPRRYPI_BACKEND_SI5351
 #include "wtp_endpoint/si5351_bridge.hpp"
+#endif
+#if WSPRRYPI_BACKEND_RPI_GPIO
+#include "WSPR-Transmitter/src/wspr_transmit_backend_rpi.hpp"
+#endif
+#if WSPRRYPI_BACKEND_RP1_GPCLK
+#include "WSPR-Transmitter/src/rp1_gpclk_transmit_backend.hpp"
 #endif
 
 namespace wsprrypi {
@@ -63,43 +72,92 @@ public:
           port_(settings.wtp_server_port_override.value_or(settings.wtp_server.port)),
           settings_(settings) {
         wsprrypico::wtp::ServiceConfig caps;
+#if WSPRRYPI_BACKEND_RPI_GPIO || WSPRRYPI_BACKEND_RP1_GPCLK || WSPRRYPI_BACKEND_SI5351
+        BackendExecutionInputs inputs;
+        HardwareProfile profile = HardwareProfile::UNSPECIFIED;
+        double ppm = settings.gpio_manual_ppm;
+#if WSPRRYPI_BACKEND_RPI_GPIO
+        if (settings.transmit_backend == TransmitBackendKind::GPIO) {
+            inputs.tx_gpio = inputs.configured_tx_gpio = settings.gpio_tx_pin;
+            inputs.power_level = settings.gpio_power_level;
+            switch (get_raspberry_pi_generation()) {
+                case 1: profile = HardwareProfile::BCM2835; break;
+                case 2: case 3: profile = HardwareProfile::BCM2836_BCM2837; break;
+                case 4: profile = HardwareProfile::BCM2711; break;
+                default: throw std::runtime_error("GPIO WTP processor profile unavailable");
+            }
+            const auto processor = profile == HardwareProfile::BCM2711
+                ? LegacyGpioProcessorProfile::Bcm2711 : profile == HardwareProfile::BCM2835
+                ? LegacyGpioProcessorProfile::Bcm2835 : LegacyGpioProcessorProfile::Bcm2836Bcm2837;
+            backend_ = std::make_unique<WsprRpiBackend>(bridge_, nullptr, settings.gpio_tx_pin, processor);
+        }
+#endif
+#if WSPRRYPI_BACKEND_RP1_GPCLK
+        if (settings.transmit_backend == TransmitBackendKind::RP1_GPCLK) {
+            backend_ = std::make_unique<WsprRp1GpclkBackend>(bridge_);
+            inputs.tx_gpio = inputs.configured_tx_gpio = settings.gpio_tx_pin;
+            inputs.power_level = settings.rp1_gpio_drive_ma;
+            profile = HardwareProfile::RP1_GPCLK;
+        }
+#endif
 #if WSPRRYPI_BACKEND_SI5351
         if (settings.transmit_backend == TransmitBackendKind::SI5351) {
-        auto config = wtp_pi_si5351_backend_config(
-            settings.si5351_i2c_bus, settings.si5351_i2c_address,
-            static_cast<std::uint32_t>(settings.si5351_reference_hz),
-            settings.si5351_reference_source == "crystal",
-            settings.si5351_crystal_load_capacitance_pf,
-            settings.si5351_tx_output, settings.si5351_power_level);
-        config.output_enable_admission = [this] { return engine_->admit_output_enable(); };
-        config.first_output_enabled = [this] { engine_->observe_output_enable(); };
-        config.silent_start_admission = [this] {
-            if (!engine_->admit_output_enable()) return false;
-            engine_->observe_output_enable(); // The timeline begins with RF off.
-            return true;
-        };
-        config.anchor_plan_to_enable = true;
-        config.confirm_output_disable = true;
-        backend_ = std::make_unique<WsprSi5351Backend>(bridge_, config);
-        BackendExecutionInputs inputs;
-        inputs.power_level = settings.si5351_power_level;
-        const auto ppm = settings.si5351_ppm;
-        auto* physical = static_cast<WsprSi5351Backend*>(backend_.get());
-        engine_ = std::make_unique<WtpPiToneEngine>(
-            *backend_, inputs, BackendKind::SI5351, clock_,
-            [physical](const wsprrypico::wtp::Job&)
-                -> std::optional<std::vector<std::uint64_t>> {
-                std::vector<std::uint64_t> realized;
-                for (double hz : physical->realizedEventFrequencies()) {
-                    if (hz == 0) { realized.push_back(0); continue; }
-                    const auto value = wtp_frequency_nhz(hz);
-                    if (!value) return std::nullopt;
-                    realized.push_back(*value);
-                }
-                return realized;
-            }, ppm, [this] { bridge_.reset_stop(); }, true,
-            [this] { bridge_.request_stop(); },
-            settings.allow_unqualified_frequency, settings.allow_non_amateur_frequency);
+            auto config = wtp_pi_si5351_backend_config(
+                settings.si5351_i2c_bus, settings.si5351_i2c_address,
+                static_cast<std::uint32_t>(settings.si5351_reference_hz),
+                settings.si5351_reference_source == "crystal",
+                settings.si5351_crystal_load_capacitance_pf,
+                settings.si5351_tx_output, settings.si5351_power_level);
+            backend_ = std::make_unique<WsprSi5351Backend>(bridge_, config);
+            inputs.power_level = settings.si5351_power_level;
+            ppm = settings.si5351_ppm;
+            profile = HardwareProfile::SI5351;
+        }
+#endif
+        if (backend_) {
+            ScheduledExecutionHooks hooks{
+                [this] { return engine_->admit_output_enable(); },
+                [this] { engine_->observe_output_enable(); },
+                [this] {
+                    if (!engine_->admit_output_enable()) return false;
+                    engine_->observe_output_enable();
+                    return true;
+                }, true};
+            if (!backend_->setScheduledExecutionHooks(std::move(hooks)))
+                throw std::runtime_error("Native backend has no scheduled WTP launch contract");
+            engine_ = std::make_unique<WtpPiToneEngine>(
+                *backend_, inputs, backend_->info().kind, clock_,
+                [this](const wsprrypico::wtp::Job&)
+                    -> std::optional<std::vector<std::uint64_t>> {
+                    std::vector<std::uint64_t> realized;
+                    for (double hz : backend_->realizedEventFrequencies()) {
+                        if (hz == 0) { realized.push_back(0); continue; }
+                        const auto value = wtp_frequency_nhz(hz);
+                        if (!value) return std::nullopt;
+                        realized.push_back(*value);
+                    }
+                    return realized;
+                }, ppm, [this] { bridge_.reset_stop(); }, true,
+                [this] { bridge_.request_stop(); },
+                settings.allow_unqualified_frequency, settings.allow_non_amateur_frequency,
+                profile, [this](const wsprrypico::wtp::Job& job, ExecutionPlan& plan,
+                                BackendExecutionInputs& job_inputs) {
+                    if (settings_.transmit_backend == TransmitBackendKind::GPIO ||
+                        settings_.transmit_backend == TransmitBackendKind::RP1_GPCLK) {
+                        const auto correction = gpio_frequency_correction_for_request(settings_);
+                        if (!correction.valid) return false;
+                        plan.calibration.ppm = correction.additional_ppm;
+                    }
+                    if (settings_.transmit_backend == TransmitBackendKind::RP1_GPCLK) {
+                        ::TransmissionRequest request;
+                        std::string error;
+                        if (!apply_direct_rp1_development_confirmation_bridge(settings_, request, &error))
+                            return false;
+                        if (request.rp1_development.operation_id != job.job_id) return false;
+                        job_inputs.rp1_development = request.rp1_development;
+                    }
+                    return true;
+                });
         }
 #endif
 #if WSPRRYPI_BACKEND_SIMULATED
@@ -123,7 +181,7 @@ public:
         if (backend_) caps = wtp_backend_caps(*backend_);
         if (engine_ && !engine_->startup_safe())
             throw std::runtime_error("WTP startup output quiescence failed");
-        if (!engine_) listener_error_ = "WTP server supports Si5351 and explicit simulation; selected route is unavailable";
+        if (!engine_) listener_error_ = "WTP server cannot use the selected transmit backend";
         service_ = std::make_unique<wsprrypico::wtp::JobService>(
             clock_, engine_ ? static_cast<wsprrypico::wtp::RfEngine&>(*engine_) :
                              static_cast<wsprrypico::wtp::RfEngine&>(unavailable_engine_),
@@ -245,14 +303,14 @@ private:
     WtpPiBootIdentity boot_identity_;
     std::string device_id_;
     WtpRevocationJournal journal_;
-#if WSPRRYPI_BACKEND_SI5351
-    WtpPiSi5351Bridge bridge_{[](WsprTransmissionCallbackEvent, WsprTransmitLogLevel level,
+#if WSPRRYPI_BACKEND_RPI_GPIO || WSPRRYPI_BACKEND_RP1_GPCLK || WSPRRYPI_BACKEND_SI5351
+    WtpPiNativeBridge bridge_{[](WsprTransmissionCallbackEvent, WsprTransmitLogLevel level,
                               const std::string& message, double) {
         const auto severity = (level == WsprTransmitLogLevel::ERROR ||
                                level == WsprTransmitLogLevel::FATAL) ? ERROR :
                               level == WsprTransmitLogLevel::WARN ? WARN :
                               level == WsprTransmitLogLevel::INFO ? INFO : DEBUG;
-        llog.logS(severity, "WTP Si5351: ", message);
+        llog.logS(severity, "WTP native: ", message);
     }};
 #endif
     WtpPiSimulationContext simulation_context_;
@@ -280,7 +338,9 @@ std::string runtime_start_error;
 std::optional<ArgParserConfig> pending_settings;
 
 auto output_settings(const ArgParserConfig& s) {
-    return std::tuple{s.transmit_backend, s.si5351_i2c_bus, s.si5351_i2c_address,
+    return std::tuple{s.transmit_backend, s.gpio_tx_pin, s.gpio_power_level, s.rp1_gpio_drive_ma,
+        s.gpio_use_system_clock_frequency_estimate, s.gpio_frequency_residual_ppm,
+        s.gpio_manual_ppm, s.rp1_development_confirmation_json, s.si5351_i2c_bus, s.si5351_i2c_address,
         s.si5351_reference_hz, s.si5351_reference_source, s.si5351_crystal_load_capacitance_pf,
         s.si5351_tx_output, s.si5351_power_level, s.si5351_ppm, s.wtp_server,
         s.wtp_server_port_override, s.allow_unqualified_frequency,

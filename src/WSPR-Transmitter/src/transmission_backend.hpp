@@ -8,6 +8,7 @@
 
 #include "execution_plan.hpp"
 #include "rp1_gpclk_development_inputs.hpp"
+#include "scheduled_execution.hpp"
 
 namespace wsprrypi
 {
@@ -117,6 +118,11 @@ public:
 
     virtual BackendInfo info() const = 0;
     virtual BackendCapabilities capabilities() const = 0;
+
+    // Optional native scheduling contract; adapters must reject routes without
+    // these hooks rather than claiming a physical launch before preparation.
+    virtual bool setScheduledExecutionHooks(ScheduledExecutionHooks) { return false; }
+    virtual std::vector<double> realizedEventFrequencies() const { return {}; }
 
     virtual BackendCompileResult configure(
         const ExecutionPlan& plan,

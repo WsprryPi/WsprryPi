@@ -72,6 +72,23 @@ int main() {
           caps.maximum_frequency_nhz == 200'000'000'000'000'000ULL,
           "CAPS must come from backend metadata and bounded protocol resources");
     check(engine.startup_safe(), "startup must quiesce output");
+    {
+        FakeBackend native;
+        WtpPiToneEngine gpio(native, {}, BackendKind::RPI_CLOCK_GPIO, clock, exact,
+            0, {}, false, {}, false, false, HardwareProfile::BCM2711);
+        constexpr std::uint64_t low = 14'097'100'000'000'000ULL;
+        Job frame{std::string(32, '3'), "rf-events/1", "wspr", 4'000'000'000ULL,
+            {{0, 1'000'000'000ULL, true, low},
+             {1'000'000'000ULL, 1'000'000'000ULL, true, low + 1'464'843'750ULL},
+             {2'000'000'000ULL, 1'000'000'000ULL, true, low + 2'929'687'500ULL},
+             {3'000'000'000ULL, 1'000'000'000ULL, true, low + 4'394'531'250ULL}}, false};
+        check(gpio.prepare(frame).accepted &&
+            native.recorded.policy.hardware_profile == HardwareProfile::BCM2711 &&
+            native.recorded.reference_frequency_hz == 14'097'102.197265625,
+            "GPIO receives its exact processor policy and native WSPR center");
+        frame.events[0].frequency_nhz = 144'490'000'000'000'000ULL;
+        check(!gpio.prepare(frame).accepted, "GPIO qualification remains processor-specific");
+    }
     Job job{std::string(32, '1'), "rf-events/1", "tone", 1'000'000'000ULL,
             {{0, 1'000'000'000ULL, true, 14'097'100'000'000'000ULL}}, false};
     check(engine.prepare(job).accepted && backend.configured,
@@ -139,6 +156,18 @@ int main() {
     backend.fail_configure = true;
     check(!engine.prepare(job).accepted, "configure failure rejected");
     backend.fail_configure = false;
+    {
+        FakeBackend preparation;
+        preparation.fail_cleanup = true;
+        WtpPiToneEngine failed_inputs(preparation, {}, BackendKind::SIMULATED, clock,
+            exact, 0, {}, false, {}, false, false, HardwareProfile::UNSPECIFIED,
+            [](const Job&, ExecutionPlan&, BackendExecutionInputs&) -> bool {
+                throw std::runtime_error("preparation failed");
+            });
+        check(!failed_inputs.prepare(job).accepted && failed_inputs.output_active(),
+            "input preparation exceptions must reject and retain unconfirmed cleanup");
+        preparation.fail_cleanup = false;
+    }
     FakeBackend rounded;
     WtpPiToneEngine rounding(rounded, {}, BackendKind::SIMULATED, clock,
         [&](const Job& j) { auto values = exact(j); ++(*values)[0]; return values; });

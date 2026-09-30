@@ -12,6 +12,7 @@
 #include <string>
 #include <time.h>
 #include <vector>
+#include <utility>
 
 class IControllerBridge;
 
@@ -112,7 +113,15 @@ public:
 
     // Actual frequencies from the configured joint planner; zero for RF-off.
     // Empty when no valid plan is configured. This never accesses hardware.
-    std::vector<double> realizedEventFrequencies() const;
+    std::vector<double> realizedEventFrequencies() const override;
+    bool setScheduledExecutionHooks(wsprrypi::ScheduledExecutionHooks hooks) override {
+        config_.output_enable_admission = std::move(hooks.admit_output_enable);
+        config_.first_output_enabled = std::move(hooks.observe_output_enable);
+        config_.silent_start_admission = std::move(hooks.admit_silent_start);
+        config_.confirm_output_disable = hooks.confirm_output_disable;
+        config_.anchor_plan_to_enable = true;
+        return true;
+    }
 
     /**
      * @brief Configure the backend for a compiled execution plan

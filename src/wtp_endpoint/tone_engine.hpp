@@ -25,7 +25,9 @@ public:
                     bool backend_controls_enable = false,
                     std::function<void()> stop_execution_context = {},
                     bool allow_unqualified_frequency = false,
-                    bool allow_non_amateur_frequency = false);
+                    bool allow_non_amateur_frequency = false,
+                    HardwareProfile hardware_profile = HardwareProfile::UNSPECIFIED,
+                    std::function<bool(const wsprrypico::wtp::Job&, ExecutionPlan&, BackendExecutionInputs&)> prepare_inputs = {});
     ~WtpPiToneEngine() override;
     WtpPiToneEngine(const WtpPiToneEngine&) = delete;
     WtpPiToneEngine& operator=(const WtpPiToneEngine&) = delete;
@@ -63,6 +65,8 @@ private:
     double calibration_ppm_ = 0.0;
     bool allow_unqualified_frequency_ = false;
     bool allow_non_amateur_frequency_ = false;
+    HardwareProfile hardware_profile_;
+    std::function<bool(const wsprrypico::wtp::Job&, ExecutionPlan&, BackendExecutionInputs&)> prepare_inputs_;
     std::function<void()> reset_execution_context_;
     std::function<void()> stop_execution_context_;
     bool backend_controls_enable_ = false;

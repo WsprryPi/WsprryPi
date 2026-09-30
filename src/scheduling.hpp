@@ -386,6 +386,9 @@ struct WsprRuntimeStatusSnapshot
 
 WsprRuntimeStatusSnapshot current_tx_runtime_status_snapshot();
 
+// Freeze the same additional GPIO correction used by local requests.
+GpioFrequencyCorrection gpio_frequency_correction_for_request(const ArgParserConfig&);
+
 /**
  * @brief Apply updated transmission parameters and reinitialize DMA.
  *

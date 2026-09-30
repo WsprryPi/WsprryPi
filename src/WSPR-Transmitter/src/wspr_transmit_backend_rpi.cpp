@@ -571,7 +571,8 @@ WsprRpiBackend::WsprRpiBackend(IControllerBridge &owner)
 WsprRpiBackend::WsprRpiBackend(
     IControllerBridge &owner,
     std::shared_ptr<IRpiStartupQuiesceAccess> startup_quiesce_access,
-    int startup_quiesce_gpio)
+    int startup_quiesce_gpio,
+    std::optional<wsprrypi::LegacyGpioProcessorProfile> processor_profile)
     : owner_(owner),
       startup_quiesce_access_(
           startup_quiesce_access
@@ -579,6 +580,7 @@ WsprRpiBackend::WsprRpiBackend(
               : makeProductionRpiStartupQuiesceAccess()),
       configured_tx_gpio_(startup_quiesce_gpio)
 {
+    if (processor_profile) dma_config_.processor_profile = *processor_profile;
     const int ncpu = cpu_count();
     watchdog_cpu_ = clamp_cpu(watchdog_cpu_, ncpu);
 
@@ -614,6 +616,7 @@ wsprrypi::BackendCapabilities WsprRpiBackend::capabilities() const
     caps.output_class = wsprrypi::BackendOutputClass::PHYSICAL_GPIO_RF;
     caps.supported_modes =
         wsprrypi::transmission_mode_bit(wsprrypi::TransmissionMode::WSPR) |
+        wsprrypi::transmission_mode_bit(wsprrypi::TransmissionMode::TONE) |
         wsprrypi::transmission_mode_bit(wsprrypi::TransmissionMode::QRSS) |
         wsprrypi::transmission_mode_bit(wsprrypi::TransmissionMode::FSKCW) |
         wsprrypi::transmission_mode_bit(wsprrypi::TransmissionMode::DFCW);
@@ -622,7 +625,26 @@ wsprrypi::BackendCapabilities WsprRpiBackend::capabilities() const
     caps.supports_fade_shape = true;
     caps.supports_precomputed_execution = true;
     caps.nominal_frequency_resolution_hz = std::pow(2.0, -12);
+    // Numerical clock envelope; per-processor amateur-band policy is separate.
+    const auto plld = wsprrypi::legacyGpioClockModel(dma_config_.processor_profile,
+        wsprrypi::LegacyGpioClockParent::PllD);
+    const double minimum_parent = dma_config_.processor_profile == wsprrypi::LegacyGpioProcessorProfile::Bcm2711
+        ? wsprrypi::legacyGpioClockModel(dma_config_.processor_profile,
+            wsprrypi::LegacyGpioClockParent::Oscillator).nominal_rate_hz : plld.nominal_rate_hz;
+    caps.min_frequency_hz = minimum_parent / 4095.999755859375;
+    caps.max_frequency_hz = plld.nominal_rate_hz / 5.0;
     return caps;
+}
+
+bool WsprRpiBackend::setScheduledExecutionHooks(wsprrypi::ScheduledExecutionHooks hooks)
+{
+    execution_hooks_ = std::move(hooks);
+    return true;
+}
+
+std::vector<double> WsprRpiBackend::realizedEventFrequencies() const
+{
+    return realized_event_frequencies_;
 }
 
 wsprrypi::BackendCompileResult WsprRpiBackend::configure(
@@ -630,6 +652,9 @@ wsprrypi::BackendCompileResult WsprRpiBackend::configure(
     const wsprrypi::BackendExecutionInputs &inputs)
 {
     wsprrypi::BackendCompileResult result;
+    configured_plan_.reset();
+    realized_event_frequencies_.clear();
+    first_enable_time_.reset();
     if (plan.backend != wsprrypi::BackendKind::RPI_CLOCK_GPIO)
     {
         result.error =
@@ -641,6 +666,9 @@ wsprrypi::BackendCompileResult WsprRpiBackend::configure(
     {
         return result;
     }
+
+    if (execution_hooks_.admit_output_enable && !dma_setup_done_)
+        prepareTransmission();
 
     if (!gpioHardwareProfileMatchesProcessor(
             plan.policy.hardware_profile,
@@ -665,10 +693,38 @@ wsprrypi::BackendCompileResult WsprRpiBackend::configure(
     configured_plan_ = compat;
     result.ok = true;
 
+    const double delta = applied.applied_frequency_hz - compat->compatibility_plan.frequency_hz;
+    for (const auto& event : plan.events)
+    {
+        if (!event.rf_on) { realized_event_frequencies_.push_back(0.0); continue; }
+        const auto& native = compat->compatibility_plan;
+        const auto symbol = plan.mode == wsprrypi::TransmissionMode::TONE ||
+                plan.mode == wsprrypi::TransmissionMode::QRSS ? 0U :
+            reconstruct_compatibility_symbol(event, native, 0,
+                plan.mode == wsprrypi::TransmissionMode::WSPR ? 3 : 1);
+        const double lower = dma_config_.gpclk_clock_frequency /
+            (static_cast<double>(active_gpclk_words_[2 * symbol] & 0x00ffffffU) / 4096.0);
+        const double upper = dma_config_.gpclk_clock_frequency /
+            (static_cast<double>(active_gpclk_words_[2 * symbol + 1] & 0x00ffffffU) / 4096.0);
+        const auto clocks = static_cast<std::int64_t>(std::llround(pwm_clock_init_ / 1024.0 *
+            std::chrono::duration<double>(event.duration).count()));
+        if (execution_hooks_.admit_output_enable && (clocks <= 0 || clocks > 5'000'000'000LL))
+            throw std::runtime_error("Scheduled GPIO event duration exceeds the native DMA clock bound.");
+        const double requested = event.frequency_hz + delta;
+        const double ratio = std::clamp(1.0 - (requested - lower) / (upper - lower), 0.0, 1.0);
+        const auto lower_clocks = clocks > 0 ? gpioDitherLowerClockCount(ratio, clocks, 0, 0) : 0;
+        const double realized = clocks > 0
+            ? (lower * static_cast<double>(lower_clocks) +
+               upper * static_cast<double>(clocks - lower_clocks)) / static_cast<double>(clocks)
+            : requested;
+        realized_event_frequencies_.push_back(realized);
+    }
+
     if (applied.applied_frequency_hz !=
         compat->compatibility_plan.frequency_hz)
     {
-        result.adjustments.push_back(wsprrypi::BackendAdjustment{
+        if (!execution_hooks_.admit_output_enable)
+            result.adjustments.push_back(wsprrypi::BackendAdjustment{
             0,
             compat->compatibility_plan.frequency_hz,
             applied.applied_frequency_hz,
@@ -698,14 +754,23 @@ wsprrypi::ExecutionResult WsprRpiBackend::execute(
         struct TxOffGuard
         {
             WsprRpiBackend *self;
-            ~TxOffGuard()
+            bool failed = false;
+            void finish() noexcept
             {
-                if (self)
-                    self->transmit_off();
+                if (!self) return;
+                try { self->transmit_off(); }
+                catch (...) { failed = true; }
+                self = nullptr;
             }
+            ~TxOffGuard() { finish(); }
         } tx_guard{this};
 
         struct timespec t0_ts{};
+        if (execution_hooks_.admit_output_enable && !plan.events.front().rf_on)
+        {
+            if (!execution_hooks_.admit_silent_start || !execution_hooks_.admit_silent_start())
+                throw std::runtime_error("Scheduled GPIO silent start was not admitted.");
+        }
         clock_gettime(CLOCK_MONOTONIC, &t0_ts);
         bool rf_enabled = false;
 
@@ -725,7 +790,12 @@ wsprrypi::ExecutionResult WsprRpiBackend::execute(
                     break;
             }
 
-            if (plan.mode == wsprrypi::TransmissionMode::QRSS)
+            if (!event.rf_on)
+            {
+                if (rf_enabled) { stop_watchdog(); disable_clock(); rf_enabled = false; }
+            }
+            else if (plan.mode == wsprrypi::TransmissionMode::QRSS ||
+                     plan.mode == wsprrypi::TransmissionMode::TONE)
             {
                 execute_qrss_event(
                     event,
@@ -768,6 +838,9 @@ wsprrypi::ExecutionResult WsprRpiBackend::execute(
                     std::chrono::duration<double>(event.duration).count(),
                     static_cast<int>(i));
             }
+            if (execution_hooks_.admit_output_enable && first_enable_time_ &&
+                plan.events.front().rf_on)
+                t0_ts = *first_enable_time_;
         }
 
         if (!owner_.backendShouldStop() && !plan.events.empty())
@@ -783,7 +856,10 @@ wsprrypi::ExecutionResult WsprRpiBackend::execute(
                 end_target);
         }
 
-        result.ok = true;
+        tx_guard.finish();
+        result.ok = !tx_guard.failed;
+        result.faulted = tx_guard.failed;
+        if (tx_guard.failed) result.error = "GPIO output disable failed.";
         result.stopped = owner_.backendShouldStop();
         return result;
     }
@@ -1055,8 +1131,20 @@ void WsprRpiBackend::stop() noexcept
 
 wsprrypi::CleanupResult WsprRpiBackend::cleanup() noexcept
 {
-    cleanupTransmission();
-    return {true, {}};
+    try {
+        cleanupTransmission();
+        configured_plan_.reset();
+        realized_event_frequencies_.clear();
+        if (execution_hooks_.confirm_output_disable) {
+            const auto safe = quiesceForStartup();
+            return {safe.ok, safe.error};
+        }
+        return {true, {}};
+    } catch (const std::exception& error) {
+        return {false, error.what()};
+    } catch (...) {
+        return {false, "GPIO output cleanup failed."};
+    }
 }
 
 std::optional<WsprRpiBackend::ExecutionPlanConfig>
@@ -1066,12 +1154,13 @@ WsprRpiBackend::build_execution_plan_config(
     wsprrypi::BackendCompileResult *result) const
 {
     if (plan.mode != wsprrypi::TransmissionMode::WSPR &&
+        plan.mode != wsprrypi::TransmissionMode::TONE &&
         plan.mode != wsprrypi::TransmissionMode::QRSS &&
         plan.mode != wsprrypi::TransmissionMode::FSKCW &&
         plan.mode != wsprrypi::TransmissionMode::DFCW)
     {
         if (result)
-            result->error = "Only WSPR, QRSS, FSKCW, and DFCW execution plans are currently supported.";
+            result->error = "Unsupported native GPIO execution mode.";
         return std::nullopt;
     }
 
@@ -1085,6 +1174,13 @@ WsprRpiBackend::build_execution_plan_config(
     ExecutionPlanConfig config;
     config.compatibility_plan.frequency_hz = plan.reference_frequency_hz;
     config.compatibility_plan.tone_spacing_hz = kWsprToneSpacingHz;
+    if (plan.mode == wsprrypi::TransmissionMode::TONE) {
+        if (!plan.duration_was_explicit) return std::nullopt;
+        config.compatibility_plan.tone_spacing_hz = 0.0;
+        for (const auto& event : plan.events)
+            if (event.rf_on && event.frequency_hz != plan.reference_frequency_hz)
+                return std::nullopt;
+    }
     if (plan.mode == wsprrypi::TransmissionMode::FSKCW ||
         plan.mode == wsprrypi::TransmissionMode::DFCW)
     {
@@ -1109,10 +1205,49 @@ WsprRpiBackend::build_execution_plan_config(
     config.compatibility_plan.ppm = plan.calibration.ppm;
     config.compatibility_plan.tx_gpio = inputs.tx_gpio;
     config.compatibility_plan.total_symbol_count = 0;
+    std::chrono::nanoseconds offset{};
     for (const auto& event : plan.events)
     {
+        if (execution_hooks_.admit_output_enable &&
+            (event.offset_from_start != offset || event.duration.count() <= 0 ||
+             event.duration > std::chrono::nanoseconds::max() - offset))
+        {
+            if (result) result->error = "Scheduled GPIO events must form one contiguous finite plan.";
+            return std::nullopt;
+        }
+        offset += event.duration;
         if (event.rf_on)
+        {
+            if (plan.mode == wsprrypi::TransmissionMode::QRSS)
+            {
+                const auto fixed = config.compatibility_plan.frequency_hz - 1.5 * kWsprToneSpacingHz;
+                if (std::fabs(event.frequency_hz - fixed) > 0.001)
+                {
+                    if (result) result->error = "GPIO QRSS requires one fixed RF-on frequency.";
+                    return std::nullopt;
+                }
+            }
+            else if (plan.mode != wsprrypi::TransmissionMode::TONE)
+            {
+                const auto spacing = config.compatibility_plan.tone_spacing_hz;
+                const auto position = (event.frequency_hz -
+                    (config.compatibility_plan.frequency_hz - 1.5 * spacing)) / spacing;
+                const auto symbol = std::round(position);
+                const auto maximum = plan.mode == wsprrypi::TransmissionMode::WSPR ? 3.0 : 1.0;
+                if (!std::isfinite(position) || symbol < 0 || symbol > maximum ||
+                    std::fabs(position - symbol) * spacing > 0.001)
+                {
+                    if (result) result->error = "GPIO event frequency does not map to the native tone table.";
+                    return std::nullopt;
+                }
+            }
             ++config.compatibility_plan.total_symbol_count;
+        }
+    }
+    if (execution_hooks_.admit_output_enable && offset != plan.summary.total_duration)
+    {
+        if (result) result->error = "Scheduled GPIO duration is inconsistent.";
+        return std::nullopt;
     }
     return config;
 }
@@ -2237,6 +2372,9 @@ void WsprRpiBackend::disable_clock()
 
 void WsprRpiBackend::transmit_on(const WsprTransmissionPlan &plan)
 {
+    if (execution_hooks_.admit_output_enable &&
+        !execution_hooks_.admit_output_enable())
+        throw std::runtime_error("Scheduled GPIO output enable was not admitted.");
     configure_transmit_gpio(plan.tx_gpio);
 
     access_bus_address(PADS_GPIO_0_27_BUS) = 0x5a000018 + plan.power_level;
@@ -2282,6 +2420,13 @@ void WsprRpiBackend::transmit_on(const WsprTransmissionPlan &plan)
         throw std::runtime_error(oss.str());
     }
     owner_.backendSetStateValue(WsprTransmitState::TRANSMITTING);
+    if (execution_hooks_.admit_output_enable && !first_enable_time_) {
+        timespec enabled{};
+        if (clock_gettime(CLOCK_MONOTONIC, &enabled) != 0)
+            throw std::runtime_error("GPIO launch timestamp unavailable.");
+        first_enable_time_ = enabled;
+        if (execution_hooks_.observe_output_enable) execution_hooks_.observe_output_enable();
+    }
 }
 
 void WsprRpiBackend::transmit_off()

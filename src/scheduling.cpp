@@ -3824,6 +3824,11 @@ void reset_current_transmission_request_for_test() noexcept
     current_transmission_request = TransmissionRequest{};
 }
 
+GpioFrequencyCorrection gpio_frequency_correction_for_request(const ArgParserConfig& cfg)
+{
+    return select_and_publish_gpio_correction(cfg);
+}
+
 void set_current_frequency_estimate_for_test(
     const SystemClockFrequencyEstimate &estimate)
 {

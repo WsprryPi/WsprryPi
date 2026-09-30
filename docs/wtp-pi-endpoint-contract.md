@@ -408,11 +408,14 @@ without its separate authorization.
 
 ## Selected implementation decisions
 
-- Physical Si5351 route: derive CAPS from the selected backend capability
-  metadata and planner envelope. Execute WSPR, TONE, QRSS, FSKCW and DFCW through
-  native finite event plans; preserve existing band qualification and policy.
+- Native GPIO, RP1 GPCLK and Si5351 routes: derive CAPS from the selected backend
+  capability metadata and clock/planner envelope. Execute WSPR, TONE, QRSS,
+  FSKCW and DFCW through native finite event plans; preserve existing processor,
+  route, development authorization, band qualification and frequency policy.
   The protocol bounds remain 512 events and 24 hours. Per-event realization must
-  come from the same configured multi-tone planner used for execution.
+  come from the same configured clock/tone program used for execution. RP1's
+  existing exact-operation host confirmation remains required; the adapter
+  does not promote its development route into ordinary Fleet availability.
 - Plain LAN only for the Pi listener. Default 31417 with INI/CLI overrides;
   automatic selection requires one eligible physical RFC1918 IPv4 station-LAN
   address. An explicit interface resolves multiple-interface ambiguity.

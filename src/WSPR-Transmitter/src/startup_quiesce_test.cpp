@@ -1033,6 +1033,26 @@ namespace
                "cleanup must attempt both unmap and close after an earlier failure");
     }
 
+    void test_scheduled_gpio_capability_and_cleanup()
+    {
+        TestBridge bridge;
+        auto access = std::make_shared<FakeStartupQuiesceAccess>();
+        WsprRpiBackend backend(bridge, access, 4,
+            wsprrypi::LegacyGpioProcessorProfile::Bcm2711);
+        const auto caps = backend.capabilities();
+        expect(wsprrypi::supports_mode(caps, wsprrypi::TransmissionMode::TONE) &&
+                   caps.max_frequency_hz == 150000000.0 && caps.min_frequency_hz < 14000,
+               "scheduled GPIO CAPS must use the selected native processor clock model");
+        wsprrypi::ScheduledExecutionHooks hooks;
+        hooks.confirm_output_disable = true;
+        expect(backend.setScheduledExecutionHooks(hooks), "GPIO accepts typed scheduled hooks");
+        expect(backend.cleanup().ok && access->lifecycle_balanced(),
+               "scheduled cleanup must confirm output-off through fresh quiescence");
+        access->failures.insert(FailurePoint::Gpclk);
+        expect(!backend.cleanup().ok && access->lifecycle_balanced(),
+               "scheduled cleanup must propagate failed GPCLK output-off confirmation");
+    }
+
     void test_fake_rejects_invalid_lifecycle_and_bounds()
     {
         FakeStartupQuiesceAccess access;
@@ -1070,6 +1090,7 @@ int main()
     test_rpi_repeated_call_safety();
     test_rpi_platform_and_gpio_rejection_precede_access();
     test_rpi_failure_injection_and_cleanup();
+    test_scheduled_gpio_capability_and_cleanup();
     test_fake_rejects_invalid_lifecycle_and_bounds();
     expect(production_platform_support_checks == 0,
            "GPIO startup-quiesce tests must never reach the production adapter");

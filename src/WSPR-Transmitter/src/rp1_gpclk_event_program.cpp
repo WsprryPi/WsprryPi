@@ -82,7 +82,7 @@ bool validateRp1GpclkEventProgram(
 }
 
 Rp1GpclkEventCompileResult compileRp1GpclkEventProgram(
-    const ExecutionPlan& plan)
+    const ExecutionPlan& plan, bool scheduled_events)
 {
     if (plan.backend != BackendKind::RP1_GPCLK)
         return reject("Execution plan is not targeted for RP1 GPCLK.");
@@ -92,9 +92,11 @@ Rp1GpclkEventCompileResult compileRp1GpclkEventProgram(
         plan.mode != TransmissionMode::FSKCW &&
         plan.mode != TransmissionMode::DFCW)
         return reject("RP1 GPCLK generic events do not support this product mode.");
-    const std::size_t event_count = plan.mode == TransmissionMode::TONE
-        ? std::size_t{1} : plan.events.size();
-    if (plan.events.empty() || event_count > RP1_GPCLK_MAX_EVENTS)
+    const bool terminal_off = !plan.events.empty() && !plan.events.back().rf_on &&
+        plan.events.back().duration == std::chrono::nanoseconds{1};
+    const std::size_t event_count = plan.mode == TransmissionMode::TONE && !scheduled_events
+        ? std::size_t{1} : plan.events.size() - (terminal_off ? 1 : 0);
+    if (plan.events.empty() || !event_count || event_count > RP1_GPCLK_MAX_EVENTS)
         return reject("RP1 GPCLK event count is outside the supported bound.");
     if (plan.mode == TransmissionMode::WSPR && event_count != 162)
         return reject("RP1 GPCLK requires exactly one 162-symbol WSPR frame.");
@@ -107,6 +109,18 @@ Rp1GpclkEventCompileResult compileRp1GpclkEventProgram(
         const auto& event = plan.events[i];
         if (!noFade(event.envelope))
             return reject("RP1 GPCLK events do not support envelope fades.");
+    }
+    if (scheduled_events) {
+        std::chrono::nanoseconds offset{};
+        for (const auto& event : plan.events) {
+            if (event.offset_from_start != offset || event.duration.count() <= 0 ||
+                event.duration > std::chrono::nanoseconds::max() - offset)
+                return reject("Scheduled RP1 events must form one contiguous finite plan.");
+            offset += event.duration;
+        }
+        if (offset != plan.summary.total_duration ||
+            (plan.mode == TransmissionMode::TONE && !plan.duration_was_explicit))
+            return reject("Scheduled RP1 duration must be explicit and consistent.");
     }
 
     double spacing = kWsprSpacingHz;
@@ -147,15 +161,19 @@ Rp1GpclkEventCompileResult compileRp1GpclkEventProgram(
     };
 
     std::vector<std::size_t> planned_indexes;
+    std::vector<double> realized;
     for (std::size_t i = 0; i < event_count; ++i)
     {
         const auto& event = plan.events[i];
-        if (!event.rf_on)
+        if (!event.rf_on) {
+            realized.push_back(0.0);
             continue;
+        }
         const std::size_t planned_index = toneForFrequency(event.frequency_hz);
         if (std::fabs(planned.plan.tones[planned_index].requested_frequency_hz -
                 event.frequency_hz) > 0.001)
             return reject("RP1 GPCLK event frequency does not map to the planned tone table.");
+        realized.push_back(planned.plan.tones[planned_index].average_frequency_hz);
         if (std::find(planned_indexes.begin(), planned_indexes.end(), planned_index) ==
             planned_indexes.end())
         {
@@ -199,6 +217,8 @@ Rp1GpclkEventCompileResult compileRp1GpclkEventProgram(
     Rp1GpclkEventCompileResult result;
     result.ok = true;
     result.program = std::move(program);
+    if (terminal_off && event_count + 1 == plan.events.size()) realized.push_back(0.0);
+    result.realized_frequencies = std::move(realized);
     return result;
 }
 

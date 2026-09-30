@@ -4,21 +4,6 @@
 
 namespace wsprrypi {
 
-void WtpPiSi5351Bridge::request_stop() noexcept {
-    stopped_ = true;
-    cv_.notify_all();
-}
-
-bool WtpPiSi5351Bridge::backendWaitInterruptableFor(
-    std::chrono::nanoseconds duration) {
-    std::unique_lock lock(mutex_);
-    return !cv_.wait_for(lock, duration, [this] { return stopped_.load(); });
-}
-
-void WtpPiSi5351Bridge::backendThrowIfStopRequested(const char* context) {
-    if (stopped_) throw std::runtime_error(context ? context : "WTP tone stopped");
-}
-
 WsprSi5351Backend::Config wtp_pi_si5351_backend_config(
     int i2c_bus, int i2c_address, std::uint32_t reference_hz,
     bool crystal_reference, int crystal_load_pf, int tx_output,

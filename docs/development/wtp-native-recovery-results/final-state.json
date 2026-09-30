@@ -1,0 +1,74 @@
+{
+  "observed_at": 1790809363.150625,
+  "wspr4": {
+    "endpoint": {
+      "address": "192.168.1.120",
+      "boot_id": "3ecb548ea8bf90649891f8c4b1d6d008",
+      "device_id": "f21e530af8a4a210ec57898c0ebd32d2",
+      "dns_sd_published": true,
+      "enabled": true,
+      "finishing_remote_job": false,
+      "launch_observed_monotonic_ns": "22349996321606",
+      "launch_target_monotonic_ns": "22349996210382",
+      "listener_error": "",
+      "listener_running": true,
+      "local_effective": false,
+      "local_requested": false,
+      "local_work_active": false,
+      "output_unknown": false,
+      "port": 31417,
+      "remote_admission_closed": false,
+      "remote_job_id": "77f8a84c1b3c4a77b2d17ce52cd83102",
+      "remote_output_active": false,
+      "remote_owner": "",
+      "remote_state": "aborted",
+      "revocation_generation": "4",
+      "revocation_unavailable": false,
+      "schema": "wsprrypi-wtp-endpoint/1"
+    },
+    "Operation": {
+      "Amp Pin": -1,
+      "Amp Pin Active High": false,
+      "Enable on Boot": "Never",
+      "LED Pin": 18,
+      "Mode": "WSPR",
+      "Shutdown Button": 19,
+      "Socket Port": 31416,
+      "Transmit": false,
+      "Transmit Backend": "gpio",
+      "Use Amp": false,
+      "Use LED": false,
+      "Use Shutdown": false,
+      "Web Port": 31415
+    },
+    "GPIO": {
+      "Frequency Residual PPM": 0.0,
+      "Manual PPM": 0.0,
+      "Power Level": 7,
+      "RP1 Drive mA": 2,
+      "Transmit Pin": 4,
+      "Use System Clock Frequency Estimate": true
+    },
+    "service_binary": "active\n7f8bff3fffd9a3cd3a87efcc6d66c419590398e153c956244605ef29e42c3ad9  /usr/local/bin/wsprrypi\n"
+  },
+  "wspr5": {
+    "Operation": {
+      "Amp Pin": -1,
+      "Amp Pin Active High": false,
+      "Enable on Boot": "Never",
+      "LED Pin": 18,
+      "Mode": "WSPR",
+      "Shutdown Button": 19,
+      "Socket Port": 31416,
+      "Transmit": false,
+      "Transmit Backend": "rp1-gpclk",
+      "Use Amp": false,
+      "Use LED": false,
+      "Use Shutdown": false,
+      "Web Port": 31415
+    },
+    "service_binary": "active\n7c3387141fe5f8b674d94f20ba31db557908c8b674d18f91a6ad208f30e9fb31  /usr/local/bin/wsprrypi\n"
+  },
+  "wspr5_config_matches_before": true,
+  "wspr4_config_matches_pre_takeover": true
+}

@@ -48,9 +48,11 @@ UTC phase. Finite tones use duration in seconds in the UI (integer milliseconds
 on the API). QRSS, FSKCW and DFCW use a message and dot duration. FSKCW and DFCW
 also specify shift. WSPR accepts a single-frame callsign/locator and dBm; its
 period and phase align to two minutes and transmission starts at second one.
-The target's current CAPS must accept the compiled job. The Si5351 Pi endpoint reports its native WSPR, TONE, QRSS, FSKCW and DFCW
-capabilities across its planner range; existing band qualification and frequency
-policy still apply. Pi and Pico assignments are checked against current CAPS.
+The target's current CAPS must accept the compiled job. Native GPIO, RP1 and
+Si5351 Pi endpoints report their WSPR, TONE, QRSS, FSKCW and DFCW capabilities.
+Existing processor, route, development authorization and frequency policies
+still apply. RP1 retains its exact-operation host confirmation; Fleet does not
+create that confirmation. Pi and Pico assignments are checked against current CAPS.
 
 Assignments obey the controller's current frequency-policy settings.
 WTP remains an unqualified physical route in that policy, so starting remote
