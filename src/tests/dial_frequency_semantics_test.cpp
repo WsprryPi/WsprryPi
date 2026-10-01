@@ -16,6 +16,7 @@
 #include "band_lookup.hpp"
 #include "wspr_transmit_backend_si5351.hpp"
 #include "web_server_config_http.hpp"
+#include "wtp_pi_control.hpp"
 
 #include <cmath>
 #include <algorithm>
@@ -7978,6 +7979,7 @@ int main(int argc, char *argv[])
         set_scheduler_execution_suppressed_for_test(false);
     }
 
+    for (const bool managed : {false, true})
     {
         init_default_config();
         reset_managed_reload_runtime_for_test();
@@ -8010,6 +8012,16 @@ int main(int argc, char *argv[])
                 validate_config_data_for_test(&validation_error),
             "bounded positional RP1 WSPR CLI must parse and validate: " +
                 validation_error);
+        ScopedTemporaryFile managed_file("/tmp/wsprrypi_managed_rp1.XXXXXX");
+        if (managed)
+        {
+            config.use_ini = true;
+            config.transmit = true;
+            config.ini_filename = managed_file.path();
+            iniFile.set_filename(config.ini_filename);
+            config_to_json();
+            json_to_ini();
+        }
         set_rp1_route_transaction_inhibited(true);
         int reconcile_calls = 0;
         set_rp1_development_reconcile_invoker_for_test(
@@ -8044,13 +8056,104 @@ int main(int argc, char *argv[])
                     "wspr-frame-operation-43" &&
                 committed.rp1_development.route_transaction_generation == 43 &&
                 committed.rp1_development.confirmation_gpio == 4 &&
-                !config.transmit && !config.loop_tx &&
-                config.tx_iterations.load() == 3,
-            "bounded positional RP1 WSPR must reconcile before its runtime gate, bind and commit the frame request, and preserve transient iteration semantics");
+                config.transmit == managed &&
+                config.rp1_development_confirmation_json == confirmation_json &&
+                (managed || (!config.loop_tx && config.tx_iterations.load() == 3)),
+            "direct and managed RP1 WSPR must reconcile before its runtime gate, bind and commit the frame request, and preserve launch semantics");
+
+        if (managed)
+        {
+            patch_all_from_web({{"Operation", {{"Transmit", false}}}});
+            require(!config.transmit &&
+                    config.rp1_development_confirmation_json == confirmation_json &&
+                    get_public_config_json().dump().find("wspr-frame-operation-43") == std::string::npos,
+                "HTTP configuration transactions must retain process launch confirmation without exposing or persisting it");
+        }
 
         reset_rp1_development_reconcile_invoker_for_test();
         set_rp1_route_transaction_inhibited(false);
         set_scheduler_execution_suppressed_for_test(false);
+    }
+
+    {
+        init_default_config();
+        reset_managed_reload_runtime_for_test();
+        config.use_ini = true;
+        config.transmit = true;
+        config.transmit_backend = TransmitBackendKind::RP1_GPCLK;
+        config.rp1_development_confirmation_json = "supplied-but-not-yet-validated";
+        set_rp1_route_transaction_inhibited(true);
+        bool local_effective = true;
+        WtpPiControlHooks hooks;
+        hooks.local_effective = [&local_effective]() {return local_effective;};
+        set_wtp_pi_control_hooks(std::move(hooks));
+        for (const auto mode : {ModeType::WSPR, ModeType::QRSS,
+                                ModeType::FSKCW, ModeType::DFCW})
+        {
+            config.mode = mode;
+            require(runtime_transmit_preparation_enabled(config) &&
+                    !runtime_transmit_enabled(config),
+                "managed RP1 finite modes may prepare confirmation while the route remains inhibited");
+            local_effective = false;
+            require(!runtime_transmit_preparation_enabled(config),
+                "managed RP1 preparation must preserve local ownership priority");
+            local_effective = true;
+            set_managed_reload_tx_inhibited(true);
+            require(!runtime_transmit_preparation_enabled(config),
+                "managed RP1 preparation must preserve reload inhibition");
+            reset_managed_reload_runtime_for_test();
+        }
+        config.rp1_development_confirmation_json.clear();
+        require(!runtime_transmit_preparation_enabled(config),
+            "an inhibited managed RP1 route without explicit launch confirmation stays blocked");
+        config.rp1_development_confirmation_json = R"({
+            "enabled":true,"route":"GPIO4","operation_id":"managed-cw-operation-44",
+            "physical_connection_confirmed":true,"attenuation_and_load_confirmed":true,
+            "bounded_operation_confirmed":true,"non_radiating_topology_confirmed":true,
+            "experimental_status_acknowledged":true})";
+        config.gpio_tx_pin = 4;
+        config.tx_pin = 4;
+        config.qrss.message = "E";
+        config.qrss.frequency_hz = 14096900;
+        config.qrss.dot_seconds = 1;
+        config.fskcw.message = "E";
+        config.fskcw.space_frequency_hz = 14096900;
+        config.fskcw.mark_frequency_hz = 14096904;
+        config.fskcw.dot_seconds = 1;
+        config.dfcw.message = "E";
+        config.dfcw.dot_frequency_hz = 14096900;
+        config.dfcw.dash_frequency_hz = 14096904;
+        config.dfcw.dot_seconds = 1;
+        int reconciles = 0;
+        set_rp1_development_reconcile_invoker_for_test([&](const std::string &) {
+            ++reconciles;
+            set_rp1_route_transaction_inhibited(false);
+            return nlohmann::json{{"ok",true},{"generation",44},{"persisted","GPIO4"},
+                {"active","GPIO4"},{"reconciled",true},{"journal","none"},
+                {"endpointOpen",false},{"endpointOwned",true},{"state","idle"}};
+        });
+        set_scheduler_execution_suppressed_for_test(true);
+        for (const auto mode : {ModeType::QRSS, ModeType::FSKCW, ModeType::DFCW})
+        {
+            config.mode = mode;
+            set_rp1_route_transaction_inhibited(true);
+            reset_current_transmission_request_for_test();
+            local_effective = false;
+            const int before = reconciles;
+            require(start_non_wspr_transmission_now_for_test(config) && reconciles == before &&
+                    !current_transmission_request_for_test().rp1_development.enabled,
+                "a deferred managed CW launch without local ownership must not reconcile or commit");
+            local_effective = true;
+            require(start_non_wspr_transmission_now_for_test(config) && reconciles == before + 1 &&
+                    current_transmission_request_for_test().rp1_development.enabled &&
+                    current_transmission_request_for_test().rp1_development.operation_id == "managed-cw-operation-44",
+                "each managed CW mode must bind explicit confirmation before committing its finite request");
+        }
+        reset_rp1_development_reconcile_invoker_for_test();
+        set_scheduler_execution_suppressed_for_test(false);
+        reset_current_transmission_request_for_test();
+        clear_wtp_pi_control_hooks();
+        set_rp1_route_transaction_inhibited(false);
     }
 
     {

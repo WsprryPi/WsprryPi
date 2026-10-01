@@ -1,0 +1,5 @@
+build metadata unchanged: build/generated/build_metadata.hpp
+backend capabilities unchanged: build/generated/backend_capabilities.hpp
+Compiling (debug) wtp_endpoint/dns_sd_publisher.cpp into build/obj/debug/rpi-gpio+rp1-gpclk+si5351+simulated+ancillary-gpio1/wtp_endpoint/dns_sd_publisher.o
+Linking debug: wsprrypi_debug (libgpiod major: 2)
+Debug build completed successfully.

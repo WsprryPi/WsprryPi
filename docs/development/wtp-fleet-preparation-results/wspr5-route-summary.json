@@ -1,0 +1,21 @@
+{
+  "active": "GPIO20",
+  "compatible": true,
+  "configured": "GPIO20",
+  "eligible": false,
+  "endpointOpen": true,
+  "endpointOwned": false,
+  "generation": 1,
+  "journal": "none",
+  "message": "GPIO20 is active and Wsprry Pi is back online in idle mode. This does not start or authorize transmission.",
+  "ok": true,
+  "operationalReady": "Unknown",
+  "outputInhibited": "Unknown",
+  "persisted": "GPIO20",
+  "preflightValidated": false,
+  "profile": "runtime",
+  "reconciled": true,
+  "requested": "GPIO20",
+  "result": "runtime_inhibited",
+  "state": "runtime_ready"
+}

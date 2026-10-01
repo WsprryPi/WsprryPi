@@ -1,5 +1,41 @@
 # Runtime route-manager application integration
 
+## Transient local development confirmation
+
+The canonical managed launch can include one
+`--rp1-development-confirmation-json <json>` argument, with optional `--no-web`.
+The JSON must contain exactly `enabled`, `route`, `operation_id`,
+`physical_connection_confirmed`, `attenuation_and_load_confirmed`,
+`bounded_operation_confirmed`, `non_radiating_topology_confirmed` and
+`experimental_status_acknowledged`. All boolean fields must be true, the route
+must be `GPIO4` or `GPIO20`, and the operation ID must contain 8–64 ASCII letters,
+digits, dots, underscores or hyphens. The application also checks the selected
+route and current provider state before binding each finite request.
+
+This transient launch argument is available to local WSPR, QRSS, FSKCW and DFCW
+scheduling. It is excluded from INI and public configuration serialization.
+Keep local Enable off during restart, then enable only the intended bounded
+development batch and disable it when that batch ends. The confirmation does
+not impose a batch timeout or enable transmission by itself; it binds finite
+requests prepared during that process launch. It does not grant incoming WTP
+jobs permission or create confirmations on Fleet targets.
+
+Managed preparation may reconcile an inhibited route only with this supplied
+confirmation and effective local ownership. Startup/reload inhibition still
+blocks preparation. The resolved route, provider and ordinary transmit gates
+remain mandatory before request commitment. The fixed service validator rejects
+alternate binary/configuration paths and unsupported CLI overrides.
+
+After changing a service launch argument, restart while local Enable is off
+and verify the running process received it. A refreshed systemd unit definition
+alone does not show the arguments of an already running process. When updating
+the installed route companion, use the provider's supported neutral update and
+digest-bound redeployment workflow; its binding includes that companion's hash.
+Keep Avahi client development headers present for native DNS-SD builds and
+verify both advertisement and discovery after deployment.
+
+## Route and startup lifecycle
+
 This companion implementation consumes the explicit
 `rp1-gpclk-route-manager-runtime` profile from RP1-GPCLK-DKMS. The
 packaged/source-development protocol remains separate. Unknown contracts fail

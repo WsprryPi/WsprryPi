@@ -1,0 +1,28 @@
+{
+  "controller": "wspr5",
+  "backend": "rp1-gpclk",
+  "gpio": 20,
+  "mode": "wspr",
+  "frequency_hz": 14097100,
+  "callsign": "AA0NT",
+  "locator": "EM18",
+  "power_dbm_metadata": 20,
+  "frame_duration_ns": 110592000000,
+  "prepared_only": true,
+  "local_enable": false,
+  "required_startup_argument": "--rp1-development-confirmation-json",
+  "operation_id_rule": "Generate a fresh operation ID for the bounded RF batch at start",
+  "route_rule": "GPIO20; reconcile the current route through the existing bridge",
+  "start_procedure": [
+    "Supply the existing RP1 development confirmation for the fresh operation, keep local Enable false during managed restart",
+    "Refresh saved Fleet state; do not automatically enable any output",
+    "At the explicit RF start, enable the selected remote schedules and local WSPR on the same two-minute UTC boundary",
+    "Disable local output after the complete 110.592-second frame; pause and stop each remote output at the end of the bounded batch"
+  ],
+  "stop_procedure": [
+    "Set local Operation.Transmit=false through the guarded HTTP API",
+    "Pause and stop each remote assignment; verify known-off terminal state and ownership release",
+    "Leave uncertain outputs paused and reconcile explicitly; do not resubmit consumed slots"
+  ],
+  "authorization": "RF test and Pi service/state configuration authorized in this session; no RF started during preparation"
+}

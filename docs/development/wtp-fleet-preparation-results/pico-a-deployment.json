@@ -1,0 +1,16 @@
+{
+  "adapter": "A",
+  "serial": "0BF4B4AEC9FFB344",
+  "device_id": "fd6127d11d6aca42a9905fa3fb1bf1d5",
+  "source_revision": "615888e5364b",
+  "installed_revision": "3e1337074003",
+  "uf2_sha256": "658605e4bc66094849be71ee6bb59c91d335d6e1fb7fe99ad54d96b27cf09aa5",
+  "backup_sha256": "20ac43b8971d01be2418e1a9de7759225c7a95d2b834ab6af2ff0e4136a73045",
+  "reserved_bytes_identical": 57344,
+  "boot_id": "4296284b4460bb4578b4637ac020a590",
+  "profile_generation": "1",
+  "access_generation": "1",
+  "engine": "pio-dma-gp2",
+  "output_active": false,
+  "saved_station": null
+}

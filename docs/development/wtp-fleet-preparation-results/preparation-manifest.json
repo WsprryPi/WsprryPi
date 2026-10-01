@@ -1,0 +1,94 @@
+{
+  "source_commit": "6a32789cfb84881df9e6839b27a9538f69e7bed1",
+  "branch": "devel",
+  "private_backups": [
+    {
+      "path": "/private/tmp/wtp-fleet-build/pi-backups/wspr1-before.tar.gz",
+      "sha256": "b303e29a9933267e5a100570cde0d281b04a59be9cbcc432731a984d3a7fbb4a"
+    },
+    {
+      "path": "/private/tmp/wtp-fleet-build/pi-backups/wspr2-before.tar.gz",
+      "sha256": "c0d103509b7b1650076fd19880b419983d900542a64ebbb3007888dc12a6b366"
+    },
+    {
+      "path": "/private/tmp/wtp-fleet-build/pi-backups/wspr4-before.tar.gz",
+      "sha256": "42d74a7bf8668b3cf909129dabebc8f9be9745d56a398a6e5402f855d2ee6ff7"
+    },
+    {
+      "path": "/private/tmp/wtp-fleet-build/pi-backups/wspr5-before.tar.gz",
+      "sha256": "8d9eb63610d4fc9bc0578c2f31aedc51fba89a18b5fa27965e9a9490a0a3ac58"
+    },
+    {
+      "path": "/private/tmp/wtp-fleet-build/pi-backups/wspr5-ui-before.tar.gz",
+      "sha256": "0832a5e573f1701657dfbf9af32473dcf6b2ec4fe0441d7d179d4417b00dcfc9"
+    },
+    {
+      "path": "/private/tmp/wtp-fleet-build/pico-a-backup/full-flash.bin.gz",
+      "uncompressed_sha256": "20ac43b8971d01be2418e1a9de7759225c7a95d2b834ab6af2ff0e4136a73045",
+      "size_uncompressed": 4194304
+    },
+    {
+      "path": "/private/tmp/wtp-fleet-build/pico-b-backup/full-flash.bin.gz",
+      "uncompressed_sha256": "e77aa61396cda525c1ad2d437e69ac30ed4f52cec7cc302261839e816c8b7d99",
+      "size_uncompressed": 4194304
+    }
+  ],
+  "preparation_complete": true,
+  "remaining": [],
+  "rf_job_requests_submitted": 0,
+  "not_tested": [
+    "concurrent_RF",
+    "eight_simulated_outputs",
+    "mixed_fleet_repeated_scheduling",
+    "browser_takeovers_and_edits",
+    "discovery_topology_changes"
+  ],
+  "launch_actions_deferred": [
+    "supply_RP1_exact_operation_confirmation_at_local_frame_launch",
+    "resume_selected_schedules_only_at_explicit_RF_start"
+  ],
+  "combiner": {
+    "wspr1": "GPIO4",
+    "Pico B": "PIO2",
+    "wspr4": "GPIO4",
+    "SDR": "connected to wspr5",
+    "source": "operator recap in this turn"
+  },
+  "artifacts": {
+    "readiness-probes.json": "bf25f8c9d034a5143570dd55d352f71476e67e37bcdb6bf13387bf2fa7d7c8af",
+    "final-preparation.json": "6cfcaf5bd6b55665127257c21f9438b9b5ba5d39ccf292e0dc8b0b1152f6b222",
+    "wspr1-state.json": "c9a85bc998103fb884041186cf131e10353d03aae2c4908792f705b42e7393b0",
+    "wspr2-state.json": "d080339f12b2afa2ae27351ef03da0571fd13eb278320f7fc3c9b51c160df180",
+    "wspr4-state.json": "f6fd413c7f61cc05b5e1810b745abbeeb984e5a1734871bc2de9a65d265361c4",
+    "wspr5-state.json": "68f5e824837ddf044287d2efc12feb4f714c54f6219d10c729641ed3a8099c82",
+    "wspr5-route-summary.json": "2a4f5d1f71a4b3dddd326bfd3f8cdfa89b6cd3377c39f7b01bc32e2200552d62",
+    "pico-a-deployment.json": "524218b7e9d7633ca32feb5d9e995afa3e010af5d7a808d242ca4ae2cf9c06c6",
+    "pico-b-deployment.json": "dc7dda790d6181ab0b4cd16650035cf7746b5288745feaef793c14f348814c92",
+    "wspr5-ui-publication.json": "50c70a20d3c5a4a859f37a90fe5d7ac7a07cebdac8867f0c5300fcc5083da173",
+    "local-rp1-launch-plan.json": "42f9e640a5bf6ed6b2d01c935400d40d4c0d4b87b7db353bd2769da8b4cf6650",
+    "fleet-desktop.png": "dfa7fddd797dcfce526f2dd13fbe770c2feadc6b2e1ca799c6581e7f36e9dead",
+    "fleet-mobile.png": "fc95fadba22c25ab0caccea4c307c63ab70cf9009126c1a4bb41c7fe160f476a"
+  },
+  "frequency_override": {
+    "controller": "wspr5",
+    "value": true,
+    "scope": "this Fleet test",
+    "explicit_operator_approval": true
+  },
+  "ui_review": {
+    "skill": "Impeccable",
+    "changed_UI_source_files": [],
+    "desktop": {
+      "width": 1280,
+      "height": 900,
+      "horizontal_overflow": false
+    },
+    "mobile": {
+      "width": 390,
+      "height": 844,
+      "horizontal_overflow": false
+    },
+    "development_controls": "revealed in browser session only",
+    "workflow": "read actual paused schedule rows; no Resume or takeover actions"
+  }
+}

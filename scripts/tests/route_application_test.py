@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: MIT
 """Offline tests of the installed route configuration companion."""
 import os
+import json
 from pathlib import Path
 import sys
 import subprocess
@@ -98,6 +99,35 @@ class Tests(unittest.TestCase):
                 with self.assertRaises(ValueError): app.inspect_service()
         with patch.object(app.subprocess, 'check_output', return_value=''):
             with self.assertRaises(ValueError): app.inspect_service()
+
+    def test_transient_confirmation_and_only_supported_service_options(self):
+        base = '/usr/local/bin/wsprrypi -J -i /usr/local/etc/wsprrypi.ini'
+        confirmation = dict(enabled=True, route='GPIO20', operation_id='managed-operation-21',
+            physical_connection_confirmed=True, attenuation_and_load_confirmed=True,
+            bounded_operation_confirmed=True, non_radiating_topology_confirmed=True,
+            experimental_status_acknowledged=True)
+        flag = ' --rp1-development-confirmation-json '
+        for encoding in (json.dumps(confirmation), json.dumps(confirmation, separators=(',', ':'))):
+            for before, after in (('', ''), (' --no-web', ''), ('', ' --no-web')):
+                command = base + before + flag + encoding + after
+                text = '{ path=/usr/local/bin/wsprrypi ; argv[]=' + command + ' ; ignore_errors=no ; }\n'
+                with patch.object(app.subprocess, 'check_output', return_value=text), patch.object(app, 'trusted', return_value=(b'WSPRRYPI_ROUTE_RESTORE_IDLE', None)):
+                    app.inspect_service()
+        invalid = [base+' --no-web --no-web', base+'.other', base+' --backend simulated',
+                   base+flag+'null', base+flag+'{}', base+flag+json.dumps(confirmation)+' --transmit-gpio 4',
+                   base+flag+json.dumps(confirmation)+flag+json.dumps(confirmation),
+                   base+flag+json.dumps(confirmation)+'--no-web',
+                   base+flag+json.dumps(confirmation)[:-1]+',"enabled":true}']
+        for field, value in (('enabled', False), ('enabled', 1), ('route', 'GPIO19'),
+                             ('operation_id', 'short'), ('operation_id', 'operation;chain'),
+                             ('operation_id', 'operation with spaces'), ('unexpected', True)):
+            invalid.append(base+flag+json.dumps({**confirmation, field:value}))
+        for command in invalid:
+            with self.subTest(command=command), self.assertRaises(ValueError):
+                app.validate_service_arguments(command)
+        text = '{ path=/usr/local/bin/wsprrypi ; argv[]='+base+' ; ignore_errors=no ; } { path=/bin/sh ; argv[]=/bin/sh ; }'
+        with patch.object(app.subprocess, 'check_output', return_value=text), self.assertRaises(ValueError):
+            app.inspect_service()
 
     def test_bootstrap_installer_uses_selected_checkout_and_honors_dry_run(self):
         for dry_run in ('true', 'false'):

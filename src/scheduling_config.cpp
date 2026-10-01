@@ -450,7 +450,7 @@ bool set_config(bool force)
 
             log_scheduler_path_selection(working_config.mode);
 
-            if (!runtime_transmit_enabled(working_config))
+            if (!runtime_transmit_preparation_enabled(working_config))
             {
                 log_transmit_disabled_skip(working_config);
                 if (!finalize_reload_pending())
@@ -905,7 +905,7 @@ bool set_config(bool force)
             {
                 llog.logS(
                     INFO,
-                    "Bounded positional RP1 WSPR frame request committed for operation ",
+                    "Bounded RP1 WSPR frame request committed for operation ",
                     next_transmission_request.rp1_development.operation_id,
                     ".");
             }

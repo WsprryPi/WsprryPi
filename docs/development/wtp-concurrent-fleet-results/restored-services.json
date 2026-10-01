@@ -1,0 +1,11 @@
+{
+  "remote_services_checked_from_mac": {
+    "wspr1": "active",
+    "wspr2": "active",
+    "wspr4": "active"
+  },
+  "wspr5": "active",
+  "test_dropin_removed": true,
+  "normal_dropin_retained": true,
+  "receiver_capture_pids": []
+}

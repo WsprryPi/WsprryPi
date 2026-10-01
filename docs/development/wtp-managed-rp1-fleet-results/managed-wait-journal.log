@@ -1,0 +1,112 @@
+Oct 01 12:56:17 wspr5 wsprrypi[344224]: INI file changed, reloading.
+Oct 01 12:56:17 wspr5 wsprrypi[344224]: GPIO frequency correction updated: mode= qualified_estimate_plus_residual, provider= chrony, estimate_ppm= 2.522, residual_ppm= 0.0, effective_ppm= 2.522, qualification= qualified
+Oct 01 12:56:17 wspr5 wsprrypi[344224]: RP1 confirmation accepted and bounded WSPR frame request prepared for operation managed-fleet-5f4c4b122d6f427e87b50fc467001000.
+Oct 01 12:56:17 wspr5 wsprrypi[344224]: Transmit backend: rp1-gpclk
+Oct 01 12:56:17 wspr5 wsprrypi[344224]: Transmit GPIO: 20
+Oct 01 12:56:17 wspr5 wsprrypi[344224]: WSPR packet payload:
+Oct 01 12:56:17 wspr5 wsprrypi[344224]: - Callsign: AA0NT
+Oct 01 12:56:17 wspr5 wsprrypi[344224]: - Locator: EM18
+Oct 01 12:56:17 wspr5 wsprrypi[344224]: - Power: 20 dBm
+Oct 01 12:56:17 wspr5 wsprrypi[344224]: - RP1 GPIO Drive mA: 2
+Oct 01 12:56:17 wspr5 wsprrypi[344224]: Requested WSPR dial frequency: 14.095600 MHz
+Oct 01 12:56:17 wspr5 wsprrypi[344224]: Scheduling path selected: WSPR.
+Oct 01 12:56:17 wspr5 wsprrypi[344224]: Bounded RP1 WSPR frame request committed for operation managed-fleet-5f4c4b122d6f427e87b50fc467001000.
+Oct 01 12:56:17 wspr5 wsprrypi[344224]: Waiting for next transmission window.
+Oct 01 12:56:17 wspr5 wsprrypi[344224]: RP1 confirmation accepted and bounded WSPR frame request prepared for operation managed-fleet-5f4c4b122d6f427e87b50fc467001000.
+Oct 01 12:56:17 wspr5 wsprrypi[344224]: Transmit backend: rp1-gpclk
+Oct 01 12:56:17 wspr5 wsprrypi[344224]: Transmit GPIO: 20
+Oct 01 12:56:17 wspr5 wsprrypi[344224]: WSPR packet payload:
+Oct 01 12:56:17 wspr5 wsprrypi[344224]: - Callsign: AA0NT
+Oct 01 12:56:17 wspr5 wsprrypi[344224]: - Locator: EM18
+Oct 01 12:56:17 wspr5 wsprrypi[344224]: - Power: 20 dBm
+Oct 01 12:56:17 wspr5 wsprrypi[344224]: - RP1 GPIO Drive mA: 2
+Oct 01 12:56:17 wspr5 wsprrypi[344224]: Requested WSPR dial frequency: 14.095600 MHz
+Oct 01 12:56:17 wspr5 wsprrypi[344224]: Scheduling path selected: WSPR.
+Oct 01 12:56:17 wspr5 wsprrypi[344224]: Bounded RP1 WSPR frame request committed for operation managed-fleet-5f4c4b122d6f427e87b50fc467001000.
+Oct 01 12:56:17 wspr5 wsprrypi[344224]: Waiting for next transmission window.
+Oct 01 12:56:18 wspr5 wsprrypi[344224]: INI file changed, reloading.
+Oct 01 12:56:18 wspr5 wsprrypi[344224]: RP1 confirmation accepted and bounded WSPR frame request prepared for operation managed-fleet-5f4c4b122d6f427e87b50fc467001000.
+Oct 01 12:56:18 wspr5 wsprrypi[344224]: Transmit backend: rp1-gpclk
+Oct 01 12:56:18 wspr5 wsprrypi[344224]: Transmit GPIO: 20
+Oct 01 12:56:18 wspr5 wsprrypi[344224]: WSPR packet payload:
+Oct 01 12:56:18 wspr5 wsprrypi[344224]: - Callsign: AA0NT
+Oct 01 12:56:18 wspr5 wsprrypi[344224]: - Locator: EM18
+Oct 01 12:56:18 wspr5 wsprrypi[344224]: - Power: 20 dBm
+Oct 01 12:56:18 wspr5 wsprrypi[344224]: - RP1 GPIO Drive mA: 2
+Oct 01 12:56:18 wspr5 wsprrypi[344224]: Requested WSPR dial frequency: 14.095600 MHz
+Oct 01 12:56:18 wspr5 wsprrypi[344224]: Scheduling path selected: WSPR.
+Oct 01 12:56:18 wspr5 wsprrypi[344224]: Bounded RP1 WSPR frame request committed for operation managed-fleet-5f4c4b122d6f427e87b50fc467001000.
+Oct 01 12:56:18 wspr5 wsprrypi[344224]: Waiting for next transmission window.
+Oct 01 12:56:18 wspr5 wsprrypi[344224]: RP1 confirmation accepted and bounded WSPR frame request prepared for operation managed-fleet-5f4c4b122d6f427e87b50fc467001000.
+Oct 01 12:56:18 wspr5 wsprrypi[344224]: Transmit backend: rp1-gpclk
+Oct 01 12:56:18 wspr5 wsprrypi[344224]: Transmit GPIO: 20
+Oct 01 12:56:18 wspr5 wsprrypi[344224]: WSPR packet payload:
+Oct 01 12:56:18 wspr5 wsprrypi[344224]: - Callsign: AA0NT
+Oct 01 12:56:18 wspr5 wsprrypi[344224]: - Locator: EM18
+Oct 01 12:56:18 wspr5 wsprrypi[344224]: - Power: 20 dBm
+Oct 01 12:56:18 wspr5 wsprrypi[344224]: - RP1 GPIO Drive mA: 2
+Oct 01 12:56:18 wspr5 wsprrypi[344224]: Requested WSPR dial frequency: 14.095600 MHz
+Oct 01 12:56:18 wspr5 wsprrypi[344224]: Scheduling path selected: WSPR.
+Oct 01 12:56:18 wspr5 wsprrypi[344224]: Bounded RP1 WSPR frame request committed for operation managed-fleet-5f4c4b122d6f427e87b50fc467001000.
+Oct 01 12:56:18 wspr5 wsprrypi[344224]: Waiting for next transmission window.
+Oct 01 12:56:21 wspr5 wsprrypi[344224]: INI file changed, reloading.
+Oct 01 12:56:22 wspr5 wsprrypi[344224]: RP1 confirmation accepted and bounded WSPR frame request prepared for operation managed-fleet-5f4c4b122d6f427e87b50fc467001000.
+Oct 01 12:56:22 wspr5 wsprrypi[344224]: Transmit backend: rp1-gpclk
+Oct 01 12:56:22 wspr5 wsprrypi[344224]: Transmit GPIO: 20
+Oct 01 12:56:22 wspr5 wsprrypi[344224]: WSPR packet payload:
+Oct 01 12:56:22 wspr5 wsprrypi[344224]: - Callsign: AA0NT
+Oct 01 12:56:22 wspr5 wsprrypi[344224]: - Locator: EM18
+Oct 01 12:56:22 wspr5 wsprrypi[344224]: - Power: 20 dBm
+Oct 01 12:56:22 wspr5 wsprrypi[344224]: - RP1 GPIO Drive mA: 2
+Oct 01 12:56:22 wspr5 wsprrypi[344224]: Requested WSPR dial frequency: 14.095600 MHz
+Oct 01 12:56:22 wspr5 wsprrypi[344224]: Scheduling path selected: WSPR.
+Oct 01 12:56:22 wspr5 wsprrypi[344224]: Bounded RP1 WSPR frame request committed for operation managed-fleet-5f4c4b122d6f427e87b50fc467001000.
+Oct 01 12:56:22 wspr5 wsprrypi[344224]: Waiting for next transmission window.
+Oct 01 12:56:22 wspr5 wsprrypi[344224]: RP1 confirmation accepted and bounded WSPR frame request prepared for operation managed-fleet-5f4c4b122d6f427e87b50fc467001000.
+Oct 01 12:56:22 wspr5 wsprrypi[344224]: Transmit backend: rp1-gpclk
+Oct 01 12:56:22 wspr5 wsprrypi[344224]: Transmit GPIO: 20
+Oct 01 12:56:22 wspr5 wsprrypi[344224]: WSPR packet payload:
+Oct 01 12:56:22 wspr5 wsprrypi[344224]: - Callsign: AA0NT
+Oct 01 12:56:22 wspr5 wsprrypi[344224]: - Locator: EM18
+Oct 01 12:56:22 wspr5 wsprrypi[344224]: - Power: 20 dBm
+Oct 01 12:56:22 wspr5 wsprrypi[344224]: - RP1 GPIO Drive mA: 2
+Oct 01 12:56:22 wspr5 wsprrypi[344224]: Requested WSPR dial frequency: 14.095600 MHz
+Oct 01 12:56:22 wspr5 wsprrypi[344224]: Scheduling path selected: WSPR.
+Oct 01 12:56:22 wspr5 wsprrypi[344224]: Bounded RP1 WSPR frame request committed for operation managed-fleet-5f4c4b122d6f427e87b50fc467001000.
+Oct 01 12:56:22 wspr5 wsprrypi[344224]: Waiting for next transmission window.
+Oct 01 12:56:25 wspr5 wsprrypi[344224]: INI file changed, reloading.
+Oct 01 12:56:25 wspr5 wsprrypi[344224]: Transmit backend: rp1-gpclk
+Oct 01 12:56:25 wspr5 wsprrypi[344224]: Transmit GPIO: 20
+Oct 01 12:56:25 wspr5 wsprrypi[344224]: No transmission requested; skipping transmission and scheduling.
+Oct 01 12:56:25 wspr5 wsprrypi[344224]: Transmit backend: rp1-gpclk
+Oct 01 12:56:25 wspr5 wsprrypi[344224]: Transmit GPIO: 20
+Oct 01 12:56:25 wspr5 wsprrypi[344224]: No transmission requested; skipping transmission and scheduling.
+Oct 01 12:56:29 wspr5 wsprrypi[344224]: INI file changed, reloading.
+Oct 01 12:56:29 wspr5 wsprrypi[344224]: Transmit backend: rp1-gpclk
+Oct 01 12:56:29 wspr5 wsprrypi[344224]: Transmit GPIO: 20
+Oct 01 12:56:29 wspr5 wsprrypi[344224]: No transmission requested; skipping transmission and scheduling.
+Oct 01 12:56:29 wspr5 wsprrypi[344224]: Transmit backend: rp1-gpclk
+Oct 01 12:56:29 wspr5 wsprrypi[344224]: Transmit GPIO: 20
+Oct 01 12:56:29 wspr5 wsprrypi[344224]: No transmission requested; skipping transmission and scheduling.
+Oct 01 13:04:39 wspr5 systemd[1]: Stopping wsprrypi.service - WsprryPi daemon for: wsprrypi...
+Oct 01 13:04:39 wspr5 wsprrypi[344224]: Shutdown requested: received SIGTERM signal
+Oct 01 13:04:40 wspr5 wsprrypi[344224]: WsprryPi exiting.
+Oct 01 13:04:40 wspr5 systemd[1]: wsprrypi.service: Deactivated successfully.
+Oct 01 13:04:40 wspr5 systemd[1]: Stopped wsprrypi.service - WsprryPi daemon for: wsprrypi.
+Oct 01 13:04:40 wspr5 systemd[1]: wsprrypi.service: Consumed 10.812s CPU time.
+Oct 01 13:04:40 wspr5 systemd[1]: Starting wsprrypi.service - WsprryPi daemon for: wsprrypi...
+Oct 01 13:04:40 wspr5 systemd[1]: Started wsprrypi.service - WsprryPi daemon for: wsprrypi.
+Oct 01 13:04:40 wspr5 wsprrypi[348953]: WsprryPi version 3.2.0-devel+6a32789 (devel).
+Oct 01 13:04:40 wspr5 wsprrypi[348953]: Platform: Raspberry Pi 5 Model B Rev 1.0.
+Oct 01 13:04:40 wspr5 wsprrypi[348953]: OS: Debian GNU/Linux 13 (trixie) 64-bit.
+Oct 01 13:04:40 wspr5 wsprrypi[348953]: Operation.Enable on Boot policy Never: setting Operation.Transmit=false for startup.
+Oct 01 13:04:40 wspr5 wsprrypi[348953]: Transmit backend: rp1-gpclk
+Oct 01 13:04:40 wspr5 wsprrypi[348953]: Transmit GPIO: 20
+Oct 01 13:04:40 wspr5 wsprrypi[348953]: RP1 GPCLK route reconciled for safe idle startup; exact provider identity and operation-scoped authorization remain required.
+Oct 01 13:04:40 wspr5 wsprrypi[348953]: Web server started on port: 31415
+Oct 01 13:04:40 wspr5 wsprrypi[348953]: HTTP listener started on port 31415.
+Oct 01 13:04:40 wspr5 wsprrypi[348953]: Socket server started on address::: 31416
+Oct 01 13:04:40 wspr5 wsprrypi[348953]: WSPR loop running.
+Oct 01 13:04:40 wspr5 wsprrypi[348953]: PPM Manager initialized successfully.
+Oct 01 13:04:40 wspr5 wsprrypi[348953]: GPIO frequency correction updated: mode= uncalibrated, provider= chrony, estimate_ppm= 0.0, residual_ppm= 0.0, effective_ppm= 0.0, qualification= converging
+Oct 01 13:04:40 wspr5 wsprrypi[348953]: No transmission requested; skipping transmission and scheduling.

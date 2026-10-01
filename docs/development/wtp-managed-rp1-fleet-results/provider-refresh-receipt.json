@@ -1,0 +1,20 @@
+{
+  "activationPlanSha256": "7f804f3afd34e7f447c2196df958a3a17e5b0334c5645ab8d38734a12b27f489",
+  "activationRequestId": "9bec34d7-e3f3-47f8-ae12-aa7db0e3ecca",
+  "artifactSetSha256": "cddfcbb5040b51db6ce16969efc9cd133f4e6e402bf5bce34cbea040de96c9e0",
+  "bindingSha256": "a74a3b16c58e8be98c19f8f9fdf8a1e9d72d975e4d09062a598dfa58580dddd9",
+  "compatibilityIdentities": {
+    "gpio20": "v0.9.0-rp1-gpio20",
+    "gpio4": "v0.9.0-rp1-gpio4"
+  },
+  "controllerGeneration": 0,
+  "controllerSession": 12865724874001468884,
+  "deploymentPlanSha256": "281975c53b2ac62a3d4d5a12bf089ae55c599bccc4861385e30349d877f074da",
+  "output": "disabled",
+  "productVersion": "0.9.0",
+  "readinessContract": "rp1-gpclk-runtime-readiness-v1",
+  "route": null,
+  "sourceCommit": "924c7e546ab82a40497339c4baeb813f95f3408e",
+  "state": "neutral_ready",
+  "targetKernel": "6.18.34+rpt-rpi-2712"
+}

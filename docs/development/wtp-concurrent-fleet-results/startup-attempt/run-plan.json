@@ -1,0 +1,13 @@
+{
+  "slot_utc_seconds": 1790869681,
+  "slots": [
+    1790869681,
+    1790869801,
+    1790869921
+  ],
+  "local_stop_utc_seconds": 1790869795,
+  "remote_stop_utc_seconds": 1790869936,
+  "capture_center_hz": 14075100,
+  "sample_rate": 250000,
+  "stage": "/home/pi/wtp-concurrent-fleet-q5xbp5s3"
+}

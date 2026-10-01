@@ -126,6 +126,12 @@ WtpPiAuthority::EnableResult WtpPiAuthority::enable_locked(bool finish) {
         return EnableResult::RevocationUnavailable;
     }
     if (local_work_active_) {
+        // Repeated configuration commits must not revoke a schedule that
+        // already holds effective local Enable. A new Enable while a Test
+        // Tone or disabled schedule is draining still waits for cleanup.
+        if (effective_local_enable_ && !local_test_tone_ && !output_unknown_ &&
+            status.state != wsprrypico::wtp::State::Failed)
+            return EnableResult::Enabled;
         effective_local_enable_ = false;
         return EnableResult::PendingLocalWork;
     }

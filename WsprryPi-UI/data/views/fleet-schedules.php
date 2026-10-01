@@ -93,3 +93,21 @@
     <button type="button" id="fleet-listener-save" class="btn btn-outline-primary mt-3">Save listener settings</button>
     <p id="fleet-listener-feedback" class="form-text mt-2" role="status" aria-live="polite"></p>
 </details>
+<div class="modal fade" id="fleet-action-confirmation" tabindex="-1" aria-labelledby="fleet-action-heading" aria-describedby="fleet-action-target fleet-action-consequence" aria-hidden="true" data-independent-wtp>
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title h5" id="fleet-action-heading">Pause and stop?</h3>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cancel"></button>
+            </div>
+            <div class="modal-body">
+                <p id="fleet-action-target" class="fw-semibold text-break"></p>
+                <p id="fleet-action-consequence" class="mb-0"></p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" id="fleet-action-cancel" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" id="fleet-action-confirm" class="btn btn-danger">Pause and stop</button>
+            </div>
+        </div>
+    </div>
+</div>

@@ -110,16 +110,60 @@ def edit(data, route):
     return result
 
 
+def validate_service_arguments(arguments):
+    """Accept only the fixed installed launch and its transient confirmation."""
+    prefix = '/usr/local/bin/wsprrypi -J -i ' + str(CONFIG)
+    if len(arguments) > 8192 or not arguments.startswith(prefix):
+        raise ValueError('unsupported installed command')
+    remaining = arguments[len(prefix):]
+    if remaining and not remaining.startswith(' '):
+        raise ValueError('alternate configuration path')
+    seen = set()
+
+    def unique_object(pairs):
+        result = {}
+        for key, value in pairs:
+            if key in result:
+                raise ValueError('duplicate confirmation field')
+            result[key] = value
+        return result
+
+    while remaining.strip():
+        remaining = remaining.lstrip()
+        option, _, tail = remaining.partition(' ')
+        if option in seen:
+            raise ValueError('duplicate installed option')
+        seen.add(option)
+        if option == '--no-web':
+            remaining = tail
+            continue
+        if option != '--rp1-development-confirmation-json' or not tail:
+            raise ValueError('unsupported installed option')
+        confirmation, end = json.JSONDecoder(object_pairs_hook=unique_object).raw_decode(tail.lstrip())
+        flags = {'enabled', 'physical_connection_confirmed',
+                 'attenuation_and_load_confirmed', 'bounded_operation_confirmed',
+                 'non_radiating_topology_confirmed', 'experimental_status_acknowledged'}
+        if (not isinstance(confirmation, dict) or
+                set(confirmation) != flags | {'route', 'operation_id'} or
+                any(confirmation[field] is not True for field in flags) or
+                confirmation['route'] not in ('GPIO4', 'GPIO20') or
+                not isinstance(confirmation['operation_id'], str) or
+                not re.fullmatch(r'[A-Za-z0-9._-]{8,64}', confirmation['operation_id'])):
+            raise ValueError('invalid installed RP1 confirmation')
+        remaining = tail.lstrip()[end:]
+        if remaining and not remaining.startswith(' '):
+            raise ValueError('ambiguous installed confirmation argument')
+
+
 def inspect_service():
     output = subprocess.check_output(['/usr/bin/systemctl', 'show', 'wsprrypi.service',
         '--property=ExecStart', '--value'], text=True, timeout=10)
     # systemd's fixed argv[] representation; reject alternate configs, command
     # chains and CLI output overrides instead of guessing which file to edit.
-    match = re.fullmatch(r'\{ path=/usr/local/bin/wsprrypi ; argv\[\]=([^;]+) ; .*\}\s*', output)
-    if not match or match[1].split() not in (
-            ['/usr/local/bin/wsprrypi', '-J', '-i', str(CONFIG)],
-            ['/usr/local/bin/wsprrypi', '-J', '-i', str(CONFIG), '--no-web']):
+    match = re.fullmatch(r'\{ path=/usr/local/bin/wsprrypi ; argv\[\]=([^;]+) ; [^{}]*\}\s*', output)
+    if not match:
         raise ValueError('service is missing, masked, or uses an unsupported command; preserve it and repair installation')
+    validate_service_arguments(match[1])
     binary, _ = trusted(BINARY)
     if b'WSPRRYPI_ROUTE_RESTORE_IDLE' not in binary:
         raise ValueError('installed application lacks idle restoration support')

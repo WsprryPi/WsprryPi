@@ -1,0 +1,410 @@
+[
+  {
+    "host": "wspr1",
+    "address": "192.168.1.44",
+    "expected_device_id": "d133ed890b90f6945b41a235429ff155",
+    "captured_utc_ns": "1790859693321033407",
+    "requests": [
+      "HELLO",
+      "CAPS",
+      "STATUS",
+      "GET_CLOCK"
+    ],
+    "hello": {
+      "selected_version": "WTP/1",
+      "device_id": "d133ed890b90f6945b41a235429ff155",
+      "boot_id": "ebb2faf2e0411e0062cd6e342803a182",
+      "product": "WsprryPi",
+      "firmware_version": "3.2.0-devel+6a32789"
+    },
+    "caps": {
+      "profiles": [
+        "rf-events/1"
+      ],
+      "modes": [
+        "wspr",
+        "tone",
+        "qrss",
+        "fskcw",
+        "dfcw"
+      ],
+      "engine": "rpi-clock-gpio",
+      "frequency_ranges": [
+        {
+          "minimum_nhz": "122070319775958",
+          "maximum_nhz": "100000000000000000"
+        }
+      ],
+      "max_payload_bytes": 65536,
+      "max_events": 512,
+      "max_job_duration_ns": "86400000000000",
+      "minimum_arm_lead_ns": "2000000000",
+      "maximum_arm_ahead_ns": "604800000000000",
+      "maximum_arm_uncertainty_ns": "500000000",
+      "maximum_holdover_age_ns": "0",
+      "output_disable_timeout_ns": "5000000000",
+      "minimum_lease_ms": 5000,
+      "maximum_lease_ms": 60000,
+      "response_cache_entries": 8,
+      "response_cache_ttl_seconds": 300,
+      "terminal_record_entries": 8,
+      "terminal_record_ttl_seconds": 3600
+    },
+    "status": {
+      "boot_id": "ebb2faf2e0411e0062cd6e342803a182",
+      "state": "empty",
+      "output_active": false,
+      "owner_id": null,
+      "job_id": null,
+      "terminal_records": []
+    },
+    "get_clock": {
+      "state": "synchronized",
+      "utc_now_ns": "1790859693534969592",
+      "monotonic_now_ns": "141646627111179",
+      "uncertainty_ns": "153742500",
+      "sync_age_ns": "0",
+      "leap": "normal"
+    }
+  },
+  {
+    "host": "wspr2",
+    "address": "192.168.1.123",
+    "expected_device_id": "e2a4d273f7d8f24f6696f7c6fb95ff11",
+    "captured_utc_ns": "1790859693606395547",
+    "requests": [
+      "HELLO",
+      "CAPS",
+      "STATUS",
+      "GET_CLOCK"
+    ],
+    "hello": {
+      "selected_version": "WTP/1",
+      "device_id": "e2a4d273f7d8f24f6696f7c6fb95ff11",
+      "boot_id": "202a2bb6e7112d46ece078f692dde2c2",
+      "product": "WsprryPi",
+      "firmware_version": "3.2.0-devel+2f67b00"
+    },
+    "caps": {
+      "profiles": [
+        "rf-events/1"
+      ],
+      "modes": [
+        "wspr",
+        "tone",
+        "qrss",
+        "fskcw",
+        "dfcw"
+      ],
+      "engine": "rpi-clock-gpio",
+      "frequency_ranges": [
+        {
+          "minimum_nhz": "122070319775958",
+          "maximum_nhz": "100000000000000000"
+        }
+      ],
+      "max_payload_bytes": 65536,
+      "max_events": 512,
+      "max_job_duration_ns": "86400000000000",
+      "minimum_arm_lead_ns": "2000000000",
+      "maximum_arm_ahead_ns": "604800000000000",
+      "maximum_arm_uncertainty_ns": "500000000",
+      "maximum_holdover_age_ns": "0",
+      "output_disable_timeout_ns": "5000000000",
+      "minimum_lease_ms": 5000,
+      "maximum_lease_ms": 60000,
+      "response_cache_entries": 8,
+      "response_cache_ttl_seconds": 300,
+      "terminal_record_entries": 8,
+      "terminal_record_ttl_seconds": 3600
+    },
+    "status": {
+      "boot_id": "202a2bb6e7112d46ece078f692dde2c2",
+      "state": "empty",
+      "output_active": false,
+      "owner_id": null,
+      "job_id": null,
+      "terminal_records": []
+    },
+    "get_clock": {
+      "state": "synchronized",
+      "utc_now_ns": "1790859693850187904",
+      "monotonic_now_ns": "3129741980212",
+      "uncertainty_ns": "121188130",
+      "sync_age_ns": "0",
+      "leap": "normal"
+    }
+  },
+  {
+    "host": "wspr4",
+    "address": "192.168.1.120",
+    "expected_device_id": "f21e530af8a4a210ec57898c0ebd32d2",
+    "captured_utc_ns": "1790859693903439413",
+    "requests": [
+      "HELLO",
+      "CAPS",
+      "STATUS",
+      "GET_CLOCK"
+    ],
+    "hello": {
+      "selected_version": "WTP/1",
+      "device_id": "f21e530af8a4a210ec57898c0ebd32d2",
+      "boot_id": "19d88d5752e3f3ad9765815d3ccf16eb",
+      "product": "WsprryPi",
+      "firmware_version": "3.2.0-devel+2f67b00"
+    },
+    "caps": {
+      "profiles": [
+        "rf-events/1"
+      ],
+      "modes": [
+        "wspr",
+        "tone",
+        "qrss",
+        "fskcw",
+        "dfcw"
+      ],
+      "engine": "rpi-clock-gpio",
+      "frequency_ranges": [
+        {
+          "minimum_nhz": "13183594535803",
+          "maximum_nhz": "150000000000000000"
+        }
+      ],
+      "max_payload_bytes": 65536,
+      "max_events": 512,
+      "max_job_duration_ns": "86400000000000",
+      "minimum_arm_lead_ns": "2000000000",
+      "maximum_arm_ahead_ns": "604800000000000",
+      "maximum_arm_uncertainty_ns": "500000000",
+      "maximum_holdover_age_ns": "0",
+      "output_disable_timeout_ns": "5000000000",
+      "minimum_lease_ms": 5000,
+      "maximum_lease_ms": 60000,
+      "response_cache_entries": 8,
+      "response_cache_ttl_seconds": 300,
+      "terminal_record_entries": 8,
+      "terminal_record_ttl_seconds": 3600
+    },
+    "status": {
+      "boot_id": "19d88d5752e3f3ad9765815d3ccf16eb",
+      "state": "empty",
+      "output_active": false,
+      "owner_id": null,
+      "job_id": null,
+      "terminal_records": []
+    },
+    "get_clock": {
+      "state": "synchronized",
+      "utc_now_ns": "1790859694006122978",
+      "monotonic_now_ns": "6925298664680",
+      "uncertainty_ns": "81774129",
+      "sync_age_ns": "0",
+      "leap": "normal"
+    }
+  },
+  {
+    "host": "wspr5",
+    "address": "192.168.1.54",
+    "expected_device_id": "e045017b11e54c2fb7029f0154e6deb9",
+    "captured_utc_ns": "1790859694052311225",
+    "requests": [
+      "HELLO",
+      "CAPS",
+      "STATUS",
+      "GET_CLOCK"
+    ],
+    "hello": {
+      "selected_version": "WTP/1",
+      "device_id": "e045017b11e54c2fb7029f0154e6deb9",
+      "boot_id": "b7ccae80494b0610ad9124d10b1b3fdd",
+      "product": "WsprryPi",
+      "firmware_version": "3.2.0-devel+2f67b00"
+    },
+    "caps": {
+      "profiles": [
+        "rf-events/1"
+      ],
+      "modes": [
+        "wspr",
+        "tone",
+        "qrss",
+        "fskcw",
+        "dfcw"
+      ],
+      "engine": "rp1-gpclk",
+      "frequency_ranges": [
+        {
+          "minimum_nhz": "3051757813211",
+          "maximum_nhz": "100000000000000000"
+        }
+      ],
+      "max_payload_bytes": 65536,
+      "max_events": 512,
+      "max_job_duration_ns": "86400000000000",
+      "minimum_arm_lead_ns": "2000000000",
+      "maximum_arm_ahead_ns": "604800000000000",
+      "maximum_arm_uncertainty_ns": "500000000",
+      "maximum_holdover_age_ns": "0",
+      "output_disable_timeout_ns": "5000000000",
+      "minimum_lease_ms": 5000,
+      "maximum_lease_ms": 60000,
+      "response_cache_entries": 8,
+      "response_cache_ttl_seconds": 300,
+      "terminal_record_entries": 8,
+      "terminal_record_ttl_seconds": 3600
+    },
+    "status": {
+      "boot_id": "b7ccae80494b0610ad9124d10b1b3fdd",
+      "state": "empty",
+      "output_active": false,
+      "owner_id": null,
+      "job_id": null,
+      "terminal_records": []
+    },
+    "get_clock": {
+      "state": "synchronized",
+      "utc_now_ns": "1790859694138701223",
+      "monotonic_now_ns": "141638368719356",
+      "uncertainty_ns": "510037",
+      "sync_age_ns": "0",
+      "leap": "normal"
+    }
+  },
+  {
+    "host": "Pico A",
+    "address": "192.168.1.47",
+    "expected_device_id": "fd6127d11d6aca42a9905fa3fb1bf1d5",
+    "captured_utc_ns": "1790859694207109283",
+    "requests": [
+      "HELLO",
+      "CAPS",
+      "STATUS",
+      "GET_CLOCK"
+    ],
+    "hello": {
+      "selected_version": "WTP/1",
+      "device_id": "fd6127d11d6aca42a9905fa3fb1bf1d5",
+      "boot_id": "4296284b4460bb4578b4637ac020a590",
+      "product": "WsprryPico",
+      "firmware_version": "0.0.0-devel"
+    },
+    "caps": {
+      "profiles": [
+        "rf-events/1"
+      ],
+      "modes": [
+        "wspr",
+        "tone",
+        "qrss",
+        "fskcw",
+        "dfcw"
+      ],
+      "engine": "pio-dma-gp2",
+      "frequency_ranges": [
+        {
+          "minimum_nhz": "100000000000000",
+          "maximum_nhz": "68999999000000000"
+        }
+      ],
+      "max_payload_bytes": 65536,
+      "max_events": 512,
+      "max_job_duration_ns": "3600000000000",
+      "minimum_arm_lead_ns": "100000000",
+      "maximum_arm_ahead_ns": "604800000000000",
+      "maximum_arm_uncertainty_ns": "500000000",
+      "maximum_holdover_age_ns": "90000000000",
+      "output_disable_timeout_ns": "100000000",
+      "minimum_lease_ms": 5000,
+      "maximum_lease_ms": 60000,
+      "response_cache_entries": 8,
+      "response_cache_ttl_seconds": 300,
+      "terminal_record_entries": 8,
+      "terminal_record_ttl_seconds": 3600
+    },
+    "status": {
+      "boot_id": "4296284b4460bb4578b4637ac020a590",
+      "state": "empty",
+      "output_active": false,
+      "owner_id": null,
+      "job_id": null,
+      "terminal_records": []
+    },
+    "get_clock": {
+      "state": "synchronized",
+      "utc_now_ns": "1790859694628300000",
+      "monotonic_now_ns": "3108674647000",
+      "uncertainty_ns": "98544984",
+      "sync_age_ns": "31945934000",
+      "leap": "normal"
+    }
+  },
+  {
+    "host": "Pico B",
+    "address": "wsprrypico-0a9d89.local",
+    "expected_device_id": "29f20b7342051ef947aa56cb9d4fab42",
+    "captured_utc_ns": "1790859694767551095",
+    "requests": [
+      "HELLO",
+      "CAPS",
+      "STATUS",
+      "GET_CLOCK"
+    ],
+    "hello": {
+      "selected_version": "WTP/1",
+      "device_id": "29f20b7342051ef947aa56cb9d4fab42",
+      "boot_id": "6df5d78b8ceddf07c0864799318f1bc5",
+      "product": "WsprryPico",
+      "firmware_version": "0.0.0-devel"
+    },
+    "caps": {
+      "profiles": [
+        "rf-events/1"
+      ],
+      "modes": [
+        "wspr",
+        "tone",
+        "qrss",
+        "fskcw",
+        "dfcw"
+      ],
+      "engine": "pio-dma-gp2",
+      "frequency_ranges": [
+        {
+          "minimum_nhz": "100000000000000",
+          "maximum_nhz": "68999999000000000"
+        }
+      ],
+      "max_payload_bytes": 65536,
+      "max_events": 512,
+      "max_job_duration_ns": "3600000000000",
+      "minimum_arm_lead_ns": "100000000",
+      "maximum_arm_ahead_ns": "604800000000000",
+      "maximum_arm_uncertainty_ns": "500000000",
+      "maximum_holdover_age_ns": "90000000000",
+      "output_disable_timeout_ns": "100000000",
+      "minimum_lease_ms": 5000,
+      "maximum_lease_ms": 60000,
+      "response_cache_entries": 8,
+      "response_cache_ttl_seconds": 300,
+      "terminal_record_entries": 8,
+      "terminal_record_ttl_seconds": 3600
+    },
+    "status": {
+      "boot_id": "6df5d78b8ceddf07c0864799318f1bc5",
+      "state": "empty",
+      "output_active": false,
+      "owner_id": null,
+      "job_id": null,
+      "terminal_records": []
+    },
+    "get_clock": {
+      "state": "synchronized",
+      "utc_now_ns": "1790859695052143000",
+      "monotonic_now_ns": "335531095000",
+      "uncertainty_ns": "103061616",
+      "sync_age_ns": "16533390000",
+      "leap": "normal"
+    }
+  }
+]

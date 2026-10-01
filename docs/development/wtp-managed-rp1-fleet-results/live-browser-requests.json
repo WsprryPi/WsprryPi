@@ -1,0 +1,10 @@
+{
+  "cancelled_pause_post_count": 0,
+  "confirmed_pause_posts": [
+    {
+      "url": "http://192.168.1.54/wsprrypi/api/v1/host/fleet",
+      "body": "{\"operation\":\"pause\",\"device_id\":\"29f20b7342051ef947aa56cb9d4fab42\"}",
+      "revision": "\"1968fabc718800a252c1e0e59ab0022ebbe2ef462b204d34572a5ac7c17610db\""
+    }
+  ]
+}

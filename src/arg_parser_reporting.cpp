@@ -113,7 +113,7 @@ void print_usage(const std::string &message, int exit_code)
               << "  --gpio-power-level <0-7>           Set GPIO backend RF power level.\n"
               << "  --rp1-gpio-drive-ma <2|4|8|12>    Set Raspberry Pi 5 RP1 pad drive. Default: 2 mA.\n"
               << "  --rp1-development-confirmation-json <json>\n"
-              << "                                     Confirm one exact direct-CLI RP1 development operation.\n"
+              << "                                     Bind transient RP1 development confirmation to finite local requests.\n"
               << "  --si5351-power-level <1-4>         Set Si5351 drive-strength level.\n\n"
               << "GPIO Backend:\n"
               << "  -a, --transmit-gpio <4|20>         Select the RF transmit GPIO.\n"

@@ -1,0 +1,15 @@
+{
+  "added_files": [],
+  "backup_directory": null,
+  "backup_verified": null,
+  "error": null,
+  "final_installed_state": "packaged",
+  "final_installed_ui_build_id": "sha256:a69abd306fbbbb886a99248db51021199fdfe90a804756a6c387d86c7a9e3892",
+  "missing_files": [],
+  "modification_report_path": null,
+  "modified_files": [],
+  "prior_manifest_backup": null,
+  "prior_state": "packaged",
+  "replacement_completed": true,
+  "schema_version": 1
+}

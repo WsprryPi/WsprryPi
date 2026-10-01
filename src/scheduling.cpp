@@ -1841,14 +1841,16 @@ bool runtime_transmit_preparation_enabled(
     if (runtime_transmit_enabled(cfg))
         return true;
 
-    // A transient positional WSPR request must first bind its supplied
-    // confirmation to the concrete frame request. That reconciliation is what
-    // resolves the RP1 route transaction; all other runtime gates remain
-    // authoritative before request preparation.
+    // Bind explicit launch confirmation to a finite request before testing the
+    // resolved RP1 route gate. Managed scheduling has the same ordering as
+    // direct scheduling, while local ownership and all other inhibits still
+    // apply. The ordinary transmit gate is checked again before commitment.
     return runtime_transmit_requested(cfg) &&
-           !cfg.use_ini &&
-           cfg.mode == ModeType::WSPR &&
+           (!cfg.use_ini || wtp_pi_local_effective()) &&
+           (cfg.mode == ModeType::WSPR || cfg.mode == ModeType::QRSS ||
+            cfg.mode == ModeType::FSKCW || cfg.mode == ModeType::DFCW) &&
            cfg.transmit_backend == TransmitBackendKind::RP1_GPCLK &&
+           !cfg.rp1_development_confirmation_json.empty() &&
            !managed_reload_tx_inhibited &&
            !startup_quiesce_inhibited.load(std::memory_order_acquire) &&
            rp1_route_transaction_inhibited.load(std::memory_order_acquire);
@@ -2618,6 +2620,17 @@ bool start_non_wspr_transmission_now(const ArgParserConfig &cfg,
         return false;
     }
 
+    // A deferred launch must recheck admission before reconciliation, since
+    // local Enable or ownership may have changed while it was waiting.
+    if (!runtime_transmit_preparation_enabled(cfg))
+    {
+        if (startup_quiesce_inhibited.load(std::memory_order_acquire))
+            log_startup_quiesce_inhibited_skip();
+        else
+            log_transmit_disabled_skip(cfg);
+        return true;
+    }
+
     if (cfg.mode == ModeType::QRSS)
     {
         auto controller_request =
@@ -2864,7 +2877,7 @@ void schedule_next_non_wspr_launch(const ArgParserConfig &cfg)
         return;
     }
 
-    if (!runtime_transmit_enabled(cfg))
+    if (!runtime_transmit_preparation_enabled(cfg))
     {
         non_wspr_schedule_generation.fetch_add(1, std::memory_order_acq_rel);
         if (startup_quiesce_inhibited.load(std::memory_order_acquire))
@@ -3191,7 +3204,7 @@ bool configure_current_wspr_transmission(
         {
             llog.logS(
                 INFO,
-                "RP1 confirmation accepted and bounded positional WSPR frame request prepared for operation ",
+                "RP1 confirmation accepted and bounded WSPR frame request prepared for operation ",
                 request_out.rp1_development.operation_id,
                 ".");
         }

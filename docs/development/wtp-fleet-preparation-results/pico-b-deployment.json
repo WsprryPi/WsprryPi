@@ -1,0 +1,20 @@
+{
+  "adapter": "B",
+  "serial": "CDDBF8767C506C07",
+  "device_id": "29f20b7342051ef947aa56cb9d4fab42",
+  "source_revision": "615888e5364b",
+  "installed_revision": "3e1337074003",
+  "uf2_sha256": "658605e4bc66094849be71ee6bb59c91d335d6e1fb7fe99ad54d96b27cf09aa5",
+  "backup_sha256": "e77aa61396cda525c1ad2d437e69ac30ed4f52cec7cc302261839e816c8b7d99",
+  "reserved_bytes_identical": 57344,
+  "boot_id": "6df5d78b8ceddf07c0864799318f1bc5",
+  "profile_generation": "5",
+  "access_generation": "1",
+  "engine": "pio-dma-gp2",
+  "output_active": false,
+  "saved_station": {
+    "callsign": "AA1NT",
+    "locator": "EM18",
+    "power_dbm": 20
+  }
+}

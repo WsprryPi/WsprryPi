@@ -1478,6 +1478,8 @@ namespace
             config_handler_deserialization::deserialize_json_to_runtime_config(
                 candidate_json, candidate_config);
             candidate_config.enable_web = config.enable_web;
+            candidate_config.rp1_development_confirmation_json =
+                config.rp1_development_confirmation_json;
             candidate_config.simulated_backend_override = config.simulated_backend_override;
             if (candidate_config.simulated_backend_override)
                 candidate_config.transmit_backend = TransmitBackendKind::SIMULATED;
@@ -1987,6 +1989,8 @@ std::string patch_all_from_web_revision(const nlohmann::json &j, const std::stri
         config_handler_deserialization::deserialize_json_to_runtime_config(
             candidate_json, candidate_config);
         candidate_config.enable_web = config.enable_web;
+        candidate_config.rp1_development_confirmation_json =
+            config.rp1_development_confirmation_json;
         candidate_config.simulated_backend_override = config.simulated_backend_override;
         if (candidate_config.simulated_backend_override)
             candidate_config.transmit_backend = TransmitBackendKind::SIMULATED;

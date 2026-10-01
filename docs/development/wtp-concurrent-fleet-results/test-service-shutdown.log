@@ -1,0 +1,35 @@
+Oct 01 10:55:30 wspr5 wsprrypi[302983]: Transmit backend: rp1-gpclk
+Oct 01 10:55:30 wspr5 wsprrypi[302983]: Transmit GPIO: 20
+Oct 01 10:55:30 wspr5 wsprrypi[302983]: No transmission requested; skipping transmission and scheduling.
+Oct 01 10:55:55 wspr5 wsprrypi[302983]: INI file changed, reloading.
+Oct 01 10:55:55 wspr5 wsprrypi[302983]: Transmit backend: rp1-gpclk
+Oct 01 10:55:55 wspr5 wsprrypi[302983]: Transmit GPIO: 20
+Oct 01 10:55:55 wspr5 wsprrypi[302983]: No transmission requested; skipping transmission and scheduling.
+Oct 01 10:55:55 wspr5 wsprrypi[302983]: No transmission requested; skipping transmission and scheduling.
+Oct 01 10:55:59 wspr5 wsprrypi[302983]: INI file changed, reloading.
+Oct 01 10:55:59 wspr5 wsprrypi[302983]: Transmit backend: rp1-gpclk
+Oct 01 10:55:59 wspr5 wsprrypi[302983]: Transmit GPIO: 20
+Oct 01 10:55:59 wspr5 wsprrypi[302983]: No transmission requested; skipping transmission and scheduling.
+Oct 01 10:55:59 wspr5 wsprrypi[302983]: Transmit backend: rp1-gpclk
+Oct 01 10:55:59 wspr5 wsprrypi[302983]: Transmit GPIO: 20
+Oct 01 10:55:59 wspr5 wsprrypi[302983]: No transmission requested; skipping transmission and scheduling.
+Oct 01 10:58:17 wspr5 wsprrypi[302983]: INI file changed, reloading.
+Oct 01 10:58:17 wspr5 wsprrypi[302983]: GPIO frequency correction updated: mode= qualified_estimate_plus_residual, provider= chrony, estimate_ppm= 2.202, residual_ppm= 0.0, effective_ppm= 2.202, qualification= qualified
+Oct 01 10:58:17 wspr5 wsprrypi[302983]: Transmit backend: rp1-gpclk
+Oct 01 10:58:17 wspr5 wsprrypi[302983]: Transmit GPIO: 20
+Oct 01 10:58:17 wspr5 wsprrypi[302983]: No transmission requested; skipping transmission and scheduling.
+Oct 01 10:58:17 wspr5 wsprrypi[302983]: Transmit backend: rp1-gpclk
+Oct 01 10:58:17 wspr5 wsprrypi[302983]: Transmit GPIO: 20
+Oct 01 10:58:17 wspr5 wsprrypi[302983]: No transmission requested; skipping transmission and scheduling.
+Oct 01 10:58:20 wspr5 wsprrypi[302983]: INI file changed, reloading.
+Oct 01 10:58:20 wspr5 wsprrypi[302983]: Transmit backend: rp1-gpclk
+Oct 01 10:58:20 wspr5 wsprrypi[302983]: Transmit GPIO: 20
+Oct 01 10:58:20 wspr5 wsprrypi[302983]: No transmission requested; skipping transmission and scheduling.
+Oct 01 10:58:20 wspr5 wsprrypi[302983]: Transmit backend: rp1-gpclk
+Oct 01 10:58:20 wspr5 wsprrypi[302983]: Transmit GPIO: 20
+Oct 01 10:58:20 wspr5 wsprrypi[302983]: No transmission requested; skipping transmission and scheduling.
+Oct 01 10:59:21 wspr5 systemd[1]: wsprrypi-fleet-controller-test.service: Service reached runtime time limit. Stopping.
+Oct 01 10:59:21 wspr5 wsprrypi[302983]: Shutdown requested: received SIGTERM signal
+Oct 01 10:59:22 wspr5 wsprrypi[302983]: WsprryPi exiting.
+Oct 01 10:59:22 wspr5 systemd[1]: wsprrypi-fleet-controller-test.service: Failed with result 'timeout'.
+Oct 01 10:59:22 wspr5 systemd[1]: wsprrypi-fleet-controller-test.service: Consumed 11.301s CPU time.

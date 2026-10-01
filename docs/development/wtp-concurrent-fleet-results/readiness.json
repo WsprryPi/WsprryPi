@@ -1,0 +1,362 @@
+[
+  {
+    "name": "wspr1",
+    "host": "192.168.1.44",
+    "hello": {
+      "selected_version": "WTP/1",
+      "device_id": "d133ed890b90f6945b41a235429ff155",
+      "boot_id": "ebb2faf2e0411e0062cd6e342803a182",
+      "product": "WsprryPi",
+      "firmware_version": "3.2.0-devel+6a32789"
+    },
+    "caps": {
+      "profiles": [
+        "rf-events/1"
+      ],
+      "modes": [
+        "wspr",
+        "tone",
+        "qrss",
+        "fskcw",
+        "dfcw"
+      ],
+      "engine": "rpi-clock-gpio",
+      "frequency_ranges": [
+        {
+          "minimum_nhz": "122070319775958",
+          "maximum_nhz": "100000000000000000"
+        }
+      ],
+      "max_payload_bytes": 65536,
+      "max_events": 512,
+      "max_job_duration_ns": "86400000000000",
+      "minimum_arm_lead_ns": "2000000000",
+      "maximum_arm_ahead_ns": "604800000000000",
+      "maximum_arm_uncertainty_ns": "500000000",
+      "maximum_holdover_age_ns": "0",
+      "output_disable_timeout_ns": "5000000000",
+      "minimum_lease_ms": 5000,
+      "maximum_lease_ms": 60000,
+      "response_cache_entries": 8,
+      "response_cache_ttl_seconds": 300,
+      "terminal_record_entries": 8,
+      "terminal_record_ttl_seconds": 3600
+    },
+    "status": {
+      "boot_id": "ebb2faf2e0411e0062cd6e342803a182",
+      "state": "empty",
+      "output_active": false,
+      "owner_id": null,
+      "job_id": null,
+      "terminal_records": []
+    },
+    "get_clock": {
+      "state": "synchronized",
+      "utc_now_ns": "1790869166429365849",
+      "monotonic_now_ns": "151119521507436",
+      "uncertainty_ns": "70616500",
+      "sync_age_ns": "0",
+      "leap": "normal"
+    }
+  },
+  {
+    "name": "wspr2",
+    "host": "192.168.1.123",
+    "hello": {
+      "selected_version": "WTP/1",
+      "device_id": "e2a4d273f7d8f24f6696f7c6fb95ff11",
+      "boot_id": "202a2bb6e7112d46ece078f692dde2c2",
+      "product": "WsprryPi",
+      "firmware_version": "3.2.0-devel+2f67b00"
+    },
+    "caps": {
+      "profiles": [
+        "rf-events/1"
+      ],
+      "modes": [
+        "wspr",
+        "tone",
+        "qrss",
+        "fskcw",
+        "dfcw"
+      ],
+      "engine": "rpi-clock-gpio",
+      "frequency_ranges": [
+        {
+          "minimum_nhz": "122070319775958",
+          "maximum_nhz": "100000000000000000"
+        }
+      ],
+      "max_payload_bytes": 65536,
+      "max_events": 512,
+      "max_job_duration_ns": "86400000000000",
+      "minimum_arm_lead_ns": "2000000000",
+      "maximum_arm_ahead_ns": "604800000000000",
+      "maximum_arm_uncertainty_ns": "500000000",
+      "maximum_holdover_age_ns": "0",
+      "output_disable_timeout_ns": "5000000000",
+      "minimum_lease_ms": 5000,
+      "maximum_lease_ms": 60000,
+      "response_cache_entries": 8,
+      "response_cache_ttl_seconds": 300,
+      "terminal_record_entries": 8,
+      "terminal_record_ttl_seconds": 3600
+    },
+    "status": {
+      "boot_id": "202a2bb6e7112d46ece078f692dde2c2",
+      "state": "empty",
+      "output_active": false,
+      "owner_id": null,
+      "job_id": null,
+      "terminal_records": []
+    },
+    "get_clock": {
+      "state": "synchronized",
+      "utc_now_ns": "1790869166689742317",
+      "monotonic_now_ns": "12602581534599",
+      "uncertainty_ns": "192204156",
+      "sync_age_ns": "0",
+      "leap": "normal"
+    }
+  },
+  {
+    "name": "wspr4",
+    "host": "192.168.1.120",
+    "hello": {
+      "selected_version": "WTP/1",
+      "device_id": "f21e530af8a4a210ec57898c0ebd32d2",
+      "boot_id": "19d88d5752e3f3ad9765815d3ccf16eb",
+      "product": "WsprryPi",
+      "firmware_version": "3.2.0-devel+2f67b00"
+    },
+    "caps": {
+      "profiles": [
+        "rf-events/1"
+      ],
+      "modes": [
+        "wspr",
+        "tone",
+        "qrss",
+        "fskcw",
+        "dfcw"
+      ],
+      "engine": "rpi-clock-gpio",
+      "frequency_ranges": [
+        {
+          "minimum_nhz": "13183594535803",
+          "maximum_nhz": "150000000000000000"
+        }
+      ],
+      "max_payload_bytes": 65536,
+      "max_events": 512,
+      "max_job_duration_ns": "86400000000000",
+      "minimum_arm_lead_ns": "2000000000",
+      "maximum_arm_ahead_ns": "604800000000000",
+      "maximum_arm_uncertainty_ns": "500000000",
+      "maximum_holdover_age_ns": "0",
+      "output_disable_timeout_ns": "5000000000",
+      "minimum_lease_ms": 5000,
+      "maximum_lease_ms": 60000,
+      "response_cache_entries": 8,
+      "response_cache_ttl_seconds": 300,
+      "terminal_record_entries": 8,
+      "terminal_record_ttl_seconds": 3600
+    },
+    "status": {
+      "boot_id": "19d88d5752e3f3ad9765815d3ccf16eb",
+      "state": "empty",
+      "output_active": false,
+      "owner_id": null,
+      "job_id": null,
+      "terminal_records": []
+    },
+    "get_clock": {
+      "state": "synchronized",
+      "utc_now_ns": "1790869166863524582",
+      "monotonic_now_ns": "16398156066275",
+      "uncertainty_ns": "155532046",
+      "sync_age_ns": "0",
+      "leap": "normal"
+    }
+  },
+  {
+    "name": "wspr5",
+    "host": "192.168.1.54",
+    "hello": {
+      "selected_version": "WTP/1",
+      "device_id": "e045017b11e54c2fb7029f0154e6deb9",
+      "boot_id": "b7ccae80494b0610ad9124d10b1b3fdd",
+      "product": "WsprryPi",
+      "firmware_version": "3.2.0-devel+2f67b00"
+    },
+    "caps": {
+      "profiles": [
+        "rf-events/1"
+      ],
+      "modes": [
+        "wspr",
+        "tone",
+        "qrss",
+        "fskcw",
+        "dfcw"
+      ],
+      "engine": "rp1-gpclk",
+      "frequency_ranges": [
+        {
+          "minimum_nhz": "3051757813211",
+          "maximum_nhz": "100000000000000000"
+        }
+      ],
+      "max_payload_bytes": 65536,
+      "max_events": 512,
+      "max_job_duration_ns": "86400000000000",
+      "minimum_arm_lead_ns": "2000000000",
+      "maximum_arm_ahead_ns": "604800000000000",
+      "maximum_arm_uncertainty_ns": "500000000",
+      "maximum_holdover_age_ns": "0",
+      "output_disable_timeout_ns": "5000000000",
+      "minimum_lease_ms": 5000,
+      "maximum_lease_ms": 60000,
+      "response_cache_entries": 8,
+      "response_cache_ttl_seconds": 300,
+      "terminal_record_entries": 8,
+      "terminal_record_ttl_seconds": 3600
+    },
+    "status": {
+      "boot_id": "b7ccae80494b0610ad9124d10b1b3fdd",
+      "state": "empty",
+      "output_active": false,
+      "owner_id": null,
+      "job_id": null,
+      "terminal_records": []
+    },
+    "get_clock": {
+      "state": "synchronized",
+      "utc_now_ns": "1790869166994723717",
+      "monotonic_now_ns": "151111224741850",
+      "uncertainty_ns": "508037",
+      "sync_age_ns": "0",
+      "leap": "normal"
+    }
+  },
+  {
+    "name": "Pico A",
+    "host": "wsprrypico-0a60df.local",
+    "hello": {
+      "selected_version": "WTP/1",
+      "device_id": "fd6127d11d6aca42a9905fa3fb1bf1d5",
+      "boot_id": "4296284b4460bb4578b4637ac020a590",
+      "product": "WsprryPico",
+      "firmware_version": "0.0.0-devel"
+    },
+    "caps": {
+      "profiles": [
+        "rf-events/1"
+      ],
+      "modes": [
+        "wspr",
+        "tone",
+        "qrss",
+        "fskcw",
+        "dfcw"
+      ],
+      "engine": "pio-dma-gp2",
+      "frequency_ranges": [
+        {
+          "minimum_nhz": "100000000000000",
+          "maximum_nhz": "68999999000000000"
+        }
+      ],
+      "max_payload_bytes": 65536,
+      "max_events": 512,
+      "max_job_duration_ns": "3600000000000",
+      "minimum_arm_lead_ns": "100000000",
+      "maximum_arm_ahead_ns": "604800000000000",
+      "maximum_arm_uncertainty_ns": "500000000",
+      "maximum_holdover_age_ns": "90000000000",
+      "output_disable_timeout_ns": "100000000",
+      "minimum_lease_ms": 5000,
+      "maximum_lease_ms": 60000,
+      "response_cache_entries": 8,
+      "response_cache_ttl_seconds": 300,
+      "terminal_record_entries": 8,
+      "terminal_record_ttl_seconds": 3600
+    },
+    "status": {
+      "boot_id": "4296284b4460bb4578b4637ac020a590",
+      "state": "empty",
+      "output_active": false,
+      "owner_id": null,
+      "job_id": null,
+      "terminal_records": []
+    },
+    "get_clock": {
+      "state": "synchronized",
+      "utc_now_ns": "1790869167597761000",
+      "monotonic_now_ns": "12581663123000",
+      "uncertainty_ns": "88797068",
+      "sync_age_ns": "24676766000",
+      "leap": "normal"
+    }
+  },
+  {
+    "name": "Pico B",
+    "host": "wsprrypico-0a9d89.local",
+    "hello": {
+      "selected_version": "WTP/1",
+      "device_id": "29f20b7342051ef947aa56cb9d4fab42",
+      "boot_id": "6df5d78b8ceddf07c0864799318f1bc5",
+      "product": "WsprryPico",
+      "firmware_version": "0.0.0-devel"
+    },
+    "caps": {
+      "profiles": [
+        "rf-events/1"
+      ],
+      "modes": [
+        "wspr",
+        "tone",
+        "qrss",
+        "fskcw",
+        "dfcw"
+      ],
+      "engine": "pio-dma-gp2",
+      "frequency_ranges": [
+        {
+          "minimum_nhz": "100000000000000",
+          "maximum_nhz": "68999999000000000"
+        }
+      ],
+      "max_payload_bytes": 65536,
+      "max_events": 512,
+      "max_job_duration_ns": "3600000000000",
+      "minimum_arm_lead_ns": "100000000",
+      "maximum_arm_ahead_ns": "604800000000000",
+      "maximum_arm_uncertainty_ns": "500000000",
+      "maximum_holdover_age_ns": "90000000000",
+      "output_disable_timeout_ns": "100000000",
+      "minimum_lease_ms": 5000,
+      "maximum_lease_ms": 60000,
+      "response_cache_entries": 8,
+      "response_cache_ttl_seconds": 300,
+      "terminal_record_entries": 8,
+      "terminal_record_ttl_seconds": 3600
+    },
+    "status": {
+      "boot_id": "6df5d78b8ceddf07c0864799318f1bc5",
+      "state": "empty",
+      "output_active": false,
+      "owner_id": null,
+      "job_id": null,
+      "terminal_records": []
+    },
+    "get_clock": {
+      "state": "synchronized",
+      "utc_now_ns": "1790869168254625000",
+      "monotonic_now_ns": "9808749580000",
+      "uncertainty_ns": "107952666",
+      "sync_age_ns": "13680561000",
+      "leap": "normal"
+    }
+  }
+]

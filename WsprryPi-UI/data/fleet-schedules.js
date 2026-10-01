@@ -7,12 +7,34 @@
     const text = name => byId("fleet-schedule-" + name).value.trim();
     let data = null, revision = "", profiles = [], editId = "", busy = false, closed = false, visible = false, timer, observedAt = 0, listenerBusy = false;
     const rows = new Map();
+    let pendingConfirmation = null;
+    function confirmMutation(operation, assignment, trigger) {
+        const panel = byId("fleet-action-confirmation");
+        const label = operation === "remove" ? "Remove assignment" : "Pause and stop";
+        byId("fleet-action-heading").textContent = label + "?";
+        byId("fleet-action-target").textContent = assignment.name;
+        byId("fleet-action-consequence").textContent = operation === "remove"
+            ? "This removes its saved schedule. Any job owned by this controller will be stopped."
+            : "This pauses its schedule. Any job owned by this controller will be stopped.";
+        const confirm = byId("fleet-action-confirm");
+        confirm.textContent = label;confirm.disabled = false;
+        const modal = root.bootstrap.Modal.getOrCreateInstance(panel);
+        return new Promise(resolve => {
+            pendingConfirmation = {resolve, modal, trigger, accepted: false};
+            modal.show();
+        });
+    }
+    function cancelConfirmation() {
+        if (!pendingConfirmation) return;
+        pendingConfirmation.accepted = false;
+        pendingConfirmation.modal.hide();
+    }
     function message(value, editor = false) {byId(editor ? "fleet-schedule-editor-feedback" : "fleet-schedule-feedback").textContent = value;}
     async function fetchJson(suffix, method = "GET", body, etag) {
         const response = await root.fetch(url(suffix), {method, cache: "no-store", signal: AbortSignal.timeout(method === "GET" ? 7000 : 45000),
             ...(body ? {headers: {"Content-Type": "application/json", "X-WsprryPico-Request": "1", "If-Match": etag}, body: JSON.stringify(body)} : {})});
         const value = await response.json();
-        if (!response.ok) throw new Error(response.status === 412 ? "Schedules changed. Refresh and review before saving again. Your draft is preserved."
+        if (!response.ok) throw new Error(response.status === 412 ? "Schedules changed. Refresh and review before trying again."
             : value.error?.message || value.error?.code || `Request failed (${response.status}).`);
         return {value, etag: response.headers.get("ETag")};
     }
@@ -28,7 +50,7 @@
             const button = root.document.createElement("button");button.type = "button";
             button.className = "btn btn-sm " + (action === "remove" ? "btn-outline-danger" : "btn-outline-secondary");
             button.textContent = label;
-            button.addEventListener("click", () => action === "edit" ? openEditor(id) : mutate(action, id));
+            button.addEventListener("click", () => action === "edit" ? openEditor(id) : mutate(action, id, button));
             actions.append(button);buttons[action] = button;
         }
         row.append(name, description, status, actions);
@@ -84,24 +106,39 @@
         try {
             const result = await fetchJson("fleet");
             if (result.value.scope !== "wsprrypi-wtp-fleet/1" || !Array.isArray(result.value.assignments)) throw new Error("Invalid fleet status response.");
+            if (closed || busy || !visible) return;
             data = result.value;revision = result.etag;observedAt = Date.now();
+            if (byId("fleet-schedule-feedback").textContent.startsWith("Fleet status unavailable:")) message("");
             if (!rows.size) byId("fleet-output-list").replaceChildren();
             render();
-        } catch (error) {message(`Fleet status unavailable: ${error.message}`);}
+        } catch (error) {if (!closed && !busy && visible) message(`Fleet status unavailable: ${error.message}`);}
         finally {if (!closed) timer = setTimeout(load, 3000);}
     }
-    async function mutate(operation, id) {
-        if (busy || !visible) return;
+    async function mutate(operation, id, trigger) {
+        if (closed || busy || !visible) return;
         const assignment = data?.assignments.find(row => row.device_id === id);
         if (!assignment && !(operation === "recover" && data?.outputs?.[id]?.revoked)) return;
-        if (["pause", "remove"].includes(operation) && !root.confirm(`${operation === "remove" ? "Remove the assignment for" : "Pause and stop"} ${assignment.name}? Any job owned by this controller will be stopped.`)) return;
-        busy = true;render();message(`${operation === "recover" ? "Requesting reconciliation" : "Updating assignment"}…`);
+        // The confirmation refers to this revision, even if another operator
+        // changes the assignment while the dialog is open.
+        const reviewedRevision = revision;
+        busy = true;clearTimeout(timer);setVisible(visible);
         try {
-            const result = await fetchJson("fleet", "POST", {operation, device_id: id}, revision);
+            if (["pause", "remove"].includes(operation) &&
+                !await confirmMutation(operation, assignment, trigger)) return;
+            if (closed || !visible) return;
+            message(`${operation === "recover" ? "Requesting reconciliation" : "Updating assignment"}…`);
+            const result = await fetchJson("fleet", "POST", {operation, device_id: id}, reviewedRevision);
             data = result.value;revision = result.etag;observedAt = Date.now();
             message(operation === "recover" ? "Reconciliation requested. Review the output status before resuming." : "Assignment updated.");
         } catch (error) {message(`${error.message} Read status before repeating an unconfirmed action.`);}
-        finally {busy = false;render();load();}
+        finally {
+            busy = false;setVisible(visible);
+            if (!closed && visible) {
+                if (trigger?.isConnected && !trigger.disabled) trigger.focus();
+                else byId("fleet-schedule-refresh").focus();
+                load();
+            }
+        }
     }
     function modeFields() {
         const mode = text("mode");
@@ -206,10 +243,26 @@
         byId("fleet-schedule-cancel").addEventListener("click", () => {byId("fleet-schedule-editor").hidden = true;byId("fleet-schedule-new").focus();});
         byId("fleet-listener").addEventListener("toggle", () => {if (byId("fleet-listener").open) loadListener();});
         byId("fleet-listener-save").addEventListener("click", saveListener);
+        const confirmation = byId("fleet-action-confirmation");
+        confirmation.addEventListener("shown.bs.modal", () => {
+            if (closed || !visible) cancelConfirmation();
+            else byId("fleet-action-cancel").focus();
+        });
+        confirmation.addEventListener("hidden.bs.modal", () => {
+            const pending = pendingConfirmation;
+            pendingConfirmation = null;
+            pending?.resolve(pending.accepted);
+        });
+        byId("fleet-action-confirm").addEventListener("click", () => {
+            if (!pendingConfirmation || closed || !visible) return;
+            pendingConfirmation.accepted = true;
+            byId("fleet-action-confirm").disabled = true;
+            pendingConfirmation.modal.hide();
+        });
         root.document.querySelectorAll("[data-independent-wtp]").forEach(panel => {
             for (const event of ["input", "change"]) panel.addEventListener(event, e => e.stopPropagation());
         });
-        root.addEventListener("pagehide", () => {closed = true;clearTimeout(timer);});
+        root.addEventListener("pagehide", () => {closed = true;clearTimeout(timer);cancelConfirmation();});
         setVisible(root.WtpUi?.developmentControlsVisible === true);
     }
     function setVisible(value) {
@@ -221,7 +274,7 @@
             panel.querySelectorAll("input,select,button").forEach(control => {control.disabled = !visible || busy || (id === "fleet-listener" && listenerBusy);});
         }
         if (visible) {modeFields();byId("fleet-schedule-device").disabled = busy || !!editId;render();}
-        else clearTimeout(timer);
+        else {clearTimeout(timer);cancelConfirmation();}
     }
     root.FleetSchedules = {setVisible};
     if (root.document.readyState === "loading") root.document.addEventListener("DOMContentLoaded", init); else init();

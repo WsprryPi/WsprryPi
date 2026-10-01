@@ -148,10 +148,12 @@ async function main() {
                 if(path.endsWith('/host/wtp-endpoint/recover')){window.__endpoint.output_unknown=false;window.__endpoint.remote_owner='';return reply(window.__endpoint);}
                 if(path.endsWith('/host/wtp-endpoint'))return reply(window.__endpoint);
                 if(path.endsWith('/host/fleet')){
+                    if(options.method==='GET' && window.__fleetLoadFailure)throw new Error('Controller disconnected');
                     if(options.method==='POST'){
-                        if(window.__fleetConflict)return reply({error:{code:'revision_conflict'}},412);
+                        if(window.__fleetConflict || options.headers['If-Match']!=='"fleet-'+window.__fleetRevision+'"')return reply({error:{code:'revision_conflict'}},412);
                         if(body.operation==='assign')window.__fleet.assignments.push({device_id:body.settings['Device ID'],name:body.name,schedule:body.schedule,settings:body.settings,enabled:body.enabled,in_flight:false});
-                        if(body.operation==='pause')window.__fleet.assignments.find(row=>row.device_id===body.device_id).enabled=false;
+                        if(body.operation==='pause')Object.assign(window.__fleet.assignments.find(row=>row.device_id===body.device_id),{enabled:false,in_flight:false});
+                        if(body.operation==='remove')window.__fleet.assignments=window.__fleet.assignments.filter(row=>row.device_id!==body.device_id);
                         ++window.__fleetRevision;
                     }
                     return reply(window.__fleet,200,'"fleet-'+window.__fleetRevision+'"');
@@ -161,7 +163,7 @@ async function main() {
                 if(path.endsWith('/status'))return reply({host:{selected:false,ready:false,phase:'idle',session_phase:'disconnected'}});
                 return reply({});
             };
-            window.confirm=()=>true;
+            window.confirm=()=>{throw new Error('Fleet must not use native confirmation');};
             backendCurrentlyConnected=true;websocketCurrentlyConnected=true;
             clearWebSocketReconnectTimer();syncConnectionAlert();clearBackendStatus('runtime');
             const style=document.createElement('style');style.textContent='*{scroll-behavior:auto!important}';document.head.append(style);
@@ -170,6 +172,10 @@ async function main() {
         await evaluate(`configAutosaveSuspended=true;clearPendingPopulateConfigRetry();clearConfigLoadFailureState();WtpUi.developmentControlsVisible=true;document.getElementById('fleet-tab').click();`);
         await waitFor(async () => await evaluate('document.getElementById("fleet-output-list").textContent.includes("Garden Pico")'), 'independent output rows');
         assert.equal(await evaluate('WtpUi.selected()'), false);
+        await evaluate(`window.__fleetLoadFailure=true;document.getElementById('fleet-schedule-refresh').click();`);
+        await waitFor(async()=>await evaluate('document.getElementById("fleet-schedule-feedback").textContent.includes("Fleet status unavailable:")'),'disconnected Fleet feedback');
+        await evaluate(`window.__fleetLoadFailure=false;document.getElementById('fleet-schedule-refresh').click();`);
+        await waitFor(async()=>await evaluate('!document.getElementById("fleet-schedule-feedback").textContent.includes("Fleet status unavailable:")'),'recovered Fleet feedback');
         await evaluate('document.getElementById("fleet-schedule-new").click()');
         await waitFor(async () => await evaluate('!document.getElementById("fleet-schedule-editor").hidden'), 'assignment editor');
         await evaluate(`document.getElementById('fleet-schedule-duration').value='4';document.getElementById('fleet-schedule-plain').checked=true;window.__fleetConflict=true;document.getElementById('fleet-schedule-save').click();`);
@@ -197,6 +203,58 @@ async function main() {
                 await evaluate(`document.getElementById('capture-chrome').remove()`);
             }
         }
+        const fleetPosts = async()=>await evaluate('__requests.filter(r=>r.url.endsWith("/host/fleet")&&r.options.method==="POST").length');
+        const clickBench = action=>evaluate(`Array.from(document.querySelectorAll('#fleet-output-list section'))[0].querySelectorAll('button')[${action}].click()`);
+        const dialogOpen = async()=>await evaluate('document.getElementById("fleet-action-confirmation").classList.contains("show") && document.activeElement.id==="fleet-action-cancel"');
+        const dialogClosed = async()=>await evaluate('!document.getElementById("fleet-action-confirmation").classList.contains("show") && !document.getElementById("fleet-schedule-refresh").disabled');
+        const originalPosts=await fleetPosts();
+        await clickBench(1);
+        await waitFor(dialogOpen,'Pause confirmation and safe default focus');
+        assert.equal(await evaluate('document.getElementById("fleet-action-target").textContent'),'Bench Pi');
+        for(const viewport of viewports){
+            await client.send('Emulation.setDeviceMetricsOverride',{...viewport,deviceScaleFactor:1,mobile:viewport.name==='mobile'});
+            assert.equal(await evaluate('document.documentElement.scrollWidth <= innerWidth + 1'),true,'confirmation overflow');
+            const shot=await client.send('Page.captureScreenshot',{format:'png',captureBeyondViewport:false});
+            fs.writeFileSync(path.join(output,viewport.name+'-fleet-confirmation.png'),Buffer.from(shot.data,'base64'));
+        }
+        await evaluate('document.getElementById("fleet-action-cancel").click()');
+        await waitFor(dialogClosed,'canceled Pause');
+        assert.equal(await fleetPosts(),originalPosts);
+        assert.equal(await evaluate('document.activeElement.textContent'),'Pause and stop');
+        await clickBench(4);
+        await waitFor(dialogOpen,'Remove confirmation');
+        await client.send('Input.dispatchKeyEvent',{type:'keyDown',key:'Escape',code:'Escape',windowsVirtualKeyCode:27});
+        await client.send('Input.dispatchKeyEvent',{type:'keyUp',key:'Escape',code:'Escape',windowsVirtualKeyCode:27});
+        await waitFor(dialogClosed,'Escape cancels Remove');
+        assert.equal(await fleetPosts(),originalPosts);
+        await clickBench(1);
+        await waitFor(dialogOpen,'confirmation before feature hiding');
+        await evaluate('WtpUi.developmentControlsVisible=false');
+        await waitFor(async()=>await evaluate('!document.getElementById("fleet-action-confirmation").classList.contains("show")'),'feature hiding cancels');
+        assert.equal(await fleetPosts(),originalPosts);
+        await evaluate('WtpUi.developmentControlsVisible=true;document.getElementById("fleet-tab").click()');
+        await waitFor(dialogClosed,'controls restored');
+        await waitFor(async()=>await evaluate('!document.querySelector("#fleet-output-list section button:nth-child(2)").disabled'),'Pause restored after feature hiding');
+        await clickBench(1);
+        await waitFor(dialogOpen,'confirmation at reviewed revision');
+        await evaluate('++__fleetRevision;document.getElementById("fleet-action-confirm").click()');
+        await waitFor(async()=>await evaluate('document.getElementById("fleet-schedule-feedback").textContent.includes("Schedules changed")'),'stale confirmation rejected');
+        assert.equal(await evaluate('__fleet.assignments[0].enabled'),true);
+        await waitFor(dialogClosed,'stale action closed');
+        await new Promise(resolve=>setTimeout(resolve,100));
+        await clickBench(1);
+        await waitFor(dialogOpen,'fresh Pause confirmation');
+        await evaluate('document.getElementById("fleet-action-confirm").click();document.getElementById("fleet-action-confirm").click()');
+        await waitFor(async()=>await evaluate('!__fleet.assignments[0].enabled'),'confirmed Pause');
+        assert.equal(await fleetPosts(),originalPosts+2,'one stale request and one confirmed request');
+        await waitFor(dialogClosed,'Pause completed');
+        await clickBench(4);
+        await waitFor(dialogOpen,'confirmed Remove dialog');
+        await evaluate('document.getElementById("fleet-action-confirm").click()');
+        await waitFor(async()=>await evaluate('!__fleet.assignments.some(r=>r.name==="Bench Pi")'),'confirmed Remove');
+        assert.equal(await fleetPosts(),originalPosts+3);
+        await waitFor(dialogClosed,'Remove completed');
+        assert.equal(await evaluate('document.activeElement.id'),'fleet-schedule-refresh');
         await capture('outputs','fleet-schedules');
         await evaluate(`document.getElementById('fleet-schedule-new').click()`);
         await waitFor(async()=>await evaluate('!document.getElementById("fleet-schedule-editor").hidden'),'editor reopened');
@@ -226,7 +284,7 @@ async function main() {
         await waitFor(async()=>await evaluate('!document.getElementById("local-wtp-confirmation").hidden'),'end-now confirmation');
         await evaluate('document.getElementById("local-wtp-end-now").click()');
         await waitFor(async()=>await evaluate('__endpoint.local_effective && !__endpoint.remote_owner'),'end-now local control');
-        console.log('Pi takeover choices, declined confirmation, independent fleet assignments, preserved conflict drafts and development gate passed.');
+        console.log('Fleet in-page confirmation, cancellation, Escape, feature hiding, stale revisions, duplicate prevention, Pi takeover choices and independent assignments passed.');
         console.log('Mocked desktop/mobile visual evidence: '+output);
     } finally {if(client)client.close();if(chrome)chrome.kill('SIGTERM');php.kill('SIGTERM');}
 }

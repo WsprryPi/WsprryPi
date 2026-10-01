@@ -1,0 +1,81 @@
+2026-10-01T10:53:15.340426-05:00 wspr5 wsprrypi[302983]: INI file changed, reloading.
+2026-10-01T10:53:15.340448-05:00 wspr5 wsprrypi[302983]: GPIO frequency correction updated: mode= qualified_estimate_plus_residual, provider= chrony, estimate_ppm= 2.292, residual_ppm= 0.0, effective_ppm= 2.292, qualification= qualified
+2026-10-01T10:53:15.340453-05:00 wspr5 wsprrypi[302983]: Transmit backend: rp1-gpclk
+2026-10-01T10:53:15.340458-05:00 wspr5 wsprrypi[302983]: Transmit GPIO: 20
+2026-10-01T10:53:15.340462-05:00 wspr5 wsprrypi[302983]: WSPR packet payload:
+2026-10-01T10:53:15.340466-05:00 wspr5 wsprrypi[302983]: - Callsign: AA0NT
+2026-10-01T10:53:15.340470-05:00 wspr5 wsprrypi[302983]: - Locator: EM18
+2026-10-01T10:53:15.340474-05:00 wspr5 wsprrypi[302983]: - Power: 20 dBm
+2026-10-01T10:53:15.340478-05:00 wspr5 wsprrypi[302983]: - RP1 GPIO Drive mA: 2
+2026-10-01T10:53:15.340484-05:00 wspr5 wsprrypi[302983]: Requested WSPR dial frequency: 14.095600 MHz
+2026-10-01T10:53:15.340488-05:00 wspr5 wsprrypi[302983]: Transmissions disabled.
+2026-10-01T10:53:15.341239-05:00 wspr5 wsprrypi[302983]: Transmit backend: rp1-gpclk
+2026-10-01T10:53:15.341249-05:00 wspr5 wsprrypi[302983]: Transmit GPIO: 20
+2026-10-01T10:53:15.341253-05:00 wspr5 wsprrypi[302983]: WSPR packet payload:
+2026-10-01T10:53:15.341257-05:00 wspr5 wsprrypi[302983]: - Callsign: AA0NT
+2026-10-01T10:53:15.341261-05:00 wspr5 wsprrypi[302983]: - Locator: EM18
+2026-10-01T10:53:15.341266-05:00 wspr5 wsprrypi[302983]: - Power: 20 dBm
+2026-10-01T10:53:15.341270-05:00 wspr5 wsprrypi[302983]: - RP1 GPIO Drive mA: 2
+2026-10-01T10:53:15.341296-05:00 wspr5 wsprrypi[302983]: Requested WSPR dial frequency: 14.095600 MHz
+2026-10-01T10:53:15.341310-05:00 wspr5 wsprrypi[302983]: Transmissions disabled.
+2026-10-01T10:53:19.160482-05:00 wspr5 wsprrypi[302983]: INI file changed, reloading.
+2026-10-01T10:53:19.161260-05:00 wspr5 wsprrypi[302983]: Transmit backend: rp1-gpclk
+2026-10-01T10:53:19.161270-05:00 wspr5 wsprrypi[302983]: Transmit GPIO: 20
+2026-10-01T10:53:19.161275-05:00 wspr5 wsprrypi[302983]: WSPR packet payload:
+2026-10-01T10:53:19.161280-05:00 wspr5 wsprrypi[302983]: - Callsign: AA0NT
+2026-10-01T10:53:19.161285-05:00 wspr5 wsprrypi[302983]: - Locator: EM18
+2026-10-01T10:53:19.161289-05:00 wspr5 wsprrypi[302983]: - Power: 20 dBm
+2026-10-01T10:53:19.161293-05:00 wspr5 wsprrypi[302983]: - RP1 GPIO Drive mA: 2
+2026-10-01T10:53:19.161319-05:00 wspr5 wsprrypi[302983]: Requested WSPR dial frequency: 14.095600 MHz
+2026-10-01T10:53:19.161691-05:00 wspr5 wsprrypi[302983]: Transmissions disabled.
+2026-10-01T10:53:19.162500-05:00 wspr5 wsprrypi[302983]: Transmit backend: rp1-gpclk
+2026-10-01T10:53:19.162509-05:00 wspr5 wsprrypi[302983]: Transmit GPIO: 20
+2026-10-01T10:53:19.162514-05:00 wspr5 wsprrypi[302983]: WSPR packet payload:
+2026-10-01T10:53:19.162519-05:00 wspr5 wsprrypi[302983]: - Callsign: AA0NT
+2026-10-01T10:53:19.162523-05:00 wspr5 wsprrypi[302983]: - Locator: EM18
+2026-10-01T10:53:19.162528-05:00 wspr5 wsprrypi[302983]: - Power: 20 dBm
+2026-10-01T10:53:19.162532-05:00 wspr5 wsprrypi[302983]: - RP1 GPIO Drive mA: 2
+2026-10-01T10:53:19.162557-05:00 wspr5 wsprrypi[302983]: Requested WSPR dial frequency: 14.095600 MHz
+2026-10-01T10:53:19.162567-05:00 wspr5 wsprrypi[302983]: Transmissions disabled.
+2026-10-01T10:55:27.278594-05:00 wspr5 wsprrypi[302983]: INI file changed, reloading.
+2026-10-01T10:55:27.278613-05:00 wspr5 wsprrypi[302983]: GPIO frequency correction updated: mode= qualified_estimate_plus_residual, provider= chrony, estimate_ppm= 2.216, residual_ppm= 0.0, effective_ppm= 2.216, qualification= qualified
+2026-10-01T10:55:27.278619-05:00 wspr5 wsprrypi[302983]: Transmit backend: rp1-gpclk
+2026-10-01T10:55:27.278623-05:00 wspr5 wsprrypi[302983]: Transmit GPIO: 20
+2026-10-01T10:55:27.278630-05:00 wspr5 wsprrypi[302983]: No transmission requested; skipping transmission and scheduling.
+2026-10-01T10:55:27.279261-05:00 wspr5 wsprrypi[302983]: Transmit backend: rp1-gpclk
+2026-10-01T10:55:27.279268-05:00 wspr5 wsprrypi[302983]: Transmit GPIO: 20
+2026-10-01T10:55:27.279287-05:00 wspr5 wsprrypi[302983]: No transmission requested; skipping transmission and scheduling.
+2026-10-01T10:55:30.677043-05:00 wspr5 wsprrypi[302983]: INI file changed, reloading.
+2026-10-01T10:55:30.677052-05:00 wspr5 wsprrypi[302983]: Transmit backend: rp1-gpclk
+2026-10-01T10:55:30.677057-05:00 wspr5 wsprrypi[302983]: Transmit GPIO: 20
+2026-10-01T10:55:30.677246-05:00 wspr5 wsprrypi[302983]: No transmission requested; skipping transmission and scheduling.
+2026-10-01T10:55:30.678002-05:00 wspr5 wsprrypi[302983]: Transmit backend: rp1-gpclk
+2026-10-01T10:55:30.678008-05:00 wspr5 wsprrypi[302983]: Transmit GPIO: 20
+2026-10-01T10:55:30.678030-05:00 wspr5 wsprrypi[302983]: No transmission requested; skipping transmission and scheduling.
+2026-10-01T10:55:55.238280-05:00 wspr5 wsprrypi[302983]: INI file changed, reloading.
+2026-10-01T10:55:55.238290-05:00 wspr5 wsprrypi[302983]: Transmit backend: rp1-gpclk
+2026-10-01T10:55:55.238294-05:00 wspr5 wsprrypi[302983]: Transmit GPIO: 20
+2026-10-01T10:55:55.238302-05:00 wspr5 wsprrypi[302983]: No transmission requested; skipping transmission and scheduling.
+2026-10-01T10:55:55.238309-05:00 wspr5 wsprrypi[302983]: No transmission requested; skipping transmission and scheduling.
+2026-10-01T10:55:59.190418-05:00 wspr5 wsprrypi[302983]: INI file changed, reloading.
+2026-10-01T10:55:59.191215-05:00 wspr5 wsprrypi[302983]: Transmit backend: rp1-gpclk
+2026-10-01T10:55:59.191224-05:00 wspr5 wsprrypi[302983]: Transmit GPIO: 20
+2026-10-01T10:55:59.191634-05:00 wspr5 wsprrypi[302983]: No transmission requested; skipping transmission and scheduling.
+2026-10-01T10:55:59.192340-05:00 wspr5 wsprrypi[302983]: Transmit backend: rp1-gpclk
+2026-10-01T10:55:59.192345-05:00 wspr5 wsprrypi[302983]: Transmit GPIO: 20
+2026-10-01T10:55:59.192368-05:00 wspr5 wsprrypi[302983]: No transmission requested; skipping transmission and scheduling.
+2026-10-01T10:58:17.024980-05:00 wspr5 wsprrypi[302983]: INI file changed, reloading.
+2026-10-01T10:58:17.025856-05:00 wspr5 wsprrypi[302983]: GPIO frequency correction updated: mode= qualified_estimate_plus_residual, provider= chrony, estimate_ppm= 2.202, residual_ppm= 0.0, effective_ppm= 2.202, qualification= qualified
+2026-10-01T10:58:17.025914-05:00 wspr5 wsprrypi[302983]: Transmit backend: rp1-gpclk
+2026-10-01T10:58:17.025921-05:00 wspr5 wsprrypi[302983]: Transmit GPIO: 20
+2026-10-01T10:58:17.026391-05:00 wspr5 wsprrypi[302983]: No transmission requested; skipping transmission and scheduling.
+2026-10-01T10:58:17.027224-05:00 wspr5 wsprrypi[302983]: Transmit backend: rp1-gpclk
+2026-10-01T10:58:17.027231-05:00 wspr5 wsprrypi[302983]: Transmit GPIO: 20
+2026-10-01T10:58:17.027258-05:00 wspr5 wsprrypi[302983]: No transmission requested; skipping transmission and scheduling.
+2026-10-01T10:58:20.714086-05:00 wspr5 wsprrypi[302983]: INI file changed, reloading.
+2026-10-01T10:58:20.714746-05:00 wspr5 wsprrypi[302983]: Transmit backend: rp1-gpclk
+2026-10-01T10:58:20.714752-05:00 wspr5 wsprrypi[302983]: Transmit GPIO: 20
+2026-10-01T10:58:20.715143-05:00 wspr5 wsprrypi[302983]: No transmission requested; skipping transmission and scheduling.
+2026-10-01T10:58:20.715821-05:00 wspr5 wsprrypi[302983]: Transmit backend: rp1-gpclk
+2026-10-01T10:58:20.715826-05:00 wspr5 wsprrypi[302983]: Transmit GPIO: 20
+2026-10-01T10:58:20.715851-05:00 wspr5 wsprrypi[302983]: No transmission requested; skipping transmission and scheduling.

@@ -1,0 +1,97 @@
+build metadata unchanged: build/generated/build_metadata.hpp
+Running portable semantics with BACKENDS=simulated ANCILLARY_GPIO=0.
+make[1]: warning: -jN forced in submake: disabling jobserver mode.
+build metadata unchanged: build/generated/build_metadata.hpp
+./build/chipset_offsets_test
+Running mailbox memory flag tests.
+Running hardware-independent legacy GPIO clock-model tests.
+Running hardware-independent GPIO frequency-correction tests.
+backend capabilities unchanged: build/generated/backend_capabilities.hpp
+Chipset offset selector tests passed
+Legacy GPIO clock-model tests passed
+GPIO frequency-correction tests passed
+Compiling (debug) tests/dial_frequency_semantics_test.cpp into build/obj/debug/simulated+ancillary-gpio0/tests/dial_frequency_semantics_test.o
+Compiling (debug) wtp_integration/fleet_runtime.cpp into build/obj/debug/simulated+ancillary-gpio0/wtp_integration/fleet_runtime.o
+I2C metadata discovery tests passed
+Compiling (debug) wtp_endpoint/runtime.cpp into build/obj/debug/simulated+ancillary-gpio0/wtp_endpoint/runtime.o
+Band lookup correlation tests passed.
+Compiling (debug) non_wspr_request_builder.cpp into build/obj/debug/simulated+ancillary-gpio0/./non_wspr_request_builder.o
+Compiling (debug) runtime_config_bridge.cpp into build/obj/debug/simulated+ancillary-gpio0/./runtime_config_bridge.o
+Compiling (debug) web_socket_commands.cpp into build/obj/debug/simulated+ancillary-gpio0/./web_socket_commands.o
+Compiling (debug) rp1_route_bridge.cpp into build/obj/debug/simulated+ancillary-gpio0/./rp1_route_bridge.o
+make[2]: warning: -jN forced in submake: disabling jobserver mode.
+legacy_tone_frequency_test: passed
+Compiling (debug) config_handler_serialization.cpp into build/obj/debug/simulated+ancillary-gpio0/./config_handler_serialization.o
+backend capability regression tests passed
+Compiling (debug) logging.cpp into build/obj/debug/simulated+ancillary-gpio0/./logging.o
+Compiling (debug) scheduling.cpp into build/obj/debug/simulated+ancillary-gpio0/./scheduling.o
+backend capability Make integration tests passed
+Compiling (debug) web_server_config_routes.cpp into build/obj/debug/simulated+ancillary-gpio0/./web_server_config_routes.o
+Compiling (debug) arg_parser_reporting.cpp into build/obj/debug/simulated+ancillary-gpio0/./arg_parser_reporting.o
+Compiling (debug) test_tone_selector_plan.cpp into build/obj/debug/simulated+ancillary-gpio0/./test_tone_selector_plan.o
+Compiling (debug) band_gpio.cpp into build/obj/debug/simulated+ancillary-gpio0/./band_gpio.o
+Compiling (debug) arg_parser_runtime.cpp into build/obj/debug/simulated+ancillary-gpio0/./arg_parser_runtime.o
+Compiling (debug) web_server_version_routes.cpp into build/obj/debug/simulated+ancillary-gpio0/./web_server_version_routes.o
+Compiling (debug) web_server_control_routes.cpp into build/obj/debug/simulated+ancillary-gpio0/./web_server_control_routes.o
+Compiling (debug) test_tone_response.cpp into build/obj/debug/simulated+ancillary-gpio0/./test_tone_response.o
+Compiling (debug) rp1_gpclk_route_service.cpp into build/obj/debug/simulated+ancillary-gpio0/./rp1_gpclk_route_service.o
+Compiling (debug) web_server_config_http.cpp into build/obj/debug/simulated+ancillary-gpio0/./web_server_config_http.o
+Compiling (debug) scheduling_test_tone.cpp into build/obj/debug/simulated+ancillary-gpio0/./scheduling_test_tone.o
+Compiling (debug) config_handler_deserialization.cpp into build/obj/debug/simulated+ancillary-gpio0/./config_handler_deserialization.o
+Compiling (debug) scheduling_websocket_status.cpp into build/obj/debug/simulated+ancillary-gpio0/./scheduling_websocket_status.o
+Compiling (debug) config_handler.cpp into build/obj/debug/simulated+ancillary-gpio0/./config_handler.o
+Compiling (debug) arg_parser.cpp into build/obj/debug/simulated+ancillary-gpio0/./arg_parser.o
+Compiling (debug) scheduling_runtime.cpp into build/obj/debug/simulated+ancillary-gpio0/./scheduling_runtime.o
+Compiling (debug) scheduling_config.cpp into build/obj/debug/simulated+ancillary-gpio0/./scheduling_config.o
+Compiling (debug) web_server.cpp into build/obj/debug/simulated+ancillary-gpio0/./web_server.o
+Compiling (debug) main.cpp into build/obj/debug/simulated+ancillary-gpio0/./main.o
+Linking debug: wsprrypi_debug (libgpiod major: 0)
+Linking debug: dial_frequency_semantics_test
+Debug build completed successfully.
+[INFO ] Socket server started on address::1: 39518 (loopback only)
+[INFO ] Socket server started on address 127.0.0.1: 39520 (loopback only)
+[INFO ] Web server started on port: -1
+[INFO ] Socket server started on address::1: 39524 (loopback only)
+[WARN ] IPv6 loopback unavailable; falling back to 127.0.0.1.
+[ERROR] Failed to open /proc/device-tree/model.
+[INFO ] Socket server started on address 127.0.0.1: 39521 (loopback only)
+[WARN ] IPv6 loopback unavailable; falling back to 127.0.0.1.
+[ERROR] Failed to open /proc/device-tree/model.
+[INFO ] Socket server started on address 127.0.0.1: 39521 (loopback only)
+WebSocket listener startup: Address already in use
+WebSocket listener startup: Address already in use
+WebSocket listener startup: Address family not supported by protocol family
+[ERROR] A WebSocket loopback family requires loopback-only mode.
+[INFO ] Socket server started on address::1: 39523 (loopback only)
+WebSocket listener startup: Address already in use
+[INFO ] Socket server started on address::1: 39523 (loopback only)
+[ERROR] Failed to open /proc/device-tree/model.
+[INFO ] Socket server started on address::: 39525
+[WARN ] Handshake failed for new client
+[ERROR] Failed to open /proc/device-tree/model.
+[ERROR] WebSocket command failed in handleMessage: [json.exception.type_error.302] type must be string, but is number
+[INFO ] Closing WebSocket client because its current network authorization is no longer valid.
+I2C web selection rejection preserves configuration
+[INFO ] Socket server started on address::: 39519
+[WARN ] Handshake failed for new client
+[INFO ] Socket server started on address::: 39519
+[ERROR] WebSocket command failed in handleMessage: [json.exception.type_error.302] type must be string, but is number
+[WARN ] GPIO.Manual PPM contains an unusably small saved value; using 0.
+Calibration exact-zero and custom-value round trips passed
+websocket lifecycle regression passed
+web_server_network_lifecycle_test: PASS
+Running portable UI/source regression tests.
+ui_source_regression_test passed
+Running portable GPIO band fail-closed policy tests.
+gpio_band_policy_test passed
+Running portable log timestamp display regression tests.
+PASS: log timestamp display regression tests
+Running portable update-check comparison tests.
+update_check_comparison_test passed
+GPIO correction provenance UI tests passed
+Running portable coherent UI publication tests.
+.......................
+----------------------------------------------------------------------
+Ran 23 tests in 0.244s
+
+OK

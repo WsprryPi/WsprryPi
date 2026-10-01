@@ -1,0 +1,33 @@
+{
+  "device_id": "29f20b7342051ef947aa56cb9d4fab42",
+  "enabled": false,
+  "in_flight": false,
+  "last_start_ns": "0",
+  "management_port": 31415,
+  "name": "Concurrent Fleet Pico B",
+  "product": "WsprryPico",
+  "revocation_generation": null,
+  "schedule": {
+    "duration_ms": 10000,
+    "frequency_hz": 14102100,
+    "mode": "tone",
+    "period_seconds": 120,
+    "phase_seconds": 1
+  },
+  "settings": {
+    "Allow Frequency Adjustment": true,
+    "Device ID": "29f20b7342051ef947aa56cb9d4fab42",
+    "Endpoint": "",
+    "Hostname": "wsprrypico-0a9d89.local",
+    "Start Uncertainty ns": 500000000,
+    "TCP Port": 31417,
+    "TLS CA File": "",
+    "TLS Client Certificate": "",
+    "TLS Client Key": "",
+    "TLS Server Identity": "",
+    "Transport": "network_plain",
+    "USB Product ID": 0,
+    "USB Serial": "",
+    "USB Vendor ID": 0
+  }
+}

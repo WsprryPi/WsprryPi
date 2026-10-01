@@ -43,6 +43,12 @@ schedule after saving** is selected. **Resume**, **Pause and stop**, **Edit sche
 a paused, reconciled output. Removing a catalog profile does not silently remove
 an assignment; remove the assignment explicitly.
 
+**Pause and stop** and **Remove assignment** open an in-page confirmation naming
+the selected output. Cancel, closing the dialog or pressing Escape leaves it
+unchanged. A confirmed action stops any job owned by this controller; removing
+also deletes the saved schedule. If another operator changes schedules while
+the dialog is open, refresh and review before repeating the action.
+
 Each assignment stores its own mode, RF base frequency in Hz, repeat period and
 UTC phase. Finite tones use duration in seconds in the UI (integer milliseconds
 on the API). QRSS, FSKCW and DFCW use a message and dot duration. FSKCW and DFCW

@@ -1,0 +1,147 @@
+{
+  "source_commit": "6a32789cfb84881df9e6839b27a9538f69e7bed1",
+  "branch": "devel",
+  "remote_targets": 5,
+  "completed_unique_jobs": 15,
+  "rf_observed": [
+    "wspr1",
+    "wspr4",
+    "Pico B"
+  ],
+  "local_frame_passed": false,
+  "browser_stop_passed": false,
+  "all_six_endpoints_empty_unowned_inactive": true,
+  "managed_services_active": true,
+  "private_capture_path": "/home/pi/wtp-concurrent-fleet-run2-20toz4j4/capture.cf32",
+  "private_capture_sha256": "c121014619f53d4203a57ce48c8fbb3e4b0f172ded3cf3c7793e7039604a850a",
+  "files": {
+    "browser-stop-fallback.json": {
+      "bytes": 13165,
+      "sha256": "162109c88f5be3853fffc73b1cd007c8461aacaf777b91ded0c30ea342dada3e"
+    },
+    "capture-command.json": {
+      "bytes": 466,
+      "sha256": "fe266120eb0e88888474137b06226ea21b41ba0cdd7074381b00e847e7890f73"
+    },
+    "capture-exit.json": {
+      "bytes": 17,
+      "sha256": "e89df0eae5ec7db81135aed16463968955c578bcc4f2ec43172eff351f080c17"
+    },
+    "capture.json": {
+      "bytes": 2496,
+      "sha256": "2e4bea0f103899312d75df8e223b37121083fc733ab4137f29de68a2f761f368"
+    },
+    "cleanup-errors.json": {
+      "bytes": 3,
+      "sha256": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570"
+    },
+    "controller-analysis.json": {
+      "bytes": 53056,
+      "sha256": "d73cf0516d6ddf1784362cd6986b3103c0389b8d35c7dea842ad8130897f0465"
+    },
+    "controller-journal.log": {
+      "bytes": 7511,
+      "sha256": "8cdf62dce75e9b206291cf6e4ad81eeb08f1462a067fad25b3ef149cc3186f7d"
+    },
+    "final-controller.json": {
+      "bytes": 25351,
+      "sha256": "81b136a4b8fe09554f961584b9754125190ef0df5805399558bc69b4b57c1ff2"
+    },
+    "final-device-status.json": {
+      "bytes": 6698,
+      "sha256": "77c2748b03cd6ef17887d6a01f3c6e6a74992d70ab5a4e224b6d8c383f2dfe66"
+    },
+    "first-slot-controller.json": {
+      "bytes": 7153,
+      "sha256": "e19968e5633291a390228484cb15a6b86fed8eee6ea44a33988a78db7cafb44b"
+    },
+    "fleet-analyze.py": {
+      "bytes": 2659,
+      "sha256": "dfc6b2cf46ae2676219c67c16f5fa2d7832141f1285aaae21e01cd0934b5c168"
+    },
+    "fleet-run.py": {
+      "bytes": 5364,
+      "sha256": "65286f93130a73d6b5a300788275075a50babac7b658b3dfce92d9b2502b86aa"
+    },
+    "fleet-running-desktop.png": {
+      "bytes": 71275,
+      "sha256": "3519e1d0b8c66fd27991e8fed12e10b840905189c21f6f6a9df98be0cb0e87e6"
+    },
+    "fleet-stopped-desktop.png": {
+      "bytes": 62698,
+      "sha256": "195309792946523937d367c1885266f26fcb00c78933d6b393e9465a13dd1b2b"
+    },
+    "fleet-verify.py": {
+      "bytes": 2696,
+      "sha256": "4d1c5d1a4ef36b7f92936d5df626c597fefd0cea8386d914d95bdaec89b08c7f"
+    },
+    "local-disabled": {
+      "bytes": 19,
+      "sha256": "adc2ff4ae467945110b2ac8ef3b8ac146f6a91bbf3d448232bb20656281fb79e"
+    },
+    "local-enabled": {
+      "bytes": 19,
+      "sha256": "28cfa7ae3730721f5aa8582e7ff6f2d12e40ebd266f368ee1e10c2dfe491f3fd"
+    },
+    "managed-command-rejection.log": {
+      "bytes": 2654,
+      "sha256": "64828b18dacc840e2efc5780059ab7202300c604ba72033952d422eb88becd46"
+    },
+    "persistence.json": {
+      "bytes": 12440,
+      "sha256": "e4cb473f1eddd490c82996cfb00356e2ced5863435affd81b3c48e22742c0339"
+    },
+    "pretest-controller.json": {
+      "bytes": 28084,
+      "sha256": "656ad74e4a9898c0616efae71a2a5bc57e248b09f7eb1d222e69b1e737291f2b"
+    },
+    "readiness.json": {
+      "bytes": 9907,
+      "sha256": "102e991b3d4d2217cea1865ae8fe519782835275f0bcb45f97ce6c480cd28a2d"
+    },
+    "restored-controller.json": {
+      "bytes": 14842,
+      "sha256": "e896e33575d689f3c6be8134b39214bf6289ab70fecd627b74f9bbb7c10f89a5"
+    },
+    "restored-services.json": {
+      "bytes": 233,
+      "sha256": "058bef2b305cf5b738f6164ffb3e021e4dc7b101518c1c0982469c26dc84104b"
+    },
+    "rf-analysis.json": {
+      "bytes": 6392,
+      "sha256": "30e51bd921748462f0abd8f1036063073d98d9f9d45077a825c207ef0db4a30f"
+    },
+    "rf-series.json": {
+      "bytes": 230633,
+      "sha256": "5ce66444b88374ccc8cfd5d153cd4152f66191b9c52d35a3b48b358e837fadb8"
+    },
+    "run-plan.json": {
+      "bytes": 299,
+      "sha256": "2a2d3f72e68a3a222547d8adfb41c9383b5049c288893072dc3f7d672bd6766c"
+    },
+    "startup-attempt/capture-exit.json": {
+      "bytes": 19,
+      "sha256": "c8d6508553196bef0913f6d7defddf6acb907daab1351212960e80c08145eb23"
+    },
+    "startup-attempt/cleanup-errors.json": {
+      "bytes": 3,
+      "sha256": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570"
+    },
+    "startup-attempt/final-controller.json": {
+      "bytes": 23215,
+      "sha256": "62980d47227714d84586689f41bc64b63f9ecec108b0494658f959f60ec30523"
+    },
+    "startup-attempt/rejected-test-dropin.conf": {
+      "bytes": 413,
+      "sha256": "dd90eabf8a9f85d089979bb05b3d8b044c0c3bf1e898d6a61e54e0d124ba89eb"
+    },
+    "startup-attempt/run-plan.json": {
+      "bytes": 294,
+      "sha256": "ef69e25f86f113336db53c7d288688b633f0f697c7cfac6e26d8d6bc03ee520c"
+    },
+    "test-service-shutdown.log": {
+      "bytes": 2916,
+      "sha256": "566421e439e2e1a9e043ced6878f3a515fcad88c8680d68e77dd45800869314b"
+    }
+  }
+}

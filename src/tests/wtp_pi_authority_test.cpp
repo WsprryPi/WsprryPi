@@ -176,6 +176,18 @@ void test_local_cleanup_and_configuration_hold_admission() {
     check(authority.handle(request("HELLO", HelloBody{{"WTP/1"}}, 'a')).ok,
           "HELLO should succeed");
     check(authority.begin_scheduled_work(), "enabled local work should reserve output");
+    check(authority.enable_noninteractive() == WtpPiAuthority::EnableResult::Enabled &&
+              authority.snapshot().effective_local_enable &&
+              authority.snapshot().local_work_active,
+          "reapplying Enable must retain admission for an already enabled local schedule");
+    const auto generation = authority.snapshot().revocation_generation;
+    check(authority.enable_noninteractive() == WtpPiAuthority::EnableResult::Enabled &&
+              authority.snapshot().revocation_generation == generation,
+          "repeated Enable must not create another revocation epoch");
+    authority.disable_local();
+    check(authority.enable_noninteractive() == WtpPiAuthority::EnableResult::PendingLocalWork &&
+              !authority.snapshot().effective_local_enable,
+          "re-enabling a disabled schedule must wait for outstanding local cleanup");
     authority.disable_local();
     check(authority.handle(request("CLAIM", ClaimBody{std::string(32, '2'), 10'000}, 'b'))
               .error == ErrorCode::Busy,
@@ -188,6 +200,9 @@ void test_local_cleanup_and_configuration_hold_admission() {
           "remote claim must not race backend configuration");
     authority.end_configuration();
     check(authority.begin_test_tone(), "idle Test Tone should reserve output");
+    check(authority.enable_noninteractive() == WtpPiAuthority::EnableResult::PendingLocalWork &&
+              !authority.snapshot().effective_local_enable,
+          "Enable during a Test Tone must still wait for its cleanup");
     authority.end_scheduled_work(true);
     check(authority.handle(request("CLAIM", ClaimBody{std::string(32, '2'), 10'000}, 'd'))
               .error == ErrorCode::Busy,

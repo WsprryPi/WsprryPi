@@ -1,0 +1,28 @@
+Oct 01 10:42:19 wspr5 wsprrypi[258104]: Shutdown requested: received SIGTERM signal
+Oct 01 10:42:19 wspr5 systemd[1]: Stopping wsprrypi.service - WsprryPi daemon for: wsprrypi...
+Oct 01 10:42:20 wspr5 wsprrypi[258104]: WsprryPi exiting.
+Oct 01 10:42:20 wspr5 systemd[1]: wsprrypi.service: Deactivated successfully.
+Oct 01 10:42:20 wspr5 systemd[1]: Stopped wsprrypi.service - WsprryPi daemon for: wsprrypi.
+Oct 01 10:42:20 wspr5 systemd[1]: wsprrypi.service: Consumed 59.972s CPU time.
+Oct 01 10:42:20 wspr5 systemd[1]: Starting wsprrypi.service - WsprryPi daemon for: wsprrypi...
+Oct 01 10:42:20 wspr5 wsprrypi[302165]: RP1 startup recovery refused: service is missing, masked, or uses an unsupported command; preserve it and repair installation
+Oct 01 10:42:20 wspr5 systemd[1]: wsprrypi.service: Control process exited, code=exited, status=1/FAILURE
+Oct 01 10:42:20 wspr5 systemd[1]: wsprrypi.service: Failed with result 'exit-code'.
+Oct 01 10:42:20 wspr5 systemd[1]: Failed to start wsprrypi.service - WsprryPi daemon for: wsprrypi.
+Oct 01 10:42:46 wspr5 systemd[1]: Stopped wsprrypi.service - WsprryPi daemon for: wsprrypi.
+Oct 01 10:42:46 wspr5 systemd[1]: Starting wsprrypi.service - WsprryPi daemon for: wsprrypi...
+Oct 01 10:42:46 wspr5 wsprrypi[302440]: WsprryPi version 3.2.0-devel+2f67b00 (devel).
+Oct 01 10:42:46 wspr5 wsprrypi[302440]: Platform: Raspberry Pi 5 Model B Rev 1.0.
+Oct 01 10:42:46 wspr5 wsprrypi[302440]: OS: Debian GNU/Linux 13 (trixie) 64-bit.
+Oct 01 10:42:46 wspr5 wsprrypi[302440]: Operation.Enable on Boot policy Never: setting Operation.Transmit=false for startup.
+Oct 01 10:42:46 wspr5 wsprrypi[302440]: Transmit backend: rp1-gpclk
+Oct 01 10:42:46 wspr5 wsprrypi[302440]: Transmit GPIO: 20
+Oct 01 10:42:46 wspr5 systemd[1]: Started wsprrypi.service - WsprryPi daemon for: wsprrypi.
+Oct 01 10:42:46 wspr5 wsprrypi[302440]: RP1 GPCLK route reconciled for safe idle startup; exact provider identity and operation-scoped authorization remain required.
+Oct 01 10:42:46 wspr5 wsprrypi[302440]: Web server started on port: 31415
+Oct 01 10:42:46 wspr5 wsprrypi[302440]: HTTP listener started on port 31415.
+Oct 01 10:42:46 wspr5 wsprrypi[302440]: Socket server started on address::: 31416
+Oct 01 10:42:46 wspr5 wsprrypi[302440]: WSPR loop running.
+Oct 01 10:42:46 wspr5 wsprrypi[302440]: PPM Manager initialized successfully.
+Oct 01 10:42:46 wspr5 wsprrypi[302440]: GPIO frequency correction updated: mode= uncalibrated, provider= chrony, estimate_ppm= 0.0, residual_ppm= 0.0, effective_ppm= 0.0, qualification= converging
+Oct 01 10:42:46 wspr5 wsprrypi[302440]: No transmission requested; skipping transmission and scheduling.

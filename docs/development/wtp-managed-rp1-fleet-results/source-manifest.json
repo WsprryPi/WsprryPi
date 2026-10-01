@@ -1,0 +1,22 @@
+{
+  "base_commit": "6a32789cfb84881df9e6839b27a9538f69e7bed1",
+  "branch": "devel",
+  "sha256": {
+    "WsprryPi-UI/data/fleet-schedules.js": "ee2069b72d82ef9c0cc55d4d0123661f5dcb064528be2781df6419556b4d5b66",
+    "WsprryPi-UI/data/views/fleet-schedules.php": "5929732153f14f4bbe03303bb51cbe9c1bcd4822acd6d3c1d567bfb73d2f24a8",
+    "WsprryPi-UI/tests/wtp_pi_fleet_ui_integration_test.js": "a60e7c5206d0e098199e504909351c9113ecb7a12f253059434724b8b01b2f5c",
+    "scripts/route_application.py": "3d03c02db2a13feb32f29ee44d921635a44c2aeb97f7cebdfc512e8c025c463b",
+    "scripts/tests/route_application_test.py": "42836168191a226f89f972bce49d347d67543de48dd756bf9a06940e22f44a9d",
+    "src/arg_parser_reporting.cpp": "18f73ddcbb347897807a5a3c19e293979c001653fdedfa557dfe11201605362a",
+    "src/config_handler.cpp": "de0da0cc4010bc1d541d87ec955686862f76403bc819b05beb4e094b84fc4d4e",
+    "src/config_types.hpp": "6bce235a637110078186125037ed3eaf1a223ecd14f08fe181acdea7aafd8c61",
+    "src/scheduling.cpp": "3f714c5f4663c565d181f956a6fd936fbd680c60bac1e704b0c528fcc6bb4bfc",
+    "src/scheduling_config.cpp": "3f5dbb5dc1c459f9bec7464ca64c0f4872766a5f227df7484925c6a0bdd2ceca",
+    "src/tests/dial_frequency_semantics_test.cpp": "c003208cda09741989870a9c03e0f0fb3a26b025b7b9f414a203ca80005d806e",
+    "src/tests/wtp_pi_authority_test.cpp": "dfd425a08984df859fb10811ca5808783ca2251e4f5c1be990362095962c8fed",
+    "src/wtp_endpoint/authority.cpp": "3da05f6d08936cca171a979bc150a910b636cb64e27a8022bfc530afc780b802"
+  },
+  "installed_binary_sha256": "5c1abc72cc8aa67e4a5a2630fafea2329675d3d71189e00c11b6ddff260f8554",
+  "installed_ui_build_id": "sha256:a69abd306fbbbb886a99248db51021199fdfe90a804756a6c387d86c7a9e3892",
+  "provider_binding_sha256": "a74a3b16c58e8be98c19f8f9fdf8a1e9d72d975e4d09062a598dfa58580dddd9"
+}
