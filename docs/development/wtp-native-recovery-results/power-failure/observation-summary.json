@@ -1,0 +1,20 @@
+{
+  "observations": 532,
+  "active_job_ids": [
+    "14eb683689d25cb40000000000000001"
+  ],
+  "consumed_slot_values": [
+    "1790852560000000000"
+  ],
+  "post_boot_observations": 177,
+  "post_boot_idle_span_s": 96.476495555,
+  "outage_observations": 80,
+  "first_fresh_boot_observation_utc_ns": "1790852798735837561",
+  "last_observation_utc_ns": "1790852895212333116",
+  "post_return_sdr_windows": 211,
+  "post_return_sdr_span_s": 52.5,
+  "all_post_return_sdr_windows_below_signal_threshold": true,
+  "raw_observations_sha256": "2bb4f3dd435dbea7ce3243acffc34a91df8d10e5bb0d2b40198f0fe8c51091ae",
+  "first_target_unavailable_observation_utc_ns": "1790852643980140385",
+  "last_target_unavailable_observation_utc_ns": "1790852797687833282"
+}

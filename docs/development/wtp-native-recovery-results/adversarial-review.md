@@ -63,3 +63,13 @@ No unresolved source defect was found within this adapter/recovery scope.
 Actual power removal, RP1 physical WTP, larger/mixed fleets, live-browser Fleet
 assignment editing and discovery topology/cache changes remain explicit
 acceptance gates. These gates are not marked passed or release-ready.
+
+## October 1 physical power follow-up
+
+Actual operator power removal passed; the [power-failure assessment](power-failure/README.md#review-and-practical-limits)
+records review and reassessment, retained-slot recovery, RF cessation, fresh boot,
+restoration and the bounded controller guard's expiry. No application source
+changed. Power return occurred after the original finite job window; no earlier
+return or uninterrupted controller uptime through closure is claimed. The final
+power case is closed. RP1, broader fleet/discovery/browser acceptance and the
+newly completed Mac/network CI failures remain open.

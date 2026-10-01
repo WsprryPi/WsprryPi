@@ -99,8 +99,14 @@ output, known output state and takeover generation 4. The original Si5351
 configuration/binary remains in its rollback archive. No persistent generation
 was rewound.
 
-Actual operator power removal is the only remaining case in this live
-failure-recovery campaign. Arrange it last; do not claim it from process restart.
+October 1 follow-up: [actual operator power removal passed](power-failure/README.md)
+on wspr4 GPIO4. Safe boot, retained consumed slot, explicit reconciliation,
+corresponding RF cessation and no observed replay close the final case in this
+live failure-recovery campaign. Current target WTP boot is
+`19d88d5752e3f3ad9765815d3ccf16eb`; it remains idle with generation 4. The separate
+source CI run failed the Mac endpoint completion assertion and network browser
+startup; those issues remain open.
+
 The wider acceptance list still includes eight simultaneous targets, a mixed
 physical Pi/Pico fleet, sustained scheduling/reconnection, live-browser Fleet
 assignment editing, link/address/multihomed discovery changes and residual cache

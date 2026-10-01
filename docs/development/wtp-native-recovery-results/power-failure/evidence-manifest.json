@@ -1,0 +1,13 @@
+{
+  "private_worker_stage": "/home/pi/wtp-power-loss.sV4Is9lV",
+  "development_mac_stage": "/private/tmp/wtp-power-loss-ready",
+  "sha256": {
+    "power-observations.jsonl": "2bb4f3dd435dbea7ce3243acffc34a91df8d10e5bb0d2b40198f0fe8c51091ae",
+    "controller-lifecycle.log": "3eddaa791d644ff9a69c68c5937b6aebdc719722947183abf996ea77c22e5029",
+    "reconciliation-lifecycle.log": "ff0d327a31ab6e311e24e530f45ba13f639e1afb313114d462cc42473973edd4",
+    "retained-before-reconciliation.json": "00f26e822685409ccff4d26da88bc8a922587a75f329fea9735d86fadb8f122b",
+    "target-before.tar.gz": "e9dfdf8eb72e41fb624597826d317b82d371d4197c5d3759932513808e39ba65",
+    "target-service-after.txt": "9ebd1c2ca3bc6644f277efcf36a22cf7be94f742f4ed9374e67e0d0a9b39805f",
+    "rf-power-loss/capture.json": "2da905abfbebea74a2ff2ea6f253a6650431f67d07eb2f36afe9d8a09ec8fae7"
+  }
+}

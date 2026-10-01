@@ -1,0 +1,1062 @@
+{
+  "authorized_at_utc_ns": "1790852485701770000",
+  "authorization": "Operator said Go after preparation",
+  "before": {
+    "host": "192.168.1.120",
+    "port": 31417,
+    "case": "inspect",
+    "started_at": 1790852389.610015,
+    "before": {
+      "address": "192.168.1.120",
+      "boot_id": "3ecb548ea8bf90649891f8c4b1d6d008",
+      "device_id": "f21e530af8a4a210ec57898c0ebd32d2",
+      "dns_sd_published": true,
+      "enabled": true,
+      "finishing_remote_job": false,
+      "launch_observed_monotonic_ns": "22349996321606",
+      "launch_target_monotonic_ns": "22349996210382",
+      "listener_error": "",
+      "listener_running": true,
+      "local_effective": false,
+      "local_requested": false,
+      "local_work_active": false,
+      "output_unknown": false,
+      "port": 31417,
+      "remote_admission_closed": false,
+      "remote_job_id": "",
+      "remote_output_active": false,
+      "remote_owner": "",
+      "remote_state": "empty",
+      "revocation_generation": "4",
+      "revocation_unavailable": false,
+      "schema": "wsprrypi-wtp-endpoint/1"
+    },
+    "hello": {
+      "type": "response",
+      "protocol": "WTP/1",
+      "session_id": "ff953e510d5a48068b222d281a590cf1",
+      "request_id": "485ea8bff3004ace8a81914444234c9c",
+      "op": "HELLO",
+      "ok": true,
+      "body": {
+        "selected_version": "WTP/1",
+        "device_id": "f21e530af8a4a210ec57898c0ebd32d2",
+        "boot_id": "3ecb548ea8bf90649891f8c4b1d6d008",
+        "product": "WsprryPi",
+        "firmware_version": "3.2.0-devel+2f67b00"
+      }
+    },
+    "caps": {
+      "type": "response",
+      "protocol": "WTP/1",
+      "session_id": "ff953e510d5a48068b222d281a590cf1",
+      "request_id": "3b02c33b698a43db9eb5fe227f0f7e0a",
+      "op": "CAPS",
+      "ok": true,
+      "body": {
+        "profiles": [
+          "rf-events/1"
+        ],
+        "modes": [
+          "wspr",
+          "tone",
+          "qrss",
+          "fskcw",
+          "dfcw"
+        ],
+        "engine": "rpi-clock-gpio",
+        "frequency_ranges": [
+          {
+            "minimum_nhz": "13183594535803",
+            "maximum_nhz": "150000000000000000"
+          }
+        ],
+        "max_payload_bytes": 65536,
+        "max_events": 512,
+        "max_job_duration_ns": "86400000000000",
+        "minimum_arm_lead_ns": "2000000000",
+        "maximum_arm_ahead_ns": "604800000000000",
+        "maximum_arm_uncertainty_ns": "500000000",
+        "maximum_holdover_age_ns": "0",
+        "output_disable_timeout_ns": "5000000000",
+        "minimum_lease_ms": 5000,
+        "maximum_lease_ms": 60000,
+        "response_cache_entries": 8,
+        "response_cache_ttl_seconds": 300,
+        "terminal_record_entries": 8,
+        "terminal_record_ttl_seconds": 3600
+      }
+    },
+    "status": {
+      "type": "response",
+      "protocol": "WTP/1",
+      "session_id": "ff953e510d5a48068b222d281a590cf1",
+      "request_id": "87433261fa434586ada52861283303a6",
+      "op": "STATUS",
+      "ok": true,
+      "body": {
+        "boot_id": "3ecb548ea8bf90649891f8c4b1d6d008",
+        "state": "empty",
+        "output_active": false,
+        "owner_id": null,
+        "job_id": null,
+        "terminal_records": []
+      }
+    },
+    "clock": {
+      "type": "response",
+      "protocol": "WTP/1",
+      "session_id": "ff953e510d5a48068b222d281a590cf1",
+      "request_id": "dd212a7ee3154bb0ab055c6033a2b18a",
+      "op": "GET_CLOCK",
+      "ok": true,
+      "body": {
+        "state": "synchronized",
+        "utc_now_ns": "1790852389713040383",
+        "monotonic_now_ns": "65865709250756",
+        "uncertainty_ns": "93544139",
+        "sync_age_ns": "0",
+        "leap": "normal"
+      }
+    },
+    "wire": [
+      {
+        "at": 1790852389.686771,
+        "message": {
+          "type": "response",
+          "protocol": "WTP/1",
+          "session_id": "ff953e510d5a48068b222d281a590cf1",
+          "request_id": "485ea8bff3004ace8a81914444234c9c",
+          "op": "HELLO",
+          "ok": true,
+          "body": {
+            "selected_version": "WTP/1",
+            "device_id": "f21e530af8a4a210ec57898c0ebd32d2",
+            "boot_id": "3ecb548ea8bf90649891f8c4b1d6d008",
+            "product": "WsprryPi",
+            "firmware_version": "3.2.0-devel+2f67b00"
+          }
+        }
+      },
+      {
+        "at": 1790852389.698272,
+        "message": {
+          "type": "response",
+          "protocol": "WTP/1",
+          "session_id": "ff953e510d5a48068b222d281a590cf1",
+          "request_id": "3b02c33b698a43db9eb5fe227f0f7e0a",
+          "op": "CAPS",
+          "ok": true,
+          "body": {
+            "profiles": [
+              "rf-events/1"
+            ],
+            "modes": [
+              "wspr",
+              "tone",
+              "qrss",
+              "fskcw",
+              "dfcw"
+            ],
+            "engine": "rpi-clock-gpio",
+            "frequency_ranges": [
+              {
+                "minimum_nhz": "13183594535803",
+                "maximum_nhz": "150000000000000000"
+              }
+            ],
+            "max_payload_bytes": 65536,
+            "max_events": 512,
+            "max_job_duration_ns": "86400000000000",
+            "minimum_arm_lead_ns": "2000000000",
+            "maximum_arm_ahead_ns": "604800000000000",
+            "maximum_arm_uncertainty_ns": "500000000",
+            "maximum_holdover_age_ns": "0",
+            "output_disable_timeout_ns": "5000000000",
+            "minimum_lease_ms": 5000,
+            "maximum_lease_ms": 60000,
+            "response_cache_entries": 8,
+            "response_cache_ttl_seconds": 300,
+            "terminal_record_entries": 8,
+            "terminal_record_ttl_seconds": 3600
+          }
+        }
+      },
+      {
+        "at": 1790852389.706502,
+        "message": {
+          "type": "response",
+          "protocol": "WTP/1",
+          "session_id": "ff953e510d5a48068b222d281a590cf1",
+          "request_id": "87433261fa434586ada52861283303a6",
+          "op": "STATUS",
+          "ok": true,
+          "body": {
+            "boot_id": "3ecb548ea8bf90649891f8c4b1d6d008",
+            "state": "empty",
+            "output_active": false,
+            "owner_id": null,
+            "job_id": null,
+            "terminal_records": []
+          }
+        }
+      },
+      {
+        "at": 1790852389.71649,
+        "message": {
+          "type": "response",
+          "protocol": "WTP/1",
+          "session_id": "ff953e510d5a48068b222d281a590cf1",
+          "request_id": "dd212a7ee3154bb0ab055c6033a2b18a",
+          "op": "GET_CLOCK",
+          "ok": true,
+          "body": {
+            "state": "synchronized",
+            "utc_now_ns": "1790852389713040383",
+            "monotonic_now_ns": "65865709250756",
+            "uncertainty_ns": "93544139",
+            "sync_age_ns": "0",
+            "leap": "normal"
+          }
+        }
+      }
+    ]
+  },
+  "power_cut_observed": true,
+  "passed": true,
+  "target_linux_boot_before": "a88742df-1813-43d1-b505-e6b601241eda",
+  "assignment": {
+    "operation": "assign",
+    "settings": {
+      "Transport": "network_plain",
+      "Hostname": "192.168.1.120",
+      "TCP Port": 31417,
+      "Device ID": "f21e530af8a4a210ec57898c0ebd32d2",
+      "Allow Frequency Adjustment": true,
+      "Start Uncertainty ns": 500000000
+    },
+    "name": "wspr4 GPIO4 power loss",
+    "schedule": {
+      "mode": "tone",
+      "frequency_hz": 14097100,
+      "duration_ms": 180000,
+      "period_seconds": 3600,
+      "phase_seconds": 160
+    },
+    "enabled": true,
+    "management_port": 31415,
+    "consent_plain": true
+  },
+  "planned_start_utc_ns": "1790852560000000000",
+  "assignment_response": {
+    "status": 200,
+    "body": {
+      "assignments": [
+        {
+          "device_id": "f21e530af8a4a210ec57898c0ebd32d2",
+          "enabled": true,
+          "in_flight": false,
+          "last_start_ns": "0",
+          "management_port": 31415,
+          "name": "wspr4 GPIO4 power loss",
+          "product": "WsprryPi",
+          "revocation_generation": "4",
+          "schedule": {
+            "duration_ms": 180000,
+            "frequency_hz": 14097100,
+            "mode": "tone",
+            "period_seconds": 3600,
+            "phase_seconds": 160
+          },
+          "settings": {
+            "Allow Frequency Adjustment": true,
+            "Device ID": "f21e530af8a4a210ec57898c0ebd32d2",
+            "Endpoint": "",
+            "Hostname": "192.168.1.120",
+            "Start Uncertainty ns": 500000000,
+            "TCP Port": 31417,
+            "TLS CA File": "",
+            "TLS Client Certificate": "",
+            "TLS Client Key": "",
+            "TLS Server Identity": "",
+            "Transport": "network_plain",
+            "USB Product ID": 0,
+            "USB Serial": "",
+            "USB Vendor ID": 0
+          }
+        }
+      ],
+      "maximum_outputs": 8,
+      "now_ms": "134470888",
+      "outputs": {
+        "f21e530af8a4a210ec57898c0ebd32d2": {
+          "message": "",
+          "revoked": false,
+          "state": "starting",
+          "wtp": {
+            "adjustments": [],
+            "arm_handed_off": false,
+            "capabilities": null,
+            "diagnostic": "",
+            "dispatch_utc_ns": "0",
+            "identity": null,
+            "job": null,
+            "job_id": "",
+            "last_recovery": null,
+            "last_report": null,
+            "lease_valid": false,
+            "observed_ms": "134470863",
+            "owner_id": "19eff84f345b6a75a1bc594725283e45",
+            "owns": false,
+            "phase": "idle",
+            "recovery_required": false,
+            "reload_requested": false,
+            "remote": null,
+            "request_id": "0",
+            "revision": "1",
+            "safety_fault": false,
+            "schema": "wsprrypi.wtp-runtime/1",
+            "session_diagnostic": "",
+            "session_id": "b26772568fb28afe5bf723ab1b880cd8",
+            "session_phase": "disconnected",
+            "start_utc_ns": "0",
+            "status_observed_ms": null,
+            "stop_requested": false,
+            "uncertain": false
+          }
+        }
+      },
+      "removals": [],
+      "scope": "wsprrypi-wtp-fleet/1",
+      "version": 1
+    }
+  },
+  "running": {
+    "address": "192.168.1.120",
+    "boot_id": "3ecb548ea8bf90649891f8c4b1d6d008",
+    "device_id": "f21e530af8a4a210ec57898c0ebd32d2",
+    "dns_sd_published": true,
+    "enabled": true,
+    "finishing_remote_job": false,
+    "launch_observed_monotonic_ns": "66035996330051",
+    "launch_target_monotonic_ns": "66035996210373",
+    "listener_error": "",
+    "listener_running": true,
+    "local_effective": false,
+    "local_requested": false,
+    "local_work_active": false,
+    "output_unknown": false,
+    "port": 31417,
+    "remote_admission_closed": false,
+    "remote_job_id": "14eb683689d25cb40000000000000001",
+    "remote_output_active": true,
+    "remote_owner": "19eff84f345b6a75a1bc594725283e45",
+    "remote_state": "running",
+    "revocation_generation": "4",
+    "revocation_unavailable": false,
+    "schema": "wsprrypi-wtp-endpoint/1"
+  },
+  "running_observed_at_utc_ns": "1790852560209901000",
+  "central_running": {
+    "assignments": [
+      {
+        "device_id": "f21e530af8a4a210ec57898c0ebd32d2",
+        "enabled": true,
+        "in_flight": true,
+        "last_start_ns": "1790852560000000000",
+        "management_port": 31415,
+        "name": "wspr4 GPIO4 power loss",
+        "product": "WsprryPi",
+        "revocation_generation": "4",
+        "schedule": {
+          "duration_ms": 180000,
+          "frequency_hz": 14097100,
+          "mode": "tone",
+          "period_seconds": 3600,
+          "phase_seconds": 160
+        },
+        "settings": {
+          "Allow Frequency Adjustment": true,
+          "Device ID": "f21e530af8a4a210ec57898c0ebd32d2",
+          "Endpoint": "",
+          "Hostname": "192.168.1.120",
+          "Start Uncertainty ns": 500000000,
+          "TCP Port": 31417,
+          "TLS CA File": "",
+          "TLS Client Certificate": "",
+          "TLS Client Key": "",
+          "TLS Server Identity": "",
+          "Transport": "network_plain",
+          "USB Product ID": 0,
+          "USB Serial": "",
+          "USB Vendor ID": 0
+        }
+      }
+    ],
+    "maximum_outputs": 8,
+    "now_ms": "134504452",
+    "outputs": {
+      "f21e530af8a4a210ec57898c0ebd32d2": {
+        "message": "",
+        "observed_ms": 134504100,
+        "revoked": false,
+        "state": "scheduled",
+        "wtp": {
+          "adjustments": [
+            {
+              "event_index": 0,
+              "realized_frequency_nhz": "14097099999999739",
+              "requested_frequency_nhz": "14097100000000000"
+            }
+          ],
+          "arm_handed_off": true,
+          "capabilities": {
+            "engine": "rpi-clock-gpio",
+            "frequency_ranges": [
+              {
+                "maximum_nhz": "150000000000000000",
+                "minimum_nhz": "13183594535803"
+              }
+            ],
+            "max_events": 512,
+            "max_job_duration_ns": "86400000000000",
+            "max_payload_bytes": 65536,
+            "maximum_arm_ahead_ns": "604800000000000",
+            "maximum_arm_uncertainty_ns": "500000000",
+            "maximum_holdover_age_ns": "0",
+            "maximum_lease_ms": 60000,
+            "minimum_arm_lead_ns": "2000000000",
+            "minimum_lease_ms": 5000,
+            "modes": [
+              "wspr",
+              "tone",
+              "qrss",
+              "fskcw",
+              "dfcw"
+            ],
+            "output_disable_timeout_ns": "5000000000",
+            "profiles": [
+              "rf-events/1"
+            ],
+            "response_cache_entries": 8,
+            "response_cache_ttl_seconds": 300,
+            "terminal_record_entries": 8,
+            "terminal_record_ttl_seconds": 3600
+          },
+          "diagnostic": "",
+          "dispatch_utc_ns": "1790852545000000000",
+          "identity": {
+            "boot_id": "3ecb548ea8bf90649891f8c4b1d6d008",
+            "device_id": "f21e530af8a4a210ec57898c0ebd32d2",
+            "firmware_version": "3.2.0-devel+2f67b00",
+            "product": "WsprryPi"
+          },
+          "job": {
+            "authoritative": true,
+            "boot_id": "3ecb548ea8bf90649891f8c4b1d6d008",
+            "device_id": "f21e530af8a4a210ec57898c0ebd32d2",
+            "device_output_active": true,
+            "job_id": "14eb683689d25cb40000000000000001",
+            "output_active": true,
+            "state": "running"
+          },
+          "job_id": "14eb683689d25cb40000000000000001",
+          "last_recovery": null,
+          "last_report": null,
+          "lease_valid": true,
+          "observed_ms": "134504448",
+          "owner_id": "19eff84f345b6a75a1bc594725283e45",
+          "owns": true,
+          "phase": "executing",
+          "recovery_required": false,
+          "reload_requested": false,
+          "remote": {
+            "boot_id": "3ecb548ea8bf90649891f8c4b1d6d008",
+            "job_id": "14eb683689d25cb40000000000000001",
+            "output_active": true,
+            "owner_id": "19eff84f345b6a75a1bc594725283e45",
+            "state": "running"
+          },
+          "request_id": "1",
+          "revision": "3367",
+          "safety_fault": false,
+          "schema": "wsprrypi.wtp-runtime/1",
+          "session_diagnostic": "Mutation requires reconciled ownership, state and lease",
+          "session_id": "b26772568fb28afe5bf723ab1b880cd8",
+          "session_phase": "ready",
+          "start_utc_ns": "1790852560000000000",
+          "status_observed_ms": "134504307",
+          "stop_requested": false,
+          "uncertain": false
+        }
+      }
+    },
+    "removals": [],
+    "scope": "wsprrypi-wtp-fleet/1",
+    "version": 1
+  },
+  "power_cut_cue_at_utc_ns": "1790852661531205000",
+  "target_first_unavailable_at_utc_ns": "1790852662552730000",
+  "target_unavailable_at_least_ten_seconds": true,
+  "operator_confirmed_power_removed": true,
+  "operator_confirmation_recorded_at_utc_ns": "1790852712907820000",
+  "restore_power_cue_at_utc_ns": "1790852736203705000",
+  "after_power_return": {
+    "address": "192.168.1.120",
+    "boot_id": "19d88d5752e3f3ad9765815d3ccf16eb",
+    "device_id": "f21e530af8a4a210ec57898c0ebd32d2",
+    "dns_sd_published": false,
+    "enabled": true,
+    "finishing_remote_job": false,
+    "launch_observed_monotonic_ns": null,
+    "launch_target_monotonic_ns": "0",
+    "listener_error": "",
+    "listener_running": true,
+    "local_effective": false,
+    "local_requested": false,
+    "local_work_active": false,
+    "output_unknown": false,
+    "port": 31417,
+    "remote_admission_closed": false,
+    "remote_job_id": "",
+    "remote_output_active": false,
+    "remote_owner": "",
+    "remote_state": "empty",
+    "revocation_generation": "4",
+    "revocation_unavailable": false,
+    "schema": "wsprrypi-wtp-endpoint/1"
+  },
+  "power_return_observed_at_utc_ns": "1790852801330114000",
+  "operator_confirmed_power_restored": true,
+  "operator_restore_confirmation_recorded_at_utc_ns": "1790852804470082000",
+  "returned_hello": {
+    "type": "response",
+    "protocol": "WTP/1",
+    "session_id": "b175be8cfa574873a18e811319052082",
+    "request_id": "78906cce97994ff7a4bf680806418cdd",
+    "op": "HELLO",
+    "ok": true,
+    "body": {
+      "selected_version": "WTP/1",
+      "device_id": "f21e530af8a4a210ec57898c0ebd32d2",
+      "boot_id": "19d88d5752e3f3ad9765815d3ccf16eb",
+      "product": "WsprryPi",
+      "firmware_version": "3.2.0-devel+2f67b00"
+    }
+  },
+  "returned_status": {
+    "type": "response",
+    "protocol": "WTP/1",
+    "session_id": "b175be8cfa574873a18e811319052082",
+    "request_id": "c57a3bbe73d946df9ee793e05719d0d7",
+    "op": "STATUS",
+    "ok": true,
+    "body": {
+      "boot_id": "19d88d5752e3f3ad9765815d3ccf16eb",
+      "state": "empty",
+      "output_active": false,
+      "owner_id": null,
+      "job_id": null,
+      "terminal_records": []
+    }
+  },
+  "returned_clock": {
+    "type": "response",
+    "protocol": "WTP/1",
+    "session_id": "b175be8cfa574873a18e811319052082",
+    "request_id": "d5fb7bbaa90c43e58dd2488a0dcde711",
+    "op": "GET_CLOCK",
+    "ok": true,
+    "body": {
+      "state": "synchronized",
+      "utc_now_ns": "1790852862800780422",
+      "monotonic_now_ns": "94093322114",
+      "uncertainty_ns": "62098046",
+      "sync_age_ns": "0",
+      "leap": "normal"
+    }
+  },
+  "central_before_explicit_recovery": {
+    "assignments": [
+      {
+        "device_id": "f21e530af8a4a210ec57898c0ebd32d2",
+        "enabled": false,
+        "in_flight": true,
+        "last_start_ns": "1790852560000000000",
+        "management_port": 31415,
+        "name": "wspr4 GPIO4 power loss",
+        "product": "WsprryPi",
+        "revocation_generation": "4",
+        "schedule": {
+          "duration_ms": 180000,
+          "frequency_hz": 14097100,
+          "mode": "tone",
+          "period_seconds": 3600,
+          "phase_seconds": 160
+        },
+        "settings": {
+          "Allow Frequency Adjustment": true,
+          "Device ID": "f21e530af8a4a210ec57898c0ebd32d2",
+          "Endpoint": "",
+          "Hostname": "192.168.1.120",
+          "Start Uncertainty ns": 500000000,
+          "TCP Port": 31417,
+          "TLS CA File": "",
+          "TLS Client Certificate": "",
+          "TLS Client Key": "",
+          "TLS Server Identity": "",
+          "Transport": "network_plain",
+          "USB Product ID": 0,
+          "USB Serial": "",
+          "USB Vendor ID": 0
+        }
+      }
+    ],
+    "maximum_outputs": 8,
+    "now_ms": "134806987",
+    "outputs": {
+      "f21e530af8a4a210ec57898c0ebd32d2": {
+        "message": "",
+        "observed_ms": 134806717,
+        "revoked": false,
+        "state": "recovery_required",
+        "wtp": {
+          "adjustments": [
+            {
+              "event_index": 0,
+              "realized_frequency_nhz": "14097099999999739",
+              "requested_frequency_nhz": "14097100000000000"
+            }
+          ],
+          "arm_handed_off": true,
+          "capabilities": null,
+          "diagnostic": "Transaction deadline or progress timeout expired Cleanup failed: Transaction deadline or progress timeout expired",
+          "dispatch_utc_ns": "1790852545000000000",
+          "identity": {
+            "boot_id": "3ecb548ea8bf90649891f8c4b1d6d008",
+            "device_id": "f21e530af8a4a210ec57898c0ebd32d2",
+            "firmware_version": "3.2.0-devel+2f67b00",
+            "product": "WsprryPi"
+          },
+          "job": null,
+          "job_id": "14eb683689d25cb40000000000000001",
+          "last_recovery": null,
+          "last_report": {
+            "adjustments": [
+              {
+                "event_index": 0,
+                "realized_frequency_nhz": "14097099999999739",
+                "requested_frequency_nhz": "14097100000000000"
+              }
+            ],
+            "arm_handed_off": true,
+            "dispatch_utc_ns": "1790852545000000000",
+            "error": "Transaction deadline or progress timeout expired Cleanup failed: Transaction deadline or progress timeout expired",
+            "execution": {
+              "cleanup": {
+                "error": "Transaction deadline or progress timeout expired",
+                "ok": false
+              },
+              "cleanup_attempted": true,
+              "error": "Transaction deadline or progress timeout expired Cleanup failed: Transaction deadline or progress timeout expired",
+              "faulted": true,
+              "ok": false,
+              "stopped": false
+            },
+            "identity": {
+              "boot_id": "3ecb548ea8bf90649891f8c4b1d6d008",
+              "device_id": "f21e530af8a4a210ec57898c0ebd32d2",
+              "firmware_version": "3.2.0-devel+2f67b00",
+              "product": "WsprryPi"
+            },
+            "job": null,
+            "job_id": "14eb683689d25cb40000000000000001",
+            "outcome": "blocked",
+            "reload_deferred": false,
+            "request_id": "1",
+            "skipped": false,
+            "start_utc_ns": "1790852560000000000"
+          },
+          "lease_valid": false,
+          "observed_ms": "134594990",
+          "owner_id": "19eff84f345b6a75a1bc594725283e45",
+          "owns": false,
+          "phase": "blocked",
+          "recovery_required": true,
+          "reload_requested": false,
+          "remote": null,
+          "request_id": "1",
+          "revision": "12412",
+          "safety_fault": false,
+          "schema": "wsprrypi.wtp-runtime/1",
+          "session_diagnostic": "Transaction deadline or progress timeout expired",
+          "session_id": "b26772568fb28afe5bf723ab1b880cd8",
+          "session_phase": "disconnected",
+          "start_utc_ns": "1790852560000000000",
+          "status_observed_ms": null,
+          "stop_requested": false,
+          "uncertain": false
+        }
+      }
+    },
+    "removals": [],
+    "scope": "wsprrypi-wtp-fleet/1",
+    "version": 1
+  },
+  "target_configuration_preserved": true,
+  "controller_runtime_guard_expired": true,
+  "retained_before_controller_reconciliation": {
+    "assignments": [
+      {
+        "device_id": "f21e530af8a4a210ec57898c0ebd32d2",
+        "enabled": false,
+        "in_flight": true,
+        "last_start_ns": "1790852560000000000",
+        "management_port": 31415,
+        "name": "wspr4 GPIO4 power loss",
+        "product": "WsprryPi",
+        "revocation_generation": "4",
+        "schedule": {
+          "duration_ms": 180000,
+          "frequency_hz": 14097100,
+          "mode": "tone",
+          "period_seconds": 3600,
+          "phase_seconds": 160
+        },
+        "settings": {
+          "Allow Frequency Adjustment": true,
+          "Device ID": "f21e530af8a4a210ec57898c0ebd32d2",
+          "Endpoint": "",
+          "Hostname": "192.168.1.120",
+          "Start Uncertainty ns": 500000000,
+          "TCP Port": 31417,
+          "TLS CA File": "",
+          "TLS Client Certificate": "",
+          "TLS Client Key": "",
+          "TLS Server Identity": "",
+          "Transport": "network_plain",
+          "USB Product ID": 0,
+          "USB Serial": "",
+          "USB Vendor ID": 0
+        }
+      }
+    ],
+    "maximum_outputs": 8,
+    "now_ms": "135021020",
+    "outputs": {
+      "f21e530af8a4a210ec57898c0ebd32d2": {
+        "message": "",
+        "observed_ms": 135020791,
+        "revoked": false,
+        "state": "recovery_required",
+        "wtp": {
+          "adjustments": [],
+          "arm_handed_off": false,
+          "capabilities": null,
+          "diagnostic": "",
+          "dispatch_utc_ns": "0",
+          "identity": null,
+          "job": null,
+          "job_id": "",
+          "last_recovery": null,
+          "last_report": null,
+          "lease_valid": false,
+          "observed_ms": "135011848",
+          "owner_id": "1dc0efa5d624bd06c1d9829bce46f809",
+          "owns": false,
+          "phase": "idle",
+          "recovery_required": false,
+          "reload_requested": false,
+          "remote": null,
+          "request_id": "0",
+          "revision": "1",
+          "safety_fault": false,
+          "schema": "wsprrypi.wtp-runtime/1",
+          "session_diagnostic": "",
+          "session_id": "b1df4d0f229c3cbfb5e61c91fa40efd9",
+          "session_phase": "disconnected",
+          "start_utc_ns": "0",
+          "status_observed_ms": null,
+          "stop_requested": false,
+          "uncertain": false
+        }
+      }
+    },
+    "removals": [],
+    "scope": "wsprrypi-wtp-fleet/1",
+    "version": 1
+  },
+  "explicit_recovery_request": {
+    "assignments": [
+      {
+        "device_id": "f21e530af8a4a210ec57898c0ebd32d2",
+        "enabled": false,
+        "in_flight": true,
+        "last_start_ns": "1790852560000000000",
+        "management_port": 31415,
+        "name": "wspr4 GPIO4 power loss",
+        "product": "WsprryPi",
+        "revocation_generation": "4",
+        "schedule": {
+          "duration_ms": 180000,
+          "frequency_hz": 14097100,
+          "mode": "tone",
+          "period_seconds": 3600,
+          "phase_seconds": 160
+        },
+        "settings": {
+          "Allow Frequency Adjustment": true,
+          "Device ID": "f21e530af8a4a210ec57898c0ebd32d2",
+          "Endpoint": "",
+          "Hostname": "192.168.1.120",
+          "Start Uncertainty ns": 500000000,
+          "TCP Port": 31417,
+          "TLS CA File": "",
+          "TLS Client Certificate": "",
+          "TLS Client Key": "",
+          "TLS Server Identity": "",
+          "Transport": "network_plain",
+          "USB Product ID": 0,
+          "USB Serial": "",
+          "USB Vendor ID": 0
+        }
+      }
+    ],
+    "maximum_outputs": 8,
+    "now_ms": "135021027",
+    "outputs": {
+      "f21e530af8a4a210ec57898c0ebd32d2": {
+        "message": "",
+        "observed_ms": 135020791,
+        "revoked": false,
+        "state": "recovery_required",
+        "wtp": {
+          "adjustments": [],
+          "arm_handed_off": false,
+          "capabilities": null,
+          "diagnostic": "",
+          "dispatch_utc_ns": "0",
+          "identity": null,
+          "job": null,
+          "job_id": "",
+          "last_recovery": null,
+          "last_report": null,
+          "lease_valid": false,
+          "observed_ms": "135011848",
+          "owner_id": "1dc0efa5d624bd06c1d9829bce46f809",
+          "owns": false,
+          "phase": "idle",
+          "recovery_required": false,
+          "reload_requested": false,
+          "remote": null,
+          "request_id": "0",
+          "revision": "1",
+          "safety_fault": false,
+          "schema": "wsprrypi.wtp-runtime/1",
+          "session_diagnostic": "",
+          "session_id": "b1df4d0f229c3cbfb5e61c91fa40efd9",
+          "session_phase": "disconnected",
+          "start_utc_ns": "0",
+          "status_observed_ms": null,
+          "stop_requested": false,
+          "uncertain": false
+        }
+      }
+    },
+    "removals": [],
+    "scope": "wsprrypi-wtp-fleet/1",
+    "version": 1
+  },
+  "explicitly_reconciled": {
+    "assignments": [
+      {
+        "device_id": "f21e530af8a4a210ec57898c0ebd32d2",
+        "enabled": false,
+        "in_flight": false,
+        "last_start_ns": "1790852560000000000",
+        "management_port": 31415,
+        "name": "wspr4 GPIO4 power loss",
+        "product": "WsprryPi",
+        "revocation_generation": "4",
+        "schedule": {
+          "duration_ms": 180000,
+          "frequency_hz": 14097100,
+          "mode": "tone",
+          "period_seconds": 3600,
+          "phase_seconds": 160
+        },
+        "settings": {
+          "Allow Frequency Adjustment": true,
+          "Device ID": "f21e530af8a4a210ec57898c0ebd32d2",
+          "Endpoint": "",
+          "Hostname": "192.168.1.120",
+          "Start Uncertainty ns": 500000000,
+          "TCP Port": 31417,
+          "TLS CA File": "",
+          "TLS Client Certificate": "",
+          "TLS Client Key": "",
+          "TLS Server Identity": "",
+          "Transport": "network_plain",
+          "USB Product ID": 0,
+          "USB Serial": "",
+          "USB Vendor ID": 0
+        }
+      }
+    ],
+    "maximum_outputs": 8,
+    "now_ms": "135021294",
+    "outputs": {
+      "f21e530af8a4a210ec57898c0ebd32d2": {
+        "message": "Output reconciled. Resume to schedule future slots.",
+        "observed_ms": 135021270,
+        "revoked": false,
+        "state": "paused",
+        "wtp": {
+          "adjustments": [],
+          "arm_handed_off": false,
+          "capabilities": {
+            "engine": "rpi-clock-gpio",
+            "frequency_ranges": [
+              {
+                "maximum_nhz": "150000000000000000",
+                "minimum_nhz": "13183594535803"
+              }
+            ],
+            "max_events": 512,
+            "max_job_duration_ns": "86400000000000",
+            "max_payload_bytes": 65536,
+            "maximum_arm_ahead_ns": "604800000000000",
+            "maximum_arm_uncertainty_ns": "500000000",
+            "maximum_holdover_age_ns": "0",
+            "maximum_lease_ms": 60000,
+            "minimum_arm_lead_ns": "2000000000",
+            "minimum_lease_ms": 5000,
+            "modes": [
+              "wspr",
+              "tone",
+              "qrss",
+              "fskcw",
+              "dfcw"
+            ],
+            "output_disable_timeout_ns": "5000000000",
+            "profiles": [
+              "rf-events/1"
+            ],
+            "response_cache_entries": 8,
+            "response_cache_ttl_seconds": 300,
+            "terminal_record_entries": 8,
+            "terminal_record_ttl_seconds": 3600
+          },
+          "diagnostic": "",
+          "dispatch_utc_ns": "0",
+          "identity": {
+            "boot_id": "19d88d5752e3f3ad9765815d3ccf16eb",
+            "device_id": "f21e530af8a4a210ec57898c0ebd32d2",
+            "firmware_version": "3.2.0-devel+2f67b00",
+            "product": "WsprryPi"
+          },
+          "job": null,
+          "job_id": "",
+          "last_recovery": null,
+          "last_report": null,
+          "lease_valid": false,
+          "observed_ms": "135021232",
+          "owner_id": "1dc0efa5d624bd06c1d9829bce46f809",
+          "owns": false,
+          "phase": "idle",
+          "recovery_required": false,
+          "reload_requested": false,
+          "remote": {
+            "boot_id": "19d88d5752e3f3ad9765815d3ccf16eb",
+            "job_id": null,
+            "output_active": false,
+            "owner_id": null,
+            "state": "empty"
+          },
+          "request_id": "0",
+          "revision": "27",
+          "safety_fault": false,
+          "schema": "wsprrypi.wtp-runtime/1",
+          "session_diagnostic": "Stream closed locally; remote output is not confirmed",
+          "session_id": "b1df4d0f229c3cbfb5e61c91fa40efd9",
+          "session_phase": "ready",
+          "start_utc_ns": "0",
+          "status_observed_ms": "135021232",
+          "stop_requested": true,
+          "uncertain": false
+        }
+      }
+    },
+    "removals": [],
+    "scope": "wsprrypi-wtp-fleet/1",
+    "version": 1
+  },
+  "reconciled_at_utc_ns": "1790853077060166000",
+  "assignment_removed": {
+    "assignments": [],
+    "maximum_outputs": 8,
+    "now_ms": "135021311",
+    "outputs": {},
+    "removals": [],
+    "scope": "wsprrypi-wtp-fleet/1",
+    "version": 1
+  },
+  "final_endpoint": {
+    "address": "192.168.1.120",
+    "boot_id": "19d88d5752e3f3ad9765815d3ccf16eb",
+    "device_id": "f21e530af8a4a210ec57898c0ebd32d2",
+    "dns_sd_published": true,
+    "enabled": true,
+    "finishing_remote_job": false,
+    "launch_observed_monotonic_ns": null,
+    "launch_target_monotonic_ns": "0",
+    "listener_error": "",
+    "listener_running": true,
+    "local_effective": false,
+    "local_requested": false,
+    "local_work_active": false,
+    "output_unknown": false,
+    "port": 31417,
+    "remote_admission_closed": false,
+    "remote_job_id": "",
+    "remote_output_active": false,
+    "remote_owner": "",
+    "remote_state": "empty",
+    "revocation_generation": "4",
+    "revocation_unavailable": false,
+    "schema": "wsprrypi-wtp-endpoint/1"
+  },
+  "target_linux_boot_after": "668e0f7f-2b05-4822-a3e5-19e32c5c68d2",
+  "target_service_after": "668e0f7f-2b05-4822-a3e5-19e32c5c68d2\nactive\nenabled\n7f8bff3fffd9a3cd3a87efcc6d66c419590398e153c956244605ef29e42c3ad9  /usr/local/bin/wsprrypi\n1414f823176e7df48222e83f3066b8a6fcd3a54d0786be8d5a543d8410b869bf  /usr/local/etc/wsprrypi.ini\nwtp-pi-revocation-v1 f21e530af8a4a210ec57898c0ebd32d2 4\n",
+  "wspr5_original_configuration_restored": true,
+  "observation_summary": {
+    "observations": 532,
+    "active_job_ids": [
+      "14eb683689d25cb40000000000000001"
+    ],
+    "consumed_slot_values": [
+      "1790852560000000000"
+    ],
+    "post_boot_observations": 177,
+    "post_boot_idle_span_s": 96.476495555,
+    "outage_observations": 80,
+    "first_fresh_boot_observation_utc_ns": "1790852798735837561",
+    "last_observation_utc_ns": "1790852895212333116",
+    "post_return_sdr_windows": 211,
+    "post_return_sdr_span_s": 52.5,
+    "all_post_return_sdr_windows_below_signal_threshold": true,
+    "raw_observations_sha256": "2bb4f3dd435dbea7ce3243acffc34a91df8d10e5bb0d2b40198f0fe8c51091ae",
+    "first_target_unavailable_observation_utc_ns": "1790852643980140385",
+    "last_target_unavailable_observation_utc_ns": "1790852797687833282"
+  },
+  "sdr_iq_sha256": "1cebfc7e54729b7130ccc4ecb59ab8960560c95e5d4aa47d9218db5c6c090340",
+  "sdr_signal_segments": [
+    {
+      "first_strong_window_utc_s": 1790852559.792,
+      "last_strong_window_utc_s": 1790852643.542,
+      "peak_snr_db": 90.746
+    }
+  ],
+  "completed_at_utc_ns": "1790853408705644000",
+  "timing_note": "Cue timestamps were recorded after message delivery. SDR windows bracket RF cessation; endpoint unavailability was observed later. These are observation times, not precise physical edge timestamps."
+}

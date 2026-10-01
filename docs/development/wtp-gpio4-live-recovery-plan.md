@@ -5,7 +5,8 @@
 2026-09-30, `devel`. The operator explicitly directed that WTP apply to every
 transmission route and authorized the missing native adapters, including the
 required `src/WSPR-Transmitter` changes. The native adapters are implemented. GPIO4 RF and non-power recovery acceptance
-have passed; actual operator power removal remains pending. See the
+have passed. Actual operator power removal also passed on October 1; see the
+[power-failure record](wtp-native-recovery-results/power-failure/README.md) and the
 [acceptance record](wtp-native-recovery-results/README.md).
 
 The operator selected wspr4 GPIO4 because Si5351 is disconnected, and stated
