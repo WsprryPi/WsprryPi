@@ -71,5 +71,8 @@ records review and reassessment, retained-slot recovery, RF cessation, fresh boo
 restoration and the bounded controller guard's expiry. No application source
 changed. Power return occurred after the original finite job window; no earlier
 return or uninterrupted controller uptime through closure is claimed. The final
-power case is closed. RP1, broader fleet/discovery/browser acceptance and the
-newly completed Mac/network CI failures remain open.
+power case is closed. Subsequent physical Fleet and RP1 GPIO20 inbound tests
+passed, and later Mac/network CI passed. Eight-way testing is excluded by the
+operator. See [the current endpoint report](../wtp-rp1-inbound-report.md) for
+the remaining reconnection, Fleet browser editing, discovery and GCC release
+CI work.

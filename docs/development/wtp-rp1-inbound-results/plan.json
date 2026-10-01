@@ -1,0 +1,130 @@
+{
+  "stage": "/home/pi/wtp-rp1-inbound-20261001",
+  "route": "GPIO20",
+  "target": "wspr5",
+  "client": "wspr4",
+  "frequency_hz": 14097100,
+  "jobs": [
+    {
+      "mode": "tone",
+      "job_id": "144627ac220f4079831b293cc0474e74",
+      "capture_exit": 0,
+      "capture_command": [
+        "/home/pi/.cache/wsprrypi-qualification/native-v2/82562c1b937ba98816eb3ae1d27aa270729b35be862b1cf8d87d00b497b95438/wspq-capture-soapy",
+        "--enable-physical-sdr",
+        "sdrplay",
+        "2404058C60",
+        "14075100",
+        "7500000",
+        "20",
+        "250000",
+        "200000",
+        "0",
+        "false",
+        "false",
+        "500000",
+        "45",
+        "/home/pi/wtp-rp1-inbound-20261001/tone.cf32",
+        "/home/pi/wtp-rp1-inbound-20261001/tone-capture.json",
+        "rp1-inbound-tone"
+      ]
+    },
+    {
+      "mode": "qrss",
+      "job_id": "066c16e9326246e38d33b1b7d345755e",
+      "capture_exit": 0,
+      "capture_command": [
+        "/home/pi/.cache/wsprrypi-qualification/native-v2/82562c1b937ba98816eb3ae1d27aa270729b35be862b1cf8d87d00b497b95438/wspq-capture-soapy",
+        "--enable-physical-sdr",
+        "sdrplay",
+        "2404058C60",
+        "14075100",
+        "6250000",
+        "20",
+        "250000",
+        "200000",
+        "0",
+        "false",
+        "false",
+        "500000",
+        "40",
+        "/home/pi/wtp-rp1-inbound-20261001/qrss.cf32",
+        "/home/pi/wtp-rp1-inbound-20261001/qrss-capture.json",
+        "rp1-inbound-qrss"
+      ]
+    },
+    {
+      "mode": "fskcw",
+      "job_id": "182d81e2a43a480bb828b7beea6b3061",
+      "capture_exit": 0,
+      "capture_command": [
+        "/home/pi/.cache/wsprrypi-qualification/native-v2/82562c1b937ba98816eb3ae1d27aa270729b35be862b1cf8d87d00b497b95438/wspq-capture-soapy",
+        "--enable-physical-sdr",
+        "sdrplay",
+        "2404058C60",
+        "14075100",
+        "6250000",
+        "20",
+        "250000",
+        "200000",
+        "0",
+        "false",
+        "false",
+        "500000",
+        "40",
+        "/home/pi/wtp-rp1-inbound-20261001/fskcw.cf32",
+        "/home/pi/wtp-rp1-inbound-20261001/fskcw-capture.json",
+        "rp1-inbound-fskcw"
+      ]
+    },
+    {
+      "mode": "dfcw",
+      "job_id": "4fd3912ab3dc427bb12f1bc7690df27e",
+      "capture_exit": 0,
+      "capture_command": [
+        "/home/pi/.cache/wsprrypi-qualification/native-v2/82562c1b937ba98816eb3ae1d27aa270729b35be862b1cf8d87d00b497b95438/wspq-capture-soapy",
+        "--enable-physical-sdr",
+        "sdrplay",
+        "2404058C60",
+        "14075100",
+        "6250000",
+        "20",
+        "250000",
+        "200000",
+        "0",
+        "false",
+        "false",
+        "500000",
+        "40",
+        "/home/pi/wtp-rp1-inbound-20261001/dfcw.cf32",
+        "/home/pi/wtp-rp1-inbound-20261001/dfcw-capture.json",
+        "rp1-inbound-dfcw"
+      ]
+    },
+    {
+      "mode": "wspr",
+      "job_id": "9f597bd376d944faaf44a50de8bb38a6",
+      "capture_exit": 0,
+      "capture_command": [
+        "/home/pi/.cache/wsprrypi-qualification/native-v2/82562c1b937ba98816eb3ae1d27aa270729b35be862b1cf8d87d00b497b95438/wspq-capture-soapy",
+        "--enable-physical-sdr",
+        "sdrplay",
+        "2404058C60",
+        "14075100",
+        "32647999",
+        "20",
+        "250000",
+        "200000",
+        "0",
+        "false",
+        "false",
+        "500000",
+        "145",
+        "/home/pi/wtp-rp1-inbound-20261001/wspr.cf32",
+        "/home/pi/wtp-rp1-inbound-20261001/wspr-capture.json",
+        "rp1-inbound-wspr"
+      ]
+    }
+  ],
+  "started_utc_ns": "1790891381598897000"
+}

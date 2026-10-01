@@ -100,10 +100,14 @@ the rotation, restore the temporary bounded launch confirmation, verify actual
 arguments and run the final three-slot mixed Fleet plus one normal local WSPR
 frame. Remove the temporary confirmation and return to paused/off state again.
 
-Wider outstanding campaigns remain: eight isolated simulated targets, sustained
-recurrence/reconnection, both local takeover choices through a browser connected
-to actual Pis, and discovery link loss/address changes/multihomed recovery/cache
-expiry. They are not acceptance claims for this focused fix.
+Current wider campaigns: sustained recurrence/reconnection, actual-browser
+Fleet assignment creation/editing, and discovery link loss/address changes/
+multihomed recovery/cache expiry. Both actual-browser local takeover choices
+already passed in the [native recovery campaign](wtp-native-recovery-results/README.md).
+Eight-way testing is excluded by the operator. The wspr5 inbound GPIO20 result
+is tracked separately in [the endpoint report](wtp-rp1-inbound-report.md).
+The final frame and combiner rotation above describe this historical snapshot;
+they subsequently passed as linked at the start of this report.
 
 ## Review and Documentation Impact
 

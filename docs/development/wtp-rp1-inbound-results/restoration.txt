@@ -1,0 +1,8 @@
+/usr/local/bin/wsprrypi
+-J
+-i
+/usr/local/etc/wsprrypi.ini
+5c1abc72cc8aa67e4a5a2630fafea2329675d3d71189e00c11b6ddff260f8554  /usr/local/bin/wsprrypi
+3d03c02db2a13feb32f29ee44d921635a44c2aeb97f7cebdfc512e8c025c463b  /usr/local/lib/wsprrypi/route_application.py
+b8d705b6ec1b4f8618698a5495ad8d06e57a9da2f25d32d8be12f5f6ae81c576  /usr/local/etc/wsprrypi.ini
+cba26bf7143e30d633ae926e17eb69e43d55f7817633792224da12433ce964a3  /usr/local/etc/wsprrypi.ini.wtp-assignments.json

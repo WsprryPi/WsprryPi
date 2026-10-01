@@ -12,6 +12,13 @@ The subsequent [execution report](wtp-concurrent-fleet-report.md) records three
 successful five-target remote slots, SDR observation of the current group,
 restored paused state, and the unresolved central-local RP1/browser-stop paths.
 
+Current status supersedes the historical next steps below: the
+[second receiver group](wtp-concurrent-fleet-part2-report.md) completed physical
+concurrency and local WSPR acceptance; browser Pause/Remove and both local
+takeover choices passed. Eight-way testing is excluded by operator instruction.
+See [the current endpoint report](wtp-rp1-inbound-report.md) for the reconciled
+remaining list.
+
 ## Prepared devices
 
 | Device | Role | Output | Listener/interface | Prepared state |
@@ -154,9 +161,9 @@ Use the confirmed first observation group. At explicit RF start, supply the
 bounded local RP1 operation confirmation, then enable the intended schedules on
 the common UTC boundary. Record target/controller completion and corresponding
 SDR signals. Stop and verify all outputs before moving the combiner connections
-for the second group. Run repeated scheduling/reconnection separately. Exercise
-eight slots with isolated simulated endpoints separately from the six physical
-members; simulated results do not add physical devices or RF qualification.
+for the second group. Run repeated scheduling/reconnection separately.
+Eight-way testing is excluded; the physical campaign uses the six available
+members and two receiver observation groups.
 
 Discovery changes can use wspr5 Ethernet for management and its WiFi interfaces
 for the affected discovery links. At preparation, eth0 and wlan1 were up;

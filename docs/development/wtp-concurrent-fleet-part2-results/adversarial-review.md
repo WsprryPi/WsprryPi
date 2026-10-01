@@ -29,6 +29,10 @@ member. No additional actionable application defect or evidence issue was
 identified in this scope.
 
 The original unresolved native-frame and second receiver-group acceptance is
-now closed. The separately listed eight-simulator, sustained-reconnection,
-actual local-takeover browser and discovery-topology campaigns remain open.
+now closed. The operator subsequently excluded eight-way testing. Both actual
+local-takeover browser choices had already passed in the wspr4 native recovery
+campaign; listing them here as open was an evidence reconciliation error.
+Sustained reconnection, actual browser Fleet assignment creation/editing and
+discovery-topology campaigns remain open. See the
+[current endpoint report](../wtp-rp1-inbound-report.md) for wspr5 inbound WTP.
 No release, calibrated RF timing/frequency, decode or RF-chain claim is made.

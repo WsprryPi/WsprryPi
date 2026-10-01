@@ -6,6 +6,10 @@ The formerly blocked local frame and second SDR group subsequently passed in
 [the Part 2 acceptance report](wtp-concurrent-fleet-part2-report.md).
 The results below remain the historical pre-fix batch.
 
+The [current endpoint report](wtp-rp1-inbound-report.md) reconciles the remaining
+test list. Eight-way testing has been excluded by operator instruction; the
+eight-slot item below records the superseded plan only.
+
 2026-10-01. WsprryPi `devel`, source commit
 `6a32789cfb84881df9e6839b27a9538f69e7bed1`.
 

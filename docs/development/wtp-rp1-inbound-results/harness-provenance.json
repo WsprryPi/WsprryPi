@@ -1,0 +1,11 @@
+{
+  "verification": "Matching SHA-256 values read independently from the executing host and this checkout after the campaign",
+  "helpers": [
+    {"host": "wspr4", "remote": "/home/pi/wtp-rp1-inbound-20261001/client.py", "local": "docs/development/wtp-rp1-inbound-results/client.py", "sha256": "fe0a676b1c17afdde6911c9fc7e197d5a687c5db558db89f221747f9492d59fa"},
+    {"host": "wspr4", "remote": "/home/pi/wtp-rp1-inbound-20261001/probe.py", "local": "tools/wtp-pi/probe.py", "sha256": "ff4ea1d7416471373352d7ac562c4f681724889e41996d07c78e32034744c190"},
+    {"host": "wspr4", "remote": "/home/pi/wtp-rp1-inbound-20261001/frame.json", "local": "docs/development/wtp-rp1-inbound-results/frame.json", "sha256": "2fb451adef96c97315ae3315f2981d33637928b2ac3475852042c334a7c81fb8"},
+    {"host": "wspr5", "remote": "/home/pi/wtp-rp1-inbound-20261001/analyze.py", "local": "docs/development/wtp-rp1-inbound-results/analyze.py", "sha256": "ab6024de22baf2a1876c61d78fd40675300549bb4031aa962170f454bf0c5236"}
+  ],
+  "source": "Application, scripts and UI trees are unchanged between 9a1b8c10036f77f8446b912c481b3ea5dc3d39e8 and the campaign HEAD 13ff2c846bd4e68b9f4f4313d4b4748a7c19c024",
+  "restoration": "Temporary drop-in independently confirmed absent; wsprrypi service active; no remaining SDR capture process"
+}

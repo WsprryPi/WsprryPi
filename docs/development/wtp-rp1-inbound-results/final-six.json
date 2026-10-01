@@ -1,0 +1,186 @@
+[
+  {
+    "name": "wspr1",
+    "hello": {
+      "selected_version": "WTP/1",
+      "device_id": "d133ed890b90f6945b41a235429ff155",
+      "boot_id": "ebb2faf2e0411e0062cd6e342803a182",
+      "product": "WsprryPi",
+      "firmware_version": "3.2.0-devel+6a32789"
+    },
+    "status": {
+      "boot_id": "ebb2faf2e0411e0062cd6e342803a182",
+      "state": "empty",
+      "output_active": false,
+      "owner_id": null,
+      "job_id": null,
+      "terminal_records": [
+        {
+          "job_id": "dca20044d3690cb70000000000000003",
+          "state": "complete",
+          "ended_monotonic_ns": "170364108812177",
+          "output_active": false
+        },
+        {
+          "job_id": "dca20044d3690cb70000000000000002",
+          "state": "complete",
+          "ended_monotonic_ns": "170244111199328",
+          "output_active": false
+        },
+        {
+          "job_id": "dca20044d3690cb70000000000000001",
+          "state": "complete",
+          "ended_monotonic_ns": "170124096100229",
+          "output_active": false
+        }
+      ]
+    }
+  },
+  {
+    "name": "wspr2",
+    "hello": {
+      "selected_version": "WTP/1",
+      "device_id": "e2a4d273f7d8f24f6696f7c6fb95ff11",
+      "boot_id": "202a2bb6e7112d46ece078f692dde2c2",
+      "product": "WsprryPi",
+      "firmware_version": "3.2.0-devel+2f67b00"
+    },
+    "status": {
+      "boot_id": "202a2bb6e7112d46ece078f692dde2c2",
+      "state": "empty",
+      "output_active": false,
+      "owner_id": null,
+      "job_id": null,
+      "terminal_records": [
+        {
+          "job_id": "d33c9acf4541acb60000000000000003",
+          "state": "complete",
+          "ended_monotonic_ns": "31846906967654",
+          "output_active": false
+        },
+        {
+          "job_id": "d33c9acf4541acb60000000000000002",
+          "state": "complete",
+          "ended_monotonic_ns": "31726922202190",
+          "output_active": false
+        },
+        {
+          "job_id": "d33c9acf4541acb60000000000000001",
+          "state": "complete",
+          "ended_monotonic_ns": "31606902155366",
+          "output_active": false
+        }
+      ]
+    }
+  },
+  {
+    "name": "wspr4",
+    "hello": {
+      "selected_version": "WTP/1",
+      "device_id": "f21e530af8a4a210ec57898c0ebd32d2",
+      "boot_id": "19d88d5752e3f3ad9765815d3ccf16eb",
+      "product": "WsprryPi",
+      "firmware_version": "3.2.0-devel+2f67b00"
+    },
+    "status": {
+      "boot_id": "19d88d5752e3f3ad9765815d3ccf16eb",
+      "state": "empty",
+      "output_active": false,
+      "owner_id": null,
+      "job_id": null,
+      "terminal_records": [
+        {
+          "job_id": "876bb5d43548dd250000000000000003",
+          "state": "complete",
+          "ended_monotonic_ns": "35642314804670",
+          "output_active": false
+        },
+        {
+          "job_id": "876bb5d43548dd250000000000000002",
+          "state": "complete",
+          "ended_monotonic_ns": "35522316065026",
+          "output_active": false
+        },
+        {
+          "job_id": "876bb5d43548dd250000000000000001",
+          "state": "complete",
+          "ended_monotonic_ns": "35402322948541",
+          "output_active": false
+        }
+      ]
+    }
+  },
+  {
+    "name": "wspr5",
+    "hello": {
+      "selected_version": "WTP/1",
+      "device_id": "e045017b11e54c2fb7029f0154e6deb9",
+      "boot_id": "0b439b2a6a4cccab53f84dae8f815c69",
+      "product": "WsprryPi",
+      "firmware_version": "3.2.0-devel+6a32789"
+    },
+    "status": {
+      "boot_id": "0b439b2a6a4cccab53f84dae8f815c69",
+      "state": "empty",
+      "output_active": false,
+      "owner_id": null,
+      "job_id": null,
+      "terminal_records": []
+    }
+  },
+  {
+    "name": "Pico A",
+    "hello": {
+      "selected_version": "WTP/1",
+      "device_id": "fd6127d11d6aca42a9905fa3fb1bf1d5",
+      "boot_id": "4296284b4460bb4578b4637ac020a590",
+      "product": "WsprryPico",
+      "firmware_version": "0.0.0-devel"
+    },
+    "status": {
+      "boot_id": "4296284b4460bb4578b4637ac020a590",
+      "state": "empty",
+      "output_active": false,
+      "owner_id": null,
+      "job_id": null,
+      "terminal_records": [
+        {
+          "job_id": "61e92649c01a1a2f0000000000000003",
+          "state": "complete",
+          "ended_monotonic_ns": "31825079215000",
+          "output_active": false
+        },
+        {
+          "job_id": "61e92649c01a1a2f0000000000000002",
+          "state": "complete",
+          "ended_monotonic_ns": "31705104816000",
+          "output_active": false
+        },
+        {
+          "job_id": "61e92649c01a1a2f0000000000000001",
+          "state": "complete",
+          "ended_monotonic_ns": "31585076273000",
+          "output_active": false
+        }
+      ]
+    }
+  },
+  {
+    "name": "Pico B",
+    "hello": {
+      "selected_version": "WTP/1",
+      "device_id": "29f20b7342051ef947aa56cb9d4fab42",
+      "boot_id": "0076a61b72868ea959213d8126d79334",
+      "product": "WsprryPico",
+      "firmware_version": "0.0.0-devel"
+    },
+    "status": {
+      "boot_id": "0076a61b72868ea959213d8126d79334",
+      "state": "empty",
+      "output_active": false,
+      "owner_id": null,
+      "job_id": null,
+      "terminal_records": []
+    }
+  }
+]

@@ -6,8 +6,10 @@ GPIO and RP1 now enter the Pi WTP server through their native backends. The
 shared adapter preserves Si5351 and explicit simulation, backend selection,
 frequency policy, local priority and existing RP1 development authorization.
 RP1 requires its existing host confirmation for the exact WTP job ID and selected
-route. This campaign physically exercised GPIO4 on wspr4; RP1 physical WTP
-acceptance remains open. Si5351 was disconnected, and Pico A was excluded.
+route. This campaign physically exercised GPIO4 on wspr4; the subsequent
+[wspr5 GPIO20 inbound campaign](../wtp-rp1-inbound-report.md) passed all five
+finite modes with corresponding SDR observations. Si5351 was disconnected,
+and Pico A was excluded from this original GPIO4 campaign.
 
 The [execution prompt](../wtp-gpio4-live-recovery-plan.md#execution-prompt),
 [adversarial assessment](adversarial-review.md), [acceptance data](acceptance.json)
@@ -105,11 +107,13 @@ corresponding RF cessation and no observed replay close the final case in this
 live failure-recovery campaign. Current target WTP boot is
 `19d88d5752e3f3ad9765815d3ccf16eb`; it remains idle with generation 4. The separate
 source CI run failed the Mac endpoint completion assertion and network browser
-startup; those issues remain open.
+startup. Later CI passed both jobs; the refreshed snapshot is linked in the
+[current endpoint report](../wtp-rp1-inbound-report.md).
 
-The wider acceptance list still includes eight simultaneous targets, a mixed
-physical Pi/Pico fleet, sustained scheduling/reconnection, live-browser Fleet
-assignment editing, link/address/multihomed discovery changes and residual cache
-expiry. RP1 physical WTP requires its own route evidence and existing exact-job
-authorization. This campaign does not establish release readiness for those
-remaining gates.
+The mixed physical Fleet, both receiver groups and RP1 GPIO20 inbound modes
+subsequently passed. Eight-way testing is excluded by operator instruction.
+The remaining agreed campaigns are sustained scheduling across reconnections,
+live-browser Fleet assignment creation/editing, discovery topology/cache changes
+and completion of the canceled GCC release CI job. See the current endpoint
+report for evidence links. This original campaign is not a general release
+readiness claim.

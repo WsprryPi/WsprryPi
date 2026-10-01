@@ -1,0 +1,2048 @@
+{
+  "client_host": "wspr4",
+  "local_address": [
+    "192.168.1.120",
+    34552
+  ],
+  "peer_address": [
+    "192.168.1.54",
+    31417
+  ],
+  "hello": {
+    "type": "response",
+    "protocol": "WTP/1",
+    "session_id": "e32853980b01464994d0857826c4d5ca",
+    "request_id": "73b0ff1b49414ef4b4888324b76c085b",
+    "op": "HELLO",
+    "ok": true,
+    "body": {
+      "selected_version": "WTP/1",
+      "device_id": "e045017b11e54c2fb7029f0154e6deb9",
+      "boot_id": "87fcacc5ae58bd68cbecd078781853eb",
+      "product": "WsprryPi",
+      "firmware_version": "3.2.0-devel+6a32789"
+    }
+  },
+  "job_id": "9f597bd376d944faaf44a50de8bb38a6",
+  "mode": "wspr",
+  "duration_ns": "110592000000",
+  "events": [
+    {
+      "offset_ns": "0",
+      "duration_ns": "682666666",
+      "rf_on": true,
+      "frequency_nhz": "14097101464843750"
+    },
+    {
+      "offset_ns": "682666666",
+      "duration_ns": "682666667",
+      "rf_on": true,
+      "frequency_nhz": "14097104394531250"
+    },
+    {
+      "offset_ns": "1365333333",
+      "duration_ns": "682666667",
+      "rf_on": true,
+      "frequency_nhz": "14097102929687500"
+    },
+    {
+      "offset_ns": "2048000000",
+      "duration_ns": "682666666",
+      "rf_on": true,
+      "frequency_nhz": "14097100000000000"
+    },
+    {
+      "offset_ns": "2730666666",
+      "duration_ns": "682666667",
+      "rf_on": true,
+      "frequency_nhz": "14097100000000000"
+    },
+    {
+      "offset_ns": "3413333333",
+      "duration_ns": "682666667",
+      "rf_on": true,
+      "frequency_nhz": "14097100000000000"
+    },
+    {
+      "offset_ns": "4096000000",
+      "duration_ns": "682666666",
+      "rf_on": true,
+      "frequency_nhz": "14097100000000000"
+    },
+    {
+      "offset_ns": "4778666666",
+      "duration_ns": "682666667",
+      "rf_on": true,
+      "frequency_nhz": "14097102929687500"
+    },
+    {
+      "offset_ns": "5461333333",
+      "duration_ns": "682666667",
+      "rf_on": true,
+      "frequency_nhz": "14097104394531250"
+    },
+    {
+      "offset_ns": "6144000000",
+      "duration_ns": "682666666",
+      "rf_on": true,
+      "frequency_nhz": "14097100000000000"
+    },
+    {
+      "offset_ns": "6826666666",
+      "duration_ns": "682666667",
+      "rf_on": true,
+      "frequency_nhz": "14097102929687500"
+    },
+    {
+      "offset_ns": "7509333333",
+      "duration_ns": "682666667",
+      "rf_on": true,
+      "frequency_nhz": "14097100000000000"
+    },
+    {
+      "offset_ns": "8192000000",
+      "duration_ns": "682666666",
+      "rf_on": true,
+      "frequency_nhz": "14097101464843750"
+    },
+    {
+      "offset_ns": "8874666666",
+      "duration_ns": "682666667",
+      "rf_on": true,
+      "frequency_nhz": "14097101464843750"
+    },
+    {
+      "offset_ns": "9557333333",
+      "duration_ns": "682666667",
+      "rf_on": true,
+      "frequency_nhz": "14097101464843750"
+    },
+    {
+      "offset_ns": "10240000000",
+      "duration_ns": "682666666",
+      "rf_on": true,
+      "frequency_nhz": "14097100000000000"
+    },
+    {
+      "offset_ns": "10922666666",
+      "duration_ns": "682666667",
+      "rf_on": true,
+      "frequency_nhz": "14097100000000000"
+    },
+    {
+      "offset_ns": "11605333333",
+      "duration_ns": "682666667",
+      "rf_on": true,
+      "frequency_nhz": "14097100000000000"
+    },
+    {
+      "offset_ns": "12288000000",
+      "duration_ns": "682666666",
+      "rf_on": true,
+      "frequency_nhz": "14097104394531250"
+    },
+    {
+      "offset_ns": "12970666666",
+      "duration_ns": "682666667",
+      "rf_on": true,
+      "frequency_nhz": "14097100000000000"
+    },
+    {
+      "offset_ns": "13653333333",
+      "duration_ns": "682666667",
+      "rf_on": true,
+      "frequency_nhz": "14097102929687500"
+    },
+    {
+      "offset_ns": "14336000000",
+      "duration_ns": "682666666",
+      "rf_on": true,
+      "frequency_nhz": "14097104394531250"
+    },
+    {
+      "offset_ns": "15018666666",
+      "duration_ns": "682666667",
+      "rf_on": true,
+      "frequency_nhz": "14097102929687500"
+    },
+    {
+      "offset_ns": "15701333333",
+      "duration_ns": "682666667",
+      "rf_on": true,
+      "frequency_nhz": "14097101464843750"
+    },
+    {
+      "offset_ns": "16384000000",
+      "duration_ns": "682666666",
+      "rf_on": true,
+      "frequency_nhz": "14097101464843750"
+    },
+    {
+      "offset_ns": "17066666666",
+      "duration_ns": "682666667",
+      "rf_on": true,
+      "frequency_nhz": "14097101464843750"
+    },
+    {
+      "offset_ns": "17749333333",
+      "duration_ns": "682666667",
+      "rf_on": true,
+      "frequency_nhz": "14097104394531250"
+    },
+    {
+      "offset_ns": "18432000000",
+      "duration_ns": "682666666",
+      "rf_on": true,
+      "frequency_nhz": "14097100000000000"
+    },
+    {
+      "offset_ns": "19114666666",
+      "duration_ns": "682666667",
+      "rf_on": true,
+      "frequency_nhz": "14097100000000000"
+    },
+    {
+      "offset_ns": "19797333333",
+      "duration_ns": "682666667",
+      "rf_on": true,
+      "frequency_nhz": "14097100000000000"
+    },
+    {
+      "offset_ns": "20480000000",
+      "duration_ns": "682666666",
+      "rf_on": true,
+      "frequency_nhz": "14097100000000000"
+    },
+    {
+      "offset_ns": "21162666666",
+      "duration_ns": "682666667",
+      "rf_on": true,
+      "frequency_nhz": "14097102929687500"
+    },
+    {
+      "offset_ns": "21845333333",
+      "duration_ns": "682666667",
+      "rf_on": true,
+      "frequency_nhz": "14097102929687500"
+    },
+    {
+      "offset_ns": "22528000000",
+      "duration_ns": "682666666",
+      "rf_on": true,
+      "frequency_nhz": "14097102929687500"
+    },
+    {
+      "offset_ns": "23210666666",
+      "duration_ns": "682666667",
+      "rf_on": true,
+      "frequency_nhz": "14097104394531250"
+    },
+    {
+      "offset_ns": "23893333333",
+      "duration_ns": "682666667",
+      "rf_on": true,
+      "frequency_nhz": "14097100000000000"
+    },
+    {
+      "offset_ns": "24576000000",
+      "duration_ns": "682666666",
+      "rf_on": true,
+      "frequency_nhz": "14097100000000000"
+    },
+    {
+      "offset_ns": "25258666666",
+      "duration_ns": "682666667",
+      "rf_on": true,
+      "frequency_nhz": "14097101464843750"
+    },
+    {
+      "offset_ns": "25941333333",
+      "duration_ns": "682666667",
+      "rf_on": true,
+      "frequency_nhz": "14097102929687500"
+    },
+    {
+      "offset_ns": "26624000000",
+      "duration_ns": "682666666",
+      "rf_on": true,
+      "frequency_nhz": "14097104394531250"
+    },
+    {
+      "offset_ns": "27306666666",
+      "duration_ns": "682666667",
+      "rf_on": true,
+      "frequency_nhz": "14097100000000000"
+    },
+    {
+      "offset_ns": "27989333333",
+      "duration_ns": "682666667",
+      "rf_on": true,
+      "frequency_nhz": "14097100000000000"
+    },
+    {
+      "offset_ns": "28672000000",
+      "duration_ns": "682666666",
+      "rf_on": true,
+      "frequency_nhz": "14097102929687500"
+    },
+    {
+      "offset_ns": "29354666666",
+      "duration_ns": "682666667",
+      "rf_on": true,
+      "frequency_nhz": "14097102929687500"
+    },
+    {
+      "offset_ns": "30037333333",
+      "duration_ns": "682666667",
+      "rf_on": true,
+      "frequency_nhz": "14097102929687500"
+    },
+    {
+      "offset_ns": "30720000000",
+      "duration_ns": "682666666",
+      "rf_on": true,
+      "frequency_nhz": "14097100000000000"
+    },
+    {
+      "offset_ns": "31402666666",
+      "duration_ns": "682666667",
+      "rf_on": true,
+      "frequency_nhz": "14097101464843750"
+    },
+    {
+      "offset_ns": "32085333333",
+      "duration_ns": "682666667",
+      "rf_on": true,
+      "frequency_nhz": "14097102929687500"
+    },
+    {
+      "offset_ns": "32768000000",
+      "duration_ns": "682666666",
+      "rf_on": true,
+      "frequency_nhz": "14097101464843750"
+    },
+    {
+      "offset_ns": "33450666666",
+      "duration_ns": "682666667",
+      "rf_on": true,
+      "frequency_nhz": "14097101464843750"
+    },
+    {
+      "offset_ns": "34133333333",
+      "duration_ns": "682666667",
+      "rf_on": true,
+      "frequency_nhz": "14097102929687500"
+    },
+    {
+      "offset_ns": "34816000000",
+      "duration_ns": "682666666",
+      "rf_on": true,
+      "frequency_nhz": "14097100000000000"
+    },
+    {
+      "offset_ns": "35498666666",
+      "duration_ns": "682666667",
+      "rf_on": true,
+      "frequency_nhz": "14097104394531250"
+    },
+    {
+      "offset_ns": "36181333333",
+      "duration_ns": "682666667",
+      "rf_on": true,
+      "frequency_nhz": "14097104394531250"
+    },
+    {
+      "offset_ns": "36864000000",
+      "duration_ns": "682666666",
+      "rf_on": true,
+      "frequency_nhz": "14097102929687500"
+    },
+    {
+      "offset_ns": "37546666666",
+      "duration_ns": "682666667",
+      "rf_on": true,
+      "frequency_nhz": "14097101464843750"
+    },
+    {
+      "offset_ns": "38229333333",
+      "duration_ns": "682666667",
+      "rf_on": true,
+      "frequency_nhz": "14097100000000000"
+    },
+    {
+      "offset_ns": "38912000000",
+      "duration_ns": "682666666",
+      "rf_on": true,
+      "frequency_nhz": "14097100000000000"
+    },
+    {
+      "offset_ns": "39594666666",
+      "duration_ns": "682666667",
+      "rf_on": true,
+      "frequency_nhz": "14097100000000000"
+    },
+    {
+      "offset_ns": "40277333333",
+      "duration_ns": "682666667",
+      "rf_on": true,
+      "frequency_nhz": "14097104394531250"
+    },
+    {
+      "offset_ns": "40960000000",
+      "duration_ns": "682666666",
+      "rf_on": true,
+      "frequency_nhz": "14097101464843750"
+    },
+    {
+      "offset_ns": "41642666666",
+      "duration_ns": "682666667",
+      "rf_on": true,
+      "frequency_nhz": "14097100000000000"
+    },
+    {
+      "offset_ns": "42325333333",
+      "duration_ns": "682666667",
+      "rf_on": true,
+      "frequency_nhz": "14097104394531250"
+    },
+    {
+      "offset_ns": "43008000000",
+      "duration_ns": "682666666",
+      "rf_on": true,
+      "frequency_nhz": "14097100000000000"
+    },
+    {
+      "offset_ns": "43690666666",
+      "duration_ns": "682666667",
+      "rf_on": true,
+      "frequency_nhz": "14097102929687500"
+    },
+    {
+      "offset_ns": "44373333333",
+      "duration_ns": "682666667",
+      "rf_on": true,
+      "frequency_nhz": "14097102929687500"
+    },
+    {
+      "offset_ns": "45056000000",
+      "duration_ns": "682666666",
+      "rf_on": true,
+      "frequency_nhz": "14097102929687500"
+    },
+    {
+      "offset_ns": "45738666666",
+      "duration_ns": "682666667",
+      "rf_on": true,
+      "frequency_nhz": "14097101464843750"
+    },
+    {
+      "offset_ns": "46421333333",
+      "duration_ns": "682666667",
+      "rf_on": true,
+      "frequency_nhz": "14097104394531250"
+    },
+    {
+      "offset_ns": "47104000000",
+      "duration_ns": "682666666",
+      "rf_on": true,
+      "frequency_nhz": "14097100000000000"
+    },
+    {
+      "offset_ns": "47786666666",
+      "duration_ns": "682666667",
+      "rf_on": true,
+      "frequency_nhz": "14097101464843750"
+    },
+    {
+      "offset_ns": "48469333333",
+      "duration_ns": "682666667",
+      "rf_on": true,
+      "frequency_nhz": "14097100000000000"
+    },
+    {
+      "offset_ns": "49152000000",
+      "duration_ns": "682666666",
+      "rf_on": true,
+      "frequency_nhz": "14097104394531250"
+    },
+    {
+      "offset_ns": "49834666666",
+      "duration_ns": "682666667",
+      "rf_on": true,
+      "frequency_nhz": "14097100000000000"
+    },
+    {
+      "offset_ns": "50517333333",
+      "duration_ns": "682666667",
+      "rf_on": true,
+      "frequency_nhz": "14097104394531250"
+    },
+    {
+      "offset_ns": "51200000000",
+      "duration_ns": "682666666",
+      "rf_on": true,
+      "frequency_nhz": "14097102929687500"
+    },
+    {
+      "offset_ns": "51882666666",
+      "duration_ns": "682666667",
+      "rf_on": true,
+      "frequency_nhz": "14097104394531250"
+    },
+    {
+      "offset_ns": "52565333333",
+      "duration_ns": "682666667",
+      "rf_on": true,
+      "frequency_nhz": "14097100000000000"
+    },
+    {
+      "offset_ns": "53248000000",
+      "duration_ns": "682666666",
+      "rf_on": true,
+      "frequency_nhz": "14097100000000000"
+    },
+    {
+      "offset_ns": "53930666666",
+      "duration_ns": "682666667",
+      "rf_on": true,
+      "frequency_nhz": "14097104394531250"
+    },
+    {
+      "offset_ns": "54613333333",
+      "duration_ns": "682666667",
+      "rf_on": true,
+      "frequency_nhz": "14097100000000000"
+    },
+    {
+      "offset_ns": "55296000000",
+      "duration_ns": "682666666",
+      "rf_on": true,
+      "frequency_nhz": "14097100000000000"
+    },
+    {
+      "offset_ns": "55978666666",
+      "duration_ns": "682666667",
+      "rf_on": true,
+      "frequency_nhz": "14097104394531250"
+    },
+    {
+      "offset_ns": "56661333333",
+      "duration_ns": "682666667",
+      "rf_on": true,
+      "frequency_nhz": "14097102929687500"
+    },
+    {
+      "offset_ns": "57344000000",
+      "duration_ns": "682666666",
+      "rf_on": true,
+      "frequency_nhz": "14097104394531250"
+    },
+    {
+      "offset_ns": "58026666666",
+      "duration_ns": "682666667",
+      "rf_on": true,
+      "frequency_nhz": "14097104394531250"
+    },
+    {
+      "offset_ns": "58709333333",
+      "duration_ns": "682666667",
+      "rf_on": true,
+      "frequency_nhz": "14097102929687500"
+    },
+    {
+      "offset_ns": "59392000000",
+      "duration_ns": "682666666",
+      "rf_on": true,
+      "frequency_nhz": "14097100000000000"
+    },
+    {
+      "offset_ns": "60074666666",
+      "duration_ns": "682666667",
+      "rf_on": true,
+      "frequency_nhz": "14097102929687500"
+    },
+    {
+      "offset_ns": "60757333333",
+      "duration_ns": "682666667",
+      "rf_on": true,
+      "frequency_nhz": "14097101464843750"
+    },
+    {
+      "offset_ns": "61440000000",
+      "duration_ns": "682666666",
+      "rf_on": true,
+      "frequency_nhz": "14097104394531250"
+    },
+    {
+      "offset_ns": "62122666666",
+      "duration_ns": "682666667",
+      "rf_on": true,
+      "frequency_nhz": "14097102929687500"
+    },
+    {
+      "offset_ns": "62805333333",
+      "duration_ns": "682666667",
+      "rf_on": true,
+      "frequency_nhz": "14097101464843750"
+    },
+    {
+      "offset_ns": "63488000000",
+      "duration_ns": "682666666",
+      "rf_on": true,
+      "frequency_nhz": "14097100000000000"
+    },
+    {
+      "offset_ns": "64170666666",
+      "duration_ns": "682666667",
+      "rf_on": true,
+      "frequency_nhz": "14097104394531250"
+    },
+    {
+      "offset_ns": "64853333333",
+      "duration_ns": "682666667",
+      "rf_on": true,
+      "frequency_nhz": "14097100000000000"
+    },
+    {
+      "offset_ns": "65536000000",
+      "duration_ns": "682666666",
+      "rf_on": true,
+      "frequency_nhz": "14097102929687500"
+    },
+    {
+      "offset_ns": "66218666666",
+      "duration_ns": "682666667",
+      "rf_on": true,
+      "frequency_nhz": "14097102929687500"
+    },
+    {
+      "offset_ns": "66901333333",
+      "duration_ns": "682666667",
+      "rf_on": true,
+      "frequency_nhz": "14097104394531250"
+    },
+    {
+      "offset_ns": "67584000000",
+      "duration_ns": "682666666",
+      "rf_on": true,
+      "frequency_nhz": "14097102929687500"
+    },
+    {
+      "offset_ns": "68266666666",
+      "duration_ns": "682666667",
+      "rf_on": true,
+      "frequency_nhz": "14097102929687500"
+    },
+    {
+      "offset_ns": "68949333333",
+      "duration_ns": "682666667",
+      "rf_on": true,
+      "frequency_nhz": "14097100000000000"
+    },
+    {
+      "offset_ns": "69632000000",
+      "duration_ns": "682666666",
+      "rf_on": true,
+      "frequency_nhz": "14097102929687500"
+    },
+    {
+      "offset_ns": "70314666666",
+      "duration_ns": "682666667",
+      "rf_on": true,
+      "frequency_nhz": "14097100000000000"
+    },
+    {
+      "offset_ns": "70997333333",
+      "duration_ns": "682666667",
+      "rf_on": true,
+      "frequency_nhz": "14097104394531250"
+    },
+    {
+      "offset_ns": "71680000000",
+      "duration_ns": "682666666",
+      "rf_on": true,
+      "frequency_nhz": "14097102929687500"
+    },
+    {
+      "offset_ns": "72362666666",
+      "duration_ns": "682666667",
+      "rf_on": true,
+      "frequency_nhz": "14097102929687500"
+    },
+    {
+      "offset_ns": "73045333333",
+      "duration_ns": "682666667",
+      "rf_on": true,
+      "frequency_nhz": "14097104394531250"
+    },
+    {
+      "offset_ns": "73728000000",
+      "duration_ns": "682666666",
+      "rf_on": true,
+      "frequency_nhz": "14097102929687500"
+    },
+    {
+      "offset_ns": "74410666666",
+      "duration_ns": "682666667",
+      "rf_on": true,
+      "frequency_nhz": "14097102929687500"
+    },
+    {
+      "offset_ns": "75093333333",
+      "duration_ns": "682666667",
+      "rf_on": true,
+      "frequency_nhz": "14097101464843750"
+    },
+    {
+      "offset_ns": "75776000000",
+      "duration_ns": "682666666",
+      "rf_on": true,
+      "frequency_nhz": "14097104394531250"
+    },
+    {
+      "offset_ns": "76458666666",
+      "duration_ns": "682666667",
+      "rf_on": true,
+      "frequency_nhz": "14097101464843750"
+    },
+    {
+      "offset_ns": "77141333333",
+      "duration_ns": "682666667",
+      "rf_on": true,
+      "frequency_nhz": "14097100000000000"
+    },
+    {
+      "offset_ns": "77824000000",
+      "duration_ns": "682666666",
+      "rf_on": true,
+      "frequency_nhz": "14097104394531250"
+    },
+    {
+      "offset_ns": "78506666666",
+      "duration_ns": "682666667",
+      "rf_on": true,
+      "frequency_nhz": "14097101464843750"
+    },
+    {
+      "offset_ns": "79189333333",
+      "duration_ns": "682666667",
+      "rf_on": true,
+      "frequency_nhz": "14097100000000000"
+    },
+    {
+      "offset_ns": "79872000000",
+      "duration_ns": "682666666",
+      "rf_on": true,
+      "frequency_nhz": "14097102929687500"
+    },
+    {
+      "offset_ns": "80554666666",
+      "duration_ns": "682666667",
+      "rf_on": true,
+      "frequency_nhz": "14097101464843750"
+    },
+    {
+      "offset_ns": "81237333333",
+      "duration_ns": "682666667",
+      "rf_on": true,
+      "frequency_nhz": "14097104394531250"
+    },
+    {
+      "offset_ns": "81920000000",
+      "duration_ns": "682666666",
+      "rf_on": true,
+      "frequency_nhz": "14097100000000000"
+    },
+    {
+      "offset_ns": "82602666666",
+      "duration_ns": "682666667",
+      "rf_on": true,
+      "frequency_nhz": "14097101464843750"
+    },
+    {
+      "offset_ns": "83285333333",
+      "duration_ns": "682666667",
+      "rf_on": true,
+      "frequency_nhz": "14097100000000000"
+    },
+    {
+      "offset_ns": "83968000000",
+      "duration_ns": "682666666",
+      "rf_on": true,
+      "frequency_nhz": "14097102929687500"
+    },
+    {
+      "offset_ns": "84650666666",
+      "duration_ns": "682666667",
+      "rf_on": true,
+      "frequency_nhz": "14097102929687500"
+    },
+    {
+      "offset_ns": "85333333333",
+      "duration_ns": "682666667",
+      "rf_on": true,
+      "frequency_nhz": "14097101464843750"
+    },
+    {
+      "offset_ns": "86016000000",
+      "duration_ns": "682666666",
+      "rf_on": true,
+      "frequency_nhz": "14097101464843750"
+    },
+    {
+      "offset_ns": "86698666666",
+      "duration_ns": "682666667",
+      "rf_on": true,
+      "frequency_nhz": "14097101464843750"
+    },
+    {
+      "offset_ns": "87381333333",
+      "duration_ns": "682666667",
+      "rf_on": true,
+      "frequency_nhz": "14097100000000000"
+    },
+    {
+      "offset_ns": "88064000000",
+      "duration_ns": "682666666",
+      "rf_on": true,
+      "frequency_nhz": "14097100000000000"
+    },
+    {
+      "offset_ns": "88746666666",
+      "duration_ns": "682666667",
+      "rf_on": true,
+      "frequency_nhz": "14097100000000000"
+    },
+    {
+      "offset_ns": "89429333333",
+      "duration_ns": "682666667",
+      "rf_on": true,
+      "frequency_nhz": "14097102929687500"
+    },
+    {
+      "offset_ns": "90112000000",
+      "duration_ns": "682666666",
+      "rf_on": true,
+      "frequency_nhz": "14097102929687500"
+    },
+    {
+      "offset_ns": "90794666666",
+      "duration_ns": "682666667",
+      "rf_on": true,
+      "frequency_nhz": "14097101464843750"
+    },
+    {
+      "offset_ns": "91477333333",
+      "duration_ns": "682666667",
+      "rf_on": true,
+      "frequency_nhz": "14097100000000000"
+    },
+    {
+      "offset_ns": "92160000000",
+      "duration_ns": "682666666",
+      "rf_on": true,
+      "frequency_nhz": "14097104394531250"
+    },
+    {
+      "offset_ns": "92842666666",
+      "duration_ns": "682666667",
+      "rf_on": true,
+      "frequency_nhz": "14097100000000000"
+    },
+    {
+      "offset_ns": "93525333333",
+      "duration_ns": "682666667",
+      "rf_on": true,
+      "frequency_nhz": "14097102929687500"
+    },
+    {
+      "offset_ns": "94208000000",
+      "duration_ns": "682666666",
+      "rf_on": true,
+      "frequency_nhz": "14097101464843750"
+    },
+    {
+      "offset_ns": "94890666666",
+      "duration_ns": "682666667",
+      "rf_on": true,
+      "frequency_nhz": "14097101464843750"
+    },
+    {
+      "offset_ns": "95573333333",
+      "duration_ns": "682666667",
+      "rf_on": true,
+      "frequency_nhz": "14097100000000000"
+    },
+    {
+      "offset_ns": "96256000000",
+      "duration_ns": "682666666",
+      "rf_on": true,
+      "frequency_nhz": "14097102929687500"
+    },
+    {
+      "offset_ns": "96938666666",
+      "duration_ns": "682666667",
+      "rf_on": true,
+      "frequency_nhz": "14097100000000000"
+    },
+    {
+      "offset_ns": "97621333333",
+      "duration_ns": "682666667",
+      "rf_on": true,
+      "frequency_nhz": "14097100000000000"
+    },
+    {
+      "offset_ns": "98304000000",
+      "duration_ns": "682666666",
+      "rf_on": true,
+      "frequency_nhz": "14097102929687500"
+    },
+    {
+      "offset_ns": "98986666666",
+      "duration_ns": "682666667",
+      "rf_on": true,
+      "frequency_nhz": "14097102929687500"
+    },
+    {
+      "offset_ns": "99669333333",
+      "duration_ns": "682666667",
+      "rf_on": true,
+      "frequency_nhz": "14097102929687500"
+    },
+    {
+      "offset_ns": "100352000000",
+      "duration_ns": "682666666",
+      "rf_on": true,
+      "frequency_nhz": "14097104394531250"
+    },
+    {
+      "offset_ns": "101034666666",
+      "duration_ns": "682666667",
+      "rf_on": true,
+      "frequency_nhz": "14097101464843750"
+    },
+    {
+      "offset_ns": "101717333333",
+      "duration_ns": "682666667",
+      "rf_on": true,
+      "frequency_nhz": "14097100000000000"
+    },
+    {
+      "offset_ns": "102400000000",
+      "duration_ns": "682666666",
+      "rf_on": true,
+      "frequency_nhz": "14097104394531250"
+    },
+    {
+      "offset_ns": "103082666666",
+      "duration_ns": "682666667",
+      "rf_on": true,
+      "frequency_nhz": "14097100000000000"
+    },
+    {
+      "offset_ns": "103765333333",
+      "duration_ns": "682666667",
+      "rf_on": true,
+      "frequency_nhz": "14097104394531250"
+    },
+    {
+      "offset_ns": "104448000000",
+      "duration_ns": "682666666",
+      "rf_on": true,
+      "frequency_nhz": "14097104394531250"
+    },
+    {
+      "offset_ns": "105130666666",
+      "duration_ns": "682666667",
+      "rf_on": true,
+      "frequency_nhz": "14097102929687500"
+    },
+    {
+      "offset_ns": "105813333333",
+      "duration_ns": "682666667",
+      "rf_on": true,
+      "frequency_nhz": "14097100000000000"
+    },
+    {
+      "offset_ns": "106496000000",
+      "duration_ns": "682666666",
+      "rf_on": true,
+      "frequency_nhz": "14097100000000000"
+    },
+    {
+      "offset_ns": "107178666666",
+      "duration_ns": "682666667",
+      "rf_on": true,
+      "frequency_nhz": "14097101464843750"
+    },
+    {
+      "offset_ns": "107861333333",
+      "duration_ns": "682666667",
+      "rf_on": true,
+      "frequency_nhz": "14097101464843750"
+    },
+    {
+      "offset_ns": "108544000000",
+      "duration_ns": "682666666",
+      "rf_on": true,
+      "frequency_nhz": "14097100000000000"
+    },
+    {
+      "offset_ns": "109226666666",
+      "duration_ns": "682666667",
+      "rf_on": true,
+      "frequency_nhz": "14097100000000000"
+    },
+    {
+      "offset_ns": "109909333333",
+      "duration_ns": "682666667",
+      "rf_on": true,
+      "frequency_nhz": "14097102929687500"
+    }
+  ],
+  "frame_metadata": {
+    "callsign": "AA0NT",
+    "locator": "EM18",
+    "message_count": 1,
+    "plan_type": "Type1Single",
+    "power_dbm": 20,
+    "type": "TYPE1"
+  },
+  "before_endpoint": {
+    "address": "192.168.1.54",
+    "boot_id": "87fcacc5ae58bd68cbecd078781853eb",
+    "device_id": "e045017b11e54c2fb7029f0154e6deb9",
+    "dns_sd_published": true,
+    "enabled": true,
+    "finishing_remote_job": false,
+    "launch_observed_monotonic_ns": null,
+    "launch_target_monotonic_ns": "0",
+    "listener_error": "",
+    "listener_running": true,
+    "local_effective": false,
+    "local_requested": false,
+    "local_work_active": false,
+    "output_unknown": false,
+    "port": 31417,
+    "remote_admission_closed": false,
+    "remote_job_id": "",
+    "remote_output_active": false,
+    "remote_owner": "",
+    "remote_state": "empty",
+    "revocation_generation": "11",
+    "revocation_unavailable": false,
+    "schema": "wsprrypi-wtp-endpoint/1"
+  },
+  "caps": {
+    "type": "response",
+    "protocol": "WTP/1",
+    "session_id": "e32853980b01464994d0857826c4d5ca",
+    "request_id": "009e7b1afe7b4b4e8cfc6ed78b0d6be1",
+    "op": "CAPS",
+    "ok": true,
+    "body": {
+      "profiles": [
+        "rf-events/1"
+      ],
+      "modes": [
+        "wspr",
+        "tone",
+        "qrss",
+        "fskcw",
+        "dfcw"
+      ],
+      "engine": "rp1-gpclk",
+      "frequency_ranges": [
+        {
+          "minimum_nhz": "3051757813211",
+          "maximum_nhz": "100000000000000000"
+        }
+      ],
+      "max_payload_bytes": 65536,
+      "max_events": 512,
+      "max_job_duration_ns": "86400000000000",
+      "minimum_arm_lead_ns": "2000000000",
+      "maximum_arm_ahead_ns": "604800000000000",
+      "maximum_arm_uncertainty_ns": "500000000",
+      "maximum_holdover_age_ns": "0",
+      "output_disable_timeout_ns": "5000000000",
+      "minimum_lease_ms": 5000,
+      "maximum_lease_ms": 60000,
+      "response_cache_entries": 8,
+      "response_cache_ttl_seconds": 300,
+      "terminal_record_entries": 8,
+      "terminal_record_ttl_seconds": 3600
+    }
+  },
+  "clock": {
+    "type": "response",
+    "protocol": "WTP/1",
+    "session_id": "e32853980b01464994d0857826c4d5ca",
+    "request_id": "f05fc8256e074ac8850579552da79d55",
+    "op": "GET_CLOCK",
+    "ok": true,
+    "body": {
+      "state": "synchronized",
+      "utc_now_ns": "1790891512427522834",
+      "monotonic_now_ns": "173456657540967",
+      "uncertainty_ns": "5009055",
+      "sync_age_ns": "0",
+      "leap": "normal"
+    }
+  },
+  "load": {
+    "type": "response",
+    "protocol": "WTP/1",
+    "session_id": "e32853980b01464994d0857826c4d5ca",
+    "request_id": "0d61e7387ecd4d6783930c694e842395",
+    "op": "LOAD",
+    "ok": true,
+    "body": {
+      "job_id": "9f597bd376d944faaf44a50de8bb38a6",
+      "state": "loaded",
+      "adjustments": [
+        {
+          "event_index": 0,
+          "requested_frequency_nhz": "14097101464843750",
+          "realized_frequency_nhz": "14097101464883681"
+        },
+        {
+          "event_index": 1,
+          "requested_frequency_nhz": "14097104394531250",
+          "realized_frequency_nhz": "14097104394445943"
+        },
+        {
+          "event_index": 2,
+          "requested_frequency_nhz": "14097102929687500",
+          "realized_frequency_nhz": "14097102929778317"
+        },
+        {
+          "event_index": 3,
+          "requested_frequency_nhz": "14097100000000000",
+          "realized_frequency_nhz": "14097099999989046"
+        },
+        {
+          "event_index": 4,
+          "requested_frequency_nhz": "14097100000000000",
+          "realized_frequency_nhz": "14097099999989046"
+        },
+        {
+          "event_index": 5,
+          "requested_frequency_nhz": "14097100000000000",
+          "realized_frequency_nhz": "14097099999989046"
+        },
+        {
+          "event_index": 6,
+          "requested_frequency_nhz": "14097100000000000",
+          "realized_frequency_nhz": "14097099999989046"
+        },
+        {
+          "event_index": 7,
+          "requested_frequency_nhz": "14097102929687500",
+          "realized_frequency_nhz": "14097102929778317"
+        },
+        {
+          "event_index": 8,
+          "requested_frequency_nhz": "14097104394531250",
+          "realized_frequency_nhz": "14097104394445943"
+        },
+        {
+          "event_index": 9,
+          "requested_frequency_nhz": "14097100000000000",
+          "realized_frequency_nhz": "14097099999989046"
+        },
+        {
+          "event_index": 10,
+          "requested_frequency_nhz": "14097102929687500",
+          "realized_frequency_nhz": "14097102929778317"
+        },
+        {
+          "event_index": 11,
+          "requested_frequency_nhz": "14097100000000000",
+          "realized_frequency_nhz": "14097099999989046"
+        },
+        {
+          "event_index": 12,
+          "requested_frequency_nhz": "14097101464843750",
+          "realized_frequency_nhz": "14097101464883681"
+        },
+        {
+          "event_index": 13,
+          "requested_frequency_nhz": "14097101464843750",
+          "realized_frequency_nhz": "14097101464883681"
+        },
+        {
+          "event_index": 14,
+          "requested_frequency_nhz": "14097101464843750",
+          "realized_frequency_nhz": "14097101464883681"
+        },
+        {
+          "event_index": 15,
+          "requested_frequency_nhz": "14097100000000000",
+          "realized_frequency_nhz": "14097099999989046"
+        },
+        {
+          "event_index": 16,
+          "requested_frequency_nhz": "14097100000000000",
+          "realized_frequency_nhz": "14097099999989046"
+        },
+        {
+          "event_index": 17,
+          "requested_frequency_nhz": "14097100000000000",
+          "realized_frequency_nhz": "14097099999989046"
+        },
+        {
+          "event_index": 18,
+          "requested_frequency_nhz": "14097104394531250",
+          "realized_frequency_nhz": "14097104394445943"
+        },
+        {
+          "event_index": 19,
+          "requested_frequency_nhz": "14097100000000000",
+          "realized_frequency_nhz": "14097099999989046"
+        },
+        {
+          "event_index": 20,
+          "requested_frequency_nhz": "14097102929687500",
+          "realized_frequency_nhz": "14097102929778317"
+        },
+        {
+          "event_index": 21,
+          "requested_frequency_nhz": "14097104394531250",
+          "realized_frequency_nhz": "14097104394445943"
+        },
+        {
+          "event_index": 22,
+          "requested_frequency_nhz": "14097102929687500",
+          "realized_frequency_nhz": "14097102929778317"
+        },
+        {
+          "event_index": 23,
+          "requested_frequency_nhz": "14097101464843750",
+          "realized_frequency_nhz": "14097101464883681"
+        },
+        {
+          "event_index": 24,
+          "requested_frequency_nhz": "14097101464843750",
+          "realized_frequency_nhz": "14097101464883681"
+        },
+        {
+          "event_index": 25,
+          "requested_frequency_nhz": "14097101464843750",
+          "realized_frequency_nhz": "14097101464883681"
+        },
+        {
+          "event_index": 26,
+          "requested_frequency_nhz": "14097104394531250",
+          "realized_frequency_nhz": "14097104394445943"
+        },
+        {
+          "event_index": 27,
+          "requested_frequency_nhz": "14097100000000000",
+          "realized_frequency_nhz": "14097099999989046"
+        },
+        {
+          "event_index": 28,
+          "requested_frequency_nhz": "14097100000000000",
+          "realized_frequency_nhz": "14097099999989046"
+        },
+        {
+          "event_index": 29,
+          "requested_frequency_nhz": "14097100000000000",
+          "realized_frequency_nhz": "14097099999989046"
+        },
+        {
+          "event_index": 30,
+          "requested_frequency_nhz": "14097100000000000",
+          "realized_frequency_nhz": "14097099999989046"
+        },
+        {
+          "event_index": 31,
+          "requested_frequency_nhz": "14097102929687500",
+          "realized_frequency_nhz": "14097102929778317"
+        },
+        {
+          "event_index": 32,
+          "requested_frequency_nhz": "14097102929687500",
+          "realized_frequency_nhz": "14097102929778317"
+        },
+        {
+          "event_index": 33,
+          "requested_frequency_nhz": "14097102929687500",
+          "realized_frequency_nhz": "14097102929778317"
+        },
+        {
+          "event_index": 34,
+          "requested_frequency_nhz": "14097104394531250",
+          "realized_frequency_nhz": "14097104394445943"
+        },
+        {
+          "event_index": 35,
+          "requested_frequency_nhz": "14097100000000000",
+          "realized_frequency_nhz": "14097099999989046"
+        },
+        {
+          "event_index": 36,
+          "requested_frequency_nhz": "14097100000000000",
+          "realized_frequency_nhz": "14097099999989046"
+        },
+        {
+          "event_index": 37,
+          "requested_frequency_nhz": "14097101464843750",
+          "realized_frequency_nhz": "14097101464883681"
+        },
+        {
+          "event_index": 38,
+          "requested_frequency_nhz": "14097102929687500",
+          "realized_frequency_nhz": "14097102929778317"
+        },
+        {
+          "event_index": 39,
+          "requested_frequency_nhz": "14097104394531250",
+          "realized_frequency_nhz": "14097104394445943"
+        },
+        {
+          "event_index": 40,
+          "requested_frequency_nhz": "14097100000000000",
+          "realized_frequency_nhz": "14097099999989046"
+        },
+        {
+          "event_index": 41,
+          "requested_frequency_nhz": "14097100000000000",
+          "realized_frequency_nhz": "14097099999989046"
+        },
+        {
+          "event_index": 42,
+          "requested_frequency_nhz": "14097102929687500",
+          "realized_frequency_nhz": "14097102929778317"
+        },
+        {
+          "event_index": 43,
+          "requested_frequency_nhz": "14097102929687500",
+          "realized_frequency_nhz": "14097102929778317"
+        },
+        {
+          "event_index": 44,
+          "requested_frequency_nhz": "14097102929687500",
+          "realized_frequency_nhz": "14097102929778317"
+        },
+        {
+          "event_index": 45,
+          "requested_frequency_nhz": "14097100000000000",
+          "realized_frequency_nhz": "14097099999989046"
+        },
+        {
+          "event_index": 46,
+          "requested_frequency_nhz": "14097101464843750",
+          "realized_frequency_nhz": "14097101464883681"
+        },
+        {
+          "event_index": 47,
+          "requested_frequency_nhz": "14097102929687500",
+          "realized_frequency_nhz": "14097102929778317"
+        },
+        {
+          "event_index": 48,
+          "requested_frequency_nhz": "14097101464843750",
+          "realized_frequency_nhz": "14097101464883681"
+        },
+        {
+          "event_index": 49,
+          "requested_frequency_nhz": "14097101464843750",
+          "realized_frequency_nhz": "14097101464883681"
+        },
+        {
+          "event_index": 50,
+          "requested_frequency_nhz": "14097102929687500",
+          "realized_frequency_nhz": "14097102929778317"
+        },
+        {
+          "event_index": 51,
+          "requested_frequency_nhz": "14097100000000000",
+          "realized_frequency_nhz": "14097099999989046"
+        },
+        {
+          "event_index": 52,
+          "requested_frequency_nhz": "14097104394531250",
+          "realized_frequency_nhz": "14097104394445943"
+        },
+        {
+          "event_index": 53,
+          "requested_frequency_nhz": "14097104394531250",
+          "realized_frequency_nhz": "14097104394445943"
+        },
+        {
+          "event_index": 54,
+          "requested_frequency_nhz": "14097102929687500",
+          "realized_frequency_nhz": "14097102929778317"
+        },
+        {
+          "event_index": 55,
+          "requested_frequency_nhz": "14097101464843750",
+          "realized_frequency_nhz": "14097101464883681"
+        },
+        {
+          "event_index": 56,
+          "requested_frequency_nhz": "14097100000000000",
+          "realized_frequency_nhz": "14097099999989046"
+        },
+        {
+          "event_index": 57,
+          "requested_frequency_nhz": "14097100000000000",
+          "realized_frequency_nhz": "14097099999989046"
+        },
+        {
+          "event_index": 58,
+          "requested_frequency_nhz": "14097100000000000",
+          "realized_frequency_nhz": "14097099999989046"
+        },
+        {
+          "event_index": 59,
+          "requested_frequency_nhz": "14097104394531250",
+          "realized_frequency_nhz": "14097104394445943"
+        },
+        {
+          "event_index": 60,
+          "requested_frequency_nhz": "14097101464843750",
+          "realized_frequency_nhz": "14097101464883681"
+        },
+        {
+          "event_index": 61,
+          "requested_frequency_nhz": "14097100000000000",
+          "realized_frequency_nhz": "14097099999989046"
+        },
+        {
+          "event_index": 62,
+          "requested_frequency_nhz": "14097104394531250",
+          "realized_frequency_nhz": "14097104394445943"
+        },
+        {
+          "event_index": 63,
+          "requested_frequency_nhz": "14097100000000000",
+          "realized_frequency_nhz": "14097099999989046"
+        },
+        {
+          "event_index": 64,
+          "requested_frequency_nhz": "14097102929687500",
+          "realized_frequency_nhz": "14097102929778317"
+        },
+        {
+          "event_index": 65,
+          "requested_frequency_nhz": "14097102929687500",
+          "realized_frequency_nhz": "14097102929778317"
+        },
+        {
+          "event_index": 66,
+          "requested_frequency_nhz": "14097102929687500",
+          "realized_frequency_nhz": "14097102929778317"
+        },
+        {
+          "event_index": 67,
+          "requested_frequency_nhz": "14097101464843750",
+          "realized_frequency_nhz": "14097101464883681"
+        },
+        {
+          "event_index": 68,
+          "requested_frequency_nhz": "14097104394531250",
+          "realized_frequency_nhz": "14097104394445943"
+        },
+        {
+          "event_index": 69,
+          "requested_frequency_nhz": "14097100000000000",
+          "realized_frequency_nhz": "14097099999989046"
+        },
+        {
+          "event_index": 70,
+          "requested_frequency_nhz": "14097101464843750",
+          "realized_frequency_nhz": "14097101464883681"
+        },
+        {
+          "event_index": 71,
+          "requested_frequency_nhz": "14097100000000000",
+          "realized_frequency_nhz": "14097099999989046"
+        },
+        {
+          "event_index": 72,
+          "requested_frequency_nhz": "14097104394531250",
+          "realized_frequency_nhz": "14097104394445943"
+        },
+        {
+          "event_index": 73,
+          "requested_frequency_nhz": "14097100000000000",
+          "realized_frequency_nhz": "14097099999989046"
+        },
+        {
+          "event_index": 74,
+          "requested_frequency_nhz": "14097104394531250",
+          "realized_frequency_nhz": "14097104394445943"
+        },
+        {
+          "event_index": 75,
+          "requested_frequency_nhz": "14097102929687500",
+          "realized_frequency_nhz": "14097102929778317"
+        },
+        {
+          "event_index": 76,
+          "requested_frequency_nhz": "14097104394531250",
+          "realized_frequency_nhz": "14097104394445943"
+        },
+        {
+          "event_index": 77,
+          "requested_frequency_nhz": "14097100000000000",
+          "realized_frequency_nhz": "14097099999989046"
+        },
+        {
+          "event_index": 78,
+          "requested_frequency_nhz": "14097100000000000",
+          "realized_frequency_nhz": "14097099999989046"
+        },
+        {
+          "event_index": 79,
+          "requested_frequency_nhz": "14097104394531250",
+          "realized_frequency_nhz": "14097104394445943"
+        },
+        {
+          "event_index": 80,
+          "requested_frequency_nhz": "14097100000000000",
+          "realized_frequency_nhz": "14097099999989046"
+        },
+        {
+          "event_index": 81,
+          "requested_frequency_nhz": "14097100000000000",
+          "realized_frequency_nhz": "14097099999989046"
+        },
+        {
+          "event_index": 82,
+          "requested_frequency_nhz": "14097104394531250",
+          "realized_frequency_nhz": "14097104394445943"
+        },
+        {
+          "event_index": 83,
+          "requested_frequency_nhz": "14097102929687500",
+          "realized_frequency_nhz": "14097102929778317"
+        },
+        {
+          "event_index": 84,
+          "requested_frequency_nhz": "14097104394531250",
+          "realized_frequency_nhz": "14097104394445943"
+        },
+        {
+          "event_index": 85,
+          "requested_frequency_nhz": "14097104394531250",
+          "realized_frequency_nhz": "14097104394445943"
+        },
+        {
+          "event_index": 86,
+          "requested_frequency_nhz": "14097102929687500",
+          "realized_frequency_nhz": "14097102929778317"
+        },
+        {
+          "event_index": 87,
+          "requested_frequency_nhz": "14097100000000000",
+          "realized_frequency_nhz": "14097099999989046"
+        },
+        {
+          "event_index": 88,
+          "requested_frequency_nhz": "14097102929687500",
+          "realized_frequency_nhz": "14097102929778317"
+        },
+        {
+          "event_index": 89,
+          "requested_frequency_nhz": "14097101464843750",
+          "realized_frequency_nhz": "14097101464883681"
+        },
+        {
+          "event_index": 90,
+          "requested_frequency_nhz": "14097104394531250",
+          "realized_frequency_nhz": "14097104394445943"
+        },
+        {
+          "event_index": 91,
+          "requested_frequency_nhz": "14097102929687500",
+          "realized_frequency_nhz": "14097102929778317"
+        },
+        {
+          "event_index": 92,
+          "requested_frequency_nhz": "14097101464843750",
+          "realized_frequency_nhz": "14097101464883681"
+        },
+        {
+          "event_index": 93,
+          "requested_frequency_nhz": "14097100000000000",
+          "realized_frequency_nhz": "14097099999989046"
+        },
+        {
+          "event_index": 94,
+          "requested_frequency_nhz": "14097104394531250",
+          "realized_frequency_nhz": "14097104394445943"
+        },
+        {
+          "event_index": 95,
+          "requested_frequency_nhz": "14097100000000000",
+          "realized_frequency_nhz": "14097099999989046"
+        },
+        {
+          "event_index": 96,
+          "requested_frequency_nhz": "14097102929687500",
+          "realized_frequency_nhz": "14097102929778317"
+        },
+        {
+          "event_index": 97,
+          "requested_frequency_nhz": "14097102929687500",
+          "realized_frequency_nhz": "14097102929778317"
+        },
+        {
+          "event_index": 98,
+          "requested_frequency_nhz": "14097104394531250",
+          "realized_frequency_nhz": "14097104394445943"
+        },
+        {
+          "event_index": 99,
+          "requested_frequency_nhz": "14097102929687500",
+          "realized_frequency_nhz": "14097102929778317"
+        },
+        {
+          "event_index": 100,
+          "requested_frequency_nhz": "14097102929687500",
+          "realized_frequency_nhz": "14097102929778317"
+        },
+        {
+          "event_index": 101,
+          "requested_frequency_nhz": "14097100000000000",
+          "realized_frequency_nhz": "14097099999989046"
+        },
+        {
+          "event_index": 102,
+          "requested_frequency_nhz": "14097102929687500",
+          "realized_frequency_nhz": "14097102929778317"
+        },
+        {
+          "event_index": 103,
+          "requested_frequency_nhz": "14097100000000000",
+          "realized_frequency_nhz": "14097099999989046"
+        },
+        {
+          "event_index": 104,
+          "requested_frequency_nhz": "14097104394531250",
+          "realized_frequency_nhz": "14097104394445943"
+        },
+        {
+          "event_index": 105,
+          "requested_frequency_nhz": "14097102929687500",
+          "realized_frequency_nhz": "14097102929778317"
+        },
+        {
+          "event_index": 106,
+          "requested_frequency_nhz": "14097102929687500",
+          "realized_frequency_nhz": "14097102929778317"
+        },
+        {
+          "event_index": 107,
+          "requested_frequency_nhz": "14097104394531250",
+          "realized_frequency_nhz": "14097104394445943"
+        },
+        {
+          "event_index": 108,
+          "requested_frequency_nhz": "14097102929687500",
+          "realized_frequency_nhz": "14097102929778317"
+        },
+        {
+          "event_index": 109,
+          "requested_frequency_nhz": "14097102929687500",
+          "realized_frequency_nhz": "14097102929778317"
+        },
+        {
+          "event_index": 110,
+          "requested_frequency_nhz": "14097101464843750",
+          "realized_frequency_nhz": "14097101464883681"
+        },
+        {
+          "event_index": 111,
+          "requested_frequency_nhz": "14097104394531250",
+          "realized_frequency_nhz": "14097104394445943"
+        },
+        {
+          "event_index": 112,
+          "requested_frequency_nhz": "14097101464843750",
+          "realized_frequency_nhz": "14097101464883681"
+        },
+        {
+          "event_index": 113,
+          "requested_frequency_nhz": "14097100000000000",
+          "realized_frequency_nhz": "14097099999989046"
+        },
+        {
+          "event_index": 114,
+          "requested_frequency_nhz": "14097104394531250",
+          "realized_frequency_nhz": "14097104394445943"
+        },
+        {
+          "event_index": 115,
+          "requested_frequency_nhz": "14097101464843750",
+          "realized_frequency_nhz": "14097101464883681"
+        },
+        {
+          "event_index": 116,
+          "requested_frequency_nhz": "14097100000000000",
+          "realized_frequency_nhz": "14097099999989046"
+        },
+        {
+          "event_index": 117,
+          "requested_frequency_nhz": "14097102929687500",
+          "realized_frequency_nhz": "14097102929778317"
+        },
+        {
+          "event_index": 118,
+          "requested_frequency_nhz": "14097101464843750",
+          "realized_frequency_nhz": "14097101464883681"
+        },
+        {
+          "event_index": 119,
+          "requested_frequency_nhz": "14097104394531250",
+          "realized_frequency_nhz": "14097104394445943"
+        },
+        {
+          "event_index": 120,
+          "requested_frequency_nhz": "14097100000000000",
+          "realized_frequency_nhz": "14097099999989046"
+        },
+        {
+          "event_index": 121,
+          "requested_frequency_nhz": "14097101464843750",
+          "realized_frequency_nhz": "14097101464883681"
+        },
+        {
+          "event_index": 122,
+          "requested_frequency_nhz": "14097100000000000",
+          "realized_frequency_nhz": "14097099999989046"
+        },
+        {
+          "event_index": 123,
+          "requested_frequency_nhz": "14097102929687500",
+          "realized_frequency_nhz": "14097102929778317"
+        },
+        {
+          "event_index": 124,
+          "requested_frequency_nhz": "14097102929687500",
+          "realized_frequency_nhz": "14097102929778317"
+        },
+        {
+          "event_index": 125,
+          "requested_frequency_nhz": "14097101464843750",
+          "realized_frequency_nhz": "14097101464883681"
+        },
+        {
+          "event_index": 126,
+          "requested_frequency_nhz": "14097101464843750",
+          "realized_frequency_nhz": "14097101464883681"
+        },
+        {
+          "event_index": 127,
+          "requested_frequency_nhz": "14097101464843750",
+          "realized_frequency_nhz": "14097101464883681"
+        },
+        {
+          "event_index": 128,
+          "requested_frequency_nhz": "14097100000000000",
+          "realized_frequency_nhz": "14097099999989046"
+        },
+        {
+          "event_index": 129,
+          "requested_frequency_nhz": "14097100000000000",
+          "realized_frequency_nhz": "14097099999989046"
+        },
+        {
+          "event_index": 130,
+          "requested_frequency_nhz": "14097100000000000",
+          "realized_frequency_nhz": "14097099999989046"
+        },
+        {
+          "event_index": 131,
+          "requested_frequency_nhz": "14097102929687500",
+          "realized_frequency_nhz": "14097102929778317"
+        },
+        {
+          "event_index": 132,
+          "requested_frequency_nhz": "14097102929687500",
+          "realized_frequency_nhz": "14097102929778317"
+        },
+        {
+          "event_index": 133,
+          "requested_frequency_nhz": "14097101464843750",
+          "realized_frequency_nhz": "14097101464883681"
+        },
+        {
+          "event_index": 134,
+          "requested_frequency_nhz": "14097100000000000",
+          "realized_frequency_nhz": "14097099999989046"
+        },
+        {
+          "event_index": 135,
+          "requested_frequency_nhz": "14097104394531250",
+          "realized_frequency_nhz": "14097104394445943"
+        },
+        {
+          "event_index": 136,
+          "requested_frequency_nhz": "14097100000000000",
+          "realized_frequency_nhz": "14097099999989046"
+        },
+        {
+          "event_index": 137,
+          "requested_frequency_nhz": "14097102929687500",
+          "realized_frequency_nhz": "14097102929778317"
+        },
+        {
+          "event_index": 138,
+          "requested_frequency_nhz": "14097101464843750",
+          "realized_frequency_nhz": "14097101464883681"
+        },
+        {
+          "event_index": 139,
+          "requested_frequency_nhz": "14097101464843750",
+          "realized_frequency_nhz": "14097101464883681"
+        },
+        {
+          "event_index": 140,
+          "requested_frequency_nhz": "14097100000000000",
+          "realized_frequency_nhz": "14097099999989046"
+        },
+        {
+          "event_index": 141,
+          "requested_frequency_nhz": "14097102929687500",
+          "realized_frequency_nhz": "14097102929778317"
+        },
+        {
+          "event_index": 142,
+          "requested_frequency_nhz": "14097100000000000",
+          "realized_frequency_nhz": "14097099999989046"
+        },
+        {
+          "event_index": 143,
+          "requested_frequency_nhz": "14097100000000000",
+          "realized_frequency_nhz": "14097099999989046"
+        },
+        {
+          "event_index": 144,
+          "requested_frequency_nhz": "14097102929687500",
+          "realized_frequency_nhz": "14097102929778317"
+        },
+        {
+          "event_index": 145,
+          "requested_frequency_nhz": "14097102929687500",
+          "realized_frequency_nhz": "14097102929778317"
+        },
+        {
+          "event_index": 146,
+          "requested_frequency_nhz": "14097102929687500",
+          "realized_frequency_nhz": "14097102929778317"
+        },
+        {
+          "event_index": 147,
+          "requested_frequency_nhz": "14097104394531250",
+          "realized_frequency_nhz": "14097104394445943"
+        },
+        {
+          "event_index": 148,
+          "requested_frequency_nhz": "14097101464843750",
+          "realized_frequency_nhz": "14097101464883681"
+        },
+        {
+          "event_index": 149,
+          "requested_frequency_nhz": "14097100000000000",
+          "realized_frequency_nhz": "14097099999989046"
+        },
+        {
+          "event_index": 150,
+          "requested_frequency_nhz": "14097104394531250",
+          "realized_frequency_nhz": "14097104394445943"
+        },
+        {
+          "event_index": 151,
+          "requested_frequency_nhz": "14097100000000000",
+          "realized_frequency_nhz": "14097099999989046"
+        },
+        {
+          "event_index": 152,
+          "requested_frequency_nhz": "14097104394531250",
+          "realized_frequency_nhz": "14097104394445943"
+        },
+        {
+          "event_index": 153,
+          "requested_frequency_nhz": "14097104394531250",
+          "realized_frequency_nhz": "14097104394445943"
+        },
+        {
+          "event_index": 154,
+          "requested_frequency_nhz": "14097102929687500",
+          "realized_frequency_nhz": "14097102929778317"
+        },
+        {
+          "event_index": 155,
+          "requested_frequency_nhz": "14097100000000000",
+          "realized_frequency_nhz": "14097099999989046"
+        },
+        {
+          "event_index": 156,
+          "requested_frequency_nhz": "14097100000000000",
+          "realized_frequency_nhz": "14097099999989046"
+        },
+        {
+          "event_index": 157,
+          "requested_frequency_nhz": "14097101464843750",
+          "realized_frequency_nhz": "14097101464883681"
+        },
+        {
+          "event_index": 158,
+          "requested_frequency_nhz": "14097101464843750",
+          "realized_frequency_nhz": "14097101464883681"
+        },
+        {
+          "event_index": 159,
+          "requested_frequency_nhz": "14097100000000000",
+          "realized_frequency_nhz": "14097099999989046"
+        },
+        {
+          "event_index": 160,
+          "requested_frequency_nhz": "14097100000000000",
+          "realized_frequency_nhz": "14097099999989046"
+        },
+        {
+          "event_index": 161,
+          "requested_frequency_nhz": "14097102929687500",
+          "realized_frequency_nhz": "14097102929778317"
+        }
+      ]
+    }
+  },
+  "start_utc_ns": "1790891517000000000",
+  "arm": {
+    "type": "response",
+    "protocol": "WTP/1",
+    "session_id": "e32853980b01464994d0857826c4d5ca",
+    "request_id": "b15570d0d6dc495aa7e5d7686dc93c1f",
+    "op": "ARM",
+    "ok": true,
+    "body": {
+      "job_id": "9f597bd376d944faaf44a50de8bb38a6",
+      "state": "armed",
+      "start_utc_ns": "1790891517000000000",
+      "start_monotonic_ns": "173461230018142",
+      "clock": {
+        "state": "synchronized",
+        "utc_now_ns": "1790891512954879698",
+        "monotonic_now_ns": "173457184897840",
+        "uncertainty_ns": "5009028",
+        "sync_age_ns": "0",
+        "leap": "normal"
+      }
+    }
+  },
+  "completed": {
+    "boot_id": "87fcacc5ae58bd68cbecd078781853eb",
+    "state": "complete",
+    "output_active": false,
+    "owner_id": "c2f587a17c0447e2a23348d7d08f9f12",
+    "job_id": "9f597bd376d944faaf44a50de8bb38a6",
+    "terminal_records": [
+      {
+        "job_id": "9f597bd376d944faaf44a50de8bb38a6",
+        "state": "complete",
+        "ended_monotonic_ns": "173571894416764",
+        "output_active": false
+      }
+    ]
+  },
+  "passed": true,
+  "release": {
+    "type": "response",
+    "protocol": "WTP/1",
+    "session_id": "e32853980b01464994d0857826c4d5ca",
+    "request_id": "af98d5c95c1f4791a5dd634f741e1ffb",
+    "op": "RELEASE",
+    "ok": true,
+    "body": {}
+  },
+  "after": {
+    "boot_id": "87fcacc5ae58bd68cbecd078781853eb",
+    "state": "empty",
+    "output_active": false,
+    "owner_id": null,
+    "job_id": null,
+    "terminal_records": [
+      {
+        "job_id": "9f597bd376d944faaf44a50de8bb38a6",
+        "state": "complete",
+        "ended_monotonic_ns": "173571894416764",
+        "output_active": false
+      }
+    ]
+  },
+  "after_endpoint": {
+    "address": "192.168.1.54",
+    "boot_id": "87fcacc5ae58bd68cbecd078781853eb",
+    "device_id": "e045017b11e54c2fb7029f0154e6deb9",
+    "dns_sd_published": true,
+    "enabled": true,
+    "finishing_remote_job": false,
+    "launch_observed_monotonic_ns": "173461230159148",
+    "launch_target_monotonic_ns": "173461230018142",
+    "listener_error": "",
+    "listener_running": true,
+    "local_effective": false,
+    "local_requested": false,
+    "local_work_active": false,
+    "output_unknown": false,
+    "port": 31417,
+    "remote_admission_closed": false,
+    "remote_job_id": "",
+    "remote_output_active": false,
+    "remote_owner": "",
+    "remote_state": "empty",
+    "revocation_generation": "11",
+    "revocation_unavailable": false,
+    "schema": "wsprrypi-wtp-endpoint/1"
+  },
+  "transitions": [
+    {
+      "utc_ns": "1790891513006861526",
+      "status": {
+        "boot_id": "87fcacc5ae58bd68cbecd078781853eb",
+        "state": "armed",
+        "output_active": false,
+        "owner_id": "c2f587a17c0447e2a23348d7d08f9f12",
+        "job_id": "9f597bd376d944faaf44a50de8bb38a6",
+        "terminal_records": []
+      }
+    },
+    {
+      "utc_ns": "1790891517202942133",
+      "status": {
+        "boot_id": "87fcacc5ae58bd68cbecd078781853eb",
+        "state": "running",
+        "output_active": true,
+        "owner_id": "c2f587a17c0447e2a23348d7d08f9f12",
+        "job_id": "9f597bd376d944faaf44a50de8bb38a6",
+        "terminal_records": []
+      }
+    },
+    {
+      "utc_ns": "1790891627854418022",
+      "status": {
+        "boot_id": "87fcacc5ae58bd68cbecd078781853eb",
+        "state": "complete",
+        "output_active": false,
+        "owner_id": "c2f587a17c0447e2a23348d7d08f9f12",
+        "job_id": "9f597bd376d944faaf44a50de8bb38a6",
+        "terminal_records": [
+          {
+            "job_id": "9f597bd376d944faaf44a50de8bb38a6",
+            "state": "complete",
+            "ended_monotonic_ns": "173571894416764",
+            "output_active": false
+          }
+        ]
+      }
+    }
+  ],
+  "running_observations": 506
+}

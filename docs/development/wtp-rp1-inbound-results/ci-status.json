@@ -1,0 +1,36 @@
+{
+  "run_id": 36927241377,
+  "url": "https://github.com/WsprryPi/WsprryPi/actions/runs/36927241377",
+  "jobs": [
+    {
+      "name": "macos-simulated-profile",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/WsprryPi/WsprryPi/actions/runs/36927241377/job/110587481719"
+    },
+    {
+      "name": "wtp-network-loopback",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/WsprryPi/WsprryPi/actions/runs/36927241377/job/110587481783"
+    },
+    {
+      "name": "ubuntu-gcc13-release",
+      "status": "completed",
+      "conclusion": "cancelled",
+      "url": "https://github.com/WsprryPi/WsprryPi/actions/runs/36927241377/job/110587481871"
+    },
+    {
+      "name": "non-hardware-validation",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/WsprryPi/WsprryPi/actions/runs/36927241377/job/110587481978"
+    },
+    {
+      "name": "strict-i2c-profile",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/WsprryPi/WsprryPi/actions/runs/36927241377/job/110587481987"
+    }
+  ]
+}

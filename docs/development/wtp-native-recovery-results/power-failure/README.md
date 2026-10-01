@@ -52,12 +52,14 @@ closes the final case in the recorded live failure-recovery campaign.
 The source commit's CI run `36791292993` completed with full Linux validation,
 release and strict I2C jobs passing. Mac `wtp-pi-tone-engine-test` failed its
 completion assertion, and the network job's browser integration timed out
-starting Chromium. Both CI issues remain open; this physical result does not
-resolve them.
+starting Chromium. Those were the results at the time of this power test;
+later CI passed both jobs, as linked in the
+[current endpoint report](../../wtp-rp1-inbound-report.md).
 
-Broader acceptance still includes RP1 physical WTP, eight simultaneous targets,
-a mixed physical Pi/Pico fleet, sustained scheduling/reconnection, live-browser
-Fleet editing and discovery topology/cache changes.
+RP1 GPIO20 inbound WTP and mixed physical Fleet acceptance subsequently passed.
+Eight-way testing is excluded by operator instruction. The current endpoint
+report tracks the remaining reconnection, browser Fleet editing, discovery
+topology/cache and canceled GCC release CI work.
 
 Application development evidence and the campaign status were updated. Operator
 backend, takeover and Fleet documentation was reviewed and left unchanged:

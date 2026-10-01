@@ -116,11 +116,17 @@ DNS-SD is available. The current combiner connections can remain in place.
 
 ## Remaining wider acceptance
 
-- Eight isolated simulated targets; available physical inventory is five remote
-  members plus the central local output.
 - Sustained scheduling/reconnection beyond these three clean rounds.
-- Both local takeover choices through a browser connected to actual Pis.
+- Fleet assignment creation/editing through a browser connected to an actual Pi.
+  Both local takeover choices already passed in the
+  [wspr4 native recovery campaign](wtp-native-recovery-results/README.md).
 - Discovery link loss, address changes, multihomed recovery and cache expiry.
+
+Eight-way testing is excluded by the operator's explicit instruction. Fleet
+acceptance uses the available five remote devices and central local output,
+with two receiver groups constrained by the four-way combiner.
+The separate wspr5 inbound WTP GPIO20 test is recorded in
+[the RP1 endpoint acceptance report](wtp-rp1-inbound-report.md).
 
 This pass does not claim those campaigns, WSPR decode, frequency calibration,
 full RF-chain qualification or release readiness.
