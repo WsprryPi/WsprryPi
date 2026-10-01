@@ -1,0 +1,193 @@
+{
+  "criterion": "Corresponding SDR signal, 30 dB peak over masked nearby median noise throughout slot interior, and 15 dB median on/off contrast. No RF-chain, frequency calibration or decode qualification.",
+  "capture_metadata": {
+    "schema_version": 1,
+    "helper_version": "0.2.0",
+    "evidence_type": "capture_success",
+    "capture_id": "concurrent-fleet-second-group",
+    "timestamps": {
+      "helper_start_utc": "2026-10-01T20:54:11.573Z",
+      "configuration_start_utc": "2026-10-01T20:54:11.573Z",
+      "configuration_complete_utc": "2026-10-01T20:54:12.091Z",
+      "first_read_start_utc": "2026-10-01T20:54:12.091Z",
+      "first_read_complete_utc": "2026-10-01T20:54:12.156Z",
+      "retained_capture_start_utc": "2026-10-01T20:54:12.156Z",
+      "retained_capture_complete_utc": "2026-10-01T21:00:30.165Z",
+      "cleanup_start_utc": "2026-10-01T21:00:37.167Z",
+      "cleanup_complete_utc": "2026-10-01T21:00:38.283Z",
+      "helper_complete_utc": "2026-10-01T21:00:38.283Z"
+    },
+    "elapsed_duration_s": 386.7103597680107,
+    "limits": {
+      "read_timeout_us": 500000,
+      "max_elapsed_duration_s": 393,
+      "max_read_calls": 1000000
+    },
+    "requested_device": {
+      "driver": "sdrplay",
+      "serial": "2404058C60"
+    },
+    "resolved_device": {
+      "driver": "sdrplay",
+      "serial": "2404058C60"
+    },
+    "requested_settings": {
+      "format": "CF32",
+      "sample_rate_hz": 250000,
+      "bandwidth_hz": 200000,
+      "center_frequency_hz": 14075100,
+      "gain_db": 20,
+      "channel": 0,
+      "agc": false,
+      "bias_tee": false
+    },
+    "actual_settings": {
+      "format": "CF32",
+      "sample_rate_hz": 250000,
+      "bandwidth_hz": 200000,
+      "center_frequency_hz": 14075100,
+      "gain_db": 20,
+      "channel": 0,
+      "agc": false,
+      "bias_tee": false
+    },
+    "wire_format": {
+      "sample_format": "CF32",
+      "component_type": "IEEE754_binary32",
+      "interleave": "real_imaginary",
+      "byte_order": "little_endian",
+      "bytes_per_complex_sample": 8
+    },
+    "first_read": {
+      "attempted": true,
+      "discarded": true,
+      "sample_count": 8064,
+      "included_in_overflow_and_clipping_statistics": false
+    },
+    "requested_sample_count": 94500000,
+    "retained_sample_count": 94500000,
+    "read_call_count": 11720,
+    "partial_read_count": 11718,
+    "timeout_count": 0,
+    "overflow_count": 0,
+    "clipping": {
+      "threshold": 0.9990000128746033,
+      "sample_count": 0
+    },
+    "output": {
+      "path": "/home/pi/wtp-managed-rp1-fix/part2/run2/capture.cf32",
+      "present": true,
+      "complete": true,
+      "size_bytes": 756000000,
+      "sha256": "dc42732023ad8e80d978ffa9ce0775ee358d5f1c592d5234f9720ccfed127849",
+      "removed_incomplete_size_bytes": 0,
+      "removed_incomplete_sha256": null
+    },
+    "primary_outcome": "success",
+    "primary_failure_cause": null,
+    "failure_causes": [],
+    "cleanup": {
+      "outcome": "verified",
+      "attempted_steps": [
+        "deactivate_stream",
+        "close_stream",
+        "release_device"
+      ],
+      "failed_steps": []
+    },
+    "process_exit_code": 0
+  },
+  "capture_exit": {
+    "exit_code": 0
+  },
+  "remote_slots": [
+    {
+      "start_utc_seconds": 1790888161,
+      "outputs": {
+        "wspr2": {
+          "samples": 16,
+          "minimum_on_snr_db": 89.130639707774,
+          "median_on_snr_db": 89.61261451076626,
+          "maximum_off_snr_db": 20.22924583701373,
+          "median_off_snr_db": 19.295261110801945,
+          "median_peak_hz": 14101116.235351562,
+          "corresponding_signal_observed": true
+        },
+        "Pico A": {
+          "samples": 16,
+          "minimum_on_snr_db": 85.16757446448638,
+          "median_on_snr_db": 85.57354882915328,
+          "maximum_off_snr_db": 12.633248550033478,
+          "median_off_snr_db": 8.73394786358283,
+          "median_peak_hz": 14100128.228759766,
+          "corresponding_signal_observed": true
+        }
+      },
+      "both_signals_observed": true
+    },
+    {
+      "start_utc_seconds": 1790888281,
+      "outputs": {
+        "wspr2": {
+          "samples": 16,
+          "minimum_on_snr_db": 89.46930412400143,
+          "median_on_snr_db": 90.0677157575882,
+          "maximum_off_snr_db": 10.095691284073638,
+          "median_off_snr_db": 9.272896699802608,
+          "median_peak_hz": 14101116.235351562,
+          "corresponding_signal_observed": true
+        },
+        "Pico A": {
+          "samples": 16,
+          "minimum_on_snr_db": 85.34120385273091,
+          "median_on_snr_db": 86.23799992247851,
+          "maximum_off_snr_db": 11.33912282529193,
+          "median_off_snr_db": 9.313827830389856,
+          "median_peak_hz": 14100128.228759766,
+          "corresponding_signal_observed": true
+        }
+      },
+      "both_signals_observed": true
+    },
+    {
+      "start_utc_seconds": 1790888401,
+      "outputs": {
+        "wspr2": {
+          "samples": 16,
+          "minimum_on_snr_db": 89.73555157428129,
+          "median_on_snr_db": 90.09022876113485,
+          "maximum_off_snr_db": 10.479088050075626,
+          "median_off_snr_db": 8.985727933232326,
+          "median_peak_hz": 14101116.235351562,
+          "corresponding_signal_observed": true
+        },
+        "Pico A": {
+          "samples": 16,
+          "minimum_on_snr_db": 84.78816137077786,
+          "median_on_snr_db": 85.71987453934051,
+          "maximum_off_snr_db": 9.415059393414031,
+          "median_off_snr_db": 8.944457552577006,
+          "median_peak_hz": 14100128.228759766,
+          "corresponding_signal_observed": true
+        }
+      },
+      "both_signals_observed": true
+    }
+  ],
+  "local_wspr": {
+    "samples": 216,
+    "minimum_on_snr_db": 80.9398474512108,
+    "median_on_snr_db": 87.8034581030251,
+    "maximum_off_snr_db": 10.098471188383352,
+    "median_off_snr_db": 8.905003050102204,
+    "median_peak_hz": 14097076.470947266,
+    "corresponding_signal_observed": true,
+    "intended_duration_ns": 110592000000,
+    "precision_edge_timing_claimed": false
+  },
+  "all_second_group_signals_observed": true,
+  "fft_size": 65536,
+  "step_samples": 125000,
+  "sample_rate": 250000,
+  "timestamps": "FFT window centres from retained capture UTC; not precision edge timing."
+}

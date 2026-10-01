@@ -1,0 +1,790 @@
+{
+  "five_remote_targets_three_slots_passed": true,
+  "completed_remote_jobs": 15,
+  "per_output": {
+    "d133ed890b90f6945b41a235429ff155": {
+      "name": "Concurrent Fleet wspr1",
+      "passed": true,
+      "completed": [
+        {
+          "name": "Concurrent Fleet wspr1",
+          "device_id": "d133ed890b90f6945b41a235429ff155",
+          "adjustments": [
+            {
+              "event_index": 0,
+              "realized_frequency_nhz": "14099100000001172",
+              "requested_frequency_nhz": "14099100000000000"
+            }
+          ],
+          "arm_handed_off": true,
+          "dispatch_utc_ns": "1790888146000000000",
+          "error": "",
+          "execution": {
+            "cleanup": {
+              "error": "",
+              "ok": true
+            },
+            "cleanup_attempted": true,
+            "error": "",
+            "faulted": false,
+            "ok": true,
+            "stopped": false
+          },
+          "identity": {
+            "boot_id": "ebb2faf2e0411e0062cd6e342803a182",
+            "device_id": "d133ed890b90f6945b41a235429ff155",
+            "firmware_version": "3.2.0-devel+6a32789",
+            "product": "WsprryPi"
+          },
+          "job": {
+            "authoritative": true,
+            "boot_id": "ebb2faf2e0411e0062cd6e342803a182",
+            "device_id": "d133ed890b90f6945b41a235429ff155",
+            "device_output_active": false,
+            "job_id": "dca20044d3690cb70000000000000001",
+            "output_active": false,
+            "state": "complete"
+          },
+          "job_id": "dca20044d3690cb70000000000000001",
+          "outcome": "complete",
+          "reload_deferred": false,
+          "request_id": "1",
+          "skipped": false,
+          "start_utc_ns": "1790888161000000000"
+        },
+        {
+          "name": "Concurrent Fleet wspr1",
+          "device_id": "d133ed890b90f6945b41a235429ff155",
+          "adjustments": [
+            {
+              "event_index": 0,
+              "realized_frequency_nhz": "14099100000001172",
+              "requested_frequency_nhz": "14099100000000000"
+            }
+          ],
+          "arm_handed_off": true,
+          "dispatch_utc_ns": "1790888266000000000",
+          "error": "",
+          "execution": {
+            "cleanup": {
+              "error": "",
+              "ok": true
+            },
+            "cleanup_attempted": true,
+            "error": "",
+            "faulted": false,
+            "ok": true,
+            "stopped": false
+          },
+          "identity": {
+            "boot_id": "ebb2faf2e0411e0062cd6e342803a182",
+            "device_id": "d133ed890b90f6945b41a235429ff155",
+            "firmware_version": "3.2.0-devel+6a32789",
+            "product": "WsprryPi"
+          },
+          "job": {
+            "authoritative": true,
+            "boot_id": "ebb2faf2e0411e0062cd6e342803a182",
+            "device_id": "d133ed890b90f6945b41a235429ff155",
+            "device_output_active": false,
+            "job_id": "dca20044d3690cb70000000000000002",
+            "output_active": false,
+            "state": "complete"
+          },
+          "job_id": "dca20044d3690cb70000000000000002",
+          "outcome": "complete",
+          "reload_deferred": false,
+          "request_id": "2",
+          "skipped": false,
+          "start_utc_ns": "1790888281000000000"
+        },
+        {
+          "name": "Concurrent Fleet wspr1",
+          "device_id": "d133ed890b90f6945b41a235429ff155",
+          "adjustments": [
+            {
+              "event_index": 0,
+              "realized_frequency_nhz": "14099100000001172",
+              "requested_frequency_nhz": "14099100000000000"
+            }
+          ],
+          "arm_handed_off": true,
+          "dispatch_utc_ns": "1790888386000000000",
+          "error": "",
+          "execution": {
+            "cleanup": {
+              "error": "",
+              "ok": true
+            },
+            "cleanup_attempted": true,
+            "error": "",
+            "faulted": false,
+            "ok": true,
+            "stopped": false
+          },
+          "identity": {
+            "boot_id": "ebb2faf2e0411e0062cd6e342803a182",
+            "device_id": "d133ed890b90f6945b41a235429ff155",
+            "firmware_version": "3.2.0-devel+6a32789",
+            "product": "WsprryPi"
+          },
+          "job": {
+            "authoritative": true,
+            "boot_id": "ebb2faf2e0411e0062cd6e342803a182",
+            "device_id": "d133ed890b90f6945b41a235429ff155",
+            "device_output_active": false,
+            "job_id": "dca20044d3690cb70000000000000003",
+            "output_active": false,
+            "state": "complete"
+          },
+          "job_id": "dca20044d3690cb70000000000000003",
+          "outcome": "complete",
+          "reload_deferred": false,
+          "request_id": "3",
+          "skipped": false,
+          "start_utc_ns": "1790888401000000000"
+        }
+      ]
+    },
+    "f21e530af8a4a210ec57898c0ebd32d2": {
+      "name": "Concurrent Fleet wspr4",
+      "passed": true,
+      "completed": [
+        {
+          "name": "Concurrent Fleet wspr4",
+          "device_id": "f21e530af8a4a210ec57898c0ebd32d2",
+          "adjustments": [
+            {
+              "event_index": 0,
+              "realized_frequency_nhz": "14098099999992376",
+              "requested_frequency_nhz": "14098100000000000"
+            }
+          ],
+          "arm_handed_off": true,
+          "dispatch_utc_ns": "1790888146000000000",
+          "error": "",
+          "execution": {
+            "cleanup": {
+              "error": "",
+              "ok": true
+            },
+            "cleanup_attempted": true,
+            "error": "",
+            "faulted": false,
+            "ok": true,
+            "stopped": false
+          },
+          "identity": {
+            "boot_id": "19d88d5752e3f3ad9765815d3ccf16eb",
+            "device_id": "f21e530af8a4a210ec57898c0ebd32d2",
+            "firmware_version": "3.2.0-devel+2f67b00",
+            "product": "WsprryPi"
+          },
+          "job": {
+            "authoritative": true,
+            "boot_id": "19d88d5752e3f3ad9765815d3ccf16eb",
+            "device_id": "f21e530af8a4a210ec57898c0ebd32d2",
+            "device_output_active": false,
+            "job_id": "876bb5d43548dd250000000000000001",
+            "output_active": false,
+            "state": "complete"
+          },
+          "job_id": "876bb5d43548dd250000000000000001",
+          "outcome": "complete",
+          "reload_deferred": false,
+          "request_id": "1",
+          "skipped": false,
+          "start_utc_ns": "1790888161000000000"
+        },
+        {
+          "name": "Concurrent Fleet wspr4",
+          "device_id": "f21e530af8a4a210ec57898c0ebd32d2",
+          "adjustments": [
+            {
+              "event_index": 0,
+              "realized_frequency_nhz": "14098099999992376",
+              "requested_frequency_nhz": "14098100000000000"
+            }
+          ],
+          "arm_handed_off": true,
+          "dispatch_utc_ns": "1790888266000000000",
+          "error": "",
+          "execution": {
+            "cleanup": {
+              "error": "",
+              "ok": true
+            },
+            "cleanup_attempted": true,
+            "error": "",
+            "faulted": false,
+            "ok": true,
+            "stopped": false
+          },
+          "identity": {
+            "boot_id": "19d88d5752e3f3ad9765815d3ccf16eb",
+            "device_id": "f21e530af8a4a210ec57898c0ebd32d2",
+            "firmware_version": "3.2.0-devel+2f67b00",
+            "product": "WsprryPi"
+          },
+          "job": {
+            "authoritative": true,
+            "boot_id": "19d88d5752e3f3ad9765815d3ccf16eb",
+            "device_id": "f21e530af8a4a210ec57898c0ebd32d2",
+            "device_output_active": false,
+            "job_id": "876bb5d43548dd250000000000000002",
+            "output_active": false,
+            "state": "complete"
+          },
+          "job_id": "876bb5d43548dd250000000000000002",
+          "outcome": "complete",
+          "reload_deferred": false,
+          "request_id": "2",
+          "skipped": false,
+          "start_utc_ns": "1790888281000000000"
+        },
+        {
+          "name": "Concurrent Fleet wspr4",
+          "device_id": "f21e530af8a4a210ec57898c0ebd32d2",
+          "adjustments": [
+            {
+              "event_index": 0,
+              "realized_frequency_nhz": "14098099999992376",
+              "requested_frequency_nhz": "14098100000000000"
+            }
+          ],
+          "arm_handed_off": true,
+          "dispatch_utc_ns": "1790888386000000000",
+          "error": "",
+          "execution": {
+            "cleanup": {
+              "error": "",
+              "ok": true
+            },
+            "cleanup_attempted": true,
+            "error": "",
+            "faulted": false,
+            "ok": true,
+            "stopped": false
+          },
+          "identity": {
+            "boot_id": "19d88d5752e3f3ad9765815d3ccf16eb",
+            "device_id": "f21e530af8a4a210ec57898c0ebd32d2",
+            "firmware_version": "3.2.0-devel+2f67b00",
+            "product": "WsprryPi"
+          },
+          "job": {
+            "authoritative": true,
+            "boot_id": "19d88d5752e3f3ad9765815d3ccf16eb",
+            "device_id": "f21e530af8a4a210ec57898c0ebd32d2",
+            "device_output_active": false,
+            "job_id": "876bb5d43548dd250000000000000003",
+            "output_active": false,
+            "state": "complete"
+          },
+          "job_id": "876bb5d43548dd250000000000000003",
+          "outcome": "complete",
+          "reload_deferred": false,
+          "request_id": "3",
+          "skipped": false,
+          "start_utc_ns": "1790888401000000000"
+        }
+      ]
+    },
+    "e2a4d273f7d8f24f6696f7c6fb95ff11": {
+      "name": "Concurrent Fleet wspr2",
+      "passed": true,
+      "completed": [
+        {
+          "name": "Concurrent Fleet wspr2",
+          "device_id": "e2a4d273f7d8f24f6696f7c6fb95ff11",
+          "adjustments": [
+            {
+              "event_index": 0,
+              "realized_frequency_nhz": "14101100000003148",
+              "requested_frequency_nhz": "14101100000000000"
+            }
+          ],
+          "arm_handed_off": true,
+          "dispatch_utc_ns": "1790888146000000000",
+          "error": "",
+          "execution": {
+            "cleanup": {
+              "error": "",
+              "ok": true
+            },
+            "cleanup_attempted": true,
+            "error": "",
+            "faulted": false,
+            "ok": true,
+            "stopped": false
+          },
+          "identity": {
+            "boot_id": "202a2bb6e7112d46ece078f692dde2c2",
+            "device_id": "e2a4d273f7d8f24f6696f7c6fb95ff11",
+            "firmware_version": "3.2.0-devel+2f67b00",
+            "product": "WsprryPi"
+          },
+          "job": {
+            "authoritative": true,
+            "boot_id": "202a2bb6e7112d46ece078f692dde2c2",
+            "device_id": "e2a4d273f7d8f24f6696f7c6fb95ff11",
+            "device_output_active": false,
+            "job_id": "d33c9acf4541acb60000000000000001",
+            "output_active": false,
+            "state": "complete"
+          },
+          "job_id": "d33c9acf4541acb60000000000000001",
+          "outcome": "complete",
+          "reload_deferred": false,
+          "request_id": "1",
+          "skipped": false,
+          "start_utc_ns": "1790888161000000000"
+        },
+        {
+          "name": "Concurrent Fleet wspr2",
+          "device_id": "e2a4d273f7d8f24f6696f7c6fb95ff11",
+          "adjustments": [
+            {
+              "event_index": 0,
+              "realized_frequency_nhz": "14101100000003148",
+              "requested_frequency_nhz": "14101100000000000"
+            }
+          ],
+          "arm_handed_off": true,
+          "dispatch_utc_ns": "1790888266000000000",
+          "error": "",
+          "execution": {
+            "cleanup": {
+              "error": "",
+              "ok": true
+            },
+            "cleanup_attempted": true,
+            "error": "",
+            "faulted": false,
+            "ok": true,
+            "stopped": false
+          },
+          "identity": {
+            "boot_id": "202a2bb6e7112d46ece078f692dde2c2",
+            "device_id": "e2a4d273f7d8f24f6696f7c6fb95ff11",
+            "firmware_version": "3.2.0-devel+2f67b00",
+            "product": "WsprryPi"
+          },
+          "job": {
+            "authoritative": true,
+            "boot_id": "202a2bb6e7112d46ece078f692dde2c2",
+            "device_id": "e2a4d273f7d8f24f6696f7c6fb95ff11",
+            "device_output_active": false,
+            "job_id": "d33c9acf4541acb60000000000000002",
+            "output_active": false,
+            "state": "complete"
+          },
+          "job_id": "d33c9acf4541acb60000000000000002",
+          "outcome": "complete",
+          "reload_deferred": false,
+          "request_id": "2",
+          "skipped": false,
+          "start_utc_ns": "1790888281000000000"
+        },
+        {
+          "name": "Concurrent Fleet wspr2",
+          "device_id": "e2a4d273f7d8f24f6696f7c6fb95ff11",
+          "adjustments": [
+            {
+              "event_index": 0,
+              "realized_frequency_nhz": "14101100000003148",
+              "requested_frequency_nhz": "14101100000000000"
+            }
+          ],
+          "arm_handed_off": true,
+          "dispatch_utc_ns": "1790888386000000000",
+          "error": "",
+          "execution": {
+            "cleanup": {
+              "error": "",
+              "ok": true
+            },
+            "cleanup_attempted": true,
+            "error": "",
+            "faulted": false,
+            "ok": true,
+            "stopped": false
+          },
+          "identity": {
+            "boot_id": "202a2bb6e7112d46ece078f692dde2c2",
+            "device_id": "e2a4d273f7d8f24f6696f7c6fb95ff11",
+            "firmware_version": "3.2.0-devel+2f67b00",
+            "product": "WsprryPi"
+          },
+          "job": {
+            "authoritative": true,
+            "boot_id": "202a2bb6e7112d46ece078f692dde2c2",
+            "device_id": "e2a4d273f7d8f24f6696f7c6fb95ff11",
+            "device_output_active": false,
+            "job_id": "d33c9acf4541acb60000000000000003",
+            "output_active": false,
+            "state": "complete"
+          },
+          "job_id": "d33c9acf4541acb60000000000000003",
+          "outcome": "complete",
+          "reload_deferred": false,
+          "request_id": "3",
+          "skipped": false,
+          "start_utc_ns": "1790888401000000000"
+        }
+      ]
+    },
+    "fd6127d11d6aca42a9905fa3fb1bf1d5": {
+      "name": "Concurrent Fleet Pico A",
+      "passed": true,
+      "completed": [
+        {
+          "name": "Concurrent Fleet Pico A",
+          "device_id": "fd6127d11d6aca42a9905fa3fb1bf1d5",
+          "adjustments": [
+            {
+              "event_index": 0,
+              "realized_frequency_nhz": "14100099989678711",
+              "requested_frequency_nhz": "14100100000000000"
+            }
+          ],
+          "arm_handed_off": true,
+          "dispatch_utc_ns": "1790888147900000000",
+          "error": "",
+          "execution": {
+            "cleanup": {
+              "error": "",
+              "ok": true
+            },
+            "cleanup_attempted": true,
+            "error": "",
+            "faulted": false,
+            "ok": true,
+            "stopped": false
+          },
+          "identity": {
+            "boot_id": "4296284b4460bb4578b4637ac020a590",
+            "device_id": "fd6127d11d6aca42a9905fa3fb1bf1d5",
+            "firmware_version": "0.0.0-devel",
+            "product": "WsprryPico"
+          },
+          "job": {
+            "authoritative": true,
+            "boot_id": "4296284b4460bb4578b4637ac020a590",
+            "device_id": "fd6127d11d6aca42a9905fa3fb1bf1d5",
+            "device_output_active": false,
+            "job_id": "61e92649c01a1a2f0000000000000001",
+            "output_active": false,
+            "state": "complete"
+          },
+          "job_id": "61e92649c01a1a2f0000000000000001",
+          "outcome": "complete",
+          "reload_deferred": false,
+          "request_id": "1",
+          "skipped": false,
+          "start_utc_ns": "1790888161000000000"
+        },
+        {
+          "name": "Concurrent Fleet Pico A",
+          "device_id": "fd6127d11d6aca42a9905fa3fb1bf1d5",
+          "adjustments": [
+            {
+              "event_index": 0,
+              "realized_frequency_nhz": "14100099989678711",
+              "requested_frequency_nhz": "14100100000000000"
+            }
+          ],
+          "arm_handed_off": true,
+          "dispatch_utc_ns": "1790888267900000000",
+          "error": "",
+          "execution": {
+            "cleanup": {
+              "error": "",
+              "ok": true
+            },
+            "cleanup_attempted": true,
+            "error": "",
+            "faulted": false,
+            "ok": true,
+            "stopped": false
+          },
+          "identity": {
+            "boot_id": "4296284b4460bb4578b4637ac020a590",
+            "device_id": "fd6127d11d6aca42a9905fa3fb1bf1d5",
+            "firmware_version": "0.0.0-devel",
+            "product": "WsprryPico"
+          },
+          "job": {
+            "authoritative": true,
+            "boot_id": "4296284b4460bb4578b4637ac020a590",
+            "device_id": "fd6127d11d6aca42a9905fa3fb1bf1d5",
+            "device_output_active": false,
+            "job_id": "61e92649c01a1a2f0000000000000002",
+            "output_active": false,
+            "state": "complete"
+          },
+          "job_id": "61e92649c01a1a2f0000000000000002",
+          "outcome": "complete",
+          "reload_deferred": false,
+          "request_id": "2",
+          "skipped": false,
+          "start_utc_ns": "1790888281000000000"
+        },
+        {
+          "name": "Concurrent Fleet Pico A",
+          "device_id": "fd6127d11d6aca42a9905fa3fb1bf1d5",
+          "adjustments": [
+            {
+              "event_index": 0,
+              "realized_frequency_nhz": "14100099989678711",
+              "requested_frequency_nhz": "14100100000000000"
+            }
+          ],
+          "arm_handed_off": true,
+          "dispatch_utc_ns": "1790888387900000000",
+          "error": "",
+          "execution": {
+            "cleanup": {
+              "error": "",
+              "ok": true
+            },
+            "cleanup_attempted": true,
+            "error": "",
+            "faulted": false,
+            "ok": true,
+            "stopped": false
+          },
+          "identity": {
+            "boot_id": "4296284b4460bb4578b4637ac020a590",
+            "device_id": "fd6127d11d6aca42a9905fa3fb1bf1d5",
+            "firmware_version": "0.0.0-devel",
+            "product": "WsprryPico"
+          },
+          "job": {
+            "authoritative": true,
+            "boot_id": "4296284b4460bb4578b4637ac020a590",
+            "device_id": "fd6127d11d6aca42a9905fa3fb1bf1d5",
+            "device_output_active": false,
+            "job_id": "61e92649c01a1a2f0000000000000003",
+            "output_active": false,
+            "state": "complete"
+          },
+          "job_id": "61e92649c01a1a2f0000000000000003",
+          "outcome": "complete",
+          "reload_deferred": false,
+          "request_id": "3",
+          "skipped": false,
+          "start_utc_ns": "1790888401000000000"
+        }
+      ]
+    },
+    "29f20b7342051ef947aa56cb9d4fab42": {
+      "name": "Concurrent Fleet Pico B",
+      "passed": true,
+      "completed": [
+        {
+          "name": "Concurrent Fleet Pico B",
+          "device_id": "29f20b7342051ef947aa56cb9d4fab42",
+          "adjustments": [
+            {
+              "event_index": 0,
+              "realized_frequency_nhz": "14102099992800504",
+              "requested_frequency_nhz": "14102100000000000"
+            }
+          ],
+          "arm_handed_off": true,
+          "dispatch_utc_ns": "1790888147900000000",
+          "error": "",
+          "execution": {
+            "cleanup": {
+              "error": "",
+              "ok": true
+            },
+            "cleanup_attempted": true,
+            "error": "",
+            "faulted": false,
+            "ok": true,
+            "stopped": false
+          },
+          "identity": {
+            "boot_id": "6df5d78b8ceddf07c0864799318f1bc5",
+            "device_id": "29f20b7342051ef947aa56cb9d4fab42",
+            "firmware_version": "0.0.0-devel",
+            "product": "WsprryPico"
+          },
+          "job": {
+            "authoritative": true,
+            "boot_id": "6df5d78b8ceddf07c0864799318f1bc5",
+            "device_id": "29f20b7342051ef947aa56cb9d4fab42",
+            "device_output_active": false,
+            "job_id": "3f850855db29f19f0000000000000001",
+            "output_active": false,
+            "state": "complete"
+          },
+          "job_id": "3f850855db29f19f0000000000000001",
+          "outcome": "complete",
+          "reload_deferred": false,
+          "request_id": "1",
+          "skipped": false,
+          "start_utc_ns": "1790888161000000000"
+        },
+        {
+          "name": "Concurrent Fleet Pico B",
+          "device_id": "29f20b7342051ef947aa56cb9d4fab42",
+          "adjustments": [
+            {
+              "event_index": 0,
+              "realized_frequency_nhz": "14102099992800504",
+              "requested_frequency_nhz": "14102100000000000"
+            }
+          ],
+          "arm_handed_off": true,
+          "dispatch_utc_ns": "1790888267900000000",
+          "error": "",
+          "execution": {
+            "cleanup": {
+              "error": "",
+              "ok": true
+            },
+            "cleanup_attempted": true,
+            "error": "",
+            "faulted": false,
+            "ok": true,
+            "stopped": false
+          },
+          "identity": {
+            "boot_id": "6df5d78b8ceddf07c0864799318f1bc5",
+            "device_id": "29f20b7342051ef947aa56cb9d4fab42",
+            "firmware_version": "0.0.0-devel",
+            "product": "WsprryPico"
+          },
+          "job": {
+            "authoritative": true,
+            "boot_id": "6df5d78b8ceddf07c0864799318f1bc5",
+            "device_id": "29f20b7342051ef947aa56cb9d4fab42",
+            "device_output_active": false,
+            "job_id": "3f850855db29f19f0000000000000002",
+            "output_active": false,
+            "state": "complete"
+          },
+          "job_id": "3f850855db29f19f0000000000000002",
+          "outcome": "complete",
+          "reload_deferred": false,
+          "request_id": "2",
+          "skipped": false,
+          "start_utc_ns": "1790888281000000000"
+        },
+        {
+          "name": "Concurrent Fleet Pico B",
+          "device_id": "29f20b7342051ef947aa56cb9d4fab42",
+          "adjustments": [
+            {
+              "event_index": 0,
+              "realized_frequency_nhz": "14102099992800504",
+              "requested_frequency_nhz": "14102100000000000"
+            }
+          ],
+          "arm_handed_off": true,
+          "dispatch_utc_ns": "1790888387900000000",
+          "error": "",
+          "execution": {
+            "cleanup": {
+              "error": "",
+              "ok": true
+            },
+            "cleanup_attempted": true,
+            "error": "",
+            "faulted": false,
+            "ok": true,
+            "stopped": false
+          },
+          "identity": {
+            "boot_id": "6df5d78b8ceddf07c0864799318f1bc5",
+            "device_id": "29f20b7342051ef947aa56cb9d4fab42",
+            "firmware_version": "0.0.0-devel",
+            "product": "WsprryPico"
+          },
+          "job": {
+            "authoritative": true,
+            "boot_id": "6df5d78b8ceddf07c0864799318f1bc5",
+            "device_id": "29f20b7342051ef947aa56cb9d4fab42",
+            "device_output_active": false,
+            "job_id": "3f850855db29f19f0000000000000003",
+            "output_active": false,
+            "state": "complete"
+          },
+          "job_id": "3f850855db29f19f0000000000000003",
+          "outcome": "complete",
+          "reload_deferred": false,
+          "request_id": "3",
+          "skipped": false,
+          "start_utc_ns": "1790888401000000000"
+        }
+      ]
+    }
+  },
+  "simultaneously_active_observations": {
+    "1790888401000000000": [
+      "1790888401344637198",
+      "1790888402154005832",
+      "1790888402963476985",
+      "1790888403772855119",
+      "1790888404586166042",
+      "1790888405399350206",
+      "1790888406209001451",
+      "1790888407018341733",
+      "1790888407827913923",
+      "1790888408637322297",
+      "1790888409447118857",
+      "1790888410256474991"
+    ],
+    "1790888281000000000": [
+      "1790888281533313685",
+      "1790888282342886259",
+      "1790888283152371871",
+      "1790888283961619853",
+      "1790888284774907716",
+      "1790888285584502939",
+      "1790888286393898678",
+      "1790888287203716302",
+      "1790888288013332705",
+      "1790888288822936218",
+      "1790888289632615491",
+      "1790888290445105943"
+    ],
+    "1790888161000000000": [
+      "1790888161619249833",
+      "1790888162426723398",
+      "1790888163234466499",
+      "1790888164041853323",
+      "1790888164849364868",
+      "1790888165656684044",
+      "1790888166466512992",
+      "1790888167273968816",
+      "1790888168081308344",
+      "1790888168888604483",
+      "1790888169695915862",
+      "1790888170503189260"
+    ]
+  },
+  "local_work_overlap_observations": [
+    "1790888161619249833",
+    "1790888162426723398",
+    "1790888163234466499",
+    "1790888164041853323",
+    "1790888164849364868",
+    "1790888165656684044",
+    "1790888166466512992",
+    "1790888167273968816",
+    "1790888168081308344",
+    "1790888168888604483",
+    "1790888169695915862",
+    "1790888170503189260"
+  ],
+  "local_frame_completed": true,
+  "local_completion_lines": [
+    "2026-10-01T15:57:51.726188-05:00 wspr5 wsprrypi[393028]: Completed transmission: 110.725809 seconds."
+  ],
+  "all_outputs_paused_known_off": true,
+  "runner_error": null
+}

@@ -1,0 +1,32 @@
+{
+  "capture.cf32": {
+    "bytes": 756000000,
+    "sha256": "dc42732023ad8e80d978ffa9ce0775ee358d5f1c592d5234f9720ccfed127849",
+    "path": "/home/pi/wtp-managed-rp1-fix/part2/run2/capture.cf32"
+  },
+  "observations.jsonl": {
+    "bytes": 7902047,
+    "sha256": "24393b848ffbcbdfd5d4b9a019302bdfe510a23f7f576a89719e94344b65bbff",
+    "path": "/home/pi/wtp-managed-rp1-fix/part2/run2/observations.jsonl"
+  },
+  "capture.log": {
+    "bytes": 155,
+    "sha256": "82531e6c3f75dd6dbbdc00f689dae49f08552705039ee2ae1f9dce48940a8920",
+    "path": "/home/pi/wtp-managed-rp1-fix/part2/run2/capture.log"
+  },
+  "pretest-controller.json": {
+    "bytes": 16839,
+    "sha256": "c5af8b5764db5fe1fd792e478c4368e46b7212df4b9aa2742ec477e712d6f53b",
+    "path": "/home/pi/wtp-managed-rp1-fix/part2/run2/pretest-controller.json"
+  },
+  "fleet-part2-run.py": {
+    "bytes": 9233,
+    "sha256": "0828cdc62c36a210b57900909d7f5e9bfa6f84b55bcbfe598e7e45078c814f0c",
+    "path": "/home/pi/wtp-managed-rp1-fix/part2/run2/fleet-part2-run.py"
+  },
+  "analyze-part2.py": {
+    "bytes": 7388,
+    "sha256": "22ad849c7e25ade23975d7ef8e522e96e77778f07b93ce3d78394dfb129fc3a8",
+    "path": "/home/pi/wtp-managed-rp1-fix/part2/run2/analyze-part2.py"
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "source_commit": "9a1b8c10036f77f8446b912c481b3ea5dc3d39e8",
+  "changed_source_hashes_match_committed_manifest": true,
+  "unique_completed_remote_jobs": 15,
+  "simultaneous_active_samples_per_slot": {
+    "1790888401000000000": 12,
+    "1790888281000000000": 12,
+    "1790888161000000000": 12
+  },
+  "local_completed_once": true,
+  "local_transmitting_overlaps_first_remote_slot": true,
+  "three_second_group_rf_signals_passed": true,
+  "receiver_cleanup_verified": true,
+  "six_distinct_endpoints_independently_empty_unowned_inactive": true,
+  "canonical_service_restored": true,
+  "binary_and_companion_unchanged": true,
+  "harness_hashes_match_executed_copies": true,
+  "application_source_modified": false
+}

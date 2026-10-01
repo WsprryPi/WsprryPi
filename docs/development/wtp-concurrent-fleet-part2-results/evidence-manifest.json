@@ -1,0 +1,114 @@
+{
+  "scope": "Bounded second receiver-group physical Fleet acceptance",
+  "tested_controller_source": "9a1b8c10036f77f8446b912c481b3ea5dc3d39e8",
+  "compact_files": {
+    "adversarial-review.md": {
+      "bytes": 3430,
+      "sha256": "c38d2bd7983d810029d41e94e15aca5b5c378fa80f436438df32c250326ced09"
+    },
+    "analyze-part2.py": {
+      "bytes": 7388,
+      "sha256": "22ad849c7e25ade23975d7ef8e522e96e77778f07b93ce3d78394dfb129fc3a8"
+    },
+    "capture-command.json": {
+      "bytes": 458,
+      "sha256": "cc31108a944cbcae592150364618ac224f4c7e7534c93a66c384fdeaa7897a00"
+    },
+    "capture-exit.json": {
+      "bytes": 17,
+      "sha256": "e89df0eae5ec7db81135aed16463968955c578bcc4f2ec43172eff351f080c17"
+    },
+    "capture.json": {
+      "bytes": 2491,
+      "sha256": "34512cd560822145299af3e637a3a27d55f8bdd777d951e56148116f33d659ff"
+    },
+    "cleanup-errors.json": {
+      "bytes": 3,
+      "sha256": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570"
+    },
+    "controller-analysis.json": {
+      "bytes": 26034,
+      "sha256": "96df7a4c8159848b2b479bcf5e2fbcd05f807bb8f477531704648ff5bb1ade30"
+    },
+    "controller-journal.log": {
+      "bytes": 11983,
+      "sha256": "5ae21f7fe69711edd28395f3d72526f94db3fafb514f29f31a5223194e9aeba0"
+    },
+    "final-controller.json": {
+      "bytes": 25352,
+      "sha256": "f753e5ffa3995ffe14447a44980b0b6162038c3aa90ea852a4f5de2bf3dc9c80"
+    },
+    "final-device-status.json": {
+      "bytes": 5747,
+      "sha256": "5062f32375b3af32bffdeff4a1f5f51239af5d86fac94f0dd429cd71138fe96f"
+    },
+    "fleet-part2-run.py": {
+      "bytes": 9233,
+      "sha256": "0828cdc62c36a210b57900909d7f5e9bfa6f84b55bcbfe598e7e45078c814f0c"
+    },
+    "launch-confirmation.json": {
+      "bytes": 286,
+      "sha256": "002f26cacb4e1c9fccb74d1fd39467bfb0431e5c0b18e653e69364efacc4f2ed"
+    },
+    "launch-state.json": {
+      "bytes": 1249,
+      "sha256": "3e28bbd72899b1f50e7c380ac42f6fa660bfba4d9fe6d593d1129d5237784872"
+    },
+    "local-state-analysis.json": {
+      "bytes": 14616,
+      "sha256": "bce721fd4d19a62f27a18a8a91032e34c5c8c16212327bd8217afdf81d2e41f9"
+    },
+    "post-restoration-device-status.json": {
+      "bytes": 5747,
+      "sha256": "5062f32375b3af32bffdeff4a1f5f51239af5d86fac94f0dd429cd71138fe96f"
+    },
+    "pre-restoration-device-status.json": {
+      "bytes": 5747,
+      "sha256": "8f3b1fba598d33608565fbed8ddaada567e60a8058b6bd251ff8a258a86f0fac"
+    },
+    "preflight-before-attempt1.json": {
+      "bytes": 9886,
+      "sha256": "3e786a3614e716bb12e0f296dbed96ec5204b02d1dd88bc9a6166ece56a2357f"
+    },
+    "preparation-attempt1.json": {
+      "bytes": 407,
+      "sha256": "d888be467418e726de83587969509eec8ead87bf22a104ffd376334322d86e91"
+    },
+    "private-evidence-manifest.json": {
+      "bytes": 1221,
+      "sha256": "80ff8ca173e01026bcac5f4bc96b4c88948a02a3f950845d2de000bfa919313c"
+    },
+    "restored-controller.json": {
+      "bytes": 19790,
+      "sha256": "1ac0a025419989bc8ebfdc2e74ce50269e0571b5bc58a2461f9b365374d31968"
+    },
+    "rf-analysis.json": {
+      "bytes": 6273,
+      "sha256": "0bd6cbb2149914ba4a1c2e88e3d9228404829018ec7c056c9cbebb8468921b70"
+    },
+    "rf-series.json": {
+      "bytes": 188586,
+      "sha256": "b6ad2417b09a269c623604606c660ea8edcd886a149353d6d098fd252c7024c6"
+    },
+    "run-plan.json": {
+      "bytes": 499,
+      "sha256": "ef99bdbad68c27d9759f83842137a61c4e497d9385e6f5f9e922d584da6260e7"
+    },
+    "service-status.json": {
+      "bytes": 87,
+      "sha256": "281fa8e01ef799b7d63da7017cae92d0056925431aea367486068433636b8bce"
+    },
+    "status-connection-rejected.jsonl": {
+      "bytes": 175,
+      "sha256": "d6a7469274fc31f6418ef1831e7b768aa71ffe579330884dd52de03e39ad29a9"
+    },
+    "verification.json": {
+      "bytes": 716,
+      "sha256": "ea2545a6347f24b2989ce8793e0bc8750d5eb6a278d412f7e7af5e3befa31008"
+    },
+    "websocket-observer.cjs": {
+      "bytes": 1355,
+      "sha256": "66dcea7edcf15e5c73e6c3c47c747fbc076f5a8452a71fe9d3e23b3646d1a502"
+    }
+  }
+}

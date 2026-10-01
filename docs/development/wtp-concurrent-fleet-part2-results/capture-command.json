@@ -1,0 +1,19 @@
+[
+  "/home/pi/.cache/wsprrypi-qualification/native-v2/82562c1b937ba98816eb3ae1d27aa270729b35be862b1cf8d87d00b497b95438/wspq-capture-soapy",
+  "--enable-physical-sdr",
+  "sdrplay",
+  "2404058C60",
+  "14075100",
+  "94500000",
+  "20",
+  "250000",
+  "200000",
+  "0",
+  "false",
+  "false",
+  "500000",
+  "393",
+  "/home/pi/wtp-managed-rp1-fix/part2/run2/capture.cf32",
+  "/home/pi/wtp-managed-rp1-fix/part2/run2/capture.json",
+  "concurrent-fleet-second-group"
+]

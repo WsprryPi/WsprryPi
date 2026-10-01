@@ -40,6 +40,10 @@ not a claim that its retired consumed-slot history was restored.
 
 ## Unclosed acceptance boundary
 
+Follow-up: this boundary was subsequently closed by
+[the Part 2 physical acceptance](../wtp-concurrent-fleet-part2-report.md).
+The paragraphs below retain the original snapshot before the operator's rotation.
+
 The final normal 110.592-second native frame alongside five remote targets,
 and corresponding SDR signals from wspr2/Pico A/wspr5, remain untested after
 the last repair. The stopped combiner rotation was requested; no operator

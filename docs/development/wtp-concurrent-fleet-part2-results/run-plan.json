@@ -1,0 +1,20 @@
+{
+  "slot_utc_seconds": 1790888161,
+  "slots": [
+    1790888161,
+    1790888281,
+    1790888401
+  ],
+  "local_stop_utc_seconds": 1790888275,
+  "remote_stop_utc_seconds": 1790888416,
+  "capture_center_hz": 14075100,
+  "sample_rate": 250000,
+  "observed_outputs": {
+    "wspr5": 14097100,
+    "Pico A": 14100100,
+    "wspr2": 14101100
+  },
+  "local_frame_duration_ns": 110592000000,
+  "source_commit": "9a1b8c10036f77f8446b912c481b3ea5dc3d39e8",
+  "stage": "/home/pi/wtp-managed-rp1-fix/part2/run2"
+}

@@ -2,6 +2,8 @@
 
 Follow-up implementation, review and current acceptance status are recorded in
 [the managed RP1/Fleet fix report](wtp-managed-rp1-fleet-fix-report.md).
+The formerly blocked local frame and second SDR group subsequently passed in
+[the Part 2 acceptance report](wtp-concurrent-fleet-part2-report.md).
 The results below remain the historical pre-fix batch.
 
 2026-10-01. WsprryPi `devel`, source commit

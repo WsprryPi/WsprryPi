@@ -3,8 +3,13 @@
 2026-10-01. Executed [the comprehensive prompt](wtp-managed-rp1-fleet-fix-prompt.md)
 on `devel`, from base `6a32789cfb84881df9e6839b27a9538f69e7bed1`.
 
-**Implementation and automated/browser checks passed. Final concurrent physical
-frame/RF acceptance remains pending the stopped combiner rotation.**
+**Implementation and automated/browser checks passed. The final concurrent
+physical frame/RF acceptance subsequently passed in
+[the second receiver-group report](wtp-concurrent-fleet-part2-report.md).**
+
+The live results and pending boundary below describe this original implementation
+snapshot. The follow-up records the completed rotation, native frame, five-target
+concurrency, corresponding SDR signals and final service restoration.
 
 ## Changes
 

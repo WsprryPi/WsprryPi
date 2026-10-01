@@ -1,0 +1,12 @@
+{
+  "error": {
+    "error": "<HTTPError 409: 'Conflict'>",
+    "utc_ns": "1790887849377250877"
+  },
+  "cleanup_errors": [],
+  "local_enabled_utc_ns": "1790887849372657073",
+  "outputs_stopped_utc_ns": "1790887849547756318",
+  "scheduled_rf_slot_utc_seconds": 1790887921,
+  "cause": "Harness used resume instead of enable for the Fleet API; corrected before successful attempt",
+  "capture_exit_code": -15
+}
