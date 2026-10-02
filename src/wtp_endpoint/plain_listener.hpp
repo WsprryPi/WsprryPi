@@ -13,7 +13,8 @@
 namespace wsprrypi {
 
 // Numeric-address TCP carrier for WTP/1 Plain LAN. The caller selects a
-// station-interface address and controls publication through DNS-SD.
+// station interface/address pair and controls publication through DNS-SD.
+// An empty interface is permitted only for portable loopback tests.
 class WtpPlainListener {
 public:
     WtpPlainListener(wsprrypico::wtp::IJobService& service,
@@ -22,7 +23,8 @@ public:
     WtpPlainListener(const WtpPlainListener&) = delete;
     WtpPlainListener& operator=(const WtpPlainListener&) = delete;
 
-    bool start(const std::string& numeric_address, std::uint16_t port);
+    bool start(const std::string& numeric_address, std::uint16_t port,
+               const std::string& interface_name = {});
     void stop() noexcept;
     bool running() const noexcept { return running_.load(); }
     std::uint16_t bound_port() const noexcept { return bound_port_.load(); }

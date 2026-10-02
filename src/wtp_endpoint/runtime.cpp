@@ -216,7 +216,7 @@ public:
             return;
         }
         address_ = *selected;
-        if (!listener_->start(address_->address, port_)) {
+        if (!listener_->start(address_->address, port_, address_->interface_name)) {
             listener_error_ = listener_->error();
             activated_ = false;
             return;
@@ -239,8 +239,9 @@ public:
         if (listener_ && listener_->running() && address_) {
             const auto current = wtp_select_station_address(
                 wtp_station_addresses(), selected_interface_);
-            if (!current || current->address != address_->address ||
-                current->interface_name != address_->interface_name) {
+            // SO_BINDTODEVICE stores a kernel interface index. Recreating a
+            // device with the same name/address still requires a fresh socket.
+            if (!current || *current != *address_) {
                 publisher_.stop();
                 listener_->stop();
                 activated_ = false;

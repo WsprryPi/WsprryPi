@@ -5,6 +5,8 @@
 #include "wtp/frame_parser.hpp"
 
 #include <array>
+#include <atomic>
+#include <cerrno>
 #include <chrono>
 #include <cstdint>
 #include <deque>
@@ -13,9 +15,40 @@
 #include <string>
 #include <sys/socket.h>
 #include <netinet/in.h>
+#include <net/if.h>
+#include <fcntl.h>
 #include <unistd.h>
 
 using namespace wsprrypico::wtp;
+
+#ifdef WSPRRYPI_TEST_SOCKET_WRAPPERS
+namespace {
+std::atomic<int> interface_failure{0}, failed_socket{-1}, bound_accepts{0};
+std::atomic<bool> expect_interface{false}, wrong_interface{false};
+}
+extern "C" int __real_setsockopt(int, int, int, const void*, socklen_t);
+extern "C" int __wrap_setsockopt(int fd, int level, int option,
+                                const void* value, socklen_t length) {
+    if (level == SOL_SOCKET && option == SO_BINDTODEVICE && interface_failure.load()) {
+        failed_socket = fd;
+        errno = interface_failure.load();
+        return -1;
+    }
+    return __real_setsockopt(fd, level, option, value, length);
+}
+extern "C" int __real_accept(int, sockaddr*, socklen_t*);
+extern "C" int __wrap_accept(int fd, sockaddr* address, socklen_t* length) {
+    const int accepted = __real_accept(fd, address, length);
+    if (accepted >= 0 && expect_interface.load()) {
+        std::array<char, IFNAMSIZ> name{};
+        socklen_t size = name.size();
+        if (getsockopt(accepted, SOL_SOCKET, SO_BINDTODEVICE, name.data(), &size) != 0 ||
+            std::string(name.data()) != "lo") wrong_interface = true;
+        ++bound_accepts;
+    }
+    return accepted;
+}
+#endif
 
 namespace {
 class TestClock final : public Clock {
@@ -80,7 +113,32 @@ int main() {
     wsprrypi::WtpPiAuthority authority(service, true);
     wsprrypi::WtpPlainListener listener(authority, std::string(32, 'c'), "test");
     check(!listener.start("localhost", 0), "listener must require numeric bind address");
-    check(listener.start("127.0.0.1", 0) && listener.bound_port(),
+    check(!listener.start("192.168.1.10", 0), "LAN address must require selected interface");
+    check(!listener.start("127.0.0.1", 0, std::string(IFNAMSIZ, 'a')),
+          "interface names must not be truncated");
+    check(!listener.start("127.0.0.1", 0, std::string("lo\0other", 8)),
+          "embedded NUL must not change selected interface");
+    std::string selected;
+#ifdef WSPRRYPI_TEST_SOCKET_WRAPPERS
+    check(!listener.start("127.0.0.1", 0, "wtp_missing0"),
+          "missing interface must not fall back to unrestricted listener");
+    for (int failure : {EACCES, ENOPROTOOPT}) {
+        interface_failure = failure;
+        check(!listener.start("127.0.0.1", 0, "lo"), "binding failure must prevent startup");
+        check(!listener.running() && listener.bound_port() == 0 &&
+                  listener.error().find("interface lo:") != std::string::npos,
+              "binding failure must expose error and no listener port");
+        check(fcntl(failed_socket.load(), F_GETFD) == -1 && errno == EBADF,
+              "failed interface socket must be closed");
+    }
+    interface_failure = 0;
+    selected = "lo";
+    expect_interface = true;
+#else
+    check(!listener.start("127.0.0.1", 0, "lo"),
+          "unsupported interface binding must fail closed");
+#endif
+    check(listener.start("127.0.0.1", 0, selected) && listener.bound_port() && listener.error().empty(),
           "loopback test listener must start");
     const int fd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
     check(fd >= 0, "socket creation failed");
@@ -127,7 +185,7 @@ int main() {
     close(fd);
     listener.stop();
 
-    check(listener.start("127.0.0.1", 0), "listener can restart after shutdown");
+    check(listener.start("127.0.0.1", 0, selected), "listener can restart after shutdown");
     address.sin_port = htons(listener.bound_port());
     auto connect_client = [&] {
         const int client = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
@@ -153,4 +211,11 @@ int main() {
     close(excess);
     for (const int client : clients) close(client);
     listener.stop();
+#ifdef WSPRRYPI_TEST_SOCKET_WRAPPERS
+    check(bound_accepts.load() >= 11 && !wrong_interface.load(),
+          "accepted TCP sockets must inherit the selected interface");
+    expect_interface = false;
+    check(listener.start("127.0.0.1", 0), "explicit loopback may remain unbound for portable tests");
+    listener.stop();
+#endif
 }

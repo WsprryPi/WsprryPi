@@ -1,0 +1,30 @@
+{
+  "live_cases": {
+    "initial": {
+      "inspection_count": 3,
+      "max_seconds": 0.055869129006168805,
+      "reply_interfaces": [
+        "eth0"
+      ]
+    },
+    "recovery1": {
+      "inspection_count": 3,
+      "max_seconds": 0.36720403999788687,
+      "reply_interfaces": [
+        "eth0"
+      ]
+    },
+    "recovery2": {
+      "inspection_count": 3,
+      "max_seconds": 0.3051331859896891,
+      "reply_interfaces": [
+        "eth0"
+      ]
+    }
+  },
+  "baseline_failed": true,
+  "network_and_config_restored": true,
+  "namespace_acceptance_passed": true,
+  "rf_operations": 0,
+  "physical_pico_contacts": 0
+}

@@ -40,6 +40,8 @@ local unit executable; the exact focused unit passed on Linux.
 
 The [Si5351 isolation implementation and live regression](../si5351-inventory-isolation-report.md)
 closed the configuration stall. Its [final adversarial reassessment](../si5351-inventory-isolation-review.md)
-has no unresolved inventory-isolation finding. Wrong-interface WTP reply routing
-remains pending as a separate TODO. The original campaign observations above
+has no unresolved inventory-isolation finding. The subsequent
+[selected-interface reply repair and live acceptance](../wtp-reply-routing-report.md)
+also closes wrong-interface WTP reply routing. Both follow-up TODOs are closed;
+Si5351 hardware nonresponse is outside this testing scope. The original campaign observations above
 remain the evidence for the defects as first encountered.

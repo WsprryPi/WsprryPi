@@ -36,8 +36,17 @@ addresses, specify an interface such as `wlan0` or `eth0`. Only RFC1918 addresse
 on an up/running physical interface are eligible; Wi-Fi must report station
 mode. Bridges, tunnels, AP interfaces, loopback and public addresses are excluded.
 The listener retries after interface recovery and withdraws its advertisement
-when the selected address disappears. A route/settings change waits for current
-ownership/work to end, while admission of new remote jobs is suspended.
+when the selected address disappears. A configured listener or output settings
+change waits for current ownership/work to end, while admission of new remote
+jobs is suspended.
+
+The Linux listener binds both the selected address and its interface before
+accepting connections. TCP replies follow that interface even when another
+interface becomes preferred by equal-metric host routes. No persistent routing
+rules or route-metric changes are required. If interface binding fails, the
+listener reports the error and remains unavailable without advertising or
+falling back to an unrestricted socket. Interface recreation, address loss and
+recovery cause withdrawal and a fresh interface-bound listener.
 
 The managed listener is default-on after confirmed startup quiescence. Local
 Enable off allows a claim when output is safe and idle. Local Enable on still

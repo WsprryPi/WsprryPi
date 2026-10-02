@@ -48,7 +48,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - name: Install host-only TLS and UI test dependencies
-        run: sudo apt-get update && sudo apt-get install -y libssl-dev libavahi-client-dev libsystemd-dev pkg-config cmake python3 nodejs php-cli
+        run: sudo apt-get update && sudo apt-get install -y libssl-dev libavahi-client-dev libsystemd-dev pkg-config cmake python3 nodejs php-cli iproute2 tcpdump
       - name: Install UI development dependencies
         working-directory: WsprryPi-UI
         run: npm ci --ignore-scripts
@@ -80,6 +80,9 @@ jobs:
           make wtp-tls-test SUDO=
           make wtp-network-runtime-test BACKENDS=simulated ANCILLARY_GPIO=0 SUDO=
           make wtp-network-interop-test SUDO= PICO_SOURCE=build/network-reference/pico MBEDTLS_SOURCE=build/network-reference/mbedtls
+      - name: Verify selected-interface WTP replies under equal-metric route changes
+        working-directory: src
+        run: make wtp-pi-routing-test BACKENDS=simulated ANCILLARY_GPIO=0 SUDO=sudo
       - name: Render network controls with mocked responses
         working-directory: WsprryPi-UI
         env:

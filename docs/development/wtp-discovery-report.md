@@ -55,11 +55,18 @@ case exercises Avahi's shared cache using Pico A's normal 120-second lifetime.
   management responsive with absent or unresponsive hardware. Preserve saved
   settings, fresh selection validation and runtime readiness. Implementation and
   live regression evidence: [execution prompt](si5351-inventory-isolation-prompt.md)
-  and [completed repair](si5351-inventory-isolation-report.md).
-- [ ] **Next: make WTP reply routing survive equal-metric route reordering.**
+  and [completed repair](si5351-inventory-isolation-report.md). **Closed.** The
+  Si5351's lack of response is outside this testing scope and is not an open
+  acceptance issue; responsive management with unresponsive hardware passed.
+- [x] **Next: make WTP reply routing survive equal-metric route reordering.**
   Reproduce Ethernet reconnection while WiFi is preferred, make the selected WTP
   interface govern replies, and prove recovery without manual route repair.
-  This remains a separate implementation task.
+  **Closed:** [executed prompt](wtp-reply-routing-prompt.md),
+  [implementation and live acceptance](wtp-reply-routing-report.md), and
+  [adversarial reassessment](wtp-reply-routing-review.md). Nine live HELLO/STATUS
+  checks passed with WiFi preferred, including two Ethernet reconnect cycles;
+  every captured reply used Ethernet without route-preference repair during
+  acceptance. Original network state was restored afterwards.
 
 ## Operational findings from the discovery campaign
 
@@ -73,11 +80,12 @@ Restoring the original Ethernet route preference made independent WTP negotiatio
 succeed. The successful DHCP-address case temporarily preferred Ethernet and
 restored the original route order afterwards.
 
-This is a real operational limitation, not an mDNS parser failure. Subsequent
-implementation must make WTP replies follow the selected interface, or establish
-an explicit routing requirement that survives interface reconnection. Reproduce
-and retest with WiFi as the preferred equal-metric route. The present campaign
-does not claim that automatic WTP transport recovery in that topology passed.
+At the end of this campaign, the operational limitation required a repair and
+retest with WiFi as the preferred equal-metric route. This campaign's original
+observations do not establish automatic WTP transport recovery in that topology.
+The subsequent [selected-interface repair](wtp-reply-routing-report.md) reproduces
+the original failure and validates usable Ethernet replies through two live
+reconnect cycles with WiFi still preferred. The failure evidence above is retained.
 
 ### wspr4 configuration snapshots can block on Si5351 inventory
 

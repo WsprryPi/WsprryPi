@@ -40,7 +40,8 @@ GPIO4 case exercised an actual 2.029-second inventory timeout while 40 reads
 INI bytes and inactive output state were preserved, and no worker remained.
 
 No unresolved finding remains in the inventory/configuration isolation slice.
-The physical I2C fault itself remains a hardware/runtime diagnostic boundary.
+The Si5351's lack of response is outside this testing scope and is not an open
+finding or acceptance requirement. The management-stall issue is closed.
 No WTP routing repair, RF qualification or whole-fleet release claim is in scope.
 
 ### CI repair reassessment

@@ -7,6 +7,7 @@
 #include <cstring>
 #include <fcntl.h>
 #include <netdb.h>
+#include <net/if.h>
 #include <limits>
 #include <poll.h>
 #include <sys/socket.h>
@@ -67,7 +68,8 @@ std::string WtpPlainListener::error() const {
     return error_;
 }
 
-bool WtpPlainListener::start(const std::string& address, std::uint16_t port) {
+bool WtpPlainListener::start(const std::string& address, std::uint16_t port,
+                             const std::string& interface_name) {
     if (running_ || thread_.joinable() || fd_ >= 0 || address.empty() ||
         address == "0.0.0.0" || address == "::") {
         { std::lock_guard lock(error_mutex_); error_ = "Listener already active or address absent"; }
@@ -85,9 +87,40 @@ bool WtpPlainListener::start(const std::string& address, std::uint16_t port) {
         { std::lock_guard lock(error_mutex_); error_ = "Invalid numeric listener address"; }
         return false;
     }
+    const auto* numeric = addresses->ai_addr;
+    const bool loopback = numeric->sa_family == AF_INET
+        ? (ntohl(reinterpret_cast<const sockaddr_in*>(numeric)->sin_addr.s_addr) >> 24) == 127
+        : numeric->sa_family == AF_INET6 &&
+          IN6_IS_ADDR_LOOPBACK(&reinterpret_cast<const sockaddr_in6*>(numeric)->sin6_addr);
+    if ((interface_name.empty() && !loopback) || interface_name.size() >= IFNAMSIZ ||
+        interface_name.find('\0') != std::string::npos) {
+        freeaddrinfo(addresses);
+        std::lock_guard lock(error_mutex_);
+        error_ = "WTP listener requires a valid selected interface";
+        return false;
+    }
+    std::string bind_error;
     for (auto* item = addresses; item; item = item->ai_next) {
         const int candidate = socket(item->ai_family, item->ai_socktype, item->ai_protocol);
         if (candidate < 0) continue;
+        if (!interface_name.empty()) {
+#if defined(__linux__) && defined(SO_BINDTODEVICE)
+            // Set this before bind/listen: binding only an accepted socket would
+            // leave SYN-ACK routing unconstrained. TCP children inherit it.
+            if (setsockopt(candidate, SOL_SOCKET, SO_BINDTODEVICE,
+                           interface_name.c_str(),
+                           static_cast<socklen_t>(interface_name.size() + 1)) != 0) {
+                bind_error = "Unable to bind WTP listener to interface " + interface_name +
+                             ": " + std::strerror(errno);
+                ::close(candidate);
+                continue;
+            }
+#else
+            bind_error = "WTP listener interface binding is unavailable on this platform";
+            ::close(candidate);
+            continue;
+#endif
+        }
         int reuse = 1;
         (void)setsockopt(candidate, SOL_SOCKET, SO_REUSEADDR, &reuse, sizeof(reuse));
 #ifdef SO_NOSIGPIPE
@@ -102,7 +135,8 @@ bool WtpPlainListener::start(const std::string& address, std::uint16_t port) {
     }
     freeaddrinfo(addresses);
     if (fd_ < 0) {
-        { std::lock_guard lock(error_mutex_); error_ = "Unable to bind WTP listener"; }
+        { std::lock_guard lock(error_mutex_);
+          error_ = bind_error.empty() ? "Unable to bind WTP listener" : bind_error; }
         return false;
     }
     sockaddr_storage local{};

@@ -6,6 +6,7 @@
 #include <cstdint>
 #include <cstring>
 #include <set>
+#include <tuple>
 #include <sys/socket.h>
 #include <sys/stat.h>
 #include <unistd.h>
@@ -60,7 +61,8 @@ std::vector<WtpStationAddress> wtp_station_addresses() {
         if (!private_ipv4(ntohl(ipv4->sin_addr.s_addr))) continue;
         char address[INET_ADDRSTRLEN]{};
         if (!inet_ntop(AF_INET, &ipv4->sin_addr, address, sizeof(address))) continue;
-        result.push_back({item->ifa_name, address});
+        const auto index = if_nametoindex(item->ifa_name);
+        if (index) result.push_back({item->ifa_name, address, index});
     }
     freeifaddrs(list);
     return result;
@@ -69,11 +71,12 @@ std::vector<WtpStationAddress> wtp_station_addresses() {
 std::optional<WtpStationAddress> wtp_select_station_address(
     const std::vector<WtpStationAddress>& addresses,
     const std::string& interface_name) {
-    std::set<std::pair<std::string, std::string>> matches;
+    std::set<std::tuple<std::string, std::string, unsigned int>> matches;
     for (const auto& item : addresses)
         if (interface_name == "auto" || item.interface_name == interface_name)
-            matches.emplace(item.interface_name, item.address);
+            matches.emplace(item.interface_name, item.address, item.interface_index);
     if (matches.size() != 1) return std::nullopt;
-    return WtpStationAddress{matches.begin()->first, matches.begin()->second};
+    const auto& [name, address, index] = *matches.begin();
+    return WtpStationAddress{name, address, index};
 }
 } // namespace wsprrypi

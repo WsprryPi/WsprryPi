@@ -1,0 +1,1968 @@
+build metadata unchanged: build/generated/build_metadata.hpp
+make[1]: Nothing to be done for 'all'.
+make[1]: Nothing to be done for 'all'.
+build metadata unchanged: build/generated/build_metadata.hpp
+Bounded Si5351 inventory subprocess tests passed
+backend capabilities unchanged: build/generated/backend_capabilities.hpp
+I2C metadata discovery tests passed
+./build/chipset_offsets_test
+Chipset offset selector tests passed
+Running mailbox memory flag tests.
+Running hardware-independent legacy GPIO clock-model tests.
+Legacy GPIO clock-model tests passed
+Running hardware-independent GPIO frequency-correction tests.
+GPIO frequency-correction tests passed
+legacy_tone_frequency_test: passed
+Linking debug: dial_frequency_semantics_test
+Linking debug: cleanup_lifecycle_test
+backend capabilities unchanged: build/generated/backend_capabilities.hpp
+Linking debug: gpio_band_policy_test
+Si5351 snapshot isolation, fresh validation and revision conflict tests passed
+[WARN ] GPIO.Manual PPM contains an unusably small saved value; using 0.
+Calibration exact-zero and custom-value round trips passed
+I2C web selection rejection preserves configuration
+RP1 web backend persistence tests passed
+[INFO ] Socket server started on address::1: 39518 (loopback only)
+[INFO ] Socket server started on address 127.0.0.1: 39520 (loopback only)
+[INFO ] Socket server started on address::1: 39524 (loopback only)
+[WARN ] IPv6 loopback unavailable; falling back to 127.0.0.1.
+[INFO ] Socket server started on address 127.0.0.1: 39521 (loopback only)
+[WARN ] IPv6 loopback unavailable; falling back to 127.0.0.1.
+[INFO ] Socket server started on address 127.0.0.1: 39521 (loopback only)
+WebSocket listener startup: Address already in use
+WebSocket listener startup: Address already in use
+WebSocket listener startup: Address family not supported by protocol
+[ERROR] A WebSocket loopback family requires loopback-only mode.
+[INFO ] Socket server started on address::1: 39523 (loopback only)
+WebSocket listener startup: Address already in use
+[INFO ] Socket server started on address::1: 39523 (loopback only)
+[INFO ] Socket server started on address::: 39525
+[WARN ] Handshake failed for new client
+[ERROR] WebSocket command failed in handleMessage: [json.exception.type_error.302] type must be string, but is number
+[INFO ] Closing WebSocket client because its current network authorization is no longer valid.
+[INFO ] Socket server started on address::: 39519
+[WARN ] Handshake failed for new client
+[INFO ] Socket server started on address::: 39519
+[ERROR] WebSocket command failed in handleMessage: [json.exception.type_error.302] type must be string, but is number
+websocket lifecycle regression passed
+[INFO ] Web server started on port: -1
+web_server_network_lifecycle_test: PASS
+Running runtime semantics tests.
+[INFO ] RP1 confirmation accepted and bounded WSPR frame request prepared for operation wspr-frame-operation-20.
+[INFO ] PPM Manager disabled.
+[INFO ] Scheduling path selected: WSPR.
+[INFO ] Bounded RP1 WSPR frame request committed for operation wspr-frame-operation-20.
+[INFO ] PPM Manager disabled.
+[INFO ] Scheduling path selected: WSPR.
+[INFO ] PPM Manager disabled.
+[INFO ] Scheduling path selected: WSPR.
+[INFO ] PPM Manager disabled.
+[INFO ] Scheduling path selected: WSPR.
+[INFO ] RP1 confirmation accepted and bounded WSPR frame request prepared for operation ppm-planning-fixture.
+[INFO ] PPM Manager disabled.
+[INFO ] Scheduling path selected: WSPR.
+[INFO ] Bounded RP1 WSPR frame request committed for operation ppm-planning-fixture.
+[INFO ] RP1 confirmation accepted and bounded WSPR frame request prepared for operation ppm-planning-fixture.
+[INFO ] PPM Manager disabled.
+[INFO ] Scheduling path selected: WSPR.
+[INFO ] Bounded RP1 WSPR frame request committed for operation ppm-planning-fixture.
+[INFO ] Beginning test tone requested by web UI.
+[INFO ] Using web UI test tone RF frequency override: 14.097100 MHz
+[INFO ] WSPR-band test tone using dial frequency: 14.095600 MHz
+[INFO ] Ending test tone requested by Web UI.
+[INFO ] PPM Manager initialized successfully.
+[INFO ] GPIO frequency correction updated: mode= fixed_manual, provider= chrony, estimate_ppm= 0.0, residual_ppm= 1.25, effective_ppm=-200.0, qualification= converging
+[INFO ] No transmission requested; skipping transmission and scheduling.
+
+Invalid power value. Must be an integer.
+
+Usage:
+  (sudo) wsprrypi [options] CALLSIGN GRID POWER FREQ [FREQ...]
+  (sudo) wsprrypi -i /path/to/wsprrypi.ini
+  (sudo) wsprrypi --test-tone RF_FREQ [backend/options]
+  (sudo) wsprrypi --mode QRSS --cw-message TEXT --cw-base-frequency FREQ [cw/options]
+  (sudo) wsprrypi --qrss-message TEXT --qrss-frequency HZ --qrss-dot-seconds SEC
+  (sudo) wsprrypi --fskcw-message TEXT --fskcw-mark-frequency HZ --fskcw-space-frequency HZ --fskcw-dot-seconds SEC
+  (sudo) wsprrypi --dfcw-message TEXT --dfcw-dot-frequency HZ --dfcw-dash-frequency HZ --dfcw-dot-seconds SEC
+
+General:
+  -h, --help                         Display this help message.
+  -v, --version                      Show the WsprryPi version.
+      --list-backends                List compiled transmission backends.
+  -i, --ini-file <file>              Load and monitor an INI file for daemon/service style operation.
+  -r, --repeat                       Repeat direct CLI transmissions until stopped.
+  -x, --terminate <count>            Stop after count iterations of the direct CLI WSPR frequency list.
+  -J, --journald                     Use journald for log output.
+  -D, --date-time-log                Prefix stream log output with date/time stamps.
+  --debug-logging, --no-debug-logging
+                                     Enable or disable DEBUG-level application logging.
+
+Experimental Frequency Policy (CLI/INI only):
+  --allow-unqualified-frequency, --no-allow-unqualified-frequency
+                                     Allow or deny unqualified backend/mode combinations.
+  --allow-non-amateur-frequency, --no-allow-non-amateur-frequency
+                                     Allow or deny frequencies outside recognized amateur bands.
+                                     Outside-band transmission requires both allow flags.
+
+WSPR Identity And Frequency:
+  Positional CALLSIGN GRID POWER FREQ [FREQ...]
+                                     Transmit WSPR directly from CLI. POWER is rounded to a standard WSPR dBm value.
+  FREQ                               Band aliases such as 20m; whole-number-Hz or unit-qualified dial frequencies; or 0 to skip.
+                                     Append @GPIO, @GPIOH, or @GPIOL for one-slot selector GPIO overrides.
+  --planner-preference <auto|prefer_paired|require_paired>
+                                     Select single-frame or paired WSPR planning policy.
+  -o, --offset                       Enable random WSPR transmit offset.
+  --no-offset                        Disable random WSPR transmit offset.
+
+Backend Selection:
+  Compiled backends: rpi-gpio,rp1-gpclk,si5351,simulated,wtp
+  Ancillary GPIO: enabled
+  --backend <gpio|rp1-gpclk|si5351|simulated|wtp>
+                                     Select the backend. Default: gpio.
+                                     simulated is transient, non-RF, and never persisted.
+                                     rp1-gpclk is an explicit Experimental Pi 5 backend and never a gpio fallback.
+  --power-level <level>
+    Set transmit power level for the active backend:
+      GPIO: 0-7
+      RP1 GPIO: 2, 4, 8, or 12 mA
+      Si5351: 1-4
+  --gpio-power-level <0-7>           Set GPIO backend RF power level.
+  --rp1-gpio-drive-ma <2|4|8|12>    Set Raspberry Pi 5 RP1 pad drive. Default: 2 mA.
+  --rp1-development-confirmation-json <json>
+                                     Bind transient RP1 development confirmation to finite local requests.
+  --si5351-power-level <1-4>         Set Si5351 drive-strength level.
+
+GPIO Backend:
+  -a, --transmit-gpio <4|20>         Select the RF transmit GPIO.
+      --transmit-pin <4|20>          Legacy alias for --transmit-gpio.
+  -n, --use-system-clock-frequency-estimate
+                                     Enable the system-clock frequency estimate for GPIO.
+      --no-system-clock-frequency-estimate
+                                     Disable the estimate and use GPIO manual PPM.
+  -p, --gpio-manual-ppm <value>      Set GPIO manual correction (-200 through 200) and disable the estimate.
+      --gpio-frequency-residual-ppm <value>
+                                     Set residual correction added to the system-clock estimate.
+                                     Positive means fast; negative means slow.
+
+Si5351 Backend:
+  --si5351-ppm <value>              Set Si5351 reference-oscillator correction (-200 through 200).
+  --si5351-i2c-bus <bus>             Linux I2C bus number. Default: 1.
+  --si5351-i2c-address <addr>        I2C address, decimal or 0x-prefixed hex. Valid: 0x60 through 0x6F.
+  --si5351-reference-frequency <hz>  Reference oscillator frequency in Hz.
+  --si5351-reference-source <source> external_tcxo or crystal.
+  --si5351-crystal-load-capacitance <pf>  Crystal load: 6, 8, or 10 pF.
+  --si5351-tx-output <CLK0|CLK1|CLK2>
+                                     Transmit clock output. CLI/INI only; not exposed in the Web UI.
+
+CW, QRSS, FSKCW, And DFCW:
+  --mode <WSPR|QRSS|FSKCW|DFCW>      Select direct CLI mode. Non-WSPR modes use the CW options below.
+  --cw-message <text>                Message for QRSS, FSKCW, or DFCW.
+  --cw-base-frequency <freq>         Base RF frequency. Accepts whole-number Hz or Hz/kHz/MHz/GHz suffixes.
+  --cw-shift-hz <hz>                 FSKCW/DFCW frequency shift in Hz.
+  --cw-dot-seconds <seconds>         Dot length in seconds.
+  --cw-start-minute <0-59>           Scheduled non-WSPR start minute.
+  --cw-start-second <0-59>           Seconds after the scheduled CW start minute. Default: 5.
+  --cw-repeat-minutes <minutes>      Scheduled non-WSPR repeat interval.
+  --cw-intra-element-gap <multiple>  Gap between Morse elements.
+  --cw-inter-character-gap <multiple>
+                                     Gap between Morse characters.
+  --cw-inter-word-gap <multiple>     Gap between Morse words.
+  --dfcw-intra-element-gap <multiple>
+                                     DFCW off gap between dot/dash symbols.
+  --dfcw-inter-character-gap <multiple>
+                                     DFCW off gap between characters.
+  --dfcw-inter-word-gap <multiple>   DFCW off gap between words.
+  --cw-fade-shape <none|linear|raised_cosine>
+                                     Envelope fade shape. Advanced CLI/INI control hidden from normal Web UI.
+  --cw-fade-in-ms <ms>, --cw-fade-out-ms <ms>, --cw-fade-slice-ms <ms>
+                                     Advanced CW envelope timing controls.
+  --qrss-message/--qrss-frequency/--qrss-dot-seconds
+                                     Legacy transient QRSS startup options; all three are required together.
+  --fskcw-message/--fskcw-mark-frequency/--fskcw-space-frequency/--fskcw-dot-seconds
+                                     Legacy transient FSKCW startup options; all four are required together.
+  --dfcw-message/--dfcw-dot-frequency/--dfcw-dash-frequency/--dfcw-dot-seconds
+                                     Legacy transient DFCW startup options; all four are required together.
+
+GPIO Controls And Service Ports:
+  --no-web                           Disable the HTTP web UI and WebSocket server for this run.
+  --no-http                          Disable only the HTTP web UI for this run.
+  -w, --web-port <port>              HTTP REST/Web UI port. Default: 31415.
+  -k, --socket-port <port>           WebSocket server port. Default: 31416.
+      --wtp-server-port <port>       WTP Plain LAN listener port for this process. Default: 31417.
+      --socket-loopback-only        Bind WebSocket control to loopback only.
+      --socket-loopback-family <auto|ipv6|ipv4>
+                                     Select loopback family; auto prefers IPv6.
+  -l, --led_pin <gpio>               Enable the TX LED on the given GPIO.
+      --led-pin <gpio>               Alias for --led_pin.
+      --use-led, --no-led            Enable or disable the TX LED using the configured/default pin.
+      --amp-pin <gpio>               Configure external amplifier control GPIO.
+      --amp-pin-active-high          Set Amp Pin polarity active-high.
+      --amp-pin-active-low           Set Amp Pin polarity active-low. Default.
+      --no-amp-pin                   Disable external amplifier control.
+  -s, --shutdown_button <gpio>       Enable shutdown button monitoring on the given GPIO.
+      --shutdown-button <gpio>       Alias for --shutdown_button.
+      --use-shutdown, --no-shutdown  Enable or disable shutdown button monitoring.
+  Band GPIO                          Configure per-band selector GPIOs in INI or with FREQ @GPIO suffixes.
+
+Test Tone:
+  -t, --test-tone <rf_frequency>     Start a transient direct RF test tone using whole-number Hz or a unit-qualified value.
+                                     Band aliases resolve to their WSPR dial frequency; use an explicit value for another RF carrier.
+                                     Invalid with --ini-file.
+
+
+Socket loopback family must be auto, ipv6, or ipv4.
+
+Usage:
+  (sudo) wsprrypi [options] CALLSIGN GRID POWER FREQ [FREQ...]
+  (sudo) wsprrypi -i /path/to/wsprrypi.ini
+  (sudo) wsprrypi --test-tone RF_FREQ [backend/options]
+  (sudo) wsprrypi --mode QRSS --cw-message TEXT --cw-base-frequency FREQ [cw/options]
+  (sudo) wsprrypi --qrss-message TEXT --qrss-frequency HZ --qrss-dot-seconds SEC
+  (sudo) wsprrypi --fskcw-message TEXT --fskcw-mark-frequency HZ --fskcw-space-frequency HZ --fskcw-dot-seconds SEC
+  (sudo) wsprrypi --dfcw-message TEXT --dfcw-dot-frequency HZ --dfcw-dash-frequency HZ --dfcw-dot-seconds SEC
+
+General:
+  -h, --help                         Display this help message.
+  -v, --version                      Show the WsprryPi version.
+      --list-backends                List compiled transmission backends.
+  -i, --ini-file <file>              Load and monitor an INI file for daemon/service style operation.
+  -r, --repeat                       Repeat direct CLI transmissions until stopped.
+  -x, --terminate <count>            Stop after count iterations of the direct CLI WSPR frequency list.
+  -J, --journald                     Use journald for log output.
+  -D, --date-time-log                Prefix stream log output with date/time stamps.
+  --debug-logging, --no-debug-logging
+                                     Enable or disable DEBUG-level application logging.
+
+Experimental Frequency Policy (CLI/INI only):
+  --allow-unqualified-frequency, --no-allow-unqualified-frequency
+                                     Allow or deny unqualified backend/mode combinations.
+  --allow-non-amateur-frequency, --no-allow-non-amateur-frequency
+                                     Allow or deny frequencies outside recognized amateur bands.
+                                     Outside-band transmission requires both allow flags.
+
+WSPR Identity And Frequency:
+  Positional CALLSIGN GRID POWER FREQ [FREQ...]
+                                     Transmit WSPR directly from CLI. POWER is rounded to a standard WSPR dBm value.
+  FREQ                               Band aliases such as 20m; whole-number-Hz or unit-qualified dial frequencies; or 0 to skip.
+                                     Append @GPIO, @GPIOH, or @GPIOL for one-slot selector GPIO overrides.
+  --planner-preference <auto|prefer_paired|require_paired>
+                                     Select single-frame or paired WSPR planning policy.
+  -o, --offset                       Enable random WSPR transmit offset.
+  --no-offset                        Disable random WSPR transmit offset.
+
+Backend Selection:
+  Compiled backends: rpi-gpio,rp1-gpclk,si5351,simulated,wtp
+  Ancillary GPIO: enabled
+  --backend <gpio|rp1-gpclk|si5351|simulated|wtp>
+                                     Select the backend. Default: gpio.
+                                     simulated is transient, non-RF, and never persisted.
+                                     rp1-gpclk is an explicit Experimental Pi 5 backend and never a gpio fallback.
+  --power-level <level>
+    Set transmit power level for the active backend:
+      GPIO: 0-7
+      RP1 GPIO: 2, 4, 8, or 12 mA
+      Si5351: 1-4
+  --gpio-power-level <0-7>           Set GPIO backend RF power level.
+  --rp1-gpio-drive-ma <2|4|8|12>    Set Raspberry Pi 5 RP1 pad drive. Default: 2 mA.
+  --rp1-development-confirmation-json <json>
+                                     Bind transient RP1 development confirmation to finite local requests.
+  --si5351-power-level <1-4>         Set Si5351 drive-strength level.
+
+GPIO Backend:
+  -a, --transmit-gpio <4|20>         Select the RF transmit GPIO.
+      --transmit-pin <4|20>          Legacy alias for --transmit-gpio.
+  -n, --use-system-clock-frequency-estimate
+                                     Enable the system-clock frequency estimate for GPIO.
+      --no-system-clock-frequency-estimate
+                                     Disable the estimate and use GPIO manual PPM.
+  -p, --gpio-manual-ppm <value>      Set GPIO manual correction (-200 through 200) and disable the estimate.
+      --gpio-frequency-residual-ppm <value>
+                                     Set residual correction added to the system-clock estimate.
+                                     Positive means fast; negative means slow.
+
+Si5351 Backend:
+  --si5351-ppm <value>              Set Si5351 reference-oscillator correction (-200 through 200).
+  --si5351-i2c-bus <bus>             Linux I2C bus number. Default: 1.
+  --si5351-i2c-address <addr>        I2C address, decimal or 0x-prefixed hex. Valid: 0x60 through 0x6F.
+  --si5351-reference-frequency <hz>  Reference oscillator frequency in Hz.
+  --si5351-reference-source <source> external_tcxo or crystal.
+  --si5351-crystal-load-capacitance <pf>  Crystal load: 6, 8, or 10 pF.
+  --si5351-tx-output <CLK0|CLK1|CLK2>
+                                     Transmit clock output. CLI/INI only; not exposed in the Web UI.
+
+CW, QRSS, FSKCW, And DFCW:
+  --mode <WSPR|QRSS|FSKCW|DFCW>      Select direct CLI mode. Non-WSPR modes use the CW options below.
+  --cw-message <text>                Message for QRSS, FSKCW, or DFCW.
+  --cw-base-frequency <freq>         Base RF frequency. Accepts whole-number Hz or Hz/kHz/MHz/GHz suffixes.
+  --cw-shift-hz <hz>                 FSKCW/DFCW frequency shift in Hz.
+  --cw-dot-seconds <seconds>         Dot length in seconds.
+  --cw-start-minute <0-59>           Scheduled non-WSPR start minute.
+  --cw-start-second <0-59>           Seconds after the scheduled CW start minute. Default: 5.
+  --cw-repeat-minutes <minutes>      Scheduled non-WSPR repeat interval.
+  --cw-intra-element-gap <multiple>  Gap between Morse elements.
+  --cw-inter-character-gap <multiple>
+                                     Gap between Morse characters.
+  --cw-inter-word-gap <multiple>     Gap between Morse words.
+  --dfcw-intra-element-gap <multiple>
+                                     DFCW off gap between dot/dash symbols.
+  --dfcw-inter-character-gap <multiple>
+                                     DFCW off gap between characters.
+  --dfcw-inter-word-gap <multiple>   DFCW off gap between words.
+  --cw-fade-shape <none|linear|raised_cosine>
+                                     Envelope fade shape. Advanced CLI/INI control hidden from normal Web UI.
+  --cw-fade-in-ms <ms>, --cw-fade-out-ms <ms>, --cw-fade-slice-ms <ms>
+                                     Advanced CW envelope timing controls.
+  --qrss-message/--qrss-frequency/--qrss-dot-seconds
+                                     Legacy transient QRSS startup options; all three are required together.
+  --fskcw-message/--fskcw-mark-frequency/--fskcw-space-frequency/--fskcw-dot-seconds
+                                     Legacy transient FSKCW startup options; all four are required together.
+  --dfcw-message/--dfcw-dot-frequency/--dfcw-dash-frequency/--dfcw-dot-seconds
+                                     Legacy transient DFCW startup options; all four are required together.
+
+GPIO Controls And Service Ports:
+  --no-web                           Disable the HTTP web UI and WebSocket server for this run.
+  --no-http                          Disable only the HTTP web UI for this run.
+  -w, --web-port <port>              HTTP REST/Web UI port. Default: 31415.
+  -k, --socket-port <port>           WebSocket server port. Default: 31416.
+      --wtp-server-port <port>       WTP Plain LAN listener port for this process. Default: 31417.
+      --socket-loopback-only        Bind WebSocket control to loopback only.
+      --socket-loopback-family <auto|ipv6|ipv4>
+                                     Select loopback family; auto prefers IPv6.
+  -l, --led_pin <gpio>               Enable the TX LED on the given GPIO.
+      --led-pin <gpio>               Alias for --led_pin.
+      --use-led, --no-led            Enable or disable the TX LED using the configured/default pin.
+      --amp-pin <gpio>               Configure external amplifier control GPIO.
+      --amp-pin-active-high          Set Amp Pin polarity active-high.
+      --amp-pin-active-low           Set Amp Pin polarity active-low. Default.
+      --no-amp-pin                   Disable external amplifier control.
+  -s, --shutdown_button <gpio>       Enable shutdown button monitoring on the given GPIO.
+      --shutdown-button <gpio>       Alias for --shutdown_button.
+      --use-shutdown, --no-shutdown  Enable or disable shutdown button monitoring.
+  Band GPIO                          Configure per-band selector GPIOs in INI or with FREQ @GPIO suffixes.
+
+Test Tone:
+  -t, --test-tone <rf_frequency>     Start a transient direct RF test tone using whole-number Hz or a unit-qualified value.
+                                     Band aliases resolve to their WSPR dial frequency; use an explicit value for another RF carrier.
+                                     Invalid with --ini-file.
+
+[WARN ] Numeric WSPR frequency token '14.097100MHz' exactly matches the legacy actual RF value for alias '20m'. WsprryPi now interprets WSPR numeric frequencies as dial frequencies. If this value came from an older config, update it to the dial frequency explicitly.
+[WARN ] Numeric WSPR frequency token '14.097100MHz' exactly matches the legacy actual RF value for alias '20m'. WsprryPi now interprets WSPR numeric frequencies as dial frequencies. If this value came from an older config, update it to the dial frequency explicitly.
+[WARN ] Invalid WSPR dial frequency '0.136': the value must resolve to a whole-number frequency in Hz. Use an Hz, kHz, MHz, or GHz suffix for decimal unit values.
+[WARN ] Invalid WSPR dial frequency '0.136Hz': the value must resolve to a whole-number frequency in Hz. Use an Hz, kHz, MHz, or GHz suffix for decimal unit values.
+[WARN ] Invalid WSPR dial frequency '14.0971001MHz': the value must resolve to a whole-number frequency in Hz. Use an Hz, kHz, MHz, or GHz suffix for decimal unit values.
+[WARN ] Invalid WSPR dial frequency '9223372036854775808': the value is outside the supported RF range.
+[ERROR] Empty or invalid WSPR dial-frequency list.
+[ERROR] Invalid frequency token '80m@': GPIO value is missing after @.
+[ERROR] Invalid frequency token '80m@99': GPIO suffix must be between 0 and 27.
+
+Invalid planner preference. Expected auto, prefer_paired, or require_paired.
+
+Usage:
+  (sudo) wsprrypi [options] CALLSIGN GRID POWER FREQ [FREQ...]
+  (sudo) wsprrypi -i /path/to/wsprrypi.ini
+  (sudo) wsprrypi --test-tone RF_FREQ [backend/options]
+  (sudo) wsprrypi --mode QRSS --cw-message TEXT --cw-base-frequency FREQ [cw/options]
+  (sudo) wsprrypi --qrss-message TEXT --qrss-frequency HZ --qrss-dot-seconds SEC
+  (sudo) wsprrypi --fskcw-message TEXT --fskcw-mark-frequency HZ --fskcw-space-frequency HZ --fskcw-dot-seconds SEC
+  (sudo) wsprrypi --dfcw-message TEXT --dfcw-dot-frequency HZ --dfcw-dash-frequency HZ --dfcw-dot-seconds SEC
+
+General:
+  -h, --help                         Display this help message.
+  -v, --version                      Show the WsprryPi version.
+      --list-backends                List compiled transmission backends.
+  -i, --ini-file <file>              Load and monitor an INI file for daemon/service style operation.
+  -r, --repeat                       Repeat direct CLI transmissions until stopped.
+  -x, --terminate <count>            Stop after count iterations of the direct CLI WSPR frequency list.
+  -J, --journald                     Use journald for log output.
+  -D, --date-time-log                Prefix stream log output with date/time stamps.
+  --debug-logging, --no-debug-logging
+                                     Enable or disable DEBUG-level application logging.
+
+Experimental Frequency Policy (CLI/INI only):
+  --allow-unqualified-frequency, --no-allow-unqualified-frequency
+                                     Allow or deny unqualified backend/mode combinations.
+  --allow-non-amateur-frequency, --no-allow-non-amateur-frequency
+                                     Allow or deny frequencies outside recognized amateur bands.
+                                     Outside-band transmission requires both allow flags.
+
+WSPR Identity And Frequency:
+  Positional CALLSIGN GRID POWER FREQ [FREQ...]
+                                     Transmit WSPR directly from CLI. POWER is rounded to a standard WSPR dBm value.
+  FREQ                               Band aliases such as 20m; whole-number-Hz or unit-qualified dial frequencies; or 0 to skip.
+                                     Append @GPIO, @GPIOH, or @GPIOL for one-slot selector GPIO overrides.
+  --planner-preference <auto|prefer_paired|require_paired>
+                                     Select single-frame or paired WSPR planning policy.
+  -o, --offset                       Enable random WSPR transmit offset.
+  --no-offset                        Disable random WSPR transmit offset.
+
+Backend Selection:
+  Compiled backends: rpi-gpio,rp1-gpclk,si5351,simulated,wtp
+  Ancillary GPIO: enabled
+  --backend <gpio|rp1-gpclk|si5351|simulated|wtp>
+                                     Select the backend. Default: gpio.
+                                     simulated is transient, non-RF, and never persisted.
+                                     rp1-gpclk is an explicit Experimental Pi 5 backend and never a gpio fallback.
+  --power-level <level>
+    Set transmit power level for the active backend:
+      GPIO: 0-7
+      RP1 GPIO: 2, 4, 8, or 12 mA
+      Si5351: 1-4
+  --gpio-power-level <0-7>           Set GPIO backend RF power level.
+  --rp1-gpio-drive-ma <2|4|8|12>    Set Raspberry Pi 5 RP1 pad drive. Default: 2 mA.
+  --rp1-development-confirmation-json <json>
+                                     Bind transient RP1 development confirmation to finite local requests.
+  --si5351-power-level <1-4>         Set Si5351 drive-strength level.
+
+GPIO Backend:
+  -a, --transmit-gpio <4|20>         Select the RF transmit GPIO.
+      --transmit-pin <4|20>          Legacy alias for --transmit-gpio.
+  -n, --use-system-clock-frequency-estimate
+                                     Enable the system-clock frequency estimate for GPIO.
+      --no-system-clock-frequency-estimate
+                                     Disable the estimate and use GPIO manual PPM.
+  -p, --gpio-manual-ppm <value>      Set GPIO manual correction (-200 through 200) and disable the estimate.
+      --gpio-frequency-residual-ppm <value>
+                                     Set residual correction added to the system-clock estimate.
+                                     Positive means fast; negative means slow.
+
+Si5351 Backend:
+  --si5351-ppm <value>              Set Si5351 reference-oscillator correction (-200 through 200).
+  --si5351-i2c-bus <bus>             Linux I2C bus number. Default: 1.
+  --si5351-i2c-address <addr>        I2C address, decimal or 0x-prefixed hex. Valid: 0x60 through 0x6F.
+  --si5351-reference-frequency <hz>  Reference oscillator frequency in Hz.
+  --si5351-reference-source <source> external_tcxo or crystal.
+  --si5351-crystal-load-capacitance <pf>  Crystal load: 6, 8, or 10 pF.
+  --si5351-tx-output <CLK0|CLK1|CLK2>
+                                     Transmit clock output. CLI/INI only; not exposed in the Web UI.
+
+CW, QRSS, FSKCW, And DFCW:
+  --mode <WSPR|QRSS|FSKCW|DFCW>      Select direct CLI mode. Non-WSPR modes use the CW options below.
+  --cw-message <text>                Message for QRSS, FSKCW, or DFCW.
+  --cw-base-frequency <freq>         Base RF frequency. Accepts whole-number Hz or Hz/kHz/MHz/GHz suffixes.
+  --cw-shift-hz <hz>                 FSKCW/DFCW frequency shift in Hz.
+  --cw-dot-seconds <seconds>         Dot length in seconds.
+  --cw-start-minute <0-59>           Scheduled non-WSPR start minute.
+  --cw-start-second <0-59>           Seconds after the scheduled CW start minute. Default: 5.
+  --cw-repeat-minutes <minutes>      Scheduled non-WSPR repeat interval.
+  --cw-intra-element-gap <multiple>  Gap between Morse elements.
+  --cw-inter-character-gap <multiple>
+                                     Gap between Morse characters.
+  --cw-inter-word-gap <multiple>     Gap between Morse words.
+  --dfcw-intra-element-gap <multiple>
+                                     DFCW off gap between dot/dash symbols.
+  --dfcw-inter-character-gap <multiple>
+                                     DFCW off gap between characters.
+  --dfcw-inter-word-gap <multiple>   DFCW off gap between words.
+  --cw-fade-shape <none|linear|raised_cosine>
+                                     Envelope fade shape. Advanced CLI/INI control hidden from normal Web UI.
+  --cw-fade-in-ms <ms>, --cw-fade-out-ms <ms>, --cw-fade-slice-ms <ms>
+                                     Advanced CW envelope timing controls.
+  --qrss-message/--qrss-frequency/--qrss-dot-seconds
+                                     Legacy transient QRSS startup options; all three are required together.
+  --fskcw-message/--fskcw-mark-frequency/--fskcw-space-frequency/--fskcw-dot-seconds
+                                     Legacy transient FSKCW startup options; all four are required together.
+  --dfcw-message/--dfcw-dot-frequency/--dfcw-dash-frequency/--dfcw-dot-seconds
+                                     Legacy transient DFCW startup options; all four are required together.
+
+GPIO Controls And Service Ports:
+  --no-web                           Disable the HTTP web UI and WebSocket server for this run.
+  --no-http                          Disable only the HTTP web UI for this run.
+  -w, --web-port <port>              HTTP REST/Web UI port. Default: 31415.
+  -k, --socket-port <port>           WebSocket server port. Default: 31416.
+      --wtp-server-port <port>       WTP Plain LAN listener port for this process. Default: 31417.
+      --socket-loopback-only        Bind WebSocket control to loopback only.
+      --socket-loopback-family <auto|ipv6|ipv4>
+                                     Select loopback family; auto prefers IPv6.
+  -l, --led_pin <gpio>               Enable the TX LED on the given GPIO.
+      --led-pin <gpio>               Alias for --led_pin.
+      --use-led, --no-led            Enable or disable the TX LED using the configured/default pin.
+      --amp-pin <gpio>               Configure external amplifier control GPIO.
+      --amp-pin-active-high          Set Amp Pin polarity active-high.
+      --amp-pin-active-low           Set Amp Pin polarity active-low. Default.
+      --no-amp-pin                   Disable external amplifier control.
+  -s, --shutdown_button <gpio>       Enable shutdown button monitoring on the given GPIO.
+      --shutdown-button <gpio>       Alias for --shutdown_button.
+      --use-shutdown, --no-shutdown  Enable or disable shutdown button monitoring.
+  Band GPIO                          Configure per-band selector GPIOs in INI or with FREQ @GPIO suffixes.
+
+Test Tone:
+  -t, --test-tone <rf_frequency>     Start a transient direct RF test tone using whole-number Hz or a unit-qualified value.
+                                     Band aliases resolve to their WSPR dial frequency; use an explicit value for another RF carrier.
+                                     Invalid with --ini-file.
+
+
+Invalid planner preference. Expected auto, prefer_paired, or require_paired.
+
+Usage:
+  (sudo) wsprrypi [options] CALLSIGN GRID POWER FREQ [FREQ...]
+  (sudo) wsprrypi -i /path/to/wsprrypi.ini
+  (sudo) wsprrypi --test-tone RF_FREQ [backend/options]
+  (sudo) wsprrypi --mode QRSS --cw-message TEXT --cw-base-frequency FREQ [cw/options]
+  (sudo) wsprrypi --qrss-message TEXT --qrss-frequency HZ --qrss-dot-seconds SEC
+  (sudo) wsprrypi --fskcw-message TEXT --fskcw-mark-frequency HZ --fskcw-space-frequency HZ --fskcw-dot-seconds SEC
+  (sudo) wsprrypi --dfcw-message TEXT --dfcw-dot-frequency HZ --dfcw-dash-frequency HZ --dfcw-dot-seconds SEC
+
+General:
+  -h, --help                         Display this help message.
+  -v, --version                      Show the WsprryPi version.
+      --list-backends                List compiled transmission backends.
+  -i, --ini-file <file>              Load and monitor an INI file for daemon/service style operation.
+  -r, --repeat                       Repeat direct CLI transmissions until stopped.
+  -x, --terminate <count>            Stop after count iterations of the direct CLI WSPR frequency list.
+  -J, --journald                     Use journald for log output.
+  -D, --date-time-log                Prefix stream log output with date/time stamps.
+  --debug-logging, --no-debug-logging
+                                     Enable or disable DEBUG-level application logging.
+
+Experimental Frequency Policy (CLI/INI only):
+  --allow-unqualified-frequency, --no-allow-unqualified-frequency
+                                     Allow or deny unqualified backend/mode combinations.
+  --allow-non-amateur-frequency, --no-allow-non-amateur-frequency
+                                     Allow or deny frequencies outside recognized amateur bands.
+                                     Outside-band transmission requires both allow flags.
+
+WSPR Identity And Frequency:
+  Positional CALLSIGN GRID POWER FREQ [FREQ...]
+                                     Transmit WSPR directly from CLI. POWER is rounded to a standard WSPR dBm value.
+  FREQ                               Band aliases such as 20m; whole-number-Hz or unit-qualified dial frequencies; or 0 to skip.
+                                     Append @GPIO, @GPIOH, or @GPIOL for one-slot selector GPIO overrides.
+  --planner-preference <auto|prefer_paired|require_paired>
+                                     Select single-frame or paired WSPR planning policy.
+  -o, --offset                       Enable random WSPR transmit offset.
+  --no-offset                        Disable random WSPR transmit offset.
+
+Backend Selection:
+  Compiled backends: rpi-gpio,rp1-gpclk,si5351,simulated,wtp
+  Ancillary GPIO: enabled
+  --backend <gpio|rp1-gpclk|si5351|simulated|wtp>
+                                     Select the backend. Default: gpio.
+                                     simulated is transient, non-RF, and never persisted.
+                                     rp1-gpclk is an explicit Experimental Pi 5 backend and never a gpio fallback.
+  --power-level <level>
+    Set transmit power level for the active backend:
+      GPIO: 0-7
+      RP1 GPIO: 2, 4, 8, or 12 mA
+      Si5351: 1-4
+  --gpio-power-level <0-7>           Set GPIO backend RF power level.
+  --rp1-gpio-drive-ma <2|4|8|12>    Set Raspberry Pi 5 RP1 pad drive. Default: 2 mA.
+  --rp1-development-confirmation-json <json>
+                                     Bind transient RP1 development confirmation to finite local requests.
+  --si5351-power-level <1-4>         Set Si5351 drive-strength level.
+
+GPIO Backend:
+  -a, --transmit-gpio <4|20>         Select the RF transmit GPIO.
+      --transmit-pin <4|20>          Legacy alias for --transmit-gpio.
+  -n, --use-system-clock-frequency-estimate
+                                     Enable the system-clock frequency estimate for GPIO.
+      --no-system-clock-frequency-estimate
+                                     Disable the estimate and use GPIO manual PPM.
+  -p, --gpio-manual-ppm <value>      Set GPIO manual correction (-200 through 200) and disable the estimate.
+      --gpio-frequency-residual-ppm <value>
+                                     Set residual correction added to the system-clock estimate.
+                                     Positive means fast; negative means slow.
+
+Si5351 Backend:
+  --si5351-ppm <value>              Set Si5351 reference-oscillator correction (-200 through 200).
+  --si5351-i2c-bus <bus>             Linux I2C bus number. Default: 1.
+  --si5351-i2c-address <addr>        I2C address, decimal or 0x-prefixed hex. Valid: 0x60 through 0x6F.
+  --si5351-reference-frequency <hz>  Reference oscillator frequency in Hz.
+  --si5351-reference-source <source> external_tcxo or crystal.
+  --si5351-crystal-load-capacitance <pf>  Crystal load: 6, 8, or 10 pF.
+  --si5351-tx-output <CLK0|CLK1|CLK2>
+                                     Transmit clock output. CLI/INI only; not exposed in the Web UI.
+
+CW, QRSS, FSKCW, And DFCW:
+  --mode <WSPR|QRSS|FSKCW|DFCW>      Select direct CLI mode. Non-WSPR modes use the CW options below.
+  --cw-message <text>                Message for QRSS, FSKCW, or DFCW.
+  --cw-base-frequency <freq>         Base RF frequency. Accepts whole-number Hz or Hz/kHz/MHz/GHz suffixes.
+  --cw-shift-hz <hz>                 FSKCW/DFCW frequency shift in Hz.
+  --cw-dot-seconds <seconds>         Dot length in seconds.
+  --cw-start-minute <0-59>           Scheduled non-WSPR start minute.
+  --cw-start-second <0-59>           Seconds after the scheduled CW start minute. Default: 5.
+  --cw-repeat-minutes <minutes>      Scheduled non-WSPR repeat interval.
+  --cw-intra-element-gap <multiple>  Gap between Morse elements.
+  --cw-inter-character-gap <multiple>
+                                     Gap between Morse characters.
+  --cw-inter-word-gap <multiple>     Gap between Morse words.
+  --dfcw-intra-element-gap <multiple>
+                                     DFCW off gap between dot/dash symbols.
+  --dfcw-inter-character-gap <multiple>
+                                     DFCW off gap between characters.
+  --dfcw-inter-word-gap <multiple>   DFCW off gap between words.
+  --cw-fade-shape <none|linear|raised_cosine>
+                                     Envelope fade shape. Advanced CLI/INI control hidden from normal Web UI.
+  --cw-fade-in-ms <ms>, --cw-fade-out-ms <ms>, --cw-fade-slice-ms <ms>
+                                     Advanced CW envelope timing controls.
+  --qrss-message/--qrss-frequency/--qrss-dot-seconds
+                                     Legacy transient QRSS startup options; all three are required together.
+  --fskcw-message/--fskcw-mark-frequency/--fskcw-space-frequency/--fskcw-dot-seconds
+                                     Legacy transient FSKCW startup options; all four are required together.
+  --dfcw-message/--dfcw-dot-frequency/--dfcw-dash-frequency/--dfcw-dot-seconds
+                                     Legacy transient DFCW startup options; all four are required together.
+
+GPIO Controls And Service Ports:
+  --no-web                           Disable the HTTP web UI and WebSocket server for this run.
+  --no-http                          Disable only the HTTP web UI for this run.
+  -w, --web-port <port>              HTTP REST/Web UI port. Default: 31415.
+  -k, --socket-port <port>           WebSocket server port. Default: 31416.
+      --wtp-server-port <port>       WTP Plain LAN listener port for this process. Default: 31417.
+      --socket-loopback-only        Bind WebSocket control to loopback only.
+      --socket-loopback-family <auto|ipv6|ipv4>
+                                     Select loopback family; auto prefers IPv6.
+  -l, --led_pin <gpio>               Enable the TX LED on the given GPIO.
+      --led-pin <gpio>               Alias for --led_pin.
+      --use-led, --no-led            Enable or disable the TX LED using the configured/default pin.
+      --amp-pin <gpio>               Configure external amplifier control GPIO.
+      --amp-pin-active-high          Set Amp Pin polarity active-high.
+      --amp-pin-active-low           Set Amp Pin polarity active-low. Default.
+      --no-amp-pin                   Disable external amplifier control.
+  -s, --shutdown_button <gpio>       Enable shutdown button monitoring on the given GPIO.
+      --shutdown-button <gpio>       Alias for --shutdown_button.
+      --use-shutdown, --no-shutdown  Enable or disable shutdown button monitoring.
+  Band GPIO                          Configure per-band selector GPIOs in INI or with FREQ @GPIO suffixes.
+
+Test Tone:
+  -t, --test-tone <rf_frequency>     Start a transient direct RF test tone using whole-number Hz or a unit-qualified value.
+                                     Band aliases resolve to their WSPR dial frequency; use an explicit value for another RF carrier.
+                                     Invalid with --ini-file.
+
+[INFO ] GPIO frequency correction updated: mode= fixed_manual, provider= chrony, estimate_ppm= 0.0, residual_ppm= 0.0, effective_ppm= 0.0, qualification= qualified
+[INFO ] Skipping transmission period because the planned frequency is 0 Hz.
+[INFO ] PPM Manager disabled.
+[INFO ] Scheduling path selected: WSPR.
+[INFO ] runtime skip window regression.
+[INFO ] Scheduling path selected: WSPR.
+[INFO ] PPM Manager disabled.
+[INFO ] Scheduling path selected: WSPR.
+[INFO ] Completed transmission (runtime repeated skip first transmit regression) 110.600000 seconds.
+[INFO ] Skipping transmission period because the planned frequency is 0 Hz.
+[INFO ] Scheduling path selected: WSPR.
+[INFO ] runtime repeated skip second slot regression.
+[INFO ] Skipping transmission period because the planned frequency is 0 Hz.
+[INFO ] Scheduling path selected: WSPR.
+[INFO ] runtime repeated skip third slot regression.
+[INFO ] Skipping transmission period because the planned frequency is 0 Hz.
+[INFO ] Scheduling path selected: WSPR.
+[INFO ] runtime repeated skip wrap regression.
+[INFO ] Scheduling path selected: WSPR.
+[INFO ] PPM Manager disabled.
+[INFO ] Scheduling path selected: WSPR.
+[INFO ] Completed transmission (runtime repeated valid-slot first transmit regression) 110.600000 seconds.
+[INFO ] Scheduling path selected: WSPR.
+[INFO ] Completed transmission (runtime repeated valid-slot second transmit regression) 110.600000 seconds.
+[INFO ] Scheduling path selected: WSPR.
+[INFO ] Completed transmission (runtime repeated valid-slot wrap regression) 110.600000 seconds.
+[INFO ] Scheduling path selected: WSPR.
+[INFO ] PPM Manager disabled.
+[INFO ] Scheduling path selected: WSPR.
+[INFO ] Completed transmission (runtime valid-valid-skip first transmit regression) 110.600000 seconds.
+[INFO ] Scheduling path selected: WSPR.
+[INFO ] Completed transmission (runtime valid-valid-skip second transmit regression) 110.600000 seconds.
+[INFO ] Skipping transmission period because the planned frequency is 0 Hz.
+[INFO ] Scheduling path selected: WSPR.
+[INFO ] runtime valid-valid-skip wrap regression.
+[INFO ] Scheduling path selected: WSPR.
+[INFO ] PPM Manager disabled.
+[INFO ] Scheduling path selected: WSPR.
+[INFO ] Completed transmission (runtime multi-slot first transmit regression) 110.600000 seconds.
+[INFO ] Scheduling path selected: WSPR.
+[INFO ] Completed transmission (runtime multi-slot second transmit regression) 110.600000 seconds.
+[INFO ] Skipping transmission period because the planned frequency is 0 Hz.
+[INFO ] Scheduling path selected: WSPR.
+[INFO ] runtime multi-slot skip regression.
+[INFO ] Scheduling path selected: WSPR.
+[WARN ] CW.Start Second missing or empty. Using default '5'.
+[WARN ] GPIO.RP1 Drive mA missing or empty. Using default '2'.
+[WARN ] Si5351.Crystal Load Capacitance missing or empty. Using default '10'.
+[WARN ] Si5351.Reference Source missing or empty. Using default 'external_tcxo'.
+[INFO ] Skipping transmission period because the planned frequency is 0 Hz.
+[INFO ] Transmit backend: gpio
+[INFO ] Transmit GPIO: 4
+[WARN ] System-clock frequency estimate disabled and manual GPIO PPM is zero.
+[INFO ] WSPR packet payload:
+[INFO ] - Callsign: AA0NT
+[INFO ] - Locator: EM18
+[INFO ] - Power: 20 dBm
+[INFO ] - GPIO Transmit Power: 7
+[INFO ] Requested WSPR dial frequencies:
+[INFO ] - Skip (0.0)
+[INFO ] - 14.095600 MHz (GPIO17H)
+[INFO ] PPM Manager disabled.
+[INFO ] Scheduling path selected: WSPR.
+[INFO ] managed skip window regression.
+[INFO ] Scheduling path selected: WSPR.
+[WARN ] CW.Start Second missing or empty. Using default '5'.
+[WARN ] GPIO.RP1 Drive mA missing or empty. Using default '2'.
+[WARN ] Si5351.Crystal Load Capacitance missing or empty. Using default '10'.
+[WARN ] Si5351.Reference Source missing or empty. Using default 'external_tcxo'.
+[INFO ] Transmit backend: gpio
+[INFO ] Transmit GPIO: 4
+[WARN ] System-clock frequency estimate disabled and manual GPIO PPM is zero.
+[INFO ] WSPR packet payload:
+[INFO ] - Callsign: AA0NT
+[INFO ] - Locator: EM18
+[INFO ] - Power: 20 dBm
+[INFO ] - GPIO Transmit Power: 7
+[INFO ] Requested WSPR dial frequency: 14.095600 MHz (GPIO17H)
+[INFO ] PPM Manager disabled.
+[INFO ] Scheduling path selected: WSPR.
+[WARN ] CW.Start Second missing or empty. Using default '5'.
+[WARN ] GPIO.RP1 Drive mA missing or empty. Using default '2'.
+[WARN ] Si5351.Crystal Load Capacitance missing or empty. Using default '10'.
+[WARN ] Si5351.Reference Source missing or empty. Using default 'external_tcxo'.
+[WARN ] Transmission is outside the recognized worldwide amateur-band catalog. Both --allow-unqualified-frequency and --allow-non-amateur-frequency are required.
+[ERROR] Managed reload could not prepare band GPIO; previous valid configuration remains loaded. Transmit is blocked until a valid configuration is loaded.
+[INFO ] PPM Manager initialized successfully.
+[INFO ] GPIO frequency correction updated: mode= qualified_estimate_plus_residual, provider= chrony, estimate_ppm= 1.999, residual_ppm= 0.0, effective_ppm= 1.999, qualification= qualified
+[ERROR] Unable to initialize LPF selector GPIO 17 inactive: Error resolving GPIO pin 17: GPIO resolution is disabled by WSPRRYPI_DISABLE_HARDWARE_ACCESS.
+[INFO ] GPIO frequency correction updated: mode= qualified_estimate_plus_residual, provider= chrony, estimate_ppm= 1.999, residual_ppm= 0.0, effective_ppm= 1.999, qualification= qualified
+[INFO ] Scheduling path selected: WSPR.
+[WARN ] CW.Start Second missing or empty. Using default '5'.
+[WARN ] GPIO.RP1 Drive mA missing or empty. Using default '2'.
+[WARN ] Si5351.Crystal Load Capacitance missing or empty. Using default '10'.
+[WARN ] Si5351.Reference Source missing or empty. Using default 'external_tcxo'.
+[INFO ] GPIO frequency correction updated: mode= fixed_manual, provider= chrony, estimate_ppm= 0.0, residual_ppm= 0.0, effective_ppm= 0.0, qualification= qualified
+[INFO ] Transmit backend: gpio
+[INFO ] Transmit GPIO: 4
+[WARN ] System-clock frequency estimate disabled and manual GPIO PPM is zero.
+[INFO ] PPM Manager disabled.
+[INFO ] No transmission requested; skipping transmission and scheduling.
+[ERROR] Invalid configuration reload rejected; previous valid configuration remains loaded: Explicit Type 3 callsigns require a 6-character locator.
+[ERROR] Transmit is blocked until a valid configuration is loaded.
+[INFO ] INI file changed during transmission.
+[INFO ] Deferring managed reload until the current TX completes (generation 1).
+[INFO ] INI file changed during transmission.
+[INFO ] Deferring managed reload until the current TX completes (generation 2).
+[WARN ] CW.Start Second missing or empty. Using default '5'.
+[WARN ] GPIO.RP1 Drive mA missing or empty. Using default '2'.
+[WARN ] Si5351.Crystal Load Capacitance missing or empty. Using default '10'.
+[WARN ] Si5351.Reference Source missing or empty. Using default 'external_tcxo'.
+[INFO ] Transmit backend: gpio
+[INFO ] Transmit GPIO: 4
+[WARN ] System-clock frequency estimate disabled and manual GPIO PPM is zero.
+[INFO ] No transmission requested; skipping transmission and scheduling.
+[WARN ] CW.Start Second missing or empty. Using default '5'.
+[WARN ] GPIO.RP1 Drive mA missing or empty. Using default '2'.
+[WARN ] Si5351.Crystal Load Capacitance missing or empty. Using default '10'.
+[WARN ] Si5351.Reference Source missing or empty. Using default 'external_tcxo'.
+[INFO ] Transmit backend: gpio
+[INFO ] Transmit GPIO: 4
+[WARN ] System-clock frequency estimate disabled and manual GPIO PPM is zero.
+[INFO ] WSPR packet payload:
+[INFO ] - Callsign: AA0NT
+[INFO ] - Locator: EM18
+[INFO ] - Power: 20 dBm
+[INFO ] - GPIO Transmit Power: 7
+[INFO ] Requested WSPR dial frequency: 14.095600 MHz
+[INFO ] PPM Manager disabled.
+[INFO ] Scheduling path selected: WSPR.
+[INFO ] INI file changed during transmission.
+[INFO ] Deferring managed reload until the current TX completes (generation 3).
+[INFO ] Completed transmission (managed post-tx reload regression) 110.600000 seconds.
+[WARN ] CW.Start Second missing or empty. Using default '5'.
+[WARN ] GPIO.RP1 Drive mA missing or empty. Using default '2'.
+[WARN ] Si5351.Crystal Load Capacitance missing or empty. Using default '10'.
+[WARN ] Si5351.Reference Source missing or empty. Using default 'external_tcxo'.
+[INFO ] Transmit backend: gpio
+[INFO ] Transmit GPIO: 4
+[WARN ] System-clock frequency estimate disabled and manual GPIO PPM is zero.
+[INFO ] No transmission requested; skipping transmission and scheduling.
+[WARN ] CW.Start Second missing or empty. Using default '5'.
+[WARN ] GPIO.RP1 Drive mA missing or empty. Using default '2'.
+[WARN ] Si5351.Crystal Load Capacitance missing or empty. Using default '10'.
+[WARN ] Si5351.Reference Source missing or empty. Using default 'external_tcxo'.
+[INFO ] Transmit backend: gpio
+[INFO ] Transmit GPIO: 4
+[WARN ] System-clock frequency estimate disabled and manual GPIO PPM is zero.
+[INFO ] WSPR packet payload:
+[INFO ] - Callsign: AA0NT
+[INFO ] - Locator: EM18
+[INFO ] - Power: 20 dBm
+[INFO ] - GPIO Transmit Power: 7
+[INFO ] Requested WSPR dial frequency: 3.568600 MHz
+[INFO ] PPM Manager disabled.
+[INFO ] Scheduling path selected: WSPR.
+[INFO ] INI file changed during transmission.
+[INFO ] Deferring managed reload until the current TX completes (generation 4).
+[INFO ] Completed transmission (file-backed deferred reload regression) 110.592000 seconds.
+[WARN ] CW.Start Second missing or empty. Using default '5'.
+[WARN ] GPIO.RP1 Drive mA missing or empty. Using default '2'.
+[WARN ] Si5351.Crystal Load Capacitance missing or empty. Using default '10'.
+[WARN ] Si5351.Reference Source missing or empty. Using default 'external_tcxo'.
+[INFO ] Transmit backend: gpio
+[INFO ] Transmit GPIO: 4
+[WARN ] System-clock frequency estimate disabled and manual GPIO PPM is zero.
+[INFO ] No transmission requested; skipping transmission and scheduling.
+[INFO ] INI file changed during transmission.
+[INFO ] Deferring managed reload until the current TX completes (generation 5).
+[INFO ] INI file changed during transmission.
+[INFO ] Deferring managed reload until the current TX completes (generation 6).
+[WARN ] CW.Start Second missing or empty. Using default '5'.
+[WARN ] GPIO.RP1 Drive mA missing or empty. Using default '2'.
+[WARN ] Si5351.Crystal Load Capacitance missing or empty. Using default '10'.
+[WARN ] Si5351.Reference Source missing or empty. Using default 'external_tcxo'.
+[INFO ] Transmit backend: gpio
+[INFO ] Transmit GPIO: 4
+[WARN ] System-clock frequency estimate disabled and manual GPIO PPM is zero.
+[INFO ] No transmission requested; skipping transmission and scheduling.
+[INFO ] INI file changed during transmission.
+[INFO ] Deferring managed reload until the current TX completes (generation 7).
+[ERROR] Invalid configuration reload rejected; previous valid configuration remains loaded: Explicit Type 3 callsigns require a 6-character locator.
+[ERROR] Transmit is blocked until a valid configuration is loaded.
+[ERROR] Invalid configuration reload rejected; previous valid configuration remains loaded: Locator must be 4 or 6 characters long.
+[ERROR] Transmit is blocked until a valid configuration is loaded.
+[WARN ] CW.Start Second missing or empty. Using default '5'.
+[WARN ] GPIO.RP1 Drive mA missing or empty. Using default '2'.
+[WARN ] Si5351.Crystal Load Capacitance missing or empty. Using default '10'.
+[WARN ] Si5351.Reference Source missing or empty. Using default 'external_tcxo'.
+[INFO ] Transmit backend: gpio
+[INFO ] Transmit GPIO: 4
+[WARN ] System-clock frequency estimate disabled and manual GPIO PPM is zero.
+[INFO ] WSPR packet payload:
+[INFO ] - Callsign: AA0NT
+[INFO ] - Locator: EM18
+[INFO ] - Power: 20 dBm
+[INFO ] - GPIO Transmit Power: 7
+[INFO ] Requested WSPR dial frequency: 14.095600 MHz
+[INFO ] PPM Manager disabled.
+[INFO ] Scheduling path selected: WSPR.
+[INFO ] INI file changed during transmission.
+[INFO ] Deferring managed reload until the current TX completes (generation 8).
+[WARN ] CW.Start Second missing or empty. Using default '5'.
+[WARN ] GPIO.RP1 Drive mA missing or empty. Using default '2'.
+[WARN ] Si5351.Crystal Load Capacitance missing or empty. Using default '10'.
+[WARN ] Si5351.Reference Source missing or empty. Using default 'external_tcxo'.
+[INFO ] Transmit backend: gpio
+[INFO ] Transmit GPIO: 4
+[WARN ] System-clock frequency estimate disabled and manual GPIO PPM is zero.
+[INFO ] WSPR packet payload:
+[INFO ] - Callsign: W1AW
+[INFO ] - Locator: FN31
+[INFO ] - Power: 20 dBm
+[INFO ] - GPIO Transmit Power: 7
+[INFO ] Requested WSPR dial frequency: 3.568600 MHz
+[INFO ] Scheduling path selected: WSPR.
+[INFO ] GPIO frequency correction updated: mode= fixed_manual, provider= chrony, estimate_ppm= 0.0, residual_ppm= 0.0, effective_ppm= 12.5, qualification= qualified
+[INFO ] PPM Manager disabled.
+[INFO ] Scheduling path selected: WSPR.
+[INFO ] PPM Manager disabled.
+[INFO ] Scheduling path selected: WSPR.
+[INFO ] PPM Manager disabled.
+[INFO ] Scheduling path selected: WSPR.
+[INFO ] PPM Manager disabled.
+[INFO ] Scheduling path selected: WSPR.
+[INFO ] PPM Manager disabled.
+[INFO ] Scheduling path selected: WSPR.
+[INFO ] PPM Manager disabled.
+[INFO ] Scheduling path selected: WSPR.
+[INFO ] PPM Manager disabled.
+[INFO ] Scheduling path selected: WSPR.
+[INFO ] Paired WSPR planning explicitly requested.
+[INFO ] PPM Manager disabled.
+[INFO ] Scheduling path selected: WSPR.
+[INFO ] PPM Manager disabled.
+[INFO ] Scheduling path selected: WSPR.
+[INFO ] Paired WSPR planning explicitly requested.
+[INFO ] PPM Manager disabled.
+[INFO ] Scheduling path selected: WSPR.
+[INFO ] Completed transmission: 110.600000 seconds.
+[INFO ] Scheduling paired WSPR frame 2 of 2 for the next WSPR slot.
+[INFO ] Scheduling path selected: WSPR.
+[INFO ] PPM Manager disabled.
+[INFO ] Scheduling path selected: WSPR.
+[INFO ] PPM Manager disabled.
+[INFO ] Scheduling path selected: WSPR.
+[INFO ] Operation.Enable on Boot policy Never: setting Operation.Transmit=false for startup.
+[INFO ] Operation.Enable on Boot policy Follow: leaving Operation.Transmit= true.
+[INFO ] Operation.Enable on Boot policy Follow: leaving Operation.Transmit= false.
+[INFO ] Operation.Enable on Boot policy Always: setting Operation.Transmit=true for startup.
+[INFO ] Operation.Enable on Boot policy Never: setting Operation.Transmit=false for startup.
+[INFO ] Operation.Enable on Boot policy Follow: leaving Operation.Transmit= true.
+[INFO ] Operation.Enable on Boot policy Follow: leaving Operation.Transmit= false.
+[INFO ] Operation.Enable on Boot policy Always: setting Operation.Transmit=true for startup.
+[DEBUG] Logging backend: streams
+[ERROR] Transmission failed: injected managed backend failure
+[DEBUG] Finalizing scheduler cleanup after transmitter stop.
+[DEBUG] WebSocket transmit event prepared: state= failed, tx_state= disabled, plan_type=, current_frame= 0/ 0.
+[DEBUG] Dropping websocket broadcast; no connected clients.
+[ERROR] Transmit is inhibited until configuration is reloaded or the service is restarted.
+[DEBUG] WebSocket transmit event prepared: state= starting, tx_state= transmitting, plan_type=, current_frame= 0/ 0.
+[DEBUG] Dropping websocket broadcast; no connected clients.
+[INFO ] Started transmission: 14.097100 MHz.
+[INFO ] Transmission canceled after 1.000000 seconds.
+[DEBUG] WebSocket transmit event prepared: state= canceled, tx_state= canceled, plan_type=, current_frame= 0/ 0.
+[DEBUG] Dropping websocket broadcast; no connected clients.
+[DEBUG] WebSocket transmit event prepared: state= starting, tx_state= transmitting, plan_type=, current_frame= 0/ 0.
+[DEBUG] Dropping websocket broadcast; no connected clients.
+[INFO ] Started transmission: 14.097100 MHz.
+[INFO ] Transmission canceled after 1.000000 seconds.
+[DEBUG] WebSocket transmit event prepared: state= canceled, tx_state= canceled, plan_type=, current_frame= 0/ 0.
+[DEBUG] Dropping websocket broadcast; no connected clients.
+[DEBUG] [BandGPIO] Unified scheduler selector prepared band 20m, GPIO 21, polarity active high, drive enabled
+[DEBUG] [BandGPIO] Unified scheduler selector asserted band 20m, GPIO 21, polarity active high, result ok
+[DEBUG] WebSocket transmit event prepared: state= starting, tx_state= transmitting, plan_type=, current_frame= 0/ 0.
+[DEBUG] Dropping websocket broadcast; no connected clients.
+[INFO ] Started transmission: 14.097100 MHz (GPIO21H).
+[INFO ] Transmission canceled after 1.000000 seconds.
+[DEBUG] [BandGPIO] Unified scheduler selector deasserted band 20m, GPIO 21, polarity active high, result ok
+[DEBUG] [BandGPIO] Unified scheduler selector transferring band 20m, GPIO 21 to idle ownership.
+[DEBUG] WebSocket transmit event prepared: state= canceled, tx_state= canceled, plan_type=, current_frame= 0/ 0.
+[DEBUG] Dropping websocket broadcast; no connected clients.
+[DEBUG] WebSocket transmit event prepared: state= starting, tx_state= transmitting, plan_type=, current_frame= 0/ 0.
+[DEBUG] Dropping websocket broadcast; no connected clients.
+[INFO ] Started transmission: 14.097100 MHz.
+[INFO ] Transmission canceled after 1.000000 seconds.
+[DEBUG] WebSocket transmit event prepared: state= canceled, tx_state= canceled, plan_type=, current_frame= 0/ 0.
+[DEBUG] Dropping websocket broadcast; no connected clients.
+[DEBUG] WebSocket transmit event prepared: state= starting, tx_state= transmitting, plan_type=, current_frame= 0/ 0.
+[DEBUG] Dropping websocket broadcast; no connected clients.
+[INFO ] Started transmission: 14.097100 MHz.
+[DEBUG] TX LED remained asserted after transmitter stop; applying shutdown fallback during test shutdown fallback.
+[DEBUG] Processing set_config().
+[DEBUG] The system-clock frequency estimate provider has updated its value.
+[INFO ] PPM Manager initialized successfully.
+[INFO ] GPIO frequency correction updated: mode= qualified_estimate_plus_residual, provider= chrony, estimate_ppm= 1.999, residual_ppm= 0.0, effective_ppm= 1.999, qualification= qualified
+[INFO ] Transmit backend: gpio
+[INFO ] Transmit GPIO: 4
+[DEBUG] Invalid or disabled LED settings, turning off LED.
+[DEBUG] Invalid or disabled Amp Control settings, turning off Amp Control.
+[DEBUG] Disabling shutdown pin functionality.
+[INFO ] No transmission requested; skipping transmission and scheduling.
+[INFO ] Stop transmission requested by user; stopping active transmission.
+[INFO ] Transmit disabled due to user stop request.
+[DEBUG] WebSocket transmit event prepared: state= stopped, tx_state= disabled, plan_type=, current_frame= 0/ 0.
+[DEBUG] Dropping websocket broadcast; no connected clients.
+[INFO ] Stop transmission requested by user; no active transmission.
+[DEBUG] The system-clock frequency estimate provider has updated its value.
+[INFO ] Transmission stopped and runtime transmit disabled without persisting.
+[DEBUG] WebSocket transmit event prepared: state= stopped, tx_state= disabled, plan_type=, current_frame= 0/ 0.
+[DEBUG] Dropping websocket broadcast; no connected clients.
+[DEBUG] INI reload defer predicate snapshot: defer=false, state_transmitting=false, state_recovering=false, state_enabled=false, web_test_tone=false, managed_reload_tx_inhibited=false, shutdown_after_current_transmission=false, shutdown_after_wspr_plan=false, active_wspr_plan_in_progress=false, runtime_tx_state=disabled, runtime_mode=QRSS, runtime_frequency_hz=1.40969e+07, runtime_frequency_is_skip=false, runtime_snapshot_mode=WSPR, committed_request_mode=WSPR, committed_request_rf_hz=0, committed_request_dial_hz=0, committed_request_skip=false, committed_request_token=, current_dial_frequency=0, current_frequency_token=, controller_request_active=false, controller_request_mode=NONE, controller_request_backend=NONE, transmitter_snapshot={state=disabled, stop_requested=true, soft_off=false, active_execution_mode=WSPR, active_execution_is_tone=false, active_execution_is_wspr=true, current_request_mode=WSPR, current_request_rf_hz=0, current_request_dial_hz=0, current_request_skip=false, current_plan_events=0, scheduled_start_rt_ns=0}
+[INFO ] INI file changed, reloading.
+[DEBUG] Processing set_config().
+[INFO ] GPIO frequency correction updated: mode= qualified_estimate_plus_residual, provider= chrony, estimate_ppm= 1.999, residual_ppm= 0.0, effective_ppm= 1.999, qualification= qualified
+[INFO ] Transmit backend: gpio
+[INFO ] Transmit GPIO: 4
+[DEBUG] Invalid or disabled LED settings, turning off LED.
+[DEBUG] Invalid or disabled Amp Control settings, turning off Amp Control.
+[DEBUG] Disabling shutdown pin functionality.
+[INFO ] QRSS configuration loaded:
+[INFO ] - Message: "CQ"
+[INFO ] - Base Freq: 14.096900 MHz
+[INFO ] - Dot Timing: 3.0 s
+[INFO ] - GPIO Transmit Power: 7
+[DEBUG] WebSocket event prepared: type= configuration, state= reload.
+[DEBUG] Dropping websocket broadcast; no connected clients.
+[INFO ] Scheduling path selected: QRSS.
+[INFO ] No transmission requested; skipping transmission and scheduling.
+[WARN ] Stop transmissions before starting a test tone. Disable transmissions after the active transmission stops.
+[WARN ] Disable transmissions before starting a test tone.
+[INFO ] Beginning test tone requested by web UI.
+[DEBUG] Resolved WSPR dial frequency 14.095600 MHz to actual RF 14.097123 MHz using audio offset 1500.0 Hz.
+[INFO ] Using web UI test tone RF frequency override: 14.097123 MHz
+[DEBUG] [BandGPIO] Frequency entry index -1 token 20m resolved band 20m; GPIO switching enabled false; fallback path band configuration had no enabled GPIO.
+[DEBUG] [BandGPIO] No selector GPIO requested for frequency entry 20m; no configured band GPIO for band 20m; leaving LPF selection inactive.
+[INFO ] WSPR-band test tone using dial frequency: 14.095600 MHz
+[INFO ] Ending test tone requested by Web UI.
+[DEBUG] Finalizing scheduler cleanup after transmitter stop.
+[DEBUG] Post-test-tone stop transmitter snapshot: defer=false, state_transmitting=false, state_recovering=false, state_enabled=false, web_test_tone=true, managed_reload_tx_inhibited=false, shutdown_after_current_transmission=false, shutdown_after_wspr_plan=false, active_wspr_plan_in_progress=false, runtime_tx_state=disabled, runtime_mode=TONE, runtime_frequency_hz=0, runtime_frequency_is_skip=false, runtime_snapshot_mode=WSPR, committed_request_mode=WSPR, committed_request_rf_hz=0, committed_request_dial_hz=0, committed_request_skip=false, committed_request_token=, current_dial_frequency=0, current_frequency_token=20m, controller_request_active=false, controller_request_mode=NONE, controller_request_backend=NONE, transmitter_snapshot={state=disabled, stop_requested=true, soft_off=false, active_execution_mode=WSPR, active_execution_is_tone=false, active_execution_is_wspr=true, current_request_mode=WSPR, current_request_rf_hz=0, current_request_dial_hz=0, current_request_skip=false, current_plan_events=0, scheduled_start_rt_ns=0}
+[DEBUG] Processing set_config().
+[INFO ] Transmit backend: gpio
+[INFO ] Transmit GPIO: 4
+[DEBUG] Invalid or disabled LED settings, turning off LED.
+[DEBUG] Invalid or disabled Amp Control settings, turning off Amp Control.
+[DEBUG] Disabling shutdown pin functionality.
+[INFO ] QRSS configuration loaded:
+[INFO ] - Message: "CQ"
+[INFO ] - Base Freq: 14.096900 MHz
+[INFO ] - Dot Timing: 3.0 s
+[INFO ] - GPIO Transmit Power: 7
+[INFO ] Scheduling path selected: QRSS.
+[INFO ] No transmission requested; skipping transmission and scheduling.
+[INFO ] Beginning test tone requested by web UI.
+[DEBUG] Resolved WSPR dial frequency 14.095600 MHz to actual RF 14.097123 MHz using audio offset 1500.0 Hz.
+[INFO ] Using web UI test tone RF frequency override: 14.097123 MHz
+[DEBUG] [BandGPIO] Frequency entry index -1 token 20m resolved band 20m; GPIO switching enabled false; fallback path band configuration had no enabled GPIO.
+[DEBUG] [BandGPIO] No selector GPIO requested for frequency entry 20m; no configured band GPIO for band 20m; leaving LPF selection inactive.
+[INFO ] WSPR-band test tone using dial frequency: 14.095600 MHz
+[INFO ] Ending test tone requested by Web UI.
+[DEBUG] Finalizing scheduler cleanup after transmitter stop.
+[DEBUG] Post-test-tone stop transmitter snapshot: defer=false, state_transmitting=false, state_recovering=false, state_enabled=false, web_test_tone=true, managed_reload_tx_inhibited=false, shutdown_after_current_transmission=false, shutdown_after_wspr_plan=false, active_wspr_plan_in_progress=false, runtime_tx_state=disabled, runtime_mode=TONE, runtime_frequency_hz=0, runtime_frequency_is_skip=false, runtime_snapshot_mode=WSPR, committed_request_mode=WSPR, committed_request_rf_hz=0, committed_request_dial_hz=0, committed_request_skip=false, committed_request_token=, current_dial_frequency=0, current_frequency_token=20m, controller_request_active=false, controller_request_mode=NONE, controller_request_backend=NONE, transmitter_snapshot={state=disabled, stop_requested=true, soft_off=false, active_execution_mode=WSPR, active_execution_is_tone=false, active_execution_is_wspr=true, current_request_mode=WSPR, current_request_rf_hz=0, current_request_dial_hz=0, current_request_skip=false, current_plan_events=0, scheduled_start_rt_ns=0}
+[INFO ] Transmit backend: gpio
+[INFO ] Transmit GPIO: 4
+[DEBUG] Invalid or disabled LED settings, turning off LED.
+[DEBUG] Invalid or disabled Amp Control settings, turning off Amp Control.
+[DEBUG] Disabling shutdown pin functionality.
+[INFO ] QRSS configuration loaded:
+[INFO ] - Message: "CQ"
+[INFO ] - Base Freq: 14.096900 MHz
+[INFO ] - Dot Timing: 3.0 s
+[INFO ] - GPIO Transmit Power: 7
+[DEBUG] Processing set_config().
+[WARN ] CW.Start Second missing or empty. Using default '5'.
+[WARN ] GPIO.RP1 Drive mA missing or empty. Using default '2'.
+[WARN ] Si5351.Crystal Load Capacitance missing or empty. Using default '10'.
+[WARN ] Si5351.Reference Source missing or empty. Using default 'external_tcxo'.
+[INFO ] Transmit backend: si5351
+[INFO ] PPM value to be used for tone generation: 2.40936
+[INFO ] PPM Manager disabled.
+[INFO ] No transmission requested; skipping transmission and scheduling.
+[INFO ] Beginning test tone requested by web UI.
+[INFO ] WSPR-band test tone using dial frequency: 14.095600 MHz
+[INFO ] Ending test tone requested by Web UI.
+[WARN ] CW.Start Second missing or empty. Using default '5'.
+[WARN ] GPIO.RP1 Drive mA missing or empty. Using default '2'.
+[WARN ] Si5351.Crystal Load Capacitance missing or empty. Using default '10'.
+[WARN ] Si5351.Reference Source missing or empty. Using default 'external_tcxo'.
+[INFO ] Transmit backend: si5351
+[INFO ] PPM value to be used for tone generation: 2.40936
+[INFO ] PPM Manager disabled.
+[INFO ] No transmission requested; skipping transmission and scheduling.
+[INFO ] Beginning test tone requested by web UI.
+[INFO ] Using web UI test tone RF frequency override: 144.490498 MHz
+[INFO ] WSPR-band test tone using dial frequency: 144.490498 MHz
+[INFO ] Ending test tone requested by Web UI.
+[WARN ] CW.Start Second missing or empty. Using default '5'.
+[WARN ] GPIO.RP1 Drive mA missing or empty. Using default '2'.
+[WARN ] Si5351.Crystal Load Capacitance missing or empty. Using default '10'.
+[WARN ] Si5351.Reference Source missing or empty. Using default 'external_tcxo'.
+[INFO ] Transmit backend: si5351
+[INFO ] PPM value to be used for tone generation: 2.40936
+[INFO ] PPM Manager disabled.
+[INFO ] No transmission requested; skipping transmission and scheduling.
+[WARN ] CW.Start Second missing or empty. Using default '5'.
+[WARN ] GPIO.RP1 Drive mA missing or empty. Using default '2'.
+[WARN ] Si5351.Crystal Load Capacitance missing or empty. Using default '10'.
+[WARN ] Si5351.Reference Source missing or empty. Using default 'external_tcxo'.
+[INFO ] Transmit backend: gpio
+[INFO ] Transmit GPIO: 4
+[WARN ] System-clock frequency estimate disabled and manual GPIO PPM is zero.
+[INFO ] PPM Manager disabled.
+[INFO ] No transmission requested; skipping transmission and scheduling.
+[INFO ] Beginning test tone requested by web UI.
+[INFO ] WSPR-band test tone using dial frequency: 14.095600 MHz
+[INFO ] Ending test tone requested by Web UI.
+[WARN ] CW.Start Second missing or empty. Using default '5'.
+[WARN ] GPIO.RP1 Drive mA missing or empty. Using default '2'.
+[WARN ] Si5351.Crystal Load Capacitance missing or empty. Using default '10'.
+[WARN ] Si5351.Reference Source missing or empty. Using default 'external_tcxo'.
+[INFO ] Transmit backend: gpio
+[INFO ] Transmit GPIO: 4
+[WARN ] System-clock frequency estimate disabled and manual GPIO PPM is zero.
+[INFO ] PPM Manager disabled.
+[INFO ] No transmission requested; skipping transmission and scheduling.
+[INFO ] INI file changed, reloading.
+[WARN ] CW.Start Second missing or empty. Using default '5'.
+[WARN ] GPIO.RP1 Drive mA missing or empty. Using default '2'.
+[WARN ] Si5351.Crystal Load Capacitance missing or empty. Using default '10'.
+[WARN ] Si5351.Reference Source missing or empty. Using default 'external_tcxo'.
+[INFO ] Transmit backend: gpio
+[INFO ] Transmit GPIO: 4
+[WARN ] System-clock frequency estimate disabled and manual GPIO PPM is zero.
+[INFO ] WSPR packet payload:
+[INFO ] - Callsign: AA0NT
+[INFO ] - Locator: EM18
+[INFO ] - Power: 20 dBm
+[INFO ] - GPIO Transmit Power: 7
+[INFO ] Requested WSPR dial frequency: 14.095600 MHz
+[INFO ] PPM Manager disabled.
+[INFO ] Scheduling path selected: WSPR.
+[WARN ] CW.Start Second missing or empty. Using default '5'.
+[WARN ] GPIO.RP1 Drive mA missing or empty. Using default '2'.
+[WARN ] Si5351.Crystal Load Capacitance missing or empty. Using default '10'.
+[WARN ] Si5351.Reference Source missing or empty. Using default 'external_tcxo'.
+[INFO ] Transmit backend: gpio
+[INFO ] Transmit GPIO: 4
+[WARN ] System-clock frequency estimate disabled and manual GPIO PPM is zero.
+[INFO ] WSPR packet payload:
+[INFO ] - Callsign: AA0NT
+[INFO ] - Locator: EM18
+[INFO ] - Power: 20 dBm
+[INFO ] - GPIO Transmit Power: 7
+[INFO ] Requested WSPR dial frequency: 14.095600 MHz
+[INFO ] PPM Manager disabled.
+[INFO ] Scheduling path selected: WSPR.
+[WARN ] Disable transmissions before starting a test tone.
+[WARN ] CW.Start Second missing or empty. Using default '5'.
+[WARN ] GPIO.RP1 Drive mA missing or empty. Using default '2'.
+[WARN ] Si5351.Crystal Load Capacitance missing or empty. Using default '10'.
+[WARN ] Si5351.Reference Source missing or empty. Using default 'external_tcxo'.
+[INFO ] Transmit backend: gpio
+[INFO ] Transmit GPIO: 4
+[WARN ] System-clock frequency estimate disabled and manual GPIO PPM is zero.
+[INFO ] PPM Manager disabled.
+[INFO ] No transmission requested; skipping transmission and scheduling.
+[INFO ] Beginning test tone requested by web UI.
+[INFO ] WSPR-band test tone using dial frequency: 14.095600 MHz
+[INFO ] INI file changed during transmission.
+[INFO ] Deferring managed reload until the current TX completes (generation 1).
+[INFO ] Ending test tone requested by Web UI.
+[WARN ] CW.Start Second missing or empty. Using default '5'.
+[WARN ] GPIO.RP1 Drive mA missing or empty. Using default '2'.
+[WARN ] Si5351.Crystal Load Capacitance missing or empty. Using default '10'.
+[WARN ] Si5351.Reference Source missing or empty. Using default 'external_tcxo'.
+[INFO ] Transmit backend: gpio
+[INFO ] Transmit GPIO: 4
+[WARN ] System-clock frequency estimate disabled and manual GPIO PPM is zero.
+[INFO ] WSPR packet payload:
+[INFO ] - Callsign: AA0NT
+[INFO ] - Locator: EM18
+[INFO ] - Power: 20 dBm
+[INFO ] - GPIO Transmit Power: 7
+[INFO ] Requested WSPR dial frequency: 14.095600 MHz
+[INFO ] PPM Manager disabled.
+[INFO ] Scheduling path selected: WSPR.
+[INFO ] INI file changed, reloading.
+[WARN ] CW.Start Second missing or empty. Using default '5'.
+[WARN ] GPIO.RP1 Drive mA missing or empty. Using default '2'.
+[WARN ] Si5351.Crystal Load Capacitance missing or empty. Using default '10'.
+[WARN ] Si5351.Reference Source missing or empty. Using default 'external_tcxo'.
+[INFO ] Transmit backend: gpio
+[INFO ] Transmit GPIO: 4
+[WARN ] System-clock frequency estimate disabled and manual GPIO PPM is zero.
+[INFO ] PPM Manager disabled.
+[INFO ] No transmission requested; skipping transmission and scheduling.
+[WARN ] CW.Start Second missing or empty. Using default '5'.
+[WARN ] GPIO.RP1 Drive mA missing or empty. Using default '2'.
+[WARN ] Si5351.Crystal Load Capacitance missing or empty. Using default '10'.
+[WARN ] Si5351.Reference Source missing or empty. Using default 'external_tcxo'.
+[INFO ] Transmit backend: gpio
+[INFO ] Transmit GPIO: 4
+[WARN ] System-clock frequency estimate disabled and manual GPIO PPM is zero.
+[INFO ] PPM Manager disabled.
+[INFO ] No transmission requested; skipping transmission and scheduling.
+[WARN ] Calibration.PPM is outside bounds (-200 to 200), applying clamped value: 200.0
+[WARN ] Calibration.PPM is outside bounds (-200 to 200), applying clamped value: -200.0
+[WARN ] CW.Start Second missing or empty. Using default '5'.
+[WARN ] GPIO.RP1 Drive mA missing or empty. Using default '2'.
+[WARN ] Si5351.Crystal Load Capacitance missing or empty. Using default '10'.
+[WARN ] Si5351.Reference Source missing or empty. Using default 'external_tcxo'.
+[INFO ] Paired WSPR planning explicitly requested.
+[INFO ] Transmit backend: gpio
+[INFO ] Transmit GPIO: 4
+[WARN ] System-clock frequency estimate disabled and manual GPIO PPM is zero.
+[INFO ] WSPR packet payload:
+[INFO ] - Callsign: AA0NT/12
+[INFO ] - Locator: EM18IG
+[INFO ] - Power: 20 dBm
+[INFO ] - GPIO Transmit Power: 7
+[INFO ] Requested WSPR dial frequency: 14.095600 MHz
+[INFO ] PPM Manager disabled.
+[INFO ] Scheduling path selected: WSPR.
+[INFO ] PPM Manager disabled.
+[INFO ] Scheduling path selected: QRSS.
+[INFO ] Next QRSS launch at: 2026-10-02T16:10:05 UTC
+
+--cw-start-second must be between 0 and 59.
+
+Usage:
+  (sudo) wsprrypi [options] CALLSIGN GRID POWER FREQ [FREQ...]
+  (sudo) wsprrypi -i /path/to/wsprrypi.ini
+  (sudo) wsprrypi --test-tone RF_FREQ [backend/options]
+  (sudo) wsprrypi --mode QRSS --cw-message TEXT --cw-base-frequency FREQ [cw/options]
+  (sudo) wsprrypi --qrss-message TEXT --qrss-frequency HZ --qrss-dot-seconds SEC
+  (sudo) wsprrypi --fskcw-message TEXT --fskcw-mark-frequency HZ --fskcw-space-frequency HZ --fskcw-dot-seconds SEC
+  (sudo) wsprrypi --dfcw-message TEXT --dfcw-dot-frequency HZ --dfcw-dash-frequency HZ --dfcw-dot-seconds SEC
+
+General:
+  -h, --help                         Display this help message.
+  -v, --version                      Show the WsprryPi version.
+      --list-backends                List compiled transmission backends.
+  -i, --ini-file <file>              Load and monitor an INI file for daemon/service style operation.
+  -r, --repeat                       Repeat direct CLI transmissions until stopped.
+  -x, --terminate <count>            Stop after count iterations of the direct CLI WSPR frequency list.
+  -J, --journald                     Use journald for log output.
+  -D, --date-time-log                Prefix stream log output with date/time stamps.
+  --debug-logging, --no-debug-logging
+                                     Enable or disable DEBUG-level application logging.
+
+Experimental Frequency Policy (CLI/INI only):
+  --allow-unqualified-frequency, --no-allow-unqualified-frequency
+                                     Allow or deny unqualified backend/mode combinations.
+  --allow-non-amateur-frequency, --no-allow-non-amateur-frequency
+                                     Allow or deny frequencies outside recognized amateur bands.
+                                     Outside-band transmission requires both allow flags.
+
+WSPR Identity And Frequency:
+  Positional CALLSIGN GRID POWER FREQ [FREQ...]
+                                     Transmit WSPR directly from CLI. POWER is rounded to a standard WSPR dBm value.
+  FREQ                               Band aliases such as 20m; whole-number-Hz or unit-qualified dial frequencies; or 0 to skip.
+                                     Append @GPIO, @GPIOH, or @GPIOL for one-slot selector GPIO overrides.
+  --planner-preference <auto|prefer_paired|require_paired>
+                                     Select single-frame or paired WSPR planning policy.
+  -o, --offset                       Enable random WSPR transmit offset.
+  --no-offset                        Disable random WSPR transmit offset.
+
+Backend Selection:
+  Compiled backends: rpi-gpio,rp1-gpclk,si5351,simulated,wtp
+  Ancillary GPIO: enabled
+  --backend <gpio|rp1-gpclk|si5351|simulated|wtp>
+                                     Select the backend. Default: gpio.
+                                     simulated is transient, non-RF, and never persisted.
+                                     rp1-gpclk is an explicit Experimental Pi 5 backend and never a gpio fallback.
+  --power-level <level>
+    Set transmit power level for the active backend:
+      GPIO: 0-7
+      RP1 GPIO: 2, 4, 8, or 12 mA
+      Si5351: 1-4
+  --gpio-power-level <0-7>           Set GPIO backend RF power level.
+  --rp1-gpio-drive-ma <2|4|8|12>    Set Raspberry Pi 5 RP1 pad drive. Default: 2 mA.
+  --rp1-development-confirmation-json <json>
+                                     Bind transient RP1 development confirmation to finite local requests.
+  --si5351-power-level <1-4>         Set Si5351 drive-strength level.
+
+GPIO Backend:
+  -a, --transmit-gpio <4|20>         Select the RF transmit GPIO.
+      --transmit-pin <4|20>          Legacy alias for --transmit-gpio.
+  -n, --use-system-clock-frequency-estimate
+                                     Enable the system-clock frequency estimate for GPIO.
+      --no-system-clock-frequency-estimate
+                                     Disable the estimate and use GPIO manual PPM.
+  -p, --gpio-manual-ppm <value>      Set GPIO manual correction (-200 through 200) and disable the estimate.
+      --gpio-frequency-residual-ppm <value>
+                                     Set residual correction added to the system-clock estimate.
+                                     Positive means fast; negative means slow.
+
+Si5351 Backend:
+  --si5351-ppm <value>              Set Si5351 reference-oscillator correction (-200 through 200).
+  --si5351-i2c-bus <bus>             Linux I2C bus number. Default: 1.
+  --si5351-i2c-address <addr>        I2C address, decimal or 0x-prefixed hex. Valid: 0x60 through 0x6F.
+  --si5351-reference-frequency <hz>  Reference oscillator frequency in Hz.
+  --si5351-reference-source <source> external_tcxo or crystal.
+  --si5351-crystal-load-capacitance <pf>  Crystal load: 6, 8, or 10 pF.
+  --si5351-tx-output <CLK0|CLK1|CLK2>
+                                     Transmit clock output. CLI/INI only; not exposed in the Web UI.
+
+CW, QRSS, FSKCW, And DFCW:
+  --mode <WSPR|QRSS|FSKCW|DFCW>      Select direct CLI mode. Non-WSPR modes use the CW options below.
+  --cw-message <text>                Message for QRSS, FSKCW, or DFCW.
+  --cw-base-frequency <freq>         Base RF frequency. Accepts whole-number Hz or Hz/kHz/MHz/GHz suffixes.
+  --cw-shift-hz <hz>                 FSKCW/DFCW frequency shift in Hz.
+  --cw-dot-seconds <seconds>         Dot length in seconds.
+  --cw-start-minute <0-59>           Scheduled non-WSPR start minute.
+  --cw-start-second <0-59>           Seconds after the scheduled CW start minute. Default: 5.
+  --cw-repeat-minutes <minutes>      Scheduled non-WSPR repeat interval.
+  --cw-intra-element-gap <multiple>  Gap between Morse elements.
+  --cw-inter-character-gap <multiple>
+                                     Gap between Morse characters.
+  --cw-inter-word-gap <multiple>     Gap between Morse words.
+  --dfcw-intra-element-gap <multiple>
+                                     DFCW off gap between dot/dash symbols.
+  --dfcw-inter-character-gap <multiple>
+                                     DFCW off gap between characters.
+  --dfcw-inter-word-gap <multiple>   DFCW off gap between words.
+  --cw-fade-shape <none|linear|raised_cosine>
+                                     Envelope fade shape. Advanced CLI/INI control hidden from normal Web UI.
+  --cw-fade-in-ms <ms>, --cw-fade-out-ms <ms>, --cw-fade-slice-ms <ms>
+                                     Advanced CW envelope timing controls.
+  --qrss-message/--qrss-frequency/--qrss-dot-seconds
+                                     Legacy transient QRSS startup options; all three are required together.
+  --fskcw-message/--fskcw-mark-frequency/--fskcw-space-frequency/--fskcw-dot-seconds
+                                     Legacy transient FSKCW startup options; all four are required together.
+  --dfcw-message/--dfcw-dot-frequency/--dfcw-dash-frequency/--dfcw-dot-seconds
+                                     Legacy transient DFCW startup options; all four are required together.
+
+GPIO Controls And Service Ports:
+  --no-web                           Disable the HTTP web UI and WebSocket server for this run.
+  --no-http                          Disable only the HTTP web UI for this run.
+  -w, --web-port <port>              HTTP REST/Web UI port. Default: 31415.
+  -k, --socket-port <port>           WebSocket server port. Default: 31416.
+      --wtp-server-port <port>       WTP Plain LAN listener port for this process. Default: 31417.
+      --socket-loopback-only        Bind WebSocket control to loopback only.
+      --socket-loopback-family <auto|ipv6|ipv4>
+                                     Select loopback family; auto prefers IPv6.
+  -l, --led_pin <gpio>               Enable the TX LED on the given GPIO.
+      --led-pin <gpio>               Alias for --led_pin.
+      --use-led, --no-led            Enable or disable the TX LED using the configured/default pin.
+      --amp-pin <gpio>               Configure external amplifier control GPIO.
+      --amp-pin-active-high          Set Amp Pin polarity active-high.
+      --amp-pin-active-low           Set Amp Pin polarity active-low. Default.
+      --no-amp-pin                   Disable external amplifier control.
+  -s, --shutdown_button <gpio>       Enable shutdown button monitoring on the given GPIO.
+      --shutdown-button <gpio>       Alias for --shutdown_button.
+      --use-shutdown, --no-shutdown  Enable or disable shutdown button monitoring.
+  Band GPIO                          Configure per-band selector GPIOs in INI or with FREQ @GPIO suffixes.
+
+Test Tone:
+  -t, --test-tone <rf_frequency>     Start a transient direct RF test tone using whole-number Hz or a unit-qualified value.
+                                     Band aliases resolve to their WSPR dial frequency; use an explicit value for another RF carrier.
+                                     Invalid with --ini-file.
+
+
+--cw-start-second must be between 0 and 59.
+
+Usage:
+  (sudo) wsprrypi [options] CALLSIGN GRID POWER FREQ [FREQ...]
+  (sudo) wsprrypi -i /path/to/wsprrypi.ini
+  (sudo) wsprrypi --test-tone RF_FREQ [backend/options]
+  (sudo) wsprrypi --mode QRSS --cw-message TEXT --cw-base-frequency FREQ [cw/options]
+  (sudo) wsprrypi --qrss-message TEXT --qrss-frequency HZ --qrss-dot-seconds SEC
+  (sudo) wsprrypi --fskcw-message TEXT --fskcw-mark-frequency HZ --fskcw-space-frequency HZ --fskcw-dot-seconds SEC
+  (sudo) wsprrypi --dfcw-message TEXT --dfcw-dot-frequency HZ --dfcw-dash-frequency HZ --dfcw-dot-seconds SEC
+
+General:
+  -h, --help                         Display this help message.
+  -v, --version                      Show the WsprryPi version.
+      --list-backends                List compiled transmission backends.
+  -i, --ini-file <file>              Load and monitor an INI file for daemon/service style operation.
+  -r, --repeat                       Repeat direct CLI transmissions until stopped.
+  -x, --terminate <count>            Stop after count iterations of the direct CLI WSPR frequency list.
+  -J, --journald                     Use journald for log output.
+  -D, --date-time-log                Prefix stream log output with date/time stamps.
+  --debug-logging, --no-debug-logging
+                                     Enable or disable DEBUG-level application logging.
+
+Experimental Frequency Policy (CLI/INI only):
+  --allow-unqualified-frequency, --no-allow-unqualified-frequency
+                                     Allow or deny unqualified backend/mode combinations.
+  --allow-non-amateur-frequency, --no-allow-non-amateur-frequency
+                                     Allow or deny frequencies outside recognized amateur bands.
+                                     Outside-band transmission requires both allow flags.
+
+WSPR Identity And Frequency:
+  Positional CALLSIGN GRID POWER FREQ [FREQ...]
+                                     Transmit WSPR directly from CLI. POWER is rounded to a standard WSPR dBm value.
+  FREQ                               Band aliases such as 20m; whole-number-Hz or unit-qualified dial frequencies; or 0 to skip.
+                                     Append @GPIO, @GPIOH, or @GPIOL for one-slot selector GPIO overrides.
+  --planner-preference <auto|prefer_paired|require_paired>
+                                     Select single-frame or paired WSPR planning policy.
+  -o, --offset                       Enable random WSPR transmit offset.
+  --no-offset                        Disable random WSPR transmit offset.
+
+Backend Selection:
+  Compiled backends: rpi-gpio,rp1-gpclk,si5351,simulated,wtp
+  Ancillary GPIO: enabled
+  --backend <gpio|rp1-gpclk|si5351|simulated|wtp>
+                                     Select the backend. Default: gpio.
+                                     simulated is transient, non-RF, and never persisted.
+                                     rp1-gpclk is an explicit Experimental Pi 5 backend and never a gpio fallback.
+  --power-level <level>
+    Set transmit power level for the active backend:
+      GPIO: 0-7
+      RP1 GPIO: 2, 4, 8, or 12 mA
+      Si5351: 1-4
+  --gpio-power-level <0-7>           Set GPIO backend RF power level.
+  --rp1-gpio-drive-ma <2|4|8|12>    Set Raspberry Pi 5 RP1 pad drive. Default: 2 mA.
+  --rp1-development-confirmation-json <json>
+                                     Bind transient RP1 development confirmation to finite local requests.
+  --si5351-power-level <1-4>         Set Si5351 drive-strength level.
+
+GPIO Backend:
+  -a, --transmit-gpio <4|20>         Select the RF transmit GPIO.
+      --transmit-pin <4|20>          Legacy alias for --transmit-gpio.
+  -n, --use-system-clock-frequency-estimate
+                                     Enable the system-clock frequency estimate for GPIO.
+      --no-system-clock-frequency-estimate
+                                     Disable the estimate and use GPIO manual PPM.
+  -p, --gpio-manual-ppm <value>      Set GPIO manual correction (-200 through 200) and disable the estimate.
+      --gpio-frequency-residual-ppm <value>
+                                     Set residual correction added to the system-clock estimate.
+                                     Positive means fast; negative means slow.
+
+Si5351 Backend:
+  --si5351-ppm <value>              Set Si5351 reference-oscillator correction (-200 through 200).
+  --si5351-i2c-bus <bus>             Linux I2C bus number. Default: 1.
+  --si5351-i2c-address <addr>        I2C address, decimal or 0x-prefixed hex. Valid: 0x60 through 0x6F.
+  --si5351-reference-frequency <hz>  Reference oscillator frequency in Hz.
+  --si5351-reference-source <source> external_tcxo or crystal.
+  --si5351-crystal-load-capacitance <pf>  Crystal load: 6, 8, or 10 pF.
+  --si5351-tx-output <CLK0|CLK1|CLK2>
+                                     Transmit clock output. CLI/INI only; not exposed in the Web UI.
+
+CW, QRSS, FSKCW, And DFCW:
+  --mode <WSPR|QRSS|FSKCW|DFCW>      Select direct CLI mode. Non-WSPR modes use the CW options below.
+  --cw-message <text>                Message for QRSS, FSKCW, or DFCW.
+  --cw-base-frequency <freq>         Base RF frequency. Accepts whole-number Hz or Hz/kHz/MHz/GHz suffixes.
+  --cw-shift-hz <hz>                 FSKCW/DFCW frequency shift in Hz.
+  --cw-dot-seconds <seconds>         Dot length in seconds.
+  --cw-start-minute <0-59>           Scheduled non-WSPR start minute.
+  --cw-start-second <0-59>           Seconds after the scheduled CW start minute. Default: 5.
+  --cw-repeat-minutes <minutes>      Scheduled non-WSPR repeat interval.
+  --cw-intra-element-gap <multiple>  Gap between Morse elements.
+  --cw-inter-character-gap <multiple>
+                                     Gap between Morse characters.
+  --cw-inter-word-gap <multiple>     Gap between Morse words.
+  --dfcw-intra-element-gap <multiple>
+                                     DFCW off gap between dot/dash symbols.
+  --dfcw-inter-character-gap <multiple>
+                                     DFCW off gap between characters.
+  --dfcw-inter-word-gap <multiple>   DFCW off gap between words.
+  --cw-fade-shape <none|linear|raised_cosine>
+                                     Envelope fade shape. Advanced CLI/INI control hidden from normal Web UI.
+  --cw-fade-in-ms <ms>, --cw-fade-out-ms <ms>, --cw-fade-slice-ms <ms>
+                                     Advanced CW envelope timing controls.
+  --qrss-message/--qrss-frequency/--qrss-dot-seconds
+                                     Legacy transient QRSS startup options; all three are required together.
+  --fskcw-message/--fskcw-mark-frequency/--fskcw-space-frequency/--fskcw-dot-seconds
+                                     Legacy transient FSKCW startup options; all four are required together.
+  --dfcw-message/--dfcw-dot-frequency/--dfcw-dash-frequency/--dfcw-dot-seconds
+                                     Legacy transient DFCW startup options; all four are required together.
+
+GPIO Controls And Service Ports:
+  --no-web                           Disable the HTTP web UI and WebSocket server for this run.
+  --no-http                          Disable only the HTTP web UI for this run.
+  -w, --web-port <port>              HTTP REST/Web UI port. Default: 31415.
+  -k, --socket-port <port>           WebSocket server port. Default: 31416.
+      --wtp-server-port <port>       WTP Plain LAN listener port for this process. Default: 31417.
+      --socket-loopback-only        Bind WebSocket control to loopback only.
+      --socket-loopback-family <auto|ipv6|ipv4>
+                                     Select loopback family; auto prefers IPv6.
+  -l, --led_pin <gpio>               Enable the TX LED on the given GPIO.
+      --led-pin <gpio>               Alias for --led_pin.
+      --use-led, --no-led            Enable or disable the TX LED using the configured/default pin.
+      --amp-pin <gpio>               Configure external amplifier control GPIO.
+      --amp-pin-active-high          Set Amp Pin polarity active-high.
+      --amp-pin-active-low           Set Amp Pin polarity active-low. Default.
+      --no-amp-pin                   Disable external amplifier control.
+  -s, --shutdown_button <gpio>       Enable shutdown button monitoring on the given GPIO.
+      --shutdown-button <gpio>       Alias for --shutdown_button.
+      --use-shutdown, --no-shutdown  Enable or disable shutdown button monitoring.
+  Band GPIO                          Configure per-band selector GPIOs in INI or with FREQ @GPIO suffixes.
+
+Test Tone:
+  -t, --test-tone <rf_frequency>     Start a transient direct RF test tone using whole-number Hz or a unit-qualified value.
+                                     Band aliases resolve to their WSPR dial frequency; use an explicit value for another RF carrier.
+                                     Invalid with --ini-file.
+
+
+--cw-start-second must be an integer.
+
+Usage:
+  (sudo) wsprrypi [options] CALLSIGN GRID POWER FREQ [FREQ...]
+  (sudo) wsprrypi -i /path/to/wsprrypi.ini
+  (sudo) wsprrypi --test-tone RF_FREQ [backend/options]
+  (sudo) wsprrypi --mode QRSS --cw-message TEXT --cw-base-frequency FREQ [cw/options]
+  (sudo) wsprrypi --qrss-message TEXT --qrss-frequency HZ --qrss-dot-seconds SEC
+  (sudo) wsprrypi --fskcw-message TEXT --fskcw-mark-frequency HZ --fskcw-space-frequency HZ --fskcw-dot-seconds SEC
+  (sudo) wsprrypi --dfcw-message TEXT --dfcw-dot-frequency HZ --dfcw-dash-frequency HZ --dfcw-dot-seconds SEC
+
+General:
+  -h, --help                         Display this help message.
+  -v, --version                      Show the WsprryPi version.
+      --list-backends                List compiled transmission backends.
+  -i, --ini-file <file>              Load and monitor an INI file for daemon/service style operation.
+  -r, --repeat                       Repeat direct CLI transmissions until stopped.
+  -x, --terminate <count>            Stop after count iterations of the direct CLI WSPR frequency list.
+  -J, --journald                     Use journald for log output.
+  -D, --date-time-log                Prefix stream log output with date/time stamps.
+  --debug-logging, --no-debug-logging
+                                     Enable or disable DEBUG-level application logging.
+
+Experimental Frequency Policy (CLI/INI only):
+  --allow-unqualified-frequency, --no-allow-unqualified-frequency
+                                     Allow or deny unqualified backend/mode combinations.
+  --allow-non-amateur-frequency, --no-allow-non-amateur-frequency
+                                     Allow or deny frequencies outside recognized amateur bands.
+                                     Outside-band transmission requires both allow flags.
+
+WSPR Identity And Frequency:
+  Positional CALLSIGN GRID POWER FREQ [FREQ...]
+                                     Transmit WSPR directly from CLI. POWER is rounded to a standard WSPR dBm value.
+  FREQ                               Band aliases such as 20m; whole-number-Hz or unit-qualified dial frequencies; or 0 to skip.
+                                     Append @GPIO, @GPIOH, or @GPIOL for one-slot selector GPIO overrides.
+  --planner-preference <auto|prefer_paired|require_paired>
+                                     Select single-frame or paired WSPR planning policy.
+  -o, --offset                       Enable random WSPR transmit offset.
+  --no-offset                        Disable random WSPR transmit offset.
+
+Backend Selection:
+  Compiled backends: rpi-gpio,rp1-gpclk,si5351,simulated,wtp
+  Ancillary GPIO: enabled
+  --backend <gpio|rp1-gpclk|si5351|simulated|wtp>
+                                     Select the backend. Default: gpio.
+                                     simulated is transient, non-RF, and never persisted.
+                                     rp1-gpclk is an explicit Experimental Pi 5 backend and never a gpio fallback.
+  --power-level <level>
+    Set transmit power level for the active backend:
+      GPIO: 0-7
+      RP1 GPIO: 2, 4, 8, or 12 mA
+      Si5351: 1-4
+  --gpio-power-level <0-7>           Set GPIO backend RF power level.
+  --rp1-gpio-drive-ma <2|4|8|12>    Set Raspberry Pi 5 RP1 pad drive. Default: 2 mA.
+  --rp1-development-confirmation-json <json>
+                                     Bind transient RP1 development confirmation to finite local requests.
+  --si5351-power-level <1-4>         Set Si5351 drive-strength level.
+
+GPIO Backend:
+  -a, --transmit-gpio <4|20>         Select the RF transmit GPIO.
+      --transmit-pin <4|20>          Legacy alias for --transmit-gpio.
+  -n, --use-system-clock-frequency-estimate
+                                     Enable the system-clock frequency estimate for GPIO.
+      --no-system-clock-frequency-estimate
+                                     Disable the estimate and use GPIO manual PPM.
+  -p, --gpio-manual-ppm <value>      Set GPIO manual correction (-200 through 200) and disable the estimate.
+      --gpio-frequency-residual-ppm <value>
+                                     Set residual correction added to the system-clock estimate.
+                                     Positive means fast; negative means slow.
+
+Si5351 Backend:
+  --si5351-ppm <value>              Set Si5351 reference-oscillator correction (-200 through 200).
+  --si5351-i2c-bus <bus>             Linux I2C bus number. Default: 1.
+  --si5351-i2c-address <addr>        I2C address, decimal or 0x-prefixed hex. Valid: 0x60 through 0x6F.
+  --si5351-reference-frequency <hz>  Reference oscillator frequency in Hz.
+  --si5351-reference-source <source> external_tcxo or crystal.
+  --si5351-crystal-load-capacitance <pf>  Crystal load: 6, 8, or 10 pF.
+  --si5351-tx-output <CLK0|CLK1|CLK2>
+                                     Transmit clock output. CLI/INI only; not exposed in the Web UI.
+
+CW, QRSS, FSKCW, And DFCW:
+  --mode <WSPR|QRSS|FSKCW|DFCW>      Select direct CLI mode. Non-WSPR modes use the CW options below.
+  --cw-message <text>                Message for QRSS, FSKCW, or DFCW.
+  --cw-base-frequency <freq>         Base RF frequency. Accepts whole-number Hz or Hz/kHz/MHz/GHz suffixes.
+  --cw-shift-hz <hz>                 FSKCW/DFCW frequency shift in Hz.
+  --cw-dot-seconds <seconds>         Dot length in seconds.
+  --cw-start-minute <0-59>           Scheduled non-WSPR start minute.
+  --cw-start-second <0-59>           Seconds after the scheduled CW start minute. Default: 5.
+  --cw-repeat-minutes <minutes>      Scheduled non-WSPR repeat interval.
+  --cw-intra-element-gap <multiple>  Gap between Morse elements.
+  --cw-inter-character-gap <multiple>
+                                     Gap between Morse characters.
+  --cw-inter-word-gap <multiple>     Gap between Morse words.
+  --dfcw-intra-element-gap <multiple>
+                                     DFCW off gap between dot/dash symbols.
+  --dfcw-inter-character-gap <multiple>
+                                     DFCW off gap between characters.
+  --dfcw-inter-word-gap <multiple>   DFCW off gap between words.
+  --cw-fade-shape <none|linear|raised_cosine>
+                                     Envelope fade shape. Advanced CLI/INI control hidden from normal Web UI.
+  --cw-fade-in-ms <ms>, --cw-fade-out-ms <ms>, --cw-fade-slice-ms <ms>
+                                     Advanced CW envelope timing controls.
+  --qrss-message/--qrss-frequency/--qrss-dot-seconds
+                                     Legacy transient QRSS startup options; all three are required together.
+  --fskcw-message/--fskcw-mark-frequency/--fskcw-space-frequency/--fskcw-dot-seconds
+                                     Legacy transient FSKCW startup options; all four are required together.
+  --dfcw-message/--dfcw-dot-frequency/--dfcw-dash-frequency/--dfcw-dot-seconds
+                                     Legacy transient DFCW startup options; all four are required together.
+
+GPIO Controls And Service Ports:
+  --no-web                           Disable the HTTP web UI and WebSocket server for this run.
+  --no-http                          Disable only the HTTP web UI for this run.
+  -w, --web-port <port>              HTTP REST/Web UI port. Default: 31415.
+  -k, --socket-port <port>           WebSocket server port. Default: 31416.
+      --wtp-server-port <port>       WTP Plain LAN listener port for this process. Default: 31417.
+      --socket-loopback-only        Bind WebSocket control to loopback only.
+      --socket-loopback-family <auto|ipv6|ipv4>
+                                     Select loopback family; auto prefers IPv6.
+  -l, --led_pin <gpio>               Enable the TX LED on the given GPIO.
+      --led-pin <gpio>               Alias for --led_pin.
+      --use-led, --no-led            Enable or disable the TX LED using the configured/default pin.
+      --amp-pin <gpio>               Configure external amplifier control GPIO.
+      --amp-pin-active-high          Set Amp Pin polarity active-high.
+      --amp-pin-active-low           Set Amp Pin polarity active-low. Default.
+      --no-amp-pin                   Disable external amplifier control.
+  -s, --shutdown_button <gpio>       Enable shutdown button monitoring on the given GPIO.
+      --shutdown-button <gpio>       Alias for --shutdown_button.
+      --use-shutdown, --no-shutdown  Enable or disable shutdown button monitoring.
+  Band GPIO                          Configure per-band selector GPIOs in INI or with FREQ @GPIO suffixes.
+
+Test Tone:
+  -t, --test-tone <rf_frequency>     Start a transient direct RF test tone using whole-number Hz or a unit-qualified value.
+                                     Band aliases resolve to their WSPR dial frequency; use an explicit value for another RF carrier.
+                                     Invalid with --ini-file.
+
+
+stoi
+
+Usage:
+  (sudo) wsprrypi [options] CALLSIGN GRID POWER FREQ [FREQ...]
+  (sudo) wsprrypi -i /path/to/wsprrypi.ini
+  (sudo) wsprrypi --test-tone RF_FREQ [backend/options]
+  (sudo) wsprrypi --mode QRSS --cw-message TEXT --cw-base-frequency FREQ [cw/options]
+  (sudo) wsprrypi --qrss-message TEXT --qrss-frequency HZ --qrss-dot-seconds SEC
+  (sudo) wsprrypi --fskcw-message TEXT --fskcw-mark-frequency HZ --fskcw-space-frequency HZ --fskcw-dot-seconds SEC
+  (sudo) wsprrypi --dfcw-message TEXT --dfcw-dot-frequency HZ --dfcw-dash-frequency HZ --dfcw-dot-seconds SEC
+
+General:
+  -h, --help                         Display this help message.
+  -v, --version                      Show the WsprryPi version.
+      --list-backends                List compiled transmission backends.
+  -i, --ini-file <file>              Load and monitor an INI file for daemon/service style operation.
+  -r, --repeat                       Repeat direct CLI transmissions until stopped.
+  -x, --terminate <count>            Stop after count iterations of the direct CLI WSPR frequency list.
+  -J, --journald                     Use journald for log output.
+  -D, --date-time-log                Prefix stream log output with date/time stamps.
+  --debug-logging, --no-debug-logging
+                                     Enable or disable DEBUG-level application logging.
+
+Experimental Frequency Policy (CLI/INI only):
+  --allow-unqualified-frequency, --no-allow-unqualified-frequency
+                                     Allow or deny unqualified backend/mode combinations.
+  --allow-non-amateur-frequency, --no-allow-non-amateur-frequency
+                                     Allow or deny frequencies outside recognized amateur bands.
+                                     Outside-band transmission requires both allow flags.
+
+WSPR Identity And Frequency:
+  Positional CALLSIGN GRID POWER FREQ [FREQ...]
+                                     Transmit WSPR directly from CLI. POWER is rounded to a standard WSPR dBm value.
+  FREQ                               Band aliases such as 20m; whole-number-Hz or unit-qualified dial frequencies; or 0 to skip.
+                                     Append @GPIO, @GPIOH, or @GPIOL for one-slot selector GPIO overrides.
+  --planner-preference <auto|prefer_paired|require_paired>
+                                     Select single-frame or paired WSPR planning policy.
+  -o, --offset                       Enable random WSPR transmit offset.
+  --no-offset                        Disable random WSPR transmit offset.
+
+Backend Selection:
+  Compiled backends: rpi-gpio,rp1-gpclk,si5351,simulated,wtp
+  Ancillary GPIO: enabled
+  --backend <gpio|rp1-gpclk|si5351|simulated|wtp>
+                                     Select the backend. Default: gpio.
+                                     simulated is transient, non-RF, and never persisted.
+                                     rp1-gpclk is an explicit Experimental Pi 5 backend and never a gpio fallback.
+  --power-level <level>
+    Set transmit power level for the active backend:
+      GPIO: 0-7
+      RP1 GPIO: 2, 4, 8, or 12 mA
+      Si5351: 1-4
+  --gpio-power-level <0-7>           Set GPIO backend RF power level.
+  --rp1-gpio-drive-ma <2|4|8|12>    Set Raspberry Pi 5 RP1 pad drive. Default: 2 mA.
+  --rp1-development-confirmation-json <json>
+                                     Bind transient RP1 development confirmation to finite local requests.
+  --si5351-power-level <1-4>         Set Si5351 drive-strength level.
+
+GPIO Backend:
+  -a, --transmit-gpio <4|20>         Select the RF transmit GPIO.
+      --transmit-pin <4|20>          Legacy alias for --transmit-gpio.
+  -n, --use-system-clock-frequency-estimate
+                                     Enable the system-clock frequency estimate for GPIO.
+      --no-system-clock-frequency-estimate
+                                     Disable the estimate and use GPIO manual PPM.
+  -p, --gpio-manual-ppm <value>      Set GPIO manual correction (-200 through 200) and disable the estimate.
+      --gpio-frequency-residual-ppm <value>
+                                     Set residual correction added to the system-clock estimate.
+                                     Positive means fast; negative means slow.
+
+Si5351 Backend:
+  --si5351-ppm <value>              Set Si5351 reference-oscillator correction (-200 through 200).
+  --si5351-i2c-bus <bus>             Linux I2C bus number. Default: 1.
+  --si5351-i2c-address <addr>        I2C address, decimal or 0x-prefixed hex. Valid: 0x60 through 0x6F.
+  --si5351-reference-frequency <hz>  Reference oscillator frequency in Hz.
+  --si5351-reference-source <source> external_tcxo or crystal.
+  --si5351-crystal-load-capacitance <pf>  Crystal load: 6, 8, or 10 pF.
+  --si5351-tx-output <CLK0|CLK1|CLK2>
+                                     Transmit clock output. CLI/INI only; not exposed in the Web UI.
+
+CW, QRSS, FSKCW, And DFCW:
+  --mode <WSPR|QRSS|FSKCW|DFCW>      Select direct CLI mode. Non-WSPR modes use the CW options below.
+  --cw-message <text>                Message for QRSS, FSKCW, or DFCW.
+  --cw-base-frequency <freq>         Base RF frequency. Accepts whole-number Hz or Hz/kHz/MHz/GHz suffixes.
+  --cw-shift-hz <hz>                 FSKCW/DFCW frequency shift in Hz.
+  --cw-dot-seconds <seconds>         Dot length in seconds.
+  --cw-start-minute <0-59>           Scheduled non-WSPR start minute.
+  --cw-start-second <0-59>           Seconds after the scheduled CW start minute. Default: 5.
+  --cw-repeat-minutes <minutes>      Scheduled non-WSPR repeat interval.
+  --cw-intra-element-gap <multiple>  Gap between Morse elements.
+  --cw-inter-character-gap <multiple>
+                                     Gap between Morse characters.
+  --cw-inter-word-gap <multiple>     Gap between Morse words.
+  --dfcw-intra-element-gap <multiple>
+                                     DFCW off gap between dot/dash symbols.
+  --dfcw-inter-character-gap <multiple>
+                                     DFCW off gap between characters.
+  --dfcw-inter-word-gap <multiple>   DFCW off gap between words.
+  --cw-fade-shape <none|linear|raised_cosine>
+                                     Envelope fade shape. Advanced CLI/INI control hidden from normal Web UI.
+  --cw-fade-in-ms <ms>, --cw-fade-out-ms <ms>, --cw-fade-slice-ms <ms>
+                                     Advanced CW envelope timing controls.
+  --qrss-message/--qrss-frequency/--qrss-dot-seconds
+                                     Legacy transient QRSS startup options; all three are required together.
+  --fskcw-message/--fskcw-mark-frequency/--fskcw-space-frequency/--fskcw-dot-seconds
+                                     Legacy transient FSKCW startup options; all four are required together.
+  --dfcw-message/--dfcw-dot-frequency/--dfcw-dash-frequency/--dfcw-dot-seconds
+                                     Legacy transient DFCW startup options; all four are required together.
+
+GPIO Controls And Service Ports:
+  --no-web                           Disable the HTTP web UI and WebSocket server for this run.
+  --no-http                          Disable only the HTTP web UI for this run.
+  -w, --web-port <port>              HTTP REST/Web UI port. Default: 31415.
+  -k, --socket-port <port>           WebSocket server port. Default: 31416.
+      --wtp-server-port <port>       WTP Plain LAN listener port for this process. Default: 31417.
+      --socket-loopback-only        Bind WebSocket control to loopback only.
+      --socket-loopback-family <auto|ipv6|ipv4>
+                                     Select loopback family; auto prefers IPv6.
+  -l, --led_pin <gpio>               Enable the TX LED on the given GPIO.
+      --led-pin <gpio>               Alias for --led_pin.
+      --use-led, --no-led            Enable or disable the TX LED using the configured/default pin.
+      --amp-pin <gpio>               Configure external amplifier control GPIO.
+      --amp-pin-active-high          Set Amp Pin polarity active-high.
+      --amp-pin-active-low           Set Amp Pin polarity active-low. Default.
+      --no-amp-pin                   Disable external amplifier control.
+  -s, --shutdown_button <gpio>       Enable shutdown button monitoring on the given GPIO.
+      --shutdown-button <gpio>       Alias for --shutdown_button.
+      --use-shutdown, --no-shutdown  Enable or disable shutdown button monitoring.
+  Band GPIO                          Configure per-band selector GPIOs in INI or with FREQ @GPIO suffixes.
+
+Test Tone:
+  -t, --test-tone <rf_frequency>     Start a transient direct RF test tone using whole-number Hz or a unit-qualified value.
+                                     Band aliases resolve to their WSPR dial frequency; use an explicit value for another RF carrier.
+                                     Invalid with --ini-file.
+
+
+--cw-start-second is a scheduled CW option and cannot be combined with transient QRSS, FSKCW, or DFCW startup options.
+
+Usage:
+  (sudo) wsprrypi [options] CALLSIGN GRID POWER FREQ [FREQ...]
+  (sudo) wsprrypi -i /path/to/wsprrypi.ini
+  (sudo) wsprrypi --test-tone RF_FREQ [backend/options]
+  (sudo) wsprrypi --mode QRSS --cw-message TEXT --cw-base-frequency FREQ [cw/options]
+  (sudo) wsprrypi --qrss-message TEXT --qrss-frequency HZ --qrss-dot-seconds SEC
+  (sudo) wsprrypi --fskcw-message TEXT --fskcw-mark-frequency HZ --fskcw-space-frequency HZ --fskcw-dot-seconds SEC
+  (sudo) wsprrypi --dfcw-message TEXT --dfcw-dot-frequency HZ --dfcw-dash-frequency HZ --dfcw-dot-seconds SEC
+
+General:
+  -h, --help                         Display this help message.
+  -v, --version                      Show the WsprryPi version.
+      --list-backends                List compiled transmission backends.
+  -i, --ini-file <file>              Load and monitor an INI file for daemon/service style operation.
+  -r, --repeat                       Repeat direct CLI transmissions until stopped.
+  -x, --terminate <count>            Stop after count iterations of the direct CLI WSPR frequency list.
+  -J, --journald                     Use journald for log output.
+  -D, --date-time-log                Prefix stream log output with date/time stamps.
+  --debug-logging, --no-debug-logging
+                                     Enable or disable DEBUG-level application logging.
+
+Experimental Frequency Policy (CLI/INI only):
+  --allow-unqualified-frequency, --no-allow-unqualified-frequency
+                                     Allow or deny unqualified backend/mode combinations.
+  --allow-non-amateur-frequency, --no-allow-non-amateur-frequency
+                                     Allow or deny frequencies outside recognized amateur bands.
+                                     Outside-band transmission requires both allow flags.
+
+WSPR Identity And Frequency:
+  Positional CALLSIGN GRID POWER FREQ [FREQ...]
+                                     Transmit WSPR directly from CLI. POWER is rounded to a standard WSPR dBm value.
+  FREQ                               Band aliases such as 20m; whole-number-Hz or unit-qualified dial frequencies; or 0 to skip.
+                                     Append @GPIO, @GPIOH, or @GPIOL for one-slot selector GPIO overrides.
+  --planner-preference <auto|prefer_paired|require_paired>
+                                     Select single-frame or paired WSPR planning policy.
+  -o, --offset                       Enable random WSPR transmit offset.
+  --no-offset                        Disable random WSPR transmit offset.
+
+Backend Selection:
+  Compiled backends: rpi-gpio,rp1-gpclk,si5351,simulated,wtp
+  Ancillary GPIO: enabled
+  --backend <gpio|rp1-gpclk|si5351|simulated|wtp>
+                                     Select the backend. Default: gpio.
+                                     simulated is transient, non-RF, and never persisted.
+                                     rp1-gpclk is an explicit Experimental Pi 5 backend and never a gpio fallback.
+  --power-level <level>
+    Set transmit power level for the active backend:
+      GPIO: 0-7
+      RP1 GPIO: 2, 4, 8, or 12 mA
+      Si5351: 1-4
+  --gpio-power-level <0-7>           Set GPIO backend RF power level.
+  --rp1-gpio-drive-ma <2|4|8|12>    Set Raspberry Pi 5 RP1 pad drive. Default: 2 mA.
+  --rp1-development-confirmation-json <json>
+                                     Bind transient RP1 development confirmation to finite local requests.
+  --si5351-power-level <1-4>         Set Si5351 drive-strength level.
+
+GPIO Backend:
+  -a, --transmit-gpio <4|20>         Select the RF transmit GPIO.
+      --transmit-pin <4|20>          Legacy alias for --transmit-gpio.
+  -n, --use-system-clock-frequency-estimate
+                                     Enable the system-clock frequency estimate for GPIO.
+      --no-system-clock-frequency-estimate
+                                     Disable the estimate and use GPIO manual PPM.
+  -p, --gpio-manual-ppm <value>      Set GPIO manual correction (-200 through 200) and disable the estimate.
+      --gpio-frequency-residual-ppm <value>
+                                     Set residual correction added to the system-clock estimate.
+                                     Positive means fast; negative means slow.
+
+Si5351 Backend:
+  --si5351-ppm <value>              Set Si5351 reference-oscillator correction (-200 through 200).
+  --si5351-i2c-bus <bus>             Linux I2C bus number. Default: 1.
+  --si5351-i2c-address <addr>        I2C address, decimal or 0x-prefixed hex. Valid: 0x60 through 0x6F.
+  --si5351-reference-frequency <hz>  Reference oscillator frequency in Hz.
+  --si5351-reference-source <source> external_tcxo or crystal.
+  --si5351-crystal-load-capacitance <pf>  Crystal load: 6, 8, or 10 pF.
+  --si5351-tx-output <CLK0|CLK1|CLK2>
+                                     Transmit clock output. CLI/INI only; not exposed in the Web UI.
+
+CW, QRSS, FSKCW, And DFCW:
+  --mode <WSPR|QRSS|FSKCW|DFCW>      Select direct CLI mode. Non-WSPR modes use the CW options below.
+  --cw-message <text>                Message for QRSS, FSKCW, or DFCW.
+  --cw-base-frequency <freq>         Base RF frequency. Accepts whole-number Hz or Hz/kHz/MHz/GHz suffixes.
+  --cw-shift-hz <hz>                 FSKCW/DFCW frequency shift in Hz.
+  --cw-dot-seconds <seconds>         Dot length in seconds.
+  --cw-start-minute <0-59>           Scheduled non-WSPR start minute.
+  --cw-start-second <0-59>           Seconds after the scheduled CW start minute. Default: 5.
+  --cw-repeat-minutes <minutes>      Scheduled non-WSPR repeat interval.
+  --cw-intra-element-gap <multiple>  Gap between Morse elements.
+  --cw-inter-character-gap <multiple>
+                                     Gap between Morse characters.
+  --cw-inter-word-gap <multiple>     Gap between Morse words.
+  --dfcw-intra-element-gap <multiple>
+                                     DFCW off gap between dot/dash symbols.
+  --dfcw-inter-character-gap <multiple>
+                                     DFCW off gap between characters.
+  --dfcw-inter-word-gap <multiple>   DFCW off gap between words.
+  --cw-fade-shape <none|linear|raised_cosine>
+                                     Envelope fade shape. Advanced CLI/INI control hidden from normal Web UI.
+  --cw-fade-in-ms <ms>, --cw-fade-out-ms <ms>, --cw-fade-slice-ms <ms>
+                                     Advanced CW envelope timing controls.
+  --qrss-message/--qrss-frequency/--qrss-dot-seconds
+                                     Legacy transient QRSS startup options; all three are required together.
+  --fskcw-message/--fskcw-mark-frequency/--fskcw-space-frequency/--fskcw-dot-seconds
+                                     Legacy transient FSKCW startup options; all four are required together.
+  --dfcw-message/--dfcw-dot-frequency/--dfcw-dash-frequency/--dfcw-dot-seconds
+                                     Legacy transient DFCW startup options; all four are required together.
+
+GPIO Controls And Service Ports:
+  --no-web                           Disable the HTTP web UI and WebSocket server for this run.
+  --no-http                          Disable only the HTTP web UI for this run.
+  -w, --web-port <port>              HTTP REST/Web UI port. Default: 31415.
+  -k, --socket-port <port>           WebSocket server port. Default: 31416.
+      --wtp-server-port <port>       WTP Plain LAN listener port for this process. Default: 31417.
+      --socket-loopback-only        Bind WebSocket control to loopback only.
+      --socket-loopback-family <auto|ipv6|ipv4>
+                                     Select loopback family; auto prefers IPv6.
+  -l, --led_pin <gpio>               Enable the TX LED on the given GPIO.
+      --led-pin <gpio>               Alias for --led_pin.
+      --use-led, --no-led            Enable or disable the TX LED using the configured/default pin.
+      --amp-pin <gpio>               Configure external amplifier control GPIO.
+      --amp-pin-active-high          Set Amp Pin polarity active-high.
+      --amp-pin-active-low           Set Amp Pin polarity active-low. Default.
+      --no-amp-pin                   Disable external amplifier control.
+  -s, --shutdown_button <gpio>       Enable shutdown button monitoring on the given GPIO.
+      --shutdown-button <gpio>       Alias for --shutdown_button.
+      --use-shutdown, --no-shutdown  Enable or disable shutdown button monitoring.
+  Band GPIO                          Configure per-band selector GPIOs in INI or with FREQ @GPIO suffixes.
+
+Test Tone:
+  -t, --test-tone <rf_frequency>     Start a transient direct RF test tone using whole-number Hz or a unit-qualified value.
+                                     Band aliases resolve to their WSPR dial frequency; use an explicit value for another RF carrier.
+                                     Invalid with --ini-file.
+
+[INFO ] Beginning test tone requested by web UI.
+[INFO ] WSPR-band test tone using dial frequency: 14.095600 MHz
+[INFO ] Ending test tone requested by Web UI.
+[WARN ] Transmission on the 12 m band is unqualified for the selected backend and mode. Use --allow-unqualified-frequency only if you accept the experimental risk.
+[WARN ] Transmission on the 4 m band is unqualified for the selected backend and mode. Use --allow-unqualified-frequency only if you accept the experimental risk.
+[WARN ] Transmission on the 2 m band is unqualified for the selected backend and mode. Use --allow-unqualified-frequency only if you accept the experimental risk.
+[WARN ] Transmission on the 1.25 m band is unavailable for the selected backend and mode. This backend cannot safely construct the requested output.
+[WARN ] Transmission on the 70 cm band is unavailable for the selected backend and mode. This backend cannot safely construct the requested output.
+[WARN ] Transmission on the 1.25 m band is unavailable for the selected backend and mode. This backend cannot safely construct the requested output.
+[WARN ] Transmission on the 70 cm band is unavailable for the selected backend and mode. This backend cannot safely construct the requested output.
+[INFO ] Beginning test tone requested by web UI.
+[INFO ] WSPR-band test tone using dial frequency: 50.293000 MHz
+[INFO ] Ending test tone requested by Web UI.
+[INFO ] Beginning test tone requested by web UI.
+[INFO ] Using web UI test tone RF frequency override: 51.000000 MHz
+[INFO ] WSPR-band test tone using dial frequency: 51.000000 MHz
+[INFO ] Ending test tone requested by Web UI.
+[WARN ] Transmission on the 12 m band is unqualified for the selected backend and mode. Use --allow-unqualified-frequency only if you accept the experimental risk.
+[WARN ] Transmission on the 12 m band is unqualified for the selected backend and mode. Use --allow-unqualified-frequency only if you accept the experimental risk.
+[INFO ] Beginning test tone requested by web UI.
+[INFO ] WSPR-band test tone using dial frequency: 24.924600 MHz
+[INFO ] Ending test tone requested by Web UI.
+[INFO ] Beginning test tone requested by web UI.
+[INFO ] Using web UI test tone RF frequency override: 24.926100 MHz
+[INFO ] WSPR-band test tone using dial frequency: 24.926100 MHz
+[INFO ] Ending test tone requested by Web UI.
+[INFO ] PPM Manager initialized successfully.
+[INFO ] GPIO frequency correction updated: mode= qualified_estimate_plus_residual, provider= chrony, estimate_ppm= 1.999, residual_ppm= 0.0, effective_ppm= 1.999, qualification= qualified
+[INFO ] RP1 confirmation accepted and bounded WSPR frame request prepared for operation wspr-frame-operation-43.
+[INFO ] Scheduling path selected: WSPR.
+[INFO ] Bounded RP1 WSPR frame request committed for operation wspr-frame-operation-43.
+[INFO ] GPIO frequency correction updated: mode= qualified_estimate_plus_residual, provider= chrony, estimate_ppm= 1.999, residual_ppm= 0.0, effective_ppm= 1.999, qualification= qualified
+[INFO ] RP1 confirmation accepted and bounded WSPR frame request prepared for operation wspr-frame-operation-43.
+[INFO ] Transmit backend: rp1-gpclk
+[INFO ] Transmit GPIO: 4
+[INFO ] WSPR packet payload:
+[INFO ] - Callsign: AA0NT
+[INFO ] - Locator: EM18
+[INFO ] - Power: 20 dBm
+[INFO ] - RP1 GPIO Drive mA: 2
+[INFO ] Requested WSPR dial frequency: 14.095600 MHz
+[INFO ] A random offset will be added to all transmissions.
+[INFO ] Scheduling path selected: WSPR.
+[INFO ] Bounded RP1 WSPR frame request committed for operation wspr-frame-operation-43.
+[ERROR] Transmission requested but inhibited because the RP1 route transaction is unresolved.
+[ERROR] Transmission requested but inhibited because the RP1 route transaction is unresolved.
+[ERROR] Transmission requested but inhibited because the RP1 route transaction is unresolved.
+[INFO ] Direct tone request committed; transmission start initiated.
+[INFO ] Direct tone request committed; transmission start initiated.
+[INFO ] Beginning test tone requested by web UI.
+[INFO ] WSPR-band test tone using dial frequency: 144.489000 MHz
+[INFO ] Ending test tone requested by Web UI.
+[INFO ] Beginning test tone requested by web UI.
+[INFO ] WSPR-band test tone using dial frequency: 14.095600 MHz
+[INFO ] Ending test tone requested by Web UI.
+[INFO ] Beginning test tone requested by web UI.
+[INFO ] Using web UI test tone RF frequency override: 14.097123 MHz
+[INFO ] WSPR-band test tone using dial frequency: 14.097123 MHz
+[INFO ] Ending test tone requested by Web UI.
+[INFO ] Beginning test tone requested by web UI.
+[INFO ] WSPR-band test tone using dial frequency: 14.095600 MHz
+[INFO ] Ending test tone requested by Web UI.
+[INFO ] Beginning test tone requested by web UI.
+[INFO ] WSPR-band test tone using dial frequency: 14.095600 MHz
+[INFO ] Ending test tone requested by Web UI.
+[INFO ] Beginning test tone requested by web UI.
+[INFO ] WSPR-band test tone using dial frequency: 14.095600 MHz
+[INFO ] Ending test tone requested by Web UI.
+[WARN ] Stop transmissions before starting a test tone. Disable transmissions after the active transmission stops.
+[WARN ] Disable transmissions before starting a test tone.
+[INFO ] Beginning test tone requested by web UI.
+[INFO ] Using web UI test tone RF frequency override: 144.490500 MHz
+[ERROR] Test tone start rejected during configuration: Si5351 planner produced unusable frequency data for tone 0.
+[INFO ] Beginning test tone requested by web UI.
+[INFO ] WSPR-band test tone using dial frequency: 14.095600 MHz
+[INFO ] Ending test tone requested by Web UI.
+[INFO ] Beginning test tone requested by web UI.
+[INFO ] Using web UI test tone RF frequency override: 14.097123 MHz
+[INFO ] WSPR-band test tone using dial frequency: 14.097123 MHz
+[INFO ] Ending test tone requested by Web UI.
+[INFO ] Beginning test tone requested by web UI.
+[INFO ] WSPR-band test tone using dial frequency: 14.095600 MHz
+[INFO ] Ending test tone requested by Web UI.
+[INFO ] Beginning test tone requested by web UI.
+[INFO ] WSPR-band test tone using dial frequency: 14.095600 MHz
+[INFO ] Ending test tone requested by Web UI.
+[INFO ] Beginning test tone requested by web UI.
+[INFO ] Using web UI test tone RF frequency override: 14.097123 MHz
+[INFO ] WSPR-band test tone using dial frequency: 14.095600 MHz
+[INFO ] Ending test tone requested by Web UI.
+[INFO ] Beginning test tone requested by web UI.
+[INFO ] WSPR-band test tone using dial frequency: 14.095600 MHz
+[INFO ] Ending test tone requested by Web UI.
+[INFO ] Transmit backend: gpio
+[INFO ] Transmit GPIO: 4
+[INFO ] A direct RF test tone will be generated at: 14.097123 MHz
+[INFO ] Direct tone request committed; transmission start initiated.
+[INFO ] Transmitting tone, hit Ctrl-C to terminate tone.
+[INFO ] Parsed last of TX iterations, signaling shutdown after current transmission.
+dial_frequency_semantics_test passed[INFO ] Parsed last of TX iterations, signaling shutdown after paired transmission.
+
+Running cleanup lifecycle tests.
+WsprTransmitter destructor cleanup failed: Injected simulated cleanup failure.
+WsprTransmitter destructor cleanup failed: Injected simulated cleanup failure.
+WsprTransmitter destructor cleanup failed: Injected simulated cleanup failure.
+WsprTransmitter destructor cleanup failed: Injected simulated cleanup failure.
+WsprTransmitter destructor cleanup failed: Injected simulated cleanup failure.
+cleanup lifecycle tests passed
+Running UI/source regression tests.
+ui_source_regression_test passed
+Running GPIO band fail-closed policy tests.
+gpio_band_policy_test passed
+Running log timestamp display regression tests.
+PASS: log timestamp display regression tests
+Running update-check comparison tests.
+update_check_comparison_test passed
+GPIO correction provenance UI tests passed
+Running coherent UI publication tests.
+.......................
+----------------------------------------------------------------------
+Ran 23 tests in 0.140s
+
+OK
+Release build completed successfully.
+[ERROR] Pico output remains unresolved: Transport read failed or closed Cleanup failed: Transport read failed or closed
+[INFO ] Beginning test tone requested by web UI.
+[INFO ] Using web UI test tone RF frequency override: 14.097100 MHz
+[INFO ] WSPR-band test tone using dial frequency: 14.095600 MHz
+[INFO ] Ending test tone requested by Web UI.
+[INFO ] Transmit backend: wtp
+[INFO ] PPM Manager disabled.
+[INFO ] No transmission requested; skipping transmission and scheduling.
+257 production WTP configuration/runtime checks passed
+WTP UI console boolean, reload reset, legacy preference isolation, polling, validation and draft-preservation tests passed

@@ -9,6 +9,8 @@ namespace wsprrypi {
 struct WtpStationAddress {
     std::string interface_name;
     std::string address;
+    unsigned int interface_index = 0;
+    bool operator==(const WtpStationAddress&) const = default;
 };
 
 // Only active RFC1918 IPv4 station addresses are candidates for a Plain LAN

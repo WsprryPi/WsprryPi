@@ -15,4 +15,10 @@ int main() {
         !wtp_select_station_address(two, "wlan1") ||
         wtp_select_station_address({}, "auto"))
         throw std::runtime_error("Ambiguous or absent station selection must fail closed");
+    const WtpStationAddress original{"eth0", "192.168.1.10", 2};
+    const WtpStationAddress recreated{"eth0", "192.168.1.10", 7};
+    if (original == recreated ||
+        wtp_select_station_address({recreated}, "eth0") != recreated ||
+        wtp_select_station_address({original, recreated}, "eth0"))
+        throw std::runtime_error("Interface recreation must preserve kernel identity and reject ambiguity");
 }

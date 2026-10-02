@@ -85,8 +85,10 @@ was preserved across the expected application boot-ID change.
 An initial harness attempt incorrectly expected an unwrapped host configuration
 and PATCH support. The host API correctly uses a `config` envelope and PUT.
 The harness was corrected before any write and the complete case rerun.
-The underlying physical I2C response failure was not repaired or qualified;
-this result closes management responsiveness and bounded inventory behavior.
+The management stall and bounded-inventory acceptance issue are **closed**.
+The Si5351's lack of response is outside this testing scope and is not tracked
+as a remaining acceptance issue. The timeout provides the failure condition
+against which responsive management was successfully tested.
 No transmission, CLAIM/LOAD/ARM, RF test or Pico contact occurred.
 
 ## CI follow-up

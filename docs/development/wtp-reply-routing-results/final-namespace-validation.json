@@ -1,0 +1,118 @@
+{
+  "baseline_route": {
+    "dst": "192.168.83.20",
+    "from": "192.168.83.10",
+    "dev": "wifi0",
+    "flags": [],
+    "uid": 0,
+    "cache": []
+  },
+  "baseline_inspection": {
+    "hello": {
+      "selected_version": "WTP/1",
+      "device_id": "cccccccccccccccccccccccccccccccc",
+      "boot_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "product": "WsprryPi",
+      "firmware_version": "routing-test"
+    },
+    "status": {
+      "boot_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "state": "empty",
+      "output_active": false,
+      "owner_id": null,
+      "job_id": null,
+      "terminal_records": []
+    }
+  },
+  "baseline_capture": {
+    "reply_interfaces": [
+      "wifi0",
+      "wifi0",
+      "wifi0",
+      "wifi0",
+      "wifi0"
+    ],
+    "packets": "11:08:20.961212 eth0  In  IP 192.168.83.20.59078 > 192.168.83.10.31417: Flags [S], seq 3202601593, win 64240, options [mss 1460,sackOK,TS val 2546063136 ecr 0,nop,wscale 9], length 0\n11:08:20.961230 wifi0 Out IP 192.168.83.10.31417 > 192.168.83.20.59078: Flags [S.], seq 2932833491, ack 3202601594, win 65160, options [mss 1460,sackOK,TS val 1464696357 ecr 2546063136,nop,wscale 9], length 0\n11:08:20.961248 eth0  In  IP 192.168.83.20.59078 > 192.168.83.10.31417: Flags [.], ack 1, win 126, options [nop,nop,TS val 2546063136 ecr 1464696357], length 0\n11:08:20.961686 eth0  In  IP 192.168.83.20.59078 > 192.168.83.10.31417: Flags [P.], seq 1:243, ack 1, win 126, options [nop,nop,TS val 2546063136 ecr 1464696357], length 242\n11:08:20.961693 wifi0 Out IP 192.168.83.10.31417 > 192.168.83.20.59078: Flags [.], ack 243, win 127, options [nop,nop,TS val 1464696357 ecr 2546063136], length 0\n11:08:20.962400 wifi0 Out IP 192.168.83.10.31417 > 192.168.83.20.59078: Flags [P.], seq 1:17, ack 243, win 127, options [nop,nop,TS val 1464696358 ecr 2546063136], length 16\n11:08:20.962417 eth0  In  IP 192.168.83.20.59078 > 192.168.83.10.31417: Flags [.], ack 17, win 126, options [nop,nop,TS val 2546063137 ecr 1464696358], length 0\n11:08:20.962430 wifi0 Out IP 192.168.83.10.31417 > 192.168.83.20.59078: Flags [P.], seq 17:357, ack 243, win 127, options [nop,nop,TS val 1464696358 ecr 2546063137], length 340\n11:08:20.962437 eth0  In  IP 192.168.83.20.59078 > 192.168.83.10.31417: Flags [.], ack 357, win 126, options [nop,nop,TS val 2546063137 ecr 1464696358], length 0\n11:08:20.963186 eth0  In  IP 192.168.83.20.59078 > 192.168.83.10.31417: Flags [P.], seq 243:416, ack 357, win 126, options [nop,nop,TS val 2546063138 ecr 1464696358], length 173\n11:08:20.963260 wifi0 Out IP 192.168.83.10.31417 > 192.168.83.20.59078: Flags [P.], seq 357:373, ack 416, win 127, options [nop,nop,TS val 1464696359 ecr 2546063138], length 16\n\n"
+  },
+  "initial_route": {
+    "dst": "192.168.83.20",
+    "from": "192.168.83.10",
+    "dev": "eth0",
+    "flags": [],
+    "uid": 0,
+    "cache": []
+  },
+  "initial_inspection": {
+    "hello": {
+      "selected_version": "WTP/1",
+      "device_id": "cccccccccccccccccccccccccccccccc",
+      "boot_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "product": "WsprryPi",
+      "firmware_version": "routing-test"
+    },
+    "status": {
+      "boot_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "state": "empty",
+      "output_active": false,
+      "owner_id": null,
+      "job_id": null,
+      "terminal_records": []
+    }
+  },
+  "reordered_route": {
+    "dst": "192.168.83.20",
+    "from": "192.168.83.10",
+    "dev": "wifi0",
+    "flags": [],
+    "uid": 0,
+    "cache": []
+  },
+  "status_after_reorder": {
+    "status": {
+      "boot_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "state": "empty",
+      "output_active": false,
+      "owner_id": null,
+      "job_id": null,
+      "terminal_records": []
+    }
+  },
+  "new_after_reorder": {
+    "hello": {
+      "selected_version": "WTP/1",
+      "device_id": "cccccccccccccccccccccccccccccccc",
+      "boot_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "product": "WsprryPi",
+      "firmware_version": "routing-test"
+    },
+    "status": {
+      "boot_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "state": "empty",
+      "output_active": false,
+      "owner_id": null,
+      "job_id": null,
+      "terminal_records": []
+    }
+  },
+  "fixed_capture": {
+    "reply_interfaces": [
+      "eth0",
+      "eth0",
+      "eth0",
+      "eth0",
+      "eth0",
+      "eth0",
+      "eth0",
+      "eth0",
+      "eth0",
+      "eth0",
+      "eth0",
+      "eth0",
+      "eth0",
+      "eth0",
+      "eth0",
+      "eth0"
+    ],
+    "packets": "11:08:21.168333 eth0  In  IP 192.168.83.20.59090 > 192.168.83.10.31417: Flags [S], seq 134869401, win 64240, options [mss 1460,sackOK,TS val 3151447048 ecr 0,nop,wscale 9], length 0\n11:08:21.168353 eth0  Out IP 192.168.83.10.31417 > 192.168.83.20.59090: Flags [S.], seq 3111796000, ack 134869402, win 65160, options [mss 1460,sackOK,TS val 3286688465 ecr 3151447048,nop,wscale 9], length 0\n11:08:21.168371 eth0  In  IP 192.168.83.20.59090 > 192.168.83.10.31417: Flags [.], ack 1, win 126, options [nop,nop,TS val 3151447048 ecr 3286688465], length 0\n11:08:21.168807 eth0  In  IP 192.168.83.20.59090 > 192.168.83.10.31417: Flags [P.], seq 1:243, ack 1, win 126, options [nop,nop,TS val 3151447048 ecr 3286688465], length 242\n11:08:21.168814 eth0  Out IP 192.168.83.10.31417 > 192.168.83.20.59090: Flags [.], ack 243, win 127, options [nop,nop,TS val 3286688465 ecr 3151447048], length 0\n11:08:21.168924 eth0  Out IP 192.168.83.10.31417 > 192.168.83.20.59090: Flags [P.], seq 1:17, ack 243, win 127, options [nop,nop,TS val 3286688465 ecr 3151447048], length 16\n11:08:21.168941 eth0  In  IP 192.168.83.20.59090 > 192.168.83.10.31417: Flags [.], ack 17, win 126, options [nop,nop,TS val 3151447048 ecr 3286688465], length 0\n11:08:21.168956 eth0  Out IP 192.168.83.10.31417 > 192.168.83.20.59090: Flags [P.], seq 17:357, ack 243, win 127, options [nop,nop,TS val 3286688465 ecr 3151447048], length 340\n11:08:21.168961 eth0  In  IP 192.168.83.20.59090 > 192.168.83.10.31417: Flags [.], ack 357, win 126, options [nop,nop,TS val 3151447048 ecr 3286688465], length 0\n11:08:21.169708 eth0  In  IP 192.168.83.20.59090 > 192.168.83.10.31417: Flags [P.], seq 243:416, ack 357, win 126, options [nop,nop,TS val 3151447049 ecr 3286688465], length 173\n11:08:21.169779 eth0  Out IP 192.168.83.10.31417 > 192.168.83.20.59090: Flags [P.], seq 357:373, ack 416, win 127, options [nop,nop,TS val 3286688466 ecr 3151447049], length 16\n11:08:21.209995 eth0  In  IP 192.168.83.20.59090 > 192.168.83.10.31417: Flags [.], ack 373, win 126, options [nop,nop,TS val 3151447090 ecr 3286688466], length 0\n11:08:21.210000 eth0  Out IP 192.168.83.10.31417 > 192.168.83.20.59090: Flags [P.], seq 373:675, ack 416, win 127, options [nop,nop,TS val 3286688507 ecr 3151447090], length 302\n11:08:21.210006 eth0  In  IP 192.168.83.20.59090 > 192.168.83.10.31417: Flags [.], ack 675, win 126, options [nop,nop,TS val 3151447090 ecr 3286688507], length 0\n11:08:21.217786 eth0  In  IP 192.168.83.20.59090 > 192.168.83.10.31417: Flags [P.], seq 416:589, ack 675, win 126, options [nop,nop,TS val 3151447097 ecr 3286688507], length 173\n11:08:21.217923 eth0  Out IP 192.168.83.10.31417 > 192.168.83.20.59090: Flags [P.], seq 675:691, ack 589, win 127, options [nop,nop,TS val 3286688514 ecr 3151447097], length 16\n11:08:21.257995 eth0  In  IP 192.168.83.20.59090 > 192.168.83.10.31417: Flags [.], ack 691, win 126, options [nop,nop,TS val 3151447138 ecr 3286688514], length 0\n11:08:21.258003 eth0  Out IP 192.168.83.10.31417 > 192.168.83.20.59090: Flags [P.], seq 691:993, ack 589, win 127, options [nop,nop,TS val 3286688555 ecr 3151447138], length 302\n11:08:21.258011 eth0  In  IP 192.168.83.20.59090 > 192.168.83.10.31417: Flags [.], ack 993, win 126, options [nop,nop,TS val 3151447138 ecr 3286688555], length 0\n11:08:21.258665 eth0  In  IP 192.168.83.20.59092 > 192.168.83.10.31417: Flags [S], seq 1336635091, win 64240, options [mss 1460,sackOK,TS val 3296684737 ecr 0,nop,wscale 9], length 0\n11:08:21.258677 eth0  Out IP 192.168.83.10.31417 > 192.168.83.20.59092: Flags [S.], seq 92439028, ack 1336635092, win 65160, options [mss 1460,sackOK,TS val 2948729651 ecr 3296684737,nop,wscale 9], length 0\n11:08:21.258689 eth0  In  IP 192.168.83.20.59092 > 192.168.83.10.31417: Flags [.], ack 1, win 126, options [nop,nop,TS val 3296684737 ecr 2948729651], length 0\n11:08:21.259075 eth0  In  IP 192.168.83.20.59092 > 192.168.83.10.31417: Flags [P.], seq 1:243, ack 1, win 126, options [nop,nop,TS val 3296684738 ecr 2948729651], length 242\n11:08:21.259080 eth0  Out IP 192.168.83.10.31417 > 192.168.83.20.59092: Flags [.], ack 243, win 127, options [nop,nop,TS val 2948729652 ecr 3296684738], length 0\n11:08:21.259179 eth0  Out IP 192.168.83.10.31417 > 192.168.83.20.59092: Flags [P.], seq 1:17, ack 243, win 127, options [nop,nop,TS val 2948729652 ecr 3296684738], length 16\n11:08:21.259191 eth0  In  IP 192.168.83.20.59092 > 192.168.83.10.31417: Flags [.], ack 17, win 126, options [nop,nop,TS val 3296684738 ecr 2948729652], length 0\n11:08:21.259201 eth0  Out IP 192.168.83.10.31417 > 192.168.83.20.59092: Flags [P.], seq 17:357, ack 243, win 127, options [nop,nop,TS val 2948729652 ecr 3296684738], length 340\n11:08:21.259206 eth0  In  IP 192.168.83.20.59092 > 192.168.83.10.31417: Flags [.], ack 357, win 126, options [nop,nop,TS val 3296684738 ecr 2948729652], length 0\n11:08:21.259925 eth0  In  IP 192.168.83.20.59092 > 192.168.83.10.31417: Flags [P.], seq 243:416, ack 357, win 126, options [nop,nop,TS val 3296684738 ecr 2948729652], length 173\n11:08:21.259997 eth0  Out IP 192.168.83.10.31417 > 192.168.83.20.59092: Flags [P.], seq 357:373, ack 416, win 127, options [nop,nop,TS val 2948729653 ecr 3296684738], length 16\n11:08:21.301995 eth0  In  IP 192.168.83.20.59092 > 192.168.83.10.31417: Flags [.], ack 373, win 126, options [nop,nop,TS val 3296684781 ecr 2948729653], length 0\n11:08:21.302001 eth0  Out IP 192.168.83.10.31417 > 192.168.83.20.59092: Flags [P.], seq 373:675, ack 416, win 127, options [nop,nop,TS val 2948729695 ecr 3296684781], length 302\n11:08:21.302007 eth0  In  IP 192.168.83.20.59092 > 192.168.83.10.31417: Flags [.], ack 675, win 126, options [nop,nop,TS val 3296684781 ecr 2948729695], length 0\n11:08:21.302465 eth0  In  IP 192.168.83.20.59092 > 192.168.83.10.31417: Flags [F.], seq 416, ack 675, win 126, options [nop,nop,TS val 3296684781 ecr 2948729695], length 0\n11:08:21.302487 eth0  Out IP 192.168.83.10.31417 > 192.168.83.20.59092: Flags [F.], seq 675, ack 417, win 127, options [nop,nop,TS val 2948729695 ecr 3296684781], length 0\n11:08:21.302500 eth0  In  IP 192.168.83.20.59092 > 192.168.83.10.31417: Flags [.], ack 676, win 126, options [nop,nop,TS val 3296684781 ecr 2948729695], length 0\n11:08:21.302586 eth0  In  IP 192.168.83.20.59090 > 192.168.83.10.31417: Flags [F.], seq 589, ack 993, win 126, options [nop,nop,TS val 3151447182 ecr 3286688555], length 0\n11:08:21.302597 eth0  Out IP 192.168.83.10.31417 > 192.168.83.20.59090: Flags [F.], seq 993, ack 590, win 127, options [nop,nop,TS val 3286688599 ecr 3151447182], length 0\n11:08:21.302605 eth0  In  IP 192.168.83.20.59090 > 192.168.83.10.31417: Flags [.], ack 994, win 126, options [nop,nop,TS val 3151447182 ecr 3286688599], length 0\n\n"
+  }
+}

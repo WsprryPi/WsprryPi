@@ -1,0 +1,54 @@
+build metadata updated: build/generated/build_metadata.hpp
+build metadata unchanged: build/generated/build_metadata.hpp
+mkdir -p build
+g++ -std=c++20 -Wall -Wextra -Wpedantic -Werror -O2 -g -Iinclude -c src/codec.cpp -o build/codec.o
+mkdir -p build
+g++ -std=c++20 -Wall -Wextra -Wpedantic -Werror -O2 -g -Iinclude -c src/codec.cpp -o build/codec.o
+mkdir -p build
+g++ -std=c++20 -Wall -Wextra -Wpedantic -Werror -O2 -g -Iinclude -c src/endpoint.cpp -o build/endpoint.o
+mkdir -p build
+g++ -std=c++20 -Wall -Wextra -Wpedantic -Werror -O2 -g -Iinclude -c src/endpoint.cpp -o build/endpoint.o
+mkdir -p build
+g++ -std=c++20 -Wall -Wextra -Wpedantic -Werror -O2 -g -Iinclude -c src/frame_parser.cpp -o build/frame_parser.o
+mkdir -p build
+g++ -std=c++20 -Wall -Wextra -Wpedantic -Werror -O2 -g -Iinclude -c src/frame_parser.cpp -o build/frame_parser.o
+mkdir -p build
+g++ -std=c++20 -Wall -Wextra -Wpedantic -Werror -O2 -g -Iinclude -c src/inhibited_rf_engine.cpp -o build/inhibited_rf_engine.o
+mkdir -p build
+g++ -std=c++20 -Wall -Wextra -Wpedantic -Werror -O2 -g -Iinclude -c src/job_service.cpp -o build/job_service.o
+mkdir -p build
+g++ -std=c++20 -Wall -Wextra -Wpedantic -Werror -O2 -g -Iinclude -c src/inhibited_rf_engine.cpp -o build/inhibited_rf_engine.o
+mkdir -p build
+g++ -std=c++20 -Wall -Wextra -Wpedantic -Werror -O2 -g -Iinclude -c src/job_service.cpp -o build/job_service.o
+mkdir -p build
+g++ -std=c++20 -Wall -Wextra -Wpedantic -Werror -O2 -g -Iinclude -c src/json.cpp -o build/json.o
+mkdir -p build
+g++ -std=c++20 -Wall -Wextra -Wpedantic -Werror -O2 -g -Iinclude -c src/json.cpp -o build/json.o
+mkdir -p build
+g++ -std=c++20 -Wall -Wextra -Wpedantic -Werror -O2 -g -Iinclude -c src/sha256.cpp -o build/sha256.o
+ar rcs build/libwtp_server.a build/codec.o build/endpoint.o build/frame_parser.o build/inhibited_rf_engine.o build/job_service.o build/json.o build/sha256.o
+mkdir -p build/src
+g++ -std=c++20 -Wall -Wextra -Wpedantic -Werror -O2 -g -Iinclude -Isrc -c src/codec.cpp -o build/src/codec.o
+mkdir -p build
+g++ -std=c++20 -Wall -Wextra -Wpedantic -Werror -O2 -g -Iinclude -c src/sha256.cpp -o build/sha256.o
+ar rcs build/libwtp_server.a build/codec.o build/endpoint.o build/frame_parser.o build/inhibited_rf_engine.o build/job_service.o build/json.o build/sha256.o
+mkdir -p build/src
+g++ -std=c++20 -Wall -Wextra -Wpedantic -Werror -O2 -g -Iinclude -Isrc -c src/codec.cpp -o build/src/codec.o
+mkdir -p build/src
+g++ -std=c++20 -Wall -Wextra -Wpedantic -Werror -O2 -g -Iinclude -Isrc -c src/frame_parser.cpp -o build/src/frame_parser.o
+mkdir -p build/src
+g++ -std=c++20 -Wall -Wextra -Wpedantic -Werror -O2 -g -Iinclude -Isrc -c src/wire.cpp -o build/src/wire.o
+mkdir -p build/src
+g++ -std=c++20 -Wall -Wextra -Wpedantic -Werror -O2 -g -Iinclude -Isrc -c src/frame_parser.cpp -o build/src/frame_parser.o
+mkdir -p build/src
+g++ -std=c++20 -Wall -Wextra -Wpedantic -Werror -O2 -g -Iinclude -Isrc -c src/session.cpp -o build/src/session.o
+mkdir -p build/src
+g++ -std=c++20 -Wall -Wextra -Wpedantic -Werror -O2 -g -Iinclude -Isrc -c src/wire.cpp -o build/src/wire.o
+mkdir -p build/src
+g++ -std=c++20 -Wall -Wextra -Wpedantic -Werror -O2 -g -Iinclude -Isrc -c src/session.cpp -o build/src/session.o
+mkdir -p build/src/detail
+g++ -std=c++20 -Wall -Wextra -Wpedantic -Werror -O2 -g -Iinclude -Isrc -c src/detail/json.cpp -o build/src/detail/json.o
+mkdir -p build/src/detail
+g++ -std=c++20 -Wall -Wextra -Wpedantic -Werror -O2 -g -Iinclude -Isrc -c src/detail/json.cpp -o build/src/detail/json.o
+ar rcs build/libwtp_client.a build/src/codec.o build/src/frame_parser.o build/src/wire.o build/src/session.o build/src/detail/json.o
+ar rcs build/libwtp_client.a build/src/codec.o build/src/frame_parser.o build/src/wire.o build/src/session.o build/src/detail/json.o

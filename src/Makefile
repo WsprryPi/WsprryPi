@@ -1190,16 +1190,36 @@ wtp-pi-authority-test:
 	$(Q)build/wtp_pi_authority_test
 
 .PHONY: wtp-pi-listener-test
+ifeq ($(HOST_OS),Linux)
+WTP_LISTENER_TEST_FLAGS := -DWSPRRYPI_TEST_SOCKET_WRAPPERS
+WTP_LISTENER_TEST_LDFLAGS := -Wl,--wrap=setsockopt -Wl,--wrap=accept
+endif
 wtp-pi-listener-test:
 	$(Q)$(MAKE) --no-print-directory -C WTP-Server all
 	$(Q)$(MAKE) --no-print-directory -C WTP-Client all
-	$(Q)$(CXX) -std=c++20 -pthread -Wall -Wextra -Wpedantic -Werror \
+	$(Q)$(CXX) -std=c++20 -pthread -Wall -Wextra -Wpedantic -Werror $(WTP_LISTENER_TEST_FLAGS) \
 		-I. -IWTP-Server/include -IWTP-Client/include \
 		tests/wtp_pi_plain_listener_test.cpp wtp_endpoint/authority.cpp \
 		wtp_endpoint/revocation_journal.cpp wtp_endpoint/plain_listener.cpp \
 		WTP-Server/build/libwtp_server.a \
-		WTP-Client/build/libwtp_client.a -o build/wtp_pi_plain_listener_test
+		WTP-Client/build/libwtp_client.a $(WTP_LISTENER_TEST_LDFLAGS) -o build/wtp_pi_plain_listener_test
 	$(Q)build/wtp_pi_plain_listener_test
+
+# Linux-only network fixture; no transmitter hardware. The routing acceptance
+# uses private namespaces and needs root/CAP_NET_ADMIN, unlike ordinary tests.
+.PHONY: wtp-pi-routing-probe wtp-pi-routing-test
+wtp-pi-routing-probe:
+	$(Q)$(MAKE) --no-print-directory -C WTP-Server all
+	$(Q)$(MAKE) --no-print-directory -C WTP-Client all
+	$(Q)$(CXX) -std=c++20 -pthread -Wall -Wextra -Wpedantic -Werror \
+		-I. -IWTP-Server/include -IWTP-Client/include \
+		tests/wtp_pi_routing_probe.cpp wtp_endpoint/authority.cpp \
+		wtp_endpoint/revocation_journal.cpp wtp_endpoint/plain_listener.cpp \
+		WTP-Server/build/libwtp_server.a WTP-Client/build/libwtp_client.a \
+		-Wl,--wrap=setsockopt -o build/wtp_pi_routing_probe
+
+wtp-pi-routing-test: wtp-pi-routing-probe
+	$(Q)$(SUDO) python3 tests/wtp_pi_reply_routing_test.py --probe build/wtp_pi_routing_probe
 
 .PHONY: wtp-pi-revocation-test
 wtp-pi-revocation-test:

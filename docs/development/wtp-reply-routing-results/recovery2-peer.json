@@ -1,0 +1,59 @@
+[
+  {
+    "success": true,
+    "seconds": 0.3051331859896891,
+    "hello": {
+      "selected_version": "WTP/1",
+      "device_id": "e045017b11e54c2fb7029f0154e6deb9",
+      "boot_id": "f92ead4639f0e969f37ad4e66addd6f5",
+      "product": "WsprryPi",
+      "firmware_version": "0.0.0-devel+d6402b1"
+    },
+    "status": {
+      "boot_id": "f92ead4639f0e969f37ad4e66addd6f5",
+      "state": "empty",
+      "output_active": false,
+      "owner_id": null,
+      "job_id": null,
+      "terminal_records": []
+    }
+  },
+  {
+    "success": true,
+    "seconds": 0.0636278400052106,
+    "hello": {
+      "selected_version": "WTP/1",
+      "device_id": "e045017b11e54c2fb7029f0154e6deb9",
+      "boot_id": "f92ead4639f0e969f37ad4e66addd6f5",
+      "product": "WsprryPi",
+      "firmware_version": "0.0.0-devel+d6402b1"
+    },
+    "status": {
+      "boot_id": "f92ead4639f0e969f37ad4e66addd6f5",
+      "state": "empty",
+      "output_active": false,
+      "owner_id": null,
+      "job_id": null,
+      "terminal_records": []
+    }
+  },
+  {
+    "success": true,
+    "seconds": 0.05399255800875835,
+    "hello": {
+      "selected_version": "WTP/1",
+      "device_id": "e045017b11e54c2fb7029f0154e6deb9",
+      "boot_id": "f92ead4639f0e969f37ad4e66addd6f5",
+      "product": "WsprryPi",
+      "firmware_version": "0.0.0-devel+d6402b1"
+    },
+    "status": {
+      "boot_id": "f92ead4639f0e969f37ad4e66addd6f5",
+      "state": "empty",
+      "output_active": false,
+      "owner_id": null,
+      "job_id": null,
+      "terminal_records": []
+    }
+  }
+]

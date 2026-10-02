@@ -1,0 +1,13 @@
+{
+  "base_commit": "d6402b1002a2d22fa7c65a5e8c8c6b1b286e91c6",
+  "candidate_source_dirty": true,
+  "qualified_source_and_binary_sha256": {
+    "src/wtp_endpoint/plain_listener.cpp": "cee8b001d8b3d3c3da0880ec8ff4da302971e4aef6ed75dc612dbbbb1ab72967",
+    "src/wtp_endpoint/plain_listener.hpp": "3bc1b8226c7a8d40cd95ff1f20df250284f2ecf2432a36d918ad031077d450f6",
+    "src/wtp_endpoint/interface_selection.cpp": "b075d350fa1c4db2ff2e67b952f923e1468da6383ef713931604a5279f73c20b",
+    "src/wtp_endpoint/interface_selection.hpp": "6752187fa27d19ac7e8bb3b47245ab38b36f559182af470c85611e2542092389",
+    "src/wtp_endpoint/runtime.cpp": "369d93c1bdf3b5a0449bf00d3ca51d4b60efdb37b9a8e893a6170ff54b8d33a7",
+    "src/build/bin/wsprrypi": "f2156011ecaaadf0708470a51f5dbb760c93a6cdb28f0468bbcaf552e78ffe38"
+  },
+  "mac_cpp_build_attempted": false
+}
