@@ -1,0 +1,9 @@
+{
+  "scope": "Full recorded plan",
+  "all_requested_cases_passed": false,
+  "all_clean_rounds_complete": false,
+  "five_independent_running_outputs_in_all_requested_slots": false,
+  "no_duplicate_or_replayed_slot_observed": true,
+  "expected_identity_observed_on_all_outputs": true,
+  "note": "Pico USB INFO reports actual shared JobService state/output; ownership and remote job IDs come from controller protocol records and independent final LAN inspection."
+}

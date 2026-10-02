@@ -1,0 +1,58 @@
+{
+  "cases": [
+    {
+      "name": "controller-network",
+      "affected": [
+        "wspr1",
+        "wspr2",
+        "wspr4",
+        "Pico A",
+        "Pico B"
+      ],
+      "known_off_before_recovery": true,
+      "fresh_expected_identity_unowned_after_recovery": true,
+      "all_five_future_slot_completions": true,
+      "unaffected_fault_slot_completions": true
+    },
+    {
+      "name": "target-subset-one",
+      "affected": [
+        "wspr2",
+        "wspr4",
+        "Pico A"
+      ],
+      "known_off_before_recovery": true,
+      "fresh_expected_identity_unowned_after_recovery": true,
+      "all_five_future_slot_completions": true,
+      "unaffected_fault_slot_completions": true
+    },
+    {
+      "name": "target-subset-two",
+      "affected": [
+        "wspr1",
+        "Pico B"
+      ],
+      "known_off_before_recovery": true,
+      "fresh_expected_identity_unowned_after_recovery": true,
+      "all_five_future_slot_completions": true,
+      "unaffected_fault_slot_completions": true
+    },
+    {
+      "name": "controller-crash",
+      "affected": [
+        "wspr1",
+        "wspr2",
+        "wspr4",
+        "Pico A",
+        "Pico B"
+      ],
+      "known_off_before_recovery": true,
+      "fresh_expected_identity_unowned_after_recovery": true,
+      "all_five_future_slot_completions": true,
+      "unaffected_fault_slot_completions": true
+    }
+  ],
+  "checkpoint_assertions_passed": true,
+  "scope": "Original first four cases only; target-restart failure excluded.",
+  "pico_ownership_evidence": "Fresh controller WTP STATUS after recovery; USB INFO has no ownership fields."
+}

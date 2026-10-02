@@ -1,0 +1,11 @@
+{
+  "device_id": "29f20b7342051ef947aa56cb9d4fab42",
+  "serial": "CDDBF8767C506C07",
+  "restored_revision": "615888e5364b",
+  "restored_uf2_sha256": "81361b105def84231c23853507bad81f992426260b9c935061fab82081d5239f",
+  "reserved_bytes_identical": 57344,
+  "boot_id": "4d84304021b0c2946d58f57a6ae8a911",
+  "engine": "inhibited-standalone-simulator",
+  "output_active": false,
+  "profile_preserved": true
+}

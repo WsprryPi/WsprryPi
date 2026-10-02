@@ -1,0 +1,738 @@
+{
+  "criterion": "Corresponding SDR signal; 30 dB peak over masked nearby median noise and 15 dB median on/off contrast. No RF-chain, calibrated frequency, decoding or precision edge-timing claim.",
+  "scope": "Original first four cases through controller-crash clean slot only.",
+  "slots": [
+    {
+      "slot": 1790901361,
+      "outputs": {
+        "wspr2": {
+          "samples": 32,
+          "minimum_on_snr_db": 81.37059006801387,
+          "median_on_snr_db": 82.13607294443071,
+          "maximum_off_snr_db": 11.17898006819926,
+          "median_off_snr_db": 8.892316438468455,
+          "median_peak_hz": 14101116.235351562,
+          "intentionally_interrupted": false,
+          "corresponding_signal_observed": true
+        },
+        "Pico A": {
+          "samples": 32,
+          "minimum_on_snr_db": 55.26327550529547,
+          "median_on_snr_db": 56.29005936000328,
+          "maximum_off_snr_db": 10.808289175622619,
+          "median_off_snr_db": 9.320814740106023,
+          "median_peak_hz": 14100124.4140625,
+          "intentionally_interrupted": false,
+          "corresponding_signal_observed": true
+        }
+      }
+    },
+    {
+      "slot": 1790901481,
+      "outputs": {
+        "wspr2": {
+          "samples": 32,
+          "minimum_on_snr_db": 82.5298688068541,
+          "median_on_snr_db": 83.2875737405206,
+          "maximum_off_snr_db": 9.58875692112337,
+          "median_off_snr_db": 8.56400283620992,
+          "median_peak_hz": 14101081.903076172,
+          "intentionally_interrupted": false,
+          "corresponding_signal_observed": true
+        },
+        "Pico A": {
+          "samples": 32,
+          "minimum_on_snr_db": 55.3215147297706,
+          "median_on_snr_db": 56.43083964241323,
+          "maximum_off_snr_db": 11.21765812521847,
+          "median_off_snr_db": 9.200416801884082,
+          "median_peak_hz": 14100059.564208984,
+          "intentionally_interrupted": false,
+          "corresponding_signal_observed": true
+        }
+      }
+    },
+    {
+      "slot": 1790901601,
+      "outputs": {
+        "wspr2": {
+          "samples": 32,
+          "minimum_on_snr_db": 82.51216171098575,
+          "median_on_snr_db": 83.42751530929617,
+          "maximum_off_snr_db": 10.294401665426454,
+          "median_off_snr_db": 8.670144303001873,
+          "median_peak_hz": 14101081.903076172,
+          "intentionally_interrupted": false,
+          "corresponding_signal_observed": true
+        },
+        "Pico A": {
+          "samples": 32,
+          "minimum_on_snr_db": 55.58668707687068,
+          "median_on_snr_db": 56.46846285676747,
+          "maximum_off_snr_db": 10.855870274089234,
+          "median_off_snr_db": 9.000256870398552,
+          "median_peak_hz": 14100059.564208984,
+          "intentionally_interrupted": false,
+          "corresponding_signal_observed": true
+        }
+      }
+    },
+    {
+      "slot": 1790901721,
+      "outputs": {
+        "wspr2": {
+          "samples": 32,
+          "minimum_on_snr_db": 81.44619712515293,
+          "median_on_snr_db": 81.96530235794381,
+          "maximum_off_snr_db": 11.223890573158336,
+          "median_off_snr_db": 8.892627786461231,
+          "median_peak_hz": 14101116.235351562,
+          "intentionally_interrupted": false,
+          "corresponding_signal_observed": true
+        },
+        "Pico A": {
+          "samples": 32,
+          "minimum_on_snr_db": 54.78465935856939,
+          "median_on_snr_db": 55.8945663141221,
+          "maximum_off_snr_db": 10.45742836998112,
+          "median_off_snr_db": 8.87035415351378,
+          "median_peak_hz": 14100124.4140625,
+          "intentionally_interrupted": false,
+          "corresponding_signal_observed": true
+        }
+      }
+    },
+    {
+      "slot": 1790901841,
+      "outputs": {
+        "wspr2": {
+          "samples": 32,
+          "minimum_on_snr_db": 81.20865937468201,
+          "median_on_snr_db": 82.06107789699274,
+          "maximum_off_snr_db": 9.900484957078358,
+          "median_off_snr_db": 8.700009238948681,
+          "median_peak_hz": 14101116.235351562,
+          "intentionally_interrupted": false,
+          "corresponding_signal_observed": true
+        },
+        "Pico A": {
+          "samples": 32,
+          "minimum_on_snr_db": 54.70367702601048,
+          "median_on_snr_db": 55.96973849703831,
+          "maximum_off_snr_db": 10.189284302338779,
+          "median_off_snr_db": 9.18678128337184,
+          "median_peak_hz": 14100124.4140625,
+          "intentionally_interrupted": false,
+          "corresponding_signal_observed": true
+        }
+      }
+    },
+    {
+      "slot": 1790901961,
+      "outputs": {
+        "wspr2": {
+          "samples": 32,
+          "minimum_on_snr_db": 81.03200193047941,
+          "median_on_snr_db": 81.85946599083414,
+          "maximum_off_snr_db": 10.860031598974109,
+          "median_off_snr_db": 8.734473721010227,
+          "median_peak_hz": 14101116.235351562,
+          "intentionally_interrupted": false,
+          "corresponding_signal_observed": true
+        },
+        "Pico A": {
+          "samples": 32,
+          "minimum_on_snr_db": 54.86991107449269,
+          "median_on_snr_db": 55.970751875901044,
+          "maximum_off_snr_db": 10.768712084611053,
+          "median_off_snr_db": 8.718018150308485,
+          "median_peak_hz": 14100124.4140625,
+          "intentionally_interrupted": false,
+          "corresponding_signal_observed": true
+        }
+      }
+    },
+    {
+      "slot": 1790902081,
+      "outputs": {
+        "wspr2": {
+          "samples": 32,
+          "minimum_on_snr_db": 81.19353788896717,
+          "median_on_snr_db": 81.97663096050975,
+          "maximum_off_snr_db": 11.709506690983025,
+          "median_off_snr_db": 8.298293826574813,
+          "median_peak_hz": 14101116.235351562,
+          "intentionally_interrupted": false,
+          "corresponding_signal_observed": true
+        },
+        "Pico A": {
+          "samples": 32,
+          "minimum_on_snr_db": 54.62972896633989,
+          "median_on_snr_db": 55.639442165820526,
+          "maximum_off_snr_db": 10.30557194323139,
+          "median_off_snr_db": 8.167721830914475,
+          "median_peak_hz": 14100124.4140625,
+          "intentionally_interrupted": false,
+          "corresponding_signal_observed": true
+        }
+      }
+    },
+    {
+      "slot": 1790902201,
+      "outputs": {
+        "wspr2": {
+          "samples": 32,
+          "minimum_on_snr_db": 81.36309312066825,
+          "median_on_snr_db": 81.94317404038688,
+          "maximum_off_snr_db": 10.830760031715705,
+          "median_off_snr_db": 9.179888263491478,
+          "median_peak_hz": 14101116.235351562,
+          "intentionally_interrupted": false,
+          "corresponding_signal_observed": true
+        },
+        "Pico A": {
+          "samples": 32,
+          "minimum_on_snr_db": 54.51733184259629,
+          "median_on_snr_db": 55.55674534140611,
+          "maximum_off_snr_db": 10.32495804168152,
+          "median_off_snr_db": 8.805956134409698,
+          "median_peak_hz": 14100124.4140625,
+          "intentionally_interrupted": false,
+          "corresponding_signal_observed": true
+        }
+      }
+    },
+    {
+      "slot": 1790902321,
+      "outputs": {
+        "wspr2": {
+          "samples": 32,
+          "minimum_on_snr_db": 81.23918352765239,
+          "median_on_snr_db": 81.9969868001035,
+          "maximum_off_snr_db": 11.411810485503837,
+          "median_off_snr_db": 8.31484556896217,
+          "median_peak_hz": 14101116.235351562,
+          "intentionally_interrupted": false,
+          "corresponding_signal_observed": true
+        },
+        "Pico A": {
+          "samples": 32,
+          "minimum_on_snr_db": 54.5161801080657,
+          "median_on_snr_db": 55.65022974588868,
+          "maximum_off_snr_db": 12.570405701123041,
+          "median_off_snr_db": 8.76947750653086,
+          "median_peak_hz": 14100124.4140625,
+          "intentionally_interrupted": false,
+          "corresponding_signal_observed": true
+        }
+      }
+    }
+  ],
+  "captures": [
+    {
+      "name": "controller-network",
+      "metadata": {
+        "schema_version": 1,
+        "helper_version": "0.2.0",
+        "evidence_type": "capture_success",
+        "capture_id": "fleet-reconnection-controller-network",
+        "timestamps": {
+          "helper_start_utc": "2026-10-02T00:33:37.691Z",
+          "configuration_start_utc": "2026-10-02T00:33:37.691Z",
+          "configuration_complete_utc": "2026-10-02T00:33:38.210Z",
+          "first_read_start_utc": "2026-10-02T00:33:38.210Z",
+          "first_read_complete_utc": "2026-10-02T00:33:38.276Z",
+          "retained_capture_start_utc": "2026-10-02T00:33:38.276Z",
+          "retained_capture_complete_utc": "2026-10-02T00:40:23.282Z",
+          "cleanup_start_utc": "2026-10-02T00:40:31.447Z",
+          "cleanup_complete_utc": "2026-10-02T00:40:32.583Z",
+          "helper_complete_utc": "2026-10-02T00:40:32.583Z"
+        },
+        "elapsed_duration_s": 414.8926888249989,
+        "limits": {
+          "read_timeout_us": 500000,
+          "max_elapsed_duration_s": 420,
+          "max_read_calls": 1000000
+        },
+        "requested_device": {
+          "driver": "sdrplay",
+          "serial": "2404058C60"
+        },
+        "resolved_device": {
+          "driver": "sdrplay",
+          "serial": "2404058C60"
+        },
+        "requested_settings": {
+          "format": "CF32",
+          "sample_rate_hz": 250000,
+          "bandwidth_hz": 200000,
+          "center_frequency_hz": 14075100,
+          "gain_db": 20,
+          "channel": 0,
+          "agc": false,
+          "bias_tee": false
+        },
+        "actual_settings": {
+          "format": "CF32",
+          "sample_rate_hz": 250000,
+          "bandwidth_hz": 200000,
+          "center_frequency_hz": 14075100,
+          "gain_db": 20,
+          "channel": 0,
+          "agc": false,
+          "bias_tee": false
+        },
+        "wire_format": {
+          "sample_format": "CF32",
+          "component_type": "IEEE754_binary32",
+          "interleave": "real_imaginary",
+          "byte_order": "little_endian",
+          "bytes_per_complex_sample": 8
+        },
+        "first_read": {
+          "attempted": true,
+          "discarded": true,
+          "sample_count": 8064,
+          "included_in_overflow_and_clipping_statistics": false
+        },
+        "requested_sample_count": 101250000,
+        "retained_sample_count": 101250000,
+        "read_call_count": 12557,
+        "partial_read_count": 12555,
+        "timeout_count": 0,
+        "overflow_count": 0,
+        "clipping": {
+          "threshold": 0.9990000128746033,
+          "sample_count": 0
+        },
+        "output": {
+          "path": "/home/pi/wtp-fleet-reconnection-20261001/run5/controller-network.cf32",
+          "present": true,
+          "complete": true,
+          "size_bytes": 810000000,
+          "sha256": "65a88a8ecf00dc99a675b5717fd1b154cc48e2f7abbd94fdfc6cda2e4ef51e62",
+          "removed_incomplete_size_bytes": 0,
+          "removed_incomplete_sha256": null
+        },
+        "primary_outcome": "success",
+        "primary_failure_cause": null,
+        "failure_causes": [],
+        "cleanup": {
+          "outcome": "verified",
+          "attempted_steps": [
+            "deactivate_stream",
+            "close_stream",
+            "release_device"
+          ],
+          "failed_steps": []
+        },
+        "process_exit_code": 0
+      }
+    },
+    {
+      "name": "target-subset-one",
+      "metadata": {
+        "schema_version": 1,
+        "helper_version": "0.2.0",
+        "evidence_type": "capture_success",
+        "capture_id": "fleet-reconnection-target-subset-one",
+        "timestamps": {
+          "helper_start_utc": "2026-10-02T00:40:32.894Z",
+          "configuration_start_utc": "2026-10-02T00:40:32.894Z",
+          "configuration_complete_utc": "2026-10-02T00:40:33.416Z",
+          "first_read_start_utc": "2026-10-02T00:40:33.416Z",
+          "first_read_complete_utc": "2026-10-02T00:40:33.481Z",
+          "retained_capture_start_utc": "2026-10-02T00:40:33.481Z",
+          "retained_capture_complete_utc": "2026-10-02T00:44:23.499Z",
+          "cleanup_start_utc": "2026-10-02T00:44:28.056Z",
+          "cleanup_complete_utc": "2026-10-02T00:44:29.172Z",
+          "helper_complete_utc": "2026-10-02T00:44:29.172Z"
+        },
+        "elapsed_duration_s": 236.27765566698508,
+        "limits": {
+          "read_timeout_us": 500000,
+          "max_elapsed_duration_s": 245,
+          "max_read_calls": 1000000
+        },
+        "requested_device": {
+          "driver": "sdrplay",
+          "serial": "2404058C60"
+        },
+        "resolved_device": {
+          "driver": "sdrplay",
+          "serial": "2404058C60"
+        },
+        "requested_settings": {
+          "format": "CF32",
+          "sample_rate_hz": 250000,
+          "bandwidth_hz": 200000,
+          "center_frequency_hz": 14075100,
+          "gain_db": 20,
+          "channel": 0,
+          "agc": false,
+          "bias_tee": false
+        },
+        "actual_settings": {
+          "format": "CF32",
+          "sample_rate_hz": 250000,
+          "bandwidth_hz": 200000,
+          "center_frequency_hz": 14075100,
+          "gain_db": 20,
+          "channel": 0,
+          "agc": false,
+          "bias_tee": false
+        },
+        "wire_format": {
+          "sample_format": "CF32",
+          "component_type": "IEEE754_binary32",
+          "interleave": "real_imaginary",
+          "byte_order": "little_endian",
+          "bytes_per_complex_sample": 8
+        },
+        "first_read": {
+          "attempted": true,
+          "discarded": true,
+          "sample_count": 8064,
+          "included_in_overflow_and_clipping_statistics": false
+        },
+        "requested_sample_count": 57500000,
+        "retained_sample_count": 57500000,
+        "read_call_count": 7132,
+        "partial_read_count": 7130,
+        "timeout_count": 0,
+        "overflow_count": 0,
+        "clipping": {
+          "threshold": 0.9990000128746033,
+          "sample_count": 0
+        },
+        "output": {
+          "path": "/home/pi/wtp-fleet-reconnection-20261001/run5/target-subset-one.cf32",
+          "present": true,
+          "complete": true,
+          "size_bytes": 460000000,
+          "sha256": "af7d520d10ca5d1a998d25228948e0bc2981baf52143342779af09fb9bcc9a9c",
+          "removed_incomplete_size_bytes": 0,
+          "removed_incomplete_sha256": null
+        },
+        "primary_outcome": "success",
+        "primary_failure_cause": null,
+        "failure_causes": [],
+        "cleanup": {
+          "outcome": "verified",
+          "attempted_steps": [
+            "deactivate_stream",
+            "close_stream",
+            "release_device"
+          ],
+          "failed_steps": []
+        },
+        "process_exit_code": 0
+      }
+    },
+    {
+      "name": "target-subset-two",
+      "metadata": {
+        "schema_version": 1,
+        "helper_version": "0.2.0",
+        "evidence_type": "capture_success",
+        "capture_id": "fleet-reconnection-target-subset-two",
+        "timestamps": {
+          "helper_start_utc": "2026-10-02T00:44:29.552Z",
+          "configuration_start_utc": "2026-10-02T00:44:29.552Z",
+          "configuration_complete_utc": "2026-10-02T00:44:30.080Z",
+          "first_read_start_utc": "2026-10-02T00:44:30.080Z",
+          "first_read_complete_utc": "2026-10-02T00:44:30.145Z",
+          "retained_capture_start_utc": "2026-10-02T00:44:30.145Z",
+          "retained_capture_complete_utc": "2026-10-02T00:48:23.163Z",
+          "cleanup_start_utc": "2026-10-02T00:48:27.612Z",
+          "cleanup_complete_utc": "2026-10-02T00:48:28.728Z",
+          "helper_complete_utc": "2026-10-02T00:48:28.728Z"
+        },
+        "elapsed_duration_s": 239.17587208200712,
+        "limits": {
+          "read_timeout_us": 500000,
+          "max_elapsed_duration_s": 248,
+          "max_read_calls": 1000000
+        },
+        "requested_device": {
+          "driver": "sdrplay",
+          "serial": "2404058C60"
+        },
+        "resolved_device": {
+          "driver": "sdrplay",
+          "serial": "2404058C60"
+        },
+        "requested_settings": {
+          "format": "CF32",
+          "sample_rate_hz": 250000,
+          "bandwidth_hz": 200000,
+          "center_frequency_hz": 14075100,
+          "gain_db": 20,
+          "channel": 0,
+          "agc": false,
+          "bias_tee": false
+        },
+        "actual_settings": {
+          "format": "CF32",
+          "sample_rate_hz": 250000,
+          "bandwidth_hz": 200000,
+          "center_frequency_hz": 14075100,
+          "gain_db": 20,
+          "channel": 0,
+          "agc": false,
+          "bias_tee": false
+        },
+        "wire_format": {
+          "sample_format": "CF32",
+          "component_type": "IEEE754_binary32",
+          "interleave": "real_imaginary",
+          "byte_order": "little_endian",
+          "bytes_per_complex_sample": 8
+        },
+        "first_read": {
+          "attempted": true,
+          "discarded": true,
+          "sample_count": 8064,
+          "included_in_overflow_and_clipping_statistics": false
+        },
+        "requested_sample_count": 58250000,
+        "retained_sample_count": 58250000,
+        "read_call_count": 7225,
+        "partial_read_count": 7223,
+        "timeout_count": 0,
+        "overflow_count": 0,
+        "clipping": {
+          "threshold": 0.9990000128746033,
+          "sample_count": 0
+        },
+        "output": {
+          "path": "/home/pi/wtp-fleet-reconnection-20261001/run5/target-subset-two.cf32",
+          "present": true,
+          "complete": true,
+          "size_bytes": 466000000,
+          "sha256": "a574de4998eeaae3111758f92ad86fda3a785373e5567768ec2a33edeb0e4f51",
+          "removed_incomplete_size_bytes": 0,
+          "removed_incomplete_sha256": null
+        },
+        "primary_outcome": "success",
+        "primary_failure_cause": null,
+        "failure_causes": [],
+        "cleanup": {
+          "outcome": "verified",
+          "attempted_steps": [
+            "deactivate_stream",
+            "close_stream",
+            "release_device"
+          ],
+          "failed_steps": []
+        },
+        "process_exit_code": 0
+      }
+    },
+    {
+      "name": "controller-crash",
+      "metadata": {
+        "schema_version": 1,
+        "helper_version": "0.2.0",
+        "evidence_type": "capture_success",
+        "capture_id": "fleet-reconnection-controller-crash",
+        "timestamps": {
+          "helper_start_utc": "2026-10-02T00:48:29.083Z",
+          "configuration_start_utc": "2026-10-02T00:48:29.083Z",
+          "configuration_complete_utc": "2026-10-02T00:48:29.619Z",
+          "first_read_start_utc": "2026-10-02T00:48:29.619Z",
+          "first_read_complete_utc": "2026-10-02T00:48:29.684Z",
+          "retained_capture_start_utc": "2026-10-02T00:48:29.684Z",
+          "retained_capture_complete_utc": "2026-10-02T00:52:23.702Z",
+          "cleanup_start_utc": "2026-10-02T00:52:28.459Z",
+          "cleanup_complete_utc": "2026-10-02T00:52:29.585Z",
+          "helper_complete_utc": "2026-10-02T00:52:29.585Z"
+        },
+        "elapsed_duration_s": 240.50193109698012,
+        "limits": {
+          "read_timeout_us": 500000,
+          "max_elapsed_duration_s": 249,
+          "max_read_calls": 1000000
+        },
+        "requested_device": {
+          "driver": "sdrplay",
+          "serial": "2404058C60"
+        },
+        "resolved_device": {
+          "driver": "sdrplay",
+          "serial": "2404058C60"
+        },
+        "requested_settings": {
+          "format": "CF32",
+          "sample_rate_hz": 250000,
+          "bandwidth_hz": 200000,
+          "center_frequency_hz": 14075100,
+          "gain_db": 20,
+          "channel": 0,
+          "agc": false,
+          "bias_tee": false
+        },
+        "actual_settings": {
+          "format": "CF32",
+          "sample_rate_hz": 250000,
+          "bandwidth_hz": 200000,
+          "center_frequency_hz": 14075100,
+          "gain_db": 20,
+          "channel": 0,
+          "agc": false,
+          "bias_tee": false
+        },
+        "wire_format": {
+          "sample_format": "CF32",
+          "component_type": "IEEE754_binary32",
+          "interleave": "real_imaginary",
+          "byte_order": "little_endian",
+          "bytes_per_complex_sample": 8
+        },
+        "first_read": {
+          "attempted": true,
+          "discarded": true,
+          "sample_count": 8064,
+          "included_in_overflow_and_clipping_statistics": false
+        },
+        "requested_sample_count": 58500000,
+        "retained_sample_count": 58500000,
+        "read_call_count": 7256,
+        "partial_read_count": 7254,
+        "timeout_count": 0,
+        "overflow_count": 0,
+        "clipping": {
+          "threshold": 0.9990000128746033,
+          "sample_count": 0
+        },
+        "output": {
+          "path": "/home/pi/wtp-fleet-reconnection-20261001/run5/controller-crash.cf32",
+          "present": true,
+          "complete": true,
+          "size_bytes": 468000000,
+          "sha256": "65a0ff9e4a81e6aaa687996d97b8e7ad0cbafc6553803ea8f1b786304bb0c929",
+          "removed_incomplete_size_bytes": 0,
+          "removed_incomplete_sha256": null
+        },
+        "primary_outcome": "success",
+        "primary_failure_cause": null,
+        "failure_causes": [],
+        "cleanup": {
+          "outcome": "verified",
+          "attempted_steps": [
+            "deactivate_stream",
+            "close_stream",
+            "release_device"
+          ],
+          "failed_steps": []
+        },
+        "process_exit_code": 0
+      }
+    },
+    {
+      "name": "target-restart",
+      "metadata": {
+        "schema_version": 1,
+        "helper_version": "0.2.0",
+        "evidence_type": "capture_success",
+        "capture_id": "fleet-reconnection-target-restart",
+        "timestamps": {
+          "helper_start_utc": "2026-10-02T00:52:29.978Z",
+          "configuration_start_utc": "2026-10-02T00:52:29.979Z",
+          "configuration_complete_utc": "2026-10-02T00:52:30.510Z",
+          "first_read_start_utc": "2026-10-02T00:52:30.510Z",
+          "first_read_complete_utc": "2026-10-02T00:52:30.575Z",
+          "retained_capture_start_utc": "2026-10-02T00:52:30.576Z",
+          "retained_capture_complete_utc": "2026-10-02T00:58:23.586Z",
+          "cleanup_start_utc": "2026-10-02T00:58:30.706Z",
+          "cleanup_complete_utc": "2026-10-02T00:58:31.822Z",
+          "helper_complete_utc": "2026-10-02T00:58:31.822Z"
+        },
+        "elapsed_duration_s": 361.84374418700463,
+        "limits": {
+          "read_timeout_us": 500000,
+          "max_elapsed_duration_s": 368,
+          "max_read_calls": 1000000
+        },
+        "requested_device": {
+          "driver": "sdrplay",
+          "serial": "2404058C60"
+        },
+        "resolved_device": {
+          "driver": "sdrplay",
+          "serial": "2404058C60"
+        },
+        "requested_settings": {
+          "format": "CF32",
+          "sample_rate_hz": 250000,
+          "bandwidth_hz": 200000,
+          "center_frequency_hz": 14075100,
+          "gain_db": 20,
+          "channel": 0,
+          "agc": false,
+          "bias_tee": false
+        },
+        "actual_settings": {
+          "format": "CF32",
+          "sample_rate_hz": 250000,
+          "bandwidth_hz": 200000,
+          "center_frequency_hz": 14075100,
+          "gain_db": 20,
+          "channel": 0,
+          "agc": false,
+          "bias_tee": false
+        },
+        "wire_format": {
+          "sample_format": "CF32",
+          "component_type": "IEEE754_binary32",
+          "interleave": "real_imaginary",
+          "byte_order": "little_endian",
+          "bytes_per_complex_sample": 8
+        },
+        "first_read": {
+          "attempted": true,
+          "discarded": true,
+          "sample_count": 8064,
+          "included_in_overflow_and_clipping_statistics": false
+        },
+        "requested_sample_count": 88250000,
+        "retained_sample_count": 88250000,
+        "read_call_count": 10945,
+        "partial_read_count": 10943,
+        "timeout_count": 0,
+        "overflow_count": 0,
+        "clipping": {
+          "threshold": 0.9990000128746033,
+          "sample_count": 0
+        },
+        "output": {
+          "path": "/home/pi/wtp-fleet-reconnection-20261001/run5/target-restart.cf32",
+          "present": true,
+          "complete": true,
+          "size_bytes": 706000000,
+          "sha256": "8d4110d0709a1677c1d76af2c408d84ae5e6c4de5c320fb2f4f75c2f54398527",
+          "removed_incomplete_size_bytes": 0,
+          "removed_incomplete_sha256": null
+        },
+        "primary_outcome": "success",
+        "primary_failure_cause": null,
+        "failure_causes": [],
+        "cleanup": {
+          "outcome": "verified",
+          "attempted_steps": [
+            "deactivate_stream",
+            "close_stream",
+            "release_device"
+          ],
+          "failed_steps": []
+        },
+        "process_exit_code": 0
+      }
+    }
+  ],
+  "fft_size": 65536,
+  "step_samples": 62500,
+  "sample_rate": 250000,
+  "center_hz": 14075100,
+  "all_uninterrupted_signals_observed": true
+}

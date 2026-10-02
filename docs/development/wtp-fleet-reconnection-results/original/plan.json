@@ -1,0 +1,76 @@
+{
+  "stage": "/home/pi/wtp-fleet-reconnection-20261001/run5",
+  "source_head": "3dd0a79894782b5dfd59fbd14ef6a282223eec6b",
+  "first_slot": 1790901361,
+  "last_slot": 1790902681,
+  "deadline": 1790902811,
+  "cases": [
+    {
+      "name": "controller-network",
+      "fault_slot": 1790901481,
+      "clean_slot": 1790901601,
+      "blocked": [
+        "wspr1",
+        "wspr2",
+        "wspr4",
+        "Pico A",
+        "Pico B"
+      ]
+    },
+    {
+      "name": "target-subset-one",
+      "fault_slot": 1790901721,
+      "clean_slot": 1790901841,
+      "blocked": [
+        "wspr2",
+        "wspr4",
+        "Pico A"
+      ]
+    },
+    {
+      "name": "target-subset-two",
+      "fault_slot": 1790901961,
+      "clean_slot": 1790902081,
+      "blocked": [
+        "wspr1",
+        "Pico B"
+      ]
+    },
+    {
+      "name": "controller-crash",
+      "fault_slot": 1790902201,
+      "clean_slot": 1790902321,
+      "blocked": []
+    },
+    {
+      "name": "target-restart",
+      "fault_slot": 1790902441,
+      "clean_slot": 1790902561,
+      "blocked": []
+    }
+  ],
+  "addresses": {
+    "wspr1": "192.168.1.44",
+    "wspr2": "192.168.1.123",
+    "wspr4": "192.168.1.120",
+    "Pico A": "192.168.1.47",
+    "Pico B": "192.168.1.53"
+  },
+  "expected_ids": {
+    "wspr1": "d133ed890b90f6945b41a235429ff155",
+    "wspr2": "e2a4d273f7d8f24f6696f7c6fb95ff11",
+    "wspr4": "f21e530af8a4a210ec57898c0ebd32d2",
+    "Pico A": "fd6127d11d6aca42a9905fa3fb1bf1d5",
+    "Pico B": "29f20b7342051ef947aa56cb9d4fab42"
+  },
+  "duration_ms": 10000,
+  "period_seconds": 120,
+  "phase_seconds": 1,
+  "local_output_enabled": false,
+  "receiver_outputs": {
+    "wspr2": 14101100,
+    "Pico A": 14100100
+  },
+  "network_fault": "Temporary controller IPv4 host blackhole routes; physical links and mDNS remain up.",
+  "guard_unit": "wtp-fleet-reconnect-guard-wtp-fleet-reconnection-run5"
+}

@@ -2,6 +2,7 @@
 #include "wtp_integration/fleet_schedule.hpp"
 #include "wtp_integration/output_lease.hpp"
 #include "wtp_integration/fleet_runtime.hpp"
+#include "wtp_integration/fleet_recovery.hpp"
 #include "wtp_settings_json.hpp"
 #include <filesystem>
 #include <fstream>
@@ -21,7 +22,44 @@ Json assignment(char id) {
         {"enabled",true},{"last_start_ns","0"},{"in_flight",false},
         {"schedule",{{"mode","tone"},{"frequency_hz",14097100},{"duration_ms",1000},{"period_seconds",60},{"phase_seconds",0}}}};
 }
+void restarted_output_admission() {
+    const std::string device(32,'a'),old_boot(32,'1'),new_boot(32,'2');
+    WtpRuntimeStatus previous,fresh;
+    previous.session_phase=wtp::SessionPhase::IdentityChanged;
+    previous.identity=wtp::HelloResponse{device,old_boot,"WsprryPi","test"};
+    fresh.session_phase=wtp::SessionPhase::Ready;
+    fresh.identity=wtp::HelloResponse{device,new_boot,"WsprryPi","test"};
+    fresh.remote=wtp::Status{new_boot,wtp::State::Empty,false,{},{},{}};
+    fresh.capabilities=wtp::Capabilities{};fresh.status_observed_ms=1;
+    const auto allowed=[&](const WtpRuntimeStatus& p,const WtpRuntimeStatus& f){
+        return wtp_fleet_restarted_output_safe(p,f,device,"WsprryPi");};
+    check(allowed(previous,fresh),"fresh pinned restarted output may be reconciled");
+    for(const auto state:{wtp::State::Complete,wtp::State::Aborted,wtp::State::Missed}) {
+        auto candidate=fresh;candidate.remote->state=state;
+        check(allowed(previous,candidate),"unowned inactive terminal state is safe");
+    }
+    const auto denied=[&](auto change){auto candidate=fresh;change(candidate);check(!allowed(previous,candidate),"unsafe restart cannot erase dispatch barrier");};
+    denied([&](auto& s){s.identity->device_id=std::string(32,'b');});
+    denied([&](auto& s){s.identity->product="WsprryPico";});
+    denied([&](auto& s){s.identity->boot_id=old_boot;s.remote->boot_id=old_boot;});
+    denied([&](auto& s){s.remote->boot_id=old_boot;});
+    denied([](auto& s){s.remote->owner_id=std::string(32,'f');});
+    denied([](auto& s){s.remote->output_active=true;});
+    for(const auto state:{wtp::State::Loaded,wtp::State::Armed,wtp::State::Running,wtp::State::Failed})
+        denied([&](auto& s){s.remote->state=state;});
+    denied([](auto& s){s.uncertain=true;});denied([](auto& s){s.safety_fault=true;});
+    denied([](auto& s){s.owns=true;});denied([](auto& s){s.remote.reset();});
+    denied([](auto& s){s.identity.reset();});denied([](auto& s){s.capabilities.reset();});
+    denied([](auto& s){s.status_observed_ms.reset();});
+    denied([](auto& s){s.session_phase=wtp::SessionPhase::Disconnected;});
+    denied([](auto& s){s.phase=WtpSchedulePhase::Blocked;});
+    auto fault=previous;fault.session_phase=wtp::SessionPhase::Fault;
+    check(!allowed(fault,fresh),"protocol faults remain latched");
+    auto different=previous;different.identity->device_id=std::string(32,'b');
+    check(!allowed(different,fresh),"retired identity must match the assignment");
+}
 int main(){
+    restarted_output_admission();
     char path[]="/tmp/wsprrypi-fleet-test.XXXXXX";check(mkdtemp(path)!=nullptr,"temporary directory");
     struct Cleanup{std::string path;~Cleanup(){std::filesystem::remove_all(path);}}cleanup{path};
     const std::string file=std::string(path)+"/fleet.json";

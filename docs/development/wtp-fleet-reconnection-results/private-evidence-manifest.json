@@ -1,0 +1,1021 @@
+{
+  "private_root": "/home/pi/wtp-fleet-reconnection-20261001",
+  "files": [
+    {
+      "path": "controller-before-repair",
+      "size_bytes": 16878240,
+      "sha256": "5c1abc72cc8aa67e4a5a2630fafea2329675d3d71189e00c11b6ddff260f8554"
+    },
+    {
+      "path": "mac-records/wtp-fleet-reconnection-deployment-final.log",
+      "size_bytes": 425,
+      "sha256": "e64d10fdfa601d832af3e24e84199f03168e3417f5a80781a99848b1e24fcb48"
+    },
+    {
+      "path": "mac-records/wtp-fleet-reconnection-linux-semantics.log",
+      "size_bytes": 126270,
+      "sha256": "7abb67cc19337b4104058461a28dc8ec8949a9c80eb866302392fc147f6ab002"
+    },
+    {
+      "path": "mac-records/wtp-fleet-reconnection-native-build.log",
+      "size_bytes": 579,
+      "sha256": "3b64eeb588d3e0aad2ab872861519cd1af5d059072d4458a7fc1d7338915b17e"
+    },
+    {
+      "path": "mac-records/wtp-fleet-reconnection-portable.log",
+      "size_bytes": 717,
+      "sha256": "7c54a62c13d0c1114f7a706035854fe5fc3aab17f1eab1d2f06c9e3a5cfe2f9a"
+    },
+    {
+      "path": "mac-records/wtp-fleet-reconnection-run1/Pico-A-observer.jsonl",
+      "size_bytes": 127751,
+      "sha256": "9e9a8fe4a663620681704362aca0d19fcdc748ce2bb4012a2f04960987e18784"
+    },
+    {
+      "path": "mac-records/wtp-fleet-reconnection-run1/Pico-B-observer.jsonl",
+      "size_bytes": 131781,
+      "sha256": "dd34d1bc10fb13a93d81a2eff9002c86ba9f6d438573007ef66b11014ea93ffc"
+    },
+    {
+      "path": "mac-records/wtp-fleet-reconnection-run1/actions.jsonl",
+      "size_bytes": 3388,
+      "sha256": "5c9398c56292df4017d35607641a39e57bd4ff970e0e767e3f99a6b622b4cac9"
+    },
+    {
+      "path": "mac-records/wtp-fleet-reconnection-run1/before-controller.json",
+      "size_bytes": 12246,
+      "sha256": "16ad04360b4e9f55034e4716721a89d3df605697d231f5a77736826209ca475f"
+    },
+    {
+      "path": "mac-records/wtp-fleet-reconnection-run1/cleanup-receipt.json",
+      "size_bytes": 20,
+      "sha256": "481835b010053b42d6209f8f5ed8022c079faea1236bd8423e5c0cdf044bdc6a"
+    },
+    {
+      "path": "mac-records/wtp-fleet-reconnection-run1/controller-network-capture-command.json",
+      "size_bytes": 499,
+      "sha256": "acd0f2fe413ca1da3c2784c165ec83bc3303db760e2497b478c86c311f669412"
+    },
+    {
+      "path": "mac-records/wtp-fleet-reconnection-run1/controller-network-capture.log",
+      "size_bytes": 155,
+      "sha256": "82531e6c3f75dd6dbbdc00f689dae49f08552705039ee2ae1f9dce48940a8920"
+    },
+    {
+      "path": "mac-records/wtp-fleet-reconnection-run1/controller-observations.jsonl",
+      "size_bytes": 3193100,
+      "sha256": "049ba35a502656b25aeeeb1b90a69af2cb24ff7c1fa901e1998799fdd37d0cfb"
+    },
+    {
+      "path": "mac-records/wtp-fleet-reconnection-run1/failure.json",
+      "size_bytes": 2610,
+      "sha256": "0f2364d65e8e4c7100fb677903714b24e8c4518aec5eb587daa15b0418c8a83e"
+    },
+    {
+      "path": "mac-records/wtp-fleet-reconnection-run1/final-controller.json",
+      "size_bytes": 23814,
+      "sha256": "4e182a0405d77f48783a9bab8c1875be80dd2e99c09f368bad7f4e7c6390a8dd"
+    },
+    {
+      "path": "mac-records/wtp-fleet-reconnection-run1/pico-b-backup-ready.json",
+      "size_bytes": 97,
+      "sha256": "a4d7f9844b0e177cb220f885a928fbce7c410f16b2f458efb8d1a8da886a0706"
+    },
+    {
+      "path": "mac-records/wtp-fleet-reconnection-run1/pico-b-before.bin",
+      "size_bytes": 4194304,
+      "sha256": "e77aa61396cda525c1ad2d437e69ac30ed4f52cec7cc302261839e816c8b7d99"
+    },
+    {
+      "path": "mac-records/wtp-fleet-reconnection-run1/plan.json",
+      "size_bytes": 1792,
+      "sha256": "475498343b80a738fa54d68fdd48e9af80060ca66e15b7f79bbc3913b70775d4"
+    },
+    {
+      "path": "mac-records/wtp-fleet-reconnection-run1/wspr1-observer.jsonl",
+      "size_bytes": 165351,
+      "sha256": "b407d027eaa906c0a350c0a6aa96ab26fd20ad6809355a8a2fb4ff77c2394a1c"
+    },
+    {
+      "path": "mac-records/wtp-fleet-reconnection-run1/wspr2-observer.jsonl",
+      "size_bytes": 164688,
+      "sha256": "73663cd08e38f644678951825ad9ed292deb743598af68372fbccc1a7521b0fb"
+    },
+    {
+      "path": "mac-records/wtp-fleet-reconnection-run1/wspr4-observer.jsonl",
+      "size_bytes": 172852,
+      "sha256": "12bfb6becfe7f31185348344adc43980f900781d3a1ef6f7f77400d0b310e19e"
+    },
+    {
+      "path": "mac-records/wtp-fleet-reconnection-run2/Pico-A-observer.jsonl",
+      "size_bytes": 361578,
+      "sha256": "e99868bb87a2d3187ab6d658fc451b7c8a0bc70e8b707e3ee5eacf9656c4ecd4"
+    },
+    {
+      "path": "mac-records/wtp-fleet-reconnection-run2/Pico-B-observer.jsonl",
+      "size_bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "mac-records/wtp-fleet-reconnection-run2/actions.jsonl",
+      "size_bytes": 573,
+      "sha256": "aeb92bb417cf0a029e7a4bcc236c011fac0db37396a59dcc89a73486ec9068bd"
+    },
+    {
+      "path": "mac-records/wtp-fleet-reconnection-run2/before-controller.json",
+      "size_bytes": 12246,
+      "sha256": "ba17bc09b2d31494a7374ce04ce95471480b5aefbc6ca3fcd4326ebe78308f5b"
+    },
+    {
+      "path": "mac-records/wtp-fleet-reconnection-run2/cleanup-failure.json",
+      "size_bytes": 125,
+      "sha256": "8816afcf7acb1b5dc8bded03cf0fb6389b3a22c67f4cbe65851a6016876dbb68"
+    },
+    {
+      "path": "mac-records/wtp-fleet-reconnection-run2/cleanup-receipt.json",
+      "size_bytes": 20,
+      "sha256": "481835b010053b42d6209f8f5ed8022c079faea1236bd8423e5c0cdf044bdc6a"
+    },
+    {
+      "path": "mac-records/wtp-fleet-reconnection-run2/controller-network-capture-command.json",
+      "size_bytes": 509,
+      "sha256": "ed6939372a908604d66be055210b768fc38fc4754b1e965bb6045fe5b127b442"
+    },
+    {
+      "path": "mac-records/wtp-fleet-reconnection-run2/controller-network-capture.log",
+      "size_bytes": 155,
+      "sha256": "82531e6c3f75dd6dbbdc00f689dae49f08552705039ee2ae1f9dce48940a8920"
+    },
+    {
+      "path": "mac-records/wtp-fleet-reconnection-run2/controller-observations.jsonl",
+      "size_bytes": 3924050,
+      "sha256": "2c1e7c2088ce6b5b6899e0b20f4da6728840f6d3712d435aec2583576cb3db05"
+    },
+    {
+      "path": "mac-records/wtp-fleet-reconnection-run2/failure.json",
+      "size_bytes": 72,
+      "sha256": "9a006641f37012eadb918e59e4b885dc83b96d670c8d7a3cf2d107c5a8a28be7"
+    },
+    {
+      "path": "mac-records/wtp-fleet-reconnection-run2/interrupted-capture-exit.json",
+      "size_bytes": 23,
+      "sha256": "303923364cbb915d4a7d01d61d435b58542b7f0d5930917f9ab636e60cec0701"
+    },
+    {
+      "path": "mac-records/wtp-fleet-reconnection-run2/plan.json",
+      "size_bytes": 1847,
+      "sha256": "a03c003ba4613107540eabf819db90ff259e1d792ab823ef158490823cf837db"
+    },
+    {
+      "path": "mac-records/wtp-fleet-reconnection-run2/usb-observer-errors.log",
+      "size_bytes": 1666,
+      "sha256": "e9a218ab6130ea53e975444a0e52462e3132455e4a922f56d66fd3faa4107494"
+    },
+    {
+      "path": "mac-records/wtp-fleet-reconnection-run2/wspr1-observer.jsonl",
+      "size_bytes": 220174,
+      "sha256": "d57fdb4ea4e31f845da30aba4de6574a05a95347c59417ffcca68898627f0692"
+    },
+    {
+      "path": "mac-records/wtp-fleet-reconnection-run2/wspr2-observer.jsonl",
+      "size_bytes": 220974,
+      "sha256": "3793f7c6674664227d7f607d46322eae50aead6e0fc21b1cb5ee6879c696f487"
+    },
+    {
+      "path": "mac-records/wtp-fleet-reconnection-run2/wspr4-observer.jsonl",
+      "size_bytes": 228770,
+      "sha256": "49525a448487ff99a9cae58ba2b430061f52fc348973a6f60088463842ed338f"
+    },
+    {
+      "path": "mac-records/wtp-fleet-reconnection-run3/Pico-A-observer.jsonl",
+      "size_bytes": 117609,
+      "sha256": "43fbc2323beb6d59015891b4c63965e22fa6b6f6f2330dabf09dfa28c11fb8a4"
+    },
+    {
+      "path": "mac-records/wtp-fleet-reconnection-run3/Pico-B-observer.jsonl",
+      "size_bytes": 3820,
+      "sha256": "e123ca78e6caa3bbb5363f0ce101f4bbda97eff0f02bb9ac946605c8ee893a53"
+    },
+    {
+      "path": "mac-records/wtp-fleet-reconnection-run3/actions.jsonl",
+      "size_bytes": 8659,
+      "sha256": "44c58cae35b91d3dc84bbc8d8a23475304c76d1d775d737adcfa382f1089ad12"
+    },
+    {
+      "path": "mac-records/wtp-fleet-reconnection-run3/before-controller.json",
+      "size_bytes": 12246,
+      "sha256": "98afb4aaa7fd74eda0c93a6c0d96c0856a9aeb6fc796c38632045318a19f31a2"
+    },
+    {
+      "path": "mac-records/wtp-fleet-reconnection-run3/cleanup-failure.json",
+      "size_bytes": 125,
+      "sha256": "8816afcf7acb1b5dc8bded03cf0fb6389b3a22c67f4cbe65851a6016876dbb68"
+    },
+    {
+      "path": "mac-records/wtp-fleet-reconnection-run3/cleanup-receipt.json",
+      "size_bytes": 20,
+      "sha256": "481835b010053b42d6209f8f5ed8022c079faea1236bd8423e5c0cdf044bdc6a"
+    },
+    {
+      "path": "mac-records/wtp-fleet-reconnection-run3/controller-network-capture-command.json",
+      "size_bytes": 508,
+      "sha256": "5308b77e75e54b7e6d84398c1d5efd3a60cfb135e04f62f4a2abb578a645c5da"
+    },
+    {
+      "path": "mac-records/wtp-fleet-reconnection-run3/controller-network-capture.log",
+      "size_bytes": 155,
+      "sha256": "82531e6c3f75dd6dbbdc00f689dae49f08552705039ee2ae1f9dce48940a8920"
+    },
+    {
+      "path": "mac-records/wtp-fleet-reconnection-run3/controller-observations.jsonl",
+      "size_bytes": 3996827,
+      "sha256": "805374686b73babdf4028cebc0c09b9d8704ff4828e54ece471ea6888c84f993"
+    },
+    {
+      "path": "mac-records/wtp-fleet-reconnection-run3/failure.json",
+      "size_bytes": 4115,
+      "sha256": "387fd931c201ac9f43f1649f168b8f27db2fd071e09651d5759e790927af6a87"
+    },
+    {
+      "path": "mac-records/wtp-fleet-reconnection-run3/interrupted-capture-exit.json",
+      "size_bytes": 23,
+      "sha256": "303923364cbb915d4a7d01d61d435b58542b7f0d5930917f9ab636e60cec0701"
+    },
+    {
+      "path": "mac-records/wtp-fleet-reconnection-run3/plan.json",
+      "size_bytes": 1870,
+      "sha256": "46f4aff13027c0b8e6fab51c6f48c6a6d5e9d8271c0b842edb4d88a6dc08a2a1"
+    },
+    {
+      "path": "mac-records/wtp-fleet-reconnection-run3/usb-observer-errors.log",
+      "size_bytes": 2628,
+      "sha256": "8e23f3b655cb7367baec0ad5435067fa07f45f1be6b88c0bd30a2cb5f110a879"
+    },
+    {
+      "path": "mac-records/wtp-fleet-reconnection-run3/wspr1-observer.jsonl",
+      "size_bytes": 250425,
+      "sha256": "addbe1cbcc6e99d62bf3b3739a57ed0d81d223bd67cd07b6bebbc5a83bd0fbec"
+    },
+    {
+      "path": "mac-records/wtp-fleet-reconnection-run3/wspr2-observer.jsonl",
+      "size_bytes": 251029,
+      "sha256": "4d610d6c87e338cac83f055d6a40aea445223734d0fa6dc4b13b9fe8b064f59b"
+    },
+    {
+      "path": "mac-records/wtp-fleet-reconnection-run3/wspr4-observer.jsonl",
+      "size_bytes": 261124,
+      "sha256": "fd24958bd007b650102cd2afab2778101dceba884f60a6facdd1a20f6dceae6b"
+    },
+    {
+      "path": "mac-records/wtp-fleet-reconnection-run4/Pico-A-observer.jsonl",
+      "size_bytes": 482539,
+      "sha256": "dc52218e866c8610d09f508912e76863f86a3c6ded19b11f5d59d5aca46a772e"
+    },
+    {
+      "path": "mac-records/wtp-fleet-reconnection-run4/Pico-B-observer.jsonl",
+      "size_bytes": 480983,
+      "sha256": "e5fe2ef8662bdab0a4eceb8a1d1f23f7bdc221ff0f08b6a01dd17e2f966b79bd"
+    },
+    {
+      "path": "mac-records/wtp-fleet-reconnection-run4/actions.jsonl",
+      "size_bytes": 11579,
+      "sha256": "11502a40f18e9d6b91e6aa794f8bd63b4f923be53336afb3dc29c501dec05f3d"
+    },
+    {
+      "path": "mac-records/wtp-fleet-reconnection-run4/baseline.json",
+      "size_bytes": 43059,
+      "sha256": "c49f836742346094b9a8521e1a726c9df5ff6519f55c22be4cd9f4d95daf4a39"
+    },
+    {
+      "path": "mac-records/wtp-fleet-reconnection-run4/before-controller.json",
+      "size_bytes": 12246,
+      "sha256": "ba414df219307bdee56d795906f3197e4e46f9891bf295ac6ec146664d605e65"
+    },
+    {
+      "path": "mac-records/wtp-fleet-reconnection-run4/cleanup-receipt.json",
+      "size_bytes": 20,
+      "sha256": "481835b010053b42d6209f8f5ed8022c079faea1236bd8423e5c0cdf044bdc6a"
+    },
+    {
+      "path": "mac-records/wtp-fleet-reconnection-run4/controller-network-capture-command.json",
+      "size_bytes": 508,
+      "sha256": "328dd6257b0dc725f453b519e9e3ebfd281c7766f254ca8f29fe6907a87801e6"
+    },
+    {
+      "path": "mac-records/wtp-fleet-reconnection-run4/controller-network-capture.log",
+      "size_bytes": 155,
+      "sha256": "82531e6c3f75dd6dbbdc00f689dae49f08552705039ee2ae1f9dce48940a8920"
+    },
+    {
+      "path": "mac-records/wtp-fleet-reconnection-run4/controller-network-result.json",
+      "size_bytes": 45885,
+      "sha256": "fcb618aa8348f24c5f902ec621e2ef32ca71faa23635039530ea2814a04d9141"
+    },
+    {
+      "path": "mac-records/wtp-fleet-reconnection-run4/controller-observations.jsonl",
+      "size_bytes": 6545329,
+      "sha256": "72d06b1be8ccd290142068ceb4f3975c7c5821dfd7e3141832e8b2ec2d125c7e"
+    },
+    {
+      "path": "mac-records/wtp-fleet-reconnection-run4/failed-reconciliation.json",
+      "size_bytes": 31974,
+      "sha256": "ba8fce600863a8d5ece515b021474f4c31d8d4d2e5641292a7ad94e5d398ab02"
+    },
+    {
+      "path": "mac-records/wtp-fleet-reconnection-run4/failure.json",
+      "size_bytes": 157,
+      "sha256": "de5fe5e39c4880a16ff8304e8ece1e1d79d655d3c9df778aca050ac47bcbc7cd"
+    },
+    {
+      "path": "mac-records/wtp-fleet-reconnection-run4/final-after-restart.json",
+      "size_bytes": 19003,
+      "sha256": "9985b6632db302ffd19ef3f88f3229e42ad2b04a737c466d363fcb45f63a896a"
+    },
+    {
+      "path": "mac-records/wtp-fleet-reconnection-run4/final-controller.json",
+      "size_bytes": 41738,
+      "sha256": "084e2789bcebfdacae420b445f117fdc17ade7b14143dfa953f2420fb13ee01c"
+    },
+    {
+      "path": "mac-records/wtp-fleet-reconnection-run4/interrupted-capture-exit.json",
+      "size_bytes": 23,
+      "sha256": "303923364cbb915d4a7d01d61d435b58542b7f0d5930917f9ab636e60cec0701"
+    },
+    {
+      "path": "mac-records/wtp-fleet-reconnection-run4/plan.json",
+      "size_bytes": 1870,
+      "sha256": "8f5a2e35274b0ebcf0cb5b7a600960683f556eeb1c114def84e2098a66017d05"
+    },
+    {
+      "path": "mac-records/wtp-fleet-reconnection-run4/usb-observer-errors.log",
+      "size_bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "mac-records/wtp-fleet-reconnection-run4/wspr1-observer.jsonl",
+      "size_bytes": 471267,
+      "sha256": "644b72b84c6c6b187bef9e0f59286bbec2f89fc461df74a72f9e2e6dc21d74e7"
+    },
+    {
+      "path": "mac-records/wtp-fleet-reconnection-run4/wspr2-observer.jsonl",
+      "size_bytes": 474761,
+      "sha256": "4d8c8c21cfa861ec152463782959a430176cb89fe57c6b5bbed89b73eef630f0"
+    },
+    {
+      "path": "mac-records/wtp-fleet-reconnection-run4/wspr4-observer.jsonl",
+      "size_bytes": 494561,
+      "sha256": "1108f3d9fe56dfd2bde6ec285d76b22dbd0cc3c6d8f207bc7e1037f1e3d0dbc2"
+    },
+    {
+      "path": "mac-records/wtp-fleet-reconnection-run5/Pico-A-observer.jsonl",
+      "size_bytes": 1826749,
+      "sha256": "9f77f89b5e47c657080c2c3151a671df9891e928946f52d222153a9f71b9b153"
+    },
+    {
+      "path": "mac-records/wtp-fleet-reconnection-run5/Pico-B-observer.jsonl",
+      "size_bytes": 1821792,
+      "sha256": "e084168bd564603728bec7f293e62f127f76e0f2ef11ea6aa54d98772742a881"
+    },
+    {
+      "path": "mac-records/wtp-fleet-reconnection-run5/accepted-case-verification.json",
+      "size_bytes": 1610,
+      "sha256": "eca8449541acf260e457b01ef52d120799cd74c43f3a034f7aef3d4e9b3d5a12"
+    },
+    {
+      "path": "mac-records/wtp-fleet-reconnection-run5/accepted-controller-analysis.json",
+      "size_bytes": 139978,
+      "sha256": "fea45318827838769ee7420f4222f1608024cb59ec21e6077b44ab3f78014267"
+    },
+    {
+      "path": "mac-records/wtp-fleet-reconnection-run5/accepted-rf-analysis.json",
+      "size_bytes": 25149,
+      "sha256": "683d4854af268b46c214cbe48bbdf681c902ce5f1c2f0c3fbe8e3d3c9ac96a89"
+    },
+    {
+      "path": "mac-records/wtp-fleet-reconnection-run5/actions.jsonl",
+      "size_bytes": 33913,
+      "sha256": "f5fe269777433dd11aaa822d8914bf708cb88f860a34a752c52986f89748c8f8"
+    },
+    {
+      "path": "mac-records/wtp-fleet-reconnection-run5/baseline.json",
+      "size_bytes": 45575,
+      "sha256": "df3e6a9763b7bca0b7b18ba3e03c39b779372a4abfc814c0d86a6e55d61afb67"
+    },
+    {
+      "path": "mac-records/wtp-fleet-reconnection-run5/before-controller.json",
+      "size_bytes": 12246,
+      "sha256": "00f42e2e9de6212612bc5b36fb2c02365512c5bcddf99c736b99096f9024af00"
+    },
+    {
+      "path": "mac-records/wtp-fleet-reconnection-run5/cleanup-failure.json",
+      "size_bytes": 76,
+      "sha256": "3948837cf0dc4bdd91786571bbb63b3fb2244de709888ff4d0f952ae279745a0"
+    },
+    {
+      "path": "mac-records/wtp-fleet-reconnection-run5/cleanup-receipt.json",
+      "size_bytes": 20,
+      "sha256": "481835b010053b42d6209f8f5ed8022c079faea1236bd8423e5c0cdf044bdc6a"
+    },
+    {
+      "path": "mac-records/wtp-fleet-reconnection-run5/controller-crash-capture-command.json",
+      "size_bytes": 502,
+      "sha256": "97fe6f910b07346ae3f0c5fd9b6ca6f5cf59402a96a7a459018c2c133c0b35e5"
+    },
+    {
+      "path": "mac-records/wtp-fleet-reconnection-run5/controller-crash-capture-exit.json",
+      "size_bytes": 21,
+      "sha256": "81868a6e94ffc0178bf833deb1c9013d9fab4ee95ddb876a5e8ec4f1d26376d2"
+    },
+    {
+      "path": "mac-records/wtp-fleet-reconnection-run5/controller-crash-capture.log",
+      "size_bytes": 155,
+      "sha256": "82531e6c3f75dd6dbbdc00f689dae49f08552705039ee2ae1f9dce48940a8920"
+    },
+    {
+      "path": "mac-records/wtp-fleet-reconnection-run5/controller-crash-journal.log",
+      "size_bytes": 2010,
+      "sha256": "99ba989c336cc34eb7872dfd2c0cdb0b44879bd26999aa080269ff47bc8b64b5"
+    },
+    {
+      "path": "mac-records/wtp-fleet-reconnection-run5/controller-crash-result.json",
+      "size_bytes": 160053,
+      "sha256": "c913a0b31ff0c35478793fec32b83808c6b50b0742b3838e7abe5250e14dca8c"
+    },
+    {
+      "path": "mac-records/wtp-fleet-reconnection-run5/controller-network-capture-command.json",
+      "size_bytes": 509,
+      "sha256": "11697ee19caee0d93e8c65d0eb4db2b2009e1ca5e15c808ec19bba202b6edda9"
+    },
+    {
+      "path": "mac-records/wtp-fleet-reconnection-run5/controller-network-capture-exit.json",
+      "size_bytes": 21,
+      "sha256": "81868a6e94ffc0178bf833deb1c9013d9fab4ee95ddb876a5e8ec4f1d26376d2"
+    },
+    {
+      "path": "mac-records/wtp-fleet-reconnection-run5/controller-network-capture.log",
+      "size_bytes": 155,
+      "sha256": "82531e6c3f75dd6dbbdc00f689dae49f08552705039ee2ae1f9dce48940a8920"
+    },
+    {
+      "path": "mac-records/wtp-fleet-reconnection-run5/controller-network-result.json",
+      "size_bytes": 181582,
+      "sha256": "716f956ea741c350acf3e86ecbdbd40fe615b0879da05a129e5a0c599e67091e"
+    },
+    {
+      "path": "mac-records/wtp-fleet-reconnection-run5/controller-observations.jsonl",
+      "size_bytes": 30919365,
+      "sha256": "0ed56d080917b1437b5d80ac205e87365364bc9b1d74a2c19f9a106786335487"
+    },
+    {
+      "path": "mac-records/wtp-fleet-reconnection-run5/failed-reconciliation.json",
+      "size_bytes": 34286,
+      "sha256": "1caa9e94c251e60310d00a95cf9b2d84677d51b30fbf354d54bc9f6822d0ee3a"
+    },
+    {
+      "path": "mac-records/wtp-fleet-reconnection-run5/failure.json",
+      "size_bytes": 119,
+      "sha256": "10bfeabcebceb17d859b80ed05316ba493fb74193222fa2ccf37afb58fee445b"
+    },
+    {
+      "path": "mac-records/wtp-fleet-reconnection-run5/interrupted-capture-exit.json",
+      "size_bytes": 23,
+      "sha256": "303923364cbb915d4a7d01d61d435b58542b7f0d5930917f9ab636e60cec0701"
+    },
+    {
+      "path": "mac-records/wtp-fleet-reconnection-run5/plan.json",
+      "size_bytes": 1870,
+      "sha256": "1c14c6d7277cb09768c23bb4bb5c977723c6b6504dd206e5435449f7dbfcccdd"
+    },
+    {
+      "path": "mac-records/wtp-fleet-reconnection-run5/run-executed.py",
+      "size_bytes": 16752,
+      "sha256": "a2699a701875ee49a54e799c89fc1896e4a0364cf374caf4ccb96c963677825a"
+    },
+    {
+      "path": "mac-records/wtp-fleet-reconnection-run5/startup-round.json",
+      "size_bytes": 329,
+      "sha256": "09a85feaba466dbe81631965af7f1a2910c9b62f5565d655bb92e5ad82350e26"
+    },
+    {
+      "path": "mac-records/wtp-fleet-reconnection-run5/target-restart-capture-command.json",
+      "size_bytes": 496,
+      "sha256": "b2d7e4272f747a1facc24888dea2459272a6d448e0ceae2cb9645276e1eec37d"
+    },
+    {
+      "path": "mac-records/wtp-fleet-reconnection-run5/target-restart-capture.log",
+      "size_bytes": 155,
+      "sha256": "82531e6c3f75dd6dbbdc00f689dae49f08552705039ee2ae1f9dce48940a8920"
+    },
+    {
+      "path": "mac-records/wtp-fleet-reconnection-run5/target-restart-journal.log",
+      "size_bytes": 1827,
+      "sha256": "a1aeddf6b72cfc514e3e68ad5ecb44686484e805c30729ba4539165557494879"
+    },
+    {
+      "path": "mac-records/wtp-fleet-reconnection-run5/target-restart-result.json",
+      "size_bytes": 52499,
+      "sha256": "b5cd7be4eda012180c6ed07efb7d833949b44a422224b94161895715042dc08c"
+    },
+    {
+      "path": "mac-records/wtp-fleet-reconnection-run5/target-subset-one-capture-command.json",
+      "size_bytes": 505,
+      "sha256": "d4776e09c8c070bd28098e0e86bc92672c88ae37a1ce1ff72f68002c39d52756"
+    },
+    {
+      "path": "mac-records/wtp-fleet-reconnection-run5/target-subset-one-capture-exit.json",
+      "size_bytes": 21,
+      "sha256": "81868a6e94ffc0178bf833deb1c9013d9fab4ee95ddb876a5e8ec4f1d26376d2"
+    },
+    {
+      "path": "mac-records/wtp-fleet-reconnection-run5/target-subset-one-capture.log",
+      "size_bytes": 155,
+      "sha256": "82531e6c3f75dd6dbbdc00f689dae49f08552705039ee2ae1f9dce48940a8920"
+    },
+    {
+      "path": "mac-records/wtp-fleet-reconnection-run5/target-subset-one-result.json",
+      "size_bytes": 196147,
+      "sha256": "76b8ae4df5c9792b7e5d8fb8095620aa91a6dfa4a81121504d2de6053de51e02"
+    },
+    {
+      "path": "mac-records/wtp-fleet-reconnection-run5/target-subset-two-capture-command.json",
+      "size_bytes": 505,
+      "sha256": "b710efd7e6683628272617b85431f6cd0a60bb36e20d1e2eda6caffb85d4e8a2"
+    },
+    {
+      "path": "mac-records/wtp-fleet-reconnection-run5/target-subset-two-capture-exit.json",
+      "size_bytes": 21,
+      "sha256": "81868a6e94ffc0178bf833deb1c9013d9fab4ee95ddb876a5e8ec4f1d26376d2"
+    },
+    {
+      "path": "mac-records/wtp-fleet-reconnection-run5/target-subset-two-capture.log",
+      "size_bytes": 155,
+      "sha256": "82531e6c3f75dd6dbbdc00f689dae49f08552705039ee2ae1f9dce48940a8920"
+    },
+    {
+      "path": "mac-records/wtp-fleet-reconnection-run5/target-subset-two-result.json",
+      "size_bytes": 197533,
+      "sha256": "3c3fa95c0b0f9375a782aebcf5cd0e7110fbeba5bf42b5f3c8b52ba1775876c3"
+    },
+    {
+      "path": "mac-records/wtp-fleet-reconnection-run5/usb-observer-errors.log",
+      "size_bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "mac-records/wtp-fleet-reconnection-run5/wspr1-observer.jsonl",
+      "size_bytes": 3298065,
+      "sha256": "e3e53f33af16361f701462c24e8cb2a6e75a8a9dfaba18b68661afc1679898b1"
+    },
+    {
+      "path": "mac-records/wtp-fleet-reconnection-run5/wspr2-observer.jsonl",
+      "size_bytes": 3094750,
+      "sha256": "3ff12f2650ae131cb8f146e2ff71f7d8e86136c94ecbef40cd691f8a74b83982"
+    },
+    {
+      "path": "mac-records/wtp-fleet-reconnection-run5/wspr4-observer.jsonl",
+      "size_bytes": 3490144,
+      "sha256": "a17ae4a5d254eb120ab938a93a2bfd8ca5ea19a04f4c311c058b3e118e6e2bd5"
+    },
+    {
+      "path": "mac-records/wtp-fleet-reconnection-run6/Pico-A-observer.jsonl",
+      "size_bytes": 324356,
+      "sha256": "00b0a56bc407b0c7327ce2918923186e60b1a19767b77aebd374305754c6d291"
+    },
+    {
+      "path": "mac-records/wtp-fleet-reconnection-run6/Pico-B-observer.jsonl",
+      "size_bytes": 322114,
+      "sha256": "8b1956c8e28bdfa91c331c1631658a679ff49cc8444546064288d93783f7e177"
+    },
+    {
+      "path": "mac-records/wtp-fleet-reconnection-run6/actions.jsonl",
+      "size_bytes": 12090,
+      "sha256": "ef3b5874e95f4b2c1e87a8f8e98d994673efdf2a01bedc39187475156f4948c4"
+    },
+    {
+      "path": "mac-records/wtp-fleet-reconnection-run6/before-controller.json",
+      "size_bytes": 12246,
+      "sha256": "2c3e6b8b1632466d0b8dae73d1d9043910f8d5f732f5761b99121b8dc1c665e7"
+    },
+    {
+      "path": "mac-records/wtp-fleet-reconnection-run6/cleanup-receipt.json",
+      "size_bytes": 20,
+      "sha256": "481835b010053b42d6209f8f5ed8022c079faea1236bd8423e5c0cdf044bdc6a"
+    },
+    {
+      "path": "mac-records/wtp-fleet-reconnection-run6/controller-observations.jsonl",
+      "size_bytes": 4599920,
+      "sha256": "66632e41163d873fedfd3931837fd7de93eb2e97758cf0f8b9213d998091fc52"
+    },
+    {
+      "path": "mac-records/wtp-fleet-reconnection-run6/failure.json",
+      "size_bytes": 5579,
+      "sha256": "707f8b393957ca8d202b10751ca528e3a7f5ca1b8015ae618406ab02fbd36ac8"
+    },
+    {
+      "path": "mac-records/wtp-fleet-reconnection-run6/final-after-restart.json",
+      "size_bytes": 19673,
+      "sha256": "8f97cba496793deecebbf648cb30dd2d14d41deb4529fdc08de4a5607514cb8d"
+    },
+    {
+      "path": "mac-records/wtp-fleet-reconnection-run6/final-controller.json",
+      "size_bytes": 35860,
+      "sha256": "83040cf47070bebd53268e21be7bb7ff16e2f614780c8f1229fc8e46bd570b56"
+    },
+    {
+      "path": "mac-records/wtp-fleet-reconnection-run6/interrupted-capture-exit.json",
+      "size_bytes": 23,
+      "sha256": "303923364cbb915d4a7d01d61d435b58542b7f0d5930917f9ab636e60cec0701"
+    },
+    {
+      "path": "mac-records/wtp-fleet-reconnection-run6/plan.json",
+      "size_bytes": 1174,
+      "sha256": "1ad5fafbf1de67789719c9e471f6dce016f814f9c170402da33c4259a4d551e7"
+    },
+    {
+      "path": "mac-records/wtp-fleet-reconnection-run6/target-restart-capture-command.json",
+      "size_bytes": 496,
+      "sha256": "15c3062e741e02cde56f4d0bda2a3862ec4525b7273219156b58e63340844b70"
+    },
+    {
+      "path": "mac-records/wtp-fleet-reconnection-run6/target-restart-capture.log",
+      "size_bytes": 155,
+      "sha256": "82531e6c3f75dd6dbbdc00f689dae49f08552705039ee2ae1f9dce48940a8920"
+    },
+    {
+      "path": "mac-records/wtp-fleet-reconnection-run6/target-restart-result.json",
+      "size_bytes": 41468,
+      "sha256": "cf720f5e66fe3a82d29a1e1add6a31e76a30904720e0a34aef7d5cf4fa045aa9"
+    },
+    {
+      "path": "mac-records/wtp-fleet-reconnection-run6/usb-observer-errors.log",
+      "size_bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "mac-records/wtp-fleet-reconnection-run6/wspr1-observer.jsonl",
+      "size_bytes": 618444,
+      "sha256": "6add1cedc324641dd85c083f931e52d88d2cf53c4720263a31f8025de241fe79"
+    },
+    {
+      "path": "mac-records/wtp-fleet-reconnection-run6/wspr2-observer.jsonl",
+      "size_bytes": 170415,
+      "sha256": "01994dc5d1481a63f20c3484acc2cbaf10201ae0c33b0b31a3ecec7e5e60d251"
+    },
+    {
+      "path": "mac-records/wtp-fleet-reconnection-run6/wspr4-observer.jsonl",
+      "size_bytes": 656813,
+      "sha256": "327b67fdc40bb188cf13769b116ce9154fd4f9c87ce4c003b194126245742690"
+    },
+    {
+      "path": "mac-records/wtp-fleet-reconnection-run7/Pico-A-observer.jsonl",
+      "size_bytes": 448681,
+      "sha256": "7a54152191599272faa1d3807399e65ec0262bbebf8c61d1a50395e8cf8231ff"
+    },
+    {
+      "path": "mac-records/wtp-fleet-reconnection-run7/Pico-B-observer.jsonl",
+      "size_bytes": 446122,
+      "sha256": "5797f25a74fc9cb4f4e129ae13dc4661a57f80b9edb1c9b4cfbfc36b05f6582d"
+    },
+    {
+      "path": "mac-records/wtp-fleet-reconnection-run7/actions.jsonl",
+      "size_bytes": 1060,
+      "sha256": "d630ebdebfeab6847b566c651d1234f23c879cda6b4103d47b9548406204a748"
+    },
+    {
+      "path": "mac-records/wtp-fleet-reconnection-run7/before-controller.json",
+      "size_bytes": 12246,
+      "sha256": "f9204f24776bab3e73ed03e120713bc0240fef85e98a0764b8c4a39e986fe5ac"
+    },
+    {
+      "path": "mac-records/wtp-fleet-reconnection-run7/case-verification.json",
+      "size_bytes": 492,
+      "sha256": "b087fe4db2003f0b07bb9137b9f38f185cdc12d13a42fcfdfb773dc113a308cc"
+    },
+    {
+      "path": "mac-records/wtp-fleet-reconnection-run7/cleanup-receipt.json",
+      "size_bytes": 20,
+      "sha256": "481835b010053b42d6209f8f5ed8022c079faea1236bd8423e5c0cdf044bdc6a"
+    },
+    {
+      "path": "mac-records/wtp-fleet-reconnection-run7/controller-analysis.json",
+      "size_bytes": 51062,
+      "sha256": "b8cdb9663195416ededc5c26cd77ab0c8c06bbb32ddc074970bcb9a40de14313"
+    },
+    {
+      "path": "mac-records/wtp-fleet-reconnection-run7/controller-observations.jsonl",
+      "size_bytes": 7117119,
+      "sha256": "4ca8121e90749745481bf658c8eac8336ea668d2c63a5272414d7e83f2125fa6"
+    },
+    {
+      "path": "mac-records/wtp-fleet-reconnection-run7/final-after-restart.json",
+      "size_bytes": 20149,
+      "sha256": "e8f2b9e16731f356ffb1fe1deb2d5ffaedef86c916e3da632ec5a40d63c2f720"
+    },
+    {
+      "path": "mac-records/wtp-fleet-reconnection-run7/final-controller.json",
+      "size_bytes": 33290,
+      "sha256": "7c88628cfb8d49edbc47bae102d1810df7092d061420e615ffb8faf29110ba5c"
+    },
+    {
+      "path": "mac-records/wtp-fleet-reconnection-run7/final-repeat.json",
+      "size_bytes": 45978,
+      "sha256": "e18e3bc6dd61fbfc3e9e8351494cf7a567494367cbd0f88f568e04ebc788132c"
+    },
+    {
+      "path": "mac-records/wtp-fleet-reconnection-run7/plan.json",
+      "size_bytes": 1174,
+      "sha256": "65ad81db61c60450dbeb947bb5a4b695349296400ea5a4ceb24b50f9b9acb9d9"
+    },
+    {
+      "path": "mac-records/wtp-fleet-reconnection-run7/rf-analysis.json",
+      "size_bytes": 6381,
+      "sha256": "612aa5f33703f6878868c76043278a541134c925c4d9cbd3b53b1af48c17357f"
+    },
+    {
+      "path": "mac-records/wtp-fleet-reconnection-run7/run-executed.py",
+      "size_bytes": 17310,
+      "sha256": "50656c089a9dff85120f07f7bacb4cf7778a749802148fc4caf4654f21937823"
+    },
+    {
+      "path": "mac-records/wtp-fleet-reconnection-run7/target-restart-capture-command.json",
+      "size_bytes": 496,
+      "sha256": "b468178f96667663ec531cf9e2783caa8e007c180b2ffa3cee2c67ada955ae99"
+    },
+    {
+      "path": "mac-records/wtp-fleet-reconnection-run7/target-restart-capture-exit.json",
+      "size_bytes": 21,
+      "sha256": "81868a6e94ffc0178bf833deb1c9013d9fab4ee95ddb876a5e8ec4f1d26376d2"
+    },
+    {
+      "path": "mac-records/wtp-fleet-reconnection-run7/target-restart-capture.log",
+      "size_bytes": 155,
+      "sha256": "82531e6c3f75dd6dbbdc00f689dae49f08552705039ee2ae1f9dce48940a8920"
+    },
+    {
+      "path": "mac-records/wtp-fleet-reconnection-run7/target-restart-result.json",
+      "size_bytes": 159953,
+      "sha256": "692012e97d448e1a61aec839b605d36b680c572fc7be5deb8b5020b6b2d9f52a"
+    },
+    {
+      "path": "mac-records/wtp-fleet-reconnection-run7/usb-observer-errors.log",
+      "size_bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "mac-records/wtp-fleet-reconnection-run7/wspr1-observer.jsonl",
+      "size_bytes": 878764,
+      "sha256": "4aa46548583cff879b4f4ed4a603c9a2249c26f3864930fe6a059f354c4b15b6"
+    },
+    {
+      "path": "mac-records/wtp-fleet-reconnection-run7/wspr2-observer.jsonl",
+      "size_bytes": 291949,
+      "sha256": "18ecaeb515f5075dcf80f567d0658f27d450180e05f3bf7277ab8fb60d212fa1"
+    },
+    {
+      "path": "mac-records/wtp-fleet-reconnection-run7/wspr4-observer.jsonl",
+      "size_bytes": 911158,
+      "sha256": "0dd6c02401d30b75d27e08510453d4555827fecd7ce1869efb8c179baad6c6a1"
+    },
+    {
+      "path": "pico-b-restoration/after-info.json",
+      "size_bytes": 4601,
+      "sha256": "7bc28f4d4079af7b33b00e79897fa73a9e5ca3f74c7ccb57fdbb19fdd53c4b6e"
+    },
+    {
+      "path": "pico-b-restoration/after-restore-reserved-owner.log",
+      "size_bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "pico-b-restoration/after-restore-reserved.bin",
+      "size_bytes": 57344,
+      "sha256": "0e86aa8329d0b388f5df04799781f62a2feb801705139da4ce404ed6bdf93523"
+    },
+    {
+      "path": "pico-b-restoration/after-restore-reserved.log",
+      "size_bytes": 1911,
+      "sha256": "78be8a51581007b0466f4f7fbb0c58991c0f823f21ddbb7e6376ffb4aa50bc0c"
+    },
+    {
+      "path": "pico-b-restoration/before-info.json",
+      "size_bytes": 6418,
+      "sha256": "4d7a4c68eb4e34bed3ae7e0a0e63be0ea49aa6a19718eb038bb441183139f5bd"
+    },
+    {
+      "path": "pico-b-restoration/before-restore-reserved-owner.log",
+      "size_bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "pico-b-restoration/before-restore-reserved.bin",
+      "size_bytes": 57344,
+      "sha256": "0e86aa8329d0b388f5df04799781f62a2feb801705139da4ce404ed6bdf93523"
+    },
+    {
+      "path": "pico-b-restoration/before-restore-reserved.log",
+      "size_bytes": 1912,
+      "sha256": "485d1584314f8ab16817a9d8a000fc42681297cf320e3e9e64f64c2f45e4c1d1"
+    },
+    {
+      "path": "pico-b-restoration/enter-rom.json",
+      "size_bytes": 29,
+      "sha256": "f83f9f27a7e859db453690ad52a40adfbc4d3eabcc91b19e77264366142fbba8"
+    },
+    {
+      "path": "pico-b-restoration/load.log",
+      "size_bytes": 10152,
+      "sha256": "2f427364838594e6df0dd3964335e9d8eba0a16f162979ad50a8377572eeea9d"
+    },
+    {
+      "path": "pico-b-restoration/reboot.log",
+      "size_bytes": 47,
+      "sha256": "ec01d4b1cb33d63c2cc601a53215453468ad30b007b147b0b732cc1f09d648d9"
+    },
+    {
+      "path": "pico-b-restoration/result.json",
+      "size_bytes": 405,
+      "sha256": "1a194baa1158e73c9598f409357308bd553fc24ee597aec25300ba00dad264d4"
+    },
+    {
+      "path": "pico-b-switch/fresh-full-flash.bin",
+      "size_bytes": 4194304,
+      "sha256": "e77aa61396cda525c1ad2d437e69ac30ed4f52cec7cc302261839e816c8b7d99"
+    },
+    {
+      "path": "private-before.tar.gz",
+      "size_bytes": 3055,
+      "sha256": "6e8939d34f00fa07ae3d35858c95dcd69f2f14fc27896a7e76f708d841084100"
+    },
+    {
+      "path": "run5/._analyze_rf.py",
+      "size_bytes": 163,
+      "sha256": "1ee80bf53151eb89379e2f7d9eb478e6e4c6b9afaeb93bc4280b1f3ea9155bab"
+    },
+    {
+      "path": "run5/accepted-rf-analysis.json",
+      "size_bytes": 25149,
+      "sha256": "683d4854af268b46c214cbe48bbdf681c902ce5f1c2f0c3fbe8e3d3c9ac96a89"
+    },
+    {
+      "path": "run5/analyze_rf.py",
+      "size_bytes": 4229,
+      "sha256": "6e19bc05d8ed0a3ee93c758d75ac2955b0809cd2f7b35357fba99a1cefda35c5"
+    },
+    {
+      "path": "run5/controller-crash-capture.json",
+      "size_bytes": 2510,
+      "sha256": "b5d7777c06ddeb110f9c29021aa4097696fa4cd835d7cd4d93661d9984c498f9"
+    },
+    {
+      "path": "run5/controller-crash.cf32",
+      "size_bytes": 468000000,
+      "sha256": "65a0ff9e4a81e6aaa687996d97b8e7ad0cbafc6553803ea8f1b786304bb0c929"
+    },
+    {
+      "path": "run5/controller-network-capture.json",
+      "size_bytes": 2518,
+      "sha256": "802a32d8ba06d36f12cd2efbec45695f0e43db82e7aa9256fd1139cbc08c4df0"
+    },
+    {
+      "path": "run5/controller-network.cf32",
+      "size_bytes": 810000000,
+      "sha256": "65a88a8ecf00dc99a675b5717fd1b154cc48e2f7abbd94fdfc6cda2e4ef51e62"
+    },
+    {
+      "path": "run5/final-six-after-failed-restart.json",
+      "size_bytes": 8985,
+      "sha256": "00c33996cc9ce8ffce36252ce47a2e83903302b588e24ecbbe4509f6796cca2b"
+    },
+    {
+      "path": "run5/guard-cleanup.json",
+      "size_bytes": 49,
+      "sha256": "92865a167ab763f81f4bb019910e6251b8b011ad1846428e8048f72a6f7c6cdb"
+    },
+    {
+      "path": "run5/guard.py",
+      "size_bytes": 1905,
+      "sha256": "13fcf331c0b86bf33db276375858bf02431c507f49317f1d34ac80f3f3d3028b"
+    },
+    {
+      "path": "run5/plan.json",
+      "size_bytes": 1499,
+      "sha256": "b6a3ca35a479595491ecfbac103c7473b12b1f1c3e9fca44f1a1be69bea0fb54"
+    },
+    {
+      "path": "run5/rf-analysis.json",
+      "size_bytes": 20216,
+      "sha256": "438aeaeda2d975a14f28328b75619fcdb45b52a873b29d092aecfffc0352f435"
+    },
+    {
+      "path": "run5/rf-series.json",
+      "size_bytes": 1220300,
+      "sha256": "8a532fa4b96c09020383938c0feb4a47a588a8ed9d30ab9e65c0744a463bf075"
+    },
+    {
+      "path": "run5/target-restart-capture.json",
+      "size_bytes": 2508,
+      "sha256": "935df6cb6b898270b75fb1fd553ddc2b59453f1f9a2fbedd8a0ce2102de814fe"
+    },
+    {
+      "path": "run5/target-restart.cf32",
+      "size_bytes": 706000000,
+      "sha256": "8d4110d0709a1677c1d76af2c408d84ae5e6c4de5c320fb2f4f75c2f54398527"
+    },
+    {
+      "path": "run5/target-subset-one-capture.json",
+      "size_bytes": 2512,
+      "sha256": "548a16b1cf48dbd707df35aaac94fe7215fc05188b1c68c3457a4c430c804b9d"
+    },
+    {
+      "path": "run5/target-subset-one.cf32",
+      "size_bytes": 460000000,
+      "sha256": "af7d520d10ca5d1a998d25228948e0bc2981baf52143342779af09fb9bcc9a9c"
+    },
+    {
+      "path": "run5/target-subset-two-capture.json",
+      "size_bytes": 2512,
+      "sha256": "71b2d336db43a4d75b14026cebe9cb83e8b7a41379abafbd822a61d1b519ca17"
+    },
+    {
+      "path": "run5/target-subset-two.cf32",
+      "size_bytes": 466000000,
+      "sha256": "a574de4998eeaae3111758f92ad86fda3a785373e5567768ec2a33edeb0e4f51"
+    },
+    {
+      "path": "run5/usb_observer.py",
+      "size_bytes": 4331,
+      "sha256": "b7ac6f60be98c5b88ea86aef0ab3c76c00093314374ecac8e40800b31f4ea568"
+    },
+    {
+      "path": "run7/._analyze_rf.py",
+      "size_bytes": 163,
+      "sha256": "1ee80bf53151eb89379e2f7d9eb478e6e4c6b9afaeb93bc4280b1f3ea9155bab"
+    },
+    {
+      "path": "run7/._guard.py",
+      "size_bytes": 163,
+      "sha256": "1ee80bf53151eb89379e2f7d9eb478e6e4c6b9afaeb93bc4280b1f3ea9155bab"
+    },
+    {
+      "path": "run7/._restore_pico_b.py",
+      "size_bytes": 163,
+      "sha256": "1ee80bf53151eb89379e2f7d9eb478e6e4c6b9afaeb93bc4280b1f3ea9155bab"
+    },
+    {
+      "path": "run7/._usb_observer.py",
+      "size_bytes": 163,
+      "sha256": "1ee80bf53151eb89379e2f7d9eb478e6e4c6b9afaeb93bc4280b1f3ea9155bab"
+    },
+    {
+      "path": "run7/analyze_rf.py",
+      "size_bytes": 5695,
+      "sha256": "74acb13724d95fcd5885c3c6c7b8797493cbe3373faea241847a6d9704ed37ba"
+    },
+    {
+      "path": "run7/guard-cleanup.json",
+      "size_bytes": 49,
+      "sha256": "92865a167ab763f81f4bb019910e6251b8b011ad1846428e8048f72a6f7c6cdb"
+    },
+    {
+      "path": "run7/guard.py",
+      "size_bytes": 1905,
+      "sha256": "13fcf331c0b86bf33db276375858bf02431c507f49317f1d34ac80f3f3d3028b"
+    },
+    {
+      "path": "run7/plan.json",
+      "size_bytes": 1041,
+      "sha256": "6781dbdada7189da63a2f7052ff5f697449949e4b9d9068451576016d3e0e764"
+    },
+    {
+      "path": "run7/restore_pico_b.py",
+      "size_bytes": 4152,
+      "sha256": "72f664cf046384f98053d9acd8ac5e40569e6b5d7116d1b4b8ae2915be045ad2"
+    },
+    {
+      "path": "run7/rf-analysis.json",
+      "size_bytes": 7079,
+      "sha256": "820b31b982e295159f7ee20628f9b052c99ec6a2bb2c9420889ce822ce1f22e0"
+    },
+    {
+      "path": "run7/rf-series.json",
+      "size_bytes": 264626,
+      "sha256": "d03cbbe08905f43ef72b8d9ae489271deb83f9debd953c2fba8cfcc4cb349241"
+    },
+    {
+      "path": "run7/target-restart-capture.json",
+      "size_bytes": 2506,
+      "sha256": "60e2cb43ab0e0be55d6a758c4f5ac6f08dc3317b302dab1a17c12a5550536ec3"
+    },
+    {
+      "path": "run7/target-restart.cf32",
+      "size_bytes": 638000000,
+      "sha256": "174d93ef8c6c31c45faed3f2fa19cfdef8889c9d7a1dbebb39f1dccb2ca6e86e"
+    },
+    {
+      "path": "run7/usb_observer.py",
+      "size_bytes": 4331,
+      "sha256": "b7ac6f60be98c5b88ea86aef0ab3c76c00093314374ecac8e40800b31f4ea568"
+    }
+  ],
+  "note": "Raw IQ, complete observations, rejected attempts, retained original firmware and configuration backups remain private outside Git. Compressed transfers used tar through gzip."
+}

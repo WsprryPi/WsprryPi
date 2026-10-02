@@ -1,0 +1,5 @@
+{
+  "observed_startup_slot": 1790901241,
+  "planned_first_slot": 1790901361,
+  "reason": "Schedules were enabled before the preceding slot preparation window. This valid scheduled startup round is recorded separately from the twelve planned acceptance rounds. Future harness gates enablement until baseline minus 100 seconds."
+}

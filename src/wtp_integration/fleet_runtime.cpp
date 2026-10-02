@@ -3,6 +3,7 @@
 #include "runtime_config_bridge.hpp"
 #include "fleet_store.hpp"
 #include "fleet_schedule.hpp"
+#include "fleet_recovery.hpp"
 #include "target_runtime.hpp"
 #include "browser_api.hpp"
 #include "wtp_settings_json.hpp"
@@ -102,6 +103,25 @@ private:
         store_.update({},[&](Json& data){if(row_for(data,id_))modify_row(data,id_,[](Json& row){row["in_flight"]=false;});});
         dispatched_here_=false;
     }
+    CleanupResult recover_restarted_output(const Json& row) {
+        const auto previous=target_->app->status();
+        if(previous.session_phase!=wtp::SessionPhase::IdentityChanged)
+            return {false,"Output identity or protocol fault remains unresolved"};
+        // Close the retired connection before inspecting a single-client Pico.
+        // Reuse its exclusion lease, but never its owner, job or transaction.
+        target_->plain.close();target_->tls.close();target_->stream.close();
+        auto fresh=std::make_unique<WtpTargetRuntime>(settings_,[this]{return admit();},target_->output_lease);
+        const auto inspection=fresh->app->inspect();
+        if(!inspection.ok)return {false,inspection.error};
+        const auto status=fresh->app->status();
+        if(!wtp_fleet_restarted_output_safe(previous,status,id_,row.at("product").get<std::string>()))
+            return {false,"Restarted output identity or inactive state is unconfirmed"};
+        check_caps(row,status);
+        if(!reconcile(row))return {false,"Local takeover removed the output assignment"};
+        // status() readers must not retain a pointer to the retired context.
+        {std::lock_guard lock(status_mutex_);target_.swap(fresh);}
+        return {true,{}};
+    }
     void tick() {
         auto row=row_for(store_.snapshot().first,id_);
         if(!row){revoked_=true;cleanup_ok_=target_->app->stop().ok;return;}
@@ -110,7 +130,9 @@ private:
         if((!target_->app->active() || target_->app->phase()==WtpSchedulePhase::Waiting) && !reconcile(*row))return;
         if(recover_.exchange(false)) {
             (void)target_->app->stop();
-            const auto result=target_->app->recover();
+            auto result=target_->app->recover();
+            if(!result.ok && target_->app->status().session_phase==wtp::SessionPhase::IdentityChanged)
+                result=recover_restarted_output(*row);
             cleanup_ok_=result.ok;
             if(result.ok && reconcile(*row)) {clear_in_flight();publish("paused","Output reconciled. Resume to schedule future slots.");}
             else publish("recovery_required",result.error);

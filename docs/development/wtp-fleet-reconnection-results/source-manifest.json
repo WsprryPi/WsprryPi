@@ -1,0 +1,28 @@
+{
+  "repository": "WsprryPi",
+  "branch": "devel",
+  "source_head": "3dd0a79894782b5dfd59fbd14ef6a282223eec6b",
+  "installed_route_helper_sha256": "3d03c02db2a13feb32f29ee44d921635a44c2aeb97f7cebdfc512e8c025c463b",
+  "original_controller_ini_sha256": "b8d705b6ec1b4f8618698a5495ad8d06e57a9da2f25d32d8be12f5f6ae81c576",
+  "harness": {
+    "analyze_controller.py": "19b16eebc6523c86a4b7ab1fab9f47e202115ddc550c296fad1d34262273f4fc",
+    "analyze_rf.py": "74acb13724d95fcd5885c3c6c7b8797493cbe3373faea241847a6d9704ed37ba",
+    "guard.py": "13fcf331c0b86bf33db276375858bf02431c507f49317f1d34ac80f3f3d3028b",
+    "restore_pico_b.py": "72f664cf046384f98053d9acd8ac5e40569e6b5d7116d1b4b8ae2915be045ad2",
+    "run.py": "50656c089a9dff85120f07f7bacb4cf7778a749802148fc4caf4654f21937823",
+    "usb_observer.py": "b7ac6f60be98c5b88ea86aef0ab3c76c00093314374ecac8e40800b31f4ea568",
+    "verify_cases.py": "6816f1b3976579f5eecaf4eedeaf0ef89bc82df1c83a152fef8c327dbd56ea44",
+    "verify_restoration.py": "a9a6131f7f32e4c7b6b62680f17bcf2020217a053dc47f38732bf0a9aeea4291"
+  },
+  "original_controller_source": "9a1b8c10036f77f8446b912c481b3ea5dc3d39e8",
+  "original_controller_binary_sha256": "5c1abc72cc8aa67e4a5a2630fafea2329675d3d71189e00c11b6ddff260f8554",
+  "repaired_controller_binary_sha256": "663b46d503c69ff4c718ba1d6ecfe2e5877e661b42bfeb1fb76c3feeb0dfa700",
+  "source_note": "src content at original 9a1b8c1 is identical to 3dd0a79; repaired native binary adds the three source files below. Retained build metadata displays 6a32789; hashes bind the actual tested candidate.",
+  "changed_source_sha256": {
+    "src/wtp_integration/fleet_runtime.cpp": "0a6fcce125df9784723eddb49e43c690db37b8bf0e513af2a176d5d9335181ae",
+    "src/wtp_integration/fleet_recovery.hpp": "a3b185358369a4db8e0cf1e7459fc4756f64a68ca1e79efa8d42ffe3cfbb75b4",
+    "src/tests/wtp_fleet_test.cpp": "9747cc2b8c407173d114e87cf264a739761923bbe845b29e2b8f1db42c5f6e1d"
+  },
+  "original_executed_run_py_sha256": "a2699a701875ee49a54e799c89fc1896e4a0364cf374caf4ccb96c963677825a",
+  "repaired_executed_run_py_sha256": "50656c089a9dff85120f07f7bacb4cf7778a749802148fc4caf4654f21937823"
+}

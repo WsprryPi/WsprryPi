@@ -1,0 +1,19 @@
+{
+  "scope": "After accepted run7 cleanup, all assignments paused; no overlapping scheduler controls",
+  "requests": [
+    {
+      "utc_seconds": 1790903955.784162,
+      "url": "http://192.168.1.54/wsprrypi/api/v1/host/fleet",
+      "request": {
+        "operation": "recover",
+        "device_id": "e2a4d273f7d8f24f6696f7c6fb95ff11"
+      },
+      "response": [
+        {
+          "status": 200,
+          "url": "http://192.168.1.54/wsprrypi/api/v1/host/fleet"
+        }
+      ]
+    }
+  ]
+}

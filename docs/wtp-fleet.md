@@ -78,6 +78,14 @@ in-flight work, use **Reconcile**, inspect the result, then **Resume**. Other
 outputs and local scheduling remain independent. Duplicate full identities and
 self-targeting are rejected, including collision with the compatibility route.
 
+If the assigned target restarts, **Reconcile** can establish a fresh session
+with that same full device identity and product. It requires fresh capabilities
+and status confirming the new boot is unowned and its output is inactive; a
+fault or unresolved output keeps the assignment blocked. Pi local control and
+takeover history are checked again. Successful reconciliation leaves the
+assignment paused. **Resume** schedules future slots; it does not replay the
+interrupted slot or take over another owner's job.
+
 Pi assignments explicitly select Plain LAN and a status HTTP port (default
 31415). Before CLAIM and ARM, the controller reads the target's durable takeover
 generation at `/api/v1/host/wtp-endpoint`. A changed generation deletes that

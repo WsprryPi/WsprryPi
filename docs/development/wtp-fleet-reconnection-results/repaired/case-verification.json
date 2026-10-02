@@ -1,0 +1,17 @@
+{
+  "cases": [
+    {
+      "name": "target-restart",
+      "affected": [
+        "wspr2"
+      ],
+      "known_off_before_recovery": true,
+      "fresh_expected_identity_unowned_after_recovery": true,
+      "all_five_future_slot_completions": true,
+      "unaffected_fault_slot_completions": true
+    }
+  ],
+  "checkpoint_assertions_passed": true,
+  "scope": "Full recorded plan",
+  "pico_ownership_evidence": "Fresh controller WTP STATUS after recovery; USB INFO has no ownership fields."
+}

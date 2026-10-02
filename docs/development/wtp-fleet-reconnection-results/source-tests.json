@@ -1,0 +1,34 @@
+{
+  "tests": [
+    {
+      "host": "wspr5",
+      "command": "WSPRRYPI_DISABLE_HARDWARE_ACCESS=1 make -j2 wtp-fleet-test SUDO=; make -j2 debug SUDO=",
+      "directory": "src",
+      "exit_code": 0,
+      "passed": true,
+      "full_log_private_archive": "mac-records/wtp-fleet-reconnection-native-build.log",
+      "full_log_sha256": "3b64eeb588d3e0aad2ab872861519cd1af5d059072d4458a7fc1d7338915b17e"
+    },
+    {
+      "host": "wspr5",
+      "command": "WSPRRYPI_DISABLE_HARDWARE_ACCESS=1 make -j2 semantics-test SUDO=",
+      "directory": "src",
+      "exit_code": 0,
+      "passed": true,
+      "full_log_private_archive": "mac-records/wtp-fleet-reconnection-linux-semantics.log",
+      "full_log_sha256": "7abb67cc19337b4104058461a28dc8ec8949a9c80eb866302392fc147f6ab002"
+    },
+    {
+      "host": "Mac",
+      "command": "SDKROOT=/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer MACOSX_DEPLOYMENT_TARGET=27.0 make -j2 wtp-fleet-test SUDO= CXX=/usr/bin/clang++ BACKENDS=simulated ANCILLARY_GPIO=0",
+      "directory": "src",
+      "exit_code": 0,
+      "passed": true,
+      "full_log_private_archive": "mac-records/wtp-fleet-reconnection-portable.log",
+      "full_log_sha256": "7c54a62c13d0c1114f7a706035854fe5fc3aab17f1eab1d2f06c9e3a5cfe2f9a"
+    }
+  ],
+  "linux_profile": "default physical and simulated backend profile; hardware access explicitly disabled; libgpiod C++ and Avahi development headers present",
+  "mac_profile": "focused simulated-only Fleet suite, not full Linux semantics",
+  "warnings": "Linux negative-fixture warnings and IPv6 loopback fallback were retained in the complete log; no compilation warning/error found."
+}

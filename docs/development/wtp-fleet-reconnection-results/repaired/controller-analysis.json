@@ -1,0 +1,1683 @@
+{
+  "scope": "Full recorded plan",
+  "all_requested_cases_passed": true,
+  "all_clean_rounds_complete": true,
+  "five_independent_running_outputs_in_all_requested_slots": true,
+  "startup_slots_recorded_separately": [],
+  "per_output": {
+    "wspr1": {
+      "clean_slots": [
+        1790903761,
+        1790903881
+      ],
+      "completed_clean_reports": [
+        {
+          "adjustments": [
+            {
+              "event_index": 0,
+              "realized_frequency_nhz": "14099100000005812",
+              "requested_frequency_nhz": "14099100000000000"
+            }
+          ],
+          "arm_handed_off": true,
+          "dispatch_utc_ns": "1790903746000000000",
+          "error": "",
+          "execution": {
+            "cleanup": {
+              "error": "",
+              "ok": true
+            },
+            "cleanup_attempted": true,
+            "error": "",
+            "faulted": false,
+            "ok": true,
+            "stopped": false
+          },
+          "identity": {
+            "boot_id": "ebb2faf2e0411e0062cd6e342803a182",
+            "device_id": "d133ed890b90f6945b41a235429ff155",
+            "firmware_version": "3.2.0-devel+6a32789",
+            "product": "WsprryPi"
+          },
+          "job": {
+            "authoritative": true,
+            "boot_id": "ebb2faf2e0411e0062cd6e342803a182",
+            "device_id": "d133ed890b90f6945b41a235429ff155",
+            "device_output_active": false,
+            "job_id": "db771a49eec6c0a10000000000000002",
+            "output_active": false,
+            "state": "complete"
+          },
+          "job_id": "db771a49eec6c0a10000000000000002",
+          "outcome": "complete",
+          "reload_deferred": false,
+          "request_id": "2",
+          "skipped": false,
+          "start_utc_ns": "1790903761000000000"
+        },
+        {
+          "adjustments": [
+            {
+              "event_index": 0,
+              "realized_frequency_nhz": "14099100000005812",
+              "requested_frequency_nhz": "14099100000000000"
+            }
+          ],
+          "arm_handed_off": true,
+          "dispatch_utc_ns": "1790903866000000000",
+          "error": "",
+          "execution": {
+            "cleanup": {
+              "error": "",
+              "ok": true
+            },
+            "cleanup_attempted": true,
+            "error": "",
+            "faulted": false,
+            "ok": true,
+            "stopped": false
+          },
+          "identity": {
+            "boot_id": "ebb2faf2e0411e0062cd6e342803a182",
+            "device_id": "d133ed890b90f6945b41a235429ff155",
+            "firmware_version": "3.2.0-devel+6a32789",
+            "product": "WsprryPi"
+          },
+          "job": {
+            "authoritative": true,
+            "boot_id": "ebb2faf2e0411e0062cd6e342803a182",
+            "device_id": "d133ed890b90f6945b41a235429ff155",
+            "device_output_active": false,
+            "job_id": "db771a49eec6c0a10000000000000003",
+            "output_active": false,
+            "state": "complete"
+          },
+          "job_id": "db771a49eec6c0a10000000000000003",
+          "outcome": "complete",
+          "reload_deferred": false,
+          "request_id": "3",
+          "skipped": false,
+          "start_utc_ns": "1790903881000000000"
+        }
+      ],
+      "all_clean_slots_complete": true
+    },
+    "wspr2": {
+      "clean_slots": [
+        1790903761,
+        1790903881
+      ],
+      "completed_clean_reports": [
+        {
+          "adjustments": [
+            {
+              "event_index": 0,
+              "realized_frequency_nhz": "14101100000000717",
+              "requested_frequency_nhz": "14101100000000000"
+            }
+          ],
+          "arm_handed_off": true,
+          "dispatch_utc_ns": "1790903746000000000",
+          "error": "",
+          "execution": {
+            "cleanup": {
+              "error": "",
+              "ok": true
+            },
+            "cleanup_attempted": true,
+            "error": "",
+            "faulted": false,
+            "ok": true,
+            "stopped": false
+          },
+          "identity": {
+            "boot_id": "2828f3638d16bdbdf0704fc7445c81ff",
+            "device_id": "e2a4d273f7d8f24f6696f7c6fb95ff11",
+            "firmware_version": "3.2.0-devel+2f67b00",
+            "product": "WsprryPi"
+          },
+          "job": {
+            "authoritative": true,
+            "boot_id": "2828f3638d16bdbdf0704fc7445c81ff",
+            "device_id": "e2a4d273f7d8f24f6696f7c6fb95ff11",
+            "device_output_active": false,
+            "job_id": "7130863abf971fed0000000000000001",
+            "output_active": false,
+            "state": "complete"
+          },
+          "job_id": "7130863abf971fed0000000000000001",
+          "outcome": "complete",
+          "reload_deferred": false,
+          "request_id": "1",
+          "skipped": false,
+          "start_utc_ns": "1790903761000000000"
+        },
+        {
+          "adjustments": [
+            {
+              "event_index": 0,
+              "realized_frequency_nhz": "14101100000000717",
+              "requested_frequency_nhz": "14101100000000000"
+            }
+          ],
+          "arm_handed_off": true,
+          "dispatch_utc_ns": "1790903866000000000",
+          "error": "",
+          "execution": {
+            "cleanup": {
+              "error": "",
+              "ok": true
+            },
+            "cleanup_attempted": true,
+            "error": "",
+            "faulted": false,
+            "ok": true,
+            "stopped": false
+          },
+          "identity": {
+            "boot_id": "2828f3638d16bdbdf0704fc7445c81ff",
+            "device_id": "e2a4d273f7d8f24f6696f7c6fb95ff11",
+            "firmware_version": "3.2.0-devel+2f67b00",
+            "product": "WsprryPi"
+          },
+          "job": {
+            "authoritative": true,
+            "boot_id": "2828f3638d16bdbdf0704fc7445c81ff",
+            "device_id": "e2a4d273f7d8f24f6696f7c6fb95ff11",
+            "device_output_active": false,
+            "job_id": "7130863abf971fed0000000000000002",
+            "output_active": false,
+            "state": "complete"
+          },
+          "job_id": "7130863abf971fed0000000000000002",
+          "outcome": "complete",
+          "reload_deferred": false,
+          "request_id": "2",
+          "skipped": false,
+          "start_utc_ns": "1790903881000000000"
+        }
+      ],
+      "all_clean_slots_complete": true
+    },
+    "wspr4": {
+      "clean_slots": [
+        1790903761,
+        1790903881
+      ],
+      "completed_clean_reports": [
+        {
+          "adjustments": [
+            {
+              "event_index": 0,
+              "realized_frequency_nhz": "14098100000007560",
+              "requested_frequency_nhz": "14098100000000000"
+            }
+          ],
+          "arm_handed_off": true,
+          "dispatch_utc_ns": "1790903746000000000",
+          "error": "",
+          "execution": {
+            "cleanup": {
+              "error": "",
+              "ok": true
+            },
+            "cleanup_attempted": true,
+            "error": "",
+            "faulted": false,
+            "ok": true,
+            "stopped": false
+          },
+          "identity": {
+            "boot_id": "19d88d5752e3f3ad9765815d3ccf16eb",
+            "device_id": "f21e530af8a4a210ec57898c0ebd32d2",
+            "firmware_version": "3.2.0-devel+2f67b00",
+            "product": "WsprryPi"
+          },
+          "job": {
+            "authoritative": true,
+            "boot_id": "19d88d5752e3f3ad9765815d3ccf16eb",
+            "device_id": "f21e530af8a4a210ec57898c0ebd32d2",
+            "device_output_active": false,
+            "job_id": "fdf9aa5ece3c71350000000000000002",
+            "output_active": false,
+            "state": "complete"
+          },
+          "job_id": "fdf9aa5ece3c71350000000000000002",
+          "outcome": "complete",
+          "reload_deferred": false,
+          "request_id": "2",
+          "skipped": false,
+          "start_utc_ns": "1790903761000000000"
+        },
+        {
+          "adjustments": [
+            {
+              "event_index": 0,
+              "realized_frequency_nhz": "14098100000007560",
+              "requested_frequency_nhz": "14098100000000000"
+            }
+          ],
+          "arm_handed_off": true,
+          "dispatch_utc_ns": "1790903866000000000",
+          "error": "",
+          "execution": {
+            "cleanup": {
+              "error": "",
+              "ok": true
+            },
+            "cleanup_attempted": true,
+            "error": "",
+            "faulted": false,
+            "ok": true,
+            "stopped": false
+          },
+          "identity": {
+            "boot_id": "19d88d5752e3f3ad9765815d3ccf16eb",
+            "device_id": "f21e530af8a4a210ec57898c0ebd32d2",
+            "firmware_version": "3.2.0-devel+2f67b00",
+            "product": "WsprryPi"
+          },
+          "job": {
+            "authoritative": true,
+            "boot_id": "19d88d5752e3f3ad9765815d3ccf16eb",
+            "device_id": "f21e530af8a4a210ec57898c0ebd32d2",
+            "device_output_active": false,
+            "job_id": "fdf9aa5ece3c71350000000000000003",
+            "output_active": false,
+            "state": "complete"
+          },
+          "job_id": "fdf9aa5ece3c71350000000000000003",
+          "outcome": "complete",
+          "reload_deferred": false,
+          "request_id": "3",
+          "skipped": false,
+          "start_utc_ns": "1790903881000000000"
+        }
+      ],
+      "all_clean_slots_complete": true
+    },
+    "Pico A": {
+      "clean_slots": [
+        1790903761,
+        1790903881
+      ],
+      "completed_clean_reports": [
+        {
+          "adjustments": [
+            {
+              "event_index": 0,
+              "realized_frequency_nhz": "14100099989678711",
+              "requested_frequency_nhz": "14100100000000000"
+            }
+          ],
+          "arm_handed_off": true,
+          "dispatch_utc_ns": "1790903747900000000",
+          "error": "",
+          "execution": {
+            "cleanup": {
+              "error": "",
+              "ok": true
+            },
+            "cleanup_attempted": true,
+            "error": "",
+            "faulted": false,
+            "ok": true,
+            "stopped": false
+          },
+          "identity": {
+            "boot_id": "4296284b4460bb4578b4637ac020a590",
+            "device_id": "fd6127d11d6aca42a9905fa3fb1bf1d5",
+            "firmware_version": "0.0.0-devel",
+            "product": "WsprryPico"
+          },
+          "job": {
+            "authoritative": true,
+            "boot_id": "4296284b4460bb4578b4637ac020a590",
+            "device_id": "fd6127d11d6aca42a9905fa3fb1bf1d5",
+            "device_output_active": false,
+            "job_id": "9bcb9df8232857350000000000000002",
+            "output_active": false,
+            "state": "complete"
+          },
+          "job_id": "9bcb9df8232857350000000000000002",
+          "outcome": "complete",
+          "reload_deferred": false,
+          "request_id": "2",
+          "skipped": false,
+          "start_utc_ns": "1790903761000000000"
+        },
+        {
+          "adjustments": [
+            {
+              "event_index": 0,
+              "realized_frequency_nhz": "14100099989678711",
+              "requested_frequency_nhz": "14100100000000000"
+            }
+          ],
+          "arm_handed_off": true,
+          "dispatch_utc_ns": "1790903867900000000",
+          "error": "",
+          "execution": {
+            "cleanup": {
+              "error": "",
+              "ok": true
+            },
+            "cleanup_attempted": true,
+            "error": "",
+            "faulted": false,
+            "ok": true,
+            "stopped": false
+          },
+          "identity": {
+            "boot_id": "4296284b4460bb4578b4637ac020a590",
+            "device_id": "fd6127d11d6aca42a9905fa3fb1bf1d5",
+            "firmware_version": "0.0.0-devel",
+            "product": "WsprryPico"
+          },
+          "job": {
+            "authoritative": true,
+            "boot_id": "4296284b4460bb4578b4637ac020a590",
+            "device_id": "fd6127d11d6aca42a9905fa3fb1bf1d5",
+            "device_output_active": false,
+            "job_id": "9bcb9df8232857350000000000000003",
+            "output_active": false,
+            "state": "complete"
+          },
+          "job_id": "9bcb9df8232857350000000000000003",
+          "outcome": "complete",
+          "reload_deferred": false,
+          "request_id": "3",
+          "skipped": false,
+          "start_utc_ns": "1790903881000000000"
+        }
+      ],
+      "all_clean_slots_complete": true
+    },
+    "Pico B": {
+      "clean_slots": [
+        1790903761,
+        1790903881
+      ],
+      "completed_clean_reports": [
+        {
+          "adjustments": [
+            {
+              "event_index": 0,
+              "realized_frequency_nhz": "14102099992800504",
+              "requested_frequency_nhz": "14102100000000000"
+            }
+          ],
+          "arm_handed_off": true,
+          "dispatch_utc_ns": "1790903747900000000",
+          "error": "",
+          "execution": {
+            "cleanup": {
+              "error": "",
+              "ok": true
+            },
+            "cleanup_attempted": true,
+            "error": "",
+            "faulted": false,
+            "ok": true,
+            "stopped": false
+          },
+          "identity": {
+            "boot_id": "2f4f322f3311d9bf58bab0c9228b67a7",
+            "device_id": "29f20b7342051ef947aa56cb9d4fab42",
+            "firmware_version": "0.0.0-devel",
+            "product": "WsprryPico"
+          },
+          "job": {
+            "authoritative": true,
+            "boot_id": "2f4f322f3311d9bf58bab0c9228b67a7",
+            "device_id": "29f20b7342051ef947aa56cb9d4fab42",
+            "device_output_active": false,
+            "job_id": "479e83e9e02bb7760000000000000002",
+            "output_active": false,
+            "state": "complete"
+          },
+          "job_id": "479e83e9e02bb7760000000000000002",
+          "outcome": "complete",
+          "reload_deferred": false,
+          "request_id": "2",
+          "skipped": false,
+          "start_utc_ns": "1790903761000000000"
+        },
+        {
+          "adjustments": [
+            {
+              "event_index": 0,
+              "realized_frequency_nhz": "14102099992800504",
+              "requested_frequency_nhz": "14102100000000000"
+            }
+          ],
+          "arm_handed_off": true,
+          "dispatch_utc_ns": "1790903867900000000",
+          "error": "",
+          "execution": {
+            "cleanup": {
+              "error": "",
+              "ok": true
+            },
+            "cleanup_attempted": true,
+            "error": "",
+            "faulted": false,
+            "ok": true,
+            "stopped": false
+          },
+          "identity": {
+            "boot_id": "2f4f322f3311d9bf58bab0c9228b67a7",
+            "device_id": "29f20b7342051ef947aa56cb9d4fab42",
+            "firmware_version": "0.0.0-devel",
+            "product": "WsprryPico"
+          },
+          "job": {
+            "authoritative": true,
+            "boot_id": "2f4f322f3311d9bf58bab0c9228b67a7",
+            "device_id": "29f20b7342051ef947aa56cb9d4fab42",
+            "device_output_active": false,
+            "job_id": "479e83e9e02bb7760000000000000003",
+            "output_active": false,
+            "state": "complete"
+          },
+          "job_id": "479e83e9e02bb7760000000000000003",
+          "outcome": "complete",
+          "reload_deferred": false,
+          "request_id": "3",
+          "skipped": false,
+          "start_utc_ns": "1790903881000000000"
+        }
+      ],
+      "all_clean_slots_complete": true
+    }
+  },
+  "independent": {
+    "wspr1": {
+      "per_slot_running_counts": {
+        "1790903641": 18,
+        "1790903761": 17,
+        "1790903881": 18
+      },
+      "terminal_records": [
+        {
+          "job_id": "160439abdaa6ad540000000000000002",
+          "state": "aborted",
+          "ended_monotonic_ns": "185237927282008",
+          "output_active": false
+        },
+        {
+          "job_id": "160439abdaa6ad540000000000000001",
+          "state": "complete",
+          "ended_monotonic_ns": "185124100598422",
+          "output_active": false
+        },
+        {
+          "job_id": "4cc1ad2eec9c42380000000000000002",
+          "state": "complete",
+          "ended_monotonic_ns": "184404101094984",
+          "output_active": false
+        },
+        {
+          "job_id": "4cc1ad2eec9c42380000000000000001",
+          "state": "complete",
+          "ended_monotonic_ns": "184284114311317",
+          "output_active": false
+        },
+        {
+          "job_id": "11c179c029f92fff0000000000000009",
+          "state": "complete",
+          "ended_monotonic_ns": "184164115051864",
+          "output_active": false
+        },
+        {
+          "job_id": "11c179c029f92fff0000000000000008",
+          "state": "complete",
+          "ended_monotonic_ns": "184044096400038",
+          "output_active": false
+        },
+        {
+          "job_id": "11c179c029f92fff0000000000000007",
+          "state": "complete",
+          "ended_monotonic_ns": "183924102661880",
+          "output_active": false
+        },
+        {
+          "job_id": "11c179c029f92fff0000000000000006",
+          "state": "complete",
+          "ended_monotonic_ns": "183804096113892",
+          "output_active": false
+        },
+        {
+          "job_id": "db771a49eec6c0a10000000000000001",
+          "state": "complete",
+          "ended_monotonic_ns": "185604110768643",
+          "output_active": false
+        },
+        {
+          "job_id": "db771a49eec6c0a10000000000000002",
+          "state": "complete",
+          "ended_monotonic_ns": "185724101093405",
+          "output_active": false
+        },
+        {
+          "job_id": "db771a49eec6c0a10000000000000003",
+          "state": "complete",
+          "ended_monotonic_ns": "185844111689891",
+          "output_active": false
+        }
+      ],
+      "observer_errors": [],
+      "identity_errors": [],
+      "owner_and_job_ids_independently_observed": true
+    },
+    "wspr2": {
+      "per_slot_running_counts": {
+        "1790903641": 3,
+        "1790903761": 18,
+        "1790903881": 18
+      },
+      "terminal_records": [
+        {
+          "job_id": "7130863abf971fed0000000000000001",
+          "state": "complete",
+          "ended_monotonic_ns": "47206907279126",
+          "output_active": false
+        },
+        {
+          "job_id": "7130863abf971fed0000000000000002",
+          "state": "complete",
+          "ended_monotonic_ns": "47326914286482",
+          "output_active": false
+        }
+      ],
+      "observer_errors": [
+        {
+          "utc_ns": "1790903642918085000",
+          "error": "RuntimeError('WTP peer closed the connection')"
+        },
+        {
+          "utc_ns": "1790903643590239000",
+          "error": "ConnectionRefusedError(61, 'Connection refused')"
+        },
+        {
+          "utc_ns": "1790903644265140000",
+          "error": "ConnectionRefusedError(61, 'Connection refused')"
+        }
+      ],
+      "identity_errors": [],
+      "owner_and_job_ids_independently_observed": true
+    },
+    "wspr4": {
+      "per_slot_running_counts": {
+        "1790903641": 19,
+        "1790903761": 18,
+        "1790903881": 18
+      },
+      "terminal_records": [
+        {
+          "job_id": "dc1661b90fe9556e0000000000000002",
+          "state": "aborted",
+          "ended_monotonic_ns": "50516320442756",
+          "output_active": false
+        },
+        {
+          "job_id": "dc1661b90fe9556e0000000000000001",
+          "state": "complete",
+          "ended_monotonic_ns": "50402304793475",
+          "output_active": false
+        },
+        {
+          "job_id": "e1f864de1e0edb6a0000000000000002",
+          "state": "complete",
+          "ended_monotonic_ns": "49682319266848",
+          "output_active": false
+        },
+        {
+          "job_id": "e1f864de1e0edb6a0000000000000001",
+          "state": "complete",
+          "ended_monotonic_ns": "49562325566966",
+          "output_active": false
+        },
+        {
+          "job_id": "3f2c376db1445b850000000000000009",
+          "state": "complete",
+          "ended_monotonic_ns": "49442300408342",
+          "output_active": false
+        },
+        {
+          "job_id": "3f2c376db1445b850000000000000008",
+          "state": "complete",
+          "ended_monotonic_ns": "49322319158053",
+          "output_active": false
+        },
+        {
+          "job_id": "3f2c376db1445b850000000000000007",
+          "state": "complete",
+          "ended_monotonic_ns": "49202312934083",
+          "output_active": false
+        },
+        {
+          "job_id": "3f2c376db1445b850000000000000006",
+          "state": "complete",
+          "ended_monotonic_ns": "49082302832436",
+          "output_active": false
+        },
+        {
+          "job_id": "fdf9aa5ece3c71350000000000000001",
+          "state": "complete",
+          "ended_monotonic_ns": "50882296717434",
+          "output_active": false
+        },
+        {
+          "job_id": "fdf9aa5ece3c71350000000000000002",
+          "state": "complete",
+          "ended_monotonic_ns": "51002315238370",
+          "output_active": false
+        },
+        {
+          "job_id": "fdf9aa5ece3c71350000000000000003",
+          "state": "complete",
+          "ended_monotonic_ns": "51122305807177",
+          "output_active": false
+        }
+      ],
+      "observer_errors": [],
+      "identity_errors": [],
+      "owner_and_job_ids_independently_observed": true
+    },
+    "Pico A": {
+      "per_slot_running_counts": {
+        "1790903641": 11,
+        "1790903761": 10,
+        "1790903881": 10
+      },
+      "terminal_records": [],
+      "observer_errors": [],
+      "identity_errors": [],
+      "owner_and_job_ids_independently_observed": false
+    },
+    "Pico B": {
+      "per_slot_running_counts": {
+        "1790903641": 10,
+        "1790903761": 10,
+        "1790903881": 11
+      },
+      "terminal_records": [],
+      "observer_errors": [],
+      "identity_errors": [],
+      "owner_and_job_ids_independently_observed": false
+    }
+  },
+  "observed_running_jobs": [
+    {
+      "name": "wspr1",
+      "device_id": "d133ed890b90f6945b41a235429ff155",
+      "boot_id": "ebb2faf2e0411e0062cd6e342803a182",
+      "job_id": "db771a49eec6c0a10000000000000001",
+      "first_running_utc_ns": "1790903641320966000",
+      "starts": [
+        "1790903641000000000"
+      ],
+      "observations": 12
+    },
+    {
+      "name": "wspr4",
+      "device_id": "f21e530af8a4a210ec57898c0ebd32d2",
+      "boot_id": "19d88d5752e3f3ad9765815d3ccf16eb",
+      "job_id": "fdf9aa5ece3c71350000000000000001",
+      "first_running_utc_ns": "1790903641320966000",
+      "starts": [
+        "1790903641000000000"
+      ],
+      "observations": 12
+    },
+    {
+      "name": "wspr2",
+      "device_id": "e2a4d273f7d8f24f6696f7c6fb95ff11",
+      "boot_id": "32f7459a15ba7af7d29cb3bd45036898",
+      "job_id": "2af17febc868c43d0000000000000001",
+      "first_running_utc_ns": "1790903641320966000",
+      "starts": [
+        "1790903641000000000"
+      ],
+      "observations": 2
+    },
+    {
+      "name": "Pico A",
+      "device_id": "fd6127d11d6aca42a9905fa3fb1bf1d5",
+      "boot_id": "4296284b4460bb4578b4637ac020a590",
+      "job_id": "9bcb9df8232857350000000000000001",
+      "first_running_utc_ns": "1790903641320966000",
+      "starts": [
+        "1790903641000000000"
+      ],
+      "observations": 12
+    },
+    {
+      "name": "Pico B",
+      "device_id": "29f20b7342051ef947aa56cb9d4fab42",
+      "boot_id": "2f4f322f3311d9bf58bab0c9228b67a7",
+      "job_id": "479e83e9e02bb7760000000000000001",
+      "first_running_utc_ns": "1790903641320966000",
+      "starts": [
+        "1790903641000000000"
+      ],
+      "observations": 12
+    },
+    {
+      "name": "wspr1",
+      "device_id": "d133ed890b90f6945b41a235429ff155",
+      "boot_id": "ebb2faf2e0411e0062cd6e342803a182",
+      "job_id": "db771a49eec6c0a10000000000000002",
+      "first_running_utc_ns": "1790903761409569000",
+      "starts": [
+        "1790903761000000000"
+      ],
+      "observations": 12
+    },
+    {
+      "name": "wspr4",
+      "device_id": "f21e530af8a4a210ec57898c0ebd32d2",
+      "boot_id": "19d88d5752e3f3ad9765815d3ccf16eb",
+      "job_id": "fdf9aa5ece3c71350000000000000002",
+      "first_running_utc_ns": "1790903761409569000",
+      "starts": [
+        "1790903761000000000"
+      ],
+      "observations": 12
+    },
+    {
+      "name": "wspr2",
+      "device_id": "e2a4d273f7d8f24f6696f7c6fb95ff11",
+      "boot_id": "2828f3638d16bdbdf0704fc7445c81ff",
+      "job_id": "7130863abf971fed0000000000000001",
+      "first_running_utc_ns": "1790903761409569000",
+      "starts": [
+        "1790903761000000000"
+      ],
+      "observations": 12
+    },
+    {
+      "name": "Pico A",
+      "device_id": "fd6127d11d6aca42a9905fa3fb1bf1d5",
+      "boot_id": "4296284b4460bb4578b4637ac020a590",
+      "job_id": "9bcb9df8232857350000000000000002",
+      "first_running_utc_ns": "1790903761409569000",
+      "starts": [
+        "1790903761000000000"
+      ],
+      "observations": 12
+    },
+    {
+      "name": "Pico B",
+      "device_id": "29f20b7342051ef947aa56cb9d4fab42",
+      "boot_id": "2f4f322f3311d9bf58bab0c9228b67a7",
+      "job_id": "479e83e9e02bb7760000000000000002",
+      "first_running_utc_ns": "1790903761409569000",
+      "starts": [
+        "1790903761000000000"
+      ],
+      "observations": 12
+    },
+    {
+      "name": "wspr1",
+      "device_id": "d133ed890b90f6945b41a235429ff155",
+      "boot_id": "ebb2faf2e0411e0062cd6e342803a182",
+      "job_id": "db771a49eec6c0a10000000000000003",
+      "first_running_utc_ns": "1790903881695580000",
+      "starts": [
+        "1790903881000000000"
+      ],
+      "observations": 12
+    },
+    {
+      "name": "wspr4",
+      "device_id": "f21e530af8a4a210ec57898c0ebd32d2",
+      "boot_id": "19d88d5752e3f3ad9765815d3ccf16eb",
+      "job_id": "fdf9aa5ece3c71350000000000000003",
+      "first_running_utc_ns": "1790903881695580000",
+      "starts": [
+        "1790903881000000000"
+      ],
+      "observations": 12
+    },
+    {
+      "name": "wspr2",
+      "device_id": "e2a4d273f7d8f24f6696f7c6fb95ff11",
+      "boot_id": "2828f3638d16bdbdf0704fc7445c81ff",
+      "job_id": "7130863abf971fed0000000000000002",
+      "first_running_utc_ns": "1790903881695580000",
+      "starts": [
+        "1790903881000000000"
+      ],
+      "observations": 12
+    },
+    {
+      "name": "Pico A",
+      "device_id": "fd6127d11d6aca42a9905fa3fb1bf1d5",
+      "boot_id": "4296284b4460bb4578b4637ac020a590",
+      "job_id": "9bcb9df8232857350000000000000003",
+      "first_running_utc_ns": "1790903881695580000",
+      "starts": [
+        "1790903881000000000"
+      ],
+      "observations": 12
+    },
+    {
+      "name": "Pico B",
+      "device_id": "29f20b7342051ef947aa56cb9d4fab42",
+      "boot_id": "2f4f322f3311d9bf58bab0c9228b67a7",
+      "job_id": "479e83e9e02bb7760000000000000003",
+      "first_running_utc_ns": "1790903881695580000",
+      "starts": [
+        "1790903881000000000"
+      ],
+      "observations": 12
+    }
+  ],
+  "observed_reports": [
+    {
+      "adjustments": [
+        {
+          "event_index": 0,
+          "realized_frequency_nhz": "14101100000000717",
+          "requested_frequency_nhz": "14101100000000000"
+        }
+      ],
+      "arm_handed_off": true,
+      "dispatch_utc_ns": "1790903626000000000",
+      "error": "Transport read failed or closed Cleanup failed: Transport read failed or closed",
+      "execution": {
+        "cleanup": {
+          "error": "Transport read failed or closed",
+          "ok": false
+        },
+        "cleanup_attempted": true,
+        "error": "Transport read failed or closed Cleanup failed: Transport read failed or closed",
+        "faulted": true,
+        "ok": false,
+        "stopped": false
+      },
+      "identity": {
+        "boot_id": "32f7459a15ba7af7d29cb3bd45036898",
+        "device_id": "e2a4d273f7d8f24f6696f7c6fb95ff11",
+        "firmware_version": "3.2.0-devel+2f67b00",
+        "product": "WsprryPi"
+      },
+      "job": null,
+      "job_id": "2af17febc868c43d0000000000000001",
+      "outcome": "blocked",
+      "reload_deferred": false,
+      "request_id": "1",
+      "skipped": false,
+      "start_utc_ns": "1790903641000000000"
+    },
+    {
+      "adjustments": [
+        {
+          "event_index": 0,
+          "realized_frequency_nhz": "14098100000007560",
+          "requested_frequency_nhz": "14098100000000000"
+        }
+      ],
+      "arm_handed_off": true,
+      "dispatch_utc_ns": "1790903626000000000",
+      "error": "",
+      "execution": {
+        "cleanup": {
+          "error": "",
+          "ok": true
+        },
+        "cleanup_attempted": true,
+        "error": "",
+        "faulted": false,
+        "ok": true,
+        "stopped": false
+      },
+      "identity": {
+        "boot_id": "19d88d5752e3f3ad9765815d3ccf16eb",
+        "device_id": "f21e530af8a4a210ec57898c0ebd32d2",
+        "firmware_version": "3.2.0-devel+2f67b00",
+        "product": "WsprryPi"
+      },
+      "job": {
+        "authoritative": true,
+        "boot_id": "19d88d5752e3f3ad9765815d3ccf16eb",
+        "device_id": "f21e530af8a4a210ec57898c0ebd32d2",
+        "device_output_active": false,
+        "job_id": "fdf9aa5ece3c71350000000000000001",
+        "output_active": false,
+        "state": "complete"
+      },
+      "job_id": "fdf9aa5ece3c71350000000000000001",
+      "outcome": "complete",
+      "reload_deferred": false,
+      "request_id": "1",
+      "skipped": false,
+      "start_utc_ns": "1790903641000000000"
+    },
+    {
+      "adjustments": [
+        {
+          "event_index": 0,
+          "realized_frequency_nhz": "14099100000005812",
+          "requested_frequency_nhz": "14099100000000000"
+        }
+      ],
+      "arm_handed_off": true,
+      "dispatch_utc_ns": "1790903626000000000",
+      "error": "",
+      "execution": {
+        "cleanup": {
+          "error": "",
+          "ok": true
+        },
+        "cleanup_attempted": true,
+        "error": "",
+        "faulted": false,
+        "ok": true,
+        "stopped": false
+      },
+      "identity": {
+        "boot_id": "ebb2faf2e0411e0062cd6e342803a182",
+        "device_id": "d133ed890b90f6945b41a235429ff155",
+        "firmware_version": "3.2.0-devel+6a32789",
+        "product": "WsprryPi"
+      },
+      "job": {
+        "authoritative": true,
+        "boot_id": "ebb2faf2e0411e0062cd6e342803a182",
+        "device_id": "d133ed890b90f6945b41a235429ff155",
+        "device_output_active": false,
+        "job_id": "db771a49eec6c0a10000000000000001",
+        "output_active": false,
+        "state": "complete"
+      },
+      "job_id": "db771a49eec6c0a10000000000000001",
+      "outcome": "complete",
+      "reload_deferred": false,
+      "request_id": "1",
+      "skipped": false,
+      "start_utc_ns": "1790903641000000000"
+    },
+    {
+      "adjustments": [
+        {
+          "event_index": 0,
+          "realized_frequency_nhz": "14100099989678711",
+          "requested_frequency_nhz": "14100100000000000"
+        }
+      ],
+      "arm_handed_off": true,
+      "dispatch_utc_ns": "1790903627900000000",
+      "error": "",
+      "execution": {
+        "cleanup": {
+          "error": "",
+          "ok": true
+        },
+        "cleanup_attempted": true,
+        "error": "",
+        "faulted": false,
+        "ok": true,
+        "stopped": false
+      },
+      "identity": {
+        "boot_id": "4296284b4460bb4578b4637ac020a590",
+        "device_id": "fd6127d11d6aca42a9905fa3fb1bf1d5",
+        "firmware_version": "0.0.0-devel",
+        "product": "WsprryPico"
+      },
+      "job": {
+        "authoritative": true,
+        "boot_id": "4296284b4460bb4578b4637ac020a590",
+        "device_id": "fd6127d11d6aca42a9905fa3fb1bf1d5",
+        "device_output_active": false,
+        "job_id": "9bcb9df8232857350000000000000001",
+        "output_active": false,
+        "state": "complete"
+      },
+      "job_id": "9bcb9df8232857350000000000000001",
+      "outcome": "complete",
+      "reload_deferred": false,
+      "request_id": "1",
+      "skipped": false,
+      "start_utc_ns": "1790903641000000000"
+    },
+    {
+      "adjustments": [
+        {
+          "event_index": 0,
+          "realized_frequency_nhz": "14102099992800504",
+          "requested_frequency_nhz": "14102100000000000"
+        }
+      ],
+      "arm_handed_off": true,
+      "dispatch_utc_ns": "1790903627900000000",
+      "error": "",
+      "execution": {
+        "cleanup": {
+          "error": "",
+          "ok": true
+        },
+        "cleanup_attempted": true,
+        "error": "",
+        "faulted": false,
+        "ok": true,
+        "stopped": false
+      },
+      "identity": {
+        "boot_id": "2f4f322f3311d9bf58bab0c9228b67a7",
+        "device_id": "29f20b7342051ef947aa56cb9d4fab42",
+        "firmware_version": "0.0.0-devel",
+        "product": "WsprryPico"
+      },
+      "job": {
+        "authoritative": true,
+        "boot_id": "2f4f322f3311d9bf58bab0c9228b67a7",
+        "device_id": "29f20b7342051ef947aa56cb9d4fab42",
+        "device_output_active": false,
+        "job_id": "479e83e9e02bb7760000000000000001",
+        "output_active": false,
+        "state": "complete"
+      },
+      "job_id": "479e83e9e02bb7760000000000000001",
+      "outcome": "complete",
+      "reload_deferred": false,
+      "request_id": "1",
+      "skipped": false,
+      "start_utc_ns": "1790903641000000000"
+    },
+    {
+      "adjustments": [
+        {
+          "event_index": 0,
+          "realized_frequency_nhz": "14099100000005812",
+          "requested_frequency_nhz": "14099100000000000"
+        }
+      ],
+      "arm_handed_off": true,
+      "dispatch_utc_ns": "1790903746000000000",
+      "error": "",
+      "execution": {
+        "cleanup": {
+          "error": "",
+          "ok": true
+        },
+        "cleanup_attempted": true,
+        "error": "",
+        "faulted": false,
+        "ok": true,
+        "stopped": false
+      },
+      "identity": {
+        "boot_id": "ebb2faf2e0411e0062cd6e342803a182",
+        "device_id": "d133ed890b90f6945b41a235429ff155",
+        "firmware_version": "3.2.0-devel+6a32789",
+        "product": "WsprryPi"
+      },
+      "job": {
+        "authoritative": true,
+        "boot_id": "ebb2faf2e0411e0062cd6e342803a182",
+        "device_id": "d133ed890b90f6945b41a235429ff155",
+        "device_output_active": false,
+        "job_id": "db771a49eec6c0a10000000000000002",
+        "output_active": false,
+        "state": "complete"
+      },
+      "job_id": "db771a49eec6c0a10000000000000002",
+      "outcome": "complete",
+      "reload_deferred": false,
+      "request_id": "2",
+      "skipped": false,
+      "start_utc_ns": "1790903761000000000"
+    },
+    {
+      "adjustments": [
+        {
+          "event_index": 0,
+          "realized_frequency_nhz": "14098100000007560",
+          "requested_frequency_nhz": "14098100000000000"
+        }
+      ],
+      "arm_handed_off": true,
+      "dispatch_utc_ns": "1790903746000000000",
+      "error": "",
+      "execution": {
+        "cleanup": {
+          "error": "",
+          "ok": true
+        },
+        "cleanup_attempted": true,
+        "error": "",
+        "faulted": false,
+        "ok": true,
+        "stopped": false
+      },
+      "identity": {
+        "boot_id": "19d88d5752e3f3ad9765815d3ccf16eb",
+        "device_id": "f21e530af8a4a210ec57898c0ebd32d2",
+        "firmware_version": "3.2.0-devel+2f67b00",
+        "product": "WsprryPi"
+      },
+      "job": {
+        "authoritative": true,
+        "boot_id": "19d88d5752e3f3ad9765815d3ccf16eb",
+        "device_id": "f21e530af8a4a210ec57898c0ebd32d2",
+        "device_output_active": false,
+        "job_id": "fdf9aa5ece3c71350000000000000002",
+        "output_active": false,
+        "state": "complete"
+      },
+      "job_id": "fdf9aa5ece3c71350000000000000002",
+      "outcome": "complete",
+      "reload_deferred": false,
+      "request_id": "2",
+      "skipped": false,
+      "start_utc_ns": "1790903761000000000"
+    },
+    {
+      "adjustments": [
+        {
+          "event_index": 0,
+          "realized_frequency_nhz": "14101100000000717",
+          "requested_frequency_nhz": "14101100000000000"
+        }
+      ],
+      "arm_handed_off": true,
+      "dispatch_utc_ns": "1790903746000000000",
+      "error": "",
+      "execution": {
+        "cleanup": {
+          "error": "",
+          "ok": true
+        },
+        "cleanup_attempted": true,
+        "error": "",
+        "faulted": false,
+        "ok": true,
+        "stopped": false
+      },
+      "identity": {
+        "boot_id": "2828f3638d16bdbdf0704fc7445c81ff",
+        "device_id": "e2a4d273f7d8f24f6696f7c6fb95ff11",
+        "firmware_version": "3.2.0-devel+2f67b00",
+        "product": "WsprryPi"
+      },
+      "job": {
+        "authoritative": true,
+        "boot_id": "2828f3638d16bdbdf0704fc7445c81ff",
+        "device_id": "e2a4d273f7d8f24f6696f7c6fb95ff11",
+        "device_output_active": false,
+        "job_id": "7130863abf971fed0000000000000001",
+        "output_active": false,
+        "state": "complete"
+      },
+      "job_id": "7130863abf971fed0000000000000001",
+      "outcome": "complete",
+      "reload_deferred": false,
+      "request_id": "1",
+      "skipped": false,
+      "start_utc_ns": "1790903761000000000"
+    },
+    {
+      "adjustments": [
+        {
+          "event_index": 0,
+          "realized_frequency_nhz": "14100099989678711",
+          "requested_frequency_nhz": "14100100000000000"
+        }
+      ],
+      "arm_handed_off": true,
+      "dispatch_utc_ns": "1790903747900000000",
+      "error": "",
+      "execution": {
+        "cleanup": {
+          "error": "",
+          "ok": true
+        },
+        "cleanup_attempted": true,
+        "error": "",
+        "faulted": false,
+        "ok": true,
+        "stopped": false
+      },
+      "identity": {
+        "boot_id": "4296284b4460bb4578b4637ac020a590",
+        "device_id": "fd6127d11d6aca42a9905fa3fb1bf1d5",
+        "firmware_version": "0.0.0-devel",
+        "product": "WsprryPico"
+      },
+      "job": {
+        "authoritative": true,
+        "boot_id": "4296284b4460bb4578b4637ac020a590",
+        "device_id": "fd6127d11d6aca42a9905fa3fb1bf1d5",
+        "device_output_active": false,
+        "job_id": "9bcb9df8232857350000000000000002",
+        "output_active": false,
+        "state": "complete"
+      },
+      "job_id": "9bcb9df8232857350000000000000002",
+      "outcome": "complete",
+      "reload_deferred": false,
+      "request_id": "2",
+      "skipped": false,
+      "start_utc_ns": "1790903761000000000"
+    },
+    {
+      "adjustments": [
+        {
+          "event_index": 0,
+          "realized_frequency_nhz": "14102099992800504",
+          "requested_frequency_nhz": "14102100000000000"
+        }
+      ],
+      "arm_handed_off": true,
+      "dispatch_utc_ns": "1790903747900000000",
+      "error": "",
+      "execution": {
+        "cleanup": {
+          "error": "",
+          "ok": true
+        },
+        "cleanup_attempted": true,
+        "error": "",
+        "faulted": false,
+        "ok": true,
+        "stopped": false
+      },
+      "identity": {
+        "boot_id": "2f4f322f3311d9bf58bab0c9228b67a7",
+        "device_id": "29f20b7342051ef947aa56cb9d4fab42",
+        "firmware_version": "0.0.0-devel",
+        "product": "WsprryPico"
+      },
+      "job": {
+        "authoritative": true,
+        "boot_id": "2f4f322f3311d9bf58bab0c9228b67a7",
+        "device_id": "29f20b7342051ef947aa56cb9d4fab42",
+        "device_output_active": false,
+        "job_id": "479e83e9e02bb7760000000000000002",
+        "output_active": false,
+        "state": "complete"
+      },
+      "job_id": "479e83e9e02bb7760000000000000002",
+      "outcome": "complete",
+      "reload_deferred": false,
+      "request_id": "2",
+      "skipped": false,
+      "start_utc_ns": "1790903761000000000"
+    },
+    {
+      "adjustments": [
+        {
+          "event_index": 0,
+          "realized_frequency_nhz": "14099100000005812",
+          "requested_frequency_nhz": "14099100000000000"
+        }
+      ],
+      "arm_handed_off": true,
+      "dispatch_utc_ns": "1790903866000000000",
+      "error": "",
+      "execution": {
+        "cleanup": {
+          "error": "",
+          "ok": true
+        },
+        "cleanup_attempted": true,
+        "error": "",
+        "faulted": false,
+        "ok": true,
+        "stopped": false
+      },
+      "identity": {
+        "boot_id": "ebb2faf2e0411e0062cd6e342803a182",
+        "device_id": "d133ed890b90f6945b41a235429ff155",
+        "firmware_version": "3.2.0-devel+6a32789",
+        "product": "WsprryPi"
+      },
+      "job": {
+        "authoritative": true,
+        "boot_id": "ebb2faf2e0411e0062cd6e342803a182",
+        "device_id": "d133ed890b90f6945b41a235429ff155",
+        "device_output_active": false,
+        "job_id": "db771a49eec6c0a10000000000000003",
+        "output_active": false,
+        "state": "complete"
+      },
+      "job_id": "db771a49eec6c0a10000000000000003",
+      "outcome": "complete",
+      "reload_deferred": false,
+      "request_id": "3",
+      "skipped": false,
+      "start_utc_ns": "1790903881000000000"
+    },
+    {
+      "adjustments": [
+        {
+          "event_index": 0,
+          "realized_frequency_nhz": "14098100000007560",
+          "requested_frequency_nhz": "14098100000000000"
+        }
+      ],
+      "arm_handed_off": true,
+      "dispatch_utc_ns": "1790903866000000000",
+      "error": "",
+      "execution": {
+        "cleanup": {
+          "error": "",
+          "ok": true
+        },
+        "cleanup_attempted": true,
+        "error": "",
+        "faulted": false,
+        "ok": true,
+        "stopped": false
+      },
+      "identity": {
+        "boot_id": "19d88d5752e3f3ad9765815d3ccf16eb",
+        "device_id": "f21e530af8a4a210ec57898c0ebd32d2",
+        "firmware_version": "3.2.0-devel+2f67b00",
+        "product": "WsprryPi"
+      },
+      "job": {
+        "authoritative": true,
+        "boot_id": "19d88d5752e3f3ad9765815d3ccf16eb",
+        "device_id": "f21e530af8a4a210ec57898c0ebd32d2",
+        "device_output_active": false,
+        "job_id": "fdf9aa5ece3c71350000000000000003",
+        "output_active": false,
+        "state": "complete"
+      },
+      "job_id": "fdf9aa5ece3c71350000000000000003",
+      "outcome": "complete",
+      "reload_deferred": false,
+      "request_id": "3",
+      "skipped": false,
+      "start_utc_ns": "1790903881000000000"
+    },
+    {
+      "adjustments": [
+        {
+          "event_index": 0,
+          "realized_frequency_nhz": "14101100000000717",
+          "requested_frequency_nhz": "14101100000000000"
+        }
+      ],
+      "arm_handed_off": true,
+      "dispatch_utc_ns": "1790903866000000000",
+      "error": "",
+      "execution": {
+        "cleanup": {
+          "error": "",
+          "ok": true
+        },
+        "cleanup_attempted": true,
+        "error": "",
+        "faulted": false,
+        "ok": true,
+        "stopped": false
+      },
+      "identity": {
+        "boot_id": "2828f3638d16bdbdf0704fc7445c81ff",
+        "device_id": "e2a4d273f7d8f24f6696f7c6fb95ff11",
+        "firmware_version": "3.2.0-devel+2f67b00",
+        "product": "WsprryPi"
+      },
+      "job": {
+        "authoritative": true,
+        "boot_id": "2828f3638d16bdbdf0704fc7445c81ff",
+        "device_id": "e2a4d273f7d8f24f6696f7c6fb95ff11",
+        "device_output_active": false,
+        "job_id": "7130863abf971fed0000000000000002",
+        "output_active": false,
+        "state": "complete"
+      },
+      "job_id": "7130863abf971fed0000000000000002",
+      "outcome": "complete",
+      "reload_deferred": false,
+      "request_id": "2",
+      "skipped": false,
+      "start_utc_ns": "1790903881000000000"
+    },
+    {
+      "adjustments": [
+        {
+          "event_index": 0,
+          "realized_frequency_nhz": "14100099989678711",
+          "requested_frequency_nhz": "14100100000000000"
+        }
+      ],
+      "arm_handed_off": true,
+      "dispatch_utc_ns": "1790903867900000000",
+      "error": "",
+      "execution": {
+        "cleanup": {
+          "error": "",
+          "ok": true
+        },
+        "cleanup_attempted": true,
+        "error": "",
+        "faulted": false,
+        "ok": true,
+        "stopped": false
+      },
+      "identity": {
+        "boot_id": "4296284b4460bb4578b4637ac020a590",
+        "device_id": "fd6127d11d6aca42a9905fa3fb1bf1d5",
+        "firmware_version": "0.0.0-devel",
+        "product": "WsprryPico"
+      },
+      "job": {
+        "authoritative": true,
+        "boot_id": "4296284b4460bb4578b4637ac020a590",
+        "device_id": "fd6127d11d6aca42a9905fa3fb1bf1d5",
+        "device_output_active": false,
+        "job_id": "9bcb9df8232857350000000000000003",
+        "output_active": false,
+        "state": "complete"
+      },
+      "job_id": "9bcb9df8232857350000000000000003",
+      "outcome": "complete",
+      "reload_deferred": false,
+      "request_id": "3",
+      "skipped": false,
+      "start_utc_ns": "1790903881000000000"
+    },
+    {
+      "adjustments": [
+        {
+          "event_index": 0,
+          "realized_frequency_nhz": "14102099992800504",
+          "requested_frequency_nhz": "14102100000000000"
+        }
+      ],
+      "arm_handed_off": true,
+      "dispatch_utc_ns": "1790903867900000000",
+      "error": "",
+      "execution": {
+        "cleanup": {
+          "error": "",
+          "ok": true
+        },
+        "cleanup_attempted": true,
+        "error": "",
+        "faulted": false,
+        "ok": true,
+        "stopped": false
+      },
+      "identity": {
+        "boot_id": "2f4f322f3311d9bf58bab0c9228b67a7",
+        "device_id": "29f20b7342051ef947aa56cb9d4fab42",
+        "firmware_version": "0.0.0-devel",
+        "product": "WsprryPico"
+      },
+      "job": {
+        "authoritative": true,
+        "boot_id": "2f4f322f3311d9bf58bab0c9228b67a7",
+        "device_id": "29f20b7342051ef947aa56cb9d4fab42",
+        "device_output_active": false,
+        "job_id": "479e83e9e02bb7760000000000000003",
+        "output_active": false,
+        "state": "complete"
+      },
+      "job_id": "479e83e9e02bb7760000000000000003",
+      "outcome": "complete",
+      "reload_deferred": false,
+      "request_id": "3",
+      "skipped": false,
+      "start_utc_ns": "1790903881000000000"
+    },
+    {
+      "adjustments": [],
+      "arm_handed_off": false,
+      "dispatch_utc_ns": "1790903986000000000",
+      "error": "Pending WTP request stopped before preparation",
+      "execution": {
+        "cleanup": null,
+        "cleanup_attempted": false,
+        "error": "",
+        "faulted": false,
+        "ok": false,
+        "stopped": false
+      },
+      "identity": {
+        "boot_id": "ebb2faf2e0411e0062cd6e342803a182",
+        "device_id": "d133ed890b90f6945b41a235429ff155",
+        "firmware_version": "3.2.0-devel+6a32789",
+        "product": "WsprryPi"
+      },
+      "job": null,
+      "job_id": "db771a49eec6c0a10000000000000004",
+      "outcome": "cancelled",
+      "reload_deferred": false,
+      "request_id": "4",
+      "skipped": false,
+      "start_utc_ns": "1790904001000000000"
+    },
+    {
+      "adjustments": [],
+      "arm_handed_off": false,
+      "dispatch_utc_ns": "1790903986000000000",
+      "error": "Pending WTP request stopped before preparation",
+      "execution": {
+        "cleanup": null,
+        "cleanup_attempted": false,
+        "error": "",
+        "faulted": false,
+        "ok": false,
+        "stopped": false
+      },
+      "identity": {
+        "boot_id": "19d88d5752e3f3ad9765815d3ccf16eb",
+        "device_id": "f21e530af8a4a210ec57898c0ebd32d2",
+        "firmware_version": "3.2.0-devel+2f67b00",
+        "product": "WsprryPi"
+      },
+      "job": null,
+      "job_id": "fdf9aa5ece3c71350000000000000004",
+      "outcome": "cancelled",
+      "reload_deferred": false,
+      "request_id": "4",
+      "skipped": false,
+      "start_utc_ns": "1790904001000000000"
+    },
+    {
+      "adjustments": [],
+      "arm_handed_off": false,
+      "dispatch_utc_ns": "1790903986000000000",
+      "error": "Pending WTP request stopped before preparation",
+      "execution": {
+        "cleanup": null,
+        "cleanup_attempted": false,
+        "error": "",
+        "faulted": false,
+        "ok": false,
+        "stopped": false
+      },
+      "identity": {
+        "boot_id": "2828f3638d16bdbdf0704fc7445c81ff",
+        "device_id": "e2a4d273f7d8f24f6696f7c6fb95ff11",
+        "firmware_version": "3.2.0-devel+2f67b00",
+        "product": "WsprryPi"
+      },
+      "job": null,
+      "job_id": "7130863abf971fed0000000000000003",
+      "outcome": "cancelled",
+      "reload_deferred": false,
+      "request_id": "3",
+      "skipped": false,
+      "start_utc_ns": "1790904001000000000"
+    },
+    {
+      "adjustments": [],
+      "arm_handed_off": false,
+      "dispatch_utc_ns": "1790903987900000000",
+      "error": "Pending WTP request stopped before preparation",
+      "execution": {
+        "cleanup": null,
+        "cleanup_attempted": false,
+        "error": "",
+        "faulted": false,
+        "ok": false,
+        "stopped": false
+      },
+      "identity": {
+        "boot_id": "4296284b4460bb4578b4637ac020a590",
+        "device_id": "fd6127d11d6aca42a9905fa3fb1bf1d5",
+        "firmware_version": "0.0.0-devel",
+        "product": "WsprryPico"
+      },
+      "job": null,
+      "job_id": "9bcb9df8232857350000000000000004",
+      "outcome": "cancelled",
+      "reload_deferred": false,
+      "request_id": "4",
+      "skipped": false,
+      "start_utc_ns": "1790904001000000000"
+    },
+    {
+      "adjustments": [],
+      "arm_handed_off": false,
+      "dispatch_utc_ns": "1790903987900000000",
+      "error": "Pending WTP request stopped before preparation",
+      "execution": {
+        "cleanup": null,
+        "cleanup_attempted": false,
+        "error": "",
+        "faulted": false,
+        "ok": false,
+        "stopped": false
+      },
+      "identity": {
+        "boot_id": "2f4f322f3311d9bf58bab0c9228b67a7",
+        "device_id": "29f20b7342051ef947aa56cb9d4fab42",
+        "firmware_version": "0.0.0-devel",
+        "product": "WsprryPico"
+      },
+      "job": null,
+      "job_id": "479e83e9e02bb7760000000000000004",
+      "outcome": "cancelled",
+      "reload_deferred": false,
+      "request_id": "4",
+      "skipped": false,
+      "start_utc_ns": "1790904001000000000"
+    }
+  ],
+  "duplicate_slot_jobs": [],
+  "watermark_regressions": [],
+  "unexpected_running": [],
+  "controller_observation_errors": [
+    {
+      "utc_ns": "1790903915553986000",
+      "error": "URLError(ConnectionRefusedError(61, 'Connection refused'))"
+    },
+    {
+      "utc_ns": "1790903916399611000",
+      "error": "URLError(ConnectionRefusedError(61, 'Connection refused'))"
+    }
+  ],
+  "no_duplicate_or_replayed_slot_observed": true,
+  "expected_identity_observed_on_all_outputs": true,
+  "note": "Pico USB INFO reports actual shared JobService state/output; ownership and remote job IDs come from controller protocol records and independent final LAN inspection."
+}

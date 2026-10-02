@@ -103,10 +103,14 @@ unchanged, so source suites and Impeccable rendering were not repeated.
 
 | Area | Remaining agreed work |
 | --- | --- |
-| Fleet recurrence | Repeated scheduling across disconnects/reconnections; three clean concurrent rounds already passed. |
 | Live Fleet browser | Create/edit assignments through the actual browser. Resume/Pause/Remove and both local takeover choices already passed. |
 | Discovery | Link loss, address changes, multihomed recovery and confirmed residual cache expiry using wspr5's Ethernet/WiFi interfaces. |
-| CI | Complete the GCC 13 release build job. The refreshed run for `13ff2c8` has Mac, network/browser, full Linux validation and strict I²C passing; GCC release was canceled. [CI snapshot](wtp-rp1-inbound-results/ci-status.json). |
+| CI | On base `3dd0a79`, Mac, full Linux, strict I²C and GCC 13 release passed. Network/browser failed at “Render network controls with mocked responses.” [Refreshed snapshot](wtp-fleet-reconnection-results/ci-status.json). |
+
+[Physical Fleet reconnection](wtp-fleet-reconnection-report.md) subsequently
+passed the agreed five-target outage/crash/restart campaign after repairing
+changed-boot reconciliation. Actual browser Reconcile also passed. This closes
+Fleet recurrence; it does not qualify the separate Discovery topology changes.
 
 Installed-service, clean-card installation, GPIO4 live recovery/power failure,
 physical takeover/INI/HTTP cancellation, mixed physical Fleet concurrency, both
