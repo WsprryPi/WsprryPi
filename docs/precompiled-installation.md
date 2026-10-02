@@ -40,6 +40,14 @@ Executables built with DNS-SD support use the Avahi runtime libraries
 `libavahi-client3`; its package dependencies provide `libavahi-common3`.
 Avahi development headers are needed only when building from source.
 
+All four repository container recipes install `libavahi-client-dev`. Container
+builds require `pkg-config` to find `avahi-client` before compilation and require
+the executable to directly link both Avahi runtime libraries. The exported
+`elf-dynamic.txt` records these dependencies. A missing dependency fails the
+build; it does not silently produce a binary without DNS-SD discovery. Generic
+source builds retain their optional Avahi support. These checks validate build
+capability and library dependencies, not live discovery or RF operation.
+
 Web packages are installed unless `--no-web` is selected. Optional RP1 GPCLK
 DKMS installation still requires its own compiler, kernel headers, DKMS tools,
 and build-resource checks, even with a precompiled application.

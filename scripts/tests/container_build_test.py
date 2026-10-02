@@ -38,8 +38,8 @@ class ContainerBuildTest(unittest.TestCase):
                     stage = Path(args[-1])
                     for name in module.EVIDENCE:
                         (stage / name).write_text("evidence\n")
-                    if failure == "evidence":
-                        (stage / "elf-header.txt").unlink()
+                    if failure in ("evidence", "avahi-evidence"):
+                        (stage / ("elf-dynamic.txt" if failure == "avahi-evidence" else "elf-header.txt")).unlink()
                     (stage / "wsprrypi").write_bytes(b"binary")
                     if failure == "copy":
                         raise subprocess.CalledProcessError(1, args)
@@ -87,7 +87,7 @@ class ContainerBuildTest(unittest.TestCase):
 
     def test_failed_exports(self):
         for failure in ("copy", "checksum", "target", "collision", "evidence",
-                        "create-interrupt", "copy-interrupt"):
+                        "create-interrupt", "copy-interrupt", "avahi-evidence"):
             with self.subTest(failure=failure):
                 self.exercise("armv6-trixie", failure=failure)
 

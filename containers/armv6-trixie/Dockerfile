@@ -9,7 +9,7 @@ RUN printf '%s\n' 'deb http://archive.raspbian.org/raspbian trixie main contrib 
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
-        build-essential binutils ca-certificates file git libgpiod-dev \
+        build-essential binutils ca-certificates file git libavahi-client-dev libgpiod-dev \
         libssl-dev libsystemd-dev pkg-config python3 \
     && rm -rf /var/lib/apt/lists/*
 

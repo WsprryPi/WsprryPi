@@ -18,7 +18,7 @@ TARGETS = {
 }
 REPO = Path(__file__).resolve().parent.parent
 EVIDENCE = ("file.txt", "elf-header.txt", "elf-attributes.txt", "elf-versions.txt",
-            "shared-libraries.txt", "build-packages.txt", "os-release.txt")
+            "shared-libraries.txt", "build-packages.txt", "os-release.txt", "elf-dynamic.txt")
 
 
 def check_destination(path):

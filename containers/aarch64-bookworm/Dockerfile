@@ -3,7 +3,7 @@ FROM debian:bookworm-slim@sha256:7b140f374b289a7c2befc338f42ebe6441b7ea838a042bb
 ARG DEBIAN_FRONTEND=noninteractive
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
-        build-essential binutils ca-certificates file git libgpiod-dev \
+        build-essential binutils ca-certificates file git libavahi-client-dev libgpiod-dev \
         libssl-dev libsystemd-dev pkg-config python3 \
     && rm -rf /var/lib/apt/lists/*
 

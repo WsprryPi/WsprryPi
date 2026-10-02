@@ -12,6 +12,10 @@ case "$cpu" in
     *) exit 1 ;;
 esac
 git config --global --add safe.directory /workspace
+if ! pkg-config --exists avahi-client; then
+    echo "container build requires Avahi development files (avahi-client)" >&2
+    exit 1
+fi
 make -C src release SUDO= JOBS=4
 mkdir -p /artifact
 cp src/build/bin/wsprrypi /artifact/wsprrypi
@@ -19,6 +23,13 @@ file /artifact/wsprrypi > /artifact/file.txt
 readelf --file-header /artifact/wsprrypi > /artifact/elf-header.txt
 readelf --arch-specific /artifact/wsprrypi > /artifact/elf-attributes.txt
 readelf --version-info /artifact/wsprrypi > /artifact/elf-versions.txt
+readelf --dynamic /artifact/wsprrypi > /artifact/elf-dynamic.txt
+for library in libavahi-client.so.3 libavahi-common.so.3; do
+    if ! grep -E '\(NEEDED\)' /artifact/elf-dynamic.txt | grep -Fq "[$library]"; then
+        echo "container executable must directly link $library" >&2
+        exit 1
+    fi
+done
 case "$cpu" in
     armv6)
         grep -Eq 'Class: +ELF32' /artifact/elf-header.txt

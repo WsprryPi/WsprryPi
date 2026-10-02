@@ -3,7 +3,7 @@ FROM balenalib/raspberry-pi:bookworm-build@sha256:5e44b1697cd34bac1eaf43fbadab44
 ARG DEBIAN_FRONTEND=noninteractive
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
-        build-essential binutils ca-certificates file git libgpiod-dev \
+        build-essential binutils ca-certificates file git libavahi-client-dev libgpiod-dev \
         libssl-dev libsystemd-dev pkg-config python3 \
     && rm -rf /var/lib/apt/lists/*
 

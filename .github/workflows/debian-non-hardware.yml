@@ -38,7 +38,9 @@ jobs:
             wtp-fleet-test BACKENDS=simulated ANCILLARY_GPIO=0 SUDO=
 
       - name: Check container build export handling
-        run: python3 scripts/tests/container_build_test.py
+        run: |
+          python3 scripts/tests/container_build_test.py
+          python3 scripts/tests/container_avahi_contract_test.py
 
   wtp-network-loopback:
     runs-on: ubuntu-24.04
