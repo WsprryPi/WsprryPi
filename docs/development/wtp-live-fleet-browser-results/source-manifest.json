@@ -1,0 +1,10 @@
+{
+  "base_commit": "eb7117eeaab693ba9d94c1c8ede087786797d428",
+  "component": "WsprryPi-UI",
+  "files": {
+    "WsprryPi-UI/data/fleet-schedules.js": "11013bfd44d9a5672192893222ba168db0cd3d312ae3d4de27f9ccc9259cbfcd",
+    "WsprryPi-UI/tests/wtp_pi_fleet_ui_integration_test.js": "12bbc5280f20247094037f3300f12f64ba5826c50ed2a7778a3939919e8f2106"
+  },
+  "installed_asset_matches_reviewed_source": true,
+  "ui_installation_classification": "local modification of existing package"
+}

@@ -1,0 +1,445 @@
+{
+  "network_recording_started_after_baseline_reproduction": true,
+  "exports": {
+    "browser-network.json": {
+      "truncated": false
+    },
+    "secondary-network.json": {
+      "truncated": true
+    },
+    "final-network.json": {
+      "truncated": true
+    }
+  },
+  "commands": [
+    {
+      "request_id": "69464.875",
+      "body": {
+        "operation": "schedule",
+        "device_id": "e2a4d273f7d8f24f6696f7c6fb95ff11",
+        "schedule": {
+          "mode": "tone",
+          "frequency_hz": 14101300,
+          "period_seconds": 120,
+          "phase_seconds": 1,
+          "duration_ms": 6000
+        }
+      },
+      "if_match": "\"749f7bc07ee1483497733f29efdbcdf3dff6068b5d619740629457a0405717ce\"",
+      "response": {
+        "status": 412,
+        "etag": null
+      }
+    },
+    {
+      "request_id": "69464.910",
+      "body": {
+        "operation": "schedule",
+        "device_id": "e2a4d273f7d8f24f6696f7c6fb95ff11",
+        "schedule": {
+          "mode": "tone",
+          "frequency_hz": 14101300,
+          "period_seconds": 120,
+          "phase_seconds": 120,
+          "duration_ms": 9000
+        }
+      },
+      "if_match": "\"a514b5d472a1ef34474b9ad4e1376791415852b629831c3a282f1a40c4e4dccd\"",
+      "response": {
+        "status": 409,
+        "etag": null
+      }
+    },
+    {
+      "request_id": "69464.970",
+      "body": {
+        "operation": "remove",
+        "device_id": "e2a4d273f7d8f24f6696f7c6fb95ff11"
+      },
+      "if_match": "\"a514b5d472a1ef34474b9ad4e1376791415852b629831c3a282f1a40c4e4dccd\"",
+      "response": {
+        "status": 200,
+        "etag": "\"46317dacb8f43cd33893462ab92bb7d0e5f4b539c62d219f9f59256457ca8f95\""
+      }
+    },
+    {
+      "request_id": "69464.978",
+      "body": {
+        "operation": "remove",
+        "device_id": "fd6127d11d6aca42a9905fa3fb1bf1d5"
+      },
+      "if_match": "\"46317dacb8f43cd33893462ab92bb7d0e5f4b539c62d219f9f59256457ca8f95\"",
+      "response": {
+        "status": 200,
+        "etag": "\"f4586e7a5cb9b0bd2bfe3a68dcb070e39b29d23c3adfd7f2ef71bbeae1edeb33\""
+      }
+    },
+    {
+      "request_id": "69464.998",
+      "body": {
+        "operation": "assign",
+        "name": "Concurrent Fleet wspr4",
+        "settings": {
+          "Allow Frequency Adjustment": true,
+          "Device ID": "f21e530af8a4a210ec57898c0ebd32d2",
+          "Endpoint": "",
+          "Hostname": "wtp-f21e530af8a4a210ec57898c0ebd32d2.local",
+          "Start Uncertainty ns": 500000000,
+          "TCP Port": 31417,
+          "TLS CA File": "",
+          "TLS Client Certificate": "",
+          "TLS Client Key": "",
+          "TLS Server Identity": "",
+          "Transport": "network_plain",
+          "USB Product ID": 0,
+          "USB Serial": "",
+          "USB Vendor ID": 0
+        },
+        "schedule": {
+          "mode": "tone",
+          "frequency_hz": 14101100,
+          "period_seconds": 120,
+          "phase_seconds": 1,
+          "duration_ms": 8000
+        },
+        "enabled": false,
+        "consent_plain": true,
+        "management_port": 31415
+      },
+      "if_match": "\"f4586e7a5cb9b0bd2bfe3a68dcb070e39b29d23c3adfd7f2ef71bbeae1edeb33\"",
+      "response": {
+        "status": 409,
+        "etag": null
+      }
+    },
+    {
+      "request_id": "69464.1011",
+      "body": {
+        "operation": "assign",
+        "name": "Concurrent Fleet wspr2",
+        "settings": {
+          "Allow Frequency Adjustment": true,
+          "Device ID": "e2a4d273f7d8f24f6696f7c6fb95ff11",
+          "Endpoint": "",
+          "Hostname": "wtp-e2a4d273f7d8f24f6696f7c6fb95ff11.local",
+          "Start Uncertainty ns": 500000000,
+          "TCP Port": 31417,
+          "TLS CA File": "",
+          "TLS Client Certificate": "",
+          "TLS Client Key": "",
+          "TLS Server Identity": "",
+          "Transport": "network_plain",
+          "USB Product ID": 0,
+          "USB Serial": "",
+          "USB Vendor ID": 0
+        },
+        "schedule": {
+          "mode": "tone",
+          "frequency_hz": 14101100,
+          "period_seconds": 120,
+          "phase_seconds": 1,
+          "duration_ms": 8000
+        },
+        "enabled": false,
+        "consent_plain": true,
+        "management_port": 31415
+      },
+      "if_match": "\"f4586e7a5cb9b0bd2bfe3a68dcb070e39b29d23c3adfd7f2ef71bbeae1edeb33\"",
+      "response": {
+        "status": 200,
+        "etag": "\"12f62f5e326ad19390508e0c39918457e01ce8e9b59da1d028fdb87750fee9d6\""
+      }
+    },
+    {
+      "request_id": "69464.1024",
+      "body": {
+        "operation": "assign",
+        "name": "Concurrent Fleet Pico A",
+        "settings": {
+          "Allow Frequency Adjustment": true,
+          "Device ID": "fd6127d11d6aca42a9905fa3fb1bf1d5",
+          "Endpoint": "",
+          "Hostname": "wsprrypico-0a60df.local",
+          "Start Uncertainty ns": 500000000,
+          "TCP Port": 31417,
+          "TLS CA File": "",
+          "TLS Client Certificate": "",
+          "TLS Client Key": "",
+          "TLS Server Identity": "",
+          "Transport": "network_plain",
+          "USB Product ID": 0,
+          "USB Serial": "",
+          "USB Vendor ID": 0
+        },
+        "schedule": {
+          "mode": "tone",
+          "frequency_hz": 14100100,
+          "period_seconds": 120,
+          "phase_seconds": 1,
+          "duration_ms": 8000
+        },
+        "enabled": false,
+        "consent_plain": true,
+        "management_port": 31415
+      },
+      "if_match": "\"12f62f5e326ad19390508e0c39918457e01ce8e9b59da1d028fdb87750fee9d6\"",
+      "response": {
+        "status": 200,
+        "etag": "\"c3e57a247b5dea00330daee013f478a23a22f34e15887b67948a114a18a68273\""
+      }
+    },
+    {
+      "request_id": "69464.1065",
+      "body": {
+        "operation": "enable",
+        "device_id": "e2a4d273f7d8f24f6696f7c6fb95ff11"
+      },
+      "if_match": "\"c3e57a247b5dea00330daee013f478a23a22f34e15887b67948a114a18a68273\"",
+      "response": {
+        "status": 200,
+        "etag": "\"a526b035c97746d063f89866b52614d3de2825eeb36e894335802a644cf61bc3\""
+      }
+    },
+    {
+      "request_id": "69464.1067",
+      "body": {
+        "operation": "enable",
+        "device_id": "fd6127d11d6aca42a9905fa3fb1bf1d5"
+      },
+      "if_match": "\"a526b035c97746d063f89866b52614d3de2825eeb36e894335802a644cf61bc3\"",
+      "response": {
+        "status": 200,
+        "etag": "\"3c110fde167e147d60d3fe97ad7596456ed010bb6cb8e5b17f786bfa1f19e881\""
+      }
+    },
+    {
+      "request_id": "69464.1184",
+      "body": {
+        "operation": "pause",
+        "device_id": "e2a4d273f7d8f24f6696f7c6fb95ff11"
+      },
+      "if_match": "\"97b1937b72f1b4b4d5c4aa7104823594887b0be38b725ba0d32be7f618bf1732\"",
+      "response": {
+        "status": 200,
+        "etag": "\"1ee51be19dddde050861804f20f44b50cf79ddf2474daedf3b12376b5214f660\""
+      }
+    },
+    {
+      "request_id": "69464.1194",
+      "body": {
+        "operation": "pause",
+        "device_id": "fd6127d11d6aca42a9905fa3fb1bf1d5"
+      },
+      "if_match": "\"1ee51be19dddde050861804f20f44b50cf79ddf2474daedf3b12376b5214f660\"",
+      "response": {
+        "status": 412,
+        "etag": null
+      }
+    },
+    {
+      "request_id": "69464.1219",
+      "body": {
+        "operation": "pause",
+        "device_id": "fd6127d11d6aca42a9905fa3fb1bf1d5"
+      },
+      "if_match": "\"80a2ccedf2c40c787a04c285a88fdbbd3ce0f463e23634bb068454b9874dc719\"",
+      "response": {
+        "status": 200,
+        "etag": "\"0490b080dd349b62ba91422538c5a83073b50b974118a2cf4bdeedde840cd46e\""
+      }
+    },
+    {
+      "request_id": "69464.1224",
+      "body": {
+        "operation": "schedule",
+        "device_id": "e2a4d273f7d8f24f6696f7c6fb95ff11",
+        "schedule": {
+          "mode": "tone",
+          "frequency_hz": 14101300,
+          "period_seconds": 120,
+          "phase_seconds": 13,
+          "duration_ms": 6000
+        }
+      },
+      "if_match": "\"0490b080dd349b62ba91422538c5a83073b50b974118a2cf4bdeedde840cd46e\"",
+      "response": {
+        "status": 200,
+        "etag": "\"df4fa079a93058761a29bb0c78779ce26e32a4678c659ee48999123dd9929e94\""
+      }
+    },
+    {
+      "request_id": "69464.1261",
+      "body": {
+        "operation": "schedule",
+        "device_id": "fd6127d11d6aca42a9905fa3fb1bf1d5",
+        "schedule": {
+          "mode": "tone",
+          "frequency_hz": 14100300,
+          "period_seconds": 120,
+          "phase_seconds": 13,
+          "duration_ms": 6000
+        }
+      },
+      "if_match": "\"0d56102964ae7bfb89588adaac095de54cac5909076bf69c8e8e2343fb04ca92\"",
+      "response": {
+        "status": 200,
+        "etag": "\"0773b4fc2746c9634bc11996dc3f618c51b5cc0b729711b8ceb4feb5d849adbf\""
+      }
+    },
+    {
+      "request_id": "69464.1263",
+      "body": {
+        "operation": "enable",
+        "device_id": "e2a4d273f7d8f24f6696f7c6fb95ff11"
+      },
+      "if_match": "\"0773b4fc2746c9634bc11996dc3f618c51b5cc0b729711b8ceb4feb5d849adbf\"",
+      "response": {
+        "status": 200,
+        "etag": "\"36c41966cc24d92dea150d12cee9e124dd37346659f478ad00199ad581c69ca8\""
+      }
+    },
+    {
+      "request_id": "69464.1265",
+      "body": {
+        "operation": "enable",
+        "device_id": "fd6127d11d6aca42a9905fa3fb1bf1d5"
+      },
+      "if_match": "\"36c41966cc24d92dea150d12cee9e124dd37346659f478ad00199ad581c69ca8\"",
+      "response": {
+        "status": 200,
+        "etag": "\"0cb4bb3971c7883d8a5556c00866a0b7da095f7c680cf6c1b327f55feef515be\""
+      }
+    },
+    {
+      "request_id": "69464.1318",
+      "body": {
+        "operation": "pause",
+        "device_id": "e2a4d273f7d8f24f6696f7c6fb95ff11"
+      },
+      "if_match": "\"bc07eb389ff14928a126a6fa15cdf6e8e2c782648ca9b18fc33dcb63f6c8fe30\"",
+      "response": {
+        "status": 200,
+        "etag": "\"0aea7b4971fe03a4d1d352c418195e126c3c0020263886b4538b3ad1ae4d304b\""
+      }
+    },
+    {
+      "request_id": "69464.1320",
+      "body": {
+        "operation": "pause",
+        "device_id": "fd6127d11d6aca42a9905fa3fb1bf1d5"
+      },
+      "if_match": "\"0aea7b4971fe03a4d1d352c418195e126c3c0020263886b4538b3ad1ae4d304b\"",
+      "response": {
+        "status": 412,
+        "etag": null
+      }
+    },
+    {
+      "request_id": "69464.1439",
+      "body": {
+        "operation": "pause",
+        "device_id": "fd6127d11d6aca42a9905fa3fb1bf1d5"
+      },
+      "if_match": "\"12f3832848d9d0e022a496b89c571170373f522e2fa22f1a7065c69c9cd9b0fc\"",
+      "response": {
+        "status": 200,
+        "etag": "\"493a80014159ef63e326a8be45d148fc53ca16761d4aab199de910ea70e79ddc\""
+      }
+    },
+    {
+      "request_id": "69464.1541",
+      "body": {
+        "operation": "schedule",
+        "device_id": "e2a4d273f7d8f24f6696f7c6fb95ff11",
+        "schedule": {
+          "mode": "tone",
+          "frequency_hz": 14101300,
+          "period_seconds": 120,
+          "phase_seconds": 13,
+          "duration_ms": 7000
+        }
+      },
+      "if_match": "\"d878a932bbe162e750ecad0f5ae6542d9267443d72e2497e94924acb1096e70e\"",
+      "response": {
+        "status": 412,
+        "etag": null
+      }
+    },
+    {
+      "request_id": "69464.1606",
+      "body": {
+        "operation": "schedule",
+        "device_id": "fd6127d11d6aca42a9905fa3fb1bf1d5",
+        "schedule": {
+          "mode": "tone",
+          "frequency_hz": 14100100,
+          "period_seconds": 120,
+          "phase_seconds": 1,
+          "duration_ms": 10000
+        }
+      },
+      "if_match": "\"98b28885668927c9a169d30edc2d5ed824deef69adc4cb928925d2f5dde545c7\"",
+      "response": {
+        "status": 200,
+        "etag": "\"8fb12a3e9a0b1f7ee09a2944e21f19caca66c611f1d12de331fb6e9cbbfd9105\""
+      }
+    },
+    {
+      "request_id": "69464.1706",
+      "body": {
+        "operation": "schedule",
+        "device_id": "fd6127d11d6aca42a9905fa3fb1bf1d5",
+        "schedule": {
+          "mode": "tone",
+          "frequency_hz": 14100100,
+          "period_seconds": 120,
+          "phase_seconds": 1,
+          "duration_ms": 7000
+        }
+      },
+      "if_match": "\"8fb12a3e9a0b1f7ee09a2944e21f19caca66c611f1d12de331fb6e9cbbfd9105\"",
+      "response": {
+        "status": 412,
+        "etag": null
+      }
+    },
+    {
+      "request_id": "69464.1730",
+      "body": {
+        "operation": "schedule",
+        "device_id": "fd6127d11d6aca42a9905fa3fb1bf1d5",
+        "schedule": {
+          "mode": "tone",
+          "frequency_hz": 14100100,
+          "period_seconds": 120,
+          "phase_seconds": 1,
+          "duration_ms": 10000
+        }
+      },
+      "if_match": "\"d693a89e94bd99c322e5a3e772e98b98707d4becd2d71a0fafa667a8dd502bd3\"",
+      "response": {
+        "status": 200,
+        "etag": "\"8fb12a3e9a0b1f7ee09a2944e21f19caca66c611f1d12de331fb6e9cbbfd9105\""
+      }
+    },
+    {
+      "request_id": "73762.1122",
+      "body": {
+        "operation": "schedule",
+        "device_id": "fd6127d11d6aca42a9905fa3fb1bf1d5",
+        "schedule": {
+          "mode": "tone",
+          "frequency_hz": 14100100,
+          "period_seconds": 120,
+          "phase_seconds": 1,
+          "duration_ms": 9000
+        }
+      },
+      "if_match": "\"8fb12a3e9a0b1f7ee09a2944e21f19caca66c611f1d12de331fb6e9cbbfd9105\"",
+      "response": {
+        "status": 200,
+        "etag": "\"d693a89e94bd99c322e5a3e772e98b98707d4becd2d71a0fafa667a8dd502bd3\""
+      }
+    }
+  ]
+}

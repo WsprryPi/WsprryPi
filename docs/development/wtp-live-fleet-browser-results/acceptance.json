@@ -1,0 +1,336 @@
+{
+  "jobs": [
+    {
+      "target": "wspr2",
+      "job_id": "fa17518d28e604450000000000000001",
+      "start_utc_ns": "1790937961000000000",
+      "frequency_hz": 14101100,
+      "duration_seconds": 8,
+      "report": {
+        "adjustments": [
+          {
+            "event_index": 0,
+            "realized_frequency_nhz": "14101100000002138",
+            "requested_frequency_nhz": "14101100000000000"
+          }
+        ],
+        "arm_handed_off": true,
+        "dispatch_utc_ns": "1790937946000000000",
+        "error": "",
+        "execution": {
+          "cleanup": {
+            "error": "",
+            "ok": true
+          },
+          "cleanup_attempted": true,
+          "error": "",
+          "faulted": false,
+          "ok": true,
+          "stopped": false
+        },
+        "identity": {
+          "boot_id": "2828f3638d16bdbdf0704fc7445c81ff",
+          "device_id": "e2a4d273f7d8f24f6696f7c6fb95ff11",
+          "firmware_version": "3.2.0-devel+2f67b00",
+          "product": "WsprryPi"
+        },
+        "job": {
+          "authoritative": true,
+          "boot_id": "2828f3638d16bdbdf0704fc7445c81ff",
+          "device_id": "e2a4d273f7d8f24f6696f7c6fb95ff11",
+          "device_output_active": false,
+          "job_id": "fa17518d28e604450000000000000001",
+          "output_active": false,
+          "state": "complete"
+        },
+        "job_id": "fa17518d28e604450000000000000001",
+        "outcome": "complete",
+        "reload_deferred": false,
+        "request_id": "1",
+        "skipped": false,
+        "start_utc_ns": "1790937961000000000"
+      },
+      "independent_active_observations": 15,
+      "independent_job_id_available": true,
+      "minimum_on_snr_db": 90.50849433795625,
+      "median_on_snr_db": 91.31484315756913,
+      "median_off_snr_db": 7.051706075595224,
+      "median_peak_hz": 14101116.235351562,
+      "corresponding_signal_observed": true
+    },
+    {
+      "target": "Pico A",
+      "job_id": "6916b9651f183f0b0000000000000001",
+      "start_utc_ns": "1790937961000000000",
+      "frequency_hz": 14100100,
+      "duration_seconds": 8,
+      "report": {
+        "adjustments": [
+          {
+            "event_index": 0,
+            "realized_frequency_nhz": "14100099989678711",
+            "requested_frequency_nhz": "14100100000000000"
+          }
+        ],
+        "arm_handed_off": true,
+        "dispatch_utc_ns": "1790937947900000000",
+        "error": "",
+        "execution": {
+          "cleanup": {
+            "error": "",
+            "ok": true
+          },
+          "cleanup_attempted": true,
+          "error": "",
+          "faulted": false,
+          "ok": true,
+          "stopped": false
+        },
+        "identity": {
+          "boot_id": "4296284b4460bb4578b4637ac020a590",
+          "device_id": "fd6127d11d6aca42a9905fa3fb1bf1d5",
+          "firmware_version": "0.0.0-devel",
+          "product": "WsprryPico"
+        },
+        "job": {
+          "authoritative": true,
+          "boot_id": "4296284b4460bb4578b4637ac020a590",
+          "device_id": "fd6127d11d6aca42a9905fa3fb1bf1d5",
+          "device_output_active": false,
+          "job_id": "6916b9651f183f0b0000000000000001",
+          "output_active": false,
+          "state": "complete"
+        },
+        "job_id": "6916b9651f183f0b0000000000000001",
+        "outcome": "complete",
+        "reload_deferred": false,
+        "request_id": "1",
+        "skipped": false,
+        "start_utc_ns": "1790937961000000000"
+      },
+      "independent_active_observations": 9,
+      "independent_job_id_available": false,
+      "minimum_on_snr_db": 44.96458669199849,
+      "median_on_snr_db": 45.62449472254639,
+      "median_off_snr_db": 7.458998538038246,
+      "median_peak_hz": 14100139.672851562,
+      "corresponding_signal_observed": true
+    },
+    {
+      "target": "wspr2",
+      "job_id": "fa17518d28e604450000000000000003",
+      "start_utc_ns": "1790938093000000000",
+      "frequency_hz": 14101300,
+      "duration_seconds": 6,
+      "report": {
+        "adjustments": [
+          {
+            "event_index": 0,
+            "realized_frequency_nhz": "14101300000009945",
+            "requested_frequency_nhz": "14101300000000000"
+          }
+        ],
+        "arm_handed_off": true,
+        "dispatch_utc_ns": "1790938078000000000",
+        "error": "",
+        "execution": {
+          "cleanup": {
+            "error": "",
+            "ok": true
+          },
+          "cleanup_attempted": true,
+          "error": "",
+          "faulted": false,
+          "ok": true,
+          "stopped": false
+        },
+        "identity": {
+          "boot_id": "2828f3638d16bdbdf0704fc7445c81ff",
+          "device_id": "e2a4d273f7d8f24f6696f7c6fb95ff11",
+          "firmware_version": "3.2.0-devel+2f67b00",
+          "product": "WsprryPi"
+        },
+        "job": {
+          "authoritative": true,
+          "boot_id": "2828f3638d16bdbdf0704fc7445c81ff",
+          "device_id": "e2a4d273f7d8f24f6696f7c6fb95ff11",
+          "device_output_active": false,
+          "job_id": "fa17518d28e604450000000000000003",
+          "output_active": false,
+          "state": "complete"
+        },
+        "job_id": "fa17518d28e604450000000000000003",
+        "outcome": "complete",
+        "reload_deferred": false,
+        "request_id": "3",
+        "skipped": false,
+        "start_utc_ns": "1790938093000000000"
+      },
+      "independent_active_observations": 11,
+      "independent_job_id_available": true,
+      "minimum_on_snr_db": 90.88717741904168,
+      "median_on_snr_db": 91.50593515064895,
+      "median_off_snr_db": 8.120738048843691,
+      "median_peak_hz": 14101314.599609375,
+      "corresponding_signal_observed": true
+    },
+    {
+      "target": "Pico A",
+      "job_id": "6916b9651f183f0b0000000000000003",
+      "start_utc_ns": "1790938093000000000",
+      "frequency_hz": 14100300,
+      "duration_seconds": 6,
+      "report": {
+        "adjustments": [
+          {
+            "event_index": 0,
+            "realized_frequency_nhz": "14100300002843142",
+            "requested_frequency_nhz": "14100300000000000"
+          }
+        ],
+        "arm_handed_off": true,
+        "dispatch_utc_ns": "1790938079900000000",
+        "error": "",
+        "execution": {
+          "cleanup": {
+            "error": "",
+            "ok": true
+          },
+          "cleanup_attempted": true,
+          "error": "",
+          "faulted": false,
+          "ok": true,
+          "stopped": false
+        },
+        "identity": {
+          "boot_id": "4296284b4460bb4578b4637ac020a590",
+          "device_id": "fd6127d11d6aca42a9905fa3fb1bf1d5",
+          "firmware_version": "0.0.0-devel",
+          "product": "WsprryPico"
+        },
+        "job": {
+          "authoritative": true,
+          "boot_id": "4296284b4460bb4578b4637ac020a590",
+          "device_id": "fd6127d11d6aca42a9905fa3fb1bf1d5",
+          "device_output_active": false,
+          "job_id": "6916b9651f183f0b0000000000000003",
+          "output_active": false,
+          "state": "complete"
+        },
+        "job_id": "6916b9651f183f0b0000000000000003",
+        "outcome": "complete",
+        "reload_deferred": false,
+        "request_id": "3",
+        "skipped": false,
+        "start_utc_ns": "1790938093000000000"
+      },
+      "independent_active_observations": 6,
+      "independent_job_id_available": false,
+      "minimum_on_snr_db": 44.03895616922679,
+      "median_on_snr_db": 44.61782717300946,
+      "median_off_snr_db": 7.7237761532568365,
+      "median_peak_hz": 14100338.037109375,
+      "corresponding_signal_observed": true
+    }
+  ],
+  "local_off_throughout": true,
+  "capture": {
+    "schema_version": 1,
+    "helper_version": "0.2.0",
+    "evidence_type": "capture_success",
+    "capture_id": "live-fleet-browser",
+    "timestamps": {
+      "helper_start_utc": "2026-10-02T10:44:25.233Z",
+      "configuration_start_utc": "2026-10-02T10:44:25.233Z",
+      "configuration_complete_utc": "2026-10-02T10:44:25.782Z",
+      "first_read_start_utc": "2026-10-02T10:44:25.782Z",
+      "first_read_complete_utc": "2026-10-02T10:44:25.847Z",
+      "retained_capture_start_utc": "2026-10-02T10:44:25.847Z",
+      "retained_capture_complete_utc": "2026-10-02T10:51:55.851Z",
+      "cleanup_start_utc": "2026-10-02T10:52:04.955Z",
+      "cleanup_complete_utc": "2026-10-02T10:52:06.091Z",
+      "helper_complete_utc": "2026-10-02T10:52:06.091Z"
+    },
+    "elapsed_duration_s": 460.8580557150126,
+    "limits": {
+      "read_timeout_us": 500000,
+      "max_elapsed_duration_s": 465,
+      "max_read_calls": 1000000
+    },
+    "requested_device": {
+      "driver": "sdrplay",
+      "serial": "2404058C60"
+    },
+    "resolved_device": {
+      "driver": "sdrplay",
+      "serial": "2404058C60"
+    },
+    "requested_settings": {
+      "format": "CF32",
+      "sample_rate_hz": 250000,
+      "bandwidth_hz": 200000,
+      "center_frequency_hz": 14075100,
+      "gain_db": 20,
+      "channel": 0,
+      "agc": false,
+      "bias_tee": false
+    },
+    "actual_settings": {
+      "format": "CF32",
+      "sample_rate_hz": 250000,
+      "bandwidth_hz": 200000,
+      "center_frequency_hz": 14075100,
+      "gain_db": 20,
+      "channel": 0,
+      "agc": false,
+      "bias_tee": false
+    },
+    "wire_format": {
+      "sample_format": "CF32",
+      "component_type": "IEEE754_binary32",
+      "interleave": "real_imaginary",
+      "byte_order": "little_endian",
+      "bytes_per_complex_sample": 8
+    },
+    "first_read": {
+      "attempted": true,
+      "discarded": true,
+      "sample_count": 8064,
+      "included_in_overflow_and_clipping_statistics": false
+    },
+    "requested_sample_count": 112500000,
+    "retained_sample_count": 112500000,
+    "read_call_count": 13952,
+    "partial_read_count": 13950,
+    "timeout_count": 0,
+    "overflow_count": 0,
+    "clipping": {
+      "threshold": 0.9990000128746033,
+      "sample_count": 0
+    },
+    "output": {
+      "path": "/home/pi/wtp-live-fleet-browser-20261002/browser.cf32",
+      "present": true,
+      "complete": true,
+      "size_bytes": 900000000,
+      "sha256": "917d8b20f289dad4b105ecb624193ff056c31e05647233186ae288ad5926bdbc",
+      "removed_incomplete_size_bytes": 0,
+      "removed_incomplete_sha256": null
+    },
+    "primary_outcome": "success",
+    "primary_failure_cause": null,
+    "failure_causes": [],
+    "cleanup": {
+      "outcome": "verified",
+      "attempted_steps": [
+        "deactivate_stream",
+        "close_stream",
+        "release_device"
+      ],
+      "failed_steps": []
+    },
+    "process_exit_code": 0
+  },
+  "criterion": "Corresponding SDR signal: minimum 30 dB peak over nearby masked noise and median on/off contrast over 15 dB. No calibrated frequency, edge timing or RF-chain qualification.",
+  "all_corresponding_signals_observed": true
+}

@@ -1,0 +1,27 @@
+{
+  "controller": {
+    "rows": 1358,
+    "errors": [
+      {
+        "utc_ns": "1790938486296363234",
+        "error": "URLError(ConnectionRefusedError(111, 'Connection refused'))"
+      }
+    ],
+    "first_utc_ns": "1790937228116421846",
+    "last_utc_ns": "1790938602974599710"
+  },
+  "wspr2": {
+    "rows": 2545,
+    "errors": [],
+    "first_utc_ns": "1790937228275933180",
+    "last_utc_ns": "1790938603112754012",
+    "active_observations": 26
+  },
+  "Pico-A": {
+    "rows": 2267,
+    "errors": [],
+    "first_utc_ns": "1790937228189848830",
+    "last_utc_ns": "1790938602879710832",
+    "active_observations": 16
+  }
+}

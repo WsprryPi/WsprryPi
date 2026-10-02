@@ -1,0 +1,41 @@
+{
+  "source": "Independent controller observations; Network recording was not yet enabled",
+  "schedule_changes": [
+    {
+      "observed_utc_ns": "1790937510794301769",
+      "schedule": {
+        "duration_ms": 10000,
+        "frequency_hz": 14101100,
+        "mode": "tone",
+        "period_seconds": 120,
+        "phase_seconds": 1
+      },
+      "enabled": false,
+      "in_flight": false
+    },
+    {
+      "observed_utc_ns": "1790937528895147851",
+      "schedule": {
+        "duration_ms": 9000,
+        "frequency_hz": 14101100,
+        "mode": "tone",
+        "period_seconds": 120,
+        "phase_seconds": 1
+      },
+      "enabled": false,
+      "in_flight": false
+    },
+    {
+      "observed_utc_ns": "1790937536943547848",
+      "schedule": {
+        "duration_ms": 6000,
+        "frequency_hz": 14101300,
+        "mode": "tone",
+        "period_seconds": 120,
+        "phase_seconds": 1
+      },
+      "enabled": false,
+      "in_flight": false
+    }
+  ]
+}

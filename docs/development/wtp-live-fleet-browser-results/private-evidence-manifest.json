@@ -1,0 +1,88 @@
+{
+  "local": "/private/tmp/wtp-live-fleet-browser-20261002",
+  "remote": "/home/pi/wtp-live-fleet-browser-20261002",
+  "files": {
+    "Pico-A-observations.jsonl": {
+      "size": 1665196,
+      "sha256": "fb89e2d583593c636b9e43c53ac5019b5289fd18fb0862c764a5fa85c1f08987"
+    },
+    "acceptance.json": {
+      "size": 10778,
+      "sha256": "da17c4ffd2b905883ded6e7dd86eb9e356e060741c8d578d230bd34609872225"
+    },
+    "before-devices.json": {
+      "size": 3918,
+      "sha256": "161600b0ea5819f84e47e52c12ea63a04c8e455c6b1f5b75f12e992aade5d4a6"
+    },
+    "before-fleet.json": {
+      "size": 10713,
+      "sha256": "65587850e9b619e62d4f566eee6d99b189c63ad3384d35c2f822062e653f88b0"
+    },
+    "before-hashes.json": {
+      "size": 319,
+      "sha256": "ca8ed3960ce09808f8f92246398be0a2e606b6c4e7b0754142f4595f5f9e1d9c"
+    },
+    "before-restart.json": {
+      "size": 15681,
+      "sha256": "d9bdcea85854ef0d247e582925792611b105d6f26d1c7f00386e453eff5dc496"
+    },
+    "before-wtp-endpoint.json": {
+      "size": 719,
+      "sha256": "19a4ffd384d6c07e3051589618f7ab9149e8fd782d6b726c6d90e538d0221cae"
+    },
+    "browser-capture.json": {
+      "size": 2482,
+      "sha256": "596f9803a53fc2795890210e0c8b5947a33a739b5d9466b0888adc1171712737"
+    },
+    "controller-observations.jsonl": {
+      "size": 13908307,
+      "sha256": "ad325123b612347d89f80b76514ebfb46ebed7671710e8b2a23718391a86bbad"
+    },
+    "created-paused.json": {
+      "size": 10674,
+      "sha256": "8d570f7921815cecd56fd9a7001cc470e07934bbd1ac61eaee72889f31214d5c"
+    },
+    "created-running.json": {
+      "size": 16673,
+      "sha256": "449524c04eb9e7913766d79bd3d5b53ca06c7f3dcfeabb51f4c1ec31817e5d19"
+    },
+    "edited-scheduled.json": {
+      "size": 16677,
+      "sha256": "16ef420dd25f00dbf039fb90f5eb7791789dff8e48fe0dd8017e3ade896a991f"
+    },
+    "evidence.tar.gz": {
+      "size": 790634,
+      "sha256": "dff78d306d39ffd3a43fa202c9ba5902e71e429596f066190ac78f91c05a3dcf"
+    },
+    "restoration.json": {
+      "size": 17342,
+      "sha256": "38bf252c22aa1bf02d3a5a6727733554ec3bf859092dea8884bdd35541851532"
+    },
+    "wspr2-observations.jsonl": {
+      "size": 1286601,
+      "sha256": "ec2b8b0969d6aa5d96b414c7ea3420a514e321d64c80d2865dacde548a334dcb"
+    },
+    "browser-network.json.raw": {
+      "size": 4298547,
+      "sha256": "61288339d82d968d1ca1263247564ce7e48bce39ea2d431ce81ab6d99ee2025c"
+    },
+    "final-network.json.raw": {
+      "size": 611579,
+      "sha256": "3bda487c311c6df572c35f2d8b207b8fced00f45ea5033e3f2885654b1b3cb85"
+    },
+    "secondary-network.json.raw": {
+      "size": 645610,
+      "sha256": "39fe5bd80cc013dffddb3da0423c25e270c9ad5a7befbd7e04ef1416976911b3"
+    }
+  },
+  "raw_iq_retained_remote_only": true,
+  "raw_iq": {
+    "path": "/home/pi/wtp-live-fleet-browser-20261002/browser.cf32",
+    "present": true,
+    "complete": true,
+    "size_bytes": 900000000,
+    "sha256": "917d8b20f289dad4b105ecb624193ff056c31e05647233186ae288ad5926bdbc",
+    "removed_incomplete_size_bytes": 0,
+    "removed_incomplete_sha256": null
+  }
+}

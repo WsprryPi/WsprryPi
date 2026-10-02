@@ -5,7 +5,7 @@
     const url = suffix => (root.WSPRRYPI_PATHS?.sharedApiPath || "/api/v1") + "/host/" + suffix;
     const number = name => Number(byId("fleet-schedule-" + name).value);
     const text = name => byId("fleet-schedule-" + name).value.trim();
-    let data = null, revision = "", profiles = [], editId = "", busy = false, closed = false, visible = false, timer, observedAt = 0, listenerBusy = false;
+    let data = null, revision = "", editorRevision = "", profiles = [], editId = "", busy = false, closed = false, visible = false, timer, observedAt = 0, listenerBusy = false;
     const rows = new Map();
     let pendingConfirmation = null;
     function confirmMutation(operation, assignment, trigger) {
@@ -34,8 +34,8 @@
         const response = await root.fetch(url(suffix), {method, cache: "no-store", signal: AbortSignal.timeout(method === "GET" ? 7000 : 45000),
             ...(body ? {headers: {"Content-Type": "application/json", "X-WsprryPico-Request": "1", "If-Match": etag}, body: JSON.stringify(body)} : {})});
         const value = await response.json();
-        if (!response.ok) throw new Error(response.status === 412 ? "Schedules changed. Refresh and review before trying again."
-            : value.error?.message || value.error?.code || `Request failed (${response.status}).`);
+        if (!response.ok) throw Object.assign(new Error(response.status === 412 ? "Schedules changed. Refresh and review before trying again."
+            : value.error?.message || value.error?.code || `Request failed (${response.status}).`), {status: response.status});
         return {value, etag: response.headers.get("ETag")};
     }
     function createRow(id) {
@@ -162,16 +162,25 @@
         return result;
     }
     async function openEditor(id = "") {
-        if (busy || !visible) return;
-        editId = id;
+        if (closed || busy || !visible || !data) return;
+        const assignment = id ? data.assignments.find(row => row.device_id === id) : null;
+        if (id && (!assignment || assignment.enabled || assignment.in_flight)) return;
+        // Bind the draft to the schedule displayed when it was opened. Status
+        // polling must not silently authorize overwriting another operator.
+        const reviewedRevision = revision;
+        busy = true;clearTimeout(timer);setVisible(visible);
         try {
-            const saved = await fetchJson("devices");profiles = saved.value.profiles.filter(p => !p.legacy_unverified);
+            const saved = await fetchJson("devices");
+            if (closed || !visible) return;
+            const nextProfiles = saved.value.profiles.filter(p => !p.legacy_unverified);
+            if (!id && !nextProfiles.length) {message("Add and identify a device in Known and nearby devices first.");return;}
+            // A failed catalog refresh must leave any existing draft bound to
+            // its original target and revision.
+            profiles = nextProfiles;editId = id;editorRevision = reviewedRevision;
             const selector = byId("fleet-schedule-device");selector.replaceChildren();
             for (const profile of profiles) {const option = root.document.createElement("option");option.value = profile.id;option.textContent = profile.name;selector.append(option);}
-            if (!id && !profiles.length) {message("Add and identify a device in Known and nearby devices first.");return;}
             selector.disabled = !!id;
             if (id) {
-                const assignment = data.assignments.find(row => row.device_id === id);
                 const option = root.document.createElement("option");option.value = "assigned";option.textContent = assignment.name;selector.append(option);selector.value = "assigned";
                 const s = assignment.schedule;
                 for (const [field, key] of [["mode", "mode"], ["frequency", "frequency_hz"], ["period", "period_seconds"], ["phase", "phase_seconds"], ["callsign", "callsign"], ["locator", "locator"], ["power", "power_dbm"], ["message", "message"], ["shift", "shift_hz"]])
@@ -183,8 +192,14 @@
             byId("fleet-schedule-save").textContent = id ? "Save schedule" : "Save assignment";
             byId("fleet-schedule-enabled").checked = false;byId("fleet-schedule-plain").checked = false;
             byId("fleet-schedule-editor").hidden = false;message("", true);modeFields();
-            byId(id ? "fleet-schedule-mode" : "fleet-schedule-device").focus();
         } catch (error) {message(error.message);}
+        finally {
+            busy = false;setVisible(visible);
+            if (!closed && visible) {
+                if (!byId("fleet-schedule-editor").hidden) byId(editId ? "fleet-schedule-mode" : "fleet-schedule-device").focus();
+                load();
+            }
+        }
     }
     async function save() {
         if (busy || !visible) return;
@@ -199,10 +214,13 @@
             management_port: number("management")};
         busy = true;setVisible(visible);message("Checking the output and saving…", true);
         try {
-            const result = await fetchJson("fleet", "POST", command, revision);
+            const result = await fetchJson("fleet", "POST", command, editorRevision);
             data = result.value;revision = result.etag;observedAt = Date.now();byId("fleet-schedule-editor").hidden = true;
             message("Output schedule saved.");byId("fleet-schedule-new").focus();
-        } catch (error) {message(`${error.message} Your draft is preserved.`, true);}
+        } catch (error) {
+            const detail = error.status === 412 ? "Schedules changed. Cancel this draft, reopen the editor, and review the current settings." : error.message;
+            message(`${detail} Your draft is preserved.`, true);
+        }
         finally {busy = false;setVisible(visible);load();}
     }
     let listenerRevision = "";

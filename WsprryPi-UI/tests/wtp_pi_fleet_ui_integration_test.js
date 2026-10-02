@@ -152,13 +152,14 @@ async function main() {
                     if(options.method==='POST'){
                         if(window.__fleetConflict || options.headers['If-Match']!=='"fleet-'+window.__fleetRevision+'"')return reply({error:{code:'revision_conflict'}},412);
                         if(body.operation==='assign')window.__fleet.assignments.push({device_id:body.settings['Device ID'],name:body.name,schedule:body.schedule,settings:body.settings,enabled:body.enabled,in_flight:false});
+                        if(body.operation==='schedule')window.__fleet.assignments.find(row=>row.device_id===body.device_id).schedule=body.schedule;
                         if(body.operation==='pause')Object.assign(window.__fleet.assignments.find(row=>row.device_id===body.device_id),{enabled:false,in_flight:false});
                         if(body.operation==='remove')window.__fleet.assignments=window.__fleet.assignments.filter(row=>row.device_id!==body.device_id);
                         ++window.__fleetRevision;
                     }
                     return reply(window.__fleet,200,'"fleet-'+window.__fleetRevision+'"');
                 }
-                if(path.endsWith('/host/devices'))return reply({scope:'wsprrypi-wtp-catalog/1',version:1,active_id:'',profiles:[{id:'1'.repeat(32),name:'New Pi',method:'manual',discovery_id:'',legacy_unverified:false,settings:window.__settings}]},200,'"catalog-r1"');
+                if(path.endsWith('/host/devices')){if(window.__catalogLoadFailure)throw new Error('Catalog unavailable');return reply({scope:'wsprrypi-wtp-catalog/1',version:1,active_id:'',profiles:[{id:'1'.repeat(32),name:'New Pi',method:'manual',discovery_id:'',legacy_unverified:false,settings:window.__settings}]},200,'"catalog-r1"');}
                 if(path.endsWith('/host/discovery'))return reply({available:true,candidates:[]});
                 if(path.endsWith('/status'))return reply({host:{selected:false,ready:false,phase:'idle',session_phase:'disconnected'}});
                 return reply({});
@@ -185,6 +186,36 @@ async function main() {
         await waitFor(async () => await evaluate('document.getElementById("fleet-schedule-editor").hidden'), 'assignment saved');
         assert.equal(await evaluate('__host.Operation.Transmit'), false);
         assert.equal(await evaluate('__fleet.assignments.length'), 3);
+        // A successful status refresh while a draft is open must not rebase its
+        // If-Match revision. Cover both editing and creating an assignment.
+        for (const editing of [true,false]) {
+            await evaluate(editing
+                ? `Array.from(document.querySelectorAll('#fleet-output-list section'))[1].querySelectorAll('button')[3].click()`
+                : `document.getElementById('fleet-schedule-new').click()`);
+            await waitFor(async()=>await evaluate('!document.getElementById("fleet-schedule-editor").hidden && !document.getElementById("fleet-schedule-save").disabled'),'draft ready');
+            const draftRevision=await evaluate('__fleetRevision');
+            await evaluate(`document.getElementById('fleet-schedule-mode').value='tone';document.getElementById('fleet-schedule-mode').dispatchEvent(new Event('change'));document.getElementById('fleet-schedule-duration').value='6';document.getElementById('fleet-schedule-plain').checked=true;++window.__fleetRevision;document.getElementById('fleet-schedule-refresh').click();`);
+            await waitFor(async()=>await evaluate('__requests.some(r=>r.url.endsWith("/host/fleet")&&r.options.method==="GET"&&window.__fleetRevision>'+draftRevision+')'),'new status revision');
+            await new Promise(resolve=>setTimeout(resolve,100));
+            const before=await evaluate('JSON.stringify(__fleet.assignments)');
+            await evaluate(`document.getElementById('fleet-schedule-save').click()`);
+            await waitFor(async()=>await evaluate('document.getElementById("fleet-schedule-editor-feedback").textContent.includes("draft is preserved")'),'refreshed draft conflict');
+            assert.equal(await evaluate('JSON.stringify(__fleet.assignments)'),before);
+            assert.equal(await evaluate('document.getElementById("fleet-schedule-duration").value'),'6');
+            assert.equal(await evaluate('__requests.filter(r=>r.url.endsWith("/host/fleet")&&r.options.method==="POST").at(-1).options.headers["If-Match"]'),'"fleet-'+draftRevision+'"');
+            await evaluate(`document.getElementById('fleet-schedule-cancel').click()`);
+        }
+        // Opening another editor may fail before its fields are populated.
+        // The still-visible draft must retain its original target authority.
+        await evaluate(`Array.from(document.querySelectorAll('#fleet-output-list section'))[1].querySelectorAll('button')[3].click()`);
+        await waitFor(async()=>await evaluate('!document.getElementById("fleet-schedule-editor").hidden && !document.getElementById("fleet-schedule-save").disabled'),'original target draft');
+        await evaluate(`window.__catalogLoadFailure=true;document.getElementById('fleet-schedule-new').click()`);
+        await waitFor(async()=>await evaluate('document.getElementById("fleet-schedule-feedback").textContent.includes("Catalog unavailable") && !document.getElementById("fleet-schedule-save").disabled'),'failed editor switch');
+        assert.equal(await evaluate('document.getElementById("fleet-schedule-device").value'),'assigned');
+        assert.equal(await evaluate('document.getElementById("fleet-schedule-device").disabled'),true);
+        await evaluate(`window.__catalogLoadFailure=false;document.getElementById('fleet-schedule-save').click()`);
+        await waitFor(async()=>await evaluate('document.getElementById("fleet-schedule-editor").hidden'),'original draft saved');
+        assert.equal(await evaluate('JSON.parse(__requests.filter(r=>r.url.endsWith("/host/fleet")&&r.options.method==="POST").at(-1).options.body).device_id'),'e'.repeat(32));
         const viewports=[{name:'desktop',width:1280,height:900},{name:'mobile',width:390,height:844}];
         async function capture(section, element) {
             for(const viewport of viewports){
