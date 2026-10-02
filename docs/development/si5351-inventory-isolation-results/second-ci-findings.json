@@ -1,0 +1,19 @@
+{
+  "source_commit": "3bee3193aa02390fd3a89a3c71fa77aed50972ee",
+  "run_url": "https://github.com/WsprryPi/WsprryPi/actions/runs/37016920733",
+  "strict_i2c_profile": "success",
+  "wtp_network_loopback": "success",
+  "non_hardware_validation": "success",
+  "macos_portable_semantics": "success",
+  "macos_wtp_stage": {
+    "job_id": 110869946410,
+    "failure": "later RF-on completes in fixed-sleep tone-engine fixture"
+  },
+  "release_profile_state_at_capture": "in_progress",
+  "linux_tone_validation": {
+    "make_target": "wtp-pi-tone-engine-test",
+    "backend_profile": "simulated; ANCILLARY_GPIO=0",
+    "make_target_passed": true,
+    "additional_executable_runs_passed": 5
+  }
+}

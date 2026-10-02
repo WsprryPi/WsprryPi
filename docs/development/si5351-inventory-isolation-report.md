@@ -43,6 +43,7 @@ application code in `src/`.
 | wspr5: `WSPRRYPI_DISABLE_HARDWARE_ACCESS=1 make -j2 JOBS=2 si5351-inventory-isolation-test SUDO=` | Passed for both initial logging states. |
 | wspr5: `WSPRRYPI_DISABLE_HARDWARE_ACCESS=1 make -j2 JOBS=2 release backend-profile-factory-test BACKENDS=si5351 ANCILLARY_GPIO=0 SUDO=` | Passed, GPIO-free profile. |
 | Strict profile and file-access scripts run as `pi` inside `sudo unshare --net -- runuser -u pi -- sh -c ...`, with `WSPRRYPI_DISABLE_HARDWARE_ACCESS=1` | Passed: unavailable-bus rejection, one nonexistent worker path, no GPIO/MMIO/mailbox/RP1 access or I2C ioctl. |
+| wspr5: `WSPRRYPI_DISABLE_HARDWARE_ACCESS=1 make -j2 JOBS=2 wtp-pi-tone-engine-test BACKENDS=simulated ANCILLARY_GPIO=0 SUDO=`, plus five executions of `build/wtp_pi_tone_engine_test` | Passed after removing fixed-sleep/UTC-phase assumptions from the test. |
 | Local Mac C++ compilation/linking | Not attempted, following the standing user instruction. |
 
 Full logs, final source hashes, installed binary hash and screenshots accompany
@@ -107,6 +108,16 @@ namespace, leaving wspr5's service untouched. The release-matrix job also reache
 its 15-minute deadline after compiling all six profiles. Its deadline is now
 30 minutes, retaining every profile and warning gate. Repaired CI results are
 recorded in the completion report.
+
+The next CI run passed the inventory portable semantics and strict I2C stages,
+then exposed `later RF-on completes` in the existing macOS tone-engine fixture.
+It now waits for actual terminal state, with a two-second bound, and uses
+controlled time to place the later gate beyond the initial UTC-second boundary.
+The real-time fixture starts at a full synthetic UTC second, avoiding a randomly
+near-expired first admission window. Completion, Failed/Missed, output-off,
+clock-loss and cancellation assertions remain; production engine code and its
+deadlines were not changed. Linux validation and repeated test results accompany
+this report.
 
 ## Adversarial reassessment and Impeccable
 

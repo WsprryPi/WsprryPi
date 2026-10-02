@@ -13,15 +13,42 @@ void check(bool value, const char* message) {
     if (!value) throw std::runtime_error(message);
 }
 
+EngineReport await_terminal(WtpPiToneEngine& engine) {
+    const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(2);
+    while (true) {
+        const auto report = engine.poll(0);
+        if (report.state == EngineState::Complete || report.state == EngineState::Failed ||
+            report.state == EngineState::Missed) return report;
+        check(std::chrono::steady_clock::now() < deadline, "engine did not reach a terminal state");
+        std::this_thread::sleep_for(std::chrono::milliseconds(2));
+    }
+}
+
 class TestClock final : public Clock {
 public:
     std::atomic<ClockState> state{ClockState::Synchronized};
+    const std::uint64_t origin = monotonic_now();
+    static std::uint64_t monotonic_now() {
+        return static_cast<std::uint64_t>(std::chrono::duration_cast<std::chrono::nanoseconds>(
+            std::chrono::steady_clock::now().time_since_epoch()).count());
+    }
     ClockSnapshot snapshot() const override {
-        const auto monotonic = static_cast<std::uint64_t>(
-            std::chrono::duration_cast<std::chrono::nanoseconds>(
-                std::chrono::steady_clock::now().time_since_epoch()).count());
-        return {state.load(), monotonic + 1'000'000'000'000ULL,
+        const auto monotonic = monotonic_now();
+        // Start this fixture at a full UTC second, rather than an arbitrary
+        // fractional second with potentially almost no admission window left.
+        return {state.load(), 1'000'000'000'000ULL + monotonic - origin,
                 monotonic, 1000, 0, LeapState::Normal, std::nullopt};
+    }
+};
+
+class GateClock final : public Clock {
+    const std::uint64_t origin = TestClock::monotonic_now();
+public:
+    std::atomic<std::uint64_t> elapsed{0};
+    ClockSnapshot snapshot() const override {
+        const auto delta = elapsed.load();
+        return {ClockState::Synchronized, 1'000'900'000'000ULL + delta,
+                origin + delta, 1000, 0, LeapState::Normal, std::nullopt};
     }
 };
 
@@ -103,8 +130,7 @@ int main() {
     check(engine.schedule(job, start,
           {&clock, now.utc_now_ns + 30'000'000ULL, 1'000'000ULL, 0, 0}),
           "prepared tone must schedule locally");
-    std::this_thread::sleep_for(std::chrono::milliseconds(80));
-    const auto report = engine.poll(clock.snapshot().monotonic_now_ns);
+    const auto report = await_terminal(engine);
     check(report.state == EngineState::Complete && backend.executed &&
               !report.output_active, "tone must complete with output off");
     check(engine.disable(clock.snapshot().monotonic_now_ns + 1'000'000'000ULL),
@@ -190,26 +216,27 @@ int main() {
     const auto physical_now = clock.snapshot();
     check(physical_adapter.schedule(job, physical_now.monotonic_now_ns,
           {&clock, physical_now.utc_now_ns, 1'000'000ULL, 0, 0}),"physical adapter schedules");
-    std::this_thread::sleep_for(std::chrono::milliseconds(20));
-    check(physical_adapter.poll(clock.snapshot().monotonic_now_ns).state == EngineState::Failed,
+    check(await_terminal(physical_adapter).state == EngineState::Failed,
           "backend success without an observed output enable must never report a completed transmission");
     // Later gated elements must not be rejected as a late initial launch.
     FakeBackend gates;
-    WtpPiToneEngine gated(gates, {}, BackendKind::SIMULATED, clock, exact,
+    GateClock gate_clock;
+    WtpPiToneEngine gated(gates, {}, BackendKind::SIMULATED, gate_clock, exact,
         0.0, [&] { gates.stopped = false; }, true);
     gates.execute_hook = [&] {
         check(gated.admit_output_enable(), "first physical enable admitted");
         gated.observe_output_enable();
-        std::this_thread::sleep_for(std::chrono::milliseconds(150));
+        gate_clock.elapsed = 150'000'000ULL;
+        check(gate_clock.snapshot().utc_now_ns >= 1'001'000'000'000ULL,
+              "later gate fixture must be beyond the first UTC-second boundary");
         check(gated.admit_output_enable(), "later RF-on is not another ARM deadline");
     };
     check(gated.prepare(job).accepted, "gated sequence prepares");
-    auto gate_now = clock.snapshot();
+    auto gate_now = gate_clock.snapshot();
     check(gated.schedule(job, gate_now.monotonic_now_ns,
-          {&clock, gate_now.utc_now_ns, 1'000'000ULL, 0, 0}), "gated sequence schedules");
-    std::this_thread::sleep_for(std::chrono::milliseconds(200));
-    check(gated.poll(0).state == EngineState::Complete, "later RF-on completes");
-    check(gated.disable(clock.snapshot().monotonic_now_ns + 1'000'000'000ULL), "gated stop");
+          {&gate_clock, gate_now.utc_now_ns, 1'000'000ULL, 0, 0}), "gated sequence schedules");
+    check(await_terminal(gated).state == EngineState::Complete, "later RF-on completes");
+    check(gated.disable(gate_clock.snapshot().monotonic_now_ns + 1'000'000'000ULL), "gated stop");
     check(!gated.admit_output_enable(), "stop prevents any subsequent RF-on");
     FakeBackend late;
     WtpPiToneEngine missed(late, {}, BackendKind::SIMULATED, clock, exact);
@@ -217,8 +244,7 @@ int main() {
     auto late_now = clock.snapshot();
     check(missed.schedule(job, late_now.monotonic_now_ns - 1'000'000'000ULL,
           {&clock, late_now.utc_now_ns - 1'000'000'000ULL, 1'000'000ULL, 0, 0}), "late sequence schedules");
-    std::this_thread::sleep_for(std::chrono::milliseconds(20));
-    check(missed.poll(0).state == EngineState::Missed && !late.executed,
+    check(await_terminal(missed).state == EngineState::Missed && !late.executed,
           "missed initial start never executes backend");
 
     FakeBackend cancelled;
@@ -236,8 +262,7 @@ int main() {
     clock.state = ClockState::Unsynchronized;
     check(unsynced_engine.schedule(job, sync_now.monotonic_now_ns,
           {&clock, sync_now.utc_now_ns, 1000, 0, 0}), "clock-loss fixture arms");
-    std::this_thread::sleep_for(std::chrono::milliseconds(20));
-    check(unsynced_engine.poll(0).state == EngineState::Missed && !unsynced.executed,
+    check(await_terminal(unsynced_engine).state == EngineState::Missed && !unsynced.executed,
           "clock loss before first enable prevents RF");
     clock.state = ClockState::Synchronized;
 

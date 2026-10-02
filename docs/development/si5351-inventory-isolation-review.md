@@ -21,6 +21,7 @@ backtrace and interface evidence as the failure definition.
 | The INI conflict fixture depended on the Linux-only earlier logging change; its macOS write was a no-op. | Toggle the actual prepared value and test both initial logging states on every host. |
 | The strict I2C audit assumed readiness directly opened a missing bus, while metadata validation now rejects it first. | Audit zero adapter opens during early rejection, then trace the isolated worker against one verified nonexistent device path; retain all forbidden-access and ioctl checks. |
 | The six-profile release job reached its 15-minute limit just after its final compile. | Increase only that job's deadline to 30 minutes; retain all six profiles, factory checks and warnings as errors. |
+| A later macOS tone-engine fixture checked async completion after a fixed sleep and used an arbitrary UTC-second phase. | Wait for a terminal report with a bound, anchor the real-time fixture at a full UTC second, and use controlled time to prove a later RF-on occurs beyond the first launch boundary. Reject Failed/Missed outcomes as before; production timing is unchanged. |
 
 ## Final reassessment
 
@@ -53,3 +54,11 @@ for forbidden GPIO, mailbox, MMIO and RP1 access. No installed wspr5 service or
 transmitter state changed. The release-job annotation confirms the original
 15-minute timeout; raising its deadline removes no compiler or test gate.
 Repaired GitHub CI results remain a separate check reported at completion.
+
+The subsequent macOS WTP-stage failure was in the existing tone-engine fixture,
+after portable semantics passed. Its repair changes only the test. Later-gate
+time now advances explicitly beyond the 100 ms first-launch window; no relaxed
+production deadline is involved. Terminal-state waits retain assertions for
+completion with output off, failure without observed enable, past-start misses,
+clock loss and cancellation. Linux execution and five repeats validate the
+fixture before the final CI rerun.
