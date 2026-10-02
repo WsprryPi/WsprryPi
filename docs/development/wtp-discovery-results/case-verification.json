@@ -1,0 +1,1101 @@
+{
+  "link": [
+    {
+      "utc_ns": "1790941269465240039",
+      "monotonic_ns": "223213695259746",
+      "kind": "link-down-evidence",
+      "value": {
+        "interface": "wlan1",
+        "removed": {
+          "available": true,
+          "candidates": [
+            {
+              "binding": "plain",
+              "domain": "local",
+              "first_seen_ms": 1790938487071,
+              "id": "service-879a3661fecc0dd95cc3c1f1d8fa6f0f",
+              "instance": "WsprryPi wspr1 d133ed89",
+              "interface": 2,
+              "last_seen_ms": 1790938487072,
+              "port": 31417,
+              "protocol": 0,
+              "reason": "",
+              "state": "online",
+              "state_changed_ms": 1790938487072,
+              "target": "wtp-d133ed890b90f6945b41a235429ff155.local",
+              "txt": [
+                "txtvers=1",
+                "binding=plain"
+              ]
+            },
+            {
+              "binding": "plain",
+              "domain": "local",
+              "first_seen_ms": 1790938487070,
+              "id": "service-eea7d3e7283a3c30c33a86479f3dfc0a",
+              "instance": "WsprryPi wspr2 e2a4d273",
+              "interface": 2,
+              "last_seen_ms": 1790938487072,
+              "port": 31417,
+              "protocol": 0,
+              "reason": "",
+              "state": "online",
+              "state_changed_ms": 1790938487072,
+              "target": "wtp-e2a4d273f7d8f24f6696f7c6fb95ff11.local",
+              "txt": [
+                "txtvers=1",
+                "binding=plain"
+              ]
+            },
+            {
+              "binding": "plain",
+              "domain": "local",
+              "first_seen_ms": 1790938487071,
+              "id": "service-67facb21fbea71aefdc46ba116736857",
+              "instance": "WsprryPi wspr4 f21e530a",
+              "interface": 2,
+              "last_seen_ms": 1790938487072,
+              "port": 31417,
+              "protocol": 0,
+              "reason": "",
+              "state": "online",
+              "state_changed_ms": 1790938487072,
+              "target": "wtp-f21e530af8a4a210ec57898c0ebd32d2.local",
+              "txt": [
+                "txtvers=1",
+                "binding=plain"
+              ]
+            },
+            {
+              "binding": "plain",
+              "domain": "local",
+              "first_seen_ms": 1790938487899,
+              "id": "service-600bfc9ce83e33d34dfbb08e0b42cc2a",
+              "instance": "WsprryPi wspr5 e045017b",
+              "interface": 2,
+              "last_seen_ms": 1790938487899,
+              "port": 31417,
+              "protocol": 0,
+              "reason": "",
+              "state": "online",
+              "state_changed_ms": 1790938487899,
+              "target": "wtp-e045017b11e54c2fb7029f0154e6deb9.local",
+              "txt": [
+                "txtvers=1",
+                "binding=plain"
+              ]
+            },
+            {
+              "binding": "plain",
+              "domain": "local",
+              "first_seen_ms": 1790938487070,
+              "id": "service-7eefe6e462fe036e3cb1dffbcab233dd",
+              "instance": "wsprrypico-0a60df",
+              "interface": 2,
+              "last_seen_ms": 1790938487072,
+              "port": 31417,
+              "protocol": 0,
+              "reason": "",
+              "state": "online",
+              "state_changed_ms": 1790938487072,
+              "target": "wsprrypico-0a60df.local",
+              "txt": [
+                "txtvers=1",
+                "binding=plain"
+              ]
+            },
+            {
+              "binding": "plain",
+              "domain": "local",
+              "first_seen_ms": 1790938487069,
+              "id": "service-8849882a0f724fdd2bbeb58e24e97d52",
+              "instance": "WsprryPi wspr1 d133ed89",
+              "interface": 4,
+              "last_seen_ms": 1790938487234,
+              "port": 31417,
+              "protocol": 0,
+              "reason": "Service was withdrawn",
+              "state": "removed",
+              "state_changed_ms": 1790941269397,
+              "target": "wtp-d133ed890b90f6945b41a235429ff155.local",
+              "txt": [
+                "txtvers=1",
+                "binding=plain"
+              ]
+            },
+            {
+              "binding": "plain",
+              "domain": "local",
+              "first_seen_ms": 1790938487069,
+              "id": "service-7eafa62f6873b13a3e036d5df55d97c9",
+              "instance": "WsprryPi wspr2 e2a4d273",
+              "interface": 4,
+              "last_seen_ms": 1790938487072,
+              "port": 31417,
+              "protocol": 0,
+              "reason": "Service was withdrawn",
+              "state": "removed",
+              "state_changed_ms": 1790941269396,
+              "target": "wtp-e2a4d273f7d8f24f6696f7c6fb95ff11.local",
+              "txt": [
+                "txtvers=1",
+                "binding=plain"
+              ]
+            },
+            {
+              "binding": "plain",
+              "domain": "local",
+              "first_seen_ms": 1790938487070,
+              "id": "service-f63e553213062c57864432b735b025f2",
+              "instance": "WsprryPi wspr4 f21e530a",
+              "interface": 4,
+              "last_seen_ms": 1790938487072,
+              "port": 31417,
+              "protocol": 0,
+              "reason": "Service was withdrawn",
+              "state": "removed",
+              "state_changed_ms": 1790941269397,
+              "target": "wtp-f21e530af8a4a210ec57898c0ebd32d2.local",
+              "txt": [
+                "txtvers=1",
+                "binding=plain"
+              ]
+            },
+            {
+              "binding": "plain",
+              "domain": "local",
+              "first_seen_ms": 1790938487069,
+              "id": "service-bfbf73f55f2bbc8b24e6f88ba7b631aa",
+              "instance": "wsprrypico-0a60df",
+              "interface": 4,
+              "last_seen_ms": 1790938487071,
+              "port": 31417,
+              "protocol": 0,
+              "reason": "Service was withdrawn",
+              "state": "removed",
+              "state_changed_ms": 1790941269396,
+              "target": "wsprrypico-0a60df.local",
+              "txt": [
+                "txtvers=1",
+                "binding=plain"
+              ]
+            }
+          ],
+          "reason": "",
+          "scope": "wtp-dns-sd/1",
+          "service": "_wtp._tcp.local."
+        },
+        "remaining": [
+          {
+            "binding": "plain",
+            "domain": "local",
+            "first_seen_ms": 1790938487071,
+            "id": "service-879a3661fecc0dd95cc3c1f1d8fa6f0f",
+            "instance": "WsprryPi wspr1 d133ed89",
+            "interface": 2,
+            "last_seen_ms": 1790938487072,
+            "port": 31417,
+            "protocol": 0,
+            "reason": "",
+            "state": "online",
+            "state_changed_ms": 1790938487072,
+            "target": "wtp-d133ed890b90f6945b41a235429ff155.local",
+            "txt": [
+              "txtvers=1",
+              "binding=plain"
+            ]
+          },
+          {
+            "binding": "plain",
+            "domain": "local",
+            "first_seen_ms": 1790938487070,
+            "id": "service-eea7d3e7283a3c30c33a86479f3dfc0a",
+            "instance": "WsprryPi wspr2 e2a4d273",
+            "interface": 2,
+            "last_seen_ms": 1790938487072,
+            "port": 31417,
+            "protocol": 0,
+            "reason": "",
+            "state": "online",
+            "state_changed_ms": 1790938487072,
+            "target": "wtp-e2a4d273f7d8f24f6696f7c6fb95ff11.local",
+            "txt": [
+              "txtvers=1",
+              "binding=plain"
+            ]
+          },
+          {
+            "binding": "plain",
+            "domain": "local",
+            "first_seen_ms": 1790938487071,
+            "id": "service-67facb21fbea71aefdc46ba116736857",
+            "instance": "WsprryPi wspr4 f21e530a",
+            "interface": 2,
+            "last_seen_ms": 1790938487072,
+            "port": 31417,
+            "protocol": 0,
+            "reason": "",
+            "state": "online",
+            "state_changed_ms": 1790938487072,
+            "target": "wtp-f21e530af8a4a210ec57898c0ebd32d2.local",
+            "txt": [
+              "txtvers=1",
+              "binding=plain"
+            ]
+          },
+          {
+            "binding": "plain",
+            "domain": "local",
+            "first_seen_ms": 1790938487899,
+            "id": "service-600bfc9ce83e33d34dfbb08e0b42cc2a",
+            "instance": "WsprryPi wspr5 e045017b",
+            "interface": 2,
+            "last_seen_ms": 1790938487899,
+            "port": 31417,
+            "protocol": 0,
+            "reason": "",
+            "state": "online",
+            "state_changed_ms": 1790938487899,
+            "target": "wtp-e045017b11e54c2fb7029f0154e6deb9.local",
+            "txt": [
+              "txtvers=1",
+              "binding=plain"
+            ]
+          },
+          {
+            "binding": "plain",
+            "domain": "local",
+            "first_seen_ms": 1790938487070,
+            "id": "service-7eefe6e462fe036e3cb1dffbcab233dd",
+            "instance": "wsprrypico-0a60df",
+            "interface": 2,
+            "last_seen_ms": 1790938487072,
+            "port": 31417,
+            "protocol": 0,
+            "reason": "",
+            "state": "online",
+            "state_changed_ms": 1790938487072,
+            "target": "wsprrypico-0a60df.local",
+            "txt": [
+              "txtvers=1",
+              "binding=plain"
+            ]
+          }
+        ],
+        "endpoint": {
+          "address": "192.168.1.54",
+          "boot_id": "ab2421ed8de8fc5f0d4e199c8447fa78",
+          "device_id": "e045017b11e54c2fb7029f0154e6deb9",
+          "dns_sd_published": true,
+          "enabled": true,
+          "finishing_remote_job": false,
+          "launch_observed_monotonic_ns": null,
+          "launch_target_monotonic_ns": "0",
+          "listener_error": "",
+          "listener_running": true,
+          "local_effective": false,
+          "local_requested": false,
+          "local_work_active": false,
+          "output_unknown": false,
+          "port": 31417,
+          "remote_admission_closed": false,
+          "remote_job_id": "",
+          "remote_output_active": false,
+          "remote_owner": "",
+          "remote_state": "empty",
+          "revocation_generation": "11",
+          "revocation_unavailable": false,
+          "schema": "wsprrypi-wtp-endpoint/1"
+        }
+      }
+    },
+    {
+      "utc_ns": "1790941434183212622",
+      "monotonic_ns": "223378413233385",
+      "kind": "link-down-evidence",
+      "value": {
+        "interface": "eth0",
+        "removed": {
+          "available": true,
+          "candidates": [
+            {
+              "binding": "plain",
+              "domain": "local",
+              "first_seen_ms": 1790938487071,
+              "id": "service-879a3661fecc0dd95cc3c1f1d8fa6f0f",
+              "instance": "WsprryPi wspr1 d133ed89",
+              "interface": 2,
+              "last_seen_ms": 1790938487072,
+              "port": 31417,
+              "protocol": 0,
+              "reason": "Service was withdrawn",
+              "state": "removed",
+              "state_changed_ms": 1790941434106,
+              "target": "wtp-d133ed890b90f6945b41a235429ff155.local",
+              "txt": [
+                "txtvers=1",
+                "binding=plain"
+              ]
+            },
+            {
+              "binding": "plain",
+              "domain": "local",
+              "first_seen_ms": 1790938487070,
+              "id": "service-eea7d3e7283a3c30c33a86479f3dfc0a",
+              "instance": "WsprryPi wspr2 e2a4d273",
+              "interface": 2,
+              "last_seen_ms": 1790938487072,
+              "port": 31417,
+              "protocol": 0,
+              "reason": "Service was withdrawn",
+              "state": "removed",
+              "state_changed_ms": 1790941434106,
+              "target": "wtp-e2a4d273f7d8f24f6696f7c6fb95ff11.local",
+              "txt": [
+                "txtvers=1",
+                "binding=plain"
+              ]
+            },
+            {
+              "binding": "plain",
+              "domain": "local",
+              "first_seen_ms": 1790938487071,
+              "id": "service-67facb21fbea71aefdc46ba116736857",
+              "instance": "WsprryPi wspr4 f21e530a",
+              "interface": 2,
+              "last_seen_ms": 1790938487072,
+              "port": 31417,
+              "protocol": 0,
+              "reason": "Service was withdrawn",
+              "state": "removed",
+              "state_changed_ms": 1790941434106,
+              "target": "wtp-f21e530af8a4a210ec57898c0ebd32d2.local",
+              "txt": [
+                "txtvers=1",
+                "binding=plain"
+              ]
+            },
+            {
+              "binding": "plain",
+              "domain": "local",
+              "first_seen_ms": 1790938487899,
+              "id": "service-600bfc9ce83e33d34dfbb08e0b42cc2a",
+              "instance": "WsprryPi wspr5 e045017b",
+              "interface": 2,
+              "last_seen_ms": 1790938487899,
+              "port": 31417,
+              "protocol": 0,
+              "reason": "Service was withdrawn",
+              "state": "removed",
+              "state_changed_ms": 1790941434106,
+              "target": "wtp-e045017b11e54c2fb7029f0154e6deb9.local",
+              "txt": [
+                "txtvers=1",
+                "binding=plain"
+              ]
+            },
+            {
+              "binding": "plain",
+              "domain": "local",
+              "first_seen_ms": 1790938487070,
+              "id": "service-7eefe6e462fe036e3cb1dffbcab233dd",
+              "instance": "wsprrypico-0a60df",
+              "interface": 2,
+              "last_seen_ms": 1790938487072,
+              "port": 31417,
+              "protocol": 0,
+              "reason": "Service was withdrawn",
+              "state": "removed",
+              "state_changed_ms": 1790941434106,
+              "target": "wsprrypico-0a60df.local",
+              "txt": [
+                "txtvers=1",
+                "binding=plain"
+              ]
+            },
+            {
+              "binding": "plain",
+              "domain": "local",
+              "first_seen_ms": 1790938487069,
+              "id": "service-8849882a0f724fdd2bbeb58e24e97d52",
+              "instance": "WsprryPi wspr1 d133ed89",
+              "interface": 4,
+              "last_seen_ms": 1790941287130,
+              "port": 31417,
+              "protocol": 0,
+              "reason": "",
+              "state": "online",
+              "state_changed_ms": 1790941287130,
+              "target": "wtp-d133ed890b90f6945b41a235429ff155.local",
+              "txt": [
+                "txtvers=1",
+                "binding=plain"
+              ]
+            },
+            {
+              "binding": "plain",
+              "domain": "local",
+              "first_seen_ms": 1790938487069,
+              "id": "service-7eafa62f6873b13a3e036d5df55d97c9",
+              "instance": "WsprryPi wspr2 e2a4d273",
+              "interface": 4,
+              "last_seen_ms": 1790941285251,
+              "port": 31417,
+              "protocol": 0,
+              "reason": "",
+              "state": "online",
+              "state_changed_ms": 1790941285251,
+              "target": "wtp-e2a4d273f7d8f24f6696f7c6fb95ff11.local",
+              "txt": [
+                "txtvers=1",
+                "binding=plain"
+              ]
+            },
+            {
+              "binding": "plain",
+              "domain": "local",
+              "first_seen_ms": 1790938487070,
+              "id": "service-f63e553213062c57864432b735b025f2",
+              "instance": "WsprryPi wspr4 f21e530a",
+              "interface": 4,
+              "last_seen_ms": 1790941284295,
+              "port": 31417,
+              "protocol": 0,
+              "reason": "",
+              "state": "online",
+              "state_changed_ms": 1790941284295,
+              "target": "wtp-f21e530af8a4a210ec57898c0ebd32d2.local",
+              "txt": [
+                "txtvers=1",
+                "binding=plain"
+              ]
+            },
+            {
+              "binding": "plain",
+              "domain": "local",
+              "first_seen_ms": 1790938487069,
+              "id": "service-bfbf73f55f2bbc8b24e6f88ba7b631aa",
+              "instance": "wsprrypico-0a60df",
+              "interface": 4,
+              "last_seen_ms": 1790941287505,
+              "port": 31417,
+              "protocol": 0,
+              "reason": "",
+              "state": "online",
+              "state_changed_ms": 1790941287505,
+              "target": "wsprrypico-0a60df.local",
+              "txt": [
+                "txtvers=1",
+                "binding=plain"
+              ]
+            }
+          ],
+          "reason": "",
+          "scope": "wtp-dns-sd/1",
+          "service": "_wtp._tcp.local."
+        },
+        "remaining": [
+          {
+            "binding": "plain",
+            "domain": "local",
+            "first_seen_ms": 1790938487069,
+            "id": "service-8849882a0f724fdd2bbeb58e24e97d52",
+            "instance": "WsprryPi wspr1 d133ed89",
+            "interface": 4,
+            "last_seen_ms": 1790941287130,
+            "port": 31417,
+            "protocol": 0,
+            "reason": "",
+            "state": "online",
+            "state_changed_ms": 1790941287130,
+            "target": "wtp-d133ed890b90f6945b41a235429ff155.local",
+            "txt": [
+              "txtvers=1",
+              "binding=plain"
+            ]
+          },
+          {
+            "binding": "plain",
+            "domain": "local",
+            "first_seen_ms": 1790938487069,
+            "id": "service-7eafa62f6873b13a3e036d5df55d97c9",
+            "instance": "WsprryPi wspr2 e2a4d273",
+            "interface": 4,
+            "last_seen_ms": 1790941285251,
+            "port": 31417,
+            "protocol": 0,
+            "reason": "",
+            "state": "online",
+            "state_changed_ms": 1790941285251,
+            "target": "wtp-e2a4d273f7d8f24f6696f7c6fb95ff11.local",
+            "txt": [
+              "txtvers=1",
+              "binding=plain"
+            ]
+          },
+          {
+            "binding": "plain",
+            "domain": "local",
+            "first_seen_ms": 1790938487070,
+            "id": "service-f63e553213062c57864432b735b025f2",
+            "instance": "WsprryPi wspr4 f21e530a",
+            "interface": 4,
+            "last_seen_ms": 1790941284295,
+            "port": 31417,
+            "protocol": 0,
+            "reason": "",
+            "state": "online",
+            "state_changed_ms": 1790941284295,
+            "target": "wtp-f21e530af8a4a210ec57898c0ebd32d2.local",
+            "txt": [
+              "txtvers=1",
+              "binding=plain"
+            ]
+          },
+          {
+            "binding": "plain",
+            "domain": "local",
+            "first_seen_ms": 1790938487069,
+            "id": "service-bfbf73f55f2bbc8b24e6f88ba7b631aa",
+            "instance": "wsprrypico-0a60df",
+            "interface": 4,
+            "last_seen_ms": 1790941287505,
+            "port": 31417,
+            "protocol": 0,
+            "reason": "",
+            "state": "online",
+            "state_changed_ms": 1790941287505,
+            "target": "wsprrypico-0a60df.local",
+            "txt": [
+              "txtvers=1",
+              "binding=plain"
+            ]
+          }
+        ],
+        "endpoint": {
+          "boot_id": "ab2421ed8de8fc5f0d4e199c8447fa78",
+          "device_id": "e045017b11e54c2fb7029f0154e6deb9",
+          "dns_sd_published": false,
+          "enabled": true,
+          "finishing_remote_job": false,
+          "launch_observed_monotonic_ns": null,
+          "launch_target_monotonic_ns": "0",
+          "listener_error": "WTP station LAN address changed; listener withdrawn",
+          "listener_running": false,
+          "local_effective": false,
+          "local_requested": false,
+          "local_work_active": false,
+          "output_unknown": false,
+          "remote_admission_closed": false,
+          "remote_job_id": "",
+          "remote_output_active": false,
+          "remote_owner": "",
+          "remote_state": "empty",
+          "revocation_generation": "11",
+          "revocation_unavailable": false,
+          "schema": "wsprrypi-wtp-endpoint/1"
+        }
+      }
+    }
+  ],
+  "address_change": {
+    "utc_ns": "1790942636036228059",
+    "monotonic_ns": "224580266247044",
+    "kind": "DHCP-address-evidence",
+    "value": {
+      "new_address": "192.168.1.62",
+      "endpoint": {
+        "address": "192.168.1.62",
+        "boot_id": "ab2421ed8de8fc5f0d4e199c8447fa78",
+        "device_id": "e045017b11e54c2fb7029f0154e6deb9",
+        "dns_sd_published": true,
+        "enabled": true,
+        "finishing_remote_job": false,
+        "launch_observed_monotonic_ns": null,
+        "launch_target_monotonic_ns": "0",
+        "listener_error": "",
+        "listener_running": true,
+        "local_effective": false,
+        "local_requested": false,
+        "local_work_active": false,
+        "output_unknown": false,
+        "port": 31417,
+        "remote_admission_closed": false,
+        "remote_job_id": "",
+        "remote_output_active": false,
+        "remote_owner": "",
+        "remote_state": "empty",
+        "revocation_generation": "11",
+        "revocation_unavailable": false,
+        "schema": "wsprrypi-wtp-endpoint/1"
+      },
+      "records": [
+        {
+          "binding": "plain",
+          "domain": "local",
+          "first_seen_ms": 1790903644350,
+          "id": "service-600bfc9ce83e33d34dfbb08e0b42cc2a",
+          "instance": "WsprryPi wspr5 e045017b",
+          "interface": 2,
+          "last_seen_ms": 1790941371687,
+          "port": 31417,
+          "protocol": 0,
+          "reason": "",
+          "state": "online",
+          "state_changed_ms": 1790941371687,
+          "target": "wtp-e045017b11e54c2fb7029f0154e6deb9.local",
+          "txt": [
+            "txtvers=1",
+            "binding=plain"
+          ]
+        }
+      ],
+      "identify": {
+        "status": 200,
+        "body": {
+          "authenticated": false,
+          "binding": "plain",
+          "boot_id": "ab2421ed8de8fc5f0d4e199c8447fa78",
+          "device_id": "e045017b11e54c2fb7029f0154e6deb9",
+          "output_active": false
+        }
+      }
+    }
+  },
+  "restored_identification": {
+    "utc_ns": "1790942649276126224",
+    "monotonic_ns": "224593506146079",
+    "kind": "restored-address-identify",
+    "value": {
+      "status": 200,
+      "body": {
+        "authenticated": false,
+        "binding": "plain",
+        "boot_id": "ab2421ed8de8fc5f0d4e199c8447fa78",
+        "device_id": "e045017b11e54c2fb7029f0154e6deb9",
+        "output_active": false
+      }
+    }
+  },
+  "cache": {
+    "start": {
+      "utc_ns": "1790942941374155608",
+      "monotonic_ns": "224885604174241",
+      "kind": "phase-start",
+      "value": {
+        "kind": "cache",
+        "target": "wsprrypico-0a60df.local",
+        "source_ip": "192.168.1.47",
+        "interfaces": [
+          "eth0",
+          "wlan1"
+        ]
+      }
+    },
+    "expiry": {
+      "utc_ns": "1790943061519837997",
+      "monotonic_ns": "225005749856926",
+      "kind": "cache-expiry-evidence",
+      "value": {
+        "elapsed_seconds": 119.98409017102676,
+        "expired": [
+          {
+            "binding": "plain",
+            "domain": "local",
+            "first_seen_ms": 1790938487070,
+            "id": "service-7eefe6e462fe036e3cb1dffbcab233dd",
+            "instance": "wsprrypico-0a60df",
+            "interface": 2,
+            "last_seen_ms": 1790942811439,
+            "port": 31417,
+            "protocol": 0,
+            "reason": "Service was withdrawn",
+            "state": "removed",
+            "state_changed_ms": 1790943060322,
+            "target": "wsprrypico-0a60df.local",
+            "txt": [
+              "txtvers=1",
+              "binding=plain"
+            ]
+          },
+          {
+            "binding": "plain",
+            "domain": "local",
+            "first_seen_ms": 1790938487069,
+            "id": "service-bfbf73f55f2bbc8b24e6f88ba7b631aa",
+            "instance": "wsprrypico-0a60df",
+            "interface": 4,
+            "last_seen_ms": 1790942872083,
+            "port": 31417,
+            "protocol": 0,
+            "reason": "Service was withdrawn",
+            "state": "removed",
+            "state_changed_ms": 1790943061056,
+            "target": "wsprrypico-0a60df.local",
+            "txt": [
+              "txtvers=1",
+              "binding=plain"
+            ]
+          }
+        ],
+        "identify_rejected": [
+          {
+            "status": 409,
+            "body": {
+              "error": {
+                "code": "catalog_request_rejected",
+                "message": "Discovery candidate is unavailable or stale"
+              }
+            }
+          },
+          {
+            "status": 409,
+            "body": {
+              "error": {
+                "code": "catalog_request_rejected",
+                "message": "Discovery candidate is unavailable or stale"
+              }
+            }
+          }
+        ],
+        "other_online": [
+          {
+            "binding": "plain",
+            "domain": "local",
+            "first_seen_ms": 1790938487071,
+            "id": "service-879a3661fecc0dd95cc3c1f1d8fa6f0f",
+            "instance": "WsprryPi wspr1 d133ed89",
+            "interface": 2,
+            "last_seen_ms": 1790942644666,
+            "port": 31417,
+            "protocol": 0,
+            "reason": "",
+            "state": "online",
+            "state_changed_ms": 1790942644666,
+            "target": "wtp-d133ed890b90f6945b41a235429ff155.local",
+            "txt": [
+              "txtvers=1",
+              "binding=plain"
+            ]
+          },
+          {
+            "binding": "plain",
+            "domain": "local",
+            "first_seen_ms": 1790938487070,
+            "id": "service-eea7d3e7283a3c30c33a86479f3dfc0a",
+            "instance": "WsprryPi wspr2 e2a4d273",
+            "interface": 2,
+            "last_seen_ms": 1790942644875,
+            "port": 31417,
+            "protocol": 0,
+            "reason": "",
+            "state": "online",
+            "state_changed_ms": 1790942644875,
+            "target": "wtp-e2a4d273f7d8f24f6696f7c6fb95ff11.local",
+            "txt": [
+              "txtvers=1",
+              "binding=plain"
+            ]
+          },
+          {
+            "binding": "plain",
+            "domain": "local",
+            "first_seen_ms": 1790938487071,
+            "id": "service-67facb21fbea71aefdc46ba116736857",
+            "instance": "WsprryPi wspr4 f21e530a",
+            "interface": 2,
+            "last_seen_ms": 1790942644839,
+            "port": 31417,
+            "protocol": 0,
+            "reason": "",
+            "state": "online",
+            "state_changed_ms": 1790942644839,
+            "target": "wtp-f21e530af8a4a210ec57898c0ebd32d2.local",
+            "txt": [
+              "txtvers=1",
+              "binding=plain"
+            ]
+          },
+          {
+            "binding": "plain",
+            "domain": "local",
+            "first_seen_ms": 1790938487899,
+            "id": "service-600bfc9ce83e33d34dfbb08e0b42cc2a",
+            "instance": "WsprryPi wspr5 e045017b",
+            "interface": 2,
+            "last_seen_ms": 1790942646245,
+            "port": 31417,
+            "protocol": 0,
+            "reason": "",
+            "state": "online",
+            "state_changed_ms": 1790942646245,
+            "target": "wtp-e045017b11e54c2fb7029f0154e6deb9.local",
+            "txt": [
+              "txtvers=1",
+              "binding=plain"
+            ]
+          },
+          {
+            "binding": "plain",
+            "domain": "local",
+            "first_seen_ms": 1790938487069,
+            "id": "service-8849882a0f724fdd2bbeb58e24e97d52",
+            "instance": "WsprryPi wspr1 d133ed89",
+            "interface": 4,
+            "last_seen_ms": 1790941287130,
+            "port": 31417,
+            "protocol": 0,
+            "reason": "",
+            "state": "online",
+            "state_changed_ms": 1790941287130,
+            "target": "wtp-d133ed890b90f6945b41a235429ff155.local",
+            "txt": [
+              "txtvers=1",
+              "binding=plain"
+            ]
+          },
+          {
+            "binding": "plain",
+            "domain": "local",
+            "first_seen_ms": 1790938487069,
+            "id": "service-7eafa62f6873b13a3e036d5df55d97c9",
+            "instance": "WsprryPi wspr2 e2a4d273",
+            "interface": 4,
+            "last_seen_ms": 1790941285251,
+            "port": 31417,
+            "protocol": 0,
+            "reason": "",
+            "state": "online",
+            "state_changed_ms": 1790941285251,
+            "target": "wtp-e2a4d273f7d8f24f6696f7c6fb95ff11.local",
+            "txt": [
+              "txtvers=1",
+              "binding=plain"
+            ]
+          },
+          {
+            "binding": "plain",
+            "domain": "local",
+            "first_seen_ms": 1790938487070,
+            "id": "service-f63e553213062c57864432b735b025f2",
+            "instance": "WsprryPi wspr4 f21e530a",
+            "interface": 4,
+            "last_seen_ms": 1790941284295,
+            "port": 31417,
+            "protocol": 0,
+            "reason": "",
+            "state": "online",
+            "state_changed_ms": 1790941284295,
+            "target": "wtp-f21e530af8a4a210ec57898c0ebd32d2.local",
+            "txt": [
+              "txtvers=1",
+              "binding=plain"
+            ]
+          }
+        ],
+        "independent_online": [
+          {
+            "binding": "plain",
+            "domain": "local",
+            "first_seen_ms": 1790903644357,
+            "id": "service-7eefe6e462fe036e3cb1dffbcab233dd",
+            "instance": "wsprrypico-0a60df",
+            "interface": 2,
+            "last_seen_ms": 1790903644392,
+            "port": 31417,
+            "protocol": 0,
+            "reason": "",
+            "state": "online",
+            "state_changed_ms": 1790903644392,
+            "target": "wsprrypico-0a60df.local",
+            "txt": [
+              "txtvers=1",
+              "binding=plain"
+            ]
+          }
+        ],
+        "filters": {
+          "eth0": [
+            {
+              "protocol": "ip",
+              "pref": 49173,
+              "kind": "flower",
+              "chain": 0
+            },
+            {
+              "protocol": "ip",
+              "pref": 49173,
+              "kind": "flower",
+              "chain": 0,
+              "options": {
+                "handle": 1,
+                "keys": {
+                  "eth_type": "ipv4",
+                  "ip_proto": "udp",
+                  "src_ip": "192.168.1.47",
+                  "src_port": 5353
+                },
+                "not_in_hw": true,
+                "actions": [
+                  {
+                    "order": 1,
+                    "kind": "gact",
+                    "control_action": {
+                      "type": "drop"
+                    },
+                    "prob": {
+                      "random_type": "none",
+                      "control_action": {
+                        "type": "pass"
+                      },
+                      "val": 0
+                    },
+                    "index": 1,
+                    "ref": 1,
+                    "bind": 1,
+                    "installed": 120,
+                    "last_used": 6,
+                    "first_used": 85,
+                    "stats": {
+                      "bytes": 1076,
+                      "packets": 8,
+                      "drops": 8,
+                      "overlimits": 0,
+                      "requeues": 0,
+                      "backlog": 0,
+                      "qlen": 0
+                    }
+                  }
+                ]
+              }
+            }
+          ],
+          "wlan1": [
+            {
+              "protocol": "ip",
+              "pref": 49173,
+              "kind": "flower",
+              "chain": 0
+            },
+            {
+              "protocol": "ip",
+              "pref": 49173,
+              "kind": "flower",
+              "chain": 0,
+              "options": {
+                "handle": 1,
+                "keys": {
+                  "eth_type": "ipv4",
+                  "ip_proto": "udp",
+                  "src_ip": "192.168.1.47",
+                  "src_port": 5353
+                },
+                "not_in_hw": true,
+                "actions": [
+                  {
+                    "order": 1,
+                    "kind": "gact",
+                    "control_action": {
+                      "type": "drop"
+                    },
+                    "prob": {
+                      "random_type": "none",
+                      "control_action": {
+                        "type": "pass"
+                      },
+                      "val": 0
+                    },
+                    "index": 2,
+                    "ref": 1,
+                    "bind": 1,
+                    "installed": 120,
+                    "last_used": 6,
+                    "first_used": 23,
+                    "stats": {
+                      "bytes": 708,
+                      "packets": 4,
+                      "drops": 4,
+                      "overlimits": 0,
+                      "requeues": 0,
+                      "backlog": 0,
+                      "qlen": 0
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      }
+    },
+    "completed": {
+      "utc_ns": "1790943062474381570",
+      "monotonic_ns": "225006704401628",
+      "kind": "phase-complete",
+      "value": {
+        "kind": "cache"
+      }
+    },
+    "lifetime": [
+      {
+        "interface": "eth0",
+        "index": 2,
+        "advertised_ttl_seconds": 120,
+        "last_prior_response_utc_ns": "1790942939586119710",
+        "expired_at_ms": 1790943060322,
+        "seconds_after_last_response": 120.73588029,
+        "drop_counters": [
+          {
+            "bytes": 1076,
+            "packets": 8,
+            "drops": 8,
+            "overlimits": 0,
+            "requeues": 0,
+            "backlog": 0,
+            "qlen": 0
+          }
+        ]
+      },
+      {
+        "interface": "wlan1",
+        "index": 4,
+        "advertised_ttl_seconds": 120,
+        "last_prior_response_utc_ns": "1790942939597445621",
+        "expired_at_ms": 1790943061056,
+        "seconds_after_last_response": 121.458554379,
+        "drop_counters": [
+          {
+            "bytes": 708,
+            "packets": 4,
+            "drops": 4,
+            "overlimits": 0,
+            "requeues": 0,
+            "backlog": 0,
+            "qlen": 0
+          }
+        ]
+      }
+    ],
+    "recovery": {
+      "utc_ns": "1790943062457848397",
+      "monotonic_ns": "225006687868752",
+      "kind": "cache-after-identify",
+      "value": {
+        "status": 200,
+        "body": {
+          "authenticated": false,
+          "binding": "plain",
+          "boot_id": "4296284b4460bb4578b4637ac020a590",
+          "device_id": "fd6127d11d6aca42a9905fa3fb1bf1d5",
+          "output_active": false
+        }
+      }
+    },
+    "goodbye_count": 0
+  },
+  "dns_sd_checks_passed": true,
+  "unresolved_operational_findings": [
+    "Equal-metric route order can send WTP replies through the other interface",
+    "wspr4 public configuration snapshot can stall on Si5351 inventory reads"
+  ]
+}

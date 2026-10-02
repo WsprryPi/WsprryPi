@@ -1,0 +1,31 @@
+{
+  "service": "MainPID=150209\nActiveState=active\nSubState=running",
+  "configured_backend": "gpio",
+  "endpoint": {
+    "address": "192.168.1.120",
+    "boot_id": "2102df76f2e6a742c0ea8eb476f59c17",
+    "device_id": "f21e530af8a4a210ec57898c0ebd32d2",
+    "dns_sd_published": true,
+    "enabled": true,
+    "finishing_remote_job": false,
+    "launch_observed_monotonic_ns": null,
+    "launch_target_monotonic_ns": "0",
+    "listener_error": "",
+    "listener_running": true,
+    "local_effective": false,
+    "local_requested": false,
+    "local_work_active": false,
+    "output_unknown": false,
+    "port": 31417,
+    "remote_admission_closed": false,
+    "remote_job_id": "",
+    "remote_output_active": false,
+    "remote_owner": "",
+    "remote_state": "empty",
+    "revocation_generation": "4",
+    "revocation_unavailable": false,
+    "schema": "wsprrypi-wtp-endpoint/1"
+  },
+  "discovery_request_reproduced_stall": true,
+  "service_restarted_twice": true
+}

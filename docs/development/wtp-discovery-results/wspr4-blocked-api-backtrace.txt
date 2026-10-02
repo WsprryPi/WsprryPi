@@ -1,0 +1,276 @@
+[New LWP 1333]
+[New LWP 1332]
+[New LWP 742]
+[New LWP 734]
+[New LWP 732]
+[New LWP 731]
+[New LWP 728]
+[New LWP 727]
+[New LWP 726]
+[New LWP 725]
+[New LWP 724]
+[New LWP 723]
+[New LWP 722]
+[New LWP 721]
+[New LWP 719]
+[New LWP 718]
+[New LWP 717]
+[New LWP 709]
+[New LWP 708]
+[New LWP 707]
+[New LWP 706]
+[New LWP 705]
+[New LWP 704]
+[New LWP 703]
+[Thread debugging using libthread_db enabled]
+Using host libthread_db library "/lib/aarch64-linux-gnu/libthread_db.so.1".
+0x0000007f7f10f228 in ?? () from /lib/aarch64-linux-gnu/libc.so.6
+
+Thread 25 (Thread 0x7f7ee8dba0 (LWP 703) "wsprrypi"):
+#0  0x0000007f7f10f228 in ?? () from /lib/aarch64-linux-gnu/libc.so.6
+#1  0x0000007f7f1028b8 in ?? () from /lib/aarch64-linux-gnu/libc.so.6
+#2  0x0000007f7f102c50 in ?? () from /lib/aarch64-linux-gnu/libc.so.6
+#3  0x0000007f7f10564c in pthread_cond_wait () from /lib/aarch64-linux-gnu/libc.so.6
+#4  0x0000005583f89348 in WsprTransmitter::callback_worker_loop() ()
+#5  0x0000007f7f40b4e0 in ?? () from /lib/aarch64-linux-gnu/libstdc++.so.6
+#6  0x0000007f7f1061d8 in ?? () from /lib/aarch64-linux-gnu/libc.so.6
+#7  0x0000007f7f16e15c in ?? () from /lib/aarch64-linux-gnu/libc.so.6
+
+Thread 24 (Thread 0x7f7e67dba0 (LWP 704) "wsprrypi"):
+#0  0x0000007f7f10f228 in ?? () from /lib/aarch64-linux-gnu/libc.so.6
+#1  0x0000007f7f1028b8 in ?? () from /lib/aarch64-linux-gnu/libc.so.6
+#2  0x0000007f7f1028fc in ?? () from /lib/aarch64-linux-gnu/libc.so.6
+#3  0x0000007f7f1638a0 in poll () from /lib/aarch64-linux-gnu/libc.so.6
+#4  0x0000005583d7f1b4 in std::thread::_State_impl<std::thread::_Invoker<std::tuple<main::{lambda()#1}> > >::_M_run() ()
+#5  0x0000007f7f40b4e0 in ?? () from /lib/aarch64-linux-gnu/libstdc++.so.6
+#6  0x0000007f7f1061d8 in ?? () from /lib/aarch64-linux-gnu/libc.so.6
+#7  0x0000007f7f16e15c in ?? () from /lib/aarch64-linux-gnu/libc.so.6
+
+Thread 23 (Thread 0x7f7de6dba0 (LWP 705) "wsprrypi"):
+#0  0x0000007f7f10f22c in ?? () from /lib/aarch64-linux-gnu/libc.so.6
+#1  0x0000007f7f1028b8 in ?? () from /lib/aarch64-linux-gnu/libc.so.6
+#2  0x0000007f7f1028fc in ?? () from /lib/aarch64-linux-gnu/libc.so.6
+#3  0x0000007f7f0b77e8 in sigtimedwait () from /lib/aarch64-linux-gnu/libc.so.6
+#4  0x0000005583f65d64 in wait_for_blocked_signal(__sigset_t const&) ()
+#5  0x0000005583f66738 in std::_Function_handler<SignalWaitResult (__sigset_t const&), SignalWaitResult (*)(__sigset_t const&) noexcept>::_M_invoke(std::_Any_data const&, __sigset_t const&) ()
+#6  0x0000005583f65e4c in SignalHandler::run() ()
+#7  0x0000007f7f40b4e0 in ?? () from /lib/aarch64-linux-gnu/libstdc++.so.6
+
+Thread 22 (Thread 0x7f7d65dba0 (LWP 706) "wsprrypi"):
+#0  0x0000007f7f10f228 in ?? () from /lib/aarch64-linux-gnu/libc.so.6
+#1  0x0000007f7f1028b8 in ?? () from /lib/aarch64-linux-gnu/libc.so.6
+#2  0x0000007f7f102c50 in ?? () from /lib/aarch64-linux-gnu/libc.so.6
+#3  0x0000007f7f10564c in pthread_cond_wait () from /lib/aarch64-linux-gnu/libc.so.6
+#4  0x0000005583f5cac0 in LCBLog::workerLoop(std::deque<std::unique_ptr<LogEntry, std::default_delete<LogEntry> >, std::allocator<std::unique_ptr<LogEntry, std::default_delete<LogEntry> > > >&, std::mutex&, std::condition_variable&, std::basic_ostream<char, std::char_traits<char> >&) ()
+#5  0x0000007f7f40b4e0 in ?? () from /lib/aarch64-linux-gnu/libstdc++.so.6
+#6  0x0000007f7f1061d8 in ?? () from /lib/aarch64-linux-gnu/libc.so.6
+#7  0x0000007f7f16e15c in ?? () from /lib/aarch64-linux-gnu/libc.so.6
+
+Thread 21 (Thread 0x7f7ce4dba0 (LWP 707) "wsprrypi"):
+#0  0x0000007f7f10f228 in ?? () from /lib/aarch64-linux-gnu/libc.so.6
+#1  0x0000007f7f1028b8 in ?? () from /lib/aarch64-linux-gnu/libc.so.6
+#2  0x0000007f7f102c50 in ?? () from /lib/aarch64-linux-gnu/libc.so.6
+#3  0x0000007f7f10564c in pthread_cond_wait () from /lib/aarch64-linux-gnu/libc.so.6
+#4  0x0000005583f5cac0 in LCBLog::workerLoop(std::deque<std::unique_ptr<LogEntry, std::default_delete<LogEntry> >, std::allocator<std::unique_ptr<LogEntry, std::default_delete<LogEntry> > > >&, std::mutex&, std::condition_variable&, std::basic_ostream<char, std::char_traits<char> >&) ()
+#5  0x0000007f7f40b4e0 in ?? () from /lib/aarch64-linux-gnu/libstdc++.so.6
+#6  0x0000007f7f1061d8 in ?? () from /lib/aarch64-linux-gnu/libc.so.6
+#7  0x0000007f7f16e15c in ?? () from /lib/aarch64-linux-gnu/libc.so.6
+
+Thread 20 (Thread 0x7f77ffdba0 (LWP 708) "wsprrypi"):
+#0  0x0000007f7f10f228 in ?? () from /lib/aarch64-linux-gnu/libc.so.6
+#1  0x0000007f7f1028b8 in ?? () from /lib/aarch64-linux-gnu/libc.so.6
+#2  0x0000007f7f102c50 in ?? () from /lib/aarch64-linux-gnu/libc.so.6
+#3  0x0000007f7f10564c in pthread_cond_wait () from /lib/aarch64-linux-gnu/libc.so.6
+#4  0x0000005583f92e60 in WsprRpiBackend::recovery_worker() ()
+#5  0x0000007f7f40b4e0 in ?? () from /lib/aarch64-linux-gnu/libstdc++.so.6
+#6  0x0000007f7f1061d8 in ?? () from /lib/aarch64-linux-gnu/libc.so.6
+#7  0x0000007f7f16e15c in ?? () from /lib/aarch64-linux-gnu/libc.so.6
+
+Thread 19 (Thread 0x7f777edba0 (LWP 709) "wsprrypi"):
+#0  0x0000007f7f10f228 in ?? () from /lib/aarch64-linux-gnu/libc.so.6
+#1  0x0000007f7f1028b8 in ?? () from /lib/aarch64-linux-gnu/libc.so.6
+#2  0x0000007f7f102c50 in ?? () from /lib/aarch64-linux-gnu/libc.so.6
+#3  0x0000007f7f10564c in pthread_cond_wait () from /lib/aarch64-linux-gnu/libc.so.6
+#4  0x0000005583f92e60 in WsprRpiBackend::recovery_worker() ()
+#5  0x0000007f7f40b4e0 in ?? () from /lib/aarch64-linux-gnu/libstdc++.so.6
+#6  0x0000007f7f1061d8 in ?? () from /lib/aarch64-linux-gnu/libc.so.6
+#7  0x0000007f7f16e15c in ?? () from /lib/aarch64-linux-gnu/libc.so.6
+
+Thread 18 (Thread 0x7f76fddba0 (LWP 717) "wsprrypi"):
+#0  0x0000007f7f10f228 in ?? () from /lib/aarch64-linux-gnu/libc.so.6
+#1  0x0000007f7f1028b8 in ?? () from /lib/aarch64-linux-gnu/libc.so.6
+#2  0x0000007f7f102c50 in ?? () from /lib/aarch64-linux-gnu/libc.so.6
+#3  0x0000007f7f10564c in pthread_cond_wait () from /lib/aarch64-linux-gnu/libc.so.6
+#4  0x0000005583f198cc in SupportBundleJobManager::expiration_loop() ()
+#5  0x0000007f7f40b4e0 in ?? () from /lib/aarch64-linux-gnu/libstdc++.so.6
+#6  0x0000007f7f1061d8 in ?? () from /lib/aarch64-linux-gnu/libc.so.6
+#7  0x0000007f7f16e15c in ?? () from /lib/aarch64-linux-gnu/libc.so.6
+
+Thread 17 (Thread 0x7f767cdba0 (LWP 718) "wsprrypi"):
+#0  0x0000007f7f10f228 in ?? () from /lib/aarch64-linux-gnu/libc.so.6
+#1  0x0000007f7f1028b8 in ?? () from /lib/aarch64-linux-gnu/libc.so.6
+#2  0x0000007f7f1028fc in ?? () from /lib/aarch64-linux-gnu/libc.so.6
+#3  0x0000007f7f170204 in accept4 () from /lib/aarch64-linux-gnu/libc.so.6
+#4  0x0000005583de74d0 in httplib::Server::listen_internal() ()
+#5  0x0000005583dbe48c in WebServer::start(int)::{lambda()#1}::operator()() const ()
+#6  0x0000007f7f40b4e0 in ?? () from /lib/aarch64-linux-gnu/libstdc++.so.6
+#7  0x0000007f7f1061d8 in ?? () from /lib/aarch64-linux-gnu/libc.so.6
+
+Thread 16 (Thread 0x7f75fbdba0 (LWP 719) "wsprrypi"):
+#0  0x0000007f7f10f228 in ?? () from /lib/aarch64-linux-gnu/libc.so.6
+#1  0x0000007f7f1028b8 in ?? () from /lib/aarch64-linux-gnu/libc.so.6
+#2  0x0000007f7f1028fc in ?? () from /lib/aarch64-linux-gnu/libc.so.6
+#3  0x0000007f7f1638a0 in poll () from /lib/aarch64-linux-gnu/libc.so.6
+#4  0x0000007f7f708140 in avahi_simple_poll_run () from /lib/aarch64-linux-gnu/libavahi-common.so.3
+#5  0x0000007f7f708394 in avahi_simple_poll_iterate () from /lib/aarch64-linux-gnu/libavahi-common.so.3
+#6  0x0000005583c79744 in std::thread::_State_impl<std::thread::_Invoker<std::tuple<wsprrypi::(anonymous namespace)::AvahiBrowser::start()::{lambda()#1}> > >::_M_run() ()
+#7  0x0000007f7f40b4e0 in ?? () from /lib/aarch64-linux-gnu/libstdc++.so.6
+
+Thread 15 (Thread 0x7f757adba0 (LWP 721) "wsprrypi"):
+#0  0x0000007f7f102f6c in ?? () from /lib/aarch64-linux-gnu/libc.so.6
+#1  0x0000007f7f1097b8 in pthread_mutex_lock () from /lib/aarch64-linux-gnu/libc.so.6
+#2  0x0000005583e5038c in get_public_config_snapshot[abi:cxx11]() ()
+#3  0x0000005583d248c0 in (anonymous namespace)::catalog_request(httplib::Request const&) ()
+#4  0x0000005583d288a0 in web_server_routes::register_control(httplib::Server&, std::function<void (httplib::Response&)>)::{lambda(httplib::Request const&, httplib::Response&)#1}::operator()(httplib::Request const&, httplib::Response&) const [clone .isra.0] ()
+#5  0x0000005583ddbf50 in httplib::Server::dispatch_request(httplib::Request&, httplib::Response&, std::vector<std::pair<std::unique_ptr<httplib::detail::MatcherBase, std::default_delete<httplib::detail::MatcherBase> >, std::function<void (httplib::Request const&, httplib::Response&)> >, std::allocator<std::pair<std::unique_ptr<httplib::detail::MatcherBase, std::default_delete<httplib::detail::MatcherBase> >, std::function<void (httplib::Request const&, httplib::Response&)> > > > const&) const ()
+#6  0x0000005583dfc85c in httplib::Server::process_request(httplib::Stream&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, int, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, int, bool, bool&, std::function<void (httplib::Request&)> const&) ()
+#7  0x0000005583dfd004 in httplib::Server::process_and_close_socket(int) ()
+
+Thread 14 (Thread 0x7f74f9dba0 (LWP 722) "wsprrypi"):
+#0  0x0000007f7f102f6c in ?? () from /lib/aarch64-linux-gnu/libc.so.6
+#1  0x0000007f7f1097b8 in pthread_mutex_lock () from /lib/aarch64-linux-gnu/libc.so.6
+#2  0x0000005583e5038c in get_public_config_snapshot[abi:cxx11]() ()
+#3  0x0000005583d248c0 in (anonymous namespace)::catalog_request(httplib::Request const&) ()
+#4  0x0000005583d288a0 in web_server_routes::register_control(httplib::Server&, std::function<void (httplib::Response&)>)::{lambda(httplib::Request const&, httplib::Response&)#1}::operator()(httplib::Request const&, httplib::Response&) const [clone .isra.0] ()
+#5  0x0000005583ddbf50 in httplib::Server::dispatch_request(httplib::Request&, httplib::Response&, std::vector<std::pair<std::unique_ptr<httplib::detail::MatcherBase, std::default_delete<httplib::detail::MatcherBase> >, std::function<void (httplib::Request const&, httplib::Response&)> >, std::allocator<std::pair<std::unique_ptr<httplib::detail::MatcherBase, std::default_delete<httplib::detail::MatcherBase> >, std::function<void (httplib::Request const&, httplib::Response&)> > > > const&) const ()
+#6  0x0000005583dfc85c in httplib::Server::process_request(httplib::Stream&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, int, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, int, bool, bool&, std::function<void (httplib::Request&)> const&) ()
+#7  0x0000005583dfd004 in httplib::Server::process_and_close_socket(int) ()
+
+Thread 13 (Thread 0x7f6bffdba0 (LWP 723) "wsprrypi"):
+#0  0x0000007f7f102f6c in ?? () from /lib/aarch64-linux-gnu/libc.so.6
+#1  0x0000007f7f1097b8 in pthread_mutex_lock () from /lib/aarch64-linux-gnu/libc.so.6
+#2  0x0000005583e5038c in get_public_config_snapshot[abi:cxx11]() ()
+#3  0x0000005583d248c0 in (anonymous namespace)::catalog_request(httplib::Request const&) ()
+#4  0x0000005583d288a0 in web_server_routes::register_control(httplib::Server&, std::function<void (httplib::Response&)>)::{lambda(httplib::Request const&, httplib::Response&)#1}::operator()(httplib::Request const&, httplib::Response&) const [clone .isra.0] ()
+#5  0x0000005583ddbf50 in httplib::Server::dispatch_request(httplib::Request&, httplib::Response&, std::vector<std::pair<std::unique_ptr<httplib::detail::MatcherBase, std::default_delete<httplib::detail::MatcherBase> >, std::function<void (httplib::Request const&, httplib::Response&)> >, std::allocator<std::pair<std::unique_ptr<httplib::detail::MatcherBase, std::default_delete<httplib::detail::MatcherBase> >, std::function<void (httplib::Request const&, httplib::Response&)> > > > const&) const ()
+#6  0x0000005583dfc85c in httplib::Server::process_request(httplib::Stream&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, int, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, int, bool, bool&, std::function<void (httplib::Request&)> const&) ()
+#7  0x0000005583dfd004 in httplib::Server::process_and_close_socket(int) ()
+
+Thread 12 (Thread 0x7f6b7edba0 (LWP 724) "wsprrypi"):
+#0  0x0000007f7f102f6c in ?? () from /lib/aarch64-linux-gnu/libc.so.6
+#1  0x0000007f7f1097b8 in pthread_mutex_lock () from /lib/aarch64-linux-gnu/libc.so.6
+#2  0x0000005583e5038c in get_public_config_snapshot[abi:cxx11]() ()
+#3  0x0000005583d248c0 in (anonymous namespace)::catalog_request(httplib::Request const&) ()
+#4  0x0000005583d288a0 in web_server_routes::register_control(httplib::Server&, std::function<void (httplib::Response&)>)::{lambda(httplib::Request const&, httplib::Response&)#1}::operator()(httplib::Request const&, httplib::Response&) const [clone .isra.0] ()
+#5  0x0000005583ddbf50 in httplib::Server::dispatch_request(httplib::Request&, httplib::Response&, std::vector<std::pair<std::unique_ptr<httplib::detail::MatcherBase, std::default_delete<httplib::detail::MatcherBase> >, std::function<void (httplib::Request const&, httplib::Response&)> >, std::allocator<std::pair<std::unique_ptr<httplib::detail::MatcherBase, std::default_delete<httplib::detail::MatcherBase> >, std::function<void (httplib::Request const&, httplib::Response&)> > > > const&) const ()
+#6  0x0000005583dfc85c in httplib::Server::process_request(httplib::Stream&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, int, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, int, bool, bool&, std::function<void (httplib::Request&)> const&) ()
+#7  0x0000005583dfd004 in httplib::Server::process_and_close_socket(int) ()
+
+Thread 11 (Thread 0x7f6afddba0 (LWP 725) "wsprrypi"):
+#0  0x0000007f7f102f6c in ?? () from /lib/aarch64-linux-gnu/libc.so.6
+#1  0x0000007f7f1097b8 in pthread_mutex_lock () from /lib/aarch64-linux-gnu/libc.so.6
+#2  0x0000005583e5038c in get_public_config_snapshot[abi:cxx11]() ()
+#3  0x0000005583d248c0 in (anonymous namespace)::catalog_request(httplib::Request const&) ()
+#4  0x0000005583d288a0 in web_server_routes::register_control(httplib::Server&, std::function<void (httplib::Response&)>)::{lambda(httplib::Request const&, httplib::Response&)#1}::operator()(httplib::Request const&, httplib::Response&) const [clone .isra.0] ()
+#5  0x0000005583ddbf50 in httplib::Server::dispatch_request(httplib::Request&, httplib::Response&, std::vector<std::pair<std::unique_ptr<httplib::detail::MatcherBase, std::default_delete<httplib::detail::MatcherBase> >, std::function<void (httplib::Request const&, httplib::Response&)> >, std::allocator<std::pair<std::unique_ptr<httplib::detail::MatcherBase, std::default_delete<httplib::detail::MatcherBase> >, std::function<void (httplib::Request const&, httplib::Response&)> > > > const&) const ()
+#6  0x0000005583dfc85c in httplib::Server::process_request(httplib::Stream&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, int, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, int, bool, bool&, std::function<void (httplib::Request&)> const&) ()
+#7  0x0000005583dfd004 in httplib::Server::process_and_close_socket(int) ()
+
+Thread 10 (Thread 0x7f6a7cdba0 (LWP 726) "wsprrypi"):
+#0  0x0000007f7f102f6c in ?? () from /lib/aarch64-linux-gnu/libc.so.6
+#1  0x0000007f7f1097b8 in pthread_mutex_lock () from /lib/aarch64-linux-gnu/libc.so.6
+#2  0x0000005583e5038c in get_public_config_snapshot[abi:cxx11]() ()
+#3  0x0000005583d248c0 in (anonymous namespace)::catalog_request(httplib::Request const&) ()
+#4  0x0000005583d288a0 in web_server_routes::register_control(httplib::Server&, std::function<void (httplib::Response&)>)::{lambda(httplib::Request const&, httplib::Response&)#1}::operator()(httplib::Request const&, httplib::Response&) const [clone .isra.0] ()
+#5  0x0000005583ddbf50 in httplib::Server::dispatch_request(httplib::Request&, httplib::Response&, std::vector<std::pair<std::unique_ptr<httplib::detail::MatcherBase, std::default_delete<httplib::detail::MatcherBase> >, std::function<void (httplib::Request const&, httplib::Response&)> >, std::allocator<std::pair<std::unique_ptr<httplib::detail::MatcherBase, std::default_delete<httplib::detail::MatcherBase> >, std::function<void (httplib::Request const&, httplib::Response&)> > > > const&) const ()
+#6  0x0000005583dfc85c in httplib::Server::process_request(httplib::Stream&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, int, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, int, bool, bool&, std::function<void (httplib::Request&)> const&) ()
+#7  0x0000005583dfd004 in httplib::Server::process_and_close_socket(int) ()
+
+Thread 9 (Thread 0x7f69fbdba0 (LWP 727) "wsprrypi"):
+#0  0x0000007f7f102f6c in ?? () from /lib/aarch64-linux-gnu/libc.so.6
+#1  0x0000007f7f1097b8 in pthread_mutex_lock () from /lib/aarch64-linux-gnu/libc.so.6
+#2  0x0000005583e5038c in get_public_config_snapshot[abi:cxx11]() ()
+#3  0x0000005583d248c0 in (anonymous namespace)::catalog_request(httplib::Request const&) ()
+#4  0x0000005583d288a0 in web_server_routes::register_control(httplib::Server&, std::function<void (httplib::Response&)>)::{lambda(httplib::Request const&, httplib::Response&)#1}::operator()(httplib::Request const&, httplib::Response&) const [clone .isra.0] ()
+#5  0x0000005583ddbf50 in httplib::Server::dispatch_request(httplib::Request&, httplib::Response&, std::vector<std::pair<std::unique_ptr<httplib::detail::MatcherBase, std::default_delete<httplib::detail::MatcherBase> >, std::function<void (httplib::Request const&, httplib::Response&)> >, std::allocator<std::pair<std::unique_ptr<httplib::detail::MatcherBase, std::default_delete<httplib::detail::MatcherBase> >, std::function<void (httplib::Request const&, httplib::Response&)> > > > const&) const ()
+#6  0x0000005583dfc85c in httplib::Server::process_request(httplib::Stream&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, int, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, int, bool, bool&, std::function<void (httplib::Request&)> const&) ()
+#7  0x0000005583dfd004 in httplib::Server::process_and_close_socket(int) ()
+
+Thread 8 (Thread 0x7f697adba0 (LWP 728) "wsprrypi"):
+#0  0x0000007f7f10f22c in ?? () from /lib/aarch64-linux-gnu/libc.so.6
+#1  0x0000007f7f1028b8 in ?? () from /lib/aarch64-linux-gnu/libc.so.6
+#2  0x0000007f7f1028fc in ?? () from /lib/aarch64-linux-gnu/libc.so.6
+#3  0x0000005583fa9544 in Si5351Device::readRegister(unsigned char, unsigned char&) ()
+#4  0x0000005583faa018 in Si5351Device::probe() ()
+#5  0x0000005583e4f9e0 in discover_si5351_addresses(int, int) ()
+#6  0x0000005583eb03d0 in config_handler_serialization::public_config_from_internal_json(nlohmann::json_abi_v3_11_3::basic_json<std::map, std::vector, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >, bool, long, unsigned long, double, std::allocator, nlohmann::json_abi_v3_11_3::adl_serializer, std::vector<unsigned char, std::allocator<unsigned char> >, void> const&) ()
+#7  0x0000005583e503a8 in get_public_config_snapshot[abi:cxx11]() ()
+
+Thread 7 (Thread 0x7f68f9dba0 (LWP 731) "wsprrypi"):
+#0  0x0000007f7f10f228 in ?? () from /lib/aarch64-linux-gnu/libc.so.6
+#1  0x0000007f7f1028b8 in ?? () from /lib/aarch64-linux-gnu/libc.so.6
+#2  0x0000007f7f1028fc in ?? () from /lib/aarch64-linux-gnu/libc.so.6
+#3  0x0000007f7f1701c4 in accept () from /lib/aarch64-linux-gnu/libc.so.6
+#4  0x0000005583d6ca7c in WebSocketServer::serverLoop() ()
+#5  0x0000007f7f40b4e0 in ?? () from /lib/aarch64-linux-gnu/libstdc++.so.6
+#6  0x0000007f7f1061d8 in ?? () from /lib/aarch64-linux-gnu/libc.so.6
+#7  0x0000007f7f16e15c in ?? () from /lib/aarch64-linux-gnu/libc.so.6
+
+Thread 6 (Thread 0x7f63ffdba0 (LWP 732) "wsprrypi"):
+#0  0x0000007f7f10f228 in ?? () from /lib/aarch64-linux-gnu/libc.so.6
+#1  0x0000007f7f1028b8 in ?? () from /lib/aarch64-linux-gnu/libc.so.6
+#2  0x0000007f7f102c50 in ?? () from /lib/aarch64-linux-gnu/libc.so.6
+#3  0x0000007f7f105a8c in pthread_cond_clockwait () from /lib/aarch64-linux-gnu/libc.so.6
+#4  0x0000005583d6aae8 in WebSocketServer::keepAliveLoop(unsigned int) ()
+#5  0x0000007f7f40b4e0 in ?? () from /lib/aarch64-linux-gnu/libstdc++.so.6
+#6  0x0000007f7f1061d8 in ?? () from /lib/aarch64-linux-gnu/libc.so.6
+#7  0x0000007f7f16e15c in ?? () from /lib/aarch64-linux-gnu/libc.so.6
+
+Thread 5 (Thread 0x7f637edba0 (LWP 734) "wsprrypi"):
+#0  0x0000007f7f10f228 in ?? () from /lib/aarch64-linux-gnu/libc.so.6
+#1  0x0000007f7f1028b8 in ?? () from /lib/aarch64-linux-gnu/libc.so.6
+#2  0x0000007f7f102c50 in ?? () from /lib/aarch64-linux-gnu/libc.so.6
+#3  0x0000007f7f105a8c in pthread_cond_clockwait () from /lib/aarch64-linux-gnu/libc.so.6
+#4  0x0000005583f5f708 in MonitorFile::monitor_loop() ()
+#5  0x0000007f7f40b4e0 in ?? () from /lib/aarch64-linux-gnu/libstdc++.so.6
+#6  0x0000007f7f1061d8 in ?? () from /lib/aarch64-linux-gnu/libc.so.6
+#7  0x0000007f7f16e15c in ?? () from /lib/aarch64-linux-gnu/libc.so.6
+
+Thread 4 (Thread 0x7f62fddba0 (LWP 742) "wsprrypi"):
+#0  0x0000007f7f10f228 in ?? () from /lib/aarch64-linux-gnu/libc.so.6
+#1  0x0000007f7f1028b8 in ?? () from /lib/aarch64-linux-gnu/libc.so.6
+#2  0x0000007f7f13e51c in clock_nanosleep () from /lib/aarch64-linux-gnu/libc.so.6
+#3  0x0000007f7f148b40 in nanosleep () from /lib/aarch64-linux-gnu/libc.so.6
+#4  0x0000005583f65678 in PPMManager::ppm_update_loop(int) ()
+#5  0x0000007f7f40b4e0 in ?? () from /lib/aarch64-linux-gnu/libstdc++.so.6
+#6  0x0000007f7f1061d8 in ?? () from /lib/aarch64-linux-gnu/libc.so.6
+#7  0x0000007f7f16e15c in ?? () from /lib/aarch64-linux-gnu/libc.so.6
+
+Thread 3 (Thread 0x7f627cdba0 (LWP 1332) "wsprrypi"):
+#0  0x0000007f7f10f228 in ?? () from /lib/aarch64-linux-gnu/libc.so.6
+#1  0x0000007f7f1028b8 in ?? () from /lib/aarch64-linux-gnu/libc.so.6
+#2  0x0000007f7f1028fc in ?? () from /lib/aarch64-linux-gnu/libc.so.6
+#3  0x0000007f7f1638a0 in poll () from /lib/aarch64-linux-gnu/libc.so.6
+#4  0x0000005583d0f8d0 in wsprrypi::WtpPlainListener::run() ()
+#5  0x0000007f7f40b4e0 in ?? () from /lib/aarch64-linux-gnu/libstdc++.so.6
+#6  0x0000007f7f1061d8 in ?? () from /lib/aarch64-linux-gnu/libc.so.6
+#7  0x0000007f7f16e15c in ?? () from /lib/aarch64-linux-gnu/libc.so.6
+
+Thread 2 (Thread 0x7f61fbdba0 (LWP 1333) "wsprrypi"):
+#0  0x0000007f7f10f228 in ?? () from /lib/aarch64-linux-gnu/libc.so.6
+#1  0x0000007f7f1028b8 in ?? () from /lib/aarch64-linux-gnu/libc.so.6
+#2  0x0000007f7f1028fc in ?? () from /lib/aarch64-linux-gnu/libc.so.6
+#3  0x0000007f7f1638a0 in poll () from /lib/aarch64-linux-gnu/libc.so.6
+#4  0x0000007f7f708140 in avahi_simple_poll_run () from /lib/aarch64-linux-gnu/libavahi-common.so.3
+#5  0x0000007f7f708394 in avahi_simple_poll_iterate () from /lib/aarch64-linux-gnu/libavahi-common.so.3
+#6  0x0000005583d0c098 in wsprrypi::WtpPiDnsSdPublisher::run() ()
+#7  0x0000007f7f40b4e0 in ?? () from /lib/aarch64-linux-gnu/libstdc++.so.6
+
+Thread 1 (Thread 0x7f7fec4020 (LWP 692) "wsprrypi"):
+#0  0x0000007f7f10f228 in ?? () from /lib/aarch64-linux-gnu/libc.so.6
+#1  0x0000007f7f1028b8 in ?? () from /lib/aarch64-linux-gnu/libc.so.6
+#2  0x0000007f7f102c50 in ?? () from /lib/aarch64-linux-gnu/libc.so.6
+#3  0x0000007f7f105a8c in pthread_cond_clockwait () from /lib/aarch64-linux-gnu/libc.so.6
+#4  0x0000005583ec3dc8 in wspr_loop() ()
+#5  0x0000005583c38590 in main ()
+[Inferior 1 (process 692) detached]

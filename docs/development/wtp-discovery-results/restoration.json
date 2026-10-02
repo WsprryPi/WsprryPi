@@ -1,0 +1,302 @@
+{
+  "before_hashes": {
+    "/usr/local/bin/wsprrypi": "663b46d503c69ff4c718ba1d6ecfe2e5877e661b42bfeb1fb76c3feeb0dfa700",
+    "/usr/local/etc/wsprrypi.ini": "b8d705b6ec1b4f8618698a5495ad8d06e57a9da2f25d32d8be12f5f6ae81c576",
+    "/usr/local/etc/wsprrypi.ini.wtp-assignments.json": "f163a16856c86d164ee42284a60c18171eaff800a84f09d8780f5bfe888a7c64",
+    "/usr/local/etc/wsprrypi.ini.wtp-devices.json": "d294997e2866237bccc326b32cbbbcbd3dac80f59621bcc3ef31dcfec11c5ca3",
+    "/etc/avahi/avahi-daemon.conf": "29219252f3d51c1bf59dca0ad95fca72ec3fd8bb9c9eb112615c9d4fed10eeb5",
+    "/etc/NetworkManager/system-connections/Bohica-IoT-wlan1.nmconnection": "ca0047bad6c3dfc17b7905811739952a092dff8b84b17a09f0004d6612f3c5cb",
+    "/etc/NetworkManager/system-connections/Bohica-IoT-wlan0.nmconnection": "5a41d26083cc5115ffaaef29935a740ff416850ada07517631db69c4dcb59302",
+    "/run/NetworkManager/system-connections/netplan-eth0.nmconnection": "38aaadab8f65ac50b4882979bf7db451eec1b2dcc769b9cbb2b6b9e12edadf1c"
+  },
+  "after_hashes": {
+    "/usr/local/bin/wsprrypi": "663b46d503c69ff4c718ba1d6ecfe2e5877e661b42bfeb1fb76c3feeb0dfa700",
+    "/usr/local/etc/wsprrypi.ini": "b8d705b6ec1b4f8618698a5495ad8d06e57a9da2f25d32d8be12f5f6ae81c576",
+    "/usr/local/etc/wsprrypi.ini.wtp-assignments.json": "f163a16856c86d164ee42284a60c18171eaff800a84f09d8780f5bfe888a7c64",
+    "/usr/local/etc/wsprrypi.ini.wtp-devices.json": "d294997e2866237bccc326b32cbbbcbd3dac80f59621bcc3ef31dcfec11c5ca3",
+    "/etc/avahi/avahi-daemon.conf": "29219252f3d51c1bf59dca0ad95fca72ec3fd8bb9c9eb112615c9d4fed10eeb5",
+    "/etc/NetworkManager/system-connections/Bohica-IoT-wlan1.nmconnection": "ca0047bad6c3dfc17b7905811739952a092dff8b84b17a09f0004d6612f3c5cb",
+    "/etc/NetworkManager/system-connections/Bohica-IoT-wlan0.nmconnection": "5a41d26083cc5115ffaaef29935a740ff416850ada07517631db69c4dcb59302",
+    "/run/NetworkManager/system-connections/netplan-eth0.nmconnection": "38aaadab8f65ac50b4882979bf7db451eec1b2dcc769b9cbb2b6b9e12edadf1c"
+  },
+  "hashes_equal": true,
+  "assignments": [
+    {
+      "device_id": "d133ed890b90f6945b41a235429ff155",
+      "enabled": false,
+      "in_flight": false,
+      "last_start_ns": "1790904001000000000",
+      "management_port": 31415,
+      "name": "Concurrent Fleet wspr1",
+      "product": "WsprryPi",
+      "revocation_generation": "0",
+      "schedule": {
+        "duration_ms": 10000,
+        "frequency_hz": 14099100,
+        "mode": "tone",
+        "period_seconds": 120,
+        "phase_seconds": 1
+      },
+      "settings": {
+        "Allow Frequency Adjustment": true,
+        "Device ID": "d133ed890b90f6945b41a235429ff155",
+        "Endpoint": "",
+        "Hostname": "wtp-d133ed890b90f6945b41a235429ff155.local",
+        "Start Uncertainty ns": 500000000,
+        "TCP Port": 31417,
+        "TLS CA File": "",
+        "TLS Client Certificate": "",
+        "TLS Client Key": "",
+        "TLS Server Identity": "",
+        "Transport": "network_plain",
+        "USB Product ID": 0,
+        "USB Serial": "",
+        "USB Vendor ID": 0
+      }
+    },
+    {
+      "device_id": "f21e530af8a4a210ec57898c0ebd32d2",
+      "enabled": false,
+      "in_flight": false,
+      "last_start_ns": "1790904001000000000",
+      "management_port": 31415,
+      "name": "Concurrent Fleet wspr4",
+      "product": "WsprryPi",
+      "revocation_generation": "4",
+      "schedule": {
+        "duration_ms": 10000,
+        "frequency_hz": 14098100,
+        "mode": "tone",
+        "period_seconds": 120,
+        "phase_seconds": 1
+      },
+      "settings": {
+        "Allow Frequency Adjustment": true,
+        "Device ID": "f21e530af8a4a210ec57898c0ebd32d2",
+        "Endpoint": "",
+        "Hostname": "wtp-f21e530af8a4a210ec57898c0ebd32d2.local",
+        "Start Uncertainty ns": 500000000,
+        "TCP Port": 31417,
+        "TLS CA File": "",
+        "TLS Client Certificate": "",
+        "TLS Client Key": "",
+        "TLS Server Identity": "",
+        "Transport": "network_plain",
+        "USB Product ID": 0,
+        "USB Serial": "",
+        "USB Vendor ID": 0
+      }
+    },
+    {
+      "device_id": "29f20b7342051ef947aa56cb9d4fab42",
+      "enabled": false,
+      "in_flight": false,
+      "last_start_ns": "1790904001000000000",
+      "management_port": 31415,
+      "name": "Concurrent Fleet Pico B",
+      "product": "WsprryPico",
+      "revocation_generation": null,
+      "schedule": {
+        "duration_ms": 10000,
+        "frequency_hz": 14102100,
+        "mode": "tone",
+        "period_seconds": 120,
+        "phase_seconds": 1
+      },
+      "settings": {
+        "Allow Frequency Adjustment": true,
+        "Device ID": "29f20b7342051ef947aa56cb9d4fab42",
+        "Endpoint": "",
+        "Hostname": "wsprrypico-0a9d89.local",
+        "Start Uncertainty ns": 500000000,
+        "TCP Port": 31417,
+        "TLS CA File": "",
+        "TLS Client Certificate": "",
+        "TLS Client Key": "",
+        "TLS Server Identity": "",
+        "Transport": "network_plain",
+        "USB Product ID": 0,
+        "USB Serial": "",
+        "USB Vendor ID": 0
+      }
+    },
+    {
+      "device_id": "e2a4d273f7d8f24f6696f7c6fb95ff11",
+      "enabled": false,
+      "in_flight": false,
+      "last_start_ns": "1790938213000000000",
+      "management_port": 31415,
+      "name": "Concurrent Fleet wspr2",
+      "product": "WsprryPi",
+      "revocation_generation": "2",
+      "schedule": {
+        "duration_ms": 10000,
+        "frequency_hz": 14101100,
+        "mode": "tone",
+        "period_seconds": 120,
+        "phase_seconds": 1
+      },
+      "settings": {
+        "Allow Frequency Adjustment": true,
+        "Device ID": "e2a4d273f7d8f24f6696f7c6fb95ff11",
+        "Endpoint": "",
+        "Hostname": "wtp-e2a4d273f7d8f24f6696f7c6fb95ff11.local",
+        "Start Uncertainty ns": 500000000,
+        "TCP Port": 31417,
+        "TLS CA File": "",
+        "TLS Client Certificate": "",
+        "TLS Client Key": "",
+        "TLS Server Identity": "",
+        "Transport": "network_plain",
+        "USB Product ID": 0,
+        "USB Serial": "",
+        "USB Vendor ID": 0
+      }
+    },
+    {
+      "device_id": "fd6127d11d6aca42a9905fa3fb1bf1d5",
+      "enabled": false,
+      "in_flight": false,
+      "last_start_ns": "1790938213000000000",
+      "management_port": 31415,
+      "name": "Concurrent Fleet Pico A",
+      "product": "WsprryPico",
+      "revocation_generation": null,
+      "schedule": {
+        "duration_ms": 10000,
+        "frequency_hz": 14100100,
+        "mode": "tone",
+        "period_seconds": 120,
+        "phase_seconds": 1
+      },
+      "settings": {
+        "Allow Frequency Adjustment": true,
+        "Device ID": "fd6127d11d6aca42a9905fa3fb1bf1d5",
+        "Endpoint": "",
+        "Hostname": "wsprrypico-0a60df.local",
+        "Start Uncertainty ns": 500000000,
+        "TCP Port": 31417,
+        "TLS CA File": "",
+        "TLS Client Certificate": "",
+        "TLS Client Key": "",
+        "TLS Server Identity": "",
+        "Transport": "network_plain",
+        "USB Product ID": 0,
+        "USB Serial": "",
+        "USB Vendor ID": 0
+      }
+    }
+  ],
+  "profiles_unchanged": true,
+  "service": "MainPID=621104\nActiveState=active",
+  "before_boot_id": "ab2421ed8de8fc5f0d4e199c8447fa78",
+  "after_boot_id": "ab2421ed8de8fc5f0d4e199c8447fa78",
+  "endpoint": {
+    "address": "192.168.1.54",
+    "boot_id": "ab2421ed8de8fc5f0d4e199c8447fa78",
+    "device_id": "e045017b11e54c2fb7029f0154e6deb9",
+    "dns_sd_published": true,
+    "enabled": true,
+    "finishing_remote_job": false,
+    "launch_observed_monotonic_ns": null,
+    "launch_target_monotonic_ns": "0",
+    "listener_error": "",
+    "listener_running": true,
+    "local_effective": false,
+    "local_requested": false,
+    "local_work_active": false,
+    "output_unknown": false,
+    "port": 31417,
+    "remote_admission_closed": false,
+    "remote_job_id": "",
+    "remote_output_active": false,
+    "remote_owner": "",
+    "remote_state": "empty",
+    "revocation_generation": "11",
+    "revocation_unavailable": false,
+    "schema": "wsprrypi-wtp-endpoint/1"
+  },
+  "addresses": {
+    "lo": [],
+    "eth0": [
+      "192.168.1.54"
+    ],
+    "wlan1": [
+      "192.168.1.117"
+    ]
+  },
+  "routes": [
+    {
+      "dst": "default",
+      "gateway": "192.168.1.1",
+      "dev": "eth0",
+      "protocol": "dhcp",
+      "prefsrc": "192.168.1.54",
+      "metric": 100,
+      "flags": []
+    },
+    {
+      "dst": "default",
+      "gateway": "192.168.1.1",
+      "dev": "wlan1",
+      "protocol": "dhcp",
+      "prefsrc": "192.168.1.117",
+      "metric": 100,
+      "flags": []
+    },
+    {
+      "dst": "192.168.1.0/24",
+      "dev": "eth0",
+      "protocol": "kernel",
+      "scope": "link",
+      "prefsrc": "192.168.1.54",
+      "metric": 100,
+      "flags": []
+    },
+    {
+      "dst": "192.168.1.0/24",
+      "dev": "wlan1",
+      "protocol": "kernel",
+      "scope": "link",
+      "prefsrc": "192.168.1.117",
+      "metric": 100,
+      "flags": []
+    }
+  ],
+  "route_preference_restored": true,
+  "ethernet_mac": "2c:cf:67:62:76:64",
+  "qdiscs": {
+    "eth0": [
+      {
+        "kind": "fq_codel",
+        "handle": "0:",
+        "root": true,
+        "refcnt": 2,
+        "options": {
+          "limit": 10240,
+          "flows": 1024,
+          "quantum": 1514,
+          "target": 4999,
+          "interval": 99999,
+          "memory_limit": 33554432,
+          "ecn": true,
+          "drop_batch": 64
+        }
+      }
+    ],
+    "wlan1": [
+      {
+        "kind": "noqueue",
+        "handle": "0:",
+        "root": true,
+        "refcnt": 2,
+        "options": {}
+      }
+    ]
+  },
+  "test_units": "",
+  "private_backup_mode": "0o600",
+  "avahi": "active",
+  "chrony": "active",
+  "pps": "/dev/pps0"
+}

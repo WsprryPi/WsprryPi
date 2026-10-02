@@ -1,4 +1,5 @@
 #include "arg_parser.hpp"
+#include "si5351_inventory_process.hpp"
 #include "backend_capabilities.hpp"
 #include "config_handler.hpp"
 #include "config_handler_deserialization.hpp"
@@ -696,6 +697,8 @@ void test_idle_startup_overrides()
 
 int main(int argc, char *argv[])
 {
+    if (const auto inventory_exit = si5351_inventory_process::helper_main(argc, argv))
+        return *inventory_exit;
     if (argc == 2 && std::string(argv[1]) == "--wtp-transient-ini-only")
     {
         ScopedTemporaryFile ini("/tmp/wsprrypi-wtp-transient-XXXXXX");

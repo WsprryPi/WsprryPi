@@ -1,0 +1,32 @@
+tcpdump: WARNING: any: That device doesn't support promiscuous mode
+(Promiscuous mode not supported on the "any" device)
+tcpdump: verbose output suppressed, use -v[v]... for full protocol decode
+listening on any, link-type LINUX_SLL2 (Linux cooked v2), snapshot length 262144 bytes
+06:51:01.427165 eth0  In  IP 192.168.1.120.52804 > 192.168.1.54.31417: Flags [S], seq 2949549152, win 64240, options [mss 1460,sackOK,TS val 2336123940 ecr 0,nop,wscale 9], length 0
+06:51:01.427195 wlan1 Out IP 192.168.1.54.31417 > 192.168.1.120.52804: Flags [S.], seq 2022950438, ack 2949549153, win 65160, options [mss 1460,sackOK,TS val 982667188 ecr 2336123940,nop,wscale 9], length 0
+06:51:01.435653 eth0  In  IP 192.168.1.120.52804 > 192.168.1.54.31417: Flags [.], ack 1, win 126, options [nop,nop,TS val 2336123949 ecr 982667188], length 0
+06:51:01.436431 eth0  In  IP 192.168.1.120.52804 > 192.168.1.54.31417: Flags [P.], seq 1:251, ack 1, win 126, options [nop,nop,TS val 2336123950 ecr 982667188], length 250
+06:51:01.436441 wlan1 Out IP 192.168.1.54.31417 > 192.168.1.120.52804: Flags [.], ack 251, win 127, options [nop,nop,TS val 982667197 ecr 2336123950], length 0
+06:51:01.437318 wlan1 Out IP 192.168.1.54.31417 > 192.168.1.120.52804: Flags [P.], seq 1:17, ack 251, win 127, options [nop,nop,TS val 982667198 ecr 2336123950], length 16
+06:51:01.646859 eth0  In  IP 192.168.1.120.52804 > 192.168.1.54.31417: Flags [P.], seq 1:251, ack 1, win 126, options [nop,nop,TS val 2336124161 ecr 982667188], length 250
+06:51:01.646881 wlan1 Out IP 192.168.1.54.31417 > 192.168.1.120.52804: Flags [.], ack 251, win 127, options [nop,nop,TS val 982667407 ecr 2336124161,nop,nop,sack 1 {1:251}], length 0
+06:51:01.657992 wlan1 Out IP 192.168.1.54.31417 > 192.168.1.120.52804: Flags [P.], seq 17:364, ack 251, win 127, options [nop,nop,TS val 982667419 ecr 2336124161], length 347
+06:51:01.859199 eth0  In  IP 192.168.1.120.52804 > 192.168.1.54.31417: Flags [P.], seq 1:251, ack 1, win 126, options [nop,nop,TS val 2336124373 ecr 982667188], length 250
+06:51:01.859214 wlan1 Out IP 192.168.1.54.31417 > 192.168.1.120.52804: Flags [.], ack 251, win 127, options [nop,nop,TS val 982667620 ecr 2336124373,nop,nop,sack 1 {1:251}], length 0
+06:51:01.949996 wlan1 Out IP 192.168.1.54.31417 > 192.168.1.120.52804: Flags [P.], seq 1:364, ack 251, win 127, options [nop,nop,TS val 982667711 ecr 2336124373], length 363
+06:51:02.302855 eth0  In  IP 192.168.1.120.52804 > 192.168.1.54.31417: Flags [P.], seq 1:251, ack 1, win 126, options [nop,nop,TS val 2336124817 ecr 982667188], length 250
+06:51:02.302872 wlan1 Out IP 192.168.1.54.31417 > 192.168.1.120.52804: Flags [.], ack 251, win 127, options [nop,nop,TS val 982668063 ecr 2336124817,nop,nop,sack 1 {1:251}], length 0
+06:51:02.521995 wlan1 Out IP 192.168.1.54.31417 > 192.168.1.120.52804: Flags [P.], seq 1:364, ack 251, win 127, options [nop,nop,TS val 982668283 ecr 2336124817], length 363
+06:51:03.166866 eth0  In  IP 192.168.1.120.52804 > 192.168.1.54.31417: Flags [P.], seq 1:251, ack 1, win 126, options [nop,nop,TS val 2336125681 ecr 982667188], length 250
+06:51:03.166885 wlan1 Out IP 192.168.1.54.31417 > 192.168.1.120.52804: Flags [.], ack 251, win 127, options [nop,nop,TS val 982668927 ecr 2336125681,nop,nop,sack 1 {1:251}], length 0
+06:51:03.641996 wlan1 Out IP 192.168.1.54.31417 > 192.168.1.120.52804: Flags [P.], seq 1:364, ack 251, win 127, options [nop,nop,TS val 982669403 ecr 2336125681], length 363
+06:51:04.862884 eth0  In  IP 192.168.1.120.52804 > 192.168.1.54.31417: Flags [P.], seq 1:251, ack 1, win 126, options [nop,nop,TS val 2336127377 ecr 982667188], length 250
+06:51:04.862902 wlan1 Out IP 192.168.1.54.31417 > 192.168.1.120.52804: Flags [.], ack 251, win 127, options [nop,nop,TS val 982670623 ecr 2336127377,nop,nop,sack 1 {1:251}], length 0
+06:51:06.041998 wlan1 Out IP 192.168.1.54.31417 > 192.168.1.120.52804: Flags [P.], seq 1:364, ack 251, win 127, options [nop,nop,TS val 982671803 ecr 2336127377], length 363
+06:51:08.446893 eth0  In  IP 192.168.1.120.52804 > 192.168.1.54.31417: Flags [P.], seq 1:251, ack 1, win 126, options [nop,nop,TS val 2336130961 ecr 982667188], length 250
+06:51:08.446913 wlan1 Out IP 192.168.1.54.31417 > 192.168.1.120.52804: Flags [.], ack 251, win 127, options [nop,nop,TS val 982674207 ecr 2336130961,nop,nop,sack 1 {1:251}], length 0
+06:51:10.650000 wlan1 Out IP 192.168.1.54.31417 > 192.168.1.120.52804: Flags [P.], seq 1:364, ack 251, win 127, options [nop,nop,TS val 982676411 ecr 2336130961], length 363
+
+24 packets captured
+24 packets received by filter
+0 packets dropped by kernel

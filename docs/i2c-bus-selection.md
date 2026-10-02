@@ -17,10 +17,24 @@ The public configuration's read-only `Platform` section includes `I2C Buses`
 transient host information, not persisted settings or client authority.
 For the configured bus, `Si5351 Address Bus`, `Si5351 Addresses`, and
 `Si5351 Address Discovery Error` publish the corresponding transient address
-inventory. The private `GET /config/si5351-addresses?bus=N` route refreshes that
-inventory when the operator selects another listed bus.
+inventory from the latest completed explicit check for that bus and reference.
+Ordinary configuration and discovery reads do not scan I2C. Before any check,
+`Si5351 Inventory Checked` is false and `Si5351 Detected` is omitted; hardware
+presence remains unconfirmed. A completed check sets the checked flag, with any
+failure reported separately. Inventory remains transient and is never permission
+to transmit.
 
-The selector refreshes when configuration is loaded. Reload after enabling,
+The private `GET /config/si5351-addresses?bus=N` route refreshes that inventory
+in an isolated process. A scan has a two-second deadline, followed by at most
+25 milliseconds of nonblocking cleanup attempts. Concurrent refreshes report
+busy. If a killed worker remains blocked in the kernel, another scan is rejected
+until it exits; configuration reads and updates remain available. There is no
+unbounded queue of discovery workers. Readiness checks use the same isolation
+and deadline but read only the configured address.
+
+The bus selector refreshes metadata when configuration is loaded. Address
+inventory refreshes separately when Si5351 is selected or its I2C bus is selected;
+loading configuration with GPIO or WTP selected does not probe Si5351. Reload after enabling,
 adding, or removing adapters. A saved bus that disappears remains visible as
 unavailable; it is never silently replaced. An empty inventory disables the
 selector and explains that no buses are available. Discovery failure and missing
@@ -40,6 +54,10 @@ to an inactive Si5351 setting, are checked against fresh host metadata. Switchin
 to Si5351 also checks its bus. An unchanged unavailable bus does not prevent
 recovery to a different backend. Existing startup and transmission readiness
 checks still govern actual device use, including CLI and INI configuration.
+Physical selection/readiness validation runs outside the shared configuration
+lock. Before saving, WsprryPi checks that configuration has not changed during
+validation; a competing update rejects the older candidate. INI validation also
+leaves reads responsive while checking readiness.
 Changed address selections and switches to the Si5351 backend are checked
 against a fresh inventory for the selected bus. The server accepts Si5351
 addresses only from `0x60` through `0x6F`; it does not trust the browser's
@@ -52,8 +70,10 @@ safe RF operation.
 
 From `src`, run `make i2c-bus-inventory-test SUDO=` for temporary filesystem
 fixtures. The `i2c-bus-selection-test` target exercises rejection of a forged
-inventory and nonexistent selection without changing configuration. Both targets
-are included in the full and portable semantics profiles. Choose the host's
+inventory and nonexistent selection without changing configuration. The `si5351-inventory-process-test` target covers Linux subprocess deadlines,
+reply limits, busy admission and cleanup. `si5351-inventory-isolation-test` covers
+hardware-free snapshots, fresh selection validation and competing revisions.
+The original inventory/selection targets and isolation test are included in the full and portable semantics profiles. Choose the host's
 profile as documented in `AGENTS.md`.
 
 From `WsprryPi-UI`, run `npm test` and

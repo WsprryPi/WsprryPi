@@ -1,0 +1,321 @@
+{
+  "started_utc_ns": "1790947582587165778",
+  "initial_endpoint": {
+    "address": "192.168.1.120",
+    "boot_id": "f5b7cb1a4242c7d941b029ad33cc4e8d",
+    "device_id": "f21e530af8a4a210ec57898c0ebd32d2",
+    "dns_sd_published": true,
+    "enabled": true,
+    "finishing_remote_job": false,
+    "launch_observed_monotonic_ns": null,
+    "launch_target_monotonic_ns": "0",
+    "listener_error": "",
+    "listener_running": true,
+    "local_effective": false,
+    "local_requested": false,
+    "local_work_active": false,
+    "output_unknown": false,
+    "port": 31417,
+    "remote_admission_closed": false,
+    "remote_job_id": "",
+    "remote_output_active": false,
+    "remote_owner": "",
+    "remote_state": "empty",
+    "revocation_generation": "4",
+    "revocation_unavailable": false,
+    "schema": "wsprrypi-wtp-endpoint/1"
+  },
+  "initial_config_seconds": 0.0027585589996306226,
+  "original_ini_sha256": "1414f823176e7df48222e83f3066b8a6fcd3a54d0786be8d5a543d8410b869bf",
+  "writes": [
+    {
+      "seconds": 0.03539049401297234,
+      "status": 200,
+      "etag": "\"33a40b28b8970b942a17e801016defafb97a62c6807621da2b319a6dc36277f6\""
+    },
+    {
+      "seconds": 0.017105569000705145,
+      "status": 200,
+      "etag": "\"00bb5c0a4457fcfa1c865e6b98f2195fcdcdfc7ac058f46765b8b3effec701b8\""
+    }
+  ],
+  "reads": [
+    {
+      "seconds": 0.008119714999338612,
+      "status": 200,
+      "etag": "\"00bb5c0a4457fcfa1c865e6b98f2195fcdcdfc7ac058f46765b8b3effec701b8\""
+    },
+    {
+      "seconds": 0.0068121380027150735,
+      "status": 200,
+      "etag": null
+    },
+    {
+      "seconds": 0.005181399988941848,
+      "status": 200,
+      "etag": "\"00bb5c0a4457fcfa1c865e6b98f2195fcdcdfc7ac058f46765b8b3effec701b8\""
+    },
+    {
+      "seconds": 0.00696200699894689,
+      "status": 200,
+      "etag": null
+    },
+    {
+      "seconds": 0.017089512999518774,
+      "status": 200,
+      "etag": "\"00bb5c0a4457fcfa1c865e6b98f2195fcdcdfc7ac058f46765b8b3effec701b8\""
+    },
+    {
+      "seconds": 0.008972297990112565,
+      "status": 200,
+      "etag": null
+    },
+    {
+      "seconds": 0.008839096000883728,
+      "status": 200,
+      "etag": "\"00bb5c0a4457fcfa1c865e6b98f2195fcdcdfc7ac058f46765b8b3effec701b8\""
+    },
+    {
+      "seconds": 0.00810201199783478,
+      "status": 200,
+      "etag": null
+    },
+    {
+      "seconds": 0.026679045011405833,
+      "status": 200,
+      "etag": "\"00bb5c0a4457fcfa1c865e6b98f2195fcdcdfc7ac058f46765b8b3effec701b8\""
+    },
+    {
+      "seconds": 0.019984348997240886,
+      "status": 200,
+      "etag": null
+    },
+    {
+      "seconds": 0.01801976100250613,
+      "status": 200,
+      "etag": "\"00bb5c0a4457fcfa1c865e6b98f2195fcdcdfc7ac058f46765b8b3effec701b8\""
+    },
+    {
+      "seconds": 0.010670054994989187,
+      "status": 200,
+      "etag": null
+    },
+    {
+      "seconds": 0.0068673229980049655,
+      "status": 200,
+      "etag": "\"00bb5c0a4457fcfa1c865e6b98f2195fcdcdfc7ac058f46765b8b3effec701b8\""
+    },
+    {
+      "seconds": 0.013373522000620142,
+      "status": 200,
+      "etag": null
+    },
+    {
+      "seconds": 0.00963849299296271,
+      "status": 200,
+      "etag": "\"33a40b28b8970b942a17e801016defafb97a62c6807621da2b319a6dc36277f6\""
+    },
+    {
+      "seconds": 0.011941279997699894,
+      "status": 200,
+      "etag": null
+    },
+    {
+      "seconds": 0.0077474059944506735,
+      "status": 200,
+      "etag": "\"33a40b28b8970b942a17e801016defafb97a62c6807621da2b319a6dc36277f6\""
+    },
+    {
+      "seconds": 0.005052309003076516,
+      "status": 200,
+      "etag": null
+    },
+    {
+      "seconds": 0.013728517005802132,
+      "status": 200,
+      "etag": "\"00bb5c0a4457fcfa1c865e6b98f2195fcdcdfc7ac058f46765b8b3effec701b8\""
+    },
+    {
+      "seconds": 0.00569033800275065,
+      "status": 200,
+      "etag": null
+    },
+    {
+      "seconds": 0.01068929600296542,
+      "status": 200,
+      "etag": "\"00bb5c0a4457fcfa1c865e6b98f2195fcdcdfc7ac058f46765b8b3effec701b8\""
+    },
+    {
+      "seconds": 0.016414502999396063,
+      "status": 200,
+      "etag": null
+    },
+    {
+      "seconds": 0.010215485992375761,
+      "status": 200,
+      "etag": "\"00bb5c0a4457fcfa1c865e6b98f2195fcdcdfc7ac058f46765b8b3effec701b8\""
+    },
+    {
+      "seconds": 0.010816256995894946,
+      "status": 200,
+      "etag": null
+    },
+    {
+      "seconds": 0.008762134006246924,
+      "status": 200,
+      "etag": "\"00bb5c0a4457fcfa1c865e6b98f2195fcdcdfc7ac058f46765b8b3effec701b8\""
+    },
+    {
+      "seconds": 0.011251566989813,
+      "status": 200,
+      "etag": null
+    },
+    {
+      "seconds": 0.00586205800937023,
+      "status": 200,
+      "etag": "\"00bb5c0a4457fcfa1c865e6b98f2195fcdcdfc7ac058f46765b8b3effec701b8\""
+    },
+    {
+      "seconds": 0.009235183999408036,
+      "status": 200,
+      "etag": null
+    },
+    {
+      "seconds": 0.0075151119963265955,
+      "status": 200,
+      "etag": "\"00bb5c0a4457fcfa1c865e6b98f2195fcdcdfc7ac058f46765b8b3effec701b8\""
+    },
+    {
+      "seconds": 0.008658301987452433,
+      "status": 200,
+      "etag": null
+    },
+    {
+      "seconds": 0.008073661010712385,
+      "status": 200,
+      "etag": "\"00bb5c0a4457fcfa1c865e6b98f2195fcdcdfc7ac058f46765b8b3effec701b8\""
+    },
+    {
+      "seconds": 0.008870003002812155,
+      "status": 200,
+      "etag": null
+    },
+    {
+      "seconds": 0.0061792210035491735,
+      "status": 200,
+      "etag": "\"00bb5c0a4457fcfa1c865e6b98f2195fcdcdfc7ac058f46765b8b3effec701b8\""
+    },
+    {
+      "seconds": 0.007314652000786737,
+      "status": 200,
+      "etag": null
+    },
+    {
+      "seconds": 0.008006476986338384,
+      "status": 200,
+      "etag": "\"00bb5c0a4457fcfa1c865e6b98f2195fcdcdfc7ac058f46765b8b3effec701b8\""
+    },
+    {
+      "seconds": 0.00928418300463818,
+      "status": 200,
+      "etag": null
+    },
+    {
+      "seconds": 0.00806410500081256,
+      "status": 200,
+      "etag": "\"00bb5c0a4457fcfa1c865e6b98f2195fcdcdfc7ac058f46765b8b3effec701b8\""
+    },
+    {
+      "seconds": 0.008678079000674188,
+      "status": 200,
+      "etag": null
+    },
+    {
+      "seconds": 0.005470692995004356,
+      "status": 200,
+      "etag": "\"00bb5c0a4457fcfa1c865e6b98f2195fcdcdfc7ac058f46765b8b3effec701b8\""
+    },
+    {
+      "seconds": 0.006622493994655088,
+      "status": 200,
+      "etag": null
+    }
+  ],
+  "scans": [
+    {
+      "seconds": 2.028610706998734,
+      "status": 200,
+      "etag": null,
+      "body": {
+        "Addresses": [],
+        "Discovery Error": "Si5351 address discovery timed out; configuration remains available.",
+        "I2C Bus": 1
+      }
+    },
+    {
+      "seconds": 0.005805521999718621,
+      "status": 200,
+      "etag": null,
+      "body": {
+        "Addresses": [],
+        "Discovery Error": "Si5351 address discovery is already running.",
+        "I2C Bus": 1
+      }
+    }
+  ],
+  "final_endpoint": {
+    "address": "192.168.1.120",
+    "boot_id": "f5b7cb1a4242c7d941b029ad33cc4e8d",
+    "device_id": "f21e530af8a4a210ec57898c0ebd32d2",
+    "dns_sd_published": true,
+    "enabled": true,
+    "finishing_remote_job": false,
+    "launch_observed_monotonic_ns": null,
+    "launch_target_monotonic_ns": "0",
+    "listener_error": "",
+    "listener_running": true,
+    "local_effective": false,
+    "local_requested": false,
+    "local_work_active": false,
+    "output_unknown": false,
+    "port": 31417,
+    "remote_admission_closed": false,
+    "remote_job_id": "",
+    "remote_output_active": false,
+    "remote_owner": "",
+    "remote_state": "empty",
+    "revocation_generation": "4",
+    "revocation_unavailable": false,
+    "schema": "wsprrypi-wtp-endpoint/1"
+  },
+  "success": true,
+  "restored_ini_sha256": "1414f823176e7df48222e83f3066b8a6fcd3a54d0786be8d5a543d8410b869bf",
+  "after_restore_endpoint": {
+    "address": "192.168.1.120",
+    "boot_id": "f5b7cb1a4242c7d941b029ad33cc4e8d",
+    "device_id": "f21e530af8a4a210ec57898c0ebd32d2",
+    "dns_sd_published": true,
+    "enabled": true,
+    "finishing_remote_job": false,
+    "launch_observed_monotonic_ns": null,
+    "launch_target_monotonic_ns": "0",
+    "listener_error": "",
+    "listener_running": true,
+    "local_effective": false,
+    "local_requested": false,
+    "local_work_active": false,
+    "output_unknown": false,
+    "port": 31417,
+    "remote_admission_closed": false,
+    "remote_job_id": "",
+    "remote_output_active": false,
+    "remote_owner": "",
+    "remote_state": "empty",
+    "revocation_generation": "4",
+    "revocation_unavailable": false,
+    "schema": "wsprrypi-wtp-endpoint/1"
+  },
+  "final_config_read_seconds": 0.0025157100026262924,
+  "service": "MainPID=157592\nActiveState=active\nSubState=running\n",
+  "remaining_inventory_workers": ""
+}

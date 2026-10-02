@@ -1,0 +1,5 @@
+build metadata unchanged: build/generated/build_metadata.hpp
+backend capabilities unchanged: build/generated/backend_capabilities.hpp
+Compiling (debug) tests/ui_source_regression_test.cpp into build/obj/debug/rpi-gpio+rp1-gpclk+si5351+simulated+ancillary-gpio1/tests/ui_source_regression_test.o
+Linking debug: ui_source_regression_test
+ui_source_regression_test passed

@@ -73,6 +73,7 @@ struct PreparedConfigCandidate
 {
     nlohmann::json normalized_json{};
     ArgParserConfig normalized_config{};
+    std::string prepared_revision{};
     bool valid = false;
     bool transmit_enabled = false;
     std::string error_reason{};
@@ -87,6 +88,7 @@ struct Si5351AddressInventory
     int i2c_bus = -1;
     std::vector<int> addresses{};
     std::string error{};
+    bool checked = false;
 
     bool contains(int address) const noexcept;
 };
@@ -131,9 +133,13 @@ bool si5351_device_detected(
     int i2c_address,
     int reference_hz,
     std::string *error_message = nullptr);
+void set_si5351_inventory_command_override_for_test(const std::vector<std::string>& command);
+void clear_si5351_inventory_command_override_for_test();
+Si5351AddressInventory cached_si5351_addresses(int i2c_bus, int reference_hz);
 Si5351AddressInventory discover_si5351_addresses(
     int i2c_bus,
-    int reference_hz);
+    int reference_hz,
+    int selected_address = -1);
 void set_si5351_detection_override_for_test(bool detected) noexcept;
 void clear_si5351_detection_override_for_test() noexcept;
 void set_si5351_address_inventory_override_for_test(

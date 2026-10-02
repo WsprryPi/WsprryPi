@@ -1,0 +1,15 @@
+{
+  "base_commit": "960914333884158c87040c030d49ecaeb8795e65",
+  "input_and_harness_sha256": {
+    "wspr4-evidence.tar.gz": "34081019cbfe260e3ddfe0d871a548e759181e7a6b81a0a3fcf6895a9213008f",
+    "wspr2-evidence.tar.gz": "2a6a4e879f8d5ff587638373074253741818dbdbc294e90411131d47fef99d0d",
+    "wspr5-evidence.tar.gz": "230de4e9b0a0250778f4b8206d876564087500b59fdcdb3898f55c6057cf547d",
+    "campaign.py": "11e4ffc189df2ab06fe14d8d4d4aa460fe63bc054de01907d7a3e9d4dea094ef",
+    "observe.py": "cea2feea704ff54b9ba833930e7186a53e2fe575ecc6bc3eabc389b7db787251",
+    "analyze.py": "a721897ed325b3322b0f98d4b237394d1912ec5dae2874ae58e879b5c5ffb6b4"
+  },
+  "installed_binary_sha256": "663b46d503c69ff4c718ba1d6ecfe2e5877e661b42bfeb1fb76c3feeb0dfa700",
+  "focused_linux_test_sha256": "20f9e5e74ce8b328f8a8ae261dcca69f05b78d32f2a77c1ba239cba709f63984",
+  "intermediate_harness_versions_hashed": false,
+  "private_network_backup_transferred": false
+}

@@ -1,0 +1,43 @@
+{
+  "controller_api_samples": 3834,
+  "controller_dns_packets": 1549,
+  "wspr2_api_samples": 999,
+  "wspr2_dns_packets": 233,
+  "wspr4_api_samples": 1383,
+  "wspr4_dns_packets": 797,
+  "wspr4_error_samples": 170,
+  "wspr4_first_error": {
+    "utc_ns": "1790941881390002660",
+    "monotonic_ns": "89112682549955",
+    "discovery": {
+      "error": "timed out"
+    },
+    "wtp-endpoint": {
+      "address": "192.168.1.120",
+      "boot_id": "19d88d5752e3f3ad9765815d3ccf16eb",
+      "device_id": "f21e530af8a4a210ec57898c0ebd32d2",
+      "dns_sd_published": true,
+      "enabled": true,
+      "finishing_remote_job": false,
+      "launch_observed_monotonic_ns": "51112292661320",
+      "launch_target_monotonic_ns": "51112292541702",
+      "listener_error": "",
+      "listener_running": true,
+      "local_effective": false,
+      "local_requested": false,
+      "local_work_active": false,
+      "output_unknown": false,
+      "port": 31417,
+      "remote_admission_closed": false,
+      "remote_job_id": "",
+      "remote_output_active": false,
+      "remote_owner": "",
+      "remote_state": "empty",
+      "revocation_generation": "4",
+      "revocation_unavailable": false,
+      "schema": "wsprrypi-wtp-endpoint/1"
+    }
+  },
+  "start_utc": "2026-10-02T11:41:00.486207+00:00",
+  "end_utc": "2026-10-02T12:12:24.520191+00:00"
+}

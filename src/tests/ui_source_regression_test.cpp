@@ -405,7 +405,7 @@ int main()
             ui_source.find("const si5351Supported = si5351UiSupported();") != std::string::npos &&
             ui_source.find("platform.si5351Detected === false") != std::string::npos &&
             ui_source.find("$backend.prop(\"disabled\", currentBackend === \"wtp\" || !anyBackendSupported);") != std::string::npos &&
-            ui_source.find("function setTransmitBackendSelection(backend, triggerChange = false)") != std::string::npos,
+            ui_source.find("function setTransmitBackendSelection(backend, triggerChange = false, refreshInventory = true)") != std::string::npos,
         "Si5351 backend selection must remain available through the output-path switch while detection controls availability guidance");
     require(
         ui_source.find("function applyBandGpioColumnToggle(column, checked)") != std::string::npos &&

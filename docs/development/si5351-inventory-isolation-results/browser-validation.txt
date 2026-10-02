@@ -1,0 +1,1 @@
+conditional_transmit_gpio_integration_test passed

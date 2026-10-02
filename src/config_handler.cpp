@@ -48,6 +48,8 @@
 #endif
 #include "version.hpp"
 
+#include "si5351_inventory_process.hpp"
+
 #include <algorithm>
 #include <cctype>
 #include <chrono>
@@ -124,6 +126,10 @@ namespace
     TestTonePlanningConfigSnapshot g_test_tone_planning_snapshot{};
     std::optional<bool> g_si5351_detection_override;
     std::optional<Si5351AddressInventory> g_si5351_address_inventory_override;
+    std::mutex si5351_inventory_mutex;
+    Si5351AddressInventory si5351_inventory_cache;
+    int si5351_inventory_reference = 0;
+    std::optional<std::vector<std::string>> si5351_inventory_command_override;
     std::string interactive_enable_file_stamp;
 
     // Identify our own persisted interactive Enable across file-monitor reloads.
@@ -715,53 +721,22 @@ bool si5351_device_detected(
         return *g_si5351_detection_override;
     }
 
-#if WSPRRYPI_BACKEND_SI5351
-    Si5351Device::Config device_config;
-    device_config.i2c_bus = i2c_bus;
-    device_config.i2c_address = static_cast<std::uint8_t>(i2c_address);
-    device_config.reference_hz = static_cast<std::uint32_t>(reference_hz);
-
-    Si5351Device device(device_config);
-    if (!device.open())
-    {
-        if (error_message != nullptr)
-        {
-            *error_message =
-                si5351_detection_unavailable_message(device.getLastError());
-        }
-        return false;
-    }
-
-    const bool detected = device.probe();
-    const std::string detail = device.getLastError();
-    device.close();
-
-    if (!detected && error_message != nullptr)
-    {
-        *error_message = si5351_detection_unavailable_message(detail);
-    }
-
+    const auto inventory = discover_si5351_addresses(i2c_bus, reference_hz, i2c_address);
+    const bool detected = inventory.contains(i2c_address);
+    if (!detected && error_message)
+        *error_message = si5351_detection_unavailable_message(inventory.error);
     return detected;
-#else
-    (void)i2c_bus;
-    (void)i2c_address;
-    (void)reference_hz;
-    if (error_message != nullptr)
-    {
-        *error_message =
-            "Si5351 detection is unavailable because the Si5351 backend was not compiled.";
-    }
-    return false;
-#endif
 }
 
 Si5351AddressInventory discover_si5351_addresses(
     int i2c_bus,
-    int reference_hz)
+    int reference_hz,
+    int selected_address)
 {
     if (g_si5351_address_inventory_override.has_value())
     {
         Si5351AddressInventory result = *g_si5351_address_inventory_override;
+        result.checked = true;
         if (result.i2c_bus != i2c_bus)
         {
             result.addresses.clear();
@@ -775,6 +750,7 @@ Si5351AddressInventory discover_si5351_addresses(
     {
         Si5351AddressInventory result;
         result.i2c_bus = i2c_bus;
+        result.checked = true;
         if (*g_si5351_detection_override)
         {
             for (int address = 0x60; address <= 0x6F; ++address)
@@ -789,41 +765,84 @@ Si5351AddressInventory discover_si5351_addresses(
 
     Si5351AddressInventory result;
     result.i2c_bus = i2c_bus;
-    const std::string bus_error = i2c_bus_inventory::selection_error(
-        i2c_bus_inventory::discover(), i2c_bus);
+    const std::string bus_error = si5351_inventory_command_override ? std::string() :
+        i2c_bus_inventory::selection_error(i2c_bus_inventory::discover(), i2c_bus);
     if (!bus_error.empty())
     {
         result.error = bus_error;
         return result;
     }
 
-#if WSPRRYPI_BACKEND_SI5351
-    for (int address = 0x60; address <= 0x6F; ++address)
+    std::vector<std::string> command{
+        "/proc/self/exe", "--internal-si5351-inventory",
+        std::to_string(i2c_bus), std::to_string(reference_hz)};
+    if (selected_address >= 0) command.push_back(std::to_string(selected_address));
+    const auto reply = si5351_inventory_process::run(
+        si5351_inventory_command_override.value_or(command));
+    result.error = reply.error;
+    result.checked = true;
+    if (result.error.empty())
     {
-        Si5351Device::Config device_config;
-        device_config.i2c_bus = i2c_bus;
-        device_config.i2c_address = static_cast<std::uint8_t>(address);
-        device_config.reference_hz = static_cast<std::uint32_t>(reference_hz);
-
-        Si5351Device device(device_config);
-        if (!device.open())
+        try
+        {
+            const auto body = nlohmann::json::parse(reply.output);
+            if (!body.is_object() || body.size() != 3 ||
+                !body.at("bus").is_number_integer() || body.at("bus") != i2c_bus ||
+                !body.at("error").is_string() ||
+                !body.at("addresses").is_array() || body.at("addresses").size() > 16)
+                throw std::runtime_error("Invalid inventory reply");
+            result.error = body.at("error").get<std::string>();
+            for (const auto& address : body.at("addresses"))
+            {
+                if (!address.is_number_integer() || address < 0x60 || address > 0x6F)
+                    throw std::runtime_error("Invalid address");
+                const int value = address.get<int>();
+                if (value < 0x60 || value > 0x6F ||
+                    std::find(result.addresses.begin(), result.addresses.end(), value) != result.addresses.end())
+                    throw std::runtime_error("Invalid address");
+                result.addresses.push_back(value);
+            }
+            if (!result.error.empty()) result.addresses.clear();
+        }
+        catch (const std::exception&)
         {
             result.addresses.clear();
-            result.error =
-                "Unable to inspect Si5351 addresses on I2C bus " +
-                std::to_string(i2c_bus) + ": " + device.getLastError();
-            return result;
+            result.error = "Invalid Si5351 discovery reply.";
         }
-        if (device.probe()) result.addresses.push_back(address);
-        device.close();
     }
-#else
-    (void)reference_hz;
-    result.error =
-        "Si5351 address discovery is unavailable because the Si5351 backend was not compiled.";
-#endif
+    if (selected_address < 0)
+    {
+        std::lock_guard lock(si5351_inventory_mutex);
+        si5351_inventory_cache = result;
+        si5351_inventory_reference = reference_hz;
+    }
 
     return result;
+}
+
+Si5351AddressInventory cached_si5351_addresses(int i2c_bus, int reference_hz)
+{
+    si5351_inventory_process::reap(); // Nonblocking cleanup only; never launches a probe.
+    // Test fixtures model already available inventory, without starting a probe.
+    if (g_si5351_address_inventory_override || g_si5351_detection_override)
+        return discover_si5351_addresses(i2c_bus, reference_hz);
+    std::lock_guard lock(si5351_inventory_mutex);
+    if (si5351_inventory_cache.i2c_bus == i2c_bus &&
+        si5351_inventory_reference == reference_hz)
+        return si5351_inventory_cache;
+    Si5351AddressInventory result;
+    result.i2c_bus = i2c_bus;
+    result.error = "Si5351 addresses have not been checked. Select Si5351 or its I2C bus to check.";
+    return result;
+}
+
+void set_si5351_inventory_command_override_for_test(const std::vector<std::string>& command)
+{
+    si5351_inventory_command_override = command;
+}
+void clear_si5351_inventory_command_override_for_test()
+{
+    si5351_inventory_command_override.reset();
 }
 
 void set_si5351_detection_override_for_test(bool detected) noexcept
@@ -1502,7 +1521,7 @@ namespace
             }
 
             std::string validation_error;
-            if (!validate_config_candidate(candidate_config, &validation_error))
+            if (!validate_config_candidate(candidate_config, &validation_error, false))
             {
                 if (error_message != nullptr)
                 {
@@ -1876,7 +1895,8 @@ void prepare_ini_config_candidate(
     const std::string &filename,
     PreparedConfigCandidate &candidate_out)
 {
-    std::lock_guard update_lock(config_update_mutex());
+    std::unique_lock update_lock(config_update_mutex());
+    const auto initial_revision = config_revision_locked();
     const auto file_stamp = config_file_stamp(filename);
     candidate_out = PreparedConfigCandidate{};
 
@@ -1892,6 +1912,20 @@ void prepare_ini_config_candidate(
         candidate_out.transmit_enabled = false;
         return;
     }
+
+    update_lock.unlock();
+    const bool ready = validate_config_candidate(
+        candidate_out.normalized_config, &candidate_out.error_reason);
+    update_lock.lock();
+    if (!ready || config_revision_locked() != initial_revision ||
+        file_stamp != config_file_stamp(filename))
+    {
+        if (ready) candidate_out.error_reason = "Configuration changed during validation; reload it.";
+        candidate_out.valid = false;
+        candidate_out.transmit_enabled = false;
+        return;
+    }
+    candidate_out.prepared_revision = initial_revision;
 
     candidate_out.migration_required =
         candidate_out.normalized_json.contains("Meta") &&
@@ -1920,6 +1954,10 @@ void commit_config_candidate(const PreparedConfigCandidate &candidate)
         throw std::invalid_argument(
             "Cannot commit an invalid configuration candidate.");
     }
+
+    if (!candidate.prepared_revision.empty() &&
+        candidate.prepared_revision != config_revision_locked())
+        throw std::runtime_error("revision_conflict");
 
     if (candidate.migration_required)
     {
@@ -1964,6 +2002,7 @@ std::string patch_all_from_web_revision(const nlohmann::json &j, const std::stri
     std::unique_lock update_lock(config_update_mutex());
     if (!expected_revision.empty() && expected_revision != config_revision_locked())
         throw std::runtime_error("revision_conflict");
+    const auto initial_revision = config_revision_locked();
     const bool interactive = action != LocalEnableAction::Noninteractive;
     const bool writes_enable = j.contains("Operation") && j.at("Operation").is_object() &&
                                j.at("Operation").contains("Transmit");
@@ -2013,6 +2052,7 @@ std::string patch_all_from_web_revision(const nlohmann::json &j, const std::stri
         const bool selecting_si5351 =
             candidate_config.transmit_backend == TransmitBackendKind::SI5351 &&
             config.transmit_backend != TransmitBackendKind::SI5351;
+        update_lock.unlock(); // Physical validation must not block config snapshots or local updates.
         if (si5351_selection_changed || selecting_si5351)
         {
             if (candidate_config.si5351_i2c_address < 0x60 ||
@@ -2036,10 +2076,16 @@ std::string patch_all_from_web_revision(const nlohmann::json &j, const std::stri
             }
         }
 
-        if (!validate_config_candidate(candidate_config, &error_message))
+        const bool require_live_backend = !(candidate_config.transmit_backend == TransmitBackendKind::SI5351 &&
+            (si5351_selection_changed || selecting_si5351));
+        if (!validate_config_candidate(candidate_config, &error_message, require_live_backend))
         {
             throw std::runtime_error(error_message);
         }
+
+        update_lock.lock();
+        if (config_revision_locked() != initial_revision)
+            throw std::runtime_error("revision_conflict");
 
         if (candidate_config.mode == ModeType::QRSS ||
             candidate_config.mode == ModeType::FSKCW ||
@@ -2106,6 +2152,7 @@ std::string patch_all_from_web_revision(const nlohmann::json &j, const std::stri
     }
     catch (const std::exception &e)
     {
+        if (std::string(e.what()) == "revision_conflict") throw;
         throw std::runtime_error(
             std::string("Configuration update rejected: ") + e.what());
     }

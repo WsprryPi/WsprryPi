@@ -1997,7 +1997,8 @@ function populateConfig(callback = null) {
                     }
                     if (typeof setTransmitBackendSelection === "function") {
                         window.WtpUi?.populate(configJson.WTP);
-                        setTransmitBackendSelection(transmitBackend, true);
+                        // Inventory starts once, after the saved bus/address are populated below.
+                        setTransmitBackendSelection(transmitBackend, true, false);
                     } else {
                         $("#transmit_backend")
                             .prop("checked", transmitBackend === "si5351")
@@ -2095,6 +2096,11 @@ function populateConfig(callback = null) {
                         .val(String(si5351CrystalLoadCapacitance))
                         .trigger("change");
                     $("#si5351-power-range").val(si5351PowerLevel).trigger("input");
+
+                    if (selectedTransmitBackend() === "si5351" &&
+                        typeof refreshSi5351Addresses === "function") {
+                        refreshSi5351Addresses(si5351I2cBus, si5351I2cAddressRaw);
+                    }
 
                     // Enable the form
                     $("#test_tone").prop("disabled", false);

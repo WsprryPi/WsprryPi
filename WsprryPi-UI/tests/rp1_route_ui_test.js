@@ -40,7 +40,7 @@ assert.match(script,/function rp1RouteSelectorHint\(\)/);
 assert.match(script,/Off uses GPIO through the RP1 GPCLK provider\./);
 assert.match(siteScript,/if \(typeof initializeRp1RouteUi === "function"\) \{\s*initializeRp1RouteUi\(\);/);
 assert.match(siteScript,/\["gpio",\s*"rp1-gpclk",\s*"si5351", "wtp"\]\.includes\(transmitBackend\)/);
-assert.match(siteScript,/setTransmitBackendSelection\(transmitBackend, true\)/);
+assert.match(siteScript,/setTransmitBackendSelection\(transmitBackend, true, false\)/);
 assert.match(script,/window\.confirm/);
 assert.match(script,/wsprrypi\.service and soapyremote-server\.service/);
 assert.match(header,/'rp1RoutePath' => \$basePath \. '\/api\/rp1-gpclk-route'/);

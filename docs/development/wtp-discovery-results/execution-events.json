@@ -1,0 +1,5288 @@
+[
+  {
+    "utc_ns": "1790941260270041372",
+    "monotonic_ns": "223204500065431",
+    "kind": "command",
+    "value": {
+      "argv": [
+        "tar",
+        "-czf",
+        "/home/pi/wtp-discovery-20261002/network-private-backup.tar.gz",
+        "/etc/NetworkManager/system-connections",
+        "/run/NetworkManager/system-connections",
+        "/etc/avahi/avahi-daemon.conf"
+      ],
+      "returncode": 0,
+      "stdout": "",
+      "stderr": "tar: Removing leading `/' from member names\ntar: Removing leading `/' from hard link targets\n"
+    }
+  },
+  {
+    "utc_ns": "1790941260328698598",
+    "monotonic_ns": "223204558718583",
+    "kind": "command",
+    "value": {
+      "argv": [
+        "ip",
+        "-j",
+        "address"
+      ],
+      "returncode": 0,
+      "stdout": "[{\"ifindex\":1,\"ifname\":\"lo\",\"flags\":[\"LOOPBACK\",\"UP\",\"LOWER_UP\"],\"mtu\":65536,\"qdisc\":\"noqueue\",\"operstate\":\"UNKNOWN\",\"group\":\"default\",\"txqlen\":1000,\"link_type\":\"loopback\",\"address\":\"00:00:00:00:00:00\",\"broadcast\":\"00:00:00:00:00:00\",\"addr_info\":[{\"family\":\"inet\",\"local\":\"127.0.0.1\",\"prefixlen\":8,\"scope\":\"host\",\"label\":\"lo\",\"valid_life_time\":4294967295,\"preferred_life_time\":4294967295},{\"family\":\"inet6\",\"local\":\"::1\",\"prefixlen\":128,\"scope\":\"host\",\"noprefixroute\":true,\"valid_life_time\":4294967295,\"preferred_life_time\":4294967295}]},{\"ifindex\":2,\"ifname\":\"eth0\",\"flags\":[\"BROADCAST\",\"MULTICAST\",\"UP\",\"LOWER_UP\"],\"mtu\":1500,\"qdisc\":\"fq_codel\",\"operstate\":\"UP\",\"group\":\"default\",\"txqlen\":1000,\"link_type\":\"ether\",\"address\":\"2c:cf:67:62:76:64\",\"broadcast\":\"ff:ff:ff:ff:ff:ff\",\"addr_info\":[{\"family\":\"inet\",\"local\":\"192.168.1.54\",\"prefixlen\":24,\"broadcast\":\"192.168.1.255\",\"scope\":\"global\",\"dynamic\":true,\"noprefixroute\":true,\"label\":\"eth0\",\"valid_life_time\":79375,\"preferred_life_time\":79375},{\"family\":\"inet6\",\"local\":\"fe80::2ecf:67ff:fe62:7664\",\"prefixlen\":64,\"scope\":\"link\",\"noprefixroute\":true,\"valid_life_time\":4294967295,\"preferred_life_time\":4294967295}]},{\"ifindex\":3,\"ifname\":\"wlan0\",\"flags\":[\"NO-CARRIER\",\"BROADCAST\",\"MULTICAST\",\"UP\"],\"mtu\":1500,\"qdisc\":\"fq_codel\",\"operstate\":\"DOWN\",\"group\":\"default\",\"txqlen\":1000,\"link_type\":\"ether\",\"address\":\"2c:cf:67:62:76:66\",\"broadcast\":\"ff:ff:ff:ff:ff:ff\",\"addr_info\":[]},{\"ifindex\":4,\"ifname\":\"wlan1\",\"flags\":[\"BROADCAST\",\"MULTICAST\",\"UP\",\"LOWER_UP\"],\"mtu\":1500,\"qdisc\":\"noqueue\",\"operstate\":\"UP\",\"group\":\"default\",\"txqlen\":1000,\"link_type\":\"ether\",\"address\":\"90:de:80:47:b9:da\",\"broadcast\":\"ff:ff:ff:ff:ff:ff\",\"addr_info\":[{\"family\":\"inet\",\"local\":\"192.168.1.117\",\"prefixlen\":24,\"broadcast\":\"192.168.1.255\",\"scope\":\"global\",\"dynamic\":true,\"noprefixroute\":true,\"label\":\"wlan1\",\"valid_life_time\":79702,\"preferred_life_time\":79702},{\"family\":\"inet6\",\"local\":\"fe80::92de:80ff:fe47:b9da\",\"prefixlen\":64,\"scope\":\"link\",\"protocol\":\"kernel_ll\",\"valid_life_time\":4294967295,\"preferred_life_time\":4294967295}]},{\"ifindex\":5,\"ifname\":\"wlan2\",\"flags\":[\"NO-CARRIER\",\"BROADCAST\",\"MULTICAST\",\"UP\"],\"mtu\":1500,\"qdisc\":\"noqueue\",\"operstate\":\"DOWN\",\"group\":\"default\",\"txqlen\":1000,\"link_type\":\"ether\",\"address\":\"e8:4e:06:ae:d7:09\",\"broadcast\":\"ff:ff:ff:ff:ff:ff\",\"addr_info\":[]}]\n",
+      "stderr": ""
+    }
+  },
+  {
+    "utc_ns": "1790941260330318519",
+    "monotonic_ns": "223204560338448",
+    "kind": "command",
+    "value": {
+      "argv": [
+        "ip",
+        "-j",
+        "-4",
+        "route"
+      ],
+      "returncode": 0,
+      "stdout": "[{\"dst\":\"default\",\"gateway\":\"192.168.1.1\",\"dev\":\"eth0\",\"protocol\":\"dhcp\",\"prefsrc\":\"192.168.1.54\",\"metric\":100,\"flags\":[]},{\"dst\":\"default\",\"gateway\":\"192.168.1.1\",\"dev\":\"wlan1\",\"protocol\":\"dhcp\",\"prefsrc\":\"192.168.1.117\",\"metric\":100,\"flags\":[]},{\"dst\":\"192.168.1.0/24\",\"dev\":\"eth0\",\"protocol\":\"kernel\",\"scope\":\"link\",\"prefsrc\":\"192.168.1.54\",\"metric\":100,\"flags\":[]},{\"dst\":\"192.168.1.0/24\",\"dev\":\"wlan1\",\"protocol\":\"kernel\",\"scope\":\"link\",\"prefsrc\":\"192.168.1.117\",\"metric\":100,\"flags\":[]}]\n",
+      "stderr": ""
+    }
+  },
+  {
+    "utc_ns": "1790941260347126485",
+    "monotonic_ns": "223204577146192",
+    "kind": "command",
+    "value": {
+      "argv": [
+        "nmcli",
+        "-t",
+        "-f",
+        "NAME,UUID,TYPE,DEVICE",
+        "connection",
+        "show",
+        "--active"
+      ],
+      "returncode": 0,
+      "stdout": "netplan-eth0:75a1216a-9d1a-30cd-8aca-ace5526ec021:802-3-ethernet:eth0\nBohica-IoT-wlan1:921301fe-cdfd-4965-8ac7-c96e9d908ea6:802-11-wireless:wlan1\nlo:2c13f4b2-7306-4bf1-9b86-7bcb542fcafc:loopback:lo\n",
+      "stderr": ""
+    }
+  },
+  {
+    "utc_ns": "1790941260355815199",
+    "monotonic_ns": "223204585834906",
+    "kind": "command",
+    "value": {
+      "argv": [
+        "systemctl",
+        "show",
+        "wsprrypi",
+        "-p",
+        "MainPID",
+        "-p",
+        "ActiveState"
+      ],
+      "returncode": 0,
+      "stdout": "MainPID=621104\nActiveState=active\n",
+      "stderr": ""
+    }
+  },
+  {
+    "utc_ns": "1790941260357847674",
+    "monotonic_ns": "223204587867307",
+    "kind": "command",
+    "value": {
+      "argv": [
+        "readlink",
+        "-f",
+        "/dev/pps-gps"
+      ],
+      "returncode": 0,
+      "stdout": "/dev/pps0\n",
+      "stderr": ""
+    }
+  },
+  {
+    "utc_ns": "1790941269136178519",
+    "monotonic_ns": "223213366199448",
+    "kind": "command",
+    "value": {
+      "argv": [
+        "systemctl",
+        "stop",
+        "wtp-discovery-rollback-wlan1.timer"
+      ],
+      "returncode": 5,
+      "stdout": "",
+      "stderr": "Failed to stop wtp-discovery-rollback-wlan1.timer: Unit wtp-discovery-rollback-wlan1.timer not loaded.\n"
+    }
+  },
+  {
+    "utc_ns": "1790941269143998032",
+    "monotonic_ns": "223213374018443",
+    "kind": "command",
+    "value": {
+      "argv": [
+        "systemctl",
+        "reset-failed",
+        "wtp-discovery-rollback-wlan1.service"
+      ],
+      "returncode": 1,
+      "stdout": "",
+      "stderr": "Failed to reset failed state of unit wtp-discovery-rollback-wlan1.service: Unit wtp-discovery-rollback-wlan1.service not loaded.\n"
+    }
+  },
+  {
+    "utc_ns": "1790941269155174628",
+    "monotonic_ns": "223213385194335",
+    "kind": "command",
+    "value": {
+      "argv": [
+        "systemd-run",
+        "--unit=wtp-discovery-rollback-wlan1",
+        "--on-active=120s",
+        "--timer-property=AccuracySec=1s",
+        "/usr/bin/python3",
+        "/home/pi/wtp-discovery-20261002/campaign.py",
+        "restore",
+        "wlan1"
+      ],
+      "returncode": 0,
+      "stdout": "",
+      "stderr": "Running timer as unit: wtp-discovery-rollback-wlan1.timer\nWill run service as unit: wtp-discovery-rollback-wlan1.service\n"
+    }
+  },
+  {
+    "utc_ns": "1790941269162164347",
+    "monotonic_ns": "223213392183962",
+    "kind": "command",
+    "value": {
+      "argv": [
+        "systemctl",
+        "is-active",
+        "wtp-discovery-rollback-wlan1.timer"
+      ],
+      "returncode": 0,
+      "stdout": "active\n",
+      "stderr": ""
+    }
+  },
+  {
+    "utc_ns": "1790941269162275717",
+    "monotonic_ns": "223213392294480",
+    "kind": "phase-start",
+    "value": {
+      "kind": "link",
+      "interface": "wlan1",
+      "index": 4
+    }
+  },
+  {
+    "utc_ns": "1790941269442270313",
+    "monotonic_ns": "223213672290372",
+    "kind": "command",
+    "value": {
+      "argv": [
+        "nmcli",
+        "device",
+        "disconnect",
+        "wlan1"
+      ],
+      "returncode": 0,
+      "stdout": "Device 'wlan1' successfully disconnected.\n",
+      "stderr": ""
+    }
+  },
+  {
+    "utc_ns": "1790941269456949083",
+    "monotonic_ns": "223213686972549",
+    "kind": "accepted",
+    "value": {
+      "label": "wlan1 candidates removed",
+      "value": {
+        "available": true,
+        "candidates": [
+          {
+            "binding": "plain",
+            "domain": "local",
+            "first_seen_ms": 1790938487071,
+            "id": "service-879a3661fecc0dd95cc3c1f1d8fa6f0f",
+            "instance": "WsprryPi wspr1 d133ed89",
+            "interface": 2,
+            "last_seen_ms": 1790938487072,
+            "port": 31417,
+            "protocol": 0,
+            "reason": "",
+            "state": "online",
+            "state_changed_ms": 1790938487072,
+            "target": "wtp-d133ed890b90f6945b41a235429ff155.local",
+            "txt": [
+              "txtvers=1",
+              "binding=plain"
+            ]
+          },
+          {
+            "binding": "plain",
+            "domain": "local",
+            "first_seen_ms": 1790938487070,
+            "id": "service-eea7d3e7283a3c30c33a86479f3dfc0a",
+            "instance": "WsprryPi wspr2 e2a4d273",
+            "interface": 2,
+            "last_seen_ms": 1790938487072,
+            "port": 31417,
+            "protocol": 0,
+            "reason": "",
+            "state": "online",
+            "state_changed_ms": 1790938487072,
+            "target": "wtp-e2a4d273f7d8f24f6696f7c6fb95ff11.local",
+            "txt": [
+              "txtvers=1",
+              "binding=plain"
+            ]
+          },
+          {
+            "binding": "plain",
+            "domain": "local",
+            "first_seen_ms": 1790938487071,
+            "id": "service-67facb21fbea71aefdc46ba116736857",
+            "instance": "WsprryPi wspr4 f21e530a",
+            "interface": 2,
+            "last_seen_ms": 1790938487072,
+            "port": 31417,
+            "protocol": 0,
+            "reason": "",
+            "state": "online",
+            "state_changed_ms": 1790938487072,
+            "target": "wtp-f21e530af8a4a210ec57898c0ebd32d2.local",
+            "txt": [
+              "txtvers=1",
+              "binding=plain"
+            ]
+          },
+          {
+            "binding": "plain",
+            "domain": "local",
+            "first_seen_ms": 1790938487899,
+            "id": "service-600bfc9ce83e33d34dfbb08e0b42cc2a",
+            "instance": "WsprryPi wspr5 e045017b",
+            "interface": 2,
+            "last_seen_ms": 1790938487899,
+            "port": 31417,
+            "protocol": 0,
+            "reason": "",
+            "state": "online",
+            "state_changed_ms": 1790938487899,
+            "target": "wtp-e045017b11e54c2fb7029f0154e6deb9.local",
+            "txt": [
+              "txtvers=1",
+              "binding=plain"
+            ]
+          },
+          {
+            "binding": "plain",
+            "domain": "local",
+            "first_seen_ms": 1790938487070,
+            "id": "service-7eefe6e462fe036e3cb1dffbcab233dd",
+            "instance": "wsprrypico-0a60df",
+            "interface": 2,
+            "last_seen_ms": 1790938487072,
+            "port": 31417,
+            "protocol": 0,
+            "reason": "",
+            "state": "online",
+            "state_changed_ms": 1790938487072,
+            "target": "wsprrypico-0a60df.local",
+            "txt": [
+              "txtvers=1",
+              "binding=plain"
+            ]
+          },
+          {
+            "binding": "plain",
+            "domain": "local",
+            "first_seen_ms": 1790938487069,
+            "id": "service-8849882a0f724fdd2bbeb58e24e97d52",
+            "instance": "WsprryPi wspr1 d133ed89",
+            "interface": 4,
+            "last_seen_ms": 1790938487234,
+            "port": 31417,
+            "protocol": 0,
+            "reason": "Service was withdrawn",
+            "state": "removed",
+            "state_changed_ms": 1790941269397,
+            "target": "wtp-d133ed890b90f6945b41a235429ff155.local",
+            "txt": [
+              "txtvers=1",
+              "binding=plain"
+            ]
+          },
+          {
+            "binding": "plain",
+            "domain": "local",
+            "first_seen_ms": 1790938487069,
+            "id": "service-7eafa62f6873b13a3e036d5df55d97c9",
+            "instance": "WsprryPi wspr2 e2a4d273",
+            "interface": 4,
+            "last_seen_ms": 1790938487072,
+            "port": 31417,
+            "protocol": 0,
+            "reason": "Service was withdrawn",
+            "state": "removed",
+            "state_changed_ms": 1790941269396,
+            "target": "wtp-e2a4d273f7d8f24f6696f7c6fb95ff11.local",
+            "txt": [
+              "txtvers=1",
+              "binding=plain"
+            ]
+          },
+          {
+            "binding": "plain",
+            "domain": "local",
+            "first_seen_ms": 1790938487070,
+            "id": "service-f63e553213062c57864432b735b025f2",
+            "instance": "WsprryPi wspr4 f21e530a",
+            "interface": 4,
+            "last_seen_ms": 1790938487072,
+            "port": 31417,
+            "protocol": 0,
+            "reason": "Service was withdrawn",
+            "state": "removed",
+            "state_changed_ms": 1790941269397,
+            "target": "wtp-f21e530af8a4a210ec57898c0ebd32d2.local",
+            "txt": [
+              "txtvers=1",
+              "binding=plain"
+            ]
+          },
+          {
+            "binding": "plain",
+            "domain": "local",
+            "first_seen_ms": 1790938487069,
+            "id": "service-bfbf73f55f2bbc8b24e6f88ba7b631aa",
+            "instance": "wsprrypico-0a60df",
+            "interface": 4,
+            "last_seen_ms": 1790938487071,
+            "port": 31417,
+            "protocol": 0,
+            "reason": "Service was withdrawn",
+            "state": "removed",
+            "state_changed_ms": 1790941269396,
+            "target": "wsprrypico-0a60df.local",
+            "txt": [
+              "txtvers=1",
+              "binding=plain"
+            ]
+          }
+        ],
+        "reason": "",
+        "scope": "wtp-dns-sd/1",
+        "service": "_wtp._tcp.local."
+      }
+    }
+  },
+  {
+    "utc_ns": "1790941269465240039",
+    "monotonic_ns": "223213695259746",
+    "kind": "link-down-evidence",
+    "value": {
+      "interface": "wlan1",
+      "removed": {
+        "available": true,
+        "candidates": [
+          {
+            "binding": "plain",
+            "domain": "local",
+            "first_seen_ms": 1790938487071,
+            "id": "service-879a3661fecc0dd95cc3c1f1d8fa6f0f",
+            "instance": "WsprryPi wspr1 d133ed89",
+            "interface": 2,
+            "last_seen_ms": 1790938487072,
+            "port": 31417,
+            "protocol": 0,
+            "reason": "",
+            "state": "online",
+            "state_changed_ms": 1790938487072,
+            "target": "wtp-d133ed890b90f6945b41a235429ff155.local",
+            "txt": [
+              "txtvers=1",
+              "binding=plain"
+            ]
+          },
+          {
+            "binding": "plain",
+            "domain": "local",
+            "first_seen_ms": 1790938487070,
+            "id": "service-eea7d3e7283a3c30c33a86479f3dfc0a",
+            "instance": "WsprryPi wspr2 e2a4d273",
+            "interface": 2,
+            "last_seen_ms": 1790938487072,
+            "port": 31417,
+            "protocol": 0,
+            "reason": "",
+            "state": "online",
+            "state_changed_ms": 1790938487072,
+            "target": "wtp-e2a4d273f7d8f24f6696f7c6fb95ff11.local",
+            "txt": [
+              "txtvers=1",
+              "binding=plain"
+            ]
+          },
+          {
+            "binding": "plain",
+            "domain": "local",
+            "first_seen_ms": 1790938487071,
+            "id": "service-67facb21fbea71aefdc46ba116736857",
+            "instance": "WsprryPi wspr4 f21e530a",
+            "interface": 2,
+            "last_seen_ms": 1790938487072,
+            "port": 31417,
+            "protocol": 0,
+            "reason": "",
+            "state": "online",
+            "state_changed_ms": 1790938487072,
+            "target": "wtp-f21e530af8a4a210ec57898c0ebd32d2.local",
+            "txt": [
+              "txtvers=1",
+              "binding=plain"
+            ]
+          },
+          {
+            "binding": "plain",
+            "domain": "local",
+            "first_seen_ms": 1790938487899,
+            "id": "service-600bfc9ce83e33d34dfbb08e0b42cc2a",
+            "instance": "WsprryPi wspr5 e045017b",
+            "interface": 2,
+            "last_seen_ms": 1790938487899,
+            "port": 31417,
+            "protocol": 0,
+            "reason": "",
+            "state": "online",
+            "state_changed_ms": 1790938487899,
+            "target": "wtp-e045017b11e54c2fb7029f0154e6deb9.local",
+            "txt": [
+              "txtvers=1",
+              "binding=plain"
+            ]
+          },
+          {
+            "binding": "plain",
+            "domain": "local",
+            "first_seen_ms": 1790938487070,
+            "id": "service-7eefe6e462fe036e3cb1dffbcab233dd",
+            "instance": "wsprrypico-0a60df",
+            "interface": 2,
+            "last_seen_ms": 1790938487072,
+            "port": 31417,
+            "protocol": 0,
+            "reason": "",
+            "state": "online",
+            "state_changed_ms": 1790938487072,
+            "target": "wsprrypico-0a60df.local",
+            "txt": [
+              "txtvers=1",
+              "binding=plain"
+            ]
+          },
+          {
+            "binding": "plain",
+            "domain": "local",
+            "first_seen_ms": 1790938487069,
+            "id": "service-8849882a0f724fdd2bbeb58e24e97d52",
+            "instance": "WsprryPi wspr1 d133ed89",
+            "interface": 4,
+            "last_seen_ms": 1790938487234,
+            "port": 31417,
+            "protocol": 0,
+            "reason": "Service was withdrawn",
+            "state": "removed",
+            "state_changed_ms": 1790941269397,
+            "target": "wtp-d133ed890b90f6945b41a235429ff155.local",
+            "txt": [
+              "txtvers=1",
+              "binding=plain"
+            ]
+          },
+          {
+            "binding": "plain",
+            "domain": "local",
+            "first_seen_ms": 1790938487069,
+            "id": "service-7eafa62f6873b13a3e036d5df55d97c9",
+            "instance": "WsprryPi wspr2 e2a4d273",
+            "interface": 4,
+            "last_seen_ms": 1790938487072,
+            "port": 31417,
+            "protocol": 0,
+            "reason": "Service was withdrawn",
+            "state": "removed",
+            "state_changed_ms": 1790941269396,
+            "target": "wtp-e2a4d273f7d8f24f6696f7c6fb95ff11.local",
+            "txt": [
+              "txtvers=1",
+              "binding=plain"
+            ]
+          },
+          {
+            "binding": "plain",
+            "domain": "local",
+            "first_seen_ms": 1790938487070,
+            "id": "service-f63e553213062c57864432b735b025f2",
+            "instance": "WsprryPi wspr4 f21e530a",
+            "interface": 4,
+            "last_seen_ms": 1790938487072,
+            "port": 31417,
+            "protocol": 0,
+            "reason": "Service was withdrawn",
+            "state": "removed",
+            "state_changed_ms": 1790941269397,
+            "target": "wtp-f21e530af8a4a210ec57898c0ebd32d2.local",
+            "txt": [
+              "txtvers=1",
+              "binding=plain"
+            ]
+          },
+          {
+            "binding": "plain",
+            "domain": "local",
+            "first_seen_ms": 1790938487069,
+            "id": "service-bfbf73f55f2bbc8b24e6f88ba7b631aa",
+            "instance": "wsprrypico-0a60df",
+            "interface": 4,
+            "last_seen_ms": 1790938487071,
+            "port": 31417,
+            "protocol": 0,
+            "reason": "Service was withdrawn",
+            "state": "removed",
+            "state_changed_ms": 1790941269396,
+            "target": "wsprrypico-0a60df.local",
+            "txt": [
+              "txtvers=1",
+              "binding=plain"
+            ]
+          }
+        ],
+        "reason": "",
+        "scope": "wtp-dns-sd/1",
+        "service": "_wtp._tcp.local."
+      },
+      "remaining": [
+        {
+          "binding": "plain",
+          "domain": "local",
+          "first_seen_ms": 1790938487071,
+          "id": "service-879a3661fecc0dd95cc3c1f1d8fa6f0f",
+          "instance": "WsprryPi wspr1 d133ed89",
+          "interface": 2,
+          "last_seen_ms": 1790938487072,
+          "port": 31417,
+          "protocol": 0,
+          "reason": "",
+          "state": "online",
+          "state_changed_ms": 1790938487072,
+          "target": "wtp-d133ed890b90f6945b41a235429ff155.local",
+          "txt": [
+            "txtvers=1",
+            "binding=plain"
+          ]
+        },
+        {
+          "binding": "plain",
+          "domain": "local",
+          "first_seen_ms": 1790938487070,
+          "id": "service-eea7d3e7283a3c30c33a86479f3dfc0a",
+          "instance": "WsprryPi wspr2 e2a4d273",
+          "interface": 2,
+          "last_seen_ms": 1790938487072,
+          "port": 31417,
+          "protocol": 0,
+          "reason": "",
+          "state": "online",
+          "state_changed_ms": 1790938487072,
+          "target": "wtp-e2a4d273f7d8f24f6696f7c6fb95ff11.local",
+          "txt": [
+            "txtvers=1",
+            "binding=plain"
+          ]
+        },
+        {
+          "binding": "plain",
+          "domain": "local",
+          "first_seen_ms": 1790938487071,
+          "id": "service-67facb21fbea71aefdc46ba116736857",
+          "instance": "WsprryPi wspr4 f21e530a",
+          "interface": 2,
+          "last_seen_ms": 1790938487072,
+          "port": 31417,
+          "protocol": 0,
+          "reason": "",
+          "state": "online",
+          "state_changed_ms": 1790938487072,
+          "target": "wtp-f21e530af8a4a210ec57898c0ebd32d2.local",
+          "txt": [
+            "txtvers=1",
+            "binding=plain"
+          ]
+        },
+        {
+          "binding": "plain",
+          "domain": "local",
+          "first_seen_ms": 1790938487899,
+          "id": "service-600bfc9ce83e33d34dfbb08e0b42cc2a",
+          "instance": "WsprryPi wspr5 e045017b",
+          "interface": 2,
+          "last_seen_ms": 1790938487899,
+          "port": 31417,
+          "protocol": 0,
+          "reason": "",
+          "state": "online",
+          "state_changed_ms": 1790938487899,
+          "target": "wtp-e045017b11e54c2fb7029f0154e6deb9.local",
+          "txt": [
+            "txtvers=1",
+            "binding=plain"
+          ]
+        },
+        {
+          "binding": "plain",
+          "domain": "local",
+          "first_seen_ms": 1790938487070,
+          "id": "service-7eefe6e462fe036e3cb1dffbcab233dd",
+          "instance": "wsprrypico-0a60df",
+          "interface": 2,
+          "last_seen_ms": 1790938487072,
+          "port": 31417,
+          "protocol": 0,
+          "reason": "",
+          "state": "online",
+          "state_changed_ms": 1790938487072,
+          "target": "wsprrypico-0a60df.local",
+          "txt": [
+            "txtvers=1",
+            "binding=plain"
+          ]
+        }
+      ],
+      "endpoint": {
+        "address": "192.168.1.54",
+        "boot_id": "ab2421ed8de8fc5f0d4e199c8447fa78",
+        "device_id": "e045017b11e54c2fb7029f0154e6deb9",
+        "dns_sd_published": true,
+        "enabled": true,
+        "finishing_remote_job": false,
+        "launch_observed_monotonic_ns": null,
+        "launch_target_monotonic_ns": "0",
+        "listener_error": "",
+        "listener_running": true,
+        "local_effective": false,
+        "local_requested": false,
+        "local_work_active": false,
+        "output_unknown": false,
+        "port": 31417,
+        "remote_admission_closed": false,
+        "remote_job_id": "",
+        "remote_output_active": false,
+        "remote_owner": "",
+        "remote_state": "empty",
+        "revocation_generation": "11",
+        "revocation_unavailable": false,
+        "schema": "wsprrypi-wtp-endpoint/1"
+      }
+    }
+  },
+  {
+    "utc_ns": "1790941283992577774",
+    "monotonic_ns": "223228222598351",
+    "kind": "command",
+    "value": {
+      "argv": [
+        "nmcli",
+        "connection",
+        "up",
+        "uuid",
+        "921301fe-cdfd-4965-8ac7-c96e9d908ea6",
+        "ifname",
+        "wlan1"
+      ],
+      "returncode": 0,
+      "stdout": "Connection successfully activated (D-Bus active path: /org/freedesktop/NetworkManager/ActiveConnection/15)\n",
+      "stderr": ""
+    }
+  },
+  {
+    "utc_ns": "1790941283992800366",
+    "monotonic_ns": "223228222819962",
+    "kind": "restored",
+    "value": "wlan1"
+  },
+  {
+    "utc_ns": "1790941287568743205",
+    "monotonic_ns": "223231798763653",
+    "kind": "accepted",
+    "value": {
+      "label": "wlan1 rediscovery",
+      "value": [
+        {
+          "binding": "plain",
+          "domain": "local",
+          "first_seen_ms": 1790938487069,
+          "id": "service-8849882a0f724fdd2bbeb58e24e97d52",
+          "instance": "WsprryPi wspr1 d133ed89",
+          "interface": 4,
+          "last_seen_ms": 1790941287130,
+          "port": 31417,
+          "protocol": 0,
+          "reason": "",
+          "state": "online",
+          "state_changed_ms": 1790941287130,
+          "target": "wtp-d133ed890b90f6945b41a235429ff155.local",
+          "txt": [
+            "txtvers=1",
+            "binding=plain"
+          ]
+        },
+        {
+          "binding": "plain",
+          "domain": "local",
+          "first_seen_ms": 1790938487069,
+          "id": "service-7eafa62f6873b13a3e036d5df55d97c9",
+          "instance": "WsprryPi wspr2 e2a4d273",
+          "interface": 4,
+          "last_seen_ms": 1790941285251,
+          "port": 31417,
+          "protocol": 0,
+          "reason": "",
+          "state": "online",
+          "state_changed_ms": 1790941285251,
+          "target": "wtp-e2a4d273f7d8f24f6696f7c6fb95ff11.local",
+          "txt": [
+            "txtvers=1",
+            "binding=plain"
+          ]
+        },
+        {
+          "binding": "plain",
+          "domain": "local",
+          "first_seen_ms": 1790938487070,
+          "id": "service-f63e553213062c57864432b735b025f2",
+          "instance": "WsprryPi wspr4 f21e530a",
+          "interface": 4,
+          "last_seen_ms": 1790941284295,
+          "port": 31417,
+          "protocol": 0,
+          "reason": "",
+          "state": "online",
+          "state_changed_ms": 1790941284295,
+          "target": "wtp-f21e530af8a4a210ec57898c0ebd32d2.local",
+          "txt": [
+            "txtvers=1",
+            "binding=plain"
+          ]
+        },
+        {
+          "binding": "plain",
+          "domain": "local",
+          "first_seen_ms": 1790938487069,
+          "id": "service-bfbf73f55f2bbc8b24e6f88ba7b631aa",
+          "instance": "wsprrypico-0a60df",
+          "interface": 4,
+          "last_seen_ms": 1790941287505,
+          "port": 31417,
+          "protocol": 0,
+          "reason": "",
+          "state": "online",
+          "state_changed_ms": 1790941287505,
+          "target": "wsprrypico-0a60df.local",
+          "txt": [
+            "txtvers=1",
+            "binding=plain"
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "utc_ns": "1790941287571440104",
+    "monotonic_ns": "223231801459886",
+    "kind": "accepted",
+    "value": {
+      "label": "listener publication recovered",
+      "value": {
+        "address": "192.168.1.54",
+        "boot_id": "ab2421ed8de8fc5f0d4e199c8447fa78",
+        "device_id": "e045017b11e54c2fb7029f0154e6deb9",
+        "dns_sd_published": true,
+        "enabled": true,
+        "finishing_remote_job": false,
+        "launch_observed_monotonic_ns": null,
+        "launch_target_monotonic_ns": "0",
+        "listener_error": "",
+        "listener_running": true,
+        "local_effective": false,
+        "local_requested": false,
+        "local_work_active": false,
+        "output_unknown": false,
+        "port": 31417,
+        "remote_admission_closed": false,
+        "remote_job_id": "",
+        "remote_output_active": false,
+        "remote_owner": "",
+        "remote_state": "empty",
+        "revocation_generation": "11",
+        "revocation_unavailable": false,
+        "schema": "wsprrypi-wtp-endpoint/1"
+      }
+    }
+  },
+  {
+    "utc_ns": "1790941287582835349",
+    "monotonic_ns": "223231812855482",
+    "kind": "command",
+    "value": {
+      "argv": [
+        "systemctl",
+        "stop",
+        "wtp-discovery-rollback-wlan1.timer"
+      ],
+      "returncode": 0,
+      "stdout": "",
+      "stderr": ""
+    }
+  },
+  {
+    "utc_ns": "1790941287588929516",
+    "monotonic_ns": "223231818949408",
+    "kind": "phase-complete",
+    "value": {
+      "kind": "link",
+      "interface": "wlan1"
+    }
+  },
+  {
+    "utc_ns": "1790941434026622290",
+    "monotonic_ns": "223378256642312",
+    "kind": "command",
+    "value": {
+      "argv": [
+        "systemctl",
+        "stop",
+        "wtp-discovery-rollback-eth0.timer"
+      ],
+      "returncode": 5,
+      "stdout": "",
+      "stderr": "Failed to stop wtp-discovery-rollback-eth0.timer: Unit wtp-discovery-rollback-eth0.timer not loaded.\n"
+    }
+  },
+  {
+    "utc_ns": "1790941434033289400",
+    "monotonic_ns": "223378263309551",
+    "kind": "command",
+    "value": {
+      "argv": [
+        "systemctl",
+        "reset-failed",
+        "wtp-discovery-rollback-eth0.service"
+      ],
+      "returncode": 1,
+      "stdout": "",
+      "stderr": "Failed to reset failed state of unit wtp-discovery-rollback-eth0.service: Unit wtp-discovery-rollback-eth0.service not loaded.\n"
+    }
+  },
+  {
+    "utc_ns": "1790941434042905908",
+    "monotonic_ns": "223378272925523",
+    "kind": "command",
+    "value": {
+      "argv": [
+        "systemd-run",
+        "--unit=wtp-discovery-rollback-eth0",
+        "--on-active=120s",
+        "--timer-property=AccuracySec=1s",
+        "/usr/bin/python3",
+        "/home/pi/wtp-discovery-20261002/campaign.py",
+        "restore",
+        "eth0"
+      ],
+      "returncode": 0,
+      "stdout": "",
+      "stderr": "Running timer as unit: wtp-discovery-rollback-eth0.timer\nWill run service as unit: wtp-discovery-rollback-eth0.service\n"
+    }
+  },
+  {
+    "utc_ns": "1790941434049500685",
+    "monotonic_ns": "223378279520225",
+    "kind": "command",
+    "value": {
+      "argv": [
+        "systemctl",
+        "is-active",
+        "wtp-discovery-rollback-eth0.timer"
+      ],
+      "returncode": 0,
+      "stdout": "active\n",
+      "stderr": ""
+    }
+  },
+  {
+    "utc_ns": "1790941434049605166",
+    "monotonic_ns": "223378279623836",
+    "kind": "phase-start",
+    "value": {
+      "kind": "link",
+      "interface": "eth0",
+      "index": 2
+    }
+  },
+  {
+    "utc_ns": "1790941434157207347",
+    "monotonic_ns": "223378387227388",
+    "kind": "command",
+    "value": {
+      "argv": [
+        "nmcli",
+        "device",
+        "disconnect",
+        "eth0"
+      ],
+      "returncode": 0,
+      "stdout": "Device 'eth0' successfully disconnected.\n",
+      "stderr": ""
+    }
+  },
+  {
+    "utc_ns": "1790941434171122102",
+    "monotonic_ns": "223378401141976",
+    "kind": "accepted",
+    "value": {
+      "label": "eth0 candidates removed",
+      "value": {
+        "available": true,
+        "candidates": [
+          {
+            "binding": "plain",
+            "domain": "local",
+            "first_seen_ms": 1790938487071,
+            "id": "service-879a3661fecc0dd95cc3c1f1d8fa6f0f",
+            "instance": "WsprryPi wspr1 d133ed89",
+            "interface": 2,
+            "last_seen_ms": 1790938487072,
+            "port": 31417,
+            "protocol": 0,
+            "reason": "Service was withdrawn",
+            "state": "removed",
+            "state_changed_ms": 1790941434106,
+            "target": "wtp-d133ed890b90f6945b41a235429ff155.local",
+            "txt": [
+              "txtvers=1",
+              "binding=plain"
+            ]
+          },
+          {
+            "binding": "plain",
+            "domain": "local",
+            "first_seen_ms": 1790938487070,
+            "id": "service-eea7d3e7283a3c30c33a86479f3dfc0a",
+            "instance": "WsprryPi wspr2 e2a4d273",
+            "interface": 2,
+            "last_seen_ms": 1790938487072,
+            "port": 31417,
+            "protocol": 0,
+            "reason": "Service was withdrawn",
+            "state": "removed",
+            "state_changed_ms": 1790941434106,
+            "target": "wtp-e2a4d273f7d8f24f6696f7c6fb95ff11.local",
+            "txt": [
+              "txtvers=1",
+              "binding=plain"
+            ]
+          },
+          {
+            "binding": "plain",
+            "domain": "local",
+            "first_seen_ms": 1790938487071,
+            "id": "service-67facb21fbea71aefdc46ba116736857",
+            "instance": "WsprryPi wspr4 f21e530a",
+            "interface": 2,
+            "last_seen_ms": 1790938487072,
+            "port": 31417,
+            "protocol": 0,
+            "reason": "Service was withdrawn",
+            "state": "removed",
+            "state_changed_ms": 1790941434106,
+            "target": "wtp-f21e530af8a4a210ec57898c0ebd32d2.local",
+            "txt": [
+              "txtvers=1",
+              "binding=plain"
+            ]
+          },
+          {
+            "binding": "plain",
+            "domain": "local",
+            "first_seen_ms": 1790938487899,
+            "id": "service-600bfc9ce83e33d34dfbb08e0b42cc2a",
+            "instance": "WsprryPi wspr5 e045017b",
+            "interface": 2,
+            "last_seen_ms": 1790938487899,
+            "port": 31417,
+            "protocol": 0,
+            "reason": "Service was withdrawn",
+            "state": "removed",
+            "state_changed_ms": 1790941434106,
+            "target": "wtp-e045017b11e54c2fb7029f0154e6deb9.local",
+            "txt": [
+              "txtvers=1",
+              "binding=plain"
+            ]
+          },
+          {
+            "binding": "plain",
+            "domain": "local",
+            "first_seen_ms": 1790938487070,
+            "id": "service-7eefe6e462fe036e3cb1dffbcab233dd",
+            "instance": "wsprrypico-0a60df",
+            "interface": 2,
+            "last_seen_ms": 1790938487072,
+            "port": 31417,
+            "protocol": 0,
+            "reason": "Service was withdrawn",
+            "state": "removed",
+            "state_changed_ms": 1790941434106,
+            "target": "wsprrypico-0a60df.local",
+            "txt": [
+              "txtvers=1",
+              "binding=plain"
+            ]
+          },
+          {
+            "binding": "plain",
+            "domain": "local",
+            "first_seen_ms": 1790938487069,
+            "id": "service-8849882a0f724fdd2bbeb58e24e97d52",
+            "instance": "WsprryPi wspr1 d133ed89",
+            "interface": 4,
+            "last_seen_ms": 1790941287130,
+            "port": 31417,
+            "protocol": 0,
+            "reason": "",
+            "state": "online",
+            "state_changed_ms": 1790941287130,
+            "target": "wtp-d133ed890b90f6945b41a235429ff155.local",
+            "txt": [
+              "txtvers=1",
+              "binding=plain"
+            ]
+          },
+          {
+            "binding": "plain",
+            "domain": "local",
+            "first_seen_ms": 1790938487069,
+            "id": "service-7eafa62f6873b13a3e036d5df55d97c9",
+            "instance": "WsprryPi wspr2 e2a4d273",
+            "interface": 4,
+            "last_seen_ms": 1790941285251,
+            "port": 31417,
+            "protocol": 0,
+            "reason": "",
+            "state": "online",
+            "state_changed_ms": 1790941285251,
+            "target": "wtp-e2a4d273f7d8f24f6696f7c6fb95ff11.local",
+            "txt": [
+              "txtvers=1",
+              "binding=plain"
+            ]
+          },
+          {
+            "binding": "plain",
+            "domain": "local",
+            "first_seen_ms": 1790938487070,
+            "id": "service-f63e553213062c57864432b735b025f2",
+            "instance": "WsprryPi wspr4 f21e530a",
+            "interface": 4,
+            "last_seen_ms": 1790941284295,
+            "port": 31417,
+            "protocol": 0,
+            "reason": "",
+            "state": "online",
+            "state_changed_ms": 1790941284295,
+            "target": "wtp-f21e530af8a4a210ec57898c0ebd32d2.local",
+            "txt": [
+              "txtvers=1",
+              "binding=plain"
+            ]
+          },
+          {
+            "binding": "plain",
+            "domain": "local",
+            "first_seen_ms": 1790938487069,
+            "id": "service-bfbf73f55f2bbc8b24e6f88ba7b631aa",
+            "instance": "wsprrypico-0a60df",
+            "interface": 4,
+            "last_seen_ms": 1790941287505,
+            "port": 31417,
+            "protocol": 0,
+            "reason": "",
+            "state": "online",
+            "state_changed_ms": 1790941287505,
+            "target": "wsprrypico-0a60df.local",
+            "txt": [
+              "txtvers=1",
+              "binding=plain"
+            ]
+          }
+        ],
+        "reason": "",
+        "scope": "wtp-dns-sd/1",
+        "service": "_wtp._tcp.local."
+      }
+    }
+  },
+  {
+    "utc_ns": "1790941434183212622",
+    "monotonic_ns": "223378413233385",
+    "kind": "link-down-evidence",
+    "value": {
+      "interface": "eth0",
+      "removed": {
+        "available": true,
+        "candidates": [
+          {
+            "binding": "plain",
+            "domain": "local",
+            "first_seen_ms": 1790938487071,
+            "id": "service-879a3661fecc0dd95cc3c1f1d8fa6f0f",
+            "instance": "WsprryPi wspr1 d133ed89",
+            "interface": 2,
+            "last_seen_ms": 1790938487072,
+            "port": 31417,
+            "protocol": 0,
+            "reason": "Service was withdrawn",
+            "state": "removed",
+            "state_changed_ms": 1790941434106,
+            "target": "wtp-d133ed890b90f6945b41a235429ff155.local",
+            "txt": [
+              "txtvers=1",
+              "binding=plain"
+            ]
+          },
+          {
+            "binding": "plain",
+            "domain": "local",
+            "first_seen_ms": 1790938487070,
+            "id": "service-eea7d3e7283a3c30c33a86479f3dfc0a",
+            "instance": "WsprryPi wspr2 e2a4d273",
+            "interface": 2,
+            "last_seen_ms": 1790938487072,
+            "port": 31417,
+            "protocol": 0,
+            "reason": "Service was withdrawn",
+            "state": "removed",
+            "state_changed_ms": 1790941434106,
+            "target": "wtp-e2a4d273f7d8f24f6696f7c6fb95ff11.local",
+            "txt": [
+              "txtvers=1",
+              "binding=plain"
+            ]
+          },
+          {
+            "binding": "plain",
+            "domain": "local",
+            "first_seen_ms": 1790938487071,
+            "id": "service-67facb21fbea71aefdc46ba116736857",
+            "instance": "WsprryPi wspr4 f21e530a",
+            "interface": 2,
+            "last_seen_ms": 1790938487072,
+            "port": 31417,
+            "protocol": 0,
+            "reason": "Service was withdrawn",
+            "state": "removed",
+            "state_changed_ms": 1790941434106,
+            "target": "wtp-f21e530af8a4a210ec57898c0ebd32d2.local",
+            "txt": [
+              "txtvers=1",
+              "binding=plain"
+            ]
+          },
+          {
+            "binding": "plain",
+            "domain": "local",
+            "first_seen_ms": 1790938487899,
+            "id": "service-600bfc9ce83e33d34dfbb08e0b42cc2a",
+            "instance": "WsprryPi wspr5 e045017b",
+            "interface": 2,
+            "last_seen_ms": 1790938487899,
+            "port": 31417,
+            "protocol": 0,
+            "reason": "Service was withdrawn",
+            "state": "removed",
+            "state_changed_ms": 1790941434106,
+            "target": "wtp-e045017b11e54c2fb7029f0154e6deb9.local",
+            "txt": [
+              "txtvers=1",
+              "binding=plain"
+            ]
+          },
+          {
+            "binding": "plain",
+            "domain": "local",
+            "first_seen_ms": 1790938487070,
+            "id": "service-7eefe6e462fe036e3cb1dffbcab233dd",
+            "instance": "wsprrypico-0a60df",
+            "interface": 2,
+            "last_seen_ms": 1790938487072,
+            "port": 31417,
+            "protocol": 0,
+            "reason": "Service was withdrawn",
+            "state": "removed",
+            "state_changed_ms": 1790941434106,
+            "target": "wsprrypico-0a60df.local",
+            "txt": [
+              "txtvers=1",
+              "binding=plain"
+            ]
+          },
+          {
+            "binding": "plain",
+            "domain": "local",
+            "first_seen_ms": 1790938487069,
+            "id": "service-8849882a0f724fdd2bbeb58e24e97d52",
+            "instance": "WsprryPi wspr1 d133ed89",
+            "interface": 4,
+            "last_seen_ms": 1790941287130,
+            "port": 31417,
+            "protocol": 0,
+            "reason": "",
+            "state": "online",
+            "state_changed_ms": 1790941287130,
+            "target": "wtp-d133ed890b90f6945b41a235429ff155.local",
+            "txt": [
+              "txtvers=1",
+              "binding=plain"
+            ]
+          },
+          {
+            "binding": "plain",
+            "domain": "local",
+            "first_seen_ms": 1790938487069,
+            "id": "service-7eafa62f6873b13a3e036d5df55d97c9",
+            "instance": "WsprryPi wspr2 e2a4d273",
+            "interface": 4,
+            "last_seen_ms": 1790941285251,
+            "port": 31417,
+            "protocol": 0,
+            "reason": "",
+            "state": "online",
+            "state_changed_ms": 1790941285251,
+            "target": "wtp-e2a4d273f7d8f24f6696f7c6fb95ff11.local",
+            "txt": [
+              "txtvers=1",
+              "binding=plain"
+            ]
+          },
+          {
+            "binding": "plain",
+            "domain": "local",
+            "first_seen_ms": 1790938487070,
+            "id": "service-f63e553213062c57864432b735b025f2",
+            "instance": "WsprryPi wspr4 f21e530a",
+            "interface": 4,
+            "last_seen_ms": 1790941284295,
+            "port": 31417,
+            "protocol": 0,
+            "reason": "",
+            "state": "online",
+            "state_changed_ms": 1790941284295,
+            "target": "wtp-f21e530af8a4a210ec57898c0ebd32d2.local",
+            "txt": [
+              "txtvers=1",
+              "binding=plain"
+            ]
+          },
+          {
+            "binding": "plain",
+            "domain": "local",
+            "first_seen_ms": 1790938487069,
+            "id": "service-bfbf73f55f2bbc8b24e6f88ba7b631aa",
+            "instance": "wsprrypico-0a60df",
+            "interface": 4,
+            "last_seen_ms": 1790941287505,
+            "port": 31417,
+            "protocol": 0,
+            "reason": "",
+            "state": "online",
+            "state_changed_ms": 1790941287505,
+            "target": "wsprrypico-0a60df.local",
+            "txt": [
+              "txtvers=1",
+              "binding=plain"
+            ]
+          }
+        ],
+        "reason": "",
+        "scope": "wtp-dns-sd/1",
+        "service": "_wtp._tcp.local."
+      },
+      "remaining": [
+        {
+          "binding": "plain",
+          "domain": "local",
+          "first_seen_ms": 1790938487069,
+          "id": "service-8849882a0f724fdd2bbeb58e24e97d52",
+          "instance": "WsprryPi wspr1 d133ed89",
+          "interface": 4,
+          "last_seen_ms": 1790941287130,
+          "port": 31417,
+          "protocol": 0,
+          "reason": "",
+          "state": "online",
+          "state_changed_ms": 1790941287130,
+          "target": "wtp-d133ed890b90f6945b41a235429ff155.local",
+          "txt": [
+            "txtvers=1",
+            "binding=plain"
+          ]
+        },
+        {
+          "binding": "plain",
+          "domain": "local",
+          "first_seen_ms": 1790938487069,
+          "id": "service-7eafa62f6873b13a3e036d5df55d97c9",
+          "instance": "WsprryPi wspr2 e2a4d273",
+          "interface": 4,
+          "last_seen_ms": 1790941285251,
+          "port": 31417,
+          "protocol": 0,
+          "reason": "",
+          "state": "online",
+          "state_changed_ms": 1790941285251,
+          "target": "wtp-e2a4d273f7d8f24f6696f7c6fb95ff11.local",
+          "txt": [
+            "txtvers=1",
+            "binding=plain"
+          ]
+        },
+        {
+          "binding": "plain",
+          "domain": "local",
+          "first_seen_ms": 1790938487070,
+          "id": "service-f63e553213062c57864432b735b025f2",
+          "instance": "WsprryPi wspr4 f21e530a",
+          "interface": 4,
+          "last_seen_ms": 1790941284295,
+          "port": 31417,
+          "protocol": 0,
+          "reason": "",
+          "state": "online",
+          "state_changed_ms": 1790941284295,
+          "target": "wtp-f21e530af8a4a210ec57898c0ebd32d2.local",
+          "txt": [
+            "txtvers=1",
+            "binding=plain"
+          ]
+        },
+        {
+          "binding": "plain",
+          "domain": "local",
+          "first_seen_ms": 1790938487069,
+          "id": "service-bfbf73f55f2bbc8b24e6f88ba7b631aa",
+          "instance": "wsprrypico-0a60df",
+          "interface": 4,
+          "last_seen_ms": 1790941287505,
+          "port": 31417,
+          "protocol": 0,
+          "reason": "",
+          "state": "online",
+          "state_changed_ms": 1790941287505,
+          "target": "wsprrypico-0a60df.local",
+          "txt": [
+            "txtvers=1",
+            "binding=plain"
+          ]
+        }
+      ],
+      "endpoint": {
+        "boot_id": "ab2421ed8de8fc5f0d4e199c8447fa78",
+        "device_id": "e045017b11e54c2fb7029f0154e6deb9",
+        "dns_sd_published": false,
+        "enabled": true,
+        "finishing_remote_job": false,
+        "launch_observed_monotonic_ns": null,
+        "launch_target_monotonic_ns": "0",
+        "listener_error": "WTP station LAN address changed; listener withdrawn",
+        "listener_running": false,
+        "local_effective": false,
+        "local_requested": false,
+        "local_work_active": false,
+        "output_unknown": false,
+        "remote_admission_closed": false,
+        "remote_job_id": "",
+        "remote_output_active": false,
+        "remote_owner": "",
+        "remote_state": "empty",
+        "revocation_generation": "11",
+        "revocation_unavailable": false,
+        "schema": "wsprrypi-wtp-endpoint/1"
+      }
+    }
+  },
+  {
+    "utc_ns": "1790941437445029311",
+    "monotonic_ns": "223381675049074",
+    "kind": "command",
+    "value": {
+      "argv": [
+        "nmcli",
+        "connection",
+        "up",
+        "uuid",
+        "75a1216a-9d1a-30cd-8aca-ace5526ec021",
+        "ifname",
+        "eth0"
+      ],
+      "returncode": 0,
+      "stdout": "Connection successfully activated (D-Bus active path: /org/freedesktop/NetworkManager/ActiveConnection/17)\n",
+      "stderr": ""
+    }
+  },
+  {
+    "utc_ns": "1790941437445213236",
+    "monotonic_ns": "223381675232332",
+    "kind": "restored",
+    "value": "eth0"
+  },
+  {
+    "utc_ns": "1790941437966208174",
+    "monotonic_ns": "223382196228233",
+    "kind": "accepted",
+    "value": {
+      "label": "eth0 rediscovery",
+      "value": [
+        {
+          "binding": "plain",
+          "domain": "local",
+          "first_seen_ms": 1790938487071,
+          "id": "service-879a3661fecc0dd95cc3c1f1d8fa6f0f",
+          "instance": "WsprryPi wspr1 d133ed89",
+          "interface": 2,
+          "last_seen_ms": 1790941437631,
+          "port": 31417,
+          "protocol": 0,
+          "reason": "",
+          "state": "online",
+          "state_changed_ms": 1790941437631,
+          "target": "wtp-d133ed890b90f6945b41a235429ff155.local",
+          "txt": [
+            "txtvers=1",
+            "binding=plain"
+          ]
+        },
+        {
+          "binding": "plain",
+          "domain": "local",
+          "first_seen_ms": 1790938487070,
+          "id": "service-eea7d3e7283a3c30c33a86479f3dfc0a",
+          "instance": "WsprryPi wspr2 e2a4d273",
+          "interface": 2,
+          "last_seen_ms": 1790941437763,
+          "port": 31417,
+          "protocol": 0,
+          "reason": "",
+          "state": "online",
+          "state_changed_ms": 1790941437763,
+          "target": "wtp-e2a4d273f7d8f24f6696f7c6fb95ff11.local",
+          "txt": [
+            "txtvers=1",
+            "binding=plain"
+          ]
+        },
+        {
+          "binding": "plain",
+          "domain": "local",
+          "first_seen_ms": 1790938487071,
+          "id": "service-67facb21fbea71aefdc46ba116736857",
+          "instance": "WsprryPi wspr4 f21e530a",
+          "interface": 2,
+          "last_seen_ms": 1790941437892,
+          "port": 31417,
+          "protocol": 0,
+          "reason": "",
+          "state": "online",
+          "state_changed_ms": 1790941437892,
+          "target": "wtp-f21e530af8a4a210ec57898c0ebd32d2.local",
+          "txt": [
+            "txtvers=1",
+            "binding=plain"
+          ]
+        },
+        {
+          "binding": "plain",
+          "domain": "local",
+          "first_seen_ms": 1790938487070,
+          "id": "service-7eefe6e462fe036e3cb1dffbcab233dd",
+          "instance": "wsprrypico-0a60df",
+          "interface": 2,
+          "last_seen_ms": 1790941437768,
+          "port": 31417,
+          "protocol": 0,
+          "reason": "",
+          "state": "online",
+          "state_changed_ms": 1790941437768,
+          "target": "wsprrypico-0a60df.local",
+          "txt": [
+            "txtvers=1",
+            "binding=plain"
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "utc_ns": "1790941439472777192",
+    "monotonic_ns": "223383702796973",
+    "kind": "accepted",
+    "value": {
+      "label": "listener publication recovered",
+      "value": {
+        "address": "192.168.1.54",
+        "boot_id": "ab2421ed8de8fc5f0d4e199c8447fa78",
+        "device_id": "e045017b11e54c2fb7029f0154e6deb9",
+        "dns_sd_published": true,
+        "enabled": true,
+        "finishing_remote_job": false,
+        "launch_observed_monotonic_ns": null,
+        "launch_target_monotonic_ns": "0",
+        "listener_error": "",
+        "listener_running": true,
+        "local_effective": false,
+        "local_requested": false,
+        "local_work_active": false,
+        "output_unknown": false,
+        "port": 31417,
+        "remote_admission_closed": false,
+        "remote_job_id": "",
+        "remote_output_active": false,
+        "remote_owner": "",
+        "remote_state": "empty",
+        "revocation_generation": "11",
+        "revocation_unavailable": false,
+        "schema": "wsprrypi-wtp-endpoint/1"
+      }
+    }
+  },
+  {
+    "utc_ns": "1790941439483852158",
+    "monotonic_ns": "223383713872421",
+    "kind": "command",
+    "value": {
+      "argv": [
+        "systemctl",
+        "stop",
+        "wtp-discovery-rollback-eth0.timer"
+      ],
+      "returncode": 0,
+      "stdout": "",
+      "stderr": ""
+    }
+  },
+  {
+    "utc_ns": "1790941439489870492",
+    "monotonic_ns": "223383719890255",
+    "kind": "phase-complete",
+    "value": {
+      "kind": "link",
+      "interface": "eth0"
+    }
+  },
+  {
+    "utc_ns": "1790941541302381617",
+    "monotonic_ns": "223485532401454",
+    "kind": "command",
+    "value": {
+      "argv": [
+        "systemctl",
+        "stop",
+        "wtp-discovery-rollback-eth0.timer"
+      ],
+      "returncode": 5,
+      "stdout": "",
+      "stderr": "Failed to stop wtp-discovery-rollback-eth0.timer: Unit wtp-discovery-rollback-eth0.timer not loaded.\n"
+    }
+  },
+  {
+    "utc_ns": "1790941541308972784",
+    "monotonic_ns": "223485538992787",
+    "kind": "command",
+    "value": {
+      "argv": [
+        "systemctl",
+        "reset-failed",
+        "wtp-discovery-rollback-eth0.service"
+      ],
+      "returncode": 1,
+      "stdout": "",
+      "stderr": "Failed to reset failed state of unit wtp-discovery-rollback-eth0.service: Unit wtp-discovery-rollback-eth0.service not loaded.\n"
+    }
+  },
+  {
+    "utc_ns": "1790941541318595145",
+    "monotonic_ns": "223485548614852",
+    "kind": "command",
+    "value": {
+      "argv": [
+        "systemd-run",
+        "--unit=wtp-discovery-rollback-eth0",
+        "--on-active=120s",
+        "--timer-property=AccuracySec=1s",
+        "/usr/bin/python3",
+        "/home/pi/wtp-discovery-20261002/campaign.py",
+        "restore",
+        "eth0"
+      ],
+      "returncode": 0,
+      "stdout": "",
+      "stderr": "Running timer as unit: wtp-discovery-rollback-eth0.timer\nWill run service as unit: wtp-discovery-rollback-eth0.service\n"
+    }
+  },
+  {
+    "utc_ns": "1790941541325215052",
+    "monotonic_ns": "223485555234722",
+    "kind": "command",
+    "value": {
+      "argv": [
+        "systemctl",
+        "is-active",
+        "wtp-discovery-rollback-eth0.timer"
+      ],
+      "returncode": 0,
+      "stdout": "active\n",
+      "stderr": ""
+    }
+  },
+  {
+    "utc_ns": "1790941544357752951",
+    "monotonic_ns": "223488587772287",
+    "kind": "command",
+    "value": {
+      "argv": [
+        "arping",
+        "-D",
+        "-I",
+        "eth0",
+        "-c",
+        "3",
+        "-w",
+        "4",
+        "192.168.1.240"
+      ],
+      "returncode": 0,
+      "stdout": "ARPING 192.168.1.240 from 0.0.0.0 eth0\nSent 3 probes (3 broadcast(s))\nReceived 0 response(s)\n",
+      "stderr": ""
+    }
+  },
+  {
+    "utc_ns": "1790941544357853858",
+    "monotonic_ns": "223488587872565",
+    "kind": "phase-start",
+    "value": {
+      "kind": "address",
+      "interface": "eth0",
+      "old": "192.168.1.54",
+      "new": "192.168.1.240"
+    }
+  },
+  {
+    "utc_ns": "1790941544402486410",
+    "monotonic_ns": "223488632507525",
+    "kind": "command",
+    "value": {
+      "argv": [
+        "nmcli",
+        "device",
+        "modify",
+        "eth0",
+        "ipv4.method",
+        "manual",
+        "ipv4.addresses",
+        "192.168.1.240/24",
+        "ipv4.gateway",
+        "192.168.1.1",
+        "ipv4.dns",
+        "192.168.1.1"
+      ],
+      "returncode": 0,
+      "stdout": "Connection successfully reapplied to device 'eth0'.\n",
+      "stderr": ""
+    }
+  },
+  {
+    "utc_ns": "1790941547415927216",
+    "monotonic_ns": "223491645947182",
+    "kind": "accepted",
+    "value": {
+      "label": "listener rebound",
+      "value": {
+        "address": "192.168.1.240",
+        "boot_id": "ab2421ed8de8fc5f0d4e199c8447fa78",
+        "device_id": "e045017b11e54c2fb7029f0154e6deb9",
+        "dns_sd_published": true,
+        "enabled": true,
+        "finishing_remote_job": false,
+        "launch_observed_monotonic_ns": null,
+        "launch_target_monotonic_ns": "0",
+        "listener_error": "",
+        "listener_running": true,
+        "local_effective": false,
+        "local_requested": false,
+        "local_work_active": false,
+        "output_unknown": false,
+        "port": 31417,
+        "remote_admission_closed": false,
+        "remote_job_id": "",
+        "remote_output_active": false,
+        "remote_owner": "",
+        "remote_state": "empty",
+        "revocation_generation": "11",
+        "revocation_unavailable": false,
+        "schema": "wsprrypi-wtp-endpoint/1"
+      }
+    }
+  },
+  {
+    "utc_ns": "1790941547432828203",
+    "monotonic_ns": "223491662848076",
+    "kind": "command",
+    "value": {
+      "argv": [
+        "avahi-resolve-host-name",
+        "-4",
+        "wtp-e045017b11e54c2fb7029f0154e6deb9.local"
+      ],
+      "returncode": 0,
+      "stdout": "wtp-e045017b11e54c2fb7029f0154e6deb9.local\t192.168.1.240\n",
+      "stderr": ""
+    }
+  },
+  {
+    "utc_ns": "1790941547476151000",
+    "monotonic_ns": "223491706171003",
+    "kind": "accepted",
+    "value": {
+      "label": "independent observer rediscovery",
+      "value": [
+        {
+          "binding": "plain",
+          "domain": "local",
+          "first_seen_ms": 1790856323548,
+          "id": "service-376ec88b9c31db7299fd6af03c789f10",
+          "instance": "WsprryPi wspr5 e045017b",
+          "interface": 4,
+          "last_seen_ms": 1790941371435,
+          "port": 31417,
+          "protocol": 0,
+          "reason": "",
+          "state": "online",
+          "state_changed_ms": 1790941371435,
+          "target": "wtp-e045017b11e54c2fb7029f0154e6deb9.local",
+          "txt": [
+            "txtvers=1",
+            "binding=plain"
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "utc_ns": "1790941547568072411",
+    "monotonic_ns": "223491798091989",
+    "kind": "address-identify",
+    "value": {
+      "status": 403,
+      "body": {
+        "error": {
+          "code": "origin_or_content_type"
+        }
+      }
+    }
+  },
+  {
+    "utc_ns": "1790941547854293781",
+    "monotonic_ns": "223492084314340",
+    "kind": "command",
+    "value": {
+      "argv": [
+        "nmcli",
+        "connection",
+        "up",
+        "uuid",
+        "75a1216a-9d1a-30cd-8aca-ace5526ec021",
+        "ifname",
+        "eth0"
+      ],
+      "returncode": 0,
+      "stdout": "Connection successfully activated (D-Bus active path: /org/freedesktop/NetworkManager/ActiveConnection/18)\n",
+      "stderr": ""
+    }
+  },
+  {
+    "utc_ns": "1790941547854476632",
+    "monotonic_ns": "223492084496654",
+    "kind": "restored",
+    "value": "eth0"
+  },
+  {
+    "utc_ns": "1790941631617220794",
+    "monotonic_ns": "223575847241464",
+    "kind": "command",
+    "value": {
+      "argv": [
+        "systemctl",
+        "stop",
+        "wtp-discovery-rollback-eth0.timer"
+      ],
+      "returncode": 0,
+      "stdout": "",
+      "stderr": ""
+    }
+  },
+  {
+    "utc_ns": "1790941631623817349",
+    "monotonic_ns": "223575853837648",
+    "kind": "command",
+    "value": {
+      "argv": [
+        "systemctl",
+        "reset-failed",
+        "wtp-discovery-rollback-eth0.service"
+      ],
+      "returncode": 1,
+      "stdout": "",
+      "stderr": "Failed to reset failed state of unit wtp-discovery-rollback-eth0.service: Unit wtp-discovery-rollback-eth0.service not loaded.\n"
+    }
+  },
+  {
+    "utc_ns": "1790941631633378210",
+    "monotonic_ns": "223575863397769",
+    "kind": "command",
+    "value": {
+      "argv": [
+        "systemd-run",
+        "--unit=wtp-discovery-rollback-eth0",
+        "--on-active=120s",
+        "--timer-property=AccuracySec=1s",
+        "/usr/bin/python3",
+        "/home/pi/wtp-discovery-20261002/campaign.py",
+        "restore",
+        "eth0"
+      ],
+      "returncode": 0,
+      "stdout": "",
+      "stderr": "Running timer as unit: wtp-discovery-rollback-eth0.timer\nWill run service as unit: wtp-discovery-rollback-eth0.service\n"
+    }
+  },
+  {
+    "utc_ns": "1790941631639946931",
+    "monotonic_ns": "223575869967009",
+    "kind": "command",
+    "value": {
+      "argv": [
+        "systemctl",
+        "is-active",
+        "wtp-discovery-rollback-eth0.timer"
+      ],
+      "returncode": 0,
+      "stdout": "active\n",
+      "stderr": ""
+    }
+  },
+  {
+    "utc_ns": "1790941634656422104",
+    "monotonic_ns": "223578886441514",
+    "kind": "command",
+    "value": {
+      "argv": [
+        "arping",
+        "-D",
+        "-I",
+        "eth0",
+        "-c",
+        "3",
+        "-w",
+        "4",
+        "192.168.1.240"
+      ],
+      "returncode": 0,
+      "stdout": "ARPING 192.168.1.240 from 0.0.0.0 eth0\nSent 3 probes (3 broadcast(s))\nReceived 0 response(s)\n",
+      "stderr": ""
+    }
+  },
+  {
+    "utc_ns": "1790941634656521103",
+    "monotonic_ns": "223578886539792",
+    "kind": "phase-start",
+    "value": {
+      "kind": "address",
+      "interface": "eth0",
+      "old": "192.168.1.54",
+      "new": "192.168.1.240"
+    }
+  },
+  {
+    "utc_ns": "1790941634678366447",
+    "monotonic_ns": "223578908387339",
+    "kind": "command",
+    "value": {
+      "argv": [
+        "nmcli",
+        "device",
+        "modify",
+        "eth0",
+        "ipv4.method",
+        "manual",
+        "ipv4.addresses",
+        "192.168.1.240/24",
+        "ipv4.gateway",
+        "192.168.1.1",
+        "ipv4.dns",
+        "192.168.1.1"
+      ],
+      "returncode": 0,
+      "stdout": "Connection successfully reapplied to device 'eth0'.\n",
+      "stderr": ""
+    }
+  },
+  {
+    "utc_ns": "1790941636186820468",
+    "monotonic_ns": "223580416839897",
+    "kind": "accepted",
+    "value": {
+      "label": "listener rebound",
+      "value": {
+        "address": "192.168.1.240",
+        "boot_id": "ab2421ed8de8fc5f0d4e199c8447fa78",
+        "device_id": "e045017b11e54c2fb7029f0154e6deb9",
+        "dns_sd_published": true,
+        "enabled": true,
+        "finishing_remote_job": false,
+        "launch_observed_monotonic_ns": null,
+        "launch_target_monotonic_ns": "0",
+        "listener_error": "",
+        "listener_running": true,
+        "local_effective": false,
+        "local_requested": false,
+        "local_work_active": false,
+        "output_unknown": false,
+        "port": 31417,
+        "remote_admission_closed": false,
+        "remote_job_id": "",
+        "remote_output_active": false,
+        "remote_owner": "",
+        "remote_state": "empty",
+        "revocation_generation": "11",
+        "revocation_unavailable": false,
+        "schema": "wsprrypi-wtp-endpoint/1"
+      }
+    }
+  },
+  {
+    "utc_ns": "1790941636201240519",
+    "monotonic_ns": "223580431260022",
+    "kind": "command",
+    "value": {
+      "argv": [
+        "avahi-resolve-host-name",
+        "-4",
+        "wtp-e045017b11e54c2fb7029f0154e6deb9.local"
+      ],
+      "returncode": 0,
+      "stdout": "wtp-e045017b11e54c2fb7029f0154e6deb9.local\t192.168.1.240\n",
+      "stderr": ""
+    }
+  },
+  {
+    "utc_ns": "1790941636603185294",
+    "monotonic_ns": "223580833205927",
+    "kind": "accepted",
+    "value": {
+      "label": "independent observer rediscovery",
+      "value": [
+        {
+          "binding": "plain",
+          "domain": "local",
+          "first_seen_ms": 1790856323548,
+          "id": "service-376ec88b9c31db7299fd6af03c789f10",
+          "instance": "WsprryPi wspr5 e045017b",
+          "interface": 4,
+          "last_seen_ms": 1790941371435,
+          "port": 31417,
+          "protocol": 0,
+          "reason": "",
+          "state": "online",
+          "state_changed_ms": 1790941371435,
+          "target": "wtp-e045017b11e54c2fb7029f0154e6deb9.local",
+          "txt": [
+            "txtvers=1",
+            "binding=plain"
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "utc_ns": "1790941641834447859",
+    "monotonic_ns": "223586064467622",
+    "kind": "address-identify",
+    "value": {
+      "status": 409,
+      "body": {
+        "error": {
+          "code": "catalog_request_rejected",
+          "message": "Read-only WTP identification failed: Pico endpoint could not negotiate; inspect endpoint identity and connection"
+        }
+      }
+    }
+  },
+  {
+    "utc_ns": "1790941642178486461",
+    "monotonic_ns": "223586408507131",
+    "kind": "command",
+    "value": {
+      "argv": [
+        "nmcli",
+        "connection",
+        "up",
+        "uuid",
+        "75a1216a-9d1a-30cd-8aca-ace5526ec021",
+        "ifname",
+        "eth0"
+      ],
+      "returncode": 0,
+      "stdout": "Connection successfully activated (D-Bus active path: /org/freedesktop/NetworkManager/ActiveConnection/19)\n",
+      "stderr": ""
+    }
+  },
+  {
+    "utc_ns": "1790941642178704090",
+    "monotonic_ns": "223586408723575",
+    "kind": "restored",
+    "value": "eth0"
+  },
+  {
+    "utc_ns": "1790941910934771241",
+    "monotonic_ns": "223855164791281",
+    "kind": "command",
+    "value": {
+      "argv": [
+        "systemctl",
+        "stop",
+        "wtp-discovery-rollback-eth0.timer"
+      ],
+      "returncode": 5,
+      "stdout": "",
+      "stderr": "Failed to stop wtp-discovery-rollback-eth0.timer: Unit wtp-discovery-rollback-eth0.timer not loaded.\n"
+    }
+  },
+  {
+    "utc_ns": "1790941910941429554",
+    "monotonic_ns": "223855171449150",
+    "kind": "command",
+    "value": {
+      "argv": [
+        "systemctl",
+        "reset-failed",
+        "wtp-discovery-rollback-eth0.service"
+      ],
+      "returncode": 1,
+      "stdout": "",
+      "stderr": "Failed to reset failed state of unit wtp-discovery-rollback-eth0.service: Unit wtp-discovery-rollback-eth0.service not loaded.\n"
+    }
+  },
+  {
+    "utc_ns": "1790941910951047877",
+    "monotonic_ns": "223855181067510",
+    "kind": "command",
+    "value": {
+      "argv": [
+        "systemd-run",
+        "--unit=wtp-discovery-rollback-eth0",
+        "--on-active=120s",
+        "--timer-property=AccuracySec=1s",
+        "/usr/bin/python3",
+        "/home/pi/wtp-discovery-20261002/campaign.py",
+        "restore",
+        "eth0"
+      ],
+      "returncode": 0,
+      "stdout": "",
+      "stderr": "Running timer as unit: wtp-discovery-rollback-eth0.timer\nWill run service as unit: wtp-discovery-rollback-eth0.service\n"
+    }
+  },
+  {
+    "utc_ns": "1790941910957769116",
+    "monotonic_ns": "223855187789027",
+    "kind": "command",
+    "value": {
+      "argv": [
+        "systemctl",
+        "is-active",
+        "wtp-discovery-rollback-eth0.timer"
+      ],
+      "returncode": 0,
+      "stdout": "active\n",
+      "stderr": ""
+    }
+  },
+  {
+    "utc_ns": "1790941913966212306",
+    "monotonic_ns": "223858196231735",
+    "kind": "command",
+    "value": {
+      "argv": [
+        "arping",
+        "-D",
+        "-I",
+        "eth0",
+        "-c",
+        "3",
+        "-w",
+        "4",
+        "192.168.1.240"
+      ],
+      "returncode": 0,
+      "stdout": "ARPING 192.168.1.240 from 0.0.0.0 eth0\nSent 3 probes (3 broadcast(s))\nReceived 0 response(s)\n",
+      "stderr": ""
+    }
+  },
+  {
+    "utc_ns": "1790941913966322509",
+    "monotonic_ns": "223858196341198",
+    "kind": "phase-start",
+    "value": {
+      "kind": "address",
+      "interface": "eth0",
+      "old": "192.168.1.54",
+      "new": "192.168.1.240"
+    }
+  },
+  {
+    "utc_ns": "1790941913989059495",
+    "monotonic_ns": "223858219079665",
+    "kind": "command",
+    "value": {
+      "argv": [
+        "nmcli",
+        "device",
+        "modify",
+        "eth0",
+        "ipv4.method",
+        "manual",
+        "ipv4.addresses",
+        "192.168.1.240/24",
+        "ipv4.gateway",
+        "192.168.1.1",
+        "ipv4.dns",
+        "192.168.1.1",
+        "ipv4.route-metric",
+        "99"
+      ],
+      "returncode": 0,
+      "stdout": "Connection successfully reapplied to device 'eth0'.\n",
+      "stderr": ""
+    }
+  },
+  {
+    "utc_ns": "1790941917002158900",
+    "monotonic_ns": "223861232178552",
+    "kind": "accepted",
+    "value": {
+      "label": "listener rebound",
+      "value": {
+        "address": "192.168.1.240",
+        "boot_id": "ab2421ed8de8fc5f0d4e199c8447fa78",
+        "device_id": "e045017b11e54c2fb7029f0154e6deb9",
+        "dns_sd_published": true,
+        "enabled": true,
+        "finishing_remote_job": false,
+        "launch_observed_monotonic_ns": null,
+        "launch_target_monotonic_ns": "0",
+        "listener_error": "",
+        "listener_running": true,
+        "local_effective": false,
+        "local_requested": false,
+        "local_work_active": false,
+        "output_unknown": false,
+        "port": 31417,
+        "remote_admission_closed": false,
+        "remote_job_id": "",
+        "remote_output_active": false,
+        "remote_owner": "",
+        "remote_state": "empty",
+        "revocation_generation": "11",
+        "revocation_unavailable": false,
+        "schema": "wsprrypi-wtp-endpoint/1"
+      }
+    }
+  },
+  {
+    "utc_ns": "1790941917016777448",
+    "monotonic_ns": "223861246797674",
+    "kind": "command",
+    "value": {
+      "argv": [
+        "avahi-resolve-host-name",
+        "-4",
+        "wtp-e045017b11e54c2fb7029f0154e6deb9.local"
+      ],
+      "returncode": 0,
+      "stdout": "wtp-e045017b11e54c2fb7029f0154e6deb9.local\t192.168.1.240\n",
+      "stderr": ""
+    }
+  },
+  {
+    "utc_ns": "1790941921090011877",
+    "monotonic_ns": "223865320032233",
+    "kind": "waiting",
+    "value": {
+      "label": "independent observer rediscovery",
+      "error": "timed out"
+    }
+  },
+  {
+    "utc_ns": "1790941925622330328",
+    "monotonic_ns": "223869852350517",
+    "kind": "waiting",
+    "value": {
+      "label": "independent observer rediscovery",
+      "error": "timed out"
+    }
+  },
+  {
+    "utc_ns": "1790941930158315767",
+    "monotonic_ns": "223874388335400",
+    "kind": "waiting",
+    "value": {
+      "label": "independent observer rediscovery",
+      "error": "timed out"
+    }
+  },
+  {
+    "utc_ns": "1790941934690285646",
+    "monotonic_ns": "223878920306076",
+    "kind": "waiting",
+    "value": {
+      "label": "independent observer rediscovery",
+      "error": "timed out"
+    }
+  },
+  {
+    "utc_ns": "1790941939226591459",
+    "monotonic_ns": "223883456611851",
+    "kind": "waiting",
+    "value": {
+      "label": "independent observer rediscovery",
+      "error": "timed out"
+    }
+  },
+  {
+    "utc_ns": "1790941943758337575",
+    "monotonic_ns": "223887988357782",
+    "kind": "waiting",
+    "value": {
+      "label": "independent observer rediscovery",
+      "error": "timed out"
+    }
+  },
+  {
+    "utc_ns": "1790941948292153179",
+    "monotonic_ns": "223892522173571",
+    "kind": "waiting",
+    "value": {
+      "label": "independent observer rediscovery",
+      "error": "timed out"
+    }
+  },
+  {
+    "utc_ns": "1790941952859909939",
+    "monotonic_ns": "223897089930424",
+    "kind": "waiting",
+    "value": {
+      "label": "independent observer rediscovery",
+      "error": "timed out"
+    }
+  },
+  {
+    "utc_ns": "1790941957378775335",
+    "monotonic_ns": "223901608795542",
+    "kind": "waiting",
+    "value": {
+      "label": "independent observer rediscovery",
+      "error": "timed out"
+    }
+  },
+  {
+    "utc_ns": "1790941961979470132",
+    "monotonic_ns": "223906209490006",
+    "kind": "waiting",
+    "value": {
+      "label": "independent observer rediscovery",
+      "error": "timed out"
+    }
+  },
+  {
+    "utc_ns": "1790941966568534085",
+    "monotonic_ns": "223910798554107",
+    "kind": "waiting",
+    "value": {
+      "label": "independent observer rediscovery",
+      "error": "timed out"
+    }
+  },
+  {
+    "utc_ns": "1790941971190281341",
+    "monotonic_ns": "223915420301659",
+    "kind": "waiting",
+    "value": {
+      "label": "independent observer rediscovery",
+      "error": "timed out"
+    }
+  },
+  {
+    "utc_ns": "1790941975719460257",
+    "monotonic_ns": "223919949480501",
+    "kind": "waiting",
+    "value": {
+      "label": "independent observer rediscovery",
+      "error": "timed out"
+    }
+  },
+  {
+    "utc_ns": "1790941980255700464",
+    "monotonic_ns": "223924485720171",
+    "kind": "waiting",
+    "value": {
+      "label": "independent observer rediscovery",
+      "error": "timed out"
+    }
+  },
+  {
+    "utc_ns": "1790941984790250094",
+    "monotonic_ns": "223929020269930",
+    "kind": "waiting",
+    "value": {
+      "label": "independent observer rediscovery",
+      "error": "timed out"
+    }
+  },
+  {
+    "utc_ns": "1790941989322542817",
+    "monotonic_ns": "223933552562783",
+    "kind": "waiting",
+    "value": {
+      "label": "independent observer rediscovery",
+      "error": "timed out"
+    }
+  },
+  {
+    "utc_ns": "1790941990178619543",
+    "monotonic_ns": "223934408639843",
+    "kind": "command",
+    "value": {
+      "argv": [
+        "nmcli",
+        "connection",
+        "up",
+        "uuid",
+        "75a1216a-9d1a-30cd-8aca-ace5526ec021",
+        "ifname",
+        "eth0"
+      ],
+      "returncode": 0,
+      "stdout": "Connection successfully activated (D-Bus active path: /org/freedesktop/NetworkManager/ActiveConnection/20)\n",
+      "stderr": ""
+    }
+  },
+  {
+    "utc_ns": "1790941990211824091",
+    "monotonic_ns": "223934441843983",
+    "kind": "command",
+    "value": {
+      "argv": [
+        "nmcli",
+        "-g",
+        "ipv4.route-metric",
+        "connection",
+        "show",
+        "921301fe-cdfd-4965-8ac7-c96e9d908ea6"
+      ],
+      "returncode": 0,
+      "stdout": "100\n",
+      "stderr": ""
+    }
+  },
+  {
+    "utc_ns": "1790941990247835612",
+    "monotonic_ns": "223934477855874",
+    "kind": "command",
+    "value": {
+      "argv": [
+        "nmcli",
+        "device",
+        "modify",
+        "wlan1",
+        "ipv4.route-metric",
+        "101"
+      ],
+      "returncode": 0,
+      "stdout": "Connection successfully reapplied to device 'wlan1'.\n",
+      "stderr": ""
+    }
+  },
+  {
+    "utc_ns": "1790941990282360174",
+    "monotonic_ns": "223934512380177",
+    "kind": "command",
+    "value": {
+      "argv": [
+        "nmcli",
+        "device",
+        "modify",
+        "wlan1",
+        "ipv4.route-metric",
+        "100"
+      ],
+      "returncode": 0,
+      "stdout": "Connection successfully reapplied to device 'wlan1'.\n",
+      "stderr": ""
+    }
+  },
+  {
+    "utc_ns": "1790941990282597877",
+    "monotonic_ns": "223934512617140",
+    "kind": "restored",
+    "value": "eth0"
+  },
+  {
+    "utc_ns": "1790942032319371539",
+    "monotonic_ns": "223976549397598",
+    "kind": "command",
+    "value": {
+      "argv": [
+        "nmcli",
+        "connection",
+        "up",
+        "uuid",
+        "75a1216a-9d1a-30cd-8aca-ace5526ec021",
+        "ifname",
+        "eth0"
+      ],
+      "returncode": 0,
+      "stdout": "Connection successfully activated (D-Bus active path: /org/freedesktop/NetworkManager/ActiveConnection/21)\n",
+      "stderr": ""
+    }
+  },
+  {
+    "utc_ns": "1790942032347885956",
+    "monotonic_ns": "223976577908237",
+    "kind": "command",
+    "value": {
+      "argv": [
+        "nmcli",
+        "-g",
+        "ipv4.route-metric",
+        "connection",
+        "show",
+        "921301fe-cdfd-4965-8ac7-c96e9d908ea6"
+      ],
+      "returncode": 0,
+      "stdout": "100\n",
+      "stderr": ""
+    }
+  },
+  {
+    "utc_ns": "1790942032373255753",
+    "monotonic_ns": "223976603275775",
+    "kind": "command",
+    "value": {
+      "argv": [
+        "nmcli",
+        "device",
+        "modify",
+        "wlan1",
+        "ipv4.route-metric",
+        "101"
+      ],
+      "returncode": 0,
+      "stdout": "Connection successfully reapplied to device 'wlan1'.\n",
+      "stderr": ""
+    }
+  },
+  {
+    "utc_ns": "1790942032403304129",
+    "monotonic_ns": "223976633323447",
+    "kind": "command",
+    "value": {
+      "argv": [
+        "nmcli",
+        "device",
+        "modify",
+        "wlan1",
+        "ipv4.route-metric",
+        "100"
+      ],
+      "returncode": 0,
+      "stdout": "Connection successfully reapplied to device 'wlan1'.\n",
+      "stderr": ""
+    }
+  },
+  {
+    "utc_ns": "1790942032403416981",
+    "monotonic_ns": "223976633435965",
+    "kind": "restored",
+    "value": "eth0"
+  },
+  {
+    "utc_ns": "1790942166755049255",
+    "monotonic_ns": "224110985069480",
+    "kind": "command",
+    "value": {
+      "argv": [
+        "systemctl",
+        "stop",
+        "wtp-discovery-rollback-eth0.timer"
+      ],
+      "returncode": 5,
+      "stdout": "",
+      "stderr": "Failed to stop wtp-discovery-rollback-eth0.timer: Unit wtp-discovery-rollback-eth0.timer not loaded.\n"
+    }
+  },
+  {
+    "utc_ns": "1790942166761679994",
+    "monotonic_ns": "224110991700072",
+    "kind": "command",
+    "value": {
+      "argv": [
+        "systemctl",
+        "reset-failed",
+        "wtp-discovery-rollback-eth0.service"
+      ],
+      "returncode": 1,
+      "stdout": "",
+      "stderr": "Failed to reset failed state of unit wtp-discovery-rollback-eth0.service: Unit wtp-discovery-rollback-eth0.service not loaded.\n"
+    }
+  },
+  {
+    "utc_ns": "1790942166770397672",
+    "monotonic_ns": "224111000418102",
+    "kind": "command",
+    "value": {
+      "argv": [
+        "systemd-run",
+        "--unit=wtp-discovery-rollback-eth0",
+        "--on-active=120s",
+        "--timer-property=AccuracySec=1s",
+        "/usr/bin/python3",
+        "/home/pi/wtp-discovery-20261002/campaign.py",
+        "restore",
+        "eth0"
+      ],
+      "returncode": 0,
+      "stdout": "",
+      "stderr": "Running timer as unit: wtp-discovery-rollback-eth0.timer\nWill run service as unit: wtp-discovery-rollback-eth0.service\n"
+    }
+  },
+  {
+    "utc_ns": "1790942166777112375",
+    "monotonic_ns": "224111007132119",
+    "kind": "command",
+    "value": {
+      "argv": [
+        "systemctl",
+        "is-active",
+        "wtp-discovery-rollback-eth0.timer"
+      ],
+      "returncode": 0,
+      "stdout": "active\n",
+      "stderr": ""
+    }
+  },
+  {
+    "utc_ns": "1790942166795250136",
+    "monotonic_ns": "224111025269899",
+    "kind": "command",
+    "value": {
+      "argv": [
+        "nmcli",
+        "connection",
+        "show",
+        "wtp-discovery-eth0-dhcp"
+      ],
+      "returncode": 10,
+      "stdout": "",
+      "stderr": "Error: wtp-discovery-eth0-dhcp - no such connection profile.\n"
+    }
+  },
+  {
+    "utc_ns": "1790942166817444701",
+    "monotonic_ns": "224111047464463",
+    "kind": "command",
+    "value": {
+      "argv": [
+        "nmcli",
+        "connection",
+        "clone",
+        "--temporary",
+        "uuid",
+        "75a1216a-9d1a-30cd-8aca-ace5526ec021",
+        "wtp-discovery-eth0-dhcp"
+      ],
+      "returncode": 0,
+      "stdout": "netplan-eth0 (75a1216a-9d1a-30cd-8aca-ace5526ec021) cloned as wtp-discovery-eth0-dhcp (7ee491c3-a2ba-4392-bb22-85aa773ff317).\n",
+      "stderr": ""
+    }
+  },
+  {
+    "utc_ns": "1790942166838773656",
+    "monotonic_ns": "224111068793567",
+    "kind": "command",
+    "value": {
+      "argv": [
+        "nmcli",
+        "connection",
+        "modify",
+        "--temporary",
+        "wtp-discovery-eth0-dhcp",
+        "connection.autoconnect",
+        "no",
+        "802-3-ethernet.cloned-mac-address",
+        "02:cf:67:62:76:64",
+        "ipv4.route-metric",
+        "99"
+      ],
+      "returncode": 0,
+      "stdout": "",
+      "stderr": ""
+    }
+  },
+  {
+    "utc_ns": "1790942166838880637",
+    "monotonic_ns": "224111068899307",
+    "kind": "phase-start",
+    "value": {
+      "kind": "address-dhcp",
+      "old": "192.168.1.54",
+      "test_mac": "02:cf:67:62:76:64"
+    }
+  },
+  {
+    "utc_ns": "1790942167455565303",
+    "monotonic_ns": "224111685585362",
+    "kind": "command",
+    "value": {
+      "argv": [
+        "nmcli",
+        "connection",
+        "up",
+        "wtp-discovery-eth0-dhcp",
+        "ifname",
+        "eth0"
+      ],
+      "returncode": 0,
+      "stdout": "Connection successfully activated (D-Bus active path: /org/freedesktop/NetworkManager/ActiveConnection/22)\n",
+      "stderr": ""
+    }
+  },
+  {
+    "utc_ns": "1790942167457866314",
+    "monotonic_ns": "224111687886114",
+    "kind": "command",
+    "value": {
+      "argv": [
+        "ip",
+        "-j",
+        "-4",
+        "address",
+        "show",
+        "dev",
+        "eth0"
+      ],
+      "returncode": 0,
+      "stdout": "[{\"ifindex\":2,\"ifname\":\"eth0\",\"flags\":[\"BROADCAST\",\"MULTICAST\",\"UP\",\"LOWER_UP\"],\"mtu\":1500,\"qdisc\":\"fq_codel\",\"operstate\":\"UP\",\"group\":\"default\",\"txqlen\":1000,\"addr_info\":[{\"family\":\"inet\",\"local\":\"192.168.1.62\",\"prefixlen\":24,\"broadcast\":\"192.168.1.255\",\"scope\":\"global\",\"dynamic\":true,\"noprefixroute\":true,\"label\":\"eth0\",\"valid_life_time\":86400,\"preferred_life_time\":86400}]}]\n",
+      "stderr": ""
+    }
+  },
+  {
+    "utc_ns": "1790942169968313365",
+    "monotonic_ns": "224114198332683",
+    "kind": "accepted",
+    "value": {
+      "label": "DHCP listener rebound",
+      "value": {
+        "address": "192.168.1.62",
+        "boot_id": "ab2421ed8de8fc5f0d4e199c8447fa78",
+        "device_id": "e045017b11e54c2fb7029f0154e6deb9",
+        "dns_sd_published": true,
+        "enabled": true,
+        "finishing_remote_job": false,
+        "launch_observed_monotonic_ns": null,
+        "launch_target_monotonic_ns": "0",
+        "listener_error": "",
+        "listener_running": true,
+        "local_effective": false,
+        "local_requested": false,
+        "local_work_active": false,
+        "output_unknown": false,
+        "port": 31417,
+        "remote_admission_closed": false,
+        "remote_job_id": "",
+        "remote_output_active": false,
+        "remote_owner": "",
+        "remote_state": "empty",
+        "revocation_generation": "11",
+        "revocation_unavailable": false,
+        "schema": "wsprrypi-wtp-endpoint/1"
+      }
+    }
+  },
+  {
+    "utc_ns": "1790942176007283758",
+    "monotonic_ns": "224120237304021",
+    "kind": "waiting",
+    "value": {
+      "label": "DHCP observer rediscovery",
+      "error": "timed out"
+    }
+  },
+  {
+    "utc_ns": "1790942180540433972",
+    "monotonic_ns": "224124770454272",
+    "kind": "waiting",
+    "value": {
+      "label": "DHCP observer rediscovery",
+      "error": "timed out"
+    }
+  },
+  {
+    "utc_ns": "1790942185074621865",
+    "monotonic_ns": "224129304642035",
+    "kind": "waiting",
+    "value": {
+      "label": "DHCP observer rediscovery",
+      "error": "timed out"
+    }
+  },
+  {
+    "utc_ns": "1790942189578812146",
+    "monotonic_ns": "224133808832094",
+    "kind": "waiting",
+    "value": {
+      "label": "DHCP observer rediscovery",
+      "error": "timed out"
+    }
+  },
+  {
+    "utc_ns": "1790942194142449474",
+    "monotonic_ns": "224138372469496",
+    "kind": "waiting",
+    "value": {
+      "label": "DHCP observer rediscovery",
+      "error": "timed out"
+    }
+  },
+  {
+    "utc_ns": "1790942198675542499",
+    "monotonic_ns": "224142905561872",
+    "kind": "waiting",
+    "value": {
+      "label": "DHCP observer rediscovery",
+      "error": "timed out"
+    }
+  },
+  {
+    "utc_ns": "1790942199271638579",
+    "monotonic_ns": "224143501658971",
+    "kind": "command",
+    "value": {
+      "argv": [
+        "nmcli",
+        "device",
+        "disconnect",
+        "eth0"
+      ],
+      "returncode": 0,
+      "stdout": "Device 'eth0' successfully disconnected.\n",
+      "stderr": ""
+    }
+  },
+  {
+    "utc_ns": "1790942199274592922",
+    "monotonic_ns": "224143504612944",
+    "kind": "command",
+    "value": {
+      "argv": [
+        "ip",
+        "link",
+        "set",
+        "dev",
+        "eth0",
+        "down"
+      ],
+      "returncode": 0,
+      "stdout": "",
+      "stderr": ""
+    }
+  },
+  {
+    "utc_ns": "1790942199277227451",
+    "monotonic_ns": "224143507247399",
+    "kind": "command",
+    "value": {
+      "argv": [
+        "ip",
+        "link",
+        "set",
+        "dev",
+        "eth0",
+        "address",
+        "2c:cf:67:62:76:64"
+      ],
+      "returncode": 0,
+      "stdout": "",
+      "stderr": ""
+    }
+  },
+  {
+    "utc_ns": "1790942204853440060",
+    "monotonic_ns": "224149083460748",
+    "kind": "command",
+    "value": {
+      "argv": [
+        "nmcli",
+        "connection",
+        "up",
+        "uuid",
+        "75a1216a-9d1a-30cd-8aca-ace5526ec021",
+        "ifname",
+        "eth0"
+      ],
+      "returncode": 0,
+      "stdout": "Connection successfully activated (D-Bus active path: /org/freedesktop/NetworkManager/ActiveConnection/23)\n",
+      "stderr": ""
+    }
+  },
+  {
+    "utc_ns": "1790942204887226737",
+    "monotonic_ns": "224149117247166",
+    "kind": "command",
+    "value": {
+      "argv": [
+        "nmcli",
+        "-g",
+        "ipv4.route-metric",
+        "connection",
+        "show",
+        "921301fe-cdfd-4965-8ac7-c96e9d908ea6"
+      ],
+      "returncode": 0,
+      "stdout": "100\n",
+      "stderr": ""
+    }
+  },
+  {
+    "utc_ns": "1790942204924631422",
+    "monotonic_ns": "224149154651870",
+    "kind": "command",
+    "value": {
+      "argv": [
+        "nmcli",
+        "device",
+        "modify",
+        "wlan1",
+        "ipv4.route-metric",
+        "101"
+      ],
+      "returncode": 0,
+      "stdout": "Connection successfully reapplied to device 'wlan1'.\n",
+      "stderr": ""
+    }
+  },
+  {
+    "utc_ns": "1790942204955596812",
+    "monotonic_ns": "224149185616889",
+    "kind": "command",
+    "value": {
+      "argv": [
+        "nmcli",
+        "device",
+        "modify",
+        "wlan1",
+        "ipv4.route-metric",
+        "100"
+      ],
+      "returncode": 0,
+      "stdout": "Connection successfully reapplied to device 'wlan1'.\n",
+      "stderr": ""
+    }
+  },
+  {
+    "utc_ns": "1790942204984902225",
+    "monotonic_ns": "224149214921895",
+    "kind": "command",
+    "value": {
+      "argv": [
+        "nmcli",
+        "-g",
+        "connection.id",
+        "connection",
+        "show",
+        "wtp-discovery-eth0-dhcp"
+      ],
+      "returncode": 0,
+      "stdout": "wtp-discovery-eth0-dhcp\n",
+      "stderr": ""
+    }
+  },
+  {
+    "utc_ns": "1790942205007308954",
+    "monotonic_ns": "224149237328661",
+    "kind": "command",
+    "value": {
+      "argv": [
+        "nmcli",
+        "connection",
+        "delete",
+        "wtp-discovery-eth0-dhcp"
+      ],
+      "returncode": 0,
+      "stdout": "Connection 'wtp-discovery-eth0-dhcp' (7ee491c3-a2ba-4392-bb22-85aa773ff317) successfully deleted.\n",
+      "stderr": ""
+    }
+  },
+  {
+    "utc_ns": "1790942205007444787",
+    "monotonic_ns": "224149237463531",
+    "kind": "restored",
+    "value": "eth0"
+  },
+  {
+    "utc_ns": "1790942421778111462",
+    "monotonic_ns": "224366008131892",
+    "kind": "command",
+    "value": {
+      "argv": [
+        "systemctl",
+        "stop",
+        "wtp-discovery-rollback-eth0.timer"
+      ],
+      "returncode": 5,
+      "stdout": "",
+      "stderr": "Failed to stop wtp-discovery-rollback-eth0.timer: Unit wtp-discovery-rollback-eth0.timer not loaded.\n"
+    }
+  },
+  {
+    "utc_ns": "1790942421784926016",
+    "monotonic_ns": "224366014945982",
+    "kind": "command",
+    "value": {
+      "argv": [
+        "systemctl",
+        "reset-failed",
+        "wtp-discovery-rollback-eth0.service"
+      ],
+      "returncode": 1,
+      "stdout": "",
+      "stderr": "Failed to reset failed state of unit wtp-discovery-rollback-eth0.service: Unit wtp-discovery-rollback-eth0.service not loaded.\n"
+    }
+  },
+  {
+    "utc_ns": "1790942421793527657",
+    "monotonic_ns": "224366023547198",
+    "kind": "command",
+    "value": {
+      "argv": [
+        "systemd-run",
+        "--unit=wtp-discovery-rollback-eth0",
+        "--on-active=120s",
+        "--timer-property=AccuracySec=1s",
+        "/usr/bin/python3",
+        "/home/pi/wtp-discovery-20261002/campaign.py",
+        "restore",
+        "eth0"
+      ],
+      "returncode": 0,
+      "stdout": "",
+      "stderr": "Running timer as unit: wtp-discovery-rollback-eth0.timer\nWill run service as unit: wtp-discovery-rollback-eth0.service\n"
+    }
+  },
+  {
+    "utc_ns": "1790942421800311674",
+    "monotonic_ns": "224366030331122",
+    "kind": "command",
+    "value": {
+      "argv": [
+        "systemctl",
+        "is-active",
+        "wtp-discovery-rollback-eth0.timer"
+      ],
+      "returncode": 0,
+      "stdout": "active\n",
+      "stderr": ""
+    }
+  },
+  {
+    "utc_ns": "1790942421817856400",
+    "monotonic_ns": "224366047876181",
+    "kind": "command",
+    "value": {
+      "argv": [
+        "nmcli",
+        "connection",
+        "show",
+        "wtp-discovery-eth0-dhcp"
+      ],
+      "returncode": 10,
+      "stdout": "",
+      "stderr": "Error: wtp-discovery-eth0-dhcp - no such connection profile.\n"
+    }
+  },
+  {
+    "utc_ns": "1790942421838527894",
+    "monotonic_ns": "224366068547749",
+    "kind": "command",
+    "value": {
+      "argv": [
+        "nmcli",
+        "connection",
+        "clone",
+        "--temporary",
+        "uuid",
+        "75a1216a-9d1a-30cd-8aca-ace5526ec021",
+        "wtp-discovery-eth0-dhcp"
+      ],
+      "returncode": 0,
+      "stdout": "netplan-eth0 (75a1216a-9d1a-30cd-8aca-ace5526ec021) cloned as wtp-discovery-eth0-dhcp (fdad10d0-dbe8-42fa-809f-2652ebbb6ba5).\n",
+      "stderr": ""
+    }
+  },
+  {
+    "utc_ns": "1790942421858536131",
+    "monotonic_ns": "224366088555931",
+    "kind": "command",
+    "value": {
+      "argv": [
+        "nmcli",
+        "connection",
+        "modify",
+        "--temporary",
+        "wtp-discovery-eth0-dhcp",
+        "connection.autoconnect",
+        "no",
+        "802-3-ethernet.cloned-mac-address",
+        "02:cf:67:62:76:64",
+        "ipv4.route-metric",
+        "99"
+      ],
+      "returncode": 0,
+      "stdout": "",
+      "stderr": ""
+    }
+  },
+  {
+    "utc_ns": "1790942421858646686",
+    "monotonic_ns": "224366088665467",
+    "kind": "phase-start",
+    "value": {
+      "kind": "address-dhcp",
+      "old": "192.168.1.54",
+      "test_mac": "02:cf:67:62:76:64"
+    }
+  },
+  {
+    "utc_ns": "1790942422408442628",
+    "monotonic_ns": "224366638463058",
+    "kind": "command",
+    "value": {
+      "argv": [
+        "nmcli",
+        "connection",
+        "up",
+        "wtp-discovery-eth0-dhcp",
+        "ifname",
+        "eth0"
+      ],
+      "returncode": 0,
+      "stdout": "Connection successfully activated (D-Bus active path: /org/freedesktop/NetworkManager/ActiveConnection/24)\n",
+      "stderr": ""
+    }
+  },
+  {
+    "utc_ns": "1790942422410630474",
+    "monotonic_ns": "224366640651033",
+    "kind": "command",
+    "value": {
+      "argv": [
+        "ip",
+        "-j",
+        "-4",
+        "address",
+        "show",
+        "dev",
+        "eth0"
+      ],
+      "returncode": 0,
+      "stdout": "[{\"ifindex\":2,\"ifname\":\"eth0\",\"flags\":[\"BROADCAST\",\"MULTICAST\",\"UP\",\"LOWER_UP\"],\"mtu\":1500,\"qdisc\":\"fq_codel\",\"operstate\":\"UP\",\"group\":\"default\",\"txqlen\":1000,\"addr_info\":[{\"family\":\"inet\",\"local\":\"192.168.1.62\",\"prefixlen\":24,\"broadcast\":\"192.168.1.255\",\"scope\":\"global\",\"dynamic\":true,\"noprefixroute\":true,\"label\":\"eth0\",\"valid_life_time\":86400,\"preferred_life_time\":86400}]}]\n",
+      "stderr": ""
+    }
+  },
+  {
+    "utc_ns": "1790942424920995022",
+    "monotonic_ns": "224369151014414",
+    "kind": "accepted",
+    "value": {
+      "label": "DHCP listener rebound",
+      "value": {
+        "address": "192.168.1.62",
+        "boot_id": "ab2421ed8de8fc5f0d4e199c8447fa78",
+        "device_id": "e045017b11e54c2fb7029f0154e6deb9",
+        "dns_sd_published": true,
+        "enabled": true,
+        "finishing_remote_job": false,
+        "launch_observed_monotonic_ns": null,
+        "launch_target_monotonic_ns": "0",
+        "listener_error": "",
+        "listener_running": true,
+        "local_effective": false,
+        "local_requested": false,
+        "local_work_active": false,
+        "output_unknown": false,
+        "port": 31417,
+        "remote_admission_closed": false,
+        "remote_job_id": "",
+        "remote_output_active": false,
+        "remote_owner": "",
+        "remote_state": "empty",
+        "revocation_generation": "11",
+        "revocation_unavailable": false,
+        "schema": "wsprrypi-wtp-endpoint/1"
+      }
+    }
+  },
+  {
+    "utc_ns": "1790942431090354926",
+    "monotonic_ns": "224375320375540",
+    "kind": "waiting",
+    "value": {
+      "label": "DHCP observer rediscovery",
+      "error": "timed out"
+    }
+  },
+  {
+    "utc_ns": "1790942435795662421",
+    "monotonic_ns": "224380025683054",
+    "kind": "waiting",
+    "value": {
+      "label": "DHCP observer rediscovery",
+      "error": "timed out"
+    }
+  },
+  {
+    "utc_ns": "1790942440404509964",
+    "monotonic_ns": "224384634530078",
+    "kind": "waiting",
+    "value": {
+      "label": "DHCP observer rediscovery",
+      "error": "timed out"
+    }
+  },
+  {
+    "utc_ns": "1790942444976636468",
+    "monotonic_ns": "224389206656638",
+    "kind": "waiting",
+    "value": {
+      "label": "DHCP observer rediscovery",
+      "error": "timed out"
+    }
+  },
+  {
+    "utc_ns": "1790942449530287044",
+    "monotonic_ns": "224393760307436",
+    "kind": "waiting",
+    "value": {
+      "label": "DHCP observer rediscovery",
+      "error": "timed out"
+    }
+  },
+  {
+    "utc_ns": "1790942454186563173",
+    "monotonic_ns": "224398416583621",
+    "kind": "waiting",
+    "value": {
+      "label": "DHCP observer rediscovery",
+      "error": "timed out"
+    }
+  },
+  {
+    "utc_ns": "1790942454798637938",
+    "monotonic_ns": "224399028658738",
+    "kind": "command",
+    "value": {
+      "argv": [
+        "nmcli",
+        "device",
+        "disconnect",
+        "eth0"
+      ],
+      "returncode": 0,
+      "stdout": "Device 'eth0' successfully disconnected.\n",
+      "stderr": ""
+    }
+  },
+  {
+    "utc_ns": "1790942454801975465",
+    "monotonic_ns": "224399031995654",
+    "kind": "command",
+    "value": {
+      "argv": [
+        "ip",
+        "link",
+        "set",
+        "dev",
+        "eth0",
+        "down"
+      ],
+      "returncode": 0,
+      "stdout": "",
+      "stderr": ""
+    }
+  },
+  {
+    "utc_ns": "1790942454807726578",
+    "monotonic_ns": "224399037747285",
+    "kind": "command",
+    "value": {
+      "argv": [
+        "ip",
+        "link",
+        "set",
+        "dev",
+        "eth0",
+        "address",
+        "2c:cf:67:62:76:64"
+      ],
+      "returncode": 0,
+      "stdout": "",
+      "stderr": ""
+    }
+  },
+  {
+    "utc_ns": "1790942460156493197",
+    "monotonic_ns": "224404386513848",
+    "kind": "command",
+    "value": {
+      "argv": [
+        "nmcli",
+        "connection",
+        "up",
+        "uuid",
+        "75a1216a-9d1a-30cd-8aca-ace5526ec021",
+        "ifname",
+        "eth0"
+      ],
+      "returncode": 0,
+      "stdout": "Connection successfully activated (D-Bus active path: /org/freedesktop/NetworkManager/ActiveConnection/25)\n",
+      "stderr": ""
+    }
+  },
+  {
+    "utc_ns": "1790942460192025221",
+    "monotonic_ns": "224404422045558",
+    "kind": "command",
+    "value": {
+      "argv": [
+        "nmcli",
+        "-g",
+        "ipv4.route-metric",
+        "connection",
+        "show",
+        "921301fe-cdfd-4965-8ac7-c96e9d908ea6"
+      ],
+      "returncode": 0,
+      "stdout": "100\n",
+      "stderr": ""
+    }
+  },
+  {
+    "utc_ns": "1790942460233966894",
+    "monotonic_ns": "224404463987360",
+    "kind": "command",
+    "value": {
+      "argv": [
+        "nmcli",
+        "device",
+        "modify",
+        "wlan1",
+        "ipv4.route-metric",
+        "101"
+      ],
+      "returncode": 0,
+      "stdout": "Connection successfully reapplied to device 'wlan1'.\n",
+      "stderr": ""
+    }
+  },
+  {
+    "utc_ns": "1790942460260240594",
+    "monotonic_ns": "224404490260245",
+    "kind": "command",
+    "value": {
+      "argv": [
+        "nmcli",
+        "device",
+        "modify",
+        "wlan1",
+        "ipv4.route-metric",
+        "100"
+      ],
+      "returncode": 0,
+      "stdout": "Connection successfully reapplied to device 'wlan1'.\n",
+      "stderr": ""
+    }
+  },
+  {
+    "utc_ns": "1790942460286625034",
+    "monotonic_ns": "224404516645019",
+    "kind": "command",
+    "value": {
+      "argv": [
+        "nmcli",
+        "-g",
+        "connection.id",
+        "connection",
+        "show",
+        "wtp-discovery-eth0-dhcp"
+      ],
+      "returncode": 0,
+      "stdout": "wtp-discovery-eth0-dhcp\n",
+      "stderr": ""
+    }
+  },
+  {
+    "utc_ns": "1790942460306557401",
+    "monotonic_ns": "224404536577979",
+    "kind": "command",
+    "value": {
+      "argv": [
+        "nmcli",
+        "connection",
+        "delete",
+        "wtp-discovery-eth0-dhcp"
+      ],
+      "returncode": 0,
+      "stdout": "Connection 'wtp-discovery-eth0-dhcp' (fdad10d0-dbe8-42fa-809f-2652ebbb6ba5) successfully deleted.\n",
+      "stderr": ""
+    }
+  },
+  {
+    "utc_ns": "1790942460306690308",
+    "monotonic_ns": "224404536709182",
+    "kind": "restored",
+    "value": "eth0"
+  },
+  {
+    "utc_ns": "1790942533323486144",
+    "monotonic_ns": "224477553506425",
+    "kind": "command",
+    "value": {
+      "argv": [
+        "ip",
+        "-j",
+        "address"
+      ],
+      "returncode": 0,
+      "stdout": "[{\"ifindex\":1,\"ifname\":\"lo\",\"flags\":[\"LOOPBACK\",\"UP\",\"LOWER_UP\"],\"mtu\":65536,\"qdisc\":\"noqueue\",\"operstate\":\"UNKNOWN\",\"group\":\"default\",\"txqlen\":1000,\"link_type\":\"loopback\",\"address\":\"00:00:00:00:00:00\",\"broadcast\":\"00:00:00:00:00:00\",\"addr_info\":[{\"family\":\"inet\",\"local\":\"127.0.0.1\",\"prefixlen\":8,\"scope\":\"host\",\"label\":\"lo\",\"valid_life_time\":4294967295,\"preferred_life_time\":4294967295},{\"family\":\"inet6\",\"local\":\"::1\",\"prefixlen\":128,\"scope\":\"host\",\"noprefixroute\":true,\"valid_life_time\":4294967295,\"preferred_life_time\":4294967295}]},{\"ifindex\":2,\"ifname\":\"eth0\",\"flags\":[\"BROADCAST\",\"MULTICAST\",\"UP\",\"LOWER_UP\"],\"mtu\":1500,\"qdisc\":\"fq_codel\",\"operstate\":\"UP\",\"group\":\"default\",\"txqlen\":1000,\"link_type\":\"ether\",\"address\":\"2c:cf:67:62:76:64\",\"broadcast\":\"ff:ff:ff:ff:ff:ff\",\"addr_info\":[{\"family\":\"inet\",\"local\":\"192.168.1.54\",\"prefixlen\":24,\"broadcast\":\"192.168.1.255\",\"scope\":\"global\",\"dynamic\":true,\"noprefixroute\":true,\"label\":\"eth0\",\"valid_life_time\":86326,\"preferred_life_time\":86326},{\"family\":\"inet6\",\"local\":\"fe80::2ecf:67ff:fe62:7664\",\"prefixlen\":64,\"scope\":\"link\",\"noprefixroute\":true,\"valid_life_time\":4294967295,\"preferred_life_time\":4294967295}]},{\"ifindex\":3,\"ifname\":\"wlan0\",\"flags\":[\"NO-CARRIER\",\"BROADCAST\",\"MULTICAST\",\"UP\"],\"mtu\":1500,\"qdisc\":\"fq_codel\",\"operstate\":\"DOWN\",\"group\":\"default\",\"txqlen\":1000,\"link_type\":\"ether\",\"address\":\"2c:cf:67:62:76:66\",\"broadcast\":\"ff:ff:ff:ff:ff:ff\",\"addr_info\":[]},{\"ifindex\":4,\"ifname\":\"wlan1\",\"flags\":[\"BROADCAST\",\"MULTICAST\",\"UP\",\"LOWER_UP\"],\"mtu\":1500,\"qdisc\":\"noqueue\",\"operstate\":\"UP\",\"group\":\"default\",\"txqlen\":1000,\"link_type\":\"ether\",\"address\":\"90:de:80:47:b9:da\",\"broadcast\":\"ff:ff:ff:ff:ff:ff\",\"addr_info\":[{\"family\":\"inet\",\"local\":\"192.168.1.117\",\"prefixlen\":24,\"broadcast\":\"192.168.1.255\",\"scope\":\"global\",\"dynamic\":true,\"noprefixroute\":true,\"label\":\"wlan1\",\"valid_life_time\":86328,\"preferred_life_time\":86328}]},{\"ifindex\":5,\"ifname\":\"wlan2\",\"flags\":[\"NO-CARRIER\",\"BROADCAST\",\"MULTICAST\",\"UP\"],\"mtu\":1500,\"qdisc\":\"noqueue\",\"operstate\":\"DOWN\",\"group\":\"default\",\"txqlen\":1000,\"link_type\":\"ether\",\"address\":\"e8:4e:06:ae:d7:09\",\"broadcast\":\"ff:ff:ff:ff:ff:ff\",\"addr_info\":[]}]\n",
+      "stderr": ""
+    }
+  },
+  {
+    "utc_ns": "1790942533325065787",
+    "monotonic_ns": "224477555085605",
+    "kind": "command",
+    "value": {
+      "argv": [
+        "ip",
+        "-j",
+        "-4",
+        "route"
+      ],
+      "returncode": 0,
+      "stdout": "[{\"dst\":\"default\",\"gateway\":\"192.168.1.1\",\"dev\":\"eth0\",\"protocol\":\"dhcp\",\"prefsrc\":\"192.168.1.54\",\"metric\":100,\"flags\":[]},{\"dst\":\"default\",\"gateway\":\"192.168.1.1\",\"dev\":\"wlan1\",\"protocol\":\"dhcp\",\"prefsrc\":\"192.168.1.117\",\"metric\":100,\"flags\":[]},{\"dst\":\"192.168.1.0/24\",\"dev\":\"eth0\",\"protocol\":\"kernel\",\"scope\":\"link\",\"prefsrc\":\"192.168.1.54\",\"metric\":100,\"flags\":[]},{\"dst\":\"192.168.1.0/24\",\"dev\":\"wlan1\",\"protocol\":\"kernel\",\"scope\":\"link\",\"prefsrc\":\"192.168.1.117\",\"metric\":100,\"flags\":[]}]\n",
+      "stderr": ""
+    }
+  },
+  {
+    "utc_ns": "1790942533343247842",
+    "monotonic_ns": "224477573267846",
+    "kind": "command",
+    "value": {
+      "argv": [
+        "nmcli",
+        "-t",
+        "-f",
+        "NAME,UUID,TYPE,DEVICE",
+        "connection",
+        "show",
+        "--active"
+      ],
+      "returncode": 0,
+      "stdout": "netplan-eth0:75a1216a-9d1a-30cd-8aca-ace5526ec021:802-3-ethernet:eth0\nBohica-IoT-wlan1:921301fe-cdfd-4965-8ac7-c96e9d908ea6:802-11-wireless:wlan1\nlo:2c13f4b2-7306-4bf1-9b86-7bcb542fcafc:loopback:lo\n",
+      "stderr": ""
+    }
+  },
+  {
+    "utc_ns": "1790942533351968426",
+    "monotonic_ns": "224477581988393",
+    "kind": "command",
+    "value": {
+      "argv": [
+        "systemctl",
+        "show",
+        "wsprrypi",
+        "-p",
+        "MainPID",
+        "-p",
+        "ActiveState"
+      ],
+      "returncode": 0,
+      "stdout": "MainPID=621104\nActiveState=active\n",
+      "stderr": ""
+    }
+  },
+  {
+    "utc_ns": "1790942533352944609",
+    "monotonic_ns": "224477582963982",
+    "kind": "command",
+    "value": {
+      "argv": [
+        "readlink",
+        "-f",
+        "/dev/pps-gps"
+      ],
+      "returncode": 0,
+      "stdout": "/dev/pps0\n",
+      "stderr": ""
+    }
+  },
+  {
+    "utc_ns": "1790942533353712995",
+    "monotonic_ns": "224477583732184",
+    "kind": "restoration-accepted",
+    "value": {
+      "hashes_equal": true,
+      "profiles_equal": true,
+      "assignments_equal": true,
+      "boot_unchanged": true
+    }
+  },
+  {
+    "utc_ns": "1790942627127765795",
+    "monotonic_ns": "224571357786353",
+    "kind": "command",
+    "value": {
+      "argv": [
+        "systemctl",
+        "stop",
+        "wtp-discovery-rollback-eth0.timer"
+      ],
+      "returncode": 5,
+      "stdout": "",
+      "stderr": "Failed to stop wtp-discovery-rollback-eth0.timer: Unit wtp-discovery-rollback-eth0.timer not loaded.\n"
+    }
+  },
+  {
+    "utc_ns": "1790942627134494756",
+    "monotonic_ns": "224571364514982",
+    "kind": "command",
+    "value": {
+      "argv": [
+        "systemctl",
+        "reset-failed",
+        "wtp-discovery-rollback-eth0.service"
+      ],
+      "returncode": 1,
+      "stdout": "",
+      "stderr": "Failed to reset failed state of unit wtp-discovery-rollback-eth0.service: Unit wtp-discovery-rollback-eth0.service not loaded.\n"
+    }
+  },
+  {
+    "utc_ns": "1790942627143150693",
+    "monotonic_ns": "224571373170715",
+    "kind": "command",
+    "value": {
+      "argv": [
+        "systemd-run",
+        "--unit=wtp-discovery-rollback-eth0",
+        "--on-active=120s",
+        "--timer-property=AccuracySec=1s",
+        "/usr/bin/python3",
+        "/home/pi/wtp-discovery-20261002/campaign.py",
+        "restore",
+        "eth0"
+      ],
+      "returncode": 0,
+      "stdout": "",
+      "stderr": "Running timer as unit: wtp-discovery-rollback-eth0.timer\nWill run service as unit: wtp-discovery-rollback-eth0.service\n"
+    }
+  },
+  {
+    "utc_ns": "1790942627149756340",
+    "monotonic_ns": "224571379775843",
+    "kind": "command",
+    "value": {
+      "argv": [
+        "systemctl",
+        "is-active",
+        "wtp-discovery-rollback-eth0.timer"
+      ],
+      "returncode": 0,
+      "stdout": "active\n",
+      "stderr": ""
+    }
+  },
+  {
+    "utc_ns": "1790942627167063770",
+    "monotonic_ns": "224571397083606",
+    "kind": "command",
+    "value": {
+      "argv": [
+        "nmcli",
+        "connection",
+        "show",
+        "wtp-discovery-eth0-dhcp"
+      ],
+      "returncode": 10,
+      "stdout": "",
+      "stderr": "Error: wtp-discovery-eth0-dhcp - no such connection profile.\n"
+    }
+  },
+  {
+    "utc_ns": "1790942627187516912",
+    "monotonic_ns": "224571417536564",
+    "kind": "command",
+    "value": {
+      "argv": [
+        "nmcli",
+        "connection",
+        "clone",
+        "--temporary",
+        "uuid",
+        "75a1216a-9d1a-30cd-8aca-ace5526ec021",
+        "wtp-discovery-eth0-dhcp"
+      ],
+      "returncode": 0,
+      "stdout": "netplan-eth0 (75a1216a-9d1a-30cd-8aca-ace5526ec021) cloned as wtp-discovery-eth0-dhcp (8c6dc4bc-6b3a-4b03-9ac4-92f44dd66e00).\n",
+      "stderr": ""
+    }
+  },
+  {
+    "utc_ns": "1790942627206507263",
+    "monotonic_ns": "224571436527081",
+    "kind": "command",
+    "value": {
+      "argv": [
+        "nmcli",
+        "connection",
+        "modify",
+        "--temporary",
+        "wtp-discovery-eth0-dhcp",
+        "connection.autoconnect",
+        "no",
+        "802-3-ethernet.cloned-mac-address",
+        "02:cf:67:62:76:64",
+        "ipv4.route-metric",
+        "99"
+      ],
+      "returncode": 0,
+      "stdout": "",
+      "stderr": ""
+    }
+  },
+  {
+    "utc_ns": "1790942627206627799",
+    "monotonic_ns": "224571436646655",
+    "kind": "phase-start",
+    "value": {
+      "kind": "address-dhcp",
+      "old": "192.168.1.54",
+      "test_mac": "02:cf:67:62:76:64"
+    }
+  },
+  {
+    "utc_ns": "1790942628152640767",
+    "monotonic_ns": "224572382661492",
+    "kind": "command",
+    "value": {
+      "argv": [
+        "nmcli",
+        "connection",
+        "up",
+        "wtp-discovery-eth0-dhcp",
+        "ifname",
+        "eth0"
+      ],
+      "returncode": 0,
+      "stdout": "Connection successfully activated (D-Bus active path: /org/freedesktop/NetworkManager/ActiveConnection/26)\n",
+      "stderr": ""
+    }
+  },
+  {
+    "utc_ns": "1790942628154894167",
+    "monotonic_ns": "224572384913967",
+    "kind": "command",
+    "value": {
+      "argv": [
+        "ip",
+        "-j",
+        "-4",
+        "address",
+        "show",
+        "dev",
+        "eth0"
+      ],
+      "returncode": 0,
+      "stdout": "[{\"ifindex\":2,\"ifname\":\"eth0\",\"flags\":[\"BROADCAST\",\"MULTICAST\",\"UP\",\"LOWER_UP\"],\"mtu\":1500,\"qdisc\":\"fq_codel\",\"operstate\":\"UP\",\"group\":\"default\",\"txqlen\":1000,\"addr_info\":[{\"family\":\"inet\",\"local\":\"192.168.1.62\",\"prefixlen\":24,\"broadcast\":\"192.168.1.255\",\"scope\":\"global\",\"dynamic\":true,\"noprefixroute\":true,\"label\":\"eth0\",\"valid_life_time\":86399,\"preferred_life_time\":86399}]}]\n",
+      "stderr": ""
+    }
+  },
+  {
+    "utc_ns": "1790942630665583973",
+    "monotonic_ns": "224574895603828",
+    "kind": "accepted",
+    "value": {
+      "label": "DHCP listener rebound",
+      "value": {
+        "address": "192.168.1.62",
+        "boot_id": "ab2421ed8de8fc5f0d4e199c8447fa78",
+        "device_id": "e045017b11e54c2fb7029f0154e6deb9",
+        "dns_sd_published": true,
+        "enabled": true,
+        "finishing_remote_job": false,
+        "launch_observed_monotonic_ns": null,
+        "launch_target_monotonic_ns": "0",
+        "listener_error": "",
+        "listener_running": true,
+        "local_effective": false,
+        "local_requested": false,
+        "local_work_active": false,
+        "output_unknown": false,
+        "port": 31417,
+        "remote_admission_closed": false,
+        "remote_job_id": "",
+        "remote_output_active": false,
+        "remote_owner": "",
+        "remote_state": "empty",
+        "revocation_generation": "11",
+        "revocation_unavailable": false,
+        "schema": "wsprrypi-wtp-endpoint/1"
+      }
+    }
+  },
+  {
+    "utc_ns": "1790942634118659498",
+    "monotonic_ns": "224578348679816",
+    "kind": "accepted",
+    "value": {
+      "label": "DHCP observer rediscovery",
+      "value": [
+        {
+          "binding": "plain",
+          "domain": "local",
+          "first_seen_ms": 1790903644350,
+          "id": "service-600bfc9ce83e33d34dfbb08e0b42cc2a",
+          "instance": "WsprryPi wspr5 e045017b",
+          "interface": 2,
+          "last_seen_ms": 1790941371687,
+          "port": 31417,
+          "protocol": 0,
+          "reason": "",
+          "state": "online",
+          "state_changed_ms": 1790941371687,
+          "target": "wtp-e045017b11e54c2fb7029f0154e6deb9.local",
+          "txt": [
+            "txtvers=1",
+            "binding=plain"
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "utc_ns": "1790942636033911937",
+    "monotonic_ns": "224580263931699",
+    "kind": "dhcp-address-identify",
+    "value": {
+      "status": 200,
+      "body": {
+        "authenticated": false,
+        "binding": "plain",
+        "boot_id": "ab2421ed8de8fc5f0d4e199c8447fa78",
+        "device_id": "e045017b11e54c2fb7029f0154e6deb9",
+        "output_active": false
+      }
+    }
+  },
+  {
+    "utc_ns": "1790942636036080190",
+    "monotonic_ns": "224580266099897",
+    "kind": "command",
+    "value": {
+      "argv": [
+        "ip",
+        "route",
+        "get",
+        "192.168.1.123",
+        "from",
+        "192.168.1.62"
+      ],
+      "returncode": 0,
+      "stdout": "192.168.1.123 from 192.168.1.62 dev eth0 uid 0 \n    cache \n",
+      "stderr": ""
+    }
+  },
+  {
+    "utc_ns": "1790942636036228059",
+    "monotonic_ns": "224580266247044",
+    "kind": "DHCP-address-evidence",
+    "value": {
+      "new_address": "192.168.1.62",
+      "endpoint": {
+        "address": "192.168.1.62",
+        "boot_id": "ab2421ed8de8fc5f0d4e199c8447fa78",
+        "device_id": "e045017b11e54c2fb7029f0154e6deb9",
+        "dns_sd_published": true,
+        "enabled": true,
+        "finishing_remote_job": false,
+        "launch_observed_monotonic_ns": null,
+        "launch_target_monotonic_ns": "0",
+        "listener_error": "",
+        "listener_running": true,
+        "local_effective": false,
+        "local_requested": false,
+        "local_work_active": false,
+        "output_unknown": false,
+        "port": 31417,
+        "remote_admission_closed": false,
+        "remote_job_id": "",
+        "remote_output_active": false,
+        "remote_owner": "",
+        "remote_state": "empty",
+        "revocation_generation": "11",
+        "revocation_unavailable": false,
+        "schema": "wsprrypi-wtp-endpoint/1"
+      },
+      "records": [
+        {
+          "binding": "plain",
+          "domain": "local",
+          "first_seen_ms": 1790903644350,
+          "id": "service-600bfc9ce83e33d34dfbb08e0b42cc2a",
+          "instance": "WsprryPi wspr5 e045017b",
+          "interface": 2,
+          "last_seen_ms": 1790941371687,
+          "port": 31417,
+          "protocol": 0,
+          "reason": "",
+          "state": "online",
+          "state_changed_ms": 1790941371687,
+          "target": "wtp-e045017b11e54c2fb7029f0154e6deb9.local",
+          "txt": [
+            "txtvers=1",
+            "binding=plain"
+          ]
+        }
+      ],
+      "identify": {
+        "status": 200,
+        "body": {
+          "authenticated": false,
+          "binding": "plain",
+          "boot_id": "ab2421ed8de8fc5f0d4e199c8447fa78",
+          "device_id": "e045017b11e54c2fb7029f0154e6deb9",
+          "output_active": false
+        }
+      }
+    }
+  },
+  {
+    "utc_ns": "1790942639161807925",
+    "monotonic_ns": "224583391828021",
+    "kind": "command",
+    "value": {
+      "argv": [
+        "nmcli",
+        "device",
+        "disconnect",
+        "eth0"
+      ],
+      "returncode": 0,
+      "stdout": "Device 'eth0' successfully disconnected.\n",
+      "stderr": ""
+    }
+  },
+  {
+    "utc_ns": "1790942639164834101",
+    "monotonic_ns": "224583394854197",
+    "kind": "command",
+    "value": {
+      "argv": [
+        "ip",
+        "link",
+        "set",
+        "dev",
+        "eth0",
+        "down"
+      ],
+      "returncode": 0,
+      "stdout": "",
+      "stderr": ""
+    }
+  },
+  {
+    "utc_ns": "1790942639168638978",
+    "monotonic_ns": "224583398659019",
+    "kind": "command",
+    "value": {
+      "argv": [
+        "ip",
+        "link",
+        "set",
+        "dev",
+        "eth0",
+        "address",
+        "2c:cf:67:62:76:64"
+      ],
+      "returncode": 0,
+      "stdout": "",
+      "stderr": ""
+    }
+  },
+  {
+    "utc_ns": "1790942644438588153",
+    "monotonic_ns": "224588668609064",
+    "kind": "command",
+    "value": {
+      "argv": [
+        "nmcli",
+        "connection",
+        "up",
+        "uuid",
+        "75a1216a-9d1a-30cd-8aca-ace5526ec021",
+        "ifname",
+        "eth0"
+      ],
+      "returncode": 0,
+      "stdout": "Connection successfully activated (D-Bus active path: /org/freedesktop/NetworkManager/ActiveConnection/27)\n",
+      "stderr": ""
+    }
+  },
+  {
+    "utc_ns": "1790942644473885474",
+    "monotonic_ns": "224588703906089",
+    "kind": "command",
+    "value": {
+      "argv": [
+        "nmcli",
+        "-g",
+        "ipv4.route-metric",
+        "connection",
+        "show",
+        "921301fe-cdfd-4965-8ac7-c96e9d908ea6"
+      ],
+      "returncode": 0,
+      "stdout": "100\n",
+      "stderr": ""
+    }
+  },
+  {
+    "utc_ns": "1790942644511907806",
+    "monotonic_ns": "224588741934235",
+    "kind": "command",
+    "value": {
+      "argv": [
+        "nmcli",
+        "device",
+        "modify",
+        "wlan1",
+        "ipv4.route-metric",
+        "101"
+      ],
+      "returncode": 0,
+      "stdout": "Connection successfully reapplied to device 'wlan1'.\n",
+      "stderr": ""
+    }
+  },
+  {
+    "utc_ns": "1790942644545064207",
+    "monotonic_ns": "224588775084136",
+    "kind": "command",
+    "value": {
+      "argv": [
+        "nmcli",
+        "device",
+        "modify",
+        "wlan1",
+        "ipv4.route-metric",
+        "100"
+      ],
+      "returncode": 0,
+      "stdout": "Connection successfully reapplied to device 'wlan1'.\n",
+      "stderr": ""
+    }
+  },
+  {
+    "utc_ns": "1790942644576096967",
+    "monotonic_ns": "224588806117026",
+    "kind": "command",
+    "value": {
+      "argv": [
+        "nmcli",
+        "-g",
+        "connection.id",
+        "connection",
+        "show",
+        "wtp-discovery-eth0-dhcp"
+      ],
+      "returncode": 0,
+      "stdout": "wtp-discovery-eth0-dhcp\n",
+      "stderr": ""
+    }
+  },
+  {
+    "utc_ns": "1790942644595843889",
+    "monotonic_ns": "224588825863708",
+    "kind": "command",
+    "value": {
+      "argv": [
+        "nmcli",
+        "connection",
+        "delete",
+        "wtp-discovery-eth0-dhcp"
+      ],
+      "returncode": 0,
+      "stdout": "Connection 'wtp-discovery-eth0-dhcp' (8c6dc4bc-6b3a-4b03-9ac4-92f44dd66e00) successfully deleted.\n",
+      "stderr": ""
+    }
+  },
+  {
+    "utc_ns": "1790942644595989315",
+    "monotonic_ns": "224588826008318",
+    "kind": "restored",
+    "value": "eth0"
+  },
+  {
+    "utc_ns": "1790942646605586140",
+    "monotonic_ns": "224590835605643",
+    "kind": "accepted",
+    "value": {
+      "label": "original DHCP listener restored",
+      "value": {
+        "address": "192.168.1.54",
+        "boot_id": "ab2421ed8de8fc5f0d4e199c8447fa78",
+        "device_id": "e045017b11e54c2fb7029f0154e6deb9",
+        "dns_sd_published": true,
+        "enabled": true,
+        "finishing_remote_job": false,
+        "launch_observed_monotonic_ns": null,
+        "launch_target_monotonic_ns": "0",
+        "listener_error": "",
+        "listener_running": true,
+        "local_effective": false,
+        "local_requested": false,
+        "local_work_active": false,
+        "output_unknown": false,
+        "port": 31417,
+        "remote_admission_closed": false,
+        "remote_job_id": "",
+        "remote_output_active": false,
+        "remote_owner": "",
+        "remote_state": "empty",
+        "revocation_generation": "11",
+        "revocation_unavailable": false,
+        "schema": "wsprrypi-wtp-endpoint/1"
+      }
+    }
+  },
+  {
+    "utc_ns": "1790942648729430292",
+    "monotonic_ns": "224592959449703",
+    "kind": "accepted",
+    "value": {
+      "label": "restored independent rediscovery",
+      "value": [
+        {
+          "binding": "plain",
+          "domain": "local",
+          "first_seen_ms": 1790903644350,
+          "id": "service-600bfc9ce83e33d34dfbb08e0b42cc2a",
+          "instance": "WsprryPi wspr5 e045017b",
+          "interface": 2,
+          "last_seen_ms": 1790941371687,
+          "port": 31417,
+          "protocol": 0,
+          "reason": "",
+          "state": "online",
+          "state_changed_ms": 1790941371687,
+          "target": "wtp-e045017b11e54c2fb7029f0154e6deb9.local",
+          "txt": [
+            "txtvers=1",
+            "binding=plain"
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "utc_ns": "1790942649276126224",
+    "monotonic_ns": "224593506146079",
+    "kind": "restored-address-identify",
+    "value": {
+      "status": 200,
+      "body": {
+        "authenticated": false,
+        "binding": "plain",
+        "boot_id": "ab2421ed8de8fc5f0d4e199c8447fa78",
+        "device_id": "e045017b11e54c2fb7029f0154e6deb9",
+        "output_active": false
+      }
+    }
+  },
+  {
+    "utc_ns": "1790942649284010108",
+    "monotonic_ns": "224593514029796",
+    "kind": "command",
+    "value": {
+      "argv": [
+        "systemctl",
+        "stop",
+        "wtp-discovery-rollback-eth0.timer"
+      ],
+      "returncode": 0,
+      "stdout": "",
+      "stderr": ""
+    }
+  },
+  {
+    "utc_ns": "1790942649288426761",
+    "monotonic_ns": "224593518446487",
+    "kind": "phase-complete",
+    "value": {
+      "kind": "address-dhcp"
+    }
+  },
+  {
+    "utc_ns": "1790942681995182964",
+    "monotonic_ns": "224626225203208",
+    "kind": "cache-before-identify",
+    "value": {
+      "status": 200,
+      "body": {
+        "authenticated": false,
+        "binding": "plain",
+        "boot_id": "4296284b4460bb4578b4637ac020a590",
+        "device_id": "fd6127d11d6aca42a9905fa3fb1bf1d5",
+        "output_active": false
+      }
+    }
+  },
+  {
+    "utc_ns": "1790942681996880533",
+    "monotonic_ns": "224626226900166",
+    "kind": "command",
+    "value": {
+      "argv": [
+        "/usr/sbin/tc",
+        "-j",
+        "qdisc",
+        "show",
+        "dev",
+        "eth0"
+      ],
+      "returncode": 0,
+      "stdout": "[{\"kind\":\"fq_codel\",\"handle\":\"0:\",\"root\":true,\"refcnt\":2,\"options\":{\"limit\":10240,\"flows\":1024,\"quantum\":1514,\"target\":4999,\"interval\":99999,\"memory_limit\":33554432,\"ecn\":true,\"drop_batch\":64}}]\n",
+      "stderr": ""
+    }
+  },
+  {
+    "utc_ns": "1790942681998360066",
+    "monotonic_ns": "224626228379032",
+    "kind": "command",
+    "value": {
+      "argv": [
+        "/usr/sbin/tc",
+        "-j",
+        "qdisc",
+        "show",
+        "dev",
+        "wlan1"
+      ],
+      "returncode": 0,
+      "stdout": "[{\"kind\":\"noqueue\",\"handle\":\"0:\",\"root\":true,\"refcnt\":2,\"options\":{}}]\n",
+      "stderr": ""
+    }
+  },
+  {
+    "utc_ns": "1790942682007008448",
+    "monotonic_ns": "224626237028340",
+    "kind": "command",
+    "value": {
+      "argv": [
+        "systemd-run",
+        "--unit=wtp-discovery-rollback-mdns",
+        "--on-active=300s",
+        "--timer-property=AccuracySec=1s",
+        "/usr/bin/python3",
+        "/home/pi/wtp-discovery-20261002/campaign.py",
+        "filters-remove"
+      ],
+      "returncode": 0,
+      "stdout": "",
+      "stderr": "Running timer as unit: wtp-discovery-rollback-mdns.timer\nWill run service as unit: wtp-discovery-rollback-mdns.service\n"
+    }
+  },
+  {
+    "utc_ns": "1790942682013590261",
+    "monotonic_ns": "224626243609931",
+    "kind": "command",
+    "value": {
+      "argv": [
+        "systemctl",
+        "is-active",
+        "wtp-discovery-rollback-mdns.timer"
+      ],
+      "returncode": 0,
+      "stdout": "active\n",
+      "stderr": ""
+    }
+  },
+  {
+    "utc_ns": "1790942682014017501",
+    "monotonic_ns": "224626244036301",
+    "kind": "multicast-query",
+    "value": {
+      "service": "_wtp._tcp.local",
+      "known_answers": 0
+    }
+  },
+  {
+    "utc_ns": "1790942684042151131",
+    "monotonic_ns": "224628272171375",
+    "kind": "command",
+    "value": {
+      "argv": [
+        "/usr/sbin/tc",
+        "qdisc",
+        "add",
+        "dev",
+        "eth0",
+        "clsact"
+      ],
+      "returncode": 0,
+      "stdout": "",
+      "stderr": ""
+    }
+  },
+  {
+    "utc_ns": "1790942684051796639",
+    "monotonic_ns": "224628281816457",
+    "kind": "command",
+    "value": {
+      "argv": [
+        "/usr/sbin/tc",
+        "filter",
+        "add",
+        "dev",
+        "eth0",
+        "ingress",
+        "protocol",
+        "ip",
+        "pref",
+        "49173",
+        "flower",
+        "ip_proto",
+        "udp",
+        "src_ip",
+        "192.168.1.47",
+        "src_port",
+        "5353",
+        "action",
+        "drop"
+      ],
+      "returncode": 0,
+      "stdout": "",
+      "stderr": ""
+    }
+  },
+  {
+    "utc_ns": "1790942684053316394",
+    "monotonic_ns": "224628283336712",
+    "kind": "command",
+    "value": {
+      "argv": [
+        "/usr/sbin/tc",
+        "qdisc",
+        "add",
+        "dev",
+        "wlan1",
+        "clsact"
+      ],
+      "returncode": 0,
+      "stdout": "",
+      "stderr": ""
+    }
+  },
+  {
+    "utc_ns": "1790942684054741297",
+    "monotonic_ns": "224628284760485",
+    "kind": "command",
+    "value": {
+      "argv": [
+        "/usr/sbin/tc",
+        "filter",
+        "add",
+        "dev",
+        "wlan1",
+        "ingress",
+        "protocol",
+        "ip",
+        "pref",
+        "49173",
+        "flower",
+        "ip_proto",
+        "udp",
+        "src_ip",
+        "192.168.1.47",
+        "src_port",
+        "5353",
+        "action",
+        "drop"
+      ],
+      "returncode": 0,
+      "stdout": "",
+      "stderr": ""
+    }
+  },
+  {
+    "utc_ns": "1790942684054827000",
+    "monotonic_ns": "224628284845652",
+    "kind": "phase-start",
+    "value": {
+      "kind": "cache",
+      "target": "wsprrypico-0a60df.local",
+      "source_ip": "192.168.1.47",
+      "interfaces": [
+        "eth0",
+        "wlan1"
+      ]
+    }
+  },
+  {
+    "utc_ns": "1790942804579949350",
+    "monotonic_ns": "224748809969631",
+    "kind": "accepted",
+    "value": {
+      "label": "natural mDNS TTL expiry on both interfaces",
+      "value": [
+        {
+          "binding": "plain",
+          "domain": "local",
+          "first_seen_ms": 1790938487070,
+          "id": "service-7eefe6e462fe036e3cb1dffbcab233dd",
+          "instance": "wsprrypico-0a60df",
+          "interface": 2,
+          "last_seen_ms": 1790942644885,
+          "port": 31417,
+          "protocol": 0,
+          "reason": "Service was withdrawn",
+          "state": "removed",
+          "state_changed_ms": 1790942804389,
+          "target": "wsprrypico-0a60df.local",
+          "txt": [
+            "txtvers=1",
+            "binding=plain"
+          ]
+        },
+        {
+          "binding": "plain",
+          "domain": "local",
+          "first_seen_ms": 1790938487069,
+          "id": "service-bfbf73f55f2bbc8b24e6f88ba7b631aa",
+          "instance": "wsprrypico-0a60df",
+          "interface": 4,
+          "last_seen_ms": 1790941287505,
+          "port": 31417,
+          "protocol": 0,
+          "reason": "Service was withdrawn",
+          "state": "removed",
+          "state_changed_ms": 1790942752158,
+          "target": "wsprrypico-0a60df.local",
+          "txt": [
+            "txtvers=1",
+            "binding=plain"
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "utc_ns": "1790942804597425871",
+    "monotonic_ns": "224748827445745",
+    "kind": "command",
+    "value": {
+      "argv": [
+        "/usr/sbin/tc",
+        "qdisc",
+        "del",
+        "dev",
+        "eth0",
+        "clsact"
+      ],
+      "returncode": 0,
+      "stdout": "",
+      "stderr": ""
+    }
+  },
+  {
+    "utc_ns": "1790942804599473383",
+    "monotonic_ns": "224748829493201",
+    "kind": "command",
+    "value": {
+      "argv": [
+        "/usr/sbin/tc",
+        "qdisc",
+        "del",
+        "dev",
+        "wlan1",
+        "clsact"
+      ],
+      "returncode": 0,
+      "stdout": "",
+      "stderr": ""
+    }
+  },
+  {
+    "utc_ns": "1790942804599600123",
+    "monotonic_ns": "224748829619182",
+    "kind": "mDNS-filters-removed",
+    "value": true
+  },
+  {
+    "utc_ns": "1790942939330351802",
+    "monotonic_ns": "224883560372491",
+    "kind": "cache-before-identify",
+    "value": {
+      "status": 200,
+      "body": {
+        "authenticated": false,
+        "binding": "plain",
+        "boot_id": "4296284b4460bb4578b4637ac020a590",
+        "device_id": "fd6127d11d6aca42a9905fa3fb1bf1d5",
+        "output_active": false
+      }
+    }
+  },
+  {
+    "utc_ns": "1790942939332012631",
+    "monotonic_ns": "224883562032597",
+    "kind": "command",
+    "value": {
+      "argv": [
+        "/usr/sbin/tc",
+        "-j",
+        "qdisc",
+        "show",
+        "dev",
+        "eth0"
+      ],
+      "returncode": 0,
+      "stdout": "[{\"kind\":\"fq_codel\",\"handle\":\"0:\",\"root\":true,\"refcnt\":2,\"options\":{\"limit\":10240,\"flows\":1024,\"quantum\":1514,\"target\":4999,\"interval\":99999,\"memory_limit\":33554432,\"ecn\":true,\"drop_batch\":64}}]\n",
+      "stderr": ""
+    }
+  },
+  {
+    "utc_ns": "1790942939333457367",
+    "monotonic_ns": "224883563477056",
+    "kind": "command",
+    "value": {
+      "argv": [
+        "/usr/sbin/tc",
+        "-j",
+        "qdisc",
+        "show",
+        "dev",
+        "wlan1"
+      ],
+      "returncode": 0,
+      "stdout": "[{\"kind\":\"noqueue\",\"handle\":\"0:\",\"root\":true,\"refcnt\":2,\"options\":{}}]\n",
+      "stderr": ""
+    }
+  },
+  {
+    "utc_ns": "1790942939341130363",
+    "monotonic_ns": "224883571150070",
+    "kind": "command",
+    "value": {
+      "argv": [
+        "systemctl",
+        "stop",
+        "wtp-discovery-rollback-mdns.timer"
+      ],
+      "returncode": 0,
+      "stdout": "",
+      "stderr": ""
+    }
+  },
+  {
+    "utc_ns": "1790942939347782491",
+    "monotonic_ns": "224883577802513",
+    "kind": "command",
+    "value": {
+      "argv": [
+        "systemctl",
+        "reset-failed",
+        "wtp-discovery-rollback-mdns.service"
+      ],
+      "returncode": 1,
+      "stdout": "",
+      "stderr": "Failed to reset failed state of unit wtp-discovery-rollback-mdns.service: Unit wtp-discovery-rollback-mdns.service not loaded.\n"
+    }
+  },
+  {
+    "utc_ns": "1790942939357390667",
+    "monotonic_ns": "224883587410151",
+    "kind": "command",
+    "value": {
+      "argv": [
+        "systemd-run",
+        "--unit=wtp-discovery-rollback-mdns",
+        "--on-active=300s",
+        "--timer-property=AccuracySec=1s",
+        "/usr/bin/python3",
+        "/home/pi/wtp-discovery-20261002/campaign.py",
+        "filters-remove"
+      ],
+      "returncode": 0,
+      "stdout": "",
+      "stderr": "Running timer as unit: wtp-discovery-rollback-mdns.timer\nWill run service as unit: wtp-discovery-rollback-mdns.service\n"
+    }
+  },
+  {
+    "utc_ns": "1790942939364000406",
+    "monotonic_ns": "224883594020206",
+    "kind": "command",
+    "value": {
+      "argv": [
+        "systemctl",
+        "is-active",
+        "wtp-discovery-rollback-mdns.timer"
+      ],
+      "returncode": 0,
+      "stdout": "active\n",
+      "stderr": ""
+    }
+  },
+  {
+    "utc_ns": "1790942939364607127",
+    "monotonic_ns": "224883594626037",
+    "kind": "multicast-query",
+    "value": {
+      "service": "_wtp._tcp.local",
+      "known_answers": 0
+    }
+  },
+  {
+    "utc_ns": "1790942941367035444",
+    "monotonic_ns": "224885597055317",
+    "kind": "command",
+    "value": {
+      "argv": [
+        "/usr/sbin/tc",
+        "qdisc",
+        "add",
+        "dev",
+        "eth0",
+        "clsact"
+      ],
+      "returncode": 0,
+      "stdout": "",
+      "stderr": ""
+    }
+  },
+  {
+    "utc_ns": "1790942941368954827",
+    "monotonic_ns": "224885598974978",
+    "kind": "command",
+    "value": {
+      "argv": [
+        "/usr/sbin/tc",
+        "filter",
+        "add",
+        "dev",
+        "eth0",
+        "ingress",
+        "protocol",
+        "ip",
+        "pref",
+        "49173",
+        "flower",
+        "ip_proto",
+        "udp",
+        "src_ip",
+        "192.168.1.47",
+        "src_port",
+        "5353",
+        "action",
+        "drop"
+      ],
+      "returncode": 0,
+      "stdout": "",
+      "stderr": ""
+    }
+  },
+  {
+    "utc_ns": "1790942941370965154",
+    "monotonic_ns": "224885600985380",
+    "kind": "command",
+    "value": {
+      "argv": [
+        "/usr/sbin/tc",
+        "qdisc",
+        "add",
+        "dev",
+        "wlan1",
+        "clsact"
+      ],
+      "returncode": 0,
+      "stdout": "",
+      "stderr": ""
+    }
+  },
+  {
+    "utc_ns": "1790942941374028701",
+    "monotonic_ns": "224885604049260",
+    "kind": "command",
+    "value": {
+      "argv": [
+        "/usr/sbin/tc",
+        "filter",
+        "add",
+        "dev",
+        "wlan1",
+        "ingress",
+        "protocol",
+        "ip",
+        "pref",
+        "49173",
+        "flower",
+        "ip_proto",
+        "udp",
+        "src_ip",
+        "192.168.1.47",
+        "src_port",
+        "5353",
+        "action",
+        "drop"
+      ],
+      "returncode": 0,
+      "stdout": "",
+      "stderr": ""
+    }
+  },
+  {
+    "utc_ns": "1790942941374155608",
+    "monotonic_ns": "224885604174241",
+    "kind": "phase-start",
+    "value": {
+      "kind": "cache",
+      "target": "wsprrypico-0a60df.local",
+      "source_ip": "192.168.1.47",
+      "interfaces": [
+        "eth0",
+        "wlan1"
+      ]
+    }
+  },
+  {
+    "utc_ns": "1790943061372141848",
+    "monotonic_ns": "225005602161703",
+    "kind": "accepted",
+    "value": {
+      "label": "natural mDNS TTL expiry on both interfaces",
+      "value": [
+        {
+          "binding": "plain",
+          "domain": "local",
+          "first_seen_ms": 1790938487070,
+          "id": "service-7eefe6e462fe036e3cb1dffbcab233dd",
+          "instance": "wsprrypico-0a60df",
+          "interface": 2,
+          "last_seen_ms": 1790942811439,
+          "port": 31417,
+          "protocol": 0,
+          "reason": "Service was withdrawn",
+          "state": "removed",
+          "state_changed_ms": 1790943060322,
+          "target": "wsprrypico-0a60df.local",
+          "txt": [
+            "txtvers=1",
+            "binding=plain"
+          ]
+        },
+        {
+          "binding": "plain",
+          "domain": "local",
+          "first_seen_ms": 1790938487069,
+          "id": "service-bfbf73f55f2bbc8b24e6f88ba7b631aa",
+          "instance": "wsprrypico-0a60df",
+          "interface": 4,
+          "last_seen_ms": 1790942872083,
+          "port": 31417,
+          "protocol": 0,
+          "reason": "Service was withdrawn",
+          "state": "removed",
+          "state_changed_ms": 1790943061056,
+          "target": "wsprrypico-0a60df.local",
+          "txt": [
+            "txtvers=1",
+            "binding=plain"
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "utc_ns": "1790943061386685249",
+    "monotonic_ns": "225005616705197",
+    "kind": "cache-expired-identify",
+    "value": [
+      {
+        "status": 409,
+        "body": {
+          "error": {
+            "code": "catalog_request_rejected",
+            "message": "Discovery candidate is unavailable or stale"
+          }
+        }
+      },
+      {
+        "status": 409,
+        "body": {
+          "error": {
+            "code": "catalog_request_rejected",
+            "message": "Discovery candidate is unavailable or stale"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "utc_ns": "1790943061517843762",
+    "monotonic_ns": "225005747863876",
+    "kind": "command",
+    "value": {
+      "argv": [
+        "/usr/sbin/tc",
+        "-s",
+        "-j",
+        "filter",
+        "show",
+        "dev",
+        "eth0",
+        "ingress"
+      ],
+      "returncode": 0,
+      "stdout": "[{\"protocol\":\"ip\",\"pref\":49173,\"kind\":\"flower\",\"chain\":0},{\"protocol\":\"ip\",\"pref\":49173,\"kind\":\"flower\",\"chain\":0,\"options\":{\"handle\":1,\"keys\":{\"eth_type\":\"ipv4\",\"ip_proto\":\"udp\",\"src_ip\":\"192.168.1.47\",\"src_port\":5353},\"not_in_hw\":true,\"actions\":[{\"order\":1,\"kind\":\"gact\",\"control_action\":{\"type\":\"drop\"},\"prob\":{\"random_type\":\"none\",\"control_action\":{\"type\":\"pass\"},\"val\":0},\"index\":1,\"ref\":1,\"bind\":1,\"installed\":120,\"last_used\":6,\"first_used\":85,\"stats\":{\"bytes\":1076,\"packets\":8,\"drops\":8,\"overlimits\":0,\"requeues\":0,\"backlog\":0,\"qlen\":0}}]}}]\n",
+      "stderr": ""
+    }
+  },
+  {
+    "utc_ns": "1790943061519670090",
+    "monotonic_ns": "225005749689889",
+    "kind": "command",
+    "value": {
+      "argv": [
+        "/usr/sbin/tc",
+        "-s",
+        "-j",
+        "filter",
+        "show",
+        "dev",
+        "wlan1",
+        "ingress"
+      ],
+      "returncode": 0,
+      "stdout": "[{\"protocol\":\"ip\",\"pref\":49173,\"kind\":\"flower\",\"chain\":0},{\"protocol\":\"ip\",\"pref\":49173,\"kind\":\"flower\",\"chain\":0,\"options\":{\"handle\":1,\"keys\":{\"eth_type\":\"ipv4\",\"ip_proto\":\"udp\",\"src_ip\":\"192.168.1.47\",\"src_port\":5353},\"not_in_hw\":true,\"actions\":[{\"order\":1,\"kind\":\"gact\",\"control_action\":{\"type\":\"drop\"},\"prob\":{\"random_type\":\"none\",\"control_action\":{\"type\":\"pass\"},\"val\":0},\"index\":2,\"ref\":1,\"bind\":1,\"installed\":120,\"last_used\":6,\"first_used\":23,\"stats\":{\"bytes\":708,\"packets\":4,\"drops\":4,\"overlimits\":0,\"requeues\":0,\"backlog\":0,\"qlen\":0}}]}}]\n",
+      "stderr": ""
+    }
+  },
+  {
+    "utc_ns": "1790943061519837997",
+    "monotonic_ns": "225005749856926",
+    "kind": "cache-expiry-evidence",
+    "value": {
+      "elapsed_seconds": 119.98409017102676,
+      "expired": [
+        {
+          "binding": "plain",
+          "domain": "local",
+          "first_seen_ms": 1790938487070,
+          "id": "service-7eefe6e462fe036e3cb1dffbcab233dd",
+          "instance": "wsprrypico-0a60df",
+          "interface": 2,
+          "last_seen_ms": 1790942811439,
+          "port": 31417,
+          "protocol": 0,
+          "reason": "Service was withdrawn",
+          "state": "removed",
+          "state_changed_ms": 1790943060322,
+          "target": "wsprrypico-0a60df.local",
+          "txt": [
+            "txtvers=1",
+            "binding=plain"
+          ]
+        },
+        {
+          "binding": "plain",
+          "domain": "local",
+          "first_seen_ms": 1790938487069,
+          "id": "service-bfbf73f55f2bbc8b24e6f88ba7b631aa",
+          "instance": "wsprrypico-0a60df",
+          "interface": 4,
+          "last_seen_ms": 1790942872083,
+          "port": 31417,
+          "protocol": 0,
+          "reason": "Service was withdrawn",
+          "state": "removed",
+          "state_changed_ms": 1790943061056,
+          "target": "wsprrypico-0a60df.local",
+          "txt": [
+            "txtvers=1",
+            "binding=plain"
+          ]
+        }
+      ],
+      "identify_rejected": [
+        {
+          "status": 409,
+          "body": {
+            "error": {
+              "code": "catalog_request_rejected",
+              "message": "Discovery candidate is unavailable or stale"
+            }
+          }
+        },
+        {
+          "status": 409,
+          "body": {
+            "error": {
+              "code": "catalog_request_rejected",
+              "message": "Discovery candidate is unavailable or stale"
+            }
+          }
+        }
+      ],
+      "other_online": [
+        {
+          "binding": "plain",
+          "domain": "local",
+          "first_seen_ms": 1790938487071,
+          "id": "service-879a3661fecc0dd95cc3c1f1d8fa6f0f",
+          "instance": "WsprryPi wspr1 d133ed89",
+          "interface": 2,
+          "last_seen_ms": 1790942644666,
+          "port": 31417,
+          "protocol": 0,
+          "reason": "",
+          "state": "online",
+          "state_changed_ms": 1790942644666,
+          "target": "wtp-d133ed890b90f6945b41a235429ff155.local",
+          "txt": [
+            "txtvers=1",
+            "binding=plain"
+          ]
+        },
+        {
+          "binding": "plain",
+          "domain": "local",
+          "first_seen_ms": 1790938487070,
+          "id": "service-eea7d3e7283a3c30c33a86479f3dfc0a",
+          "instance": "WsprryPi wspr2 e2a4d273",
+          "interface": 2,
+          "last_seen_ms": 1790942644875,
+          "port": 31417,
+          "protocol": 0,
+          "reason": "",
+          "state": "online",
+          "state_changed_ms": 1790942644875,
+          "target": "wtp-e2a4d273f7d8f24f6696f7c6fb95ff11.local",
+          "txt": [
+            "txtvers=1",
+            "binding=plain"
+          ]
+        },
+        {
+          "binding": "plain",
+          "domain": "local",
+          "first_seen_ms": 1790938487071,
+          "id": "service-67facb21fbea71aefdc46ba116736857",
+          "instance": "WsprryPi wspr4 f21e530a",
+          "interface": 2,
+          "last_seen_ms": 1790942644839,
+          "port": 31417,
+          "protocol": 0,
+          "reason": "",
+          "state": "online",
+          "state_changed_ms": 1790942644839,
+          "target": "wtp-f21e530af8a4a210ec57898c0ebd32d2.local",
+          "txt": [
+            "txtvers=1",
+            "binding=plain"
+          ]
+        },
+        {
+          "binding": "plain",
+          "domain": "local",
+          "first_seen_ms": 1790938487899,
+          "id": "service-600bfc9ce83e33d34dfbb08e0b42cc2a",
+          "instance": "WsprryPi wspr5 e045017b",
+          "interface": 2,
+          "last_seen_ms": 1790942646245,
+          "port": 31417,
+          "protocol": 0,
+          "reason": "",
+          "state": "online",
+          "state_changed_ms": 1790942646245,
+          "target": "wtp-e045017b11e54c2fb7029f0154e6deb9.local",
+          "txt": [
+            "txtvers=1",
+            "binding=plain"
+          ]
+        },
+        {
+          "binding": "plain",
+          "domain": "local",
+          "first_seen_ms": 1790938487069,
+          "id": "service-8849882a0f724fdd2bbeb58e24e97d52",
+          "instance": "WsprryPi wspr1 d133ed89",
+          "interface": 4,
+          "last_seen_ms": 1790941287130,
+          "port": 31417,
+          "protocol": 0,
+          "reason": "",
+          "state": "online",
+          "state_changed_ms": 1790941287130,
+          "target": "wtp-d133ed890b90f6945b41a235429ff155.local",
+          "txt": [
+            "txtvers=1",
+            "binding=plain"
+          ]
+        },
+        {
+          "binding": "plain",
+          "domain": "local",
+          "first_seen_ms": 1790938487069,
+          "id": "service-7eafa62f6873b13a3e036d5df55d97c9",
+          "instance": "WsprryPi wspr2 e2a4d273",
+          "interface": 4,
+          "last_seen_ms": 1790941285251,
+          "port": 31417,
+          "protocol": 0,
+          "reason": "",
+          "state": "online",
+          "state_changed_ms": 1790941285251,
+          "target": "wtp-e2a4d273f7d8f24f6696f7c6fb95ff11.local",
+          "txt": [
+            "txtvers=1",
+            "binding=plain"
+          ]
+        },
+        {
+          "binding": "plain",
+          "domain": "local",
+          "first_seen_ms": 1790938487070,
+          "id": "service-f63e553213062c57864432b735b025f2",
+          "instance": "WsprryPi wspr4 f21e530a",
+          "interface": 4,
+          "last_seen_ms": 1790941284295,
+          "port": 31417,
+          "protocol": 0,
+          "reason": "",
+          "state": "online",
+          "state_changed_ms": 1790941284295,
+          "target": "wtp-f21e530af8a4a210ec57898c0ebd32d2.local",
+          "txt": [
+            "txtvers=1",
+            "binding=plain"
+          ]
+        }
+      ],
+      "independent_online": [
+        {
+          "binding": "plain",
+          "domain": "local",
+          "first_seen_ms": 1790903644357,
+          "id": "service-7eefe6e462fe036e3cb1dffbcab233dd",
+          "instance": "wsprrypico-0a60df",
+          "interface": 2,
+          "last_seen_ms": 1790903644392,
+          "port": 31417,
+          "protocol": 0,
+          "reason": "",
+          "state": "online",
+          "state_changed_ms": 1790903644392,
+          "target": "wsprrypico-0a60df.local",
+          "txt": [
+            "txtvers=1",
+            "binding=plain"
+          ]
+        }
+      ],
+      "filters": {
+        "eth0": [
+          {
+            "protocol": "ip",
+            "pref": 49173,
+            "kind": "flower",
+            "chain": 0
+          },
+          {
+            "protocol": "ip",
+            "pref": 49173,
+            "kind": "flower",
+            "chain": 0,
+            "options": {
+              "handle": 1,
+              "keys": {
+                "eth_type": "ipv4",
+                "ip_proto": "udp",
+                "src_ip": "192.168.1.47",
+                "src_port": 5353
+              },
+              "not_in_hw": true,
+              "actions": [
+                {
+                  "order": 1,
+                  "kind": "gact",
+                  "control_action": {
+                    "type": "drop"
+                  },
+                  "prob": {
+                    "random_type": "none",
+                    "control_action": {
+                      "type": "pass"
+                    },
+                    "val": 0
+                  },
+                  "index": 1,
+                  "ref": 1,
+                  "bind": 1,
+                  "installed": 120,
+                  "last_used": 6,
+                  "first_used": 85,
+                  "stats": {
+                    "bytes": 1076,
+                    "packets": 8,
+                    "drops": 8,
+                    "overlimits": 0,
+                    "requeues": 0,
+                    "backlog": 0,
+                    "qlen": 0
+                  }
+                }
+              ]
+            }
+          }
+        ],
+        "wlan1": [
+          {
+            "protocol": "ip",
+            "pref": 49173,
+            "kind": "flower",
+            "chain": 0
+          },
+          {
+            "protocol": "ip",
+            "pref": 49173,
+            "kind": "flower",
+            "chain": 0,
+            "options": {
+              "handle": 1,
+              "keys": {
+                "eth_type": "ipv4",
+                "ip_proto": "udp",
+                "src_ip": "192.168.1.47",
+                "src_port": 5353
+              },
+              "not_in_hw": true,
+              "actions": [
+                {
+                  "order": 1,
+                  "kind": "gact",
+                  "control_action": {
+                    "type": "drop"
+                  },
+                  "prob": {
+                    "random_type": "none",
+                    "control_action": {
+                      "type": "pass"
+                    },
+                    "val": 0
+                  },
+                  "index": 2,
+                  "ref": 1,
+                  "bind": 1,
+                  "installed": 120,
+                  "last_used": 6,
+                  "first_used": 23,
+                  "stats": {
+                    "bytes": 708,
+                    "packets": 4,
+                    "drops": 4,
+                    "overlimits": 0,
+                    "requeues": 0,
+                    "backlog": 0,
+                    "qlen": 0
+                  }
+                }
+              ]
+            }
+          }
+        ]
+      }
+    }
+  },
+  {
+    "utc_ns": "1790943061521715528",
+    "monotonic_ns": "225005751735272",
+    "kind": "command",
+    "value": {
+      "argv": [
+        "/usr/sbin/tc",
+        "qdisc",
+        "del",
+        "dev",
+        "eth0",
+        "clsact"
+      ],
+      "returncode": 0,
+      "stdout": "",
+      "stderr": ""
+    }
+  },
+  {
+    "utc_ns": "1790943061523461837",
+    "monotonic_ns": "225005753481656",
+    "kind": "command",
+    "value": {
+      "argv": [
+        "/usr/sbin/tc",
+        "qdisc",
+        "del",
+        "dev",
+        "wlan1",
+        "clsact"
+      ],
+      "returncode": 0,
+      "stdout": "",
+      "stderr": ""
+    }
+  },
+  {
+    "utc_ns": "1790943061523570078",
+    "monotonic_ns": "225005753588859",
+    "kind": "mDNS-filters-removed",
+    "value": true
+  },
+  {
+    "utc_ns": "1790943061523920799",
+    "monotonic_ns": "225005753939932",
+    "kind": "multicast-query",
+    "value": {
+      "service": "_wtp._tcp.local",
+      "known_answers": 0
+    }
+  },
+  {
+    "utc_ns": "1790943062040326412",
+    "monotonic_ns": "225006270346379",
+    "kind": "accepted",
+    "value": {
+      "label": "Pico A rediscovery after multicast recovery",
+      "value": [
+        {
+          "binding": "plain",
+          "domain": "local",
+          "first_seen_ms": 1790938487070,
+          "id": "service-7eefe6e462fe036e3cb1dffbcab233dd",
+          "instance": "wsprrypico-0a60df",
+          "interface": 2,
+          "last_seen_ms": 1790943061731,
+          "port": 31417,
+          "protocol": 0,
+          "reason": "",
+          "state": "online",
+          "state_changed_ms": 1790943061731,
+          "target": "wsprrypico-0a60df.local",
+          "txt": [
+            "txtvers=1",
+            "binding=plain"
+          ]
+        },
+        {
+          "binding": "plain",
+          "domain": "local",
+          "first_seen_ms": 1790938487069,
+          "id": "service-bfbf73f55f2bbc8b24e6f88ba7b631aa",
+          "instance": "wsprrypico-0a60df",
+          "interface": 4,
+          "last_seen_ms": 1790943061739,
+          "port": 31417,
+          "protocol": 0,
+          "reason": "",
+          "state": "online",
+          "state_changed_ms": 1790943061739,
+          "target": "wsprrypico-0a60df.local",
+          "txt": [
+            "txtvers=1",
+            "binding=plain"
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "utc_ns": "1790943062457848397",
+    "monotonic_ns": "225006687868752",
+    "kind": "cache-after-identify",
+    "value": {
+      "status": 200,
+      "body": {
+        "authenticated": false,
+        "binding": "plain",
+        "boot_id": "4296284b4460bb4578b4637ac020a590",
+        "device_id": "fd6127d11d6aca42a9905fa3fb1bf1d5",
+        "output_active": false
+      }
+    }
+  },
+  {
+    "utc_ns": "1790943062468646939",
+    "monotonic_ns": "225006698667072",
+    "kind": "command",
+    "value": {
+      "argv": [
+        "systemctl",
+        "stop",
+        "wtp-discovery-rollback-mdns.timer"
+      ],
+      "returncode": 0,
+      "stdout": "",
+      "stderr": ""
+    }
+  },
+  {
+    "utc_ns": "1790943062474381570",
+    "monotonic_ns": "225006704401628",
+    "kind": "phase-complete",
+    "value": {
+      "kind": "cache"
+    }
+  },
+  {
+    "utc_ns": "1790943144856293487",
+    "monotonic_ns": "225089086313620",
+    "kind": "command",
+    "value": {
+      "argv": [
+        "ip",
+        "-j",
+        "address"
+      ],
+      "returncode": 0,
+      "stdout": "[{\"ifindex\":1,\"ifname\":\"lo\",\"flags\":[\"LOOPBACK\",\"UP\",\"LOWER_UP\"],\"mtu\":65536,\"qdisc\":\"noqueue\",\"operstate\":\"UNKNOWN\",\"group\":\"default\",\"txqlen\":1000,\"link_type\":\"loopback\",\"address\":\"00:00:00:00:00:00\",\"broadcast\":\"00:00:00:00:00:00\",\"addr_info\":[{\"family\":\"inet\",\"local\":\"127.0.0.1\",\"prefixlen\":8,\"scope\":\"host\",\"label\":\"lo\",\"valid_life_time\":4294967295,\"preferred_life_time\":4294967295},{\"family\":\"inet6\",\"local\":\"::1\",\"prefixlen\":128,\"scope\":\"host\",\"noprefixroute\":true,\"valid_life_time\":4294967295,\"preferred_life_time\":4294967295}]},{\"ifindex\":2,\"ifname\":\"eth0\",\"flags\":[\"BROADCAST\",\"MULTICAST\",\"UP\",\"LOWER_UP\"],\"mtu\":1500,\"qdisc\":\"fq_codel\",\"operstate\":\"UP\",\"group\":\"default\",\"txqlen\":1000,\"link_type\":\"ether\",\"address\":\"2c:cf:67:62:76:64\",\"broadcast\":\"ff:ff:ff:ff:ff:ff\",\"addr_info\":[{\"family\":\"inet\",\"local\":\"192.168.1.54\",\"prefixlen\":24,\"broadcast\":\"192.168.1.255\",\"scope\":\"global\",\"dynamic\":true,\"noprefixroute\":true,\"label\":\"eth0\",\"valid_life_time\":85899,\"preferred_life_time\":85899},{\"family\":\"inet6\",\"local\":\"fe80::2ecf:67ff:fe62:7664\",\"prefixlen\":64,\"scope\":\"link\",\"noprefixroute\":true,\"valid_life_time\":4294967295,\"preferred_life_time\":4294967295}]},{\"ifindex\":3,\"ifname\":\"wlan0\",\"flags\":[\"NO-CARRIER\",\"BROADCAST\",\"MULTICAST\",\"UP\"],\"mtu\":1500,\"qdisc\":\"fq_codel\",\"operstate\":\"DOWN\",\"group\":\"default\",\"txqlen\":1000,\"link_type\":\"ether\",\"address\":\"2c:cf:67:62:76:66\",\"broadcast\":\"ff:ff:ff:ff:ff:ff\",\"addr_info\":[]},{\"ifindex\":4,\"ifname\":\"wlan1\",\"flags\":[\"BROADCAST\",\"MULTICAST\",\"UP\",\"LOWER_UP\"],\"mtu\":1500,\"qdisc\":\"noqueue\",\"operstate\":\"UP\",\"group\":\"default\",\"txqlen\":1000,\"link_type\":\"ether\",\"address\":\"90:de:80:47:b9:da\",\"broadcast\":\"ff:ff:ff:ff:ff:ff\",\"addr_info\":[{\"family\":\"inet\",\"local\":\"192.168.1.117\",\"prefixlen\":24,\"broadcast\":\"192.168.1.255\",\"scope\":\"global\",\"dynamic\":true,\"noprefixroute\":true,\"label\":\"wlan1\",\"valid_life_time\":85900,\"preferred_life_time\":85900}]},{\"ifindex\":5,\"ifname\":\"wlan2\",\"flags\":[\"NO-CARRIER\",\"BROADCAST\",\"MULTICAST\",\"UP\"],\"mtu\":1500,\"qdisc\":\"noqueue\",\"operstate\":\"DOWN\",\"group\":\"default\",\"txqlen\":1000,\"link_type\":\"ether\",\"address\":\"e8:4e:06:ae:d7:09\",\"broadcast\":\"ff:ff:ff:ff:ff:ff\",\"addr_info\":[]}]\n",
+      "stderr": ""
+    }
+  },
+  {
+    "utc_ns": "1790943144857886889",
+    "monotonic_ns": "225089087906670",
+    "kind": "command",
+    "value": {
+      "argv": [
+        "ip",
+        "-j",
+        "-4",
+        "route"
+      ],
+      "returncode": 0,
+      "stdout": "[{\"dst\":\"default\",\"gateway\":\"192.168.1.1\",\"dev\":\"eth0\",\"protocol\":\"dhcp\",\"prefsrc\":\"192.168.1.54\",\"metric\":100,\"flags\":[]},{\"dst\":\"default\",\"gateway\":\"192.168.1.1\",\"dev\":\"wlan1\",\"protocol\":\"dhcp\",\"prefsrc\":\"192.168.1.117\",\"metric\":100,\"flags\":[]},{\"dst\":\"192.168.1.0/24\",\"dev\":\"eth0\",\"protocol\":\"kernel\",\"scope\":\"link\",\"prefsrc\":\"192.168.1.54\",\"metric\":100,\"flags\":[]},{\"dst\":\"192.168.1.0/24\",\"dev\":\"wlan1\",\"protocol\":\"kernel\",\"scope\":\"link\",\"prefsrc\":\"192.168.1.117\",\"metric\":100,\"flags\":[]}]\n",
+      "stderr": ""
+    }
+  },
+  {
+    "utc_ns": "1790943144876415554",
+    "monotonic_ns": "225089106435316",
+    "kind": "command",
+    "value": {
+      "argv": [
+        "nmcli",
+        "-t",
+        "-f",
+        "NAME,UUID,TYPE,DEVICE",
+        "connection",
+        "show",
+        "--active"
+      ],
+      "returncode": 0,
+      "stdout": "netplan-eth0:75a1216a-9d1a-30cd-8aca-ace5526ec021:802-3-ethernet:eth0\nBohica-IoT-wlan1:921301fe-cdfd-4965-8ac7-c96e9d908ea6:802-11-wireless:wlan1\nlo:2c13f4b2-7306-4bf1-9b86-7bcb542fcafc:loopback:lo\n",
+      "stderr": ""
+    }
+  },
+  {
+    "utc_ns": "1790943144885109434",
+    "monotonic_ns": "225089115129067",
+    "kind": "command",
+    "value": {
+      "argv": [
+        "systemctl",
+        "show",
+        "wsprrypi",
+        "-p",
+        "MainPID",
+        "-p",
+        "ActiveState"
+      ],
+      "returncode": 0,
+      "stdout": "MainPID=621104\nActiveState=active\n",
+      "stderr": ""
+    }
+  },
+  {
+    "utc_ns": "1790943144886072227",
+    "monotonic_ns": "225089116091916",
+    "kind": "command",
+    "value": {
+      "argv": [
+        "readlink",
+        "-f",
+        "/dev/pps-gps"
+      ],
+      "returncode": 0,
+      "stdout": "/dev/pps0\n",
+      "stderr": ""
+    }
+  },
+  {
+    "utc_ns": "1790943144886857021",
+    "monotonic_ns": "225089116875839",
+    "kind": "restoration-accepted",
+    "value": {
+      "hashes_equal": true,
+      "profiles_equal": true,
+      "assignments_equal": true,
+      "boot_unchanged": true
+    }
+  }
+]

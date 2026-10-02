@@ -207,7 +207,7 @@ async function captureRp1DriveScreenshot(client, outputPath, theme) {
     fs.writeFileSync(outputPath, screenshot.data, "base64");
 }
 
-async function captureSi5351LayoutScreenshot(client, outputPath, theme, missing = false) {
+async function captureSi5351LayoutScreenshot(client, outputPath, theme, missing = false, inventoryError = "") {
     await client.send("Runtime.evaluate", {
         expression: `(() => {
             document.documentElement.setAttribute("data-bs-theme", ${JSON.stringify(theme)});
@@ -227,7 +227,7 @@ async function captureSi5351LayoutScreenshot(client, outputPath, theme, missing 
             document.querySelectorAll(".modal-backdrop").forEach(backdrop => backdrop.remove());
             document.body.classList.remove("modal-open");
             populateI2cBuses(1);
-            populateSi5351Addresses(1, "0x60", ${missing ? '[]' : '["0x60"]'}, "", 1);
+            populateSi5351Addresses(1, "0x60", ${missing ? '[]' : '["0x60"]'}, ${JSON.stringify(inventoryError)}, 1);
             document.getElementById("si5351_reference_frequency").value = "27000000";
             clickTransmitBackend();
             updateBackendPlatformSupportUi();
@@ -1016,6 +1016,8 @@ async function browserTest() {
     populateSi5351Addresses(1, "0x60", [], "Permission denied", 1);
     equal(buildConfigPayload().Si5351["I2C Address"], "0x60",
         "discovery errors do not erase inactive backend settings");
+    ok(field("si5351_i2c_address").selectedOptions[0].textContent.includes("unconfirmed"),
+        "discovery failure must not claim that the saved hardware is absent");
     ok(field("si5351-address-hint").textContent.includes("Permission denied"),
         "address discovery failure remains distinct from empty inventory");
     populateSi5351Addresses(1, "0x60", ["0x60"], "", 1);
@@ -1155,6 +1157,8 @@ async function main() {
             await captureSi5351LayoutScreenshot(client, path.join(screenshotDir, "Si5351_Desktop_Light.png"), "light");
             await captureSi5351LayoutScreenshot(client, path.join(screenshotDir, "Si5351_Desktop_Dark.png"), "dark");
             await captureSi5351LayoutScreenshot(client, path.join(screenshotDir, "Si5351_Missing_Desktop.png"), "light", true);
+            await captureSi5351LayoutScreenshot(client, path.join(screenshotDir, "Si5351_Timeout_Desktop.png"), "light", true,
+                "Si5351 address discovery timed out; configuration remains available.");
             await captureRouteRequiredRp1Screenshot(client, path.join(screenshotDir, "RP1_Route_Required_Desktop_Light.png"), "light");
             await captureRouteRequiredRp1Screenshot(client, path.join(screenshotDir, "RP1_Route_Required_Desktop_Dark.png"), "dark");
             await captureRouteRequiredRp1Screenshot(client, path.join(screenshotDir, "RP1_Route_Removed_Desktop_Light.png"), "light", true);
@@ -1180,6 +1184,8 @@ async function main() {
             await captureSi5351LayoutScreenshot(client, path.join(screenshotDir, "Si5351_Mobile_Light.png"), "light");
             await captureSi5351LayoutScreenshot(client, path.join(screenshotDir, "Si5351_Mobile_Dark.png"), "dark");
             await captureSi5351LayoutScreenshot(client, path.join(screenshotDir, "Si5351_Missing_Mobile.png"), "dark", true);
+            await captureSi5351LayoutScreenshot(client, path.join(screenshotDir, "Si5351_Timeout_Mobile.png"), "dark", true,
+                "Si5351 address discovery timed out; configuration remains available.");
             await captureRouteRequiredRp1Screenshot(client, path.join(screenshotDir, "RP1_Route_Required_Mobile_Light.png"), "light");
             await captureRouteRequiredRp1Screenshot(client, path.join(screenshotDir, "RP1_Route_Required_Mobile_Dark.png"), "dark");
             await captureRouteRequiredRp1Screenshot(client, path.join(screenshotDir, "RP1_Route_Removed_Mobile_Light.png"), "light", true);

@@ -195,7 +195,7 @@ nlohmann::json public_config_from_internal_json(const nlohmann::json &source)
                       si5351.at("Reference Frequency"),
                       "Si5351.Reference Frequency")
                 : kDefaultSi5351ReferenceHz;
-        si5351_address_inventory = discover_si5351_addresses(
+        si5351_address_inventory = cached_si5351_addresses(
             i2c_bus, reference_hz);
         si5351_detected = si5351_address_inventory.contains(i2c_address);
         if (!si5351_detected)
@@ -237,6 +237,7 @@ nlohmann::json public_config_from_internal_json(const nlohmann::json &source)
         {"I2C Buses", i2c_buses},
         {"I2C Bus Discovery Error", i2c_inventory.error},
         {"Si5351 Address Bus", si5351_address_inventory.i2c_bus},
+        {"Si5351 Inventory Checked", si5351_address_inventory.checked},
         {"Si5351 Addresses", si5351_addresses},
         {"Si5351 Address Discovery Error", si5351_address_inventory.error},
         {"Model", get_pi_model()},
@@ -250,6 +251,9 @@ nlohmann::json public_config_from_internal_json(const nlohmann::json &source)
         {"Si5351 Detected", si5351_detected},
         {"Si5351 Detection Error",
          si5351_detected ? std::string() : si5351_detection_error}};
+    // Absence of a check is unknown, never a claim that hardware is missing/present.
+    if (!si5351_address_inventory.checked)
+        public_json["Platform"].erase("Si5351 Detected");
     return public_json;
 }
 

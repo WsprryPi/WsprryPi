@@ -28,6 +28,7 @@
 
 // Primary header for this source file
 #include "main.hpp"
+#include "si5351_inventory_process.hpp"
 
 // Project headers
 #include "arg_parser.hpp"
@@ -223,6 +224,9 @@ void callback_signal_handler(int signum, bool is_critical)
  */
 int main(int argc, char *argv[])
 {
+    // Inventory workers never acquire the application singleton or initialize output.
+    if (const auto inventory_exit = si5351_inventory_process::helper_main(argc, argv))
+        return *inventory_exit;
     // Maintain retval for main()
     int retval = EXIT_SUCCESS;
 

@@ -1,0 +1,117 @@
+[
+  {
+    "name": "wspr1",
+    "host": "192.168.1.44",
+    "peer": [
+      "192.168.1.44",
+      31417
+    ],
+    "hello": {
+      "selected_version": "WTP/1",
+      "device_id": "d133ed890b90f6945b41a235429ff155",
+      "boot_id": "ebb2faf2e0411e0062cd6e342803a182",
+      "product": "WsprryPi",
+      "firmware_version": "3.2.0-devel+6a32789"
+    },
+    "status": {
+      "boot_id": "ebb2faf2e0411e0062cd6e342803a182",
+      "state": "empty",
+      "output_active": false,
+      "owner_id": null,
+      "job_id": null,
+      "terminal_records": []
+    }
+  },
+  {
+    "name": "wspr2",
+    "host": "192.168.1.123",
+    "peer": [
+      "192.168.1.123",
+      31417
+    ],
+    "hello": {
+      "selected_version": "WTP/1",
+      "device_id": "e2a4d273f7d8f24f6696f7c6fb95ff11",
+      "boot_id": "2828f3638d16bdbdf0704fc7445c81ff",
+      "product": "WsprryPi",
+      "firmware_version": "3.2.0-devel+2f67b00"
+    },
+    "status": {
+      "boot_id": "2828f3638d16bdbdf0704fc7445c81ff",
+      "state": "empty",
+      "output_active": false,
+      "owner_id": null,
+      "job_id": null,
+      "terminal_records": []
+    }
+  },
+  {
+    "name": "wspr4",
+    "host": "192.168.1.120",
+    "peer": [
+      "192.168.1.120",
+      31417
+    ],
+    "hello": {
+      "selected_version": "WTP/1",
+      "device_id": "f21e530af8a4a210ec57898c0ebd32d2",
+      "boot_id": "2102df76f2e6a742c0ea8eb476f59c17",
+      "product": "WsprryPi",
+      "firmware_version": "3.2.0-devel+2f67b00"
+    },
+    "status": {
+      "boot_id": "2102df76f2e6a742c0ea8eb476f59c17",
+      "state": "empty",
+      "output_active": false,
+      "owner_id": null,
+      "job_id": null,
+      "terminal_records": []
+    }
+  },
+  {
+    "name": "wspr5",
+    "host": "192.168.1.54",
+    "peer": [
+      "192.168.1.54",
+      31417
+    ],
+    "hello": {
+      "selected_version": "WTP/1",
+      "device_id": "e045017b11e54c2fb7029f0154e6deb9",
+      "boot_id": "ab2421ed8de8fc5f0d4e199c8447fa78",
+      "product": "WsprryPi",
+      "firmware_version": "3.2.0-devel+6a32789"
+    },
+    "status": {
+      "boot_id": "ab2421ed8de8fc5f0d4e199c8447fa78",
+      "state": "empty",
+      "output_active": false,
+      "owner_id": null,
+      "job_id": null,
+      "terminal_records": []
+    }
+  },
+  {
+    "name": "Pico A",
+    "host": "192.168.1.47",
+    "peer": [
+      "192.168.1.47",
+      31417
+    ],
+    "hello": {
+      "selected_version": "WTP/1",
+      "device_id": "fd6127d11d6aca42a9905fa3fb1bf1d5",
+      "boot_id": "4296284b4460bb4578b4637ac020a590",
+      "product": "WsprryPico",
+      "firmware_version": "0.0.0-devel"
+    },
+    "status": {
+      "boot_id": "4296284b4460bb4578b4637ac020a590",
+      "state": "empty",
+      "output_active": false,
+      "owner_id": null,
+      "job_id": null,
+      "terminal_records": []
+    }
+  }
+]

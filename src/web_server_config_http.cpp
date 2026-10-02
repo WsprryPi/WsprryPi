@@ -35,8 +35,12 @@ RouteResponse build_si5351_addresses_response(const std::string &i2c_bus)
         return {400, body.dump(4), "application/json", true};
     }
 
-    const auto inventory = discover_si5351_addresses(
-        bus, config.si5351_reference_hz);
+    int reference_hz;
+    {
+        std::lock_guard lock(config_update_mutex());
+        reference_hz = config.si5351_reference_hz;
+    }
+    const auto inventory = discover_si5351_addresses(bus, reference_hz);
     auto addresses = nlohmann::json::array();
     for (const int address : inventory.addresses)
         addresses.push_back(

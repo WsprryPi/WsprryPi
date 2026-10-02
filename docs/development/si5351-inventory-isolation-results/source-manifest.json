@@ -1,0 +1,26 @@
+{
+  "base_commit": "960914333884158c87040c030d49ecaeb8795e65",
+  "branch": "devel",
+  "source_sha256": {
+    "src/config_handler.cpp": "7b126c1fe75629f9d45b1a3ec708efe2030e6d7fa56f10aaf8488ea1c3d73841",
+    "src/config_handler.hpp": "59a52f64f9aae12e42448ad1ceaf047c2b055d4e8d26ce2c09dc90b118197a72",
+    "src/config_handler_serialization.cpp": "fd3cbca5fcd663135a87626fdb1718abc08a9119e34443dc67a0700c31c6142c",
+    "src/si5351_inventory_process.cpp": "a461a3129e768c9e21f543ff42dca75f309ea8da8f74db1ab4651884e10a4c8e",
+    "src/si5351_inventory_process.hpp": "97d173238d0caa52bf9124f771ae0468e2da055d74a453ff2259bab413a802a9",
+    "src/main.cpp": "bdb0c1f0c9e774aaee88ae7a8559094c43a40177a7364339b40b7dd71f95d47e",
+    "src/web_server_config_http.cpp": "6e9abe736a5b393554e145358260fd5b972cb4ba16a5e33b2a20840864caf75c",
+    "src/Makefile": "c05ee3a2b010b43b56abda71b3069c66724c040602e0bbfe852a5fb18b76046f",
+    "src/tests/si5351_inventory_isolation_test.cpp": "27813a5a50e7181289564feaa759bf3e2df03ab4a2559d9ae572ea8c065397e4",
+    "src/tests/si5351_inventory_process_test.cpp": "56beecc3d5d09561c76c47daa73d8e0401916322e68849cbd1c4f8ea772f8a9b",
+    "WsprryPi-UI/data/index.js": "fe545dcbe53e5eb68a5b3d29823f3df6e22aa71a3ad3cfb6f0df9e11fc3b2b3e",
+    "WsprryPi-UI/data/site.js": "643fc6de29688ce8c9526b776b8e5682b3a150d7a756cb5a6072d7e32735f613",
+    "src/tests/ui_source_regression_test.cpp": "2d1b7292869fe2d1eccd90c37a50ac2cf4e54b4d3e19b0787731778a90f304b8",
+    "WsprryPi-UI/tests/si5351_inventory_ui_test.js": "c00421bf1a7020cc89be5ec9b6d883d9e1f72b17d35769632a66a0c1702025a7",
+    "WsprryPi-UI/tests/rp1_route_ui_test.js": "70eec7bb3cab55e2c55e6ee46deedad582f08d6fc354564ab6a43a1c8cffaec6"
+  },
+  "installed_binary_sha256": "beac5ba347014694af6b7ef00b7ded4334840718eb783479242f05de6e7f7565",
+  "linux_host": "wspr5",
+  "live_host": "wspr4",
+  "profile": "rpi-gpio,rp1-gpclk,si5351,simulated; ancillary GPIO enabled",
+  "git_metadata": "Isolated shallow clone at base devel; candidate built from recorded working source before commit."
+}

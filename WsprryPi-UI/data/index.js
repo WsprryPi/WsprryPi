@@ -574,7 +574,16 @@ function bindIndexActions() {
         }
         syncBackendPanelVisibility();
     });
-    $("#transmit_backend").on("change", clickTransmitBackend);
+    $("#transmit_backend").on("change", function (event, refreshInventory = true) {
+        clickTransmitBackend();
+        if (selectedTransmitBackend() === "si5351" && refreshInventory) {
+            refreshSi5351Addresses(selectedI2cBusValue());
+        } else if (selectedTransmitBackend() !== "si5351") {
+            // Invalidate any outstanding scan response without changing the saved address.
+            ++si5351AddressDiscoverySequence;
+            si5351AddressInventoryState.loading = false;
+        }
+    });
     $("#tx_pin").on("change", clickTransmitPin);
     initializeRp1RouteUi();
 
@@ -706,7 +715,10 @@ function bindIndexActions() {
         refreshSi5351Addresses(Number(this.value));
         validateTransmitterHardwareFields();
     });
-    $("#si5351_i2c_address").on("change", validateSi5351I2cAddress);
+    $("#si5351_i2c_address").on("change", function () {
+        validateSi5351I2cAddress();
+        validatePage();
+    });
     $("#si5351_i2c_bus, #si5351_reference_frequency").on(
         "input blur",
         validateTransmitterHardwareFields
@@ -1972,12 +1984,12 @@ function selectedTransmitBackend() {
     return $("#transmit_backend").is(":checked") ? "si5351" : "gpio";
 }
 
-function setTransmitBackendSelection(backend, triggerChange = false) {
+function setTransmitBackendSelection(backend, triggerChange = false, refreshInventory = true) {
     window.WtpUi?.select(String(backend).toLowerCase() === "wtp");
     const $backend = $("#transmit_backend");
     $backend.prop("checked", transmitBackendForUi(backend) === "si5351");
     if (triggerChange) {
-        $backend.trigger("change");
+        $backend.trigger("change", [refreshInventory]);
     }
 }
 
@@ -2306,7 +2318,7 @@ function backendInlineHintMessage() {
     const backend = selectedTransmitBackend();
 
     if (backend === "si5351" && platform.si5351Detected === false) {
-        return "No Si5351 detected on the configured I2C bus.";
+        return platform.si5351DetectionError || "No Si5351 detected on the configured I2C bus.";
     }
 
     if (backend === "gpio" && platform.gpioClockTransmissionSupported === false) {
@@ -4097,7 +4109,8 @@ function populateSi5351Addresses(bus, savedAddress, addresses, error = "", inven
             : "Select a detected address";
     field.add(new Option(placeholder, "", true, !present));
     if (normalizedSaved && !present) {
-        const unavailable = new Option(`${normalizedSaved} (not detected)`, normalizedSaved, true, true);
+        const availability = si5351AddressInventoryState.error ? "unconfirmed" : "not detected";
+        const unavailable = new Option(`${normalizedSaved} (${availability})`, normalizedSaved, true, true);
         unavailable.disabled = true;
         field.add(unavailable);
     }
@@ -4122,7 +4135,8 @@ function populateSi5351Addresses(bus, savedAddress, addresses, error = "", inven
 
 function refreshSi5351Addresses(bus, savedAddressOverride = null) {
     const field = document.getElementById("si5351_i2c_address");
-    if (!field || !Number.isInteger(bus) || bus < 0) return;
+    if (!field || selectedTransmitBackend() !== "si5351" ||
+        !Number.isInteger(bus) || bus < 0) return;
     const savedAddress = savedAddressOverride === null
         ? field.value
         : formatSi5351Address(savedAddressOverride);
@@ -4141,13 +4155,19 @@ function refreshSi5351Addresses(bus, savedAddressOverride = null) {
         cache: false,
         timeout: CONFIG_REQUEST_TIMEOUT_MS,
     }).done((inventory) => {
-        if (requestSequence !== si5351AddressDiscoverySequence || selectedI2cBusValue() !== bus) return;
+        if (requestSequence !== si5351AddressDiscoverySequence ||
+            selectedTransmitBackend() !== "si5351" || selectedI2cBusValue() !== bus) return;
+        const platform = window.WSPRRYPI_PLATFORM || {};
+        platform.si5351Detected = !inventory?.["Discovery Error"] &&
+            normalizedSi5351Addresses(inventory?.Addresses).includes(formatSi5351Address(savedAddress));
+        platform.si5351DetectionError = String(inventory?.["Discovery Error"] || "");
         populateSi5351Addresses(bus, savedAddress, inventory?.Addresses,
             inventory?.["Discovery Error"], inventory?.["I2C Bus"]);
         validatePage();
         scheduleAutosave();
     }).fail(() => {
-        if (requestSequence !== si5351AddressDiscoverySequence || selectedI2cBusValue() !== bus) return;
+        if (requestSequence !== si5351AddressDiscoverySequence ||
+            selectedTransmitBackend() !== "si5351" || selectedI2cBusValue() !== bus) return;
         populateSi5351Addresses(bus, savedAddress, [],
             "The controller could not provide Si5351 address discovery.", bus);
         validatePage();
@@ -4168,6 +4188,12 @@ function validateSi5351I2cAddress() {
         si5351AddressInventoryState.bus === selectedI2cBusValue() &&
         !si5351AddressInventoryState.error &&
         si5351AddressInventoryState.addresses.includes(address);
+    if (!si5351AddressInventoryState.loading &&
+        si5351AddressInventoryState.bus === selectedI2cBusValue() &&
+        window.WSPRRYPI_PLATFORM) {
+        window.WSPRRYPI_PLATFORM.si5351Detected = valid;
+        window.WSPRRYPI_PLATFORM.si5351DetectionError = si5351AddressInventoryState.error;
+    }
     fld.setCustomValidity(valid
         ? ""
         : "Select a detected Si5351 address on the selected I2C bus.");

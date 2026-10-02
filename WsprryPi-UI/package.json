@@ -5,7 +5,7 @@
   "description": "Development and test dependencies for the WsprryPi UI component",
   "scripts": {
     "test": "npm run test:unit",
-    "test:unit": "npm run test:manifest && node tests/rp1_route_ui_test.js && node tests/wtp_ui_test.js && node tests/cw_timing_state_test.js && node tests/responsive_shell_logs_test.js && node tests/spots_hardening_test.js && node tests/network_safety_ui_test.js && node tests/support_bundle_ui_test.js && node tests/support_intake_ui_harness_test.js && node tests/wspr_band_frequency_correlation_test.js && php tests/gpio_dropdown_test.php && php tests/spot_menu_test.php",
+    "test:unit": "npm run test:manifest && node tests/si5351_inventory_ui_test.js && node tests/rp1_route_ui_test.js && node tests/wtp_ui_test.js && node tests/cw_timing_state_test.js && node tests/responsive_shell_logs_test.js && node tests/spots_hardening_test.js && node tests/network_safety_ui_test.js && node tests/support_bundle_ui_test.js && node tests/support_intake_ui_harness_test.js && node tests/wspr_band_frequency_correlation_test.js && php tests/gpio_dropdown_test.php && php tests/spot_menu_test.php",
     "test:manifest": "python3 tests/ui_manifest_test.py && python3 tests/ui_installation_classification_test.py && php tests/ui_identity_test.php && python3 tests/ui_identity_http_integration_test.py",
     "test:browser": "node tests/conditional_transmit_gpio_integration_test.js && node tests/cw_duration_latch_integration_test.js && node tests/support_intake_ui_integration_test.js"
   },
