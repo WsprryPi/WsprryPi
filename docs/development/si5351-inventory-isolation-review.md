@@ -18,6 +18,9 @@ backtrace and interface evidence as the failure definition.
 | Active Si5351 population could scan twice, first using the previous bus and then receiving busy on its correct scan. | Defer the population-triggered backend scan until saved bus/address fields are ready. Execute the actual handler and population calls in a regression that requires exactly one scan, while operator selection still refreshes. |
 | Timeout/unchecked inventory could be displayed as missing hardware. | Omit detected state before a check, preserve the saved address, display unconfirmed for discovery errors, and keep the specific timeout/failure message beside the field. |
 | UI address replacement could retain an unavailable flag for the previous address. | Availability follows the currently selected address from checked inventory, preserving explicit replacement and fresh server-side validation. |
+| The INI conflict fixture depended on the Linux-only earlier logging change; its macOS write was a no-op. | Toggle the actual prepared value and test both initial logging states on every host. |
+| The strict I2C audit assumed readiness directly opened a missing bus, while metadata validation now rejects it first. | Audit zero adapter opens during early rejection, then trace the isolated worker against one verified nonexistent device path; retain all forbidden-access and ioctl checks. |
+| The six-profile release job reached its 15-minute limit just after its final compile. | Increase only that job's deadline to 30 minutes; retain all six profiles, factory checks and warnings as errors. |
 
 ## Final reassessment
 
@@ -38,3 +41,15 @@ INI bytes and inactive output state were preserved, and no worker remained.
 No unresolved finding remains in the inventory/configuration isolation slice.
 The physical I2C fault itself remains a hardware/runtime diagnostic boundary.
 No WTP routing repair, RF qualification or whole-fleet release claim is in scope.
+
+### CI repair reassessment
+
+The corrected INI fixture passes for both initial logging states on Linux. The
+strict Si5351 release and factory test pass with ancillary GPIO disabled. Inside
+an ephemeral network namespace, both the non-root profile test and file-access
+audit pass; the worker attempts only the verified nonexistent selected path and
+performs no I2C ioctl. The audit still examines both application and worker traces
+for forbidden GPIO, mailbox, MMIO and RP1 access. No installed wspr5 service or
+transmitter state changed. The release-job annotation confirms the original
+15-minute timeout; raising its deadline removes no compiler or test gate.
+Repaired GitHub CI results remain a separate check reported at completion.

@@ -1,0 +1,3 @@
+backend capability reporting passed: si5351,wtp
+strict I2C profile passed
+strict I2C file-access audit passed: /dev/i2c-2147483646 only

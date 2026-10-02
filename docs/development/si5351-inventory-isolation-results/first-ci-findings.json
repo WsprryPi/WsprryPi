@@ -1,0 +1,20 @@
+{
+  "source_commit": "402c0c20b57464f92912c91733bab24d1edc18ae",
+  "run_url": "https://github.com/WsprryPi/WsprryPi/actions/runs/37014606369",
+  "macos_simulated_profile": {
+    "job_id": 110862285055,
+    "failure": "INI conflict fixture wrote false to already-false logging state; no newer revision was created."
+  },
+  "strict_i2c_profile": {
+    "job_id": 110862285016,
+    "failure": "Audit expected an I2C open but unavailable bus metadata now rejects earlier."
+  },
+  "ubuntu_gcc13_release": {
+    "job_id": 110862284510,
+    "started_at": "2026-10-02T13:40:57Z",
+    "completed_at": "2026-10-02T13:56:05Z",
+    "annotation": "The job has exceeded the maximum execution time of 15m0s"
+  },
+  "non_hardware_validation": "success",
+  "wtp_network_loopback": "success"
+}

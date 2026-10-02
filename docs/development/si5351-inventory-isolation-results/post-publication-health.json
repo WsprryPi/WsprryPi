@@ -1,0 +1,38 @@
+{
+  "ui_source_commit": "402c0c20b57464f92912c91733bab24d1edc18ae",
+  "ui_build_id": "sha256:4c7c9064d6b04f1809f77645434efe125ffed629b56661e65e8e53650b666e91",
+  "ui_publication_state": "packaged",
+  "served_asset_sha256": {
+    "index.js": "fe545dcbe53e5eb68a5b3d29823f3df6e22aa71a3ad3cfb6f0df9e11fc3b2b3e",
+    "site.js": "643fc6de29688ce8c9526b776b8e5682b3a150d7a756cb5a6072d7e32735f613"
+  },
+  "config_read_seconds": 0.04665969299094286,
+  "original_ini_sha256": "1414f823176e7df48222e83f3066b8a6fcd3a54d0786be8d5a543d8410b869bf",
+  "endpoint": {
+    "address": "192.168.1.120",
+    "boot_id": "f5b7cb1a4242c7d941b029ad33cc4e8d",
+    "device_id": "f21e530af8a4a210ec57898c0ebd32d2",
+    "dns_sd_published": true,
+    "enabled": true,
+    "finishing_remote_job": false,
+    "launch_observed_monotonic_ns": null,
+    "launch_target_monotonic_ns": "0",
+    "listener_error": "",
+    "listener_running": true,
+    "local_effective": false,
+    "local_requested": false,
+    "local_work_active": false,
+    "output_unknown": false,
+    "port": 31417,
+    "remote_admission_closed": false,
+    "remote_job_id": "",
+    "remote_output_active": false,
+    "remote_owner": "",
+    "remote_state": "empty",
+    "revocation_generation": "4",
+    "revocation_unavailable": false,
+    "schema": "wsprrypi-wtp-endpoint/1"
+  },
+  "service": "MainPID=157592\nActiveState=active\nSubState=running\n",
+  "binary_sha256": "beac5ba347014694af6b7ef00b7ded4334840718eb783479242f05de6e7f7565"
+}

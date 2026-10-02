@@ -90,16 +90,20 @@ int main(int argc, char** argv) {
     config.use_ini = true;
     config.ini_filename = ini_path;
     iniFile.set_filename(ini_path);
-    config_to_json();
-    json_to_ini();
-    PreparedConfigCandidate candidate;
-    prepare_ini_config_candidate(ini_path, candidate);
-    assert(candidate.valid);
-    const auto committed = patch_all_from_web_revision({{"Meta", {{"debug_logging", false}}}}, {});
-    bool ini_conflict = false;
-    try { commit_config_candidate(candidate); }
-    catch (const std::exception& error) { ini_conflict = std::string(error.what()) == "revision_conflict"; }
-    assert(ini_conflict && get_public_config_snapshot().second == committed);
+    for (const bool initial_debug_logging : {false, true}) {
+        config.debug_logging = initial_debug_logging;
+        config_to_json();
+        json_to_ini();
+        PreparedConfigCandidate candidate;
+        prepare_ini_config_candidate(ini_path, candidate);
+        assert(candidate.valid);
+        const auto committed = patch_all_from_web_revision(
+            {{"Meta", {{"debug_logging", !candidate.normalized_config.debug_logging}}}}, {});
+        bool ini_conflict = false;
+        try { commit_config_candidate(candidate); }
+        catch (const std::exception& error) { ini_conflict = std::string(error.what()) == "revision_conflict"; }
+        assert(ini_conflict && get_public_config_snapshot().second == committed);
+    }
     unlink(ini_path);
     std::cout << "Si5351 snapshot isolation, fresh validation and revision conflict tests passed\n";
 }

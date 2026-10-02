@@ -10,13 +10,15 @@
     "src/main.cpp": "bdb0c1f0c9e774aaee88ae7a8559094c43a40177a7364339b40b7dd71f95d47e",
     "src/web_server_config_http.cpp": "6e9abe736a5b393554e145358260fd5b972cb4ba16a5e33b2a20840864caf75c",
     "src/Makefile": "c05ee3a2b010b43b56abda71b3069c66724c040602e0bbfe852a5fb18b76046f",
-    "src/tests/si5351_inventory_isolation_test.cpp": "27813a5a50e7181289564feaa759bf3e2df03ab4a2559d9ae572ea8c065397e4",
+    "src/tests/si5351_inventory_isolation_test.cpp": "82c196e6633035637398e47115e120e893684fbc370c7de43912c970dabae520",
     "src/tests/si5351_inventory_process_test.cpp": "56beecc3d5d09561c76c47daa73d8e0401916322e68849cbd1c4f8ea772f8a9b",
     "WsprryPi-UI/data/index.js": "fe545dcbe53e5eb68a5b3d29823f3df6e22aa71a3ad3cfb6f0df9e11fc3b2b3e",
     "WsprryPi-UI/data/site.js": "643fc6de29688ce8c9526b776b8e5682b3a150d7a756cb5a6072d7e32735f613",
     "src/tests/ui_source_regression_test.cpp": "2d1b7292869fe2d1eccd90c37a50ac2cf4e54b4d3e19b0787731778a90f304b8",
     "WsprryPi-UI/tests/si5351_inventory_ui_test.js": "c00421bf1a7020cc89be5ec9b6d883d9e1f72b17d35769632a66a0c1702025a7",
-    "WsprryPi-UI/tests/rp1_route_ui_test.js": "70eec7bb3cab55e2c55e6ee46deedad582f08d6fc354564ab6a43a1c8cffaec6"
+    "WsprryPi-UI/tests/rp1_route_ui_test.js": "70eec7bb3cab55e2c55e6ee46deedad582f08d6fc354564ab6a43a1c8cffaec6",
+    "scripts/tests/strict_i2c_file_access_audit.sh": "23ceebf23ddac29e2b943a62c1cbd3648d254114819f7cf463f8042d9e1be8a8",
+    ".github/workflows/debian-non-hardware.yml": "5a47e8a27fc7d359a2053409f71cc9e5a76fc3ba803d2ce7d2f1312887d17618"
   },
   "installed_binary_sha256": "beac5ba347014694af6b7ef00b7ded4334840718eb783479242f05de6e7f7565",
   "linux_host": "wspr5",

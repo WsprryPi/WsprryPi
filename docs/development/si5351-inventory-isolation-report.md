@@ -40,13 +40,16 @@ application code in `src/`.
 | `WSPRRYPI_CONDITIONAL_GPIO_SCREENSHOT_DIR=... node tests/conditional_transmit_gpio_integration_test.js` | Passed with saved-value, replacement and unconfirmed-failure assertions. |
 | `node --check` for affected JavaScript; Python harness syntax; `git diff --check` | Passed. |
 | Final single-load scan repair: `npm test`, conditional GPIO browser regression, and Linux `build/bin/ui_source_regression_test` | Passed after updating existing source assertions for the deferred population scan. |
+| wspr5: `WSPRRYPI_DISABLE_HARDWARE_ACCESS=1 make -j2 JOBS=2 si5351-inventory-isolation-test SUDO=` | Passed for both initial logging states. |
+| wspr5: `WSPRRYPI_DISABLE_HARDWARE_ACCESS=1 make -j2 JOBS=2 release backend-profile-factory-test BACKENDS=si5351 ANCILLARY_GPIO=0 SUDO=` | Passed, GPIO-free profile. |
+| Strict profile and file-access scripts run as `pi` inside `sudo unshare --net -- runuser -u pi -- sh -c ...`, with `WSPRRYPI_DISABLE_HARDWARE_ACCESS=1` | Passed: unavailable-bus rejection, one nonexistent worker path, no GPIO/MMIO/mailbox/RP1 access or I2C ioctl. |
 | Local Mac C++ compilation/linking | Not attempted, following the standing user instruction. |
 
 Full logs, final source hashes, installed binary hash and screenshots accompany
 this report. Linux tests used isolated source on wspr5, without modifying its
 installed application or operational state. Build metadata identifies the base
 commit and dirty candidate source; it is not represented as an already committed
-binary. No separate new `WSPR-Transmitter` component test was necessary because
+binary. Follow-up validation changes only tests and CI. No separate new `WSPR-Transmitter` component test was necessary because
 that component's source was unchanged; its parent integration paths ran in the
 full profile.
 
@@ -71,6 +74,12 @@ was preserved across the expected application boot-ID change.
   unowned and known off, with no remaining inventory workers.
 - The successful candidate remains installed. The rollback timer was cancelled;
   private backups remain on wspr4 for recovery.
+- The canonical transactional publisher installed the matching UI from commit
+  `402c0c20b57464f92912c91733bab24d1edc18ae` with packaged state and verified
+  served JavaScript hashes. A live browser showed Controller connected and GPIO4.
+  Subsequent configuration reads remained responsive; original INI bytes, service
+  PID, boot ID, empty ownership and known-off output were preserved. Publication
+  and post-publication health receipts accompany this report.
 
 An initial harness attempt incorrectly expected an unwrapped host configuration
 and PATCH support. The host API correctly uses a `config` envelope and PUT.
@@ -78,6 +87,26 @@ The harness was corrected before any write and the complete case rerun.
 The underlying physical I2C response failure was not repaired or qualified;
 this result closes management responsiveness and bounded inventory behavior.
 No transmission, CLAIM/LOAD/ARM, RF test or Pico contact occurred.
+
+## CI follow-up
+
+The [first pushed CI run](https://github.com/WsprryPi/WsprryPi/actions/runs/37014606369)
+exposed two test assumptions. On macOS, the INI conflict fixture wrote false to
+an already-false logging setting, creating no newer revision. It now changes the
+prepared value and exercises both initial states on every host. The strict I2C
+audit expected an unavailable bus to be opened; metadata validation now correctly
+rejects it earlier. The audit checks that early rejection and separately traces
+the isolated worker's open of a verified nonexistent path, retaining all forbidden
+GPIO/mailbox/MMIO/RP1/other-adapter and I2C-ioctl checks. These follow-up changes
+affect tests and evidence, without changing the installed application behavior.
+
+The first local audit invocation used the full build profile and correctly hit
+its root requirement; the strict build then hit the installed service's singleton
+guard. Audits use the explicit GPIO-free Si5351 profile and an ephemeral network
+namespace, leaving wspr5's service untouched. The release-matrix job also reached
+its 15-minute deadline after compiling all six profiles. Its deadline is now
+30 minutes, retaining every profile and warning gate. Repaired CI results are
+recorded in the completion report.
 
 ## Adversarial reassessment and Impeccable
 
@@ -109,6 +138,7 @@ qualify RF or a live browser-to-device Fleet workflow.
   deadline and responsive cached configuration reads. Cross-repository changes
   were not made in this focused implementation request.
 
-Commit/push and installed UI publication are recorded in the completion report.
+Implementation and UI publication are from commit `402c0c2`; the test/evidence
+follow-up commit and repaired CI results are recorded in the completion report.
 The routing TODO remains open: Ethernet reconnect with WiFi preferred must
 recover usable WTP replies without manually repairing route preference.

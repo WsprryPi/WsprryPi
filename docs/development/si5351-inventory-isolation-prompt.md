@@ -42,6 +42,11 @@ scanning Si5351 while holding the shared configuration mutex.
 - Add regression assertions that public snapshots perform zero physical probes,
   GPIO config/discovery remain responsive during stalled refresh, cache keys do
   not cross buses/references, and concurrent updates preserve newer revisions.
+  Exercise both initial logging states in the INI revision test on every host.
+- Audit the strict GPIO-free Si5351 profile: an unavailable bus must be rejected
+  before any adapter open; separately audit the isolated worker against a verified
+  nonexistent selected I2C path. Preserve checks against GPIO, mailbox, MMIO, RP1,
+  other adapter paths and I2C ioctls.
 - Run focused inventory/configuration tests and the default hardware-disabled
   Linux semantics profile. Run UI unit/browser regressions and inspect affected
   desktop/mobile states using Impeccable. Record exact commands and limitations.

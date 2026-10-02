@@ -6,14 +6,16 @@ audit_bus=2147483646
 expected_i2c_path="/dev/i2c-${audit_bus}"
 trace_file=$(mktemp)
 output_file=$(mktemp)
-trap 'rm -f "$trace_file" "$output_file"' EXIT
+worker_trace_file=$(mktemp)
+worker_output_file=$(mktemp)
+trap 'rm -f "$trace_file" "$output_file" "$worker_trace_file" "$worker_output_file"' EXIT
 
 if [ "$(id -u)" -eq 0 ]; then
     echo "strict I2C file-access audit must run as a non-root account" >&2
     exit 1
 fi
 
-if [ -e "$expected_i2c_path" ]; then
+if [ -e "$expected_i2c_path" ] || [ -L "$expected_i2c_path" ]; then
     echo "audit requires a nonexistent I2C path: $expected_i2c_path" >&2
     exit 1
 fi
@@ -27,6 +29,39 @@ then
     echo "strict I2C audit invocation unexpectedly succeeded" >&2
     exit 1
 fi
+
+# Application validation rejects an unavailable bus before opening any adapter.
+grep -F "Si5351 transmission is unavailable" "$output_file" >/dev/null || {
+    echo "missing selected-bus validation diagnostic" >&2
+    cat "$output_file" >&2
+    exit 1
+}
+if grep -E '/dev/i2c-[0-9]+' "$trace_file" >/dev/null; then
+    echo "unavailable-bus validation unexpectedly reached an I2C open" >&2
+    exit 1
+fi
+if grep -F "must be run as root" "$output_file" >/dev/null; then
+    echo "strict I2C audit was rejected by the legacy root gate" >&2
+    cat "$output_file" >&2
+    exit 1
+fi
+
+# Exercise the actual isolated worker against only the verified nonexistent
+# path. No adapter can be opened and no I2C ioctl can occur. Its result is JSON,
+# not an application startup failure. The ordinary CI hardware guard stays set
+# for every other invocation; only this negative-path worker bypasses it.
+strace -f -e trace=open,openat,ioctl,read,write -o "$worker_trace_file" \
+    env -u WSPRRYPI_DISABLE_HARDWARE_ACCESS \
+    "$binary" --internal-si5351-inventory "$audit_bus" 27000000 96 \
+    >"$worker_output_file" 2>&1
+cat "$worker_trace_file" >>"$trace_file"
+python3 - "$worker_output_file" "$audit_bus" "$expected_i2c_path" <<'PY'
+import json, pathlib, sys
+reply = json.loads(pathlib.Path(sys.argv[1]).read_text())
+assert reply['bus'] == int(sys.argv[2])
+assert reply['addresses'] == []
+assert f"Open failed for {sys.argv[3]}" in reply['error'], reply
+PY
 
 if ! grep -E \
     "open(at)?\\(.*\"${expected_i2c_path}\", O_RDWR\\|O_CLOEXEC(\\) = -1 ENOENT| <unfinished \\.\\.\\.>)" \
@@ -54,18 +89,6 @@ then
         "$trace_file" >&2
     exit 1
 fi
-
-if grep -F "must be run as root" "$output_file" >/dev/null; then
-    echo "strict I2C audit was rejected by the legacy root gate" >&2
-    cat "$output_file" >&2
-    exit 1
-fi
-
-grep -F "Open failed for $expected_i2c_path" "$output_file" >/dev/null || {
-    echo "missing selected-I2C-path failure diagnostic" >&2
-    cat "$output_file" >&2
-    exit 1
-}
 
 if grep -E 'ioctl\([^,]+, (I2C_|0x070)' "$trace_file" >/dev/null; then
     echo "audit unexpectedly reached an I2C ioctl" >&2
