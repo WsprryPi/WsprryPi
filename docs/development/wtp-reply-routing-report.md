@@ -41,11 +41,15 @@ tar streams. Local Mac C++ compilation/linking was not attempted.
 | `WSPRRYPI_DISABLE_HARDWARE_ACCESS=1 make -j2 JOBS=2 semantics-test release wtp-pi-authority-test wtp-pi-control-test wtp-pi-config-transaction-test SUDO=` | Passed. Default Linux profile with libgpiod headers; the authority target also runs the existing WTP-Server standalone suite. |
 | Final source: `WSPRRYPI_DISABLE_HARDWARE_ACCESS=1 make -j2 JOBS=2 wtp-pi-interface-selection-test wtp-pi-listener-test semantics-test wtp-production-test release SUDO=` | Passed after kernel-index tracking. Full semantics and parent WTP integration; expected injected-failure diagnostics remain in logs. |
 | Python harness syntax and `git diff --check` | Passed. |
+| Local `python3 docs/development/wtp-reply-routing-results/rollback_test.py` | Passed. Injected unavailable listener cannot prevent atomic original-binary restoration; former inode and network-only retry verified without services or hardware. |
 
 The first namespace attempt used `route add` for duplicate equal-metric routes;
 Linux rejected the second route. The harness now uses `append` and retains
 diagnostics. Its failure cleanup removed every namespace and fixture process.
 The baseline binding bypass exists only in the link-time test fixture.
+Final review also repaired rollback ordering and atomic replacement in the live
+harness; its failure-injected regression runs entirely in a temporary directory.
+The root-owned Pi harness was updated without changing the qualified application.
 
 Linux CI now runs the namespace acceptance on the host network-validation job,
 with explicit `iproute2`/`tcpdump` dependencies. macOS retains portable loopback

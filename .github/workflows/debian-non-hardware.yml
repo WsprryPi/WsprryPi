@@ -82,7 +82,9 @@ jobs:
           make wtp-network-interop-test SUDO= PICO_SOURCE=build/network-reference/pico MBEDTLS_SOURCE=build/network-reference/mbedtls
       - name: Verify selected-interface WTP replies under equal-metric route changes
         working-directory: src
-        run: make wtp-pi-routing-test BACKENDS=simulated ANCILLARY_GPIO=0 SUDO=sudo
+        run: |
+          make wtp-pi-routing-test BACKENDS=simulated ANCILLARY_GPIO=0 SUDO=sudo
+          python3 -B ../docs/development/wtp-reply-routing-results/rollback_test.py
       - name: Render network controls with mocked responses
         working-directory: WsprryPi-UI
         env:

@@ -12,6 +12,7 @@
 | A route change can invalidate an established socket's cached route. | Namespace acceptance changes equal-metric route order after HELLO, then requires STATUS over that connection and HELLO/STATUS over a new one. Both retain Ethernet replies and boot identity. |
 | A privileged acceptance harness could disturb host routes or leave resources behind. | Three private namespaces contain all synthetic links/routes/sysctls. Cleanup runs on failure; the first route-setup failure left no namespace or fixture process. Live changes have private backup and independent rollback. |
 | Buffered capture startup lines could strand readiness in userspace. | Capture stderr is unbuffered and startup is bounded. Equal-metric duplicate routes use `append`; command failures include diagnostics. |
+| Rollback waited for the candidate's listener before replacing its binary, and archive extraction could overwrite an executing inode. | Restore a fresh adjacent inode atomically before network/listener recovery. A hardware-free injected-failure test verifies replacement, former-inode preservation, restart ordering and a subsequent network-only retry. |
 
 No reusable component or UI source is modified. The inherited WTP principal,
 authority, leases, bounded clients, session replacement and job engine remain
@@ -45,3 +46,9 @@ and PPS were unchanged. No namespace, capture service or rollback timer remains
 active. The qualified candidate remains installed with inactive, unowned, known-off
 output. No unresolved finding remains in this routing slice. Pushed CI is a
 separate gate recorded in the completion report.
+
+The final harness repair passed `python3 docs/development/wtp-reply-routing-results/rollback_test.py`:
+even when listener recovery fails, the original binary has already been restored
+and restarted. A second rollback with no candidate marker changes only the
+network recovery path. The amended root-owned harness was installed on wspr5;
+no further operational rollback was necessary after successful live acceptance.

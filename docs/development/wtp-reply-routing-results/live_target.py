@@ -7,6 +7,7 @@ import os
 from pathlib import Path
 import shutil
 import subprocess
+import tarfile
 import time
 import urllib.request
 
@@ -17,6 +18,7 @@ ADDRESS = '192.168.1.54'
 CLIENT = '192.168.1.120'
 GUARD = 'wtp-routing-rollback'
 CAPTURE = 'wtp-routing-capture'
+BINARY = Path('/usr/local/bin/wsprrypi')
 FILES = ['/usr/local/bin/wsprrypi', '/usr/local/etc/wsprrypi.ini',
          '/usr/local/etc/wsprrypi.ini.wtp-assignments.json',
          '/usr/local/etc/wsprrypi.ini.wtp-devices.json', '/etc/avahi/avahi-daemon.conf',
@@ -149,12 +151,22 @@ def restore_network():
 
 def rollback():
     command('systemctl', 'stop', CAPTURE+'.service', check=False)
-    restore_network()
     if (ROOT/'candidate-installed').exists():
-        # Only the binary changed during this task; preserve every configuration file.
-        command('tar', '-xzf', str(ROOT/'private-original.tar.gz'), '-C', '/', 'usr/local/bin/wsprrypi')
+        # Restore before waiting for a listener that the failed candidate cannot
+        # serve. Write a fresh inode and rename it over the running executable;
+        # overwriting its active inode can fail with ETXTBSY.
+        temporary = BINARY.with_name(BINARY.name+'.routing-rollback')
+        with tarfile.open(ROOT/'private-original.tar.gz', 'r:gz') as archive:
+            member = archive.getmember('usr/local/bin/wsprrypi')
+            with archive.extractfile(member) as original, temporary.open('wb') as target:
+                shutil.copyfileobj(original, target)
+                target.flush()
+                os.fsync(target.fileno())
+            temporary.chmod(member.mode & 0o777)
+        os.replace(temporary, BINARY)
         command('systemctl', 'restart', 'wsprrypi')
         (ROOT/'candidate-installed').unlink()
+    restore_network()
     return {'rolled_back': True}
 
 
