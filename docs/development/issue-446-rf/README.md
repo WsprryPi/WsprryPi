@@ -136,7 +136,7 @@ restored. wspr5's normal WsprryPi service was left running.
 Updated operator documentation in the separate `Wsprry_Pi_Docs` repository:
 Maintenance Test Tone, CLI Service/GPIO/Test Controls, and Transmission Timing
 and Calibration, committed as
-[`c4cfc4ac9908adcc40a53702bb38803700b8a92e`](https://github.com/WsprryPi/Wsprry_Pi_Docs/commit/c4cfc4ac9908adcc40a53702bb38803700b8a92e).
+[`c4cfc4ac9908adcc40a53702bb38803700b8a92e`](https://github.com/WsprryPi/WsprryPi-Docs/commit/c4cfc4ac9908adcc40a53702bb38803700b8a92e).
 The strict Sphinx HTML build passed. Impeccable review covered
 all three rendered pages at 1440×1000 and 390×844 with no horizontal overflow;
 the mechanical detector found no issues. Two new heading-anchor warnings were
