@@ -15,6 +15,7 @@
 #include "backend_http_guard.hpp"
 #include <fstream>
 #include <filesystem>
+#include <future>
 #include <thread>
 #include <sys/stat.h>
 #include <unistd.h>
@@ -406,7 +407,27 @@ void run(const std::string &credentials) {
     set_wtp_runtime_for_test(network, rotation_clock, rotation_clock.peer,
         {backend_test::sid, backend_test::owner_id, backend_test::device}, [&] { rotation_clock.peer.open(); return true; });
     CHECK(wtp_runtime_inspect().ok);
+    // The new coordinator enters the same process-wide operation authority.
+    std::promise<void> entered, release;
+    auto entered_future = entered.get_future();
+    auto released = release.get_future().share();
+    std::thread holder([&] {
+      (void)wtp_runtime_safe_probe([&] {
+        entered.set_value(); released.wait(); return nlohmann::json::object();
+      });
+    });
+    entered_future.wait();
+    auto competing = std::async(std::launch::async, [] {
+      return wtp_runtime_management("member/configuration", "POST", "{}", "");
+    });
+    const bool prompt_busy = competing.wait_for(1s) == std::future_status::ready;
+    release.set_value(); holder.join();
+    const auto busy_reply = competing.get();
+    CHECK(prompt_busy && busy_reply.status == 409 && busy_reply.body.find("busy") != std::string::npos);
     wtp_runtime_prepare(request);
+    const auto before_management = rotation_clock.peer.operations;
+    CHECK(wtp_runtime_management("member/configuration", "GET", "", "").status == 409);
+    CHECK(rotation_clock.peer.operations == before_management);
     CHECK(wtp_runtime_selection_error(network).empty());
     copy_credentials("other");
     CHECK(!wtp_runtime_selection_error(network).empty());

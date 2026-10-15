@@ -82,6 +82,7 @@ jobs:
           make wtp-tls-test SUDO=
           make wtp-network-runtime-test BACKENDS=simulated ANCILLARY_GPIO=0 SUDO=
           make wtp-network-interop-test SUDO= PICO_SOURCE=build/network-reference/pico MBEDTLS_SOURCE=build/network-reference/mbedtls
+          make wtp-config-interop-test SUDO= PICO_SOURCE=build/network-reference/pico MBEDTLS_SOURCE=build/network-reference/mbedtls
       - name: Verify selected-interface WTP replies under equal-metric route changes
         working-directory: src
         run: |
@@ -94,6 +95,42 @@ jobs:
         run: |
           node tests/wtp_network_ui_integration_test.js
           node tests/wtp_pi_fleet_ui_integration_test.js
+
+  wtp-configuration-legacy:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    strategy:
+      matrix:
+        profile: [legacy, extended]
+    steps:
+      - uses: actions/checkout@v7
+      - name: Existing host-only compatibility dependencies
+        run: sudo apt-get update && sudo apt-get install -y libssl-dev pkg-config cmake python3 nodejs
+      - name: Read exact historical API revision
+        id: reference
+        env:
+          PROFILE: ${{ matrix.profile }}
+        run: |
+          revision=$(cat "src/tests/network/pico-${PROFILE}-revision.txt")
+          [[ "$revision" =~ ^[0-9a-f]{40}$ ]]
+          echo "revision=$revision" >> "$GITHUB_OUTPUT"
+      - uses: actions/checkout@v7
+        with:
+          repository: WsprryPi/WsprryPico
+          ref: ${{ steps.reference.outputs.revision }}
+          path: src/build/network-reference/pico
+          persist-credentials: false
+      - uses: actions/checkout@v7
+        with:
+          repository: Mbed-TLS/mbedtls
+          ref: 0bebf8b8c7f07abe3571ded48a11aa907a1ffb20
+          path: src/build/network-reference/mbedtls
+          submodules: recursive
+      - name: Actual UI producer through Pi adapters and historical Pico persistence
+        working-directory: src
+        env:
+          PROFILE: ${{ matrix.profile }}
+        run: make wtp-config-interop-test SUDO= PICO_COMPAT_PROFILE="$PROFILE" PICO_SOURCE=build/network-reference/pico MBEDTLS_SOURCE=build/network-reference/mbedtls
 
   strict-i2c-profile:
     runs-on: ubuntu-24.04

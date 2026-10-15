@@ -107,7 +107,13 @@ async function main() {
     const profileDir = `/tmp/wsprrypi-network-ui-${process.pid}`;
     const output = path.resolve(UI_ROOT, '../src/build/wtp-network/ui');
     fs.mkdirSync(output, { recursive: true });
+    const captureScreenshots = process.env.WSPRRYPI_UI_CAPTURE !== '0';
     let chrome, client;
+    const capture = async (name, parameters = {format:'png'}) => {
+        if (!captureScreenshots) return;
+        const shot = await client.send('Page.captureScreenshot', parameters);
+        fs.writeFileSync(path.join(output, name), Buffer.from(shot.data, 'base64'));
+    };
     try {
         await waitFor(async () => await getStatus(url) === 200, 'PHP fixture');
         chrome = spawn(process.env.CHROME_BIN || (process.platform === 'darwin' ? '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome' : 'chromium'),
@@ -148,6 +154,10 @@ async function main() {
                 if (String(url).endsWith('/jobs')) { window.__snapshot.owns=false; window.__snapshot.job_id=''; return {ok:true,json:async()=>({ok:true,result:{cleanup_ok:true}})}; }
                 if (String(url).endsWith('/network')) return {ok:true,headers:{get:()=> '\"network-r1\"'},json:async()=>({enabled:true,ipv4:'192.0.2.27',configured_hostname:window.__snapshot.network.hostname,advertised_hostname:window.__discoveryState==='active'?window.__snapshot.network.hostname:'',mdns_state:window.__discoveryState,mdns_reason:window.__discoveryState==='conflict'?'name_conflict':''})};
                 if (window.__remoteFailure) return {ok:false,status:412,json:async()=>({error:{code:'revision_conflict'}})};
+                if (String(url).endsWith('/member/configuration')) {
+                    if (options.method === 'POST' && window.__mutationFailure) return {ok:false,status:window.__mutationFailure==='unsupported'?409:503,json:async()=>({error:{code:window.__mutationFailure==='unsupported'?'unsupported_configuration_updates':'management_outcome_unknown'}})};
+                    return {ok:true,headers:{get:()=> '\"remote-r1\"'},json:async()=>({schema:'wsprrypi-pico-settings/1',target:{scope:'member',device_id:'a'.repeat(32),boot_id:'1'.repeat(32)},update_strategy:'merge',reboot_required:false,config:{version:1,enabled:false,station:{callsign:'AA0NT',locator:'EM18',power_dbm:20},wifi:{ssid:'Bench Wi-Fi',password:null,ntp_ipv4:'192.0.2.1'},schedules:[{period_s:120,phase_s:0}]}})};
+                }
                 return {ok:true,headers:{get:()=> '"remote-r1"'},json:async()=>({config:{version:1,enabled:false,station:{callsign:'AA0NT',locator:'EM18',power_dbm:20},wifi:{ssid:'Bench Wi-Fi',password:null,ntp_ipv4:'192.0.2.1'},schedules:[{period_s:120,phase_s:0}]}})};
             };
             window.WtpUi.populate({Transport:'network',Hostname:window.__snapshot.network.hostname,'TCP Port':18443,'Device ID':'a'.repeat(32),'TLS CA File':'/etc/wsprrypi/pico/ca.crt','TLS Client Certificate':'/etc/wsprrypi/pico/client.crt','TLS Client Key':'/etc/wsprrypi/pico/client.key','TLS Server Identity':'','Start Uncertainty ns':1000000,'Allow Frequency Adjustment':false,Endpoint:'/dev/preserved','USB Serial':'00001234','USB Vendor ID':51966,'USB Product ID':16402});
@@ -168,12 +178,10 @@ async function main() {
             await client.send('Emulation.setDeviceMetricsOverride', {...viewport,deviceScaleFactor:1,mobile:viewport.name==='mobile'});
             await evaluate(`document.getElementById('fleet-device').scrollIntoView({block:'center',behavior:'instant'});`);
             await new Promise(resolve=>setTimeout(resolve,200));
-            const shot=await client.send('Page.captureScreenshot',{format:'png'});
-            fs.writeFileSync(path.join(output,`${viewport.name}-fleet-selector.png`),Buffer.from(shot.data,'base64'));
+            await capture(`${viewport.name}-fleet-selector.png`, {format:'png'});
             assert(await evaluate('document.documentElement.scrollWidth <= window.innerWidth + 1'), 'Fleet horizontal overflow');
             await evaluate('document.getElementById("fleet-binding").scrollIntoView({block:"center",behavior:"instant"})');
-            const editorShot=await client.send('Page.captureScreenshot',{format:'png'});
-            fs.writeFileSync(path.join(output,`${viewport.name}-fleet-editor.png`),Buffer.from(editorShot.data,'base64'));
+            await capture(`${viewport.name}-fleet-editor.png`, {format:'png'});
         }
         await evaluate(`document.getElementById('fleet-editor-cancel').click()`);
         assert.equal(await evaluate('window.WtpUi.validate()'), true);
@@ -196,8 +204,7 @@ async function main() {
             await evaluate('document.getElementById("wtp_transport").scrollIntoView({block:"center",behavior:"instant"})');
             const transportVisible = await evaluate('(() => { const r=document.getElementById("wtp_transport").getBoundingClientRect(); return {height:r.height,top:r.top,bottom:r.bottom,viewport:window.innerHeight}; })()');
             assert(transportVisible.height > 0 && transportVisible.top >= 0 && transportVisible.bottom <= transportVisible.viewport, `Plain LAN selector visible: ${JSON.stringify(transportVisible)}`);
-            const shot=await client.send('Page.captureScreenshot',{format:'png'});
-            fs.writeFileSync(path.join(output,`${viewport.name}-plain-lan.png`),Buffer.from(shot.data,'base64'));
+            await capture(`${viewport.name}-plain-lan.png`, {format:'png'});
             assert(await evaluate('document.documentElement.scrollWidth <= window.innerWidth + 1'), 'Plain LAN horizontal overflow');
         }
         await evaluate(`(() => {
@@ -216,7 +223,10 @@ async function main() {
         await waitFor(async () => await evaluate('document.getElementById("wtp-management-feedback").textContent.includes("changed elsewhere")'), 'revision feedback');
         assert.equal(await evaluate('document.getElementById("wtp-remote-callsign").value'), 'MYDRAFT');
         assert.equal(await evaluate('document.getElementById("wtp-remote-password").value'), '');
-        await evaluate(`window.__remoteFailure=false; document.getElementById('wtp-remote-password').value='unsaved-secret'; document.getElementById('wtp-schedules-save').click();`);
+        await evaluate(`window.__remoteFailure=false; document.getElementById('wtp-remote-load').click();`);
+        await waitFor(async () => await evaluate('document.getElementById("wtp-management-feedback").textContent.includes("draft and password entry are preserved")'), 'conflict readback');
+        assert.equal(await evaluate('document.getElementById("wtp-remote-callsign").value'),'MYDRAFT');
+        await evaluate(`document.getElementById('wtp-remote-password').value='unsaved-secret'; document.getElementById('wtp-schedules-save').click();`);
         await waitFor(async () => await evaluate('document.getElementById("wtp-management-feedback").textContent.includes("schedules saved")'), 'schedule save');
         assert.equal(await evaluate('document.getElementById("wtp-remote-password").value'),'unsaved-secret');
         for (const viewport of [{name:'desktop',width:1280,height:900},{name:'mobile',width:390,height:844}]) {
@@ -225,10 +235,30 @@ async function main() {
             for (const section of ['wtp-remote-password','wtp-management-feedback']) {
                 await evaluate(`document.getElementById('${section}').scrollIntoView({block:'center',behavior:'instant'});`);
                 await new Promise(resolve=>setTimeout(resolve,200));
-                const shot=await client.send('Page.captureScreenshot',{format:'png'});
-                fs.writeFileSync(path.join(output,`${viewport.name}-schedule-${section}.png`),Buffer.from(shot.data,'base64'));
+                await capture(`${viewport.name}-schedule-${section}.png`, {format:'png'});
             }
         }
+        for (const state of ['saved', 'stale', 'unsupported', 'ambiguous', 'busy']) {
+            await evaluate(`window.__remoteFailure=false; window.__mutationFailure=''; window.WtpManagement.setAvailability(true); document.getElementById('wtp-remote-load').click();`);
+            await waitFor(async () => await evaluate('!document.getElementById("wtp-remote-save").disabled'), 'settings readback');
+            await evaluate(`document.getElementById('wtp-remote-callsign').value='K1ABC'; window.__remoteFailure=${state === 'stale'}; window.__mutationFailure='${['unsupported','ambiguous'].includes(state) ? state : ''}'; ${state === 'busy' ? 'window.WtpManagement.setAvailability(false)' : "document.getElementById('wtp-remote-save').click()"};`);
+            await waitFor(async () => await evaluate('document.getElementById("wtp-management").getAttribute("aria-busy") === "false"'), 'settings result');
+            for (const theme of ['light','dark']) for (const viewport of [{name:'desktop',width:1280,height:900},{name:'mobile',width:390,height:844}]) {
+                await client.send('Emulation.setDeviceMetricsOverride',{...viewport,deviceScaleFactor:1,mobile:viewport.name==='mobile'});
+                await evaluate(`applyThemePreference('${theme}'); document.getElementById('wtp-management-feedback').scrollIntoView({block:'center',behavior:'instant'});`);
+                await waitFor(async () => await evaluate(`(() => {
+                    const element=document.getElementById('wtp-management-feedback');
+                    element.scrollIntoView({block:'center',behavior:'instant'});
+                    const r=element.getBoundingClientRect(); return r.height>0 && r.top>=0 && r.bottom<=innerHeight-32;
+                })()`), 'settings feedback in viewport');
+                await new Promise(resolve=>setTimeout(resolve,200));
+                await capture(`${viewport.name}-${theme}-settings-${state}.png`, {format:'png'});
+                assert(await evaluate('document.documentElement.scrollWidth <= window.innerWidth + 1'),'settings horizontal overflow');
+            }
+        }
+        await evaluate(`window.__remoteFailure=false; window.__mutationFailure=''; window.WtpManagement.setAvailability(true); document.getElementById('wtp-remote-load').click();`);
+        await waitFor(async () => await evaluate('!document.getElementById("wtp-remote-save").disabled'), 'final settings readback');
+        await evaluate(`document.getElementById('wtp-remote-password').value='unsaved-secret';`);
         for (const discovery of ['active', 'conflict', 'failed']) {
             await evaluate(`window.__discoveryState='${discovery}'; document.getElementById('wtp-network-load').click();`);
             await waitFor(async () => await evaluate(`document.getElementById('wtp-management-feedback').textContent.includes('Discovery: ${discovery}.')`), 'discovery feedback');
@@ -236,12 +266,11 @@ async function main() {
             for (const viewport of [{name:'desktop',width:1280,height:900},{name:'mobile',width:390,height:844}]) {
                 await client.send('Emulation.setDeviceMetricsOverride', {...viewport,deviceScaleFactor:1,mobile:viewport.name==='mobile'});
                 await evaluate(`document.getElementById('wtp-management-feedback').scrollIntoView({block:'center',behavior:'instant'});`);
-                const shot = await client.send('Page.captureScreenshot',{format:'png'});
-                fs.writeFileSync(path.join(output,`${viewport.name}-discovery-${discovery}.png`),Buffer.from(shot.data,'base64'));
+                await capture(`${viewport.name}-discovery-${discovery}.png`, {format:'png'});
                 assert(await evaluate('document.documentElement.scrollWidth <= window.innerWidth + 1'), 'discovery horizontal overflow');
             }
         }
-        await evaluate(`window.__snapshot.owns=true; window.__snapshot.job_id='b'.repeat(32); window.WtpUi.select(true);`);
+        await evaluate(`document.getElementById('wtp-remote-callsign').value='MYDRAFT'; window.__snapshot.owns=true; window.__snapshot.job_id='b'.repeat(32); window.WtpUi.select(true);`);
         await waitFor(async () => await evaluate('!document.getElementById("wtp-cancel").disabled'), 'owned cancellation');
         await evaluate(`document.getElementById('wtp-cancel').click();`);
         await waitFor(async () => await evaluate('document.getElementById("wtp-feedback").textContent.includes("Cleanup confirmed")'), 'shared cancellation');
@@ -256,13 +285,11 @@ async function main() {
             await evaluate('window.scrollTo({top:0,behavior:"instant"})');
             await new Promise(resolve=>setTimeout(resolve,500));
             const layout=await client.send('Page.getLayoutMetrics');
-            const full=await client.send('Page.captureScreenshot',{format:'png',captureBeyondViewport:true,clip:{x:0,y:0,width:viewport.width,height:layout.cssContentSize.height,scale:1}});
-            fs.writeFileSync(path.join(output,`${viewport.name}-full.png`),Buffer.from(full.data,'base64'));
+            await capture(`${viewport.name}-full.png`, {format:'png',captureBeyondViewport:true,clip:{x:0,y:0,width:viewport.width,height:layout.cssContentSize.height,scale:1}});
             for (const section of ['wtp_transport','wtp_hostname','wtp-status-heading','wtp-management','wtp-management-feedback']) {
                 await evaluate(`document.getElementById('${section}').scrollIntoView({block:'center',behavior:'instant'});`);
                 await new Promise(resolve=>setTimeout(resolve,150));
-                const shot=await client.send('Page.captureScreenshot',{format:'png'});
-                fs.writeFileSync(path.join(output,`${viewport.name}-${section}.png`),Buffer.from(shot.data,'base64'));
+                await capture(`${viewport.name}-${section}.png`, {format:'png'});
             }
             assert(await evaluate('document.documentElement.scrollWidth <= window.innerWidth + 1'), 'horizontal overflow');
         }
@@ -274,14 +301,13 @@ async function main() {
         await evaluate(`document.getElementById('wtp-status-heading').scrollIntoView({block:'start',behavior:'instant'}); window.scrollBy(0,-140);`);
         assert.equal(await evaluate('document.getElementById("wtp-remote-load").disabled'),true);
         await new Promise(resolve=>setTimeout(resolve,200));
-        const failure=await client.send('Page.captureScreenshot',{format:'png'});
-        fs.writeFileSync(path.join(output,'mobile-status-failure.png'),Buffer.from(failure.data,'base64'));
+        await capture('mobile-status-failure.png', {format:'png'});
         await evaluate('window.WtpUi.developmentControlsVisible = false');
         await waitFor(async () => await evaluate('document.getElementById("transmitter-hardware-tab").classList.contains("active")'), 'Transmitter tab after hiding Fleet');
         assert.equal(await evaluate('document.getElementById("fleet-tab-item").hidden && document.getElementById("fleet-pane").hidden'), true);
         assert.equal(await evaluate('window.WtpUi.read().Hostname'), 'DrAfT.LoCaL.');
         console.log('Rendered desktop/mobile: transport selection, preserved inactive settings, management revision failure, status failure and drafts passed');
-        console.log('Screenshots: '+output);
+        console.log(captureScreenshots ? 'Screenshots: '+output : 'Screenshot capture disabled; existing visual evidence retained.');
     } finally {
         if (client) client.close();
         if (chrome) chrome.kill('SIGTERM');

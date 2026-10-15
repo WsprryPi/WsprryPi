@@ -1,5 +1,11 @@
 # Browser and production-client acceptance follow-up
 
+For current configuration editing, see the
+[configuration compatibility contract](wtp-configuration-compatibility.md) and
+[issue 448 review](development/issue448-review.md). Its exact old/extended/current
+Pico API matrix is separate from the historical scheduling and physical evidence
+below. Historical source pins and acceptance scopes are retained as recorded.
+
 The 2026-09-09 RF-inhibited Pico coverage exposed a production scheduling defect:
 a job 60 seconds ahead waited silently past the Pico's 30-second connection idle
 budget, then failed before ARM. The isolated fix was rebased onto the user's

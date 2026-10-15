@@ -45,6 +45,15 @@ PicoHttpResponse WtpBrowserApi::handle(const BrowserRequest &r) {
         {"management_scope", "pico-standalone"}, {"active_job_connections", false},
         {"max_body_bytes", 32768}}.dump(), {}};
   }
+  if (r.path == "/api/v1/member/configuration" && (r.method == "GET" || r.method == "POST")) {
+    if (r.body.size() > 2048) return error(413, "body_too_large");
+    if (r.method == "POST") {
+      if (r.revision.empty()) return error(428, "revision_required");
+      try { if (!strict_browser_json(r.body).is_object()) return error(400, "invalid_request"); }
+      catch (...) { return error(400, "invalid_json"); }
+    }
+    return management_("member/configuration", r.method, r.body, r.revision);
+  }
   for (const std::string resource : {"config", "schedules", "network"}) {
     if (r.path == "/api/v1/" + resource && (r.method == "GET" || r.method == "PUT")) {
       if (r.method == "PUT") {
