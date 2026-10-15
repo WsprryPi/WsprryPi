@@ -70,8 +70,9 @@ std::optional<double> parse_finite_double(const std::string &value)
 {
     try
     {
-        const double parsed = std::stod(value);
-        if (std::isfinite(parsed))
+        std::size_t consumed = 0;
+        const double parsed = std::stod(value, &consumed);
+        if (consumed == value.size() && std::isfinite(parsed))
             return parsed;
     }
     catch (...) {}
@@ -254,18 +255,24 @@ bool PPMManager::isChronyAlive()
  */
 PPMProviderSnapshot PPMManager::get_chrony_snapshot()
 {
+    // Anchor before querying: time spent collecting the reports must not
+    // make their selected-source sample look newer than it is.
+    const auto acquired_at = std::chrono::steady_clock::now();
     return parseChronyReports(
         run_command("chronyc -c tracking 2>/dev/null"),
         run_command("chronyc -c sources -n 2>/dev/null"),
-        run_command("chronyc -c sourcestats -n 2>/dev/null"));
+        run_command("chronyc -c sourcestats -n 2>/dev/null"),
+        acquired_at);
 }
 
 PPMProviderSnapshot PPMManager::parseChronyReports(
     const std::string &tracking_csv,
     const std::string &sources_csv,
-    const std::string &sourcestats_csv)
+    const std::string &sourcestats_csv,
+    std::chrono::steady_clock::time_point acquired_at)
 {
     PPMProviderSnapshot result;
+    result.age_reference_time = acquired_at;
     std::string tracking_line;
     std::stringstream tracking_stream(tracking_csv);
     std::getline(tracking_stream, tracking_line);
@@ -283,6 +290,9 @@ PPMProviderSnapshot PPMManager::parseChronyReports(
 
     std::vector<std::string> selected_names;
     std::vector<std::string> combined_names;
+    bool has_local_reference = false;
+    bool has_network = false;
+    bool has_unknown_source = false;
     std::string line;
     std::stringstream sources_stream(sources_csv);
     while (std::getline(sources_stream, line))
@@ -293,11 +303,22 @@ PPMProviderSnapshot PPMManager::parseChronyReports(
         if (fields[1] == "*" || fields[1] == "+")
         {
             (fields[1] == "*" ? selected_names : combined_names).push_back(fields[2]);
+            // Chrony's source mode identifies the kind of source. Names and
+            // unselected rows cannot establish the selected estimate's origin.
+            if (fields[0] == "#")
+                has_local_reference = true;
+            else if (fields[0] == "^" || fields[0] == "=")
+                has_network = true;
+            else
+                has_unknown_source = true;
             if (fields[1] == "*" && fields.size() > 6)
-                result.age_seconds = parse_finite_double(fields[6]).value_or(0.0);
+                result.age_seconds = parse_finite_double(fields[6]).value_or(
+                    std::numeric_limits<double>::quiet_NaN());
         }
     }
-    result.selected_source = !selected_names.empty();
+    result.selected_source = selected_names.size() == 1 && !selected_names.front().empty();
+    if (!result.selected_source)
+        result.age_seconds = std::numeric_limits<double>::quiet_NaN();
     result.combined_sources = !combined_names.empty();
     result.synchronized = result.selected_source && result.leap_normal;
 
@@ -320,12 +341,9 @@ PPMProviderSnapshot PPMManager::parseChronyReports(
     all_names.insert(all_names.end(), combined_names.begin(), combined_names.end());
     std::sort(all_names.begin(), all_names.end());
 
-    const bool has_local_reference = sources_csv.find("PPS") != std::string::npos ||
-        sources_csv.find("GPS") != std::string::npos ||
-        sources_csv.find("GNSS") != std::string::npos ||
-        sources_csv.find("PHC") != std::string::npos;
-    const bool has_network = !all_names.empty() && !has_local_reference;
-    if (has_local_reference && result.combined_sources)
+    if (has_unknown_source || !result.selected_source)
+        result.source_provenance = "Unknown";
+    else if (has_local_reference && has_network)
         result.source_provenance = "Mixed";
     else if (has_local_reference)
         result.source_provenance = "GNSS/PPS or other local reference clock";
@@ -337,9 +355,11 @@ PPMProviderSnapshot PPMManager::parseChronyReports(
     if (!result.frequency_ppm.has_value())
         result.error_reason = "chrony did not report a finite frequency estimate";
     else if (!result.selected_source)
-        result.error_reason = "chrony has no selected source";
+        result.error_reason = "chrony has no unique selected source";
     else if (!result.leap_normal)
         result.error_reason = "chrony leap status is not normal";
+    else if (!std::isfinite(result.age_seconds) || result.age_seconds < 0.0)
+        result.error_reason = "chrony selected-source age is unavailable or malformed";
 
     std::stringstream stats_stream(sourcestats_csv);
     bool first_selected_stat = true;
@@ -501,7 +521,7 @@ double PPMManager::getCurrentPPM()
 PPMProviderSnapshot PPMManager::getProviderSnapshot()
 {
     std::lock_guard<std::mutex> lock(ppm_mutex_);
-    return provider_snapshot_;
+    return provider_snapshot_.withAgeAt(std::chrono::steady_clock::now());
 }
 
 bool PPMManager::isRunning() const

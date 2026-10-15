@@ -6,6 +6,9 @@ evaluation of other parents is deferred.** This completes the calibration
 scope review, not PPS implementation or backend/RF qualification. No evidence
 reviewed establishes a 4.0 requirement for a new calibration mechanism.
 
+The source findings describe the reviewed baseline. Their separately authorized
+implementation follow-up is recorded in [Chrony report repairs](#chrony-report-repairs).
+
 ## Evidence boundary
 
 The application review uses `devel`
@@ -319,3 +322,115 @@ macOS deferral and Standard Feld post-4.0 scope remain unchanged. Independent
 route, mode, timing, installation/service, frequency, spectral and RF
 qualification and existing release gates remain outstanding. Settling scope
 does not establish release readiness.
+
+## Chrony report repairs
+
+The separately authorized October 15 follow-up repairs F1 and F2 in the existing
+Chrony correction path. The direct PPS and alternative-parent deferrals above
+remain unchanged. This is software validation, not calibrated RF evidence.
+
+- **F1 repaired:** absent/malformed age stays unknown; acquisition is anchored
+  before report collection with a monotonic clock. Cached snapshots accrue
+  elapsed age, including copies already aged by the component. The application
+  maps and qualifies that current age whenever selecting correction for future
+  requests, including inbound WTP preparation. Existing 300/900-second limits,
+  manual/zero fallback, intrinsic values, correction signs and persisted
+  settings are unchanged. Invalid or ambiguous selected-source identity cannot
+  establish freshness. Committed execution requests are not rewritten.
+- **F2 repaired:** provenance considers only selected/combined source records
+  and their Chrony modes (`#` local, `^`/`=` network). Network-only and local-only
+  combinations retain those identities; only a cross-kind combination is
+  `Mixed`, and unrecognized modes remain `Unknown`. Neither source names nor
+  unselected PPS/GNSS records establish reference provenance or lock.
+- **Related UI repair:** unknown/null, malformed and negative age displays
+  **age unknown** in the existing correction panel. Actual numeric zero remains
+  **age 0 s**. Candidate/committed presentation and additional-only reporting
+  retain their existing semantics.
+
+Implementation boundaries: reusable `src/PPM-Manager` owns report parsing,
+acquisition metadata and aging; parent `system_clock_frequency_estimate` owns
+mapping/qualification/fallback, and scheduling consumes it. The UI only fixes
+unknown-age normalization/display. No new calibration control, direct PPS,
+clock selection, correction algorithm, provider operation or configuration
+migration is introduced. The component README documents the additive C++ API;
+explicit timestamp arguments are transient deterministic test inputs.
+
+### Follow-up validation
+
+Initial tests used an isolated snapshot of
+`534328d7dd37955bc8dbc8d06e4310ac350b3d3b`; the final integration check uses
+`a5605c54630d501dc84b51ea7834f59768a250ef` plus this fix, preserving newly
+published WTP work and excluding unrelated uncommitted work. The Linux surface is a
+new disposable Docker container from
+`wsprrypi-issue412-qualification:debian-trixie` (image `6ceba8b34e64`), Debian
+13.6 ARM64 with GCC 14.2.0. It runs as UID 501 without network, capabilities or
+hardware-device mounts. No existing bench/container process was operated.
+
+Commands from the snapshot's `src` directory, with
+`WSPRRYPI_DISABLE_HARDWARE_ACCESS=1`, passed:
+
+```sh
+make -C PPM-Manager/src test -j2
+make -j2 gpio-frequency-correction-test chipset-offsets-test \
+  legacy-gpio-clock-model-test rp1-gpclk-planner-test SUDO=
+make -j2 calibration-roundtrip-test BACKENDS=simulated ANCILLARY_GPIO=0 SUDO=
+node ../WsprryPi-UI/tests/gpio_correction_provenance_test.js
+node --check ../WsprryPi-UI/data/site.js
+```
+
+The new report-to-correction test runs under `gpio-frequency-correction-test`
+and therefore under existing semantics-suite callers. It covers malformed and
+missing age, cached consumption, exact current/stale limits and expiry, source
+loss/replacement, holdover identity and manual/zero fallback using controlled
+time. Standalone tests cover selected/combined source modes and ignored sources.
+The application integration uses the explicit simulated-only build profile;
+this is not a full semantics-suite pass. Its subnormal-manual-value warning is
+expected fixture output.
+
+Initial source-archive builds lacked Git metadata, then Docker mount ownership
+prevented metadata generation. An isolated shallow Git metadata copy and a
+process-only `safe.directory=/work` resolved these limitations before the final
+application build/test passed; host Git configuration was not changed.
+
+Impeccable review used the established operation-panel markup, styles and
+renderer with qualified, bounded-stale and unknown-age/manual fixtures.
+Desktop/light (1440 by 1000) and mobile/dark (390 by 1400) screenshots were
+inspected; unknown age and unchanged committed fixture values remained legible
+without horizontal overflow. The detector's three existing literal-color
+findings elsewhere in `site.js` are outside this change and were not broadened
+into palette work. No UI assets or operator screenshots were replaced.
+
+### Follow-up adversarial review
+
+| Finding | Repair and verification |
+| --- | --- |
+| P2: ambiguous selected-source records could leave a misleading age/identity. | Require one nonempty selected-source identity; standalone malformed/duplicate/missing-selection fixtures reject freshness and attribution. |
+| P2: correction selection outside configuration refresh could reuse an old qualified candidate. | Recheck the aged provider whenever selecting correction for a future request, including inbound WTP. The production mapper-to-qualifier tests cover expiry/fallback, and the application integration compiles the scheduler wiring. Committed-request preservation is source-reviewed; no live execution is claimed. |
+| P2: UI numeric conversion turned JSON null into a fresh-looking zero. | Preserve unknown age and render it explicitly. UI regressions reject null, missing, malformed and negative age while accepting a real numeric zero; desktop/mobile fixtures verify the result. |
+
+Reassessment checks age anchoring/rebasing, monotonic expiry, holdover
+provenance, source composition, future versus committed correction,
+range/sign/default/persistence preservation and component boundaries.
+
+Negative controls in the disposable snapshot deliberately restored invalid-age
+zero, frozen cache age, unselected-PPS attribution and UI null-to-zero behavior.
+All four were rejected by regression assertions; restored source and affected
+tests passed. No mutation was applied to the working checkout. The final
+reassessment found no actionable in-scope finding.
+
+### Follow-up Documentation Impact
+
+- **Updated:** component README, this closure record and focused test/build
+  entry points; existing UI wording now represents unknown age accurately.
+- **Considered unchanged:** calibration settings, manual/residual accounting,
+  Si5351 and WTP calibration isolation, direct PPS deferral and RP1 parents.
+- **Still required in separately authorized WsprryPi-Docs work:**
+  `docs/Advanced_Operations/timing_calibration.md` should describe unknown age,
+  bounded prior-qualified reuse even when the current report is unavailable,
+  and selected/combined source provenance without implying verified lock.
+  `docs/User_Interface/Setup/Transmitter/index.md` should explain the existing
+  candidate/committed panel and unknown-age status. Earlier intrinsic/RP1
+  documentation follow-ups remain. That repository was inspected read-only.
+
+No local macOS C++ build, full suite, live Chrony query, service/installation
+change, device access or hardware/RF qualification was performed by this repair.

@@ -27,6 +27,18 @@ assert.match(nodes.gpio_frequency_correction_value.textContent, /1.250 residual 
 assert.match(nodes.gpio_frequency_correction_value.textContent, /sampled 2026/);
 assert.match(nodes.gpio_frequency_correction_detail.textContent, /Committed: unavailable/);
 assert.match(nodes.gpio_frequency_correction_detail.textContent, /Estimate: qualified · age 2 s/);
+for (const age of [null, undefined, NaN, Infinity, -1, "5", false]) {
+    context.renderGpioFrequencyCorrection(context.normalizeRuntimeStatus({
+        transmit_backend: 'rp1-gpclk', frequency_estimate_qualification: 'unavailable',
+        frequency_estimate_age_seconds: age
+    }));
+    assert.match(nodes.gpio_frequency_correction_detail.textContent, /age unknown/);
+    assert.doesNotMatch(nodes.gpio_frequency_correction_detail.textContent, /age 0 s/);
+}
+context.renderGpioFrequencyCorrection(context.normalizeRuntimeStatus({
+    transmit_backend: 'rp1-gpclk', frequency_estimate_age_seconds: 0
+}));
+assert.match(nodes.gpio_frequency_correction_detail.textContent, /age 0 s/);
 render({...provenance, correction_mode: 'fixed_manual'});
 assert.match(nodes.gpio_frequency_correction_value.textContent, /residual configured, not applied/);
 render({...provenance, correction_ppm: null});

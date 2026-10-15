@@ -18,7 +18,10 @@
 #define PPM_MANAGER_HPP
 
 #include <atomic>
+#include <chrono>
+#include <cmath>
 #include <functional>
+#include <limits>
 #include <mutex>
 #include <optional>
 #include <thread>
@@ -30,7 +33,8 @@ struct PPMProviderSnapshot
     std::string provider_name = "chrony";
     std::optional<double> frequency_ppm;
     bool synchronized = false;
-    double age_seconds = 0.0;
+    double age_seconds = std::numeric_limits<double>::quiet_NaN();
+    std::optional<std::chrono::steady_clock::time_point> age_reference_time;
     std::optional<double> residual_frequency_ppm;
     std::optional<double> skew_ppm;
     bool selected_source = false;
@@ -41,6 +45,22 @@ struct PPMProviderSnapshot
     std::size_t retained_source_samples = 0;
     double source_stability_span_seconds = 0.0;
     std::string error_reason;
+
+    // Age a copy, rebasing its age anchor so repeated consumption cannot
+    // double-count elapsed time. An unknown age/anchor must remain unknown.
+    PPMProviderSnapshot withAgeAt(std::chrono::steady_clock::time_point now) const
+    {
+        auto result = *this;
+        if (!age_reference_time || now < *age_reference_time ||
+            !std::isfinite(age_seconds) || age_seconds < 0.0)
+        {
+            result.age_seconds = std::numeric_limits<double>::quiet_NaN();
+            return result;
+        }
+        result.age_seconds += std::chrono::duration<double>(now - *age_reference_time).count();
+        result.age_reference_time = now;
+        return result;
+    }
 };
 
 /**
@@ -128,7 +148,8 @@ public:
     static PPMProviderSnapshot parseChronyReports(
         const std::string &tracking_csv,
         const std::string &sources_csv,
-        const std::string &sourcestats_csv);
+        const std::string &sourcestats_csv,
+        std::chrono::steady_clock::time_point acquired_at = std::chrono::steady_clock::now());
 
     /**
      * @brief Checks whether the system time is synchronized.

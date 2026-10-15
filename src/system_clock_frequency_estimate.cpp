@@ -1,4 +1,5 @@
 #include "system_clock_frequency_estimate.hpp"
+#include "PPM-Manager/src/ppm_manager.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -21,15 +22,47 @@ GpioFrequencyCorrection invalid_correction(std::string reason)
 }
 }
 
+SystemClockFrequencyEstimate system_clock_frequency_estimate_from_provider(
+    const PPMProviderSnapshot &provider,
+    std::chrono::steady_clock::time_point now,
+    std::chrono::system_clock::time_point utc_now)
+{
+    const auto aged = provider.withAgeAt(now);
+    SystemClockFrequencyEstimate sample;
+    sample.provider_name = aged.provider_name;
+    sample.frequency_ppm = aged.frequency_ppm;
+    sample.synchronized = aged.synchronized;
+    sample.age_seconds = aged.age_seconds;
+    sample.residual_frequency_ppm = aged.residual_frequency_ppm;
+    sample.skew_ppm = aged.skew_ppm;
+    sample.selected_source = aged.selected_source;
+    sample.combined_sources = aged.combined_sources;
+    sample.leap_normal = aged.leap_normal;
+    sample.source_provenance = aged.source_provenance;
+    sample.source_signature = aged.source_signature;
+    if (std::isfinite(aged.age_seconds) && aged.age_seconds >= 0.0 &&
+        aged.age_seconds <= FrequencyEstimateQualifier::kStaleMaximumAgeSeconds)
+    {
+        sample.snapshot_time = utc_now -
+            std::chrono::duration_cast<std::chrono::system_clock::duration>(
+                std::chrono::duration<double>(aged.age_seconds));
+    }
+    sample.retained_source_samples = aged.retained_source_samples;
+    sample.source_stability_span_seconds = aged.source_stability_span_seconds;
+    sample.reason = aged.error_reason;
+    return sample;
+}
+
 SystemClockFrequencyEstimate FrequencyEstimateQualifier::evaluate(
-    SystemClockFrequencyEstimate sample)
+    SystemClockFrequencyEstimate sample,
+    std::chrono::steady_clock::time_point now)
 {
     const auto attach_stale_fallback = [&]()
     {
-        if (!last_qualified_.has_value())
+        if (!last_qualified_.has_value() || now < last_qualified_at_)
             return;
         const double age = std::chrono::duration<double>(
-            std::chrono::steady_clock::now() - last_qualified_at_).count() +
+            now - last_qualified_at_).count() +
             last_qualified_->age_seconds;
         if (age <= kStaleMaximumAgeSeconds)
         {
@@ -150,7 +183,7 @@ SystemClockFrequencyEstimate FrequencyEstimateQualifier::evaluate(
     sample.qualification = FrequencyEstimateQualification::Qualified;
     sample.reason = "Provider estimate meets the configured quality and stability criteria.";
     last_qualified_ = sample;
-    last_qualified_at_ = std::chrono::steady_clock::now();
+    last_qualified_at_ = now;
     return sample;
 }
 

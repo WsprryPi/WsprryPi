@@ -2374,9 +2374,10 @@ function normalizeRuntimeStatus(msg) {
         effectiveGpioPpm: Number.isFinite(Number(msg.effective_gpio_ppm))
             ? Number(msg.effective_gpio_ppm)
             : 0,
-        frequencyEstimateAgeSeconds: Number.isFinite(Number(msg.frequency_estimate_age_seconds))
-            ? Number(msg.frequency_estimate_age_seconds)
-            : 0,
+        frequencyEstimateAgeSeconds: typeof msg.frequency_estimate_age_seconds === "number" &&
+            Number.isFinite(msg.frequency_estimate_age_seconds) && msg.frequency_estimate_age_seconds >= 0
+            ? msg.frequency_estimate_age_seconds
+            : null,
         gpioCorrectionCandidate: normalizeCorrectionProvenance(msg.gpio_correction_candidate),
         gpioCorrectionCommitted: normalizeCorrectionProvenance(msg.gpio_correction_committed),
         frameCallsign: typeof msg.frame_callsign === "string" ? msg.frame_callsign : "",
@@ -3209,7 +3210,9 @@ function renderGpioFrequencyCorrection(status) {
         "Candidate refreshes do not alter a committed transmission. " +
         `Estimate: ${status.frequencyEstimateQualification}` +
         (status.frequencyEstimateReason ? ` (${status.frequencyEstimateReason})` : "") +
-        ` · age ${status.frequencyEstimateAgeSeconds.toFixed(0)} s.`;
+        (status.frequencyEstimateAgeSeconds === null
+            ? " · age unknown."
+            : ` · age ${status.frequencyEstimateAgeSeconds.toFixed(0)} s.`);
 }
 
 function applyRuntimeStatus(msg) {

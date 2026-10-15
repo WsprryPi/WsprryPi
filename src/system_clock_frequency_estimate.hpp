@@ -10,6 +10,8 @@
 
 #include "WSPR-Transmitter/src/legacy_gpio_clock_model.hpp"
 
+struct PPMProviderSnapshot;
+
 enum class FrequencyEstimateQualification
 {
     Qualified,
@@ -89,7 +91,9 @@ public:
     static constexpr double kCurrentMaximumAgeSeconds = 300.0;
     static constexpr double kStaleMaximumAgeSeconds = 900.0;
 
-    SystemClockFrequencyEstimate evaluate(SystemClockFrequencyEstimate sample);
+    SystemClockFrequencyEstimate evaluate(
+        SystemClockFrequencyEstimate sample,
+        std::chrono::steady_clock::time_point now = std::chrono::steady_clock::now());
     void reset();
 
 private:
@@ -98,6 +102,11 @@ private:
     std::optional<SystemClockFrequencyEstimate> last_qualified_;
     std::chrono::steady_clock::time_point last_qualified_at_{};
 };
+
+SystemClockFrequencyEstimate system_clock_frequency_estimate_from_provider(
+    const PPMProviderSnapshot &provider,
+    std::chrono::steady_clock::time_point now = std::chrono::steady_clock::now(),
+    std::chrono::system_clock::time_point utc_now = std::chrono::system_clock::now());
 
 GpioFrequencyCorrection select_gpio_frequency_correction(
     bool use_estimate,

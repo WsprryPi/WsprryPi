@@ -156,34 +156,20 @@ namespace
     SystemClockFrequencyEstimate qualify_provider_snapshot(
         const PPMProviderSnapshot &provider)
     {
-        SystemClockFrequencyEstimate sample;
-        sample.provider_name = provider.provider_name;
-        sample.frequency_ppm = provider.frequency_ppm;
-        sample.synchronized = provider.synchronized;
-        sample.age_seconds = provider.age_seconds;
-        sample.residual_frequency_ppm = provider.residual_frequency_ppm;
-        sample.skew_ppm = provider.skew_ppm;
-        sample.selected_source = provider.selected_source;
-        sample.combined_sources = provider.combined_sources;
-        sample.leap_normal = provider.leap_normal;
-        sample.source_provenance = provider.source_provenance;
-        sample.source_signature = provider.source_signature;
-        if (std::isfinite(provider.age_seconds) && provider.age_seconds >= 0.0)
-        {
-            sample.snapshot_time = std::chrono::system_clock::now() -
-                std::chrono::duration_cast<std::chrono::system_clock::duration>(
-                    std::chrono::duration<double>(provider.age_seconds));
-        }
-        sample.retained_source_samples = provider.retained_source_samples;
-        sample.source_stability_span_seconds = provider.source_stability_span_seconds;
-        sample.reason = provider.error_reason;
-        return frequency_estimate_qualifier.evaluate(std::move(sample));
+        const auto now = std::chrono::steady_clock::now();
+        return frequency_estimate_qualifier.evaluate(
+            system_clock_frequency_estimate_from_provider(provider, now), now);
     }
 
     GpioFrequencyCorrection select_and_publish_gpio_correction(
         const ArgParserConfig &cfg)
     {
+        const auto provider = ppmManager.getProviderSnapshot();
         std::lock_guard<std::mutex> lock(frequency_estimate_mutex);
+        // Every future request, including inbound WTP preparation, must check
+        // the cached report's current age. Committed requests remain frozen.
+        if (cfg.use_system_clock_frequency_estimate && provider.age_reference_time)
+            current_frequency_estimate = qualify_provider_snapshot(provider);
         GpioFrequencyCorrection selected = select_gpio_frequency_correction(
             cfg.use_system_clock_frequency_estimate,
             cfg.gpio_frequency_residual_ppm,

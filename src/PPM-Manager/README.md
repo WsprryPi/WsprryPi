@@ -7,6 +7,22 @@ provider is unavailable, the component reports that state instead of inventing
 an estimate; the parent application owns its manual and uncalibrated fallback
 policy.
 
+Selected-source age is unknown when absent, malformed, negative, or associated
+with an ambiguous selected source. Snapshots carry a monotonic acquisition
+anchor; `getProviderSnapshot()` returns a copy whose age includes elapsed time
+since collection. `withAgeAt()` supplies the same calculation for deterministic
+consumers/tests and safely rebases already-aged copies. Invalid/missing anchors
+do not establish freshness. The parent owns the current/stale limits and
+correction fallback policy.
+
+Provenance uses only the selected (`*`) and combined (`+`) source rows. Chrony
+mode `#` identifies a local reference; `^` and `=` identify network sources.
+Only a mixture of local and network sources is `Mixed`; unrecognized modes
+remain `Unknown`. Source names and unselected PPS/GNSS rows cannot establish
+local-reference provenance. This classification does not verify reference lock,
+electrical routing, authentication or RF accuracy. See the official
+[Chrony source report reference](https://chrony-project.org/doc/4.4/chronyc.html#sources).
+
 The public component boundary is `src/ppm_manager.hpp` and
 `src/ppm_manager.cpp`. `PPM_Weighting_Discussion.md` documents the estimation
 and quality model.
@@ -45,6 +61,8 @@ ordinary test boundary.
   residual frequency, source state, provenance, and error reason.
 - `parseChronyReports()` parses supplied machine-readable reports without
   consulting host services; this is the hardware-free test boundary.
+- Optional C++ acquisition/consumption timestamps are transient test/API inputs;
+  no CLI, INI, environment or UI calibration controls are added.
 - `startPPMUpdateLoop()` and `stop()` manage periodic live-provider refreshes.
 - `setPPMCallback()` registers an estimate callback.
 

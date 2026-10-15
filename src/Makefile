@@ -1411,13 +1411,21 @@ mailbox-memory-flag-test: $(BIN_DIR)/$(MAILBOX_MEMORY_FLAG_TEST_OUT)
 	$(Q)echo "Running mailbox memory flag tests."
 	$(Q)./$(BIN_DIR)/$(MAILBOX_MEMORY_FLAG_TEST_OUT)
 
-$(BIN_DIR)/$(GPIO_FREQUENCY_CORRECTION_TEST_OUT): tests/gpio_frequency_correction_test.cpp system_clock_frequency_estimate.cpp WSPR-Transmitter/src/legacy_gpio_clock_model.cpp Chipset-Offsets/src/chipset_offsets.hpp
+$(BIN_DIR)/$(GPIO_FREQUENCY_CORRECTION_TEST_OUT): tests/gpio_frequency_correction_test.cpp system_clock_frequency_estimate.cpp WSPR-Transmitter/src/legacy_gpio_clock_model.cpp system_clock_frequency_estimate.hpp PPM-Manager/src/ppm_manager.hpp Chipset-Offsets/src/chipset_offsets.hpp
 	$(Q)mkdir -p $(BIN_DIR)
 	$(Q)$(CXX) $(GPIO_FREQUENCY_CORRECTION_TEST_FLAGS) $(filter %.cpp,$^) -o $@
 
-gpio-frequency-correction-test: $(BIN_DIR)/$(GPIO_FREQUENCY_CORRECTION_TEST_OUT)
+gpio-frequency-correction-test: $(BIN_DIR)/$(GPIO_FREQUENCY_CORRECTION_TEST_OUT) chrony-frequency-correction-test
 	$(Q)echo "Running hardware-independent GPIO frequency-correction tests."
 	$(Q)./$(BIN_DIR)/$(GPIO_FREQUENCY_CORRECTION_TEST_OUT)
+
+$(BIN_DIR)/chrony_frequency_correction_test: tests/chrony_frequency_correction_test.cpp system_clock_frequency_estimate.cpp PPM-Manager/src/ppm_manager.cpp WSPR-Transmitter/src/legacy_gpio_clock_model.cpp system_clock_frequency_estimate.hpp PPM-Manager/src/ppm_manager.hpp Chipset-Offsets/src/chipset_offsets.hpp
+	$(Q)mkdir -p $(BIN_DIR)
+	$(Q)$(CXX) $(GPIO_FREQUENCY_CORRECTION_TEST_FLAGS) $(filter %.cpp,$^) -lpthread $(ATOMIC_LIB) -o $@
+
+.PHONY: chrony-frequency-correction-test
+chrony-frequency-correction-test: $(BIN_DIR)/chrony_frequency_correction_test
+	$(Q)./$(BIN_DIR)/chrony_frequency_correction_test
 
 websocket-lifecycle-test: $(BIN_DIR)/$(WEBSOCKET_LIFECYCLE_TEST_OUT)
 	$(Q)./$(BIN_DIR)/$(WEBSOCKET_LIFECYCLE_TEST_OUT)
