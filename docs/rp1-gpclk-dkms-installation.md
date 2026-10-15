@@ -79,8 +79,12 @@ sudo INSTALL_RP1_GPCLK_DKMS=true \
 ## Published releases
 
 No eligible RP1-GPCLK-DKMS release is currently published. Production/main
-selection therefore fails closed until the canonical release is prepared with
-the contract below; it does not fall back to development source.
+selection therefore fails closed until an eligible immutable release is
+published and validated under the contract below; it does not fall back to
+development source. WsprryPi candidate acceptance and integration must precede
+provider freeze/publication. After publication, WsprryPi must separately adopt
+and validate the published artifacts before its own release. See the
+[RP1 dependency order](../release_tools/Release%20Punchlist.md#rp1-dependency-order).
 
 Release selection enumerates published, immutable, non-draft, non-prerelease
 semantic versions rather than following a `latest` redirect. A candidate must provide
