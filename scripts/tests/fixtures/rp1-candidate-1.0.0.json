@@ -1,8 +1,8 @@
 {
   "schema": "wsprrypi-rp1-candidate-lock-v1",
   "repository": "WsprryPi/RP1-GPCLK-DKMS",
-  "sourceCommit": "51b8012a4ca2f01576805a81f4b50519b5b786d3",
-  "sourceTree": "8574c0fa6f542b84cf8705127b0bd4779b4f5f1d",
+  "sourceCommit": "840afebc667cf9202701246b84d437d95581cdd3",
+  "sourceTree": "9ae4e4a1a5e432f3f722c7bbfae7563d3d1a39f8",
   "productVersion": "1.0.0",
   "debianVersion": "1.0.0-1",
   "classification": "candidate",
@@ -26,12 +26,12 @@
     "update": "rp1-gpclk-runtime-update-v1"
   },
   "assets": {
-    "SHA256SUMS": "aef5df4328cfc436af9625e038ae35b790bc4076d0104d8173b6f0d3e02e7453",
-    "candidate-validation.json": "6d16b001fcf9b743577e526aed97007da07d17fc4b8d687cb9a2602ed2fb9b25",
-    "release-metadata.json": "17acf415cbbe4fef5644d39d5fba94b65256ee09b043758cf95bf45c955fcaa2",
-    "rp1-gpclk-compatibility-manifest.json": "ad91a5c1fc296c0617c3ab1fc32de0ce6db70ce989c7db695e9f7af463e386f2",
-    "rp1-gpclk-dkms-1.0.0.tar.gz": "341466a5b9d2aab10d498be4b24fe1e634927e9b906f0b87d7bb9c69c066b741",
-    "rp1-gpclk-dkms-installation-manifest-v1.json": "c101eb12f8cfcda25e9c1c1442b439bccc860168627a3ebc7ab859ef368a40e3",
-    "rp1-gpclk-dkms_1.0.0-1_all.deb": "3d101fd4c8cd733f7463ded128ba88bd2d9e9df3343de277af6fb6bb375d3177"
+    "SHA256SUMS": "0ac66e70e1599ade100100f95585ec890cfd61c2ea6a1998cc5cbe15589bbb4c",
+    "candidate-validation.json": "abdc36bd6bba1fc78673b5d5f42d1332572e25df2341a6b894c8798e1178fa97",
+    "release-metadata.json": "1686fcd79a407c7118bfcb791b703d55923613774caedecfaeb60e2d71378aef",
+    "rp1-gpclk-compatibility-manifest.json": "9267638592d116981640e21b347be7b44a91c182f912afd5285a24f297986706",
+    "rp1-gpclk-dkms-1.0.0.tar.gz": "8069120b17ed60d46dd351bcfcfec272afd2c498f92de95bc2d3b0d584a4f4cd",
+    "rp1-gpclk-dkms-installation-manifest-v1.json": "ca24fecb766168e8f40f335b31d1e50fd0bc21e1910724d8ec547fff31175c6e",
+    "rp1-gpclk-dkms_1.0.0-1_all.deb": "5b0608453dec6160fbc76d54fce743a8e0f54f2acd4e166c15676d190d9b9501"
   }
 }

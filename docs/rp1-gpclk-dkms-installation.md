@@ -143,9 +143,10 @@ captured `0.9.0` predecessor removal authority. Exact commit, kernel, route,
 hashes, enrollment, and qualification remain separate facts.
 
 Runtime-capable source selection additionally requires commit
-`51b8012a4ca2f01576805a81f4b50519b5b786d3`, which provides the single-owner
+`840afebc667cf9202701246b84d437d95581cdd3`, which provides the single-owner
 DKMS runtime-controller profile, binding version 3, and authenticated passive
-package preservation during runtime retirement, or a selected commit/tag
+package preservation and interrupted inverse-deployment recovery during runtime
+retirement, or a selected commit/tag
 whose Git history contains it. A development checkout or immutable release that
 cannot prove that ancestry is rejected before provider mutation or runtime bundle
 creation.

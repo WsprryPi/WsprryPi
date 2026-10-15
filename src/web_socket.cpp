@@ -33,16 +33,19 @@
 
 #include "logging.hpp"
 #include "sha1.hpp"
+#include "json.hpp"
 
 #include <algorithm>
 #include <cerrno>
 #include <chrono>
 #include <cstdint>
 #include <cstring>
+#include <deque>
 #include <iostream>
 #include <limits>
 #include <optional>
 #include <sstream>
+#include <stdexcept>
 #include <system_error>
 #include <thread>
 #include <vector>
@@ -496,6 +499,7 @@ std::string WebSocketServer::decodeWebSocketFrame(const char *data, size_t data_
         return "";
     }
 
+    constexpr std::uint64_t maximum_payload = 64U * 1024U;
     uint8_t byte1 = static_cast<uint8_t>(data[0]);
     opcode = byte1 & 0x0F;
     // bool fin = byte1 & 0x80; // Currently unused
@@ -531,6 +535,10 @@ std::string WebSocketServer::decodeWebSocketFrame(const char *data, size_t data_
         }
         pos += 8;
     }
+
+    // Bound length arithmetic before allocating or awaiting a payload.
+    if (payload_length > maximum_payload)
+        throw std::runtime_error("WebSocket frame exceeds the 64 KiB limit.");
 
     if (mask)
     {
@@ -914,19 +922,39 @@ void WebSocketServer::clientLoop(
             server->client_handlers_cv_.notify_all();
         }
     } handler_exit{this, client_fd};
-    char buf[1024];
+    char buf[4096];
+    std::string buffered;
+    struct Frame { uint8_t opcode; std::string message; bool status_query; };
+    std::deque<Frame> pending;
+    std::size_t pending_bytes = 0;
+    constexpr std::size_t maximum_buffered = 128U * 1024U;
     bool connection_open = true;
+    bool input_closed = false;
+    const auto is_status_query = [this](uint8_t opcode, const std::string &message) {
+        if (opcode != 0x1) return false;
+        const auto value = nlohmann::json::parse(message, nullptr, false);
+        return value.is_object() && value.contains("command") &&
+               value["command"].is_string() &&
+               toLower(value["command"].get<std::string>()) == "get_tx_state";
+    };
 
     try
     {
     while (running_ && connection_open)
     {
-        ssize_t bytes = recv(client_fd, buf, sizeof(buf), 0);
-        if (bytes <= 0)
+        // Read available input before dispatching another queued command. Status
+        // observations can be slower than polling clients; retain only the latest
+        // consecutive observation so End/STOP cannot sit behind stale queries.
+        ssize_t bytes = -1;
+        if (!input_closed)
         {
-            // TCP FIN or error
-            break;
+            bytes = recv(client_fd, buf, sizeof(buf),
+                         pending.empty() ? 0 : MSG_DONTWAIT);
+            if (bytes == 0) input_closed = true;
+            if (bytes < 0 && errno == EINTR) continue;
+            if (bytes < 0 && errno != EAGAIN && errno != EWOULDBLOCK) break;
         }
+        if (input_closed && pending.empty()) break;
         if (!clientAuthorizationCurrent(authorization))
         {
             llog.logS(INFO,
@@ -934,53 +962,70 @@ void WebSocketServer::clientLoop(
                 "authorization is no longer valid.");
             break;
         }
-
-        size_t pos = 0;
-        while (pos < static_cast<size_t>(bytes))
+        if (bytes > 0) buffered.append(buf, static_cast<std::size_t>(bytes));
+        if (buffered.size() + pending_bytes > maximum_buffered)
+            throw std::runtime_error("WebSocket command buffer exceeded its limit.");
+        std::size_t consumed = 0;
+        while (consumed < buffered.size())
         {
             size_t frame_size = 0;
             uint8_t opcode = 0;
             std::string message = decodeWebSocketFrame(
-                buf + pos, bytes - pos, frame_size, opcode);
-            if (frame_size == 0)
+                buffered.data() + consumed, buffered.size() - consumed,
+                frame_size, opcode);
+            if (frame_size == 0) break; // Keep incomplete bytes for the next recv.
+            consumed += frame_size;
+            const bool status_query = is_status_query(opcode, message);
+            if (status_query && !pending.empty() && pending.back().status_query)
             {
-                // Incomplete frame
-                break;
+                pending_bytes -= pending.back().message.size();
+                pending.pop_back();
             }
-            pos += frame_size;
+            pending_bytes += message.size();
+            pending.push_back({opcode, std::move(message), status_query});
+            if (pending.size() > 1024)
+                throw std::runtime_error("WebSocket command count exceeded its limit.");
+        }
+        buffered.erase(0, consumed);
+        if (pending.empty()) continue;
+        Frame frame = std::move(pending.front());
+        pending.pop_front();
+        pending_bytes -= frame.message.size();
+        const auto opcode = frame.opcode;
+        const auto &message = frame.message;
 
-            switch (opcode)
-            {
-            case 0x1: // Text frame
-                handleMessage(message);
-                break;
-
-            case 0x8: // Close frame
-            {
-                llog.logS(DEBUG, "Received Close frame from fd: ",
-                          client_fd);
-                const char close_resp[] = {static_cast<char>(0x88), 0x00};
-                send(client_fd, close_resp, sizeof(close_resp), 0);
-                connection_open = false;
-            }
+        switch (opcode)
+        {
+        case 0x1: // Text frame
+            if (inbound_message_for_test_) inbound_message_for_test_(message);
+            else handleMessage(message);
             break;
 
-            case 0x9: // Ping frame
-            {
-                // llog.logS(DEBUG, "Received Ping; sending Pong to fd: ", client_fd);
-                const unsigned char pong[2] = {0x8A, 0x00};
-                send(client_fd, pong, sizeof(pong), 0);
-            }
+        case 0x8: // Close frame
+        {
+            llog.logS(DEBUG, "Received Close frame from fd: ",
+                      client_fd);
+            const char close_resp[] = {static_cast<char>(0x88), 0x00};
+            send(client_fd, close_resp, sizeof(close_resp), 0);
+            connection_open = false;
+        }
+        break;
+
+        case 0x9: // Ping frame
+        {
+            // llog.logS(DEBUG, "Received Ping; sending Pong to fd: ", client_fd);
+            const unsigned char pong[2] = {0x8A, 0x00};
+            send(client_fd, pong, sizeof(pong), 0);
+        }
+        break;
+
+        case 0xA: // Pong frame
+            // llog.logS(DEBUG, "Received Pong from fd: ", client_fd);
             break;
 
-            case 0xA: // Pong frame
-                // llog.logS(DEBUG, "Received Pong from fd: ", client_fd);
-                break;
-
-            default:
-                llog.logS(WARN, "Unhandled opcode", static_cast<int>(opcode),
-                          "from fd: ", client_fd);
-            }
+        default:
+            llog.logS(WARN, "Unhandled opcode", static_cast<int>(opcode),
+                      "from fd: ", client_fd);
         }
     }
     }

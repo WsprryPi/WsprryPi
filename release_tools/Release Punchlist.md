@@ -46,15 +46,15 @@ Status key: ✅ Complete · ⏳ In progress · ☐ Not started
    closure accepts the bounded I2C evidence without requiring RF measurement.
 7. ✅ **RP1 release-candidate preparation.** Complete. The exact unpublished
    `1.0.0` candidate is bound to RP1-GPCLK-DKMS commit
-   `51b8012a4ca2f01576805a81f4b50519b5b786d3`. Release-scoped module/lifecycle
+   `840afebc667cf9202701246b84d437d95581cdd3`. Release-scoped module/lifecycle
    work, packaging, manifests, hashes, reproducibility, cleanup-first
    `0.9`-to-`1.0` migration, rollback, removal, reinstall and recovery validation
    are complete. The candidate is not frozen or published. See the provider's
-   [candidate procedure](https://github.com/WsprryPi/RP1-GPCLK-DKMS/blob/51b8012a4ca2f01576805a81f4b50519b5b786d3/docs/operator/release-candidate.md)
-   and [package lifecycle contract](https://github.com/WsprryPi/RP1-GPCLK-DKMS/blob/51b8012a4ca2f01576805a81f4b50519b5b786d3/docs/operator/package-lifecycle.md).
+   [candidate procedure](https://github.com/WsprryPi/RP1-GPCLK-DKMS/blob/840afebc667cf9202701246b84d437d95581cdd3/docs/operator/release-candidate.md)
+   and [package lifecycle contract](https://github.com/WsprryPi/RP1-GPCLK-DKMS/blob/840afebc667cf9202701246b84d437d95581cdd3/docs/operator/package-lifecycle.md).
 8. ⏳ **WsprryPi acceptance of the exact RP1 candidate.** In progress in a
    separate feature worktree. Validate current WsprryPi `devel` against candidate
-   commit `51b8012a4ca2f01576805a81f4b50519b5b786d3`, reconcile exact identities,
+   commit `840afebc667cf9202701246b84d437d95581cdd3`, reconcile exact identities,
    preserve cleanup-first migration, disposition historical provider-rejection
    and eight-second finite-TONE failures, and repair WsprryPi-owned integration
    defects. Integrate the accepted WsprryPi changes before provider freeze.

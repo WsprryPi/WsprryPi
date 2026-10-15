@@ -17,15 +17,29 @@
 #include <unistd.h>
 
 class WebSocketLifecycleTest {
-    static void send_text(int fd, const std::string &text) {
-        assert(text.size() < 126U);
-        std::string frame;
-        frame.push_back(static_cast<char>(0x81));
-        frame.push_back(static_cast<char>(0x80U | text.size()));
+    static std::string text_frame(const std::string &text) {
+        assert(text.size() <= 65535U);
+        std::string frame(1, static_cast<char>(0x81));
+        if (text.size() < 126) frame.push_back(static_cast<char>(0x80U | text.size()));
+        else {
+            frame.push_back(static_cast<char>(0xFE));
+            frame.push_back(static_cast<char>(text.size() >> 8));
+            frame.push_back(static_cast<char>(text.size()));
+        }
         const unsigned char mask[4]={1,2,3,4};
         frame.append(reinterpret_cast<const char *>(mask),4);
         for(std::size_t i=0;i<text.size();++i) frame.push_back(static_cast<char>(text[i]^mask[i%4]));
-        assert(send(fd,frame.data(),frame.size(),0)==static_cast<ssize_t>(frame.size()));
+        return frame;
+    }
+    static void send_bytes(int fd, const std::string &frame) {
+        std::size_t offset = 0;
+        while (offset < frame.size()) {
+            auto sent = send(fd, frame.data()+offset, frame.size()-offset, 0);
+            assert(sent > 0); offset += static_cast<std::size_t>(sent);
+        }
+    }
+    static void send_text(int fd, const std::string &text) {
+        send_bytes(fd, text_frame(text));
     }
     static int connect_client(
         unsigned short port,
@@ -298,8 +312,61 @@ class WebSocketLifecycleTest {
         assert(wait_zero(local));
         local.stop();
     }
+    static void verify_stream_and_control_queue(unsigned short port) {
+        WebSocketServer local;
+        std::mutex mutex;
+        std::condition_variable cv;
+        std::vector<std::string> messages;
+        bool release = false;
+        local.inbound_message_for_test_ = [&](const std::string &message) {
+            std::unique_lock<std::mutex> lock(mutex);
+            messages.push_back(message); cv.notify_all();
+            if (message == "barrier") cv.wait(lock, [&]{ return release; });
+        };
+        assert(local.start(port, 0, true, WebSocketLoopbackFamily::IPv4));
+        int fd = connect_client(port);
+        const auto split = text_frame(std::string(1800, 'x'));
+        // Separate reads in the middle of both an extended header and payload.
+        send_bytes(fd, split.substr(0, 3));
+        std::this_thread::sleep_for(std::chrono::milliseconds(30));
+        send_bytes(fd, split.substr(3, 401));
+        std::this_thread::sleep_for(std::chrono::milliseconds(30));
+        { std::lock_guard<std::mutex> lock(mutex); assert(messages.empty()); }
+        send_bytes(fd, split.substr(404) + text_frame("barrier"));
+        {
+            std::unique_lock<std::mutex> lock(mutex);
+            assert(cv.wait_for(lock, std::chrono::seconds(2), [&]{return messages.size()==2;}));
+            assert(messages.front() == std::string(1800, 'x'));
+        }
+        std::string backlog;
+        for (int i=0;i<80;++i) backlog += text_frame(i % 2 == 0
+            ? "{\"command\":\"GET_TX_STATE\"}" : "{\"command\":\"get_tx_state\"}");
+        backlog += text_frame("{\"command\":\"tone_end\"}");
+        backlog += text_frame("{\"command\":\"bounded_tone\"}");
+        send_bytes(fd, backlog);
+        shutdown(fd, SHUT_WR); // Drain complete queued commands after TCP FIN.
+        {
+            std::lock_guard<std::mutex> lock(mutex); release = true;
+        }
+        cv.notify_all();
+        {
+            std::unique_lock<std::mutex> lock(mutex);
+            assert(cv.wait_for(lock, std::chrono::seconds(2), [&]{return messages.size()>=5;}));
+            assert(messages.size()==5);
+            assert(messages[2]=="{\"command\":\"get_tx_state\"}");
+            assert(messages[3]=="{\"command\":\"tone_end\"}");
+            assert(messages[4]=="{\"command\":\"bounded_tone\"}");
+        }
+        assert(wait_disconnected(fd)); close(fd); assert(wait_zero(local));
+        // Reject a hostile 64-bit length before allocation or overflow.
+        fd = connect_client(port);
+        send_bytes(fd, std::string("\x81\xff\x7f\xff\xff\xff\xff\xff\xff\xff",10));
+        assert(wait_disconnected(fd)); close(fd); assert(wait_zero(local));
+        local.stop();
+    }
 public:
     static int run() {
+        verify_stream_and_control_queue(39526);
         verify_loopback_binding(39518);
         verify_ipv4_loopback_binding(39520);
         verify_auto_prefers_ipv6(39524);

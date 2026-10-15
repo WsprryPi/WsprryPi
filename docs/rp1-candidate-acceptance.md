@@ -3,8 +3,8 @@
 The maintained lock is
 [`scripts/tests/fixtures/rp1-candidate-1.0.0.json`](../scripts/tests/fixtures/rp1-candidate-1.0.0.json).
 It identifies unpublished provider commit
-`51b8012a4ca2f01576805a81f4b50519b5b786d3`, tree
-`8574c0fa6f542b84cf8705127b0bd4779b4f5f1d`, product/module/controller
+`840afebc667cf9202701246b84d437d95581cdd3`, tree
+`9ae4e4a1a5e432f3f722c7bbfae7563d3d1a39f8`, product/module/controller
 `1.0.0`, Debian package `1.0.0-1`, both UAPIs, both route identities and
 overlays, runtime binding v3/readiness v1/update v1, and all seven asset hashes.
 The lock is acceptance configuration, not production release metadata.
@@ -79,3 +79,6 @@ Target installation, service behavior, route switching, eight-second live
 TONE and RF checks require their own identified target state and authorization.
 Acceptance does not freeze or publish the provider and does not release
 WsprryPi. Operator documentation is maintained separately.
+
+The [Item 16 acceptance record](development/rp1-item16-acceptance.md) separates
+software evidence, the stopped target campaign and the renewed target gate.
