@@ -63,6 +63,14 @@ wtp_runtime_selection_error(const std::optional<WtpSettings> &settings) {
   } catch (const std::exception &error) { return error.what(); }
   return {};
 }
+void set_wtp_management_transports_for_test(wsprrypi::PicoManagementExchange engineering,
+    wsprrypi::ConsumerRadioClient::Transport consumer) {
+  std::lock_guard operation(operation_mutex);
+  auto r = require();
+  if (!r->app->replaceable()) throw std::logic_error("Test transport requires idle runtime");
+  r->engineering_transport_for_test = std::move(engineering);
+  r->consumer_transport_for_test = std::move(consumer);
+}
 nlohmann::json wtp_runtime_safe_probe(const std::function<nlohmann::json()> &probe) {
   std::lock_guard operation(operation_mutex);
   auto r = get();
@@ -210,6 +218,7 @@ std::string wtp_runtime_json() {
   j["worker_active"] = r->app->active();
   j["host_skip_waiting"] = r->app->skipping();
   j["ready"] = r->app->ready();
+  j["management_available"] = r->app->replaceable(); // Local admission only; remote authentication is still required.
   j["host_utc_valid"] = wsprrypi::wtp_host_utc_valid();
   return j.dump();
 }
@@ -229,11 +238,14 @@ wsprrypi::CleanupResult wtp_runtime_cancel_job(const std::string &job_id) {
   return r->app->stop();
 }
 wsprrypi::PicoHttpResponse wtp_runtime_management(const std::string &resource,
-    const std::string &method, const std::string &body, const std::string &revision) {
+    const std::string &method, const std::string &body, const std::string &revision,
+    const std::string &expected_selection) {
   std::unique_lock operation(operation_mutex, std::try_to_lock);
   if (!operation.owns_lock()) return {409, R"({"error":{"code":"busy"}})", {}};
   auto r = get();
   if (!r) return {409, R"({"error":{"code":"member_not_selected"}})", {}};
+  if (!expected_selection.empty() && expected_selection != r->management_selection_id)
+    return {409,R"({"error":{"code":"member_read_required"}})",{}};
   wsprrypi::PicoHttpResponse response;
   try {
     const auto failure = [](unsigned status, const char* code) {
@@ -244,7 +256,7 @@ wsprrypi::PicoHttpResponse wtp_runtime_management(const std::string &resource,
         const bool connected = r->consumer_management && r->consumer_management->active();
         return {200, nlohmann::json{{"carrier", r->management_carrier.empty()
             ? (r->settings.transport == "network" ? "engineering_mtls" : "unsupported") : r->management_carrier},
-            {"connected", connected}, {"host", r->management_host}}.dump(), {}};
+            {"connected", connected}, {"host", r->management_host}, {"selection_id",r->management_selection_id}}.dump(), {}};
       }
       if (method != "POST" || body.size() > 512) return failure(400, "invalid_management_selection");
       auto input = wsprrypi::strict_browser_json(body);
@@ -272,8 +284,10 @@ wsprrypi::PicoHttpResponse wtp_runtime_management(const std::string &resource,
 
         if (!r->app->idle_management([&] {
           r->management_carrier = carrier; r->management_host = host;
+          r->management_selection_id = wsprrypi::wtp_random_identity();
           r->consumer_management = std::make_unique<wsprrypi::ConsumerRadioClient>(
               [owner = r.get(), host](const auto& path, const auto& verb, const auto& payload, const auto& media) {
+                if (owner->consumer_transport_for_test) return owner->consumer_transport_for_test(path,verb,payload,media);
                 return wsprrypi::consumer_http_request(owner->management_tcp, [owner] { return owner->clock.now_ms(); },
                     host, path, verb, payload, media);
               }, [owner = r.get()] { return owner->clock.now_ms(); });
@@ -288,6 +302,7 @@ wsprrypi::PicoHttpResponse wtp_runtime_management(const std::string &resource,
       if (!r->app->idle_management([&] {
         if (r->consumer_management) r->consumer_management->logout();
         r->consumer_management.reset(); r->management_host.clear();
+        r->management_selection_id = wsprrypi::wtp_random_identity();
         r->management_carrier = action == "engineering_mtls" ? "engineering_mtls" : "disconnected";
       }, true)) return failure(409, "host_busy_or_output_unresolved");
       return {200, R"({"ok":true})", {}};
@@ -303,6 +318,10 @@ wsprrypi::PicoHttpResponse wtp_runtime_management(const std::string &resource,
           response = wsprrypi::pico_configuration_request(exchange, r->consumer_management->device(),
               r->consumer_management->boot(), method, body, revision, r->management_carrier,
               r->consumer_management->generation());
+        else if (resource == "member/application" || resource == "member/station" || resource == "member/hardware" ||
+            resource == "member/pins" || resource == "member/pins/validate")
+          response = wsprrypi::pico_resource_request(exchange,r->consumer_management->device(),r->consumer_management->boot(),
+              resource.substr(7),method,body,revision,r->management_carrier,r->consumer_management->generation());
         else response = exchange(resource, method, body, revision);
       }, true)) return failure(409, "host_busy_or_output_unresolved");
       return response;
@@ -314,6 +333,7 @@ wsprrypi::PicoHttpResponse wtp_runtime_management(const std::string &resource,
     if (!r->app->idle_management([&] {
       const auto exchange = [&](const std::string &path, const std::string &verb,
           const std::string &payload, const std::string &etag) {
+        if (r->engineering_transport_for_test) return r->engineering_transport_for_test(path,verb,payload,etag);
         return wsprrypi::pico_http_request(r->tls, r->network_selection(), r->credentials,
             [&] { return r->clock.now_ms(); }, path, verb, payload, etag);
       };
@@ -322,8 +342,14 @@ wsprrypi::PicoHttpResponse wtp_runtime_management(const std::string &resource,
         response = wsprrypi::pico_configuration_request(exchange,
             identity ? identity->device_id : "", identity ? identity->boot_id : "",
             method, body, revision);
+      } else if (resource == "member/application" || resource == "member/station" || resource == "member/hardware" ||
+          resource == "member/pins" || resource == "member/pins/validate") {
+        const auto identity = r->app->status().identity;
+        response = wsprrypi::pico_resource_request(exchange,identity ? identity->device_id : "",identity ? identity->boot_id : "",
+            resource.substr(7),method,body,revision);
       } else response = exchange(resource, method, body, revision);
-    })) return {409, R"({"error":{"code":"host_busy_or_output_unresolved"}})", {}};
+    }, false, !(method == "PUT" && (resource == "member/station" || resource == "member/hardware"))))
+      return {409, R"({"error":{"code":"host_busy_or_output_unresolved"}})", {}};
   } catch (...) { return {503, R"({"error":{"code":"network_unavailable"}})", {}}; }
   return response;
 }

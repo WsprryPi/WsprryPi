@@ -17,6 +17,9 @@ prefix `/wsprrypi`; the table below shows backend paths.
 | GET/PUT `/api/v1/network` | Pico network status/control, with its own remote revision. |
 | GET/POST `/api/v1/member/management` | Explicit volatile engineering/consumer station/AP management selection and login; shared host guard and idle gate. |
 | GET/POST `/api/v1/member/configuration` | Host-coordinated selected-Pico settings context and one compatible atomic save; schema `wsprrypi-pico-settings/1`. |
+| GET `/api/v1/member/application`, `/station`, `/hardware`, `/pins` | Reconciled authenticated Pico application, station, hardware and pin-choice observations; schema `wsprrypi-member-resources/1`. All paths have the `/api/v1/member` prefix. |
+| PUT `/api/v1/member/station`, `/hardware` | Separate complete, revision-guarded station or supported hardware save. |
+| POST `/api/v1/member/pins/validate` | Protected nonpersistent pin-plan preview. |
 | GET/PUT `/api/v1/host/config` | Explicit `wsprrypi-host-config/1` application and transport settings. PUT applies a merge patch. |
 | GET `/api/v1/host/discovery` | Bounded local Avahi snapshot; no WTP connection. |
 | GET/POST `/api/v1/host/devices` | Host-owned known-device catalog, revision-guarded add/edit/rename/remove. |
@@ -126,6 +129,70 @@ from the last successful handshake. A new failed connection clears authenticated
 identity; transport closure cannot establish inactive output. The remote network
 resource additionally exposes Pico discovery state, separate from this host's
 resolver/TLS observations. None of these fields installs or changes Linux NSS.
+
+## Shared Pico member resources
+
+The [P15.4 implementation record](development/phase15-4-shared-resources.md)
+defines the supported mapping and validation evidence. These resources belong
+to the selected Pico, independently of Pi host settings and prepared jobs.
+Application is read-only. Each of the four member GET routes returns the same
+reconciled bundle:
+
+```json
+{"schema":"wsprrypi-member-resources/1","target":{"scope":"member","device_id":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","boot_id":"00000000000000000000000000000001"},"carrier":"engineering_mtls","profile_generation":null,"profile_owned_station":false,"application":{},"pin_choices":{},"member_context":"<opaque host editor context>"}
+```
+
+The empty objects illustrate the envelope only: actual application and pin-choice
+objects must satisfy their complete closed Pico schemas. The host authenticates
+existing `application_resources` discovery, then brackets station, hardware and
+pin reads with application reads. Targets, saved values, generations and the
+common ETag must agree. Live recurrence/active observations can change
+independently; the UI identifies when they were observed. Decimal uint64 strings
+remain strings. Hardware `active_revision` is an observation digest.
+
+Station PUT forwards a complete `transmitter-station/1` object containing exact
+`target` and all three station fields. Hardware PUT forwards a complete
+`transmitter-hardware/1` object containing exact `target` and `pins`. Both require
+the exact common `If-Match` and the GET's opaque
+`X-WsprryPi-Member-Context` header. Pin preview requires those same host context
+headers but forwards the bare complete pin plan to Pico without remote
+If-Match, preserving Pico's preview semantics. All mutations retain the existing
+Origin, JSON intent, protected peer/authority and runtime admission checks.
+Duplicate context headers are rejected. The runtime checks selection identity
+under its operation mutex before dispatch.
+
+Scoped PUT bodies are limited to 1,024 UTF-8 bytes and preview to 2,048 bytes;
+each remote resource response is at most 4,096 bytes. Preview validates the
+complete response, including role ownership, conflicts and operational support,
+and verifies unchanged configuration on readback. It never saves or activates.
+PUT success is confirmed against authoritative application readback. A malformed
+or missing result after dispatch is unconfirmed, even if persistence succeeded.
+
+The UI supports direct PIO RF GP, optional active-low button GP and
+onboard/external/disabled TX indicator, preserving external polarity. Pico GP
+numbers and advertised choices are used. Fixed I2C pairs are inspection-only;
+I2C RF, amplifier, LPF, drive, calibration and waveform controls are unavailable.
+Station saves all fields together; reported dBm is WSPR message metadata.
+Consumer profile-owned station fields are read-only and require existing Pico
+transactional setup. Stored extended callsigns remain visible; scoped writes
+retain the current Type 1 encoder restriction.
+
+Saved hardware and active-at-boot hardware are separate. Null active state stays
+unknown even when the pin-choice convenience projection has a value. Saving changed
+pins establishes restart/output inhibition for the boot; restoring old
+pins or saving station cannot clear it. Storage and application faults are
+reported separately. No scoped save restarts, reconnects WTP, enables recurrence,
+claims ownership or transmits. `output_disable_failed` can mean settings saved
+while shutdown was unconfirmed; read back before another deliberate action.
+
+Carrier changes and attempted saves invalidate other resource and legacy editor
+contexts. Drafts are retained, with fresh explicit readback required before a
+further mutation; preview and field edits never autosave. Missing shared-resource
+discovery leaves the existing settings workflow available. Present malformed or
+unsupported discovery refuses without fallback through Config/update or full
+Config PUT. Host `features.member_resources` and `member_resources` route mapping
+describe built-in adapters only. Existing `transmitter-management/1` operations
+and legacy `authenticated_https` metadata are unchanged.
 
 ## Explicit consumer management
 

@@ -305,7 +305,7 @@ bool WtpApplication::replaceable() const {
          s.remote->state != wtp::State::Armed &&
          s.remote->state != wtp::State::Running;
 }
-bool WtpApplication::idle_management(const std::function<void()> &request, bool authenticated_management) {
+bool WtpApplication::idle_management(const std::function<void()> &request, bool authenticated_management, bool reconnect_after) {
   std::lock_guard lock(control_);
   if (active_ || skip_pending_ || scheduler_.phase() != WtpSchedulePhase::Idle)
     return false;
@@ -325,8 +325,8 @@ bool WtpApplication::idle_management(const std::function<void()> &request, bool 
   ready_ = false;
   idle_detached_ = true; // Fresh unowned/inactive evidence preceded deliberate close.
   try { request(); }
-  catch (...) { (void)connect_idle(); throw; }
-  (void)connect_idle(); // Read-only same-session negotiation; never recovery.
+  catch (...) { if (reconnect_after) (void)connect_idle(); throw; }
+  if (reconnect_after) (void)connect_idle(); // Read-only same-session negotiation; never recovery.
   return true;
 }
 std::optional<WtpScheduleReport> WtpApplication::take_completion() {

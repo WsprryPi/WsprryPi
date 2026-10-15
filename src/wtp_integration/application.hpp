@@ -24,7 +24,8 @@ public:
   void start();
   CleanupResult stop();
   CleanupResult recover();
-  bool idle_management(const std::function<void()> &, bool authenticated_management = false);
+  bool idle_management(const std::function<void()> &, bool authenticated_management = false,
+                       bool reconnect_after = true);
   bool replaceable() const;
   bool ready() const;
   bool active() const noexcept { return active_.load(); }

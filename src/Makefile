@@ -2012,7 +2012,7 @@ wtp-config-client-build:
 	$(Q)pkg-config --atleast-version=3.0 openssl
 	$(Q)mkdir -p "$(WTP_NETWORK_BUILD_DIR)"
 	$(Q)$(MAKE) --no-print-directory -C WTP-Client all BUILD_DIR="$(abspath $(WTP_NETWORK_BUILD_DIR)/client)" CXXFLAGS="$(WTP_NETWORK_CXXFLAGS)"
-	$(Q)$(CXX) $(WTP_NETWORK_FLAGS) tests/wtp_configuration_client.cpp wtp_integration/tls.cpp wtp_integration/network_http.cpp \
+	$(Q)$(CXX) $(WTP_NETWORK_FLAGS) -IWSPR-Transmitter/src tests/wtp_configuration_client.cpp wtp_integration/tls.cpp wtp_integration/network_http.cpp wtp_runtime_bridge.cpp wtp_integration/output_lease.cpp wtp_integration/usb_cdc.cpp privileged_network_policy.cpp backend_http_guard.cpp support_request_guard.cpp httplib.cpp \
 		wtp_integration/configuration.cpp wtp_integration/consumer_radio.cpp wtp_integration/plain_tcp.cpp wtp_integration/browser_api.cpp wtp_integration/application.cpp wtp_integration/status.cpp \
 		wtp_integration/scheduler.cpp wtp_integration/backend.cpp wtp_integration/execution_plan.cpp \
 		WSPR-Transmitter/src/execution_plan_compiler.cpp WSPR-Transmitter/src/transmission_controller.cpp \
@@ -2021,7 +2021,8 @@ wtp-config-interop-test: wtp-config-client-build wtp-config-test
 	$(Q)cmake -S tests/network -B "$(WTP_NETWORK_BUILD_DIR)" -DPICO_COMPAT_PROFILE=$(PICO_COMPAT_PROFILE) -DPICO_SOURCE="$(abspath $(PICO_SOURCE))" -DMBEDTLS_SOURCE="$(abspath $(MBEDTLS_SOURCE))"
 	$(Q)cmake --build "$(WTP_NETWORK_BUILD_DIR)" -j 2
 	$(Q)node ../WsprryPi-UI/tests/wtp_configuration_interop_test.js "$(abspath $(WTP_NETWORK_BUILD_DIR))" $(PICO_COMPAT_PROFILE) "$(abspath $(PICO_SOURCE))"
-	$(Q)if [ "$(PICO_COMPAT_PROFILE)" = current ]; then "$(WTP_NETWORK_BUILD_DIR)/consumer_interop" "$(abspath $(PICO_SOURCE))/docs/protocol/Consumer-Radio-v1-vectors.json"; fi
+	$(Q)if [ "$(PICO_COMPAT_PROFILE)" = current ] || [ "$(PICO_COMPAT_PROFILE)" = p153 ]; then "$(WTP_NETWORK_BUILD_DIR)/consumer_interop" "$(abspath $(PICO_SOURCE))/docs/protocol/Consumer-Radio-v1-vectors.json"; fi
+	$(Q)if [ "$(PICO_COMPAT_PROFILE)" = current ]; then node ../WsprryPi-UI/tests/wtp_resources_interop_test.js "$(abspath $(WTP_NETWORK_BUILD_DIR))"; fi
 wtp-network-interop-test: wtp-tls-build wtp-api-test wtp-network-process-test
 	$(Q)cmake -S tests/network -B "$(WTP_NETWORK_BUILD_DIR)" -DPICO_SOURCE="$(abspath $(PICO_SOURCE))" -DMBEDTLS_SOURCE="$(abspath $(MBEDTLS_SOURCE))"
 	$(Q)cmake --build "$(WTP_NETWORK_BUILD_DIR)" -j 4
@@ -2082,4 +2083,4 @@ $(BIN_DIR)/test_tone_lifecycle_test: tests/test_tone_lifecycle_test.cpp $(SEMANT
 	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) $^ -o $@ $(LDFLAGS)
 
 test-tone-lifecycle-test: $(BIN_DIR)/test_tone_lifecycle_test
-	$(Q)timeout 30s ./$(BIN_DIR)/test_tone_lifecycle_test
+	$(Q)python3 -c 'import subprocess; subprocess.run(["./$(BIN_DIR)/test_tone_lifecycle_test"], check=True, timeout=30)'

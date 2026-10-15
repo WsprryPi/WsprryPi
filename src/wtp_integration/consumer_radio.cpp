@@ -444,17 +444,18 @@ PicoHttpResponse ConsumerRadioClient::request(const std::string &resource,
       (method == "GET" && (resource == "capabilities" || resource == "status" ||
                            resource == "config" || resource == "schedules" ||
                            resource == "network" || resource == "application" ||
-                           resource == "management")) ||
+                           resource == "management" || resource == "station" || resource == "hardware" || resource == "pins")) ||
       (method == "PUT" && (resource == "config" || resource == "schedules" ||
-                           resource == "network")) ||
+                           resource == "network" || resource == "station" || resource == "hardware")) ||
       (method == "POST" &&
-       (resource == "config/update" || resource == "consumer/logout"));
+       (resource == "config/update" || resource == "consumer/logout" || resource == "pins/validate"));
   if (!allowed)
     return error(404, "not_found");
-  if (body.size() > (resource == "config/update" ? 2048U : 1800U) ||
+  if (body.size() > ((resource == "config/update" || resource == "pins/validate") ? 2048U :
+      (resource == "station" || resource == "hardware") ? 1024U : 1800U) ||
       revision.size() > 80)
     return error(413, "body_too_large");
-  if (mutation && resource != "consumer/logout" && revision.empty())
+  if (mutation && resource != "consumer/logout" && resource != "pins/validate" && revision.empty())
     return error(428, "revision_required");
   try {
     require(sequence_ != UINT64_MAX);

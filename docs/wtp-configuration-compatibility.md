@@ -4,6 +4,9 @@ The Pi settings form uses one host-coordinated, serialized settings transaction.
 The existing WTP application remains the only scheduling/ownership authority;
 Pico remains the only remote configuration validator and journal authority.
 The P15.3 extension adds explicit consumer management carriers while preserving WTP/1, RF engines and recurrence policy.
+P15.4 adds [scoped member resources](wtp-browser-api.md#shared-pico-member-resources)
+beside this existing atomic settings transaction. It does not split a legacy
+settings save into station and hardware writes.
 
 ## Context and edit API
 
@@ -81,10 +84,16 @@ An unrecognized future field causes safe refusal rather than loss. Present but
 unsupported update support never silently downgrades. Host feature flags, WTP
 CAPS, firmware dates and transport reachability do not establish update support.
 
-Engineering Network (TLS) remains the default certificate management carrier. Explicit authenticated consumer station/AP management is described in [the adapter contract](wtp-browser-api.md#explicit-consumer-management). Outbound
-allowlists add only GET application and POST config/update to existing finite
-pairs. Authenticated canonical Host/Origin, JSON intent and If-Match apply to
-POST as to PUT. USB and Plain LAN WTP are not management carriers; no carrier is substituted automatically.
+Engineering Network (TLS) remains the default certificate management carrier.
+Explicit authenticated consumer station/AP management is described in
+[the adapter contract](wtp-browser-api.md#explicit-consumer-management). Outbound
+allowlists retain the existing finite pairs and add GET station/hardware/pins,
+PUT station/hardware and POST pins/validate for P15.4. Authenticated canonical
+Host/Origin and JSON intent apply; scoped writes retain the common If-Match,
+while the bare nonpersistent remote preview does not require it. These controls
+use existing authenticated application-resource discovery, independently of the
+closed P15.3 management operation list. USB and Plain LAN WTP are not management
+carriers; no carrier is substituted automatically.
 Existing direct `/config`, `/schedules` and `/network` resource compatibility
 remains available; the settings form uses the coordinated resource above.
 
@@ -109,6 +118,19 @@ Unavailable restart data is stated as unconfirmed. Profile-owned station/Wi-Fi
 changes must use Pico setup when Pico rejects them; Pi never claims they saved.
 
 ## Source-pair scope
+
+P15.4's current implementation dependency is clean Pico
+`ddb00dd7960373cec271f7816c0e1b10117416e9`; its difference from accepted P15.3
+`d6208dbc88005383041c5ec306b738db7ec22796` is documentation only. The historical
+`p153` row remains pinned separately, alongside `legacy`, `extended` and `p152`.
+Current and p153 execute the actual native consumer fixture as well as the TLS
+settings tests. Current additionally executes the UI-produced shared resource
+workflow through protected routing, production runtime and actual Pico handlers
+on engineering mTLS and consumer station/AP paths. Older peers retain their
+supported legacy editor; absent shared resources are unavailable. See the
+[P15.4 ledger](development/phase15-4-shared-resources.md) for exact commands,
+source-pair results, sanitizer coverage and limits. The table below preserves
+the original P15.2 evidence, rather than reclassifying its historical rows.
 
 | Pi client | Pico commit | Contract |
 | --- | --- | --- |

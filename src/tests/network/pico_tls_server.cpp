@@ -25,8 +25,10 @@ struct ObservedEngine final : wsprrypico::wtp::RfEngine {
   wsprrypico::standalone::DryRunEngine engine;
   std::uint64_t start{}, allowance{};
   bool reported{};
+  unsigned disables{}, prepares{};
+  bool can_disable=true;
   wsprrypico::wtp::PrepareResult prepare(const wsprrypico::wtp::Job &job) override {
-    return engine.prepare(job);
+    ++prepares; return engine.prepare(job);
   }
   bool schedules_locally() const override { return true; }
   bool schedule(const wsprrypico::wtp::Job &job, std::uint64_t when,
@@ -47,7 +49,7 @@ struct ObservedEngine final : wsprrypico::wtp::RfEngine {
     }
     return result;
   }
-  bool disable(std::uint64_t when) override { return engine.disable(when); }
+  bool disable(std::uint64_t when) override { ++disables; return can_disable && engine.disable(when); }
   bool output_active() const override { return false; }
 };
 }
@@ -56,7 +58,7 @@ int main(int argc, char **argv) {
   network_test::Flash flash;
   wsprrypico::standalone::Store store{flash};
   if (!store.load()) return 1;
-  if (argc > 3) {
+  if (argc > 3 && std::string(argv[3]) != "blank") {
     auto config = *wsprrypico::standalone::parse_config(network_test::config);
     config.power_dbm = 20;
 #ifdef WSPRRY_PICO_EXTENDED_API
@@ -95,6 +97,8 @@ int main(int argc, char **argv) {
       std::string input; std::getline(std::cin, input);
       if (input == "FAIL") { flash.fail = true; std::cout << "ACK" << std::endl; }
       else if (input == "RESUME") { flash.fail = false; std::cout << "ACK" << std::endl; }
+      else if (input == "DISABLE_FAIL") { engine.can_disable=false; std::cout << "ACK" << std::endl; }
+      else if (input == "STOP") { (void)scheduler.command("STOP"); std::cout << "ACK" << std::endl; }
       else if (input == "DUMP") {
         wsprrypico::standalone::Store reload{flash};
         const bool healthy = reload.load();
@@ -108,9 +112,20 @@ int main(int argc, char **argv) {
           }
           redacted.password.clear(); config = wsprrypico::standalone::serialize_config(redacted);
         }
+        std::string flash_digest;
+        for (const auto byte : wsprrypico::wtp::sha256(flash.bytes)) { flash_digest += "0123456789abcdef"[byte >> 4]; flash_digest += "0123456789abcdef"[byte & 15]; }
+        const auto status_text = scheduler.status();
+        const auto status = wsprrypico::wtp::json::parse(status_text);
         std::cout << "DUMP {\"healthy\":" << (healthy ? "true" : "false") << ",\"config\":" << config
                   << ",\"cursor\":\"" << reload.watermark() << "\",\"password_sha256\":\"" << digest
-                  << "\",\"generation\":" << reload.config_sequence() << "}" << std::endl;
+                  << "\",\"generation\":\"" << reload.config_sequence() << "\",\"bytes_sha256\":\"" << flash_digest
+                  << '"'
+#ifdef WSPRRY_PICO_EXTENDED_API
+                  << ",\"inhibit\":" << (service.output_inhibited() ? "true" : "false")
+                  << ",\"pending_restart\":" << (scheduler.hardware_restart_required() ? "true" : "false")
+#endif
+                  << ",\"disables\":" << engine.disables << ",\"prepares\":" << engine.prepares
+                  << ",\"suspended\":" << (status ? std::string(status->get("suspended")->raw) : "null") << "}" << std::endl;
       }
     }
     mock_tcp_poll();

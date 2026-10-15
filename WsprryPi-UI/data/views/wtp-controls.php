@@ -223,6 +223,79 @@
                 </div>
                 <p class="col-12 form-text mb-0" id="wtp-management-connection-feedback" role="status" aria-live="polite">Engineering HTTPS uses the selected certificate connection. Consumer login requires the configured full Pico device ID. No automatic fallback is used.</p>
             </div>
+            <section class="mt-4 mb-4" aria-labelledby="wtp-member-heading">
+                <h4 class="cw-control-section__title" id="wtp-member-heading">Member application, station and pins</h4>
+                <p class="form-text">Inspect this Pico's standalone defaults and saved hardware. These actions do not change Pi station settings or prepared jobs.</p>
+                <button type="button" class="btn btn-outline-primary" id="wtp-member-load">Load member resources</button>
+                <p class="form-text mt-2" id="wtp-member-feedback" role="status" aria-live="polite">Load resources using the selected management connection. Older firmware may support only the settings form below.</p>
+                <dl class="wtp-observations">
+                    <div><dt>Member / boot / connection</dt><dd id="wtp-member-identity">Unavailable until loaded</dd></div>
+                    <div><dt>Member recurrence</dt><dd id="wtp-member-recurrence">Unknown</dd></div>
+                    <div><dt>Storage / application</dt><dd id="wtp-member-health">Unknown</dd></div>
+                    <div><dt>Saved hardware</dt><dd id="wtp-member-saved">Unknown</dd></div>
+                    <div><dt>Active at boot</dt><dd id="wtp-member-active">Unknown</dd></div>
+                    <div><dt>Restart required</dt><dd id="wtp-member-restart">Unknown</dd></div>
+                </dl>
+                <h5 class="cw-control-section__title">Standalone station defaults</h5>
+                <p class="form-text" id="wtp-member-station-hint">Save the complete station together. Reported WSPR power is message metadata, separate from drive, measured RF output and calibration. The current write path requires a Type 1 callsign; six-character locators are retained and encoded using the first four.</p>
+                <div class="row gx-3 gy-3">
+                    <div class="col-12 col-lg-4 config-stacked-field">
+                        <label class="form-label" for="wtp-member-callsign">Callsign</label>
+                        <input class="form-control" id="wtp-member-callsign" type="text" maxlength="12" autocomplete="off" spellcheck="false" data-wtp-resource="station" aria-describedby="wtp-member-station-hint" disabled>
+                    </div>
+                    <div class="col-12 col-lg-4 config-stacked-field">
+                        <label class="form-label" for="wtp-member-locator">Locator</label>
+                        <input class="form-control" id="wtp-member-locator" type="text" maxlength="6" autocomplete="off" spellcheck="false" data-wtp-resource="station" aria-describedby="wtp-member-station-hint" disabled>
+                    </div>
+                    <div class="col-12 col-lg-4 config-stacked-field">
+                        <label class="form-label" for="wtp-member-power">Reported WSPR power (dBm)</label>
+                        <select class="form-select" id="wtp-member-power" data-wtp-resource="station" aria-describedby="wtp-member-station-hint" disabled>
+                            <?php foreach ([0,3,7,10,13,17,20,23,27,30,33,37,40,43,47,50,53,57,60] as $power): ?>
+                            <option value="<?= $power ?>"><?= $power ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                </div>
+                <button type="button" class="btn btn-primary mt-3" id="wtp-member-station-save" disabled>Save member station</button>
+                <p class="form-text mt-2" id="wtp-member-station-feedback" role="status" aria-live="polite"></p>
+                <h5 class="cw-control-section__title mt-4">Supported pin plan</h5>
+                <p class="form-text" id="wtp-member-pin-hint">Pico GP numbering. Direct PIO output, active-low button and indicator are supported. Button actions require the member's button adapter to be enabled. Changes are saved for restart; saving does not change physical routing or enable RF. Pin selection does not establish RF qualification.</p>
+                <div class="row gx-3 gy-3">
+                    <div class="col-12 col-lg-6 config-stacked-field">
+                        <label class="form-label" for="wtp-member-rf">Direct RF output</label>
+                        <select class="form-select" id="wtp-member-rf" data-wtp-resource="hardware" aria-describedby="wtp-member-pin-hint" disabled></select>
+                    </div>
+                    <div class="col-12 col-lg-6 config-stacked-field">
+                        <label class="form-label" for="wtp-member-button">Active-low button</label>
+                        <select class="form-select" id="wtp-member-button" data-wtp-resource="hardware" aria-describedby="wtp-member-pin-hint" disabled></select>
+                    </div>
+                    <div class="col-12 col-lg-4 config-stacked-field">
+                        <label class="form-label" for="wtp-member-indicator">TX indicator</label>
+                        <select class="form-select" id="wtp-member-indicator" data-wtp-resource="hardware" disabled>
+                            <option value="">Select indicator</option>
+                            <option value="onboard_led">Onboard LED</option><option value="external">External GP</option><option value="disabled">Disabled</option>
+                        </select>
+                    </div>
+                    <div class="col-12 col-lg-4 config-stacked-field">
+                        <label class="form-label" for="wtp-member-indicator-gp">External indicator GP</label>
+                        <select class="form-select" id="wtp-member-indicator-gp" data-wtp-resource="hardware" disabled></select>
+                    </div>
+                    <div class="col-12 col-lg-4 config-stacked-field">
+                        <label class="form-label" for="wtp-member-polarity">External indicator polarity</label>
+                        <select class="form-select" id="wtp-member-polarity" data-wtp-resource="hardware" disabled><option value="true">Active high</option><option value="false">Active low</option></select>
+                    </div>
+                </div>
+                <div class="d-flex flex-wrap gap-2 mt-3">
+                    <button type="button" class="btn btn-outline-primary" id="wtp-member-validate" disabled>Validate candidate pins</button>
+                    <button type="button" class="btn btn-primary" id="wtp-member-hardware-save" disabled>Save member hardware</button>
+                </div>
+                <p class="form-text mt-2" id="wtp-member-pin-feedback" role="status" aria-live="polite">Validation is a preview. It never saves or activates pins.</p>
+                <p class="form-text" id="wtp-member-hardware-feedback" role="status" aria-live="polite"></p>
+                <details class="mt-3"><summary>Platform limits and fixed I2C choices</summary>
+                    <p class="form-text">Si5351/I2C RF, amplifier, LPF, drive, reference calibration and waveform settings are unavailable. Pi BCM and physical header numbers do not apply here. Structurally eligible I2C pairs cannot be saved as operational RF hardware.</p>
+                    <p class="form-text" id="wtp-member-pairs">Choices unavailable until loaded.</p>
+                </details>
+            </section>
             <button type="button" class="btn btn-outline-primary" id="wtp-remote-load">Load saved Pico settings</button>
             <p class="form-text">Loading replaces the standalone draft below. After a conflicting or unconfirmed save, loading reads saved values and keeps your draft for review. Status polling preserves it.</p>
             <div class="row gx-3 gy-3" id="wtp-remote-fields">

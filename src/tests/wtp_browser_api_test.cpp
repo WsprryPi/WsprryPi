@@ -8,7 +8,11 @@ int main() {
   try {
     int reads = 0, mutations = 0, management = 0;
     WtpBrowserApi api([&] { ++reads; return nlohmann::json{{"transport", "network"}, {"start_utc_ns", "18446744073709551615"}}; },
-      [&](auto resource, auto method, auto, auto revision) {
+      [&](auto resource, auto method, auto, auto revision, auto) {
+        if (resource == "member/management" && method == "GET")
+          return PicoHttpResponse{200,R"({"selection_id":"test-selection"})",{}};
+        if (resource == "config" && method == "GET")
+          return PicoHttpResponse{200,R"({"config":null})","\"revision\""};
         ++management; CHECK(resource == "config"); CHECK(method == "PUT"); CHECK(revision == "\"revision\"");
         return PicoHttpResponse{412, R"({"error":{"code":"revision_conflict"}})", {}};
       }, [&](auto job) { ++mutations; CHECK(job == std::string(32, 'a')); return PicoHttpResponse{200, R"({"cleanup_ok":true})", {}}; });
@@ -19,11 +23,19 @@ int main() {
     CHECK(api.handle({"PUT", "/api/v1/config", "{}", {}, false}).status == 403);
     CHECK(api.handle({"PUT", "/api/v1/config", "{}", {}, true}).status == 428);
     CHECK(api.handle({"PUT", "/api/v1/config", R"({"a":1,"a":2})", "\"revision\"", true}).status == 400);
+    CHECK(api.handle({"GET", "/api/v1/config", {}, {}, true}).status == 200);
     CHECK(api.handle({"PUT", "/api/v1/config", "{}", "\"revision\"", true}).status == 412);
     CHECK(api.handle({"POST", "/api/v1/member/configuration", "{}", "\"revision\"", false}).status == 403);
     CHECK(api.handle({"POST", "/api/v1/member/configuration", "{}", {}, true}).status == 428);
     CHECK(api.handle({"POST", "/api/v1/member/configuration", R"({"a":1,"a":2})", "\"revision\"", true}).status == 400);
     CHECK(api.handle({"POST", "/api/v1/member/configuration", std::string(2049,' '), "\"revision\"", true}).status == 413);
+    for (const auto resource : {"application","station","hardware","pins"}) {
+      const std::string path="/api/v1/member/"+std::string(resource);
+      CHECK(classify_privileged_http_operation("GET",path)==PrivilegedOperationClass::protected_operation);
+      CHECK(classify_privileged_http_operation("DELETE",path)==PrivilegedOperationClass::reject);
+      CHECK(classify_privileged_http_operation("PUT",path)==((std::string(resource)=="station"||std::string(resource)=="hardware") ? PrivilegedOperationClass::protected_operation : PrivilegedOperationClass::reject));
+    }
+    CHECK(classify_privileged_http_operation("POST","/api/v1/member/pins/validate")==PrivilegedOperationClass::protected_operation);
     CHECK(classify_privileged_http_operation("GET", "/api/v1/member/configuration") == PrivilegedOperationClass::protected_operation);
     CHECK(classify_privileged_http_operation("POST", "/api/v1/member/configuration") == PrivilegedOperationClass::protected_operation);
     CHECK(classify_privileged_http_operation("PUT", "/api/v1/member/configuration") == PrivilegedOperationClass::reject);

@@ -108,6 +108,12 @@ async function main() {
     const output = path.resolve(UI_ROOT, '../src/build/wtp-network/ui');
     fs.mkdirSync(output, { recursive: true });
     const captureScreenshots = process.env.WSPRRYPI_UI_CAPTURE !== '0';
+    const resourceBuild=path.dirname(output);
+    const resourceFixtures={
+        loaded:JSON.parse(fs.readFileSync(path.join(resourceBuild,'resources-loaded-engineering_mtls.json'))),
+        consumer:JSON.parse(fs.readFileSync(path.join(resourceBuild,'resources-pending-consumer_station.json'))),
+        fault:JSON.parse(fs.readFileSync(path.join(resourceBuild,'resources-fault-engineering_mtls.json')))
+    };
     let chrome, client;
     const capture = async (name, parameters = {format:'png'}) => {
         if (!captureScreenshots) return;
@@ -137,6 +143,8 @@ async function main() {
             backendCurrentlyConnected = true; websocketCurrentlyConnected = true;
             syncConnectionAlert(); clearBackendStatus('runtime'); clearConfigLoadFailureState();
             const style = document.createElement('style'); style.textContent='* { scroll-behavior: auto !important; }'; document.head.append(style);
+            window.__resourceFixtures = ${JSON.stringify(resourceFixtures)};
+            window.__resourceState = 'loaded';
             window.__requests = [];
             window.__remoteFailure = false;
             window.__statusFailure = false;
@@ -152,6 +160,12 @@ async function main() {
                     if (body?.action === 'disconnect') window.__management = {carrier:'disconnected',host:'',connected:false};
                     return {ok:true,headers:{get:()=>''},json:async()=>window.__management || {carrier:'engineering_mtls',host:'',connected:false}};
                 }
+                if (String(url).endsWith('/member/application')) {
+                    if(window.__resourceState==='unsupported')return {ok:false,status:409,json:async()=>({error:{code:'shared_resources_unavailable'}})};
+                    return {ok:true,headers:{get:()=> '\"resource-r1\"'},json:async()=>structuredClone(window.__resourceFixtures[window.__resourceState])};
+                }
+                if (String(url).endsWith('/member/pins/validate'))return {ok:true,headers:{get:()=>''},json:async()=>({valid:true,operational_supported:true,applied:false})};
+                if (String(url).endsWith('/member/station') || String(url).endsWith('/member/hardware'))return {ok:true,headers:{get:()=> '\"resource-r2\"'},json:async()=>({pending_restart:true})};
                 if (String(url).endsWith('/host/devices')) return {ok:true,headers:{get:()=> '"catalog-r1"'},json:async()=>({scope:'wsprrypi-wtp-catalog/1',version:1,active_id:'c'.repeat(32),active_unmatched:false,profiles:[{id:'c'.repeat(32),name:'Bench Pico',method:'manual',discovery_id:'',legacy_unverified:false,settings:{Transport:'network',Hostname:'wsprrypico-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.local','TCP Port':18443,'TLS Server Identity':'pico.local','TLS CA File':'/etc/wsprrypi/pico/ca.crt','TLS Client Certificate':'/etc/wsprrypi/pico/client.crt','TLS Client Key':'/etc/wsprrypi/pico/client.key',Endpoint:'', 'USB Serial':'','USB Vendor ID':0,'USB Product ID':0,'Device ID':'a'.repeat(32),'Start Uncertainty ns':1000000,'Allow Frequency Adjustment':false}}]})};
                 if (String(url).endsWith('/host/discovery')) return {ok:true,json:async()=>({available:true,reason:'',candidates:[{id:'service-nearby',interface:2,protocol:0,instance:'Nearby Pico',domain:'local',target:'nearby.local',port:40123,binding:'plain',state:'online',first_seen_ms:1,last_seen_ms:2}]})};
                 if (String(url).endsWith('/status')) {
@@ -265,6 +279,43 @@ async function main() {
         }
         await evaluate(`window.__consumerBusy=false; window.__management={carrier:'engineering_mtls',host:'',connected:false}; document.getElementById('wtp-management-state').click();`);
         await waitFor(async()=>await evaluate('document.getElementById("wtp-management").getAttribute("aria-busy")==="false"'),'restore engineering management');
+        // One batched P15.4 visual pass: real emitted resource fixtures, with
+        // mocked browser transport only. Actual carrier evidence runs separately.
+        for (const state of ['loaded','consumer','fault','unsupported']) {
+            await evaluate(`window.__resourceState='${state}'; window.WtpManagement.setAvailability(true,true); document.getElementById('wtp-member-load').click();`);
+            await waitFor(async()=>await evaluate('document.getElementById("wtp-management").getAttribute("aria-busy")==="false"'),'shared resource load');
+            if(state==='loaded') {
+                assert.equal(await evaluate('document.getElementById("wtp-member-station-save").disabled'),false);
+                assert.equal(await evaluate(`(()=>{
+                    const original=window.scheduleAutosave; let calls=0; window.scheduleAutosave=()=>{calls++;};
+                    for(const id of ['wtp-member-callsign','wtp-member-rf','wtp-remote-password','wtp-management-carrier']) {
+                        const e=document.getElementById(id);e.dispatchEvent(new Event('input',{bubbles:true}));e.dispatchEvent(new Event('change',{bubbles:true}));
+                    }
+                    const memberCalls=calls;document.getElementById('wtp_hostname').dispatchEvent(new Event('input',{bubbles:true}));
+                    window.scheduleAutosave=original;return memberCalls===0&&calls>0;
+                })()`),true,'member draft changes must never schedule host autosave');
+                const before=await evaluate('window.__requests.filter(r=>r.options.method==="PUT").length');
+                await evaluate(`document.getElementById('wtp-member-validate').click()`);
+                await waitFor(async()=>await evaluate('document.getElementById("wtp-member-pin-feedback").textContent.includes("Preview only")'),'pin preview');
+                assert.equal(await evaluate('window.__requests.filter(r=>r.options.method==="PUT").length'),before);
+                assert.equal(await evaluate('document.getElementById("wtp-member-hardware-save").disabled'),false);
+            }
+            if(state==='consumer') {
+                assert.equal(await evaluate('document.getElementById("wtp-member-station-save").disabled'),true);
+                assert.match(await evaluate('document.getElementById("wtp-member-active").textContent'),/Unknown/);
+                assert.match(await evaluate('document.getElementById("wtp-member-restart").textContent'),/latched/);
+            }
+            if(state==='fault'||state==='unsupported') assert.equal(await evaluate('document.getElementById("wtp-member-hardware-save").disabled'),true);
+            for(const theme of ['light','dark'])for(const viewport of [{name:'desktop',width:1280,height:900},{name:'mobile',width:390,height:844}]) {
+                await client.send('Emulation.setDeviceMetricsOverride',{...viewport,deviceScaleFactor:1,mobile:viewport.name==='mobile'});
+                await evaluate(`applyThemePreference('${theme}'); document.getElementById('wtp-member-heading').scrollIntoView({block:'start',behavior:'instant'});`);
+                const rect=await evaluate(`(()=>{const r=document.getElementById('wtp-member-heading').closest('section').getBoundingClientRect();return {x:Math.max(0,r.x+scrollX),y:Math.max(0,r.y+scrollY),width:r.width,height:r.height,scale:1};})()`);
+                await capture(`${viewport.name}-${theme}-resources-${state}.png`,{format:'png',captureBeyondViewport:true,clip:rect});
+                assert(await evaluate('document.documentElement.scrollWidth<=innerWidth+1'),'member resource overflow');
+                assert(await evaluate('[...document.querySelectorAll("[data-wtp-resource]")].every(e=>document.querySelector(`label[for="${e.id}"]`))'),'member control labels');
+                assert.equal(await evaluate('getComputedStyle(document.getElementById("wtp-member-feedback")).fontSize'),'14px');
+            }
+        }
         for (const state of ['saved', 'stale', 'unsupported', 'ambiguous', 'busy']) {
             await evaluate(`window.__remoteFailure=false; window.__mutationFailure=''; window.WtpManagement.setAvailability(true); document.getElementById('wtp-remote-load').click();`);
             await waitFor(async () => await evaluate('!document.getElementById("wtp-remote-save").disabled'), 'settings readback');

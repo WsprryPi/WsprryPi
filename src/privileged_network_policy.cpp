@@ -90,6 +90,11 @@ PrivilegedOperationClass classify_privileged_http_operation(
     }
 
     if (path.starts_with("/api/v1/")) {
+        if ((method == "GET" && (path == "/api/v1/member/application" || path == "/api/v1/member/station" ||
+              path == "/api/v1/member/hardware" || path == "/api/v1/member/pins")) ||
+            (method == "PUT" && (path == "/api/v1/member/station" || path == "/api/v1/member/hardware")) ||
+            (method == "POST" && path == "/api/v1/member/pins/validate"))
+            return PrivilegedOperationClass::protected_operation;
         if ((path == "/api/v1/member/configuration" || path == "/api/v1/member/management") && (method == "GET" || method == "POST"))
             return PrivilegedOperationClass::protected_operation;
         if (method == "GET" && (path == "/api/v1/status" || path == "/api/v1/jobs" || path == "/api/v1/capabilities"))

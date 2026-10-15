@@ -5,6 +5,8 @@
 #include "wspr_transmit_types.hpp"
 #include "wtp_integration/application.hpp"
 #include "wtp_integration/network_http.hpp"
+#include "wtp_integration/configuration.hpp"
+#include "wtp_integration/consumer_radio.hpp"
 #include "json.hpp"
 #include <optional>
 std::string wtp_runtime_selection_error(const std::optional<WtpSettings> &);
@@ -25,7 +27,8 @@ void wtp_runtime_poll_idle();
 wsprrypi::CleanupResult wtp_runtime_recover();
 std::string wtp_runtime_json();
 wsprrypi::PicoHttpResponse wtp_runtime_management(const std::string &resource,
-    const std::string &method, const std::string &body, const std::string &revision);
+    const std::string &method, const std::string &body, const std::string &revision,
+    const std::string &expected_selection = {});
 wsprrypi::CleanupResult wtp_runtime_cancel_job(const std::string &job_id);
 // Holds the runtime operation gate while a bounded read-only identification
 // callback runs. It never claims or changes the active endpoint.
@@ -40,3 +43,7 @@ void set_wtp_runtime_for_test(WtpSettings, wsprrypi::WtpScheduleClock &,
                               wsprrypi::wtp::ByteStream &,
                               wsprrypi::wtp::SessionOptions,
                               std::function<bool()>);
+// Typed transport injection for isolated real-handler/crypto fixtures only.
+// Runtime admission, carrier selection and dispatch remain production code.
+void set_wtp_management_transports_for_test(wsprrypi::PicoManagementExchange engineering,
+    wsprrypi::ConsumerRadioClient::Transport consumer = {});

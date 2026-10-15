@@ -3,6 +3,9 @@
 #include "wtp_integration/application.hpp"
 #include "wtp_integration/browser_api.hpp"
 #include "wtp_integration/configuration.hpp"
+#include "wtp_runtime_bridge.hpp"
+#include "privileged_network_policy.hpp"
+#include "tests/network/protected_browser_fixture.hpp"
 #include <iostream>
 #include <thread>
 using namespace wsprrypi;
@@ -33,34 +36,40 @@ int main(int argc, char **argv) {
       return tls.ready();
     };
     WtpSettings settings; settings.device_id=std::string(32,'a'); settings.start_uncertainty_ns=1000000;
-    WtpApplication app(clock,tls,settings,{std::string(32,'1'),std::string(32,'2'),settings.device_id},open);
-    if (!app.inspect().ok) throw std::runtime_error("Initial WTP negotiation failed");
+    settings.transport="network"; settings.hostname=selection.host; settings.tcp_port=selection.port;
+    settings.tls_ca=selection.ca_file; settings.tls_certificate=selection.certificate_file; settings.tls_key=selection.key_file;
+    set_wtp_runtime_for_test(settings,clock,tls,{std::string(32,'1'),std::string(32,'2'),settings.device_id},open);
+    struct Reset { ~Reset() { select_wtp_runtime(std::nullopt); } } reset;
+    if (!wtp_runtime_inspect().ok) throw std::runtime_error("Initial WTP negotiation failed");
     nlohmann::json exchanges=nlohmann::json::array();
-    bool drop=false;
-    WtpBrowserApi api([&]{return wtp_runtime_status_json(app.status());},
-      [&](auto resource,auto method,auto body,auto revision) {
-        PicoHttpResponse result;
-        if (!app.idle_management([&] {
-          const auto exchange=[&](const std::string &path,const std::string &verb,const std::string &payload,const std::string &etag) {
-            exchanges.push_back({{"resource",path},{"method",verb},{"body",payload},{"revision",etag}});
-            auto response=pico_http_request(tls,selection,credentials,[&]{return clock.now_ms();},path,verb,payload,etag);
-            if (drop && verb!="GET") { drop=false; return PicoHttpResponse{503,R"({"error":{"code":"management_outcome_unknown"}})",{}}; }
-            return response;
-          };
-          if (resource=="member/configuration") {
-            const auto identity=app.status().identity;
-            result=pico_configuration_request(exchange,identity?identity->device_id:"",identity?identity->boot_id:"",method,body,revision);
-          } else result=exchange(resource,method,body,revision);
-        })) return PicoHttpResponse{409,R"({"error":{"code":"host_busy_or_output_unresolved"}})",{}};
-        return result;
-      },[](auto){return PicoHttpResponse{409,R"({"error":{"code":"not_owner"}})",{}};});
+    bool drop=false; nlohmann::json corruption;
+    set_wtp_management_transports_for_test([&](const std::string &path,const std::string &verb,const std::string &payload,const std::string &etag) {
+      exchanges.push_back({{"resource",path},{"method",verb},{"body",payload},{"revision",etag}});
+      auto result=pico_http_request(tls,selection,credentials,[&]{return clock.now_ms();},path,verb,payload,etag);
+      if (drop && verb!="GET") { drop=false; return PicoHttpResponse{503,R"({"error":{"code":"management_outcome_unknown"}})",{}}; }
+      if (corruption.is_object() && corruption.value("resource","") == path && result.status == 200 && verb == corruption.value("method","GET")) {
+        auto value=strict_browser_json(result.body);
+        value[nlohmann::json::json_pointer(corruption.at("pointer").get<std::string>())]=corruption.at("value");
+        if (corruption.value("as_float",false)) { auto &slot=value[nlohmann::json::json_pointer(corruption.at("pointer").get<std::string>())];slot=slot.get<double>(); }
+        result.body=value.dump();
+        if (corruption.value("duplicate",false)) result.body.insert(1,"\"schema\":null,");
+        if (corruption.value("oversized",false)) result.body.append(4097,' ');
+      }
+      return result;
+    });
+    WtpBrowserApi api([]{return nlohmann::json::parse(wtp_runtime_json());},wtp_runtime_management,
+      [](auto){return PicoHttpResponse{409,R"({"error":{"code":"not_owner"}})",{}};});
     std::string line;
     while (std::getline(std::cin,line)) {
       const auto command=strict_browser_json(line); exchanges=nlohmann::json::array();
-      if (command.contains("control")) { drop=command["control"]=="drop_mutation_reply"; std::cout<<"{}"<<std::endl; continue; }
-      const auto response=api.handle({command.at("method"),command.at("path"),command.value("body",""),command.value("revision",""),true});
+      if (command.contains("control")) {
+        drop=command["control"]=="drop_mutation_reply";
+        corruption=command.value("corruption",nlohmann::json(nullptr));
+        std::cout<<"{}"<<std::endl; continue;
+      }
+      const auto response=protected_browser_fixture(api,command);
       std::cout<<nlohmann::json{{"status",response.status},{"body",strict_browser_json(response.body)},
-          {"etag",response.etag},{"exchanges",exchanges}}.dump()<<std::endl;
+          {"etag",response.etag},{"exchanges",exchanges},{"host_ready",wtp_runtime_ready()}}.dump()<<std::endl;
     }
   } catch (const std::exception &e) { std::cerr<<e.what()<<'\n'; return 1; }
 }

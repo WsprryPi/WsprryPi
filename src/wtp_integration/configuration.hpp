@@ -12,4 +12,10 @@ PicoHttpResponse pico_configuration_request(const PicoManagementExchange &,
     const std::string &device, const std::string &boot, const std::string &method,
     const std::string &body = {}, const std::string &revision = {},
     const std::string &carrier = "engineering_mtls", const std::string &generation = {});
+// Caller holds the same operation/application gate as the legacy editor.
+// Only the fixed shared-resource mapping is accepted. No Config fallback.
+PicoHttpResponse pico_resource_request(const PicoManagementExchange &,
+    const std::string &device, const std::string &boot, const std::string &resource,
+    const std::string &method, const std::string &body = {}, const std::string &revision = {},
+    const std::string &carrier = "engineering_mtls", const std::string &generation = {});
 } // namespace wsprrypi

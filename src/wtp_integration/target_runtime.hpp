@@ -5,6 +5,7 @@
 #include "tls.hpp"
 #include "plain_tcp.hpp"
 #include "consumer_radio.hpp"
+#include "configuration.hpp"
 #include "output_lease.hpp"
 #include <cstdlib>
 #include <memory>
@@ -26,8 +27,11 @@ struct WtpTargetRuntime {
   std::unique_ptr<wsprrypi::WtpApplication> app;
   // Management selection is volatile and independent of the WTP transport.
   std::string management_carrier, management_host;
+  std::string management_selection_id{wtp_random_identity()};
   std::unique_ptr<wsprrypi::ConsumerRadioClient> consumer_management;
   wsprrypi::PlainTcpStream management_tcp{[this] { return clock.now_ms(); }};
+  PicoManagementExchange engineering_transport_for_test;
+  ConsumerRadioClient::Transport consumer_transport_for_test;
 
   bool credentials_current() const {
     return settings.transport != "network" ||

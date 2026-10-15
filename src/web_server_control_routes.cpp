@@ -11,6 +11,7 @@
 #include "json.hpp"
 #include "config_handler.hpp"
 #include "wtp_integration/browser_api.hpp"
+#include "wtp_integration/browser_http.hpp"
 #include "wtp_integration/catalog.hpp"
 #include "wtp_integration/fleet_runtime.hpp"
 #include "wtp_integration/discovery.hpp"
@@ -202,21 +203,13 @@ void register_control(
                     nlohmann::json{{"error", {{"code", "not_owner_or_cleanup_unresolved"}}}}.dump(), {}};
         });
     const auto shared = [](const httplib::Request &request, httplib::Response &response) {
-        if (request.target != request.path || request.body.size() > 32768 ||
-            request.get_header_value_count("Host") != 1 ||
-            request.get_header_value_count("Origin") > 1 ||
-            request.get_header_value_count("Content-Type") > 1 ||
-            request.get_header_value_count("If-Match") > 1 ||
-            request.get_header_value_count("X-WsprryPico-Request") > 1) {
+        const auto browser_request = wsprrypi::wtp_browser_http_request(request);
+        if (!browser_request) {
             response.status = 400;
             response.set_content(R"({"error":{"code":"invalid_request"}})", "application/json");
             return;
         }
-        const auto fetch = request.get_header_value("Sec-Fetch-Site");
-        const bool context = request.has_header("Origin") &&
-            request.get_header_value("Content-Type") == "application/json" &&
-            request.get_header_value("X-WsprryPico-Request") == "1" &&
-            (fetch.empty() || fetch == "same-origin" || fetch == "none");
+        const bool context = browser_request->mutation_context;
         wsprrypi::PicoHttpResponse result;
         if (request.path == "/api/v1/host/fleet") {
             result = request.method == "GET" || context
@@ -283,7 +276,7 @@ void register_control(
                 result = {conflict ? 412U : 400U,
                     nlohmann::json{{"error", {{"code", conflict ? "revision_conflict" : "invalid_config"}}}}.dump(), {}};
             }
-        } else result = api.handle({request.method, request.path, request.body, request.get_header_value("If-Match"), context});
+        } else result = api.handle(*browser_request);
         response.status = result.status;
         response.set_header("Cache-Control", "no-store");
         response.set_header("X-Content-Type-Options", "nosniff");

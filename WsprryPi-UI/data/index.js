@@ -743,6 +743,7 @@ function bindIndexActions() {
         "input change",
         '.form-control:not([type="range"], .form-check-input)',
         function () {
+            if (this.closest("#wtp-management")) return;
             validatePage();
             scheduleAutosave();
         }
@@ -751,7 +752,9 @@ function bindIndexActions() {
     $("#wsprform").on(
         "change input",
         'input:not(#transmit, [name="mode_toggle"], [name="qrss_type"]), select:not(#tx_pin), textarea',
-        scheduleAutosave
+        function () {
+            if (!this.closest("#wtp-management")) scheduleAutosave();
+        }
     );
 
     bindTestToneControls();

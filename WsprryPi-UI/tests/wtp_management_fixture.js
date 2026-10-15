@@ -11,10 +11,10 @@ function browser(exchange, producer = source) {
   const fields = new Map(), requests = [];
   const element = id => {
     if (!fields.has(id)) fields.set(id, {value:'',checked:false,disabled:false,hidden:false,textContent:'',listeners:{},
-      setAttribute(){},addEventListener(name,callback){this.listeners[name]=callback;}});
+      dataset:{wtpResource:['wtp-member-callsign','wtp-member-locator','wtp-member-power'].includes(id)?'station':'hardware'}, setAttribute(){},addEventListener(name,callback){this.listeners[name]=callback;}});
     return fields.get(id);
   };
-  const root = {document:{readyState:'complete',getElementById:element,querySelectorAll:()=>[]},
+  const root = {document:{readyState:'complete',getElementById:element,querySelectorAll:selector=>selector==='[data-wtp-resource]' ? [...fields.entries()].filter(([id])=>/^wtp-member-(callsign|locator|power|rf|button|indicator|indicator-gp|polarity)$/.test(id)).map(([,e])=>e) : []},
     WtpUi:{developmentControlsVisible:true,read:()=>({Transport:'network'})}, AbortController,setTimeout,clearTimeout,
     fetch:async (url, options) => {
       const request = {url,...options,body:options.body ? JSON.parse(options.body) : null};

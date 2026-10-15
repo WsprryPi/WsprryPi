@@ -296,12 +296,15 @@ async function main() {
         fs.writeFileSync(path.join(evidence, "measurements.json"), JSON.stringify({ run: run.result.value, measurements, textZoom: zoom.result.value }, null, 2));
         console.log(`Test Tone browser: 16 workflows passed; 17 screenshots in ${evidence}`);
     } finally {
+        if (client && chromium?.exitCode === null) {
+            await Promise.race([client.send("Browser.close").catch(() => {}), new Promise(resolve => setTimeout(resolve, 1000))]);
+        }
         client?.close();
         await Promise.all([chromium, php].filter(Boolean).map(process => new Promise(resolve => {
             if (process.exitCode !== null || process.signalCode !== null) return resolve();
             process.once("exit", resolve); process.kill("SIGTERM");
         })));
-        fs.rmSync(profileDir, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 });
+        fs.rmSync(profileDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
     }
 }
 main().catch(error => { console.error(error); process.exitCode=1; });

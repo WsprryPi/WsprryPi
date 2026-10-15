@@ -76,15 +76,18 @@ PicoHttpResponse pico_http_request(TlsStream &stream, const TlsSelection &select
   };
   const bool mutation = method == "PUT" || method == "POST";
   const bool allowed = (method == "GET" && (resource == "config" || resource == "schedules" ||
-      resource == "network" || resource == "capabilities" || resource == "status" || resource == "application" || resource == "management")) ||
-      (method == "PUT" && (resource == "config" || resource == "schedules" || resource == "network")) ||
-      (method == "POST" && resource == "config/update");
+      resource == "network" || resource == "capabilities" || resource == "status" || resource == "application" || resource == "management" ||
+       resource == "station" || resource == "hardware" || resource == "pins")) ||
+      (method == "PUT" && (resource == "config" || resource == "schedules" || resource == "network" || resource == "station" || resource == "hardware")) ||
+      (method == "POST" && (resource == "config/update" || resource == "pins/validate"));
   if (!allowed)
     return error(404, "not_found");
   if (body.size() > 32768 || revision.size() > 128 || revision.find_first_of("\r\n") != std::string::npos)
     return error(400, "invalid_request");
   if (method == "POST" && body.size() > 2048) return error(413, "body_too_large");
-  if (mutation && revision.empty()) return error(428, "revision_required");
+  if (method == "PUT" && (resource == "station" || resource == "hardware") && body.size() > 1024)
+    return error(413,"body_too_large");
+  if (mutation && resource != "pins/validate" && revision.empty()) return error(428, "revision_required");
   if (!stream.begin_open(selection, std::move(credentials), "http/1.1")) return error(503, "network_unavailable");
   struct Close { TlsStream &stream; ~Close() { stream.close(); } } close{stream};
   const auto deadline = clock() + 20000;
@@ -99,8 +102,8 @@ PicoHttpResponse pico_http_request(TlsStream &stream, const TlsSelection &select
   if (selection.port != 443) authority += ':' + std::to_string(selection.port);
   std::string request = method + " /api/v1/" + resource + " HTTP/1.1\r\nHost: " + authority + "\r\n";
   if (mutation) request += "Origin: https://" + authority +
-      "\r\nContent-Type: application/json\r\nX-WsprryPico-Request: 1\r\nIf-Match: " + revision +
-      "\r\nContent-Length: " + std::to_string(body.size()) + "\r\n";
+      "\r\nContent-Type: application/json\r\nX-WsprryPico-Request: 1\r\n" + (revision.empty() ? "" : "If-Match: " + revision + "\r\n") +
+      "Content-Length: " + std::to_string(body.size()) + "\r\n";
   request += "\r\n" + body;
   return wtp_json_http_exchange(stream, clock, request, deadline, mutation);
 }

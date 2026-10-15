@@ -398,6 +398,9 @@ void run(const std::string &credentials) {
   const auto uncertain_end = end_test_tone();
   CHECK(uncertain_end.restoration_failed && uncertain_end.lifecycle.state == "unknown" && !config.transmit);
   CHECK(!start_test_tone(bounded).started);
+  const auto unresolved_operations=tone_clock.peer.operations;
+  CHECK(wtp_runtime_management("member/management","POST",R"({"action":"connect","carrier":"consumer_station","host":"192.168.1.53","password":"test-password"})","").status==409);
+  CHECK(tone_clock.peer.operations==unresolved_operations);
   CHECK(wtp_runtime_recover().ok);
   const auto recovered_end = end_test_tone();
   CHECK(recovered_end.stopped && !recovered_end.tone_was_active && recovered_end.output_inactive);
@@ -434,6 +437,11 @@ void run(const std::string &credentials) {
   CHECK(wtp_runtime_management("member/configuration","GET","","").status == 401);
   CHECK(wtp_runtime_management("member/management","POST",R"({"action":"disconnect"})","").status == 200);
 
+  const auto previous_selection=nlohmann::json::parse(wtp_runtime_management("member/management","GET","","").body).at("selection_id").get<std::string>();
+  auto changed_selection=management_settings;changed_selection.hostname="192.0.2.123";
+  select_wtp_runtime(changed_selection);
+  const auto stale_dispatch=wtp_runtime_management("member/application","GET","","",previous_selection);
+  CHECK(stale_dispatch.status==409 && stale_dispatch.body.find("member_read_required")!=std::string::npos);
   select_wtp_runtime(std::nullopt);
   if (!credentials.empty()) {
     auto network = settings;
@@ -470,6 +478,10 @@ void run(const std::string &credentials) {
     wtp_runtime_prepare(request);
     const auto before_management = rotation_clock.peer.operations;
     CHECK(wtp_runtime_management("member/configuration", "GET", "", "").status == 409);
+    for (const auto resource : {"member/application","member/station","member/hardware","member/pins","member/pins/validate"}) {
+      CHECK(wtp_runtime_management(resource,std::string(resource).ends_with("validate") ? "POST" : "GET","","").status==409);
+      CHECK(rotation_clock.peer.operations==before_management);
+    }
     CHECK(rotation_clock.peer.operations == before_management);
     CHECK(wtp_runtime_management("member/management", "POST",
         R"({"action":"connect","carrier":"consumer_station","host":"192.168.1.53","password":"test-password"})", "").status == 409);

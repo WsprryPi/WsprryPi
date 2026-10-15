@@ -14,6 +14,8 @@ elseif(PICO_COMPAT_PROFILE STREQUAL "extended")
   set(pico_pin_file "${CMAKE_CURRENT_SOURCE_DIR}/pico-extended-revision.txt")
 elseif(PICO_COMPAT_PROFILE STREQUAL "p152")
   set(pico_pin_file "${CMAKE_CURRENT_SOURCE_DIR}/pico-p152-revision.txt")
+elseif(PICO_COMPAT_PROFILE STREQUAL "p153")
+  set(pico_pin_file "${CMAKE_CURRENT_SOURCE_DIR}/pico-p153-revision.txt")
 elseif(NOT PICO_COMPAT_PROFILE STREQUAL "current")
   message(FATAL_ERROR "Unknown Pico compatibility profile")
 endif()
@@ -82,7 +84,7 @@ if(NOT PICO_COMPAT_PROFILE STREQUAL "legacy")
     network/bootstrap_slot.cpp network/bootstrap_wire.cpp network/owner_wire.cpp
     network/owner_challenge.cpp network/owner_claim_http.cpp network/consumer_radio.cpp network/softap_api.cpp
     standalone/frequency_policy_engine.cpp time/controller_time.cpp)
-  if(PICO_COMPAT_PROFILE STREQUAL "current")
+  if(PICO_COMPAT_PROFILE STREQUAL "current" OR PICO_COMPAT_PROFILE STREQUAL "p153")
     list(APPEND core application/config_update.cpp network/management.cpp)
   elseif(PICO_COMPAT_PROFILE STREQUAL "p152")
     list(APPEND core application/config_update.cpp)
@@ -108,7 +110,7 @@ if(NOT PICO_COMPAT_PROFILE STREQUAL "legacy")
 endif()
 
 # P15.3 genuine consumer path; historical compatibility profiles remain intact.
-if(PICO_COMPAT_PROFILE STREQUAL "current")
+if(PICO_COMPAT_PROFILE STREQUAL "current" OR PICO_COMPAT_PROFILE STREQUAL "p153")
   target_compile_definitions(pico_tls_server PRIVATE WSPRRY_PICO_MANAGEMENT_API=1)
   add_library(pico_consumer_fixture STATIC ${core}
     "${CMAKE_BINARY_DIR}/generated/web_assets.cpp"
@@ -123,12 +125,13 @@ if(PICO_COMPAT_PROFILE STREQUAL "current")
     ../../wtp_integration/consumer_radio.cpp ../../wtp_integration/configuration.cpp
     ../../wtp_integration/browser_api.cpp ../../wtp_integration/network_http.cpp
     ../../wtp_integration/plain_tcp.cpp ../../wtp_integration/tls.cpp
+    ../../wtp_runtime_bridge.cpp ../../wtp_integration/output_lease.cpp ../../wtp_integration/usb_cdc.cpp ../../privileged_network_policy.cpp ../../backend_http_guard.cpp ../../support_request_guard.cpp ../../httplib.cpp
     ../../wtp_integration/application.cpp ../../wtp_integration/status.cpp
     ../../wtp_integration/scheduler.cpp ../../wtp_integration/backend.cpp
     ../../wtp_integration/execution_plan.cpp ../../WSPR-Transmitter/src/execution_plan_compiler.cpp
     ../../WSPR-Transmitter/src/transmission_controller.cpp)
   target_compile_definitions(consumer_interop PRIVATE WSPRRYPI_CONSUMER_CRYPTO_TEST=1 MBEDTLS_CONFIG_FILE="${MBEDTLS_CONFIG_FILE}")
-  target_include_directories(consumer_interop PRIVATE ../.. ../../WTP-Client/include
+  target_include_directories(consumer_interop PRIVATE ../.. ../../WTP-Client/include ../../WSPR-Transmitter/src
     "${PICO_SOURCE}/src" "${PICO_SOURCE}/tests" "${CMAKE_BINARY_DIR}/generated" "${MBEDTLS_SOURCE}/include")
   target_link_libraries(consumer_interop PRIVATE pico_consumer_fixture mbedcrypto ssl crypto
     "${CMAKE_BINARY_DIR}/client/libwtp_client.a" pthread)
