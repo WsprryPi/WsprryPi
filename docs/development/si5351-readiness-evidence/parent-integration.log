@@ -1,0 +1,380 @@
+build metadata unchanged: build/generated/build_metadata.hpp
+backend capabilities unchanged: build/generated/backend_capabilities.hpp
+build/server_core_test
+[INFO ] Stop transmission requested by user; no active transmission.
+[INFO ] Transmission stopped and runtime transmit disabled without persisting.
+[ERROR] Failed to open /proc/device-tree/model.
+[ERROR] Failed to open /sys/firmware/devicetree/base/compatible.
+[INFO ] Beginning test tone requested by web UI.
+[INFO ] Using web UI test tone RF frequency override: 14.097100 MHz
+[ERROR] Failed to open /proc/device-tree/model.
+[ERROR] Failed to open /sys/firmware/devicetree/base/compatible.
+[INFO ] WSPR-band test tone using dial frequency: 14.097100 MHz
+[INFO ] Ending test tone requested by Web UI.
+[INFO ] Transmit backend: simulated
+[INFO ] Transmit GPIO: 4
+[WARN ] System-clock frequency estimate disabled and manual GPIO PPM is zero.
+[INFO ] PPM Manager disabled.
+[INFO ] No transmission requested; skipping transmission and scheduling.
+[INFO ] Stop transmission requested by user; no active transmission.
+[INFO ] Transmission stopped and runtime transmit disabled without persisting.
+[ERROR] Failed to open /proc/device-tree/model.
+[ERROR] Failed to open /sys/firmware/devicetree/base/compatible.
+[INFO ] Beginning test tone requested by web UI.
+[INFO ] Using web UI test tone RF frequency override: 14.097100 MHz
+[ERROR] Failed to open /proc/device-tree/model.
+[ERROR] Failed to open /sys/firmware/devicetree/base/compatible.
+[INFO ] WSPR-band test tone using dial frequency: 14.097100 MHz
+[INFO ] Ending test tone requested by Web UI.
+[INFO ] Transmit backend: simulated
+[INFO ] Transmit GPIO: 4
+[WARN ] System-clock frequency estimate disabled and manual GPIO PPM is zero.
+[INFO ] PPM Manager disabled.
+[INFO ] No transmission requested; skipping transmission and scheduling.
+[INFO ] Stop transmission requested by user; no active transmission.
+[INFO ] Transmission stopped and runtime transmit disabled without persisting.
+[ERROR] Failed to open /proc/device-tree/model.
+[ERROR] Failed to open /sys/firmware/devicetree/base/compatible.
+[INFO ] Beginning test tone requested by web UI.
+[INFO ] Using web UI test tone RF frequency override: 14.097100 MHz
+[ERROR] Failed to open /proc/device-tree/model.
+[ERROR] Failed to open /sys/firmware/devicetree/base/compatible.
+[INFO ] WSPR-band test tone using dial frequency: 14.097100 MHz
+[INFO ] Stop transmission requested by user; no active transmission.
+[INFO ] Transmission stopped and runtime transmit disabled without persisting.
+[ERROR] Failed to open /proc/device-tree/model.
+[ERROR] Failed to open /sys/firmware/devicetree/base/compatible.
+[INFO ] Beginning test tone requested by web UI.
+[INFO ] Using web UI test tone RF frequency override: 14.097100 MHz
+[ERROR] Failed to open /proc/device-tree/model.
+[ERROR] Failed to open /sys/firmware/devicetree/base/compatible.
+[INFO ] WSPR-band test tone using dial frequency: 14.097100 MHz
+[INFO ] Stop transmission requested by user; no active transmission.
+[INFO ] Transmission stopped and runtime transmit disabled without persisting.
+[ERROR] Failed to open /proc/device-tree/model.
+[ERROR] Failed to open /sys/firmware/devicetree/base/compatible.
+[INFO ] Beginning test tone requested by web UI.
+[INFO ] Using web UI test tone RF frequency override: 14.097100 MHz
+[ERROR] Failed to open /proc/device-tree/model.
+[ERROR] Failed to open /sys/firmware/devicetree/base/compatible.
+[INFO ] WSPR-band test tone using dial frequency: 14.097100 MHz
+[INFO ] Stop transmission requested by user; no active transmission.
+[INFO ] Transmission stopped and runtime transmit disabled without persisting.
+[ERROR] Failed to open /proc/device-tree/model.
+[ERROR] Failed to open /sys/firmware/devicetree/base/compatible.
+[INFO ] Beginning test tone requested by web UI.
+[INFO ] Using web UI test tone RF frequency override: 14.097100 MHz
+[ERROR] Failed to open /proc/device-tree/model.
+[ERROR] Failed to open /sys/firmware/devicetree/base/compatible.
+[INFO ] WSPR-band test tone using dial frequency: 14.097100 MHz
+[INFO ] Stop transmission requested by user; no active transmission.
+[INFO ] Transmit disabled due to user stop request.
+[INFO ] Stop transmission requested by user; no active transmission.
+[INFO ] Transmission stopped and runtime transmit disabled without persisting.
+[ERROR] Failed to open /proc/device-tree/model.
+[ERROR] Failed to open /sys/firmware/devicetree/base/compatible.
+[INFO ] Beginning test tone requested by web UI.
+[INFO ] Using web UI test tone RF frequency override: 14.097100 MHz
+[ERROR] Failed to open /proc/device-tree/model.
+[ERROR] Failed to open /sys/firmware/devicetree/base/compatible.
+[INFO ] WSPR-band test tone using dial frequency: 14.097100 MHz
+[INFO ] Ending test tone requested by Web UI.
+[INFO ] Transmit backend: simulated
+[INFO ] Transmit GPIO: 4
+[WARN ] System-clock frequency estimate disabled and manual GPIO PPM is zero.
+[INFO ] PPM Manager disabled.
+[INFO ] No transmission requested; skipping transmission and scheduling.
+[INFO ] Stop transmission requested by user; no active transmission.
+[INFO ] Transmission stopped and runtime transmit disabled without persisting.
+[INFO ] Stop transmission requested by user; no active transmission.
+[INFO ] Transmission stopped and runtime transmit disabled without persisting.
+[INFO ] Beginning test tone requested by web UI.
+[INFO ] Using web UI test tone RF frequency override: 14.097100 MHz
+[INFO ] WSPR-band test tone using dial frequency: 14.097100 MHz
+[INFO ] Ending test tone requested by Web UI.
+[INFO ] Transmit backend: simulated
+[INFO ] Transmit GPIO: 4
+[WARN ] System-clock frequency estimate disabled and manual GPIO PPM is zero.
+[INFO ] A direct RF test tone will be generated at: 14.097123 MHz
+[INFO ] Direct tone request committed; transmission start initiated.
+[INFO ] Stop transmission requested by user; no active transmission.
+[INFO ] Transmission stopped and runtime transmit disabled without persisting.
+[INFO ] Stop transmission requested by user; no active transmission.
+[INFO ] Transmission stopped and runtime transmit disabled without persisting.
+[ERROR] Failed to open /proc/device-tree/model.
+[ERROR] Failed to open /sys/firmware/devicetree/base/compatible.
+[INFO ] Beginning test tone requested by web UI.
+[INFO ] Using web UI test tone RF frequency override: 14.097100 MHz
+[ERROR] Failed to open /proc/device-tree/model.
+[ERROR] Failed to open /sys/firmware/devicetree/base/compatible.
+[INFO ] WSPR-band test tone using dial frequency: 14.097100 MHz
+[INFO ] Ending test tone requested by Web UI.
+[INFO ] Transmit backend: simulated
+[INFO ] Transmit GPIO: 4
+[WARN ] System-clock frequency estimate disabled and manual GPIO PPM is zero.
+[INFO ] PPM Manager disabled.
+[INFO ] No transmission requested; skipping transmission and scheduling.
+[INFO ] Stop transmission requested by user; no active transmission.
+[INFO ] Transmission stopped and runtime transmit disabled without persisting.
+[ERROR] Failed to open /proc/device-tree/model.
+[ERROR] Failed to open /sys/firmware/devicetree/base/compatible.
+[INFO ] Beginning test tone requested by web UI.
+[INFO ] Using web UI test tone RF frequency override: 14.097100 MHz
+[ERROR] Failed to open /proc/device-tree/model.
+[ERROR] Failed to open /sys/firmware/devicetree/base/compatible.
+[INFO ] WSPR-band test tone using dial frequency: 14.097100 MHz
+[INFO ] Ending test tone requested by Web UI.
+[INFO ] Transmit backend: simulated
+[INFO ] Transmit GPIO: 4
+[WARN ] System-clock frequency estimate disabled and manual GPIO PPM is zero.
+[INFO ] PPM Manager disabled.
+[INFO ] No transmission requested; skipping transmission and scheduling.
+[INFO ] Stop transmission requested by user; no active transmission.
+[INFO ] Transmission stopped and runtime transmit disabled without persisting.
+[ERROR] Failed to open /proc/device-tree/model.
+[ERROR] Failed to open /sys/firmware/devicetree/base/compatible.
+[INFO ] Beginning test tone requested by web UI.
+[INFO ] Using web UI test tone RF frequency override: 14.097100 MHz
+[ERROR] Failed to open /proc/device-tree/model.
+[ERROR] Failed to open /sys/firmware/devicetree/base/compatible.
+[INFO ] WSPR-band test tone using dial frequency: 14.097100 MHz
+[INFO ] Ending test tone requested by Web UI.
+[INFO ] Transmit backend: simulated
+[INFO ] Transmit GPIO: 4
+[WARN ] System-clock frequency estimate disabled and manual GPIO PPM is zero.
+[INFO ] QRSS configuration loaded:
+[INFO ] - Message: "E"
+[INFO ] - Base Freq: 14.097100 MHz
+[INFO ] - Dot Timing: 3.0 s
+[INFO ] PPM Manager disabled.
+[INFO ] Scheduling path selected: QRSS.
+[INFO ] No transmission requested; skipping transmission and scheduling.
+[INFO ] Stop transmission requested by user; no active transmission.
+[INFO ] Transmission stopped and runtime transmit disabled without persisting.
+[ERROR] Failed to open /proc/device-tree/model.
+[ERROR] Failed to open /sys/firmware/devicetree/base/compatible.
+[INFO ] Beginning test tone requested by web UI.
+[INFO ] Using web UI test tone RF frequency override: 14.097100 MHz
+[ERROR] Failed to open /proc/device-tree/model.
+[ERROR] Failed to open /sys/firmware/devicetree/base/compatible.
+[INFO ] WSPR-band test tone using dial frequency: 14.097100 MHz
+[INFO ] Ending test tone requested by Web UI.
+[INFO ] Transmit backend: simulated
+[INFO ] Transmit GPIO: 4
+[WARN ] System-clock frequency estimate disabled and manual GPIO PPM is zero.
+[INFO ] FSKCW configuration loaded:
+[INFO ] - Message: "E"
+[INFO ] - Mark Freq: 14.097105 MHz
+[INFO ] - Space Freq: 14.097100 MHz
+[INFO ] - Dot Timing: 3.0 s
+[INFO ] PPM Manager disabled.
+[INFO ] Scheduling path selected: FSKCW.
+[INFO ] No transmission requested; skipping transmission and scheduling.
+[INFO ] Stop transmission requested by user; no active transmission.
+[INFO ] Transmission stopped and runtime transmit disabled without persisting.
+[ERROR] Failed to open /proc/device-tree/model.
+[ERROR] Failed to open /sys/firmware/devicetree/base/compatible.
+[INFO ] Beginning test tone requested by web UI.
+[INFO ] Using web UI test tone RF frequency override: 14.097100 MHz
+[ERROR] Failed to open /proc/device-tree/model.
+[ERROR] Failed to open /sys/firmware/devicetree/base/compatible.
+[INFO ] WSPR-band test tone using dial frequency: 14.097100 MHz
+[INFO ] Ending test tone requested by Web UI.
+[INFO ] Transmit backend: simulated
+[INFO ] Transmit GPIO: 4
+[WARN ] System-clock frequency estimate disabled and manual GPIO PPM is zero.
+[INFO ] DFCW configuration loaded:
+[INFO ] - Message: "E"
+[INFO ] - Dot Freq: 14.097100 MHz
+[INFO ] - Dash Freq: 14.097105 MHz
+[INFO ] - Dot Timing: 3.0 s
+[INFO ] PPM Manager disabled.
+[INFO ] Scheduling path selected: DFCW.
+[INFO ] No transmission requested; skipping transmission and scheduling.
+[INFO ] Stop transmission requested by user; no active transmission.
+[INFO ] Transmission stopped and runtime transmit disabled without persisting.
+[ERROR] Failed to open /proc/device-tree/model.
+[ERROR] Failed to open /sys/firmware/devicetree/base/compatible.
+[INFO ] Beginning test tone requested by web UI.
+[INFO ] Using web UI test tone RF frequency override: 14.097100 MHz
+[ERROR] Failed to open /proc/device-tree/model.
+[ERROR] Failed to open /sys/firmware/devicetree/base/compatible.
+[INFO ] WSPR-band test tone using dial frequency: 14.097100 MHz
+[INFO ] Ending test tone requested by Web UI.
+[INFO ] Transmit backend: simulated
+[INFO ] Transmit GPIO: 4
+[WARN ] System-clock frequency estimate disabled and manual GPIO PPM is zero.
+[INFO ] PPM Manager disabled.
+[INFO ] No transmission requested; skipping transmission and scheduling.
+[INFO ] Stop transmission requested by user; no active transmission.
+[INFO ] Transmission stopped and runtime transmit disabled without persisting.
+[ERROR] Failed to open /proc/device-tree/model.
+[ERROR] Failed to open /sys/firmware/devicetree/base/compatible.
+[INFO ] Beginning test tone requested by web UI.
+[INFO ] Using web UI test tone RF frequency override: 14.097100 MHz
+[ERROR] Failed to open /proc/device-tree/model.
+[ERROR] Failed to open /sys/firmware/devicetree/base/compatible.
+[INFO ] WSPR-band test tone using dial frequency: 14.097100 MHz
+[INFO ] Ending test tone requested by Web UI.
+[INFO ] Stop transmission requested by user; no active transmission.
+[INFO ] Transmission stopped and runtime transmit disabled without persisting.
+[ERROR] Failed to open /proc/device-tree/model.
+[ERROR] Failed to open /sys/firmware/devicetree/base/compatible.
+[INFO ] Beginning test tone requested by web UI.
+[INFO ] Using web UI test tone RF frequency override: 14.097100 MHz
+[ERROR] Failed to open /proc/device-tree/model.
+[ERROR] Failed to open /sys/firmware/devicetree/base/compatible.
+[INFO ] WSPR-band test tone using dial frequency: 14.097100 MHz
+[ERROR] Failed to open /proc/device-tree/model.
+[ERROR] Failed to open /sys/firmware/devicetree/base/compatible.
+[ERROR] Failed to open /proc/device-tree/model.
+[ERROR] Failed to open /proc/device-tree/model.
+[ERROR] Failed to open /sys/firmware/devicetree/base/compatible.
+[ERROR] Failed to open /proc/device-tree/model.
+[ERROR] Failed to open /sys/firmware/devicetree/base/compatible.
+[ERROR] Failed to open /proc/device-tree/model.
+[ERROR] Failed to open /proc/device-tree/model.
+[ERROR] Failed to open /sys/firmware/devicetree/base/compatible.
+[ERROR] Failed to open /proc/device-tree/model.
+[ERROR] Failed to open /sys/firmware/devicetree/base/compatible.
+[ERROR] Failed to open /proc/device-tree/model.
+[ERROR] Failed to open /sys/firmware/devicetree/base/compatible.
+[INFO ] INI file changed, reloading.
+[INFO ] Ending test tone requested by Web UI.
+[INFO ] Transmit backend: simulated
+[INFO ] Transmit GPIO: 4
+[WARN ] System-clock frequency estimate disabled and manual GPIO PPM is zero.
+[INFO ] PPM Manager disabled.
+[INFO ] No transmission requested; skipping transmission and scheduling.
+[INFO ] Stop transmission requested by user; no active transmission.
+[INFO ] Transmission stopped and runtime transmit disabled without persisting.
+[ERROR] Failed to open /proc/device-tree/model.
+[ERROR] Failed to open /sys/firmware/devicetree/base/compatible.
+[INFO ] Beginning test tone requested by web UI.
+[INFO ] Using web UI test tone RF frequency override: 14.097100 MHz
+[ERROR] Failed to open /proc/device-tree/model.
+[ERROR] Failed to open /sys/firmware/devicetree/base/compatible.
+[INFO ] WSPR-band test tone using dial frequency: 14.097100 MHz
+[INFO ] Ending test tone requested by Web UI.
+[INFO ] Stop transmission requested by user; no active transmission.
+[INFO ] Transmission stopped and runtime transmit disabled without persisting.
+[ERROR] Failed to open /proc/device-tree/model.
+[ERROR] Failed to open /sys/firmware/devicetree/base/compatible.
+[ERROR] Failed to open /proc/device-tree/model.
+[ERROR] Failed to open /sys/firmware/devicetree/base/compatible.
+[INFO ] Beginning test tone requested by web UI.
+[INFO ] Using web UI test tone RF frequency override: 14.097100 MHz
+[ERROR] Failed to open /proc/device-tree/model.
+[ERROR] Failed to open /sys/firmware/devicetree/base/compatible.
+[ERROR] Test tone start rejected during configuration: partial start
+[INFO ] Stop transmission requested by user; no active transmission.
+[INFO ] Transmission stopped and runtime transmit disabled without persisting.
+[INFO ] Socket server started on address 127.0.0.1: 39526 (loopback only)
+[INFO ] Beginning test tone requested by web UI.
+[INFO ] Using web UI test tone RF frequency override: 14.097100 MHz
+[INFO ] WSPR-band test tone using dial frequency: 14.095600 MHz
+[INFO ] Stop transmission requested by user; no active transmission.
+[INFO ] Transmit disabled due to user stop request.
+[INFO ] Stop transmission requested by user; no active transmission.
+[INFO ] Transmission stopped and runtime transmit disabled without persisting.
+[INFO ] Socket server started on address 127.0.0.1: 39526 (loopback only)
+[ERROR] Failed to open /proc/device-tree/model.
+[ERROR] Failed to open /sys/firmware/devicetree/base/compatible.
+[INFO ] Beginning test tone requested by web UI.
+[INFO ] Using web UI test tone RF frequency override: 14.097100 MHz
+[ERROR] Failed to open /proc/device-tree/model.
+[ERROR] Failed to open /sys/firmware/devicetree/base/compatible.
+[INFO ] WSPR-band test tone using dial frequency: 14.097100 MHz
+[INFO ] Ending test tone requested by Web UI.
+[INFO ] Transmit backend: simulated
+[INFO ] Transmit GPIO: 4
+[WARN ] System-clock frequency estimate disabled and manual GPIO PPM is zero.
+[INFO ] PPM Manager disabled.
+[INFO ] No transmission requested; skipping transmission and scheduling.
+[INFO ] Beginning test tone requested by web UI.
+[INFO ] Using web UI test tone RF frequency override: 14.097100 MHz
+[INFO ] WSPR-band test tone using dial frequency: 14.095600 MHz
+[INFO ] Stop transmission requested by user; no active transmission.
+[INFO ] Transmission stopped and runtime transmit disabled without persisting.
+[INFO ] Socket server started on address 127.0.0.1: 39526 (loopback only)
+[ERROR] Failed to open /proc/device-tree/model.
+[ERROR] Failed to open /sys/firmware/devicetree/base/compatible.
+[INFO ] Beginning test tone requested by web UI.
+[INFO ] Using web UI test tone RF frequency override: 14.097100 MHz
+[ERROR] Failed to open /proc/device-tree/model.
+[ERROR] Failed to open /sys/firmware/devicetree/base/compatible.
+[INFO ] WSPR-band test tone using dial frequency: 14.097100 MHz
+[INFO ] Received websocket stop command.
+[INFO ] Stop transmission requested by user; no active transmission.
+[INFO ] Transmission stopped and runtime transmit disabled without persisting.
+[ERROR] Failed to open /proc/device-tree/model.
+[ERROR] Failed to open /sys/firmware/devicetree/base/compatible.
+[INFO ] Beginning test tone requested by web UI.
+[INFO ] Using web UI test tone RF frequency override: 14.097100 MHz
+[ERROR] Failed to open /proc/device-tree/model.
+[ERROR] Failed to open /sys/firmware/devicetree/base/compatible.
+[INFO ] WSPR-band test tone using dial frequency: 14.097100 MHz
+[INFO ] Ending test tone requested by Web UI.
+[INFO ] Socket server started on address 127.0.0.1: 39526 (loopback only)
+[ERROR] Failed to open /proc/device-tree/model.
+[ERROR] Failed to open /sys/firmware/devicetree/base/compatible.
+[INFO ] Beginning test tone requested by web UI.
+[INFO ] Using web UI test tone RF frequency override: 14.097100 MHz
+[ERROR] Failed to open /proc/device-tree/model.
+[ERROR] Failed to open /sys/firmware/devicetree/base/compatible.
+[INFO ] WSPR-band test tone using dial frequency: 14.097100 MHz
+[INFO ] Ending test tone requested by Web UI.
+[INFO ] Stop transmission requested by user; no active transmission.
+[INFO ] Transmission stopped and runtime transmit disabled without persisting.
+[INFO ] Socket server started on address 127.0.0.1: 39526 (loopback only)
+[ERROR] Failed to open /proc/device-tree/model.
+[ERROR] Failed to open /sys/firmware/devicetree/base/compatible.
+[INFO ] Beginning test tone requested by web UI.
+[INFO ] Using web UI test tone RF frequency override: 14.097100 MHz
+[ERROR] Failed to open /proc/device-tree/model.
+[ERROR] Failed to open /sys/firmware/devicetree/base/compatible.
+[INFO ] WSPR-band test tone using dial frequency: 14.097100 MHz
+[INFO ] Ending test tone requested by Web UI.
+[INFO ] Stop transmission requested by user; no active transmission.
+[INFO ] Transmission stopped and runtime transmit disabled without persisting.
+[INFO ] Socket server started on address 127.0.0.1: 39526 (loopback only)
+[ERROR] Failed to open /proc/device-tree/model.
+[ERROR] Failed to open /sys/firmware/devicetree/base/compatible.
+[INFO ] Beginning test tone requested by web UI.
+[INFO ] Using web UI test tone RF frequency override: 14.097100 MHz
+[ERROR] Failed to open /proc/device-tree/model.
+[ERROR] Failed to open /sys/firmware/devicetree/base/compatible.
+[INFO ] WSPR-band test tone using dial frequency: 14.097100 MHz
+[INFO ] Ending test tone requested by Web UI.
+Test Tone lifecycle interleavings passed
+[INFO ] Socket server started on address::1: 39518 (loopback only)
+[INFO ] Socket server started on address 127.0.0.1: 39520 (loopback only)
+[INFO ] Socket server started on address::1: 39524 (loopback only)
+[WARN ] IPv6 loopback unavailable; falling back to 127.0.0.1.
+[INFO ] Socket server started on address 127.0.0.1: 39521 (loopback only)
+[WARN ] IPv6 loopback unavailable; falling back to 127.0.0.1.
+[INFO ] Socket server started on address 127.0.0.1: 39521 (loopback only)
+WebSocket listener startup: Address already in use
+WebSocket listener startup: Address already in use
+WebSocket listener startup: Address family not supported by protocol
+[ERROR] A WebSocket loopback family requires loopback-only mode.
+[INFO ] Socket server started on address::1: 39523 (loopback only)
+WebSocket listener startup: Address already in use
+[INFO ] Socket server started on address::1: 39523 (loopback only)
+[INFO ] Socket server started on address::: 39525
+[WARN ] Handshake failed for new client
+[ERROR] WebSocket command failed in handleMessage: [json.exception.type_error.302] type must be string, but is number
+[INFO ] Closing WebSocket client because its current network authorization is no longer valid.
+[INFO ] Socket server started on address::: 39519
+[WARN ] Handshake failed for new client
+[INFO ] Socket server started on address::: 39519
+[ERROR] WebSocket command failed in handleMessage: [json.exception.type_error.302] type must be string, but is number
+websocket lifecycle regression passed
+[WARN ] TX LED deassert request did not complete during startup hardware quiesce.
+[WARN ] TX LED deassert request did not complete during startup hardware quiesce.
+[WARN ] TX LED deassert request did not complete during startup hardware quiesce.
+[WARN ] TX LED deassert request did not complete during startup hardware quiesce.
+[ERROR] Transmit is configured on but inhibited because startup hardware could not be quiesced: fake quiesce failure
+[WARN ] TX LED deassert request did not complete during startup hardware quiesce.
+[ERROR] Transmit is configured on but inhibited because startup hardware could not be quiesced: Injected simulated startup quiesce failure.
+startup_quiesce_parent_test passed

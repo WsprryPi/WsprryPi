@@ -10,7 +10,7 @@ int main()
     char scratch[] = "/tmp/wsprrypi-i2c-inventory-XXXXXX";
     const char *created = mkdtemp(scratch);
     assert(created);
-    const fs::path root(created), sysfs = root / "sys", dev = root / "dev";
+    const fs::path root(created), sysfs = root / "sys", dev = root / "device-fixture";
     fs::create_directory(sysfs);
     fs::create_directory(dev);
     assert(discover(sysfs, dev).buses.empty());

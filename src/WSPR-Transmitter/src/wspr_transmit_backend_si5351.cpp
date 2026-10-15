@@ -480,28 +480,33 @@ wsprrypi::ExecutionResult WsprSi5351Backend::execute(
         return result;
     }
 
-    auto idle_device = [this]() {
-        const bool disabled = disableTransmitOutput();
-        const bool idle_programmed = applyIdleProgramming();
-        const bool confirmed = !config_.confirm_output_disable || outputIsDisabled();
-        device_.close();
-        execution_cleanup_completed_ = true;
-        execution_cleanup_result_.ok = disabled && idle_programmed && confirmed;
-        execution_cleanup_result_.error.clear();
-        if (!disabled || !confirmed)
-            execution_cleanup_result_.error =
-                "Could not disable Si5351 output.";
-        if (!idle_programmed)
-        {
+    // Until SYS_INIT clears, only emergency output-disable writes are allowed.
+    bool programming_admitted = false;
+    auto idle_device = [this, &programming_admitted]() {
+        execution_cleanup_result_ = {true, {}};
+        auto record = [&](const std::string& phase, const std::string& detail) {
+            execution_cleanup_result_.ok = false;
             if (!execution_cleanup_result_.error.empty())
                 execution_cleanup_result_.error += " ";
-            execution_cleanup_result_.error +=
-                "Could not apply Si5351 idle programming.";
-        }
-        log_si5351(
-            owner_,
-            WsprTransmitLogLevel::DEBUG,
-            "Si5351 idle cleanup complete.");
+            execution_cleanup_result_.error += phase + ": " + detail;
+        };
+        const bool disabled = config_.dry_run || (programming_admitted
+            ? disableTransmitOutput() : device_.disableAllOutputs());
+        if (!disabled)
+            record("Could not disable Si5351 output (output state unknown)",
+                   device_error_or(device_, "disable or readback failed"));
+        if (programming_admitted && !applyIdleProgramming())
+            record("Could not apply Si5351 idle programming",
+                   device_error_or(device_, "idle programming failed"));
+        if (config_.confirm_output_disable && !outputIsDisabled())
+            record("Si5351 output-disable confirmation failed (output state unknown)",
+                   device_error_or(device_, "output-disable bit was not set"));
+        device_.close();
+        execution_cleanup_completed_ = true;
+        log_si5351(owner_, execution_cleanup_result_.ok
+            ? WsprTransmitLogLevel::DEBUG : WsprTransmitLogLevel::ERROR,
+            execution_cleanup_result_.ok ? "Si5351 idle cleanup complete."
+                                        : execution_cleanup_result_.error);
     };
 
     try
@@ -534,6 +539,33 @@ wsprrypi::ExecutionResult WsprSi5351Backend::execute(
                 "Si5351 device opened.");
         }
 
+        if (!config_.dry_run)
+        {
+            // Preserve immediate quiescence even if status never becomes ready.
+            // An accepted write is not independent evidence of RF inactivity.
+            if (!device_.disableAllOutputs())
+            {
+                result.error = device_error_or(device_,
+                    "Could not inhibit Si5351 outputs before initialization.");
+                idle_device();
+                return result;
+            }
+            if (!waitForReady(0x80, "initialization", result.error))
+            {
+                result.stopped = result.error.empty();
+                result.ok = result.stopped;
+                idle_device();
+                return result;
+            }
+        }
+        if (stop_requested_ || owner_.backendShouldStop())
+        {
+            result.ok = true;
+            result.stopped = true;
+            idle_device();
+            return result;
+        }
+        programming_admitted = true;
         if (!config_.dry_run && !device_.initialize())
         {
             result.error = device_error_or(
@@ -657,17 +689,20 @@ wsprrypi::ExecutionResult WsprSi5351Backend::execute(
                 event_tone_indexes_[i] != invalid_tone_index() &&
                 event_tone_indexes_[i] != current_tone_index_)
             {
-                if (!applyTone(event_tone_indexes_[i], rf_enabled))
+                if (!applyTone(event_tone_indexes_[i], rf_enabled, result.error))
                 {
-                    if (stop_requested_ || owner_.backendShouldStop())
+                    if (result.error.empty() &&
+                        (stop_requested_ || owner_.backendShouldStop()))
                     {
                         execution_interrupted = true;
                         break;
                     }
 
-                    result.error = device_error_or(
-                        device_,
-                        "Could not apply Si5351 tone programming.");
+                    if (result.error.empty())
+                        result.error = device_error_or(device_,
+                            "Could not apply Si5351 tone programming.");
+                    result.error += " event=" + std::to_string(i) +
+                        " tone=" + std::to_string(event_tone_indexes_[i]);
                     log_si5351(
                         owner_,
                         WsprTransmitLogLevel::ERROR,
@@ -681,6 +716,12 @@ wsprrypi::ExecutionResult WsprSi5351Backend::execute(
                     add_ns(start_time, event.offset_from_start.count()),
                     rf_enabled, result.error))
             {
+                if (result.error.empty() &&
+                    (stop_requested_ || owner_.backendShouldStop()))
+                {
+                    execution_interrupted = true;
+                    break;
+                }
                 log_si5351(owner_, WsprTransmitLogLevel::ERROR, result.error);
                 idle_device();
                 return result;
@@ -764,9 +805,10 @@ bool WsprSi5351Backend::runEnvelopeEvent(
 
         if (!enableTransmitOutput())
         {
-            error = device_error_or(
-                device_,
-                "Could not enable Si5351 transmit output.");
+            if (!device_.getLastError().empty() ||
+                !(stop_requested_ || owner_.backendShouldStop()))
+                error = device_error_or(device_,
+                    "Could not enable Si5351 transmit output.");
             return false;
         }
 
@@ -887,9 +929,9 @@ wsprrypi::CleanupResult WsprSi5351Backend::cleanup() noexcept
 {
     if (execution_cleanup_completed_)
     {
-        const wsprrypi::CleanupResult result = execution_cleanup_result_;
-        resetState();
-        return result;
+        // Retain failures across repeated cleanup without reopening the bus.
+        configured_ = false;
+        return execution_cleanup_result_;
     }
 
     if (!configured_)
@@ -898,11 +940,17 @@ wsprrypi::CleanupResult WsprSi5351Backend::cleanup() noexcept
         return {true, {}};
     }
 
+    auto retain_cleanup = [this](const wsprrypi::CleanupResult& result) {
+        resetState();
+        execution_cleanup_completed_ = true;
+        execution_cleanup_result_ = result;
+        return execution_cleanup_result_;
+    };
+
     if (config_.confirm_output_disable && !device_.isOpen())
     {
         const auto quiesced = quiesceForStartup();
-        resetState();
-        return {quiesced.ok, quiesced.error};
+        return retain_cleanup({quiesced.ok, quiesced.error});
     }
 
     const bool disabled = disableTransmitOutput();
@@ -916,8 +964,7 @@ wsprrypi::CleanupResult WsprSi5351Backend::cleanup() noexcept
             WsprTransmitLogLevel::DEBUG,
             "Si5351 cleanup requested.");
     }
-    resetState();
-    return result;
+    return retain_cleanup(result);
 }
 
 const WsprSi5351Backend::Config&
@@ -1177,7 +1224,8 @@ bool WsprSi5351Backend::applyIdleProgramming()
 
 bool WsprSi5351Backend::applyTone(
     std::size_t tone_index,
-    bool rf_enabled)
+    bool rf_enabled,
+    std::string& error)
 {
     const auto programming_start = std::chrono::steady_clock::now();
     if (tone_index >= si5351_plan_.tone_sets.size())
@@ -1209,7 +1257,10 @@ bool WsprSi5351Backend::applyTone(
         }
         const bool inhibited = tone.requires_output_inhibit && !pll_only;
         if (inhibited && !disableTransmitOutput())
+        {
+            error = device_error_or(device_, "Could not inhibit Si5351 tone programming.");
             return false;
+        }
 
         if (stop_requested_ || owner_.backendShouldStop())
             return false;
@@ -1226,22 +1277,19 @@ bool WsprSi5351Backend::applyTone(
             if (!(end == begin + 1
                 ? device_.writeRegister(writes[begin].address, writes[begin].value)
                 : device_.writeRegisters({writes.begin() + begin, writes.begin() + end})))
+            {
+                error = device_error_or(device_, "Could not write Si5351 tone parameters.");
                 return false;
+            }
             if (stop_requested_ || owner_.backendShouldStop()) return false;
             begin = end;
         }
 
         if (rf_enabled && !inhibited) {
-            std::uint8_t status = 0;
-            if (!device_.readRegister(0,status) || (status & 0xa8) != 0) {
-                std::ostringstream message;
-                message << "Si5351 active readiness failure, register 0="
-                        << static_cast<unsigned>(status) << "; inhibiting output.";
-                log_si5351(owner_, WsprTransmitLogLevel::ERROR, message.str());
-                disableTransmitOutput();
+            // Active readiness faults must stop execution; never poll/re-enable.
+            if (checkReady(0xa8, "active readiness", error) != ReadyState::READY)
                 return false;
-            }
-        } else if (!waitForPllReady()) {
+        } else if (!waitForReady(0xa8, "inhibited readiness", error)) {
             return false;
         }
 
@@ -1251,6 +1299,9 @@ bool WsprSi5351Backend::applyTone(
             rf_enabled &&
             !enableTransmitOutput())
         {
+            if (!device_.getLastError().empty() ||
+                !(stop_requested_ || owner_.backendShouldStop()))
+                error = device_error_or(device_, "Could not re-enable Si5351 output.");
             return false;
         }
     }
@@ -1270,41 +1321,70 @@ bool WsprSi5351Backend::applyTone(
     return true;
 }
 
-bool WsprSi5351Backend::waitForPllReady()
+WsprSi5351Backend::ReadyState WsprSi5351Backend::checkReady(
+    std::uint8_t mask, const char* phase, std::string& error)
 {
-    // AN619 register 0: SYS_INIT bit 7, LOL_A bit 5, LOS_XTAL bit 3.
-    // This backend drives PLLA from XA (passive crystal or external TCXO).
-    constexpr std::uint8_t not_ready = 0xa8;
+    std::uint8_t status = 0;
+    const bool valid = device_.readRegister(0, status);
+    if (valid && (status & mask) == 0)
+        return ReadyState::READY;
+
+    // Capture transport detail before any cleanup can clear device last-error.
+    std::ostringstream message;
+    message << "Si5351 " << phase << " failure; plan=" << current_plan_.id.value
+            << " request=" << current_plan_.request_id.value
+            << " PLLA reference=XA/"
+            << (config_.device.reference_source == Si5351Device::ReferenceSource::CRYSTAL
+                ? "crystal" : "external_tcxo")
+            << " reference_hz=" << config_.device.reference_hz;
+    if (valid)
+        message << " register0=0x" << std::hex << std::setw(2)
+                << std::setfill('0') << static_cast<unsigned>(status);
+    else
+        message << " status unavailable; " << device_error_or(device_, "I2C read failed");
+    error = message.str();
+    return valid ? ReadyState::NOT_READY : ReadyState::TRANSPORT_FAILURE;
+}
+
+bool WsprSi5351Backend::waitForReady(
+    std::uint8_t mask, const char* phase, std::string& error)
+{
+    // Register 0 is live status. Initialization gates only SYS_INIT; PLLA/XA
+    // lock is checked after programming (unused PLLB and revision bits ignored).
+    // 50 reads/1 ms waits bound attempts, not a blocking kernel I2C transaction.
+    std::string first_nonready;
     for (unsigned attempt = 0; attempt < 50; ++attempt)
     {
         if (stop_requested_ || owner_.backendShouldStop())
             return false;
-        std::uint8_t status = 0;
-        if (!device_.readRegister(0, status))
-            return false;
-        if ((status & not_ready) == 0)
+        std::string observation;
+        const auto state = checkReady(mask, phase, observation);
+        if (state == ReadyState::READY)
             return true;
+        if (state == ReadyState::TRANSPORT_FAILURE)
+        {
+            error = first_nonready.empty() ? observation
+                : first_nonready + "; subsequent " + observation;
+            return false;
+        }
+        if (first_nonready.empty()) first_nonready = observation;
         if (!owner_.backendWaitInterruptableFor(std::chrono::milliseconds(1)))
             return false;
     }
-    log_si5351(owner_, WsprTransmitLogLevel::ERROR,
-        "Si5351 PLLA/reference readiness timed out; output will remain inhibited.");
+    error = first_nonready + "; readiness attempt limit reached (50 reads).";
     return false;
 }
 
 bool WsprSi5351Backend::enableTransmitOutput()
 {
-    bool enabled = false;
-    if (config_.output_enable_admission)
-    {
-        std::uint8_t value = 0xff;
-        if (!config_.dry_run && !device_.readRegister(3, value)) return false;
-        if (!config_.output_enable_admission()) return false;
-        value &= static_cast<std::uint8_t>(~(1u << static_cast<unsigned>(config_.planner.tx_output)));
-        enabled = config_.dry_run || device_.writeRegister(3, value);
-    }
-    else
-        enabled = config_.dry_run || device_.enableOutput(config_.planner.tx_output);
+    if (stop_requested_ || owner_.backendShouldStop()) return false;
+    std::uint8_t value = 0xff;
+    if (!config_.dry_run && !device_.readRegister(3, value)) return false;
+    if (config_.output_enable_admission && !config_.output_enable_admission()) return false;
+    // Both ordinary and WTP paths can be cancelled during the preceding read.
+    if (stop_requested_ || owner_.backendShouldStop()) return false;
+    value &= static_cast<std::uint8_t>(~(1u << static_cast<unsigned>(config_.planner.tx_output)));
+    const bool enabled = config_.dry_run || device_.writeRegister(3, value);
     if (enabled && !first_enable_time_ &&
         (config_.anchor_finite_tone_to_enable || config_.anchor_plan_to_enable ||
          config_.first_output_enabled))

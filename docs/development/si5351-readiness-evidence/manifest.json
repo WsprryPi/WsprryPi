@@ -1,0 +1,150 @@
+{
+  "recorded_utc": "2026-10-15T20:52:42.279651+00:00",
+  "base_revision": "50097e652b4af70d510f4a29d4edf1ffa24d3f0a",
+  "current_head": "50097e652b4af70d510f4a29d4edf1ffa24d3f0a",
+  "branch": "devel",
+  "disposition": "Closed by explicit maintainer acceptance: software repairs and two consecutive identical inhibited wspr1 I2C checks passed; historical wspr4 cause remains unestablished",
+  "punchlist_item6": "complete",
+  "committed": false,
+  "pushed": false,
+  "independent_coordinating_review": "pending",
+  "validation": {
+    "component_six_targets": "pass",
+    "full_linux_semantics": "pass",
+    "explicit_parent_six_targets": "pass",
+    "unchanged_hardware_audit_and_i2c_ioctl_check": "pass",
+    "base_negative_control": "expected assertion failure",
+    "diagnostic_fake_cases": 10,
+    "local_mac_cpp_build": "not attempted",
+    "rf_transmission_and_measurement": "not performed"
+  },
+  "hardware": {
+    "host": "wspr1",
+    "bus": 1,
+    "address": "0x60",
+    "authorization": "maintainer explicitly authorized required wspr1 operations; final scope I2C only",
+    "attempt1": "refused: register3=0, no status samples; service and installed hashes restored",
+    "attempt2": {
+      "split_reads": 500,
+      "combined_reads": 500,
+      "all_register0": "0x11",
+      "sys_init_observations": 0,
+      "transport_failures": 0,
+      "register3_before_and_after": "0xff",
+      "service_restored": "active",
+      "binary_ini_hashes": "unchanged"
+    },
+    "module_part_identity": "not established",
+    "historical_wspr4_fault_reproduced": false,
+    "attempt3": {
+      "split_reads": 500,
+      "combined_reads": 500,
+      "all_register0": "0x11",
+      "sys_init_observations": 0,
+      "transport_failures": 0,
+      "cleanup_failures": 0,
+      "elapsed_s": 3.1027507090002473,
+      "register3_before_and_after": "0xff",
+      "service_restored": "active",
+      "binary_ini_hashes": "unchanged",
+      "identical_diagnostic_sha256": "12fa4bb0fffb0bf5c3647d636f63f70bdf8d081da25b843c0bfc6bc2c3848681"
+    }
+  },
+  "source_sha256": {
+    "src/WSPR-Transmitter/src/wspr_transmit_backend_si5351.cpp": "be691bf41ba8431b44cf3fa3f5b78b10db1d5feab06ca7c29fc03f033eeafcd3",
+    "src/WSPR-Transmitter/src/wspr_transmit_backend_si5351.hpp": "c736991f93a0c43c9a8cbbb70c36fed6502d8c659c32587d3c089d9bb597e895",
+    "src/WSPR-Transmitter/src/si5351_transition_test.cpp": "4466c254362f13e1534b67294fd0102b95bd9f247ee7f643dfebafd85891f92f",
+    "src/WSPR-Transmitter/src/si5351_device.cpp": "c44af9548a95f4657c9116cbadda469fe181929e531ad956d07e8a52e62da6d0",
+    "src/WSPR-Transmitter/src/si5351_planner.cpp": "e0e1695acf6814cb619f46a5867c23ecfec67612f40603f064cb5eaa4b457b1b",
+    "src/WSPR-Transmitter/src/Makefile": "adcf5c5ff7bcbf220d103652d2f87799ea4b9ebd9698732e9e08841c02a242f4",
+    "src/Makefile": "4c0f19dd53c25e8647a4cc6133a98c40c72086a008e86105b6f162dc577a98cb",
+    "src/tests/i2c_bus_inventory_test.cpp": "ad9eef1f46852c9a7a14c175ac2b67c4fd82fa34563231e927735ebf28d9b113",
+    ".github/workflows/debian-non-hardware.yml": "fb04c3999016ea9eb11c0206651cc6d82a5bb2a9ce0ec1706aa704fc69f644bc"
+  },
+  "validation_scope": "isolated base plus this task source overlay; concurrent WTP/UI/Makefile/workflow changes in working-tree.txt are preserved and excluded",
+  "compressed_local_traces": {
+    "dist/si5351-readiness-20261015/base-negative-control.strace.gz": {
+      "compressed_sha256": "c4a587118e886f02f7142ebd5dc8908920fa87c90af892eeac36a3d605c33e09",
+      "uncompressed_sha256": "3ae6b133ed53aef68edd996ec0cbbb3d7a5f40e60eaffd7597c6fa936d8c8bb4"
+    },
+    "dist/si5351-readiness-20261015/component.strace.gz": {
+      "compressed_sha256": "e42cf0334625321c78d048cf1c2d43e8763bcbb84f566a447d3af3b9db07849a",
+      "uncompressed_sha256": "626f9bab80f18260534c3f6fc155b5a0768e2c1523cef2eacd98a27caf130aaf"
+    },
+    "dist/si5351-readiness-20261015/parent-full.strace.gz": {
+      "compressed_sha256": "a22931aa312115d0e14a5b6cc9677bafe8e503ee622fe09804aa43cb3d1374af",
+      "uncompressed_sha256": "6de52585fab3d0dc652a1123e6144c01e22a60b0e93bb871a6552789849c94e4"
+    },
+    "dist/si5351-readiness-20261015/parent-integration.strace.gz": {
+      "compressed_sha256": "ec80fec75d676836db54b145f8f3d0189290dfd67a136c57e05418ab414dd4ae",
+      "uncompressed_sha256": "745f09631eafcd0013773ed56177f47712fc1f10c34cb77c1167e718f113b0a0"
+    }
+  },
+  "artifact_sha256": {
+    "Dockerfile.validation": "0c983a3290e32ac003bb9e62bfe0552be63aa21eb895581b7eba7093ab6c81d1",
+    "audit-before-fixture-rename.txt": "fa43f7349d414ec7ba805e87e443773df09086f4a0405719bcbe919c24985256",
+    "base-negative-control.log.gz": "ea1d81f1192521a3002b7ed300a9a822f7c04155eb84f7b70ab1cfa71c31d3f4",
+    "cancellation-before-repair.log": "bcf98c5e9dfd8adc5b4231eb0f07cb93470c74daddeafcb9906e673160e59416",
+    "cancellation-classification-before-repair.log": "954c545184192e0df1ffb555d65fe7775a5d5322990a90fee2ccc3eb89cda21c",
+    "commands.txt": "da1af0982aeb4959ba1bd0beb62f8ad0282d7282c4663833d863c9f1a656eb93",
+    "component-audit.txt": "0c457c5601d8bdcb575eb5d34ae1a89ed2b4e9127fa8497b11ce63bf1d20911d",
+    "component.log": "403598616fefc6eba0025552421daf7070babdbe69bb64f4bf8926c7538157f3",
+    "container.json": "918e0a1961ff748df667ec138e1f622395eef73e99957b713a6fdbd1307bd539",
+    "diagnostic-test.log": "1635a6194f78c5e89329e41ae3b95909ced52dd425f9291840b91d6deaa41ba0",
+    "diagnostic_test.py": "aa3604adc619099ec4865cb4171bee391ef6521f4773e4d242cfee1968498bbd",
+    "environment.txt": "caef172f79b4c22b00f4463fbd8f61931cf887c22a005e5b760bed941d96500e",
+    "hardware-free-audit.txt": "0c457c5601d8bdcb575eb5d34ae1a89ed2b4e9127fa8497b11ce63bf1d20911d",
+    "loaded-cleanup-before-repair.log": "3405b7a44f08b8bfee17a34f3061e8b821214ee9e8a4def5ca4e1f66c6eb7234",
+    "parent-full.log": "1665de007a6e6d260236705ee3d4a3c05293a0c8941fb9b954cd18a814133ae8",
+    "parent-integration.log": "4427dcca15810ddd1aa39a68e3bb937c258693ebb7d075e78857b7e6bf2b68ee",
+    "source-sha256.txt": "220fbb14de59ddfcda5c5feaedbf051a19457b39f8a008db92e6003a0caced37",
+    "starting-punchlist.patch.gz": "aba8c5df34dc30559df2c9142465ce0bb54d2c2fab2d748ae9dfa833b89b2662",
+    "working-tree.txt": "621eaea06d99f15274c45321183250cb1016db38ed3d6a3a80ae8c18e2268b9e",
+    "wspr1-attempt1/diagnostic.jsonl": "b5ee63a4a312f2e7364a7f7ec1d565fd5cda8e9a06e9ee7299c9a5a47e766585",
+    "wspr1-attempt1/diagnostic.py": "08643655620d5c56317fbb59984a4c841e75883b7620b12676e3ca4107d849a3",
+    "wspr1-attempt1/diagnostic.sha256": "ed6043d7801c27dfd48deb56d365e9e8572c41e958e68e0b8dee35a28a65e4f3",
+    "wspr1-attempt1/diagnostic.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "wspr1-attempt1/installed-before.sha256": "c49e990ed4d8462075e6fece14f89dfb6c0116d254655aa20b3b71c0772dbfda",
+    "wspr1-attempt1/run.log": "68f3589f691657d79f1cf5be0360ce2bf56f569c0311a3c7ab9f6aced90b239c",
+    "wspr1-attempt1/run.sh": "d3eb61a9ffddc01dc2bd626249f3c12cf535db9fd54e07eb4d6ae82b97ba0c00",
+    "wspr1-attempt1/service-after.txt": "dfa7bdd48e9bf4f729ce3971970a4f85928ea9d4c9b8f5afd4d6bff460654ce5",
+    "wspr1-attempt1/service-before.txt": "f7e2bcbba8a960a69b15ea2475e6bc6aacfc14dadd3b5698e473ce1862fca9dd",
+    "wspr1-attempt1/surviving-process.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "wspr1-attempt2/diagnostic.jsonl": "e6bb0cecb71a3eb816bea0461c7f204b9ef2b784fee7dc7675c99dc4687137f3",
+    "wspr1-attempt2/diagnostic.py": "12fa4bb0fffb0bf5c3647d636f63f70bdf8d081da25b843c0bfc6bc2c3848681",
+    "wspr1-attempt2/diagnostic.sha256": "f353d9c1ae7a02b960c9d43352ff2b0c19e0c630e5a93be1c6ae0d4760e85165",
+    "wspr1-attempt2/diagnostic.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "wspr1-attempt2/installed-before.sha256": "c49e990ed4d8462075e6fece14f89dfb6c0116d254655aa20b3b71c0772dbfda",
+    "wspr1-attempt2/run.log": "ab4259c09983a57b450890343b502955b2c424f3941ad7e78116fb55b640da0f",
+    "wspr1-attempt2/run.sh": "d734525cfaf124a08cbab77a0a26f881aa9a30aff69fe462d62ef1e256d95b71",
+    "wspr1-attempt2/service-after.txt": "918ac2c586f0f3cc68d4158fb29349f8ec78c6cb64092e0c6166cdfaf7381018",
+    "wspr1-attempt2/service-before.txt": "dfa7bdd48e9bf4f729ce3971970a4f85928ea9d4c9b8f5afd4d6bff460654ce5",
+    "wspr1-attempt2/surviving-process.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "wspr1-attempt3/diagnostic.jsonl": "cd57a725d3394372a9be49099d7f90c5dc0a4885f1748f77e0ff8f272625d644",
+    "wspr1-attempt3/diagnostic.py": "12fa4bb0fffb0bf5c3647d636f63f70bdf8d081da25b843c0bfc6bc2c3848681",
+    "wspr1-attempt3/diagnostic.sha256": "f353d9c1ae7a02b960c9d43352ff2b0c19e0c630e5a93be1c6ae0d4760e85165",
+    "wspr1-attempt3/diagnostic.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "wspr1-attempt3/installed-before.sha256": "c49e990ed4d8462075e6fece14f89dfb6c0116d254655aa20b3b71c0772dbfda",
+    "wspr1-attempt3/invocation.log": "5749d04e34881cc294989f0804e9641e7bfa4203f8c77457512197900f069d41",
+    "wspr1-attempt3/run.log": "5749d04e34881cc294989f0804e9641e7bfa4203f8c77457512197900f069d41",
+    "wspr1-attempt3/run.sh": "983e72354f9f37433b9dcc2f8e1278bfb784359509d274dc1e0554c6f4af3335",
+    "wspr1-attempt3/service-after.txt": "fb24a7534b67113d5934e36cbeb8f82e82427e953738eb1e838a5f442b26e84c",
+    "wspr1-attempt3/service-before.txt": "918ac2c586f0f3cc68d4158fb29349f8ec78c6cb64092e0c6166cdfaf7381018",
+    "wspr1-attempt3/surviving-process.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "wspr1-inhibited-status.py": "12fa4bb0fffb0bf5c3647d636f63f70bdf8d081da25b843c0bfc6bc2c3848681",
+    "wspr1-run.sh": "d734525cfaf124a08cbab77a0a26f881aa9a30aff69fe462d62ef1e256d95b71"
+  },
+  "maintainer_acceptance": {
+    "date": "2026-10-15",
+    "criterion": "Repeat the identical wspr1 I2C test once; close if it passes again",
+    "criterion_met": true,
+    "consecutive_passes": 2,
+    "status_reads_in_consecutive_passes": 2000,
+    "historical_cause_established": false
+  },
+  "publication_state_scope": "Pre-publication executor return; committed/pushed flags are historical. The maintainer subsequently authorized commit and push; Git history and exact-head hosted checks identify publication.",
+  "starting_punchlist_uncompressed_sha256": "22df217da2ee9699ac4401f51b92d6c70a9ee14d1f63bd53d9d4b4e7bf44817f",
+  "preserved_log_uncompressed_sha256": {
+    "base-negative-control.log": "8422491f9ee7dd4786dc3935a927e7e5fdf9f37c2fe3c81e0ad26eeda7d8b326"
+  }
+}

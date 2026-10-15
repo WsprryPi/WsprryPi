@@ -1,0 +1,2 @@
+No prohibited transmitter hardware access observed.
+No I2C ioctls observed.

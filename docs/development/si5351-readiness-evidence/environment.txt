@@ -1,0 +1,49 @@
+uid=65534(nobody) gid=65534(nogroup) groups=65534(nogroup)
+Linux 705d50944734 7.0.12-linuxkit #1 SMP PREEMPT Fri Aug 14 16:27:59 UTC 2026 aarch64 GNU/Linux
+PRETTY_NAME="Debian GNU/Linux 13 (trixie)"
+NAME="Debian GNU/Linux"
+VERSION_ID="13"
+VERSION="13 (trixie)"
+VERSION_CODENAME=trixie
+DEBIAN_VERSION_FULL=13.6
+ID=debian
+HOME_URL="https://www.debian.org/"
+SUPPORT_URL="https://www.debian.org/support"
+BUG_REPORT_URL="https://bugs.debian.org/"
+g++ (Debian 14.2.0-19) 14.2.0
+Copyright (C) 2024 Free Software Foundation, Inc.
+This is free software; see the source for copying conditions.  There is NO
+warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+
+50097e652b4af70d510f4a29d4edf1ffa24d3f0a
+g++	4:14.2.0-1
+git	1:2.47.3-0+deb13u1
+libavahi-client-dev:arm64	0.8-16
+libgpiod-dev:arm64	2.2.1-2+deb13u1
+libssl-dev:arm64	3.5.6-1~deb13u2
+libsystemd-dev:arm64	257.13-1~deb13u1
+make	4.4.1-2
+nodejs	20.19.2+dfsg-1+deb13u2
+php-cli	2:8.4+96
+strace	6.13+ds-1
+be691bf41ba8431b44cf3fa3f5b78b10db1d5feab06ca7c29fc03f033eeafcd3  src/WSPR-Transmitter/src/wspr_transmit_backend_si5351.cpp
+c736991f93a0c43c9a8cbbb70c36fed6502d8c659c32587d3c089d9bb597e895  src/WSPR-Transmitter/src/wspr_transmit_backend_si5351.hpp
+4466c254362f13e1534b67294fd0102b95bd9f247ee7f643dfebafd85891f92f  src/WSPR-Transmitter/src/si5351_transition_test.cpp
+c44af9548a95f4657c9116cbadda469fe181929e531ad956d07e8a52e62da6d0  src/WSPR-Transmitter/src/si5351_device.cpp
+e0e1695acf6814cb619f46a5867c23ecfec67612f40603f064cb5eaa4b457b1b  src/WSPR-Transmitter/src/si5351_planner.cpp
+adcf5c5ff7bcbf220d103652d2f87799ea4b9ebd9698732e9e08841c02a242f4  src/WSPR-Transmitter/src/Makefile
+4c0f19dd53c25e8647a4cc6133a98c40c72086a008e86105b6f162dc577a98cb  src/Makefile
+ad9eef1f46852c9a7a14c175ac2b67c4fd82fa34563231e927735ebf28d9b113  src/tests/i2c_bus_inventory_test.cpp
+fb04c3999016ea9eb11c0206651cc6d82a5bb2a9ce0ec1706aa704fc69f644bc  .github/workflows/debian-non-hardware.yml
+45b5bd82d69dd43d01aa6bd6f0778b47c4d2eb0a2aad4047b40cabea1009f10c  src/WSPR-Transmitter/src/build/bin/si5351_transition_test
+0aea3e16774534d0e105f4a98a423ab93a6935126da2f6c447ca7362a85b14b1  src/build/bin/dial_frequency_semantics_test
+2302ca2ce5e8631828605dd4deee26ee56d82bb874f0b9f074ff27e6ecda3a71  src/build/bin/test_tone_lifecycle_test
+4a50d807530d1df5a4ab9b867c3d51a656f03ea79d44c831465a19ce03e63e12  src/build/bin/startup_quiesce_parent_test
+626f9bab80f18260534c3f6fc155b5a0768e2c1523cef2eacd98a27caf130aaf  /tmp/si5351-component.strace
+3ae6b133ed53aef68edd996ec0cbbb3d7a5f40e60eaffd7597c6fa936d8c8bb4  /tmp/si5351-negative.strace
+6de52585fab3d0dc652a1123e6144c01e22a60b0e93bb871a6552789849c94e4  /tmp/si5351-parent-final.strace
+745f09631eafcd0013773ed56177f47712fc1f10c34cb77c1167e718f113b0a0  /tmp/si5351-integration-final.strace
+full_semantics_exit
+0
+integration_exit
+0

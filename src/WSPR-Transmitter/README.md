@@ -301,9 +301,20 @@ by the programmed PLL ratio, divided by the programmed MultiSynth and R-divider.
 Bounded rational approximation is used for the fractional ratios. The configured
 output drive strength is retained when applying tone control registers.
 
-Initially inhibited programming waits for Si5351 initialization/reference/PLLA
-readiness with at most 50 interruptible 1 ms waits. A non-ready status while RF is
-active immediately inhibits and fails the execution. Duty-cycle fades use the
+Execution first attempts all-output inhibition, then checks SYS_INIT before
+ordinary RAM programming. Initialization and post-programming PLLA/XA readiness
+each permit at most 50 reads with interruptible 1 ms waits. These attempt limits
+do not bound a blocking kernel I2C transaction. A valid non-ready status and an
+I2C transport failure are reported separately; either while RF is active fails
+execution and proceeds to disabling cleanup without re-enable. Cleanup failures
+are retained separately from the primary fault, including output uncertainty,
+and repeated cleanup returns the retained job receipt without I2C access.
+Accepted disable writes or register confirmation do not establish measured RF
+inactivity. Release item 6 was closed by maintainer acceptance after software
+repairs and two consecutive inhibited wspr1 I2C checks passed; historical SYS_INIT
+causation remains unestablished. See the
+[readiness investigation and disposition](../../docs/development/si5351-readiness-review.md).
+Duty-cycle fades use the
 scheduled event deadlines, including I2C overhead; missed slices are skipped.
 These fades still switch RF fully on/off and do not produce an analog amplitude
 envelope. Spectral improvement must be measured, not inferred from the shape name.

@@ -8,7 +8,8 @@ disposition rather than implementation before 4.0.
 
 ## Ordered release checklist
 
-Status updated October 15, 2026. Items 1, 2, 3 and 4 are complete.
+Status updated October 15, 2026. Items 1 through 6 are complete within their
+recorded scopes.
 
 Status key: ✅ Complete · ⏳ In progress · ☐ Not started
 
@@ -29,25 +30,36 @@ Status key: ✅ Complete · ⏳ In progress · ☐ Not started
    restoration feedback are implemented and software-validated. See the
    [review and evidence](../docs/development/test-tone-lifecycle-review.md).
    Physical qualification and the final integrated UI review remain open.
-5. ☐ **Si5351 readiness failures.** Characterize and resolve or explicitly
-   disposition intermittent `SYS_INIT` failures, then repeat the necessary
-   guarded-default qualification against the settled Test Tone behavior.
-6. ☐ **RP1 release candidate preparation.** Finish release-scoped
+5. ✅ **WsprryPico — Implement Phase 15.4: adopt shared application, station and
+   hardware resources.** Complete within the authorized software scope. Shared
+   member resources, scoped saves, pin inspection and nonpersistent validation
+   are adopted and software-validated. See the
+   [acceptance record](../docs/development/phase15-4-shared-resources.md).
+   Physical, installed-service and unrestricted security qualification remain
+   separate; P15.5 concurrent web servicing is not included.
+6. ✅ **Si5351 readiness failures.** Complete by explicit maintainer
+   disposition after software repairs, Linux validation and two consecutive
+   inhibited wspr1 I2C checks (1,000 reads each) passed. The maintainer requested
+   closure if the identical repeat passed; it did. See the
+   [readiness review and acceptance](../docs/development/si5351-readiness-review.md).
+   Historical wspr4 `SYS_INIT` observations remain retained and unexplained;
+   closure accepts the bounded I2C evidence without requiring RF measurement.
+7. ☐ **RP1 release candidate preparation.** Finish release-scoped
    module/lifecycle work, packaging and the release pipeline; identify the
    exact candidate and its UAPI, compatibility metadata, manifests and hashes.
-7. ☐ **WsprryPi acceptance of the RP1 candidate.** Verify that exact candidate
+8. ☐ **WsprryPi acceptance of the RP1 candidate.** Verify that exact candidate
    and disposition historical provider-rejection/eight-second TONE failures;
    repair integration defects before provider freeze.
-8. ☐ **RP1 publication.** Publish the immutable provider release and verify
+9. ☐ **RP1 publication.** Publish the immutable provider release and verify
    production selection and consumption of those exact artifacts.
-9. ☐ **Documentation performance and remaining Impeccable housekeeping.**
-   Reconcile reminders and finish selected image-delivery improvements before
-   final documentation rendering; use current Impeccable tooling during UI work.
-10. ☐ **Consolidated operator-documentation update.** Cover settled API,
+10. ☐ **Documentation performance and remaining Impeccable housekeeping.**
+    Reconcile reminders and finish selected image-delivery improvements before
+    final documentation rendering; use current Impeccable tooling during UI work.
+11. ☐ **Consolidated operator-documentation update.** Cover settled API,
     Test Tone, Si5351, inventory-timeout and RP1 correction/installation behavior.
-11. ☐ **Final integrated Impeccable review (#423).** Review the settled product,
+12. ☐ **Final integrated Impeccable review (#423).** Review the settled product,
     repair actionable findings and verify affected documentation/screenshots.
-12. ☐ **Final candidate validation, packaging and 4.0 release.** Run final
+13. ☐ **Final candidate validation, packaging and 4.0 release.** Run final
     regressions, identify artifacts, complete applicable installation/upgrade/
     runtime checks and publish after acceptance.
 
@@ -57,7 +69,7 @@ Status key: ✅ Complete · ⏳ In progress · ☐ Not started
 | --- | --- | --- |
 | **Test Tone concurrency** | Coordinate complete Start, End, user-stop, expiry, cleanup and restoration transactions, with deterministic race tests. | Complete under release checklist item 4: scheduler ordering, generation fences, nonblocking delivery and watchdog lifecycle validated. See the [review and evidence](../docs/development/test-tone-lifecycle-review.md). Physical qualification remains separate. |
 | **Test Tone status duplication** | Keep the frequency preview separate from execution feedback. Include this in the final UI review. | Complete for item 4: accepted/startup/runtime/uncertain and restoration feedback, correlation tests and focused Impeccable review recorded in the [review and evidence](../docs/development/test-tone-lifecycle-review.md). Final integrated UI review (#423) remains pending. |
-| **Si5351 readiness failures** | The five comparison investigations were implemented, but intermittent `SYS_INIT` failures remain unresolved in the [qualification record](../docs/development/si5351-results/README.md). Successful later captures did not close that reliability question. | Pending qualification disposition. |
+| **Si5351 readiness failures** | The five comparison investigations were implemented, but intermittent `SYS_INIT` failures remain unresolved in the [qualification record](../docs/development/si5351-results/README.md). Successful later captures did not close that reliability question. | Complete by explicit maintainer acceptance after software repairs and two consecutive inhibited wspr1 checks passed; see [results and disposition](../docs/development/si5351-readiness-review.md). Historical failures remain preserved without claiming their cause was established. |
 | **Direct PPS for GPIO frequency calibration** | Optional RF-calibration scope decision; retain Chrony-derived estimates, intrinsic defaults, manual correction and conducted residuals. | Review complete: native PPS RF calibration deferred beyond 4.0. No independent RF counter/capture benefit or new 4.0 requirement established; reopening requires an identified measurement path and measurable improvement. See [Calibration Scope Decisions](Calibration%20Scope%20Decisions.md#direct-pps-disposition-and-reopening-criteria). |
 | **RP1 alternative clock parents** | Current output already uses nominal 200 MHz `pll_sys`; historical 50 MHz/XOSC planning is obsolete. | Reconciled: `pll_sys` implemented; genuinely alternative paths through `clk_i2s`, `clk_adc` or `clk_sys` deferred beyond 4.0, subject to ancestry/ownership and coordinated provider/userspace qualification. See [Calibration Scope Decisions](Calibration%20Scope%20Decisions.md#rp1-parent-disposition). |
 | **Documentation performance and Impeccable housekeeping** | Build-time lazy loading now exists. Reconcile the older image-optimization, product-metadata, and host-update reminders before carrying them forward. | Pending reconciliation. |

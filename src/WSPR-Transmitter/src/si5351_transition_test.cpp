@@ -47,6 +47,7 @@ namespace
         int selectSlave(int, std::uint8_t) override
         {
             ++select_calls;
+            if (fail_slave) { errno = EBUSY; return -1; }
             return 0;
         }
 
@@ -56,6 +57,10 @@ namespace
             if (size == 1)
             {
                 selected_register = bytes[0];
+                const auto occurrence = ++select_attempts[selected_register];
+                if (before_select) before_select(selected_register, occurrence);
+                if (selected_register == fail_select_address && occurrence == fail_select_occurrence)
+                { errno = EIO; return select_result; }
                 return 1;
             }
             if (size < 2 || size > 9) { errno = EIO; return -1; }
@@ -65,7 +70,7 @@ namespace
                 const std::uint8_t address = bytes[0] + i - 1;
                 ++address_attempts[address];
                 if (address == fail_address && address_attempts[address] == fail_address_occurrence)
-                { errno = EIO; return i == 1 ? -1 : static_cast<ssize_t>(i); }
+                { errno = EIO; return i == 1 ? write_failure_result : static_cast<ssize_t>(i); }
                 registers[address] = bytes[i];
                 writes.push_back({address, bytes[i]});
                 if (after_write) after_write(address, bytes[i], address_attempts[address]);
@@ -80,6 +85,10 @@ namespace
                 errno = EIO;
                 return -1;
             }
+            const auto occurrence = ++read_attempts[selected_register];
+            if (before_read) before_read(selected_register, occurrence);
+            if (selected_register == fail_read_address && occurrence == fail_read_occurrence)
+            { errno = EIO; return read_result; }
             *static_cast<std::uint8_t*>(data) = registers[selected_register];
             return 1;
         }
@@ -90,6 +99,18 @@ namespace
             return 0;
         }
 
+        ssize_t write_failure_result = -1;
+        bool fail_slave = false;
+        int fail_select_address = -1;
+        std::size_t fail_select_occurrence = 0;
+        ssize_t select_result = -1;
+        int fail_read_address = -1;
+        std::size_t fail_read_occurrence = 0;
+        ssize_t read_result = -1;
+        std::array<std::size_t, 256> select_attempts{};
+        std::array<std::size_t, 256> read_attempts{};
+        std::function<void(std::uint8_t, std::size_t)> before_read;
+        std::function<void(std::uint8_t, std::size_t)> before_select;
         std::array<std::uint8_t, 256> registers{};
         std::array<std::size_t, 256> address_attempts{};
         std::vector<std::pair<std::uint8_t, std::uint8_t>> writes;
@@ -299,6 +320,262 @@ namespace
         const FakeI2CAdapter& adapter,
         std::size_t expected_progress,
         const std::string& label);
+
+    void test_initialization_admission_and_cancellation()
+    {
+        for (bool cancel : {false, true})
+        {
+            TestBridge bridge;
+            auto adapter = std::make_shared<FakeI2CAdapter>();
+            adapter->registers[0] = 0xc1;
+            auto cfg = config(adapter);
+            cfg.device.reference_source = Si5351Device::ReferenceSource::CRYSTAL;
+            bool programmed_while_busy = false;
+            adapter->after_write = [&](std::uint8_t r, std::uint8_t, std::size_t) {
+                if (r != 3 && (adapter->registers[0] & 0x80)) programmed_while_busy = true;
+            };
+            bridge.on_wait = [&] {
+                if (!cancel) adapter->registers[0] = 0x61; // PLLA may unlock before programming.
+            };
+            if (cancel) bridge.interrupt_on_wait_call = 1;
+            adapter->before_read = [&](std::uint8_t r, std::size_t) {
+                if (r == 0 && adapter->address_attempts[26] != 0) adapter->registers[0] = 0x41;
+            };
+            WsprSi5351Backend backend(bridge, cfg);
+            auto plan = single_tone_plan();
+            expect(configure(backend, plan) && adapter->open_calls == 0, "configure is I2C-free");
+            const auto result = backend.execute(plan);
+            expect(result.ok && result.stopped == cancel, "busy initialization ready/cancel outcome");
+            expect(!programmed_while_busy, "no ordinary RAM programming before SYS_INIT clears");
+            expect(!adapter->writes.empty() && adapter->writes.front() ==
+                std::make_pair(std::uint8_t{3}, std::uint8_t{255}), "first write immediately inhibits all outputs");
+            expect(cancel ? adapter->address_attempts[183] == 0 : adapter->address_attempts[183] == 1,
+                   "crystal load is programmed only after admission");
+            expect(adapter->registers[3] == 255 && backend.cleanup().ok, "initialization cleanup inhibits");
+        }
+        TestBridge bridge;
+        auto adapter = std::make_shared<FakeI2CAdapter>();
+        adapter->registers[0] = 0xc1;
+        bridge.on_wait = [&] { adapter->registers[0] = 0x80; };
+        WsprSi5351Backend backend(bridge, config(adapter));
+        auto plan = single_tone_plan();
+        expect(configure(backend, plan), "persistent initialization configures");
+        const auto result = backend.execute(plan);
+        expect(!result.ok && result.error.find("initialization failure") != std::string::npos &&
+               result.error.find("register0=0xc1") != std::string::npos, "persistent initialization retains valid status");
+        expect(adapter->read_attempts[0] == 50 && bridge.wait_calls == 50, "initialization attempt budget unchanged");
+        for (const auto& w : adapter->writes) expect(w.first == 3 && w.second == 255,
+            "failed initialization permits only emergency disable writes");
+        expect(backend.cleanup().ok, "persistent initialization cleanup consumed");
+    }
+
+    void test_readiness_status_and_transport_evidence()
+    {
+        // Default 40m active retunes exercise the same check as experimental PLL-only retunes.
+        for (const std::uint8_t status : {0x00, 0x01, 0x02, 0x03, 0x41, 0x51, 0x20, 0x08, 0xa8, 0xc1})
+        {
+            TestBridge bridge;
+            auto adapter = std::make_shared<FakeI2CAdapter>();
+            auto plan = four_tone_plan(4);
+            for (std::size_t i = 0; i < plan.events.size(); ++i) plan.events[i].frequency_hz = 7040100.0 + i;
+            adapter->after_write = [&](std::uint8_t r, std::uint8_t v, std::size_t) {
+                if (r == 3 && v == 254) adapter->registers[0] = status;
+            };
+            WsprSi5351Backend backend(bridge, config(adapter));
+            expect(configure(backend, plan), "status matrix configures");
+            const auto result = backend.execute(plan);
+            const bool ready = (status & 0xa8) == 0;
+            expect(result.ok == ready, "selected PLLA/XA live faults gate active output");
+            if (!ready)
+            {
+                expect(result.error.find("active readiness failure") != std::string::npos &&
+                       result.error.find("event=1 tone=1") != std::string::npos &&
+                       result.error.find("PLLA reference=XA/external_tcxo") != std::string::npos,
+                       "valid status retains phase, tone/event and selected reference");
+                expect(count_write(*adapter, 3, 254) == 1, "active readiness fault never re-enables");
+            }
+            expect(backend.cleanup().ok && adapter->registers[3] == 255, "status matrix cleanup");
+        }
+        for (bool active : {false, true})
+        for (bool select_failure : {false, true})
+        for (ssize_t transfer_result : {ssize_t{-1}, ssize_t{0}})
+        for (bool cleanup_failure : {false, true})
+        {
+            TestBridge bridge;
+            auto adapter = std::make_shared<FakeI2CAdapter>();
+            // init read, first inhibited tone read, then first active retune read
+            const std::size_t occurrence = active ? 3 : 1;
+            if (select_failure) {
+                adapter->fail_select_address = 0; adapter->fail_select_occurrence = occurrence;
+                adapter->select_result = transfer_result;
+            } else {
+                adapter->fail_read_address = 0; adapter->fail_read_occurrence = occurrence;
+                adapter->read_result = transfer_result;
+            }
+            if (cleanup_failure) adapter->before_select = [&](std::uint8_t r, std::size_t n) {
+                if (r == 0 && n == occurrence) {
+                    adapter->fail_address = 3;
+                    adapter->fail_address_occurrence = adapter->address_attempts[3] + 1;
+                }
+            };
+            auto plan = four_tone_plan(4);
+            for (std::size_t i = 0; i < plan.events.size(); ++i) plan.events[i].frequency_hz = 7040100.0 + i;
+            WsprSi5351Backend backend(bridge, config(adapter));
+            expect(configure(backend, plan), "transport matrix configures");
+            const auto result = backend.execute(plan);
+            expect(!result.ok && result.error.find("status unavailable") != std::string::npos &&
+                result.error.find(select_failure ? "Select Si5351 register" : "Read Si5351 register") != std::string::npos,
+                "transport failure survives cleanup with transport operation");
+            expect(result.error.find("register0=") == std::string::npos, "failed read never invents valid zero status");
+            expect(count_write(*adapter, 3, 254) == (active ? 1U : 0U), "transport failure never re-enables");
+            const auto cleanup = backend.cleanup();
+            if (active && !select_failure && transfer_result == -1 && cleanup_failure)
+                std::cout << "Transport fixture primary: " << result.error
+                          << "\nTransport fixture cleanup: " << cleanup.error << '\n';
+            expect(cleanup.ok == !cleanup_failure, "cleanup transport failure reported separately");
+            if (cleanup_failure) expect(cleanup.error.find("output state unknown") != std::string::npos &&
+                cleanup.error.find("Write Si5351 register 0x3 failed") != std::string::npos,
+                "cleanup retains transport evidence and uncertain output state");
+            const auto again = backend.cleanup();
+            expect(cleanup.ok == again.ok && cleanup.error == again.error && adapter->close_calls == 1,
+                "cleanup receipt retained and repeated cleanup is I2C-free");
+        }
+    }
+
+    void test_busy_status_then_transport_failure()
+    {
+        TestBridge bridge;
+        auto adapter = std::make_shared<FakeI2CAdapter>();
+        adapter->registers[0] = 0xc1;
+        adapter->fail_read_address = 0;
+        adapter->fail_read_occurrence = 2;
+        WsprSi5351Backend backend(bridge, config(adapter));
+        auto plan = single_tone_plan();
+        expect(configure(backend, plan), "busy then transport failure configures");
+        const auto result = backend.execute(plan);
+        expect(!result.ok && result.error.find("register0=0xc1") != std::string::npos &&
+            result.error.find("status unavailable") != std::string::npos &&
+            result.error.find("Read Si5351 register") != std::string::npos,
+            "polling preserves first valid non-ready sample and subsequent transport cause");
+        expect(adapter->read_attempts[0] == 2 && bridge.wait_calls == 1 && backend.cleanup().ok,
+            "transport failure terminates polling without further readiness retries");
+    }
+
+    void test_cancellation_at_admission_boundaries()
+    {
+        // Initialization status read, default enable read, WTP admission callback.
+        for (int boundary = 0; boundary < 3; ++boundary)
+        {
+            const bool at_initialization_read = boundary == 0;
+            TestBridge bridge;
+            auto adapter = std::make_shared<FakeI2CAdapter>();
+            auto cfg = config(adapter);
+            if (at_initialization_read) adapter->before_read = [&](std::uint8_t r, std::size_t n) {
+                if (r == 0 && n == 1) bridge.backendSignalStopRequest();
+            };
+            else if (boundary == 1) adapter->before_read = [&](std::uint8_t r, std::size_t) {
+                if (r == 3 && adapter->read_attempts[0] == 2) bridge.backendSignalStopRequest();
+            };
+            else cfg.output_enable_admission = [&] {
+                bridge.backendSignalStopRequest();
+                return true;
+            };
+            WsprSi5351Backend backend(bridge, cfg);
+            auto plan = single_tone_plan();
+            expect(configure(backend, plan), "admission cancellation configures");
+            const auto result = backend.execute(plan);
+            expect(result.ok && result.stopped && result.error.empty(),
+                "cancellation at admission remains a clean interruption");
+            expect(count_write(*adapter, 3, 254) == 0 && backend.cleanup().ok,
+                "cancellation during admission never enables output");
+            if (at_initialization_read) for (const auto& w : adapter->writes)
+                expect(w.first == 3 && w.second == 255, "cancelled initialization admission skips RAM programming");
+        }
+    }
+
+    void test_device_transport_and_cache_invalidation()
+    {
+        auto slave = std::make_shared<FakeI2CAdapter>();
+        slave->fail_slave = true;
+        Si5351Device failed({}, slave);
+        expect(!failed.open() && !failed.isOpen() && slave->close_calls == 1 &&
+            failed.getLastError().find("Select I2C slave") != std::string::npos,
+            "failed slave selection closes handle and retains transport error");
+        for (bool read : {false, true})
+        for (ssize_t transfer_result : {ssize_t{-1}, ssize_t{0}})
+        {
+            auto adapter = std::make_shared<FakeI2CAdapter>();
+            Si5351Device::Config cfg;
+            cfg.optimize_register_writes = true;
+            Si5351Device device(cfg, adapter);
+            expect(device.open() && device.writeRegister(16, 0x4c), "transport cache fixture opens");
+            if (read) {
+                adapter->fail_read_address = 0; adapter->fail_read_occurrence = 1;
+                adapter->read_result = transfer_result;
+                std::uint8_t value = 0;
+                expect(!device.readRegister(0, value), "failed or short read rejected");
+            } else {
+                adapter->fail_address = 26; adapter->fail_address_occurrence = 1;
+                adapter->write_failure_result = transfer_result;
+                expect(!device.writeRegister(26, 1), "failed or short scalar write rejected");
+            }
+            expect(!device.getLastError().empty(), "transport cause retained until next operation");
+            expect(device.writeRegister(16, 0x4c) && adapter->address_attempts[16] == 2,
+                "transport error invalidates stable-control cache");
+        }
+    }
+
+    void test_controller_primary_and_cleanup_receipts()
+    {
+        for (int cleanup_fault = 0; cleanup_fault < 4; ++cleanup_fault)
+        for (bool simultaneous_stop : {false, true})
+        {
+            TestBridge bridge;
+            auto adapter = std::make_shared<FakeI2CAdapter>();
+            auto cfg = config(adapter);
+            cfg.confirm_output_disable = true;
+            auto plan = four_tone_plan(4);
+            for (std::size_t i = 0; i < plan.events.size(); ++i) plan.events[i].frequency_hz = 7040100.0 + i;
+            adapter->before_read = [&](std::uint8_t r, std::size_t n) {
+                if (r != 0 || n != 3) return;
+                adapter->registers[0] = 0xc1;
+                if (simultaneous_stop) bridge.backendSignalStopRequest();
+                if (cleanup_fault == 1) {
+                    adapter->fail_address = 3;
+                    adapter->fail_address_occurrence = adapter->address_attempts[3] + 1;
+                } else if (cleanup_fault == 2) {
+                    adapter->fail_read_address = 3;
+                    adapter->fail_read_occurrence = adapter->read_attempts[3] + 2;
+                } else if (cleanup_fault == 3) {
+                    adapter->fail_address = 16;
+                    adapter->fail_address_occurrence = adapter->address_attempts[16] + 1;
+                }
+            };
+            WsprSi5351Backend backend(bridge, cfg);
+            FixedPlanCompiler compiler(plan);
+            wsprrypi::TransmissionController controller(compiler, backend);
+            wsprrypi::TransmissionRequest request;
+            request.id = plan.request_id;
+            request.output.backend = wsprrypi::BackendKind::SI5351;
+            expect(controller.prepare(request, wsprrypi::TransmissionPrepareOptions{1}).ok,
+                "primary/cleanup controller fixture prepares");
+            const auto result = controller.execute_prepared();
+            expect(!result.ok && result.cleanup_attempted && result.cleanup.ok == (cleanup_fault == 0),
+                "controller propagates primary failure and independent cleanup outcome");
+            expect(result.error.find("active readiness failure") != std::string::npos &&
+                   result.error.find("register0=0xc1") != std::string::npos &&
+                   result.error.find("event=1 tone=1") != std::string::npos,
+                "first valid fault survives cleanup and simultaneous cancellation");
+            if (cleanup_fault == 1 && !simultaneous_stop)
+                std::cout << "Status fixture primary and cleanup: " << result.error << '\n';
+            if (cleanup_fault != 0) expect(result.error.find("Cleanup failed") != std::string::npos &&
+                !result.cleanup.error.empty(), "controller retains both failure causes");
+            expect(count_write(*adapter, 3, 254) == 1, "first fault never re-enables output");
+            const auto again = backend.cleanup();
+            expect(again.ok == result.cleanup.ok && again.error == result.cleanup.error && adapter->close_calls == 1,
+                "controller consumption retains receipt without reopening");
+        }
+    }
 
     void test_pll_only_and_readiness()
     {
@@ -698,7 +975,8 @@ namespace
             const char* label;
         };
         const InterruptPoint points[] = {
-            {kOutputEnableRegister, 3, "output-inhibit interruption"},
+            // Immediate pre-initialization inhibition precedes the existing startup writes.
+            {kOutputEnableRegister, 4, "output-inhibit interruption"},
             {28, 2, "PLL-parameter interruption"},
             {kPllResetRegister, 2, "PLL-reset interruption"}};
 
@@ -1038,7 +1316,13 @@ int main()
         adapter->after_write = [&](std::uint8_t r, std::uint8_t, std::size_t) {
             if (r == 3) adapter->registers[3] = 254;
         };
-        expect(!backend.cleanup().ok, "stuck enabled output fails cleanup readback");
+        const auto failed_cleanup = backend.cleanup();
+        expect(!failed_cleanup.ok, "stuck enabled output fails cleanup readback");
+        const auto opens_after_failure = adapter->open_calls;
+        const auto repeated_cleanup = backend.cleanup();
+        expect(!repeated_cleanup.ok && repeated_cleanup.error == failed_cleanup.error &&
+                   adapter->open_calls == opens_after_failure,
+               "loaded-job cleanup failure remains retained without retrying I2C");
         adapter->after_write = {};
     }
     {
@@ -1114,6 +1398,12 @@ int main()
     test_envelope_deadlines_and_off_retune_readiness();
     test_burst_and_cache_failure_contract();
     test_optimized_backend_and_drive();
+    test_busy_status_then_transport_failure();
+    test_cancellation_at_admission_boundaries();
+    test_device_transport_and_cache_invalidation();
+    test_controller_primary_and_cleanup_receipts();
+    test_initialization_admission_and_cancellation();
+    test_readiness_status_and_transport_evidence();
     test_pll_only_and_readiness();
     test_committed_calibration_snapshot_and_reporting();
     test_invalid_calibration_fails_before_output_enable();

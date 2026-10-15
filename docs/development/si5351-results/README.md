@@ -1,5 +1,10 @@
 # Si5351 conducted comparison report
 
+**2026-10-15:** [Readiness software review and qualification disposition](../si5351-readiness-review.md)
+records software repairs, two consecutive inhibited wspr1 I2C passes and the
+maintainer's accepted item-6 closure. The historical failures, measurements and
+identities below remain unchanged; their cause was not established.
+
 **2026-09-08 follow-up:** a [complete matched 40 m/2 m pair with experiments off](matched-off.md) is now available. Both bands completed; the earlier intermittent SYS_INIT reliability issue remains unresolved. The original campaign findings below are retained.
 
 Final RF qualification is incomplete: repeated SYS_INIT status faults occurred

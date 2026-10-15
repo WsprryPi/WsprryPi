@@ -262,16 +262,15 @@ private:
      *
      * @param tone_index Tone index in the planned tone-set array
      * @param rf_enabled Whether the output is currently enabled
+     * @param error Primary programming/readiness failure, captured before cleanup
      * @return True on success
      */
-    bool applyTone(std::size_t tone_index, bool rf_enabled);
+    bool applyTone(std::size_t tone_index, bool rf_enabled, std::string& error);
 
-    /**
-     * @brief Enable the transmit output
-     *
-     * @return True on success
-     */
-    bool waitForPllReady();
+    // Live register-0 readiness, distinct from I2C transport failure.
+    enum class ReadyState { READY, NOT_READY, TRANSPORT_FAILURE };
+    ReadyState checkReady(std::uint8_t mask, const char* phase, std::string& error);
+    bool waitForReady(std::uint8_t mask, const char* phase, std::string& error);
     bool enableTransmitOutput();
 
     /**

@@ -1,0 +1,18 @@
+2026-10-15T20:34:17Z
+MainPID=463
+ActiveState=active
+SubState=running
+{'i2c1_open_descriptors_before': []}
+{"address": 96, "device": "/dev/i2c-1", "host": "wspr1", "kind": "start", "maximum_pairs": 500, "maximum_requested_rf_seconds": 0, "requested_pair_wait_ms": 2}
+{"kind": "verify_inhibited_before", "register3": 0}
+{"errno": null, "error": "register 3 is not 0xff; refusing sampling without changing outputs", "kind": "first_fault", "phase": "verify_inhibited_before"}
+{"kind": "verify_inhibited_after", "register3": 0}
+{"error": "output state unknown: register 3 is not 0xff", "kind": "cleanup_failure"}
+{"cleanup_error": "output state unknown: register 3 is not 0xff", "counts": {"combined": {}, "split": {}}, "elapsed_s": 0.018379749000814627, "first_fault": {"errno": null, "error": "register 3 is not 0xff; refusing sampling without changing outputs", "phase": "verify_inhibited_before"}, "kind": "result", "ok": false}
+MainPID=14699
+ActiveState=active
+SubState=running
+/usr/local/bin/wsprrypi: OK
+/usr/local/etc/wsprrypi.ini: OK
+2026-10-15T20:34:28Z
+run_exit=1

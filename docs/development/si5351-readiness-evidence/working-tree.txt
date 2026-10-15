@@ -1,0 +1,21 @@
+## devel...origin/devel
+ M .github/workflows/debian-non-hardware.yml
+ M WsprryPi-UI/data/wtp-management.js
+ M WsprryPi-UI/tests/wtp_configuration_interop_test.js
+ M WsprryPi-UI/tests/wtp_management_test.js
+ M WsprryPi-UI/tests/wtp_network_ui_integration_test.js
+ M docs/development/si5351-results/README.md
+ M "release_tools/Release Punchlist.md"
+ M src/Makefile
+ M src/WSPR-Transmitter/README.md
+ M src/WSPR-Transmitter/src/si5351_transition_test.cpp
+ M src/WSPR-Transmitter/src/wspr_transmit_backend_si5351.cpp
+ M src/WSPR-Transmitter/src/wspr_transmit_backend_si5351.hpp
+ M src/tests/i2c_bus_inventory_test.cpp
+ M src/tests/network/CMakeLists.txt
+ M src/tests/network/consumer_interop.cpp
+ M src/wtp_integration/configuration.cpp
+ M src/wtp_integration/consumer_radio.cpp
+?? docs/development/si5351-readiness-evidence/
+?? docs/development/si5351-readiness-review.md
+?? src/tests/network/pico-p154-revision.txt

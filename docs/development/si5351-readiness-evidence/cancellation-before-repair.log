@@ -1,0 +1,5 @@
+Compiling (debug) si5351_transition_test.cpp into build/obj/debug/./si5351_transition_test.o
+Linking debug: si5351_transition_test
+FAIL: cancellation during admission never enables output
+1 Si5351 transition test(s) failed.
+make: *** [Makefile:381: si5351-transition-test] Error 1
