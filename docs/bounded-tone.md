@@ -67,3 +67,62 @@ An automation client must authenticate its host access, launch or select an
 explicitly loopback-contained WsprryPi process, correlate both response events,
 and enforce an outer deadline. Those client controls are defense in depth; the
 WsprryPi watchdog remains the RF-duration authority.
+
+## Transaction ordering and status
+
+The scheduler serializes complete Start, End, operator Stop, and restoration
+transactions. Each accepted Test Tone has a process-local generation. The
+watchdog can end only that generation; operator Stop, an ended transaction,
+or a successor prevents stale cleanup or restoration. An ordinary End can
+restore a previous CLI direct tone, so `stopped=true` describes the Test Tone
+transaction, not a blanket assertion that all output is off.
+
+The server reuses one watchdog thread. End cancels its pending deadline without
+joining it. Server shutdown cancels the deadline and quiesces only its still-owned
+bounded generation without restoring earlier work, then joins without holding
+command, lifecycle, or watchdog-state locks. Process exit also prohibits restoration.
+Failure to create the watchdog quiesces the newly accepted generation. A finite
+execution that reconciles before the deadline retains its terminal outcome for
+the matching watchdog without repeating cleanup or restoration.
+
+The existing request forms and response booleans remain available. Optional
+`client_request_id` strings (up to 128 characters) are echoed for browser
+correlation. Additive `test_tone` metadata carries `generation`, monotonic
+`revision`, `owned`, `state`, `message`, and `restoration`. These identifiers are
+local to the process; clients reacquire evidence after reconnect. States include
+`starting`, `active`, `completed`, `failed`, `cancelled`, `ended`, and `unknown`.
+The main loop publishes changed observations as `test_tone_status` messages;
+`get_tx_state` also includes the metadata. Receivers should ignore older
+revisions and tolerate additional fields.
+
+`started=true` means the request was accepted and asynchronous startup was
+requested. `active` is an observed controller runtime event, never an RF
+measurement. Terminal callbacks record their own generation and let the main
+loop perform cleanup/restoration outside the worker. A terminal event may
+precede the Start acknowledgment. End responses additionally expose
+`restoration_failed` and `output_inactive`; restoration warnings must not be
+hidden by `stopped=true`. Unknown cleanup keeps output arbitration inhibited.
+An inactive legacy End remains inert with `tone_was_active=false` and
+`stopped=false`; the metadata distinguishes that case from uncertain cleanup.
+An End recovering uncertain cleanup reports the cleanup result explicitly and
+does not resume prior work; successful recovery can have `stopped=true` with
+`tone_was_active=false`.
+
+Configuration reloads and saved web edits during Test Tone defer runtime
+application until cleanup, retaining the committed backend, mode, frequency,
+and selector snapshot. Saved repair/reset operations follow the same rule.
+Operator Stop retains its existing persistence option and clears restoration
+ownership. Browser replies are versioned so an older result cannot overwrite a
+newer observation even when HTTP Stop and WebSocket delivery overlap.
+
+Broadcasts, including keep-alive traffic, do not wait for a slow peer's send
+buffer. A peer that cannot accept a complete frame is disconnected and must
+reconnect for current evidence. Tone worker callbacks never broadcast or take
+the scheduler lifecycle/configuration locks. These are software ordering and
+reporting contracts, not hardware or RF qualification.
+
+An old controller response without correlation or revision evidence cannot
+prove which tab's pending request it answers. The browser retains a conservative
+recovery state for an uncorrelated rejection rather than enabling another
+Start. Matching acknowledgments that arrive after newer runtime observations
+settle their request timers without rolling the observed state backward.

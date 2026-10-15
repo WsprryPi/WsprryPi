@@ -37,7 +37,18 @@ private:
 
 bool set_config(bool force)
 {
+    // A joined transmitter callback must never wait for a lifecycle owner.
+    // Record deferred work; the main loop or End reconciles it after cleanup.
+    std::unique_lock transaction(test_tone_lifecycle_mutex(), std::try_to_lock);
+    if (!transaction.owns_lock()) {
+        ini_reload_pending.store(true, std::memory_order_release);
+        return true;
+    }
     std::lock_guard<std::mutex> lk(set_config_mtx);
+    if (web_test_tone.load()) {
+        ini_reload_pending.store(true, std::memory_order_release);
+        return true;
+    }
 
     // Exit if we are shutting down
     if (exiting_wspr.load())

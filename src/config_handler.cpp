@@ -1999,6 +1999,7 @@ std::string patch_all_from_web_revision(const nlohmann::json &j, const std::stri
     LocalEnableAction action, bool confirmed,
     const std::string& observed_owner, const std::string& observed_job)
 {
+    std::unique_lock tone_transaction(test_tone_lifecycle_mutex());
     std::unique_lock update_lock(config_update_mutex());
     if (!expected_revision.empty() && expected_revision != config_revision_locked())
         throw std::runtime_error("revision_conflict");
@@ -2053,6 +2054,7 @@ std::string patch_all_from_web_revision(const nlohmann::json &j, const std::stri
             candidate_config.transmit_backend == TransmitBackendKind::SI5351 &&
             config.transmit_backend != TransmitBackendKind::SI5351;
         update_lock.unlock(); // Physical validation must not block config snapshots or local updates.
+        tone_transaction.unlock();
         if (si5351_selection_changed || selecting_si5351)
         {
             if (candidate_config.si5351_i2c_address < 0x60 ||
@@ -2083,6 +2085,7 @@ std::string patch_all_from_web_revision(const nlohmann::json &j, const std::stri
             throw std::runtime_error(error_message);
         }
 
+        tone_transaction.lock();
         update_lock.lock();
         if (config_revision_locked() != initial_revision)
             throw std::runtime_error("revision_conflict");
@@ -2169,11 +2172,15 @@ std::string patch_all_from_web_revision(const nlohmann::json &j, const std::stri
         wsprrypi::wtp_pi_enable_interactive(action == LocalEnableAction::FinishCurrent,
                                            confirmed, persist, observed_owner, observed_job);
     else persist();
-    copy_config(candidate_config, config);
-    wsprrypi::wtp_pi_configuration_committed(config);
-    if (!interactive && (writes_enable || !config.transmit))
-        wtp_pi_config_transmit_committed(config.transmit);
-    publish_test_tone_planning_config(config);
+    // Persist edits during Test Tone, but do not replace its runtime backend,
+    // mode, selectors, or reservation. End consumes the deferred INI candidate.
+    if (!current_test_tone_status().owned) {
+        copy_config(candidate_config, config);
+        wsprrypi::wtp_pi_configuration_committed(config);
+        if (!interactive && (writes_enable || !config.transmit))
+            wtp_pi_config_transmit_committed(config.transmit);
+        publish_test_tone_planning_config(config);
+    }
     jConfig = candidate_json;
     refresh_logger_level_from_config();
     const auto revision = config_revision_locked();
@@ -2236,6 +2243,7 @@ bool persist_rp1_gpclk_route_config(int gpio, std::string *error_message) noexce
 
 void repair_from_web(bool attempt_repair)
 {
+    std::lock_guard tone_transaction(test_tone_lifecycle_mutex());
     const std::string filename = config.ini_filename;
 
     if (attempt_repair)
@@ -2251,6 +2259,14 @@ void repair_from_web(bool attempt_repair)
         iniMonitor.stop();
         iniMonitor.filemon(config.ini_filename, callback_ini_changed);
         iniMonitor.setPriority(SCHED_RR, 10);
+    }
+
+    if (current_test_tone_status().owned) {
+        // Keep the running tone's backend/mode/selector snapshot until End.
+        // The file monitor and scheduler will reconcile the saved repair.
+        ini_reload_pending.store(true, std::memory_order_release);
+        llog.logS(INFO, "Configuration repair saved; runtime reload deferred until Test Tone ends.");
+        return;
     }
 
     std::string load_error;

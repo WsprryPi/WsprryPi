@@ -96,6 +96,7 @@ WsprFrequencyEntry next_frequency_entry_from(
 WsprFrequencyEntry next_frequency_entry(bool reset);
 double maybe_apply_wspr_random_offset(double, const ArgParserConfig &);
 void schedule_next_non_wspr_launch(const ArgParserConfig &);
+bool launch_scheduled_non_wspr_if_current(std::uint64_t);
 bool start_non_wspr_transmission_now(const ArgParserConfig &,
     std::optional<std::chrono::system_clock::time_point> = std::nullopt);
 TransmissionRequest make_skip_window_request(

@@ -66,6 +66,7 @@ int main()
     TestToneStartResult result;
     result.started = true;
     result.message = "started";
+    result.lifecycle = {9, 17, true, "starting", "acceptance only", "none"};
     result.band = "20m";
     result.dial_frequency_hz = 14095600;
     result.audio_offset_hz = 1500;
@@ -78,6 +79,10 @@ int main()
 
     const auto active_high_band = build_test_tone_response(
         {TestToneRequestSource::WsprBand, "20m", {}}, result);
+    require(active_high_band.at("test_tone") == nlohmann::json{
+        {"generation", 9}, {"revision", 17}, {"owned", true},
+        {"state", "starting"}, {"message", "acceptance only"}, {"restoration", "none"}},
+        "additive lifecycle metadata preserves acceptance versus activity");
     require_common_fields(active_high_band, true, false, false, false, "started",
                           "active-high band common fields");
     require(active_high_band["frequency_source"] == "wspr_band" &&

@@ -8,7 +8,7 @@ disposition rather than implementation before 4.0.
 
 ## Ordered release checklist
 
-Status updated October 15, 2026. Items 1, 2 and 3 are complete; item 4 is in progress.
+Status updated October 15, 2026. Items 1, 2, 3 and 4 are complete.
 
 Status key: ✅ Complete · ⏳ In progress · ☐ Not started
 
@@ -24,9 +24,11 @@ Status key: ✅ Complete · ⏳ In progress · ☐ Not started
    absence blocks release. This closes the scope decision, not RF calibration.
    Existing Chrony source-age and source-identification concerns remain recorded
    for separate triage. See [Calibration Scope Decisions](Calibration%20Scope%20Decisions.md).
-4. ⏳ **Test Tone lifecycle and status feedback.** **In progress.** Address
-   concurrency and status duplication together, including Start/End/user-stop/
-   restoration races and distinct frequency-preview versus execution feedback.
+4. ✅ **Test Tone lifecycle and status feedback.** Complete. Scheduler-owned
+   ordering, generation fencing, watchdog cleanup and truthful execution/
+   restoration feedback are implemented and software-validated. See the
+   [review and evidence](../docs/development/test-tone-lifecycle-review.md).
+   Physical qualification and the final integrated UI review remain open.
 5. ☐ **Si5351 readiness failures.** Characterize and resolve or explicitly
    disposition intermittent `SYS_INIT` failures, then repeat the necessary
    guarded-default qualification against the settled Test Tone behavior.
@@ -53,8 +55,8 @@ Status key: ✅ Complete · ⏳ In progress · ☐ Not started
 
 | Saved item | Release relevance | Disposition and evidence |
 | --- | --- | --- |
-| **Test Tone concurrency** | Deferred P3: coordinate complete Start, End, and user-stop transactions, with deterministic race tests. Current WebSocket locking addresses part of this; reassess the broader scheduler follow-up. | In progress under release checklist item 4. |
-| **Test Tone status duplication** | Keep the frequency preview separate from execution feedback. Include this in the final UI review. | In progress under release checklist item 4; final integrated UI review remains pending. |
+| **Test Tone concurrency** | Coordinate complete Start, End, user-stop, expiry, cleanup and restoration transactions, with deterministic race tests. | Complete under release checklist item 4: scheduler ordering, generation fences, nonblocking delivery and watchdog lifecycle validated. See the [review and evidence](../docs/development/test-tone-lifecycle-review.md). Physical qualification remains separate. |
+| **Test Tone status duplication** | Keep the frequency preview separate from execution feedback. Include this in the final UI review. | Complete for item 4: accepted/startup/runtime/uncertain and restoration feedback, correlation tests and focused Impeccable review recorded in the [review and evidence](../docs/development/test-tone-lifecycle-review.md). Final integrated UI review (#423) remains pending. |
 | **Si5351 readiness failures** | The five comparison investigations were implemented, but intermittent `SYS_INIT` failures remain unresolved in the [qualification record](../docs/development/si5351-results/README.md). Successful later captures did not close that reliability question. | Pending qualification disposition. |
 | **Direct PPS for GPIO frequency calibration** | Optional RF-calibration scope decision; retain Chrony-derived estimates, intrinsic defaults, manual correction and conducted residuals. | Review complete: native PPS RF calibration deferred beyond 4.0. No independent RF counter/capture benefit or new 4.0 requirement established; reopening requires an identified measurement path and measurable improvement. See [Calibration Scope Decisions](Calibration%20Scope%20Decisions.md#direct-pps-disposition-and-reopening-criteria). |
 | **RP1 alternative clock parents** | Current output already uses nominal 200 MHz `pll_sys`; historical 50 MHz/XOSC planning is obsolete. | Reconciled: `pll_sys` implemented; genuinely alternative paths through `clk_i2s`, `clk_adc` or `clk_sys` deferred beyond 4.0, subject to ancestry/ownership and coordinated provider/userspace qualification. See [Calibration Scope Decisions](Calibration%20Scope%20Decisions.md#rp1-parent-disposition). |

@@ -6,6 +6,7 @@
 #include "scheduling.hpp"
 
 #include "json.hpp"
+#include "test_tone_response.hpp"
 #include "logging.hpp"
 #include "web_socket.hpp"
 
@@ -37,6 +38,7 @@ void send_ws_message(
     nlohmann::json j;
     j["type"] = type;
     j["state"] = state;
+    j["test_tone"] = test_tone_status_json(current_test_tone_status());
 
     if (type == "transmit")
     {

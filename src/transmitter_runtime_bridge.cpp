@@ -9,6 +9,7 @@
 #include "wtp_runtime_bridge.hpp"
 #include "wtp_pi_control.hpp"
 #include "logging.hpp"
+#include "scheduling.hpp"
 #include <mutex>
 #include <stdexcept>
 namespace { std::mutex callback_mutex; TransmitterRuntimeCallback runtime_callback; }
@@ -99,15 +100,16 @@ void transmitter_start_async()
     }
 }
 
-void transmitter_stop_and_join()
+wsprrypi::CleanupResult transmitter_stop_and_join()
 {
     if (wtp_runtime_selected()) {
         auto result = wtp_runtime_stop();
         if (!result.ok) llog.logS(ERROR, "Pico output remains unresolved: ", result.error);
-        return;
+        return result;
     }
     wsprTransmitter.stopAndJoin();
     wtp_pi_end_scheduled(transmitter_output_inactive_confirmed());
+    return wsprTransmitter.lastCleanupResult();
 }
 
 bool transmitter_output_inactive_confirmed() noexcept
@@ -131,6 +133,11 @@ void transmitter_clear_soft_off() noexcept
 
 void transmitter_poll_events()
 {
+    // Pair completion consumption and callback dispatch with the scheduler
+    // owner. Otherwise an old WTP report could be delivered after Start has
+    // installed a successor's generation-capturing callback.
+    std::unique_lock transaction(test_tone_lifecycle_mutex(), std::try_to_lock);
+    if (!transaction.owns_lock()) return;
     wtp_runtime_poll_idle();
     auto result = wtp_runtime_completion();
     if (!result) return;

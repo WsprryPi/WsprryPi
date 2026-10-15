@@ -192,6 +192,9 @@ async function browserTest() {
         }
     }
 
+    // Every controller response is mocked; container network isolation must
+    // not turn these autosave scenarios into browser-offline scenarios.
+    Object.defineProperty(navigator, "onLine", { configurable: true, get: () => true });
     const clock = new FakeClock();
     window.setTimeout = clock.setTimeout.bind(clock);
     window.clearTimeout = clock.clearTimeout.bind(clock);

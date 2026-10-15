@@ -28,21 +28,46 @@
 #include <mutex>
 #include <optional>
 #include <string>
+#include <utility>
 
 namespace
 {
+std::recursive_mutex lifecycle_mutex;
+std::mutex observation_mutex;
+TestToneStatus tone_status;
+TestToneLifecycleHook lifecycle_hook;
+void checkpoint(std::string_view point) { if (lifecycle_hook) lifecycle_hook(point); }
+void publish_status(std::string state, bool owned, std::string message,
+                    std::string restoration = "none")
+{
+    std::lock_guard lock(observation_mutex);
+    ++tone_status.revision;
+    tone_status.state = std::move(state);
+    tone_status.owned = owned;
+    tone_status.message = std::move(message);
+    tone_status.restoration = std::move(restoration);
+}
+bool stop_tone_output()
+{
+    const auto cleanup = transmitter_stop_and_join();
+    // Pico owns remote RF cleanup. The generic query intentionally cannot
+    // prove its inactivity; use this transaction's WTP stop result instead.
+    return wtp_runtime_selected() ? cleanup.ok : transmitter_output_inactive_confirmed();
+}
 class LocalToneReservation
 {
 public:
-    explicit LocalToneReservation(bool held) : held_(held) {}
+    explicit LocalToneReservation(const bool &cleanup_confirmed)
+        : cleanup_confirmed_(cleanup_confirmed) {}
     ~LocalToneReservation()
     {
         if (held_)
-            wtp_pi_end_local(transmitter_output_inactive_confirmed());
+            wtp_pi_end_local(cleanup_confirmed_);
     }
     void transfer_to_running_tone() noexcept { held_ = false; }
 private:
-    bool held_;
+    bool held_ = true;
+    const bool &cleanup_confirmed_;
 };
 
 wsprrypi::BackendKind to_controller_backend(
@@ -87,6 +112,59 @@ wsprrypi::HardwareProfile to_controller_profile(
 }
 }
 
+std::recursive_mutex &test_tone_lifecycle_mutex() { return lifecycle_mutex; }
+TestToneStatus current_test_tone_status()
+{
+    std::lock_guard lock(observation_mutex);
+    return tone_status;
+}
+void set_test_tone_lifecycle_hook_for_test(TestToneLifecycleHook hook)
+{
+    std::lock_guard lock(lifecycle_mutex);
+    lifecycle_hook = std::move(hook);
+}
+void record_test_tone_event(std::uint64_t generation,
+                           WsprTransmissionCallbackEvent event,
+                           const std::string &message)
+{
+    std::lock_guard lock(observation_mutex);
+    if (!tone_status.owned || tone_status.generation != generation) return;
+    // Terminal observations cannot be overwritten by a delayed STARTING event.
+    if (tone_status.state == "completed" || tone_status.state == "failed" ||
+        tone_status.state == "cancelled") return;
+    const char *state = event == WsprTransmissionCallbackEvent::STARTING ? "active" :
+        event == WsprTransmissionCallbackEvent::COMPLETE ? "completed" :
+        event == WsprTransmissionCallbackEvent::FAILED ? "failed" :
+        event == WsprTransmissionCallbackEvent::CANCELLED ? "cancelled" : nullptr;
+    if (!state) return;
+    ++tone_status.revision;
+    tone_status.state = state;
+    tone_status.message = message;
+}
+
+void reconcile_test_tone_runtime()
+{
+    std::unique_lock lock(lifecycle_mutex, std::try_to_lock);
+    if (!lock.owns_lock()) return;
+    auto status = current_test_tone_status();
+    // WTP reports execution through polled status rather than a STARTING
+    // callback. Confirm only the currently owned tone's observed runtime.
+    if (status.owned && status.state == "starting" &&
+        transmitter_state() == WsprTransmitState::TRANSMITTING &&
+        transmitter_active_execution_is_tone()) {
+        record_test_tone_event(status.generation, WsprTransmissionCallbackEvent::STARTING, "");
+        status = current_test_tone_status();
+    }
+    if (!status.owned || (status.state != "completed" && status.state != "failed" &&
+                          status.state != "cancelled")) return;
+    const auto ended = end_test_tone(status.generation,
+        status.state == "failed" ? TestToneEndPolicy::Quiesce :
+                                  TestToneEndPolicy::RestorePrevious);
+    publish_status(ended.restoration_failed ? ended.lifecycle.state : status.state, ended.lifecycle.owned,
+        (status.message.empty() ? std::string("Test Tone ") + status.state + "." : status.message) +
+        " " + ended.message, ended.lifecycle.restoration);
+}
+
 /**
  * @brief Start a transient runtime tone using scheduler-owned setup.
  *
@@ -96,12 +174,13 @@ wsprrypi::HardwareProfile to_controller_profile(
  * frequency and does not receive WSPR dial-frequency offset. Tone mode here is
  * runtime-only behavior.
  */
-static void rollback_failed_test_tone_start(ModeType previous_mode) noexcept
+static bool rollback_failed_test_tone_start(ModeType previous_mode) noexcept
 {
+    bool cleanup_confirmed = false;
     wsprrypi::invalidateRp1GpclkDevelopmentOperation();
     try
     {
-        transmitter_stop_and_join();
+        cleanup_confirmed = stop_tone_output();
         transmitter_clear_execution_state_after_stop();
         finalize_transmission_stop_cleanup(
             &config,
@@ -132,12 +211,25 @@ static void rollback_failed_test_tone_start(ModeType previous_mode) noexcept
     web_test_tone.store(false);
     config.mode = previous_mode;
     test_tone_restoration_owner = TestToneRestorationOwner::Unknown;
+    transmitter_set_callbacks(transmitter_cb);
+    const bool inactive = cleanup_confirmed;
+    if (!inactive) config.transmit = false;
+    publish_status(inactive ? "failed" : "unknown", false,
+        inactive ? "Test Tone startup failed; output cleanup confirmed."
+                 : "Test Tone startup failed; output cleanup is unconfirmed. Use End or local recovery.");
+    return cleanup_confirmed;
 }
 
-TestToneStartResult start_test_tone(const TestToneRequest &tone_request)
+static TestToneStartResult start_test_tone_locked(const TestToneRequest &tone_request)
 {
+    std::unique_lock config_lock(set_config_mtx);
     TestToneStartResult result;
+    if (exiting_wspr.load()) { result.message = "Application is stopping."; return result; }
     result.source = tone_request.source;
+    if (!web_test_tone.load() && current_test_tone_status().state == "unknown") {
+        result.message = "Test Tone output cleanup is unconfirmed. Use End or local recovery before starting another tone.";
+        return result;
+    }
     if (config.transmit_backend == TransmitBackendKind::WTP &&
         (!tone_request.duration || *tone_request.duration <= std::chrono::nanoseconds::zero())) {
         result.message = "Pico requires a finite tone duration; continuous Test Tone is unavailable.";
@@ -254,7 +346,8 @@ TestToneStartResult start_test_tone(const TestToneRequest &tone_request)
         result.message = "The local output is owned by a remote WTP job or is not confirmed idle.";
         return result;
     }
-    LocalToneReservation local_tone_reservation(true);
+    bool rollback_cleanup_confirmed = false;
+    LocalToneReservation local_tone_reservation(rollback_cleanup_confirmed);
     web_test_tone.store(true);
 
     // Save previous mode so we can restore it later.
@@ -263,7 +356,21 @@ TestToneStartResult start_test_tone(const TestToneRequest &tone_request)
 
     try
     {
+    config_lock.unlock();
     transmitter_stop_and_join();
+    config_lock.lock();
+    // Any delayed launch armed by a drained predecessor callback is stale.
+    non_wspr_schedule_generation.fetch_add(1, std::memory_order_acq_rel);
+    {
+        std::lock_guard lock(observation_mutex);
+        ++tone_status.generation;
+    }
+    publish_status("starting", true, "Test Tone accepted; waiting for runtime confirmation.");
+    const auto generation = current_test_tone_status().generation;
+    transmitter_set_callbacks([generation](WsprTransmissionCallbackEvent event,
+        WsprTransmitLogLevel, const std::string &message, double) {
+        record_test_tone_event(generation, event, message);
+    });
 
     ArgParserConfig selector_preparation_cfg;
     WsprFrequencyEntry entry;
@@ -373,9 +480,7 @@ TestToneStartResult start_test_tone(const TestToneRequest &tone_request)
         selector_status);
     if (selector_status == BandGPIOPrepareStatus::Failed)
     {
-        web_test_tone.store(false);
-        config.mode = lastMode;
-        test_tone_restoration_owner = TestToneRestorationOwner::Unknown;
+        rollback_cleanup_confirmed = rollback_failed_test_tone_start(lastMode);
         const auto gpio_policy = wsprrypi::evaluate_gpio_band_policy(
             to_controller_backend(selector_preparation_cfg.transmit_backend),
             actual_rf_freq,
@@ -415,8 +520,12 @@ TestToneStartResult start_test_tone(const TestToneRequest &tone_request)
         : false;
     if (result.band.empty()) result.band = ham_band_to_string(*lookup.lookup_ham_band(dial_freq));
 
+    checkpoint("before_start_async");
+    if (exiting_wspr.load()) throw std::runtime_error("Application is stopping.");
     if (!suppress_scheduler_execution_for_test)
     {
+        if (config.transmit_backend != TransmitBackendKind::WTP)
+            assert_transmit_gpio_outputs("Test Tone start");
         transmitter_start_async();
     }
 
@@ -424,7 +533,7 @@ TestToneStartResult start_test_tone(const TestToneRequest &tone_request)
               "WSPR-band test tone using dial frequency: ",
               lookup.freq_display_string(dial_freq));
     result.started = true;
-    result.message = "Test tone started.";
+    result.message = "Test Tone accepted; waiting for runtime confirmation.";
     local_tone_reservation.transfer_to_running_tone();
     return result;
     }
@@ -434,7 +543,7 @@ TestToneStartResult start_test_tone(const TestToneRequest &tone_request)
         llog.logE(
             ERROR,
             "Test tone start rejected during configuration: " + detail);
-        rollback_failed_test_tone_start(lastMode);
+        rollback_cleanup_confirmed = rollback_failed_test_tone_start(lastMode);
         result.message = detail.empty()
             ? "Unable to configure the requested test tone."
             : detail;
@@ -445,10 +554,19 @@ TestToneStartResult start_test_tone(const TestToneRequest &tone_request)
         llog.logE(
             ERROR,
             "Test tone start rejected by an unknown configuration error.");
-        rollback_failed_test_tone_start(lastMode);
+        rollback_cleanup_confirmed = rollback_failed_test_tone_start(lastMode);
         result.message = "Unable to configure the requested test tone.";
         return result;
     }
+}
+
+TestToneStartResult start_test_tone(const TestToneRequest &request)
+{
+    std::lock_guard transaction(lifecycle_mutex);
+    checkpoint("start_locked");
+    auto result = start_test_tone_locked(request);
+    result.lifecycle = current_test_tone_status();
+    return result;
 }
 
 TestToneStartResult start_test_tone(
@@ -468,21 +586,55 @@ TestToneStartResult start_test_tone(
  * This stops the current tone, tears down selector lifecycle state through
  * the scheduler helper, and then resumes the pre-tone runtime mode.
  */
-TestToneStopResult end_test_tone()
+static TestToneStopResult end_test_tone_locked(std::uint64_t expected_generation, TestToneEndPolicy policy)
 {
-    wsprrypi::invalidateRp1GpclkDevelopmentOperation();
+    std::unique_lock config_lock(set_config_mtx);
     TestToneStopResult result;
+    const auto status = current_test_tone_status();
+    if (expected_generation && (!status.owned || status.generation != expected_generation))
+    {
+        // Natural finite completion can reconcile before the host watchdog.
+        // Replay that owner's outcome without cleanup/restoration a second time.
+        if (status.generation == expected_generation && !status.owned) {
+            result.stopped = status.state != "unknown";
+            result.restoration_failed = status.restoration == "failed";
+            result.scheduler_restored = status.restoration == "scheduler";
+            result.output_inactive = transmitter_output_inactive_confirmed();
+            result.message = status.message;
+        } else result.message = "Test Tone transaction already ended or superseded.";
+        return result;
+    }
+    wsprrypi::invalidateRp1GpclkDevelopmentOperation();
     result.tone_was_active = web_test_tone.load();
 
     if (!result.tone_was_active)
     {
-        result.message = "No active test tone.";
+        result.output_inactive = transmitter_output_inactive_confirmed();
+        if (status.state == "unknown") {
+            config_lock.unlock();
+            const bool inactive = stop_tone_output();
+            config_lock.lock();
+            finalize_transmission_stop_cleanup(&config, false, "Test Tone recovery", true, true);
+            wtp_pi_end_local(inactive);
+            result.output_inactive = inactive;
+            config.transmit = false;
+            result.stopped = inactive;
+            result.message = inactive
+                ? "Test Tone recovery cleanup confirmed; previous work was not resumed."
+                : "Output cleanup remains unconfirmed; use local recovery.";
+            publish_status(inactive ? "ended" : "unknown", false,
+                           result.message, "not_resumed");
+            return result;
+        }
+        result.message = "No active Test Tone transaction; prior output state is unchanged.";
         return result;
     }
 
     llog.logS(INFO, "Ending test tone requested by Web UI.");
 
-    transmitter_stop_and_join();
+    config_lock.unlock();
+    const bool cleanup_confirmed = stop_tone_output();
+    config_lock.lock();
     transmitter_clear_execution_state_after_stop();
     finalize_transmission_stop_cleanup(
         &config,
@@ -491,13 +643,12 @@ TestToneStopResult end_test_tone()
         true,
         true);
     clear_committed_execution_request();
-    llog.logS(
-        DEBUG,
-        "Post-test-tone stop transmitter snapshot: ",
-        transmitter_reload_defer_debug_snapshot());
     (void)reconcile_tx_led_after_transmitter_stop("test tone stop");
-    wtp_pi_end_local(transmitter_output_inactive_confirmed());
+    wtp_pi_end_local(cleanup_confirmed);
 
+    result.stopped = true;
+    result.output_inactive = cleanup_confirmed;
+    transmitter_set_callbacks(transmitter_cb);
     const bool deferred_reload_pending =
         ini_reload_pending.load(std::memory_order_acquire);
 
@@ -505,21 +656,42 @@ TestToneStopResult end_test_tone()
     test_tone_restoration_owner = TestToneRestorationOwner::Unknown;
     web_test_tone.store(false);
     config.mode = lastMode;
+    publish_status("ended", false, "Test Tone ended.");
+    if (!result.output_inactive || policy == TestToneEndPolicy::Quiesce || exiting_wspr.load())
+    {
+        config.transmit = false;
+        result.restoration_failed = !result.output_inactive;
+        result.message = result.output_inactive
+            ? "Test Tone ended; previous work was not resumed."
+            : "Test Tone cleanup is unconfirmed; output remains inhibited. Use local recovery.";
+        publish_status(result.output_inactive ? "ended" : "unknown", false,
+                       result.message, "not_resumed");
+        return result;
+    }
+    config_lock.unlock();
+    checkpoint("before_restore");
 
     if (restoration_owner == TestToneRestorationOwner::WsprScheduler)
     {
         if (config.mode != ModeType::WSPR)
         {
+            result.restoration_failed = true;
             result.message = "Inconsistent Test Tone scheduler restoration state.";
             return result;
         }
         if (!set_config(true))
         {
+            result.restoration_failed = true;
             result.message = "Unable to restore scheduler state after test tone stop.";
             return result;
         }
 
-        if (runtime_transmit_enabled(config) &&
+        if (managed_reload_tx_inhibited_state()) {
+            result.restoration_failed = true;
+            result.message = "Test Tone ended; configuration restoration was rejected. Transmit remains inhibited.";
+            return result;
+        }
+        if (config.mode == ModeType::WSPR && runtime_transmit_enabled(config) &&
             !suppress_scheduler_execution_for_test)
         {
             // Re-arm the committed WSPR wait loop even if the tone stop
@@ -530,10 +702,12 @@ TestToneStopResult end_test_tone()
 
         result.stopped = true;
         result.scheduler_restored = true;
+        if (runtime_transmit_enabled(config)) result.output_inactive = false;
         result.deferred_reload_reconciled =
             deferred_reload_pending &&
             !ini_reload_pending.load(std::memory_order_acquire);
-        result.message = "Test tone stopped and scheduler restored.";
+        result.message = "Test Tone ended; scheduler configuration restored.";
+        publish_status("ended", false, result.message, "scheduler");
         return result;
     }
 
@@ -543,17 +717,31 @@ TestToneStopResult end_test_tone()
               (config.mode == ModeType::FSKCW || config.mode == ModeType::QRSS ||
                config.mode == ModeType::DFCW)))
         {
+            result.restoration_failed = true;
             result.message = "Inconsistent managed Test Tone restoration state.";
             return result;
         }
 
         result.stopped = true;
-        result.message = "Test tone stopped; managed mode restored inactive.";
+        if (deferred_reload_pending) {
+            result.deferred_reload_reconciled = set_config(true) && !ini_reload_pending.load();
+        }
+        if (managed_reload_tx_inhibited_state()) {
+            result.restoration_failed = true;
+            result.message = "Test Tone ended; configuration restoration was rejected. Transmit remains inhibited.";
+            return result;
+        }
+        const bool enabled = runtime_transmit_enabled(config);
+        if (enabled) result.output_inactive = false;
+        result.message = enabled ? "Test Tone ended; updated managed scheduling restored."
+                                 : "Test Tone ended; managed mode restored inactive.";
+        publish_status("ended", false, result.message, enabled ? "scheduler" : "managed_idle");
         return result;
     }
 
     if (restoration_owner != TestToneRestorationOwner::DirectToneStartup)
     {
+        result.restoration_failed = true;
         result.message = "Unknown Test Tone restoration state after safe cleanup.";
         return result;
     }
@@ -567,6 +755,7 @@ TestToneStopResult end_test_tone()
         llog.logE(ERROR,
                   "Unable to restore direct test tone; no "
                   "transient tone request is active.");
+        result.restoration_failed = true;
         result.message =
             "Unable to restore direct test tone; no transient tone request is active.";
         return result;
@@ -581,20 +770,62 @@ TestToneStopResult end_test_tone()
             &restoration_error))
     {
         result.stopped = true;
-        result.message = restoration_error;
+        result.restoration_failed = true;
+        result.message = "Test Tone ended; direct tone restoration failed: " + restoration_error;
+        publish_status("failed", false, result.message, "failed");
         return result;
     }
 
     llog.logS(INFO,
               "Transmitting tone, hit Ctrl-C to terminate tone.");
     result.stopped = true;
-    result.message = "Test tone stopped and direct tone restored.";
+    result.output_inactive = false;
+    result.message = "Test Tone ended; previous CLI direct tone restored (startup requested).";
+    publish_status("ended", false, result.message, "direct_tone");
+    return result;
+}
+
+TestToneStopResult end_test_tone(std::uint64_t expected_generation, TestToneEndPolicy policy)
+{
+    std::lock_guard transaction(lifecycle_mutex);
+    checkpoint("end_locked");
+    TestToneStopResult result;
+    const bool owned_before = web_test_tone.load();
+    try { result = end_test_tone_locked(expected_generation, policy); }
+    catch (const std::exception &error) {
+        result.restoration_failed = true;
+        result.message = std::string("Test Tone cleanup or restoration failed: ") + error.what();
+        if (!web_test_tone.load()) {
+            result.output_inactive = rollback_failed_test_tone_start(lastMode);
+            wtp_pi_end_local(result.output_inactive);
+        }
+    }
+    catch (...) {
+        result.restoration_failed = true;
+        result.message = "Test Tone cleanup or restoration failed; use End or local recovery.";
+        if (!web_test_tone.load()) {
+            result.output_inactive = rollback_failed_test_tone_start(lastMode);
+            wtp_pi_end_local(result.output_inactive);
+        }
+    }
+    if (result.restoration_failed) {
+        result.tone_was_active = owned_before;
+        result.stopped = owned_before && !web_test_tone.load();
+        if (!wtp_runtime_selected()) result.output_inactive = transmitter_output_inactive_confirmed();
+        publish_status(result.output_inactive ? "failed" : "unknown", web_test_tone.load(), result.message, "failed");
+    }
+    result.lifecycle = current_test_tone_status();
     return result;
 }
 
 StopTransmissionResult stop_transmission_by_user_request(bool persist_transmit)
 {
+    std::lock_guard transaction(lifecycle_mutex);
+    checkpoint("stop_locked");
     StopTransmissionResult result;
+    const bool was_test_tone = web_test_tone.load();
+    test_tone_restoration_owner = TestToneRestorationOwner::Unknown;
+    publish_status("unknown", false, "Operator Stop requested; awaiting cleanup.", "not_resumed");
     const bool remote_stopped = wsprrypi::wtp_pi_stop_remote_work();
     bool persist_to_ini = false;
     suppress_cancelled_ws_event_for_user_stop.store(false, std::memory_order_release);
@@ -602,6 +833,7 @@ StopTransmissionResult stop_transmission_by_user_request(bool persist_transmit)
     {
         std::lock_guard<std::mutex> lk(set_config_mtx);
 
+        if (was_test_tone) config.mode = lastMode;
         const WsprTransmitState state = transmitter_state();
         result.transmission_active =
             state == WsprTransmitState::TRANSMITTING;
@@ -630,13 +862,20 @@ StopTransmissionResult stop_transmission_by_user_request(bool persist_transmit)
         suppress_cancelled_ws_event_for_user_stop.store(true, std::memory_order_release);
     }
 
-    transmitter_stop_and_join();
+    const bool output_inactive = stop_tone_output();
+    transmitter_set_callbacks(transmitter_cb);
+    transmitter_clear_execution_state_after_stop();
+    clear_committed_execution_request();
     deassert_transmit_gpio_outputs(
         &config,
         false,
         "scheduler shutdown");
     release_idle_selector_gpio_reservations();
-    wtp_pi_end_local(transmitter_output_inactive_confirmed());
+    wtp_pi_end_local(output_inactive);
+    publish_status(output_inactive && remote_stopped ? "ended" : "unknown", false,
+        output_inactive && remote_stopped
+            ? "Operator Stop completed; previous work will not resume."
+            : "Operator Stop requested; output cleanup is unconfirmed. Use local recovery.", "not_resumed");
 
     {
         std::lock_guard<std::mutex> lk(set_config_mtx);

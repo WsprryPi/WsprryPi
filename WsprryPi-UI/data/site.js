@@ -162,6 +162,7 @@ const TEST_TONE_SELECTION_MODES = Object.freeze({
 const TEST_TONE_LIFECYCLE = Object.freeze({
     IDLE: "idle",
     START_PENDING: "start_pending",
+    STARTING: "starting",
     ACTIVE: "active",
     END_PENDING: "end_pending",
     UNKNOWN: "unknown"
@@ -405,6 +406,13 @@ let unresolvedTestToneStartContext = null;
 let pendingTestToneStartTimeoutHandle = null;
 let pendingTestToneEndTimeoutHandle = null;
 let testToneLifecycleState = TEST_TONE_LIFECYCLE.IDLE;
+let testToneLatestRevision = -1;
+let testToneLatestStatus = null;
+let testToneCommittedDetails = "";
+let testToneRequestSequence = 0;
+let pendingTestToneEndRequestId = "";
+const testToneClientIdentity = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+function nextTestToneRequestId() { return `${testToneClientIdentity}-${++testToneRequestSequence}`; }
 let testToneStartQuarantinedSocket = null;
 let testToneStartQuarantinedConnectionGeneration = 0;
 let retainingTestToneStartContextForResponse = false;
@@ -3077,8 +3085,10 @@ function setTestToneExecutionResult(message, state = "") {
     }
 
     node.textContent = typeof message === "string" ? message : "";
-    node.className = state
-        ? `small mb-0 mt-2 text-${state}`
+    const textState = { info: "body", success: "success-emphasis",
+        warning: "warning-emphasis", danger: "danger-emphasis" }[state] || state;
+    node.className = textState
+        ? `small mb-0 mt-2 text-${textState}`
         : "small mb-0 mt-2";
 }
 
@@ -3132,20 +3142,21 @@ function committedTestToneExecutionText(
             return { applicable: true, valid: false };
         }
         const requestedBand = expectedRequest?.band;
-        const requestedDial = requestedBand
+        const requestedDial = expectedRequest?.preview_dial_frequency_hz ?? (requestedBand
             ? wsprBandDialFrequenciesHz[requestedBand]
-            : 0;
-        const requestedRf = requestedDial + wsprAudioOffsetHz;
+            : 0);
+        const requestedOffset = expectedRequest?.preview_audio_offset_hz ?? wsprAudioOffsetHz;
+        const requestedRf = requestedDial + requestedOffset;
         const matchedRequest = requestedBand === response.band &&
             requestedDial === response.dial_frequency_hz &&
-            wsprAudioOffsetHz === response.audio_offset_hz &&
+            requestedOffset === response.audio_offset_hz &&
             requestedRf === response.actual_rf_frequency_hz;
         return {
             applicable: true,
             valid: true,
             text: matchedRequest
-                ? `Test Tone started at the requested ${formatTestToneFrequencyMhz(response.actual_rf_frequency_hz)} RF. ${selector.text}`
-                : `Test Tone started on ${response.band} at committed ${formatTestToneFrequencyMhz(response.actual_rf_frequency_hz)} RF (requested values differed). ${selector.text}`
+                ? `Requested frequency committed. ${selector.text}`
+                : `Committed on ${response.band} at ${formatTestToneFrequencyMhz(response.actual_rf_frequency_hz)} RF (requested values differed). ${selector.text}`
         };
     }
 
@@ -3160,8 +3171,8 @@ function committedTestToneExecutionText(
             applicable: true,
             valid: true,
             text: matchedRequest
-                ? `Test Tone started at the requested exact ${formatTestToneFrequencyMhz(response.actual_rf_frequency_hz)} RF on ${response.band}. No WSPR offset was applied. ${selector.text}`
-                : `Test Tone started on ${response.band} at committed exact ${formatTestToneFrequencyMhz(response.actual_rf_frequency_hz)} RF (different from the request). No WSPR offset was applied. ${selector.text}`
+                ? `Requested exact RF frequency committed. ${selector.text}`
+                : `Committed on ${response.band} at exact ${formatTestToneFrequencyMhz(response.actual_rf_frequency_hz)} RF (different from the request). ${selector.text}`
         };
     }
 
@@ -3222,6 +3233,7 @@ function applyRuntimeStatus(msg) {
     }
 
     currentRuntimeStatus = status;
+    reconcileTestToneStatus(msg.test_tone);
     renderGpioFrequencyCorrection(status);
     const selectedMode =
         typeof selectedConfigMode === "function" ? selectedConfigMode() : "";
@@ -3877,6 +3889,8 @@ function connectWebSocket(endpoint, reconnectDelay = 5000, attemptIndex = 0) {
         opened = true;
         debugConsole("debug", "WebSocket ▶️ open");
         websocketCurrentlyConnected = true;
+        testToneLatestRevision = -1;
+        testToneLatestStatus = null;
         websocketConnectedOnce = true;
         armOutageBannerIfReady();
         setConnectionState("connected");
@@ -3911,6 +3925,7 @@ function connectWebSocket(endpoint, reconnectDelay = 5000, attemptIndex = 0) {
     // On message: Try to parse JSON and react to “transmitting” or
     // "tx_state" state
     socket.addEventListener("message", (ev) => {
+        if (socket !== ws) return;
         debugConsole("debug", "WebSocket ◀️ message:", ev.data);
         let msg;
         try {
@@ -3932,6 +3947,11 @@ function connectWebSocket(endpoint, reconnectDelay = 5000, attemptIndex = 0) {
             if (typeof handleTestToneCommandResponse === "function") {
                 handleTestToneCommandResponse(msg, socket);
             }
+            return;
+        }
+
+        if (msg.command === "test_tone_status") {
+            reconcileTestToneStatus(msg.test_tone);
             return;
         }
 
@@ -6790,7 +6810,8 @@ function bindTestToneControls() {
 }
 
 function isTestToneRuntimeActive() {
-    return testToneLifecycleState === TEST_TONE_LIFECYCLE.ACTIVE ||
+    return testToneLifecycleState === TEST_TONE_LIFECYCLE.STARTING ||
+        testToneLifecycleState === TEST_TONE_LIFECYCLE.ACTIVE ||
         testToneLifecycleState === TEST_TONE_LIFECYCLE.END_PENDING ||
         testToneLifecycleState === TEST_TONE_LIFECYCLE.UNKNOWN;
 }
@@ -6838,6 +6859,10 @@ function clearPendingTestToneEndTimeout() {
 
 function markTestToneOutcomeUnknown(message) {
     clearPendingTestToneEndTimeout();
+    for (const id of ["testToneStart", "testToneEnd"]) {
+        const button = document.getElementById(id);
+        if (button) toggleButtonLoading(button, false);
+    }
     testToneLifecycleState = TEST_TONE_LIFECYCLE.UNKNOWN;
     setTestToneExecutionResult(message, "warning");
     syncTestToneControlState(true);
@@ -6868,16 +6893,13 @@ function quarantineTimedOutTestToneStartRequest() {
         return;
     }
 
-    // tone_start has no request ID. Once the timeout leaves its outcome unknown,
+    // Legacy controllers do not echo request IDs. After an unknown timeout,
     // this socket cannot safely issue another Start until it reconnects or replies.
     testToneStartQuarantinedSocket = context.socket;
     testToneStartQuarantinedConnectionGeneration = context.connectionGeneration;
-    testToneLifecycleState = TEST_TONE_LIFECYCLE.UNKNOWN;
-    setTestToneExecutionResult(
-        "Test Tone start timed out and the controller outcome is unknown. Wait for a response or reconnect before trying again.",
-        "warning"
+    markTestToneOutcomeUnknown(
+        "Test Tone start timed out and the controller outcome is unknown. Wait for a response or reconnect before trying again."
     );
-    syncTestToneControlState(true);
 }
 
 function isTestToneStartQuarantinedForCurrentSocket() {
@@ -6895,8 +6917,12 @@ function markPendingTestToneStartRequest() {
         : "";
     unresolvedTestToneStartContext = Object.freeze({
         frequencySource,
+        clientRequestId: payload?.client_request_id || "",
         request: payload && typeof payload === "object"
-            ? Object.freeze({ ...payload })
+            ? Object.freeze({ ...payload,
+                preview_dial_frequency_hz: wsprBandDialFrequenciesHz[payload.band],
+                preview_audio_offset_hz: wsprAudioOffsetHz,
+            })
             : null,
         socket: ws,
         connectionGeneration: wsprBandCatalogConnectionGeneration,
@@ -7090,6 +7116,7 @@ function canStartTestTone() {
         wsprBandCatalogPendingRequest === null &&
         pendingTestToneStartRequest === false &&
         !isTestToneStartQuarantinedForCurrentSocket() &&
+        !isTestToneRuntimeActive() &&
         currentTestToneSelection &&
         currentTestToneSelection.valid === true &&
         currentTestToneSelection.payload &&
@@ -7101,7 +7128,8 @@ function canStartTestTone() {
 function syncTestToneControlState(toneActive) {
     const shouldEnableStart = toneActive !== true && canStartTestTone();
     $("#testToneStart").prop("disabled", !shouldEnableStart);
-    $("#testToneEnd").prop("disabled", toneActive !== true);
+    $("#testToneEnd").prop("disabled", toneActive !== true ||
+        testToneLifecycleState === TEST_TONE_LIFECYCLE.END_PENDING);
     $("#testToneClose").prop("disabled", false);
 }
 
@@ -7193,7 +7221,8 @@ function onTestToneStart(e) {
     }
 
     const btn = this;
-    clearTestToneExecutionResult();
+    testToneCommittedDetails = "";
+    setTestToneExecutionResult("Sending Test Tone Start; awaiting acceptance.", "info");
     testToneLifecycleState = TEST_TONE_LIFECYCLE.START_PENDING;
     toggleButtonLoading(btn, true);
     syncTestToneControlState(false);
@@ -7201,6 +7230,7 @@ function onTestToneStart(e) {
     $("#testToneEnd").prop("disabled", true);
     const toneStartPayload = {
         command: "tone_start",
+        client_request_id: nextTestToneRequestId(),
         ...testToneFrequencyOverridePayload()
     };
     markPendingTestToneStartRequest(toneStartPayload);
@@ -7287,8 +7317,8 @@ function sendTestToneStartPayload(payload) {
 
 function onTestToneEnd(e) {
     e.preventDefault();
-    if (!isTestToneRuntimeActive()) {
-        syncTestToneControlState(false);
+    if (!isTestToneRuntimeActive() || testToneLifecycleState === TEST_TONE_LIFECYCLE.END_PENDING) {
+        syncTestToneControlState(isTestToneRuntimeActive());
         return;
     }
 
@@ -7298,9 +7328,13 @@ function onTestToneEnd(e) {
     toggleButtonLoading(btn, true);
     $("#testToneStart").prop("disabled", true);
     $("#testToneEnd").prop("disabled", true);
-    debugConsole("debug", "Test tone end.");
-    if (!sendCommand("tone_end")) {
-        testToneLifecycleState = TEST_TONE_LIFECYCLE.ACTIVE;
+    setTestToneExecutionResult("Ending Test Tone; awaiting cleanup and restoration.", "info");
+    pendingTestToneEndRequestId = nextTestToneRequestId();
+    let sent = false;
+    try { sent = sendCommand({ command: "tone_end", client_request_id: pendingTestToneEndRequestId }); }
+    catch (error) { debugConsole("warn", "Test Tone End send failed:", error); }
+    if (!sent) {
+        testToneLifecycleState = TEST_TONE_LIFECYCLE.UNKNOWN;
         toggleButtonLoading(btn, false);
         setTestToneExecutionResult(
             "Test Tone End could not be sent. The tone may still be active; try End again.",
@@ -7317,97 +7351,178 @@ function onTestToneEnd(e) {
     }, TEST_TONE_COMMAND_TIMEOUT_MS);
 }
 
+function validTestToneStatus(status) {
+    return status && Number.isSafeInteger(status.generation) && status.generation >= 0 &&
+        Number.isSafeInteger(status.revision) && status.revision >= 0 &&
+        typeof status.owned === "boolean" &&
+        ["idle", "starting", "active", "completed", "failed", "cancelled", "ended", "unknown"].includes(status.state);
+}
+
+function reconcileTestToneStatus(status, acceptEqual = false) {
+    if (!validTestToneStatus(status) || status.revision < testToneLatestRevision ||
+        (!acceptEqual && status.revision === testToneLatestRevision)) return false;
+    testToneLatestRevision = status.revision;
+    testToneLatestStatus = Object.freeze({ ...status });
+    // Keep the operator's End pending until its reply or timeout settles it.
+    // Runtime observations remain available for reconciliation after the reply.
+    if (testToneLifecycleState === TEST_TONE_LIFECYCLE.END_PENDING && pendingTestToneEndRequestId) return true;
+    testToneLifecycleState = status.state === "active" && status.owned
+        ? TEST_TONE_LIFECYCLE.ACTIVE
+        : status.state === "starting" && status.owned ? TEST_TONE_LIFECYCLE.STARTING
+        : status.state === "unknown" || (status.owned && status.state !== "active")
+            ? TEST_TONE_LIFECYCLE.UNKNOWN : TEST_TONE_LIFECYCLE.IDLE;
+    const text = status.state === "active" ? "Test Tone active (controller runtime confirmed)."
+        : status.state === "starting" ? "Test Tone accepted; waiting for runtime confirmation."
+        : status.owned && ["completed", "failed", "cancelled"].includes(status.state)
+            ? `Test Tone execution ${status.state}; cleanup pending.${status.message ? ` ${status.message}` : ""}`
+            : status.message || (status.state === "idle" ? "" : `Test Tone ${status.state}.`);
+    if (text) setTestToneExecutionResult(
+        `${text}${status.owned && testToneCommittedDetails ? ` ${testToneCommittedDetails}` : ""}`,
+        status.state === "failed" ? "danger" : status.state === "unknown" ? "warning"
+            : status.state === "active" ? "success" : "info"
+    );
+    syncTestToneControlState(isTestToneRuntimeActive());
+    return true;
+}
+
 function handleTestToneCommandResponse(message) {
     const responseSocket = arguments[1] || ws;
-    if (responseSocket !== ws) {
-        return;
-    }
+    if (responseSocket !== ws) return;
     const response = message && typeof message === "object" ? message : {};
     const command = typeof response.command === "string" ? response.command : "";
+    const hasStatus = validTestToneStatus(response.test_tone);
+    const pendingStartContext = unresolvedTestToneStartContext &&
+        unresolvedTestToneStartContext.socket === responseSocket &&
+        unresolvedTestToneStartContext.connectionGeneration === wsprBandCatalogConnectionGeneration
+        ? unresolvedTestToneStartContext : null;
+    const correlatedStart = pendingStartContext && (!response.client_request_id ||
+        response.client_request_id === pendingStartContext.clientRequestId);
+    const correlatedEnd = !response.client_request_id ||
+        response.client_request_id === pendingTestToneEndRequestId;
+    if (command === "tone_start" && testToneLifecycleState === TEST_TONE_LIFECYCLE.END_PENDING) {
+        reconcileTestToneStatus(response.test_tone);
+        return;
+    }
+    // Runtime evidence can arrive before this tab's acknowledgment. Settle
+    // the correlated request without rolling back the newer observed state.
+    if (hasStatus && response.test_tone.revision < testToneLatestRevision) {
+        if (command === "tone_start" && correlatedStart) {
+            if (response.started === true && response.test_tone.generation === testToneLatestStatus?.generation) {
+                const committed = committedTestToneExecutionText(response,
+                    pendingStartContext.frequencySource, pendingStartContext.request);
+                testToneCommittedDetails = committed.applicable
+                    ? committed.valid ? committed.text : "Committed execution details were unavailable or invalid."
+                    : "";
+            }
+            clearPendingTestToneStartRequest();
+            const button = document.getElementById("testToneStart");
+            if (button) toggleButtonLoading(button, false);
+        } else if (command === "tone_end" && correlatedEnd) {
+            clearPendingTestToneEndTimeout();
+            pendingTestToneEndRequestId = "";
+            const button = document.getElementById("testToneEnd");
+            if (button) toggleButtonLoading(button, false);
+        }
+        if (testToneLatestStatus) reconcileTestToneStatus(testToneLatestStatus, true);
+        return;
+    }
+    if (hasStatus && response.test_tone.revision === testToneLatestRevision &&
+        !correlatedStart && !(command === "tone_end" && pendingTestToneEndRequestId && correlatedEnd)) return;
+    // Other clients' results may carry current runtime evidence, but cannot
+    // consume this tab's pending request or open an unsolicited guard dialog.
+    if ((command === "tone_start" && !correlatedStart && pendingStartContext) ||
+        (command === "tone_end" && !correlatedEnd)) {
+        reconcileTestToneStatus(response.test_tone);
+        return;
+    }
     const startButton = document.getElementById("testToneStart");
     const endButton = document.getElementById("testToneEnd");
-
-    if (startButton) {
-        toggleButtonLoading(startButton, false);
+    if (!hasStatus && command === "tone_end" && !response.client_request_id && testToneLatestStatus) {
+        // A legacy broadcast cannot invalidate newer versioned evidence.
+        return;
     }
-    if (endButton) {
-        toggleButtonLoading(endButton, false);
+    if (!hasStatus && command === "tone_start" && response.started !== true &&
+        !response.client_request_id && pendingStartContext?.clientRequestId) {
+        clearPendingTestToneStartRequest(false);
+        testToneStartQuarantinedSocket = responseSocket;
+        testToneStartQuarantinedConnectionGeneration = wsprBandCatalogConnectionGeneration;
+        markTestToneOutcomeUnknown(`${response.message || "Test Tone Start was rejected."} ` +
+            "This response cannot be correlated; use End to recover.");
+        return;
     }
-
     if (command === "tone_start") {
-        const locallyRequested = pendingTestToneStartRequest === true;
-        const pendingStartContext = unresolvedTestToneStartContext &&
-            unresolvedTestToneStartContext.socket === responseSocket &&
-            unresolvedTestToneStartContext.connectionGeneration === wsprBandCatalogConnectionGeneration
-            ? unresolvedTestToneStartContext
-            : null;
+        const locallyRequested = pendingTestToneStartRequest === true && Boolean(correlatedStart);
+        if (!correlatedStart && response.started !== true) {
+            reconcileTestToneStatus(response.test_tone);
+            debugConsole("debug", "Passive test tone start rejection received:", response);
+            return;
+        }
+        if (!correlatedStart && !hasStatus && isTestToneRuntimeActive()) return;
         retainingTestToneStartContextForResponse = true;
         clearPendingTestToneStartRequest();
+        if (startButton) toggleButtonLoading(startButton, false);
         if (response.started === true) {
-            testToneLifecycleState = TEST_TONE_LIFECYCLE.ACTIVE;
-            syncTestToneControlState(true);
-            const committed = committedTestToneExecutionText(
-                response,
-                pendingStartContext?.frequencySource,
-                pendingStartContext?.request
+            const committed = committedTestToneExecutionText(response,
+                pendingStartContext?.frequencySource, pendingStartContext?.request);
+            testToneCommittedDetails = committed.applicable
+                ? committed.valid ? committed.text : "Committed execution details were unavailable or invalid."
+                : "";
+            // Legacy started=true acknowledges a request; it does not establish
+            // worker activity. Keep End available until runtime evidence arrives.
+            testToneLifecycleState = TEST_TONE_LIFECYCLE.STARTING;
+            setTestToneExecutionResult(
+                `Test Tone accepted; waiting for runtime confirmation.${testToneCommittedDetails ? ` ${testToneCommittedDetails}` : ""}`,
+                committed.applicable && !committed.valid ? "warning" : "info"
             );
-            if (committed.applicable) {
-                setTestToneExecutionResult(
-                    committed.valid
-                        ? committed.text
-                        : "Test Tone started, but committed execution details were unavailable or invalid.",
-                    committed.valid ? "success" : "warning"
-                );
-            }
+            reconcileTestToneStatus(response.test_tone, true);
+            syncTestToneControlState(isTestToneRuntimeActive());
         } else {
-            testToneLifecycleState = TEST_TONE_LIFECYCLE.IDLE;
-            syncTestToneControlState(false);
+            testToneLifecycleState = response.already_active === true
+                ? TEST_TONE_LIFECYCLE.UNKNOWN : TEST_TONE_LIFECYCLE.IDLE;
             const rejectionMessage = typeof response.message === "string" && response.message.trim()
-                ? response.message.trim()
-                : "Test Tone start was rejected by the controller.";
+                ? response.message.trim() : "Test Tone start was rejected by the controller.";
             setTestToneExecutionResult(rejectionMessage, "danger");
+            reconcileTestToneStatus(response.test_tone);
+            syncTestToneControlState(isTestToneRuntimeActive());
             if (locallyRequested && response.blocked_by_active_transmission === true) {
                 showTestToneBlockedModal("active");
             } else if (locallyRequested && response.blocked_by_enabled_transmission === true) {
                 showTestToneBlockedModal("enabled");
-            } else if (
-                !locallyRequested &&
-                (
-                    response.blocked_by_active_transmission === true ||
-                    response.blocked_by_enabled_transmission === true
-                )
-            ) {
-                debugConsole("debug", "Passive test tone start rejection received:", response);
-            } else {
-                debugConsole("error", "Test tone start rejected:", response);
             }
         }
         clearUnresolvedTestToneStartContext();
         retainingTestToneStartContextForResponse = false;
     } else if (command === "tone_end") {
+        // An uncorrelated legacy End arriving during a newer Start cannot prove
+        // which transaction it ended. Preserve recovery instead of declaring idle.
+        if (!hasStatus && pendingStartContext && !pendingTestToneEndRequestId) {
+            markTestToneOutcomeUnknown("An uncorrelated End result arrived during Start. Use End to recover.");
+            return;
+        }
         clearPendingTestToneEndTimeout();
-        if (response.stopped === true) {
-            testToneLifecycleState = TEST_TONE_LIFECYCLE.IDLE;
-            if (isTestToneStartQuarantinedForCurrentSocket()) {
-                clearUnresolvedTestToneStartContext();
-            }
+        pendingTestToneEndRequestId = "";
+        if (endButton) toggleButtonLoading(endButton, false);
+        if (response.stopped === true || (hasStatus && !response.test_tone.owned &&
+            ["idle", "ended", "completed", "cancelled"].includes(response.test_tone.state))) {
+            testToneLifecycleState = response.restoration_failed === true
+                ? TEST_TONE_LIFECYCLE.UNKNOWN : TEST_TONE_LIFECYCLE.IDLE;
+            clearPendingTestToneStartRequest();
+            if (startButton) toggleButtonLoading(startButton, false);
             currentRuntimeStatus = null;
-            setTestToneExecutionResult("Test Tone ended.", "success");
-            syncTestToneControlState(false);
+            testToneCommittedDetails = "";
+            setTestToneExecutionResult(response.message || "Test Tone transaction ended; restoration details unavailable.",
+                response.restoration_failed === true || response.status === "error" ? "danger" : "success");
+            reconcileTestToneStatus(hasStatus ? {
+                ...response.test_tone,
+                message: response.test_tone.message || response.message || "Test Tone transaction ended; restoration details unavailable.",
+            } : null, true);
+            syncTestToneControlState(isTestToneRuntimeActive());
         } else {
-            testToneLifecycleState = TEST_TONE_LIFECYCLE.ACTIVE;
-            const rejectionMessage = typeof response.message === "string" && response.message.trim()
-                ? response.message.trim()
-                : "Test Tone End was not confirmed. The tone may still be active.";
-            setTestToneExecutionResult(rejectionMessage, "danger");
-            syncTestToneControlState(true);
-            debugConsole("error", "Test tone stop rejected:", response);
+            markTestToneOutcomeUnknown(response.message ||
+                "Test Tone End was not confirmed. The tone may still be active; use End to recover.");
         }
     }
-
-    if (typeof getTxState === "function") {
-        getTxState();
-    }
+    if (typeof getTxState === "function") getTxState();
 }
 
 
@@ -7743,6 +7858,10 @@ function installWsprryPiTestHooks() {
         }
         pendingTestToneStopDisableAction = null;
         testToneLifecycleState = TEST_TONE_LIFECYCLE.IDLE;
+        testToneLatestRevision = -1;
+        testToneLatestStatus = null;
+        testToneCommittedDetails = "";
+        pendingTestToneEndRequestId = "";
         CONSOLE_LOG_LEVEL = "log";
         ws = null;
         websocketCurrentlyConnected = false;

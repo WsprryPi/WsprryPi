@@ -277,6 +277,7 @@ bool WebSocketServer::start(
     bool loopback_only,
     WebSocketLoopbackFamily loopback_family)
 {
+    std::lock_guard<std::recursive_mutex> start_lock(stop_mutex_);
     if (port < 1024 || port > 49151)
     {
         llog.logE(ERROR, "Port must be between 1024 and 49151: ", port);
@@ -351,12 +352,11 @@ const std::string &WebSocketServer::listening_address() const noexcept
  */
 void WebSocketServer::stop()
 {
-    std::lock_guard<std::mutex> stop_lock(stop_mutex_);
+    std::lock_guard<std::recursive_mutex> stop_lock(stop_mutex_);
     if (!running_ && !server_thread_.joinable() && !keep_alive_thread_.joinable())
         return;
 
     running_ = false;
-    stopBoundedTone();
 
     // Wake keep-alive thread if sleeping
     keep_alive_cv_.notify_all();
@@ -379,6 +379,8 @@ void WebSocketServer::stop()
         for (int fd : handshaking_sockets_)
             shutdown(fd, SHUT_RDWR);
     }
+
+    stopBoundedTone();
 
     // Detached handlers release their own thread resources on exit.  Do not
     // destroy server state until every handler has observed shutdown and left.
@@ -672,11 +674,12 @@ void WebSocketServer::sendToClient(const std::string &message)
             shutdown(fd, SHUT_RDWR);
             continue;
         }
-        ssize_t sent = ::send(fd, frame.data(), frame.size(), 0);
-        if (sent < 0)
-        {
-            std::perror("send");
-        }
+        const auto sent = ::send(fd, frame.data(), frame.size(), MSG_DONTWAIT
+#ifdef MSG_NOSIGNAL
+                                 | MSG_NOSIGNAL
+#endif
+        );
+        if (sent != static_cast<ssize_t>(frame.size())) shutdown(fd, SHUT_RDWR);
     }
 }
 
@@ -744,10 +747,15 @@ void WebSocketServer::sendAllClients(const std::string &message)
             shutdown(fd, SHUT_RDWR);
             continue;
         }
-        if (::send(fd, frame.data(), frame.size(), 0) < 0)
-        {
-            std::perror("sendAllClients");
-        }
+        // A slow/disconnected observer must not block lifecycle cleanup or a
+        // transmitter join. A partial frame cannot be resumed by another send;
+        // close that connection and let its owner retire it.
+        const auto sent = ::send(fd, frame.data(), frame.size(), MSG_DONTWAIT
+#ifdef MSG_NOSIGNAL
+                                 | MSG_NOSIGNAL
+#endif
+        );
+        if (sent != static_cast<ssize_t>(frame.size())) shutdown(fd, SHUT_RDWR);
     }
 }
 
@@ -1022,10 +1030,12 @@ void WebSocketServer::keepAliveLoop(uint32_t interval)
                     continue;
                 }
                 unsigned char ping[2] = {0x89, 0x00};
-                if (::send(fd, ping, sizeof(ping), 0) < 0)
-                {
-                    std::perror("send ping");
-                }
+                const auto sent = ::send(fd, ping, sizeof(ping), MSG_DONTWAIT
+#ifdef MSG_NOSIGNAL
+                                         | MSG_NOSIGNAL
+#endif
+                );
+                if (sent != static_cast<ssize_t>(sizeof(ping))) shutdown(fd, SHUT_RDWR);
             }
         }
     }

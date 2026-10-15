@@ -336,7 +336,7 @@ void run(const std::string &credentials) {
       });
   CHECK(wtp_runtime_inspect().ok);
   config.transmit_backend = TransmitBackendKind::WTP;
-  config.mode = ModeType::WSPR;
+  config.mode = ModeType::QRSS;
   config.transmit = false;
   config.frequencies = "20m";
   config.allow_unqualified_frequency = true;
@@ -354,11 +354,11 @@ void run(const std::string &credentials) {
   if (!tone_started.started) std::cerr << tone_started.message << '\n';
   CHECK(tone_started.started && tone_started.bounded_cleanup_delay);
   const auto tone_deadline = std::chrono::steady_clock::now() + 10s;
-  while (!complete && std::chrono::steady_clock::now() < tone_deadline) {
+  while (current_test_tone_status().state != "completed" && std::chrono::steady_clock::now() < tone_deadline) {
     transmitter_poll_events();
     std::this_thread::sleep_for(1ms);
   }
-  CHECK(complete && tone_clock.peer.executions == 1);
+  CHECK(current_test_tone_status().state == "completed" && tone_clock.peer.executions == 1);
   CHECK(tone_clock.peer.records.front().state == wsprrypi::wtp::State::Complete);
   CHECK(tone_clock.peer.records.front().ended >= tone_clock.peer.start + 10000000000ULL);
   CHECK(tone_started.bounded_cleanup_delay->count() >
@@ -377,7 +377,33 @@ void run(const std::string &credentials) {
           wire.at("body").at("events").at(1).at("rf_on") == false;
   }
   CHECK(exact_duration);
-  CHECK(end_test_tone().stopped);
+  const auto tone_ended = end_test_tone();
+  CHECK(tone_ended.stopped && !tone_ended.restoration_failed && tone_ended.output_inactive);
+  CHECK(!current_test_tone_status().owned && current_test_tone_status().state == "ended");
+  const auto tone_again = start_test_tone(bounded);
+  CHECK(tone_again.started);
+  CHECK(end_test_tone(tone_again.lifecycle.generation, TestToneEndPolicy::Quiesce).stopped);
+  // Lost ARM acknowledgment leaves ownership uncertain. End must retain the
+  // inhibition until explicit recovery proves inactivity, then report the
+  // recovery it actually performed rather than saying output was unchanged.
+  tone_clock.peer.lose_reply = wsprrypi::wtp::Operation::Arm;
+  const auto uncertain_tone = start_test_tone(bounded);
+  CHECK(uncertain_tone.started);
+  const auto uncertain_deadline = std::chrono::steady_clock::now() + 10s;
+  while (current_test_tone_status().state != "failed" && std::chrono::steady_clock::now() < uncertain_deadline) {
+    transmitter_poll_events();
+    std::this_thread::sleep_for(1ms);
+  }
+  CHECK(current_test_tone_status().state == "failed");
+  const auto uncertain_end = end_test_tone();
+  CHECK(uncertain_end.restoration_failed && uncertain_end.lifecycle.state == "unknown" && !config.transmit);
+  CHECK(!start_test_tone(bounded).started);
+  CHECK(wtp_runtime_recover().ok);
+  const auto recovered_end = end_test_tone();
+  CHECK(recovered_end.stopped && !recovered_end.tone_was_active && recovered_end.output_inactive);
+  CHECK(recovered_end.message == recovered_end.lifecycle.message &&
+        recovered_end.message.find("recovery cleanup confirmed") != std::string::npos);
+  CHECK(recovered_end.lifecycle.state == "ended" && !config.transmit);
   select_wtp_runtime(std::nullopt);
   Clock plain_clock;
   set_wtp_runtime_for_test(plain_settings, plain_clock, plain_clock.peer,

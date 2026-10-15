@@ -30,6 +30,7 @@
 #define WEBSOCKET_HPP
 
 #include <atomic>
+#include <chrono>
 #include <condition_variable>
 #include <cstdint>
 #include <functional>
@@ -66,6 +67,7 @@ extern const uint32_t SOCKET_KEEPALIVE;
 class WebSocketServer
 {
     friend class WebSocketLifecycleTest;
+    friend class TestToneLifecycleTest;
 public:
     /**
      * @brief Constructs a new WebSocketServer instance.
@@ -156,13 +158,21 @@ private:
     std::size_t active_client_handlers_{0};
     bool client_registration_closed_{false};
     std::condition_variable client_handlers_cv_;
-    std::mutex stop_mutex_;
+    std::recursive_mutex stop_mutex_;
     std::mutex test_tone_command_mutex_;
     std::mutex bounded_tone_mutex_;
     std::condition_variable bounded_tone_cv_;
     bool bounded_tone_stop_requested_{false};
     std::string bounded_tone_request_id_;
     std::thread bounded_tone_watchdog_;
+    std::uint64_t bounded_tone_generation_{0};
+    std::chrono::steady_clock::time_point bounded_tone_deadline_;
+    // Typed, transient test seams; no production request/configuration surface.
+    std::function<void()> bounded_expiry_ready_for_test_;
+    bool fail_bounded_thread_creation_for_test_{false};
+    std::function<void(const std::string &)> reply_ready_for_test_;
+    void boundedToneLoop();
+    void cancelBoundedTone();
     bool loopback_only_{false};
     std::string listening_address_;
     std::function<SupportRequestGuardSnapshot()> network_snapshot_provider_{

@@ -2854,6 +2854,20 @@ bool start_non_wspr_transmission_now_for_test(const ArgParserConfig &cfg)
     return start_non_wspr_transmission_now(cfg);
 }
 
+bool launch_scheduled_non_wspr_if_current(std::uint64_t generation)
+{
+    std::lock_guard transaction(test_tone_lifecycle_mutex());
+    if (exiting_wspr.load(std::memory_order_acquire) || web_test_tone.load() ||
+        generation != non_wspr_schedule_generation.load(std::memory_order_acquire))
+        return false;
+    const ArgParserConfig scheduled_config = config;
+    if (!start_non_wspr_transmission_now(scheduled_config)) {
+        request_wspr_shutdown("non-WSPR scheduled transmission setup failed");
+        return false;
+    }
+    return true;
+}
+
 void schedule_next_non_wspr_launch(const ArgParserConfig &cfg)
 {
     if (cfg.mode != ModeType::QRSS &&
@@ -2914,17 +2928,7 @@ void schedule_next_non_wspr_launch(const ArgParserConfig &cfg)
         {
             std::this_thread::sleep_until(next_launch);
 
-            if (exiting_wspr.load(std::memory_order_acquire) ||
-                generation != non_wspr_schedule_generation.load(std::memory_order_acquire))
-            {
-                return;
-            }
-
-            const ArgParserConfig scheduled_config = config;
-            if (!start_non_wspr_transmission_now(scheduled_config))
-            {
-                request_wspr_shutdown("non-WSPR scheduled transmission setup failed");
-            }
+            (void)launch_scheduled_non_wspr_if_current(generation);
         })
         .detach();
 }

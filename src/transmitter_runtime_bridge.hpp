@@ -41,7 +41,7 @@ void transmitter_set_thread_scheduling(int policy, int priority);
 void transmitter_set_callbacks(TransmitterRuntimeCallback callback);
 std::string transmitter_format_frequency_mhz(double frequency_hz);
 void transmitter_start_async();
-void transmitter_stop_and_join();
+wsprrypi::CleanupResult transmitter_stop_and_join();
 bool transmitter_output_inactive_confirmed() noexcept;
 void transmitter_shutdown_for_process_exit();
 void transmitter_clear_soft_off() noexcept;

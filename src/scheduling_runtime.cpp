@@ -14,6 +14,7 @@
 #include "gpio_input.hpp"
 #include "gpio_output.hpp"
 #include "logging.hpp"
+#include "test_tone_response.hpp"
 #include "machine_power_control.hpp"
 #include "ppm_manager.hpp"
 #include "privileged_network_runtime.hpp"
@@ -548,6 +549,7 @@ void reboot_system()
 
 void stop_runtime_components_for_process_exit() noexcept
 {
+    request_wspr_shutdown("runtime teardown");
     ini_reload_pending.store(false, std::memory_order_relaxed);
 
     webServer.stop();
@@ -914,12 +916,22 @@ bool wspr_loop()
     // Loop (block wspr_loop only) until shutdown is triggered
     // -------------------------------------------------------------------------
     wsprrypi::activate_wtp_pi_endpoint();
+    std::uint64_t published_tone_revision = 0;
     {
         std::unique_lock<std::mutex> lk(exitwspr_mtx);
         while (!exitwspr_ready) {
             exitwspr_cv.wait_for(lk, std::chrono::milliseconds(100));
             lk.unlock();
             transmitter_poll_events();
+            reconcile_test_tone_runtime();
+            const auto tone_status = current_test_tone_status();
+            if (tone_status.revision != published_tone_revision) {
+                published_tone_revision = tone_status.revision;
+                // Freeze evidence before sending, without a lifecycle lock.
+                socketServer.sendAllClients(nlohmann::json{
+                    {"command", "test_tone_status"},
+                    {"test_tone", test_tone_status_json(tone_status)}}.dump());
+            }
             wsprrypi::poll_wtp_pi_endpoint();
             if (ini_reload_pending.load(std::memory_order_acquire) &&
                 !web_test_tone.load() && !transmitter_reload_should_defer() &&

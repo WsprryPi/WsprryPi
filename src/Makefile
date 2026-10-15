@@ -1347,7 +1347,7 @@ semantics-test:
 	$(Q)$(MAKE) --no-print-directory semantics-test-full \
 		BACKENDS=$(DEFAULT_BACKENDS) ANCILLARY_GPIO=1
 
-semantics-test-full: si5351-inventory-process-test si5351-inventory-isolation-test calibration-roundtrip-test i2c-bus-inventory-test i2c-bus-selection-test chipset-offsets-test mailbox-memory-flag-test legacy-gpio-clock-model-test gpio-frequency-correction-test rp1-web-backend-persistence-test websocket-lifecycle-test web-server-network-lifecycle-test $(BIN_DIR)/$(SEMANTICS_TEST_OUT) $(BIN_DIR)/$(CLEANUP_LIFECYCLE_TEST_OUT) $(BIN_DIR)/$(UI_SOURCE_REGRESSION_TEST_OUT) $(BIN_DIR)/$(GPIO_BAND_POLICY_TEST_OUT)
+semantics-test-full: test-tone-lifecycle-test si5351-inventory-process-test si5351-inventory-isolation-test calibration-roundtrip-test i2c-bus-inventory-test i2c-bus-selection-test chipset-offsets-test mailbox-memory-flag-test legacy-gpio-clock-model-test gpio-frequency-correction-test rp1-web-backend-persistence-test websocket-lifecycle-test web-server-network-lifecycle-test $(BIN_DIR)/$(SEMANTICS_TEST_OUT) $(BIN_DIR)/$(CLEANUP_LIFECYCLE_TEST_OUT) $(BIN_DIR)/$(UI_SOURCE_REGRESSION_TEST_OUT) $(BIN_DIR)/$(GPIO_BAND_POLICY_TEST_OUT)
 	$(Q)echo "Running runtime semantics tests."
 	$(Q)./$(BIN_DIR)/$(SEMANTICS_TEST_OUT)
 	$(Q)echo "Running cleanup lifecycle tests."
@@ -1375,7 +1375,7 @@ semantics-test-portable:
 	$(Q)$(MAKE) --no-print-directory semantics-test-portable-profile \
 		BACKENDS=simulated ANCILLARY_GPIO=0 SUDO=
 
-semantics-test-portable-profile: si5351-inventory-isolation-test calibration-roundtrip-test idle-startup-policy-test i2c-bus-inventory-test i2c-bus-selection-test backend-capabilities-regression-test backend-capabilities-make-regression-test debug band-lookup-correlation-test chipset-offsets-test mailbox-memory-flag-test legacy-gpio-clock-model-test gpio-frequency-correction-test websocket-lifecycle-test web-server-network-lifecycle-test $(BIN_DIR)/$(UI_SOURCE_REGRESSION_TEST_OUT) $(BIN_DIR)/$(GPIO_BAND_POLICY_TEST_OUT)
+semantics-test-portable-profile: test-tone-lifecycle-test si5351-inventory-isolation-test calibration-roundtrip-test idle-startup-policy-test i2c-bus-inventory-test i2c-bus-selection-test backend-capabilities-regression-test backend-capabilities-make-regression-test debug band-lookup-correlation-test chipset-offsets-test mailbox-memory-flag-test legacy-gpio-clock-model-test gpio-frequency-correction-test websocket-lifecycle-test web-server-network-lifecycle-test $(BIN_DIR)/$(UI_SOURCE_REGRESSION_TEST_OUT) $(BIN_DIR)/$(GPIO_BAND_POLICY_TEST_OUT)
 	$(Q)echo "Running portable UI/source regression tests."
 	$(Q)./$(BIN_DIR)/$(UI_SOURCE_REGRESSION_TEST_OUT)
 	$(Q)echo "Running portable GPIO band fail-closed policy tests."
@@ -2073,3 +2073,13 @@ $(BIN_DIR)/si5351_inventory_isolation_test: tests/si5351_inventory_isolation_tes
 	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -Itests $^ -o $@ $(LDFLAGS)
 si5351-inventory-isolation-test: $(BIN_DIR)/si5351_inventory_isolation_test
 	$(Q)WSPRRYPI_DISABLE_HARDWARE_ACCESS=1 ./$(BIN_DIR)/si5351_inventory_isolation_test
+
+# Parent lifecycle integration only. The fixture suppresses hardware execution
+# and injects typed events/failures after real parent planning/commitment.
+.PHONY: test-tone-lifecycle-test
+$(BIN_DIR)/test_tone_lifecycle_test: tests/test_tone_lifecycle_test.cpp $(SEMANTICS_TEST_DEPS)
+	$(Q)mkdir -p $(BIN_DIR)
+	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) $^ -o $@ $(LDFLAGS)
+
+test-tone-lifecycle-test: $(BIN_DIR)/test_tone_lifecycle_test
+	$(Q)timeout 30s ./$(BIN_DIR)/test_tone_lifecycle_test

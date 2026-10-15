@@ -838,6 +838,7 @@ assert.equal(handlerCount(elements.testToneFrequencyHz, "input"), 1, "custom inp
 dispatch(elements.testToneStart, "click", { preventDefault() {} });
 assert.equal(JSON.stringify(context.toneStartMessages(first)), JSON.stringify([{
     command: "tone_start",
+    client_request_id: context.toneStartMessages(first)[0].client_request_id,
     frequency_source: "wspr_band",
     band: "20m",
 }]), "band mode must send exactly the semantic band payload");
@@ -857,6 +858,7 @@ assert.match(elements.testToneSelectionPreview.textContent, /No WSPR offset is a
 dispatch(elements.testToneStart, "click", { preventDefault() {} });
 assert.equal(JSON.stringify(context.toneStartMessages(first)[1]), JSON.stringify({
     command: "tone_start",
+    client_request_id: context.toneStartMessages(first)[1].client_request_id,
     frequency_source: "custom_rf",
     frequency_hz: 14097123,
 }), "custom mode must send exactly the semantic exact-RF payload");
@@ -983,7 +985,7 @@ first.message({
     actual_rf_frequency_hz: 14097100,
     selector_gpio_enabled: false,
 });
-assert.match(elements.testToneExecutionResult.textContent, /committed 14\.097100 MHz RF \(requested values differed\)/i,
+assert.match(elements.testToneExecutionResult.textContent, /at 14\.097100 MHz RF \(requested values differed\)/i,
     "a response after post-send diagnostics must remain attributed and disclose changed execution values");
 assert.equal(buttons["#testToneEnd"].disabled, false,
     "End remains available after an accepted request receives its normal response");
@@ -1024,11 +1026,11 @@ first.message({
     selector_gpio: 17,
     selector_gpio_active_high: true,
 });
-assert.match(elements.testToneExecutionResult.textContent, /started at the requested 14\.098350 MHz RF/i,
+assert.match(elements.testToneExecutionResult.textContent, /Requested frequency committed/i,
     "matching band success must confirm execution without repeating the preview equation");
 assert.match(elements.testToneExecutionResult.textContent, /GPIO 17, active high/,
     "band success must display committed active-high selector metadata");
-assert.match(elements.testToneExecutionResult.className, /text-success/, "committed success must be styled as a status");
+assert.match(elements.testToneExecutionResult.className, /text-body/, "acceptance must be styled as pending runtime confirmation");
 assert.equal(buttons["#testToneEnd"].disabled, false, "End remains usable after a successful start");
 
 context.markPendingTestToneStartRequest({ frequency_source: "custom_rf", frequency_hz: 14097123 });
@@ -1042,7 +1044,7 @@ context.handleTestToneCommandResponse({
     selector_gpio: 18,
     selector_gpio_active_high: false,
 });
-assert.match(elements.testToneExecutionResult.textContent, /started at the requested exact 14\.097123 MHz RF on 20m/i,
+assert.match(elements.testToneExecutionResult.textContent, /Requested exact RF frequency committed/i,
     "matching custom success must confirm exact RF without repeating raw input");
 assert.match(elements.testToneExecutionResult.textContent, /GPIO 18, active low/,
     "custom success must display committed active-low selector metadata");
@@ -1071,7 +1073,7 @@ context.handleTestToneCommandResponse({
     audio_offset_hz: 1500,
     selector_gpio_enabled: "false",
 });
-assert.match(elements.testToneExecutionResult.textContent, /started, but committed execution details were unavailable or invalid/i,
+assert.match(elements.testToneExecutionResult.textContent, /committed execution details were unavailable or invalid/i,
     "malformed semantic success must warn without inventing committed values");
 assert.doesNotMatch(elements.testToneExecutionResult.textContent, /14095600|GPIO/, "malformed success must not expose unvalidated metadata");
 
@@ -1083,7 +1085,7 @@ for (const [name, expectedSource, response] of [
 ]) {
     context.markPendingTestToneStartRequest({ frequency_source: expectedSource });
     context.handleTestToneCommandResponse(response);
-    assert.match(elements.testToneExecutionResult.textContent, /started, but committed execution details were unavailable or invalid/i,
+    assert.match(elements.testToneExecutionResult.textContent, /committed execution details were unavailable or invalid/i,
         `${name} must warn rather than be treated as legacy success`);
     assert.equal(buttons["#testToneEnd"].disabled, false,
         `${name} must keep End available because the backend reported an active tone`);
@@ -1092,11 +1094,12 @@ for (const [name, expectedSource, response] of [
 context.clearTestToneExecutionResult();
 context.markPendingTestToneStartRequest();
 context.handleTestToneCommandResponse({ command: "tone_start", started: true });
-assert.equal(elements.testToneExecutionResult.textContent, "",
+assert.equal(elements.testToneExecutionResult.textContent, "Test Tone accepted; waiting for runtime confirmation.",
     "a genuine legacy success must not invent semantic execution details or a malformed warning");
 assert.equal(buttons["#testToneEnd"].disabled, false,
     "a genuine legacy success must keep End available");
 
+context.markPendingTestToneStartRequest();
 context.handleTestToneCommandResponse({
     command: "tone_start",
     started: false,
@@ -1205,7 +1208,7 @@ first.message({
     actual_rf_frequency_hz: 14098350,
     selector_gpio_enabled: false,
 });
-assert.match(elements.testToneExecutionResult.textContent, /started at the requested 14\.098350 MHz RF/i,
+assert.match(elements.testToneExecutionResult.textContent, /Requested frequency committed/i,
     "a late valid band response must be attributed to its timed-out semantic request");
 assert.equal(buttons["#testToneEnd"].disabled, false,
     "End remains available after a late backend-confirmed start");
@@ -1226,7 +1229,7 @@ for (const [name, response] of [
     selectBandForTimedStart("20m");
     startSelectedToneAndRunRealTimeout(first, "wspr_band");
     context.handleTestToneCommandResponse(response);
-    assert.match(elements.testToneExecutionResult.textContent, /started, but committed execution details were unavailable or invalid/i,
+    assert.match(elements.testToneExecutionResult.textContent, /committed execution details were unavailable or invalid/i,
         `late ${name} must warn instead of being treated as a legacy result`);
     assert.equal(buttons["#testToneEnd"].disabled, false,
         `End must remain available after a late ${name} response reporting started`);
@@ -1245,7 +1248,7 @@ context.handleTestToneCommandResponse({
     selector_gpio: 18,
     selector_gpio_active_high: false,
 });
-assert.match(elements.testToneExecutionResult.textContent, /started at the requested exact 14\.097123 MHz RF on 20m/i,
+assert.match(elements.testToneExecutionResult.textContent, /Requested exact RF frequency committed/i,
     "a late valid custom response must retain its exact RF semantics");
 assert.equal(buttons["#testToneEnd"].disabled, false,
     "End remains available after a late valid custom start");
@@ -1258,16 +1261,20 @@ context.handleTestToneCommandResponse({
     started: false,
     message: "The backend rejected the late custom request.",
 });
-assert.equal(elements.testToneExecutionResult.textContent, "The backend rejected the late custom request.",
+assert.equal(elements.testToneExecutionResult.textContent, "The backend rejected the late custom request. This response cannot be correlated; use End to recover.",
     "a late rejection must preserve its backend message inline");
 assert.doesNotMatch(elements.testToneExecutionResult.textContent, /RF|GPIO|Selector/,
     "a late rejection must not display uncommitted execution metadata");
-assert.equal(context.testToneStartSnapshot().hasUnresolvedContext, false,
-    "a late rejection must release its retained request context");
+assert.equal(context.testToneStartSnapshot().hasUnresolvedContext, true,
+    "an uncorrelated legacy rejection must retain the recovery context");
+assert.equal(context.testToneLifecycleSnapshot().state, "unknown");
+assert.equal(elements.testToneEnd.disabled, false);
+bridge.functions.onTestToneEnd.call(elements.testToneEnd, { preventDefault() {} });
+context.handleTestToneCommandResponse({ command: "tone_end", stopped: true });
 
 context.clearTestToneExecutionResult();
 context.handleTestToneCommandResponse({ command: "tone_start", started: true });
-assert.equal(elements.testToneExecutionResult.textContent, "",
+assert.equal(elements.testToneExecutionResult.textContent, "Test Tone accepted; waiting for runtime confirmation.",
     "a genuine legacy success without retained semantic context remains compatible");
 assert.equal(buttons["#testToneEnd"].disabled, false,
     "a genuine legacy success remains truthfully active");
@@ -1306,7 +1313,7 @@ assert.equal(buttons["#testToneStart"].disabled, false,
 startSelectedToneAndRunRealTimeout(first, "wspr_band");
 dispatch(elements.testToneEnd, "click", { preventDefault() {} });
 first.message({ command: "tone_end", stopped: false, message: "Controller rejected End." });
-assert.equal(context.testToneLifecycleSnapshot().state, "active",
+assert.equal(context.testToneLifecycleSnapshot().state, "unknown",
     "a rejected End must retain possible active-tone state");
 assert.equal(context.testToneStartSnapshot().quarantined, true,
     "a rejected End must retain the timed Start quarantine");
@@ -1370,7 +1377,7 @@ assert.equal(context.testToneLifecycleSnapshot().state, "idle",
     "a confirmed End must clear active-tone state");
 assert.equal(buttons["#testToneStart"].disabled, false,
     "a confirmed End must restore Start despite the stale pre-End runtime snapshot");
-assert.equal(elements.testToneExecutionResult.textContent, "Test Tone ended.",
+assert.equal(elements.testToneExecutionResult.textContent, "Test Tone transaction ended; restoration details unavailable.",
     "a confirmed End must replace the stale Started result");
 
 dispatch(elements.testToneStart, "click", { preventDefault() {} });
@@ -1408,7 +1415,7 @@ assert.equal(buttons["#testToneStart"].disabled, true,
 second.message({ command: "tone_end", stopped: true });
 assert.equal(context.testToneLifecycleSnapshot().state, "idle",
     "a recovery End response must settle the unknown state");
-assert.equal(elements.testToneExecutionResult.textContent, "Test Tone ended.",
+assert.equal(elements.testToneExecutionResult.textContent, "Test Tone transaction ended; restoration details unavailable.",
     "recovery End must report only the confirmed outcome");
 });
 
@@ -1580,8 +1587,8 @@ runScenario("isolation target state", () => {
     staleSocketCallbackInvoked = true;
     assert.equal(staleSocketCallbackInvoked, true,
         "the retained raw production socket callback must execute after reset");
-    assert.equal(diagnostics.calls.length, diagnosticsBeforeStaleSocket + 2,
-        "the stale production socket callback must reach its pre-guard diagnostic dependency");
+    assert.equal(diagnostics.calls.length, diagnosticsBeforeStaleSocket,
+        "the stale production socket callback must exit before diagnostics or state changes");
     assert.equal(isolationSnapshot(socket), beforeStaleCallbacks,
         "the stale production socket callback must not mutate the next scenario");
     assert.equal(bridge.hasCurrentSocket(), true,
@@ -1612,6 +1619,90 @@ assert.deepEqual(JSON.parse(JSON.stringify(bridge.inspect().catalog)), {
 }, "the narrow bridge reset must restore deterministic production catalog state between cases");
 assert.equal(bridge.inspect().testToneStart.hasUnresolvedContext, false,
     "the narrow bridge reset must not retain production Start attribution state");
+});
+
+runScenario("versioned Test Tone outcomes preserve newer evidence and restoration", () => {
+    const socket = openAuthorizedConnection();
+    selectBandForTimedStart("20m");
+    dispatch(elements.testToneStart, "click", { preventDefault() {} });
+    const requestId = context.toneStartMessages(socket).at(-1).client_request_id;
+    assert.ok(requestId);
+    const status = (revision, state, owned = true, extra = {}) => ({
+        generation: 7, revision, state, owned, message: "", restoration: "none", ...extra,
+    });
+    socket.message({ command: "tone_start", client_request_id: "another-client", started: false,
+        test_tone: status(10, "starting") });
+    assert.equal(context.testToneStartSnapshot().pending, true,
+        "another client's rejection must not consume the pending request");
+    const accepted = { command: "tone_start", client_request_id: requestId, started: true,
+        frequency_source: "wspr_band", band: "20m", dial_frequency_hz: 14095600,
+        audio_offset_hz: 2750, actual_rf_frequency_hz: 14098350,
+        selector_gpio_enabled: false, test_tone: status(11, "starting") };
+    socket.message(accepted);
+    assert.equal(context.testToneLifecycleSnapshot().state, "starting");
+    assert.match(elements.testToneExecutionResult.textContent, /waiting for runtime confirmation/);
+    assert.doesNotMatch(elements.testToneExecutionResult.textContent, /14\.098350/,
+        "matched execution status must not repeat the preview frequency");
+    socket.message({ command: "test_tone_status", test_tone: status(12, "active") });
+    assert.equal(context.testToneLifecycleSnapshot().state, "active");
+    const activeText = elements.testToneExecutionResult.textContent;
+    socket.message(accepted);
+    socket.message({ command: "tone_start", started: false, message: "old rejection" });
+    assert.equal(elements.testToneExecutionResult.textContent, activeText);
+    socket.message({ command: "tone_start", ...accepted, test_tone: status(12, "active") });
+    assert.equal(elements.testToneExecutionResult.textContent, activeText,
+        "an equal-revision duplicate cannot erase committed details");
+    dispatch(elements.testToneEnd, "click", { preventDefault() {} });
+    const endId = commandMessages(socket, "tone_end").at(-1).client_request_id;
+    socket.message({ command: "test_tone_status", test_tone: status(13, "active") });
+    socket.message({ ...accepted, test_tone: status(13, "active") });
+    assert.equal(context.testToneLifecycleSnapshot().state, "end_pending");
+    assert.equal(elements.testToneEnd.disabled, true,
+        "a runtime observation cannot enable a duplicate pending End");
+    dispatch(elements.testToneEnd, "click", { preventDefault() {} });
+    assert.equal(commandMessages(socket, "tone_end").length, 1);
+    socket.message({ command: "tone_end", client_request_id: endId, stopped: true,
+        message: "Test Tone ended; previous CLI direct tone restored (startup requested).",
+        test_tone: status(14, "ended", false, { restoration: "direct_tone" }) });
+    assert.match(elements.testToneExecutionResult.textContent, /CLI direct tone restored/);
+    assert.doesNotMatch(elements.testToneExecutionResult.textContent, /output.*off/i);
+    socket.message(accepted);
+    assert.equal(context.testToneLifecycleSnapshot().state, "idle");
+    socket.message({ command: "tone_end", stopped: true, restoration_failed: true, status: "error",
+        message: "Restoration failed; use local recovery.",
+        test_tone: status(15, "unknown", false, { message: "Restoration failed; use local recovery.", restoration: "failed" }) });
+    assert.equal(context.testToneLifecycleSnapshot().state, "unknown");
+    assert.match(elements.testToneExecutionResult.textContent, /Restoration failed/);
+    assert.equal(elements.testToneEnd.disabled, false);
+    socket.message({ command: "test_tone_status", test_tone: status(16, "failed", false,
+        { message: "Startup failed; output cleanup confirmed." }) });
+    assert.equal(context.testToneLifecycleSnapshot().state, "idle");
+    assert.match(elements.testToneExecutionResult.textContent, /Startup failed/);
+});
+
+runScenario("runtime observation can precede the correlated acknowledgment", () => {
+    const socket = openAuthorizedConnection();
+    selectBandForTimedStart("20m");
+    dispatch(elements.testToneStart, "click", { preventDefault() {} });
+    const start = context.toneStartMessages(socket).at(-1);
+    const status = (revision, state, owned = true) => ({ generation: 22, revision, state, owned,
+        message: state === "ended" ? "Test Tone ended; scheduler configuration restored." : "", restoration: "scheduler" });
+    socket.message({ command: "test_tone_status", test_tone: status(32, "active") });
+    assert.equal(context.testToneStartSnapshot().pending, true);
+    socket.message({ command: "tone_start", client_request_id: start.client_request_id, started: true,
+        frequency_source: "wspr_band", band: "20m", dial_frequency_hz: 14095600,
+        audio_offset_hz: 2750, actual_rf_frequency_hz: 14098350, selector_gpio_enabled: false,
+        test_tone: status(31, "starting") });
+    assert.equal(context.testToneStartSnapshot().pending, false);
+    assert.equal(context.testToneLifecycleSnapshot().state, "active");
+    assert.match(elements.testToneExecutionResult.textContent, /Requested frequency committed/);
+    dispatch(elements.testToneEnd, "click", { preventDefault() {} });
+    const end = commandMessages(socket, "tone_end").at(-1);
+    socket.message({ command: "test_tone_status", test_tone: status(34, "ended", false) });
+    socket.message({ command: "tone_end", client_request_id: end.client_request_id, stopped: true,
+        test_tone: status(33, "ended", false) });
+    assert.equal(context.testToneLifecycleSnapshot().endTimeoutHandle, null);
+    assert.equal(context.testToneLifecycleSnapshot().state, "idle");
 });
 
 console.log("wspr_band_frequency_correlation_test passed");

@@ -116,7 +116,7 @@ int main()
     require(
         websocket_header_source.find("std::mutex test_tone_command_mutex_;") !=
                 std::string::npos &&
-            websocket_source.find("if (cmd == \"tone_start\" || cmd == \"tone_end\")") !=
+            websocket_source.find("if (cmd == \"tone_start\" || cmd == \"tone_end\" || cmd == \"stop\")") !=
                 std::string::npos &&
             websocket_source.find("std::unique_lock<std::mutex>(test_tone_command_mutex_)") !=
                 std::string::npos,
@@ -144,14 +144,14 @@ int main()
             scheduling_source.find("\"reload_failed\",\n                        policy_error") != std::string::npos,
         "managed non-web reloads must retain runtime CW duration-policy validation and reload failure reporting");
     require(
-        scheduling_source.find("TestToneStopResult end_test_tone()") != std::string::npos &&
+        scheduling_source.find("TestToneStopResult end_test_tone(") != std::string::npos &&
             scheduling_source.find("send_ws_message(\"transmit\", \"finished\");") ==
                 scheduling_source.find("send_ws_message(\"transmit\", \"finished\");", scheduling_source.find("void transmitter_cb(")),
         "test tone end must rely on transmitter callback websocket ownership only");
     require(
         scheduling_source.find("finalize_transmission_stop_cleanup(") != std::string::npos &&
             scheduling_source.find("wsprTransmitter.clearSoftOff();") != std::string::npos &&
-            scheduling_source.find("wsprTransmitter.startAsync();", scheduling_source.find("TestToneStopResult end_test_tone()")) !=
+            scheduling_source.find("wsprTransmitter.startAsync();", scheduling_source.find("TestToneStopResult end_test_tone(")) !=
                 std::string::npos,
         "WSPR test tone stop recovery must route through shared stop cleanup and explicitly re-arm the committed scheduler wait path");
 
@@ -1673,11 +1673,11 @@ int main()
             site_source.find("const startButton = document.getElementById(\"testToneStart\");") != std::string::npos &&
             site_source.find("toggleButtonLoading(startButton, false);") != std::string::npos &&
             site_source.find("toggleButtonLoading(endButton, false);") != std::string::npos &&
-            site_source.find("testToneLifecycleState = TEST_TONE_LIFECYCLE.ACTIVE;\n            syncTestToneControlState(true);") != std::string::npos &&
-            site_source.find("if (response.stopped === true) {") != std::string::npos &&
+            site_source.find("testToneLifecycleState = TEST_TONE_LIFECYCLE.STARTING;") != std::string::npos &&
+            site_source.find("if (response.stopped === true ||") != std::string::npos &&
             site_source.find("testToneLifecycleState = TEST_TONE_LIFECYCLE.IDLE;") != std::string::npos &&
-            site_source.find("if (isTestToneStartQuarantinedForCurrentSocket()) {\n                clearUnresolvedTestToneStartContext();\n            }") != std::string::npos &&
-            site_source.find("setTestToneExecutionResult(\"Test Tone ended.\", \"success\");") != std::string::npos &&
+            site_source.find("clearUnresolvedTestToneStartContext();") != std::string::npos &&
+            site_source.find("response.restoration_failed === true") != std::string::npos &&
             site_source.find("if (hasActiveManagedTransmissionForTestTone()) {") != std::string::npos &&
             site_source.find("if (hasEnabledManagedTransmissionForTestTone()) {") != std::string::npos &&
             site_source.find("showTestToneBlockedModal(\"active\");") != std::string::npos &&
@@ -1698,7 +1698,7 @@ int main()
             site_source.find("function clearPendingTestToneStartRequest()") != std::string::npos &&
             site_source.find("function quarantineTimedOutTestToneStartRequest()") != std::string::npos &&
             site_source.find("function testToneFrequencyOverridePayload()") != std::string::npos &&
-            site_source.find("const toneStartPayload = {\n        command: \"tone_start\",\n        ...testToneFrequencyOverridePayload()\n    };") != std::string::npos &&
+            site_source.find("client_request_id: nextTestToneRequestId()") != std::string::npos &&
             site_source.find("if (!sendCommand(toneStartPayload))") != std::string::npos &&
             site_source.find("testToneLifecycleState = TEST_TONE_LIFECYCLE.START_PENDING;") != std::string::npos &&
             site_source.find("testToneLifecycleState = TEST_TONE_LIFECYCLE.UNKNOWN;") != std::string::npos &&
@@ -1706,14 +1706,14 @@ int main()
             site_source.find("clearPendingTestToneStartRequest();") != std::string::npos,
         "Test Tone start requests must use a local per-tab pending flag, include optional frequency override payload data, and clear state on send failure or websocket disconnect");
     require(
-        site_source.find("const locallyRequested = pendingTestToneStartRequest === true;") != std::string::npos &&
-            site_source.find("clearPendingTestToneStartRequest();\n        if (response.started === true)") != std::string::npos &&
+        site_source.find("const locallyRequested = pendingTestToneStartRequest === true && Boolean(correlatedStart);") != std::string::npos &&
+            site_source.find("if (response.started === true)") != std::string::npos &&
             site_source.find("if (locallyRequested && response.blocked_by_active_transmission === true)") != std::string::npos &&
             site_source.find("} else if (locallyRequested && response.blocked_by_enabled_transmission === true)") != std::string::npos,
         "Test Tone blocked modal handling must be gated by the local pending tone_start request flag");
     require(
-        site_source.find("!locallyRequested &&") != std::string::npos &&
-            site_source.find("response.blocked_by_active_transmission === true ||\n                    response.blocked_by_enabled_transmission === true") != std::string::npos &&
+        site_source.find("!correlatedStart && response.started !== true") != std::string::npos &&
+            site_source.find("reconcileTestToneStatus(response.test_tone)") != std::string::npos &&
             site_source.find("Passive test tone start rejection received:") != std::string::npos &&
             site_source.find("syncTestToneControlState(false);") != std::string::npos,
         "passive websocket tone_start rejections must still update Test Tone state without showing blocked modals");

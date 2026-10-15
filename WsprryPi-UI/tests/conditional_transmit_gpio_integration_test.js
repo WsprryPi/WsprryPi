@@ -423,6 +423,9 @@ async function browserTest() {
         always(callback) { callback(); return this; }
     }
 
+    // Network-isolated CI containers report offline even though every control
+    // endpoint below is mocked. Connectivity is explicit fixture state.
+    Object.defineProperty(navigator, "onLine", { configurable: true, get: () => true });
     const clock = new FakeClock();
     window.setTimeout = clock.setTimeout.bind(clock);
     window.clearTimeout = clock.clearTimeout.bind(clock);
@@ -467,6 +470,9 @@ async function browserTest() {
         configAutosaveInFlight = false;
         configAutosavePendingAfterFlight = false;
         configAutosaveDirty = false;
+        // The PHP-only fixture's initial controller fetch can leave saving
+        // paused. Each independent ownership case starts with a usable mock.
+        configAutosaveNetworkPaused = false;
         lastSavedConfigPayload = "";
         lastFailedConfigPayload = "";
         lastFailedConfigMessage = "";

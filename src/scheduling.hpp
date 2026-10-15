@@ -210,8 +210,29 @@ bool ppm_init();
 using TestToneFrequencySource = TestToneRequestSource;
 using TestToneRequest = ParsedTestToneRequest;
 
+// Lifecycle transactions serialize in the scheduler. Worker callbacks only
+// publish generation-fenced observations and never acquire this mutex.
+std::recursive_mutex &test_tone_lifecycle_mutex();
+struct TestToneStatus
+{
+    std::uint64_t generation = 0;
+    std::uint64_t revision = 0;
+    bool owned = false;
+    std::string state = "idle";
+    std::string message;
+    std::string restoration = "none";
+};
+TestToneStatus current_test_tone_status();
+void reconcile_test_tone_runtime();
+void record_test_tone_event(std::uint64_t generation,
+                           WsprTransmissionCallbackEvent event,
+                           const std::string &message);
+using TestToneLifecycleHook = std::function<void(std::string_view)>;
+void set_test_tone_lifecycle_hook_for_test(TestToneLifecycleHook hook);
+
 struct TestToneStartResult
 {
+    TestToneStatus lifecycle;
     bool started = false;
     bool already_active = false;
     bool blocked_by_active_transmission = false;
@@ -246,6 +267,9 @@ TestToneStartResult start_test_tone(const TestToneRequest &request);
  */
 struct TestToneStopResult
 {
+    TestToneStatus lifecycle;
+    bool restoration_failed = false;
+    bool output_inactive = false;
     bool stopped = false;
     bool tone_was_active = false;
     bool scheduler_restored = false;
@@ -253,7 +277,10 @@ struct TestToneStopResult
     std::string message;
 };
 
-TestToneStopResult end_test_tone();
+enum class TestToneEndPolicy { RestorePrevious, Quiesce };
+TestToneStopResult end_test_tone(
+    std::uint64_t expected_generation = 0,
+    TestToneEndPolicy policy = TestToneEndPolicy::RestorePrevious);
 
 /**
  * @brief Run the main orchestration loop.
