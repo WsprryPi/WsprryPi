@@ -8,8 +8,8 @@ disposition rather than implementation before 4.0.
 
 ## Ordered release checklist
 
-Status updated October 15, 2026. Items 1 through 6 are complete within their
-recorded scopes.
+Status updated October 15, 2026. Items 1 through 7 are complete within their
+recorded scopes; item 8 is in progress.
 
 Status key: ✅ Complete · ⏳ In progress · ☐ Not started
 
@@ -44,22 +44,38 @@ Status key: ✅ Complete · ⏳ In progress · ☐ Not started
    [readiness review and acceptance](../docs/development/si5351-readiness-review.md).
    Historical wspr4 `SYS_INIT` observations remain retained and unexplained;
    closure accepts the bounded I2C evidence without requiring RF measurement.
-7. ☐ **RP1 release candidate preparation.** Finish release-scoped
-   module/lifecycle work, packaging and the release pipeline; identify the
-   exact candidate and its UAPI, compatibility metadata, manifests and hashes.
-8. ☐ **WsprryPi acceptance of the RP1 candidate.** Verify that exact candidate
-   and disposition historical provider-rejection/eight-second TONE failures;
-   repair integration defects before provider freeze.
-9. ☐ **RP1 publication.** Publish the immutable provider release and verify
-   production selection and consumption of those exact artifacts.
-10. ☐ **Documentation performance and remaining Impeccable housekeeping.**
+7. ✅ **RP1 release-candidate preparation.** Complete. The exact unpublished
+   `1.0.0` candidate is bound to RP1-GPCLK-DKMS commit
+   `0b2fc4e0542df6d53ba5ace8aab742729ae81e8f`. Release-scoped module/lifecycle
+   work, packaging, manifests, hashes, reproducibility, cleanup-first
+   `0.9`-to-`1.0` migration, rollback, removal, reinstall and recovery validation
+   are complete. The candidate is not frozen or published. See the provider's
+   [candidate procedure](https://github.com/WsprryPi/RP1-GPCLK-DKMS/blob/0b2fc4e0542df6d53ba5ace8aab742729ae81e8f/docs/operator/release-candidate.md)
+   and [package lifecycle contract](https://github.com/WsprryPi/RP1-GPCLK-DKMS/blob/0b2fc4e0542df6d53ba5ace8aab742729ae81e8f/docs/operator/package-lifecycle.md).
+8. ⏳ **WsprryPi acceptance of the exact RP1 candidate.** In progress in a
+   separate feature worktree. Validate current WsprryPi `devel` against candidate
+   commit `0b2fc4e0542df6d53ba5ace8aab742729ae81e8f`, reconcile exact identities,
+   preserve cleanup-first migration, disposition historical provider-rejection
+   and eight-second finite-TONE failures, and repair WsprryPi-owned integration
+   defects. Integrate the accepted WsprryPi changes before provider freeze.
+9. ☐ **RP1 provider freeze and publication.** After candidate acceptance and
+   integration are complete, freeze and publish the exact immutable
+   RP1-GPCLK-DKMS `1.0.0` source, Debian package, checksums, inventories,
+   compatibility metadata, manifests and provenance. Candidate changes require
+   repetition of affected candidate, lifecycle and WsprryPi acceptance checks.
+10. ☐ **WsprryPi production integration of the published RP1 release.** Replace
+    candidate/development selection with the published immutable provider
+    identities. Validate production selection, installation, cleanup-first
+    migration, runtime activation, route handling, operation, removal, rollback,
+    diagnostics and failure recovery against the exact published artifacts.
+11. ☐ **Documentation performance and remaining Impeccable housekeeping.**
     Reconcile reminders and finish selected image-delivery improvements before
     final documentation rendering; use current Impeccable tooling during UI work.
-11. ☐ **Consolidated operator-documentation update.** Cover settled API,
+12. ☐ **Consolidated operator-documentation update.** Cover settled API,
     Test Tone, Si5351, inventory-timeout and RP1 correction/installation behavior.
-12. ☐ **Final integrated Impeccable review (#423).** Review the settled product,
+13. ☐ **Final integrated Impeccable review (#423).** Review the settled product,
     repair actionable findings and verify affected documentation/screenshots.
-13. ☐ **Final candidate validation, packaging and 4.0 release.** Run final
+14. ☐ **Final WsprryPi candidate validation, packaging and 4.0 release.** Run final
     regressions, identify artifacts, complete applicable installation/upgrade/
     runtime checks and publish after acceptance.
 
@@ -76,53 +92,75 @@ Status key: ✅ Complete · ⏳ In progress · ☐ Not started
 
 ## Release gates
 
-- ☐ **RP1 publication and candidate verification:**
-  [#412](https://github.com/WsprryPi/WsprryPi/issues/412) is implementation-complete.
-  Publish an eligible immutable provider release and verify WsprryPi against
-  its exact artifacts. At selection of this punchlist,
-  [RP1-GPCLK-DKMS had no published release](https://github.com/WsprryPi/RP1-GPCLK-DKMS/releases).
-  Complete the correction-documentation work and record the disposition of
-  historical provider-rejection exception-containment and eight-second finite
-  TONE failures. Cite subsequent fixes and applicable evidence first; link a
-  focused regression if a defect remains. Two-second brackets alone do not
-  resolve the eight-second observation.
-- ☐ **Operator documentation:** reconcile the recorded Si5351
-  readiness/drive/fade, inventory-timeout, and RP1 correction follow-ups in the
-  separate `WsprryPi-Docs` repository. Update and verify documentation under
-  separately authorized cross-repository scope.
+- ⏳ **WsprryPi candidate acceptance and integration:** accept the exact
+  unpublished `1.0.0` provider candidate identified above against current
+  WsprryPi `devel`, and integrate the accepted application changes before
+  provider freeze. Preserve the ownership boundary established by
+  [#412](https://github.com/WsprryPi/WsprryPi/issues/412). Record the disposition
+  of historical provider-rejection exception-containment and eight-second
+  finite-TONE failures. Cite subsequent fixes and applicable evidence first;
+  link a focused regression if a defect remains. Two-second brackets alone do
+  not resolve the eight-second observation.
+- ☐ **RP1 provider freeze and publication:** after candidate acceptance and
+  application integration, freeze and publish the exact accepted provider
+  source and immutable artifacts. The prepared candidate remains unpublished;
+  provider publication does not complete WsprryPi production integration or 4.0.
+- ☐ **WsprryPi published-provider integration:** after provider publication,
+  select and consume its exact immutable artifacts and validate production
+  installation, cleanup-first migration, runtime, routes, removal, rollback,
+  diagnostics and recovery. Follow the
+  [published-release contract](../docs/rp1-gpclk-dkms-installation.md#published-releases).
+- ☐ **Operator documentation:** after production RP1 integration, reconcile
+  the recorded Si5351 readiness/drive/fade, inventory-timeout, and RP1 correction
+  follow-ups in the separate `WsprryPi-Docs` repository. Update and verify
+  documentation under separately authorized cross-repository scope.
 - ☐ **Final integrated Impeccable review:** complete
-  [#423](https://github.com/WsprryPi/WsprryPi/issues/423) after release-scoped
-  implementation and documentation work has settled on `devel`, with no
-  unresolved UI-affecting changes expected. Repair or explicitly accept
-  findings as required by that issue, then complete exact-candidate packaging
-  and applicable installation/runtime checks before publication.
+  [#423](https://github.com/WsprryPi/WsprryPi/issues/423) after production RP1
+  integration and release-scoped implementation/documentation have settled on
+  `devel`, with no unresolved UI-affecting changes expected. Repair or explicitly
+  accept findings as required by that issue, then complete WsprryPi's final
+  candidate packaging and applicable installation/runtime checks before its
+  4.0 publication.
 
 ## RP1 dependency order
 
-Finish the release-scoped RP1 work first, with one bounded WsprryPi acceptance
-pass before provider publication:
+Keep provider preparation, consumer acceptance, provider publication and
+production consumption as separate gates:
 
-1. **RP1-GPCLK-DKMS candidate:** finish module/lifecycle acceptance, packaging,
-   and the release pipeline. Prepare an exact candidate with identified
-   source, UAPI, compatibility metadata, manifests, and hashes.
-2. **Cross-repository acceptance:** validate current WsprryPi `devel` against
-   that exact candidate through the supported development/test path. Repair
-   integration defects before the provider freeze. Changes to the candidate
-   require updated identities and repetition of affected checks.
-3. **RP1-GPCLK-DKMS publication:** freeze and publish the immutable provider
-   release with its package, checksums, installation manifest, inventory,
-   compatibility, and provenance. Keep provider and application review,
-   qualification, and publication boundaries separate.
-4. **WsprryPi release:** verify production selection and consumption of that
-   published artifact, complete applicable installation/runtime checks and
-   operator documentation, perform final #423 review, then package and release
-   Wsprry Pi 4.0.
+1. **Prepare the provider candidate:** identify and lifecycle-test the exact
+   RP1-GPCLK-DKMS candidate, including its source, package, UAPI, compatibility
+   metadata, manifests and hashes.
+2. **Accept the candidate in WsprryPi:** validate current WsprryPi `devel`
+   against those exact candidate identities through the supported
+   development/test path; repair application-owned integration defects.
+3. **Integrate accepted consumer changes:** integrate the accepted WsprryPi
+   candidate-consumer changes into `devel` before provider freeze.
+4. **Freeze and publish the provider:** freeze and publish the exact accepted
+   RP1-GPCLK-DKMS source and immutable artifacts through its own release process.
+5. **Adopt the published provider:** update WsprryPi production selection and
+   consumption to the exact published artifacts and immutable identities.
+6. **Validate production integration:** complete applicable installation,
+   cleanup-first migration, runtime activation, route/operation, removal,
+   rollback, diagnostics and recovery checks against those published artifacts.
+7. **Complete documentation and final UI review:** finish documentation
+   performance/housekeeping and consolidated operator documentation, then the
+   final integrated Impeccable review (#423) of the settled product.
+8. **Release WsprryPi:** complete final candidate validation and packaging,
+   then publish Wsprry Pi 4.0 after final candidate acceptance.
 
-RP1 acceptance can use unreleased WsprryPi `devel`; it does not require a
-published WsprryPi release. The dependent production WsprryPi release requires
-the published RP1 artifact. Follow the
+Candidate acceptance can use unreleased WsprryPi `devel`; it does not require a
+published WsprryPi release. Acceptance and integration precede provider freeze;
+published-provider consumption follows provider publication. The DKMS and
+WsprryPi releases remain separate review and publication boundaries. RP1
+completion does not complete documentation, UI, packaging or WsprryPi 4.0 gates.
+
+A candidate change after acceptance invalidates affected identities and requires
+updated provenance and repetition of affected candidate, lifecycle and consumer
+acceptance checks before freeze. Follow the
 [provider release contract](../docs/rp1-gpclk-dkms-installation.md#published-releases)
 and preserve fail-closed identity and compatibility checks throughout.
+Hardware-free tests do not establish target, GPIO, transmission, SDR or RF
+qualification.
 
 ## Post-release scope
 
