@@ -251,3 +251,37 @@ The final companion revision includes that independent Chrony work unchanged.
 Its resulting CI must complete before the lead acceptance record closes P15.3.
 No source pin is weakened or changed by this documentation publication. Future
 record-only Pico closure commits are distinct from the tested implementation pin.
+
+## Final evidence-review repairs
+
+The final documentation review clarified that no **local** native macOS C++
+application build ran; the unchanged hosted macOS CI profile is separate.
+
+Independent CI evidence review found a pre-existing packet-capture drain race in
+`src/tests/wtp_pi_reply_routing_test.py`. Parent run 38760244313 completed real
+HELLO/STATUS exchanges but retained only an incoming SYN before immediate
+capture shutdown. The repair enables tcpdump immediate mode and observes the
+whole capture until a bounded quiet interval (minimum 0.5 seconds elapsed,
+0.25 seconds quiet, maximum 3 seconds), then retains capture statistics.
+It never stops at the first matching reply. The baseline `wifi0` requirement
+and exact fixed `{'eth0'}` assertion are unchanged; production routing is unchanged.
+
+The independent reassessment found no actionable issue in the repair. Python
+syntax and whitespace checks passed. Three finite actual namespace regressions
+passed in network-disabled disposable Linux with private namespace capabilities:
+
+```sh
+make wtp-pi-routing-probe BACKENDS=simulated ANCILLARY_GPIO=0 SUDO=
+python3 tests/wtp_pi_reply_routing_test.py --probe build/wtp_pi_routing_probe
+```
+
+All three runs reproduced baseline `wifi0` and fixed `eth0` replies; each fixed
+capture had 39 packets captured/received and zero kernel drops. Tools were
+iproute2 6.15.0-1 and tcpdump 4.99.5-2 in the disposable container, with no host
+installation or hardware mounts. Initial read-only container sysctls prevented
+the fixture before packet execution; allowing the fixture's private sysctls
+resolved that environment limitation. Evidence is retained as
+`routing-check-{1,2,3}.json`, `routing-check.log` and `routing-probe-build.log`
+in the local temporary evidence directory. This validates software routing and
+capture behavior only. Required CI is rerun after this harness repair; final
+joint outcome remains in the lead acceptance record.

@@ -146,7 +146,7 @@ def main(probe):
         def start_capture(label):
             path = Path(directory)/(label+'.txt')
             out = path.open('w')
-            child = subprocess.Popen(['ip', 'netns', 'exec', server, 'tcpdump', '-l', '-n', '-i', 'any',
+            child = subprocess.Popen(['ip', 'netns', 'exec', server, 'tcpdump', '--immediate-mode', '-l', '-n', '-i', 'any',
                                       'tcp', 'port', str(PORT)], stdout=out, stderr=subprocess.PIPE, bufsize=0)
             children.append(child)
             with selectors.DefaultSelector() as selector:
@@ -160,14 +160,34 @@ def main(probe):
 
         def finish_capture(capture):
             child, out, path = capture
+            # The real client/probe exchange has finished, but capture delivery
+            # can lag it. Drain all traffic, including later replies after route
+            # changes; stopping at the first matching reply could hide misrouting.
+            started = quiet_since = time.monotonic()
+            previous_size = path.stat().st_size
+            settled = False
+            while time.monotonic() - started < 3:
+                assert child.poll() is None, 'capture exited before drain'
+                time.sleep(0.05)
+                now = time.monotonic()
+                size = path.stat().st_size
+                if size != previous_size:
+                    previous_size = size
+                    quiet_since = now
+                if now - started >= 0.5 and now - quiet_since >= 0.25:
+                    settled = True
+                    break
             child.send_signal(signal.SIGINT)
-            child.wait(timeout=3)
+            _, diagnostics = child.communicate(timeout=3)
             out.close()
-            child.stderr.close()
             text = path.read_text()
+            diagnostics = diagnostics.decode(errors='replace')
+            assert settled, {'error': 'capture drain deadline', 'packets': text,
+                             'statistics': diagnostics}
             outgoing = re.findall(r'\s(\S+)\s+Out\s+IP\s'+re.escape(SERVER)+r'\.'+str(PORT)+r'\s*>', text)
-            assert outgoing, text
-            return {'reply_interfaces': outgoing, 'packets': text}
+            assert outgoing, text + '\n' + diagnostics
+            return {'reply_interfaces': outgoing, 'packets': text,
+                    'statistics': diagnostics}
 
         try:
             for ns in (server, client, bridge):
