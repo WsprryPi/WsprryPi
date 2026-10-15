@@ -1,7 +1,8 @@
 # Phase 15.3 management carriers: companion implementation and review
 
-Status: implementation and local software acceptance complete; CI pending. October 15,
-2026. Pico owns the [carrier/access matrix and discovery contract](https://github.com/WsprryPi/WsprryPico/blob/d6208dbc88005383041c5ec306b738db7ec22796/docs/development/phase15-3-management-carriers.md).
+Status: implementation and local software acceptance passed. October 15, 2026.
+Final required CI outcome, remote parity and joint P15.3 closure are retained in
+the [lead acceptance record](https://github.com/WsprryPi/WsprryPico/blob/devel/docs/development/phase15-3-management-carriers.md); this companion record preserves the implementation and local evidence. Pico owns the [carrier/access matrix and discovery contract](https://github.com/WsprryPi/WsprryPico/blob/d6208dbc88005383041c5ec306b738db7ec22796/docs/development/phase15-3-management-carriers.md).
 P15.4 and later work has not started. No hardware, installed service, GPIO or RF
 operation was performed or is qualified by this record.
 
@@ -150,7 +151,7 @@ The final bounded independent reassessment found no remaining actionable
 implementation finding. All six first-round findings were repaired and their
 affected checks rerun. It separately verified the exact-source fixture, source
 guards, current CI invocation and task-only 289-check runtime result. CI is a
-separate acceptance step below.
+separate acceptance step in the lead record.
 
 Exact clean Pico source pairs, with this companion implementation:
 
@@ -205,7 +206,7 @@ Six affected Pico tests and Pi config/API tests passed ASan/UBSan using
 `0bebf8b8c7f07abe3571ded48a11aa907a1ffb20`. The existing RP2350 cross-link
 `cmake --build build/consumer-lan-pico --parallel 2 --target WsprryPico`
 passed with retained SDK `079c6f39023649b154152db30f1d781e884879bc` and Arm GNU
-15.3.1, including post-link budget/topology checks. This was a cross-build; no
+15.3.1, including post-link topology, pool/heap-hook and stack-guard checks. This was a cross-build; no
 native macOS C++ application build or physical firmware load occurred.
 
 Impeccable was used before and during UI changes. Two bounded visual batches
@@ -231,3 +232,22 @@ passed ASan/UBSan without diagnostics, including fixed vectors and all fixture
 negative cases (`consumer-sanitize.log`). The isolated task-only UI `npm test`
 passed after reusing retained `ws` and other JavaScript dependencies; its initial
 missing-module failure was environmental and was rerun.
+
+## Publication and final CI boundary
+
+Implementation commit: `a5605c54630d501dc84b51ea7834f59768a250ef`. Its source
+was checked byte-for-byte against the isolated task-only compiled source before
+commit. It depends on clean Pico `d6208dbc88005383041c5ec306b738db7ec22796`.
+Independent `ls-remote` confirmed its initial origin/devel parity.
+
+[Run 38764100628](https://github.com/WsprryPi/WsprryPi/actions/runs/38764100628)
+passed all three historical profiles, strict I2C and the existing macOS CI
+profile, then was cancelled by concurrent commit
+`c605142e45057080ade6a0905fb6b81281e3a367`. The other three jobs were cancelled,
+not accepted as passes. The successor run is superseded by this record-only
+publication; no full CI success is inferred from either partial run.
+
+The final companion revision includes that independent Chrony work unchanged.
+Its resulting CI must complete before the lead acceptance record closes P15.3.
+No source pin is weakened or changed by this documentation publication. Future
+record-only Pico closure commits are distinct from the tested implementation pin.
