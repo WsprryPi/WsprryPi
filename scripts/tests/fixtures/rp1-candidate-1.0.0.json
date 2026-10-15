@@ -1,0 +1,37 @@
+{
+  "schema": "wsprrypi-rp1-candidate-lock-v1",
+  "repository": "WsprryPi/RP1-GPCLK-DKMS",
+  "sourceCommit": "51b8012a4ca2f01576805a81f4b50519b5b786d3",
+  "sourceTree": "8574c0fa6f542b84cf8705127b0bd4779b4f5f1d",
+  "productVersion": "1.0.0",
+  "debianVersion": "1.0.0-1",
+  "classification": "candidate",
+  "published": false,
+  "qualification": false,
+  "compatibilityIdentities": {
+    "gpio4": "v1.0.0-rp1-gpio4",
+    "gpio20": "v1.0.0-rp1-gpio20"
+  },
+  "uapiSha256": {
+    "consumer": "4af14cdf60471ac4b318b10d7d70824a63c74029c2934e86bbdcd1b7f06cf633",
+    "controller": "52f34e567f06350eb3231049c1a456b30b92cc7d37bbb13ff948d1471aee926e"
+  },
+  "overlaySha256": {
+    "gpio4": "96b157b50961ebf74915f84186494f9a0d5427faa59bf9729a8bd4c95dc5f681",
+    "gpio20": "b43691796628e4675f9f8cae8aef187cc670b3f7a3713cb67e352ee585c53713"
+  },
+  "runtime": {
+    "binding": "rp1-gpclk-runtime-binding-v3",
+    "readiness": "rp1-gpclk-runtime-readiness-v1",
+    "update": "rp1-gpclk-runtime-update-v1"
+  },
+  "assets": {
+    "SHA256SUMS": "aef5df4328cfc436af9625e038ae35b790bc4076d0104d8173b6f0d3e02e7453",
+    "candidate-validation.json": "6d16b001fcf9b743577e526aed97007da07d17fc4b8d687cb9a2602ed2fb9b25",
+    "release-metadata.json": "17acf415cbbe4fef5644d39d5fba94b65256ee09b043758cf95bf45c955fcaa2",
+    "rp1-gpclk-compatibility-manifest.json": "ad91a5c1fc296c0617c3ab1fc32de0ce6db70ce989c7db695e9f7af463e386f2",
+    "rp1-gpclk-dkms-1.0.0.tar.gz": "341466a5b9d2aab10d498be4b24fe1e634927e9b906f0b87d7bb9c69c066b741",
+    "rp1-gpclk-dkms-installation-manifest-v1.json": "c101eb12f8cfcda25e9c1c1442b439bccc860168627a3ebc7ab859ef368a40e3",
+    "rp1-gpclk-dkms_1.0.0-1_all.deb": "3d101fd4c8cd733f7463ded128ba88bd2d9e9df3343de277af6fb6bb375d3177"
+  }
+}

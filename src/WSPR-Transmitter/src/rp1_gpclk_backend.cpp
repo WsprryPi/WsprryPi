@@ -28,6 +28,11 @@ bool Rp1GpclkBackend::prepare(
     std::uint64_t required_capabilities,
     std::string& error)
 {
+    if (cleanup_fault_)
+    {
+        error = cleanup_error_;
+        return false;
+    }
     if (acquired_)
     {
         error = "RP1 GPCLK backend is already prepared.";
@@ -78,26 +83,54 @@ bool Rp1GpclkBackend::requestStop(std::string& error)
 bool Rp1GpclkBackend::cancel(std::string& error) { return requestStop(error); }
 bool Rp1GpclkBackend::timedOut(std::string& error) { return requestStop(error); }
 
-bool Rp1GpclkBackend::cleanup(std::string& error)
+bool Rp1GpclkBackend::cleanup(std::string& error, bool provider_cleanup_fault)
 {
+    if (provider_cleanup_fault) {
+        cleanup_fault_ = true;
+        cleanup_error_ = "RP1 GPCLK provider reported a latched cleanup fault.";
+    }
     if (!acquired_)
-        return true;
+    {
+        error = cleanup_error_;
+        return !cleanup_fault_;
+    }
     if (in_flight_)
     {
-        const auto state = provider_.eventState(generation_).completion;
-        if (state != Rp1GpclkCompletionState::complete &&
-            state != Rp1GpclkCompletionState::failed)
+        const auto state = provider_.eventState(generation_);
+        if (state.cleanup_fault) {
+            cleanup_fault_ = true;
+            cleanup_error_ = state.error.empty()
+                ? "RP1 GPCLK provider reported a latched cleanup fault."
+                : state.error;
+        }
+        if (state.completion != Rp1GpclkCompletionState::complete &&
+            state.completion != Rp1GpclkCompletionState::failed)
         {
             error = "RP1 GPCLK descriptor is still draining.";
             return false;
         }
         in_flight_ = false;
     }
-    if (!provider_.release(error))
-        return false;
+    return closeAfterFailure(error);
+}
+
+bool Rp1GpclkBackend::closeAfterFailure(std::string& error, bool unproven_cleanup)
+{
+    if (unproven_cleanup) {
+        cleanup_fault_ = true;
+        cleanup_error_ = "RP1 GPCLK terminal quiescence was not established.";
+    }
+    std::string detail;
+    if ((acquired_ || !provider_.endpointClosed() || provider_.leaseId() != 0) &&
+        !provider_.release(detail)) {
+        cleanup_fault_ = true;
+        cleanup_error_ = detail;
+    }
+    in_flight_ = false;
     drive_ma_ = 0;
     acquired_ = false;
-    return true;
+    error = cleanup_error_;
+    return !cleanup_fault_;
 }
 
 std::uint64_t Rp1GpclkBackend::generation() const noexcept { return generation_; }

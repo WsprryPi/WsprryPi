@@ -345,6 +345,84 @@ run_bounded_absolute_cmd() {
   fi
 }
 
+collect_rp1_record_summary() {
+  run_bounded_absolute_cmd rp1_gpclk_ownership_identity "$RP1_PYTHON" -I - "$RP1_INSTALLATION_RECORD" <<'PY_RP1_IDENTITY'
+import json, os, re, stat, sys
+OWNER_UID = 0
+
+def pairs(items):
+    value = {}
+    for key, item in items:
+        if key in value: raise ValueError('duplicate field')
+        value[key] = item
+    return value
+
+def summarize(value):
+    if (not isinstance(value, dict) or value.get('owner') != 'WsprryPi' or
+        value.get('repository') != 'WsprryPi/RP1-GPCLK-DKMS' or
+        value.get('schema') not in ('wsprrypi-rp1-gpclk-dkms-ownership-v2',
+                                   'wsprrypi-rp1-gpclk-dkms-ownership-v3') or
+        value.get('channel') not in ('development', 'release') or
+        value.get('qualificationClaim') is not False):
+        raise ValueError('untrusted record')
+    manifest = value.get('manifest', {})
+    if not isinstance(manifest, dict): raise ValueError('invalid manifest')
+    result = {'status': 'recorded-only', 'liveValidated': False,
+              'selection': value['channel'], 'qualificationEstablished': False,
+              'publicationVerified': False}
+    fields = {'sourceCommit': (value.get('sourceCommit'), '[0-9a-f]{40}'),
+              'sourceTree': (value.get('sourceTree'), '[0-9a-f]{40}'),
+              'productVersion': (value.get('productVersion', manifest.get('productVersion')), r'[0-9]+\.[0-9]+\.[0-9]+'),
+              'debianVersion': (manifest.get('debianVersion'), r'[0-9]+\.[0-9]+\.[0-9]+-[0-9]+'),
+              'recordedReleaseTag': (value.get('tag'), r'v[0-9]+\.[0-9]+\.[0-9]+'),
+              'consumerUapiSha256': (value.get('uapiSha256', manifest.get('uapi', {}).get('sha256'))
+                   if isinstance(manifest.get('uapi', {}), dict) else None, '[0-9a-f]{64}')}
+    for key, (item, pattern) in fields.items():
+        if item is not None:
+            if not isinstance(item, str) or re.fullmatch(pattern, item) is None:
+                raise ValueError('invalid identity')
+            result[key] = item
+    runtime = value.get('runtime', {})
+    if not isinstance(runtime, dict): raise ValueError('invalid runtime')
+    for key in ('bindingSha256', 'artifactSetSha256'):
+        item = runtime.get(key)
+        if item is not None:
+            if not isinstance(item, str) or re.fullmatch('[0-9a-f]{64}', item) is None:
+                raise ValueError('invalid runtime identity')
+            result[key] = item
+    identities = runtime.get('compatibilityIdentities', {})
+    if not isinstance(identities, dict): raise ValueError('invalid route identities')
+    result['compatibilityIdentities'] = {}
+    for route in ('gpio4', 'gpio20'):
+        if route in identities:
+            item = identities[route]
+            if not isinstance(item, str) or re.fullmatch(r'v[0-9]+\.[0-9]+\.[0-9]+-rp1-'+route, item) is None:
+                raise ValueError('invalid route identity')
+            result['compatibilityIdentities'][route] = item
+    return result
+
+def read_summary(path):
+    try:
+        fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+        try:
+            info = os.fstat(fd)
+            if (not stat.S_ISREG(info.st_mode) or info.st_uid != OWNER_UID or
+                info.st_mode & 0o077 or info.st_size > 4*1024*1024):
+                raise ValueError('untrusted record file')
+            with os.fdopen(fd, 'rb', closefd=False) as stream: data = stream.read(4*1024*1024+1)
+            if len(data) > 4*1024*1024: raise ValueError('read bound')
+        finally: os.close(fd)
+        return summarize(json.loads(data, object_pairs_hook=pairs))
+    except FileNotFoundError: return {'status': 'absent'}
+    except (OSError, ValueError, TypeError, KeyError): return {'status': 'unavailable-or-invalid'}
+
+if __name__ == '__main__':
+    print(json.dumps({'contract': 'wsprrypi-rp1-ownership-diagnostics-v1',
+        'installation': read_summary(sys.argv[1]),
+        'pendingRemoval': read_summary(sys.argv[1]+'.removal-pending')}))
+PY_RP1_IDENTITY
+}
+
 safe_root_owned_regular_file() {
   local path="$1" owner mode
   [[ -f "$path" && ! -L "$path" ]] || return 1
@@ -1175,6 +1253,7 @@ else
   echo "WsprryPi installation record absent or inaccessible" \
     > "${OUT_DIR}/hardware/rp1-gpclk/wsprrypi-installation-record.txt"
 fi
+collect_rp1_record_summary
 if safe_root_owned_regular_file "$RP1_RUNTIME_PROVIDER"; then
   run_bounded_absolute_cmd rp1_gpclk_runtime_provider_inspect \
     "$RP1_PYTHON" "$RP1_RUNTIME_PROVIDER" inspect
@@ -1191,7 +1270,7 @@ run_cmd rp1_gpclk_route_journals sh -c "find /var/lib/rp1-gpclk-dkms/route-trans
 {
   echo "Provider provisioning and package identity: external to WsprryPi"
   echo "DKMS registration and kernel-specific module identity: captured as passive command reports"
-  echo "WsprryPi ownership record: presence only; record contents are not copied"
+  echo "WsprryPi ownership record: bounded identity whitelist; full record contents are not copied"
   echo "Runtime provider readiness: captured through the read-only inspect operation when available"
   echo "Persisted route: GPIO$(ini_value "$INSTALLED_INI" "GPIO" "Transmit Pin" "unavailable")"
   echo "Active route and operation readiness: reported through the runtime provider protocol"

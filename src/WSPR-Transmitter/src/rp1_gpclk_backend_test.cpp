@@ -51,7 +51,7 @@ public:
 
     wsprrypi::Rp1GpclkProviderEventState eventState(
         std::uint64_t) const noexcept override
-    { return {current, 0, 0, 0, 0, 0}; }
+    { return {current, 0, 0, cleanup_fault, 0, 0, cleanup_detail}; }
 
     bool release(std::string&) noexcept override
     {
@@ -62,6 +62,8 @@ public:
     bool acquire_ok{true};
     bool submit_ok{true};
     bool release_ok{true};
+    std::uint32_t cleanup_fault{};
+    std::string cleanup_detail;
     int releases{};
     std::uint64_t next_generation{1};
     wsprrypi::Rp1GpclkCompletionState current{
@@ -152,6 +154,23 @@ void test_failures()
     wsprrypi::Rp1GpclkBackend third(release_failure);
     expect(prepare(third, 2, error) && !third.cleanup(error),
         "release failure must remain visible");
+    release_failure.release_ok = true;
+    expect(!third.cleanup(error) && !prepare(third, 2, error),
+        "later cleanup or prepare must not clear a latched release failure");
+
+    Provider terminal_fault;
+    wsprrypi::Rp1GpclkBackend fourth(terminal_fault);
+    expect(prepare(fourth, 2, error) && fourth.emitEvents(program(), error),
+        "terminal cleanup fault fixture must submit");
+    terminal_fault.current = wsprrypi::Rp1GpclkCompletionState::failed;
+    terminal_fault.cleanup_fault = 1;
+    terminal_fault.cleanup_detail = "final state poll EIO detail";
+    expect(!fourth.cleanup(error) && terminal_fault.releases == 1 &&
+        error.find("final state poll EIO detail") != std::string::npos,
+        "cleanup's own terminal observation must retain and latch its fault");
+    terminal_fault.cleanup_fault = 0;
+    expect(!fourth.cleanup(error) && !prepare(fourth, 2, error),
+        "a later clean poll must not erase a terminal cleanup fault");
 }
 }
 

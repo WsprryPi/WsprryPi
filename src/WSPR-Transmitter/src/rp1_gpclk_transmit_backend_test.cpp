@@ -2,6 +2,8 @@
 #include "rp1_gpclk_planner.hpp"
 #include "rp1_gpclk_uapi.h"
 #include "wspr_transmit.hpp"
+#include "execution_plan_compiler.hpp"
+#include <stdexcept>
 
 #include <cmath>
 #include <iostream>
@@ -34,26 +36,29 @@ public:
     std::vector<std::size_t> progress;
 };
 
-class Provider final : public wsprrypi::Rp1GpclkProvider
+class Provider : public wsprrypi::Rp1GpclkProvider
 {
 public:
     bool query(std::uint32_t route, std::uint64_t capabilities, bool,
         wsprrypi::Rp1GpclkProviderIdentity& identity, std::string&) override {
+        if (throw_query) throw std::runtime_error("provider query EOPNOTSUPP detail");
         identity.route=route;
         identity.compatibility_state=RP1_GPCLK_COMPAT_EXPERIMENTAL;
         identity.capabilities=capabilities; identity.module_id="rp1-gpclk-dkms";
-        identity.build_id="1.1.2";
+        identity.build_id="1.0.0";
         identity.compatibility_id=route==RP1_GPCLK_ROUTE_GPIO20
-            ? "external-provider-gpio20" : "external-provider-gpio4";
+            ? "v1.0.0-rp1-gpio20" : "v1.0.0-rp1-gpio4";
         return true;
     }
     bool acquire(std::uint32_t route, std::uint64_t capabilities,
         std::string& error) override {
+        if (throw_acquire) throw std::runtime_error("provider acquire EBUSY detail");
         if (fail_acquire) { error=acquire_error; endpoint_closed=true; lease_id=0; return false; }
         acquired_route=route; required_capabilities=capabilities; acquired=true;
         endpoint_closed=false; lease_id=41; return true;
     }
     bool submitEvents(wsprrypi::Rp1GpclkProviderEventProgram& value, std::string& error) override {
+        if (throw_submit) throw std::runtime_error("provider submit EINVAL detail");
         if (fail_submit) { error=submit_error; return false; }
         value.generation=1;
         event_program=value; submitted=true; state_value=completion_after_submit; return true;
@@ -82,6 +87,7 @@ public:
     std::uint64_t lease_id{};
     std::string release_error{"injected release failure"};
     bool fail_acquire{},fail_submit{};
+    bool throw_query{},throw_acquire{},throw_submit{};
     std::string acquire_error{"injected acquire failure"};
     std::string submit_error{"injected submit ENOTTY"};
     wsprrypi::Rp1GpclkProviderEventProgram event_program{};
@@ -129,9 +135,9 @@ wsprrypi::BackendExecutionInputs developmentInputs(int drive=2, int gpio=4)
         RP1_GPCLK_CAP_ROUTE_IDENTITY | RP1_GPCLK_CAP_COMPAT_IDENTITY |
         RP1_GPCLK_CAP_CLEANUP_FAULT_LATCH | RP1_GPCLK_CAP_OUTPUT_INHIBIT |
         RP1_GPCLK_CAP_PASSIVE_SNAPSHOT | RP1_GPCLK_CAP_BOUNDED_DMA_CHUNKS;
-    identity.module_id="rp1-gpclk-dkms"; identity.build_id="1.1.2";
+    identity.module_id="rp1-gpclk-dkms"; identity.build_id="1.0.0";
     identity.compatibility_id=gpio==20
-        ? "external-provider-gpio20" : "external-provider-gpio4";
+        ? "v1.0.0-rp1-gpio20" : "v1.0.0-rp1-gpio4";
     return inputs;
 }
 
@@ -256,11 +262,227 @@ void test_direct_band_range()
                 "finite tones must preserve their duration as generic events");
     }
 }
+
+class ChunkProvider final : public Provider
+{
+public:
+    std::uint64_t* now{};
+    mutable std::uint64_t last_elapsed{};
+    mutable std::uint64_t terminal_elapsed{};
+    bool poll_failure{}, owner_close{}, never_complete{}, never_drain{}, fail_stop{};
+    bool requestFiniteStop(std::uint64_t, std::string& error) override {
+        if (fail_stop) { error = "provider STOP EIO detail"; return false; }
+        stopped = true;
+        terminal_elapsed = ((*now + 999999999ULL) / 1000000000ULL) * 1000000000ULL;
+        return true;
+    }
+    wsprrypi::Rp1GpclkProviderEventState eventState(std::uint64_t) const noexcept override {
+        using S = wsprrypi::Rp1GpclkCompletionState;
+        last_elapsed = std::min(*now, event_program.total_duration_ns);
+        if (poll_failure && *now >= 3500000000ULL)
+            return {S::failed, 0, RP1_GPCLK_REASON_INTERNAL_ERROR, 1, last_elapsed, 0,
+                    "provider GET_STATE EIO detail"};
+        if (owner_close && *now >= 3500000000ULL) {
+            if (*now < 4000000000ULL)
+                return {S::draining, 0, RP1_GPCLK_REASON_NONE, 0, last_elapsed,
+                        event_program.total_duration_ns - last_elapsed};
+            return {S::complete, 0, RP1_GPCLK_REASON_OWNER_CLOSED, 0, last_elapsed,
+                    event_program.total_duration_ns - last_elapsed};
+        }
+        if (stopped && !never_drain && *now >= terminal_elapsed)
+            return {S::complete, 0, RP1_GPCLK_REASON_STOPPED, 0,
+                    std::min(terminal_elapsed, event_program.total_duration_ns),
+                    event_program.total_duration_ns - std::min(terminal_elapsed, event_program.total_duration_ns)};
+        if (!never_complete && *now >= event_program.total_duration_ns)
+            return {S::complete, 0, RP1_GPCLK_REASON_COMPLETE, 0, last_elapsed, 0};
+        return {stopped ? S::draining : S::running, 0, RP1_GPCLK_REASON_NONE, 0,
+                last_elapsed, event_program.total_duration_ns - last_elapsed};
+    }
+};
+
+void test_eight_second_product_plan()
+{
+    wsprrypi::ExecutionPlanCompiler compiler;
+    for (int gpio : {4, 20}) {
+        for (std::uint64_t stop_ns : {0ULL, 10000000ULL, 3990000000ULL,
+                                      4000000000ULL, 7990000000ULL}) {
+            wsprrypi::TransmissionRequest request;
+            request.mode = wsprrypi::TransmissionMode::TONE;
+            request.output.backend = wsprrypi::BackendKind::RP1_GPCLK;
+            request.output.gpio = gpio;
+            request.payload = wsprrypi::TonePayload{14097100.0, std::chrono::seconds{8}, {}};
+            auto plan = compiler.compile(request);
+            plan.id.value = 8000 + gpio;
+            expect(plan.events.front().duration == std::chrono::seconds{8} &&
+                   plan.duration_was_explicit,
+                   "real finite-TONE compiler must preserve exactly eight seconds");
+            Owner owner;
+            std::uint64_t now = 0;
+            auto provider = std::make_unique<ChunkProvider>();
+            auto* observed = provider.get(); observed->now = &now;
+            WsprRp1GpclkBackend::ExecutionClock clock;
+            clock.now = [&] { return std::chrono::steady_clock::time_point{std::chrono::nanoseconds{now}}; };
+            clock.wait = [&](std::chrono::milliseconds delay) {
+                now += std::chrono::duration_cast<std::chrono::nanoseconds>(delay).count();
+                if (stop_ns && now >= stop_ns) owner.stop = true;
+            };
+            WsprRp1GpclkBackend backend(owner, std::move(provider), clock);
+            expect(backend.configure(plan, developmentInputs(2, gpio)).ok, "eight-second candidate plan configures");
+            const auto result = backend.execute(plan);
+            const auto record = wsprrypi::rp1GpclkOperationRecordSnapshot();
+            expect(result.ok && result.stopped == (stop_ns != 0), "completion/STOP must follow the full finite lifecycle");
+            expect(observed->event_program.total_duration_ns == 8000000000ULL,
+                   "production adapter must submit all eight seconds in one logical event program");
+            expect(record.terminal_reason == (stop_ns ? RP1_GPCLK_REASON_STOPPED : RP1_GPCLK_REASON_COMPLETE),
+                   "finite completion must retain the exact provider terminal reason");
+            expect(record.endpoint_closed && record.lease == 0 && record.cleanup_complete,
+                   "terminal record must prove endpoint/lease release after bounded drain");
+            expect(!stop_ns ? now == 8000000000ULL : now <= stop_ns + 1000000000ULL,
+                   "no two-second truncation; cancellation drains only the current one-second chunk");
+            expect(owner.progress.size() >= (stop_ns ? 1U : 800U),
+                   "application must keep polling and owning the operation through every chunk");
+            expect(!backend.execute(plan).ok, "a successor requires fresh configure and operation reconciliation");
+            expect(backend.cleanup().ok, "finite cleanup is idempotent");
+        }
+    }
+    for (const auto mode : {wsprrypi::TransmissionMode::QRSS, wsprrypi::TransmissionMode::FSKCW,
+                            wsprrypi::TransmissionMode::DFCW}) {
+        auto plan = mode == wsprrypi::TransmissionMode::QRSS ? qrssPlan() : twoTonePlan(mode, true);
+        plan.events[0].duration = std::chrono::seconds{180};
+        plan.events[1].offset_from_start = plan.events[0].duration;
+        if (plan.events.size() > 2) plan.events[2].offset_from_start = plan.events[1].offset_from_start + plan.events[1].duration;
+        plan.summary.total_duration = plan.events.back().offset_from_start + plan.events.back().duration;
+        const auto compiled = wsprrypi::compileRp1GpclkEventProgram(plan);
+        expect(compiled.ok && compiled.program.total_duration_ns > 120000000000ULL,
+               "long QRSS-family plans must not inherit a 120-second total limit");
+    }
+}
+
+void test_provider_exception_containment()
+{
+    for (int stage : {0, 1, 2, 3, 4}) {
+        Owner owner;
+        auto provider = std::make_unique<Provider>();
+        auto* observed = provider.get();
+        observed->throw_query = stage == 0;
+        observed->throw_acquire = stage == 1;
+        observed->throw_submit = stage == 2;
+        WsprRp1GpclkBackend backend(owner, std::move(provider));
+        if (stage == 0) {
+            const auto startup = backend.quiesceForStartup();
+            expect(!startup.ok && startup.error.find("EOPNOTSUPP detail") != std::string::npos,
+                "startup provider exceptions must become detailed quiescence failures");
+        }
+        if (stage == 3) backend.setScheduledExecutionHooks({[]() -> bool {
+            throw std::runtime_error("provider admission callback detail"); }, {}, {}, true});
+        if (stage == 4) backend.setScheduledExecutionHooks({[] { return true; }, [] {
+            throw std::runtime_error("provider output observation callback detail"); }, {}, true});
+        auto plan = tonePlan(true);
+        expect(backend.configure(plan, developmentInputs()).ok, "rejection regression configures");
+        const auto result = backend.execute(plan);
+        expect(!result.ok && result.error.find("detail") != std::string::npos,
+               "provider/callback exceptions become detailed failures without process termination");
+        expect(observed->endpoint_closed && observed->lease_id == 0,
+               "exception containment must close its owned endpoint");
+        expect(backend.cleanup().ok, "exception cleanup remains bounded");
+    }
+}
+
+void test_eight_second_failure_lifecycle()
+{
+    for (int gpio : {4, 20})
+    for (const std::string stage : {"prepare", "submit", "poll", "owner-close", "service-stop",
+                                   "timeout", "drain-timeout", "stop-refused", "cleanup"}) {
+        wsprrypi::TransmissionRequest request;
+        request.mode = wsprrypi::TransmissionMode::TONE;
+        request.output.backend = wsprrypi::BackendKind::RP1_GPCLK;
+        request.output.gpio = gpio;
+        request.payload = wsprrypi::TonePayload{14097100.0, std::chrono::seconds{8}, {}};
+        auto plan = wsprrypi::ExecutionPlanCompiler{}.compile(request);
+        plan.id.value = 16000 + gpio;
+        Owner owner;
+        std::uint64_t now = 0;
+        auto provider = std::make_unique<ChunkProvider>();
+        auto* observed = provider.get(); observed->now = &now;
+        observed->fail_acquire = stage == "prepare";
+        observed->fail_submit = stage == "submit";
+        observed->poll_failure = stage == "poll";
+        observed->owner_close = stage == "owner-close";
+        observed->never_complete = stage == "timeout" || stage == "drain-timeout";
+        observed->never_drain = stage == "drain-timeout";
+        observed->fail_stop = stage == "stop-refused";
+        observed->release_ok = stage != "cleanup";
+        WsprRp1GpclkBackend* running = nullptr;
+        WsprRp1GpclkBackend::ExecutionClock clock;
+        clock.now = [&] { return std::chrono::steady_clock::time_point{std::chrono::nanoseconds{now}}; };
+        clock.wait = [&](std::chrono::milliseconds delay) {
+            now += std::chrono::duration_cast<std::chrono::nanoseconds>(delay).count();
+            const auto record = wsprrypi::rp1GpclkOperationRecordSnapshot();
+            expect(record.execution_authorized && record.operation_id == "test-operation",
+                   "scheduler must retain the exact operation until terminal cleanup");
+            if (now >= 3990000000ULL && (stage == "service-stop" || stage == "stop-refused")) running->stop();
+        };
+        WsprRp1GpclkBackend backend(owner, std::move(provider), clock); running = &backend;
+        expect(backend.configure(plan, developmentInputs(2, gpio)).ok, "finite failure fixture configures");
+        const auto result = backend.execute(plan);
+        const auto record = wsprrypi::rp1GpclkOperationRecordSnapshot();
+        expect(result.ok == (stage == "service-stop" || stage == "owner-close"),
+               "orderly STOP and owner-close complete their bounded cancellation lifecycle");
+        expect(record.endpoint_closed && !record.execution_authorized && record.lease == 0,
+               "all bounded terminal paths release local endpoint and operation authority");
+        if (stage == "service-stop")
+            expect(result.stopped && record.terminal_reason == RP1_GPCLK_REASON_STOPPED && now <= 4990000000ULL,
+                   "service STOP drains its current one-second chunk");
+        if (stage == "owner-close") expect(result.stopped && now == 4000000000ULL &&
+                                            record.terminal_reason == RP1_GPCLK_REASON_OWNER_CLOSED,
+                                            "owner close drains to its chunk boundary and retains its exact reason");
+        expect(record.remaining_ns <= 8000000000ULL,
+               "failure fixtures retain bounded logical progress without unsigned underflow");
+        if (stage == "poll") expect(record.provider_detail.find("GET_STATE EIO detail") != std::string::npos,
+                                     "poll rejection retains its underlying diagnostic");
+        if (stage == "timeout") expect(!result.ok && record.state == "timeout" && now < 15000000000ULL,
+                                        "deadline STOP is a bounded failure, never a completed tone");
+        if (stage == "drain-timeout") expect(record.state == "drain-timeout" && now < 20000000000ULL,
+                                              "unproven drain closes locally within the finite bound");
+        const bool fault = record.cleanup_fault;
+        const auto cleanup = backend.cleanup();
+        expect(cleanup.ok == !fault, "cleanup fault remains latched across repeated cleanup");
+        expect(!backend.execute(plan).ok, "terminal failure cannot schedule a successor without fresh configure");
+        const auto retained = wsprrypi::rp1GpclkOperationRecordSnapshot();
+        expect(retained.terminal_reason == record.terminal_reason && retained.cleanup_fault == fault,
+               "later calls retain the exact terminal reason and cleanup fault");
+    }
+}
+
+void test_older_backend_cannot_replace_new_terminal_evidence()
+{
+    Owner owner;
+    auto failed_provider = std::make_unique<Provider>();
+    failed_provider->release_ok = false;
+    auto older = std::make_unique<WsprRp1GpclkBackend>(owner, std::move(failed_provider));
+    auto plan = tonePlan(true);
+    expect(older->configure(plan, developmentInputs()).ok, "older operation configures");
+    expect(!older->execute(plan).ok, "older operation retains its cleanup fault");
+    WsprRp1GpclkBackend newer(owner, std::make_unique<Provider>());
+    expect(newer.configure(plan, developmentInputs()).ok && newer.execute(plan).ok,
+           "independent fresh reconciled fixture completes its own operation");
+    const auto before = wsprrypi::rp1GpclkOperationRecordSnapshot();
+    older.reset();
+    const auto after = wsprrypi::rp1GpclkOperationRecordSnapshot();
+    expect(after.state == before.state && after.cleanup_fault == before.cleanup_fault &&
+           after.provider_detail == before.provider_detail && after.cleanup_complete,
+           "destruction of an older backend must preserve the newer terminal record");
+}
+
 }
 
 int main()
 {
     test_direct_band_range();
+    test_eight_second_product_plan();
+    test_provider_exception_containment();
+    test_eight_second_failure_lifecycle();
+    test_older_backend_cannot_replace_new_terminal_evidence();
     {
         Owner scheduled_owner;
         auto scheduled_provider = std::make_unique<Provider>();
@@ -348,7 +570,7 @@ int main()
     const auto operation_record=wsprrypi::rp1GpclkOperationRecordSnapshot();
     expect(operation_record.schema_version==2, "operation record schema must expose failure detail");
     expect(operation_record.operation_id=="test-operation", "operation record must preserve operation identity");
-    expect(operation_record.module_version=="1.1.2", "operation record must preserve module version");
+    expect(operation_record.module_version=="1.0.0", "operation record must preserve module version");
     expect(operation_record.route==RP1_GPCLK_ROUTE_GPIO4, "operation record must preserve route");
     expect(operation_record.generation==1, "operation record must preserve generation");
     expect(operation_record.state=="complete", "operation record must preserve terminal completion");
@@ -480,7 +702,7 @@ int main()
         "provider-failure frame must configure");
     const auto provider_failure=provider_failure_backend.execute(plan);
     expect(!provider_failure.ok && provider_failure.faulted &&
-        provider_failure.cleanup_attempted && provider_failure.cleanup.ok &&
+        provider_failure.cleanup_attempted && !provider_failure.cleanup.ok &&
         provider_failure.error.find("pinctrl-failed (11)")!=std::string::npos &&
         provider_failure.error.find("cleanup fault")!=std::string::npos,
         "provider failure must preserve terminal reason and cleanup state");

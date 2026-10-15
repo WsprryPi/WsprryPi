@@ -69,6 +69,7 @@ struct Rp1GpclkProviderEventState
     std::uint32_t cleanup_fault{0};
     std::uint64_t elapsed_ns{0};
     std::uint64_t remaining_ns{0};
+    std::string error{};
 };
 
 struct Rp1GpclkPassiveSnapshot
@@ -146,7 +147,8 @@ public:
     bool emitEvents(Rp1GpclkProviderEventProgram program, std::string& error);
     bool cancel(std::string& error);
     bool timedOut(std::string& error);
-    bool cleanup(std::string& error);
+    bool cleanup(std::string& error, bool provider_cleanup_fault = false);
+    bool closeAfterFailure(std::string& error, bool unproven_cleanup = false);
 
     static bool validDrive(std::uint32_t drive_ma) noexcept;
     std::uint64_t generation() const noexcept;
@@ -159,6 +161,8 @@ private:
     std::uint64_t generation_{0};
     bool acquired_{false};
     bool in_flight_{false};
+    bool cleanup_fault_{false};
+    std::string cleanup_error_;
 };
 
 } // namespace wsprrypi

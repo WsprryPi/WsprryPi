@@ -108,6 +108,16 @@ An End recovering uncertain cleanup reports the cleanup result explicitly and
 does not resume prior work; successful recovery can have `stopped=true` with
 `tone_was_active=false`.
 
+For RP1 execution, provider rejection becomes an operation failure with its
+underlying diagnostic. The finite plan retains its complete duration through
+the provider's one-second execution chunks. STOP requests bounded drain; a
+deadline-expired operation remains failed even if that drain succeeds. Cleanup
+failure stays latched and prevents renewed output without recovery. These
+software observations do not attest RF inactivity or physical qualification.
+RP1-enabled status includes `rp1_last_operation` with timing, terminal reason,
+provider detail, local endpoint state and cleanup evidence. It identifies the
+last operation, and exposes lease presence without its token.
+
 Configuration reloads and saved web edits during Test Tone defer runtime
 application until cleanup, retaining the committed backend, mode, frequency,
 and selector snapshot. Saved repair/reset operations follow the same rule.

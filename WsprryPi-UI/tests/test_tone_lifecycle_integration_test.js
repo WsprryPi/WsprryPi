@@ -215,9 +215,18 @@ async function browserTest() {
         stopped: false, message: "Cleanup remains uncertain; use End to recover.",
         test_tone: status(21, "unknown") });
     ok(testToneLifecycleState === "unknown" && !node("testToneEnd").disabled, "failed End remains recovery, never active certainty");
+    const providerDetail = "RP1 GPCLK GET_STATE refused: Input/output error. Cleanup remains unconfirmed. Use End to retry cleanup. <provider-detail>";
+    const providerDraft = node("testToneFrequencyHz").value;
+    reconnected.message({ command: "test_tone_status",
+        test_tone: status(22, "unknown", false, providerDetail, "failed") });
+    ok(node("testToneExecutionResult").textContent.includes(providerDetail), "provider refusal detail remains visible");
+    ok(!node("testToneExecutionResult").querySelector("provider-detail"), "provider detail is rendered as text");
+    ok(node("testToneFrequencyHz").value === providerDraft && !node("testToneEnd").disabled,
+       "provider refusal preserves the operator draft and cleanup recovery: " + JSON.stringify({
+           before: providerDraft, after: node("testToneFrequencyHz").value, endDisabled: node("testToneEnd").disabled }));
     clearWebSocketReconnectTimer();
     window.toneVisual = { status, accepted };
-    return { assertions: "passed", workflows: 16 };
+    return { assertions: "passed", workflows: 17 };
 }
 
 async function main() {
@@ -249,7 +258,7 @@ async function main() {
         }, "Maintenance scripts");
         const run = await client.send("Runtime.evaluate", { expression: `(${browserTest.toString()})()`, awaitPromise: true, returnByValue: true });
         if (run.exceptionDetails) throw new Error(run.exceptionDetails.exception?.description || run.exceptionDetails.text);
-        assert.deepEqual(run.result.value, { assertions: "passed", workflows: 16 });
+        assert.deepEqual(run.result.value, { assertions: "passed", workflows: 17 });
         const inputFocus = await client.send("Runtime.evaluate", { expression: `
             document.getElementById('testToneSourceCustom').checked=true;
             document.getElementById('testToneSourceBand').checked=false;
@@ -271,6 +280,7 @@ async function main() {
                 ["active-difference", `testToneLatestRevision=-1; testToneCommittedDetails='Committed on 20m at exact 14.097100 MHz RF (different from the request). Selector: GPIO 17, active low.'; reconcileTestToneStatus(toneVisual.status(11,'active'));`],
                 ["restored", `testToneLatestRevision=-1; reconcileTestToneStatus(toneVisual.status(12,'ended',false,'Test Tone ended; previous CLI direct tone restored (startup requested).','direct_tone'));`],
                 ["recovery", `testToneLatestRevision=-1; reconcileTestToneStatus(toneVisual.status(13,'unknown',false,'Test Tone ended; direct tone restoration failed. Output cleanup is unconfirmed. Use End or local recovery.','failed'));`],
+                ["provider-refusal", `testToneLatestRevision=-1; reconcileTestToneStatus(toneVisual.status(14,'unknown',false,'RP1 GPCLK GET_STATE refused: Input/output error. Cleanup remains unconfirmed. Use End to retry cleanup.','failed'));`],
             ]) {
                 const r = await client.send("Runtime.evaluate", { expression: `(() => { document.documentElement.setAttribute('data-bs-theme', '${theme}'); ${expression}
                     const modal=document.getElementById('testToneModal'); const result=document.getElementById('testToneExecutionResult');
@@ -296,7 +306,7 @@ async function main() {
         const shot = await client.send("Page.captureScreenshot", { format: "png" });
         fs.writeFileSync(path.join(evidence, "dark-mobile-200-percent.png"), Buffer.from(shot.data, "base64"));
         fs.writeFileSync(path.join(evidence, "measurements.json"), JSON.stringify({ run: run.result.value, measurements, textZoom: zoom.result.value }, null, 2));
-        console.log(`Test Tone browser: 16 workflows passed; 17 screenshots in ${evidence}`);
+        console.log(`Test Tone browser: 17 workflows passed; 21 screenshots in ${evidence}`);
     } catch (error) { failure = error; }
     finally {
         const errors = failure ? [failure] : [];

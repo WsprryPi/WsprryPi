@@ -43,8 +43,8 @@ struct Io final : wsprrypi::Rp1GpclkIo
         query.max_request_duration_ns = RP1_GPCLK_REQUEST_DURATION_NS_MAX;
         query.dma_chunk_duration_ns = RP1_GPCLK_DMA_CHUNK_DURATION_NS;
         std::strcpy(query.module_id, "rp1-gpclk-dkms");
-        std::strcpy(query.build_id, "development");
-        std::strcpy(query.compatibility_id, "rp1-structural-gpio4");
+        std::strcpy(query.build_id, "1.0.0");
+        std::strcpy(query.compatibility_id, "v1.0.0-rp1-gpio4");
 
         snapshot.header.size = sizeof(snapshot);
         snapshot.route = query.route;
@@ -120,6 +120,7 @@ struct Io final : wsprrypi::Rp1GpclkIo
             value->remaining_ns = remaining_ns;
             if (stale_generation) ++value->generation;
             if (foreign_lease) ++value->lease_id;
+            if (malformed_state) value->reserved[0] = 1;
         }
         else if (request == RP1_GPCLK_IOC_STOP)
             stop = *static_cast<rp1_gpclk_stop*>(argument);
@@ -159,6 +160,7 @@ struct Io final : wsprrypi::Rp1GpclkIo
     bool foreign_lease{};
     bool malformed_query_size{};
     bool nonzero_acquire_reserved{};
+    bool malformed_state{};
 };
 
 wsprrypi::Rp1GpclkProviderEventProgram oneSecondProgram()
@@ -186,6 +188,15 @@ void test_query_and_readiness()
         identity.dma_chunk_duration_ns == RP1_GPCLK_DMA_CHUNK_DURATION_NS,
         "QUERY must preserve long-duration and bounded-chunk limits");
     expect(io.path == "/dev/rp1-gpclk", "only canonical endpoint may be opened");
+
+    io.snapshot.operation_state = RP1_GPCLK_STATE_COMPLETE;
+    io.snapshot.terminal_reason = RP1_GPCLK_REASON_OWNER_CLOSED;
+    io.snapshot.drain_state = RP1_GPCLK_DRAIN_COMPLETE;
+    expect(provider.query(RP1_GPCLK_ROUTE_GPIO4, kRequired, true, identity, error),
+        "canonical completed owner-close must remain inspectable after bounded drain");
+    io.snapshot.operation_state = RP1_GPCLK_STATE_IDLE;
+    io.snapshot.terminal_reason = RP1_GPCLK_REASON_NONE;
+    io.snapshot.drain_state = RP1_GPCLK_DRAIN_NONE;
 
     io.snapshot.output_inhibited = RP1_GPCLK_OBSERVATION_TRUE;
     expect(!provider.query(RP1_GPCLK_ROUTE_GPIO4, kRequired, true, identity, error),
@@ -261,6 +272,43 @@ void test_acquire_submit_state_stop_release()
         "release must expose closed local endpoint and cleared local lease");
 }
 
+void test_exact_route_version_and_state_rejections()
+{
+    for (const auto route : {RP1_GPCLK_ROUTE_GPIO4, RP1_GPCLK_ROUTE_GPIO20}) {
+        Io io;
+        io.query.route = io.snapshot.route = route;
+        const char* identity = route == RP1_GPCLK_ROUTE_GPIO4 ? "v1.0.0-rp1-gpio4" : "v1.0.0-rp1-gpio20";
+        std::strcpy(io.query.compatibility_id, identity);
+        std::strcpy(io.snapshot.compatibility_id, identity);
+        wsprrypi::Rp1GpclkLinuxProvider provider(io);
+        wsprrypi::Rp1GpclkProviderIdentity observed;
+        std::string error;
+        expect(provider.query(route, kRequired, true, observed, error), "each exact candidate route must query independently");
+        for (const auto wrong : {"v0.9.0-pi5", "v1.0.0-rp1-gpio4", "v1.0.0-rp1-gpio20"}) {
+            if (std::strcmp(wrong, identity) == 0) continue;
+            std::strcpy(io.query.compatibility_id, wrong);
+            expect(!provider.query(route, kRequired, true, observed, error), "legacy or substituted route identity must be rejected");
+        }
+        std::strcpy(io.query.compatibility_id, identity);
+        std::strcpy(io.query.build_id, "0.9.0");
+        expect(!provider.query(route, kRequired, true, observed, error), "stale module version must be rejected");
+        std::strcpy(io.query.build_id, "1.0.0");
+        expect(provider.acquire(route, kRequired, error), "exact version and route restore acquisition");
+        auto program = oneSecondProgram();
+        expect(provider.submitEvents(program, error), "state rejection fixture submits");
+        io.fail_request = RP1_GPCLK_IOC_GET_STATE; io.fail_error = EIO;
+        auto state = provider.eventState(program.generation);
+        expect(state.completion == wsprrypi::Rp1GpclkCompletionState::failed &&
+               state.error.find("Could not get") != std::string::npos,
+               "GET_STATE failure must retain provider detail");
+        io.fail_request = 0; io.malformed_state = true;
+        state = provider.eventState(program.generation);
+        expect(state.completion == wsprrypi::Rp1GpclkCompletionState::failed &&
+               state.error.find("reserved") != std::string::npos,
+               "malformed current state must retain its rejection detail");
+    }
+}
+
 void test_fail_closed_acquire_and_snapshot()
 {
     Io io;
@@ -295,6 +343,7 @@ int main()
 {
     test_query_and_readiness();
     test_acquire_submit_state_stop_release();
+    test_exact_route_version_and_state_rejections();
     test_fail_closed_acquire_and_snapshot();
     if (failures) return 1;
     std::cout << "RP1 GPCLK canonical UAPI provider tests passed\n";
