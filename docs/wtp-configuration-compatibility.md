@@ -11,7 +11,11 @@ GET `/api/v1/member/configuration` is a protected management read, not the host'
 public capabilities projection. It temporarily uses the existing idle HTTPS
 slot, after fresh WTP negotiation. It reads actual Pico capabilities, redacted
 Config and status, plus the advertised application projection where available,
-and verifies a consistent configuration readback. It returns:
+and verifies a consistent configuration readback. The advertised `api_version`
+must be the integer 1; numeric coercion from fractional values is refused.
+Advertised update modes must be strings; unknown string modes can coexist with
+the supported `merge` mode. It
+returns:
 
 ```json
 {

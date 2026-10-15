@@ -173,7 +173,8 @@ PicoHttpResponse pico_configuration_request(const PicoManagementExchange &exchan
       const auto r = exchange(resource, "GET", {}, {}); success(r); return r;
     };
     const auto caps = parsed(read("capabilities"));
-    require(caps.is_object() && caps.value("api_version", 0) == 1, "unsupported_remote_api", 409);
+    require(caps.is_object() && caps.contains("api_version") && caps["api_version"].is_number_integer() &&
+        caps["api_version"] == 1, "unsupported_remote_api", 409);
     auto original = read("config");
     auto configuration = parsed(original);
     require(fields(configuration, {"config"}) && (configuration["config"].is_null() ||
@@ -194,6 +195,7 @@ PicoHttpResponse pico_configuration_request(const PicoManagementExchange &exchan
       require(update.is_object() && update.value("schema", "") == "transmitter-config-update/1" &&
           update.value("path", "") == "/api/v1/config/update" && update.value("method", "") == "POST" &&
           update.contains("modes") && update["modes"].is_array() &&
+          std::all_of(update["modes"].begin(), update["modes"].end(), [](const Json &mode) { return mode.is_string(); }) &&
           std::find(update["modes"].begin(), update["modes"].end(), "merge") != update["modes"].end(),
           "unsupported_configuration_updates", 409);
       for (const auto key : {"max_update_bytes", "max_config_bytes"})

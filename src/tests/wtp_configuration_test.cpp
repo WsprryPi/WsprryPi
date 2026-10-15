@@ -102,6 +102,17 @@ void checks() {
     if (variant == 11) m.race = true;
     CHECK(m.call().status != 200 && m.mutations == 0);
   }
+  for (const auto &version : {Json(1.1), Json(1.0), Json("1"), Json(true), Json(nullptr)}) {
+    Member m; m.modern(); m.caps["api_version"] = version;
+    CHECK(m.call().status != 200 && m.mutations == 0);
+  }
+  for (const auto &modes : {Json::array({"merge", 42}), Json::array({"merge", nullptr})}) {
+    Member m; m.modern(); m.caps["configuration_updates"]["modes"] = modes;
+    CHECK(m.call().status == 409 && m.mutations == 0);
+  }
+  Member future_mode; future_mode.modern();
+  future_mode.caps["configuration_updates"]["modes"] = {"merge", "future"};
+  CHECK(future_mode.call().status == 200 && future_mode.mutations == 1);
   for (const auto key : {"station", "hardware", "recurrence", "capabilities", "reboot_required"}) {
     Member m; m.modern(); m.corrupt_application = [key](Json &j) { j.erase(key); };
     CHECK(m.call().status == 502 && m.mutations == 0);
