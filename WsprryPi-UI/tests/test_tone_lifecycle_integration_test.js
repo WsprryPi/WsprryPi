@@ -5,7 +5,7 @@ const http = require("node:http");
 const net = require("node:net");
 const path = require("node:path");
 const fs = require("node:fs");
-const { spawn } = require("node:child_process");
+const { spawnFixtureChild, waitForSpawn, spawnIsolatedProcess, stopIsolatedProcess, stopChild } = require("./browser_fixture_process.js");
 const WebSocket = require("ws");
 
 const UI_ROOT = path.resolve(__dirname, "..");
@@ -222,15 +222,17 @@ async function browserTest() {
 
 async function main() {
     const phpPort = await freePort(); const debugPort = await freePort();
-    const php = spawn("php", ["-S", `127.0.0.1:${phpPort}`, "-t", "data"], { cwd: UI_ROOT, stdio: "ignore" });
     const profileDir = `/tmp/wsprrypi-tone-browser-${process.pid}`;
     const evidence = process.env.TEST_TONE_EVIDENCE_DIR || "/tmp/wsprrypi-tone-ui-evidence";
     fs.mkdirSync(evidence, { recursive: true });
-    let chromium, client;
+    let chromium, client, php, failure;
     try {
+        php = spawnFixtureChild("php", ["-S", `127.0.0.1:${phpPort}`, "-t", "data"], { cwd: UI_ROOT });
+        await waitForSpawn(php);
         await waitFor(async () => await getStatus(`http://127.0.0.1:${phpPort}/index.php?page=maintenance`) === 200, "PHP fixture");
-        chromium = spawn(process.env.CHROME_BIN || (process.platform === "darwin" ? "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" : "chromium"),
-            ["--headless", "--no-sandbox", "--disable-gpu", `--remote-debugging-port=${debugPort}`, `--user-data-dir=${profileDir}`, "about:blank"], { stdio: "ignore" });
+        chromium = spawnIsolatedProcess(process.env.CHROME_BIN || (process.platform === "darwin" ? "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" : "chromium"),
+            ["--headless", "--no-sandbox", "--disable-gpu", `--remote-debugging-port=${debugPort}`, `--user-data-dir=${profileDir}`, "about:blank"]);
+        await waitForSpawn(chromium);
         const page = await waitFor(async () => (await getJson(`http://127.0.0.1:${debugPort}/json`)).find(item => item.type === "page"), "Chromium");
         client = new CdpClient(page.webSocketDebuggerUrl); await client.open();
         await client.send("Page.enable");
@@ -295,16 +297,17 @@ async function main() {
         fs.writeFileSync(path.join(evidence, "dark-mobile-200-percent.png"), Buffer.from(shot.data, "base64"));
         fs.writeFileSync(path.join(evidence, "measurements.json"), JSON.stringify({ run: run.result.value, measurements, textZoom: zoom.result.value }, null, 2));
         console.log(`Test Tone browser: 16 workflows passed; 17 screenshots in ${evidence}`);
-    } finally {
+    } catch (error) { failure = error; }
+    finally {
+        const errors = failure ? [failure] : [];
         if (client && chromium?.exitCode === null) {
             await Promise.race([client.send("Browser.close").catch(() => {}), new Promise(resolve => setTimeout(resolve, 1000))]);
         }
-        client?.close();
-        await Promise.all([chromium, php].filter(Boolean).map(process => new Promise(resolve => {
-            if (process.exitCode !== null || process.signalCode !== null) return resolve();
-            process.once("exit", resolve); process.kill("SIGTERM");
-        })));
-        fs.rmSync(profileDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
+        for (const cleanup of [() => client?.close(), () => stopIsolatedProcess(chromium), () => stopChild(php),
+            () => fs.rmSync(profileDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })]) {
+            try { await cleanup(); } catch (error) { if (!errors.includes(error)) errors.push(error); }
+        }
+        if (errors.length) throw new AggregateError(errors, "Test Tone browser workflow or cleanup failed");
     }
 }
 main().catch(error => { console.error(error); process.exitCode=1; });

@@ -404,3 +404,62 @@ P15.3 operations, schema versions and legacy resource metadata are unchanged.
 Physical/installed-service/security limitations and P15.14 documentation follow-up
 above remain explicit. P15.5 concurrent web servicing is next; no P15.5 or later
 implementation is included.
+
+## Final-head browser fixture repair
+
+The record-only head `3444c9bdd063d16d62e8044e6ce9f5acbbf7d64a` exposed a
+remaining Chromium cleanup race in
+[run 38790906594](https://github.com/WsprryPi/WsprryPi/actions/runs/38790906594):
+all 16 Test Tone browser workflows passed, followed by `ENOTEMPTY` after the
+full profile-removal retry budget. The earlier graceful-close acknowledgment
+and leader-only termination were insufficient; a one-off green run was not
+accepted as deterministic cleanup evidence.
+
+The browser fixture now owns a detached POSIX process group, waits for graceful
+leader exit, then sends bounded SIGTERM/SIGKILL to only that exact group,
+including descendants surviving their leader. PHP cleanup is bounded too.
+Original workflow, spawn and cleanup errors remain visible through AggregateError;
+missing executables cannot bypass cleanup through an unhandled child error.
+There is no process-name kill, relaxed workflow assertion or ignored profile
+removal failure. Node's [detached-process contract](https://nodejs.org/api/child_process.html#optionsdetached)
+and [descendant lifetime boundary](https://nodejs.org/api/child_process.html#subprocesskillsignal)
+explain the fixture's ownership model.
+
+`npm run test:browser` actively runs a deterministic process regression before
+the unchanged 16 workflows. It retires a SIGTERM-ignoring writer whose leader
+has exited, proves the profile cannot be recreated, preserves a separate
+sentinel, and verifies missing-executable error propagation without a group
+signal. That Node test passed on Linux and macOS. Complete Linux `npm test`,
+`npm run test:browser`, five additional full browser repetitions and the real
+missing-browser error path passed after review repairs. The missing-browser
+case deliberately exits 1 with its original ENOENT retained and completes
+within 15 seconds. Logs are `ui-unit-group-final.log`,
+`ui-browser-owned-final.log`, `browser-owned-final-repeat-{1..5}.log`
+and `browser-missing-executable.log` in the temporary evidence directory.
+
+These are validation-fixture changes only; application/UI presentation,
+resource contracts, Pico implementation and P15.4 source-pair results are
+unchanged. Final publication still requires successful checks attached to its
+exact commit and independently verified remote parity before completion is
+reported. No additional operator documentation change follows from this harness
+repair; the P15.14 resource workflow follow-up remains as recorded above.
+
+That same final-head attempt also passed all current Pico and routing assertions,
+then failed the renderer's unchanged 10-second browser readiness check with
+ECONNREFUSED. Discarded Chrome stderr prevents attributing that original startup
+failure. The resource renderer now uses the same owned-process lifecycle and
+retains bounded trailing stderr/exit diagnostics on failure, without changing
+flags, adding retries or relaxing readiness/workflow assertions. A real
+missing-executable attempt deliberately exits 1 with original ENOENT and bounded
+cleanup; it is error-path evidence, not a rendered-workflow pass. The deterministic
+process test also validates captured stderr from a real exit-42 child.
+
+Independent review additionally found that synchronous evidence setup and
+fixture reads could throw after PHP spawn but before protected cleanup. Both
+harnesses now complete synchronous preflight before creating PHP inside their
+try/finally boundary. The repaired group, spawn-error, diagnostic and preflight
+paths were reassessed with no actionable findings. The final browser suite,
+five full repetitions and two resource-renderer runs passed; the latter retain
+the already reviewed screenshots (`network-owned-final-{1..2}.log`). Successful
+exact-head hosted execution remains the final publication gate; no unsupported
+claim about the original renderer startup cause is made.

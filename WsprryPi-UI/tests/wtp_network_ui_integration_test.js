@@ -6,7 +6,7 @@ const assert = require("node:assert/strict");
 const http = require("node:http");
 const net = require("node:net");
 const path = require("node:path");
-const { spawn } = require("node:child_process");
+const { spawnFixtureChild, waitForSpawn, childDiagnostic, spawnIsolatedProcess, stopIsolatedProcess, stopChild } = require("./browser_fixture_process.js");
 const WebSocket = require("ws");
 
 const UI_ROOT = path.resolve(__dirname, "..");
@@ -102,7 +102,6 @@ class CdpClient {
 async function main() {
     const fs = require('node:fs');
     const phpPort = await freePort(), debugPort = await freePort();
-    const php = spawn('php', ['-S', `127.0.0.1:${phpPort}`, '-t', 'data'], { cwd: UI_ROOT, stdio: 'ignore' });
     const url = `http://127.0.0.1:${phpPort}/index.php?page=config&setup_tab=%23fleet-pane`;
     const profileDir = `/tmp/wsprrypi-network-ui-${process.pid}`;
     const output = path.resolve(UI_ROOT, '../src/build/wtp-network/ui');
@@ -114,16 +113,19 @@ async function main() {
         consumer:JSON.parse(fs.readFileSync(path.join(resourceBuild,'resources-pending-consumer_station.json'))),
         fault:JSON.parse(fs.readFileSync(path.join(resourceBuild,'resources-fault-engineering_mtls.json')))
     };
-    let chrome, client;
+    let chrome, client, php, failure;
     const capture = async (name, parameters = {format:'png'}) => {
         if (!captureScreenshots) return;
         const shot = await client.send('Page.captureScreenshot', parameters);
         fs.writeFileSync(path.join(output, name), Buffer.from(shot.data, 'base64'));
     };
     try {
+        php = spawnFixtureChild('php', ['-S', `127.0.0.1:${phpPort}`, '-t', 'data'], { cwd: UI_ROOT });
+        await waitForSpawn(php);
         await waitFor(async () => await getStatus(url) === 200, 'PHP fixture');
-        chrome = spawn(process.env.CHROME_BIN || (process.platform === 'darwin' ? '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome' : 'chromium'),
-            ['--headless', '--no-sandbox', '--disable-gpu', `--remote-debugging-port=${debugPort}`, `--user-data-dir=${profileDir}`, url], { stdio: 'ignore' });
+        chrome = spawnIsolatedProcess(process.env.CHROME_BIN || (process.platform === 'darwin' ? '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome' : 'chromium'),
+            ['--headless', '--no-sandbox', '--disable-gpu', `--remote-debugging-port=${debugPort}`, `--user-data-dir=${profileDir}`, url]);
+        await waitForSpawn(chrome);
         const page = await waitFor(async () => (await getJson(`http://127.0.0.1:${debugPort}/json`)).find(p => p.type === 'page'), 'browser');
         client = new CdpClient(page.webSocketDebuggerUrl); await client.open();
         const evaluate = async expression => {
@@ -386,10 +388,16 @@ async function main() {
         assert.equal(await evaluate('window.WtpUi.read().Hostname'), 'DrAfT.LoCaL.');
         console.log('Rendered desktop/mobile: transport selection, preserved inactive settings, management revision failure, status failure and drafts passed');
         console.log(captureScreenshots ? 'Screenshots: '+output : 'Screenshot capture disabled; existing visual evidence retained.');
+    } catch (error) {
+        failure = new Error(`${error.message}\n${childDiagnostic(chrome || php)}`, { cause: error });
     } finally {
-        if (client) client.close();
-        if (chrome) chrome.kill('SIGTERM');
-        php.kill('SIGTERM');
+        const errors = failure ? [failure] : [];
+        if (client && chrome?.exitCode === null) await Promise.race([client.send('Browser.close').catch(() => {}),new Promise(resolve=>setTimeout(resolve,1000))]);
+        for(const cleanup of [()=>client?.close(),()=>stopIsolatedProcess(chrome),()=>stopChild(php),
+            ()=>fs.rmSync(profileDir,{recursive:true,force:true,maxRetries:10,retryDelay:100})]) {
+            try { await cleanup(); } catch(error) { if(!errors.includes(error)) errors.push(error); }
+        }
+        if(errors.length) throw new AggregateError(errors,'Network browser workflow or cleanup failed');
     }
 }
 main().catch(error=>{console.error(error);process.exitCode=1;});
