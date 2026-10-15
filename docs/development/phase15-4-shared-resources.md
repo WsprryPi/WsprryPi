@@ -352,3 +352,29 @@ Local acceptance, final independent evidence assessment, commits, origin/devel
 pushes, actual pushed-head CI and independent `ls-remote` parity are distinct
 steps. P15.4 remains in progress until all applicable gates pass. No PR or release
 is requested. The separate release-punchlist edit stays outside task commits.
+
+Initial publication: Pi implementation `085ef702b43be57b13baf3637651cb36084d985d`
+and Pico documentation `0048ad82a0f1db3b499ebe7a58ee8f6031801878` pushed to
+origin/devel and independently matched `ls-remote`. All 37 original staged Pi
+files were compared byte-for-byte with the tested snapshot after commit. Pico's
+five-file companion diff is documentation only; the clean implementation pin
+remains `ddb00dd7960373cec271f7816c0e1b10117416e9`.
+
+[Implementation CI run 38786878022](https://github.com/WsprryPi/WsprryPi/actions/runs/38786878022)
+passed strict I2C and all four historical compatibility jobs. Hosted macOS got
+past the repaired timeout command and exposed the next baseline fixture issue:
+the slow-observer test's blocking socket pair did not complete its saturated
+send under `MSG_DONTWAIT`. A bounded native Python check reproduced the wait on
+both UNIX and loopback TCP sockets; explicit nonblocking mode returned a partial
+send immediately. No native Mac C++ build ran. Apple's
+[generic socket send path](https://github.com/apple-oss-distributions/xnu/blob/main/bsd/kern/uipc_socket.c#L1828-L1857)
+explains why per-call flags alone are insufficient for this Darwin fixture.
+
+The Apple-only test fixture now asserts successful F_GETFL/F_SETFL and adds
+O_NONBLOCK to that sender. Linux keeps its blocking descriptor and per-call
+MSG_DONTWAIT regression. Both retain 1 MiB pressure, three-second completion and
+clients-mutex cleanup assertions. This is a portability repair to the test;
+Darwin production WebSocket behavior remains unqualified. Independent review
+accepted this boundary rather than claiming a Mac server fix. The Linux target
+and a repeat pass; hosted acceptance requires a new pushed-head CI run. No
+product WebSocket implementation changed.

@@ -16,6 +16,9 @@
 #include <stdexcept>
 #include <thread>
 #include <sys/socket.h>
+#ifdef __APPLE__
+#include <fcntl.h>
+#endif
 #include <unistd.h>
 using namespace std::chrono_literals;
 
@@ -244,6 +247,13 @@ public:
             int sockets[2]; assert(socketpair(AF_UNIX, SOCK_STREAM, 0, sockets) == 0);
             int capacity = 4096;
             assert(setsockopt(sockets[0], SOL_SOCKET, SO_SNDBUF, &capacity, sizeof(capacity)) == 0);
+#ifdef __APPLE__
+            // Darwin needs descriptor nonblocking mode for saturated sends.
+            // Linux retains the blocking descriptor to exercise MSG_DONTWAIT.
+            const int flags = fcntl(sockets[0], F_GETFL, 0);
+            assert(flags >= 0);
+            assert(fcntl(sockets[0], F_SETFL, flags | O_NONBLOCK) == 0);
+#endif
             WebSocketServer::ClientAuthorizationContext authorization{
                 "127.0.0.1", "GET / HTTP/1.1\r\nHost: 127.0.0.1\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Version: 13\r\nSec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\n\r\n"};
             assert(slow.clientAuthorizationCurrent(authorization));
