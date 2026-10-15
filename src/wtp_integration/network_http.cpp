@@ -27,10 +27,12 @@ PicoHttpResponse wtp_json_http_exchange(wtp::ByteStream& stream, TlsStream::Cloc
     if (response.size() > 36864) return error(502, "invalid_remote_response");
     const auto boundary = response.find("\r\n\r\n");
     if (boundary != std::string::npos) {
-      if (boundary > 4096 || !response.starts_with("HTTP/1.1 ")) return error(502, "invalid_remote_response");
+      if (boundary < 13 || boundary > 4096 || !response.starts_with("HTTP/1.1 ") || response[12] != ' ')
+        return error(502, "invalid_remote_response");
       unsigned status{};
       auto parsed = std::from_chars(response.data() + 9, response.data() + 12, status);
-      if (parsed.ec != std::errc() || status < 200 || status > 599) return error(502, "invalid_remote_response");
+      if (parsed.ec != std::errc() || parsed.ptr != response.data() + 12 || status < 200 || status > 599)
+        return error(502, "invalid_remote_response");
       std::map<std::string, std::string> headers;
       auto pos = response.find("\r\n") + 2;
       while (pos < boundary) {
@@ -71,12 +73,17 @@ PicoHttpResponse pico_http_request(TlsStream &stream, const TlsSelection &select
   const auto error = [](unsigned status, const char *code) {
     return PicoHttpResponse{status, nlohmann::json{{"error", {{"code", code}}}}.dump(), {}};
   };
-  if ((resource != "config" && resource != "schedules" && resource != "network" && resource != "capabilities" && resource != "status") ||
-      (method != "GET" && method != "PUT") || (method == "PUT" && (resource == "status" || resource == "capabilities")))
+  const bool mutation = method == "PUT" || method == "POST";
+  const bool allowed = (method == "GET" && (resource == "config" || resource == "schedules" ||
+      resource == "network" || resource == "capabilities" || resource == "status" || resource == "application")) ||
+      (method == "PUT" && (resource == "config" || resource == "schedules" || resource == "network")) ||
+      (method == "POST" && resource == "config/update");
+  if (!allowed)
     return error(404, "not_found");
   if (body.size() > 32768 || revision.size() > 128 || revision.find_first_of("\r\n") != std::string::npos)
     return error(400, "invalid_request");
-  if (method == "PUT" && revision.empty()) return error(428, "revision_required");
+  if (method == "POST" && body.size() > 2048) return error(413, "body_too_large");
+  if (mutation && revision.empty()) return error(428, "revision_required");
   if (!stream.begin_open(selection, std::move(credentials), "http/1.1")) return error(503, "network_unavailable");
   struct Close { TlsStream &stream; ~Close() { stream.close(); } } close{stream};
   const auto deadline = clock() + 20000;
@@ -90,11 +97,11 @@ PicoHttpResponse pico_http_request(TlsStream &stream, const TlsSelection &select
   if (authority.find(':') != std::string::npos) authority = '[' + authority + ']';
   if (selection.port != 443) authority += ':' + std::to_string(selection.port);
   std::string request = method + " /api/v1/" + resource + " HTTP/1.1\r\nHost: " + authority + "\r\n";
-  if (method == "PUT") request += "Origin: https://" + authority +
+  if (mutation) request += "Origin: https://" + authority +
       "\r\nContent-Type: application/json\r\nX-WsprryPico-Request: 1\r\nIf-Match: " + revision +
       "\r\nContent-Length: " + std::to_string(body.size()) + "\r\n";
   request += "\r\n" + body;
-  return wtp_json_http_exchange(stream, clock, request, deadline, method == "PUT");
+  return wtp_json_http_exchange(stream, clock, request, deadline, mutation);
 }
 
 } // namespace wsprrypi

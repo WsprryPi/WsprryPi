@@ -195,9 +195,9 @@
         </div>
         <details id="wtp-management" class="wtp-status mt-3" hidden>
             <summary class="cw-control-section__title">Pico standalone settings and Wi-Fi</summary>
-            <p class="form-text">These settings belong to Pico's standalone scheduler, separate from WsprryPi's schedule. Management is available only while the host has no pending, owned or unresolved job. Saving standalone settings requires a Pico restart to apply.</p>
+            <p class="form-text">These settings belong to Pico's standalone scheduler, separate from WsprryPi's schedule. Management is available only while the host has no pending, owned or unresolved job. Saves preserve settings outside this form. Network or pin changes may require a Pico restart; each save reports the requirement.</p>
             <button type="button" class="btn btn-outline-primary" id="wtp-remote-load">Load saved Pico settings</button>
-            <p class="form-text">Loading replaces the standalone draft below. Status polling preserves it.</p>
+            <p class="form-text">Loading replaces the standalone draft below. After a conflicting or unconfirmed save, loading reads saved values and keeps your draft for review. Status polling preserves it.</p>
             <div class="row gx-3 gy-3" id="wtp-remote-fields">
                 <div class="col-12 col-lg-6 config-stacked-field">
                     <label class="form-label" for="wtp-remote-callsign">Standalone callsign</label>
@@ -225,7 +225,7 @@
                     <div class="form-text" id="wtp-remote-password-hint">Leave blank to preserve the saved password. It is never returned by Pico.</div>
                 </div>
                 <div class="col-12 col-lg-6 config-stacked-field">
-                    <label class="form-label" for="wtp-remote-ntp">Time server IPv4 address</label>
+                    <label class="form-label" for="wtp-remote-ntp">Time server</label>
                     <input class="form-control" id="wtp-remote-ntp" type="text" autocomplete="off" data-wtp-remote disabled aria-describedby="wtp-remote-ntp-hint">
                     <div class="form-text" id="wtp-remote-ntp-hint"></div>
                 </div>
@@ -235,7 +235,8 @@
                     <div class="form-text" id="wtp-remote-expiry-hint">0 means no expiry. Existing values are preserved until you change them.</div>
                 </div>
                 <div class="col-12">
-                    <div class="form-check"><input class="form-check-input" type="checkbox" id="wtp-remote-enabled" data-wtp-remote disabled><label class="form-check-label" for="wtp-remote-enabled">Enable Pico standalone schedule after restart</label></div>
+                    <div class="form-check"><input class="form-check-input" type="checkbox" id="wtp-remote-enabled" data-wtp-remote disabled><label class="form-check-label" for="wtp-remote-enabled">Enable Pico standalone schedule</label></div>
+                    <div class="form-text" id="wtp-remote-enabled-hint"></div>
                 </div>
                 <div class="col-12 config-stacked-field">
                     <label class="form-label" for="wtp-remote-schedules">Standalone schedule periods and phases (seconds)</label>
@@ -251,6 +252,7 @@
             </div>
             <p class="form-text mt-2">Disabling Wi-Fi disconnects network control. Re-enable it using the physical USB Console or a restart. This is a temporary switch, separate from saved standalone settings.</p>
             <p id="wtp-management-feedback" class="form-text" role="status" aria-live="polite"></p>
+            <p id="wtp-management-availability" class="form-text" role="status" aria-live="polite" hidden></p>
         </details>
     </section>
 </div>

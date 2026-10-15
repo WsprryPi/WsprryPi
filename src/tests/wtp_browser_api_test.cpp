@@ -20,6 +20,13 @@ int main() {
     CHECK(api.handle({"PUT", "/api/v1/config", "{}", {}, true}).status == 428);
     CHECK(api.handle({"PUT", "/api/v1/config", R"({"a":1,"a":2})", "\"revision\"", true}).status == 400);
     CHECK(api.handle({"PUT", "/api/v1/config", "{}", "\"revision\"", true}).status == 412);
+    CHECK(api.handle({"POST", "/api/v1/member/configuration", "{}", "\"revision\"", false}).status == 403);
+    CHECK(api.handle({"POST", "/api/v1/member/configuration", "{}", {}, true}).status == 428);
+    CHECK(api.handle({"POST", "/api/v1/member/configuration", R"({"a":1,"a":2})", "\"revision\"", true}).status == 400);
+    CHECK(api.handle({"POST", "/api/v1/member/configuration", std::string(2049,' '), "\"revision\"", true}).status == 413);
+    CHECK(classify_privileged_http_operation("GET", "/api/v1/member/configuration") == PrivilegedOperationClass::protected_operation);
+    CHECK(classify_privileged_http_operation("POST", "/api/v1/member/configuration") == PrivilegedOperationClass::protected_operation);
+    CHECK(classify_privileged_http_operation("PUT", "/api/v1/member/configuration") == PrivilegedOperationClass::reject);
     nlohmann::json body{{"session_id", std::string(32, '1')}, {"request_id", std::string(32, '2')}, {"operation", "ABORT"}, {"body", {{"job_id", std::string(32, 'a')}}}};
     BrowserRequest request{"POST", "/api/v1/jobs/" + std::string(32, 'a') + "/abort", body.dump(), {}, true};
     const auto first = api.handle(request);

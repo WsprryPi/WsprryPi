@@ -13,6 +13,7 @@ prefix `/wsprrypi`; the table below shows backend paths.
 | GET/PUT `/api/v1/config` | Pico standalone station/Wi-Fi/schedule configuration, through serialized idle HTTPS. |
 | GET/PUT `/api/v1/schedules` | Pico standalone schedule subresource, sharing Pico config revisions. |
 | GET/PUT `/api/v1/network` | Pico network status/control, with its own remote revision. |
+| GET/POST `/api/v1/member/configuration` | Host-coordinated selected-Pico settings context and one compatible atomic save; schema `wsprrypi-pico-settings/1`. |
 | GET/PUT `/api/v1/host/config` | Explicit `wsprrypi-host-config/1` application and transport settings. PUT applies a merge patch. |
 | GET `/api/v1/host/discovery` | Bounded local Avahi snapshot; no WTP connection. |
 | GET/POST `/api/v1/host/devices` | Host-owned known-device catalog, revision-guarded add/edit/rename/remove. |
@@ -80,9 +81,32 @@ the configured host client credential.
 Responses use no-store and nosniff. Copied status has no certificate/private-key
 material. Host config exposes local credential references only. Remote config
 retains Pico's password redaction; new passwords are submitted only by an explicit
-save, kept out of browser storage and cleared after full-config success. A
+save, kept out of browser storage and cleared after confirmed settings-save success. A
 schedule-only save keeps password and other unrelated drafts. Management never
 runs periodically and never releases host ownership to poll Pico TLS sessions.
+
+## Compatible Pico settings
+
+The [configuration compatibility contract](wtp-configuration-compatibility.md)
+defines the settings form's host-scoped context/edit resource. Its GET reads
+actual selected-member capabilities and saved state under serialized idle
+authority, binding device, boot and exact common ETag. Its POST re-reads that
+context, then sends at most one mutation: advertised targeted merge, a complete
+understood legacy Config v1, initial PUT, or schedule-only PUT. Present but
+unsupported update capability and unknown configuration fields refuse safely.
+Host `/capabilities` and WTP CAPS remain separate from those remote capabilities.
+
+The form sends only changed fields. Omitted form fields never reset pins or
+advanced frequency flags. Ordinary edits use no replacement/reset mode. An
+unchanged Save performs no mutation. Explicit edits preserve password null;
+new passwords clear only after confirmed settings-save success.
+
+Conflict or unconfirmed results disable further saves until an explicit saved
+state readback. That readback preserves the draft/password and shows saved
+values for review; a subsequent deliberate Save uses the new context. No
+mutation retries, strategy switches or endpoint substitution occur automatically.
+Normal Load replaces the draft, and polling never does. Feedback uses actual
+`reboot_required`/application state rather than claiming every save needs reboot.
 
 
 Outbound management authenticates the canonical configured expected TLS identity

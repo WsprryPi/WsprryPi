@@ -3,9 +3,12 @@
 // WsprryPi-owned harness: actual unmodified Pico TLS server and common service.
 #include "network/pico/server.hpp"
 #include "network_support.hpp"
+#include "network_credentials.hpp"
 #include "pico/time.h"
 #include <chrono>
 #include <csignal>
+#include <poll.h>
+#include <unistd.h>
 #include <thread>
 namespace {
 struct Clock : wsprrypico::wtp::Clock {
@@ -53,6 +56,15 @@ int main(int argc, char **argv) {
   network_test::Flash flash;
   wsprrypico::standalone::Store store{flash};
   if (!store.load()) return 1;
+  if (argc > 3) {
+    auto config = *wsprrypico::standalone::parse_config(network_test::config);
+    config.power_dbm = 20;
+#ifdef WSPRRY_PICO_EXTENDED_API
+    config.pins.rf = 28;
+    config.allow_unqualified_frequency = config.allow_non_amateur_frequency = true;
+#endif
+    if (!store.save(config) || !store.reserve(1'700'000'000'000'000'000ULL)) return 1;
+  }
   Clock clock;
   network_test::Identity identities;
   if (argc > 1) identities.boot = static_cast<unsigned>(std::stoul(argv[1]));
@@ -64,10 +76,39 @@ int main(int argc, char **argv) {
   wsprrypico::network::BrowserApi api{service, store, scheduler, network, device, "phase11-host-test"};
   // Match the pinned Pico standalone image's active-job connection policy.
   api.set_active_job_connections(true);
+#ifdef WSPRRY_PICO_EXTENDED_API
+  using namespace wsprrypico::network::credentials;
+  const wsprrypico::provisioning::CredentialMaterial material{device_id,hostname,port,certificate,key,ca};
+  wsprrypico::network::PicoServer server{service, api, device, "phase11-host-test",material};
+#else
   wsprrypico::network::PicoServer server{service, api, device, "phase11-host-test"};
+#endif
   if (!server.start()) { std::cerr << "TLS server initialization failed\n"; return 1; }
   std::cout << "READY " << server.port() << std::endl;
   while (true) {
+    pollfd command{STDIN_FILENO, POLLIN, 0};
+    if (argc > 3 && ::poll(&command, 1, 0) > 0 && (command.revents & POLLIN)) {
+      std::string input; std::getline(std::cin, input);
+      if (input == "FAIL") { flash.fail = true; std::cout << "ACK" << std::endl; }
+      else if (input == "RESUME") { flash.fail = false; std::cout << "ACK" << std::endl; }
+      else if (input == "DUMP") {
+        wsprrypico::standalone::Store reload{flash};
+        const bool healthy = reload.load();
+        std::string config = "null", digest;
+        if (reload.config()) {
+          auto redacted = *reload.config();
+          const auto &password = redacted.password;
+          for (const auto byte : wsprrypico::wtp::sha256(std::span(
+              reinterpret_cast<const std::uint8_t *>(password.data()), password.size()))) {
+            digest += "0123456789abcdef"[byte >> 4]; digest += "0123456789abcdef"[byte & 15];
+          }
+          redacted.password.clear(); config = wsprrypico::standalone::serialize_config(redacted);
+        }
+        std::cout << "DUMP {\"healthy\":" << (healthy ? "true" : "false") << ",\"config\":" << config
+                  << ",\"cursor\":\"" << reload.watermark() << "\",\"password_sha256\":\"" << digest
+                  << "\",\"generation\":" << reload.config_sequence() << "}" << std::endl;
+      }
+    }
     mock_tcp_poll();
     const auto *test_address = std::getenv("WSPRRY_TEST_LISTEN_ADDRESS");
     server.poll(network.enabled, std::string(test_address ? test_address : "127.0.0.1") + ":" + std::to_string(server.port()));

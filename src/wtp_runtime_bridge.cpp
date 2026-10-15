@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Lee Bussy
 #include "wtp_runtime_bridge.hpp"
+#include "wtp_integration/configuration.hpp"
 #include "wtp_integration/target_runtime.hpp"
 #include "json.hpp"
 #include "wtp_integration/usb_cdc.hpp"
@@ -228,8 +229,17 @@ wsprrypi::PicoHttpResponse wtp_runtime_management(const std::string &resource,
     if (!r->credentials_current())
       return {409, R"({"error":{"code":"credentials_changed_reload_required"}})", {}};
     if (!r->app->idle_management([&] {
-      response = wsprrypi::pico_http_request(r->tls, r->network_selection(), r->credentials,
-          [&] { return r->clock.now_ms(); }, resource, method, body, revision);
+      const auto exchange = [&](const std::string &path, const std::string &verb,
+          const std::string &payload, const std::string &etag) {
+        return wsprrypi::pico_http_request(r->tls, r->network_selection(), r->credentials,
+            [&] { return r->clock.now_ms(); }, path, verb, payload, etag);
+      };
+      if (resource == "member/configuration") {
+        const auto identity = r->app->status().identity;
+        response = wsprrypi::pico_configuration_request(exchange,
+            identity ? identity->device_id : "", identity ? identity->boot_id : "",
+            method, body, revision);
+      } else response = exchange(resource, method, body, revision);
     })) return {409, R"({"error":{"code":"host_busy_or_output_unresolved"}})", {}};
   } catch (...) { return {503, R"({"error":{"code":"network_unavailable"}})", {}}; }
   return response;

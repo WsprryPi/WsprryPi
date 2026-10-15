@@ -7,6 +7,14 @@ find_package(Python3 REQUIRED COMPONENTS Interpreter)
 file(CHMOD "${CMAKE_BINARY_DIR}" PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE)
 # Share the immutable source pin with the CI checkout.
 set(pico_pin_file "${CMAKE_CURRENT_SOURCE_DIR}/pico-reference-revision.txt")
+set(PICO_COMPAT_PROFILE current CACHE STRING "Exact Pico API compatibility profile")
+if(PICO_COMPAT_PROFILE STREQUAL "legacy")
+  set(pico_pin_file "${CMAKE_CURRENT_SOURCE_DIR}/pico-legacy-revision.txt")
+elseif(PICO_COMPAT_PROFILE STREQUAL "extended")
+  set(pico_pin_file "${CMAKE_CURRENT_SOURCE_DIR}/pico-extended-revision.txt")
+elseif(NOT PICO_COMPAT_PROFILE STREQUAL "current")
+  message(FATAL_ERROR "Unknown Pico compatibility profile")
+endif()
 set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${pico_pin_file}")
 file(READ "${pico_pin_file}" pico_pin)
 string(STRIP "${pico_pin}" pico_pin)
@@ -60,6 +68,22 @@ set(core network/http.cpp network/api.cpp encoding/wspr.cpp standalone/dry_run_e
   standalone/config.cpp standalone/storage.cpp standalone/scheduler.cpp time/sntp.cpp
   time/utc_discipline.cpp time/usb_time_source.cpp wtp/json.cpp wtp/codec.cpp wtp/endpoint.cpp
   wtp/frame_parser.cpp wtp/inhibited_rf_engine.cpp wtp/job_service.cpp wtp/sha256.cpp)
+if(NOT PICO_COMPAT_PROFILE STREQUAL "legacy")
+  list(APPEND core application/resources.cpp application/frequency_policy.cpp hardware/pins.cpp
+    provisioning/profile.cpp provisioning/network_profile.cpp provisioning/consumer_profile.cpp
+    provisioning/consumer_claim.cpp provisioning/consumer_claim_commit.cpp provisioning/access.cpp
+    provisioning/ble_session.cpp provisioning/field_runtime.cpp provisioning/gatt_framing.cpp
+    provisioning/local_access.cpp provisioning/reset.cpp provisioning/reset_storage.cpp
+    provisioning/softap_http.cpp provisioning/activation.cpp provisioning/storage.cpp
+    provisioning/manager.cpp provisioning/command.cpp provisioning/runtime.cpp
+    network/mdns.cpp network/bootstrap_http.cpp network/bootstrap_codec.cpp network/bootstrap_join.cpp
+    network/bootstrap_slot.cpp network/bootstrap_wire.cpp network/owner_wire.cpp
+    network/owner_challenge.cpp network/owner_claim_http.cpp network/consumer_radio.cpp network/softap_api.cpp
+    standalone/frequency_policy_engine.cpp time/controller_time.cpp)
+  if(PICO_COMPAT_PROFILE STREQUAL "current")
+    list(APPEND core application/config_update.cpp)
+  endif()
+endif()
 list(TRANSFORM core PREPEND "${PICO_SOURCE}/src/")
 add_executable(pico_tls_server pico_tls_server.cpp ${core}
   "${CMAKE_BINARY_DIR}/generated/web_assets.cpp" tcp.cpp
@@ -71,3 +95,10 @@ target_compile_definitions(pico_tls_server PRIVATE
   WSPRRY_PICO_STANDALONE_WSPR_BASE_FREQUENCY_HZ=3570100)
 target_link_libraries(pico_tls_server PRIVATE mbedtls mbedx509 mbedcrypto)
 target_compile_options(pico_tls_server PRIVATE -Wall -Wextra -Wpedantic -Werror)
+
+if(NOT PICO_COMPAT_PROFILE STREQUAL "legacy")
+  target_sources(pico_tls_server PRIVATE
+    "${PICO_SOURCE}/src/network/pico/psa_lifetime.cpp"
+    "${PICO_SOURCE}/src/provisioning/pico/credential_validator.cpp")
+  target_compile_definitions(pico_tls_server PRIVATE WSPRRY_PICO_EXTENDED_API=1)
+endif()
