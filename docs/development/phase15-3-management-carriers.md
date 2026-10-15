@@ -207,7 +207,7 @@ Six affected Pico tests and Pi config/API tests passed ASan/UBSan using
 `cmake --build build/consumer-lan-pico --parallel 2 --target WsprryPico`
 passed with retained SDK `079c6f39023649b154152db30f1d781e884879bc` and Arm GNU
 15.3.1, including post-link topology, pool/heap-hook and stack-guard checks. This was a cross-build; no
-native macOS C++ application build or physical firmware load occurred.
+local native macOS C++ application build or physical firmware load occurred.
 
 Impeccable was used before and during UI changes. Two bounded visual batches
 covered desktop/mobile light/dark entry, connected and busy states. The first
@@ -242,7 +242,7 @@ Independent `ls-remote` confirmed its initial origin/devel parity.
 
 [Run 38764100628](https://github.com/WsprryPi/WsprryPi/actions/runs/38764100628)
 passed all three historical profiles, strict I2C and the existing macOS CI
-profile, then was cancelled by concurrent commit
+profile on GitHub-hosted runners, then was cancelled by concurrent commit
 `c605142e45057080ade6a0905fb6b81281e3a367`. The other three jobs were cancelled,
 not accepted as passes. The successor run is superseded by this record-only
 publication; no full CI success is inferred from either partial run.
