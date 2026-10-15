@@ -111,8 +111,10 @@ async function main() {
     try {
         await waitFor(async () => await getStatus(base + '?page=config') === 200, 'PHP fixture');
         chrome = spawn(process.env.CHROME_BIN || (process.platform === 'darwin' ? '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome' : 'chromium'),
-            ['--headless', '--no-sandbox', '--disable-gpu', `--remote-debugging-port=${debugPort}`, `--user-data-dir=${profileDir}`, base + '?page=config'], {stdio: 'ignore'});
-        const page = await waitFor(async () => (await getJson(`http://127.0.0.1:${debugPort}/json`)).find(p => p.type === 'page'), 'browser');
+            ['--headless', '--no-sandbox', '--disable-gpu', '--no-first-run', '--no-default-browser-check', '--disable-background-networking', `--remote-debugging-port=${debugPort}`, `--user-data-dir=${profileDir}`, base + '?page=config'], {stdio: 'ignore'});
+        // A fresh CI Chrome profile can take longer than workflow assertions to start.
+        // Keep startup finite without changing any UI assertion deadline.
+        const page = await waitFor(async () => (await getJson(`http://127.0.0.1:${debugPort}/json`)).find(p => p.type === 'page'), 'browser startup', 60000);
         client = new CdpClient(page.webSocketDebuggerUrl);await client.open();
         const evaluate = async expression => {
             const result = await client.send('Runtime.evaluate', {expression, awaitPromise: true, returnByValue: true});

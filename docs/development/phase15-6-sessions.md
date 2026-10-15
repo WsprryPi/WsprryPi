@@ -133,3 +133,22 @@ connection/session/capacity/conflict/readback workflows and screenshots, and
 `docs/Advanced_Operations/ini_configuration/transmitter_backends.md#pico-wtp`
 for the separate WTP transport and management-carrier boundaries. Both paths
 were inspected read-only in WsprryPi-Docs; no docs build or publication occurred.
+
+## Published-head browser fixture reassessment
+
+The first published-head CI run 38809630376 passed nine jobs, including all
+historical rows, broad non-hardware/browser regressions and release profiles.
+Its current-pair job passed native/Pico interoperability and routing, but twice
+failed before rendered UI assertions: the Chrome debugging port remained closed
+at the existing ten-second startup deadline while the child remained alive.
+The delay's underlying cause is unconfirmed; these attempts are not browser passes.
+
+Both browser scripts in that job now disable first-run/default-browser/background
+setup and allow a finite 60 seconds only for the fresh Chrome debugging endpoint.
+All workflow assertions keep their existing ten-second deadlines, and failures
+still fail the job. The network fixture retains process-group cleanup and stderr
+diagnostics. Product code and the exact Pico pin are unchanged. Actual local
+network/Fleet browser reruns and owned-process cleanup regressions pass after
+the repair. Reassessment found no changed workflow assertion or product path.
+Successor CI results are recorded in the companion Pico handoff packet. No later
+roadmap feature is implemented.
