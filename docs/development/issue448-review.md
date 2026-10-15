@@ -157,7 +157,7 @@ observation. No installed UI/runtime or physical carrier qualification is claime
 
 An independent agent reviewed the complete implementation, first-party UI,
 source pins, fixture changes, CI, contracts and evidence limits. Its first source
-assessment found no actionable issue. The final challenge found one P2:
+assessment found no actionable issue. The later challenges found two P2 issues:
 
 - **Incomplete advertised application projection accepted:** schema/target/ETag
   alone allowed a save without establishing required saved/active/restart state.
@@ -166,6 +166,22 @@ assessment found no actionable issue. The final challenge found one P2:
   state before mutation. Negative tests prove zero writes. Older peers without
   the advertisement still have unavailable/null context. Independent reassessment
   accepted the repair and found no additional actionable issue.
+
+- **Malformed capability types:** final root review found that integer deserialization
+  accepted fractional `api_version:1.1` as version 1. A negative regression first
+  reproduced the acceptance. The follow-up requires presence, an integer JSON
+  type and exact value 1; fractional, floating, string, boolean and null versions
+  reject before mutation. Independent follow-up review also identified mixed-type
+  mode lists such as `["merge",42]`; entries must now be strings. Unknown string
+  modes remain compatible alongside `merge`, with positive regression coverage.
+  This bounded repair uses feature branch
+  `codex/issue-448-capability-type-guard` after the primary merge.
+
+Follow-up capability-guard validation: the before-fix test failed at the new
+zero-mutation assertion. After both repairs, focused `wtp-config-test`/
+`wtp-api-test`, ASan/UBSan and all four actual-producer matrix rows passed.
+The independent final source reassessment found no remaining actionable issue.
+The primary merge also passed all seven non-hardware CI jobs.
 
 Final evidence reassessment: source repair accepted with no remaining actionable
 findings. The final focused, sanitizer and all four real matrix runs passed; the
