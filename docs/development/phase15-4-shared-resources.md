@@ -1,7 +1,7 @@
 # P15.4 shared member resources
 
-Status: implementation and local software acceptance passed; publication and
-pushed-head CI acceptance pending.
+Status: P15.4 complete within the software acceptance recorded below. Physical,
+installed-service and unrestricted security qualification remain separate.
 
 ## Baseline and source-backed gap assessment
 
@@ -88,7 +88,7 @@ pushed-head CI/remote parity. Results below will distinguish attempts and passes
 
 Updated: Pi browser API and compatibility guide, this acceptance record, and
 Pico's adoption reference, development index and contract/API pointers. Pico's
-roadmap stays ⏳ until acceptance and publication finish, then closes ✅.
+roadmap records ✅ after acceptance and publication.
 Considered unchanged: historical P15.1–P15.3 records, normative schemas, storage,
 WTP/1 and field/setup authority.
 
@@ -350,7 +350,7 @@ the durable reproducible record. Resource screenshots are under isolated
 
 Local acceptance, final independent evidence assessment, commits, origin/devel
 pushes, actual pushed-head CI and independent `ls-remote` parity are distinct
-steps. P15.4 remains in progress until all applicable gates pass. No PR or release
+steps. The applicable implementation gates are accepted below. No PR or release
 is requested. The separate release-punchlist edit stays outside task commits.
 
 Initial publication: Pi implementation `085ef702b43be57b13baf3637651cb36084d985d`
@@ -376,5 +376,31 @@ MSG_DONTWAIT regression. Both retain 1 MiB pressure, three-second completion and
 clients-mutex cleanup assertions. This is a portability repair to the test;
 Darwin production WebSocket behavior remains unqualified. Independent review
 accepted this boundary rather than claiming a Mac server fix. The Linux target
-and a repeat pass; hosted acceptance requires a new pushed-head CI run. No
+and a repeat passed; hosted acceptance required a new pushed-head CI run. No
 product WebSocket implementation changed.
+
+## Joint software acceptance
+
+The reviewed implementation is Pi `085ef702b43be57b13baf3637651cb36084d985d`
+plus the independently reviewed fixture-only portability repair
+`f51d7b0686769f5e7dc574992dfde7e338f275cf`, with clean Pico implementation
+`ddb00dd7960373cec271f7816c0e1b10117416e9`. Companion documentation was published
+separately as `0048ad82a0f1db3b499ebe7a58ee8f6031801878`; closure records do not
+change that tested dependency pin. All 38 task paths match the tested isolated
+snapshot, and the release punchlist is excluded.
+
+[Required CI run 38787918615](https://github.com/WsprryPi/WsprryPi/actions/runs/38787918615)
+passed all nine jobs on exact repair head `f51d7b0`: hosted macOS portable,
+Linux non-hardware application/UI/semantics, current Pico network/resource/UI
+and software reply-routing, four historical compatibility rows, strict I2C,
+and six GCC 13 release backend profiles. Earlier cancelled jobs are not passes.
+Independent source, UI, compatibility, sanitizer and evidence reassessments
+found no actionable findings after repair. Both authorized origin/devel pushes
+were independently matched with `ls-remote`; final record-only publication
+receives its own pushed-head checks and remote verification.
+
+P15.4 is complete within this software scope. Pico implementation, closed
+P15.3 operations, schema versions and legacy resource metadata are unchanged.
+Physical/installed-service/security limitations and P15.14 documentation follow-up
+above remain explicit. P15.5 concurrent web servicing is next; no P15.5 or later
+implementation is included.
