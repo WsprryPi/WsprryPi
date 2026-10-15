@@ -34,13 +34,19 @@
     if (!root.document) return;
     const byId = id => root.document.getElementById(id);
     let available = false, busy = false, loaded = false, reconcile = false;
+    let canSelect = false, consumerConnected = false, explicitDisconnected = false, selectionObserved = false;
     let configRevision = "", networkRevision = "", saved = null, target = null;
     const field = name => byId(`wtp-remote-${name}`);
     const originalHints = new Map();
     function failure(message) { const error = new Error(message); error.operatorMessage = true; return error; }
     function render() {
         if (!byId("wtp-management")) return;
-        byId("wtp-management").hidden = !root.WtpUi?.developmentControlsVisible || root.WtpUi?.read().Transport !== "network";
+        byId("wtp-management").hidden = !root.WtpUi?.developmentControlsVisible;
+        const carrier = byId("wtp-management-carrier");
+        const consumer = carrier && carrier.value !== "engineering_mtls";
+        for (const id of ["wtp-management-host-field", "wtp-management-password-field"]) if (byId(id)) byId(id).hidden = !consumer;
+        for (const id of ["wtp-management-carrier", "wtp-management-host", "wtp-management-password", "wtp-management-connect", "wtp-management-disconnect", "wtp-management-state"])
+            if (byId(id)) byId(id).disabled = busy || !canSelect || (id === "wtp-management-connect" && consumerConnected);
         byId("wtp-management").setAttribute("aria-busy", String(busy));
         root.document.querySelectorAll("[data-wtp-remote]").forEach(input => { input.disabled = busy || !available || !loaded; });
         for (const id of ["wtp-remote-load", "wtp-network-load"]) byId(id).disabled = busy || !available;
@@ -78,9 +84,9 @@
             : " Restart requirements are unconfirmed; read Pico status before operating.";
     }
     async function request(resource, method = "GET", body = null, revision = "") {
-        if (busy || !available) return;
+        if (busy || (resource === "member/management" ? !canSelect : !available)) return;
         busy = true; render();
-        const feedback = byId("wtp-management-feedback");
+        const feedback = byId(resource === "member/management" ? "wtp-management-connection-feedback" : "wtp-management-feedback");
         feedback.textContent = "Contacting the idle Pico…";
         const controller = new AbortController();
         const timeout = setTimeout(() => controller.abort(), 180000);
@@ -92,6 +98,24 @@
             const data = await response.json();
             if (!response.ok) {
                 const code = data.error?.code;
+                if (resource === "member/management") {
+                    if (code === "management_session_already_selected") {
+                        selectionObserved = false;
+                        throw failure("A management session is already active. Read its connection state or disconnect it before selecting another connection.");
+                    }
+                    consumerConnected = false; explicitDisconnected = true; available = false;
+                    throw failure(code === "radio_session_busy"
+                        ? "Pico already has a browser or client session. Log out there or wait for it to expire; this client did not close it."
+                        : code === "host_busy_or_output_unresolved"
+                            ? "Host work or unresolved output blocks management. Reconcile that work before connecting."
+                            : code === "unsupported_management_contract"
+                                ? "This Pico does not advertise the supported management contract. No fallback was attempted."
+                                : "Consumer login or connection was not confirmed. Check the exact Pico ID, address and saved Wi-Fi password. No fallback was attempted.");
+                }
+                if (["consumer_login_required", "consumer_session_unconfirmed", "management_carrier_required"].includes(code)) {
+                    consumerConnected = false; explicitDisconnected = true; available = false;
+                    throw failure("Consumer session expired or was not confirmed. Your draft is preserved. Log in again, then load saved Pico settings before saving.");
+                }
                 throw failure(response.status === 412
                     ? "Pico settings changed elsewhere. Your draft is preserved. Load saved Pico settings before saving again."
                     : code === "unsupported_configuration_updates" || code === "unsupported_legacy_field" || code === "invalid_remote_configuration"
@@ -105,7 +129,24 @@
                             : "The Pico request was not confirmed. Your draft is preserved. Load saved Pico settings and review them before saving again.");
             }
             const etag = response.headers.get("ETag") || "";
-            if (resource === "network") {
+            if (resource === "member/management") {
+                consumerConnected = data.connected === true;
+                if (method === "GET") {
+                    if (!["engineering_mtls", "consumer_station", "consumer_ap", "unsupported", "disconnected"].includes(data.carrier) || typeof data.connected !== "boolean" || typeof data.host !== "string")
+                        throw failure("Management connection state could not be read. Select a connection explicitly.");
+                    explicitDisconnected = ["unsupported", "disconnected"].includes(data.carrier) || (data.carrier.startsWith("consumer_") && !data.connected);
+                    if (consumerConnected && byId("wtp-management-carrier")) {
+                        byId("wtp-management-carrier").value = data.carrier;
+                        byId("wtp-management-host").value = data.host;
+                    }
+                } else explicitDisconnected = body.action === "disconnect";
+                available = canSelect && (consumerConnected || (!explicitDisconnected && root.WtpUi?.read().Transport === "network"));
+                configRevision = networkRevision = ""; target = null; reconcile = loaded;
+                feedback.textContent = consumerConnected
+                    ? "Consumer management authenticated for this Pico and boot. Load saved Pico settings before editing. The login password has been cleared."
+                    : explicitDisconnected ? "Management disconnected. Only this client's consumer session was closed. Your settings draft is preserved."
+                        : "Engineering HTTPS selected. Load saved Pico settings before editing.";
+            } else if (resource === "network") {
                 networkRevision = etag;
                 const discovery = data.mdns_state ? ` Discovery: ${data.mdns_state}. Configured hostname: ${data.configured_hostname || "none"}. Advertised hostname: ${data.advertised_hostname || "none"}. Current address: ${data.ipv4 || "unavailable"}.` : "";
                 const problem = data.mdns_state === "conflict" ? " Resolve the name conflict, then retry the same certified name with an idle disable/re-enable or restart. No automatic rename occurred."
@@ -140,7 +181,10 @@
                 ? "Pico request timed out. Its result is unconfirmed. Your draft is preserved; read saved settings before retrying a change."
                 : error.operatorMessage ? error.message
                     : "Pico request or response could not be confirmed. Your draft is preserved; load saved settings before saving again.";
-        } finally { clearTimeout(timeout); busy = false; render(); }
+        } finally {
+            if (resource === "member/management" && method === "POST" && byId("wtp-management-password")) byId("wtp-management-password").value = "";
+            clearTimeout(timeout); busy = false; render();
+        }
     }
     function save(onlySchedules) {
         if (!configRevision || !target) return;
@@ -161,10 +205,31 @@
                 operation: onlySchedules ? "schedules" : "save", config }, configRevision);
         } catch (error) { byId("wtp-management-feedback").textContent = error.message; }
     }
-    root.WtpManagement = { setAvailability(value) { available = value; render(); } };
+    root.WtpManagement = { setAvailability(value, selectable = value) {
+        canSelect = selectable;
+        available = !explicitDisconnected && (consumerConnected ? selectable : value);
+        render();
+        if (selectable && !selectionObserved && !busy) {
+            selectionObserved = true;
+            void request("member/management");
+        }
+    } };
     function init() {
         if (!byId("wtp-management")) return;
         for (const id of Object.keys(values(null))) originalHints.set(id, byId(`wtp-remote-${id}-hint`)?.textContent || "");
+        byId("wtp-management-carrier")?.addEventListener("change", () => {
+            if (byId("wtp-management-password")) byId("wtp-management-password").value = "";
+            render();
+        });
+        byId("wtp-management-connect")?.addEventListener("click", () => {
+            const carrier = byId("wtp-management-carrier").value;
+            return request("member/management", "POST", carrier === "engineering_mtls"
+                ? { action: "engineering_mtls" }
+                : { action: "connect", carrier, host: byId("wtp-management-host").value,
+                    password: byId("wtp-management-password").value });
+        });
+        byId("wtp-management-state")?.addEventListener("click", () => request("member/management"));
+        byId("wtp-management-disconnect")?.addEventListener("click", () => request("member/management", "POST", { action: "disconnect" }));
         byId("wtp-remote-load").addEventListener("click", () => request("member/configuration"));
         byId("wtp-network-load").addEventListener("click", () => request("network"));
         byId("wtp-remote-save").addEventListener("click", () => save(false));

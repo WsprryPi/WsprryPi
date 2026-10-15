@@ -1,5 +1,7 @@
 # WsprryPi shared browser API adapter
 
+See the [P15.3 implementation and evidence](development/phase15-3-management-carriers.md) for the carrier matrix, exact source-pair validation and limits.
+
 The host adopts Pico API v1 resource names for their compatible meanings and
 labels host projections `scope: wsprrypi-host/1`. It retains `/config`, `/api/wtp`,
 `/api/wtp/recover` and existing controls. Browser URLs use the application proxy
@@ -13,6 +15,7 @@ prefix `/wsprrypi`; the table below shows backend paths.
 | GET/PUT `/api/v1/config` | Pico standalone station/Wi-Fi/schedule configuration, through serialized idle HTTPS. |
 | GET/PUT `/api/v1/schedules` | Pico standalone schedule subresource, sharing Pico config revisions. |
 | GET/PUT `/api/v1/network` | Pico network status/control, with its own remote revision. |
+| GET/POST `/api/v1/member/management` | Explicit volatile engineering/consumer station/AP management selection and login; shared host guard and idle gate. |
 | GET/POST `/api/v1/member/configuration` | Host-coordinated selected-Pico settings context and one compatible atomic save; schema `wsprrypi-pico-settings/1`. |
 | GET/PUT `/api/v1/host/config` | Explicit `wsprrypi-host-config/1` application and transport settings. PUT applies a merge patch. |
 | GET `/api/v1/host/discovery` | Bounded local Avahi snapshot; no WTP connection. |
@@ -123,3 +126,64 @@ from the last successful handshake. A new failed connection clears authenticated
 identity; transport closure cannot establish inactive output. The remote network
 resource additionally exposes Pico discovery state, separate from this host's
 resolver/TLS observations. None of these fields installs or changes Linux NSS.
+
+## Explicit consumer management
+
+Management is selected separately from WTP job transport in Pico standalone
+settings. Engineering HTTPS retains its certificate policy. Consumer Wi-Fi and
+setup Wi-Fi use trusted local OpenSSL Consumer-Radio/1 code, without executing
+device JavaScript. Enter the configured Pico's full device ID, reachable IPv4 or
+local hostname and its saved Wi-Fi password. AP use requires existing Pi network
+reachability; no automatic network change occurs.
+
+POST `/api/v1/member/management` accepts exactly one of:
+`{"action":"connect","carrier":"consumer_station","host":"192.168.1.53","password":"<operator input>"}`,
+the equivalent `consumer_ap` with host `192.168.4.1`,
+`{"action":"disconnect"}`, or `{"action":"engineering_mtls"}`. Password input is
+8-63 printable ASCII bytes. The complete request is limited to 512 UTF-8 bytes.
+GET returns only selected carrier, authority and volatile connection availability.
+It exposes no credentials/keys and is protected like configuration reads.
+Engineering selection requires the existing engineering WTP/TLS configuration.
+All selections and remote requests use the existing operation mutex and application
+idle gate. A deliberately supported consumer management-only path authenticates
+its member/boot/generation without WTP, but cannot bypass prior host uncertainty,
+owned work or pending work. The remote coordinator still verifies idle/unowned/
+inactive/nonfaulted status and complete configuration context.
+
+Consumer authentication uses a group-shared Wi-Fi passphrase. A holder can
+impersonate a member; the protocol provides neither unique-device authentication
+nor PAKE properties. The native client avoids HTTP page substitution by using
+local code, but does not strengthen that trust model. The browser-to-Pi link uses
+the existing trusted-LAN operator policy: protect that link and its operator
+session when entering a shared password. No personal-account isolation is added.
+
+The password is used during login, then its parsed transient storage is wiped;
+HTTP request/parser buffers have their ordinary request lifetime. The UI clears
+login input after an attempt. Only traffic keys remain in RAM, with 5-minute idle
+and 15-minute absolute expiry; no durable credential reference is created.
+Do not put passwords in URLs, saved INI, device catalogs or browser storage.
+Disconnect logs out only this client's session; an existing browser session
+returns `radio_session_busy` and is never evicted. A lost encrypted reply clears
+local keys; its remote slot can remain occupied until expiry. Wait or close the
+owning session explicitly; this client never uses an unrelated logout.
+
+Carrier/authority changes require explicit selection and new authentication.
+There is no redirect follow, alternate-carrier fallback, WTP-principal password,
+or automatic mutation retry. Authenticate the `transmitter-management/1`
+document before using capabilities; public identity is an untrusted hint.
+The legacy closed application's `authenticated_https` label remains for old
+clients; it does not inventory actual carriers. Unsupported discovery refuses.
+USB/Console, Plain LAN WTP, TLS-WTP and BLE gain no JSON administration.
+
+
+Host capabilities report built-in management adapters separately from actual
+remote authenticated capability/availability. `features.config/schedules/network`
+indicate built-in host routes across job transports; read the protected local
+management selection and then the authenticated remote contract for current
+support. Neither these flags nor WTP reachability authorize a mutation.
+
+An active fake endpoint can collect a password-derived finish proof and test
+password guesses offline with its chosen X25519 shared secret. Passive capture
+does not reveal that secret. This unchanged protocol limitation requires a
+strong passphrase and trusted endpoint/network; native code does not authenticate
+a unique device before sending its proof.

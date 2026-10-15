@@ -144,7 +144,8 @@
         if (byId("wtp-network-state")) byId("wtp-network-state").textContent = n
             ? `Configured target: ${n.hostname}:${n.port} · ${n.state}. ${n.security === "plain_lan" ? "Plain LAN; clients on this network can control the Pico." : `Expected identity: ${n.expected_identity || "unconfirmed"}. Last authenticated identity: ${n.authenticated_identity || "unconfirmed"}.`} Resolved address: ${n.resolved_address || "unresolved"}. Observation age: ${n.observed_ms && snapshot.now_ms ? Math.max(0, Number(BigInt(snapshot.now_ms) - BigInt(n.observed_ms))) + " ms" : "unknown"}. ${n.diagnostic || ""}`
             : "Network connection is unconfirmed.";
-        root.WtpManagement?.setAvailability(visible && selected() && transport === "network" && snapshot?.selected === true && snapshot.ready === true && snapshot.phase === "idle" && !snapshot.worker_active && !snapshot.recovery_required && !snapshot.owns);
+        root.WtpManagement?.setAvailability(visible && selected() && transport === "network" && snapshot?.selected === true && snapshot.ready === true && snapshot.phase === "idle" && !snapshot.worker_active && !snapshot.recovery_required && !snapshot.owns,
+            visible && selected() && snapshot?.selected === true && snapshot.phase === "idle" && !snapshot.worker_active && !snapshot.recovery_required && !snapshot.owns && !snapshot.uncertain && !snapshot.safety_fault);
         const state = summarize(snapshot);
         for (const [id, value] of [["wtp-status-text", state.text], ["wtp-output", state.output], ["wtp-clock", state.clock], ["wtp-identity", state.identity], ["wtp-history", state.history]]) byId(id).textContent = value;
         if (byId("wtp-cancel")) byId("wtp-cancel").disabled = cancelling || !selected() || snapshot?.selected !== true || !snapshot?.job_id || !(snapshot.owns || snapshot.phase === "waiting");

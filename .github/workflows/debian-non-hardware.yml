@@ -101,7 +101,7 @@ jobs:
     timeout-minutes: 15
     strategy:
       matrix:
-        profile: [legacy, extended]
+        profile: [legacy, extended, p152]
     steps:
       - uses: actions/checkout@v7
       - name: Existing host-only compatibility dependencies

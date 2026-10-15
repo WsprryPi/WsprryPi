@@ -3,7 +3,7 @@
 The Pi settings form uses one host-coordinated, serialized settings transaction.
 The existing WTP application remains the only scheduling/ownership authority;
 Pico remains the only remote configuration validator and journal authority.
-This changes no WTP/1 message, RF engine, recurrence policy or management carrier.
+The P15.3 extension adds explicit consumer management carriers while preserving WTP/1, RF engines and recurrence policy.
 
 ## Context and edit API
 
@@ -81,10 +81,10 @@ An unrecognized future field causes safe refusal rather than loss. Present but
 unsupported update support never silently downgrades. Host feature flags, WTP
 CAPS, firmware dates and transport reachability do not establish update support.
 
-Engineering Network (TLS) remains the Pi JSON management carrier. Outbound
+Engineering Network (TLS) remains the default certificate management carrier. Explicit authenticated consumer station/AP management is described in [the adapter contract](wtp-browser-api.md#explicit-consumer-management). Outbound
 allowlists add only GET application and POST config/update to existing finite
 pairs. Authenticated canonical Host/Origin, JSON intent and If-Match apply to
-POST as to PUT. USB, Plain LAN WTP and consumer-radio are not substituted.
+POST as to PUT. USB and Plain LAN WTP are not management carriers; no carrier is substituted automatically.
 Existing direct `/config`, `/schedules` and `/network` resource compatibility
 remains available; the settings form uses the coordinated resource above.
 

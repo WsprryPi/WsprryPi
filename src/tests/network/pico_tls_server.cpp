@@ -76,6 +76,10 @@ int main(int argc, char **argv) {
   wsprrypico::network::BrowserApi api{service, store, scheduler, network, device, "phase11-host-test"};
   // Match the pinned Pico standalone image's active-job connection policy.
   api.set_active_job_connections(true);
+#ifdef WSPRRY_PICO_MANAGEMENT_API
+  api.management_availability({wsprrypico::network::ManagementProfile::Engineering,
+      0, false, true, false, false, false});
+#endif
 #ifdef WSPRRY_PICO_EXTENDED_API
   using namespace wsprrypico::network::credentials;
   const wsprrypico::provisioning::CredentialMaterial material{device_id,hostname,port,certificate,key,ca};

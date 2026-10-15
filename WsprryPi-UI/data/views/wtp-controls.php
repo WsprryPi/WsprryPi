@@ -196,6 +196,33 @@
         <details id="wtp-management" class="wtp-status mt-3" hidden>
             <summary class="cw-control-section__title">Pico standalone settings and Wi-Fi</summary>
             <p class="form-text">These settings belong to Pico's standalone scheduler, separate from WsprryPi's schedule. Management is available only while the host has no pending, owned or unresolved job. Saves preserve settings outside this form. Network or pin changes may require a Pico restart; each save reports the requirement.</p>
+            <div class="row gx-3 gy-3 mb-3">
+                <div class="col-12 col-lg-6 config-stacked-field">
+                    <label class="form-label" for="wtp-management-carrier">Management connection</label>
+                    <select class="form-select" id="wtp-management-carrier" aria-describedby="wtp-management-carrier-hint">
+                        <option value="engineering_mtls">Engineering HTTPS (certificates)</option>
+                        <option value="consumer_station">Consumer Wi-Fi</option>
+                        <option value="consumer_ap">Consumer setup Wi-Fi</option>
+                    </select>
+                    <div class="form-text" id="wtp-management-carrier-hint">Choose separately from job transport. USB, Plain LAN WTP, TLS-WTP and BLE carry no JSON settings.</div>
+                </div>
+                <div class="col-12 col-lg-6 config-stacked-field" id="wtp-management-host-field" hidden>
+                    <label class="form-label" for="wtp-management-host">Pico IP address or local hostname</label>
+                    <input class="form-control" id="wtp-management-host" type="text" maxlength="253" autocomplete="off" spellcheck="false" aria-describedby="wtp-management-host-hint">
+                    <div class="form-text" id="wtp-management-host-hint">Use the exact reachable authority. Setup Wi-Fi uses 192.168.4.1; connect this Pi to that network first. This control does not change the Pi's network.</div>
+                </div>
+                <div class="col-12 col-lg-6 config-stacked-field" id="wtp-management-password-field" hidden>
+                    <label class="form-label" for="wtp-management-password">Saved Pico Wi-Fi password</label>
+                    <input class="form-control" id="wtp-management-password" type="password" maxlength="63" autocomplete="off" aria-describedby="wtp-management-password-hint">
+                    <div class="form-text" id="wtp-management-password-hint">Used once for login, then cleared. Session keys expire in memory. Anyone who knows this shared password has the same access.</div>
+                </div>
+                <div class="col-12 d-flex flex-wrap gap-2">
+                    <button type="button" class="btn btn-outline-primary" id="wtp-management-connect">Use this management connection</button>
+                    <button type="button" class="btn btn-outline-secondary" id="wtp-management-state">Read connection state</button>
+                    <button type="button" class="btn btn-outline-secondary" id="wtp-management-disconnect">Disconnect management</button>
+                </div>
+                <p class="col-12 form-text mb-0" id="wtp-management-connection-feedback" role="status" aria-live="polite">Engineering HTTPS uses the selected certificate connection. Consumer login requires the configured full Pico device ID. No automatic fallback is used.</p>
+            </div>
             <button type="button" class="btn btn-outline-primary" id="wtp-remote-load">Load saved Pico settings</button>
             <p class="form-text">Loading replaces the standalone draft below. After a conflicting or unconfirmed save, loading reads saved values and keeps your draft for review. Status polling preserves it.</p>
             <div class="row gx-3 gy-3" id="wtp-remote-fields">

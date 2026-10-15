@@ -17,12 +17,15 @@ function browser(exchange, producer = source) {
   const root = {document:{readyState:'complete',getElementById:element,querySelectorAll:()=>[]},
     WtpUi:{developmentControlsVisible:true,read:()=>({Transport:'network'})}, AbortController,setTimeout,clearTimeout,
     fetch:async (url, options) => {
-      const request = {url,...options,body:options.body ? JSON.parse(options.body) : null}; requests.push(request);
+      const request = {url,...options,body:options.body ? JSON.parse(options.body) : null};
+      if (!(url.endsWith('/member/management') && (!options.method || options.method === 'GET'))) requests.push(request);
+      if (url.endsWith('/member/management') && (!options.method || options.method === 'GET'))
+        return response({carrier:'engineering_mtls',host:'',connected:false});
       return exchange(request);
     }};
   root.window=root; vm.runInNewContext(producer,root);
   root.WtpManagement.setAvailability(true);
-  return {root,fields,requests,element,click:id=>element(id).listeners.click()};
+  return {root,fields,requests,element,click:async id=>{ await new Promise(resolve=>setImmediate(resolve)); return element(id).listeners.click(); }};
 }
 const response = (body, status=200, etag='"r1"') => ({ok:status===200,status,headers:{get:()=>etag},json:async()=>body});
 const context = (c=config) => ({schema:'wsprrypi-pico-settings/1',target,config:structuredClone(c),update_strategy:'merge',reboot_required:false});

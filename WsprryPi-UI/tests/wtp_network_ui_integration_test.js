@@ -145,6 +145,13 @@ async function main() {
                 remote:{output_active:false}, owns:false, network:{hostname:'wsprrypico-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.local',port:18443,expected_identity:'wsprrypico-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.local',resolved_address:'192.0.2.27',authenticated_identity:'wsprrypico-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.local',state:'ready',observed_ms:'9000'} };
             window.fetch = async (url, options = {}) => {
                 window.__requests.push({url,options});
+                if (String(url).endsWith('/member/management')) {
+                    const body = options.body ? JSON.parse(options.body) : null;
+                    if (body?.action === 'connect' && window.__consumerBusy) return {ok:false,status:409,json:async()=>({error:{code:'radio_session_busy'}})};
+                    if (body?.action === 'connect') window.__management = {carrier:body.carrier,host:body.host,connected:true};
+                    if (body?.action === 'disconnect') window.__management = {carrier:'disconnected',host:'',connected:false};
+                    return {ok:true,headers:{get:()=>''},json:async()=>window.__management || {carrier:'engineering_mtls',host:'',connected:false}};
+                }
                 if (String(url).endsWith('/host/devices')) return {ok:true,headers:{get:()=> '"catalog-r1"'},json:async()=>({scope:'wsprrypi-wtp-catalog/1',version:1,active_id:'c'.repeat(32),active_unmatched:false,profiles:[{id:'c'.repeat(32),name:'Bench Pico',method:'manual',discovery_id:'',legacy_unverified:false,settings:{Transport:'network',Hostname:'wsprrypico-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.local','TCP Port':18443,'TLS Server Identity':'pico.local','TLS CA File':'/etc/wsprrypi/pico/ca.crt','TLS Client Certificate':'/etc/wsprrypi/pico/client.crt','TLS Client Key':'/etc/wsprrypi/pico/client.key',Endpoint:'', 'USB Serial':'','USB Vendor ID':0,'USB Product ID':0,'Device ID':'a'.repeat(32),'Start Uncertainty ns':1000000,'Allow Frequency Adjustment':false}}]})};
                 if (String(url).endsWith('/host/discovery')) return {ok:true,json:async()=>({available:true,reason:'',candidates:[{id:'service-nearby',interface:2,protocol:0,instance:'Nearby Pico',domain:'local',target:'nearby.local',port:40123,binding:'plain',state:'online',first_seen_ms:1,last_seen_ms:2}]})};
                 if (String(url).endsWith('/status')) {
@@ -197,7 +204,7 @@ async function main() {
         assert.equal(await evaluate('document.querySelector("[data-wtp-security=tls]").hidden'), true);
         assert.equal(await evaluate('document.querySelector("[data-wtp-transport=network]").hidden'), false);
         assert.equal(await evaluate('document.getElementById("wtp-device-label").textContent.includes("optional")'), true);
-        assert.equal(await evaluate('document.getElementById("wtp-management").hidden'), true);
+        assert.equal(await evaluate('document.getElementById("wtp-management").hidden'), false);
         for (const viewport of [{name:'desktop',width:1280,height:900},{name:'mobile',width:390,height:844}]) {
             await client.send('Emulation.setDeviceMetricsOverride', {...viewport,deviceScaleFactor:1,mobile:viewport.name==='mobile'});
             await new Promise(resolve=>setTimeout(resolve,200));
@@ -238,6 +245,26 @@ async function main() {
                 await capture(`${viewport.name}-schedule-${section}.png`, {format:'png'});
             }
         }
+        for (const state of ['entry', 'connected', 'busy']) {
+            await evaluate(`window.__consumerBusy=${state === 'busy'}; window.WtpManagement.setAvailability(true,true); document.getElementById('wtp-management-carrier').value='consumer_station'; document.getElementById('wtp-management-carrier').dispatchEvent(new Event('change')); document.getElementById('wtp-management-host').value='192.168.1.53';`);
+            if (state !== 'entry') {
+                await evaluate(`document.getElementById('wtp-management-password').value='synthetic-test-password'; document.getElementById('wtp-management-connect').click();`);
+                await waitFor(async()=>await evaluate('document.getElementById("wtp-management").getAttribute("aria-busy")==="false"'),'consumer login result');
+                assert.equal(await evaluate('document.getElementById("wtp-management-password").value'),'');
+            }
+            for (const theme of ['light','dark']) for (const viewport of [{name:'desktop',width:1280,height:900},{name:'mobile',width:390,height:844}]) {
+                await client.send('Emulation.setDeviceMetricsOverride',{...viewport,deviceScaleFactor:1,mobile:viewport.name==='mobile'});
+                await evaluate(`applyThemePreference('${theme}'); document.getElementById('wtp-management-carrier').scrollIntoView({block:'start',behavior:'instant'}); window.scrollBy(0,-190);`);
+                await capture(`${viewport.name}-${theme}-consumer-${state}.png`,{format:'png'});
+                assert(await evaluate('document.documentElement.scrollWidth<=innerWidth+1'),'consumer management overflow');
+            }
+            if (state === 'connected') {
+                await evaluate(`document.getElementById('wtp-management-disconnect').click();`);
+                await waitFor(async()=>await evaluate('document.getElementById("wtp-management").getAttribute("aria-busy")==="false"'),'consumer disconnect');
+            }
+        }
+        await evaluate(`window.__consumerBusy=false; window.__management={carrier:'engineering_mtls',host:'',connected:false}; document.getElementById('wtp-management-state').click();`);
+        await waitFor(async()=>await evaluate('document.getElementById("wtp-management").getAttribute("aria-busy")==="false"'),'restore engineering management');
         for (const state of ['saved', 'stale', 'unsupported', 'ambiguous', 'busy']) {
             await evaluate(`window.__remoteFailure=false; window.__mutationFailure=''; window.WtpManagement.setAvailability(true); document.getElementById('wtp-remote-load').click();`);
             await waitFor(async () => await evaluate('!document.getElementById("wtp-remote-save").disabled'), 'settings readback');

@@ -391,6 +391,23 @@ void run(const std::string &credentials) {
   select_wtp_runtime(std::nullopt);
   select_wtp_runtime(plain_settings);
   CHECK(nlohmann::json::parse(wtp_runtime_json()).at("transport") == "network_plain");
+  auto management_settings = plain_settings;
+  management_settings.device_id = backend_test::device;
+  select_wtp_runtime(management_settings);
+  CHECK(!wtp_runtime_inspect().ok); // Failed WTP startup never submitted work.
+  // Deliberate management-only admission must not open an unrelated WTP path.
+  for (const auto carrier : {"usb", "ble", "network_plain", "engineering_field", "tls_wtp"}) {
+    const auto rejected = wtp_runtime_management("member/management", "POST",
+        nlohmann::json{{"action","connect"},{"carrier",carrier},{"host","192.168.1.53"},{"password","test-password"}}.dump(), "");
+    CHECK(rejected.status == 400);
+  }
+  const auto login_refused = wtp_runtime_management("member/management", "POST",
+      R"({"action":"connect","carrier":"consumer_station","host":"192.168.1.53","password":"test-password"})", "");
+  CHECK(login_refused.status == 401); // Production network I/O is inhibited.
+  CHECK(nlohmann::json::parse(wtp_runtime_management("member/management","GET","","").body).at("carrier") == "consumer_station");
+  CHECK(wtp_runtime_management("member/configuration","GET","","").status == 401);
+  CHECK(wtp_runtime_management("member/management","POST",R"({"action":"disconnect"})","").status == 200);
+
   select_wtp_runtime(std::nullopt);
   if (!credentials.empty()) {
     auto network = settings;
@@ -428,6 +445,10 @@ void run(const std::string &credentials) {
     const auto before_management = rotation_clock.peer.operations;
     CHECK(wtp_runtime_management("member/configuration", "GET", "", "").status == 409);
     CHECK(rotation_clock.peer.operations == before_management);
+    CHECK(wtp_runtime_management("member/management", "POST",
+        R"({"action":"connect","carrier":"consumer_station","host":"192.168.1.53","password":"test-password"})", "").status == 409);
+    CHECK(rotation_clock.peer.operations == before_management);
+
     CHECK(wtp_runtime_selection_error(network).empty());
     copy_credentials("other");
     CHECK(!wtp_runtime_selection_error(network).empty());

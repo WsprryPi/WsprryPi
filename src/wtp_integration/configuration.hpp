@@ -10,5 +10,6 @@ using PicoManagementExchange = std::function<PicoHttpResponse(
 // comes from its fresh WTP negotiation, never from the browser or TLS address.
 PicoHttpResponse pico_configuration_request(const PicoManagementExchange &,
     const std::string &device, const std::string &boot, const std::string &method,
-    const std::string &body = {}, const std::string &revision = {});
+    const std::string &body = {}, const std::string &revision = {},
+    const std::string &carrier = "engineering_mtls", const std::string &generation = {});
 } // namespace wsprrypi

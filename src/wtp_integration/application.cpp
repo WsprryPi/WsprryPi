@@ -305,11 +305,21 @@ bool WtpApplication::replaceable() const {
          s.remote->state != wtp::State::Armed &&
          s.remote->state != wtp::State::Running;
 }
-bool WtpApplication::idle_management(const std::function<void()> &request) {
+bool WtpApplication::idle_management(const std::function<void()> &request, bool authenticated_management) {
   std::lock_guard lock(control_);
   if (active_ || skip_pending_ || scheduler_.phase() != WtpSchedulePhase::Idle)
     return false;
   join();
+  // A management-only path authenticates its own member context. Prior host
+  // uncertainty/ownership remains authoritative; never connect unrelated WTP.
+  if (authenticated_management) {
+    if (!replaceable()) return false;
+    scheduler_.disconnect();
+    ready_ = false;
+    idle_detached_ = true;
+    request();
+    return true;
+  }
   if (!connect_idle().ok || !replaceable()) return false;
   scheduler_.disconnect();
   ready_ = false;

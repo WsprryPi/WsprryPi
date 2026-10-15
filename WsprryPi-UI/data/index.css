@@ -1371,3 +1371,21 @@ legend {
 @media (max-width: 575.98px) { .wtp-observations > div { grid-template-columns: 1fr; gap: .25rem; } }
 
 #wtp-recover:focus-visible { outline: 2px solid var(--bs-body-color); outline-offset: 3px; }
+
+/* Management controls retain readable action text in both appliance themes. */
+[data-bs-theme="dark"] #wtp-management .btn-outline-secondary {
+    color: var(--bs-body-color);
+    border-color: var(--bs-border-color);
+}
+[data-bs-theme="dark"] #wtp-management .btn-outline-primary {
+    color: var(--bs-primary-text-emphasis);
+    border-color: var(--bs-primary-text-emphasis);
+}
+[data-bs-theme="dark"] #wtp-management .btn-outline-secondary:hover {
+    color: var(--bs-body-bg);
+    background-color: var(--bs-body-color);
+}
+[data-bs-theme="dark"] #wtp-management .btn-outline-primary:hover {
+    color: var(--bs-body-bg);
+    background-color: var(--bs-primary-text-emphasis);
+}

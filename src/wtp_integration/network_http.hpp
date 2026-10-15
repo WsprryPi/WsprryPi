@@ -9,9 +9,10 @@ namespace wsprrypi {
 struct PicoHttpResponse {
   unsigned status{503};
   std::string body{R"({"error":{"code":"network_unavailable"}})"}, etag;
+  std::string media_type{"application/json"};
 };
 PicoHttpResponse wtp_json_http_exchange(wtp::ByteStream&, TlsStream::Clock,
-    const std::string& request, std::uint64_t deadline, bool mutation);
+    const std::string& request, std::uint64_t deadline, bool mutation, bool consumer = false);
 // One bounded request, already authorized/serialized by the application owner.
 // Only standalone management resources; never forwards browser job operations.
 PicoHttpResponse pico_http_request(TlsStream &, const TlsSelection &,

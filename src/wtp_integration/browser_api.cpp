@@ -36,14 +36,20 @@ PicoHttpResponse WtpBrowserApi::handle(const BrowserRequest &r) {
   }
   if (r.method == "GET" && r.path == "/api/v1/capabilities") {
     const auto host = status_();
-    const bool network = host.value("transport", "usb") == "network";
+
     return {200, nlohmann::json{{"api_version", 1}, {"scope", "wsprrypi-host/1"},
         {"wtp", host.value("capabilities", nlohmann::json(nullptr))},
-        {"features", {{"config", network}, {"schedules", network}, {"network", network},
+        {"features", {{"config", true}, {"schedules", true}, {"network", true},
                       {"jobs", true}, {"softap", false}, {"ble", false}}},
         {"job_operations", {"ABORT"}}, {"job_submission", "host-application"},
-        {"management_scope", "pico-standalone"}, {"active_job_connections", false},
+        {"management_scope", "pico-standalone"},
+        {"management_carriers", {{"scope", "wsprrypi-host/1"}, {"built_in", {"engineering_mtls", "consumer_station", "consumer_ap"}},
+          {"selection", "/api/v1/member/management"}, {"remote_capabilities", "authenticated_read_required"}}}, {"active_job_connections", false},
         {"max_body_bytes", 32768}}.dump(), {}};
+  }
+  if (r.path == "/api/v1/member/management" && (r.method == "GET" || r.method == "POST")) {
+    if (r.body.size() > 512) return error(413, "body_too_large");
+    return management_("member/management", r.method, r.body, {});
   }
   if (r.path == "/api/v1/member/configuration" && (r.method == "GET" || r.method == "POST")) {
     if (r.body.size() > 2048) return error(413, "body_too_large");

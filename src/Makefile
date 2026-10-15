@@ -1980,7 +1980,7 @@ WTP_NETWORK_FLAGS = -std=c++20 -pthread -Wall -Wextra -Wpedantic -Werror $(WTP_N
 .PHONY: wtp-api-test wtp-config-test wtp-config-client-build wtp-config-interop-test wtp-tls-build wtp-network-interop-test wtp-network-process-test
 wtp-config-test:
 	$(Q)mkdir -p "$(WTP_NETWORK_BUILD_DIR)"
-	$(Q)$(CXX) $(WTP_NETWORK_FLAGS) tests/wtp_configuration_test.cpp wtp_integration/configuration.cpp wtp_integration/browser_api.cpp wtp_integration/network_http.cpp wtp_integration/tls.cpp $(OPENSSL_LIBS) $(WTP_NETWORK_LDFLAGS) -o "$(WTP_NETWORK_BUILD_DIR)/wtp_configuration_test"
+	$(Q)$(CXX) $(WTP_NETWORK_FLAGS) tests/wtp_configuration_test.cpp wtp_integration/configuration.cpp wtp_integration/consumer_radio.cpp wtp_integration/plain_tcp.cpp wtp_integration/browser_api.cpp wtp_integration/network_http.cpp wtp_integration/tls.cpp $(OPENSSL_LIBS) $(WTP_NETWORK_LDFLAGS) -o "$(WTP_NETWORK_BUILD_DIR)/wtp_configuration_test"
 	$(Q)"$(WTP_NETWORK_BUILD_DIR)/wtp_configuration_test"
 	$(Q)node ../WsprryPi-UI/tests/wtp_management_test.js
 wtp-network-process-test:
@@ -2005,7 +2005,7 @@ wtp-config-client-build:
 	$(Q)mkdir -p "$(WTP_NETWORK_BUILD_DIR)"
 	$(Q)$(MAKE) --no-print-directory -C WTP-Client all BUILD_DIR="$(abspath $(WTP_NETWORK_BUILD_DIR)/client)" CXXFLAGS="$(WTP_NETWORK_CXXFLAGS)"
 	$(Q)$(CXX) $(WTP_NETWORK_FLAGS) tests/wtp_configuration_client.cpp wtp_integration/tls.cpp wtp_integration/network_http.cpp \
-		wtp_integration/configuration.cpp wtp_integration/browser_api.cpp wtp_integration/application.cpp wtp_integration/status.cpp \
+		wtp_integration/configuration.cpp wtp_integration/consumer_radio.cpp wtp_integration/plain_tcp.cpp wtp_integration/browser_api.cpp wtp_integration/application.cpp wtp_integration/status.cpp \
 		wtp_integration/scheduler.cpp wtp_integration/backend.cpp wtp_integration/execution_plan.cpp \
 		WSPR-Transmitter/src/execution_plan_compiler.cpp WSPR-Transmitter/src/transmission_controller.cpp \
 		"$(WTP_NETWORK_BUILD_DIR)/client/libwtp_client.a" $(OPENSSL_LIBS) $(WTP_NETWORK_LDFLAGS) -o "$(WTP_NETWORK_BUILD_DIR)/wtp_configuration_client"
@@ -2013,6 +2013,7 @@ wtp-config-interop-test: wtp-config-client-build wtp-config-test
 	$(Q)cmake -S tests/network -B "$(WTP_NETWORK_BUILD_DIR)" -DPICO_COMPAT_PROFILE=$(PICO_COMPAT_PROFILE) -DPICO_SOURCE="$(abspath $(PICO_SOURCE))" -DMBEDTLS_SOURCE="$(abspath $(MBEDTLS_SOURCE))"
 	$(Q)cmake --build "$(WTP_NETWORK_BUILD_DIR)" -j 2
 	$(Q)node ../WsprryPi-UI/tests/wtp_configuration_interop_test.js "$(abspath $(WTP_NETWORK_BUILD_DIR))" $(PICO_COMPAT_PROFILE) "$(abspath $(PICO_SOURCE))"
+	$(Q)if [ "$(PICO_COMPAT_PROFILE)" = current ]; then "$(WTP_NETWORK_BUILD_DIR)/consumer_interop" "$(abspath $(PICO_SOURCE))/docs/protocol/Consumer-Radio-v1-vectors.json"; fi
 wtp-network-interop-test: wtp-tls-build wtp-api-test wtp-network-process-test
 	$(Q)cmake -S tests/network -B "$(WTP_NETWORK_BUILD_DIR)" -DPICO_SOURCE="$(abspath $(PICO_SOURCE))" -DMBEDTLS_SOURCE="$(abspath $(MBEDTLS_SOURCE))"
 	$(Q)cmake --build "$(WTP_NETWORK_BUILD_DIR)" -j 4

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Lee Bussy
 #include "configuration.hpp"
+#include "consumer_radio.hpp"
 #include "browser_api.hpp"
 #include <algorithm>
 #include <set>
@@ -135,7 +136,8 @@ void success(const PicoHttpResponse &r) {
   for (const auto known : {"revision_conflict", "target_mismatch", "consumer_setup_identity_required",
        "busy", "not_configured", "invalid_config", "storage_fault", "output_disable_failed",
        "resource_exhausted", "management_outcome_unknown", "network_unavailable", "network_deadline",
-       "tls_authentication_or_connection_failed", "host_busy_or_output_unresolved"})
+       "tls_authentication_or_connection_failed", "host_busy_or_output_unresolved",
+       "consumer_login_required", "consumer_session_unconfirmed", "setup_pending"})
     if (code == known) throw Rejected{r.status, known};
   throw Rejected{r.status >= 400 && r.status <= 599 ? r.status : 502U, "remote_configuration_rejected"};
 }
@@ -150,7 +152,8 @@ Json merge(Json current, const Json &patch) {
 } // namespace
 PicoHttpResponse pico_configuration_request(const PicoManagementExchange &exchange,
     const std::string &device, const std::string &boot, const std::string &method,
-    const std::string &body, const std::string &revision) {
+    const std::string &body, const std::string &revision,
+    const std::string &carrier, const std::string &generation) {
   bool attempted = false;
   try {
     require(identity(device) && identity(boot), "member_identity_unavailable", 409);
@@ -175,6 +178,13 @@ PicoHttpResponse pico_configuration_request(const PicoManagementExchange &exchan
     const auto caps = parsed(read("capabilities"));
     require(caps.is_object() && caps.contains("api_version") && caps["api_version"].is_number_integer() &&
         caps["api_version"] == 1, "unsupported_remote_api", 409);
+    if (caps.contains("management_carriers")) {
+      require(fields(caps["management_carriers"], {"schema", "path"}) &&
+          caps["management_carriers"]["schema"] == "transmitter-management/1" &&
+          caps["management_carriers"]["path"] == "/api/v1/management", "unsupported_management_contract", 409);
+      require(valid_management_contract(parsed(read("management")), carrier, device, boot, generation),
+          "unsupported_management_contract", 409);
+    } else require(carrier == "engineering_mtls", "unsupported_management_contract", 409);
     auto original = read("config");
     auto configuration = parsed(original);
     require(fields(configuration, {"config"}) && (configuration["config"].is_null() ||

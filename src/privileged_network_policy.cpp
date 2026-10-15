@@ -90,7 +90,7 @@ PrivilegedOperationClass classify_privileged_http_operation(
     }
 
     if (path.starts_with("/api/v1/")) {
-        if (path == "/api/v1/member/configuration" && (method == "GET" || method == "POST"))
+        if ((path == "/api/v1/member/configuration" || path == "/api/v1/member/management") && (method == "GET" || method == "POST"))
             return PrivilegedOperationClass::protected_operation;
         if (method == "GET" && (path == "/api/v1/status" || path == "/api/v1/jobs" || path == "/api/v1/capabilities"))
             return PrivilegedOperationClass::read_only;

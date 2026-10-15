@@ -9,7 +9,7 @@
 #include <thread>
 namespace wsprrypi {
 PicoHttpResponse wtp_json_http_exchange(wtp::ByteStream& stream, TlsStream::Clock clock,
-    const std::string& request, std::uint64_t deadline, bool mutation) {
+    const std::string& request, std::uint64_t deadline, bool mutation, bool consumer) {
   const auto error = [](unsigned status, const char *code) {
     return PicoHttpResponse{status, nlohmann::json{{"error", {{"code", code}}}}.dump(), {}};
   };
@@ -49,14 +49,15 @@ PicoHttpResponse wtp_json_http_exchange(wtp::ByteStream& stream, TlsStream::Cloc
       const auto &size = headers["content-length"];
       auto number = std::from_chars(size.data(), size.data() + size.size(), length);
       if (size.empty() || number.ec != std::errc() || number.ptr != size.data() + size.size() ||
-          length > 32768 || headers.contains("transfer-encoding") || headers["content-type"] != "application/json")
+          length > 32768 || headers.contains("transfer-encoding") || (headers["content-type"] != "application/json" &&
+           !(consumer && status == 200 && headers["content-type"] == "application/octet-stream")))
         return error(502, "invalid_remote_response");
       const auto received = response.size() - boundary - 4;
       if (received > length) return error(502, "invalid_remote_response");
       if (received == length) {
         auto payload = response.substr(boundary + 4);
-        if (nlohmann::json::parse(payload, nullptr, false).is_discarded()) return error(502, "invalid_remote_response");
-        return {status, std::move(payload), headers["etag"]};
+        if (headers["content-type"] == "application/json" && nlohmann::json::parse(payload, nullptr, false).is_discarded()) return error(502, "invalid_remote_response");
+        return {status, std::move(payload), headers["etag"], headers["content-type"]};
       }
     }
     if (result.state == wtp::IoState::Closed || result.state == wtp::IoState::Failed)
@@ -75,7 +76,7 @@ PicoHttpResponse pico_http_request(TlsStream &stream, const TlsSelection &select
   };
   const bool mutation = method == "PUT" || method == "POST";
   const bool allowed = (method == "GET" && (resource == "config" || resource == "schedules" ||
-      resource == "network" || resource == "capabilities" || resource == "status" || resource == "application")) ||
+      resource == "network" || resource == "capabilities" || resource == "status" || resource == "application" || resource == "management")) ||
       (method == "PUT" && (resource == "config" || resource == "schedules" || resource == "network")) ||
       (method == "POST" && resource == "config/update");
   if (!allowed)
