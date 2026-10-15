@@ -119,12 +119,12 @@ changes must use Pico setup when Pico rejects them; Pi never claims they saved.
 
 ## Source-pair scope
 
-P15.4's current implementation dependency is clean Pico
+P15.4's historical implementation dependency is clean Pico
 `ddb00dd7960373cec271f7816c0e1b10117416e9`; its difference from accepted P15.3
 `d6208dbc88005383041c5ec306b738db7ec22796` is documentation only. The historical
 `p153` row remains pinned separately, alongside `legacy`, `extended` and `p152`.
-Current and p153 execute the actual native consumer fixture as well as the TLS
-settings tests. Current additionally executes the UI-produced shared resource
+Current, p153 and the explicit p154 row execute the actual native consumer
+fixture as well as the TLS settings tests. Current additionally executes the UI-produced shared resource
 workflow through protected routing, production runtime and actual Pico handlers
 on engineering mTLS and consumer station/AP paths. Older peers retain their
 supported legacy editor; absent shared resources are unavailable. See the
@@ -138,6 +138,20 @@ the original P15.2 evidence, rather than reclassifying its historical rows.
 | Updated client | `95aac22bf7cc31b67fe5773761708d743d8a6473` | Strict legacy Config v1 fallback |
 | Updated client | `dfffdd5220db8b7cf1acf5e74950dbd294283c55` | Extended pre-fix legacy replacement; Pi explicitly preserves known extensions |
 | Updated client | `87144d1364f36d04bfe0a714bd1c2f6deb974302` | Advertised merge with exact target and journal-generation/ABA revision |
+
+P15.6 current is pinned to clean Pico
+`792b5b2f60e381a6bd8e7a7726eeffe24fc08519`, with exact management/2 limits
+and three independently authenticated sessions. The old published-current
+`ddb00dd7960373cec271f7816c0e1b10117416e9` is retained as explicit `p154`.
+All five older rows (`legacy`, `extended`, `p152`, `p153`, `p154`) remain active.
+New Pi validates management/1 and management/2 exactly, including field types,
+capacity, quotas, carrier, target, boot and generation. Invalid, fractional,
+boolean, zero, negative, excessive or unknown-version values refuse without
+fallback or mutation. Actual old native Pi source explicitly refuses new
+discovery with `unsupported_management_contract`, logs out its own temporary
+session and makes no write. Consumer-Radio/1 bytes and fixed vectors stay the
+same. The [P15.6 record](development/phase15-6-sessions.md) retains source-pair,
+mixed native/browser, sanitizer and scope evidence.
 
 The September strict server's ETag hashes boot/config/network values without
 modern device/generation binding. It cannot detect an external A-to-B-to-A

@@ -70,5 +70,11 @@ const {schedules,changes} = require('../data/wtp-management.js');
   assert(occupied.element('wtp-remote-load').disabled);
   assert.match(occupied.element('wtp-management-connection-feedback').textContent,/did not close/);
   assert.equal(occupied.requests.length,1);
+  for(const [code,status,message] of [['radio_session_capacity',409,/three Pico radio sessions/],['radio_login_pending',409,/30 seconds/],['radio_login_rate_limited',429,/one second/]]) {
+    const limited=browser(()=>response({error:{code}},status));await new Promise(resolve=>setImmediate(resolve));
+    limited.element('wtp-management-carrier').value='consumer_station';limited.element('wtp-management-host').value='192.168.1.53';limited.element('wtp-management-password').value='test-password';
+    await limited.click('wtp-management-connect');assert.match(limited.element('wtp-management-connection-feedback').textContent,message);
+    assert.equal(limited.requests.length,1);assert.equal(limited.element('wtp-management-password').value,'');
+  }
   console.log('Pico settings producer, partial edits, no-change, drafts, conflict/readback, password and restart feedback passed');
 })().catch(error=>{console.error(error);process.exitCode=1;});

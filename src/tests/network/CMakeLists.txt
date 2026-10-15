@@ -16,6 +16,8 @@ elseif(PICO_COMPAT_PROFILE STREQUAL "p152")
   set(pico_pin_file "${CMAKE_CURRENT_SOURCE_DIR}/pico-p152-revision.txt")
 elseif(PICO_COMPAT_PROFILE STREQUAL "p153")
   set(pico_pin_file "${CMAKE_CURRENT_SOURCE_DIR}/pico-p153-revision.txt")
+elseif(PICO_COMPAT_PROFILE STREQUAL "p154")
+  set(pico_pin_file "${CMAKE_CURRENT_SOURCE_DIR}/pico-p154-revision.txt")
 elseif(NOT PICO_COMPAT_PROFILE STREQUAL "current")
   message(FATAL_ERROR "Unknown Pico compatibility profile")
 endif()
@@ -84,7 +86,7 @@ if(NOT PICO_COMPAT_PROFILE STREQUAL "legacy")
     network/bootstrap_slot.cpp network/bootstrap_wire.cpp network/owner_wire.cpp
     network/owner_challenge.cpp network/owner_claim_http.cpp network/consumer_radio.cpp network/softap_api.cpp
     standalone/frequency_policy_engine.cpp time/controller_time.cpp)
-  if(PICO_COMPAT_PROFILE STREQUAL "current" OR PICO_COMPAT_PROFILE STREQUAL "p153")
+  if(PICO_COMPAT_PROFILE STREQUAL "current" OR PICO_COMPAT_PROFILE STREQUAL "p153" OR PICO_COMPAT_PROFILE STREQUAL "p154")
     list(APPEND core application/config_update.cpp network/management.cpp)
   elseif(PICO_COMPAT_PROFILE STREQUAL "p152")
     list(APPEND core application/config_update.cpp)
@@ -110,7 +112,7 @@ if(NOT PICO_COMPAT_PROFILE STREQUAL "legacy")
 endif()
 
 # P15.3 genuine consumer path; historical compatibility profiles remain intact.
-if(PICO_COMPAT_PROFILE STREQUAL "current" OR PICO_COMPAT_PROFILE STREQUAL "p153")
+if(PICO_COMPAT_PROFILE STREQUAL "current" OR PICO_COMPAT_PROFILE STREQUAL "p153" OR PICO_COMPAT_PROFILE STREQUAL "p154")
   target_compile_definitions(pico_tls_server PRIVATE WSPRRY_PICO_MANAGEMENT_API=1)
   add_library(pico_consumer_fixture STATIC ${core}
     "${CMAKE_BINARY_DIR}/generated/web_assets.cpp"
@@ -136,4 +138,8 @@ if(PICO_COMPAT_PROFILE STREQUAL "current" OR PICO_COMPAT_PROFILE STREQUAL "p153"
   target_link_libraries(consumer_interop PRIVATE pico_consumer_fixture mbedcrypto ssl crypto
     "${CMAKE_BINARY_DIR}/client/libwtp_client.a" pthread)
   target_compile_options(consumer_interop PRIVATE -Wall -Wextra -Wpedantic -Werror -UNDEBUG)
+endif()
+
+if(PICO_COMPAT_PROFILE STREQUAL "current")
+  target_compile_definitions(consumer_interop PRIVATE WSPRRY_PICO_MULTI_SESSIONS=1)
 endif()

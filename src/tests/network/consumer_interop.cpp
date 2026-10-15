@@ -105,12 +105,20 @@ struct Test {
   NoWtp wtp;
   pico::provisioning::ProfileStore profiles{media};
   pico::provisioning::RuntimeProfile runtime;
+#ifdef WSPRRY_PICO_MULTI_SESSIONS
+  pico::network::PicoConsumerRadioCrypto crypto[3];
+#else
   pico::network::PicoConsumerRadioCrypto crypto;
+#endif
   pico::network::ConsumerRadioApi radio{f.api,
                                         profiles,
                                         runtime,
                                         random,
+#ifdef WSPRRY_PICO_MULTI_SESSIONS
+                                        {&crypto[0], &crypto[1], &crypto[2]},
+#else
                                         crypto,
+#endif
                                         device,
                                         f.service.status().boot_id};
   WtpSettings settings;
@@ -264,7 +272,23 @@ void cases(bool ap) {
   assert(t.coordinated(*c, "POST", edit.dump(), fresh.etag).status == 409 &&
          t.mutations == 1);
   auto stranger = t.client();
+#ifdef WSPRRY_PICO_MULTI_SESSIONS
+  t.host.now += 1000;
+  assert(stranger->login(device, carrier, "test-password").status == 200);
+  for (unsigned i=0;i<3;++i) {
+    assert(stranger->request("status","GET").status == 200);
+    assert(c->request("status","GET").status == 200);
+  }
+  auto third=t.client(); t.host.now+=1000;
+  assert(third->login(device,carrier,"test-password").status==200);
+  auto fourth=t.client(); t.host.now+=1000;
+  assert(fourth->login(device,carrier,"test-password").status==409);
+  assert(third->request("status","GET").status==200);
+  stranger->logout();
+  assert(c->request("status","GET").status==200);
+#else
   assert(stranger->login(device, carrier, "test-password").status == 409);
+#endif
   assert(c->active());
   assert(c->request("jobs", "POST", "{}").status == 404 && t.mutations == 1);
   t.origin = "http://foreign.local";
@@ -315,6 +339,18 @@ void interactive(bool ap,bool configured=true) {
   std::string line;
   while (std::getline(std::cin,line)) {
     const auto command=pi::strict_browser_json(line);
+    // Test-only second transport client: genuine shipped browser packets share
+    // this exact Pico manager with the production native runtime session.
+    if (command.contains("consumer_packet")) {
+      const auto packet=command["consumer_packet"];
+      std::vector<std::uint8_t> bytes;
+      const std::string encoded=packet.at("body_b64");
+      assert(encoded.empty()||pico::network::bootstrap_unb64url(encoded,bytes,0,32768));
+      const auto response=t.send(packet.at("path"),packet.at("method"),std::string(bytes.begin(),bytes.end()),packet.at("media"));
+      const auto view=std::span(reinterpret_cast<const std::uint8_t*>(response.body.data()),response.body.size());
+      std::cout<<Json{{"status",response.status},{"media",response.media_type},{"body_b64",pico::network::bootstrap_b64url(view)}}.dump()<<std::endl;
+      continue;
+    }
     if (command.contains("control")) {
       const auto control=command["control"];
       if (control=="drop_mutation_reply") t.drop_mutation=true;
@@ -450,7 +486,7 @@ int main(int argc, char **argv) {
     for (unsigned variant = 0; variant < 12; ++variant) {
       auto bad = good;
       if (variant == 0)
-        bad["schema"] = "transmitter-management/2";
+        bad["schema"] = "transmitter-management/3";
       if (variant == 1)
         bad["limits"]["update"] = 2048.0;
       if (variant == 2)
@@ -476,7 +512,57 @@ int main(int argc, char **argv) {
       assert(!pi::valid_management_contract(bad, "consumer_station", device,
                                             t.f.service.status().boot_id, "1"));
     }
+    for (const auto version : {1,2}) {
+      auto supported=good;
+      supported["schema"]="transmitter-management/"+std::to_string(version);
+      supported["limits"]["consumer_sessions"]=version==1?1:3;
+      supported["limits"].erase("consumer_pending_logins");
+      if(version==2)supported["limits"]["consumer_pending_logins"]=1;
+      assert(pi::valid_management_contract(supported,"consumer_station",device,t.f.service.status().boot_id,"1"));
+      for(const Json& invalid : {Json(-1),Json(0),Json(true),Json(1.5),Json(4),Json("3"),Json(nullptr)}) {
+        auto bad=supported;bad["limits"]["consumer_sessions"]=invalid;
+        assert(!pi::valid_management_contract(bad,"consumer_station",device,t.f.service.status().boot_id,"1"));
+        if(version==2){bad=supported;bad["limits"]["consumer_pending_logins"]=invalid;
+          assert(!pi::valid_management_contract(bad,"consumer_station",device,t.f.service.status().boot_id,"1"));}
+      }
+    }
     assert(t.mutations == 0);
+  }
+  // Discovery refusals pass through the actual native coordinator and never write.
+  for (unsigned variant=0;variant<12;++variant) {
+    Test t;auto c=t.client();assert(c->login(device,"consumer_station","test-password").status==200);
+    const auto exchange=[&](const std::string& resource,const std::string& method,const std::string& body,const std::string& revision) {
+      auto response=c->request(resource,method,body,revision);
+      if(resource=="management") {
+        auto j=Json::parse(response.body);
+        if(variant==0)j["schema"]="transmitter-management/3";
+        if(variant==1)j["limits"]["consumer_sessions"]=0;
+        if(variant==2)j["limits"]["consumer_sessions"]=true;
+        if(variant==3)j["limits"]["consumer_sessions"]=3.0;
+        if(variant==4)j["limits"]["consumer_sessions"]=-1;
+        if(variant==5)j["limits"]["consumer_sessions"]=100;
+        if(variant==6)j["limits"]["consumer_pending_logins"]=2;
+        if(variant==7)j["target"]["boot_id"]=std::string(32,'b');
+        if(variant==8)j.erase("schema");
+        if(variant==9)j=Json::array();
+        if(variant==10)j=nullptr;
+        if(variant==11){
+          const bool old=j["schema"]=="transmitter-management/1";
+          j["schema"]=old?"transmitter-management/2":"transmitter-management/1";
+          j["limits"]["consumer_sessions"]=old?3:1;
+          j["limits"].erase("consumer_pending_logins");
+          if(old)j["limits"]["consumer_pending_logins"]=1;
+        }
+        response.body=j.dump();
+      }
+      return response;
+    };
+    pi::PicoHttpResponse config,resource;
+    assert(t.app->idle_management([&]{
+      config=pi::pico_configuration_request(exchange,c->device(),c->boot(),"GET",{}, {},"consumer_station",c->generation());
+      resource=pi::pico_resource_request(exchange,c->device(),c->boot(),"application","GET",{}, {},"consumer_station",c->generation());
+    },true));
+    assert(config.status==409 && resource.status==409 && t.mutations==0 && c->active());
   }
   for (const auto profile : {pico::network::ManagementProfile::Blank,
                              pico::network::ManagementProfile::Recovery,

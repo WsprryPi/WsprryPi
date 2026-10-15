@@ -157,7 +157,7 @@ async function main() {
                 window.__requests.push({url,options});
                 if (String(url).endsWith('/member/management')) {
                     const body = options.body ? JSON.parse(options.body) : null;
-                    if (body?.action === 'connect' && window.__consumerBusy) return {ok:false,status:409,json:async()=>({error:{code:'radio_session_busy'}})};
+                    if (body?.action === 'connect' && window.__consumerBusy) return {ok:false,status:window.__consumerBusy==='rate'?429:409,json:async()=>({error:{code:({capacity:'radio_session_capacity',pending:'radio_login_pending',rate:'radio_login_rate_limited'})[window.__consumerBusy]||'radio_session_busy'}})};
                     if (body?.action === 'connect') window.__management = {carrier:body.carrier,host:body.host,connected:true};
                     if (body?.action === 'disconnect') window.__management = {carrier:'disconnected',host:'',connected:false};
                     return {ok:true,headers:{get:()=>''},json:async()=>window.__management || {carrier:'engineering_mtls',host:'',connected:false}};
@@ -261,8 +261,8 @@ async function main() {
                 await capture(`${viewport.name}-schedule-${section}.png`, {format:'png'});
             }
         }
-        for (const state of ['entry', 'connected', 'busy']) {
-            await evaluate(`window.__consumerBusy=${state === 'busy'}; window.WtpManagement.setAvailability(true,true); document.getElementById('wtp-management-carrier').value='consumer_station'; document.getElementById('wtp-management-carrier').dispatchEvent(new Event('change')); document.getElementById('wtp-management-host').value='192.168.1.53';`);
+        for (const state of ['entry', 'connected', 'busy', 'capacity', 'pending', 'rate']) {
+            await evaluate(`window.__consumerBusy=${JSON.stringify(['busy','capacity','pending','rate'].includes(state)?state:false)}; window.WtpManagement.setAvailability(true,true); document.getElementById('wtp-management-carrier').value='consumer_station'; document.getElementById('wtp-management-carrier').dispatchEvent(new Event('change')); document.getElementById('wtp-management-host').value='192.168.1.53';`);
             if (state !== 'entry') {
                 await evaluate(`document.getElementById('wtp-management-password').value='synthetic-test-password'; document.getElementById('wtp-management-connect').click();`);
                 await waitFor(async()=>await evaluate('document.getElementById("wtp-management").getAttribute("aria-busy")==="false"'),'consumer login result');
@@ -271,6 +271,10 @@ async function main() {
             for (const theme of ['light','dark']) for (const viewport of [{name:'desktop',width:1280,height:900},{name:'mobile',width:390,height:844}]) {
                 await client.send('Emulation.setDeviceMetricsOverride',{...viewport,deviceScaleFactor:1,mobile:viewport.name==='mobile'});
                 await evaluate(`applyThemePreference('${theme}'); document.getElementById('wtp-management-carrier').scrollIntoView({block:'start',behavior:'instant'}); window.scrollBy(0,-190);`);
+                // Allow the resized layout to paint before framing the scoped feedback.
+                await evaluate(`new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)))`);
+                if (['busy','capacity','pending','rate'].includes(state))
+                    await evaluate(`document.getElementById('wtp-management-connection-feedback').scrollIntoView({block:'center',behavior:'instant'}); new Promise(resolve=>requestAnimationFrame(resolve))`);
                 await capture(`${viewport.name}-${theme}-consumer-${state}.png`,{format:'png'});
                 assert(await evaluate('document.documentElement.scrollWidth<=innerWidth+1'),'consumer management overflow');
             }

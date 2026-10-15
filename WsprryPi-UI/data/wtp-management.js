@@ -201,7 +201,13 @@
                         throw failure("A management session is already active. Read its connection state or disconnect it before selecting another connection.");
                     }
                     consumerConnected = false; explicitDisconnected = true; available = false;
-                    throw failure(code === "radio_session_busy"
+                    throw failure(code === "radio_session_capacity"
+                        ? "All three Pico radio sessions are in use. Log out another client or wait up to five idle minutes, then connect again."
+                        : code === "radio_login_pending"
+                            ? "Another Pico login is in progress. Wait up to 30 seconds, then connect again."
+                            : code === "radio_login_rate_limited"
+                                ? "Pico logins must be at least one second apart. Wait a second, then connect again."
+                                : code === "radio_session_busy"
                         ? "Pico already has a browser or client session. Log out there or wait for it to expire; this client did not close it."
                         : code === "host_busy_or_output_unresolved"
                             ? "Host work or unresolved output blocks management. Reconcile that work before connecting."

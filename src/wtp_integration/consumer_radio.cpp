@@ -145,7 +145,8 @@ bool valid_management_contract(const Json &j, const std::string &carrier,
     if (!fields(j, {"schema", "target", "profile", "preclock",
                     "profile_generation", "selected", "carriers", "unsupported",
                     "operations", "limits"}) ||
-        j["schema"] != "transmitter-management/1" || j["selected"] != carrier ||
+        (j["schema"] != "transmitter-management/1" &&
+         j["schema"] != "transmitter-management/2") || j["selected"] != carrier ||
         !j["preclock"].is_boolean() ||
         j["target"] !=
             Json{{"scope", "member"}, {"device_id", device}, {"boot_id", boot}})
@@ -181,10 +182,14 @@ bool valid_management_contract(const Json &j, const std::string &carrier,
                                "network", "application", "management"}},
                              {"PUT", {"config", "schedules", "network"}},
                              {"POST", {"config/update"}}};
-    const Json limits = {{"http_body", 32768},    {"consumer_plaintext", 32724},
+    Json limits = {{"http_body", 32768},    {"consumer_plaintext", 32724},
                          {"config", 1800},        {"update", 2048},
                          {"login_ms", 30000},     {"idle_ms", 300000},
                          {"absolute_ms", 900000}, {"consumer_sessions", 1}};
+    if (j["schema"] == "transmitter-management/2") {
+      limits["consumer_sessions"] = 3;
+      limits["consumer_pending_logins"] = 1;
+    }
     for (const auto &[name, value] : limits.items()) {
       (void)value;
       if (!j["limits"].is_object() || !j["limits"].contains(name) ||
@@ -335,12 +340,17 @@ PicoHttpResponse ConsumerRadioClient::login(const std::string &device,
                   {"public_key", b64(pub)}, {"nonce", hex(nonce)}};
     r = transport_("/api/consumer/v1/start", "POST", start.dump(),
                    "application/json");
-    if (r.status == 409 && r.body.size() <= 256 &&
-        strict_browser_json(r.body)
-                .value("error", Json::object())
-                .value("code", "") == "radio_session_busy") {
-      clear();
-      return error(409, "radio_session_busy");
+    if ((r.status == 409 || r.status == 429) && r.body.size() <= 256 &&
+        r.media_type == "application/json") {
+      const auto code = strict_browser_json(r.body)
+                            .value("error", Json::object()).value("code", "");
+      if ((r.status == 409 && (code == "radio_session_busy" ||
+                              code == "radio_session_capacity" ||
+                              code == "radio_login_pending")) ||
+          (r.status == 429 && code == "radio_login_rate_limited")) {
+        clear();
+        return error(r.status, code.c_str());
+      }
     }
     require(r.status == 200 && r.body.size() <= 1024 &&
             r.media_type == "application/json");

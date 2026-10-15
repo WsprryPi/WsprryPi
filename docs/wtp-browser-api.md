@@ -229,15 +229,23 @@ HTTP request/parser buffers have their ordinary request lifetime. The UI clears
 login input after an attempt. Only traffic keys remain in RAM, with 5-minute idle
 and 15-minute absolute expiry; no durable credential reference is created.
 Do not put passwords in URLs, saved INI, device catalogs or browser storage.
-Disconnect logs out only this client's session; an existing browser session
-returns `radio_session_busy` and is never evicted. A lost encrypted reply clears
+Disconnect logs out only this client's session. Pico management/2 supports three
+independent consumer sessions, including native Pi plus phone and Mac. At most
+one of those slots may be a pending login. Full capacity, pending-login quota and
+one-second pacing have distinct finite refusal feedback; no healthy session is
+evicted. Supported older management/1 firmware retains its single-session
+`radio_session_busy` refusal. A lost encrypted reply clears
 local keys; its remote slot can remain occupied until expiry. Wait or close the
 owning session explicitly; this client never uses an unrelated logout.
 
 Carrier/authority changes require explicit selection and new authentication.
 There is no redirect follow, alternate-carrier fallback, WTP-principal password,
-or automatic mutation retry. Authenticate the `transmitter-management/1`
-document before using capabilities; public identity is an untrusted hint.
+or automatic mutation retry. Authenticate the supported `transmitter-management/1`
+or `/2` document before using capabilities; public identity is an untrusted hint.
+Each version has exact closed fields and integer limits. Version 2 advertises
+`consumer_sessions:3` and `consumer_pending_logins:1`; version 1 remains frozen
+at one consumer session. Old Pi clients explicitly refuse version 2. See the
+[P15.6 acceptance record](development/phase15-6-sessions.md).
 The legacy closed application's `authenticated_https` label remains for old
 clients; it does not inventory actual carriers. Unsupported discovery refuses.
 USB/Console, Plain LAN WTP, TLS-WTP and BLE gain no JSON administration.
