@@ -37,6 +37,8 @@
     let canSelect = false, consumerConnected = false, explicitDisconnected = false, selectionObserved = false;
     let configRevision = "", networkRevision = "", saved = null, target = null;
     const field = name => byId(`wtp-remote-${name}`);
+    let retirement = null, selectionId = "", nativeSession = null;
+    let configReview = false, resourceReview = false, lastAttempt = null;
     const originalHints = new Map();
     function failure(message) { const error = new Error(message); error.operatorMessage = true; return error; }
     function render() {
@@ -48,6 +50,9 @@
         for (const id of ["wtp-management-host-field", "wtp-management-password-field"]) if (byId(id)) byId(id).hidden = !consumer;
         for (const id of ["wtp-management-carrier", "wtp-management-host", "wtp-management-password", "wtp-management-connect", "wtp-management-disconnect", "wtp-management-state"])
             if (byId(id)) byId(id).disabled = busy || !canSelect || (id === "wtp-management-connect" && consumerConnected);
+        if (byId("wtp-management-recovery")) byId("wtp-management-recovery").hidden = !consumer;
+        if (byId("wtp-management-inspect")) byId("wtp-management-inspect").disabled = busy || !canSelect;
+        if (byId("wtp-management-retire")) byId("wtp-management-retire").disabled = busy || !canSelect || !retirement || !byId("wtp-management-target").value;
         byId("wtp-management").setAttribute("aria-busy", String(busy));
         root.document.querySelectorAll("[data-wtp-remote]").forEach(input => { input.disabled = busy || !available || !loaded; });
         for (const id of ["wtp-remote-load", "wtp-network-load"]) byId(id).disabled = busy || !available;
@@ -173,6 +178,8 @@
         const station = kind === "station";
         if (station && resources.profile_owned_station) return;
         if (!station && (!validatedPlan || validatedPlan !== JSON.stringify(hardwareCandidate()))) return;
+        if (resourceReview && !root.confirm("Review current saved and active observations beside your preserved draft. Send one new explicit save using the fresh revision?")) return;
+        resourceReview = false;
         const payload = station ? { callsign:member("callsign").value, locator:member("locator").value, power_dbm:Number(member("power").value) } : hardwareCandidate();
         return request(`member/${kind}`, "PUT", {schema:`transmitter-${kind}/1`, target:resources.target, [station ? "station" : "pins"]:payload}, resourceRevision);
     }
@@ -183,6 +190,12 @@
         const feedback = shared ? member(resource.endsWith("validate") ? "pin-feedback" : method === "PUT" ? `${resource.split("/")[1]}-feedback` : "feedback")
             : byId(resource === "member/management" ? "wtp-management-connection-feedback" : "wtp-management-feedback");
         const context = resourceContext;
+        if (method !== "GET" && ["member/configuration","member/station","member/hardware"].includes(resource)) {
+            const intended = JSON.parse(JSON.stringify(body));
+            if (intended.config?.wifi) intended.config.wifi.password = null;
+            lastAttempt = {resource,method,revision,target:body.target,selectionId,intended,sent:true};
+        }
+        const recoveryAction = resource === "member/management" && ["inspect_logins","retire_login"].includes(body?.action);
         if (method !== "GET" && !resource.endsWith("validate")) invalidateEditors();
         feedback.textContent = "Contacting the idle Pico…";
         const controller = new AbortController();
@@ -195,6 +208,14 @@
             const data = await response.json();
             if (!response.ok) {
                 const code = data.error?.code;
+                if (recoveryAction) {
+                    const message = code === "consumer_recovery_unsupported" ? "This firmware has no authenticated login retirement. Existing reads and saves remain supported; occupied logins need their own logout or expiry."
+                        : code === "radio_recovery_pending" ? "A retirement proof is pending for at most five seconds. No login was retired by this refusal."
+                        : code === "radio_recovery_rate_limited" ? "Wait one second before another explicit retirement attempt."
+                        : "Retirement is rejected or unconfirmed. Retain the exact selection for another explicit authenticated attempt. Read connection state; no save was replayed.";
+                    if (byId("wtp-management-retirement-status")) byId("wtp-management-retirement-status").textContent = `${message} (${code || "response_unconfirmed"})`;
+                    throw failure(message);
+                }
                 if (resource === "member/management") {
                     if (code === "management_session_already_selected") {
                         selectionObserved = false;
@@ -202,7 +223,7 @@
                     }
                     consumerConnected = false; explicitDisconnected = true; available = false;
                     throw failure(code === "radio_session_capacity"
-                        ? "All three Pico radio sessions are in use. Log out another client or wait up to five idle minutes, then connect again."
+                        ? "All three Pico radio sessions are in use. Inspect occupied logins and explicitly retire the affected login. Older firmware may require its own logout or expiry."
                         : code === "radio_login_pending"
                             ? "Another Pico login is in progress. Wait up to 30 seconds, then connect again."
                             : code === "radio_login_rate_limited"
@@ -242,6 +263,7 @@
                 if (method === "GET") {
                     if (data.schema !== "wsprrypi-member-resources/1" || !data.application || !data.target || typeof data.member_context !== "string" || !etag)
                         throw failure("Member resources are incomplete. Your draft is preserved; load resources again.");
+                    resourceReview = resourceReconcile && resourceLoaded;
                     resourcePopulate(data); resourceRevision = etag; resourceContext = data.member_context;
                     feedback.textContent = "Member resources loaded. Saved configuration was reconciled under one revision. Station and hardware are separate explicit saves.";
                 } else if (resource.endsWith("validate")) {
@@ -253,11 +275,24 @@
                 } else {
                     feedback.textContent = `Member ${resource.split("/")[1]} saved.${data.pending_restart === true ? " Pins require restart; active routing is unchanged and output inhibition remains latched." : ""} Load member resources before another save. Other drafts are preserved. No restart or transmission requested.`;
                 }
+            } else if (resource === "member/management" && recoveryAction) {
+                if (body.action === "inspect_logins") {
+                    if (data.schema !== "consumer-recovery/1" || !Array.isArray(data.sessions) || data.sessions.length > 3 || typeof data.selection_id !== "string") throw failure("Retirement inspection is unconfirmed.");
+                    retirement = {...data,carrier:body.carrier,host:body.host}; selectionId = data.selection_id;
+                    const select = byId("wtp-management-target");
+                    select.replaceChildren(new Option("Choose a login explicitly",""),...data.sessions.map(s => new Option(`${s.selector} · ${s.state}${nativeSession?.selector === s.selector ? " · retained native selector" : ""}`,s.selector)));
+                    byId("wtp-management-retirement-status").textContent = `Pico ${data.device_id}; ${data.interface} at ${data.authority}. A selected login may belong to another operator. Enter the current saved Wi-Fi password and explicitly retire one login.`;
+                } else {
+                    selectionObserved = false;
+                    byId("wtp-management-retirement-status").textContent = "Selected login retired or already absent. Read connection state before explicitly connecting. Read saved settings before a new save. No replacement session or save was sent.";
+                }
+                feedback.textContent = "Login inspection/retirement does not establish a save outcome. Your drafts are preserved.";
             } else if (resource === "member/management") {
                 consumerConnected = data.connected === true;
                 if (method === "GET") {
                     if (!["engineering_mtls", "consumer_station", "consumer_ap", "unsupported", "disconnected"].includes(data.carrier) || typeof data.connected !== "boolean" || typeof data.host !== "string")
                         throw failure("Management connection state could not be read. Select a connection explicitly.");
+                    selectionId = data.selection_id; nativeSession = data.session || null;
                     explicitDisconnected = ["unsupported", "disconnected"].includes(data.carrier) || (data.carrier.startsWith("consumer_") && !data.connected);
                     if (consumerConnected && byId("wtp-management-carrier")) {
                         byId("wtp-management-carrier").value = data.carrier;
@@ -283,6 +318,7 @@
                 configRevision = etag; target = data.target;
                 if (method === "GET") {
                     const keepDraft = reconcile && loaded;
+                    configReview = keepDraft;
                     saved = data.config;
                     populate(saved, keepDraft);
                     loaded = true; reconcile = false;
@@ -302,6 +338,7 @@
             if (shared) invalidateResources();
             if (resource !== "network" || method !== "GET") { configRevision = ""; target = null; reconcile = loaded; }
             if (resource === "network") networkRevision = "";
+            if (resource === "member/management" && !error.operatorMessage) selectionObserved = false;
             feedback.textContent = error.name === "AbortError"
                 ? "Pico request timed out. Its result is unconfirmed. Your draft is preserved; read saved settings before retrying a change."
                 : error.operatorMessage ? error.message
@@ -313,6 +350,8 @@
     }
     function save(onlySchedules) {
         if (!configRevision || !target) return;
+        if (configReview && !root.confirm("Review the current saved values beside your preserved draft. Matching values do not prove an earlier save committed. Send one new explicit save with this fresh revision?")) return;
+        configReview = false;
         try {
             const entries = schedules(field("schedules").value);
             let config = { schedules: entries };
@@ -344,6 +383,13 @@
         for (const id of Object.keys(values(null))) originalHints.set(id, byId(`wtp-remote-${id}-hint`)?.textContent || "");
         byId("wtp-management-carrier")?.addEventListener("change", () => {
             if (byId("wtp-management-password")) byId("wtp-management-password").value = "";
+            retirement = null;
+            if (byId("wtp-management-target")) byId("wtp-management-target").replaceChildren(new Option("Inspect this endpoint first",""));
+            render();
+        });
+        byId("wtp-management-host")?.addEventListener("input", () => {
+            retirement = null; byId("wtp-management-target")?.replaceChildren(new Option("Inspect this endpoint first",""));
+            if (byId("wtp-management-password")) byId("wtp-management-password").value = "";
             render();
         });
         byId("wtp-management-connect")?.addEventListener("click", () => {
@@ -352,6 +398,18 @@
                 ? { action: "engineering_mtls" }
                 : { action: "connect", carrier, host: byId("wtp-management-host").value,
                     password: byId("wtp-management-password").value });
+        });
+        byId("wtp-management-inspect")?.addEventListener("click", () => {
+            retirement = null;
+            return request("member/management","POST",{action:"inspect_logins",carrier:byId("wtp-management-carrier").value,host:byId("wtp-management-host").value});
+        });
+        byId("wtp-management-target")?.addEventListener("change",render);
+        byId("wtp-management-retire")?.addEventListener("click", () => {
+            const targetSession = byId("wtp-management-target").value;
+            if (!retirement || !targetSession || !root.confirm(`Retire login ${targetSession} on Pico ${retirement.device_id} at ${retirement.host} (${retirement.carrier})? It may belong to another operator. Saved settings and radio jobs remain.`)) return;
+            return request("member/management","POST",{action:"retire_login",carrier:retirement.carrier,host:retirement.host,
+                password:byId("wtp-management-password").value,selection_id:selectionId,
+                scope:{target_selector:targetSession,device_id:retirement.device_id,boot_id:retirement.boot_id,generation:retirement.generation}});
         });
         byId("wtp-management-state")?.addEventListener("click", () => request("member/management"));
         byId("wtp-management-disconnect")?.addEventListener("click", () => request("member/management", "POST", { action: "disconnect" }));

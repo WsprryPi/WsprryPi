@@ -23,6 +23,12 @@ public:
                            const std::string &method,
                            const std::string &body = {},
                            const std::string &revision = {});
+  PicoHttpResponse recovery(const std::string &device, const std::string &carrier,
+                            const std::string &host);
+  PicoHttpResponse retire(const std::string &device, const std::string &carrier,
+                          const std::string &host, std::string_view password,
+                          const nlohmann::json &scope);
+  const nlohmann::json &lost_session() const { return lost_session_; }
   void logout();
   void clear() noexcept;
   bool active() const;
@@ -34,6 +40,9 @@ private:
 #ifdef WSPRRYPI_CONSUMER_CRYPTO_TEST
   friend void consumer_radio_fixed_vectors(const nlohmann::json &);
 #endif
+  PicoHttpResponse handshake(const std::string &, const std::string &,
+                             std::string_view, const nlohmann::json &);
+  nlohmann::json lost_session_ = nullptr;
   Transport transport_;
   TlsStream::Clock clock_;
   std::string device_, boot_, generation_;

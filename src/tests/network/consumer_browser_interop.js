@@ -23,7 +23,7 @@ function consumer(){
    return new Response(Buffer.from(r.body_b64,'base64url'),{status:r.status,headers:{'Content-Type':r.media}});
   }};
  vm.runInNewContext(source,root);
- return root.WsprryPicoConsumerRadio.createClient();
+ return root.WsprryPicoConsumerRadio.createClient(undefined,undefined,{authority:'192.168.1.53',interface:'station'});
 }
 (async()=>{
  try{
@@ -39,11 +39,38 @@ function consumer(){
    for(const client of [a,b])assert.equal((await client.request('status')).status,200);
   }
   await command({control:'advance'});const full=consumer();await assert.rejects(full.login('test-password',await full.identity()),/three radio sessions/);
-  await a.logout();assert.equal((await b.request('status')).status,200);
+  // The ordinary status read reaches the genuine manager, then its reply is
+  // intentionally lost. No application mutation is involved in this loss.
+  const before=await command({control:'dump'}),target=a.retirementSelector;
+  const original=a.fetcher;let lost=0;
+  a.fetcher=async(url,options)=>{
+   const result=await original(url,options);
+   if(url==='/api/consumer/v1/request' && lost===0){lost++;assert(result.ok);throw Error('ordinary read reply intentionally lost');}
+   return result;
+  };
+  await assert.rejects(a.request('status'),/ordinary read reply intentionally lost/);
+  assert.equal(lost,1);assert.equal(a.authenticated,false);assert.equal(a.state,null);
+  assert.equal(a.lostSession.selector,target);assert.equal(a.retirementSelector,target);
+  const discovery=await full.recovery();assert.equal(discovery.sessions.length,3);
+  assert(discovery.sessions.some(session=>session.selector===target&&session.state==='active'));
+  const retired=await full.retire('test-password',discovery,target);
+  assert.equal(retired.retired,true);assert.equal(retired.present,true);assert.equal(retired.target_selector,target);
+  assert.equal((await b.request('status')).status,200);
+  await ui.click('wtp-remote-load');assert.equal(calls.at(-1).status,200);
+  const reclaimed=await full.recovery();assert.equal(reclaimed.sessions.length,2);
+  assert(!reclaimed.sessions.some(session=>session.selector===target));
+  // Reuse the reclaimed traffic slot only through a new explicit login.
+  await command({control:'advance'});await full.login('test-password',await full.identity());
+  assert.equal((await full.recovery()).sessions.length,3);
+  assert.equal((await full.request('status')).status,200);
+  await full.logout();assert.equal((await b.request('status')).status,200);
+  await ui.click('wtp-remote-load');assert.equal(calls.at(-1).status,200);
+  await b.logout();
   await ui.click('wtp-remote-load');assert.equal(calls.at(-1).status,200);
   await ui.click('wtp-management-disconnect');assert.equal(calls.at(-1).status,200);
-  assert.equal((await b.request('status')).status,200);
+  assert.equal((await full.recovery()).sessions.length,0);
   const state=await command({control:'dump'});assert.equal(state.wtp_io,0);assert.equal(state.mutations,0);
-  console.log('Actual native Pi runtime plus two shipped-browser crypto contexts coexist; three-session quota and independent logout passed');
+  assert.equal(state.bytes_sha256,before.bytes_sha256);assert.equal(state.generation,before.generation);
+  console.log('Actual native Pi runtime plus two shipped-browser crypto contexts: full-capacity lost-read recovery, healthy-peer continuity, explicit slot reuse and independent logout passed');
  }finally{child.stdin.end();if(child.exitCode===null)await new Promise(resolve=>child.once('exit',resolve));}
 })().catch(error=>{console.error(error);process.exitCode=1;});

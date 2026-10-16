@@ -221,6 +221,15 @@
                     <button type="button" class="btn btn-outline-secondary" id="wtp-management-state">Read connection state</button>
                     <button type="button" class="btn btn-outline-secondary" id="wtp-management-disconnect">Disconnect management</button>
                 </div>
+                <details class="col-12" id="wtp-management-recovery">
+                    <summary>Recover an occupied Pico login</summary>
+                    <p class="form-text">First read connection state. A working native Pi session can survive browser connection loss. Retirement may end another operator's login; it does not repeat a save, alter saved settings or stop a radio job.</p>
+                    <button type="button" class="btn btn-outline-secondary" id="wtp-management-inspect">Inspect occupied logins</button>
+                    <label class="form-label" for="wtp-management-target">Login to retire</label>
+                    <select class="form-select" id="wtp-management-target"><option value="">Inspect logins first</option></select>
+                    <p class="form-text" id="wtp-management-retirement-status" role="status" aria-live="polite"></p>
+                    <button type="button" class="btn btn-outline-danger" id="wtp-management-retire" disabled>Authenticate and retire selected login</button>
+                </details>
                 <p class="col-12 form-text mb-0" id="wtp-management-connection-feedback" role="status" aria-live="polite">Engineering HTTPS uses the selected certificate connection. Consumer login requires the configured full Pico device ID. No automatic fallback is used.</p>
             </div>
             <section class="mt-4 mb-4" aria-labelledby="wtp-member-heading">

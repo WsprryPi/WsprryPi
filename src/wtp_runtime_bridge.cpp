@@ -256,7 +256,8 @@ wsprrypi::PicoHttpResponse wtp_runtime_management(const std::string &resource,
         const bool connected = r->consumer_management && r->consumer_management->active();
         return {200, nlohmann::json{{"carrier", r->management_carrier.empty()
             ? (r->settings.transport == "network" ? "engineering_mtls" : "unsupported") : r->management_carrier},
-            {"connected", connected}, {"host", r->management_host}, {"selection_id",r->management_selection_id}}.dump(), {}};
+            {"connected", connected}, {"host", r->management_host}, {"selection_id",r->management_selection_id},
+            {"session",r->consumer_management ? r->consumer_management->lost_session() : nlohmann::json(nullptr)}}.dump(), {}};
       }
       if (method != "POST" || body.size() > 512) return failure(400, "invalid_management_selection");
       auto input = wsprrypi::strict_browser_json(body);
@@ -266,6 +267,53 @@ wsprrypi::PicoHttpResponse wtp_runtime_management(const std::string &resource,
       if (!input.is_object() || !input.contains("action") || !input["action"].is_string())
         return failure(400, "invalid_management_selection");
       const auto action = input["action"].get<std::string>();
+      if (action == "inspect_logins" || action == "retire_login") {
+        const bool retiring = action == "retire_login";
+        if (input.size() != (retiring ? 6U : 3U) || !input.contains("carrier") || !input["carrier"].is_string() ||
+            !input.contains("host") || !input["host"].is_string() ||
+            (retiring && (!credential || !input.contains("scope") || !input.contains("selection_id") ||
+                input["selection_id"] != r->management_selection_id))) return failure(400,"invalid_management_selection");
+        const auto carrier = input["carrier"].get<std::string>(), host = input["host"].get<std::string>();
+        const auto canonical = wsprrypi::canonical_network_identity(host);
+        if (!canonical || *canonical != host || host.find(':') != std::string::npos ||
+            (carrier != "consumer_ap" && carrier != "consumer_station") ||
+            ((carrier == "consumer_ap") != (host == "192.168.4.1")) || r->settings.device_id.empty())
+          return failure(400,"invalid_consumer_endpoint");
+        if (!r->app->idle_management([&] {
+          wsprrypi::ConsumerRadioClient proof(
+              [owner=r.get(),host,&input,retiring](const auto& path,const auto& verb,const auto& payload,const auto& media) {
+                // Invalidate self traffic only once the fully prepared proof
+                // may take effect. Invalid input/start failures keep it usable.
+                if (retiring && path == "/api/consumer/v1/recovery/finish" && owner->consumer_management) {
+                  const auto &selected = owner->consumer_management->lost_session();
+                  if (selected.is_object() && selected.value("selector", "") == input["scope"].value("target_selector", "") &&
+                      selected.value("device_id", "") == input["scope"].value("device_id", "") &&
+                      selected.value("boot_id", "") == input["scope"].value("boot_id", "")) owner->consumer_management->clear();
+                }
+                if (owner->consumer_transport_for_test) return owner->consumer_transport_for_test(path,verb,payload,media);
+                return wsprrypi::consumer_http_request(owner->management_tcp,[owner]{return owner->clock.now_ms();},host,path,verb,payload,media);
+              },[owner=r.get()]{return owner->clock.now_ms();});
+          response = retiring ? proof.retire(r->settings.device_id,carrier,host,*credential,input["scope"])
+                              : proof.recovery(r->settings.device_id,carrier,host);
+          if (response.status == 200) {
+            auto result = wsprrypi::strict_browser_json(response.body);
+            if (retiring) {
+              // The caller reviewed one exact scope; do not replace or reconnect.
+              // A selected native session may have been retired; read its state
+              // explicitly before any subsequent operation.
+              if (r->consumer_management) {
+                const auto &selected = r->consumer_management->lost_session();
+                if (selected.is_object() && selected.value("selector", "") == input["scope"].value("target_selector", "") &&
+                    selected.value("boot_id", "") == input["scope"].value("boot_id", "")) r->consumer_management->clear();
+              }
+              r->management_selection_id = wsprrypi::wtp_random_identity();
+            }
+            result["selection_id"] = r->management_selection_id;
+            response.body = result.dump();
+          }
+        },true)) return failure(409,"host_busy_or_output_unresolved");
+        return response;
+      }
       if (action == "connect") {
         if (input.size() != 4 || !input.contains("carrier") || !input["carrier"].is_string() ||
             !input.contains("host") || !input["host"].is_string() ||
