@@ -82,7 +82,7 @@ No assertion, deadline or CI timeout was weakened. Logs/builds remain under
 
 Production implementation is `41c1dbd42620da6d5595b3ca0171c15ad6c9ee5f`;
 subsequent changes only stabilize the browser fixture/evidence. Pico current
-stays pinned to `bcd7f036b9ed57ee0aab080ca8617fccb69b7588`; later lead-repo
+is finally pinned to `99ce69670e3c44182216f847b245a3f62a13eca2`; later lead-repo
 review/report commits do not replace that implementation pin. Historical rows
 remain legacy `95aac22`, extended `dfffdd5`, p152 `87144d1`, p153 `d6208db`,
 p154 `ddb00dd`, p156 `792b5b2`, p157 `26ae596` (full identities in pin files).
@@ -125,3 +125,14 @@ refusals make this staged rollout safe; Pi devel is not a publication target.
 CI run/head/results and final remote parity are recorded in the lead Pico
 `docs/development/phase15-8-wspr-type23.md` after the workflow completes. Feature
 branch validation does not mean the release branch adopted the new capability.
+
+
+A final Pico-only UI reassessment corrected application/2's null-plan empty
+state, which had displayed the old Type-1-only fallback label. Pico production
+identity is now `99ce69670e3c44182216f847b245a3f62a13eca2`; its portable C++,
+protocol, planner and scheduler are unchanged from `bcd7f03`. The current pin and
+clean-source interop/firmware/browser checks were refreshed. All seven historical
+rows passed again with the final native client (`final-pairs.log`, seven
+`FINAL PASS` records); their source pins and original expectations were not
+changed. The current UI-source retest uses `current-ui-*` and `sanitize-ui-*`
+logs. No Pi production code changed after `41c1dbd`.
