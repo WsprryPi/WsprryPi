@@ -136,3 +136,16 @@ rows passed again with the final native client (`final-pairs.log`, seven
 `FINAL PASS` records); their source pins and original expectations were not
 changed. The current UI-source retest uses `current-ui-*` and `sanitize-ui-*`
 logs. No Pi production code changed after `41c1dbd`.
+
+
+Final companion current pin is `0c02423d3ea0f6e89507a74ed5a2be9b00895ee0`.
+Pico's last UI-only repair preserves an unchanged legacy unencodable identity
+when saving unrelated settings, matching the existing API's preservation rule;
+a changed identity still requires authoritative planning. Its shipped-script
+behavioral regression passes. C++/protocol/encoder/scheduler blobs remain the
+same as `bcd7f03`. Final-source local checks use `final0c-*` logs. The native
+host network test at the preceding UI identity `99ce696` conservatively reported
+one missed start during concurrent builds (elapsed 158668 ns, allowance 1 ms;
+mapping error was not logged). The unchanged test passed after other compilation
+finished (`current-ui-network-quiet.log`); no timing assertion was weakened.
+The final pinned source is also exercised by companion-head CI.
