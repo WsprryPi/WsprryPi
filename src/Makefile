@@ -1148,6 +1148,11 @@ RELEASE: release
 
 rp1-gpclk-diagnostics-test:
 	$(Q)python3 ../scripts/tests/rp1_gpclk_diagnostics_test.py
+	$(Q)python3 ../scripts/tests/rp1_provider_diagnostics_test.py
+
+.PHONY: rp1-candidate-acceptance-test
+rp1-candidate-acceptance-test:
+	$(Q)python3 ../scripts/tests/rp1_candidate_acceptance_test.py
 
 clean:
 	$(Q)echo "Cleaning up build artifacts."
@@ -1720,17 +1725,17 @@ rp1-gpclk-transition-test: $(BIN_DIR)/$(RP1_GPCLK_TRANSITION_TEST_OUT)
 	$(Q)echo "Running hardware-independent RP1 GPCLK transition sequencing tests."
 	$(Q)./$(BIN_DIR)/$(RP1_GPCLK_TRANSITION_TEST_OUT)
 
-$(BIN_DIR)/$(RP1_GPCLK_BACKEND_TEST_OUT): WSPR-Transmitter/src/rp1_gpclk_backend_test.cpp WSPR-Transmitter/src/rp1_gpclk_backend.cpp WSPR-Transmitter/src/rp1_gpclk_planner.cpp WSPR-Transmitter/src/rp1_gpclk_reconciliation.cpp
+$(BIN_DIR)/$(RP1_GPCLK_BACKEND_TEST_OUT): WSPR-Transmitter/src/rp1_gpclk_backend_test.cpp WSPR-Transmitter/src/rp1_gpclk_backend.cpp WSPR-Transmitter/src/rp1_gpclk_planner.cpp WSPR-Transmitter/src/rp1_gpclk_reconciliation.cpp WSPR-Transmitter/src/rp1_gpclk_backend.hpp
 	$(Q)mkdir -p $(BIN_DIR)
-	$(Q)$(CXX) $(RP1_GPCLK_PLANNER_TEST_FLAGS) $^ -o $@
+	$(Q)$(CXX) $(RP1_GPCLK_PLANNER_TEST_FLAGS) $(filter %.cpp,$^) -o $@
 
 rp1-gpclk-backend-test: $(BIN_DIR)/$(RP1_GPCLK_BACKEND_TEST_OUT)
 	$(Q)echo "Running clock-disabled RP1 GPCLK production backend contract tests."
 	$(Q)./$(BIN_DIR)/$(RP1_GPCLK_BACKEND_TEST_OUT)
 
-$(BIN_DIR)/$(RP1_GPCLK_LINUX_PROVIDER_TEST_OUT): WSPR-Transmitter/src/rp1_gpclk_linux_provider_test.cpp WSPR-Transmitter/src/rp1_gpclk_linux_provider.cpp WSPR-Transmitter/src/rp1_gpclk_reconciliation.cpp WSPR-Transmitter/src/rp1_gpclk_development_policy.cpp
+$(BIN_DIR)/$(RP1_GPCLK_LINUX_PROVIDER_TEST_OUT): WSPR-Transmitter/src/rp1_gpclk_linux_provider_test.cpp WSPR-Transmitter/src/rp1_gpclk_linux_provider.cpp WSPR-Transmitter/src/rp1_gpclk_reconciliation.cpp WSPR-Transmitter/src/rp1_gpclk_development_policy.cpp WSPR-Transmitter/src/rp1_gpclk_consumer_contract.hpp WSPR-Transmitter/src/rp1_gpclk_linux_provider.hpp
 	$(Q)mkdir -p $(BIN_DIR)
-	$(Q)$(CXX) $(RP1_GPCLK_PLANNER_TEST_FLAGS) $^ -o $@
+	$(Q)$(CXX) $(RP1_GPCLK_PLANNER_TEST_FLAGS) $(filter %.cpp,$^) -o $@
 
 rp1-gpclk-linux-provider-test: $(BIN_DIR)/$(RP1_GPCLK_LINUX_PROVIDER_TEST_OUT)
 	$(Q)echo "Running address-independent RP1 GPCLK Linux provider client tests."
@@ -1751,16 +1756,21 @@ $(BIN_DIR)/$(RP1_GPCLK_ROUTE_RUNTIME_WIRING_TEST_OUT): tests/rp1_gpclk_route_run
 rp1-gpclk-route-runtime-wiring-test: $(BIN_DIR)/$(RP1_GPCLK_ROUTE_RUNTIME_WIRING_TEST_OUT)
 	$(Q)./$(BIN_DIR)/$(RP1_GPCLK_ROUTE_RUNTIME_WIRING_TEST_OUT)
 
-$(BIN_DIR)/$(RP1_GPCLK_ROUTE_SERVICE_TEST_OUT): tests/rp1_gpclk_route_service_test.cpp rp1_gpclk_route_service.cpp WSPR-Transmitter/src/rp1_gpclk_development_policy.cpp
+$(BIN_DIR)/$(RP1_GPCLK_ROUTE_SERVICE_TEST_OUT): tests/rp1_gpclk_route_service_test.cpp rp1_gpclk_route_service.cpp WSPR-Transmitter/src/rp1_gpclk_development_policy.cpp rp1_provider_process.hpp rp1_gpclk_route_service.hpp
 	$(Q)mkdir -p $(BIN_DIR)
-	$(Q)$(CXX) $(RP1_GPCLK_PLANNER_TEST_FLAGS) -DWSPRRYPI_ROUTE_SERVICE_TEST $^ -o $@
+	$(Q)$(CXX) $(RP1_GPCLK_PLANNER_TEST_FLAGS) -DWSPRRYPI_ROUTE_SERVICE_TEST $(filter %.cpp,$^) -o $@
 
-rp1-gpclk-route-service-test: $(BIN_DIR)/$(RP1_GPCLK_ROUTE_SERVICE_TEST_OUT)
+$(BIN_DIR)/rp1_provider_process_test: tests/rp1_provider_process_test.cpp rp1_provider_process.hpp
+	$(Q)mkdir -p $(BIN_DIR)
+	$(Q)$(CXX) $(RP1_GPCLK_PLANNER_TEST_FLAGS) $< -o $@
+
+rp1-gpclk-route-service-test: $(BIN_DIR)/$(RP1_GPCLK_ROUTE_SERVICE_TEST_OUT) $(BIN_DIR)/rp1_provider_process_test
 	$(Q)./$(BIN_DIR)/$(RP1_GPCLK_ROUTE_SERVICE_TEST_OUT)
+	$(Q)./$(BIN_DIR)/rp1_provider_process_test
 	$(Q)python3 ../scripts/tests/route_application_test.py
 	$(Q)python3 ../scripts/tests/runtime_reconcile_test.py
 
-$(BIN_DIR)/$(RP1_GPCLK_TRANSMIT_BACKEND_TEST_OUT): WSPR-Transmitter/src/rp1_gpclk_transmit_backend_test.cpp WSPR-Transmitter/src/rp1_gpclk_transmit_backend.cpp WSPR-Transmitter/src/rp1_gpclk_development_policy.cpp WSPR-Transmitter/src/rp1_gpclk_event_program.cpp WSPR-Transmitter/src/rp1_gpclk_backend.cpp WSPR-Transmitter/src/rp1_gpclk_linux_provider.cpp WSPR-Transmitter/src/rp1_gpclk_planner.cpp WSPR-Transmitter/src/rp1_gpclk_reconciliation.cpp Chipset-Offsets/src/chipset_offsets.hpp
+$(BIN_DIR)/$(RP1_GPCLK_TRANSMIT_BACKEND_TEST_OUT): WSPR-Transmitter/src/execution_plan_compiler.cpp WSPR-Transmitter/src/rp1_gpclk_transmit_backend_test.cpp WSPR-Transmitter/src/rp1_gpclk_transmit_backend.cpp WSPR-Transmitter/src/rp1_gpclk_development_policy.cpp WSPR-Transmitter/src/rp1_gpclk_event_program.cpp WSPR-Transmitter/src/rp1_gpclk_backend.cpp WSPR-Transmitter/src/rp1_gpclk_linux_provider.cpp WSPR-Transmitter/src/rp1_gpclk_planner.cpp WSPR-Transmitter/src/rp1_gpclk_reconciliation.cpp Chipset-Offsets/src/chipset_offsets.hpp WSPR-Transmitter/src/rp1_gpclk_consumer_contract.hpp WSPR-Transmitter/src/rp1_gpclk_backend.hpp WSPR-Transmitter/src/rp1_gpclk_transmit_backend.hpp
 	$(Q)mkdir -p $(BIN_DIR)
 	$(Q)$(CXX) $(RP1_GPCLK_PLANNER_TEST_FLAGS) $(OPENSSL_CFLAGS) -pthread $(filter %.cpp,$^) $(OPENSSL_LIBS) -o $@
 

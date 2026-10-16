@@ -8,6 +8,7 @@
 
 #include <atomic>
 #include <cstdint>
+#include <functional>
 #include <memory>
 #include <mutex>
 #include <optional>
@@ -31,6 +32,7 @@ struct Rp1GpclkOperationRecord
     std::string state{"idle"};
     std::uint32_t terminal_reason{0};
     std::string terminal_reason_name{"none"};
+    std::string provider_detail;
     bool cleanup_fault{false};
     std::uint64_t elapsed_ns{0};
     std::uint64_t remaining_ns{0};
@@ -52,10 +54,18 @@ Rp1GpclkOperationRecord rp1GpclkOperationRecordSnapshot();
 class WsprRp1GpclkBackend final : public wsprrypi::ITransmissionBackend
 {
 public:
+    struct ExecutionClock
+    {
+        std::function<std::chrono::steady_clock::time_point()> now{
+            [] { return std::chrono::steady_clock::now(); }};
+        std::function<void(std::chrono::milliseconds)> wait;
+    };
     explicit WsprRp1GpclkBackend(IControllerBridge& owner);
     WsprRp1GpclkBackend(
         IControllerBridge& owner,
         std::unique_ptr<wsprrypi::Rp1GpclkProvider> provider);
+    WsprRp1GpclkBackend(IControllerBridge& owner,
+        std::unique_ptr<wsprrypi::Rp1GpclkProvider> provider, ExecutionClock clock);
     ~WsprRp1GpclkBackend() override;
 
     wsprrypi::BackendInfo info() const override;
@@ -72,6 +82,8 @@ public:
     wsprrypi::CleanupResult cleanup() noexcept override;
 
 private:
+    wsprrypi::ExecutionResult closeFailedOperation(const std::string& state,
+        const std::string& detail, bool unproven_cleanup = false);
     struct ConfiguredFrame
     {
         wsprrypi::PlanId plan_id{};
@@ -91,5 +103,8 @@ private:
     std::unique_ptr<wsprrypi::Rp1GpclkBackend> backend_;
     std::optional<ConfiguredFrame> configured_;
     std::atomic<bool> stop_requested_{false};
+    std::atomic<bool> execution_consumed_{false};
+    std::uint64_t record_owner_{0};
     std::mutex backend_mutex_;
+    ExecutionClock clock_;
 };

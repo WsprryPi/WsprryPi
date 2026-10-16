@@ -1,4 +1,5 @@
 #include "rp1_gpclk_route_service.hpp"
+#include "rp1_provider_process.hpp"
 #include "WSPR-Transmitter/src/rp1_gpclk_development_policy.hpp"
 #ifndef WSPRRYPI_ROUTE_SERVICE_TEST
 #include "config_handler.hpp"
@@ -91,68 +92,13 @@ nlohmann::json providerCommand(const std::string &operation,
       (digest.size() != 64 ||
        digest.find_first_not_of("0123456789abcdef") != std::string::npos))
     throw std::runtime_error("Invalid reviewed RP1 route-plan digest.");
-  int output[2];
-  if (::pipe(output) != 0)
-    throw std::runtime_error("Could not create the RP1 runtime-provider pipe.");
-  const pid_t child = ::fork();
-  if (child < 0) {
-    ::close(output[0]);
-    ::close(output[1]);
-    throw std::runtime_error("Could not start the RP1 runtime provider.");
+  std::vector<std::string> arguments{"/usr/bin/python3", "-I",
+      "/usr/lib/rp1-gpclk-dkms/runtime_provider.py", operation, "--route", route};
+  if (operation == "route-ensure") {
+    arguments.push_back("--plan-sha256");
+    arguments.push_back(digest);
   }
-  if (child == 0) {
-    ::close(output[0]);
-    if (::dup2(output[1], STDOUT_FILENO) < 0)
-      _exit(126);
-    ::close(output[1]);
-    const char *provider = "/usr/lib/rp1-gpclk-dkms/runtime_provider.py";
-    if (operation == "route-plan")
-      ::execl("/usr/bin/python3", "python3", provider, "route-plan",
-              "--route", route.c_str(), static_cast<char *>(nullptr));
-    else
-      ::execl("/usr/bin/python3", "python3", provider, "route-ensure",
-              "--route", route.c_str(), "--plan-sha256", digest.c_str(),
-              static_cast<char *>(nullptr));
-    _exit(127);
-  }
-  ::close(output[1]);
-  const auto terminate_child = [child] {
-    (void)::kill(child, SIGKILL);
-    int discarded = 0;
-    while (::waitpid(child, &discarded, 0) < 0 && errno == EINTR) {
-    }
-  };
-  std::string response;
-  char buffer[4096];
-  for (;;) {
-    const auto count = ::read(output[0], buffer, sizeof(buffer));
-    if (count < 0 && errno == EINTR)
-      continue;
-    if (count < 0) {
-      ::close(output[0]);
-      terminate_child();
-      throw std::runtime_error("Could not read the RP1 runtime-provider response.");
-    }
-    if (count == 0)
-      break;
-    response.append(buffer, static_cast<std::size_t>(count));
-    if (response.size() > 1024U * 1024U) {
-      ::close(output[0]);
-      terminate_child();
-      throw std::runtime_error("The RP1 runtime-provider response exceeded its bound.");
-    }
-  }
-  ::close(output[0]);
-  int status = 0;
-  while (::waitpid(child, &status, 0) < 0) {
-    if (errno != EINTR)
-      throw std::runtime_error("Could not collect the RP1 runtime provider.");
-  }
-  if (!WIFEXITED(status) || WEXITSTATUS(status) != 0)
-    throw std::runtime_error("The RP1 runtime provider refused the reviewed route operation.");
-  if (response.empty())
-    throw std::runtime_error("The RP1 runtime provider returned no response.");
-  return nlohmann::json::parse(response);
+  return nlohmann::json::parse(runRp1ProviderProcess(arguments));
 }
 
 void launchRuntimeRouteOperation(const std::string &operation,
@@ -174,52 +120,23 @@ void launchRuntimeRouteOperation(const std::string &operation,
   const std::string unit = "wsprrypi-rp1-route-" +
                            std::to_string(static_cast<long long>(::getpid())) +
                            "-" + request_id;
-  const pid_t child = ::fork();
-  if (child < 0)
-    throw std::runtime_error("Could not submit the detached RP1 route operation.");
-  if (child == 0) {
-    const char *systemd_run = "/usr/bin/systemd-run";
-    if (operation == "switch") {
-      const char *provider = "/usr/lib/rp1-gpclk-dkms/runtime_provider.py";
-      ::execl(systemd_run, "systemd-run", "--quiet", "--no-block",
-              "--collect", "--unit", unit.c_str(),
-              "--property=Type=exec", "--property=TimeoutStartSec=60s",
-              "--property=RuntimeMaxSec=90s",
-              "/usr/bin/python3", provider, "route-ensure", "--route",
-              route.c_str(), "--plan-sha256", digest.c_str(),
-              static_cast<char *>(nullptr));
-    } else if (operation == "remove") {
-      const char *client =
-          "/usr/lib/rp1-gpclk-dkms/runtime_route_client.py";
-      ::execl(systemd_run, "systemd-run", "--quiet", "--no-block",
-              "--collect", "--unit", unit.c_str(),
-              "--property=Type=exec", "--property=TimeoutStartSec=60s",
-              "--property=RuntimeMaxSec=90s",
-              "/usr/bin/python3", client, operation.c_str(), route.c_str(),
-              "--execute",
-              static_cast<char *>(nullptr));
-    } else {
-      const char *client =
-          "/usr/lib/rp1-gpclk-dkms/runtime_route_client.py";
-      ::execl(systemd_run, "systemd-run", "--quiet", "--no-block",
-              "--collect", "--unit", unit.c_str(),
-              "--property=Type=exec", "--property=TimeoutStartSec=60s",
-              "--property=RuntimeMaxSec=90s",
-              "/usr/bin/python3", client, "recover", "--execute",
-              static_cast<char *>(nullptr));
-    }
-    _exit(127);
+  std::vector<std::string> arguments{"/usr/bin/systemd-run", "--quiet", "--no-block",
+      "--collect", "--unit", unit, "--property=Type=exec",
+      "--property=TimeoutStartSec=60s", "--property=RuntimeMaxSec=90s", "/usr/bin/python3"};
+  if (operation == "switch") {
+    arguments.insert(arguments.end(), {"/usr/lib/rp1-gpclk-dkms/runtime_provider.py",
+        "route-ensure", "--route", route, "--plan-sha256", digest});
+  } else {
+    arguments.insert(arguments.end(), {"/usr/lib/rp1-gpclk-dkms/runtime_route_client.py", operation});
+    if (operation == "remove") arguments.push_back(route);
+    arguments.push_back("--execute");
   }
-  int status = 0;
-  while (::waitpid(child, &status, 0) < 0) {
-    if (errno != EINTR)
-      throw std::runtime_error("Could not collect the RP1 route submission.");
-  }
-  if (!WIFEXITED(status) || WEXITSTATUS(status) != 0)
-    throw std::runtime_error("The detached RP1 route operation was not accepted.");
+  (void)runRp1ProviderProcess(arguments, std::chrono::seconds{3}, false);
 }
 
 nlohmann::json socketRequest(const nlohmann::json &request) {
+  const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds{3};
+  const std::string payload = request.dump() + "\n";
   const int fd = ::socket(AF_UNIX, SOCK_STREAM, 0);
   if (fd < 0)
     throw std::runtime_error(
@@ -229,7 +146,7 @@ nlohmann::json socketRequest(const nlohmann::json &request) {
     throw std::runtime_error(
         "Could not secure the RP1 GPCLK route-manager socket.");
   }
-  const timeval timeout{30, 0};
+  const timeval timeout{3, 0};
   if (::setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout)) ||
       ::setsockopt(fd, SOL_SOCKET, SO_SNDTIMEO, &timeout, sizeof(timeout))) {
     ::close(fd);
@@ -249,47 +166,7 @@ nlohmann::json socketRequest(const nlohmann::json &request) {
     throw std::runtime_error(
         "Could not connect to the RP1 GPCLK route manager: " + detail);
   }
-  const std::string payload = request.dump() + "\n";
-  std::size_t offset = 0;
-  while (offset < payload.size()) {
-    const auto count = ::send(fd, payload.data() + offset,
-                              payload.size() - offset, MSG_NOSIGNAL);
-    if (count < 0 && errno == EINTR)
-      continue;
-    if (count <= 0) {
-      ::close(fd);
-      throw std::runtime_error("Could not send the RP1 GPCLK route request.");
-    }
-    offset += static_cast<std::size_t>(count);
-  }
-  if (::shutdown(fd, SHUT_WR) != 0) {
-    ::close(fd);
-    throw std::runtime_error("Could not finish the RP1 GPCLK route request.");
-  }
-  std::string response;
-  char buffer[4096];
-  for (;;) {
-    const auto count = ::read(fd, buffer, sizeof(buffer));
-    if (count < 0 && errno == EINTR)
-      continue;
-    if (count < 0) {
-      ::close(fd);
-      throw std::runtime_error("Could not read the RP1 GPCLK route response.");
-    }
-    if (count == 0)
-      break;
-    response.append(buffer, static_cast<std::size_t>(count));
-    if (response.size() > 1024U * 1024U) {
-      ::close(fd);
-      throw std::runtime_error(
-          "The RP1 GPCLK route response exceeded its bound.");
-    }
-  }
-  ::close(fd);
-  if (response.empty())
-    throw std::runtime_error(
-        "The RP1 GPCLK route manager returned no response.");
-  return nlohmann::json::parse(response);
+  return nlohmann::json::parse(exchangeRp1ProviderSocket(fd, payload, deadline));
 }
 #endif
 std::string field(const nlohmann::json &value, const char *name) {
@@ -367,7 +244,7 @@ nlohmann::json Rp1GpclkRouteService::request(const nlohmann::json &value) {
   }
 }
 nlohmann::json Rp1GpclkRouteService::render(const nlohmann::json &response,
-                                            const std::string &requested) {
+                                            const std::string &requested) try {
   if (response.contains("ok"))
     return response;
   const std::string status = field(response, "status");
@@ -552,7 +429,10 @@ nlohmann::json Rp1GpclkRouteService::render(const nlohmann::json &response,
                ? nlohmann::json(safety["operationalReady"].get<bool>() ? "Ready"
                                                                         : "Not ready")
                : nlohmann::json("Unknown")}};
+} catch (const std::exception &error) {
+  return failure("provider_response_invalid", error.what());
 }
+
 bool Rp1GpclkRouteService::acknowledgeRestoration(const std::string &token,
                                                  bool transmit) {
   std::lock_guard<std::mutex> guard(mutex_);
@@ -564,7 +444,7 @@ bool Rp1GpclkRouteService::acknowledgeRestoration(const std::string &token,
   const auto reply = request({{"schemaVersion", 3}, {"operation", "application-ready"},
       {"route", gpio == 4 ? "gpio4" : "gpio20"}, {"token", token},
       {"pid", static_cast<int>(::getpid())}, {"transmit", false}});
-  return reply.value("status", std::string{}) == "ok";
+  return field(reply, "status") == "ok";
 }
 
 nlohmann::json Rp1GpclkRouteService::query() {
@@ -575,6 +455,7 @@ nlohmann::json Rp1GpclkRouteService::operate(const std::string &operation,
                                              const std::string &route,
                                              std::uint64_t generation) {
   std::lock_guard<std::mutex> guard(mutex_);
+  try {
   invalidateRp1GpclkDevelopmentOperation();
   const int gpio = gpioForRoute(route);
   const std::string executor_route = gpio == 4    ? "gpio4"
@@ -803,6 +684,12 @@ nlohmann::json Rp1GpclkRouteService::operate(const std::string &operation,
   }
   return failure("invalid_operation",
                  "Operation must be preflight, apply-and-reboot, or rollback.");
+  } catch (const std::exception &error) {
+    invalidateRp1GpclkDevelopmentOperation();
+    startup_failure_latched_ = true;
+    operations_.set_transmission_inhibited(true, error.what());
+    return failure("provider_response_invalid", error.what());
+  }
 }
 nlohmann::json Rp1GpclkRouteService::reconcileStartup() {
   std::lock_guard<std::mutex> guard(mutex_);
@@ -827,7 +714,7 @@ nlohmann::json Rp1GpclkRouteService::reconcileStartup() {
   if (!reconciled) {
     rendered["result"] = "startup_reconciliation_failed";
     rendered["message"] =
-        "RP1 GPCLK startup reconciliation is incomplete or mismatched.";
+        "RP1 GPCLK startup reconciliation is incomplete or mismatched. " + field(rendered, "message");
   }
   startup_failure_latched_ = !reconciled;
   operations_.set_transmission_inhibited(
@@ -836,6 +723,7 @@ nlohmann::json Rp1GpclkRouteService::reconcileStartup() {
 }
 nlohmann::json Rp1GpclkRouteService::reconcileRuntime(
     const std::string &route, bool development) {
+  try {
   const int gpio = gpioForRoute(route);
   if (!gpio || gpio != operations_.persisted_gpio())
     return failure("runtime_route_mismatch", "Requested and saved runtime route differ.");
@@ -874,6 +762,12 @@ nlohmann::json Rp1GpclkRouteService::reconcileRuntime(
   operations_.set_transmission_inhibited(!development,
       development ? "" : "Runtime idle startup awaits an operation authorization");
   return result;
+  } catch (const std::exception &error) {
+    invalidateRp1GpclkDevelopmentOperation();
+    startup_failure_latched_ = true;
+    operations_.set_transmission_inhibited(true, error.what());
+    return failure("provider_response_invalid", error.what());
+  }
 }
 
 nlohmann::json Rp1GpclkRouteService::reconcileIdleStartup(
@@ -914,7 +808,7 @@ nlohmann::json Rp1GpclkRouteService::reconcileIdleStartup(
     rendered["ok"] = false;
     rendered["result"] = "idle_startup_reconciliation_failed";
     rendered["message"] =
-        "RP1 GPCLK idle startup route state is incomplete, stale, ambiguous, or mismatched.";
+        "RP1 GPCLK idle startup route state is incomplete, stale, ambiguous, or mismatched. " + field(rendered, "message");
     return rendered;
   }
 
@@ -924,7 +818,7 @@ nlohmann::json Rp1GpclkRouteService::reconcileIdleStartup(
     rendered["ok"] = false;
     rendered["result"] = "idle_startup_endpoint_unsafe";
     rendered["message"] =
-        "RP1 GPCLK idle startup requires the endpoint to be correctly owned and closed.";
+        "RP1 GPCLK idle startup requires the endpoint to be correctly owned and closed. " + field(rendered, "message");
     return rendered;
   }
 
@@ -977,7 +871,7 @@ nlohmann::json Rp1GpclkRouteService::reconcileDevelopmentStartup(
                                     : "development_route_failed";
   rendered["message"] = reconciled
       ? "Externally provisioned route state reconciled; operation authorization and runtime provider checks remain required."
-      : "Externally provisioned route state is incomplete, stale, ambiguous, or mismatched.";
+      : "Externally provisioned route state is incomplete, stale, ambiguous, or mismatched. " + field(rendered, "message");
   startup_failure_latched_ = !reconciled;
   operations_.set_transmission_inhibited(
       !reconciled,

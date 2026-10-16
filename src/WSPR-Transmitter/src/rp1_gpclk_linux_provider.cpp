@@ -1,5 +1,6 @@
 #include "rp1_gpclk_linux_provider.hpp"
 #include "rp1_gpclk_uapi.h"
+#include "rp1_gpclk_consumer_contract.hpp"
 
 #include <cerrno>
 #include <cstring>
@@ -62,7 +63,8 @@ bool validStateReason(std::uint32_t state, std::uint32_t reason)
         state == RP1_GPCLK_STATE_DRAINING)
         return reason == RP1_GPCLK_REASON_NONE;
     if (state == RP1_GPCLK_STATE_COMPLETE)
-        return reason == RP1_GPCLK_REASON_COMPLETE || reason == RP1_GPCLK_REASON_STOPPED;
+        return reason == RP1_GPCLK_REASON_COMPLETE || reason == RP1_GPCLK_REASON_STOPPED ||
+            reason == RP1_GPCLK_REASON_OWNER_CLOSED;
     return reason != RP1_GPCLK_REASON_NONE && reason != RP1_GPCLK_REASON_COMPLETE;
 }
 }
@@ -154,6 +156,12 @@ bool Rp1GpclkLinuxProvider::queryOpen(
         !boundedIdentity(request.compatibility_id, sizeof(request.compatibility_id), identity.compatibility_id))
     {
         error = "RP1 GPCLK provider returned an empty or unterminated identity."; return false;
+    }
+    if (identity.module_id != Rp1GpclkConsumerContract::module ||
+        identity.build_id != Rp1GpclkConsumerContract::version ||
+        identity.compatibility_id != Rp1GpclkConsumerContract::compatibility(identity.route)) {
+        error = "RP1 GPCLK module/version/route compatibility identity is not accepted.";
+        return false;
     }
     return true;
 }
@@ -473,6 +481,8 @@ bool Rp1GpclkLinuxProvider::getState(
     if (io_.control(fd_, RP1_GPCLK_IOC_GET_STATE, &request) < 0)
         return failed("Could not get RP1 GPCLK generation state", error);
     if (request.lease_id != lease_id_ || request.generation != generation ||
+        request.header.size != sizeof(request) || request.header.flags != 0 ||
+        request.header.reserved != 0 ||
         !knownState(request.state) || !knownTerminalReason(request.terminal_reason) ||
         !validStateReason(request.state, request.terminal_reason) ||
         request.cleanup_fault > 1)
@@ -480,6 +490,11 @@ bool Rp1GpclkLinuxProvider::getState(
         error = "RP1 GPCLK provider returned stale or unknown state data.";
         return false;
     }
+    for (const auto value : request.reserved)
+        if (value != 0) {
+            error = "RP1 GPCLK provider returned nonzero reserved state data.";
+            return false;
+        }
     Rp1GpclkCompletionState completion = Rp1GpclkCompletionState::failed;
     switch (request.state)
     {
@@ -501,8 +516,12 @@ Rp1GpclkProviderEventState Rp1GpclkLinuxProvider::eventState(std::uint64_t gener
     Rp1GpclkProviderEventState result{
         Rp1GpclkCompletionState::failed, 0, RP1_GPCLK_REASON_INTERNAL_ERROR,
         1, 0, 0};
-    std::string ignored;
-    (void)getState(generation, result, ignored);
+    try {
+        std::string detail;
+        if (!getState(generation, result, detail)) result.error = std::move(detail);
+    } catch (const std::exception& error) {
+        result.error = error.what();
+    }
     return result;
 }
 
@@ -523,7 +542,8 @@ bool Rp1GpclkLinuxProvider::release(std::string& error) noexcept
             io_.control(fd_, RP1_GPCLK_IOC_RELEASE, &request);
         if (release_result < 0)
         {
-            error = "Could not release the owned RP1 GPCLK lease.";
+            error = "Could not release the owned RP1 GPCLK lease: " +
+                std::string(std::strerror(io_.lastError()));
             ok = false;
         }
     }

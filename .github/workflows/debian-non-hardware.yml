@@ -4,7 +4,7 @@ on:
   pull_request:
     branches: [devel]
   push:
-    branches: [devel]
+    branches: [devel, codex/rp1-1.0-candidate-acceptance]
 
 permissions:
   contents: read
@@ -215,7 +215,7 @@ jobs:
         run: |
           apt-get update
           DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
-            age build-essential ca-certificates chromium cmake git libgpiod-dev libssl-dev libavahi-client-dev \
+            age build-essential ca-certificates chromium cmake device-tree-compiler git libgpiod-dev libssl-dev libavahi-client-dev \
             libsystemd-dev nodejs npm php-cli pkg-config python3 strace
 
       - name: Check out source
@@ -269,7 +269,22 @@ jobs:
         run: |
           strace -f -e trace=openat,open \
             -o /tmp/wsprrypi-rp1.strace \
-            make rp1-gpclk-transmit-backend-test SUDO=
+            make rp1-gpclk-planner-test rp1-gpclk-lifecycle-test rp1-gpclk-transition-test \
+              rp1-gpclk-backend-test rp1-gpclk-linux-provider-test \
+              rp1-gpclk-development-policy-test rp1-gpclk-route-runtime-wiring-test \
+              rp1-gpclk-route-service-test rp1-gpclk-transmit-backend-test \
+              rp1-gpclk-diagnostics-test rp1-candidate-acceptance-test SUDO=
+
+      - name: Read-only exact RP1 provider reference
+        uses: actions/checkout@v7
+        with:
+          repository: WsprryPi/RP1-GPCLK-DKMS
+          ref: 817f3dc6a194f4a92a7f94acf10147169e6439d6
+          path: src/build/rp1-provider-reference
+          persist-credentials: false
+
+      - name: Validate actual provider update and bootstrap boundary
+        run: python3 -B scripts/tests/rp1_gpclk_update_contract_test.py src/build/rp1-provider-reference
 
       - name: Qualify support-bundle age round trip
         working-directory: src

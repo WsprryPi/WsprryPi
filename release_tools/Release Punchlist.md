@@ -9,8 +9,8 @@ disposition rather than implementation before 4.0.
 ## Ordered release checklist
 
 Status updated October 15, 2026. Items 1 through 8 are complete within their
-recorded scopes. Item 9 is in progress in RP1. Accepted implementation
-integration remains a prerequisite to provider freeze.
+recorded scopes. Accepted implementation is integrated into `devel`.
+Item 9 is in progress in RP1; production consumption remains a separate gate.
 
 Status key: ✅ Complete · ⏳ In progress · ☐ Not started
 
@@ -62,11 +62,10 @@ Status key: ✅ Complete · ⏳ In progress · ☐ Not started
    Final adversarial review has no unresolved findings in scope. See the accepted
    [maintainer requirements](https://github.com/WsprryPi/WsprryPi/blob/c4736e55e34574349d94d5e974c337760d7f78a2/docs/development/rp1-item16-acceptance.md).
    Calibrated RF frequency, power, spectrum and general hardware qualification
-   are not claimed. Integration of the accepted implementation branches remains
-   separately authorized and pending before provider freeze.
-9. ⏳ **RP1 provider freeze and publication.** In progress in RP1. Integration
-   of the accepted WsprryPi feature and provider repair branch remains pending.
-   After separately authorized integration and applicable revalidation, freeze and publish the
+   are not claimed. The accepted consumer and provider repair are integrated
+   into their respective `devel` branches.
+9. ⏳ **RP1 provider freeze and publication.** In progress in RP1. After
+   applicable integration validation, freeze and publish the
    exact immutable RP1-GPCLK-DKMS `1.0.0` source, Debian package, checksums, inventories,
    compatibility metadata, manifests and provenance. Candidate changes require
    repetition of affected candidate, lifecycle and WsprryPi acceptance checks.
@@ -104,10 +103,10 @@ Status key: ✅ Complete · ⏳ In progress · ☐ Not started
   historical provider-rejection and eight-second lifecycle follow-ups.
   Preserve the accepted scope and the ownership boundary established by
   [#412](https://github.com/WsprryPi/WsprryPi/issues/412).
-- ☐ **Accepted implementation integration:** separately integrate the accepted
-  WsprryPi feature and provider repair branch before provider freeze. Preserve
-  exact accepted identities and repeat affected checks if integration changes
-  either accepted result. Acceptance does not itself merge either branch.
+- ✅ **Accepted implementation integration:** the accepted WsprryPi consumer
+  and provider repair are integrated into their respective `devel` branches.
+  Preserve the accepted runtime, UAPI and route behavior; repeat affected
+  checks when source or artifact identities change.
 - ⏳ **RP1 provider freeze and publication:** in progress in RP1. After candidate
   acceptance and application integration, freeze and publish the exact accepted
   provider source and immutable artifacts. The prepared candidate remains unpublished;

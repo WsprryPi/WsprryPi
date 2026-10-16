@@ -19,14 +19,16 @@ for historical test-tone calibration handling and physical-validation limits.
 
 On Raspberry Pi 5, RP1 output exclusively uses the externally provisioned
 endpoint `/dev/rp1-gpclk`; it never falls back to the legacy DMA backend.
-WsprryPi does not install or attest the provider. Runtime protocol and
+This component does not install or attest the provider. Runtime protocol and
 capability checks, operation-scoped ownership, bounded one-second DMA chunks,
 operational readiness, and cleanup remain required. WsprryPi translates every
 supported product mode into the provider's generic finite-event UAPI; product
 mode and operator authorization remain application policy and are not sent to
 the kernel. GPIO4 and GPIO20 are independent routes. The root-owned, mode-0600
-endpoint is the production authority. The provider's package version or build
-label is not an application allowlist.
+endpoint is the production authority. The consumer accepts module `1.0.0` and
+the distinct `v1.0.0-rp1-gpio4` and `v1.0.0-rp1-gpio20` identities through its
+typed consumer contract. That compatibility gate does not grant output
+authorization, publication status, or qualification.
 
 ### Parent WTP backend integration
 
@@ -78,6 +80,15 @@ WsprryPi retains stop ownership and requests bounded drain when the operator or
 application stops it. Long QRSS events are submitted directly; the provider's
 fixed one-second DMA chunks bound coherent allocation and cancellation latency
 without imposing a 120-second logical-event limit.
+
+Finite execution uses the complete plan duration plus a cleanup allowance.
+A deadline-triggered STOP is a failed operation even when bounded drain
+succeeds. Provider refusals retain their diagnostic text and terminal evidence;
+cleanup faults remain latched across repeated cleanup. A new execution requires
+fresh configuration and operation reconciliation. Terminal records are owned by
+their operation, so destruction of an earlier backend cannot replace newer
+evidence. The injectable clock is a typed test seam with no CLI or persistent
+configuration surface.
 
 The intrinsic baseline is a shared RP1 product default. It is not an
 individual-board calibration. Si5351 behavior is unchanged.

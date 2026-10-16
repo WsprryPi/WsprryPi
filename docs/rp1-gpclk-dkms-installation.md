@@ -136,15 +136,26 @@ loading either module. A single DKMS instance owns
 the consumer and controller; WsprryPi verifies the returned exact commit,
 canonical version, kernel, UAPI, both installed-file and decompressed-ELF hashes,
 null route, and quiescent unowned state before recording success. Development
-identity remains `v0.9.0-pi5`; exact commit, kernel, route, hashes, enrollment,
-and qualification remain separate facts.
+provenance records version-derived GPIO4 and GPIO20 compatibility identities
+separately. The `1.0.0` identities are `v1.0.0-rp1-gpio4` and
+`v1.0.0-rp1-gpio20`. The historical `v0.9.0-pi5` value is accepted only as
+captured `0.9.0` predecessor removal authority. Exact commit, kernel, route,
+hashes, enrollment, and qualification remain separate facts.
 
 Runtime-capable source selection additionally requires commit
-`8a8bf5d4184714949faffbf2e2538a1cac0526b2`, which provides the single-owner
-DKMS runtime-controller profile and binding version 3, or a selected commit/tag
+`817f3dc6a194f4a92a7f94acf10147169e6439d6`, which provides the single-owner
+DKMS runtime-controller profile, binding version 3, and authenticated passive
+package preservation, interrupted inverse-deployment recovery, and owner/lease
+revocation after a successful owner-close drain, or a selected commit/tag
 whose Git history contains it. A development checkout or immutable release that
 cannot prove that ancestry is rejected before provider mutation or runtime bundle
 creation.
+
+An upstream `devel` tip predating that minimum is refused. Select the exact
+reviewed commit explicitly until the owning provider branch includes it. This
+does not create a production release. The separate
+[unpublished candidate acceptance](rp1-candidate-acceptance.md) command never
+installs a package or changes ordinary source selection.
 
 A repeated development installation is a no-op only when WsprryPi's existing
 v2 ownership record and the complete inactive provider inventory still match
@@ -367,11 +378,20 @@ overall uninstall fails, and no uninstall-success message is reported. Failures
 in later independent application teardown remain cumulative: safe teardown
 continues where possible, but the overall uninstall still fails.
 
-The ownership record is deleted only after the canonical removal succeeds and
-the helper verifies that package, DKMS, source, module, overlay, route,
-enrollment, and manager state are absent. A lifecycle failure retains the
-record, fails the overall uninstall, and leaves recovery to the recorded owning
-procedure. Successfully rolled-back development evidence remains under
+For a release package, WsprryPi durably retains the exact ownership record in
+an adjacent `.removal-pending` file before retiring the active record. The
+provider's own read-only removal guard must then permit the package transition
+before APT runs. A pending removal blocks new installation and runtime
+deployment. On failure WsprryPi restores the active ownership record without
+overwriting concurrent state. An interrupted invocation can restore its exact
+authority on the next `remove` request; if package/DKMS state is already absent,
+it verifies absence before retiring that evidence. Changed, foreign, or partial
+state that cannot satisfy owning validation remains preserved for recovery.
+
+Final ownership retirement requires successful canonical removal and verified
+package, DKMS, consumer/controller module, source, overlay, route, enrollment,
+and manager absence. A lifecycle failure fails the overall uninstall and leaves
+recovery to the recorded owning procedure. Successfully rolled-back development evidence remains under
 `/var/lib/wsprrypi` as uniquely named audit/recovery evidence and does not block
 a later installation.
 

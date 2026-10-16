@@ -45,8 +45,8 @@ PACKAGE_NAME = "rp1-gpclk-dkms"
 DKMS_NAME = "rp1-gpclk-dkms"
 MODULE_NAME = "rp1_gpclk_dkms"
 CONTROLLER_MODULE_NAME = "rp1_route_controller"
-COMPATIBILITY_IDENTITY = "v0.9.0-pi5"
-CORRECTED_RUNTIME_COMMIT = "8a8bf5d4184714949faffbf2e2538a1cac0526b2"
+LEGACY_COMPATIBILITY_IDENTITY = "v0.9.0-pi5"
+CORRECTED_RUNTIME_COMMIT = "817f3dc6a194f4a92a7f94acf10147169e6439d6"
 LEGACY_RECORD_SCHEMA = "wsprrypi-rp1-gpclk-dkms-installation-v1"
 RECORD_SCHEMA = "wsprrypi-rp1-gpclk-dkms-ownership-v2"
 RUNTIME_RECORD_SCHEMA = "wsprrypi-rp1-gpclk-dkms-ownership-v3"
@@ -374,7 +374,7 @@ def validate_manifest(manifest: Any, *, tag: str, tag_commit: str) -> dict[str, 
         "installationBehavior", "releaseChannel",
     }
     require_exact_keys(manifest, required, "installation manifest")
-    require(manifest["schema"] == MANIFEST_SCHEMA and manifest["schemaVersion"] == 1, "unsupported installation manifest schema")
+    require(manifest["schema"] == MANIFEST_SCHEMA and type(manifest["schemaVersion"]) is int and manifest["schemaVersion"] == 1, "unsupported installation manifest schema")
     require(manifest["repository"] == REPOSITORY, "installation manifest repository substitution")
     require(manifest["releaseTag"] == tag, "manifest release tag differs from selected release")
     require(manifest["sourceCommit"] == tag_commit and SHA40.fullmatch(tag_commit) is not None, "manifest source commit differs from immutable tag commit")
@@ -667,6 +667,10 @@ def download_release(state_dir: pathlib.Path, client: GitHubClient, runner: Runn
         "release package and exact runtime source product versions differ",
     )
     runtime_source_identity(source, upstream_identity["version"])
+    require(manifest["uapi"]["sha256"] == sha256_file(source / "include/uapi/linux/rp1_gpclk.h")
+            and manifest["uapi"]["path"] ==
+                f"usr/src/{PACKAGE_NAME}-{manifest['productVersion']}/include/uapi/linux/rp1_gpclk.h",
+            "release package UAPI differs from exact runtime source")
     return {
         "channel": "release", "tag": tag, "commit": tag_commit,
         "manifest": manifest, "packagePath": str(package_path),
@@ -696,7 +700,7 @@ def require_compatible_runtime_source(
     )
     require(
         compatible.returncode == 0,
-        "selected RP1-GPCLK-DKMS source predates the corrected runtime controller UAPI",
+        "selected RP1-GPCLK-DKMS source predates the corrected runtime lifecycle contract",
     )
 
 
@@ -878,8 +882,16 @@ def prepare_development(state_dir: pathlib.Path, selector: str, value: str | Non
         "sourceTree": identity["tree"], "uapiSha256": sha256_file(uapi),
         "versionSource": upstream_identity["versionSource"],
         "versionSourceSha256": upstream_identity["versionSourceSha256"],
-        "compatibilityIdentity": COMPATIBILITY_IDENTITY,
+        "compatibilityIdentity": development_compatibility(upstream_identity["version"]),
     }
+
+
+def development_compatibility(version: str) -> str:
+    """Route-neutral provenance; each runtime route still has its own identity."""
+    require(isinstance(version, str) and SAFE_VERSION.fullmatch(version),
+            "invalid development product version")
+    return canonical({route: f"v{version}-rp1-{route}"
+                      for route in ("gpio4", "gpio20")}).decode()
 
 
 def secure_state_dir(path: pathlib.Path) -> pathlib.Path:
@@ -1055,7 +1067,8 @@ def validate_runtime_ownership(runtime: Any, record: Mapping[str, Any]) -> dict[
     require(
         isinstance(compatibility, dict)
         and set(compatibility) == {"gpio4", "gpio20"}
-        and all(isinstance(value, str) and value for value in compatibility.values()),
+        and compatibility == {route: f"v{product}-rp1-{route}"
+                              for route in ("gpio4", "gpio20")},
         "runtime compatibility identities are invalid",
     )
     require(isinstance(runtime["activationRequestId"], str) and len(runtime["activationRequestId"]) >= 8, "runtime activation request ID is invalid")
@@ -1081,7 +1094,7 @@ def runtime_deployment_destinations(files: Iterable[str] = ()) -> set[str]:
             "runtime_route_client.py", "runtime_layout.py",
             "runtime_deployment.py", "runtime_output.py",
             "runtime_application.py", "runtime_activation.py",
-            "runtime_provider.py", "runtime_binding.py")),
+            "runtime_provider.py", "runtime_binding.py", "package_preflight.py")),
         *(f"{library}/runtime-uapi/{name}" for name in
           ("rp1_gpclk.h", "rp1_route_admin.h")),
         *(f"{library}/runtime-overlays/{route}.dtbo" for route in
@@ -1114,7 +1127,9 @@ def module_artifacts(root: pathlib.Path) -> list[dict[str, str]]:
     artifacts: list[dict[str, str]] = []
     if not base.exists():
         return artifacts
-    for path in sorted(base.glob("*/updates/dkms/rp1_gpclk_dkms.ko*")):
+    paths = [path for name in (MODULE_NAME, CONTROLLER_MODULE_NAME)
+             for path in base.glob(f"*/updates/dkms/{name}.ko*")]
+    for path in sorted(paths):
         relative = pathlib.PurePosixPath("/" + str(path.relative_to(root)))
         installed = installed_member(root, str(relative).removeprefix("/"), "file")
         artifacts.append({"path": str(relative), "sha256": sha256_file(installed)})
@@ -1125,6 +1140,30 @@ def ensure_new_ownership_record(path: pathlib.Path) -> None:
     require(path.is_absolute(), "installation ownership record path must be absolute")
     secure_record_parent(path)
     require(not path.exists() and not path.is_symlink(), "stale installation ownership state blocks a new provider installation")
+    pending = removal_pending_path(path)
+    require(not pending.exists() and not pending.is_symlink(),
+            "pending owned-provider removal must be recovered before installation")
+
+
+def removal_pending_path(path: pathlib.Path) -> pathlib.Path:
+    return path.with_name(path.name + ".removal-pending")
+
+
+def recover_pending_removal(path: pathlib.Path) -> bool:
+    """Restore authority after interruption without replacing concurrent state."""
+    pending = removal_pending_path(path)
+    if not pending.exists() and not pending.is_symlink():
+        return False
+    value, identity, reason = load_ownership_record(pending)
+    require(value is not None and identity is not None and value.get("channel") == "release",
+            "invalid pending package-removal authority: " + str(reason))
+    if path.exists() or path.is_symlink():
+        current, _, reason = load_ownership_record(path)
+        require(current == value, "pending removal conflicts with current ownership: " + str(reason))
+    else:
+        atomic_json_new(path, value)
+    remove_ownership_record(pending, identity)
+    return True
 
 
 def render_plan(plan: Mapping[str, Any]) -> None:
@@ -1218,6 +1257,7 @@ def runtime_residue_inventory(root: pathlib.Path) -> list[str]:
         "/usr/lib/rp1-gpclk-dkms/runtime_output.py",
         "/usr/lib/rp1-gpclk-dkms/runtime_provider.py",
         "/usr/lib/rp1-gpclk-dkms/runtime_route_client.py",
+        "/usr/lib/rp1-gpclk-dkms/package_preflight.py",
         "/usr/lib/rp1-gpclk-dkms/schema/rp1-gpclk-runtime-readiness-v1.schema.json",
         "/dev/rp1-route-admin",
         "/dev/rp1-gpclk",
@@ -1298,6 +1338,14 @@ def installed_member(root: pathlib.Path, relative: str, expected_type: str) -> p
             info = current.lstat()
         except FileNotFoundError as error:
             raise ContractError(f"installed package member is missing: /{relative}") from error
+        if index == 0 and part == "lib" and stat.S_ISLNK(info.st_mode):
+            # Debian's merged-/usr alias is the sole permitted ancestor link.
+            # Walk the canonical destination again without following any other
+            # symlink, including a substituted /usr/lib or module directory.
+            require(info.st_uid == (0 if root == pathlib.Path("/") else os.geteuid())
+                    and os.readlink(current) in ("usr/lib", "/usr/lib"),
+                    f"installed package path has a substituted ancestor: /{relative}")
+            return installed_member(root, str(pathlib.PurePosixPath("usr/lib", *parts[1:])), expected_type)
         final = index == len(parts) - 1
         if not final:
             require(stat.S_ISDIR(info.st_mode) and not stat.S_ISLNK(info.st_mode), f"installed package path has a substituted ancestor: /{relative}")
@@ -1310,6 +1358,24 @@ def installed_member(root: pathlib.Path, relative: str, expected_type: str) -> p
     return current
 
 
+def release_runtime_inventory(inventory: Mapping[str, Any], root: pathlib.Path,
+                              manifest: Mapping[str, Any]) -> dict[str, Any]:
+    """Inactive package-owned unit fragments are distinct from deployed runtime."""
+    result = dict(inventory)
+    if inventory["packageVersion"] != manifest["debianVersion"]:
+        return result
+    units = {"usr/lib/systemd/system/rp1-gpclk-route-manager.socket",
+             "usr/lib/systemd/system/rp1-gpclk-route-manager@.service"}
+    passive = set()
+    for member in manifest["packageInventory"]:
+        if member["path"] in units and member["type"] == "file":
+            path = installed_member(root, member["path"], "file")
+            require(sha256_file(path) == member["sha256"], "passive package unit differs from manifest")
+            passive.add(str(path))
+    result["runtimeResidue"] = [path for path in inventory["runtimeResidue"] if path not in passive]
+    return result
+
+
 def verify_installed_release(
     root: pathlib.Path,
     manifest: Mapping[str, Any],
@@ -1317,11 +1383,13 @@ def verify_installed_release(
     *,
     allow_owned_runtime: bool = False,
 ) -> None:
-    inventory = existing_inventory(root, runner)
+    inventory = release_runtime_inventory(existing_inventory(root, runner), root, manifest)
     if not allow_owned_runtime:
         require_no_runtime_residue(inventory, "release verification")
     require(inventory["packageVersion"] == manifest["debianVersion"], "installed Debian package version differs from plan")
-    require(not inventory["activeModule"], "RP1 GPCLK module became active during route-neutral installation")
+    require(not inventory["activeModule"]
+            and (allow_owned_runtime or not inventory.get("activeController", False)),
+            "RP1 module/controller became active during route-neutral installation")
     require(not inventory["configuredRoute"], "RP1 GPCLK route became configured during route-neutral installation")
     require(not inventory["enrollment"] and not inventory["developmentManager"], "installed provider has unexpected development enrollment or manager binding")
     dkms_lines = [line for line in inventory["dkms"].splitlines() if line.strip()]
@@ -1354,16 +1422,21 @@ def verify_installed_release(
         if kind != "symlink":
             actual_mode = f"0{stat.S_IMODE(installed.stat().st_mode):03o}"
             require(actual_mode == member["mode"], f"installed package member mode differs: /{member['path']}")
-    version = runner.run(["modinfo", "-k", platform.release(), "-F", "version", MODULE_NAME]).stdout.strip()
-    require(version == manifest["productVersion"], "installed module metadata version differs from manifest")
+    artifacts = module_artifacts(root)
+    validate_recorded_module_artifacts(artifacts)
+    for name in (MODULE_NAME, CONTROLLER_MODULE_NAME):
+        version = runner.run(["modinfo", "-k", platform.release(), "-F", "version", name]).stdout.strip()
+        require(version == manifest["productVersion"], "installed module/controller metadata version differs from manifest")
 
 
 def apply_release(state_dir: pathlib.Path, resolved: Mapping[str, Any], record: pathlib.Path, root: pathlib.Path, runner: Runner) -> None:
+    require(not removal_pending_path(record).exists() and not removal_pending_path(record).is_symlink(),
+            "pending owned-provider removal blocks release installation")
     manifest = resolved["manifest"]
     package_path = pathlib.Path(str(resolved["packagePath"]))
     require(package_path.parent == state_dir and package_path.is_file() and not package_path.is_symlink(), "prepared package was replaced before installation")
     validate_package(package_path, manifest, runner)
-    inventory = existing_inventory(root, runner)
+    inventory = release_runtime_inventory(existing_inventory(root, runner), root, manifest)
     owned, owned_identity, _ = load_ownership_record(record)
     owned_runtime = bool(
         owned is not None and owned_identity is not None
@@ -1374,6 +1447,7 @@ def apply_release(state_dir: pathlib.Path, resolved: Mapping[str, Any], record: 
     if owned_runtime:
         require(owned.get("tag") == resolved.get("tag") and owned.get("manifest") == manifest,
                 "existing WsprryPi-owned runtime release identity differs from the selected source")
+        validate_resumable_neutral_activation(owned, inventory, runner)
     if not owned_runtime:
         require_no_runtime_residue(inventory, "release installation")
     require(not inventory["activeModule"], "an active RP1 GPCLK module blocks ordinary installation")
@@ -1389,6 +1463,7 @@ def apply_release(state_dir: pathlib.Path, resolved: Mapping[str, Any], record: 
             "foreign or mixed RP1 GPCLK installation blocks package installation",
         )
         ensure_new_ownership_record(record)
+        package_preflight(resolved, "unpack", runner)
         runner.run(
             ["apt-get", "install", "--no-install-recommends", "-y", str(package_path)],
             passthrough=True,
@@ -1397,11 +1472,11 @@ def apply_release(state_dir: pathlib.Path, resolved: Mapping[str, Any], record: 
     elif inventory["packageVersion"] == expected:
         pass
     else:
-        raise ContractError(f"existing RP1-GPCLK-DKMS {inventory['packageVersion']} requires its owning package migration workflow; automatic replacement refused")
+        raise ContractError(f"existing RP1-GPCLK-DKMS {inventory['packageVersion']} requires cleanup-first migration: retain its exact package and ownership evidence, prepare/remove its runtime through the owning provider, remove the predecessor through its owning lifecycle, and verify complete absence before installing the selected provider; direct upgrade/downgrade refused")
     verify_installed_release(root, manifest, runner, allow_owned_runtime=owned_runtime)
     if installed_by_wsprrypi:
         artifacts = module_artifacts(root)
-        require(bool(artifacts), "installed release lacks attributable DKMS module artifacts")
+        validate_recorded_module_artifacts(artifacts)
         atomic_json_new(record, {
             "schema": RECORD_SCHEMA, "repository": REPOSITORY, "owner": "WsprryPi",
             "channel": "release", "installationMethod": "debian-package",
@@ -1410,6 +1485,33 @@ def apply_release(state_dir: pathlib.Path, resolved: Mapping[str, Any], record: 
             "routeActivation": "disabled", "output": "disabled",
             "qualificationClaim": False,
         })
+
+
+def package_preflight(resolved: Mapping[str, Any], operation: str, runner: Runner) -> None:
+    """The incoming provider owns package transition admission before APT."""
+    source = revalidate_checkout(resolved["checkout"], runner)
+    guard = source / "scripts/package_preflight.py"
+    require(guard.is_file() and not guard.is_symlink(), "selected source lacks package preflight")
+    run_package_preflight(guard, operation, runner)
+
+
+def run_package_preflight(guard: pathlib.Path, operation: str, runner: Runner) -> None:
+    reply = runner.run(["python3", "-I", str(guard), operation], check=False)
+    value = json_result(CommandResult(reply.stdout or reply.stderr, reply.stderr, reply.returncode), "package preflight")
+    require(reply.returncode == 0 and value.get("contract") == "rp1-gpclk-package-preflight-v1"
+            and value.get("status") == "permitted" and value.get("operation") == operation
+            and value.get("executionAuthorized") is False and value.get("routeSelected") is False,
+            "provider package preflight refused: " + reply.stdout.strip() + " " + reply.stderr.strip())
+
+
+def package_removal_preflight(record: Mapping[str, Any], root: pathlib.Path, runner: Runner) -> None:
+    relative = "usr/libexec/rp1-gpclk-dkms/package_preflight.py"
+    members = [member for member in record["manifest"]["packageInventory"]
+               if member["path"] == relative and member["type"] == "file"]
+    require(len(members) == 1, "owned package lacks its removal preflight")
+    guard = installed_member(root, relative, "file")
+    require(sha256_file(guard) == members[0]["sha256"], "owned package removal preflight changed")
+    run_package_preflight(guard, "remove", runner)
 
 
 def verify_development_result(
@@ -1619,6 +1721,8 @@ def validate_runtime_update_envelope(value: Mapping[str, Any], operation: str,
 
 
 def apply_development(resolved: Mapping[str, Any], record: pathlib.Path, runner: Runner) -> None:
+    require(not removal_pending_path(record).exists() and not removal_pending_path(record).is_symlink(),
+            "pending owned-provider removal blocks development installation")
     source = revalidate_checkout(resolved["checkout"], runner)
     interface, route_args = route_neutral_interface(source, runner)
     require(interface == resolved["interface"] and route_args == resolved["routeArguments"], "upstream development interface changed after preflight")
@@ -1659,7 +1763,7 @@ def apply_development(resolved: Mapping[str, Any], record: pathlib.Path, runner:
             "versionSource": resolved["versionSource"],
             "versionSourceSha256": resolved["versionSourceSha256"],
             "targetKernel": platform.release(),
-            "compatibilityIdentity": COMPATIBILITY_IDENTITY,
+            "compatibilityIdentity": development_compatibility(resolved["version"]),
         }
         identity_matches = all(
             existing_record.get(name) == value
@@ -1833,7 +1937,7 @@ def apply_development(resolved: Mapping[str, Any], record: pathlib.Path, runner:
         "decompressedModuleSha256": installed["decompressedElfSha256"],
         "installedModulePath": str(installed_path),
         "targetKernel": platform.release(),
-        "compatibilityIdentity": COMPATIBILITY_IDENTITY, "routeActivation": "disabled",
+        "compatibilityIdentity": development_compatibility(resolved["version"]), "routeActivation": "disabled",
         "output": "disabled", "qualificationClaim": False, "upstreamEvidence": str(evidence),
         "rollbackRecord": str(rollback_record), "rollbackRecordSha256": sha256_file(rollback_record),
         "rollbackEntrypoint": str(rollback_entrypoint),
@@ -1855,11 +1959,17 @@ def validate_recorded_module_artifacts(value: Any) -> list[dict[str, str]]:
         path = item["path"]
         require(
             isinstance(path, str)
-            and re.fullmatch(r"/lib/modules/[^/]+/updates/dkms/rp1_gpclk_dkms\.ko(?:\.(?:xz|gz|zst|bz2))?", path) is not None,
+            and re.fullmatch(r"/lib/modules/[^/]+/updates/dkms/(?:rp1_gpclk_dkms|rp1_route_controller)\.ko(?:\.(?:xz|gz|zst|bz2))?", path) is not None,
             "installation ownership module artifact path is out of scope",
         )
         result.append({"path": path, "sha256": require_hash(item["sha256"], "module artifact SHA-256")})
     require(len({item["path"] for item in result}) == len(result), "installation ownership module artifacts contain duplicate paths")
+    kernels: dict[str, list[str]] = {}
+    for item in result:
+        parts = pathlib.PurePosixPath(item["path"]).parts
+        kernels.setdefault(parts[3], []).append(parts[-1].split(".ko")[0])
+    require(all(sorted(names) == sorted((MODULE_NAME, CONTROLLER_MODULE_NAME))
+                for names in kernels.values()), "installation ownership requires one consumer/controller pair per kernel")
     return sorted(result, key=lambda item: item["path"])
 
 
@@ -1874,12 +1984,12 @@ def validate_release_removal(record: Mapping[str, Any], root: pathlib.Path, runn
     validated = validate_manifest(manifest, tag=tag, tag_commit=commit)
     verify_installed_release(root, validated, runner)
     expected = {item["path"]: item["sha256"] for item in validate_recorded_module_artifacts(record["moduleArtifacts"])}
-    current = {item["path"]: item["sha256"] for item in module_artifacts(root)}
+    current = {item["path"]: item["sha256"] for item in validate_recorded_module_artifacts(module_artifacts(root))}
     require(all(current.get(path) == digest for path, digest in expected.items()), "recorded DKMS module artifacts differ from WsprryPi ownership")
     for path in current:
-        match = re.fullmatch(r"/lib/modules/([^/]+)/updates/dkms/rp1_gpclk_dkms\.ko(?:\.(?:xz|gz|zst|bz2))?", path)
+        match = re.fullmatch(r"/lib/modules/([^/]+)/updates/dkms/(rp1_gpclk_dkms|rp1_route_controller)\.ko(?:\.(?:xz|gz|zst|bz2))?", path)
         require(match is not None, "installed DKMS module artifact path is out of scope")
-        version = runner.run(["modinfo", "-k", match.group(1), "-F", "version", MODULE_NAME]).stdout.strip()
+        version = runner.run(["modinfo", "-k", match.group(1), "-F", "version", match.group(2)]).stdout.strip()
         require(version == validated["productVersion"], "additional-kernel DKMS module identity differs from WsprryPi ownership")
 
 
@@ -1907,7 +2017,10 @@ def validate_development_rollback_authority(
     require(isinstance(record["productVersion"], str) and SAFE_VERSION.fullmatch(record["productVersion"]) is not None, "development ownership version is invalid")
     require(SHA40.fullmatch(record["sourceTree"]) is not None, "development ownership source tree is invalid")
     require(record["versionSource"] == "include/rp1_gpclk/version.h", "development ownership version source differs")
-    require(record["compatibilityIdentity"] == COMPATIBILITY_IDENTITY, "development ownership compatibility identity differs")
+    require(record["compatibilityIdentity"] == development_compatibility(record["productVersion"])
+            or (record["productVersion"] == "0.9.0"
+                and record["compatibilityIdentity"] == LEGACY_COMPATIBILITY_IDENTITY),
+            "development ownership compatibility identity differs")
     require(record["targetKernel"] == platform.release(), "development ownership targets a different running kernel")
     for field in (
         "uapiSha256", "versionSourceSha256", "rollbackRecordSha256",
@@ -2017,6 +2130,7 @@ def remove_owned_provider(args: argparse.Namespace, runner: Runner) -> None:
     if args.remove == "false":
         print("RP1-GPCLK-DKMS preserved: explicit operator opt-out.")
         return
+    recovered_removal = recover_pending_removal(args.record)
     record, identity, reason = load_ownership_record(args.record)
     if record is None or identity is None:
         try:
@@ -2031,9 +2145,20 @@ def remove_owned_provider(args: argparse.Namespace, runner: Runner) -> None:
         root = args.root.resolve(strict=True)
     except OSError as error:
         raise ContractError("provider inventory root is unavailable") from error
+    if recovered_removal:
+        try:
+            verify_provider_absent(root, runner)
+        except ContractError:
+            pass
+        else:
+            remove_ownership_record(args.record, identity)
+            print("Interrupted owned-package removal completed; absence verified.")
+            return
     try:
         if record["schema"] == RUNTIME_RECORD_SCHEMA:
             inventory = existing_inventory(root, runner)
+            if record["channel"] == "release":
+                inventory = release_runtime_inventory(inventory, root, record["manifest"])
         else:
             inventory = {"runtimeResidue": []}
         if inventory["runtimeResidue"]:
@@ -2065,9 +2190,29 @@ def remove_owned_provider(args: argparse.Namespace, runner: Runner) -> None:
         and (current_identity.st_dev, current_identity.st_ino) == (identity.st_dev, identity.st_ino),
         f"installation ownership changed before provider removal: {current_reason or 'identity mismatch'}",
     )
-    runner.run(command, cwd=working_directory, passthrough=True)
-    verify_provider_absent(root, runner)
-    remove_ownership_record(args.record, identity)
+    if record["channel"] == "release":
+        # The provider correctly refuses an active application ownership record.
+        # Retain its exact authority durably before retiring that record. This
+        # journal blocks installation and permits recovery after process death.
+        pending = removal_pending_path(args.record)
+        atomic_json_new(pending, record)
+        pending_identity = record_file_identity(pending)
+        require_unchanged_ownership(args.record, record, identity, "package ownership retirement")
+        remove_ownership_record(args.record, identity)
+        try:
+            package_removal_preflight(record, root, runner)
+            runner.run(command, cwd=working_directory, passthrough=True)
+            verify_provider_absent(root, runner)
+            require(not args.record.exists() and not args.record.is_symlink(),
+                    "concurrent ownership record appeared during package removal")
+        except BaseException:
+            recover_pending_removal(args.record)
+            raise
+        remove_ownership_record(pending, pending_identity)
+    else:
+        runner.run(command, cwd=working_directory, passthrough=True)
+        verify_provider_absent(root, runner)
+        remove_ownership_record(args.record, identity)
     print("WsprryPi-owned RP1-GPCLK-DKMS provider removed and absence verified.")
 
 
@@ -2203,7 +2348,7 @@ def validate_runtime_bundle(
         "runtime_deployment.py", "runtime_controller_admin.py", "runtime_layout.py",
         "runtime_application.py", "runtime_output.py", "runtime_provider.py",
         "runtime_binding.py", "runtime_activation.py", "runtime_route_client.py",
-        "runtime_manager.py",
+        "runtime_manager.py", "package_preflight.py",
     }
     expected_members = {"binding.json", *bootstrap}
     for destination, expected in files.items():
@@ -2386,6 +2531,8 @@ def prepare_runtime_update(args: argparse.Namespace, runner: Runner) -> None:
 
 
 def activate_runtime(args: argparse.Namespace, runner: Runner) -> None:
+    require(not removal_pending_path(args.record).exists() and not removal_pending_path(args.record).is_symlink(),
+            "pending owned-provider removal blocks runtime deployment")
     state_dir = secure_state_dir(args.state_dir)
     plan = load_plan(state_dir)
     require(not plan.get("dryRun"), "dry-run plan cannot activate runtime administration")

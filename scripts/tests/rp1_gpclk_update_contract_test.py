@@ -55,7 +55,8 @@ class ContractTests(unittest.TestCase):
             root = Path(tmp)
             modules = root / 'lib/modules' / KERNEL / 'updates/dkms'
             modules.mkdir(parents=True)
-            prefix = b'\x7fELF\x02\x01\0version=0.9.0\0vermagic=' + KERNEL.encode() + b' '
+            prefix = (b'\x7fELF\x02\x01\0version=' + builder.PRODUCT_VERSION.encode() +
+                      b'\0vermagic=' + KERNEL.encode() + b' ')
             consumer = prefix + b'\0rp1_runtime_controller=1\0rp1_route_controller\0'
             controller = prefix + b''.join((PROVIDER / 'build/runtime-controller' /
                 (route + '.dtbo')).read_bytes() for route in ('gpio4', 'gpio20'))
@@ -107,7 +108,7 @@ class ContractTests(unittest.TestCase):
                     if route in (4, 20):
                         host.select_route(route)
                     record = {"schema": installer.RUNTIME_RECORD_SCHEMA, "channel": "development",
-                              "sourceCommit": host.value["sourceCommit"], "productVersion": "0.9.0",
+                              "sourceCommit": host.value["sourceCommit"], "productVersion": receipt["productVersion"],
                               "runtime": receipt}
                     runner = PublicRunner(host)
                     with tempfile.TemporaryDirectory() as tmp, \
@@ -127,7 +128,7 @@ class ContractTests(unittest.TestCase):
             elif bad == "owner": host.system.controller_open = True
             else: host._artifacts[next(iter(host._artifacts))]["status"] = "changed"
             record = {"schema": installer.RUNTIME_RECORD_SCHEMA, "channel": "development",
-                      "sourceCommit": host.value["sourceCommit"], "productVersion": "0.9.0", "runtime": receipt}
+                      "sourceCommit": host.value["sourceCommit"], "productVersion": receipt["productVersion"], "runtime": receipt}
             runner = PublicRunner(host)
             with mock.patch.object(installer, "RUNTIME_PROVIDER", PROVIDER / "scripts/runtime_provider.py"), \
                  mock.patch.object(installer.platform, "release", return_value=host.running_kernel()), \

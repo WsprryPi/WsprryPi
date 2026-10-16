@@ -4,7 +4,7 @@ from pathlib import Path
 root = Path(__file__).resolve().parents[2]
 collector = (root / "scripts/collect-support-bundle.sh").read_text()
 runtime = (root / "src/scheduling.cpp").read_text()
-websocket = (root / "src/web_socket.cpp").read_text()
+websocket = (root / "src/web_socket_commands.cpp").read_text()
 admin_probe = (root / "src/WSPR-Transmitter/src/rp1_gpclk_admin_probe.cpp").read_text()
 
 for command in ("status -m rp1-gpclk-dkms", "-k \"$RP1_KERNEL\" -F",
@@ -21,7 +21,7 @@ for evidence in ("/dev/rp1-gpclk",
     assert evidence in collector, evidence
 for evidence in ("Provider provisioning and package identity: external to WsprryPi",
                  "DKMS registration and kernel-specific module identity",
-                 "WsprryPi ownership record: presence only",
+                 "WsprryPi ownership record: bounded identity whitelist",
                  "read-only inspect operation",
                  "Persisted route", "Active route and operation readiness",
                  "Qualification: not established"):

@@ -65,6 +65,7 @@ nlohmann::json rp1_operation_record_json()
             {"state", record.state},
             {"terminalReason", record.terminal_reason},
             {"terminalReasonName", record.terminal_reason_name},
+            {"providerDetail", record.provider_detail},
             {"cleanupFault", record.cleanup_fault},
             {"elapsedNs", record.elapsed_ns},
             {"remainingNs", record.remaining_ns},
@@ -314,6 +315,12 @@ void WebSocketServer::handleMessage(const std::string &raw_message)
             reply["rp1_eligibility"] = snapshot.rp1_eligibility;
             reply["rp1_cleanup_state"] = snapshot.rp1_cleanup_state;
             reply["rp1_journal_state"] = snapshot.rp1_journal_state;
+#if WSPRRYPI_BACKEND_RP1_GPCLK
+            auto rp1_diagnostic = rp1_operation_record_json();
+            rp1_diagnostic["leasePresent"] = rp1_diagnostic["lease"] != 0;
+            rp1_diagnostic.erase("lease");
+            reply["rp1_last_operation"] = std::move(rp1_diagnostic);
+#endif
             auto now = std::chrono::system_clock::now();
             auto now_t = std::chrono::system_clock::to_time_t(now);
             std::tm tm_utc{};

@@ -607,5 +607,43 @@ int main() {
   assert(runtime_service.query().at("state") ==
          "runtime_neutral_restoration_failed");
 
+  for (const char* bad_field : {"profile", "safety", "controller"}) {
+    auto malformed = runtime;
+    malformed["state"][bad_field] = 17;
+    wsprrypi::Rp1GpclkRouteService malformed_service({
+        [&](const nlohmann::json&) { return malformed; }, idle, [] { return 20; },
+        [](int, std::string*) { return false; }, [](bool, const std::string&) {}});
+    assert(malformed_service.query().at("ok") == false);
+    assert(malformed_service.reconcileDevelopmentStartup("GPIO20").at("ok") == false);
+  }
+  bool reject_provider = true;
+  wsprrypi::Rp1GpclkRouteService rejecting_service({
+      [&](const nlohmann::json&) -> nlohmann::json {
+        if (reject_provider) throw std::runtime_error("provider EOPNOTSUPP exact detail");
+        return runtime;
+      }, idle, [] { return 20; }, [](int, std::string*) { return false; },
+      [](bool, const std::string&) {}});
+  const auto refused = rejecting_service.query();
+  assert(refused.at("ok") == false &&
+         refused.at("message").get<std::string>().find("EOPNOTSUPP exact detail") != std::string::npos);
+  assert(rejecting_service.reconcileDevelopmentStartup("GPIO20").at("message")
+             .get<std::string>().find("EOPNOTSUPP exact detail") != std::string::npos);
+  wsprrypi::Rp1GpclkRouteService rejecting_startup({
+      [](const nlohmann::json&) -> nlohmann::json {
+        throw std::runtime_error("provider startup refusal detail");
+      }, idle, [] { return 20; }, [](int, std::string*) { return false; },
+      [](bool, const std::string&) {}});
+  assert(rejecting_startup.reconcileStartup().at("message").get<std::string>()
+             .find("provider startup refusal detail") != std::string::npos);
+  wsprrypi::Rp1GpclkRouteService rejecting_idle({
+      [](const nlohmann::json&) -> nlohmann::json {
+        throw std::runtime_error("provider idle refusal detail");
+      }, idle, [] { return 20; }, [](int, std::string*) { return false; },
+      [](bool, const std::string&) {}});
+  assert(rejecting_idle.reconcileIdleStartup("GPIO20").at("message").get<std::string>()
+             .find("provider idle refusal detail") != std::string::npos);
+  reject_provider = false;
+  assert(rejecting_service.query().is_object());
+
   std::cout << "rp1_gpclk_route_service_test: PASS\n";
 }
