@@ -123,5 +123,14 @@ WSPRRYPI_RUN_RECOVERY_BROWSER=1 node \
 Earlier native teardown and Docker fixture-permission failures are retained and
 explained in the lead evidence packet; final repaired runs pass. No remaining
 actionable production finding was identified in final independent reassessment.
+The existing network browser fixture initially stalled CI because it did not
+handle the new real saved-state review confirmation. A test-only repair enables
+CDP Page events, accepts only the two exact review messages, rejects unexpected
+dialogs, and requires at least one actual confirmation. Independent reassessment
+found no remaining issue. The original desktop/mobile workflow then passed in
+actual Chrome, accepting five expected confirmations with screenshots disabled;
+assertions and deadlines were unchanged. Production sources remain those of
+`a6e5137a19f50f9b469dafaf18098bdaf400e44e`.
+
 Final clean-commit confirmation and published-head CI are recorded in the lead
 repository's [current execution packet](https://github.com/WsprryPi/WsprryPico/blob/devel/docs/development/phase15-7-recovery.md).

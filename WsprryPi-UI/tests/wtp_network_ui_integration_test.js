@@ -68,8 +68,26 @@ class CdpClient {
         this.socket = new WebSocket(url);
         this.nextId = 1;
         this.pending = new Map();
+        this.dialogs = [];
+        this.dialogError = null;
+        const reviewDialogs = new Set([
+            "Review the current saved values beside your preserved draft. Matching values do not prove an earlier save committed. Send one new explicit save with this fresh revision?",
+            "Review current saved and active observations beside your preserved draft. Send one new explicit save using the fresh revision?"
+        ]);
+        const failDialog = error => {
+            this.dialogError = error;
+            for (const { reject } of this.pending.values()) reject(error);
+            this.pending.clear();
+        };
         this.socket.on("message", (raw) => {
             const message = JSON.parse(raw);
+            if (message.method === 'Page.javascriptDialogOpening') {
+                const expected = message.params.type === 'confirm' && reviewDialogs.has(message.params.message);
+                this.dialogs.push(message.params.message);
+                if (!expected) failDialog(new Error(`Unexpected browser dialog: ${message.params.type}: ${message.params.message}`));
+                void this.send('Page.handleJavaScriptDialog', { accept: expected }).catch(failDialog);
+                return;
+            }
             if (!message.id || !this.pending.has(message.id)) return;
             const { resolve, reject } = this.pending.get(message.id);
             this.pending.delete(message.id);
@@ -130,7 +148,9 @@ async function main() {
         // Keep startup finite without changing any UI assertion deadline.
         const page = await waitFor(async () => (await getJson(`http://127.0.0.1:${debugPort}/json`)).find(p => p.type === 'page'), 'browser startup', 60000);
         client = new CdpClient(page.webSocketDebuggerUrl); await client.open();
+        await client.send('Page.enable');
         const evaluate = async expression => {
+            if (client.dialogError) throw client.dialogError;
             const result = await client.send('Runtime.evaluate', { expression, awaitPromise: true, returnByValue: true });
             if (result.exceptionDetails) throw new Error(result.exceptionDetails.exception?.description || result.exceptionDetails.text);
             return result.result.value;
@@ -392,6 +412,9 @@ async function main() {
         await waitFor(async () => await evaluate('document.getElementById("transmitter-hardware-tab").classList.contains("active")'), 'Transmitter tab after hiding Fleet');
         assert.equal(await evaluate('document.getElementById("fleet-tab-item").hidden && document.getElementById("fleet-pane").hidden'), true);
         assert.equal(await evaluate('window.WtpUi.read().Hostname'), 'DrAfT.LoCaL.');
+        assert.equal(client.dialogError, null);
+        assert(client.dialogs.length > 0, 'saved-state review must show a real browser confirmation');
+        console.log(`Accepted ${client.dialogs.length} expected saved-state review confirmations`);
         console.log('Rendered desktop/mobile: transport selection, preserved inactive settings, management revision failure, status failure and drafts passed');
         console.log(captureScreenshots ? 'Screenshots: '+output : 'Screenshot capture disabled; existing visual evidence retained.');
     } catch (error) {
