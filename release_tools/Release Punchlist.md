@@ -8,7 +8,7 @@ disposition rather than implementation before 4.0.
 
 ## Ordered release checklist
 
-Status updated October 16, 2026. Items 1 through 11 are complete within their
+Status updated October 16, 2026. Items 1 through 13 are complete within their
 recorded scopes. Accepted implementation is integrated into `devel`, and the
 immutable RP1 provider release is published. Item 10, WsprryPi production
 consumption and validation, is accepted for installation and idle runtime
@@ -19,9 +19,9 @@ as the original release state and excluded target rollback rehearsals. The
 accepted route evidence without changing those assets or application policy.
 Its installed consumer, cache, independent both-route status, API/UI and support
 collector are now verified on wspr5.
-No new RF qualification is claimed. Item 11 is complete, including verified
-hosted build and publication. Item 12 is in progress in WsprryPi-Docs;
-items 13–14 have not started.
+No new RF qualification is claimed. Items 11–12 are complete, including verified
+hosted builds and publication. Item 13 is complete for reviewed implementation
+`d93c75c` on `devel`; item 14 has not started.
 
 The current milestone is **WsprryPi 4.0 Beta 1**, not final 4.0 stable
 publication. The maintainer's October 16 direction is to prepare a reviewable
@@ -140,29 +140,51 @@ Status key: ✅ Complete · ⏳ In progress · ☐ Not started
     [completion record](https://github.com/WsprryPi/WsprryPi-Docs/blob/8d6d037f7e1ae1bb9f0a525735ddcf5a6ee57d3a/maintainer/item11-docs-performance-review.md).
     Commit `8d6d037` updates only that record; publication of this newer record-only
     commit is not claimed. All-host Impeccable updates and custom-domain TLS
-    remain separately recorded follow-ups. Items 12–14 remain open.
-12. ⏳ **Consolidated operator-documentation update.**
-    **Lead: WsprryPi-Docs · RP1 item 20.** In progress. Incorporate item 10's impact record and
-    cover settled API/Phase 15.4 resources, Test Tone, calibration boundaries,
-    Si5351 disposition/drive/fade, inventory-timeout and RP1 correction,
-    installation, migration and recovery behavior. Include supplement cache/refresh,
-    evidence-status meanings, structural compatibility versus external qualification,
-    the installed consumer diagnostic and frozen packaged diagnostic limitations;
-    preserve the application band table. Keep support claims aligned
-    with the acceptance matrix. Build/render the documentation, verify links and
-    replace materially inaccurate screenshots after item 11's changes settle.
-13. ☐ **Final integrated Impeccable review (#423).**
-    **Lead: WsprryPi · RP1 item 21.** Begin after items 10–12 and release-scoped
-    implementation are accepted on their respective integrated branches, with
-    the application candidate on `devel` and no expected UI-affecting changes.
-    Confirm the publication-only tracking exception from item 10 is reflected
-    in the issue criteria before starting. Review the complete settled product,
-    repair actionable findings, explicitly disposition accepted findings and
-    repeat affected tests/visual checks. Coordinate only affected documentation
-    and screenshot repairs with WsprryPi-Docs. Record the exact reviewed
-    application/documentation identities and evidence before Beta 1 packaging.
-    Acceptance applies to that reviewed candidate; later Beta/stable changes
-    require repetition of affected UI/documentation checks.
+    remain separately recorded follow-ups. Consolidated operator documentation,
+    integrated application review and Beta 1 preparation are separate gates.
+12. ✅ **Consolidated operator-documentation update.**
+    **Lead: WsprryPi-Docs · RP1 item 20.** Complete. Content commit
+    `166639f21ba3e13f24db2fae97928069cc9069ab` reconciles host/member settings,
+    persistence, Test Tone lifecycle/restoration, UTC versus RF calibration,
+    Si5351 readiness/drive/fades, bounded inventory/cache behavior and RP1
+    installation/activation/authorization/recovery. Examples and screenshots
+    match the reviewed application `a2437d1`; checklist-only `587c7b1` is
+    incorporated into the scope review. Qualification/band dispositions,
+    navigation, Pico gating and item 11's image/style behavior are preserved.
+    All four tests, strict default/Pico HTML, EPUB/LaTeX and actual PDF builds,
+    schema/example/link checks and bounded Impeccable checks passed; actionable
+    in-thread adversarial findings were repaired. Recorded TeX advisories,
+    degraded detector coverage and accessibility/device-review limits remain.
+    [RTD build 35197867](https://app.readthedocs.org/projects/wsprry-pi/builds/35197867/)
+    succeeded for the exact content commit; canonical pages, copied sources,
+    assets and hosted PDF/EPUB were verified. See the
+    [acceptance record](https://github.com/WsprryPi/WsprryPi-Docs/blob/b377bc48bafe7310a5e5e6ef04db7a7e8ace9427/maintainer/item12-operator-docs-review.md).
+    Commit `b377bc4` records verification only; publication of that newer
+    record-only commit is not claimed. The documentation prerequisite for
+    item 13 is satisfied, subject to its fresh candidate/prerequisite checks.
+    No new hardware/RF qualification or Beta 1 readiness is claimed; integrated
+    UI review and Beta preparation remain separate gates. Custom-domain TLS and
+    all-host Impeccable follow-ups stay separate.
+13. ✅ **Final integrated Impeccable review (#423).**
+    **Lead: WsprryPi · RP1 item 21.** Complete for reviewed implementation
+    `d93c75c4f1490df9108856403710e692b9c2d3dd` on `devel` (UI repairs `090a15a`,
+    followed by the fail-closed CI trace-audit repair). Prerequisite evidence
+    and candidate inclusion verified items 10–12 and accepted release-scoped
+    integration. #423's sequencing now permits accepted Ready for Release issues
+    to remain open pending publication; #412's publication-only exception remains.
+    Impeccable 4.1.1 isolated critique/audit and fresh adversarial reassessment
+    completed; bounded findings were repaired and revalidated, with no unresolved
+    actionable finding. All five views/four modes, representative operator states,
+    desktop/mobile, both themes, keyboard/focus and 200% text were reviewed.
+    Local UI/browser/Fleet/network/recovery suites and exact-implementation
+    [CI 38952419761](https://github.com/WsprryPi/WsprryPi/actions/runs/38952419761)
+    passed. See the [maintainer acceptance record](../docs/development/item13-integrated-impeccable-review.md)
+    and retained visual/detector evidence. Operator docs remain unchanged at
+    accepted content `166639f`/verification record `b377bc4`; no blocking correction
+    is required. This UI gate does not qualify physical devices, assistive
+    technology, installation, services, GPIO, timing or RF, and does not establish
+    Beta publication readiness. Later UI-affecting changes require affected
+    review/documentation checks again. Item 14 has not started.
 14. ☐ **WsprryPi 4.0 Beta 1 release documentation and candidate preparation.**
     **Lead: WsprryPi · RP1 item 22.** The current effort stops after 14c.
     Release-note research/drafting in 14a may proceed alongside items 12–13;
@@ -229,8 +251,8 @@ Status key: ✅ Complete · ⏳ In progress · ☐ Not started
 | --- | --- | --- | --- | --- |
 | 10 | 18 | ✅ Complete within accepted scope | Published-provider installation/runtime integration; installed supplement and both-route status accepted; prior target passes/rollback exclusion and RF scope preserved | `WsprryPi` |
 | 11 | 19 | ✅ Complete | Documentation performance and Impeccable housekeeping; hosted build/publication verified | `WsprryPi-Docs` |
-| 12 | 20 | ⏳ In progress | Consolidated operator documentation | `WsprryPi-Docs` |
-| 13 | 21 | ☐ Not started | Integrated application Impeccable review for the Beta 1 candidate | `WsprryPi` |
+| 12 | 20 | ✅ Complete | Consolidated operator documentation; exact-revision hosted build/publication verified | `WsprryPi-Docs` |
+| 13 | 21 | ✅ Complete | Integrated application Impeccable review accepted for `d93c75c`; bounded validation and qualification limits retained | `WsprryPi` |
 | 14 | 22 | ☐ Not started | Beta 1 release notes, candidate build and acceptance; stop after 14c; later 14d prerelease publication and 14e issue announcements | `WsprryPi` |
 
 RP1 item numbers above are historical cross-references; the current provider
@@ -293,19 +315,20 @@ Beta preparation or announcement does not itself close that stable release gate.
   evidence for each route without creating a provider permission gate. No new RF
   qualification is claimed. Follow the
   [published-release contract](../docs/rp1-gpclk-dkms-installation.md#published-releases).
-- ⏳ **Operator documentation:** in progress in WsprryPi-Docs. Reconcile
-  the recorded Si5351 readiness/drive/fade, inventory-timeout, and RP1 correction
-  follow-ups alongside API/Phase 15.4, Test Tone and calibration boundaries.
-  WsprryPi-Docs leads items 11–12. Update and verify documentation under
-  separately authorized cross-repository scope.
-- ☐ **Final integrated Impeccable review:** complete
-  [#423](https://github.com/WsprryPi/WsprryPi/issues/423) after production RP1
-  integration and release-scoped implementation/documentation have settled on
-  their integrated branches, with the application on `devel` and no unresolved
-  UI-affecting changes expected. Confirm the publication-only #412 tracking
-  exception in the issue criteria. WsprryPi leads item 13; repair or explicitly
-  accept findings as required by that issue, then complete Beta 1 candidate
-  packaging and acceptance under 14b–14c. Release-note research may begin earlier.
+- ✅ **Operator documentation:** WsprryPi-Docs completed items 11–12, including
+  the consolidated API/Phase 15.4, Test Tone, calibration, Si5351/inventory and
+  RP1 supplement/installation/recovery guidance. Exact-revision local/hosted
+  validation and publication are recorded in item 12. This satisfies the docs
+  prerequisite for item 13; integrated application review and Beta 1 acceptance
+  remain separate gates.
+- ✅ **Final integrated Impeccable review:**
+  [#423](https://github.com/WsprryPi/WsprryPi/issues/423) accepted for implementation
+  `d93c75c` after production RP1 integration and release-scoped implementation/
+  documentation acceptance. The [item 13 record](../docs/development/item13-integrated-impeccable-review.md)
+  retains repairs, independent reassessment, exact-head CI and bounded evidence.
+  #412 stays open for publication; other ready issues await the later authorized
+  publication notifications. Item 14 remains the next separate gate.
+
 - ☐ **Beta 1 release documentation and readiness:** complete 14a–14c's sourced
   Markdown notes, compatibility/migration guidance, exact candidate and acceptance
   evidence. Stop with a reviewable handoff; no release or announcement is authorized.

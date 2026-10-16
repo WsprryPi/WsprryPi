@@ -1,0 +1,35 @@
+[
+  {
+    "antipattern": "design-system-color",
+    "name": "Color outside DESIGN.md",
+    "description": "A literal color is outside the DESIGN.md palette and sidecar tonal ramps. This may be legitimate, but it should be an intentional design-system addition rather than drift.",
+    "severity": "advisory",
+    "category": "quality",
+    "file": "/Users/lbussy/GitHub/WsprryPi/WsprryPi-UI/data/site.js",
+    "line": 3650,
+    "snippet": "Undocumented color #1f6feb is outside DESIGN.md colors",
+    "ignoreValue": "#1f6feb"
+  },
+  {
+    "antipattern": "design-system-color",
+    "name": "Color outside DESIGN.md",
+    "description": "A literal color is outside the DESIGN.md palette and sidecar tonal ramps. This may be legitimate, but it should be an intentional design-system addition rather than drift.",
+    "severity": "advisory",
+    "category": "quality",
+    "file": "/Users/lbussy/GitHub/WsprryPi/WsprryPi-UI/data/site.js",
+    "line": 3652,
+    "snippet": "Undocumented color #9a6700 is outside DESIGN.md colors",
+    "ignoreValue": "#9a6700"
+  },
+  {
+    "antipattern": "design-system-color",
+    "name": "Color outside DESIGN.md",
+    "description": "A literal color is outside the DESIGN.md palette and sidecar tonal ramps. This may be legitimate, but it should be an intentional design-system addition rather than drift.",
+    "severity": "advisory",
+    "category": "quality",
+    "file": "/Users/lbussy/GitHub/WsprryPi/WsprryPi-UI/data/site.js",
+    "line": 3653,
+    "snippet": "Undocumented color #cf222e is outside DESIGN.md colors",
+    "ignoreValue": "#cf222e"
+  }
+]

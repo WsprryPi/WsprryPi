@@ -1,0 +1,7 @@
+Initial run 38950255973 at 090a15a: rejected audit evidence (F13).
+non-hardware-validation	Reject transmitter hardware access	2026-10-16T18:58:54.3751098Z grep:  /tmp/wsprrypi-semantics.strace: No such file or directory
+non-hardware-validation	Reject transmitter hardware access	2026-10-16T18:58:54.3751820Z grep:  /tmp/wsprrypi-startup-quiesce-parent.strace: No such file or directory
+non-hardware-validation	Reject transmitter hardware access	2026-10-16T18:58:54.3764250Z grep:  /tmp/wsprrypi-rp1.strace: No such file or directory
+non-hardware-validation	Reject transmitter hardware access	2026-10-16T18:58:54.3764940Z grep:  /tmp/wsprrypi-simulator.strace: No such file or directory
+non-hardware-validation	Reject transmitter hardware access	2026-10-16T18:58:54.3765600Z grep:  /tmp/wsprrypi-wspr-simulator.strace: No such file or directory
+non-hardware-validation	Reject transmitter hardware access	2026-10-16T18:58:54.3766159Z No prohibited transmitter hardware access observed.

@@ -1,0 +1,104 @@
+{
+  "b-config-desktop.json": {
+    "groups": 7,
+    "findings": 7,
+    "rules": {
+      "cramped-padding": 1,
+      "gpt-thin-border-wide-shadow": 1,
+      "nested-cards": 1,
+      "text-occlusion": 3,
+      "skipped-heading": 1
+    }
+  },
+  "b-logs-desktop.json": {
+    "groups": 6,
+    "findings": 6,
+    "rules": {
+      "low-contrast": 1,
+      "gpt-thin-border-wide-shadow": 1,
+      "text-occlusion": 3,
+      "skipped-heading": 1
+    }
+  },
+  "b-maintenance-desktop.json": {
+    "groups": 5,
+    "findings": 5,
+    "rules": {
+      "low-contrast": 1,
+      "gpt-thin-border-wide-shadow": 1,
+      "text-occlusion": 2,
+      "skipped-heading": 1
+    }
+  },
+  "b-operation-desktop.json": {
+    "groups": 2,
+    "findings": 2,
+    "rules": {
+      "gpt-thin-border-wide-shadow": 1,
+      "skipped-heading": 1
+    }
+  },
+  "b-spots-desktop.json": {
+    "groups": 3,
+    "findings": 3,
+    "rules": {
+      "gpt-thin-border-wide-shadow": 1,
+      "nested-cards": 1,
+      "skipped-heading": 1
+    }
+  },
+  "b-config-mobile.json": {
+    "groups": 6,
+    "findings": 6,
+    "rules": {
+      "cramped-padding": 1,
+      "gray-on-color": 1,
+      "gpt-thin-border-wide-shadow": 1,
+      "nested-cards": 1,
+      "text-occlusion": 1,
+      "skipped-heading": 1
+    }
+  },
+  "b-logs-mobile.json": {
+    "groups": 9,
+    "findings": 9,
+    "rules": {
+      "low-contrast": 1,
+      "gray-on-color": 1,
+      "gpt-thin-border-wide-shadow": 1,
+      "text-occlusion": 5,
+      "skipped-heading": 1
+    }
+  },
+  "b-maintenance-mobile.json": {
+    "groups": 5,
+    "findings": 5,
+    "rules": {
+      "low-contrast": 1,
+      "gray-on-color": 1,
+      "gpt-thin-border-wide-shadow": 1,
+      "text-occlusion": 1,
+      "skipped-heading": 1
+    }
+  },
+  "b-operation-mobile.json": {
+    "groups": 3,
+    "findings": 3,
+    "rules": {
+      "gray-on-color": 1,
+      "gpt-thin-border-wide-shadow": 1,
+      "skipped-heading": 1
+    }
+  },
+  "b-spots-mobile.json": {
+    "groups": 7,
+    "findings": 7,
+    "rules": {
+      "gray-on-color": 1,
+      "gpt-thin-border-wide-shadow": 1,
+      "nested-cards": 1,
+      "text-occlusion": 3,
+      "skipped-heading": 1
+    }
+  }
+}

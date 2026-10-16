@@ -1,0 +1,613 @@
+{
+  "run": 38952419761,
+  "headSha": "d93c75c4f1490df9108856403710e692b9c2d3dd",
+  "status": "completed",
+  "conclusion": "success",
+  "url": "https://github.com/WsprryPi/WsprryPi/actions/runs/38952419761",
+  "jobs": [
+    {
+      "name": "strict-i2c-profile",
+      "conclusion": "success",
+      "startedAt": "2026-10-16T19:06:22Z",
+      "completedAt": "2026-10-16T19:09:35Z",
+      "steps": [
+        {
+          "name": "Set up job",
+          "conclusion": "success"
+        },
+        {
+          "name": "Initialize containers",
+          "conclusion": "success"
+        },
+        {
+          "name": "Install build dependencies without libgpiod",
+          "conclusion": "success"
+        },
+        {
+          "name": "Check out source",
+          "conclusion": "success"
+        },
+        {
+          "name": "Trust checkout ownership",
+          "conclusion": "success"
+        },
+        {
+          "name": "Build and audit strict Si5351 profile",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Check out source",
+          "conclusion": "success"
+        },
+        {
+          "name": "Stop containers",
+          "conclusion": "success"
+        },
+        {
+          "name": "Complete job",
+          "conclusion": "success"
+        }
+      ]
+    },
+    {
+      "name": "macos-simulated-profile",
+      "conclusion": "success",
+      "startedAt": "2026-10-16T19:06:30Z",
+      "completedAt": "2026-10-16T19:09:58Z",
+      "steps": [
+        {
+          "name": "Set up job",
+          "conclusion": "success"
+        },
+        {
+          "name": "Check out source",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run portable semantics profile",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run WTP component, plan, USB adapter, backend, scheduler and status tests",
+          "conclusion": "success"
+        },
+        {
+          "name": "Check container build export handling",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Check out source",
+          "conclusion": "success"
+        },
+        {
+          "name": "Complete job",
+          "conclusion": "success"
+        }
+      ]
+    },
+    {
+      "name": "wtp-network-loopback",
+      "conclusion": "success",
+      "startedAt": "2026-10-16T19:06:23Z",
+      "completedAt": "2026-10-16T19:19:16Z",
+      "steps": [
+        {
+          "name": "Set up job",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/checkout@v7",
+          "conclusion": "success"
+        },
+        {
+          "name": "Install host-only TLS and UI test dependencies",
+          "conclusion": "success"
+        },
+        {
+          "name": "Install UI development dependencies",
+          "conclusion": "success"
+        },
+        {
+          "name": "Read Pico reference revision",
+          "conclusion": "success"
+        },
+        {
+          "name": "Read-only pinned Pico reference",
+          "conclusion": "success"
+        },
+        {
+          "name": "Read-only pinned Pico TLS dependency",
+          "conclusion": "success"
+        },
+        {
+          "name": "Parent TLS, shared API and actual Pico interoperability",
+          "conclusion": "success"
+        },
+        {
+          "name": "Verify selected-interface WTP replies under equal-metric route changes",
+          "conclusion": "success"
+        },
+        {
+          "name": "Render network controls with mocked responses",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Read-only pinned Pico TLS dependency",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Read-only pinned Pico reference",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run actions/checkout@v7",
+          "conclusion": "success"
+        },
+        {
+          "name": "Complete job",
+          "conclusion": "success"
+        }
+      ]
+    },
+    {
+      "name": "wtp-configuration-legacy (p154)",
+      "conclusion": "success",
+      "startedAt": "2026-10-16T19:06:23Z",
+      "completedAt": "2026-10-16T19:10:11Z",
+      "steps": [
+        {
+          "name": "Set up job",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/checkout@v7",
+          "conclusion": "success"
+        },
+        {
+          "name": "Existing host-only compatibility dependencies",
+          "conclusion": "success"
+        },
+        {
+          "name": "Read exact historical API revision",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/checkout@v7",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/checkout@v7",
+          "conclusion": "success"
+        },
+        {
+          "name": "Actual UI producer through Pi adapters and historical Pico persistence",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run actions/checkout@v7",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run actions/checkout@v7",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run actions/checkout@v7",
+          "conclusion": "success"
+        },
+        {
+          "name": "Complete job",
+          "conclusion": "success"
+        }
+      ]
+    },
+    {
+      "name": "wtp-configuration-legacy (p152)",
+      "conclusion": "success",
+      "startedAt": "2026-10-16T19:06:23Z",
+      "completedAt": "2026-10-16T19:09:20Z",
+      "steps": [
+        {
+          "name": "Set up job",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/checkout@v7",
+          "conclusion": "success"
+        },
+        {
+          "name": "Existing host-only compatibility dependencies",
+          "conclusion": "success"
+        },
+        {
+          "name": "Read exact historical API revision",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/checkout@v7",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/checkout@v7",
+          "conclusion": "success"
+        },
+        {
+          "name": "Actual UI producer through Pi adapters and historical Pico persistence",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run actions/checkout@v7",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run actions/checkout@v7",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run actions/checkout@v7",
+          "conclusion": "success"
+        },
+        {
+          "name": "Complete job",
+          "conclusion": "success"
+        }
+      ]
+    },
+    {
+      "name": "wtp-configuration-legacy (p156)",
+      "conclusion": "success",
+      "startedAt": "2026-10-16T19:06:23Z",
+      "completedAt": "2026-10-16T19:10:23Z",
+      "steps": [
+        {
+          "name": "Set up job",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/checkout@v7",
+          "conclusion": "success"
+        },
+        {
+          "name": "Existing host-only compatibility dependencies",
+          "conclusion": "success"
+        },
+        {
+          "name": "Read exact historical API revision",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/checkout@v7",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/checkout@v7",
+          "conclusion": "success"
+        },
+        {
+          "name": "Actual UI producer through Pi adapters and historical Pico persistence",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run actions/checkout@v7",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run actions/checkout@v7",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run actions/checkout@v7",
+          "conclusion": "success"
+        },
+        {
+          "name": "Complete job",
+          "conclusion": "success"
+        }
+      ]
+    },
+    {
+      "name": "non-hardware-validation",
+      "conclusion": "success",
+      "startedAt": "2026-10-16T19:06:22Z",
+      "completedAt": "2026-10-16T19:18:03Z",
+      "steps": [
+        {
+          "name": "Set up job",
+          "conclusion": "success"
+        },
+        {
+          "name": "Initialize containers",
+          "conclusion": "success"
+        },
+        {
+          "name": "Install build and audit dependencies",
+          "conclusion": "success"
+        },
+        {
+          "name": "Check out source",
+          "conclusion": "success"
+        },
+        {
+          "name": "Trust parent checkout ownership",
+          "conclusion": "success"
+        },
+        {
+          "name": "Build parent debug executable",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run WTP component, plan, USB adapter, backend, scheduler and status tests",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run parent semantics and cleanup lifecycle tests",
+          "conclusion": "success"
+        },
+        {
+          "name": "Install UI development dependencies",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run UI component regressions",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run UI browser integration regressions",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run RP1 non-hardware regression",
+          "conclusion": "success"
+        },
+        {
+          "name": "Read-only published RP1 1.0.0 provider reference",
+          "conclusion": "success"
+        },
+        {
+          "name": "Validate actual provider update and bootstrap boundary",
+          "conclusion": "success"
+        },
+        {
+          "name": "Qualify support-bundle age round trip",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run transmitter component contract regressions",
+          "conclusion": "success"
+        },
+        {
+          "name": "Build and test WSPR reference component",
+          "conclusion": "success"
+        },
+        {
+          "name": "Verify WSPR reference package consumer",
+          "conclusion": "success"
+        },
+        {
+          "name": "Verify deterministic hardware-free simulation",
+          "conclusion": "success"
+        },
+        {
+          "name": "Verify complete application-planned WSPR simulation",
+          "conclusion": "success"
+        },
+        {
+          "name": "Verify hardware-access audit fails closed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Reject transmitter hardware access",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Read-only published RP1 1.0.0 provider reference",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Check out source",
+          "conclusion": "success"
+        },
+        {
+          "name": "Stop containers",
+          "conclusion": "success"
+        },
+        {
+          "name": "Complete job",
+          "conclusion": "success"
+        }
+      ]
+    },
+    {
+      "name": "wtp-configuration-legacy (p153)",
+      "conclusion": "success",
+      "startedAt": "2026-10-16T19:06:22Z",
+      "completedAt": "2026-10-16T19:09:58Z",
+      "steps": [
+        {
+          "name": "Set up job",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/checkout@v7",
+          "conclusion": "success"
+        },
+        {
+          "name": "Existing host-only compatibility dependencies",
+          "conclusion": "success"
+        },
+        {
+          "name": "Read exact historical API revision",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/checkout@v7",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/checkout@v7",
+          "conclusion": "success"
+        },
+        {
+          "name": "Actual UI producer through Pi adapters and historical Pico persistence",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run actions/checkout@v7",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run actions/checkout@v7",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run actions/checkout@v7",
+          "conclusion": "success"
+        },
+        {
+          "name": "Complete job",
+          "conclusion": "success"
+        }
+      ]
+    },
+    {
+      "name": "wtp-configuration-legacy (legacy)",
+      "conclusion": "success",
+      "startedAt": "2026-10-16T19:06:23Z",
+      "completedAt": "2026-10-16T19:09:08Z",
+      "steps": [
+        {
+          "name": "Set up job",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/checkout@v7",
+          "conclusion": "success"
+        },
+        {
+          "name": "Existing host-only compatibility dependencies",
+          "conclusion": "success"
+        },
+        {
+          "name": "Read exact historical API revision",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/checkout@v7",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/checkout@v7",
+          "conclusion": "success"
+        },
+        {
+          "name": "Actual UI producer through Pi adapters and historical Pico persistence",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run actions/checkout@v7",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run actions/checkout@v7",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run actions/checkout@v7",
+          "conclusion": "success"
+        },
+        {
+          "name": "Complete job",
+          "conclusion": "success"
+        }
+      ]
+    },
+    {
+      "name": "ubuntu-gcc13-release",
+      "conclusion": "success",
+      "startedAt": "2026-10-16T19:06:22Z",
+      "completedAt": "2026-10-16T19:16:53Z",
+      "steps": [
+        {
+          "name": "Set up job",
+          "conclusion": "success"
+        },
+        {
+          "name": "Install release-build dependencies",
+          "conclusion": "success"
+        },
+        {
+          "name": "Check out source",
+          "conclusion": "success"
+        },
+        {
+          "name": "Verify GCC 13 toolchain",
+          "conclusion": "success"
+        },
+        {
+          "name": "Build parent release executable with warnings as errors",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Check out source",
+          "conclusion": "success"
+        },
+        {
+          "name": "Complete job",
+          "conclusion": "success"
+        }
+      ]
+    },
+    {
+      "name": "wtp-configuration-legacy (extended)",
+      "conclusion": "success",
+      "startedAt": "2026-10-16T19:06:23Z",
+      "completedAt": "2026-10-16T19:09:04Z",
+      "steps": [
+        {
+          "name": "Set up job",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/checkout@v7",
+          "conclusion": "success"
+        },
+        {
+          "name": "Existing host-only compatibility dependencies",
+          "conclusion": "success"
+        },
+        {
+          "name": "Read exact historical API revision",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/checkout@v7",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/checkout@v7",
+          "conclusion": "success"
+        },
+        {
+          "name": "Actual UI producer through Pi adapters and historical Pico persistence",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run actions/checkout@v7",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run actions/checkout@v7",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run actions/checkout@v7",
+          "conclusion": "success"
+        },
+        {
+          "name": "Complete job",
+          "conclusion": "success"
+        }
+      ]
+    }
+  ]
+}

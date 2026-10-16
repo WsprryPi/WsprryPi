@@ -1,0 +1,1540 @@
+[
+  {
+    "view": "operation",
+    "theme": "light",
+    "size": "desktop",
+    "width": 1440,
+    "height": 1000,
+    "scrollWidth": 1440,
+    "buttons": [
+      {
+        "id": "Operation",
+        "ratio": 12.065861025171916,
+        "font": "14px",
+        "color": "rgb(236, 241, 246)",
+        "bg": [
+          31.87450980392157,
+          46.8156862745098,
+          60.760784313725495
+        ]
+      },
+      {
+        "id": "Setup",
+        "ratio": 4.841307746815507,
+        "font": "14px",
+        "color": "rgba(236, 241, 246, 0.85)",
+        "bg": [
+          64,
+          94,
+          122
+        ]
+      },
+      {
+        "id": "Logs",
+        "ratio": 4.841307746815507,
+        "font": "14px",
+        "color": "rgba(236, 241, 246, 0.85)",
+        "bg": [
+          64,
+          94,
+          122
+        ]
+      },
+      {
+        "id": "spotsDropdown",
+        "ratio": 4.841307746815507,
+        "font": "14px",
+        "color": "rgba(236, 241, 246, 0.85)",
+        "bg": [
+          64,
+          94,
+          122
+        ]
+      },
+      {
+        "id": "Maintenance",
+        "ratio": 4.841307746815507,
+        "font": "14px",
+        "color": "rgba(236, 241, 246, 0.85)",
+        "bg": [
+          64,
+          94,
+          122
+        ]
+      },
+      {
+        "id": "wsprlinksDropdown",
+        "ratio": 4.841307746815507,
+        "font": "14px",
+        "color": "rgba(236, 241, 246, 0.85)",
+        "bg": [
+          64,
+          94,
+          122
+        ]
+      },
+      {
+        "id": "operationRetryButton",
+        "ratio": 14.357875960087172,
+        "font": "14px",
+        "color": "rgb(21, 36, 92)",
+        "bg": [
+          253,
+          253,
+          254
+        ]
+      },
+      {
+        "id": "operationSetupButton",
+        "ratio": 8.043116011531694,
+        "font": "14px",
+        "color": "rgb(73, 80, 87)",
+        "bg": [
+          253,
+          253,
+          254
+        ]
+      }
+    ],
+    "dangling": []
+  },
+  {
+    "view": "operation",
+    "theme": "light",
+    "size": "mobile",
+    "width": 390,
+    "height": 844,
+    "scrollWidth": 390,
+    "buttons": [
+      {
+        "id": "operationRetryButton",
+        "ratio": 14.357875960087172,
+        "font": "14px",
+        "color": "rgb(21, 36, 92)",
+        "bg": [
+          253,
+          253,
+          254
+        ]
+      },
+      {
+        "id": "operationSetupButton",
+        "ratio": 8.043116011531694,
+        "font": "14px",
+        "color": "rgb(73, 80, 87)",
+        "bg": [
+          253,
+          253,
+          254
+        ]
+      }
+    ],
+    "dangling": []
+  },
+  {
+    "view": "operation",
+    "theme": "dark",
+    "size": "desktop",
+    "width": 1440,
+    "height": 1000,
+    "scrollWidth": 1440,
+    "buttons": [
+      {
+        "id": "Operation",
+        "ratio": 13.057017955994942,
+        "font": "14px",
+        "color": "rgb(229, 236, 242)",
+        "bg": [
+          25.898039215686275,
+          36.85490196078432,
+          47.811764705882354
+        ]
+      },
+      {
+        "id": "Setup",
+        "ratio": 6.087814471124692,
+        "font": "14px",
+        "color": "rgba(229, 236, 242, 0.85)",
+        "bg": [
+          52,
+          74,
+          96
+        ]
+      },
+      {
+        "id": "Logs",
+        "ratio": 6.087814471124692,
+        "font": "14px",
+        "color": "rgba(229, 236, 242, 0.85)",
+        "bg": [
+          52,
+          74,
+          96
+        ]
+      },
+      {
+        "id": "spotsDropdown",
+        "ratio": 6.087814471124692,
+        "font": "14px",
+        "color": "rgba(229, 236, 242, 0.85)",
+        "bg": [
+          52,
+          74,
+          96
+        ]
+      },
+      {
+        "id": "Maintenance",
+        "ratio": 6.087814471124692,
+        "font": "14px",
+        "color": "rgba(229, 236, 242, 0.85)",
+        "bg": [
+          52,
+          74,
+          96
+        ]
+      },
+      {
+        "id": "wsprlinksDropdown",
+        "ratio": 6.087814471124692,
+        "font": "14px",
+        "color": "rgba(229, 236, 242, 0.85)",
+        "bg": [
+          52,
+          74,
+          96
+        ]
+      },
+      {
+        "id": "operationRetryButton",
+        "ratio": 5.688350510422345,
+        "font": "14px",
+        "color": "rgb(133, 155, 240)",
+        "bg": [
+          35,
+          39,
+          43
+        ]
+      },
+      {
+        "id": "operationSetupButton",
+        "ratio": 11.547760079785869,
+        "font": "14px",
+        "color": "rgb(222, 226, 230)",
+        "bg": [
+          35,
+          39,
+          43
+        ]
+      }
+    ],
+    "dangling": []
+  },
+  {
+    "view": "operation",
+    "theme": "dark",
+    "size": "mobile",
+    "width": 390,
+    "height": 844,
+    "scrollWidth": 390,
+    "buttons": [
+      {
+        "id": "operationRetryButton",
+        "ratio": 5.688350510422345,
+        "font": "14px",
+        "color": "rgb(133, 155, 240)",
+        "bg": [
+          35,
+          39,
+          43
+        ]
+      },
+      {
+        "id": "operationSetupButton",
+        "ratio": 11.547760079785869,
+        "font": "14px",
+        "color": "rgb(222, 226, 230)",
+        "bg": [
+          35,
+          39,
+          43
+        ]
+      }
+    ],
+    "dangling": []
+  },
+  {
+    "view": "config",
+    "theme": "light",
+    "size": "desktop",
+    "width": 1440,
+    "height": 1000,
+    "scrollWidth": 1440,
+    "buttons": [
+      {
+        "id": "Operation",
+        "ratio": 4.841307746815507,
+        "font": "14px",
+        "color": "rgba(236, 241, 246, 0.85)",
+        "bg": [
+          64,
+          94,
+          122
+        ]
+      },
+      {
+        "id": "Setup",
+        "ratio": 12.065861025171916,
+        "font": "14px",
+        "color": "rgb(236, 241, 246)",
+        "bg": [
+          31.87450980392157,
+          46.8156862745098,
+          60.760784313725495
+        ]
+      },
+      {
+        "id": "Logs",
+        "ratio": 4.841307746815507,
+        "font": "14px",
+        "color": "rgba(236, 241, 246, 0.85)",
+        "bg": [
+          64,
+          94,
+          122
+        ]
+      },
+      {
+        "id": "spotsDropdown",
+        "ratio": 4.841307746815507,
+        "font": "14px",
+        "color": "rgba(236, 241, 246, 0.85)",
+        "bg": [
+          64,
+          94,
+          122
+        ]
+      },
+      {
+        "id": "Maintenance",
+        "ratio": 4.841307746815507,
+        "font": "14px",
+        "color": "rgba(236, 241, 246, 0.85)",
+        "bg": [
+          64,
+          94,
+          122
+        ]
+      },
+      {
+        "id": "wsprlinksDropdown",
+        "ratio": 4.841307746815507,
+        "font": "14px",
+        "color": "rgba(236, 241, 246, 0.85)",
+        "bg": [
+          64,
+          94,
+          122
+        ]
+      },
+      {
+        "id": "radio-tab",
+        "ratio": 14.348992285422906,
+        "font": "16px",
+        "color": "rgb(21, 36, 92)",
+        "bg": [
+          253,
+          253,
+          253
+        ]
+      },
+      {
+        "id": "transmitter-hardware-tab",
+        "ratio": 8.155115484740826,
+        "font": "16px",
+        "color": "rgb(73, 80, 87)",
+        "bg": [
+          254.64752018454442,
+          254.70657439446367,
+          254.70657439446367
+        ]
+      },
+      {
+        "id": "pi-hardware-tab",
+        "ratio": 8.155115484740826,
+        "font": "16px",
+        "color": "rgb(73, 80, 87)",
+        "bg": [
+          254.64752018454442,
+          254.70657439446367,
+          254.70657439446367
+        ]
+      },
+      {
+        "id": "WSPR",
+        "ratio": 17.686772158757236,
+        "font": "16px",
+        "color": "rgb(0, 0, 0)",
+        "bg": [
+          231,
+          235,
+          252
+        ]
+      },
+      {
+        "id": "CW Modes",
+        "ratio": 7.95507213795542,
+        "font": "16px",
+        "color": "rgb(73, 80, 87)",
+        "bg": [
+          251,
+          252,
+          252
+        ]
+      }
+    ],
+    "dangling": []
+  },
+  {
+    "view": "config",
+    "theme": "light",
+    "size": "mobile",
+    "width": 390,
+    "height": 844,
+    "scrollWidth": 390,
+    "buttons": [
+      {
+        "id": "radio-tab",
+        "ratio": 14.348992285422906,
+        "font": "16px",
+        "color": "rgb(21, 36, 92)",
+        "bg": [
+          253,
+          253,
+          253
+        ]
+      },
+      {
+        "id": "transmitter-hardware-tab",
+        "ratio": 8.155115484740826,
+        "font": "16px",
+        "color": "rgb(73, 80, 87)",
+        "bg": [
+          254.64752018454442,
+          254.70657439446367,
+          254.70657439446367
+        ]
+      },
+      {
+        "id": "pi-hardware-tab",
+        "ratio": 8.155115484740826,
+        "font": "16px",
+        "color": "rgb(73, 80, 87)",
+        "bg": [
+          254.64752018454442,
+          254.70657439446367,
+          254.70657439446367
+        ]
+      },
+      {
+        "id": "WSPR",
+        "ratio": 17.686772158757236,
+        "font": "16px",
+        "color": "rgb(0, 0, 0)",
+        "bg": [
+          231,
+          235,
+          252
+        ]
+      },
+      {
+        "id": "CW Modes",
+        "ratio": 7.95507213795542,
+        "font": "16px",
+        "color": "rgb(73, 80, 87)",
+        "bg": [
+          251,
+          252,
+          252
+        ]
+      }
+    ],
+    "dangling": []
+  },
+  {
+    "view": "config",
+    "theme": "dark",
+    "size": "desktop",
+    "width": 1440,
+    "height": 1000,
+    "scrollWidth": 1440,
+    "buttons": [
+      {
+        "id": "Operation",
+        "ratio": 6.087814471124692,
+        "font": "14px",
+        "color": "rgba(229, 236, 242, 0.85)",
+        "bg": [
+          52,
+          74,
+          96
+        ]
+      },
+      {
+        "id": "Setup",
+        "ratio": 13.057017955994942,
+        "font": "14px",
+        "color": "rgb(229, 236, 242)",
+        "bg": [
+          25.898039215686275,
+          36.85490196078432,
+          47.811764705882354
+        ]
+      },
+      {
+        "id": "Logs",
+        "ratio": 6.087814471124692,
+        "font": "14px",
+        "color": "rgba(229, 236, 242, 0.85)",
+        "bg": [
+          52,
+          74,
+          96
+        ]
+      },
+      {
+        "id": "spotsDropdown",
+        "ratio": 6.087814471124692,
+        "font": "14px",
+        "color": "rgba(229, 236, 242, 0.85)",
+        "bg": [
+          52,
+          74,
+          96
+        ]
+      },
+      {
+        "id": "Maintenance",
+        "ratio": 6.087814471124692,
+        "font": "14px",
+        "color": "rgba(229, 236, 242, 0.85)",
+        "bg": [
+          52,
+          74,
+          96
+        ]
+      },
+      {
+        "id": "wsprlinksDropdown",
+        "ratio": 6.087814471124692,
+        "font": "14px",
+        "color": "rgba(229, 236, 242, 0.85)",
+        "bg": [
+          52,
+          74,
+          96
+        ]
+      },
+      {
+        "id": "radio-tab",
+        "ratio": 5.688350510422345,
+        "font": "16px",
+        "color": "rgb(133, 155, 240)",
+        "bg": [
+          35,
+          39,
+          43
+        ]
+      },
+      {
+        "id": "transmitter-hardware-tab",
+        "ratio": 11.795367755209876,
+        "font": "16px",
+        "color": "rgb(222, 226, 230)",
+        "bg": [
+          33.350634371395614,
+          37.343252595155704,
+          41.3358708189158
+        ]
+      },
+      {
+        "id": "pi-hardware-tab",
+        "ratio": 11.795367755209876,
+        "font": "16px",
+        "color": "rgb(222, 226, 230)",
+        "bg": [
+          33.350634371395614,
+          37.343252595155704,
+          41.3358708189158
+        ]
+      },
+      {
+        "id": "WSPR",
+        "ratio": 14.084045753040167,
+        "font": "16px",
+        "color": "rgb(255, 255, 255)",
+        "bg": [
+          35,
+          43,
+          64
+        ]
+      },
+      {
+        "id": "CW Modes",
+        "ratio": 11.277049320692782,
+        "font": "16px",
+        "color": "rgb(222, 226, 230)",
+        "bg": [
+          36,
+          41,
+          45
+        ]
+      }
+    ],
+    "dangling": []
+  },
+  {
+    "view": "config",
+    "theme": "dark",
+    "size": "mobile",
+    "width": 390,
+    "height": 844,
+    "scrollWidth": 390,
+    "buttons": [
+      {
+        "id": "radio-tab",
+        "ratio": 5.688350510422345,
+        "font": "16px",
+        "color": "rgb(133, 155, 240)",
+        "bg": [
+          35,
+          39,
+          43
+        ]
+      },
+      {
+        "id": "transmitter-hardware-tab",
+        "ratio": 11.795367755209876,
+        "font": "16px",
+        "color": "rgb(222, 226, 230)",
+        "bg": [
+          33.350634371395614,
+          37.343252595155704,
+          41.3358708189158
+        ]
+      },
+      {
+        "id": "pi-hardware-tab",
+        "ratio": 11.795367755209876,
+        "font": "16px",
+        "color": "rgb(222, 226, 230)",
+        "bg": [
+          33.350634371395614,
+          37.343252595155704,
+          41.3358708189158
+        ]
+      },
+      {
+        "id": "WSPR",
+        "ratio": 14.084045753040167,
+        "font": "16px",
+        "color": "rgb(255, 255, 255)",
+        "bg": [
+          35,
+          43,
+          64
+        ]
+      },
+      {
+        "id": "CW Modes",
+        "ratio": 11.277049320692782,
+        "font": "16px",
+        "color": "rgb(222, 226, 230)",
+        "bg": [
+          36,
+          41,
+          45
+        ]
+      }
+    ],
+    "dangling": []
+  },
+  {
+    "view": "logs",
+    "theme": "light",
+    "size": "desktop",
+    "width": 1440,
+    "height": 1000,
+    "scrollWidth": 1440,
+    "buttons": [
+      {
+        "id": "Operation",
+        "ratio": 4.841307746815507,
+        "font": "14px",
+        "color": "rgba(236, 241, 246, 0.85)",
+        "bg": [
+          64,
+          94,
+          122
+        ]
+      },
+      {
+        "id": "Setup",
+        "ratio": 4.841307746815507,
+        "font": "14px",
+        "color": "rgba(236, 241, 246, 0.85)",
+        "bg": [
+          64,
+          94,
+          122
+        ]
+      },
+      {
+        "id": "Logs",
+        "ratio": 12.065861025171916,
+        "font": "14px",
+        "color": "rgb(236, 241, 246)",
+        "bg": [
+          31.87450980392157,
+          46.8156862745098,
+          60.760784313725495
+        ]
+      },
+      {
+        "id": "spotsDropdown",
+        "ratio": 4.841307746815507,
+        "font": "14px",
+        "color": "rgba(236, 241, 246, 0.85)",
+        "bg": [
+          64,
+          94,
+          122
+        ]
+      },
+      {
+        "id": "Maintenance",
+        "ratio": 4.841307746815507,
+        "font": "14px",
+        "color": "rgba(236, 241, 246, 0.85)",
+        "bg": [
+          64,
+          94,
+          122
+        ]
+      },
+      {
+        "id": "wsprlinksDropdown",
+        "ratio": 4.841307746815507,
+        "font": "14px",
+        "color": "rgba(236, 241, 246, 0.85)",
+        "bg": [
+          64,
+          94,
+          122
+        ]
+      },
+      {
+        "id": "btn-clear",
+        "ratio": 8.063035590323391,
+        "font": "14px",
+        "color": "rgb(98, 76, 39)",
+        "bg": [
+          254,
+          254,
+          254
+        ]
+      },
+      {
+        "id": "btn-reconnect",
+        "ratio": 14.472034870800572,
+        "font": "14px",
+        "color": "rgb(21, 36, 92)",
+        "bg": [
+          254,
+          254,
+          254
+        ]
+      }
+    ],
+    "dangling": []
+  },
+  {
+    "view": "logs",
+    "theme": "light",
+    "size": "mobile",
+    "width": 390,
+    "height": 844,
+    "scrollWidth": 390,
+    "buttons": [
+      {
+        "id": "btn-clear",
+        "ratio": 8.063035590323391,
+        "font": "14px",
+        "color": "rgb(98, 76, 39)",
+        "bg": [
+          254,
+          254,
+          254
+        ]
+      },
+      {
+        "id": "btn-reconnect",
+        "ratio": 14.472034870800572,
+        "font": "14px",
+        "color": "rgb(21, 36, 92)",
+        "bg": [
+          254,
+          254,
+          254
+        ]
+      }
+    ],
+    "dangling": []
+  },
+  {
+    "view": "logs",
+    "theme": "dark",
+    "size": "desktop",
+    "width": 1440,
+    "height": 1000,
+    "scrollWidth": 1440,
+    "buttons": [
+      {
+        "id": "Operation",
+        "ratio": 6.087814471124692,
+        "font": "14px",
+        "color": "rgba(229, 236, 242, 0.85)",
+        "bg": [
+          52,
+          74,
+          96
+        ]
+      },
+      {
+        "id": "Setup",
+        "ratio": 6.087814471124692,
+        "font": "14px",
+        "color": "rgba(229, 236, 242, 0.85)",
+        "bg": [
+          52,
+          74,
+          96
+        ]
+      },
+      {
+        "id": "Logs",
+        "ratio": 13.057017955994942,
+        "font": "14px",
+        "color": "rgb(229, 236, 242)",
+        "bg": [
+          25.898039215686275,
+          36.85490196078432,
+          47.811764705882354
+        ]
+      },
+      {
+        "id": "spotsDropdown",
+        "ratio": 6.087814471124692,
+        "font": "14px",
+        "color": "rgba(229, 236, 242, 0.85)",
+        "bg": [
+          52,
+          74,
+          96
+        ]
+      },
+      {
+        "id": "Maintenance",
+        "ratio": 6.087814471124692,
+        "font": "14px",
+        "color": "rgba(229, 236, 242, 0.85)",
+        "bg": [
+          52,
+          74,
+          96
+        ]
+      },
+      {
+        "id": "wsprlinksDropdown",
+        "ratio": 6.087814471124692,
+        "font": "14px",
+        "color": "rgba(229, 236, 242, 0.85)",
+        "bg": [
+          52,
+          74,
+          96
+        ]
+      },
+      {
+        "id": "btn-clear",
+        "ratio": 10.2365510506626,
+        "font": "14px",
+        "color": "rgb(248, 215, 160)",
+        "bg": [
+          37,
+          44,
+          51
+        ]
+      },
+      {
+        "id": "btn-reconnect",
+        "ratio": 5.343305579990246,
+        "font": "14px",
+        "color": "rgb(133, 155, 240)",
+        "bg": [
+          37,
+          44,
+          51
+        ]
+      }
+    ],
+    "dangling": []
+  },
+  {
+    "view": "logs",
+    "theme": "dark",
+    "size": "mobile",
+    "width": 390,
+    "height": 844,
+    "scrollWidth": 390,
+    "buttons": [
+      {
+        "id": "btn-clear",
+        "ratio": 10.2365510506626,
+        "font": "14px",
+        "color": "rgb(248, 215, 160)",
+        "bg": [
+          37,
+          44,
+          51
+        ]
+      },
+      {
+        "id": "btn-reconnect",
+        "ratio": 5.343305579990246,
+        "font": "14px",
+        "color": "rgb(133, 155, 240)",
+        "bg": [
+          37,
+          44,
+          51
+        ]
+      }
+    ],
+    "dangling": []
+  },
+  {
+    "view": "spots",
+    "theme": "light",
+    "size": "desktop",
+    "width": 1440,
+    "height": 1000,
+    "scrollWidth": 1440,
+    "buttons": [
+      {
+        "id": "Operation",
+        "ratio": 4.841307746815507,
+        "font": "14px",
+        "color": "rgba(236, 241, 246, 0.85)",
+        "bg": [
+          64,
+          94,
+          122
+        ]
+      },
+      {
+        "id": "Setup",
+        "ratio": 4.841307746815507,
+        "font": "14px",
+        "color": "rgba(236, 241, 246, 0.85)",
+        "bg": [
+          64,
+          94,
+          122
+        ]
+      },
+      {
+        "id": "Logs",
+        "ratio": 4.841307746815507,
+        "font": "14px",
+        "color": "rgba(236, 241, 246, 0.85)",
+        "bg": [
+          64,
+          94,
+          122
+        ]
+      },
+      {
+        "id": "spotsDropdown",
+        "ratio": 12.065861025171916,
+        "font": "14px",
+        "color": "rgb(236, 241, 246)",
+        "bg": [
+          31.87450980392157,
+          46.8156862745098,
+          60.760784313725495
+        ]
+      },
+      {
+        "id": "Maintenance",
+        "ratio": 4.841307746815507,
+        "font": "14px",
+        "color": "rgba(236, 241, 246, 0.85)",
+        "bg": [
+          64,
+          94,
+          122
+        ]
+      },
+      {
+        "id": "wsprlinksDropdown",
+        "ratio": 4.841307746815507,
+        "font": "14px",
+        "color": "rgba(236, 241, 246, 0.85)",
+        "bg": [
+          64,
+          94,
+          122
+        ]
+      }
+    ],
+    "dangling": []
+  },
+  {
+    "view": "spots",
+    "theme": "light",
+    "size": "mobile",
+    "width": 390,
+    "height": 844,
+    "scrollWidth": 390,
+    "buttons": [],
+    "dangling": []
+  },
+  {
+    "view": "spots",
+    "theme": "dark",
+    "size": "desktop",
+    "width": 1440,
+    "height": 1000,
+    "scrollWidth": 1440,
+    "buttons": [
+      {
+        "id": "Operation",
+        "ratio": 6.087814471124692,
+        "font": "14px",
+        "color": "rgba(229, 236, 242, 0.85)",
+        "bg": [
+          52,
+          74,
+          96
+        ]
+      },
+      {
+        "id": "Setup",
+        "ratio": 6.087814471124692,
+        "font": "14px",
+        "color": "rgba(229, 236, 242, 0.85)",
+        "bg": [
+          52,
+          74,
+          96
+        ]
+      },
+      {
+        "id": "Logs",
+        "ratio": 6.087814471124692,
+        "font": "14px",
+        "color": "rgba(229, 236, 242, 0.85)",
+        "bg": [
+          52,
+          74,
+          96
+        ]
+      },
+      {
+        "id": "spotsDropdown",
+        "ratio": 13.057017955994942,
+        "font": "14px",
+        "color": "rgb(229, 236, 242)",
+        "bg": [
+          25.898039215686275,
+          36.85490196078432,
+          47.811764705882354
+        ]
+      },
+      {
+        "id": "Maintenance",
+        "ratio": 6.087814471124692,
+        "font": "14px",
+        "color": "rgba(229, 236, 242, 0.85)",
+        "bg": [
+          52,
+          74,
+          96
+        ]
+      },
+      {
+        "id": "wsprlinksDropdown",
+        "ratio": 6.087814471124692,
+        "font": "14px",
+        "color": "rgba(229, 236, 242, 0.85)",
+        "bg": [
+          52,
+          74,
+          96
+        ]
+      }
+    ],
+    "dangling": []
+  },
+  {
+    "view": "spots",
+    "theme": "dark",
+    "size": "mobile",
+    "width": 390,
+    "height": 844,
+    "scrollWidth": 390,
+    "buttons": [],
+    "dangling": []
+  },
+  {
+    "view": "maintenance",
+    "theme": "light",
+    "size": "desktop",
+    "width": 1440,
+    "height": 1000,
+    "scrollWidth": 1440,
+    "buttons": [
+      {
+        "id": "Operation",
+        "ratio": 4.841307746815507,
+        "font": "14px",
+        "color": "rgba(236, 241, 246, 0.85)",
+        "bg": [
+          64,
+          94,
+          122
+        ]
+      },
+      {
+        "id": "Setup",
+        "ratio": 4.841307746815507,
+        "font": "14px",
+        "color": "rgba(236, 241, 246, 0.85)",
+        "bg": [
+          64,
+          94,
+          122
+        ]
+      },
+      {
+        "id": "Logs",
+        "ratio": 4.841307746815507,
+        "font": "14px",
+        "color": "rgba(236, 241, 246, 0.85)",
+        "bg": [
+          64,
+          94,
+          122
+        ]
+      },
+      {
+        "id": "spotsDropdown",
+        "ratio": 4.841307746815507,
+        "font": "14px",
+        "color": "rgba(236, 241, 246, 0.85)",
+        "bg": [
+          64,
+          94,
+          122
+        ]
+      },
+      {
+        "id": "Maintenance",
+        "ratio": 12.065861025171916,
+        "font": "14px",
+        "color": "rgb(236, 241, 246)",
+        "bg": [
+          31.87450980392157,
+          46.8156862745098,
+          60.760784313725495
+        ]
+      },
+      {
+        "id": "wsprlinksDropdown",
+        "ratio": 4.841307746815507,
+        "font": "14px",
+        "color": "rgba(236, 241, 246, 0.85)",
+        "bg": [
+          64,
+          94,
+          122
+        ]
+      },
+      {
+        "id": "repairConfigButton",
+        "ratio": 9.034125617899749,
+        "font": "14px",
+        "color": "rgb(33, 37, 41)",
+        "bg": [
+          244,
+          189,
+          97
+        ]
+      },
+      {
+        "id": "restoreConfigButton",
+        "ratio": 4.841262093297579,
+        "font": "14px",
+        "color": "rgb(255, 255, 255)",
+        "bg": [
+          218,
+          41,
+          46
+        ]
+      },
+      {
+        "id": "test_tone",
+        "ratio": 8.063035590323391,
+        "font": "14px",
+        "color": "rgb(98, 76, 39)",
+        "bg": [
+          254,
+          254,
+          254
+        ]
+      },
+      {
+        "id": "updateCheckNowBtn",
+        "ratio": 14.331853897311046,
+        "font": "14px",
+        "color": "rgb(21, 36, 92)",
+        "bg": [
+          252,
+          253,
+          254
+        ]
+      },
+      {
+        "id": "updateCheckToggleBtn",
+        "ratio": 8.028538753004767,
+        "font": "14px",
+        "color": "rgb(73, 80, 87)",
+        "bg": [
+          252,
+          253,
+          254
+        ]
+      },
+      {
+        "id": "createSupportBundleButton",
+        "ratio": 5.648807970575567,
+        "font": "14px",
+        "color": "rgb(255, 255, 255)",
+        "bg": [
+          52,
+          89,
+          230
+        ]
+      }
+    ],
+    "dangling": []
+  },
+  {
+    "view": "maintenance",
+    "theme": "light",
+    "size": "mobile",
+    "width": 390,
+    "height": 844,
+    "scrollWidth": 390,
+    "buttons": [
+      {
+        "id": "repairConfigButton",
+        "ratio": 9.034125617899749,
+        "font": "14px",
+        "color": "rgb(33, 37, 41)",
+        "bg": [
+          244,
+          189,
+          97
+        ]
+      },
+      {
+        "id": "restoreConfigButton",
+        "ratio": 4.841262093297579,
+        "font": "14px",
+        "color": "rgb(255, 255, 255)",
+        "bg": [
+          218,
+          41,
+          46
+        ]
+      },
+      {
+        "id": "test_tone",
+        "ratio": 8.063035590323391,
+        "font": "14px",
+        "color": "rgb(98, 76, 39)",
+        "bg": [
+          254,
+          254,
+          254
+        ]
+      },
+      {
+        "id": "updateCheckNowBtn",
+        "ratio": 14.331853897311046,
+        "font": "14px",
+        "color": "rgb(21, 36, 92)",
+        "bg": [
+          252,
+          253,
+          254
+        ]
+      },
+      {
+        "id": "updateCheckToggleBtn",
+        "ratio": 8.028538753004767,
+        "font": "14px",
+        "color": "rgb(73, 80, 87)",
+        "bg": [
+          252,
+          253,
+          254
+        ]
+      },
+      {
+        "id": "createSupportBundleButton",
+        "ratio": 5.648807970575567,
+        "font": "14px",
+        "color": "rgb(255, 255, 255)",
+        "bg": [
+          52,
+          89,
+          230
+        ]
+      }
+    ],
+    "dangling": []
+  },
+  {
+    "view": "maintenance",
+    "theme": "dark",
+    "size": "desktop",
+    "width": 1440,
+    "height": 1000,
+    "scrollWidth": 1440,
+    "buttons": [
+      {
+        "id": "Operation",
+        "ratio": 6.087814471124692,
+        "font": "14px",
+        "color": "rgba(229, 236, 242, 0.85)",
+        "bg": [
+          52,
+          74,
+          96
+        ]
+      },
+      {
+        "id": "Setup",
+        "ratio": 6.087814471124692,
+        "font": "14px",
+        "color": "rgba(229, 236, 242, 0.85)",
+        "bg": [
+          52,
+          74,
+          96
+        ]
+      },
+      {
+        "id": "Logs",
+        "ratio": 6.087814471124692,
+        "font": "14px",
+        "color": "rgba(229, 236, 242, 0.85)",
+        "bg": [
+          52,
+          74,
+          96
+        ]
+      },
+      {
+        "id": "spotsDropdown",
+        "ratio": 6.087814471124692,
+        "font": "14px",
+        "color": "rgba(229, 236, 242, 0.85)",
+        "bg": [
+          52,
+          74,
+          96
+        ]
+      },
+      {
+        "id": "Maintenance",
+        "ratio": 13.057017955994942,
+        "font": "14px",
+        "color": "rgb(229, 236, 242)",
+        "bg": [
+          25.898039215686275,
+          36.85490196078432,
+          47.811764705882354
+        ]
+      },
+      {
+        "id": "wsprlinksDropdown",
+        "ratio": 6.087814471124692,
+        "font": "14px",
+        "color": "rgba(229, 236, 242, 0.85)",
+        "bg": [
+          52,
+          74,
+          96
+        ]
+      },
+      {
+        "id": "repairConfigButton",
+        "ratio": 9.034125617899749,
+        "font": "14px",
+        "color": "rgb(33, 37, 41)",
+        "bg": [
+          244,
+          189,
+          97
+        ]
+      },
+      {
+        "id": "restoreConfigButton",
+        "ratio": 4.841262093297579,
+        "font": "14px",
+        "color": "rgb(255, 255, 255)",
+        "bg": [
+          218,
+          41,
+          46
+        ]
+      },
+      {
+        "id": "test_tone",
+        "ratio": 11.038757936293761,
+        "font": "14px",
+        "color": "rgb(248, 215, 160)",
+        "bg": [
+          34,
+          38,
+          42
+        ]
+      },
+      {
+        "id": "updateCheckNowBtn",
+        "ratio": 5.916816993035461,
+        "font": "14px",
+        "color": "rgb(133, 155, 240)",
+        "bg": [
+          31,
+          36,
+          41
+        ]
+      },
+      {
+        "id": "updateCheckToggleBtn",
+        "ratio": 12.011563448206102,
+        "font": "14px",
+        "color": "rgb(222, 226, 230)",
+        "bg": [
+          31,
+          36,
+          41
+        ]
+      },
+      {
+        "id": "createSupportBundleButton",
+        "ratio": 5.648807970575567,
+        "font": "14px",
+        "color": "rgb(255, 255, 255)",
+        "bg": [
+          52,
+          89,
+          230
+        ]
+      }
+    ],
+    "dangling": []
+  },
+  {
+    "view": "maintenance",
+    "theme": "dark",
+    "size": "mobile",
+    "width": 390,
+    "height": 844,
+    "scrollWidth": 390,
+    "buttons": [
+      {
+        "id": "repairConfigButton",
+        "ratio": 9.034125617899749,
+        "font": "14px",
+        "color": "rgb(33, 37, 41)",
+        "bg": [
+          244,
+          189,
+          97
+        ]
+      },
+      {
+        "id": "restoreConfigButton",
+        "ratio": 4.841262093297579,
+        "font": "14px",
+        "color": "rgb(255, 255, 255)",
+        "bg": [
+          218,
+          41,
+          46
+        ]
+      },
+      {
+        "id": "test_tone",
+        "ratio": 11.038757936293761,
+        "font": "14px",
+        "color": "rgb(248, 215, 160)",
+        "bg": [
+          34,
+          38,
+          42
+        ]
+      },
+      {
+        "id": "updateCheckNowBtn",
+        "ratio": 5.916816993035461,
+        "font": "14px",
+        "color": "rgb(133, 155, 240)",
+        "bg": [
+          31,
+          36,
+          41
+        ]
+      },
+      {
+        "id": "updateCheckToggleBtn",
+        "ratio": 12.011563448206102,
+        "font": "14px",
+        "color": "rgb(222, 226, 230)",
+        "bg": [
+          31,
+          36,
+          41
+        ]
+      },
+      {
+        "id": "createSupportBundleButton",
+        "ratio": 5.648807970575567,
+        "font": "14px",
+        "color": "rgb(255, 255, 255)",
+        "bg": [
+          52,
+          89,
+          230
+        ]
+      }
+    ],
+    "dangling": []
+  }
+]

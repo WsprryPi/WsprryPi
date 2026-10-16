@@ -1,0 +1,529 @@
+{
+  "scope": "Tracked UI component, non-hardware CI workflow and hardware-access audit/regression",
+  "files": [
+    {
+      "path": ".github/workflows/debian-non-hardware.yml",
+      "sha256": "c85ac7e14422d9e42027f9a0259c465959e4c324e176f251ad89933c4fb96b7d"
+    },
+    {
+      "path": "WsprryPi-UI/.gitignore",
+      "sha256": "96c01b36d0f1b1d7ccaac1081de7c9178d5e340ce63c0aa962a3d576899514f7"
+    },
+    {
+      "path": "WsprryPi-UI/.impeccable/config.json",
+      "sha256": "e9b1179c839289e7f450760d8f3336f56de2ee02e8520f7236edd29495ca7ec4"
+    },
+    {
+      "path": "WsprryPi-UI/.impeccable/design.json",
+      "sha256": "143bfea8e56062abcd42912c9fd51806fa2b4c76915dc0be3feefcc5078a1b74"
+    },
+    {
+      "path": "WsprryPi-UI/API_syslog.md",
+      "sha256": "72b99e588ada108d9be91b4dcd0fd4b20adf75d6faab0536de6f519f59f6455f"
+    },
+    {
+      "path": "WsprryPi-UI/DESIGN.md",
+      "sha256": "98a7e0453883b078531e5ed2fda573cad9f9f8a073598f64b825f73252b7b82a"
+    },
+    {
+      "path": "WsprryPi-UI/PRODUCT.md",
+      "sha256": "f510a4ea965b583709a96bf20cd256ab36dcacb0cc4179232b6bcef9a5046a0e"
+    },
+    {
+      "path": "WsprryPi-UI/README.md",
+      "sha256": "c9b5a6e4541610117345223e042d69ba7fe67cacdbe5b0a7c79831ad54a47c59"
+    },
+    {
+      "path": "WsprryPi-UI/data/android-chrome-192x192.png",
+      "sha256": "a194ded870df5a526e3aff58471a212267d9c4b2db733d433b4dba39dde5660a"
+    },
+    {
+      "path": "WsprryPi-UI/data/android-chrome-512x512.png",
+      "sha256": "eafbb9b2996bcfd394d32c7551001bbc7ccefcac4d1ccd19e2a6f02a65a4ef26"
+    },
+    {
+      "path": "WsprryPi-UI/data/app_state.php",
+      "sha256": "817d10968a00a19e95a11f5bf63ee459093962a9b3e69a705185bc2110e2dd40"
+    },
+    {
+      "path": "WsprryPi-UI/data/apple-touch-icon.png",
+      "sha256": "76b511c1c2df5d3cc3e33ef17c7f1870166e4c2a6c637ca7e5c6f48014853213"
+    },
+    {
+      "path": "WsprryPi-UI/data/cache/wspr_spots_auto_0aab225fe089e4a2f63d52e7a7680ae2.json",
+      "sha256": "bdfead0352e2f9c5416d7ac4cbbe20f8332d1eda2ce5952565b98a70804cb4c3"
+    },
+    {
+      "path": "WsprryPi-UI/data/cache/wspr_spots_auto_4a603960af5e66f8724e36d1a409bb26.json",
+      "sha256": "255c5d4a6a0695e4538fb09ab0feb472885ca276ee0544003773c63b65deaf26"
+    },
+    {
+      "path": "WsprryPi-UI/data/cache/wspr_spots_auto_6d65b1d595de8c445d563a368ba8d84c.json",
+      "sha256": "67c57ee4dad9f3c8930517d878549b065fab9b8cbeb18080021a5c6362f57a87"
+    },
+    {
+      "path": "WsprryPi-UI/data/cache/wspr_spots_wspr_live_b48f1eb8c02741c70be05144927731ef.json",
+      "sha256": "b7300e0c00c6565f642810cd8866fcb355d3e986ed974f92e13786f055cf71fe"
+    },
+    {
+      "path": "WsprryPi-UI/data/cache/wspr_spots_wspr_live_clickhouse_eedf8e70f2bea615e0f34e6f9f60dbf9.json",
+      "sha256": "dd2dcb0cc060d6353c9431baf21f716d89ec327fc4867f6e771383e3329feafe"
+    },
+    {
+      "path": "WsprryPi-UI/data/cache/wspr_spots_wspr_live_downloader_022443dd38abff41bfba3cb445b62d40.json",
+      "sha256": "d23a6c07e7cbfbc29f12152e14e82d10c1101665d1bf96c9fe7e28f63ecbe82f"
+    },
+    {
+      "path": "WsprryPi-UI/data/cache/wspr_spots_wsprnet_d3d1f47b565612dda42e7acbba705a26.json",
+      "sha256": "67c57ee4dad9f3c8930517d878549b065fab9b8cbeb18080021a5c6362f57a87"
+    },
+    {
+      "path": "WsprryPi-UI/data/card_header.php",
+      "sha256": "d9f9ea7b5ac9337acb3d401c1893fd87a4752beeb3bdf3353ed6c4090be0ddf9"
+    },
+    {
+      "path": "WsprryPi-UI/data/clock_and_reboot.php",
+      "sha256": "f073f1c07dfabf0c2e960084b5b7a607a5496aadf42afb5ce811ea0ad0bb7341"
+    },
+    {
+      "path": "WsprryPi-UI/data/connection_alert.php",
+      "sha256": "97577dccff6c18c7f42237cd6277a864363bf64bce5f592dda46b1de50a80b12"
+    },
+    {
+      "path": "WsprryPi-UI/data/cw_timing_state.js",
+      "sha256": "9ed75b94f8d362f52123c015583816163c603cd47546cc5be1d156e6adcfa83c"
+    },
+    {
+      "path": "WsprryPi-UI/data/favicon-16x16.png",
+      "sha256": "c13c3b4b4632a527c84a9a719214476c531205327765969df90cd496decbaf4b"
+    },
+    {
+      "path": "WsprryPi-UI/data/favicon-32x32.png",
+      "sha256": "5cc614070497ee20f3a17eea8547d02f60a8c2e4834c8a1adbe8cc47db750d50"
+    },
+    {
+      "path": "WsprryPi-UI/data/favicon.ico",
+      "sha256": "1b783462a82fc344b01efbc79f168f1075986d8d5b88d0d28540ad1cc8acb3cc"
+    },
+    {
+      "path": "WsprryPi-UI/data/fetch_spots.php",
+      "sha256": "0dcd0eb9982064d228866f3714df9d31360d54b0cc2a612af6295f526f4e13e9"
+    },
+    {
+      "path": "WsprryPi-UI/data/fleet-schedules.js",
+      "sha256": "11013bfd44d9a5672192893222ba168db0cd3d312ae3d4de27f9ccc9259cbfcd"
+    },
+    {
+      "path": "WsprryPi-UI/data/footer.php",
+      "sha256": "84a311b4eb5054fbb0c11eff84eb5b096619c3e2749a0dfcdc2814a820760635"
+    },
+    {
+      "path": "WsprryPi-UI/data/gpio_dropdown.php",
+      "sha256": "d248d8aca721e0bfbd5a9461724db2381a3031e21084edad2c3babdaf2fb5da6"
+    },
+    {
+      "path": "WsprryPi-UI/data/header.php",
+      "sha256": "cfd6d3bcd695deff6f8cd0e960346562a81797ef745bcf037346c54ad432548f"
+    },
+    {
+      "path": "WsprryPi-UI/data/html_cache_headers.php",
+      "sha256": "bdca55059ffe2f0c3bf45b1f078646d85ddb5bb760b87b9d7934c9f4a66a51cc"
+    },
+    {
+      "path": "WsprryPi-UI/data/index.css",
+      "sha256": "a20ec7bbcff66af75e58684216669aca1e14314d2249896a5bf4f29db72abad9"
+    },
+    {
+      "path": "WsprryPi-UI/data/index.js",
+      "sha256": "c6d0adc6ea0b509e0f8b11dfd2484bc8a94cd9042d19b9a15ae62adf308f99aa"
+    },
+    {
+      "path": "WsprryPi-UI/data/index.php",
+      "sha256": "8a3f0bd6e51fc156afb8adf09a6808e6d52920fe62f43364e3797421965fbf28"
+    },
+    {
+      "path": "WsprryPi-UI/data/local-wtp.js",
+      "sha256": "564033ec3200aef9f1655eca596e1c3498b7f36a78432acc240ac8f5905dcd2c"
+    },
+    {
+      "path": "WsprryPi-UI/data/log_stream.php",
+      "sha256": "3b74b12a321878190f316935705b438a5856507976f4f026acf6ca79da1e5bf2"
+    },
+    {
+      "path": "WsprryPi-UI/data/maintenance.css",
+      "sha256": "7b80f21565303de1a8755c168e9858672a7c8bdc20d7e06f5b8b94daf6efb9e3"
+    },
+    {
+      "path": "WsprryPi-UI/data/maintenance.js",
+      "sha256": "3926b5c0422e636b5e2224de48ea40eaa72f421abb776a7c9db2de64e86e7b69"
+    },
+    {
+      "path": "WsprryPi-UI/data/maintenance.php",
+      "sha256": "9c50d55b3ce09a88b0a8fa62e7d1079c35577404e1068c447420c51d17e8bc58"
+    },
+    {
+      "path": "WsprryPi-UI/data/navbar.php",
+      "sha256": "70c67a306be6bd4e621ea563a1449f5ad22c46499bb3a42ab1cd9607331a3e65"
+    },
+    {
+      "path": "WsprryPi-UI/data/operation.css",
+      "sha256": "1e8d9d9dc96f9214f955ff2fec622a2efcf1fc477c255f34299b46c0ada84ca1"
+    },
+    {
+      "path": "WsprryPi-UI/data/operation.js",
+      "sha256": "225fa4c791efdaa26a2f59e6049b6ac5155eb234ed38c4cca9c1881c9ab6c2b5"
+    },
+    {
+      "path": "WsprryPi-UI/data/page_metadata.php",
+      "sha256": "feecb4fa21a956d2c41e95516f77882947bb364392e1bde1a68da3ccb25ac623"
+    },
+    {
+      "path": "WsprryPi-UI/data/page_shell_end.php",
+      "sha256": "c4b302bd5eb9bc0a957fdb48ff7789b605a105a3c3c94764765ad4182d5ea8f7"
+    },
+    {
+      "path": "WsprryPi-UI/data/page_shell_start.php",
+      "sha256": "01b33ffcc8610c5d36ad261953f70ffd4e93584d26e3b1b0fa0edd41cf296fb1"
+    },
+    {
+      "path": "WsprryPi-UI/data/site.css",
+      "sha256": "6d8d11da971d9d5b4089d1bd4ef3af7f710ca087d219e67bb24451b8835afc31"
+    },
+    {
+      "path": "WsprryPi-UI/data/site.js",
+      "sha256": "2a66f777e28929e62e4fb81eae87a64d8ebe00afa9f2b6684e03331f4f706c3e"
+    },
+    {
+      "path": "WsprryPi-UI/data/site.js.includes.php",
+      "sha256": "97f767c768d7f0b961f37d00efac423a6fed9551988a33e8fa35ac0bab68147e"
+    },
+    {
+      "path": "WsprryPi-UI/data/site.webmanifest",
+      "sha256": "7a9e07ce1f7386689917602ddc5a75750ad842e605ff764f67173529c181bf04"
+    },
+    {
+      "path": "WsprryPi-UI/data/system_action_modal.php",
+      "sha256": "2e1f2f1f8cae385eea4b3ffba830c47fbf32f88ad6bcda3c80ed88f85ad62a67"
+    },
+    {
+      "path": "WsprryPi-UI/data/template.php",
+      "sha256": "5224172db06deabf206b669f97c4a2500b55bfafc021a54fbff7194b78bde1c7"
+    },
+    {
+      "path": "WsprryPi-UI/data/ui-manifest.php",
+      "sha256": "21d03cdd32425c6ef3d09abc9b2154771220e7bb1bc696e2a0acdccab56ed50d"
+    },
+    {
+      "path": "WsprryPi-UI/data/ui-version.php",
+      "sha256": "857beb808832075a3ab64a902adb9e13aa3827c8428115b1f2f04dd133ed4b53"
+    },
+    {
+      "path": "WsprryPi-UI/data/ui_version.php",
+      "sha256": "50d088448343e17d79ef98162b69d675a4a93d4b46cebdbb69341fd02da65464"
+    },
+    {
+      "path": "WsprryPi-UI/data/vendor/THIRD_PARTY_NOTICES.md",
+      "sha256": "b83761f0ea8ebb68f298c66175c85970ae09207c5ba6c36853b9b245fc2f72d0"
+    },
+    {
+      "path": "WsprryPi-UI/data/vendor/css/bootswatch-zephyr-5.3.8.min.css",
+      "sha256": "0eb1079dbae68677d81044a09023da7a28e6748f3462d5c9276fe4ce745d8820"
+    },
+    {
+      "path": "WsprryPi-UI/data/vendor/fonts/bootstrap-icons/bootstrap-icons.css",
+      "sha256": "fc499030409f5641ca47078ac415ff7ed39308a2aebdff8abf783b167a18ae24"
+    },
+    {
+      "path": "WsprryPi-UI/data/vendor/fonts/bootstrap-icons/fonts/bootstrap-icons.woff2",
+      "sha256": "476adf42b40325098fcfa8b36ab3e769186bb4f6ce6a249753e2e1a9c22bf99e"
+    },
+    {
+      "path": "WsprryPi-UI/data/vendor/fonts/fontawesome/all.min.css",
+      "sha256": "3219148441227c82ff4cbcbc9deab1bdbcb9c2b1535377a3ee6ccb3edf1abcd4"
+    },
+    {
+      "path": "WsprryPi-UI/data/vendor/fonts/fontawesome/webfonts/fa-brands-400.woff2",
+      "sha256": "b66b3da5ff7b2db79b6cb5a22c3e762e2bf16958a11987e69eeb1980bbbcdfb0"
+    },
+    {
+      "path": "WsprryPi-UI/data/vendor/fonts/fontawesome/webfonts/fa-regular-400.woff2",
+      "sha256": "3a74c08d486310c03731b458616f0172375fe3780e96165f8a1adc02d1355eaa"
+    },
+    {
+      "path": "WsprryPi-UI/data/vendor/fonts/fontawesome/webfonts/fa-solid-900.woff2",
+      "sha256": "f4c5a5b297e623bc159679563a4d1eb16e409ca3b57698fbc00fd2c907dadae0"
+    },
+    {
+      "path": "WsprryPi-UI/data/vendor/fonts/fontawesome/webfonts/fa-v4compatibility.woff2",
+      "sha256": "33e73fb0656f23945b0d160507dba4dbcd315c3c18eedd0c1fd128ba88272b41"
+    },
+    {
+      "path": "WsprryPi-UI/data/vendor/fonts/google/barlow-semi-condensed-500.ttf",
+      "sha256": "c2b046235fb4c2f81ca58bbdca2313e9681758295b129931853324ade56180c9"
+    },
+    {
+      "path": "WsprryPi-UI/data/vendor/fonts/google/barlow-semi-condensed-600.ttf",
+      "sha256": "cb75439ae401f77624d5b268ea25fd7556e34803fccbd2f92e937a4f3856a1da"
+    },
+    {
+      "path": "WsprryPi-UI/data/vendor/fonts/google/barlow-semi-condensed-700.ttf",
+      "sha256": "6098b66ce7d608dcea8c6a2eeacfdeeee5416e0e0c12a2318595d3dd8c5babef"
+    },
+    {
+      "path": "WsprryPi-UI/data/vendor/fonts/google/fonts.css",
+      "sha256": "f90d3e74637436d262bea1d8564658d8b7bfefe368e36fb7698dc91638477ef7"
+    },
+    {
+      "path": "WsprryPi-UI/data/vendor/fonts/google/source-sans-3-400.ttf",
+      "sha256": "b6f2cc8d9905e97b5cd7a294367bb529814385f299fb23057060394cbd6bbffb"
+    },
+    {
+      "path": "WsprryPi-UI/data/vendor/fonts/google/source-sans-3-500.ttf",
+      "sha256": "3772689bdef0cd284428994189d89d1fd412591e8906fb5bd0c4692a3314cbe7"
+    },
+    {
+      "path": "WsprryPi-UI/data/vendor/fonts/google/source-sans-3-600.ttf",
+      "sha256": "26efb7fbad9540df2595fe867a37e454d22973b9e37816d263fdc5295cb084bb"
+    },
+    {
+      "path": "WsprryPi-UI/data/vendor/fonts/google/source-sans-3-700.ttf",
+      "sha256": "e53acf3eb590b2ff183288401da9f3b829703e9716bc88e0da821e3a2ce9c175"
+    },
+    {
+      "path": "WsprryPi-UI/data/vendor/js/bootstrap.bundle-5.3.8.min.js",
+      "sha256": "c6f670216aedd2c61ec83102f7e40c1c44114eecd7f37b2edc332757390c386a"
+    },
+    {
+      "path": "WsprryPi-UI/data/vendor/js/jquery-3.7.1.min.js",
+      "sha256": "fc9a93dd241f6b045cbff0481cf4e1901becd0e12fb45166a8f17f95823f0b1a"
+    },
+    {
+      "path": "WsprryPi-UI/data/vendor/licenses/OFL-1.1.txt",
+      "sha256": "f0e9b2b6a0c7c04b6519f4f497a4346d6830cc786f7d8a8af0935e6da0329a9d"
+    },
+    {
+      "path": "WsprryPi-UI/data/version.php",
+      "sha256": "057b202105303b78a88adf5f4655fa60fe10cf597ec94f9ea8b83b2313be94b9"
+    },
+    {
+      "path": "WsprryPi-UI/data/view_diag_logs.php",
+      "sha256": "dea0c619e9e5f9d3030a151a612317ee306779f4e3450afea26a3c483ce5fd13"
+    },
+    {
+      "path": "WsprryPi-UI/data/view_logs.css",
+      "sha256": "6fe114efd8c591e67540e6dee7a8a77b5374bed78754dbaef0294c8995ad4070"
+    },
+    {
+      "path": "WsprryPi-UI/data/view_logs.js",
+      "sha256": "25d8c55625fbb439b38ee37cd3ac01670cf8c9bb574ff553d2052a7ae602ab3c"
+    },
+    {
+      "path": "WsprryPi-UI/data/view_logs.php",
+      "sha256": "8e54685ac0c282b54485623d19ec039d83dc068f49dbc46dcbac59f72b9409a0"
+    },
+    {
+      "path": "WsprryPi-UI/data/view_spots.css",
+      "sha256": "1369654a75895319eacb1068f92c8a18739147dee689a5fca9080239387e9ab0"
+    },
+    {
+      "path": "WsprryPi-UI/data/view_spots.js",
+      "sha256": "5bbe97485de751d183951f7f50a94ee826f4db9d1ed70d6ed7aae4a8edf2c6ad"
+    },
+    {
+      "path": "WsprryPi-UI/data/view_spots.php",
+      "sha256": "51c652fafd7d142f9f8f22706266cd1b77056d65f6eefe3cee9646d20c021e8c"
+    },
+    {
+      "path": "WsprryPi-UI/data/views/config.php",
+      "sha256": "f6e4aae01fea6bef49b1ceff107c467dd533b2ab93436d235cbe82d84954e0c5"
+    },
+    {
+      "path": "WsprryPi-UI/data/views/fleet-schedules.php",
+      "sha256": "5929732153f14f4bbe03303bb51cbe9c1bcd4822acd6d3c1d567bfb73d2f24a8"
+    },
+    {
+      "path": "WsprryPi-UI/data/views/local-wtp-control.php",
+      "sha256": "4dcfa6062a70944aaab8156febb588e5e969eb3dec688ab2f0e3cdbc34f4d988"
+    },
+    {
+      "path": "WsprryPi-UI/data/views/logs.php",
+      "sha256": "85590aef8a9f562505e163b2fba06e867c251bdb32bcfcee67d105b117d180ed"
+    },
+    {
+      "path": "WsprryPi-UI/data/views/maintenance.php",
+      "sha256": "c12485f9ee59e4204027b596de774c65abeb17e13bade36f06f544df4aa68e94"
+    },
+    {
+      "path": "WsprryPi-UI/data/views/operation.php",
+      "sha256": "2a0c159da15ef7d37a340b247688e9844c141625ebce76036737037a0caad21a"
+    },
+    {
+      "path": "WsprryPi-UI/data/views/spots.php",
+      "sha256": "156fa0fa59eb2ce7002b9c9610f83dfb9ed74e9ec7f7f1e40b052f3992bec6fb"
+    },
+    {
+      "path": "WsprryPi-UI/data/views/wtp-controls.php",
+      "sha256": "e2a8d0b1c85331e7c1bef65b09f020e8c25a84e59b07e16260b907330cf60226"
+    },
+    {
+      "path": "WsprryPi-UI/data/wtp-management.js",
+      "sha256": "bdc7e23106495863be22f629e42153fac9432bd316194f6026ee4c8247c20136"
+    },
+    {
+      "path": "WsprryPi-UI/data/wtp.js",
+      "sha256": "7f13349eb6ca9bb146af40b17ca0ea84f4a1650021c2fdde6b35e3dfbbe5eea5"
+    },
+    {
+      "path": "WsprryPi-UI/package-lock.json",
+      "sha256": "df5f1ccb18e353270ba808ab540f14786f6f98d640a6038fec5b533d3d8722e6"
+    },
+    {
+      "path": "WsprryPi-UI/package.json",
+      "sha256": "d37fe4214e6735e8d08721411c49d6b8fb5fca49de543b31c48fcae2705f8e8e"
+    },
+    {
+      "path": "WsprryPi-UI/scripts/generate_ui_manifest.py",
+      "sha256": "178f97ed3d02f3678800df5d9ac15cd48d3faa0da6609e44e8c8f3c80bdbfa9e"
+    },
+    {
+      "path": "WsprryPi-UI/tests/browser_fixture_process.js",
+      "sha256": "5f11a8519e3be59e3be524c011d58e5fef59e5210a1a56aa055565692d107b88"
+    },
+    {
+      "path": "WsprryPi-UI/tests/browser_fixture_process_test.js",
+      "sha256": "c9044200e199dbec9dcc364240a5b2eb8adf437ca21cdae32226476b3652423a"
+    },
+    {
+      "path": "WsprryPi-UI/tests/browser_fixture_router.php",
+      "sha256": "99a7fe8bb069829a2b7d4784dfbd45d4a7a5018b2d1aeab20d007363b9b4f5be"
+    },
+    {
+      "path": "WsprryPi-UI/tests/conditional_transmit_gpio_integration_test.js",
+      "sha256": "209915824283934d71619e54379254d292a1a3294e3310f97ead02c75c791ae8"
+    },
+    {
+      "path": "WsprryPi-UI/tests/cw_duration_latch_integration_test.js",
+      "sha256": "bc7e7265127acedc7e596e8edb64b90e3b300ccfaeccd34a88e1dffaed02adf2"
+    },
+    {
+      "path": "WsprryPi-UI/tests/cw_timing_state_test.js",
+      "sha256": "17d5e211d5c5aad0883a26802f555f7d735b37a44ca0eb5998606c46a8551b93"
+    },
+    {
+      "path": "WsprryPi-UI/tests/gpio_correction_provenance_test.js",
+      "sha256": "60d9eaf836c2a5e896cb4af882cac61ef60cabc680090d3834a485649709d906"
+    },
+    {
+      "path": "WsprryPi-UI/tests/gpio_dropdown_test.php",
+      "sha256": "a4bd180d58db8e9eb18808f793ed86acdf7b13a3f0ed7db42eaf5d513b325524"
+    },
+    {
+      "path": "WsprryPi-UI/tests/integrated_review_browser.js",
+      "sha256": "82942d2c29f957b612710569ef5fa861661ad898006b9b999b7be773fed354a4"
+    },
+    {
+      "path": "WsprryPi-UI/tests/log_stream_disconnect_integration_test.sh",
+      "sha256": "dba37999c6fbe0eec074df338311d8d3e9fdf0b65b6868938a9ed933b6299c73"
+    },
+    {
+      "path": "WsprryPi-UI/tests/network_safety_ui_test.js",
+      "sha256": "5d66fcb31ad7a00306a248f047f165ac43d6c06145d667f3b6be26ea34e8ebbb"
+    },
+    {
+      "path": "WsprryPi-UI/tests/responsive_shell_logs_test.js",
+      "sha256": "e0f9a1d78cba2d0a9300f345baef87326981c5a4f885e2f67746e3e8f4c05646"
+    },
+    {
+      "path": "WsprryPi-UI/tests/rp1_route_ui_test.js",
+      "sha256": "52e7a8dea76d9af8c017f571beed452a694a63b6fe92e7b5138d3be972b44368"
+    },
+    {
+      "path": "WsprryPi-UI/tests/si5351_inventory_ui_test.js",
+      "sha256": "c00421bf1a7020cc89be5ec9b6d883d9e1f72b17d35769632a66a0c1702025a7"
+    },
+    {
+      "path": "WsprryPi-UI/tests/spot_menu_test.php",
+      "sha256": "8b01fc2212171ba3e83a955abb228639f8de2d7c3e533238f424e0938c7a17cb"
+    },
+    {
+      "path": "WsprryPi-UI/tests/spots_hardening_test.js",
+      "sha256": "23cd0baffd05be649de529de105fea12741598cbf18a783dbadb3aab5074f023"
+    },
+    {
+      "path": "WsprryPi-UI/tests/support_bundle_ui_test.js",
+      "sha256": "5eb4d82a6a676015509ede9d9eb9f4ad8041ef489c87ac85d2235434eee5c746"
+    },
+    {
+      "path": "WsprryPi-UI/tests/support_intake_ui_harness_test.js",
+      "sha256": "c4f09d47dddbb41e0aeedeba737d0d8af6cb96c1f681101911d071e0b70961f7"
+    },
+    {
+      "path": "WsprryPi-UI/tests/support_intake_ui_integration_test.js",
+      "sha256": "888b71fa8e6c54adad114ba97abc6464a66436bf92099b0391b4f4688daaa209"
+    },
+    {
+      "path": "WsprryPi-UI/tests/test_tone_lifecycle_integration_test.js",
+      "sha256": "c819a5dc0cbe68f2e55fa64d2b2193912cc8b25e4267bacf747dff145036c016"
+    },
+    {
+      "path": "WsprryPi-UI/tests/ui_identity_http_integration_test.py",
+      "sha256": "ab282c27474d1200b0a402445e5db4d6c38dc48cb365b2f1a6d594f73137f7ec"
+    },
+    {
+      "path": "WsprryPi-UI/tests/ui_identity_test.php",
+      "sha256": "37159c5dc23e30121510353f9bf75510ee75479899f9ae73aea9f6a477b5502b"
+    },
+    {
+      "path": "WsprryPi-UI/tests/ui_installation_classification_test.py",
+      "sha256": "e2c8c58f57629cd3a91a5709ee0fe7cb929896008ac329d3b2f6df7ceb95ff92"
+    },
+    {
+      "path": "WsprryPi-UI/tests/ui_manifest_test.py",
+      "sha256": "93ad4c4b0b79beeeccb4db382c46003f8f5eda135c48a6288e5f516f85b6ade8"
+    },
+    {
+      "path": "WsprryPi-UI/tests/wspr_band_frequency_correlation_test.js",
+      "sha256": "2c5dde2597c6c7f49654a3788ab134e1a1da20c3fa7228d0a92e47b8aeba23ae"
+    },
+    {
+      "path": "WsprryPi-UI/tests/wtp_configuration_interop_test.js",
+      "sha256": "dd03df552e7f281f5cc5077e8c30ca1f77e70ea0b37b653061da0607cf02727b"
+    },
+    {
+      "path": "WsprryPi-UI/tests/wtp_management_fixture.js",
+      "sha256": "4b629fa2a0262afea872f1283dd37c70763d9ff77fa802e7a31e915ad794df94"
+    },
+    {
+      "path": "WsprryPi-UI/tests/wtp_management_test.js",
+      "sha256": "c4bffac9848a1efc56af233791eb39da8c8765288a8bdbb86a113ab7f4916a0a"
+    },
+    {
+      "path": "WsprryPi-UI/tests/wtp_network_ui_integration_test.js",
+      "sha256": "88d01f4e9abb504a698b9423561957fdc9c11c56c8abead7f6daeaaac72b1ebe"
+    },
+    {
+      "path": "WsprryPi-UI/tests/wtp_pi_fleet_ui_integration_test.js",
+      "sha256": "2bd62eb39ae33462f7fde3c80c85b6c2a2ea088fffc94a71f4e78ad284579e5e"
+    },
+    {
+      "path": "WsprryPi-UI/tests/wtp_recovery_ui_integration_test.js",
+      "sha256": "80158ce55dab8cafb35f832330067f6c4cad9d9b7d26037307cff41e434058d0"
+    },
+    {
+      "path": "WsprryPi-UI/tests/wtp_resources_interop_test.js",
+      "sha256": "c59c37eeed6f1c0e0e6e04797a636abae9bd9dd19b07769d07381110bd4516d6"
+    },
+    {
+      "path": "WsprryPi-UI/tests/wtp_ui_test.js",
+      "sha256": "196a782f242d1cbbb13f4be4ee2f59c5eccb61fb148013140c8bc64a81e56700"
+    },
+    {
+      "path": "scripts/ci/assert-no-transmitter-hardware.sh",
+      "sha256": "e908489245fbc21cff39ed6438088ec05b81256a6ef2067f841eda59dd3ecc39"
+    },
+    {
+      "path": "scripts/tests/no_transmitter_hardware_audit_test.py",
+      "sha256": "54c79ad533c60726b590d7b00312a1d204dbd29a8fa8b82fb0b466e183eb0c3d"
+    }
+  ]
+}
