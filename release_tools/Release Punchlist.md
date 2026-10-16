@@ -21,7 +21,8 @@ Its installed consumer, cache, independent both-route status, API/UI and support
 collector are now verified on wspr5.
 No new RF qualification is claimed. Items 11–12 are complete, including verified
 hosted builds and publication. Item 13 is complete for reviewed implementation
-`d93c75c` on `devel`; items 14–15 have not started. Item 14 records planned
+`d93c75c` on `devel`, with #423 closed and final closeout CI verified;
+items 14–15 have not started. Item 14 records planned
 Pico Type 2/3 companion integration requiring separate authorization and
 affected revalidation before the Beta 1 candidate is frozen.
 
@@ -50,7 +51,8 @@ Status key: ✅ Complete · ⏳ In progress · ☐ Not started
    ordering, generation fencing, watchdog cleanup and truthful execution/
    restoration feedback are implemented and software-validated. See the
    [review and evidence](../docs/development/test-tone-lifecycle-review.md).
-   Physical qualification and the final integrated UI review remain open.
+   Physical qualification remains separate; the final integrated UI review
+   is closed under item 13.
 5. ✅ **WsprryPico — Implement Phase 15.4: adopt shared application, station and
    hardware resources.** Complete within the authorized software scope. Shared
    member resources, scoped saves, pin inspection and nonpersistent validation
@@ -105,8 +107,9 @@ Status key: ✅ Complete · ⏳ In progress · ☐ Not started
     development selectors and fail-closed policy remain intact. The maintained
     [release acceptance workflow](../docs/rp1-provider-acceptance.md) now checks
     production resolution explicitly. Maintainer publication guidance and
-    #412/#423 criteria are reconciled; both issues remain open. The maintainer
-    confirmed automatic installation on positively identified Pi 5/CM5 with
+    #412/#423 criteria are reconciled; #412 remains open and #423 is closed
+    under item 13. The maintainer confirmed automatic installation on
+    positively identified Pi 5/CM5 with
     explicit opt-out. Operator-documentation follow-ups are recorded for item 12.
     On wspr5, consumer `8abb0d1` and published provider `8c16d3c` passed
     cleanup-first development-to-release migration, normal installation,
@@ -168,7 +171,9 @@ Status key: ✅ Complete · ⏳ In progress · ☐ Not started
     UI review and Beta preparation remain separate gates. Custom-domain TLS and
     all-host Impeccable follow-ups stay separate.
 13. ✅ **Final integrated Impeccable review (#423).**
-    **Lead: WsprryPi · RP1 item 21.** Complete for reviewed implementation
+    **Lead: WsprryPi · RP1 item 21.** Complete;
+    [#423 is closed with evidence](https://github.com/WsprryPi/WsprryPi/issues/423#issuecomment-6223312301)
+    for reviewed implementation
     `d93c75c4f1490df9108856403710e692b9c2d3dd` on `devel` (UI repairs `090a15a`,
     followed by the fail-closed CI trace-audit repair). Prerequisite evidence
     and candidate inclusion verified items 10–12 and accepted release-scoped
@@ -180,17 +185,24 @@ Status key: ✅ Complete · ⏳ In progress · ☐ Not started
     desktop/mobile, both themes, keyboard/focus and 200% text were reviewed.
     Local UI/browser/Fleet/network/recovery suites and exact-implementation
     [CI 38952419761](https://github.com/WsprryPi/WsprryPi/actions/runs/38952419761)
-    passed. See the [maintainer acceptance record](../docs/development/item13-integrated-impeccable-review.md)
+    passed. Final evidence/checklist commit `b85ba90` passed
+    [all 11 closeout CI jobs](https://github.com/WsprryPi/WsprryPi/actions/runs/38954297998).
+    Planning-only commit `e3e5008` was subsequently pushed and passed
+    [all 11 exact-head CI jobs](https://github.com/WsprryPi/WsprryPi/actions/runs/38966261503);
+    the [follow-up verification](https://github.com/WsprryPi/WsprryPi/issues/423#issuecomment-6224818188)
+    confirms #423 remains closed. All 131 reviewed UI/workflow/audit inputs
+    retain their accepted hashes. See the [maintainer acceptance record](../docs/development/item13-integrated-impeccable-review.md)
     and retained visual/detector evidence. Operator docs remain unchanged at
     accepted content `166639f`/verification record `b377bc4`; no blocking correction
     is required. This UI gate does not qualify physical devices, assistive
     technology, installation, services, GPIO, timing or RF, and does not establish
-    Beta publication readiness. Later UI-affecting changes require affected
-    review/documentation checks again; item 14 records that follow-up for the
+    Beta publication readiness. Physical-device, actual screen-reader and native
+    browser-zoom coverage remain outstanding. Later UI-affecting changes require
+    affected review/documentation checks again; item 14 records that follow-up for the
     Pico Type 2/3 companion. Items 14–15 have not started.
 14. ☐ **Pico WSPR Type 2/3 management integration and acceptance.**
-    **Lead: WsprryPi · Documentation: WsprryPi-Docs.** Begin after item 13's
-    active closeout is finished and `devel` is at a clean, verified checkpoint.
+    **Lead: WsprryPi · Documentation: WsprryPi-Docs.** Item 13's closeout is
+    complete. Start from a fresh, clean, verified `devel` checkpoint.
     Under separate integration authorization, integrate the reviewed
     `codex/p15-8-wspr-type23` branch, whose accepted handoff head is
     `6d5e73430bfbacdb8cfc29c3fe41089aa8ae5fcb`. That head changes only the
@@ -285,7 +297,7 @@ Status key: ✅ Complete · ⏳ In progress · ☐ Not started
 | 10 | 18 | ✅ Complete within accepted scope | Published-provider installation/runtime integration; installed supplement and both-route status accepted; prior target passes/rollback exclusion and RF scope preserved | `WsprryPi` |
 | 11 | 19 | ✅ Complete | Documentation performance and Impeccable housekeeping; hosted build/publication verified | `WsprryPi-Docs` |
 | 12 | 20 | ✅ Complete | Consolidated operator documentation; exact-revision hosted build/publication verified | `WsprryPi-Docs` |
-| 13 | 21 | ✅ Complete | Integrated application Impeccable review accepted for `d93c75c`; bounded validation and qualification limits retained | `WsprryPi` |
+| 13 | 21 | ✅ Complete; #423 closed | Integrated application Impeccable review accepted for `d93c75c`; final closeout/planning-head CI each passed 11/11; bounded validation and qualification limits retained | `WsprryPi` |
 | 14 | — | ☐ Not started | Pico Type 2/3 companion integration, compatibility checks, affected UI/documentation revalidation and adversarial acceptance | `WsprryPi`; affected operator docs: `WsprryPi-Docs` |
 | 15 | 22 | ☐ Not started | Beta 1 release notes, candidate build and acceptance; stop after 15c; later 15d prerelease publication and 15e issue announcements | `WsprryPi` |
 
@@ -318,7 +330,7 @@ Beta preparation or announcement does not itself close that stable release gate.
 | Saved item | Release relevance | Disposition and evidence |
 | --- | --- | --- |
 | **Test Tone concurrency** | Coordinate complete Start, End, user-stop, expiry, cleanup and restoration transactions, with deterministic race tests. | Complete under release checklist item 4: scheduler ordering, generation fences, nonblocking delivery and watchdog lifecycle validated. See the [review and evidence](../docs/development/test-tone-lifecycle-review.md). Physical qualification remains separate. |
-| **Test Tone status duplication** | Keep the frequency preview separate from execution feedback. Include this in the final UI review. | Complete for item 4: accepted/startup/runtime/uncertain and restoration feedback, correlation tests and focused Impeccable review recorded in the [review and evidence](../docs/development/test-tone-lifecycle-review.md). Final integrated UI review (#423) remains pending. |
+| **Test Tone status duplication** | Keep the frequency preview separate from execution feedback. Include this in the final UI review. | Complete for item 4: accepted/startup/runtime/uncertain and restoration feedback, correlation tests and focused Impeccable review recorded in the [review and evidence](../docs/development/test-tone-lifecycle-review.md). Final integrated UI review (#423) is closed under item 13; changed Pico surfaces require affected review under item 14. |
 | **Si5351 readiness failures** | The five comparison investigations were implemented, but intermittent `SYS_INIT` failures remain unresolved in the [qualification record](../docs/development/si5351-results/README.md). Successful later captures did not close that reliability question. | Complete by explicit maintainer acceptance after software repairs and two consecutive inhibited wspr1 checks passed; see [results and disposition](../docs/development/si5351-readiness-review.md). Historical failures remain preserved without claiming their cause was established. |
 | **Direct PPS for GPIO frequency calibration** | Optional RF-calibration scope decision; retain Chrony-derived estimates, intrinsic defaults, manual correction and conducted residuals. | Review complete: native PPS RF calibration deferred beyond 4.0. No independent RF counter/capture benefit or new 4.0 requirement established; reopening requires an identified measurement path and measurable improvement. See [Calibration Scope Decisions](Calibration%20Scope%20Decisions.md#direct-pps-disposition-and-reopening-criteria). |
 | **RP1 alternative clock parents** | Current output already uses nominal 200 MHz `pll_sys`; historical 50 MHz/XOSC planning is obsolete. | Reconciled: `pll_sys` implemented; genuinely alternative paths through `clk_i2s`, `clk_adc` or `clk_sys` deferred beyond 4.0, subject to ancestry/ownership and coordinated provider/userspace qualification. See [Calibration Scope Decisions](Calibration%20Scope%20Decisions.md#rp1-parent-disposition). |
@@ -358,10 +370,13 @@ Beta preparation or announcement does not itself close that stable release gate.
   prerequisite for item 13; integrated application review and Beta 1 acceptance
   remain separate gates.
 - ✅ **Final integrated Impeccable review:**
-  [#423](https://github.com/WsprryPi/WsprryPi/issues/423) accepted for implementation
+  [#423](https://github.com/WsprryPi/WsprryPi/issues/423) is closed for reviewed implementation
   `d93c75c` after production RP1 integration and release-scoped implementation/
   documentation acceptance. The [item 13 record](../docs/development/item13-integrated-impeccable-review.md)
   retains repairs, independent reassessment, exact-head CI and bounded evidence.
+  Final `b85ba90` closeout and published planning-only `e3e5008` each passed
+  11/11 CI jobs; unchanged reviewed inputs and closure are confirmed in the
+  [follow-up verification](https://github.com/WsprryPi/WsprryPi/issues/423#issuecomment-6224818188).
   #412 stays open for publication; other ready issues await the later authorized
   publication notifications. Item 14 is the next separate gate; its UI-affecting
   integration requires an addendum covering changed surfaces before candidate freeze.
