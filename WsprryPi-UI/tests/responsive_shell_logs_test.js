@@ -19,7 +19,7 @@ assert.match(
 );
 assert.match(
     siteCss,
-    /@media \(max-width: 767\.98px\)[\s\S]*?grid-template-areas:[\s\S]*?"copy"[\s\S]*?"status"[\s\S]*?\.navbar-title[\s\S]*?white-space: normal/,
+    /@media \(max-width: 767\.98px\)[\s\S]*?grid-template-areas:[\s\S]*?"copy toggle"[\s\S]*?"status status"[\s\S]*?\.navbar-title[\s\S]*?white-space: normal/,
     "mobile masthead must retain readable title and controller status rows"
 );
 assert.match(

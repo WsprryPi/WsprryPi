@@ -24,6 +24,39 @@ require __DIR__ . '/../card_header.php';
                         </div>
                     </div>
 
+                    <div class="operation-hero__controls" aria-label="Runtime controls">
+                        <div class="operation-hero__state-label">Transmit control</div>
+
+                        <div class="operation-runtime-toggle">
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" role="switch" id="transmit" aria-describedby="transmitAvailabilityHint operationStateDetail">
+                                <label class="form-check-label" for="transmit">Transmit enabled</label>
+                            </div>
+                            <?php require __DIR__ . '/local-wtp-control.php'; ?>
+                            <div id="transmitAvailabilityHint" class="form-text mt-2" aria-live="polite" aria-atomic="true" hidden></div>
+                        </div>
+
+                        <button
+                            type="button"
+                            class="btn btn-danger operation-stop-button"
+                            id="stop_transmit"
+                            aria-describedby="operationStateDetail"
+                            disabled>
+                            Stop transmission
+                        </button>
+
+                        <div id="operationRecoveryActions" class="operation-recovery" hidden>
+                            <div class="operation-recovery__actions">
+                                <button type="button" class="btn btn-outline-primary operation-recovery__action" id="operationRetryButton">
+                                    Retry now
+                                </button>
+                                <a class="btn btn-outline-secondary operation-recovery__action" id="operationSetupButton" href="index.php?page=config" hidden>
+                                    Open Setup
+                                </a>
+                            </div>
+                            <div id="operationRecoveryHint" class="operation-recovery__hint" aria-live="polite" aria-atomic="true"></div>
+                        </div>
+                    </div>
                     <div class="operation-hero__reboot" aria-labelledby="operationRebootBehaviorTitle">
                         <div class="operation-hero__state-label" id="operationRebootBehaviorTitle">Reboot behavior</div>
                         <div class="operation-reboot-options" role="radiogroup" aria-labelledby="operationRebootBehaviorTitle">
@@ -42,39 +75,6 @@ require __DIR__ . '/../card_header.php';
                         </div>
                     </div>
 
-                    <div class="operation-hero__controls" aria-label="Runtime controls">
-                        <div class="operation-hero__state-label">Transmit control</div>
-
-                        <div class="operation-runtime-toggle">
-                            <div class="form-check form-switch">
-                                <input class="form-check-input" type="checkbox" role="switch" id="transmit" aria-describedby="transmitAvailabilityHint operationControlHint">
-                                <label class="form-check-label" for="transmit">Transmit enabled</label>
-                            </div>
-                            <?php require __DIR__ . '/local-wtp-control.php'; ?>
-                            <div id="transmitAvailabilityHint" class="form-text mt-2" aria-live="polite" aria-atomic="true" hidden></div>
-                        </div>
-
-                        <button
-                            type="button"
-                            class="btn btn-danger operation-stop-button"
-                            id="stop_transmit"
-                            aria-describedby="operationControlHint"
-                            disabled>
-                            Stop transmission
-                        </button>
-
-                        <div id="operationRecoveryActions" class="operation-recovery" hidden>
-                            <div class="operation-recovery__actions">
-                                <button type="button" class="btn btn-outline-primary operation-recovery__action" id="operationRetryButton">
-                                    Retry now
-                                </button>
-                                <a class="btn btn-outline-secondary operation-recovery__action" id="operationSetupButton" href="index.php?page=config" hidden>
-                                    Open Setup
-                                </a>
-                            </div>
-                            <div id="operationRecoveryHint" class="operation-recovery__hint" aria-live="polite" aria-atomic="true"></div>
-                        </div>
-                    </div>
                 </section>
 
                 <section class="operation-summary-grid" aria-label="Runtime summary">

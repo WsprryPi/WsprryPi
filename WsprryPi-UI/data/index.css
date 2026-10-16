@@ -132,7 +132,7 @@
 }
 
 #configTabs .nav-link:not(.active) {
-    color: color-mix(in srgb, var(--bs-secondary-color) 88%, transparent);
+    color: var(--bs-body-color);
     background-color: color-mix(in srgb, var(--bs-body-bg) 94%, transparent);
 }
 
@@ -154,6 +154,7 @@
 }
 
 #configTabs .nav-link.active {
+    color: var(--bs-primary-text-emphasis);
     background-color: color-mix(in srgb, var(--bs-body-bg) 90%, var(--bs-secondary-bg) 10%);
     border-color: color-mix(in srgb, var(--bs-border-color) 88%, transparent);
 }
@@ -367,7 +368,7 @@
     min-width: 0;
     margin: 0;
     padding: 0.45rem 1rem;
-    color: color-mix(in srgb, var(--bs-secondary-color) 88%, transparent);
+    color: var(--bs-body-color);
     background-color: transparent;
     border: 0;
     border-radius: 999px;
@@ -1349,10 +1350,10 @@ legend {
 /* Keep GPIO20 readable beside the validation icon and dropdown arrow. */
 .rp1-route-control-row .form-select { flex: 0 0 11rem; width: 11rem; }
 .rp1-route-state { padding: .3rem .65rem; font-family: var(--font-display); font-weight: var(--weight-semibold); border: 1px solid var(--bs-border-color); border-radius: 999px; white-space: nowrap; }
-.rp1-route-state[data-state="active"], .rp1-route-state[data-state="runtime_ready"], .rp1-route-state[data-state="runtime_neutral"], .rp1-route-state[data-state="output_inhibited_validated"] { color: var(--wspr-state-success); }
-.rp1-route-state[data-state="checking"], .rp1-route-state[data-state="applying"], .rp1-route-state[data-state="rollback"] { color: rgb(var(--wspr-accent-rgb)); }
-.rp1-route-state[data-state="reboot_required"], .rp1-route-state[data-state="staged"], .rp1-route-state[data-state="runtime_unsaved"], .rp1-route-state[data-state="runtime_switch_queued"], .rp1-route-state[data-state="runtime_recovery_queued"], .rp1-route-state[data-state="runtime_restoring"], .rp1-route-state[data-state="runtime_unknown"], .rp1-route-state[data-state="compatible_unqualified"] { color: var(--wspr-state-warning); }
-.rp1-route-state[data-state="mismatch"], .rp1-route-state[data-state="unavailable"], .rp1-route-state[data-state="rollback_required"], .rp1-route-state[data-state="runtime_preflight_failed"], .rp1-route-state[data-state="runtime_restoration_failed"], .rp1-route-state[data-state="runtime_recovery"] { color: var(--wspr-state-danger); }
+.rp1-route-state[data-state="active"], .rp1-route-state[data-state="runtime_ready"], .rp1-route-state[data-state="runtime_neutral"], .rp1-route-state[data-state="output_inhibited_validated"] { color: var(--bs-success-text-emphasis); }
+.rp1-route-state[data-state="checking"], .rp1-route-state[data-state="applying"], .rp1-route-state[data-state="rollback"] { color: var(--bs-primary-text-emphasis); }
+.rp1-route-state[data-state="reboot_required"], .rp1-route-state[data-state="staged"], .rp1-route-state[data-state="runtime_unsaved"], .rp1-route-state[data-state="runtime_switch_queued"], .rp1-route-state[data-state="runtime_recovery_queued"], .rp1-route-state[data-state="runtime_restoring"], .rp1-route-state[data-state="runtime_unknown"], .rp1-route-state[data-state="compatible_unqualified"] { color: var(--bs-warning-text-emphasis); }
+.rp1-route-state[data-state="mismatch"], .rp1-route-state[data-state="unavailable"], .rp1-route-state[data-state="rollback_required"], .rp1-route-state[data-state="runtime_preflight_failed"], .rp1-route-state[data-state="runtime_restoration_failed"], .rp1-route-state[data-state="runtime_recovery"] { color: var(--bs-danger-text-emphasis); }
 .rp1-route-progress-heading { display: flex; align-items: center; justify-content: space-between; gap: .75rem; margin-bottom: 1rem; }
 .rp1-route-progress-retry { color: var(--bs-secondary-color); font-size: var(--text-caption); text-align: end; }
 .rp1-route-identities { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: .75rem; margin: 1rem 0; }

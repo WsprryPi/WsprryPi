@@ -24,7 +24,7 @@ require __DIR__ . '/../card_header.php';
                 <section class="maintenance-recovery" aria-label="Recovery actions">
                     <div class="maintenance-recovery__grid">
                         <section class="maintenance-pane maintenance-pane--primary">
-                            <h3 class="maintenance-pane__title h5 mb-0">Repair configuration</h3>
+                            <h2 class="maintenance-pane__title h5 mb-0">Repair configuration</h2>
                             <p class="maintenance-pane__body mb-0">
                                 Check the current configuration for missing or invalid values and repair what can be repaired while preserving usable settings.
                             </p>
@@ -53,7 +53,7 @@ require __DIR__ . '/../card_header.php';
                         </section>
 
                         <section class="maintenance-pane maintenance-pane--danger">
-                            <h3 class="maintenance-pane__title h5 mb-0">Reset to stock defaults</h3>
+                            <h2 class="maintenance-pane__title h5 mb-0">Reset to stock defaults</h2>
                             <p class="maintenance-pane__body mb-0">
                                 Replace the current configuration with the stock baseline when the existing settings are no longer trustworthy.
                             </p>

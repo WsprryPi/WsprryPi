@@ -4212,6 +4212,17 @@ function updateCallsign(forceCallsign) {
     }
 }
 
+function renderUpdateCheckVersionUnavailable() {
+    if (isUpdateCheckDisabled()) {
+        renderUpdateCheckPanelDisabled();
+    } else {
+        renderUpdateCheckPanelFailure({
+            code: "local_version_unavailable",
+            message: "The current application version is unavailable. Retry Check now after the controller reconnects."
+        });
+    }
+}
+
 function updateWsprryPiVersion() {
     let versionElement = document.getElementById("versionText");
 
@@ -4231,6 +4242,7 @@ function updateWsprryPiVersion() {
                 versionElement.textContent = "Service unavailable";
                 versionElement.removeAttribute("title");
                 clearWsprryPiUpdateFooter();
+                renderUpdateCheckVersionUnavailable();
                 debugConsole("error", "Invalid JSON format from version.");
             }
             syncFixedChromeOffsets();
@@ -4239,6 +4251,7 @@ function updateWsprryPiVersion() {
             versionElement.textContent = "Service unavailable";
             versionElement.removeAttribute("title");
             clearWsprryPiUpdateFooter();
+            renderUpdateCheckVersionUnavailable();
 
             debugConsole(
                 "error",
@@ -7198,8 +7211,12 @@ function clickTestTone(e) {
     initializeTestToneSelectionControls();
     updateTestToneFrequencyContext();
     const modalEl = document.getElementById("testToneModal");
-    const modal = new bootstrap.Modal(modalEl);
-    modal.show();
+    const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+    modalEl.addEventListener("hidden.bs.modal", () => {
+        toggleButtonLoading(btn, false);
+        if (btn.isConnected) btn.focus();
+    }, { once: true });
+    modal.show(btn);
 }
 
 function onTestToneStart(e) {

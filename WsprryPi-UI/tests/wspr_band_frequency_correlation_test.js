@@ -119,6 +119,15 @@ function element(initial = {}) {
         offsetWidth: 120,
         classList: classList(),
         handlers: Object.create(null),
+        domListeners: Object.create(null),
+        addEventListener(type, callback, options = {}) {
+            (this.domListeners[type] ||= []).push({ callback, once: options.once === true });
+        },
+        dispatchEvent(event) {
+            const listeners = this.domListeners[event.type] || [];
+            this.domListeners[event.type] = listeners.filter(listener => !listener.once);
+            for (const listener of listeners) listener.callback.call(this, event);
+        },
         setAttribute(name, value) {
             this[name] = String(value);
         },

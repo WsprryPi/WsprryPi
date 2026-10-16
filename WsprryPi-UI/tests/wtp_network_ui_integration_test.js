@@ -138,7 +138,7 @@ async function main() {
         fs.writeFileSync(path.join(output, name), Buffer.from(shot.data, 'base64'));
     };
     try {
-        php = spawnFixtureChild('php', ['-S', `127.0.0.1:${phpPort}`, '-t', 'data'], { cwd: UI_ROOT });
+        php = spawnFixtureChild('php', ['-S', `127.0.0.1:${phpPort}`, '-t', 'data', 'tests/browser_fixture_router.php'], { cwd: UI_ROOT });
         await waitForSpawn(php);
         await waitFor(async () => await getStatus(url) === 200, 'PHP fixture');
         chrome = spawnIsolatedProcess(process.env.CHROME_BIN || (process.platform === 'darwin' ? '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome' : 'chromium'),

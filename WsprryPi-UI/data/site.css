@@ -40,6 +40,59 @@
     --wspr-state-active: #d0b171;
 }
 
+/* Zephyr's light button colors need theme-aware text on neutral panels. */
+.btn-outline-primary {
+    --bs-btn-color: var(--bs-primary-text-emphasis);
+    --bs-btn-border-color: var(--bs-primary-text-emphasis);
+}
+
+.btn-outline-secondary {
+    --bs-btn-color: var(--bs-body-color);
+    --bs-btn-border-color: var(--bs-secondary-color);
+    --bs-btn-hover-color: var(--bs-body-color);
+    --bs-btn-hover-bg: var(--bs-secondary-bg);
+    --bs-btn-hover-border-color: var(--bs-body-color);
+    --bs-btn-active-color: var(--bs-body-color);
+    --bs-btn-active-bg: var(--bs-secondary-bg);
+    --bs-btn-active-border-color: var(--bs-body-color);
+    color: var(--bs-btn-color);
+    border-color: var(--bs-btn-border-color);
+}
+
+.btn-outline-secondary:hover,
+.btn-outline-secondary:active {
+    color: var(--bs-btn-hover-color);
+    background-color: var(--bs-btn-hover-bg);
+    border-color: var(--bs-btn-hover-border-color);
+}
+
+.btn-warning,
+.btn-outline-warning {
+    --bs-btn-hover-color: #212529;
+    --bs-btn-active-color: #212529;
+}
+
+.btn-warning {
+    --bs-btn-color: #212529;
+}
+
+.btn-outline-warning {
+    --bs-btn-color: var(--bs-warning-text-emphasis);
+    --bs-btn-border-color: var(--bs-warning-text-emphasis);
+}
+
+.btn-outline-danger {
+    --bs-btn-color: var(--bs-danger-text-emphasis);
+    --bs-btn-border-color: var(--bs-danger-text-emphasis);
+}
+
+.btn-outline-success {
+    --bs-btn-color: var(--bs-success-text-emphasis);
+    --bs-btn-border-color: var(--bs-success-text-emphasis);
+    --bs-btn-hover-color: #000;
+    --bs-btn-active-color: #000;
+}
+
 /* Connection indicator */
 #fleet-output-list .btn:disabled {
     color: var(--bs-secondary-color);
@@ -79,7 +132,7 @@
 }
 
 .navbar-dark {
-    --bs-navbar-color: rgba(var(--wspr-accent-text-rgb), 0.8);
+    --bs-navbar-color: rgba(var(--wspr-accent-text-rgb), 0.85);
     --bs-navbar-hover-color: rgba(var(--wspr-accent-text-rgb), 0.96);
     --bs-navbar-active-color: rgb(var(--wspr-accent-text-rgb));
     --bs-navbar-brand-color: rgb(var(--wspr-accent-text-rgb));
@@ -344,6 +397,13 @@ legend {
 .form-select:focus-visible,
 .form-check-input:focus-visible {
     box-shadow: var(--focus-ring);
+    outline: 2px solid var(--bs-emphasis-color);
+    outline-offset: 2px;
+}
+
+.navbar-toggler:focus-visible,
+.navbar-nav .nav-link:focus-visible {
+    outline-color: rgb(var(--wspr-accent-text-rgb));
 }
 
 .page-shell {
@@ -412,7 +472,7 @@ legend {
     flex-wrap: nowrap;
     gap: 0.15rem;
     padding: 0.5rem 0.8rem;
-    color: rgba(var(--wspr-accent-text-rgb), 0.8);
+    color: rgba(var(--wspr-accent-text-rgb), 0.85);
     border: 1px solid transparent;
     border-radius: 0.65rem;
     transition: background-color 120ms ease-in-out, border-color 120ms ease-in-out,
@@ -468,6 +528,7 @@ legend {
     justify-self: end;
     display: inline-grid;
     grid-auto-flow: column;
+    grid-template-columns: auto minmax(0, 1fr);
     align-items: center;
     gap: 0.45rem;
     padding: 0.45rem 0.75rem;
@@ -494,8 +555,8 @@ legend {
     font-size: var(--text-caption);
     font-weight: var(--weight-medium);
     line-height: 1.2;
-    overflow-wrap: normal;
-    white-space: nowrap;
+    overflow-wrap: anywhere;
+    white-space: normal;
 }
 
 #mainNavbar .container {
@@ -548,6 +609,11 @@ legend {
 }
 
 @media (max-width: 991.98px) {
+    #mainNavbar {
+        max-height: 100dvh;
+        overflow-y: auto;
+    }
+
     .navbar-brand-app {
         min-width: 0;
         flex: 1 1 auto;
@@ -676,6 +742,8 @@ legend {
 ------------------------------------------------------------ */
 .group-wrapper {
     gap: 0.5rem 0.75rem;
+    min-width: 0;
+    max-width: 100%;
 }
 
 .icons-wrapper {
@@ -706,13 +774,14 @@ legend {
 .times-wrapper {
     display: grid;
     gap: 0.1rem;
-    min-width: max-content;
+    min-width: 0;
+    max-width: 100%;
 }
 
 .times-wrapper .time-line {
     font-size: var(--text-caption);
     margin-bottom: 0.1rem;
-    flex-wrap: nowrap;
+    flex-wrap: wrap;
     justify-content: flex-end;
 }
 
@@ -790,15 +859,20 @@ legend {
         --bs-navbar-padding-y: 0.5rem;
     }
 
+    #mainNavbar .container {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        grid-template-areas: "copy toggle" "status status" "navigation navigation";
+        gap: 0.35rem 0.75rem;
+    }
+
     .navbar-brand-app {
-        max-width: calc(100vw - 5.75rem);
-        grid-template-columns: minmax(0, 1fr);
-        grid-template-areas:
-            "copy"
-            "status";
-        align-items: start;
-        row-gap: 0.35rem;
-        margin-right: 0.75rem;
+        display: contents;
+    }
+
+    #mainNav {
+        grid-area: navigation;
+        width: 100%;
     }
 
     .navbar-title {
@@ -811,9 +885,11 @@ legend {
         justify-self: start;
         margin-inline-start: 0;
         padding: 0.35rem 0.6rem;
+        white-space: normal;
     }
 
     .navbar-toggler {
+        grid-area: toggle;
         flex: 0 0 auto;
         margin-left: 0;
     }
@@ -837,7 +913,11 @@ legend {
     }
 
     .times-wrapper .time-label {
-        min-width: 5.75rem;
+        min-width: 0;
+    }
+
+    .times-wrapper .time-value {
+        min-width: 0;
     }
 }
 
@@ -1045,9 +1125,11 @@ footer .container {
     }
 
     .footer-meta__panel {
-        right: 0.5rem;
-        left: 0.5rem;
+        right: 0;
+        left: auto;
+        width: min(22rem, calc(100vw - 1.5rem));
         min-width: 0;
+        overflow-wrap: anywhere;
     }
 
     .footer-version-value {

@@ -95,6 +95,7 @@ jobs:
         run: |
           node tests/wtp_network_ui_integration_test.js
           node tests/wtp_pi_fleet_ui_integration_test.js
+          WSPRRYPI_RUN_RECOVERY_BROWSER=1 node tests/wtp_recovery_ui_integration_test.js
 
   wtp-configuration-legacy:
     runs-on: ubuntu-24.04

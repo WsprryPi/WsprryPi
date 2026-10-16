@@ -31,7 +31,7 @@ $bandGpioBands = ['2200m', '630m', '160m', '80m', '60m', '40m', '30m', '20m', '1
                     </div>
                 </div>
 
-                <ul class="nav nav-tabs card-header-tabs" id="configTabs" role="tablist" aria-describedby="config-tabs-hint" data-persist-tab-state="true" data-persist-tab-state-scope="reload" data-persist-tab-query-param="setup_tab">
+                <ul class="nav nav-tabs card-header-tabs" id="configTabs" role="tablist" aria-label="Setup sections" data-persist-tab-state="true" data-persist-tab-state-scope="reload" data-persist-tab-query-param="setup_tab">
                     <li class="nav-item" role="presentation">
                         <button
                             class="nav-link active"

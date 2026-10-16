@@ -700,7 +700,7 @@ async function browserTest() {
 async function main() {
     const phpPort = await freePort();
     const debugPort = await freePort();
-    const php = spawn("php", ["-S", `127.0.0.1:${phpPort}`, "-t", "data"], {
+    const php = spawn("php", ["-S", `127.0.0.1:${phpPort}`, "-t", "data", "tests/browser_fixture_router.php"], {
         cwd: UI_ROOT,
         stdio: "ignore",
     });

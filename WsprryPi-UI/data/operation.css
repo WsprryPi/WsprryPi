@@ -7,6 +7,7 @@
     display: grid;
     gap: 1.2rem 1.5rem;
     grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr) minmax(16rem, 0.8fr);
+    grid-template-areas: "state reboot controls";
     align-items: stretch;
 }
 
@@ -85,7 +86,7 @@
 
 .operation-hero__state-value[data-state="warning"],
 .operation-hero__state-value[data-state="setup"] {
-    color: color-mix(in srgb, var(--bs-warning) 76%, var(--bs-body-color) 24%);
+    color: var(--bs-warning-text-emphasis);
 }
 
 .operation-hero__state-value[data-state="degraded"],
@@ -104,6 +105,7 @@
 }
 
 .operation-hero__controls {
+    grid-area: controls;
     display: grid;
     gap: 0.85rem;
     align-content: start;
@@ -111,10 +113,12 @@
 }
 
 .operation-hero__status {
+    grid-area: state;
     padding-block: 1.2rem 1.25rem;
 }
 
 .operation-hero__reboot {
+    grid-area: reboot;
     display: grid;
     gap: 0.85rem;
     align-content: start;
@@ -294,6 +298,10 @@
 }
 
 @media (max-width: 991.98px) {
+    .operation-hero {
+        grid-template-areas: "state" "controls" "reboot";
+    }
+
     .operation-hero,
     .operation-nav-panel {
         grid-template-columns: minmax(0, 1fr);

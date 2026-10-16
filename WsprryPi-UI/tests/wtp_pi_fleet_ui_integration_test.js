@@ -102,7 +102,7 @@ class CdpClient {
 async function main() {
     const fs = require('node:fs');
     const phpPort = await freePort(), debugPort = await freePort();
-    const php = spawn('php', ['-S', `127.0.0.1:${phpPort}`, '-t', 'data'], {cwd: UI_ROOT, stdio: 'ignore'});
+    const php = spawn('php', ['-S', `127.0.0.1:${phpPort}`, '-t', 'data', 'tests/browser_fixture_router.php'], {cwd: UI_ROOT, stdio: 'ignore'});
     const base = `http://127.0.0.1:${phpPort}/index.php`;
     const profileDir = `/tmp/wsprrypi-pi-fleet-ui-${process.pid}`;
     const output = path.resolve(UI_ROOT, '../src/build/wtp-pi/ui');

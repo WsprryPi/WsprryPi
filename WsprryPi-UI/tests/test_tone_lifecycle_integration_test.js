@@ -235,8 +235,14 @@ async function main() {
     const evidence = process.env.TEST_TONE_EVIDENCE_DIR || "/tmp/wsprrypi-tone-ui-evidence";
     fs.mkdirSync(evidence, { recursive: true });
     let chromium, client, php, failure;
+    let escapedRequests = 0;
+    const sentinel = http.createServer((request, response) => {
+        escapedRequests += 1;
+        response.end("No real application is attached to this sentinel.");
+    });
     try {
-        php = spawnFixtureChild("php", ["-S", `127.0.0.1:${phpPort}`, "-t", "data"], { cwd: UI_ROOT });
+        await new Promise(resolve => sentinel.listen(0, "127.0.0.1", resolve));
+        php = spawnFixtureChild("php", ["-S", `127.0.0.1:${phpPort}`, "-t", "data", "tests/browser_fixture_router.php"], { cwd: UI_ROOT });
         await waitForSpawn(php);
         await waitFor(async () => await getStatus(`http://127.0.0.1:${phpPort}/index.php?page=maintenance`) === 200, "PHP fixture");
         chromium = spawnIsolatedProcess(process.env.CHROME_BIN || (process.platform === "darwin" ? "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" : "chromium"),
@@ -256,6 +262,25 @@ async function main() {
             const r = await client.send("Runtime.evaluate", { expression: "typeof onTestToneStart === 'function' && typeof bootstrap === 'object' && document.readyState === 'complete'", returnByValue: true });
             return r.result.value;
         }, "Maintenance scripts");
+        // Prove the browser enforces isolation before installing in-memory
+        // workflow mocks. The foreign port is an owned harmless sentinel.
+        const isolation = await client.send("Runtime.evaluate", { expression: `(async () => {
+            const foreign = 'http://127.0.0.1:${sentinel.address().port}/config';
+            const fetchBlocked = await fetch(foreign).then(() => false, () => true);
+            const xhrBlocked = await new Promise(resolve => {
+                const request = new XMLHttpRequest();
+                request.onerror = () => resolve(true); request.onload = () => resolve(false);
+                request.open('GET', foreign); request.send();
+            });
+            return {fetchBlocked, xhrBlocked, config: (await fetch('/config')).status,
+                logs: (await fetch('/log_stream.php')).status,
+                spots: (await fetch('/fetch_spots.php')).status};
+        })()`, awaitPromise: true, returnByValue: true });
+        assert.ok(!isolation.exceptionDetails, JSON.stringify(isolation.exceptionDetails));
+        assert.deepEqual(isolation.result.value,
+            {fetchBlocked: true, xhrBlocked: true, config: 503, logs: 503, spots: 503});
+        assert.equal(escapedRequests, 0, "no request reaches the other-port application sentinel");
+        console.log("Browser fixture isolation: CSP blocks direct fallback; application, journal and spot endpoints refuse execution");
         const run = await client.send("Runtime.evaluate", { expression: `(${browserTest.toString()})()`, awaitPromise: true, returnByValue: true });
         if (run.exceptionDetails) throw new Error(run.exceptionDetails.exception?.description || run.exceptionDetails.text);
         assert.deepEqual(run.result.value, { assertions: "passed", workflows: 17 });
@@ -307,6 +332,7 @@ async function main() {
         fs.writeFileSync(path.join(evidence, "dark-mobile-200-percent.png"), Buffer.from(shot.data, "base64"));
         fs.writeFileSync(path.join(evidence, "measurements.json"), JSON.stringify({ run: run.result.value, measurements, textZoom: zoom.result.value }, null, 2));
         console.log(`Test Tone browser: 17 workflows passed; 21 screenshots in ${evidence}`);
+        await require("./integrated_review_browser.js").reviewIntegratedUi(client, `http://127.0.0.1:${phpPort}`, path.join(evidence, "integrated"));
     } catch (error) { failure = error; }
     finally {
         const errors = failure ? [failure] : [];
@@ -314,6 +340,7 @@ async function main() {
             await Promise.race([client.send("Browser.close").catch(() => {}), new Promise(resolve => setTimeout(resolve, 1000))]);
         }
         for (const cleanup of [() => client?.close(), () => stopIsolatedProcess(chromium), () => stopChild(php),
+            () => new Promise((resolve, reject) => sentinel.close(error => error ? reject(error) : resolve())),
             () => fs.rmSync(profileDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })]) {
             try { await cleanup(); } catch (error) { if (!errors.includes(error)) errors.push(error); }
         }

@@ -57,12 +57,18 @@
     padding: 0.5rem 1rem;
 }
 
-/* Top-left overlay controls inside the black log pane (not the header). */
+.logs-control-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    margin-bottom: 0.75rem;
+}
+
+/* Controls occupy their own row so streamed records never sit underneath. */
 #logs-overlay-controls {
-    position: absolute;
-    top: 12px;
-    left: 12px;
-    z-index: 13;
+    order: -1;
     display: inline-flex;
     flex-wrap: wrap;
     gap: 8px;
@@ -98,16 +104,11 @@
     font-weight: var(--weight-semibold);
     line-height: 1.2;
 
-    background-color: color-mix(in srgb, var(--logs-surface) 94%, var(--bs-secondary-bg) 6%);
     box-shadow: none;
 }
 
 /* SSE status badge (top-right overlay). */
 #sse-status-badge {
-    position: absolute;
-    top: 12px;
-    right: 12px;
-    z-index: 12;
     min-height: 2rem;
     padding: 0.3rem 0.75rem;
     border-radius: 999px;
@@ -172,7 +173,7 @@
 .logs-empty-state {
     display: grid;
     gap: 0.4rem;
-    padding: 5.5rem 1.25rem 2rem;
+    padding: 1.25rem 1.25rem 2rem;
     color: var(--logs-muted);
     justify-items: start;
 }
@@ -283,22 +284,15 @@
     }
 
     #logs-overlay-controls {
-        top: 0.75rem;
-        left: 0.75rem;
-        right: 0.75rem;
+        width: 100%;
         display: grid;
-        grid-template-columns: repeat(2, minmax(0, 1fr));
+        grid-template-columns: repeat(auto-fit, minmax(min(100%, 9rem), 1fr));
     }
 
     #logs-overlay-controls .btn,
     .logs-jump-bottom {
+        min-width: 0;
         width: 100%;
-    }
-
-    #sse-status-badge {
-        top: auto;
-        right: 0.75rem;
-        bottom: 0.75rem;
     }
 
     .logs-jump-bottom {

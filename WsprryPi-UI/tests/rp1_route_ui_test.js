@@ -45,7 +45,7 @@ assert.match(script,/window\.confirm/);
 assert.match(script,/wsprrypi\.service and soapyremote-server\.service/);
 assert.match(header,/'rp1RoutePath' => \$basePath \. '\/api\/rp1-gpclk-route'/);
 assert.match(styles,/@media \(max-width: 575\.98px\)[\s\S]*\.rp1-route-actions > \.btn/);
-assert.match(styles,/runtime_preflight_failed[^}]*--wspr-state-danger/);
+assert.match(styles,/runtime_preflight_failed[^}]*--bs-danger-text-emphasis/);
 console.log("rp1_route_ui_test passed");
 
 // Execute the real controller without a browser or external dependencies.
