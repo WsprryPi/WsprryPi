@@ -265,7 +265,9 @@ async function main() {
             assert.match(await evaluate('document.getElementById("wtp-member-station-feedback").textContent'),scenario==='type2'?/Type 2/:scenario==='type3'?/Type 3/:/ambiguous/);
             for (const theme of ['light','dark']) for(const viewport of [{name:'desktop',width:1440,height:1100},{name:'mobile',width:390,height:844}]) {
               await client.send('Emulation.setDeviceMetricsOverride',{...viewport,deviceScaleFactor:1,mobile:viewport.name==='mobile'});
-              await evaluate(`applyThemePreference('${theme}');document.getElementById('wtp-member-callsign').scrollIntoView({block:'start',behavior:'instant'});window.scrollBy(0,-160);new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)))`);
+              await evaluate(`applyThemePreference('${theme}');new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)))`);
+              await evaluate(`document.getElementById('wtp-member-callsign').scrollIntoView({block:'start',behavior:'instant'});window.scrollBy(0,-160);new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)))`);
+              assert(await evaluate('document.getElementById("wtp-member-callsign").getBoundingClientRect().top>=100 && document.getElementById("wtp-member-station-feedback").getBoundingClientRect().top<innerHeight'),'station capture framing');
               assert(await evaluate('document.documentElement.scrollWidth<=innerWidth+1'),'WSPR plan feedback overflow');
               await capture(`${viewport.name}-${theme}-wspr-${scenario}.png`);
             }
