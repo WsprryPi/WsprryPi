@@ -11,16 +11,17 @@ function browser(exchange, producer = source) {
   const fields = new Map(), requests = [];
   const element = id => {
     if (!fields.has(id)) fields.set(id, {value:'',checked:false,disabled:false,hidden:false,textContent:'',listeners:{},
-      dataset:{wtpResource:['wtp-member-callsign','wtp-member-locator','wtp-member-power'].includes(id)?'station':'hardware'}, setAttribute(){},addEventListener(name,callback){this.listeners[name]=callback;}});
+      replaceChildren(...children){this.options=children;this.value=children[0]?.value || "";},dataset:{wtpResource:['wtp-member-callsign','wtp-member-locator','wtp-member-power'].includes(id)?'station':'hardware'}, setAttribute(){},addEventListener(name,callback){this.listeners[name]=callback;}});
     return fields.get(id);
   };
-  const root = {document:{readyState:'complete',getElementById:element,querySelectorAll:selector=>selector==='[data-wtp-resource]' ? [...fields.entries()].filter(([id])=>/^wtp-member-(callsign|locator|power|rf|button|indicator|indicator-gp|polarity)$/.test(id)).map(([,e])=>e) : []},
+  class Option {constructor(text,value){this.textContent=text;this.value=value;}}
+  const root = {Option,confirm:()=>true,document:{readyState:'complete',getElementById:element,querySelectorAll:selector=>selector==='[data-wtp-resource]' ? [...fields.entries()].filter(([id])=>/^wtp-member-(callsign|locator|power|rf|button|indicator|indicator-gp|polarity)$/.test(id)).map(([,e])=>e) : []},
     WtpUi:{developmentControlsVisible:true,read:()=>({Transport:'network'})}, AbortController,setTimeout,clearTimeout,
     fetch:async (url, options) => {
       const request = {url,...options,body:options.body ? JSON.parse(options.body) : null};
       if (!(url.endsWith('/member/management') && (!options.method || options.method === 'GET'))) requests.push(request);
       if (url.endsWith('/member/management') && (!options.method || options.method === 'GET'))
-        return response({carrier:'engineering_mtls',host:'',connected:false});
+        return response(root.managementState || {carrier:'engineering_mtls',host:'',connected:false,selection_id:'f'.repeat(32),session:null});
       return exchange(request);
     }};
   root.window=root; vm.runInNewContext(producer,root);

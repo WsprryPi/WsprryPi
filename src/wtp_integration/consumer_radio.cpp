@@ -98,6 +98,15 @@ std::array<unsigned char, 32> hash(std::span<const unsigned char> bytes) {
           count == 32);
   return result;
 }
+std::string recovery_selector(const std::string &device, const std::string &boot,
+                              std::span<const unsigned char,16> session) {
+  constexpr char domain[] = "WsprryPico/Consumer-Recovery/1/selector";
+  Bytes bytes(domain,domain+sizeof(domain));
+  for (const auto &part : {unhex(device,16),unhex(boot,16),Bytes(session.begin(),session.end())})
+    bytes.insert(bytes.end(),part.begin(),part.end());
+  const auto digest=hash(bytes);
+  return hex(std::span(digest).first(16));
+}
 void derive(std::span<const unsigned char> secret,
             std::span<const unsigned char> salt, std::string_view info,
             std::span<unsigned char> output) {
@@ -298,8 +307,12 @@ std::optional<std::string> ConsumerRadioClient::open(std::string_view packet,
 PicoHttpResponse ConsumerRadioClient::login(const std::string &device,
                                             const std::string &carrier,
                                             std::string_view password) {
-  if (active())
-    return error(409, "management_session_already_selected");
+  return handshake(device,carrier,password,Json{});
+}
+PicoHttpResponse ConsumerRadioClient::handshake(const std::string &device,
+    const std::string &carrier, std::string_view password, const Json &recovery) {
+  const bool retiring = !recovery.is_null();
+  if (active()) return error(409, "management_session_already_selected");
   clear();
   try {
     require(hex_id(device) &&
@@ -323,6 +336,7 @@ PicoHttpResponse ConsumerRadioClient::login(const std::string &device,
     require(hex_id(boot_));
     const auto gen = decimal(identity["generation"]);
     generation_ = identity["generation"];
+    if (retiring) require(recovery.at("expected_boot") == boot_ && recovery.at("expected_generation") == generation_);
     std::unique_ptr<EVP_PKEY_CTX, decltype(&EVP_PKEY_CTX_free)> maker(
         EVP_PKEY_CTX_new_id(EVP_PKEY_X25519, nullptr), EVP_PKEY_CTX_free);
     EVP_PKEY *raw = nullptr;
@@ -338,7 +352,8 @@ PicoHttpResponse ConsumerRadioClient::login(const std::string &device,
     Json start = {{"version", 1},           {"device_id", device_},
                   {"boot_id", boot_},       {"generation", generation_},
                   {"public_key", b64(pub)}, {"nonce", hex(nonce)}};
-    r = transport_("/api/consumer/v1/start", "POST", start.dump(),
+    if (retiring) start["target_selector"] = recovery.at("target_selector");
+    r = transport_(retiring ? "/api/consumer/v1/recovery/start" : "/api/consumer/v1/start", "POST", start.dump(),
                    "application/json");
     if ((r.status == 409 || r.status == 429) && r.body.size() <= 256 &&
         r.media_type == "application/json") {
@@ -346,8 +361,8 @@ PicoHttpResponse ConsumerRadioClient::login(const std::string &device,
                             .value("error", Json::object()).value("code", "");
       if ((r.status == 409 && (code == "radio_session_busy" ||
                               code == "radio_session_capacity" ||
-                              code == "radio_login_pending")) ||
-          (r.status == 429 && code == "radio_login_rate_limited")) {
+                              code == "radio_login_pending" || code == "radio_recovery_pending")) ||
+          (r.status == 429 && (code == "radio_login_rate_limited" || code == "radio_recovery_rate_limited"))) {
         clear();
         return error(r.status, code.c_str());
       }
@@ -355,17 +370,24 @@ PicoHttpResponse ConsumerRadioClient::login(const std::string &device,
     require(r.status == 200 && r.body.size() <= 1024 &&
             r.media_type == "application/json");
     const auto answer = strict_browser_json(r.body);
+    auto shape = answer;
+    if (retiring) {
+      auto wire_scope = recovery; wire_scope.erase("expected_boot"); wire_scope.erase("expected_generation");
+      require(answer.contains("recovery") && answer["recovery"] == wire_scope);
+      shape.erase("recovery");
+    }
     require(
-        fields(answer, {"version", "device_id", "boot_id", "generation",
+        fields(shape, {"version", "device_id", "boot_id", "generation",
                         "session_id", "public_key", "challenge", "login_ms"}) &&
         answer["version"].is_number_integer() && answer["version"] == 1 &&
         answer["device_id"] == device_ && answer["boot_id"] == boot_ &&
         answer["generation"] == generation_ &&
-        answer["login_ms"].is_number_integer() && answer["login_ms"] == 30000);
+        answer["login_ms"].is_number_integer() && answer["login_ms"] == (retiring ? 5000 : 30000));
     const auto sid = unhex(answer["session_id"], 16),
                challenge = unhex(answer["challenge"], 16),
                peer = unb64(answer["public_key"]);
     std::copy(sid.begin(), sid.end(), session_.begin());
+    if (!retiring) lost_session_ = Json{{"selector",recovery_selector(device_,boot_,session_)},{"device_id",device_},{"boot_id",boot_},{"generation",generation_}};
     constexpr char domain[] = "WsprryPico/Consumer-Radio/1";
     Bytes transcript(domain, domain + sizeof(domain));
     for (const auto &part : {unhex(device_, 16), unhex(boot_, 16), sid})
@@ -375,6 +397,17 @@ PicoHttpResponse ConsumerRadioClient::login(const std::string &device,
     for (const auto &part : {Bytes(pub.begin(), pub.end()), peer, challenge,
                              Bytes(nonce.begin(), nonce.end())})
       transcript.insert(transcript.end(), part.begin(), part.end());
+    if (retiring) {
+      auto context = unhex(recovery.at("target_selector"),16);
+      const auto authority = recovery.at("authority").get<std::string>();
+      context.push_back(carrier == "consumer_ap" ? 1 : 2);
+      context.push_back(static_cast<unsigned char>(authority.size()));
+      context.insert(context.end(),authority.begin(),authority.end());
+      const auto scope = hash(context);
+      constexpr char recovery_domain[] = "WsprryPico/Consumer-Recovery/1";
+      transcript.insert(transcript.end(),recovery_domain,recovery_domain+sizeof(recovery_domain));
+      transcript.insert(transcript.end(),scope.begin(),scope.end());
+    }
     transcript_ = hash(transcript);
     Secrets secrets;
     std::unique_ptr<EVP_PKEY, decltype(&EVP_PKEY_free)> remote(
@@ -403,9 +436,9 @@ PicoHttpResponse ConsumerRadioClient::login(const std::string &device,
            secrets.traffic);
     std::copy_n(secrets.traffic.begin(), 32, request_key_.begin());
     std::copy_n(secrets.traffic.begin() + 32, 32, response_key_.begin());
-    require(clock_() >= before && clock_() - before < 22000);
+    require(clock_() >= before && clock_() - before < (retiring ? 5000U : 22000U));
     r = transport_(
-        "/api/consumer/v1/finish", "POST",
+        retiring ? "/api/consumer/v1/recovery/finish" : "/api/consumer/v1/finish", "POST",
         seal({reinterpret_cast<const char *>(transcript_.data()), 32},
              secrets.login, 0),
         "application/octet-stream");
@@ -414,6 +447,14 @@ PicoHttpResponse ConsumerRadioClient::login(const std::string &device,
     require(plain.has_value());
     auto authenticated = strict_browser_json(*plain);
     wipe(*plain);
+    if (retiring) {
+      require(fields(authenticated,{"retired","present","target_selector","device_id","boot_id"}) &&
+          authenticated["retired"] == true && authenticated["present"].is_boolean() &&
+          authenticated["target_selector"] == recovery.at("target_selector") &&
+          authenticated["device_id"] == device_ && authenticated["boot_id"] == boot_);
+      clear();
+      return {200,authenticated.dump(),{}};
+    }
     require(fields(authenticated, {"authenticated", "device_id", "boot_id"}) &&
             authenticated["authenticated"] == true &&
             authenticated["device_id"] == device_ &&
@@ -438,8 +479,61 @@ PicoHttpResponse ConsumerRadioClient::login(const std::string &device,
             {}};
   } catch (...) {
     clear();
-    return error(401, "consumer_authentication_or_connection_failed");
+    return error(401, retiring ? "consumer_retirement_unconfirmed" : "consumer_authentication_or_connection_failed");
   }
+}
+PicoHttpResponse ConsumerRadioClient::recovery(const std::string &device,
+    const std::string &carrier, const std::string &host) {
+  try {
+    require(hex_id(device) && (carrier == "consumer_ap" || carrier == "consumer_station"));
+    auto r = transport_("/api/consumer/v1/recovery","GET",{},"application/json");
+    if (r.status == 404) return error(409,"consumer_recovery_unsupported");
+    require(r.status == 200 && r.media_type == "application/json" && r.body.size() <= 1024);
+    const auto j = strict_browser_json(r.body);
+    require(fields(j,{"schema","device_id","boot_id","generation","authority","interface","proof_ms","sessions"}) &&
+        j["schema"] == "consumer-recovery/1" && j["device_id"] == device &&
+        hex_id(j.at("boot_id")) && decimal(j.at("generation")) && j["authority"] == host &&
+        j["interface"] == (carrier == "consumer_ap" ? "ap" : "station") &&
+        j["proof_ms"].is_number_integer() && j["proof_ms"] == 5000 &&
+        j["sessions"].is_array() && j["sessions"].size() <= 3);
+    std::vector<std::string> ids;
+    for (const auto &entry : j["sessions"]) {
+      require(fields(entry,{"selector","state"}) && hex_id(entry.at("selector")) &&
+          (entry["state"] == "pending" || entry["state"] == "active"));
+      const auto id = entry["selector"].get<std::string>();
+      require(std::find(ids.begin(),ids.end(),id) == ids.end());ids.push_back(id);
+    }
+    return r;
+  } catch (...) { return error(503,"consumer_recovery_discovery_unconfirmed"); }
+}
+PicoHttpResponse ConsumerRadioClient::retire(const std::string &device,
+    const std::string &carrier, const std::string &host, std::string_view password,
+    const Json &scope) {
+  try {
+    require(fields(scope,{"target_selector","device_id","boot_id","generation"}) &&
+        hex_id(scope.at("target_selector")) && scope["device_id"] == device &&
+        hex_id(scope.at("boot_id")) && decimal(scope.at("generation")) &&
+        password.size() >= 8 && password.size() <= 63 &&
+        std::all_of(password.begin(), password.end(),
+                    [](unsigned char c) { return c >= 32 && c <= 126; }));
+    const auto r = recovery(device,carrier,host);
+    if (r.status != 200) return r;
+    const auto current = strict_browser_json(r.body);
+    require(current["boot_id"] == scope["boot_id"] && current["generation"] == scope["generation"]);
+    // A separate proof preserves ordinary traffic until a complete proof can
+    // be dispatched. Local validation and failed starts cannot retire anything.
+    ConsumerRadioClient proof([&](const auto &path, const auto &method,
+                                  const auto &payload, const auto &media) {
+      if (path == "/api/consumer/v1/recovery/finish" && !device_.empty() &&
+          scope["target_selector"] == recovery_selector(device_, boot_, session_) &&
+          scope["boot_id"] == boot_) clear();
+      return transport_(path, method, payload, media);
+    }, clock_);
+    auto result = proof.handshake(device,carrier,password,Json{{"target_selector",scope["target_selector"]},
+        {"authority",host},{"interface",carrier == "consumer_ap" ? "ap" : "station"},
+        {"expected_boot",scope["boot_id"]},{"expected_generation",scope["generation"]}});
+    return result;
+  } catch (...) { return error(409,"consumer_recovery_context_changed"); }
 }
 PicoHttpResponse ConsumerRadioClient::request(const std::string &resource,
                                               const std::string &method,
@@ -467,6 +561,11 @@ PicoHttpResponse ConsumerRadioClient::request(const std::string &resource,
     return error(413, "body_too_large");
   if (mutation && resource != "consumer/logout" && resource != "pins/validate" && revision.empty())
     return error(428, "revision_required");
+  Json parsed = nullptr;
+  if (mutation) {
+    try { parsed = strict_browser_json(body); }
+    catch (...) { return error(400,"invalid_consumer_request"); }
+  }
   try {
     require(sequence_ != UINT64_MAX);
     const auto seq = sequence_++;
@@ -474,7 +573,7 @@ PicoHttpResponse ConsumerRadioClient::request(const std::string &resource,
         {"method", method},
         {"path", "/api/v1/" + resource},
         {"if_match", revision.empty() ? Json(nullptr) : Json(revision)},
-        {"body", method == "GET" ? Json(nullptr) : strict_browser_json(body)}};
+        {"body", parsed}};
     auto plain = envelope.dump();
     auto packet = seal(plain, request_key_, seq);
     wipe(plain);
@@ -584,7 +683,8 @@ consumer_http_request(PlainTcpStream &stream, TlsStream::Clock clock,
       (method != "GET" && method != "POST") || body.size() > 32768 ||
       (path != "/api/consumer/v1/identity" &&
        path != "/api/consumer/v1/start" && path != "/api/consumer/v1/finish" &&
-       path != "/api/consumer/v1/request"))
+       path != "/api/consumer/v1/request" && path != "/api/consumer/v1/recovery" &&
+       path != "/api/consumer/v1/recovery/start" && path != "/api/consumer/v1/recovery/finish"))
     return error(400, "invalid_consumer_endpoint");
   if (!stream.begin_open(host, 80))
     return error(503, "network_unavailable");

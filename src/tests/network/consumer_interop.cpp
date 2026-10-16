@@ -13,10 +13,15 @@
 #include "wtp_runtime_bridge.hpp"
 #include "privileged_network_policy.hpp"
 #include "protected_browser_fixture.hpp"
+#include "../wtp_backend_peer.hpp"
 #include "wtp_integration/consumer_radio.hpp"
 #include <cassert>
 #include <fstream>
+#include <filesystem>
 #include <iostream>
+#include <map>
+#include <sys/wait.h>
+#include <unistd.h>
 #include <openssl/rand.h>
 #include <random>
 extern "C" mbedtls_ms_time_t mbedtls_ms_time(void) { return 1000; }
@@ -49,8 +54,9 @@ struct Media : pico::provisioning::Media {
   }
 };
 struct Random : pico::provisioning::RandomSource {
+  bool fail=false;
   bool fill(std::span<std::uint8_t> out) override {
-    return RAND_bytes(out.data(), out.size()) == 1;
+    return !fail && RAND_bytes(out.data(), out.size()) == 1;
   }
 };
 struct HostClock : pi::WtpScheduleClock {
@@ -75,15 +81,17 @@ struct NoWtp : pi::wtp::ByteStream {
 };
 struct FixtureEngine : pico::wtp::RfEngine {
   pico::standalone::DryRunEngine dry;
-  bool can_disable=true;
+  bool can_disable=true, failure_report=false, reported_active=false;
   unsigned disables{},prepares{};
   pico::wtp::PrepareResult prepare(const pico::wtp::Job &j) override { ++prepares;return dry.prepare(j); }
   bool schedules_locally() const override { return true; }
   bool schedule(const pico::wtp::Job &j,std::uint64_t n,const pico::wtp::LocalStartConditions &c) override {return dry.schedule(j,n,c);}
   bool begin(const pico::wtp::Job &j,std::uint64_t n) override {return dry.begin(j,n);}
-  pico::wtp::EngineReport poll(std::uint64_t n) override {return dry.poll(n);}
+  pico::wtp::EngineReport poll(std::uint64_t n) override {
+    return failure_report ? pico::wtp::EngineReport{pico::wtp::EngineState::Failed,reported_active,{}} : dry.poll(n);
+  }
   bool disable(std::uint64_t n) override {++disables;return can_disable&&dry.disable(n);}
-  bool output_active() const override {return false;}
+  bool output_active() const override {return reported_active;}
 };
 struct ResourceFixture {
   network_test::Flash flash;
@@ -106,7 +114,7 @@ struct Test {
   pico::provisioning::ProfileStore profiles{media};
   pico::provisioning::RuntimeProfile runtime;
 #ifdef WSPRRY_PICO_MULTI_SESSIONS
-  pico::network::PicoConsumerRadioCrypto crypto[3];
+  pico::network::PicoConsumerRadioCrypto crypto[4];
 #else
   pico::network::PicoConsumerRadioCrypto crypto;
 #endif
@@ -120,7 +128,11 @@ struct Test {
                                         crypto,
 #endif
                                         device,
-                                        f.service.status().boot_id};
+                                        f.service.status().boot_id
+#ifdef WSPRRY_PICO_RECOVERY
+                                        , &crypto[3]
+#endif
+                                        };
   WtpSettings settings;
   std::unique_ptr<pi::WtpApplication> app;
   std::string authority = "192.168.1.53", origin = "http://192.168.1.53";
@@ -128,6 +140,8 @@ struct Test {
       pico::network::ConsumerInterface::Station;
   bool drop = false, drop_mutation = false, tamper = false, replay = false;
   unsigned mutations{}, exchanges{};
+  bool drop_recovery_finish=false, drop_before_recovery_finish=false;
+  std::map<std::string,unsigned> handler_calls;
   std::string previous_packet;
   std::uint64_t transaction = 1;
   explicit Test(bool configured=true) {
@@ -175,6 +189,11 @@ struct Test {
   pi::PicoHttpResponse send(const std::string &path, const std::string &method,
                             std::string body, const std::string &type) {
     ++exchanges;
+    if (drop_before_recovery_finish && path == "/api/consumer/v1/recovery/finish") {
+      drop_before_recovery_finish=false;
+      return {503,R"({"error":{"code":"reply_lost_before_dispatch"}})",{}};
+    }
+    ++handler_calls[path];
     pico::network::HttpRequest r{method,
                                  path,
                                  {},
@@ -205,6 +224,10 @@ struct Test {
     }
     auto output = response.body_text();
     radio.finish_request(tx, !drop);
+    if (drop_recovery_finish && path == "/api/consumer/v1/recovery/finish") {
+      drop_recovery_finish=false;
+      return {503,R"({"error":{"code":"reply_lost_after_dispatch"}})",{}};
+    }
     if (drop && path == "/api/consumer/v1/request") {
       drop = false;
       return {503, R"({"error":{"code":"management_outcome_unknown"}})", {}};
@@ -295,6 +318,268 @@ void cases(bool ap) {
   assert(c->request("config", "GET").status != 200 && !c->active());
   assert(t.mutations == 1);
 }
+void recovery_cases() {
+#ifdef WSPRRY_PICO_RECOVERY
+  Test t; auto a=t.client(),b=t.client(),c=t.client();
+  for (auto* client : {a.get(),b.get(),c.get()}) {
+    assert(client->login(device,"consumer_station","test-password").status==200);t.host.now+=1000;
+  }
+  const auto selected=a->lost_session();
+  const Json scope={{"target_selector",selected.at("selector")},{"device_id",device},
+      {"boot_id",selected.at("boot_id")},{"generation",selected.at("generation")}};
+  assert(a->recovery(device,"consumer_station",t.authority).status==200);
+  auto fourth=t.client();assert(fourth->login(device,"consumer_station","test-password").status==409);
+  assert(b->retire(device,"consumer_station",t.authority,"wrong-password",scope).status!=200);
+  for (auto* client : {a.get(),b.get(),c.get()}) assert(client->request("status","GET").status==200);
+  t.host.now+=1000;
+  assert(b->retire(device,"consumer_station",t.authority,"test-password",scope).status==200);
+  assert(a->request("status","GET").status!=200);assert(!a->active());
+  for (auto* client : {b.get(),c.get()}) assert(client->request("config","GET").status==200);
+  t.host.now+=1000;assert(a->login(device,"consumer_station","test-password").status==200);
+  assert(b->retire(device,"consumer_station",t.authority,"test-password",scope).status==200);
+  assert(a->request("status","GET").status==200);
+  auto stale=scope;stale["boot_id"]=std::string(32,'f');t.host.now+=1000;
+  assert(b->retire(device,"consumer_station",t.authority,"test-password",stale).status==409);
+  assert(t.mutations==0&&t.wtp.io==0);
+#else
+  Test t;auto c=t.client();assert(c->login(device,"consumer_station","test-password").status==200);
+  assert(c->recovery(device,"consumer_station",t.authority).status!=200);
+  assert(c->active()&&c->request("config","GET").status==200);
+#endif
+}
+
+void alias_fixed_vector(const Json &vector) {
+  // The fixed grant enters the production native login path. Losing its finish
+  // reply leaves only the public alias, whose expected bytes are independently
+  // fixed by Consumer-Recovery/1's selector vector.
+  const Json identity={{"version",1},{"device_id",vector.at("device_id")},
+      {"boot_id",vector.at("boot_id")},{"generation",vector.at("generation")},
+      {"authentication","saved_wifi_passphrase"}};
+  const Json grant={{"version",1},{"device_id",vector.at("device_id")},
+      {"boot_id",vector.at("boot_id")},{"generation",vector.at("generation")},
+      {"session_id",vector.at("session_id")},{"public_key",vector.at("pico_public_key")},
+      {"challenge",vector.at("challenge")},{"login_ms",30000}};
+  unsigned finishes=0;
+  pi::ConsumerRadioClient client([&](auto path,auto method,auto,auto) {
+    if (path=="/api/consumer/v1/identity") {
+      assert(method=="GET");return pi::PicoHttpResponse{200,identity.dump(),{},"application/json"};
+    }
+    if (path=="/api/consumer/v1/start") {
+      assert(method=="POST");return pi::PicoHttpResponse{200,grant.dump(),{},"application/json"};
+    }
+    assert(path=="/api/consumer/v1/finish" && method=="POST");++finishes;
+    return pi::PicoHttpResponse{503,"",{}};
+  },[]{return 1000;});
+  assert(client.login(vector.at("device_id"),"consumer_station",vector.at("password").get<std::string>()).status==401);
+  assert(finishes==1 && !client.active());
+  assert(client.lost_session().at("selector")=="e1adf81f3688e1b7fcc7f1bb034c63ea");
+  assert(!client.lost_session().contains("session_id"));
+}
+
+void retirement_job_authority_cases() {
+#ifdef WSPRRY_PICO_RECOVERY
+  for (unsigned phase=0;phase<5;++phase) {
+    Test t;auto victim=t.client(),peer=t.client();
+    assert(victim->login(device,"consumer_station","test-password").status==200);
+    t.host.now+=1000;assert(peer->login(device,"consumer_station","test-password").status==200);
+    unsigned sequence=0;
+    const auto invoke=[&](const std::string &operation,pico::wtp::RequestBody body) {
+      pico::wtp::Request request;request.principal="fixture-owner";request.session_id=std::string(32,'b');
+      request.request_id=std::string(31,'0')+std::to_string(++sequence);request.operation=operation;
+      request.body=std::move(body);request.payload_digest[0]=sequence;return t.f.service.handle(request);
+    };
+    assert(invoke("HELLO",pico::wtp::HelloBody{{"WTP/1"}}).ok);
+    assert(invoke("CLAIM",pico::wtp::ClaimBody{std::string(32,'b'),60000}).ok);
+    pico::wtp::Job job{std::string(32,'c'),"rf-events/1","tone",1'000'000'000,{},false};
+    assert(job.events.push_back({0,job.total_duration_ns,true,7'040'000'000'000'000ULL}));
+    assert(invoke("LOAD",std::move(job)).ok);
+    if (phase>=1) assert(invoke("ARM",pico::wtp::ArmBody{std::string(32,'c'),t.f.clock.snapshot().utc_now_ns+3'000'000'000,1000}).ok);
+    if (phase>=2) {
+      t.f.clock.now+=3'000'000'000;t.f.service.poll();
+      assert(t.f.service.status().state==pico::wtp::State::Running);
+    }
+    if (phase==3) {t.f.engine.failure_report=true;t.f.service.poll();}
+    if (phase==4) {
+      t.f.engine.can_disable=false;t.f.engine.reported_active=true;
+      assert(!invoke("ABORT",pico::wtp::AbortBody{std::string(32,'c')}).ok);
+    }
+    const auto before=t.f.service.status();
+    const std::array expected{pico::wtp::State::Loaded,pico::wtp::State::Armed,pico::wtp::State::Running,pico::wtp::State::Failed,pico::wtp::State::Failed};
+    assert(before.state==expected[phase] && before.owner_id==std::string(32,'b') && before.job_id==std::string(32,'c'));
+    if (phase>=3) assert(before.terminal_records.front().error==(phase==3 ? pico::wtp::ErrorCode::DeviceFault : pico::wtp::ErrorCode::OutputStateUnknown));
+    const auto flash=t.f.flash.bytes,profile=t.media.data;
+    const auto scheduler=t.f.scheduler.status();const auto watermark=t.f.store.watermark();
+    const auto disables=t.f.engine.disables,prepares=t.f.engine.prepares;
+    const bool inhibit=t.f.service.output_inhibited();
+    const auto retained=victim->lost_session();
+    const Json scope={{"target_selector",retained.at("selector")},{"device_id",device},
+        {"boot_id",retained.at("boot_id")},{"generation",retained.at("generation")}};
+    assert(peer->retire(device,"consumer_station",t.authority,"wrong-password",scope).status!=200);
+    assert(victim->request("status","GET").status==200 && peer->request("status","GET").status==200);
+    t.host.now+=1000;
+    assert(peer->retire(device,"consumer_station",t.authority,"test-password",scope).status==200);
+    assert(victim->request("status","GET").status!=200 && peer->request("status","GET").status==200);
+    assert(t.f.service.status()==before && t.f.flash.bytes==flash && t.media.data==profile);
+    assert(t.f.scheduler.status()==scheduler && t.f.store.watermark()==watermark && t.f.service.output_inhibited()==inhibit);
+    assert(t.f.engine.disables==disables && t.f.engine.prepares==prepares && t.mutations==0 && t.wtp.io==0);
+  }
+#endif
+}
+
+
+void local_retirement_refusal_cases() {
+#ifdef WSPRRY_PICO_RECOVERY
+  Test t;auto native=t.client(),peer=t.client();
+  assert(native->login(device,"consumer_station","test-password").status==200);
+  t.host.now+=1000;assert(peer->login(device,"consumer_station","test-password").status==200);
+  const auto retained=native->lost_session();
+  const Json scope={{"target_selector",retained.at("selector")},{"device_id",device},
+      {"boot_id",retained.at("boot_id")},{"generation",retained.at("generation")}};
+  const auto starts=t.handler_calls["/api/consumer/v1/recovery/start"],finishes=t.handler_calls["/api/consumer/v1/recovery/finish"];
+  assert(native->retire(device,"consumer_station",t.authority,"short",scope).status!=200);
+  auto malformed=scope;malformed.erase("generation");
+  assert(native->retire(device,"consumer_station",t.authority,"test-password",malformed).status!=200);
+  assert(native->active() && native->lost_session()==retained && native->request("status","GET").status==200);
+  assert(t.handler_calls["/api/consumer/v1/recovery/start"]==starts && t.handler_calls["/api/consumer/v1/recovery/finish"]==finishes);
+  t.random.fail=true;
+  assert(native->retire(device,"consumer_station",t.authority,"test-password",scope).status!=200);
+  t.random.fail=false;
+  assert(native->active() && native->request("status","GET").status==200 && peer->request("status","GET").status==200);
+  assert(t.handler_calls["/api/consumer/v1/recovery/start"]==starts+1 && t.handler_calls["/api/consumer/v1/recovery/finish"]==finishes);
+  assert(t.mutations==0 && t.wtp.io==0);
+#endif
+}
+
+struct RuntimeReset {
+  ~RuntimeReset() {select_wtp_runtime(std::nullopt);}
+};
+void runtime_recovery_continuity_cases() {
+#ifdef WSPRRY_PICO_RECOVERY
+  for (bool after_effect : {false,true}) {
+    Test t;
+    set_wtp_runtime_for_test(t.settings,t.host,t.wtp,{std::string(32,'1'),std::string(32,'2'),device},[]{return false;});
+    RuntimeReset reset;
+    set_wtp_management_transports_for_test({},[&](auto p,auto m,auto b,auto type){return t.send(p,m,b,type);});
+    const auto management=[&](const Json &body) {return wtp_runtime_management("member/management","POST",body.dump(),"");};
+    const auto state=[] {return Json::parse(wtp_runtime_management("member/management","GET","","").body);};
+    const Json connect={{"action","connect"},{"carrier","consumer_station"},{"host",t.authority},{"password","test-password"}};
+    // The native result reached its handler but the browser need not observe it.
+    assert(management(connect).status==200);
+    const auto native=state();assert(native.at("connected")==true && native.at("session").contains("selector"));
+
+    Json local_self={{"action","retire_login"},{"carrier","consumer_station"},{"host",t.authority},{"password","short"},
+        {"selection_id",native.at("selection_id")},{"scope",{{"target_selector",native.at("session").at("selector")},
+        {"device_id",device},{"boot_id",native.at("session").at("boot_id")},{"generation",native.at("session").at("generation")}}}};
+    const auto proof_starts=t.handler_calls["/api/consumer/v1/recovery/start"],proof_finishes=t.handler_calls["/api/consumer/v1/recovery/finish"];
+    assert(management(local_self).status!=200);
+    local_self["password"]="test-password";local_self["scope"].erase("generation");
+    assert(management(local_self).status!=200);
+    assert(state().at("connected")==true && state().at("session")==native.at("session"));
+    assert(t.handler_calls["/api/consumer/v1/recovery/start"]==proof_starts && t.handler_calls["/api/consumer/v1/recovery/finish"]==proof_finishes);
+    local_self["scope"]["generation"]=native.at("session").at("generation");t.random.fail=true;
+    assert(management(local_self).status!=200);t.random.fail=false;
+    assert(state().at("connected")==true && wtp_runtime_management("member/configuration","GET","","").status==200);
+    assert(t.handler_calls["/api/consumer/v1/recovery/start"]==proof_starts+1 && t.handler_calls["/api/consumer/v1/recovery/finish"]==proof_finishes);
+    t.host.now+=1000;
+
+    const auto starts=t.handler_calls["/api/consumer/v1/start"];
+    assert(state().at("session")==native.at("session") && t.handler_calls["/api/consumer/v1/start"]==starts);
+    auto victim=t.client(),healthy=t.client();
+    t.host.now+=1000;assert(victim->login(device,"consumer_station","test-password").status==200);
+    t.host.now+=1000;assert(healthy->login(device,"consumer_station","test-password").status==200);
+    const Json inspect={{"action","inspect_logins"},{"carrier","consumer_station"},{"host",t.authority}};
+    auto inspected=Json::parse(management(inspect).body);assert(inspected.at("sessions").size()==3);
+    const auto scope_for=[&](const Json &retained) {
+      return Json{{"target_selector",retained.at("selector")},{"device_id",device},
+          {"boot_id",retained.at("boot_id")},{"generation",retained.at("generation")}};
+    };
+    Json retire={{"action","retire_login"},{"carrier","consumer_station"},{"host",t.authority},{"password","test-password"},
+        {"selection_id",inspected.at("selection_id")},{"scope",scope_for(victim->lost_session())}};
+    assert(management(retire).status==200);
+    assert(state().at("connected")==true && state().at("session")==native.at("session"));
+    assert(wtp_runtime_management("member/configuration","GET","","").status==200);
+    assert(victim->request("status","GET").status!=200 && healthy->request("status","GET").status==200);
+    const auto calls=t.exchanges;
+    assert(management(retire).status!=200 && t.exchanges==calls); // Old selection cannot dispatch.
+    inspected=Json::parse(management(inspect).body);
+    retire["selection_id"]=inspected.at("selection_id");retire["scope"]=scope_for(native.at("session"));
+    t.host.now+=1000;
+    const auto before_finish=t.handler_calls["/api/consumer/v1/recovery/finish"];
+    const auto before_starts=t.handler_calls["/api/consumer/v1/start"];
+    t.drop_recovery_finish=after_effect;t.drop_before_recovery_finish=!after_effect;
+    assert(management(retire).status!=200);
+    assert(state().at("connected")==false && state().at("session")==native.at("session"));
+    assert(t.handler_calls["/api/consumer/v1/recovery/finish"]==before_finish+(after_effect ? 1U : 0U));
+    assert(t.handler_calls["/api/consumer/v1/start"]==before_starts);
+    assert(healthy->request("status","GET").status==200);
+    const auto list=Json::parse(healthy->recovery(device,"consumer_station",t.authority).body);
+    const bool occupied=std::any_of(list.at("sessions").begin(),list.at("sessions").end(),[&](const Json &entry){return entry.at("selector")==native.at("session").at("selector");});
+    assert(occupied==!after_effect);
+    // Only the dedicated five-second proof is expired; ordinary sessions stay live.
+    t.host.now+=5000;assert(management(retire).status==200);
+    assert(state().at("connected")==false && healthy->request("status","GET").status==200);
+    assert(t.mutations==0 && t.wtp.io==0);
+  }
+#endif
+}
+
+struct PeerClock : pi::WtpScheduleClock {
+  backend_test::Peer peer;
+  std::uint64_t now_ms() const override {return peer.now;}
+  std::optional<std::uint64_t> utc_now_ns() const override {return backend_test::Peer::utc_base+peer.mono();}
+  void wait_ms(std::uint64_t n) override {peer.advance(peer.now+n);}
+};
+void runtime_recovery_admission_cases() {
+#ifdef WSPRRY_PICO_RECOVERY
+  for (unsigned phase=0;phase<7;++phase) {
+    // Failed/unknown output is deliberately latched by the production host.
+    // Isolate each fixture instead of bypassing that latch for test teardown.
+    std::cout.flush();
+    const auto child=fork();assert(child>=0);
+    if (child) {
+      int result=0;assert(waitpid(child,&result,0)==child);
+      assert(WIFEXITED(result) && WEXITSTATUS(result)==0);
+      continue;
+    }
+    PeerClock clock;clock.peer.device_id=device;
+    WtpSettings settings;settings.device_id=device;
+    set_wtp_runtime_for_test(settings,clock,clock.peer,{backend_test::sid,backend_test::owner_id,device},[&]{clock.peer.open();return true;});
+    unsigned consumer_calls=0;
+    set_wtp_management_transports_for_test({},[&](auto,auto,auto,auto){++consumer_calls;return pi::PicoHttpResponse{503,"",{}};});
+    assert(wtp_runtime_inspect().ok);
+    if (phase==0) wtp_runtime_prepare_skip();
+    else if (phase==6) {clock.peer.close();clock.peer.advance(clock.peer.now+1000);wtp_runtime_poll_idle();}
+    else {
+      clock.peer.owner=std::string(32,'e');clock.peer.expiry=clock.peer.mono()+60'000'000'000ULL;
+      if (phase>=2) {clock.peer.job=pi::wtp::Job{};clock.peer.job->job_id=backend_test::jid;clock.peer.job->total_duration_ns=60'000'000'000ULL;}
+      const std::array states{pi::wtp::State::Empty,pi::wtp::State::Empty,pi::wtp::State::Loaded,pi::wtp::State::Armed,pi::wtp::State::Running,pi::wtp::State::Failed};
+      clock.peer.state=states[phase];clock.peer.start=clock.peer.mono()+5'000'000'000ULL;
+      clock.peer.active=phase==4 || phase==5;
+      clock.peer.advance(clock.peer.now+1000);wtp_runtime_poll_idle();
+    }
+    assert(!wtp_runtime_switch_allowed());
+    const auto before=Json::parse(wtp_runtime_json());const auto operations=clock.peer.operations;
+    const auto owner=clock.peer.owner;const auto state=clock.peer.state;const bool output=clock.peer.active;
+    const auto selection=Json::parse(wtp_runtime_management("member/management","GET","","").body).at("selection_id");
+    const Json inspect={{"action","inspect_logins"},{"carrier","consumer_station"},{"host","192.168.1.53"}};
+    const Json retire={{"action","retire_login"},{"carrier","consumer_station"},{"host","192.168.1.53"},{"password","test-password"},
+        {"selection_id",selection},{"scope",{{"target_selector",std::string(32,'b')},{"device_id",device},{"boot_id",backend_test::boot},{"generation","1"}}}};
+    for (const auto &request : {inspect,retire}) {
+      const auto result=wtp_runtime_management("member/management","POST",request.dump(),"");
+      assert(result.status==409 && Json::parse(result.body).at("error").at("code")=="host_busy_or_output_unresolved");
+    }
+    const auto after=Json::parse(wtp_runtime_json());
+    for (const auto *field : {"phase","session_phase","uncertain","safety_fault","owns","recovery_required","remote"})
+      assert(before.at(field)==after.at(field));
+    assert(consumer_calls==0 && clock.peer.operations==operations && clock.peer.owner==owner && clock.peer.state==state && clock.peer.active==output);
+    assert(!wtp_runtime_switch_allowed());
+    // exit() runs static runtime cleanup while this typed clock/peer is still
+    // alive; no fixture operation clears ownership or output uncertainty.
+    std::exit(0);
+  }
+#endif
+}
+
 void resource_admission_cases() {
   for (unsigned phase=0;phase<5;++phase) {
     Test t; auto c=t.client(); assert(c->login(device,"consumer_station","test-password").status==200);
@@ -391,6 +676,20 @@ int main(int argc, char **argv) {
   Json vectors;
   vector_file >> vectors;
   pi::consumer_radio_fixed_vectors(vectors);
+  alias_fixed_vector(vectors);
+#ifdef WSPRRY_PICO_RECOVERY
+  std::ifstream recovery_vector_file(std::filesystem::path(argv[1]).parent_path()/"Consumer-Recovery-v1-vectors.json");
+  assert(recovery_vector_file.is_open());
+  Json recovery_vectors;recovery_vector_file >> recovery_vectors;
+  pi::consumer_radio_fixed_vectors(recovery_vectors);
+  alias_fixed_vector(recovery_vectors);
+  std::cout << "Consumer-Recovery/1 fixed AEAD/HKDF and native selector vectors passed\n";
+#endif
+  retirement_job_authority_cases();
+  local_retirement_refusal_cases();
+  runtime_recovery_continuity_cases();
+  runtime_recovery_admission_cases();
+  recovery_cases();
   cases(false);
   cases(true);
   resource_admission_cases();

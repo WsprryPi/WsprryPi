@@ -163,3 +163,16 @@ See the [execution prompt](development/issue448-execution-prompt.md) and
 [review/validation matrix](development/issue448-review.md) for actual executed
 coverage and limits. Software loopback/RAM-journal evidence does not qualify
 firmware, physical flash, installed proxy/services, transport timing or RF.
+
+
+## P15.7 current and preserved P15.6 row
+
+Current advances to clean Pico `26ae596b540e92f25da37f978321ba1ec5934bdc`.
+`p156` pins historical `792b5b2f60e381a6bd8e7a7726eeffe24fc08519`; all six
+historical sources/expectations remain, alongside current. New Pi keeps supported
+old-firmware reads/saves when authenticated retirement is unavailable. Frozen
+management/1, management/2 and Radio/1 are unchanged; the recovery discovery and
+proof are an independently versioned extension reachable at full capacity.
+Published P15.6 Pi behavior against new Pico is tested separately using its
+actual old product sources. See the [P15.7 record](development/phase15-7-recovery.md)
+and lead packet for exact tested pairs and results.

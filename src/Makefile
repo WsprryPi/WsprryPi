@@ -2021,7 +2021,7 @@ wtp-config-interop-test: wtp-config-client-build wtp-config-test
 	$(Q)cmake -S tests/network -B "$(WTP_NETWORK_BUILD_DIR)" -DPICO_COMPAT_PROFILE=$(PICO_COMPAT_PROFILE) -DPICO_SOURCE="$(abspath $(PICO_SOURCE))" -DMBEDTLS_SOURCE="$(abspath $(MBEDTLS_SOURCE))"
 	$(Q)cmake --build "$(WTP_NETWORK_BUILD_DIR)" -j 2
 	$(Q)node ../WsprryPi-UI/tests/wtp_configuration_interop_test.js "$(abspath $(WTP_NETWORK_BUILD_DIR))" $(PICO_COMPAT_PROFILE) "$(abspath $(PICO_SOURCE))"
-	$(Q)if [ "$(PICO_COMPAT_PROFILE)" = current ] || [ "$(PICO_COMPAT_PROFILE)" = p153 ] || [ "$(PICO_COMPAT_PROFILE)" = p154 ]; then "$(WTP_NETWORK_BUILD_DIR)/consumer_interop" "$(abspath $(PICO_SOURCE))/docs/protocol/Consumer-Radio-v1-vectors.json"; fi
+	$(Q)if [ "$(PICO_COMPAT_PROFILE)" = current ] || [ "$(PICO_COMPAT_PROFILE)" = p156 ] || [ "$(PICO_COMPAT_PROFILE)" = p153 ] || [ "$(PICO_COMPAT_PROFILE)" = p154 ]; then "$(WTP_NETWORK_BUILD_DIR)/consumer_interop" "$(abspath $(PICO_SOURCE))/docs/protocol/Consumer-Radio-v1-vectors.json"; fi
 	$(Q)if [ "$(PICO_COMPAT_PROFILE)" = current ]; then node ../WsprryPi-UI/tests/wtp_resources_interop_test.js "$(abspath $(WTP_NETWORK_BUILD_DIR))"; fi
 	$(Q)if [ "$(PICO_COMPAT_PROFILE)" = current ]; then node tests/network/consumer_browser_interop.js "$(abspath $(WTP_NETWORK_BUILD_DIR))" "$(abspath $(PICO_SOURCE))"; fi
 wtp-network-interop-test: wtp-tls-build wtp-api-test wtp-network-process-test

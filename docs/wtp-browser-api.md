@@ -262,3 +262,21 @@ password guesses offline with its chosen X25519 shared secret. Passive capture
 does not reveal that secret. This unchanged protocol limitation requires a
 strong passphrase and trusted endpoint/network; native code does not authenticate
 a unique device before sending its proof.
+
+
+## P15.7 login retirement and save review
+
+`member/management` supports explicit `inspect_logins` and `retire_login` through
+the existing operation/admission lock. Recovery is independent of WTP connectivity
+when host state permits it. Public `consumer-recovery/1` metadata is not proof of
+identity or authority; native Pi validates the independently configured device,
+carrier and authority before its fresh password proof. Retirement carries exact
+scope and the inspected management selection ID; it never reconnects or retries
+an application mutation. The current native connection can be read after a lost
+Pi-browser reply. Pi tabs share that native session.
+
+UIs preserve drafts after uncertain config/resource writes, invalidate revisions,
+read consistent saved state and require explicit review before a new save. A
+healthy status or connection read alone cannot enable writing. The
+[P15.7 execution record](development/phase15-7-recovery.md) defines proof bounds,
+self-retirement uncertainty, historical compatibility and qualification limits.
