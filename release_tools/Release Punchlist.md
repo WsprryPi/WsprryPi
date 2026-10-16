@@ -8,7 +8,7 @@ disposition rather than implementation before 4.0.
 
 ## Ordered release checklist
 
-Status updated October 16, 2026. Items 1 through 10 are complete within their
+Status updated October 16, 2026. Items 1 through 11 are complete within their
 recorded scopes. Accepted implementation is integrated into `devel`, and the
 immutable RP1 provider release is published. Item 10, WsprryPi production
 consumption and validation, is accepted for installation and idle runtime
@@ -19,7 +19,16 @@ as the original release state and excluded target rollback rehearsals. The
 accepted route evidence without changing those assets or application policy.
 Its installed consumer, cache, independent both-route status, API/UI and support
 collector are now verified on wspr5.
-No new RF qualification is claimed. Items 11–14 remain open.
+No new RF qualification is claimed. Item 11 is complete, including verified
+hosted build and publication. Item 12 is in progress in WsprryPi-Docs;
+items 13–14 have not started.
+
+The current milestone is **WsprryPi 4.0 Beta 1**, not final 4.0 stable
+publication. The maintainer's October 16 direction is to prepare a reviewable
+Beta 1 candidate and Markdown release documentation, with a hard stop after
+item 14c. Items 14d–14e are later publication/announcement gates, not authorized
+by this planning update. No tag, GitHub release/draft, asset upload, issue
+announcement or final stable publication is to be performed now.
 
 Status key: ✅ Complete · ⏳ In progress · ☐ Not started
 
@@ -117,14 +126,23 @@ Status key: ✅ Complete · ⏳ In progress · ☐ Not started
     The original provider manifest remains empty. Prior migration/reboot/recovery
     evidence is retained because its bound inputs are unchanged. No new RF,
     reboot or rollback rehearsal occurred during the supplement closeout.
-11. ☐ **Documentation performance and remaining Impeccable housekeeping.**
-    **Lead: WsprryPi-Docs · RP1 item 19.** Reconcile the saved image-optimization,
-    product-metadata and host/tooling reminders; implement justified documentation
-    performance and presentation changes before final rendering/screenshots.
-    Use current Impeccable tooling for UI work. Any application UI repair belongs
-    in a separately scoped WsprryPi change before item 13.
-12. ☐ **Consolidated operator-documentation update.**
-    **Lead: WsprryPi-Docs · RP1 item 20.** Incorporate item 10's impact record and
+11. ✅ **Documentation performance and remaining Impeccable housekeeping.**
+    **Lead: WsprryPi-Docs · RP1 item 19.** Complete. Implementation `bb42bc9`
+    repairs authored image sizing/loading, cache invalidation and mobile
+    breadcrumbs; three losslessly optimized PNGs save 367,799 bytes with decoded
+    pixels and metadata preserved. Saved product/design reminders are reconciled.
+    Local default/Pico builds, regression tests, focused Impeccable review and
+    adversarial reassessment passed within recorded coverage and limitations.
+    [RTD build 35197280](https://app.readthedocs.org/projects/wsprry-pi/builds/35197280/)
+    succeeded for `dad196e706968d48b045c84a550ec4342130196b`, including HTML, PDF
+    and EPUB. Canonical devel publication was verified against source asset hashes
+    and image-loading attributes. See the
+    [completion record](https://github.com/WsprryPi/WsprryPi-Docs/blob/8d6d037f7e1ae1bb9f0a525735ddcf5a6ee57d3a/maintainer/item11-docs-performance-review.md).
+    Commit `8d6d037` updates only that record; publication of this newer record-only
+    commit is not claimed. All-host Impeccable updates and custom-domain TLS
+    remain separately recorded follow-ups. Items 12–14 remain open.
+12. ⏳ **Consolidated operator-documentation update.**
+    **Lead: WsprryPi-Docs · RP1 item 20.** In progress. Incorporate item 10's impact record and
     cover settled API/Phase 15.4 resources, Test Tone, calibration boundaries,
     Si5351 disposition/drive/fade, inventory-timeout and RP1 correction,
     installation, migration and recovery behavior. Include supplement cache/refresh,
@@ -142,36 +160,78 @@ Status key: ✅ Complete · ⏳ In progress · ☐ Not started
     repair actionable findings, explicitly disposition accepted findings and
     repeat affected tests/visual checks. Coordinate only affected documentation
     and screenshot repairs with WsprryPi-Docs. Record the exact reviewed
-    application/documentation identities and evidence before release packaging.
-14. ☐ **Final WsprryPi candidate validation, packaging and 4.0 release.**
-    **Lead: WsprryPi · RP1 item 22.** Complete these checkpoints in order:
+    application/documentation identities and evidence before Beta 1 packaging.
+    Acceptance applies to that reviewed candidate; later Beta/stable changes
+    require repetition of affected UI/documentation checks.
+14. ☐ **WsprryPi 4.0 Beta 1 release documentation and candidate preparation.**
+    **Lead: WsprryPi · RP1 item 22.** The current effort stops after 14c.
+    Release-note research/drafting in 14a may proceed alongside items 12–13;
+    candidate freeze/build and acceptance in 14b–14c follow item 13.
 
-    - ☐ **14a — Freeze identities and build release artifacts.** After item 13,
-      settle version metadata, release notes, compatibility requirements and
-      known limitations. Record exact application/documentation commits and
-      published provider identities, then build and checksum the release
-      artifacts. Any later change requires a new candidate identity and repetition
-      of affected acceptance checks, including UI/docs review where applicable.
-    - ☐ **14b — Validate the exact candidate and obtain acceptance.** Run required
-      CI/regressions and applicable installation/upgrade/service/runtime checks
-      against the frozen source and actual release artifacts using item 10's
-      acceptance matrix. Record evidence reused, checks repeated, exclusions and
-      accepted limitations; repair findings and reassess before acceptance.
-    - ☐ **14c — Publish and independently verify.** After candidate acceptance
-      and publication authorization, publish WsprryPi 4.0 and its corresponding
-      operator-documentation revision through their separate release workflows.
-      Verify published tag/commit identities, downloads, checksums and documentation
-      availability, then complete release-tracking closeout, including #412.
+    - ☐ **14a — Research and draft Beta 1 release documentation in Markdown.**
+      Establish the previous published stable WsprryPi baseline and the intended
+      Beta 1 source range. Enumerate all issues marked ready for release and
+      closed issues relevant to that range, using the actual labels, project
+      statuses, milestones and recorded dispositions with complete pagination.
+      Reconcile every candidate issue against commit/merge history and all
+      relevant internal documentation, including development/acceptance records,
+      protocol/configuration contracts, component READMEs and operator-docs
+      handbacks. Issue closure or a ready status alone does not prove inclusion;
+      record included, duplicate, superseded, excluded and unresolved dispositions.
+      Prepare `release_tools/4.0-Beta-1-Release-Notes.md` for the eventual GitHub
+      prerelease body, with an auditable companion
+      `release_tools/4.0-Beta-1-Release-Evidence.md` mapping claims to issues,
+      commits and evidence. Cover what was added, changed and fixed; removals
+      and deprecations; backward-compatibility breaks or risks; defaults, API/WTP,
+      configuration, platform/backend and installation changes; upgrade/migration
+      and rollback guidance; dependencies, qualification limits and known issues.
+      Distinguish confirmed breaks from uncertain compatibility and state what
+      the operator must do. Deduplicate overlapping fixes, retain useful issue
+      links, and keep private paths/bench details out of the public notes.
+      Review omissions and unsupported claims adversarially; refresh the draft
+      against the exact accepted candidate before publication. These are planned
+      deliverables, not files already created by this checklist update.
+    - ☐ **14b — Freeze identities and build the Beta 1 candidate.** After item 13,
+      select Beta 1 version metadata using the project's existing convention,
+      record exact application/documentation commits and published provider
+      identities, and build/checksum candidate artifacts. Preserve the researched
+      stable-to-Beta comparison range and record later changes. Any changed input
+      requires a new candidate identity and repetition of affected acceptance
+      checks. This step does not create a public tag or release.
+    - ☐ **14c — Validate, accept and hand off Beta 1; stop before publication.**
+      Run required CI/regressions and applicable installation/upgrade/service/
+      runtime checks against the exact candidate and artifacts using item 10's
+      acceptance matrix. Record reused evidence, repeated checks, exclusions and
+      accepted limitations; repair findings and reassess. Reconcile release notes
+      and compatibility guidance with the actual tested result. Produce the
+      accepted candidate identities, checksums, Markdown prerelease body and
+      evidence handoff, ready for a separate publication decision. Do not merge
+      to the release branch, create a tag/GitHub release or draft, upload assets,
+      announce availability, or claim Beta 1 is published.
+    - ☐ **14d — Later: publish Beta 1 as a GitHub prerelease and verify.** Only
+      after separate authorization, publish the accepted Beta 1 and corresponding
+      documentation through their separate workflows. Use the reviewed Markdown
+      body, mark it as a prerelease, and independently verify tag/source identities,
+      downloads, checksums, notes and documentation. This is not final 4.0 stable
+      publication. Do not perform 14e until actual Beta availability is verified.
+    - ☐ **14e — Later: update every open issue marked ready for release.**
+      After 14d, freshly enumerate the complete open ready-for-release set using
+      the project's actual readiness markers. Reconcile it against the accepted
+      Beta scope and update every such issue with the verified Beta 1 prerelease
+      URL and accurate availability/testing guidance. Do not imply an unshipped
+      fix is included. Preserve issue states; do not automatically close issues.
+      Avoid duplicate announcements, record issue/comment URLs and outcomes, and
+      resolve any failed or omitted updates before declaring this gate complete.
 
 ## Remaining work ownership and cross-reference
 
 | WsprryPi item | RP1 item | Status | Work | Lead repository |
 | --- | --- | --- | --- | --- |
 | 10 | 18 | ✅ Complete within accepted scope | Published-provider installation/runtime integration; installed supplement and both-route status accepted; prior target passes/rollback exclusion and RF scope preserved | `WsprryPi` |
-| 11 | 19 | ☐ Not started | Documentation performance and Impeccable housekeeping | `WsprryPi-Docs` |
-| 12 | 20 | ☐ Not started | Consolidated operator documentation | `WsprryPi-Docs` |
-| 13 | 21 | ☐ Not started | Final integrated application Impeccable review | `WsprryPi` |
-| 14 | 22 | ☐ Not started | 14a freeze/package; 14b validate/accept; 14c publish/verify | `WsprryPi` |
+| 11 | 19 | ✅ Complete | Documentation performance and Impeccable housekeeping; hosted build/publication verified | `WsprryPi-Docs` |
+| 12 | 20 | ⏳ In progress | Consolidated operator documentation | `WsprryPi-Docs` |
+| 13 | 21 | ☐ Not started | Integrated application Impeccable review for the Beta 1 candidate | `WsprryPi` |
+| 14 | 22 | ☐ Not started | Beta 1 release notes, candidate build and acceptance; stop after 14c; later 14d prerelease publication and 14e issue announcements | `WsprryPi` |
 
 RP1 item numbers above are historical cross-references; the current provider
 ROADMAP has no numbered application release gates.
@@ -186,6 +246,15 @@ hardware/service operations, commits, pushes or publication. The #412/#423
 criteria reconciliation was performed under the separately authorized item 10
 work; item 13 still requires acceptance of actual integration prerequisites.
 
+## Later final 4.0 stable release
+
+Final 4.0 stable publication is outside the current Beta 1 milestone. After
+Beta feedback and any resulting changes, establish a separate final-candidate
+acceptance/publication decision, repeat affected implementation, documentation,
+UI, packaging and applicable runtime checks, and complete the remaining release
+tracking requirements, including #412 at its proper publication boundary.
+Beta preparation or announcement does not itself close that stable release gate.
+
 ## Saved items
 
 | Saved item | Release relevance | Disposition and evidence |
@@ -195,7 +264,7 @@ work; item 13 still requires acceptance of actual integration prerequisites.
 | **Si5351 readiness failures** | The five comparison investigations were implemented, but intermittent `SYS_INIT` failures remain unresolved in the [qualification record](../docs/development/si5351-results/README.md). Successful later captures did not close that reliability question. | Complete by explicit maintainer acceptance after software repairs and two consecutive inhibited wspr1 checks passed; see [results and disposition](../docs/development/si5351-readiness-review.md). Historical failures remain preserved without claiming their cause was established. |
 | **Direct PPS for GPIO frequency calibration** | Optional RF-calibration scope decision; retain Chrony-derived estimates, intrinsic defaults, manual correction and conducted residuals. | Review complete: native PPS RF calibration deferred beyond 4.0. No independent RF counter/capture benefit or new 4.0 requirement established; reopening requires an identified measurement path and measurable improvement. See [Calibration Scope Decisions](Calibration%20Scope%20Decisions.md#direct-pps-disposition-and-reopening-criteria). |
 | **RP1 alternative clock parents** | Current output already uses nominal 200 MHz `pll_sys`; historical 50 MHz/XOSC planning is obsolete. | Reconciled: `pll_sys` implemented; genuinely alternative paths through `clk_i2s`, `clk_adc` or `clk_sys` deferred beyond 4.0, subject to ancestry/ownership and coordinated provider/userspace qualification. See [Calibration Scope Decisions](Calibration%20Scope%20Decisions.md#rp1-parent-disposition). |
-| **Documentation performance and Impeccable housekeeping** | Build-time lazy loading now exists. Reconcile the older image-optimization, product-metadata, and host-update reminders before carrying them forward. | Pending reconciliation. |
+| **Documentation performance and Impeccable housekeeping** | Build-time lazy loading now exists. Reconcile the older image-optimization, product-metadata, and host-update reminders before carrying them forward. | Complete under item 11, including measured image improvements, reminder dispositions and verified hosted publication. All-host tooling updates and custom-domain TLS remain separate follow-ups; see the pinned item 11 completion record. |
 
 ## Release gates
 
@@ -224,7 +293,7 @@ work; item 13 still requires acceptance of actual integration prerequisites.
   evidence for each route without creating a provider permission gate. No new RF
   qualification is claimed. Follow the
   [published-release contract](../docs/rp1-gpclk-dkms-installation.md#published-releases).
-- ☐ **Operator documentation:** after production RP1 integration, reconcile
+- ⏳ **Operator documentation:** in progress in WsprryPi-Docs. Reconcile
   the recorded Si5351 readiness/drive/fade, inventory-timeout, and RP1 correction
   follow-ups alongside API/Phase 15.4, Test Tone and calibration boundaries.
   WsprryPi-Docs leads items 11–12. Update and verify documentation under
@@ -233,10 +302,17 @@ work; item 13 still requires acceptance of actual integration prerequisites.
   [#423](https://github.com/WsprryPi/WsprryPi/issues/423) after production RP1
   integration and release-scoped implementation/documentation have settled on
   their integrated branches, with the application on `devel` and no unresolved
-  UI-affecting changes expected. First resolve the publication-only #412 tracking
+  UI-affecting changes expected. Confirm the publication-only #412 tracking
   exception in the issue criteria. WsprryPi leads item 13; repair or explicitly
-  accept findings as required by that issue, then complete item 14a–14c's final
-  candidate packaging, acceptance, publication and independent verification.
+  accept findings as required by that issue, then complete Beta 1 candidate
+  packaging and acceptance under 14b–14c. Release-note research may begin earlier.
+- ☐ **Beta 1 release documentation and readiness:** complete 14a–14c's sourced
+  Markdown notes, compatibility/migration guidance, exact candidate and acceptance
+  evidence. Stop with a reviewable handoff; no release or announcement is authorized.
+- ☐ **Later Beta 1 publication and issue announcements:** after separate
+  publication authorization, complete 14d verification before updating every
+  open ready-for-release issue under 14e. Preserve issue states and audit coverage.
+  Final 4.0 stable acceptance/publication remains a later separate gate.
 
 ## RP1 dependency order
 
@@ -263,8 +339,15 @@ production consumption as separate gates:
 7. **Complete documentation and final UI review:** finish documentation
    performance/housekeeping and consolidated operator documentation, then the
    final integrated Impeccable review (#423) of the settled product.
-8. **Release WsprryPi:** complete final candidate validation and packaging,
-   then publish Wsprry Pi 4.0 after final candidate acceptance.
+8. **Prepare WsprryPi Beta 1:** research all relevant ready/closed issues,
+   internal documentation and commit history; write sourced Markdown release
+   notes and compatibility guidance. After the integrated review, build and
+   accept the exact Beta 1 candidate, then stop before publication (14a–14c).
+9. **Later publish and announce Beta 1:** after separate authorization, verify
+   the GitHub prerelease and artifacts, then update every open ready-for-release
+   issue with its availability link and accurate scope (14d–14e).
+10. **Later final stable release:** resolve Beta feedback, repeat affected checks
+    and obtain separate final 4.0 candidate/publication acceptance.
 
 Candidate acceptance can use unreleased WsprryPi `devel`; it does not require a
 published WsprryPi release. Acceptance and integration precede provider freeze;
