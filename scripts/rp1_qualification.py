@@ -21,6 +21,7 @@ ASSETS = {'rp1-qualification.json', 'rp1-qualification.schema.json', 'qualificat
 CACHE = Path('/var/cache/wsprrypi/rp1-qualification')
 RUNTIME = Path('/usr/local/lib/wsprrypi')
 OWNERSHIP = Path('/var/lib/wsprrypi/rp1-gpclk-dkms-installation.json')
+PROVIDER = Path('/usr/lib/rp1-gpclk-dkms/runtime_provider.py')
 OWNER_UID = 0
 
 
@@ -131,10 +132,13 @@ def status(lock, route, report=None, ownership=None, directory=CACHE):
             'applicationEligibility': 'WsprryPi band/mode policy'}
     try:
         if report is None:
-            provider = Path('/usr/lib/rp1-gpclk-dkms/runtime_provider.py')
+            provider = PROVIDER
             read(provider, trusted=True)
             with tempfile.TemporaryFile() as stream:
-                process = subprocess.run(['/usr/bin/python3', '-I', str(provider), 'inspect'],
+                # The released provider imports its root-owned sibling modules.
+                # Ignore Python environment/user-site injection while retaining
+                # that installed script directory in the import path.
+                process = subprocess.run(['/usr/bin/python3', '-E', '-s', '-B', str(provider), 'inspect'],
                     stdout=stream, stderr=subprocess.DEVNULL, timeout=8, check=False)
                 require(stream.tell() <= 4*1024*1024, 'runtime inspection response exceeded bound')
                 stream.seek(0)

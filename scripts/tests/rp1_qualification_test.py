@@ -3,6 +3,7 @@
 """Offline tests of supplemental resolution; fake network and no target access."""
 import copy
 import json
+import os
 from pathlib import Path
 import sys
 import tempfile
@@ -122,6 +123,23 @@ class Tests(unittest.TestCase):
                 installed.write_bytes(Path(Q.__file__).read_bytes())
                 Q.remove_runtime(); Q.remove_runtime()
                 self.assertEqual(list(directory.iterdir()), [])
+
+    def test_live_inspection_imports_installed_siblings_without_pythonpath(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            directory = Path(temporary).resolve()
+            provider = directory/'runtime_provider.py'
+            provider.write_text('import json, sibling\nprint(json.dumps({"origin": sibling.ORIGIN}))\n')
+            (directory/'sibling.py').write_text('ORIGIN = "installed"\n')
+            injected = directory/'injected'; injected.mkdir()
+            (injected/'sibling.py').write_text('raise RuntimeError("PYTHONPATH was used")\n')
+            original_read = Q.read
+            with patch.object(Q, 'PROVIDER', provider), \
+                 patch.object(Q, 'read', side_effect=lambda p, **kw: original_read(p)), \
+                 patch.object(Q, 'cached', return_value=({}, lambda metadata, report, route, owner: report)), \
+                 patch.dict(os.environ, {'PYTHONPATH': str(injected)}):
+                result = Q.status({}, 'gpio20', ownership={})
+            self.assertEqual(result['origin'], 'installed')
+            self.assertFalse((directory/'__pycache__').exists())
 
 
 if __name__ == '__main__': unittest.main()

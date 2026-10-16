@@ -36,11 +36,23 @@ provider admission or enrollment requirement and cannot enable a transmission.
 ## Resolution and runtime status
 
 The application installer installs the maintained consumer interpreter and its
-separate reference, then attempts to refresh the pinned evidence cache. A failed
+separate reference. When provider installation is selected, it also attempts to
+refresh the pinned evidence cache. A failed
 refresh is reported without changing provider installation or application policy.
 Status never downloads metadata. Missing evidence reports `Evidence missing`;
 corrupt, substituted or stale bytes report `Evidence invalid`. Existing application
 qualification remains independent in both cases.
+
+After an application update that explicitly skips the unchanged provider, refresh
+the installed cache separately:
+
+```sh
+sudo python3 -B /usr/local/lib/wsprrypi/rp1_qualification.py refresh
+```
+
+This supported command resolves only the separately pinned supplement; it does
+not reinstall the provider. Verify its result and the installed status separately
+from installer success.
 
 To independently resolve and validate the supplemental publication without any
 installation, service, endpoint or target effects:
