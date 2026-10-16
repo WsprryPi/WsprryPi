@@ -17,6 +17,8 @@ preserved; the maintainer accepted the provider's empty `Unavailable` manifest
 as the original release state and excluded target rollback rehearsals. The
 [separate qualification supplement](../docs/rp1-qualification-metadata.md) records
 accepted route evidence without changing those assets or application policy.
+Its installed consumer, cache, independent both-route status, API/UI and support
+collector are now verified on wspr5.
 No new RF qualification is claimed. Items 11–14 remain open.
 
 Status key: ✅ Complete · ⏳ In progress · ☐ Not started
@@ -82,9 +84,9 @@ Status key: ✅ Complete · ⏳ In progress · ☐ Not started
    lifecycle scenarios and final adversarial review passed. Item 8's 14 conducted
    RF cases were reused with unchanged relevant executable/build inputs and
    matching Debian package members; no new target or RF operation occurred.
-   WsprryPi production consumption and validation remain open under item 10.
+   WsprryPi production consumption and validation are accepted separately under item 10.
 10. ✅ **WsprryPi production integration of the published RP1 release.**
-    **Lead: WsprryPi · RP1 item 18.** The
+    **Lead: WsprryPi.** The
     [acceptance matrix and evidence](../docs/development/rp1-item10-production-integration.md)
     bind the published immutable `1.0.0` identities, software checks, evidence
     reuse, target results and accepted exclusions. Fresh downloads, independent
@@ -107,8 +109,14 @@ Status key: ✅ Complete · ⏳ In progress · ☐ Not started
     integration with the published manifest unchanged (`Unavailable`, no target
     entries). Existing application band/mode RF qualification remains valid
     within its recorded scope; an empty provider manifest does not erase it.
-    Accepted route evidence is exposed through separately pinned supplemental metadata;
-    the original provider manifest remains empty. Zero new RF attempts occurred.
+    The separately published `qualification-v1.0.0-r1` supplement is now installed
+    and verified on wspr5: application binary `8d5247a`, repaired helper `aae72f1`,
+    exact pinned cache/receipt, independent GPIO4/GPIO20 evidence, detailed API,
+    installed UI and support collector. Wrong-route/build and missing/invalid/stale
+    evidence checks pass without changing provider authority or application policy.
+    The original provider manifest remains empty. Prior migration/reboot/recovery
+    evidence is retained because its bound inputs are unchanged. No new RF,
+    reboot or rollback rehearsal occurred during the supplement closeout.
 11. ☐ **Documentation performance and remaining Impeccable housekeeping.**
     **Lead: WsprryPi-Docs · RP1 item 19.** Reconcile the saved image-optimization,
     product-metadata and host/tooling reminders; implement justified documentation
@@ -119,7 +127,10 @@ Status key: ✅ Complete · ⏳ In progress · ☐ Not started
     **Lead: WsprryPi-Docs · RP1 item 20.** Incorporate item 10's impact record and
     cover settled API/Phase 15.4 resources, Test Tone, calibration boundaries,
     Si5351 disposition/drive/fade, inventory-timeout and RP1 correction,
-    installation, migration and recovery behavior. Keep support claims aligned
+    installation, migration and recovery behavior. Include supplement cache/refresh,
+    evidence-status meanings, structural compatibility versus external qualification,
+    the installed consumer diagnostic and frozen packaged diagnostic limitations;
+    preserve the application band table. Keep support claims aligned
     with the acceptance matrix. Build/render the documentation, verify links and
     replace materially inaccurate screenshots after item 11's changes settle.
 13. ☐ **Final integrated Impeccable review (#423).**
@@ -156,11 +167,14 @@ Status key: ✅ Complete · ⏳ In progress · ☐ Not started
 
 | WsprryPi item | RP1 item | Status | Work | Lead repository |
 | --- | --- | --- | --- | --- |
-| 10 | 18 | ✅ Complete within accepted scope | Published-provider installation/runtime integration; target passes and metadata/rollback disposition recorded; existing RF qualification preserved | `WsprryPi` |
+| 10 | 18 | ✅ Complete within accepted scope | Published-provider installation/runtime integration; installed supplement and both-route status accepted; prior target passes/rollback exclusion and RF scope preserved | `WsprryPi` |
 | 11 | 19 | ☐ Not started | Documentation performance and Impeccable housekeeping | `WsprryPi-Docs` |
 | 12 | 20 | ☐ Not started | Consolidated operator documentation | `WsprryPi-Docs` |
 | 13 | 21 | ☐ Not started | Final integrated application Impeccable review | `WsprryPi` |
 | 14 | 22 | ☐ Not started | 14a freeze/package; 14b validate/accept; 14c publish/verify | `WsprryPi` |
+
+RP1 item numbers above are historical cross-references; the current provider
+ROADMAP has no numbered application release gates.
 
 The lead repository owns coordination and completion evidence. RP1-GPCLK-DKMS
 provides provider-specific support for item 10; a provider defect requires its
@@ -206,8 +220,9 @@ work; item 13 still requires acceptance of actual integration prerequisites.
   lifecycle evidence is retained; target rollback rehearsals were explicitly
   excluded. The maintainer accepts the unchanged empty `Unavailable` manifest
   as the original release state. Existing RF qualification retains its recorded scope;
-  the separately pinned supplement records accepted evidence without creating
-  a provider permission gate. No new RF qualification is claimed. Follow the
+  the separately pinned supplement and installed consumer report verified scoped
+  evidence for each route without creating a provider permission gate. No new RF
+  qualification is claimed. Follow the
   [published-release contract](../docs/rp1-gpclk-dkms-installation.md#published-releases).
 - ☐ **Operator documentation:** after production RP1 integration, reconcile
   the recorded Si5351 readiness/drive/fade, inventory-timeout, and RP1 correction

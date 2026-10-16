@@ -86,8 +86,9 @@ that path on `devel` too. Development automatic selection remains exact-source
 development. An unavailable or corrupt release fails closed without fallback.
 The [release lock and acceptance workflow](rp1-provider-acceptance.md) bind
 the published bytes; the [item 10 matrix](development/rp1-item10-production-integration.md)
-separates software acceptance from outstanding target installation/runtime
-checks. The published compatibility manifest defaults to `Unavailable` and has
+separates software acceptance from accepted target installation/runtime checks
+and the remaining application release gates. The published compatibility
+manifest defaults to `Unavailable` and has
 no qualified target entries. The separately pinned [qualification supplement](rp1-qualification-metadata.md)
 records accepted scoped evidence without modifying that manifest. Publication, reproducibility and successful DKMS
 builds do not grant live eligibility or transmission authorization. See the

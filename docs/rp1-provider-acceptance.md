@@ -100,7 +100,8 @@ and its applicability, and repeat checks affected by changed inputs. The
 [provider acceptance requirements](development/rp1-provider-acceptance.md) define
 software and separately authorized target evidence. The
 [item 10 acceptance matrix](development/rp1-item10-production-integration.md)
-records the published integration disposition and remaining target gates. The
+records the accepted published integration, installed supplement verification
+and evidence-reuse boundaries. The
 [release checklist](../release_tools/Release%20Punchlist.md) owns remaining
 production integration and documentation work; software-only verification does
 not close that gate.
