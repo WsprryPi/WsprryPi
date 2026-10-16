@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: MIT
-"""Deterministic rejection tests; real candidate rebuilding is a separate gate."""
+"""Deterministic rejection tests; real release rebuilding is a separate gate."""
 import copy
 import importlib.util
 import json
@@ -10,7 +10,7 @@ import unittest
 from unittest import mock
 
 ROOT = Path(__file__).resolve().parents[2]
-spec = importlib.util.spec_from_file_location('accept_rp1', ROOT/'scripts/maintainer/accept_rp1_candidate.py')
+spec = importlib.util.spec_from_file_location('accept_rp1', ROOT/'scripts/maintainer/accept_rp1_release.py')
 A = importlib.util.module_from_spec(spec); spec.loader.exec_module(A)
 
 
@@ -20,7 +20,7 @@ class Tests(unittest.TestCase):
         self.source = Path('/fixture/provider')
         self.assets = {name: name.encode() for name in self.lock['assets']}
         self.metadata = {name: self.lock[name] for name in
-            ('sourceCommit', 'sourceTree', 'productVersion', 'debianVersion', 'classification', 'published')}
+            ('sourceCommit', 'sourceTree', 'productVersion', 'debianVersion', 'classification', 'published', 'releaseTag', 'releaseUrl')}
         self.metadata.update(qualification={name: False for name in
             ('hardware', 'lifecycle', 'product', 'rf', 'wsprrypiAcceptance')},
             runtime=self.lock['runtime'], routes={route: {'compatibilityId': identity,
@@ -64,7 +64,8 @@ class Tests(unittest.TestCase):
 
     def test_scoped_positive_does_not_install_or_claim_publication(self):
         result = self.validate()
-        self.assertEqual(result['providerSelection'], 'candidate')
+        self.assertEqual(result['providerSelection'], 'release')
+        self.assertTrue(result['releaseProfileVerified'])
         for field in ('published', 'qualification', 'productionSelectable', 'installationPerformed'):
             self.assertIs(result[field], False)
 
@@ -99,7 +100,8 @@ class Tests(unittest.TestCase):
 
     def test_runtime_uapi_route_and_publication_mismatches(self):
         original = copy.deepcopy(self.metadata)
-        mutations = [lambda x: x.update(published=True), lambda x: x.update(classification='release'),
+        mutations = [lambda x: x.update(published=False), lambda x: x.update(classification='candidate'),
+            lambda x: x.update(releaseTag='v0.9.0'), lambda x: x.update(releaseUrl='https://example.invalid'),
             lambda x: x['qualification'].update(rf=True), lambda x: x.update(qualification={}),
             lambda x: x['runtime'].update(binding='rp1-gpclk-runtime-binding-v2'),
             lambda x: x['runtime'].update(readiness='wrong'), lambda x: x['runtime'].update(update='wrong'),
@@ -127,6 +129,42 @@ class Tests(unittest.TestCase):
             (directory/'foreign').unlink()
             (directory/self.package).unlink(); (directory/self.package).symlink_to('/dev/null')
             with self.assertRaises(OSError): A.snapshot(directory, self.lock)
+
+    def publication(self):
+        tag = self.lock['releaseTag']
+        return {'tag_name': tag, 'html_url': self.lock['releaseUrl'],
+                'published_at': '2026-10-16T04:25:49Z', 'immutable': True,
+                'draft': False, 'prerelease': False, 'assets': [
+                    {'name': name, 'state': 'uploaded', 'digest': 'sha256:' + digest,
+                     'browser_download_url': A.installer.REPOSITORY_URL.removesuffix('.git') +
+                        '/releases/download/' + tag + '/' + name}
+                    for name, digest in self.lock['assets'].items()]}
+
+    def test_publication_requires_production_policy_exact_tag_and_all_digests(self):
+        release = self.publication()
+        client = mock.Mock()
+        client.json.return_value = release
+        client.tag_commit.return_value = self.lock['sourceCommit']
+        result = A.validate_publication(client, self.lock)
+        self.assertTrue(result['publicationVerified'])
+        self.assertTrue(result['productionSelectable'])
+        client.json.assert_called_once_with(A.installer.API_BASE + '/releases/tags/v1.0.0')
+        mutations = [lambda x: x.update(draft=True), lambda x: x.update(prerelease=True),
+            lambda x: x.update(immutable=False), lambda x: x.update(published_at=None),
+            lambda x: x.update(tag_name='v1.0.1'), lambda x: x.update(html_url='https://example.invalid'),
+            lambda x: x['assets'].pop(),
+            lambda x: x['assets'][0].update(digest='sha256:' + '0'*64),
+            lambda x: x['assets'][0].update(browser_download_url='https://example.invalid/asset'),
+            lambda x: x['assets'].append(copy.deepcopy(x['assets'][0]))]
+        for index, mutate in enumerate(mutations):
+            bad = copy.deepcopy(release); mutate(bad)
+            client.json.return_value = bad
+            with self.subTest(index=index), self.assertRaises(A.installer.ContractError):
+                A.validate_publication(client, self.lock)
+        client.json.return_value = release
+        client.tag_commit.return_value = '0'*40
+        with self.assertRaisesRegex(A.installer.ContractError, 'tag commit'):
+            A.validate_publication(client, self.lock)
 
     def test_unpublished_release_selection_remains_unavailable(self):
         with self.assertRaisesRegex(A.installer.ContractError, 'no eligible'):

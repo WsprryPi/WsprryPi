@@ -273,13 +273,13 @@ jobs:
               rp1-gpclk-backend-test rp1-gpclk-linux-provider-test \
               rp1-gpclk-development-policy-test rp1-gpclk-route-runtime-wiring-test \
               rp1-gpclk-route-service-test rp1-gpclk-transmit-backend-test \
-              rp1-gpclk-diagnostics-test rp1-candidate-acceptance-test SUDO=
+              rp1-gpclk-diagnostics-test rp1-release-acceptance-test SUDO=
 
-      - name: Read-only exact RP1 provider reference
+      - name: Read-only published RP1 1.0.0 provider reference
         uses: actions/checkout@v7
         with:
           repository: WsprryPi/RP1-GPCLK-DKMS
-          ref: 817f3dc6a194f4a92a7f94acf10147169e6439d6
+          ref: 8c16d3c237cb1267cbedafb5da2bb74132ca5de0
           path: src/build/rp1-provider-reference
           persist-credentials: false
 

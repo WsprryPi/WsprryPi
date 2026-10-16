@@ -151,10 +151,10 @@ whose Git history contains it. A development checkout or immutable release that
 cannot prove that ancestry is rejected before provider mutation or runtime bundle
 creation.
 
-An upstream `devel` tip predating that minimum is refused. Select the exact
-reviewed commit explicitly until the owning provider branch includes it. This
-does not create a production release. The separate
-[unpublished candidate acceptance](rp1-candidate-acceptance.md) command never
+An upstream `devel` tip predating that minimum is refused. The published
+`1.0.0` source includes that lifecycle prerequisite; its immutable source and
+asset identities are selected independently. The separate
+[published-provider verification](rp1-provider-acceptance.md) command never
 installs a package or changes ordinary source selection.
 
 A repeated development installation is a no-op only when WsprryPi's existing

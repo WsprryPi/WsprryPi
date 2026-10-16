@@ -1150,9 +1150,9 @@ rp1-gpclk-diagnostics-test:
 	$(Q)python3 ../scripts/tests/rp1_gpclk_diagnostics_test.py
 	$(Q)python3 ../scripts/tests/rp1_provider_diagnostics_test.py
 
-.PHONY: rp1-candidate-acceptance-test
-rp1-candidate-acceptance-test:
-	$(Q)python3 ../scripts/tests/rp1_candidate_acceptance_test.py
+.PHONY: rp1-release-acceptance-test
+rp1-release-acceptance-test:
+	$(Q)python3 ../scripts/tests/rp1_release_acceptance_test.py
 
 clean:
 	$(Q)echo "Cleaning up build artifacts."

@@ -83,6 +83,8 @@ Status key: ✅ Complete · ⏳ In progress · ☐ Not started
     installation, service and runtime checks, exact identities, reusable evidence,
     and explicit exclusions or accepted limitations. Identify separately
     authorized target checks; planning does not authorize hardware operations.
+    Use the maintained [release acceptance workflow](../docs/rp1-provider-acceptance.md)
+    and published asset lock for source/package and publication verification.
     Adopt and verify the published immutable `1.0.0` identities through production
     selection while preserving supported development selectors and fail-closed
     behavior. Validate installation, cleanup-first migration, runtime activation,

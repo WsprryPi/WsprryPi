@@ -1,22 +1,24 @@
 <!-- SPDX-License-Identifier: MIT -->
 
-# RP1 candidate acceptance requirements
+# RP1 provider acceptance requirements
 
-Candidate acceptance binds one exact WsprryPi source revision to one exact
-unpublished provider source revision and its reproducible assets. The
-[candidate lock](../../scripts/tests/fixtures/rp1-candidate-1.0.0.json) is the
+Provider acceptance binds one exact WsprryPi source revision to the published
+immutable `1.0.0` provider source revision and its reproducible assets. The
+[release lock](../../scripts/tests/fixtures/rp1-release-1.0.0.json) is the
 machine-readable authority for source, tree, package, UAPI, overlay and asset
-identities. The [acceptance command](../rp1-candidate-acceptance.md) rebuilds and
+identities. The [acceptance command](../rp1-provider-acceptance.md) rebuilds and
 independently validates those inputs without installation or target access.
 
 ## Software evidence
 
 Use clean committed consumer and provider inputs for final acceptance. Keep
-candidate assets, logs, private configuration, target captures and results
+release assets, logs, private configuration, target captures and results
 outside Git. Results must identify both source revisions, tool/lock/installer
 hashes and any working-tree changes. Reject substituted, missing, duplicated,
-malformed or unexpected assets. Unpublished candidate acceptance never grants
-production release selection or establishes publication or RF qualification.
+malformed or unexpected assets. A matching local release profile alone establishes neither publication nor
+production selectability. Read-only publication verification must also establish
+remote immutability, exact tag identity and all published asset digests. Neither
+check establishes target installation or RF qualification.
 
 Required software coverage includes exact-source development selection,
 production refusal of unpublished releases, distinct GPIO4/GPIO20 identities,
@@ -28,7 +30,10 @@ history must remain observable. Stale callbacks must not regain authority.
 All RP1-supported modes require their applicable planning and lifecycle checks.
 
 Repeat affected provider build/package/lifecycle checks and consumer checks
-whenever a provider repair creates a new candidate. Kernel header builds prove
+when relevant executable, build, package or interface inputs change.
+Documentation and test maintenance does not replace the immutable provider
+release. Preserve the original evidence identity and record an applicability
+rationale before reusing it for current acceptance. Kernel header builds prove
 build compatibility only. Disposable package tests, simulated application tests,
 provider boundary tests and hosted CI are separate evidence classes. None
 substitutes for target installation, service, GPIO, DMA or RF evidence.
@@ -75,6 +80,7 @@ provider acceptance, operator documentation and licensing reviews explicit.
 Operator documentation lives in the separate documentation repository and has
 its own authorization and validation boundary.
 
-Passing acceptance does not authorize a PR, merge, provider freeze, tag,
-publication or WsprryPi release. Integration into `devel` and later provider
-freeze/publication are subsequent, separately authorized steps.
+Passing software acceptance does not authorize installation, target operations,
+publication or a WsprryPi release. The existing provider `v1.0.0` tag and assets
+remain immutable. Keep WsprryPi release integration and publication as separate
+application-owned steps.
