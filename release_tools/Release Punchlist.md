@@ -8,7 +8,7 @@ disposition rather than implementation before 4.0.
 
 ## Ordered release checklist
 
-Status updated October 16, 2026. Items 1 through 13 are complete within their
+Status updated October 16, 2026. Items 1 through 14 are complete within their
 recorded scopes. Accepted implementation is integrated into `devel`, and the
 immutable RP1 provider release is published. Item 10, WsprryPi production
 consumption and validation, is accepted for installation and idle runtime
@@ -22,11 +22,12 @@ collector are now verified on wspr5.
 No new RF qualification is claimed. Items 11–12 are complete, including verified
 hosted builds and publication. Item 13 is complete for reviewed implementation
 `d93c75c` on `devel`, with #423 closed and final closeout CI verified;
-items 14–16 have not started. Item 14 records planned
-Pico Type 2/3 companion integration requiring separate authorization and
-affected revalidation before the Beta 1 candidate is frozen. Item 15 retains
+item 14 is complete within its bounded software integration scope. The full
+Pico Type 2/3 companion is integrated with affected Impeccable review,
+independent adversarial repairs, exact-source compatibility and promoted-head
+CI. Docs devel and its hosted default-gated build are verified. Item 15 retains
 the unexecuted P15.9 valid-field-saving prompt under WsprryPi coordination;
-Beta 1 preparation is item 16.
+Beta 1 preparation is item 16. Items 15–16 have not started.
 
 The current milestone is **WsprryPi 4.0 Beta 1**, not final 4.0 stable
 publication. The maintainer's October 16 direction is to prepare a reviewable
@@ -192,50 +193,45 @@ Status key: ✅ Complete · ⏳ In progress · ☐ Not started
     Planning-only commit `e3e5008` was subsequently pushed and passed
     [all 11 exact-head CI jobs](https://github.com/WsprryPi/WsprryPi/actions/runs/38966261503);
     the [follow-up verification](https://github.com/WsprryPi/WsprryPi/issues/423#issuecomment-6224818188)
-    confirms #423 remains closed. All 131 reviewed UI/workflow/audit inputs
-    retain their accepted hashes. See the [maintainer acceptance record](../docs/development/item13-integrated-impeccable-review.md)
-    and retained visual/detector evidence. Operator docs remain unchanged at
-    accepted content `166639f`/verification record `b377bc4`; no blocking correction
-    is required. This UI gate does not qualify physical devices, assistive
+    confirms #423 remains closed. At that item 13 checkpoint, all 131 reviewed
+    UI/workflow/audit inputs retained their accepted hashes. Item 14 records
+    the later 123 unchanged/eight affected input addendum. See the
+    [maintainer acceptance record](../docs/development/item13-integrated-impeccable-review.md)
+    and retained visual/detector evidence. At that item 13 checkpoint, operator
+    docs remained unchanged at accepted content `166639f`/verification record
+    `b377bc4`; no blocking correction was required. This UI gate does not qualify physical devices, assistive
     technology, installation, services, GPIO, timing or RF, and does not establish
     Beta publication readiness. Physical-device, actual screen-reader and native
     browser-zoom coverage remain outstanding. Later UI-affecting changes require
     affected review/documentation checks again; items 14–15 record the Pico
-    Type 2/3 integration and valid-field-saving follow-ups. Items 14–16 have
-    not started.
-14. ☐ **Pico WSPR Type 2/3 management integration and acceptance.**
-    **Lead: WsprryPi · Documentation: WsprryPi-Docs.** Item 13's closeout is
-    complete. Start from a fresh, clean, verified `devel` checkpoint.
-    The [full P15.8 integration-candidate prompt](P15.8%20Pi%20Integration%20Prompt.md)
-    is saved verbatim from the WsprryPico handoff and has not been executed.
-    Its future approval covers only the stated Pi/Docs feature branches;
-    devel promotion and full item 14 closure remain separate decisions.
-    Under separate integration authorization, integrate the reviewed
-    `codex/p15-8-wspr-type23` branch, whose accepted handoff head is
-    `6d5e73430bfbacdb8cfc29c3fe41089aa8ae5fcb`. That head changes only the
-    completion record; include the preceding implementation, tests and final
-    Pico pin, not just a cherry-pick of the final documentation commit. Refresh
-    both branch identities and inspect all changes before integration. See the
-    [companion handoff](https://github.com/WsprryPi/WsprryPi/blob/6d5e73430bfbacdb8cfc29c3fe41089aa8ae5fcb/docs/development/phase15-8-wspr-type23.md).
-    Preserve item 13's UI repairs, guarded browser fixtures and fail-closed
-    hardware-access audit. Verify the exact current Pico pin and historical
-    compatibility rows, Type 1 preservation, negotiated Type 2/3 reads/saves,
-    unsupported-format refusal, native TLS and consumer station/AP paths.
-    Run applicable Linux/API/UI/browser regressions and exact integrated-head
-    CI. Repeat focused Impeccable checks for member settings, saved-plan/draft
-    feedback, explicit saves and recovery at desktop/mobile sizes in both
-    themes, with keyboard and enlarged-text checks. Perform an independent
-    adversarial assessment, repair findings and repeat affected checks.
-    Coordinate affected Type 1-only operator guidance and materially inaccurate
-    screenshots under separate WsprryPi-Docs authorization; build and verify
-    affected documentation and record its accepted publication status.
-    Record the integrated application/Pico/documentation identities and an
-    item 13 review addendum for changed surfaces. Existing evidence remains
-    applicable where inputs are unchanged; reassess any newly affected scope.
-    This item does not itself require repeating RP1 publication, calibration
-    decisions, Si5351 readiness or physical RF qualification. Complete this gate
-    before Beta 1 candidate freeze/build; checklist inclusion does not authorize
-    the merge, sibling writes or hardware operations.
+    Type 2/3 integration and valid-field-saving follow-ups. Item 14 records the
+    completed affected integration review below; items 15–16 have not started.
+14. ✅ **Pico WSPR Type 2/3 management integration and acceptance.**
+    **Lead: WsprryPi · Documentation: WsprryPi-Docs.** Complete within the
+    bounded software scope. The full accepted companion through `6d5e734`,
+    including its implementation, tests and immutable Pico `804e8a0` pin, is
+    integrated on `devel` at reviewed implementation `f6b5158`. All
+    [12 feature-head CI jobs](https://github.com/WsprryPi/WsprryPi/actions/runs/38974181065)
+    and [12 promoted-head jobs](https://github.com/WsprryPi/WsprryPi/actions/runs/38975937376)
+    pass. Eight exact local compatibility pairs, genuine TLS/consumer crypto/
+    resource/journal/recovery, runtime and sanitizer checks pass. Impeccable
+    and fresh independent adversarial reassessment close all bounded findings;
+    72 current plus 16 historical rendered captures cover both themes,
+    desktop/mobile, keyboard and 200% text. Step 13's unchanged inputs and
+    guarded fixtures/fail-closed trace audit are preserved.
+    Separate Docs commits `7dcac4a`/`ee689f0` are promoted to Docs `devel`;
+    [RTD build 35202029](https://app.readthedocs.org/projects/wsprry-pi/builds/35202029/)
+    verifies exact `ee689f0`, HTML/copied sources/PDF/EPUB, and unchanged
+    Pico-hidden hosted gating. Strict local Pico-enabled outputs are reviewed
+    separately. No P15.9, freeze/build, release, installation, target services
+    or physical RF qualification is included. The record retains the nonblocking
+    Pico Type 1 rationale wording follow-up; no Pico edit or repin is included.
+    See the
+    [acceptance and item 13 affected-review addendum](../docs/development/item14-pico-type23-integration.md)
+    and [retained execution prompt](P15.8%20Pi%20Integration%20Prompt.md).
+    The later evidence/test-fixture closeout changes no product code; its own
+    exact-head CI and final feature/devel parity are verified in the final
+    execution handback. Items 15–16 remain unstarted.
 15. ☐ **P15.9 — Save valid fields independently of transmit readiness.**
     **Lead: WsprryPi coordination · Implementation: WsprryPico.** Not started.
     The [full operator-supplied execution prompt](P15.9%20Valid%20Field%20Saves%20Prompt.md)
@@ -330,7 +326,7 @@ Status key: ✅ Complete · ⏳ In progress · ☐ Not started
 | 11 | 19 | ✅ Complete | Documentation performance and Impeccable housekeeping; hosted build/publication verified | `WsprryPi-Docs` |
 | 12 | 20 | ✅ Complete | Consolidated operator documentation; exact-revision hosted build/publication verified | `WsprryPi-Docs` |
 | 13 | 21 | ✅ Complete; #423 closed | Integrated application Impeccable review accepted for `d93c75c`; final closeout/planning-head CI each passed 11/11; bounded validation and qualification limits retained | `WsprryPi` |
-| 14 | — | ☐ Not started | Pico Type 2/3 companion integration, compatibility checks, affected UI/documentation revalidation and adversarial acceptance | `WsprryPi`; affected operator docs: `WsprryPi-Docs` |
+| 14 | — | ✅ Complete within bounded software scope | Full companion integrated; eight exact compatibility pairs, affected Impeccable/adversarial repairs, promoted-head CI and separately published Docs verified; nonblocking Pico wording follow-up retained | `WsprryPi`; affected operator docs: `WsprryPi-Docs` |
 | 15 | — | ☐ Not started; prompt saved | P15.9 independent valid-field saves, durable draft/applied/readiness semantics and coordinated acceptance; Pi release integration remains separately authorized | `WsprryPi` coordination; `WsprryPico` implementation |
 | 16 | 22 | ☐ Not started | Beta 1 release notes, candidate build and acceptance; stop after 16c; later 16d prerelease publication and 16e issue announcements | `WsprryPi` |
 
@@ -412,13 +408,14 @@ Beta preparation or announcement does not itself close that stable release gate.
   11/11 CI jobs; unchanged reviewed inputs and closure are confirmed in the
   [follow-up verification](https://github.com/WsprryPi/WsprryPi/issues/423#issuecomment-6224818188).
   #412 stays open for publication; other ready issues await the later authorized
-  publication notifications. Item 14 is the next separate gate; its UI-affecting
-  integration requires an addendum covering changed surfaces before candidate freeze.
-- ☐ **Pico Type 2/3 companion integration and acceptance:** complete item 14's
-  separately authorized integration, current/historical interoperability,
-  affected Impeccable/adversarial review and operator-documentation follow-up.
-  Retain accepted evidence for unchanged inputs and record the new candidate
-  identities before item 16b.
+  publication notifications. Item 14's affected integration addendum is now
+  complete; item 15 and item 16's gates remain unstarted.
+- ✅ **Pico Type 2/3 companion integration and acceptance:** item 14's complete
+  companion integration, eight current/historical pairs, affected Impeccable/
+  adversarial repairs and separately published operator documentation are
+  accepted within the bounded software scope. See the
+  [acceptance addendum](../docs/development/item14-pico-type23-integration.md)
+  for exact identities, CI, preserved evidence and the Pico wording follow-up.
 - ☐ **P15.9 independent valid-field saves:** item 15's prompt is saved and has
   not been executed. WsprryPi coordinates Pico implementation and any separately
   approved Pi work. Preserve draft/applied/readiness and legacy atomic semantics,

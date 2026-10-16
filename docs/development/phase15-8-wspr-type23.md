@@ -1,5 +1,11 @@
 # P15.8 Pico WSPR Type 2/3 companion
 
+> Historical companion checkpoint retained below. The later authorized
+> [item 14 integration and acceptance](item14-pico-type23-integration.md)
+> adopts this complete series on Pi devel, performs affected review and records
+> the current Docs disposition. Its historical branch-status statements are
+> not the current release integration state.
+
 Status: software implementation and local validation complete. CI/publication
 are tracked in the lead Pico execution record. This branch is not integrated
 into Pi devel.

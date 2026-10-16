@@ -1,0 +1,59 @@
+{
+  "scope": "Affected item13 inputs; historical item13 inventory remains unchanged",
+  "preintegration": "af4ce3138177ac488421e7d45808e5c31a54ec4f",
+  "companion": "6d5e73430bfbacdb8cfc29c3fe41089aa8ae5fcb",
+  "pico_pin": "804e8a06585ec5a0e650e69fcd71ada398b6cc9f",
+  "unchanged_count": 123,
+  "changed": [
+    {
+      "path": ".github/workflows/debian-non-hardware.yml",
+      "item13_sha256": "c85ac7e14422d9e42027f9a0259c465959e4c324e176f251ad89933c4fb96b7d",
+      "item14_sha256": "33cdafb1dd0e407ec4f938c0ed7c5df138f89dde78f58b5ce830f2262cb8e9e5"
+    },
+    {
+      "path": "WsprryPi-UI/data/views/wtp-controls.php",
+      "item13_sha256": "e2a8d0b1c85331e7c1bef65b09f020e8c25a84e59b07e16260b907330cf60226",
+      "item14_sha256": "9ccdc9399e6572093973e05cbe1dd3a1533b51a009fd40554ae396ceb28edcfa"
+    },
+    {
+      "path": "WsprryPi-UI/data/wtp-management.js",
+      "item13_sha256": "bdc7e23106495863be22f629e42153fac9432bd316194f6026ee4c8247c20136",
+      "item14_sha256": "fdab6cad31a7bc04f6249bef906b0913e4f9ed1783f48af9720e777713f16943"
+    },
+    {
+      "path": "WsprryPi-UI/package.json",
+      "item13_sha256": "d37fe4214e6735e8d08721411c49d6b8fb5fca49de543b31c48fcae2705f8e8e",
+      "item14_sha256": "ce3f07f69e6f8ffff946949ba8ee54cf1d10cb2bbe0ae6a4405d115832aa300c"
+    },
+    {
+      "path": "WsprryPi-UI/tests/wtp_configuration_interop_test.js",
+      "item13_sha256": "dd03df552e7f281f5cc5077e8c30ca1f77e70ea0b37b653061da0607cf02727b",
+      "item14_sha256": "207d67c16adfc5cf0f26871c973669df137ea65c67a86cad56eebb60f6fb0113"
+    },
+    {
+      "path": "WsprryPi-UI/tests/wtp_management_test.js",
+      "item13_sha256": "c4bffac9848a1efc56af233791eb39da8c8765288a8bdbb86a113ab7f4916a0a",
+      "item14_sha256": "9238d6c997841b321bcfacbfeeb1fb47a7f612f65de39d90f59d3819ca48a1d0"
+    },
+    {
+      "path": "WsprryPi-UI/tests/wtp_recovery_ui_integration_test.js",
+      "item13_sha256": "80158ce55dab8cafb35f832330067f6c4cad9d9b7d26037307cff41e434058d0",
+      "item14_sha256": "c068c6ac436d986c91433669acf085ee0fcefc722c61b0ace0fc1e36505e0d49"
+    },
+    {
+      "path": "WsprryPi-UI/tests/wtp_resources_interop_test.js",
+      "item13_sha256": "c59c37eeed6f1c0e0e6e04797a636abae9bd9dd19b07769d07381110bd4516d6",
+      "item14_sha256": "fb8fa05d55b4d5dd3d2206c22ad2693ca2bb357908d558a450bf76f647d85995"
+    }
+  ],
+  "new": [
+    {
+      "path": "WsprryPi-UI/tests/wtp_recovery_fixture_test.js",
+      "sha256": "007926000372781d9d198e744abc9fdeeb028e04d0a30604f767cd86196fdf37"
+    },
+    {
+      "path": "WsprryPi-UI/tests/wtp_recovery_resource_fixtures.js",
+      "sha256": "e037a1a8a988eb423d4c00bd4cf86d4ac85a9d87269b1afdbf4388887848e8d3"
+    }
+  ]
+}
