@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# shellcheck disable=SC1091,SC2016,SC2034,SC2329
+# shellcheck disable=SC1091,SC2016,SC2034,SC2317,SC2329
 set -euo pipefail
 
 SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
@@ -275,10 +275,59 @@ if grep -Eiq 'live_output|kernel_2712_phase|dtoverlay=rp1' "$INSTALLER"; then
     echo "standard installer must not deploy historical experimental RP1 paths" >&2
     exit 1
 fi
-if grep -Eiq 'qualification.*(tar|download|install)|dtoverlay=rp1|modprobe[[:space:]]+rp1' "$INSTALLER"; then
-    echo "standard installer must not consume qualification content or activate the RP1 path" >&2
+if grep -Eiq 'dtoverlay=rp1|modprobe[[:space:]]+rp1' "$INSTALLER"; then
+    echo "standard installer must not directly activate the RP1 path" >&2
     exit 1
 fi
+
+# shellcheck disable=SC2119
+(
+    # Pin-verified supplemental metadata is application status data. Exercise
+    # its selection/failure boundary without executing any installer command.
+    # shellcheck source=../install.sh
+    source "$INSTALLER"
+    ACTION=install
+    LOCAL_REPO_DIR=/fixture
+    metadata_selected=false
+    metadata_refresh_fails=false
+    metadata_refreshes=0
+    metadata_helpers=0
+    metadata_removals=0
+    metadata_warnings=0
+    rp1_gpclk_dkms_installation_selected() { [[ "$metadata_selected" == true ]]; }
+    warn() { metadata_warnings=$((metadata_warnings + 1)); }
+    exec_command() {
+        local description="$1"
+        shift
+        case "$description" in
+            "Create route-runtime directory"|"Install route application companion"|\
+            "Install runtime reconciliation support"|"Remove runtime reconciliation support") ;;
+            "Install RP1 qualification interpreter and separate reference")
+                [[ "$#" == 3 && "$1" == python3 && "$2" == /fixture/scripts/rp1_qualification.py && "$3" == install-runtime ]] || return 1
+                metadata_helpers=$((metadata_helpers + 1)) ;;
+            "Refresh pinned RP1 qualification evidence")
+                [[ "$#" == 3 && "$1" == python3 && "$2" == /fixture/scripts/rp1_qualification.py && "$3" == refresh ]] || return 1
+                metadata_refreshes=$((metadata_refreshes + 1))
+                [[ "$metadata_refresh_fails" == false ]] || return 1 ;;
+            "Remove attributable RP1 qualification helper files")
+                [[ "$#" == 3 && "$1" == python3 && "$2" == /fixture/scripts/rp1_qualification.py && "$3" == remove-runtime ]] || return 1
+                metadata_removals=$((metadata_removals + 1)) ;;
+            *) echo "unexpected installer operation: $description" >&2; return 1 ;;
+        esac
+    }
+    manage_route_application
+    [[ "$metadata_helpers" == 1 && "$metadata_refreshes" == 0 ]]
+    metadata_selected=true
+    metadata_refresh_fails=true
+    manage_route_application
+    [[ "$metadata_helpers" == 2 && "$metadata_refreshes" == 1 && "$metadata_warnings" == 1 ]]
+    metadata_refresh_fails=false
+    manage_route_application
+    [[ "$metadata_refreshes" == 2 && "$metadata_warnings" == 1 ]]
+    ACTION=uninstall
+    manage_route_application
+    [[ "$metadata_removals" == 1 ]]
+)
 
 if ! grep -Fq 'exec_command "Publish validated UI artifact"' "$INSTALLER"; then
     echo "install.sh must publish the UI through the validated artifact publisher" >&2
