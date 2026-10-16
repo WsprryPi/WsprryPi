@@ -50,6 +50,8 @@ async function cases(carrier, failure="storage") {
     const load=async()=>{await b.click('wtp-member-load');const r=calls.at(-1).result;assert.equal(r.status,200,JSON.stringify(r));return r;};
     let loaded=await load(); if(failure==="storage")fs.writeFileSync(path.join(build,`resources-loaded-${carrier}.json`),JSON.stringify(loaded.body)); const initial=await control('dump');
     assert.equal(loaded.body.profile_owned_station,consumer);
+    const extendedFormats=loaded.body.application.schema==='transmitter-application/2';
+    const remoteResource=r=>extendedFormats&&['application','station'].includes(r)?r+'/2':r;
     if (consumer) {
       assert.match(b.element('wtp-member-active').textContent,/Unknown/);
       assert(b.element('wtp-member-station-save').disabled);assert.match(b.element('wtp-member-station-feedback').textContent,/setup owns/);
@@ -102,8 +104,8 @@ async function cases(carrier, failure="storage") {
         ['application','/recurrence',{...a.recurrence,enabled:true,schedules:[]}],
         ['application','/recurrence/schedules',[{period_s:240,phase_s:0},{period_s:120,phase_s:0}]],
         ['application','/capabilities/station_encoding','wspr_type2'],
-        ['capabilities','/application_resources/schema','transmitter-application/2'],
-        ['capabilities','/application_resources',null],
+        ['capabilities',extendedFormats?'/application_resources_v2/schema':'/application_resources/schema',extendedFormats?'transmitter-application/99':'transmitter-application/2'],
+        ['capabilities',extendedFormats?'/application_resources_v2':'/application_resources',null],
         ['capabilities','/features/consumer_setup_identity',true],
         ['management','/selected','consumer_ap'],
         ['pins','/active/rf_gp',14],
@@ -113,16 +115,16 @@ async function cases(carrier, failure="storage") {
       for (const [resource,pointer,value] of variants) {
         // Unchanged false is valid; exercise the impossible active/saved divergence separately.
         if(resource==='application'&&pointer==='/hardware/pending_restart')continue;
-        await call({control:'corrupt',corruption:{resource,pointer,value}});
+        await call({control:'corrupt',corruption:{resource:remoteResource(resource),pointer,value}});
         await b.click('wtp-member-load');assert.notEqual(calls.at(-1).result.status,200,`${resource}${pointer}`);
         assert.deepEqual(await control('dump'),initial);
       }
       for(const [resource,pointer,value] of [['station','/station/power_dbm',20],['hardware','/saved/rf_gp',28],['pins','/choices/eligible_gps/0',0],['application','/capabilities/max_update_bytes',1024]]) {
-        await call({control:'corrupt',corruption:{resource,pointer,value,as_float:true}});
+        await call({control:'corrupt',corruption:{resource:remoteResource(resource),pointer,value,as_float:true}});
         await b.click('wtp-member-load');assert.notEqual(calls.at(-1).result.status,200,`${resource}${pointer} float`);assert.deepEqual(await control('dump'),initial);
       }
       for(const option of ['duplicate','oversized']) {
-        await call({control:'corrupt',corruption:{resource:'application',pointer:'/schema',value:'transmitter-application/1',[option]:true}});
+        await call({control:'corrupt',corruption:{resource:remoteResource('application'),pointer:'/schema',value:'transmitter-application/1',[option]:true}});
         await b.click('wtp-member-load');assert.notEqual(calls.at(-1).result.status,200);assert.deepEqual(await control('dump'),initial);
       }
       await call({control:'clear'});loaded=await load();
@@ -190,9 +192,22 @@ async function cases(carrier, failure="storage") {
       let state=await control('dump');assert.equal(state.config.station.locator,'FN42AB');assert(state.pending_restart&&state.inhibit);
       assert.equal(state.password_sha256,initial.password_sha256);
       loaded=await load();
-      const extended=JSON.parse(stationWire.body);extended.station.callsign='K1ABC/P';
-      r=await call({...stationWire,body:JSON.stringify(extended),revision:loaded.etag,member_context:loaded.body.member_context});
-      assert.equal(r.status,400);assert.equal(r.body.error.code,'unsupported_station_encoding');assert.deepEqual(await control('dump'),state);
+      if(extendedFormats) {
+        for(const [callsign,locator,types] of [['K1ABC/P','FN42',['type2']],['<AA0NT>','EM18IG',['type3']],['PJ4/AA0NT','EM18IG',['type2','type3']],['AA0NT/09','EM18IG',['type2','type3']]]) {
+          loaded=await load();b.element('wtp-member-callsign').value=callsign;b.element('wtp-member-locator').value=locator;
+          await b.click('wtp-member-station-save');assert.equal(calls.at(-1).result.status,200,JSON.stringify(calls.at(-1)));
+          assert.equal(JSON.parse(calls.at(-1).request.body).schema,'transmitter-station/2');
+          state=await control('dump');assert.equal(state.config.station.callsign,callsign);assert.equal(state.config.station.locator,locator);
+          assert.equal(state.cursor,initial.cursor);assert.equal(state.password_sha256,initial.password_sha256);assert.deepEqual(state.config.schedules,initial.config.schedules);
+          loaded=await load();assert.deepEqual(loaded.body.application.wspr_plan.frame_types,types);
+          fs.writeFileSync(path.join(build,`resources-wspr-${callsign==='AA0NT/09'?'ambiguity':types.length===2?'pair':types[0]}.json`),JSON.stringify(loaded.body));
+          if(callsign==='AA0NT/09'){assert.equal(loaded.body.application.wspr_plan.type2_ambiguous,true);assert.equal(loaded.body.application.wspr_plan.alternate_callsign,'AA0NT/Z');}
+        }
+      } else {
+        const extended=JSON.parse(stationWire.body);extended.station.callsign='K1ABC/P';
+        r=await call({...stationWire,body:JSON.stringify(extended),revision:loaded.etag,member_context:loaded.body.member_context});
+        assert.equal(r.status,400);assert.equal(r.body.error.code,'unsupported_station_encoding');assert.deepEqual(await control('dump'),state);
+      }
       // A successful legacy write invalidates the shared editor context.
       loaded=await load();await b.click('wtp-remote-load');b.element('wtp-remote-callsign').value='W1AW';
       b.element('wtp-remote-password').value='';await b.click('wtp-remote-save');assert.equal(calls.at(-1).result.status,200);
@@ -202,7 +217,7 @@ async function cases(carrier, failure="storage") {
       r=await call({method:'PUT',path:'/api/v1/schedules',body:JSON.stringify({schedules:state.config.schedules}),revision:alias.etag});assert.equal(r.status,200);
     } else {
       const count=calls.length;await b.click('wtp-member-station-save');assert.equal(calls.length,count);
-      const payload={schema:'transmitter-station/1',target:loaded.body.target,station:{callsign:'K1ABC',locator:'FN42AB',power_dbm:10}};
+      const payload={schema:extendedFormats?'transmitter-station/2':'transmitter-station/1',target:loaded.body.target,station:{callsign:'K1ABC',locator:'FN42AB',power_dbm:10}};
       r=await call({method:'PUT',path:'/api/v1/member/station',body:JSON.stringify(payload),revision:loaded.etag,member_context:loaded.body.member_context});
       assert.equal(r.status,409);assert.equal(r.body.error.code,'consumer_setup_identity_required');
     }
@@ -244,7 +259,7 @@ async function cases(carrier, failure="storage") {
     if(consumer) {await control('advance');b.element('wtp-management-password').value='test-password';await b.click('wtp-management-connect');assert.equal(calls.at(-1).result.status,200,JSON.stringify(calls.at(-1).result));}
     if(!consumer) {
       loaded=await load();b.element('wtp-member-power').value='13';
-      await call({control:'corrupt',corruption:{resource:'station',method:'PUT',pointer:'/station/power_dbm',value:13,as_float:true}});
+      await call({control:'corrupt',corruption:{resource:remoteResource('station'),method:'PUT',pointer:'/station/power_dbm',value:13,as_float:true}});
       await b.click('wtp-member-station-save');assert.notEqual(calls.at(-1).result.status,200);assert.equal(calls.at(-1).result.body.mutation_attempted,true);
       assert.equal((await control('dump')).config.station.power_dbm,13);assert(b.element('wtp-member-station-save').disabled);
       await call({control:'clear'});loaded=await load();assert.equal(loaded.body.application.station.station.power_dbm,13);

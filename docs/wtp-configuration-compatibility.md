@@ -176,3 +176,43 @@ proof are an independently versioned extension reachable at full capacity.
 Published P15.6 Pi behavior against new Pico is tested separately using its
 actual old product sources. See the [P15.7 record](development/phase15-7-recovery.md)
 and lead packet for exact tested pairs and results.
+
+## P15.8 versioned WSPR formats
+
+The separately advertised `application_resources_v2` descriptor negotiates
+`transmitter-application/2`, `transmitter-station/2` and
+`wspr_type123_auto`. Its exact paths are GET `application/2` and `station/2`,
+PUT `station/2` and `config/2`, and POST `config/update/2` below `/api/v1/`.
+The complete seven-field descriptor is closed; unknown schema, literal, path,
+plan type or shape refuses before a mutation. Absence selects the historical
+Type 1 contract. Present unsupported support never falls back.
+
+The host member-facing routes remain unchanged. A station save uses the schema
+actually read from the negotiated resource. Atomic settings retain Config v1
+and config-update/1 envelope/omission/password-preserve semantics on the new
+paths. Consumer profile station identity still belongs to encrypted Pico setup;
+member station writes remain unavailable for those profiles. Both native TLS
+and encrypted station/AP outbound allowlists retain explicit methods, bounds,
+revision requirements and their original authentication.
+
+The versioned application adds bounded `wspr-plan/1` metadata: supported state,
+one/two known frame types, 120-second slot separation, rationale and explicit
+Type 2 ambiguity/alternate call. A 12-character stored token includes brackets.
+Ordinary six-character locators retain Type 1/four on air. Compound plus four
+selects Type 2 without a locator; compound plus six selects Type 2 then Type 3;
+explicit brackets plus six select a Type 3 single. No preference selector is
+introduced. Reported dBm is message content, separate from RF output.
+
+`/00`–`/09` remain supported, sharing Type 2 bits with `/Q`–`/Z`; readback and
+paired Type 3 hashing retain the requested identity. Receiver hash context and
+ambiguity resolution remain receiver limitations. Frozen legacy application/1
+and station/1 projections retain their shape/literal and explicitly refuse a
+selected new-format station. Unchanged release Pi can continue existing Type 1
+workflows; a selected Type 2/3 station requires this companion or a later
+integration. WTP/1, management/1 and /2, Consumer-Radio/1 and Consumer-Recovery/1
+remain unchanged.
+
+The matrix adds historical `p157` at
+`26ae596b540e92f25da37f978321ba1ec5934bdc`, preserving its original strict
+expectations, and advances only `current`. Execution and branch/rollout evidence
+are in [the P15.8 companion record](development/phase15-8-wspr-type23.md).

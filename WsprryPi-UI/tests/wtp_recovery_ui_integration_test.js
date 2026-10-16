@@ -244,7 +244,35 @@ async function main() {
         assert.match(await evaluate('document.getElementById("wtp-management-retirement-status").textContent'),/retired or already absent/);
         assert.equal(await evaluate('document.getElementById("wtp-remote-callsign").value'),'MYDRAFT');
         assert.equal(await evaluate('window.__requests.filter(r=>r.url.endsWith("/member/configuration")&&r.options.method==="POST").length'),1);
-        console.log(JSON.stringify({source:UI_ROOT,browser:(await client.send('Browser.getVersion')).product,readback_preserves_draft:true,decline_sends_nothing:true,keyboard_inspection:true,retirement_error_and_success:true,password_scrubbed:true,no_mutation_replay:true,screenshots:captureScreenshots?8:0,fixture_build:resourceBuild,output}));
+        if (fs.existsSync(path.join(resourceBuild,'resources-wspr-type3.json'))) {
+          await evaluate(`document.getElementById('wtp-management-carrier').value='engineering_mtls';document.getElementById('wtp-management-carrier').dispatchEvent(new Event('change'));document.getElementById('wtp-management-connect').click();`);
+          await waitFor(async()=>await evaluate('document.getElementById("wtp-management").getAttribute("aria-busy")==="false"'),'engineering selection');
+          for (const scenario of ['type2','type3','ambiguity']) {
+            const saved=JSON.parse(fs.readFileSync(path.join(resourceBuild,`resources-wspr-${scenario}.json`)));
+            await evaluate(`window.__resourceFixtures.loaded=${JSON.stringify(saved)};window.__resourceState='loaded';document.getElementById('wtp-member-load').click();`);
+            await waitFor(async()=>await evaluate('document.getElementById("wtp-management").getAttribute("aria-busy")==="false"'),'versioned station readback');
+            assert.match(await evaluate('document.getElementById("wtp-member-station-feedback").textContent'),/Saved plan:/);
+            const station=saved.application.station.station;
+            await evaluate(`document.getElementById('wtp-member-callsign').value=${JSON.stringify(station.callsign)};document.getElementById('wtp-member-locator').value=${JSON.stringify(station.locator)};document.getElementById('wtp-member-callsign').dispatchEvent(new Event('input'));document.getElementById('wtp-member-callsign').focus();`);
+            await client.send('Input.dispatchKeyEvent',{type:'keyDown',key:'Tab',code:'Tab',windowsVirtualKeyCode:9});
+            await client.send('Input.dispatchKeyEvent',{type:'keyUp',key:'Tab',code:'Tab',windowsVirtualKeyCode:9});
+            assert.equal(await evaluate('document.activeElement.id'),'wtp-member-locator');
+            if(scenario==='type3') {
+              await evaluate(`document.getElementById('wtp-member-locator').value='EM18';document.getElementById('wtp-member-locator').dispatchEvent(new Event('input'));`);
+              assert.match(await evaluate('document.getElementById("wtp-member-station-feedback").textContent'),/six-character/);
+              await evaluate(`document.getElementById('wtp-member-locator').value='EM18IG';document.getElementById('wtp-member-locator').dispatchEvent(new Event('input'));`);
+            }
+            assert.match(await evaluate('document.getElementById("wtp-member-station-feedback").textContent'),scenario==='type2'?/Type 2/:scenario==='type3'?/Type 3/:/ambiguous/);
+            for (const theme of ['light','dark']) for(const viewport of [{name:'desktop',width:1440,height:1100},{name:'mobile',width:390,height:844}]) {
+              await client.send('Emulation.setDeviceMetricsOverride',{...viewport,deviceScaleFactor:1,mobile:viewport.name==='mobile'});
+              await evaluate(`applyThemePreference('${theme}');document.getElementById('wtp-member-callsign').scrollIntoView({block:'start',behavior:'instant'});window.scrollBy(0,-160);new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)))`);
+              assert(await evaluate('document.documentElement.scrollWidth<=innerWidth+1'),'WSPR plan feedback overflow');
+              await capture(`${viewport.name}-${theme}-wspr-${scenario}.png`);
+            }
+          }
+          console.log('Versioned Type 2/3 and ambiguous pair readback, draft feedback, keyboard and desktop/mobile light/dark passed');
+        }
+        console.log(JSON.stringify({source:UI_ROOT,browser:(await client.send('Browser.getVersion')).product,readback_preserves_draft:true,decline_sends_nothing:true,keyboard_inspection:true,retirement_error_and_success:true,password_scrubbed:true,no_mutation_replay:true,screenshots:captureScreenshots?(fs.existsSync(path.join(resourceBuild,'resources-wspr-type3.json'))?20:8):0,fixture_build:resourceBuild,output}));
     } catch (error) {
         failure = new Error(`${error.message}\n${childDiagnostic(chrome || php)}`, { cause: error });
     } finally {

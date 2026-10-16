@@ -156,8 +156,9 @@
             ? "Station storage is faulted; saved values are unavailable. Any retained fields are previous drafts. Resolve the storage fault before saving."
             : data.profile_owned_station
             ? `Read-only: Pico transactional setup owns the effective station. ${station ? `${station.callsign}, ${station.locator}, ${station.power_dbm} dBm.` : "Effective station unavailable."}`
-            : station ? `Saved: ${station.callsign}, ${station.locator}, ${station.power_dbm} dBm.${keep ? " Your draft is preserved; review before saving." : " Stored extended callsigns can be valid configuration while unsupported by the Type 1 station-write path."}`
+            : station ? `Saved: ${station.callsign}, ${station.locator}, ${station.power_dbm} dBm.${keep ? " Your draft is preserved; review before saving." : a.schema === "transmitter-application/2" ? "" : " This firmware supports Type 1 station writes only."}`
                 : "No saved station. Use the existing setup workflow first.";
+        if (a.wspr_plan) member("station-feedback").textContent += ` Saved plan: ${a.wspr_plan.frame_types.join(" → ")}. ${a.wspr_plan.rationale}`;
         member("pairs").textContent = data.pin_choices.i2c_pairs.map(p => `Pair ${p.id}: I2C${p.controller} GP${p.sda_gp}/GP${p.scl_gp}`).join("; ");
         if (!keep) {
             if (station) for (const [name,value] of Object.entries({callsign:station.callsign,locator:station.locator,power:station.power_dbm})) member(name).value = String(value);
@@ -181,7 +182,7 @@
         if (resourceReview && !root.confirm("Review current saved and active observations beside your preserved draft. Send one new explicit save using the fresh revision?")) return;
         resourceReview = false;
         const payload = station ? { callsign:member("callsign").value, locator:member("locator").value, power_dbm:Number(member("power").value) } : hardwareCandidate();
-        return request(`member/${kind}`, "PUT", {schema:`transmitter-${kind}/1`, target:resources.target, [station ? "station" : "pins"]:payload}, resourceRevision);
+        return request(`member/${kind}`, "PUT", {schema:station ? resources.application.station.schema : `transmitter-${kind}/1`, target:resources.target, [station ? "station" : "pins"]:payload}, resourceRevision);
     }
     async function request(resource, method = "GET", body = null, revision = "") {
         if (busy || (resource === "member/management" ? !canSelect : !available)) return;
@@ -241,7 +242,7 @@
                     throw failure("Consumer session expired or was not confirmed. Your draft is preserved. Log in again, then load saved Pico settings before saving.");
                 }
                 if (shared && code === "shared_resources_unavailable") throw failure("This firmware does not advertise shared resources. Use the supported Pico settings form below; no replacement write was attempted.");
-                if (shared && code === "unsupported_station_encoding") throw failure("The complete station cannot be encoded by the current Type 1 write path. Your callsign and locator draft is preserved without truncation. Load resources before another save.");
+                if (shared && code === "unsupported_station_encoding") throw failure("The complete station cannot be encoded by the selected Pico format. Check affixes, brackets and locator length. Your callsign and locator draft is preserved without truncation. Load resources before another save.");
                 if (shared && code === "output_disable_failed") throw failure("The new settings may be saved, but output shutdown was not confirmed. Load resources to inspect saved and active plans. Restart/output inhibition remains latched; no restart was requested.");
                 if (shared && code === "storage_fault") throw failure("Pico storage reported a fault. The save result is unconfirmed; load member resources to inspect trusted saved state. Your draft is preserved.");
                 if (shared && method === "PUT" && data.mutation_attempted === true && response.status >= 500) throw failure("The save result is unconfirmed; new settings may already be stored. Your draft is preserved. Load member resources before another explicit save. No automatic replay occurred.");
@@ -417,6 +418,17 @@
         member("station-save")?.addEventListener("click", () => resourceSave("station"));
         member("hardware-save")?.addEventListener("click", () => resourceSave("hardware"));
         member("validate")?.addEventListener("click", () => request("member/pins/validate", "POST", hardwareCandidate(), resourceRevision));
+        for (const name of ["callsign","locator","power"]) member(name)?.addEventListener("input", () => {
+            const call=member("callsign").value, grid=member("locator").value;
+            const formats=resources?.application.schema === "transmitter-application/2";
+            member("station-feedback").textContent = !formats && /[<>/]/.test(call) ?
+                "This firmware supports Type 1 station writes only. Your draft is preserved." :
+                call.startsWith("<") && grid.length !== 6 ? "A bracketed callsign needs a six-character locator. Your draft has not been saved." :
+                "Draft plan: " + (call.startsWith("<") ? "Type 3, one hash frame; receiver context is needed." : call.includes("/") ?
+                grid.length === 6 ? "Type 2 then Type 3, two frames in adjacent even-minute windows (230.592 seconds total); receiver hash context may be needed." :
+                "Type 2, one frame without a locator." : "Type 1, one frame; first four locator characters on air, all six retained.") +
+                (!call.startsWith("<") && /\/(?:[Q-Z]|0[0-9])$/.test(call) ? " Type 2 is ambiguous with another suffix; the saved call and Type 3 hash retain the requested identity." : "") + " The Pico validates encoding before saving.";
+        });
         for (const name of ["rf", "button", "indicator", "indicator-gp", "polarity"]) member(name)?.addEventListener("change", () => {
             validatedPlan = ""; member("pin-feedback").textContent = "Candidate changed. Validate the complete plan before saving."; render();
         });

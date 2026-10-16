@@ -28,6 +28,13 @@ struct Member {
         {"method", "POST"}, {"modes", {"merge", "replace"}}, {"max_update_bytes", 2048}, {"max_config_bytes", 1800}};
     caps["application_resources"] = {{"schema", "transmitter-application/1"}, {"read", "/api/v1/application"}};
   }
+  void type23() {
+    modern();
+    caps["application_resources_v2"]={{"schema","transmitter-application/2"},{"read","/api/v1/application/2"},
+        {"station","/api/v1/station/2"},{"hardware","/api/v1/hardware"},{"management_carrier","authenticated_https"},
+        {"config","/api/v1/config/2"},{"update","/api/v1/config/update/2"}};
+    config["station"]={{"callsign","<AA0NT>"},{"locator","EM18IG"},{"power_dbm",20}};
+  }
   PicoHttpResponse exchange(const std::string &path, const std::string &verb, const std::string &body, const std::string &etag) {
     if (verb != "GET") {
       ++mutations; resource = path; method = verb; emitted = strict_browser_json(body);
@@ -38,7 +45,7 @@ struct Member {
     ++reads;
     if (path == "capabilities") return {200, caps.dump(), {}};
     if (path == "status") return {200, Json{{"job", job}}.dump(), {}};
-    if (path == "application") {
+    if (path == "application" || path == "application/2") {
       Json application{{"schema", "transmitter-application/1"}, {"target", target}, {"reboot_required", false},
           {"station", {{"schema", "transmitter-station/1"}, {"target", target}, {"station", config["station"]},
               {"saved_generation", "1"}, {"storage_healthy", true}}},
@@ -51,6 +58,13 @@ struct Member {
               {"station_write", true}, {"hardware_write", true}, {"max_update_bytes", 1024}, {"max_config_bytes", 1800},
               {"hardware_activation", "restart"}, {"station_encoding", "wspr_type1"}, {"station_power_meaning", "reported_wspr_dbm"},
               {"recurrence_authorities", {"member"}}, {"autonomous_modes", {"wspr"}}, {"unavailable", Json::array()}}}};
+      if (path == "application/2") {
+        application["schema"]="transmitter-application/2";
+        application["station"]["schema"]="transmitter-station/2";
+        application["capabilities"]["station_encoding"]="wspr_type123_auto";
+        application["wspr_plan"]={{"schema","wspr-plan/1"},{"supported",true},{"frames",1},
+            {"frame_types",{"type3"}},{"type2_ambiguous",false},{"alternate_callsign",nullptr},{"slot_separation_s",120},{"rationale","Hash context is needed."}};
+      }
       if (corrupt_application) corrupt_application(application);
       return {200, application.dump(), revision};
     }
@@ -150,6 +164,24 @@ void checks() {
   }
   Member initial; initial.config = nullptr;
   CHECK(initial.call().status == 400 && initial.mutations == 0);
+  Member type23; type23.type23();
+  CHECK(type23.call(Json{{"station",{{"callsign","<K1ABC>"},{"locator","FN42AA"}}}}).status==200);
+  CHECK(type23.resource=="config/update/2" && type23.emitted["config"]["station"]["callsign"]=="<K1ABC>");
+  for (unsigned fault=0;fault<9;++fault) {
+    Member bad; bad.type23();
+    if(fault==0) bad.caps["application_resources_v2"]["schema"]="transmitter-application/99";
+    else if(fault==8) { bad.caps.erase("application_resources");bad.caps.erase("configuration_updates"); }
+    else bad.corrupt_application=[fault](Json &a) {
+      if(fault==1) a["wspr_plan"]["frame_types"]={"type99"};
+      if(fault==2) a["capabilities"]["station_encoding"]="wspr_type1";
+      if(fault==3) a["station"]["schema"]="transmitter-station/1";
+      if(fault==4) { a["wspr_plan"]["type2_ambiguous"]=true; a["wspr_plan"]["alternate_callsign"]="AA0NT/09"; }
+      if(fault==5) a["wspr_plan"]=nullptr;
+      if(fault==6) { a["wspr_plan"]["frame_types"]={"type2"}; a["wspr_plan"]["type2_ambiguous"]=true; a["wspr_plan"]["alternate_callsign"]="<invalid>"; }
+      if(fault==7) a["wspr_plan"]["slot_separation_s"]=120.0;
+    };
+    CHECK(bad.call().status>=400 && bad.mutations==0);
+  }
   std::cout << "Configuration negotiation, strict fallback, closed shapes, revisions, identity and ambiguous-write checks passed\n";
 }
 struct HttpInput : wtp::ByteStream {

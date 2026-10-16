@@ -20,6 +20,8 @@ elseif(PICO_COMPAT_PROFILE STREQUAL "p154")
   set(pico_pin_file "${CMAKE_CURRENT_SOURCE_DIR}/pico-p154-revision.txt")
 elseif(PICO_COMPAT_PROFILE STREQUAL "p156")
   set(pico_pin_file "${CMAKE_CURRENT_SOURCE_DIR}/pico-p156-revision.txt")
+elseif(PICO_COMPAT_PROFILE STREQUAL "p157")
+  set(pico_pin_file "${CMAKE_CURRENT_SOURCE_DIR}/pico-p157-revision.txt")
 elseif(NOT PICO_COMPAT_PROFILE STREQUAL "current")
   message(FATAL_ERROR "Unknown Pico compatibility profile")
 endif()
@@ -76,6 +78,9 @@ set(core network/http.cpp network/api.cpp encoding/wspr.cpp standalone/dry_run_e
   standalone/config.cpp standalone/storage.cpp standalone/scheduler.cpp time/sntp.cpp
   time/utc_discipline.cpp time/usb_time_source.cpp wtp/json.cpp wtp/codec.cpp wtp/endpoint.cpp
   wtp/frame_parser.cpp wtp/inhibited_rf_engine.cpp wtp/job_service.cpp wtp/sha256.cpp)
+if(EXISTS "${PICO_SOURCE}/src/encoding/wspr_plan.cpp")
+  list(APPEND core encoding/wspr_plan.cpp)
+endif()
 if(NOT PICO_COMPAT_PROFILE STREQUAL "legacy")
   list(APPEND core application/resources.cpp application/frequency_policy.cpp hardware/pins.cpp
     provisioning/profile.cpp provisioning/network_profile.cpp provisioning/consumer_profile.cpp
@@ -88,7 +93,7 @@ if(NOT PICO_COMPAT_PROFILE STREQUAL "legacy")
     network/bootstrap_slot.cpp network/bootstrap_wire.cpp network/owner_wire.cpp
     network/owner_challenge.cpp network/owner_claim_http.cpp network/consumer_radio.cpp network/softap_api.cpp
     standalone/frequency_policy_engine.cpp time/controller_time.cpp)
-  if(PICO_COMPAT_PROFILE STREQUAL "current" OR PICO_COMPAT_PROFILE STREQUAL "p156" OR PICO_COMPAT_PROFILE STREQUAL "p153" OR PICO_COMPAT_PROFILE STREQUAL "p154")
+  if(PICO_COMPAT_PROFILE STREQUAL "current" OR PICO_COMPAT_PROFILE STREQUAL "p157" OR PICO_COMPAT_PROFILE STREQUAL "p156" OR PICO_COMPAT_PROFILE STREQUAL "p153" OR PICO_COMPAT_PROFILE STREQUAL "p154")
     list(APPEND core application/config_update.cpp network/management.cpp)
   elseif(PICO_COMPAT_PROFILE STREQUAL "p152")
     list(APPEND core application/config_update.cpp)
@@ -114,7 +119,7 @@ if(NOT PICO_COMPAT_PROFILE STREQUAL "legacy")
 endif()
 
 # P15.3 genuine consumer path; historical compatibility profiles remain intact.
-if(PICO_COMPAT_PROFILE STREQUAL "current" OR PICO_COMPAT_PROFILE STREQUAL "p156" OR PICO_COMPAT_PROFILE STREQUAL "p153" OR PICO_COMPAT_PROFILE STREQUAL "p154")
+if(PICO_COMPAT_PROFILE STREQUAL "current" OR PICO_COMPAT_PROFILE STREQUAL "p157" OR PICO_COMPAT_PROFILE STREQUAL "p156" OR PICO_COMPAT_PROFILE STREQUAL "p153" OR PICO_COMPAT_PROFILE STREQUAL "p154")
   target_compile_definitions(pico_tls_server PRIVATE WSPRRY_PICO_MANAGEMENT_API=1)
   add_library(pico_consumer_fixture STATIC ${core}
     "${CMAKE_BINARY_DIR}/generated/web_assets.cpp"
@@ -142,10 +147,13 @@ if(PICO_COMPAT_PROFILE STREQUAL "current" OR PICO_COMPAT_PROFILE STREQUAL "p156"
   target_compile_options(consumer_interop PRIVATE -Wall -Wextra -Wpedantic -Werror -UNDEBUG)
 endif()
 
-if(PICO_COMPAT_PROFILE STREQUAL "current" OR PICO_COMPAT_PROFILE STREQUAL "p156")
+if(PICO_COMPAT_PROFILE STREQUAL "current" OR PICO_COMPAT_PROFILE STREQUAL "p157" OR PICO_COMPAT_PROFILE STREQUAL "p156")
   target_compile_definitions(consumer_interop PRIVATE WSPRRY_PICO_MULTI_SESSIONS=1)
 endif()
 
-if(PICO_COMPAT_PROFILE STREQUAL "current")
+if(PICO_COMPAT_PROFILE STREQUAL "current" OR PICO_COMPAT_PROFILE STREQUAL "p157")
   target_compile_definitions(consumer_interop PRIVATE WSPRRY_PICO_RECOVERY=1)
+endif()
+if(EXISTS "${PICO_SOURCE}/src/encoding/wspr_plan.cpp")
+  target_compile_definitions(consumer_interop PRIVATE WSPRRY_PICO_TYPE23=1)
 endif()
