@@ -8,8 +8,9 @@ disposition rather than implementation before 4.0.
 
 ## Ordered release checklist
 
-Status updated October 15, 2026. Items 1 through 7 are complete within their
-recorded scopes; item 8 is in progress.
+Status updated October 15, 2026. Items 1 through 8 are complete within their
+recorded scopes. Accepted implementation integration remains a prerequisite
+to item 9.
 
 Status key: ✅ Complete · ⏳ In progress · ☐ Not started
 
@@ -46,21 +47,27 @@ Status key: ✅ Complete · ⏳ In progress · ☐ Not started
    closure accepts the bounded I2C evidence without requiring RF measurement.
 7. ✅ **RP1 release-candidate preparation.** Complete. The exact unpublished
    `1.0.0` candidate is bound to RP1-GPCLK-DKMS commit
-   `0b2fc4e0542df6d53ba5ace8aab742729ae81e8f`. Release-scoped module/lifecycle
+   `817f3dc6a194f4a92a7f94acf10147169e6439d6`. Release-scoped module/lifecycle
    work, packaging, manifests, hashes, reproducibility, cleanup-first
    `0.9`-to-`1.0` migration, rollback, removal, reinstall and recovery validation
    are complete. The candidate is not frozen or published. See the provider's
-   [candidate procedure](https://github.com/WsprryPi/RP1-GPCLK-DKMS/blob/0b2fc4e0542df6d53ba5ace8aab742729ae81e8f/docs/operator/release-candidate.md)
-   and [package lifecycle contract](https://github.com/WsprryPi/RP1-GPCLK-DKMS/blob/0b2fc4e0542df6d53ba5ace8aab742729ae81e8f/docs/operator/package-lifecycle.md).
-8. ⏳ **WsprryPi acceptance of the exact RP1 candidate.** In progress in a
-   separate feature worktree. Validate current WsprryPi `devel` against candidate
-   commit `0b2fc4e0542df6d53ba5ace8aab742729ae81e8f`, reconcile exact identities,
-   preserve cleanup-first migration, disposition historical provider-rejection
-   and eight-second finite-TONE failures, and repair WsprryPi-owned integration
-   defects. Integrate the accepted WsprryPi changes before provider freeze.
-9. ☐ **RP1 provider freeze and publication.** After candidate acceptance and
-   integration are complete, freeze and publish the exact immutable
-   RP1-GPCLK-DKMS `1.0.0` source, Debian package, checksums, inventories,
+   [candidate procedure](https://github.com/WsprryPi/RP1-GPCLK-DKMS/blob/817f3dc6a194f4a92a7f94acf10147169e6439d6/docs/operator/release-candidate.md)
+   and [package lifecycle contract](https://github.com/WsprryPi/RP1-GPCLK-DKMS/blob/817f3dc6a194f4a92a7f94acf10147169e6439d6/docs/operator/package-lifecycle.md).
+8. ✅ **WsprryPi acceptance of the exact RP1 candidate.** Complete for WsprryPi
+   feature commit `c4736e55e34574349d94d5e974c337760d7f78a2`, incorporating
+   `devel` commit `37b41bb20b9d3824c9a555cd730b5361bd085954`, against unpublished
+   provider candidate `817f3dc6a194f4a92a7f94acf10147169e6439d6`. All
+   [11 CI jobs](https://github.com/WsprryPi/WsprryPi/actions/runs/38835065520)
+   passed; 14 fresh finite-TONE conducted cases passed with zero RF retries.
+   Final adversarial review has no unresolved findings in scope. See the accepted
+   [maintainer requirements](https://github.com/WsprryPi/WsprryPi/blob/c4736e55e34574349d94d5e974c337760d7f78a2/docs/development/rp1-item16-acceptance.md).
+   Calibrated RF frequency, power, spectrum and general hardware qualification
+   are not claimed. Integration of the accepted implementation branches remains
+   separately authorized and pending before provider freeze.
+9. ☐ **RP1 provider freeze and publication.** Integration of the accepted
+   WsprryPi feature and provider repair branch remains pending. After separately
+   authorized integration and applicable revalidation, freeze and publish the
+   exact immutable RP1-GPCLK-DKMS `1.0.0` source, Debian package, checksums, inventories,
    compatibility metadata, manifests and provenance. Candidate changes require
    repetition of affected candidate, lifecycle and WsprryPi acceptance checks.
 10. ☐ **WsprryPi production integration of the published RP1 release.** Replace
@@ -92,15 +99,15 @@ Status key: ✅ Complete · ⏳ In progress · ☐ Not started
 
 ## Release gates
 
-- ⏳ **WsprryPi candidate acceptance and integration:** accept the exact
-  unpublished `1.0.0` provider candidate identified above against current
-  WsprryPi `devel`, and integrate the accepted application changes before
-  provider freeze. Preserve the ownership boundary established by
-  [#412](https://github.com/WsprryPi/WsprryPi/issues/412). Record the disposition
-  of historical provider-rejection exception-containment and eight-second
-  finite-TONE failures. Cite subsequent fixes and applicable evidence first;
-  link a focused regression if a defect remains. Two-second brackets alone do
-  not resolve the eight-second observation.
+- ✅ **WsprryPi exact-candidate acceptance:** the source pair in item 8 passed
+  software/CI and bounded conducted finite-TONE acceptance, including the
+  historical provider-rejection and eight-second lifecycle follow-ups.
+  Preserve the accepted scope and the ownership boundary established by
+  [#412](https://github.com/WsprryPi/WsprryPi/issues/412).
+- ☐ **Accepted implementation integration:** separately integrate the accepted
+  WsprryPi feature and provider repair branch before provider freeze. Preserve
+  exact accepted identities and repeat affected checks if integration changes
+  either accepted result. Acceptance does not itself merge either branch.
 - ☐ **RP1 provider freeze and publication:** after candidate acceptance and
   application integration, freeze and publish the exact accepted provider
   source and immutable artifacts. The prepared candidate remains unpublished;
@@ -133,8 +140,10 @@ production consumption as separate gates:
 2. **Accept the candidate in WsprryPi:** validate current WsprryPi `devel`
    against those exact candidate identities through the supported
    development/test path; repair application-owned integration defects.
-3. **Integrate accepted consumer changes:** integrate the accepted WsprryPi
-   candidate-consumer changes into `devel` before provider freeze.
+3. **Integrate accepted implementation changes:** integrate the accepted
+   WsprryPi candidate-consumer changes into `devel` and the accepted provider
+   repairs into its release line before provider freeze. Repeat affected checks
+   if either integrated result changes.
 4. **Freeze and publish the provider:** freeze and publish the exact accepted
    RP1-GPCLK-DKMS source and immutable artifacts through its own release process.
 5. **Adopt the published provider:** update WsprryPi production selection and
