@@ -11,7 +11,8 @@ disposition rather than implementation before 4.0.
 Status updated October 16, 2026. Items 1 through 9 are complete within their
 recorded scopes. Accepted implementation is integrated into `devel`, and the
 immutable RP1 provider release is published. Item 10, WsprryPi production
-consumption and validation, remains a separate gate and has not been executed.
+consumption and validation, is in progress with software evidence recorded;
+required target acceptance remains a separate open gate.
 
 Status key: ✅ Complete · ⏳ In progress · ☐ Not started
 
@@ -77,27 +78,24 @@ Status key: ✅ Complete · ⏳ In progress · ☐ Not started
    RF cases were reused with unchanged relevant executable/build inputs and
    matching Debian package members; no new target or RF operation occurred.
    WsprryPi production consumption and validation remain open under item 10.
-10. ☐ **WsprryPi production integration of the published RP1 release.**
-    **Lead: WsprryPi · RP1 item 18.** Before implementation, define the release
-    acceptance matrix: supported platforms/backends/routes, required software,
-    installation, service and runtime checks, exact identities, reusable evidence,
-    and explicit exclusions or accepted limitations. Identify separately
-    authorized target checks; planning does not authorize hardware operations.
-    Use the maintained [release acceptance workflow](../docs/rp1-provider-acceptance.md)
-    and published asset lock for source/package and publication verification.
-    Adopt and verify the published immutable `1.0.0` identities through production
-    selection while preserving supported development selectors and fail-closed
-    behavior. Validate installation, cleanup-first migration, runtime activation,
-    GPIO4/GPIO20 routing, operation, removal, rollback, diagnostics and recovery
-    against the exact published artifacts. Reuse accepted evidence only with a
-    recorded applicability rationale; repeat checks affected by changed inputs.
-    Reconcile stale publication statements in maintainer documentation and
-    [#412](https://github.com/WsprryPi/WsprryPi/issues/412). Resolve the
-    #412/#423 sequencing conflict by explicitly permitting publication-only
-    tracking to remain open after its implementation/integration prerequisites
-    are accepted; retain #412's publication closeout requirement. Record operator
-    documentation impacts for item 12. These documentation/issue reconciliations
-    remain pending; this checklist update does not perform them.
+10. ⏳ **WsprryPi production integration of the published RP1 release.**
+    **Lead: WsprryPi · RP1 item 18.** The
+    [acceptance matrix and evidence](../docs/development/rp1-item10-production-integration.md)
+    bind the published immutable `1.0.0` identities, software checks, evidence
+    reuse, exclusions and bounded target plan. Fresh downloads, independent
+    rebuilds and the actual production resolver validate the published bytes;
+    development selectors and fail-closed policy remain intact. The maintained
+    [release acceptance workflow](../docs/rp1-provider-acceptance.md) now checks
+    production resolution explicitly. Maintainer publication guidance and
+    #412/#423 criteria are reconciled; both issues remain open. The maintainer
+    confirmed automatic installation on positively identified Pi 5/CM5 with
+    explicit opt-out. Operator-documentation follow-ups are recorded for item 12.
+    **Still open:** separately authorized exact-release target installation,
+    neutral activation, both routes, saved-route/service/startup reconciliation,
+    migration, removal, rollback and recovery acceptance, plus disposition of
+    desired operational eligibility. The published compatibility manifest has
+    no target entries and defaults to Unavailable. Software passes do not close
+    these gates or establish production runtime, hardware or RF qualification.
 11. ☐ **Documentation performance and remaining Impeccable housekeeping.**
     **Lead: WsprryPi-Docs · RP1 item 19.** Reconcile the saved image-optimization,
     product-metadata and host/tooling reminders; implement justified documentation
@@ -145,7 +143,7 @@ Status key: ✅ Complete · ⏳ In progress · ☐ Not started
 
 | WsprryPi item | RP1 item | Status | Work | Lead repository |
 | --- | --- | --- | --- | --- |
-| 10 | 18 | ☐ Not started | Published-provider integration and acceptance matrix | `WsprryPi` |
+| 10 | 18 | ⏳ In progress | Software integration/evidence; target acceptance and eligibility disposition open | `WsprryPi` |
 | 11 | 19 | ☐ Not started | Documentation performance and Impeccable housekeeping | `WsprryPi-Docs` |
 | 12 | 20 | ☐ Not started | Consolidated operator documentation | `WsprryPi-Docs` |
 | 13 | 21 | ☐ Not started | Final integrated application Impeccable review | `WsprryPi` |
@@ -158,8 +156,8 @@ changes during items 11–14; application UI changes remain in WsprryPi. Keep
 cross-repository changes, commits, pushes and publication boundaries separate.
 This plan does not authorize implementation, issue edits, cross-repository writes,
 hardware/service operations, commits, pushes or publication. The #412/#423
-criteria reconciliation is a prerequisite to item 13, not a claim that either
-GitHub issue has already been changed.
+criteria reconciliation was performed under the separately authorized item 10
+work; item 13 still requires acceptance of actual integration prerequisites.
 
 ## Saved items
 
@@ -192,7 +190,8 @@ GitHub issue has already been changed.
   select and consume its exact immutable artifacts and validate production
   installation, cleanup-first migration, runtime, routes, removal, rollback,
   diagnostics and recovery. WsprryPi leads item 10, including the acceptance
-  matrix, evidence-reuse decisions and issue/documentation reconciliation. Follow the
+  matrix, evidence-reuse decisions and completed maintainer issue/documentation
+  reconciliation; required target acceptance remains open. Follow the
   [published-release contract](../docs/rp1-gpclk-dkms-installation.md#published-releases).
 - ☐ **Operator documentation:** after production RP1 integration, reconcile
   the recorded Si5351 readiness/drive/fade, inventory-timeout, and RP1 correction

@@ -135,13 +135,37 @@ def validate_publication(client, lock: dict) -> dict:
             "releaseTag": tag, "releaseUrl": lock["releaseUrl"]}
 
 
+def validate_production_resolution(client, lock: dict, directory: Path) -> dict:
+    """Exercise the installer's real download/source path without applying it."""
+    runner = installer.Runner()
+    resolved = installer.download_release(directory, client, runner)
+    require(resolved["channel"] == "release" and resolved["tag"] == lock["releaseTag"]
+            and resolved["commit"] == lock["sourceCommit"],
+            "production resolver selected a different release")
+    manifest = resolved["manifest"]
+    package = manifest["package"]
+    require(manifest["debianVersion"] == lock["debianVersion"]
+            and package["sha256"] == lock["assets"][package["filename"]],
+            "production resolver package differs from release lock")
+    require(installer.sha256_file(directory / installer.MANIFEST_NAME)
+            == installer.sha256_bytes(installer.canonical(manifest) + b"\n"),
+            "production resolver retained manifest differs")
+    source = Path(resolved["checkout"]["path"])
+    require(installer.git_output(runner, source, "rev-parse", "HEAD^{tree}") == lock["sourceTree"],
+            "production resolver runtime tree differs from release lock")
+    require(installer.sha256_file(Path(resolved["packagePath"])) == package["sha256"],
+            "production resolver retained package differs")
+    return {"productionResolverVerified": True,
+            "resolvedPackageSha256": package["sha256"], "resolvedSourceTree": lock["sourceTree"]}
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--provider-source", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True, help="new external directory")
     parser.add_argument("--compare-retained", type=Path)
     parser.add_argument("--verify-publication", action="store_true",
-                        help="read-only GitHub verification of the immutable tag and asset digests")
+                        help="read-only GitHub verification plus the production download/source resolver")
     args = parser.parse_args()
     lock = strict_json(LOCK_PATH.read_bytes())
     source, output = args.provider_source, args.output
@@ -183,7 +207,10 @@ def main():
     if args.compare_retained:
         require(snapshot(args.compare_retained, lock) == snapshot(candidate, lock), "retained release differs from fresh build")
     if args.verify_publication:
-        result.update(validate_publication(installer.GitHubClient(), lock))
+        client = installer.GitHubClient()
+        result.update(validate_publication(client, lock))
+        with tempfile.TemporaryDirectory(prefix="production-resolution-", dir=output) as raw:
+            result.update(validate_production_resolution(client, lock, Path(raw)))
     result["independentlyRebuilt"] = True
     result["wsprrypiCommit"] = installer.git_output(runner, ROOT, "rev-parse", "HEAD")
     result["wsprrypiWorkingTreeClean"] = not bool(installer.git_output(

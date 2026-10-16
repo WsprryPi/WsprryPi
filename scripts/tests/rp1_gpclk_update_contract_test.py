@@ -6,6 +6,7 @@ Pass an explicit RP1-GPCLK-DKMS checkout. Only its offline test adapters run.
 import contextlib
 import importlib.util
 import io
+from itertools import product
 import json
 import subprocess
 from pathlib import Path
@@ -98,18 +99,20 @@ class ContractTests(unittest.TestCase):
                 str(output), *helpers], cwd=root, check=True)
 
     def test_real_json_contract_and_lifecycle_planners(self):
-        for route in (None, 4, 20, "removed"):
+        for channel, route in product(('development', 'release'), (None, 4, 20, "removed")):
             for active, masked in ((True, False), (False, False), (False, True)):
                 if route in (4, 20) and not active:
                     continue
-                with self.subTest(route=route, active=active, masked=masked):
+                with self.subTest(channel=channel, route=route, active=active, masked=masked):
                     host = UpdateHost(active, masked, removed=route == "removed")
                     receipt = provider.installation_status(host)["receipt"]
                     if route in (4, 20):
                         host.select_route(route)
-                    record = {"schema": installer.RUNTIME_RECORD_SCHEMA, "channel": "development",
+                    record = {"schema": installer.RUNTIME_RECORD_SCHEMA, "channel": channel,
                               "sourceCommit": host.value["sourceCommit"], "productVersion": receipt["productVersion"],
                               "runtime": receipt}
+                    if channel == 'release':
+                        record['manifest'] = {'productVersion': receipt['productVersion']}
                     runner = PublicRunner(host)
                     with tempfile.TemporaryDirectory() as tmp, \
                          mock.patch.object(installer, "RUNTIME_PROVIDER", PROVIDER / "scripts/runtime_provider.py"), \
@@ -121,14 +124,16 @@ class ContractTests(unittest.TestCase):
                     self.assertTrue(set(runner.calls) <= {"capabilities", "update-plan", "update-execute"})
 
     def test_installer_cannot_override_provider_identity_or_unsafe_state(self):
-        for bad in ("identity", "owner", "artifact"):
+        for channel, bad in product(('development', 'release'), ("identity", "owner", "artifact")):
             host = UpdateHost()
             receipt = provider.installation_status(host)["receipt"]
             if bad == "identity": receipt["bindingSha256"] = "0" * 64
             elif bad == "owner": host.system.controller_open = True
             else: host._artifacts[next(iter(host._artifacts))]["status"] = "changed"
-            record = {"schema": installer.RUNTIME_RECORD_SCHEMA, "channel": "development",
+            record = {"schema": installer.RUNTIME_RECORD_SCHEMA, "channel": channel,
                       "sourceCommit": host.value["sourceCommit"], "productVersion": receipt["productVersion"], "runtime": receipt}
+            if channel == 'release':
+                record['manifest'] = {'productVersion': receipt['productVersion']}
             runner = PublicRunner(host)
             with mock.patch.object(installer, "RUNTIME_PROVIDER", PROVIDER / "scripts/runtime_provider.py"), \
                  mock.patch.object(installer.platform, "release", return_value=host.running_kernel()), \

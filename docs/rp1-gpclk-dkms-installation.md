@@ -78,12 +78,18 @@ sudo INSTALL_RP1_GPCLK_DKMS=true \
 
 ## Published releases
 
-No eligible RP1-GPCLK-DKMS release is currently published. Production/main
-selection therefore fails closed until an eligible immutable release is
-published and validated under the contract below; it does not fall back to
-development source. WsprryPi candidate acceptance and integration must precede
-provider freeze/publication. After publication, WsprryPi must separately adopt
-and validate the published artifacts before its own release. See the
+The immutable [RP1-GPCLK-DKMS v1.0.0 release](https://github.com/WsprryPi/RP1-GPCLK-DKMS/releases/tag/v1.0.0)
+is published at commit `8c16d3c237cb1267cbedafb5da2bb74132ca5de0` (module/DKMS
+`1.0.0`, Debian `1.0.0-1`). Production/main automatic selection consumes an
+eligible published release; explicit `RP1_GPCLK_DKMS_SOURCE=release` selects
+that path on `devel` too. Development automatic selection remains exact-source
+development. An unavailable or corrupt release fails closed without fallback.
+The [release lock and acceptance workflow](rp1-provider-acceptance.md) bind
+the published bytes; the [item 10 matrix](development/rp1-item10-production-integration.md)
+separates software acceptance from outstanding target installation/runtime
+checks. The published compatibility manifest defaults to `Unavailable` and has
+no qualified target entries. Publication, reproducibility and successful DKMS
+builds do not grant live eligibility or transmission authorization. See the
 [RP1 dependency order](../release_tools/Release%20Punchlist.md#rp1-dependency-order).
 
 Release selection enumerates published, immutable, non-draft, non-prerelease

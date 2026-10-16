@@ -44,6 +44,14 @@ authoritative asset URLs and GitHub's per-asset digests. Omitting it keeps the
 command offline; a matching local release profile alone does not establish
 publication or production selectability.
 
+With that option, the command also runs the installer's actual production
+release enumeration, downloads, package/inventory validation and exact runtime
+source resolution in temporary external staging. It requires the selected
+tag, commit, tree and package to match the lock and records
+`productionResolverVerified`. It performs no package apply or runtime effect.
+This exercises production `auto` and explicit `release` resolution; ordinary
+offline selector tests establish their mapping without contacting GitHub.
+
 The command runs the provider's reproducible builder and independent validator
 with `--release`, applies WsprryPi's production manifest/package parsers to
 captured asset bytes, and exercises exact-source development selection separately.
@@ -85,6 +93,8 @@ qualification. Define the applicable acceptance matrix, identify reusable eviden
 and its applicability, and repeat checks affected by changed inputs. The
 [provider acceptance requirements](development/rp1-provider-acceptance.md) define
 software and separately authorized target evidence. The
+[item 10 acceptance matrix](development/rp1-item10-production-integration.md)
+records the published integration disposition and remaining target gates. The
 [release checklist](../release_tools/Release%20Punchlist.md) owns remaining
 production integration and documentation work; software-only verification does
 not close that gate.

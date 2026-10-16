@@ -172,5 +172,40 @@ class Tests(unittest.TestCase):
         self.assertFalse(A.installer.release_candidate({'tag_name': 'v1.0.0', 'published_at': None,
             'draft': False, 'prerelease': False, 'immutable': False, 'assets': []}))
 
+    def test_production_resolution_uses_installer_and_rejects_substitution(self):
+        with tempfile.TemporaryDirectory() as raw:
+            directory = Path(raw)
+            package = directory / self.package
+            package.write_bytes(self.assets[self.package])
+            (directory / A.installer.MANIFEST_NAME).write_bytes(A.installer.canonical(self.manifest) + b'\n')
+            resolved = {'channel': 'release', 'tag': self.lock['releaseTag'],
+                'commit': self.lock['sourceCommit'], 'manifest': self.manifest,
+                'packagePath': str(package), 'checkout': {'path': str(self.source)}}
+            client = mock.Mock()
+            with mock.patch.object(A.installer, 'download_release', return_value=resolved) as download, \
+                 mock.patch.object(A.installer, 'git_output', return_value=self.lock['sourceTree']) as git, \
+                 mock.patch.object(A.installer, 'apply_release') as apply:
+                result = A.validate_production_resolution(client, self.lock, directory)
+                self.assertTrue(result['productionResolverVerified'])
+                download.assert_called_once_with(directory, client, mock.ANY)
+                git.assert_called_once_with(mock.ANY, self.source, 'rev-parse', 'HEAD^{tree}')
+                apply.assert_not_called()
+                mutations = [lambda x: x.update(channel='development'),
+                    lambda x: x.update(tag='v1.0.1'), lambda x: x.update(commit='0'*40),
+                    lambda x: x['manifest'].update(debianVersion='1.0.0-2'),
+                    lambda x: x['manifest']['package'].update(sha256='0'*64)]
+                for index, mutate in enumerate(mutations):
+                    bad = copy.deepcopy(resolved); mutate(bad); download.return_value = bad
+                    with self.subTest(index=index), self.assertRaises(A.installer.ContractError):
+                        A.validate_production_resolution(client, self.lock, directory)
+                download.return_value = resolved
+                git.return_value = '0'*40
+                with self.assertRaisesRegex(A.installer.ContractError, 'runtime tree'):
+                    A.validate_production_resolution(client, self.lock, directory)
+                git.return_value = self.lock['sourceTree']
+                package.write_bytes(b'substituted')
+                with self.assertRaisesRegex(A.installer.ContractError, 'retained package'):
+                    A.validate_production_resolution(client, self.lock, directory)
+
 
 if __name__ == '__main__': unittest.main()
