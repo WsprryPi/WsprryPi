@@ -354,10 +354,14 @@ jobs:
         working-directory: src
         run: ../scripts/ci/verify-simulated-wspr.sh
 
+      - name: Verify hardware-access audit fails closed
+        run: python3 scripts/tests/no_transmitter_hardware_audit_test.py
+
       - name: Reject transmitter hardware access
-        run: scripts/ci/assert-no-transmitter-hardware.sh \
-          /tmp/wsprrypi-semantics.strace \
-          /tmp/wsprrypi-startup-quiesce-parent.strace \
-          /tmp/wsprrypi-rp1.strace \
-          /tmp/wsprrypi-simulator.strace \
-          /tmp/wsprrypi-wspr-simulator.strace
+        run: |
+          scripts/ci/assert-no-transmitter-hardware.sh \
+            /tmp/wsprrypi-semantics.strace \
+            /tmp/wsprrypi-startup-quiesce-parent.strace \
+            /tmp/wsprrypi-rp1.strace \
+            /tmp/wsprrypi-simulator.strace \
+            /tmp/wsprrypi-wspr-simulator.strace
