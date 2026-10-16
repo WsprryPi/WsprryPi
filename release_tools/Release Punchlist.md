@@ -21,12 +21,14 @@ Its installed consumer, cache, independent both-route status, API/UI and support
 collector are now verified on wspr5.
 No new RF qualification is claimed. Items 11–12 are complete, including verified
 hosted builds and publication. Item 13 is complete for reviewed implementation
-`d93c75c` on `devel`; item 14 has not started.
+`d93c75c` on `devel`; items 14–15 have not started. Item 14 records planned
+Pico Type 2/3 companion integration requiring separate authorization and
+affected revalidation before the Beta 1 candidate is frozen.
 
 The current milestone is **WsprryPi 4.0 Beta 1**, not final 4.0 stable
 publication. The maintainer's October 16 direction is to prepare a reviewable
 Beta 1 candidate and Markdown release documentation, with a hard stop after
-item 14c. Items 14d–14e are later publication/announcement gates, not authorized
+item 15c. Items 15d–15e are later publication/announcement gates, not authorized
 by this planning update. No tag, GitHub release/draft, asset upload, issue
 announcement or final stable publication is to be performed now.
 
@@ -184,13 +186,44 @@ Status key: ✅ Complete · ⏳ In progress · ☐ Not started
     is required. This UI gate does not qualify physical devices, assistive
     technology, installation, services, GPIO, timing or RF, and does not establish
     Beta publication readiness. Later UI-affecting changes require affected
-    review/documentation checks again. Item 14 has not started.
-14. ☐ **WsprryPi 4.0 Beta 1 release documentation and candidate preparation.**
-    **Lead: WsprryPi · RP1 item 22.** The current effort stops after 14c.
-    Release-note research/drafting in 14a may proceed alongside items 12–13;
-    candidate freeze/build and acceptance in 14b–14c follow item 13.
+    review/documentation checks again; item 14 records that follow-up for the
+    Pico Type 2/3 companion. Items 14–15 have not started.
+14. ☐ **Pico WSPR Type 2/3 management integration and acceptance.**
+    **Lead: WsprryPi · Documentation: WsprryPi-Docs.** Begin after item 13's
+    active closeout is finished and `devel` is at a clean, verified checkpoint.
+    Under separate integration authorization, integrate the reviewed
+    `codex/p15-8-wspr-type23` branch, whose accepted handoff head is
+    `6d5e73430bfbacdb8cfc29c3fe41089aa8ae5fcb`. That head changes only the
+    completion record; include the preceding implementation, tests and final
+    Pico pin, not just a cherry-pick of the final documentation commit. Refresh
+    both branch identities and inspect all changes before integration. See the
+    [companion handoff](https://github.com/WsprryPi/WsprryPi/blob/6d5e73430bfbacdb8cfc29c3fe41089aa8ae5fcb/docs/development/phase15-8-wspr-type23.md).
+    Preserve item 13's UI repairs, guarded browser fixtures and fail-closed
+    hardware-access audit. Verify the exact current Pico pin and historical
+    compatibility rows, Type 1 preservation, negotiated Type 2/3 reads/saves,
+    unsupported-format refusal, native TLS and consumer station/AP paths.
+    Run applicable Linux/API/UI/browser regressions and exact integrated-head
+    CI. Repeat focused Impeccable checks for member settings, saved-plan/draft
+    feedback, explicit saves and recovery at desktop/mobile sizes in both
+    themes, with keyboard and enlarged-text checks. Perform an independent
+    adversarial assessment, repair findings and repeat affected checks.
+    Coordinate affected Type 1-only operator guidance and materially inaccurate
+    screenshots under separate WsprryPi-Docs authorization; build and verify
+    affected documentation and record its accepted publication status.
+    Record the integrated application/Pico/documentation identities and an
+    item 13 review addendum for changed surfaces. Existing evidence remains
+    applicable where inputs are unchanged; reassess any newly affected scope.
+    This item does not itself require repeating RP1 publication, calibration
+    decisions, Si5351 readiness or physical RF qualification. Complete this gate
+    before Beta 1 candidate freeze/build; checklist inclusion does not authorize
+    the merge, sibling writes or hardware operations.
+15. ☐ **WsprryPi 4.0 Beta 1 release documentation and candidate preparation.**
+    **Lead: WsprryPi · RP1 item 22.** The current effort stops after 15c.
+    Release-note research/drafting in 15a may proceed while item 14 is prepared;
+    candidate freeze/build and acceptance in 15b–15c require accepted items
+    13–14, including affected UI/documentation revalidation after integration.
 
-    - ☐ **14a — Research and draft Beta 1 release documentation in Markdown.**
+    - ☐ **15a — Research and draft Beta 1 release documentation in Markdown.**
       Establish the previous published stable WsprryPi baseline and the intended
       Beta 1 source range. Enumerate all issues marked ready for release and
       closed issues relevant to that range, using the actual labels, project
@@ -213,14 +246,14 @@ Status key: ✅ Complete · ⏳ In progress · ☐ Not started
       Review omissions and unsupported claims adversarially; refresh the draft
       against the exact accepted candidate before publication. These are planned
       deliverables, not files already created by this checklist update.
-    - ☐ **14b — Freeze identities and build the Beta 1 candidate.** After item 13,
-      select Beta 1 version metadata using the project's existing convention,
+    - ☐ **15b — Freeze identities and build the Beta 1 candidate.** After items
+      13–14, select Beta 1 version metadata using the project's existing convention,
       record exact application/documentation commits and published provider
       identities, and build/checksum candidate artifacts. Preserve the researched
       stable-to-Beta comparison range and record later changes. Any changed input
       requires a new candidate identity and repetition of affected acceptance
       checks. This step does not create a public tag or release.
-    - ☐ **14c — Validate, accept and hand off Beta 1; stop before publication.**
+    - ☐ **15c — Validate, accept and hand off Beta 1; stop before publication.**
       Run required CI/regressions and applicable installation/upgrade/service/
       runtime checks against the exact candidate and artifacts using item 10's
       acceptance matrix. Record reused evidence, repeated checks, exclusions and
@@ -230,14 +263,14 @@ Status key: ✅ Complete · ⏳ In progress · ☐ Not started
       evidence handoff, ready for a separate publication decision. Do not merge
       to the release branch, create a tag/GitHub release or draft, upload assets,
       announce availability, or claim Beta 1 is published.
-    - ☐ **14d — Later: publish Beta 1 as a GitHub prerelease and verify.** Only
+    - ☐ **15d — Later: publish Beta 1 as a GitHub prerelease and verify.** Only
       after separate authorization, publish the accepted Beta 1 and corresponding
       documentation through their separate workflows. Use the reviewed Markdown
       body, mark it as a prerelease, and independently verify tag/source identities,
       downloads, checksums, notes and documentation. This is not final 4.0 stable
-      publication. Do not perform 14e until actual Beta availability is verified.
-    - ☐ **14e — Later: update every open issue marked ready for release.**
-      After 14d, freshly enumerate the complete open ready-for-release set using
+      publication. Do not perform 15e until actual Beta availability is verified.
+    - ☐ **15e — Later: update every open issue marked ready for release.**
+      After 15d, freshly enumerate the complete open ready-for-release set using
       the project's actual readiness markers. Reconcile it against the accepted
       Beta scope and update every such issue with the verified Beta 1 prerelease
       URL and accurate availability/testing guidance. Do not imply an unshipped
@@ -253,7 +286,8 @@ Status key: ✅ Complete · ⏳ In progress · ☐ Not started
 | 11 | 19 | ✅ Complete | Documentation performance and Impeccable housekeeping; hosted build/publication verified | `WsprryPi-Docs` |
 | 12 | 20 | ✅ Complete | Consolidated operator documentation; exact-revision hosted build/publication verified | `WsprryPi-Docs` |
 | 13 | 21 | ✅ Complete | Integrated application Impeccable review accepted for `d93c75c`; bounded validation and qualification limits retained | `WsprryPi` |
-| 14 | 22 | ☐ Not started | Beta 1 release notes, candidate build and acceptance; stop after 14c; later 14d prerelease publication and 14e issue announcements | `WsprryPi` |
+| 14 | — | ☐ Not started | Pico Type 2/3 companion integration, compatibility checks, affected UI/documentation revalidation and adversarial acceptance | `WsprryPi`; affected operator docs: `WsprryPi-Docs` |
+| 15 | 22 | ☐ Not started | Beta 1 release notes, candidate build and acceptance; stop after 15c; later 15d prerelease publication and 15e issue announcements | `WsprryPi` |
 
 RP1 item numbers above are historical cross-references; the current provider
 ROADMAP has no numbered application release gates.
@@ -261,12 +295,14 @@ ROADMAP has no numbered application release gates.
 The lead repository owns coordination and completion evidence. RP1-GPCLK-DKMS
 provides provider-specific support for item 10; a provider defect requires its
 own scoped repair and affected requalification. WsprryPi-Docs owns documentation
-changes during items 11–14; application UI changes remain in WsprryPi. Keep
+changes during items 11–15; application UI changes remain in WsprryPi. Keep
 cross-repository changes, commits, pushes and publication boundaries separate.
 This plan does not authorize implementation, issue edits, cross-repository writes,
 hardware/service operations, commits, pushes or publication. The #412/#423
 criteria reconciliation was performed under the separately authorized item 10
-work; item 13 still requires acceptance of actual integration prerequisites.
+work. Item 13's acceptance remains bound to its reviewed candidate; item 14
+requires acceptance of the companion integration and affected checks before
+item 15's candidate freeze.
 
 ## Later final 4.0 stable release
 
@@ -327,14 +363,19 @@ Beta preparation or announcement does not itself close that stable release gate.
   documentation acceptance. The [item 13 record](../docs/development/item13-integrated-impeccable-review.md)
   retains repairs, independent reassessment, exact-head CI and bounded evidence.
   #412 stays open for publication; other ready issues await the later authorized
-  publication notifications. Item 14 remains the next separate gate.
-
-- ☐ **Beta 1 release documentation and readiness:** complete 14a–14c's sourced
+  publication notifications. Item 14 is the next separate gate; its UI-affecting
+  integration requires an addendum covering changed surfaces before candidate freeze.
+- ☐ **Pico Type 2/3 companion integration and acceptance:** complete item 14's
+  separately authorized integration, current/historical interoperability,
+  affected Impeccable/adversarial review and operator-documentation follow-up.
+  Retain accepted evidence for unchanged inputs and record the new candidate
+  identities before item 15b.
+- ☐ **Beta 1 release documentation and readiness:** complete 15a–15c's sourced
   Markdown notes, compatibility/migration guidance, exact candidate and acceptance
   evidence. Stop with a reviewable handoff; no release or announcement is authorized.
 - ☐ **Later Beta 1 publication and issue announcements:** after separate
-  publication authorization, complete 14d verification before updating every
-  open ready-for-release issue under 14e. Preserve issue states and audit coverage.
+  publication authorization, complete 15d verification before updating every
+  open ready-for-release issue under 15e. Preserve issue states and audit coverage.
   Final 4.0 stable acceptance/publication remains a later separate gate.
 
 ## RP1 dependency order
@@ -362,14 +403,18 @@ production consumption as separate gates:
 7. **Complete documentation and final UI review:** finish documentation
    performance/housekeeping and consolidated operator documentation, then the
    final integrated Impeccable review (#423) of the settled product.
-8. **Prepare WsprryPi Beta 1:** research all relevant ready/closed issues,
+8. **Integrate the Pico Type 2/3 companion:** after item 13 closeout, complete
+   item 14's separately authorized integration and compatibility checks, then
+   repeat affected UI/documentation review and adversarial acceptance. Preserve
+   the accepted RP1 and unchanged UI evidence; record the new candidate identities.
+9. **Prepare WsprryPi Beta 1:** research all relevant ready/closed issues,
    internal documentation and commit history; write sourced Markdown release
-   notes and compatibility guidance. After the integrated review, build and
-   accept the exact Beta 1 candidate, then stop before publication (14a–14c).
-9. **Later publish and announce Beta 1:** after separate authorization, verify
-   the GitHub prerelease and artifacts, then update every open ready-for-release
-   issue with its availability link and accurate scope (14d–14e).
-10. **Later final stable release:** resolve Beta feedback, repeat affected checks
+   notes and compatibility guidance. After items 13–14 are accepted, build and
+   accept the exact Beta 1 candidate, then stop before publication (15a–15c).
+10. **Later publish and announce Beta 1:** after separate authorization, verify
+    the GitHub prerelease and artifacts, then update every open ready-for-release
+    issue with its availability link and accurate scope (15d–15e).
+11. **Later final stable release:** resolve Beta feedback, repeat affected checks
     and obtain separate final 4.0 candidate/publication acceptance.
 
 Candidate acceptance can use unreleased WsprryPi `devel`; it does not require a
