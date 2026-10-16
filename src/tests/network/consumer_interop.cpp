@@ -615,7 +615,7 @@ void resource_admission_cases() {
 }
 #ifdef WSPRRY_PICO_TYPE23
 void type23_profile_cases() {
-  for (bool ap : {false,true}) for (const auto &call : {"AA0NT/P","<AA0NT>","PJ4/AA0NT","AA0NT/09"}) {
+  for (bool ap : {false,true}) for (const auto &call : {"AA0NT/P","<AA0NT>","PJ4/AA0NT","W1A/AA0NT","<W1A/AA0NT>","AA0NT/09"}) {
     const std::string grid=std::string(call)=="AA0NT/P" ? "EM18" : "EM18IG";
     Test t(true,call,grid);
     if (ap) { t.authority="192.168.4.1";t.origin="http://192.168.4.1";t.interface=pico::network::ConsumerInterface::AccessPoint; }

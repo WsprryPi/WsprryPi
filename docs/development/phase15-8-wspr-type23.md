@@ -149,3 +149,17 @@ one missed start during concurrent builds (elapsed 158668 ns, allowance 1 ms;
 mapping error was not logged). The unchanged test passed after other compilation
 finished (`current-ui-network-quiet.log`); no timing assertion was weakened.
 The final pinned source is also exercised by companion-head CI.
+
+
+The post-publication grammar reassessment found and repaired a Pico prefix
+selection defect: a valid three-character prefix can also be a valid Type 1
+base call (`W1A`). The old suffix branch returned before trying the valid right-
+hand base call. Final Pico source is now
+`804e8a06585ec5a0e650e69fcd71ada398b6cc9f`; `0c02423` is superseded. Pi's
+unchanged reference and pinned independent WSJT-X agree on all 162 Type 2
+symbols for `W1A/AA0NT`; cold/contextual Type 3 observations and full-call hash
+vectors are added. Original Pico binary reproduction reports both the pair and
+explicit compound Type 3 refused; repaired planner/resource/real commissioning
+checks pass. Native station/AP profile and UI/journal cases now cover both
+`W1A/AA0NT` and `<W1A/AA0NT>`. No Pi product code changed. The earlier CI run
+38948276130 at `28ee735` is superseded; a new feature-head run is required.

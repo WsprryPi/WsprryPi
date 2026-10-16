@@ -193,7 +193,7 @@ async function cases(carrier, failure="storage") {
       assert.equal(state.password_sha256,initial.password_sha256);
       loaded=await load();
       if(extendedFormats) {
-        for(const [callsign,locator,types] of [['K1ABC/P','FN42',['type2']],['<AA0NT>','EM18IG',['type3']],['PJ4/AA0NT','EM18IG',['type2','type3']],['AA0NT/09','EM18IG',['type2','type3']]]) {
+        for(const [callsign,locator,types] of [['K1ABC/P','FN42',['type2']],['<AA0NT>','EM18IG',['type3']],['PJ4/AA0NT','EM18IG',['type2','type3']],['W1A/AA0NT','EM18IG',['type2','type3']],['<W1A/AA0NT>','EM18IG',['type3']],['AA0NT/09','EM18IG',['type2','type3']]]) {
           loaded=await load();b.element('wtp-member-callsign').value=callsign;b.element('wtp-member-locator').value=locator;
           await b.click('wtp-member-station-save');assert.equal(calls.at(-1).result.status,200,JSON.stringify(calls.at(-1)));
           assert.equal(JSON.parse(calls.at(-1).request.body).schema,'transmitter-station/2');
