@@ -8,11 +8,13 @@ disposition rather than implementation before 4.0.
 
 ## Ordered release checklist
 
-Status updated October 16, 2026. Items 1 through 9 are complete within their
+Status updated October 16, 2026. Items 1 through 10 are complete within their
 recorded scopes. Accepted implementation is integrated into `devel`, and the
 immutable RP1 provider release is published. Item 10, WsprryPi production
-consumption and validation, is in progress with software evidence recorded;
-required target acceptance remains a separate open gate.
+consumption and validation, is accepted for installation and idle runtime
+integration. Production RF operation remains unqualified; the maintainer accepted
+the empty `Unavailable` manifest as a bounded limitation and excluded target
+rollback rehearsals. Items 11–14 remain open.
 
 Status key: ✅ Complete · ⏳ In progress · ☐ Not started
 
@@ -78,11 +80,11 @@ Status key: ✅ Complete · ⏳ In progress · ☐ Not started
    RF cases were reused with unchanged relevant executable/build inputs and
    matching Debian package members; no new target or RF operation occurred.
    WsprryPi production consumption and validation remain open under item 10.
-10. ⏳ **WsprryPi production integration of the published RP1 release.**
+10. ✅ **WsprryPi production integration of the published RP1 release.**
     **Lead: WsprryPi · RP1 item 18.** The
     [acceptance matrix and evidence](../docs/development/rp1-item10-production-integration.md)
     bind the published immutable `1.0.0` identities, software checks, evidence
-    reuse, exclusions and bounded target plan. Fresh downloads, independent
+    reuse, target results and accepted exclusions. Fresh downloads, independent
     rebuilds and the actual production resolver validate the published bytes;
     development selectors and fail-closed policy remain intact. The maintained
     [release acceptance workflow](../docs/rp1-provider-acceptance.md) now checks
@@ -90,12 +92,18 @@ Status key: ✅ Complete · ⏳ In progress · ☐ Not started
     #412/#423 criteria are reconciled; both issues remain open. The maintainer
     confirmed automatic installation on positively identified Pi 5/CM5 with
     explicit opt-out. Operator-documentation follow-ups are recorded for item 12.
-    **Still open:** separately authorized exact-release target installation,
-    neutral activation, both routes, saved-route/service/startup reconciliation,
-    migration, removal, rollback and recovery acceptance, plus disposition of
-    desired operational eligibility. The published compatibility manifest has
-    no target entries and defaults to Unavailable. Software passes do not close
-    these gates or establish production runtime, hardware or RF qualification.
+    On wspr5, consumer `8abb0d1` and published provider `8c16d3c` passed
+    cleanup-first development-to-release migration, normal installation,
+    neutral activation, both routes' idle selection/recovery/removal/reselection,
+    and independent GPIO4/GPIO20 automatic restoration across two reboots.
+    Upgraded versions remain installed with GPIO20 idle, transmission disabled
+    and boot transmission set to Never. The maintainer explicitly excluded
+    target rollback rehearsals; unchanged package reinstall/interruption/inverse
+    coverage is retained from software and disposable lifecycle evidence, not
+    claimed as fresh target tests. **Accepted scope:** installation/runtime
+    integration with the published manifest unchanged (`Unavailable`, no target
+    entries). Production RF operation remains unqualified and requires qualifying
+    metadata and an appropriate provider publication. Zero RF attempts occurred.
 11. ☐ **Documentation performance and remaining Impeccable housekeeping.**
     **Lead: WsprryPi-Docs · RP1 item 19.** Reconcile the saved image-optimization,
     product-metadata and host/tooling reminders; implement justified documentation
@@ -143,7 +151,7 @@ Status key: ✅ Complete · ⏳ In progress · ☐ Not started
 
 | WsprryPi item | RP1 item | Status | Work | Lead repository |
 | --- | --- | --- | --- | --- |
-| 10 | 18 | ⏳ In progress | Software integration/evidence; target acceptance and eligibility disposition open | `WsprryPi` |
+| 10 | 18 | ✅ Complete within accepted scope | Published-provider installation/runtime integration; target passes and bounded compatibility/rollback disposition recorded; RF unqualified | `WsprryPi` |
 | 11 | 19 | ☐ Not started | Documentation performance and Impeccable housekeeping | `WsprryPi-Docs` |
 | 12 | 20 | ☐ Not started | Consolidated operator documentation | `WsprryPi-Docs` |
 | 13 | 21 | ☐ Not started | Final integrated application Impeccable review | `WsprryPi` |
@@ -186,12 +194,14 @@ work; item 13 still requires acceptance of actual integration prerequisites.
   and all seven published assets were independently verified; exact source and
   integration identities are recorded in item 9. WsprryPi production integration
   and its 4.0 release remain separate gates.
-- ☐ **WsprryPi published-provider integration:** after provider publication,
-  select and consume its exact immutable artifacts and validate production
-  installation, cleanup-first migration, runtime, routes, removal, rollback,
-  diagnostics and recovery. WsprryPi leads item 10, including the acceptance
-  matrix, evidence-reuse decisions and completed maintainer issue/documentation
-  reconciliation; required target acceptance remains open. Follow the
+- ✅ **WsprryPi published-provider integration:** item 10 accepts the exact
+  published artifacts for installation and idle runtime integration after
+  wspr5 migration, installation, neutral activation, independent both-route
+  recovery/removal and automatic reboot restoration passed. Software/disposable
+  lifecycle evidence is retained; target rollback rehearsals were explicitly
+  excluded. The maintainer accepts the unchanged empty `Unavailable` manifest
+  for this bounded closeout. Production RF operation remains unqualified and
+  requires qualifying metadata and an appropriate provider publication. Follow the
   [published-release contract](../docs/rp1-gpclk-dkms-installation.md#published-releases).
 - ☐ **Operator documentation:** after production RP1 integration, reconcile
   the recorded Si5351 readiness/drive/fade, inventory-timeout, and RP1 correction
