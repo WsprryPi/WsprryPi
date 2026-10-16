@@ -1,115 +1,80 @@
 <!-- SPDX-License-Identifier: MIT -->
 
-# Item 16 candidate acceptance record
+# RP1 candidate acceptance requirements
 
-Status: **PARTIAL — renewed target acceptance remains required.** No provider
-freeze, publication, WsprryPi merge or release is authorized by this record.
+Candidate acceptance binds one exact WsprryPi source revision to one exact
+unpublished provider source revision and its reproducible assets. The
+[candidate lock](../../scripts/tests/fixtures/rp1-candidate-1.0.0.json) is the
+machine-readable authority for source, tree, package, UAPI, overlay and asset
+identities. The [acceptance command](../rp1-candidate-acceptance.md) rebuilds and
+independently validates those inputs without installation or target access.
 
-## Exact source and policy
+## Software evidence
 
-The feature branch is `codex/rp1-1.0-candidate-acceptance`, based on synchronized
-WsprryPi `devel` commit `1090d1af6095757fec039e39e09fc5ad70a5706f`.
-Implementation and validation use `/private/tmp/wsprrypi-rp1-1.0-acceptance`;
-the primary checkout and concurrent Si5351/WTP work remain separate.
+Use clean committed consumer and provider inputs for final acceptance. Keep
+candidate assets, logs, private configuration, target captures and results
+outside Git. Results must identify both source revisions, tool/lock/installer
+hashes and any working-tree changes. Reject substituted, missing, duplicated,
+malformed or unexpected assets. Unpublished candidate acceptance never grants
+production release selection or establishes publication or RF qualification.
 
-The accepted software inputs now identify unpublished provider commit
-`840afebc667cf9202701246b84d437d95581cdd3`, tree
-`9ae4e4a1a5e432f3f722c7bbfae7563d3d1a39f8`, product/module/controller
-`1.0.0`, Debian version `1.0.0-1`, binding v3/readiness v1/update v1.
-The [candidate lock](../../scripts/tests/fixtures/rp1-candidate-1.0.0.json)
-records every asset, UAPI and overlay hash. GPIO4 and GPIO20 retain distinct
-`v1.0.0-rp1-gpio4` and `v1.0.0-rp1-gpio20` identities. Development installation,
-software candidate acceptance and production consumption remain distinct;
-production still refuses an unpublished release.
+Required software coverage includes exact-source development selection,
+production refusal of unpublished releases, distinct GPIO4/GPIO20 identities,
+cleanup-first predecessor removal, interrupted inverse recovery, ownership and
+rollback refusal, bounded provider failures, complete eight-second TONE plans,
+chunk-boundary cancellation, owner close, service stop and cleanup fault latches.
+Owner-close drain completion must clear both owner and lease; passive terminal
+history must remain observable. Stale callbacks must not regain authority.
+All RP1-supported modes require their applicable planning and lifecycle checks.
 
-Provider-owned repairs required new candidates rather than consumer workarounds:
-passive package data survives exact inverse runtime removal, orphaned runtime
-helpers/UAPI directories are refused, and interrupted inverse removal resumes
-without trying to observe an already removed binding. The latter regression
-now reads the binding from the mutating filesystem; the former fixture kept a
-synthetic binding alive and concealed the failure. Foreign or unretired journals,
-changed bytes, unsafe modules/endpoints and stale plans remain refusals.
+Repeat affected provider build/package/lifecycle checks and consumer checks
+whenever a provider repair creates a new candidate. Kernel header builds prove
+build compatibility only. Disposable package tests, simulated application tests,
+provider boundary tests and hosted CI are separate evidence classes. None
+substitutes for target installation, service, GPIO, DMA or RF evidence.
 
-## Target campaign and disposition
+## Target evidence
 
-The approved exact-input campaign used consumer
-`baa1459a4cd1456613b24430e826b286094dffb6` and provider
-`51b8012a4ca2f01576805a81f4b50519b5b786d3` on `wspr5`, kernel
-`6.18.34+rpt-rpi-2712`. Cleanup-first source-development migration from exact
-`0.9.0` source `924c7e546ab82a40497339c4baeb813f95f3408e` completed before
-installation and neutral runtime activation. No reboot or boot edit occurred.
+A target plan identifies the configured SSH alias, exact consumer/provider
+commits, starting ownership and package state, migration, deployment, route and
+service operations, finite programs, stopping procedure, cleanup, rollback and
+final state. Live output also requires identified frequency, duration, correction,
+drive strength, route, attached hardware and physical RF path. Keep GPSDO output
+sequencing explicit when that equipment is connected. Do not infer calibration
+from an attached GPSDO, PPS timestamps or an uncalibrated SDR observation.
 
-The maintainer confirmed GPIO4 and GPIO20 connected through proper attenuation
-to the SDR. The campaign used TONE at 14,097,100 Hz, 2 mA, transient manual
-0 PPM plus the intrinsic -46.245 PPM baseline. GPSDO LBE-1421 outputs and PPS
-were disabled and verified; no GPSDO reference output or frequency calibration
-was performed. Receiver: SDRplay RSP1B, 250 ksps CF32, center 14,087,100 Hz,
-200 kHz bandwidth, 20 dB gain, AGC/bias off. FFT windows were 32.768 ms and
-had no hardware timestamp or independent frequency calibration.
+Use a fresh finite campaign ledger for each exact-input plan. Record every
+attempt before starting output; enforce the approved program/time budget and
+stop the sequence on a failure. A stopped campaign provides no retry authority.
+Preserve raw failures and separately record any evidence-based adjudication.
+Late STOP may race natural completion; accept its actual terminal reason only
+when operation history, cleanup and receiver evidence agree. Record actual STOP
+send timing rather than claiming the intended timer as observed timing.
 
-| GPIO4 case | SDR carrier duration | Result |
-| --- | --- | --- |
-| Full eight-second finite program | 8.031744 s | PASS on those exact inputs |
-| STOP near start | 1.032192 s | PASS on those exact inputs |
-| STOP requested at 3.99 s | 8.031744 s | FAIL; End was processed near 7.75 s |
+For each route independently, verify the full eight-second interval, STOP near
+start and chunk boundaries, owner close and service stop. Verify terminal reason,
+endpoint closure, owner/lease clearance, stable GPIO/clock/DMA quiescence and
+absence of successor output. Do not transfer evidence across routes or builds.
+A cleanup failure remains visible and latched even when some resources appear
+quiescent. Use provider-owned recovery and inverse removal on failure.
 
-The failed batch stopped after three programs: 24 programmed RF seconds, within
-the approved maximum of 14 programs/112 programmed seconds. GPIO20, later STOP
-cases, owner-close and service-stop were not run. Terminal cleanup and passive
-GPIO/clock/DMA/owner/lease quiescence were verified after all three cases.
-No results transfer to the repaired commits or the untested route.
+Capture rollback inputs before mutation, including the startup-file ownership
+receipt. Restore managed startup files through their owning installer while the
+current files still match that receipt; verify receipt/file agreement before
+restoring other captured application state. Reinstall a predecessor through its
+owning lifecycle and verify the resulting module identities and final service,
+configuration, endpoint, route and GPSDO state. Historical runtime journals must
+not be replayed as proof of restoration.
 
-The external helper polled status every 50 ms while synchronous replies took
-about 110 ms, placing End behind queued observations. The consumer repair retains
-partial frames, bounds frame/queue storage and coalesces consecutive pending
-status observations without reordering control commands. Hardware-free socket
-regressions cover split headers/payloads, a backlog before End followed by Start,
-half-close and oversized frame rejection. Revised qualification helpers allow
-one outstanding status query and record STOP send completion.
+## Integration boundary
 
-Failure cleanup used provider-owned recovery and exact inverse removal. When the
-public update wrapper refused interrupted removal, its direct owning removal
-verb completed cleanup. The captured application/configuration/service files
-were restored; exact original `0.9.0` source was reinstalled through its owning
-installer. Both module file hashes match the original backup. The application
-is active/enabled and idle, saved GPIO20/correction restored, GPSDO outputs off,
-modules/endpoints absent. Runtime deployment remains absent; historical runtime
-journals were not replayed, and fresh source-installation ownership is retained.
+Acceptance remains incomplete while required target evidence or an actionable
+adversarial finding remains unresolved. Complete a separate adversarial review,
+repair every finding and repeat affected checks. Keep application acceptance,
+provider acceptance, operator documentation and licensing reviews explicit.
+Operator documentation lives in the separate documentation repository and has
+its own authorization and validation boundary.
 
-## Verification and remaining gate
-
-The candidate procedure performs two reproducible builds and independent
-validation. Provider offline checks, all disposable package/DKMS lifecycle
-scenarios, consumer installer/candidate/diagnostic tests, real cross-provider
-contract tests, Linux semantics, transmitter component tests, GCC13 release
-profiles, simulator audits, and UI/browser regressions form separate software
-evidence. The initial consumer commit's ten hosted CI jobs passed; a follow-up
-commit must pass its own hosted run. Software evidence does not qualify RF.
-
-The retained external evidence root is
-`/private/tmp/wsprrypi-item16-evidence`; `validation-index.json` maps exact
-commands, outcomes and evidence hashes. `wspr5-rf-campaign-manifest.json` seals
-capture hashes and records the failed case explicitly. Private configuration
-and raw IQ remain in the protected target evidence directory.
-
-A revised consolidated plan must bind the repaired consumer/provider commits
-before any additional target migration or RF acceptance. Target tests must
-repeat on those inputs and independently cover both routes. No successful
-software check closes this gate. After acceptance, integration into `devel`
-requires separate authorization; only then may later provider freeze/publication
-work be considered.
-
-## Documentation and licensing
-
-Maintainer documentation covers candidate selection, installation/ownership,
-bounded Tone, diagnostics and this record. Separate operator documentation still
-needs the 1.0 selection/version gate, cleanup-first/pending-removal recovery,
-identity diagnostics and terminal failure behavior. That sibling repository was
-reviewed read-only and was not edited without cross-repository authorization.
-
-The existing UI presentation remains unchanged. Impeccable review and the browser
-fixture exercise literal provider failures, draft preservation and available
-End/recovery controls at desktop/mobile sizes, light/dark themes and mobile
-200% zoom. Local Impeccable design-sidecar drift remains a separate follow-up.
-Existing licenses/notices remain intact. New independent tooling/tests/docs use
-MIT; no provider kernel source or canonical UAPI is vendored into WsprryPi.
+Passing acceptance does not authorize a PR, merge, provider freeze, tag,
+publication or WsprryPi release. Integration into `devel` and later provider
+freeze/publication are subsequent, separately authorized steps.

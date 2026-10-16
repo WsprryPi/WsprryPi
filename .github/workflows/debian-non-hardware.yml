@@ -279,7 +279,7 @@ jobs:
         uses: actions/checkout@v7
         with:
           repository: WsprryPi/RP1-GPCLK-DKMS
-          ref: 840afebc667cf9202701246b84d437d95581cdd3
+          ref: 817f3dc6a194f4a92a7f94acf10147169e6439d6
           path: src/build/rp1-provider-reference
           persist-credentials: false
 
