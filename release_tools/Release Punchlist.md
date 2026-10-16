@@ -9,8 +9,8 @@ disposition rather than implementation before 4.0.
 ## Ordered release checklist
 
 Status updated October 15, 2026. Items 1 through 8 are complete within their
-recorded scopes. Accepted implementation integration remains a prerequisite
-to item 9.
+recorded scopes. Item 9 is in progress in RP1. Accepted implementation
+integration remains a prerequisite to provider freeze.
 
 Status key: ✅ Complete · ⏳ In progress · ☐ Not started
 
@@ -64,9 +64,9 @@ Status key: ✅ Complete · ⏳ In progress · ☐ Not started
    Calibrated RF frequency, power, spectrum and general hardware qualification
    are not claimed. Integration of the accepted implementation branches remains
    separately authorized and pending before provider freeze.
-9. ☐ **RP1 provider freeze and publication.** Integration of the accepted
-   WsprryPi feature and provider repair branch remains pending. After separately
-   authorized integration and applicable revalidation, freeze and publish the
+9. ⏳ **RP1 provider freeze and publication.** In progress in RP1. Integration
+   of the accepted WsprryPi feature and provider repair branch remains pending.
+   After separately authorized integration and applicable revalidation, freeze and publish the
    exact immutable RP1-GPCLK-DKMS `1.0.0` source, Debian package, checksums, inventories,
    compatibility metadata, manifests and provenance. Candidate changes require
    repetition of affected candidate, lifecycle and WsprryPi acceptance checks.
@@ -108,9 +108,9 @@ Status key: ✅ Complete · ⏳ In progress · ☐ Not started
   WsprryPi feature and provider repair branch before provider freeze. Preserve
   exact accepted identities and repeat affected checks if integration changes
   either accepted result. Acceptance does not itself merge either branch.
-- ☐ **RP1 provider freeze and publication:** after candidate acceptance and
-  application integration, freeze and publish the exact accepted provider
-  source and immutable artifacts. The prepared candidate remains unpublished;
+- ⏳ **RP1 provider freeze and publication:** in progress in RP1. After candidate
+  acceptance and application integration, freeze and publish the exact accepted
+  provider source and immutable artifacts. The prepared candidate remains unpublished;
   provider publication does not complete WsprryPi production integration or 4.0.
 - ☐ **WsprryPi published-provider integration:** after provider publication,
   select and consume its exact immutable artifacts and validate production
