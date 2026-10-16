@@ -4,7 +4,7 @@ on:
   pull_request:
     branches: [devel]
   push:
-    branches: [devel, codex/rp1-1.0-candidate-acceptance]
+    branches: [devel, codex/rp1-1.0-candidate-acceptance, codex/p15-8-wspr-type23, codex/step14-pico-type23-integration]
 
 permissions:
   contents: read
@@ -102,7 +102,7 @@ jobs:
     timeout-minutes: 15
     strategy:
       matrix:
-        profile: [legacy, extended, p152, p153, p154, p156]
+        profile: [legacy, extended, p152, p153, p154, p156, p157]
     steps:
       - uses: actions/checkout@v7
       - name: Existing host-only compatibility dependencies

@@ -144,14 +144,14 @@ struct Test {
   std::map<std::string,unsigned> handler_calls;
   std::string previous_packet;
   std::uint64_t transaction = 1;
-  explicit Test(bool configured=true) {
+  explicit Test(bool configured=true, std::string callsign="AA0NT", std::string locator="EM18") {
     pico::provisioning::ConsumerProfile profile;
     profile.device_id = device;
     profile.ssid = "test-network";
     profile.password = "test-password";
     profile.time_server = "192.0.2.1";
-    profile.callsign = "AA0NT";
-    profile.locator = "EM18";
+    profile.callsign = std::move(callsign);
+    profile.locator = std::move(locator);
     profile.power_dbm = 37;
     profile.tls_pending = true;
     profile.tls.hostname = "wsprrypico-0a60df.local";
@@ -613,6 +613,31 @@ void resource_admission_cases() {
     assert(result.status==409 && t.f.flash.bytes==bytes && t.f.service.status()==status && t.mutations==0 && t.wtp.io==0);
   }
 }
+#ifdef WSPRRY_PICO_TYPE23
+void type23_profile_cases() {
+  for (bool ap : {false,true}) for (const auto &call : {"AA0NT/P","<AA0NT>","PJ4/AA0NT","W1A/AA0NT","<W1A/AA0NT>","AA0NT/09"}) {
+    const std::string grid=std::string(call)=="AA0NT/P" ? "EM18" : "EM18IG";
+    Test t(true,call,grid);
+    if (ap) { t.authority="192.168.4.1";t.origin="http://192.168.4.1";t.interface=pico::network::ConsumerInterface::AccessPoint; }
+    const auto carrier=ap ? "consumer_ap" : "consumer_station";
+    auto c=t.client();assert(c->login(device,carrier,"test-password").status==200);
+    const auto state=t.coordinated(*c);assert(state.status==200);
+    const auto saved=Json::parse(state.body);
+    assert(saved["config"]["station"]["callsign"]==call && saved["config"]["station"]["locator"]==grid);
+    const auto before=t.f.flash.bytes;const auto profile=t.profiles.sequence();
+    pi::PicoHttpResponse resources;
+    assert(t.app->idle_management([&]{ resources=pi::pico_resource_request([&](auto p,auto m,auto b,auto e){return c->request(p,m,b,e);},
+      c->device(),c->boot(),"application","GET",{}, {},carrier,c->generation());},true));
+    assert(resources.status==200);
+    const auto application=Json::parse(resources.body)["application"];
+    assert(application["schema"]=="transmitter-application/2" && application["station"]["station"]["callsign"]==call && application["wspr_plan"]["supported"]==true);
+    assert(application["wspr_plan"]["frames"]==(grid.size()==4 || std::string(call).starts_with('<') ? 1 : 2));
+    assert(t.f.flash.bytes==before && t.profiles.sequence()==profile && t.wtp.io==0 && t.mutations==0);
+    c->logout();
+  }
+  std::cout<<"Type 2/3 profile readback through native station/AP crypto and strict resource adapters passed\n";
+}
+#endif
 void interactive(bool ap,bool configured=true) {
   Test t(configured);
   if (ap) { t.authority="192.168.4.1"; t.origin="http://192.168.4.1"; t.interface=pico::network::ConsumerInterface::AccessPoint; }
@@ -693,6 +718,9 @@ int main(int argc, char **argv) {
   cases(false);
   cases(true);
   resource_admission_cases();
+#ifdef WSPRRY_PICO_TYPE23
+  type23_profile_cases();
+#endif
   {
     Test t;
     auto c = t.client();

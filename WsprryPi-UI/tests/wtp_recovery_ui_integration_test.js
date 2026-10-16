@@ -109,11 +109,7 @@ async function main() {
     fs.mkdirSync(output, { recursive: true });
     const captureScreenshots = process.env.WSPRRYPI_UI_CAPTURE !== '0';
     const resourceBuild=path.resolve(process.argv[2] || path.join(UI_ROOT,'../src/build/wtp-network'));
-    const resourceFixtures={
-        loaded:JSON.parse(fs.readFileSync(path.join(resourceBuild,'resources-loaded-engineering_mtls.json'))),
-        consumer:JSON.parse(fs.readFileSync(path.join(resourceBuild,'resources-pending-consumer_station.json'))),
-        fault:JSON.parse(fs.readFileSync(path.join(resourceBuild,'resources-fault-engineering_mtls.json')))
-    };
+    const resourceFixtures=require('./wtp_recovery_resource_fixtures.js').loadResourceFixtures(resourceBuild);
     let chrome, client, php, failure;
     const capture = async (name, parameters = {format:'png'}) => {
         if (!captureScreenshots) return;
@@ -163,6 +159,7 @@ async function main() {
                     if (body?.action === 'inspect_logins') return {ok:true,headers:{get:()=>''},json:async()=>({schema:'consumer-recovery/1',device_id:'a'.repeat(32),boot_id:'1'.repeat(32),generation:'3',authority:'192.168.1.53',interface:'station',proof_ms:5000,selection_id:'f'.repeat(32),sessions:[{selector:'b'.repeat(32),state:'active'}]})};
                     if (body?.action === 'retire_login') return window.__retireFailure ? {ok:false,status:503,json:async()=>({error:{code:'retirement_unconfirmed_'+ 'x'.repeat(280)}})} : {ok:true,headers:{get:()=>''},json:async()=>({retired:true,present:true,selection_id:'e'.repeat(32)})};
                     if (body?.action === 'connect' && window.__consumerBusy) return {ok:false,status:window.__consumerBusy==='rate'?429:409,json:async()=>({error:{code:({capacity:'radio_session_capacity',pending:'radio_login_pending',rate:'radio_login_rate_limited'})[window.__consumerBusy]||'radio_session_busy'}})};
+                    if (body?.action === 'engineering_mtls') window.__management = {carrier:'engineering_mtls',host:'',connected:false};
                     if (body?.action === 'connect') window.__management = {carrier:body.carrier,host:body.host,connected:true};
                     if (body?.action === 'disconnect') window.__management = {carrier:'disconnected',host:'',connected:false};
                     return {ok:true,headers:{get:()=>''},json:async()=>window.__management || {carrier:'engineering_mtls',host:'',connected:false}};
@@ -244,7 +241,47 @@ async function main() {
         assert.match(await evaluate('document.getElementById("wtp-management-retirement-status").textContent'),/retired or already absent/);
         assert.equal(await evaluate('document.getElementById("wtp-remote-callsign").value'),'MYDRAFT');
         assert.equal(await evaluate('window.__requests.filter(r=>r.url.endsWith("/member/configuration")&&r.options.method==="POST").length'),1);
-        console.log(JSON.stringify({source:UI_ROOT,browser:(await client.send('Browser.getVersion')).product,readback_preserves_draft:true,decline_sends_nothing:true,keyboard_inspection:true,retirement_error_and_success:true,password_scrubbed:true,no_mutation_replay:true,screenshots:captureScreenshots?8:0,fixture_build:resourceBuild,output}));
+        if (resourceFixtures.plans.length) {
+          await evaluate(`document.getElementById('wtp-management-carrier').value='engineering_mtls';document.getElementById('wtp-management-carrier').dispatchEvent(new Event('change'));document.getElementById('wtp-management-connect').click();`);
+          await waitFor(async()=>await evaluate('document.getElementById("wtp-management").getAttribute("aria-busy")==="false"'),'engineering selection');
+          // Reconcile the management selection invalidated by retirement before
+          // loading station revisions, following the operator workflow.
+          await evaluate(`window.WtpManagement.setAvailability(true,true)`);
+          await waitFor(async()=>await evaluate('document.getElementById("wtp-management").getAttribute("aria-busy")==="false"'),'fresh engineering management state');
+          for (const [scenario,saved] of resourceFixtures.plans) {
+            await evaluate(`window.__resourceFixtures.loaded=${JSON.stringify(saved)};window.__resourceState='loaded';document.getElementById('wtp-member-load').click();`);
+            await waitFor(async()=>await evaluate('document.getElementById("wtp-management").getAttribute("aria-busy")==="false"'),'versioned station readback');
+            assert.match(await evaluate('document.getElementById("wtp-member-station-feedback").textContent'),/Saved plan:/);
+            const station=saved.application.station.station;
+            await evaluate(`document.getElementById('wtp-member-callsign').value=${JSON.stringify(station.callsign)};document.getElementById('wtp-member-locator').value=${JSON.stringify(station.locator)};document.getElementById('wtp-member-callsign').dispatchEvent(new Event('input'));document.getElementById('wtp-member-callsign').focus();`);
+            await client.send('Input.dispatchKeyEvent',{type:'keyDown',key:'Tab',code:'Tab',windowsVirtualKeyCode:9});
+            await client.send('Input.dispatchKeyEvent',{type:'keyUp',key:'Tab',code:'Tab',windowsVirtualKeyCode:9});
+            assert.equal(await evaluate('document.activeElement.id'),'wtp-member-locator');
+            if(['type3','w1a-type3'].includes(scenario)) {
+              await evaluate(`document.getElementById('wtp-member-locator').value='EM18';document.getElementById('wtp-member-locator').dispatchEvent(new Event('input'));`);
+              assert.match(await evaluate('document.getElementById("wtp-member-station-feedback").textContent'),/six-character/);
+              await evaluate(`document.getElementById('wtp-member-locator').value='EM18IG';document.getElementById('wtp-member-locator').dispatchEvent(new Event('input'));`);
+            }
+            assert.match(await evaluate('document.getElementById("wtp-member-station-feedback").textContent'),scenario==='ambiguity'?/ambiguous/:saved.application.wspr_plan.frame_types.length===2?/Type 2 then Type 3/:['type3','w1a-type3'].includes(scenario)?/Type 3/:scenario==='type2'?/Type 2/:/Type 1/);
+            for (const theme of ['light','dark']) for(const viewport of [{name:'desktop',width:1440,height:1100},{name:'mobile',width:390,height:844}]) for(const textScale of [100,200]) {
+              await evaluate(`document.documentElement.style.fontSize='${textScale}%'`);
+              await client.send('Emulation.setDeviceMetricsOverride',{...viewport,deviceScaleFactor:1,mobile:viewport.name==='mobile'});
+              await evaluate(`applyThemePreference('${theme}');new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)))`);
+              await evaluate(`document.getElementById('wtp-member-callsign').scrollIntoView({block:'start',behavior:'instant'});window.scrollBy(0,-160);new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)))`);
+              assert(await evaluate('document.getElementById("wtp-member-callsign").getBoundingClientRect().top>=100'),'station field framing');
+              assert(await evaluate('document.documentElement.scrollWidth<=innerWidth+1'),'WSPR plan feedback overflow');
+              assert.match(await evaluate('document.getElementById("wtp-member-station-hint").textContent'),/automatically selects Type 1, Type 2 or Type 3/);
+              assert.equal(await evaluate('document.getElementById("wtp-member-locator").getAttribute("aria-describedby")'),'wtp-member-station-hint');
+              const bounds=await evaluate(`(() => { const top=document.getElementById('wtp-member-station-hint').getBoundingClientRect().top+scrollY;const bottom=document.getElementById('wtp-member-station-feedback').getBoundingClientRect().bottom+scrollY;return {x:0,y:top,width:innerWidth,height:bottom-top+24,scale:1}; })()`);
+              await capture(`${viewport.name}-${theme}-${textScale}-wspr-${scenario}.png`,{format:'png',captureBeyondViewport:true,clip:bounds});
+            }
+          }
+          await evaluate(`document.documentElement.style.fontSize='100%';document.getElementById('wtp-member-callsign').value='BAD//CALL';document.getElementById('wtp-member-callsign').dispatchEvent(new Event('input'));`);
+          assert.match(await evaluate('document.getElementById("wtp-member-station-feedback").textContent'),/Pico validates encoding before saving/);
+          assert.equal(await evaluate('document.getElementById("wtp-member-callsign").value'),'BAD//CALL');
+          console.log('All eight versioned station plans, unsupported draft, keyboard, desktop/mobile light/dark and 200% text passed');
+        }
+        console.log(JSON.stringify({source:UI_ROOT,browser:(await client.send('Browser.getVersion')).product,readback_preserves_draft:true,decline_sends_nothing:true,keyboard_inspection:true,retirement_error_and_success:true,password_scrubbed:true,no_mutation_replay:true,screenshots:captureScreenshots?(8+resourceFixtures.plans.length*8):0,fixture_build:resourceBuild,output}));
     } catch (error) {
         failure = new Error(`${error.message}\n${childDiagnostic(chrome || php)}`, { cause: error });
     } finally {

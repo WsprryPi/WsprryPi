@@ -246,7 +246,7 @@
                     <div><dt>Restart required</dt><dd id="wtp-member-restart">Unknown</dd></div>
                 </dl>
                 <h5 class="cw-control-section__title">Standalone station defaults</h5>
-                <p class="form-text" id="wtp-member-station-hint">Save the complete station together. Reported WSPR power is message metadata, separate from drive, measured RF output and calibration. The current write path requires a Type 1 callsign; six-character locators are retained and encoded using the first four.</p>
+                <p class="form-text" id="wtp-member-station-hint">Save the complete station together. Reported WSPR power is message metadata, separate from drive, measured RF output and calibration. Load member resources to check this firmware's supported station formats.</p>
                 <div class="row gx-3 gy-3">
                     <div class="col-12 col-lg-4 config-stacked-field">
                         <label class="form-label" for="wtp-member-callsign">Callsign</label>

@@ -548,15 +548,15 @@ PicoHttpResponse ConsumerRadioClient::request(const std::string &resource,
       (method == "GET" && (resource == "capabilities" || resource == "status" ||
                            resource == "config" || resource == "schedules" ||
                            resource == "network" || resource == "application" ||
-                           resource == "management" || resource == "station" || resource == "hardware" || resource == "pins")) ||
+                           resource == "management" || resource == "station" || resource == "hardware" || resource == "pins" || resource == "application/2" || resource == "station/2")) ||
       (method == "PUT" && (resource == "config" || resource == "schedules" ||
-                           resource == "network" || resource == "station" || resource == "hardware")) ||
+                           resource == "network" || resource == "station" || resource == "hardware" || resource == "config/2" || resource == "station/2")) ||
       (method == "POST" &&
-       (resource == "config/update" || resource == "consumer/logout" || resource == "pins/validate"));
+       (resource == "config/update" || resource == "config/update/2" || resource == "consumer/logout" || resource == "pins/validate"));
   if (!allowed)
     return error(404, "not_found");
-  if (body.size() > ((resource == "config/update" || resource == "pins/validate") ? 2048U :
-      (resource == "station" || resource == "hardware") ? 1024U : 1800U) ||
+  if (body.size() > ((resource == "config/update" || resource == "config/update/2" || resource == "pins/validate") ? 2048U :
+      (resource == "station" || resource == "station/2" || resource == "hardware") ? 1024U : 1800U) ||
       revision.size() > 80)
     return error(413, "body_too_large");
   if (mutation && resource != "consumer/logout" && resource != "pins/validate" && revision.empty())

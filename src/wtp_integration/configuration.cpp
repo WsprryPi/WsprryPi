@@ -80,12 +80,41 @@ bool decimal(const Json &j) {
       std::all_of(s.begin(), s.end(), [](char c) { return c >= '0' && c <= '9'; }) &&
       (s.size() < 20 || s <= "18446744073709551615");
 }
+Json resource_descriptor(bool extended) {
+  Json result{{"schema",extended ? "transmitter-application/2" : "transmitter-application/1"},
+      {"read",extended ? "/api/v1/application/2" : "/api/v1/application"},
+      {"station",extended ? "/api/v1/station/2" : "/api/v1/station"},
+      {"hardware","/api/v1/hardware"},{"management_carrier","authenticated_https"}};
+  if (extended) { result["config"]="/api/v1/config/2"; result["update"]="/api/v1/config/update/2"; }
+  return result;
+}
 bool application_shape(const Json &j, const Json &target) {
-  if (!fields(j, {"schema", "target", "station", "hardware", "recurrence", "capabilities", "reboot_required"}) ||
-      j["schema"] != "transmitter-application/1" || j["target"] != target || !j["reboot_required"].is_boolean()) return false;
+  const bool extended = j.is_object() && j.value("schema", "") == "transmitter-application/2";
+  if (extended) {
+    if (!j.contains("wspr_plan")) return false;
+    const auto &p=j["wspr_plan"];
+    if (!p.is_null()) {
+      if (!fields(p,{"schema","supported","frame_types","frames","slot_separation_s","rationale","type2_ambiguous","alternate_callsign"}) ||
+          p["schema"] != "wspr-plan/1" || !p["supported"].is_boolean() || !p["type2_ambiguous"].is_boolean() ||
+          (p["type2_ambiguous"] == false ? !p["alternate_callsign"].is_null() :
+           (!p["alternate_callsign"].is_string() || p["alternate_callsign"].get_ref<const std::string &>().size()<3 || p["alternate_callsign"].get_ref<const std::string &>().size()>12)) || !p["frames"].is_number_integer() ||
+          !p["frame_types"].is_array() || p["frames"] != p["frame_types"].size() || !p["slot_separation_s"].is_number_integer() || p["slot_separation_s"] != 120 ||
+          !p["rationale"].is_string() || p["rationale"].get_ref<const std::string &>().size() > 512) return false;
+      const auto &types=p["frame_types"];
+      if (p["supported"] == false ? !types.empty() :
+          !(types == Json::array({"type1"}) || types == Json::array({"type2"}) ||
+            types == Json::array({"type3"}) || types == Json::array({"type2","type3"}))) return false;
+      if (p["type2_ambiguous"] == true && (types.empty() || types[0] != "type2" ||
+          !std::regex_match(p["alternate_callsign"].get<std::string>(),std::regex("[A-Z0-9]+/[A-Z0-9]+")))) return false;
+    }
+  }
+  if (!fields(j, {"schema", "target", "station", "hardware", "recurrence", "capabilities", "reboot_required"}, extended ? std::initializer_list<const char *>{"wspr_plan"} : std::initializer_list<const char *>{}) ||
+      j["schema"] != (extended ? "transmitter-application/2" : "transmitter-application/1") || j["target"] != target || !j["reboot_required"].is_boolean()) return false;
   const auto &s = j["station"], &h = j["hardware"], &r = j["recurrence"], &c = j["capabilities"];
+  if (extended && s.is_object() && s.contains("station") &&
+      j["wspr_plan"].is_null() != s["station"].is_null()) return false;
   if (!fields(s, {"schema", "target", "station", "saved_generation", "storage_healthy"}) ||
-      s["schema"] != "transmitter-station/1" || s["target"] != target || !s["storage_healthy"].is_boolean() ||
+      s["schema"] != (extended ? "transmitter-station/2" : "transmitter-station/1") || s["target"] != target || !s["storage_healthy"].is_boolean() ||
       !(s["saved_generation"].is_null() || decimal(s["saved_generation"])) ||
       !(s["station"].is_null() || (fields(s["station"], {"callsign", "locator", "power_dbm"}) &&
           shape(Json{{"station", s["station"]}}, true, true)))) return false;
@@ -112,7 +141,7 @@ bool application_shape(const Json &j, const Json &target) {
           "max_config_bytes", "hardware_activation", "station_encoding", "station_power_meaning", "recurrence_authorities",
           "autonomous_modes", "unavailable"}) || c["management_carrier"] != "authenticated_https" ||
       c["application_read"] != true || !c["station_write"].is_boolean() || !c["hardware_write"].is_boolean() ||
-      c["hardware_activation"] != "restart" || c["station_encoding"] != "wspr_type1" ||
+      c["hardware_activation"] != "restart" || c["station_encoding"] != (extended ? "wspr_type123_auto" : "wspr_type1") ||
       c["station_power_meaning"] != "reported_wspr_dbm") return false;
   for (const auto key : {"max_update_bytes", "max_config_bytes"})
     if (!c[key].is_number_integer() || c[key] <= 0) return false;
@@ -181,6 +210,8 @@ PicoHttpResponse pico_configuration_request(const PicoManagementExchange &exchan
     const auto caps = parsed(read("capabilities"));
     require(caps.is_object() && caps.contains("api_version") && caps["api_version"].is_number_integer() &&
         caps["api_version"] == 1, "unsupported_remote_api", 409);
+    require(!caps.contains("application_resources_v2") || caps.contains("application_resources"),
+        "unsupported_configuration_context",409);
     if (caps.contains("management_carriers")) {
       require(fields(caps["management_carriers"], {"schema", "path"}) &&
           (caps["management_carriers"]["schema"] == "transmitter-management/1" ||
@@ -204,6 +235,7 @@ PicoHttpResponse pico_configuration_request(const PicoManagementExchange &exchan
         (job["state"] == "empty" || job["state"] == "complete" || job["state"] == "aborted" || job["state"] == "missed"),
         "remote_busy_or_output_unresolved", 409);
     Json application = nullptr, update = nullptr;
+    bool extended = false;
     const bool has_update = caps.contains("configuration_updates");
     std::size_t update_limit = 2048, config_limit = 1800;
     if (has_update) {
@@ -221,11 +253,12 @@ PicoHttpResponse pico_configuration_request(const PicoManagementExchange &exchan
       config_limit = std::min<std::size_t>(1800, update["max_config_bytes"].get<std::size_t>());
     }
     if (caps.contains("application_resources")) {
-      const auto &resources = caps["application_resources"];
-      require(resources.is_object() && resources.value("schema", "") == "transmitter-application/1" &&
-          resources.value("read", "") == "/api/v1/application", "unsupported_configuration_context", 409);
-      const auto r = read("application"); application = parsed(r);
-      require(application_shape(application, target), "invalid_remote_response");
+      extended = caps.contains("application_resources_v2");
+      const auto &resources = caps[extended ? "application_resources_v2" : "application_resources"];
+      require(extended ? resources == resource_descriptor(true) :
+          (resources.is_object() && resources.value("schema", "") == "transmitter-application/1" && resources.value("read", "") == "/api/v1/application"), "unsupported_configuration_context",409);
+      const auto r = read(extended ? "application/2" : "application"); application = parsed(r);
+      require(application_shape(application, target) && application["schema"] == (extended ? "transmitter-application/2" : "transmitter-application/1"), "invalid_remote_response");
       require(r.etag == original.etag, "configuration_context_changed", 409);
       require(application["station"]["storage_healthy"] == true && application["hardware"]["storage_healthy"] == true &&
           application["hardware"]["application_error"].is_null(), "remote_busy_or_output_unresolved", 409);
@@ -239,13 +272,13 @@ PicoHttpResponse pico_configuration_request(const PicoManagementExchange &exchan
         application["reboot_required"].is_boolean() ? application["reboot_required"] : Json(nullptr);
     if (method == "POST") {
       const auto &patch = input["config"];
-      std::string resource = "config", verb = "PUT";
+      std::string resource = extended ? "config/2" : "config", verb = "PUT";
       Json candidate;
       if (input["operation"] == "schedules") {
         require(!config.is_null(), "not_configured", 409);
         resource = "schedules"; candidate = patch;
       } else if (strategy == "merge") {
-        resource = "config/update"; verb = "POST";
+        resource = extended ? "config/update/2" : "config/update"; verb = "POST";
         candidate = {{"schema", "transmitter-config-update/1"}, {"target", target}, {"mode", "merge"}, {"config", patch}};
       } else if (strategy == "initial") {
         require(shape(patch, false, false) && patch["wifi"]["password"].is_string(), "initial_configuration_required", 400);
@@ -286,12 +319,12 @@ const unsigned pairs[12][3] = {{0,0,1},{0,4,5},{0,8,9},{0,12,13},{0,16,17},{0,20
 bool whole(const Json &j, std::uint64_t maximum) {
   return j.is_number_integer() && j >= 0 && j <= maximum;
 }
-bool station_valid(const Json &j) {
-  static const std::regex call("[A-Z0-9]+(/[A-Z0-9]+)*"), grid("[A-R]{2}[0-9]{2}([A-X]{2})?");
+bool station_valid(const Json &j, bool extended = false) {
+  static const std::regex call("[A-Z0-9]+(/[A-Z0-9]+)*"), extended_call("([A-Z0-9]+(/[A-Z0-9]+)*|<[A-Z0-9]+(/[A-Z0-9]+)*>)"), grid("[A-R]{2}[0-9]{2}([A-X]{2})?");
   const Json powers = {0,3,7,10,13,17,20,23,27,30,33,37,40,43,47,50,53,57,60};
   return fields(j, {"callsign", "locator", "power_dbm"}) && j["callsign"].is_string() &&
       j["callsign"].get_ref<const std::string &>().size() >= 3 && j["callsign"].get_ref<const std::string &>().size() <= 12 &&
-      std::regex_match(j["callsign"].get_ref<const std::string &>(), call) && j["locator"].is_string() &&
+      std::regex_match(j["callsign"].get_ref<const std::string &>(), extended ? extended_call : call) && j["locator"].is_string() &&
       j["callsign"].get_ref<const std::string &>().find_first_of("ABCDEFGHIJKLMNOPQRSTUVWXYZ") != std::string::npos &&
       j["callsign"].get_ref<const std::string &>().find_first_of("0123456789") != std::string::npos &&
       std::regex_match(j["locator"].get_ref<const std::string &>(), grid) && j["power_dbm"].is_number_integer() &&
@@ -347,7 +380,7 @@ bool plan_valid(const Json &p) { return plan_shape(p) && review_plan(p)["operati
 void shared_application(const Json &j, const Json &target) {
   require(j.dump().size() <= 4096 && application_shape(j,target), "invalid_remote_resource");
   const auto &s = j["station"], &h = j["hardware"], &c = j["capabilities"], &r = j["recurrence"];
-  require((s["station"].is_null() || station_valid(s["station"])) &&
+  require((s["station"].is_null() || station_valid(s["station"], j["schema"] == "transmitter-application/2")) &&
       s["station"].is_null() == s["saved_generation"].is_null() &&
       (s["storage_healthy"] == true || s["station"].is_null()) &&
       h["saved"].is_null() == h["saved_generation"].is_null() &&
@@ -415,9 +448,9 @@ PicoHttpResponse pico_resource_request(const PicoManagementExchange &exchange,
       else {
         const bool station = resource == "station";
         require(fields(input,{"schema","target",station ? "station" : "pins"}) &&
-            input["schema"] == (station ? "transmitter-station/1" : "transmitter-hardware/1"),"invalid_resource",400);
+            (station ? (input["schema"] == "transmitter-station/1" || input["schema"] == "transmitter-station/2") : input["schema"] == "transmitter-hardware/1"),"invalid_resource",400);
         require(input["target"] == target,"target_mismatch",409);
-        require(station ? station_valid(input["station"]) : plan_valid(input["pins"]), station ? "invalid_station" : "unsupported_pin_adapter",400);
+        require(station ? station_valid(input["station"], input["schema"] == "transmitter-station/2") : plan_valid(input["pins"]), station ? "invalid_station" : "unsupported_pin_adapter",400);
       }
     }
     const auto read = [&](const std::string &path, std::size_t limit = 4096) {
@@ -434,22 +467,26 @@ PicoHttpResponse pico_resource_request(const PicoManagementExchange &exchange,
           management["schema"] == caps["management_carriers"]["schema"],"unsupported_management_contract",409);
     } else require(carrier == "engineering_mtls","unsupported_management_contract",409);
     require(caps.contains("application_resources"),"shared_resources_unavailable",409);
-    require(caps["application_resources"] == Json{{"schema","transmitter-application/1"},{"read","/api/v1/application"},
-        {"station","/api/v1/station"},{"hardware","/api/v1/hardware"},{"management_carrier","authenticated_https"}},"unsupported_resource_capabilities",409);
+    const bool extended = caps.contains("application_resources_v2");
+    require(caps[extended ? "application_resources_v2" : "application_resources"] == resource_descriptor(extended),"unsupported_resource_capabilities",409);
+    const std::string application_path = extended ? "application/2" : "application";
+    const auto resource_path = [&](const std::string &path) { return extended && path == "station" ? std::string("station/2") : path; };
+    if (write && resource == "station") require(input["schema"] == (extended ? "transmitter-station/2" : "transmitter-station/1"),"unsupported_resource_schema",409);
     require(caps.contains("features") && caps["features"].is_object() && caps["features"].contains("consumer_setup_identity") &&
         caps["features"]["consumer_setup_identity"].is_boolean(),"invalid_remote_resource");
     for (const auto feature : {"application","station","hardware"})
       require(caps["features"].contains(feature) && caps["features"][feature] == true,"unsupported_resource_capabilities",409);
     const bool profile_owned = caps["features"]["consumer_setup_identity"] == true;
     if (caps.contains("management_carriers")) require(profile_owned == (carrier == "consumer_station" || carrier == "consumer_ap"),"invalid_remote_resource");
-    const auto first = read("application"); auto application = parsed(first); shared_application(application,target);
+    const auto first = read(application_path); auto application = parsed(first); shared_application(application,target);
+    require(application["schema"] == (extended ? "transmitter-application/2" : "transmitter-application/1"),"invalid_remote_resource");
     require(etag(first.etag),"invalid_remote_resource");
     for (const auto path : {"station","hardware"}) {
-      const auto r = read(path);
+      const auto r = read(resource_path(path));
       require(r.etag == first.etag && parsed(r).dump() == application[path].dump(),"configuration_context_changed",409);
     }
     const auto pins = parsed(read("pins")); pin_choices(pins);
-    const auto last = read("application"); const auto after = parsed(last); shared_application(after,target);
+    const auto last = read(application_path); const auto after = parsed(last); shared_application(after,target);
     // Configuration consistency is distinct from mutable live recurrence/status.
     require(last.etag == first.etag && after["station"].dump() == application["station"].dump() &&
         after["hardware"]["saved"].dump() == application["hardware"]["saved"].dump() &&
@@ -472,19 +509,19 @@ PicoHttpResponse pico_resource_request(const PicoManagementExchange &exchange,
       require(resource != "station" || !profile_owned,"consumer_setup_identity_required",409);
     }
     attempted = write;
-    auto result = exchange(resource,method,body,preview ? "" : revision); success(result);
+    auto result = exchange(resource_path(resource),method,body,preview ? "" : revision); success(result);
     require(result.body.size() <= 4096,preview ? "invalid_pin_validation" : "management_outcome_unknown");
     const auto value = parsed(result);
     if (preview) {
       require(value.contains("gp") && (value["gp"].is_null() || value["gp"].is_number_integer()) && value.dump() == review_plan(input).dump(),"invalid_pin_validation");
-      const auto confirmed = read("application");
+      const auto confirmed = read(application_path);
       const auto observed = parsed(confirmed); shared_application(observed,target);
       require(confirmed.etag == revision && observed["station"].dump() == application["station"].dump() &&
           observed["hardware"].dump() == application["hardware"].dump(),"configuration_context_changed",409);
       return {200,value.dump(),{}};
     }
     require(etag(result.etag) && result.etag != revision && result.body.size() <= 4096,"management_outcome_unknown");
-    const auto confirmed = read("application"); const auto updated = parsed(confirmed);
+    const auto confirmed = read(application_path); const auto updated = parsed(confirmed);
     shared_application(updated,target);
     require(confirmed.etag == result.etag && updated[resource].dump() == value.dump(),"management_outcome_unknown");
     if (resource == "hardware" && !input["pins"].contains("indicator_active_high")) input["pins"]["indicator_active_high"] = true;

@@ -77,15 +77,15 @@ PicoHttpResponse pico_http_request(TlsStream &stream, const TlsSelection &select
   const bool mutation = method == "PUT" || method == "POST";
   const bool allowed = (method == "GET" && (resource == "config" || resource == "schedules" ||
       resource == "network" || resource == "capabilities" || resource == "status" || resource == "application" || resource == "management" ||
-       resource == "station" || resource == "hardware" || resource == "pins")) ||
-      (method == "PUT" && (resource == "config" || resource == "schedules" || resource == "network" || resource == "station" || resource == "hardware")) ||
-      (method == "POST" && (resource == "config/update" || resource == "pins/validate"));
+       resource == "station" || resource == "hardware" || resource == "pins" || resource == "application/2" || resource == "station/2")) ||
+      (method == "PUT" && (resource == "config" || resource == "schedules" || resource == "network" || resource == "station" || resource == "hardware" || resource == "config/2" || resource == "station/2")) ||
+      (method == "POST" && (resource == "config/update" || resource == "config/update/2" || resource == "pins/validate"));
   if (!allowed)
     return error(404, "not_found");
   if (body.size() > 32768 || revision.size() > 128 || revision.find_first_of("\r\n") != std::string::npos)
     return error(400, "invalid_request");
   if (method == "POST" && body.size() > 2048) return error(413, "body_too_large");
-  if (method == "PUT" && (resource == "station" || resource == "hardware") && body.size() > 1024)
+  if (method == "PUT" && (resource == "station" || resource == "station/2" || resource == "hardware") && body.size() > 1024)
     return error(413,"body_too_large");
   if (mutation && resource != "pins/validate" && revision.empty()) return error(428, "revision_required");
   if (!stream.begin_open(selection, std::move(credentials), "http/1.1")) return error(503, "network_unavailable");
