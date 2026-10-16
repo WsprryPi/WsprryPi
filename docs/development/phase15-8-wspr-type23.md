@@ -1,6 +1,8 @@
 # P15.8 Pico WSPR Type 2/3 companion
 
-Status: validation in progress. This branch is not integrated into Pi devel.
+Status: software implementation and local validation complete. CI/publication
+are tracked in the lead Pico execution record. This branch is not integrated
+into Pi devel.
 
 The operator approved only this companion scope on 2026-10-16: strict native
 management/client/UI format negotiation, tests, compatibility pins, associated
@@ -75,3 +77,51 @@ the unchanged suite is being rerun on the container's native Linux filesystem.
 No assertion, deadline or CI timeout was weakened. Logs/builds remain under
 `/private/tmp/wsprrypi-p158/results`; browser evidence is under
 `/private/tmp/wsprrypi-p158/browser-confirmation`.
+
+## Final local gate and source identities
+
+Production implementation is `41c1dbd42620da6d5595b3ca0171c15ad6c9ee5f`;
+subsequent changes only stabilize the browser fixture/evidence. Pico current
+stays pinned to `bcd7f036b9ed57ee0aab080ca8617fccb69b7588`; later lead-repo
+review/report commits do not replace that implementation pin. Historical rows
+remain legacy `95aac22`, extended `dfffdd5`, p152 `87144d1`, p153 `d6208db`,
+p154 `ddb00dd`, p156 `792b5b2`, p157 `26ae596` (full identities in pin files).
+
+Final Linux native units/API/UI producers pass. ASan/UBSan with leak detection
+passes the final native validators, actual consumer profile/crypto cases and
+resource/UI producers for TLS, consumer station and AP. Logs:
+`sanitize-final-{native,build,consumer,resources}.log`. Linux native-filesystem
+runtime passes 34 TLS cases, 358 production runtime checks, 1,514 scheduler checks
+and 1,337 application checks (`runtime-localfs.log`); simulated backend, no devices
+or RF, no timeout changes. The original bind-mount failure remains recorded.
+
+The maintained release probe is in the lead repo under
+`tests/release_pi_compatibility/`: it verifies exact clean Pi/Pico/Mbed TLS
+identities, compiles unchanged release Pi product files, reuses only test doubles
+from the original fixture and links the freshly built current Pico fixture.
+Its ten station/AP cases pass (`release-probe-maintained-test.log`). Type 1
+includes a real unrelated-settings save and preserved watermark; every new
+format is an explicit `unsupported_station_encoding` refusal with no mutation.
+
+The browser confirmation passes all twenty captures
+(`browser-confirmation-framed.log`), with visible-field assertions after viewport
+layout settles. It corrects only screenshot framing under the incumbent fixed
+header. Product UI received one bounded repair batch; no redesign/polishing loop
+was performed. The lead repo's generated page also passes its twelve-capture
+real HTTP/crypto commissioning confirmation.
+
+During execution the operator independently advanced Pi devel to
+`587c7b137e982dca012701c0a5e85422bf720d73`; GitHub comparison shows only
+`release_tools/Release Punchlist.md` changed. Therefore reviewed native product
+blobs are unchanged from the probe's exact `a2437d1` base. The primary checkout
+now has that HEAD and a further dirty Punchlist edit; neither was altered by this
+execution. This companion retains its approved base and is not rebased/merged.
+
+Publication order is constrained by CI's exact cross-repository checkout:
+after local old/new compatibility gates pass, push the tested Pico implementation
+so its immutable SHA is reachable, then push this approved Pi feature head and
+run its existing required workflow. The frozen Type 1 contract and tested old-Pi
+refusals make this staged rollout safe; Pi devel is not a publication target.
+CI run/head/results and final remote parity are recorded in the lead Pico
+`docs/development/phase15-8-wspr-type23.md` after the workflow completes. Feature
+branch validation does not mean the release branch adopted the new capability.
