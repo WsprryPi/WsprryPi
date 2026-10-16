@@ -100,7 +100,9 @@ route/build attribution, release selection, missing-evidence semantics, control
 path locking, unchanged high-band refusal, final state and evidence reuse.
 No actionable finding remains within item 10. Focused diagnostics, qualification,
 release-selection, installer and UI regressions pass; Linux hosted CI covers
-route/runtime/transmitter and support-installer tests. Consumer baseline
+route/runtime/transmitter and support-bundle tests. The support-installer
+fixture passes separately in an unprivileged, network-disabled Debian container.
+Consumer baseline
 [8d5247a CI](https://github.com/WsprryPi/WsprryPi/actions/runs/38911212968)
 and [aae72f1 repair CI](https://github.com/WsprryPi/WsprryPi/actions/runs/38920583987)
 each passed all 11 jobs; [supplement CI](https://github.com/WsprryPi/RP1-GPCLK-DKMS/actions/runs/38909156788)
@@ -109,7 +111,7 @@ exact-commit CI and parity verification in the execution handback.
 
 No local macOS C++ compilation ran. The support-installer shell fixture requires
 GNU `stat`, so its macOS invocation stopped on that platform dependency; the
-passing Linux CI supplies that check. No new reboot, rollback rehearsal, active
+separate passing Linux container run supplies that check. No new reboot, rollback rehearsal, active
 I2C scan, transmission or RF/receiver capture occurred during this supplement
 closeout. Prior accepted target and RF results retain their original identities.
 
