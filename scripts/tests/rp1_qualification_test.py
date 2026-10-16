@@ -95,6 +95,7 @@ class Tests(unittest.TestCase):
             directory.mkdir()
             for n, raw in assets.items(): (directory/n).write_bytes(raw)
             self.assertEqual(Q.cached(directory, lock, trusted=False)[0], {'fixture': True})
+            self.assertEqual(Q.status(lock, 'gpio4', {}, {}, directory)['status'], 'verified')
             (directory/'rp1-qualification.json').write_bytes(b'{}')
             with self.assertRaises(ValueError): Q.cached(directory, lock, trusted=False)
             path = Path(temporary).resolve()/'large'; path.write_bytes(b'a'*20)

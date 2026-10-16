@@ -126,6 +126,7 @@ def cached(directory, lock, trusted=True):
 
 
 def status(lock, route, report=None, ownership=None, directory=CACHE):
+    live_inspection = report is None
     base = {'status': 'missing', 'state': 'Evidence missing', 'permissionGate': False,
             'applicationEligibility': 'WsprryPi band/mode policy'}
     try:
@@ -150,7 +151,7 @@ def status(lock, route, report=None, ownership=None, directory=CACHE):
         report = {}
         base['providerInspection'] = str(error)
     try:
-        metadata, interpret = cached(directory, lock)
+        metadata, interpret = cached(directory, lock, trusted=live_inspection)
     except FileNotFoundError:
         return base
     except (OSError, ValueError, KeyError, TypeError) as error:
