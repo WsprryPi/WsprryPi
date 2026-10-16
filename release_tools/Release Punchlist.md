@@ -12,9 +12,10 @@ Status updated October 16, 2026. Items 1 through 10 are complete within their
 recorded scopes. Accepted implementation is integrated into `devel`, and the
 immutable RP1 provider release is published. Item 10, WsprryPi production
 consumption and validation, is accepted for installation and idle runtime
-integration. Production RF operation remains unqualified; the maintainer accepted
-the empty `Unavailable` manifest as a bounded limitation and excluded target
-rollback rehearsals. Items 11–14 remain open.
+integration. Existing documented RF qualification and its limitations are
+preserved; the maintainer accepted the provider's empty `Unavailable` manifest
+as a metadata limitation and excluded target rollback rehearsals. No new RF
+qualification is claimed. Items 11–14 remain open.
 
 Status key: ✅ Complete · ⏳ In progress · ☐ Not started
 
@@ -102,8 +103,10 @@ Status key: ✅ Complete · ⏳ In progress · ☐ Not started
     coverage is retained from software and disposable lifecycle evidence, not
     claimed as fresh target tests. **Accepted scope:** installation/runtime
     integration with the published manifest unchanged (`Unavailable`, no target
-    entries). Production RF operation remains unqualified and requires qualifying
-    metadata and an appropriate provider publication. Zero RF attempts occurred.
+    entries). Existing application band/mode RF qualification remains valid
+    within its recorded scope; an empty provider manifest does not erase it.
+    Publishing matching provider qualification entries requires attributable
+    evidence and an appropriate provider publication. Zero new RF attempts occurred.
 11. ☐ **Documentation performance and remaining Impeccable housekeeping.**
     **Lead: WsprryPi-Docs · RP1 item 19.** Reconcile the saved image-optimization,
     product-metadata and host/tooling reminders; implement justified documentation
@@ -151,7 +154,7 @@ Status key: ✅ Complete · ⏳ In progress · ☐ Not started
 
 | WsprryPi item | RP1 item | Status | Work | Lead repository |
 | --- | --- | --- | --- | --- |
-| 10 | 18 | ✅ Complete within accepted scope | Published-provider installation/runtime integration; target passes and bounded compatibility/rollback disposition recorded; RF unqualified | `WsprryPi` |
+| 10 | 18 | ✅ Complete within accepted scope | Published-provider installation/runtime integration; target passes and metadata/rollback disposition recorded; existing RF qualification preserved | `WsprryPi` |
 | 11 | 19 | ☐ Not started | Documentation performance and Impeccable housekeeping | `WsprryPi-Docs` |
 | 12 | 20 | ☐ Not started | Consolidated operator documentation | `WsprryPi-Docs` |
 | 13 | 21 | ☐ Not started | Final integrated application Impeccable review | `WsprryPi` |
@@ -200,8 +203,9 @@ work; item 13 still requires acceptance of actual integration prerequisites.
   recovery/removal and automatic reboot restoration passed. Software/disposable
   lifecycle evidence is retained; target rollback rehearsals were explicitly
   excluded. The maintainer accepts the unchanged empty `Unavailable` manifest
-  for this bounded closeout. Production RF operation remains unqualified and
-  requires qualifying metadata and an appropriate provider publication. Follow the
+  as a metadata limitation. Existing RF qualification retains its recorded scope;
+  provider qualification entries require attributable evidence and an appropriate
+  provider publication. No new RF qualification is claimed. Follow the
   [published-release contract](../docs/rp1-gpclk-dkms-installation.md#published-releases).
 - ☐ **Operator documentation:** after production RP1 integration, reconcile
   the recorded Si5351 readiness/drive/fade, inventory-timeout, and RP1 correction

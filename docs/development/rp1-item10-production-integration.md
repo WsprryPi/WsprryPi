@@ -4,9 +4,10 @@
 
 Status: **complete within the maintainer-accepted installation/runtime scope**
 on October 16, 2026. This is WsprryPi's handback for RP1 roadmap item 18.
-Production RF operation remains **unqualified**. The maintainer explicitly
-accepted the published manifest's empty `Unavailable` state for this bounded
-closeout and excluded target rollback rehearsals. Items 11–14 and WsprryPi 4.0
+Existing documented RF qualification retains its recorded band, mode, profile
+and evidence scope. The maintainer accepted the published provider manifest's
+empty `Unavailable` state for this bounded closeout and excluded target rollback
+rehearsals. This acceptance adds no RF qualification. Items 11–14 and WsprryPi 4.0
 release acceptance remain open. This record grants no new target or RF authority.
 
 ## Inputs and evidence boundary
@@ -64,7 +65,7 @@ platforms are expected refusals/skips, not supported RP1 targets.
 | Foreign/mixed/orphan/changed ownership/stale plans | Refusal before effects; retain recovery evidence | Installer, update and startup negative fixtures | PASS required refusals; no supported-state claim from negative tests |
 | Kernel/headers/module/signing/compression mismatch | Refuse incompatible source/build/binding/trust | Installer fixtures; unchanged provider disposable DKMS campaign; actual target artifact/binding inspection | PASS software refusals; running `6.18.34+rpt-rpi-2712`, matching headers and exact unsigned XZ module pair recorded below. Other installed-kernel builds are not runtime-qualified |
 | Diagnostics/errors/support/STOP | Bounded process errors; truthful missing/failed state; responsive STOP and cleanup latches | Diagnostics/collector/lifecycle fixtures | PASS; support evidence is not qualification |
-| Unavailable/rejected compatibility | No acquisition/transmission or backend/route fallback | Real manifest defaults to Unavailable, entries empty; consumer negative tests; explicit maintainer disposition | Required refusal coverage retained. Maintainer accepts installation/runtime integration only; production RF operation remains unqualified and requires qualifying metadata and an appropriate provider publication |
+| Unavailable/rejected compatibility | No acquisition/transmission or backend/route fallback for an unavailable/rejected runtime identity | Real manifest defaults to Unavailable, entries empty; consumer negative tests; explicit maintainer disposition | Required refusal coverage retained. The empty release manifest is accepted as a metadata limitation; existing application band qualification is preserved. Publishing provider qualification entries requires attributable evidence and an appropriate provider publication |
 | Application simulation, profiles, UI regressions | Software contracts pass with hardware access disabled | Canonical Linux workflow, simulator traces, UI unit/browser tests | PASS local semantics/audit/simulation/UI (browser cleanup caveat below); exact-head hosted profiles/CI required after push |
 
 Historical candidate evidence remains at its original identities, including
@@ -90,13 +91,29 @@ repeated. No historical candidate lock or acceptance record was rewritten.
 
 The maintainer separately authorized installation, both-route idle acceptance
 and two reboot checks on `wspr5`, instructed that the upgraded versions stay
-installed, and excluded rollback rehearsals and RF. On October 16, 2026 the
-maintainer accepted installation/runtime integration while explicitly retaining
-production RF operation as unqualified. The published compatibility manifest
-remains byte-for-byte unchanged: `defaultState=Unavailable`, `entries=[]`.
-Production RF eligibility requires qualifying metadata and an appropriate
-provider publication; this closeout adds no override, qualification entry or
-transmission permission. Target rollback rehearsals are an accepted exclusion,
+installed, and excluded rollback rehearsals and new RF activity. On October 16,
+2026 the maintainer accepted installation/runtime integration with the published
+compatibility manifest unchanged: `defaultState=Unavailable`, `entries=[]`.
+Existing RF qualification is documented in
+the [development band-qualification table](https://wsprry-pi.readthedocs.io/en/devel/About_Wsprry_Pi/index.html#band-qualification).
+The Pi 5 / 200 MHz PLL_SYS column records qualification from 2200 m
+through 10 m, including 12 m; 6 m and 4 m remain unqualified, and 2 m and higher
+listed bands are unavailable. Preserve that recorded scope and its underlying
+evidence; do not erase it because the provider release metadata is empty.
+
+These are distinct records: the published JSON has no target entries; the
+module reports structurally compatible GPIO4/GPIO20 as `Compatible-unqualified`;
+WsprryPi records band/mode qualification separately. The JSON schema supports
+separate route entries with exact board, kernel/build, module/UAPI/overlay
+identities and evidence references. Its `Qualified` state requires build,
+clock-disabled, timing, cleanup, recovery and RF evidence. An appropriate
+provider publication can populate those entries using attributable existing
+evidence where inputs match, preserving its route/band/mode limits. Unknown
+combinations retain the `Unavailable` default. Neither the empty file nor this
+closeout changes existing application qualification or runtime authorization.
+
+This closeout adds no override, qualification entry or transmission permission.
+Target rollback rehearsals are an accepted exclusion,
 not a passing target check. Existing software and disposable lifecycle evidence
 remain applicable under the unchanged-input rationale above.
 
@@ -330,7 +347,7 @@ disabled output and ownerless quiescent snapshots, unchanged boot configuration,
 and absence of RF/rollback operations. No actionable target finding remains
 within the accepted installation/runtime scope. The maintainer's bounded
 compatibility disposition and rollback exclusion above close the remaining
-item 10 decisions without claiming production RF eligibility. Items 1–9 are
+item 10 decisions without expanding existing RF qualification. Items 1–9 are
 preserved; items 11–14 remain open.
 
 The final commit containing this record identifies the reviewed diff. After its
@@ -342,4 +359,6 @@ does not qualify that final head. Implementation commit `8abb0d1` passed all
 The documentation-only closeout must receive its own exact-commit CI result;
 that cannot replace or broaden the recorded target source identity. Item 10 /
 RP1 item 18 is **complete within the accepted installation/runtime scope**.
-The remaining release work is items 11–14, with RF operation still unqualified.
+The remaining release work is items 11–14. Existing documented RF qualification
+and its limitations remain in force; the provider's empty qualification metadata
+is a separate accepted limitation, not a blanket absence of RF evidence.
