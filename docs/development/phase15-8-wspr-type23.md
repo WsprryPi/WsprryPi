@@ -82,7 +82,7 @@ No assertion, deadline or CI timeout was weakened. Logs/builds remain under
 
 Production implementation is `41c1dbd42620da6d5595b3ca0171c15ad6c9ee5f`;
 subsequent changes only stabilize the browser fixture/evidence. Pico current
-is finally pinned to `99ce69670e3c44182216f847b245a3f62a13eca2`; later lead-repo
+is finally pinned to `0c02423d3ea0f6e89507a74ed5a2be9b00895ee0`; later lead-repo
 review/report commits do not replace that implementation pin. Historical rows
 remain legacy `95aac22`, extended `dfffdd5`, p152 `87144d1`, p153 `d6208db`,
 p154 `ddb00dd`, p156 `792b5b2`, p157 `26ae596` (full identities in pin files).
