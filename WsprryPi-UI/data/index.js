@@ -2648,9 +2648,7 @@ class Rp1RouteUiController {
         $("#rp1-route-active").text(this.active);
         $("#rp1-route-module").text(this.routeValue(data.moduleRoute));
         for (const id of ["rp1-route-module-fact", "rp1-route-endpoint-fact",
-            "rp1-route-output-inhibited-fact", "rp1-route-operational-ready-fact",
-            "rp1-development-policy-fact", "rp1-operation-lifecycle-fact",
-            "rp1-route-eligible-fact"]) {
+            "rp1-development-policy-fact", "rp1-operation-lifecycle-fact"]) {
             const fact=document.getElementById(id);
             if(fact) fact.hidden=this.runtimeProfile;
         }
@@ -2667,12 +2665,18 @@ class Rp1RouteUiController {
         $("#rp1-route-endpoint").text(endpoint);
         $("#rp1-route-output-inhibited").text(data.outputInhibited || "Unknown");
         $("#rp1-route-operational-ready").text(data.operationalReady || "Unknown");
+        $("#rp1-structural-compatibility").text(data.structuralCompatibility || "Unknown");
         $("#rp1-development-policy").text(data.developmentPolicy || "Disabled");
         const lifecycle=data.operationLifecycle && typeof data.operationLifecycle==="object"
             ? `Lease ${data.operationLifecycle.lease || "none"}; generation ${data.operationLifecycle.generation || "none"}; ${data.operationLifecycle.terminalReasonName || data.operationLifecycle.terminalReason || "no terminal result"}`
             : "No active lease or generation";
         $("#rp1-operation-lifecycle").text(lifecycle);
-        $("#rp1-route-eligible").text("Unqualified");
+        const evidence=data.qualificationEvidence;
+        const qualified=evidence?.status==="verified" && evidence?.scope?.kind==="finite-conducted-tone";
+        $("#rp1-route-eligible").text(qualified
+            ? `Qualified TONE evidence: ${evidence.scope.frequencyHz.toLocaleString()} Hz, ${evidence.scope.driveMa} mA`
+            : (data.liveQualification || "Evidence missing"));
+        $("#rp1-application-eligibility").text("Depends on band and mode");
         $("#rp1-route-rollback").text(this.runtimeProfile ? "Recover to no route" : "Roll back");
         const reported=String(data.state || (requested===this.active ? "active" : "mismatch")).replaceAll("-","_");
         const displayed=confirmedNeutral && reported==="runtime_inhibited" ? "runtime_neutral_stopped" : reported;

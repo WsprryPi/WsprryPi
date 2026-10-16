@@ -6,7 +6,7 @@ const script=fs.readFileSync(path.join(root,"data/index.js"),"utf8");
 const siteScript=fs.readFileSync(path.join(root,"data/site.js"),"utf8");
 const styles=fs.readFileSync(path.join(root,"data/index.css"),"utf8");
 const header=fs.readFileSync(path.join(root,"data/header.php"),"utf8");
-assert.match(view,/Requested[\s\S]*Persisted[\s\S]*Configured[\s\S]*Active[\s\S]*Module reported[\s\S]*Reconciled[\s\S]*Boot ownership[\s\S]*Pending transaction[\s\S]*Fixed services[\s\S]*Endpoint[\s\S]*Output inhibited[\s\S]*Operational readiness[\s\S]*Development policy[\s\S]*Operation lifecycle[\s\S]*Product qualification/);
+assert.match(view,/Requested[\s\S]*Persisted[\s\S]*Configured[\s\S]*Active[\s\S]*Module reported[\s\S]*Reconciled[\s\S]*Boot ownership[\s\S]*Pending transaction[\s\S]*Fixed services[\s\S]*Endpoint[\s\S]*Output inhibited[\s\S]*Operational readiness[\s\S]*Development policy[\s\S]*Operation lifecycle[\s\S]*Route evidence[\s\S]*Application eligibility/);
 assert.match(view,/>Check route</); assert.match(view,/>Cancel</);
 assert.match(view,/role="status" aria-live="polite" aria-atomic="true"/);
 assert.match(view,/<option value="">None<\/option>/);
@@ -30,7 +30,7 @@ assert.match(script,/select:not\(#tx_pin\)/);
 assert.match(siteScript,/isRp1RouteStatusModalActive/);
 assert.match(script,/rp1-development-policy/);
 assert.match(view,/id="rp1-development-policy">Disabled/);
-assert.match(view,/id="rp1-route-eligible">Unqualified/);
+assert.match(view,/id="rp1-route-eligible">Evidence missing/);
 assert.doesNotMatch(view,/Package|Predecessor evidence|Module \/ ABI|Compatibility/);
 assert.match(view,/Installation leaves RP1 route-neutral/);
 assert.match(script,/function rp1GpioRouteSelectable\(\)/);
@@ -68,6 +68,13 @@ vm.runInContext(script.slice(script.indexOf("const RP1_ROUTE_STATES"),script.ind
  ';globalThis.controller=new Rp1RouteUiController("/offline");',context);
 (async()=>{
  const controller=context.controller;
+ controller.render({profile:"runtime",ok:true,state:"runtime_ready",active:"GPIO4",
+  liveQualification:"Qualified (scoped TONE evidence)",qualificationEvidence:{status:"verified",
+  scope:{kind:"finite-conducted-tone",frequencyHz:14097100,driveMa:2}}});
+ assert.match(element("rp1-route-eligible").textContent,/Qualified TONE evidence:.*Hz, 2 mA/);
+ assert.equal(element("rp1-application-eligibility").textContent,"Depends on band and mode");
+ controller.render({profile:"runtime",ok:true,state:"runtime_ready",active:"GPIO4",liveQualification:"Evidence invalid"});
+ assert.equal(element("rp1-route-eligible").textContent,"Evidence invalid");
  controller.render({profile:"legacy",ok:true,state:"active",persisted:"GPIO20",active:"GPIO20",compatible:true});
  assert.equal(element('#tx_pin option[value=""]').hidden,true,"None stays unavailable to the legacy development profile");
  controller.render({profile:"runtime",ok:true,state:"runtime_inhibited",persisted:"GPIO20",active:"GPIO4",compatible:true});
@@ -120,8 +127,7 @@ vm.runInContext(script.slice(script.indexOf("const RP1_ROUTE_STATES"),script.ind
  controller.render({profile:"runtime",ok:true,state:"runtime_ready",persisted:"GPIO20",active:"GPIO20"});
  assert.equal(element("rp1-route-state").textContent,"Route selected");
  for(const id of ["rp1-route-module-fact","rp1-route-endpoint-fact",
-  "rp1-route-output-inhibited-fact","rp1-route-operational-ready-fact",
-  "rp1-development-policy-fact","rp1-operation-lifecycle-fact","rp1-route-eligible-fact"])
+  "rp1-development-policy-fact","rp1-operation-lifecycle-fact"])
   assert.equal(element(id).hidden,true,`${id} must not show unavailable provider facts in runtime administration`);
  controller.render({profile:"runtime",ok:false,state:"runtime_restoration_failed",persisted:"GPIO20",active:"GPIO4"});
  assert.equal(element("rp1-route-apply").disabled,true,"restoration failure cannot launch another switch");

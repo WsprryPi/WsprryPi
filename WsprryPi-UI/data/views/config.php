@@ -803,9 +803,11 @@ $bandGpioBands = ['2200m', '630m', '160m', '80m', '60m', '40m', '30m', '20m', '1
                                                 <div id="rp1-route-endpoint-fact"><dt>Endpoint</dt><dd id="rp1-route-endpoint">Not inspected</dd></div>
                                                 <div id="rp1-route-output-inhibited-fact"><dt>Output inhibited</dt><dd id="rp1-route-output-inhibited">Unknown</dd></div>
                                                 <div id="rp1-route-operational-ready-fact"><dt>Operational readiness</dt><dd id="rp1-route-operational-ready">Unknown</dd></div>
+                                                <div><dt>Resource compatibility</dt><dd id="rp1-structural-compatibility">Unknown</dd></div>
                                                 <div id="rp1-development-policy-fact"><dt>Development policy</dt><dd id="rp1-development-policy">Disabled</dd></div>
                                                 <div id="rp1-operation-lifecycle-fact"><dt>Operation lifecycle</dt><dd id="rp1-operation-lifecycle">No active lease or generation</dd></div>
-                                                <div id="rp1-route-eligible-fact"><dt>Product qualification</dt><dd id="rp1-route-eligible">Unqualified</dd></div>
+                                                <div id="rp1-route-eligible-fact"><dt>Route evidence</dt><dd id="rp1-route-eligible">Evidence missing</dd></div>
+                                                <div><dt>Application eligibility</dt><dd id="rp1-application-eligibility">Depends on band and mode</dd></div>
                                             </dl>
                                         </section>
                                     </div>

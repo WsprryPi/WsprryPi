@@ -211,7 +211,8 @@ nlohmann::json Rp1GpclkRouteService::failure(const std::string &result,
           {"reconciled", false},
           {"compatible", false},
           {"eligible", false},
-          {"liveQualification", "Unavailable"},
+          {"liveQualification", "Not inspected"},
+          {"applicationEligibility", "WsprryPi band/mode policy"},
           {"contractIdentity", kContract},
           {"bootOwnership", "unknown"},
           {"journal", "unknown"},
@@ -220,6 +221,25 @@ nlohmann::json Rp1GpclkRouteService::failure(const std::string &result,
           {"endpointOpen", true},
           {"outputInhibited", "Unknown"},
           {"operationalReady", "Unknown"}};
+}
+nlohmann::json Rp1GpclkRouteService::withQualification(nlohmann::json result) const {
+  result["applicationEligibility"] = "WsprryPi band/mode policy";
+  if (!operations_.qualification_status)
+    return result;
+  try {
+    const auto route = field(result, "active");
+    const auto evidence = operations_.qualification_status(
+        route == "GPIO4" ? "gpio4" : route == "GPIO20" ? "gpio20" : "");
+    if (evidence.is_object()) {
+      result["qualificationEvidence"] = evidence;
+      result["liveQualification"] = evidence.value("state", std::string("Evidence missing"));
+      result["structuralCompatibility"] = evidence.value("structuralCompatibility", std::string("Unknown"));
+    }
+  } catch (const std::exception &) {
+    result["liveQualification"] = "Evidence inspection failed";
+  }
+  // Qualification is observational. Never change compatible, eligible or inhibition here.
+  return result;
 }
 nlohmann::json Rp1GpclkRouteService::request(const nlohmann::json &value) {
   try {
@@ -410,7 +430,7 @@ nlohmann::json Rp1GpclkRouteService::render(const nlohmann::json &response,
           {"compatible", aligned},
           {"preflightValidated", preflight_safe},
           {"eligible", false},
-          {"liveQualification", "Unavailable"},
+          {"liveQualification", "Not inspected"},
           {"contractIdentity", kContract},
           {"moduleRoute", active},
           {"bootOwnership", field(state, "bootOwnership")},
@@ -447,9 +467,15 @@ bool Rp1GpclkRouteService::acknowledgeRestoration(const std::string &token,
   return field(reply, "status") == "ok";
 }
 
-nlohmann::json Rp1GpclkRouteService::query() {
-  std::lock_guard<std::mutex> guard(mutex_);
-  return render(request({{"operation", "query"}}));
+nlohmann::json Rp1GpclkRouteService::query(bool include_qualification) {
+  nlohmann::json result;
+  {
+    std::lock_guard<std::mutex> guard(mutex_);
+    result = render(request({{"operation", "query"}}));
+  }
+  // Slow evidence inspection belongs to the detailed HTTP query. It must not
+  // hold route/configuration locks or delay scheduler status and STOP delivery.
+  return include_qualification ? withQualification(std::move(result)) : result;
 }
 nlohmann::json Rp1GpclkRouteService::operate(const std::string &operation,
                                              const std::string &route,
@@ -648,8 +674,8 @@ nlohmann::json Rp1GpclkRouteService::operate(const std::string &operation,
     preflight_route_ = executor_route;
     rendered["generation"] = generation_;
     rendered["message"] =
-        "External route-manager preflight passed. Product and RF "
-        "qualification remain unavailable.";
+        "External route-manager preflight passed. Qualification evidence and "
+        "application band/mode eligibility are reported separately.";
     return rendered;
   }
   if (operation == "apply-and-reboot") {
@@ -908,6 +934,12 @@ Rp1GpclkRouteService &productionRp1GpclkRouteService() {
          if (operation == "switch" && binding != owned_binding)
            throw std::runtime_error("WsprryPi runtime ownership is unavailable.");
          launchRuntimeRouteOperation(operation, route, digest, request_id);
+       },
+       [](const std::string &route) {
+         std::vector<std::string> arguments{"/usr/bin/python3", "-I",
+             "/usr/local/lib/wsprrypi/rp1_qualification.py", "status"};
+         if (!route.empty()) arguments.insert(arguments.end(), {"--route", route});
+         return nlohmann::json::parse(runRp1ProviderProcess(arguments, std::chrono::seconds{10}));
        }});
   return service;
 }

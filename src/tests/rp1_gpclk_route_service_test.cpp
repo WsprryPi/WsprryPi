@@ -124,6 +124,7 @@ int main() {
   int persisted_write = 0;
   bool inhibited = false;
   bool runtime_launch_fails = false;
+  int qualification_queries = 0;
   std::string runtime_plan_classification = "neutral_ready";
   bool runtime_plan_operational_ready = false;
   bool runtime_plan_operational_ready_reported = true;
@@ -176,13 +177,22 @@ int main() {
          runtime_launches.push_back({{"operation", operation}, {"route", route},
              {"digest", digest}, {"binding", binding},
              {"requestId", request_id}});
+       },
+       [&](const std::string &route) {
+         ++qualification_queries;
+         return nlohmann::json{{"status", "verified"},
+             {"route", route}, {"state", "Qualified (scoped TONE evidence)"},
+             {"structuralCompatibility", "Compatible-unqualified"},
+             {"permissionGate", false}};
        }});
 
   const auto query = service.query();
   assert(query.at("ok") == true);
   assert(query.at("compatible") == true);
   assert(query.at("eligible") == false);
-  assert(query.at("liveQualification") == "Unavailable");
+  assert(query.at("liveQualification") == "Qualified (scoped TONE evidence)");
+  assert(query.at("structuralCompatibility") == "Compatible-unqualified");
+  assert(query.at("qualificationEvidence").at("route") == "gpio4");
   assert(query.at("requested") == "GPIO4");
   assert(query.at("configured") == "GPIO4");
   assert(query.at("active") == "GPIO4");
@@ -191,6 +201,9 @@ int main() {
   assert(requests.size() == 1);
   assert(requests.back() ==
          nlohmann::json({{"operation", "query"}}));
+  assert(qualification_queries == 1);
+  assert(service.query(false).at("liveQualification") == "Not inspected");
+  assert(qualification_queries == 1);
 
   next = response("preflight", "ok", state());
   auto preflight = service.operate("preflight", "GPIO20", 0);

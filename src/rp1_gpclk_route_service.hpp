@@ -17,11 +17,12 @@ struct Rp1GpclkRouteExecutorOperations {
                      const std::string &, const std::string &,
                      const std::string &)>
       runtime_route_launch;
+  std::function<nlohmann::json(const std::string &)> qualification_status;
 };
 class Rp1GpclkRouteService {
 public:
   explicit Rp1GpclkRouteService(Rp1GpclkRouteExecutorOperations);
-  nlohmann::json query();
+  nlohmann::json query(bool include_qualification = true);
   bool acknowledgeRestoration(const std::string &token, bool transmit);
   nlohmann::json operate(const std::string &, const std::string &,
                          std::uint64_t);
@@ -34,6 +35,7 @@ private:
   nlohmann::json render(const nlohmann::json &,
                         const std::string &requested = {});
   nlohmann::json failure(const std::string &, const std::string &) const;
+  nlohmann::json withQualification(nlohmann::json) const;
   nlohmann::json reconcileRuntime(const std::string &, bool);
   bool idle() const;
   static std::string routeForGpio(int);

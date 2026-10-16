@@ -207,6 +207,39 @@ async function captureRp1DriveScreenshot(client, outputPath, theme) {
     fs.writeFileSync(outputPath, screenshot.data, "base64");
 }
 
+async function captureRp1QualificationScreenshot(client, outputPath, theme) {
+    const rendered = await client.send("Runtime.evaluate", {
+        returnByValue: true,
+        expression: `(() => {
+            document.documentElement.setAttribute("data-bs-theme", ${JSON.stringify(theme)});
+            rp1RouteUi.render({profile:"runtime",ok:true,state:"runtime_ready",
+                requested:"GPIO20",persisted:"GPIO20",configured:"GPIO20",active:"GPIO20",
+                reconciled:true,compatible:true,journal:"none",bootOwnership:"runtime controller",
+                outputInhibited:"Disabled",operationalReady:"Ready",
+                structuralCompatibility:"Compatible-unqualified",
+                qualificationEvidence:{status:"verified",scope:{kind:"finite-conducted-tone",
+                    frequencyHz:14097100,driveMa:2}}});
+            // The retained detailed diagnostic panel is inspected explicitly.
+            const panel=document.getElementById("rp1-route-panel");
+            panel.hidden=false;
+            panel.scrollIntoView({block:"end"});
+            const bounds=panel.getBoundingClientRect();
+            return {x:bounds.x+scrollX,y:bounds.y+scrollY,width:bounds.width,height:bounds.height,
+                overflow:document.documentElement.scrollWidth>innerWidth+1,
+                evidence:document.getElementById("rp1-route-eligible").textContent};
+        })()`,
+    });
+    const box=rendered.result.value;
+    assert.equal(box.overflow,false,"qualification facts must fit the viewport");
+    assert.match(box.evidence,/Qualified TONE evidence/);
+    const screenshot=await client.send("Page.captureScreenshot", {
+        format:"png",captureBeyondViewport:false,
+    });
+    fs.writeFileSync(outputPath,screenshot.data,"base64");
+    await client.send("Runtime.evaluate", {expression:
+        'document.getElementById("rp1-route-panel").hidden=true;'});
+}
+
 async function captureSi5351LayoutScreenshot(client, outputPath, theme, missing = false, inventoryError = "") {
     await client.send("Runtime.evaluate", {
         expression: `(() => {
@@ -963,7 +996,18 @@ async function browserTest() {
         profile: "runtime", ok: true, state: "runtime_ready",
         requested: "GPIO20", persisted: "GPIO20", active: "GPIO20",
         compatible: true, generation: 2,
+        liveQualification: "Qualified (scoped TONE evidence)",
+        structuralCompatibility: "Compatible-unqualified",
+        operationalReady: "Ready", outputInhibited: "Disabled",
+        qualificationEvidence: {status: "verified", scope: {
+            kind: "finite-conducted-tone", frequencyHz: 14097100, driveMa: 2}},
     });
+    ok(field("rp1-route-eligible").textContent.includes("Qualified TONE evidence"),
+        "route evidence must preserve its finite TONE scope");
+    equal(field("rp1-structural-compatibility").textContent, "Compatible-unqualified",
+        "external qualification cannot relabel structural module compatibility");
+    equal(field("rp1-application-eligibility").textContent, "Depends on band and mode",
+        "route evidence cannot imply application eligibility");
     updateBackendPlatformSupportUi();
     ok(selectedBackendUnavailableMessage().includes("GPIO20 is selected and active"),
         "RP1 warning must not ask for a route that is already active");
@@ -1160,6 +1204,8 @@ async function main() {
             );
             await captureRp1DriveScreenshot(client, path.join(screenshotDir, "RP1_Drive_Desktop_Light.png"), "light");
             await captureRp1DriveScreenshot(client, path.join(screenshotDir, "RP1_Drive_Desktop_Dark.png"), "dark");
+            await captureRp1QualificationScreenshot(client, path.join(screenshotDir, "RP1_Qualification_Desktop_Light.png"), "light");
+            await captureRp1QualificationScreenshot(client, path.join(screenshotDir, "RP1_Qualification_Desktop_Dark.png"), "dark");
             await captureSi5351LayoutScreenshot(client, path.join(screenshotDir, "Si5351_Desktop_Light.png"), "light");
             await captureSi5351LayoutScreenshot(client, path.join(screenshotDir, "Si5351_Desktop_Dark.png"), "dark");
             await captureSi5351LayoutScreenshot(client, path.join(screenshotDir, "Si5351_Missing_Desktop.png"), "light", true);
@@ -1187,6 +1233,8 @@ async function main() {
             await captureBandPreferencesScreenshot(client, path.join(screenshotDir, "Band_Preferences_Mobile.png"));
             await captureRp1DriveScreenshot(client, path.join(screenshotDir, "RP1_Drive_Mobile_Light.png"), "light");
             await captureRp1DriveScreenshot(client, path.join(screenshotDir, "RP1_Drive_Mobile_Dark.png"), "dark");
+            await captureRp1QualificationScreenshot(client, path.join(screenshotDir, "RP1_Qualification_Mobile_Light.png"), "light");
+            await captureRp1QualificationScreenshot(client, path.join(screenshotDir, "RP1_Qualification_Mobile_Dark.png"), "dark");
             await captureSi5351LayoutScreenshot(client, path.join(screenshotDir, "Si5351_Mobile_Light.png"), "light");
             await captureSi5351LayoutScreenshot(client, path.join(screenshotDir, "Si5351_Mobile_Dark.png"), "dark");
             await captureSi5351LayoutScreenshot(client, path.join(screenshotDir, "Si5351_Missing_Mobile.png"), "dark", true);

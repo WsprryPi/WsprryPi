@@ -395,14 +395,14 @@ int main()
     }
 
     for (const auto mode : exercised_modes)
-    for (const double frequency : {50294500.0,144490500.0})
+    for (const double frequency : {50294500.0,70294500.0})
     {
         const auto decision=wsprrypi::evaluate_frequency_policy(
             wsprrypi::BackendKind::RP1_GPCLK,mode,frequency,false,false,
             wsprrypi::HardwareProfile::RP1_GPCLK);
         require(!decision.allowed &&
-            decision.qualification==wsprrypi::QualificationState::UNTESTED,
-            "RP1 6 m and 2 m must remain untested and blocked without opt-in");
+            decision.qualification==wsprrypi::QualificationState::UNQUALIFIED,
+            "RP1 6 m and 4 m retain the documented unqualified disposition");
         require_controller_policy(wsprrypi::BackendKind::RP1_GPCLK,mode,
             frequency,false,"RP1 untested VHF",false,false,
             wsprrypi::HardwareProfile::RP1_GPCLK);
@@ -410,6 +410,30 @@ int main()
             frequency,true,"RP1 VHF policy opt-in does not grant backend capability",
             true,false,wsprrypi::HardwareProfile::RP1_GPCLK);
     }
+
+    for (const auto mode : exercised_modes)
+    {
+        require_controller_policy(wsprrypi::BackendKind::RP1_GPCLK, mode,
+            24926100.0, true, "RP1 documented qualified 12 m", false, false,
+            wsprrypi::HardwareProfile::RP1_GPCLK);
+        for (const double frequency : {144490500.0, 223500000.0, 435000000.0})
+        {
+            const auto decision = wsprrypi::evaluate_frequency_policy(
+                wsprrypi::BackendKind::RP1_GPCLK, mode, frequency, true, true,
+                wsprrypi::HardwareProfile::RP1_GPCLK);
+            require(!decision.allowed && decision.qualification == wsprrypi::QualificationState::UNAVAILABLE,
+                "RP1 high-band Unavailable cannot be overridden");
+        }
+    }
+
+    require(!wsprrypi::evaluate_frequency_policy(wsprrypi::BackendKind::RP1_GPCLK,
+        wsprrypi::TransmissionMode::CW, 24926100.0, false, false,
+        wsprrypi::HardwareProfile::RP1_GPCLK).allowed,
+        "12 m table reconciliation must not qualify an unrecorded CW mode");
+    require(!wsprrypi::evaluate_frequency_policy(wsprrypi::BackendKind::RP1_GPCLK,
+        wsprrypi::TransmissionMode::TONE, 144490500.0, true, true,
+        wsprrypi::HardwareProfile::UNSPECIFIED).allowed,
+        "an unspecified hardware profile cannot override RP1 high-band Unavailable");
 
     std::cout << "gpio_band_policy_test passed" << std::endl;
     return EXIT_SUCCESS;

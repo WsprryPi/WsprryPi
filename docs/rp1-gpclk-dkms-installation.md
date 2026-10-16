@@ -88,7 +88,8 @@ The [release lock and acceptance workflow](rp1-provider-acceptance.md) bind
 the published bytes; the [item 10 matrix](development/rp1-item10-production-integration.md)
 separates software acceptance from outstanding target installation/runtime
 checks. The published compatibility manifest defaults to `Unavailable` and has
-no qualified target entries. Publication, reproducibility and successful DKMS
+no qualified target entries. The separately pinned [qualification supplement](rp1-qualification-metadata.md)
+records accepted scoped evidence without modifying that manifest. Publication, reproducibility and successful DKMS
 builds do not grant live eligibility or transmission authorization. See the
 [RP1 dependency order](../release_tools/Release%20Punchlist.md#rp1-dependency-order).
 

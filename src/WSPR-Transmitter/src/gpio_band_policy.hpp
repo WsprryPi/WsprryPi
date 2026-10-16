@@ -74,10 +74,22 @@ inline QualificationState qualification_for(
     if (backend != BackendKind::RPI_CLOCK_GPIO && backend != BackendKind::RP1_GPCLK)
         return QualificationState::UNAVAILABLE;
 
-    // Numerical planning support is not a mode-specific RF qualification.
-    if (backend == BackendKind::RP1_GPCLK &&
-        profile == HardwareProfile::RP1_GPCLK && (band == "6m" || band == "2m"))
-        return QualificationState::UNTESTED;
+    // Application-owned qualification from the maintained Pi 5 / PLL_SYS table.
+    // These dispositions are independent of provider metadata and overrides.
+    if (backend == BackendKind::RP1_GPCLK)
+    {
+        if (band == "2m" || band == "1.25m" || band == "70cm")
+            return QualificationState::UNAVAILABLE;
+        if (profile == HardwareProfile::RP1_GPCLK && (band == "6m" || band == "4m"))
+            return QualificationState::UNQUALIFIED;
+        if (profile == HardwareProfile::RP1_GPCLK && (band == "8m" || band == "5m"))
+            return QualificationState::UNTESTED;
+        if (profile == HardwareProfile::RP1_GPCLK && band == "12m" &&
+            (mode == TransmissionMode::WSPR || mode == TransmissionMode::TONE ||
+             mode == TransmissionMode::QRSS || mode == TransmissionMode::FSKCW ||
+             mode == TransmissionMode::DFCW))
+            return QualificationState::QUALIFIED;
+    }
 
     if (band == "2200m")
     {

@@ -14,8 +14,10 @@ immutable RP1 provider release is published. Item 10, WsprryPi production
 consumption and validation, is accepted for installation and idle runtime
 integration. Existing documented RF qualification and its limitations are
 preserved; the maintainer accepted the provider's empty `Unavailable` manifest
-as a metadata limitation and excluded target rollback rehearsals. No new RF
-qualification is claimed. Items 11–14 remain open.
+as the original release state and excluded target rollback rehearsals. The
+[separate qualification supplement](../docs/rp1-qualification-metadata.md) records
+accepted route evidence without changing those assets or application policy.
+No new RF qualification is claimed. Items 11–14 remain open.
 
 Status key: ✅ Complete · ⏳ In progress · ☐ Not started
 
@@ -105,8 +107,8 @@ Status key: ✅ Complete · ⏳ In progress · ☐ Not started
     integration with the published manifest unchanged (`Unavailable`, no target
     entries). Existing application band/mode RF qualification remains valid
     within its recorded scope; an empty provider manifest does not erase it.
-    Publishing matching provider qualification entries requires attributable
-    evidence and an appropriate provider publication. Zero new RF attempts occurred.
+    Accepted route evidence is exposed through separately pinned supplemental metadata;
+    the original provider manifest remains empty. Zero new RF attempts occurred.
 11. ☐ **Documentation performance and remaining Impeccable housekeeping.**
     **Lead: WsprryPi-Docs · RP1 item 19.** Reconcile the saved image-optimization,
     product-metadata and host/tooling reminders; implement justified documentation
@@ -203,9 +205,9 @@ work; item 13 still requires acceptance of actual integration prerequisites.
   recovery/removal and automatic reboot restoration passed. Software/disposable
   lifecycle evidence is retained; target rollback rehearsals were explicitly
   excluded. The maintainer accepts the unchanged empty `Unavailable` manifest
-  as a metadata limitation. Existing RF qualification retains its recorded scope;
-  provider qualification entries require attributable evidence and an appropriate
-  provider publication. No new RF qualification is claimed. Follow the
+  as the original release state. Existing RF qualification retains its recorded scope;
+  the separately pinned supplement records accepted evidence without creating
+  a provider permission gate. No new RF qualification is claimed. Follow the
   [published-release contract](../docs/rp1-gpclk-dkms-installation.md#published-releases).
 - ☐ **Operator documentation:** after production RP1 integration, reconcile
   the recorded Si5351 readiness/drive/fade, inventory-timeout, and RP1 correction

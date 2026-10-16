@@ -1149,6 +1149,7 @@ RELEASE: release
 rp1-gpclk-diagnostics-test:
 	$(Q)python3 ../scripts/tests/rp1_gpclk_diagnostics_test.py
 	$(Q)python3 ../scripts/tests/rp1_provider_diagnostics_test.py
+	$(Q)python3 -B ../scripts/tests/rp1_qualification_test.py
 
 .PHONY: rp1-release-acceptance-test
 rp1-release-acceptance-test:

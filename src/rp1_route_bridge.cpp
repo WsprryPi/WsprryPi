@@ -143,7 +143,7 @@ bool acknowledge_rp1_restoration(const std::string &token, bool transmit)
 
 Rp1RouteStatus query_rp1_route_status()
 {
-    const auto value = wsprrypi::productionRp1GpclkRouteService().query();
+    const auto value = wsprrypi::productionRp1GpclkRouteService().query(false);
     return {value.value("requested", std::string("Unavailable")),
             value.value("persisted", std::string("Unavailable")),
             value.value("configured", std::string("Unavailable")),

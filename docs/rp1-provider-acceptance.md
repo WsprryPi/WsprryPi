@@ -8,6 +8,12 @@ Debian package `1.0.0-1`, both UAPIs, independent route identities and overlays,
 runtime binding v3/readiness v1/update v1, and all seven published asset hashes.
 It is maintained acceptance configuration, not a record of target qualification.
 
+The [supplemental qualification contract](rp1-qualification-metadata.md) uses a
+separate source/revision/asset reference. It records accepted route evidence
+without rewriting this release lock or its original empty manifest. Missing or
+invalid supplemental evidence is reported separately from operational availability
+and application band/mode policy.
+
 | Selection | Entry point | Identity and effects |
 | --- | --- | --- |
 | Exact-source development | Normal installer with `devel`, `commit:`, or `checkout:` | Exact source identity, separate Experimental ownership; installation and runtime effects require authorization |

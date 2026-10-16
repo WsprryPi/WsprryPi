@@ -19,6 +19,7 @@ RP1_MODINFO="/usr/sbin/modinfo"
 RP1_PYTHON="/usr/bin/python3"
 RP1_TIMEOUT="/usr/bin/timeout"
 RP1_RUNTIME_PROVIDER="/usr/lib/rp1-gpclk-dkms/runtime_provider.py"
+RP1_QUALIFICATION="/usr/local/lib/wsprrypi/rp1_qualification.py"
 RP1_INSTALLATION_RECORD="/var/lib/wsprrypi/rp1-gpclk-dkms-installation.json"
 
 STAMP="$(date -u +"%Y%m%dT%H%M%SZ")"
@@ -1254,6 +1255,13 @@ else
     > "${OUT_DIR}/hardware/rp1-gpclk/wsprrypi-installation-record.txt"
 fi
 collect_rp1_record_summary
+if safe_root_owned_regular_file "$RP1_QUALIFICATION"; then
+  run_bounded_absolute_cmd rp1_gpclk_qualification_evidence \
+    "$RP1_PYTHON" -I "$RP1_QUALIFICATION" status
+else
+  echo "Qualification evidence interpreter absent, inaccessible, or unsafe" \
+    > "${OUT_DIR}/commands/rp1_gpclk_qualification_evidence.txt"
+fi
 if safe_root_owned_regular_file "$RP1_RUNTIME_PROVIDER"; then
   run_bounded_absolute_cmd rp1_gpclk_runtime_provider_inspect \
     "$RP1_PYTHON" "$RP1_RUNTIME_PROVIDER" inspect

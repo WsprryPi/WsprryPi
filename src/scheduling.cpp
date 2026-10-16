@@ -3315,7 +3315,9 @@ WsprRuntimeStatusSnapshot current_tx_runtime_status_snapshot()
         snapshot.rp1_route_persisted = route.persisted;
         snapshot.rp1_route_configured = route.configured;
         snapshot.rp1_route_active = route.active;
-        snapshot.rp1_eligibility = route.eligible ? "eligible" : "unavailable";
+        // This route snapshot has no application plan to assess. Route state
+        // and published evidence cannot stand in for band/mode eligibility.
+        snapshot.rp1_eligibility = "not-evaluated";
         snapshot.rp1_journal_state = route.journal;
     }
     {

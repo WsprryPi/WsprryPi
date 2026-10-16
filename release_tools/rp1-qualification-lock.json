@@ -1,0 +1,58 @@
+{
+  "SPDX-License-Identifier": "MIT",
+  "assets": {
+    "SHA256SUMS": "4a70b3f7e996e1a6a252d8c9e617d24468637fd11e37320d638ff9c1a52aa54b",
+    "qualification_status.py": "909d4ed0a05abef07271492474b4e2e80df5d0bd219f5fe0f9662040dd426dc8",
+    "rp1-qualification.json": "87ef40621d9f7d495994adda92db0165ebaf5d9acc4fa846820ef4c5b4f2ad9d",
+    "rp1-qualification.schema.json": "056a4320f8fa83ba0de4f361285d7b98f174967f78ee758e6c0b81f5182e9890"
+  },
+  "metadataSource": {
+    "commit": "bb6815446beb9b96853ad5a353b0d355d4975710",
+    "inputSha256": "cae7d712a90aac6ad995b41cec82263ddf0d27cb915ddd55d0aa93cd8b011b06",
+    "tree": "b659a6e27ac07e77dff6f0ec89490afbe9e0ceb4"
+  },
+  "metadataTag": "qualification-v1.0.0-r1",
+  "revision": 1,
+  "schema": "wsprrypi-rp1-qualification-lock-v1",
+  "software": {
+    "SPDX-License-Identifier": "MIT",
+    "assets": {
+      "SHA256SUMS": "c2239f0c951f743dcbcc5297dd7c587a9cdaa83acaa7b24b9fb905d394c63925",
+      "candidate-validation.json": "2acea61b2cc370280fe55a843fb946224f3b697b623281e5cc0536f46ea41fae",
+      "release-metadata.json": "d8f5cba30cd57488a5ddff809f1ec3e7169536b3732ce8806e67f494cbf0f81c",
+      "rp1-gpclk-compatibility-manifest.json": "9cde8fbcdf2155312c90438eac6deb74474f557e56499b12788f911b217fca80",
+      "rp1-gpclk-dkms-1.0.0.tar.gz": "5720024b7be3faedf09d047087ab0d4597cf9fcb09db89e7cbf11216032ec237",
+      "rp1-gpclk-dkms-installation-manifest-v1.json": "111a7208522877c06ea81b0a20c05e5a7246121fa327b7720f86509225e7d969",
+      "rp1-gpclk-dkms_1.0.0-1_all.deb": "dd629b131f7937706d707cba14042a0a6feed59e31cced738821f9836429881f"
+    },
+    "classification": "release",
+    "compatibilityIdentities": {
+      "gpio20": "v1.0.0-rp1-gpio20",
+      "gpio4": "v1.0.0-rp1-gpio4"
+    },
+    "debianVersion": "1.0.0-1",
+    "overlaySha256": {
+      "gpio20": "b43691796628e4675f9f8cae8aef187cc670b3f7a3713cb67e352ee585c53713",
+      "gpio4": "96b157b50961ebf74915f84186494f9a0d5427faa59bf9729a8bd4c95dc5f681"
+    },
+    "productVersion": "1.0.0",
+    "published": true,
+    "qualification": false,
+    "releaseTag": "v1.0.0",
+    "releaseUrl": "https://github.com/WsprryPi/RP1-GPCLK-DKMS/releases/tag/v1.0.0",
+    "repository": "WsprryPi/RP1-GPCLK-DKMS",
+    "runtime": {
+      "binding": "rp1-gpclk-runtime-binding-v3",
+      "readiness": "rp1-gpclk-runtime-readiness-v1",
+      "update": "rp1-gpclk-runtime-update-v1"
+    },
+    "schema": "wsprrypi-rp1-release-lock-v1",
+    "sourceCommit": "8c16d3c237cb1267cbedafb5da2bb74132ca5de0",
+    "sourceTree": "4c1ad8acf513b36ba32e58a636942655accbb52d",
+    "tagObject": "52c5d42cf6e3f9c8a77fe9a03e1f012c3e8304a0",
+    "uapiSha256": {
+      "consumer": "4af14cdf60471ac4b318b10d7d70824a63c74029c2934e86bbdcd1b7f06cf633",
+      "controller": "52f34e567f06350eb3231049c1a456b30b92cc7d37bbb13ff948d1471aee926e"
+    }
+  }
+}
