@@ -82,7 +82,7 @@ No assertion, deadline or CI timeout was weakened. Logs/builds remain under
 
 Production implementation is `41c1dbd42620da6d5595b3ca0171c15ad6c9ee5f`;
 subsequent changes only stabilize the browser fixture/evidence. Pico current
-is finally pinned to `0c02423d3ea0f6e89507a74ed5a2be9b00895ee0`; later lead-repo
+is finally pinned to `804e8a06585ec5a0e650e69fcd71ada398b6cc9f`; later lead-repo
 review/report commits do not replace that implementation pin. Historical rows
 remain legacy `95aac22`, extended `dfffdd5`, p152 `87144d1`, p153 `d6208db`,
 p154 `ddb00dd`, p156 `792b5b2`, p157 `26ae596` (full identities in pin files).
@@ -163,3 +163,15 @@ explicit compound Type 3 refused; repaired planner/resource/real commissioning
 checks pass. Native station/AP profile and UI/journal cases now cover both
 `W1A/AA0NT` and `<W1A/AA0NT>`. No Pi product code changed. The earlier CI run
 38948276130 at `28ee735` is superseded; a new feature-head run is required.
+
+
+Final prefix-repair local gate: Pico host 196/196, sanitizer-build selection
+27/27, both firmware links and genuine shipped-browser W1A preview/Type 3/pair
+commissioning pass. The exact current source passes native TLS/config, station/AP
+profile/crypto, actual resource/UI producer/journals, mixed browser recovery and
+ASan/UBSan/leak checks (`final804e-*` logs). The maintained unchanged-release
+probe passes twelve cases, now including `W1A/AA0NT` on both carriers. The first
+CI run 38948276130 completed successfully (12/12) at the superseded `28ee735`
+head/pin; it does not qualify this repaired source. A fresh all-job workflow on
+the new published head is required and its result is recorded in the lead Pico
+packet. All seven historical pins and their strict expectations remain intact.
