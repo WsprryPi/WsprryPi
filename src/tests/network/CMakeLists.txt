@@ -73,6 +73,9 @@ set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
 set(WSPRRY_PICO_NETWORK_PORT 18443)
 configure_file("${PICO_SOURCE}/cmake/network_credentials.hpp.in" "${CMAKE_BINARY_DIR}/generated/network_credentials.hpp" @ONLY)
 file(CHMOD "${CMAKE_BINARY_DIR}/generated/network_credentials.hpp" PERMISSIONS OWNER_READ OWNER_WRITE)
+if(EXISTS "${PICO_SOURCE}/src/network/web/gpio-drive.js")
+  set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${PICO_SOURCE}/src/network/web/gpio-drive.js")
+endif()
 execute_process(COMMAND "${Python3_EXECUTABLE}" "${PICO_SOURCE}/scripts/generate_web_assets.py" "${PICO_SOURCE}" "${CMAKE_BINARY_DIR}/generated/web_assets.cpp" COMMAND_ERROR_IS_FATAL ANY)
 set(core network/http.cpp network/api.cpp encoding/wspr.cpp standalone/dry_run_engine.cpp
   standalone/config.cpp standalone/storage.cpp standalone/scheduler.cpp time/sntp.cpp

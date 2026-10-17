@@ -95,11 +95,11 @@ PrivilegedOperationClass classify_privileged_http_operation(
             (method == "DELETE" && path == "/api/v1/member/wifi") ||
             (method == "GET" && path == "/api/v1/member/progress") ||
             (method == "POST" && (path == "/api/v1/member/restart" || path == "/api/v1/member/ap" ||
-              path == "/api/v1/member/progress/update" || path == "/api/v1/member/progress/apply")))
+              path == "/api/v1/member/gpio-drive-progress" || path == "/api/v1/member/progress/update" || path == "/api/v1/member/progress/apply")))
             return PrivilegedOperationClass::protected_operation;
         if ((method == "GET" && (path == "/api/v1/member/application" || path == "/api/v1/member/station" ||
-              path == "/api/v1/member/hardware" || path == "/api/v1/member/pins")) ||
-            (method == "PUT" && (path == "/api/v1/member/station" || path == "/api/v1/member/hardware")) ||
+              path == "/api/v1/member/gpio-drive" || path == "/api/v1/member/gpio-drive-progress" || path == "/api/v1/member/hardware" || path == "/api/v1/member/pins")) ||
+            (method == "PUT" && (path == "/api/v1/member/station" || path == "/api/v1/member/gpio-drive" || path == "/api/v1/member/gpio-drive-progress" || path == "/api/v1/member/hardware")) ||
             (method == "POST" && path == "/api/v1/member/pins/validate"))
             return PrivilegedOperationClass::protected_operation;
         if ((path == "/api/v1/member/configuration" || path == "/api/v1/member/management") && (method == "GET" || method == "POST"))

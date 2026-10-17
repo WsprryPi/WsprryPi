@@ -430,10 +430,137 @@ void pin_choices(const Json &j) {
   for (const auto &gp : c["eligible_gps"]) require(gp.is_number_integer(),"invalid_remote_pins");
 }
 }
+namespace {
+PicoHttpResponse gpio_drive_progress_request(const PicoManagementExchange &exchange,
+    const std::string &device, const std::string &boot, const std::string &method,
+    const std::string &body, const std::string &revision,
+    const std::string &carrier, const std::string &generation) {
+  bool attempted=false;
+  try {
+    require(method=="GET" || method=="PUT" || method=="POST","not_found",404);
+    require(body.size()<=2048,"body_too_large",413);
+    const Json target{{"scope","member"},{"device_id",device},{"boot_id",boot}};
+    const auto capsReply=exchange("capabilities","GET",{},{}); success(capsReply);
+    const auto caps=parsed(capsReply);
+    require(caps.contains("gpio_drive") && caps["gpio_drive"]==Json::parse(R"({"schema":"transmitter-gpio-drive/1","read":"/api/v1/gpio-drive","write":"/api/v1/gpio-drive","method":"PUT","values":[2,4,8,12],"default":4,"units":"mA","engine":"pio","activation":"restart","config":"/api/v1/config/3","update":"/api/v1/config/update/3","update_schema":"transmitter-config-update/2","hardware":"/api/v1/hardware/2","application":"/api/v1/application/3","progress":"/api/v1/progress/2","progress_schema":"transmitter-progress/2"})"),"gpio_drive_unavailable",409);
+    const auto context=pico_resource_request(exchange,device,boot,"application","GET",{}, {},carrier,generation);success(context);
+    const auto read=[&] {
+      const auto r=exchange("progress/2","GET",{},{});success(r);const auto v=parsed(r);
+      require(fields(v,{"schema","target","draft_revision","config_revision","profile_revision","fields","last_receipt","last_outcomes","applied_station","station","station_complete","complete","apply_domains","wspr_plan","schedule_enabled","schedule_suspended","matches_applied"}) &&
+          v["schema"]=="transmitter-progress/2" && v["target"]==target && decimal(v["draft_revision"]) &&
+          decimal(v["config_revision"]) && decimal(v["profile_revision"]) && etag(r.etag) &&
+          fields(v["fields"],{},{"callsign","locator","power_dbm","enabled","schedules","expires_utc_s","pins","frequency_policy","wifi","ntp_ipv4","gpio_drive_ma"}) &&
+          fields(v["apply_domains"],{"station","network","radio","all","drive"}),"invalid_remote_resource");
+      for(const auto &b:v["apply_domains"]) require(b.is_boolean(),"invalid_remote_resource");
+      if(v["fields"].contains("gpio_drive_ma")) {
+        const auto &ma=v["fields"]["gpio_drive_ma"];
+        require(ma.is_number_integer() && (ma==2 || ma==4 || ma==8 || ma==12),"invalid_remote_resource");
+      }
+      return r;
+    };
+    const auto before=read();require(before.etag==context.etag,"configuration_context_changed",409);
+    if(method=="GET")return before;
+    require(revision==before.etag,"revision_conflict",412);
+    const auto old=parsed(before);
+    Json input;try {input=strict_browser_json(body);} catch(...) {throw Rejected{400,"invalid_json"};}
+    const bool apply=method=="POST";
+    require(input.is_object() && input.contains("schema") && input["schema"]=="transmitter-progress/2" && input.contains("target") && input["target"]==target,"invalid_progress",400);
+    if(apply) require(fields(input,{"schema","target","application"}) && fields(input["application"],{"draft_revision","domain"}) &&
+        input["application"]["domain"]=="drive" && input["application"]["draft_revision"]==old["draft_revision"] &&
+        old["fields"].contains("gpio_drive_ma") && old["apply_domains"]["drive"]==true,"invalid_progress_application",400);
+    else {
+      require(fields(input,{"schema","target","request_id","fields"}) && input["request_id"].is_string() && identity(input["request_id"].get<std::string>()) &&
+          fields(input["fields"],{"gpio_drive_ma"}),"invalid_progress",400);
+      const auto &ma=input["fields"]["gpio_drive_ma"];
+      require(ma.is_number_integer() && (ma==2 || ma==4 || ma==8 || ma==12),"invalid_gpio_drive",400);
+    }
+    const auto statusReply=exchange("status","GET",{},{});success(statusReply);const auto job=parsed(statusReply).at("job");
+    require(job.at("boot_id")==boot && job.at("output_active")==false && job.at("owner_id").is_null() &&
+        (job.at("state")=="empty" || job.at("state")=="complete" || job.at("state")=="aborted" || job.at("state")=="missed"),"remote_busy_or_output_unresolved",409);
+    attempted=true;const auto result=exchange(apply?"progress/apply/2":"progress/update/2","POST",body,revision);success(result);
+    const auto confirmed=read();require(confirmed.etag==result.etag && confirmed.etag!=revision,"management_outcome_unknown");
+    const auto value=parsed(result),after=parsed(confirmed);
+    if(apply) {
+      require(value.contains("config") && value["config"].contains("gpio_drive_ma") && value["config"]["gpio_drive_ma"]==old["fields"]["gpio_drive_ma"],"management_outcome_unknown");
+      return confirmed;
+    }
+    require(value.value("request_id","")==input["request_id"].get<std::string>() && fields(value.at("outcomes"),{"gpio_drive_ma"}) && value["outcomes"]["gpio_drive_ma"]=="saved" &&
+        after["fields"]["gpio_drive_ma"]==input["fields"]["gpio_drive_ma"] && value["last_receipt"]==after["last_receipt"],"management_outcome_unknown");
+    return result;
+  } catch(const Rejected &e) {return {e.status,Json{{"error",{{"code",e.code}}},{"mutation_attempted",attempted}}.dump(),{}};}
+    catch(...) {return {502,Json{{"error",{{"code",attempted?"management_outcome_unknown":"invalid_remote_resource"}}},{"mutation_attempted",attempted}}.dump(),{}};}
+}
+PicoHttpResponse gpio_drive_request(const PicoManagementExchange &exchange,
+    const std::string &device, const std::string &boot, const std::string &method,
+    const std::string &body, const std::string &revision,
+    const std::string &carrier, const std::string &generation) {
+  bool attempted = false;
+  try {
+    require(method == "GET" || method == "PUT", "not_found", 404);
+    require(body.size() <= 1024, "body_too_large", 413);
+    const Json target{{"scope","member"},{"device_id",device},{"boot_id",boot}};
+    Json input;
+    if (method == "PUT") {
+      try { input = strict_browser_json(body); } catch (...) { throw Rejected{400,"invalid_json"}; }
+      require(fields(input,{"schema","target","gpio_drive_ma"}) &&
+          input["schema"] == "transmitter-gpio-drive/1" && input["target"] == target &&
+          input["gpio_drive_ma"].is_number_integer() &&
+          (input["gpio_drive_ma"] == 2 || input["gpio_drive_ma"] == 4 ||
+           input["gpio_drive_ma"] == 8 || input["gpio_drive_ma"] == 12), "invalid_gpio_drive",400);
+    }
+    const auto caps_response = exchange("capabilities","GET",{},{}); success(caps_response);
+    const auto caps = parsed(caps_response);
+    const auto expected = Json::parse(R"({"schema":"transmitter-gpio-drive/1","read":"/api/v1/gpio-drive","write":"/api/v1/gpio-drive","method":"PUT","values":[2,4,8,12],"default":4,"units":"mA","engine":"pio","activation":"restart","config":"/api/v1/config/3","update":"/api/v1/config/update/3","update_schema":"transmitter-config-update/2","hardware":"/api/v1/hardware/2","application":"/api/v1/application/3","progress":"/api/v1/progress/2","progress_schema":"transmitter-progress/2"})");
+    require(caps.contains("gpio_drive") && caps["gpio_drive"] == expected,"gpio_drive_unavailable",409);
+    // Reuse existing carrier validation, boot identity, saved/active consistency
+    // and selected application authority; do not weaken any closed legacy shape.
+    const auto context = pico_resource_request(exchange,device,boot,"application","GET",{}, {},carrier,generation);
+    success(context);
+    const auto read = [&] {
+      auto r = exchange("gpio-drive","GET",{},{}); success(r);
+      const auto v = parsed(r);
+      require(fields(v,{"schema","target","saved","boot_active","pad_readback","pending_restart",
+          "application_error","rf_gp","execution_engine","storage_healthy"}) &&
+          v["schema"] == "transmitter-gpio-drive/1" && v["target"] == target &&
+          v["pending_restart"].is_boolean() && v["storage_healthy"].is_boolean() &&
+          v["execution_engine"].is_string() && etag(r.etag),"invalid_remote_resource");
+      for (const auto key : {"saved","boot_active","pad_readback"})
+        require(v[key].is_null() || (v[key].is_number_integer() &&
+            (v[key] == 2 || v[key] == 4 || v[key] == 8 || v[key] == 12)),"invalid_remote_resource");
+      require(v["rf_gp"].is_null() || (v["rf_gp"].is_number_integer() && v["rf_gp"] >= 0 && v["rf_gp"] <= 28),"invalid_remote_resource");
+      require(v["application_error"].is_null() || v["application_error"] == "pad_application_failed" ||
+          v["application_error"] == "output_disable_failed","invalid_remote_resource");
+      return r;
+    };
+    const auto before = read();
+    require(before.etag == context.etag,"configuration_context_changed",409);
+    if (method == "GET") return before;
+    require(revision == before.etag,"revision_conflict",412);
+    const auto observed = parsed(before);
+    require(observed["storage_healthy"] == true && observed["application_error"].is_null() && !observed["saved"].is_null(),"remote_busy_or_output_unresolved",409);
+    const auto status_response = exchange("status","GET",{},{}); success(status_response);
+    const auto state = parsed(status_response).at("job");
+    require(state.at("boot_id") == boot && state.at("output_active") == false && state.at("owner_id").is_null() &&
+        (state.at("state") == "empty" || state.at("state") == "complete" || state.at("state") == "aborted" || state.at("state") == "missed"),"remote_busy_or_output_unresolved",409);
+    attempted = true;
+    const auto result = exchange("gpio-drive","PUT",body,revision); success(result);
+    const auto confirmed = read();
+    require(result.etag != revision && result.etag == confirmed.etag && parsed(result) == parsed(confirmed) &&
+        parsed(confirmed)["saved"] == input["gpio_drive_ma"],"management_outcome_unknown");
+    return result;
+  } catch (const Rejected &e) {
+    return {e.status,Json{{"error",{{"code",e.code}}},{"mutation_attempted",attempted}}.dump(),{}};
+  } catch (...) {
+    return {502,Json{{"error",{{"code",attempted ? "management_outcome_unknown" : "invalid_remote_resource"}}},{"mutation_attempted",attempted}}.dump(),{}};
+  }
+}
+} // namespace
 PicoHttpResponse pico_resource_request(const PicoManagementExchange &exchange,
     const std::string &device, const std::string &boot, const std::string &resource,
     const std::string &method, const std::string &body, const std::string &revision,
     const std::string &carrier, const std::string &generation) {
+  if (resource == "gpio-drive-progress") return gpio_drive_progress_request(exchange,device,boot,method,body,revision,carrier,generation);
+  if (resource == "gpio-drive") return gpio_drive_request(exchange,device,boot,method,body,revision,carrier,generation);
   bool attempted = false;
   try {
     const bool preview = resource == "pins/validate" && method == "POST";

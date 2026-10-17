@@ -114,6 +114,7 @@
         }
     }
     function invalidateEditors() {
+        driveEditor?.invalidate();
         configRevision = networkRevision = ""; target = null; reconcile = loaded;
         invalidateResources();
     }
@@ -382,9 +383,25 @@
                 operation: onlySchedules ? "schedules" : "save", config }, configRevision);
         } catch (error) { byId("wtp-management-feedback").textContent = error.message; }
     }
+    const driveEditor = root.WsprryGpioDrive && byId('gpio-drive-select') ? root.WsprryGpioDrive.create({
+        select:byId('gpio-drive-select'),read:byId('gpio-drive-read'),save:byId('gpio-drive-save'),discard:byId('gpio-drive-discard'),status:byId('gpio-drive-status'),saveDraft:byId('gpio-drive-save-draft'),applyDraft:byId('gpio-drive-apply-draft'),draftStatus:byId('gpio-drive-draft-status'),
+        exchange:async(method,body,revision,resource = 'gpio-drive')=>{
+            if (resource === 'progress/update/2') method = 'PUT';
+            const r = await root.fetch((root.WSPRRYPI_PATHS?.sharedApiPath || '/api/v1') + '/member/' + (resource === 'gpio-drive' ? 'gpio-drive' : 'gpio-drive-progress'),{
+                method,cache:'no-store',signal:AbortSignal.timeout(20000),...(body ? {headers:{'Content-Type':'application/json','X-WsprryPico-Request':'1','If-Match':revision},body:JSON.stringify(body)} : {})});
+            const data = await r.json(); if (!r.ok) throw new Error(r.status === 409 ? 'Selected Pico does not support this setting or needs fresh identity/readback.' : 'Request was not confirmed.');
+            return {data,revision:r.headers.get('ETag') || ''};
+        },afterSave:()=>invalidateEditors()
+    }) : null;
+    let driveSelection = "";
     root.WtpManagement = { setAvailability(value, selectable = value) {
+        const selectedDrive = root.WtpUi?.read?.() || {};
+        const key = JSON.stringify(['Transport','Endpoint','USB Serial','Device ID','Hostname','TCP Port'].map(k=>selectedDrive[k]));
+        if (driveSelection && key !== driveSelection) driveEditor?.invalidate();
+        driveSelection = key;
         canSelect = selectable;
         available = !explicitDisconnected && (consumerConnected ? selectable : value);
+        driveEditor?.setAvailability(available);
         render();
         if (selectable && !selectionObserved && !busy) {
             selectionObserved = true;
@@ -396,11 +413,13 @@
         for (const id of Object.keys(values(null))) originalHints.set(id, byId(`wtp-remote-${id}-hint`)?.textContent || "");
         byId("wtp-management-carrier")?.addEventListener("change", () => {
             if (byId("wtp-management-password")) byId("wtp-management-password").value = "";
+            driveEditor?.invalidate();
             retirement = null;
             if (byId("wtp-management-target")) byId("wtp-management-target").replaceChildren(new Option("Inspect this endpoint first",""));
             render();
         });
         byId("wtp-management-host")?.addEventListener("input", () => {
+            driveEditor?.invalidate();
             retirement = null; byId("wtp-management-target")?.replaceChildren(new Option("Inspect this endpoint first",""));
             if (byId("wtp-management-password")) byId("wtp-management-password").value = "";
             render();
@@ -413,6 +432,7 @@
                     password: byId("wtp-management-password").value });
         });
         byId("wtp-management-inspect")?.addEventListener("click", () => {
+            driveEditor?.invalidate();
             retirement = null;
             return request("member/management","POST",{action:"inspect_logins",carrier:byId("wtp-management-carrier").value,host:byId("wtp-management-host").value});
         });

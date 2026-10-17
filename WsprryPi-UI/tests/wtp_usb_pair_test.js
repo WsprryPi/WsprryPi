@@ -28,6 +28,13 @@ const {browser,reply,target}=require("./wtp_usb_settings_test.js");
         b.element("wtp-usb-ssid").value="replacement-network";b.element("wtp-usb-password").value="replacement-synthetic-password";await b.click("wifi-save");assert.match(b.element("wtp-usb-feedback").textContent,/Settings saved/);await b.click("load");assert.equal(b.element("wtp-usb-ssid").value,"replacement-network");
         await b.click("wifi-remove");assert.match(b.element("wtp-usb-feedback").textContent,/removed/);await b.click("load");assert.equal(b.element("wtp-usb-ssid").value,"");assert.equal(b.element("wtp-usb-hostname").value,"usb-bench.local");
         const clock=await request({synchronize:true});assert.equal(clock.accepted,true,JSON.stringify(clock));
+        const blankDriveProgress=await request({method:"GET",path:"/api/v1/member/gpio-drive-progress",body:""});
+        if(process.env.WSPRRYPI_GPIO_DRIVE_REQUIRED==='1')assert.equal(blankDriveProgress.status,200,JSON.stringify(blankDriveProgress));
+        if(blankDriveProgress.status===200){
+            const independent=await request({method:'PUT',path:'/api/v1/member/gpio-drive-progress',revision:blankDriveProgress.etag,
+                body:JSON.stringify({schema:'transmitter-progress/2',target,request_id:'9'.repeat(32),fields:{gpio_drive_ma:8}})});
+            assert.equal(independent.status,200,JSON.stringify(independent));assert.equal(independent.body.station_complete,false);assert.equal(independent.body.fields.gpio_drive_ma,8);
+        }
         const progress=await request({method:"GET",path:"/api/v1/member/progress",body:""});assert.equal(progress.status,200,JSON.stringify(progress));
         const partial=await request({method:"POST",path:"/api/v1/member/progress/update",body:JSON.stringify({schema:"transmitter-progress/1",target,request_id:"1".repeat(32),fields:{callsign:"AA0NT"}}),revision:progress.etag});
         assert.equal(partial.status,200,JSON.stringify(partial));assert.equal(partial.body.station_complete,false);
@@ -44,6 +51,28 @@ const {browser,reply,target}=require("./wtp_usb_settings_test.js");
         assert.equal(station.status,200,JSON.stringify(station));
         const settings=await request({method:"GET",path:"/api/v1/member/configuration",body:""});assert.equal(settings.status,200,JSON.stringify(settings));
         assert.equal(settings.body.config.wifi.ssid,"");assert.equal(settings.body.config.station.callsign,"K1ABC");
+        const driveInitial=await request({method:"GET",path:"/api/v1/member/gpio-drive",body:""});
+        if(process.env.WSPRRYPI_GPIO_DRIVE_REQUIRED === "1") assert.equal(driveInitial.status,200,JSON.stringify(driveInitial));
+        if(driveInitial.status===200) { assert.equal(driveInitial.body.saved,4);
+        for (const value of [2,8,12,4]) {
+            const read=await request({method:"GET",path:"/api/v1/member/gpio-drive",body:""});
+            const write=await request({method:"PUT",path:"/api/v1/member/gpio-drive",body:JSON.stringify({schema:"transmitter-gpio-drive/1",target,gpio_drive_ma:value}),revision:read.etag});
+            assert.equal(write.status,200,JSON.stringify(write)); assert.equal(write.body.saved,value); assert.equal(write.body.pad_readback,null);
+            const legacy=await request({method:"GET",path:"/api/v1/member/configuration",body:""});
+            assert.equal(legacy.status,200,JSON.stringify(legacy));assert(!Object.hasOwn(legacy.body.config,'gpio_drive_ma'));
+        }
+        for (const resource of ['gpio-drive','application/3','hardware/2','config/3','progress/2']) {
+            const wire=await request({raw_resource:resource});assert.equal(wire.status,200,JSON.stringify(wire));assert(wire.bytes<65536);
+            if(resource==='config/3')assert.equal(wire.body.config.gpio_drive_ma,4);
+        }
+        const draft=await request({raw_resource:'progress/2'});
+        const driveDraft=await request({raw_resource:'progress/update/2',method:'POST',revision:draft.etag,
+            body:JSON.stringify({schema:'transmitter-progress/2',target,request_id:'3'.repeat(32),fields:{gpio_drive_ma:8}})});
+        assert.equal(driveDraft.status,200,JSON.stringify(driveDraft));assert.equal(driveDraft.body.fields.gpio_drive_ma,8);
+        const applyDrive=await request({raw_resource:'progress/apply/2',method:'POST',revision:driveDraft.etag,
+            body:JSON.stringify({schema:'transmitter-progress/2',target,application:{draft_revision:driveDraft.body.draft_revision,domain:'drive'}})});
+        assert.equal(applyDrive.status,200,JSON.stringify(applyDrive));assert.equal(applyDrive.body.config.gpio_drive_ma,8);
+        } else assert.equal(driveInitial.status,409,JSON.stringify(driveInitial));
         // Removal is not a reset: unrelated station and schedules are retained.
         await b.click("load");b.element("wtp-usb-ssid").value="recreated-network";b.element("wtp-usb-password").value="different-synthetic-password";await b.click("wifi-save");
         assert.match(b.element("wtp-usb-feedback").textContent,/Settings saved/);await b.click("load");assert.equal(b.element("wtp-usb-ssid").value,"recreated-network");

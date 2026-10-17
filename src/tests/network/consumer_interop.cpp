@@ -6,6 +6,10 @@
 #include "network/bootstrap_codec.hpp"
 #include "network/pico/consumer_radio_crypto.hpp"
 #include "network_support.hpp"
+#if __has_include("standalone/progress.hpp")
+#include "standalone/progress.hpp"
+#define WSPRRYPI_PROGRESS_FIXTURE 1
+#endif
 #include "provisioning/consumer_profile.hpp"
 #include "wtp_integration/application.hpp"
 #include "wtp_integration/browser_api.hpp"
@@ -107,6 +111,10 @@ struct ResourceFixture {
 };
 struct Test {
   ResourceFixture f;
+#ifdef WSPRRYPI_PROGRESS_FIXTURE
+  network_test::Flash progress_flash;
+  pico::standalone::Progress progress{progress_flash};
+#endif
   Media media;
   Random random;
   HostClock host;
@@ -163,6 +171,10 @@ struct Test {
     assert(runtime.load(profiles, device,
                         pico::provisioning::BuildBundleState::Absent));
     f.api.consumer_config(runtime);
+#ifdef WSPRRYPI_PROGRESS_FIXTURE
+    assert(progress.load());
+    f.api.progress_settings(progress);
+#endif
     if (configured) {
       assert(f.scheduler.command("CONFIG " + network_test::config).find("true") != std::string::npos);
       assert(f.store.reserve(1791970000000000000ULL));

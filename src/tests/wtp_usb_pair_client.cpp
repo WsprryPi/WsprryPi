@@ -72,7 +72,7 @@ int main(int argc,char **argv) {
       if(resource=="member/management")return PicoHttpResponse{200,Json{{"carrier","usb_physical"},{"selection_id","pipe-selection"},
         {"connected",true},{"host",""},{"session",nullptr}}.dump(),{}};
       if(resource=="member/configuration")return pico_configuration_request(exchange,client.device(),client.boot(),method,body,revision,"usb_physical");
-      if(resource=="member/application"||resource=="member/station"||resource=="member/hardware"||resource=="member/pins"||resource=="member/pins/validate")
+      if(resource=="member/application"||resource=="member/station"||resource=="member/hardware"||resource=="member/gpio-drive"||resource=="member/gpio-drive-progress"||resource=="member/pins"||resource=="member/pins/validate")
         return pico_resource_request(exchange,client.device(),client.boot(),resource.substr(7),method,body,revision,"usb_physical");
       if(resource.starts_with("member/progress"))return exchange("/api/v1/"+resource.substr(7),method,body,revision);
       return exchange(resource=="member/wifi"?"/api/usb/v1/wifi":resource=="member/hostname"?"/api/v1/hostname":resource=="member/ap"?"/api/usb/v1/ap":resource=="member/restart"?"/api/v1/restart":resource,method,body,revision);
@@ -81,6 +81,11 @@ int main(int argc,char **argv) {
   while(std::getline(std::cin,line)) {
     try {
       const auto command=strict_browser_json(line);
+      if(command.contains("raw_resource")) {
+        const auto r=exchange(command.at("raw_resource"),command.value("method","GET"),command.value("body",""),command.value("revision",""));
+        std::cout<<Json{{"status",r.status},{"body",strict_browser_json(r.body)},{"etag",r.etag},{"bytes",r.body.size()}}.dump()<<std::endl;
+        continue;
+      }
       if(command.contains("synchronize")) {
         const bool accepted=physical?client.synchronize():client.synchronize([] {
           const auto mono=std::chrono::steady_clock::now().time_since_epoch();

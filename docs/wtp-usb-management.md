@@ -191,3 +191,5 @@ The separate Wsprry_Pi_Docs repository is outside this authorization; follow-up
 must document the visible Pico control toggle, cable selection/permissions,
 common name, USB Wi-Fi create/remove, UTC readiness, uncertain-save readback
 and bounded AP request with screenshots of the final verified UI.
+
+The negotiated [Pico GPIO drive extension](wtp-gpio-drive.md) provides four nominal RF-pad choices with explicit restart activation.

@@ -3,6 +3,10 @@
 // WsprryPi-owned harness: actual unmodified Pico TLS server and common service.
 #include "network/pico/server.hpp"
 #include "network_support.hpp"
+#if __has_include("standalone/progress.hpp")
+#include "standalone/progress.hpp"
+#define WSPRRYPI_PROGRESS_FIXTURE 1
+#endif
 #include "network_credentials.hpp"
 #include "pico/time.h"
 #include <chrono>
@@ -76,6 +80,12 @@ int main(int argc, char **argv) {
   network_test::Network network;
   const std::string device(32, argc > 2 ? argv[2][0] : 'a');
   wsprrypico::network::BrowserApi api{service, store, scheduler, network, device, "phase11-host-test"};
+#ifdef WSPRRYPI_PROGRESS_FIXTURE
+  network_test::Flash progress_flash;
+  wsprrypico::standalone::Progress progress(progress_flash);
+  if (!progress.load()) return 1;
+  api.progress_settings(progress);
+#endif
   // Match the pinned Pico standalone image's active-job connection policy.
   api.set_active_job_connections(true);
 #ifdef WSPRRY_PICO_MANAGEMENT_API
@@ -99,6 +109,7 @@ int main(int argc, char **argv) {
       else if (input == "RESUME") { flash.fail = false; std::cout << "ACK" << std::endl; }
       else if (input == "DISABLE_FAIL") { engine.can_disable=false; std::cout << "ACK" << std::endl; }
       else if (input == "STOP") { (void)scheduler.command("STOP"); std::cout << "ACK" << std::endl; }
+      else if (input.starts_with("CONFIG ")) { std::cout << scheduler.command(input) << std::flush; }
       else if (input == "DUMP") {
         wsprrypico::standalone::Store reload{flash};
         const bool healthy = reload.load();
