@@ -114,18 +114,30 @@ arbitration, disagreement latch, uncertainty, launch and holdover limits remain
 authoritative. A healthy SNTP source can remain selected; inner accepted and
 selected fields are reported separately from a transport status of 200.
 
-The unchanged default Pi job maximum is 1000000 ns (1 ms). An accepted USB
-UTC observation can exceed that per-job limit and therefore still refuse
-CLAIM/ARM admission. The bounded target check observed 56.7–71 ms using the
-production client and qualified host; it did not arm a job or qualify default
-job readiness. Do not widen or clamp timing limits to hide this distinction.
+The ordinary Pi job default is now 100000000 ns (100 ms), consistently across
+USB, Plain LAN and TLS. Explicit saved limits, including the former 1 ms
+default, are preserved. Enter `100000000` in the active endpoint field to
+adopt 100 ms through Setup's existing autosave. In a saved device editor,
+**Use 100 ms** changes the profile draft; **Save device** persists it, then
+**Use this device** applies it to the active endpoint. The profile preset does
+not save, reconnect or transmit. See the
+[configuration guide](wtp-production-integration.md) for the two save workflows.
+
+An accepted USB UTC observation can still exceed the selected job limit and
+refuse admission. Pico rechecks the age-grown uncertainty immediately before
+launch; an earlier ARM does not bypass that check. The 100 ms policy changes no
+measurement accounting, symbol timing, missed-start deadline, holdover, lead
+reserve, host qualification, clock-step/leap guard, job capacity or RF servicing
+budget. Pico's independent advertised maximum remains 500 ms.
+
+The earlier bounded target check observed 56.7–71 ms without arming a job.
 The subsequent [clock investigation](https://github.com/WsprryPi/WsprryPico/blob/devel/docs/development/usb-time-uncertainty.md)
-corrects the sample bracket and records its remaining measured uncertainty.
-Job timing policy is separate from transfer accounting; the 1 ms default
-remains unchanged. Runtime observations now report host error, sample round
-trip and midpoint radius, clock discrepancy, processing margin and ACK duration
-separately. A 100 ms ordinary-operation UTC policy is a documented proposal,
-not an applied setting.
+corrected the sample bracket and measured 17.686–18.235 ms with a qualified host
+and no Pico station network. These are historical USB time-transfer measurements,
+not absolute RF start-error measurements. Runtime observations report host error,
+sample round trip and midpoint radius, clock discrepancy, processing margin and
+ACK duration separately. The [100 ms execution/review record](development/utc-100ms-review.md)
+distinguishes deterministic acceptance from physical/RF qualification.
 
 STOP and owned-job cancellation signal the USB transaction before waiting for
 runtime authority, so a silent management read is interrupted cooperatively.
@@ -138,8 +150,9 @@ Pico Wi-Fi disabled does not imply disabling the Pi's network or time service.
 ## Preservation and validation
 
 This slice changes no job/event/frame/duration limits, supported waveform modes,
-scheduler recurrence authority, uncertainty/holdover/launch limits or RF
-servicing reserves. Existing standalone, consumer Wi-Fi, Plain LAN, engineering
+scheduler recurrence authority, holdover/launch limits or RF servicing reserves.
+The accepted ordinary UTC default changes to 100 ms; explicit per-job limits
+and Pico's advertised ceiling remain authoritative. Existing standalone, consumer Wi-Fi, Plain LAN, engineering
 TLS/HTTPS and engineering BLE paths remain, with the explicitly selected finite
 AP lifetime policy on the Pico. Final firmware resource and physical evidence
 is recorded with the coordinated Pico implementation, not inferred from host

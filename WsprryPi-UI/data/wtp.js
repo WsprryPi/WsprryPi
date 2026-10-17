@@ -7,7 +7,7 @@
         "TLS CA File": "", "TLS Client Certificate": "", "TLS Client Key": "",
         "Endpoint": "", "USB Serial": "", "Device ID": "",
         "USB Vendor ID": 0, "USB Product ID": 0,
-        "Start Uncertainty ns": 1000000, "Allow Frequency Adjustment": false
+        "Start Uncertainty ns": 100000000, "Allow Frequency Adjustment": false
     });
     function validNetworkIdentity(value) {
         if (typeof value !== "string" || !value || value.length > 254 || /[^\x21-\x7e]/.test(value)) return false;
@@ -268,6 +268,7 @@
         byId("fleet-use").disabled = fleetBusy || !profile || profile.legacy_unverified;
         byId("fleet-edit").disabled = fleetBusy || !profile;
         byId("fleet-remove").disabled = fleetBusy || !profile;
+        if (byId("fleet-uncertainty-default")) byId("fleet-uncertainty-default").disabled = fleetBusy;
         byId("fleet-device-detail").textContent = profile
             ? `${fleetCatalog.active_id === profile.id ? "Active host endpoint. " : "Saved profile. "}${profile.method === "dns_sd" ? "DNS-SD hint; identity must be checked again before use. " : "Manual endpoint. "}${profile.legacy_unverified ? "Confirm the full device ID before use. " : ""}Expected ID: ${profile.settings?.["Device ID"] || "unverified"}. Endpoint: ${profile.settings?.Transport === "usb" ? profile.settings?.Endpoint : `${profile.settings?.Hostname}:${profile.settings?.["TCP Port"]}`}.${candidate?.state === "online" && (candidate.target !== profile.settings?.Hostname || candidate.port !== profile.settings?.["TCP Port"]) ? ` Nearby SRV is now ${candidate.target}:${candidate.port}; edit and verify this profile before use.` : ""} Selecting does not connect or save.`
             : candidate ? `${candidate.binding === "plain" ? "Plain LAN needs your explicit consent and device-ID confirmation. " : "TLS needs device-specific trust files and identity validation. "}SRV: ${candidate.target || "unresolved"}:${candidate.port || "?"}; interface ${candidate.interface}, protocol ${candidate.protocol}, domain ${candidate.domain}. This advertisement is not proof of RF readiness or identity.`
@@ -456,6 +457,13 @@
         byId("fleet-remove").addEventListener("click", fleetRemove);
         byId("fleet-use").addEventListener("click", fleetUse);
         byId("fleet-save").addEventListener("click", fleetSave);
+        byId("fleet-uncertainty-default")?.addEventListener("click", () => {
+            if (fleetBusy || byId("fleet-editor").hidden) return;
+            byId("fleet-uncertainty").value = String(defaults["Start Uncertainty ns"]);
+            fleetObservedId = "";
+            editorFeedback("100 ms selected in this draft. Save the profile, then use it to update the active endpoint.");
+            byId("fleet-uncertainty").focus();
+        });
         byId("fleet-identify").addEventListener("click", fleetIdentify);
         byId("fleet-editor-cancel").addEventListener("click", () => { byId("fleet-editor").hidden = true; editorFeedback(""); });
         byId("fleet-binding").addEventListener("change", () => { fleetObservedId = ""; fleetEditorRender(); });

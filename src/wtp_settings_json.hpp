@@ -44,7 +44,7 @@ inline WtpSettings parse_wtp_settings(const nlohmann::json &j, bool selected) {
   s.tcp_port = static_cast<int>(integer("TCP Port", 0, 65535));
   s.vendor_id = static_cast<int>(integer("USB Vendor ID", 0, 65535));
   s.product_id = static_cast<int>(integer("USB Product ID", 0, 65535));
-  s.start_uncertainty_ns = integer("Start Uncertainty ns", 1000000, 1000000000);
+  s.start_uncertainty_ns = integer("Start Uncertainty ns", s.start_uncertainty_ns, 1000000000);
   s.allow_frequency_adjustment = j.value("Allow Frequency Adjustment", false);
   validate_wtp_settings(s, selected);
   return s;

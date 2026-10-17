@@ -15,6 +15,7 @@
 #include "httplib.hpp"
 #include "backend_http_guard.hpp"
 #include <fstream>
+#include <sstream>
 #include <filesystem>
 #include <future>
 #include <thread>
@@ -75,6 +76,44 @@ struct ReclaimedManagement : wsprrypi::wtp::ByteStream {
   }
   void close() noexcept override {closed=true;}
 };
+void ordinary_usb_utc_admission() {
+  for (unsigned scenario = 0; scenario < 3; ++scenario) {
+    Clock clock;
+    const std::uint64_t uncertainty = scenario == 1 ? 100'000'001 : 18'000'000;
+    clock.peer.filter = [=](auto operation, std::string &reply) {
+      if (operation != wsprrypi::wtp::Operation::Caps && operation != wsprrypi::wtp::Operation::GetClock) return;
+      auto j = nlohmann::json::parse(reply);
+      if (operation == wsprrypi::wtp::Operation::Caps) j["body"]["maximum_arm_uncertainty_ns"] = "500000000";
+      else j["body"]["uncertainty_ns"] = std::to_string(uncertainty);
+      reply = j.dump();
+    };
+    WtpSettings settings;
+    settings.path = "/dev/ttyACM1";settings.usb_serial = "test-serial";
+    settings.device_id = backend_test::device;settings.vendor_id = 0xcafe;settings.product_id = 0x4012;
+    if (scenario == 2) settings.start_uncertainty_ns = 1'000'000;
+    wsprrypi::WtpTargetRuntime target(settings,clock,clock.peer,
+        {backend_test::sid,backend_test::owner_id,backend_test::device},[&]{clock.peer.open();return true;});
+    CHECK(target.app->inspect().ok);
+    wsprrypi::TransmissionRequest request;
+    request.output.backend = wsprrypi::BackendKind::WTP;
+    request.mode = wsprrypi::TransmissionMode::TONE;
+    request.payload = wsprrypi::TonePayload{14097100,200ms,{}};
+    request.policy.allow_unqualified_frequency = true;
+    target.app->prepare(request);target.app->start();
+    const auto deadline = std::chrono::steady_clock::now()+15s;
+    while (target.app->active() && std::chrono::steady_clock::now()<deadline) std::this_thread::sleep_for(1ms);
+    CHECK(!target.app->active());
+    unsigned arms = 0;
+    for (const auto &payload : clock.peer.payloads) {
+      const auto command = nlohmann::json::parse(payload);
+      if (command.at("op") != "ARM") continue;
+      ++arms;
+      CHECK(command.at("body").at("max_start_uncertainty_ns") == std::to_string(settings.start_uncertainty_ns));
+    }
+    CHECK(arms == (scenario == 0 ? 1 : 0));
+    CHECK(target.app->stop().ok);
+  }
+}
 void usb_management_reclaimed_at_load() {
   Clock clock;ReclaimedManagement management;
   WtpSettings settings{"/dev/ttyACM1","test-serial",backend_test::device,0xcafe,0x4012,1000};
@@ -212,6 +251,18 @@ void run(const std::string &credentials) {
   } remove{filename};
   init_config_json();
   json_to_config();
+  CHECK(config.wtp.start_uncertainty_ns == 100'000'000);
+  CHECK(get_public_config_json().at("WTP").at("Start Uncertainty ns") == 100'000'000);
+  for (const auto transport : {"usb", "network_plain", "network"}) {
+    const auto missing = parse_wtp_settings({{"Transport", transport}}, false);
+    CHECK(missing.start_uncertainty_ns == 100'000'000);
+    for (const std::uint64_t saved : {1'000'000ULL, 37'000'000ULL, 250'000'000ULL}) {
+      const auto explicit_value = parse_wtp_settings(
+          {{"Transport", transport}, {"Start Uncertainty ns", saved}}, false);
+      CHECK(explicit_value.start_uncertainty_ns == saved);
+      CHECK(parse_wtp_settings(wtp_settings_json(explicit_value), false) == explicit_value);
+    }
+  }
   set_patch_all_from_web_runtime_apply_suppressed_for_test(true);
   iniFile.set_filename(filename);
   config.use_ini = true;
@@ -289,6 +340,34 @@ void run(const std::string &credentials) {
   if (!candidate.valid)
     throw std::runtime_error(candidate.error_reason);
   CHECK(candidate.normalized_config.wtp == settings);
+  {
+    std::ifstream file(filename);
+    const std::string original((std::istreambuf_iterator<char>(file)), {});
+    file.close();
+    std::istringstream lines(original);
+    std::string line, without_limit;
+    unsigned removed = 0;
+    while (std::getline(lines, line)) {
+      if (line.find("Start Uncertainty ns") != std::string::npos) { ++removed; continue; }
+      without_limit += line + "\n";
+    }
+    CHECK(removed == 1);
+    { std::ofstream missing(filename); missing << without_limit; }
+    RuntimeConfigCandidate fallback;
+    prepare_runtime_config_candidate(filename, fallback);
+    CHECK(fallback.valid && fallback.normalized_config.wtp.start_uncertainty_ns == 100'000'000);
+    { std::ofstream restore(filename); restore << original; }
+  }
+  // Round trip explicit limits through the real INI and unrelated config edits.
+  for (const std::uint64_t saved : {1'000'000ULL, 37'000'000ULL, 250'000'000ULL}) {
+    patch_all_from_web({{"WTP", {{"Start Uncertainty ns", saved}}}});
+    patch_all_from_web({{"WTP", {{"Allow Frequency Adjustment", true}}}});
+    RuntimeConfigCandidate restored;
+    prepare_runtime_config_candidate(filename, restored);
+    CHECK(restored.valid && restored.normalized_config.wtp.start_uncertainty_ns == saved);
+    CHECK(get_public_config_json().at("WTP").at("Start Uncertainty ns") == saved);
+  }
+  patch_all_from_web({{"WTP", wtp_settings_json(settings)}});
   auto plain_settings = settings;
   plain_settings.transport = "network_plain";
   plain_settings.hostname = "pico.local";
@@ -652,6 +731,7 @@ void run(const std::string &credentials) {
 } // namespace
 int main(int argc, char **argv) {
   try {
+    ordinary_usb_utc_admission();
     usb_management_reclaimed_at_load();
     usb_management_known_binding_fault();
     usb_first_identity_lease_race();

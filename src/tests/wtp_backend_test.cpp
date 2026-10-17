@@ -4,6 +4,7 @@
 #include "json.hpp"
 #include "wtp_backend_peer.hpp"
 #include "wtp_integration/backend.hpp"
+#include "wtp_settings.hpp"
 using namespace wsprrypi;
 using namespace backend_test;
 using namespace std::chrono_literals;
@@ -39,12 +40,15 @@ struct Fixture {
   WtpTransmitBackend backend{clock, {sid, owner_id, device}};
   ExecutionPlanCompiler compiler;
   TransmissionController controller{compiler, backend};
-  explicit Fixture(bool extended = false) {
-    if (extended) peer.filter = [](Operation op, std::string& reply) {
+  explicit Fixture(bool extended = false, std::uint64_t maximum_uncertainty = 1'000'000) {
+    peer.filter = [=](Operation op, std::string& reply) {
       if (op != Operation::Caps) return;
       auto j = Json::parse(reply);
-      j["body"]["max_events"] = 512;
-      j["body"]["max_job_duration_ns"] = "3600000000000";
+      j["body"]["maximum_arm_uncertainty_ns"] = std::to_string(maximum_uncertainty);
+      if (extended) {
+        j["body"]["max_events"] = 512;
+        j["body"]["max_job_duration_ns"] = "3600000000000";
+      }
       reply = j.dump();
     };
     CHECK(backend.capabilities().supported_modes == 0);
@@ -67,6 +71,37 @@ struct Fixture {
     return std::count(peer.operations.begin(), peer.operations.end(), op);
   }
 };
+void ordinary_utc_policy() {
+  const auto limit = WtpSettings{}.start_uncertainty_ns;
+  CHECK(limit == 100'000'000);
+  for (const auto uncertainty : {limit - 1, limit, limit + 1}) {
+    Fixture f(false, 500'000'000);
+    CHECK(f.backend.schedule({std::string(32, 'a'), Peer::utc_base + f.peer.mono() + 500'000'000, limit}));
+    CHECK(f.controller.prepare(request()).ok);
+    f.peer.filter = [=](Operation op, std::string &reply) {
+      if (op != Operation::GetClock) return;
+      auto j = Json::parse(reply);
+      j["body"]["uncertainty_ns"] = std::to_string(uncertainty);
+      reply = j.dump();
+    };
+    const auto result = f.controller.execute_prepared();
+    CHECK(result.ok == (uncertainty <= limit));
+    CHECK(result.cleanup.ok && f.count(Operation::Arm) == (uncertainty <= limit ? 1 : 0));
+    for (const auto &payload : f.peer.payloads) {
+      const auto command = Json::parse(payload);
+      if (command.at("op") == "ARM")
+        CHECK(command.at("body").at("max_start_uncertainty_ns") == std::to_string(limit));
+    }
+  }
+  Fixture strict(false, 500'000'000);
+  CHECK(strict.backend.schedule({std::string(32, 'a'), Peer::utc_base + strict.peer.mono() + 500'000'000, 1'000'000}));
+  CHECK(strict.controller.prepare(request()).ok);
+  strict.peer.filter = [](Operation op, std::string &reply) {
+    if (op != Operation::GetClock) return;
+    auto j = Json::parse(reply);j["body"]["uncertainty_ns"] = "1000001";reply = j.dump();
+  };
+  CHECK(!strict.controller.execute_prepared().ok && strict.count(Operation::Arm) == 0);
+}
 void complete_and_repeat() {
   Fixture f;
   CHECK(f.backend.info().kind == BackendKind::WTP);
@@ -592,6 +627,7 @@ void bounded_waits() {
 } // namespace
 int main() {
   try {
+    ordinary_utc_policy();
     complete_and_repeat();
     completed_execution_reuses_fresh_terminal_proof_for_cleanup();
     execution_avoids_continuous_status_transactions();

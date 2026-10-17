@@ -34,8 +34,19 @@ An explicit USB endpoint requires all of the following:
 | `USB Serial` | Exact serial string, including any leading zeros. |
 | `USB Vendor ID` / `USB Product ID` | Decimal integers from 1 through 65535 for the selected device. |
 | `Device ID` | Expected WTP identity: 32 lowercase hexadecimal characters; USB may learn and pin it for the selected runtime when blank. |
-| `Start Uncertainty ns` | Maximum start uncertainty, 1–1000000000 nanoseconds; default 1000000. |
+| `Start Uncertainty ns` | Maximum estimated UTC uncertainty at ARM and launch, 1–1000000000 nanoseconds; default 100000000 (100 ms). |
 | `Allow Frequency Adjustment` | Default false; explicitly permits the existing CAPS-bound frequency rounding policy. It grants no RF qualification. |
+
+New configurations, profiles and missing values use 100 ms over USB, Plain LAN
+and TLS. Every explicit saved limit is preserved, including the former 1 ms
+default. To adopt 100 ms in an existing active endpoint, enter `100000000`
+in **Maximum UTC uncertainty (ns)**. Valid host edits save automatically through
+the existing Setup workflow; review its save status. In a saved
+device editor, choose **Use 100 ms**, **Save device**, then **Use this device**
+to apply the profile to the active endpoint. The fleet preset changes its profile draft only.
+Custom values remain editable. A clock above the selected limit refuses;
+100 ms is an admission policy, not a measured error or a launch-jitter allowance.
+Pico's advertised 500 ms ceiling and every other timing/job limit remain unchanged.
 
 `Operation.Transmit Backend = wtp` selects these settings. The default inactive
 WTP section has empty identities and zero USB IDs; existing configurations need

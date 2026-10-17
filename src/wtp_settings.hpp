@@ -7,10 +7,12 @@
 #include <stdexcept>
 #include <string>
 
+inline constexpr std::uint64_t default_wtp_start_uncertainty_ns = 100'000'000ULL;
+
 struct WtpSettings {
   std::string path, usb_serial, device_id;
   int vendor_id{}, product_id{};
-  std::uint64_t start_uncertainty_ns{1000000};
+  std::uint64_t start_uncertainty_ns{default_wtp_start_uncertainty_ns};
   bool allow_frequency_adjustment{false};
   std::string transport{"usb"};
   std::string hostname{}, tls_identity{}, tls_ca{}, tls_certificate{}, tls_key{};

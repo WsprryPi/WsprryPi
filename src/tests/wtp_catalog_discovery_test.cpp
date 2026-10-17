@@ -52,6 +52,7 @@ int main() {
   WtpSettings legacy;
   legacy.path = "/dev/ttyACM1"; legacy.usb_serial = "123";
   legacy.vendor_id = 0xcafe; legacy.product_id = 0x4012;
+  legacy.start_uncertainty_ns = 1'000'000;
   legacy.device_id = "a" + std::string(31, 'a');
   auto [initial, revision] = catalog.snapshot(legacy);
   assert(initial["profiles"].size() == 1 && !initial["active_id"].get<std::string>().empty());
@@ -62,6 +63,9 @@ int main() {
   try { catalog.mutate({{"operation", "remove"}, {"id", initial["active_id"]}}, "\"stale\"", legacy); }
   catch (const std::exception &e) { rejected = std::string(e.what()) == "revision_conflict"; }
   assert(rejected);
+  WtpCatalog reopened(name);
+  assert(reopened.snapshot(legacy).first == initial);
+  assert(reopened.profile(initial["active_id"], revision, legacy).settings.start_uncertainty_ns == 1'000'000);
   auto plain = legacy;
   plain.transport = "network_plain"; plain.hostname = "pico.local"; plain.tcp_port = 41234;
   rejected = false;
@@ -69,15 +73,22 @@ int main() {
       {"discovery_id", ""}, {"settings", wtp_settings_json(plain)}, {"consent_plain", false}}, revision, legacy); }
   catch (...) { rejected = true; }
   assert(rejected);
+  auto missing_limit = wtp_settings_json(plain);
+  missing_limit.erase("Start Uncertainty ns");
   auto [added, added_revision] = catalog.mutate({{"operation", "add"}, {"name", "Plain"},
-      {"method", "manual"}, {"discovery_id", ""}, {"settings", wtp_settings_json(plain)},
+      {"method", "manual"}, {"discovery_id", ""}, {"settings", missing_limit},
       {"consent_plain", true}}, revision, legacy);
   assert(added["profiles"].size() == 2 && added_revision != revision);
   const auto plain_id = added["profiles"][1]["id"].get<std::string>();
+  plain.start_uncertainty_ns = 100'000'000;
   assert(catalog.profile(plain_id, added_revision, legacy).settings == plain);
   auto [renamed, renamed_revision] = catalog.mutate({{"operation", "rename"},
       {"id", plain_id}, {"name", "Nearby bench"}}, added_revision, legacy);
   assert(renamed["profiles"][1]["name"] == "Nearby bench");
+  assert(renamed["profiles"][0]["settings"]["Start Uncertainty ns"] == 1'000'000);
+  assert(renamed["profiles"][1]["settings"]["Start Uncertainty ns"] == 100'000'000);
+  WtpCatalog renamed_reload(name);
+  assert(renamed_reload.profile(plain_id, renamed_revision, legacy).settings == plain);
   auto [removed, removed_revision] = catalog.mutate({{"operation", "remove"},
       {"id", plain_id}}, renamed_revision, legacy);
   assert(removed["profiles"].size() == 1 && removed_revision != renamed_revision);

@@ -20,6 +20,7 @@ assert.deepEqual(errors(plain, true), {});
 assert.deepEqual(errors({ ...plain, "TLS Server Identity": "stale:invalid" }, true), {});
 assert(errors({ ...plain, "TCP Port": 0 }, true)["TCP Port"]);
 assert.equal(defaults["TCP Port"], 31417);
+assert.equal(defaults["Start Uncertainty ns"], 100000000);
 assert.equal(named.Hostname, "PiCo.LoCaL.");
 assert(errors({ ...named, "TLS Server Identity": "pico.local:443" }, true)["TLS Server Identity"]);
 assert(errors({ ...named, Transport: "usb", Hostname: "pico..local" }, false).Hostname);
@@ -92,6 +93,17 @@ function browser(storage = new Map(), storageBlocked = false) {
     }
     assert(calls.every(c => c.options.method === "GET"));
     assert.deepEqual(writes, []);
+    for (const saved of [1000000, 37000000, 250000000]) {
+        root.WtpUi.populate({...settings, "Start Uncertainty ns": saved});
+        assert.equal(root.WtpUi.read()["Start Uncertainty ns"], saved);
+        root.WtpUi.populate({...settings, "Start Uncertainty ns": saved, "Allow Frequency Adjustment": true});
+        assert.equal(root.WtpUi.read()["Start Uncertainty ns"], saved);
+    }
+    root.WtpUi.populate({...settings, "Start Uncertainty ns": 1000000});
+    root.WtpUi.developmentControlsVisible = true;
+    fields.get("Start Uncertainty ns").value = "100000000";
+    assert.equal(root.WtpUi.read()["Start Uncertainty ns"], 100000000);
+    root.WtpUi.developmentControlsVisible = false;
     fields.get("USB Serial").value = "";
     assert.equal(root.WtpUi.validate(), false);
     root.WtpUi.developmentControlsVisible = false;

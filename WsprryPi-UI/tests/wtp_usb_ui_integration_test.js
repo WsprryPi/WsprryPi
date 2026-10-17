@@ -141,14 +141,23 @@ async function main() {
             window.__snapshot={selected:true,transport:'usb',ready:true,management_available:true,host_utc_valid:true,phase:'idle',session_phase:'ready',now_ms:'10000',status_observed_ms:'9000',remote:{output_active:false},owns:false,
                 identity:{device_id:target.device_id,boot_id:target.boot_id},common_name:'workbench-pico.local',common_name_confirmed:true,name_pending_restart:false,
                 usb:{management:{connected:true,time:{accepted:true,selected:true,uncertainty_ns:'2400000',observed_ms:'9000'}},hostname:{saved:'workbench-pico.local'}}};
+            window.__mutations=[];
+            window.__catalog={scope:'wsprrypi-wtp-catalog/1',profiles:[{id:'c'.repeat(32),name:'Saved precision Pico',method:'manual',settings:{Transport:'usb',Endpoint:'/dev/serial/by-id/pico-if02','USB Serial':'PICO123','USB Vendor ID':51966,'USB Product ID':16402,'Device ID':'a'.repeat(32),'Start Uncertainty ns':1000000}}],active_id:'c'.repeat(32)};
             window.fetch=async(url,options={})=>{
+                if(options.method && options.method!=='GET') {
+                    window.__mutations.push({url:String(url),body:JSON.parse(options.body||'{}')});
+                    if(String(url).endsWith('/host/devices') && options.method==='POST') {
+                        const body=JSON.parse(options.body);
+                        window.__catalog.profiles[0].settings=body.settings;
+                    }
+                }
                 const path=String(url),header={get:()=> '\\"usb-r1\\"'};
                 let value=(path.includes('/api/wtp') || path.endsWith('/api/v1/status'))?window.__snapshot:
                     path.endsWith('/member/management')?{carrier:'usb_physical',connected:true,host:'',selection_id:'usb-selection',session:null}:
                     path.endsWith('/member/hostname')?{schema:'transmitter-hostname/1',target,saved:'workbench-pico.local',active:'workbench-pico.local',default:'wsprrypico-aaaaaaaa.local',writable:true,pending_restart:false}:
                     path.endsWith('/member/progress')?{schema:'transmitter-progress/1',target,draft_revision:'1',station:{callsign:'AA0NT',locator:null,power_dbm:null},station_complete:false,complete:false,apply_domains:{station:false},matches_applied:false,schedule_suspended:true}:
                     path.endsWith('/member/wifi')?{schema:'transmitter-wifi/1',target,wifi:null,pending_restart:false,storage_healthy:true}:
-                    path.endsWith('/host/devices')?{scope:'wsprrypi-wtp-catalog/1',profiles:[],active_id:null}:
+                    path.endsWith('/host/devices')?window.__catalog:
                     path.endsWith('/host/discovery')?{available:false,candidates:[],reason:'USB workflow'}:{};
                 return {ok:true,status:200,headers:header,json:async()=>value};
             };
@@ -177,8 +186,53 @@ async function main() {
                 const shot=await client.send("Page.captureScreenshot",{format:"png"});fs.writeFileSync(path.join(output,`${name}-${theme}.png`),Buffer.from(shot.data,"base64"));
             }
         }
+        // Exercise the actual profile editor and active form. Choosing the preset
+        // has an explicit save; active host field edits use existing autosave.
+        await evaluate("WtpUi.developmentControlsVisible=true");
+        await waitFor(async()=>await evaluate("document.getElementById('fleet-edit').disabled===false"),"saved profile list");
+        await evaluate("document.getElementById('fleet-add').click()");
+        assert.equal(await evaluate("document.getElementById('fleet-uncertainty').value"),"100000000");
+        await evaluate("document.getElementById('fleet-editor-cancel').click();document.getElementById('fleet-edit').click()");
+        assert.equal(await evaluate("document.getElementById('fleet-uncertainty').value"),"1000000");
+        for(const saved of [1000000,37000000,250000000]) {
+            await evaluate(`WtpUi.populate({...WtpUi.read(),'Start Uncertainty ns':${saved}})`);
+            assert.equal(await evaluate("WtpUi.read()['Start Uncertainty ns']"),saved);
+        }
+        await evaluate("document.getElementById('fleet-uncertainty-default').click();document.getElementById('wtp_uncertainty').value='100000000'");
+        assert.equal(await evaluate("document.getElementById('fleet-uncertainty').value"),"100000000");
+        assert.equal(await evaluate("WtpUi.read()['Start Uncertainty ns']"),100000000);
+        assert.equal(await evaluate("window.__mutations.length"),0,"preset actions must not save, connect or arm");
+        assert.match(await evaluate("document.getElementById('fleet-editor-feedback').textContent"),/Save the profile/);
+        assert.match(await evaluate("document.getElementById('wtp-uncertainty-hint').textContent"),/valid edits save automatically/);
+        assert.equal(await evaluate("buildConfigPayload().WTP['Start Uncertainty ns']"),100000000);
+        for(const [name,width,height] of [["desktop",1440,1100],["mobile",390,844]]) {
+            await client.send("Emulation.setDeviceMetricsOverride",{width,height,deviceScaleFactor:1,mobile:name==="mobile"});
+            for(const theme of ["light","dark"]) {
+                await evaluate(`applyThemePreference('${theme}')`);
+                for(const surface of ["fleet","wtp"]) {
+                    const field=surface==="fleet"?"fleet-uncertainty":"wtp_uncertainty";
+                    const preset=surface==="fleet"?"fleet-uncertainty-default":field;
+                    await evaluate(`document.getElementById('${field}').closest('.config-stacked-field').scrollIntoView({block:'center',behavior:'instant'});document.getElementById('${preset}').focus()`);
+                    await new Promise(resolve=>setTimeout(resolve,100));
+                    const state=await evaluate(`(() => {const input=document.getElementById('${field}'),button=document.getElementById('${preset}'),r=input.getBoundingClientRect();return {focus:document.activeElement===button,width:r.width,height:r.height,value:input.value,overflow:document.documentElement.scrollWidth>innerWidth};})()`);
+                    assert(state.focus&&state.width>150&&state.height>0&&!state.overflow,JSON.stringify(state));
+                    findings.push({name,theme,surface,...state});
+                    const shot=await client.send("Page.captureScreenshot",{format:"png"});fs.writeFileSync(path.join(output,`policy-${surface}-${name}-${theme}.png`),Buffer.from(shot.data,"base64"));
+                }
+            }
+        }
+        await evaluate("window.confirm=()=>true;document.getElementById('fleet-save').click()");
+        await waitFor(async()=>await evaluate("document.getElementById('fleet-editor').hidden"),"explicit profile save");
+        const mutations=await evaluate("window.__mutations");
+        assert.equal(mutations.length,1);
+        assert(mutations[0].url.endsWith('/host/devices'));
+        assert.equal(mutations[0].body.settings['Start Uncertainty ns'],100000000);
+        assert.equal(mutations[0].body.operation,'edit');
+        assert.equal(await evaluate("window.__catalog.profiles[0].settings['USB Serial']"),'PICO123');
+        await evaluate("document.getElementById('fleet-edit').click()");
+        assert.equal(await evaluate("document.getElementById('fleet-uncertainty').value"),"100000000");
         fs.writeFileSync(path.join(output,"checks.json"),JSON.stringify(findings,null,2)+"\n");
-        console.log("Rendered ordinary Pico toggle, configured common name and USB no-network editor at desktop/mobile in light/dark; no horizontal overflow; advanced fleet remains hidden; focus/input sizes passed");
+        console.log("Rendered ordinary Pico toggle, configured common name and USB no-network editor at desktop/mobile in light/dark; no horizontal overflow; advanced fleet remains hidden by default; 100 ms profile draft-only adoption, active form collection, explicit profile save/reload and focus/input sizes passed");
         console.log(output);
     } finally {
         if(client)client.close();if(chrome)await stopIsolatedProcess(chrome);if(php)await stopChild(php);

@@ -140,9 +140,10 @@ separately from simulated tests.
 
 For a LAN Pi, set the controller profile's **Start Uncertainty ns** to a value
 that accommodates its reported `GET_CLOCK` uncertainty, up to `500000000`.
-The existing 1 ms client default remains available for tighter-clock endpoints;
-it may reject an otherwise synchronized Pi using ordinary NTP. Custom profile
-values are never silently increased.
+New controller profiles default to `100000000` (100 ms). An explicit 1 ms or
+other custom limit remains authoritative and may reject an otherwise synchronized
+Pi using ordinary NTP. Existing profiles are never silently increased; adopt the
+recommendation through the profile editor, save it, then use the saved device.
 
 Explicit `--backend simulated` runs the same managed arbitration and protocol
 without hardware. It persists across managed reloads for the process lifetime

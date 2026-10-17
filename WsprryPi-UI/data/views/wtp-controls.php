@@ -80,8 +80,10 @@
                         <input class="form-control" id="fleet-key" maxlength="512" autocomplete="off">
                     </div>
                     <div class="col-12 col-lg-6 config-stacked-field">
-                        <label class="form-label" for="fleet-uncertainty">Maximum start uncertainty (ns)</label>
-                        <input class="form-control" id="fleet-uncertainty" type="number" min="1" max="1000000000" value="1000000">
+                        <label class="form-label" for="fleet-uncertainty">Maximum UTC uncertainty (ns)</label>
+                        <input class="form-control" id="fleet-uncertainty" type="number" min="1" max="1000000000" value="100000000" aria-describedby="fleet-uncertainty-hint">
+                        <div class="form-text" id="fleet-uncertainty-hint">Recommended: 100,000,000 ns = 100 ms. Existing saved limits are kept.</div>
+                        <button type="button" class="btn btn-outline-secondary btn-sm mt-2" id="fleet-uncertainty-default" aria-describedby="fleet-uncertainty-hint">Use 100 ms</button>
                     </div>
                     <div class="col-12 d-flex flex-wrap gap-3 align-items-center">
                         <div class="form-check"><input class="form-check-input" type="checkbox" id="fleet-adjust"><label class="form-check-label" for="fleet-adjust">Allow device frequency rounding</label></div>
@@ -146,9 +148,9 @@
                 <div class="form-text" id="wtp-product-hint">Decimal USB identifier.</div>
             </div>
             <div class="col-12 col-lg-6 config-stacked-field">
-                <label class="form-label" for="wtp_uncertainty">Maximum start uncertainty (ns)</label>
-                <input class="form-control" id="wtp_uncertainty" type="number" min="1" max="1000000000" step="1" value="1000000" data-wtp-key="Start Uncertainty ns" aria-describedby="wtp-uncertainty-hint" disabled>
-                <div class="form-text" id="wtp-uncertainty-hint">1,000,000 ns = 1 ms. Device clock evidence must meet this limit.</div>
+                <label class="form-label" for="wtp_uncertainty">Maximum UTC uncertainty (ns)</label>
+                <input class="form-control" id="wtp_uncertainty" type="number" min="1" max="1000000000" step="1" value="100000000" data-wtp-key="Start Uncertainty ns" aria-describedby="wtp-uncertainty-hint" disabled>
+                <div class="form-text" id="wtp-uncertainty-hint">Recommended: 100,000,000 ns = 100 ms. Existing saved limits are kept. Enter a new value to change it; valid edits save automatically. Pico checks the limit at ARM and launch.</div>
             </div>
             <div class="col-12 col-lg-6 config-stacked-field" data-wtp-security="tls" hidden>
                 <label class="form-label" for="wtp_tls_identity">Expected certificate identity</label>

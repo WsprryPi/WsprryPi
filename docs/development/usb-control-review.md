@@ -1,5 +1,9 @@
 # USB control implementation and software acceptance
 
+The subsequent [100 ms policy execution](utc-100ms-review.md) changes the ordinary
+Pi default explicitly; the 1 ms-default statements below retain the historical
+scope of the original USB/accounting work.
+
 Date: 2026-10-17. This records the WsprryPi portion of the coordinated normal
 Pico USB control slice. Hardware observations/restoration and the final Pico
 product commit are recorded by the coordinating execution in WsprryPico.

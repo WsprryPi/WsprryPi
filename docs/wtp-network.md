@@ -27,7 +27,9 @@ existing resolution and reconnection behavior.
 Legacy `[WTP]` sections without `Transport` mean `usb`. Their existing endpoint,
 serial, VID/PID and device-ID requirements are unchanged. Network fields and USB
 fields persist while inactive. The existing uncertainty and frequency-adjustment
-consent apply to every transport. A complete Plain LAN section looks like:
+consent apply to every transport. New and missing uncertainty values default to
+100000000 ns (100 ms); explicit saved values, including 1000000 ns, are retained.
+Changing an existing limit requires an explicit save. A complete Plain LAN section looks like:
 
 ```ini
 [Operation]
@@ -38,7 +40,7 @@ Transmit = false
 Transport = network_plain
 Hostname = wsprrypico-0a60df.local
 TCP Port = 31417
-Start Uncertainty ns = 1000000
+Start Uncertainty ns = 100000000
 Allow Frequency Adjustment = false
 ```
 
@@ -59,7 +61,7 @@ TLS CA File = /etc/wsprrypi/pico/ca.crt
 TLS Client Certificate = /etc/wsprrypi/pico/client.crt
 TLS Client Key = /etc/wsprrypi/pico/client.key
 Device ID = aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
-Start Uncertainty ns = 1000000
+Start Uncertainty ns = 100000000
 Allow Frequency Adjustment = false
 ```
 
