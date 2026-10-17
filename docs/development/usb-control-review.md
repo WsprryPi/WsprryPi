@@ -105,6 +105,16 @@ Passing checks during implementation:
 | Actual production Pi/Pico pair | Passed over fragmented anonymous pipes with erased volatile flash and no network |
 | Whitespace | git diff --check passed |
 
+The complete Linux `wtp-config-interop-test` subsequently passed on the frozen
+product with the unchanged current-network and MbedTLS pins above. This covers
+engineering TLS, consumer station/AP, protected UI/runtime/resources and journal
+failure/recovery, plus both shipped-browser crypto contexts with full-capacity
+lost-read recovery. The extra local network-runtime attempt passed Plain TCP
+but did not reach its TLS runtime cases: its first image lacked the OpenSSL CLI
+and the complete image encountered a bind-mount fixture-copy permission error.
+No local full-target pass is claimed. The separate GitHub network-loopback job
+passed in its complete Linux environment.
+
 The actual pair executes production UsbManagementClient, protected browser
 request parsing, BrowserApi and configuration/resource adapters against Pico's
 production USB endpoint, API, persistence and time handlers. It covers blank
@@ -218,3 +228,11 @@ USB/AP outcomes, exact restoration and publication are recorded in the
 [coordinated Pico execution record](https://github.com/WsprryPi/WsprryPico/blob/devel/docs/development/usb-control-results.md).
 That evidence distinguishes the tested pre-commit image label from the
 subsequent clean product build and does not claim transmitter RF qualification.
+
+The complete [non-hardware CI workflow](https://github.com/WsprryPi/WsprryPi/actions/runs/39039613596)
+passed on product `b2160ca39bed539dfd5d39a0c449dd64d37c53a2`: the new exact USB
+pair, all seven historical compatibility jobs, current network loopback,
+non-hardware validation, macOS simulated, strict I2C and all six GCC13 release
+profiles. The final follow-up changes only this evidence and the operator
+clock-readiness explanation; production source and all compatibility pins
+remain exactly those tested.

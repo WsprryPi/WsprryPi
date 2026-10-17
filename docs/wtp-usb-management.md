@@ -110,6 +110,12 @@ arbitration, disagreement latch, uncertainty, launch and holdover limits remain
 authoritative. A healthy SNTP source can remain selected; inner accepted and
 selected fields are reported separately from a transport status of 200.
 
+The unchanged default Pi job maximum is 1000000 ns (1 ms). An accepted USB
+UTC observation can exceed that per-job limit and therefore still refuse
+CLAIM/ARM admission. The bounded target check observed 56.7–71 ms using the
+production client and qualified host; it did not arm a job or qualify default
+job readiness. Do not widen or clamp timing limits to hide this distinction.
+
 STOP and owned-job cancellation signal the USB transaction before waiting for
 runtime authority, so a silent management read is interrupted cooperatively.
 The native descriptor uses bounded nonblocking transfers. Physical kernel/USB
