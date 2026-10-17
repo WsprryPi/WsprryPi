@@ -858,10 +858,9 @@ function findTabTriggerBySelector(tabList, selector) {
     }
 
     const normalizedSelector = selector.trim();
-    const trigger = tabList.querySelector(
-        `[data-bs-toggle="tab"][data-bs-target="${normalizedSelector}"], ` +
-        `[data-bs-toggle="tab"][href="${normalizedSelector}"]`
-    );
+    // URL/storage values name literal targets; never parse them as CSS.
+    const trigger = Array.from(tabList.querySelectorAll('[data-bs-toggle="tab"]'))
+        .find((candidate) => getPersistedTabSelector(candidate) === normalizedSelector);
     return trigger && !trigger.disabled && !trigger.closest("[hidden]") ? trigger : null;
 }
 

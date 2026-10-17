@@ -74,13 +74,15 @@ report locations, and actual replacement status as its final output block.
 
 ### Fleet staging flag
 
-The Setup > Fleet tab contains the existing single-Pico connection, status and
-standalone-management controls. It starts hidden and disabled on every page load.
+The Setup > Fleet tab groups known and nearby WTP devices, connection and status
+controls, member management, and output schedules. It starts hidden and disabled
+on every page load.
 For a local UI review, set `window.WtpUi.developmentControlsVisible = true` in
 the browser console; the flag lasts only for that page session. Turning it off
 while Fleet is active returns to Transmitter. A saved Fleet URL cannot reveal
-it while the flag is off. This flag does not create a known-device registry or
-a multi-Pico selector.
+it while the flag is off. Showing the tab does not apply endpoint settings or
+enable transmission. Profile application, member saves and schedule changes
+retain their explicit controls.
 
 ### Pico finite CW messages
 

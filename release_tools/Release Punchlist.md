@@ -210,7 +210,11 @@ Status key: ✅ Complete · ⏳ In progress · ☐ Not started
     Type 2/3 integration and valid-field-saving follow-ups. Item 14 records the
     completed affected integration review below; item 15's supported Pico
     implementation and originating assessment are complete within the recorded
-    software scope. Pi/Beta adoption remains separate. Item 16 has not started.
+    software scope. Pi/Beta adoption remains separate. The later
+    [Fleet staging closeout](../docs/development/fleet-staging-closeout.md)
+    confirms the old nine-file patch was already integrated and records the
+    malformed saved-tab repair and affected UI revalidation. Item 16 has not
+    started.
 14. ✅ **Pico WSPR Type 2/3 management integration and acceptance.**
     **Lead: WsprryPi · Documentation: WsprryPi-Docs.** Closed within the
     bounded software scope. The full accepted companion through `6d5e734`,

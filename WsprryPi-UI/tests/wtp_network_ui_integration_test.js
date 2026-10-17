@@ -161,6 +161,37 @@ async function main() {
         assert.equal(await evaluate('new URL(location.href).searchParams.has("setup_tab")'), false);
         assert.equal(await evaluate('document.getElementById("fleet-tab").disabled'), true);
         assert.equal(await evaluate('document.getElementById("wtp-controls").closest("[role=tabpanel]").id'), 'fleet-pane');
+        // Saved navigation values are literal targets, never CSS selectors.
+        for (const target of ['#fleet-pane"]', '"] , #fleet-tab, [data-bs-target="x', '#missing-pane']) {
+            await evaluate(`(() => {
+                const tabs=document.getElementById('configTabs');
+                const url=new URL(location.href);url.searchParams.set('setup_tab',${JSON.stringify(target)});
+                history.replaceState(null,'',url);restorePersistedTabState(tabs);
+            })()`);
+            assert.equal(await evaluate('new URL(location.href).searchParams.has("setup_tab")'),false,'invalid tab URL removed');
+            assert.equal(await evaluate('document.getElementById("fleet-tab").classList.contains("active")'),false);
+        }
+        await evaluate(`(() => {
+            const tabs=document.getElementById('configTabs');
+            window.__originalRestoreScope=tabs.dataset.persistTabStateScope;
+            tabs.dataset.persistTabStateScope='always';
+            localStorage.setItem(getPersistedTabStorageKey(tabs),'#fleet-pane"]');
+            restorePersistedTabState(tabs);
+        })()`);
+        assert.equal(await evaluate('localStorage.getItem(getPersistedTabStorageKey(document.getElementById("configTabs")))'),null,'malformed stored target removed');
+        await evaluate(`(() => {
+            const tabs=document.getElementById('configTabs');
+            const url=new URL(location.href);url.searchParams.set('setup_tab','#pi-hardware-pane');history.replaceState(null,'',url);
+            restorePersistedTabState(tabs);
+        })()`);
+        await waitFor(async()=>await evaluate('document.getElementById("pi-hardware-tab").classList.contains("active")'),'visible saved tab restores');
+        await evaluate(`(() => {
+            const tabs=document.getElementById('configTabs');
+            tabs.dataset.persistTabStateScope=window.__originalRestoreScope;
+            bootstrap.Tab.getOrCreateInstance(document.getElementById('transmitter-hardware-tab')).show();
+            localStorage.removeItem(getPersistedTabStorageKey(tabs));clearPersistedTabUrlState(tabs);
+        })()`);
+        await waitFor(async()=>await evaluate('document.getElementById("transmitter-hardware-tab").classList.contains("active")'),'Transmitter restored after hostile tab inputs');
         await evaluate(`(() => {
             configAutosaveSuspended = true;
             clearPendingPopulateConfigRetry(); clearWebSocketReconnectTimer();
@@ -228,6 +259,11 @@ async function main() {
             await evaluate('document.getElementById("fleet-binding").scrollIntoView({block:"center",behavior:"instant"})');
             await capture(`${viewport.name}-fleet-editor.png`, {format:'png'});
         }
+        await client.send('Emulation.setDeviceMetricsOverride', {width:1280,height:900,deviceScaleFactor:1,mobile:false});
+        await evaluate(`document.documentElement.style.zoom='2'; document.getElementById('fleet-device').scrollIntoView({block:'center',behavior:'instant'});`);
+        assert(await evaluate('document.documentElement.scrollWidth <= innerWidth + 1'), 'Fleet 200% text/layout overflow');
+        await capture('desktop-fleet-zoom.png', {format:'png'});
+        await evaluate(`document.documentElement.style.zoom='';`);
         await evaluate(`document.getElementById('fleet-editor-cancel').click()`);
         assert.equal(await evaluate('window.WtpUi.validate()'), true);
         await evaluate(`(() => {
