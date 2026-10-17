@@ -100,3 +100,21 @@ scheduler spacing, not permission to exceed a device's finite-job duration.
 Local Chromium tests cover both desktop/mobile layouts, 31/32/33 and spaces,
 exact duration boundaries, smaller CAPS and fractional timing. They use simulated
 controller responses; live-device R3 acceptance remains separately required.
+
+### Browser fixture process ownership
+
+Chromium fixtures must use `spawnIsolatedProcess` and `stopIsolatedProcess`
+from `tests/browser_fixture_process.js`. On POSIX this owns a private process
+group, so shutdown also retires descendants that outlive the browser leader.
+Use `spawnFixtureChild`, `waitForSpawn` and `stopChild` for the PHP fixture.
+Create children inside protected cleanup, attempt every cleanup step, and
+remove the profile only after the browser group has stopped. A successful
+workflow followed by failed cleanup is a failed test. Do not replace this with
+PID-only termination, process-name kills or ignored removal errors.
+
+Run `npm test` and `npm run test:browser` from this component. The process
+regression covers an exited leader with a stubborn writer and verifies that an
+unrelated sentinel survives. `node tests/wtp_pi_fleet_ui_integration_test.js`
+exercises the separate Fleet browser fixture. These use synthetic local
+controller responses; an online test-network interface is needed for workflows
+that honor `navigator.onLine`, even when external access is disabled.

@@ -5,7 +5,7 @@ const http = require("node:http");
 const net = require("node:net");
 const path = require("node:path");
 const fs = require("node:fs");
-const { spawn } = require("node:child_process");
+const { spawnFixtureChild, waitForSpawn, spawnIsolatedProcess, stopIsolatedProcess, stopChild } = require("./browser_fixture_process.js");
 const WebSocket = require("ws");
 
 const UI_ROOT = path.resolve(__dirname, "..");
@@ -700,15 +700,16 @@ async function browserTest() {
 async function main() {
     const phpPort = await freePort();
     const debugPort = await freePort();
-    const php = spawn("php", ["-S", `127.0.0.1:${phpPort}`, "-t", "data", "tests/browser_fixture_router.php"], {
-        cwd: UI_ROOT,
-        stdio: "ignore",
-    });
+
     const profileDir = `/tmp/wsprrypi-cw-duration-test-${process.pid}`;
     let chromium;
 
-    let client;
+    let client, php, failure;
     try {
+        php = spawnFixtureChild("php", ["-S", `127.0.0.1:${phpPort}`, "-t", "data", "tests/browser_fixture_router.php"], {
+            cwd: UI_ROOT,
+        });
+        await waitForSpawn(php);
         await waitFor(
             async () => await getStatus(
                 `http://127.0.0.1:${phpPort}/index.php?page=config`
@@ -720,14 +721,15 @@ async function main() {
                 ? "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
                 : "chromium"
         );
-        chromium = spawn(chromiumExecutable, [
+        chromium = spawnIsolatedProcess(chromiumExecutable, [
             "--headless",
             "--no-sandbox",
             "--disable-gpu",
             `--remote-debugging-port=${debugPort}`,
             `--user-data-dir=${profileDir}`,
             `http://127.0.0.1:${phpPort}/index.php?page=config`,
-        ], { stdio: "ignore" });
+        ]);
+        await waitForSpawn(chromium);
 
         const page = await waitFor(async () => {
             const pages = await getJson(`http://127.0.0.1:${debugPort}/json`);
@@ -900,14 +902,21 @@ async function main() {
             }
         }
         console.log("cw_duration_latch_integration_test passed");
-    } finally {
-        if (client) client.close();
-        if (chromium) chromium.kill("SIGTERM");
-        php.kill("SIGTERM");
+    } catch (error) { failure = error; }
+    finally {
+        const errors = failure ? [failure] : [];
+        if (client && chromium?.exitCode === null) {
+            await Promise.race([client.send("Browser.close").catch(() => {}), new Promise(resolve => setTimeout(resolve, 1000))]);
+        }
+        for (const cleanup of [() => client?.close(), () => stopIsolatedProcess(chromium), () => stopChild(php),
+            () => fs.rmSync(profileDir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 })]) {
+            try { await cleanup(); } catch (error) { if (!errors.includes(error)) errors.push(error); }
+        }
+        if (errors.length) throw new AggregateError(errors, "CW duration browser workflow or cleanup failed");
     }
 }
 
 main().catch((error) => {
-    console.error(error.stack || error.message);
+    console.error(error);
     process.exitCode = 1;
 });

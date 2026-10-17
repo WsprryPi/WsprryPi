@@ -5,7 +5,7 @@ const fs = require("node:fs");
 const http = require("node:http");
 const net = require("node:net");
 const path = require("node:path");
-const { spawn } = require("node:child_process");
+const { spawnFixtureChild, waitForSpawn, spawnIsolatedProcess, stopIsolatedProcess, stopChild } = require("./browser_fixture_process.js");
 const WebSocket = require("ws");
 
 const UI_ROOT = path.resolve(__dirname, "..");
@@ -56,31 +56,6 @@ async function waitFor(check, description, timeoutMs = 10000) {
         await new Promise((resolve) => setTimeout(resolve, 50));
     }
     throw new Error(`Timed out waiting for ${description}${lastError ? `: ${lastError.message}` : ""}`);
-}
-
-function waitForExit(child, timeoutMs) {
-    if (child.exitCode !== null) return Promise.resolve(true);
-    return new Promise((resolve) => {
-        let timer;
-        const finish = (exited) => {
-            clearTimeout(timer);
-            child.off("exit", onExit);
-            resolve(exited);
-        };
-        const onExit = () => finish(true);
-        child.once("exit", onExit);
-        timer = setTimeout(() => finish(child.exitCode !== null), timeoutMs);
-    });
-}
-
-async function terminate(child) {
-    if (!child || child.exitCode !== null) return;
-    child.kill("SIGTERM");
-    if (await waitForExit(child, 2000)) return;
-    child.kill("SIGKILL");
-    if (!await waitForExit(child, 2000)) {
-        throw new Error(`Child process ${child.pid} did not terminate`);
-    }
 }
 
 class CdpClient {
@@ -1108,14 +1083,15 @@ async function browserTest() {
 async function main() {
     const phpPort = await freePort();
     const debugPort = await freePort();
-    const php = spawn("php", ["-S", `127.0.0.1:${phpPort}`, "-t", "data", "tests/browser_fixture_router.php"], {
-        cwd: UI_ROOT,
-        stdio: "ignore",
-    });
+
     const profileDir = `/tmp/wsprrypi-conditional-gpio-test-${process.pid}`;
     let chromium;
-    let client;
+    let client, php, failure;
     try {
+        php = spawnFixtureChild("php", ["-S", `127.0.0.1:${phpPort}`, "-t", "data", "tests/browser_fixture_router.php"], {
+            cwd: UI_ROOT,
+        });
+        await waitForSpawn(php);
         await waitFor(async () => await getStatus(
             `http://127.0.0.1:${phpPort}/index.php?page=config`) === 200,
         "local PHP fixture");
@@ -1124,12 +1100,13 @@ async function main() {
                 ? "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
                 : "chromium"
         );
-        chromium = spawn(chromiumExecutable, [
+        chromium = spawnIsolatedProcess(chromiumExecutable, [
             "--headless", "--no-sandbox", "--disable-gpu",
             `--remote-debugging-port=${debugPort}`,
             `--user-data-dir=${profileDir}`,
             `http://127.0.0.1:${phpPort}/index.php?page=config`,
-        ], { stdio: "ignore" });
+        ]);
+        await waitForSpawn(chromium);
 
         const page = await waitFor(async () => {
             const pages = await getJson(`http://127.0.0.1:${debugPort}/json`);
@@ -1248,20 +1225,21 @@ async function main() {
             await captureRouteProgressModalScreenshot(client, path.join(screenshotDir, "RP1_Route_Progress_Mobile_Dark.png"), "dark");
         }
         console.log("conditional_transmit_gpio_integration_test passed");
-    } finally {
-        if (client) client.close();
-        await terminate(chromium);
-        await terminate(php);
-        fs.rmSync(profileDir, {
-            recursive: true,
-            force: true,
-            maxRetries: 5,
-            retryDelay: 100,
-        });
+    } catch (error) { failure = error; }
+    finally {
+        const errors = failure ? [failure] : [];
+        if (client && chromium?.exitCode === null) {
+            await Promise.race([client.send("Browser.close").catch(() => {}), new Promise(resolve => setTimeout(resolve, 1000))]);
+        }
+        for (const cleanup of [() => client?.close(), () => stopIsolatedProcess(chromium), () => stopChild(php),
+            () => fs.rmSync(profileDir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 })]) {
+            try { await cleanup(); } catch (error) { if (!errors.includes(error)) errors.push(error); }
+        }
+        if (errors.length) throw new AggregateError(errors, "Conditional GPIO browser workflow or cleanup failed");
     }
 }
 
 main().catch((error) => {
-    console.error(error.stack || error.message);
+    console.error(error);
     process.exitCode = 1;
 });

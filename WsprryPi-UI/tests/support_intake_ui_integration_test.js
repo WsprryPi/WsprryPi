@@ -5,7 +5,8 @@ const fs = require("node:fs");
 const http = require("node:http");
 const net = require("node:net");
 const path = require("node:path");
-const { spawn, spawnSync } = require("node:child_process");
+const { spawnSync } = require("node:child_process");
+const { spawnFixtureChild, waitForSpawn, spawnIsolatedProcess, stopIsolatedProcess, stopChild } = require("./browser_fixture_process.js");
 const WebSocket = require("ws");
 
 const UI_ROOT = path.resolve(__dirname, "..");
@@ -56,31 +57,6 @@ async function waitFor(check, description, timeoutMs = 12000) {
         await new Promise((resolve) => setTimeout(resolve, 50));
     }
     throw new Error(`Timed out waiting for ${description}${lastError ? `: ${lastError.message}` : ""}`);
-}
-
-function waitForExit(child, timeoutMs) {
-    if (child.exitCode !== null) return Promise.resolve(true);
-    return new Promise((resolve) => {
-        let timer;
-        const finish = (exited) => {
-            clearTimeout(timer);
-            child.off("exit", onExit);
-            resolve(exited);
-        };
-        const onExit = () => finish(true);
-        child.once("exit", onExit);
-        timer = setTimeout(() => finish(child.exitCode !== null), timeoutMs);
-    });
-}
-
-async function terminate(child) {
-    if (!child || child.exitCode !== null) return;
-    child.kill("SIGTERM");
-    if (await waitForExit(child, 2000)) return;
-    child.kill("SIGKILL");
-    if (!await waitForExit(child, 2000)) {
-        throw new Error(`Child process ${child.pid} did not terminate`);
-    }
 }
 
 async function removeProfileDirectory(profileDir, options = {}) {
@@ -600,22 +576,25 @@ async function capture(client, outputPath, width, height, state, theme = "light"
 async function main() {
     const phpPort = await freePort();
     const debugPort = await freePort();
-    const php = spawn("php", ["-S", `127.0.0.1:${phpPort}`, "-t", "data", "tests/browser_fixture_router.php"], {
-        cwd: UI_ROOT, stdio: "ignore",
-    });
+
     const profileDir = `/tmp/wsprrypi-support-intake-ui-${process.pid}`;
     let chromium;
-    let client;
+    let client, php;
     let primaryError;
     try {
+        php = spawnFixtureChild("php", ["-S", `127.0.0.1:${phpPort}`, "-t", "data", "tests/browser_fixture_router.php"], {
+            cwd: UI_ROOT,
+        });
+        await waitForSpawn(php);
         await waitFor(async () => await getStatus(
             `http://127.0.0.1:${phpPort}/index.php?page=maintenance`) === 200, "Maintenance fixture");
-        chromium = spawn(chromiumBinary(), [
+        chromium = spawnIsolatedProcess(chromiumBinary(), [
             "--headless", "--no-sandbox", "--disable-gpu",
             `--remote-debugging-port=${debugPort}`,
             `--user-data-dir=${profileDir}`,
             `http://127.0.0.1:${phpPort}/index.php?page=maintenance`,
-        ], { stdio: "ignore" });
+        ]);
+        await waitForSpawn(chromium);
         const page = await waitFor(async () => {
             const pages = await getJson(`http://127.0.0.1:${debugPort}/json`);
             return pages.find((item) => item.type === "page");
@@ -670,10 +649,13 @@ async function main() {
         primaryError = error;
     } finally {
         let cleanupError;
+        if (client && chromium?.exitCode === null) {
+            await Promise.race([client.send("Browser.close").catch(() => {}), new Promise(resolve => setTimeout(resolve, 1000))]);
+        }
         const cleanupSteps = [
             async () => { if (client) client.close(); },
-            async () => terminate(chromium),
-            async () => terminate(php),
+            async () => stopIsolatedProcess(chromium),
+            async () => stopChild(php),
             async () => removeProfileDirectory(profileDir),
         ];
         for (const cleanupStep of cleanupSteps) {

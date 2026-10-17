@@ -6,7 +6,7 @@ const assert = require("node:assert/strict");
 const http = require("node:http");
 const net = require("node:net");
 const path = require("node:path");
-const { spawn } = require("node:child_process");
+const { spawnFixtureChild, waitForSpawn, spawnIsolatedProcess, stopIsolatedProcess, stopChild } = require("./browser_fixture_process.js");
 const WebSocket = require("ws");
 
 const UI_ROOT = path.resolve(__dirname, "..");
@@ -102,16 +102,18 @@ class CdpClient {
 async function main() {
     const fs = require('node:fs');
     const phpPort = await freePort(), debugPort = await freePort();
-    const php = spawn('php', ['-S', `127.0.0.1:${phpPort}`, '-t', 'data', 'tests/browser_fixture_router.php'], {cwd: UI_ROOT, stdio: 'ignore'});
     const base = `http://127.0.0.1:${phpPort}/index.php`;
     const profileDir = `/tmp/wsprrypi-pi-fleet-ui-${process.pid}`;
     const output = path.resolve(UI_ROOT, '../src/build/wtp-pi/ui');
     fs.mkdirSync(output, {recursive: true});
-    let chrome, client;
+    let php, chrome, client, failure;
     try {
+        php = spawnFixtureChild('php', ['-S', `127.0.0.1:${phpPort}`, '-t', 'data', 'tests/browser_fixture_router.php'], {cwd: UI_ROOT});
+        await waitForSpawn(php);
         await waitFor(async () => await getStatus(base + '?page=config') === 200, 'PHP fixture');
-        chrome = spawn(process.env.CHROME_BIN || (process.platform === 'darwin' ? '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome' : 'chromium'),
-            ['--headless', '--no-sandbox', '--disable-gpu', '--no-first-run', '--no-default-browser-check', '--disable-background-networking', `--remote-debugging-port=${debugPort}`, `--user-data-dir=${profileDir}`, base + '?page=config'], {stdio: 'ignore'});
+        chrome = spawnIsolatedProcess(process.env.CHROME_BIN || (process.platform === 'darwin' ? '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome' : 'chromium'),
+            ['--headless', '--no-sandbox', '--disable-gpu', '--no-first-run', '--no-default-browser-check', '--disable-background-networking', `--remote-debugging-port=${debugPort}`, `--user-data-dir=${profileDir}`, base + '?page=config']);
+        await waitForSpawn(chrome);
         // A fresh CI Chrome profile can take longer than workflow assertions to start.
         // Keep startup finite without changing any UI assertion deadline.
         const page = await waitFor(async () => (await getJson(`http://127.0.0.1:${debugPort}/json`)).find(p => p.type === 'page'), 'browser startup', 60000);
@@ -319,6 +321,17 @@ async function main() {
         await waitFor(async()=>await evaluate('__endpoint.local_effective && !__endpoint.remote_owner'),'end-now local control');
         console.log('Fleet in-page confirmation, cancellation, Escape, feature hiding, stale revisions, duplicate prevention, Pi takeover choices and independent assignments passed.');
         console.log('Mocked desktop/mobile visual evidence: '+output);
-    } finally {if(client)client.close();if(chrome)chrome.kill('SIGTERM');php.kill('SIGTERM');}
+    } catch (error) { failure = error; }
+    finally {
+        const errors = failure ? [failure] : [];
+        if (client && chrome?.exitCode === null) {
+            await Promise.race([client.send('Browser.close').catch(() => {}), new Promise(resolve => setTimeout(resolve, 1000))]);
+        }
+        for (const cleanup of [() => client?.close(), () => stopIsolatedProcess(chrome), () => stopChild(php),
+            () => fs.rmSync(profileDir, {recursive: true, force: true, maxRetries: 5, retryDelay: 100})]) {
+            try { await cleanup(); } catch (error) { if (!errors.includes(error)) errors.push(error); }
+        }
+        if (errors.length) throw new AggregateError(errors, 'Pi Fleet browser workflow or cleanup failed');
+    }
 }
 main().catch(error=>{console.error(error);process.exitCode=1;});
