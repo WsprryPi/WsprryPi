@@ -90,8 +90,12 @@ then apply. No blind replay or transport fallback occurs.
 The production host clock probe is read-only Linux adjtimex. It requires
 TIME_OK, no unsynchronized/clock-error/pending-leap flags, nonnegative maxerror
 and esterror, and maxerror at most 500 ms. USB exchange charges the larger
-clock error, the full measured sample/ACK round trip, measured wall/monotonic
-skew and a 100 microsecond processing/drift reserve. A clock step exceeding
+clock error, the rounded-up half-width of the sample request/response interval,
+measured wall/monotonic skew and the unchanged 100 microsecond processing/drift
+reserve. The sample is bracketed before its request and after its response,
+before the mandatory delivery ACK. A midpoint and this half-window bound cover
+fully asymmetric delivery; no symmetric path is assumed. ACK waiting does not
+move the sampled instant; Pico clock aging still charges subsequent elapsed time. A clock step exceeding
 1 ms, regressing clock or exchange over one second is rejected. Bounds are
 reported without clamping to a transmitter admission limit.
 
@@ -115,6 +119,13 @@ UTC observation can exceed that per-job limit and therefore still refuse
 CLAIM/ARM admission. The bounded target check observed 56.7–71 ms using the
 production client and qualified host; it did not arm a job or qualify default
 job readiness. Do not widen or clamp timing limits to hide this distinction.
+The subsequent [clock investigation](https://github.com/WsprryPi/WsprryPico/blob/devel/docs/development/usb-time-uncertainty.md)
+corrects the sample bracket and records its remaining measured uncertainty.
+Job timing policy is separate from transfer accounting; the 1 ms default
+remains unchanged. Runtime observations now report host error, sample round
+trip and midpoint radius, clock discrepancy, processing margin and ACK duration
+separately. A 100 ms ordinary-operation UTC policy is a documented proposal,
+not an applied setting.
 
 STOP and owned-job cancellation signal the USB transaction before waiting for
 runtime authority, so a silent management read is interrupted cooperatively.

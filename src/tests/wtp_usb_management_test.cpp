@@ -3,6 +3,7 @@
 #include "wtp_integration/browser_api.hpp"
 #include "privileged_network_policy.hpp"
 #include <deque>
+#include <limits>
 #include <iostream>
 using namespace wsprrypi;
 using Json=nlohmann::json;
@@ -14,10 +15,12 @@ struct Device : wtp::ByteStream {
   std::vector<Json> operations;
   bool bad_boot{}, drop{}, closed{}, duplicate{};
   unsigned mutations{}, acks{};
+  std::function<void(const Json &)> on_request;
   std::size_t chunk{3};
   Json target{{"scope","member"},{"device_id",std::string(32,'a')},{"boot_id",std::string(32,'b')}};
   void respond(const Json &request) {
     operations.push_back(request);
+    if(on_request)on_request(request);
     if(drop)return;
     const auto operation=request.at("operation").get<std::string>();
     if(operation=="ack")++acks;
@@ -62,7 +65,64 @@ int main() {
   unsigned observations{};
   CHECK(client.synchronize([&]{++observations;return HostUtcObservation{true,observations*1000000ULL,1700000000000000000ULL+observations*1000000ULL,200000};}));
   auto last=device.operations[device.operations.size()-2];auto time=Json::parse(last.at("body").get<std::string>());
-  CHECK(std::stoull(time.at("uncertainty_ns").get<std::string>())>=1200000ULL && time.at("leap")=="normal");
+  CHECK(std::stoull(time.at("uncertainty_ns").get<std::string>())==800000ULL && time.at("leap")=="normal");
+  CHECK(client.observation().at("time").at("sample_round_trip_ns")=="1000000");
+  CHECK(client.observation().at("time").at("host_uncertainty_ns")=="200000");
+
+  // A delayed delivery ACK is outside the device-sample bracket. It must
+  // neither bias the UTC midpoint nor inflate the transfer uncertainty.
+  for (const std::uint64_t duration : {1ULL,100001ULL,1000000ULL,100000000ULL}) {
+    Device peer;std::uint64_t mono=1000000000ULL;unsigned reads=0;
+    UsbManagementClient timed(peer,[&]{return mono/1000000;},[&](unsigned n){mono+=n*1000000ULL;});
+    CHECK(timed.hello(""));
+    peer.on_request=[&](const Json &r){if(r.at("operation")=="ack")mono+=200000000ULL;};
+    CHECK(timed.synchronize([&]{
+      if(reads++==1)mono+=duration;
+      return HostUtcObservation{true,mono,1700000000000000000ULL+mono,200000ULL};
+    }));
+    CHECK(reads==3);
+    const auto report=timed.observation().at("time");
+    CHECK(report.at("sample_ack_ms")=="200");
+    CHECK(report.at("sample_round_trip_ns")==std::to_string(duration));
+    auto submit=Json::parse(peer.operations[peer.operations.size()-2].at("body").get<std::string>());
+    const auto bound=std::stoull(submit.at("uncertainty_ns").get<std::string>());
+    const auto center=std::stoull(submit.at("utc_ns").get<std::string>());
+    CHECK(bound==300000ULL+duration/2+duration%2);
+    // Both extremes are possible: all request delay or all reply delay.
+    // Neither case relies on half the *one-way* delay being symmetric.
+    const auto left=1700000001000000000ULL,right=left+duration;
+    CHECK(center>=left && center<=right);
+    CHECK(center-left<=bound && right-center<=bound);
+    CHECK((bound<=1000000ULL)==(duration<=1000000ULL));
+  }
+  // Clock steps, regressions, huge host error and unqualified second samples
+  // remain refusals and must never submit a time update.
+  for (unsigned failure=0;failure<8;++failure) {
+    Device peer;unsigned reads=0;
+    UsbManagementClient timed(peer,[&]{return now;},[&](unsigned n){now+=n;});
+    CHECK(timed.hello(""));
+    CHECK(!timed.synchronize([&]{
+      const auto index=reads++;const bool second=index==1;
+      HostUtcObservation v{true,1000000000ULL+index*100000ULL,1700000001000000000ULL+index*100000ULL,200000ULL};
+      if(failure==0 && second)v.utc_ns+=2000000;
+      if(failure==1 && second)v.monotonic_ns=0;
+      if(failure==2)v.uncertainty_ns=std::numeric_limits<std::uint64_t>::max();
+      if(failure==3 && second)v.qualified=false;
+      if(failure==4 && second)v.utc_ns=0;
+      if(failure==5 && index==2)v.utc_ns+=2000000ULL;
+      if(failure==6 && index==2)v.qualified=false;
+      if(failure==7 && index==2)v.monotonic_ns=0;
+      return v;
+    }));
+    CHECK(peer.mutations==0);
+  }
+
+  Device no_ack;unsigned sample_reads=0;
+  UsbManagementClient unconfirmed(no_ack,[&]{return now;},[&](unsigned n){now+=n;});
+  CHECK(unconfirmed.hello(""));
+  no_ack.on_request=[&](const Json &r){if(r.at("operation")=="ack")no_ack.drop=true;};
+  CHECK(!unconfirmed.synchronize([&]{++sample_reads;return HostUtcObservation{true,sample_reads*100000ULL,1700000000000000000ULL+sample_reads*100000ULL,200000ULL};}));
+  CHECK(no_ack.closed && no_ack.mutations==0 && sample_reads==2);
   CHECK(!client.synchronize([]{return HostUtcObservation{};}));
   CHECK(client.observation().at("time").at("reason")=="host_utc_unqualified");
   const auto before=device.operations.size(); cancelled=true;

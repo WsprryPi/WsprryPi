@@ -125,7 +125,8 @@ bool UsbManagementClient::hello(const std::string &expected_device) {
   } catch (const std::exception &e) { fail(e.what()); return false; }
 }
 PicoHttpResponse UsbManagementClient::request_locked(const std::string &path,const std::string &method,
-    const std::string &body,const std::string &revision,unsigned timeout) {
+    const std::string &body,const std::string &revision,unsigned timeout,
+    const std::function<void()> &response_observed) {
   if (!connected_) return {409,R"({"error":{"code":"usb_management_required"}})",{}};
   bool mutation=method!="GET";
   try {
@@ -136,6 +137,9 @@ PicoHttpResponse UsbManagementClient::request_locked(const std::string &path,con
     if (response.at("session")!=session_ || response.at("target")!=target_ || response.at("delivery_required")!=true)
       throw std::runtime_error("usb_binding_mismatch");
     PicoHttpResponse result{response.at("status").get<unsigned>(),response.at("body").get<std::string>(),response.at("etag").get<std::string>()};
+    // Time samples are bounded by the response, before its delivery ACK.
+    // The ACK cannot move the instant already sampled on the Pico.
+    if (response_observed) response_observed();
     auto ack=exchange({{"schema","usb-management/1"},{"id",next_id_},{"operation","ack"},
       {"session",session_},{"target",target_}},deadline);
     if (ack.at("session")!=session_ || ack.at("target")!=target_ || ack.at("status")!=200 || ack.at("delivery_required")!=false)
@@ -156,20 +160,42 @@ bool UsbManagementClient::synchronize(const std::function<HostUtcObservation()> 
   try {
     const auto before=observe();
     if (!before.qualified) return reject("host_utc_unqualified");
-    const auto sample=request_locked("/api/usb/v1/time/sample","GET",{},{},500);
-    const auto after=observe();
+    HostUtcObservation after;
+    std::uint64_t ack_started_ms{};
+    const auto sample=request_locked("/api/usb/v1/time/sample","GET",{},{},500,[&] {
+      after=observe(); ack_started_ms=now_();
+    });
+    const auto ack_finished_ms=now_();
+    if (sample.status!=200) return reject("usb_sample_unavailable");
     if (!after.qualified || after.monotonic_ns<before.monotonic_ns || after.utc_ns<before.utc_ns)
+      return reject("host_clock_changed");
+    // Excluding ACK latency must not remove the clock-step/quality check
+    // across that ACK. This observation validates the existing sample;
+    // its later time is never used to recenter the captured UTC instant.
+    const auto confirmed=observe();
+    if (!confirmed.qualified || confirmed.monotonic_ns<after.monotonic_ns || confirmed.utc_ns<after.utc_ns)
       return reject("host_clock_changed");
     const auto elapsed=after.monotonic_ns-before.monotonic_ns;
     const auto wall_elapsed=after.utc_ns-before.utc_ns;
-    const auto step=elapsed>wall_elapsed?elapsed-wall_elapsed:wall_elapsed-elapsed;
-    if (sample.status!=200 || elapsed>1000000000ULL || step>1000000ULL) return reject("usb_sample_delay_or_clock_step");
+    const auto sample_step=elapsed>wall_elapsed?elapsed-wall_elapsed:wall_elapsed-elapsed;
+    const auto ack_elapsed=confirmed.monotonic_ns-after.monotonic_ns;
+    const auto ack_wall=confirmed.utc_ns-after.utc_ns;
+    const auto ack_step=ack_elapsed>ack_wall?ack_elapsed-ack_wall:ack_wall-ack_elapsed;
+    if (confirmed.monotonic_ns-before.monotonic_ns>1000000000ULL ||
+        sample_step>1000000ULL || ack_step>1000000ULL || sample_step+ack_step>1000000ULL)
+      return reject("usb_sample_delay_or_clock_step");
+    const auto step=sample_step+ack_step;
     const auto value=strict_browser_json(sample.body);
     (void)decimal(value.at("monotonic_ns"));
     if (!value.at("sample").is_string()) return reject("invalid_time_sample");
-    const auto error=std::max(before.uncertainty_ns,after.uncertainty_ns);
-    if (error>UINT64_MAX-elapsed-step-100000ULL) return reject("time_overflow");
-    const auto uncertainty=error+elapsed+step+100000ULL; // full RTT, measured skew, conservative 100us processing/drift reserve.
+    const auto error=std::max({before.uncertainty_ns,after.uncertainty_ns,confirmed.uncertainty_ns});
+    // The Pico sample lies somewhere inside [before, after]. Its UTC
+    // midpoint has a worst-case radius of ceil(RTT/2), even with fully
+    // asymmetric delivery. Keep host error, observed wall/mono skew and
+    // the existing 100us processing/drift margin; assume no symmetry.
+    const auto radius=elapsed/2+elapsed%2;
+    if (error>UINT64_MAX-radius-step-100000ULL) return reject("time_overflow");
+    const auto uncertainty=error+radius+step+100000ULL;
     const auto utc=before.utc_ns+wall_elapsed/2;
     const auto result=request_locked("/api/usb/v1/time/submit","POST",Json{{"sample",value.at("sample")},
       {"utc_ns",std::to_string(utc)},{"uncertainty_ns",std::to_string(uncertainty)},{"leap","normal"}}.dump(),{},500);
@@ -177,6 +203,10 @@ bool UsbManagementClient::synchronize(const std::function<HostUtcObservation()> 
     const bool accepted=result.status==200 && outcome.is_object() && outcome.value("accepted",false);
     time_={{"source","usb-physical"},{"accepted",accepted},{"selected",outcome.value("selected",false)},
       {"selected_source",outcome.value("source",std::string{})},{"uncertainty_ns",std::to_string(uncertainty)},
+      {"host_uncertainty_ns",std::to_string(error)},{"sample_round_trip_ns",std::to_string(elapsed)},
+      {"sample_radius_ns",std::to_string(radius)},{"clock_discrepancy_ns",std::to_string(step)},
+      {"post_ack_clock_discrepancy_ns",std::to_string(ack_step)},
+      {"processing_margin_ns","100000"},{"sample_ack_ms",std::to_string(ack_finished_ms>=ack_started_ms?ack_finished_ms-ack_started_ms:0)},
       {"observed_ms",std::to_string(now_())},{"result",outcome}};
     return accepted;
   } catch (...) { return reject("invalid_time_exchange"); }

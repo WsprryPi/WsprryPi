@@ -28,7 +28,7 @@ public:
 private:
   nlohmann::json exchange(const nlohmann::json &, std::uint64_t deadline);
   PicoHttpResponse request_locked(const std::string &, const std::string &,
-      const std::string &, const std::string &, unsigned);
+      const std::string &, const std::string &, unsigned, const std::function<void()> & = {});
   void fail(const char *);
   wtp::ByteStream &stream_;
   Clock now_;

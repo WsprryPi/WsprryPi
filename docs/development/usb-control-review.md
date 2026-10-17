@@ -236,3 +236,34 @@ non-hardware validation, macOS simulated, strict I2C and all six GCC13 release
 profiles. The final follow-up changes only this evidence and the operator
 clock-readiness explanation; production source and all compatibility pins
 remain exactly those tested.
+
+## Subsequent USB UTC investigation
+
+The [USB uncertainty investigation](https://github.com/WsprryPi/WsprryPico/blob/devel/docs/development/usb-time-uncertainty.md)
+records the ACK-inclusive sample window, corrected midpoint interval, component
+measurements and a proposed ordinary-operation UTC requirement. The client now
+captures the sample response before ACK and retains a separate post-ACK clock
+qualification/step check. Delayed or lost ACKs cannot bias the sample midpoint
+or permit an unconfirmed submit. The 1000000 ns Pi default and all Pico timing,
+service, capacity and uncertainty bounds remain unchanged.
+
+Final focused tests cover fully asymmetric interval endpoints, odd rounding,
+200 ms ACK delay, missing ACK, clock steps both inside the sample window and
+during ACK, regression, overflow and loss of qualification. Normal and Linux
+ASan/UBSan builds pass. The final native production runtime passes 447 checks;
+the exact production-target Node UI regression and production USB pair pass.
+No UI presentation was changed. No macOS Pi C++ build was attempted.
+
+The compiler-only GCC13 image lacks Node, and a relink in the Node-capable
+image lacks the Avahi development linker metadata required by the cached
+production objects. Final native source is rebuilt/run in the complete GCC13
+compiler environment; the existing Node test runs separately in the retained
+Node-capable environment. No product source or dependency policy was changed
+to accommodate these environment limitations. The initial mistaken Node
+filename was corrected to the exact command in the Makefile.
+
+The physical clock-only results use the production native client and inhibited
+Pico firmware with no saved station network. They do not qualify 1 ms ARM, an
+installed service, RF output or absolute UTC accuracy. The canonical result
+records the exact client/source/image hashes and original full-flash restore.
+A 100 ms ordinary-operation UTC requirement is recommended, not applied.
