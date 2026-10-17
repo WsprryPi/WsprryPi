@@ -8,7 +8,7 @@ disposition rather than implementation before 4.0.
 
 ## Ordered release checklist
 
-Status updated October 16, 2026. Items 1 through 14 are complete within their
+Status updated October 17, 2026. Items 1 through 15 are complete within their
 recorded scopes. Accepted implementation is integrated into `devel`, and the
 immutable RP1 provider release is published. Item 10, WsprryPi production
 consumption and validation, is accepted for installation and idle runtime
@@ -25,9 +25,12 @@ hosted builds and publication. Item 13 is complete for reviewed implementation
 item 14 is complete within its bounded software integration scope. The full
 Pico Type 2/3 companion is integrated with affected Impeccable review,
 independent adversarial repairs, exact-source compatibility and promoted-head
-CI. Docs devel and its hosted default-gated build are verified. Item 15 retains
-the unexecuted P15.9 valid-field-saving prompt under WsprryPi coordination;
-Beta 1 preparation is item 16. Items 15–16 have not started.
+CI. Docs devel and its hosted default-gated build are verified. Item 15/P15.9
+is closed for the supported Pico software implementation and originating
+post-execution assessment. Four findings were repaired and independently
+reassessed at Pico `1653034`. Pi adoption and P15.14 operator documentation
+remain separate; no Pi release adoption or physical qualification is claimed.
+Beta 1 preparation is item 16 and has not started.
 
 The current milestone is **WsprryPi 4.0 Beta 1**, not final 4.0 stable
 publication. The maintainer's October 16 direction is to prepare a reviewable
@@ -205,15 +208,19 @@ Status key: ✅ Complete · ⏳ In progress · ☐ Not started
     browser-zoom coverage remain outstanding. Later UI-affecting changes require
     affected review/documentation checks again; items 14–15 record the Pico
     Type 2/3 integration and valid-field-saving follow-ups. Item 14 records the
-    completed affected integration review below; items 15–16 have not started.
+    completed affected integration review below; item 15's supported Pico
+    implementation and originating assessment are complete within the recorded
+    software scope. Pi/Beta adoption remains separate. Item 16 has not started.
 14. ✅ **Pico WSPR Type 2/3 management integration and acceptance.**
-    **Lead: WsprryPi · Documentation: WsprryPi-Docs.** Complete within the
+    **Lead: WsprryPi · Documentation: WsprryPi-Docs.** Closed within the
     bounded software scope. The full accepted companion through `6d5e734`,
     including its implementation, tests and immutable Pico `804e8a0` pin, is
-    integrated on `devel` at reviewed implementation `f6b5158`. All
-    [12 feature-head CI jobs](https://github.com/WsprryPi/WsprryPi/actions/runs/38974181065)
-    and [12 promoted-head jobs](https://github.com/WsprryPi/WsprryPi/actions/runs/38975937376)
-    pass. Eight exact local compatibility pairs, genuine TLS/consumer crypto/
+    integrated on `devel` at reviewed implementation `f6b5158`, with final
+    closeout `a84010d6c16ac416d52989053ac1f273390a8ab5`. All
+    [12 final feature-head CI jobs](https://github.com/WsprryPi/WsprryPi/actions/runs/38977319372)
+    and [12 final devel-head jobs](https://github.com/WsprryPi/WsprryPi/actions/runs/38977334299)
+    passed on that exact closeout head. Eight exact local compatibility pairs,
+    genuine TLS/consumer crypto/
     resource/journal/recovery, runtime and sanitizer checks pass. Impeccable
     and fresh independent adversarial reassessment close all bounded findings;
     72 current plus 16 historical rendered captures cover both themes,
@@ -229,39 +236,57 @@ Status key: ✅ Complete · ⏳ In progress · ☐ Not started
     See the
     [acceptance and item 13 affected-review addendum](../docs/development/item14-pico-type23-integration.md)
     and [retained execution prompt](P15.8%20Pi%20Integration%20Prompt.md).
-    The later evidence/test-fixture closeout changes no product code; its own
-    exact-head CI and final feature/devel parity are verified in the final
-    execution handback. Items 15–16 remain unstarted.
-15. ☐ **P15.9 — Save valid fields independently of transmit readiness.**
-    **Lead: WsprryPi coordination · Implementation: WsprryPico.** Not started.
-    The [full operator-supplied execution prompt](P15.9%20Valid%20Field%20Saves%20Prompt.md)
-    is saved verbatim for later explicit execution; do not execute it as part of
-    this checklist update. Read the referenced comprehensive Pico source review
-    before future implementation. Permit independent valid progress to be saved
-    while distinguishing browser edits, durable drafts, applied settings,
-    operation-specific readiness and actual output. Preserve complete-config/
-    profile validation, legacy atomic requests, explicit application, STOP,
-    ownership, uncertain-write recovery and P15.8 planning/pair behavior.
-    Pico implementation runs on its `devel` under the saved prompt's authority
-    only when executed. Establish the exact Pi scope before Pi edits; prefer the
-    isolated `codex/p15-9-valid-field-saves` feature branch. Preserve Pi release
-    repairs, fixtures and audits. Item 14 does not authorize P15.9 promotion;
-    Pi `devel` integration/push requires separate explicit authorization.
-    Validate storage/reload, legacy and new API semantics, genuine browser/carrier
-    behavior and affected sanitizers/firmware builds. Preserve historical peer
-    expectations; if advancing current Pico, retain P15.8's `804e8a0` as `p158`
-    and test nine compatibility rows. Use Impeccable, adversarial assessment,
-    repairs and reassessment. Record operator-documentation follow-ups for Pico
-    P15.14 unless separately authorized. Keep implementation acceptance,
-    feature branch compatibility and release integration distinct; a feature push does
-    not establish Pi release adoption. Resolve selected release integration and
-    affected UI/documentation acceptance before item 16b. No hardware, release,
-    tag or cross-conversation messaging is authorized by storing this prompt.
+    The evidence/test-fixture closeout changes no product code; its own final
+    feature/devel CI and local/upstream/independent remote parity are verified.
+    The nonblocking Pico wording defect remains separately deferred; it does
+    not reopen this bounded integration gate. Item 15's Pico implementation is
+    complete within its separate recorded scope; item 16 has not started.
+15. ✅ **P15.9 — Save valid fields independently of transmit readiness.**
+    **Lead: WsprryPi coordination · Implementation: WsprryPico.** Closed within
+    the supported Pico software and originating-assessment scope. Original
+    product `56821ac`/execution record `29542e4` and later P15.12 integration
+    `227e73c` were reviewed in current Pico `156dfa1`; four findings were repaired
+    and closed at published Pico `165303458e49feaac1de54c8344058f56578d533`.
+    Valid independent fields persist as durable progress; invalid/newer browser
+    edits remain visible. Applying saved settings is explicit; saving does not
+    establish readiness or activate output. The originating assessment repaired
+    storage-fault admission, delayed rejected/cleared-value feedback, native
+    reported-power clearing and authoritative incomplete saved-state readback.
+    Fresh independent reassessment found no unresolved actionable findings.
+    See the [coordinating acceptance record](../docs/development/item15-pico-valid-field-saves-review.md),
+    [immutable originating review](https://github.com/WsprryPi/WsprryPico/blob/165303458e49feaac1de54c8344058f56578d533/docs/development/phase15-9-post-execution-review.md),
+    [historical execution evidence](https://github.com/WsprryPi/WsprryPico/blob/29542e40e131b3e0faa5be5522d220f906de4b0f/docs/development/phase15-9-valid-field-saves.md)
+    and [retained prompt](P15.9%20Valid%20Field%20Saves%20Prompt.md).
+    Fresh validation passed 200 executed host groups (201 registered; one
+    optional schema group skipped), 13 affected ASan/UBSan groups, 43 shared
+    browser assertions, 17 bootstrap Node groups, both firmware builds and
+    genuine production carrier/browser workflows. Progress schema/session
+    checks passed 44/35 assertions. Impeccable used 41 desktop/mobile/zoom
+    captures with representative visual inspection and keyboard checks. Exact
+    commands, failed attempts, warnings, skips and limits are retained in the
+    review. Pages checks are publication-only; no firmware/software-test CI
+    pass is claimed.
+    Historical unchanged Pi pairs against Pico product `56821ac` passed for
+    release `a84010d` and accepted companion `6d5e734`. They are not fresh
+    compatibility evidence for later P15.12 or these repairs. Pi source,
+    components, UI, tests, workflows, compatibility pins and historical rows
+    were not changed; the current Pi Pico pin remains P15.8 `804e8a0`.
+    **Still separate:** Pi/Beta adoption disposition, P15.14 operator
+    documentation and P15.13 physical qualification. This closes the originating
+    assessment; it does not establish Pi release adoption or Beta inclusion.
+    Select and accept the applicable adoption/documentation inputs before any
+    affected item 16b freeze. Any Pi changes or pin advance require separate
+    authorization; preserve historical expectations and retain P15.8 as `p158`
+    if the current pin advances, with nine compatibility rows. Item 16 has not
+    started. No hardware operation occurred.
 16. ☐ **WsprryPi 4.0 Beta 1 release documentation and candidate preparation.**
     **Lead: WsprryPi · RP1 item 22.** The current effort stops after 16c.
-    Release-note research/drafting in 16a may proceed while items 14–15 are
-    prepared; candidate freeze/build and acceptance in 16b–16c require accepted items
-    13–15, including affected UI/documentation revalidation after integration.
+    Release-note research/drafting in 16a may proceed while item 15's remaining
+    Pi/Beta adoption and documentation dispositions are resolved. Its originating
+    assessment is complete. Candidate freeze/build and acceptance in 16b–16c
+    require acceptance of the selected inputs and an explicit Pi/Beta adoption/
+    documentation disposition; item 15's software closure does not establish
+    those separate decisions.
 
     - ☐ **16a — Research and draft Beta 1 release documentation in Markdown.**
       Establish the previous published stable WsprryPi baseline and the intended
@@ -326,8 +351,8 @@ Status key: ✅ Complete · ⏳ In progress · ☐ Not started
 | 11 | 19 | ✅ Complete | Documentation performance and Impeccable housekeeping; hosted build/publication verified | `WsprryPi-Docs` |
 | 12 | 20 | ✅ Complete | Consolidated operator documentation; exact-revision hosted build/publication verified | `WsprryPi-Docs` |
 | 13 | 21 | ✅ Complete; #423 closed | Integrated application Impeccable review accepted for `d93c75c`; final closeout/planning-head CI each passed 11/11; bounded validation and qualification limits retained | `WsprryPi` |
-| 14 | — | ✅ Complete within bounded software scope | Full companion integrated; eight exact compatibility pairs, affected Impeccable/adversarial repairs, promoted-head CI and separately published Docs verified; nonblocking Pico wording follow-up retained | `WsprryPi`; affected operator docs: `WsprryPi-Docs` |
-| 15 | — | ☐ Not started; prompt saved | P15.9 independent valid-field saves, durable draft/applied/readiness semantics and coordinated acceptance; Pi release integration remains separately authorized | `WsprryPi` coordination; `WsprryPico` implementation |
+| 14 | — | ✅ Closed within bounded software scope | Full companion integrated at final `a84010d`; feature/devel CI each passed 12/12; eight exact compatibility pairs, affected Impeccable/adversarial repairs and published Docs accepted; nonblocking Pico wording follow-up retained | `WsprryPi`; affected operator docs: `WsprryPi-Docs` |
+| 15 | — | ✅ Pico software and originating assessment complete | Pico `1653034` closes four findings after fresh independent reassessment; 200 executed host groups, 13 sanitizer groups, both firmware builds and genuine browser checks passed. Pi adoption, P15.14 docs and physical qualification remain separate | `WsprryPi` coordination; `WsprryPico` implementation |
 | 16 | 22 | ☐ Not started | Beta 1 release notes, candidate build and acceptance; stop after 16c; later 16d prerelease publication and 16e issue announcements | `WsprryPi` |
 
 RP1 item numbers above are historical cross-references; the current provider
@@ -409,18 +434,23 @@ Beta preparation or announcement does not itself close that stable release gate.
   [follow-up verification](https://github.com/WsprryPi/WsprryPi/issues/423#issuecomment-6224818188).
   #412 stays open for publication; other ready issues await the later authorized
   publication notifications. Item 14's affected integration addendum is now
-  complete; item 15 and item 16's gates remain unstarted.
+  complete; item 15's Pico implementation and originating assessment are
+  complete within their recorded software scope. Pi/Beta adoption remains
+  separate. Item 16 has not started.
 - ✅ **Pico Type 2/3 companion integration and acceptance:** item 14's complete
   companion integration, eight current/historical pairs, affected Impeccable/
   adversarial repairs and separately published operator documentation are
   accepted within the bounded software scope. See the
   [acceptance addendum](../docs/development/item14-pico-type23-integration.md)
   for exact identities, CI, preserved evidence and the Pico wording follow-up.
-- ☐ **P15.9 independent valid-field saves:** item 15's prompt is saved and has
-  not been executed. WsprryPi coordinates Pico implementation and any separately
-  approved Pi work. Preserve draft/applied/readiness and legacy atomic semantics,
-  validate persistence/interoperability/UI behavior, repair adversarial findings
-  and record the separately authorized release-adoption disposition before 16b.
+- ✅ **P15.9 supported Pico implementation and originating assessment:** item 15
+  closes the original `56821ac`/`29542e4` scope and four originating-review repairs
+  at Pico `1653034`, after fresh independent reassessment and software validation.
+  Pi remains unchanged and unadopted. See the
+  [coordinating acceptance](../docs/development/item15-pico-valid-field-saves-review.md).
+- ☐ **P15.9 Pi/Beta adoption and documentation disposition:** select the
+  applicable software/docs inputs before affected item 16b. The originating
+  assessment is closed; no new hardware operation is authorized or implied.
 - ☐ **Beta 1 release documentation and readiness:** complete 16a–16c's sourced
   Markdown notes, compatibility/migration guidance, exact candidate and acceptance
   evidence. Stop with a reviewable handoff; no release or announcement is authorized.
@@ -458,10 +488,11 @@ production consumption as separate gates:
    item 14's separately authorized integration and compatibility checks, then
    repeat affected UI/documentation review and adversarial acceptance. Preserve
    the accepted RP1 and unchanged UI evidence; record the new candidate identities.
-9. **Deliver P15.9 valid-field saves:** retain item 15's prompt until explicit
-   execution. WsprryPi coordinates implementation owned by WsprryPico, with
-   separately approved Pi feature work and release integration. Validate and
-   accept selected changes, affected UI/docs and compatibility before freeze.
+9. **Deliver P15.9 valid-field saves:** item 15's supported Pico implementation
+   and originating assessment are complete after four repaired findings and
+   fresh independent reassessment. Pi/Beta adoption/documentation dispositions
+   remain separate. Accept selected inputs and repeat affected compatibility/
+   UI/docs checks before freeze; Pi adoption is not yet claimed.
 10. **Prepare WsprryPi Beta 1:** research all relevant ready/closed issues,
     internal documentation and commit history; write sourced Markdown release
     notes and compatibility guidance. After items 13–15 are accepted, build and
