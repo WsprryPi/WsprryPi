@@ -5,10 +5,11 @@ const source = fs.readFileSync(path.join(__dirname, "../data/wtp.js"), "utf8");
 const { defaults, errors, summarize, validNetworkIdentity } = require("../data/wtp.js");
 const settings = { ...defaults, Endpoint: "/dev/serial/by-id/pico-if02", "USB Serial": "000012345678", "Device ID": "4".repeat(32), "USB Vendor ID": 51966, "USB Product ID": 16402 };
 assert.deepEqual(errors(settings, true), {});
+assert.deepEqual(errors({...settings,"Device ID":""},true),{});
 assert.match(summarize(null).text, /unavailable/);
 assert.match(summarize({selected:false}).text, /not selected/);
 assert.deepEqual(errors(defaults, false), {});
-assert.equal(Object.keys(errors(defaults, true)).length, 5);
+assert.equal(Object.keys(errors(defaults, true)).length, 4);
 for (const bad of [-1, 1.2, NaN, 65536, true]) assert(errors({ ...settings, "USB Vendor ID": bad }, true)["USB Vendor ID"]);
 for (const value of ["PiCo.LoCaL.", "pico.local", "localhost", "127.0.0.1", "::1", "2001:0DB8::1", "::ffff:192.0.2.1", "a".repeat(63) + ".local"]) assert(validNetworkIdentity(value), value);
 for (const value of ["", "pico.local..", "pico.local\n", "127.0.0.1\n", "pico.local\u2028", "pico..local", "-pico.local", "pico-.local", "pico_local", "pico.local:443", "*.local", "pico.local/", "127.1", "0127.0.0.1", "0x7f000001", "0x7f000001.", "256.0.0.1", "127.0.0.1.", "[::1]", "::g", "1:::2", "a".repeat(64) + ".local"]) assert(!validNetworkIdentity(value), value);
@@ -26,6 +27,11 @@ const status = { selected: true, ready: true, phase: "idle", session_phase: "rea
 assert.match(summarize(status).output, /Inactive \(9 s ago/);
 assert.equal(summarize({ ...status, remote: null }).output, "Unknown");
 assert.match(summarize({ ...status, recovery_required: true }).text, /unresolved/);
+const bindingMismatch=summarize({...status,usb:{binding_fault:true}});
+assert.match(bindingMismatch.text,/USB device identity changed.*Reconcile/);
+assert.doesNotMatch(bindingMismatch.text,/safety remains unresolved/);
+assert.equal(bindingMismatch.recover,true);
+assert.match(bindingMismatch.output,/Inactive/);
 assert.equal(summarize({ ...status, worker_active: true }).recover, false);
 assert.equal(summarize({ ...status, session_phase: "identity_changed" }).recover, false);
 assert.match(summarize({ ...status, remote: { output_active: true } }).output, /^Active/); // historical completion cannot override current output

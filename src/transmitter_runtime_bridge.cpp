@@ -133,6 +133,10 @@ void transmitter_clear_soft_off() noexcept
 
 void transmitter_poll_events()
 {
+    // USB time has its own serialized channel. Service it before acquiring the
+    // lifecycle mutex so STOP can enter, cancel its I/O, then take operation
+    // authority even when the USB peer is silent.
+    wtp_runtime_poll_usb_time();
     // Pair completion consumption and callback dispatch with the scheduler
     // owner. Otherwise an old WTP report could be delivered after Start has
     // installed a successor's generation-capturing callback.

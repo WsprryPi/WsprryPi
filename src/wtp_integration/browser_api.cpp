@@ -49,15 +49,47 @@ PicoHttpResponse WtpBrowserApi::handle(const BrowserRequest &r) {
           {"remote_support","authenticated_resource_discovery_required"}}},
         {"job_operations", {"ABORT"}}, {"job_submission", "host-application"},
         {"management_scope", "pico-standalone"},
-        {"management_carriers", {{"scope", "wsprrypi-host/1"}, {"built_in", {"engineering_mtls", "consumer_station", "consumer_ap"}},
+        {"management_carriers", {{"scope", "wsprrypi-host/1"}, {"built_in", {"engineering_mtls", "consumer_station", "consumer_ap", "usb_physical"}},
           {"selection", "/api/v1/member/management"}, {"remote_capabilities", "authenticated_read_required"}}}, {"active_job_connections", false},
         {"max_body_bytes", 32768}}.dump(), {}};
   }
   if (r.path == "/api/v1/member/management" && (r.method == "GET" || r.method == "POST")) {
     std::lock_guard lock(management_mutex_);
     if (r.body.size() > 512) return error(413, "body_too_large");
-    if (r.method == "POST") { member_context_.clear(); member_revision_.clear(); legacy_read_required_ = true; alias_reads_required_ = {"config","schedules","network"}; }
+    if (r.method == "POST") { usb_resource_reads_.clear(); member_context_.clear(); member_revision_.clear(); legacy_read_required_ = true; alias_reads_required_ = {"config","schedules","network"}; }
     return management_("member/management", r.method, r.body, {}, {});
+  }
+  for (const std::string resource : {"wifi","hostname","restart","ap","progress","progress/update","progress/apply"}) {
+    if (r.path != "/api/v1/member/" + resource) continue;
+    const bool read = r.method == "GET" && (resource == "wifi" || resource == "hostname" || resource == "progress");
+    const bool write = (r.method == "PUT" && (resource == "wifi" || resource == "hostname")) ||
+        (r.method == "DELETE" && resource == "wifi") ||
+        (r.method == "POST" && (resource == "restart" || resource == "ap" || resource == "progress/update" || resource == "progress/apply"));
+    if (!read && !write) return error(404,"not_found");
+    std::lock_guard lock(management_mutex_);
+    if (r.body.size() > 2048) return error(413,"body_too_large");
+    std::string selection;
+    try {
+      const auto state=management_("member/management","GET",{},{},{});
+      if (state.status!=200) return error(409,"member_read_required");
+      const auto value=strict_browser_json(state.body);
+      if (value.value("carrier","")!="usb_physical") return error(409,"usb_management_required");
+      selection=value.at("selection_id").get<std::string>();
+    } catch (...) { return error(409,"member_read_required"); }
+    const auto key=resource.starts_with("progress/")?"progress":(resource=="restart" || resource=="ap")?"hostname":resource;
+    if (write) {
+      const auto found=usb_resource_reads_.find(key);
+      if (r.revision.empty()) return error(428,"revision_required");
+      if (found==usb_resource_reads_.end() || found->second!=std::pair{selection,r.revision}) return error(409,"member_read_required");
+      try { if (!strict_browser_json(r.body).is_object()) return error(400,"invalid_json"); }
+      catch (...) { return error(400,"invalid_json"); }
+      // A mutation can change the global revision. Every editor must read again.
+      usb_resource_reads_.clear(); member_context_.clear(); member_revision_.clear();
+      legacy_read_required_=true; alias_reads_required_={"config","schedules","network"};
+    }
+    auto result=management_("member/"+resource,r.method,r.body,r.revision,selection);
+    if (read && result.status==200 && !result.etag.empty()) usb_resource_reads_[resource]={selection,result.etag};
+    return result;
   }
   for (const std::string resource : {"application", "station", "hardware", "pins", "pins/validate"}) {
     if (r.path != "/api/v1/member/" + resource) continue;

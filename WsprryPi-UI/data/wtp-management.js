@@ -54,7 +54,7 @@
         byId("wtp-management").hidden = !root.WtpUi?.developmentControlsVisible;
         resourceRender();
         const carrier = byId("wtp-management-carrier");
-        const consumer = carrier && carrier.value !== "engineering_mtls";
+        const consumer = carrier && carrier.value.startsWith("consumer_");
         for (const id of ["wtp-management-host-field", "wtp-management-password-field"]) if (byId(id)) byId(id).hidden = !consumer;
         for (const id of ["wtp-management-carrier", "wtp-management-host", "wtp-management-password", "wtp-management-connect", "wtp-management-disconnect", "wtp-management-state"])
             if (byId(id)) byId(id).disabled = busy || !canSelect || (id === "wtp-management-connect" && consumerConnected);
@@ -76,7 +76,7 @@
     function values(c) {
         c = c || { enabled: false, station: {}, wifi: {}, schedules: [{ period_s: 120, phase_s: 0 }] };
         return { callsign: c.station.callsign || "", locator: c.station.locator || "", power: c.station.power_dbm ?? 20,
-            ssid: c.wifi.ssid || "", ntp: c.wifi.ntp_ipv4 || "", expiry: c.expires_utc_s || 0,
+            ssid: c.wifi.ssid || "", ntp: c.wifi.ntp_ipv4 || "pool.ntp.org", expiry: c.expires_utc_s || 0,
             schedules: c.schedules.map(s => `${s.period_s} ${s.phase_s}`).join("\n"), enabled: c.enabled === true };
     }
     function populate(c, keepDraft) {
@@ -100,7 +100,7 @@
     let resources = null, resourceRevision = "", resourceContext = "", resourceLoaded = false, resourceReconcile = false, validatedPlan = "";
     let resourceObserved = "";
     const member = name => byId(`wtp-member-${name}`);
-    const resourceIdentity = data => `${data.target.device_id} / ${data.target.boot_id} / ${{engineering_mtls:"Engineering HTTPS",consumer_station:"Consumer Wi-Fi",consumer_ap:"Consumer setup Wi-Fi"}[data.carrier]}${data.profile_generation === null ? "" : ` / profile ${data.profile_generation}`}`;
+    const resourceIdentity = data => `${data.target.device_id} / ${data.target.boot_id} / ${{engineering_mtls:"Engineering HTTPS",consumer_station:"Consumer Wi-Fi",consumer_ap:"Consumer setup Wi-Fi",usb_physical:"USB"}[data.carrier]}${data.profile_generation === null ? "" : ` / profile ${data.profile_generation}`}`;
     function frequencyText(value) {
         const nhz = BigInt(value), fraction = String(nhz % 1000000000n).padStart(9,"0").replace(/0+$/,"");
         return `${nhz / 1000000000n}${fraction ? "." + fraction : ""} Hz`;
@@ -137,9 +137,10 @@
         const previewReady = available && resourceRevision && resources;
         const writable = available && resourceRevision && h?.saved && h.storage_healthy && resources.application.station.storage_healthy && !h.application_error;
         root.document.querySelectorAll("[data-wtp-resource]").forEach(input => {
-            input.disabled = busy || (input.dataset.wtpResource === "station" ? !writable || resources.profile_owned_station : !previewReady);
+            input.disabled = busy || (input.dataset.wtpResource === "station" ? (!(writable || (previewReady && resources?.carrier === "usb_physical" && resources.application.station.storage_healthy)) || resources.profile_owned_station) : !previewReady);
         });
         member("station-save").disabled = busy || !writable || resources?.profile_owned_station;
+        root.WtpUsbSettings?.stationEditorReady(!member("callsign").disabled && resources?.carrier === "usb_physical");
         member("validate").disabled = busy || !previewReady;
         member("hardware-save").disabled = busy || !writable || !validatedPlan || validatedPlan !== JSON.stringify(hardwareCandidate());
         for (const name of ["indicator-gp", "polarity"]) member(name).disabled = busy || !previewReady || member("indicator").value !== "external";
@@ -300,18 +301,20 @@
             } else if (resource === "member/management") {
                 consumerConnected = data.connected === true;
                 if (method === "GET") {
-                    if (!["engineering_mtls", "consumer_station", "consumer_ap", "unsupported", "disconnected"].includes(data.carrier) || typeof data.connected !== "boolean" || typeof data.host !== "string")
+                    if (!["engineering_mtls", "consumer_station", "consumer_ap", "usb_physical", "unsupported", "disconnected"].includes(data.carrier) || typeof data.connected !== "boolean" || typeof data.host !== "string")
                         throw failure("Management connection state could not be read. Select a connection explicitly.");
                     selectionId = data.selection_id; nativeSession = data.session || null;
                     explicitDisconnected = ["unsupported", "disconnected"].includes(data.carrier) || (data.carrier.startsWith("consumer_") && !data.connected);
-                    if (consumerConnected && byId("wtp-management-carrier")) {
+                    if ((consumerConnected || data.carrier === "usb_physical") && byId("wtp-management-carrier")) {
                         byId("wtp-management-carrier").value = data.carrier;
                         byId("wtp-management-host").value = data.host;
                     }
                 } else explicitDisconnected = body.action === "disconnect";
-                available = canSelect && (consumerConnected || (!explicitDisconnected && root.WtpUi?.read().Transport === "network"));
+                available = canSelect && (consumerConnected || (!explicitDisconnected && ["network","usb"].includes(root.WtpUi?.read().Transport)));
                 invalidateEditors();
-                feedback.textContent = consumerConnected
+                feedback.textContent = data.carrier === "usb_physical" || body?.action === "usb_physical"
+                    ? "USB management selected. Load saved Pico settings before editing. Wi-Fi and a network password are not required."
+                    : consumerConnected
                     ? "Consumer management authenticated for this Pico and boot. Load saved Pico settings before editing. The login password has been cleared."
                     : explicitDisconnected ? "Management disconnected. Only this client's consumer session was closed. Your settings draft is preserved."
                         : "Engineering HTTPS selected. Load saved Pico settings before editing.";
@@ -320,7 +323,7 @@
                 const discovery = data.mdns_state ? ` Discovery: ${data.mdns_state}. Configured hostname: ${data.configured_hostname || "none"}. Advertised hostname: ${data.advertised_hostname || "none"}. Current address: ${data.ipv4 || "unavailable"}.` : "";
                 const problem = data.mdns_state === "conflict" ? " Resolve the name conflict, then retry the same certified name with an idle disable/re-enable or restart. No automatic rename occurred."
                     : data.mdns_state === "failed" ? ` Discovery failed (${data.mdns_reason || "unconfirmed reason"}); inspect the Pico deployment before retrying.` : "";
-                feedback.textContent = `Pico Wi-Fi: ${data.enabled ? "enabled" : "disabled"}.${discovery}${problem} ${method === "PUT" ? "Network control may now disconnect; use USB Console or restart to reconnect." : "This is a remote observation."}`;
+                feedback.textContent = `Pico Wi-Fi: ${data.enabled ? "enabled" : "disabled"}.${discovery}${problem} ${method === "PUT" ? "Network control may now disconnect its network carrier. USB management stays available." : "This is a remote observation."}`;
                 if (method === "PUT") { networkRevision = ""; configRevision = ""; reconcile = true; }
             } else {
                 if (data.schema !== "wsprrypi-pico-settings/1" || !data.target || !Object.hasOwn(data, "config") || !etag)
@@ -404,8 +407,8 @@
         });
         byId("wtp-management-connect")?.addEventListener("click", () => {
             const carrier = byId("wtp-management-carrier").value;
-            return request("member/management", "POST", carrier === "engineering_mtls"
-                ? { action: "engineering_mtls" }
+            return request("member/management", "POST", ["engineering_mtls","usb_physical"].includes(carrier)
+                ? { action: carrier }
                 : { action: "connect", carrier, host: byId("wtp-management-host").value,
                     password: byId("wtp-management-password").value });
         });

@@ -748,7 +748,12 @@ $bandGpioBands = ['2200m', '630m', '160m', '80m', '60m', '40m', '30m', '20m', '1
                                     </div>
                                 </div>
                                 <div id="backendStatus" class="alert mt-3 mb-0" role="alert" aria-live="assertive" aria-atomic="true" hidden></div>
-                                <p id="wtp-hidden-selection" class="form-text mt-2 mb-0" hidden>Pico is selected. Fleet controls are hidden.</p>
+<div class="form-check mt-3 mb-3">
+    <input class="form-check-input" type="checkbox" id="wtp-show-controls" aria-controls="wtp-development" aria-describedby="wtp-show-controls-hint">
+    <label class="form-check-label" for="wtp-show-controls">Show Pico connections and settings</label>
+    <div class="form-text" id="wtp-show-controls-hint">View USB and Wi-Fi connections without changing the selected transmitter or saving settings.</div>
+</div>
+                                <p id="wtp-hidden-selection" class="form-text mt-2 mb-0" hidden>Pico is selected. Connections and settings are hidden.</p>
 
                                 <div class="transmitter-backend-fields" id="gpio-backend-panel" role="group" aria-labelledby="gpio-output-heading">
 

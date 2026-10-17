@@ -96,8 +96,8 @@ void select_wtp_runtime(const std::optional<WtpSettings> &settings) {
   if (runtime && !runtime->app->replaceable())
     throw std::runtime_error("Resolve Pico ownership and output before "
                              "changing the backend or endpoint");
-  auto lease = runtime && settings && runtime->settings.device_id == settings->device_id
-      ? runtime->output_lease : std::shared_ptr<void>{};
+  auto lease = runtime && settings && !settings->device_id.empty() && runtime->settings.device_id == settings->device_id
+      ? runtime->output_lease_snapshot() : std::shared_ptr<void>{};
   const bool management_requires_selection = runtime && !runtime->management_carrier.empty() &&
       runtime->management_carrier != "engineering_mtls";
   runtime = settings ? std::make_shared<NativeRuntime>(*settings, std::function<bool()>{}, std::move(lease)) : nullptr;
@@ -158,7 +158,9 @@ wsprrypi::TransmissionMode wtp_runtime_mode() noexcept {
 }
 void wtp_runtime_prepare(wsprrypi::TransmissionRequest r) {
   std::lock_guard operation(operation_mutex);
-  require()->app->prepare(std::move(r));
+  auto target = require();
+  target->refresh_usb_time(true);
+  target->app->prepare(std::move(r));
 }
 std::chrono::nanoseconds wtp_runtime_preparation_lead() {
   return std::chrono::nanoseconds(require()->app->preparation_lead_ns());
@@ -169,14 +171,25 @@ void wtp_runtime_start() {
 }
 wsprrypi::CleanupResult wtp_runtime_stop() {
   auto r = get();
+  if (r) r->usb_cancelled = true; // Interrupt bounded USB I/O before waiting for operation authority.
   if (r && r->tls.opening()) r->tls.cancel();
   std::lock_guard operation(operation_mutex);
   r = get();
-  return r ? r->app->stop() : wsprrypi::CleanupResult{true, {}};
+  auto result = r ? r->app->stop() : wsprrypi::CleanupResult{true, {}};
+  if (r) r->usb_cancelled = false;
+  return result;
 }
 wsprrypi::StartupQuiesceResult wtp_runtime_inspect() {
   std::lock_guard operation(operation_mutex);
-  return require()->app->inspect();
+  auto target = require();
+  target->refresh_usb_time(true);
+  return target->app->inspect();
+}
+void wtp_runtime_poll_usb_time() {
+  std::unique_lock operation(operation_mutex,std::try_to_lock);
+  if (!operation) return;
+  auto r=get();
+  if (r && r->settings.transport=="usb") r->refresh_usb_time();
 }
 void wtp_runtime_poll_idle() {
   std::unique_lock operation(operation_mutex, std::try_to_lock);
@@ -193,8 +206,13 @@ void wtp_runtime_poll_idle() {
 wsprrypi::CleanupResult wtp_runtime_recover() {
   std::lock_guard operation(operation_mutex);
   auto r = get();
-  return r ? r->app->recover()
-           : wsprrypi::CleanupResult{false, "Pico is not selected"};
+  if (!r) return {false, "Pico is not selected"};
+  auto result=r->app->recover();
+  if (result.ok) {
+    (void)r->reconcile_usb_binding();
+    if (r->has_usb_binding_fault()) return {false,"USB device identity changed. Reconcile matching USB control channels before another job."};
+  }
+  return result;
 }
 std::string wtp_runtime_json() {
   auto r = get();
@@ -215,9 +233,18 @@ std::string wtp_runtime_json() {
         {"security", r->settings.transport == "network" ? "tls" : "plain_lan"},
         {"state", n.state}, {"diagnostic", n.diagnostic}, {"observed_ms", std::to_string(n.observed_ms)}};
   }
+  if (r->settings.transport == "usb") {
+    j["usb"] = r->usb_status();
+    const auto &name = j["usb"]["hostname"];
+    if (name.is_object()) { j["common_name"] = name.value("saved",""); j["name_pending_restart"] = name.value("pending_restart",false);
+      j["common_name_confirmed"] = j["usb"].value("name_confirmed",false) &&
+          j["usb"]["management"].is_object() && j["usb"]["management"].value("connected",false); }
+  }
   j["worker_active"] = r->app->active();
   j["host_skip_waiting"] = r->app->skipping();
-  j["ready"] = r->app->ready();
+  const bool binding_fault=r->has_usb_binding_fault();
+  j["ready"] = r->app->ready() && !binding_fault;
+  if (binding_fault) j["diagnostic"]="USB device identity changed. Reconcile the Pico before another job.";
   j["management_available"] = r->app->replaceable(); // Local admission only; remote authentication is still required.
   j["host_utc_valid"] = wsprrypi::wtp_host_utc_valid();
   return j.dump();
@@ -228,7 +255,14 @@ std::optional<wsprrypi::WtpScheduleReport> wtp_runtime_completion() {
 }
 
 wsprrypi::CleanupResult wtp_runtime_cancel_job(const std::string &job_id) {
+  auto candidate = get();
+  if (candidate) {
+    const auto current=candidate->app->status();
+    if (current.job_id == job_id && (current.owns || current.phase == wsprrypi::WtpSchedulePhase::Waiting))
+      candidate->usb_cancelled = true;
+  }
   std::lock_guard operation(operation_mutex);
+  struct CancelReset { std::shared_ptr<NativeRuntime> owner; ~CancelReset() { if(owner) owner->usb_cancelled=false; } } reset{candidate};
   auto r = get();
   if (!r) return {false, "Pico is not selected"};
   const auto status = r->app->status();
@@ -253,9 +287,11 @@ wsprrypi::PicoHttpResponse wtp_runtime_management(const std::string &resource,
     };
     if (resource == "member/management") {
       if (method == "GET") {
-        const bool connected = r->consumer_management && r->consumer_management->active();
+        std::lock_guard connection(r->usb_connection_mutex);
+        const bool connected = (r->consumer_management && r->consumer_management->active()) ||
+            (r->management_carrier == "usb_physical" && r->usb_management && r->usb_management->connected());
         return {200, nlohmann::json{{"carrier", r->management_carrier.empty()
-            ? (r->settings.transport == "network" ? "engineering_mtls" : "unsupported") : r->management_carrier},
+            ? (r->settings.transport == "network" ? "engineering_mtls" : r->settings.transport == "usb" ? "usb_physical" : "unsupported") : r->management_carrier},
             {"connected", connected}, {"host", r->management_host}, {"selection_id",r->management_selection_id},
             {"session",r->consumer_management ? r->consumer_management->lost_session() : nlohmann::json(nullptr)}}.dump(), {}};
       }
@@ -267,6 +303,17 @@ wsprrypi::PicoHttpResponse wtp_runtime_management(const std::string &resource,
       if (!input.is_object() || !input.contains("action") || !input["action"].is_string())
         return failure(400, "invalid_management_selection");
       const auto action = input["action"].get<std::string>();
+      if (action == "usb_physical") {
+        if (input.size() != 1 || r->settings.transport != "usb") return failure(409,"usb_transport_required");
+        if (!r->app->idle_management([&] {
+          if (!r->ensure_usb_management()) { response=failure(409,"usb_management_unavailable"); return; }
+          if (r->consumer_management) r->consumer_management->logout();
+          r->consumer_management.reset(); r->management_host.clear();
+          r->management_carrier="usb_physical"; r->management_selection_id=wsprrypi::wtp_random_identity();
+          response={200,R"({"ok":true})",{}};
+        },true)) return failure(409,"host_busy_or_output_unresolved");
+        return response;
+      }
       if (action == "inspect_logins" || action == "retire_login") {
         const bool retiring = action == "retire_login";
         if (input.size() != (retiring ? 6U : 3U) || !input.contains("carrier") || !input["carrier"].is_string() ||
@@ -350,10 +397,34 @@ wsprrypi::PicoHttpResponse wtp_runtime_management(const std::string &resource,
       if (!r->app->idle_management([&] {
         if (r->consumer_management) r->consumer_management->logout();
         r->consumer_management.reset(); r->management_host.clear();
+        std::lock_guard connection(r->usb_connection_mutex);
+        if (r->usb_management) r->usb_management->close();
+        r->usb_unavailable();
         r->management_selection_id = wsprrypi::wtp_random_identity();
         r->management_carrier = action == "engineering_mtls" ? "engineering_mtls" : "disconnected";
       }, true)) return failure(409, "host_busy_or_output_unresolved");
       return {200, R"({"ok":true})", {}};
+    }
+    if (r->management_carrier == "usb_physical") {
+      if (!r->app->idle_management([&] {
+        std::lock_guard connection(r->usb_connection_mutex);
+        if (!r->ensure_usb_management()) { response=failure(409,"usb_management_unavailable"); return; }
+        const auto exchange = [&](const std::string &path,const std::string &verb,const std::string &payload,const std::string &etag) {
+          return r->usb_management->request(path.starts_with("/") ? path : "/api/v1/" + path,verb,payload,etag);
+        };
+        if (resource == "member/configuration") response = wsprrypi::pico_configuration_request(exchange,
+          r->usb_management->device(),r->usb_management->boot(),method,body,revision,"usb_physical");
+        else if (resource == "member/application" || resource == "member/station" || resource == "member/hardware" ||
+            resource == "member/pins" || resource == "member/pins/validate") response = wsprrypi::pico_resource_request(exchange,
+          r->usb_management->device(),r->usb_management->boot(),resource.substr(7),method,body,revision,"usb_physical");
+        else if (resource.starts_with("member/progress")) response = exchange("/api/v1/"+resource.substr(7),method,body,revision);
+        else if (resource == "member/wifi") response = exchange("/api/usb/v1/wifi",method,body,revision);
+        else if (resource == "member/hostname") { response = exchange("/api/v1/hostname",method,body,revision); r->observe_usb_name(response); }
+        else if (resource == "member/ap") response = exchange("/api/usb/v1/ap",method,body,revision);
+        else if (resource == "member/restart") response = exchange("/api/v1/restart",method,body,revision);
+        else response = exchange(resource,method,body,revision);
+      },true)) return failure(409,"host_busy_or_output_unresolved");
+      return response;
     }
     const bool consumer = r->management_carrier == "consumer_station" || r->management_carrier == "consumer_ap";
     if (consumer) {
@@ -398,6 +469,6 @@ wsprrypi::PicoHttpResponse wtp_runtime_management(const std::string &resource,
       } else response = exchange(resource, method, body, revision);
     }, false, !(method == "PUT" && (resource == "member/station" || resource == "member/hardware"))))
       return {409, R"({"error":{"code":"host_busy_or_output_unresolved"}})", {}};
-  } catch (...) { return {503, R"({"error":{"code":"network_unavailable"}})", {}}; }
+  } catch (...) { return {503, R"({"error":{"code":"management_unavailable"}})", {}}; }
   return response;
 }

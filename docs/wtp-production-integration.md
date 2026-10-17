@@ -5,34 +5,25 @@ and `--backend wtp`. The parent application owns the complete-job scheduler,
 worker, Linux USB CDC, Plain LAN or authenticated TLS network adapter and explicit recovery lifecycle.
 See [network configuration and credentials](wtp-network.md) and
 [shared browser API](wtp-browser-api.md) for Phase 11.1. The web interface
-can reveal Pico settings through a browser-console boolean. This is
+exposes Pico connections/settings through an ordinary checkbox in the Transmitter
+pane. This is
 implemented software integration; physical USB, target lifecycle, timing and RF
 qualification remain separate acceptance work.
 
 ## Selection and configuration
 
-On Signal Setup, open the browser's developer console and assign:
-
-```js
-window.WtpUi.developmentControlsVisible = true;  // Show Pico controls.
-window.WtpUi.developmentControlsVisible = false; // Hide Pico controls.
-```
-
-The boolean updates the Transmitter tab immediately; there is no visible
-visibility switch. Read `window.WtpUi.developmentControlsVisible` to check it.
-Only boolean values are accepted (not strings such as `"false"`). It defaults to
-false on every page load and lasts only for that page. Reloading hides the
-entire Pico panel, including **Use Pico**, until the console boolean
-is explicitly set to true again. Previously saved browser visibility preferences
-are ignored; this boolean does not read or write browser storage.
+On Signal Setup, select **Show Pico connections and settings**. This exposes
+the ordinary connection/status/management workflow without browser-console
+commands. It does not save configuration, select a backend or enable output.
+The existing typed `WtpUi.developmentControlsVisible` development property
+remains available for advanced fleet scheduling; it resets on reload.
 
 **Use Pico** is the separate, persisted backend selection. Hiding the
 controls preserves saved selection and field drafts; a passive notice identifies
 Pico when it remains selected. Visibility changes do not save configuration,
 enable transmission, select another output, reconcile the device or clear
 recovery faults. Status polling continues while Pico is selected, even when its
-controls are hidden. This console preference is a development convenience, not
-an access-control boundary.
+controls are hidden. The visibility preference is local to the page and is not an access-control boundary.
 
 An explicit USB endpoint requires all of the following:
 
@@ -42,7 +33,7 @@ An explicit USB endpoint requires all of the following:
 | `Endpoint` | Selected WTP character-device path under `/dev/`; stable by-id aliases are accepted after identity checks. |
 | `USB Serial` | Exact serial string, including any leading zeros. |
 | `USB Vendor ID` / `USB Product ID` | Decimal integers from 1 through 65535 for the selected device. |
-| `Device ID` | Expected WTP identity: 32 lowercase hexadecimal characters. |
+| `Device ID` | Expected WTP identity: 32 lowercase hexadecimal characters; USB may learn and pin it for the selected runtime when blank. |
 | `Start Uncertainty ns` | Maximum start uncertainty, 1–1000000000 nanoseconds; default 1000000. |
 | `Allow Frequency Adjustment` | Default false; explicitly permits the existing CAPS-bound frequency rounding policy. It grants no RF qualification. |
 
@@ -72,9 +63,9 @@ session prevents replacing the backend or endpoint.
 Host UTC must be independently synchronized. Linux readiness uses read-only
 `adjtimex` status: no unsynchronized/clock-error flag, no `TIME_ERROR`, and a
 maximum error no greater than 500 ms. This is host scheduling evidence only.
-The Pico must separately have valid UTC, acceptable uncertainty, holdover and
-leap state. GET_CLOCK observes that state and does not provision it. Neither
-clock check calibrates RF frequency.
+The Pico must have valid UTC, acceptable uncertainty, holdover and leap state.
+USB supplies qualified host observations through the [management/time adapter](wtp-usb-management.md);
+network WTP GET_CLOCK only observes time. Neither clock check calibrates RF frequency.
 
 The parent prepares complete finite WSPR, QRSS, FSKCW and DFCW jobs using the
 existing canonical encoders. One intended WSPR frame is loaded per slot. An

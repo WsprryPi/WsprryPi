@@ -1,5 +1,9 @@
 # WTP USB CDC host adapter
 
+Current normal-firmware USB management, hostname/Wi-Fi lifecycle and UTC
+support are documented in [USB management](wtp-usb-management.md). Historical
+phase-specific limitations below retain their original evidence scope.
+
 Phase 10 Slice 4 adds the parent application's
 [`UsbCdcStream`](../src/wtp_integration/usb_cdc.hpp). It implements the portable
 WTP-Client `ByteStream` interface using POSIX serial I/O. The subsequent

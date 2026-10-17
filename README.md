@@ -50,7 +50,10 @@ off their exact UTC starts before the RF boundary. Its [status and recovery
 boundary](docs/wtp-status-recovery.md) publishes coherent observations and retains
 explicit recovery results. [Production integration](docs/wtp-production-integration.md)
 adds persisted endpoint selection, an owned runtime worker and explicit status/
-recovery controls behind a default-off UI development toggle. Physical USB,
+recovery controls through the visible Pico connections/settings toggle.
+Supported normal Pico firmware also provides [USB configuration and qualified
+UTC synchronization](docs/wtp-usb-management.md), including common-name and
+Wi-Fi create/replace/remove while Pico Wi-Fi is unavailable. Physical USB,
 target operation and RF qualification are accepted only within the bounded
 Phase 10/11 records; broad mode/band/clock, timing, spectral, reliability and
 release qualification remain outstanding in Phase 13.

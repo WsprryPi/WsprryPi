@@ -1,5 +1,9 @@
 # Pico configuration compatibility
 
+Current normal-firmware USB management, hostname/Wi-Fi lifecycle and UTC
+support are documented in [USB management](wtp-usb-management.md). Historical
+phase-specific limitations below retain their original evidence scope.
+
 The Pi settings form uses one host-coordinated, serialized settings transaction.
 The existing WTP application remains the only scheduling/ownership authority;
 Pico remains the only remote configuration validator and journal authority.
@@ -92,7 +96,7 @@ PUT station/hardware and POST pins/validate for P15.4. Authenticated canonical
 Host/Origin and JSON intent apply; scoped writes retain the common If-Match,
 while the bare nonpersistent remote preview does not require it. These controls
 use existing authenticated application-resource discovery, independently of the
-closed P15.3 management operation list. USB and Plain LAN WTP are not management
+closed P15.3 management operation list. In that frozen phase, USB and Plain LAN WTP were not management
 carriers; no carrier is substituted automatically.
 Existing direct `/config`, `/schedules` and `/network` resource compatibility
 remains available; the settings form uses the coordinated resource above.

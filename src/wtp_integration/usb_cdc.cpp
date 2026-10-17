@@ -118,6 +118,33 @@ CdcIdentity inspect_linux_cdc(const std::string &path,
       "Selected endpoint has no USB control-interface metadata");
 }
 
+PicoCdcSelection paired_linux_cdc(const PicoCdcSelection &selected,
+    PicoCdcRole role, const std::filesystem::path &root,
+    const std::filesystem::path &dev_root) {
+  const auto source = inspect_linux_cdc(selected.path, root);
+  if (source.control_interface != static_cast<unsigned>(selected.role) ||
+      source.usb_serial != selected.usb_serial || source.vendor_id != selected.vendor_id ||
+      source.product_id != selected.product_id)
+    throw std::runtime_error("Selected USB identity changed before role pairing");
+  const auto parent = std::filesystem::path(source.interface_path).parent_path();
+  std::optional<PicoCdcSelection> result;
+  for (const auto &entry : std::filesystem::directory_iterator(root / "class/tty")) {
+    try {
+      auto candidate = inspect_linux_cdc((dev_root / entry.path().filename()).string(), root);
+      if (std::filesystem::path(candidate.interface_path).parent_path() != parent ||
+          candidate.control_interface != static_cast<unsigned>(role) ||
+          candidate.usb_serial != source.usb_serial || candidate.vendor_id != source.vendor_id ||
+          candidate.product_id != source.product_id) continue;
+      if (result) throw std::logic_error("Ambiguous USB management interface");
+      result = PicoCdcSelection{candidate.path,candidate.usb_serial,
+          candidate.vendor_id,candidate.product_id,role};
+    } catch (const std::logic_error &) { throw; }
+      catch (const std::exception &) { /* Other tty devices are not candidates. */ }
+  }
+  if (!result) throw std::runtime_error("Selected firmware has no paired USB management interface");
+  return *result;
+}
+
 CdcIdentity PosixCdcSystem::inspect(const std::string &path) {
 #ifdef __linux__
   return inspect_linux_cdc(path);
@@ -210,16 +237,16 @@ bool UsbCdcStream::begin_open(const PicoCdcSelection &selection,
     if (!valid_text(selection.path, 4096) ||
         !std::filesystem::path(selection.path).is_absolute() ||
         !valid_text(selection.usb_serial, 256) || !selection.vendor_id ||
-        !selection.product_id)
+        !selection.product_id || (selection.role != PicoCdcRole::Wtp && selection.role != PicoCdcRole::Management))
       throw std::runtime_error(
           "Explicit endpoint, USB serial and VID/PID are required");
     const auto identity = system_.inspect(selection.path);
     if (identity.usb_serial != selection.usb_serial ||
         identity.vendor_id != selection.vendor_id ||
         identity.product_id != selection.product_id ||
-        identity.control_interface != 2)
+        identity.control_interface != static_cast<unsigned>(selection.role))
       throw std::runtime_error(
-          "Selected port does not match the expected Pico WTP interface");
+          "Selected port does not match the expected Pico USB role");
     fd_ = system_.open(identity.path,
                        O_RDWR | O_NOCTTY | O_NONBLOCK | O_CLOEXEC | O_NOFOLLOW);
     if (fd_ < 0)

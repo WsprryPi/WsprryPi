@@ -496,6 +496,40 @@ struct Tree {
     std::filesystem::remove_all(root, ec);
   }
 };
+void pairing() {
+  Pty wtp_port, management_port, other_port;
+  Tree tree(wtp_port.slave);
+  const auto devices=tree.root/"device-nodes";
+  std::filesystem::create_directories(tree.root/"class/tty");
+  std::filesystem::create_directories(devices);
+  const auto add=[&](Pty &port,const std::filesystem::path &usb,const std::string &name) {
+    const auto interface=usb/"interface4";
+    std::filesystem::create_directories(interface/"tty"/name);
+    Tree::write(usb/"serial","PICO123\n");Tree::write(usb/"idVendor","cafe\n");Tree::write(usb/"idProduct","4012\n");
+    Tree::write(interface/"bInterfaceNumber","04\n");Tree::write(interface/"bInterfaceClass","02\n");
+    Tree::write(interface/"bInterfaceSubClass","02\n");Tree::write(interface/"bInterfaceProtocol","00\n");
+    std::filesystem::create_symlink(tree.root/"drivers/cdc_acm",interface/"driver");
+    struct stat info{};CHECK(::stat(port.slave.c_str(),&info)==0);
+    std::filesystem::create_symlink(interface/"tty"/name,tree.root/"dev/char"/(std::to_string(major(info.st_rdev))+":"+std::to_string(minor(info.st_rdev))));
+    std::filesystem::create_directory(tree.root/"class/tty"/name);
+    std::filesystem::create_symlink(port.slave,devices/name);
+  };
+  add(management_port,tree.usb,"arbitrary-role-name");
+  add(other_port,tree.root/"devices/usb/other-board","not-this-board");
+  auto selected=selection();selected.path=wtp_port.slave;
+  const auto paired=paired_linux_cdc(selected,PicoCdcRole::Management,tree.root,devices);
+  CHECK(paired.path==management_port.slave && paired.role==PicoCdcRole::Management);
+  // Duplicate serials on other physical parents do not select another board.
+  CHECK(paired.path!=other_port.slave);
+  std::filesystem::create_directory(tree.root/"class/tty"/"duplicate-role-alias");
+  std::filesystem::create_symlink(management_port.slave,devices/"duplicate-role-alias");
+  bool refused=false;try {(void)paired_linux_cdc(selected,PicoCdcRole::Management,tree.root,devices);}catch(...){refused=true;}
+  CHECK(refused);
+  Fake system;system.device.control_interface=4;UsbCdcStream stream(system);
+  auto role=selection();role.role=PicoCdcRole::Management;
+  CHECK(stream.begin_open(role,0));stream.close();
+  CHECK(!stream.begin_open(selection(),0));
+}
 void metadata() {
   Pty p;
   Tree t(p.slave);
@@ -721,6 +755,7 @@ void session_integration() {
 int main() {
   try {
     setup_and_identity();
+    pairing();
     io_contract();
     metadata();
     pseudo_terminal();

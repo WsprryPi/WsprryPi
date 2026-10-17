@@ -743,7 +743,7 @@ function bindIndexActions() {
         "input change",
         '.form-control:not([type="range"], .form-check-input)',
         function () {
-            if (this.closest("#wtp-management")) return;
+            if (this.closest("#wtp-management") || this.id === "wtp-show-controls") return;
             validatePage();
             scheduleAutosave();
         }
@@ -753,7 +753,7 @@ function bindIndexActions() {
         "change input",
         'input:not(#transmit, [name="mode_toggle"], [name="qrss_type"]), select:not(#tx_pin), textarea',
         function () {
-            if (!this.closest("#wtp-management")) scheduleAutosave();
+            if (!this.closest("#wtp-management") && this.id !== "wtp-show-controls") scheduleAutosave();
         }
     );
 

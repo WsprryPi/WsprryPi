@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 #include "wtp_integration/configuration.hpp"
 #include "wtp_integration/browser_api.hpp"
+#include "wtp_integration/consumer_radio.hpp"
 #include <iostream>
 using namespace wsprrypi;
 using Json = nlohmann::json;
@@ -195,6 +196,26 @@ struct HttpInput : wtp::ByteStream {
   }
   void close() noexcept override {}
 };
+void usb_management_contract() {
+  Json contract{{"schema","transmitter-management/3"},{"target",target},{"profile","blank"},{"preclock",true},
+    {"profile_generation",nullptr},{"selected","usb_physical"},{"carriers",Json::array()},
+    {"unsupported",{"plain_wtp_json","tls_wtp_json","ble_json"}},
+    {"operations",{{"GET",{"capabilities","status","config","schedules","network","application","management"}},
+      {"PUT",{"config","schedules","network"}},{"POST",{"config/update"}}}},
+    {"limits",{{"http_body",32768},{"consumer_plaintext",32724},{"config",1800},{"update",2048},
+      {"login_ms",30000},{"idle_ms",300000},{"absolute_ms",900000},{"consumer_sessions",3},{"consumer_pending_logins",1}}}};
+  for(const auto carrier:{"engineering_mtls","engineering_field","consumer_station","consumer_ap","usb_physical"})
+    contract["carriers"].push_back({{"carrier",carrier},{"built_in",true},{"available",std::string(carrier)=="usb_physical"}});
+  const auto valid=[&](const Json &j){return valid_management_contract(j,"usb_physical",device,boot,"");};
+  CHECK(valid(contract));
+  auto changed=contract;changed["schema"]="transmitter-management/2";CHECK(!valid(changed));
+  changed=contract;changed["carriers"][4]["available"]=false;CHECK(!valid(changed));
+  changed=contract;changed["target"]["boot_id"]=std::string(32,'f');CHECK(!valid(changed));
+  changed=contract;changed["limits"]["update"]=4096;CHECK(!valid(changed));
+  changed=contract;changed["operations"]["DELETE"]={"wifi"};CHECK(!valid(changed));
+  changed=contract;changed["future"]=true;CHECK(!valid(changed));
+  CHECK(!valid_management_contract(contract,"engineering_mtls",device,boot,""));
+}
 void http_boundaries() {
   for (const auto raw : {"HTTP/1.1 \r\n\r\n", "HTTP/1.1 20x OK\r\n\r\n", "HTTP/1.1 200X\r\n\r\n",
        "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: 2\r\ncontent-length: 2\r\n\r\n{}",
@@ -207,4 +228,4 @@ void http_boundaries() {
   CHECK(wtp_json_http_exchange(valid,[&]{return ++tick;},"",100,true).status==200);
 }
 } // namespace
-int main() { try { checks(); http_boundaries(); } catch (const std::exception &e) { std::cerr << e.what() << '\n'; return 1; } }
+int main() { try { checks(); usb_management_contract(); http_boundaries(); } catch (const std::exception &e) { std::cerr << e.what() << '\n'; return 1; } }

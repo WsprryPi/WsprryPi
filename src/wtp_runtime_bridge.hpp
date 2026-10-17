@@ -24,6 +24,7 @@ void wtp_runtime_start();
 wsprrypi::CleanupResult wtp_runtime_stop();
 wsprrypi::StartupQuiesceResult wtp_runtime_inspect();
 void wtp_runtime_poll_idle();
+void wtp_runtime_poll_usb_time();
 wsprrypi::CleanupResult wtp_runtime_recover();
 std::string wtp_runtime_json();
 wsprrypi::PicoHttpResponse wtp_runtime_management(const std::string &resource,

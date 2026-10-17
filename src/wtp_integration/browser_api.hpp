@@ -30,6 +30,7 @@ private:
   std::set<std::string> alias_reads_required_;
   std::string legacy_selection_;
   std::map<std::string,std::string> alias_selections_;
+  std::map<std::string,std::pair<std::string,std::string>> usb_resource_reads_;
   bool legacy_read_required_{};
   std::mutex mutex_;
   struct Replay { std::string body; PicoHttpResponse response; };

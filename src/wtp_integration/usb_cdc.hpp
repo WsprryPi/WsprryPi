@@ -8,10 +8,12 @@
 #include <string>
 
 namespace wsprrypi {
+enum class PicoCdcRole : unsigned { Wtp = 2, Management = 4 };
 struct PicoCdcSelection {
   std::string path, usb_serial;
   std::uint16_t vendor_id{},
       product_id{}; // Explicit; cafe:4012 is development identity only.
+  PicoCdcRole role{PicoCdcRole::Wtp};
 };
 struct CdcIdentity {
   std::string path, interface_path, usb_serial;
@@ -53,6 +55,12 @@ public:
 // missing/invalid metadata.
 CdcIdentity inspect_linux_cdc(const std::string &path,
                               const std::filesystem::path &sysfs_root = "/sys");
+
+// Resolve a sibling role only under the exact selected physical USB parent.
+// Missing or ambiguous siblings fail closed; tty numbering never selects a role.
+PicoCdcSelection paired_linux_cdc(const PicoCdcSelection &, PicoCdcRole,
+    const std::filesystem::path &sysfs_root = "/sys",
+    const std::filesystem::path &dev_root = "/dev");
 
 class PosixCdcSystem : public CdcSystem {
 public:

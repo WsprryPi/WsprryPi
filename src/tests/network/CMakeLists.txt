@@ -99,6 +99,13 @@ if(NOT PICO_COMPAT_PROFILE STREQUAL "legacy")
     list(APPEND core application/config_update.cpp)
   endif()
 endif()
+# Additive application sources are selected from the exact pinned checkout;
+# historical profiles without these files retain their original source closure.
+foreach(optional_source IN ITEMS standalone/progress.cpp provisioning/hostname.cpp provisioning/local_settings.cpp)
+  if(EXISTS "${PICO_SOURCE}/src/${optional_source}")
+    list(APPEND core "${optional_source}")
+  endif()
+endforeach()
 list(TRANSFORM core PREPEND "${PICO_SOURCE}/src/")
 add_executable(pico_tls_server pico_tls_server.cpp ${core}
   "${CMAKE_BINARY_DIR}/generated/web_assets.cpp" tcp.cpp
@@ -134,7 +141,7 @@ if(PICO_COMPAT_PROFILE STREQUAL "current" OR PICO_COMPAT_PROFILE STREQUAL "p157"
     ../../wtp_integration/consumer_radio.cpp ../../wtp_integration/configuration.cpp
     ../../wtp_integration/browser_api.cpp ../../wtp_integration/network_http.cpp
     ../../wtp_integration/plain_tcp.cpp ../../wtp_integration/tls.cpp
-    ../../wtp_runtime_bridge.cpp ../../wtp_integration/output_lease.cpp ../../wtp_integration/usb_cdc.cpp ../../privileged_network_policy.cpp ../../backend_http_guard.cpp ../../support_request_guard.cpp ../../httplib.cpp
+    ../../wtp_runtime_bridge.cpp ../../wtp_integration/output_lease.cpp ../../wtp_integration/usb_cdc.cpp ../../wtp_integration/usb_management.cpp ../../privileged_network_policy.cpp ../../backend_http_guard.cpp ../../support_request_guard.cpp ../../httplib.cpp
     ../../wtp_integration/application.cpp ../../wtp_integration/status.cpp
     ../../wtp_integration/scheduler.cpp ../../wtp_integration/backend.cpp
     ../../wtp_integration/execution_plan.cpp ../../WSPR-Transmitter/src/execution_plan_compiler.cpp

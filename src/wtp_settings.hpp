@@ -40,7 +40,7 @@ inline void validate_wtp_settings(const WtpSettings &s, bool selected) {
     throw std::runtime_error("Invalid WTP transport or network settings.");
   if (!selected)
     return;
-  if (!(s.transport == "network_plain" && s.device_id.empty()) &&
+  if (!((s.transport == "network_plain" || s.transport == "usb") && s.device_id.empty()) &&
       (s.device_id.size() != 32 ||
        !std::all_of(s.device_id.begin(), s.device_id.end(), [](char c) {
         return (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f');
@@ -56,11 +56,11 @@ inline void validate_wtp_settings(const WtpSettings &s, bool selected) {
   }
   if (!s.path.starts_with("/dev/") ||
       s.path.find("/../") != std::string::npos || s.usb_serial.empty() ||
-      !s.vendor_id || !s.product_id || s.device_id.size() != 32 ||
+      !s.vendor_id || !s.product_id || (!s.device_id.empty() && (s.device_id.size() != 32 ||
       !std::all_of(s.device_id.begin(), s.device_id.end(), [](char c) {
         return (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f');
-      }))
+      }))))
     throw std::runtime_error(
         "Pico requires an explicit /dev/ WTP endpoint, USB serial, nonzero "
-        "VID/PID and 32 lowercase hex device ID.");
+        "VID/PID and an optional 32 lowercase hex device ID.");
 }

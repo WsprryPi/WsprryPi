@@ -22,7 +22,7 @@ $viewMetadata = [
         'bodyClass' => '',
         'htmlTheme' => 'light',
         'css' => ['index.css'],
-        'js' => ['cw_timing_state.js', 'local-wtp.js', 'wtp.js', 'wtp-management.js', 'fleet-schedules.js', 'index.js'],
+        'js' => ['cw_timing_state.js', 'local-wtp.js', 'wtp.js', 'wtp-management.js', 'wtp-usb-settings.js', 'fleet-schedules.js', 'index.js'],
         'partial' => __DIR__ . '/views/config.php',
     ],
     'logs' => [

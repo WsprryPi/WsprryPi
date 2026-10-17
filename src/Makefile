@@ -2023,7 +2023,7 @@ wtp-config-client-build:
 	$(Q)pkg-config --atleast-version=3.0 openssl
 	$(Q)mkdir -p "$(WTP_NETWORK_BUILD_DIR)"
 	$(Q)$(MAKE) --no-print-directory -C WTP-Client all BUILD_DIR="$(abspath $(WTP_NETWORK_BUILD_DIR)/client)" CXXFLAGS="$(WTP_NETWORK_CXXFLAGS)"
-	$(Q)$(CXX) $(WTP_NETWORK_FLAGS) -IWSPR-Transmitter/src tests/wtp_configuration_client.cpp wtp_integration/tls.cpp wtp_integration/network_http.cpp wtp_runtime_bridge.cpp wtp_integration/output_lease.cpp wtp_integration/usb_cdc.cpp privileged_network_policy.cpp backend_http_guard.cpp support_request_guard.cpp httplib.cpp \
+	$(Q)$(CXX) $(WTP_NETWORK_FLAGS) -IWSPR-Transmitter/src tests/wtp_configuration_client.cpp wtp_integration/tls.cpp wtp_integration/network_http.cpp wtp_runtime_bridge.cpp wtp_integration/output_lease.cpp wtp_integration/usb_cdc.cpp wtp_integration/usb_management.cpp privileged_network_policy.cpp backend_http_guard.cpp support_request_guard.cpp httplib.cpp \
 		wtp_integration/configuration.cpp wtp_integration/consumer_radio.cpp wtp_integration/plain_tcp.cpp wtp_integration/browser_api.cpp wtp_integration/application.cpp wtp_integration/status.cpp \
 		wtp_integration/scheduler.cpp wtp_integration/backend.cpp wtp_integration/execution_plan.cpp \
 		WSPR-Transmitter/src/execution_plan_compiler.cpp WSPR-Transmitter/src/transmission_controller.cpp \
@@ -2096,3 +2096,20 @@ $(BIN_DIR)/test_tone_lifecycle_test: tests/test_tone_lifecycle_test.cpp $(SEMANT
 
 test-tone-lifecycle-test: $(BIN_DIR)/test_tone_lifecycle_test
 	$(Q)python3 -c 'import subprocess; subprocess.run(["./$(BIN_DIR)/test_tone_lifecycle_test"], check=True, timeout=30)'
+
+.PHONY: wtp-usb-management-test
+wtp-usb-management-test:
+	$(Q)mkdir -p "$(WTP_NETWORK_BUILD_DIR)"
+	$(Q)$(CXX) $(WTP_NETWORK_FLAGS) tests/wtp_usb_management_test.cpp wtp_integration/usb_management.cpp wtp_integration/browser_api.cpp privileged_network_policy.cpp $(WTP_NETWORK_LDFLAGS) -o "$(WTP_NETWORK_BUILD_DIR)/wtp_usb_management_test"
+	$(Q)"$(WTP_NETWORK_BUILD_DIR)/wtp_usb_management_test"
+
+WTP_USB_PAIR_SOURCES := tests/wtp_usb_pair_client.cpp wtp_integration/usb_cdc.cpp wtp_integration/usb_management.cpp wtp_integration/configuration.cpp wtp_integration/browser_api.cpp wtp_integration/consumer_radio.cpp wtp_integration/plain_tcp.cpp wtp_integration/network_http.cpp wtp_integration/tls.cpp privileged_network_policy.cpp backend_http_guard.cpp support_request_guard.cpp httplib.cpp
+WTP_USB_PAIR_OBJECTS := $(addprefix $(WTP_NETWORK_BUILD_DIR)/usb-pair/,$(WTP_USB_PAIR_SOURCES:.cpp=.o))
+.PHONY: wtp-usb-pair-client-build
+wtp-usb-pair-client-build: $(WTP_NETWORK_BUILD_DIR)/wtp_usb_pair_client
+$(WTP_NETWORK_BUILD_DIR)/wtp_usb_pair_client: $(WTP_USB_PAIR_OBJECTS)
+	$(Q)$(CXX) $(WTP_NETWORK_FLAGS) $^ $(OPENSSL_LIBS) $(WTP_NETWORK_LDFLAGS) -o "$@"
+$(WTP_NETWORK_BUILD_DIR)/usb-pair/%.o: %.cpp
+	$(Q)mkdir -p "$(dir $@)"
+	$(Q)$(CXX) $(WTP_NETWORK_FLAGS) -MMD -MP -c "$<" -o "$@"
+-include $(WTP_USB_PAIR_OBJECTS:.o=.d)

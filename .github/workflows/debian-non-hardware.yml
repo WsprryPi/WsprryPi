@@ -30,7 +30,7 @@ jobs:
       - name: Run WTP component, plan, USB adapter, backend, scheduler and status tests
         working-directory: src
         run: |
-          make wtp-protocol-test wtp-plan-test wtp-usb-test wtp-backend-test wtp-scheduler-test wtp-status-test wtp-application-test SUDO=
+          make wtp-protocol-test wtp-plan-test wtp-usb-test wtp-usb-management-test wtp-backend-test wtp-scheduler-test wtp-status-test wtp-application-test SUDO=
           make wtp-production-test BACKENDS=simulated ANCILLARY_GPIO=0 SUDO=
           make wtp-pi-authority-test wtp-pi-listener-test wtp-pi-revocation-test \
             wtp-pi-tone-engine-test wtp-pi-identity-test wtp-pi-interface-selection-test \
@@ -96,6 +96,36 @@ jobs:
           node tests/wtp_network_ui_integration_test.js
           node tests/wtp_pi_fleet_ui_integration_test.js
           WSPRRYPI_RUN_RECOVERY_BROWSER=1 node tests/wtp_recovery_ui_integration_test.js
+
+  wtp-usb-management-pair:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+      - name: USB host-only build dependencies
+        run: sudo apt-get update && sudo apt-get install -y build-essential libssl-dev pkg-config cmake python3 nodejs
+      - name: Read exact USB Pico product revision
+        id: usb_reference
+        run: |
+          revision=$(cat src/tests/network/pico-usb-revision.txt)
+          [[ "$revision" =~ ^[0-9a-f]{40}$ ]]
+          echo "revision=$revision" >> "$GITHUB_OUTPUT"
+      - uses: actions/checkout@v7
+        with:
+          repository: WsprryPi/WsprryPico
+          ref: ${{ steps.usb_reference.outputs.revision }}
+          path: src/build/usb-reference/pico
+          persist-credentials: false
+      - name: Build actual production Pico USB endpoint without SDK or network
+        run: |
+          cmake -S src/build/usb-reference/pico -B src/build/usb-reference/pico-host -DWSPRRY_PICO_BUILD_FIRMWARE=OFF -DWSPRRY_PICO_BUILD_TESTS=ON -DCMAKE_BUILD_TYPE=Debug
+          cmake --build src/build/usb-reference/pico-host --target usb_management_driver -j2
+      - name: Build Pi USB clients and negative contract checks
+        run: make -C src wtp-usb-pair-client-build wtp-usb-management-test SUDO=
+      - name: Actual UI producer through production Pi and Pico USB handlers
+        run: |
+          node WsprryPi-UI/tests/wtp_usb_settings_test.js
+          node WsprryPi-UI/tests/wtp_usb_pair_test.js src/build/wtp-network/wtp_usb_pair_client src/build/usb-reference/pico-host/usb_management_driver
 
   wtp-configuration-legacy:
     runs-on: ubuntu-24.04
@@ -236,7 +266,7 @@ jobs:
       - name: Run WTP component, plan, USB adapter, backend, scheduler and status tests
         working-directory: src
         run: |
-          make wtp-protocol-test wtp-plan-test wtp-usb-test wtp-backend-test wtp-scheduler-test wtp-status-test wtp-application-test wtp-production-test SUDO=
+          make wtp-protocol-test wtp-plan-test wtp-usb-test wtp-usb-management-test wtp-backend-test wtp-scheduler-test wtp-status-test wtp-application-test wtp-production-test SUDO=
           make wtp-pi-authority-test wtp-pi-listener-test wtp-pi-revocation-test \
             wtp-pi-tone-engine-test wtp-pi-identity-test wtp-pi-interface-selection-test \
             wtp-pi-si5351-realization-test wtp-pi-control-test wtp-pi-config-transaction-test \

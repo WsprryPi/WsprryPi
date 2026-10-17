@@ -287,6 +287,7 @@ void register_control(
     server.Get(R"(/api/v1/.*)", shared);
     server.Put(R"(/api/v1/.*)", shared);
     server.Post(R"(/api/v1/.*)", shared);
+    server.Delete(R"(/api/v1/.*)", shared);
     server.Get("/api/wtp", [](const httplib::Request &, httplib::Response &response) {
         response.set_header("Cache-Control", "no-store");
         response.set_content(wtp_runtime_json(), "application/json");

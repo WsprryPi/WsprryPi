@@ -1,5 +1,9 @@
 # WsprryPi shared browser API adapter
 
+Current normal-firmware USB management, hostname/Wi-Fi lifecycle and UTC
+support are documented in [USB management](wtp-usb-management.md). Historical
+phase-specific limitations below retain their original evidence scope.
+
 See the [P15.3 implementation and evidence](development/phase15-3-management-carriers.md) for the carrier matrix, exact source-pair validation and limits.
 
 The host adopts Pico API v1 resource names for their compatible meanings and
@@ -248,7 +252,8 @@ at one consumer session. Old Pi clients explicitly refuse version 2. See the
 [P15.6 acceptance record](development/phase15-6-sessions.md).
 The legacy closed application's `authenticated_https` label remains for old
 clients; it does not inventory actual carriers. Unsupported discovery refuses.
-USB/Console, Plain LAN WTP, TLS-WTP and BLE gain no JSON administration.
+That phase added no JSON administration to USB/Console, Plain LAN WTP, TLS-WTP
+or BLE. Current USB-Management/1 support is described in [USB management](wtp-usb-management.md).
 
 
 Host capabilities report built-in management adapters separately from actual

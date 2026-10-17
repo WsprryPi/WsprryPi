@@ -54,7 +54,7 @@
         if (selected) {
             if (!network && !String(settings.Endpoint).startsWith("/dev/") || (!network && settings.Endpoint.includes("/../"))) result.Endpoint = "Select the dedicated WTP device path under /dev/.";
             if (!network && !settings["USB Serial"]) result["USB Serial"] = "Enter the selected device's USB serial.";
-            if (!(settings.Transport === "network_plain" && settings["Device ID"] === "") &&
+            if (!((settings.Transport === "network_plain" || settings.Transport === "usb") && settings["Device ID"] === "") &&
                 !/^[0-9a-f]{32}$/.test(settings["Device ID"]))
                 result["Device ID"] = "Enter 32 lowercase hexadecimal characters.";
         }
@@ -78,6 +78,7 @@
             ? `${remote.output_active ? "Active" : "Inactive"} (${age}; last observation)` : "Unknown";
         const blocked = s.recovery_required || s.uncertain || s.safety_fault;
         const text = blocked ? "Recovery required. Output safety remains unresolved."
+            : s.usb?.binding_fault === true ? "USB device identity changed. Reconcile the Pico before another job."
             : s.host_skip_waiting ? "Waiting for a skipped WSPR window; no Pico job was sent."
             : s.phase === "waiting" ? "Waiting to prepare the scheduled job."
             : s.phase === "preparing" ? "Preparing the complete job."
@@ -92,6 +93,7 @@
     if (typeof module !== "undefined" && module.exports) module.exports = { defaults, errors, summarize, validNetworkIdentity };
     if (!root.document) return;
     const byId = id => root.document.getElementById(id);
+    let advancedVisible = false;
     let saved = { ...defaults }, snapshot = null, busy = false, timer = null, initialized = false, visible = false, closed = false, statusReadFailed = false, hostRevision = "", cancelling = false;
     let browserSession = "";
     const selected = () => byId("wtp_use")?.checked === true;
@@ -117,21 +119,23 @@
             root.bootstrap?.Tab?.getOrCreateInstance(byId("transmitter-hardware-tab"))?.show();
         if (fleetTab) {
             fleetTab.disabled = !visible;
+            fleetTab.textContent = advancedVisible ? "Fleet" : "Pico";
             fleetTab.parentElement.hidden = !visible;
         }
         if (fleetPane) fleetPane.hidden = !visible;
+        if (byId("wtp-show-controls")) byId("wtp-show-controls").checked = visible;
         byId("wtp-controls").hidden = !visible;
         byId("wtp-hidden-selection").hidden = visible || !selected();
         byId("wtp-development").hidden = !visible;
-        root.FleetSchedules?.setVisible(visible);
+        root.FleetSchedules?.setVisible(advancedVisible);
         byId("wtp_use").disabled = !visible;
         root.document.querySelectorAll("[data-wtp-key]").forEach(field => { field.disabled = !visible || !selected(); });
         const transport = read().Transport;
         const network = transport === "network" || transport === "network_plain";
         if (byId("wtp-device-label")) byId("wtp-device-label").textContent =
-            transport === "network_plain" ? "Device identity (optional)" : "Device identity";
+            (transport === "network_plain" || transport === "usb") ? "Device identity (optional)" : "Device identity";
         if (byId("wtp-device-hint")) byId("wtp-device-hint").textContent =
-            transport === "network_plain"
+            (transport === "network_plain" || transport === "usb")
                 ? "Leave blank to learn this Pico's identity on first connect; later connections in this session check it."
                 : "32 lowercase hexadecimal characters from Pico HELLO.";
         root.document.querySelectorAll("[data-wtp-transport]").forEach(group => {
@@ -144,8 +148,20 @@
         if (byId("wtp-network-state")) byId("wtp-network-state").textContent = n
             ? `Configured target: ${n.hostname}:${n.port} · ${n.state}. ${n.security === "plain_lan" ? "Plain LAN; clients on this network can control the Pico." : `Expected identity: ${n.expected_identity || "unconfirmed"}. Last authenticated identity: ${n.authenticated_identity || "unconfirmed"}.`} Resolved address: ${n.resolved_address || "unresolved"}. Observation age: ${n.observed_ms && snapshot.now_ms ? Math.max(0, Number(BigInt(snapshot.now_ms) - BigInt(n.observed_ms))) + " ms" : "unknown"}. ${n.diagnostic || ""}`
             : "Network connection is unconfirmed.";
-        root.WtpManagement?.setAvailability(visible && selected() && transport === "network" && snapshot?.selected === true && (snapshot.ready === true || snapshot.management_available === true) && snapshot.phase === "idle" && !snapshot.worker_active && !snapshot.recovery_required && !snapshot.owns,
+        root.WtpManagement?.setAvailability(visible && selected() && (transport === "network" || transport === "usb") && snapshot?.selected === true && (snapshot.ready === true || snapshot.management_available === true) && snapshot.phase === "idle" && !snapshot.worker_active && !snapshot.recovery_required && !snapshot.owns,
             visible && selected() && snapshot?.selected === true && snapshot.phase === "idle" && !snapshot.worker_active && !snapshot.recovery_required && !snapshot.owns && !snapshot.uncertain && !snapshot.safety_fault);
+        if (byId("wtp-status-heading")) byId("wtp-status-heading").textContent = snapshot?.common_name ? snapshot.common_name + (snapshot.common_name_confirmed ? "" : " (last confirmed)") : "Pico status";
+        if (byId("wtp-connection-method")) byId("wtp-connection-method").textContent = transport === "usb"
+            ? `USB${snapshot?.common_name ? " · configured hostname" : " · hostname unconfirmed"}${snapshot?.name_pending_restart ? " · name pending restart" : ""}`
+            : transport === "network" ? "Wi-Fi · Engineering HTTPS" : "Wi-Fi · Plain LAN";
+        if (byId("wtp-usb-time")) {
+            const time=snapshot?.usb?.management?.time;
+            byId("wtp-usb-time").textContent = transport !== "usb" ? "Uses the selected Pico time source"
+                : time?.accepted ? `USB observation accepted · uncertainty ${time.uncertainty_ns} ns · refreshed at host monotonic ${time.observed_ms} ms`
+                    : time?.selected_source ? `Active Pico source: ${time.selected_source}. USB observation ${time.accepted ? "accepted" : "not selected"}; clock admission remains required.`
+                    : time?.reason ? `USB time unavailable: ${time.reason}. Pico clock admission remains required.` : "USB time has not been confirmed";
+        }
+        root.WtpUsbSettings?.setAvailability(visible && selected() && transport === "usb" && snapshot?.management_available === true);
         const state = summarize(snapshot);
         for (const [id, value] of [["wtp-status-text", state.text], ["wtp-output", state.output], ["wtp-clock", state.clock], ["wtp-identity", state.identity], ["wtp-history", state.history]]) byId(id).textContent = value;
         if (byId("wtp-cancel")) byId("wtp-cancel").disabled = cancelling || !selected() || snapshot?.selected !== true || !snapshot?.job_id || !(snapshot.owns || snapshot.phase === "waiting");
@@ -235,7 +251,7 @@
                 candidate?.state === "online" ? "advertised; identity unconfirmed" : "offline";
             const endpoint = profile.settings?.Transport === "usb" ? profile.settings?.Endpoint :
                 `${profile.settings?.Hostname || "?"}:${profile.settings?.["TCP Port"] || "?"}`;
-            return [`known:${profile.id}`, `${profile.name} · ${profile.settings?.Transport || "?"} · ${state} · ${endpoint} · ${(profile.settings?.["Device ID"] || "unverified").slice(0, 8)}…`];
+            return [`known:${profile.id}`, `${fleetCatalog.active_id === profile.id && snapshot?.common_name ? snapshot.common_name + (snapshot.common_name_confirmed ? "" : " (last confirmed)") : profile.name} · ${profile.settings?.Transport || "?"} · ${state} · ${endpoint} · ${(profile.settings?.["Device ID"] || "unverified").slice(0, 8)}…`];
         }));
         group("Nearby advertisements (unverified)", (fleetDiscovery?.candidates || []).map(candidate =>
             [`nearby:${candidate.id}`, `${candidate.instance} · ${candidate.binding || "unknown binding"} · ${candidate.state} · ${candidate.target || "unresolved"}:${candidate.port || "?"} · link ${candidate.interface}`]));
@@ -462,7 +478,7 @@
         get developmentControlsVisible() { return visible; },
         set developmentControlsVisible(value) {
             if (typeof value !== "boolean") throw new TypeError("developmentControlsVisible must be a boolean.");
-            visible = value;
+            visible = value; advancedVisible = value;
             if (!initialized) return;
             render();
             if (visible || selected()) request(); else clearTimeout(timer);
@@ -503,6 +519,13 @@
         if (!byId("wtp-controls")) return;
         initialized = true;
         fleetInit();
+        byId("wtp-show-controls")?.addEventListener("change", () => {
+            visible = byId("wtp-show-controls").checked;
+            if (!visible) advancedVisible = false;
+            render();
+            if (visible) root.bootstrap?.Tab?.getOrCreateInstance(byId("fleet-tab"))?.show();
+            if (visible || selected()) { request(); void fleetLoad(); } else clearTimeout(timer);
+        });
         populate(saved);
         byId("wtp_use").addEventListener("change", () => { render(); root.clickTransmitBackend?.(); root.updateCwMessageLengthEstimate?.(); root.validateCwMessage?.(); request(); });
         const keepFleetTabVisible = () => {

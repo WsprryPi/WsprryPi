@@ -1,4 +1,5 @@
 <?php // SPDX-License-Identifier: MIT ?>
+
 <div id="wtp-development" class="wtp-development" hidden>
     <section id="wtp-controls" class="transmitter-backend-fields" aria-labelledby="wtp-heading" hidden>
         <h3 id="wtp-heading" class="transmitter-backend-fields__title">WTP outputs</h3>
@@ -177,11 +178,13 @@
                 <p class="form-text mb-0">Accepts the device's reported realizable frequencies. This does not establish RF accuracy.</p>
             </div>
         </div>
-        <p class="form-text mt-3">The host needs synchronized UTC. The Pico needs its own valid UTC clock with bounded uncertainty; WTP does not set that clock. GPSDO frequency discipline alone is not UTC.</p>
+        <p class="form-text mt-3">The host needs synchronized UTC. The Pico needs its own valid UTC clock with bounded uncertainty; USB automatically supplies qualified host UTC on supported firmware. Network WTP does not set that clock. GPSDO frequency discipline alone is not UTC.</p>
         <div class="wtp-status" aria-labelledby="wtp-status-heading">
             <h4 id="wtp-status-heading" class="cw-control-section__title">Pico status</h4>
             <p id="wtp-status-text" class="mb-2" role="status" aria-live="polite">Status has not been checked.</p>
             <dl class="wtp-observations">
+                <div><dt>Connection</dt><dd id="wtp-connection-method">Unconfirmed</dd></div>
+                <div><dt>Pico UTC over USB</dt><dd id="wtp-usb-time">Unconfirmed</dd></div>
                 <div><dt>Output observed</dt><dd id="wtp-output">Unknown</dd></div>
                 <div><dt>Network connection</dt><dd id="wtp-network-state">No network connection has been observed.</dd></div>
                 <div><dt>Host UTC</dt><dd id="wtp-clock">Unknown</dd></div>
@@ -196,15 +199,58 @@
         <details id="wtp-management" class="wtp-status mt-3" hidden>
             <summary class="cw-control-section__title">Pico standalone settings and Wi-Fi</summary>
             <p class="form-text">These settings belong to Pico's standalone scheduler, separate from WsprryPi's schedule. Management is available only while the host has no pending, owned or unresolved job. Saves preserve settings outside this form. Network or pin changes may require a Pico restart; each save reports the requirement.</p>
+            <section id="wtp-usb-settings" class="mb-4" aria-labelledby="wtp-usb-settings-heading" hidden>
+                <h5 id="wtp-usb-settings-heading" class="h6">USB name and Wi-Fi</h5>
+                <p class="form-text">The common name is the Pico's Wi-Fi hostname, including .local. Saved names or network changes may need a restart. Removing Wi-Fi keeps USB control and transmitter settings.</p>
+                <button type="button" class="btn btn-outline-primary mb-3" id="wtp-usb-load">Read name and Wi-Fi</button>
+                <p id="wtp-usb-identity" class="form-text text-break"></p>
+                <div class="row gx-3 gy-3">
+                    <div class="col-12 col-lg-6">
+                        <label class="form-label" for="wtp-usb-hostname">Pico common name</label>
+                        <input class="form-control" id="wtp-usb-hostname" type="text" maxlength="63" autocomplete="off" spellcheck="false">
+                        <div class="form-text" id="wtp-usb-name-state">Read the saved and active name first. Leave blank to select the device default.</div>
+                        <button type="button" class="btn btn-outline-primary mt-2" id="wtp-usb-name-save" disabled>Save common name</button>
+                    </div>
+                    <div class="col-12 col-lg-6">
+                        <label class="form-label" for="wtp-usb-ssid">Pico Wi-Fi network</label>
+                        <input class="form-control" id="wtp-usb-ssid" type="text" maxlength="32" autocomplete="off" spellcheck="false">
+                        <label class="form-label mt-2" for="wtp-usb-password">Wi-Fi password</label>
+                        <input class="form-control" id="wtp-usb-password" type="password" maxlength="63" autocomplete="off" aria-describedby="wtp-usb-password-hint">
+                        <div class="form-text" id="wtp-usb-password-hint">Leave blank to preserve the password for the same network. A new or renamed connection needs its password. Credentials are never read back.</div>
+                        <label class="form-label mt-2" for="wtp-usb-time-server">Wi-Fi time server</label>
+                        <input class="form-control" id="wtp-usb-time-server" type="text" maxlength="253" autocomplete="off" spellcheck="false">
+                        <div class="d-flex flex-wrap gap-2 mt-2">
+                            <button type="button" class="btn btn-outline-primary" id="wtp-usb-wifi-save" disabled>Save Wi-Fi connection</button>
+                            <button type="button" class="btn btn-outline-danger" id="wtp-usb-wifi-remove" disabled>Remove saved Wi-Fi</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="d-flex flex-wrap gap-2 mt-3">
+                    <button type="button" class="btn btn-outline-secondary" id="wtp-usb-restart" disabled>Restart Pico to apply</button>
+                    <button type="button" class="btn btn-outline-secondary" id="wtp-usb-ap" disabled>Open setup Wi-Fi for ten minutes</button>
+                </div>
+                <section class="mt-3" aria-labelledby="wtp-usb-progress-heading">
+                    <h6 id="wtp-usb-progress-heading">Saved station progress</h6>
+                    <p class="form-text">Read saved progress, then use the station fields below to save valid fields independently. Applying saved station progress is a separate action. Neither action transmits, resumes STOP or changes clock readiness.</p>
+                    <div class="d-flex flex-wrap gap-2">
+                        <button type="button" class="btn btn-outline-secondary" id="wtp-usb-progress-load">Read saved progress</button>
+                        <button type="button" class="btn btn-outline-primary" id="wtp-usb-progress-save" disabled>Save valid station fields</button>
+                        <button type="button" class="btn btn-outline-primary" id="wtp-usb-progress-apply" disabled>Apply saved station progress</button>
+                    </div>
+                    <p id="wtp-usb-progress-state" class="form-text mt-2" role="status" aria-live="polite">Saved progress and applied configuration have not been read.</p>
+                </section>
+                <p id="wtp-usb-feedback" class="form-text mt-2" role="status" aria-live="polite">Read name and Wi-Fi before editing.</p>
+            </section>
             <div class="row gx-3 gy-3 mb-3">
                 <div class="col-12 col-lg-6 config-stacked-field">
                     <label class="form-label" for="wtp-management-carrier">Management connection</label>
                     <select class="form-select" id="wtp-management-carrier" aria-describedby="wtp-management-carrier-hint">
+                        <option value="usb_physical">USB cable</option>
                         <option value="engineering_mtls">Engineering HTTPS (certificates)</option>
                         <option value="consumer_station">Consumer Wi-Fi</option>
                         <option value="consumer_ap">Consumer setup Wi-Fi</option>
                     </select>
-                    <div class="form-text" id="wtp-management-carrier-hint">Choose separately from job transport. USB, Plain LAN WTP, TLS-WTP and BLE carry no JSON settings.</div>
+                    <div class="form-text" id="wtp-management-carrier-hint">USB uses the selected Pico cable and needs no Wi-Fi credentials. Network management is selected separately from job transport.</div>
                 </div>
                 <div class="col-12 col-lg-6 config-stacked-field" id="wtp-management-host-field" hidden>
                     <label class="form-label" for="wtp-management-host">Pico IP address or local hostname</label>

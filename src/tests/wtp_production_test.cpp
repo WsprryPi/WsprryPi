@@ -10,6 +10,7 @@
 #include "wtp_backend_peer.hpp"
 #include "wtp_runtime_bridge.hpp"
 #include "wtp_settings_json.hpp"
+#include "wtp_integration/target_runtime.hpp"
 #include "web_server_routes.hpp"
 #include "httplib.hpp"
 #include "backend_http_guard.hpp"
@@ -30,6 +31,156 @@ struct Clock : wsprrypi::WtpScheduleClock {
   }
   void wait_ms(std::uint64_t n) override { peer.advance(peer.now + n); }
 };
+// Optional USB management storage is allowed to disappear during a maximum
+// WTP LOAD. The physical CDC remains present; the old logical session is silent.
+struct ReclaimedManagement : wsprrypi::wtp::ByteStream {
+  std::vector<std::uint8_t> input;
+  std::deque<std::uint8_t> output;
+  unsigned opens{}, name_reads{}, time_submits{}, config_mutations{};
+  bool reclaimed{}, closed{};
+  std::string session;
+  nlohmann::json target{{"scope","member"},{"device_id",backend_test::device},{"boot_id",backend_test::boot}};
+  void open() { ++opens; reclaimed=closed=false;input.clear();output.clear();session=std::string(32,opens==1?'a':'b'); }
+  wsprrypi::wtp::IoResult write(std::span<const std::uint8_t> bytes) override {
+    if(closed)return {wsprrypi::wtp::IoState::Closed,0};
+    input.insert(input.end(),bytes.begin(),bytes.end());
+    if(input.size()>=8) {
+      const auto length=(std::uint32_t(input[4])<<24)|(std::uint32_t(input[5])<<16)|(std::uint32_t(input[6])<<8)|input[7];
+      if(input.size()==8+length) {
+        const auto request=nlohmann::json::parse(input.begin()+8,input.end());input.clear();
+        if(!reclaimed) {
+          const auto operation=request.at("operation").get<std::string>();
+          std::string body="{}";
+          if(operation=="hello")body=R"({"schema":"usb-management-discovery/1"})";
+          if(operation=="request") {
+            const auto path=request.at("path").get<std::string>();
+            if(path=="/api/v1/hostname") {++name_reads;body=nlohmann::json{{"schema","transmitter-hostname/1"},{"target",target},{"saved","pico.local"}}.dump();}
+            else if(path=="/api/usb/v1/time/sample")body=R"({"sample":"fresh","monotonic_ns":"1000000"})";
+            else if(path=="/api/usb/v1/time/submit") {++time_submits;body=R"({"accepted":true,"selected":true,"source":"controller"})";}
+            else if(request.at("method")!="GET")++config_mutations;
+          }
+          const auto response=nlohmann::json{{"schema","usb-management/1"},{"id",request.at("id")},{"status",200},
+            {"session",session},{"target",target},{"body",body},{"etag","\"r1\""},{"delivery_required",operation=="request"}}.dump();
+          std::vector<std::uint8_t> frame{'U','M','P','1',std::uint8_t(response.size()>>24),std::uint8_t(response.size()>>16),std::uint8_t(response.size()>>8),std::uint8_t(response.size())};
+          frame.insert(frame.end(),response.begin(),response.end());output.insert(output.end(),frame.begin(),frame.end());
+        }
+      }
+    }
+    return {wsprrypi::wtp::IoState::Progress,bytes.size()};
+  }
+  wsprrypi::wtp::IoResult read(std::span<std::uint8_t> bytes) override {
+    auto count=std::min(bytes.size(),output.size());
+    for(std::size_t i=0;i<count;++i){bytes[i]=output.front();output.pop_front();}
+    return {count?wsprrypi::wtp::IoState::Progress:wsprrypi::wtp::IoState::WouldBlock,count};
+  }
+  void close() noexcept override {closed=true;}
+};
+void usb_management_reclaimed_at_load() {
+  Clock clock;ReclaimedManagement management;
+  WtpSettings settings{"/dev/ttyACM1","test-serial",backend_test::device,0xcafe,0x4012,1000};
+  wsprrypi::WtpTargetRuntime target(settings,clock,clock.peer,
+      {backend_test::sid,backend_test::owner_id,backend_test::device},[&]{clock.peer.open();return true;});
+  target.usb_management_for_test=[&] {
+    management.open();
+    return std::make_unique<wsprrypi::UsbManagementClient>(management,[&]{return clock.now_ms();},
+      [&](unsigned ms){clock.wait_ms(ms);},[&]{return target.usb_cancelled.load();});
+  };
+  target.usb_utc_observer=[&]{return wsprrypi::HostUtcObservation{true,clock.peer.mono(),backend_test::Peer::utc_base+clock.peer.mono(),1000};};
+  CHECK(target.app->inspect().ok);
+  clock.peer.before_handle=[&](auto operation) {
+    if(operation==wsprrypi::wtp::Operation::Load)management.reclaimed=true;
+    if(operation==wsprrypi::wtp::Operation::Arm)CHECK(management.opens==2 && management.name_reads==2 && management.time_submits==2);
+  };
+  wsprrypi::TransmissionRequest request;
+  request.output.backend=wsprrypi::BackendKind::WTP;
+  request.mode=wsprrypi::TransmissionMode::TONE;
+  request.payload=wsprrypi::TonePayload{14097100,200ms,{}};
+  request.policy.allow_unqualified_frequency=true;
+  target.app->prepare(request);target.app->start();
+  const auto deadline=std::chrono::steady_clock::now()+15s;
+  while(target.app->active() && std::chrono::steady_clock::now()<deadline)std::this_thread::sleep_for(1ms);
+  CHECK(!target.app->active());
+  CHECK(std::find(clock.peer.operations.begin(),clock.peer.operations.end(),wsprrypi::wtp::Operation::Arm)!=clock.peer.operations.end());
+  CHECK(management.opens==2 && management.name_reads==2 && management.time_submits==2 && management.config_mutations==0);
+  CHECK(target.usb_status()["management"]["connected"]==true && target.usb_status()["name_confirmed"]==true);
+  CHECK(target.app->stop().ok);
+}
+void usb_management_known_binding_fault() {
+  Clock clock;ReclaimedManagement management;
+  WtpSettings settings{"/dev/ttyACM1","test-serial",backend_test::device,0xcafe,0x4012,1000};
+  wsprrypi::WtpTargetRuntime target(settings,clock,clock.peer,
+      {backend_test::sid,backend_test::owner_id,backend_test::device},[&]{clock.peer.open();return true;});
+  target.usb_management_for_test=[&] {
+    management.open();
+    return std::make_unique<wsprrypi::UsbManagementClient>(management,[&]{return clock.now_ms();},
+      [&](unsigned ms){clock.wait_ms(ms);},[&]{return target.usb_cancelled.load();});
+  };
+  target.usb_utc_observer=[&]{return wsprrypi::HostUtcObservation{true,clock.peer.mono(),backend_test::Peer::utc_base+clock.peer.mono(),1000};};
+  CHECK(target.app->inspect().ok);
+  target.learned_usb_device=backend_test::device;target.learned_usb_boot=backend_test::boot;
+  management.target["boot_id"]=std::string(32,'c');
+  CHECK(!target.ensure_usb_management() && !target.usb_identity_admitted());
+  wsprrypi::TransmissionRequest request;
+  request.output.backend=wsprrypi::BackendKind::WTP;
+  request.mode=wsprrypi::TransmissionMode::TONE;
+  request.payload=wsprrypi::TonePayload{14097100,200ms,{}};
+  request.policy.allow_unqualified_frequency=true;
+  target.app->prepare(request);target.app->start();
+  const auto deadline=std::chrono::steady_clock::now()+15s;
+  while(target.app->active() && std::chrono::steady_clock::now()<deadline)std::this_thread::sleep_for(1ms);
+  CHECK(!target.app->active());
+  CHECK(std::find(clock.peer.operations.begin(),clock.peer.operations.end(),wsprrypi::wtp::Operation::Load)==clock.peer.operations.end());
+  CHECK(std::find(clock.peer.operations.begin(),clock.peer.operations.end(),wsprrypi::wtp::Operation::Arm)==clock.peer.operations.end());
+  // A later matching periodic observation cannot erase the known contradiction.
+  management.target["boot_id"]=backend_test::boot;
+  target.refresh_usb_time(true);CHECK(!target.usb_identity_admitted());
+  CHECK(target.app->stop().ok && target.app->inspect().ok);
+  CHECK(target.reconcile_usb_binding() && target.usb_identity_admitted());
+}
+void usb_first_identity_lease_race() {
+  Clock clock;
+  WtpSettings settings{"/dev/ttyACM1","test-serial","",0xcafe,0x4012,1000};
+  wsprrypi::WtpTargetRuntime target(settings,clock,clock.peer,
+      {backend_test::sid,backend_test::owner_id,backend_test::device},[&]{clock.peer.open();return true;});
+  std::promise<void> release;auto ready=release.get_future().share();
+  auto first=std::async(std::launch::async,[&]{ready.wait();return target.reserve_output(std::string(32,'c'));});
+  auto delayed_management=std::async(std::launch::async,[&]{ready.wait();return target.reserve_output(std::string(32,'c'));});
+  release.set_value();CHECK(first.get() && delayed_management.get());
+  CHECK(target.output_lease_snapshot()!=nullptr);
+  // A later contradictory management HELLO cannot repurpose that reservation.
+  CHECK(!target.reserve_output(std::string(32,'d')));
+}
+void usb_binding_and_observation() {
+  for (bool wrong_boot : {false,true}) {
+    Clock clock;
+    WtpSettings settings{"/dev/ttyACM1","test-serial","",0xcafe,0x4012,1000};
+    auto options=wsprrypi::wtp::SessionOptions{backend_test::sid,backend_test::owner_id,""};
+    options.learn_device_identity=true;
+    wsprrypi::WtpTargetRuntime target(settings,clock,clock.peer,options,[&]{clock.peer.open();return true;});
+    target.learned_usb_device=wrong_boot?backend_test::device:std::string(32,'a');
+    target.learned_usb_boot=wrong_boot?std::string(32,'b'):backend_test::boot;
+    CHECK(target.app->inspect().ok && !target.usb_identity_admitted());
+    wsprrypi::TransmissionRequest request;
+    request.output.backend=wsprrypi::BackendKind::WTP;
+    request.mode=wsprrypi::TransmissionMode::TONE;
+    request.payload=wsprrypi::TonePayload{14097100,200ms,{}};
+    request.policy.allow_unqualified_frequency=true;
+    target.app->prepare(request);target.app->start();
+    const auto deadline=std::chrono::steady_clock::now()+3s;
+    while(target.app->active() && std::chrono::steady_clock::now()<deadline)std::this_thread::sleep_for(1ms);
+    CHECK(!target.app->active());
+    CHECK(std::find(clock.peer.operations.begin(),clock.peer.operations.end(),wsprrypi::wtp::Operation::Load)==clock.peer.operations.end());
+    CHECK(std::find(clock.peer.operations.begin(),clock.peer.operations.end(),wsprrypi::wtp::Operation::Arm)==clock.peer.operations.end());
+    CHECK(target.app->stop().ok);
+    target.usb_name={{"saved","previous.local"}};target.usb_name_confirmed=true;
+    target.usb_observation={{"connected",true}};
+    CHECK(!target.usb_unavailable());
+    const auto disconnected=target.usb_status();
+    CHECK(disconnected["management"]["connected"]==false && disconnected["name_confirmed"]==false && disconnected["hostname"]["saved"]=="previous.local");
+    CHECK(!target.ensure_usb_management());
+    CHECK(target.usb_status()["management"]["connected"]==false);
+  }
+}
 void finite_message_request_inputs() {
   ArgParserConfig cfg{};
   cfg.transmit_backend = TransmitBackendKind::WTP;
@@ -501,6 +652,10 @@ void run(const std::string &credentials) {
 } // namespace
 int main(int argc, char **argv) {
   try {
+    usb_management_reclaimed_at_load();
+    usb_management_known_binding_fault();
+    usb_first_identity_lease_race();
+    usb_binding_and_observation();
     finite_message_request_inputs();
     run(argc > 1 ? argv[1] : "");
   } catch (const std::exception &e) {

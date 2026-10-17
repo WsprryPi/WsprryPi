@@ -151,19 +151,22 @@ bool valid_management_contract(const Json &j, const std::string &carrier,
                                const std::string &boot,
                                const std::string &generation) {
   try {
+    const bool usb=carrier=="usb_physical";
     if (!fields(j, {"schema", "target", "profile", "preclock",
                     "profile_generation", "selected", "carriers", "unsupported",
                     "operations", "limits"}) ||
-        (j["schema"] != "transmitter-management/1" &&
-         j["schema"] != "transmitter-management/2") || j["selected"] != carrier ||
+        (usb ? j["schema"] != "transmitter-management/3" :
+         (j["schema"] != "transmitter-management/1" && j["schema"] != "transmitter-management/2")) || j["selected"] != carrier ||
         !j["preclock"].is_boolean() ||
         j["target"] !=
             Json{{"scope", "member"}, {"device_id", device}, {"boot_id", boot}})
       return false;
     const bool consumer =
         carrier == "consumer_station" || carrier == "consumer_ap";
-    if (j["profile"] != (consumer ? "consumer" : "engineering"))
-      return false;
+    if (usb) {
+      const Json profiles={"unavailable","blank","recovery","engineering","consumer"};
+      if (!j["profile"].is_string() || std::find(profiles.begin(),profiles.end(),j["profile"])==profiles.end()) return false;
+    } else if (j["profile"] != (consumer ? "consumer" : "engineering")) return false;
     if (consumer) {
       if (j["profile_generation"] != generation ||
           !decimal(j["profile_generation"]))
@@ -171,12 +174,12 @@ bool valid_management_contract(const Json &j, const std::string &carrier,
     } else if (!(j["profile_generation"].is_null() ||
                  decimal(j["profile_generation"])))
       return false;
-    if (!j["carriers"].is_array() || j["carriers"].size() != 4)
+    if (!j["carriers"].is_array() || j["carriers"].size() != (usb ? 5U : 4U))
       return false;
     const char *names[] = {"engineering_mtls", "engineering_field",
-                           "consumer_station", "consumer_ap"};
+                           "consumer_station", "consumer_ap", "usb_physical"};
     bool admitted = false;
-    for (unsigned i = 0; i < 4; ++i) {
+    for (unsigned i = 0; i < (usb ? 5U : 4U); ++i) {
       const auto &row = j["carriers"][i];
       if (!fields(row, {"carrier", "built_in", "available"}) ||
           row["carrier"] != names[i] || !row["built_in"].is_boolean() ||
@@ -195,7 +198,7 @@ bool valid_management_contract(const Json &j, const std::string &carrier,
                          {"config", 1800},        {"update", 2048},
                          {"login_ms", 30000},     {"idle_ms", 300000},
                          {"absolute_ms", 900000}, {"consumer_sessions", 1}};
-    if (j["schema"] == "transmitter-management/2") {
+    if (usb || j["schema"] == "transmitter-management/2") {
       limits["consumer_sessions"] = 3;
       limits["consumer_pending_logins"] = 1;
     }
@@ -206,8 +209,8 @@ bool valid_management_contract(const Json &j, const std::string &carrier,
         return false;
     }
     return admitted && j["operations"] == operations && j["limits"] == limits &&
-           j["unsupported"] == Json::array({"usb_json", "plain_wtp_json",
-                                            "tls_wtp_json", "ble_json"});
+           j["unsupported"] == (usb ? Json::array({"plain_wtp_json","tls_wtp_json","ble_json"}) :
+             Json::array({"usb_json", "plain_wtp_json", "tls_wtp_json", "ble_json"}));
   } catch (...) {
     return false;
   }

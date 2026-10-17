@@ -59,7 +59,7 @@ void config() {
     } catch (const std::exception &) {
       rejected = true;
     }
-    CHECK(rejected);
+    CHECK(rejected == (std::string(key) != "Device ID"));
   }
   for (auto value : {nlohmann::json(-1), nlohmann::json(65536),
                      nlohmann::json(1.5), nlohmann::json(true)}) {

@@ -71,7 +71,9 @@
             const id = assignment.device_id;
             if (!rows.has(id)) {const elements = createRow(id);rows.set(id, elements);list.append(elements.row);}
             const elements = rows.get(id), schedule = assignment.schedule, output = data.outputs?.[id];
-            elements.name.textContent = assignment.name;
+            const memberName=output?.usb?.hostname;
+            elements.name.textContent = memberName?.saved || assignment.name;
+            if (memberName?.saved) elements.name.textContent += output?.usb?.management?.connected && output?.usb?.name_confirmed ? "" : " (last confirmed)";
             elements.description.textContent = `${schedule.mode.toUpperCase()} · ${Number(schedule.frequency_hz).toLocaleString()} Hz · every ${schedule.period_seconds} s · phase ${schedule.phase_seconds} s UTC`;
             const observed = output?.wtp?.status_observed_ms;
             const age = observed && data.now_ms ? `${Math.max(0, Math.round((Number(data.now_ms) - Number(observed) + Date.now() - observedAt) / 1000))} s ago` : "age unknown";

@@ -80,15 +80,15 @@ bool decimal(const Json &j) {
       std::all_of(s.begin(), s.end(), [](char c) { return c >= '0' && c <= '9'; }) &&
       (s.size() < 20 || s <= "18446744073709551615");
 }
-Json resource_descriptor(bool extended) {
+Json resource_descriptor(bool extended, bool usb = false) {
   Json result{{"schema",extended ? "transmitter-application/2" : "transmitter-application/1"},
       {"read",extended ? "/api/v1/application/2" : "/api/v1/application"},
       {"station",extended ? "/api/v1/station/2" : "/api/v1/station"},
-      {"hardware","/api/v1/hardware"},{"management_carrier","authenticated_https"}};
+      {"hardware","/api/v1/hardware"},{"management_carrier",usb ? "usb_physical" : "authenticated_https"}};
   if (extended) { result["config"]="/api/v1/config/2"; result["update"]="/api/v1/config/update/2"; }
   return result;
 }
-bool application_shape(const Json &j, const Json &target) {
+bool application_shape(const Json &j, const Json &target, bool usb = false) {
   const bool extended = j.is_object() && j.value("schema", "") == "transmitter-application/2";
   if (extended) {
     if (!j.contains("wspr_plan")) return false;
@@ -139,7 +139,7 @@ bool application_shape(const Json &j, const Json &target) {
       !shape(Json{{"schedules", r["schedules"]}}, true, true)) return false;
   if (!fields(c, {"management_carrier", "application_read", "station_write", "hardware_write", "max_update_bytes",
           "max_config_bytes", "hardware_activation", "station_encoding", "station_power_meaning", "recurrence_authorities",
-          "autonomous_modes", "unavailable"}) || c["management_carrier"] != "authenticated_https" ||
+          "autonomous_modes", "unavailable"}) || c["management_carrier"] != (usb ? "usb_physical" : "authenticated_https") ||
       c["application_read"] != true || !c["station_write"].is_boolean() || !c["hardware_write"].is_boolean() ||
       c["hardware_activation"] != "restart" || c["station_encoding"] != (extended ? "wspr_type123_auto" : "wspr_type1") ||
       c["station_power_meaning"] != "reported_wspr_dbm") return false;
@@ -214,8 +214,8 @@ PicoHttpResponse pico_configuration_request(const PicoManagementExchange &exchan
         "unsupported_configuration_context",409);
     if (caps.contains("management_carriers")) {
       require(fields(caps["management_carriers"], {"schema", "path"}) &&
-          (caps["management_carriers"]["schema"] == "transmitter-management/1" ||
-           caps["management_carriers"]["schema"] == "transmitter-management/2") &&
+          (carrier == "usb_physical" ? caps["management_carriers"]["schema"] == "transmitter-management/3" :
+           (caps["management_carriers"]["schema"] == "transmitter-management/1" || caps["management_carriers"]["schema"] == "transmitter-management/2")) &&
           caps["management_carriers"]["path"] == "/api/v1/management", "unsupported_management_contract", 409);
       const auto management = parsed(read("management"));
       require(valid_management_contract(management, carrier, device, boot, generation) &&
@@ -255,10 +255,10 @@ PicoHttpResponse pico_configuration_request(const PicoManagementExchange &exchan
     if (caps.contains("application_resources")) {
       extended = caps.contains("application_resources_v2");
       const auto &resources = caps[extended ? "application_resources_v2" : "application_resources"];
-      require(extended ? resources == resource_descriptor(true) :
+      require(extended ? resources == resource_descriptor(true, carrier == "usb_physical") :
           (resources.is_object() && resources.value("schema", "") == "transmitter-application/1" && resources.value("read", "") == "/api/v1/application"), "unsupported_configuration_context",409);
       const auto r = read(extended ? "application/2" : "application"); application = parsed(r);
-      require(application_shape(application, target) && application["schema"] == (extended ? "transmitter-application/2" : "transmitter-application/1"), "invalid_remote_response");
+      require(application_shape(application, target, carrier == "usb_physical") && application["schema"] == (extended ? "transmitter-application/2" : "transmitter-application/1"), "invalid_remote_response");
       require(r.etag == original.etag, "configuration_context_changed", 409);
       require(application["station"]["storage_healthy"] == true && application["hardware"]["storage_healthy"] == true &&
           application["hardware"]["application_error"].is_null(), "remote_busy_or_output_unresolved", 409);
@@ -377,8 +377,8 @@ Json review_plan(const Json &p) {
   return result;
 }
 bool plan_valid(const Json &p) { return plan_shape(p) && review_plan(p)["operational_supported"] == true; }
-void shared_application(const Json &j, const Json &target) {
-  require(j.dump().size() <= 4096 && application_shape(j,target), "invalid_remote_resource");
+void shared_application(const Json &j, const Json &target, bool usb = false) {
+  require(j.dump().size() <= 4096 && application_shape(j,target,usb), "invalid_remote_resource");
   const auto &s = j["station"], &h = j["hardware"], &c = j["capabilities"], &r = j["recurrence"];
   require((s["station"].is_null() || station_valid(s["station"], j["schema"] == "transmitter-application/2")) &&
       s["station"].is_null() == s["saved_generation"].is_null() &&
@@ -387,10 +387,12 @@ void shared_application(const Json &j, const Json &target) {
       (h["storage_healthy"] == true || h["saved"].is_null()) &&
       h["active"].is_null() == h["active_revision"].is_null(), "invalid_remote_resource");
   for (const auto key : {"saved","active"}) require(h[key].is_null() || plan_valid(h[key]), "invalid_remote_resource");
+  Json unavailable=Json::array({"recurrence_transfer","si5351","amplifier","lpf","drive","reference_calibration","waveform_preferences"});
+  if (!usb) unavailable.push_back("usb_json_management");
+  unavailable.push_back("plain_lan_json_management");unavailable.push_back("ble_json_management");
   require(c["station_write"] == true && c["hardware_write"] == true && c["max_update_bytes"] == 1024 &&
       c["max_config_bytes"] == 1800 && c["recurrence_authorities"] == Json::array({"member"}) &&
-      c["autonomous_modes"] == Json::array({"wspr"}) && c["unavailable"] == Json::array({"recurrence_transfer","si5351",
-        "amplifier","lpf","drive","reference_calibration","waveform_preferences","usb_json_management","plain_lan_json_management","ble_json_management"}),
+      c["autonomous_modes"] == Json::array({"wspr"}) && c["unavailable"] == unavailable,
       "unsupported_resource_capabilities",409);
   for (const auto &schedule : r["schedules"]) {
     require(whole(schedule["period_s"],86400) && schedule["period_s"] >= 120 && whole(schedule["phase_s"],86280), "invalid_remote_resource");
@@ -460,15 +462,16 @@ PicoHttpResponse pico_resource_request(const PicoManagementExchange &exchange,
     auto caps = parsed(read("capabilities",16384));
     require(caps.is_object() && caps.contains("api_version") && caps["api_version"].is_number_integer() && caps["api_version"] == 1,"unsupported_remote_api",409);
     if (caps.contains("management_carriers")) {
-      require((caps["management_carriers"] == Json{{"schema","transmitter-management/1"},{"path","/api/v1/management"}} ||
-               caps["management_carriers"] == Json{{"schema","transmitter-management/2"},{"path","/api/v1/management"}}),"unsupported_management_contract",409);
+      require((carrier == "usb_physical" ? caps["management_carriers"] == Json{{"schema","transmitter-management/3"},{"path","/api/v1/management"}} :
+              (caps["management_carriers"] == Json{{"schema","transmitter-management/1"},{"path","/api/v1/management"}} ||
+               caps["management_carriers"] == Json{{"schema","transmitter-management/2"},{"path","/api/v1/management"}})),"unsupported_management_contract",409);
       const auto management = parsed(read("management",16384));
       require(valid_management_contract(management,carrier,device,boot,generation) &&
           management["schema"] == caps["management_carriers"]["schema"],"unsupported_management_contract",409);
     } else require(carrier == "engineering_mtls","unsupported_management_contract",409);
     require(caps.contains("application_resources"),"shared_resources_unavailable",409);
     const bool extended = caps.contains("application_resources_v2");
-    require(caps[extended ? "application_resources_v2" : "application_resources"] == resource_descriptor(extended),"unsupported_resource_capabilities",409);
+    require(caps[extended ? "application_resources_v2" : "application_resources"] == resource_descriptor(extended,carrier == "usb_physical"),"unsupported_resource_capabilities",409);
     const std::string application_path = extended ? "application/2" : "application";
     const auto resource_path = [&](const std::string &path) { return extended && path == "station" ? std::string("station/2") : path; };
     if (write && resource == "station") require(input["schema"] == (extended ? "transmitter-station/2" : "transmitter-station/1"),"unsupported_resource_schema",409);
@@ -476,9 +479,9 @@ PicoHttpResponse pico_resource_request(const PicoManagementExchange &exchange,
         caps["features"]["consumer_setup_identity"].is_boolean(),"invalid_remote_resource");
     for (const auto feature : {"application","station","hardware"})
       require(caps["features"].contains(feature) && caps["features"][feature] == true,"unsupported_resource_capabilities",409);
-    const bool profile_owned = caps["features"]["consumer_setup_identity"] == true;
-    if (caps.contains("management_carriers")) require(profile_owned == (carrier == "consumer_station" || carrier == "consumer_ap"),"invalid_remote_resource");
-    const auto first = read(application_path); auto application = parsed(first); shared_application(application,target);
+    const bool profile_owned = carrier != "usb_physical" && caps["features"]["consumer_setup_identity"] == true;
+    if (carrier != "usb_physical" && caps.contains("management_carriers")) require(profile_owned == (carrier == "consumer_station" || carrier == "consumer_ap"),"invalid_remote_resource");
+    const auto first = read(application_path); auto application = parsed(first); shared_application(application,target,carrier == "usb_physical");
     require(application["schema"] == (extended ? "transmitter-application/2" : "transmitter-application/1"),"invalid_remote_resource");
     require(etag(first.etag),"invalid_remote_resource");
     for (const auto path : {"station","hardware"}) {
@@ -486,7 +489,7 @@ PicoHttpResponse pico_resource_request(const PicoManagementExchange &exchange,
       require(r.etag == first.etag && parsed(r).dump() == application[path].dump(),"configuration_context_changed",409);
     }
     const auto pins = parsed(read("pins")); pin_choices(pins);
-    const auto last = read(application_path); const auto after = parsed(last); shared_application(after,target);
+    const auto last = read(application_path); const auto after = parsed(last); shared_application(after,target,carrier == "usb_physical");
     // Configuration consistency is distinct from mutable live recurrence/status.
     require(last.etag == first.etag && after["station"].dump() == application["station"].dump() &&
         after["hardware"]["saved"].dump() == application["hardware"]["saved"].dump() &&
@@ -515,14 +518,14 @@ PicoHttpResponse pico_resource_request(const PicoManagementExchange &exchange,
     if (preview) {
       require(value.contains("gp") && (value["gp"].is_null() || value["gp"].is_number_integer()) && value.dump() == review_plan(input).dump(),"invalid_pin_validation");
       const auto confirmed = read(application_path);
-      const auto observed = parsed(confirmed); shared_application(observed,target);
+      const auto observed = parsed(confirmed); shared_application(observed,target,carrier == "usb_physical");
       require(confirmed.etag == revision && observed["station"].dump() == application["station"].dump() &&
           observed["hardware"].dump() == application["hardware"].dump(),"configuration_context_changed",409);
       return {200,value.dump(),{}};
     }
     require(etag(result.etag) && result.etag != revision && result.body.size() <= 4096,"management_outcome_unknown");
     const auto confirmed = read(application_path); const auto updated = parsed(confirmed);
-    shared_application(updated,target);
+    shared_application(updated,target,carrier == "usb_physical");
     require(confirmed.etag == result.etag && updated[resource].dump() == value.dump(),"management_outcome_unknown");
     if (resource == "hardware" && !input["pins"].contains("indicator_active_high")) input["pins"]["indicator_active_high"] = true;
     require(resource == "station" ? value["station"].dump() == input["station"].dump() : value["saved"].dump() == input["pins"].dump(),"management_outcome_unknown");

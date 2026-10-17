@@ -50,14 +50,14 @@ public:
         :store_(store),id_(row.at("device_id").get<std::string>()),settings_(parse_wtp_settings(row.at("settings"),true)) {
         // Use one native context per target; a temporary read-only inspection
         // can transfer its identity exclusion lease without transferring jobs.
-        auto lease=verified?verified->output_lease:std::shared_ptr<void>{};
+        auto lease=verified?verified->output_lease_snapshot():std::shared_ptr<void>{};
         verified.reset();
         target_=std::make_unique<WtpTargetRuntime>(settings_,[this]{return admit();},std::move(lease));
     }
     ~OutputWorker(){halt();}
     void start(){quit_=false;finished_=false;thread_=std::thread([this]{run();});}
-    bool halt(){quit_=true;cv_.notify_all();if(thread_.joinable())thread_.join();return cleanup_ok_;}
-    void recover(){recover_=true;cv_.notify_all();}
+    bool halt(){quit_=true;{std::lock_guard lock(status_mutex_);target_->usb_cancelled=true;}cv_.notify_all();if(thread_.joinable())thread_.join();return cleanup_ok_;}
+    void recover(){{std::lock_guard lock(status_mutex_);target_->usb_cancelled=true;}recover_=true;cv_.notify_all();}
     bool retired() const {return revoked_ && finished_ && cleanup_ok_;}
     bool reconcile_retired() {
         if(!revoked_ || !finished_)return false;
@@ -71,6 +71,7 @@ public:
         auto result=status_;
         result["wtp"]=Json::parse(wtp_runtime_status_json(target_->app->status()));
         result["revoked"]=revoked_.load();
+        if(settings_.transport=="usb") result["usb"]=target_->usb_status();
         return result;
     }
 private:
@@ -110,7 +111,7 @@ private:
         // Close the retired connection before inspecting a single-client Pico.
         // Reuse its exclusion lease, but never its owner, job or transaction.
         target_->plain.close();target_->tls.close();target_->stream.close();
-        auto fresh=std::make_unique<WtpTargetRuntime>(settings_,[this]{return admit();},target_->output_lease);
+        auto fresh=std::make_unique<WtpTargetRuntime>(settings_,[this]{return admit();},target_->output_lease_snapshot());
         const auto inspection=fresh->app->inspect();
         if(!inspection.ok)return {false,inspection.error};
         const auto status=fresh->app->status();
@@ -123,16 +124,22 @@ private:
         return {true,{}};
     }
     void tick() {
+        target_->refresh_usb_time();
         auto row=row_for(store_.snapshot().first,id_);
         if(!row){revoked_=true;cleanup_ok_=target_->app->stop().ok;return;}
         // Paused and crash-retained assignments also observe offline takeover.
         // Do not interrupt a running job selected to finish locally.
         if((!target_->app->active() || target_->app->phase()==WtpSchedulePhase::Waiting) && !reconcile(*row))return;
         if(recover_.exchange(false)) {
+            target_->usb_cancelled=false;
             (void)target_->app->stop();
             auto result=target_->app->recover();
             if(!result.ok && target_->app->status().session_phase==wtp::SessionPhase::IdentityChanged)
                 result=recover_restarted_output(*row);
+            if(result.ok) {
+                (void)target_->reconcile_usb_binding();
+                if(target_->has_usb_binding_fault())result={false,"USB device identity changed. Reconcile matching USB control channels before another job."};
+            }
             cleanup_ok_=result.ok;
             if(result.ok && reconcile(*row)) {clear_in_flight();publish("paused","Output reconciled. Resume to schedule future slots.");}
             else publish("recovery_required",result.error);
@@ -165,6 +172,7 @@ private:
         if(row->at("in_flight").get<bool>()) {publish("recovery_required","A previous process may have dispatched this job. Reconcile before resuming.");return;}
         // Read-only reconnect and revocation observation precede each new slot.
         if(!reconcile(*row))return;
+        target_->refresh_usb_time(true);
         const auto inspection=target_->app->inspect();
         if(!inspection.ok){publish("paused",inspection.error);return;}
         check_caps(*row,target_->app->status());
