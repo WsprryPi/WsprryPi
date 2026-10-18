@@ -9,6 +9,10 @@
 #include "wtp_integration/usb_cdc.hpp"
 #include "wtp_integration/tls.hpp"
 #include "wtp_integration/plain_tcp.hpp"
+#include "pico_usb_installer.hpp"
+#include "pico_usb_installer_state.hpp"
+#include <filesystem>
+#include <fstream>
 #include <cstdlib>
 #include <memory>
 #include <mutex>
@@ -25,6 +29,8 @@ std::shared_ptr<NativeRuntime> require() {
   auto r = get();
   if (!r)
     throw std::runtime_error("Pico backend is not selected");
+  if (r->settings.transport == "usb" && wsprrypi::pico_usb_update_blocked(r->settings.usb_serial))
+    throw std::runtime_error("Selected Pico is in firmware maintenance; finish or recover its update first");
   return r;
 }
 } // namespace
@@ -106,7 +112,7 @@ void select_wtp_runtime(const std::optional<WtpSettings> &settings) {
 bool wtp_runtime_selected() noexcept { return static_cast<bool>(get()); }
 bool wtp_runtime_ready() noexcept {
   auto r = get();
-  return r && r->app->ready();
+  return r && !(r->settings.transport == "usb" && wsprrypi::pico_usb_update_blocked(r->settings.usb_serial)) && r->app->ready();
 }
 bool wtp_runtime_invalidate_for_reload() {
   std::lock_guard operation(operation_mutex);
@@ -189,12 +195,13 @@ void wtp_runtime_poll_usb_time() {
   std::unique_lock operation(operation_mutex,std::try_to_lock);
   if (!operation) return;
   auto r=get();
-  if (r && r->settings.transport=="usb") r->refresh_usb_time();
+  if (r && r->settings.transport=="usb" && !wsprrypi::pico_usb_update_blocked(r->settings.usb_serial)) r->refresh_usb_time();
 }
 void wtp_runtime_poll_idle() {
   std::unique_lock operation(operation_mutex, std::try_to_lock);
   if (!operation) return;
   auto r = get();
+  if (r && r->settings.transport=="usb" && wsprrypi::pico_usb_update_blocked(r->settings.usb_serial)) return;
   if (r && r->consumer_management) {
     if (!r->consumer_management->active()) r->consumer_management->clear();
     // This selected management path owns its authenticated context and needs
@@ -207,6 +214,8 @@ wsprrypi::CleanupResult wtp_runtime_recover() {
   std::lock_guard operation(operation_mutex);
   auto r = get();
   if (!r) return {false, "Pico is not selected"};
+  if (r->settings.transport=="usb" && wsprrypi::pico_usb_update_blocked(r->settings.usb_serial))
+    return {false,"Finish or recover the selected Pico firmware update first"};
   auto result=r->app->recover();
   if (result.ok) {
     (void)r->reconcile_usb_binding();
@@ -223,6 +232,7 @@ std::string wtp_runtime_json() {
   j["now_ms"] = std::to_string(r->clock.now_ms());
   j["selected"] = true;
   j["transport"] = r->settings.transport;
+  if (r->settings.transport=="usb") j["firmware_maintenance"]=wsprrypi::pico_usb_update_blocked(r->settings.usb_serial);
   if (r->settings.transport == "network" || r->settings.transport == "network_plain") {
     const auto n = r->settings.transport == "network" ? r->tls.observation()
                                                        : r->plain.observation();
@@ -235,6 +245,9 @@ std::string wtp_runtime_json() {
   }
   if (r->settings.transport == "usb") {
     j["usb"] = r->usb_status();
+    j["usb_serial"]=r->settings.usb_serial;
+    std::unique_lock selection_lock(operation_mutex,std::try_to_lock);
+    if(selection_lock.owns_lock()) j["firmware_selection_id"]=r->management_selection_id;
     const auto &name = j["usb"]["hostname"];
     if (name.is_object()) { j["common_name"] = name.value("saved",""); j["name_pending_restart"] = name.value("pending_restart",false);
       j["common_name_confirmed"] = j["usb"].value("name_confirmed",false) &&
@@ -271,6 +284,165 @@ wsprrypi::CleanupResult wtp_runtime_cancel_job(const std::string &job_id) {
     return {false, "Only the current host-owned job may be cancelled"};
   return r->app->stop();
 }
+
+wsprrypi::PicoHttpResponse wtp_runtime_firmware(const std::string &method, const std::string &body) {
+  using nlohmann::json;
+  static wsprrypi::PicoUsbInstallerTask task;
+  const auto failure=[](unsigned code,const std::string& reason) {
+    return wsprrypi::PicoHttpResponse{code,json{{"error",{{"message",reason}}}}.dump(),{}};
+  };
+  auto r=get();
+  if (!r || r->settings.transport!="usb" || !wsprrypi::pico_usb_serial(r->settings.usb_serial))
+    return failure(409,"Select a Pico connected to this Pi by USB first.");
+  const auto in_progress=task.status();
+  if(method=="GET" && in_progress.value("running",false) &&
+      in_progress.value("bound_serial","")==r->settings.usb_serial) {
+    auto state=wsprrypi::pico_usb_public_task(in_progress);
+    state["serial"]=in_progress.at("bound_serial"); state["selection_id"]=in_progress.at("bound_selection");
+    state["device_id"]=in_progress.at("bound_device"); state["installed_version"]=nullptr;
+    state["maintenance"]=wsprrypi::pico_usb_update_blocked(r->settings.usb_serial);
+    state["default_branch"]="main";
+    return {200,state.dump(),{}};
+  }
+  std::unique_lock selection_lock(operation_mutex,std::try_to_lock);
+  if(!selection_lock.owns_lock()) return failure(409,"The selected Pico is busy; read firmware status again shortly.");
+  const auto identity=r->app->status().identity;
+  const std::string serial=r->settings.usb_serial, selection=r->management_selection_id;
+  const auto public_status=[&] {
+    auto state=wsprrypi::pico_usb_public_task(task.status());
+    if (state.value("bound_serial",serial)!=serial) state={{"running",false},{"result",nullptr}};
+    state["serial"]=serial; state["selection_id"]=selection;
+    state["device_id"]=identity?json(identity->device_id):json(nullptr);
+    state["installed_version"]=identity?json(identity->firmware_version):json(nullptr);
+    state["maintenance"]=wsprrypi::pico_usb_update_blocked(serial);
+    state["default_branch"]="main";
+    if(state["maintenance"]==true) {
+      try { const auto hold=wsprrypi::pico_usb_read_hold(wsprrypi::pico_usb_hold_path(serial));
+        state["recovery_plan_id"]=hold.at("plan_id"); state["recovery_version"]=hold.at("version");
+      } catch(...) { state["recovery_record_unavailable"]=true; }
+    }
+    return state;
+  };
+  if (method=="GET") return {200,public_status().dump(),{}};
+  if (method!="POST") return failure(405,"Unsupported firmware operation.");
+  if (body.size()>2048) return failure(413,"Firmware request is too large.");
+  try {
+    const auto input=wsprrypi::strict_browser_json(body);
+    if (!input.is_object() || input.value("selection_id","")!=selection)
+      return failure(409,"Read the selected USB Pico again before requesting firmware work.");
+    const auto action=input.at("action").get<std::string>();
+    const auto entry=std::filesystem::path("/usr/local/lib/wsprrypi/pico-usb/entry.py");
+    if (!wsprrypi::pico_usb_entry_protected(entry))
+      return failure(409,"The shared Pico USB installer is missing or not root-protected. Update the Pi package first.");
+    const std::vector<std::string> base{"/usr/bin/python3","-I",entry.string()};
+    const auto marker=wsprrypi::pico_usb_hold_path(serial);
+    if (action=="plan") {
+      if (!identity || wsprrypi::pico_usb_update_blocked(serial))
+        return failure(409,"Reconcile the selected Pico or recover its outstanding firmware transaction first.");
+      for (auto field=input.begin();field!=input.end();++field)
+        if(field.key()!="action" && field.key()!="selection_id" && field.key()!="branch" && field.key()!="version" && field.key()!="stable")
+          return failure(400,"Unsupported firmware plan field.");
+      const std::string branch=input.value("branch",std::string("main"));
+      if (branch!="main" && branch!="devel") return failure(400,"Select main or devel explicitly.");
+      auto args=base;
+      args.insert(args.end(),{"plan","--branch",branch});
+      if(input.contains("version")) args.insert(args.end(),{"--version",input.at("version").get<std::string>()});
+      if(input.contains("stable")) { if(input.at("stable")!=true || input.contains("version")) return failure(400,"Select one image source."); args.push_back("--stable"); }
+      const auto plan=wsprrypi::wtp_random_identity();
+      const auto destination=std::filesystem::path("/var/cache/wsprrypi/pico-usb")/plan;
+      args.insert(args.end(),{"--output",destination.string()});
+      const bool started=task.start([args,plan] {
+        try { auto result=wsprrypi::pico_usb_installer_process(args); result["plan_id"]=plan; return result; }
+        catch(const std::exception& error) { return json{{"ok",false},{"error",error.what()},{"recovery_required",false}}; }
+      },{{"operation","plan"},{"plan_id",plan},{"branch",branch},{"bound_serial",serial},
+         {"bound_device",identity->device_id},{"bound_selection",selection}});
+      return started?wsprrypi::PicoHttpResponse{202,public_status().dump(),{}}:failure(409,"Firmware work is already running.");
+    }
+    if (input.size()!=4 || input.at("confirmed")!=true || (action!="upgrade" && action!="recover"))
+      return failure(400,"A firmware operation requires an explicit confirmed plan.");
+    const auto planned=task.status();
+    const auto plan=input.at("plan_id").get<std::string>();
+    json expected;
+    std::filesystem::path bundle;
+    std::string branch;
+    if(action=="upgrade") {
+      if (!identity || planned.value("running",false) || planned.value("operation","")!="plan" ||
+          planned.value("plan_id","")!=plan || planned.value("bound_serial","")!=serial ||
+          planned.value("bound_device","")!=identity->device_id || planned.value("bound_selection","")!=selection ||
+          !planned.at("result").value("ok",false) || wsprrypi::pico_usb_update_blocked(serial))
+        return failure(409,"Download and review a fresh plan for this selected USB Pico.");
+      branch=planned.at("branch").get<std::string>(); expected=planned.at("result");
+      expected["device_id"]=identity->device_id; expected["plan_id"]=plan; expected["serial"]=serial;
+      bundle=std::filesystem::path("/var/cache/wsprrypi/pico-usb")/plan;
+    } else {
+      expected=wsprrypi::pico_usb_read_hold(marker);
+      if(expected.at("serial")!=serial || expected.at("plan_id")!=plan)
+        return failure(409,"Read the outstanding transaction for this selected Pico first.");
+      branch=expected.at("branch").get<std::string>();
+      if(!expected.contains("transaction") && !expected.value("verified",false))
+        return failure(409,"Host interruption needs administrator recovery with the private transaction record. Keep this Pico paused.");
+    }
+    const bool started=task.start([r,serial,selection,branch,base,bundle,expected,marker,action]() mutable {
+      std::lock_guard operation(operation_mutex);
+      if (get()!=r || r->management_selection_id!=selection)
+        throw std::runtime_error("Selected Pico changed; read its firmware status again.");
+      json result={{"ok",false},{"error","Pico is busy or ownership is unresolved."},{"recovery_required",false}};
+      const auto run=[&] {
+        std::lock_guard connection(r->usb_connection_mutex);
+        if(action=="upgrade") { expected["branch"]=branch; wsprrypi::pico_usb_save_hold(marker,expected,true); }
+        if (r->usb_management) r->usb_management->close();
+        r->management_usb.close(); r->usb_unavailable(); r->updater_lease.reset();
+        if(action=="recover" && expected.value("verified",false)) result={{"ok",true},{"stage","complete"},{"serial",serial},{"source",expected.at("source")},{"version",expected.at("version")},{"target",expected.at("verified_target")}};
+        else {
+          auto args=base;
+          if(action=="recover") args.insert(args.end(),{"recover","--transaction",expected.at("transaction").get<std::string>()});
+          else args.insert(args.end(),{"upgrade","--branch",branch,"--bundle",bundle.string()});
+          args.insert(args.end(),{"--device",serial,"--board","pico2_w","--yes","--state-dir","/var/lib/wsprrypi/pico-usb"});
+          result=wsprrypi::pico_usb_installer_process(args);
+        }
+        if(result.contains("transaction")) expected["transaction"]=result.at("transaction");
+        if(result.value("ok",false)) {
+          if(result.value("stage","")!="complete" || result.value("serial","")!=serial ||
+              result.value("source","")!=expected.at("source").get<std::string>() || result.value("version","")!=expected.at("version").get<std::string>())
+            throw std::runtime_error("Shared installer did not verify the reviewed Pico image.");
+          const auto& target=result.at("target");
+          const auto boot=target.at("boot_id").get<std::string>();
+          if(target.value("scope","")!="member" || target.at("device_id")!=expected.at("device_id") ||
+              boot.size()!=32 || boot.find_first_not_of("0123456789abcdef")!=std::string::npos)
+            throw std::runtime_error("Shared installer target binding is invalid.");
+          expected["verified"]=true;
+          expected["verified_target"]=result.at("target");
+        }
+        wsprrypi::pico_usb_save_hold(marker,expected);
+      };
+      const bool admitted=action=="recover"?(run(),true):r->app->idle_management(run,false,false);
+      if (!admitted) return result;
+      if (result.value("ok",false) || !result.value("recovery_required",true)) {
+        // Keep the durable marker blocking every scheduler/frontend until
+        // only this serialized recovery path verifies the new USB session.
+        r->verified_update_reconnect=true;
+        bool reconnected=false;
+        try {
+          reconnected=r->app->inspect().ok && r->reconcile_usb_binding();
+          const auto observed=r->app->status().identity;
+          reconnected=reconnected && observed && observed->device_id==expected.at("device_id").get<std::string>() &&
+              (!result.value("ok",false) || (observed->firmware_version==expected.at("version").get<std::string>() &&
+               observed->boot_id==expected.at("verified_target").at("boot_id").get<std::string>()));
+          r->verified_update_reconnect=false;
+        } catch(...) { r->verified_update_reconnect=false; throw; }
+        if(reconnected) wsprrypi::pico_usb_remove_hold(marker);
+        else {
+          result["ok"]=false; result["recovery_required"]=true;
+          result["error"]="Pi reconnection remains unconfirmed. Keep this Pico in maintenance and retry recovery.";
+        }
+      }
+      return result;
+    },{{"operation",action},{"plan_id",plan},{"branch",branch},{"bound_serial",serial},
+       {"bound_device",expected.at("device_id")},{"bound_selection",selection}});
+    return started?wsprrypi::PicoHttpResponse{202,public_status().dump(),{}}:failure(409,"Firmware work is already running.");
+  } catch (const std::exception& error) { return failure(400,error.what()); }
+}
+
 wsprrypi::PicoHttpResponse wtp_runtime_management(const std::string &resource,
     const std::string &method, const std::string &body, const std::string &revision,
     const std::string &expected_selection) {
@@ -278,6 +450,8 @@ wsprrypi::PicoHttpResponse wtp_runtime_management(const std::string &resource,
   if (!operation.owns_lock()) return {409, R"({"error":{"code":"busy"}})", {}};
   auto r = get();
   if (!r) return {409, R"({"error":{"code":"member_not_selected"}})", {}};
+  if(method!="GET" && r->settings.transport=="usb" && wsprrypi::pico_usb_update_blocked(r->settings.usb_serial))
+    return {409,R"({"error":{"code":"firmware_maintenance"}})",{}};
   if (!expected_selection.empty() && expected_selection != r->management_selection_id)
     return {409,R"({"error":{"code":"member_read_required"}})",{}};
   wsprrypi::PicoHttpResponse response;

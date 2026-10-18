@@ -103,3 +103,6 @@ for the original host-software review and its Phase 11.7 addendum. WsprryPico's
 [authoritative joint closure](https://github.com/WsprryPi/WsprryPico/blob/devel/docs/development/phase11-7-review.md)
 closes Phase 11 within its documented software, bounded physical and scoped
 conducted-RF acceptance; it does not claim release qualification.
+
+USB firmware installation for a selected Pico is under validation; see
+[the implementation and deployment notes](docs/pico-usb-installer.md).

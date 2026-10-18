@@ -8,6 +8,7 @@
 #include "configuration.hpp"
 #include "output_lease.hpp"
 #include "usb_management.hpp"
+#include "../pico_usb_installer_state.hpp"
 #include <cstdlib>
 #include <memory>
 namespace wsprrypi {
@@ -30,6 +31,8 @@ struct WtpTargetRuntime {
   wsprrypi::WtpSystemScheduleClock clock{wsprrypi::wtp_host_utc_valid};
   wsprrypi::PosixCdcSystem system;
   wsprrypi::UsbCdcStream stream{system};
+  std::shared_ptr<void> updater_lease;
+  std::atomic_bool verified_update_reconnect{false};
   wsprrypi::TlsStream tls{[this] { return clock.now_ms(); }};
   wsprrypi::PlainTcpStream plain{[this] { return clock.now_ms(); }};
   std::shared_ptr<wsprrypi::TlsCredentials> credentials;
@@ -74,6 +77,7 @@ struct WtpTargetRuntime {
   bool ensure_usb_management() {
     std::lock_guard connection(usb_connection_mutex);
     if (settings.transport != "usb") return usb_unavailable();
+    if (pico_usb_update_blocked(settings.usb_serial) && !verified_update_reconnect) return usb_unavailable();
     if (!usb_management_for_test) {
       if (const char *disabled = std::getenv("WSPRRYPI_DISABLE_HARDWARE_ACCESS");
           disabled && std::string(disabled) == "1") return usb_unavailable();
@@ -197,6 +201,7 @@ struct WtpTargetRuntime {
            (credentials && credentials->matches(wsprrypi::TlsCredentials(network_selection())));
   }
   bool reopen() {
+    if (settings.transport == "usb" && pico_usb_update_blocked(settings.usb_serial) && !verified_update_reconnect) return false;
     if (const char *disabled = std::getenv("WSPRRYPI_DISABLE_HARDWARE_ACCESS");
         disabled && std::string(disabled) == "1") return false;
     if (settings.transport == "network") {
@@ -218,6 +223,8 @@ struct WtpTargetRuntime {
       } catch (...) { plain.close(); return false; }
     }
     stream.close();
+    try { if (!updater_lease) updater_lease=pico_usb_runtime_lease(settings.usb_serial); }
+    catch (...) { return false; }
     if (!stream.begin_open({settings.path, settings.usb_serial,
                             static_cast<std::uint16_t>(settings.vendor_id),
                             static_cast<std::uint16_t>(settings.product_id)}, clock.now_ms()))

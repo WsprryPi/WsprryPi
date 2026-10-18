@@ -198,6 +198,32 @@
             <p class="form-text mt-2 mb-0" id="wtp-recover-hint">Checks an idle device, or reconnects the current session to resolve its owned job. Recovery may stop that job. It never resumes a transmission or takes another owner's job.</p>
             <p id="wtp-feedback" class="form-text mt-2 mb-0" role="status" aria-live="polite"></p>
         </div>
+        <details id="wtp-firmware" class="wtp-status mt-3" hidden>
+            <summary class="cw-control-section__title">Pico firmware over USB</summary>
+            <p class="form-text">Updates the Pico connected to this Pi by USB and preserves its saved settings. The Pico must be idle and unowned. Keep the USB cable connected until verification finishes.</p>
+            <p id="wtp-firmware-identity" class="text-break">Read the selected Pico first.</p>
+            <div class="row gx-3 gy-3">
+                <div class="col-12 col-lg-4">
+                    <label class="form-label" for="wtp-firmware-branch">Firmware branch</label>
+                    <select id="wtp-firmware-branch" class="form-select"><option value="main">main</option><option value="devel">devel</option></select>
+                </div>
+                <div class="col-12 col-lg-4">
+                    <label class="form-label" for="wtp-firmware-source">Image selection</label>
+                    <select id="wtp-firmware-source" class="form-select"><option value="latest">Latest verified CI image</option><option value="version">Specific CI version</option><option value="stable">Stable release</option></select>
+                </div>
+                <div id="wtp-firmware-version-field" class="col-12 col-lg-4" hidden>
+                    <label class="form-label" for="wtp-firmware-version">CI version</label>
+                    <input id="wtp-firmware-version" class="form-control" type="text" maxlength="80" placeholder="0.1.0-ci.RUN.ATTEMPT" autocomplete="off" spellcheck="false">
+                </div>
+            </div>
+            <div class="d-flex flex-wrap gap-2 mt-3">
+                <button id="wtp-firmware-read" class="btn btn-outline-primary" type="button">Read firmware status</button>
+                <button id="wtp-firmware-plan" class="btn btn-outline-primary" type="button" disabled>Download and check image</button>
+                <button id="wtp-firmware-upgrade" class="btn btn-primary" type="button" disabled>Install checked image</button>
+                <button id="wtp-firmware-recover" class="btn btn-outline-danger" type="button" hidden disabled>Recover this update</button>
+            </div>
+            <p id="wtp-firmware-feedback" class="form-text mt-3 mb-0 text-break" role="status" aria-live="polite">main is selected by default. No firmware download or device change has been requested.</p>
+        </details>
         <details id="wtp-management" class="wtp-status mt-3" hidden>
             <summary class="cw-control-section__title">Pico standalone settings and Wi-Fi</summary>
             <p class="form-text">These settings belong to Pico's standalone scheduler, separate from WsprryPi's schedule. Management is available only while the host has no pending, owned or unresolved job. Saves preserve settings outside this form. Network or pin changes may require a Pico restart; each save reports the requirement.</p>

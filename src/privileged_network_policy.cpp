@@ -90,6 +90,8 @@ PrivilegedOperationClass classify_privileged_http_operation(
     }
 
     if (path.starts_with("/api/v1/")) {
+        if (path == "/api/v1/member/firmware" && (method == "GET" || method == "POST"))
+            return PrivilegedOperationClass::protected_operation;
         if (((method == "GET" || method == "PUT") &&
              (path == "/api/v1/member/wifi" || path == "/api/v1/member/hostname")) ||
             (method == "DELETE" && path == "/api/v1/member/wifi") ||

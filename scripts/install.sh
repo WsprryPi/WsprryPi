@@ -7258,6 +7258,16 @@ manage_support_bundle_runtime() {
     debug_end "$debug"
 }
 
+manage_pico_usb_runtime() {
+    local debug
+    debug=$(debug_start "$@")
+    eval set -- "$(debug_filter "$@")"
+    # shellcheck source=scripts/pico_usb_runtime_install.sh
+    source "${LOCAL_REPO_DIR}/scripts/pico_usb_runtime_install.sh" || return 1
+    pico_usb_runtime_provision "$ACTION" "$LOCAL_REPO_DIR" "$debug" || return 1
+    debug_end "$debug"
+}
+
 # Install the application-owned route companion from the selected checkout.
 manage_route_application() {
     if [[ "$ACTION" == "install" ]]; then
@@ -9726,6 +9736,7 @@ manage_wsprry_pi() {
         "prepare_install_executable \"$WSPR_EXE\""
         "manage_exe \"$WSPR_EXE\""
         "manage_support_bundle_runtime"
+        "manage_pico_usb_runtime"
         "manage_route_application"
         "manage_config \"$WSPR_INI\" \"/usr/local/etc/\""
         "manage_i2c"

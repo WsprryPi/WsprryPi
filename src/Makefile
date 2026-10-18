@@ -2113,3 +2113,13 @@ $(WTP_NETWORK_BUILD_DIR)/usb-pair/%.o: %.cpp
 	$(Q)mkdir -p "$(dir $@)"
 	$(Q)$(CXX) $(WTP_NETWORK_FLAGS) -MMD -MP -c "$<" -o "$@"
 -include $(WTP_USB_PAIR_OBJECTS:.o=.d)
+
+.PHONY: pico-usb-installer-test pico-usb-installer-cpp-test
+pico-usb-installer-cpp-test:
+	$(Q)mkdir -p "$(WTP_NETWORK_BUILD_DIR)"
+	$(Q)$(CXX) $(WTP_NETWORK_FLAGS) tests/pico_usb_installer_test.cpp -o "$(WTP_NETWORK_BUILD_DIR)/pico_usb_installer_test"
+	$(Q)"$(WTP_NETWORK_BUILD_DIR)/pico_usb_installer_test"
+
+pico-usb-installer-test: pico-usb-installer-cpp-test
+	$(Q)node ../WsprryPi-UI/tests/wtp_firmware_test.js
+	$(Q)python3 -B ../scripts/tests/pico_usb_deploy_test.py

@@ -211,7 +211,11 @@ void register_control(
         }
         const bool context = browser_request->mutation_context;
         wsprrypi::PicoHttpResponse result;
-        if (request.path == "/api/v1/host/fleet") {
+        if (request.path == "/api/v1/member/firmware") {
+            result = request.method == "GET" || context
+                ? wtp_runtime_firmware(request.method, request.body)
+                : wsprrypi::PicoHttpResponse{403, R"({"error":{"code":"origin_or_content_type"}})", {}};
+        } else if (request.path == "/api/v1/host/fleet") {
             result = request.method == "GET" || context
                 ? wsprrypi::wtp_fleet_api(request.method, request.body, request.get_header_value("If-Match"))
                 : wsprrypi::PicoHttpResponse{403, R"({"error":{"code":"origin_or_content_type"}})", {}};

@@ -35,6 +35,9 @@ int main() {
       CHECK(classify_privileged_http_operation("DELETE",path)==PrivilegedOperationClass::reject);
       CHECK(classify_privileged_http_operation("PUT",path)==((std::string(resource)=="station"||std::string(resource)=="hardware") ? PrivilegedOperationClass::protected_operation : PrivilegedOperationClass::reject));
     }
+    CHECK(classify_privileged_http_operation("GET","/api/v1/member/firmware")==PrivilegedOperationClass::protected_operation);
+    CHECK(classify_privileged_http_operation("POST","/api/v1/member/firmware")==PrivilegedOperationClass::protected_operation);
+    CHECK(classify_privileged_http_operation("PUT","/api/v1/member/firmware")==PrivilegedOperationClass::reject);
     CHECK(classify_privileged_http_operation("POST","/api/v1/member/pins/validate")==PrivilegedOperationClass::protected_operation);
     CHECK(classify_privileged_http_operation("GET", "/api/v1/member/configuration") == PrivilegedOperationClass::protected_operation);
     CHECK(classify_privileged_http_operation("POST", "/api/v1/member/configuration") == PrivilegedOperationClass::protected_operation);

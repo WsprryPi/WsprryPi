@@ -161,6 +161,8 @@
                     : time?.selected_source ? `Active Pico source: ${time.selected_source}. USB observation ${time.accepted ? "accepted" : "not selected"}; clock admission remains required.`
                     : time?.reason ? `USB time unavailable: ${time.reason}. Pico clock admission remains required.` : "USB time has not been confirmed";
         }
+        root.WtpFirmware?.setAvailability(visible && selected() && transport === "usb" && snapshot?.selected === true,
+            JSON.stringify([read()["USB Serial"], read().Endpoint, read()["Device ID"]]), snapshot?.firmware_selection_id || "");
         root.WtpUsbSettings?.setAvailability(visible && selected() && transport === "usb" && snapshot?.management_available === true);
         const state = summarize(snapshot);
         for (const [id, value] of [["wtp-status-text", state.text], ["wtp-output", state.output], ["wtp-clock", state.clock], ["wtp-identity", state.identity], ["wtp-history", state.history]]) byId(id).textContent = value;

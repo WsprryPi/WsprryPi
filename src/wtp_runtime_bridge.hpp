@@ -30,6 +30,7 @@ std::string wtp_runtime_json();
 wsprrypi::PicoHttpResponse wtp_runtime_management(const std::string &resource,
     const std::string &method, const std::string &body, const std::string &revision,
     const std::string &expected_selection = {});
+wsprrypi::PicoHttpResponse wtp_runtime_firmware(const std::string &method, const std::string &body);
 wsprrypi::CleanupResult wtp_runtime_cancel_job(const std::string &job_id);
 // Holds the runtime operation gate while a bounded read-only identification
 // callback runs. It never claims or changes the active endpoint.
