@@ -156,12 +156,14 @@ async function main() {
             return result.result.value;
         };
         await waitFor(async () => await evaluate('document.readyState === "complete" && !!window.WtpUi && !!window.WtpManagement'), 'WTP scripts');
-        assert.equal(await evaluate('document.getElementById("fleet-tab-item").hidden'), true);
-        assert.equal(await evaluate('document.getElementById("fleet-tab").classList.contains("active")'), false);
-        assert.equal(await evaluate('new URL(location.href).searchParams.has("setup_tab")'), false);
-        assert.equal(await evaluate('document.getElementById("fleet-tab").disabled'), true);
+        assert.equal(await evaluate('document.getElementById("fleet-tab-item").hidden'), false);
+        await waitFor(async () => await evaluate('document.getElementById("fleet-tab").classList.contains("active")'), 'Fleet deep link');
+        assert.equal(await evaluate('new URL(location.href).searchParams.get("setup_tab")'), '#fleet-pane');
+        assert.equal(await evaluate('document.getElementById("fleet-tab").disabled'), false);
         assert.equal(await evaluate('document.getElementById("wtp-controls").closest("[role=tabpanel]").id'), 'fleet-pane');
         // Saved navigation values are literal targets, never CSS selectors.
+        await evaluate('document.getElementById("transmitter-hardware-tab").click()');
+        await waitFor(async () => await evaluate('document.getElementById("transmitter-hardware-tab").classList.contains("active")'), 'Transmitter before invalid saved navigation');
         for (const target of ['#fleet-pane"]', '"] , #fleet-tab, [data-bs-target="x', '#missing-pane']) {
             await evaluate(`(() => {
                 const tabs=document.getElementById('configTabs');
@@ -204,7 +206,7 @@ async function main() {
             window.__remoteFailure = false;
             window.__statusFailure = false;
             window.__discoveryState = "active";
-            window.__snapshot = { selected:true, transport:'network', ready:true, host_utc_valid:true, phase:'idle', session_phase:'ready', now_ms:'10000', status_observed_ms:'1000',
+            window.__snapshot = { selected:true, firmware_maintenance:false, transport:'network', ready:true, host_utc_valid:true, phase:'idle', session_phase:'ready', now_ms:'10000', status_observed_ms:'1000',
                 remote:{output_active:false}, owns:false, network:{hostname:'wsprrypico-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.local',port:18443,expected_identity:'wsprrypico-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.local',resolved_address:'192.0.2.27',authenticated_identity:'wsprrypico-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.local',state:'ready',observed_ms:'9000'} };
             window.fetch = async (url, options = {}) => {
                 window.__requests.push({url,options});
@@ -242,6 +244,7 @@ async function main() {
             document.getElementById('fleet-tab').click();
         })()`);
         await waitFor(async () => await evaluate('document.getElementById("wtp-network-state").textContent.includes("192.0.2.27")'), 'network snapshot');
+        await waitFor(async () => await evaluate('!window.PicoFirmwareSafety.locked'), 'host firmware maintenance status');
         assert.equal(await evaluate('document.getElementById("fleet-tab").classList.contains("active")'), true);
         await waitFor(async () => await evaluate('document.getElementById("fleet-device").options.length === 2'), 'Fleet catalog');
         assert.equal(await evaluate('document.getElementById("fleet-device").value'), 'known:'+'c'.repeat(32));

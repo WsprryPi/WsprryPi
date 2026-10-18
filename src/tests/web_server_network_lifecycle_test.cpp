@@ -1,6 +1,7 @@
 #include "../privileged_network_runtime.hpp"
 #include "../web_server.hpp"
 #include "../httplib.hpp"
+#include "../json.hpp"
 
 #include <atomic>
 #include <cassert>
@@ -69,7 +70,10 @@ public:
             httplib::Client client("127.0.0.1", port);
             httplib::Headers headers{{"Host", "wsprrypi"}};
             auto observation = client.Get("/api/wtp", headers);
-            assert(observation && observation->status == 200 && observation->body == "{\"selected\":false}");
+            assert(observation && observation->status == 200);
+            const auto snapshot = nlohmann::json::parse(observation->body);
+            assert(snapshot.at("selected") == false);
+            assert(snapshot.at("firmware_maintenance") == false);
             assert(observation->get_header_value("Cache-Control") == "no-store");
             for (const auto &body : {"{}", "[]", "{\"operation\":\"resume\"}", "{\"operation\":\"reconcile\",\"operation\":\"reconcile\"}"}) {
                 auto response = client.Post("/api/wtp/recover", headers, body, "application/json");

@@ -165,7 +165,7 @@ async function main() {
                 }
                 if(path.endsWith('/host/devices')){if(window.__catalogLoadFailure)throw new Error('Catalog unavailable');return reply({scope:'wsprrypi-wtp-catalog/1',version:1,active_id:'',profiles:[{id:'1'.repeat(32),name:'New Pi',method:'manual',discovery_id:'',legacy_unverified:false,settings:window.__settings}]},200,'"catalog-r1"');}
                 if(path.endsWith('/host/discovery'))return reply({available:true,candidates:[]});
-                if(path.endsWith('/status'))return reply({host:{selected:false,ready:false,phase:'idle',session_phase:'disconnected'}});
+                if(path.endsWith('/status'))return reply({host:{selected:false,firmware_maintenance:false,ready:false,phase:'idle',session_phase:'disconnected'}});
                 return reply({});
             };
             window.confirm=()=>{throw new Error('Fleet must not use native confirmation');};
@@ -174,6 +174,7 @@ async function main() {
             const style=document.createElement('style');style.textContent='*{scroll-behavior:auto!important}';document.head.append(style);
         })()`;
         await evaluate(mock);
+        await waitFor(async () => await evaluate('!window.PicoFirmwareSafety.locked'), 'host firmware maintenance status');
         await evaluate(`configAutosaveSuspended=true;clearPendingPopulateConfigRetry();clearConfigLoadFailureState();document.getElementById('fleet-tab').click();`);
         await waitFor(async () => await evaluate('document.getElementById("fleet-output-list").textContent.includes("Garden Pico")'), 'independent output rows');
         assert.equal(await evaluate('WtpUi.selected()'), false);
@@ -292,6 +293,7 @@ async function main() {
         await client.send('Page.navigate',{url:base+'?page=operation'});
         await waitFor(async()=>await evaluate('document.readyState==="complete" && !!window.LocalWtp && typeof requestTransmitEnabledChange==="function"'),'Operation view');
         await evaluate(mock);
+        await waitFor(async () => await evaluate('!window.PicoFirmwareSafety.locked'), 'host firmware maintenance status');
         await evaluate(`currentRuntimeTransmitBackend='si5351';currentTransmitUnavailableMessage=()=>'';window.__declined=false;void requestTransmitEnabledChange(true,false).fail((_,status)=>{window.__declined=status==='declined';});`);
         await waitFor(async()=>await evaluate('!document.getElementById("local-wtp-confirmation").hidden'),'local confirmation');
         await capture('local-takeover','local-wtp-control');
