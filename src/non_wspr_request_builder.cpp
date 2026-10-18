@@ -150,6 +150,10 @@ static wsprrypi::EnvelopeSettings cw_envelope_from_config(
     const ArgParserConfig &cfg)
 {
     wsprrypi::EnvelopeSettings envelope;
+    // Host envelope settings stay saved for local backends. Pico owns its RF
+    // execution and rf-events/1 does not carry amplitude shaping.
+    if (cfg.transmit_backend == TransmitBackendKind::WTP)
+        return envelope;
     envelope.fade_shape = cw_fade_shape_from_config(cfg.cw_fade_shape);
     envelope.fade_in = std::chrono::milliseconds(cfg.cw_fade_in_ms);
     envelope.fade_out = std::chrono::milliseconds(cfg.cw_fade_out_ms);

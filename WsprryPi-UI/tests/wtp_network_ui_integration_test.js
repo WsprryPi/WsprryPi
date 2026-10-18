@@ -237,7 +237,7 @@ async function main() {
                 return {ok:true,headers:{get:()=> '"remote-r1"'},json:async()=>({config:{version:1,enabled:false,station:{callsign:'AA0NT',locator:'EM18',power_dbm:20},wifi:{ssid:'Bench Wi-Fi',password:null,ntp_ipv4:'192.0.2.1'},schedules:[{period_s:120,phase_s:0}]}})};
             };
             window.WtpUi.populate({Transport:'network',Hostname:window.__snapshot.network.hostname,'TCP Port':18443,'Device ID':'a'.repeat(32),'TLS CA File':'/etc/wsprrypi/pico/ca.crt','TLS Client Certificate':'/etc/wsprrypi/pico/client.crt','TLS Client Key':'/etc/wsprrypi/pico/client.key','TLS Server Identity':'','Start Uncertainty ns':1000000,'Allow Frequency Adjustment':false,Endpoint:'/dev/preserved','USB Serial':'00001234','USB Vendor ID':51966,'USB Product ID':16402});
-            window.WtpUi.developmentControlsVisible = true;
+
             window.WtpUi.select(true);
             document.getElementById('fleet-tab').click();
         })()`);
@@ -444,9 +444,9 @@ async function main() {
         assert.equal(await evaluate('document.getElementById("wtp-remote-load").disabled'),true);
         await new Promise(resolve=>setTimeout(resolve,200));
         await capture('mobile-status-failure.png', {format:'png'});
-        await evaluate('window.WtpUi.developmentControlsVisible = false');
-        await waitFor(async () => await evaluate('document.getElementById("transmitter-hardware-tab").classList.contains("active")'), 'Transmitter tab after hiding Fleet');
-        assert.equal(await evaluate('document.getElementById("fleet-tab-item").hidden && document.getElementById("fleet-pane").hidden'), true);
+        await evaluate('document.getElementById("transmitter-hardware-tab").click()');
+        await waitFor(async () => await evaluate('document.getElementById("transmitter-hardware-tab").classList.contains("active")'), 'Transmitter tab after leaving Fleet');
+        assert.equal(await evaluate('document.getElementById("fleet-tab-item").hidden || document.getElementById("fleet-pane").hidden'), false);
         assert.equal(await evaluate('window.WtpUi.read().Hostname'), 'DrAfT.LoCaL.');
         assert.equal(client.dialogError, null);
         assert(client.dialogs.length > 0, 'saved-state review must show a real browser confirmation');

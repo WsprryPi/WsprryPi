@@ -6,4 +6,6 @@
 namespace wsprrypi {
 // Explicit host action: TLS/Plain LAN HELLO, STATUS and CAPS only. No CLAIM.
 nlohmann::json wtp_probe_network_identity(const WtpSettings &);
+// Explicit USB identification. No clock writes, CLAIM, LOAD or ARM.
+nlohmann::json wtp_probe_usb_identity(const WtpSettings &);
 }

@@ -69,8 +69,9 @@ Replace the example identity, port and files with administrator-provisioned
 values. There is no assumed production port. Other required application settings
 and safety policy still apply; this fragment is not a complete runnable station
 configuration. Keep the existing enabled-transmission/boot settings disabled
-while selecting and inspecting an endpoint. GPIO peripherals and fades remain
-incompatible with WTP. The CLI remains `--backend wtp --ini-file <file>`.
+while selecting and inspecting an endpoint. Host GPIO peripherals remain
+incompatible with WTP. Host shaping and fades are retained for local backends
+and omitted from Pico requests. The CLI remains `--backend wtp --ini-file <file>`.
 
 `Hostname` is the connection address. Blank `TLS Server Identity` verifies that
 configured hostname or literal IP. For a direct-IP connection, an explicit DNS

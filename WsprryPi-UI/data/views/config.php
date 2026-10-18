@@ -71,7 +71,7 @@ $bandGpioBands = ['2200m', '630m', '160m', '80m', '60m', '40m', '30m', '20m', '1
                             Pi I/O
                         </button>
                     </li>
-                    <li class="nav-item" id="fleet-tab-item" role="presentation" hidden>
+                    <li class="nav-item" id="fleet-tab-item" role="presentation">
                         <button
                             class="nav-link"
                             id="fleet-tab"
@@ -80,8 +80,7 @@ $bandGpioBands = ['2200m', '630m', '160m', '80m', '60m', '40m', '30m', '20m', '1
                             type="button"
                             role="tab"
                             aria-controls="fleet-pane"
-                            aria-selected="false"
-                            disabled>
+                            aria-selected="false">
                             Fleet
                         </button>
                     </li>
@@ -748,13 +747,6 @@ $bandGpioBands = ['2200m', '630m', '160m', '80m', '60m', '40m', '30m', '20m', '1
                                     </div>
                                 </div>
                                 <div id="backendStatus" class="alert mt-3 mb-0" role="alert" aria-live="assertive" aria-atomic="true" hidden></div>
-<div class="form-check mt-3 mb-3">
-    <input class="form-check-input" type="checkbox" id="wtp-show-controls" aria-controls="wtp-development" aria-describedby="wtp-show-controls-hint">
-    <label class="form-check-label" for="wtp-show-controls">Show Pico connections and settings</label>
-    <div class="form-text" id="wtp-show-controls-hint">View USB and Wi-Fi connections without changing the selected transmitter or saving settings.</div>
-</div>
-                                <p id="wtp-hidden-selection" class="form-text mt-2 mb-0" hidden>Pico is selected. Connections and settings are hidden.</p>
-
                                 <div class="transmitter-backend-fields" id="gpio-backend-panel" role="group" aria-labelledby="gpio-output-heading">
 
                                 <h3 id="gpio-output-heading" class="transmitter-backend-fields__title">GPIO output</h3>
@@ -1255,8 +1247,7 @@ $bandGpioBands = ['2200m', '630m', '160m', '80m', '60m', '40m', '30m', '20m', '1
                             id="fleet-pane"
                             role="tabpanel"
                             aria-labelledby="fleet-tab"
-                            tabindex="0"
-                            hidden>
+                            tabindex="0">
                             <div class="config-pane-intro">
                                 <span class="config-pane-intro__label">Fleet</span>
                                 <p class="mb-0">Manage saved Pi and Pico outputs and assign their schedules.</p>

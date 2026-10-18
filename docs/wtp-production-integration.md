@@ -12,18 +12,14 @@ qualification remain separate acceptance work.
 
 ## Selection and configuration
 
-On Signal Setup, select **Show Pico connections and settings**. This exposes
-the ordinary connection/status/management workflow without browser-console
-commands. It does not save configuration, select a backend or enable output.
-The existing typed `WtpUi.developmentControlsVisible` development property
-remains available for advanced fleet scheduling; it resets on reload.
+Open **Setup → Fleet** for device discovery, connection settings, member
+management and independent output schedules. The tab is available on each page
+load without a console command or visibility preference. Browsing it does not
+save configuration, select a backend or enable output.
 
-**Use Pico** is the separate, persisted backend selection. Hiding the
-controls preserves saved selection and field drafts; a passive notice identifies
-Pico when it remains selected. Visibility changes do not save configuration,
-enable transmission, select another output, reconcile the device or clear
-recovery faults. Status polling continues while Pico is selected, even when its
-controls are hidden. The visibility preference is local to the page and is not an access-control boundary.
+**Use Pico** is the separate, persisted backend selection. Device and schedule
+changes retain their explicit actions, ownership checks and recovery rules.
+Status polling observes the current selection without initiating recovery.
 
 An explicit USB endpoint requires all of the following:
 
@@ -54,7 +50,10 @@ no migration. Active incomplete or malformed settings are rejected before
 runtime mutation. Settings for inactive GPIO and Si5351 backends are retained.
 WTP uses zero host PPM, GPIO output and electrical drive controls. Enabled LED,
 amplifier, shutdown and band-selector GPIO, including per-frequency `@` selectors,
-are rejected while WTP is selected. Unsupported fades are rejected as well.
+are rejected while WTP is selected. Saved host envelope shaping and fade
+settings do not block selection. They remain in the configuration for local
+backends; Pico QRSS, FSKCW and DFCW requests omit them. WTP `rf-events/1` still
+rejects an explicitly shaped execution plan that it cannot represent.
 
 The CLI selects the backend with `--backend wtp`; endpoint fields come from the
 file supplied by `--ini-file` (`-i`). There are no endpoint-discovery or Console

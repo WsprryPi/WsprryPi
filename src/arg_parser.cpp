@@ -1471,9 +1471,6 @@ bool validate_config_candidate(
              std::any_of(candidate.band_gpio.begin(), candidate.band_gpio.end(),
                          [](const BandGPIOConfig &entry) { return entry.enabled; })))
             throw std::runtime_error("Pico WTP requires TX LED, amplifier, shutdown-button and band GPIO controls disabled.");
-        if (candidate.transmit_backend == TransmitBackendKind::WTP &&
-            (candidate.cw_fade_shape != "none" || candidate.cw_fade_in_ms || candidate.cw_fade_out_ms))
-            throw std::runtime_error("Pico WTP does not support envelope shaping or fades.");
     } catch (const std::exception &e) {
         if (error_message) *error_message = e.what();
         return false;

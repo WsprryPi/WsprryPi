@@ -1,9 +1,8 @@
 # WTP Fleet catalog and local discovery
 
-Fleet is a session-visible development pane under Setup. It remains hidden and
-disabled on every page load until the existing `WtpUi.developmentControlsVisible`
-boolean is explicitly set for that browser session. Hiding Fleet does not
-change the selected backend, `[WTP]`, a pending job, or saved drafts.
+Fleet is available as a normal tab under Setup. Opening it observes devices
+and schedules without selecting a backend, changing `[WTP]`, enabling output
+or saving field drafts.
 
 The compatibility route keeps one selected endpoint in the existing `[WTP]`
 INI section and runtime configuration. Independent output assignments, described
@@ -99,6 +98,37 @@ observations and a quoted ETag. POST requires `If-Match` and the existing host
 request guard. Operations are `assign`, `enable`, `pause`, `schedule`, `recover`,
 and `remove`. See [Pi endpoint operation](wtp-pi-operation.md) for inbound
 listener and target-side takeover controls.
+
+## Attached USB Picos
+
+Setup lists attached WsprryPico USB devices automatically while the Pico pane
+is visible. **Refresh list** also rescans. Enumeration reads Linux USB metadata;
+it does not open serial ports, write settings, select a backend or enable output.
+Only the dedicated WTP CDC function is offered. Console and management ports,
+unrelated serial devices, incomplete metadata and ambiguous duplicate serials
+are excluded. Persistent `/dev/serial/by-id` paths are preferred when available.
+
+Choose an entry under **Attached USB Picos**, then **Add device**. The editor
+fills the USB path, serial and vendor/product IDs and reads the Pico's full WTP
+identity with HELLO, STATUS and CAPS. No clock is set and no job is claimed,
+loaded or armed. Identification respects existing ownership and firmware-update
+exclusion. A disconnected or changed endpoint is refused on fresh metadata
+before the port is opened. A failed identity read leaves the draft available
+for retry through **Read USB Pico identity**.
+
+Name the device, choose **Save device**, then select its saved profile and
+**Use this device**. USB profiles use the existing manual catalog format; no
+configuration migration is required. Existing saved profiles and custom values
+are retained. Discovery and draft preparation never apply the profile. Removing
+a cable removes its live observation without deleting its saved profile or
+discarding an open draft.
+
+`GET /api/v1/host/discovery` retains its network `wtp-dns-sd/1` representation
+and adds a `usb` object (`scope: wtp-usb/1`) containing availability, a reason
+and metadata-only candidates. USB IDs in `POST /api/v1/host/discovery/identify`
+are resolved again against current metadata and matched to the supplied USB
+settings before identification. The UI refreshes observations with status;
+unchanged observations preserve the open selector.
 
 ## DNS-SD observations
 

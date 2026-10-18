@@ -575,7 +575,7 @@ const configSchema = {
             "RP1 GPIO Operator Visible": { required: false, type: "boolean" },
             "I2C Buses": { required: false, type: "array" },
             "I2C Bus Discovery Error": { required: false, type: "string" },
-            "Si5351 Detected": { required: false, type: "boolean" },
+            "Si5351 Detected": { required: false, type: "boolean", unknownWhenAbsent: true },
             "Si5351 Detection Error": { required: false, type: "string" }
         }
     },
@@ -1420,7 +1420,7 @@ function validateConfigSchema(json, schema) {
                         keyName +
                         '".'
                     );
-                } else {
+                } else if (!keyRule.unknownWhenAbsent) {
                     logConfigWarningOnce(
                         'Missing optional config key "' +
                         sectionName +
@@ -1694,12 +1694,12 @@ function populateConfig(callback = null) {
                     si5351AddressDiscoveryError: String(
                         platform["Si5351 Address Discovery Error"] || ""
                     ),
-                    si5351Detected: getConfigBoolValue(
+                    si5351Detected: hasConfigValue(platform, "Si5351 Detected") ? getConfigBoolValue(
                         platform,
                         "Platform",
                         "Si5351 Detected",
-                        true
-                    ),
+                        null
+                    ) : null,
                     si5351DetectionError: getConfigValue(
                         platform,
                         "Platform",

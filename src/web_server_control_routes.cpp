@@ -15,6 +15,7 @@
 #include "wtp_integration/catalog.hpp"
 #include "wtp_integration/fleet_runtime.hpp"
 #include "wtp_integration/discovery.hpp"
+#include "wtp_integration/usb_discovery.hpp"
 #include "wtp_integration/identity_probe.hpp"
 #include "wtp_settings_json.hpp"
 #include "transmitter_runtime_bridge.hpp"
@@ -49,6 +50,11 @@ void require_probe_idle() {
 }
 WtpSettings candidate_settings(const nlohmann::json &request, bool allow_blank_plain) {
     const auto id = request.at("discovery_id").get<std::string>();
+    if (id.starts_with("usb-")) {
+        auto settings = parse_wtp_settings(request.at("settings"), true);
+        wsprrypi::validate_discovered_usb(wsprrypi::wtp_usb_discovery(), id, settings);
+        return settings;
+    }
     const auto candidate = wsprrypi::wtp_discovery().candidate(id, discovery_now());
     if (!candidate) throw std::runtime_error("Discovery candidate is unavailable or stale");
     auto settings = parse_wtp_settings(request.at("settings"), true);
@@ -71,8 +77,11 @@ wsprrypi::PicoHttpResponse catalog_request(const httplib::Request &request) {
             (request.path == "/api/v1/host/devices" ||
              request.path == "/api/v1/host/devices/use")) mutation_lock.lock();
         const auto active = selected_wtp();
-        if (request.path == "/api/v1/host/discovery" && request.method == "GET")
-            return {200, wsprrypi::wtp_discovery().snapshot(discovery_now()).dump(), {}};
+        if (request.path == "/api/v1/host/discovery" && request.method == "GET") {
+            auto result = wsprrypi::wtp_discovery().snapshot(discovery_now());
+            result["usb"] = wsprrypi::wtp_usb_discovery();
+            return {200, result.dump(), {}};
+        }
         if (request.path == "/api/v1/host/devices" && request.method == "GET") {
             auto [snapshot, revision] = catalog().snapshot(active);
             return {200, snapshot.dump(), revision};
@@ -83,7 +92,8 @@ wsprrypi::PicoHttpResponse catalog_request(const httplib::Request &request) {
             const auto settings = candidate_settings(body, true);
             require_probe_idle();
             const auto observation = wtp_runtime_safe_probe([&] {
-                return wsprrypi::wtp_probe_network_identity(settings);
+                return settings.transport == "usb" ? wsprrypi::wtp_probe_usb_identity(settings)
+                    : wsprrypi::wtp_probe_network_identity(settings);
             });
             return {200, observation.dump(), {}};
         }

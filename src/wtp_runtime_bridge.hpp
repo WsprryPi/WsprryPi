@@ -14,6 +14,7 @@ void wtp_runtime_prepare_skip();
 void select_wtp_runtime(const std::optional<WtpSettings> &);
 bool wtp_runtime_selected() noexcept;
 bool wtp_runtime_ready() noexcept;
+bool wtp_runtime_firmware_busy() noexcept;
 bool wtp_runtime_invalidate_for_reload();
 bool wtp_runtime_defers_reload() noexcept;
 WsprTransmitState wtp_runtime_state() noexcept;

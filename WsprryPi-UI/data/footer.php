@@ -35,4 +35,5 @@
     <?php require_once 'site.js.includes.php'; ?>
 
     <!-- Main JavaScript -->
+    <script src="<?= htmlspecialchars(wsprrypiAssetUrl('pico-firmware-safety.js')) ?>"></script>
     <script src="<?= htmlspecialchars(wsprrypiAssetUrl('site.js')) ?>"></script>

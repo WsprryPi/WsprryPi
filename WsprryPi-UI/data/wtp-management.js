@@ -51,7 +51,7 @@
     function failure(message) { const error = new Error(message); error.operatorMessage = true; return error; }
     function render() {
         if (!byId("wtp-management")) return;
-        byId("wtp-management").hidden = !root.WtpUi?.developmentControlsVisible;
+        byId("wtp-management").hidden = false;
         resourceRender();
         const carrier = byId("wtp-management-carrier");
         const consumer = carrier && carrier.value.startsWith("consumer_");

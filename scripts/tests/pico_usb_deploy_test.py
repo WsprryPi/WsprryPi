@@ -48,6 +48,20 @@ class DeploymentTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError,'maintenance'): self.install()
         self.assertTrue(hold.exists())
 
+    def test_explicit_development_source_is_hash_bound_and_labelled(self):
+        source=self.repository/'pico-source'
+        for name,data in self.payload.items():
+            path=source/name;path.parent.mkdir(parents=True,exist_ok=True);path.write_bytes(data+b'development')
+        deploy.provision('install',self.repository,self.root,lambda _:self.fail('unexpected download'),development_source=source)
+        target=self.root/'usr/local/lib/wsprrypi/pico-usb'
+        descriptor=json.loads((target/'deployment.json').read_text())
+        self.assertEqual(descriptor['development_source']['kind'],'unpublished-working-tree')
+        self.assertEqual(descriptor['development_source']['base_revision'],'a'*40)
+        for name,data in self.payload.items():
+            self.assertEqual((target/name).read_bytes(),data+b'development')
+            self.assertEqual(descriptor['files'][name],hashlib.sha256(data+b'development').hexdigest())
+        self.assertEqual(json.loads((self.repository/'config/pico-usb-installer.json').read_text()),self.descriptor)
+
 class EntryBufferTests(unittest.TestCase):
     def test_executes_exact_verified_core_and_schema_when_files_are_replaced(self):
         entry_spec=importlib.util.spec_from_file_location('entry',SCRIPT.with_name('pico_usb_entry.py'))

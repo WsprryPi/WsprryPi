@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 #include "WTP-Client/include/wtp/session.hpp"
 #include "wtp_integration/usb_cdc.hpp"
+#include "wtp_integration/usb_discovery.hpp"
+#include "wtp_settings_json.hpp"
 
 #include <algorithm>
 #include <array>
@@ -612,6 +614,59 @@ void metadata() {
 #endif
 }
 
+void discovery() {
+  Pty port;
+  Tree tree(port.slave);
+  const auto devices = tree.root / "nodes";
+  std::filesystem::create_directories(tree.root / "class/tty/arbitrary-name");
+  std::filesystem::create_directories(devices / "serial/by-id");
+  std::filesystem::create_symlink(port.slave, devices / "arbitrary-name");
+  Tree::write(tree.usb / "product", "WsprryPico\n");
+  Tree::write(tree.interface / "interface", "WsprryPico WTP\n");
+  // Discovery reads synthetic metadata only. The PTY stays unopened by it.
+  const char *disabled = std::getenv("WSPRRYPI_DISABLE_HARDWARE_ACCESS");
+  const std::optional<std::string> previous = disabled ? std::optional<std::string>(disabled) : std::nullopt;
+  ::unsetenv("WSPRRYPI_DISABLE_HARDWARE_ACCESS");
+  const auto snapshot = wtp_usb_discovery(tree.root, devices);
+  CHECK(snapshot.at("available") && snapshot.at("candidates").size() == 1);
+  const auto candidate = snapshot.at("candidates").at(0);
+  const auto id = candidate.at("id").get<std::string>();
+  auto settings = parse_wtp_settings(candidate.at("settings"), true);
+  CHECK(settings.path == port.slave && settings.usb_serial == "PICO123");
+  CHECK(settings.vendor_id == 0xcafe && settings.product_id == 0x4012 && settings.device_id.empty());
+  validate_discovered_usb(snapshot, id, settings);
+  ++settings.vendor_id;
+  bool refused = false;
+  try { validate_discovered_usb(snapshot, id, settings); } catch (...) { refused = true; }
+  CHECK(refused);
+  const auto stable = devices / "serial/by-id/pico-role2";
+  std::filesystem::create_symlink(port.slave, stable);
+  CHECK(wtp_usb_discovery(tree.root, devices).at("candidates").at(0).at("settings").at("Endpoint") == stable.string());
+  // Neither console nor management nor another product is a WTP candidate.
+  for (const auto &role : {"00\n", "04\n"}) {
+    Tree::write(tree.interface / "bInterfaceNumber", role);
+    CHECK(wtp_usb_discovery(tree.root, devices).at("candidates").empty());
+  }
+  Tree::write(tree.interface / "bInterfaceNumber", "02\n");
+  Tree::write(tree.usb / "product", "Other serial device\n");
+  CHECK(wtp_usb_discovery(tree.root, devices).at("candidates").empty());
+  Tree::write(tree.usb / "product", "WsprryPico\n");
+  std::filesystem::create_directories(tree.root / "class/tty/duplicate");
+  std::filesystem::create_symlink(port.slave, devices / "duplicate");
+  CHECK(wtp_usb_discovery(tree.root, devices).at("candidates").empty());
+  std::filesystem::remove(devices / "duplicate");
+  std::filesystem::remove(devices / "arbitrary-name");
+  const auto unplugged = wtp_usb_discovery(tree.root, devices);
+  CHECK(unplugged.at("candidates").empty());
+  refused = false;
+  try { validate_discovered_usb(unplugged, id, settings); } catch (...) { refused = true; }
+  CHECK(refused);
+  ::setenv("WSPRRYPI_DISABLE_HARDWARE_ACCESS", "1", 1);
+  CHECK(!wtp_usb_discovery(tree.root, devices).at("available").get<bool>());
+  if (previous) ::setenv("WSPRRYPI_DISABLE_HARDWARE_ACCESS", previous->c_str(), 1);
+  else ::unsetenv("WSPRRYPI_DISABLE_HARDWARE_ACCESS");
+}
+
 const std::string sid(32, '1'), owner(32, '2'), device_id(32, '4'),
     boot(32, '5');
 const std::string capabilities =
@@ -758,6 +813,7 @@ int main() {
     pairing();
     io_contract();
     metadata();
+    discovery();
     pseudo_terminal();
     session_integration();
     std::cout << "WTP USB CDC checks passed: " << checks

@@ -46,8 +46,8 @@ function browser(storage = new Map(), storageBlocked = false) {
         const f = { id, dataset: key ? { wtpKey: key } : {}, type, value: "", checked: false, disabled: false, hidden: false, listeners: {}, textContent: "", setCustomValidity(v) { this.validityMessage = v; }, setAttribute() {}, addEventListener(name, fn) { this.listeners[name] = fn; } };
         fields.set(id, f); return f;
     }
-    for (const id of ["wtp-development", "wtp_use", "wtp-controls", "wtp-hidden-selection", "fleet-tab", "fleet-pane", "wtp-status-text", "wtp-output", "wtp-clock", "wtp-identity", "wtp-history", "wtp-recover", "wtp-feedback"]) field(id);
-    fields.get("fleet-tab").parentElement = { hidden: true };
+    for (const id of ["wtp_use", "wtp-controls", "fleet-tab", "fleet-pane", "wtp-status-text", "wtp-output", "wtp-clock", "wtp-identity", "wtp-history", "wtp-recover", "wtp-feedback"]) field(id);
+    fields.get("fleet-tab").parentElement = { hidden: false };
     for (const [key, value] of Object.entries(defaults)) field(key, key, typeof value === "number" ? "number" : typeof value === "boolean" ? "checkbox" : "text");
     const writes = [], calls = [], events = {}, timers = new Map();
     let nextTimer = 0;
@@ -58,83 +58,61 @@ function browser(storage = new Map(), storageBlocked = false) {
     return { root, fields, calls, writes, events, timers };
 }
 (async () => {
-    const storage = new Map([["wsprrypi.pico-development-controls", "true"]]);
+    const storage = new Map([["wsprrypi.pico-development-controls", "false"]]);
     const { root, fields, calls, writes, events, timers } = browser(storage);
+    assert.equal(calls.length, 0);
     events.DOMContentLoaded();
-    assert.equal(root.WtpUi.developmentControlsVisible, false);
-    assert.equal(fields.get("wtp-development").hidden, true);
-    assert.equal(fields.get("fleet-tab").parentElement.hidden, true);
-    assert.equal(fields.get("fleet-tab").disabled, true);
-    assert.equal(fields.get("fleet-pane").hidden, true);
-    assert.equal(calls.length, 0);
-    for (const invalid of ["false", "true", 0, 1, null, undefined, {}, []]) {
-        assert.throws(() => { root.WtpUi.developmentControlsVisible = invalid; }, /must be a boolean/);
-        assert.equal(root.WtpUi.developmentControlsVisible, false);
-    }
+    await new Promise(setImmediate);
+    assert.equal(Object.hasOwn(root.WtpUi, "developmentControlsVisible"), false);
+    assert.equal(fields.get("wtp-controls").hidden, false);
+    assert.equal(fields.get("fleet-tab").parentElement.hidden, false);
+    assert.equal(fields.get("fleet-tab").disabled, false);
+    assert.equal(fields.get("fleet-pane").hidden, false);
+    assert.equal(fields.get("wtp_use").disabled, false);
+    assert.equal(root.WtpUi.selected(), false); // Visibility never selects a backend.
+    assert(calls.length > 0 && calls.every(c => c.options.method === "GET"));
     assert.equal(writes.length, 0);
-    assert.equal(calls.length, 0);
-    assert.equal(fields.get("wtp-controls").hidden, true);
+    assert([...fields.values()].filter(f => f.dataset.wtpKey).every(f => f.disabled));
     root.WtpUi.populate(settings); root.WtpUi.select(true);
     await new Promise(setImmediate);
     assert.equal(root.WtpUi.selected(), true);
-    assert.equal(fields.get("wtp-hidden-selection").hidden, false);
-    for (const visible of [true, false, true]) {
-        root.WtpUi.developmentControlsVisible = visible;
-        assert.equal(root.WtpUi.developmentControlsVisible, visible);
-        assert.equal(fields.get("wtp-controls").hidden, !visible);
-        assert.equal(fields.get("fleet-tab").parentElement.hidden, !visible);
-        assert.equal(fields.get("fleet-tab").disabled, !visible);
-        assert.equal(fields.get("fleet-pane").hidden, !visible);
-        assert.equal(fields.get("wtp_use").disabled, !visible);
-        assert.equal(fields.get("wtp-hidden-selection").hidden, visible);
-        await new Promise(setImmediate);
-        assert.equal(root.WtpUi.selected(), true);
-        assert.equal(JSON.stringify(root.WtpUi.read()), JSON.stringify(settings));
-    }
-    assert(calls.every(c => c.options.method === "GET"));
-    assert.deepEqual(writes, []);
+    assert.equal(JSON.stringify(root.WtpUi.read()), JSON.stringify(settings));
     for (const saved of [1000000, 37000000, 250000000]) {
-        root.WtpUi.populate({...settings, "Start Uncertainty ns": saved});
-        assert.equal(root.WtpUi.read()["Start Uncertainty ns"], saved);
         root.WtpUi.populate({...settings, "Start Uncertainty ns": saved, "Allow Frequency Adjustment": true});
         assert.equal(root.WtpUi.read()["Start Uncertainty ns"], saved);
     }
     root.WtpUi.populate({...settings, "Start Uncertainty ns": 1000000});
-    root.WtpUi.developmentControlsVisible = true;
     fields.get("Start Uncertainty ns").value = "100000000";
     assert.equal(root.WtpUi.read()["Start Uncertainty ns"], 100000000);
-    root.WtpUi.developmentControlsVisible = false;
     fields.get("USB Serial").value = "";
     assert.equal(root.WtpUi.validate(), false);
-    root.WtpUi.developmentControlsVisible = false;
-    assert.equal(root.WtpUi.read()["USB Serial"], ""); // hiding does not restore or normalize a failed draft
+    root.WtpUi.refreshControls();
+    assert.equal(root.WtpUi.read()["USB Serial"], "");
     await new Promise(setImmediate);
-    assert([...timers.values()].some(t => t.ms === 3000)); // Selected Pico remains monitored while hidden.
+    assert([...timers.values()].some(t => t.ms === 3000));
     root.WtpUi.select(false);
-    assert.equal(fields.get("wtp-development").hidden, true);
-    root.WtpUi.developmentControlsVisible = true;
     await new Promise(setImmediate);
-    root.WtpUi.developmentControlsVisible = false;
-    assert.equal(timers.size, 0); // Hidden, unselected Pico does not keep polling.
+    assert.equal(fields.get("wtp-controls").hidden, false);
+    assert.equal(root.WtpUi.read()["USB Serial"], "");
+    assert([...fields.values()].filter(f => f.dataset.wtpKey).every(f => f.disabled));
     assert(calls.every(c => c.options.method === "GET"));
-    for (const value of [true, false]) {
-        root.WtpUi.developmentControlsVisible = value;
+    for (const legacyPreference of ["true", "false"]) {
+        storage.set("wsprrypi.pico-development-controls", legacyPreference);
         const reloaded = browser(storage);
         reloaded.events.DOMContentLoaded();
-        assert.equal(reloaded.root.WtpUi.developmentControlsVisible, false);
-        assert.equal(reloaded.fields.get("wtp-controls").hidden, true);
-        assert.equal(reloaded.fields.get("wtp_use").disabled, true);
+        assert.equal(reloaded.fields.get("wtp-controls").hidden, false);
+        assert.equal(reloaded.fields.get("wtp_use").disabled, false);
+        assert.equal(reloaded.root.WtpUi.selected(), false);
+        assert.deepEqual(reloaded.writes, []);
     }
     const blocked = browser(new Map(), true);
     blocked.events.DOMContentLoaded();
-    for (const value of [true, false]) {
-        blocked.root.WtpUi.developmentControlsVisible = value;
-        assert.equal(blocked.fields.get("wtp-controls").hidden, !value);
-    }
-    const early = browser();
-    early.root.WtpUi.developmentControlsVisible = true;
-    assert.equal(early.calls.length, 0);
-    early.events.DOMContentLoaded();
-    assert.equal(early.fields.get("wtp-controls").hidden, false);
-    console.log("WTP UI console boolean, reload reset, legacy preference isolation, polling, validation and draft-preservation tests passed");
+    assert.equal(blocked.fields.get("wtp-controls").hidden, false);
+    assert.equal(blocked.fields.get("wtp_use").disabled, false);
+    const configMarkup = fs.readFileSync(path.join(__dirname, "../data/views/config.php"), "utf8");
+    assert.doesNotMatch(configMarkup, /id="fleet-tab-item"[^>]*hidden/);
+    assert.doesNotMatch(configMarkup, /id="fleet-tab"[^>]*disabled/s);
+    assert.doesNotMatch(configMarkup, /wtp-show-controls|wtp-hidden-selection/);
+    assert.match(markup, /id="wtp-controls"[^>]*aria-labelledby="wtp-heading">/);
+    console.log("Fleet is available on fresh load without console/storage flags; selection, validation, drafts and read-only polling preserved");
 })().catch(error => { console.error(error); process.exitCode = 1; });

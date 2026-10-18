@@ -152,7 +152,7 @@ async function main() {
             };
             WtpUi.populate({Transport:'usb',Endpoint:'/dev/serial/by-id/pico-if02','USB Serial':'1545B6EFBF78028C','USB Vendor ID':51966,'USB Product ID':16402,'Device ID':'c'.repeat(32)});
             WtpUi.select(true);bootstrap.Tab.getOrCreateInstance(document.getElementById('transmitter-hardware-tab')).show();
-            document.getElementById('wtp-show-controls').checked=true;document.getElementById('wtp-show-controls').dispatchEvent(new Event('change'));
+
             WtpFirmware.setAvailability(true);document.getElementById('wtp-firmware').open=true;
             window.confirm=()=>true;
         })()`);

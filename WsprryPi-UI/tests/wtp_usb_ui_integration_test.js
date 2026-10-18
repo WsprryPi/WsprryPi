@@ -163,7 +163,7 @@ async function main() {
             };
             WtpUi.populate({Transport:'usb',Endpoint:'/dev/serial/by-id/pico-if02','USB Serial':'PICO123','USB Vendor ID':51966,'USB Product ID':16402,'Device ID':'a'.repeat(32),'Start Uncertainty ns':1000000,'Allow Frequency Adjustment':false});
             WtpUi.select(true);bootstrap.Tab.getOrCreateInstance(document.getElementById('transmitter-hardware-tab')).show();
-            document.getElementById('wtp-show-controls').checked=true;document.getElementById('wtp-show-controls').dispatchEvent(new Event('change'));
+
             document.getElementById('wtp-management').open=true;
         })()`);
         await waitFor(async()=>await evaluate("document.getElementById('wtp-status-heading').textContent==='workbench-pico.local'"),"common name");
@@ -188,7 +188,6 @@ async function main() {
         }
         // Exercise the actual profile editor and active form. Choosing the preset
         // has an explicit save; active host field edits use existing autosave.
-        await evaluate("WtpUi.developmentControlsVisible=true");
         await waitFor(async()=>await evaluate("document.getElementById('fleet-edit').disabled===false"),"saved profile list");
         await evaluate("document.getElementById('fleet-add').click()");
         assert.equal(await evaluate("document.getElementById('fleet-uncertainty').value"),"100000000");

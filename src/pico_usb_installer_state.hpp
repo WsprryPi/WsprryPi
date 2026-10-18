@@ -8,11 +8,27 @@
 #include <memory>
 #include <stdexcept>
 #include <string>
+#include <string_view>
 #include <sys/file.h>
 #include <sys/stat.h>
 #include <unistd.h>
 
 namespace wsprrypi {
+inline bool pico_usb_any_update_blocked(const std::filesystem::path& root="/var/lib/wsprrypi/pico-usb-control") noexcept {
+  std::error_code error;
+  const bool exists=std::filesystem::exists(root,error);
+  if(error) return true;
+  if(!exists) return false;
+  const bool empty=std::filesystem::is_empty(root,error);
+  return error || !empty;
+}
+inline bool pico_usb_http_mutation(std::string_view method,std::string_view path) {
+  return method!="GET" && method!="HEAD" && method!="OPTIONS" &&
+      !(method=="POST" && path=="/api/v1/member/firmware");
+}
+inline bool pico_usb_command_mutation(std::string_view command) {
+  return command!="get_tx_state" && command!="wspr_band_catalog" && command!="echo";
+}
 inline bool pico_usb_entry_protected(const std::filesystem::path& path) {
   auto current=path;
   bool first=true;

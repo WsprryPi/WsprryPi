@@ -84,3 +84,20 @@ assert.match(populations[0][3], /timed out/);
 assert.equal(context.window.WSPRRYPI_PLATFORM.si5351Detected, false);
 assert.equal(populations[0][1], "0x61", "timeout preserves the saved address");
 console.log("Si5351 single-load scan, inactive-backend, late-reply and timeout UI tests passed");
+const warnings=[];
+const optionalContext={logConfigWarningOnce:message=>warnings.push(message),parseBool:value=>value===true||value==="true"||value===1||value==="1"};
+vm.createContext(optionalContext);
+for(const name of ["configTypeMatches","validateConfigSchema","getConfigValue","getConfigBoolValue","hasConfigValue"]) {
+    const start=siteSource.indexOf(`\nfunction ${name}(`)+1,end=siteSource.indexOf("\nfunction ",start+1);
+    vm.runInContext(siteSource.slice(start,end),optionalContext);
+}
+vm.runInContext(siteSource.slice(siteSource.indexOf("const configSchema ="),siteSource.indexOf("function logConfigWarningOnce")),optionalContext);
+vm.runInContext("validateConfigSchema({Platform:{}},configSchema)",optionalContext);
+assert(!warnings.some(message=>message.includes("Si5351 Detected")),"an unqueried inventory is expected unknown state");
+const fieldStart=siteSource.indexOf("si5351Detected:"),fieldEnd=siteSource.indexOf("si5351DetectionError:",fieldStart);
+for(const [platform,expected] of [[{},null],[{"Si5351 Detected":false},false],[{"Si5351 Detected":true},true]]) {
+    optionalContext.platform=platform;
+    assert.equal(vm.runInContext(`({${siteSource.slice(fieldStart,fieldEnd)}}).si5351Detected`,optionalContext),expected);
+}
+assert(!warnings.some(message=>message.includes("Si5351 Detected")));
+console.log("Si5351 absent inventory stays unknown without console warnings; explicit detection is retained");

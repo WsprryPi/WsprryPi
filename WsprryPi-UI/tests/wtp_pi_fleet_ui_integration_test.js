@@ -174,7 +174,7 @@ async function main() {
             const style=document.createElement('style');style.textContent='*{scroll-behavior:auto!important}';document.head.append(style);
         })()`;
         await evaluate(mock);
-        await evaluate(`configAutosaveSuspended=true;clearPendingPopulateConfigRetry();clearConfigLoadFailureState();WtpUi.developmentControlsVisible=true;document.getElementById('fleet-tab').click();`);
+        await evaluate(`configAutosaveSuspended=true;clearPendingPopulateConfigRetry();clearConfigLoadFailureState();document.getElementById('fleet-tab').click();`);
         await waitFor(async () => await evaluate('document.getElementById("fleet-output-list").textContent.includes("Garden Pico")'), 'independent output rows');
         assert.equal(await evaluate('WtpUi.selected()'), false);
         await evaluate(`window.__fleetLoadFailure=true;document.getElementById('fleet-schedule-refresh').click();`);
@@ -263,14 +263,6 @@ async function main() {
         await waitFor(dialogClosed,'Escape cancels Remove');
         assert.equal(await fleetPosts(),originalPosts);
         await clickBench(1);
-        await waitFor(dialogOpen,'confirmation before feature hiding');
-        await evaluate('WtpUi.developmentControlsVisible=false');
-        await waitFor(async()=>await evaluate('!document.getElementById("fleet-action-confirmation").classList.contains("show")'),'feature hiding cancels');
-        assert.equal(await fleetPosts(),originalPosts);
-        await evaluate('WtpUi.developmentControlsVisible=true;document.getElementById("fleet-tab").click()');
-        await waitFor(dialogClosed,'controls restored');
-        await waitFor(async()=>await evaluate('!document.querySelector("#fleet-output-list section button:nth-child(2)").disabled'),'Pause restored after feature hiding');
-        await clickBench(1);
         await waitFor(dialogOpen,'confirmation at reviewed revision');
         await evaluate('++__fleetRevision;document.getElementById("fleet-action-confirm").click()');
         await waitFor(async()=>await evaluate('document.getElementById("fleet-schedule-feedback").textContent.includes("Schedules changed")'),'stale confirmation rejected');
@@ -297,8 +289,6 @@ async function main() {
         await evaluate(`document.getElementById('fleet-schedule-cancel').click();document.getElementById('fleet-listener').open=true;`);
         await waitFor(async()=>await evaluate('document.getElementById("fleet-listener-feedback").textContent.includes("Listening")'),'listener status');
         await capture('listener','fleet-listener');
-        await evaluate('WtpUi.developmentControlsVisible=false');
-        assert.equal(await evaluate('document.getElementById("fleet-schedule-save").disabled'),true);
         await client.send('Page.navigate',{url:base+'?page=operation'});
         await waitFor(async()=>await evaluate('document.readyState==="complete" && !!window.LocalWtp && typeof requestTransmitEnabledChange==="function"'),'Operation view');
         await evaluate(mock);

@@ -9,6 +9,8 @@
 #include "httplib.hpp"
 #include "logging.hpp"
 #include "privileged_network_runtime.hpp"
+#include "wtp_runtime_bridge.hpp"
+#include "pico_usb_installer_state.hpp"
 
 #include <optional>
 #include <string>
@@ -47,6 +49,11 @@ void register_request_guard(
                     active_privileged_network_mode(),
                     trusted_proxy_identities, &rejection_reason) ==
                 BackendHttpGuardDecision::allowed) {
+                if(wtp_runtime_firmware_busy() && wsprrypi::pico_usb_http_mutation(request.method,request.path)) {
+                    response.status=409;
+                    response.set_content(R"({"error":{"code":"pico_firmware_maintenance","message":"Pico firmware maintenance is active. Continue or recover the update before making changes."}})","application/json");
+                    return httplib::Server::HandlerResponse::Handled;
+                }
                 return httplib::Server::HandlerResponse::Unhandled;
             }
             switch (rejection_reason) {

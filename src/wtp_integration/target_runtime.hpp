@@ -164,6 +164,18 @@ struct WtpTargetRuntime {
     if (!identity || identity->device_id!=usb_management->device() || identity->boot_id!=usb_management->boot()) return false;
     std::lock_guard lock(usb_observation_mutex); usb_binding_fault=false; return true;
   }
+  // The caller creates a fresh runtime only after the shared installer has
+  // verified this exact boot. Ordinary reconnects retain their identity latch.
+  bool verify_firmware_reconnection(const std::string &device, const std::string &boot,
+                                    const std::string &version) {
+    if (settings.transport != "usb") return false;
+    verified_update_reconnect = true;
+    struct Reset { std::atomic_bool &flag; ~Reset() { flag = false; } } reset{verified_update_reconnect};
+    if (!app->inspect().ok || !reconcile_usb_binding()) return false;
+    const auto observed = app->status().identity;
+    return observed && observed->device_id == device && observed->boot_id == boot &&
+        observed->firmware_version == version;
+  }
   nlohmann::json usb_status() const {
     std::lock_guard lock(usb_observation_mutex);
     return {{"management",usb_observation},{"hostname",usb_name},{"name_confirmed",usb_name_confirmed},{"binding_fault",usb_binding_fault}};

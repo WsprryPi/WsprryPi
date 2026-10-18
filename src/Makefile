@@ -1294,9 +1294,9 @@ WTP_USB_LDFLAGS ?=
 wtp-usb-test:
 	$(Q)$(MAKE) --no-print-directory -C WTP-Client all BUILD_DIR="$(abspath $(WTP_USB_BUILD_DIR)/client)" CXXFLAGS="$(WTP_USB_CXXFLAGS)"
 	$(Q)mkdir -p "$(WTP_USB_BUILD_DIR)"
-	$(Q)$(CXX) -std=c++20 -Wall -Wextra -Wpedantic -Werror $(WTP_USB_CXXFLAGS) -I. -IWTP-Client/include \
-		tests/wtp_usb_cdc_test.cpp wtp_integration/usb_cdc.cpp "$(WTP_USB_BUILD_DIR)/client/libwtp_client.a" \
-		$(WTP_USB_LDFLAGS) -o "$(WTP_USB_BUILD_DIR)/wtp_usb_cdc_test"
+	$(Q)$(CXX) -std=c++20 -Wall -Wextra -Wpedantic -Werror $(WTP_USB_CXXFLAGS) $(OPENSSL_CFLAGS) -I. -IWTP-Client/include \
+		tests/wtp_usb_cdc_test.cpp wtp_integration/usb_cdc.cpp wtp_integration/usb_discovery.cpp "$(WTP_USB_BUILD_DIR)/client/libwtp_client.a" \
+		$(OPENSSL_LIBS) $(WTP_USB_LDFLAGS) -o "$(WTP_USB_BUILD_DIR)/wtp_usb_cdc_test"
 	$(Q)"$(WTP_USB_BUILD_DIR)/wtp_usb_cdc_test"
 
 backend-profile-factory-test: $(BACKEND_PROFILE_FACTORY_TEST_BIN)

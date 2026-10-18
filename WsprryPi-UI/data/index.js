@@ -743,7 +743,7 @@ function bindIndexActions() {
         "input change",
         '.form-control:not([type="range"], .form-check-input)',
         function () {
-            if (this.closest("#wtp-management") || this.id === "wtp-show-controls") return;
+            if (this.closest("#wtp-management")) return;
             validatePage();
             scheduleAutosave();
         }
@@ -753,7 +753,7 @@ function bindIndexActions() {
         "change input",
         'input:not(#transmit, [name="mode_toggle"], [name="qrss_type"]), select:not(#tx_pin), textarea',
         function () {
-            if (!this.closest("#wtp-management") && this.id !== "wtp-show-controls") scheduleAutosave();
+            if (!this.closest("#wtp-management")) scheduleAutosave();
         }
     );
 
@@ -2425,9 +2425,7 @@ function updateBackendPlatformSupportUi() {
 
     $backend.prop("disabled", currentBackend === "wtp" || !anyBackendSupported);
     $selectorHint.text(
-        currentBackend === "wtp" ? (window.WtpUi.developmentControlsVisible
-            ? "Pico is selected on Fleet. Turn off Use Pico there to choose GPIO or Si5351."
-            : "GPIO and Si5351 selection is unavailable while Pico is in use.") :
+        currentBackend === "wtp" ? "Pico is selected on Fleet. Turn off Use Pico there to choose GPIO or Si5351." :
         rp1RouteSelectable && !gpioSupported
             ? rp1RouteSelectorHint()
             : isRp1GpioPlatform() && !rp1GpioOperatorVisible()

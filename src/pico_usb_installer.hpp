@@ -16,6 +16,28 @@
 #include <vector>
 
 namespace wsprrypi {
+inline bool pico_usb_reconnect_allowed(const nlohmann::json& result,bool preparing) {
+  return result.value("ok",false) ? result.value("stage","")=="complete" :
+      preparing && !result.value("recovery_required",true);
+}
+inline void pico_usb_record_result(nlohmann::json& expected,const nlohmann::json& result,bool preparing) {
+  if(result.contains("transaction")) expected["transaction"]=result.at("transaction");
+  if(result.contains("manual_bootsel_required")) expected["manual_bootsel_required"]=result.at("manual_bootsel_required");
+  if(!result.value("ok",false)) return;
+  const bool waiting=preparing && result.value("stage","")=="awaiting_bootsel" &&
+      result.value("manual_bootsel_required",false) && result.value("recovery_required",false) && result.contains("transaction");
+  if((result.value("stage","")!="complete" && !waiting) || result.value("serial","")!=expected.at("serial").get<std::string>() ||
+      result.value("source","")!=expected.at("source").get<std::string>() || result.value("version","")!=expected.at("version").get<std::string>())
+    throw std::runtime_error("Shared installer did not verify the reviewed Pico image.");
+  if(waiting) return;
+  const auto& target=result.at("target");
+  const auto boot=target.at("boot_id").get<std::string>();
+  if(target.value("scope","")!="member" || target.at("device_id")!=expected.at("device_id") ||
+      boot.size()!=32 || boot.find_first_not_of("0123456789abcdef")!=std::string::npos)
+    throw std::runtime_error("Shared installer target binding is invalid.");
+  expected["verified"]=true;
+  expected["verified_target"]=target;
+}
 inline nlohmann::json pico_usb_public_task(const nlohmann::json& state) {
   nlohmann::json result=nlohmann::json::object();
   for(const auto* key:{"running","operation","plan_id","branch","bound_serial","bound_device","bound_selection"})
@@ -24,11 +46,11 @@ inline nlohmann::json pico_usb_public_task(const nlohmann::json& state) {
   if(state.contains("result") && state.at("result").is_object()) {
     const auto& value=state.at("result"); auto& projected=result["result"];
     projected=nlohmann::json::object();
-    for(const auto* key:{"schema","installer_version","ok","stage","serial","version","branch","source","workflow","run","uf2","preserved","recovery_required","recent_ci"})
+    for(const auto* key:{"schema","installer_version","ok","stage","serial","version","branch","source","workflow","run","uf2","preserved","recovery_required","recent_ci","manual_bootsel_required"})
       if(value.contains(key)) projected[key]=value.at(key);
     if(value.contains("error")) {
       const auto text=value.value("error",std::string{});
-      projected["error"]=(!value.contains("transaction") && text.size()<=512 && text.find('/')==std::string::npos && text.find('\n')==std::string::npos)
+      projected["error"]=(text.size()<=512 && text.find('/')==std::string::npos && text.find('\\')==std::string::npos && text.find('\n')==std::string::npos)
           ?text:"Firmware work is unconfirmed. Inspect the private host transaction and recover this selected Pico.";
     }
   }

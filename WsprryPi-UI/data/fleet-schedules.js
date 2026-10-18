@@ -103,7 +103,7 @@
         if (removals.length && !busy) message(`${removals.length} assignment${removals.length === 1 ? " was" : "s were"} removed after local takeover. Reassign only when the target is available again.`);
     }
     async function load() {
-        if (closed || busy || !root.WtpUi?.developmentControlsVisible) return;
+        if (closed || busy || !visible) return;
         clearTimeout(timer);
         try {
             const result = await fetchJson("fleet");
@@ -283,7 +283,7 @@
             for (const event of ["input", "change"]) panel.addEventListener(event, e => e.stopPropagation());
         });
         root.addEventListener("pagehide", () => {closed = true;clearTimeout(timer);cancelConfirmation();});
-        setVisible(root.WtpUi?.developmentControlsVisible === true);
+        setVisible(true);
     }
     function setVisible(value) {
         visible = value === true;

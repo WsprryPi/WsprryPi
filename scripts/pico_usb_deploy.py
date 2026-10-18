@@ -18,7 +18,7 @@ def safe(path):
         if parent.is_symlink():
             raise ValueError('Symlink in installer deployment destination')
 
-def provision(action, repository, root=Path('/'), fetch=None):
+def provision(action, repository, root=Path('/'), fetch=None, development_source=None):
     prefix = lambda path: root / path.lstrip('/')
     target = prefix('/usr/local/lib/wsprrypi/pico-usb')
     safe(target)
@@ -52,7 +52,21 @@ def provision(action, repository, root=Path('/'), fetch=None):
             if path.exists() and path.read_text() == owned_text(name): path.unlink()
         return
     payload = {}
+    if development_source is not None:
+        # Explicit maintainer deployment of unpublished source. Never claim
+        # these bytes came from the descriptor's published Git revision.
+        development_source = development_source.resolve(strict=True)
+        for name in FILES:
+            source = development_source / name
+            safe(source)
+            data = source.read_bytes()
+            if len(data)>1024*1024: raise ValueError('Oversized development installer')
+            payload[name] = data
+        descriptor['development_source'] = {'kind':'unpublished-working-tree',
+            'base_revision':descriptor['revision'], 'files':{name:hashlib.sha256(data).hexdigest() for name,data in payload.items()}}
+        descriptor['files'] = descriptor['development_source']['files']
     for name, digest in descriptor['files'].items():
+        if development_source is not None: continue
         url = f"https://raw.githubusercontent.com/WsprryPi/WsprryPico/{descriptor['revision']}/{name}"
         if fetch:
             data = fetch(url)
@@ -112,6 +126,7 @@ def owned_text(name):
 
 if __name__=='__main__':
     p=argparse.ArgumentParser(description=__doc__); p.add_argument('action',choices=('install','uninstall')); p.add_argument('--repository',type=Path,required=True)
+    p.add_argument('--development-source',type=Path,help='Explicit unpublished WsprryPico source; records actual hashes instead of claiming published provenance')
     args=p.parse_args()
     if os.geteuid()!=0: p.error('Package-time provisioning requires root; ordinary installer use does not')
-    provision(args.action,args.repository)
+    provision(args.action,args.repository,development_source=args.development_source)

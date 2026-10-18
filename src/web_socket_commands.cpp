@@ -27,6 +27,8 @@
  */
 
 #include "web_socket.hpp"
+#include "wtp_runtime_bridge.hpp"
+#include "pico_usb_installer_state.hpp"
 #include "backend_capabilities.hpp"
 #if WSPRRYPI_BACKEND_RP1_GPCLK
 #include "WSPR-Transmitter/src/rp1_gpclk_transmit_backend.hpp"
@@ -219,7 +221,14 @@ void WebSocketServer::handleMessage(const std::string &raw_message)
                 std::unique_lock<std::mutex>(test_tone_command_mutex_);
         }
 
-        if (cmd == "shutdown")
+        if (wtp_runtime_firmware_busy() && wsprrypi::pico_usb_command_mutation(cmd))
+        {
+            reply["command"]=cmd;
+            reply["status"]="error";
+            reply["error"]="pico_firmware_maintenance";
+            reply["message"]="Pico firmware maintenance is active. Continue or recover the update before making changes.";
+        }
+        else if (cmd == "shutdown")
         {
             llog.logS(INFO, "Received websocket shutdown command.");
             reply["command"] = "shutdown";
@@ -256,6 +265,7 @@ void WebSocketServer::handleMessage(const std::string &raw_message)
             const WsprRuntimeStatusSnapshot snapshot =
                 current_tx_runtime_status_snapshot();
             reply["tx_state"] = snapshot.tx_state;
+            reply["firmware_maintenance"]=wtp_runtime_firmware_busy();
             reply["runtime_mode"] = snapshot.runtime_mode;
             reply["transmit_backend"] = snapshot.transmit_backend;
             reply["next_transmission_at"] = snapshot.next_transmission_at;

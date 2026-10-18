@@ -1,7 +1,7 @@
 <?php // SPDX-License-Identifier: MIT ?>
 
-<div id="wtp-development" class="wtp-development" hidden>
-    <section id="wtp-controls" class="transmitter-backend-fields" aria-labelledby="wtp-heading" hidden>
+<div id="wtp-fleet">
+    <section id="wtp-controls" class="transmitter-backend-fields" aria-labelledby="wtp-heading">
         <h3 id="wtp-heading" class="transmitter-backend-fields__title">WTP outputs</h3>
         <section class="fleet-catalog mb-4" aria-labelledby="fleet-catalog-heading">
             <h4 id="fleet-catalog-heading" class="cw-control-section__title">Known and nearby devices</h4>
@@ -200,7 +200,7 @@
         </div>
         <details id="wtp-firmware" class="wtp-status mt-3" hidden>
             <summary class="cw-control-section__title">Pico firmware over USB</summary>
-            <p class="form-text">Updates the Pico connected to this Pi by USB and preserves its saved settings. The Pico must be idle and unowned. Keep the USB cable connected until verification finishes.</p>
+            <p class="form-text">Updates the Pico connected to this Pi by USB and preserves its saved settings. The Pico must be idle and unowned. Older firmware needs a one-time BOOTSEL reconnect when prompted; its saved standalone schedule must be disabled first. Keep USB connected during programming and verification.</p>
             <p id="wtp-firmware-identity" class="text-break">Read the selected Pico first.</p>
             <div class="row gx-3 gy-3">
                 <div class="col-12 col-lg-4">
@@ -222,7 +222,16 @@
                 <button id="wtp-firmware-upgrade" class="btn btn-primary" type="button" disabled>Install checked image</button>
                 <button id="wtp-firmware-recover" class="btn btn-outline-danger" type="button" hidden disabled>Recover this update</button>
             </div>
+            <p id="wtp-firmware-read-status" class="form-text mt-2 mb-0" role="status" aria-live="polite"></p>
             <p id="wtp-firmware-feedback" class="form-text mt-3 mb-0 text-break" role="status" aria-live="polite">main is selected by default. No firmware download or device change has been requested.</p>
+            <div id="wtp-firmware-migration" class="mt-3" hidden>
+                <p class="mb-2">Keep the Pico idle and do not edit its settings while completing these steps.</p>
+                <ol class="mb-0">
+                    <li>Unplug this Pico's USB cable from the Pi.</li>
+                    <li>Hold BOOTSEL on the Pico while reconnecting to the same Pi USB port, then release BOOTSEL.</li>
+                    <li>Choose <strong>Continue after BOOTSEL</strong>. Keep USB connected until installation and verification finish.</li>
+                </ol>
+            </div>
         </details>
         <details id="wtp-management" class="wtp-status mt-3" hidden>
             <summary class="cw-control-section__title">Pico standalone settings and Wi-Fi</summary>

@@ -189,6 +189,61 @@ void usb_first_identity_lease_race() {
   // A later contradictory management HELLO cannot repurpose that reservation.
   CHECK(!target.reserve_output(std::string(32,'d')));
 }
+void verified_firmware_reconnection() {
+  for (unsigned scenario=0;scenario<5;++scenario) {
+    Clock clock; ReclaimedManagement management;
+    WtpSettings settings{"/dev/ttyACM1","test-serial",backend_test::device,0xcafe,0x4012,1000};
+    wsprrypi::WtpTargetRuntime old(settings,clock,clock.peer,
+        {backend_test::sid,backend_test::owner_id,backend_test::device},[&]{clock.peer.open();return true;});
+    CHECK(old.app->inspect().ok);
+    CHECK(old.app->idle_management([]{},false,false));
+    const auto new_boot=std::string(32,'a');
+    clock.peer.boot_id=new_boot;
+    // Reproduce the live failure: ordinary inspection must keep rejecting a
+    // changed boot rather than silently dropping the original session latch.
+    CHECK(!old.app->inspect().ok);
+    CHECK(old.app->status().session_phase==wsprrypi::wtp::SessionPhase::IdentityChanged);
+    CHECK(!old.app->inspect().ok);
+    const auto before=clock.peer.operations.size();
+    // Peer caches request IDs globally; the fresh device/session starts a new
+    // replay namespace, as a real reboot does.
+    clock.peer.cache.clear();
+    wsprrypi::WtpTargetRuntime fresh(settings,clock,clock.peer,
+        {std::string(32,'9'),backend_test::owner_id,backend_test::device},[&]{clock.peer.open();return true;});
+    management.target["boot_id"]=scenario==4?std::string(32,'b'):new_boot;
+    fresh.usb_management_for_test=[&] {
+      management.open();
+      return std::make_unique<wsprrypi::UsbManagementClient>(management,[&]{return clock.now_ms();},
+          [&](unsigned ms){clock.wait_ms(ms);});
+    };
+    const bool admitted=fresh.verify_firmware_reconnection(
+        scenario==1?std::string(32,'c'):backend_test::device,
+        scenario==2?std::string(32,'b'):new_boot,scenario==3?"2":"1");
+    CHECK(admitted==(scenario==0));
+    CHECK(!fresh.verified_update_reconnect.load());
+    CHECK(management.config_mutations==0 && management.time_submits==0);
+    for(auto op=clock.peer.operations.begin()+before;op!=clock.peer.operations.end();++op)
+      CHECK(*op==wsprrypi::wtp::Operation::Hello || *op==wsprrypi::wtp::Operation::Status ||
+          *op==wsprrypi::wtp::Operation::Caps || *op==wsprrypi::wtp::Operation::GetClock);
+  }
+}
+void startup_inspection_refusal() {
+  CHECK(!wtp_runtime_inspect().ok);
+  Clock clock;
+  WtpSettings settings{"/dev/ttyACM1","0000000000000001",backend_test::device,0xcafe,0x4012,1000};
+  set_wtp_runtime_for_test(settings,clock,clock.peer,
+      {backend_test::sid,backend_test::owner_id,backend_test::device},[]()->bool {
+        throw std::runtime_error("USB unavailable during startup");
+      });
+  const auto refused=transmitter_quiesce_for_startup();
+  CHECK(!refused.ok && !refused.error.empty() && !wtp_runtime_ready());
+  CHECK(clock.peer.operations.empty());
+  // Recovery/status remains available even when startup admission throws for
+  // a retained maintenance hold or an unavailable transport.
+  CHECK(wtp_runtime_firmware("GET","").status==200);
+  CHECK(wtp_runtime_switch_allowed());
+  select_wtp_runtime(std::nullopt);
+}
 void usb_binding_and_observation() {
   for (bool wrong_boot : {false,true}) {
     Clock clock;
@@ -240,6 +295,37 @@ void finite_message_request_inputs() {
     }
   }
 }
+void host_envelope_settings() {
+  ArgParserConfig cfg{};
+  cfg.cw_fade_shape = "raised_cosine";
+  cfg.cw_fade_in_ms = 25;
+  cfg.cw_fade_out_ms = 40;
+  cfg.cw_fade_slice_ms = 7;
+  cfg.qrss.dot_seconds = cfg.fskcw.dot_seconds = cfg.dfcw.dot_seconds = 1;
+  for (const auto backend : {TransmitBackendKind::WTP, TransmitBackendKind::GPIO,
+                             TransmitBackendKind::SI5351}) {
+    cfg.transmit_backend = backend;
+    for (auto builder : {scheduling_detail::make_qrss_controller_request,
+                         scheduling_detail::make_fskcw_controller_request,
+                         scheduling_detail::make_dfcw_controller_request}) {
+      const auto request = builder(cfg, 0);
+      std::visit([&](const auto &payload) {
+        if constexpr (requires { payload.envelope; }) {
+          const auto &envelope = payload.envelope;
+          if (backend == TransmitBackendKind::WTP) {
+            CHECK(envelope.fade_shape == wsprrypi::FadeShape::NONE);
+            CHECK(envelope.fade_in == 0ms && envelope.fade_out == 0ms);
+          } else {
+            CHECK(envelope.fade_shape == wsprrypi::FadeShape::RAISED_COSINE);
+            CHECK(envelope.fade_in == 25ms && envelope.fade_out == 40ms && envelope.fade_slice == 7ms);
+          }
+        } else { CHECK(false); }
+      }, request.payload);
+      CHECK(cfg.cw_fade_shape == "raised_cosine" && cfg.cw_fade_in_ms == 25 &&
+            cfg.cw_fade_out_ms == 40 && cfg.cw_fade_slice_ms == 7);
+    }
+  }
+}
 void run(const std::string &credentials) {
   char filename[] = "/tmp/wtp-production-config-XXXXXX";
   const int fd = mkstemp(filename);
@@ -274,8 +360,13 @@ void run(const std::string &credentials) {
   config.grid_square = "EM18";
   config.power_dbm = 20;
   config.frequencies = "20m";
+  config.cw_fade_shape = "raised_cosine";
+  config.cw_fade_in_ms = 25;
+  config.cw_fade_out_ms = 40;
+  config.cw_fade_slice_ms = 7;
   resolve_backend_specific_config(config);
   config_to_json();
+  const auto saved_cw = get_public_config_json().at("CW");
   // Active host-config routes use the same guarded authority and revision CAS.
   httplib::Server http;
   web_server_routes::register_control(http, [](httplib::Response &) {});
@@ -340,6 +431,26 @@ void run(const std::string &credentials) {
   if (!candidate.valid)
     throw std::runtime_error(candidate.error_reason);
   CHECK(candidate.normalized_config.wtp == settings);
+  CHECK(get_public_config_json().at("CW") == saved_cw);
+  CHECK(candidate.normalized_config.cw_fade_shape == "raised_cosine" &&
+        candidate.normalized_config.cw_fade_in_ms == 25 &&
+        candidate.normalized_config.cw_fade_out_ms == 40 &&
+        candidate.normalized_config.cw_fade_slice_ms == 7);
+  // Persist/reload a local-backend round trip. Si5351 request behavior is
+  // covered above without requiring a host I2C bus or address inventory.
+  {
+    set_raspberry_pi_generation_override_for_test(4);
+    struct RestorePlatform { ~RestorePlatform() { clear_raspberry_pi_generation_override_for_test(); } } restore_platform;
+    for (const auto backend : {"gpio", "wtp"}) {
+      if (std::string(backend) == "gpio" && !transmit_backend_is_compiled(TransmitBackendKind::GPIO)) continue;
+      patch_all_from_web({{"Operation", {{"Transmit Backend", backend}}}});
+      CHECK(get_public_config_json().at("CW") == saved_cw);
+      RuntimeConfigCandidate restored;
+      prepare_runtime_config_candidate(filename, restored);
+      CHECK(restored.valid && restored.normalized_config.cw_fade_shape == "raised_cosine" &&
+            restored.normalized_config.cw_fade_in_ms == 25 && restored.normalized_config.cw_fade_out_ms == 40);
+    }
+  }
   {
     std::ifstream file(filename);
     const std::string original((std::istreambuf_iterator<char>(file)), {});
@@ -430,6 +541,7 @@ void run(const std::string &credentials) {
       nlohmann::json{{"id", known_json.at("active_id")},
                      {"catalog_revision", known->get_header_value("ETag")}}.dump(), "application/json");
   CHECK(use_current && use_current->status == 200 && config.wtp == settings);
+  CHECK(get_public_config_json().at("CW") == saved_cw);
   auto invalid_plain = plain_settings;
   invalid_plain.tcp_port = 0;
   CHECK(!wtp_runtime_selection_error(invalid_plain).empty());
@@ -735,8 +847,11 @@ int main(int argc, char **argv) {
     usb_management_reclaimed_at_load();
     usb_management_known_binding_fault();
     usb_first_identity_lease_race();
+    verified_firmware_reconnection();
+    startup_inspection_refusal();
     usb_binding_and_observation();
     finite_message_request_inputs();
+    host_envelope_settings();
     run(argc > 1 ? argv[1] : "");
   } catch (const std::exception &e) {
     std::cerr << e.what() << '\n';

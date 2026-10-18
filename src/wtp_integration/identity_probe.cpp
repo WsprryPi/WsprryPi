@@ -4,10 +4,47 @@
 #include "application.hpp"
 #include "tls.hpp"
 #include "plain_tcp.hpp"
+#include "usb_cdc.hpp"
+#include "pico_usb_installer_state.hpp"
 #include <cstdlib>
 #include <stdexcept>
 
 namespace wsprrypi {
+nlohmann::json wtp_probe_usb_identity(const WtpSettings &settings) {
+  if (settings.transport != "usb") throw std::runtime_error("USB endpoint required");
+  if (const char *disabled = std::getenv("WSPRRYPI_DISABLE_HARDWARE_ACCESS");
+      disabled && std::string(disabled) == "1")
+    throw std::runtime_error("USB identification is disabled in hardware-free validation");
+  validate_wtp_settings(settings, true);
+  auto lease = pico_usb_runtime_lease(settings.usb_serial);
+  if (pico_usb_update_blocked(settings.usb_serial))
+    throw std::runtime_error("Resolve this Pico's firmware update before identification");
+  WtpSystemScheduleClock clock(wtp_host_utc_valid);
+  PosixCdcSystem system;
+  UsbCdcStream stream(system);
+  const PicoCdcSelection selection{settings.path, settings.usb_serial,
+      static_cast<std::uint16_t>(settings.vendor_id),
+      static_cast<std::uint16_t>(settings.product_id)};
+  auto reopen = [&] {
+    if (!stream.begin_open(selection, clock.now_ms())) return false;
+    while (stream.state() == CdcState::Resetting) {
+      stream.poll_open(clock.now_ms());
+      if (stream.state() == CdcState::Resetting) clock.wait_ms(5);
+    }
+    return stream.state() == CdcState::Ready;
+  };
+  wtp::SessionOptions options{wtp_random_identity(), wtp_random_identity(), settings.device_id};
+  options.learn_device_identity = settings.device_id.empty();
+  WtpApplication app(clock, stream, settings, options, reopen);
+  const auto result = app.inspect();
+  if (!result.ok) throw std::runtime_error("USB identification failed: " + result.error);
+  const auto observation = app.status();
+  if (!observation.identity || !observation.capabilities || !observation.remote)
+    throw std::runtime_error("Incomplete USB Pico identity or status");
+  return {{"device_id", observation.identity->device_id},
+      {"boot_id", observation.identity->boot_id}, {"binding", "usb"},
+      {"authenticated", false}, {"output_active", observation.remote->output_active}};
+}
 nlohmann::json wtp_probe_network_identity(const WtpSettings &settings) {
   if (settings.transport != "network" && settings.transport != "network_plain")
     throw std::runtime_error("Identification requires a network endpoint");
