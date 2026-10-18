@@ -52,10 +52,22 @@ mutations, including requests from other tabs. The maintenance hold survives a
 failed status read or browser reload. Normal controls return only after the
 host confirms that firmware work and its durable hold have ended.
 
-Read firmware status remains available while work is running. A manual read
-shows a reading indicator followed by the time of the successful status read,
-even when the update state has not changed. The read observes host progress;
-it does not repeat programming or access the Pico.
+Firmware status refreshes automatically while the selected USB Pico is
+available, including after page reload or another tab starts work. An activity
+indicator identifies image checking, installation or recovery; monitoring time
+and the age of the last successful status read distinguish ongoing work from a
+lost connection. Failed reads retry automatically, without repeating an install
+or recovery request. A temporary loss of the general Pico status does not cancel
+this firmware monitor. Each result is bound to the selected USB serial and host
+selection context; changing image choices still requires a fresh image check.
+
+The shared installer exposes no overall percentage or live byte counts. The
+activity indicator is indeterminate and does not claim a particular backup,
+programming or verification fraction. Read firmware status remains available
+while work is running. A manual read shows a reading indicator and successful
+read time, even when the update state has not changed. Reads observe host progress;
+they do not repeat programming or access the Pico. Monitoring stops when the
+page closes or the selected USB connection becomes unavailable.
 
 A refusal before programming reports that no firmware was written. Safe error
 text is shown beside the firmware controls; paths and backup contents remain

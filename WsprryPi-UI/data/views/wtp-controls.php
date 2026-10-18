@@ -222,6 +222,13 @@
                 <button id="wtp-firmware-upgrade" class="btn btn-primary" type="button" disabled>Install checked image</button>
                 <button id="wtp-firmware-recover" class="btn btn-outline-danger" type="button" hidden disabled>Recover this update</button>
             </div>
+            <div id="wtp-firmware-activity" class="mt-3" hidden>
+                <div class="d-flex align-items-center gap-2">
+                    <span class="spinner-border spinner-border-sm flex-shrink-0" aria-hidden="true"></span>
+                    <p id="wtp-firmware-phase" class="form-text mb-0" role="status" aria-live="polite"></p>
+                </div>
+                <p id="wtp-firmware-timing" class="form-text mt-1 mb-0" aria-live="off"></p>
+            </div>
             <p id="wtp-firmware-read-status" class="form-text mt-2 mb-0" role="status" aria-live="polite"></p>
             <p id="wtp-firmware-feedback" class="form-text mt-3 mb-0 text-break" role="status" aria-live="polite">main is selected by default. No firmware download or device change has been requested.</p>
             <div id="wtp-firmware-migration" class="mt-3" hidden>

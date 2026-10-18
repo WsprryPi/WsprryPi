@@ -12,7 +12,7 @@ async function main() {
             if(p.action==="plan")state={...state,operation:"plan",plan_id:"bound",result:{ok:true,version:"checked",branch:p.branch,source:"a".repeat(40),workflow:{run_id:7,attempt:1}}};
             else state={...state,operation:p.action,running:true,maintenance:true};}
         return {ok:true,json:async()=>state};}};
-    root.window=root;vm.runInNewContext(source,root);root.WtpFirmware.setAvailability(true,"Pico C","first-selection");
+    root.window=root;vm.runInNewContext(source,root);root.WtpFirmware.setAvailability(true,"Pico C","fresh-selection");
     const el=name=>element("wtp-firmware-"+name), click=name=>el(name).listeners.click();
     assert(el("plan").disabled);await click("read");assert.match(el("read-status").textContent,/Status read at/);await click("plan");
     assert.equal(JSON.parse(requests.at(-1).body).branch,"main");assert.equal(el("upgrade").disabled,false);

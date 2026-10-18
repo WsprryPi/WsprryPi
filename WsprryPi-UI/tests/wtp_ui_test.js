@@ -96,6 +96,16 @@ function browser(storage = new Map(), storageBlocked = false) {
     assert.equal(root.WtpUi.read()["USB Serial"], "");
     assert([...fields.values()].filter(f => f.dataset.wtpKey).every(f => f.disabled));
     assert(calls.every(c => c.options.method === "GET"));
+    const interrupted = browser();
+    interrupted.events.DOMContentLoaded();
+    interrupted.root.WtpUi.populate(settings); interrupted.root.WtpUi.select(true);
+    await new Promise(setImmediate);
+    const firmwareAvailability = [];
+    interrupted.root.WtpFirmware = {setAvailability:(...args)=>firmwareAvailability.push(args)};
+    interrupted.root.fetch = async()=>{throw Error("Temporary host status interruption");};
+    await [...interrupted.timers.values()].find(timer=>timer.ms===3000).fn();
+    assert.equal(firmwareAvailability.at(-1)[0],true,"a host status failure must not hide or cancel USB firmware monitoring");
+    assert.equal(firmwareAvailability.at(-1)[3],settings["USB Serial"]);
     for (const legacyPreference of ["true", "false"]) {
         storage.set("wsprrypi.pico-development-controls", legacyPreference);
         const reloaded = browser(storage);
