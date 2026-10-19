@@ -1,8 +1,7 @@
 # Selected Pico USB firmware access
 
-The source implementation adds **Pico firmware over USB** beside selected Pico
-controls in Setup. It is under validation and is not yet a released package.
-The shared core remains owned by WsprryPico; WsprryPi provides protected routes,
+WsprryPi provides **Pico firmware over USB** beside selected Pico controls in
+Setup. The shared core remains owned by WsprryPico; WsprryPi provides protected routes,
 process/permission boundaries, selected-member maintenance and presentation.
 
 The default firmware branch is **main**, independently of WsprryPi's branch.
@@ -201,31 +200,50 @@ The package creates private root-owned backup/control/cache directories,
 `dialout` USB permissions for WsprryPico CDC and RP2350 BOOTSEL, and a setgid
 per-device lock directory restored by tmpfiles at boot. Permissions apply to
 new USB enumeration after rules reload; reconnect a cable when necessary.
-Python 3.10+ and a USB-enabled pinned picotool 2.3.0 are required. It does not
+Python 3.10+ and USB-enabled picotool 2.3 or newer within 2.x are required. It does not
 install an SDK, compiler or picotool, or change unrelated backend settings.
 
 ## Validation and documentation impact
 
-Full erase has hardware-free coverage in the shared installer (65 tests),
-installer publication (six tests), Pi deployment (nine tests), distribution
-(19 tests), firmware UI, polling and maintenance-safety suites. The source-owned
-Fleet panel renders 44 states across desktop/mobile and light/dark, including
-erase preparation, BOOTSEL, running, failed verification and blank completion,
-without horizontal overflow. Impeccable's detector reports no findings. The
-Linux installer C++ tests and bridge syntax check pass against the current
-source snapshot in `/tmp/wsprrypi-erase-validation.YFX99l` on wspr4.
+The [shared installer acceptance record](https://github.com/WsprryPi/WsprryPico/blob/devel/docs/development/usb-installer-results.md)
+separates the implemented contract, publication checks and board-specific
+physical evidence. Installer 0.1.3 retains contract 1 and the imported
+noninteractive entry point; no Pi source pin or adapter change is needed.
+Its numbered device menu applies only to an interactive standalone CLI.
+
+The recorded Pico C BOOTSEL migration on wspr4 installed
+`0.1.0-ci.39145255987.1` from source
+`f6ed8a208e2919a00b7ced044349fd45336f8760`. The full backup, reserved flash,
+public saved semantics and exact new boot passed verification. The Pi
+reconnected and cleared its maintenance hold. Connection-only recovery
+retained the same boot without reflashing. Host settings bytes were unchanged.
+This was a reviewed development-core deployment; it does not independently
+qualify every later published installer or firmware image.
+
 The [Pico C physical CLI/core erase check](https://github.com/WsprryPi/WsprryPico/blob/devel/docs/development/usb-installer.md#physical-erase-check)
-passes full-flash blank readback, nonblank-final-byte rejection and repeated
-erase recovery. Original flash and saved settings are restored and verified;
-the existing wspr4 service returns active, ready, unowned and output inactive.
-The live Pi web-route erase and physical disconnect/power-cut cases remain
-unqualified. No software deployment or RF operation is part of this check.
+passed full-flash blank readback, nonblank-final-byte rejection, repeated erase
+recovery and byte-identical restoration. The separate
+[deployed web erase and restoration test](development/pico-usb-erase-web-test-20261019.md)
+passed on 2026-10-19 with application/UI `8b7b7fe` and published installer 0.1.1
+from `90bb95e`. It exercised the production web endpoint and independently
+verified all 4,194,304 bytes blank. Original full flash and saved semantics
+were restored; wspr4 returned active and ready, with Pico C idle, unowned and
+output inactive. That record contains exact release, board, firmware and host
+identities. Its BOOTSEL handoff used the guarded USB test fixture.
+
+The 2026-10-19 closeout checks pass nine deployment and 19 compatible
+distribution/recovery tests, firmware UI unit, polling, maintenance-safety and
+rendered browser integration checks. Desktop/mobile light/dark render checks
+report no overflow and pass button/recovery gating. The shared core passes
+85 behavioral tests and six publication tests. These are software results;
+physical disconnect/power-cut cases, multi-board programming and RF remain
+outside the recorded acceptance.
 
 The Pi repository-root commands are:
 
 ```sh
-python3 scripts/tests/pico_usb_deploy_test.py
-python3 scripts/tests/pico_usb_bundle_test.py
+python3 -B scripts/tests/pico_usb_deploy_test.py
+python3 -B scripts/tests/pico_usb_bundle_test.py
 node WsprryPi-UI/tests/wtp_firmware_test.js
 node WsprryPi-UI/tests/wtp_firmware_polling_test.js
 node WsprryPi-UI/tests/pico_firmware_safety_test.js
@@ -234,56 +252,13 @@ php -l WsprryPi-UI/data/views/wtp-controls.php
 git diff --check
 ```
 
-The Linux checks run from `src` in an isolated source snapshot:
+Existing Linux C++ acceptance used isolated wspr4 source exports rather than
+the broken local macOS compiler. Installer tests, production WTP tests and
+bridge/control-route checks remain bound to those recorded sources. This
+closeout changes documentation only in WsprryPi; it does not rebuild or deploy
+its application, change services or operate a Pico.
 
-```sh
-g++ -std=c++20 -pthread -Wall -Wextra -Wpedantic -Werror -I. -IWTP-Client/include tests/pico_usb_installer_test.cpp -o ../pico_usb_installer_test
-../pico_usb_installer_test
-g++ -std=c++20 -pthread -Wall -Wextra -Wpedantic -Werror -I. -IWTP-Client/include -IWSPR-Transmitter/src -fsyntax-only wtp_runtime_bridge.cpp
-```
-
-BOOTSEL migration software checks cover preparation without programming,
-same-board continuation, early continuation retry, changed-port refusal,
-disabled-schedule admission, backup/cache/image failure, reserved-byte
-readback and postboot semantic mismatch. All 36 shared installer tests pass on
-macOS and Linux; six package/adapter tests, the firmware UI unit checks, the
-Linux installer adapter checks and 878 hardware-inhibited production WTP
-checks pass. The release application, UI and hash-bound development core are
-deployed on wspr4. Host settings bytes remained unchanged. Pico C's physical
-BOOTSEL migration completed with a verified full backup, preserved reserved
-flash and saved settings, exact firmware/boot identity, idle output and a cleared
-maintenance hold. A connection-only recovery retained that same boot and did
-not reflash the Pico. The BOOTSEL instructions, status-read acknowledgement
-and reconnection feedback were rendered at desktop/mobile sizes in light/dark;
-the operator workflow and final verified state were also checked in Firefox.
-No RF transmission was performed. Broader physical failure/recovery and
-multi-board qualification remain separate from this result.
-
-Hardware-free tests cover the process result/argv contract, durable private
-holds, task exclusion, route authorization classification, immutable package
-payload integrity/removal and UI states. The actual source-owned PHP/JS UI was
-rendered at desktop/mobile sizes in light/dark for checked, pending, refusal,
-failure, reconnect and success, without horizontal overflow. Impeccable's
-detector returned no findings. This is presentation/software evidence only.
-The committed Pico revision and both descriptor hashes were also checked against
-Git object bytes, then staged and removed through the real package adapter in a
-temporary root. The Linux C++ sources match the retained validation snapshot;
-installer, browser API and USB-management binaries pass on wspr4.
-
-The user authorized wspr4 for a temporary Linux build. Source and extracted
-OpenSSL development headers stay under `/tmp/wsprrypi-usb-installer-20261018`;
-its installed packages, checkout, services and RF hardware were not changed.
-The Mac's C++ toolchain was not used for WsprryPi compilation. On Debian 13.7
-aarch64 with g++ 14.2, the installer C++ tests and configuration/runtime client
-compile pass. Browser API and USB-management test binaries pass in that
-same hardware-free tree. Build metadata is disabled for this exported non-Git
-snapshot. JavaScript tests run on the Mac because wspr4 has no Node runtime;
-this is not a Linux aggregate/whole-suite pass. The changed web control-route
-translation unit passes a separate Linux syntax check. Independent read-only
-review reports no remaining actionable source/doc findings and independently
-reran the five deployment/adapter tests, UI unit, Impeccable detector, Bash
-syntax and diff checks. It did not rerun Linux C++ compilation.
-
-The separate operator documentation repository needs instructions for branch
-selection, dependency/USB permissions, recovery and the selected Pico firmware
-controls after acceptance. No separate docs repository was edited or published.
+The current installer guide covers firmware branch selection, dependency and
+USB permissions, selected-device confirmation, preservation and recovery.
+The separate operator documentation task owns final site publication. No
+separate documentation repository is changed here.
