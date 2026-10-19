@@ -122,7 +122,7 @@ only the selected member and durably creates
 `/var/lib/wsprrypi/pico-usb-control/SERIAL.json`. Runtime and installer share
 per-serial locks under `/run/lock/wsprrypico`. Firmware preflash/postboot holds
 protect the standalone scheduler as described in WsprryPico's
-`docs/development/usb-installer.md` in the integrated Pico `devel` source.
+[installer contract](https://github.com/WsprryPi/WsprryPico/blob/devel/engineering/development/usb-installer.md).
 A failed/ambiguous update keeps that member blocked across service restart.
 After core verification, a serialized reconnection checks the fresh device
 identity and version while the durable marker still blocks scheduling. The
@@ -200,12 +200,17 @@ The package creates private root-owned backup/control/cache directories,
 `dialout` USB permissions for WsprryPico CDC and RP2350 BOOTSEL, and a setgid
 per-device lock directory restored by tmpfiles at boot. Permissions apply to
 new USB enumeration after rules reload; reconnect a cable when necessary.
-Python 3.10+ and USB-enabled picotool 2.3 or newer within 2.x are required. It does not
-install an SDK, compiler or picotool, or change unrelated backend settings.
+Python 3.10+ and USB-enabled picotool 2.3 or newer within 2.x are required. The
+Pi deployment does not install an SDK, compiler or picotool, or change unrelated
+backend settings. The imported Fleet entry never downloads or removes tools.
+The separate [standalone bootstrap](https://wsprrypico.readthedocs.io/en/devel/install.html#run-directly-with-curl)
+can offer a verified official picotool download and cleanup. When using it on a
+WsprryPi host, follow the [service handoff](https://wsprrypico.readthedocs.io/en/devel/wsprrypi.html#standalone-installer-on-a-wsprrypi-host)
+so only one process uses the selected USB connection.
 
 ## Validation and documentation impact
 
-The [shared installer acceptance record](https://github.com/WsprryPi/WsprryPico/blob/devel/docs/development/usb-installer-results.md)
+The [shared installer acceptance record](https://github.com/WsprryPi/WsprryPico/blob/devel/engineering/development/usb-installer-results.md)
 separates the implemented contract, publication checks and board-specific
 physical evidence. Installer 0.1.3 retains contract 1 and the imported
 noninteractive entry point; no Pi source pin or adapter change is needed.
@@ -220,7 +225,7 @@ retained the same boot without reflashing. Host settings bytes were unchanged.
 This was a reviewed development-core deployment; it does not independently
 qualify every later published installer or firmware image.
 
-The [Pico C physical CLI/core erase check](https://github.com/WsprryPi/WsprryPico/blob/devel/docs/development/usb-installer.md#physical-erase-check)
+The [Pico C physical CLI/core erase check](https://github.com/WsprryPi/WsprryPico/blob/devel/engineering/development/usb-installer.md#physical-erase-check)
 passed full-flash blank readback, nonblank-final-byte rejection, repeated erase
 recovery and byte-identical restoration. The separate
 [deployed web erase and restoration test](development/pico-usb-erase-web-test-20261019.md)
@@ -230,6 +235,16 @@ verified all 4,194,304 bytes blank. Original full flash and saved semantics
 were restored; wspr4 returned active and ready, with Pico C idle, unowned and
 output inactive. That record contains exact release, board, firmware and host
 identities. Its BOOTSEL handoff used the guarded USB test fixture.
+
+The [public curl-to-Bash acceptance](https://github.com/WsprryPi/WsprryPico/blob/devel/engineering/development/usb-installer-results.md#public-bootstrap-upgrade-with-tool-download-and-cleanup)
+passed on wspr4/Pico C with installer 0.1.4 and an official ARM64 picotool 2.3.1
+download. Interactive download, Pico selection and cleanup passed. Firmware
+`0.1.0-ci.39324562626.1` from `c02e5d875dfdf2aa23e2220a95dd6ea7563adb4c`
+was verified with identical reserved bytes and saved semantics. All 47 prior
+private host files and the existing system picotool 2.3.0 were unchanged.
+After restarting WsprryPi, Fleet reconnected to the same Pico, ready, idle,
+unowned and output inactive. This observation used an unconfigured standalone
+schedule; it does not extend the web erase or physical interruption evidence.
 
 The 2026-10-19 closeout checks pass nine deployment and 19 compatible
 distribution/recovery tests, firmware UI unit, polling, maintenance-safety and
@@ -258,7 +273,9 @@ bridge/control-route checks remain bound to those recorded sources. This
 closeout changes documentation only in WsprryPi; it does not rebuild or deploy
 its application, change services or operate a Pico.
 
-The current installer guide covers firmware branch selection, dependency and
-USB permissions, selected-device confirmation, preservation and recovery.
-The separate operator documentation task owns final site publication. No
-separate documentation repository is changed here.
+The published [Pico operator manual](https://wsprrypico.readthedocs.io/en/devel/install.html)
+covers standalone installation, tool download/cleanup, preservation and recovery.
+The published [Pi operator manual](https://wsprry-pi.readthedocs.io/en/devel/User_Interface/Setup/Transmitter/index.html#install-or-update-pico-firmware-over-usb)
+covers Fleet's selected-Pico workflow. The Pico manual's
+[publication record](https://github.com/WsprryPi/WsprryPico/blob/devel/engineering/development/operator-documentation-results.md)
+confirms completion. No separate documentation repository is changed here.
