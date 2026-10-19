@@ -231,6 +231,7 @@
             </div>
             <p id="wtp-firmware-read-status" class="form-text mt-2 mb-0" role="status" aria-live="polite"></p>
             <p id="wtp-firmware-feedback" class="form-text mt-3 mb-0 text-break" role="status" aria-live="polite">main is selected by default. No firmware download or device change has been requested.</p>
+            <p id="wtp-firmware-retry" class="form-text mt-2 mb-0" aria-live="off" hidden></p>
             <div id="wtp-firmware-migration" class="mt-3" hidden>
                 <p class="mb-2">Keep the Pico idle and do not edit its settings while completing these steps.</p>
                 <ol class="mb-0">

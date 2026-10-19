@@ -98,6 +98,24 @@ async function main() {
     assert.match(h.el("feedback").textContent,/Verified checked/);assert(!h.safety.pending,"automatic completion releases the local pending hold");
     assert.deepEqual(h.requests.filter(r=>r.method==="POST").map(r=>JSON.parse(r.body).action),["plan","upgrade"]);
     h.events.pagehide();
-    console.log("Firmware polling: automatic completion, immediate activity, elapsed feedback, failed reads, lost replies, invalidation, lifecycle and exact USB binding passed");
+    const limited=fixture();limited.setState({operation:"plan",result:{ok:false,error:"GitHub's anonymous API request limit is exhausted (HTTP 403). Retry after 2026-10-18 21:00:00 UTC.",error_code:"github_rate_limited",retry_at:70,recovery_required:false}});
+    limited.root.WtpFirmware.setAvailability(true,"C","selection");await limited.advance(0);
+    assert.match(limited.el("feedback").textContent,/GitHub.*limit.*UTC/);
+    assert(!limited.el("retry").hidden);assert.match(limited.el("retry").textContent,/Try again in 1:00/);
+    assert(limited.el("plan").disabled);assert(!limited.el("read").disabled);
+    await limited.click("plan");assert(limited.requests.every(r=>r.method==="GET"),"cooldown cannot send an early POST");
+    limited.el("branch").value="main";limited.el("branch").listeners.change();await limited.advance(3000);
+    assert.match(limited.el("feedback").textContent,/GitHub.*limit/);assert(limited.el("plan").disabled,"changing branches does not bypass a shared API limit");
+    await limited.advance(57000);assert(!limited.el("plan").disabled);
+    assert.match(limited.el("retry").textContent,/retry time has passed/);
+    assert(limited.requests.every(r=>r.method==="GET"),"expiry never restarts a download");
+    await limited.click("plan");assert.equal(limited.requests.filter(r=>r.method==="POST").length,1);
+    limited.events.pagehide();
+    const optional=fixture();optional.setState({operation:"plan",result:{ok:true,version:"checked",recent_ci:{available:false,error_code:"github_rate_limited",reason:"GitHub temporarily rate-limited this API request. Retry after 2026-10-18 21:00:00 UTC.",retry_at:70}}});
+    optional.root.WtpFirmware.setAvailability(true,"C","selection");await optional.advance(0);
+    assert.match(optional.el("feedback").textContent,/Additional CI status: GitHub.*UTC/);
+    assert(!optional.el("upgrade").disabled,"optional CI status cannot invalidate a verified checked image");
+    assert(optional.el("retry").hidden);optional.events.pagehide();
+    console.log("Firmware polling: completion, retry cooldown/expiry, optional CI limits, lost replies, invalidation, lifecycle and exact USB binding passed");
 }
 main().catch(error=>{console.error(error);process.exitCode=1;});

@@ -69,6 +69,17 @@ read time, even when the update state has not changed. Reads observe host progre
 they do not repeat programming or access the Pico. Monitoring stops when the
 page closes or the selected USB connection becomes unavailable.
 
+GitHub API rate limits identify the actual refusal and earliest retry time,
+rather than implying that the selected branch has no verified image. Fleet
+shows the UTC time, the browser's local time and a countdown. Download and check
+image stays disabled during that wait, including after reload or changing
+branches. Firmware status keeps refreshing from the Pi without another GitHub
+request. When the wait ends, the button becomes available; another download
+still needs an explicit click. A minimum one-minute wait is identified when
+GitHub supplies no usable retry header. Limits on optional additional CI status
+do not invalidate a verified checked image. GitHub response bodies, addresses
+and credentials are not exposed in the error.
+
 A refusal before programming reports that no firmware was written. Safe error
 text is shown beside the firmware controls; paths and backup contents remain
 private. The core retains the failure reason and stage in its private

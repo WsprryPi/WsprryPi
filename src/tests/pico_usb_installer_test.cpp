@@ -69,6 +69,14 @@ int main() {
     CHECK(!public_state.at("result").contains("backup_sha256") && !public_state.at("result").contains("transaction"));
     CHECK(public_state.dump().find("future_private_field")==std::string::npos && public_state.dump().find("/private")==std::string::npos);
     CHECK(pico_usb_public_task({{"result",{{"ok",false},{"error","HTTPS download failed"},{"transaction","/private/transaction"}}}}).at("result").at("error")=="HTTPS download failed");
+    const auto rate=pico_usb_public_task({{"result",{{"ok",false},{"error","GitHub API rate limit reached. Retry after 2026-10-18 21:00:00 UTC."},
+        {"error_code","github_rate_limited"},{"retry_at",1792357200},{"headers","private"}}}}).at("result");
+    CHECK(rate.at("error_code")=="github_rate_limited" && rate.at("retry_at")==1792357200);
+    CHECK(!rate.contains("headers") && rate.at("error").get<std::string>().find("UTC")!=std::string::npos);
+    for(const nlohmann::json& retry:{nlohmann::json(-1),nlohmann::json("1792357200"),nlohmann::json(1792357200.5),nlohmann::json(true),nlohmann::json(999999999999ULL)}) {
+      const auto invalid=pico_usb_public_task({{"result",{{"error_code","github_rate_limited"},{"retry_at",retry}}}}).at("result");
+      CHECK(!invalid.contains("retry_at") && !invalid.contains("error_code"));
+    }
     CHECK(pico_usb_reconnect_allowed({{"ok",false},{"recovery_required",false}},true));
     CHECK(!pico_usb_reconnect_allowed({{"ok",false},{"recovery_required",false}},false));
     CHECK(!pico_usb_reconnect_allowed({{"ok",true},{"stage","awaiting_bootsel"}},true));

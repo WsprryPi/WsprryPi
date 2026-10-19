@@ -7,6 +7,8 @@
     let closed = false, uncertain = false, requestAction = "", expectedSerial = "", imageEdited = false;
     let clockTimer = null, monitoringSince = null, lastRead = null, failures = 0;
     const url = () => (root.WSPRRYPI_PATHS?.sharedApiPath || "/api/v1") + "/member/firmware";
+    const retryAt = () => state?.result?.error_code === "github_rate_limited" && Number.isSafeInteger(state.result.retry_at)
+        && state.result.retry_at > 0 && state.result.retry_at <= 4102444800 ? state.result.retry_at * 1000 : 0;
     const cancelPoll = () => { root.clearTimeout(timer); timer = null; };
     function schedulePoll(delay = state?.running ? 1500 : 3000) {
         if (!available || closed || busy || timer !== null) return;
@@ -30,9 +32,17 @@
             const age = lastRead === null ? "Waiting for the first status update."
                 : `Last status update ${Math.floor((Date.now() - lastRead) / 1000)} s ago.`;
             el("timing").textContent = `Monitoring for ${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}. ${age} Refreshes automatically; a total percentage is not available.`;
-            if (clockTimer === null && !closed) clockTimer = root.setTimeout(() => { clockTimer = null; activity(); }, 1000);
         } else {
             monitoringSince = null;
+        }
+        const retry = retryAt(), remaining = Math.max(0, Math.ceil((retry - Date.now()) / 1000));
+        el("retry").hidden = !available || !retry;
+        if (retry) el("retry").textContent = remaining
+            ? `Download checks paused until ${new Date(retry).toLocaleString(undefined, {timeZoneName:"short"})}. Try again in ${Math.floor(remaining / 60)}:${String(remaining % 60).padStart(2,"0")}. Firmware status keeps refreshing.`
+            : "The retry time has passed. Choose Download and check image to try again; downloads do not restart automatically.";
+        if ((active || available && remaining > 0) && !closed) {
+            if (clockTimer === null) clockTimer = root.setTimeout(() => { clockTimer = null; render(); }, 1000);
+        } else {
             root.clearTimeout(clockTimer); clockTimer = null;
         }
     }
@@ -46,7 +56,7 @@
         el("version-field").hidden = el("source").value !== "version";
         el("read").disabled = busy || !available;
         el("read").textContent = reading ? "Reading status…" : "Read firmware status";
-        el("plan").disabled = busy || locked || !available || !state?.selection_id || state?.maintenance === true;
+        el("plan").disabled = busy || locked || retryAt() > Date.now() || !available || !state?.selection_id || state?.maintenance === true;
         el("upgrade").disabled = busy || locked || imageEdited || !available || state?.operation !== "plan" || state?.result?.ok !== true || state?.maintenance === true;
         el("recover").hidden = state?.maintenance !== true;
         el("recover").disabled = busy || locked || !available || !state?.recovery_plan_id;
@@ -59,13 +69,13 @@
         if (state?.running) return state.operation === "plan" ? "The Pico has not been changed. The checked image will appear automatically when verification finishes."
             : "Keep the cable connected. Saved settings are checked before this Pico returns to use.";
         const result = state?.result;
-        if (imageEdited && state?.operation === "plan") return "Image selection changed. Download and check a fresh image before installing.";
+        if (imageEdited && state?.operation === "plan" && result?.ok) return "Image selection changed. Download and check a fresh image before installing.";
         if (state?.manual_bootsel_required) return `${result?.ok === false ? `Previous attempt: ${result.error || "Continuation did not complete"}. ` : ""}Ready for a one-time BOOTSEL migration. No firmware has been written. This Pico remains paused in WsprryPi. Follow the reconnect instructions below; saved settings will be backed up and verified during installation.`;
-        if (result?.ok && state.operation === "plan") return `Checked ${result.version} · ${result.branch} · source ${result.source} · CI ${result.workflow?.run_id || "unavailable"}/${result.workflow?.attempt || "unavailable"}. Saved settings will be preserved. Review this image before installing.${result.recent_ci?.newer_run ? ` A newer CI run ${result.recent_ci.newer_run.run_id} is ${result.recent_ci.newer_run.status} (${result.recent_ci.newer_run.conclusion || "pending"}); the checked saved image remains selected.` : result.recent_ci?.available === false ? " Additional CI run status is unavailable." : ""}`;
+        if (result?.ok && state.operation === "plan") return `Checked ${result.version} · ${result.branch} · source ${result.source} · CI ${result.workflow?.run_id || "unavailable"}/${result.workflow?.attempt || "unavailable"}. Saved settings will be preserved. Review this image before installing.${result.recent_ci?.newer_run ? ` A newer CI run ${result.recent_ci.newer_run.run_id} is ${result.recent_ci.newer_run.status} (${result.recent_ci.newer_run.conclusion || "pending"}); the checked saved image remains selected.` : result.recent_ci?.available === false ? result.recent_ci.error_code === "github_rate_limited" ? ` Additional CI status: ${result.recent_ci.reason} The checked image remains selected.` : " Additional CI run status is unavailable." : ""}`;
         if (result?.ok) return `Verified ${result.version}. Saved settings were preserved and the Pi reconnected to this Pico.`;
         if (state?.maintenance && state?.programming_verified) return `Firmware ${state.recovery_version} is verified. The Pi connection remains unconfirmed. Keep this Pico connected and choose Recover this update to retry the connection without reflashing.`;
         if (state?.maintenance) return `${(result?.error || "An interrupted update needs recovery").replace(/[.]+$/, "")}. This Pico remains paused in WsprryPi. Keep it connected; use Recover this update. An administrator may need the private transaction record and a deliberate BOOTSEL reconnect.`;
-        if (result?.error) return `${state.operation === "plan" ? "Image request" : "Firmware update"} refused: ${result.error.replace(/[.]+$/, "")}. ${result.recovery_required === false ? "No firmware was written. " : ""}Read status and check the image before retrying.`;
+        if (result?.error) return `${state.operation === "plan" ? "Image request" : "Firmware update"} refused: ${result.error.replace(/[.]+$/, "")}. ${result.recovery_required === false ? "No firmware was written. " : ""}${retryAt() ? "Wait until the retry time before checking the image again." : "Read status and check the image before retrying."}`;
         return "Select a branch and image, then download and check it. An unavailable branch or stable release is refused without substitution. Developer builds use the host command line.";
     }
     async function exchange(payload) {
@@ -76,7 +86,7 @@
         return value;
     }
     async function perform(action, automatic = false) {
-        if (!available || closed || busy || (action !== "read" && (uncertain || state?.running))) return;
+        if (!available || closed || busy || action === "plan" && retryAt() > Date.now() || (action !== "read" && (uncertain || state?.running))) return;
         if (action === "upgrade" || action === "recover") {
             const selected = action === "upgrade" ? state.result?.version : state.recovery_version;
             const verb = action === "upgrade" ? "Install" : state.manual_bootsel_required ? "Continue the BOOTSEL migration to" : "Recover";
@@ -122,7 +132,7 @@
     }
     function invalidate() {
         imageEdited = true;
-        if (state?.operation === "plan" && !state.running) el("feedback").textContent = "Image selection changed. Download and check a fresh image before installing.";
+        if (state?.operation === "plan" && !state.running && state.result?.ok) el("feedback").textContent = "Image selection changed. Download and check a fresh image before installing.";
         render();
     }
     function init() {

@@ -48,6 +48,11 @@ inline nlohmann::json pico_usb_public_task(const nlohmann::json& state) {
     projected=nlohmann::json::object();
     for(const auto* key:{"schema","installer_version","ok","stage","serial","version","branch","source","workflow","run","uf2","preserved","recovery_required","recent_ci","manual_bootsel_required"})
       if(value.contains(key)) projected[key]=value.at(key);
+    if(value.contains("error_code") && value.at("error_code")=="github_rate_limited" && value.contains("retry_at") &&
+        value.at("retry_at").is_number_integer() && value.at("retry_at")>0 && value.at("retry_at")<=4102444800LL) {
+      projected["error_code"]="github_rate_limited";
+      projected["retry_at"]=value.at("retry_at");
+    }
     if(value.contains("error")) {
       const auto text=value.value("error",std::string{});
       projected["error"]=(text.size()<=512 && text.find('/')==std::string::npos && text.find('\\')==std::string::npos && text.find('\n')==std::string::npos)
