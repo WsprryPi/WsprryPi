@@ -743,14 +743,14 @@ async function main() {
         });
         await waitFor(async () => {
             const result = await client.send("Runtime.evaluate", {
-                expression: "({ ready: typeof scheduleAutosave === 'function' && document.readyState === 'complete', state: document.readyState, title: document.title, url: location.href, scheduleType: typeof scheduleAutosave, scripts: [...document.scripts].map((script) => script.src) })",
+                expression: "({ ready: typeof scheduleAutosave === 'function' && document.readyState === 'complete' && window.PicoFirmwareSafety?.locked === false, state: document.readyState, title: document.title, url: location.href, scheduleType: typeof scheduleAutosave, scripts: [...document.scripts].map((script) => script.src) })",
                 returnByValue: true,
             });
             if (!result.result.value.ready) {
                 throw new Error(JSON.stringify(result.result.value));
             }
             return true;
-        }, "Setup production scripts");
+        }, "Setup production scripts and idle host firmware status");
 
         const result = await client.send("Runtime.evaluate", {
             expression: `(${browserTest.toString()})()`,

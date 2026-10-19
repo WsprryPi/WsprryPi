@@ -59,7 +59,7 @@ async function reviewIntegratedUi(client, origin, evidence) {
     const measurements=[];
     for (const view of ["operation","config","logs","spots","maintenance"]) {
         await client.send("Page.navigate", {url:`${origin}/index.php?page=${view}${view==='spots'?'&demo=1':''}`});
-        await waitFor("document.readyState==='complete' && typeof applyThemePreference==='function'", `${view} load`);
+        await waitFor("document.readyState==='complete' && typeof applyThemePreference==='function' && window.PicoFirmwareSafety?.locked===false", `${view} load and idle host firmware status`);
         await client.send("Page.bringToFront");
         if (view === "logs") {
             await evaluate(`__reviewLogStream.onopen();__reviewLogStream.emit('message',{type:'journal',__REALTIME_TIMESTAMP:'1792173600000000',PRIORITY:'6',SYSLOG_IDENTIFIER:'wsprrypi-long-service-identifier',MESSAGE:'First visible record: '+ 'long-technical-value-'.repeat(14)});`);

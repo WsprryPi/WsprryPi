@@ -611,11 +611,11 @@ async function main() {
         }, "Maintenance page to receive browser focus");
         await waitFor(async () => {
             const result = await client.send("Runtime.evaluate", {
-                expression: "document.readyState === 'complete' && typeof SUPPORT_INTAKE_ENDPOINT === 'object'",
+                expression: "document.readyState === 'complete' && typeof SUPPORT_INTAKE_ENDPOINT === 'object' && window.PicoFirmwareSafety?.locked === false",
                 returnByValue: true,
             });
             return result.result.value === true;
-        }, "Maintenance scripts");
+        }, "Maintenance scripts and idle host firmware status");
         await dismissUiRefreshPrompt(client);
         const result = await client.send("Runtime.evaluate", {
             expression: `(${browserTest.toString()})()`, awaitPromise: true, returnByValue: true,

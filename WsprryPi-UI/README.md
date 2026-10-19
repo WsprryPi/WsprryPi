@@ -112,6 +112,12 @@ remove the profile only after the browser group has stopped. A successful
 workflow followed by failed cleanup is a failed test. Do not replace this with
 PID-only termination, process-name kills or ignored removal errors.
 
+The PHP fixture router supplies a synthetic, read-only `GET /api/v1/status`
+response with `host.firmware_maintenance: false`. Wait for
+`PicoFirmwareSafety.locked === false` before exercising controls, including
+after navigation. Keep the production maintenance guard active; the router
+refuses status mutations, firmware actions and other application endpoints.
+
 Run `npm test` and `npm run test:browser` from this component. The process
 regression covers an exited leader with a stubborn writer and verifies that an
 unrelated sentinel survives. `node tests/wtp_pi_fleet_ui_integration_test.js`

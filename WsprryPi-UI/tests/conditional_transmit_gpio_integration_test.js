@@ -1121,7 +1121,7 @@ async function main() {
             const result = await client.send("Runtime.evaluate", {
                 expression: `({
                     ready: typeof refreshGpioConflictOptions === "function" &&
-                        document.readyState === "complete",
+                        document.readyState === "complete" && window.PicoFirmwareSafety?.locked === false,
                     state: document.readyState,
                     title: document.title,
                     url: location.href,
@@ -1136,7 +1136,7 @@ async function main() {
                 throw new Error(JSON.stringify(result.result.value));
             }
             return true;
-        }, "GPIO configuration scripts");
+        }, "GPIO configuration scripts and idle host firmware status");
 
         const result = await client.send("Runtime.evaluate", {
             expression: `(${browserTest.toString()})()`,

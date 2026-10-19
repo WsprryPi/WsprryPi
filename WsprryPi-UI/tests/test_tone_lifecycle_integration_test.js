@@ -259,9 +259,9 @@ async function main() {
         ` });
         await client.send("Page.navigate", { url: `http://127.0.0.1:${phpPort}/index.php?page=maintenance` });
         await waitFor(async () => {
-            const r = await client.send("Runtime.evaluate", { expression: "typeof onTestToneStart === 'function' && typeof bootstrap === 'object' && document.readyState === 'complete'", returnByValue: true });
+            const r = await client.send("Runtime.evaluate", { expression: "typeof onTestToneStart === 'function' && typeof bootstrap === 'object' && document.readyState === 'complete' && window.PicoFirmwareSafety?.locked === false", returnByValue: true });
             return r.result.value;
-        }, "Maintenance scripts");
+        }, "Maintenance scripts and idle host firmware status");
         // Prove the browser enforces isolation before installing in-memory
         // workflow mocks. The foreign port is an owned harmless sentinel.
         const isolation = await client.send("Runtime.evaluate", { expression: `(async () => {
@@ -272,13 +272,20 @@ async function main() {
                 request.onerror = () => resolve(true); request.onload = () => resolve(false);
                 request.open('GET', foreign); request.send();
             });
-            return {fetchBlocked, xhrBlocked, config: (await fetch('/config')).status,
+            const hostStatus = await fetch('/api/v1/status');
+            return {fetchBlocked, xhrBlocked, hostStatus: await hostStatus.json(),
+                statusMutation: (await fetch('/api/v1/status', {method:'POST'})).status,
+                firmwareMutation: (await fetch('/api/v1/member/firmware', {method:'POST'})).status,
+                config: (await fetch('/config')).status,
                 logs: (await fetch('/log_stream.php')).status,
                 spots: (await fetch('/fetch_spots.php')).status};
         })()`, awaitPromise: true, returnByValue: true });
         assert.ok(!isolation.exceptionDetails, JSON.stringify(isolation.exceptionDetails));
         assert.deepEqual(isolation.result.value,
-            {fetchBlocked: true, xhrBlocked: true, config: 503, logs: 503, spots: 503});
+            {fetchBlocked: true, xhrBlocked: true,
+                hostStatus: {host: {selected: false, firmware_maintenance: false,
+                    ready: false, phase: "idle", session_phase: "disconnected"}},
+                statusMutation: 503, firmwareMutation: 503, config: 503, logs: 503, spots: 503});
         assert.equal(escapedRequests, 0, "no request reaches the other-port application sentinel");
         console.log("Browser fixture isolation: CSP blocks direct fallback; application, journal and spot endpoints refuse execution");
         const run = await client.send("Runtime.evaluate", { expression: `(${browserTest.toString()})()`, awaitPromise: true, returnByValue: true });
