@@ -7,6 +7,9 @@
     let closed = false, uncertain = false, requestAction = "", expectedSerial = "", imageEdited = false;
     let clockTimer = null, monitoringSince = null, lastRead = null, failures = 0;
     const url = () => (root.WSPRRYPI_PATHS?.sharedApiPath || "/api/v1") + "/member/firmware";
+    const erasing = () => state?.operation === "erase" || state?.recovery_operation === "erase" || state?.result?.operation === "erase";
+    const erased = () => state?.result?.ok === true && state.result.operation === "erase" &&
+        state.result.erase_verified === true && state.result.erased_bytes === 4194304;
     const retryAt = () => state?.result?.error_code === "github_rate_limited" && Number.isSafeInteger(state.result.retry_at)
         && state.result.retry_at > 0 && state.result.retry_at <= 4102444800 ? state.result.retry_at * 1000 : 0;
     const cancelPoll = () => { root.clearTimeout(timer); timer = null; };
@@ -24,8 +27,11 @@
                 : requestAction === "plan" ? "Requesting image check…"
                 : requestAction === "upgrade" ? "Requesting installation…"
                 : requestAction === "recover" ? "Requesting update recovery…"
+                : requestAction === "erase" ? "Preparing full erase…"
                 : action === "plan" ? "Downloading and checking the selected image…"
                 : action === "upgrade" ? "Backing up, installing and verifying saved settings…"
+                : action === "recover" && erasing() ? "Erasing all flash and verifying every byte…"
+                : action === "erase" ? "Preparing full erase…"
                 : action === "recover" ? "Recovering and verifying this Pico…" : "Checking firmware status…";
             if (el("phase").textContent !== phase) el("phase").textContent = phase;
             const seconds = Math.floor((Date.now() - monitoringSince) / 1000);
@@ -58,17 +64,30 @@
         el("read").textContent = reading ? "Reading status…" : "Read firmware status";
         el("plan").disabled = busy || locked || retryAt() > Date.now() || !available || !state?.selection_id || state?.maintenance === true;
         el("upgrade").disabled = busy || locked || imageEdited || !available || state?.operation !== "plan" || state?.result?.ok !== true || state?.maintenance === true;
+        el("erase").disabled = busy || locked || !available || !state?.selection_id || !state?.device_id || state?.maintenance === true;
         el("recover").hidden = state?.maintenance !== true;
         el("recover").disabled = busy || locked || !available || !state?.recovery_plan_id;
-        el("recover").textContent = state?.manual_bootsel_required ? "Continue after BOOTSEL" : "Recover this update";
+        el("recover").textContent = erasing() ? state?.manual_bootsel_required ? "Erase after BOOTSEL" : "Retry full erase"
+            : state?.manual_bootsel_required ? "Continue after BOOTSEL" : "Recover this update";
         el("migration").hidden = state?.manual_bootsel_required !== true;
-        if (state) el("identity").textContent = `USB ${state.serial} · Device ${state.device_id || "unconfirmed"} · Installed ${state.installed_version || "unconfirmed"}`;
+        el("migration-action").textContent = erasing() ? "Erase after BOOTSEL" : "Continue after BOOTSEL";
+        el("migration-tail").textContent = erasing() ? "Keep USB connected until erase verification finishes."
+            : "Keep USB connected until installation and verification finish.";
+        if (state) el("identity").textContent = `USB ${state.serial} · Device ${state.device_id || "unconfirmed"} · Installed ${erased() ? "none (flash erased)" : state.installed_version || "unconfirmed"}`;
         const installerUpdate = state?.result?.installer_update;
         el("installer-update").hidden = installerUpdate?.state !== "retained";
         if (installerUpdate?.state === "retained") el("installer-update").textContent = `Using the retained flash tool. Its update check could not complete: ${installerUpdate.reason || "The compatible update channel is unavailable."}${state.result.ok ? " The checked firmware image remains usable." : ""}`;
         activity();
     }
     function describe() {
+        if (erasing()) {
+            if (state?.running) return "Keep USB connected. Full erase removes firmware and all saved data; completion requires verification of every flash byte.";
+            if (erased())
+                return "Erase verified: all 4 MiB of flash is blank. Firmware, credentials and saved data are removed. The Pico remains in BOOTSEL; install firmware before using it again. Existing host backups are retained.";
+            if (state?.manual_bootsel_required) return `${state.result?.error ? `Previous attempt: ${state.result.error}. ` : ""}Full erase is prepared. No flash has been erased yet. This Pico remains paused in WsprryPi. Follow the BOOTSEL steps below, then choose Erase after BOOTSEL to erase and verify all flash. No backup will be created.`;
+            if (state?.maintenance) return `Erase is unconfirmed. Do not assume credentials or firmware have been removed. ${state.result?.error || "An interrupted erase needs recovery."} Keep the selected Pico in BOOTSEL and choose Retry full erase.`;
+            if (state?.result?.error) return `Erase refused: ${state.result.error} Read status before preparing another erase.`;
+        }
         if (state?.running) return state.operation === "plan" ? "The Pico has not been changed. The checked image will appear automatically when verification finishes."
             : "Keep the cable connected. Saved settings are checked before this Pico returns to use.";
         const result = state?.result;
@@ -90,7 +109,10 @@
     }
     async function perform(action, automatic = false) {
         if (!available || closed || busy || action === "plan" && retryAt() > Date.now() || (action !== "read" && (uncertain || state?.running))) return;
-        if (action === "upgrade" || action === "recover") {
+        if (action === "erase" || action === "recover" && erasing()) {
+            if (!state?.selection_id || !state?.serial || action === "erase" && (!state.device_id || state.maintenance)) return;
+            if (!root.confirm(`${action === "erase" ? "Prepare full erase of" : "Erase ALL firmware and saved data on"} USB Pico ${state.serial}? This deletes Wi-Fi passwords, certificates, Bluetooth bonds and all persistent data from the entire flash. No backup is created. Existing host backups are retained. ${action === "erase" ? "Disable its saved standalone schedule first. You will be asked to reconnect while holding BOOTSEL, then explicitly continue the erase." : "This cannot be undone. Keep USB connected until all flash is verified blank."}`)) return;
+        } else if (action === "upgrade" || action === "recover") {
             const selected = action === "upgrade" ? state.result?.version : state.recovery_version;
             const verb = action === "upgrade" ? "Install" : state.manual_bootsel_required ? "Continue the BOOTSEL migration to" : "Recover";
             if (!root.confirm(`${verb} ${selected} on USB Pico ${state.serial}? Saved settings are retained. ${action === "upgrade" ? "Older firmware may ask you to reconnect while holding BOOTSEL. " : ""}Keep USB connected during programming and verification.`)) return;
@@ -107,6 +129,9 @@
                 payload = {action,selection_id:state.selection_id,branch:el("branch").value};
                 if (el("source").value === "version") payload.version = el("version").value.trim();
                 if (el("source").value === "stable") payload.stable = true;
+            } else if (action === "erase") {
+                root.PicoFirmwareSafety?.begin();
+                payload = {action,selection_id:state.selection_id,serial:state.serial,confirmed:true};
             } else if (action === "upgrade" || action === "recover") {
                 root.PicoFirmwareSafety?.begin();
                 payload = {action,selection_id:state.selection_id,plan_id:action === "upgrade" ? state.plan_id : state.recovery_plan_id,confirmed:true};
@@ -140,7 +165,7 @@
     }
     function init() {
         if (!el("")) return;
-        for (const action of ["read","plan","upgrade","recover"]) el(action).addEventListener("click", () => perform(action));
+        for (const action of ["read","plan","upgrade","recover","erase"]) el(action).addEventListener("click", () => perform(action));
         for (const name of ["branch","source","version"]) el(name).addEventListener("change", invalidate);
         root.WtpFirmware = {setAvailability(value, member = "", selection = "", serial = "") {
             const changed = (boundMember && member && boundMember !== member) || (boundSelection && selection && boundSelection !== selection);

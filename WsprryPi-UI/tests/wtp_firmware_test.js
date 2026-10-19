@@ -51,6 +51,39 @@ async function main() {
     assert.match(el("feedback").textContent,/Selected Pico changed/);
     assert(el("upgrade").disabled);assert(el("plan").disabled);
     root.WtpFirmware.setAvailability(false);assert(element("wtp-firmware").hidden);
+    state={serial:"1545B6EFBF78028C",device_id:"c".repeat(32),selection_id:"fresh-selection",running:false,maintenance:false};
+    root.fetch=async(url,options)=>{
+        requests.push({url,...options});
+        if(options.method==="POST") {
+            const p=JSON.parse(options.body);
+            assert.equal(p.selection_id,"fresh-selection");
+            if(p.action==="erase") {
+                assert.equal(p.serial,state.serial);assert.equal(p.confirmed,true);assert(!('plan_id' in p));
+                state={...state,operation:"erase",maintenance:true,manual_bootsel_required:true,recovery_operation:"erase",recovery_plan_id:"erase-bound",result:{ok:true,operation:"erase",stage:"awaiting_bootsel"}};
+            } else {assert.equal(p.plan_id,"erase-bound");state={...state,operation:"recover",running:true};}
+        }
+        return {ok:true,json:async()=>state};
+    };
+    root.WtpFirmware.setAvailability(true,"Pico C","fresh-selection");await click("read");
+    assert(!el("erase").disabled,"erase does not require an image check");
+    root.confirm=message=>{assert.match(message,/1545B6EFBF78028C/);assert.match(message,/No backup/);return false;};
+    count=requests.length;await click("erase");assert.equal(requests.length,count,"cancelled erase sends nothing");
+    root.confirm=()=>true;await click("erase");assert(el("erase").disabled);
+    assert.equal(el("recover").textContent,"Erase after BOOTSEL");assert.match(el("feedback").textContent,/No flash has been erased yet/);
+    assert.equal(el("migration-action").textContent,"Erase after BOOTSEL");
+    root.confirm=message=>{assert.match(message,/This cannot be undone/);assert(!message.includes('settings are retained'));return true;};
+    await click("recover");assert.match(el("phase").textContent,/Erasing all flash/);
+    state={serial:state.serial,device_id:state.device_id,selection_id:state.selection_id,
+        operation:"recover",running:true,maintenance:true,recovery_operation:"erase",result:null};
+    await click("read");assert.match(el("phase").textContent,/Erasing all flash/);
+    assert.match(el("feedback").textContent,/Full erase removes firmware and all saved data/);
+    state={...state,recovery_plan_id:"erase-bound"};
+    state={...state,running:false,manual_bootsel_required:false,result:{ok:false,operation:"erase",error:"Full flash comparison failed",recovery_required:true}};
+    await click("read");assert.equal(el("recover").textContent,"Retry full erase");assert.match(el("feedback").textContent,/Do not assume credentials/);
+    state={...state,maintenance:false,result:{ok:true,operation:"erase",erase_verified:true,erased_bytes:4194304}};
+    await click("read");assert.match(el("feedback").textContent,/all 4 MiB of flash is blank/);
+    assert.match(el("identity").textContent,/Installed none \(flash erased\)/);
+    assert(!el("feedback").textContent.includes('Pi reconnected'));assert(el("recover").hidden);
     console.log("Firmware UI branch defaults, plan invalidation, confirmation, pending, refusal and recovery passed");
 }
 main().catch(error=>{console.error(error);process.exitCode=1;});

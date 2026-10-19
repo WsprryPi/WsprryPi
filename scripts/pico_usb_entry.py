@@ -48,6 +48,11 @@ def invoke(manifest,payload,arguments):
     exec(compile(payload['usb_installer.py'],module.__file__,'exec'),module.__dict__)
     if module.INSTALLER_VERSION != manifest['installer_version']:
         raise ValueError('Shared installer version differs from its receipt')
+    if arguments[0] == 'erase' and not callable(getattr(module,'erase_transaction',None)):
+        return 2,{'schema':'wsprrypico-usb-result/1','installer_version':manifest['installer_version'],
+                  'installer_contract':1,'installer_source':manifest['source'],'ok':False,'operation':'erase',
+                  'recovery_required':False,
+                  'error':'The retained USB installer lacks full erase. Check for an installer update before erasing.'}
     with contextlib.redirect_stdout(io.StringIO()) as output:
         code = module.main(arguments,schema_bytes=payload['release-manifest-1.schema.json'])
     result = json.loads(output.getvalue())
@@ -60,7 +65,7 @@ def invoke(manifest,payload,arguments):
 
 def run(arguments,distribution,store,cache=CACHE,state=STATE):
     parser = argparse.ArgumentParser(add_help=False)
-    parser.add_argument('operation',choices=('plan','upgrade','recover','discover'))
+    parser.add_argument('operation',choices=('plan','upgrade','recover','discover','erase'))
     parser.add_argument('--output',type=Path)
     parser.add_argument('--bundle',type=Path)
     parser.add_argument('--transaction',type=Path)
@@ -72,7 +77,7 @@ def run(arguments,distribution,store,cache=CACHE,state=STATE):
     if args.operation != 'recover':
         cache.mkdir(parents=True,exist_ok=True,mode=0o700)
     with distribution.lock(store.root,owner=store.owner):
-        pending = 0 if args.operation == 'recover' else store.prune(cache,state)
+        pending = 0 if args.operation == 'recover' else store.prune(cache,state,retain_history=args.operation=='erase')
         update = None
         if args.operation == 'recover':
             if args.transaction is None:
@@ -85,10 +90,16 @@ def run(arguments,distribution,store,cache=CACHE,state=STATE):
                 selected = store.refresh()
                 identity,update = selected['identity'],selected['update']
                 store.bind(args.output.name,identity)
-            elif args.operation == 'upgrade':
-                if args.bundle is None or args.bundle.parent != cache:
-                    raise ValueError('Installation requires its checked firmware bundle')
-                identity = store.planned(args.bundle.name)
+            elif args.operation in ('upgrade','erase'):
+                if args.operation == 'upgrade':
+                    if args.bundle is None or args.bundle.parent != cache:
+                        raise ValueError('Installation requires its checked firmware bundle')
+                    identity = store.planned(args.bundle.name)
+                else:
+                    # Erase needs no firmware plan or download. Freeze the active
+                    # verified installer so interrupted erases recover offline.
+                    selected = store.refresh()
+                    identity,update = selected['identity'],selected['update']
                 if pending >= 8:
                     raise ValueError('Eight unresolved firmware transactions retained; finish recovery before another update')
                 bucket = store.snapshot(state,identity)
@@ -107,7 +118,7 @@ def run(arguments,distribution,store,cache=CACHE,state=STATE):
             return code,result
         finally:
             if args.operation != 'recover':
-                store.prune(cache,state)
+                store.prune(cache,state,retain_history=args.operation=='erase')
 
 
 def main():
@@ -124,6 +135,6 @@ if __name__ == '__main__':
     except Exception as error:
         print(json.dumps({'schema':'wsprrypico-usb-result/1','installer_contract':1,
                           'installer_version':'adapter','ok':False,'error':str(error),
-                          'recovery_required':len(sys.argv)>1 and sys.argv[1] in ('upgrade','recover'),
+                          'recovery_required':len(sys.argv)>1 and sys.argv[1] in ('upgrade','recover','erase'),
                           **getattr(error,'details',{})}))
         sys.exit(2)

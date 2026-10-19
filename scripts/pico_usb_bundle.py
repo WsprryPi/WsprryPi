@@ -358,13 +358,13 @@ class Store:
         require(sha(self.read(parent/'usb-installer.json')) == parent.name, 'Recovery installer receipt changed')
         return self.bundle(parent)
 
-    def prune(self, cache, state):
+    def prune(self, cache, state, *, retain_history=False):
         # One global firmware budget across all installer versions, not one
         # independent allowance for each release. Recovery is never evicted.
         safe(cache,self.owner)
         plans = sorted((p for p in cache.iterdir() if re.fullmatch(PLAN,p.name)),key=lambda p:p.stat().st_mtime,reverse=True)
         retained = {p.name for p in plans[:3]}
-        for path in plans[3:]:
+        for path in ([] if retain_history else plans[3:]):
             safe(path,self.owner)
             require(path.is_dir(), 'Unexpected firmware cache member')
             shutil.rmtree(path)
@@ -372,7 +372,7 @@ class Store:
         if bindings.exists():
             for path in bindings.iterdir():
                 require(re.fullmatch(PLAN+r'\.json',path.name), 'Unknown installer plan binding')
-                if path.stem not in retained:
+                if not retain_history and path.stem not in retained:
                     safe(path,self.owner)
                     path.unlink()
         records = []
@@ -386,7 +386,7 @@ class Store:
                 if child.is_dir() or child.is_symlink():
                     safe(child,self.owner)
                     require((child/'transaction.json').is_file(), 'Unknown private transaction directory; inspect it before another update')
-            if directory != state:
+            if directory != state and not retain_history:
                 self.local_references(directory,state)
                 for reference in directory.glob('.local-reference-*.json'):
                     (directory/reference.name.replace('.local-reference-','.local-image-').replace('.json','.uf2')).unlink()
@@ -401,6 +401,8 @@ class Store:
         complete, unchanged, pending = [],[],[]
         for path,record in records:
             (pending if record['recovery_required'] else complete if record.get('stage') == 'complete' else unchanged).append(path)
+        if retain_history:
+            return len(pending)
         for history,limit in ((complete,2),(unchanged,8)):
             for i,path in enumerate(sorted(history,key=lambda p:p.stat().st_mtime,reverse=True)):
                 if i >= limit or time.time()-path.stat().st_mtime > 7*86400:

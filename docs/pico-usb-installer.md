@@ -30,6 +30,38 @@ omitted. Upgrade requires its current `plan_id` and `confirmed: true`. Recover
 uses only the selected serial's private retained record. No USB update is
 offered for a network-only Pico.
 
+## Full flash erase
+
+**Erase this Pico → Erase firmware and all data…** is independent of image
+selection. It removes firmware, Wi-Fi credentials, certificates, Bluetooth
+bonds and every persistent flash record, including diagnostic and boot
+workaround sectors. The entire 4 MiB flash is compared with blank bytes before
+success is reported. ROM, OTP and immutable hardware identity are outside this
+flash operation. No new backup is created; existing host backups are retained.
+
+Disable the selected Pico's saved standalone schedule first. Confirm the USB
+serial and destructive operation. The Pi requires idle/unowned admission and
+pauses that member while the core prepares a transaction. Reconnect the same
+Pico in BOOTSEL on the same physical port, then choose **Erase after BOOTSEL**
+and confirm again. Keep USB connected through verification. Success leaves
+the Pico blank in BOOTSEL and releases the host maintenance hold without
+attempting WTP reconnection. Install firmware before returning it to service.
+
+An interrupted erase stays in maintenance; **Retry full erase** repeats the
+erase and complete comparison on the same device. It never restores old
+firmware or settings. The exact installer is retained in the private
+transaction snapshot, so recovery needs no firmware image or network access.
+Starting erase can refresh the compatible installer, with the verified cached
+copy retained when offline. An older cached installer without erase support
+refuses; update the installer before retrying.
+
+The standalone CLI exposes the same operation as `usb_installer.py erase
+--device SERIAL --board pico2_w --yes`; running firmware produces a manual
+BOOTSEL handoff and exact continuation command. A board already in BOOTSEL
+can be erased directly.
+
+## Firmware update and recovery
+
 For verified older CI firmware, **Install checked image** prepares a one-time
 BOOTSEL migration instead of attempting an unsupported automatic reset. The
 Pico must be idle, unowned, and have its saved standalone schedule disabled or
@@ -173,6 +205,42 @@ Python 3.10+ and a USB-enabled pinned picotool 2.3.0 are required. It does not
 install an SDK, compiler or picotool, or change unrelated backend settings.
 
 ## Validation and documentation impact
+
+Full erase has hardware-free coverage in the shared installer (65 tests),
+installer publication (six tests), Pi deployment (nine tests), distribution
+(19 tests), firmware UI, polling and maintenance-safety suites. The source-owned
+Fleet panel renders 44 states across desktop/mobile and light/dark, including
+erase preparation, BOOTSEL, running, failed verification and blank completion,
+without horizontal overflow. Impeccable's detector reports no findings. The
+Linux installer C++ tests and bridge syntax check pass against the current
+source snapshot in `/tmp/wsprrypi-erase-validation.YFX99l` on wspr4.
+The [Pico C physical CLI/core erase check](https://github.com/WsprryPi/WsprryPico/blob/devel/docs/development/usb-installer.md#physical-erase-check)
+passes full-flash blank readback, nonblank-final-byte rejection and repeated
+erase recovery. Original flash and saved settings are restored and verified;
+the existing wspr4 service returns active, ready, unowned and output inactive.
+The live Pi web-route erase and physical disconnect/power-cut cases remain
+unqualified. No software deployment or RF operation is part of this check.
+
+The Pi repository-root commands are:
+
+```sh
+python3 scripts/tests/pico_usb_deploy_test.py
+python3 scripts/tests/pico_usb_bundle_test.py
+node WsprryPi-UI/tests/wtp_firmware_test.js
+node WsprryPi-UI/tests/wtp_firmware_polling_test.js
+node WsprryPi-UI/tests/pico_firmware_safety_test.js
+node WsprryPi-UI/tests/wtp_firmware_ui_integration_test.js
+php -l WsprryPi-UI/data/views/wtp-controls.php
+git diff --check
+```
+
+The Linux checks run from `src` in an isolated source snapshot:
+
+```sh
+g++ -std=c++20 -pthread -Wall -Wextra -Wpedantic -Werror -I. -IWTP-Client/include tests/pico_usb_installer_test.cpp -o ../pico_usb_installer_test
+../pico_usb_installer_test
+g++ -std=c++20 -pthread -Wall -Wextra -Wpedantic -Werror -I. -IWTP-Client/include -IWSPR-Transmitter/src -fsyntax-only wtp_runtime_bridge.cpp
+```
 
 BOOTSEL migration software checks cover preparation without programming,
 same-board continuation, early continuation retry, changed-port refusal,

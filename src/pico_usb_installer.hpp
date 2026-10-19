@@ -23,6 +23,19 @@ inline bool pico_usb_reconnect_allowed(const nlohmann::json& result,bool prepari
 inline void pico_usb_record_result(nlohmann::json& expected,const nlohmann::json& result,bool preparing) {
   if(result.contains("transaction")) expected["transaction"]=result.at("transaction");
   if(result.contains("manual_bootsel_required")) expected["manual_bootsel_required"]=result.at("manual_bootsel_required");
+  if(expected.value("operation","")=="erase") {
+    expected["erase_verified"]=false;
+    if(!result.value("ok",false)) return;
+    const bool waiting=result.value("stage","")=="awaiting_bootsel" &&
+        result.value("manual_bootsel_required",false) && result.value("recovery_required",false) && result.contains("transaction");
+    const bool erased=result.value("stage","")=="complete" && result.value("erase_verified",false) &&
+        result.value("erased_bytes",0)==0x400000 && !result.value("recovery_required",true);
+    if(result.value("serial","")!=expected.at("serial").get<std::string>() ||
+        result.value("operation","")!="erase" || (!waiting && !erased))
+      throw std::runtime_error("Shared installer did not verify this selected Pico erase.");
+    expected["erase_verified"]=erased;
+    return;
+  }
   if(!result.value("ok",false)) return;
   const bool waiting=preparing && result.value("stage","")=="awaiting_bootsel" &&
       result.value("manual_bootsel_required",false) && result.value("recovery_required",false) && result.contains("transaction");
@@ -40,13 +53,13 @@ inline void pico_usb_record_result(nlohmann::json& expected,const nlohmann::json
 }
 inline nlohmann::json pico_usb_public_task(const nlohmann::json& state) {
   nlohmann::json result=nlohmann::json::object();
-  for(const auto* key:{"running","operation","plan_id","branch","bound_serial","bound_device","bound_selection"})
+  for(const auto* key:{"running","operation","recovery_operation","plan_id","branch","bound_serial","bound_device","bound_selection"})
     if(state.contains(key)) result[key]=state.at(key);
   result["result"]=nullptr;
   if(state.contains("result") && state.at("result").is_object()) {
     const auto& value=state.at("result"); auto& projected=result["result"];
     projected=nlohmann::json::object();
-    for(const auto* key:{"schema","installer_version","installer_contract","installer_source","ok","stage","serial","version","branch","source","workflow","run","uf2","preserved","recovery_required","recent_ci","manual_bootsel_required"})
+    for(const auto* key:{"schema","installer_version","installer_contract","installer_source","ok","stage","serial","version","branch","source","workflow","run","uf2","preserved","recovery_required","recent_ci","manual_bootsel_required","operation","erase_verified","erased_bytes"})
       if(value.contains(key)) projected[key]=value.at(key);
     if(value.contains("installer_update") && value.at("installer_update").is_object()) {
       const auto& update=value.at("installer_update");

@@ -107,6 +107,29 @@ int main() {
     completed["target"]={{"scope","member"},{"device_id",std::string(32,'c')},{"boot_id",std::string(32,'b')}};
     pico_usb_record_result(pending,completed,false);CHECK(pending.at("verified")==true && pending.at("manual_bootsel_required")==false);
     pico_usb_remove_hold(marker);
+    const nlohmann::json erase_reviewed={{"operation","erase"},{"serial",reviewed.at("serial")}};
+    const nlohmann::json erase_waiting={{"ok",true},{"operation","erase"},{"serial",reviewed.at("serial")},
+        {"stage","awaiting_bootsel"},{"manual_bootsel_required",true},{"recovery_required",true},{"transaction","/private/erase/transaction.json"}};
+    auto erase_pending=erase_reviewed; pico_usb_record_result(erase_pending,erase_waiting,true);
+    CHECK(!erase_pending.value("erase_verified",true));
+    const nlohmann::json erased={{"ok",true},{"operation","erase"},{"serial",reviewed.at("serial")},
+        {"stage","complete"},{"erase_verified",true},{"erased_bytes",0x400000},{"recovery_required",false}};
+    pico_usb_record_result(erase_pending,erased,false);CHECK(erase_pending.at("erase_verified")==true);
+    pico_usb_record_result(erase_pending,{{"ok",false},{"recovery_required",true}},false);
+    CHECK(!erase_pending.value("erase_verified",true)); // A failed retry cannot reuse old success.
+    for(const auto* field:{"operation","serial","erase_verified","erased_bytes","recovery_required"}) {
+      auto invalid=erased;invalid.erase(field);auto held=erase_reviewed;refused=false;
+      try {pico_usb_record_result(held,invalid,false);} catch(...) {refused=true;} CHECK(refused);
+    }
+    for(const auto& patch:{nlohmann::json{{"erased_bytes",0x3ff000}},nlohmann::json{{"serial","0000000000000000"}},nlohmann::json{{"recovery_required",true}}}) {
+      auto invalid=erased;invalid.update(patch);auto held=erase_reviewed;refused=false;
+      try {pico_usb_record_result(held,invalid,false);} catch(...) {refused=true;} CHECK(refused);
+    }
+    const auto erase_public=pico_usb_public_task({{"result",erased}}).at("result");
+    CHECK(erase_public.at("erase_verified")==true && erase_public.at("erased_bytes")==0x400000);
+    const auto erase_running=pico_usb_public_task({{"operation","recover"},{"running",true},
+        {"recovery_operation","erase"},{"result",nullptr}});
+    CHECK(erase_running.at("recovery_operation")=="erase" && erase_running.at("result").is_null());
     PicoUsbInstallerTask task;
     CHECK(task.start([] {std::this_thread::sleep_for(std::chrono::milliseconds(100));return nlohmann::json{{"ok",true}};},{{"operation","fixture"}}));
     CHECK(!task.start([] {return nlohmann::json{};},{}));

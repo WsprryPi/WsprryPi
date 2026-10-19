@@ -222,6 +222,11 @@
                 <button id="wtp-firmware-upgrade" class="btn btn-primary" type="button" disabled>Install checked image</button>
                 <button id="wtp-firmware-recover" class="btn btn-outline-danger" type="button" hidden disabled>Recover this update</button>
             </div>
+            <details class="mt-3">
+                <summary>Erase this Pico</summary>
+                <p class="form-text mt-2">Full erase removes the firmware, Wi-Fi passwords, certificates, Bluetooth bonds and every saved setting from all 4 MiB of flash. It creates no backup. Disable the Pico's saved standalone schedule first. After a BOOTSEL reconnect, the entire flash is erased and checked. The Pico stays blank until firmware is installed again. Existing backups on this Pi are retained.</p>
+                <button id="wtp-firmware-erase" class="btn btn-outline-danger" type="button" disabled>Erase firmware and all data…</button>
+            </details>
             <div id="wtp-firmware-activity" class="mt-3" hidden>
                 <div class="d-flex align-items-center gap-2">
                     <span class="spinner-border spinner-border-sm flex-shrink-0" aria-hidden="true"></span>
@@ -238,7 +243,7 @@
                 <ol class="mb-0">
                     <li>Unplug this Pico's USB cable from the Pi.</li>
                     <li>Hold BOOTSEL on the Pico while reconnecting to the same Pi USB port, then release BOOTSEL.</li>
-                    <li>Choose <strong>Continue after BOOTSEL</strong>. Keep USB connected until installation and verification finish.</li>
+                    <li>Choose <strong id="wtp-firmware-migration-action">Continue after BOOTSEL</strong>. <span id="wtp-firmware-migration-tail">Keep USB connected until installation and verification finish.</span></li>
                 </ol>
             </div>
         </details>

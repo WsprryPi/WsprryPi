@@ -17,23 +17,26 @@ def core(version):
     return ("INSTALLER_VERSION="+repr(version)+"\n"+'''
 import argparse,json,tempfile
 from pathlib import Path
+def erase_transaction(args): pass
 def main(argv=None,schema_bytes=None):
     p=argparse.ArgumentParser();p.add_argument('op');p.add_argument('--output');p.add_argument('--bundle');p.add_argument('--transaction');p.add_argument('--state-dir');p.add_argument('--device');p.add_argument('--branch')
     args,_=p.parse_known_args(argv)
     result=dict(schema='wsprrypico-usb-result/1',installer_version=INSTALLER_VERSION,ok=True,serial='1545B6EFBF78028C',recovery_required=False,marker=INSTALLER_VERSION)
     if args.op=='plan':
         out=Path(args.output);out.mkdir();(out/'firmware.uf2').write_bytes(b'firmware fixture')
-    if args.op=='upgrade':
+    if args.op in ('upgrade','erase'):
         directory=Path(tempfile.mkdtemp(prefix='1545B6EFBF78028C-',dir=args.state_dir));path=directory/'transaction.json'
-        record=dict(schema='wsprrypico-usb-transaction/1',serial='1545B6EFBF78028C',installer_version=INSTALLER_VERSION,stage='awaiting_bootsel',recovery_required=True,saved='untouched')
+        record=dict(schema='wsprrypico-usb-transaction/1',serial='1545B6EFBF78028C',installer_version=INSTALLER_VERSION,stage='awaiting_bootsel',recovery_required=True,saved='untouched',operation=args.op)
         path.write_text(json.dumps(record));path.chmod(0o600)
         result.update(transaction=str(path),stage='awaiting_bootsel',recovery_required=True)
+        if args.op=='erase':result.update(operation='erase',manual_bootsel_required=True)
     if args.op=='recover':
         path=Path(args.transaction);record=json.loads(path.read_text())
         assert record['installer_version']==INSTALLER_VERSION
         assert record['saved']=='untouched'
         record.update(stage='complete',recovery_required=False);path.write_text(json.dumps(record))
         result.update(stage='complete',saved=record['saved'])
+        if record.get('operation')=='erase':result.update(operation='erase',erase_verified=True,erased_bytes=4194304)
     print(json.dumps(result));return 0
 ''').encode()
 

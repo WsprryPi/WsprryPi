@@ -37,6 +37,39 @@ class DistributionTests(unittest.TestCase):
         self.assertNotEqual(initial,current['identity']);self.assertEqual(current['update']['state'],'current')
         self.assertEqual(self.store.load(current['identity'])[0]['installer_version'],'0.1.2')
         self.assertEqual(POLICY,policy)
+    def test_erase_without_image_plan_retains_exact_installer_for_offline_recovery(self):
+        identity=self.select()
+        with patch.object(self.store,'refresh',return_value={'identity':identity,'update':{'state':'current'}}):
+            code,result=self.invoke('erase','--device',SERIAL,'--board','pico2_w','--yes')
+        self.assertEqual(code,0);self.assertEqual(result['operation'],'erase')
+        self.assertEqual(list(self.cache.iterdir()),[])
+        transaction=Path(result['transaction'])
+        self.assertTrue((transaction.parent.parent/'usb-installer.json').is_file())
+        newer=self.store.refresh(Network(*fixture(101,'0.1.2')),force=True)
+        self.assertNotEqual(newer['identity'],identity)
+        with patch.object(self.store,'refresh',side_effect=AssertionError('recovery must stay offline')):
+            code,result=self.invoke('recover','--transaction',str(transaction),'--device',SERIAL,'--board','pico2_w','--yes')
+        self.assertEqual(code,0);self.assertTrue(result['erase_verified'])
+        self.assertEqual(result['installer_version'],'0.1.1')
+        self.assertEqual(result['erased_bytes'],4194304)
+    def test_old_core_refuses_erase_without_leaving_an_unrecoverable_hold(self):
+        payload=dict(self.payload)
+        payload['usb_installer.py']=payload['usb_installer.py'].replace(b'def erase_transaction(args): pass',b'')
+        code,result=entry.invoke(self.manifest,payload,['erase'])
+        self.assertEqual(code,2);self.assertFalse(result['recovery_required'])
+        self.assertIn('lacks full erase',result['error'])
+    def test_erase_retains_expired_host_backups_before_and_after_execution(self):
+        identity=self.select();bucket=self.store.snapshot(self.state,identity);backups=[]
+        for index in range(4):
+            directory=bucket/(SERIAL+'-old-'+str(index));directory.mkdir()
+            (directory/'transaction.json').write_bytes(encoded({'schema':'wsprrypico-usb-transaction/1',
+                'serial':SERIAL,'stage':'complete','recovery_required':False}))
+            backup=directory/'before.bin';backup.write_bytes(b'private fixture backup');backups.append(backup)
+            os.utime(directory,(1,1))
+        with patch.object(self.store,'refresh',return_value={'identity':identity,'update':{'state':'current'}}):
+            code,result=self.invoke('erase','--device',SERIAL,'--board','pico2_w','--yes')
+        self.assertEqual(code,0);self.assertEqual(result['operation'],'erase')
+        self.assertTrue(all(p.read_bytes()==b'private fixture backup' for p in backups))
     def test_verified_live_ci_and_exact_release_checks_fail_closed(self):
         changes=[lambda r:r.update(draft=True),lambda r:r.update(head_sha='c'*40),lambda r:r.update(conclusion='failure'),
                  lambda r:r.update(status='in_progress'),lambda r:r.update(path='other.yml'),

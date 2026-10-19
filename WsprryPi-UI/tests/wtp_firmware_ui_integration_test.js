@@ -148,10 +148,10 @@ async function main() {
                 const value=String(url).endsWith('/api/v1/status')||String(url).includes('/api/wtp')?window.__snapshot:
                     String(url).endsWith('/host/devices')?{scope:'wsprrypi-wtp-catalog/1',profiles:[],active_id:null}:
                     String(url).endsWith('/host/discovery')?{available:false,candidates:[],reason:'fixture'}:{};
-                return {ok:true,status:200,headers:{get:()=>''},json:async()=>value};
+                return {ok:true,status:200,headers:{get:()=>''},json:async()=>value===window.__snapshot ? {host:{...value,firmware_maintenance:window.__fw.maintenance===true}} : value};
             };
             WtpUi.populate({Transport:'usb',Endpoint:'/dev/serial/by-id/pico-if02','USB Serial':'1545B6EFBF78028C','USB Vendor ID':51966,'USB Product ID':16402,'Device ID':'c'.repeat(32)});
-            WtpUi.select(true);bootstrap.Tab.getOrCreateInstance(document.getElementById('transmitter-hardware-tab')).show();
+            WtpUi.select(true);bootstrap.Tab.getOrCreateInstance(document.getElementById('fleet-tab')).show();
 
             WtpFirmware.setAvailability(true);document.getElementById('wtp-firmware').open=true;
             window.confirm=()=>true;
@@ -163,25 +163,41 @@ async function main() {
             refusal:{operation:'plan',result:{ok:false,error:'No verified main CI download is available.'}},
             failure:{operation:'upgrade',maintenance:true,recovery_plan_id:'fixture-plan',recovery_version:'0.1.0-ci.40000000000.1',result:{ok:false,error:'Saved semantic state differs after reboot; keep member in maintenance'}},
             reconnect:{operation:'recover',maintenance:true,recovery_plan_id:'fixture-plan',recovery_version:'0.1.0-ci.40000000000.1',result:{ok:false,error:'Firmware verified; Pi reconnection remains unconfirmed.'}},
-            success:{operation:'upgrade',result:{ok:true,version:'0.1.0-ci.40000000000.1'}}
+            success:{operation:'upgrade',result:{ok:true,version:'0.1.0-ci.40000000000.1'}},
+            erase_ready:{result:null},
+            erase_waiting:{operation:'erase',maintenance:true,recovery_operation:'erase',manual_bootsel_required:true,recovery_plan_id:'erase-plan',result:{ok:true,operation:'erase',stage:'awaiting_bootsel'}},
+            erase_running:{operation:'recover',running:true,maintenance:true,recovery_operation:'erase',result:null},
+            erase_failure:{operation:'recover',maintenance:true,recovery_operation:'erase',recovery_plan_id:'erase-plan',result:{ok:false,operation:'erase',error:'Full flash comparison failed'}},
+            erased:{operation:'recover',result:{ok:true,operation:'erase',erase_verified:true,erased_bytes:4194304}}
         };
         const findings=[];
         for(const [name,width,height] of [["desktop",1440,1100],["mobile",390,844]]) {
             await client.send("Emulation.setDeviceMetricsOverride",{width,height,deviceScaleFactor:1,mobile:name==="mobile"});
             for(const theme of ["light","dark"]) for(const [state,value] of Object.entries(states)) {
                 await evaluate(`applyThemePreference('${theme}');window.__fw={...window.__base,...${JSON.stringify(value)}};document.getElementById('wtp-firmware-read').click()`);
-                await waitFor(async()=>await evaluate("document.getElementById('wtp-firmware-read').disabled===false"),"firmware status read");
+                await waitFor(async()=>await evaluate("document.getElementById('wtp-firmware-read').disabled===false"),`${name}/${theme}/${state} firmware status read`);
+                await waitFor(async()=>await evaluate("PicoFirmwareSafety.locked===(__fw.maintenance===true || __fw.running===true && __fw.operation!=='plan')"),"host maintenance observation");
+                await evaluate("document.getElementById('wtp-firmware-erase').closest('details').open=true");
                 await evaluate("document.getElementById('wtp-firmware').scrollIntoView({block:'start',behavior:'instant'});window.scrollBy(0,-110)");
                 await new Promise(resolve=>setTimeout(resolve,100));
                 const observed=await evaluate(`(() => {const b=document.getElementById('wtp-firmware-upgrade'),r=b.getBoundingClientRect();return {overflow:document.documentElement.scrollWidth>innerWidth,installDisabled:b.disabled,recoverHidden:document.getElementById('wtp-firmware-recover').hidden,buttonHeight:r.height,text:document.getElementById('wtp-firmware-feedback').textContent};})()`);
+                if(observed.buttonHeight<36) {
+                    const diagnostic=await evaluate(`(() => {let e=document.getElementById('wtp-firmware-upgrade');const a=[];for(;e;e=e.parentElement)a.push({id:e.id,tag:e.tagName,hidden:e.hidden,open:e.open,display:getComputedStyle(e).display});return a;})()`);
+                    const shot=await client.send("Page.captureScreenshot",{format:"png"});fs.writeFileSync(path.join(output,"fixture-failure.png"),Buffer.from(shot.data,"base64"));
+                    throw Error(`${name}/${theme}/${state}: hidden firmware control: ${JSON.stringify(diagnostic)}`);
+                }
                 assert(!observed.overflow,`${name}/${theme}/${state} horizontal overflow`);assert(observed.buttonHeight>=36);
-                assert.equal(observed.installDisabled,state!=="checked");assert.equal(observed.recoverHidden,!value.maintenance);
+                assert.equal(observed.installDisabled,state!=="checked",`${name}/${theme}/${state} installation gate`);assert.equal(observed.recoverHidden,!value.maintenance);
                 findings.push({name,theme,state,...observed});
                 const shot=await client.send("Page.captureScreenshot",{format:"png"});fs.writeFileSync(path.join(output,`${name}-${theme}-${state}.png`),Buffer.from(shot.data,"base64"));
+                if(name==="mobile" && (state==="erase_waiting" || state==="erased")) {
+                    await evaluate("document.getElementById('wtp-firmware-feedback').scrollIntoView({block:'center',behavior:'instant'})");
+                    const detail=await client.send("Page.captureScreenshot",{format:"png"});fs.writeFileSync(path.join(output,`${name}-${theme}-${state}-detail.png`),Buffer.from(detail.data,"base64"));
+                }
             }
         }
         fs.writeFileSync(path.join(output,"checks.json"),JSON.stringify(findings,null,2)+"\n");
-        console.log("Actual firmware UI rendered at desktop/mobile light/dark: checked, pending, refusal, failure, reconnect and success; no overflow; buttons and recovery gates passed");console.log(output);
+        console.log("Actual firmware UI rendered at desktop/mobile light/dark, including full erase preparation, BOOTSEL, verification, failure and blank completion; no overflow; buttons and recovery gates passed");console.log(output);
     } finally {
         if(client)client.close();if(chrome)await stopIsolatedProcess(chrome);if(php)await stopChild(php);
         fs.rmSync(profileDir,{recursive:true,force:true});
