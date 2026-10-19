@@ -2282,6 +2282,7 @@ manage_i2c() { record_step manage_i2c; }
 manage_config() { record_step manage_config; }
 manage_route_application() { record_step manage_route_application; }
 manage_support_bundle_runtime() { record_step manage_support_bundle_runtime; }
+manage_pico_usb_runtime() { record_step manage_pico_usb_runtime; }
 manage_exe() { record_step manage_exe; }
 manage_sound() { record_step manage_sound; }
 prepare_owned_rp1_gpclk_runtime_removal() { record_step prepare_owned_rp1_gpclk_runtime_removal; }
@@ -2322,10 +2323,13 @@ printf 'return_status=%s\n' "$status" >>"$CAPTURE"
         expected_teardown = {
             "manage_apache", "manage_web", "manage_service", "manage_i2c",
             "manage_config", "manage_route_application",
-            "manage_support_bundle_runtime", "manage_exe", "manage_sound",
+            "manage_support_bundle_runtime", "manage_pico_usb_runtime",
+            "manage_exe", "manage_sound",
             "flag_need_reboot", "prepare_owned_rp1_gpclk_runtime_removal",
         }
-        for failing_step in ("manage_service", "manage_route_application", "manage_exe"):
+        for failing_step in (
+            "manage_service", "manage_route_application", "manage_pico_usb_runtime", "manage_exe",
+        ):
             with self.subTest(failing_step=failing_step):
                 lines, stdout = self.run_uninstall_orchestration(failing_step)
                 self.assertTrue(expected_teardown.issubset(lines))
