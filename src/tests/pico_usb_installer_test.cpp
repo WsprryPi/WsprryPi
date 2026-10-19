@@ -38,10 +38,16 @@ int main() {
     CHECK(pico_usb_http_mutation("PUT","/api/v1/member/firmware"));
     for(const auto* cmd:{"reboot","shutdown","tone_start","tone_end","bounded_tone","stop","unknown"}) CHECK(pico_usb_command_mutation(cmd));
     for(const auto* cmd:{"get_tx_state","wspr_band_catalog","echo"}) CHECK(!pico_usb_command_mutation(cmd));
-    const std::string code="import json,sys; print(json.dumps(dict(schema='wsprrypico-usb-result/1',installer_version='0.1.0',ok=True,argument=sys.argv[1])))";
+    const std::string code="import json,sys; print(json.dumps(dict(schema='wsprrypico-usb-result/1',installer_contract=1,installer_version='0.9.3',ok=True,argument=sys.argv[1])))";
     const auto argument="path with spaces; $(literal)";
     const auto result=pico_usb_installer_process({"/usr/bin/python3","-c",code,argument});
     CHECK(result.at("argument")==argument && result.at("ok")==true);
+    CHECK(result.at("installer_version")=="0.9.3"); // Compatible fixes do not require another Pi version pin.
+    refused=false;
+    try {(void)pico_usb_installer_process({"/usr/bin/python3","-c","import json; print(json.dumps(dict(schema='wsprrypico-usb-result/1',installer_contract=2,installer_version='0.9.3',ok=True)))"});} catch(...) {refused=true;}
+    CHECK(refused);
+    const auto update=pico_usb_public_task({{"result",{{"installer_update",{{"state","retained"},{"reason","GitHub update request rate-limited. Retry after UTC."},{"private","/private/path"}}}}}}).at("result").at("installer_update");
+    CHECK(update.at("state")=="retained" && update.contains("reason") && !update.contains("private"));
     refused=false;
     try {(void)pico_usb_installer_process({"/usr/bin/python3","-c","print('{}')"});} catch(...) {refused=true;}
     CHECK(refused);

@@ -2123,3 +2123,4 @@ pico-usb-installer-cpp-test:
 pico-usb-installer-test: pico-usb-installer-cpp-test
 	$(Q)node ../WsprryPi-UI/tests/wtp_firmware_test.js
 	$(Q)python3 -B ../scripts/tests/pico_usb_deploy_test.py
+	$(Q)python3 -B ../scripts/tests/pico_usb_bundle_test.py

@@ -116,6 +116,10 @@ async function main() {
     assert.match(optional.el("feedback").textContent,/Additional CI status: GitHub.*UTC/);
     assert(!optional.el("upgrade").disabled,"optional CI status cannot invalidate a verified checked image");
     assert(optional.el("retry").hidden);optional.events.pagehide();
+    const retained=fixture();retained.setState({operation:"plan",result:{ok:true,version:"checked",installer_update:{state:"retained",reason:"GitHub request rate-limited. Retry after 2026-10-19 21:00:00 UTC."}}});
+    retained.root.WtpFirmware.setAvailability(true,"C","selection");await retained.advance(0);
+    assert(!retained.el("installer-update").hidden);assert.match(retained.el("installer-update").textContent,/retained flash tool.*rate-limited.*image remains usable/);
+    assert(!retained.el("upgrade").disabled,"a retained verified installer can use the checked image");retained.events.pagehide();
     console.log("Firmware polling: completion, retry cooldown/expiry, optional CI limits, lost replies, invalidation, lifecycle and exact USB binding passed");
 }
 main().catch(error=>{console.error(error);process.exitCode=1;});

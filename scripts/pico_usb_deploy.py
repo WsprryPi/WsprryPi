@@ -1,121 +1,163 @@
 #!/usr/bin/env python3
-"""Package-time deployment only; never invoked by a browser or USB transaction."""
+"""Install the protected contract adapter; shared installer releases are independent."""
 import argparse
-import hashlib
+import ast
+import errno
+import importlib.util
 import json
 import os
 from pathlib import Path
-import re
 import shutil
-import stat
 import tempfile
-import urllib.request
 
-FILES = {'scripts/usb_installer.py', 'scripts/ci/release-manifest-1.schema.json'}
+SPEC = importlib.util.spec_from_file_location('pico_usb_bundle',Path(__file__).with_name('pico_usb_bundle.py'))
+bundle = importlib.util.module_from_spec(SPEC)
+SPEC.loader.exec_module(bundle)
+FILES = {'scripts/usb_installer.py','scripts/ci/release-manifest-1.schema.json'}
 
-def safe(path):
-    for parent in (path, *path.parents):
-        if parent.is_symlink():
-            raise ValueError('Symlink in installer deployment destination')
 
-def provision(action, repository, root=Path('/'), fetch=None, development_source=None):
-    prefix = lambda path: root / path.lstrip('/')
+def remove_empty_legacy_directories(target):
+    # Old deployments may contain Python caches or administrator files. Only
+    # the two owned source files are removed; unrelated contents are retained.
+    for relative in ('scripts/ci','scripts'):
+        try:
+            (target/relative).rmdir()
+        except OSError as error:
+            if error.errno not in (errno.ENOTEMPTY,errno.EEXIST):
+                raise
+
+
+def retained(prior,payload,channel,kind='retained-installation'):
+    tree = ast.parse(payload['usb_installer.py'])
+    versions = [ast.literal_eval(node.value) for node in tree.body if isinstance(node,ast.Assign)
+                and any(isinstance(t,ast.Name) and t.id == 'INSTALLER_VERSION' for t in node.targets)]
+    bundle.require(len(versions) == 1, 'Installer has no unambiguous version')
+    return {'schema':bundle.MARKER,'repository':bundle.REPOSITORY,'contract':1,'channel':channel,
+            'result_schema':'wsprrypico-usb-result/1','transaction_schema':'wsprrypico-usb-transaction/1',
+            'firmware_manifest_schema':1,'python_min':[3,10],'installer_version':versions[0],
+            'source':prior['revision'],'origin':{'kind':kind,'previous_deployment':prior},
+            'files':{name:{'sha256':bundle.sha(data),'bytes':len(data)} for name,data in payload.items()}}
+
+
+def provision(action,repository,root=Path('/'),fetch=None,development_source=None):
+    prefix = lambda name:root/name.lstrip('/')
     target = prefix('/usr/local/lib/wsprrypi/pico-usb')
-    safe(target)
-    descriptor = json.loads((repository / 'config/pico-usb-installer.json').read_text())
-    if (descriptor['schema'] != 'wsprrypi-pico-usb-deployment/1' or
-            not re.fullmatch('[0-9a-f]{40}', descriptor['revision']) or descriptor['revision'] == '0'*40 or
-            set(descriptor['files']) != FILES or
-            any(not re.fullmatch('[0-9a-f]{64}', value) for value in descriptor['files'].values())):
-        raise ValueError('Unpinned shared installer deployment')
-    if action == 'uninstall':
-        # Backups, cache and maintenance markers deliberately survive removal.
-        if not target.exists():
-            return
-        safe(target / 'deployment.json')
-        prior = json.loads((target / 'deployment.json').read_text())
-        if set(prior['files']) != FILES: raise ValueError('Unknown deployed installer inventory')
-        expected = {**prior['files'], 'entry.py':prior['entry_sha256']}
-        for name, digest in expected.items():
-            path = target / name
-            safe(path)
-            if path.exists() and hashlib.sha256(path.read_bytes()).hexdigest() != digest:
-                raise ValueError('Changed deployed installer retained for administrator review')
-        for name in expected:
-            (target / name).unlink(missing_ok=True)
-        (target / 'deployment.json').unlink()
-        for path in (target / 'scripts/ci', target / 'scripts', target):
-            try: path.rmdir()
-            except OSError: pass
-        for name in ('/etc/udev/rules.d/70-wsprrypico-usb.rules','/usr/lib/tmpfiles.d/wsprrypico-usb.conf'):
-            path = prefix(name); safe(path)
-            if path.exists() and path.read_text() == owned_text(name): path.unlink()
-        return
-    payload = {}
-    if development_source is not None:
-        # Explicit maintainer deployment of unpublished source. Never claim
-        # these bytes came from the descriptor's published Git revision.
-        development_source = development_source.resolve(strict=True)
-        for name in FILES:
-            source = development_source / name
-            safe(source)
-            data = source.read_bytes()
-            if len(data)>1024*1024: raise ValueError('Oversized development installer')
-            payload[name] = data
-        descriptor['development_source'] = {'kind':'unpublished-working-tree',
-            'base_revision':descriptor['revision'], 'files':{name:hashlib.sha256(data).hexdigest() for name,data in payload.items()}}
-        descriptor['files'] = descriptor['development_source']['files']
-    for name, digest in descriptor['files'].items():
-        if development_source is not None: continue
-        url = f"https://raw.githubusercontent.com/WsprryPi/WsprryPico/{descriptor['revision']}/{name}"
-        if fetch:
-            data = fetch(url)
-        else:
-            with urllib.request.urlopen(url, timeout=30) as response:
-                if not response.url.startswith('https://'): raise ValueError('Insecure installer download')
-                data = response.read(1024*1024+1)
-        if len(data)>1024*1024 or hashlib.sha256(data).hexdigest()!=digest:
-            raise ValueError('Pinned installer download failed integrity check')
-        payload[name] = data
-    entry = (repository / 'scripts/pico_usb_entry.py').read_bytes()
-    descriptor['entry_sha256'] = hashlib.sha256(entry).hexdigest()
-    payload['entry.py'] = entry
-    payload['deployment.json'] = (json.dumps(descriptor, sort_keys=True, indent=2)+'\n').encode()
-    # Validate all bytes before publishing any executable.
-    target.parent.mkdir(parents=True, exist_ok=True)
-    if target.exists():
-        safe(target / 'deployment.json')
-        prior = json.loads((target / 'deployment.json').read_text())
-        if set(prior['files']) != FILES: raise ValueError('Unknown deployed installer inventory')
-        for name,digest in {**prior['files'],'entry.py':prior['entry_sha256']}.items():
-            path=target/name; safe(path)
-            if not path.is_file() or hashlib.sha256(path.read_bytes()).hexdigest()!=digest:
-                raise ValueError('Changed deployed installer retained; repair explicitly before upgrade')
-    stage = Path(tempfile.mkdtemp(prefix='.pico-usb-',dir=target.parent))
-    try:
-        stage.chmod(0o755)
-        for name,data in payload.items():
-            path=stage/name; path.parent.mkdir(parents=True,exist_ok=True); path.write_bytes(data); path.chmod(0o644)
-            path.parent.chmod(0o755)
+    policy = bundle.decode((repository/'config/pico-usb-installer.json').read_bytes())
+    bundle.Store(target,policy)
+    bundle.safe(target,owner=False)
+    with bundle.lock(target,owner=root == Path('/')):
+        prior = None
         if target.exists():
-            # Package-time replacement is refused while any member is held.
-            holds=prefix('/var/lib/wsprrypi/pico-usb-control')
-            if holds.exists() and any(holds.iterdir()): raise ValueError('Finish Pico USB maintenance before replacing its installer')
-            for name in payload:
-                path=target/name; path.parent.mkdir(parents=True,exist_ok=True); os.replace(stage/name,path)
-        else: os.replace(stage,target)
-    finally:
-        if stage.exists(): shutil.rmtree(stage)
-    for name,mode in (('/var/lib/wsprrypi/pico-usb',0o700),('/var/lib/wsprrypi/pico-usb-control',0o700),
-                      ('/var/cache/wsprrypi/pico-usb',0o700),('/run/lock/wsprrypico',0o3770)):
-        path=prefix(name); safe(path); path.mkdir(parents=True,exist_ok=True); path.chmod(mode)
-        if root==Path('/'):
-            import grp
-            os.chown(path,0,grp.getgrnam('dialout').gr_gid if name.startswith('/run/') else 0)
-    for name in ('/etc/udev/rules.d/70-wsprrypico-usb.rules','/usr/lib/tmpfiles.d/wsprrypico-usb.conf'):
-        path=prefix(name); safe(path); path.parent.mkdir(parents=True,exist_ok=True)
-        if path.exists() and path.read_text()!=owned_text(name): raise ValueError('Unrecognized USB permission file retained')
-        path.write_text(owned_text(name)); path.chmod(0o644)
+            prior = bundle.decode((target/'deployment.json').read_bytes())
+            expected = (prior['adapter_files'] if prior.get('schema') == 'wsprrypi-pico-usb-deployment/2' else
+                        {**prior['files'],'entry.py':prior['entry_sha256']})
+            bundle.require((prior.get('removed') is True and expected == {}) or
+                           set(expected) == ({'entry.py','bundle.py','policy.json'} if 'adapter_files' in prior else FILES | {'entry.py'}),
+                           'Unknown deployed installer inventory')
+            for name,digest in expected.items():
+                path = target/name
+                bundle.safe(path,owner=False)
+                bundle.require(path.is_file() and bundle.sha(path.read_bytes()) == digest,
+                               'Changed deployed installer retained for administrator review')
+        if action == 'uninstall':
+            if prior is None:
+                return
+            if 'adapter_files' not in prior:
+                store = bundle.Store(target,policy,owner=root == Path('/'))
+                payload = {Path(name).name:(target/name).read_bytes() for name in FILES}
+                identity = store.save(retained(prior,payload,policy['channel']),payload)
+                bundle.write_json(target/'legacy.json',{'identity':identity})
+                bundle.write_json(target/'active.json',{'identity':identity,'check_after':0,'update':{'state':'retained'}})
+            # Retain immutable installers and private data for recovery.
+            for name in expected:
+                (target/name).unlink()
+            bundle.write_json(target/'deployment.json',{'schema':'wsprrypi-pico-usb-deployment/2','adapter_files':{},'removed':True})
+            for name in ('/etc/udev/rules.d/70-wsprrypico-usb.rules','/usr/lib/tmpfiles.d/wsprrypico-usb.conf'):
+                path = prefix(name)
+                bundle.safe(path,owner=False)
+                if path.exists() and path.read_text() == owned_text(name):
+                    path.unlink()
+            return
+        holds = prefix('/var/lib/wsprrypi/pico-usb-control')
+        bundle.require(not holds.exists() or not any(holds.iterdir()), 'Finish Pico USB maintenance before replacing its adapter')
+        target.parent.mkdir(parents=True,exist_ok=True)
+        stage = Path(tempfile.mkdtemp(prefix='.pico-usb-',dir=target.parent))
+        try:
+            if target.exists():
+                shutil.copytree(target,stage,dirs_exist_ok=True)
+            store = bundle.Store(stage,policy,owner=root == Path('/'))
+            if prior is not None and 'adapter_files' not in prior:
+                payload = {Path(name).name:(target/name).read_bytes() for name in FILES}
+                identity = store.save(retained(prior,payload,policy['channel']),payload)
+                bundle.write_json(stage/'legacy.json',{'identity':identity})
+                bundle.write_json(stage/'active.json',{'identity':identity,'check_after':0,'update':{'state':'retained'}})
+                for name in FILES:
+                    (stage/name).unlink()
+                remove_empty_legacy_directories(stage)
+            if development_source is not None:
+                source = development_source.resolve(strict=True)
+                payload = {}
+                for name in FILES:
+                    bundle.safe(source/name,owner=False)
+                    payload[Path(name).name] = (source/name).read_bytes()
+                identity = store.save(retained({'revision':'0'*40},payload,policy['channel'],'unpublished-working-tree'),payload)
+                bundle.write_json(stage/'active.json',{'identity':identity,'check_after':0,'update':{'state':'retained'}})
+            elif not (stage/'active.json').exists():
+                client = None
+                if fetch is not None:
+                    class Client(bundle.Network):
+                        def get(self,url,limit=bundle.MAX_FILE):
+                            data = fetch(url)
+                            bundle.require(len(data) <= limit,'Oversized installer download')
+                            return data
+                    client = Client()
+                store.refresh(client)
+            else:
+                store.load(store.active()['identity'])
+            files = {'entry.py':(repository/'scripts/pico_usb_entry.py').read_bytes(),
+                     'bundle.py':(repository/'scripts/pico_usb_bundle.py').read_bytes(),
+                     'policy.json':(json.dumps(policy,indent=2,sort_keys=True)+'\n').encode()}
+            for name,data in files.items():
+                bundle.atomic(stage/name,data,0o644)
+            descriptor = {'schema':'wsprrypi-pico-usb-deployment/2',
+                          'adapter_files':{name:bundle.sha(data) for name,data in files.items()}}
+            bundle.atomic(stage/'deployment.json',(json.dumps(descriptor,indent=2,sort_keys=True)+'\n').encode(),0o644)
+            stage.chmod(0o755)
+            if not target.exists():
+                os.replace(stage,target)
+            else:
+                # The shared lock excludes entry processes. Metadata is last.
+                for name in ('bundles','plans'):
+                    if (stage/name).exists():
+                        shutil.copytree(stage/name,target/name,dirs_exist_ok=True)
+                for path in stage.iterdir():
+                    if path.is_file() and path.name != 'deployment.json':
+                        os.replace(path,target/path.name)
+                os.replace(stage/'deployment.json',target/'deployment.json')
+                if prior and 'adapter_files' not in prior:
+                    for name in FILES:
+                        (target/name).unlink()
+                    remove_empty_legacy_directories(target)
+        finally:
+            if stage.exists():
+                shutil.rmtree(stage)
+        for name,mode in (('/var/lib/wsprrypi/pico-usb',0o700),('/var/lib/wsprrypi/pico-usb-control',0o700),
+                          ('/var/cache/wsprrypi/pico-usb',0o700),('/run/lock/wsprrypico',0o3770)):
+            path = prefix(name)
+            bundle.safe(path,owner=False)
+            path.mkdir(parents=True,exist_ok=True)
+            path.chmod(mode)
+            if root == Path('/'):
+                import grp
+                os.chown(path,0,grp.getgrnam('dialout').gr_gid if name.startswith('/run/') else 0)
+        for name in ('/etc/udev/rules.d/70-wsprrypico-usb.rules','/usr/lib/tmpfiles.d/wsprrypico-usb.conf'):
+            path = prefix(name)
+            bundle.safe(path,owner=False)
+            path.parent.mkdir(parents=True,exist_ok=True)
+            bundle.require(not path.exists() or path.read_text() == owned_text(name),'Unrecognized USB permission file retained')
+            path.write_text(owned_text(name))
+            path.chmod(0o644)
+
 
 def owned_text(name):
     if name.endswith('.conf'):
@@ -124,9 +166,13 @@ def owned_text(name):
             'SUBSYSTEM=="tty", ATTRS{idVendor}=="cafe", ATTRS{idProduct}=="4012", GROUP="dialout", MODE="0660"\n'
             'SUBSYSTEM=="usb", ATTR{idVendor}=="2e8a", ATTR{idProduct}=="000f", GROUP="dialout", MODE="0660"\n')
 
-if __name__=='__main__':
-    p=argparse.ArgumentParser(description=__doc__); p.add_argument('action',choices=('install','uninstall')); p.add_argument('--repository',type=Path,required=True)
-    p.add_argument('--development-source',type=Path,help='Explicit unpublished WsprryPico source; records actual hashes instead of claiming published provenance')
-    args=p.parse_args()
-    if os.geteuid()!=0: p.error('Package-time provisioning requires root; ordinary installer use does not')
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('action',choices=('install','uninstall'))
+    parser.add_argument('--repository',type=Path,required=True)
+    parser.add_argument('--development-source',type=Path,help='Explicit unpublished core; never claims CI provenance')
+    args = parser.parse_args()
+    if os.geteuid() != 0:
+        parser.error('Package-time provisioning requires root')
     provision(args.action,args.repository,development_source=args.development_source)

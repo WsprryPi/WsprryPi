@@ -46,8 +46,17 @@ inline nlohmann::json pico_usb_public_task(const nlohmann::json& state) {
   if(state.contains("result") && state.at("result").is_object()) {
     const auto& value=state.at("result"); auto& projected=result["result"];
     projected=nlohmann::json::object();
-    for(const auto* key:{"schema","installer_version","ok","stage","serial","version","branch","source","workflow","run","uf2","preserved","recovery_required","recent_ci","manual_bootsel_required"})
+    for(const auto* key:{"schema","installer_version","installer_contract","installer_source","ok","stage","serial","version","branch","source","workflow","run","uf2","preserved","recovery_required","recent_ci","manual_bootsel_required"})
       if(value.contains(key)) projected[key]=value.at(key);
+    if(value.contains("installer_update") && value.at("installer_update").is_object()) {
+      const auto& update=value.at("installer_update");
+      const auto state_name=update.value("state",std::string{});
+      if(state_name=="current" || state_name=="retained") {
+        auto& public_update=projected["installer_update"]; public_update={{"state",state_name}};
+        const auto reason=update.value("reason",std::string{});
+        if(!reason.empty() && reason.size()<=512 && reason.find_first_of("/\\\n")==std::string::npos) public_update["reason"]=reason;
+      }
+    }
     if(value.contains("error_code") && value.at("error_code")=="github_rate_limited" && value.contains("retry_at") &&
         value.at("retry_at").is_number_integer() && value.at("retry_at")>0 && value.at("retry_at")<=4102444800LL) {
       projected["error_code"]="github_rate_limited";
@@ -115,7 +124,7 @@ inline nlohmann::json pico_usb_installer_process(const std::vector<std::string>&
     close(descriptors[0]); descriptors[0]=-1;
     auto value=nlohmann::json::parse(output);
     if (!value.is_object() || value.value("schema","")!="wsprrypico-usb-result/1" ||
-        value.value("installer_version","")!="0.1.0" || !value.contains("ok") || !value["ok"].is_boolean() ||
+        value.value("installer_contract",0)!=1 || !value.contains("ok") || !value["ok"].is_boolean() ||
         !WIFEXITED(status) || (value["ok"].get<bool>() && WEXITSTATUS(status)!=0) ||
         (!value["ok"].get<bool>() && WEXITSTATUS(status)==0))
       throw std::runtime_error("invalid_shared_installer_result");

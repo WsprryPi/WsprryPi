@@ -16,8 +16,8 @@ workflow; browser clients cannot request compilation.
 
 The backend invokes `/usr/bin/python3 -I` with the fixed deployed entry path
 `/usr/local/lib/wsprrypi/pico-usb/entry.py`, direct argument arrays, bounded output
-and a deadline. It validates `wsprrypico-usb-result/1`, installer version and exit
-status. The adapter checks root ownership/protection and the pinned core/schema
+and a deadline. It validates `wsprrypico-usb-result/1`, installer contract and exit
+status. The adapter checks root ownership/protection and the retained core/schema
 hashes, then executes the verified source without a stale bytecode cache.
 Release selection, identity, UF2 bounds, backup, programming and preservation
 are implemented only in the shared core. The browser cannot pass a command,
@@ -114,41 +114,63 @@ Do not delete a marker to bypass an unidentified state or restore another
 board's backup. Deliberate BOOTSEL reconnect may be necessary. Browser status
 omits private paths and never contains flash/credential bytes.
 
+## Independent installer updates
+
+`config/pico-usb-installer.json` declares installer contract 1 and an update
+channel. It contains no WsprryPico commit or file checksums. The protected Pi
+adapter understands the result, transaction and firmware-manifest contracts;
+compatible shared installer fixes are published by WsprryPico independently of
+Pi releases. The installer channel is independent of firmware image selection.
+
+**Download and check image** checks the compatible installer channel before
+planning an image. Successful update checks are cached for ten minutes. The
+Pi accepts only an exact public version release, complete uploaded assets,
+SHA-256 checksums, matching source tag and successful installer CI provenance.
+An incompatible contract, unsupported Python version, changed payload or failed
+CI cannot replace the installed copy. The first installation requires a valid
+published bundle; a refresh failure retains the previous verified copy and
+reports the reason beside the firmware controls. GitHub retry guidance is
+honored without retrying early. No GitHub credentials are loaded.
+
+A checked image retains its installer identity. Installing it does not check
+for or substitute a newer installer. Before the first possible firmware write,
+the adapter persists an immutable installer/schema/receipt snapshot in the
+private transaction area. Recovery reads that snapshot and the retained image
+offline, even after the installer channel advances or its general cache is
+removed. Existing transactions use the frozen installer retained when the
+adapter was migrated. Root ownership, file protection, symlink refusal and
+checksum verification apply before execution; verified bytes are executed
+without a Python bytecode cache. Adapter replacement and entry processes use a
+shared host lock. Package replacement refuses outstanding Pico maintenance.
+
+## Storage limits
+
+The Pi keeps three recent image-check downloads, two completed firmware
+transactions in total, and up to eight pre-programming refusals. Completed and
+unchanged histories expire after seven days. These are global limits across
+installer versions. Unresolved recovery records and backups are never evicted
+to make room; eight unresolved transactions block another installation.
+Installer objects are retained only for the active selection, those three
+image checks and the legacy recovery copy. Private snapshots survive while
+their transaction survives. Same-board local-build references retain their
+existing maximum of 32 boards and remain separate from saved settings.
+
 ## Package lifecycle
 
-`config/pico-usb-installer.json` freezes the compatible WsprryPico source
-revision, installer version and core/schema SHA-256. `scripts/pico_usb_deploy.py`
-is called only by the established package lifecycle, not by a browser click.
-It fetches those exact anonymous HTTPS files and validates all bytes before
-publishing executable content. An update refuses changed administrator-owned
-installer bytes and outstanding Pico maintenance. Removal deletes only
-unchanged owned files and retains private backups, markers and caches.
+`scripts/pico_usb_deploy.py` installs the protected entry, distribution manager
+and channel policy. It obtains a compatible public installer on first install
+and validates all bytes before publishing executable content. Migration keeps
+the previous exact installer for legacy recovery. An explicit maintainer
+`--development-source` deployment remains labelled `unpublished-working-tree`;
+it never impersonates a verified CI publication. Removal retains private
+recovery material and immutable installer snapshots.
 
 The package creates private root-owned backup/control/cache directories,
 `dialout` USB permissions for WsprryPico CDC and RP2350 BOOTSEL, and a setgid
 per-device lock directory restored by tmpfiles at boot. Permissions apply to
 new USB enumeration after rules reload; reconnect a cable when necessary.
 Python 3.10+ and a USB-enabled pinned picotool 2.3.0 are required. It does not
-install an SDK, compiler, picotool or change unrelated GPIO/backend settings.
-
-An explicit maintainer deployment can pass `--development-source` to
-`scripts/pico_usb_deploy.py`. It installs the reviewed unpublished shared core
-and schema from that source directory, records their exact hashes and labels
-the deployment `unpublished-working-tree`. Ordinary package installation
-continues to use the published revision in the descriptor. This development
-deployment does not change firmware CI selection or represent a published
-installer revision.
-
-The deployment is pinned to integrated Pico revision
-`cc12ca45eb66a95e518b81119e3d6ca546db1547`, with exact core/schema hashes in the
-descriptor. Its installer version is `0.1.0`; firmware selection still defaults
-to main, with explicit devel selection. The reviewed development deployment on
-wspr4 completed Pico C's USB migration to devel image
-`0.1.0-ci.39145255987.1` from source
-`f6ed8a208e2919a00b7ced044349fd45336f8760`. Reserved bytes and public saved state
-passed preservation checks, and the Pi reconnected to the verified new boot.
-This board-specific result does not establish package release readiness or RF
-qualification.
+install an SDK, compiler or picotool, or change unrelated backend settings.
 
 ## Validation and documentation impact
 

@@ -1,9 +1,5 @@
 {
-  "schema": "wsprrypi-pico-usb-deployment/1",
-  "installer_version": "0.1.0",
-  "revision": "798b821a61c080bbd54bd4741f4912261ca6902b",
-  "files": {
-    "scripts/usb_installer.py": "ed683167c1e4e877c89de0640c6dc7db0a9afc20000285c6a38cde32f89ba673",
-    "scripts/ci/release-manifest-1.schema.json": "d12be0a5e164de54cc93eb388e1b93cfe154f81ee3340f738e842b227ca6affe"
-  }
+  "schema": "wsprrypi-pico-usb-policy/1",
+  "contract": 1,
+  "channel": "devel"
 }

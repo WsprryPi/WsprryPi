@@ -63,6 +63,9 @@
         el("recover").textContent = state?.manual_bootsel_required ? "Continue after BOOTSEL" : "Recover this update";
         el("migration").hidden = state?.manual_bootsel_required !== true;
         if (state) el("identity").textContent = `USB ${state.serial} · Device ${state.device_id || "unconfirmed"} · Installed ${state.installed_version || "unconfirmed"}`;
+        const installerUpdate = state?.result?.installer_update;
+        el("installer-update").hidden = installerUpdate?.state !== "retained";
+        if (installerUpdate?.state === "retained") el("installer-update").textContent = `Using the retained flash tool. Its update check could not complete: ${installerUpdate.reason || "The compatible update channel is unavailable."}${state.result.ok ? " The checked firmware image remains usable." : ""}`;
         activity();
     }
     function describe() {
