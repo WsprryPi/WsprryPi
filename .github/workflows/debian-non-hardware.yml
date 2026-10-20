@@ -44,7 +44,8 @@ jobs:
 
   wtp-network-loopback:
     runs-on: ubuntu-24.04
-    timeout-minutes: 15
+    # Cold C++ builds share this budget with TLS, routing, and browser checks.
+    timeout-minutes: 30
     env:
       WSPRRYPI_DISABLE_HARDWARE_ACCESS: "1"
     steps:
