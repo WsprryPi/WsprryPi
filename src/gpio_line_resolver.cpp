@@ -1,6 +1,7 @@
 #include "gpio_line_resolver.hpp"
 
 #include <algorithm>
+#include <cstdlib>
 #include <fstream>
 #include <map>
 #include <set>
@@ -447,6 +448,16 @@ bool resolve_gpio_line(
     {
         error_message =
             "BCM GPIO " + std::to_string(bcm) + " is out of supported range 0-27.";
+        return false;
+    }
+
+    const char* hardware_disabled =
+        std::getenv("WSPRRYPI_DISABLE_HARDWARE_ACCESS");
+    if (hardware_disabled != nullptr &&
+        std::string(hardware_disabled) == "1")
+    {
+        error_message =
+            "GPIO resolution is disabled by WSPRRYPI_DISABLE_HARDWARE_ACCESS.";
         return false;
     }
 

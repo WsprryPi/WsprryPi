@@ -1,0 +1,146 @@
+{
+  "schema_cases": [
+    {
+      "name": "hello request",
+      "valid": true,
+      "message": {"type":"request","protocol":"WTP/1","session_id":"11111111111111111111111111111111","request_id":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","op":"HELLO","body":{"versions":["WTP/1"],"client_name":"WsprryPi","client_version":"1.0.0"}}
+    },
+    {
+      "name": "claim request",
+      "valid": true,
+      "message": {"type":"request","protocol":"WTP/1","session_id":"11111111111111111111111111111111","request_id":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","op":"CLAIM","body":{"owner_id":"22222222222222222222222222222222","lease_ms":10000}}
+    },
+    {
+      "name": "two-event load request",
+      "valid": true,
+      "message": {"type":"request","protocol":"WTP/1","session_id":"11111111111111111111111111111111","request_id":"cccccccccccccccccccccccccccccccc","op":"LOAD","body":{"job_id":"33333333333333333333333333333333","profile":"rf-events/1","mode":"wspr","total_duration_ns":"1366400000","events":[{"offset_ns":"0","duration_ns":"683200000","rf_on":true,"frequency_nhz":"14097100000000000"},{"offset_ns":"683200000","duration_ns":"683200000","rf_on":false}]}}
+    },
+    {
+      "name": "arm request",
+      "valid": true,
+      "message": {"type":"request","protocol":"WTP/1","session_id":"11111111111111111111111111111111","request_id":"dddddddddddddddddddddddddddddddd","op":"ARM","body":{"job_id":"33333333333333333333333333333333","start_utc_ns":"1788627600000000000","max_start_uncertainty_ns":"1000000"}}
+    },
+    {
+      "name": "hello response",
+      "valid": true,
+      "message": {"type":"response","protocol":"WTP/1","session_id":"11111111111111111111111111111111","request_id":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","op":"HELLO","ok":true,"body":{"selected_version":"WTP/1","device_id":"44444444444444444444444444444444","boot_id":"55555555555555555555555555555555","product":"WsprryPico","firmware_version":"0.1.0"}}
+    },
+    {
+      "name": "capabilities response",
+      "valid": true,
+      "message": {"type":"response","protocol":"WTP/1","session_id":"11111111111111111111111111111111","request_id":"abababababababababababababababab","op":"CAPS","ok":true,"body":{"profiles":["rf-events/1"],"modes":["wspr","tone"],"engine":"mock","frequency_ranges":[{"minimum_nhz":"1000000000","maximum_nhz":"30000000000000000"}],"max_payload_bytes":65536,"max_events":512,"max_job_duration_ns":"86400000000000","minimum_arm_lead_ns":"100000000","maximum_arm_ahead_ns":"86400000000000","maximum_arm_uncertainty_ns":"1000000","maximum_holdover_age_ns":"60000000000","output_disable_timeout_ns":"100000000","minimum_lease_ms":5000,"maximum_lease_ms":60000,"response_cache_entries":8,"response_cache_ttl_seconds":300,"terminal_record_entries":8,"terminal_record_ttl_seconds":3600}}
+    },
+    {
+      "name": "clock response with pending leap",
+      "valid": true,
+      "message": {"type":"response","protocol":"WTP/1","session_id":"11111111111111111111111111111111","request_id":"eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee","op":"GET_CLOCK","ok":true,"body":{"state":"synchronized","utc_now_ns":"1788627500000000000","monotonic_now_ns":"42000000000","uncertainty_ns":"250000","sync_age_ns":"1000000000","leap":"insert_pending","leap_transition_utc_ns":"1790000000000000000"}}
+    },
+    {
+      "name": "status response",
+      "valid": true,
+      "message": {"type":"response","protocol":"WTP/1","session_id":"11111111111111111111111111111111","request_id":"ffffffffffffffffffffffffffffffff","op":"STATUS","ok":true,"body":{"boot_id":"55555555555555555555555555555555","state":"empty","output_active":false,"owner_id":null,"job_id":null,"terminal_records":[]}}
+    },
+    {
+      "name": "error response",
+      "valid": true,
+      "message": {"type":"response","protocol":"WTP/1","session_id":"11111111111111111111111111111111","request_id":"0123456789abcdef0123456789abcdef","op":"ARM","ok":false,"error":{"code":"CLOCK_UNCERTAIN","message":"clock uncertainty exceeds request","retryable":true}}
+    },
+    {
+      "name": "unknown operation error echoes operation",
+      "valid": true,
+      "message": {"type":"response","protocol":"WTP/1","session_id":"11111111111111111111111111111111","request_id":"0123456789abcdef0123456789abcdef","op":"START","ok":false,"error":{"code":"UNKNOWN_OPERATION","message":"operation is not defined","retryable":false}}
+    },
+    {
+      "name": "job-state event",
+      "valid": true,
+      "message": {"type":"event","protocol":"WTP/1","session_id":"11111111111111111111111111111111","boot_id":"55555555555555555555555555555555","event_id":"0","event":"JOB_STATE","body":{"job_id":"33333333333333333333333333333333","state":"running","output_active":true}}
+    },
+    {
+      "name": "owner-released event",
+      "valid": true,
+      "message": {"type":"event","protocol":"WTP/1","session_id":"11111111111111111111111111111111","boot_id":"55555555555555555555555555555555","event_id":"1","event":"OWNER_RELEASED","body":{"owner_id":"22222222222222222222222222222222","reason":"terminal","output_active":false}}
+    },
+    {
+      "name": "uppercase identifier",
+      "valid": false,
+      "message": {"type":"request","protocol":"WTP/1","session_id":"1111111111111111111111111111111A","request_id":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","op":"STATUS","body":{}}
+    },
+    {
+      "name": "nanoseconds encoded as number",
+      "valid": false,
+      "message": {"type":"request","protocol":"WTP/1","session_id":"11111111111111111111111111111111","request_id":"dddddddddddddddddddddddddddddddd","op":"ARM","body":{"job_id":"33333333333333333333333333333333","start_utc_ns":1788627600,"max_start_uncertainty_ns":"1000000"}}
+    },
+    {
+      "name": "unknown operation",
+      "valid": false,
+      "message": {"type":"request","protocol":"WTP/1","session_id":"11111111111111111111111111111111","request_id":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","op":"START","body":{}}
+    },
+    {
+      "name": "noncontiguous events",
+      "valid": false,
+      "message": {"type":"request","protocol":"WTP/1","session_id":"11111111111111111111111111111111","request_id":"cccccccccccccccccccccccccccccccc","op":"LOAD","body":{"job_id":"33333333333333333333333333333333","profile":"rf-events/1","mode":"wspr","total_duration_ns":"30","events":[{"offset_ns":"0","duration_ns":"10","rf_on":true,"frequency_nhz":"14097100000000000"},{"offset_ns":"20","duration_ns":"10","rf_on":false}]}}
+    },
+    {
+      "name": "off event has frequency",
+      "valid": false,
+      "message": {"type":"request","protocol":"WTP/1","session_id":"11111111111111111111111111111111","request_id":"cccccccccccccccccccccccccccccccc","op":"LOAD","body":{"job_id":"33333333333333333333333333333333","profile":"rf-events/1","mode":"tone","total_duration_ns":"10","events":[{"offset_ns":"0","duration_ns":"10","rf_on":false,"frequency_nhz":"1000000000"}]}}
+    },
+    {
+      "name": "unknown job member",
+      "valid": false,
+      "message": {"type":"request","protocol":"WTP/1","session_id":"11111111111111111111111111111111","request_id":"cccccccccccccccccccccccccccccccc","op":"LOAD","body":{"job_id":"33333333333333333333333333333333","profile":"rf-events/1","mode":"tone","total_duration_ns":"10","events":[{"offset_ns":"0","duration_ns":"10","rf_on":true,"frequency_nhz":"1000000000"}],"gpio":4}}
+    },
+    {
+      "name": "normal clock contains leap transition",
+      "valid": false,
+      "message": {"type":"response","protocol":"WTP/1","session_id":"11111111111111111111111111111111","request_id":"eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee","op":"GET_CLOCK","ok":true,"body":{"state":"synchronized","utc_now_ns":"1","monotonic_now_ns":"1","uncertainty_ns":"1","sync_age_ns":"1","leap":"normal","leap_transition_utc_ns":"2"}}
+    },
+    {
+      "name": "owner-released event uses job-state body",
+      "valid": false,
+      "message": {"type":"event","protocol":"WTP/1","session_id":"11111111111111111111111111111111","boot_id":"55555555555555555555555555555555","event_id":"2","event":"OWNER_RELEASED","body":{"state":"empty","output_active":false}}
+    },
+    {
+      "name": "unsafe output-disable timeout",
+      "valid": false,
+      "message": {"type":"response","protocol":"WTP/1","session_id":"11111111111111111111111111111111","request_id":"abababababababababababababababab","op":"CAPS","ok":true,"body":{"profiles":["rf-events/1"],"modes":["tone"],"engine":"mock","frequency_ranges":[{"minimum_nhz":"1000000000","maximum_nhz":"2000000000"}],"max_payload_bytes":65536,"max_events":1,"max_job_duration_ns":"10","minimum_arm_lead_ns":"1","maximum_arm_ahead_ns":"10","maximum_arm_uncertainty_ns":"1","maximum_holdover_age_ns":"0","output_disable_timeout_ns":"5000000001","minimum_lease_ms":5000,"maximum_lease_ms":60000,"response_cache_entries":8,"response_cache_ttl_seconds":300,"terminal_record_entries":8,"terminal_record_ttl_seconds":3600}}
+    },
+    {
+      "name": "reversed frequency range",
+      "valid": false,
+      "message": {"type":"response","protocol":"WTP/1","session_id":"11111111111111111111111111111111","request_id":"abababababababababababababababab","op":"CAPS","ok":true,"body":{"profiles":["rf-events/1"],"modes":["tone"],"engine":"mock","frequency_ranges":[{"minimum_nhz":"2000000000","maximum_nhz":"1000000000"}],"max_payload_bytes":65536,"max_events":1,"max_job_duration_ns":"10","minimum_arm_lead_ns":"1","maximum_arm_ahead_ns":"10","maximum_arm_uncertainty_ns":"1","maximum_holdover_age_ns":"0","output_disable_timeout_ns":"1000000","minimum_lease_ms":5000,"maximum_lease_ms":60000,"response_cache_entries":8,"response_cache_ttl_seconds":300,"terminal_record_entries":8,"terminal_record_ttl_seconds":3600}}
+    },
+    {
+      "name": "arm lead exceeds horizon",
+      "valid": false,
+      "message": {"type":"response","protocol":"WTP/1","session_id":"11111111111111111111111111111111","request_id":"abababababababababababababababab","op":"CAPS","ok":true,"body":{"profiles":["rf-events/1"],"modes":["tone"],"engine":"mock","frequency_ranges":[{"minimum_nhz":"1000000000","maximum_nhz":"2000000000"}],"max_payload_bytes":65536,"max_events":1,"max_job_duration_ns":"10","minimum_arm_lead_ns":"11","maximum_arm_ahead_ns":"10","maximum_arm_uncertainty_ns":"1","maximum_holdover_age_ns":"0","output_disable_timeout_ns":"1000000","minimum_lease_ms":5000,"maximum_lease_ms":60000,"response_cache_entries":8,"response_cache_ttl_seconds":300,"terminal_record_entries":8,"terminal_record_ttl_seconds":3600}}
+    }
+  ],
+  "raw_json_cases": [
+    {"name":"duplicate member","valid":false,"json":"{\"type\":\"request\",\"type\":\"request\"}"},
+    {"name":"floating point","valid":false,"json":"{\"value\":1.5}"},
+    {"name":"non-finite number","valid":false,"json":"{\"value\":NaN}"},
+    {"name":"oversized JSON integer","valid":false,"json":"{\"detail\":{\"value\":2147483648}}"},
+    {"name":"unpaired Unicode surrogate","valid":false,"json":"{\"value\":\"\\ud800\"}"},
+    {"name":"top-level array","valid":false,"json":"[]"},
+    {"name":"excess nesting","valid":false,"json":"{\"a\":{\"b\":{\"c\":{\"d\":{\"e\":{\"f\":{\"g\":{\"h\":{\"i\":{\"j\":{\"k\":{\"l\":{\"m\":{\"n\":{\"o\":{\"p\":{\"q\":0}}}}}}}}}}}}}}}}}"}
+  ],
+  "framing_cases": [
+    {
+      "name": "empty status request frame",
+      "payload_utf8": "{\"type\":\"request\",\"protocol\":\"WTP/1\",\"session_id\":\"11111111111111111111111111111111\",\"request_id\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"op\":\"STATUS\",\"body\":{}}",
+      "crc32c_hex": "59dba00c",
+      "frame_hex": "57545046010100000000009d59dba00c7b2274797065223a2272657175657374222c2270726f746f636f6c223a225754502f31222c2273657373696f6e5f6964223a223131313131313131313131313131313131313131313131313131313131313131222c22726571756573745f6964223a226161616161616161616161616161616161616161616161616161616161616161222c226f70223a22535441545553222c22626f6479223a7b7d7d"
+    }
+  ],
+  "transition_cases": [
+    {"from":"empty","to":"loaded","valid":true},
+    {"from":"loaded","to":"armed","valid":true},
+    {"from":"armed","to":"running","valid":true},
+    {"from":"running","to":"complete","valid":true},
+    {"from":"armed","to":"complete","valid":false},
+    {"from":"complete","to":"running","valid":false},
+    {"from":"failed","to":"loaded","valid":false},
+    {"from":"failed","to":"empty","valid":true}
+  ]
+}

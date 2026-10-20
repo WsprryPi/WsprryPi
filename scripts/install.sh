@@ -191,6 +191,27 @@ declare ACTION="${ACTION:-install}"
 # -----------------------------------------------------------------------------
 declare DRY_RUN="${DRY_RUN:-false}"
 
+# Temporary build swap defaults to automatic allocation for low-memory builds;
+# false opts out and true explicitly permits the same resource policy. The remaining
+# BUILD_RESOURCE_* variables are test seams and reviewed policy constants; the
+# installer does not expose them as operator controls.
+declare ALLOW_TEMP_BUILD_SWAP="${ALLOW_TEMP_BUILD_SWAP:-auto}"
+declare BUILD_RESOURCE_MEMINFO_PATH="/proc/meminfo"
+declare BUILD_RESOURCE_SWAPS_PATH="/proc/swaps"
+declare BUILD_RESOURCE_SWAP_ROOT="/var/lib/wsprrypi/build-swap"
+declare BUILD_RESOURCE_DISK_AVAILABLE_KB=""
+declare BUILD_RESOURCE_LOW_RAM_KB=$((1536 * 1024))
+declare BUILD_RESOURCE_VERY_LOW_RAM_KB=$((768 * 1024))
+declare BUILD_RESOURCE_LOW_RAM_SWAP_KB=$((1024 * 1024))
+declare BUILD_RESOURCE_VERY_LOW_RAM_SWAP_KB=$((2048 * 1024))
+declare BUILD_RESOURCE_DISK_RESERVE_KB=$((512 * 1024))
+declare BUILD_RESOURCE_SWAP_METADATA_ALLOWANCE_KB=1024
+declare BUILD_RESOURCE_SWAP_ALLOCATION_QUANTUM_KB=1024
+declare TEMP_BUILD_SWAP_PATH=""
+declare TEMP_BUILD_SWAP_OWNED="false"
+declare TEMP_BUILD_SWAP_ACTIVE="false"
+declare TEMP_BUILD_SWAP_ROOT_OWNED="false"
+
 # -----------------------------------------------------------------------------
 # @brief Defines global repository-related variables.
 # @details These variables are used to determine the repository context,
@@ -220,6 +241,26 @@ declare GIT_TAG="${GIT_TAG:-v$SEM_VER}"
 declare GIT_RAW_BASE="https://raw.githubusercontent.com"
 declare GIT_API_BASE="https://api.github.com/repos"
 declare GIT_CLONE_BASE="https://github.com"
+declare FAIL_ON_UI_MODIFICATIONS="${FAIL_ON_UI_MODIFICATIONS:-false}"
+declare UI_PUBLICATION_ATTEMPTED="false"
+declare UI_PUBLICATION_RESULT_FILE=""
+declare INSTALL_RP1_GPCLK_DKMS="${INSTALL_RP1_GPCLK_DKMS:-auto}"
+declare RP1_GPCLK_DKMS_SOURCE="${RP1_GPCLK_DKMS_SOURCE:-auto}"
+declare REMOVE_RP1_GPCLK_DKMS="${REMOVE_RP1_GPCLK_DKMS:-auto}"
+declare RP1_GPCLK_DKMS_STATE_DIR=""
+declare RP1_GPCLK_DKMS_HELPER=""
+declare RP1_GPCLK_DKMS_PROVIDER_REMOVAL_UNPROVEN="false"
+declare -a RESOLVED_APT_PACKAGES=()
+declare BINARY_SOURCE="${BINARY_SOURCE:-build}"
+declare BINARY_PATH="${BINARY_PATH:-}"
+declare BINARY_RELEASE_TAG="${BINARY_RELEASE_TAG:-}"
+declare BINARY_STAGE=""
+declare BINARY_VERSION=""
+declare -a BINARY_RUNTIME_PACKAGES=()
+declare BINARY_PREVIOUS=""
+declare BINARY_INSTALLED="false"
+declare BINARY_DESTINATION=""
+declare BINARY_INSTALL_DIR="/usr/local/bin"
 
 # -----------------------------------------------------------------------------
 # Declare Arguments Variables
@@ -350,7 +391,7 @@ if [[ "$REQUIRE_SUDO" == true && -z "${SUDO_USER-}" ]]; then
     USER_HOME=""
 elif [[ -n "${SUDO_USER-}" ]]; then
     # Use SUDO_USER's home directory if it's set
-    USER_HOME=$(eval echo "~$SUDO_USER")
+    USER_HOME=$(getent passwd "$SUDO_USER" | cut -d: -f6)
 else
     # Fallback to HOME if SUDO_USER is not set
     USER_HOME="$HOME"
@@ -530,9 +571,13 @@ if [[ -z "${SUPPORTED_MODELS+x}" || ${#SUPPORTED_MODELS[@]} -eq 0 ]]; then
     SUPPORTED_MODELS=(
         # Supported models
         ["Raspberry Pi 5|5-model-b|bcm2712"]="Supported"
+        ["Raspberry Pi Compute Module 5|5-compute-module|bcm2712"]="Supported"
         ["Raspberry Pi 400|400|bcm2711"]="Supported"
+        ["Raspberry Pi Compute Module 4S|4s-compute-module|bcm2711"]="Supported"
         ["Raspberry Pi Compute Module 4|4-compute-module|bcm2711"]="Supported"
+        ["Raspberry Pi Compute Module 3+|3-plus-compute-module|bcm2837"]="Supported"
         ["Raspberry Pi Compute Module 3|3-compute-module|bcm2837"]="Supported"
+        ["Raspberry Pi Compute Module Zero|0-compute-module|bcm2837"]="Supported"
         ["Raspberry Pi Compute Module|compute-module|bcm2835"]="Supported"
         ["Raspberry Pi 4 Model B|4-model-b|bcm2711"]="Supported"
         ["Raspberry Pi 3 Model A+|3-model-a-plus|bcm2837"]="Supported"
@@ -659,7 +704,9 @@ declare -ar DEPENDENCIES=(
     "whoami"
     "touch"
     "dpkg"
+    "dpkg-deb"
     "dpkg-reconfigure"
+    "python3"
     "curl"
     "wget"
     "realpath"
@@ -760,33 +807,40 @@ declare -ar SYSTEM_READS=(
 readonly SYSTEM_READS
 
 # -----------------------------------------------------------------------------
-# @var APT_PACKAGES
-# @type array
-# @brief List of required APT packages.
-# @details Defines the APT packages that the script depends on for its
-#          execution. These packages should be available in the system's
-#          default package repository. The script will check for their presence
-#          and attempt to install any missing packages as needed.
-#
-#          Packages included:
-#          - `jq`: JSON parsing utility.
-#          - `git`: Version control system.
-#
-# @example
-# for pkg in "${APT_PACKAGES[@]}"; do
-#     if ! dpkg -l "$pkg" &>/dev/null; then
-#         echo "Error: Required package '$pkg' is not installed."
-#         exit 1
-#     fi
-# done
+# Runtime, web, application-build, and optional kernel-build dependencies are
+# selected separately. Precompiled installation does not need application headers
+# or a compiler. age and age-keygen support encrypted diagnostic bundles.
 # -----------------------------------------------------------------------------
-readonly APT_PACKAGES=(
+readonly RUNTIME_APT_PACKAGES=(
     "git"
-    "apache2"
-    "php"
+    "python3"
     "chrony"
+    "age"
+    "libatomic1"
+    "libstdc++6"
+    "libgcc-s1"
+    "libc6"
+    "libsystemd0"
+    "libavahi-client3"
+)
+readonly WEB_APT_PACKAGES=("apache2" "php")
+readonly BUILD_APT_PACKAGES=(
+    "build-essential"
     "libgpiod-dev"
     "libsystemd-dev"
+    "libssl-dev"
+    "libavahi-client-dev"
+)
+# readelf inspects supplied files; it does not compile or execute WsprryPi.
+readonly BINARY_VALIDATION_APT_PACKAGES=("binutils")
+
+# RP1 kernel-build packages are appended only when RP1 provider installation is
+# selected. The exact running-kernel header package is resolved at runtime.
+readonly RP1_GPCLK_DKMS_APT_PACKAGES=(
+    "build-essential"
+    "dkms"
+    "device-tree-compiler"
+    "kmod"
 )
 
 # -----------------------------------------------------------------------------
@@ -963,7 +1017,21 @@ declare REBOOT=${REBOOT:-false}
 # shellcheck disable=SC2317
 # shellcheck disable=SC2329
 egress() {
-    true
+    local status=$?
+    if [[ "$status" -ne 0 ]]; then
+        rollback_executable || status=1
+        restore_daemon_state || status=1
+    fi
+    cleanup_precompiled_executable
+    report_ui_publication_result
+    cleanup_rp1_gpclk_dkms_state
+    if ! cleanup_temp_build_swap; then
+        if [[ "$status" -eq 0 ]]; then
+            status=1
+        fi
+    fi
+    trap - EXIT
+    exit "$status"
 }
 
 # -----------------------------------------------------------------------------
@@ -1850,12 +1918,28 @@ remove_slash() {
 }
 
 # -----------------------------------------------------------------------------
+# @brief Render command arguments with unambiguous Bash-safe quoting.
+# @param ... Command argv to render.
+# @return A single display-only string; no argument is evaluated.
+# -----------------------------------------------------------------------------
+render_command_argv() {
+    local arg quoted rendered=""
+    for arg in "$@"; do
+        printf -v quoted '%q' "$arg"
+        rendered+="${rendered:+ }${quoted}"
+    done
+    printf '%s' "$rendered"
+}
+
+# -----------------------------------------------------------------------------
 # @brief Executes a command in a separate Bash process.
 # @details This function manages the execution of a shell command, handling the
-#          display of status messages. It supports dry-run mode, where the
+#          display of status messages. Child stdout and stderr are always
+#          suppressed; debug mode renders the safely quoted command through the
+#          wrapper's own diagnostics. It supports dry-run mode, where the
 #          command is simulated without execution. The function prints success
-#          or failure messages and handles the removal of the "Running" line
-#          once the command finishes.
+#          or failure messages and removes the "Running" line once the command
+#          finishes.
 #
 # @param exec_name The name of the command or task being executed.
 # @param ...       The command and its arguments, followed optionally by the
@@ -1873,14 +1957,22 @@ remove_slash() {
 # shellcheck disable=SC2317
 # shellcheck disable=SC2329
 exec_command() {
-    # Start debug and filter parameters
-    local debug status
-    debug=$(debug_start "$@")
-    eval set -- "$(debug_filter "$@")"
+    # The documented debug control is a trailing wrapper argument. Preserve
+    # command arguments named "debug" anywhere else with exact argv fidelity.
+    local debug="" status
+    if (( $# > 0 )) && [[ "${!#}" == "debug" ]]; then
+        debug=$(debug_start "debug")
+        set -- "${@:1:$(($# - 1))}"
+    else
+        debug=$(debug_start)
+    fi
 
     # Declare local variables after debug initialization
     local status=0 exec_name running_pre complete_pre failed_pre
-    local args cmd cmd_str
+    local args cmd cmd_str failure_output_file output_line
+    local -a pipeline_status=()
+    local status_mode="${EXEC_COMMAND_STATUS_MODE:-execution}"
+    failure_output_file="${EXEC_COMMAND_FAILURE_OUTPUT_FILE:-}"
 
     # Assign the human readable name and shift it off
     exec_name="$1"; shift
@@ -1896,12 +1988,82 @@ exec_command() {
     # Build the actual command array
     cmd=( "${args[@]}" )
 
-    # Join cmd[@] on spaces into one line
-    cmd_str=$(printf '%s ' "${cmd[@]}")
-    cmd_str=${cmd_str% }   # strip trailing space
+    # Render argv for display without losing argument boundaries or allowing
+    # shell metacharacters to look executable.
+    cmd_str=$(render_command_argv "${cmd[@]}")
     if [[ "$debug" == "debug" ]]; then
-        logD "Name:    $exec_name"
-        logD "Command: $cmd_str"
+        debug_print "Name:    $exec_name" "$debug"
+        debug_print "Command: $cmd_str" "$debug"
+    fi
+
+    case "$status_mode" in
+        execution|info) ;;
+        *)
+            warn "Unsupported exec_command status mode: $status_mode"
+            debug_end "$debug"
+            return 2
+            ;;
+    esac
+
+    if [[ -n "$failure_output_file" ]]; then
+        if [[ -e "$failure_output_file" || -L "$failure_output_file" ||
+              ! -d "${failure_output_file%/*}" || -L "${failure_output_file%/*}" ]]; then
+            warn "Refusing unsafe command failure-output path: $failure_output_file"
+            debug_end "$debug"
+            return 2
+        fi
+        if ! (umask 077; set -o noclobber; : >"$failure_output_file") 2>/dev/null; then
+            warn "Unable to create command failure-output file: $failure_output_file"
+            debug_end "$debug"
+            return 2
+        fi
+        if [[ ! -f "$failure_output_file" || -L "$failure_output_file" ]]; then
+            warn "Command failure-output file is not a regular file: $failure_output_file"
+            debug_end "$debug"
+            return 2
+        fi
+    fi
+
+    # Read-only planning is useful operator context, not a completed mutation.
+    # Keep it inside this wrapper so dry runs still suppress command execution
+    # and debug mode still renders the exact argv.
+    if [[ "$status_mode" == "info" ]]; then
+        logI "$exec_name."
+        if [[ "$DRY_RUN" == "true" ]]; then
+            debug_end "$debug"
+            return 0
+        fi
+
+        if [[ -n "$failure_output_file" ]]; then
+            if "${cmd[@]}" 2>&1 | tail -c 16384 >"$failure_output_file"; then
+                pipeline_status=("${PIPESTATUS[@]}")
+            else
+                pipeline_status=("${PIPESTATUS[@]}")
+            fi
+            status="${pipeline_status[0]}"
+            if [[ "$status" -eq 0 && "${pipeline_status[1]}" -ne 0 ]]; then
+                status="${pipeline_status[1]}"
+            fi
+        else
+            "${cmd[@]}" &>/dev/null || status=$?
+        fi
+        if [[ $status -ne 0 ]]; then
+            logE "Failed: $exec_name."
+            if [[ $status -eq 127 ]]; then
+                warn "Command not found: ${cmd_str}"
+            else
+                warn "Command failed with status $status: ${cmd_str}"
+            fi
+            if [[ -n "$failure_output_file" && -s "$failure_output_file" ]]; then
+                logW "Failure details from $exec_name (last 20 lines, 16 KiB maximum):"
+                while IFS= read -r output_line || [[ -n "$output_line" ]]; do
+                    logW "${output_line:0:500}"
+                done < <(tail -c 16384 -- "$failure_output_file" |
+                    tail -n 20 | LC_ALL=C tr -cd '\11\12\40-\176')
+            fi
+        fi
+        debug_end "$debug"
+        return "$status"
     fi
 
     # Prepare status prefixes
@@ -1912,27 +2074,36 @@ exec_command() {
         failed_pre+=" (dry)"
     fi
 
-    # Show running status line
-    printf "%b[  -  ]%b %s %s.\n" "${FGGLD}" "${RESET}" "$running_pre" "$exec_name"
-    sleep 0.02
     if [[ "$DRY_RUN" == "true" ]]; then
+        printf "%b[  -  ]%b %s %s.\n" "${FGGLD}" "${RESET}" "$running_pre" "$exec_name"
+        sleep 0.02
         printf "%b%b" "$MOVE_UP" "$CLEAR_LINE"
         printf "%b[✔]%b %s %s.\n" "${FGGRN}" "${RESET}" "$complete_pre" "$exec_name"
         debug_end "$debug"
         return 0
     fi
 
-    # Execute the command, swallowing output unless debug is enabled
-    if [[ "$debug" == "debug" ]]; then
-        "${cmd[@]}" || status=$?
+    # Show running status line
+    printf "%b[  -  ]%b %s %s.\n" "${FGGLD}" "${RESET}" "$running_pre" "$exec_name"
+    sleep 0.02
+
+    # Child output never bypasses the wrapper. Debug mode has already rendered
+    # the exact command through debug_print().
+    if [[ -n "$failure_output_file" ]]; then
+        if "${cmd[@]}" 2>&1 | tail -c 16384 >"$failure_output_file"; then
+            pipeline_status=("${PIPESTATUS[@]}")
+        else
+            pipeline_status=("${PIPESTATUS[@]}")
+        fi
+        status="${pipeline_status[0]}"
+        if [[ "$status" -eq 0 && "${pipeline_status[1]}" -ne 0 ]]; then
+            status="${pipeline_status[1]}"
+        fi
     else
         "${cmd[@]}" &>/dev/null || status=$?
     fi
 
-    # Clear running status line only when not in debug mode
-    if [[ "$debug" != "debug" ]]; then
-        printf "%b%b" "$MOVE_UP" "$CLEAR_LINE"
-    fi
+    printf "%b%b" "$MOVE_UP" "$CLEAR_LINE"
 
     # Report result
     if [[ $status -eq 0 ]]; then
@@ -1943,6 +2114,13 @@ exec_command() {
             warn "Command not found: ${cmd_str}"
         else
             warn "Command failed with status $status: ${cmd_str}"
+        fi
+        if [[ -n "$failure_output_file" && -s "$failure_output_file" ]]; then
+            logW "Failure details from $exec_name (last 20 lines, 16 KiB maximum):"
+            while IFS= read -r output_line || [[ -n "$output_line" ]]; do
+                logW "${output_line:0:500}"
+            done < <(tail -c 16384 -- "$failure_output_file" |
+                tail -n 20 | LC_ALL=C tr -cd '\11\12\40-\176')
         fi
     fi
 
@@ -2017,7 +2195,7 @@ modify_comment_lines() {
         logD "Exec: sed -i '$sed_script' '$file'"
     else
         # Actually apply it
-        sed -i "$sed_script" "$file" || {
+        exec_command "Update log directives in $file" sed -i "$sed_script" "$file" "$debug" || {
             logE "sed failed on $file"
             debug_end "$debug"; return 1
         }
@@ -2058,6 +2236,15 @@ replace_string_in_script() {
     local search_string="$2"
     local replace_string="$3"
 
+    if [[ "$DRY_RUN" == "true" ]]; then
+        local planned_command
+        planned_command=$(render_command_argv \
+            sed -i "s|%${search_string}%|${replace_string}|g" "$file_path")
+        debug_print "Dry run command: $planned_command" "$debug"
+        debug_end "$debug"
+        return 0
+    fi
+
     if [[ ! -f "$file_path" ]]; then
         debug_print "Error: File '$file_path' not found." "$debug"
         debug_end "$debug"
@@ -2066,8 +2253,15 @@ replace_string_in_script() {
 
     local pattern="%${search_string}%"
 
-    # Use sed to replace all occurrences of %SEARCH_STRING% with REPLACE_STRING
-    sed -i "s|${pattern}|${replace_string}|g" "$file_path"
+    # Use sed to replace all occurrences of %SEARCH_STRING% with REPLACE_STRING.
+    # Propagate failure so callers staging privileged files cannot continue with
+    # an incomplete render.
+    if ! exec_command "Set $search_string in $file_path" \
+        sed -i "s|${pattern}|${replace_string}|g" "$file_path" "$debug"; then
+        logE "Failed to replace '${pattern}' in '$file_path'."
+        debug_end "$debug"
+        return 1
+    fi
 
     debug_print "Replaced occurrences of '${pattern}' with '${replace_string}' in '$file_path'." "$debug"
 
@@ -2138,12 +2332,22 @@ print_model_name() {
     # Read and process the compatible string
     if ! detected_model=$(tr '\0' '\n' </proc/device-tree/compatible 2>/dev/null \
         | sed -n 's/raspberrypi,//p'); then
+        if [[ "$INSTALL_RP1_GPCLK_DKMS" == "true" ]]; then
+            warn "Platform model detection is unavailable; continuing because RP1 provider installation was explicitly requested."
+            debug_end "$debug"
+            return 0
+        fi
         debug_end "$debug"
         die 1 "Failed to read or process /proc/device-tree/compatible."
     fi
 
     # Ensure a model was detected
     if [[ -z "${detected_model:-}" ]]; then
+        if [[ "$INSTALL_RP1_GPCLK_DKMS" == "true" ]]; then
+            warn "This system is not identified as a Raspberry Pi; continuing because RP1 provider installation was explicitly requested."
+            debug_end "$debug"
+            return 0
+        fi
         debug_end "$debug"
         die 1 "No Raspberry Pi model found in /proc/device-tree/compatible."
     fi
@@ -2158,6 +2362,12 @@ print_model_name() {
         fi
     done
 
+    if [[ "$INSTALL_RP1_GPCLK_DKMS" == "true" ]]; then
+        warn "Detected Raspberry Pi model '$detected_model' is not recognized; continuing because RP1 provider installation was explicitly requested."
+        debug_end "$debug"
+        return 0
+    fi
+
     debug_end "$debug"
     die 1 "Detected Raspberry Pi model '$detected_model' is not recognized."
 }
@@ -2170,7 +2380,543 @@ is_pi5() {
         return 1
     fi
 
-    [[ "${detected_model:-}" == "5-model-b" ]]
+    [[ "${detected_model:-}" == "5-model-b" || \
+        "${detected_model:-}" == "5-compute-module" ]]
+}
+
+is_rp1_system() {
+    local compatible_file="${1:-/proc/device-tree/compatible}"
+    local compatible
+
+    compatible=$(tr '\0' '\n' <"$compatible_file" 2>/dev/null) || return 1
+    grep -Fqx -e 'raspberrypi,5-model-b' -e 'raspberrypi,5-compute-module' \
+        <<<"$compatible" || return 1
+    grep -Fqx 'brcm,bcm2712' <<<"$compatible"
+}
+
+# -----------------------------------------------------------------------------
+# @brief Return success only when RP1 provider work belongs in this install.
+# @details Automatic selection is limited to positively identified Pi 5/CM5
+#          systems. Explicit true remains an operator override so the provider
+#          helper can validate and fail closed; explicit false skips all RP1
+#          planning and lifecycle output on every platform. Unknown values are
+#          passed through to the helper for its existing validation error.
+# -----------------------------------------------------------------------------
+rp1_gpclk_dkms_installation_selected() {
+    case "${INSTALL_RP1_GPCLK_DKMS:-auto}" in
+        false)
+            return 1
+            ;;
+        auto)
+            is_rp1_system
+            return "$?"
+            ;;
+        *)
+            return 0
+            ;;
+    esac
+}
+
+# -----------------------------------------------------------------------------
+# @brief Resolve the APT package closure for this installer invocation.
+# @details Base application build packages apply on every supported Pi. RP1
+#          DKMS, device-tree and kernel-module tools plus exact running-kernel
+#          headers are appended only when RP1 provider installation is selected.
+# @param $1 Optional resolved libgpiod runtime package.
+# -----------------------------------------------------------------------------
+resolve_apt_package_list() {
+    local runtime_pkg="${1:-}"
+    local kernel_release=""
+
+    RESOLVED_APT_PACKAGES=( "${RUNTIME_APT_PACKAGES[@]}" )
+    if [[ "${NO_WEB:-false}" != "true" ]]; then
+        RESOLVED_APT_PACKAGES+=( "${WEB_APT_PACKAGES[@]}" )
+    fi
+    if [[ "$BINARY_SOURCE" == "build" ]]; then
+        RESOLVED_APT_PACKAGES+=( "${BUILD_APT_PACKAGES[@]}" )
+    else
+        RESOLVED_APT_PACKAGES+=( "${BINARY_VALIDATION_APT_PACKAGES[@]}" "${BINARY_RUNTIME_PACKAGES[@]}" )
+    fi
+    if [[ -n "$runtime_pkg" ]]; then
+        RESOLVED_APT_PACKAGES+=( "$runtime_pkg" )
+    fi
+    if ! rp1_gpclk_dkms_installation_selected; then
+        return 0
+    fi
+
+    kernel_release=$(uname -r) || {
+        warn "Unable to identify the running kernel for RP1 DKMS headers."
+        return 1
+    }
+    if [[ ! "$kernel_release" =~ ^[0-9A-Za-z][0-9A-Za-z.+:~_-]*$ ]]; then
+        warn "The running kernel release cannot form a safe APT package name: $kernel_release"
+        return 1
+    fi
+    RESOLVED_APT_PACKAGES+=(
+        "${RP1_GPCLK_DKMS_APT_PACKAGES[@]}"
+        "linux-headers-${kernel_release}"
+    )
+}
+
+# -----------------------------------------------------------------------------
+# @brief Verify the exact RP1 DKMS build closure after package handling.
+# @details This check is conditional on RP1 installation, is observational only,
+#          and fails closed before provider apply. Optional path arguments exist
+#          solely so hardware-free tests can provide a synthetic header layout.
+# -----------------------------------------------------------------------------
+validate_rp1_gpclk_build_dependencies() {
+    local debug
+    debug=$(debug_start "$@")
+    eval set -- "$(debug_filter "$@")"
+
+    [[ "$ACTION" == "install" ]] || return 0
+    rp1_gpclk_dkms_installation_selected || return 0
+    if [[ "$DRY_RUN" == "true" ]]; then
+        debug_print "Dry run: RP1 DKMS build dependency validation was not executed." "$debug"
+        debug_end "$debug"
+        return 0
+    fi
+
+    local kernel_release="${1:-}"
+    local modules_base="${2:-/lib/modules}"
+    local headers_base="${3:-/usr/src}"
+    local header_package=""
+    local expected_headers=""
+    local build_link=""
+    local expected_real=""
+    local build_real=""
+    local tool=""
+    local missing=0
+
+    if [[ -z "$kernel_release" ]]; then
+        kernel_release=$(uname -r) || {
+            warn "Unable to identify the running kernel for RP1 DKMS validation."
+            return 1
+        }
+    fi
+    if [[ ! "$kernel_release" =~ ^[0-9A-Za-z][0-9A-Za-z.+:~_-]*$ ]]; then
+        warn "Invalid running-kernel release for RP1 DKMS validation: $kernel_release"
+        return 1
+    fi
+
+    header_package="linux-headers-${kernel_release}"
+    expected_headers="${headers_base}/${header_package}"
+    build_link="${modules_base}/${kernel_release}/build"
+    if ! dpkg-query -W -f='${Status}' "$header_package" 2>/dev/null |
+        grep -q "install ok installed"; then
+        warn "Exact RP1 DKMS header package is not installed: $header_package"
+        ((missing++))
+    fi
+    expected_real=$(realpath "$expected_headers" 2>/dev/null) || expected_real=""
+    build_real=$(realpath "$build_link" 2>/dev/null) || build_real=""
+    if [[ -z "$expected_real" || -z "$build_real" ||
+        "$expected_real" != "$build_real" || ! -f "$build_real/Makefile" ]]; then
+        warn "RP1 DKMS headers do not resolve to the exact running-kernel tree: $build_link -> $expected_headers"
+        ((missing++))
+    fi
+
+    for tool in make dkms depmod modinfo sha256sum dtc fdtput; do
+        if ! command -v "$tool" >/dev/null 2>&1; then
+            warn "Missing RP1 DKMS build dependency: $tool"
+            ((missing++))
+        fi
+    done
+    if ! command -v cc >/dev/null 2>&1 && ! command -v gcc >/dev/null 2>&1; then
+        warn "Missing RP1 DKMS compiler: expected cc or gcc."
+        ((missing++))
+    fi
+    if ((missing > 0)); then
+        warn "RP1 DKMS build dependency validation failed with $missing issue(s)."
+        debug_end "$debug"
+        return 1
+    fi
+
+    debug_print "RP1 DKMS build dependencies match kernel $kernel_release." "$debug"
+    debug_end "$debug"
+    return 0
+}
+
+# -----------------------------------------------------------------------------
+# @brief Remove only the fresh RP1 provider planning directory from this run.
+# @details The independently owned installed provider and its operational record
+#          are deliberately preserved. This cleanup owns only mktemp output.
+# -----------------------------------------------------------------------------
+cleanup_rp1_gpclk_dkms_state() {
+    local state_dir="${RP1_GPCLK_DKMS_STATE_DIR:-}"
+    if [[ "$state_dir" == "dry-run:no-state-created" ]]; then
+        RP1_GPCLK_DKMS_STATE_DIR=""
+        RP1_GPCLK_DKMS_HELPER=""
+        return 0
+    fi
+    if [[ -z "$state_dir" || ! -d "$state_dir" || -L "$state_dir" ]]; then
+        return 0
+    fi
+    case "$state_dir" in
+        /tmp/wsprrypi-rp1-gpclk-dkms.*|/var/tmp/wsprrypi-rp1-gpclk-dkms.*)
+            rm -rf -- "$state_dir"
+            ;;
+        *)
+            warn "Refusing to remove unexpected RP1 provider state directory: $state_dir"
+            return 1
+            ;;
+    esac
+    RP1_GPCLK_DKMS_STATE_DIR=""
+    RP1_GPCLK_DKMS_HELPER=""
+    return 0
+}
+
+# -----------------------------------------------------------------------------
+# @brief Resolve and validate the RP1-GPCLK-DKMS installation before mutation.
+# @details Uses the checked-out helper when available. A streamed installer
+#          retrieves the helper from the exact WsprryPi source selector already
+#          chosen for this installer invocation. The helper enumerates and
+#          validates release metadata or resolves an immutable development
+#          source before any package-manager operation.
+# -----------------------------------------------------------------------------
+prepare_rp1_gpclk_dkms_installation() {
+    local debug
+    debug=$(debug_start "$@")
+    eval set -- "$(debug_filter "$@")"
+
+    [[ "$ACTION" == "install" ]] || return 0
+    rp1_gpclk_dkms_installation_selected || return 0
+
+    local script_source="${BASH_SOURCE[0]:-}"
+    local local_helper=""
+    if [[ -n "$script_source" && "$script_source" != "bash" ]]; then
+        local_helper="$(cd "$(dirname "$script_source")" && pwd -P)/rp1_gpclk_dkms_install.py"
+    fi
+
+    if [[ "$DRY_RUN" == "true" ]]; then
+        # Use stable display-only paths. exec_command() deliberately does not
+        # execute Python in dry-run mode, so no helper download, temporary
+        # directory, network resolution, package inspection, or preflight runs.
+        RP1_GPCLK_DKMS_STATE_DIR="dry-run:no-state-created"
+        RP1_GPCLK_DKMS_HELPER="${local_helper:-dry-run:no-helper-downloaded}"
+    else
+        RP1_GPCLK_DKMS_STATE_DIR=$(mktemp -d /tmp/wsprrypi-rp1-gpclk-dkms.XXXXXX)
+        exec_command "Protect RP1 helper staging directory" chmod 0700 "$RP1_GPCLK_DKMS_STATE_DIR" "$debug" || return 1
+        RP1_GPCLK_DKMS_HELPER="$RP1_GPCLK_DKMS_STATE_DIR/rp1_gpclk_dkms_install.py"
+        if [[ -n "$local_helper" && -f "$local_helper" && ! -L "$local_helper" ]]; then
+            exec_command "Stage RP1 installer helper" cp -- "$local_helper" "$RP1_GPCLK_DKMS_HELPER" "$debug" || return 1
+            exec_command "Protect RP1 installer helper" chmod 0700 "$RP1_GPCLK_DKMS_HELPER" "$debug" || return 1
+        else
+            local helper_url="${GIT_RAW_BASE}/${REPO_ORG}/${REPO_NAME}/${REPO_BRANCH}/scripts/rp1_gpclk_dkms_install.py"
+            if ! exec_command "Download RP1 installer helper" curl --proto '=https' --tlsv1.2 --fail --silent --show-error \
+                --output "$RP1_GPCLK_DKMS_HELPER" "$helper_url" "$debug"; then
+                warn "Unable to retrieve the RP1-GPCLK-DKMS installer helper from $helper_url."
+                cleanup_rp1_gpclk_dkms_state
+                return 1
+            fi
+            exec_command "Protect RP1 installer helper" chmod 0700 "$RP1_GPCLK_DKMS_HELPER" "$debug" || return 1
+        fi
+    fi
+
+    local prepare_args=(
+        prepare
+        --state-dir "$RP1_GPCLK_DKMS_STATE_DIR"
+        --install "$INSTALL_RP1_GPCLK_DKMS"
+        --source "$RP1_GPCLK_DKMS_SOURCE"
+        --wsprry-source "$REPO_BRANCH"
+    )
+    if [[ "$DRY_RUN" == "true" ]]; then
+        prepare_args+=(--dry-run)
+    fi
+    if [[ "$debug" == "debug" ]]; then
+        prepare_args+=(--debug)
+    fi
+
+    if ! EXEC_COMMAND_STATUS_MODE=info \
+        exec_command "Resolve RP1-GPCLK-DKMS installation plan" \
+        python3 "$RP1_GPCLK_DKMS_HELPER" "${prepare_args[@]}" "$debug"; then
+        warn "RP1-GPCLK-DKMS installation planning failed before package mutation."
+        cleanup_rp1_gpclk_dkms_state
+        return 1
+    fi
+    debug_end "$debug"
+    return 0
+}
+
+# -----------------------------------------------------------------------------
+# @brief Apply the previously validated RP1 provider plan.
+# @details Dry runs stop after rendering the plan. Real installations revalidate
+#          prepared inputs and invoke only the package manager or the reviewed
+#          upstream exact-source lifecycle. No overlay, route, load, service,
+#          GPIO, output, transmission, or RF operation is performed.
+# -----------------------------------------------------------------------------
+apply_rp1_gpclk_dkms_installation() {
+    local debug
+    debug=$(debug_start "$@")
+    eval set -- "$(debug_filter "$@")"
+
+    [[ "$ACTION" == "install" ]] || return 0
+    rp1_gpclk_dkms_installation_selected || return 0
+    if [[ "$DRY_RUN" != "true" && \
+        ( -z "${RP1_GPCLK_DKMS_STATE_DIR:-}" || -z "${RP1_GPCLK_DKMS_HELPER:-}" ) ]]; then
+        warn "RP1-GPCLK-DKMS plan state is unavailable."
+        return 1
+    fi
+
+    local apply_args=(apply --state-dir "$RP1_GPCLK_DKMS_STATE_DIR")
+    local failure_output_file=""
+    if [[ "$DRY_RUN" != "true" ]]; then
+        failure_output_file="$RP1_GPCLK_DKMS_STATE_DIR/apply-output.log"
+    fi
+    if [[ "$debug" == "debug" ]]; then
+        apply_args+=(--debug)
+    fi
+    if ! EXEC_COMMAND_FAILURE_OUTPUT_FILE="$failure_output_file" \
+        exec_command "Apply RP1-GPCLK-DKMS installation plan" \
+        python3 "$RP1_GPCLK_DKMS_HELPER" "${apply_args[@]}" "$debug"; then
+        warn "RP1-GPCLK-DKMS installation failed closed; inspect the failure details above, retained installer log, and provider state."
+        return 1
+    fi
+    debug_end "$debug"
+    return 0
+}
+
+# -----------------------------------------------------------------------------
+# @brief Recover owned RP1 administration before package/provider mutation.
+# @details A repeat installation must not invalidate a completed activation
+#          journal by replacing or restarting WsprryPi first. The helper
+#          performs only the provider's digest-reviewed recovery transaction;
+#          fresh/provider-only installs and dry runs remain no-ops.
+# -----------------------------------------------------------------------------
+prepare_rp1_gpclk_runtime_update() {
+    local debug
+    debug=$(debug_start "$@")
+    eval set -- "$(debug_filter "$@")"
+
+    [[ "$ACTION" == "install" ]] || return 0
+    rp1_gpclk_dkms_installation_selected || return 0
+    if [[ "$DRY_RUN" != "true" &&
+        ( -z "${RP1_GPCLK_DKMS_STATE_DIR:-}" || -z "${RP1_GPCLK_DKMS_HELPER:-}" ) ]]; then
+        warn "RP1-GPCLK-DKMS plan state is unavailable."
+        return 1
+    fi
+
+    local update_args=(prepare-runtime-update --state-dir "$RP1_GPCLK_DKMS_STATE_DIR")
+    local failure_output_file=""
+    if [[ "$DRY_RUN" != "true" ]]; then
+        failure_output_file="$RP1_GPCLK_DKMS_STATE_DIR/runtime-update-output.log"
+    fi
+    if [[ "$debug" == "debug" ]]; then
+        update_args+=(--debug)
+    fi
+    if ! EXEC_COMMAND_FAILURE_OUTPUT_FILE="$failure_output_file" \
+        exec_command "Prepare neutral RP1 runtime for application update" \
+        python3 "$RP1_GPCLK_DKMS_HELPER" "${update_args[@]}" "$debug"; then
+        warn "RP1-GPCLK-DKMS runtime update preparation failed closed; application files and services were not changed."
+        return 1
+    fi
+    debug_end "$debug"
+    return 0
+}
+
+# -----------------------------------------------------------------------------
+# @brief Establish digest-bound, route-neutral RP1 runtime administration.
+# @details Runs only after the exact WsprryPi route companion is installed.
+#          The helper builds and reviews the exact runtime bundle, executes the
+#          reviewed deployment and neutral-activation plans, and requires
+#          neutral_ready with administration eligible and transmission
+#          ineligible before restoring an explicit saved RP1 route. Neither
+#          stage authorizes transmission.
+# -----------------------------------------------------------------------------
+activate_rp1_gpclk_runtime_administration() {
+    local debug
+    debug=$(debug_start "$@")
+    eval set -- "$(debug_filter "$@")"
+
+    [[ "$ACTION" == "install" ]] || return 0
+    rp1_gpclk_dkms_installation_selected || return 0
+    if [[ "$DRY_RUN" != "true" && \
+        ( -z "${RP1_GPCLK_DKMS_STATE_DIR:-}" || -z "${RP1_GPCLK_DKMS_HELPER:-}" ) ]]; then
+        warn "RP1-GPCLK-DKMS runtime plan state is unavailable."
+        return 1
+    fi
+
+    local runtime_args=(activate-runtime --state-dir "$RP1_GPCLK_DKMS_STATE_DIR")
+    local failure_output_file=""
+    if [[ "$DRY_RUN" != "true" ]]; then
+        failure_output_file="$RP1_GPCLK_DKMS_STATE_DIR/activation-output.log"
+    fi
+    if [[ "$debug" == "debug" ]]; then
+        runtime_args+=(--debug)
+    fi
+    if ! EXEC_COMMAND_FAILURE_OUTPUT_FILE="$failure_output_file" \
+        exec_command "Activate neutral RP1-GPCLK-DKMS administration" \
+        python3 "$RP1_GPCLK_DKMS_HELPER" "${runtime_args[@]}" "$debug"; then
+        warn "RP1-GPCLK-DKMS neutral runtime activation failed closed; no GPIO route or output was requested."
+        return 1
+    fi
+    exec_command "Reload systemd after RP1 runtime activation" \
+        systemctl daemon-reload "$debug" || return 1
+    exec_command "Start WsprryPi after RP1 runtime activation" \
+        systemctl start "$WSPR_SERVICE.service" "$debug" || return 1
+    # Neutral administration is only the provider bootstrap. Explicit persisted
+    # RP1 configuration must also regain its route before setup reports success.
+    if [[ "$DRY_RUN" != "true" ]]; then
+        failure_output_file="$RP1_GPCLK_DKMS_STATE_DIR/route-restoration-output.log"
+    fi
+    if ! EXEC_COMMAND_FAILURE_OUTPUT_FILE="$failure_output_file" \
+        exec_command "Restore configured RP1 route with transmission disabled" \
+        python3 /usr/local/lib/wsprrypi/runtime_reconcile.py install "$debug"; then
+        warn "Configured RP1 route restoration failed; setup cannot confirm transmitter readiness. Inspect the retained installer log and provider state."
+        return 1
+    fi
+    debug_end "$debug"
+    return 0
+}
+
+# -----------------------------------------------------------------------------
+# @brief Recover an exact owned neutral runtime before application teardown.
+# @details A v3 runtime activation records the running application instance.
+#          Recover it while that instance still exists so later service and
+#          file removal cannot turn terminal evidence into a PID-drift conflict.
+# -----------------------------------------------------------------------------
+prepare_owned_rp1_gpclk_runtime_removal() {
+    local debug
+    debug=$(debug_start "$@")
+    eval set -- "$(debug_filter "$@")"
+
+    [[ "$ACTION" == "uninstall" ]] || return 0
+    [[ "$REMOVE_RP1_GPCLK_DKMS" != "false" ]] || return 0
+
+    local script_source="${BASH_SOURCE[0]:-}"
+    local local_helper=""
+    local state_dir=""
+    if [[ -n "$script_source" && "$script_source" != "bash" ]]; then
+        local_helper="$(cd "$(dirname "$script_source")" && pwd -P)/rp1_gpclk_dkms_install.py"
+    fi
+    if [[ "$DRY_RUN" == "true" ]]; then
+        logI "Dry run: would recover exact owned RP1 runtime before application teardown."
+        debug_end "$debug"
+        return 0
+    fi
+    state_dir=$(mktemp -d /tmp/wsprrypi-rp1-gpclk-dkms.XXXXXX)
+    exec_command "Protect RP1 helper staging directory" chmod 0700 "$state_dir" "$debug" || return 1
+    local helper="$state_dir/rp1_gpclk_dkms_install.py"
+    if [[ -n "$local_helper" && -f "$local_helper" && ! -L "$local_helper" ]]; then
+        exec_command "Stage RP1 installer helper" cp -- "$local_helper" "$helper" "$debug" || return 1
+        exec_command "Protect RP1 installer helper" chmod 0700 "$helper" "$debug" || return 1
+    else
+        local helper_url="${GIT_RAW_BASE}/${REPO_ORG}/${REPO_NAME}/${REPO_BRANCH}/scripts/rp1_gpclk_dkms_install.py"
+        if ! exec_command "Download RP1 installer helper" curl --proto '=https' --tlsv1.2 --fail --silent --show-error \
+            --output "$helper" "$helper_url" "$debug"; then
+            warn "Unable to retrieve the RP1-GPCLK-DKMS installer helper from $helper_url."
+            rm -rf -- "$state_dir"
+            return 1
+        fi
+        exec_command "Protect RP1 installer helper" chmod 0700 "$helper" "$debug" || return 1
+    fi
+    local update_args=(prepare-runtime-removal)
+    local failure_output_file="$state_dir/runtime-removal-output.log"
+    if [[ "$debug" == "debug" ]]; then
+        update_args+=(--debug)
+    fi
+    if ! EXEC_COMMAND_FAILURE_OUTPUT_FILE="$failure_output_file" \
+        exec_command "Prepare owned RP1 runtime for removal" \
+        python3 "$helper" "${update_args[@]}" "$debug"; then
+        warn "RP1-GPCLK-DKMS runtime recovery failed before application teardown."
+        rm -rf -- "$state_dir"
+        return 1
+    fi
+    rm -rf -- "$state_dir"
+    debug_end "$debug"
+    return 0
+}
+
+# -----------------------------------------------------------------------------
+# @brief Remove an unchanged RP1 provider only when a v2 record proves that
+#        WsprryPi installed it.
+# @details The helper preserves missing, legacy, malformed, drifted, active, or
+#          otherwise ambiguous provider state. Release removal uses the normal
+#          Debian package lifecycle; development removal uses the exact
+#          upstream rollback entrypoint captured at installation time.
+# -----------------------------------------------------------------------------
+remove_owned_rp1_gpclk_dkms_provider() {
+    local debug
+    debug=$(debug_start "$@")
+    eval set -- "$(debug_filter "$@")"
+
+    [[ "$ACTION" == "uninstall" ]] || return 0
+    case "$REMOVE_RP1_GPCLK_DKMS" in
+        auto|true|false) ;;
+        *)
+            warn "REMOVE_RP1_GPCLK_DKMS must be auto, true, or false."
+            return 1
+            ;;
+    esac
+    if [[ "$REMOVE_RP1_GPCLK_DKMS" == "false" ]]; then
+        RP1_GPCLK_DKMS_PROVIDER_REMOVAL_UNPROVEN="false"
+        logI "RP1-GPCLK-DKMS preserved by explicit operator opt-out."
+        debug_end "$debug"
+        return 0
+    fi
+
+    local script_source="${BASH_SOURCE[0]:-}"
+    local local_helper=""
+    if [[ -n "$script_source" && "$script_source" != "bash" ]]; then
+        local_helper="$(cd "$(dirname "$script_source")" && pwd -P)/rp1_gpclk_dkms_install.py"
+    fi
+
+    if [[ "$DRY_RUN" == "true" ]]; then
+        RP1_GPCLK_DKMS_STATE_DIR="dry-run:no-state-created"
+        RP1_GPCLK_DKMS_HELPER="${local_helper:-dry-run:no-helper-downloaded}"
+    else
+        RP1_GPCLK_DKMS_STATE_DIR=$(mktemp -d /tmp/wsprrypi-rp1-gpclk-dkms.XXXXXX)
+        exec_command "Protect RP1 helper staging directory" chmod 0700 "$RP1_GPCLK_DKMS_STATE_DIR" "$debug" || return 1
+        RP1_GPCLK_DKMS_HELPER="$RP1_GPCLK_DKMS_STATE_DIR/rp1_gpclk_dkms_install.py"
+        if [[ -n "$local_helper" && -f "$local_helper" && ! -L "$local_helper" ]]; then
+            exec_command "Stage RP1 installer helper" cp -- "$local_helper" "$RP1_GPCLK_DKMS_HELPER" "$debug" || return 1
+            exec_command "Protect RP1 installer helper" chmod 0700 "$RP1_GPCLK_DKMS_HELPER" "$debug" || return 1
+        else
+            local helper_url="${GIT_RAW_BASE}/${REPO_ORG}/${REPO_NAME}/${REPO_BRANCH}/scripts/rp1_gpclk_dkms_install.py"
+            if ! exec_command "Download RP1 installer helper" curl --proto '=https' --tlsv1.2 --fail --silent --show-error \
+                --output "$RP1_GPCLK_DKMS_HELPER" "$helper_url" "$debug"; then
+                warn "Unable to retrieve the RP1-GPCLK-DKMS installer helper from $helper_url."
+                cleanup_rp1_gpclk_dkms_state
+                return 1
+            fi
+            exec_command "Protect RP1 installer helper" chmod 0700 "$RP1_GPCLK_DKMS_HELPER" "$debug" || return 1
+        fi
+    fi
+
+    local remove_args=(remove --remove "$REMOVE_RP1_GPCLK_DKMS")
+    local removal_output_file=""
+    if [[ "$debug" == "debug" ]]; then
+        remove_args+=(--debug)
+    fi
+    if [[ "$DRY_RUN" != "true" ]]; then
+        removal_output_file="$RP1_GPCLK_DKMS_STATE_DIR/provider-removal-output.log"
+    fi
+    if ! EXEC_COMMAND_FAILURE_OUTPUT_FILE="$removal_output_file" \
+        exec_command "Check owned RP1 provider" \
+            python3 "$RP1_GPCLK_DKMS_HELPER" "${remove_args[@]}" "$debug"; then
+        warn "RP1-GPCLK-DKMS owned-provider removal failed; the ownership record was retained for recovery."
+        cleanup_rp1_gpclk_dkms_state
+        return 1
+    fi
+    if [[ "$DRY_RUN" != "true" ]]; then
+        if grep -Fq "RP1-GPCLK-DKMS preserved:" "$removal_output_file"; then
+            RP1_GPCLK_DKMS_PROVIDER_REMOVAL_UNPROVEN="true"
+        elif grep -Fq \
+            "WsprryPi-owned RP1-GPCLK-DKMS provider removed and absence verified." \
+            "$removal_output_file"; then
+            RP1_GPCLK_DKMS_PROVIDER_REMOVAL_UNPROVEN="false"
+        elif grep -Fq \
+            "RP1-GPCLK-DKMS absent: no provider removal was required." \
+            "$removal_output_file"; then
+            RP1_GPCLK_DKMS_PROVIDER_REMOVAL_UNPROVEN="false"
+        else
+            warn "RP1-GPCLK-DKMS removal helper did not report a recognized outcome."
+            cleanup_rp1_gpclk_dkms_state
+            return 1
+        fi
+    fi
+    cleanup_rp1_gpclk_dkms_state
+    debug_end "$debug"
+    return 0
 }
 
 # -----------------------------------------------------------------------------
@@ -2553,6 +3299,12 @@ validate_sys_accs() {
     # Iterate through system files
     for file in "${SYSTEM_READS[@]}"; do
         if [[ ! -r "$file" ]]; then
+            if [[ "$file" == "/proc/device-tree/compatible" && \
+                "$INSTALL_RP1_GPCLK_DKMS" == "true" ]]; then
+                warn "Missing or unreadable platform identity: $file; continuing because RP1 provider installation was explicitly requested."
+                debug_print "Explicit RP1 provider override permits missing platform identity: $file" "$debug"
+                continue
+            fi
             warn "Missing or unreadable file: $file"
             ((missing++))
             debug_print "Missing or unreadable file: $file" "$debug"
@@ -2874,12 +3626,22 @@ check_arch() {
 
     # Read and process the compatible string
     if ! detected_model=$(tr '\0' '\n' </proc/device-tree/compatible 2>/dev/null | sed -n 's/raspberrypi,//p'); then
+        if [[ "$INSTALL_RP1_GPCLK_DKMS" == "true" ]]; then
+            warn "Platform architecture detection is unavailable; continuing because RP1 provider installation was explicitly requested."
+            debug_end "$debug"
+            return 0
+        fi
         debug_end "$debug"
         die 1 "Failed to read or process /proc/device-tree/compatible. Ensure compatibility."
     fi
 
     # Check if the detected model is empty
     if [[ -z "${detected_model:-}" ]]; then
+        if [[ "$INSTALL_RP1_GPCLK_DKMS" == "true" ]]; then
+            warn "This system has no recognized Raspberry Pi architecture; continuing because RP1 provider installation was explicitly requested."
+            debug_end "$debug"
+            return 0
+        fi
         debug_end "$debug"
         die 1 "No Raspberry Pi model found in /proc/device-tree/compatible. This system may not be supported."
     fi
@@ -2893,6 +3655,11 @@ check_arch() {
                 is_supported=true
                 debug_print "Model: '$full_name' ($chip) is supported." "$debug"
             else
+                if [[ "$INSTALL_RP1_GPCLK_DKMS" == "true" ]]; then
+                    warn "Model '$full_name' ($chip) is normally unsupported; continuing because RP1 provider installation was explicitly requested."
+                    debug_end "$debug"
+                    return 0
+                fi
                 debug_end "$debug"
                 die 1 "Model: '$full_name' ($chip) is not supported."
             fi
@@ -2935,6 +3702,11 @@ check_arch() {
 
     # Log an error if no supported model was found
     if [[ "$is_supported" == false ]]; then
+        if [[ "$INSTALL_RP1_GPCLK_DKMS" == "true" ]]; then
+            warn "Detected Raspberry Pi model '$detected_model' is not recognized or supported; continuing because RP1 provider installation was explicitly requested."
+            debug_end "$debug"
+            return 0
+        fi
         debug_end "$debug"
         die 1 "Detected Raspberry Pi model '$detected_model' is not recognized or supported."
     fi
@@ -3323,8 +4095,9 @@ wrap_messages() {
 # shellcheck disable=SC2317
 print_log_entry() {
     local debug
-    debug=$(debug_start "$@")
-    eval set -- "$(debug_filter "$@")"
+    debug=$(debug_start "${6:-}")
+    # Preserve positional fields: a terminal without colors supplies an empty
+    # third argument, which the general debug filter would remove.
 
     # Declare local variables at the start of the function
     local timestamp="$1"
@@ -3423,8 +4196,7 @@ prepare_log_context() {
 # shellcheck disable=SC2317
 log_message() {
     local debug
-    debug=$(debug_start "$@")
-    eval set -- "$(debug_filter "$@")"
+    debug=$(debug_start "${3:-}")
 
     # Ensure the calling function is log_message_with_severity()
     if [[ "${FUNCNAME[1]}" != "log_message_with_severity" ]]; then
@@ -3464,8 +4236,8 @@ log_message() {
     # Extract log properties for the specified level
     IFS="|" read -r custom_level color severity <<<"${LOG_PROPERTIES[$level]}"
 
-    # Check if all three values (custom_level, color, severity) were successfully parsed
-    if [[ -z "$custom_level" || -z "$color" || -z "$severity" ]]; then
+    # An empty color is valid when the terminal lacks that capability.
+    if [[ -z "$custom_level" || -z "$severity" ]]; then
         warn "Malformed log properties for level '$level'. Using default values."
         custom_level="UNSET"
         color="$RESET"
@@ -3515,8 +4287,7 @@ log_message() {
 # shellcheck disable=SC2329
 log_message_with_severity() {
     local debug
-    debug=$(debug_start "$@")
-    eval set -- "$(debug_filter "$@")"
+    debug=$(debug_start "${3:-}" "${4:-}")
 
     # Exit if the calling function is not one of the allowed ones.
     # shellcheck disable=2076
@@ -3532,13 +4303,13 @@ log_message_with_severity() {
     local extended_message=""
 
     # Get level if it exists (must be one of the predefined values)
-    if [[ -n "$1" && "$1" =~ ^(DEBUG|INFO|WARNING|ERROR|CRITICAL|EXTENDED)$ ]]; then
-        severity="$1"
+    if [[ -n "${1:-}" && "${1:-}" =~ ^(DEBUG|INFO|WARNING|ERROR|CRITICAL|EXTENDED)$ ]]; then
+        severity="${1:-}"
     fi
 
     # Process arguments
-    if [[ -n "$2" ]]; then
-        message="$2"
+    if [[ -n "${2:-}" ]]; then
+        message="${2:-}"
     else
         warn "Message is required."
         debug_end "$debug"
@@ -3547,6 +4318,9 @@ log_message_with_severity() {
 
     # Extended_message will be empty if $3 is unset
     extended_message="${3:-}"
+    # Preserve the existing optional debug shorthand without interpreting the
+    # primary message as a control flag.
+    [[ "$extended_message" != "debug" ]] || extended_message=""
 
     # Print debug information if the flag is set
     debug_print "Logging message at severity '$severity' with message='$message'." "$debug"
@@ -3645,6 +4419,17 @@ init_log() {
 
     local scriptname="${THIS_SCRIPT%%.*}" # Extract script name without extension
     local homepath log_dir fallback_log
+
+    # A dry run must not create, truncate, chown, or append to a log file.
+    # Console output remains available, including debug output.
+    if [[ "$DRY_RUN" == "true" ]]; then
+        LOG_FILE="/dev/null"
+        readonly LOG_FILE
+        export LOG_FILE
+        debug_print "Dry run: file logging disabled." "$debug"
+        debug_end "$debug"
+        return 0
+    fi
 
     # Get the home directory of the current user
     homepath=$(
@@ -3761,7 +4546,7 @@ init_colors() {
     ITALIC=$(default_color sitm)
     NO_ITALIC=$(default_color ritm)
     MOVE_UP=$(default_color cuu1)
-    CLEAR_LINE=$(tput el)
+    CLEAR_LINE=$(default_color el)
 
     # Foreground colors
     FGBLK=$(default_color setaf 0)
@@ -4669,7 +5454,7 @@ git_clone() {
     retval=0
 
     # Return if we are in the repo
-    if [[ -d "$dest_root" && "${IS_REPO}" ]]; then
+    if [[ -d "$dest_root" && "${IS_REPO}" == "true" ]]; then
         debug_end "$debug"
         return 0
     fi
@@ -4682,7 +5467,7 @@ git_clone() {
     fi
 
     exec_command "Clone repository '$GIT_CLONE'" \
-        runuser -u "$SUDO_USER" -- git clone -b "$REPO_BRANCH" --recurse-submodules -j8 \
+        runuser -u "$SUDO_USER" -- git clone -b "$REPO_BRANCH" \
             "$GIT_CLONE" "$dest_root" \
         "$debug" || {
         warn "Failed to clone repository from '$GIT_CLONE' to '$dest_root'"
@@ -4692,6 +5477,46 @@ git_clone() {
 
     debug_end "$debug"
     return "$retval"
+}
+
+# -----------------------------------------------------------------------------
+# @brief Capture one stable source version before installation creates any
+#        temporary files inside the checkout.
+# @details Reinstall configuration merging temporarily creates a generated INI
+#          below the repository root. Later version rendering must use this
+#          pre-mutation value so identical installs produce identical artifacts.
+# -----------------------------------------------------------------------------
+# shellcheck disable=SC2317
+# shellcheck disable=SC2329
+capture_install_sem_ver() {
+    local debug
+    debug=$(debug_start "$@")
+    eval set -- "$(debug_filter "$@")"
+
+    if [[ "$BINARY_SOURCE" != "build" ]]; then
+        [[ -n "$BINARY_VERSION" ]] || { logE "Precompiled version was not validated."; return 1; }
+        SEM_VER="$BINARY_VERSION"
+        export SEM_VER
+        return 0
+    fi
+    local captured_version=""
+
+    captured_version=$(cd "$LOCAL_REPO_DIR" && get_sem_ver "$debug") || {
+        logE "Unable to capture the installation source version."
+        debug_end "$debug"
+        return 1
+    }
+    if [[ -z "$captured_version" ]]; then
+        logE "Installation source version is empty."
+        debug_end "$debug"
+        return 1
+    fi
+
+    SEM_VER="$captured_version"
+    export SEM_VER
+    debug_print "Captured stable installation version: $SEM_VER" "$debug"
+    debug_end "$debug"
+    return 0
 }
 
 ############
@@ -4747,6 +5572,12 @@ set_time() {
 
     # Inform the user about the current date and time
     logI "Timezone detected as $tz, which may need to be updated."
+
+    if [[ "$DRY_RUN" == "true" ]]; then
+        logI "Dry run: would confirm or reconfigure the system timezone."
+        debug_end "$debug"
+        return 0
+    fi
 
     # Prompt for confirmation or reconfiguration
     while true; do
@@ -4853,20 +5684,9 @@ handle_apt_packages() {
     debug=$(debug_start "$@")
     eval set -- "$(debug_filter "$@")"
 
-    # Check if APT_PACKAGES is empty
-    if [[ ${#APT_PACKAGES[@]} -eq 0 ]]; then
-        logI "No packages specified in APT_PACKAGES. Skipping package handling."
-        debug_print "APT_PACKAGES is empty, skipping execution." "$debug"
-        debug_end "$debug"
-        return 0
-    fi
-
-    local package
     local error_count=0
     local runtime_pkg=""
     local packages_to_install=()
-
-    logI "Updating and managing required packages (this may take a few minutes)."
 
     # Update package list and fix broken installs
     if ! exec_command "Update local package index" apt-get update "$debug"; then
@@ -4880,42 +5700,30 @@ handle_apt_packages() {
         ((error_count++))
     fi
 
-    # Resolve the correct runtime package for libgpiod-dev (libgpiod2/libgpiod3).
-    runtime_pkg="$(resolve_libgpiod_runtime_pkg "$debug")"
-    if [[ -z "$runtime_pkg" ]]; then
-        warn "Failed to resolve required libgpiod runtime package."
-        debug_print "Continuing without explicit libgpiod runtime package." \
-            "$debug"
-        ((error_count++))
-    else
-        debug_print "Using libgpiod runtime package '$runtime_pkg'." "$debug"
-    fi
-
-    # Build final install list: base packages + resolved libgpiod runtime package.
-    packages_to_install=( "${APT_PACKAGES[@]}" )
-    if [[ -n "$runtime_pkg" ]]; then
-        packages_to_install+=( "$runtime_pkg" )
-    fi
-
-    # Install or upgrade each package in the list
-    for package in "${packages_to_install[@]}"; do
-        if dpkg-query -W -f='${Status}' "$package" 2>/dev/null \
-            | grep -q "install ok installed"; then
-            if ! exec_command \
-                "Upgrade $package" \
-                apt-get install --only-upgrade -y "${package}" "$debug"; then
-                warn "Failed to upgrade package: $package."
-                ((error_count++))
-            fi
-        else
-            if ! exec_command \
-                "Install $package" \
-                apt-get install -y "${package}" "$debug"; then
-                warn "Failed to install package: $package."
-                ((error_count++))
-            fi
+    if [[ "$BINARY_SOURCE" == "build" ]]; then
+        runtime_pkg="$(resolve_libgpiod_runtime_pkg "$debug")"
+        if [[ -z "$runtime_pkg" ]]; then
+            warn "Failed to resolve required libgpiod runtime package."
+            return 1
         fi
-    done
+    fi
+
+    # Build the final platform-aware install list. RP1 kernel-development
+    # packages are absent unless provider installation is selected.
+    if ! resolve_apt_package_list "$runtime_pkg"; then
+        warn "Failed to resolve the platform-specific APT package list."
+        debug_end "$debug"
+        return 1
+    fi
+    packages_to_install=( "${RESOLVED_APT_PACKAGES[@]}" )
+
+    # One APT transaction avoids reparsing the package index for every package
+    # on low-memory Pis. Do not remove previously installed development tools.
+    if ! exec_command "Install required packages" apt-get install -y \
+        "${packages_to_install[@]}" "$debug"; then
+        warn "Failed to install the required package set."
+        ((error_count++))
+    fi
 
     # Log summary of errors
     if ((error_count > 0)); then
@@ -4928,6 +5736,35 @@ handle_apt_packages() {
 
     debug_end "$debug"
     return "$error_count"
+}
+
+# shellcheck disable=SC2317
+run_support_bundle_age_dependency_validation() {
+    # shellcheck source=scripts/support_bundle_age_dependency.sh
+    source "${LOCAL_REPO_DIR}/scripts/support_bundle_age_dependency.sh" &&
+        support_bundle_validate_age_dependency
+}
+
+# shellcheck disable=SC2317
+validate_support_bundle_age_dependency() {
+    local debug
+    debug=$(debug_start "$@")
+    eval set -- "$(debug_filter "$@")"
+
+    if ! exec_command "Validate support-bundle encryption tools" \
+        run_support_bundle_age_dependency_validation "$debug"; then
+        logE "Required support-bundle encryption tools are unavailable or unsafe."
+        debug_print "Support-bundle encryption validation status: ${SUPPORT_BUNDLE_AGE_DEPENDENCY_ERROR:-helper_unavailable}." "$debug"
+        debug_end "$debug"
+        return 1
+    fi
+    if [[ "$DRY_RUN" == "true" ]]; then
+        debug_print "Support-bundle encryption validation planned but not executed." "$debug"
+    else
+        debug_print "Validated fixed support-bundle encryption tools." "$debug"
+    fi
+    debug_end "$debug"
+    return 0
 }
 
 # -----------------------------------------------------------------------------
@@ -5094,7 +5931,11 @@ OPTIONS_LIST=(
     "-h|--help 0 usage Show these instructions 1"
     "-v|--version 0 print_version Display $WSPR_SERVICE version 1"
     "--no-web 0 set_no_web Disable web UI installation and Apache integration (service will run with --no-web) 0"
+    "--binary-source 1 set_binary_source Choose build (default), local, or release executable 0"
+    "--binary-path 1 set_binary_path Use a local executable (default: invoking user's ~/wsprrypi) 0"
+    "--release-tag 1 set_binary_release_tag Select the release tag for --binary-source release 0"
     "--release 0 set_release_build Build as release regardless of branch 0"
+    "--fail-on-ui-modifications 0 set_fail_on_ui_modifications Refuse to replace a modified or unknown installed UI 0"
 )
 
 # -----------------------------------------------------------------------------
@@ -5168,6 +6009,16 @@ set_no_web() {
     return 0
 }
 
+# shellcheck disable=SC2329
+set_fail_on_ui_modifications() {
+    local debug
+    debug=$(debug_start "$@")
+    eval set -- "$(debug_filter "$@")"
+    FAIL_ON_UI_MODIFICATIONS="true"
+    debug_end "$debug"
+    return 0
+}
+
 # shellcheck disable=SC2317
 process_args() {
     local debug
@@ -5222,6 +6073,7 @@ process_args() {
                             # Call the function with the next argument as a parameter
                             $function_name "$next_arg" "$debug"
                             retval="$?"
+                            [[ "$retval" -eq 0 ]] || return "$retval"
 
                             # Remove the processed flag and its argument
                             args=("${args[@]:2}")
@@ -5230,6 +6082,7 @@ process_args() {
                             # Call the function with no arguments
                             $function_name
                             retval="$?"
+                            [[ "$retval" -eq 0 ]] || return "$retval"
                             # Remove the processed flag
                             args=("${args[@]:1}")
                             processed_argument=true
@@ -5599,6 +6452,337 @@ start_script() {
 }
 
 # -----------------------------------------------------------------------------
+# @brief Read one numeric KiB value from a meminfo-format file.
+# -----------------------------------------------------------------------------
+# shellcheck disable=SC2317
+build_resource_meminfo_kb() {
+    local path="${1:-}"
+    local key="${2:-}"
+
+    [[ -n "$path" && -n "$key" && -r "$path" ]] || return 1
+    awk -v wanted="${key}:" '$1 == wanted { print $2; found = 1; exit }
+        END { if (!found) exit 1 }' "$path"
+}
+
+# -----------------------------------------------------------------------------
+# @brief Report free active swap as total, zram, file, partition, other, and
+#        independently backed values (KiB).
+# -----------------------------------------------------------------------------
+# shellcheck disable=SC2317
+build_resource_swap_free_kb() {
+    local path="${1:-}"
+
+    [[ -n "$path" && -r "$path" ]] || return 1
+    awk '
+        NR == 1 { next }
+        NF >= 4 {
+            available = $3 - $4
+            if (available < 0) available = 0
+            total += available
+            if ($1 ~ /(^|\/)zram[0-9]+$/) zram += available
+            else {
+                independent += available
+                if ($2 == "file") file += available
+                else if ($2 == "partition") partition += available
+                else other += available
+            }
+        }
+        END {
+            printf "%d %d %d %d %d %d\n", total + 0, zram + 0,
+                file + 0, partition + 0, other + 0, independent + 0
+        }
+    ' "$path"
+}
+
+# -----------------------------------------------------------------------------
+# @brief Return the required free non-zram swap for the supplied total RAM.
+# -----------------------------------------------------------------------------
+# shellcheck disable=SC2317
+required_non_zram_build_swap_kb() {
+    local mem_total_kb="${1:-0}"
+
+    if ((mem_total_kb < BUILD_RESOURCE_VERY_LOW_RAM_KB)); then
+        printf '%s\n' "$BUILD_RESOURCE_VERY_LOW_RAM_SWAP_KB"
+    elif ((mem_total_kb < BUILD_RESOURCE_LOW_RAM_KB)); then
+        printf '%s\n' "$BUILD_RESOURCE_LOW_RAM_SWAP_KB"
+    else
+        printf '0\n'
+    fi
+}
+
+# -----------------------------------------------------------------------------
+# @brief Test whether this invocation's temporary swap is still active.
+# -----------------------------------------------------------------------------
+# shellcheck disable=SC2317
+temp_build_swap_is_active() {
+    local path="${1:-}"
+    [[ -n "$path" && -r "$BUILD_RESOURCE_SWAPS_PATH" ]] || return 1
+    awk -v expected="$path" 'NR > 1 && $1 == expected { found = 1 }
+        END { exit(found ? 0 : 1) }' "$BUILD_RESOURCE_SWAPS_PATH"
+}
+
+# -----------------------------------------------------------------------------
+# @brief Disable and remove only temporary swap created by this invocation.
+# -----------------------------------------------------------------------------
+# shellcheck disable=SC2317
+cleanup_temp_build_swap() {
+    local path="${TEMP_BUILD_SWAP_PATH:-}"
+
+    if [[ "${TEMP_BUILD_SWAP_OWNED:-false}" != "true" || -z "$path" ]]; then
+        return 0
+    fi
+
+    if [[ "${TEMP_BUILD_SWAP_ACTIVE:-false}" == "true" ]] ||
+        temp_build_swap_is_active "$path"; then
+        if ! exec_command "Disable temporary build swap" swapoff "$path"; then
+            logE "Unable to disable installer-owned temporary build swap: $path"
+            logE "The active file was preserved. Recover with: sudo swapoff '$path' && sudo rm -f '$path'"
+            return 1
+        fi
+        TEMP_BUILD_SWAP_ACTIVE="false"
+    fi
+
+    if temp_build_swap_is_active "$path"; then
+        logE "Temporary build swap still appears active after swapoff: $path"
+        logE "The file was preserved; do not remove it until swapoff succeeds."
+        return 1
+    fi
+
+    if [[ -e "$path" ]]; then
+        exec_command "Remove temporary build swap file" rm -f -- "$path" || return 1
+    fi
+    if [[ -e "$path" ]]; then
+        logE "Unable to remove installer-owned temporary build swap: $path"
+        return 1
+    fi
+
+    if [[ "${TEMP_BUILD_SWAP_ROOT_OWNED:-false}" == "true" ]]; then
+        rmdir -- "$BUILD_RESOURCE_SWAP_ROOT" 2>/dev/null || true
+    fi
+
+    logI "Removed installer-owned temporary build swap."
+    TEMP_BUILD_SWAP_PATH=""
+    TEMP_BUILD_SWAP_OWNED="false"
+    TEMP_BUILD_SWAP_ROOT_OWNED="false"
+    return 0
+}
+
+# -----------------------------------------------------------------------------
+# @brief Create enough invocation-owned disk swap to meet the reviewed gate.
+# -----------------------------------------------------------------------------
+# shellcheck disable=SC2317
+create_temp_build_swap() {
+    local required_kb="${1:-0}"
+    local existing_non_zram_kb="${2:-0}"
+    local shortfall_kb
+    local allocation_kb
+    local required_disk_kb
+    local disk_probe_path
+    local disk_available_kb
+    local directory_mode
+    local directory_owner
+    local tool
+
+    if [[ "${TEMP_BUILD_SWAP_OWNED:-false}" == "true" ]]; then
+        if temp_build_swap_is_active "${TEMP_BUILD_SWAP_PATH:-}"; then
+            logI "Invocation-owned temporary build swap is already active."
+            return 0
+        fi
+        logE "Refusing to replace tracked temporary build swap that is not active: ${TEMP_BUILD_SWAP_PATH:-unknown}"
+        return 1
+    fi
+
+    shortfall_kb=$((required_kb - existing_non_zram_kb))
+    ((shortfall_kb > 0)) || return 0
+    allocation_kb=$((
+        (shortfall_kb + BUILD_RESOURCE_SWAP_METADATA_ALLOWANCE_KB +
+            BUILD_RESOURCE_SWAP_ALLOCATION_QUANTUM_KB - 1) /
+        BUILD_RESOURCE_SWAP_ALLOCATION_QUANTUM_KB *
+        BUILD_RESOURCE_SWAP_ALLOCATION_QUANTUM_KB
+    ))
+    required_disk_kb=$((allocation_kb + BUILD_RESOURCE_DISK_RESERVE_KB))
+
+    disk_probe_path="$BUILD_RESOURCE_SWAP_ROOT"
+    while [[ ! -e "$disk_probe_path" && "$disk_probe_path" != "/" ]]; do
+        disk_probe_path=$(dirname "$disk_probe_path")
+    done
+
+    if [[ -n "$BUILD_RESOURCE_DISK_AVAILABLE_KB" ]]; then
+        disk_available_kb="$BUILD_RESOURCE_DISK_AVAILABLE_KB"
+    else
+        disk_available_kb=$(df -Pk "$disk_probe_path" 2>/dev/null |
+            awk 'NR == 2 { print $4 }')
+    fi
+    if [[ ! "$disk_available_kb" =~ ^[0-9]+$ ]]; then
+        logE "Unable to determine free space for temporary build swap."
+        return 1
+    fi
+    if ((disk_available_kb < required_disk_kb)); then
+        logE "Insufficient disk space for temporary build swap."
+        logE "Need ${allocation_kb} KiB plus a ${BUILD_RESOURCE_DISK_RESERVE_KB} KiB safety reserve; ${disk_available_kb} KiB is available."
+        return 1
+    fi
+
+    logW "Temporary build swap may be slow and can increase flash-media writes."
+    if [[ "$DRY_RUN" == "true" ]]; then
+        logI "Dry run: would create ${allocation_kb} KiB of protected temporary build swap beneath ${BUILD_RESOURCE_SWAP_ROOT}."
+        logI "Dry run: would disable and remove only that invocation-owned swap after the installer exits."
+        return 0
+    fi
+
+    for tool in df dirname stat install mktemp chmod fallocate mkswap swapon swapoff rm rmdir; do
+        if ! command -v "$tool" >/dev/null 2>&1; then
+            logE "Cannot create temporary build swap because '$tool' is unavailable."
+            return 1
+        fi
+    done
+
+    if [[ -e "$BUILD_RESOURCE_SWAP_ROOT" || -L "$BUILD_RESOURCE_SWAP_ROOT" ]]; then
+        if [[ ! -d "$BUILD_RESOURCE_SWAP_ROOT" || -L "$BUILD_RESOURCE_SWAP_ROOT" ]]; then
+            logE "Temporary build swap root is not a directory: $BUILD_RESOURCE_SWAP_ROOT"
+            return 1
+        fi
+        directory_mode=$(stat -c '%a' "$BUILD_RESOURCE_SWAP_ROOT" 2>/dev/null || true)
+        directory_owner=$(stat -c '%u' "$BUILD_RESOURCE_SWAP_ROOT" 2>/dev/null || true)
+        if [[ ! "$directory_mode" =~ ^[0-7]+$ ||
+            ! "$directory_owner" =~ ^[0-9]+$ ||
+            "$directory_owner" -ne "$EUID" ||
+            $((8#$directory_mode & 077)) -ne 0 ]]; then
+            logE "Temporary build swap root must be owned by the installer user and inaccessible to group/other: $BUILD_RESOURCE_SWAP_ROOT"
+            return 1
+        fi
+    else
+        exec_command "Create temporary build swap directory" \
+            install -d -m 0700 "$BUILD_RESOURCE_SWAP_ROOT" || return 1
+        TEMP_BUILD_SWAP_ROOT_OWNED="true"
+    fi
+
+    TEMP_BUILD_SWAP_PATH=$(mktemp "${BUILD_RESOURCE_SWAP_ROOT}/wsprrypi-build.XXXXXXXX.swap") || {
+        cleanup_temp_build_swap || true
+        return 1
+    }
+    TEMP_BUILD_SWAP_OWNED="true"
+    exec_command "Protect temporary build swap file" chmod 0600 "$TEMP_BUILD_SWAP_PATH" || {
+        cleanup_temp_build_swap || true
+        return 1
+    }
+    exec_command "Allocate temporary build swap" fallocate -l "${allocation_kb}K" -- "$TEMP_BUILD_SWAP_PATH" || {
+        cleanup_temp_build_swap || true
+        return 1
+    }
+    exec_command "Format temporary build swap" mkswap "$TEMP_BUILD_SWAP_PATH" || {
+        cleanup_temp_build_swap || true
+        return 1
+    }
+    exec_command "Enable temporary build swap" swapon -p 10 "$TEMP_BUILD_SWAP_PATH" || {
+        cleanup_temp_build_swap || true
+        return 1
+    }
+    TEMP_BUILD_SWAP_ACTIVE="true"
+
+    if ! temp_build_swap_is_active "$TEMP_BUILD_SWAP_PATH"; then
+        logE "Temporary build swap did not appear in the active swap inventory."
+        cleanup_temp_build_swap || true
+        return 1
+    fi
+
+    logI "Enabled ${allocation_kb} KiB of invocation-owned temporary build swap."
+    return 0
+}
+
+# -----------------------------------------------------------------------------
+# @brief Enforce deterministic build resources before installer mutation.
+# -----------------------------------------------------------------------------
+# shellcheck disable=SC2317
+preflight_build_resources() {
+    if [[ "$BINARY_SOURCE" != "build" ]] && ! rp1_gpclk_dkms_installation_selected; then
+        logI "Precompiled executable: skipping application build and build swap."
+        return 0
+    fi
+    local mem_total_kb
+    local mem_available_kb
+    local swap_free_kb
+    local zram_swap_free_kb
+    local file_swap_free_kb
+    local partition_swap_free_kb
+    local other_swap_free_kb
+    local non_zram_swap_free_kb
+    local required_swap_kb
+
+    case "$ALLOW_TEMP_BUILD_SWAP" in
+        auto|true|false) ;;
+        *)
+            logE "ALLOW_TEMP_BUILD_SWAP must be 'auto', 'true', or 'false'."
+            return 1
+            ;;
+    esac
+
+    mem_total_kb=$(build_resource_meminfo_kb "$BUILD_RESOURCE_MEMINFO_PATH" MemTotal) || {
+        logE "Unable to read MemTotal from $BUILD_RESOURCE_MEMINFO_PATH."
+        return 1
+    }
+    mem_available_kb=$(build_resource_meminfo_kb "$BUILD_RESOURCE_MEMINFO_PATH" MemAvailable) || {
+        logE "Unable to read MemAvailable from $BUILD_RESOURCE_MEMINFO_PATH."
+        return 1
+    }
+    if [[ ! "$mem_total_kb" =~ ^[0-9]+$ || "$mem_total_kb" -le 0 ||
+        ! "$mem_available_kb" =~ ^[0-9]+$ ]]; then
+        logE "Invalid memory values reported by $BUILD_RESOURCE_MEMINFO_PATH."
+        return 1
+    fi
+
+    IFS=' ' read -r swap_free_kb zram_swap_free_kb file_swap_free_kb \
+        partition_swap_free_kb other_swap_free_kb non_zram_swap_free_kb < <(
+        build_resource_swap_free_kb "$BUILD_RESOURCE_SWAPS_PATH"
+    ) || {
+        logE "Unable to inventory active swap from $BUILD_RESOURCE_SWAPS_PATH."
+        return 1
+    }
+    required_swap_kb=$(required_non_zram_build_swap_kb "$mem_total_kb")
+
+    logI "Build resources:"
+    logI "  MemTotal=${mem_total_kb} KiB"
+    logI "  MemAvailable=${mem_available_kb} KiB"
+    logI "  swap-free=${swap_free_kb} KiB"
+    logI "Build swap classification:"
+    logI "  zram-free=${zram_swap_free_kb} KiB"
+    logI "  file-free=${file_swap_free_kb} KiB"
+    logI "  partition-free=${partition_swap_free_kb} KiB"
+    logI "  other-independent-free=${other_swap_free_kb} KiB"
+    logI "Build swap independently-backed-free=${non_zram_swap_free_kb} KiB."
+
+    if ((mem_total_kb < BUILD_RESOURCE_LOW_RAM_KB)); then
+        if [[ "${JOBS:-}" != "1" ]]; then
+            logW "Low-memory build detected; forcing single-job compilation."
+        fi
+        export JOBS=1
+    fi
+
+    if ((required_swap_kb == 0)); then
+        return 0
+    fi
+    if ((non_zram_swap_free_kb + BUILD_RESOURCE_SWAP_METADATA_ALLOWANCE_KB >=
+        required_swap_kb)); then
+        logI "Low-memory build has sufficient independently backed swap."
+        return 0
+    fi
+
+    if ((zram_swap_free_kb > 0)); then
+        logW "Active zram swap is not counted as independently backed build swap."
+    fi
+    if [[ "$ALLOW_TEMP_BUILD_SWAP" == "false" ]]; then
+        logE "Low-memory build requires at least ${required_swap_kb} KiB of free non-zram swap; ${non_zram_swap_free_kb} KiB is available."
+        logE "Enable adequate file/partition swap, or explicitly retry with ALLOW_TEMP_BUILD_SWAP=true."
+        return 1
+    fi
+
+    if [[ "$ALLOW_TEMP_BUILD_SWAP" == "auto" ]]; then
+        logI "Automatic temporary build swap selected for a low-memory build with insufficient independently backed swap."
+    fi
+    create_temp_build_swap "$required_swap_kb" "$non_zram_swap_free_kb"
+}
+
+# -----------------------------------------------------------------------------
 # @brief  Analyze system resources and display compilation concurrency notes.
 # @details
 #   Evaluates the system environment using the same heuristics as the Makefile
@@ -5624,6 +6808,7 @@ start_script() {
 # -----------------------------------------------------------------------------
 # shellcheck disable=SC2317
 display_compilation_resource_notes() {
+    [[ "$BINARY_SOURCE" == "build" ]] || return 0
     local debug
     debug=$(debug_start "$@")
     eval set -- "$(debug_filter "$@")"
@@ -5733,6 +6918,151 @@ display_compilation_resource_notes() {
 # -----------------------------------------------------------------------------
 # shellcheck disable=SC2317
 # shellcheck disable=SC2329
+# Precompiled executable acquisition is explicit and never falls back to a build.
+set_binary_source() { BINARY_SOURCE="$1"; }
+set_binary_path() { BINARY_PATH="$1"; }
+set_binary_release_tag() { BINARY_RELEASE_TAG="$1"; }
+
+# Keep helper diagnostics in the installer logger and successful field values
+# separate from console output. An empty first argument discards helper output.
+run_precompiled_helper() {
+    local precompiled_output_var="$1" precompiled_output precompiled_status precompiled_line
+    shift
+    if [[ -n "$precompiled_output_var" ]]; then
+        printf -v "$precompiled_output_var" '%s' ''
+    fi
+    if precompiled_output=$(python3 "$@" 2>&1); then
+        if [[ -n "$precompiled_output_var" ]]; then
+            printf -v "$precompiled_output_var" '%s' "$precompiled_output"
+        fi
+        return 0
+    else
+        precompiled_status=$?
+    fi
+    if [[ -n "$precompiled_output" ]]; then
+        while IFS= read -r precompiled_line; do
+            [[ -z "$precompiled_line" ]] || logE "$precompiled_line"
+        done <<<"$precompiled_output"
+    else
+        logE "Precompiled executable helper failed (status $precompiled_status)."
+    fi
+    return "$precompiled_status"
+}
+
+validate_binary_options() {
+    case "$BINARY_SOURCE" in
+        build)
+            [[ -z "$BINARY_PATH$BINARY_RELEASE_TAG" ]] || {
+                logE "Binary path/tag options require --binary-source local or release."; return 1;
+            } ;;
+        local)
+            [[ -z "$BINARY_RELEASE_TAG" ]] || { logE "--release-tag requires --binary-source release."; return 1; } ;;
+        release)
+            [[ -n "$BINARY_RELEASE_TAG" && -z "$BINARY_PATH" ]] || {
+                logE "Release mode requires --release-tag and cannot use a local binary path."; return 1;
+            }
+            [[ "$BINARY_RELEASE_TAG" =~ ^[A-Za-z0-9][A-Za-z0-9._+-]*$ ]] || { logE "Invalid release tag."; return 1; }
+            ;;
+        *) logE "--binary-source must be build, local, or release."; return 1 ;;
+    esac
+    if [[ "$ACTION" == "uninstall" && "$BINARY_SOURCE" != "build" ]]; then
+        logE "Uninstall does not take executable-source options. Run uninstall without them."
+        return 1
+    fi
+}
+
+cleanup_precompiled_executable() {
+    if [[ -n "$BINARY_PREVIOUS" && "$BINARY_INSTALLED" != "recovery-failed" ]]; then
+        rm -f -- "$BINARY_PREVIOUS"
+        BINARY_PREVIOUS=""
+    fi
+    if [[ -n "$BINARY_STAGE" ]]; then
+        rm -rf -- "$BINARY_STAGE"
+        BINARY_STAGE=""
+    fi
+}
+
+rollback_executable() {
+    [[ "$BINARY_INSTALLED" == "true" ]] || return 0
+    if systemctl is-active --quiet "$WSPR_SERVICE" 2>/dev/null; then
+        exec_command "Stop $WSPR_SERVICE for executable recovery" \
+            systemctl stop "$WSPR_SERVICE" || { BINARY_INSTALLED="recovery-failed"; return 1; }
+    fi
+    if [[ -n "$BINARY_PREVIOUS" ]]; then
+        if ! exec_command "Restore previous executable at $BINARY_DESTINATION" \
+            mv -f -- "$BINARY_PREVIOUS" "$BINARY_DESTINATION"; then
+            logE "Executable recovery failed; previous executable retained at $BINARY_PREVIOUS."
+            BINARY_INSTALLED="recovery-failed"
+            return 1
+        fi
+        BINARY_PREVIOUS=""
+    else
+        exec_command "Remove failed executable at $BINARY_DESTINATION" \
+            rm -f -- "$BINARY_DESTINATION" || return 1
+    fi
+    BINARY_INSTALLED="false"
+    logI "Restored the previous executable after installation failure."
+}
+
+prepare_precompiled_executable() {
+    [[ "$BINARY_SOURCE" != "build" ]] || return 0
+    local helper binary packages
+    helper="${LOCAL_REPO_DIR}/scripts/precompiled_binary.py"
+    binary="${BINARY_PATH:-${USER_HOME}/wsprrypi}"
+    if [[ "$DRY_RUN" == "true" ]]; then
+        logI "Dry run: would validate and stage the $BINARY_SOURCE executable; no download or copy performed."
+        if [[ "$BINARY_SOURCE" == "local" && -f "$helper" ]]; then
+            run_precompiled_helper '' "$helper" check --binary "$binary" || return 1
+            BINARY_VERSION="dry-run-unvalidated"
+            run_precompiled_helper packages "$helper" check --binary "$binary" --field runtime_packages || return 1
+            mapfile -t BINARY_RUNTIME_PACKAGES <<<"$packages"
+        else
+            BINARY_VERSION="dry-run-unvalidated"
+            logI "Dry run: artifact version and dependencies require validation during a real installation."
+        fi
+        return 0
+    fi
+    git_clone "$@" || return 1
+    [[ -f "$helper" ]] || { logE "Missing precompiled validation helper in the source checkout."; return 1; }
+    BINARY_STAGE=$(mktemp -d /var/tmp/wsprrypi-binary.XXXXXXXX) || return 1
+    exec_command "Set precompiled staging directory permissions" chmod 755 "$BINARY_STAGE" "$@" || return 1
+    if [[ "$BINARY_SOURCE" == "local" ]]; then
+        [[ -f "$binary" ]] || {
+            logE "Provide the executable at $binary."; return 1;
+        }
+        # Caller-owned files are copied, never removed, and checked after copying.
+        exec_command "Stage precompiled executable" cp -- "$binary" "$BINARY_STAGE/wsprrypi" "$@" || return 1
+    else
+        run_precompiled_helper '' "$helper" fetch --repo "$REPO_ORG/$REPO_NAME" --tag "$BINARY_RELEASE_TAG" --directory "$BINARY_STAGE" || return 1
+    fi
+    exec_command "Set precompiled executable permissions" chmod 755 "$BINARY_STAGE/wsprrypi" "$@" || return 1
+    run_precompiled_helper packages "$helper" check --binary "$BINARY_STAGE/wsprrypi" --field runtime_packages || return 1
+    mapfile -t BINARY_RUNTIME_PACKAGES <<<"$packages"
+    logI "Checked $BINARY_SOURCE executable architecture; application build disabled."
+}
+
+validate_precompiled_runtime() {
+    [[ "$BINARY_SOURCE" != "build" ]] || return 0
+    [[ "$DRY_RUN" != "true" ]] || { logI "Dry run: runtime library checks await installed dependencies."; return 0; }
+    run_precompiled_helper BINARY_VERSION "$LOCAL_REPO_DIR/scripts/precompiled_binary.py" check \
+        --binary "$BINARY_STAGE/wsprrypi" --full --runtime-user "$SUDO_USER" --field version || return 1
+}
+
+prepare_install_executable() {
+    if [[ "$BINARY_SOURCE" == "build" ]]; then
+        compile_binary "$@"
+    else
+        validate_precompiled_runtime "$@"
+    fi
+}
+
+stop_binary_service() {
+    if systemctl is-active --quiet "$WSPR_SERVICE" 2>/dev/null; then
+        WAS_RUNNING="true"
+        exec_command "Stop ${WSPR_SERVICE}.service" systemctl stop "${WSPR_SERVICE}.service" "$@" || return 1
+    fi
+}
+
 compile_binary() {
     local debug
     debug=$(debug_start "$@")
@@ -5758,8 +7088,13 @@ compile_binary() {
     daemon_name="${WSPR_SERVICE}" # Remove path
     daemon_systemd_name="${daemon_name}.service"
 
-    runuser -u "$SUDO_USER" -- mkdir -p "${staging_path}"
-    if [[ ! -d "${staging_path:-}" ]]; then
+    exec_command "Create executable staging directory" \
+        runuser -u "$SUDO_USER" -- mkdir -p "${staging_path}" "$debug" || {
+        logE "Error: Unable to create executable staging directory."
+        debug_end "$debug"
+        return 1
+    }
+    if [[ "$DRY_RUN" != "true" && ! -d "${staging_path:-}" ]]; then
         debug_end "$debug"
         die 1 "Executables source directory does not exist."
     fi
@@ -5769,18 +7104,6 @@ compile_binary() {
         logE "Error: Invalid WSPR_BUILD_TYPE '${type}'."
         debug_end "$debug"
         return 1
-    fi
-
-    # Stop Daemon
-    debug_print "Stopping daemon" "$debug"
-    if systemctl is-active --quiet "$daemon_name" 2>/dev/null; then
-        WAS_RUNNING="true"
-        exec_command "Stop ${daemon_systemd_name}" \
-            systemctl stop "${daemon_systemd_name}" "$debug" || {
-                logE "Error: Unable to stop daemon."
-                debug_end "$debug"
-                return 1
-            }
     fi
 
     # Compile the binary
@@ -5856,51 +7179,41 @@ manage_exe() {
     exe_name="${executable##*/}" # Remove path
     exe_name="${exe_name%.*}"    # Remove extension (if present)
     source_path="${LOCAL_REPO_DIR}/executables/${exe_name}"
-    exe_path="/usr/local/bin/${executable}"
+    exe_path="${BINARY_INSTALL_DIR}/${executable}"
 
     if [[ "$ACTION" == "install" ]]; then
-        # Validate source file exists
-        if [[ ! -f "$source_path" ]]; then
-            logE "Error: Source file '$source_path' not found."
-            debug_end "$debug"
+        if [[ "$BINARY_SOURCE" != "build" ]]; then
+            source_path="${BINARY_STAGE}/wsprrypi"
+        fi
+        if [[ "$DRY_RUN" == "true" ]]; then
+            logI "Dry run: would install the validated executable at $exe_path."
+            return 0
+        fi
+        [[ -f "$source_path" ]] || { logE "Executable is missing: $source_path"; return 1; }
+        local pending
+        pending=$(mktemp "${exe_path}.new.XXXXXXXX") || return 1
+        if ! exec_command "Stage executable for $exe_path" \
+            install -o root -g root -m 755 "$source_path" "$pending" "$debug"; then
+            rm -f -- "$pending"
             return 1
         fi
-
-        # Install the application
-        debug_print "Copying application." "$debug"
-        if [[ "$DRY_RUN" == "true" ]]; then
-            logD "Exec: cp -f $source_path $exe_path"
-        else
-            exec_command "Install application" cp -f "${source_path}" "${exe_path}" "$debug" || {
-                logE "Failed to install application."
-                debug_end "$debug"
-                return 1
-            }
+        BINARY_DESTINATION="$exe_path"
+        if [[ -e "$exe_path" || -L "$exe_path" ]]; then
+            BINARY_PREVIOUS=$(mktemp "${exe_path}.previous.XXXXXXXX") || { rm -f -- "$pending"; return 1; }
+            exec_command "Back up existing executable at $exe_path" \
+                cp -p -- "$exe_path" "$BINARY_PREVIOUS" "$debug" || { rm -f -- "$pending" "$BINARY_PREVIOUS"; BINARY_PREVIOUS=""; return 1; }
         fi
-
-        # Change ownership on the application
-        debug_print "Changing ownership on application." "$debug"
-        if [[ "$DRY_RUN" == "true" ]]; then
-            logD "Exec: chown root:root $exe_path"
-        else
-            exec_command "Change ownership on application" chown root:root "${exe_path}" "$debug" || {
-                logE "Failed to change ownership on application."
-                debug_end "$debug"
-                return 1
-            }
+        if ! stop_binary_service "$debug"; then
+            rm -f -- "$pending"
+            return 1
         fi
-
-        # Change permissions on the application to make it executable
-        debug_print "Changing permissions on application." "$debug"
-        if [[ "$DRY_RUN" == "true" ]]; then
-            logD "Exec: chmod 755 $exe_path"
-        else
-            exec_command "Make app executable" chmod 755 "${exe_path}" "$debug" || {
-                logE "Failed to change permissions on application."
-                debug_end "$debug"
-                return 1
-            }
+        if ! exec_command "Install executable at $exe_path" \
+            mv -f -- "$pending" "$exe_path" "$debug"; then
+            rm -f -- "$pending"
+            restore_daemon_state "$debug"
+            return 1
         fi
+        BINARY_INSTALLED="true"
 
     elif [[ "$ACTION" == "uninstall" ]]; then
         # Remove the application
@@ -5919,6 +7232,66 @@ manage_exe() {
     fi
 
     debug_end "$debug"
+}
+
+# -----------------------------------------------------------------------------
+# @brief Installs or removes the private support-bundle collector runtime.
+# @details Storage is intentionally retained on uninstall. Administrators may
+#          remove `/var/lib/wsprrypi/support-bundles` explicitly after retaining
+#          or deleting any diagnostic artifacts they need.
+# -----------------------------------------------------------------------------
+manage_support_bundle_runtime() {
+    local debug
+    debug=$(debug_start "$@")
+    eval set -- "$(debug_filter "$@")"
+
+    # shellcheck source=scripts/support_bundle_runtime_install.sh
+    source "${LOCAL_REPO_DIR}/scripts/support_bundle_runtime_install.sh" || {
+        logE "Failed to load support-bundle runtime provisioning."
+        debug_end "$debug"
+        return 1
+    }
+    if ! support_bundle_runtime_provision "$ACTION" "$LOCAL_REPO_DIR" "" "$debug"; then
+        logE "Failed to provision support-bundle runtime."
+        debug_end "$debug"
+        return 1
+    fi
+
+    debug_end "$debug"
+}
+
+manage_pico_usb_runtime() {
+    local debug
+    debug=$(debug_start "$@")
+    eval set -- "$(debug_filter "$@")"
+    # shellcheck source=scripts/pico_usb_runtime_install.sh
+    source "${LOCAL_REPO_DIR}/scripts/pico_usb_runtime_install.sh" || return 1
+    pico_usb_runtime_provision "$ACTION" "$LOCAL_REPO_DIR" "$debug" || return 1
+    debug_end "$debug"
+}
+
+# Install the application-owned route companion from the selected checkout.
+manage_route_application() {
+    if [[ "$ACTION" == "install" ]]; then
+        exec_command "Create route-runtime directory" \
+            install -d -o root -g root -m 0755 /usr/local/lib/wsprrypi "$@" || return 1
+        exec_command "Install route application companion" \
+            install -o root -g root -m 0755 "${LOCAL_REPO_DIR}/scripts/route_application.py" \
+            /usr/local/lib/wsprrypi/route_application.py "$@" || return 1
+        exec_command "Install runtime reconciliation support" \
+            python3 "${LOCAL_REPO_DIR}/scripts/install_runtime_reconcile.py" install "$@" || return 1
+        exec_command "Install RP1 qualification interpreter and separate reference" \
+            python3 "${LOCAL_REPO_DIR}/scripts/rp1_qualification.py" install-runtime "$@" || return 1
+        if rp1_gpclk_dkms_installation_selected && ! exec_command "Refresh pinned RP1 qualification evidence" \
+            python3 "${LOCAL_REPO_DIR}/scripts/rp1_qualification.py" refresh "$@"; then
+            warn "RP1 qualification evidence could not be refreshed. Status will report missing or invalid evidence; application band/mode policy still applies."
+        fi
+    elif [[ "$ACTION" == "uninstall" ]]; then
+        exec_command "Remove attributable RP1 qualification helper files" \
+            python3 "${LOCAL_REPO_DIR}/scripts/rp1_qualification.py" remove-runtime "$@" || return 1
+        exec_command "Remove runtime reconciliation support" \
+            python3 "${LOCAL_REPO_DIR}/scripts/install_runtime_reconcile.py" remove "$@" || return 1
+    fi
 }
 
 # -----------------------------------------------------------------------------
@@ -6018,8 +7391,12 @@ manage_config() {
 
             if [[ -n "$old_path" ]]; then
                 merged_ini="${LOCAL_CONFIG_DIR}/wsprrypi_merged.ini"
-                upgrade_ini "$old_path" "$source_path" "$merged_ini" "$debug"
-                source_path="$merged_ini"
+                if upgrade_ini "$old_path" "$source_path" "$merged_ini" "$debug"; then
+                    source_path="$merged_ini"
+                else
+                    debug_end "$debug"
+                    return 1
+                fi
             fi
         fi
 
@@ -6040,8 +7417,8 @@ manage_config() {
         replace_string_in_script \
             "$config_path" \
             "SEMANTIC_VERSION" \
-            "$(get_sem_ver "$debug")" \
-            "$debug"
+            "$SEM_VER" \
+            "$debug" || retval=1
 
         # Install the stock configuration copy for the primary INI
         if [[ -n "$stock_source_path" && -n "$stock_config_path" ]]; then
@@ -6060,8 +7437,8 @@ manage_config() {
             replace_string_in_script \
                 "$stock_config_path" \
                 "SEMANTIC_VERSION" \
-                "$(get_sem_ver "$debug")" \
-                "$debug"
+                "$SEM_VER" \
+                "$debug" || retval=1
 
             debug_print \
                 "Changing ownership on stock configuration." \
@@ -6184,6 +7561,19 @@ upgrade_ini() {
         return 1
     fi
 
+    if [[ "$DRY_RUN" == "true" ]]; then
+        local planned_command
+        if [[ -f "$old_ini" ]]; then
+            planned_command=$(render_command_argv cp -f "$old_ini" "$backup_ini")
+            debug_print "Dry run command: $planned_command" "$debug"
+        fi
+        debug_print \
+            "Dry run INI merge: old=$(printf '%q' "$old_ini") new=$(printf '%q' "$new_ini") output=$(printf '%q' "$merged_ini")" \
+            "$debug"
+        debug_end "$debug"
+        return 0
+    fi
+
     if [[ -f "$old_ini" ]]; then
         exec_command \
             "Backup existing INI" \
@@ -6196,10 +7586,18 @@ upgrade_ini() {
 
     rm -f /tmp/upgrade_ini.err "$tmp_merged"
 
-    mawk '
+    if awk '
     function trim(value) {
-      gsub(/^[ \t]+|[ \t]+$/, "", value)
+      gsub(/^[ \t\r]+|[ \t\r]+$/, "", value)
       return value
+    }
+
+    function strict_bool(value, key, normalized) {
+      normalized = tolower(trim(value))
+      if (normalized ~ /^(true|t|1|yes|y|on)$/) return 1
+      if (normalized ~ /^(false|f|0|no|n|off)$/) return 0
+      print "Invalid boolean for " key > "/dev/stderr"
+      exit 2
     }
 
     # Phase 1: read old.ini → overrides[section,key]=value
@@ -6225,10 +7623,34 @@ upgrade_ini() {
 
       val = l
       sub(/^[^=]*=[ \t]*/, "", val)
-      sub(/[ \t]*$/, "", val)
+      sub(/[ \t\r]*$/, "", val)
 
       overrides[current_section SUBSEP key] = val
       next
+    }
+
+    # Preserve the supported legacy GPIO migration before stock defaults can
+    # hide missing canonical keys. Match the application migration precedence.
+    FNR == 1 {
+      legacy = "GPIO" SUBSEP "Use NTP"
+      canonical = "GPIO" SUBSEP "Use System Clock Frequency Estimate"
+      residual = "GPIO" SUBSEP "Frequency Residual PPM"
+      manual = "GPIO" SUBSEP "Manual PPM"
+      calibration = "Calibration" SUBSEP "PPM"
+      if (legacy in overrides) {
+        enabled = strict_bool(overrides[legacy], "GPIO.Use NTP")
+        if (canonical in overrides) {
+          strict_bool(overrides[canonical], "GPIO.Use System Clock Frequency Estimate")
+        } else {
+          overrides[canonical] = enabled ? "true" : "false"
+        }
+        if (!(residual in overrides)) overrides[residual] = "0.0"
+        if (!(manual in overrides)) {
+          overrides[manual] = !enabled && calibration in overrides && trim(overrides[calibration]) != "" \
+            ? overrides[calibration] : "0.0"
+        }
+        delete overrides[legacy]
+      }
     }
 
     # Phase 2: walk new.ini
@@ -6280,42 +7702,27 @@ upgrade_ini() {
 
       print
     }
-    ' "$old_ini" "$new_ini" >"$tmp_merged" 2>/tmp/upgrade_ini.err
-
-    rc=$?
+    ' "$old_ini" "$new_ini" >"$tmp_merged" 2>/tmp/upgrade_ini.err; then
+        rc=0
+    else
+        rc=$?
+    fi
 
     if (( rc != 0 )); then
         err_details=$(sed 's/^/  > /' /tmp/upgrade_ini.err)
-        logE "INI merge failed (mawk exited $rc). Falling back to default INI." "$err_details"
-
-        if [[ -s "$new_ini" ]]; then
-            cp -f "$new_ini" "$merged_ini"
-            rm -f /tmp/upgrade_ini.err "$tmp_merged"
-            debug_print "Fallback to installer INI succeeded." "$debug"
-            debug_end "$debug"
-            return 0
-        else
-            logE "Fallback failed: installer INI is also empty."
-            rm -f /tmp/upgrade_ini.err "$tmp_merged"
-            debug_end "$debug"
-            return 1
-        fi
+        logE "INI merge failed (awk exited $rc). Existing configuration preserved." "$err_details"
+        rm -f /tmp/upgrade_ini.err "$tmp_merged"
+        debug_end "$debug"
+        return 1
     fi
 
     if [[ ! -s "$tmp_merged" ]]; then
-        logE "INI merge produced an empty file. Falling back to default INI."
-
-        if [[ -s "$new_ini" ]]; then
-            cp -f "$new_ini" "$merged_ini"
-            debug_print "Fallback to installer INI succeeded." "$debug"
-        else
-            logE "Fallback failed: installer INI is also empty."
-            rm -f /tmp/upgrade_ini.err "$tmp_merged"
-            debug_end "$debug"
-            return 1
-        fi
+        logE "INI merge produced an empty file. Existing configuration preserved."
+        rm -f /tmp/upgrade_ini.err "$tmp_merged"
+        debug_end "$debug"
+        return 1
     else
-        mv -f "$tmp_merged" "$merged_ini"
+        exec_command "Publish merged INI" mv -f "$tmp_merged" "$merged_ini" "$debug" || return 1
         debug_print "INI merge successful." "$debug"
     fi
 
@@ -6351,6 +7758,219 @@ upgrade_ini() {
 # -----------------------------------------------------------------------------
 # shellcheck disable=SC2317
 # shellcheck disable=SC2329
+service_unit_path_is_mask() {
+    local unit_path="${1:-}"
+    local mask_target="${2:-/dev/null}"
+    local link_target=""
+
+    [[ -n "$unit_path" && -L "$unit_path" ]] || return 1
+    link_target=$(readlink -- "$unit_path") || return 1
+    [[ "$link_target" == "$mask_target" ]]
+}
+
+# -----------------------------------------------------------------------------
+# @brief Return systemd's textual enablement state without treating a nonzero
+#        status as loss of the state text.
+# @details `systemctl is-enabled` intentionally exits nonzero for states such as
+#          masked, disabled and not-found. Capturing the output separately keeps
+#          `set -o pipefail` from hiding a reported mask.
+# -----------------------------------------------------------------------------
+# shellcheck disable=SC2317
+# shellcheck disable=SC2329
+service_unit_enablement_state() {
+    local unit_name="${1:-}"
+    local state=""
+
+    state=$(systemctl is-enabled "$unit_name" 2>/dev/null) || :
+    printf '%s\n' "$state"
+}
+
+# -----------------------------------------------------------------------------
+# @brief Verify that neither systemd nor either exact unit path reports a mask.
+# -----------------------------------------------------------------------------
+# shellcheck disable=SC2317
+# shellcheck disable=SC2329
+verify_systemd_service_unmasked() {
+    local unit_name="${1:-}"
+    local persistent_path="${2:-}"
+    local runtime_path="${3:-}"
+    local mask_target="${4:-/dev/null}"
+    local state=""
+
+    state=$(service_unit_enablement_state "$unit_name")
+    if [[ "$state" == "masked" || "$state" == "masked-runtime" ]]; then
+        logE "Systemd service $unit_name remains $state after mask recovery."
+        return 1
+    fi
+    if service_unit_path_is_mask "$persistent_path" "$mask_target"; then
+        logE "Persistent systemd mask remains at $persistent_path."
+        return 1
+    fi
+    if service_unit_path_is_mask "$runtime_path" "$mask_target"; then
+        logE "Runtime systemd mask remains at $runtime_path."
+        return 1
+    fi
+    return 0
+}
+
+# -----------------------------------------------------------------------------
+# @brief Recover persistent or runtime masks before replacing a service unit.
+# -----------------------------------------------------------------------------
+# shellcheck disable=SC2317
+# shellcheck disable=SC2329
+repair_systemd_service_mask() {
+    local debug
+    debug=$(debug_start "$@")
+    eval set -- "$(debug_filter "$@")"
+
+    local unit_name="${1:-}"
+    local persistent_path="${2:-}"
+    local runtime_path="${3:-}"
+    local mask_target="${4:-/dev/null}"
+    local state=""
+    local persistent_mask=false
+    local runtime_mask=false
+
+    state=$(service_unit_enablement_state "$unit_name")
+    if [[ "$state" == "masked" ]] ||
+        service_unit_path_is_mask "$persistent_path" "$mask_target"; then
+        persistent_mask=true
+    fi
+    if [[ "$state" == "masked-runtime" ]] ||
+        service_unit_path_is_mask "$runtime_path" "$mask_target"; then
+        runtime_mask=true
+    fi
+
+    if [[ "$persistent_mask" != "true" && "$runtime_mask" != "true" ]]; then
+        debug_end "$debug"
+        return 0
+    fi
+
+    if [[ "$persistent_mask" == "true" ]]; then
+        if ! exec_command "Remove persistent systemd service mask" \
+            systemctl unmask "$unit_name" "$debug"; then
+            logE "Unable to repair the persistent systemd mask for $unit_name; installation cannot safely replace the unit."
+            debug_end "$debug"
+            return 1
+        fi
+    fi
+    if [[ "$runtime_mask" == "true" ]]; then
+        if ! exec_command "Remove runtime systemd service mask" \
+            systemctl unmask --runtime "$unit_name" "$debug"; then
+            logE "Unable to repair the runtime systemd mask for $unit_name; installation cannot safely replace the unit."
+            debug_end "$debug"
+            return 1
+        fi
+    fi
+
+    # A dry run deliberately leaves the observed mask in place.
+    if [[ "$DRY_RUN" != "true" ]] &&
+        ! verify_systemd_service_unmasked \
+            "$unit_name" "$persistent_path" "$runtime_path" "$mask_target"; then
+        logE "Systemd mask recovery for $unit_name did not remove every persistent and runtime mask."
+        debug_end "$debug"
+        return 1
+    fi
+
+    debug_end "$debug"
+    return 0
+}
+
+# -----------------------------------------------------------------------------
+# @brief Render and atomically install a regular systemd unit without following
+#        a destination symlink.
+# -----------------------------------------------------------------------------
+# shellcheck disable=SC2317
+# shellcheck disable=SC2329
+install_systemd_service_unit() {
+    local debug
+    debug=$(debug_start "$@")
+    eval set -- "$(debug_filter "$@")"
+
+    local source_path="${1:-}"
+    local service_path="${2:-}"
+    local runtime_path="${3:-}"
+    local unit_name="${4:-}"
+    local semantic_version="${5:-}"
+    local daemon_name="${6:-}"
+    local exec_start="${7:-}"
+    local syslog_identifier="${8:-}"
+    local mask_target="${9:-/dev/null}"
+    local staged_path=""
+
+    if [[ ! -f "$source_path" || -L "$source_path" ]]; then
+        logE "Systemd unit template is not a regular file: $source_path"
+        debug_end "$debug"
+        return 1
+    fi
+
+    if [[ "$DRY_RUN" == "true" ]]; then
+        debug_print "Dry run: would render and atomically install $service_path without following destination symlinks." "$debug"
+        debug_end "$debug"
+        return 0
+    fi
+
+    staged_path=$(mktemp "${service_path}.tmp.XXXXXX") || {
+        logE "Unable to create a same-directory temporary service unit for $service_path."
+        debug_end "$debug"
+        return 1
+    }
+    if [[ ! -f "$staged_path" || -L "$staged_path" ]]; then
+        rm -f -- "$staged_path"
+        logE "Temporary systemd unit is not a regular file: $staged_path"
+        debug_end "$debug"
+        return 1
+    fi
+
+    if ! exec_command "Stage systemd service unit" cp -- "$source_path" "$staged_path" "$debug" ||
+        ! replace_string_in_script "$staged_path" "SEMANTIC_VERSION" "$semantic_version" "$debug" ||
+        ! replace_string_in_script "$staged_path" "DAEMON_NAME" "$daemon_name" "$debug" ||
+        ! replace_string_in_script "$staged_path" "EXEC_START" "$exec_start" "$debug" ||
+        ! replace_string_in_script "$staged_path" "SYSLOG_IDENTIFIER" "$syslog_identifier" "$debug" ||
+        ! exec_command "Change ownership on staged systemd unit" \
+            chown root:root "$staged_path" "$debug" ||
+        ! exec_command "Change permissions on staged systemd unit" \
+            chmod 0644 "$staged_path" "$debug"; then
+        rm -f -- "$staged_path"
+        logE "Unable to render a safe replacement unit for $unit_name."
+        debug_end "$debug"
+        return 1
+    fi
+
+    if [[ ! -f "$staged_path" || -L "$staged_path" ]]; then
+        rm -f -- "$staged_path"
+        logE "Rendered systemd unit is not a regular file: $staged_path"
+        debug_end "$debug"
+        return 1
+    fi
+    if ! verify_systemd_service_unmasked \
+        "$unit_name" "$service_path" "$runtime_path" "$mask_target"; then
+        rm -f -- "$staged_path"
+        logE "Refusing to replace $unit_name because a mask reappeared during unit rendering."
+        debug_end "$debug"
+        return 1
+    fi
+    if ! exec_command "Atomically install systemd service unit" \
+        mv -Tf -- "$staged_path" "$service_path" "$debug"; then
+        rm -f -- "$staged_path"
+        logE "Unable to atomically install $service_path."
+        debug_end "$debug"
+        return 1
+    fi
+    staged_path=""
+
+    if [[ ! -f "$service_path" || -L "$service_path" ]]; then
+        logE "Installed systemd unit is not a regular file: $service_path"
+        debug_end "$debug"
+        return 1
+    fi
+
+    debug_end "$debug"
+    return 0
+}
+
+# shellcheck disable=SC2317
+# shellcheck disable=SC2329
 manage_service() {
     local debug
     debug=$(debug_start "$@")
@@ -6374,79 +7994,97 @@ manage_service() {
     local source_path
     local daemon_systemd_name
     local service_path
+    local runtime_service_path
     local syslog_identifier
-    local retval=0 # Initialize return value
+    local service_state=""
+    local semantic_version=""
+    local retval=0
 
     daemon_name="${WSPR_SERVICE}" # Remove path
     source_path="$LOCAL_SYSTEMD_DIR/generic.service"
     daemon_systemd_name="${daemon_name}.service"
     # Install under /etc so it overrides anything in /lib
     service_path="/etc/systemd/system/${daemon_systemd_name}"
+    runtime_service_path="/run/systemd/system/${daemon_systemd_name}"
     syslog_identifier="$daemon_name"       # Use stripped daemon_exe
 
     if [[ "$ACTION" == "install" ]]; then
-        if systemctl list-unit-files --type=service | grep -q "$daemon_systemd_name"; then
-            if [[ "$DRY_RUN" != "true" ]]; then
-                exec_command "Disable systemd service" systemctl disable "${daemon_systemd_name}" "$debug" || retval=1
-                exec_command "Stop systemd service" systemctl stop "${daemon_systemd_name}" "$debug" || retval=1
+        if [[ ! -f "$source_path" || -L "$source_path" ]]; then
+            logE "Systemd unit template is not a regular file: $source_path"
+            debug_end "$debug"
+            return 1
+        fi
+        semantic_version="$SEM_VER"
+        if [[ -z "$semantic_version" ]]; then
+            logE "Unable to resolve the version for $daemon_systemd_name."
+            debug_end "$debug"
+            return 1
+        fi
+        repair_systemd_service_mask \
+            "$daemon_systemd_name" "$service_path" "$runtime_service_path" "/dev/null" "$debug" || {
+            debug_end "$debug"
+            return 1
+        }
 
-                if systemctl is-enabled "$daemon_systemd_name" 2>/dev/null | grep -q "^masked$"; then
-                    exec_command "Unmask systemd service" systemctl unmask "${daemon_systemd_name}" "$debug" || retval=1
-                fi
+        if [[ "$DRY_RUN" != "true" ]]; then
+            if systemctl is-active --quiet "$daemon_systemd_name" 2>/dev/null; then
+                exec_command "Stop systemd service" \
+                    systemctl stop "$daemon_systemd_name" "$debug" || {
+                    debug_end "$debug"
+                    return 1
+                }
             fi
+            service_state=$(service_unit_enablement_state "$daemon_systemd_name")
+            case "$service_state" in
+                enabled|enabled-runtime|linked|linked-runtime|alias)
+                    exec_command "Disable systemd service" \
+                        systemctl disable "$daemon_systemd_name" "$debug" || {
+                        debug_end "$debug"
+                        return 1
+                    }
+                    ;;
+            esac
         fi
 
-        if [[ ! -f "$source_path" ]]; then
-            warn "$source_path not found."
-            retval=1
-        elif [[ "$DRY_RUN" != "true" ]]; then
-            # Remove any existing override in /etc
-            if [[ -f "$service_path" ]]; then
-                exec_command "Remove old unit in /etc" rm -f "${service_path}" "$debug" || retval=1
-            fi
-            # Now copy our fresh unit into /etc
-            exec_command "Copy systemd file" cp -f "${source_path}" "${service_path}" "$debug" || retval=1
-            debug_print "Updating $service_path." "$debug"
-
-            replace_string_in_script "$service_path" "SEMANTIC_VERSION" "$(get_sem_ver "$debug")" "$debug"
-            replace_string_in_script "$service_path" "DAEMON_NAME" "$daemon_name" "$debug"
-            replace_string_in_script "$service_path" "EXEC_START" "$exec_start" "$debug"
-            replace_string_in_script "$service_path" "SYSLOG_IDENTIFIER" "$syslog_identifier" "$debug"
-
-            exec_command "Change ownership on systemd file" \
-                chown root:root "$service_path" \
-                "$debug" || retval=1
-
-            exec_command "Change permissions on systemd file" \
-                chmod 644 "$service_path" \
-                "$debug" || retval=1
-
-            exec_command "Enable systemd service" \
-                systemctl enable "$daemon_systemd_name" \
-                "$debug" || retval=1
-
-            exec_command "Reload systemd" \
-                systemctl daemon-reload \
-                "$debug" || retval=1
-
-            exec_command "Start systemd service" \
-                systemctl restart "$daemon_systemd_name" \
-                "$debug" || retval=1
-        fi
+        install_systemd_service_unit \
+            "$source_path" "$service_path" "$runtime_service_path" \
+            "$daemon_systemd_name" "$semantic_version" "$daemon_name" \
+            "$exec_start" "$syslog_identifier" "/dev/null" "$debug" || {
+            debug_end "$debug"
+            return 1
+        }
+        exec_command "Reload systemd" systemctl daemon-reload "$debug" || {
+            debug_end "$debug"
+            return 1
+        }
+        exec_command "Enable systemd service" \
+            systemctl enable "$daemon_systemd_name" "$debug" || {
+            debug_end "$debug"
+            return 1
+        }
+        exec_command "Start systemd service" \
+            systemctl restart "$daemon_systemd_name" "$debug" || {
+            debug_end "$debug"
+            return 1
+        }
 
     elif [[ "$ACTION" == "uninstall" ]]; then
-        if [[ -f "$service_path" ]]; then
-            if systemctl list-unit-files | grep -q "^$daemon_systemd_name"; then
-                if systemctl is-active --quiet "$daemon_systemd_name"; then
-                    exec_command "Stop systemd service" systemctl stop "${daemon_systemd_name}" "$debug" || retval=1
-                fi
-
-                if systemctl is-enabled --quiet "$daemon_systemd_name"; then
-                    exec_command "Disable systemd service" systemctl disable "${daemon_systemd_name}" "$debug" || retval=1
-                fi
+        if [[ -e "$service_path" || -L "$service_path" ]]; then
+            if systemctl is-active --quiet "$daemon_systemd_name" 2>/dev/null; then
+                exec_command "Stop systemd service" systemctl stop "${daemon_systemd_name}" "$debug" || retval=1
             fi
 
+            service_state=$(service_unit_enablement_state "$daemon_systemd_name")
+            case "$service_state" in
+                enabled|enabled-runtime|linked|linked-runtime|alias)
+                    exec_command "Disable systemd service" systemctl disable "${daemon_systemd_name}" "$debug" || retval=1
+                    ;;
+            esac
+
             exec_command "Remove service file" rm -f "${service_path}" "$debug" || retval=1
+            if [[ "$DRY_RUN" != "true" ]]; then
+                exec_command "Reload systemd" systemctl daemon-reload "$debug" || retval=1
+            fi
         else
             debug_print "Service file $service_path does not exist. Skipping removal." "$debug"
         fi
@@ -6456,6 +8094,140 @@ manage_service() {
 
     debug_end "$debug"
     return "$retval"
+}
+
+# -----------------------------------------------------------------------------
+# @brief Resolve the REST and WebSocket ports used by the installed service.
+# @details Mirrors the application's valid unprivileged port range and default
+#          fallback so Apache and readiness checks follow preserved INI values.
+#          Results are returned in WSPRRYPI_WEB_PORT and WSPRRYPI_SOCKET_PORT.
+# -----------------------------------------------------------------------------
+resolve_wsprrypi_service_ports() {
+    local debug
+    debug=$(debug_start "$@")
+    eval set -- "$(debug_filter "$@")"
+
+    local ini_path="${1:-/usr/local/etc/${WSPR_INI}}"
+    local configured_web="" configured_socket="" resolved=""
+    WSPRRYPI_WEB_PORT=31415
+    WSPRRYPI_SOCKET_PORT=31416
+
+    if [[ -r "$ini_path" ]]; then
+        resolved=$(awk '
+            function trim(value) {
+                gsub(/^[ \t]+|[ \t]+$/, "", value)
+                return value
+            }
+            /^[[:space:]]*[;#]/ || /^[[:space:]]*$/ { next }
+            /^[[:space:]]*\[/ {
+                section = tolower($0)
+                sub(/^[[:space:]]*\[/, "", section)
+                sub(/\][[:space:]]*$/, "", section)
+                section = trim(section)
+                next
+            }
+            section == "operation" && index($0, "=") {
+                line = $0
+                sub(/[;#].*$/, "", line)
+                key = line
+                sub(/=.*/, "", key)
+                key = tolower(trim(key))
+                value = line
+                sub(/^[^=]*=/, "", value)
+                value = trim(value)
+                if (key == "web port") web = value
+                if (key == "socket port") socket = value
+            }
+            END { printf "%s|%s", web, socket }
+        ' "$ini_path")
+        IFS='|' read -r configured_web configured_socket <<<"$resolved"
+    fi
+
+    if [[ "$configured_web" =~ ^[0-9]+$ ]] && \
+        ((10#$configured_web >= 1024 && 10#$configured_web <= 49151)); then
+        WSPRRYPI_WEB_PORT=$((10#$configured_web))
+    fi
+    if [[ "$configured_socket" =~ ^[0-9]+$ ]] && \
+        ((10#$configured_socket >= 1024 && 10#$configured_socket <= 49151)); then
+        WSPRRYPI_SOCKET_PORT=$((10#$configured_socket))
+    fi
+
+    debug_print "Effective service ports: REST=${WSPRRYPI_WEB_PORT}, WebSocket=${WSPRRYPI_SOCKET_PORT}." "$debug"
+    debug_end "$debug"
+    return 0
+}
+
+# -----------------------------------------------------------------------------
+# @brief Prove the installed application is actually available before success.
+# @details A successful systemctl start job can still mean that systemd skipped
+#          the service because a unit condition was false. Poll the resulting
+#          active state and configured direct REST endpoint, then, when web mode
+#          is enabled, the installed Apache proxy endpoint. This is application
+#          readiness only; it does not exercise GPIO, clocks, transmission, or
+#          RF.
+# -----------------------------------------------------------------------------
+# shellcheck disable=SC2317
+# shellcheck disable=SC2329
+validate_wsprrypi_runtime() {
+    local debug
+    debug=$(debug_start "$@")
+    eval set -- "$(debug_filter "$@")"
+
+    [[ "$ACTION" == "install" ]] || return 0
+    if [[ "$DRY_RUN" == "true" ]]; then
+        logD "Validate WsprryPi service and local API readiness (dry-run)."
+        debug_end "$debug"
+        return 0
+    fi
+
+    local attempts_remaining=30 service_ready=false direct_api_ready=false
+    local proxy_api_ready=false
+    local installed_ini="/usr/local/etc/${WSPR_INI}"
+    resolve_wsprrypi_service_ports "$installed_ini" "$debug"
+
+    while ((attempts_remaining-- > 0)); do
+        if systemctl is-active --quiet "${WSPR_SERVICE}.service" 2>/dev/null; then
+            service_ready=true
+            if [[ "${NO_WEB:-false}" == "true" ]]; then
+                direct_api_ready=true
+                proxy_api_ready=true
+                break
+            fi
+            if curl --fail --silent --show-error --max-time 2 \
+                "http://127.0.0.1:${WSPRRYPI_WEB_PORT}/version" \
+                >/dev/null 2>&1; then
+                direct_api_ready=true
+                if curl --fail --silent --show-error --max-time 2 \
+                    "http://127.0.0.1/${REPO_NAME,,}/version" \
+                    >/dev/null 2>&1; then
+                    proxy_api_ready=true
+                    break
+                fi
+            fi
+        else
+            service_ready=false
+        fi
+        sleep 1
+    done
+
+    if [[ "$service_ready" != "true" ]]; then
+        warn "WsprryPi service did not become active; inspect systemd conditions and the service journal."
+        debug_end "$debug"
+        return 1
+    fi
+    if [[ "$direct_api_ready" != "true" ]]; then
+        warn "WsprryPi service is active, but its configured local REST endpoint on port ${WSPRRYPI_WEB_PORT} did not become ready; inspect the installed INI and service journal."
+        debug_end "$debug"
+        return 1
+    fi
+    if [[ "$proxy_api_ready" != "true" ]]; then
+        warn "WsprryPi REST endpoint on port ${WSPRRYPI_WEB_PORT} is ready, but the installed local /${REPO_NAME,,}/version Apache proxy did not become ready; inspect the active Apache proxy configuration."
+        debug_end "$debug"
+        return 1
+    fi
+
+    debug_end "$debug"
+    return 0
 }
 
 # -----------------------------------------------------------------------------
@@ -6491,6 +8263,9 @@ manage_web() {
     local source_path="$LOCAL_WWW_DIR"
     local target_path="/var/www/html/${REPO_NAME,,}"
     local retval=0 # Initialize return value
+    local publisher="${LOCAL_REPO_DIR}/scripts/copy_ui.py"
+    local source_commit=""
+    local publisher_args=()
 
     if [[ "$ACTION" == "install" ]]; then
         # Validate source directory exists
@@ -6500,48 +8275,49 @@ manage_web() {
             return 1
         fi
 
-        # Ensure target directory exists
-        debug_print "Creating target web directory if missing." "$debug"
-        if [[ "$DRY_RUN" == "true" ]]; then
-            logD "Exec: mkdir -p $target_path"
-        else
-            exec_command "Create target web directory" mkdir -p "${target_path}" "$debug" || retval=1
+        if [[ ! -x "$publisher" ]]; then
+            logE "Error: UI publisher '$publisher' is missing or not executable."
+            debug_end "$debug"
+            return 1
         fi
 
-        # Copy web files
-        debug_print "Copying web files from '$source_path' to '$target_path'." "$debug"
-        if [[ "$DRY_RUN" == "true" ]]; then
-            logD "Exec: cp -r $source_path* $target_path/"
-        else
-            exec_command "Copy web files" \
-                cp -r "${source_path}"/* "${target_path}/" \
-                "$debug" || retval=1
+        source_commit=$(git -C "$LOCAL_REPO_DIR" rev-parse HEAD 2>/dev/null) || {
+            logE "Error: Unable to determine the exact UI source commit."
+            debug_end "$debug"
+            return 1
+        }
+
+        UI_PUBLICATION_RESULT_FILE="/run/wsprrypi-ui-publication-${$}.json"
+        if [[ "$DRY_RUN" != "true" ]]; then
+            UI_PUBLICATION_ATTEMPTED="true"
+            rm -f "$UI_PUBLICATION_RESULT_FILE"
+        fi
+        publisher_args=(
+            --source "$source_path"
+            --target "$target_path"
+            --source-commit "$source_commit"
+            --application-version "$SEM_VER"
+            --owner www-data
+            --group www-data
+            --result-file "$UI_PUBLICATION_RESULT_FILE"
+        )
+        if [[ "$FAIL_ON_UI_MODIFICATIONS" == "true" ]]; then
+            publisher_args+=(--fail-on-ui-modifications)
         fi
 
-        # Change ownership and permissions
-        debug_print "Setting permissions for '$target_path'." "$debug"
+        debug_print "Staging, validating, and publishing web files from '$source_path' to '$target_path'." "$debug"
         if [[ "$DRY_RUN" == "true" ]]; then
-            logD "Exec: sudo chown -R www-data:www-data $target_path"
-            logD "Exec: sudo chmod -R 755 $target_path"
-            logD "Exec: sudo usermod -aG systemd-journal www-data"
+            logD "Exec: $publisher ${publisher_args[*]}"
         else
-            # Set ownership for the entire directory
-            exec_command "Set ownership" chown -R www-data:www-data "${target_path}" "$debug" || retval=1
-
-            # Set correct permissions:
-            # - Directories: `rwxr-xr-x` (755)
-            # - Files: `rw-r--r--` (644)
-            exec_command "Set directory permissions" \
-                find "$target_path" -type d -exec sudo chmod 755 {} + \
+            exec_command "Publish validated UI artifact" \
+                "$publisher" \
+                "${publisher_args[@]}" \
                 "$debug" || retval=1
-
-            exec_command "Set file permissions" \
-                find "$target_path" -type f -exec sudo chmod 644 {} + \
-                "$debug" || retval=1
-
-            exec_command "Set log permissions" \
-                sudo usermod -aG systemd-journal www-data \
-                "$debug" || retval=1
+            if [[ "$retval" -eq 0 ]]; then
+                exec_command "Set log permissions" \
+                    usermod -aG systemd-journal www-data \
+                    "$debug" || retval=1
+            fi
         fi
 
     elif [[ "$ACTION" == "uninstall" ]]; then
@@ -6561,12 +8337,12 @@ manage_web() {
 }
 
 # -----------------------------------------------------------------------------
-# @brief Manages the sound module for WsprryPi.
-# @details This function enables or disables the Raspberry Pi sound module
-#          (`snd_bcm2835`) by modifying the ALSA blacklist file. During
-#          installation, the module is blacklisted to allow WsprryPi to
-#          generate radio frequencies. During uninstallation, the blacklist
-#          entry is removed to restore sound functionality.
+# @brief Manages the legacy-Pi sound module for WsprryPi.
+# @details On pre-Pi-5 models, installation blacklists `snd_bcm2835` to avoid
+#          conflicts with WsprryPi's legacy clock use, and uninstallation
+#          removes that entry. Pi 5 and Compute Module 5 never create the
+#          blacklist; uninstall only cleans up an obsolete entry left by an
+#          older WsprryPi installation.
 #
 # @global ACTION Specifies whether the function runs in 'install' or 'uninstall' mode.
 # @global REBOOT Indicates whether a system reboot is required.
@@ -6595,15 +8371,56 @@ manage_sound() {
     blacklist="blacklist snd_bcm2835"
     file="/etc/modprobe.d/alsa-blacklist.conf"
 
+    # Pi 5 has no bcm2835 analogue-audio device sharing the legacy clock
+    # peripheral. Never create this blacklist there. During uninstall, still
+    # remove an entry left by an older WsprryPi installation, but that cleanup
+    # does not require a reboot or mean that Pi 5 sound was re-enabled.
+    local sound_reboot_required="true"
+    if is_pi5; then
+        if [[ "$ACTION" == "install" ]]; then
+            debug_print "Legacy snd_bcm2835 sound management is not applicable on Raspberry Pi 5." "$debug"
+            debug_end "$debug"
+            return 0
+        fi
+        sound_reboot_required="false"
+    fi
+
+    if [[ "$DRY_RUN" == "true" ]]; then
+        if [[ "$ACTION" == "install" ]]; then
+            if [[ ! -f "$file" ]]; then
+                logD "Exec: create $file with '$blacklist'"
+                REBOOT="true"
+            elif ! grep -Fxq "$blacklist" "$file"; then
+                logD "Exec: append '$blacklist' to $file"
+                REBOOT="true"
+            else
+                debug_print "Sound is already disabled." "$debug"
+            fi
+        elif [[ "$ACTION" == "uninstall" ]]; then
+            if [[ -f "$file" ]] && grep -Fxq "$blacklist" "$file"; then
+                logD "Exec: remove '$blacklist' from $file"
+                if [[ "$sound_reboot_required" == "true" ]]; then
+                    REBOOT="true"
+                fi
+            else
+                debug_print "Sound is already enabled or no blacklist file exists." "$debug"
+            fi
+        else
+            die 1 "Invalid action. Use 'install' or 'uninstall'."
+        fi
+        debug_end "$debug"
+        return 0
+    fi
+
     if [[ "$ACTION" == "install" ]]; then
         if [[ ! -f "$file" ]]; then
             # Create file and add the blacklist line
-            echo "$blacklist" >"$file"
+            exec_command "Disable legacy analogue audio" tee -- "$file" "$debug" <<<"$blacklist" || return 1
             REBOOT="true"
             debug_print "Created $file and disabled sound." "$debug"
         elif ! grep -Fxq "$blacklist" "$file"; then
             # Append blacklist line if it doesn't exist
-            echo "$blacklist" >>"$file"
+            exec_command "Disable legacy analogue audio" tee -a -- "$file" "$debug" <<<"$blacklist" || return 1
             REBOOT="true"
             debug_print "Added blacklist entry to $file." "$debug"
         else
@@ -6616,14 +8433,21 @@ manage_sound() {
 
             if [[ "$line_count" -eq 1 ]]; then
                 # If it's the only line, delete the file
-                rm -f "$file"
-                debug_print "Removed $file and re-enabled sound." "$debug"
+                exec_command "Remove legacy audio blacklist file" rm -f "$file" "$debug" || return 1
+                if [[ "$sound_reboot_required" == "true" ]]; then
+                    debug_print "Removed $file and re-enabled sound." "$debug"
+                else
+                    debug_print "Removed obsolete Pi 5 sound blacklist file $file." "$debug"
+                fi
             else
                 # Otherwise, remove just the blacklist line
-                sed -i "\|$blacklist|d" "$file"
+                exec_command "Remove legacy audio blacklist entry" \
+                    sed -i "\|$blacklist|d" "$file" "$debug" || return 1
                 debug_print "Removed blacklist entry from $file." "$debug"
             fi
-            REBOOT="true"
+            if [[ "$sound_reboot_required" == "true" ]]; then
+                REBOOT="true"
+            fi
         else
             debug_print "Sound is already enabled or no blacklist file exists." "$debug"
         fi
@@ -6690,13 +8514,15 @@ manage_i2c() {
         if [[ "$DRY_RUN" == "true" ]]; then
             logD "Exec: sed -i 's|^[[:space:]#]*dtparam=i2c_arm=.*|$i2c_setting|' $boot_config"
         else
-            sed -i "s|^[[:space:]#]*dtparam=i2c_arm=.*|$i2c_setting|" "$boot_config"
+            exec_command "Enable I2C in boot configuration" \
+                sed -i "s|^[[:space:]#]*dtparam=i2c_arm=.*|$i2c_setting|" "$boot_config" "$debug" || return 1
         fi
     else
         if [[ "$DRY_RUN" == "true" ]]; then
             logD "Exec: printf '\\n%s\\n' '$i2c_setting' >> $boot_config"
         else
-            printf "\n%s\n" "$i2c_setting" >>"$boot_config"
+            exec_command "Enable I2C in boot configuration" \
+                tee -a -- "$boot_config" "$debug" <<<$'\n'"$i2c_setting" || return 1
         fi
     fi
 
@@ -6714,8 +8540,8 @@ manage_i2c() {
 #     – Adds DEFAULT_SERVERNAME to $APACHE_CONF if missing
 #     – Writes the single $DEFAULT_SITES_CONF/wsprrypi.conf with:
 #         • A redirect “/ → /wsprrypi/” (if stock Apache home is detected)
-#         • REST proxies (31415) for /wsprrypi/config & /version
-#         • WS proxy (31416) for /wsprrypi/socket
+#         • REST proxies using the effective configured Web Port
+#         • WS proxy using the effective configured Socket Port
 #         • <Proxy> blocks allowing remote access
 #     – Disables 000-default.conf, enables wsprrypi.conf
 #   * On uninstall (ACTION=uninstall):
@@ -6742,13 +8568,31 @@ manage_apache() {
     # Declare local variables after debug initialization
     local status=0
     local config_file source_path site_conf server_name target_conf
+    local network_policy_file network_policy_renderer installed_ini
 
     config_file="wsprrypi.conf"
     source_path="${LOCAL_CONFIG_DIR}/${config_file}"
     site_conf="${DEFAULT_SITES_CONF}/${config_file}"
     server_name="${DEFAULT_SERVERNAME}"
+    network_policy_file="/usr/local/etc/wsprrypi-apache-network-policy.conf"
+    network_policy_renderer="${LOCAL_REPO_DIR}/scripts/render-apache-privileged-network-policy.py"
+    installed_ini="/usr/local/etc/${WSPR_INI}"
 
     if [[ -z "$ACTION" || "$ACTION" == install ]]; then
+        if [[ ! -f "$network_policy_renderer" ]]; then
+            logE "Network policy renderer not found at '$network_policy_renderer'."
+            debug_end "$debug"
+            return 1
+        fi
+        exec_command "Render Apache privileged-network policy" \
+            python3 "$network_policy_renderer" \
+            --ini "$installed_ini" \
+            --output "$network_policy_file" \
+            "$debug" || {
+            logE "Failed to render the Apache privileged-network policy."
+            debug_end "$debug"
+            return 1
+        }
         # Ensure ServerName is present in the main Apache config
         if [[ "${APACHE_WEB_MODE:-unknown}" == "unknown" ]]; then
             detect_apache_web_mode "$debug" || true
@@ -6766,7 +8610,7 @@ manage_apache() {
         if [[ "${APACHE_WEB_MODE:-unknown}" == "custom_site" ]]; then
 
             exec_command "Enable proxy modules" \
-                a2enmod proxy proxy_http proxy_wstunnel \
+                a2enmod headers proxy proxy_http proxy_wstunnel \
                 "$debug" || {
                 logE "Failed to enable proxy modules."
                 debug_end "$debug"
@@ -6781,7 +8625,7 @@ manage_apache() {
             fi
 
             for target_conf in "${APACHE_ACTIVE_SITE_CONFS[@]}"; do
-                if ! install_wsprrypi_proxy_block "$target_conf" "$debug"; then
+                if ! install_wsprrypi_proxy_block "$target_conf" "$installed_ini" "$debug"; then
                     logE "Failed to update Apache vhost '$target_conf'."
                     debug_end "$debug"
                     return 1
@@ -6818,13 +8662,19 @@ manage_apache() {
             return 1
         }
 
+        if ! install_wsprrypi_proxy_block "$site_conf" "$installed_ini" "$debug"; then
+            logE "Failed to configure WsprryPi service ports in '$site_conf'."
+            debug_end "$debug"
+            return 1
+        fi
+
         # If stock page, comment out log lines in the vhost before enabling.
         if [[ "${APACHE_WEB_MODE:-unknown}" == "stock" ]] && is_stock_apache_page "/var/www/html/index.html" "$debug"; then
             modify_comment_lines "${site_conf}" ".log" comment "$debug"
         fi
 
         # Enable required modules
-        exec_command "Enable proxy modules" a2enmod proxy proxy_http proxy_wstunnel "$debug" || {
+        exec_command "Enable proxy modules" a2enmod headers proxy proxy_http proxy_wstunnel "$debug" || {
             logE "Failed to enable proxy modules."
             debug_end "$debug"
             return 1
@@ -6866,6 +8716,9 @@ manage_apache() {
         fi
 
         exec_command "Remove wsprrypi available config" rm -f "${site_conf}" "$debug"
+
+        exec_command "Remove Apache privileged-network policy" \
+            rm -f "$network_policy_file" "$debug"
 
         exec_command "Remove ServerName directive" sed -i "/^${server_name}/d" "$APACHE_CONF" "$debug"
     fi
@@ -7355,7 +9208,8 @@ find_active_apache_site_conf() {
 #          tag is present, the block is appended to the file.
 #
 # @param $1 Apache vhost config path to update.
-# @param $2 Optional debug flag.
+# @param $2 Effective installed INI path.
+# @param $3 Optional debug flag.
 #
 # @return 0 on success, 1 otherwise.
 # -----------------------------------------------------------------------------
@@ -7367,9 +9221,18 @@ install_wsprrypi_proxy_block() {
     eval set -- "$(debug_filter "$@")"
 
     local config_file="${1:-}"
-    local tmp_file
+    local installed_ini="${2:-/usr/local/etc/${WSPR_INI}}"
+    local tmp_file block_file
     local backup_file
     local proxy_block
+
+    resolve_wsprrypi_service_ports "$installed_ini" "$debug"
+
+    if [[ "$DRY_RUN" == "true" ]]; then
+        logD "Exec: update managed WsprryPi proxy block in $config_file for REST port ${WSPRRYPI_WEB_PORT} and WebSocket port ${WSPRRYPI_SOCKET_PORT}"
+        debug_end "$debug"
+        return 0
+    fi
 
     if [[ -z "$config_file" || ! -f "$config_file" ]]; then
         logE "Apache vhost config '$config_file' was not found."
@@ -7377,51 +9240,85 @@ install_wsprrypi_proxy_block() {
         return 1
     fi
 
-    proxy_block=$(cat <<'EOF'
+    proxy_block=$(cat <<EOF
     # BEGIN WsprryPi proxy configuration
-    # REST API (port 31415)
-    ProxyPass        /wsprrypi/config  http://127.0.0.1:31415/config
-    ProxyPassReverse /wsprrypi/config  http://127.0.0.1:31415/config
-    ProxyPass        /wsprrypi/version http://127.0.0.1:31415/version
-    ProxyPassReverse /wsprrypi/version http://127.0.0.1:31415/version
+    # REST API (port ${WSPRRYPI_WEB_PORT})
+    ProxyPass        /wsprrypi/config  http://127.0.0.1:${WSPRRYPI_WEB_PORT}/config
+    ProxyPassReverse /wsprrypi/config  http://127.0.0.1:${WSPRRYPI_WEB_PORT}/config
+    ProxyPass        /wsprrypi/version http://127.0.0.1:${WSPRRYPI_WEB_PORT}/version
+    ProxyPassReverse /wsprrypi/version http://127.0.0.1:${WSPRRYPI_WEB_PORT}/version
+    # Support bundle API family and signed private-intake availability.
+    ProxyPass        /wsprrypi/api/support-bundles http://127.0.0.1:${WSPRRYPI_WEB_PORT}/api/support-bundles
+    ProxyPassReverse /wsprrypi/api/support-bundles http://127.0.0.1:${WSPRRYPI_WEB_PORT}/api/support-bundles
+    ProxyPass        /wsprrypi/api/support-intake http://127.0.0.1:${WSPRRYPI_WEB_PORT}/api/support-intake
+    ProxyPassReverse /wsprrypi/api/support-intake http://127.0.0.1:${WSPRRYPI_WEB_PORT}/api/support-intake
+    ProxyPass        /wsprrypi/api/network-safety http://127.0.0.1:${WSPRRYPI_WEB_PORT}/api/network-safety
+    ProxyPassReverse /wsprrypi/api/network-safety http://127.0.0.1:${WSPRRYPI_WEB_PORT}/api/network-safety
+    ProxyPass        /wsprrypi/api/rp1-gpclk-route http://127.0.0.1:${WSPRRYPI_WEB_PORT}/api/rp1-gpclk-route
+    ProxyPassReverse /wsprrypi/api/rp1-gpclk-route http://127.0.0.1:${WSPRRYPI_WEB_PORT}/api/rp1-gpclk-route
 
-    # WebSocket (port 31416)
-    ProxyPass        /wsprrypi/socket  ws://127.0.0.1:31416/socket
-    ProxyPassReverse /wsprrypi/socket  ws://127.0.0.1:31416/socket
+    ProxyPass        /wsprrypi/api/v1 http://127.0.0.1:${WSPRRYPI_WEB_PORT}/api/v1
+    ProxyPassReverse /wsprrypi/api/v1 http://127.0.0.1:${WSPRRYPI_WEB_PORT}/api/v1
+    ProxyPass        /wsprrypi/api/wtp http://127.0.0.1:${WSPRRYPI_WEB_PORT}/api/wtp
+    ProxyPassReverse /wsprrypi/api/wtp http://127.0.0.1:${WSPRRYPI_WEB_PORT}/api/wtp
 
-    <Proxy "http://127.0.0.1:31415/*">
+    Include /usr/local/etc/wsprrypi-apache-network-policy.conf
+
+    # WebSocket (port ${WSPRRYPI_SOCKET_PORT})
+    ProxyPass        /wsprrypi/socket  ws://127.0.0.1:${WSPRRYPI_SOCKET_PORT}/socket
+    ProxyPassReverse /wsprrypi/socket  ws://127.0.0.1:${WSPRRYPI_SOCKET_PORT}/socket
+
+    <Proxy "http://127.0.0.1:${WSPRRYPI_WEB_PORT}/*">
         Require all granted
     </Proxy>
-    <Proxy "ws://127.0.0.1:31416/*">
+    <Proxy "ws://127.0.0.1:${WSPRRYPI_SOCKET_PORT}/*">
         Require all granted
     </Proxy>
     # END WsprryPi proxy configuration
 EOF
 )
 
-    if [[ "$DRY_RUN" == "true" ]]; then
-        logD "Exec: update managed WsprryPi proxy block in $config_file"
-        debug_end "$debug"
-        return 0
-    fi
-
     tmp_file=$(mktemp) || {
         logE "Failed to create temporary file."
+        debug_end "$debug"
+        return 1
+    }
+    block_file=$(mktemp) || {
+        rm -f "$tmp_file"
+        logE "Failed to create proxy-block temporary file."
+        debug_end "$debug"
+        return 1
+    }
+    printf '%s\n' "$proxy_block" >"$block_file" || {
+        rm -f "$tmp_file" "$block_file"
+        logE "Failed to stage the managed Apache proxy block."
         debug_end "$debug"
         return 1
     }
 
     backup_file="${config_file}.wsprrypi.bak"
     if [[ ! -f "$backup_file" ]]; then
-        cp "$config_file" "$backup_file" || {
-            rm -f "$tmp_file"
+        exec_command "Back up Apache proxy configuration" cp "$config_file" "$backup_file" "$debug" || {
+            rm -f "$tmp_file" "$block_file"
             logE "Failed to back up '$config_file'."
             debug_end "$debug"
             return 1
         }
     fi
 
-    awk -v block="$proxy_block" '
+    exec_command "Stage Apache proxy configuration" cp -p "$config_file" "$tmp_file" "$debug" || {
+        rm -f "$tmp_file" "$block_file"
+        logE "Failed to preserve Apache config metadata."
+        debug_end "$debug"
+        return 1
+    }
+
+    awk -v block_file="$block_file" '
+        function print_block(   line) {
+            while ((getline line < block_file) > 0) print line
+            close(block_file)
+        }
+
         /^[[:space:]]*# BEGIN WsprryPi proxy configuration[[:space:]]*$/ {
             in_block = 1
             next
@@ -7434,7 +9331,7 @@ EOF
 
         !in_block {
             if ($0 ~ /^[[:space:]]*<\/VirtualHost>[[:space:]]*$/) {
-                print block
+                print_block()
                 inserted = 1
             }
             print
@@ -7443,22 +9340,23 @@ EOF
         END {
             if (!inserted) {
                 print ""
-                print block
+                print_block()
             }
         }
     ' "$config_file" >"$tmp_file" || {
-        rm -f "$tmp_file"
+        rm -f "$tmp_file" "$block_file"
         logE "Failed to build updated Apache config."
         debug_end "$debug"
         return 1
     }
 
-    mv "$tmp_file" "$config_file" || {
-        rm -f "$tmp_file"
+    exec_command "Install Apache proxy configuration" mv "$tmp_file" "$config_file" "$debug" || {
+        rm -f "$tmp_file" "$block_file"
         logE "Failed to install updated Apache config."
         debug_end "$debug"
         return 1
     }
+    rm -f "$block_file"
 
     debug_print "Installed WsprryPi proxy block in $config_file." "$debug"
     debug_end "$debug"
@@ -7524,7 +9422,7 @@ remove_wsprrypi_proxy_block() {
         return 1
     }
 
-    mv "$tmp_file" "$config_file" || {
+    exec_command "Remove WsprryPi Apache proxy configuration" mv "$tmp_file" "$config_file" "$debug" || {
         rm -f "$tmp_file"
         logE "Failed to install updated Apache config."
         debug_end "$debug"
@@ -7604,51 +9502,11 @@ cleanup_files_in_directories() {
     return 0
 }
 
-# -----------------------------------------------------------------------------
-# @brief Display a reboot prompt when required.
-# @details
-#   Checks the global REBOOT flag. If "true", prints a message
-#   explaining why a reboot is needed (install or uninstall path),
-#   shows the reboot command, and waits for a key press.
-#
-# @global ACTION  Install or uninstall mode indicator.
-# @global REBOOT  Semaphore flag for reboot requirement.
-#
-# @param $1  Optional debug flag to enable debug output.
-#
-# @return Always returns 0.
-#
-# @example
-#   flag_need_reboot "debug"
-# -----------------------------------------------------------------------------
-# shellcheck disable=SC2317
-# shellcheck disable=SC2329
-flag_need_reboot() {
-    local debug
-    debug=$(debug_start "$@")
-    eval set -- "$(debug_filter "$@")"
-
-    if [[ "$REBOOT" == "true" ]]; then
-        printf "\n*Important Note:*\n\n"
-        if [[ "$ACTION" == "install" ]]; then
-            printf "Wsprry Pi uses the same hardware as the sound system to\n"
-            printf "generate radio frequencies. This soundcard has been disabled.\n"
-            printf "Reboot with 'sudo reboot' after install for changes to take\n"
-            printf "effect.\n\n"
-        else
-            printf "The sound system has been re-enabled. To use audio, reboot\n"
-            printf "with 'sudo reboot' for changes to take effect.\n\n"
-        fi
-        read -rp "Press any key to continue." </dev/tty
-        echo
-    fi
-
-    debug_end "$debug"
-    return 0
-}
-
-# shellcheck disable=SC2317
 restore_daemon_state() {
+    if [[ "${BINARY_INSTALLED:-false}" == "recovery-failed" ]]; then
+        logE "Executable recovery needs attention; automatic service restart is withheld."
+        return 1
+    fi
     local debug
     debug=$(debug_start "$@")
     eval set -- "$(debug_filter "$@")"
@@ -7708,7 +9566,14 @@ flag_need_reboot() {
         fi
         printf "'sudo reboot'\n\n"
 
-        read -rp "Press any key to continue." </dev/tty
+        if [[ "$DRY_RUN" == "true" ]]; then
+            debug_end "$debug"
+            return 0
+        fi
+
+        if [[ -t 0 ]]; then
+            read -rp "Press any key to continue." || true
+        fi
         echo
     fi
 
@@ -7717,6 +9582,20 @@ flag_need_reboot() {
 }
 
 # -----------------------------------------------------------------------------
+report_ui_publication_result() {
+    if [[ "$UI_PUBLICATION_ATTEMPTED" != "true" ]]; then
+        return 0
+    fi
+    if [[ -n "$UI_PUBLICATION_RESULT_FILE" && -f "$UI_PUBLICATION_RESULT_FILE" ]]; then
+        python3 "${LOCAL_REPO_DIR}/scripts/copy_ui.py" \
+            --render-result "$UI_PUBLICATION_RESULT_FILE" || true
+    else
+        printf "\nUI replacement issue\n"
+        printf "  Publication details are unavailable because the UI publisher did not create its result file.\n"
+        printf "  Confirm the installed UI state before retrying.\n"
+    fi
+}
+
 # @brief Finalizes the installation or uninstallation process.
 # @details Logs and displays a completion message based on whether the install
 #          or uninstall was successful or failed. It also provides follow-up
@@ -7761,6 +9640,21 @@ finish_script() {
         action_message="Uninstallation"
     fi
 
+    # Dry runs describe plan evaluation and return before any normal install or
+    # uninstall success message, URL, reboot reminder, or completion claim.
+    if [[ "$DRY_RUN" == "true" ]]; then
+        if [[ "$overall_status" -eq 0 ]]; then
+            debug_print "$action_message dry run completed successfully; no changes were applied." "$debug"
+            printf "\nDry run complete. No changes were applied.\n"
+            debug_end "$debug"
+            return 0
+        fi
+        logE "$action_message dry run failed while evaluating the $REPO_TITLE plan."
+        debug_print "$action_message dry run encountered errors; no completion was claimed." "$debug"
+        debug_end "$debug"
+        return 1
+    fi
+
     # Handle success or failure messages
     if [[ "$overall_status" -eq 0 ]]; then
         debug_print "$action_message completed successfully." "$debug"
@@ -7801,8 +9695,12 @@ finish_script() {
             printf "Remember to reboot to disable your soundcard before transmission.\n\n"
         fi
     elif [[ "$ACTION" == "uninstall" && "$overall_status" -eq 0 ]]; then
-        printf "\n%s has been uninstalled. No apt packages have\n" "$REPO_TITLE"
-        printf "been removed to prevent impact to other functionality.\n\n"
+        printf "\n%s has been uninstalled. Shared apt packages were retained.\n" "$REPO_TITLE"
+        if [[ "$RP1_GPCLK_DKMS_PROVIDER_REMOVAL_UNPROVEN" == "true" ]]; then
+            printf "The RP1-GPCLK-DKMS provider was not removed, as I was unable to prove\n"
+            printf "WsprryPi's secure ownership of the module.\n"
+        fi
+        printf "\n"
         if [[ "${REBOOT:-false}" == "true" ]]; then
             printf "Remember to reboot to re-enable your soundcard.\n\n"
         fi
@@ -7849,15 +9747,21 @@ manage_wsprry_pi() {
     # Define the group of functions to install/uninstall
     local install_group=(
         "git_clone"
+        "capture_install_sem_ver"
         "remove_legacy_services"
         "remove_legacy_files_and_dirs"
-        "compile_binary \"$WSPR_EXE\""
+        "prepare_install_executable \"$WSPR_EXE\""
         "manage_exe \"$WSPR_EXE\""
+        "manage_support_bundle_runtime"
+        "manage_pico_usb_runtime"
+        "manage_route_application"
         "manage_config \"$WSPR_INI\" \"/usr/local/etc/\""
         "manage_i2c"
         "manage_service \"/usr/bin/$WSPR_EXE\" \"$service_command\" \"false\""
+        "activate_rp1_gpclk_runtime_administration"
         "manage_web"
         "manage_apache"
+        "validate_wsprrypi_runtime"
         "manage_sound"
         "cleanup_files_in_directories"
         "restore_daemon_state"
@@ -7866,7 +9770,8 @@ manage_wsprry_pi() {
     # Define functions to skip on uninstall using an indexed array
     local skip_on_uninstall=(
         "git_clone"
-        "compile_binary"
+        "capture_install_sem_ver"
+        "prepare_install_executable"
         "cleanup_files_in_directories"
         "remove_legacy_services"
         "remove_legacy_files_and_dirs"
@@ -7911,6 +9816,14 @@ manage_wsprry_pi() {
                 { command -v tac &>/dev/null && tac || awk '{lines[NR]=$0} END{for(i=NR;i>=1;i--)print lines[i]}'; } |
                 grep -v -E "^($skip_regex)( |$)"
         )
+        # The runtime deployment owns restoration of the application state it
+        # captured. Remove it while that service and its companion still
+        # exist, then continue with ordinary WsprryPi teardown.
+        group_to_execute=(
+            "prepare_owned_rp1_gpclk_runtime_removal"
+            "remove_owned_rp1_gpclk_dkms_provider"
+            "${group_to_execute[@]}"
+        )
         # Re-add manage_sound at the very end
         group_to_execute+=("manage_sound")
         ;;
@@ -7941,15 +9854,32 @@ manage_wsprry_pi() {
         if [[ $status -ne 0 ]]; then
             logE "$func failed with status $status" "$debug"
             if [[ "$ACTION" == "install" ]]; then
+                rollback_executable || return 1
                 cleanup_files_in_directories "${func}" "${debug}"
                 restore_daemon_state "${func}" "${debug}"
                 overall_status=1
                 break
+            elif [[ "$ACTION" == "uninstall" ]]; then
+                if [[ "$function_name" == "prepare_owned_rp1_gpclk_runtime_removal" ||
+                    "$function_name" == "remove_owned_rp1_gpclk_dkms_provider" ]]; then
+                    overall_status=1
+                    break
+                fi
+                # Continue independent application teardown, but retain every
+                # failure so uninstall success cannot be reported.
+                overall_status=1
             fi
         else
             debug_print "$func succeeded." "$debug"
         fi
     done
+
+    # Keep informational summaries after the per-step execution output. The
+    # readiness check runs earlier in the group, but reaching this point with a
+    # successful install proves that it and all subsequent steps completed.
+    if [[ "$ACTION" == "install" && "$DRY_RUN" != "true" && "$overall_status" -eq 0 ]]; then
+        logI "WsprryPi runtime readiness verified."
+    fi
 
     # Indicate if a reboot will be necessary
     flag_need_reboot "$debug"
@@ -8009,7 +9939,8 @@ _main() {
 
     # Check and set up the environment
     handle_execution_context "$debug" # Get execution context and set environment variables
-    process_args "$@" "$debug"        # Parse command-line arguments
+    process_args "$@" "$debug" || return $? # Parse command-line arguments
+    validate_binary_options || return 1
     enforce_sudo "$debug"             # Ensure proper privileges for script execution
     setup_log "$debug"                # Setup logging environment
 
@@ -8019,6 +9950,7 @@ _main() {
     validate_sys_accs "$debug" # Verify critical system files are accessible
     validate_env_vars "$debug" # Check for required environment variables
     get_proj_params "$debug"   # Get project and git parameters
+    [[ "$BINARY_SOURCE" == "build" ]] || BUILD_TYPE_OVERRIDE="RELEASE"
     resolve_build_settings "$debug"
     if [[ "${LOG_LEVEL_SET_FROM_ENV}" != "true" ]]; then
         if [[ "${WSPR_BUILD_TYPE}" == "RELEASE" ]]; then
@@ -8036,8 +9968,22 @@ _main() {
     check_arch "$debug"        # Validate Raspberry Pi model compatibility
     check_internet "$debug"    # Verify internet connectivity if required
 
+    # Resolve the independently owned RP1 provider before any package-manager
+    # mutation. Automatic selection skips non-Pi-5/unknown systems, while an
+    # explicit true request is only an installation override.
+    if [[ "$ACTION" != "uninstall" ]]; then
+        prepare_rp1_gpclk_dkms_installation "$debug" || return 1
+    fi
+
     # Start the script
     start_script "$debug"
+
+    # The operator has confirmed the install; enforce build resources before
+    # any package, service, or compilation mutation begins.
+    if [[ "$ACTION" != "uninstall" ]]; then
+        preflight_build_resources "$debug" || return 1
+        prepare_precompiled_executable "$debug" || return 1
+    fi
 
     # Print/display the environment
     print_model_name "$debug"   # Log board variant
@@ -8053,8 +9999,16 @@ _main() {
         detect_apache_web_mode "$debug"
     fi
 
-    # Install dependencies after system checks
-    [[ "$ACTION" != "uninstall" ]] && handle_apt_packages "$debug"
+    # Prepare an owned runtime, then install and validate dependencies.
+    if [[ "$ACTION" != "uninstall" ]]; then
+        logI "Updating and managing required packages (this may take a few minutes)."
+        prepare_rp1_gpclk_runtime_update "$debug" || return 1
+        handle_apt_packages "$debug" || return 1
+        validate_support_bundle_age_dependency "$debug" || return 1
+        validate_precompiled_runtime "$debug" || return 1
+        validate_rp1_gpclk_build_dependencies "$debug" || return 1
+        apply_rp1_gpclk_dkms_installation "$debug" || return 1
+    fi
 
     # Handle correcting timezone
     [[ "$ACTION" != "uninstall" ]] && set_time "$debug"
@@ -8069,7 +10023,7 @@ _main() {
     fi
 
     # Install or uninstall Wsprry Pi services
-    manage_wsprry_pi "$debug"
+    manage_wsprry_pi "$debug" || return $?
 
     debug_end "$debug"
     return 0
@@ -8097,11 +10051,16 @@ main() {
 #          exits. This enables proper session cleanup and displays session
 #          statistics to the user.
 # -----------------------------------------------------------------------------
-trap egress EXIT
+if [[ -z "${BASH_SOURCE[0]:-}" || "${BASH_SOURCE[0]}" == "$0" ]]; then
+    trap egress EXIT
+    trap 'exit 130' INT
+    trap 'exit 143' TERM
+    trap 'exit 129' HUP
 
-debug=$(debug_start "$@")
-eval set -- "$(debug_filter "$@")"
-main "$@" "$debug"
-retval="$?"
-debug_end "$debug"
-exit "$retval"
+    debug=$(debug_start "$@")
+    eval set -- "$(debug_filter "$@")"
+    main "$@" "$debug"
+    retval="$?"
+    debug_end "$debug"
+    exit "$retval"
+fi

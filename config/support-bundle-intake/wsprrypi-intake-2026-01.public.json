@@ -1,0 +1,16 @@
+{
+  "schema_version": 1,
+  "project_id": "wsprrypi",
+  "purpose": "support_intake_manifest_signing",
+  "algorithm": "Ed25519",
+  "key_id": "wsprrypi-intake-2026-01",
+  "public_key": {
+    "encoding": "base64url",
+    "value": "wRJvj70F1YTXv0lFahS5OeoS5rwzRum5WeJv-g1pcD4"
+  },
+  "created_at_utc": "2026-08-17T12:47:58Z",
+  "fingerprint": {
+    "algorithm": "sha256",
+    "value": "688b5769d2b763481bad938fe8a9963693950c5e80bcf6d47d71db75711843ac"
+  }
+}

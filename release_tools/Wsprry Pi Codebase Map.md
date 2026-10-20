@@ -8,12 +8,13 @@ debug issues efficiently.
 
 ------------------------------------------------------------------------
 
-## Project Structure Additions
+## Project Structure
 
-- UI lives in submodule: `./WsprryPi-UI`
+- First-party UI component: `./WsprryPi-UI`
 - Scripts and installer: `./scripts`
 - Developer notes and release tooling: `./release_tools`
-- Core source directory: `./src/` (contains multiple submodules)
+- Core source and reusable components: `./src/`
+- Component maintenance: `./docs/components/README.md`
 - Deployment target: systemd-managed service
 - CLI interface available alongside daemon operation
 
@@ -53,7 +54,7 @@ debug issues efficiently.
 
 - `src/arg_parser.cpp` --- CLI argument parsing
 - `src/config_handler.cpp` --- Config normalization and persistence
-- `INI-Handler/src/ini_file.cpp` --- INI parsing
+- `src/INI-Handler/src/ini_file.cpp` --- INI parsing
 - `src/web_server.cpp`, `src/web_socket.cpp` --- UI/API layer
 
 ------------------------------------------------------------------------
@@ -62,7 +63,7 @@ debug issues efficiently.
 
 - `src/scheduling.cpp` --- Central orchestration logic
 - `src/scheduling.hpp` --- Public scheduler interface
-- `src/wspr_band_lookup.cpp` --- Frequency and band resolution
+- `src/band_lookup.cpp` --- Frequency and band resolution
 - `src/band_gpio*.cpp` --- Band GPIO handling
 
 Responsibilities:
@@ -77,7 +78,7 @@ Responsibilities:
 
 ### 3. Request Contract Layer
 
-- `WSPR-Transmitter/src/wspr_transmit_types.hpp`
+- `src/WSPR-Transmitter/src/wspr_transmit_types.hpp`
 
 Defines:
 
@@ -90,9 +91,9 @@ This is the commit boundary contract between scheduler and backend.
 
 ### 4. Execution / Backend Layer
 
-- `WSPR-Transmitter/src/wspr_transmit.cpp` --- High-level execution
-- `WSPR-Transmitter/src/wspr_transmit_backend_rpi.cpp` --- Hardware-specific backend
-- `Mailbox/src/mailbox.cpp` --- Low-level Pi interaction
+- `src/WSPR-Transmitter/src/wspr_transmit.cpp` --- High-level execution
+- `src/WSPR-Transmitter/src/wspr_transmit_backend_rpi.cpp` --- Hardware-specific backend
+- `src/Mailbox/src/mailbox.cpp` --- Low-level Pi interaction
 
 Responsibilities:
 
@@ -104,10 +105,10 @@ Responsibilities:
 
 ### 5. WSPR Reference Layer
 
-- `WSPR-Transmitter/src/wspr_reference_adapter.cpp` --- Integration seam
-- `WSPR-Reference/src/wspr/wspr_ref_plan.cpp` --- Planning logic
-- `WSPR-Reference/src/wspr/wspr_ref_encoder.cpp` --- Encoding
-- `WSPR-Reference/src/wspr/wspr_ref_decoder.cpp` --- Decoding
+- `src/WSPR-Transmitter/src/wspr_reference_adapter.cpp` --- Integration seam
+- `src/WSPR-Reference/src/wspr/wspr_ref_plan.cpp` --- Planning logic
+- `src/WSPR-Reference/src/wspr/wspr_ref_encoder.cpp` --- Encoding
+- `src/WSPR-Reference/src/wspr/wspr_ref_decoder.cpp` --- Decoding
 
 Purpose:
 
@@ -118,8 +119,8 @@ Purpose:
 
 ## PPM System
 
-- `PPM-Manager/src/ppm_manager.hpp` --- Interface
-- `PPM-Manager/src/ppm_manager.cpp` --- Implementation
+- `src/PPM-Manager/src/ppm_manager.hpp` --- Interface
+- `src/PPM-Manager/src/ppm_manager.cpp` --- Implementation
 
 Key concept:
 
@@ -130,9 +131,27 @@ Key concept:
 
 ## Source Composition
 
-The `./src/` directory includes multiple submodules that are compiled
-into the final binary. These represent independently maintained
-components that form the runtime system.
+The parent repository tracks ten coherent component directories as ordinary
+content:
+
+- `WsprryPi-UI`
+- `src/INI-Handler`
+- `src/LCBLog`
+- `src/Mailbox`
+- `src/MonitorFile`
+- `src/PPM-Manager`
+- `src/Signal-Handler`
+- `src/Singleton`
+- `src/WSPR-Transmitter`
+- `src/WSPR-Reference`
+
+The source components participate in the parent build while retaining their
+named roots, source hierarchies, documentation, and standalone build or test
+entry points where provided. `src/LCBLog` remains independently reusable and
+extractable without WsprryPi-internal dependencies. `src/WSPR-Reference`
+retains its standalone CMake project, `wspr_ref_lib` API, tools, examples,
+vectors, and tests. Maintenance and licensing boundaries are documented in
+`docs/components/README.md`.
 
 ------------------------------------------------------------------------
 
@@ -163,7 +182,7 @@ components that form the runtime system.
 ## UI Layer
 
 - Located in: `./WsprryPi-UI`
-- Maintained as a separate submodule
+- Tracked as a coherent first-party component in the parent repository
 - Interfaces with backend via web server and WebSocket layer
 
 ------------------------------------------------------------------------
@@ -244,18 +263,18 @@ Only the request contract is shared.
 
 ## Recommended Reading Order
 
-1. `dial_frequency_semantics_test.cpp`
-2. `scheduling.hpp`
-3. `scheduling.cpp`
-4. `wspr_transmit_types.hpp`
-5. `wspr_transmit.cpp`
-6. `wspr_transmit_backend_rpi.cpp`
-7. `wspr_reference_adapter.cpp`
-8. `wspr_ref_plan.cpp`
-9. `wspr_ref_encoder.cpp`
-10. `config_handler.cpp`
-11. `wspr_band_lookup.cpp`
-12. `ppm_manager.cpp`
+1. `src/tests/dial_frequency_semantics_test.cpp`
+2. `src/scheduling.hpp`
+3. `src/scheduling.cpp`
+4. `src/WSPR-Transmitter/src/wspr_transmit_types.hpp`
+5. `src/WSPR-Transmitter/src/wspr_transmit.cpp`
+6. `src/WSPR-Transmitter/src/wspr_transmit_backend_rpi.cpp`
+7. `src/WSPR-Transmitter/src/wspr_reference_adapter.cpp`
+8. `src/WSPR-Reference/src/wspr/wspr_ref_plan.cpp`
+9. `src/WSPR-Reference/src/wspr/wspr_ref_encoder.cpp`
+10. `src/config_handler.cpp`
+11. `src/band_lookup.cpp`
+12. `src/PPM-Manager/src/ppm_manager.cpp`
 
 ------------------------------------------------------------------------
 
@@ -263,11 +282,11 @@ Only the request contract is shared.
 
 ### If semantics fail
 
-→ Check `scheduling.cpp` commit path
+→ Check the `src/scheduling.cpp` commit path
 
 ### If transmitted signal is wrong
 
-→ Check backend (`wspr_transmit_backend_rpi.cpp`)
+→ Check the backend (`src/WSPR-Transmitter/src/wspr_transmit_backend_rpi.cpp`)
 
 ### If encoding is wrong
 
@@ -275,7 +294,7 @@ Only the request contract is shared.
 
 ### If config behaves oddly
 
-→ Check `config_handler.cpp` and INI handling
+→ Check `src/config_handler.cpp` and `src/INI-Handler`
 
 ------------------------------------------------------------------------
 

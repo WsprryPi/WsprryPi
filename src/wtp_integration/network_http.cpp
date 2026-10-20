@@ -1,0 +1,111 @@
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2026 Lee Bussy
+#include "network_http.hpp"
+#include "json.hpp"
+#include <array>
+#include <charconv>
+#include <chrono>
+#include <map>
+#include <thread>
+namespace wsprrypi {
+PicoHttpResponse wtp_json_http_exchange(wtp::ByteStream& stream, TlsStream::Clock clock,
+    const std::string& request, std::uint64_t deadline, bool mutation, bool consumer) {
+  const auto error = [](unsigned status, const char *code) {
+    return PicoHttpResponse{status, nlohmann::json{{"error", {{"code", code}}}}.dump(), {}};
+  };
+  std::size_t sent = 0;
+  std::string response;
+  while (clock() < deadline) {
+    if (sent < request.size()) {
+      auto result = stream.write(std::span(reinterpret_cast<const std::uint8_t *>(request.data() + sent), request.size() - sent));
+      if (result.state == wtp::IoState::Progress) sent += result.count;
+      else if (result.state != wtp::IoState::WouldBlock) return error(503, "management_outcome_unknown");
+    }
+    std::array<std::uint8_t, 4096> bytes{};
+    auto result = stream.read(bytes);
+    if (result.state == wtp::IoState::Progress) response.append(reinterpret_cast<const char *>(bytes.data()), result.count);
+    if (response.size() > 36864) return error(502, "invalid_remote_response");
+    const auto boundary = response.find("\r\n\r\n");
+    if (boundary != std::string::npos) {
+      if (boundary < 13 || boundary > 4096 || !response.starts_with("HTTP/1.1 ") || response[12] != ' ')
+        return error(502, "invalid_remote_response");
+      unsigned status{};
+      auto parsed = std::from_chars(response.data() + 9, response.data() + 12, status);
+      if (parsed.ec != std::errc() || parsed.ptr != response.data() + 12 || status < 200 || status > 599)
+        return error(502, "invalid_remote_response");
+      std::map<std::string, std::string> headers;
+      auto pos = response.find("\r\n") + 2;
+      while (pos < boundary) {
+        const auto end = response.find("\r\n", pos), colon = response.find(':', pos);
+        if (colon >= end) return error(502, "invalid_remote_response");
+        auto name = response.substr(pos, colon - pos);
+        std::transform(name.begin(), name.end(), name.begin(), [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+        auto value = response.substr(colon + 1, end - colon - 1);
+        if (value.starts_with(' ')) value.erase(0, 1);
+        if (!headers.emplace(name, value).second) return error(502, "invalid_remote_response");
+        pos = end + 2;
+      }
+      std::size_t length{};
+      const auto &size = headers["content-length"];
+      auto number = std::from_chars(size.data(), size.data() + size.size(), length);
+      if (size.empty() || number.ec != std::errc() || number.ptr != size.data() + size.size() ||
+          length > 32768 || headers.contains("transfer-encoding") || (headers["content-type"] != "application/json" &&
+           !(consumer && status == 200 && headers["content-type"] == "application/octet-stream")))
+        return error(502, "invalid_remote_response");
+      const auto received = response.size() - boundary - 4;
+      if (received > length) return error(502, "invalid_remote_response");
+      if (received == length) {
+        auto payload = response.substr(boundary + 4);
+        if (headers["content-type"] == "application/json" && nlohmann::json::parse(payload, nullptr, false).is_discarded()) return error(502, "invalid_remote_response");
+        return {status, std::move(payload), headers["etag"], headers["content-type"]};
+      }
+    }
+    if (result.state == wtp::IoState::Closed || result.state == wtp::IoState::Failed)
+      return error(503, mutation ? "management_outcome_unknown" : "network_unavailable");
+    std::this_thread::sleep_for(std::chrono::milliseconds(2));
+  }
+  return error(503, mutation ? "management_outcome_unknown" : "network_deadline");
+}
+
+PicoHttpResponse pico_http_request(TlsStream &stream, const TlsSelection &selection,
+    std::shared_ptr<TlsCredentials> credentials, TlsStream::Clock clock,
+    const std::string &resource, const std::string &method,
+    const std::string &body, const std::string &revision) {
+  const auto error = [](unsigned status, const char *code) {
+    return PicoHttpResponse{status, nlohmann::json{{"error", {{"code", code}}}}.dump(), {}};
+  };
+  const bool mutation = method == "PUT" || method == "POST";
+  const bool allowed = (method == "GET" && (resource == "config" || resource == "schedules" ||
+      resource == "network" || resource == "capabilities" || resource == "status" || resource == "application" || resource == "management" ||
+       resource == "station" || resource == "hardware" || resource == "pins" || resource == "application/2" || resource == "station/2" || resource == "gpio-drive" || resource == "config/3" || resource == "hardware/2" || resource == "application/3" || resource == "progress/2" || resource == "progress")) ||
+      (method == "PUT" && (resource == "config" || resource == "schedules" || resource == "network" || resource == "station" || resource == "hardware" || resource == "config/2" || resource == "station/2" || resource == "gpio-drive" || resource == "config/3")) ||
+      (method == "POST" && (resource == "config/update" || resource == "config/update/2" || resource == "config/update/3" || resource == "progress/update/2" || resource == "progress/apply/2" || resource == "progress/update" || resource == "progress/apply" || resource == "pins/validate"));
+  if (!allowed)
+    return error(404, "not_found");
+  if (body.size() > 32768 || revision.size() > 128 || revision.find_first_of("\r\n") != std::string::npos)
+    return error(400, "invalid_request");
+  if (method == "POST" && body.size() > 2048) return error(413, "body_too_large");
+  if (method == "PUT" && (resource == "station" || resource == "station/2" || resource == "hardware") && body.size() > 1024)
+    return error(413,"body_too_large");
+  if (mutation && resource != "pins/validate" && revision.empty()) return error(428, "revision_required");
+  if (!stream.begin_open(selection, std::move(credentials), "http/1.1")) return error(503, "network_unavailable");
+  struct Close { TlsStream &stream; ~Close() { stream.close(); } } close{stream};
+  const auto deadline = clock() + 20000;
+  while (stream.opening() && clock() < deadline) {
+    stream.poll_open(); std::this_thread::sleep_for(std::chrono::milliseconds(2));
+  }
+  if (!stream.ready()) return error(503, "tls_authentication_or_connection_failed");
+  // The successful handshake authenticated the canonical configured reference
+  // identity. Resolution chooses only the TCP address, never HTTP authority.
+  auto authority = stream.observation().authenticated_identity;
+  if (authority.find(':') != std::string::npos) authority = '[' + authority + ']';
+  if (selection.port != 443) authority += ':' + std::to_string(selection.port);
+  std::string request = method + " /api/v1/" + resource + " HTTP/1.1\r\nHost: " + authority + "\r\n";
+  if (mutation) request += "Origin: https://" + authority +
+      "\r\nContent-Type: application/json\r\nX-WsprryPico-Request: 1\r\n" + (revision.empty() ? "" : "If-Match: " + revision + "\r\n") +
+      "Content-Length: " + std::to_string(body.size()) + "\r\n";
+  request += "\r\n" + body;
+  return wtp_json_http_exchange(stream, clock, request, deadline, mutation);
+}
+
+} // namespace wsprrypi

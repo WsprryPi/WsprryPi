@@ -6,7 +6,7 @@
  * appropriate GPIO based on the active amateur band and controls its
  * state during transmission.
  *
- * It bridges frequency-based band lookup (WSPRBandLookup) with GPIO
+ * It bridges frequency-based band lookup (BandLookup) with GPIO
  * control (GPIOOutput), using configuration provided by band_gpio.*.
  * Scheduling decides which band should be active; this helper only
  * prepares, asserts, and releases the selected output safely.

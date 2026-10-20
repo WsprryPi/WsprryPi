@@ -59,7 +59,7 @@ namespace
         config.tx_pin = 4;
         set_raspberry_pi_generation_override_for_test(4);
         config.ppm = 0.0;
-        config.use_ntp = false;
+        config.use_system_clock_frequency_estimate = false;
         config.use_offset = false;
         config.wspr.callsign = config.callsign;
         config.wspr.grid_square = config.grid_square;

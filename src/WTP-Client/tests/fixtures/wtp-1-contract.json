@@ -1,0 +1,90 @@
+{
+  "protocol": "WTP/1",
+  "framing": {
+    "magic_hex": "57545046",
+    "version": 1,
+    "encoding_json": 1,
+    "flags": 0,
+    "header_bytes": 16,
+    "max_payload_bytes": 65536,
+    "max_json_depth": 16,
+    "partial_frame_timeout_ms": 5000,
+    "max_consecutive_invalid_frames": 3,
+    "max_resync_discard_bytes": 131072,
+    "crc": {
+      "name": "CRC-32C",
+      "reflected_polynomial_hex": "82f63b78",
+      "initial_hex": "ffffffff",
+      "final_xor_hex": "ffffffff"
+    }
+  },
+  "identifiers": {
+    "pattern": "^[0-9a-f]{32}$"
+  },
+  "operations": [
+    "HELLO", "CAPS", "CLAIM", "RENEW", "RELEASE", "LOAD", "ARM",
+    "ABORT", "STATUS", "GET_CLOCK", "PING"
+  ],
+  "read_only_operations": ["HELLO", "CAPS", "STATUS", "GET_CLOCK", "PING"],
+  "owner_required_operations": ["RENEW", "RELEASE", "LOAD", "ARM", "ABORT"],
+  "states": [
+    "empty", "loaded", "armed", "running", "complete", "aborted",
+    "missed", "failed"
+  ],
+  "transitions": {
+    "empty": ["loaded"],
+    "loaded": ["armed", "aborted", "empty"],
+    "armed": ["running", "aborted", "missed"],
+    "running": ["complete", "aborted", "failed"],
+    "complete": ["loaded", "empty"],
+    "aborted": ["loaded", "empty"],
+    "missed": ["loaded", "empty"],
+    "failed": ["empty"]
+  },
+  "job": {
+    "profile": "rf-events/1",
+    "modes": ["wspr", "qrss", "fskcw", "dfcw", "cw", "tone"],
+    "max_events": 512,
+    "max_duration_ns": "86400000000000"
+  },
+  "safety": {
+    "output_disable_timeout_required": true,
+    "max_output_disable_timeout_ns": "5000000000"
+  },
+  "ownership": {
+    "min_lease_ms": 5000,
+    "max_lease_ms": 60000
+  },
+  "retention": {
+    "min_response_entries": 8,
+    "request_identity": "SHA-256",
+    "min_response_ttl_seconds": 300,
+    "min_terminal_entries": 8,
+    "min_terminal_ttl_seconds": 3600
+  },
+  "clock": {
+    "states": ["unsynchronized", "synchronized", "holdover"],
+    "leap_states": ["normal", "insert_pending", "delete_pending", "unknown"],
+    "leap_exclusion_ns": "1000000000",
+    "max_arm_ahead_ns": "604800000000000",
+    "late_start_allowed": false
+  },
+  "transports": {
+    "reference": "usb-cdc-acm",
+    "tcp_minimum_tls": "1.3",
+    "tcp_alpn": "wtp/1",
+    "tcp_plaintext_allowed": false,
+    "tcp_mutual_authentication": true
+  },
+  "errors": [
+    "INVALID_FRAME", "INVALID_MESSAGE", "UNSUPPORTED_VERSION",
+    "HELLO_REQUIRED", "UNKNOWN_OPERATION", "AUTHENTICATION_REQUIRED",
+    "SESSION_REPLACED", "BUSY", "NOT_OWNER", "LEASE_EXPIRED",
+    "REQUEST_ID_REUSE", "INVALID_STATE", "JOB_NOT_FOUND",
+    "JOB_ID_CONFLICT", "JOB_LIMIT_EXCEEDED", "UNSUPPORTED_PROFILE",
+    "UNSUPPORTED_MODE", "FREQUENCY_REJECTED", "ARM_CONFLICT",
+    "CLOCK_UNSYNCHRONIZED", "CLOCK_UNCERTAIN", "LEAP_UNSAFE",
+    "ARM_TOO_LATE", "ARM_TOO_FAR", "MISSED_START", "OUTPUT_STATE_UNKNOWN",
+    "DEVICE_FAULT", "INTERNAL_ERROR"
+  ]
+}

@@ -1,0 +1,304 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:wsprrypi:wtp:1:schema",
+  "title": "WTP/1 message",
+  "oneOf": [
+    { "$ref": "#/$defs/request" },
+    { "$ref": "#/$defs/response" },
+    { "$ref": "#/$defs/event" }
+  ],
+  "$defs": {
+    "id": { "type": "string", "pattern": "^[0-9a-f]{32}$" },
+    "u64": { "type": "string", "pattern": "^(0|[1-9][0-9]*)$", "x-maximum": "18446744073709551615" },
+    "nonzeroU64": { "type": "string", "pattern": "^[1-9][0-9]*$", "x-maximum": "18446744073709551615" },
+    "state": { "enum": ["empty", "loaded", "armed", "running", "complete", "aborted", "missed", "failed"] },
+    "mode": { "enum": ["wspr", "qrss", "fskcw", "dfcw", "cw", "tone"] },
+    "clockState": { "enum": ["unsynchronized", "synchronized", "holdover"] },
+    "leapState": { "enum": ["normal", "insert_pending", "delete_pending", "unknown"] },
+    "clock": {
+      "type": "object",
+      "required": ["state", "utc_now_ns", "monotonic_now_ns", "uncertainty_ns", "sync_age_ns", "leap"],
+      "properties": {
+        "state": { "$ref": "#/$defs/clockState" },
+        "utc_now_ns": { "$ref": "#/$defs/u64" },
+        "monotonic_now_ns": { "$ref": "#/$defs/u64" },
+        "uncertainty_ns": { "$ref": "#/$defs/u64" },
+        "sync_age_ns": { "$ref": "#/$defs/u64" },
+        "leap": { "$ref": "#/$defs/leapState" },
+        "leap_transition_utc_ns": { "$ref": "#/$defs/u64" }
+      },
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": { "properties": { "leap": { "enum": ["insert_pending", "delete_pending"] } }, "required": ["leap"] },
+          "then": { "required": ["leap_transition_utc_ns"] },
+          "else": { "not": { "required": ["leap_transition_utc_ns"] } }
+        }
+      ]
+    },
+    "rfEvent": {
+      "type": "object",
+      "required": ["offset_ns", "duration_ns", "rf_on"],
+      "properties": {
+        "offset_ns": { "$ref": "#/$defs/u64" },
+        "duration_ns": { "$ref": "#/$defs/nonzeroU64" },
+        "rf_on": { "type": "boolean" },
+        "frequency_nhz": { "$ref": "#/$defs/nonzeroU64" }
+      },
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": { "properties": { "rf_on": { "const": true } }, "required": ["rf_on"] },
+          "then": { "required": ["frequency_nhz"] },
+          "else": { "not": { "required": ["frequency_nhz"] } }
+        }
+      ]
+    },
+    "job": {
+      "type": "object",
+      "required": ["job_id", "profile", "mode", "total_duration_ns", "events"],
+      "properties": {
+        "job_id": { "$ref": "#/$defs/id" },
+        "profile": { "const": "rf-events/1" },
+        "mode": { "$ref": "#/$defs/mode" },
+        "total_duration_ns": { "$ref": "#/$defs/nonzeroU64" },
+        "events": { "type": "array", "minItems": 1, "maxItems": 512, "items": { "$ref": "#/$defs/rfEvent" } },
+        "allow_frequency_adjustment": { "type": "boolean" }
+      },
+      "additionalProperties": false
+    },
+    "requestBase": {
+      "type": "object",
+      "required": ["type", "protocol", "session_id", "request_id", "op", "body"],
+      "properties": {
+        "type": { "const": "request" },
+        "protocol": { "const": "WTP/1" },
+        "session_id": { "$ref": "#/$defs/id" },
+        "request_id": { "$ref": "#/$defs/id" },
+        "op": { "type": "string" },
+        "body": { "type": "object" }
+      },
+      "additionalProperties": false
+    },
+    "request": {
+      "allOf": [
+        { "$ref": "#/$defs/requestBase" },
+        {
+          "oneOf": [
+            { "properties": { "op": { "const": "HELLO" }, "body": { "$ref": "#/$defs/helloRequest" } } },
+            { "properties": { "op": { "const": "CAPS" }, "body": { "$ref": "#/$defs/empty" } } },
+            { "properties": { "op": { "const": "CLAIM" }, "body": { "$ref": "#/$defs/claimRequest" } } },
+            { "properties": { "op": { "const": "RENEW" }, "body": { "$ref": "#/$defs/renewRequest" } } },
+            { "properties": { "op": { "const": "RELEASE" }, "body": { "$ref": "#/$defs/empty" } } },
+            { "properties": { "op": { "const": "LOAD" }, "body": { "$ref": "#/$defs/job" } } },
+            { "properties": { "op": { "const": "ARM" }, "body": { "$ref": "#/$defs/armRequest" } } },
+            { "properties": { "op": { "const": "ABORT" }, "body": { "$ref": "#/$defs/abortRequest" } } },
+            { "properties": { "op": { "const": "STATUS" }, "body": { "$ref": "#/$defs/empty" } } },
+            { "properties": { "op": { "const": "GET_CLOCK" }, "body": { "$ref": "#/$defs/empty" } } },
+            { "properties": { "op": { "const": "PING" }, "body": { "$ref": "#/$defs/pingBody" } } }
+          ]
+        }
+      ]
+    },
+    "empty": { "type": "object", "maxProperties": 0 },
+    "helloRequest": {
+      "type": "object", "required": ["versions", "client_name", "client_version"],
+      "properties": {
+        "versions": { "type": "array", "minItems": 1, "maxItems": 16, "uniqueItems": true, "items": { "type": "string", "pattern": "^WTP/[1-9][0-9]*$" } },
+        "client_name": { "type": "string", "minLength": 1, "maxLength": 64, "x-maxUtf8Bytes": 64 },
+        "client_version": { "type": "string", "minLength": 1, "maxLength": 64, "x-maxUtf8Bytes": 64 }
+      }, "additionalProperties": false
+    },
+    "claimRequest": {
+      "type": "object", "required": ["owner_id", "lease_ms"],
+      "properties": { "owner_id": { "$ref": "#/$defs/id" }, "lease_ms": { "type": "integer", "minimum": 5000, "maximum": 60000 } },
+      "additionalProperties": false
+    },
+    "renewRequest": {
+      "type": "object", "required": ["owner_id", "lease_ms"],
+      "properties": { "owner_id": { "$ref": "#/$defs/id" }, "lease_ms": { "type": "integer", "minimum": 5000, "maximum": 60000 } },
+      "additionalProperties": false
+    },
+    "armRequest": {
+      "type": "object", "required": ["job_id", "start_utc_ns", "max_start_uncertainty_ns"],
+      "properties": {
+        "job_id": { "$ref": "#/$defs/id" },
+        "start_utc_ns": { "$ref": "#/$defs/u64" },
+        "max_start_uncertainty_ns": { "$ref": "#/$defs/u64" }
+      }, "additionalProperties": false
+    },
+    "abortRequest": {
+      "type": "object", "required": ["job_id"],
+      "properties": { "job_id": { "$ref": "#/$defs/id" } }, "additionalProperties": false
+    },
+    "pingBody": {
+      "type": "object", "properties": { "token": { "type": "string", "maxLength": 64, "x-maxUtf8Bytes": 64 } }, "additionalProperties": false
+    },
+    "responseBase": {
+      "type": "object",
+      "required": ["type", "protocol", "session_id", "request_id", "op", "ok"],
+      "properties": {
+        "type": { "const": "response" }, "protocol": { "const": "WTP/1" },
+        "session_id": { "$ref": "#/$defs/id" }, "request_id": { "$ref": "#/$defs/id" },
+        "op": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]{0,63}$", "x-maxUtf8Bytes": 64 },
+        "ok": { "type": "boolean" }, "body": { "type": "object" }, "error": { "$ref": "#/$defs/error" }
+      },
+      "additionalProperties": false
+    },
+    "response": {
+      "allOf": [
+        { "$ref": "#/$defs/responseBase" },
+        { "oneOf": [
+          { "properties": { "ok": { "const": true } }, "required": ["body"], "not": { "required": ["error"] } },
+          { "properties": { "ok": { "const": false } }, "required": ["error"], "not": { "required": ["body"] } }
+        ] },
+        { "if": { "properties": { "ok": { "const": true } }, "required": ["ok"] }, "then": { "$ref": "#/$defs/successResponse" } }
+      ]
+    },
+    "successResponse": {
+      "oneOf": [
+        { "properties": { "op": { "const": "HELLO" }, "body": { "$ref": "#/$defs/helloResponse" } } },
+        { "properties": { "op": { "const": "CAPS" }, "body": { "$ref": "#/$defs/capsResponse" } } },
+        { "properties": { "op": { "enum": ["CLAIM", "RENEW"] }, "body": { "$ref": "#/$defs/leaseResponse" } } },
+        { "properties": { "op": { "const": "RELEASE" }, "body": { "$ref": "#/$defs/empty" } } },
+        { "properties": { "op": { "const": "LOAD" }, "body": { "$ref": "#/$defs/loadResponse" } } },
+        { "properties": { "op": { "const": "ARM" }, "body": { "$ref": "#/$defs/armResponse" } } },
+        { "properties": { "op": { "const": "ABORT" }, "body": { "$ref": "#/$defs/abortResponse" } } },
+        { "properties": { "op": { "const": "STATUS" }, "body": { "$ref": "#/$defs/status" } } },
+        { "properties": { "op": { "const": "GET_CLOCK" }, "body": { "$ref": "#/$defs/clock" } } },
+        { "properties": { "op": { "const": "PING" }, "body": { "$ref": "#/$defs/pingBody" } } }
+      ]
+    },
+    "helloResponse": {
+      "type": "object", "required": ["selected_version", "device_id", "boot_id", "product", "firmware_version"],
+      "properties": {
+        "selected_version": { "const": "WTP/1" }, "device_id": { "$ref": "#/$defs/id" }, "boot_id": { "$ref": "#/$defs/id" },
+        "product": { "type": "string", "minLength": 1, "maxLength": 64, "x-maxUtf8Bytes": 64 },
+        "firmware_version": { "type": "string", "minLength": 1, "maxLength": 64, "x-maxUtf8Bytes": 64 }
+      }, "additionalProperties": false
+    },
+    "frequencyRange": {
+      "type": "object", "required": ["minimum_nhz", "maximum_nhz"],
+      "properties": { "minimum_nhz": { "$ref": "#/$defs/nonzeroU64" }, "maximum_nhz": { "$ref": "#/$defs/nonzeroU64" } },
+      "additionalProperties": false
+    },
+    "capsResponse": {
+      "type": "object",
+      "required": ["profiles", "modes", "engine", "frequency_ranges", "max_payload_bytes", "max_events", "max_job_duration_ns", "minimum_arm_lead_ns", "maximum_arm_ahead_ns", "maximum_arm_uncertainty_ns", "maximum_holdover_age_ns", "output_disable_timeout_ns", "minimum_lease_ms", "maximum_lease_ms", "response_cache_entries", "response_cache_ttl_seconds", "terminal_record_entries", "terminal_record_ttl_seconds"],
+      "properties": {
+        "profiles": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "const": "rf-events/1" } },
+        "modes": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "$ref": "#/$defs/mode" } },
+        "engine": { "type": "string", "minLength": 1, "maxLength": 64, "x-maxUtf8Bytes": 64 },
+        "frequency_ranges": { "type": "array", "minItems": 1, "maxItems": 32, "items": { "$ref": "#/$defs/frequencyRange" } },
+        "max_payload_bytes": { "const": 65536 }, "max_events": { "type": "integer", "minimum": 1, "maximum": 512 },
+        "max_job_duration_ns": { "allOf": [{ "$ref": "#/$defs/nonzeroU64" }, { "x-maximum": "86400000000000" }] }, "minimum_arm_lead_ns": { "$ref": "#/$defs/u64" },
+        "maximum_arm_ahead_ns": { "allOf": [{ "$ref": "#/$defs/nonzeroU64" }, { "x-maximum": "604800000000000" }] }, "maximum_arm_uncertainty_ns": { "$ref": "#/$defs/u64" }, "maximum_holdover_age_ns": { "$ref": "#/$defs/u64" },
+        "output_disable_timeout_ns": { "allOf": [{ "$ref": "#/$defs/nonzeroU64" }, { "x-maximum": "5000000000" }] }, "minimum_lease_ms": { "type": "integer", "maximum": 5000 },
+        "maximum_lease_ms": { "type": "integer", "minimum": 60000 }, "response_cache_entries": { "type": "integer", "minimum": 8 },
+        "response_cache_ttl_seconds": { "type": "integer", "minimum": 300 }, "terminal_record_entries": { "type": "integer", "minimum": 8 },
+        "terminal_record_ttl_seconds": { "type": "integer", "minimum": 3600 }
+      }, "additionalProperties": false
+    },
+    "leaseResponse": {
+      "type": "object", "required": ["owner_id", "granted_lease_ms", "expires_monotonic_ns"],
+      "properties": { "owner_id": { "$ref": "#/$defs/id" }, "granted_lease_ms": { "type": "integer", "minimum": 5000, "maximum": 60000 }, "expires_monotonic_ns": { "$ref": "#/$defs/u64" } },
+      "additionalProperties": false
+    },
+    "adjustment": {
+      "type": "object", "required": ["event_index", "requested_frequency_nhz", "realized_frequency_nhz"],
+      "properties": { "event_index": { "type": "integer", "minimum": 0, "maximum": 511 }, "requested_frequency_nhz": { "$ref": "#/$defs/nonzeroU64" }, "realized_frequency_nhz": { "$ref": "#/$defs/nonzeroU64" } },
+      "additionalProperties": false
+    },
+    "loadResponse": {
+      "type": "object", "required": ["job_id", "state", "adjustments"],
+      "properties": { "job_id": { "$ref": "#/$defs/id" }, "state": { "const": "loaded" }, "adjustments": { "type": "array", "maxItems": 512, "items": { "$ref": "#/$defs/adjustment" } } },
+      "additionalProperties": false
+    },
+    "armResponse": {
+      "type": "object", "required": ["job_id", "state", "start_utc_ns", "start_monotonic_ns", "clock"],
+      "properties": { "job_id": { "$ref": "#/$defs/id" }, "state": { "const": "armed" }, "start_utc_ns": { "$ref": "#/$defs/u64" }, "start_monotonic_ns": { "$ref": "#/$defs/u64" }, "clock": { "$ref": "#/$defs/clock" } },
+      "additionalProperties": false
+    },
+    "abortResponse": {
+      "type": "object", "required": ["job_id", "state", "output_active"],
+      "properties": { "job_id": { "$ref": "#/$defs/id" }, "state": { "const": "aborted" }, "output_active": { "const": false } },
+      "additionalProperties": false
+    },
+    "terminalRecord": {
+      "type": "object", "required": ["job_id", "state", "ended_monotonic_ns", "output_active"],
+      "properties": { "job_id": { "$ref": "#/$defs/id" }, "state": { "enum": ["complete", "aborted", "missed", "failed"] }, "ended_monotonic_ns": { "$ref": "#/$defs/u64" }, "output_active": { "type": "boolean" }, "error": { "$ref": "#/$defs/error" } },
+      "additionalProperties": false,
+      "allOf": [
+        { "if": { "properties": { "state": { "enum": ["failed", "missed"] } }, "required": ["state"] }, "then": { "required": ["error"] } },
+        { "if": { "properties": { "state": { "const": "complete" } }, "required": ["state"] }, "then": { "not": { "required": ["error"] } } }
+      ]
+    },
+    "status": {
+      "type": "object", "required": ["boot_id", "state", "output_active", "owner_id", "job_id", "terminal_records"],
+      "properties": {
+        "boot_id": { "$ref": "#/$defs/id" }, "state": { "$ref": "#/$defs/state" }, "output_active": { "type": "boolean" },
+        "owner_id": { "oneOf": [{ "$ref": "#/$defs/id" }, { "type": "null" }] }, "job_id": { "oneOf": [{ "$ref": "#/$defs/id" }, { "type": "null" }] },
+        "terminal_records": { "type": "array", "items": { "$ref": "#/$defs/terminalRecord" } }
+      }, "additionalProperties": false,
+      "allOf": [
+        { "if": { "properties": { "state": { "const": "empty" } }, "required": ["state"] }, "then": { "properties": { "job_id": { "type": "null" } } }, "else": { "properties": { "job_id": { "$ref": "#/$defs/id" } } } }
+      ]
+    },
+    "errorCode": { "enum": ["INVALID_FRAME", "INVALID_MESSAGE", "UNSUPPORTED_VERSION", "HELLO_REQUIRED", "UNKNOWN_OPERATION", "AUTHENTICATION_REQUIRED", "SESSION_REPLACED", "BUSY", "NOT_OWNER", "LEASE_EXPIRED", "REQUEST_ID_REUSE", "INVALID_STATE", "JOB_NOT_FOUND", "JOB_ID_CONFLICT", "JOB_LIMIT_EXCEEDED", "UNSUPPORTED_PROFILE", "UNSUPPORTED_MODE", "FREQUENCY_REJECTED", "ARM_CONFLICT", "CLOCK_UNSYNCHRONIZED", "CLOCK_UNCERTAIN", "LEAP_UNSAFE", "ARM_TOO_LATE", "ARM_TOO_FAR", "MISSED_START", "OUTPUT_STATE_UNKNOWN", "DEVICE_FAULT", "INTERNAL_ERROR"] },
+    "error": {
+      "type": "object", "required": ["code", "message", "retryable"],
+      "properties": { "code": { "$ref": "#/$defs/errorCode" }, "message": { "type": "string", "minLength": 1, "maxLength": 256, "x-maxUtf8Bytes": 256 }, "retryable": { "type": "boolean" }, "detail": { "type": "object" } },
+      "additionalProperties": false
+    },
+    "eventBase": {
+      "type": "object", "required": ["type", "protocol", "session_id", "boot_id", "event_id", "event", "body"],
+      "properties": {
+        "type": { "const": "event" }, "protocol": { "const": "WTP/1" }, "session_id": { "$ref": "#/$defs/id" },
+        "boot_id": { "$ref": "#/$defs/id" }, "event_id": { "$ref": "#/$defs/u64" },
+        "event": { "enum": ["JOB_STATE", "MISSED_START", "OWNER_RELEASED", "DEVICE_FAULT", "INVALID_FRAME", "SESSION_REPLACED"] },
+        "body": { "type": "object" }
+      }, "additionalProperties": false
+    },
+    "event": {
+      "allOf": [
+        { "$ref": "#/$defs/eventBase" },
+        { "oneOf": [
+          { "properties": { "event": { "const": "JOB_STATE" }, "body": { "$ref": "#/$defs/jobStateEvent" } } },
+          { "properties": { "event": { "const": "MISSED_START" }, "body": { "$ref": "#/$defs/missedStartEvent" } } },
+          { "properties": { "event": { "const": "OWNER_RELEASED" }, "body": { "$ref": "#/$defs/ownerReleasedEvent" } } },
+          { "properties": { "event": { "const": "DEVICE_FAULT" }, "body": { "$ref": "#/$defs/deviceFaultEvent" } } },
+          { "properties": { "event": { "const": "INVALID_FRAME" }, "body": { "$ref": "#/$defs/errorEvent" } } },
+          { "properties": { "event": { "const": "SESSION_REPLACED" }, "body": { "$ref": "#/$defs/errorEvent" } } }
+        ] }
+      ]
+    },
+    "jobStateEvent": {
+      "type": "object", "required": ["job_id", "state", "output_active"],
+      "properties": { "job_id": { "oneOf": [{ "$ref": "#/$defs/id" }, { "type": "null" }] }, "state": { "$ref": "#/$defs/state" }, "output_active": { "type": "boolean" }, "error": { "$ref": "#/$defs/error" } },
+      "additionalProperties": false,
+      "allOf": [
+        { "if": { "properties": { "state": { "const": "empty" } }, "required": ["state"] }, "then": { "properties": { "job_id": { "type": "null" } } }, "else": { "properties": { "job_id": { "$ref": "#/$defs/id" } } } }
+      ]
+    },
+    "missedStartEvent": {
+      "type": "object", "required": ["job_id", "state", "output_active", "error"],
+      "properties": { "job_id": { "$ref": "#/$defs/id" }, "state": { "const": "missed" }, "output_active": { "const": false }, "error": { "allOf": [{ "$ref": "#/$defs/error" }, { "properties": { "code": { "const": "MISSED_START" } } }] } },
+      "additionalProperties": false
+    },
+    "ownerReleasedEvent": {
+      "type": "object", "required": ["owner_id", "reason", "output_active"],
+      "properties": { "owner_id": { "$ref": "#/$defs/id" }, "reason": { "enum": ["released", "lease_expired", "terminal"] }, "output_active": { "type": "boolean" } },
+      "additionalProperties": false
+    },
+    "deviceFaultEvent": {
+      "type": "object", "required": ["state", "output_active", "error"],
+      "properties": { "job_id": { "$ref": "#/$defs/id" }, "state": { "const": "failed" }, "output_active": { "type": "boolean" }, "error": { "$ref": "#/$defs/error" } },
+      "additionalProperties": false
+    },
+    "errorEvent": {
+      "type": "object", "required": ["error"],
+      "properties": { "error": { "$ref": "#/$defs/error" } },
+      "additionalProperties": false
+    }
+  }
+}

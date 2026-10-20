@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "project_id": "wsprrypi",
+  "purpose": "support_bundle_encryption",
+  "algorithm": "age-x25519",
+  "key_id": "wsprrypi-bundle-2026-01",
+  "recipient": "age1s23dd6mfm5c2prurxreyz4vyclzg8sqn0lu84m98k4m00gtcmg3q8jjqpq",
+  "created_at_utc": "2026-08-17T12:47:58Z",
+  "fingerprint": {
+    "algorithm": "sha256",
+    "value": "61289289afbd0f7813eb59b54e60d514f3cd8dbdf05e9c6b2d405b101b5b0fc4"
+  }
+}

@@ -1,0 +1,5 @@
+{
+  "schema": "wsprrypi-pico-usb-policy/1",
+  "contract": 1,
+  "channel": "devel"
+}

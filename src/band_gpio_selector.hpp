@@ -5,7 +5,7 @@
  * This class provides the runtime interface for selecting an amateur
  * band and controlling its associated GPIO output. It uses the band
  * configuration defined in band_gpio.* and supports selection by
- * HamBand or by frequency via WSPRBandLookup.
+ * HamBand or by frequency via BandLookup.
  *
  * This header represents the control interface of the band GPIO
  * subsystem.

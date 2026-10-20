@@ -1,0 +1,24 @@
+/dts-v1/;
+/plugin/;
+
+#include <dt-bindings/clock/rp1.h>
+#include <dt-bindings/mfd/rp1.h>
+
+&rp1 {
+	#address-cells = <2>;
+	#size-cells = <2>;
+
+	rp1_gpclk_dma_probe: rp1-gpclk-dma-probe@174024 {
+		compatible = "wsprrypi,rp1-gpclk-dma-clock-only";
+		reg = <0xc0 0x40174024 0x0 0x8>,
+		      <0xc0 0x40158000 0x0 0x8>;
+		reg-names = "tick-dma0", "dma-tick0";
+		clocks = <&rp1_clocks RP1_CLK_GP0>;
+		clock-names = "gpclk";
+		dmas = <&rp1_dma RP1_DMA_DMA_TICK_TICK0>;
+		dma-names = "tick0";
+		/* CPU physical address; DMAengine translates it to RP1's system address. */
+		divider-dma-address = /bits/ 64 <0x0000001f0001817c>;
+		status = "okay";
+	};
+};

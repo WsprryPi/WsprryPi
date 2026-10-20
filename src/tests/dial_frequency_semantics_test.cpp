@@ -1,13 +1,26 @@
 #include "arg_parser.hpp"
+#include "si5351_inventory_process.hpp"
+#include "backend_capabilities.hpp"
 #include "config_handler.hpp"
+#include "config_handler_deserialization.hpp"
+#include "config_handler_serialization.hpp"
+#include "i2c_bus_inventory.hpp"
 #include "execution_plan_compiler.hpp"
 #include "frequency_semantics.hpp"
+#include "gpio_band_policy.hpp"
 #include "gpio_output.hpp"
 #include "scheduling.hpp"
-#include "wspr_band_lookup.hpp"
+#include "scheduling_internal.hpp"
+#include "scheduling_rp1_test_support.hpp"
+#include "system_clock_frequency_estimate.hpp"
+#include "ppm_manager.hpp"
+#include "band_lookup.hpp"
 #include "wspr_transmit_backend_si5351.hpp"
+#include "web_server_config_http.hpp"
+#include "wtp_pi_control.hpp"
 
 #include <cmath>
+#include <algorithm>
 #include <cstdlib>
 #include <fstream>
 #include <getopt.h>
@@ -20,9 +33,14 @@
 #include <stdexcept>
 #include <string>
 #include <sys/wait.h>
+#include <tuple>
 #include <unistd.h>
 #include <unordered_map>
 #include <vector>
+
+#if defined(__APPLE__)
+#include <mach-o/dyld.h>
+#endif
 
 #define private public
 #include "wspr_transmit.hpp"
@@ -192,12 +210,22 @@ namespace
         const std::string &message)
     {
         char exe_path[PATH_MAX] = {0};
+#if defined(__APPLE__)
+        std::uint32_t exe_path_capacity = sizeof(exe_path);
+        const bool resolved_executable_path =
+            _NSGetExecutablePath(exe_path, &exe_path_capacity) == 0;
+#else
         const ssize_t exe_path_length =
             readlink("/proc/self/exe", exe_path, sizeof(exe_path) - 1);
+        const bool resolved_executable_path = exe_path_length > 0;
+        if (resolved_executable_path)
+        {
+            exe_path[exe_path_length] = '\0';
+        }
+#endif
         require(
-            exe_path_length > 0,
+            resolved_executable_path,
             message + " must resolve the current test binary path");
-        exe_path[exe_path_length] = '\0';
 
         pid_t pid = fork();
         require(pid >= 0, message + " must be able to fork a child process");
@@ -277,7 +305,9 @@ namespace
             {"GPIO",
              {{"Transmit Pin", "4"},
               {"Power Level", "7"},
-              {"Use NTP", "false"}}},
+              {"Use System Clock Frequency Estimate", "false"},
+              {"Frequency Residual PPM", "0"},
+              {"Manual PPM", "0"}}},
             {"Calibration",
              {{"PPM", "0"}}},
             {"Si5351",
@@ -345,11 +375,11 @@ namespace
         config.callsign = "AA0NT";
         config.grid_square = "EM18";
         config.power_dbm = 20;
-        config.frequencies = "20m@17H";
+        config.frequencies = has_ancillary_gpio() ? "20m@17H" : "20m";
         config.transmit_backend = TransmitBackendKind::GPIO;
         config.gpio_tx_pin = 4;
         config.gpio_power_level = 7;
-        config.gpio_use_ntp = false;
+        config.gpio_use_system_clock_frequency_estimate = false;
         config.wspr_planner_preference = WsprPlannerPreference::Auto;
         config.wspr.callsign = config.callsign;
         config.wspr.grid_square = config.grid_square;
@@ -361,6 +391,53 @@ namespace
         set_frequencies(config);
         config_to_json();
     }
+
+#if WSPRRYPI_BACKEND_RP1_GPCLK
+    void test_rp1_web_backend_persistence()
+    {
+        set_patch_all_from_web_runtime_apply_suppressed_for_test(true);
+        set_si5351_detection_override_for_test(true);
+        set_raspberry_pi_generation_override_for_test(5);
+        set_rp1_gpclk_provider_available_override_for_test(true);
+        require(
+            operator_exposes_rp1_gpio(),
+            "RP1 web backend persistence regression requires the RP1 backend");
+
+        ScopedTemporaryFile persistence_ini(
+            "/tmp/wsprrypi-rp1-web-backend-persistence-XXXXXX");
+        iniFile.set_filename(persistence_ini.path());
+        prime_valid_runtime_identity_config();
+        config.transmit = false;
+        config.transmit_backend = TransmitBackendKind::RP1_GPCLK;
+        resolve_backend_specific_config(config);
+        config_to_json();
+        patch_all_from_web({
+            {"Operation", {{"Transmit Backend", "gpio"}}},
+            {"GPIO", {{"Transmit Pin", 20}}}});
+        require(
+            config.transmit_backend == TransmitBackendKind::RP1_GPCLK &&
+                config.gpio_tx_pin == 20 &&
+                jConfig["Operation"].value("Transmit Backend", std::string()) ==
+                    "rp1-gpclk",
+            "Pi 5 web GPIO changes must retain the canonical RP1 backend identity");
+
+        config.transmit_backend = TransmitBackendKind::GPIO;
+        resolve_backend_specific_config(config);
+        config_to_json();
+        std::string route_persistence_error;
+        require(
+            persist_rp1_gpclk_route_config(4, &route_persistence_error) &&
+                config.transmit_backend == TransmitBackendKind::RP1_GPCLK &&
+                config.gpio_tx_pin == 4 &&
+                jConfig["Operation"].value("Transmit Backend", std::string()) ==
+                    "rp1-gpclk",
+            "Pi 5 route persistence must promote route-neutral GPIO to the canonical RP1 backend: " +
+                route_persistence_error);
+
+        clear_rp1_gpclk_provider_available_override_for_test();
+        set_raspberry_pi_generation_override_for_test(4);
+    }
+#endif
 
     nlohmann::json make_identity_patch(
         const std::string &callsign,
@@ -555,10 +632,312 @@ namespace
             message + " must not mutate live config after rejection");
     }
 
+void test_explicit_tone_experimental_policy()
+{
+    init_default_config();
+    reset_managed_reload_runtime_for_test();
+    reset_current_transmission_request_for_test();
+    set_scheduler_execution_suppressed_for_test(true);
+    config.transmit = false;
+    config.transmit_backend = TransmitBackendKind::GPIO;
+    config.mode = ModeType::QRSS;
+    set_raspberry_pi_generation_override_for_test(4);
+    for (const bool allowed : {false, true})
+    {
+        config.allow_unqualified_frequency = allowed;
+        copy_runtime_config(config, config);
+        for (const auto& request : {
+                 TestToneRequest{TestToneFrequencySource::WsprBand, "12m", std::nullopt},
+                 TestToneRequest{TestToneFrequencySource::CustomRf, "", 24926100U}})
+        {
+            const auto started = start_test_tone(request);
+            const auto committed = current_transmission_request_for_test();
+            const auto stopped = end_test_tone();
+            require(started.started == allowed && !config.transmit,
+                "explicit experimental tones must honor opt-in without enabling scheduling");
+            if (allowed)
+                require(stopped.stopped && committed.allow_unqualified_frequency,
+                    "explicit experimental tones must preserve opt-in through selector preparation");
+        }
+    }
+    set_scheduler_execution_suppressed_for_test(false);
+    clear_pi_generation_override_for_scope();
+}
+
 } // namespace
+
+void test_idle_startup_overrides()
+{
+    for (const char *flag : {"WSPRRYPI_ROUTE_RESTORE_IDLE", "WSPRRYPI_RP1_REBOOT_IDLE"})
+    {
+        setenv(flag, "offline-restoration", 1);
+        for (auto policy : {EnableOnBootBehavior::Never,
+                            EnableOnBootBehavior::Follow,
+                            EnableOnBootBehavior::Always})
+        {
+            init_default_config();
+            config.use_ini = true;
+            config.ini_filename = "/tmp/route_restoration_startup.ini";
+            write_text_file(config.ini_filename, "");
+            iniFile.set_filename(config.ini_filename);
+            config.enable_on_boot = policy;
+            config.transmit = true;
+            config_to_json();
+            json_to_ini();
+            apply_enable_on_boot_startup_policy();
+            require(!config.transmit &&
+                iniFile.getData().at("Operation").at("Transmit") == "false",
+                "Idle startup must disable and persist transmission for every boot policy");
+            require(config.enable_on_boot == policy,
+                "Idle startup must preserve the saved boot preference");
+        }
+        unsetenv(flag);
+    }
+}
 
 int main(int argc, char *argv[])
 {
+    if (const auto inventory_exit = si5351_inventory_process::helper_main(argc, argv))
+        return *inventory_exit;
+    if (argc == 2 && std::string(argv[1]) == "--wtp-transient-ini-only")
+    {
+        ScopedTemporaryFile ini("/tmp/wsprrypi-wtp-transient-XXXXXX");
+        auto data = make_managed_ini_data(
+            "AA0NT", "EM18", "20m", true, WsprPlannerPreference::Auto, "Follow");
+        data["Operation"]["Transmit Backend"] = "wtp";
+        data["Operation"]["Use LED"] = "false";
+        data["Operation"]["Use Amp"] = "false";
+        data["Operation"]["Use Shutdown"] = "false";
+        data["Experimental"] = {
+            {"Allow Unqualified Frequency", "true"},
+            {"Allow Non-Amateur Frequency", "true"}};
+        data["WTP"] = {
+            {"Transport", "network"},
+            {"Hostname", "wsprrypico-0a60df.local"},
+            {"TCP Port", "18443"},
+            {"TLS Server Identity", "wsprrypico-0a60df.local"},
+            {"TLS CA File", "/tmp/ca.crt"},
+            {"TLS Client Certificate", "/tmp/client.crt"},
+            {"TLS Client Key", "/tmp/client.key"},
+            {"Endpoint", ""},
+            {"USB Serial", ""},
+            {"USB Vendor ID", "0"},
+            {"USB Product ID", "0"},
+            {"Device ID", "fd6127d11d6aca42a9905fa3fb1bf1d5"},
+            {"Allow Frequency Adjustment", "true"},
+            {"Start Uncertainty ns", "500000000"}};
+        write_managed_ini_file(ini.path(), data);
+        reset_getopt_state();
+        std::vector<std::string> args = {
+            "wsprrypi", "-i", ini.path(),
+            "--dfcw-message", "ET E",
+            "--dfcw-dot-frequency", "137505",
+            "--dfcw-dash-frequency", "137500",
+            "--dfcw-dot-seconds", "3"};
+        std::vector<char *> parsed_argv = argv_for(args);
+        require(
+            parse_command_line(static_cast<int>(parsed_argv.size()), parsed_argv.data()),
+            "managed WTP INI plus complete transient DFCW request must parse");
+        std::string message;
+        double dot_hz = 0.0;
+        double dash_hz = 0.0;
+        double dot_seconds = 0.0;
+        require(
+            config.use_ini && config.transmit_backend == TransmitBackendKind::WTP &&
+                try_get_dfcw_startup_request(message, dot_hz, dash_hz, dot_seconds) &&
+                message == "ET E" && nearly_equal(dot_hz, 137505.0) &&
+                nearly_equal(dash_hz, 137500.0) && nearly_equal(dot_seconds, 3.0),
+            "managed WTP transient DFCW must preserve explicit reverse-profile frequencies");
+        std::cout << "Managed WTP transient INI parsing passed" << std::endl;
+        return EXIT_SUCCESS;
+    }
+    if (argc == 2 && std::string(argv[1]) == "--calibration-roundtrip-only")
+    {
+        init_config_json();
+        json_to_config();
+        for (const double value : {0.0, -0.0, 12.345678, -3.5})
+        {
+            auto data = make_managed_ini_data("AA0NT", "EM18", "20m", false);
+            // WTP is compiled in the portable profile. Candidate preparation
+            // validates these fixture identities without opening an endpoint.
+            data["Operation"]["Transmit Backend"] = "wtp";
+            data["WTP"] = {{"Endpoint", "/dev/calibration-test"},
+                {"USB Serial", "calibration-test"}, {"USB Vendor ID", "1"},
+                {"USB Product ID", "2"}, {"Device ID", std::string(32, 'a')}};
+            const auto text = nlohmann::json(value).dump();
+            data["Calibration"]["PPM"] = text;
+            data["GPIO"]["Manual PPM"] = text;
+            data["GPIO"]["Frequency Residual PPM"] = text;
+            iniFile.setData(data);
+            PreparedConfigCandidate candidate;
+            prepare_ini_config_candidate("/tmp/calibration_roundtrip.ini", candidate);
+            require(candidate.valid, "calibration INI candidate must parse: " + candidate.error_reason);
+            require(candidate.normalized_config.si5351_ppm == value &&
+                    candidate.normalized_config.gpio_manual_ppm == value &&
+                    candidate.normalized_config.gpio_frequency_residual_ppm == value,
+                    "calibration must preserve exact zero and custom double values");
+            auto serialized = nlohmann::json::object();
+            config_handler_serialization::serialize_runtime_config_to_json(
+                candidate.normalized_config, serialized);
+            require(serialized["Calibration"]["PPM"].get<double>() == value &&
+                    serialized["GPIO"]["Manual PPM"].get<double>() == value &&
+                    serialized["GPIO"]["Frequency Residual PPM"].get<double>() == value,
+                    "calibration serialization must not introduce an exponent artifact");
+        }
+        {
+            auto data = make_managed_ini_data("AA0NT", "EM18", "20m", false);
+            data["Operation"]["Transmit Backend"] = "wtp";
+            data["WTP"] = {{"Endpoint", "/dev/calibration-test"},
+                {"USB Serial", "calibration-test"}, {"USB Vendor ID", "1"},
+                {"USB Product ID", "2"}, {"Device ID", std::string(32, 'a')}};
+            data["GPIO"]["Manual PPM"] = "5e-324";
+            iniFile.setData(data);
+            PreparedConfigCandidate candidate;
+            prepare_ini_config_candidate("/tmp/calibration_roundtrip.ini", candidate);
+            require(candidate.valid &&
+                    candidate.normalized_config.gpio_manual_ppm == 0.0 &&
+                    candidate.normalized_json["GPIO"]["Manual PPM"].get<double>() == 0.0,
+                "legacy subnormal fallback must load as zero without surfacing the artifact");
+            candidate.normalized_json["GPIO"]["Manual PPM"] =
+                std::numeric_limits<double>::denorm_min();
+            ArgParserConfig rejected_config;
+            bool rejected = false;
+            try
+            {
+                config_handler_deserialization::deserialize_json_to_runtime_config(
+                    candidate.normalized_json, rejected_config);
+            }
+            catch (const std::exception &error)
+            {
+                rejected = std::string(error.what()).find("too small to use") !=
+                    std::string::npos;
+            }
+            require(rejected,
+                "new subnormal fallback values must be rejected before configuration update");
+        }
+        {
+            ScopedTemporaryFile ini("/tmp/wsprrypi-subnormal-ppm-XXXXXX");
+            iniFile.set_filename(ini.path());
+            init_config_json();
+            config.use_ini = true;
+            json_to_ini();
+            const auto before_subnormal = read_text_file(ini.path());
+            jConfig["GPIO"]["Manual PPM"] =
+                std::numeric_limits<double>::denorm_min();
+            bool rejected = false;
+            try
+            {
+                json_to_ini();
+            }
+            catch (const std::exception &error)
+            {
+                rejected = std::string(error.what()).find("too small to use") !=
+                    std::string::npos;
+            }
+            require(rejected && read_text_file(ini.path()) == before_subnormal,
+                "subnormal fallback must not be persisted to INI");
+        }
+        ArgParserConfig defaults;
+        require(defaults.si5351_ppm == 0.0 && defaults.gpio_manual_ppm == 0.0 &&
+                defaults.gpio_frequency_residual_ppm == 0.0,
+                "calibration defaults must be exact zero");
+        std::cout << "Calibration exact-zero and custom-value round trips passed" << std::endl;
+        return EXIT_SUCCESS;
+    }
+    if (argc == 2 && std::string(argv[1]) == "--idle-startup-overrides-only")
+    {
+        test_idle_startup_overrides();
+        return EXIT_SUCCESS;
+    }
+    if (argc == 2 && std::string(argv[1]) == "--i2c-bus-selection-only")
+    {
+        init_config_json();
+        json_to_config();
+        set_si5351_detection_override_for_test(true);
+        set_si5351_address_inventory_override_for_test(1, {0x60, 0x6F});
+        set_raspberry_pi_generation_override_for_test(4);
+        const auto inventory = i2c_bus_inventory::discover();
+        const auto public_config = get_public_config_json();
+        const auto &platform = public_config.at("Platform");
+        assert(platform.at("I2C Bus Discovery Error") == inventory.error);
+        assert(platform.at("I2C Buses").size() == inventory.buses.size());
+        for (std::size_t i = 0; i < inventory.buses.size(); ++i)
+        {
+            assert(platform.at("I2C Buses").at(i).at("Number") == inventory.buses[i].number);
+            assert(platform.at("I2C Buses").at(i).at("Name") == inventory.buses[i].name);
+        }
+        assert(platform.at("Si5351 Address Bus") == 1);
+        assert(platform.at("Si5351 Addresses") ==
+            nlohmann::json::array({"0x60", "0x6F"}));
+        assert(platform.at("Si5351 Address Discovery Error") == "");
+        const auto address_response =
+            web_server_routes::build_si5351_addresses_response("1");
+        assert(address_response.status == 200);
+        const auto address_body = nlohmann::json::parse(address_response.body);
+        assert(address_body.at("I2C Bus") == 1);
+        assert(address_body.at("Addresses") ==
+            nlohmann::json::array({"0x60", "0x6F"}));
+        assert(web_server_routes::build_si5351_addresses_response("1junk").status == 400);
+        assert(!jConfig.contains("Platform"));
+        const auto before = jConfig;
+        const int saved_bus = config.si5351_i2c_bus;
+        bool rejected = false;
+        try
+        {
+            patch_all_from_web({
+                {"Si5351", {{"I2C Bus", 2147483647}}},
+                {"Platform", {{"I2C Buses", {{{"Number", 2147483647}, {"Name", "forged"}}}}}}});
+        }
+        catch (const std::exception &error)
+        {
+            rejected = std::string(error.what()).find("I2C bus") != std::string::npos;
+        }
+        assert(rejected);
+        assert(jConfig == before);
+        assert(config.si5351_i2c_bus == saved_bus);
+        rejected = false;
+        try
+        {
+            patch_all_from_web({{"Si5351", {{"I2C Address", "0x61"}}}});
+        }
+        catch (const std::exception &error)
+        {
+            rejected = std::string(error.what()).find("No register-compatible") !=
+                std::string::npos;
+        }
+        assert(rejected);
+        assert(jConfig == before);
+
+        rejected = false;
+        try
+        {
+            patch_all_from_web({{"Si5351", {{"I2C Address", "0x70"}}}});
+        }
+        catch (const std::exception &error)
+        {
+            rejected = std::string(error.what()).find("0x60 through 0x6F") !=
+                std::string::npos;
+        }
+        assert(rejected);
+        assert(jConfig == before);
+        std::cout << "I2C web selection rejection preserves configuration" << std::endl;
+        return EXIT_SUCCESS;
+    }
+
+    if (argc == 2 &&
+        std::string(argv[1]) == "--rp1-web-backend-persistence-only")
+    {
+#if WSPRRYPI_BACKEND_RP1_GPCLK
+        test_rp1_web_backend_persistence();
+        std::cout << "RP1 web backend persistence tests passed" << std::endl;
+#else
+        std::cout <<
+            "RP1 web backend persistence test skipped: RP1 backend unavailable" <<
+            std::endl;
+#endif
+        return EXIT_SUCCESS;
+    }
+
     if (const char *cli_check = std::getenv("DIAL_FREQUENCY_SEMANTICS_CLI_CHECK");
         cli_check != nullptr && std::string(cli_check) == "1")
     {
@@ -572,7 +951,186 @@ int main(int argc, char *argv[])
     set_si5351_detection_override_for_test(true);
     set_raspberry_pi_generation_override_for_test(4);
 
-    WSPRBandLookup lookup;
+    if (argc == 2 && std::string(argv[1]) == "--explicit-tone-policy-only")
+    {
+        test_explicit_tone_experimental_policy();
+        std::cout << "Explicit tone experimental policy tests passed" << std::endl;
+        return EXIT_SUCCESS;
+    }
+
+    init_default_config();
+    require(
+        config.rp1_gpio_drive_ma == 2,
+        "RP1 GPIO drive must default to the minimum 2 mA profile");
+    init_config_json();
+    require(
+        jConfig.at("GPIO").at("RP1 Drive mA").get<int>() == 2,
+        "canonical default JSON must publish the minimum 2 mA RP1 drive");
+    for (const int drive_ma : {2, 4, 8, 12})
+    {
+        config.rp1_gpio_drive_ma = drive_ma;
+        config_to_json();
+        config.rp1_gpio_drive_ma = 2;
+        json_to_config();
+        require(
+            config.rp1_gpio_drive_ma == drive_ma,
+            "each supported RP1 GPIO drive must survive JSON persistence");
+    }
+    jConfig["GPIO"]["RP1 Drive mA"] = 6;
+    bool invalid_rp1_drive_rejected = false;
+    try
+    {
+        json_to_config();
+    }
+    catch (const std::exception& error)
+    {
+        invalid_rp1_drive_rejected =
+            std::string(error.what()).find("2, 4, 8, or 12") !=
+            std::string::npos;
+    }
+    require(
+        invalid_rp1_drive_rejected,
+        "unsupported RP1 GPIO drive values must be rejected while loading JSON");
+    init_default_config();
+    config.use_ini = true;
+    config.ini_filename = "/tmp/rp1_drive_persistence.ini";
+    config.rp1_gpio_drive_ma = 12;
+    config_to_json();
+    write_text_file(config.ini_filename, "");
+    iniFile.set_filename(config.ini_filename);
+    json_to_ini();
+    require(
+        iniFile.getData().at("GPIO").at("RP1 Drive mA") == "12",
+        "RP1 GPIO drive must be included in managed INI persistence");
+    config.rp1_gpio_drive_ma = 2;
+    ini_to_json(config.ini_filename);
+    json_to_config();
+    require(
+        config.rp1_gpio_drive_ma == 12,
+        "RP1 GPIO drive must survive managed INI reload");
+    set_raspberry_pi_generation_override_for_test(5);
+    config.transmit_backend = TransmitBackendKind::RP1_GPCLK;
+    for (const int drive_ma : {2, 4, 8, 12})
+    {
+        config.rp1_gpio_drive_ma = drive_ma;
+        resolve_backend_specific_config(config);
+        require(
+            config.power_level == drive_ma,
+            "explicit RP1 runtime resolution must consume each committed drive unchanged");
+    }
+    set_raspberry_pi_generation_override_for_test(4);
+    config.transmit_backend = TransmitBackendKind::GPIO;
+    config.gpio_power_level = 7;
+    resolve_backend_specific_config(config);
+    require(
+        config.power_level == 7,
+        "Pi 4 runtime resolution must preserve the legacy GPIO power level");
+    init_default_config();
+
+    {
+#if WSPRRYPI_BACKEND_RP1_GPCLK
+        set_raspberry_pi_generation_override_for_test(5);
+        set_rp1_gpclk_provider_available_override_for_test(true);
+        prime_valid_runtime_identity_config();
+        config.transmit_backend = TransmitBackendKind::RP1_GPCLK;
+        config.frequencies = "20m";
+        config.wspr.frequencies = config.frequencies;
+        set_frequencies(config);
+        config.gpio_tx_pin = 20;
+        resolve_backend_specific_config(config);
+
+        std::string validation_error;
+        require(
+            validate_config_candidate(config, &validation_error),
+            "Pi 5 RP1 validation must accept GPIO20 when the provider is available");
+
+        config_to_json();
+        config.gpio_tx_pin = 4;
+        resolve_backend_specific_config(config);
+        json_to_config();
+        require(
+            config.gpio_tx_pin == 20 && config.tx_pin == 20,
+            "Pi 5 GPIO20 must survive JSON parsing and runtime resolution");
+
+        config.use_ini = true;
+        config.ini_filename = "/tmp/rp1_gpio20_route_persistence.ini";
+        config_to_json();
+        write_text_file(config.ini_filename, "");
+        iniFile.set_filename(config.ini_filename);
+        json_to_ini();
+        require(
+            iniFile.getData().at("GPIO").at("Transmit Pin") == "20",
+            "Pi 5 GPIO20 must be written to managed INI persistence");
+        config.gpio_tx_pin = 4;
+        resolve_backend_specific_config(config);
+        ini_to_json(config.ini_filename);
+        json_to_config();
+        require(
+            config.gpio_tx_pin == 20 && config.tx_pin == 20,
+            "Pi 5 GPIO20 must survive managed INI reload");
+
+        config.use_ini = false;
+        config.rp1_development_confirmation_json = R"({
+            "enabled": true,
+            "route": "GPIO20",
+            "operation_id": "wspr-frame-operation-20",
+            "physical_connection_confirmed": true,
+            "attenuation_and_load_confirmed": true,
+            "bounded_operation_confirmed": true,
+            "non_radiating_topology_confirmed": true,
+            "experimental_status_acknowledged": true
+        })";
+        set_rp1_development_reconcile_invoker_for_test(
+            [](const std::string &route) {
+                require(route == "GPIO20",
+                    "GPIO20 WSPR planning must reconcile the confirmed route");
+                set_rp1_route_transaction_inhibited(false);
+                return nlohmann::json{
+                    {"ok", true},
+                    {"generation", 20},
+                    {"persisted", "GPIO20"},
+                    {"active", "GPIO20"},
+                    {"reconciled", true},
+                    {"journal", "none"},
+                    {"contractIdentity", "rp1-gpclk-route-manager"},
+                    {"endpointOpen", false},
+                    {"endpointOwned", true},
+                    {"state", "idle"},
+                    {"outputInhibited", "Disabled"},
+                    {"operationalReady", "Ready"}};
+            });
+        const ArgParserConfig copied_confirmation_config = config;
+        require(
+            copied_confirmation_config.rp1_development_confirmation_json ==
+                config.rp1_development_confirmation_json,
+            "WSPR runtime configuration copies must retain transient RP1 confirmation");
+        config_to_json();
+        require(
+            jConfig.dump().find("wspr-frame-operation-20") == std::string::npos,
+            "transient RP1 confirmation must never enter persisted JSON configuration");
+        reset_runtime_planning_state_for_identity_test();
+        require(
+            set_config(true),
+            "Pi 5 GPIO20 must enter the normal scheduler planning path");
+        const TransmissionRequest gpio20_request =
+            current_transmission_request_for_test();
+        require(
+            gpio20_request.tx_gpio == 20,
+            "Pi 5 scheduling must snapshot GPIO20 into the committed request");
+        config.gpio_tx_pin = 4;
+        resolve_backend_specific_config(config);
+        require(
+            current_transmission_request_for_test().tx_gpio == 20,
+            "a committed Pi 5 schedule must retain its GPIO20 snapshot after config changes");
+        finish_runtime_planning_state_for_identity_test();
+        reset_rp1_development_reconcile_invoker_for_test();
+
+        clear_rp1_gpclk_provider_available_override_for_test();
+        clear_pi_generation_override_for_scope();
+#endif
+    }
+
+    BandLookup lookup;
 
     require(
         nearly_equal(lookup.parse_string_to_frequency("20m", false), 14095600.0),
@@ -590,8 +1148,17 @@ int main(int argc, char *argv[])
         nearly_equal(lookup.parse_string_to_frequency("mf", false), 474200.0),
         "mf must resolve to the 630m WSPR dial frequency");
     require(
-        nearly_equal(lookup.parse_string_to_frequency("22m", false), 13551500.0),
-        "22m must resolve to the WSPR dial frequency");
+        nearly_equal(
+            lookup.parse_string_to_frequency("60m", false, "wrc15"),
+            5364700.0) &&
+            nearly_equal(
+                lookup.parse_string_to_frequency("60m:legacy", false, "wrc15"),
+                5287200.0),
+        "WSPR profile resolution must affect only bare 60m");
+    bool rejected_22m = false;
+    try { (void)lookup.parse_string_to_frequency("22m", false); }
+    catch (const std::invalid_argument &) { rejected_22m = true; }
+    require(rejected_22m, "22m must no longer resolve as a WSPR alias");
     require(
         lookup.lookup_ham_band(14095600.0).has_value(),
         "band lookup should still succeed on WSPR dial frequency values");
@@ -615,6 +1182,57 @@ int main(int argc, char *argv[])
         }
     }
 
+#if WSPRRYPI_BACKEND_RPI_GPIO || WSPRRYPI_BACKEND_RP1_GPCLK || WSPRRYPI_BACKEND_SI5351
+    {
+        ScopedTemporaryFile conflict_ini("/tmp/wsprrypi-gpio-migration-conflict-XXXXXX");
+        iniFile.set_filename(conflict_ini.path());
+        auto conflict_data = make_managed_ini_data("AA0NT", "EM18", "20m", false);
+#if !WSPRRYPI_BACKEND_RPI_GPIO && WSPRRYPI_BACKEND_SI5351
+        conflict_data["Operation"]["Transmit Backend"] = "si5351";
+#elif !WSPRRYPI_BACKEND_RPI_GPIO && WSPRRYPI_BACKEND_RP1_GPCLK
+        set_raspberry_pi_generation_override_for_test(5);
+        set_rp1_gpclk_provider_available_override_for_test(true);
+#endif
+        conflict_data["GPIO"]["Use System Clock Frequency Estimate"] = "true";
+        conflict_data["GPIO"]["Use NTP"] = "false";
+        iniFile.setData(conflict_data);
+        iniFile.save();
+
+        PreparedConfigCandidate conflict_candidate;
+        prepare_ini_config_candidate(conflict_ini.path(), conflict_candidate);
+        const bool conflict_warning = std::any_of(
+            conflict_candidate.warnings.begin(),
+            conflict_candidate.warnings.end(),
+            [](const std::string &warning)
+            {
+                return warning.find("conflicts with GPIO.Use System Clock Frequency Estimate") !=
+                    std::string::npos;
+            });
+        require(conflict_candidate.valid,
+                "GPIO estimate conflict migration must produce a valid configuration: " +
+                    conflict_candidate.error_reason);
+        require(conflict_candidate.migration_required,
+                "GPIO estimate conflict must require migration");
+        require(
+            conflict_candidate.normalized_config.gpio_use_system_clock_frequency_estimate,
+            "the canonical GPIO estimate value must win a legacy conflict");
+        require(conflict_warning,
+                "GPIO estimate conflict migration must produce a clear warning");
+        commit_config_candidate(conflict_candidate);
+        std::ifstream conflict_file(conflict_ini.path());
+        const std::string conflict_text(
+            (std::istreambuf_iterator<char>(conflict_file)),
+            std::istreambuf_iterator<char>());
+        require(
+            conflict_text.find("Use NTP =") == std::string::npos,
+            "conflict migration must remove the retired key after retaining the canonical value");
+#if !WSPRRYPI_BACKEND_RPI_GPIO && !WSPRRYPI_BACKEND_SI5351 && WSPRRYPI_BACKEND_RP1_GPCLK
+        clear_rp1_gpclk_provider_available_override_for_test();
+        clear_pi_generation_override_for_scope();
+#endif
+    }
+#endif
+
     {
         init_config_json();
         json_to_config();
@@ -631,13 +1249,313 @@ int main(int argc, char *argv[])
 
     {
         const std::string stock_ini =
-            read_text_file("/home/pi/WsprryPi/config/wsprrypi.ini");
+            read_text_file("../config/wsprrypi.ini");
         require(
             stock_ini.find("2200m = \n2200m Active High = false") != std::string::npos &&
                 stock_ini.find("20m = \n20m Active High = false") != std::string::npos &&
                 stock_ini.find("2m =\n2m Active High = false") != std::string::npos &&
                 stock_ini.find("Active High = true") == std::string::npos,
             "stock INI must declare explicit disabled Band GPIO defaults for every band");
+        require(
+            stock_ini.find("[Experimental]") != std::string::npos &&
+                stock_ini.find("Allow Unqualified Frequency = false") != std::string::npos &&
+                stock_ini.find("Allow Non-Amateur Frequency = false") != std::string::npos,
+            "stock INI must expose both experimental frequency controls as default deny");
+        require(
+            stock_ini.find("RP1 Drive mA = 2") != std::string::npos,
+            "stock INI must publish the minimum RP1 GPIO drive default");
+    }
+
+    if (has_ancillary_gpio())
+    {
+        const auto configure_shared_band_gpio = [](ArgParserConfig &candidate,
+                                                    bool active_high) {
+            candidate.band_gpio[ham_band_index(HamBand::BAND_20M)] =
+                BandGPIOConfig{.gpio = 5, .enabled = true, .active_high = active_high};
+            candidate.band_gpio[ham_band_index(HamBand::BAND_40M)] =
+                BandGPIOConfig{.gpio = 5, .enabled = true, .active_high = active_high};
+        };
+
+        prime_valid_runtime_identity_config();
+        configure_shared_band_gpio(config, true);
+        std::string validation_error;
+        require(
+            validate_config_candidate(config, &validation_error),
+            "two enabled bands may share one GPIO when their polarity matches");
+
+        config.band_gpio[ham_band_index(HamBand::BAND_80M)] =
+            BandGPIOConfig{.gpio = 5, .enabled = true, .active_high = true};
+        require(
+            validate_config_candidate(config, &validation_error),
+            "three enabled bands may share one GPIO when their polarity matches");
+
+        config.band_gpio[ham_band_index(HamBand::BAND_80M)].active_high = false;
+        require(
+            !validate_config_candidate(config, &validation_error) &&
+                validation_error ==
+                    "Bands sharing GPIO5 must use the same Active High setting.",
+            "bands sharing a GPIO with conflicting polarity must be rejected");
+
+        prime_valid_runtime_identity_config();
+        configure_shared_band_gpio(config, true);
+        config_to_json();
+        json_to_config();
+        require(
+            validate_config_candidate(config, &validation_error),
+            "JSON configuration must retain valid shared Band GPIO assignments");
+
+        for (const auto &[use_led, use_shutdown, use_amp, pin, label] :
+             std::vector<std::tuple<bool, bool, bool, int, std::string>>{
+                 {true, false, false, 5, "Transmit LED"},
+                 {false, true, false, 5, "Shutdown Button"},
+                 {false, false, true, 5, "Amp Control"}})
+        {
+            prime_valid_runtime_identity_config();
+            configure_shared_band_gpio(config, true);
+            config.use_led = use_led;
+            config.led_pin = use_led ? pin : -1;
+            config.use_shutdown = use_shutdown;
+            config.shutdown_pin = use_shutdown ? pin : -1;
+            config.use_amp = use_amp;
+            config.amp_pin = use_amp ? pin : -1;
+            require(
+                !validate_config_candidate(config, &validation_error) &&
+                    validation_error == "GPIO5 is reserved by " + label + ".",
+                "Band GPIO must reject an enabled " + label + " assignment");
+        }
+
+        prime_valid_runtime_identity_config();
+        configure_shared_band_gpio(config, true);
+        config.use_led = false;
+        config.led_pin = 5;
+        config.use_shutdown = false;
+        config.shutdown_pin = 5;
+        config.use_amp = false;
+        config.amp_pin = 5;
+        require(
+            validate_config_candidate(config, &validation_error),
+            "disabled Pi I/O features must not reserve their retained GPIO values");
+
+        enum class OrdinaryGpioRole
+        {
+            Band,
+            Led,
+            Shutdown,
+            Amp
+        };
+        const auto assign_ordinary_gpio = [](ArgParserConfig &candidate,
+                                             OrdinaryGpioRole role,
+                                             int pin,
+                                             bool enabled) {
+            switch (role)
+            {
+                case OrdinaryGpioRole::Band:
+                    candidate.band_gpio[ham_band_index(HamBand::BAND_20M)] =
+                        BandGPIOConfig{.gpio = pin, .enabled = enabled, .active_high = true};
+                    break;
+                case OrdinaryGpioRole::Led:
+                    candidate.use_led = enabled;
+                    candidate.led_pin = pin;
+                    break;
+                case OrdinaryGpioRole::Shutdown:
+                    candidate.use_shutdown = enabled;
+                    candidate.shutdown_pin = pin;
+                    break;
+                case OrdinaryGpioRole::Amp:
+                    candidate.use_amp = enabled;
+                    candidate.amp_pin = pin;
+                    break;
+            }
+        };
+
+        set_raspberry_pi_generation_override_for_test(5);
+        set_rp1_gpclk_provider_available_override_for_test(true);
+        for (const bool transmit : {false, true})
+        {
+            for (const int transmit_pin : {4, 20})
+            {
+                const int available_pin = transmit_pin == 4 ? 20 : 4;
+                for (const OrdinaryGpioRole role : {
+                         OrdinaryGpioRole::Band,
+                         OrdinaryGpioRole::Led,
+                         OrdinaryGpioRole::Shutdown,
+                         OrdinaryGpioRole::Amp})
+                {
+                    prime_valid_runtime_identity_config();
+                    config.transmit = transmit;
+                    config.transmit_backend = TransmitBackendKind::RP1_GPCLK;
+                    config.gpio_tx_pin = transmit_pin;
+                    resolve_backend_specific_config(config);
+                    assign_ordinary_gpio(config, role, transmit_pin, true);
+                    require(
+                        !validate_config_candidate(config, &validation_error) &&
+                            validation_error ==
+                                "GPIO" + std::to_string(transmit_pin) +
+                                    " is reserved by GPIO RF Output.",
+                        "GPIO RF output must reject every enabled ordinary role on its selected pin regardless of transmit state");
+
+                    prime_valid_runtime_identity_config();
+                    config.transmit = transmit;
+                    config.transmit_backend = TransmitBackendKind::RP1_GPCLK;
+                    config.gpio_tx_pin = transmit_pin;
+                    resolve_backend_specific_config(config);
+                    assign_ordinary_gpio(config, role, available_pin, true);
+                    require(
+                        validate_config_candidate(config, &validation_error),
+                        "GPIO RF output must leave the other GPCLK0-capable pin available to ordinary roles");
+
+                    prime_valid_runtime_identity_config();
+                    config.transmit = transmit;
+                    config.transmit_backend = TransmitBackendKind::RP1_GPCLK;
+                    config.gpio_tx_pin = transmit_pin;
+                    resolve_backend_specific_config(config);
+                    assign_ordinary_gpio(config, role, transmit_pin, false);
+                    require(
+                        validate_config_candidate(config, &validation_error),
+                        "disabled ordinary roles may retain the selected GPIO RF output pin");
+                }
+            }
+        }
+        clear_rp1_gpclk_provider_available_override_for_test();
+        clear_pi_generation_override_for_scope();
+
+        for (const int retained_transmit_pin : {4, 20})
+        {
+            for (const int ordinary_pin : {4, 20})
+            {
+                for (const OrdinaryGpioRole role : {
+                         OrdinaryGpioRole::Band,
+                         OrdinaryGpioRole::Led,
+                         OrdinaryGpioRole::Shutdown,
+                         OrdinaryGpioRole::Amp})
+                {
+                    prime_valid_runtime_identity_config();
+                    config.transmit_backend = TransmitBackendKind::SI5351;
+                    config.gpio_tx_pin = retained_transmit_pin;
+                    resolve_backend_specific_config(config);
+                    assign_ordinary_gpio(config, role, ordinary_pin, true);
+                    require(
+                        validate_config_candidate(config, &validation_error),
+                        "Si5351 backend must not reserve a retained GPIO transmit-pin value");
+                }
+            }
+        }
+
+        prime_valid_runtime_identity_config();
+        config.transmit_backend = TransmitBackendKind::GPIO;
+        config.gpio_tx_pin = 20;
+        config.use_led = true;
+        config.led_pin = 20;
+        config_to_json();
+        json_to_config();
+        require(
+            !validate_config_candidate(config, &validation_error) &&
+                validation_error == "GPIO20 is reserved by GPIO RF Output.",
+            "JSON round trips must preserve and reject a retained GPIO RF-output conflict");
+
+        auto transmit_gpio_conflict_ini =
+            make_managed_ini_data("AA0NT", "EM18", "20m", false);
+        transmit_gpio_conflict_ini["GPIO"]["Transmit Pin"] = "20";
+        transmit_gpio_conflict_ini["Operation"]["Use Shutdown"] = "true";
+        transmit_gpio_conflict_ini["Operation"]["Shutdown Button"] = "20";
+        iniFile.setData(transmit_gpio_conflict_ini);
+        PreparedConfigCandidate transmit_gpio_ini_candidate;
+        prepare_ini_config_candidate(
+            "/tmp/transmit_gpio_conflict.ini",
+            transmit_gpio_ini_candidate);
+        require(
+            !transmit_gpio_ini_candidate.valid &&
+                transmit_gpio_ini_candidate.error_reason ==
+                    "GPIO20 is reserved by GPIO RF Output.",
+            "managed INI load and reload candidates must reject GPIO RF-output conflicts when transmit is off");
+
+        prime_valid_runtime_identity_config();
+        config_to_json();
+        const nlohmann::json before_transmit_gpio_patch = jConfig;
+        bool transmit_gpio_patch_rejected = false;
+        try
+        {
+            patch_all_from_web({
+                {"Operation", {{"Use Amp", true}, {"Amp Pin", 4}}}});
+        }
+        catch (const std::exception &e)
+        {
+            transmit_gpio_patch_rejected =
+                std::string(e.what()).find(
+                    "GPIO4 is reserved by GPIO RF Output.") != std::string::npos;
+        }
+        require(
+            transmit_gpio_patch_rejected && jConfig == before_transmit_gpio_patch,
+            "REST/web patches must reject GPIO RF-output conflicts without changing configuration");
+
+        config.use_led = true;
+        config.led_pin = 6;
+        config.use_shutdown = true;
+        config.shutdown_pin = 6;
+        require(
+            !validate_config_candidate(config, &validation_error) &&
+                validation_error ==
+                    "GPIO6 is assigned to both Transmit LED and Shutdown Button.",
+            "enabled LED, shutdown, and amplifier roles must remain mutually exclusive");
+
+        auto managed_ini = make_managed_ini_data("AA0NT", "EM18", "20m", true);
+        managed_ini["Band GPIO"]["20m"] = "5";
+        managed_ini["Band GPIO"]["20m Active High"] = "true";
+        managed_ini["Band GPIO"]["40m"] = "5";
+        managed_ini["Band GPIO"]["40m Active High"] = "true";
+        iniFile.setData(managed_ini);
+        PreparedConfigCandidate ini_candidate;
+        prepare_ini_config_candidate("/tmp/shared_band_gpio.ini", ini_candidate);
+        require(
+            ini_candidate.valid,
+            "INI configuration must accept matching shared Band GPIO assignments");
+
+        managed_ini["Band GPIO"]["22m"] = "";
+        managed_ini["Band GPIO"]["22m Active High"] = "false";
+        iniFile.setData(managed_ini);
+        prepare_ini_config_candidate("/tmp/retired_disabled_22m.ini", ini_candidate);
+        require(
+            ini_candidate.valid,
+            "INI migration must ignore the retired 22m Band GPIO pair only when disabled");
+        managed_ini["Band GPIO"]["22m"] = "5";
+        iniFile.setData(managed_ini);
+        prepare_ini_config_candidate("/tmp/retired_enabled_22m.ini", ini_candidate);
+        require(
+            !ini_candidate.valid &&
+                ini_candidate.error_reason.find("Unknown key in [Band GPIO]") !=
+                    std::string::npos &&
+                ini_candidate.error_reason.find("22m") != std::string::npos,
+            "INI migration must reject a configured retired 22m Band GPIO assignment");
+        managed_ini["Band GPIO"].erase("22m");
+        managed_ini["Band GPIO"].erase("22m Active High");
+
+        managed_ini["Band GPIO"]["40m Active High"] = "false";
+        iniFile.setData(managed_ini);
+        prepare_ini_config_candidate("/tmp/conflicting_band_gpio.ini", ini_candidate);
+        require(
+            !ini_candidate.valid && ini_candidate.error_reason ==
+                "Bands sharing GPIO5 must use the same Active High setting.",
+            "INI configuration must reject conflicting shared Band GPIO polarity");
+
+        prime_valid_runtime_identity_config();
+        config.use_led = true;
+        config.led_pin = 5;
+        config_to_json();
+        const nlohmann::json before_invalid_patch = jConfig;
+        bool patch_rejected = false;
+        try
+        {
+            patch_all_from_web({
+                {"Band GPIO",
+                 {{"20m", {{"GPIO", 5}, {"Enabled", true}, {"Active High", true}}}}}});
+        }
+        catch (const std::exception &)
+        {
+            patch_rejected = true;
+        }
+        require(
+            patch_rejected && jConfig == before_invalid_patch,
+            "web patches must reject reserved Band GPIO assignments without changing config");
     }
 
     for (const std::string &removed_alias : {
@@ -690,55 +1608,271 @@ int main(int argc, char *argv[])
         require(
             current_transmission_request_for_test().mode == TransmissionMode::WSPR,
             "scheduler must commit a normal WSPR request for GPIO on Raspberry Pi 4");
+        const auto provenance = current_tx_runtime_status_snapshot();
+        require(
+            provenance.gpio_correction_candidate.available &&
+                provenance.gpio_correction_candidate.processor_profile == "BCM2711" &&
+                provenance.gpio_correction_candidate.selected_parent == "PLLD" &&
+                provenance.gpio_correction_candidate.nominal_rate_hz == 750000000.0 &&
+                nearly_equal(
+                    provenance.gpio_correction_candidate.intrinsic_ppm,
+                    0.0,
+                    1.0e-9) &&
+                nearly_equal(
+                    provenance.gpio_correction_candidate.final_ppm,
+                    0.0,
+                    1.0e-9),
+            "candidate provenance must expose the exact planned BCM2711 parent and correction");
+        require(
+            provenance.gpio_correction_committed.available &&
+                !provenance.gpio_correction_committed.active &&
+                provenance.gpio_correction_committed.processor_profile == "BCM2711" &&
+                provenance.gpio_correction_committed.selected_parent == "PLLD" &&
+                provenance.gpio_correction_committed.nominal_rate_hz == 750000000.0 &&
+                nearly_equal(
+                    provenance.gpio_correction_committed.intrinsic_ppm,
+                    0.0,
+                    1.0e-9) &&
+                nearly_equal(
+                    provenance.gpio_correction_committed.final_ppm,
+                    0.0,
+                    1.0e-9) &&
+                !provenance.gpio_correction_committed.execution_identity.empty(),
+            "committed provenance must freeze exact plan identity without claiming idle work is active");
 
+        finish_runtime_planning_state_for_identity_test();
+        reset_current_transmission_request_for_test();
+        require(
+            !current_tx_runtime_status_snapshot().gpio_correction_committed.available,
+            "cleared execution state must not expose stale committed provenance");
+        clear_pi_generation_override_for_scope();
+    }
+
+    {
+        set_raspberry_pi_generation_override_for_test(4);
+        prime_valid_runtime_identity_config();
+        config.frequencies = "2200m";
+        config.allow_unqualified_frequency = false;
+        config.allow_non_amateur_frequency = false;
+        sync_wspr_fields_for_test();
+        require(
+            set_frequencies(config),
+            "BCM2711 2200 m WSPR regression must resolve its dial frequency");
+        reset_runtime_planning_state_for_identity_test();
+        require(
+            set_config(true),
+            "BCM2711 2200 m WSPR regression must plan a scheduler request");
+        const auto bcm2711_legacy_request = current_transmission_request_for_test();
+        const auto bcm2711_2200m_provenance = current_tx_runtime_status_snapshot();
+        require(
+            nearly_equal(bcm2711_legacy_request.ppm, 0.0) &&
+                bcm2711_2200m_provenance.gpio_correction_candidate.available &&
+                bcm2711_2200m_provenance.gpio_correction_candidate.selected_parent ==
+                    "oscillator" &&
+                bcm2711_2200m_provenance.gpio_correction_candidate.nominal_rate_hz ==
+                    54000000.0 &&
+                nearly_equal(
+                    bcm2711_2200m_provenance.gpio_correction_candidate.intrinsic_ppm,
+                    0.0) &&
+                nearly_equal(
+                    bcm2711_2200m_provenance.gpio_correction_candidate.final_ppm,
+                    0.0),
+            "BCM2711 2200 m planning must commit and publish the conservative oscillator zero baseline");
+        auto bcm2711_request = controller_request_from_legacy_for_test(
+            bcm2711_legacy_request,
+            wsprrypi::TransmissionMode::WSPR);
+        wsprrypi::WsprPayload bcm2711_payload;
+        bcm2711_payload.prepared = bcm2711_legacy_request.payload;
+        bcm2711_payload.base_frequency_hz =
+            bcm2711_legacy_request.actual_rf_frequency_hz;
+        bcm2711_request.payload = bcm2711_payload;
+        require(
+            !bcm2711_request.policy.allow_unqualified_frequency &&
+                !bcm2711_request.policy.allow_non_amateur_frequency &&
+                bcm2711_request.policy.hardware_profile ==
+                    wsprrypi::HardwareProfile::BCM2711 &&
+                wsprrypi::evaluate_gpio_band_policy(
+                    wsprrypi::ExecutionPlanCompiler{}.compile(bcm2711_request)).allowed,
+            "direct WSPR controller requests must preserve the qualified BCM2711 2200 m profile");
+        finish_runtime_planning_state_for_identity_test();
+
+        set_raspberry_pi_generation_override_for_test(3);
+        prime_valid_runtime_identity_config();
+        config.frequencies = "2200m";
+        config.allow_unqualified_frequency = true;
+        config.allow_non_amateur_frequency = false;
+        sync_wspr_fields_for_test();
+        require(
+            set_frequencies(config),
+            "legacy 2200 m WSPR override regression must resolve its dial frequency");
+        reset_runtime_planning_state_for_identity_test();
+        require(
+            set_config(true),
+            "legacy 2200 m WSPR override regression must plan a scheduler request");
+        const auto legacy_request = current_transmission_request_for_test();
+        auto legacy_override_request = controller_request_from_legacy_for_test(
+            legacy_request,
+            wsprrypi::TransmissionMode::WSPR);
+        wsprrypi::WsprPayload legacy_payload;
+        legacy_payload.prepared = legacy_request.payload;
+        legacy_payload.base_frequency_hz = legacy_request.actual_rf_frequency_hz;
+        legacy_override_request.payload = legacy_payload;
+        require(
+            legacy_override_request.policy.allow_unqualified_frequency &&
+                !legacy_override_request.policy.allow_non_amateur_frequency &&
+                legacy_override_request.policy.hardware_profile ==
+                    wsprrypi::HardwareProfile::BCM2836_BCM2837 &&
+                wsprrypi::evaluate_gpio_band_policy(
+                    wsprrypi::ExecutionPlanCompiler{}.compile(legacy_override_request)).allowed,
+            "direct WSPR controller requests must preserve the legacy unqualified-frequency override");
         finish_runtime_planning_state_for_identity_test();
         clear_pi_generation_override_for_scope();
     }
 
     {
         set_raspberry_pi_generation_override_for_test(5);
+        set_rp1_gpclk_provider_available_override_for_test(true);
         prime_valid_runtime_identity_config();
+        config.transmit_backend = TransmitBackendKind::RP1_GPCLK;
 
         std::string validation_error;
         require(
-            !validate_config_candidate(config, &validation_error),
-            "GPIO backend must be rejected on Raspberry Pi 5");
+            validate_config_candidate(config, &validation_error),
+            "GPIO4 must be accepted on Raspberry Pi 5 when the RP1 provider is available");
+
+        // This is a hardware-free planning fixture, including route confirmation.
+        config.rp1_development_confirmation_json = R"({
+            "enabled": true, "route": "GPIO4", "operation_id": "ppm-planning-fixture",
+            "physical_connection_confirmed": true,
+            "attenuation_and_load_confirmed": true,
+            "bounded_operation_confirmed": true,
+            "non_radiating_topology_confirmed": true,
+            "experimental_status_acknowledged": true
+        })";
+        set_rp1_development_reconcile_invoker_for_test(
+            [](const std::string &) {
+                set_rp1_route_transaction_inhibited(false);
+                return nlohmann::json{
+                    {"ok", true}, {"generation", 20},
+                    {"persisted", "GPIO4"}, {"active", "GPIO4"},
+                    {"reconciled", true}, {"journal", "none"},
+                    {"contractIdentity", "rp1-gpclk-route-manager"},
+                    {"endpointOpen", false}, {"endpointOwned", true},
+                    {"state", "idle"}, {"outputInhibited", "Disabled"},
+                    {"operationalReady", "Ready"}};
+            });
+        config.gpio_use_system_clock_frequency_estimate = false;
+        config.use_system_clock_frequency_estimate = false;
+        config.gpio_manual_ppm = 12.5;
+        reset_runtime_planning_state_for_identity_test();
         require(
-            validation_error.find(
-                "GPIO transmission mode is unsupported on Raspberry Pi 5 and newer.") !=
-                std::string::npos,
-            "GPIO backend rejection on Raspberry Pi 5 must explain the unsupported platform");
+            set_config(true),
+            "RP1 scheduler must accept a manual GPIO correction");
+        auto rp1_manual_request = current_transmission_request_for_test();
+        auto rp1_manual_provenance = current_tx_runtime_status_snapshot();
+        require(
+            nearly_equal(rp1_manual_request.ppm, 12.5) &&
+                nearly_equal(rp1_manual_provenance.additional_gpio_ppm, 12.5) &&
+                nearly_equal(rp1_manual_provenance.gpio_correction_committed.additional_ppm, 12.5) &&
+                rp1_manual_provenance.gpio_correction_committed.available &&
+                rp1_manual_provenance.gpio_correction_committed.processor_profile ==
+                    "RP1" &&
+                rp1_manual_provenance.gpio_correction_committed.selected_parent ==
+                    "PLL_SYS" &&
+                nearly_equal(
+                    rp1_manual_provenance.gpio_correction_committed.nominal_rate_hz,
+                    200000000.0) &&
+                nearly_equal(
+                    rp1_manual_provenance.gpio_correction_committed.intrinsic_ppm,
+                    -46.245) &&
+                nearly_equal(
+                    rp1_manual_provenance.gpio_correction_committed.final_ppm,
+                    -33.745),
+            "RP1 must freeze only additional PPM for the backend and report the shared intrinsic plus manual correction");
+        config.gpio_manual_ppm = -200.0;
+        require(set_config(true), "RP1 must retain the full additional correction range");
+        require(nearly_equal(current_transmission_request_for_test().ppm, -200.0) &&
+                nearly_equal(current_tx_runtime_status_snapshot().gpio_correction_committed.final_ppm, -246.245),
+            "RP1 must not clamp or apply its intrinsic offset twice at the caller boundary");
+        finish_runtime_planning_state_for_identity_test();
+
+        SystemClockFrequencyEstimate rp1_estimate;
+        rp1_estimate.provider_name = "chrony";
+        rp1_estimate.qualification = FrequencyEstimateQualification::Qualified;
+        rp1_estimate.frequency_ppm = 10.0;
+        rp1_estimate.synchronized = true;
+        rp1_estimate.selected_source = true;
+        rp1_estimate.leap_normal = true;
+        config.gpio_use_system_clock_frequency_estimate = true;
+        config.use_system_clock_frequency_estimate = true;
+        config.gpio_frequency_residual_ppm = 1.25;
+        config.transmit = false;
+        config.loop_tx = true;
+        wsprTransmitter.backendSetStateValue(WsprTransmitter::State::DISABLED);
+        reset_current_transmission_request_for_test();
+        reset_committed_execution_route_for_test();
+        set_current_frequency_estimate_for_test(rp1_estimate);
+        reset_runtime_planning_state_for_identity_test();
+        require(
+            start_test_tone(14097100).started,
+            "RP1 tone planning must accept the injected qualified system-clock estimate");
+        const auto rp1_estimate_request = current_transmission_request_for_test();
+        const auto rp1_estimate_provenance = current_tx_runtime_status_snapshot();
+        require(
+            nearly_equal(rp1_estimate_request.ppm, 11.25) &&
+                nearly_equal(rp1_estimate_provenance.additional_gpio_ppm, 11.25) &&
+                nearly_equal(rp1_estimate_provenance.gpio_correction_committed.additional_ppm, 11.25) &&
+                nearly_equal(
+                    rp1_estimate_provenance.gpio_correction_committed
+                        .conducted_residual_ppm,
+                    1.25) &&
+                nearly_equal(
+                    rp1_estimate_provenance.gpio_correction_committed.final_ppm,
+                    -34.995),
+            "RP1 must report its shared intrinsic plus qualified estimate and conducted residual exactly once");
+        require(end_test_tone().stopped, "RP1 planning fixture must stop its suppressed tone");
+        finish_runtime_planning_state_for_identity_test();
+        reset_rp1_development_reconcile_invoker_for_test();
+        set_current_frequency_estimate_for_test(SystemClockFrequencyEstimate{});
 
         PreparedConfigCandidate candidate;
-        iniFile.setData(make_managed_ini_data("AA0NT", "EM18", "20m", true));
+        auto managed_rp1_ini =
+            make_managed_ini_data("AA0NT", "EM18", "20m", true);
+        managed_rp1_ini["Operation"]["Transmit Backend"] = "rp1-gpclk";
+        iniFile.setData(managed_rp1_ini);
         prepare_ini_config_candidate("/tmp/gpio_pi5.ini", candidate);
         require(
-            !candidate.valid,
-            "managed GPIO configuration must be rejected on Raspberry Pi 5");
-        require(
-            candidate.error_reason.find(
-                "GPIO transmission mode is unsupported on Raspberry Pi 5 and newer.") !=
-                std::string::npos,
-            "managed GPIO rejection on Raspberry Pi 5 must preserve the platform error");
+            candidate.valid,
+            "managed GPIO4 configuration must be accepted on Raspberry Pi 5");
 
+        clear_rp1_gpclk_provider_available_override_for_test();
         clear_pi_generation_override_for_scope();
     }
 
     {
         set_raspberry_pi_generation_override_for_test(5);
+        set_rp1_gpclk_provider_available_override_for_test(true);
         prime_valid_runtime_identity_config();
+        config.transmit_backend = TransmitBackendKind::RP1_GPCLK;
         config.transmit = false;
 
         std::string validation_error;
         require(
-            !validate_config_candidate(config, &validation_error),
-            "GPIO backend must remain invalid on Raspberry Pi 5 even when transmit is off");
-        require(
-            validation_error.find(
-                "GPIO transmission mode is unsupported on Raspberry Pi 5 and newer.") !=
-                std::string::npos,
-            "GPIO backend invalidity on Raspberry Pi 5 must not depend on transmit state");
+            validate_config_candidate(config, &validation_error),
+            "available Pi 5 RP1 GPIO backend must remain valid when transmit is off");
 
+        clear_rp1_gpclk_provider_available_override_for_test();
+
+        PreparedConfigCandidate inactive_candidate;
+        auto inactive_managed_rp1_ini =
+            make_managed_ini_data("AA0NT", "EM18", "20m", false);
+        inactive_managed_rp1_ini["Operation"]["Transmit Backend"] = "rp1-gpclk";
+        iniFile.setData(inactive_managed_rp1_ini);
+        prepare_ini_config_candidate("/tmp/inactive_gpio_pi5.ini", inactive_candidate);
+        require(
+            inactive_candidate.valid,
+            "inactive managed GPIO configuration must load on Raspberry Pi 5 without requiring the inactive provider: " +
+                inactive_candidate.error_reason);
         clear_pi_generation_override_for_scope();
     }
 
@@ -805,14 +1939,19 @@ int main(int argc, char *argv[])
     }
 
     {
-        set_raspberry_pi_generation_override_for_test(5);
-        reset_current_transmission_request_for_test();
+        init_config_json();
+        json_to_config();
+        config.use_ini = false;
         reset_getopt_state();
 
         std::vector<std::string> args = {
             "wsprrypi",
-            "--backend",
-            "gpio",
+            "--no-http",
+            "--socket-loopback-only",
+            "--socket-loopback-family",
+            "ipv4",
+            "--transmit-gpio",
+            "4",
             "AA0NT",
             "EM18",
             "20",
@@ -821,21 +1960,82 @@ int main(int argc, char *argv[])
 
         require(
             parse_command_line(static_cast<int>(argv.size()), argv.data()),
-            "CLI GPIO setup on Raspberry Pi 5 must still parse before validation");
+            "CLI parsing with --no-http must succeed");
+        require(
+            config.enable_web && !config.enable_http,
+            "--no-http must disable HTTP without disabling WebSocket control");
+        require(
+            !web_server_start_enabled(config),
+            "startup gating must skip HTTP when --no-http is present");
+        require(
+            websocket_server_start_enabled(config),
+            "startup gating must retain WebSocket control when --no-http is present");
+        require(
+            config.socket_loopback_only,
+            "loopback-only WebSocket control must remain selected");
+        require(
+            config.socket_loopback_family == WebSocketLoopbackFamily::IPv4,
+            "explicit IPv4 loopback selection must remain command-line bound");
+    }
+
+    {
+        require_cli_parse_rejected(
+            {
+                "wsprrypi",
+                "--socket-loopback-family",
+                "ipv4",
+                "AA0NT",
+                "EM18",
+                "20",
+                "20m"},
+            "loopback family without loopback-only mode");
+        require_cli_parse_rejected(
+            {
+                "wsprrypi",
+                "--socket-loopback-only",
+                "--socket-loopback-family",
+                "localhost",
+                "AA0NT",
+                "EM18",
+                "20",
+                "20m"},
+            "invalid loopback family");
+    }
+
+    {
+        set_raspberry_pi_generation_override_for_test(5);
+        set_rp1_gpclk_provider_available_override_for_test(true);
+        reset_current_transmission_request_for_test();
+        reset_getopt_state();
+
+        std::vector<std::string> args = {
+            "wsprrypi",
+            "--backend",
+            "rp1-gpclk",
+            "AA0NT",
+            "EM18",
+            "20",
+            "20m"};
+        std::vector<char *> argv = argv_for(args);
+
+        require(
+            parse_command_line(static_cast<int>(argv.size()), argv.data()),
+            "explicit CLI RP1 GPCLK setup on Raspberry Pi 5 must parse before validation");
         std::string validation_error;
         require(
-            !validate_config_data_for_test(&validation_error),
-            "CLI startup validation must fail for GPIO on Raspberry Pi 5");
+            validate_config_data_for_test(&validation_error),
+            "CLI startup validation must accept the explicit RP1 GPCLK backend on Raspberry Pi 5");
         require(
-            validation_error.find(
-                "GPIO transmission mode is unsupported on Raspberry Pi 5 and newer.") !=
-                std::string::npos,
-            "CLI startup validation on Raspberry Pi 5 must report the GPIO platform error");
+            config.transmit_backend == TransmitBackendKind::RP1_GPCLK &&
+                std::string(transmit_backend_kind_to_string(config.transmit_backend)) ==
+                    "rp1-gpclk",
+            "explicit RP1 GPCLK CLI selection must retain its distinct runtime identity");
         require(
             current_transmission_request_for_test().actual_rf_frequency_hz == 0.0 &&
                 current_transmission_request_for_test().payload.frames.empty(),
-            "CLI startup failure on Raspberry Pi 5 must not commit a transmission request");
+            "RP1 GPCLK CLI validation must not itself commit a transmission request");
 
+        clear_rp1_gpclk_provider_available_override_for_test();
         clear_pi_generation_override_for_scope();
     }
 
@@ -905,6 +2105,7 @@ int main(int argc, char *argv[])
         clear_si5351_detection_override_for_scope();
     }
 
+#if WSPRRYPI_BACKEND_SI5351
     {
         set_raspberry_pi_generation_override_for_test(5);
 
@@ -944,7 +2145,8 @@ int main(int argc, char *argv[])
             backend.configure(plan, inputs);
         require(
             compile_result.ok,
-            "Si5351 backend configure path must remain allowed on Raspberry Pi 5");
+            "Si5351 backend configure path must remain allowed on Raspberry Pi 5: " +
+                compile_result.error);
 
         const wsprrypi::ExecutionResult execute_result = backend.execute(plan);
         require(
@@ -953,9 +2155,11 @@ int main(int argc, char *argv[])
 
         clear_pi_generation_override_for_scope();
     }
+#endif
 
     {
         WsprTransmitter transmitter;
+        transmitter.selectBackend(wsprrypi::BackendKind::SIMULATED);
 
         wsprrypi::TransmissionRequest controller_request;
         controller_request.mode = wsprrypi::TransmissionMode::TONE;
@@ -990,12 +2194,12 @@ int main(int argc, char *argv[])
 
         require(
             threw,
-            "non-SI5351 controller tone execution must be rejected before backend preparation");
+            "legacy GPIO controller tone execution must be rejected before backend preparation");
         require(
             error_message.find(
-                "Controller tone execution is only supported for the SI5351 backend; received GPIO.") !=
+                "Controller tone execution is supported only for SI5351 or RP1 GPCLK; received GPIO.") !=
                 std::string::npos,
-            "non-SI5351 controller tone execution must fail with the specific backend-routing diagnostic");
+            "legacy GPIO controller tone execution must fail with the specific backend-routing diagnostic");
     }
 
     {
@@ -1031,6 +2235,69 @@ int main(int argc, char *argv[])
         require(
             config.wspr.frequencies == "20m",
             "WSPR.Frequency must remain the authoritative external WSPR frequency input");
+    }
+
+    {
+        init_config_json();
+        jConfig["WSPR"]["Frequency Profile"] = "wrc15";
+        jConfig["WSPR"]["Band Preferences"] = {{"60m", "60m:legacy"}};
+        jConfig["WSPR"]["Frequency"] = "60m 60m:legacy 5.2872MHz";
+        json_to_config();
+        config.transmit = true;
+        config.frequencies = config.wspr.frequencies;
+
+        require(config.wspr.frequency_profile == "wrc15",
+                "WSPR frequency profile must load through the configuration model");
+        require(set_frequencies(config) && config.wspr_frequency_entries.size() == 3,
+                "profile-aware WSPR frequency lists must parse");
+        require(
+            nearly_equal(config.wspr_frequency_entries[0].dial_frequency_hz, 5287200.0) &&
+                nearly_equal(config.wspr_frequency_entries[1].dial_frequency_hz, 5287200.0) &&
+                nearly_equal(config.wspr_frequency_entries[2].dial_frequency_hz, 5287200.0),
+            "local preference must precede the profile while preserving explicit entries");
+        config_to_json();
+        require(jConfig["WSPR"].at("Frequency Profile") == "wrc15",
+                "WSPR frequency profile must serialize through the configuration model");
+        require(jConfig["WSPR"].at("Band Preferences").at("60m") == "60m:legacy",
+                "WSPR band preferences must serialize through the configuration model");
+    }
+
+    {
+        init_config_json();
+        jConfig["WSPR"]["Band Preferences"] = {
+            {"20m", 14095650},
+            {"60m", "60m:wrc15"},
+            {"8m", 40680000},
+            {"5m", 60000000}};
+        jConfig["WSPR"]["Frequency"] = "20m 60m 8m 5m";
+        json_to_config();
+
+        require(
+            std::get<std::uint64_t>(config.wspr.band_preferences.at("20m")) ==
+                    14095650 &&
+                std::get<std::string>(config.wspr.band_preferences.at("60m")) ==
+                    "60m:wrc15",
+            "configuration must retain typed numeric and preset band preferences");
+        require(set_frequencies(config) && config.wspr_frequency_entries.size() == 4 &&
+                    nearly_equal(
+                        config.wspr_frequency_entries[0].dial_frequency_hz,
+                        14095650.0) &&
+                    nearly_equal(
+                        config.wspr_frequency_entries[1].dial_frequency_hz,
+                        5364700.0) &&
+                    nearly_equal(
+                        config.wspr_frequency_entries[2].dial_frequency_hz,
+                        40680000.0) &&
+                    nearly_equal(
+                        config.wspr_frequency_entries[3].dial_frequency_hz,
+                        60000000.0),
+            "numeric preferences, including configured-only 8m and 5m, must drive scheduler dial resolution");
+        config_to_json();
+        require(
+            jConfig["WSPR"].at("Band Preferences").at("20m").is_number_unsigned() &&
+                jConfig["WSPR"].at("Band Preferences").at("20m") == 14095650 &&
+                jConfig["WSPR"].at("Band Preferences").at("60m") == "60m:wrc15",
+            "typed band preferences must serialize without changing representation");
     }
 
     {
@@ -1130,6 +2397,35 @@ int main(int argc, char *argv[])
 
     {
         init_config_json();
+        json_to_config();
+        config.transmit = false;
+        config.frequencies = "223.5MHz 435000000";
+        require(
+            set_frequencies(config) &&
+                config.wspr_frequency_entries.size() == 2U &&
+                lookup.lookup_ham_band(
+                    config.wspr_frequency_entries[0].dial_frequency_hz) ==
+                    std::optional<HamBand>(HamBand::BAND_1_25M) &&
+                lookup.lookup_ham_band(
+                    config.wspr_frequency_entries[1].dial_frequency_hz) ==
+                    std::optional<HamBand>(HamBand::BAND_70CM),
+            "numeric WSPR entries in 1.25 m and 70 cm must resolve to canonical HamBands");
+
+        config.frequencies = "1.25m 70cm";
+        require(
+            set_frequencies(config) &&
+                config.wspr_frequency_entries.size() == 2U &&
+                nearly_equal(
+                    config.wspr_frequency_entries[0].dial_frequency_hz,
+                    222100000.0) &&
+                nearly_equal(
+                    config.wspr_frequency_entries[1].dial_frequency_hz,
+                    432300000.0),
+            "authoritative 1.25 m and 70 cm WSPR aliases must parse to their dial frequencies");
+    }
+
+    {
+        init_config_json();
         if (jConfig.contains("CW") && jConfig["CW"].is_object())
         {
             jConfig["CW"].erase("Base Frequency");
@@ -1220,7 +2516,7 @@ int main(int argc, char *argv[])
             config.ini_filename,
             "[Meta]\nUse INI=true\nDate Time Log=false\ndebug_logging=false\nLoop TX=false\nTX Iterations=0\n"
             "[Operation]\nMode=QRSS\nTransmit=false\nTransmit Backend=si5351\nEnable on Boot=Never\nUse LED=false\nLED Pin=-1\nUse Amp=false\nAmp Pin=-1\nAmp Pin Active High=false\nWeb Port=31415\nSocket Port=31416\nUse Shutdown=false\nShutdown Button=-1\n"
-            "[GPIO]\nTransmit Pin=4\nPower Level=7\nUse NTP=false\n"
+            "[GPIO]\nTransmit Pin=4\nPower Level=7\nUse System Clock Frequency Estimate=false\nFrequency Residual PPM=0\nManual PPM=0\n"
             "[Calibration]\nPPM=0\n"
             "[Si5351]\nI2C Bus=1\nI2C Address=96\nReference Frequency=27000000\nTX Output=CLK0\nPower Level=1\n"
             "[WSPR]\nCall Sign=AA0NT\nGrid Square=EM18\nTX Power=20\nFrequency=20m\nPlanner Preference=auto\nUse Random Offset=false\n"
@@ -1302,7 +2598,7 @@ int main(int argc, char *argv[])
         init_config_json();
         json_to_config();
         config.transmit = true;
-        config.frequencies = "0,2200m,630m,22m@17H,20m@27L,14.097100MHz@22";
+        config.frequencies = "0,2200m,630m,30m@17H,20m@27L,14.097100MHz@22";
 
         require(
             set_frequencies(config),
@@ -1323,8 +2619,8 @@ int main(int argc, char *argv[])
         require(
             config.wspr_frequency_entries[3].selector_gpio == 17 &&
                 config.wspr_frequency_entries[3].selector_gpio_active_high &&
-                nearly_equal(config.wspr_frequency_entries[3].dial_frequency_hz, 13551500.0),
-            "22m@17H must retain the GPIO mapping, polarity, and dial frequency");
+                nearly_equal(config.wspr_frequency_entries[3].dial_frequency_hz, 10138700.0),
+            "30m@17H must retain the GPIO mapping, polarity, and dial frequency");
         require(
             config.wspr_frequency_entries[4].selector_gpio == 27 &&
                 !config.wspr_frequency_entries[4].selector_gpio_active_high &&
@@ -1335,6 +2631,38 @@ int main(int argc, char *argv[])
                 !config.wspr_frequency_entries[5].selector_gpio_active_high &&
                 nearly_equal(config.wspr_frequency_entries[5].dial_frequency_hz, 14097100.0),
             "unit-qualified frequencies must remain compatible with comma-separated lists and @GPIO");
+    }
+
+    {
+        init_config_json();
+        json_to_config();
+        config.transmit = true;
+        config.frequencies = "0.136,0.136Hz,14.0971001MHz@22,9223372036854775808";
+
+        require(
+            !set_frequencies(config) &&
+                config.wspr_frequency_entries.empty() &&
+                config.wspr_dial_freq_set.empty(),
+            "WSPR frequency lists must reject values that do not resolve to whole-number Hz before scheduling or selector preparation");
+    }
+
+    {
+        init_config_json();
+        json_to_config();
+        config.transmit = true;
+        config.frequencies = "0,0.136MHz,136kHz,136000,2200m,0.136MHz@22";
+
+        require(
+            set_frequencies(config) &&
+                config.wspr_frequency_entries.size() == 6U &&
+                nearly_equal(config.wspr_frequency_entries[0].dial_frequency_hz, 0.0) &&
+                nearly_equal(config.wspr_frequency_entries[1].dial_frequency_hz, 136000.0) &&
+                nearly_equal(config.wspr_frequency_entries[2].dial_frequency_hz, 136000.0) &&
+                nearly_equal(config.wspr_frequency_entries[3].dial_frequency_hz, 136000.0) &&
+                nearly_equal(config.wspr_frequency_entries[4].dial_frequency_hz, 136000.0) &&
+                nearly_equal(config.wspr_frequency_entries[5].dial_frequency_hz, 136000.0) &&
+                config.wspr_frequency_entries[5].selector_gpio == 22,
+            "WSPR frequency lists must retain zero skip, integral unit conversion, aliases, raw Hz, and selector suffixes");
     }
 
     {
@@ -1361,6 +2689,7 @@ int main(int argc, char *argv[])
 
     {
         WsprTransmitter transmitter;
+        transmitter.selectBackend(wsprrypi::BackendKind::SIMULATED);
 
         TransmissionRequest committed_request;
         committed_request.mode = TransmissionMode::WSPR;
@@ -1476,6 +2805,12 @@ int main(int argc, char *argv[])
             jConfig["Meta"].contains("debug_logging") &&
                 !jConfig["Meta"]["debug_logging"].get<bool>(),
             "default JSON config must serialize debug_logging as false");
+        require(
+            !config.allow_unqualified_frequency &&
+                !config.allow_non_amateur_frequency &&
+                !jConfig["Experimental"]["Allow Unqualified Frequency"].get<bool>() &&
+                !jConfig["Experimental"]["Allow Non-Amateur Frequency"].get<bool>(),
+            "experimental frequency policy must default deny");
     }
 
     {
@@ -1638,14 +2973,41 @@ int main(int argc, char *argv[])
 
 
     {
+        reset_getopt_state();
+        set_si5351_detection_override_for_test(true);
+        std::vector<std::string> args = {
+            "wsprrypi",
+            "--backend", "si5351",
+            "--si5351-reference-source", "crystal",
+            "--si5351-crystal-load-capacitance", "6",
+            "AA0NT", "EM18", "20", "20m"};
+        std::vector<char *> argv = argv_for(args);
+        require(
+            parse_command_line(static_cast<int>(argv.size()), argv.data()),
+            "Si5351 reference-source CLI settings must parse");
+        require(
+            config.si5351_reference_source == "crystal" &&
+                config.si5351_crystal_load_capacitance_pf == 6,
+            "Si5351 reference-source CLI settings must reach canonical runtime config");
+        clear_si5351_detection_override_for_scope();
+    }
+
+    {
         const std::string help_output = capture_print_usage_output(0);
         require(
-            help_output.find("--use-ntp") != std::string::npos &&
+            help_output.find("--use-system-clock-frequency-estimate") != std::string::npos &&
+                help_output.find("--no-system-clock-frequency-estimate") != std::string::npos &&
+                help_output.find("--gpio-manual-ppm") != std::string::npos &&
+                help_output.find("--gpio-frequency-residual-ppm") != std::string::npos &&
+                help_output.find("--si5351-ppm") != std::string::npos &&
+                help_output.find("--si5351-reference-source") != std::string::npos &&
+                help_output.find("--si5351-crystal-load-capacitance") != std::string::npos &&
                 help_output.find("--repeat") != std::string::npos &&
                 help_output.find("--offset") != std::string::npos &&
                 help_output.find("--journald") != std::string::npos &&
                 help_output.find("--date-time-log") != std::string::npos &&
                 help_output.find("--terminate <count>") != std::string::npos &&
+                help_output.find("--socket-loopback-family <auto|ipv6|ipv4>") != std::string::npos &&
                 help_output.find("--planner-preference <auto|prefer_paired|require_paired>") != std::string::npos &&
                 help_output.find("--qrss-message/--qrss-frequency/--qrss-dot-seconds") != std::string::npos &&
                 help_output.find("--fskcw-message/--fskcw-mark-frequency/--fskcw-space-frequency/--fskcw-dot-seconds") != std::string::npos &&
@@ -1784,6 +3146,23 @@ int main(int argc, char *argv[])
 
 
     {
+        reset_getopt_state();
+        std::vector<std::string> args = {
+            "wsprrypi", "--allow-unqualified-frequency",
+            "--allow-non-amateur-frequency",
+            "--no-allow-non-amateur-frequency",
+            "AA0NT", "EM18", "20", "20m"};
+        std::vector<char *> argv = argv_for(args);
+        require(
+            parse_command_line(static_cast<int>(argv.size()), argv.data()),
+            "experimental frequency CLI flags must parse");
+        require(
+            config.allow_unqualified_frequency &&
+                !config.allow_non_amateur_frequency,
+            "experimental frequency CLI flags must use last-option precedence");
+    }
+
+    {
         clear_direct_tone_startup_request();
         require(
             set_direct_tone_startup_request("730000"),
@@ -1854,7 +3233,7 @@ int main(int argc, char *argv[])
         config.frequencies = "0,20m@17H";
         config.use_offset = false;
         config.gpio_tx_pin = 4;
-        config.gpio_use_ntp = false;
+        config.gpio_use_system_clock_frequency_estimate = false;
         resolve_backend_specific_config(config);
 
         require(
@@ -1928,8 +3307,8 @@ int main(int argc, char *argv[])
         config.frequencies = "30m@17H,0,0,0";
         config.use_offset = false;
         config.gpio_tx_pin = 4;
-        config.gpio_use_ntp = false;
-        config.ppm = 12.5;
+        config.gpio_use_system_clock_frequency_estimate = false;
+        config.gpio_manual_ppm = 12.5;
         resolve_backend_specific_config(config);
 
         require(
@@ -2076,7 +3455,7 @@ int main(int argc, char *argv[])
         config.frequencies = "30m,30m,20m";
         config.use_offset = false;
         config.gpio_tx_pin = 4;
-        config.gpio_use_ntp = false;
+        config.gpio_use_system_clock_frequency_estimate = false;
         resolve_backend_specific_config(config);
 
         require(
@@ -2169,7 +3548,7 @@ int main(int argc, char *argv[])
         config.frequencies = "20m,20m,0";
         config.use_offset = false;
         config.gpio_tx_pin = 4;
-        config.gpio_use_ntp = false;
+        config.gpio_use_system_clock_frequency_estimate = false;
         resolve_backend_specific_config(config);
 
         require(
@@ -2263,7 +3642,7 @@ int main(int argc, char *argv[])
         config.frequencies = "20m,30m,0";
         config.use_offset = false;
         config.gpio_tx_pin = 4;
-        config.gpio_use_ntp = false;
+        config.gpio_use_system_clock_frequency_estimate = false;
         resolve_backend_specific_config(config);
 
         require(
@@ -3009,19 +4388,20 @@ int main(int argc, char *argv[])
         config.power_dbm = 20;
         config.frequencies = "20m";
         config.gpio_tx_pin = 4;
+        config.gpio_use_system_clock_frequency_estimate = false;
+        config.gpio_manual_ppm = 12.5;
         resolve_backend_specific_config(config);
-        config.ppm = 12.5;
         set_frequencies(config);
 
         ppm_reload_pending.store(true, std::memory_order_relaxed);
-        const double expected_ppm = ppmManager.getCurrentPPM();
+        const double expected_ppm = 12.5;
 
         require(
             set_config(true),
             "pending runtime PPM update must be consumable during scheduler commit");
         require(
             nearly_equal(current_transmission_request_for_test().ppm, expected_ppm),
-            "committed request must consume the current PPM manager value");
+            "committed request must consume the selected GPIO correction value");
         require(
             nearly_equal(config.ppm, current_transmission_request_for_test().ppm),
             "live runtime config must retain the committed PPM for later requests");
@@ -3539,6 +4919,20 @@ int main(int argc, char *argv[])
 
     {
         PreparedConfigCandidate candidate;
+        auto data = make_managed_ini_data("AA0NT", "EM18", "20m", true);
+        data["Meta"]["Loop TX"] = "false";
+        data["Meta"]["TX Iterations"] = "1";
+        iniFile.setData(data);
+        prepare_ini_config_candidate("/tmp/managed_finite_candidate.ini", candidate);
+        require(
+            candidate.valid &&
+                !candidate.normalized_config.loop_tx &&
+                candidate.normalized_config.tx_iterations.load() == 1,
+            "managed INI candidate must preserve a finite WSPR iteration contract");
+    }
+
+    {
+        PreparedConfigCandidate candidate;
         init_default_config();
         config.enable_web = false;
         iniFile.setData(
@@ -3605,6 +4999,37 @@ int main(int argc, char *argv[])
     }
 
     {
+        init_config_json();
+        iniFile.setData({
+            {"Operation", {{"Mode", "WSPR"}}},
+            {"Experimental", {
+                {"Allow Unqualified Frequency", "true"},
+                {"Allow Non-Amateur Frequency", "true"}}}});
+        ini_to_json("/tmp/experimental_frequency.ini");
+        json_to_config();
+        require(
+            config.allow_unqualified_frequency &&
+                config.allow_non_amateur_frequency,
+            "experimental frequency INI controls must load as booleans");
+        config_to_json();
+        const nlohmann::json public_config = get_public_config_json();
+        require(
+            !public_config.contains("Experimental"),
+            "experimental frequency controls must remain hidden from UI JSON");
+        config.use_ini = true;
+        config.ini_filename = "/tmp/experimental_frequency.ini";
+        write_text_file(config.ini_filename, "[Operation]\nMode=WSPR\n");
+        iniFile.set_filename(config.ini_filename);
+        json_to_ini();
+        const auto persisted = iniFile.getData();
+        require(
+            persisted.at("Experimental").at("Allow Unqualified Frequency") == "true" &&
+                persisted.at("Experimental").at("Allow Non-Amateur Frequency") == "true",
+            "experimental frequency controls must persist in the INI section");
+        init_default_config();
+    }
+
+    {
         init_default_config();
         config.use_ini = true;
         config.ini_filename = "/tmp/debug_logging_patch.ini";
@@ -3615,7 +5040,7 @@ int main(int argc, char *argv[])
             "Enable on Boot=Never\n"
             "Use LED=false\nLED Pin=-1\nUse Amp=false\nAmp Pin=-1\nAmp Pin Active High=false\nWeb Port=31415\nSocket Port=31416\n"
             "Use Shutdown=false\nShutdown Button=-1\n"
-            "[GPIO]\nTransmit Pin=4\nPower Level=7\nUse NTP=false\n"
+            "[GPIO]\nTransmit Pin=4\nPower Level=7\nUse System Clock Frequency Estimate=false\nFrequency Residual PPM=0\nManual PPM=0\n"
             "[Calibration]\nPPM=0\n"
             "[Si5351]\nI2C Bus=1\nI2C Address=96\nReference Frequency=27000000\n"
             "TX Output=CLK0\nPower Level=1\n"
@@ -3774,6 +5199,8 @@ int main(int argc, char *argv[])
             true,
             "/tmp/enable_on_boot_startup_always.ini",
             "Enable on Boot Always must enable and persist Operation.Transmit on startup");
+
+        test_idle_startup_overrides();
 
         auto exercise_managed_startup_gate =
             [](EnableOnBootBehavior behavior,
@@ -3966,6 +5393,69 @@ int main(int argc, char *argv[])
 
     {
         init_default_config();
+        set_raspberry_pi_generation_override_for_test(5);
+        set_rp1_gpclk_provider_available_override_for_test(true);
+        config.rp1_gpio_drive_ma = 12;
+        config_to_json();
+        require(
+            platform_supports_gpio_clock_transmission(),
+            "operator visibility must not disable the explicit Pi 5 RP1 runtime path");
+        const nlohmann::json ready_rp1_public_config = get_public_config_json();
+        require(
+            ready_rp1_public_config["Platform"]
+                 ["GPIO Clock Transmission Supported"].get<bool>() &&
+                ready_rp1_public_config["Platform"]
+                  ["RP1 GPIO Operator Visible"].get<bool>(),
+            "public capability JSON must expose a ready Pi 5 RP1 GPIO path");
+        require(
+            ready_rp1_public_config["Platform"]
+                ["GPIO Clock Transmission Error"].get<std::string>().empty(),
+            "ready Pi 5 RP1 GPIO must not report a platform error");
+        require(
+            ready_rp1_public_config["GPIO"]["RP1 Drive mA"].get<int>() == 12,
+            "operator visibility must preserve retained RP1 configuration");
+
+        set_rp1_gpclk_provider_available_override_for_test(false);
+        const nlohmann::json neutral_rp1_public_config = get_public_config_json();
+        require(
+            !neutral_rp1_public_config["Platform"]
+                 ["GPIO Clock Transmission Supported"].get<bool>() &&
+                neutral_rp1_public_config["Platform"]
+                  ["RP1 GPIO Operator Visible"].get<bool>(),
+            "route-neutral Pi 5 must expose administration without claiming transmission readiness");
+        const std::string neutral_gpio_error =
+            neutral_rp1_public_config["Platform"]
+                ["GPIO Clock Transmission Error"].get<std::string>();
+        require(
+            neutral_gpio_error.find(
+                "canonical RP1 GPCLK provider is unavailable") !=
+                    std::string::npos &&
+                neutral_gpio_error.find(
+                    "Review the RP1 clock route status below") !=
+                    std::string::npos,
+            "route-neutral Pi 5 must report the explicit next operator action");
+        std::string neutral_backend_error;
+        require(
+            !backend_ready_for_transmission(config, &neutral_backend_error) &&
+                neutral_backend_error.find("/dev/rp1-gpclk") != std::string::npos,
+            "route-neutral configuration must not weaken live GPIO transmission readiness");
+        set_patch_all_from_web_runtime_apply_suppressed_for_test(true);
+        patch_all_from_web({
+            {"Meta", {{"debug_logging", true}}},
+            {"GPIO", {
+                {"Transmit Pin", 20},
+                {"RP1 Drive mA", 8}}}});
+        require(
+            jConfig["Meta"]["debug_logging"].get<bool>(),
+            "route-neutral RP1 state must not block unrelated web patches");
+        require(
+            jConfig["GPIO"]["Transmit Pin"].get<int>() == 20 &&
+                jConfig["GPIO"]["RP1 Drive mA"].get<int>() == 8,
+            "operator-visible Pi 5 RP1 web patches must preserve valid route settings");
+        clear_rp1_gpclk_provider_available_override_for_test();
+        clear_raspberry_pi_generation_override_for_test();
+
+        init_default_config();
         set_si5351_detection_override_for_test(false);
         config.si5351_tx_output = 2;
         config_to_json();
@@ -4009,6 +5499,40 @@ int main(int argc, char *argv[])
         require(
             si5351_it->second.at("TX Output") == "CLK2",
             "json_to_ini must persist Si5351 TX Output");
+
+        require(
+            jConfig["Si5351"].value("Reference Source", "") == "external_tcxo" &&
+                jConfig["Si5351"].value("Crystal Load Capacitance", 0) == 10,
+            "legacy missing Si5351 reference settings must use TCXO and 10 pF defaults");
+
+        jConfig["Si5351"]["Reference Source"] = "crystal";
+        jConfig["Si5351"]["Crystal Load Capacitance"] = 8;
+        json_to_config();
+        require(
+            config.si5351_reference_source == "crystal" &&
+                config.si5351_crystal_load_capacitance_pf == 8,
+            "JSON parsing must carry crystal reference settings into runtime config");
+        config_to_json();
+        json_to_ini();
+        const auto crystal_ini = iniFile.getData().at("Si5351");
+        require(
+            crystal_ini.at("Reference Source") == "crystal" &&
+                crystal_ini.at("Crystal Load Capacitance") == "8",
+            "crystal reference settings must round-trip through canonical JSON and INI");
+
+        for (const int invalid : {0, 7, 9, 12})
+        {
+            ArgParserConfig invalid_config = config;
+            invalid_config.transmit_backend = TransmitBackendKind::SI5351;
+            invalid_config.transmit = false;
+            invalid_config.use_ini = true;
+            invalid_config.si5351_crystal_load_capacitance_pf = invalid;
+            std::string validation_error;
+            require(
+                !validate_config_candidate(invalid_config, &validation_error) &&
+                    validation_error.find("crystal load capacitance") != std::string::npos,
+                "invalid Si5351 crystal load capacitance must be rejected");
+        }
         clear_si5351_detection_override_for_scope();
     }
 
@@ -4040,6 +5564,35 @@ int main(int argc, char *argv[])
         require(
             config.use_shutdown && config.shutdown_pin == 19,
             "managed config candidate commit must update shutdown GPIO settings");
+    }
+
+    {
+        GPIOOutput::setTestMode(true);
+        init_default_config();
+        ini_reload_pending.store(false, std::memory_order_relaxed);
+        exiting_wspr.store(false, std::memory_order_relaxed);
+        reset_managed_reload_runtime_for_test();
+        reset_current_transmission_request_for_test();
+
+        config.use_ini = true;
+        config.mode = ModeType::WSPR;
+        config.transmit = true;
+
+        transmitter_cb(
+            WsprTransmissionCallbackEvent::FAILED,
+            WsprTransmitLogLevel::ERROR,
+            "injected managed backend failure",
+            0.0);
+
+        require(
+            managed_reload_tx_inhibited_for_test(),
+            "managed backend failure must inhibit future transmissions");
+        require(
+            !exiting_wspr.load(std::memory_order_relaxed),
+            "managed backend failure must not request process shutdown");
+
+        cleanup_scheduler_regression_test_state();
+        GPIOOutput::setTestMode(false);
     }
 
     {
@@ -4592,6 +6145,36 @@ int main(int argc, char *argv[])
         require(
             tone_stop_result.stopped,
             "test tone override regression must stop the transient tone cleanly");
+
+        SystemClockFrequencyEstimate qualified_estimate;
+        qualified_estimate.provider_name = "chrony";
+        qualified_estimate.qualification = FrequencyEstimateQualification::Qualified;
+        qualified_estimate.frequency_ppm = 10.763;
+        qualified_estimate.synchronized = true;
+        qualified_estimate.selected_source = true;
+        qualified_estimate.leap_normal = true;
+        config.gpio_use_system_clock_frequency_estimate = true;
+        config.use_system_clock_frequency_estimate = true;
+        config.gpio_frequency_residual_ppm = 1.310;
+        config.gpio_manual_ppm = 0.0;
+        config.ppm = 10.763;
+        set_current_frequency_estimate_for_test(qualified_estimate);
+
+        const TestToneStartResult residual_tone_start =
+            start_test_tone(override_frequency_hz);
+        require(
+            residual_tone_start.started,
+            "GPIO test tone must start with a qualified system-clock estimate and residual");
+        const TransmissionRequest residual_tone_request =
+            current_transmission_request_for_test();
+        require(
+            nearly_equal(residual_tone_request.ppm, 12.073) &&
+                nearly_equal(config.ppm, 12.073),
+            "GPIO test tone commit must select the current estimate plus residual instead of a stale cached PPM");
+        require(
+            end_test_tone().stopped,
+            "GPIO estimate-plus-residual test tone must stop cleanly");
+        set_current_frequency_estimate_for_test(SystemClockFrequencyEstimate{});
         set_scheduler_execution_suppressed_for_test(false);
     }
 
@@ -4627,10 +6210,15 @@ int main(int argc, char *argv[])
             make_managed_ini_data("AA0NT", "EM18", "20m", false);
         managed_ini["Operation"]["Transmit Backend"] = "si5351";
         managed_ini["Si5351"]["TX Output"] = "CLK2";
+        managed_ini["Calibration"]["PPM"] = "2.409358";
         iniFile.setData(managed_ini);
         require(
             set_config(true),
             "disabled scheduler tone regression must load a stable WSPR runtime config");
+        require(
+            current_test_tone_planning_config_snapshot().transmit_backend ==
+                TransmitBackendKind::SI5351,
+            "disabled scheduler configuration must publish the accepted Si5351 backend for explicit Test Tone planning");
         reset_tx_led_request_counts_for_test();
 
         const TestToneStartResult tone_start_result = start_test_tone();
@@ -4667,6 +6255,7 @@ int main(int argc, char *argv[])
                 nearly_equal(tone_payload->frequency_hz, tone_request.actual_rf_frequency_hz),
             "disabled-scheduler Si5351 test tone start must expose the committed tone frequency through the controller request");
 
+#if WSPRRYPI_BACKEND_SI5351
         set_raspberry_pi_generation_override_for_test(5);
         wsprrypi::ExecutionPlan plan =
             wsprrypi::ExecutionPlanCompiler{}.compile(*controller_request);
@@ -4695,6 +6284,7 @@ int main(int argc, char *argv[])
             execute_result.ok,
             "disabled-scheduler Si5351 test tone dry-run execution must not fail through the canonical backend path");
         clear_pi_generation_override_for_scope();
+#endif
 
         wsprTransmitter.backendSetStateValue(WsprTransmitter::State::TRANSMITTING);
         const TestToneStopResult tone_stop_result = end_test_tone();
@@ -4710,6 +6300,100 @@ int main(int argc, char *argv[])
         require(
             wsprTransmitter.getState() == WsprTransmitter::State::DISABLED,
             "test tone stop with transmit disabled must not leave the transmitter busy");
+        require(
+            current_test_tone_planning_config_snapshot().transmit_backend ==
+                TransmitBackendKind::SI5351,
+            "test tone stop must preserve the accepted Si5351 backend for the next explicit Test Tone plan");
+
+        constexpr std::uint64_t calibrated_2m_hz = 144490498U;
+        const TestToneStartResult calibrated_start = start_test_tone(
+            TestToneRequest{
+                TestToneFrequencySource::CustomRf,
+                "",
+                calibrated_2m_hz});
+        require(
+            calibrated_start.started,
+            "calibrated custom 2 m Test Tone must start through the normal "
+            "disabled-scheduler path");
+        const TransmissionRequest calibrated_tone_request =
+            current_transmission_request_for_test();
+        const auto calibrated_controller_request =
+            current_controller_request_for_test();
+        require(
+            calibrated_tone_request.mode == TransmissionMode::TONE &&
+                nearly_equal(
+                    calibrated_tone_request.actual_rf_frequency_hz,
+                    static_cast<double>(calibrated_2m_hz)) &&
+                nearly_equal(calibrated_tone_request.ppm, 2.409358),
+            "custom 2 m Test Tone must preserve requested RF and committed "
+            "Calibration.PPM in the legacy request");
+        require(
+            calibrated_controller_request.has_value() &&
+                calibrated_controller_request->mode ==
+                    wsprrypi::TransmissionMode::TONE &&
+                calibrated_controller_request->output.backend ==
+                    wsprrypi::BackendKind::SI5351 &&
+                nearly_equal(
+                    calibrated_controller_request->calibration.ppm,
+                    2.409358),
+            "custom 2 m Test Tone must carry committed Calibration.PPM into "
+            "the controller request");
+        const auto *calibrated_payload =
+            calibrated_controller_request.has_value()
+                ? std::get_if<wsprrypi::TonePayload>(
+                      &calibrated_controller_request->payload)
+                : nullptr;
+        require(
+            calibrated_payload != nullptr &&
+                nearly_equal(
+                    calibrated_payload->frequency_hz,
+                    static_cast<double>(calibrated_2m_hz)),
+            "custom 2 m Test Tone must preserve requested RF in the "
+            "controller payload");
+
+#if WSPRRYPI_BACKEND_SI5351
+        set_raspberry_pi_generation_override_for_test(5);
+        const wsprrypi::ExecutionPlan calibrated_plan =
+            wsprrypi::ExecutionPlanCompiler{}.compile(
+                *calibrated_controller_request);
+        require(
+            calibrated_plan.mode == wsprrypi::TransmissionMode::TONE &&
+                calibrated_plan.backend == wsprrypi::BackendKind::SI5351 &&
+                nearly_equal(calibrated_plan.calibration.ppm, 2.409358) &&
+                calibrated_plan.events.size() == 2 &&
+                nearly_equal(
+                    calibrated_plan.events.front().frequency_hz,
+                    static_cast<double>(calibrated_2m_hz)),
+            "custom 2 m Test Tone must retain requested RF and calibration "
+            "through execution-plan compilation");
+        WsprSi5351Backend calibrated_backend(
+            wsprTransmitter,
+            si5351_config);
+        const wsprrypi::BackendCompileResult calibrated_compile =
+            calibrated_backend.configure(calibrated_plan, inputs);
+        require(
+            calibrated_compile.ok,
+            "calibrated custom 2 m Test Tone must configure through the "
+            "canonical dry-run Si5351 backend");
+        const wsprrypi::ExecutionResult calibrated_execute =
+            calibrated_backend.execute(calibrated_plan);
+        require(
+            calibrated_execute.ok,
+            "calibrated custom 2 m Test Tone must execute through the "
+            "canonical dry-run Si5351 backend");
+        clear_pi_generation_override_for_scope();
+#endif
+
+        wsprTransmitter.backendSetStateValue(
+            WsprTransmitter::State::TRANSMITTING);
+        const TestToneStopResult calibrated_stop = end_test_tone();
+        require(
+            calibrated_stop.stopped && calibrated_stop.scheduler_restored &&
+                !config.transmit &&
+                wsprTransmitter.getState() ==
+                    WsprTransmitter::State::DISABLED,
+            "calibrated custom 2 m Test Tone stop must restore the disabled "
+            "scheduler and transmitter state");
 
         clear_si5351_detection_override_for_scope();
         set_scheduler_execution_suppressed_for_test(false);
@@ -4986,7 +6670,39 @@ int main(int argc, char *argv[])
     {
         init_default_config();
         config.use_ini = true;
-        config.ini_filename = "/tmp/mode_ntp_patch.ini";
+        config.ini_filename = "/tmp/wtp_server_settings_patch.ini";
+        config.wtp_server_port_override = 31419;
+        config_to_json();
+        require(config.wtp_server.enabled && config.wtp_server.port == 31417 &&
+                    config.wtp_server.interface == "auto",
+                "WTP server defaults must enable Plain LAN on port 31417");
+        patch_all_from_web({{"WTP Server", {{"Enabled", false},
+                                               {"Port", 31418},
+                                               {"Interface", "eth0"}}}});
+        require(!config.wtp_server.enabled && config.wtp_server.port == 31418 &&
+                    config.wtp_server.interface == "eth0" &&
+                    config.wtp_server_port_override == 31419,
+                "WTP server settings must apply through HTTP config writes");
+        const auto saved = iniFile.getData();
+        require(saved.at("WTP Server").at("Enabled") == "false" &&
+                    saved.at("WTP Server").at("Port") == "31418" &&
+                    saved.at("WTP Server").at("Interface") == "eth0",
+                "WTP server settings must persist in INI");
+        PreparedConfigCandidate candidate;
+        prepare_ini_config_candidate(config.ini_filename, candidate);
+        require(candidate.valid && !candidate.normalized_config.wtp_server.enabled &&
+                    candidate.normalized_config.wtp_server.port == 31418 &&
+                    candidate.normalized_config.wtp_server.interface == "eth0",
+                "WTP server settings must survive managed INI reload");
+        commit_config_candidate(candidate);
+        require(config.wtp_server_port_override == 31419,
+                "managed INI reload must retain transient WTP server port override");
+    }
+
+    {
+        init_default_config();
+        config.use_ini = true;
+        config.ini_filename = "/tmp/mode_clock_estimate_patch.ini";
         config.mode = ModeType::QRSS;
         config.transmit = false;
         config.callsign = "AA0NT";
@@ -4994,35 +6710,83 @@ int main(int argc, char *argv[])
         config.power_dbm = 20;
         config.frequencies = "20m";
         config.gpio_tx_pin = 4;
-        config.gpio_use_ntp = false;
+        config.gpio_use_system_clock_frequency_estimate = false;
         config.transmit_backend = TransmitBackendKind::GPIO;
         resolve_backend_specific_config(config);
         config_to_json();
 
         patch_all_from_web(nlohmann::json{
             {"Operation", {{"Mode", "WSPR"}}},
-            {"GPIO", {{"Use NTP", true}}}});
+            {"GPIO", {{"Use System Clock Frequency Estimate", true},
+                      {"Frequency Residual PPM", -0.125},
+                      {"Manual PPM", 3.5}}}});
 
         require(
             config.mode == ModeType::WSPR,
             "web patch must update canonical Operation.Mode immediately");
         require(
-            config.gpio_use_ntp && config.use_ntp,
-            "web patch must update canonical GPIO.Use NTP immediately");
+            config.gpio_use_system_clock_frequency_estimate && config.use_system_clock_frequency_estimate,
+            "web patch must update canonical GPIO system-clock estimate setting immediately");
+        require(
+            nearly_equal(config.gpio_frequency_residual_ppm, -0.125) &&
+                nearly_equal(config.gpio_manual_ppm, 3.5),
+            "web patch must update canonical GPIO residual and manual PPM values");
         require(
             jConfig["Operation"].value("Mode", std::string()) == "WSPR",
             "web patch must persist canonical Operation.Mode in JSON");
         require(
-            jConfig["GPIO"].value("Use NTP", false),
-            "web patch must persist canonical GPIO.Use NTP in JSON");
+            jConfig["GPIO"].value("Use System Clock Frequency Estimate", false),
+            "web patch must persist canonical GPIO estimate setting in JSON");
 
         const auto persisted_ini = iniFile.getData();
         require(
             persisted_ini.at("Operation").at("Mode") == "WSPR",
             "web patch must persist canonical Operation.Mode in INI");
         require(
-            persisted_ini.at("GPIO").at("Use NTP") == "true",
-            "web patch must persist canonical GPIO.Use NTP in INI");
+            persisted_ini.at("GPIO").at("Use System Clock Frequency Estimate") == "true" &&
+                nearly_equal(std::stod(persisted_ini.at("GPIO").at("Frequency Residual PPM")), -0.125) &&
+                nearly_equal(std::stod(persisted_ini.at("GPIO").at("Manual PPM")), 3.5),
+            "web patch must persist all canonical GPIO correction settings in INI");
+
+        const auto before_subnormal_json = jConfig;
+        const auto before_subnormal_ini = iniFile.getData();
+        bool subnormal_rejected = false;
+        try
+        {
+            patch_all_from_web({{"GPIO", {{"Manual PPM",
+                std::numeric_limits<double>::denorm_min()}}}});
+        }
+        catch (const std::exception &error)
+        {
+            subnormal_rejected =
+                std::string(error.what()).find("too small to use") != std::string::npos;
+        }
+        require(subnormal_rejected && jConfig == before_subnormal_json &&
+                iniFile.getData() == before_subnormal_ini &&
+                config.gpio_manual_ppm == 3.5,
+            "subnormal fallback patch must be rejected without changing saved or active configuration");
+
+        jConfig["GPIO"]["Manual PPM"] =
+            std::numeric_limits<double>::denorm_min();
+        subnormal_rejected = false;
+        try
+        {
+            json_to_ini();
+        }
+        catch (const std::exception &error)
+        {
+            subnormal_rejected =
+                std::string(error.what()).find("too small to use") != std::string::npos;
+        }
+        require(subnormal_rejected && iniFile.getData() == before_subnormal_ini,
+            "subnormal fallback must not reach the INI persistence path");
+        jConfig = before_subnormal_json;
+
+        patch_all_from_web({{"GPIO", {{"Manual PPM", 0.0}}}});
+        require(config.gpio_manual_ppm == 0.0 &&
+                jConfig["GPIO"]["Manual PPM"].get<double>() == 0.0 &&
+                std::stod(iniFile.getData().at("GPIO").at("Manual PPM")) == 0.0,
+            "explicit zero must replace an earlier fallback through runtime, JSON, and INI");
     }
 
     {
@@ -5030,16 +6794,81 @@ int main(int argc, char *argv[])
         jConfig["Operation"]["Transmit Backend"] = "gpio";
         if (jConfig.contains("GPIO") && jConfig["GPIO"].is_object())
         {
-            jConfig["GPIO"].erase("Use NTP");
+            jConfig["GPIO"].erase("Use System Clock Frequency Estimate");
         }
         json_to_config();
 
         require(
-            config.gpio_use_ntp,
-            "missing GPIO.Use NTP must default true in backend normalization");
+            config.gpio_use_system_clock_frequency_estimate,
+            "missing GPIO estimate setting must default true in backend normalization");
         require(
-            config.use_ntp,
-            "missing GPIO.Use NTP must enable the active GPIO runtime NTP path");
+            config.use_system_clock_frequency_estimate,
+            "missing GPIO estimate setting must enable the active GPIO provider path");
+    }
+
+    {
+        init_default_config();
+        config.use_ini = true;
+        config.ini_filename = "/tmp/retired_gpio_key_patch.ini";
+        config_to_json();
+        const nlohmann::json before_retired_patch = jConfig;
+        bool retired_patch_rejected = false;
+        try
+        {
+            patch_all_from_web({{"GPIO", {{"Use NTP", false}}}});
+        }
+        catch (const std::exception &e)
+        {
+            retired_patch_rejected =
+                std::string(e.what()).find("accepted only during INI migration") !=
+                std::string::npos;
+        }
+        require(
+            retired_patch_rejected && jConfig == before_retired_patch,
+            "public patches must reject the retired GPIO.Use NTP key without changing configuration");
+    }
+
+    {
+        ScopedTemporaryFile migrated_ini("/tmp/wsprrypi-gpio-migration-XXXXXX");
+        iniFile.set_filename(migrated_ini.path());
+        auto legacy_ini = make_managed_ini_data("AA0NT", "EM18", "20m", false);
+        legacy_ini["GPIO"].erase("Use System Clock Frequency Estimate");
+        legacy_ini["GPIO"].erase("Frequency Residual PPM");
+        legacy_ini["GPIO"].erase("Manual PPM");
+        legacy_ini["GPIO"]["Use NTP"] = "false";
+        legacy_ini["Calibration"]["PPM"] = "4.25";
+        iniFile.setData(legacy_ini);
+        iniFile.save();
+        iniFile.set_filename(migrated_ini.path());
+
+        PreparedConfigCandidate migrated_candidate;
+        prepare_ini_config_candidate(migrated_ini.path(), migrated_candidate);
+        require(
+            migrated_candidate.valid && migrated_candidate.migration_required,
+            "legacy GPIO.Use NTP must produce a valid migration candidate");
+        require(
+            !migrated_candidate.normalized_config.gpio_use_system_clock_frequency_estimate &&
+                nearly_equal(migrated_candidate.normalized_config.gpio_manual_ppm, 4.25) &&
+                nearly_equal(migrated_candidate.normalized_config.gpio_frequency_residual_ppm, 0.0),
+            "legacy fixed GPIO correction must migrate to canonical manual PPM with zero residual");
+
+        commit_config_candidate(migrated_candidate);
+        std::ifstream migrated_file(migrated_ini.path());
+        const std::string migrated_text(
+            (std::istreambuf_iterator<char>(migrated_file)),
+            std::istreambuf_iterator<char>());
+        require(
+            migrated_text.find("Use NTP =") == std::string::npos &&
+                migrated_text.find("Use System Clock Frequency Estimate = false") != std::string::npos &&
+                migrated_text.find("Frequency Residual PPM = 0.0") != std::string::npos &&
+                migrated_text.find("Manual PPM = 4.25") != std::string::npos,
+            "migration persistence must remove the retired key and write all canonical GPIO keys");
+
+        PreparedConfigCandidate second_candidate;
+        prepare_ini_config_candidate(migrated_ini.path(), second_candidate);
+        require(
+            second_candidate.valid && !second_candidate.migration_required,
+            "loading an already migrated GPIO configuration must be idempotent");
     }
 
     {
@@ -5048,8 +6877,8 @@ int main(int argc, char *argv[])
         json_to_config();
 
         require(
-            nearly_equal(config.ppm, 200.0),
-            "backend normalization must clamp manual Calibration.PPM to the shared upper bound");
+            nearly_equal(config.si5351_ppm, 200.0) && nearly_equal(config.ppm, 0.0),
+            "backend normalization must clamp Si5351 Calibration.PPM without changing active GPIO correction");
 
         config_to_json();
         require(
@@ -5068,7 +6897,7 @@ int main(int argc, char *argv[])
         config.power_dbm = 20;
         config.frequencies = "20m";
         config.gpio_tx_pin = 4;
-        config.gpio_use_ntp = false;
+        config.gpio_use_system_clock_frequency_estimate = false;
         config.transmit_backend = TransmitBackendKind::GPIO;
         resolve_backend_specific_config(config);
         config_to_json();
@@ -5076,8 +6905,8 @@ int main(int argc, char *argv[])
         patch_all_from_web({{"Calibration", {{"PPM", -275.5}}}});
 
         require(
-            nearly_equal(config.ppm, -200.0),
-            "web patch path must clamp manual Calibration.PPM to the shared lower bound");
+            nearly_equal(config.si5351_ppm, -200.0) && nearly_equal(config.ppm, 0.0),
+            "web patch path must clamp Si5351 Calibration.PPM without changing active GPIO correction");
         require(
             nearly_equal(jConfig["Calibration"].at("PPM").get<double>(), -200.0),
             "web patch path must persist the clamped manual Calibration.PPM in JSON");
@@ -5429,6 +7258,56 @@ int main(int argc, char *argv[])
     }
 
     {
+        ScopedTemporaryFile ini("/tmp/wsprrypi-wtp-transient-XXXXXX");
+        auto data = make_managed_ini_data(
+            "AA0NT", "EM18", "20m", true, WsprPlannerPreference::Auto, "Follow");
+        data["Operation"]["Transmit Backend"] = "wtp";
+        data["Operation"]["Use LED"] = "false";
+        data["Operation"]["Use Amp"] = "false";
+        data["Operation"]["Use Shutdown"] = "false";
+        data["Experimental"] = {
+            {"Allow Unqualified Frequency", "true"},
+            {"Allow Non-Amateur Frequency", "true"}};
+        data["WTP"] = {
+            {"Transport", "network"},
+            {"Hostname", "wsprrypico-0a60df.local"},
+            {"TCP Port", "18443"},
+            {"TLS Server Identity", "wsprrypico-0a60df.local"},
+            {"TLS CA File", "/tmp/ca.crt"},
+            {"TLS Client Certificate", "/tmp/client.crt"},
+            {"TLS Client Key", "/tmp/client.key"},
+            {"Endpoint", ""},
+            {"USB Serial", ""},
+            {"USB Vendor ID", "0"},
+            {"USB Product ID", "0"},
+            {"Device ID", "fd6127d11d6aca42a9905fa3fb1bf1d5"},
+            {"Allow Frequency Adjustment", "true"},
+            {"Start Uncertainty ns", "500000000"}};
+        write_managed_ini_file(ini.path(), data);
+        reset_getopt_state();
+        std::vector<std::string> args = {
+            "wsprrypi", "-i", ini.path(),
+            "--dfcw-message", "ET E",
+            "--dfcw-dot-frequency", "137505",
+            "--dfcw-dash-frequency", "137500",
+            "--dfcw-dot-seconds", "3"};
+        std::vector<char *> argv = argv_for(args);
+        require(
+            parse_command_line(static_cast<int>(argv.size()), argv.data()),
+            "managed WTP INI plus complete transient DFCW request must parse");
+        std::string message;
+        double dot_hz = 0.0;
+        double dash_hz = 0.0;
+        double dot_seconds = 0.0;
+        require(
+            config.use_ini && config.transmit_backend == TransmitBackendKind::WTP &&
+                try_get_dfcw_startup_request(message, dot_hz, dash_hz, dot_seconds) &&
+                message == "ET E" && nearly_equal(dot_hz, 137505.0) &&
+                nearly_equal(dash_hz, 137500.0) && nearly_equal(dot_seconds, 3.0),
+            "managed WTP transient DFCW must preserve explicit reverse-profile frequencies");
+    }
+
+    {
         ArgParserConfig invalid_gap_candidate;
         invalid_gap_candidate.cw_intra_element_gap = 0.0;
         std::string validation_error;
@@ -5525,12 +7404,27 @@ int main(int argc, char *argv[])
                 decimal_candidate.normalized_config.si5351_i2c_address == 96,
             "Si5351 I2C address must accept decimal strings");
 
+        PreparedConfigCandidate upper_boundary_candidate =
+            prepare_si5351_address_candidate("0x6F");
+        require(
+            upper_boundary_candidate.valid &&
+                upper_boundary_candidate.normalized_config.si5351_i2c_address == 0x6F,
+            "Si5351 I2C address must accept the inclusive upper boundary");
+
+        PreparedConfigCandidate below_range_candidate =
+            prepare_si5351_address_candidate("0x5F");
+        require(
+            !below_range_candidate.valid &&
+                below_range_candidate.error_reason ==
+                    "Invalid Si5351 I2C address. Expected 0x60 through 0x6F.",
+            "Si5351 I2C address must reject values below 0x60");
+
         PreparedConfigCandidate out_of_range_candidate =
             prepare_si5351_address_candidate("0x80");
         require(
             !out_of_range_candidate.valid &&
                 out_of_range_candidate.error_reason ==
-                    "Invalid Si5351 I2C address. Expected 0x03 through 0x77.",
+                    "Invalid Si5351 I2C address. Expected 0x60 through 0x6F.",
             "Si5351 I2C address must reject out-of-range hex values");
 
         PreparedConfigCandidate malformed_candidate =
@@ -5882,6 +7776,1138 @@ int main(int argc, char *argv[])
             {"--qrss-message", "TEST", "--qrss-frequency", "14096900",
              "--qrss-dot-seconds", "1", "--cw-start-second", "5"},
             "scheduled seconds with transient QRSS startup");
+    }
+
+    {
+        init_default_config();
+        reset_managed_reload_runtime_for_test();
+        reset_current_transmission_request_for_test();
+        set_scheduler_execution_suppressed_for_test(true);
+        config.transmit = false;
+        config.frequencies = "40m@5";
+        config.wspr.audio_offset_hz = 1500.0;
+        set_frequencies(config);
+        copy_runtime_config(config, config);
+        const TestToneStartResult started = start_test_tone(
+            TestToneRequest{TestToneFrequencySource::WsprBand, "20m", std::nullopt});
+        const TransmissionRequest request = current_transmission_request_for_test();
+        require(started.started && nearly_equal(request.dial_frequency_hz, 14095600.0) &&
+                    nearly_equal(request.actual_rf_frequency_hz, 14097100.0),
+                "explicit 20m tone must commit canonical dial plus offset once");
+        require(!request.selector_gpio_enabled,
+                "different-band first-entry selector must not be inherited");
+        const TestToneStopResult stopped = end_test_tone();
+        require(stopped.tone_was_active && stopped.stopped,
+                "explicit 20m Test Tone End must succeed");
+        set_scheduler_execution_suppressed_for_test(false);
+    }
+
+    {
+        init_default_config();
+        reset_managed_reload_runtime_for_test();
+        reset_current_transmission_request_for_test();
+        set_scheduler_execution_suppressed_for_test(true);
+        config.transmit = false;
+        config.transmit_backend = TransmitBackendKind::GPIO;
+        config.mode = ModeType::QRSS;
+        copy_runtime_config(config, config);
+        TransmissionRequest sentinel;
+        sentinel.actual_rf_frequency_hz = 7654321.0;
+        set_current_transmission_request_for_test(sentinel);
+        reset_band_gpio_prepare_call_count_for_test();
+
+        const TestToneStartResult band_rejected = start_test_tone(
+            TestToneRequest{TestToneFrequencySource::WsprBand, "12m", std::nullopt});
+        const TestToneStartResult four_meter_rejected = start_test_tone(
+            TestToneRequest{TestToneFrequencySource::WsprBand, "4m", std::nullopt});
+        const TestToneStartResult two_meter_rejected = start_test_tone(
+            TestToneRequest{TestToneFrequencySource::WsprBand, "2m", std::nullopt});
+        const TestToneStartResult one_twenty_five_meter_rejected = start_test_tone(
+            TestToneRequest{TestToneFrequencySource::WsprBand, "1.25m", std::nullopt});
+        const TestToneStartResult seventy_centimeter_rejected = start_test_tone(
+            TestToneRequest{TestToneFrequencySource::WsprBand, "70cm", std::nullopt});
+        const TestToneStartResult custom_125m_rejected = start_test_tone(
+            TestToneRequest{TestToneFrequencySource::CustomRf, "", 223500000U});
+        const TestToneStartResult custom_70cm_rejected = start_test_tone(
+            TestToneRequest{TestToneFrequencySource::CustomRf, "", 435000000U});
+
+        require(
+            !band_rejected.started && !four_meter_rejected.started &&
+                !two_meter_rejected.started &&
+                !one_twenty_five_meter_rejected.started &&
+                !seventy_centimeter_rejected.started &&
+                !custom_125m_rejected.started &&
+                !custom_70cm_rejected.started &&
+                band_rejected.message.find("12 m") !=
+                    std::string::npos &&
+                four_meter_rejected.message.find("4 m") != std::string::npos &&
+                two_meter_rejected.message.find("2 m") != std::string::npos &&
+                one_twenty_five_meter_rejected.message.find("1.25 m") !=
+                    std::string::npos &&
+                seventy_centimeter_rejected.message.find("70 cm") !=
+                    std::string::npos &&
+                custom_125m_rejected.message.find("1.25 m") != std::string::npos &&
+                custom_70cm_rejected.message.find("70 cm") != std::string::npos &&
+                band_rejected.message.find("experimental risk") !=
+                    std::string::npos &&
+                config.mode == ModeType::QRSS &&
+                nearly_equal(
+                    current_transmission_request_for_test().actual_rf_frequency_hz,
+                    7654321.0) &&
+                band_gpio_prepare_call_count_for_test() == 0U,
+            "named and custom disqualified GPIO Test Tones must reject before runtime or selector mutation");
+        set_scheduler_execution_suppressed_for_test(false);
+    }
+
+    {
+        init_default_config();
+        reset_managed_reload_runtime_for_test();
+        reset_current_transmission_request_for_test();
+        set_scheduler_execution_suppressed_for_test(true);
+        config.transmit = false;
+        config.transmit_backend = TransmitBackendKind::GPIO;
+        config.mode = ModeType::QRSS;
+        copy_runtime_config(config, config);
+        set_raspberry_pi_generation_override_for_test(4);
+
+        const TestToneStartResult six_meter_started = start_test_tone(
+            TestToneRequest{TestToneFrequencySource::WsprBand, "6m", std::nullopt});
+        const TestToneStopResult six_meter_stopped = end_test_tone();
+        const TestToneStartResult custom_six_meter_started = start_test_tone(
+            TestToneRequest{TestToneFrequencySource::CustomRf, "", 51000000U});
+        const TestToneStopResult custom_six_meter_stopped = end_test_tone();
+        require(
+            six_meter_started.started && six_meter_stopped.tone_was_active &&
+                six_meter_stopped.stopped && custom_six_meter_started.started &&
+                custom_six_meter_stopped.tone_was_active &&
+                custom_six_meter_stopped.stopped,
+            "named and custom BCM2711 6 m TONE must start and stop after qualification");
+        set_scheduler_execution_suppressed_for_test(false);
+        clear_pi_generation_override_for_scope();
+    }
+
+    test_explicit_tone_experimental_policy();
+
+    {
+        init_config_json();
+        json_to_config();
+        reset_getopt_state();
+        std::vector<std::string> args = {
+            "wsprrypi",
+            "--test-tone",
+            "435000000",
+            "--backend",
+            "gpio",
+            "--transmit-gpio",
+            "4"};
+        std::vector<char *> argv = argv_for(args);
+        require(
+            parse_command_line(static_cast<int>(argv.size()), argv.data()),
+            "direct CLI 70 cm test-tone parsing must succeed before band policy evaluation");
+
+        WsprFrequencyEntry entry;
+        double actual_rf_frequency_hz = 0.0;
+        require(
+            try_get_direct_tone_startup_request(entry, actual_rf_frequency_hz) &&
+                nearly_equal(actual_rf_frequency_hz, 435000000.0),
+            "direct CLI 70 cm test tone must retain its transient numeric request");
+
+        set_scheduler_execution_suppressed_for_test(true);
+        reset_current_transmission_request_for_test();
+        reset_current_controller_request_for_test();
+        reset_committed_execution_route_for_test();
+        reset_band_gpio_prepare_call_count_for_test();
+        int start_async_calls = 0;
+        set_direct_tone_start_invoker_for_test(
+            [&start_async_calls] { ++start_async_calls; });
+        std::string startup_error;
+        const bool started = start_direct_tone_execution_for_test(
+            config,
+            entry,
+            actual_rf_frequency_hz,
+            &startup_error);
+
+        require(
+            !started && startup_error.find("70 cm") != std::string::npos &&
+                start_async_calls == 0 &&
+                band_gpio_prepare_call_count_for_test() == 0U &&
+                current_transmission_request_for_test().actual_rf_frequency_hz == 0.0 &&
+                !current_controller_request_for_test().has_value() &&
+                committed_execution_route_for_test() ==
+                    CommittedExecutionRouteForTest::NONE,
+            "direct CLI 70 cm GPIO tone must fail before selector preparation, request commit, or startAsync");
+
+        reset_direct_tone_start_invoker_for_test();
+        clear_direct_tone_startup_request();
+        set_scheduler_execution_suppressed_for_test(false);
+    }
+
+    {
+        init_default_config();
+        config.transmit_backend = TransmitBackendKind::GPIO;
+        set_scheduler_execution_suppressed_for_test(true);
+        reset_current_transmission_request_for_test();
+        reset_current_controller_request_for_test();
+        reset_committed_execution_route_for_test();
+        reset_band_gpio_prepare_call_count_for_test();
+        int start_async_calls = 0;
+        set_direct_tone_start_invoker_for_test(
+            [&start_async_calls] { ++start_async_calls; });
+
+        WsprFrequencyEntry unknown_band_entry;
+        unknown_band_entry.token = "150000000";
+        unknown_band_entry.dial_frequency_hz = 150000000.0;
+        std::string lookup_error;
+        const bool unknown_band_started = start_direct_tone_execution_for_test(
+            config,
+            unknown_band_entry,
+            unknown_band_entry.dial_frequency_hz,
+            &lookup_error);
+        BandGPIOConfig inactive_selector_config;
+        std::string inactive_selector_band;
+        require(
+            !unknown_band_started && !lookup_error.empty() &&
+                start_async_calls == 0 &&
+                band_gpio_prepare_call_count_for_test() == 0U &&
+                current_transmission_request_for_test().actual_rf_frequency_hz == 0.0 &&
+                !current_controller_request_for_test().has_value() &&
+                committed_execution_route_for_test() ==
+                    CommittedExecutionRouteForTest::NONE &&
+                !current_band_gpio_selection_for_test(
+                    inactive_selector_config,
+                    inactive_selector_band),
+            "outside-band direct CLI policy rejection must precede selector preparation, request commit, and startAsync");
+
+        reset_direct_tone_start_invoker_for_test();
+        set_scheduler_execution_suppressed_for_test(false);
+    }
+
+    for (const bool managed : {false, true})
+    {
+        init_default_config();
+        reset_managed_reload_runtime_for_test();
+        reset_current_transmission_request_for_test();
+        reset_committed_execution_route_for_test();
+        set_scheduler_execution_suppressed_for_test(true);
+        config.transmit = false;
+        const std::string confirmation_json = R"({
+            "enabled": true,
+            "route": "GPIO4",
+            "operation_id": "wspr-frame-operation-43",
+            "physical_connection_confirmed": true,
+            "attenuation_and_load_confirmed": true,
+            "bounded_operation_confirmed": true,
+            "non_radiating_topology_confirmed": true,
+            "experimental_status_acknowledged": true
+        })";
+        reset_getopt_state();
+        std::vector<std::string> args = {
+            "wsprrypi",
+            "--backend", "rp1-gpclk",
+            "--transmit-gpio", "4",
+            "--rp1-development-confirmation-json", confirmation_json,
+            "-x", "3",
+            "AA0NT", "EM18", "20", "20m"};
+        std::vector<char *> argv = argv_for(args);
+        std::string validation_error;
+        require(
+            parse_command_line(static_cast<int>(argv.size()), argv.data()) &&
+                validate_config_data_for_test(&validation_error),
+            "bounded positional RP1 WSPR CLI must parse and validate: " +
+                validation_error);
+        ScopedTemporaryFile managed_file("/tmp/wsprrypi_managed_rp1.XXXXXX");
+        if (managed)
+        {
+            config.use_ini = true;
+            config.transmit = true;
+            config.ini_filename = managed_file.path();
+            iniFile.set_filename(config.ini_filename);
+            config_to_json();
+            json_to_ini();
+        }
+        set_rp1_route_transaction_inhibited(true);
+        int reconcile_calls = 0;
+        set_rp1_development_reconcile_invoker_for_test(
+            [&reconcile_calls](const std::string &route) {
+                ++reconcile_calls;
+                require(route == "GPIO4",
+                    "positional RP1 WSPR must reconcile the confirmed route");
+                set_rp1_route_transaction_inhibited(false);
+                return nlohmann::json{
+                    {"ok", true},
+                    {"generation", 43},
+                    {"persisted", "GPIO4"},
+                    {"active", "GPIO4"},
+                    {"reconciled", true},
+                    {"journal", "none"},
+                    {"contractIdentity", "rp1-gpclk-route-manager"},
+                    {"endpointOpen", false},
+                    {"endpointOwned", true},
+                    {"state", "idle"},
+                    {"outputInhibited", "Disabled"},
+                    {"operationalReady", "Ready"}};
+            });
+
+        const bool configured = set_config(true);
+        const TransmissionRequest committed =
+            current_transmission_request_for_test();
+        require(
+            configured && reconcile_calls == 1 &&
+                committed.mode == TransmissionMode::WSPR &&
+                committed.rp1_development.enabled &&
+                committed.rp1_development.operation_id ==
+                    "wspr-frame-operation-43" &&
+                committed.rp1_development.route_transaction_generation == 43 &&
+                committed.rp1_development.confirmation_gpio == 4 &&
+                config.transmit == managed &&
+                config.rp1_development_confirmation_json == confirmation_json &&
+                (managed || (!config.loop_tx && config.tx_iterations.load() == 3)),
+            "direct and managed RP1 WSPR must reconcile before its runtime gate, bind and commit the frame request, and preserve launch semantics");
+
+        if (managed)
+        {
+            patch_all_from_web({{"Operation", {{"Transmit", false}}}});
+            require(!config.transmit &&
+                    config.rp1_development_confirmation_json == confirmation_json &&
+                    get_public_config_json().dump().find("wspr-frame-operation-43") == std::string::npos,
+                "HTTP configuration transactions must retain process launch confirmation without exposing or persisting it");
+        }
+
+        reset_rp1_development_reconcile_invoker_for_test();
+        set_rp1_route_transaction_inhibited(false);
+        set_scheduler_execution_suppressed_for_test(false);
+    }
+
+    {
+        init_default_config();
+        reset_managed_reload_runtime_for_test();
+        config.use_ini = true;
+        config.transmit = true;
+        config.transmit_backend = TransmitBackendKind::RP1_GPCLK;
+        config.rp1_development_confirmation_json = "supplied-but-not-yet-validated";
+        set_rp1_route_transaction_inhibited(true);
+        bool local_effective = true;
+        WtpPiControlHooks hooks;
+        hooks.local_effective = [&local_effective]() {return local_effective;};
+        set_wtp_pi_control_hooks(std::move(hooks));
+        for (const auto mode : {ModeType::WSPR, ModeType::QRSS,
+                                ModeType::FSKCW, ModeType::DFCW})
+        {
+            config.mode = mode;
+            require(runtime_transmit_preparation_enabled(config) &&
+                    !runtime_transmit_enabled(config),
+                "managed RP1 finite modes may prepare confirmation while the route remains inhibited");
+            local_effective = false;
+            require(!runtime_transmit_preparation_enabled(config),
+                "managed RP1 preparation must preserve local ownership priority");
+            local_effective = true;
+            set_managed_reload_tx_inhibited(true);
+            require(!runtime_transmit_preparation_enabled(config),
+                "managed RP1 preparation must preserve reload inhibition");
+            reset_managed_reload_runtime_for_test();
+        }
+        config.rp1_development_confirmation_json.clear();
+        require(!runtime_transmit_preparation_enabled(config),
+            "an inhibited managed RP1 route without explicit launch confirmation stays blocked");
+        config.rp1_development_confirmation_json = R"({
+            "enabled":true,"route":"GPIO4","operation_id":"managed-cw-operation-44",
+            "physical_connection_confirmed":true,"attenuation_and_load_confirmed":true,
+            "bounded_operation_confirmed":true,"non_radiating_topology_confirmed":true,
+            "experimental_status_acknowledged":true})";
+        config.gpio_tx_pin = 4;
+        config.tx_pin = 4;
+        config.qrss.message = "E";
+        config.qrss.frequency_hz = 14096900;
+        config.qrss.dot_seconds = 1;
+        config.fskcw.message = "E";
+        config.fskcw.space_frequency_hz = 14096900;
+        config.fskcw.mark_frequency_hz = 14096904;
+        config.fskcw.dot_seconds = 1;
+        config.dfcw.message = "E";
+        config.dfcw.dot_frequency_hz = 14096900;
+        config.dfcw.dash_frequency_hz = 14096904;
+        config.dfcw.dot_seconds = 1;
+        int reconciles = 0;
+        set_rp1_development_reconcile_invoker_for_test([&](const std::string &) {
+            ++reconciles;
+            set_rp1_route_transaction_inhibited(false);
+            return nlohmann::json{{"ok",true},{"generation",44},{"persisted","GPIO4"},
+                {"active","GPIO4"},{"reconciled",true},{"journal","none"},
+                {"endpointOpen",false},{"endpointOwned",true},{"state","idle"}};
+        });
+        set_scheduler_execution_suppressed_for_test(true);
+        for (const auto mode : {ModeType::QRSS, ModeType::FSKCW, ModeType::DFCW})
+        {
+            config.mode = mode;
+            set_rp1_route_transaction_inhibited(true);
+            reset_current_transmission_request_for_test();
+            local_effective = false;
+            const int before = reconciles;
+            require(start_non_wspr_transmission_now_for_test(config) && reconciles == before &&
+                    !current_transmission_request_for_test().rp1_development.enabled,
+                "a deferred managed CW launch without local ownership must not reconcile or commit");
+            local_effective = true;
+            require(start_non_wspr_transmission_now_for_test(config) && reconciles == before + 1 &&
+                    current_transmission_request_for_test().rp1_development.enabled &&
+                    current_transmission_request_for_test().rp1_development.operation_id == "managed-cw-operation-44",
+                "each managed CW mode must bind explicit confirmation before committing its finite request");
+        }
+        reset_rp1_development_reconcile_invoker_for_test();
+        set_scheduler_execution_suppressed_for_test(false);
+        reset_current_transmission_request_for_test();
+        clear_wtp_pi_control_hooks();
+        set_rp1_route_transaction_inhibited(false);
+    }
+
+    {
+        init_default_config();
+        config.use_ini = false;
+        config.mode = ModeType::TONE;
+        config.transmit = false;
+        config.transmit_backend = TransmitBackendKind::RP1_GPCLK;
+        config.tx_pin = 4;
+        config.gpio_tx_pin = 4;
+        config.rp1_development_confirmation_json = R"({
+            "enabled": true,
+            "route": "GPIO4",
+            "operation_id": "tone-operation-42",
+            "physical_connection_confirmed": true,
+            "attenuation_and_load_confirmed": true,
+            "bounded_operation_confirmed": true,
+            "non_radiating_topology_confirmed": true,
+            "experimental_status_acknowledged": true
+        })";
+        const nlohmann::json valid_confirmation = nlohmann::json::parse(
+            config.rp1_development_confirmation_json);
+        set_scheduler_execution_suppressed_for_test(true);
+        const bool persistent_transmit_before = config.transmit;
+        set_rp1_route_transaction_inhibited(true);
+        set_rp1_development_reconcile_invoker_for_test(
+            [](const std::string &route) {
+                require(route == "GPIO4",
+                    "direct RP1 tone must reconcile the confirmed route");
+                set_rp1_route_transaction_inhibited(false);
+                return nlohmann::json{
+                    {"ok", true},
+                    {"generation", 42},
+                    {"persisted", "GPIO4"},
+                    {"active", "GPIO4"},
+                    {"reconciled", true},
+                    {"journal", "none"},
+                    {"contractIdentity", "rp1-gpclk-route-manager"},
+                    {"endpointOpen", false},
+                    {"endpointOwned", true},
+                    {"state", "idle"},
+                    {"outputInhibited", "Disabled"},
+                    {"operationalReady", "Ready"}};
+            });
+        reset_current_transmission_request_for_test();
+        reset_committed_execution_route_for_test();
+        int start_async_calls = 0;
+        set_direct_tone_start_invoker_for_test(
+            [&start_async_calls] { ++start_async_calls; });
+
+        WsprFrequencyEntry entry;
+        entry.token = "20m";
+        entry.dial_frequency_hz = 14097100.0;
+        std::string error;
+        const bool started = start_direct_tone_execution_for_test(
+            config, entry, entry.dial_frequency_hz, &error);
+        const TransmissionRequest committed =
+            current_transmission_request_for_test();
+        require(
+            started && error.empty() && start_async_calls == 1 &&
+                committed.rp1_development.enabled &&
+                committed.rp1_development.operation_id == "tone-operation-42" &&
+                committed.rp1_development.route_transaction_generation == 42 &&
+                committed.rp1_development.confirmation_gpio == 4 &&
+                config.transmit == persistent_transmit_before,
+            "valid direct RP1 tone confirmation must reconcile before gating, bind the committed request, start once, and not mutate persistent transmit");
+
+        set_rp1_route_transaction_inhibited(true);
+        error.clear();
+        const bool replay_started = start_direct_tone_execution_for_test(
+            config, entry, entry.dial_frequency_hz, &error);
+        require(
+            !replay_started && error.find("replay") != std::string::npos &&
+                start_async_calls == 1 && config.transmit == persistent_transmit_before,
+            "direct RP1 tone confirmation must not be reusable after its first bounded request");
+
+        std::vector<std::string> rejected_confirmations = {"not-json", "{}"};
+        for (const auto& [field, value] : std::vector<std::pair<std::string, nlohmann::json>>{
+                 {"enabled", false},
+                 {"route", "GPIO20"},
+                 {"operation_id", "short"},
+                 {"physical_connection_confirmed", false},
+                 {"attenuation_and_load_confirmed", false},
+                 {"bounded_operation_confirmed", false},
+                 {"non_radiating_topology_confirmed", false},
+                 {"experimental_status_acknowledged", false}})
+        {
+            nlohmann::json rejected = valid_confirmation;
+            rejected[field] = value;
+            rejected_confirmations.push_back(rejected.dump());
+        }
+        for (const std::string& rejected : rejected_confirmations)
+        {
+            config.rp1_development_confirmation_json = rejected;
+            set_rp1_route_transaction_inhibited(true);
+            error.clear();
+            const bool malformed_started = start_direct_tone_execution_for_test(
+                config, entry, entry.dial_frequency_hz, &error);
+            require(
+                !malformed_started &&
+                    error.find("confirmation rejected") != std::string::npos &&
+                    start_async_calls == 1 &&
+                    config.transmit == persistent_transmit_before,
+                "malformed or mismatched direct RP1 confirmation must fail before commit or start without changing persistent transmit");
+        }
+
+        reset_rp1_development_reconcile_invoker_for_test();
+        reset_direct_tone_start_invoker_for_test();
+        set_rp1_route_transaction_inhibited(false);
+        set_scheduler_execution_suppressed_for_test(false);
+    }
+
+    {
+        init_default_config();
+        config.transmit_backend = TransmitBackendKind::GPIO;
+        config.allow_unqualified_frequency = true;
+        config.allow_non_amateur_frequency = true;
+        config.use_ini = false;
+        set_scheduler_execution_suppressed_for_test(true);
+        reset_current_transmission_request_for_test();
+        reset_current_controller_request_for_test();
+        reset_committed_execution_route_for_test();
+        reset_band_gpio_prepare_call_count_for_test();
+        int start_async_calls = 0;
+        set_direct_tone_start_invoker_for_test(
+            [&start_async_calls] { ++start_async_calls; });
+
+        WsprFrequencyEntry experimental_entry;
+        experimental_entry.token = "150000000@17H";
+        experimental_entry.dial_frequency_hz = 150000000.0;
+        experimental_entry.selector_gpio = 17;
+        experimental_entry.selector_gpio_active_high = true;
+        std::string error;
+        const bool started = start_direct_tone_execution_for_test(
+            config, experimental_entry,
+            experimental_entry.dial_frequency_hz, &error);
+        const TransmissionRequest committed =
+            current_transmission_request_for_test();
+        require(
+            started && error.empty() && start_async_calls == 1 &&
+                band_gpio_prepare_call_count_for_test() == 1U &&
+                committed.selector_gpio_enabled &&
+                committed.selector_gpio_config.gpio == 17 &&
+                committed.selector_gpio_config.active_high,
+            "dual outside-band override must retain an explicit CLI selector without band inference: " + error);
+
+        stop_active_transmission_selectors_for_test();
+        reset_direct_tone_start_invoker_for_test();
+        set_scheduler_execution_suppressed_for_test(false);
+    }
+
+    {
+        init_default_config();
+        reset_current_transmission_request_for_test();
+        set_scheduler_execution_suppressed_for_test(true);
+        config.transmit = false;
+        config.transmit_backend = TransmitBackendKind::SI5351;
+        config.mode = ModeType::QRSS;
+        copy_runtime_config(config, config);
+
+        const TestToneStartResult started = start_test_tone(
+            TestToneRequest{TestToneFrequencySource::WsprBand, "2m", std::nullopt});
+        const TestToneStopResult stopped = end_test_tone();
+
+        require(
+            started.started && stopped.tone_was_active && stopped.stopped,
+            "the GPIO band restriction must not block a Si5351 2 m Test Tone");
+        set_scheduler_execution_suppressed_for_test(false);
+    }
+
+    {
+        init_default_config();
+        reset_current_transmission_request_for_test();
+        set_scheduler_execution_suppressed_for_test(true);
+        config.transmit = false;
+        config.frequencies = "20m";
+        config.wspr.audio_offset_hz = 1500.0;
+        set_frequencies(config);
+        copy_runtime_config(config, config);
+        const TestToneStartResult started = start_test_tone(
+            TestToneRequest{TestToneFrequencySource::WsprBand, "22m", std::nullopt});
+        require(!started.started && started.message.find("22m") != std::string::npos,
+                "removed 22m Test Tone preset must fail with an explicit diagnostic");
+        set_scheduler_execution_suppressed_for_test(false);
+    }
+
+    {
+        init_default_config();
+        reset_current_transmission_request_for_test();
+        set_scheduler_execution_suppressed_for_test(true);
+        config.transmit = false;
+        config.frequencies = "20m";
+        config.wspr.audio_offset_hz = 2750.0;
+        set_frequencies(config);
+        copy_runtime_config(config, config);
+        // Simulate a later uncommitted mutable write. Explicit planning must
+        // consume the one published snapshot for both RF and result metadata.
+        config.wspr.audio_offset_hz = 1500.0;
+        const TestToneStartResult started = start_test_tone(
+            TestToneRequest{TestToneFrequencySource::WsprBand, "20m", std::nullopt});
+        const TransmissionRequest request = current_transmission_request_for_test();
+        require(started.started && nearly_equal(request.actual_rf_frequency_hz, 14098350.0) &&
+                    nearly_equal(request.applied_offset_hz, 2750.0) &&
+                    started.audio_offset_hz == 2750U,
+                "one published snapshot must supply explicit RF and committed offset metadata");
+        const TestToneStopResult stopped = end_test_tone();
+        require(stopped.tone_was_active && stopped.stopped,
+                "snapshot-backed explicit Test Tone End must succeed");
+        set_scheduler_execution_suppressed_for_test(false);
+    }
+
+    {
+        init_default_config();
+        reset_current_transmission_request_for_test();
+        set_scheduler_execution_suppressed_for_test(true);
+        config.transmit = false;
+        config.frequencies = "40m";
+        config.wspr.audio_offset_hz = 1500.0;
+        set_frequencies(config);
+        copy_runtime_config(config, config);
+        constexpr std::uint64_t custom_rf_hz = 14097123;
+        const TestToneStartResult started = start_test_tone(
+            TestToneRequest{TestToneFrequencySource::CustomRf, "", custom_rf_hz});
+        const TransmissionRequest request = current_transmission_request_for_test();
+        require(started.started && nearly_equal(request.actual_rf_frequency_hz, static_cast<double>(custom_rf_hz)) &&
+                    nearly_equal(request.dial_frequency_hz, static_cast<double>(custom_rf_hz)) &&
+                    started.band == "20m",
+                "explicit custom RF must remain exact and resolve 20m without a WSPR offset");
+        const TestToneStopResult stopped = end_test_tone();
+        require(stopped.tone_was_active && stopped.stopped,
+                "explicit custom-RF Test Tone End must succeed");
+        set_scheduler_execution_suppressed_for_test(false);
+    }
+
+    {
+        init_default_config();
+        reset_current_transmission_request_for_test();
+        set_scheduler_execution_suppressed_for_test(true);
+        config.transmit = false;
+        config.frequencies = "40m@5 20m@17";
+        set_frequencies(config);
+        copy_runtime_config(config, config);
+        const TestToneStartResult started = start_test_tone(
+            TestToneRequest{TestToneFrequencySource::WsprBand, "20m", std::nullopt});
+        const TransmissionRequest request = current_transmission_request_for_test();
+        require(started.started && request.selector_gpio_enabled &&
+                    request.selector_gpio_config.gpio == 17 &&
+                    !request.selector_gpio_config.active_high &&
+                    !started.selector_gpio_active_high &&
+                    request.selector_band == HamBand::BAND_20M,
+                "matching same-band active-low selector metadata must match the committed RF-band request");
+        const TestToneStopResult stopped = end_test_tone();
+        require(stopped.tone_was_active && stopped.stopped,
+                "selector-backed explicit Test Tone End must succeed");
+        set_scheduler_execution_suppressed_for_test(false);
+    }
+
+    {
+        init_default_config();
+        reset_current_transmission_request_for_test();
+        set_scheduler_execution_suppressed_for_test(true);
+        config.transmit = false;
+        config.frequencies = "40m@5";
+        config.band_gpio[ham_band_index(HamBand::BAND_20M)] = {19, true, true};
+        config.band_gpio[ham_band_index(HamBand::BAND_40M)] = {6, true, false};
+        set_frequencies(config);
+        copy_runtime_config(config, config);
+        config.band_gpio[ham_band_index(HamBand::BAND_20M)] = {20, true, false};
+        const TestToneStartResult started = start_test_tone(
+            TestToneRequest{TestToneFrequencySource::WsprBand, "20m", std::nullopt});
+        const TransmissionRequest request = current_transmission_request_for_test();
+        require(started.started && request.selector_gpio_enabled &&
+                    request.selector_gpio_config.gpio == 19 &&
+                    request.selector_gpio_config.active_high &&
+                    started.selector_gpio_active_high &&
+                    request.selector_band == HamBand::BAND_20M,
+                "active-high metadata must come from the committed selected-band fallback, not a different-band selector");
+        const TestToneStopResult stopped = end_test_tone();
+        require(stopped.tone_was_active && stopped.stopped,
+                "fallback-selector explicit Test Tone End must succeed");
+        set_scheduler_execution_suppressed_for_test(false);
+    }
+
+    {
+        init_default_config();
+        reset_current_transmission_request_for_test();
+        set_scheduler_execution_suppressed_for_test(true);
+        config.transmit = false;
+        config.frequencies = "40m@5";
+        set_frequencies(config);
+        copy_runtime_config(config, config);
+        const TestToneStartResult started = start_test_tone(
+            TestToneRequest{TestToneFrequencySource::WsprBand, "20m", std::nullopt});
+        const TransmissionRequest request = current_transmission_request_for_test();
+        require(started.started && !request.selector_gpio_enabled &&
+                    !started.selector_gpio_active_high,
+                "selector-disabled Test Tone metadata must remain neutral");
+        const TestToneStopResult stopped = end_test_tone();
+        require(stopped.tone_was_active && stopped.stopped,
+                "selector-disabled explicit Test Tone End must succeed");
+        set_scheduler_execution_suppressed_for_test(false);
+    }
+
+    {
+        init_default_config();
+        set_scheduler_execution_suppressed_for_test(true);
+        config.transmit = false;
+        config.mode = ModeType::QRSS;
+        TransmissionRequest sentinel;
+        sentinel.mode = TransmissionMode::WSPR;
+        sentinel.actual_rf_frequency_hz = 1234567.0;
+        set_current_transmission_request_for_test(sentinel);
+        reset_band_gpio_prepare_call_count_for_test();
+        const TestToneStartResult rejected = start_test_tone(
+            TestToneRequest{TestToneFrequencySource::WsprBand, "not-a-band", std::nullopt});
+        require(!rejected.started && config.mode == ModeType::QRSS &&
+                    nearly_equal(current_transmission_request_for_test().actual_rf_frequency_hz, 1234567.0) &&
+                    band_gpio_prepare_call_count_for_test() == 0U,
+                "frequency planning failure must leave tone, mode, request, and selector preparation unchanged");
+        set_scheduler_execution_suppressed_for_test(false);
+    }
+
+    {
+        init_default_config();
+        set_scheduler_execution_suppressed_for_test(true);
+        config.transmit = false;
+        config.mode = ModeType::FSKCW;
+        config.frequencies = "20m@17 20m@18";
+        set_frequencies(config);
+        copy_runtime_config(config, config);
+        TransmissionRequest sentinel;
+        sentinel.mode = TransmissionMode::WSPR;
+        sentinel.actual_rf_frequency_hz = 7654321.0;
+        set_current_transmission_request_for_test(sentinel);
+        reset_band_gpio_prepare_call_count_for_test();
+        const TestToneStartResult rejected = start_test_tone(
+            TestToneRequest{TestToneFrequencySource::WsprBand, "20m", std::nullopt});
+        require(!rejected.started && !rejected.message.empty() && config.mode == ModeType::FSKCW &&
+                    nearly_equal(current_transmission_request_for_test().actual_rf_frequency_hz, 7654321.0) &&
+                    band_gpio_prepare_call_count_for_test() == 0U,
+                "selector conflict must reject before tone, mode, request, or selector preparation mutation");
+        set_scheduler_execution_suppressed_for_test(false);
+    }
+
+    {
+        init_default_config();
+        reset_managed_reload_runtime_for_test();
+        reset_current_transmission_request_for_test();
+        set_scheduler_execution_suppressed_for_test(true);
+        config.mode = ModeType::WSPR;
+        config.transmit = true;
+        config.frequencies = "20m";
+        set_frequencies(config);
+        TransmissionRequest sentinel;
+        sentinel.mode = TransmissionMode::WSPR;
+        sentinel.actual_rf_frequency_hz = 1111111.0;
+        set_current_transmission_request_for_test(sentinel);
+        reset_band_gpio_prepare_call_count_for_test();
+        wsprTransmitter.backendSetStateValue(WsprTransmitter::State::TRANSMITTING);
+
+        const TestToneStartResult rejected = start_test_tone(
+            TestToneRequest{TestToneFrequencySource::WsprBand, "20m", std::nullopt});
+        const TestToneStopResult inactive_stop = end_test_tone();
+        require(!rejected.started && rejected.blocked_by_active_transmission &&
+                    !rejected.blocked_by_enabled_transmission &&
+                    !inactive_stop.tone_was_active &&
+                    nearly_equal(current_transmission_request_for_test().actual_rf_frequency_hz, 1111111.0) &&
+                    band_gpio_prepare_call_count_for_test() == 0U &&
+                    wsprTransmitter.getState() == WsprTransmitter::State::TRANSMITTING,
+                "explicit WSPR-band request must reject before planning, selector preparation, Test Tone activation, or request mutation while TX is active");
+
+        wsprTransmitter.backendSetStateValue(WsprTransmitter::State::DISABLED);
+        set_scheduler_execution_suppressed_for_test(false);
+    }
+
+    {
+        init_default_config();
+        reset_managed_reload_runtime_for_test();
+        reset_current_transmission_request_for_test();
+        set_scheduler_execution_suppressed_for_test(true);
+        config.mode = ModeType::WSPR;
+        config.transmit = true;
+        config.frequencies = "20m";
+        set_frequencies(config);
+        TransmissionRequest sentinel;
+        sentinel.mode = TransmissionMode::WSPR;
+        sentinel.actual_rf_frequency_hz = 2222222.0;
+        set_current_transmission_request_for_test(sentinel);
+        reset_band_gpio_prepare_call_count_for_test();
+        wsprTransmitter.backendSetStateValue(WsprTransmitter::State::ENABLED);
+
+        const TestToneStartResult rejected = start_test_tone(
+            TestToneRequest{TestToneFrequencySource::CustomRf, "", 14097123});
+        const TestToneStopResult inactive_stop = end_test_tone();
+        require(!rejected.started && !rejected.blocked_by_active_transmission &&
+                    rejected.blocked_by_enabled_transmission && !inactive_stop.tone_was_active &&
+                    nearly_equal(current_transmission_request_for_test().actual_rf_frequency_hz, 2222222.0) &&
+                    band_gpio_prepare_call_count_for_test() == 0U &&
+                    wsprTransmitter.getState() == WsprTransmitter::State::ENABLED,
+                "explicit custom-RF request must reject before planning, selector preparation, Test Tone activation, or request mutation while schedule is enabled");
+
+        wsprTransmitter.backendSetStateValue(WsprTransmitter::State::DISABLED);
+        set_scheduler_execution_suppressed_for_test(false);
+    }
+
+    {
+        init_default_config();
+        reset_current_transmission_request_for_test();
+        reset_current_controller_request_for_test();
+        reset_committed_execution_route_for_test();
+        reset_tx_led_request_counts_for_test();
+        set_scheduler_execution_suppressed_for_test(false);
+        config.mode = ModeType::QRSS;
+        config.transmit = false;
+        config.transmit_backend = TransmitBackendKind::SI5351;
+        config.frequencies = "20m";
+        set_frequencies(config);
+        copy_runtime_config(config, config);
+        wsprTransmitter.backendSetStateValue(WsprTransmitter::State::DISABLED);
+        set_test_tone_commit_invoker_for_test([] {
+            throw std::runtime_error(
+                "Si5351 planner produced unusable frequency data for tone 0.");
+        });
+
+        const TestToneStartResult rejected = start_test_tone(
+            TestToneRequest{
+                TestToneFrequencySource::CustomRf,
+                "",
+                144490500U});
+        reset_test_tone_commit_invoker_for_test();
+        const TestToneStopResult inactive_stop = end_test_tone();
+
+        require(
+            !rejected.started &&
+                rejected.message.find("Si5351 planner produced unusable") !=
+                    std::string::npos &&
+                config.mode == ModeType::QRSS &&
+                !inactive_stop.tone_was_active &&
+                current_transmission_request_for_test().actual_rf_frequency_hz == 0.0 &&
+                !current_controller_request_for_test().has_value() &&
+                committed_execution_route_for_test() ==
+                    CommittedExecutionRouteForTest::NONE &&
+                wsprTransmitter.getState() == WsprTransmitter::State::DISABLED &&
+                !tx_led_active_for_test(),
+            "synchronous test tone configuration failure must reject with its diagnostic and restore inactive runtime state");
+    }
+
+    // Managed INI CW modes are idle owners, never implicit CLI direct tones.
+    const std::array<std::pair<ModeType, TestToneRequest>, 5> managed_idle_cases{{
+        {ModeType::FSKCW, {TestToneFrequencySource::WsprBand, "20m", std::nullopt}},
+        {ModeType::FSKCW, {TestToneFrequencySource::CustomRf, "", 14097123U}},
+        {ModeType::QRSS, {TestToneFrequencySource::WsprBand, "20m", std::nullopt}},
+        {ModeType::DFCW, {TestToneFrequencySource::WsprBand, "20m", std::nullopt}},
+        {ModeType::FSKCW, {TestToneFrequencySource::LegacyExactRf, "", 14097123U}},
+    }};
+    for (const auto &[prior_mode, request] : managed_idle_cases)
+    {
+        init_default_config();
+        clear_direct_tone_startup_request();
+        reset_current_transmission_request_for_test();
+        reset_committed_execution_route_for_test();
+        reset_band_gpio_prepare_call_count_for_test();
+        set_scheduler_execution_suppressed_for_test(true);
+        config.use_ini = true;
+        config.transmit = false;
+        config.mode = prior_mode;
+        config.frequencies = "20m";
+        config.wspr.audio_offset_hz = 1500.0;
+        set_frequencies(config);
+        copy_runtime_config(config, config);
+        const WsprTransmitter::State state_before_start =
+            wsprTransmitter.getState();
+        const TestToneStartResult start = start_test_tone(request);
+        const WsprTransmitter::State state_after_suppressed_start =
+            wsprTransmitter.getState();
+        const TransmissionRequest committed = current_transmission_request_for_test();
+        const TestToneStopResult stop = end_test_tone();
+        const TransmissionRequest cleared = current_transmission_request_for_test();
+        const std::size_t prepares = band_gpio_prepare_call_count_for_test();
+        BandGPIOConfig selector_config;
+        std::string selector_band;
+        const bool selector_active = current_band_gpio_selection_for_test(
+            selector_config,
+            selector_band);
+        const ModeType mode_after_first_end = config.mode;
+        const WsprTransmitter::State state_after_first_end =
+            wsprTransmitter.getState();
+        const bool direct_tone_after_first_end =
+            has_direct_tone_startup_request();
+        const TestToneStopResult repeated = end_test_tone();
+        require(start.started && committed.mode == TransmissionMode::TONE,
+                "managed idle non-WSPR Test Tone must start and commit a tone request");
+        require(state_before_start == WsprTransmitter::State::DISABLED &&
+                    state_after_suppressed_start == WsprTransmitter::State::DISABLED,
+                "suppressed managed idle Test Tone setup must leave the transmitter disabled before End cleanup");
+        require(stop.tone_was_active && stop.stopped,
+                "managed idle non-WSPR Test Tone End must report a successful active stop");
+        require(config.mode == prior_mode && !config.transmit,
+                "managed idle non-WSPR Test Tone End must restore the inactive managed mode");
+        require(state_after_first_end == WsprTransmitter::State::DISABLED,
+                "managed idle non-WSPR Test Tone End must leave the transmitter disabled");
+        require(cleared.actual_rf_frequency_hz == 0.0,
+                "managed idle non-WSPR Test Tone End must clear committed execution state");
+        require(!selector_active && prepares <= 1U,
+                "managed idle non-WSPR Test Tone must leave the disabled selector neutral without a restart");
+        require(!direct_tone_after_first_end,
+                "managed idle non-WSPR Test Tone must not create or consume a direct-tone startup request");
+        require(!repeated.tone_was_active && !repeated.stopped &&
+                    config.mode == mode_after_first_end &&
+                    wsprTransmitter.getState() == state_after_first_end &&
+                    current_transmission_request_for_test().actual_rf_frequency_hz == 0.0 &&
+                    band_gpio_prepare_call_count_for_test() == prepares &&
+                    has_direct_tone_startup_request() == direct_tone_after_first_end,
+                "managed idle non-WSPR Test Tone repeated End must remain inert");
+        if (request.source == TestToneFrequencySource::WsprBand)
+            require(nearly_equal(committed.dial_frequency_hz, 14095600.0) &&
+                        nearly_equal(committed.actual_rf_frequency_hz, 14097100.0),
+                    "managed explicit 20m Test Tone must use dial plus 1500 Hz once");
+        if (request.source == TestToneFrequencySource::CustomRf ||
+            request.source == TestToneFrequencySource::LegacyExactRf)
+            require(nearly_equal(committed.actual_rf_frequency_hz, 14097123.0),
+                    "managed exact-RF Test Tone must not apply WSPR offset");
+        clear_direct_tone_startup_request();
+        set_scheduler_execution_suppressed_for_test(false);
+    }
+
+    {
+        init_default_config();
+        clear_direct_tone_startup_request();
+        reset_current_transmission_request_for_test();
+        reset_committed_execution_route_for_test();
+        set_scheduler_execution_suppressed_for_test(true);
+        config.use_ini = false;
+        config.transmit = true;
+        config.mode = ModeType::TONE;
+        require(set_direct_tone_startup_request("14097123"),
+                "CLI direct-tone restoration setup must create the production startup request");
+        set_startup_quiesce_invoker_for_test(
+            []()
+            {
+                return wsprrypi::StartupQuiesceResult{
+                    false,
+                    "direct-tone restoration regression inhibition"};
+            });
+        require(!run_startup_quiesce_gate_for_test(config) &&
+                    startup_quiesce_inhibited_for_test(),
+                "CLI direct-tone restoration setup must use the production startup inhibition path");
+        copy_runtime_config(config, config);
+
+        const TestToneStartResult start = start_test_tone(
+            TestToneRequest{TestToneFrequencySource::WsprBand, "20m", std::nullopt});
+        require(start.started,
+                "CLI direct-tone restoration regression must begin the web Test Tone");
+        reset_startup_quiesce_for_test();
+        const TestToneStopResult stop = end_test_tone();
+        const TransmissionRequest restored = current_transmission_request_for_test();
+        WsprFrequencyEntry startup_entry;
+        double startup_rf_hz = 0.0;
+        const bool startup_request_preserved =
+            try_get_direct_tone_startup_request(startup_entry, startup_rf_hz);
+
+        require(start.started && stop.tone_was_active && stop.stopped &&
+                    config.mode == ModeType::TONE &&
+                    startup_request_preserved && nearly_equal(startup_rf_hz, 14097123.0) &&
+                    restored.mode == TransmissionMode::TONE &&
+                    nearly_equal(restored.actual_rf_frequency_hz, 14097123.0),
+                "a genuine CLI direct-tone startup request must restore through the direct-tone path");
+        clear_direct_tone_startup_request();
+        reset_startup_quiesce_for_test();
+        reset_current_transmission_request_for_test();
+        set_scheduler_execution_suppressed_for_test(false);
+    }
+
+    {
+        clear_direct_tone_startup_request();
+        for (const std::string token : {"0.136", "0.136Hz", "14.0971001MHz@22"})
+        {
+            std::string error;
+            require(
+                !set_direct_tone_startup_request(token, &error) &&
+                    error.find("whole-number frequency in Hz") != std::string::npos &&
+                    !has_direct_tone_startup_request(),
+                "direct CLI test tone must reject fractional-Hz values before creating startup state");
+        }
+
+        {
+            std::string error;
+            require(
+                !set_direct_tone_startup_request("9223372036854775808", &error) &&
+                    error.find("outside the supported RF range") != std::string::npos &&
+                    !has_direct_tone_startup_request(),
+                "direct CLI test tone must reject values outside the signed integral-Hz correlation range");
+        }
+
+        for (const std::string token : {"0.136MHz", "136kHz", "136000", "2200m", "0.136MHz@22"})
+        {
+            std::string error;
+            require(
+                set_direct_tone_startup_request(token, &error),
+                "direct CLI test tone must accept inputs that resolve to integral Hz");
+            WsprFrequencyEntry entry;
+            double actual_rf_hz = 0.0;
+            require(
+                try_get_direct_tone_startup_request(entry, actual_rf_hz) &&
+                    nearly_equal(actual_rf_hz, 136000.0),
+                "accepted direct CLI test-tone forms must retain 136000 Hz exactly");
+            if (token == "0.136MHz@22")
+            {
+                require(
+                    entry.selector_gpio == 22,
+                    "integral unit-qualified direct test-tone input must retain its selector suffix");
+            }
+            clear_direct_tone_startup_request();
+        }
+    }
+
+    {
+        FrequencyEstimateQualifier qualifier;
+        SystemClockFrequencyEstimate sample;
+        sample.provider_name = "chrony";
+        sample.frequency_ppm = 1.25;
+        sample.synchronized = true;
+        sample.age_seconds = 2.0;
+        sample.residual_frequency_ppm = 0.05;
+        sample.skew_ppm = 0.2;
+        sample.selected_source = true;
+        sample.leap_normal = true;
+        sample.source_provenance = "Network NTP";
+        sample.source_signature = "ntp.example";
+        sample.retained_source_samples = 8;
+        sample.source_stability_span_seconds = 512.0;
+        require(
+            qualifier.evaluate(sample).qualification == FrequencyEstimateQualification::Converging &&
+                qualifier.evaluate(sample).qualification == FrequencyEstimateQualification::Converging,
+            "a provider estimate must remain converging until its stability window is complete");
+        const SystemClockFrequencyEstimate qualified = qualifier.evaluate(sample);
+        require(
+            qualified.qualification == FrequencyEstimateQualification::Qualified,
+            "a stable synchronized provider estimate within quality limits must qualify");
+        const GpioFrequencyCorrection combined = select_gpio_frequency_correction(
+            true, -0.20, 8.0, qualified);
+        require(
+            combined.mode == GpioCorrectionMode::QualifiedEstimate &&
+                nearly_equal(combined.effective_ppm, 1.05),
+            "effective GPIO PPM must equal the qualified provider estimate plus RF residual with the same sign convention");
+
+        sample.source_signature = "PPS0,ntp.example";
+        sample.source_provenance = "Mixed";
+        const SystemClockFrequencyEstimate changed_source = qualifier.evaluate(sample);
+        const GpioFrequencyCorrection stale_fallback = select_gpio_frequency_correction(
+            true, -0.20, 8.0, changed_source);
+        require(
+            changed_source.qualification == FrequencyEstimateQualification::Converging &&
+                stale_fallback.mode == GpioCorrectionMode::StaleEstimate &&
+                nearly_equal(stale_fallback.effective_ppm, 1.05),
+            "a source-composition change must reset convergence while retaining a visible last-qualified fallback");
+
+        SystemClockFrequencyEstimate unavailable;
+        unavailable.qualification = FrequencyEstimateQualification::Unavailable;
+        unavailable.reason = "provider unavailable";
+        const GpioFrequencyCorrection manual = select_gpio_frequency_correction(
+            true, 0.3, -2.5, unavailable);
+        require(
+            manual.mode == GpioCorrectionMode::FixedManual &&
+                nearly_equal(manual.effective_ppm, -2.5),
+            "an unavailable estimate without a stale value must fall back to fixed manual GPIO correction");
+        const GpioFrequencyCorrection uncalibrated = select_gpio_frequency_correction(
+            true, 0.3, 0.0, unavailable);
+        require(
+            uncalibrated.mode == GpioCorrectionMode::Uncalibrated &&
+                nearly_equal(uncalibrated.effective_ppm, 0.0),
+            "an unavailable estimate with no configured fallback must use zero PPM and report uncalibrated");
+    }
+
+    {
+        const std::string tracking =
+            "REF,2,0,0,0,0,0,1.25,0.05,0.20,0,0,16,Normal\n";
+        const PPMProviderSnapshot network = PPMManager::parseChronyReports(
+            tracking,
+            "^,*,ntp.example,2,6,377,4,0,0,0\n",
+            "ntp.example,8,5,512,1.25,0.20,0,0\n");
+        const PPMProviderSnapshot local = PPMManager::parseChronyReports(
+            tracking,
+            "#,*,PPS0,0,4,377,1,0,0,0\n",
+            "PPS0,8,5,64,1.25,0.20,0,0\n");
+        const PPMProviderSnapshot mixed = PPMManager::parseChronyReports(
+            tracking,
+            "#,*,PPS0,0,4,377,1,0,0,0\n^,+,ntp.example,2,6,377,4,0,0,0\n",
+            "PPS0,8,5,64,1.25,0.20,0,0\nntp.example,8,5,512,1.24,0.25,0,0\n");
+        const PPMProviderSnapshot reselected = PPMManager::parseChronyReports(
+            tracking,
+            "#,+,PPS0,0,4,377,1,0,0,0\n^,*,ntp.example,2,6,377,4,0,0,0\n",
+            "PPS0,8,5,64,1.25,0.20,0,0\nntp.example,8,5,512,1.24,0.25,0,0\n");
+        require(
+            network.synchronized && network.source_provenance == "Network NTP" &&
+                local.synchronized && local.source_provenance.find("local reference") != std::string::npos &&
+                mixed.synchronized && mixed.combined_sources && mixed.source_provenance == "Mixed" &&
+                network.source_signature != mixed.source_signature &&
+                mixed.source_signature != reselected.source_signature,
+            "fake chrony reports must distinguish network, local-reference, mixed composition, and selected-source changes");
+    }
+
+    {
+        init_default_config();
+        config.use_ini = true;
+        config.loop_tx = false;
+        config.tx_iterations.store(1, std::memory_order_release);
+        shutdown_after_current_transmission.store(false, std::memory_order_release);
+        shutdown_after_wspr_plan.store(false, std::memory_order_release);
+        reset_active_wspr_plan_state();
+
+        consume_tx_iteration_if_needed();
+
+        require(
+            config.tx_iterations.load(std::memory_order_acquire) == 0 &&
+                shutdown_after_current_transmission.load(std::memory_order_acquire) &&
+                !shutdown_after_wspr_plan.load(std::memory_order_acquire),
+            "a finite managed-INI WSPR run must request shutdown after its final frame");
+
+        shutdown_after_current_transmission.store(false, std::memory_order_release);
+        config.tx_iterations.store(0, std::memory_order_release);
+        consume_tx_iteration_if_needed();
+        require(
+            config.tx_iterations.load(std::memory_order_acquire) == 0 &&
+                !shutdown_after_current_transmission.load(std::memory_order_acquire) &&
+                !shutdown_after_wspr_plan.load(std::memory_order_acquire),
+            "managed-INI TX Iterations=0 must retain unlimited scheduling semantics");
+
+        config.loop_tx = true;
+        config.tx_iterations.store(1, std::memory_order_release);
+        consume_tx_iteration_if_needed();
+        require(
+            config.tx_iterations.load(std::memory_order_acquire) == 1 &&
+                !shutdown_after_current_transmission.load(std::memory_order_acquire) &&
+                !shutdown_after_wspr_plan.load(std::memory_order_acquire),
+            "managed-INI Loop TX must override a finite iteration value");
+
+        config.loop_tx = false;
+        config.tx_iterations.store(1, std::memory_order_release);
+        active_wspr_plan_in_progress = true;
+        active_wspr_frame_index = 0;
+        active_wspr_plan.frames.resize(2);
+        consume_tx_iteration_if_needed();
+        require(
+            config.tx_iterations.load(std::memory_order_acquire) == 0 &&
+                !shutdown_after_current_transmission.load(std::memory_order_acquire) &&
+                shutdown_after_wspr_plan.load(std::memory_order_acquire),
+            "a finite managed-INI paired WSPR run must defer shutdown until the complete plan finishes");
+
+        shutdown_after_wspr_plan.store(false, std::memory_order_release);
+        reset_active_wspr_plan_state();
     }
 
     std::cout << "dial_frequency_semantics_test passed" << std::endl;

@@ -1,0 +1,36 @@
+name: Debian backend contracts
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend-contracts:
+    runs-on: ubuntu-24.04
+    container: debian:trixie-slim
+    steps:
+      - name: Install build dependencies
+        run: |
+          apt-get update
+          DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+            build-essential ca-certificates git
+
+      - name: Check out source
+        uses: actions/checkout@v7
+
+      - name: Run standalone backend contracts
+        working-directory: src
+        run: |
+          make simulated-backend-test
+          make build/bin/simulated_transmit_backend_realtime_test
+          timeout 5s ./build/bin/simulated_transmit_backend_realtime_test
+          make transmission-controller-contract-test

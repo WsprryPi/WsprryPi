@@ -33,7 +33,7 @@ namespace
         config.transmit_backend = TransmitBackendKind::GPIO;
         config.gpio_tx_pin = 4;
         config.gpio_power_level = 7;
-        config.gpio_use_ntp = false;
+        config.gpio_use_system_clock_frequency_estimate = false;
         config.wspr_planner_preference = WsprPlannerPreference::Auto;
         config.wspr.callsign = config.callsign;
         config.wspr.grid_square = config.grid_square;

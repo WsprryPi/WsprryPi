@@ -80,7 +80,20 @@ int main()
         "guarded mode-change stop must not publish an extra persistence generation");
 
     patch_all_from_web({
-        {"Operation", {{"Mode", "QRSS"}, {"Transmit", false}}}
+        {"Operation", {{"Mode", "QRSS"}, {"Transmit", false}}},
+        {"CW",
+         {{"Message", "CQ"},
+          {"Base Frequency", 14096900.0},
+          {"Shift Hz", 5.0},
+          {"Dot Seconds", 3.0},
+          {"Intra Element Gap", 1.0},
+          {"Inter Character Gap", 3.0},
+          {"Inter Word Gap", 7.0},
+          {"DFCW Intra Element Gap", 0.333333},
+          {"DFCW Inter Character Gap", 1.0},
+          {"DFCW Inter Word Gap", 3.0},
+          {"Start Minute", 0},
+          {"Repeat Minutes", 10}}}
     });
 
     const std::string ini_after_guard = read_text_file(config.ini_filename);
@@ -95,6 +108,11 @@ int main()
         iniFile.getData().at("Operation").at("Mode") == "QRSS" &&
             iniFile.getData().at("Operation").at("Transmit") == "false",
         "guarded mode-change final save must persist the final mode and disabled transmit state");
+
+    config.qrss.message.clear();
+    config.fskcw.message.clear();
+    config.dfcw.message.clear();
+    config_to_json();
 
     bool transmit_enable_rejected = false;
     try

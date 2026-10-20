@@ -1,0 +1,100 @@
+# Repo-specific ignores
+signal_handler*.
+*_test
+src/[^/]*[^.][^/]*$
+!src/
+!src/**/
+src/*/*
+src/*.o
+src/*.d
+!/src/Makefile
+
+# macOS / AppleDouble files
+.DS_Store
+._*
+.AppleDouble/
+.LSOverride
+
+# Editor / IDE files
+.idea/
+.vscode/
+*.code-workspace
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Temporary files
+*.tmp
+*.swp
+*.swo
+*~
+*.bak
+*.old
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Build artifacts
+[bB]in/
+[Oo]bj/
+build/
+dist/
+dist-ssr/
+install/
+x64/
+x86/
+
+# Object / library / binary outputs
+*.d
+*.o
+*.obj
+*.slo
+*.lo
+*.so
+*.dll
+*.dylib
+*.a
+*.lib
+*.exe
+*.out
+*.app
+
+# C/C++ / CMake outputs
+*.gch
+*.pch
+*.pdb
+*.ilk
+*.map
+*.sbr
+*.idb
+*.ipch
+*.sdf
+*.tlog
+*.vcxproj.user
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+compile_commands.json
+
+# Python outputs
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.egg
+*.egg-info/
+*.manifest
+*.spec
+.venv/
+venv/
+
+# Documentation outputs
+docs/_build/

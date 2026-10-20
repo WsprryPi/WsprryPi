@@ -28,13 +28,19 @@
 
 // Primary header for this source file
 #include "main.hpp"
+#include "si5351_inventory_process.hpp"
 
 // Project headers
 #include "arg_parser.hpp"
+#include "gpio_output.hpp"
+#ifdef DEBUG_WSPR
+#include "qualification_gpio_test_mode.hpp"
+#endif
 #include "scheduling.hpp"
 #include "signal_handler.hpp"
 #include "version.hpp"
 #include "logging.hpp"
+#include "machine_power_control.hpp"
 #include "singleton.hpp"
 #include "wspr_transmit.hpp"
 
@@ -42,6 +48,7 @@
 #include <atomic>
 #include <cerrno>
 #include <csignal>
+#include <cstdlib>
 #include <mutex>
 #include <string_view>
 #include <thread>
@@ -89,7 +96,9 @@ void notify_async_shutdown_signal(int signum) noexcept
     const std::uint8_t wake = 1;
     if (g_async_shutdown_pipe[1] >= 0)
     {
-        (void)::write(g_async_shutdown_pipe[1], &wake, sizeof(wake));
+        const ssize_t wake_result =
+            ::write(g_async_shutdown_pipe[1], &wake, sizeof(wake));
+        (void)wake_result;
     }
 }
 
@@ -215,8 +224,20 @@ void callback_signal_handler(int signum, bool is_critical)
  */
 int main(int argc, char *argv[])
 {
+    // Inventory workers never acquire the application singleton or initialize output.
+    if (const auto inventory_exit = si5351_inventory_process::helper_main(argc, argv))
+        return *inventory_exit;
     // Maintain retval for main()
     int retval = EXIT_SUCCESS;
+
+#ifdef DEBUG_WSPR
+    const char *qualification_gpio_test_mode =
+        std::getenv("WSPRRYPI_QUALIFICATION_GPIO_TEST_MODE");
+    if (qualification_gpio_test_mode_requested(qualification_gpio_test_mode))
+    {
+        GPIOOutput::setTestMode(true);
+    }
+#endif
 
     if (!install_async_shutdown_handlers())
     {
@@ -272,14 +293,31 @@ int main(int argc, char *argv[])
     signalHandler.start();
     signalHandler.setPriority(SCHED_RR, 40);
 
+    bool simulated_backend = false;
+    for (int i = 1; i < argc; ++i)
+    {
+        const std::string option(argv[i]);
+        if ((option == "--backend" && i + 1 < argc &&
+             std::string(argv[i + 1]) == "simulated") ||
+            option == "--backend=simulated")
+        {
+            simulated_backend = true;
+        }
+    }
+
+    if (simulated_backend)
+        set_hardware_platform_detection_enabled(false);
+
     // Sets up logger based on DEBUG flag: INFO or DEBUG
     initialize_logger();
 
     // Parse command line first allowing calls for -h or -v
     handle_early_cli_options(argc, argv);
 
-    // Make sure we are running as root
-    if (getuid() != 0)
+    // Preserve the pre-parse privilege boundary for every executable capable
+    // of physical GPIO. Only an explicit simulation bypasses this legacy gate.
+    if (getuid() != 0 && !simulated_backend &&
+        build_has_physical_gpio_capability())
     {
         print_usage("This program must be run as root or with sudo.", EXIT_FAILURE);
     }
@@ -307,10 +345,27 @@ int main(int argc, char *argv[])
         print_usage(error_message, EXIT_FAILURE);
     }
 
+    // GPIO-capable executables retain the legacy privilege boundary. A
+    // GPIO-free Si5351 executable relies on the selected I2C device's ordinary
+    // kernel permissions, and simulation requires no hardware privilege.
+    if (getuid() != 0 && transmit_backend_requires_root(config.transmit_backend))
+    {
+        print_usage("This program must be run as root or with sudo.", EXIT_FAILURE);
+    }
+
     initialize_logger(
         config.use_journald,
         config.date_time_log,
         config.debug_logging);
+
+#ifdef DEBUG_WSPR
+    if (qualification_gpio_test_mode_requested(qualification_gpio_test_mode))
+    {
+        llog.logS(
+            WARN,
+            "Qualification GPIO test mode enabled: physical GPIO output requests, writes, and releases are suppressed. Hardware is not qualified.");
+    }
+#endif
 
     // Display version, Raspberry Pi model, and process ID after CLI parsing so
     // the first backend banner matches the requested logging mode.
@@ -373,14 +428,20 @@ int main(int argc, char *argv[])
 
     if (reboot_flag.load(std::memory_order_acquire))
     {
-        llog.logS(INFO, "Rebooting.");
-        std::cerr << "[INFO ] Rebooting." << std::endl;
+        if (machine_power_control_supported())
+        {
+            llog.logS(INFO, "Rebooting.");
+            std::cerr << "[INFO ] Rebooting." << std::endl;
+        }
         reboot_machine();
     }
     if (shutdown_flag.load(std::memory_order_acquire))
     {
-        llog.logS(INFO, "Shutting down.");
-        std::cerr << "[INFO ] Shutting down." << std::endl;
+        if (machine_power_control_supported())
+        {
+            llog.logS(INFO, "Shutting down.");
+            std::cerr << "[INFO ] Shutting down." << std::endl;
+        }
         shutdown_machine();
     }
 

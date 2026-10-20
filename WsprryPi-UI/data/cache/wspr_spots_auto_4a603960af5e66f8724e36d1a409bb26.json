@@ -1,0 +1,1 @@
+{"data":[],"source_used":"wspr_live_clickhouse","fallback_used":true,"warning":"wspr.live downloader failed, using direct wspr.live data.","fallback_reason":"wspr_live_downloader forced failure for fallback test."}

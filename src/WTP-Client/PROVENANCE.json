@@ -1,0 +1,48 @@
+{
+  "repository": "https://github.com/WsprryPi/WsprryPico",
+  "revision": "40812e7438f180c5e8d8ad75d4eb227271152b10",
+  "files": [
+    {
+      "upstream": "src/wtp/json.hpp",
+      "upstream_sha256": "7e4caa3e596490d0c7856e96d386c06020c116df5610c7f123c295a5c7031003",
+      "local": "src/detail/json.hpp",
+      "kind": "adapted source"
+    },
+    {
+      "upstream": "src/wtp/json.cpp",
+      "upstream_sha256": "0cd89f862b7886c7248b47d714dbf3202ebe8e5760d68f3854d90edb6c880cfb",
+      "local": "src/detail/json.cpp",
+      "kind": "adapted source"
+    },
+    {
+      "upstream": "src/wtp/frame_parser.hpp",
+      "upstream_sha256": "510ab9969d7ee66557673e8cca44eb8c1bfbc155d4f1005446efdb4d0b99261d",
+      "local": "include/wtp/frame_parser.hpp",
+      "kind": "adapted source"
+    },
+    {
+      "upstream": "src/wtp/frame_parser.cpp",
+      "upstream_sha256": "3cdd51cfc44b873e59f499593ac6e45e1de2e8dd9260987857a3b8b37f586ccd",
+      "local": "src/frame_parser.cpp",
+      "kind": "adapted source"
+    },
+    {
+      "upstream": "docs/protocol/wtp-1.schema.json",
+      "upstream_sha256": "fae1a7f94adb875733f47f22438a0811a3ab7fd9e4b8477780aea77cad62c8a8",
+      "local": "tests/fixtures/wtp-1.schema.json",
+      "kind": "unmodified test snapshot"
+    },
+    {
+      "upstream": "docs/protocol/wtp-1-contract.json",
+      "upstream_sha256": "ff9508c28de162c8d954e810955da7e15ae6cdd10912bba43e3b70c24269e6c8",
+      "local": "tests/fixtures/wtp-1-contract.json",
+      "kind": "unmodified test snapshot"
+    },
+    {
+      "upstream": "docs/protocol/test-vectors/wtp-1.json",
+      "upstream_sha256": "ba8811917794eede0609aa7b70b74778a18d1894cced50098c54d3332f81c747",
+      "local": "tests/fixtures/wtp-1.json",
+      "kind": "unmodified test snapshot"
+    }
+  ]
+}

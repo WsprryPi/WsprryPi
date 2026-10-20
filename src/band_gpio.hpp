@@ -36,7 +36,7 @@
 #ifndef BAND_GPIO_HPP
 #define BAND_GPIO_HPP
 
-constexpr int HAM_BAND_COUNT = 16;
+constexpr int HAM_BAND_COUNT = 19;
 
 /**
  * @brief Supported amateur radio bands for GPIO band selection.
@@ -50,15 +50,18 @@ enum class HamBand
     BAND_60M,
     BAND_40M,
     BAND_30M,
-    BAND_22M,
     BAND_20M,
     BAND_17M,
     BAND_15M,
     BAND_12M,
     BAND_10M,
+    BAND_8M,
     BAND_6M,
+    BAND_5M,
     BAND_4M,
-    BAND_2M
+    BAND_2M,
+    BAND_1_25M,
+    BAND_70CM
 };
 
 constexpr int ham_band_index(HamBand band)
@@ -107,15 +110,18 @@ constexpr const char *band_to_string(HamBand band)
         case HamBand::BAND_60M:   return "60m";
         case HamBand::BAND_40M:   return "40m";
         case HamBand::BAND_30M:   return "30m";
-        case HamBand::BAND_22M:   return "22m";
         case HamBand::BAND_20M:   return "20m";
         case HamBand::BAND_17M:   return "17m";
         case HamBand::BAND_15M:   return "15m";
         case HamBand::BAND_12M:   return "12m";
         case HamBand::BAND_10M:   return "10m";
+        case HamBand::BAND_8M:    return "8m";
         case HamBand::BAND_6M:    return "6m";
+        case HamBand::BAND_5M:    return "5m";
         case HamBand::BAND_4M:    return "4m";
         case HamBand::BAND_2M:    return "2m";
+        case HamBand::BAND_1_25M: return "1.25m";
+        case HamBand::BAND_70CM:  return "70cm";
     }
 
     return "unknown";

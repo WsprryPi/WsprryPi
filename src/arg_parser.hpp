@@ -36,12 +36,12 @@
 #define ARG_PARSER_HPP
 
 // Project headers
-#include "config_handler.hpp"
+#include "config_types.hpp"
 #include "ini_file.hpp"
 #include "lcblog.hpp"
 #include "monitorfile.hpp"
 #include "version.hpp"
-#include "wspr_band_lookup.hpp"
+#include "band_lookup.hpp"
 
 // Standard library headers
 #include <atomic>
@@ -67,9 +67,9 @@
 extern MonitorFile iniMonitor;
 
 /**
- * @brief Instance of WSPRBandLookup.
+ * @brief Instance of BandLookup.
  *
- * This instance of WSPRBandLookup is used to translate frequency representations:
+ * This instance of BandLookup is used to translate frequency representations:
  * - Converts from a short-hand (Hx) to a higher order (e.g., MHz) and vice versa.
  * - Validates frequency values.
  * - Translates terms (e.g., "20m") into a valid WSPR frequency.
@@ -77,7 +77,7 @@ extern MonitorFile iniMonitor;
  * Use this instance for any operations requiring frequency conversions and validation
  * within the WSPR system.
  */
-extern WSPRBandLookup lookup;
+extern BandLookup lookup;
 
 /**
  * @brief Atomic variable representing the current WSPR transmission interval.
@@ -177,7 +177,8 @@ bool validate_config_data_for_test(
 
 bool validate_config_candidate(
     ArgParserConfig &candidate,
-    std::string *error_message = nullptr);
+    std::string *error_message = nullptr,
+    bool require_live_backend = true);
 bool backend_ready_for_transmission(
     const ArgParserConfig &candidate,
     std::string *error_message = nullptr);

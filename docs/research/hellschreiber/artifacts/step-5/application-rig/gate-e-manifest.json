@@ -1,0 +1,44 @@
+{
+  "schema_version": 1,
+  "gate": "gate-e",
+  "generated_at": "2026-07-30T11:20:29Z",
+  "image": {
+    "id": "sha256:ae3a1f5f5ed9a5c0724ea891bf3c5f465d1ae5e4f7adc8dacf8446502cb29fac",
+    "architecture": "arm64/linux"
+  },
+  "applications": {
+    "fldigi": "4.2.12",
+    "xfhell": "3.5.2"
+  },
+  "sources": {
+    "fldigi_sha256": "028bcb1c100cb790cad36324b8063c13594e160743f9378320ceabcf16dbc44a",
+    "xfhell_sha256": "7b16ecdaa425ebc19f7e555fe28473e0228ea344e0203062a4e408346e75b209"
+  },
+  "audio": {
+    "sample_rate_hz": 48000,
+    "route": "private PulseAudio null sink and monitor",
+    "host_audio": false
+  },
+  "corpus": "HELL TEST 0123456789 DE WSPRY WSPRY 73",
+  "artifacts": {
+    "fldigi_transmit_wav": {
+      "path": "fldigi-transmit.wav",
+      "sha256": "4766c06f8f3998811c717a5ebad5f0eb5aebafea8fa872d94aec9c3921cf9570"
+    },
+    "xfhell_transmit_wav": {
+      "path": "xfhell-transmit.wav",
+      "sha256": "bad95d93ca60f88e61886e4bb0f53a73d0d896b902adef6aee999d14a2911432"
+    },
+    "fldigi_receive_png": {
+      "path": "fldigi-receive.png",
+      "sha256": "b8ccacbbc0787025d9f932e45660fd0c7f9d1d65a4b7ac91c1153a2e71801f9a"
+    },
+    "xfhell_receive_png": {
+      "path": "xfhell-receive.png",
+      "sha256": "2637a207221c05808e84b1d4bb82c8fe3968981301f13842fc4c860fbe664bf6"
+    }
+  },
+  "automation": "scripted application control; receive rasters manually interpreted",
+  "classification": "CONTROL PASS",
+  "summary": "Both applications produced recognizably correct self-decode rasters through a record-and-replay boundary."
+}

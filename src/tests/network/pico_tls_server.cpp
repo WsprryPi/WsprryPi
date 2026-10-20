@@ -1,0 +1,147 @@
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2026 Lee Bussy
+// WsprryPi-owned harness: actual unmodified Pico TLS server and common service.
+#include "network/pico/server.hpp"
+#include "network_support.hpp"
+#if __has_include("standalone/progress.hpp")
+#include "standalone/progress.hpp"
+#define WSPRRYPI_PROGRESS_FIXTURE 1
+#endif
+#include "network_credentials.hpp"
+#include "pico/time.h"
+#include <chrono>
+#include <csignal>
+#include <poll.h>
+#include <unistd.h>
+#include <thread>
+namespace {
+struct Clock : wsprrypico::wtp::Clock {
+  wsprrypico::wtp::ClockSnapshot snapshot() const override {
+    using namespace std::chrono;
+    return {wsprrypico::wtp::ClockState::Synchronized,
+      static_cast<std::uint64_t>(duration_cast<nanoseconds>(system_clock::now().time_since_epoch()).count()),
+      time_us_64() * 1000, 1000000, 0, wsprrypico::wtp::LeapState::Normal, {}};
+  }
+ };
+// Preserve the production dry-run engine's timing policy. Diagnose a host OS
+// scheduling miss instead of treating a later retry as evidence it never happened.
+struct ObservedEngine final : wsprrypico::wtp::RfEngine {
+  wsprrypico::standalone::DryRunEngine engine;
+  std::uint64_t start{}, allowance{};
+  bool reported{};
+  unsigned disables{}, prepares{};
+  bool can_disable=true;
+  wsprrypico::wtp::PrepareResult prepare(const wsprrypico::wtp::Job &job) override {
+    ++prepares; return engine.prepare(job);
+  }
+  bool schedules_locally() const override { return true; }
+  bool schedule(const wsprrypico::wtp::Job &job, std::uint64_t when,
+                const wsprrypico::wtp::LocalStartConditions &conditions) override {
+    start = when; allowance = conditions.maximum_uncertainty_ns; reported = false;
+    return engine.schedule(job, when, conditions);
+  }
+  bool begin(const wsprrypico::wtp::Job &job, std::uint64_t when) override {
+    return engine.begin(job, when);
+  }
+  wsprrypico::wtp::EngineReport poll(std::uint64_t now) override {
+    const auto result = engine.poll(now);
+    if (!reported && result.state == wsprrypico::wtp::EngineState::Missed) {
+      reported = true;
+      std::cerr << "HOST_DRY_RUN_MISSED start_ns=" << start << " poll_ns=" << now
+                << " elapsed_ns=" << (now >= start ? now - start : 0)
+                << " allowance_ns=" << allowance << std::endl;
+    }
+    return result;
+  }
+  bool disable(std::uint64_t when) override { ++disables; return can_disable && engine.disable(when); }
+  bool output_active() const override { return false; }
+};
+}
+int main(int argc, char **argv) {
+  std::signal(SIGPIPE, SIG_IGN);
+  network_test::Flash flash;
+  wsprrypico::standalone::Store store{flash};
+  if (!store.load()) return 1;
+  if (argc > 3 && std::string(argv[3]) != "blank") {
+    auto config = *wsprrypico::standalone::parse_config(network_test::config);
+    config.power_dbm = 20;
+#ifdef WSPRRY_PICO_EXTENDED_API
+    config.pins.rf = 28;
+    config.allow_unqualified_frequency = config.allow_non_amateur_frequency = true;
+#endif
+    if (!store.save(config) || !store.reserve(1'700'000'000'000'000'000ULL)) return 1;
+  }
+  Clock clock;
+  network_test::Identity identities;
+  if (argc > 1) identities.boot = static_cast<unsigned>(std::stoul(argv[1]));
+  ObservedEngine engine;
+  wsprrypico::wtp::JobService service{clock, engine, identities};
+  wsprrypico::standalone::Scheduler scheduler{store, service};
+  network_test::Network network;
+  const std::string device(32, argc > 2 ? argv[2][0] : 'a');
+  wsprrypico::network::BrowserApi api{service, store, scheduler, network, device, "phase11-host-test"};
+#ifdef WSPRRYPI_PROGRESS_FIXTURE
+  network_test::Flash progress_flash;
+  wsprrypico::standalone::Progress progress(progress_flash);
+  if (!progress.load()) return 1;
+  api.progress_settings(progress);
+#endif
+  // Match the pinned Pico standalone image's active-job connection policy.
+  api.set_active_job_connections(true);
+#ifdef WSPRRY_PICO_MANAGEMENT_API
+  api.management_availability({wsprrypico::network::ManagementProfile::Engineering,
+      0, false, true, false, false, false});
+#endif
+#ifdef WSPRRY_PICO_EXTENDED_API
+  using namespace wsprrypico::network::credentials;
+  const wsprrypico::provisioning::CredentialMaterial material{device_id,hostname,port,certificate,key,ca};
+  wsprrypico::network::PicoServer server{service, api, device, "phase11-host-test",material};
+#else
+  wsprrypico::network::PicoServer server{service, api, device, "phase11-host-test"};
+#endif
+  if (!server.start()) { std::cerr << "TLS server initialization failed\n"; return 1; }
+  std::cout << "READY " << server.port() << std::endl;
+  while (true) {
+    pollfd command{STDIN_FILENO, POLLIN, 0};
+    if (argc > 3 && ::poll(&command, 1, 0) > 0 && (command.revents & POLLIN)) {
+      std::string input; std::getline(std::cin, input);
+      if (input == "FAIL") { flash.fail = true; std::cout << "ACK" << std::endl; }
+      else if (input == "RESUME") { flash.fail = false; std::cout << "ACK" << std::endl; }
+      else if (input == "DISABLE_FAIL") { engine.can_disable=false; std::cout << "ACK" << std::endl; }
+      else if (input == "STOP") { (void)scheduler.command("STOP"); std::cout << "ACK" << std::endl; }
+      else if (input.starts_with("CONFIG ")) { std::cout << scheduler.command(input) << std::flush; }
+      else if (input == "DUMP") {
+        wsprrypico::standalone::Store reload{flash};
+        const bool healthy = reload.load();
+        std::string config = "null", digest;
+        if (reload.config()) {
+          auto redacted = *reload.config();
+          const auto &password = redacted.password;
+          for (const auto byte : wsprrypico::wtp::sha256(std::span(
+              reinterpret_cast<const std::uint8_t *>(password.data()), password.size()))) {
+            digest += "0123456789abcdef"[byte >> 4]; digest += "0123456789abcdef"[byte & 15];
+          }
+          redacted.password.clear(); config = wsprrypico::standalone::serialize_config(redacted);
+        }
+        std::string flash_digest;
+        for (const auto byte : wsprrypico::wtp::sha256(flash.bytes)) { flash_digest += "0123456789abcdef"[byte >> 4]; flash_digest += "0123456789abcdef"[byte & 15]; }
+        const auto status_text = scheduler.status();
+        const auto status = wsprrypico::wtp::json::parse(status_text);
+        std::cout << "DUMP {\"healthy\":" << (healthy ? "true" : "false") << ",\"config\":" << config
+                  << ",\"cursor\":\"" << reload.watermark() << "\",\"password_sha256\":\"" << digest
+                  << "\",\"generation\":\"" << reload.config_sequence() << "\",\"bytes_sha256\":\"" << flash_digest
+                  << '"'
+#ifdef WSPRRY_PICO_EXTENDED_API
+                  << ",\"inhibit\":" << (service.output_inhibited() ? "true" : "false")
+                  << ",\"pending_restart\":" << (scheduler.hardware_restart_required() ? "true" : "false")
+#endif
+                  << ",\"disables\":" << engine.disables << ",\"prepares\":" << engine.prepares
+                  << ",\"suspended\":" << (status ? std::string(status->get("suspended")->raw) : "null") << "}" << std::endl;
+      }
+    }
+    mock_tcp_poll();
+    const auto *test_address = std::getenv("WSPRRY_TEST_LISTEN_ADDRESS");
+    server.poll(network.enabled, std::string(test_address ? test_address : "127.0.0.1") + ":" + std::to_string(server.port()));
+    std::this_thread::sleep_for(std::chrono::microseconds(100));
+  }
+}

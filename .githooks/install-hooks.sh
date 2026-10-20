@@ -24,8 +24,6 @@ fi
 
 # Expected hooks
 EXPECTED_HOOKS=(
-    "post-checkout"
-    "post-merge"
     "pre-commit"
     "pre-push"
 )

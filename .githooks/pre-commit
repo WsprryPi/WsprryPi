@@ -5,15 +5,8 @@ set -o pipefail
 cd "$(git rev-parse --show-toplevel)" || exit 1
 source ".githooks/lib/common.sh"
 
-log "[pre-commit] Validating submodules"
-
-validate_submodules || {
-    log "[pre-commit] BLOCKED: Submodule state invalid"
-    exit 1
-}
-
-# Check merge conflicts
-if git diff --cached | grep -E '^[<=>]{7}' > /dev/null; then
+# Check staged additions for merge-conflict markers
+if git diff --cached | grep -E '^\+[<=>]{7}' > /dev/null; then
     log "[pre-commit] ERROR: Merge conflict markers detected"
     exit 1
 fi

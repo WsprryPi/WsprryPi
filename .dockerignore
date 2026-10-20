@@ -1,0 +1,14 @@
+.git/**
+!.git/HEAD
+!.git/config
+!.git/index
+!.git/refs/**
+!.git/packed-refs
+!.git/objects/**
+**/.DS_Store
+**/._*
+**/build/
+**/node_modules/
+dist/
+executables/
+**/.wsprrypi-export-*/

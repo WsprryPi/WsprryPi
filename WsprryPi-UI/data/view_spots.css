@@ -1,0 +1,154 @@
+/* Make the card fill the available vertical space */
+.spots-card {
+    display: flex;
+    flex-direction: column;
+    min-height: min(42rem, calc(100vh - 12rem));
+}
+
+.spots-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem 0.75rem;
+}
+
+.spots-toolbar__label {
+    margin: 0;
+    font-size: var(--text-caption);
+    color: var(--bs-secondary-color);
+}
+
+.spots-toolbar__select {
+    width: auto;
+    min-width: 11rem;
+}
+
+.spots-toolbar__status {
+    font-size: var(--text-caption);
+    line-height: 1.45;
+    overflow-wrap: anywhere;
+}
+
+.spots-toolbar__status--success {
+    color: var(--bs-success-text-emphasis);
+}
+
+.spots-toolbar__status--warning {
+    color: var(--bs-warning-text-emphasis);
+}
+
+.spots-toolbar__status--danger {
+    color: var(--bs-danger-text-emphasis);
+}
+
+/* Only the card body scrolls */
+.spots-card .card-body.tab-content {
+    flex: 1;
+    min-height: 18rem;
+    overflow-y: auto;
+}
+
+/* Inside that, the table container scrolls */
+.spots-card .table-responsive {
+    height: 100%;
+    overflow-x: auto;
+    overflow-y: auto;
+}
+
+/* Sticky table header with solid background */
+.spots-card .table-responsive thead th {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    /* use the same background as the table or card */
+    background-color: var(--bs-body-bg);
+    /* ensure the background covers the full cell */
+    background-clip: padding-box;
+}
+
+.spots-header-stamp,
+#spotsFor small {
+    font-size: var(--text-caption);
+    color: var(--bs-secondary-color);
+    line-height: 1.45;
+}
+
+#spotsFor {
+    min-width: 0;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0.25rem 0.5rem;
+}
+
+#spotsFor .spots-header-text {
+    display: inline-block;
+    max-width: min(100%, 24ch);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    vertical-align: bottom;
+    white-space: nowrap;
+}
+
+.spots-header-stamp {
+    overflow-wrap: anywhere;
+}
+
+.spots-state {
+    display: grid;
+    justify-items: center;
+    text-align: center;
+}
+
+.spots-state__title {
+    max-width: 28rem;
+}
+
+.spots-state__body {
+    width: min(100%, 42rem);
+    margin-inline: auto;
+    overflow-wrap: anywhere;
+}
+
+.spots-state__action {
+    min-height: 2.75rem;
+    padding: 0.5rem 1rem;
+}
+
+.spots-card .table {
+    table-layout: fixed;
+    min-width: 68rem;
+}
+
+.spots-card .table th,
+.spots-card .table td {
+    overflow-wrap: anywhere;
+    vertical-align: top;
+}
+
+.spots-card .table td {
+    min-width: 0;
+}
+
+@media (max-width: 767.98px) {
+    .spots-card {
+        min-height: 0;
+    }
+
+    .spots-toolbar__select {
+        min-width: 0;
+        width: 100%;
+    }
+
+    .spots-toolbar__status {
+        width: 100%;
+    }
+
+    .spots-card .card-body.tab-content {
+        min-height: 14rem;
+    }
+
+    #spotsFor .spots-header-text {
+        max-width: 100%;
+    }
+}

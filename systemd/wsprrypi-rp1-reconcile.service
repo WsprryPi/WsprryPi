@@ -1,0 +1,10 @@
+# SPDX-License-Identifier: MIT
+[Unit]
+Description=Restore WsprryPi's selected RP1 route after reboot with output disabled
+After=wsprrypi.service
+
+[Service]
+Type=oneshot
+User=root
+ExecStart=/usr/bin/python3 /usr/local/lib/wsprrypi/runtime_reconcile.py reconcile
+TimeoutStartSec=180

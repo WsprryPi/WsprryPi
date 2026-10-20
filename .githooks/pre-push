@@ -8,13 +8,3 @@ if [[ "$branch" == "main" || "$branch" == "master" ]]; then
     printf "[pre-push] ERROR: Direct push to %s blocked\n" "$branch" >&2
     exit 1
 fi
-
-cd "$(git rev-parse --show-toplevel)" || exit 1
-source ".githooks/lib/common.sh"
-
-log "[pre-push] Validating submodules before push"
-
-validate_submodules || {
-    log "[pre-push] BLOCKED: Submodule state invalid"
-    exit 1
-}

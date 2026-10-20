@@ -34,8 +34,11 @@
 #include <string>
 #include <vector>
 
+#include "backend_capabilities.hpp"
+#if WSPRRYPI_ANCILLARY_GPIO
 #include "gpio_include.hpp"
 #include "gpio_line_resolver.hpp"
+#endif
 
 /**
  * @class GPIOOutput
@@ -118,6 +121,7 @@ private:
     bool enabled_;
     bool last_logical_state_;
     std::string last_error_;
+#if WSPRRYPI_ANCILLARY_GPIO
     ResolvedGPIOLine resolved_line_;
 
     // Using unique_ptr to manage the libgpiod chip.
@@ -128,6 +132,7 @@ private:
 #else
     // v1: store the line by value.
     gpiod::line line_;
+#endif
 #endif
 
     // Helper to compute the physical state to write based on active configuration.

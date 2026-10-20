@@ -4,7 +4,8 @@ These instructions apply to the entire WsprryPi repository unless a more specifi
 
 ## Working Principles
 
-- Inspect the current repository, branch, working-tree status, submodule status, and relevant implementation contracts before acting.
+- Inspect the current repository, branch, working-tree status, affected component
+  paths, and relevant implementation contracts before acting.
 - Keep work tightly within the user-approved scope.
 - Preserve all existing changes. A dirty working tree belongs to the user unless explicitly stated otherwise.
 - Do not discard, overwrite, reset, stage, commit, amend, rebase, push, or create a pull request unless the user explicitly requests that action.
@@ -32,6 +33,32 @@ These instructions apply to the entire WsprryPi repository unless a more specifi
 - If a task is divided into approved slices, implement only the current slice. Do not silently begin later slices.
 - If an ambiguity would materially change behavior, compatibility, persistence, hardware operation, or user workflow, stop and ask for direction.
 
+## Repository and Work-Harness Cleanup
+
+- For an explicit request to clean up WsprryPi, follow the
+  [reusable cleanup instructions](docs/development/repository-cleanup-prompt.md).
+- Present an exact DELETE / REWRITE / RETAIN / HOLD inventory before changes.
+  Include project-owned tracked, untracked and ignored artifacts, Mac work areas,
+  and the Raspberry Pi hosts authorized for the request. Verify physical paths,
+  active use, dependencies and recovery duties; preserve user work and shared tools.
+- Describe the current product in direct, impersonal language. Operator prose
+  explains capabilities, use and meaningful limitations. Keep required technical
+  detail in engineering guides; remove development diaries and future promises.
+- Delete completed, superseded and abandoned execution prompts, temporary
+  handoffs and obsolete evidence after consolidating needed current information.
+  Repair references; do not create an archive or permanent cleanup report.
+- Keep handoffs needed for selected unfinished work and genuinely reusable
+  instructions. The release punchlist is the selected work authority; preserve
+  its priorities and acceptance gates. Active release/research plans may retain
+  phase/step organization; remove that framing from ordinary documentation.
+- Preserve component boundaries, current behavioral tests/fixtures, source
+  provenance, dependencies, live settings and required rollback/recovery assets.
+  Keep permission-limited or ambiguous items on hold and continue independent work.
+- Cleanup does not authorize hardware operation, service/configuration changes,
+  sibling-repository edits, checkout synchronization, Git-history changes,
+  staging, commits, pushes or publication. Separate explicit requests govern them.
+- Reading or maintaining the instructions does not invoke cleanup.
+
 ## Raspberry Pi and Hardware Safety
 
 WsprryPi controls radio-transmission and Raspberry Pi hardware.
@@ -55,6 +82,67 @@ Treat compilation, non-hardware unit tests, source inspection, and configuration
 Never claim that hardware, RF output, GPIO timing, service lifecycle, or installation behavior has been validated solely because source-level tests passed.
 
 Before any authorized live transmission, confirm the exact frequency, mode, duration, output path, attached hardware, and stopping procedure.
+
+### Authorized Installation Monitoring
+
+When the user explicitly authorizes an installation, keep its completion marker
+outside the Git checkout. Before starting, always remove any stale marker from
+the invoking user's home directory. Create the marker only if the installer
+succeeds:
+
+```sh
+rm -f ~/finished
+sudo ./scripts/install.sh && touch ~/finished
+```
+
+For an installation running in an existing terminal session, monitor
+`~/finished`; never create or monitor `finished` relative to the repository
+working directory. The marker belongs to the invoking command, not to
+`scripts/install.sh`.
+
+## Hardware-Free Simulated Backend
+
+WsprryPi provides a canonical hardware-free simulated transmission backend for
+ordinary Debian development, automated tests, and CI. Read
+`docs/simulated-backend.md` before planning or running application-level
+transmission tests that do not require physical hardware.
+
+- Prefer the explicit `--backend simulated` selection when exercising the real
+  application planning, scheduling, cancellation, status, failure, and cleanup
+  paths without GPIO, MMIO, mailbox, DMA, I2C, transmitter device nodes, or RF.
+- Use `.github/workflows/debian-non-hardware.yml` as the checked-in reference
+  for the canonical unprivileged Debian validation suite.
+- Simulation must never be selected automatically because hardware is absent or
+  initialization fails, and it must not weaken safety policy for physical
+  backends.
+- Timing-mode selection, trace-path overrides, and lifecycle fault injection are
+  transient typed C++ test/developer APIs, not production CLI, INI, environment,
+  or UI controls. Additional shell-facing controls require a separately reviewed
+  developer-harness use case.
+- Simulator evidence qualifies software contracts only. It does not qualify
+  Raspberry Pi timing, GPIO, MMIO, DMA, mailbox, I2C electrical behavior,
+  Si5351 output, installation, services, RF output, frequency accuracy, or a
+  physical transmitter chain.
+
+## Raspberry Pi Kernel Build Worker
+
+Maintainer kernel work can use the Debian ARM64 build worker prepared outside
+the WsprryPi repositories. Agents working on kernel source, configuration,
+builds, staging, or deployment planning must read this document before
+operating the worker:
+
+- `docs/raspberry-pi-kernel-build-worker-setup.md` is the canonical guide.
+  It defines VM requirements, package installation, workspace creation, exact
+  source pinning, target-config import and normalization, stock validation,
+  staging, checksums, acceptance criteria, repeat runs, cleanup, and the
+  validated safety boundary.
+The worker contract is build-and-stage only. Keep kernel source, out-of-tree
+build output, staged artifacts, and WsprryPi repositories separate. Never
+install a built kernel into the worker's `/boot` or `/lib/modules`. Target-Pi
+access, copying, installation, boot configuration, `depmod`, reboot, service
+operation, GPIO, transmission, and RF activity require separate explicit
+authorization. A successful build or manifest verification is not target
+hardware qualification.
 
 ## User Interface Work: Impeccable Is Required
 
@@ -85,142 +173,126 @@ Do not commit local skill/runtime artifacts such as `.agents/`, `.impeccable/`, 
 
 ## Operator Documentation Repository
 
-Operator documentation lives in the separate sibling Git repository `../Wsprry_Pi_Docs`; it is not a submodule of `WsprryPi`.
+Operator documentation lives in the separate sibling Git repository
+`../Wsprry_Pi_Docs`.
 
 - Inspect and follow `Wsprry_Pi_Docs/AGENTS.md` before working there.
 - Do not write to that repository without explicit cross-repository authorization.
 - Preserve its current branch and working tree, including all existing user changes.
 - Build, render, and verify documentation using that repository's documented workflow.
 - Use Impeccable to review affected rendered UI documentation. Replace screenshots only when they are materially inaccurate.
-- Keep application, `WsprryPi-UI` submodule, and `Wsprry_Pi_Docs` changes as separate review, commit, and push boundaries.
+- Keep application/UI changes and `Wsprry_Pi_Docs` changes as separate review,
+  commit, and push boundaries.
 - If cross-repository documentation changes are not authorized, review and report the required operator-documentation follow-up without modifying that repository.
 
-## Submodule Policy
+## Component Policy
 
-WsprryPi uses Git submodules in two distinct roles:
+WsprryPi tracks its application and reusable components as ordinary content in
+one Git repository:
 
-- `WsprryPi-UI` at the repository root contains the first-party application web interface.
-- Submodules under `src/` provide libraries and supporting components used by the C++ application.
+- `WsprryPi-UI` contains the first-party application web interface.
+- Named components under `src/` provide libraries and supporting functionality
+  used by the C++ application.
 
-Treat every submodule as a separate Git repository with its own branch, working tree, history, tests, and commit boundary.
+Treat every component as a coherent source and test boundary inside the parent
+repository. Preserve its named root, internal hierarchy, public interfaces,
+README, attribution, standalone build or test entry points, and extraction
+potential where present.
 
 ### Initial Inspection
 
-Before building, testing, or modifying code, inspect the parent repository and all submodules:
+Before building, testing, or modifying code, inspect the parent repository and
+the affected component paths:
 
 ```sh
 git status --short --branch
-git submodule status --recursive
-git submodule foreach --recursive 'git status --short --branch'
+git diff --check
+git diff --cached --check
 ```
 
-Interpret submodule status carefully:
+Review both staged and unstaged changes. Confirm that affected component files
+are ordinary parent-repository content and inspect applicable nested
+instructions before acting. Existing changes anywhere in the repository belong
+to the user and must be preserved.
 
-- A leading `-` means the submodule is not initialized.
-- A leading `+` means it is checked out at a commit different from the parent repository’s recorded commit.
-- A dirty submodule contains local changes that must be preserved.
-- A detached `HEAD` is common for a checked-out submodule and must not be mistaken for an error or permission to discard work.
-
-Report unexpected, dirty, uninitialized, or mismatched submodule state before making changes that could affect it.
-
-### Initialization
-
-When required for inspection, building, or testing, initialize submodules at the commits recorded by the parent repository:
-
-```sh
-git submodule update --init --recursive
-```
-
-Do not use any of the following unless the user explicitly requests a dependency update:
-
-```sh
-git submodule update --remote
-git submodule foreach git pull
-git submodule foreach git reset --hard
-```
-
-Do not automatically move a submodule to its latest upstream branch. The parent repository’s recorded commit is the authoritative dependency version.
-
-Do not change submodule URLs, branches, or `.gitmodules` configuration unless that is explicitly in scope.
-
-### Root UI Submodule
+### Root UI Component
 
 `WsprryPi-UI` is the editable first-party web UI.
 
 For UI work:
 
 - Follow the mandatory Impeccable workflow.
-- Verify that `WsprryPi-UI` is initialized at the commit recorded by the parent repository.
-- Inspect the UI submodule’s branch and working-tree status separately.
+- Inspect the complete parent working tree and the existing UI source state.
 - Make UI source changes inside `WsprryPi-UI`.
-- Do not replace missing UI sources with copies from an installed web root, generated output, or another checkout.
-- Coordinate UI behavior with the parent repository’s configuration, validation, persistence, websocket, scheduling, and runtime contracts.
-- Run UI-specific tests in the UI repository and applicable integration or source-regression tests in the parent repository.
-- Treat the UI commit and the parent repository’s updated submodule pointer as separate reviewable changes.
+- Do not replace missing UI sources with copies from an installed web root,
+  generated output, or another checkout.
+- Coordinate UI behavior with the parent repository's configuration,
+  validation, persistence, websocket, scheduling, and runtime contracts.
+- Run UI-specific tests from `WsprryPi-UI` and applicable integration or
+  source-regression tests from the parent repository.
+- Review UI changes as an explicit component portion of the parent diff.
 
-Do not update the parent repository’s `WsprryPi-UI` pointer until the intended UI commit exists and has been reviewed.
+### `src/` Components
 
-### `src/` Dependency Submodules
+Components under `src/` retain strong independent boundaries even though they
+are tracked by the parent repository.
 
-Submodules under `src/` are dependencies and must be treated as read-only by default.
+- Do not modify a component merely to work around a parent integration problem.
+- Do not apply formatting, refactoring, warning cleanup, or modernization as
+  incidental work.
+- If a required fix belongs in a component, identify the affected component,
+  suspected defect, why a parent-level fix would be inappropriate, proposed
+  change, and validation.
+- Obtain approval before broadening a parent-only task into component changes.
+- Keep component changes independently buildable and testable where supported.
+- Preserve reusable components such as `LCBLog` and `WSPR-Reference` without
+  introducing dependencies on WsprryPi application internals.
 
-- Do not modify a `src/` submodule merely to work around a parent-repository problem.
-- Do not update a dependency revision as incidental cleanup.
-- Do not apply formatting, refactoring, warning cleanup, or modernization inside dependency submodules unless explicitly requested.
-- If a required fix appears to belong in a dependency, report:
-  - the affected submodule
-  - its current recorded commit
-  - the suspected defect
-  - why a parent-level fix would be inappropriate
-  - the proposed dependency change and validation
-- Obtain approval before editing the dependency submodule.
-- Keep dependency changes independently buildable and testable where its repository supports that.
-- Update the parent repository’s submodule pointer only after the dependency change has been reviewed and committed in the dependency repository.
+Never conceal a component modification inside an otherwise parent-only change.
 
-Never conceal a dependency modification inside an otherwise parent-only change.
+### Dirty Component Paths
 
-### Dirty Submodules
+Existing changes inside a component path belong to the user just like changes
+elsewhere in the parent repository.
 
-Existing submodule changes belong to the user.
-
-- Do not reset, clean, switch, checkout, stash, rebase, or overwrite a dirty submodule.
-- Do not run recursive commands that could mutate every submodule.
-- Work around unrelated dirty submodules when safe.
-- If the requested work overlaps a dirty submodule, inspect the existing changes and continue from them only when the task clearly authorizes that scope.
+- Do not reset, clean, switch, checkout, stash, rebase, overwrite, or discard
+  them.
+- Work around unrelated changes when safe.
+- If requested work overlaps existing changes, inspect them and continue only
+  when the task clearly authorizes that scope.
 - Otherwise stop and ask for direction.
 
-### Commit and Push Ordering
+### Commit and Push Boundaries
 
 Do not commit or push unless explicitly requested.
 
-When an authorized change includes a submodule:
+When an authorized change includes a component:
 
-1. Review the submodule diff.
-2. Run the submodule’s relevant tests.
-3. Commit the submodule change in that submodule repository.
-4. Ensure the submodule commit is available on its intended remote before publishing a parent commit that references it.
-5. Review the parent repository diff, including the exact old and new submodule commit IDs.
-6. Commit the parent repository’s pointer update separately or as an explicitly reviewed part of the parent change.
-7. Push only the repositories the user authorized.
+1. Review the component portion of the parent diff.
+2. Run the component's relevant standalone tests where available.
+3. Run applicable parent integration tests.
+4. Review the complete staged parent diff.
+5. Commit the component and integration changes in the parent repository at a
+   boundary appropriate to the approved task.
+6. Push only the parent branch and remote the user authorized.
 
-Never push a parent commit whose submodule pointer refers only to an unpushed local commit. That would leave other checkouts unable to initialize the recorded revision.
+Any future extraction or publication workflow requires separate authorization.
 
 ### Validation and Reporting
 
-Build and test against the exact submodule commits recorded by the parent repository unless the approved task intentionally changes them.
+Build and test the ordinary component trees tracked by the parent repository.
 
 In the completion report, state:
 
-- parent repository branch and working-tree state
-- initialized and uninitialized submodules
-- dirty or mismatched submodules
-- every submodule modified
-- old and new submodule commit IDs, if pointers changed
-- tests run inside each affected submodule
-- integration tests run in the parent repository
-- whether submodule commits and parent-pointer commits were created or pushed
+- parent repository branch and working-tree state;
+- every component path modified;
+- standalone component tests run;
+- integration tests run in the parent repository;
+- validation not run and why; and
+- whether a parent commit or push occurred.
 
-Do not describe the parent repository as clean when one of its submodules is dirty or checked out at an unexpected commit.
+Do not describe the repository as clean when a component path contains staged,
+unstaged, or untracked changes.
 
 ## Configuration and Compatibility
 
@@ -257,12 +329,18 @@ Use the repository’s existing Makefile targets and test infrastructure.
 
 Run tests from `src` unless the project’s current instructions say otherwise.
 
-A typical non-hardware regression command is:
+Choose the semantics profile explicitly for the build host:
 
-```sh
-cd src
-make semantics-test
-```
+| Host/toolchain | Command | Coverage |
+| --- | --- | --- |
+| Linux with the libgpiod C++ development headers | `WSPRRYPI_DISABLE_HARDWARE_ACCESS=1 make semantics-test SUDO=` | Full semantics coverage for the default physical and simulated backend profile, with hardware access disabled. |
+| macOS, another non-Linux host, or Linux without the libgpiod C++ development headers | `make semantics-test-portable SUDO=` | Portable simulated-only coverage with `BACKENDS=simulated ANCILLARY_GPIO=0`. |
+
+`semantics-test-portable` is an explicit subset, not an automatic fallback and
+not evidence that the full suite passed. It excludes the backend-specific
+runtime-semantics and cleanup-lifecycle executables whose assertions require
+physical backend capabilities. Neither profile qualifies physical hardware,
+GPIO timing, installation, services, or RF output.
 
 Use focused targets when they cover the changed behavior, including as applicable:
 

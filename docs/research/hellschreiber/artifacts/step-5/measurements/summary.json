@@ -1,0 +1,106 @@
+{
+  "method": "source-derived raster and continuous-phase FSK fixtures; not application execution",
+  "test_text": "CQ TEST",
+  "sources": {
+    "fldigi_4_2_12_archive_sha256": "028bcb1c100cb790cad36324b8063c13594e160743f9378320ceabcf16dbc44a",
+    "xfhell_3_5_2_archive_sha256": "7b16ecdaa425ebc19f7e555fe28473e0228ea344e0203062a4e408346e75b209",
+    "radiolib_0795caa_archive_sha256": "6bf3c67958c8fe97d019560e11fb2b99231ff4b86c61aa7e461db640bf396150"
+  },
+  "track_a_contracts": {
+    "fldigi_FSKH105": {
+      "physical_symbol_rate_per_s": 245.0,
+      "column_rate_per_s": 17.5,
+      "rows_per_column": 14,
+      "tone_shift_hz": 55.0,
+      "fixture_font": "Feld7x7-14.cxx"
+    },
+    "xfhell_FMHell105": {
+      "physical_symbol_rate_per_s": 210.0,
+      "column_rate_per_s": 17.5,
+      "rows_per_column": 12,
+      "tone_shift_hz": 210.0,
+      "nominal_logical_baud": 105.0,
+      "fixture_font": "FMFatLoEn.bdf"
+    }
+  },
+  "track_a_exact_contract_match": false,
+  "track_a_mismatch": {
+    "symbol_rate_ratio": 1.1666666666666667,
+    "tone_shift_ratio": 3.8181818181818183,
+    "row_count_difference": 2
+  },
+  "raster_summary": {
+    "fldigi-real-vs-historical-drum:transmitted-cell": {
+      "characters_compared": 40,
+      "exact_characters": 27,
+      "total_mismatched_cells": 158,
+      "total_cells": 3920
+    },
+    "fldigi-real-vs-historical-drum:trimmed-glyph": {
+      "characters_compared": 40,
+      "exact_characters": 34,
+      "total_mismatched_cells": 38,
+      "total_cells": 1970
+    },
+    "fldigi-real-vs-xfhell-real:transmitted-cell": {
+      "characters_compared": 40,
+      "exact_characters": 0,
+      "total_mismatched_cells": 1096,
+      "total_cells": 3836
+    },
+    "fldigi-real-vs-xfhell-real:trimmed-glyph": {
+      "characters_compared": 40,
+      "exact_characters": 36,
+      "total_mismatched_cells": 32,
+      "total_cells": 1978
+    },
+    "fldigi-7x7-vs-radiolib:transmitted-cell": {
+      "characters_compared": 40,
+      "exact_characters": 11,
+      "total_mismatched_cells": 258,
+      "total_cells": 3920
+    },
+    "fldigi-7x7-vs-radiolib:trimmed-glyph": {
+      "characters_compared": 40,
+      "exact_characters": 12,
+      "total_mismatched_cells": 298,
+      "total_cells": 1920
+    }
+  },
+  "audio": [
+    {
+      "file": "fldigi-fskh105-source-contract.wav",
+      "sha256": "5be94ad3f2e2fd1387ed9d6f8ad4ceddec9c95814529eb97d117cdf861dafdcd",
+      "sample_rate_hz": 48000,
+      "center_hz": 1500.0,
+      "shift_hz": 55.0,
+      "symbol_rate_per_s": 245.0,
+      "samples": 82286,
+      "duration_s": 1.7142916666666668
+    },
+    {
+      "file": "xfhell-fmhell105-source-contract.wav",
+      "sha256": "b622e5e20c78af27454ac2ca2507589a8e0a830543a39500346cbb0c5ac0b8a0",
+      "sample_rate_hz": 48000,
+      "center_hz": 1500.0,
+      "shift_hz": 210.0,
+      "symbol_rate_per_s": 210.0,
+      "samples": 139886,
+      "duration_s": 2.9142916666666667
+    }
+  ],
+  "tone_decision_tests": {
+    "pattern": "280 alternating binary symbols",
+    "scenarios": [
+      "clean",
+      "reverse-uncompensated",
+      "offset-plus-10Hz",
+      "offset-plus-25Hz",
+      "offset-plus-50Hz",
+      "awgn-0dB",
+      "awgn-minus-6dB"
+    ],
+    "result_file": "measurements/impairment-results.csv",
+    "scope": "source-derived coherent tone-energy decisions only; no application receiver or human readability claim"
+  }
+}

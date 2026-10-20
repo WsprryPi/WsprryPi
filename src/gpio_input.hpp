@@ -29,8 +29,11 @@
 #ifndef GPIO_INPUT_HPP
 #define GPIO_INPUT_HPP
 
+#include "backend_capabilities.hpp"
+#if WSPRRYPI_ANCILLARY_GPIO
 #include "gpio_include.hpp"
 #include "gpio_line_resolver.hpp"
+#endif
 
 #include <atomic>
 #include <condition_variable>
@@ -121,6 +124,7 @@ private:
 
     std::string last_error_;            ///< Last setup/runtime error text.
     Status status_;                     ///< Current operational state.
+#if WSPRRYPI_ANCILLARY_GPIO
     ResolvedGPIOLine resolved_line_;    ///< Resolved chip/offset metadata.
     std::unique_ptr<gpiod::chip> chip_; ///< GPIO chip handle.
 
@@ -129,6 +133,7 @@ private:
     gpiod::edge_event_buffer event_buf_{16};
 #else
     gpiod::line line_;
+#endif
 #endif
 };
 

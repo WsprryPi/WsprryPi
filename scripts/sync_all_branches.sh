@@ -8,7 +8,7 @@ clone_if_missing() {
 
     if [[ ! -d "$repo_dir/.git" ]]; then
         printf "Cloning %s into %s.\n" "$repo_url" "$repo_dir"
-        git clone --recurse-submodules -j8 "$repo_url" "$repo_dir"
+        git clone "$repo_url" "$repo_dir"
     fi
 
     cd "$repo_dir"
@@ -81,9 +81,6 @@ iterate_and_update_branches() {
                 printf "Fast-forward failed on '%s'.\n" "$branch" >&2
             }
         fi
-
-        printf "\nAbout to reinit submodules, this may take a moment if there are many.\n"
-        git submodule update --init --recursive 2>/dev/null || true
     done
 
     if [[ -n "$original_branch" ]]; then
