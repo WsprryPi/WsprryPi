@@ -366,7 +366,8 @@ class WebSocketLifecycleTest {
     }
 public:
     static int run() {
-        verify_stream_and_control_queue(39526);
+        // The Test Tone lifecycle fixture uses 39526 and runs in parallel.
+        verify_stream_and_control_queue(39527);
         verify_loopback_binding(39518);
         verify_ipv4_loopback_binding(39520);
         verify_auto_prefers_ipv6(39524);
