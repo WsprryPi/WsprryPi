@@ -5452,7 +5452,7 @@ git_clone() {
     retval=0
 
     # Return if we are in the repo
-    if [[ -d "$dest_root" && "${IS_REPO}" ]]; then
+    if [[ -d "$dest_root" && "${IS_REPO}" == "true" ]]; then
         debug_end "$debug"
         return 0
     fi
@@ -7584,7 +7584,7 @@ upgrade_ini() {
 
     rm -f /tmp/upgrade_ini.err "$tmp_merged"
 
-    mawk '
+    if awk '
     function trim(value) {
       gsub(/^[ \t]+|[ \t]+$/, "", value)
       return value
@@ -7668,42 +7668,25 @@ upgrade_ini() {
 
       print
     }
-    ' "$old_ini" "$new_ini" >"$tmp_merged" 2>/tmp/upgrade_ini.err
-
-    rc=$?
+    ' "$old_ini" "$new_ini" >"$tmp_merged" 2>/tmp/upgrade_ini.err; then
+        rc=0
+    else
+        rc=$?
+    fi
 
     if (( rc != 0 )); then
         err_details=$(sed 's/^/  > /' /tmp/upgrade_ini.err)
-        logE "INI merge failed (mawk exited $rc). Falling back to default INI." "$err_details"
-
-        if [[ -s "$new_ini" ]]; then
-            exec_command "Use default INI after merge failure" \
-                cp -f "$new_ini" "$merged_ini" "$debug" || return 1
-            rm -f /tmp/upgrade_ini.err "$tmp_merged"
-            debug_print "Fallback to installer INI succeeded." "$debug"
-            debug_end "$debug"
-            return 0
-        else
-            logE "Fallback failed: installer INI is also empty."
-            rm -f /tmp/upgrade_ini.err "$tmp_merged"
-            debug_end "$debug"
-            return 1
-        fi
+        logE "INI merge failed (awk exited $rc). Existing configuration preserved." "$err_details"
+        rm -f /tmp/upgrade_ini.err "$tmp_merged"
+        debug_end "$debug"
+        return 1
     fi
 
     if [[ ! -s "$tmp_merged" ]]; then
-        logE "INI merge produced an empty file. Falling back to default INI."
-
-        if [[ -s "$new_ini" ]]; then
-            exec_command "Use default INI after empty merge" \
-                cp -f "$new_ini" "$merged_ini" "$debug" || return 1
-            debug_print "Fallback to installer INI succeeded." "$debug"
-        else
-            logE "Fallback failed: installer INI is also empty."
-            rm -f /tmp/upgrade_ini.err "$tmp_merged"
-            debug_end "$debug"
-            return 1
-        fi
+        logE "INI merge produced an empty file. Existing configuration preserved."
+        rm -f /tmp/upgrade_ini.err "$tmp_merged"
+        debug_end "$debug"
+        return 1
     else
         exec_command "Publish merged INI" mv -f "$tmp_merged" "$merged_ini" "$debug" || return 1
         debug_print "INI merge successful." "$debug"

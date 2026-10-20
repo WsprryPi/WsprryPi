@@ -11,6 +11,37 @@ trap 'rm -rf "$fixture"' EXIT
 logI() { :; }; logE() { :; }; logW() { :; }
 expect_failure() { if "$@"; then echo "Expected failure: $*" >&2; exit 1; fi; }
 contains_pkg() { printf '%s\n' "${RESOLVED_APT_PACKAGES[@]}" | grep -Fxq -- "$1"; }
+# An outside-checkout invocation must not use an existing directory as its
+# selected source. In particular, the nonempty string "false" is not consent
+# to reuse its helper, UI, configuration, or service templates.
+(
+    LOCAL_REPO_DIR="$fixture/existing-source"
+    mkdir "$LOCAL_REPO_DIR"
+    printf preserved >"$LOCAL_REPO_DIR/sentinel"
+    exec_command() { printf invoked >"$fixture/clone-invoked"; }
+    IS_REPO=false
+    expect_failure git_clone
+    [[ $(cat "$LOCAL_REPO_DIR/sentinel") == preserved ]]
+    [[ ! -e "$fixture/clone-invoked" ]]
+    IS_REPO=true
+    git_clone
+    [[ ! -e "$fixture/clone-invoked" ]]
+    IS_REPO=false
+    LOCAL_REPO_DIR="$fixture/new-source"
+    SUDO_USER='fixture-user'
+    REPO_BRANCH=selected-branch
+    GIT_CLONE=https://example.invalid/selected-source.git
+    exec_command() {
+        shift
+        [[ "$1" == runuser && "$2" == -u && "$3" == fixture-user &&
+           "$4" == -- && "$5" == git && "$6" == clone && "$7" == -b &&
+           "$8" == selected-branch && "$9" == "$GIT_CLONE" &&
+           "${10}" == "$LOCAL_REPO_DIR" ]] || return 1
+        printf invoked >"$fixture/clone-invoked"
+    }
+    git_clone
+    [[ -f "$fixture/clone-invoked" && ! -e "$LOCAL_REPO_DIR" ]]
+)
 INSTALL_RP1_GPCLK_DKMS=false
 NO_WEB=true
 BINARY_SOURCE=local

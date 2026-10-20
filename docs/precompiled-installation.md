@@ -5,6 +5,10 @@ select `--binary-source local`. Only the executable is required; no sidecar,
 source fingerprint, or matching Git commit is needed. Supporting files use the
 normal installer workflow.
 
+Run from the intended application checkout to select its supporting files.
+Outside a checkout, an existing destination directory is refused; it is not
+silently reused as the selected source.
+
 ```sh
 rm -f ~/finished
 sudo ./scripts/install.sh --binary-source local --binary-path /home/pi/wsprrypi && touch ~/finished
@@ -56,6 +60,10 @@ The executable is staged before service interruption and published by an
 atomic rename. If a subsequent installer step fails, the installer attempts to
 restore the prior executable and service state. This is executable recovery,
 not a rollback of package or configuration changes.
+
+An upgrade preserves existing configuration values. A failed or empty
+configuration merge stops installation and retains the existing configuration
+and its recovery copy.
 
 ## Future release downloads
 
