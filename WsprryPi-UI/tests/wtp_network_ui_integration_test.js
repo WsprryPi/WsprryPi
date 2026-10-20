@@ -72,7 +72,9 @@ class CdpClient {
         this.dialogError = null;
         const reviewDialogs = new Set([
             "Review the current saved values beside your preserved draft. Matching values do not prove an earlier save committed. Send one new explicit save with this fresh revision?",
-            "Review current saved and active observations beside your preserved draft. Send one new explicit save using the fresh revision?"
+            "Review current saved and active observations beside your preserved draft. Send one new explicit save using the fresh revision?",
+            "Review saved progress beside your preserved draft. Send one new explicit change using this fresh read?",
+            "Replace these station drafts with this Pico's saved progress?"
         ]);
         const failDialog = error => {
             this.dialogError = error;
@@ -202,6 +204,7 @@ async function main() {
             const style = document.createElement('style'); style.textContent='* { scroll-behavior: auto !important; }'; document.head.append(style);
             window.__resourceFixtures = ${JSON.stringify(resourceFixtures)};
             window.__resourceState = 'loaded';
+            window.__progress = {"schema": "transmitter-progress/1", "target": {"scope": "member", "device_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "boot_id": "11111111111111111111111111111111"}, "draft_revision": "1", "config_revision": "1", "profile_revision": "0", "fields": {"callsign": "AA0NT", "locator": null, "power_dbm": null}, "last_receipt": null, "last_outcomes": {}, "applied_station": {"callsign": "AA0NT", "locator": "EM18", "power_dbm": 20}, "station": {"callsign": "AA0NT", "locator": null, "power_dbm": null}, "station_complete": false, "complete": false, "apply_domains": {"station": false, "network": false, "radio": false, "all": false}, "wspr_plan": null, "schedule_enabled": false, "schedule_suspended": true, "matches_applied": false};
             window.__requests = [];
             window.__remoteFailure = false;
             window.__statusFailure = false;
@@ -216,6 +219,21 @@ async function main() {
                     if (body?.action === 'connect') window.__management = {carrier:body.carrier,host:body.host,connected:true};
                     if (body?.action === 'disconnect') window.__management = {carrier:'disconnected',host:'',connected:false};
                     return {ok:true,headers:{get:()=>''},json:async()=>window.__management || {carrier:'engineering_mtls',host:'',connected:false}};
+                }
+                if (String(url).includes('/member/progress')) {
+                    if(window.__progressFailure)return {ok:false,status:window.__progressFailure==='fault'?503:409,json:async()=>({error:{code:window.__progressFailure==='fault'?'storage_fault':'saved_progress_unavailable'}})};
+                    const result=structuredClone(window.__progress);
+                    if(options.method==='POST') {
+                        const body=JSON.parse(options.body);result.request_id=body.request_id;result.outcomes={};
+                        for(const [key,value] of Object.entries(body.fields||{})) {
+                            const invalid=key==='locator'&&value!==null&&!/^[A-R]{2}[0-9]{2}([A-X]{2})?$/.test(value);
+                            result.outcomes[key]=invalid?'invalid':value===null?'cleared':'saved';
+                            if(!invalid){result.station[key]=value;result.fields[key]=value;}
+                        }
+                        if(body.application) {result.applied_station=structuredClone(result.station);delete result.request_id;delete result.outcomes;}
+                        const stored=structuredClone(result);delete stored.request_id;delete stored.outcomes;window.__progress=stored;
+                    }
+                    return {ok:true,headers:{get:()=> '\"progress-r1\"'},json:async()=>result};
                 }
                 if (String(url).endsWith('/member/application')) {
                     if(window.__resourceState==='unsupported')return {ok:false,status:409,json:async()=>({error:{code:'shared_resources_unavailable'}})};
@@ -361,6 +379,8 @@ async function main() {
                     const memberCalls=calls;document.getElementById('wtp_hostname').dispatchEvent(new Event('input',{bubbles:true}));
                     window.scheduleAutosave=original;return memberCalls===0&&calls>0;
                 })()`),true,'member draft changes must never schedule host autosave');
+                await evaluate(`document.getElementById('wtp-member-load').click()`);
+                await waitFor(async()=>await evaluate('!document.getElementById("wtp-member-validate").disabled'),'resources after carrier draft change');
                 const before=await evaluate('window.__requests.filter(r=>r.options.method==="PUT").length');
                 await evaluate(`document.getElementById('wtp-member-validate').click()`);
                 await waitFor(async()=>await evaluate('document.getElementById("wtp-member-pin-feedback").textContent.includes("Preview only")'),'pin preview');
@@ -383,6 +403,42 @@ async function main() {
                 assert.equal(await evaluate('getComputedStyle(document.getElementById("wtp-member-feedback")).fontSize'),'14px');
             }
         }
+        // Independent station saves: one desktop/mobile, light/dark visual batch.
+        for(const state of ['incomplete','invalid','complete','fault','unsupported']) {
+            await evaluate(`window.__progressFailure='${['fault','unsupported'].includes(state)?state:''}'; window.WtpManagement.invalidate(); window.WtpManagement.setAvailability(true,true); document.getElementById('wtp-usb-progress-load').click();`);
+            await waitFor(async()=>await evaluate('document.getElementById("wtp-management").getAttribute("aria-busy")==="false"'),'station progress read');
+            if(!['fault','unsupported'].includes(state)) {
+                await evaluate(`document.getElementById('wtp-usb-progress-discard').click()`);
+                assert.equal(await evaluate('document.getElementById("wtp-member-power").value'),'');
+                if(state==='invalid') {
+                    await evaluate(`document.getElementById('wtp-member-locator').value='BAD'; document.getElementById('wtp-member-locator').dispatchEvent(new Event('input',{bubbles:true})); document.getElementById('wtp-usb-progress-save').click()`);
+                    await waitFor(async()=>await evaluate('document.getElementById("wtp-member-locator-progress").textContent.includes("Invalid")'),'per-field rejection');
+                    assert.equal(await evaluate('document.getElementById("wtp-member-locator").value'),'BAD');
+                }
+                if(state==='complete') {
+                    await evaluate(`window.__progress.station={callsign:'AA0NT',locator:'EM18',power_dbm:0};window.__progress.fields={...window.__progress.station};window.__progress.station_complete=true;window.__progress.apply_domains.station=true;document.getElementById('wtp-usb-progress-load').click()`);
+                    await waitFor(async()=>await evaluate('!document.getElementById("wtp-usb-progress-apply").disabled'),'explicit progress application');
+                    await evaluate(`document.getElementById('wtp-usb-progress-discard').click()`);
+                    assert.equal(await evaluate('document.getElementById("wtp-member-power").value'),'0');
+                }
+            } else assert.equal(await evaluate('document.getElementById("wtp-usb-progress-save").disabled'),true);
+            for(const theme of ['light','dark'])for(const viewport of [{name:'desktop',width:1280,height:900},{name:'mobile',width:390,height:844}]) {
+                await client.send('Emulation.setDeviceMetricsOverride',{...viewport,deviceScaleFactor:1,mobile:viewport.name==='mobile'});
+                await evaluate(`applyThemePreference('${theme}'); document.getElementById('wtp-member-callsign').scrollIntoView({block:'start',behavior:'instant'});window.scrollBy(0,-150)`);
+                await new Promise(resolve=>setTimeout(resolve,150));
+                const stationClip=await evaluate(`(()=>{const h=document.getElementById('wtp-member-station-hint').previousElementSibling,r=h.closest('section').getBoundingClientRect(),a=h.getBoundingClientRect(),b=document.getElementById('wtp-usb-progress-state').getBoundingClientRect();return {x:Math.max(0,r.x+scrollX),y:a.top+scrollY,width:r.width,height:b.bottom-a.top+12,scale:1};})()`);
+                await capture(`${viewport.name}-${theme}-station-progress-${state}.png`,{format:'png',captureBeyondViewport:true,clip:stationClip});
+                assert(await evaluate('document.documentElement.scrollWidth<=innerWidth+1'),'station progress overflow');
+                assert(await evaluate(`['callsign','locator','power'].every(n=>document.getElementById('wtp-member-'+n).getAttribute('aria-describedby').includes('wtp-member-'+n+'-progress'))`),'field outcome descriptions');
+            }
+        }
+        await evaluate(`window.__progressFailure='';document.documentElement.style.zoom='2';document.getElementById('wtp-usb-progress-load').scrollIntoView({block:'center',behavior:'instant'})`);
+        assert(await evaluate('document.documentElement.scrollWidth<=innerWidth+1'),'station progress 200% zoom overflow');
+        await capture('mobile-station-progress-zoom.png',{format:'png'});
+        await evaluate(`document.documentElement.style.zoom='';document.getElementById('wtp-usb-progress-load').focus()`);
+        await client.send('Input.dispatchKeyEvent',{type:'keyDown',key:'Tab',code:'Tab',windowsVirtualKeyCode:9});
+        await client.send('Input.dispatchKeyEvent',{type:'keyUp',key:'Tab',code:'Tab',windowsVirtualKeyCode:9});
+        assert(await evaluate('document.activeElement.tagName==="BUTTON"'),'station progress keyboard navigation');
         for (const state of ['saved', 'stale', 'unsupported', 'ambiguous', 'busy']) {
             await evaluate(`window.__remoteFailure=false; window.__mutationFailure=''; window.WtpManagement.setAvailability(true); document.getElementById('wtp-remote-load').click();`);
             await waitFor(async () => await evaluate('!document.getElementById("wtp-remote-save").disabled'), 'settings readback');

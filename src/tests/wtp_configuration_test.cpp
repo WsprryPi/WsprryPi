@@ -3,6 +3,7 @@
 #include "wtp_integration/browser_api.hpp"
 #include "wtp_integration/consumer_radio.hpp"
 #include <iostream>
+#include <openssl/sha.h>
 using namespace wsprrypi;
 using Json = nlohmann::json;
 #define CHECK(x) do { if (!(x)) throw std::runtime_error(std::string(#x) + " at " + std::to_string(__LINE__)); } while (false)
@@ -185,6 +186,108 @@ void checks() {
   }
   std::cout << "Configuration negotiation, strict fallback, closed shapes, revisions, identity and ambiguous-write checks passed\n";
 }
+struct ProgressPeer {
+  Json value{{"schema","transmitter-progress/1"},{"target",target},{"draft_revision","0"},
+    {"config_revision","0"},{"profile_revision","0"},{"fields",Json::object()},
+    {"last_receipt",nullptr},{"last_outcomes",Json::object()},{"applied_station",nullptr},
+    {"station",{{"callsign",nullptr},{"locator",nullptr},{"power_dbm",nullptr}}},
+    {"station_complete",false},{"complete",false},{"apply_domains",{{"station",false},{"network",false},{"radio",false},{"all",false}}},
+    {"wspr_plan",nullptr},{"schedule_enabled",false},{"schedule_suspended",true},{"matches_applied",false}};
+  Json caps{{"api_version",1},{"features",{{"consumer_setup_identity",false}}},
+    {"saved_progress",{{"schema","transmitter-progress/1"},{"read","/api/v1/progress"},
+      {"save","/api/v1/progress/update"},{"apply","/api/v1/progress/apply"},{"max_bytes",2048}}}};
+  unsigned writes=0, sequence=0;
+  bool busy=false, storage_fault=false, drop=false;
+  std::function<void(Json &)> corrupt_read, corrupt_ack;
+  std::string revision() const { return "\"p"+std::to_string(sequence)+"\""; }
+  PicoHttpResponse exchange(std::string path,std::string method,std::string body,std::string etag) {
+    if (path=="capabilities") return {200,caps.dump(),{}};
+    if (path=="status") return {200,Json{{"job",{{"boot_id",boot},{"output_active",false},{"owner_id",nullptr},{"state",busy?"armed":"empty"}}}}.dump(),{}};
+    if (method=="GET") {
+      CHECK(path=="progress");
+      if (storage_fault) return {503,R"({"error":{"code":"storage_fault"}})",{}};
+      auto observed=value; if (corrupt_read) corrupt_read(observed);
+      return {200,observed.dump(),revision()};
+    }
+    ++writes; CHECK(method=="POST" && etag==revision());
+    const auto input=strict_browser_json(body);
+    if (path=="progress/apply") {
+      value["applied_station"]=value["station"]; value["config_revision"]="1"; ++sequence;
+      Member complete; complete.config["station"]=value["station"];
+      return {200,Json{{"config",complete.config}}.dump(),revision()};
+    }
+    CHECK(path=="progress/update");
+    Json outcomes=Json::object(); bool accepted=false;
+    for (const auto &[key,field] : input["fields"].items()) {
+      if (field=="invalid") outcomes[key]="invalid";
+      else { accepted=true; outcomes[key]=field.is_null()?"cleared":"saved"; value["fields"][key]=field; value["station"][key]=field; }
+    }
+    if (accepted) {
+      unsigned char bytes[SHA256_DIGEST_LENGTH]; SHA256(reinterpret_cast<const unsigned char *>(body.data()),body.size(),bytes);
+      const char *hex="0123456789abcdef"; std::string receipt;
+      for (auto byte : bytes) { receipt+=hex[byte>>4];receipt+=hex[byte&15]; }
+      ++sequence; value["draft_revision"]=std::to_string(sequence); value["last_receipt"]=receipt;value["last_outcomes"]=outcomes;
+    }
+    value["station_complete"]=!value["station"]["callsign"].is_null() && !value["station"]["locator"].is_null() && !value["station"]["power_dbm"].is_null();
+    value["apply_domains"]["station"]=value["station_complete"];
+    if (drop) return {503,R"({"error":{"code":"management_outcome_unknown"}})",{}};
+    auto ack=value;ack["outcomes"]=outcomes;ack["request_id"]=input["request_id"];
+    if (corrupt_ack) corrupt_ack(ack);
+    return {200,ack.dump(),revision()};
+  }
+  PicoHttpResponse call(const Json &fields) {
+    return pico_progress_request([&](auto p,auto m,auto b,auto e){return exchange(p,m,b,e);},device,boot,
+      "progress/update","POST",Json{{"schema","transmitter-progress/1"},{"target",target},{"request_id",std::string(32,'a')},{"fields",fields}}.dump(),revision());
+  }
+};
+void progress_checks() {
+  ProgressPeer peer;
+  CHECK(peer.call({{"callsign","AA0NT"},{"locator","invalid"},{"power_dbm",0}}).status==200);
+  CHECK(peer.value["fields"]["callsign"]=="AA0NT" && peer.value["fields"]["power_dbm"]==0 && peer.value["station_complete"]==false);
+  CHECK(peer.value["applied_station"].is_null() && peer.value["schedule_suspended"]==true);
+  CHECK(peer.call({{"power_dbm",nullptr}}).status==200 && peer.value["station"]["power_dbm"].is_null());
+  const auto old=peer.value;CHECK(peer.call({{"locator","invalid"}}).status==200 && peer.value==old);
+  CHECK(peer.call({{"locator","EM18"},{"power_dbm",0}}).status==200);
+  CHECK(pico_progress_request([&](auto p,auto m,auto b,auto e){return peer.exchange(p,m,b,e);},device,boot,
+      "progress/apply","POST",Json{{"schema","transmitter-progress/1"},{"target",target},
+        {"application",{{"draft_revision",peer.value["draft_revision"]},{"domain","station"}}}}.dump(),peer.revision()).status==200);
+  CHECK(peer.value["applied_station"]==peer.value["station"]);
+  for (unsigned fault=0;fault<12;++fault) {
+    ProgressPeer bad;
+    if (fault==0) bad.caps.erase("saved_progress");
+    if (fault==1) bad.caps["saved_progress"]["schema"]="transmitter-progress/99";
+    if (fault==2) bad.busy=true;
+    if (fault==3) bad.storage_fault=true;
+    if (fault>=4) bad.corrupt_read=[fault](Json &j) {
+      if(fault==4)j["target"]["boot_id"]=std::string(32,'f');
+      if(fault==5)j["draft_revision"]="18446744073709551616";
+      if(fault==6)j["draft_revision"]=1;
+      if(fault==7)j["fields"]={{"future",true}};
+      if(fault==8)j["fields"]={{"wifi",{{"ssid","synthetic"},{"password","secret-must-not-be-forwarded"}}}};
+      if(fault==9)j["station"]["power_dbm"]=false;
+      if(fault==10)j["apply_domains"]["station"]=1;
+      if(fault==11)j["extra"]=true;
+    };
+    CHECK(bad.call({{"callsign","AA0NT"}}).status>=400 && bad.writes==0);
+  }
+  for (unsigned fault=0;fault<5;++fault) {
+    ProgressPeer bad;
+    if (fault==4) bad.drop=true;
+    else bad.corrupt_ack=[fault](Json &j){
+      if(fault==0)j["request_id"]=std::string(32,'b');
+      if(fault==1)j["last_receipt"]=std::string(64,'b');
+      if(fault==2)j["outcomes"]["callsign"]="invalid";
+      if(fault==3)j["outcomes"]["locator"]="saved";
+    };
+    const auto result=bad.call({{"callsign","AA0NT"}});
+    CHECK(result.status>=400 && bad.writes==1 && strict_browser_json(result.body)["mutation_attempted"]==true);
+  }
+  ProgressPeer changed_applied;
+  changed_applied.corrupt_read=[&](Json &j){if(changed_applied.writes)j["config_revision"]="1";};
+  const auto changed=changed_applied.call({{"callsign","AA0NT"}});
+  CHECK(changed.status>=400 && changed_applied.writes==1);
+  std::cout<<"Saved-progress discovery, incomplete/null/zero, receipt attribution, invalid siblings, explicit apply and fail-closed readbacks passed\n";
+}
 struct HttpInput : wtp::ByteStream {
   std::string input;
   explicit HttpInput(std::string raw) : input(std::move(raw)) {}
@@ -228,4 +331,4 @@ void http_boundaries() {
   CHECK(wtp_json_http_exchange(valid,[&]{return ++tick;},"",100,true).status==200);
 }
 } // namespace
-int main() { try { checks(); usb_management_contract(); http_boundaries(); } catch (const std::exception &e) { std::cerr << e.what() << '\n'; return 1; } }
+int main() { try { checks(); progress_checks(); usb_management_contract(); http_boundaries(); } catch (const std::exception &e) { std::cerr << e.what() << '\n'; return 1; } }

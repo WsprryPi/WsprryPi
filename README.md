@@ -59,8 +59,9 @@ Phase 10/11 records; broad mode/band/clock, timing, spectral, reliability and
 release qualification remain outstanding in Phase 13.
 The [Pi WTP endpoint](docs/wtp-pi-operation.md) provides a Plain LAN WTP/1
 server, DNS-SD advertisement, local takeover and up to eight independent remote
-output schedules alongside the central Pi’s own schedule. The initial Pi server
-route is finite 20 m Si5351 TONE; Fleet remains development-gated. See the
+output schedules alongside the central Pi’s own schedule. Fleet is available
+in Setup. The Pi endpoint uses the selected native GPIO, RP1 GPCLK or Si5351
+adapter within its reported mode/frequency capabilities and admission policy. See the
 [implementation contract](docs/wtp-pi-endpoint-contract.md) and
 [execution record](docs/development/wtp-pi-execution-report.md) for acceptance scope and evidence.
 
@@ -104,5 +105,9 @@ for the original host-software review and its Phase 11.7 addendum. WsprryPico's
 closes Phase 11 within its documented software, bounded physical and scoped
 conducted-RF acceptance; it does not claim release qualification.
 
-USB firmware installation for a selected Pico is under validation; see
-[the implementation and deployment notes](docs/pico-usb-installer.md).
+USB firmware installation, retained recovery and explicit full-flash erase for
+a selected Pico have bounded software and recorded physical acceptance; see
+[the implementation, deployment evidence and limits](docs/pico-usb-installer.md).
+Supporting firmware also provides [independent station progress](docs/wtp-browser-api.md#independent-saved-station-progress)
+through the selected Pi management connection; applying saved values is separate
+from saving valid fields and never substitutes for transmit readiness.

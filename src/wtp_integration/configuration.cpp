@@ -6,6 +6,7 @@
 #include <algorithm>
 #include <set>
 #include <regex>
+#include <openssl/sha.h>
 namespace wsprrypi {
 namespace {
 using Json = nlohmann::json;
@@ -429,6 +430,206 @@ void pin_choices(const Json &j) {
   }
   for (const auto &gp : c["eligible_gps"]) require(gp.is_number_integer(),"invalid_remote_pins");
 }
+}
+namespace {
+bool progress_fields(const Json &j) {
+  return fields(j, {}, {"callsign","locator","power_dbm","enabled","schedules",
+      "expires_utc_s","pins","frequency_policy","wifi","ntp_ipv4"});
+}
+bool progress_outcomes(const Json &j) {
+  if (!progress_fields(j)) return false;
+  for (const auto &v : j) if (v != "saved" && v != "cleared" && v != "invalid") return false;
+  return true;
+}
+bool progress_station(const Json &j) {
+  if (!fields(j,{"callsign","locator","power_dbm"})) return false;
+  for (const auto &[key,value] : j.items()) {
+    if (value.is_null()) continue;
+    Json candidate{{"callsign","AA0NT"},{"locator","EM18"},{"power_dbm",0}};
+    candidate[key]=value;
+    if (!station_valid(candidate,true)) return false;
+  }
+  return true;
+}
+std::string progress_receipt(const std::string &body) {
+  unsigned char bytes[SHA256_DIGEST_LENGTH];
+  SHA256(reinterpret_cast<const unsigned char *>(body.data()),body.size(),bytes);
+  static constexpr char hex[]="0123456789abcdef";
+  std::string result;
+  for (const auto byte : bytes) { result+=hex[byte>>4]; result+=hex[byte&15]; }
+  return result;
+}
+Json progress_readback(const PicoHttpResponse &response, const Json &target, bool acknowledgement = false) {
+  success(response);
+  require(response.body.size()<=4096 && etag(response.etag),"invalid_remote_progress");
+  const auto v=parsed(response);
+  require(fields(v,{"schema","target","draft_revision","config_revision","profile_revision","fields",
+      "last_receipt","last_outcomes","applied_station","station","station_complete","complete",
+      "apply_domains","wspr_plan","schedule_enabled","schedule_suspended","matches_applied"},
+      acknowledgement ? std::initializer_list<const char *>{"outcomes","request_id"} : std::initializer_list<const char *>{}) &&
+      v["schema"]=="transmitter-progress/1" && v["target"]==target &&
+      decimal(v["draft_revision"]) && decimal(v["config_revision"]) && decimal(v["profile_revision"]) &&
+      progress_fields(v["fields"]) && v["fields"].dump().size()<=1400 && progress_outcomes(v["last_outcomes"]) &&
+      progress_station(v["station"]) && (v["applied_station"].is_null() || station_valid(v["applied_station"],true)) &&
+      fields(v["apply_domains"],{"station","network","radio","all"}),"invalid_remote_progress");
+  for (const auto key : {"station_complete","complete","schedule_enabled","schedule_suspended","matches_applied"})
+    require(v[key].is_boolean(),"invalid_remote_progress");
+  for (const auto &value : v["apply_domains"]) require(value.is_boolean(),"invalid_remote_progress");
+  require(v["last_receipt"].is_null() || (v["last_receipt"].is_string() &&
+      std::regex_match(v["last_receipt"].get<std::string>(),std::regex("[0-9a-f]{64}"))),"invalid_remote_progress");
+  require(v["station_complete"]==station_valid(v["station"],true),"invalid_remote_progress");
+  for (const auto &[key,value] : v["fields"].items()) {
+    if (key=="callsign" || key=="locator" || key=="power_dbm") {
+      require(value==v["station"][key],"invalid_remote_progress");
+    }
+    if (value.is_null()) continue;
+    if (key=="callsign" || key=="locator" || key=="power_dbm") {
+      auto station=v["station"]; station[key]=value;
+      require(progress_station(station) && value==v["station"][key],"invalid_remote_progress");
+    } else if (key=="enabled") require(value.is_boolean(),"invalid_remote_progress");
+    else if (key=="wifi") require(fields(value,{"ssid","password"}) && value["ssid"].is_string() &&
+        value["ssid"].get_ref<const std::string &>().size()<=32 && value["password"].is_null(),"invalid_remote_progress");
+    else if (key=="ntp_ipv4") require(value.is_string() && value.get_ref<const std::string &>().size()<=253,"invalid_remote_progress");
+    else if (key=="expires_utc_s") require(whole(value,2147483647),"invalid_remote_progress");
+    else if (key=="pins") require(plan_valid(value),"invalid_remote_progress");
+    else if (key=="frequency_policy") require(fields(value,{"allow_unqualified_frequency","allow_non_amateur_frequency"}) &&
+        value["allow_unqualified_frequency"].is_boolean() && value["allow_non_amateur_frequency"].is_boolean() &&
+        (value["allow_non_amateur_frequency"]==false || value["allow_unqualified_frequency"]==true),"invalid_remote_progress");
+    else {
+      require(value.is_array() && value.size()<=8,"invalid_remote_progress");
+      for (const auto &row : value) require(fields(row,{"period_s","phase_s"}) &&
+          whole(row["period_s"],86400) && row["period_s"]>=120 && whole(row["phase_s"],86399),"invalid_remote_progress");
+    }
+  }
+  require(v["wspr_plan"].is_null() || (fields(v["wspr_plan"],{"schema","supported","frame_types","frames",
+      "slot_separation_s","rationale","type2_ambiguous","alternate_callsign"}) &&
+      v["wspr_plan"]["schema"]=="wspr-plan/1" && v["wspr_plan"]["supported"].is_boolean() &&
+      v["wspr_plan"]["frame_types"].is_array() && whole(v["wspr_plan"]["frames"],2) &&
+      v["wspr_plan"]["frames"]==v["wspr_plan"]["frame_types"].size() &&
+      v["wspr_plan"]["slot_separation_s"].is_number_integer() && v["wspr_plan"]["slot_separation_s"]==120 &&
+      v["wspr_plan"]["rationale"].is_string() && v["wspr_plan"]["rationale"].get_ref<const std::string &>().size()<=512 &&
+      v["wspr_plan"]["type2_ambiguous"].is_boolean() &&
+      (v["wspr_plan"]["alternate_callsign"].is_null() || v["wspr_plan"]["alternate_callsign"].is_string())),"invalid_remote_progress");
+  if (acknowledgement) require(v.contains("outcomes") && v.contains("request_id") && progress_outcomes(v["outcomes"]) &&
+      v["request_id"].is_string() && identity(v["request_id"].get<std::string>()),"invalid_remote_progress");
+  return v;
+}
+} // namespace
+PicoHttpResponse pico_progress_request(const PicoManagementExchange &exchange,
+    const std::string &device, const std::string &boot, const std::string &resource,
+    const std::string &method, const std::string &body, const std::string &revision,
+    const std::string &carrier, const std::string &generation) {
+  bool attempted=false;
+  try {
+    const bool update=resource=="progress/update" && method=="POST";
+    const bool apply=resource=="progress/apply" && method=="POST";
+    require(update || apply || (resource=="progress" && method=="GET"),"not_found",404);
+    require(identity(device) && identity(boot),"member_identity_unavailable",409);
+    require(body.size()<=(apply?512U:2048U),"body_too_large",413);
+    const Json target{{"scope","member"},{"device_id",device},{"boot_id",boot}};
+    Json input;
+    if (method=="POST") {
+      require(etag(revision),"revision_required",428);
+      try { input=strict_browser_json(body); } catch (...) { throw Rejected{400,"invalid_json"}; }
+      require(input.is_object() && input.contains("schema") && input["schema"]=="transmitter-progress/1" &&
+          input.contains("target") && input["target"]==target,"invalid_progress",400);
+      if (update) require(fields(input,{"schema","target","request_id","fields"}) &&
+          input["request_id"].is_string() && identity(input["request_id"].get<std::string>()) &&
+          progress_fields(input["fields"]) && !input["fields"].empty(),"invalid_progress",400);
+      else require(fields(input,{"schema","target","application"}) &&
+          fields(input["application"],{"draft_revision","domain"}) && decimal(input["application"]["draft_revision"]) &&
+          input["application"]["draft_revision"]!="0" && (input["application"]["domain"]=="station" ||
+          input["application"]["domain"]=="network" || input["application"]["domain"]=="radio" ||
+          input["application"]["domain"]=="all"),"invalid_progress_application",400);
+    }
+    const auto read=[&](const std::string &path) { auto r=exchange(path,"GET",{},{}); success(r); return r; };
+    const auto caps=parsed(read("capabilities"));
+    require(caps.is_object() && caps.contains("api_version") && caps["api_version"].is_number_integer() &&
+        caps["api_version"]==1,"unsupported_remote_api",409);
+    require(caps.contains("saved_progress"),"saved_progress_unavailable",409);
+    require(caps["saved_progress"].is_object() && caps["saved_progress"].contains("max_bytes") &&
+        caps["saved_progress"]["max_bytes"].is_number_integer() && caps["saved_progress"]==Json{{"schema","transmitter-progress/1"},{"read","/api/v1/progress"},
+        {"save","/api/v1/progress/update"},{"apply","/api/v1/progress/apply"},{"max_bytes",2048}},"unsupported_saved_progress",409);
+    if (caps.contains("management_carriers")) {
+      const auto management=parsed(read("management"));
+      require(fields(caps["management_carriers"],{"schema","path"}) &&
+          caps["management_carriers"]["path"]=="/api/v1/management" &&
+          management["schema"]==caps["management_carriers"]["schema"] &&
+          valid_management_contract(management,carrier,device,boot,generation),"unsupported_management_contract",409);
+    } else require(carrier=="engineering_mtls","unsupported_management_contract",409);
+    const auto before=read("progress"); const auto old=progress_readback(before,target);
+    if (method=="GET") return before;
+    require(before.etag==revision,"revision_conflict",412);
+    if (apply) {
+      const auto domain=input["application"]["domain"].get<std::string>();
+      require(input["application"]["draft_revision"]==old["draft_revision"] && old["apply_domains"][domain]==true,
+          "invalid_progress_application",409);
+      if (carrier!="usb_physical" && (domain=="station" || domain=="network" || domain=="all"))
+        require(caps.contains("features") && caps["features"].contains("consumer_setup_identity") &&
+            caps["features"]["consumer_setup_identity"].is_boolean() && caps["features"]["consumer_setup_identity"]==false,
+            "consumer_setup_identity_required",409);
+    }
+    const auto status=parsed(read("status")); const auto &job=status.at("job");
+    require(job.at("boot_id")==boot && job.at("output_active")==false && job.at("owner_id").is_null() &&
+        (job.at("state")=="empty" || job.at("state")=="complete" || job.at("state")=="aborted" || job.at("state")=="missed"),
+        "remote_busy_or_output_unresolved",409);
+    // Consumer-Radio embeds parsed JSON inside an encrypted envelope. Freeze
+    // identical canonical bytes for every carrier before hashing the receipt.
+    const auto wire_body=input.dump();
+    require(wire_body.size()<=(apply?512U:2048U),"body_too_large",413);
+    attempted=true; const auto result=exchange(resource,"POST",wire_body,revision); success(result);
+    const auto after_response=read("progress"); const auto after=progress_readback(after_response,target);
+    require(result.etag==after_response.etag,"management_outcome_unknown");
+    if (update) {
+      const auto ack=progress_readback(result,target,true);
+      require(ack["request_id"]==input["request_id"] && ack["outcomes"].size()==input["fields"].size(),"management_outcome_unknown");
+      for (const auto key : {"applied_station","config_revision","profile_revision","schedule_enabled","schedule_suspended"})
+        require(after[key]==old[key],"management_outcome_unknown");
+      for (const auto &[key,value] : old["fields"].items()) if (!input["fields"].contains(key))
+        require(after["fields"].contains(key) && after["fields"][key]==value,"management_outcome_unknown");
+      for (const auto &[key,value] : after["fields"].items()) {
+        (void)value;
+        require(input["fields"].contains(key) || old["fields"].contains(key),"management_outcome_unknown");
+      }
+      bool accepted=false;
+      for (const auto &[key,value] : input["fields"].items()) {
+        require(ack["outcomes"].contains(key),"management_outcome_unknown");
+        const auto &outcome=ack["outcomes"][key];
+        if (outcome=="invalid") {
+          require(after["fields"].contains(key)==old["fields"].contains(key) &&
+              (!old["fields"].contains(key) || after["fields"][key]==old["fields"][key]),"management_outcome_unknown");
+          continue;
+        }
+        accepted=true;
+        require(outcome==(value.is_null()?"cleared":"saved") && after["fields"].contains(key),"management_outcome_unknown");
+        if (key=="wifi" && !value.is_null()) require(after["fields"][key]==Json{{"ssid",value.at("ssid")},{"password",nullptr}},"management_outcome_unknown");
+        else if (key=="pins" && !value.is_null()) {
+          auto normalized=value;
+          if (!normalized.contains("indicator_active_high")) normalized["indicator_active_high"]=true;
+          require(after["fields"][key]==normalized,"management_outcome_unknown");
+        } else require(after["fields"][key]==value,"management_outcome_unknown");
+      }
+      auto projection=ack; projection.erase("outcomes"); projection.erase("request_id");
+      require(projection==after,"management_outcome_unknown");
+      if (accepted) require(after["last_receipt"]==progress_receipt(wire_body) && after["last_outcomes"]==ack["outcomes"] &&
+          after["draft_revision"]!=old["draft_revision"] && after_response.etag!=revision,"management_outcome_unknown");
+      else require(after==old && after_response.etag==revision,"management_outcome_unknown");
+      return result;
+    }
+    const auto applied=parsed(result);
+    require(fields(applied,{"config"},{"reboot_required"}) && shape(applied["config"],false,true) &&
+        (!applied.contains("reboot_required") || applied["reboot_required"].is_boolean()),"management_outcome_unknown");
+    if (input["application"]["domain"]=="station") require(applied["config"].contains("station") &&
+        applied["config"]["station"]==old["station"] && after["applied_station"]==old["station"],"management_outcome_unknown");
+    // Preserve the existing USB apply API's complete-configuration result.
+    // The validated progress readback above confirms the effect, but is not a
+    // replacement wire schema for clients of this established route.
+    return result;
+  } catch (const Rejected &e) {
+    return {e.status,Json{{"error",{{"code",e.code}}},{"mutation_attempted",attempted}}.dump(),{}};
+  } catch (...) {
+    return {502,Json{{"error",{{"code",attempted?"management_outcome_unknown":"invalid_remote_progress"}}},{"mutation_attempted",attempted}}.dump(),{}};
+  }
 }
 namespace {
 PicoHttpResponse gpio_drive_progress_request(const PicoManagementExchange &exchange,

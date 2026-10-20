@@ -16,7 +16,7 @@ function browser(exchange, producer = source) {
   };
   class Option {constructor(text,value){this.textContent=text;this.value=value;}}
   const root = {Option,confirm:()=>true,document:{readyState:'complete',getElementById:element,querySelectorAll:selector=>selector==='[data-wtp-resource]' ? [...fields.entries()].filter(([id])=>/^wtp-member-(callsign|locator|power|rf|button|indicator|indicator-gp|polarity)$/.test(id)).map(([,e])=>e) : []},
-    WtpUi:{read:()=>({Transport:'network'})}, AbortController,setTimeout,clearTimeout,
+    WtpUi:{read:()=>({Transport:'network'})}, crypto:require("node:crypto").webcrypto, AbortSignal, AbortController,setTimeout,clearTimeout,
     fetch:async (url, options) => {
       const request = {url,...options,body:options.body ? JSON.parse(options.body) : null};
       if (!(url.endsWith('/member/management') && (!options.method || options.method === 'GET'))) requests.push(request);

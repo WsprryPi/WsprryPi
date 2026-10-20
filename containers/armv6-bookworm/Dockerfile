@@ -9,6 +9,7 @@ RUN apt-get update \
 
 WORKDIR /workspace
 COPY . .
+ARG WSPRRYPI_RELEASE_VERSION
 RUN sh containers/build-artifact.sh armv6 bookworm
 
 FROM scratch AS artifact

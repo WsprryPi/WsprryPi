@@ -321,6 +321,19 @@ def main() -> int:
         assert snapshot(repo, marker) == valid_snapshot
         assert_version(repo, "version_fixture", commit_c, False)
 
+        tagged = make(repo, "release", "BUILD_METADATA_VERSION=4.0.0-beta.1")
+        assert "Compiling-release" in tagged.stdout
+        candidate_header = (repo / "build/generated/build_metadata.hpp").read_text()
+        assert '#define MAKE_TAG "4.0.0-beta.1+' in candidate_header
+        candidate_snapshot = snapshot(repo, marker)
+        make(repo, "-n", "release", "BUILD_METADATA_VERSION=4.0.0-beta.1")
+        assert snapshot(repo, marker) == candidate_snapshot
+        same_candidate = make(repo, "release", "BUILD_METADATA_VERSION=4.0.0-beta.1")
+        assert "Compiling-release" not in same_candidate.stdout
+        restored = make(repo, "release")
+        assert "Compiling-release" in restored.stdout
+        assert_version(repo, "version_fixture", commit_c, False)
+
     print("build metadata Make regression test passed")
     return 0
 

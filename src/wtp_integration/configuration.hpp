@@ -18,4 +18,10 @@ PicoHttpResponse pico_resource_request(const PicoManagementExchange &,
     const std::string &device, const std::string &boot, const std::string &resource,
     const std::string &method, const std::string &body = {}, const std::string &revision = {},
     const std::string &carrier = "engineering_mtls", const std::string &generation = {});
+// Additive saved drafts retain Pico's independent field and explicit application
+// semantics. The caller holds the same selected-member operation/idle gate.
+PicoHttpResponse pico_progress_request(const PicoManagementExchange &,
+    const std::string &device, const std::string &boot, const std::string &resource,
+    const std::string &method, const std::string &body = {}, const std::string &revision = {},
+    const std::string &carrier = "engineering_mtls", const std::string &generation = {});
 } // namespace wsprrypi

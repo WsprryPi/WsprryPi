@@ -73,7 +73,7 @@ PicoHttpResponse WtpBrowserApi::handle(const BrowserRequest &r) {
       const auto state=management_("member/management","GET",{},{},{});
       if (state.status!=200) return error(409,"member_read_required");
       const auto value=strict_browser_json(state.body);
-      if (resource != "gpio-drive" && resource != "gpio-drive-progress" && value.value("carrier","")!="usb_physical") return error(409,"usb_management_required");
+      if (resource != "gpio-drive" && resource != "gpio-drive-progress" && !resource.starts_with("progress") && value.value("carrier","")!="usb_physical") return error(409,"usb_management_required");
       selection=value.at("selection_id").get<std::string>();
     } catch (...) { return error(409,"member_read_required"); }
     const auto key=resource.starts_with("progress/")?"progress":(resource=="restart" || resource=="ap")?"hostname":resource;

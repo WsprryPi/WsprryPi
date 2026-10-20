@@ -28,9 +28,11 @@ independent adversarial repairs, exact-source compatibility and promoted-head
 CI. Docs devel and its hosted default-gated build are verified. Item 15/P15.9
 is closed for the supported Pico software implementation and originating
 post-execution assessment. Four findings were repaired and independently
-reassessed at Pico `1653034`. Pi adoption and P15.14 operator documentation
-remain separate; no Pi release adoption or physical qualification is claimed.
-Beta 1 preparation is item 16 and has not started.
+reassessed at Pico `1653034`. Item 16 now implements the explicitly selected Pi
+station-progress adoption, retains P15.8 as a historical pair, and updates the
+Pi operator workflow in Docs `5214cdf`. Pico's broader P15.14 documentation and
+physical qualification remain separate. Beta 1 preparation is in progress;
+final-candidate installation/service/runtime acceptance remains open.
 
 The current milestone is **WsprryPi 4.0 Beta 1**, not final 4.0 stable
 publication. The maintainer's October 16 direction is to prepare a reviewable
@@ -272,18 +274,19 @@ Status key: ✅ Complete · ⏳ In progress · ☐ Not started
     pass is claimed.
     Historical unchanged Pi pairs against Pico product `56821ac` passed for
     release `a84010d` and accepted companion `6d5e734`. They are not fresh
-    compatibility evidence for later P15.12 or these repairs. Pi source,
-    components, UI, tests, workflows, compatibility pins and historical rows
-    were not changed; the current Pi Pico pin remains P15.8 `804e8a0`.
+    compatibility evidence for later P15.12 or these repairs. At item 15 closeout,
+    Pi was unchanged and its current pin remained P15.8 `804e8a0`. The later,
+    explicitly authorized item 16 adoption advances current to `1653034`, retains
+    P15.8 as `p158`, and tests nine network rows plus the independent USB pair.
     **Still separate:** Pi/Beta adoption disposition, P15.14 operator
     documentation and P15.13 physical qualification. This closes the originating
     assessment; it does not establish Pi release adoption or Beta inclusion.
     Select and accept the applicable adoption/documentation inputs before any
     affected item 16b freeze. Any Pi changes or pin advance require separate
     authorization; preserve historical expectations and retain P15.8 as `p158`
-    if the current pin advances, with nine compatibility rows. Item 16 has not
-    started. No hardware operation occurred.
-16. ☐ **WsprryPi 4.0 Beta 1 release documentation and candidate preparation.**
+    if the current pin advances, with nine compatibility rows. That decision is
+    now recorded in item 16's evidence; no hardware operation occurred.
+16. ⏳ **WsprryPi 4.0 Beta 1 release documentation and candidate preparation.**
     **Lead: WsprryPi · RP1 item 22.** The current effort stops after 16c.
     Release-note research/drafting in 16a may proceed while item 15's remaining
     Pi/Beta adoption and documentation dispositions are resolved. Its originating
@@ -292,7 +295,15 @@ Status key: ✅ Complete · ⏳ In progress · ☐ Not started
     documentation disposition; item 15's software closure does not establish
     those separate decisions.
 
-    - ☐ **16a — Research and draft Beta 1 release documentation in Markdown.**
+    Execution: [comprehensive prompt](Item%2016%20Beta%201%20Preparation%20Prompt.md),
+    [release notes draft](4.0-Beta-1-Release-Notes.md),
+    [evidence and acceptance gates](4.0-Beta-1-Release-Evidence.md), and
+    [complete source inventory](4.0-Beta-1-Source-Inventory.json).
+    The user selected the Pi editor changes and separately authorized the Docs
+    update, validation, commit and push. Historical physical evidence is reused
+    at its recorded identities; no fresh target operation is authorized.
+
+    - ✅ **16a — Research and draft Beta 1 release documentation in Markdown.**
       Establish the previous published stable WsprryPi baseline and the intended
       Beta 1 source range. Enumerate all issues marked ready for release and
       closed issues relevant to that range, using the actual labels, project
@@ -313,8 +324,8 @@ Status key: ✅ Complete · ⏳ In progress · ☐ Not started
       the operator must do. Deduplicate overlapping fixes, retain useful issue
       links, and keep private paths/bench details out of the public notes.
       Review omissions and unsupported claims adversarially; refresh the draft
-      against the exact accepted candidate before publication. These are planned
-      deliverables, not files already created by this checklist update.
+      against the exact accepted candidate before publication. The linked draft,
+      evidence and inventory now record the complete research and dispositions.
     - ☐ **16b — Freeze identities and build the Beta 1 candidate.** After items
       13–15, select Beta 1 version metadata using the project's existing convention,
       record exact application/documentation commits and published provider
@@ -357,7 +368,7 @@ Status key: ✅ Complete · ⏳ In progress · ☐ Not started
 | 13 | 21 | ✅ Complete; #423 closed | Integrated application Impeccable review accepted for `d93c75c`; final closeout/planning-head CI each passed 11/11; bounded validation and qualification limits retained | `WsprryPi` |
 | 14 | — | ✅ Closed within bounded software scope | Full companion integrated at final `a84010d`; feature/devel CI each passed 12/12; eight exact compatibility pairs, affected Impeccable/adversarial repairs and published Docs accepted; nonblocking Pico wording follow-up retained | `WsprryPi`; affected operator docs: `WsprryPi-Docs` |
 | 15 | — | ✅ Pico software and originating assessment complete | Pico `1653034` closes four findings after fresh independent reassessment; 200 executed host groups, 13 sanitizer groups, both firmware builds and genuine browser checks passed. Pi adoption, P15.14 docs and physical qualification remain separate | `WsprryPi` coordination; `WsprryPico` implementation |
-| 16 | 22 | ☐ Not started | Beta 1 release notes, candidate build and acceptance; stop after 16c; later 16d prerelease publication and 16e issue announcements | `WsprryPi` |
+| 16 | 22 | ⏳ In progress | 16a research/notes and selected Pi editor adoption implemented; exact-source build/CI handoff in progress. Final candidate installation/service/runtime acceptance remains open; 16d/16e publication is separate | `WsprryPi` |
 
 RP1 item numbers above are historical cross-references; the current provider
 ROADMAP has no numbered application release gates.
@@ -450,11 +461,12 @@ Beta preparation or announcement does not itself close that stable release gate.
 - ✅ **P15.9 supported Pico implementation and originating assessment:** item 15
   closes the original `56821ac`/`29542e4` scope and four originating-review repairs
   at Pico `1653034`, after fresh independent reassessment and software validation.
-  Pi remains unchanged and unadopted. See the
+  The later Pi adoption is tracked separately under item 16. See the
   [coordinating acceptance](../docs/development/item15-pico-valid-field-saves-review.md).
-- ☐ **P15.9 Pi/Beta adoption and documentation disposition:** select the
-  applicable software/docs inputs before affected item 16b. The originating
-  assessment is closed; no new hardware operation is authorized or implied.
+- ✅ **P15.9 Pi/Beta adoption and documentation disposition:** the user selected
+  Pi station-progress adoption against `1653034`; P15.8 remains `p158`. The Pi
+  operator workflow is updated in Docs `5214cdf`. Pico P15.14 and physical
+  qualification remain separate; no new hardware operation is authorized.
 - ☐ **Beta 1 release documentation and readiness:** complete 16a–16c's sourced
   Markdown notes, compatibility/migration guidance, exact candidate and acceptance
   evidence. Stop with a reviewable handoff; no release or announcement is authorized.

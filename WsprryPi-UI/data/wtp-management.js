@@ -45,7 +45,7 @@
     let canSelect = false, consumerConnected = false, explicitDisconnected = false, selectionObserved = false;
     let configRevision = "", networkRevision = "", saved = null, target = null;
     const field = name => byId(`wtp-remote-${name}`);
-    let retirement = null, selectionId = "", nativeSession = null;
+    let retirement = null, selectionId = "", nativeSession = null, managementCarrier = "";
     let configReview = false, resourceReview = false, lastAttempt = null;
     const originalHints = new Map();
     function failure(message) { const error = new Error(message); error.operatorMessage = true; return error; }
@@ -99,11 +99,132 @@
     }
     let resources = null, resourceRevision = "", resourceContext = "", resourceLoaded = false, resourceReconcile = false, validatedPlan = "";
     let resourceObserved = "";
+    let progress = null, progressRevision = "", progressEpoch = 0, progressLoaded = false, progressReview = false, stationDirty = false;
     const member = name => byId(`wtp-member-${name}`);
     const resourceIdentity = data => `${data.target.device_id} / ${data.target.boot_id} / ${{engineering_mtls:"Engineering HTTPS",consumer_station:"Consumer Wi-Fi",consumer_ap:"Consumer setup Wi-Fi",usb_physical:"USB"}[data.carrier]}${data.profile_generation === null ? "" : ` / profile ${data.profile_generation}`}`;
     function frequencyText(value) {
         const nhz = BigInt(value), fraction = String(nhz % 1000000000n).padStart(9,"0").replace(/0+$/,"");
         return `${nhz / 1000000000n}${fraction ? "." + fraction : ""} Hz`;
+    }
+    let progressDraftTarget = "", progressTargetMismatch = false;
+    const progressControl = name => byId(`wtp-usb-progress-${name}`);
+    const stationEdits = {callsign:0,locator:0,power:0};
+    const stationNames = {callsign:"callsign",locator:"locator",power:"power_dbm"};
+    function validProgress(value) {
+        const keys = "schema,target,draft_revision,config_revision,profile_revision,fields,last_receipt,last_outcomes,applied_station,station,station_complete,complete,apply_domains,wspr_plan,schedule_enabled,schedule_suspended,matches_applied".split(",");
+        const sequence = v => typeof v === "string" && /^(0|[1-9][0-9]{0,19})$/.test(v) && BigInt(v) <= 18446744073709551615n;
+        return value && Object.keys(value).every(k => keys.includes(k) || ["outcomes","request_id"].includes(k)) && keys.every(k => Object.hasOwn(value,k)) &&
+            value.schema === "transmitter-progress/1" && value.target?.scope === "member" &&
+            /^[0-9a-f]{32}$/.test(value.target.device_id) && /^[0-9a-f]{32}$/.test(value.target.boot_id) &&
+            ["draft_revision","config_revision","profile_revision"].every(k => sequence(value[k])) &&
+            value.station && Object.keys(value.station).sort().join(",") === "callsign,locator,power_dbm" &&
+            ["callsign","locator"].every(k => value.station[k] === null || typeof value.station[k] === "string") &&
+            (value.station.power_dbm === null || [0,3,7,10,13,17,20,23,27,30,33,37,40,43,47,50,53,57,60].includes(value.station.power_dbm)) &&
+            ["station_complete","complete","matches_applied","schedule_enabled","schedule_suspended"].every(k => typeof value[k] === "boolean") &&
+            value.fields && typeof value.fields === "object" && !Array.isArray(value.fields) &&
+            value.apply_domains && Object.keys(value.apply_domains).sort().join(",") === "all,network,radio,station" &&
+            Object.values(value.apply_domains).every(v => typeof v === "boolean");
+    }
+    function invalidateProgress() {
+        ++progressEpoch; progressRevision = "";
+        if (progressLoaded) progressReview = true;
+    }
+    function progressRender() {
+        if (!progressControl("load")) return;
+        progressControl("load").disabled = busy || !available;
+        const ready = available && progressRevision && progress;
+        progressControl("save").disabled = busy || !ready || progressTargetMismatch;
+        const profileOwned = managementCarrier.startsWith("consumer_");
+        progressControl("apply").disabled = busy || !ready || progressTargetMismatch || profileOwned || progress.draft_revision === "0" || progress.apply_domains.station !== true;
+        if (progressControl("discard")) progressControl("discard").disabled = busy || !ready;
+        if (progressLoaded) member("station-hint").textContent = "Save valid station fields independently; incomplete fields remain drafts. Apply saved station progress separately. Complete station save remains available. Reported WSPR power is message metadata, separate from drive and measured RF output.";
+    }
+    function progressSummary(value) {
+        const text = station => station ? `${station.callsign ?? "unset"}, ${station.locator ?? "unset"}, ${station.power_dbm ?? "unset"} dBm` : "none";
+        return `Saved progress: ${text(value.station)}. Applied station: ${text(value.applied_station)}. Draft ${value.draft_revision}; station ${value.station_complete ? "complete" : "incomplete"}; full configuration ${value.complete ? "complete" : "incomplete"}. STOP ${value.schedule_suspended ? "suspended" : "not suspended"}. Saving progress does not establish transmit readiness. Consumer profile station changes require Pico setup.`;
+    }
+    async function stationProgress(action) {
+        if (busy || !available || (action !== "load" && !progressRevision)) return;
+        if (action === "discard") {
+            if (!root.confirm("Replace these station drafts with this Pico's saved progress?")) return;
+            for (const [name,key] of Object.entries(stationNames)) {
+                member(name).value = progress.station[key] ?? "";
+                member(`${name}-progress`).textContent = "Device-saved progress loaded into this draft.";
+            }
+            progressDraftTarget = JSON.stringify(progress.target); progressTargetMismatch = stationDirty = false;
+            render(); return;
+        }
+        if (action !== "load" && (progressTargetMismatch || progressReview && !root.confirm("Review saved progress beside your preserved draft. Send one new explicit change using this fresh read?"))) return;
+        if (action === "apply" && progressControl("apply").disabled) return;
+        const values = Object.fromEntries(Object.keys(stationNames).map(name => [name,member(name).value]));
+        const stamps = {...stationEdits};
+        const prior = progress, revision = progressRevision;
+        let payload;
+        if (action === "save") {
+            const power = values.power;
+            payload = {schema:"transmitter-progress/1",target:prior.target,
+                request_id:Array.from(root.crypto.getRandomValues(new Uint8Array(16)),b=>b.toString(16).padStart(2,"0")).join(""),
+                fields:{callsign:values.callsign || null,locator:values.locator || null,power_dbm:power === "" ? null : Number.isSafeInteger(Number(power)) ? Number(power) : power}};
+        } else if (action === "apply") payload = {schema:"transmitter-progress/1",target:prior.target,
+            application:{draft_revision:prior.draft_revision,domain:"station"}};
+        const needsReview = progressReview;
+        if (action !== "load") invalidateEditors(); else progressRevision = "";
+        const ticket = ++progressEpoch;
+        busy = true; render(); progressControl("state").textContent = action === "load" ? "Reading saved station progress…" : action === "save" ? "Saving valid station fields…" : "Applying device-saved station progress…";
+        try {
+            const response = await root.fetch((root.WSPRRYPI_PATHS?.sharedApiPath || "/api/v1") + "/member/progress" + (action === "load" ? "" : `/${action === "save" ? "update" : "apply"}`), {
+                method:action === "load" ? "GET" : "POST",cache:"no-store",signal:AbortSignal.timeout(120000),
+                ...(payload ? {headers:{"Content-Type":"application/json","X-WsprryPico-Request":"1","If-Match":revision},body:JSON.stringify(payload)} : {})
+            });
+            const result = await response.json();
+            if (ticket !== progressEpoch) return;
+            if (!response.ok) {
+                const code = result.error?.code;
+                if (["saved_progress_unavailable","unsupported_saved_progress"].includes(code)) progressLoaded = false;
+                throw new Error(code === "saved_progress_unavailable" ? "This firmware has no saved-progress API. Use the existing complete station/settings save."
+                    : code === "unsupported_saved_progress" ? "This firmware's saved-progress contract is unsupported. No change was sent. Use compatible firmware or the existing complete settings workflow."
+                    : code === "consumer_setup_identity_required" ? "Pico setup owns the applied station. Your saved progress is retained; use Pico transactional setup to apply it."
+                    : code === "storage_fault" ? "Pico storage is faulted. Resolve the fault, then read saved progress. Your draft is preserved."
+                    : action === "load" ? "Saved station progress could not be read. Check the selected firmware and management connection, then read again. Your draft is preserved; this read did not save settings."
+                    : "Station progress is rejected or unconfirmed. It may already be saved. Read saved progress and review before another change; your draft is preserved.");
+            }
+            const etag = response.headers.get("ETag") || "";
+            if (action === "apply") {
+                if (!etag || !result.config || Object.keys(prior.station).some(key => result.config.station?.[key] !== prior.station[key])) throw new Error("Station application was not confirmed. Read saved progress and member resources before another change.");
+                progressReview = true;
+                for (const name of Object.keys(stationNames)) member(`${name}-progress`).textContent = "Device-saved station applied. Your visible draft was not sent.";
+                progressControl("state").textContent = "Device-saved station progress applied. Read saved progress and member resources to inspect current applied settings and restart requirements. No restart, STOP resume or transmission requested.";
+                return;
+            }
+            if (!validProgress(result) || !etag || (payload && JSON.stringify(result.target) !== JSON.stringify(payload.target))) throw new Error("Station progress reply is incomplete or belongs to another Pico. Read saved progress before another change.");
+            if (action === "save" && (result.request_id !== payload.request_id || !result.outcomes ||
+                Object.keys(result.outcomes).sort().join(",") !== "callsign,locator,power_dbm" ||
+                Object.values(result.outcomes).some(v => !["saved","cleared","invalid"].includes(v)))) throw new Error("Station save outcomes were not confirmed. Read saved progress before another change.");
+            progress = result; progressLoaded = true;
+            if (action === "load") {
+                progressReview = needsReview;
+                progressTargetMismatch = stationDirty && progressDraftTarget !== "" && progressDraftTarget !== "null" && progressDraftTarget !== JSON.stringify(result.target);
+                if (!stationDirty) {
+                    for (const [name,key] of Object.entries(stationNames)) if (stationEdits[name] === stamps[name]) member(name).value = result.station[key] ?? "";
+                    progressDraftTarget = JSON.stringify(result.target);
+                }
+                for (const [name,key] of Object.entries(stationNames)) member(`${name}-progress`).textContent = `Device-saved progress: ${result.station[key] ?? "unset"}. ${stationDirty ? "Your draft is preserved." : ""}`;
+                progressRevision = etag;
+            } else {
+                progressReview = true;
+                for (const [name,key] of Object.entries(stationNames)) member(`${name}-progress`).textContent = action === "save"
+                    ? `${{saved:"Saved as progress",cleared:"Saved as unset",invalid:"Invalid; previous progress retained"}[result.outcomes[key]]}.${stationEdits[name] !== stamps[name] ? " Your newer edit has not been saved." : ""}`
+                    : "Device-saved station applied. Your visible draft was not sent.";
+            }
+            progressControl("state").textContent = progressSummary(result) + (progressTargetMismatch
+                ? " These station drafts belong to a different Pico or boot. Discard and load this Pico's saved progress before saving."
+                : action === "load" ? " Review device-saved values beside your draft before changing them."
+                    : " Read saved progress and member resources before another change. No restart or transmission requested.");
+        } catch (error) {
+            if (ticket !== progressEpoch) return;
+            invalidateProgress(); progressReview = true;
+            progressControl("state").textContent = error.message || "Station progress unconfirmed. Read back before another change; your draft is preserved.";
+        } finally { busy = false; render(); }
     }
     function invalidateResources() {
         resourceRevision = resourceContext = validatedPlan = "";
@@ -115,6 +236,7 @@
     }
     function invalidateEditors() {
         driveEditor?.invalidate();
+        invalidateProgress();
         configRevision = networkRevision = ""; target = null; reconcile = loaded;
         invalidateResources();
     }
@@ -136,12 +258,13 @@
         member("station-hint").textContent = stationHint(resourceRevision ? resources?.application.schema : null);
         const h = resources?.application.hardware;
         const previewReady = available && resourceRevision && resources;
+        const progressReady = available && progressRevision && progress;
         const writable = available && resourceRevision && h?.saved && h.storage_healthy && resources.application.station.storage_healthy && !h.application_error;
         root.document.querySelectorAll("[data-wtp-resource]").forEach(input => {
-            input.disabled = busy || (input.dataset.wtpResource === "station" ? (!(writable || (previewReady && resources?.carrier === "usb_physical" && resources.application.station.storage_healthy)) || resources.profile_owned_station) : !previewReady);
+            input.disabled = busy || (input.dataset.wtpResource === "station" ? (!progressReady && (!(writable || (previewReady && resources?.carrier === "usb_physical" && resources.application.station.storage_healthy)) || resources.profile_owned_station)) : !previewReady);
         });
         member("station-save").disabled = busy || !writable || resources?.profile_owned_station;
-        root.WtpUsbSettings?.stationEditorReady(!member("callsign").disabled && resources?.carrier === "usb_physical");
+        progressRender();
         member("validate").disabled = busy || !previewReady;
         member("hardware-save").disabled = busy || !writable || !validatedPlan || validatedPlan !== JSON.stringify(hardwareCandidate());
         for (const name of ["indicator-gp", "polarity"]) member(name).disabled = busy || !previewReady || member("indicator").value !== "external";
@@ -172,7 +295,7 @@
         if (a.wspr_plan) member("station-feedback").textContent += ` Saved plan: ${a.wspr_plan.frame_types.join(" → ")}. ${a.wspr_plan.rationale}`;
         member("pairs").textContent = data.pin_choices.i2c_pairs.map(p => `Pair ${p.id}: I2C${p.controller} GP${p.sda_gp}/GP${p.scl_gp}`).join("; ");
         if (!keep) {
-            if (station) for (const [name,value] of Object.entries({callsign:station.callsign,locator:station.locator,power:station.power_dbm})) member(name).value = String(value);
+            if (station && !stationDirty && !progressLoaded) for (const [name,value] of Object.entries({callsign:station.callsign,locator:station.locator,power:station.power_dbm})) member(name).value = String(value);
             const options = (name, optional) => {
                 member(name).innerHTML = `<option value="">${optional ? "Disabled" : "Select GP"}</option>` + data.pin_choices.eligible_gps.map(gp => `<option value="${gp}">GP${gp}</option>`).join("");
             };
@@ -192,6 +315,7 @@
         if (!station && (!validatedPlan || validatedPlan !== JSON.stringify(hardwareCandidate()))) return;
         if (resourceReview && !root.confirm("Review current saved and active observations beside your preserved draft. Send one new explicit save using the fresh revision?")) return;
         resourceReview = false;
+        if (station && member("power").value === "") { member("station-feedback").textContent = "Select reported power for a complete station save, or save the unset field as progress."; return; }
         const payload = station ? { callsign:member("callsign").value, locator:member("locator").value, power_dbm:Number(member("power").value) } : hardwareCandidate();
         return request(`member/${kind}`, "PUT", {schema:station ? resources.application.station.schema : `transmitter-${kind}/1`, target:resources.target, [station ? "station" : "pins"]:payload}, resourceRevision);
     }
@@ -300,6 +424,7 @@
                 }
                 feedback.textContent = "Login inspection/retirement does not establish a save outcome. Your drafts are preserved.";
             } else if (resource === "member/management") {
+                managementCarrier = data.carrier || (body?.action === "connect" ? body.carrier : ["engineering_mtls","usb_physical","disconnect"].includes(body?.action) ? body.action : managementCarrier);
                 consumerConnected = data.connected === true;
                 if (method === "GET") {
                     if (!["engineering_mtls", "consumer_station", "consumer_ap", "usb_physical", "unsupported", "disconnected"].includes(data.carrier) || typeof data.connected !== "boolean" || typeof data.host !== "string")
@@ -394,10 +519,11 @@
         },afterSave:()=>invalidateEditors()
     }) : null;
     let driveSelection = "";
-    root.WtpManagement = { setAvailability(value, selectable = value) {
+    root.WtpManagement = { invalidate:invalidateEditors, setAvailability(value, selectable = value) {
         const selectedDrive = root.WtpUi?.read?.() || {};
         const key = JSON.stringify(['Transport','Endpoint','USB Serial','Device ID','Hostname','TCP Port'].map(k=>selectedDrive[k]));
-        if (driveSelection && key !== driveSelection) driveEditor?.invalidate();
+        if (driveSelection && key !== driveSelection) { invalidateEditors(); progressLoaded = false; }
+        if (!value && !selectable) invalidateProgress();
         driveSelection = key;
         canSelect = selectable;
         available = !explicitDisconnected && (consumerConnected ? selectable : value);
@@ -413,13 +539,13 @@
         for (const id of Object.keys(values(null))) originalHints.set(id, byId(`wtp-remote-${id}-hint`)?.textContent || "");
         byId("wtp-management-carrier")?.addEventListener("change", () => {
             if (byId("wtp-management-password")) byId("wtp-management-password").value = "";
-            driveEditor?.invalidate();
+            invalidateEditors();
             retirement = null;
             if (byId("wtp-management-target")) byId("wtp-management-target").replaceChildren(new Option("Inspect this endpoint first",""));
             render();
         });
         byId("wtp-management-host")?.addEventListener("input", () => {
-            driveEditor?.invalidate();
+            invalidateEditors();
             retirement = null; byId("wtp-management-target")?.replaceChildren(new Option("Inspect this endpoint first",""));
             if (byId("wtp-management-password")) byId("wtp-management-password").value = "";
             render();
@@ -432,7 +558,7 @@
                     password: byId("wtp-management-password").value });
         });
         byId("wtp-management-inspect")?.addEventListener("click", () => {
-            driveEditor?.invalidate();
+            invalidateEditors();
             retirement = null;
             return request("member/management","POST",{action:"inspect_logins",carrier:byId("wtp-management-carrier").value,host:byId("wtp-management-host").value});
         });
@@ -446,11 +572,15 @@
         });
         byId("wtp-management-state")?.addEventListener("click", () => request("member/management"));
         byId("wtp-management-disconnect")?.addEventListener("click", () => request("member/management", "POST", { action: "disconnect" }));
+        for (const action of ["load","save","apply","discard"]) byId(`wtp-usb-progress-${action}`)?.addEventListener("click", () => stationProgress(action));
         member("load")?.addEventListener("click", () => request("member/application"));
         member("station-save")?.addEventListener("click", () => resourceSave("station"));
         member("hardware-save")?.addEventListener("click", () => resourceSave("hardware"));
         member("validate")?.addEventListener("click", () => request("member/pins/validate", "POST", hardwareCandidate(), resourceRevision));
         for (const name of ["callsign","locator","power"]) member(name)?.addEventListener("input", () => {
+            ++stationEdits[name];
+            stationDirty = true;
+            if (!progressDraftTarget) progressDraftTarget = JSON.stringify(progress?.target || resources?.target || null);
             const call=member("callsign").value, grid=member("locator").value;
             const formats=resources?.application.schema === "transmitter-application/2";
             member("station-feedback").textContent = !formats && /[<>/]/.test(call) ?

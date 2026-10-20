@@ -44,6 +44,14 @@ async function stop(child) {
     const resourcesBrowser=browser(exchange);
     await resourcesBrowser.click('wtp-member-load');
     const resources=calls.at(-1).result;
+    await resourcesBrowser.click('wtp-usb-progress-load');
+    const progressSupport=calls.at(-1).result;
+    if(profile==='current') assert.equal(progressSupport.status,200,JSON.stringify(progressSupport));
+    else {
+      assert.equal(progressSupport.status,409,JSON.stringify(progressSupport));
+      assert.equal(progressSupport.body.error.code,'saved_progress_unavailable');
+      assert.match(resourcesBrowser.element('wtp-usb-progress-state').textContent,/existing complete station/);
+    }
     const versioned=resources.status===200 && resources.body.application.schema==='transmitter-application/2';
     assert.equal(resources.exchanges.filter(e=>e.method!=='GET').length,0);
     assert.deepEqual(await dump(),original,'resource discovery must not mutate the historical member');
@@ -60,7 +68,7 @@ async function stop(child) {
       assert(!resourcesBrowser.element('wtp-member-station-save').disabled);
       assert(resourcesBrowser.element('wtp-member-hardware-save').disabled,'preview is required before save');
     }
-    if((profile==='current'||profile==='p157'||profile==='p156'||profile==='p153'||profile==='p154'||profile==='p152')) {
+    if((profile==='current'||profile==='p158'||profile==='p157'||profile==='p156'||profile==='p153'||profile==='p154'||profile==='p152')) {
       const source=fs.readFileSync(path.join(pico,'tests/fixtures/pi-8454e21-wtp-management.js'),'utf8');
       assert.equal(crypto.createHash('sha256').update(source).digest('hex'),'08639d74049de9c9f66890423bd339cc86eaf328bce9a9004a42aeaec628f963');
       const old=browser(exchange,source); await old.click('wtp-remote-load');
@@ -74,14 +82,14 @@ async function stop(child) {
     const b=browser(exchange);
     await b.click('wtp-remote-load');
     const context=calls.at(-1).result; assert.equal(context.status,200,JSON.stringify(context.body));
-    assert.equal(context.body.update_strategy,(profile==='current'||profile==='p157'||profile==='p156'||profile==='p153'||profile==='p154'||profile==='p152')?'merge':'legacy');
+    assert.equal(context.body.update_strategy,(profile==='current'||profile==='p158'||profile==='p157'||profile==='p156'||profile==='p153'||profile==='p154'||profile==='p152')?'merge':'legacy');
     const loaded=structuredClone(context.body.config);
     b.element('wtp-remote-callsign').value='W1AW';
     await b.click('wtp-remote-save');
     const saved=calls.at(-1).result; assert.equal(saved.status,200);
     const mutations=saved.exchanges.filter(e=>e.method!=='GET'); assert.equal(mutations.length,1);
     const wire=mutations[0], payload=JSON.parse(wire.body);
-    if((profile==='current'||profile==='p157'||profile==='p156'||profile==='p153'||profile==='p154'||profile==='p152')) {
+    if((profile==='current'||profile==='p158'||profile==='p157'||profile==='p156'||profile==='p153'||profile==='p154'||profile==='p152')) {
       assert.equal(wire.method,'POST'); assert.equal(wire.resource,versioned?'config/update/2':'config/update');
       assert.deepEqual(payload.config,{station:{callsign:'W1AW'}}); assert.equal(payload.target.device_id,'a'.repeat(32));
     } else {

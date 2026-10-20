@@ -63,7 +63,19 @@ def c_string(value: str) -> str:
     return "".join(escaped)
 
 
-def metadata(repo_root: Path, project: str, executable: str) -> str:
+def release_version(value: str) -> str:
+    """Accept a SemVer release identity without tags or build metadata."""
+    if not re.fullmatch(r"(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(?:-[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?", value):
+        raise MetadataError("release version must be SemVer without v prefix or build metadata")
+    prerelease = value.partition("-")[2]
+    if any(part.isdigit() and len(part) > 1 and part.startswith("0") for part in prerelease.split(".")):
+        raise MetadataError("numeric prerelease identifiers cannot have leading zeros")
+    return value
+
+
+def metadata(repo_root: Path, project: str, executable: str, version_override: str | None = None) -> str:
+    if version_override is not None:
+        release_version(version_override)
     git(repo_root, "rev-parse", "--is-inside-work-tree")
     full_commit = git(repo_root, "rev-parse", "HEAD")
     short_commit = git(repo_root, "rev-parse", "--short", "HEAD")
@@ -100,8 +112,8 @@ def metadata(repo_root: Path, project: str, executable: str) -> str:
         capture_output=True,
         text=True,
     ).returncode == 0
-    version = f"{base_version}{prerelease}"
-    if not exact_tag:
+    version = version_override if version_override is not None else f"{base_version}{prerelease}"
+    if not exact_tag or version_override is not None:
         version += f"+{short_commit}"
 
     dirty = "true" if git(
@@ -165,13 +177,14 @@ def main() -> int:
     parser.add_argument("--output", required=True, type=Path)
     parser.add_argument("--project", required=True)
     parser.add_argument("--executable", required=True)
+    parser.add_argument("--release-version", help="explicit candidate SemVer; always retains commit attribution")
     parser.add_argument(
         "--check", action="store_true",
         help="check generated content without writing (0=current, 3=stale)",
     )
     args = parser.parse_args()
     try:
-        content = metadata(args.repo_root.resolve(), args.project, args.executable)
+        content = metadata(args.repo_root.resolve(), args.project, args.executable, args.release_version)
         if args.check:
             current = matches_existing(args.output, content)
             print(f"build metadata {'current' if current else 'stale'}: {args.output}")

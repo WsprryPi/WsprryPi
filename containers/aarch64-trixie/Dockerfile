@@ -9,6 +9,7 @@ RUN apt-get update \
 
 WORKDIR /workspace
 COPY . .
+ARG WSPRRYPI_RELEASE_VERSION
 RUN sh containers/build-artifact.sh aarch64 trixie
 
 FROM scratch AS artifact

@@ -11,7 +11,7 @@ const {schedules,changes} = require('../data/wtp-management.js');
   assert(!stationHint(null).includes('Type 1 station writes only'));
   assert.match(stationHint('transmitter-application/1'),/Type 1 station writes only/);
   assert.match(stationHint('transmitter-application/2'),/automatically selects Type 1, Type 2 or Type 3/);
-  for(const name of ['callsign','locator','power']) assert.match(view,new RegExp('id="wtp-member-'+name+'"[^>]*aria-describedby="wtp-member-station-hint"'));
+  for(const name of ['callsign','locator','power']) assert.match(view,new RegExp('id="wtp-member-'+name+'"[^>]*aria-describedby="wtp-member-station-hint [^"]*"'));
 
   assert.deepEqual(schedules(''), []);
   assert.throws(()=>schedules('121 0'));

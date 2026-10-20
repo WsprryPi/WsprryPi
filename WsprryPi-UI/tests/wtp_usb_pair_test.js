@@ -27,6 +27,12 @@ const {browser,reply,target}=require("./wtp_usb_settings_test.js");
         await b.click("wifi-save");assert.match(b.element("wtp-usb-feedback").textContent,/Settings saved/);await b.click("load");assert.equal(b.element("wtp-usb-ssid").value,"synthetic-network");
         b.element("wtp-usb-ssid").value="replacement-network";b.element("wtp-usb-password").value="replacement-synthetic-password";await b.click("wifi-save");assert.match(b.element("wtp-usb-feedback").textContent,/Settings saved/);await b.click("load");assert.equal(b.element("wtp-usb-ssid").value,"replacement-network");
         await b.click("wifi-remove");assert.match(b.element("wtp-usb-feedback").textContent,/removed/);await b.click("load");assert.equal(b.element("wtp-usb-ssid").value,"");assert.equal(b.element("wtp-usb-hostname").value,"usb-bench.local");
+        const preclock=await request({method:"GET",path:"/api/v1/member/progress",body:""});
+        assert.equal(preclock.status,200,JSON.stringify(preclock));
+        const preclockSave=await request({method:"POST",path:"/api/v1/member/progress/update",revision:preclock.etag,
+            body:JSON.stringify({schema:"transmitter-progress/1",target,request_id:"8".repeat(32),fields:{callsign:"AA0NT",locator:null,power_dbm:0}})});
+        assert.equal(preclockSave.status,200,JSON.stringify(preclockSave));
+        assert.equal(preclockSave.body.station_complete,false);assert.equal(preclockSave.body.station.power_dbm,0);
         const clock=await request({synchronize:true});assert.equal(clock.accepted,true,JSON.stringify(clock));
         const blankDriveProgress=await request({method:"GET",path:"/api/v1/member/gpio-drive-progress",body:""});
         if(process.env.WSPRRYPI_GPIO_DRIVE_REQUIRED==='1')assert.equal(blankDriveProgress.status,200,JSON.stringify(blankDriveProgress));

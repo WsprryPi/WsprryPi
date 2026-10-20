@@ -208,6 +208,19 @@ def main() -> int:
         packed_content = output.read_text(encoding="utf-8")
         assert f'#define MAKE_COMMIT "{commit_b}"' in packed_content
 
+        candidate = BUILD_METADATA.metadata(repo, "WsprryPi", "wsprrypi", "4.0.0-beta.1")
+        short = run("git", "rev-parse", "--short", "HEAD", cwd=repo).stdout.strip()
+        assert f'#define MAKE_TAG "4.0.0-beta.1+{short}"' in candidate
+        assert f'#define MAKE_COMMIT "{commit_b}"' in candidate
+        assert '#define MAKE_BRANCH_STATE "detached"' in candidate
+        for invalid in ("v4.0.0-beta.1", "4.0", "04.0.0", "4.0.0-beta.01", "4.0.0+fake", "4.0.0\n", "$(id)"):
+            try:
+                BUILD_METADATA.metadata(repo, "WsprryPi", "wsprrypi", invalid)
+            except BUILD_METADATA.MetadataError:
+                pass
+            else:
+                raise AssertionError(f"accepted invalid candidate version {invalid!r}")
+
         outside = Path(temporary) / "not-a-repository"
         outside.mkdir()
         unavailable = generate(outside, outside / "metadata.hpp", expect=1)

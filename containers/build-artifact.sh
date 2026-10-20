@@ -16,7 +16,7 @@ if ! pkg-config --exists avahi-client; then
     echo "container build requires Avahi development files (avahi-client)" >&2
     exit 1
 fi
-make -C src release SUDO= JOBS=4
+make -C src release SUDO= JOBS=4 BUILD_METADATA_VERSION="${WSPRRYPI_RELEASE_VERSION:-}"
 mkdir -p /artifact
 cp src/build/bin/wsprrypi /artifact/wsprrypi
 file /artifact/wsprrypi > /artifact/file.txt

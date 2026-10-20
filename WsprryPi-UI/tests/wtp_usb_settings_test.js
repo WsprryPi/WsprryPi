@@ -32,11 +32,8 @@ async function unit() {
     await b.click("load");await b.click("wifi-remove");assert.equal(b.requests.at(-1).method,"DELETE");assert.equal(JSON.parse(b.requests.at(-1).body).wifi,null);
     await b.click("load");assert.match(b.element("wtp-usb-feedback").textContent,/No saved Wi-Fi/);
     b.element("wtp-usb-hostname").value="renamed.local";fail=true;const count=b.requests.length;await b.click("name-save");assert.equal(b.requests.length,count+1);assert.equal(b.element("wtp-usb-hostname").value,"renamed.local");
-    fail=false;await b.click("load");await b.click("progress-load");b.root.confirm=()=>false;const reviewed=b.requests.length;await b.click("name-save");assert.equal(b.requests.length,reviewed);
+    fail=false;await b.click("load");b.root.confirm=()=>false;const reviewed=b.requests.length;await b.click("name-save");assert.equal(b.requests.length,reviewed);
     b.root.confirm=()=>true;await b.click("name-save");assert.equal(JSON.parse(b.requests.at(-1).body).hostname,"renamed.local");
-    await b.click("progress-load");assert.match(b.element("wtp-usb-progress-state").textContent,/station incomplete/);assert(b.element("wtp-usb-progress-apply").disabled);
-    b.element("wtp-member-callsign").value="AA0NT";b.element("wtp-member-locator").value="";b.element("wtp-member-power").value="invalid";
-    b.root.WtpUsbSettings.stationEditorReady(true);await b.click("progress-save");const staged=JSON.parse(b.requests.at(-1).body);assert.equal(staged.fields.locator,null);assert.equal(staged.fields.power_dbm,"invalid");assert.equal(staged.request_id.length,32);assert.match(b.element("wtp-usb-progress-state").textContent,/Field outcomes/);
     console.log("USB settings producer: name, Wi-Fi create/replace/remove, password preservation, uncertain outcome and explicit review passed");
 }
 module.exports={browser,reply,target};

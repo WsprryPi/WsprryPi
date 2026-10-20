@@ -32,6 +32,20 @@ is `dist/<target>`. An optional argument selects an absent or empty directory:
 ./scripts/build-aarch64-trixie-container.sh /path/to/empty-output
 ```
 
+An unpublished candidate can select an explicit SemVer without creating a tag:
+
+```sh
+./scripts/build-aarch64-trixie-container.sh /path/to/empty-output --release-version 4.0.0-beta.1
+```
+
+All four wrappers support this option. The executable retains full source
+commit, actual branch/detached state and dirty attribution; its version is
+`4.0.0-beta.1+<short-commit>`. Only a SemVer without a `v` prefix or supplied build
+metadata is accepted. Omitting the option preserves the normal Git-derived
+version. The parent Make equivalent is `BUILD_METADATA_VERSION=4.0.0-beta.1`;
+changing or removing it regenerates metadata and rebuilds the version object.
+This is a build input, not a runtime setting or publication operation.
+
 Non-empty directories, files, and destination symlinks are rejected. Existing
 exports are never merged or overwritten. Failed exports remove temporary files
 and containers; a completed artifact is published by a same-filesystem directory

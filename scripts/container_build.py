@@ -9,6 +9,7 @@ import signal
 import subprocess
 import tempfile
 import uuid
+from generate_build_metadata import MetadataError, release_version
 
 TARGETS = {
     "armv6-bookworm": "linux/arm/v6",
@@ -31,7 +32,9 @@ def run(*args, **kwargs):
     return subprocess.run(args, check=True, text=True, **kwargs)
 
 
-def build(target, output):
+def build(target, output, candidate_version=None):
+    if candidate_version is not None:
+        release_version(candidate_version)
     # abspath preserves the final symlink so it can be rejected before use.
     output = Path(os.path.abspath(output))
     check_destination(output)
@@ -45,6 +48,7 @@ def build(target, output):
                 str(REPO / "containers" / target / "Dockerfile"),
                 "--platform", platform, "--target", "build", "--tag",
                 f"wsprrypi-build:{target}", "--iidfile", str(iidfile),
+                *(["--build-arg", f"WSPRRYPI_RELEASE_VERSION={candidate_version}"] if candidate_version is not None else []),
                 "--load", str(REPO))
             image = iidfile.read_text().strip()
             if not image.startswith("sha256:") or len(image) != 71:
@@ -96,10 +100,11 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("target", choices=TARGETS)
     parser.add_argument("output", nargs="?")
+    parser.add_argument("--release-version", help="candidate SemVer; no tag or release is created")
     args = parser.parse_args()
     try:
-        build(args.target, args.output or REPO / "dist" / args.target)
-    except (OSError, ValueError, subprocess.CalledProcessError) as error:
+        build(args.target, args.output or REPO / "dist" / args.target, args.release_version)
+    except (OSError, ValueError, MetadataError, subprocess.CalledProcessError) as error:
         parser.exit(1, f"container build failed: {error}\n")
     except KeyboardInterrupt:
         parser.exit(130, "container build interrupted\n")

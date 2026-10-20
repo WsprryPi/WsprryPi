@@ -280,16 +280,6 @@
                     <button type="button" class="btn btn-outline-secondary" id="wtp-usb-restart" disabled>Restart Pico to apply</button>
                     <button type="button" class="btn btn-outline-secondary" id="wtp-usb-ap" disabled>Open setup Wi-Fi for ten minutes</button>
                 </div>
-                <section class="mt-3" aria-labelledby="wtp-usb-progress-heading">
-                    <h6 id="wtp-usb-progress-heading">Saved station progress</h6>
-                    <p class="form-text">Read saved progress, then use the station fields below to save valid fields independently. Applying saved station progress is a separate action. Neither action transmits, resumes STOP or changes clock readiness.</p>
-                    <div class="d-flex flex-wrap gap-2">
-                        <button type="button" class="btn btn-outline-secondary" id="wtp-usb-progress-load">Read saved progress</button>
-                        <button type="button" class="btn btn-outline-primary" id="wtp-usb-progress-save" disabled>Save valid station fields</button>
-                        <button type="button" class="btn btn-outline-primary" id="wtp-usb-progress-apply" disabled>Apply saved station progress</button>
-                    </div>
-                    <p id="wtp-usb-progress-state" class="form-text mt-2" role="status" aria-live="polite">Saved progress and applied configuration have not been read.</p>
-                </section>
                 <p id="wtp-usb-feedback" class="form-text mt-2" role="status" aria-live="polite">Read name and Wi-Fi before editing.</p>
             </section>
             <div class="row gx-3 gy-3 mb-3">
@@ -347,23 +337,38 @@
                 <div class="row gx-3 gy-3">
                     <div class="col-12 col-lg-4 config-stacked-field">
                         <label class="form-label" for="wtp-member-callsign">Callsign</label>
-                        <input class="form-control" id="wtp-member-callsign" type="text" maxlength="12" autocomplete="off" spellcheck="false" data-wtp-resource="station" aria-describedby="wtp-member-station-hint" disabled>
+                        <input class="form-control" id="wtp-member-callsign" type="text" maxlength="12" autocomplete="off" spellcheck="false" data-wtp-resource="station" aria-describedby="wtp-member-station-hint wtp-member-callsign-progress" disabled>
+                        <p class="form-text mb-0" id="wtp-member-callsign-progress" role="status" aria-live="polite"></p>
                     </div>
                     <div class="col-12 col-lg-4 config-stacked-field">
                         <label class="form-label" for="wtp-member-locator">Locator</label>
-                        <input class="form-control" id="wtp-member-locator" type="text" maxlength="6" autocomplete="off" spellcheck="false" data-wtp-resource="station" aria-describedby="wtp-member-station-hint" disabled>
+                        <input class="form-control" id="wtp-member-locator" type="text" maxlength="6" autocomplete="off" spellcheck="false" data-wtp-resource="station" aria-describedby="wtp-member-station-hint wtp-member-locator-progress" disabled>
+                        <p class="form-text mb-0" id="wtp-member-locator-progress" role="status" aria-live="polite"></p>
                     </div>
                     <div class="col-12 col-lg-4 config-stacked-field">
                         <label class="form-label" for="wtp-member-power">Reported WSPR power (dBm)</label>
-                        <select class="form-select" id="wtp-member-power" data-wtp-resource="station" aria-describedby="wtp-member-station-hint" disabled>
+                        <select class="form-select" id="wtp-member-power" data-wtp-resource="station" aria-describedby="wtp-member-station-hint wtp-member-power-progress" disabled>
+                            <option value="">Unset</option>
                             <?php foreach ([0,3,7,10,13,17,20,23,27,30,33,37,40,43,47,50,53,57,60] as $power): ?>
                             <option value="<?= $power ?>"><?= $power ?></option>
                             <?php endforeach; ?>
                         </select>
+                        <p class="form-text mb-0" id="wtp-member-power-progress" role="status" aria-live="polite"></p>
                     </div>
                 </div>
                 <button type="button" class="btn btn-primary mt-3" id="wtp-member-station-save" disabled>Save member station</button>
                 <p class="form-text mt-2" id="wtp-member-station-feedback" role="status" aria-live="polite"></p>
+                <section class="mt-3" aria-labelledby="wtp-usb-progress-heading">
+                    <h6 id="wtp-usb-progress-heading">Save station progress</h6>
+                    <p class="form-text">Read saved progress, then edit the station fields above to save valid fields independently. Applying saved station progress is a separate action. Neither action transmits, resumes STOP or changes clock readiness. Older firmware retains the complete station save.</p>
+                    <div class="d-flex flex-wrap gap-2">
+                        <button type="button" class="btn btn-outline-secondary" id="wtp-usb-progress-load">Read saved progress</button>
+                        <button type="button" class="btn btn-outline-primary" id="wtp-usb-progress-save" disabled>Save valid station fields</button>
+                        <button type="button" class="btn btn-outline-primary" id="wtp-usb-progress-apply" disabled>Apply saved station progress</button>
+                        <button type="button" class="btn btn-outline-primary" id="wtp-usb-progress-discard" disabled>Discard station drafts and load progress</button>
+                    </div>
+                    <p id="wtp-usb-progress-state" class="form-text mt-2" role="status" aria-live="polite">Saved progress and applied configuration have not been read.</p>
+                </section>
                 <h5 class="cw-control-section__title mt-4">Supported pin plan</h5>
                 <p class="form-text" id="wtp-member-pin-hint">Pico GP numbering. Direct PIO output, active-low button and indicator are supported. Button actions require the member's button adapter to be enabled. Changes are saved for restart; saving does not change physical routing or enable RF. Pin selection does not establish RF qualification.</p>
                 <div class="row gx-3 gy-3">

@@ -12,6 +12,16 @@ P15.4 adds [scoped member resources](wtp-browser-api.md#shared-pico-member-resou
 beside this existing atomic settings transaction. It does not split a legacy
 settings save into station and hardware writes.
 
+Beta 1 adds a separate [saved station progress](wtp-browser-api.md#independent-saved-station-progress)
+workflow on supporting firmware. It adopts Pico P15.9 at exact network reference
+`165303458e49feaac1de54c8344058f56578d533`. The prior P15.8 network reference
+`804e8a06585ec5a0e650e69fcd71ada398b6cc9f` is retained as `p158`; current,
+`legacy`, `extended`, `p152`, `p153`, `p154`, `p156`, `p157` and `p158` are nine
+separate network rows. The independent USB reference remains
+`100e749c815f7485d5097c9086852d3b97adca9f`. These are software test pairs,
+not firmware image selections or general physical qualification. The complete
+configuration and station APIs below retain their atomic semantics.
+
 ## Context and edit API
 
 GET `/api/v1/member/configuration` is a protected management read, not the host's

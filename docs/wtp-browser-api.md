@@ -38,6 +38,43 @@ ownership, SoftAP and BLE are unavailable. Capabilities report ABORT only and
 workflow. Management is temporarily unavailable during work or unresolved output,
 not an independent connection around the scheduler.
 
+## Independent saved station progress
+
+`GET /api/v1/member/progress` and POST `/api/v1/member/progress/update` or
+`/api/v1/member/progress/apply` use the selected engineering HTTPS, authenticated
+consumer station/AP, or physical USB management carrier. The fixed
+`saved_progress` descriptor must advertise `transmitter-progress/1` and its
+exact paths and 2,048-byte budget. Absence leaves existing complete saves
+available; malformed/future support refuses without a fallback mutation.
+
+Reads return the redacted progress/1 resource and common ETag. Update requires
+the current member/device/boot target, request ID, known field subset and
+If-Match. Apply requires the saved decimal-string draft revision and an explicit
+domain, with a 512-byte body limit. Existing supported units/domains retain
+Pico authority; the Pi station editor submits only callsign, locator and reported
+power and applies only station. Consumer profile-owned station/network
+application still requires Pico transactional setup. A complete station is not
+required to save independent progress.
+
+The coordinator validates bounded/closed readbacks, identity, uint64 strings,
+redaction and outcomes. Updates freeze canonical JSON bytes before carrier
+dispatch, including encryption, and compare the receipt against those exact
+transmitted bytes. A successful accepted batch must advance its draft revision,
+preserve applied configuration/profile/STOP observations and unrelated fields,
+and agree with fresh saved readback. All-invalid batches do not advance storage.
+Apply retains its existing complete-configuration response shape; internal
+progress readback verifies the station effect before success is returned.
+
+Protected network/Origin/JSON-intent policy, host operation/idle locking, fresh
+management selection and remote storage/application admission remain in force.
+Every attempted mutation invalidates all cached editor revisions. A stale,
+lost or malformed result requires explicit read/review, never automatic replay.
+The UI preserves invalid/newer drafts, distinguishes unset power from zero,
+and reports each field beside its input. Discard/reload is explicit; drafts
+bound to another member/boot cannot be saved by the progress editor. Applying
+uses saved values, never a newer browser draft. No draft reaches scheduling or
+activates output by being saved.
+
 ## Cancellation, replay and precision
 
 ```json

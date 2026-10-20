@@ -132,7 +132,7 @@ jobs:
     timeout-minutes: 15
     strategy:
       matrix:
-        profile: [legacy, extended, p152, p153, p154, p156, p157]
+        profile: [legacy, extended, p152, p153, p154, p156, p157, p158]
     steps:
       - uses: actions/checkout@v7
       - name: Existing host-only compatibility dependencies
@@ -261,6 +261,7 @@ jobs:
         run: |
           make backend-capabilities-regression-test SUDO=
           make backend-capabilities-make-regression-test SUDO=
+          make build-metadata-regression-test build-metadata-make-regression-test SUDO=
           make debug SUDO=
 
       - name: Run WTP component, plan, USB adapter, backend, scheduler and status tests

@@ -74,7 +74,7 @@ int main(int argc,char **argv) {
       if(resource=="member/configuration")return pico_configuration_request(exchange,client.device(),client.boot(),method,body,revision,"usb_physical");
       if(resource=="member/application"||resource=="member/station"||resource=="member/hardware"||resource=="member/gpio-drive"||resource=="member/gpio-drive-progress"||resource=="member/pins"||resource=="member/pins/validate")
         return pico_resource_request(exchange,client.device(),client.boot(),resource.substr(7),method,body,revision,"usb_physical");
-      if(resource.starts_with("member/progress"))return exchange("/api/v1/"+resource.substr(7),method,body,revision);
+      if(resource.starts_with("member/progress"))return pico_progress_request(exchange,client.device(),client.boot(),resource.substr(7),method,body,revision,"usb_physical");
       return exchange(resource=="member/wifi"?"/api/usb/v1/wifi":resource=="member/hostname"?"/api/v1/hostname":resource=="member/ap"?"/api/usb/v1/ap":resource=="member/restart"?"/api/v1/restart":resource,method,body,revision);
     },[](auto){return PicoHttpResponse{409,"{}",{}};});
   std::string line;
