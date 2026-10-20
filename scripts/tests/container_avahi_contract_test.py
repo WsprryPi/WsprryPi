@@ -40,7 +40,14 @@ elif name == 'readelf':
               else 'Class: ELF64\nMachine: AArch64')
     elif '--arch-specific' in args:
         print('Tag_CPU_arch: v6\nTag_FP_arch: VFPv2\nTag_ABI_VFP_args: VFP registers')
-elif name == 'ldd':
+elif name in ('ldd', 'arm-loader'):
+    if name == 'arm-loader':
+        assert args == ['--list', args[-1]]
+    if os.environ.get('RESOLUTION_FAILURE') == 'exit':
+        sys.exit(9)
+    if os.environ.get('RESOLUTION_FAILURE') == 'missing':
+        print('libmissing.so => not found')
+        sys.exit(0)
     # Always report both as resolved: transitive resolution must not satisfy NEEDED.
     print('libavahi-client.so.3 => /lib/libavahi-client.so.3\n'
           'libavahi-common.so.3 => /lib/libavahi-common.so.3')
@@ -55,14 +62,14 @@ elif name == 'sha256sum':
 
 
 class ContainerAvahiContractTest(unittest.TestCase):
-    def exercise(self, target, *, no_avahi=False, missing='', soname_only=False):
+    def exercise(self, target, *, no_avahi=False, missing='', soname_only=False, resolution_failure=''):
         cpu, release = target.split('-')
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             commands = root / 'commands'
             commands.mkdir()
             for name in ('pkg-config', 'git', 'dpkg', 'make', 'readelf', 'ldd',
-                         'file', 'dpkg-query', 'sha256sum'):
+                         'file', 'dpkg-query', 'sha256sum', 'arm-loader'):
                 p = commands / name
                 p.write_text('#!' + sys.executable + '\n' + STUB)
                 p.chmod(0o755)
@@ -71,9 +78,11 @@ class ContainerAvahiContractTest(unittest.TestCase):
             script = root / 'build-artifact.sh'
             script.write_text((REPO / 'containers/build-artifact.sh').read_text()
                               .replace('/etc/os-release', str(os_release))
-                              .replace('/artifact', str(root / 'artifact')))
+                              .replace('/artifact', str(root / 'artifact'))
+                              .replace('/lib/ld-linux-armhf.so.3', str(commands / 'arm-loader')))
             env = dict(os.environ, PATH=str(commands) + os.pathsep + os.environ['PATH'],
-                       ARCH='armhf' if cpu == 'armv6' else 'arm64', MISSING=missing)
+                       ARCH='armhf' if cpu == 'armv6' else 'arm64', MISSING=missing,
+                       RESOLUTION_FAILURE=resolution_failure)
             env.pop('NO_AVAHI', None)
             env.pop('SONAME_ONLY', None)
             if soname_only:
@@ -86,6 +95,9 @@ class ContainerAvahiContractTest(unittest.TestCase):
                 self.assertNotEqual(result.returncode, 0)
                 self.assertIn('requires Avahi development files', result.stderr)
                 self.assertFalse((root / 'compiled').exists())
+            elif resolution_failure:
+                self.assertNotEqual(result.returncode, 0)
+                self.assertFalse((root / 'artifact/SHA256SUMS').exists())
             elif missing or soname_only:
                 self.assertNotEqual(result.returncode, 0)
                 self.assertIn('must directly link ' + (missing or 'libavahi-client.so.3'), result.stderr)
@@ -108,6 +120,12 @@ class ContainerAvahiContractTest(unittest.TestCase):
         for target in TARGETS:
             with self.subTest(target=target):
                 self.exercise(target)
+
+    def test_dependency_resolution_fails_closed(self):
+        for target in ('armv6-bookworm', 'aarch64-trixie'):
+            for failure in ('exit', 'missing'):
+                with self.subTest(target=target, failure=failure):
+                    self.exercise(target, resolution_failure=failure)
 
     def test_missing_dependency_fails_before_compile(self):
         self.exercise('armv6-bookworm', no_avahi=True)

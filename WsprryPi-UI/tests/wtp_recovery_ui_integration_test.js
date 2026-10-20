@@ -273,7 +273,8 @@ async function main() {
               assert(await evaluate('document.getElementById("wtp-member-callsign").getBoundingClientRect().top>=100'),'station field framing');
               assert(await evaluate('document.documentElement.scrollWidth<=innerWidth+1'),'WSPR plan feedback overflow');
               assert.match(await evaluate('document.getElementById("wtp-member-station-hint").textContent'),scenario==='legacy'?/Type 1 station writes only/:/automatically selects Type 1, Type 2 or Type 3/);
-              assert.equal(await evaluate('document.getElementById("wtp-member-locator").getAttribute("aria-describedby")'),'wtp-member-station-hint');
+              assert.equal(await evaluate('document.getElementById("wtp-member-locator").getAttribute("aria-describedby")'),'wtp-member-station-hint wtp-member-locator-progress');
+              assert(await evaluate('document.getElementById("wtp-member-locator").getAttribute("aria-describedby").split(/\\s+/).every(id=>document.getElementById(id))'),'station descriptions resolve to existing feedback');
               const bounds=await evaluate(`(() => { const top=document.getElementById('wtp-member-station-hint').getBoundingClientRect().top+scrollY;const bottom=document.getElementById('wtp-member-station-feedback').getBoundingClientRect().bottom+scrollY;return {x:0,y:Math.max(0,top-160),width:innerWidth,height:bottom-Math.max(0,top-160)+320,scale:1}; })()`);
               await capture(`${viewport.name}-${theme}-${textScale}-wspr-${scenario}.png`,{format:'png',captureBeyondViewport:true,clip:bounds});
             }

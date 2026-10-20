@@ -84,6 +84,7 @@ package inventory records the versions actually present in each build.
 - `build-metadata.hpp`: exact compiled version, commit, branch and dirty state
 - `file.txt`, `elf-header.txt`, `elf-attributes.txt`: executable format and ABI
 - `elf-versions.txt`: required ELF symbol-version information
+- `elf-dynamic.txt`: direct shared-library dependencies, including Avahi
 - `shared-libraries.txt`: libraries resolved inside the build environment
 - `build-packages.txt`: complete installed package/version inventory
 - `os-release.txt`, `target.txt`: actual userspace release and requested target
@@ -97,6 +98,13 @@ The build rejects a wrong userspace release/architecture, missing linked
 libraries, or an unexpected ELF class/machine. ARMv6 additionally requires v6,
 VFPv2, and hard-float argument attributes in the executable. These checks do not
 exhaustively audit every instruction in every runtime dependency.
+
+ARMv6 dependency resolution invokes the hard-float dynamic loader's `--list`
+mode directly; the ARMv6 QEMU `ldd` verification subprocess crashed during
+candidate preparation. AArch64 uses `ldd`. Both paths require successful
+resolution and reject missing libraries. The dependency check does not execute
+the application or qualify target runtime behavior. See the
+[`ld.so --list` contract](https://man7.org/linux/man-pages/man8/ld.so.8.html).
 
 Bookworm and Trixie have different library generations, including libgpiod.
 Keep their artifacts separate; do not rename a Bookworm executable as Trixie.
