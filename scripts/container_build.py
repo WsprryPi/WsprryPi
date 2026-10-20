@@ -3,6 +3,7 @@
 import argparse
 import hashlib
 import os
+import re
 from pathlib import Path
 import shutil
 import signal
@@ -40,6 +41,7 @@ def build(target, output, candidate_version=None):
     check_destination(output)
     platform = TARGETS[target]
     container = None
+    resolver = None
     staging = None
     try:
         with tempfile.TemporaryDirectory(prefix="wsprrypi-build-") as temporary:
@@ -63,8 +65,23 @@ def build(target, output, candidate_version=None):
                                             dir=output.parent))
             run("docker", "cp", f"{container}:/artifact/.", str(staging))
             for name in EVIDENCE:
-                if not (staging / name).is_file():
+                if name != "shared-libraries.txt" and not (staging / name).is_file():
                     raise ValueError(f"export is missing evidence: {name}")
+            needed = re.findall(r"\(NEEDED\).*\[([^\]]+)\]", (staging / "elf-dynamic.txt").read_text())
+            resolver = container + "-libraries"
+            resolved = run("docker", "run", "--rm", "--name", resolver, "--platform", platform,
+                           "--network", "none", "--cap-drop", "ALL",
+                           "--security-opt", "no-new-privileges",
+                           "--user", "65534:65534", "--read-only",
+                           "--ulimit", "core=0", "--env", "LD_TRACE_LOADED_OBJECTS=1",
+                           "--env", "WSPRRYPI_DISABLE_HARDWARE_ACCESS=1",
+                           "--entrypoint", "/artifact/wsprrypi", image,
+                           "--backend", "simulated", "--version",
+                           stdout=subprocess.PIPE, timeout=60)
+            resolver = None
+            if not needed or any(name not in resolved.stdout for name in needed) or "not found" in resolved.stdout:
+                raise ValueError("candidate shared-library resolution failed")
+            (staging / "shared-libraries.txt").write_text(resolved.stdout)
             binary = staging / "wsprrypi"
             expected = hashlib.sha256(binary.read_bytes()).hexdigest()
             if (staging / "SHA256SUMS").read_text().strip() != f"{expected}  wsprrypi":
@@ -85,6 +102,8 @@ def build(target, output, candidate_version=None):
             staging = None
             print(f"{target} artifacts exported to {output}")
     finally:
+        if resolver:
+            subprocess.run(["docker", "rm", "-f", resolver], check=False)
         if container:
             subprocess.run(["docker", "rm", "-f", container], check=False)
         if staging:
@@ -104,7 +123,7 @@ def main():
     args = parser.parse_args()
     try:
         build(args.target, args.output or REPO / "dist" / args.target, args.release_version)
-    except (OSError, ValueError, MetadataError, subprocess.CalledProcessError) as error:
+    except (OSError, ValueError, MetadataError, subprocess.CalledProcessError, subprocess.TimeoutExpired) as error:
         parser.exit(1, f"container build failed: {error}\n")
     except KeyboardInterrupt:
         parser.exit(130, "container build interrupted\n")

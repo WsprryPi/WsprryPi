@@ -44,18 +44,8 @@ case "$cpu" in
         grep -Eq 'Machine: +AArch64$' /artifact/elf-header.txt
         ;;
 esac
-if test "$cpu" = armv6; then
-    # ldd's verification subprocess can crash under ARMv6 QEMU. The actual
-    # hard-float loader's --list mode still resolves every shared dependency
-    # and fails on missing libraries, without executing the application.
-    /lib/ld-linux-armhf.so.3 --list /artifact/wsprrypi > /artifact/shared-libraries.txt
-else
-    ldd /artifact/wsprrypi > /artifact/shared-libraries.txt
-fi
-if grep -q 'not found' /artifact/shared-libraries.txt; then
-    cat /artifact/shared-libraries.txt >&2
-    exit 1
-fi
+# The exporter resolves libraries in a separate unprivileged container using
+# this exact image. Failed or incomplete resolution refuses the atomic export.
 # Record the complete package inventory, including transitive dependencies and
 # release-specific names such as libssl3t64 and libgpiod3 on Trixie.
 dpkg-query -W -f='${binary:Package}\t${Version}\n' > /artifact/build-packages.txt

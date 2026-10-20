@@ -44,6 +44,7 @@ class ContainerBuildTest(unittest.TestCase):
                     stage = Path(args[-1])
                     for name in module.EVIDENCE:
                         (stage / name).write_text("evidence\n")
+                    (stage / "elf-dynamic.txt").write_text("(NEEDED) Shared library: [libavahi-client.so.3]\n(NEEDED) Shared library: [libavahi-common.so.3]\n")
                     if failure in ("evidence", "avahi-evidence"):
                         (stage / ("elf-dynamic.txt" if failure == "avahi-evidence" else "elf-header.txt")).unlink()
                     (stage / "wsprrypi").write_bytes(b"binary")
@@ -64,19 +65,44 @@ class ContainerBuildTest(unittest.TestCase):
                     if failure == "collision":
                         output.mkdir(exist_ok=True)
                         (output / "keep").write_text("other export")
+                elif args[1] == "run":
+                    for option in ("--read-only", "no-new-privileges", "65534:65534", "core=0"):
+                        self.assertIn(option, args)
+                    self.assertEqual(args[args.index("--network") + 1], "none")
+                    self.assertEqual(args[-4:], (image, "--backend", "simulated", "--version"))
+                    self.assertIn("LD_TRACE_LOADED_OBJECTS=1", args)
+                    self.assertIn("WSPRRYPI_DISABLE_HARDWARE_ACCESS=1", args)
+                    self.assertEqual(kwargs['timeout'], 60)
+                    self.assertTrue(args[args.index("--name") + 1].endswith("-libraries"))
+                    if failure == "resolution-exit":
+                        raise subprocess.CalledProcessError(139, args)
+                    if failure == "resolution-interrupt":
+                        raise KeyboardInterrupt
+                    if failure == "resolution-timeout":
+                        raise subprocess.TimeoutExpired(args, 60)
+                    value = "libavahi-client.so.3 => /lib/libavahi-client.so.3\nlibavahi-common.so.3 => /lib/libavahi-common.so.3\n"
+                    if failure == "resolution-missing":
+                        value += "libmissing.so => not found\n"
+                    if failure == "resolution-partial":
+                        value = "libavahi-client.so.3 => /lib/libavahi-client.so.3\n"
+                    if failure == "resolution-ignored":
+                        value = "WsprryPi version 4.0.0-beta.1\n"
+                    if failure == "resolution-empty":
+                        value = ""
+                    return subprocess.CompletedProcess(args, 0, value)
                 return subprocess.CompletedProcess(args, 0, "")
 
             with patch.object(module, "run", side_effect=docker), \
                     patch.object(module.subprocess, "run") as cleanup:
                 if failure:
-                    with self.assertRaises((ValueError, subprocess.CalledProcessError,
+                    with self.assertRaises((ValueError, subprocess.CalledProcessError, subprocess.TimeoutExpired,
                                             KeyboardInterrupt)):
                         module.build(target, output)
                     self.assertFalse((output / "wsprrypi").exists())
                     if failure == "collision":
                         self.assertEqual((output / "keep").read_text(), "other export")
                     else:
-                        cleanup.assert_called_once()
+                        self.assertEqual(cleanup.call_count, 2 if failure in ("resolution-exit", "resolution-interrupt", "resolution-timeout") else 1)
                 else:
                     module.build(target, output, candidate_version)
                     self.assertEqual((output / "build-image-id.txt").read_text(), image + "\n")
@@ -100,7 +126,8 @@ class ContainerBuildTest(unittest.TestCase):
 
     def test_failed_exports(self):
         for failure in ("copy", "checksum", "target", "collision", "evidence",
-                        "create-interrupt", "copy-interrupt", "avahi-evidence"):
+                        "create-interrupt", "copy-interrupt", "avahi-evidence",
+                        "resolution-exit", "resolution-missing", "resolution-empty", "resolution-partial", "resolution-ignored", "resolution-interrupt", "resolution-timeout"):
             with self.subTest(failure=failure):
                 self.exercise("armv6-trixie", failure=failure)
 

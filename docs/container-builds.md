@@ -99,12 +99,21 @@ libraries, or an unexpected ELF class/machine. ARMv6 additionally requires v6,
 VFPv2, and hard-float argument attributes in the executable. These checks do not
 exhaustively audit every instruction in every runtime dependency.
 
-ARMv6 dependency resolution invokes the hard-float dynamic loader's `--list`
-mode directly; the ARMv6 QEMU `ldd` verification subprocess crashed during
-candidate preparation. AArch64 uses `ldd`. Both paths require successful
-resolution and reject missing libraries. The dependency check does not execute
-the application or qualify target runtime behavior. See the
-[`ld.so --list` contract](https://man7.org/linux/man-pages/man8/ld.so.8.html).
+Dependency resolution runs in a separate unprivileged, read-only container from
+the exact immutable build image, with no network or added capabilities. It uses
+[glibc dependency-trace mode](https://man7.org/linux/man-pages/man8/ld.so.8.html)
+(`LD_TRACE_LOADED_OBJECTS=1`) through the executable's normal interpreter path,
+instead of explicitly invoking a loader that failed under ARMv6 QEMU during
+candidate preparation. Trace mode lists libraries instead of entering application
+logic. The supplied fallback arguments select simulated `--version` if trace
+mode is ignored; such version-only output is rejected as dependency evidence.
+
+The exporter requires every ELF NEEDED name in the trace and rejects failed,
+empty, incomplete or missing-library resolution. It bounds inspection to 60
+seconds, owns/cleans the inspection container, and publishes the local export
+atomically only after every check passes. The compiled image remains available
+for diagnosis if inspection fails. No target runtime qualification follows from
+dependency resolution.
 
 Bookworm and Trixie have different library generations, including libgpiod.
 Keep their artifacts separate; do not rename a Bookworm executable as Trixie.
