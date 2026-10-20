@@ -85,6 +85,35 @@ init_colors
                 self.assertEqual(result.stderr, "")
                 self.assertEqual(snapshot(self.root), before)
 
+    def test_logging_with_unavailable_terminal_capabilities(self) -> None:
+        for terminal in ("unknown", "dumb"):
+            with self.subTest(terminal=terminal):
+                log_file = self.root / f"{terminal}.log"
+                result = self.run_shell(
+                    r'''
+source "$INSTALLER"
+# Account lookup and ownership are fixture boundaries; initialization and log
+# formatting use the actual functions on Linux and macOS.
+getent() { printf 'fixture:x:1:1::/tmp:/bin/sh\n'; }
+chown() { :; }
+setup_log
+logI 'terminal fallback info'
+logW 'terminal fallback warning'
+logI 'debug'
+logW 'message with details' 'extra detail'
+''',
+                    TERM=terminal, LOG_FILE=log_file, REQUIRE_SUDO="false",
+                )
+                self.assertEqual(result.stderr, "")
+                self.assertIn("[INFO ] terminal fallback info", result.stdout)
+                self.assertIn("[WARN ] terminal fallback warning", result.stdout)
+                self.assertNotIn("UNSET", result.stdout)
+                self.assertIn("[INFO ] debug", result.stdout)
+                self.assertIn("message with details", result.stdout)
+                self.assertIn("extra detail", result.stdout)
+                self.assertIn("terminal fallback info", log_file.read_text())
+                self.assertIn("terminal fallback warning", log_file.read_text())
+
     def test_upgrade_ini_dry_run_creates_nothing(self) -> None:
         paths = self.root / "INI paths; $(not-executed)"
         paths.mkdir()

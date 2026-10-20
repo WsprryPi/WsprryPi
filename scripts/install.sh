@@ -4095,8 +4095,9 @@ wrap_messages() {
 # shellcheck disable=SC2317
 print_log_entry() {
     local debug
-    debug=$(debug_start "$@")
-    eval set -- "$(debug_filter "$@")"
+    debug=$(debug_start "${6:-}")
+    # Preserve positional fields: a terminal without colors supplies an empty
+    # third argument, which the general debug filter would remove.
 
     # Declare local variables at the start of the function
     local timestamp="$1"
@@ -4195,8 +4196,7 @@ prepare_log_context() {
 # shellcheck disable=SC2317
 log_message() {
     local debug
-    debug=$(debug_start "$@")
-    eval set -- "$(debug_filter "$@")"
+    debug=$(debug_start "${3:-}")
 
     # Ensure the calling function is log_message_with_severity()
     if [[ "${FUNCNAME[1]}" != "log_message_with_severity" ]]; then
@@ -4236,8 +4236,8 @@ log_message() {
     # Extract log properties for the specified level
     IFS="|" read -r custom_level color severity <<<"${LOG_PROPERTIES[$level]}"
 
-    # Check if all three values (custom_level, color, severity) were successfully parsed
-    if [[ -z "$custom_level" || -z "$color" || -z "$severity" ]]; then
+    # An empty color is valid when the terminal lacks that capability.
+    if [[ -z "$custom_level" || -z "$severity" ]]; then
         warn "Malformed log properties for level '$level'. Using default values."
         custom_level="UNSET"
         color="$RESET"
@@ -4287,8 +4287,7 @@ log_message() {
 # shellcheck disable=SC2329
 log_message_with_severity() {
     local debug
-    debug=$(debug_start "$@")
-    eval set -- "$(debug_filter "$@")"
+    debug=$(debug_start "${3:-}" "${4:-}")
 
     # Exit if the calling function is not one of the allowed ones.
     # shellcheck disable=2076
@@ -4319,6 +4318,9 @@ log_message_with_severity() {
 
     # Extended_message will be empty if $3 is unset
     extended_message="${3:-}"
+    # Preserve the existing optional debug shorthand without interpreting the
+    # primary message as a control flag.
+    [[ "$extended_message" != "debug" ]] || extended_message=""
 
     # Print debug information if the flag is set
     debug_print "Logging message at severity '$severity' with message='$message'." "$debug"
