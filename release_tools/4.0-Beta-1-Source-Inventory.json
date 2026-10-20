@@ -9561,5 +9561,20 @@
       "commit": "e97b76739b182487712940b3192d595e6847ef40",
       "subject": "Update WsprryPi UI to merged CW timing changes"
     }
-  ]
+  ],
+  "supporting_source_boundary": {
+    "frozen_executable_source": "3decc072c0d59d410d888d307182c4a6f73b70e4",
+    "supporting_source_commit": "4ea48c66b1df5e04d4d468c84991148955b5e902",
+    "disposition": "installer/external INI template and enlarged-text/disconnected-state UI acceptance repairs; executable source/helpers/services/build recipes unchanged; original artifact identities retained",
+    "changes": [
+      "Refuse stale existing source directory outside a checkout",
+      "Preserve configuration on failed or empty migration and use validated awk dependency",
+      "Preserve logger fields and tolerate unavailable terminal capabilities",
+      "Complete stock schema for 20 current persistent keys and preserve supported legacy GPIO clock migration, including CRLF",
+      "Keep navigation/status and runtime controls within their panels at 200 percent text; add geometric browser regressions at three widths",
+      "Correct older-file route fixture after stock acquired 8m; duplicate-key rejection retained",
+      "Refresh cached Operation status on actual socket close/error/fallback; preserve cached values and command behavior"
+    ],
+    "acceptance": "accepted: predecessor upgrade, repeat, replacement restart, final UI installation and full five-minute idle passed; exact 4ea48c66 source CI passed 14/14; final independent reassessment found no actionable finding. Operator accepted precise physical-test limitations and documented 20-versus-18 service-request nonconformance. Original four executable identities unchanged; 16d/16e not started."
+  }
 }

@@ -1,10 +1,11 @@
 # Wsprry Pi 4.0 Release Punchlist
 
 This is the selected work and release-gate authority. Items 1–15 are complete
-within their accepted scopes. Item 16 remains in progress: Beta 1 source/build
-preparation is complete, while final candidate installation/service/runtime
-acceptance remains open. Cleanup changes no status, selected requirement,
-priority, candidate identity or publication authority.
+within their accepted scopes. Item 16 remains in progress: 16a–16c are complete,
+with 16c accepted under its specific physical-test limitations and documented
+service-request cap exception. Publication and announcements in 16d/16e remain
+not started and require separate authorization. Cleanup changes no selected
+requirement, priority, candidate identity or publication authority.
 
 The current milestone is **WsprryPi 4.0 Beta 1**. Work stops after item 16c.
 Items 16d–16e require separate publication authorization. No tag, release/draft,
@@ -102,7 +103,8 @@ Status key: ✅ Complete · ⏳ In progress · ☐ Not started
     [complete source inventory](4.0-Beta-1-Source-Inventory.json).
     The user selected the Pi editor changes and separately authorized the Docs
     update, validation, commit and push. Historical physical evidence is reused
-    at its recorded identities; no fresh target operation is authorized.
+    at its recorded identities. The separate October 20 finite wspr5 authority
+    and stop-on-failure amendments are recorded in the evidence.
 
     - ✅ **16a — Research and draft Beta 1 release documentation in Markdown.**
       Establish the previous published stable WsprryPi baseline and the intended
@@ -136,7 +138,7 @@ Status key: ✅ Complete · ⏳ In progress · ☐ Not started
       checks. Frozen source is `3decc07`, Docs `5214cdf`; all four exports and
       checksums are in the [candidate manifest](4.0-Beta-1-Candidate-Manifest.json).
       This step does not create a public tag or release.
-    - ⏳ **16c — Validate, accept and hand off Beta 1; stop before publication.**
+    - ✅ **16c — Validate, accept and hand off Beta 1; stop before publication.**
       Run required CI/regressions and applicable installation/upgrade/service/
       runtime checks against the exact candidate and artifacts using item 10's
       acceptance matrix. Record reused evidence, repeated checks, exclusions and
@@ -146,11 +148,19 @@ Status key: ✅ Complete · ⏳ In progress · ☐ Not started
       evidence handoff, ready for a separate publication decision. Do not merge
       to the release branch, create a tag/GitHub release or draft, upload assets,
       announce availability, or claim Beta 1 is published.
-      **Current disposition:** exact-source CI passed 14/14 jobs; genuine
-      software pairs, UI/Impeccable review, hosted Docs and four candidate builds
-      passed. Fresh candidate installation/upgrade/service/runtime checks were
-      not authorized under the selected reuse-only scope. Their acceptance or
-      an explicitly accepted limitation remains open; see the evidence matrix.
+      **Current disposition:** all functional target acceptance passed. The
+      restored predecessor upgrade at `809ef2d6`, repeat at `cea6ac3`, replacement
+      explicit restart at `cea6ac3`, and final UI installation at `4ea48c66` each passed
+      full five-minute idle checks. Original executable source remains `3decc072`;
+      final support/UI is `4ea48c66`. Custom settings and disabled admission/output
+      are preserved. Independent reassessment found no remaining scoped finding.
+      The operator accepted the exact clean-install/other-three-physical-target/
+      reboot/fresh-GPIO4 limitations and separately the documented 20-versus-18
+      service-request nonconformance. This does not rewrite the approved limit.
+      Exact-support CI `39420958734` passed 14/14, as did frozen-source CI.
+      16c is accepted with those specific limitations and the documented cap
+      exception. Final documentation-head CI is verified after the scoped record
+      push and reported separately. 16d/16e remain not started.
     - ☐ **16d — Later: publish Beta 1 as a GitHub prerelease and verify.** Only
       after separate authorization, publish the accepted Beta 1 and corresponding
       documentation through their separate workflows. Use the reviewed Markdown
@@ -176,7 +186,7 @@ Status key: ✅ Complete · ⏳ In progress · ☐ Not started
 | 13 | 21 | ✅ Complete; #423 closed | Integrated application Impeccable review accepted for `d93c75c`; final closeout/planning-head CI each passed 11/11; bounded validation and qualification limits retained | `WsprryPi` |
 | 14 | — | ✅ Closed within bounded software scope | Full companion integrated at final `a84010d`; feature/devel CI each passed 12/12; eight exact compatibility pairs, affected Impeccable/adversarial repairs and published Docs accepted; nonblocking Pico wording follow-up retained | `WsprryPi`; affected operator docs: `WsprryPi-Docs` |
 | 15 | — | ✅ Pico software and originating assessment complete | Pico `1653034` closes four findings after fresh independent reassessment; 200 executed host groups, 13 sanitizer groups, both firmware builds and genuine browser checks passed. Pi adoption, P15.14 docs and physical qualification remain separate | `WsprryPi` coordination; `WsprryPico` implementation |
-| 16 | 22 | ⏳ In progress | 16a/16b complete at `3decc07`; four candidate exports and 14/14 source CI pass. Pi editor and operator Docs adopted. 16c physical installation/service/runtime acceptance remains open; 16d/16e publication is separate | `WsprryPi` |
+| 16 | 22 | ⏳ In progress | 16a–16c complete: original `3decc07` exports and supporting `4ea48c66` each have 14/14 CI passes; finite wspr5 acceptance passed, specific physical-test limitations and documented service-request cap exception accepted. 16d/16e publication remains not started | `WsprryPi` |
 
 RP1 item numbers above are historical cross-references; the current provider
 ROADMAP has no numbered application release gates.
