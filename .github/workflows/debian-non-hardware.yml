@@ -2,9 +2,9 @@ name: Non-hardware validation
 
 on:
   pull_request:
-    branches: [devel]
+    branches: [devel, main]
   push:
-    branches: [devel, codex/rp1-1.0-candidate-acceptance, codex/p15-8-wspr-type23, codex/step14-pico-type23-integration]
+    branches: [devel, main, codex/rp1-1.0-candidate-acceptance, codex/p15-8-wspr-type23, codex/step14-pico-type23-integration]
 
 permissions:
   contents: read
@@ -301,7 +301,7 @@ jobs:
         run: |
           strace -f -e trace=openat,open \
             -o /tmp/wsprrypi-rp1.strace \
-            make rp1-gpclk-planner-test rp1-gpclk-lifecycle-test rp1-gpclk-transition-test \
+            make object-dependency-test rp1-gpclk-planner-test rp1-gpclk-lifecycle-test rp1-gpclk-transition-test \
               rp1-gpclk-backend-test rp1-gpclk-linux-provider-test \
               rp1-gpclk-development-policy-test rp1-gpclk-route-runtime-wiring-test \
               rp1-gpclk-route-service-test rp1-gpclk-transmit-backend-test \

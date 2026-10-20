@@ -75,6 +75,14 @@ The same accounting applies to Pi1's -2.5 ppm baseline: a manually entered
 total correction of -2.5 becomes an additional correction of 0. No persisted
 value is rewritten automatically.
 
+The standalone numerical planner accepts explicit alternate-parent models;
+those models do not establish support in the physical adapter. Production
+event compilation always uses the nominal 200 MHz parent. The separate
+50 MHz DMA pacing reference and tick divider 511 control divider-write timing,
+not the nominal frequency used to calculate RF divider words.
+The 66,792-entry dither period is a numerical weighting cycle, not the number
+of divider writes guaranteed for each event or symbol.
+
 Implicit continuous tone is submitted as one maximum-duration finite event.
 WsprryPi retains stop ownership and requests bounded drain when the operator or
 application stops it. Long QRSS events are submitted directly; the provider's

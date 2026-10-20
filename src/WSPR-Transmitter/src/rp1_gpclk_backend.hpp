@@ -133,6 +133,8 @@ class Rp1GpclkBackend
 {
 public:
     static constexpr std::uint32_t kDefaultDriveMa = 2;
+    // Numerical dither period; the provider derives event write counts from
+    // duration and its separate pacing reference, not from this legacy name.
     static constexpr std::uint32_t kWritesPerSymbol = 66792;
     static constexpr std::uint32_t kTickDivider = 511;
 

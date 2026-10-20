@@ -18,6 +18,8 @@ struct Rp1GpclkPlannerInput
 {
     double center_frequency_hz{0.0};
     double tone_spacing_hz{0.0};
+    // Explicit for numerical experiments. Physical RP1 event compilation uses
+    // kRp1GpclkNominalParentFrequencyHz; the DMA pacing rate is not this parent.
     double parent_frequency_hz{0.0};
     double source_rate_ppm{0.0};
     double maximum_output_hz{kRp1GpclkMaximumDirectOutputHz};

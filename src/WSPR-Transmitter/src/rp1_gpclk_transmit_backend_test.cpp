@@ -5,6 +5,7 @@
 #include "execution_plan_compiler.hpp"
 #include <stdexcept>
 
+#include <algorithm>
 #include <cmath>
 #include <iostream>
 #include <memory>
@@ -245,17 +246,35 @@ void test_direct_band_range()
         expect(!observed->event_program.tones.empty(),
             "every product mode must submit at least one generic tone");
         if (observed->event_program.tones.empty()) continue;
-        const auto tone=observed->event_program.tones[0];
-        const double requested=plan.events[0].frequency_hz;
         // Independent literal/formula: catches missing, doubled, wrong-sign,
-        // or multiplicatively applied intrinsic offsets in every adapter path.
+        // or multiplicatively applied offsets in every submitted tone/mode/route.
         const double parent=200000000.0*(1.0+(ppm-46.245)*1e-6);
-        const double average=parent*65536.0*
-            (double(tone.lower_count)/tone.lower_divider_word+
-             double(tone.upper_count)/tone.upper_divider_word)/
-            (tone.lower_count+tone.upper_count);
-        expect(std::fabs(average-requested)<=0.01,
-            "submitted divider counts must synthesize direct RF within the unchanged tolerance");
+        const auto& program=observed->event_program;
+        expect(program.fractional_bits==16 && program.tick_divider==511,
+            "the 200 MHz RF parent must retain the separate DMA tick contract");
+        expect(program.events.size()<=plan.events.size(),
+            "the adapter must not invent events beyond the requested plan");
+        std::vector<bool> referenced(program.tones.size(),false);
+        for (std::size_t i=0;i<std::min(program.events.size(),plan.events.size());++i) {
+            const auto& event=program.events[i];
+            if (!event.rf_on) continue;
+            expect(event.tone_index<program.tones.size(),
+                "every enabled event must reference an existing tone");
+            if (event.tone_index>=program.tones.size()) continue;
+            referenced[event.tone_index]=true;
+            const auto& tone=program.tones[event.tone_index];
+            expect(tone.lower_divider_word>0 && tone.upper_divider_word>0 &&
+                std::uint64_t(tone.lower_count)+tone.upper_count==66792,
+                "each submitted tone must retain the current dither block");
+            if (!tone.lower_divider_word || !tone.upper_divider_word) continue;
+            const double average=parent*65536.0*
+                (double(tone.lower_count)/tone.lower_divider_word+
+                 double(tone.upper_count)/tone.upper_divider_word)/66792.0;
+            expect(std::fabs(average-plan.events[i].frequency_hz)<=0.01,
+                "every submitted tone must use the corrected 200 MHz parent");
+        }
+        expect(std::all_of(referenced.begin(),referenced.end(),[](bool used){return used;}),
+            "the parent-contract check must exercise every submitted tone profile");
         if (mode==Mode::TONE)
             expect(observed->event_program.events.size()==1 &&
                 observed->event_program.events[0].duration_ns==1000000000ULL,

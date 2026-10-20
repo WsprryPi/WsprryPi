@@ -58,3 +58,51 @@ all: $(CPP_DEBUG_OBJECTS) $(CPP_OBJECTS)
     assert make('one').count('Compiling') == 1
     assert 'Compiling' not in make('one')
 print('Production Make rules: debug/release, two profiles, header ABI refresh and missing-dependency migration passed')
+
+# Directly linked test executables do not use the production object-rule .d files.
+# Exercise their actual Make rules with minimal sources to protect clock changes.
+with tempfile.TemporaryDirectory(prefix='rp1-make-clock-deps-') as temp:
+    root = Path(temp)
+    executable_rules = []
+    targets = ('RP1_GPCLK_PLANNER_TEST_OUT', 'RP1_GPCLK_TRANSMIT_BACKEND_TEST_OUT')
+    for target in targets:
+        start = source.index('$(BIN_DIR)/$(' + target + '):')
+        rule = source[start:source.index('\n\n', start)]
+        executable_rules.append(rule)
+        for name in rule.splitlines()[0].split(':', 1)[1].split():
+            path = root/name
+            path.parent.mkdir(parents=True, exist_ok=True)
+            if path.suffix == '.cpp' and path.name in (
+                    'rp1_gpclk_planner_test.cpp', 'rp1_gpclk_transmit_backend_test.cpp'):
+                path.write_text('#include "rp1_gpclk_planner.hpp"\n'
+                    'int main() { return parent_hz == 200000000 ? 0 : 7; }\n')
+            else:
+                path.write_text('// Hardware-free Make-rule fixture.\n')
+    header = root/'WSPR-Transmitter/src/rp1_gpclk_planner.hpp'
+    header.write_text('inline constexpr int parent_hz = 200000000;\n')
+    (root/'Makefile').write_text('''Q := @
+BIN_DIR := build/bin
+RP1_GPCLK_PLANNER_TEST_OUT := planner
+RP1_GPCLK_TRANSMIT_BACKEND_TEST_OUT := adapter
+CXX := ''' + compiler + '''
+RP1_GPCLK_PLANNER_TEST_FLAGS := -std=c++20 -IWSPR-Transmitter/src
+.DEFAULT_GOAL := all
+.PHONY: all
+all: build/bin/planner build/bin/adapter
+''' + '\n\n'.join(executable_rules) + '\n')
+    def make_executables():
+        result = subprocess.run(['make', 'all'], cwd=root, env=env,
+                                text=True, capture_output=True)
+        assert result.returncode == 0, (result.stdout, result.stderr)
+    make_executables()
+    binaries = [root/'build/bin'/name for name in ('planner', 'adapter')]
+    before = [path.stat().st_mtime_ns for path in binaries]
+    make_executables()
+    assert before == [path.stat().st_mtime_ns for path in binaries]
+    for parent, expected_exit in ((50000000, 7), (200000000, 0)):
+        time.sleep(1.05)
+        header.write_text(f'inline constexpr int parent_hz = {parent};\n')
+        make_executables()
+        for binary in binaries:
+            assert subprocess.run([str(binary)]).returncode == expected_exit, binary
+print('RP1 executable Make rules: planner and adapter clock-header invalidation passed')

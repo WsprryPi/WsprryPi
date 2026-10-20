@@ -79,6 +79,7 @@ void test_all_bands_and_parents()
             }
         }
 
+        // Alternate parents are numerical models, not current provider support.
         const auto xosc = wsprrypi::planRp1GpclkWspr(
             inputFor(band.center_hz, 50000000.0));
         const bool above_xosc =
@@ -86,7 +87,7 @@ void test_all_bands_and_parents()
         if (above_xosc)
             expect(!xosc.ok, std::string(band.name) + " must reject tones above the 50 MHz parent");
         else
-            expect(xosc.ok, std::string(band.name) + " must plan from the 50 MHz parent");
+            expect(xosc.ok, std::string(band.name) + " must plan in the offline 50 MHz model");
     }
 }
 
@@ -184,21 +185,39 @@ void test_sequence_lengths_and_tolerance()
         inputFor(14097100.0, 200000000.0, 1, 0.01));
     expect(!too_short.ok && too_short.error.find("average-error") != std::string::npos,
            "an insufficient finite block must fail the arithmetic tolerance");
+}
 
-    const auto rp1_dma_tick = wsprrypi::planRp1GpclkWspr(
-        inputFor(14097100.0, 50000000.0, 66792, 0.01));
+void test_current_parent_dither_fixture()
+{
+    const auto rp1_dma_tick = wsprrypi::planRp1GpclkWspr(inputFor(
+        14097100.0, wsprrypi::kRp1GpclkNominalParentFrequencyHz, 66792, 0.01));
     expect(rp1_dma_tick.ok,
-           "the RP1 511-cycle DMA-tick block must meet the 20 m arithmetic tolerance");
+           "the current 200 MHz-parent dither block must meet the 20 m tolerance");
     if (rp1_dma_tick.ok)
     {
+        // Independent exact-rational fixture: nominal parent, no PPM correction.
+        constexpr std::array<std::uint64_t, 4> expected_lower_words{
+            929780, 929779, 929779, 929779};
         constexpr std::array<std::uint32_t, 4> expected_lower_counts{
-            66312, 1134, 2747, 4360};
+            64873, 4534, 10987, 17440};
+        expect(rp1_dma_tick.plan.nominal_parent_frequency_hz == 200000000.0 &&
+               rp1_dma_tick.plan.corrected_parent_frequency_hz == 200000000.0,
+               "the current fixture must use the uncorrected 200 MHz parent");
         for (std::size_t i = 0; i < rp1_dma_tick.plan.tones.size(); ++i)
         {
-            expect(rp1_dma_tick.plan.tones[i].lower_word_count == expected_lower_counts[i],
-                   "RP1 DMA-tick plan must retain its validated lower-word count");
-            expect(std::fabs(rp1_dma_tick.plan.tones[i].average_error_hz) < 0.0005,
-                   "RP1 DMA-tick plan must keep each 20 m tone within 0.0005 Hz");
+            const auto& tone = rp1_dma_tick.plan.tones[i];
+            expect(tone.lower_divider_word == expected_lower_words[i] &&
+                   tone.upper_divider_word == expected_lower_words[i] + 1,
+                   "current-parent Q16 words must match the independent fixture");
+            expect(tone.lower_word_count == expected_lower_counts[i] &&
+                   tone.upper_word_count == 66792 - expected_lower_counts[i],
+                   "current-parent dither counts must match the independent fixture");
+            const long double mean = 200000000.0L * 65536.0L *
+                (static_cast<long double>(tone.lower_word_count) / tone.lower_divider_word +
+                 static_cast<long double>(tone.upper_word_count) / tone.upper_divider_word) /
+                66792.0L;
+            expect(std::fabs(mean - tone.requested_frequency_hz) < 0.0005L,
+                   "current-parent words must synthesize the requested numerical mean");
         }
     }
 }
@@ -293,6 +312,7 @@ int main()
     test_intrinsic_offset_composition();
     test_calibration_direction_and_determinism();
     test_sequence_lengths_and_tolerance();
+    test_current_parent_dither_fixture();
     test_integer_boundary_and_invalid_inputs();
 
     if (failures != 0)
