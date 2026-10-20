@@ -107,6 +107,7 @@
 .operation-hero__controls {
     grid-area: controls;
     display: grid;
+    grid-template-columns: minmax(0, 1fr);
     gap: 0.85rem;
     align-content: start;
     min-width: 0;
@@ -169,10 +170,14 @@
 
 .operation-runtime-toggle .form-check-label {
     font-weight: var(--weight-semibold);
+    min-width: 0;
+    overflow-wrap: anywhere;
 }
 
 .operation-stop-button {
     min-height: 2.9rem;
+    min-width: 0;
+    overflow-wrap: anywhere;
 }
 
 .operation-summary-grid {

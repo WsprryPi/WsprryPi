@@ -75,7 +75,7 @@ async function reviewIntegratedUi(client, origin, evidence) {
             await evaluate("setUpdateCheckDisabled(true);updateWsprryPiVersion();");
             await waitFor("document.getElementById('updateCheckStatus').dataset.state==='disabled'", "disabled preference retained");
         }
-        for (const theme of ["light","dark"]) for (const size of [{name:"desktop",width:1440,height:1000},{name:"mobile",width:390,height:844}]) {
+        for (const theme of ["light","dark"]) for (const size of [{name:"desktop",width:1440,height:1000},{name:"compact",width:1024,height:1000},{name:"mobile",width:390,height:844}]) {
             await client.send("Emulation.setDeviceMetricsOverride", {width:size.width,height:size.height,deviceScaleFactor:1,mobile:size.name==='mobile'});
             await evaluate(`document.documentElement.style.fontSize='';applyThemePreference('${theme}');window.scrollTo(0,0);`);
             await settled();
@@ -118,6 +118,20 @@ async function reviewIntegratedUi(client, origin, evidence) {
                 return nodes.map(n=>{const box=n.getBoundingClientRect(),range=document.createRange();range.selectNodeContents(n);const text=range.getBoundingClientRect();const parent=n.closest('.navbar-signal-status,.card-header,#mainNavbar').getBoundingClientRect();return {id:n.id||n.className,left:text.left,right:text.right,parentLeft:parent.left,parentRight:parent.right,viewport:innerWidth,boxLeft:box.left,boxRight:box.right};});
             })()`);
             assert.deepEqual(shellBounds.filter(b=>b.left<b.parentLeft-1||b.right>b.parentRight+1||b.right>b.viewport+1),[],`${view} ${theme} ${size.name} 200% clipped shell text: ${JSON.stringify(shellBounds)}`);
+            const brandOverlap=await evaluate(`(()=>{
+                const range=document.createRange();range.selectNodeContents(document.querySelector('.navbar-brand-copy'));
+                const copy=range.getBoundingClientRect(),status=document.querySelector('.navbar-signal-status').getBoundingClientRect();
+                return copy.left<status.right-1&&copy.right>status.left+1&&copy.top<status.bottom-1&&copy.bottom>status.top+1;
+            })()`);
+            assert.equal(brandOverlap,false,`${view} ${theme} ${size.name} 200% brand/status overlap`);
+            if(view==='operation') {
+                const stopBounds=await evaluate(`(()=>{
+                    const button=document.getElementById('stop_transmit'),box=button.getBoundingClientRect(),panel=button.parentElement.getBoundingClientRect();
+                    return {left:box.left,right:box.right,panelLeft:panel.left,panelRight:panel.right,scroll:button.scrollWidth,client:button.clientWidth};
+                })()`);
+                assert.ok(stopBounds.left>=stopBounds.panelLeft&&stopBounds.right<=stopBounds.panelRight+1&&stopBounds.scroll<=stopBounds.client+1,
+                    `200% Stop control must fit its panel: ${JSON.stringify(stopBounds)}`);
+            }
             if(view==='maintenance' && size.name==='mobile') {
                 await evaluate("document.querySelector('.navbar-toggler').focus()");
                 for(const type of ['keyDown','keyUp']) await client.send('Input.dispatchKeyEvent',{type,key:' ',code:'Space',windowsVirtualKeyCode:32});
@@ -163,6 +177,6 @@ async function reviewIntegratedUi(client, origin, evidence) {
     assert.equal(await evaluate("getComputedStyle(document.activeElement).outlineStyle"),'solid','keyboard focus outline is visible');
     await capture('maintenance-keyboard-return-dark-mobile');
     fs.writeFileSync(path.join(evidence,"measurements.json"),JSON.stringify(measurements,null,2));
-    console.log(`Integrated console: 5 pages, 4 modes, 2 themes x 2 viewports, 200% text, button contrast, descriptions and first-record clearance passed; ${evidence}`);
+    console.log(`Integrated console: 5 pages, 4 modes, 2 themes x 3 viewports, 200% text, button contrast, descriptions and first-record clearance passed; ${evidence}`);
 }
 module.exports={reviewIntegratedUi};
