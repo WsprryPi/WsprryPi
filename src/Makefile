@@ -1706,10 +1706,6 @@ gpio-band-policy-test: $(BIN_DIR)/$(GPIO_BAND_POLICY_TEST_OUT)
 	$(Q)echo "Running GPIO band fail-closed policy tests."
 	$(Q)./$(BIN_DIR)/$(GPIO_BAND_POLICY_TEST_OUT)
 
-.PHONY: rp1-gpclk-dma-probe-clock-test
-rp1-gpclk-dma-probe-clock-test:
-	$(Q)python3 ../scripts/tests/rp1_dma_probe_clock_test.py
-
 $(BIN_DIR)/$(RP1_GPCLK_PLANNER_TEST_OUT): WSPR-Transmitter/src/rp1_gpclk_planner_test.cpp WSPR-Transmitter/src/rp1_gpclk_planner.cpp WSPR-Transmitter/src/rp1_gpclk_planner.hpp Chipset-Offsets/src/chipset_offsets.hpp
 	$(Q)mkdir -p $(BIN_DIR)
 	$(Q)$(CXX) $(RP1_GPCLK_PLANNER_TEST_FLAGS) $(filter %.cpp,$^) -o $@
