@@ -19,6 +19,7 @@ fi
 make -C src release SUDO= JOBS=4 BUILD_METADATA_VERSION="${WSPRRYPI_RELEASE_VERSION:-}"
 mkdir -p /artifact
 cp src/build/bin/wsprrypi /artifact/wsprrypi
+cp src/build/generated/build_metadata.hpp /artifact/build-metadata.hpp
 file /artifact/wsprrypi > /artifact/file.txt
 readelf --file-header /artifact/wsprrypi > /artifact/elf-header.txt
 readelf --arch-specific /artifact/wsprrypi > /artifact/elf-attributes.txt

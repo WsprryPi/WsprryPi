@@ -18,7 +18,7 @@ TARGETS = {
     "aarch64-trixie": "linux/arm64",
 }
 REPO = Path(__file__).resolve().parent.parent
-EVIDENCE = ("file.txt", "elf-header.txt", "elf-attributes.txt", "elf-versions.txt",
+EVIDENCE = ("build-metadata.hpp", "file.txt", "elf-header.txt", "elf-attributes.txt", "elf-versions.txt",
             "shared-libraries.txt", "build-packages.txt", "os-release.txt", "elf-dynamic.txt")
 
 

@@ -24,6 +24,9 @@ elif name == 'make':
     p = pathlib.Path('src/build/bin/wsprrypi')
     p.parent.mkdir(parents=True, exist_ok=True)
     p.write_text('fixture executable - never execute')
+    metadata = pathlib.Path('src/build/generated/build_metadata.hpp')
+    metadata.parent.mkdir(parents=True, exist_ok=True)
+    metadata.write_text('fixture metadata')
 elif name == 'readelf':
     if '--dynamic' in args:
         missing = os.environ.get('MISSING', '')
@@ -93,6 +96,7 @@ class ContainerAvahiContractTest(unittest.TestCase):
                 for library in ('libavahi-client.so.3', 'libavahi-common.so.3'):
                     self.assertIn('[' + library + ']', evidence)
                 self.assertTrue((root / 'artifact/SHA256SUMS').is_file())
+                self.assertEqual((root / 'artifact/build-metadata.hpp').read_text(), 'fixture metadata')
 
     def test_supported_recipes_include_avahi(self):
         for target in TARGETS:

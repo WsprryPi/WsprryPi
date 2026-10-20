@@ -81,12 +81,17 @@ package inventory records the versions actually present in each build.
 
 - `wsprrypi`: release executable with the default backend profile
 - `SHA256SUMS`: executable checksum, rechecked after export
+- `build-metadata.hpp`: exact compiled version, commit, branch and dirty state
 - `file.txt`, `elf-header.txt`, `elf-attributes.txt`: executable format and ABI
 - `elf-versions.txt`: required ELF symbol-version information
 - `shared-libraries.txt`: libraries resolved inside the build environment
 - `build-packages.txt`: complete installed package/version inventory
 - `os-release.txt`, `target.txt`: actual userspace release and requested target
 - `build-image-id.txt`: exact local build-image identity
+
+The context includes Git's index with its objects and refs so a clean source
+checkout remains clean in the embedded metadata. Build from a clean frozen
+checkout for a release candidate; the version override does not hide changes.
 
 The build rejects a wrong userspace release/architecture, missing linked
 libraries, or an unexpected ELF class/machine. ARMv6 additionally requires v6,

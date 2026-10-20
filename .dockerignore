@@ -1,6 +1,7 @@
 .git/**
 !.git/HEAD
 !.git/config
+!.git/index
 !.git/refs/**
 !.git/packed-refs
 !.git/objects/**
