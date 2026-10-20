@@ -1,0 +1,660 @@
+{
+  "schema": "wsprrypi-beta-candidate/1",
+  "publication": "unpublished",
+  "candidate_acceptance": "software-and-build-evidence-complete; final physical installation/service/runtime acceptance open",
+  "version": "4.0.0-beta.1",
+  "source_commit": "3decc072c0d59d410d888d307182c4a6f73b70e4",
+  "source_branch": "devel",
+  "source_dirty": false,
+  "superseded_preparation_commits": [
+    "274e0e32340fe6c86a28376929d68ce607e55240",
+    "d2a9a3469993d882f322f85d8f4488889edccb8b",
+    "cdb2d69229259ff13d9117af0d87f39b145f4d6b",
+    "e8ad4e6acb82e43eeca31995a2ccd7895411532d"
+  ],
+  "stable": {
+    "tag": "v3.2.0",
+    "commit": "4356b11265f875605f08d4f35bb012ce576b27d0"
+  },
+  "research_boundary": {
+    "commit": "5e428aae0ccdd1e3662c9a0b881e4e2b18866f9e",
+    "commits_beyond_stable": 779
+  },
+  "candidate_commits_beyond_stable": 784,
+  "source_input_fingerprint": {
+    "algorithm": "SHA256 of git ls-tree -r output",
+    "roots": [
+      "src",
+      "WsprryPi-UI",
+      "scripts",
+      "containers",
+      "config",
+      ".dockerignore",
+      ".github"
+    ],
+    "sha256": "8238004d43b5836a2f31d96f3f0c897a0da69c96425a65143eafca68b8a00270"
+  },
+  "operator_docs": {
+    "commit": "5214cdf8ee8517b570553edeeefbdced17f2ba93",
+    "build_id": 35257101,
+    "build_url": "https://app.readthedocs.org/projects/wsprry-pi/builds/35257101/",
+    "success": true,
+    "hosted_page_verified": "https://wsprry-pi.readthedocs.io/en/devel/User_Interface/Setup/Transmitter/index.html#save-station-progress-from-fleet"
+  },
+  "pico_test_references": {
+    "pico-extended-revision.txt": "dfffdd5220db8b7cf1acf5e74950dbd294283c55",
+    "pico-legacy-revision.txt": "95aac22bf7cc31b67fe5773761708d743d8a6473",
+    "pico-p152-revision.txt": "87144d1364f36d04bfe0a714bd1c2f6deb974302",
+    "pico-p153-revision.txt": "d6208dbc88005383041c5ec306b738db7ec22796",
+    "pico-p154-revision.txt": "ddb00dd7960373cec271f7816c0e1b10117416e9",
+    "pico-p156-revision.txt": "792b5b2f60e381a6bd8e7a7726eeffe24fc08519",
+    "pico-p157-revision.txt": "26ae596b540e92f25da37f978321ba1ec5934bdc",
+    "pico-p158-revision.txt": "804e8a06585ec5a0e650e69fcd71ada398b6cc9f",
+    "pico-reference-revision.txt": "165303458e49feaac1de54c8344058f56578d533",
+    "pico-usb-revision.txt": "100e749c815f7485d5097c9086852d3b97adca9f"
+  },
+  "rp1_locks": {
+    "release_tools/rp1-qualification-lock.json": "10a1a7da96157e101767b7252d174e2e095efc90abfc56e583586f064c9a6fca",
+    "scripts/tests/fixtures/rp1-release-1.0.0.json": "f47d974f43ccc87efc3cd049e2ccadfe050f6d599a464c744f4b00d31793d884"
+  },
+  "rp1_published_assets_freshly_verified": [
+    {
+      "group": "rp1-software",
+      "name": "SHA256SUMS",
+      "sha256": "c2239f0c951f743dcbcc5297dd7c587a9cdaa83acaa7b24b9fb905d394c63925"
+    },
+    {
+      "group": "rp1-software",
+      "name": "candidate-validation.json",
+      "sha256": "2acea61b2cc370280fe55a843fb946224f3b697b623281e5cc0536f46ea41fae"
+    },
+    {
+      "group": "rp1-software",
+      "name": "release-metadata.json",
+      "sha256": "d8f5cba30cd57488a5ddff809f1ec3e7169536b3732ce8806e67f494cbf0f81c"
+    },
+    {
+      "group": "rp1-software",
+      "name": "rp1-gpclk-compatibility-manifest.json",
+      "sha256": "9cde8fbcdf2155312c90438eac6deb74474f557e56499b12788f911b217fca80"
+    },
+    {
+      "group": "rp1-software",
+      "name": "rp1-gpclk-dkms-1.0.0.tar.gz",
+      "sha256": "5720024b7be3faedf09d047087ab0d4597cf9fcb09db89e7cbf11216032ec237"
+    },
+    {
+      "group": "rp1-software",
+      "name": "rp1-gpclk-dkms-installation-manifest-v1.json",
+      "sha256": "111a7208522877c06ea81b0a20c05e5a7246121fa327b7720f86509225e7d969"
+    },
+    {
+      "group": "rp1-software",
+      "name": "rp1-gpclk-dkms_1.0.0-1_all.deb",
+      "sha256": "dd629b131f7937706d707cba14042a0a6feed59e31cced738821f9836429881f"
+    },
+    {
+      "group": "rp1-supplement",
+      "name": "SHA256SUMS",
+      "sha256": "4a70b3f7e996e1a6a252d8c9e617d24468637fd11e37320d638ff9c1a52aa54b"
+    },
+    {
+      "group": "rp1-supplement",
+      "name": "qualification_status.py",
+      "sha256": "909d4ed0a05abef07271492474b4e2e80df5d0bd219f5fe0f9662040dd426dc8"
+    },
+    {
+      "group": "rp1-supplement",
+      "name": "rp1-qualification.json",
+      "sha256": "87ef40621d9f7d495994adda92db0165ebaf5d9acc4fa846820ef4c5b4f2ad9d"
+    },
+    {
+      "group": "rp1-supplement",
+      "name": "rp1-qualification.schema.json",
+      "sha256": "056a4320f8fa83ba0de4f361285d7b98f174967f78ee758e6c0b81f5182e9890"
+    }
+  ],
+  "ci": {
+    "id": 39351018294,
+    "head_sha": "3decc072c0d59d410d888d307182c4a6f73b70e4",
+    "html_url": "https://github.com/WsprryPi/WsprryPi/actions/runs/39351018294",
+    "status": "completed",
+    "conclusion": "success",
+    "updated_at": "2026-10-20T01:18:44Z",
+    "jobs": [
+      {
+        "id": 118395017728,
+        "name": "non-hardware-validation",
+        "conclusion": "success",
+        "html_url": "https://github.com/WsprryPi/WsprryPi/actions/runs/39351018294/job/118395017728"
+      },
+      {
+        "id": 118395017877,
+        "name": "wtp-configuration-legacy (legacy)",
+        "conclusion": "success",
+        "html_url": "https://github.com/WsprryPi/WsprryPi/actions/runs/39351018294/job/118395017877"
+      },
+      {
+        "id": 118395017912,
+        "name": "strict-i2c-profile",
+        "conclusion": "success",
+        "html_url": "https://github.com/WsprryPi/WsprryPi/actions/runs/39351018294/job/118395017912"
+      },
+      {
+        "id": 118395017925,
+        "name": "wtp-usb-management-pair",
+        "conclusion": "success",
+        "html_url": "https://github.com/WsprryPi/WsprryPi/actions/runs/39351018294/job/118395017925"
+      },
+      {
+        "id": 118395017956,
+        "name": "macos-simulated-profile",
+        "conclusion": "success",
+        "html_url": "https://github.com/WsprryPi/WsprryPi/actions/runs/39351018294/job/118395017956"
+      },
+      {
+        "id": 118395017974,
+        "name": "wtp-network-loopback",
+        "conclusion": "success",
+        "html_url": "https://github.com/WsprryPi/WsprryPi/actions/runs/39351018294/job/118395017974"
+      },
+      {
+        "id": 118395018002,
+        "name": "wtp-configuration-legacy (p158)",
+        "conclusion": "success",
+        "html_url": "https://github.com/WsprryPi/WsprryPi/actions/runs/39351018294/job/118395018002"
+      },
+      {
+        "id": 118395018079,
+        "name": "wtp-configuration-legacy (p153)",
+        "conclusion": "success",
+        "html_url": "https://github.com/WsprryPi/WsprryPi/actions/runs/39351018294/job/118395018079"
+      },
+      {
+        "id": 118395018080,
+        "name": "wtp-configuration-legacy (p157)",
+        "conclusion": "success",
+        "html_url": "https://github.com/WsprryPi/WsprryPi/actions/runs/39351018294/job/118395018080"
+      },
+      {
+        "id": 118395018088,
+        "name": "ubuntu-gcc13-release",
+        "conclusion": "success",
+        "html_url": "https://github.com/WsprryPi/WsprryPi/actions/runs/39351018294/job/118395018088"
+      },
+      {
+        "id": 118395018127,
+        "name": "wtp-configuration-legacy (p154)",
+        "conclusion": "success",
+        "html_url": "https://github.com/WsprryPi/WsprryPi/actions/runs/39351018294/job/118395018127"
+      },
+      {
+        "id": 118395018151,
+        "name": "wtp-configuration-legacy (p152)",
+        "conclusion": "success",
+        "html_url": "https://github.com/WsprryPi/WsprryPi/actions/runs/39351018294/job/118395018151"
+      },
+      {
+        "id": 118395018207,
+        "name": "wtp-configuration-legacy (p156)",
+        "conclusion": "success",
+        "html_url": "https://github.com/WsprryPi/WsprryPi/actions/runs/39351018294/job/118395018207"
+      },
+      {
+        "id": 118395018383,
+        "name": "wtp-configuration-legacy (extended)",
+        "conclusion": "success",
+        "html_url": "https://github.com/WsprryPi/WsprryPi/actions/runs/39351018294/job/118395018383"
+      }
+    ]
+  },
+  "artifacts": [
+    {
+      "target": "armv6-bookworm",
+      "path_relative_to_repository": "dist/beta1/armv6-bookworm",
+      "binary_bytes": 5841868,
+      "image": "sha256:2ec7005707b816be2109596d451238a3d68e82873e38dacfa84457768415ba6a",
+      "compiled_metadata": {
+        "MAKE_TAG": "4.0.0-beta.1+3decc07",
+        "MAKE_BRH": "devel",
+        "MAKE_RAW_BRH": "devel",
+        "MAKE_BRANCH_STATE": "branch",
+        "MAKE_COMMIT": "3decc072c0d59d410d888d307182c4a6f73b70e4",
+        "MAKE_DIRTY": "false",
+        "MAKE_EXE": "wsprrypi",
+        "MAKE_PRJ": "WsprryPi"
+      },
+      "checks": {
+        "build_exit": 0,
+        "checksum": true,
+        "elf_abi": true,
+        "direct_avahi_linkage": true,
+        "build_environment_libraries_resolved": true,
+        "unprivileged_version_exit": 0
+      },
+      "export_sha256": {
+        "SHA256SUMS": "73171225395a883ca24a586adbb8f3c928f0634180752bf5728663c4c90aba71",
+        "build-image-id.txt": "9899b8382478cbd3496c30c4122f273aff1b729bc62910835af1042600976ee8",
+        "build-metadata.hpp": "e2e9693885e0abb6289b0807ca30ea6d68ac7b4f0c203afea0edd50e5d06bfb8",
+        "build-packages.txt": "2b97702b1882f23eb41240e1ef159f292bc0f4cea90ca86aa1c4d5b79229e52a",
+        "elf-attributes.txt": "7a9d070ba32d27d4f8c9cf8063bf670f4736b5dd81ffaddb4fbe897fcf5745c3",
+        "elf-dynamic.txt": "94cb3ad2881dfecbf42829f5e55f8d6f5b97663d9af5be0774d101f53d49fd84",
+        "elf-header.txt": "829f7976a25bee8ad97393b93a2945d2b60ef48bdcc54b3795aae79bf53982df",
+        "elf-versions.txt": "d027d18dc46237ec5053a8b6016070a0e767a19b5c7e23988a1ffbfb63feb726",
+        "file.txt": "e03105e4102e32f7dc0f9710e304b3fe011d4bc2ac57740748ff992a07b9e75b",
+        "os-release.txt": "8c7c20d66f556c1804af774a9fc89b38c3862960e2cd6571c8a4ad177fa77028",
+        "shared-libraries.txt": "8e2ac80d161329af24593e9f7d6a6d4f7eb9326a53264ee467bb1e1af1ea943e",
+        "target.txt": "6bf0e78dfec924f611421701b31d1fa29ff3027b19e6ee3c30703fcc11873f05",
+        "version.txt": "230591dc93bff3321501b08be739a75518a0ba87c70155d80074bb67de39f4f6",
+        "wsprrypi": "d08f7f6324e8e2734fd5dde28e83d98954a0e7ffac7cc3baf1bff9b7fab1a11c"
+      }
+    },
+    {
+      "target": "armv6-trixie",
+      "path_relative_to_repository": "dist/beta1/armv6-trixie",
+      "binary_bytes": 5999712,
+      "image": "sha256:60b6b461a3f35608480d7b54a4362974176c449422420eb64bda9ae8b8828e43",
+      "compiled_metadata": {
+        "MAKE_TAG": "4.0.0-beta.1+3decc07",
+        "MAKE_BRH": "devel",
+        "MAKE_RAW_BRH": "devel",
+        "MAKE_BRANCH_STATE": "branch",
+        "MAKE_COMMIT": "3decc072c0d59d410d888d307182c4a6f73b70e4",
+        "MAKE_DIRTY": "false",
+        "MAKE_EXE": "wsprrypi",
+        "MAKE_PRJ": "WsprryPi"
+      },
+      "checks": {
+        "build_exit": 0,
+        "checksum": true,
+        "elf_abi": true,
+        "direct_avahi_linkage": true,
+        "build_environment_libraries_resolved": true,
+        "unprivileged_version_exit": 0
+      },
+      "export_sha256": {
+        "SHA256SUMS": "933ce1722f151cf1ecbd1032ec0f889c0bb032e82e0fec33114cba993c45e51a",
+        "build-image-id.txt": "12a93c23e9ac035709ff43be8b5a7101c7bba4d698b2ba8110728731f2cfe90c",
+        "build-metadata.hpp": "e2e9693885e0abb6289b0807ca30ea6d68ac7b4f0c203afea0edd50e5d06bfb8",
+        "build-packages.txt": "0ac68d146ef4af888c12f5cf90e0e7a7ffe51f3ef8535c2d709208dbe2e24ebc",
+        "elf-attributes.txt": "7a9d070ba32d27d4f8c9cf8063bf670f4736b5dd81ffaddb4fbe897fcf5745c3",
+        "elf-dynamic.txt": "b8d1a0548c898b396400b55f10b51deae2f7b7896d12d3f1294a32514a7c86bb",
+        "elf-header.txt": "d83a93fabdd730ef581533f8e4ac650fe6a14a42a1ae580172765cd8b31fd784",
+        "elf-versions.txt": "222d621068b50cc8a0ee508ad21c8c0cfebf3b9aafd8135247b3a1b8d16a6525",
+        "file.txt": "4d25a56616231a116483d726984d0f64adba6b332a0941c724288d0858ba9f91",
+        "os-release.txt": "c5f3e5673a41105db643d44fda696588e1a2f5221d90a0e11e297757561ae1cb",
+        "shared-libraries.txt": "3f3f524c627de72588bdf18961f29666134127f2c23e36ff4cff502883e9ad29",
+        "target.txt": "34592eb14fd837efe2d23a59b347e8d5627cd24a89faae4c60b6a716597526dc",
+        "version.txt": "230591dc93bff3321501b08be739a75518a0ba87c70155d80074bb67de39f4f6",
+        "wsprrypi": "1c6c5b569f3c295a06ee67c4bd277612df69ca9850c1a063c7e592349ef465fc"
+      }
+    },
+    {
+      "target": "aarch64-bookworm",
+      "path_relative_to_repository": "dist/beta1/aarch64-bookworm",
+      "binary_bytes": 6451856,
+      "image": "sha256:c612846ae686b347d0f3f7c438b0d40e2e2d19aeee9142664e950d6491dfa360",
+      "compiled_metadata": {
+        "MAKE_TAG": "4.0.0-beta.1+3decc07",
+        "MAKE_BRH": "devel",
+        "MAKE_RAW_BRH": "devel",
+        "MAKE_BRANCH_STATE": "branch",
+        "MAKE_COMMIT": "3decc072c0d59d410d888d307182c4a6f73b70e4",
+        "MAKE_DIRTY": "false",
+        "MAKE_EXE": "wsprrypi",
+        "MAKE_PRJ": "WsprryPi"
+      },
+      "checks": {
+        "build_exit": 0,
+        "checksum": true,
+        "elf_abi": true,
+        "direct_avahi_linkage": true,
+        "build_environment_libraries_resolved": true,
+        "unprivileged_version_exit": 0
+      },
+      "export_sha256": {
+        "SHA256SUMS": "0a0dea8cbb4ee6a379cafc50b8f57aa88a3cabd7190d02c4ec3c5e66a55d6ed5",
+        "build-image-id.txt": "1588b31acf960b6ce6c0494aa3a6b5368da0bf01117cac9a08171dc90c4b1758",
+        "build-metadata.hpp": "e2e9693885e0abb6289b0807ca30ea6d68ac7b4f0c203afea0edd50e5d06bfb8",
+        "build-packages.txt": "940573ce8239c978b0d55dae920e31ede11085dac701d3bcaadb240330761685",
+        "elf-attributes.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "elf-dynamic.txt": "9fe8c6e761e26a97e6fbff7ac0ff1b557cb6157a7e1cd6f4bae0bc99a100b014",
+        "elf-header.txt": "72e616eb20810533277ebc5a6e2a11b0880757006b05314a1ee04954e1f8869c",
+        "elf-versions.txt": "de81365baae803cc78f3cf426c2afc40ce8fb7ff075b806db7144a7e6c84ea90",
+        "file.txt": "2dbeebe8401487fbeba535dbf301a4233c2cd1881127397059353e5c17946be4",
+        "os-release.txt": "59a77b5f2666d9c85c489bd1911a6eebbd91ef22fe48b90a3b75f1b21f3844d4",
+        "shared-libraries.txt": "e8e179fea6d955af2aa5eafe76e593f452b58bb69a7d1079b85000016770c2b8",
+        "target.txt": "d742ebc54118c65d32c5d17c94fad7cbd743c4c5c4fb9ec0d56198d2d6585c2d",
+        "version.txt": "230591dc93bff3321501b08be739a75518a0ba87c70155d80074bb67de39f4f6",
+        "wsprrypi": "a6b455367454905baec5dc578db5c7ee701da2eee503d8cc3316319bd8f23319"
+      }
+    },
+    {
+      "target": "aarch64-trixie",
+      "path_relative_to_repository": "dist/beta1/aarch64-trixie",
+      "binary_bytes": 6549304,
+      "image": "sha256:044236fe69e50f2d38036b735f315bc647a21b7c84c495eecc84685de3fd5d7f",
+      "compiled_metadata": {
+        "MAKE_TAG": "4.0.0-beta.1+3decc07",
+        "MAKE_BRH": "devel",
+        "MAKE_RAW_BRH": "devel",
+        "MAKE_BRANCH_STATE": "branch",
+        "MAKE_COMMIT": "3decc072c0d59d410d888d307182c4a6f73b70e4",
+        "MAKE_DIRTY": "false",
+        "MAKE_EXE": "wsprrypi",
+        "MAKE_PRJ": "WsprryPi"
+      },
+      "checks": {
+        "build_exit": 0,
+        "checksum": true,
+        "elf_abi": true,
+        "direct_avahi_linkage": true,
+        "build_environment_libraries_resolved": true,
+        "unprivileged_version_exit": 0
+      },
+      "export_sha256": {
+        "SHA256SUMS": "2792cd276cc46e72f8da2d27ce35169cb688dc9c7933e0c38bd4205433e55ec8",
+        "build-image-id.txt": "d957f2e5a32498152e39a33903bb7f4e538ba756056326c7b71dfb0692591151",
+        "build-metadata.hpp": "e2e9693885e0abb6289b0807ca30ea6d68ac7b4f0c203afea0edd50e5d06bfb8",
+        "build-packages.txt": "6febb0bba7c7a5680eab36ddd63d0bc8372d1996586c0711d723b17c5c65d391",
+        "elf-attributes.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "elf-dynamic.txt": "d8b4346febda2073c5ef1ffe6657eaaacdb8ddf1360222ec56ba8858d7effd72",
+        "elf-header.txt": "c0644afedc506e768ee6a1c63536b302b1779c5ee1edd5f229d3cd421b5295ca",
+        "elf-versions.txt": "3033748b66ee16b4d5aab5648ef8d38c3a172788695ca7186188f5e4ce9b647a",
+        "file.txt": "b0333410c90d06679cff91e443651ca51c281f59ed971d3c98d4e13a50a63148",
+        "os-release.txt": "14c430da04c2d571793fc68a8f5e17fce3d7a746e316c3f23192590861b18bd7",
+        "shared-libraries.txt": "5ab57c6ea4be8724084ebc55f7224264918472efd09dcc448bdd2bf00347f06b",
+        "target.txt": "102065d9385bede43e08b401e02b1ed1f267de82076b0cb78f1ca4935df878a7",
+        "version.txt": "230591dc93bff3321501b08be739a75518a0ba87c70155d80074bb67de39f4f6",
+        "wsprrypi": "5cc770d2dd9df828e1440a481150eeb2aa9ca08a798e1c1d24419e4d823208d1"
+      }
+    }
+  ],
+  "retained_validation_evidence": [
+    {
+      "path": "dist/beta1/validation/adversarial-recheck.log",
+      "sha256": "9e891ab2da7c420dbd524ce52a23a03ba92777130e463ae151d78aa8f0c6d243",
+      "bytes": 1599
+    },
+    {
+      "path": "dist/beta1/validation/armv6-bookworm-direct-loader-failure.log",
+      "sha256": "a3473451c4c395e3d78fe60ac771bc73768f9ecc0e793984c1428e52db25c0ea",
+      "bytes": 31196
+    },
+    {
+      "path": "dist/beta1/validation/armv6-bookworm-first-ldd-failure.log",
+      "sha256": "b3952687fea998fd3d19f993064b681b1a92d562a400f3f588584a5de1b77cec",
+      "bytes": 31236
+    },
+    {
+      "path": "dist/beta1/validation/armv6-direct-loader.log",
+      "sha256": "31b63795f515543fb90b9410c0f4a8007ae8242118c790ffd1214d055bfcc0e4",
+      "bytes": 1425
+    },
+    {
+      "path": "dist/beta1/validation/armv6-existing-image-probe.log",
+      "sha256": "cda03a91c9381c6b8eac9d7d0374dd8221f1d60708c159338076fffc83b3a925",
+      "bytes": 1554
+    },
+    {
+      "path": "dist/beta1/validation/armv6-implicit-loader.log",
+      "sha256": "8e2ac80d161329af24593e9f7d6a6d4f7eb9326a53264ee467bb1e1af1ea943e",
+      "bytes": 1425
+    },
+    {
+      "path": "dist/beta1/validation/armv6-ldd-repeat.log",
+      "sha256": "60abe8001cd5daf8ae0b064a867624c0fbe22c05c291efb3cf7ecbba420bfe7d",
+      "bytes": 191
+    },
+    {
+      "path": "dist/beta1/validation/armv6-ldd-source.txt",
+      "sha256": "95c75425f4d834fc2ab92f7c7c2d48e504a8c032fa69b683be0fdfe94c2ab222",
+      "bytes": 1149
+    },
+    {
+      "path": "dist/beta1/validation/armv6-trixie-first-ldd-failure.log",
+      "sha256": "ebbc9f981828a29735172994fd62ad589778ebaad5d8410d9346b07557eae59d",
+      "bytes": 43073
+    },
+    {
+      "path": "dist/beta1/validation/avahi-unit-final.log",
+      "sha256": "e9a4b8301c4ab59005b8726eea982735845f55ff1ba929ceafcefdacb0a67000",
+      "bytes": 103
+    },
+    {
+      "path": "dist/beta1/validation/build-aarch64-bookworm-accepted.log",
+      "sha256": "0f2e6738de0d3d01ce7ccd48f9c785d402cf8c1157f10331ef1bf1a81be8ff48",
+      "bytes": 30022
+    },
+    {
+      "path": "dist/beta1/validation/build-aarch64-trixie-accepted.log",
+      "sha256": "5cbb488c33b70930286b2129b433835ba44735004f786bc809e7c1f8a331d16e",
+      "bytes": 29830
+    },
+    {
+      "path": "dist/beta1/validation/build-armv6-bookworm-accepted.log",
+      "sha256": "f2c1e88365bb87449b723b33ad78ab643ecce6eebeff4e11ecf40e0b33fdb8fe",
+      "bytes": 29864
+    },
+    {
+      "path": "dist/beta1/validation/build-armv6-trixie-accepted.log",
+      "sha256": "e6d99da283452a52f8f83f698bd74eea65c6ff1d72e3c9d5bcbc3bc8e2597187",
+      "bytes": 30060
+    },
+    {
+      "path": "dist/beta1/validation/ci-cdb2d69-network-failure.txt",
+      "sha256": "ee9934d0c44fa3dd6fc50bf531b1fad1d51f51882c33e59575e5014dd66253ef",
+      "bytes": 7494
+    },
+    {
+      "path": "dist/beta1/validation/ci-final-candidate-jobs.json",
+      "sha256": "4d00c0af4f31dadc47438411a9fb4ab544b7a6d11e3ba2eb62503e156514d152",
+      "bytes": 40598
+    },
+    {
+      "path": "dist/beta1/validation/ci-final-candidate-run.json",
+      "sha256": "5ce4ac70a842d784a81f965d5cfb0d6975d691cfa58f653d59d96e9434683303",
+      "bytes": 11947
+    },
+    {
+      "path": "dist/beta1/validation/container-unit-final.log",
+      "sha256": "ac3c966bdb0ac570cf3950271f5a4ee838999288852fc0f57d71ae740d73bcda",
+      "bytes": 818
+    },
+    {
+      "path": "dist/beta1/validation/docs-build-final.json",
+      "sha256": "8626b74ebe90f0e7ba78846ca4895b9123f921f5fcf26d0e38172a4c2d4cc171",
+      "bytes": 841
+    },
+    {
+      "path": "dist/beta1/validation/docs-visual/desktop.png",
+      "sha256": "f3a1e2f5f5d128769b31737426732af3d5e14ecd13e44b5ff601cee25b45dbe8",
+      "bytes": 168724
+    },
+    {
+      "path": "dist/beta1/validation/docs-visual/mobile-zoom.png",
+      "sha256": "9686fb5d6ecb0b5f86074c22529f76d075caf5dceadf404ffc890df4e0ad3873",
+      "bytes": 467375
+    },
+    {
+      "path": "dist/beta1/validation/docs-visual/mobile.png",
+      "sha256": "82320254e5a86953c124b6558bb11e1edc0565e9f2a002d203856fd04cf1cc79",
+      "bytes": 151245
+    },
+    {
+      "path": "dist/beta1/validation/docs-visual/results.json",
+      "sha256": "add5456eec36dacfd7f53e4f40df671fdd7640e3ede0acbf6ca7fe64eedc79ea",
+      "bytes": 796
+    },
+    {
+      "path": "dist/beta1/validation/final-editor-ui.log",
+      "sha256": "bc45e7e3ba2bb27af533d092fa79ddc452506c7691cea87d1391e295486ff51f",
+      "bytes": 3091
+    },
+    {
+      "path": "dist/beta1/validation/final-focused.log",
+      "sha256": "a00baeece6ed4b603c125d18b9706d0a08d18b4f99a123976aaffb4ce62ab47b",
+      "bytes": 1518
+    },
+    {
+      "path": "dist/beta1/validation/freeze-focused.log",
+      "sha256": "3e62f837173806ecb1bf947f9a08621134e7c19c40dbe403545326d310160c4a",
+      "bytes": 957
+    },
+    {
+      "path": "dist/beta1/validation/freeze-progress-final.log",
+      "sha256": "e7cd5c871cbaa11560dcfb4d758e5ae144713fc8a3d0aee1744a6cf0dd3b2977",
+      "bytes": 463
+    },
+    {
+      "path": "dist/beta1/validation/freeze-ui.log",
+      "sha256": "e9d1f9c9a85d9a54a8e6326a710274805adfa01bdba21e3be37e1d84d6edcf5f",
+      "bytes": 3091
+    },
+    {
+      "path": "dist/beta1/validation/metadata-ui.log",
+      "sha256": "0be09e9d4add05dbffaf217d7f0d43f52641c589429b1f810c4c4a5e12409ba8",
+      "bytes": 2932
+    },
+    {
+      "path": "dist/beta1/validation/recovery-after.log",
+      "sha256": "26bb1c5f22963e2b8dc32270407ee5228ce18c7502b56bda4157a426c1b07874",
+      "bytes": 462
+    },
+    {
+      "path": "dist/beta1/validation/recovery-before.log",
+      "sha256": "83e5e5186e128f627567f13feaf5f5d6389d6a54777fa00c99408b50d8b97ee1",
+      "bytes": 6344
+    },
+    {
+      "path": "dist/beta1/validation/rp1-verification.json",
+      "sha256": "bc51c1b2e5d0057c7036b898dac2183c760f05b84a6141a9081480370f0dee39",
+      "bytes": 1774
+    },
+    {
+      "path": "dist/beta1/validation/sequence-final.log",
+      "sha256": "9a3420589b7aa3110f41aa0705b954675fbd203495bae5cfe2303ad3e914facb",
+      "bytes": 1577
+    },
+    {
+      "path": "dist/beta1/validation/ui/desktop-dark-station-progress-complete.png",
+      "sha256": "85d0684913a0824eb6e8a449615919fd9caf80746b071427b355707b818e0ab3",
+      "bytes": 94961
+    },
+    {
+      "path": "dist/beta1/validation/ui/desktop-dark-station-progress-fault.png",
+      "sha256": "ef1000295e8df68c7150476f33b4cf70e1494ef51bde19b3cd0b27a38203035b",
+      "bytes": 80539
+    },
+    {
+      "path": "dist/beta1/validation/ui/desktop-dark-station-progress-incomplete.png",
+      "sha256": "abfca4fd2f35b6e71443c04ad3411f3d108528eb02db88387ba12cde1844c969",
+      "bytes": 100120
+    },
+    {
+      "path": "dist/beta1/validation/ui/desktop-dark-station-progress-invalid.png",
+      "sha256": "fd5f973411a4d03a00e0951c3e03686b60051904ebe252aec4dfdb43554e99ed",
+      "bytes": 94889
+    },
+    {
+      "path": "dist/beta1/validation/ui/desktop-dark-station-progress-unsupported.png",
+      "sha256": "215404dc88712860a1026e3395960c7a87a6cea74d5ea35104de178a1e75f71b",
+      "bytes": 78578
+    },
+    {
+      "path": "dist/beta1/validation/ui/desktop-light-station-progress-complete.png",
+      "sha256": "67d8d171db159e7632020a9689980661adf64a40f06e9c4ef9340e89bf3e40c1",
+      "bytes": 92175
+    },
+    {
+      "path": "dist/beta1/validation/ui/desktop-light-station-progress-fault.png",
+      "sha256": "972ec8761b72c5bb124bcc648afe835072255534607797035f21a4b0ecbc0c68",
+      "bytes": 78194
+    },
+    {
+      "path": "dist/beta1/validation/ui/desktop-light-station-progress-incomplete.png",
+      "sha256": "bea9ef0d38195fce72878110a16f9535a0ab18a8cf2dff2253069f0db1bf95cc",
+      "bytes": 97293
+    },
+    {
+      "path": "dist/beta1/validation/ui/desktop-light-station-progress-invalid.png",
+      "sha256": "e092ca3417ddcddfa9a28c956b26536d0c6bcf554e0eb2e7e5b48a4eb664f753",
+      "bytes": 92130
+    },
+    {
+      "path": "dist/beta1/validation/ui/desktop-light-station-progress-unsupported.png",
+      "sha256": "eca33986d7ad730c2fc4784e330c9c1b533c091cccfea7df9356ad6df156c063",
+      "bytes": 76252
+    },
+    {
+      "path": "dist/beta1/validation/ui/mobile-dark-station-progress-complete.png",
+      "sha256": "fa79c0056769a8a159884628a96d85a8a57ac91369b07bb5784a9a42247727ea",
+      "bytes": 91196
+    },
+    {
+      "path": "dist/beta1/validation/ui/mobile-dark-station-progress-fault.png",
+      "sha256": "63cb1677f5886b0fc4283fbb230d3cd330990dd94c27a4b04261fdb11644f355",
+      "bytes": 77761
+    },
+    {
+      "path": "dist/beta1/validation/ui/mobile-dark-station-progress-incomplete.png",
+      "sha256": "e04c0c6e0b920bb0f4fcaa2a7308f4f327bad9049b0caa34a24140dd1476ab69",
+      "bytes": 93871
+    },
+    {
+      "path": "dist/beta1/validation/ui/mobile-dark-station-progress-invalid.png",
+      "sha256": "52e6aaad81bb8c4fca664c472b00219ff2aaf62bddb38cbb522c17e6a9852be9",
+      "bytes": 87021
+    },
+    {
+      "path": "dist/beta1/validation/ui/mobile-dark-station-progress-unsupported.png",
+      "sha256": "de05cc6b86a711f6a108f4075b19c70bad80ed07ebac527043548a33eb21afa0",
+      "bytes": 76661
+    },
+    {
+      "path": "dist/beta1/validation/ui/mobile-light-station-progress-complete.png",
+      "sha256": "d7fbb5fc07bbeca93d57049602fe4da3bbe684da034192709586d1115c062bfc",
+      "bytes": 87766
+    },
+    {
+      "path": "dist/beta1/validation/ui/mobile-light-station-progress-fault.png",
+      "sha256": "35808770ff56b8844370669d0cf902414fada9edd0cf4afd7c50cbe42bb8ee8c",
+      "bytes": 74779
+    },
+    {
+      "path": "dist/beta1/validation/ui/mobile-light-station-progress-incomplete.png",
+      "sha256": "a31ec1e50c6f455d30bd2fa650b4fa7f1bac676d7ece6b11262d858e936ae577",
+      "bytes": 90163
+    },
+    {
+      "path": "dist/beta1/validation/ui/mobile-light-station-progress-invalid.png",
+      "sha256": "4a2cb38b69481ecd2d54bed4678d16ad5985ff1326368f1a134129abeb8d9de7",
+      "bytes": 83942
+    },
+    {
+      "path": "dist/beta1/validation/ui/mobile-light-station-progress-unsupported.png",
+      "sha256": "b0a839d604b9f6fa35f82de4f76b3c381bc458862df935917e80fb3527641eb5",
+      "bytes": 73763
+    },
+    {
+      "path": "dist/beta1/validation/ui/mobile-station-progress-zoom.png",
+      "sha256": "a53107686120dfb3115d29cd148de57b276f8f051099c710b9fbfcf7d53e0ebc",
+      "bytes": 47801
+    },
+    {
+      "path": "dist/beta1/validation/ui-browser.log",
+      "sha256": "f173b9d47398f9fdeebc443d2775cdb226f1104c5587a66e5d1d34af925164a8",
+      "bytes": 924
+    },
+    {
+      "path": "dist/beta1/validation/usb-pair-final.log",
+      "sha256": "437c0e3f90b8462617d55a4a7bea09b9be7cafce4fa7bb2fed5d79f57ae227fd",
+      "bytes": 388
+    }
+  ],
+  "limits": [
+    "No new target installation, upgrade, service, GPIO, Pico flash or RF operation.",
+    "Package repositories are not snapshotted; exports record their actual package versions.",
+    "Final handoff documentation commits do not reidentify these executables; source and artifact hashes above remain authoritative."
+  ]
+}

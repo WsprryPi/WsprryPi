@@ -326,14 +326,16 @@ Status key: ✅ Complete · ⏳ In progress · ☐ Not started
       Review omissions and unsupported claims adversarially; refresh the draft
       against the exact accepted candidate before publication. The linked draft,
       evidence and inventory now record the complete research and dispositions.
-    - ☐ **16b — Freeze identities and build the Beta 1 candidate.** After items
+    - ✅ **16b — Freeze identities and build the Beta 1 candidate.** After items
       13–15, select Beta 1 version metadata using the project's existing convention,
       record exact application/documentation commits and published provider
       identities, and build/checksum candidate artifacts. Preserve the researched
       stable-to-Beta comparison range and record later changes. Any changed input
       requires a new candidate identity and repetition of affected acceptance
-      checks. This step does not create a public tag or release.
-    - ☐ **16c — Validate, accept and hand off Beta 1; stop before publication.**
+      checks. Frozen source is `3decc07`, Docs `5214cdf`; all four exports and
+      checksums are in the [candidate manifest](4.0-Beta-1-Candidate-Manifest.json).
+      This step does not create a public tag or release.
+    - ⏳ **16c — Validate, accept and hand off Beta 1; stop before publication.**
       Run required CI/regressions and applicable installation/upgrade/service/
       runtime checks against the exact candidate and artifacts using item 10's
       acceptance matrix. Record reused evidence, repeated checks, exclusions and
@@ -343,6 +345,11 @@ Status key: ✅ Complete · ⏳ In progress · ☐ Not started
       evidence handoff, ready for a separate publication decision. Do not merge
       to the release branch, create a tag/GitHub release or draft, upload assets,
       announce availability, or claim Beta 1 is published.
+      **Current disposition:** exact-source CI passed 14/14 jobs; genuine
+      software pairs, UI/Impeccable review, hosted Docs and four candidate builds
+      passed. Fresh candidate installation/upgrade/service/runtime checks were
+      not authorized under the selected reuse-only scope. Their acceptance or
+      an explicitly accepted limitation remains open; see the evidence matrix.
     - ☐ **16d — Later: publish Beta 1 as a GitHub prerelease and verify.** Only
       after separate authorization, publish the accepted Beta 1 and corresponding
       documentation through their separate workflows. Use the reviewed Markdown
@@ -368,7 +375,7 @@ Status key: ✅ Complete · ⏳ In progress · ☐ Not started
 | 13 | 21 | ✅ Complete; #423 closed | Integrated application Impeccable review accepted for `d93c75c`; final closeout/planning-head CI each passed 11/11; bounded validation and qualification limits retained | `WsprryPi` |
 | 14 | — | ✅ Closed within bounded software scope | Full companion integrated at final `a84010d`; feature/devel CI each passed 12/12; eight exact compatibility pairs, affected Impeccable/adversarial repairs and published Docs accepted; nonblocking Pico wording follow-up retained | `WsprryPi`; affected operator docs: `WsprryPi-Docs` |
 | 15 | — | ✅ Pico software and originating assessment complete | Pico `1653034` closes four findings after fresh independent reassessment; 200 executed host groups, 13 sanitizer groups, both firmware builds and genuine browser checks passed. Pi adoption, P15.14 docs and physical qualification remain separate | `WsprryPi` coordination; `WsprryPico` implementation |
-| 16 | 22 | ⏳ In progress | 16a research/notes and selected Pi editor adoption implemented; exact-source build/CI handoff in progress. Final candidate installation/service/runtime acceptance remains open; 16d/16e publication is separate | `WsprryPi` |
+| 16 | 22 | ⏳ In progress | 16a/16b complete at `3decc07`; four candidate exports and 14/14 source CI pass. Pi editor and operator Docs adopted. 16c physical installation/service/runtime acceptance remains open; 16d/16e publication is separate | `WsprryPi` |
 
 RP1 item numbers above are historical cross-references; the current provider
 ROADMAP has no numbered application release gates.
@@ -450,8 +457,9 @@ Beta preparation or announcement does not itself close that stable release gate.
   #412 stays open for publication; other ready issues await the later authorized
   publication notifications. Item 14's affected integration addendum is now
   complete; item 15's Pico implementation and originating assessment are
-  complete within their recorded software scope. Pi/Beta adoption remains
-  separate. Item 16 has not started.
+  complete within their recorded software scope. Pi/Beta adoption is now
+  implemented under item 16; its source/build handoff is complete, while final
+  candidate installation/service/runtime acceptance remains open.
 - ✅ **Pico Type 2/3 companion integration and acceptance:** item 14's complete
   companion integration, eight current/historical pairs, affected Impeccable/
   adversarial repairs and separately published operator documentation are
@@ -467,9 +475,10 @@ Beta preparation or announcement does not itself close that stable release gate.
   Pi station-progress adoption against `1653034`; P15.8 remains `p158`. The Pi
   operator workflow is updated in Docs `5214cdf`. Pico P15.14 and physical
   qualification remain separate; no new hardware operation is authorized.
-- ☐ **Beta 1 release documentation and readiness:** complete 16a–16c's sourced
-  Markdown notes, compatibility/migration guidance, exact candidate and acceptance
-  evidence. Stop with a reviewable handoff; no release or announcement is authorized.
+- ⏳ **Beta 1 release documentation and readiness:** 16a/16b's sourced notes,
+  compatibility guidance, exact candidate, four exports and software validation
+  are complete. 16c's physical acceptance disposition remains open. The evidence
+  handoff records reused checks and remaining gates; publication is separate.
 - ☐ **Later Beta 1 publication and issue announcements:** after separate
   publication authorization, complete 16d verification before updating every
   open ready-for-release issue under 16e. Preserve issue states and audit coverage.

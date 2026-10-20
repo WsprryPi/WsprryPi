@@ -8,5 +8,7 @@ These are tools and notes that I use during development.
   deferral, current RP1 parent, correction authority and reopening criteria.
 - Beta 1 preparation: [execution prompt](Item%2016%20Beta%201%20Preparation%20Prompt.md),
   [public notes draft](4.0-Beta-1-Release-Notes.md),
-  [evidence and remaining gates](4.0-Beta-1-Release-Evidence.md), and
-  [source inventory](4.0-Beta-1-Source-Inventory.json). Publication remains separate.
+  [evidence and remaining gates](4.0-Beta-1-Release-Evidence.md),
+  [source inventory](4.0-Beta-1-Source-Inventory.json),
+  [candidate manifest](4.0-Beta-1-Candidate-Manifest.json), and
+  [artifact checksums](4.0-Beta-1-SHA256SUMS). Publication remains separate.

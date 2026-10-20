@@ -110,9 +110,13 @@ announcement/edit, or final stable-release claim.
    evidence remains reusable by unchanged inputs, which has changed, and which
    checks remain unperformed under the user's no-live-operation selection.
    Do not call a fresh candidate accepted if required checks lack evidence.
-6. Inspect the sibling operator Docs read-only. Record exact coverage and
-   required follow-up paths; cross-repository changes/publication are separate.
-   Update application-side contract/developer docs within this scope.
+6. Inspect sibling operator Docs coverage and follow its AGENTS.md. Under the
+   user's subsequent cross-repository authorization, apply the prepared Fleet
+   station-progress update, build/render it with the documented virtual
+   environment, and commit/push Docs `devel` as a separate boundary. Verify the
+   exact hosted build and page. This authorization covers the Pi operator
+   workflow; broader Pico P15.14 work remains separate. Update application-side
+   contract/developer docs within the parent scope.
 
 ## 5. Adversarial assessment and closeout
 
