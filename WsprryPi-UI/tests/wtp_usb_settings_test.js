@@ -25,6 +25,9 @@ async function unit() {
         return reply({},200,`"r${revision}"`);
     });
     await b.click("load");assert.equal(b.element("wtp-usb-hostname").value,name);assert(b.element("wtp-usb-wifi-remove").disabled);
+    b.root.WtpUsbSettings.invalidate();
+    assert(b.element("wtp-usb-name-save").disabled && b.element("wtp-usb-wifi-save").disabled,"cross-editor mutation requires fresh USB reads");
+    await b.click("load");
     b.element("wtp-usb-ssid").value="new-network";b.element("wtp-usb-password").value="synthetic-password";b.element("wtp-usb-time-server").value="192.0.2.1";
     await b.click("wifi-save");assert.equal(b.requests.at(-1).method,"PUT");assert.equal(JSON.parse(b.requests.at(-1).body).wifi.password,"synthetic-password");assert.equal(b.element("wtp-usb-password").value,"");
     assert(b.element("wtp-usb-wifi-save").disabled);await b.click("load");

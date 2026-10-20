@@ -19,6 +19,8 @@ async function tests() {
         }
         return response(malformed ? {...state,schema:"transmitter-progress/99"} : structuredClone(state));
     });
+    let usbInvalidations=0;
+    b.root.WtpUsbSettings={invalidate(){++usbInvalidations;}};
     await b.click("wtp-usb-progress-load");
     assert(!b.element("wtp-member-callsign").disabled,"blank station can save progress without complete resources");
     assert.equal(b.element("wtp-member-power").value,"");
@@ -26,6 +28,7 @@ async function tests() {
     b.element("wtp-member-callsign").value="AA0NT"; b.element("wtp-member-callsign").listeners.input();
     b.element("wtp-member-locator").value="invalid"; b.element("wtp-member-power").value="0";
     await b.click("wtp-usb-progress-save");
+    assert(usbInvalidations>0,"station mutations invalidate USB name/Wi-Fi revisions too");
     assert.equal(sent.fields.power_dbm,0);assert.equal(sent.fields.locator,"invalid");assert.match(sent.request_id,/^[0-9a-f]{32}$/);
     assert.match(b.element("wtp-member-locator-progress").textContent,/Invalid/);
     assert.equal(b.element("wtp-member-locator").value,"invalid");

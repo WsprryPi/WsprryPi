@@ -78,7 +78,7 @@
             byId("feedback").textContent = error.message || "Request unconfirmed. Read back before another change; your draft is preserved.";
         } finally { busy = false; render(); }
     }
-    root.WtpUsbSettings = {setAvailability(value) { available = value; render(); }};
+    root.WtpUsbSettings = {invalidate() { invalidate(); render(); }, setAvailability(value) { available = value; render(); }};
     function init() {
         if (!byId("settings")) return;
         for (const action of ["load", "name-save", "wifi-save", "wifi-remove", "restart", "ap"])

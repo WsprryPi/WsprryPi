@@ -286,6 +286,12 @@ void progress_checks() {
   changed_applied.corrupt_read=[&](Json &j){if(changed_applied.writes)j["config_revision"]="1";};
   const auto changed=changed_applied.call({{"callsign","AA0NT"}});
   CHECK(changed.status>=400 && changed_applied.writes==1);
+  ProgressPeer regressed;
+  regressed.sequence=10; regressed.value["draft_revision"]="10";
+  regressed.corrupt_read=[&](Json &j){if(regressed.writes)j["draft_revision"]="9";};
+  regressed.corrupt_ack=[](Json &j){j["draft_revision"]="9";};
+  const auto rollback=regressed.call({{"callsign","AA0NT"}});
+  CHECK(rollback.status>=400 && regressed.writes==1 && strict_browser_json(rollback.body)["mutation_attempted"]==true);
   std::cout<<"Saved-progress discovery, incomplete/null/zero, receipt attribution, invalid siblings, explicit apply and fail-closed readbacks passed\n";
 }
 struct HttpInput : wtp::ByteStream {

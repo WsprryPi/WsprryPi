@@ -612,7 +612,8 @@ PicoHttpResponse pico_progress_request(const PicoManagementExchange &exchange,
       auto projection=ack; projection.erase("outcomes"); projection.erase("request_id");
       require(projection==after,"management_outcome_unknown");
       if (accepted) require(after["last_receipt"]==progress_receipt(wire_body) && after["last_outcomes"]==ack["outcomes"] &&
-          after["draft_revision"]!=old["draft_revision"] && after_response.etag!=revision,"management_outcome_unknown");
+          std::stoull(after["draft_revision"].get<std::string>())>std::stoull(old["draft_revision"].get<std::string>()) &&
+          after_response.etag!=revision,"management_outcome_unknown");
       else require(after==old && after_response.etag==revision,"management_outcome_unknown");
       return result;
     }

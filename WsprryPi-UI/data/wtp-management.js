@@ -236,6 +236,7 @@
     }
     function invalidateEditors() {
         driveEditor?.invalidate();
+        root.WtpUsbSettings?.invalidate();
         invalidateProgress();
         configRevision = networkRevision = ""; target = null; reconcile = loaded;
         invalidateResources();
