@@ -1,23 +1,27 @@
-# RP1 GPCLK clock-disabled DMA probe
+# Legacy RP1 GPCLK clock-disabled DMA probe
 
-This research-only kernel probe tests whether RP1's DMA0 tick can pace a
-preloaded sequence targeted at GPCLK0's fractional-divider register.
-It acquires `clk_gp0` with exclusive rate ownership but deliberately never
-prepares or enables it. The overlay declares no GPIO or pinctrl configuration.
+This retained research probe uses a fixed **50 MHz GPCLK parent** and a
+four-tone divider table calculated for that parent. It does not implement the
+current RP1-GPCLK-DKMS adapter, which uses nominal **200 MHz `pll_sys`**.
+The probe checks the observed parent rate before acquiring exclusive clock
+rate ownership and again after its inactive seed-rate request, which can
+reparent GPCLK0. Other parent rates are rejected before DMA submission.
+Its required initial 50 MHz GPCLK output rate is a separate baseline check;
+an output rate alone does not identify the parent.
 
-This is not a production register-access interface. A production backend must
-move DMA setup and divider-register ownership into the RP1 clock provider so
-that DMA writes participate in that driver's locking and lifecycle contract.
+The probe never prepares or enables GPCLK0, and its overlay declares no GPIO
+or pinctrl configuration. It accesses the DMA and divider resources directly
+and uses internal provider probes for readback. These research interfaces are
+outside the production module contract; the parent-rate check does not
+establish resource isolation or target qualification.
 
-The checked-in fixture uses 66,792 transfers at the slowest 511-cycle DMA tick.
-Phase 6C completed all four clock-disabled descriptors within 4.8 us of one
-WSPR symbol. It also corrected the register packing: RP1 expects the logical 16-bit
-fraction in bits 31:16 of `DIV_FRAC`. With that shift, exact DMA readback and
-the existing provider's raw regmap reads both matched all four final words.
+The fixture uses 66,792 transfers at the 511-cycle DMA tick. DMA pacing has
+its own 50 MHz reference, independent of the GPCLK parent. Logical 16-bit
+fractions are packed into bits 31:16 of `DIV_FRAC` for DMA and provider
+readback comparisons.
 
-Phase 6D uses bounded finite completion for cancellation. Once a symbol
-descriptor has started, cancellation prevents future work but drains that one
-finite descriptor to its normal hardware-idle completion before disabling the
-tick/DREQ and restoring the divider. The hard bound is the remainder of one
-0.682667-second WSPR symbol. The earlier tick-first abort ordering is documented
-in the Phase 6C report and must not be restored.
+Cancellation prevents successor work and drains the current finite descriptor
+before disabling the tick/DREQ and restoring the output rate. This fixed
+research descriptor is approximately one WSPR symbol; production DKMS uses
+its own bounded chunk contract. The probe requires separate target
+authorization and validation before any use.

@@ -1181,13 +1181,21 @@ backend-capabilities-make-regression-test:
 semantics-make-regression-test:
 	$(Q)python3 $(SEMANTICS_MAKE_REGRESSION_TEST)
 
-.PHONY: wtp-protocol-test
-wtp-protocol-test:
+.PHONY: wtp-client-host-build wtp-protocol-test
+wtp-client-host-build:
+	$(Q)$(MAKE) --no-print-directory -C WTP-Client all
+
+wtp-protocol-test: wtp-client-host-build
 	$(Q)$(MAKE) --no-print-directory -C WTP-Client test
+
+# One recursive archive build per parent Make invocation, before any consumers.
+.PHONY: wtp-server-host-build
+wtp-server-host-build:
+	$(Q)$(MAKE) --no-print-directory -C WTP-Server all
 
 # Portable Pi WTP ownership model; inhibited engine and injected clock only.
 .PHONY: wtp-pi-authority-test
-wtp-pi-authority-test:
+wtp-pi-authority-test: wtp-server-host-build
 	$(Q)$(MAKE) --no-print-directory -C WTP-Server test
 	$(Q)$(CXX) -std=c++20 -Wall -Wextra -Wpedantic -Werror -I. -IWTP-Server/include \
 		tests/wtp_pi_authority_test.cpp wtp_endpoint/authority.cpp \
@@ -1200,9 +1208,7 @@ ifeq ($(HOST_OS),Linux)
 WTP_LISTENER_TEST_FLAGS := -DWSPRRYPI_TEST_SOCKET_WRAPPERS
 WTP_LISTENER_TEST_LDFLAGS := -Wl,--wrap=setsockopt -Wl,--wrap=accept
 endif
-wtp-pi-listener-test:
-	$(Q)$(MAKE) --no-print-directory -C WTP-Server all
-	$(Q)$(MAKE) --no-print-directory -C WTP-Client all
+wtp-pi-listener-test: wtp-server-host-build wtp-client-host-build
 	$(Q)$(CXX) -std=c++20 -pthread -Wall -Wextra -Wpedantic -Werror $(WTP_LISTENER_TEST_FLAGS) \
 		-I. -IWTP-Server/include -IWTP-Client/include \
 		tests/wtp_pi_plain_listener_test.cpp wtp_endpoint/authority.cpp \
@@ -1214,9 +1220,7 @@ wtp-pi-listener-test:
 # Linux-only network fixture; no transmitter hardware. The routing acceptance
 # uses private namespaces and needs root/CAP_NET_ADMIN, unlike ordinary tests.
 .PHONY: wtp-pi-routing-probe wtp-pi-routing-test
-wtp-pi-routing-probe:
-	$(Q)$(MAKE) --no-print-directory -C WTP-Server all
-	$(Q)$(MAKE) --no-print-directory -C WTP-Client all
+wtp-pi-routing-probe: wtp-server-host-build wtp-client-host-build
 	$(Q)$(CXX) -std=c++20 -pthread -Wall -Wextra -Wpedantic -Werror \
 		-I. -IWTP-Server/include -IWTP-Client/include \
 		tests/wtp_pi_routing_probe.cpp wtp_endpoint/authority.cpp \
@@ -1702,6 +1706,10 @@ gpio-band-policy-test: $(BIN_DIR)/$(GPIO_BAND_POLICY_TEST_OUT)
 	$(Q)echo "Running GPIO band fail-closed policy tests."
 	$(Q)./$(BIN_DIR)/$(GPIO_BAND_POLICY_TEST_OUT)
 
+.PHONY: rp1-gpclk-dma-probe-clock-test
+rp1-gpclk-dma-probe-clock-test:
+	$(Q)python3 ../scripts/tests/rp1_dma_probe_clock_test.py
+
 $(BIN_DIR)/$(RP1_GPCLK_PLANNER_TEST_OUT): WSPR-Transmitter/src/rp1_gpclk_planner_test.cpp WSPR-Transmitter/src/rp1_gpclk_planner.cpp WSPR-Transmitter/src/rp1_gpclk_planner.hpp Chipset-Offsets/src/chipset_offsets.hpp
 	$(Q)mkdir -p $(BIN_DIR)
 	$(Q)$(CXX) $(RP1_GPCLK_PLANNER_TEST_FLAGS) $(filter %.cpp,$^) -o $@
@@ -2061,6 +2069,7 @@ wtp-network-runtime-test: wtp-tls-test wtp-plain-tcp-test $(BIN_DIR)/wtp_product
 .PHONY: object-dependency-test
 object-dependency-test:
 	$(Q)python3 ../scripts/tests/object_dependency_make_regression_test.py
+	$(Q)python3 ../scripts/tests/wtp_server_make_regression_test.py
 
 .PHONY: wtp-fleet-test
 $(BIN_DIR)/wtp_fleet_test: tests/wtp_fleet_test.cpp $(SEMANTICS_TEST_DEPS)
