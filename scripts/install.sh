@@ -4544,7 +4544,7 @@ init_colors() {
     ITALIC=$(default_color sitm)
     NO_ITALIC=$(default_color ritm)
     MOVE_UP=$(default_color cuu1)
-    CLEAR_LINE=$(tput el)
+    CLEAR_LINE=$(default_color el)
 
     # Foreground colors
     FGBLK=$(default_color setaf 0)

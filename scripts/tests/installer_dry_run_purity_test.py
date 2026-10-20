@@ -70,6 +70,21 @@ class InstallerDryRunPurityTest(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         return result
 
+    def test_terminal_setup_tolerates_unavailable_capabilities(self) -> None:
+        for terminal in ("unknown", "dumb"):
+            with self.subTest(terminal=terminal):
+                before = snapshot(self.root)
+                result = self.run_shell(
+                    r'''
+source "$INSTALLER"
+init_colors
+[[ -z "$CLEAR_LINE" ]]
+''',
+                    TERM=terminal,
+                )
+                self.assertEqual(result.stderr, "")
+                self.assertEqual(snapshot(self.root), before)
+
     def test_upgrade_ini_dry_run_creates_nothing(self) -> None:
         paths = self.root / "INI paths; $(not-executed)"
         paths.mkdir()
