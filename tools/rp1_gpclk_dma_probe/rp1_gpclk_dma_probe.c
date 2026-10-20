@@ -40,6 +40,7 @@ struct tone_profile {
 	u32 lower_count;
 };
 
+/* Retained 50 MHz-parent research fixture, not the 200 MHz DKMS planner. */
 static const struct tone_profile profiles[] = {
 	{232445, 232446, 66312},
 	{232444, 232445, 1134},
@@ -229,6 +230,15 @@ static void release_resources(struct dma_probe *probe)
 	probe->chan = NULL;
 }
 
+static int validate_profile_parent_rate(struct clk *clock)
+{
+	struct clk *parent = clk_get_parent(clock);
+
+	if (!parent || clk_get_rate(parent) != 50000000UL)
+		return -EINVAL;
+	return 0;
+}
+
 static int rp1_dma_probe(struct platform_device *pdev)
 {
 	struct dma_slave_config config = {};
@@ -265,6 +275,10 @@ static int rp1_dma_probe(struct platform_device *pdev)
 	probe->clk = devm_clk_get(&pdev->dev, "gpclk");
 	if (IS_ERR(probe->clk))
 		return dev_err_probe(&pdev->dev, PTR_ERR(probe->clk), "could not acquire clk_gp0\n");
+	ret = validate_profile_parent_rate(probe->clk);
+	if (ret)
+		return dev_err_probe(&pdev->dev, ret,
+			"legacy DMA fixture requires a 50 MHz parent; not the 200 MHz DKMS path\n");
 	ret = clk_rate_exclusive_get(probe->clk);
 	if (ret)
 		return ret;
@@ -302,6 +316,10 @@ static int rp1_dma_probe(struct platform_device *pdev)
 		(unsigned long long)phys_to_dma(probe->chan->device->dev,
 			(phys_addr_t)divider_address));
 	ret = clk_set_rate(probe->clk, 14097098);
+	if (ret)
+		goto fail;
+	/* A rate request can reparent GPCLK0; do not submit the old table then. */
+	ret = validate_profile_parent_rate(probe->clk);
 	if (ret)
 		goto fail;
 
