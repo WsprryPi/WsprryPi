@@ -269,8 +269,9 @@ Beta preparation or announcement does not itself close that stable release gate.
   publication notifications. Item 14's affected integration addendum is now
   complete; item 15's Pico implementation and originating assessment are
   complete within their recorded software scope. Pi/Beta adoption is now
-  implemented under item 16; its source/build handoff is complete, while final
-  candidate installation/service/runtime acceptance remains open.
+  implemented under item 16. Its source/build handoff is complete; 16c is
+  accepted with its specific physical-test limitations and documented
+  service-request cap exception. Publication and announcements remain separate.
 - ✅ **Pico Type 2/3 companion integration and acceptance:** item 14's complete
   companion integration, eight current/historical pairs, affected Impeccable/
   adversarial repairs and separately published operator documentation are
@@ -287,10 +288,14 @@ Beta preparation or announcement does not itself close that stable release gate.
   Pi station-progress adoption against `1653034`; P15.8 remains `p158`. The Pi
   operator workflow is updated in Docs `5214cdf`. Pico P15.14 and physical
   qualification remain separate; no new hardware operation is authorized.
-- ⏳ **Beta 1 release documentation and readiness:** 16a/16b's sourced notes,
-  compatibility guidance, exact candidate, four exports and software validation
-  are complete. 16c's physical acceptance disposition remains open. The evidence
-  handoff records reused checks and remaining gates; publication is separate.
+- ✅ **Beta 1 release documentation and readiness:** 16a–16c are complete.
+  The sourced notes, compatibility guidance, exact candidate, four exports and
+  acceptance handoff are recorded in the Beta 1 evidence. Fresh clean installation,
+  physical-target acceptance of the other three exports, reboot and fresh GPIO4
+  selection remain unperformed, specifically accepted Beta limitations. The
+  documented 20-versus-18 service-request exception accepts the past
+  nonconformance for 16c disposition without retroactive authorization.
+  16d/16e remain unauthorized and not started; overall item 16 remains in progress.
 - ☐ **Later Beta 1 publication and issue announcements:** after separate
   publication authorization, complete 16d verification before updating every
   open ready-for-release issue under 16e. Preserve issue states and audit coverage.
@@ -327,9 +332,10 @@ production consumption as separate gates:
    the accepted RP1 and unchanged UI evidence; record the new candidate identities.
 9. **Deliver P15.9 valid-field saves:** item 15's supported Pico implementation
    and originating assessment are complete after four repaired findings and
-   fresh independent reassessment. Pi/Beta adoption/documentation dispositions
-   remain separate. Accept selected inputs and repeat affected compatibility/
-   UI/docs checks before freeze; Pi adoption is not yet claimed.
+   fresh independent reassessment. Pi/Beta adoption, affected compatibility/UI
+   checks and operator documentation are complete under item 16 at the identities
+   recorded in the Beta 1 evidence. Pico P15.14 documentation and physical
+   qualification retain their separate scope.
 10. **Prepare WsprryPi Beta 1:** research all relevant ready/closed issues,
     internal documentation and commit history; write sourced Markdown release
     notes and compatibility guidance. After items 13–15 are accepted, build and
