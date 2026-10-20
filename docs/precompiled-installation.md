@@ -61,7 +61,10 @@ atomic rename. If a subsequent installer step fails, the installer attempts to
 restore the prior executable and service state. This is executable recovery,
 not a rollback of package or configuration changes.
 
-An upgrade preserves existing configuration values. A failed or empty
+An upgrade preserves current settings, including WTP connection settings,
+WSPR frequency preferences and band-selector assignments. Retired `GPIO.Use NTP`
+settings migrate to the clock-estimate policy and manual correction; existing
+canonical values take precedence. A failed or empty
 configuration merge stops installation and retains the existing configuration
 and its recovery copy.
 

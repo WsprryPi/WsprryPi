@@ -4,6 +4,8 @@
 from __future__ import annotations
 
 import shutil
+import configparser
+import re
 import subprocess
 import tempfile
 from pathlib import Path
@@ -24,6 +26,38 @@ def extract_upgrade_program(installer: str) -> str:
 def require(condition: bool, message: str) -> None:
     if not condition:
         raise RuntimeError(message)
+
+
+def parse_ini(text: str) -> configparser.ConfigParser:
+    data = configparser.ConfigParser(interpolation=None, inline_comment_prefixes=(";", "#"))
+    data.optionxform = str
+    data.read_string(text)
+    return data
+
+
+def check_persistent_schema(current: str) -> None:
+    """Use the runtime persistence allowlist, including its dynamic key sets."""
+    source = (ROOT / "src/config_handler.cpp").read_text(encoding="utf-8")
+    allowlist = source.split("const bool persist_key =", 1)[1].split("if (!persist_key)", 1)[0]
+    sections = list(re.finditer(r'section_name == "([^"]+)"', allowlist))
+    required = {}
+    for index, section in enumerate(sections):
+        end = sections[index + 1].start() if index + 1 < len(sections) else len(allowlist)
+        required[section[1]] = set(re.findall(r'key == "([^"]+)"', allowlist[section.end():end]))
+    for section, header, function in (
+        ("WTP", "wtp_settings_json.hpp", "wtp_settings_json"),
+        ("WTP Server", "wtp_server_settings_json.hpp", "wtp_server_settings_json"),
+    ):
+        serializer = (ROOT / "src" / header).read_text(encoding="utf-8").split(function, 1)[1].split("inline ", 1)[0]
+        required[section] = set(re.findall(r'\{"([^"]+)"\s*,', serializer))
+        require(bool(required[section]), f"no runtime keys extracted for {section}")
+    bands = source.split("kHamBandJsonKeys =", 1)[1].split("}};", 1)[0]
+    required["Band GPIO"] = {key for band in re.findall(r'"([^"]+)"', bands)
+                            for key in (band, f"{band} Active High")}
+    stock = parse_ini(current)
+    missing = [(section, key) for section, keys in required.items() for key in sorted(keys)
+               if not stock.has_option(section, key)]
+    require(not missing, f"stock INI omits runtime-persisted settings: {missing}")
 
 
 def upgrade(
@@ -48,6 +82,7 @@ def main() -> None:
     require(awk is not None, "no awk implementation is available")
 
     current = CURRENT_INI.read_text(encoding="utf-8")
+    check_persistent_schema(current)
     require("\n22m =" not in current, "current INI still contains 22m")
     require(
         "\n22m Active High =" not in current,
@@ -65,6 +100,77 @@ def main() -> None:
         old_ini = root / "old.ini"
         merged_ini = root / "merged.ini"
         stock_ini = root / "installed.ini.stock"
+
+        custom = {
+            "WTP": {"Transport": "network", "Hostname": "station.example", "TCP Port": "31418",
+                    "TLS Server Identity": "station.example", "TLS CA File": "/etc/station/ca.pem",
+                    "TLS Client Certificate": "/etc/station/client.pem", "TLS Client Key": "/etc/station/client.key",
+                    "Endpoint": "/dev/serial/by-id/station", "USB Serial": "001234",
+                    "USB Vendor ID": "11914", "USB Product ID": "10", "Device ID": "0123456789abcdef0123456789abcdef",
+                    "Allow Frequency Adjustment": "true", "Start Uncertainty ns": "1000000"},
+            "WSPR": {"Frequency Profile": "wrc15", "Band Preferences": '{"20m":14097100}'},
+            "Band GPIO": {"8m": "23", "8m Active High": "true", "5m": "24", "5m Active High": "true"},
+        }
+        old_ini.write_text("".join(f"[{section}]\n" + "".join(f"{key} = {value}\n" for key, value in keys.items())
+                                   for section, keys in custom.items()) + "\n[Unknown]\nSetting = ignored\n", encoding="utf-8")
+        original = old_ini.read_bytes()
+        # Run the actual shell publication/backup path, not just the AWK program.
+        result = subprocess.run(["bash", "-c", r'''
+source "$1"
+DRY_RUN=false
+debug_start() { :; }; debug_filter() { printf '%q ' "$@"; }; debug_print() { :; }
+debug_end() { :; }; logE() { :; }
+exec_command() {
+    shift
+    local args=() arg
+    for arg in "$@"; do [[ -z "$arg" ]] || args+=("$arg"); done
+    "${args[@]}"
+}
+upgrade_ini "$2" "$3" "$4"
+''', "ini-preservation", str(INSTALLER), str(old_ini), str(CURRENT_INI), str(merged_ini)],
+                                capture_output=True, text=True, check=False)
+        require(result.returncode == 0, f"custom merge failed: {result.stderr}")
+        merged = merged_ini.read_text(encoding="utf-8")
+        parsed = parse_ini(merged)
+        for section, keys in custom.items():
+            for key, value in keys.items():
+                require(parsed.get(section, key) == value, f"custom {section}.{key} was lost")
+        require(not parsed.has_section("Unknown"), "unknown settings passed through")
+        require(old_ini.read_bytes() == original, "custom merge changed installed input")
+        require(Path(f"{old_ini}.pre_migration.bak").read_bytes() == original, "custom merge changed backup")
+        require(upgrade(awk, program, merged_ini, CURRENT_INI, root / "custom-repeat.ini") == merged,
+                "custom repeat installation is not idempotent")
+
+        for token, enabled in (("true", True), ("T", True), ("1", True), ("yes", True),
+                               ("Y", True), ("on", True), ("false", False), ("F", False),
+                               ("0", False), ("no", False), ("N", False), ("off", False)):
+            for canonical in (None, "true", "false"):
+                for manual in (None, "-7.25"):
+                    old_ini.write_text(f"[Calibration]\nPPM = 3.125\n[GPIO]\nUse NTP = {token}\n" +
+                                       (f"Use System Clock Frequency Estimate = {canonical}\n" if canonical else "") +
+                                       (f"Manual PPM = {manual}\n" if manual else ""), encoding="utf-8")
+                    migrated = parse_ini(upgrade(awk, program, old_ini, CURRENT_INI, merged_ini))
+                    require(migrated.getboolean("GPIO", "Use System Clock Frequency Estimate") ==
+                            (canonical == "true" if canonical else enabled), "legacy clock policy changed")
+                    expected_manual = manual if manual else ("0.0" if enabled else "3.125")
+                    require(migrated.get("GPIO", "Manual PPM") == expected_manual, "legacy manual PPM changed")
+                    require(migrated.get("GPIO", "Frequency Residual PPM") == "0.0", "legacy residual missing")
+                    require(not migrated.has_option("GPIO", "Use NTP"), "retired clock key persisted")
+        for calibration in ("", "PPM =\n", "PPM = -2.5\n"):
+            old_ini.write_text("[Calibration]\n" + calibration +
+                               "[GPIO]\nUse NTP = false\nFrequency Residual PPM = 1.75\n", encoding="utf-8")
+            migrated = parse_ini(upgrade(awk, program, old_ini, CURRENT_INI, merged_ini))
+            require(migrated.get("GPIO", "Manual PPM") == ("-2.5" if "-2.5" in calibration else "0.0"),
+                    "missing/blank legacy calibration was not handled")
+            require(migrated.get("GPIO", "Frequency Residual PPM") == "1.75", "custom residual was lost")
+        for invalid in ("Use NTP = maybe", "Use NTP = false\nUse System Clock Frequency Estimate = invalid"):
+            old_ini.write_text(f"[GPIO]\n{invalid}\n", encoding="utf-8")
+            result = subprocess.run([awk, program, str(old_ini), str(CURRENT_INI)], capture_output=True, text=True)
+            require(result.returncode != 0, "invalid legacy boolean was silently normalized")
+        old_ini.write_bytes(b"[Calibration]\r\nPPM = 3.125\r\n[GPIO]\r\nUse NTP = false\r\n")
+        migrated = parse_ini(upgrade(awk, program, old_ini, CURRENT_INI, merged_ini))
+        require(not migrated.getboolean("GPIO", "Use System Clock Frequency Estimate"), "CRLF policy lost")
+        require(migrated.get("GPIO", "Manual PPM") == "3.125", "CRLF calibration lost")
 
         # Exercise the actual shell function, including failure handling. A
         # failed or empty merge must never publish defaults over custom gates.

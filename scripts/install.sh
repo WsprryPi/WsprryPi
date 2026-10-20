@@ -7588,8 +7588,16 @@ upgrade_ini() {
 
     if awk '
     function trim(value) {
-      gsub(/^[ \t]+|[ \t]+$/, "", value)
+      gsub(/^[ \t\r]+|[ \t\r]+$/, "", value)
       return value
+    }
+
+    function strict_bool(value, key, normalized) {
+      normalized = tolower(trim(value))
+      if (normalized ~ /^(true|t|1|yes|y|on)$/) return 1
+      if (normalized ~ /^(false|f|0|no|n|off)$/) return 0
+      print "Invalid boolean for " key > "/dev/stderr"
+      exit 2
     }
 
     # Phase 1: read old.ini → overrides[section,key]=value
@@ -7615,10 +7623,34 @@ upgrade_ini() {
 
       val = l
       sub(/^[^=]*=[ \t]*/, "", val)
-      sub(/[ \t]*$/, "", val)
+      sub(/[ \t\r]*$/, "", val)
 
       overrides[current_section SUBSEP key] = val
       next
+    }
+
+    # Preserve the supported legacy GPIO migration before stock defaults can
+    # hide missing canonical keys. Match the application migration precedence.
+    FNR == 1 {
+      legacy = "GPIO" SUBSEP "Use NTP"
+      canonical = "GPIO" SUBSEP "Use System Clock Frequency Estimate"
+      residual = "GPIO" SUBSEP "Frequency Residual PPM"
+      manual = "GPIO" SUBSEP "Manual PPM"
+      calibration = "Calibration" SUBSEP "PPM"
+      if (legacy in overrides) {
+        enabled = strict_bool(overrides[legacy], "GPIO.Use NTP")
+        if (canonical in overrides) {
+          strict_bool(overrides[canonical], "GPIO.Use System Clock Frequency Estimate")
+        } else {
+          overrides[canonical] = enabled ? "true" : "false"
+        }
+        if (!(residual in overrides)) overrides[residual] = "0.0"
+        if (!(manual in overrides)) {
+          overrides[manual] = !enabled && calibration in overrides && trim(overrides[calibration]) != "" \
+            ? overrides[calibration] : "0.0"
+        }
+        delete overrides[legacy]
+      }
     }
 
     # Phase 2: walk new.ini
