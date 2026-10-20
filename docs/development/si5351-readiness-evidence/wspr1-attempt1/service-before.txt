@@ -1,3 +1,0 @@
-MainPID=463
-ActiveState=active
-SubState=running

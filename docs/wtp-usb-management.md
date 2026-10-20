@@ -130,14 +130,10 @@ measurement accounting, symbol timing, missed-start deadline, holdover, lead
 reserve, host qualification, clock-step/leap guard, job capacity or RF servicing
 budget. Pico's independent advertised maximum remains 500 ms.
 
-The earlier bounded target check observed 56.7–71 ms without arming a job.
-The subsequent [clock investigation](https://github.com/WsprryPi/WsprryPico/blob/devel/docs/development/usb-time-uncertainty.md)
-corrected the sample bracket and measured 17.686–18.235 ms with a qualified host
-and no Pico station network. These are historical USB time-transfer measurements,
-not absolute RF start-error measurements. Runtime observations report host error,
-sample round trip and midpoint radius, clock discrepancy, processing margin and
-ACK duration separately. The [100 ms execution/review record](development/utc-100ms-review.md)
-distinguishes deterministic acceptance from physical/RF qualification.
+Runtime observations report host error, sample round trip and midpoint radius,
+clock discrepancy, processing margin and ACK duration separately. A transport
+observation is not an absolute RF start-error measurement. Deterministic
+acceptance remains separate from physical/RF qualification.
 
 STOP and owned-job cancellation signal the USB transaction before waiting for
 runtime authority, so a silent management read is interrupted cooperatively.
@@ -149,7 +145,7 @@ Pico Wi-Fi disabled does not imply disabling the Pi's network or time service.
 
 ## Preservation and validation
 
-This slice changes no job/event/frame/duration limits, supported waveform modes,
+USB management preserves job/event/frame/duration limits, supported waveform modes,
 scheduler recurrence authority, holdover/launch limits or RF servicing reserves.
 The accepted ordinary UTC default changes to 100 ms; explicit per-job limits
 and Pico's advertised ceiling remain authoritative. Existing standalone, consumer Wi-Fi, Plain LAN, engineering
@@ -183,13 +179,7 @@ The dedicated USB CI pin selects Pico product
 review, command results and bounded physical USB/AP evidence are recorded in
 the coordinated Pico execution record. Unpublished source does not claim a remote CI pass.
 
-## Documentation impact
+## Related configuration
 
-Updated this guide, production/USB/browser/configuration references and README.
-Historical Phase 10/11/15 records retain their original tested applicability.
-The separate Wsprry_Pi_Docs repository is outside this authorization; follow-up
-must document the visible Pico control toggle, cable selection/permissions,
-common name, USB Wi-Fi create/remove, UTC readiness, uncertain-save readback
-and bounded AP request with screenshots of the final verified UI.
-
+Physical claims remain bounded by their exact tested source and setup identities.
 The negotiated [Pico GPIO drive extension](wtp-gpio-drive.md) provides four nominal RF-pad choices with explicit restart activation.

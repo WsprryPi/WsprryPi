@@ -1,1 +1,0 @@
-{"image":"sha256:005c0c2704a12e61bdc428c07340a8f27a5dba593f4d823b923ce62e4c3beed6","mounts":[],"devices":[],"network":"none","privileged":false,"cap_drop":["ALL"],"security_opt":["no-new-privileges"]

@@ -1,8 +1,0 @@
-Compiling (debug) si5351_transition_test.cpp into build/obj/debug/./si5351_transition_test.o
-Linking debug: si5351_transition_test
-FAIL: loaded-job cleanup failure remains retained without retrying I2C
-Status fixture primary and cleanup: Si5351 active readiness failure; plan=1 request=379 PLLA reference=XA/external_tcxo reference_hz=27000000 register0=0xc1 event=1 tone=1 Cleanup failed: Could not disable Si5351 output (output state unknown): Write Si5351 register 0x3 failed: Input/output error
-Transport fixture primary: Si5351 active readiness failure; plan=379 request=379 PLLA reference=XA/external_tcxo reference_hz=27000000 status unavailable; Read Si5351 register 0x0 failed: Input/output error event=1 tone=1
-Transport fixture cleanup: Could not disable Si5351 output (output state unknown): Write Si5351 register 0x3 failed: Input/output error
-1 Si5351 transition test(s) failed.
-make: *** [Makefile:381: si5351-transition-test] Error 1

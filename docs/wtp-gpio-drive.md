@@ -24,12 +24,8 @@ and requires explicit read/review before another save. Changing member or boot
 requires discarding the old member-bound draft before saving to the new member.
 Older firmware shows drive unavailable and retains its other usable settings.
 
-## Documentation Impact
+## Qualification boundary
 
-Updated this companion development contract. Existing USB and configuration
-operator guides retain their original scope and link here for the extension.
-P15.20 must add the four choices/default, electrical meaning, saved versus active
-status, explicit restart, old-firmware availability and unknown-outcome recovery.
-The separate operator documentation repository/site is outside this task.
-Physical pad programming, USB restart/re-enumeration and RF amplitude/spectral
-acceptance remain separately recorded in the Pico P15.15 execution record.
+Nominal drive selection does not establish measured RF amplitude, power or
+spectral performance. Physical pad programming, restart/re-enumeration and RF
+behavior require evidence for the selected firmware, board, output and load.

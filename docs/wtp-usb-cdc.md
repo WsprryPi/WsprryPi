@@ -1,12 +1,11 @@
 # WTP USB CDC host adapter
 
 Current normal-firmware USB management, hostname/Wi-Fi lifecycle and UTC
-support are documented in [USB management](wtp-usb-management.md). Historical
-phase-specific limitations below retain their original evidence scope.
+support are documented in [USB management](wtp-usb-management.md).
 
-Phase 10 Slice 4 adds the parent application's
-[`UsbCdcStream`](../src/wtp_integration/usb_cdc.hpp). It implements the portable
-WTP-Client `ByteStream` interface using POSIX serial I/O. The subsequent
+The parent application's
+[`UsbCdcStream`](../src/wtp_integration/usb_cdc.hpp) implements the portable
+WTP-Client `ByteStream` interface using POSIX serial I/O. The
 [production integration](wtp-production-integration.md) links this adapter into
 the application with explicit persisted endpoint selection and an owned worker.
 The reusable WTP-Client library remains OS-independent.
@@ -154,20 +153,14 @@ behavior, permissions, physical DTR reset, unplug/re-enumeration, suspend,
 USB stalls and actual Pico endpoint interoperability require separately
 authorized target validation. No existing campaign/RF qualification is extended.
 
-## Documentation impact
+## Integration and qualification
 
-This developer guide and the root/component progress references were updated.
-No operator configuration or UI changed. The separate Wsprry_Pi_Docs backend and
-INI guidance was reviewed and remains unchanged. Later integration needs
-separately authorized endpoint-selection, access-permission, clock prerequisite
-and unresolved-output guidance there; no udev rules or services are installed.
-
-The [complete-plan backend](wtp-backend.md) is implemented in Slice 5 with
-explicit typed construction. Slice 6 adds the [early scheduler](wtp-scheduling.md).
-Production status/recovery and configuration/operator integration remain required.
-Device UTC must already be independently provisioned; GET_CLOCK observes it.
-Future UI work still requires a temporary UI-level development toggle and
-Impeccable desktop/mobile review. Phase 10 is not complete.
+The [complete-plan backend](wtp-backend.md), [early scheduler](wtp-scheduling.md)
+and [production integration](wtp-production-integration.md) connect this adapter
+to persisted endpoint selection, status and recovery. Device UTC must satisfy
+the selected job's uncertainty limits. GET_CLOCK observes it; supporting
+firmware can accept qualified controller UTC through the separate
+[USB management](wtp-usb-management.md) exchange.
 
 [pico-usb]: https://github.com/WsprryPi/WsprryPico/blob/40812e7438f180c5e8d8ad75d4eb227271152b10/docs/development/usb-cdc.md
 [wtp]: https://github.com/WsprryPi/WsprryPico/blob/40812e7438f180c5e8d8ad75d4eb227271152b10/docs/protocol/WTP.md

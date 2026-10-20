@@ -1,6 +1,6 @@
 # WTP execution-plan conversion
 
-Phase 10 Slice 3 implements the pure parent application adapter in
+The pure parent application adapter is implemented in
 [`src/wtp_integration`](../src/wtp_integration/execution_plan.hpp). It consumes
 the reusable WSPR-Transmitter execution-plan type and produces WTP-Client
 types. Neither component depends on the other. The adapter is compiled by its
@@ -12,7 +12,7 @@ focused test target; it is not linked into the production application yet.
 `WtpPlanResult` containing a specific error, explanation and event index when
 applicable. Failure returns no partial job or ARM request. The source plan and
 previously prepared results are not modified. The result retains source plan
-and request IDs for later integration; those process-local numbers are not WTP
+and request IDs for the host runtime; those process-local numbers are not WTP
 job identities.
 
 The caller supplies a fresh 32-character lowercase hexadecimal job ID, an
@@ -23,10 +23,10 @@ and an uncertainty request above the advertised maximum are rejected.
 
 `ExecutionPlan` contains no absolute schedule. The caller must derive the
 explicit UTC value from the committed scheduled slot, including its offset,
-using checked arithmetic. This slice does not yet connect that scheduling path.
+using checked arithmetic. The converter does not start that scheduling path.
 The converter cannot assess clock age, holdover, leap exclusions, minimum lead
 or horizon without a fresh device clock and the preparation timeline. Those
-checks belong to later scheduler/backend admission; the session already
+checks belong to scheduler/backend admission; the session
 validates correlated ARM acknowledgments. Never treat conversion as ARM success
 or compensate for an unsuccessful ARM by starting late.
 
@@ -130,24 +130,15 @@ across exponents, halfway cases and uint64 boundaries. Tests use no device,
 transport, installation or service operations. CI runs the focused target on
 macOS and Linux; a local macOS pass is not evidence that Linux CI ran.
 
-## Documentation impact and remaining work
+## Integration and qualification
 
-This document, the root README and the WTP component README describe the
-developer API. No operator behavior or configuration changes in Slice 3.
-The separate Wsprry_Pi_Docs backend, INI and Transmitter documentation was
-considered and remains unchanged. Later operator integration needs separately
-authorized documentation for endpoint identity, finite jobs, unsupported
-features, clock prerequisites and truthful cancellation/output-unknown status.
+The [USB CDC adapter](wtp-usb-cdc.md), [backend](wtp-backend.md),
+[early scheduler](wtp-scheduling.md) and [production integration](wtp-production-integration.md)
+connect typed plans to endpoint selection, an owned runtime and explicit status
+and recovery. Host tests do not qualify physical USB, device timing, RF output
+or release readiness.
 
-The [USB CDC transport adapter](wtp-usb-cdc.md) is implemented in Slice 4.
-The [backend](wtp-backend.md) and [early scheduler](wtp-scheduling.md) are
-implemented in Slices 5 and 6. Slice 7 supplies status/recovery, and the parent
-[production integration](wtp-production-integration.md) now connects selection,
-an owned worker and UI controls with a temporary default-off development toggle.
-Physical USB behavior,
-device timing, RF output and release readiness remain unqualified by these tests.
-
-## Selected Pico message limits (Phase 11.5 R3 v2)
+## Selected Pico message limits
 
 On the WTP backend, QRSS, FSKCW and DFCW accept at most 32 characters,
 including spaces. The shared compiler rejects 33 without truncating or splitting;
@@ -170,6 +161,5 @@ The request builder checks finite positive timing and nanosecond conversion
 bounds before casting or multiplying durations. The WTP compiler checks event
 sum overflow. Host regressions include 31/32/33 characters and counted spaces
 in every mode, smaller CAPS, exact duration boundaries and integer overflow.
-The parent WTP production tests exercise the request builder. These checks
-qualify software behavior; final physical long-job and R3 acceptance is tracked
-in WsprryPico's Phase 11.5 ledger and remains open during implementation.
+The parent WTP production tests exercise the request builder. These checks qualify software behavior. Physical long-job timing and RF
+acceptance require separate evidence for the selected firmware and setup.

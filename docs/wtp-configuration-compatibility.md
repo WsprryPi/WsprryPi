@@ -1,20 +1,19 @@
 # Pico configuration compatibility
 
 Current normal-firmware USB management, hostname/Wi-Fi lifecycle and UTC
-support are documented in [USB management](wtp-usb-management.md). Historical
-phase-specific limitations below retain their original evidence scope.
+support are documented in [USB management](wtp-usb-management.md).
 
 The Pi settings form uses one host-coordinated, serialized settings transaction.
 The existing WTP application remains the only scheduling/ownership authority;
 Pico remains the only remote configuration validator and journal authority.
-The P15.3 extension adds explicit consumer management carriers while preserving WTP/1, RF engines and recurrence policy.
-P15.4 adds [scoped member resources](wtp-browser-api.md#shared-pico-member-resources)
-beside this existing atomic settings transaction. It does not split a legacy
+Explicit consumer management carriers preserve WTP/1, RF engines and recurrence
+policy. [Scoped member resources](wtp-browser-api.md#shared-pico-member-resources)
+coexist with the atomic settings transaction. It does not split a legacy
 settings save into station and hardware writes.
 
 Beta 1 adds a separate [saved station progress](wtp-browser-api.md#independent-saved-station-progress)
-workflow on supporting firmware. It adopts Pico P15.9 at exact network reference
-`165303458e49feaac1de54c8344058f56578d533`. The prior P15.8 network reference
+workflow on supporting firmware, using exact network reference
+`165303458e49feaac1de54c8344058f56578d533`. The prior network reference
 `804e8a06585ec5a0e650e69fcd71ada398b6cc9f` is retained as `p158`; current,
 `legacy`, `extended`, `p152`, `p153`, `p154`, `p156`, `p157` and `p158` are nine
 separate network rows. The independent USB reference remains
@@ -102,12 +101,12 @@ Engineering Network (TLS) remains the default certificate management carrier.
 Explicit authenticated consumer station/AP management is described in
 [the adapter contract](wtp-browser-api.md#explicit-consumer-management). Outbound
 allowlists retain the existing finite pairs and add GET station/hardware/pins,
-PUT station/hardware and POST pins/validate for P15.4. Authenticated canonical
+PUT station/hardware and POST pins/validate. Authenticated canonical
 Host/Origin and JSON intent apply; scoped writes retain the common If-Match,
 while the bare nonpersistent remote preview does not require it. These controls
 use existing authenticated application-resource discovery, independently of the
-closed P15.3 management operation list. In that frozen phase, USB and Plain LAN WTP were not management
-carriers; no carrier is substituted automatically.
+closed management-operation list. USB uses its own management contract;
+Plain LAN WTP is not a management carrier. No carrier is substituted automatically.
 Existing direct `/config`, `/schedules` and `/network` resource compatibility
 remains available; the settings form uses the coordinated resource above.
 
@@ -131,67 +130,25 @@ activation is distinct from station/schedule settings used by later admissions.
 Unavailable restart data is stated as unconfirmed. Profile-owned station/Wi-Fi
 changes must use Pico setup when Pico rejects them; Pi never claims they saved.
 
-## Source-pair scope
+## Compatibility fixture boundaries
 
-P15.4's historical implementation dependency is clean Pico
-`ddb00dd7960373cec271f7816c0e1b10117416e9`; its difference from accepted P15.3
-`d6208dbc88005383041c5ec306b738db7ec22796` is documentation only. The historical
-`p153` row remains pinned separately, alongside `legacy`, `extended` and `p152`.
-Current, p153 and the explicit p154 row execute the actual native consumer
-fixture as well as the TLS settings tests. Current additionally executes the UI-produced shared resource
-workflow through protected routing, production runtime and actual Pico handlers
-on engineering mTLS and consumer station/AP paths. Older peers retain their
-supported legacy editor; absent shared resources are unavailable. See the
-[P15.4 ledger](development/phase15-4-shared-resources.md) for exact commands,
-source-pair results, sanitizer coverage and limits. The table below preserves
-the original P15.2 evidence, rather than reclassifying its historical rows.
+The nine network rows listed above retain their separately pinned sources and
+expectations. Tests use actual Pico handlers, native TLS and consumer station/AP
+fixtures. Older peers retain their supported legacy editor; absent shared
+resources or authenticated retirement remain unavailable. Management/1 and
+management/2 discovery are validated exactly. Unsupported versions, malformed
+limits and inconsistent targets refuse before mutation or fallback.
 
-| Pi client | Pico commit | Contract |
-| --- | --- | --- |
-| Unchanged producer `8454e21429c89401b1b9fb5f47a5e15276b86763` | `87144d1364f36d04bfe0a714bd1c2f6deb974302` | Pico-owned legacy omission preservation |
-| Updated client | `95aac22bf7cc31b67fe5773761708d743d8a6473` | Strict legacy Config v1 fallback |
-| Updated client | `dfffdd5220db8b7cf1acf5e74950dbd294283c55` | Extended pre-fix legacy replacement; Pi explicitly preserves known extensions |
-| Updated client | `87144d1364f36d04bfe0a714bd1c2f6deb974302` | Advertised merge with exact target and journal-generation/ABA revision |
+The strict legacy server's ETag hashes boot/config/network values without modern
+device/generation binding. It cannot detect an external A-to-B-to-A sequence.
+Its fallback row covers preservation and ordinary stale rejection, not modern
+ABA guarantees. Fresh Pi WTP/TLS identity and the explicit host target still
+bind the selected member; modern Pico also checks the remote target.
 
-P15.6 current is pinned to clean Pico
-`792b5b2f60e381a6bd8e7a7726eeffe24fc08519`, with exact management/2 limits
-and three independently authenticated sessions. The old published-current
-`ddb00dd7960373cec271f7816c0e1b10117416e9` is retained as explicit `p154`.
-All five older rows (`legacy`, `extended`, `p152`, `p153`, `p154`) remain active.
-New Pi validates management/1 and management/2 exactly, including field types,
-capacity, quotas, carrier, target, boot and generation. Invalid, fractional,
-boolean, zero, negative, excessive or unknown-version values refuse without
-fallback or mutation. Actual old native Pi source explicitly refuses new
-discovery with `unsupported_management_contract`, logs out its own temporary
-session and makes no write. Consumer-Radio/1 bytes and fixed vectors stay the
-same. The [P15.6 record](development/phase15-6-sessions.md) retains source-pair,
-mixed native/browser, sanitizer and scope evidence.
+Software loopback/RAM-journal checks do not qualify firmware, physical flash,
+installed proxy/services, transport timing or RF.
 
-The September strict server's ETag hashes boot/config/network values without
-modern device/generation binding. It cannot detect an external A-to-B-to-A
-sequence. Its fallback row qualifies preservation and ordinary stale rejection,
-not modern ABA guarantees. The fresh Pi WTP/TLS identity and explicit host target
-still bind the selected member; modern Pico also checks the remote target.
-
-See the [execution prompt](development/issue448-execution-prompt.md) and
-[review/validation matrix](development/issue448-review.md) for actual executed
-coverage and limits. Software loopback/RAM-journal evidence does not qualify
-firmware, physical flash, installed proxy/services, transport timing or RF.
-
-
-## P15.7 current and preserved P15.6 row
-
-Current advances to clean Pico `26ae596b540e92f25da37f978321ba1ec5934bdc`.
-`p156` pins historical `792b5b2f60e381a6bd8e7a7726eeffe24fc08519`; all six
-historical sources/expectations remain, alongside current. New Pi keeps supported
-old-firmware reads/saves when authenticated retirement is unavailable. Frozen
-management/1, management/2 and Radio/1 are unchanged; the recovery discovery and
-proof are an independently versioned extension reachable at full capacity.
-Published P15.6 Pi behavior against new Pico is tested separately using its
-actual old product sources. See the [P15.7 record](development/phase15-7-recovery.md)
-and lead packet for exact tested pairs and results.
-
-## P15.8 versioned WSPR formats
+## Versioned WSPR formats
 
 The separately advertised `application_resources_v2` descriptor negotiates
 `transmitter-application/2`, `transmitter-station/2` and
@@ -225,8 +182,3 @@ selected new-format station. Unchanged release Pi can continue existing Type 1
 workflows; a selected Type 2/3 station requires this companion or a later
 integration. WTP/1, management/1 and /2, Consumer-Radio/1 and Consumer-Recovery/1
 remain unchanged.
-
-The matrix adds historical `p157` at
-`26ae596b540e92f25da37f978321ba1ec5934bdc`, preserving its original strict
-expectations, and advances only `current`. Execution and branch/rollout evidence
-are in [the P15.8 companion record](development/phase15-8-wspr-type23.md).

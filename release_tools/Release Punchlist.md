@@ -1,291 +1,92 @@
 # Wsprry Pi 4.0 Release Punchlist
 
-Selected by the maintainer on October 14, 2026. Review every saved item and
-record whether it is completed, already addressed, or explicitly deferred,
-with supporting evidence or a reason for deferral. Optional research and
-post-release features retain their stated scope; inclusion here requires a
-disposition rather than implementation before 4.0.
+This is the selected work and release-gate authority. Items 1–15 are complete
+within their accepted scopes. Item 16 remains in progress: Beta 1 source/build
+preparation is complete, while final candidate installation/service/runtime
+acceptance remains open. Cleanup changes no status, selected requirement,
+priority, candidate identity or publication authority.
+
+The current milestone is **WsprryPi 4.0 Beta 1**. Work stops after item 16c.
+Items 16d–16e require separate publication authorization. No tag, release/draft,
+asset upload, release-branch merge, issue announcement or final stable publication
+is authorized by preparation or cleanup.
+
+The [Beta 1 evidence](4.0-Beta-1-Release-Evidence.md),
+[source inventory](4.0-Beta-1-Source-Inventory.json) and
+[candidate manifest](4.0-Beta-1-Candidate-Manifest.json) bind the selected source,
+accepted reuse and remaining gates. Completed development narratives and raw
+campaign outputs are retired under the
+[cleanup instructions](../docs/development/repository-cleanup-prompt.md).
 
 ## Ordered release checklist
 
-Status updated October 17, 2026. Items 1 through 15 are complete within their
-recorded scopes. Accepted implementation is integrated into `devel`, and the
-immutable RP1 provider release is published. Item 10, WsprryPi production
-consumption and validation, is accepted for installation and idle runtime
-integration. Existing documented RF qualification and its limitations are
-preserved; the maintainer accepted the provider's empty `Unavailable` manifest
-as the original release state and excluded target rollback rehearsals. The
-[separate qualification supplement](../docs/rp1-qualification-metadata.md) records
-accepted route evidence without changing those assets or application policy.
-Its installed consumer, cache, independent both-route status, API/UI and support
-collector are now verified on wspr5.
-No new RF qualification is claimed. Items 11–12 are complete, including verified
-hosted builds and publication. Item 13 is complete for reviewed implementation
-`d93c75c` on `devel`, with #423 closed and final closeout CI verified;
-item 14 is complete within its bounded software integration scope. The full
-Pico Type 2/3 companion is integrated with affected Impeccable review,
-independent adversarial repairs, exact-source compatibility and promoted-head
-CI. Docs devel and its hosted default-gated build are verified. Item 15/P15.9
-is closed for the supported Pico software implementation and originating
-post-execution assessment. Four findings were repaired and independently
-reassessed at Pico `1653034`. Item 16 now implements the explicitly selected Pi
-station-progress adoption, retains P15.8 as a historical pair, and updates the
-Pi operator workflow in Docs `5214cdf`. Pico's broader P15.14 documentation and
-physical qualification remain separate. Beta 1 preparation is in progress;
-final-candidate installation/service/runtime acceptance remains open.
-
-The current milestone is **WsprryPi 4.0 Beta 1**, not final 4.0 stable
-publication. The maintainer's October 16 direction is to prepare a reviewable
-Beta 1 candidate and Markdown release documentation, with a hard stop after
-item 16c. Items 16d–16e are later publication/announcement gates, not authorized
-by this planning update. No tag, GitHub release/draft, asset upload, issue
-announcement or final stable publication is to be performed now.
-
 Status key: ✅ Complete · ⏳ In progress · ☐ Not started
 
-1. ✅ **WTP/API maturity — Pico configuration contract (#447).** Complete.
-   Establish Pico-owned preservation, partial updates, explicit resets,
-   capabilities and revision handling while retaining WTP/1 job semantics.
-2. ✅ **WTP/API maturity — Pi integration and compatibility (#448).** Complete.
-   Adopt the update contract and verify supported version pairs, providing
-   the tested handoff that unblocks further Pico development.
-3. ✅ **Calibration scope decisions.** Complete. Retain current correction
-   behavior and RP1's implemented 200 MHz `pll_sys` parent for 4.0. Defer direct
-   PPS calibration and alternative-parent experiments beyond 4.0; neither
-   absence blocks release. This closes the scope decision, not RF calibration.
-   Existing Chrony source-age and source-identification concerns remain recorded
-   for separate triage. See [Calibration Scope Decisions](Calibration%20Scope%20Decisions.md).
-4. ✅ **Test Tone lifecycle and status feedback.** Complete. Scheduler-owned
-   ordering, generation fencing, watchdog cleanup and truthful execution/
-   restoration feedback are implemented and software-validated. See the
-   [review and evidence](../docs/development/test-tone-lifecycle-review.md).
-   Physical qualification remains separate; the final integrated UI review
-   is closed under item 13.
-5. ✅ **WsprryPico — Implement Phase 15.4: adopt shared application, station and
-   hardware resources.** Complete within the authorized software scope. Shared
-   member resources, scoped saves, pin inspection and nonpersistent validation
-   are adopted and software-validated. See the
-   [acceptance record](../docs/development/phase15-4-shared-resources.md).
-   Physical, installed-service and unrestricted security qualification remain
-   separate; P15.5 concurrent web servicing is not included.
-6. ✅ **Si5351 readiness failures.** Complete by explicit maintainer
-   disposition after software repairs, Linux validation and two consecutive
-   inhibited wspr1 I2C checks (1,000 reads each) passed. The maintainer requested
-   closure if the identical repeat passed; it did. See the
-   [readiness review and acceptance](../docs/development/si5351-readiness-review.md).
-   Historical wspr4 `SYS_INIT` observations remain retained and unexplained;
-   closure accepts the bounded I2C evidence without requiring RF measurement.
-7. ✅ **RP1 release-candidate preparation.** Complete. The original unpublished
-   `1.0.0` candidate was bound to RP1-GPCLK-DKMS commit
-   `817f3dc6a194f4a92a7f94acf10147169e6439d6`. Release-scoped module/lifecycle
-   work, packaging, manifests, hashes, reproducibility, cleanup-first
-   `0.9`-to-`1.0` migration, rollback, removal, reinstall and recovery validation
-   are complete. Subsequent freeze and publication are recorded in item 9.
-   See the provider's
-   [candidate procedure](https://github.com/WsprryPi/RP1-GPCLK-DKMS/blob/817f3dc6a194f4a92a7f94acf10147169e6439d6/docs/operator/release-candidate.md)
-   and [package lifecycle contract](https://github.com/WsprryPi/RP1-GPCLK-DKMS/blob/817f3dc6a194f4a92a7f94acf10147169e6439d6/docs/operator/package-lifecycle.md).
-8. ✅ **WsprryPi acceptance of the exact RP1 candidate.** Complete for WsprryPi
-   feature commit `c4736e55e34574349d94d5e974c337760d7f78a2`, incorporating
-   `devel` commit `37b41bb20b9d3824c9a555cd730b5361bd085954`, against then-unpublished
-   provider candidate `817f3dc6a194f4a92a7f94acf10147169e6439d6`. All
-   [11 CI jobs](https://github.com/WsprryPi/WsprryPi/actions/runs/38835065520)
-   passed; 14 fresh finite-TONE conducted cases passed with zero RF retries.
-   Final adversarial review has no unresolved findings in scope. See the accepted
-   [maintainer requirements](https://github.com/WsprryPi/WsprryPi/blob/c4736e55e34574349d94d5e974c337760d7f78a2/docs/development/rp1-item16-acceptance.md).
-   Calibrated RF frequency, power, spectrum and general hardware qualification
-   are not claimed. The accepted consumer and provider repair are integrated
-   into their respective `devel` branches.
-9. ✅ **RP1 provider freeze and publication.** Complete.
-   [RP1-GPCLK-DKMS 1.0.0](https://github.com/WsprryPi/RP1-GPCLK-DKMS/releases/tag/v1.0.0)
-   is published and immutable at provider commit
-   `8c16d3c237cb1267cbedafb5da2bb74132ca5de0`; accepted consumer integration is
-   on WsprryPi `devel` at `dc4044ba420d00839c79d72895e3f97e25bea99e`.
-   All seven published assets matched independent rebuilds and checksums.
-   Provider CI (2/2), consumer CI (11/11), 22 disposable Linux package/DKMS
-   lifecycle scenarios and final adversarial review passed. Item 8's 14 conducted
-   RF cases were reused with unchanged relevant executable/build inputs and
-   matching Debian package members; no new target or RF operation occurred.
-   WsprryPi production consumption and validation are accepted separately under item 10.
+1. ✅ **WTP/API maturity — Pico configuration contract (#447).** Pico-owned
+   preservation, partial updates, explicit resets, capabilities and revision
+   handling retain WTP/1 job semantics.
+2. ✅ **WTP/API maturity — Pi integration and compatibility (#448).** Adopt the
+   update contract and supported version pairs. See the
+   [configuration contract](../docs/wtp-configuration-compatibility.md).
+3. ✅ **Calibration scope decisions.** Keep current correction behavior and
+   RP1's nominal 200 MHz `pll_sys` parent for 4.0. Direct PPS calibration and
+   alternative parents are deferred beyond 4.0. Chrony source-age and identity
+   concerns retain separate triage. See [scope and reopening criteria](Calibration%20Scope%20Decisions.md).
+4. ✅ **Test Tone lifecycle and status feedback.** Scheduler-owned ordering,
+   generation fences, watchdog cleanup and truthful execution/restoration
+   feedback are accepted in software. Physical qualification remains separate.
+   See the [current contract](../docs/bounded-tone.md).
+5. ✅ **Shared Pico application, station and hardware resources.** Scoped saves,
+   pin inspection and nonpersistent validation are adopted. Physical,
+   installed-service and unrestricted security qualification remain separate;
+   concurrent Pico web servicing is outside this item's scope. See the
+   [member-resource contract](../docs/wtp-browser-api.md#shared-pico-member-resources).
+6. ✅ **Si5351 readiness failures.** Accepted by maintainer disposition after
+   software repairs and two consecutive inhibited wspr1 checks of 1,000 reads.
+   Earlier wspr4 SYS_INIT failures remain unexplained. The acceptance does not
+   require or establish RF measurement. See [current limits](../docs/si5351-support.md).
+7. ✅ **RP1 release-candidate preparation.** Provider candidate
+   `817f3dc6a194f4a92a7f94acf10147169e6439d6` completed release-scoped lifecycle,
+   packaging, reproducibility, cleanup-first migration, removal and recovery work.
+8. ✅ **WsprryPi acceptance of the exact RP1 candidate.** Consumer
+   `c4736e55e34574349d94d5e974c337760d7f78a2` against provider `817f3dc6` was
+   accepted for its bounded software and finite-TONE scope. Calibrated RF
+   frequency, power, spectrum and general hardware qualification are not claimed.
+9. ✅ **RP1 provider freeze and publication.** Immutable
+   [1.0.0](https://github.com/WsprryPi/RP1-GPCLK-DKMS/releases/tag/v1.0.0) is
+   published at `8c16d3c237cb1267cbedafb5da2bb74132ca5de0`; consumer integration
+   is `dc4044ba420d00839c79d72895e3f97e25bea99e`. The seven software assets and
+   separate pinned qualification supplement retain their identities.
 10. ✅ **WsprryPi production integration of the published RP1 release.**
-    **Lead: WsprryPi.** The
-    [acceptance matrix and evidence](../docs/development/rp1-item10-production-integration.md)
-    bind the published immutable `1.0.0` identities, software checks, evidence
-    reuse, target results and accepted exclusions. Fresh downloads, independent
-    rebuilds and the actual production resolver validate the published bytes;
-    development selectors and fail-closed policy remain intact. The maintained
-    [release acceptance workflow](../docs/rp1-provider-acceptance.md) now checks
-    production resolution explicitly. Maintainer publication guidance and
-    #412/#423 criteria are reconciled; #412 remains open and #423 is closed
-    under item 13. The maintainer confirmed automatic installation on
-    positively identified Pi 5/CM5 with
-    explicit opt-out. Operator-documentation follow-ups are recorded for item 12.
-    On wspr5, consumer `8abb0d1` and published provider `8c16d3c` passed
-    cleanup-first development-to-release migration, normal installation,
-    neutral activation, both routes' idle selection/recovery/removal/reselection,
-    and independent GPIO4/GPIO20 automatic restoration across two reboots.
-    Upgraded versions remain installed with GPIO20 idle, transmission disabled
-    and boot transmission set to Never. The maintainer explicitly excluded
-    target rollback rehearsals; unchanged package reinstall/interruption/inverse
-    coverage is retained from software and disposable lifecycle evidence, not
-    claimed as fresh target tests. **Accepted scope:** installation/runtime
-    integration with the published manifest unchanged (`Unavailable`, no target
-    entries). Existing application band/mode RF qualification remains valid
-    within its recorded scope; an empty provider manifest does not erase it.
-    The separately published `qualification-v1.0.0-r1` supplement is now installed
-    and verified on wspr5: application binary `8d5247a`, repaired helper `aae72f1`,
-    exact pinned cache/receipt, independent GPIO4/GPIO20 evidence, detailed API,
-    installed UI and support collector. Wrong-route/build and missing/invalid/stale
-    evidence checks pass without changing provider authority or application policy.
-    The original provider manifest remains empty. Prior migration/reboot/recovery
-    evidence is retained because its bound inputs are unchanged. No new RF,
-    reboot or rollback rehearsal occurred during the supplement closeout.
+    Installation and idle runtime integration, neutral activation, both routes'
+    selection/recovery and reboot restoration are accepted within their tested
+    scope. Automatic selection applies only to positively identified Pi 5/CM5
+    with explicit opt-out. Target rollback rehearsals were excluded; the
+    provider's original empty `Unavailable` manifest remains accepted unchanged.
+    The supplement conveys scoped evidence rather than permission to transmit.
+    See [release acceptance](../docs/rp1-provider-acceptance.md).
 11. ✅ **Documentation performance and remaining Impeccable housekeeping.**
-    **Lead: WsprryPi-Docs · RP1 item 19.** Complete. Implementation `bb42bc9`
-    repairs authored image sizing/loading, cache invalidation and mobile
-    breadcrumbs; three losslessly optimized PNGs save 367,799 bytes with decoded
-    pixels and metadata preserved. Saved product/design reminders are reconciled.
-    Local default/Pico builds, regression tests, focused Impeccable review and
-    adversarial reassessment passed within recorded coverage and limitations.
-    [RTD build 35197280](https://app.readthedocs.org/projects/wsprry-pi/builds/35197280/)
-    succeeded for `dad196e706968d48b045c84a550ec4342130196b`, including HTML, PDF
-    and EPUB. Canonical devel publication was verified against source asset hashes
-    and image-loading attributes. See the
-    [completion record](https://github.com/WsprryPi/WsprryPi-Docs/blob/8d6d037f7e1ae1bb9f0a525735ddcf5a6ee57d3a/maintainer/item11-docs-performance-review.md).
-    Commit `8d6d037` updates only that record; publication of this newer record-only
-    commit is not claimed. All-host Impeccable updates and custom-domain TLS
-    remain separately recorded follow-ups. Consolidated operator documentation,
-    integrated application review and Beta 1 preparation are separate gates.
-12. ✅ **Consolidated operator-documentation update.**
-    **Lead: WsprryPi-Docs · RP1 item 20.** Complete. Content commit
-    `166639f21ba3e13f24db2fae97928069cc9069ab` reconciles host/member settings,
-    persistence, Test Tone lifecycle/restoration, UTC versus RF calibration,
-    Si5351 readiness/drive/fades, bounded inventory/cache behavior and RP1
-    installation/activation/authorization/recovery. Examples and screenshots
-    match the reviewed application `a2437d1`; checklist-only `587c7b1` is
-    incorporated into the scope review. Qualification/band dispositions,
-    navigation, Pico gating and item 11's image/style behavior are preserved.
-    All four tests, strict default/Pico HTML, EPUB/LaTeX and actual PDF builds,
-    schema/example/link checks and bounded Impeccable checks passed; actionable
-    in-thread adversarial findings were repaired. Recorded TeX advisories,
-    degraded detector coverage and accessibility/device-review limits remain.
-    [RTD build 35197867](https://app.readthedocs.org/projects/wsprry-pi/builds/35197867/)
-    succeeded for the exact content commit; canonical pages, copied sources,
-    assets and hosted PDF/EPUB were verified. See the
-    [acceptance record](https://github.com/WsprryPi/WsprryPi-Docs/blob/b377bc48bafe7310a5e5e6ef04db7a7e8ace9427/maintainer/item12-operator-docs-review.md).
-    Commit `b377bc4` records verification only; publication of that newer
-    record-only commit is not claimed. The documentation prerequisite for
-    item 13 is satisfied, subject to its fresh candidate/prerequisite checks.
-    No new hardware/RF qualification or Beta 1 readiness is claimed; integrated
-    UI review and Beta preparation remain separate gates. Custom-domain TLS and
-    all-host Impeccable follow-ups stay separate.
-13. ✅ **Final integrated Impeccable review (#423).**
-    **Lead: WsprryPi · RP1 item 21.** Complete;
-    [#423 is closed with evidence](https://github.com/WsprryPi/WsprryPi/issues/423#issuecomment-6223312301)
-    for reviewed implementation
-    `d93c75c4f1490df9108856403710e692b9c2d3dd` on `devel` (UI repairs `090a15a`,
-    followed by the fail-closed CI trace-audit repair). Prerequisite evidence
-    and candidate inclusion verified items 10–12 and accepted release-scoped
-    integration. #423's sequencing now permits accepted Ready for Release issues
-    to remain open pending publication; #412's publication-only exception remains.
-    Impeccable 4.1.1 isolated critique/audit and fresh adversarial reassessment
-    completed; bounded findings were repaired and revalidated, with no unresolved
-    actionable finding. All five views/four modes, representative operator states,
-    desktop/mobile, both themes, keyboard/focus and 200% text were reviewed.
-    Local UI/browser/Fleet/network/recovery suites and exact-implementation
-    [CI 38952419761](https://github.com/WsprryPi/WsprryPi/actions/runs/38952419761)
-    passed. Final evidence/checklist commit `b85ba90` passed
-    [all 11 closeout CI jobs](https://github.com/WsprryPi/WsprryPi/actions/runs/38954297998).
-    Planning-only commit `e3e5008` was subsequently pushed and passed
-    [all 11 exact-head CI jobs](https://github.com/WsprryPi/WsprryPi/actions/runs/38966261503);
-    the [follow-up verification](https://github.com/WsprryPi/WsprryPi/issues/423#issuecomment-6224818188)
-    confirms #423 remains closed. At that item 13 checkpoint, all 131 reviewed
-    UI/workflow/audit inputs retained their accepted hashes. Item 14 records
-    the later 123 unchanged/eight affected input addendum. See the
-    [maintainer acceptance record](../docs/development/item13-integrated-impeccable-review.md)
-    and retained visual/detector evidence. At that item 13 checkpoint, operator
-    docs remained unchanged at accepted content `166639f`/verification record
-    `b377bc4`; no blocking correction was required. This UI gate does not qualify physical devices, assistive
-    technology, installation, services, GPIO, timing or RF, and does not establish
-    Beta publication readiness. Physical-device, actual screen-reader and native
-    browser-zoom coverage remain outstanding. Later UI-affecting changes require
-    affected review/documentation checks again; items 14–15 record the Pico
-    Type 2/3 integration and valid-field-saving follow-ups. Item 14 records the
-    completed affected integration review below; item 15's supported Pico
-    implementation and originating assessment are complete within the recorded
-    software scope. Pi/Beta adoption remains separate. The later
-    [Fleet staging closeout](../docs/development/fleet-staging-closeout.md)
-    confirms the old nine-file patch was already integrated and records the
-    malformed saved-tab repair and affected UI revalidation. Item 16 has not
-    started.
-14. ✅ **Pico WSPR Type 2/3 management integration and acceptance.**
-    **Lead: WsprryPi · Documentation: WsprryPi-Docs.** Closed within the
-    bounded software scope. The full accepted companion through `6d5e734`,
-    including its implementation, tests and immutable Pico `804e8a0` pin, is
-    integrated on `devel` at reviewed implementation `f6b5158`, with final
-    closeout `a84010d6c16ac416d52989053ac1f273390a8ab5`. All
-    [12 final feature-head CI jobs](https://github.com/WsprryPi/WsprryPi/actions/runs/38977319372)
-    and [12 final devel-head jobs](https://github.com/WsprryPi/WsprryPi/actions/runs/38977334299)
-    passed on that exact closeout head. Eight exact local compatibility pairs,
-    genuine TLS/consumer crypto/
-    resource/journal/recovery, runtime and sanitizer checks pass. Impeccable
-    and fresh independent adversarial reassessment close all bounded findings;
-    72 current plus 16 historical rendered captures cover both themes,
-    desktop/mobile, keyboard and 200% text. Step 13's unchanged inputs and
-    guarded fixtures/fail-closed trace audit are preserved.
-    Separate Docs commits `7dcac4a`/`ee689f0` are promoted to Docs `devel`;
-    [RTD build 35202029](https://app.readthedocs.org/projects/wsprry-pi/builds/35202029/)
-    verifies exact `ee689f0`, HTML/copied sources/PDF/EPUB, and unchanged
-    Pico-hidden hosted gating. Strict local Pico-enabled outputs are reviewed
-    separately. No P15.9, freeze/build, release, installation, target services
-    or physical RF qualification is included. The record retains the nonblocking
-    Pico Type 1 rationale wording follow-up; no Pico edit or repin is included.
-    See the
-    [acceptance and item 13 affected-review addendum](../docs/development/item14-pico-type23-integration.md)
-    and [retained execution prompt](P15.8%20Pi%20Integration%20Prompt.md).
-    The evidence/test-fixture closeout changes no product code; its own final
-    feature/devel CI and local/upstream/independent remote parity are verified.
-    The nonblocking Pico wording defect remains separately deferred; it does
-    not reopen this bounded integration gate. Item 15's Pico implementation is
-    complete within its separate recorded scope; item 16 has not started.
-15. ✅ **P15.9 — Save valid fields independently of transmit readiness.**
-    **Lead: WsprryPi coordination · Implementation: WsprryPico.** Closed within
-    the supported Pico software and originating-assessment scope. Original
-    product `56821ac`/execution record `29542e4` and later P15.12 integration
-    `227e73c` were reviewed in current Pico `156dfa1`; four findings were repaired
-    and closed at published Pico `165303458e49feaac1de54c8344058f56578d533`.
-    Valid independent fields persist as durable progress; invalid/newer browser
-    edits remain visible. Applying saved settings is explicit; saving does not
-    establish readiness or activate output. The originating assessment repaired
-    storage-fault admission, delayed rejected/cleared-value feedback, native
-    reported-power clearing and authoritative incomplete saved-state readback.
-    Fresh independent reassessment found no unresolved actionable findings.
-    See the [coordinating acceptance record](../docs/development/item15-pico-valid-field-saves-review.md),
-    [immutable originating review](https://github.com/WsprryPi/WsprryPico/blob/165303458e49feaac1de54c8344058f56578d533/docs/development/phase15-9-post-execution-review.md),
-    [historical execution evidence](https://github.com/WsprryPi/WsprryPico/blob/29542e40e131b3e0faa5be5522d220f906de4b0f/docs/development/phase15-9-valid-field-saves.md)
-    and [retained prompt](P15.9%20Valid%20Field%20Saves%20Prompt.md).
-    Fresh validation passed 200 executed host groups (201 registered; one
-    optional schema group skipped), 13 affected ASan/UBSan groups, 43 shared
-    browser assertions, 17 bootstrap Node groups, both firmware builds and
-    genuine production carrier/browser workflows. Progress schema/session
-    checks passed 44/35 assertions. Impeccable used 41 desktop/mobile/zoom
-    captures with representative visual inspection and keyboard checks. Exact
-    commands, failed attempts, warnings, skips and limits are retained in the
-    review. Pages checks are publication-only; no firmware/software-test CI
-    pass is claimed.
-    Historical unchanged Pi pairs against Pico product `56821ac` passed for
-    release `a84010d` and accepted companion `6d5e734`. They are not fresh
-    compatibility evidence for later P15.12 or these repairs. At item 15 closeout,
-    Pi was unchanged and its current pin remained P15.8 `804e8a0`. The later,
-    explicitly authorized item 16 adoption advances current to `1653034`, retains
-    P15.8 as `p158`, and tests nine network rows plus the independent USB pair.
-    **Still separate:** Pi/Beta adoption disposition, P15.14 operator
-    documentation and P15.13 physical qualification. This closes the originating
-    assessment; it does not establish Pi release adoption or Beta inclusion.
-    Select and accept the applicable adoption/documentation inputs before any
-    affected item 16b freeze. Any Pi changes or pin advance require separate
-    authorization; preserve historical expectations and retain P15.8 as `p158`
-    if the current pin advances, with nine compatibility rows. That decision is
-    now recorded in item 16's evidence; no hardware operation occurred.
+    Image optimization, product metadata/reminder dispositions and hosted
+    publication are accepted. All-host tooling updates and custom-domain TLS
+    retain their separate follow-ups.
+12. ✅ **Consolidated operator-documentation update.** The independent Docs
+    repository covers shared resources, Test Tone, calibration, Si5351/inventory,
+    RP1 supplement, installation and recovery. Documentation acceptance does
+    not establish application or physical qualification.
+13. ✅ **Final integrated Impeccable review (#423).** Closed for reviewed
+    implementation `d93c75c`, with affected follow-up under items 14–15.
+    #412 remains open for its publication boundary. New implementation changes
+    require affected validation; preparation does not publish a release.
+14. ✅ **Pico WSPR Type 2/3 management integration and acceptance.** Complete
+    within the bounded software integration and operator-documentation scope.
+    The nonblocking Pico Type 1 rationale wording follow-up remains deferred.
+    See [versioned WSPR formats](../docs/wtp-configuration-compatibility.md#versioned-wspr-formats).
+15. ✅ **Save valid fields independently of transmit readiness.** The Pico
+    implementation and originating assessment are accepted at `1653034`.
+    Valid fields persist independently, invalid/newer drafts remain visible,
+    and application is explicit. Pi/Beta adoption is implemented under item 16;
+    Pico's broader operator-documentation and physical qualifications retain
+    their separate scope. See [station progress](../docs/wtp-browser-api.md#independent-saved-station-progress).
 16. ⏳ **WsprryPi 4.0 Beta 1 release documentation and candidate preparation.**
     **Lead: WsprryPi · RP1 item 22.** The current effort stops after 16c.
     Release-note research/drafting in 16a may proceed while item 15's remaining
@@ -406,12 +207,12 @@ Beta preparation or announcement does not itself close that stable release gate.
 
 | Saved item | Release relevance | Disposition and evidence |
 | --- | --- | --- |
-| **Test Tone concurrency** | Coordinate complete Start, End, user-stop, expiry, cleanup and restoration transactions, with deterministic race tests. | Complete under release checklist item 4: scheduler ordering, generation fences, nonblocking delivery and watchdog lifecycle validated. See the [review and evidence](../docs/development/test-tone-lifecycle-review.md). Physical qualification remains separate. |
-| **Test Tone status duplication** | Keep the frequency preview separate from execution feedback. Include this in the final UI review. | Complete for item 4: accepted/startup/runtime/uncertain and restoration feedback, correlation tests and focused Impeccable review recorded in the [review and evidence](../docs/development/test-tone-lifecycle-review.md). Final integrated UI review (#423) is closed under item 13; changed Pico surfaces require affected review under items 14–15. |
-| **Si5351 readiness failures** | The five comparison investigations were implemented, but intermittent `SYS_INIT` failures remain unresolved in the [qualification record](../docs/development/si5351-results/README.md). Successful later captures did not close that reliability question. | Complete by explicit maintainer acceptance after software repairs and two consecutive inhibited wspr1 checks passed; see [results and disposition](../docs/development/si5351-readiness-review.md). Historical failures remain preserved without claiming their cause was established. |
+| **Test Tone concurrency** | Coordinate complete Start, End, user-stop, expiry, cleanup and restoration transactions, with deterministic race tests. | Complete under release checklist item 4: scheduler ordering, generation fences, nonblocking delivery and watchdog lifecycle validated. See the [current contract](../docs/bounded-tone.md). Physical qualification remains separate. |
+| **Test Tone status duplication** | Keep the frequency preview separate from execution feedback. Include this in the final UI review. | Complete for item 4: accepted/startup/runtime/uncertain and restoration feedback, correlation handling and focused Impeccable review are accepted; see the [current behavior](../docs/bounded-tone.md). Final integrated UI review (#423) is closed under item 13; changed Pico surfaces require affected review under items 14–15. |
+| **Si5351 readiness failures** | The five comparison investigations were implemented, but intermittent `SYS_INIT` failures remain unresolved in the [current contract](../docs/si5351-support.md). Successful later captures did not close that reliability question. | Complete by explicit maintainer acceptance after software repairs and two consecutive inhibited wspr1 checks passed; see [results and disposition](../docs/si5351-support.md). The cause of historical failures remains unestablished. |
 | **Direct PPS for GPIO frequency calibration** | Optional RF-calibration scope decision; retain Chrony-derived estimates, intrinsic defaults, manual correction and conducted residuals. | Review complete: native PPS RF calibration deferred beyond 4.0. No independent RF counter/capture benefit or new 4.0 requirement established; reopening requires an identified measurement path and measurable improvement. See [Calibration Scope Decisions](Calibration%20Scope%20Decisions.md#direct-pps-disposition-and-reopening-criteria). |
 | **RP1 alternative clock parents** | Current output already uses nominal 200 MHz `pll_sys`; historical 50 MHz/XOSC planning is obsolete. | Reconciled: `pll_sys` implemented; genuinely alternative paths through `clk_i2s`, `clk_adc` or `clk_sys` deferred beyond 4.0, subject to ancestry/ownership and coordinated provider/userspace qualification. See [Calibration Scope Decisions](Calibration%20Scope%20Decisions.md#rp1-parent-disposition). |
-| **Documentation performance and Impeccable housekeeping** | Build-time lazy loading now exists. Reconcile the older image-optimization, product-metadata, and host-update reminders before carrying them forward. | Complete under item 11, including measured image improvements, reminder dispositions and verified hosted publication. All-host tooling updates and custom-domain TLS remain separate follow-ups; see the pinned item 11 completion record. |
+| **Documentation performance and Impeccable housekeeping** | Build-time lazy loading now exists. Reconcile the older image-optimization, product-metadata, and host-update reminders before carrying them forward. | Complete under item 11, including measured image improvements, reminder dispositions and verified hosted publication. All-host tooling updates and custom-domain TLS remain separate follow-ups; see the [active release evidence](4.0-Beta-1-Release-Evidence.md). |
 
 ## Release gates
 
@@ -449,8 +250,8 @@ Beta preparation or announcement does not itself close that stable release gate.
 - ✅ **Final integrated Impeccable review:**
   [#423](https://github.com/WsprryPi/WsprryPi/issues/423) is closed for reviewed implementation
   `d93c75c` after production RP1 integration and release-scoped implementation/
-  documentation acceptance. The [item 13 record](../docs/development/item13-integrated-impeccable-review.md)
-  retains repairs, independent reassessment, exact-head CI and bounded evidence.
+  documentation acceptance. The [active release evidence](4.0-Beta-1-Release-Evidence.md)
+  binds selected source identities, accepted reuse and remaining gates.
   Final `b85ba90` closeout and published planning-only `e3e5008` each passed
   11/11 CI jobs; unchanged reviewed inputs and closure are confirmed in the
   [follow-up verification](https://github.com/WsprryPi/WsprryPi/issues/423#issuecomment-6224818188).
@@ -464,13 +265,14 @@ Beta preparation or announcement does not itself close that stable release gate.
   companion integration, eight current/historical pairs, affected Impeccable/
   adversarial repairs and separately published operator documentation are
   accepted within the bounded software scope. See the
-  [acceptance addendum](../docs/development/item14-pico-type23-integration.md)
-  for exact identities, CI, preserved evidence and the Pico wording follow-up.
+  [current contract](../docs/wtp-configuration-compatibility.md)
+  for current version negotiation and source-pair limits. The selected candidate
+  and acceptance disposition remain in the Beta 1 evidence.
 - ✅ **P15.9 supported Pico implementation and originating assessment:** item 15
   closes the original `56821ac`/`29542e4` scope and four originating-review repairs
   at Pico `1653034`, after fresh independent reassessment and software validation.
   The later Pi adoption is tracked separately under item 16. See the
-  [coordinating acceptance](../docs/development/item15-pico-valid-field-saves-review.md).
+  [current contract](../docs/wtp-configuration-compatibility.md).
 - ✅ **P15.9 Pi/Beta adoption and documentation disposition:** the user selected
   Pi station-progress adoption against `1653034`; P15.8 remains `p158`. The Pi
   operator workflow is updated in Docs `5214cdf`. Pico P15.14 and physical

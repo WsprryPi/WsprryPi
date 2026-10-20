@@ -1,3 +1,0 @@
-MainPID=16133
-ActiveState=active
-SubState=running

@@ -1,1 +1,0 @@
-["timeout", "--signal=TERM", "--kill-after=2", "18", "/home/pi/si5351-iterations/source/src/WSPR-Transmitter/src/build/bin/si5351_backend_harness", "--scenario", "keyed", "--fade", "none", "--freq", "144490500", "--ppm", "3.470680", "--power-level", "1"]

@@ -1,4 +1,0 @@
-throttled=0x50000
-temp=45.2'C
- 20:27:28 up 2 days, 10:14,  1 user,  load average: 0.08, 0.10, 0.14
-{65: 98, 193: 2}

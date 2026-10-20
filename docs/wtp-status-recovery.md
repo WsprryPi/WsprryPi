@@ -1,15 +1,15 @@
 # WTP runtime status and recovery
 
-Phase 10 Slice 7 publishes coherent observations from the parent WTP
+The runtime publishes coherent observations from the parent WTP
 Session/backend/controller/[early scheduler](wtp-scheduling.md) execution path.
 `WtpScheduler::status()` returns an owned `WtpRuntimeStatus` copy that can be read
 from another thread while `run()` blocks. `wtp_runtime_status_json()` serializes
 that copy using the existing parent JSON library. Neither reads the transport,
 invokes callbacks, changes ownership nor performs recovery.
 
-The subsequent [production integration](wtp-production-integration.md) connects
+The [production integration](wtp-production-integration.md) connects
 this boundary to an owned runtime, CLI/INI selection, HTTP status and explicit
-recovery. The UI includes a default-off development visibility toggle. WTP ARM
+recovery. Setup exposes Fleet on every page load. WTP ARM
 handoff never emits the legacy `starting` callback, which can assert local GPIO.
 The typed scheduler contract below remains applicable beneath that integration.
 
@@ -78,8 +78,8 @@ in `job` and retained reports. The typed `remote` also retains the bounded wire
 terminal-record collection. Diagnostics are escaped by the JSON library.
 
 This serializer is an application data boundary, not a new WTP operation or a
-public web endpoint. It has no side effects and is not linked into the production
-application by the original slice; subsequent production integration supplies it. The UI presents unknown, blocked, pending and
+public web endpoint. It has no side effects; production integration exposes
+copied observations through the application. The UI presents unknown, blocked, pending and
 historical states distinctly and avoids reporting ARM as transmitting.
 
 ## Explicit recovery
@@ -108,30 +108,19 @@ operator recovery beyond same-session reconciliation require separately designed
 persistence and workflow; never reconstruct transmission authority from a status
 label or a reused owner string.
 
-## Validation and remaining work
+## Hardware-free validation
 
 From `src`, `make wtp-status-test SUDO=` exercises the actual wire/Session/backend/
 controller/scheduler with injected clocks and peers, including concurrent readers,
 mutation acknowledgement loss, changed identity, missing history, foreign ownership,
 missed starts, cancellation and fault persistence. The existing scheduler interop
 target also checks reports against the pinned Pico endpoint implementation with a
-software clock/engine. See [Slice 7 review](development/wtp-slice7-review.md) for
-commands, findings, repairs and validation boundaries.
+software clock/engine. See the [development guide](development/README.md) for
+commands and validation boundaries.
 
 The [production integration](wtp-production-integration.md) now supplies endpoint,
-clock/configuration and gated UI wiring. [Network integration](wtp-network.md)
+clock/configuration and operator controls. [Network integration](wtp-network.md)
 uses the same authority with TLS and shared API status/cancellation. No physical USB, timing, RF, installation or
-service behavior is qualified by these tests. Independent device UTC provision
-remains required; GET_CLOCK cannot set it.
-
-## Documentation Impact
-
-This guide and parent/component progress links describe the developer boundary.
-The separate Wsprry_Pi_Docs backend configuration, command-line backend, timing
-and Setup/Transmitter guidance was reviewed read-only. No operator setting or UI
-behavior changed, so those pages remain unchanged. When production selection is
-implemented, separately authorized updates must explain endpoint identity and
-permissions, host/device clock prerequisites, finite jobs, early preparation,
-armed versus running, observation age, output unknown, retained failed reports,
-explicit recovery and process-restart limits. The temporary toggle belongs in
-developer guidance, not permanent operator instructions.
+service behavior is qualified by these tests. Device UTC must satisfy admission
+limits; GET_CLOCK observes rather than sets it. Supporting firmware can receive
+qualified controller time through [USB management](wtp-usb-management.md).

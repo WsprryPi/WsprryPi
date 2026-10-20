@@ -1,12 +1,12 @@
 # Early WTP scheduling and UTC handoff
 
-Phase 10 Slice 6 adds the parent
-[`WtpScheduler`](../src/wtp_integration/scheduler.hpp). It connects the actual
+The parent
+[`WtpScheduler`](../src/wtp_integration/scheduler.hpp) connects the actual
 shared `TransmissionRequest::slot`, compiler and transmission controller to the
 [WTP backend](wtp-backend.md). This dedicated path dispatches preparation early;
 it does not use the legacy transmitter's wait-until-start execution path.
 
-The scheduler remains a typed parent API. The subsequent
+The scheduler remains a typed parent API. The
 [production integration](wtp-production-integration.md) owns it in a worker and
 connects persisted configuration, early scheduling, completion dispatch and UI
 status/recovery. Its timing and fault-injection seams remain typed test APIs;
@@ -142,7 +142,7 @@ controller preparation already attempts cleanup; the scheduler performs another
 bounded cleanup observation to obtain a typed result. Thus a failed preparation
 may consume two cleanup budgets. No unbounded retry or automatic reconnect exists.
 
-## Validation and remaining work
+## Hardware-free validation
 
 From `src`:
 
@@ -165,19 +165,11 @@ source pin and runs its actual endpoint/job service with a software clock/engine
 It opens no physical USB device. macOS/Linux CI includes the ordinary scheduler
 tests; a local macOS pass does not establish a Linux runtime pass.
 
-## Documentation impact
+## Integration and qualification
 
-Updated this developer contract, the saved
-[execution prompt](development/wtp-slice6-prompt.md), review record and progress
-links. The separate Wsprry_Pi_Docs backend and timing guidance was reviewed
-read-only and remains unchanged because no production operator behavior changed.
-Its future follow-up must distinguish early preparation from on-device RF start,
-explain host/device clock prerequisites, pending versus committed reload, missed
-slots and blocked recovery, alongside endpoint selection and USB permissions.
-
-The [production integration](wtp-production-integration.md) now connects this
-scheduler to persisted USB/network selection, application lifecycle and the gated
-UI. [Network integration](wtp-network.md) adds TLS without a second scheduler.
-Physical timing, USB/DTR/unplug, services and RF still require their own evidence.
-The earlier slice records describe historical scope rather than current missing
-software integration.
+[Production integration](wtp-production-integration.md) connects the scheduler to
+persisted USB/network selection, application lifecycle and operator controls.
+[Network integration](wtp-network.md) supplies TLS through the same scheduler.
+Early preparation and ARM handoff remain separate from device-local RF start.
+Physical timing, USB/DTR/unplug behavior, installed services and RF require
+their own evidence.

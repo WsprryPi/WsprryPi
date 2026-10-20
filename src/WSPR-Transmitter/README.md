@@ -324,7 +324,7 @@ Accepted disable writes or register confirmation do not establish measured RF
 inactivity. Release item 6 was closed by maintainer acceptance after software
 repairs and two consecutive inhibited wspr1 I2C checks passed; historical SYS_INIT
 causation remains unestablished. See the
-[readiness investigation and disposition](../../docs/development/si5351-readiness-review.md).
+[readiness investigation and disposition](../../docs/si5351-support.md).
 Duty-cycle fades use the
 scheduled event deadlines, including I2C overhead; missed slices are skipped.
 These fades still switch RF fully on/off and do not produce an analog amplitude
@@ -343,9 +343,9 @@ Maintainer-only typed options and the standalone backend harness support:
 
 These three experiments remain opt-in; the application retains fixed-PLL HF
 planning and full inhibited 2 m transitions. No persisted setting or UI control
-was added. Same-path conducted evidence for wspr4 CLK0 at 40 m and 2 m is linked
-from `docs/development/si5351-results` in the parent repository. It does not
-qualify other hardware, full encoded WSPR frames, or temperature extremes.
+was added. These options do not qualify a physical board, full encoded WSPR frames,
+other output paths or temperature extremes. Current limitations are described
+in the parent Si5351 support guide.
 
 ### WTP-facing message validation
 

@@ -1,10 +1,9 @@
 # Pi WTP endpoint and local control
 
-Implementation reference for the development-gated Pi/Pico fleet workflow.
-The [local contract](wtp-pi-endpoint-contract.md) defines the requirements and
-[implementation prompt](development/wtp-pi-implementation-prompt.md) defines the
-execution scope. Protocol authority is the WsprryPico
-[protocol directory](https://github.com/WsprryPi/WsprryPico/tree/devel/docs/protocol),
+Implementation reference for the Pi/Pico fleet workflow. The
+[local contract](wtp-pi-endpoint-contract.md) defines endpoint requirements and
+ownership boundaries. Protocol authority is WsprryPico's
+[protocol directory](https://github.com/WsprryPi/WsprryPico/tree/devel/engineering/protocol),
 pinned for this implementation to `c13fc16819749e9b53a42609f31702c3aca9931c`.
 
 ## Independent controls

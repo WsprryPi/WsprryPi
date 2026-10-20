@@ -208,51 +208,20 @@ can offer a verified official picotool download and cleanup. When using it on a
 WsprryPi host, follow the [service handoff](https://wsprrypico.readthedocs.io/en/devel/wsprrypi.html#standalone-installer-on-a-wsprrypi-host)
 so only one process uses the selected USB connection.
 
-## Validation and documentation impact
+## Validation boundary
 
-The [shared installer acceptance record](https://github.com/WsprryPi/WsprryPico/blob/devel/engineering/development/usb-installer-results.md)
-separates the implemented contract, publication checks and board-specific
-physical evidence. Installer 0.1.3 retains contract 1 and the imported
-noninteractive entry point; no Pi source pin or adapter change is needed.
-Its numbered device menu applies only to an interactive standalone CLI.
+The [shared installer contract](https://github.com/WsprryPi/WsprryPico/blob/devel/engineering/development/usb-installer.md)
+and [acceptance scope](https://github.com/WsprryPi/WsprryPico/blob/devel/engineering/development/usb-installer-results.md)
+define software compatibility, publication checks and board-specific physical
+limits. The imported noninteractive entry point retains contract 1; interactive
+standalone menus do not change the Pi adapter's protocol.
 
-The recorded Pico C BOOTSEL migration on wspr4 installed
-`0.1.0-ci.39145255987.1` from source
-`f6ed8a208e2919a00b7ced044349fd45336f8760`. The full backup, reserved flash,
-public saved semantics and exact new boot passed verification. The Pi
-reconnected and cleared its maintenance hold. Connection-only recovery
-retained the same boot without reflashing. Host settings bytes were unchanged.
-This was a reviewed development-core deployment; it does not independently
-qualify every later published installer or firmware image.
-
-The [Pico C physical CLI/core erase check](https://github.com/WsprryPi/WsprryPico/blob/devel/engineering/development/usb-installer.md#physical-erase-check)
-passed full-flash blank readback, nonblank-final-byte rejection, repeated erase
-recovery and byte-identical restoration. The separate
-[deployed web erase and restoration test](development/pico-usb-erase-web-test-20261019.md)
-passed on 2026-10-19 with application/UI `8b7b7fe` and published installer 0.1.1
-from `90bb95e`. It exercised the production web endpoint and independently
-verified all 4,194,304 bytes blank. Original full flash and saved semantics
-were restored; wspr4 returned active and ready, with Pico C idle, unowned and
-output inactive. That record contains exact release, board, firmware and host
-identities. Its BOOTSEL handoff used the guarded USB test fixture.
-
-The [public curl-to-Bash acceptance](https://github.com/WsprryPi/WsprryPico/blob/devel/engineering/development/usb-installer-results.md#public-bootstrap-upgrade-with-tool-download-and-cleanup)
-passed on wspr4/Pico C with installer 0.1.4 and an official ARM64 picotool 2.3.1
-download. Interactive download, Pico selection and cleanup passed. Firmware
-`0.1.0-ci.39324562626.1` from `c02e5d875dfdf2aa23e2220a95dd6ea7563adb4c`
-was verified with identical reserved bytes and saved semantics. All 47 prior
-private host files and the existing system picotool 2.3.0 were unchanged.
-After restarting WsprryPi, Fleet reconnected to the same Pico, ready, idle,
-unowned and output inactive. This observation used an unconfigured standalone
-schedule; it does not extend the web erase or physical interruption evidence.
-
-The 2026-10-19 closeout checks pass nine deployment and 19 compatible
-distribution/recovery tests, firmware UI unit, polling, maintenance-safety and
-rendered browser integration checks. Desktop/mobile light/dark render checks
-report no overflow and pass button/recovery gating. The shared core passes
-85 behavioral tests and six publication tests. These are software results;
-physical disconnect/power-cut cases, multi-board programming and RF remain
-outside the recorded acceptance.
+Preservation verification requires exact firmware identity, reserved flash,
+saved semantics and the new boot to agree. Connection-only recovery must not
+reflash the board. Erase verification requires full-flash blank readback;
+restoration requires the original complete image and saved semantics. A successful
+software test or one board observation does not qualify every later installer,
+firmware image, physical interruption, multi-board operation or RF output.
 
 The Pi repository-root commands are:
 
@@ -267,15 +236,11 @@ php -l WsprryPi-UI/data/views/wtp-controls.php
 git diff --check
 ```
 
-Existing Linux C++ acceptance used isolated wspr4 source exports rather than
-the broken local macOS compiler. Installer tests, production WTP tests and
-bridge/control-route checks remain bound to those recorded sources. This
-closeout changes documentation only in WsprryPi; it does not rebuild or deploy
-its application, change services or operate a Pico.
+Run C++ checks on a supported Linux environment. Inspect each command before
+execution; these software checks do not authorize deployment, service changes
+or Pico operation.
 
 The published [Pico operator manual](https://wsprrypico.readthedocs.io/en/devel/install.html)
 covers standalone installation, tool download/cleanup, preservation and recovery.
 The published [Pi operator manual](https://wsprry-pi.readthedocs.io/en/devel/User_Interface/Setup/Transmitter/index.html#install-or-update-pico-firmware-over-usb)
-covers Fleet's selected-Pico workflow. The Pico manual's
-[publication record](https://github.com/WsprryPi/WsprryPico/blob/devel/engineering/development/operator-documentation-results.md)
-confirms completion. No separate documentation repository is changed here.
+covers Fleet's selected-Pico workflow. The operator manuals and this engineering contract serve different audiences.

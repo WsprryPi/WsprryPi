@@ -1,6 +1,8 @@
 # Wsprry Pi Release Tools
 
-These are tools and notes that I use during development.
+These documents define selected release work, acceptance gates and maintainer
+validation workflows. Completed execution handoffs are retired under the
+[cleanup instructions](../docs/development/repository-cleanup-prompt.md).
 
 - [Wsprry Pi 4.0 Release Punchlist](Release%20Punchlist.md): saved follow-ups,
   release gates, and RP1 dependency order.

@@ -97,11 +97,9 @@ Publication and source/package verification do not prove actual installation,
 service behavior, route switching, live output, calibration, spectrum or RF
 qualification. Define the applicable acceptance matrix, identify reusable evidence
 and its applicability, and repeat checks affected by changed inputs. The
-[provider acceptance requirements](development/rp1-provider-acceptance.md) define
-software and separately authorized target evidence. The
-[item 10 acceptance matrix](development/rp1-item10-production-integration.md)
-records the accepted published integration, installed supplement verification
-and evidence-reuse boundaries. The
+[active release evidence](../release_tools/4.0-Beta-1-Release-Evidence.md) binds
+selected source/artifact identities, accepted published-provider integration,
+installed supplement verification and evidence-reuse limits. The
 [release checklist](../release_tools/Release%20Punchlist.md) owns remaining
-production integration and documentation work; software-only verification does
-not close that gate.
+candidate acceptance and publication gates. Software-only verification does
+not close installation or runtime acceptance.

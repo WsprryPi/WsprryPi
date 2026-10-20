@@ -1,10 +1,7 @@
 # WsprryPi shared browser API adapter
 
 Current normal-firmware USB management, hostname/Wi-Fi lifecycle and UTC
-support are documented in [USB management](wtp-usb-management.md). Historical
-phase-specific limitations below retain their original evidence scope.
-
-See the [P15.3 implementation and evidence](development/phase15-3-management-carriers.md) for the carrier matrix, exact source-pair validation and limits.
+support are documented in [USB management](wtp-usb-management.md).
 
 The host adopts Pico API v1 resource names for their compatible meanings and
 labels host projections `scope: wsprrypi-host/1`. It retains `/config`, `/api/wtp`,
@@ -173,9 +170,8 @@ resolver/TLS observations. None of these fields installs or changes Linux NSS.
 
 ## Shared Pico member resources
 
-The [P15.4 implementation record](development/phase15-4-shared-resources.md)
-defines the supported mapping and validation evidence. These resources belong
-to the selected Pico, independently of Pi host settings and prepared jobs.
+These resources belong to the selected Pico, independently of Pi host settings
+and prepared jobs.
 Application is read-only. Each of the four member GET routes returns the same
 reconciled bundle:
 
@@ -285,12 +281,11 @@ or automatic mutation retry. Authenticate the supported `transmitter-management/
 or `/2` document before using capabilities; public identity is an untrusted hint.
 Each version has exact closed fields and integer limits. Version 2 advertises
 `consumer_sessions:3` and `consumer_pending_logins:1`; version 1 remains frozen
-at one consumer session. Old Pi clients explicitly refuse version 2. See the
-[P15.6 acceptance record](development/phase15-6-sessions.md).
+at one consumer session. Old Pi clients explicitly refuse version 2.
 The legacy closed application's `authenticated_https` label remains for old
 clients; it does not inventory actual carriers. Unsupported discovery refuses.
-That phase added no JSON administration to USB/Console, Plain LAN WTP, TLS-WTP
-or BLE. Current USB-Management/1 support is described in [USB management](wtp-usb-management.md).
+Plain LAN WTP and TLS-WTP carry job control rather than JSON administration.
+USB-Management/1 support is described in [USB management](wtp-usb-management.md).
 
 
 Host capabilities report built-in management adapters separately from actual
@@ -306,7 +301,7 @@ strong passphrase and trusted endpoint/network; native code does not authenticat
 a unique device before sending its proof.
 
 
-## P15.7 login retirement and save review
+## Login retirement and save review
 
 `member/management` supports explicit `inspect_logins` and `retire_login` through
 the existing operation/admission lock. Recovery is independent of WTP connectivity
@@ -319,6 +314,7 @@ Pi-browser reply. Pi tabs share that native session.
 
 UIs preserve drafts after uncertain config/resource writes, invalidate revisions,
 read consistent saved state and require explicit review before a new save. A
-healthy status or connection read alone cannot enable writing. The
-[P15.7 execution record](development/phase15-7-recovery.md) defines proof bounds,
-self-retirement uncertainty, historical compatibility and qualification limits.
+healthy status or connection read alone cannot enable writing. A lost retirement
+reply leaves the outcome uncertain; read the selected session state before any
+new deliberate action. Software fixtures do not qualify flash, transport timing
+or RF behavior.

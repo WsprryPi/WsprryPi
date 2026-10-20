@@ -85,7 +85,7 @@ eligible published release; explicit `RP1_GPCLK_DKMS_SOURCE=release` selects
 that path on `devel` too. Development automatic selection remains exact-source
 development. An unavailable or corrupt release fails closed without fallback.
 The [release lock and acceptance workflow](rp1-provider-acceptance.md) bind
-the published bytes; the [item 10 matrix](development/rp1-item10-production-integration.md)
+the published bytes; the [active acceptance matrix](../release_tools/4.0-Beta-1-Release-Evidence.md#item-10-reuse-matrix-and-remaining-gates)
 separates software acceptance from accepted target installation/runtime checks
 and the remaining application release gates. The published compatibility
 manifest defaults to `Unavailable` and has

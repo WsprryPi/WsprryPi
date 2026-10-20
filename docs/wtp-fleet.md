@@ -200,6 +200,5 @@ still pins `95aac22bf7cc31b67fe5773761708d743d8a6473`; its WTP wire
 coverage does not exercise the later published DNS-SD advertisement commit
 `c13fc16819749e9b53a42609f31702c3aca9931c`. Use that published Pico
 revision when comparing the published profile with live advertisements. The
-[Pi endpoint execution record](development/wtp-pi-execution-report.md) records
-this implementation's live LAN observations separately from the older interop
-fixture; it does not change that fixture's source pin or qualify new Pico firmware.
+older interoperability fixture retains its source pin; it does not qualify
+later Pico firmware or a physical LAN setup.

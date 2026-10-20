@@ -1,3 +1,0 @@
-MainPID=82090
-ExecMainStatus=0
-ActiveState=active

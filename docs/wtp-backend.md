@@ -1,6 +1,6 @@
 # WTP complete-plan backend
 
-Phase 10 Slice 5 implements `WtpTransmitBackend` in
+`WtpTransmitBackend` is implemented in
 [`src/wtp_integration`](../src/wtp_integration/backend.hpp), using the existing
 `ITransmissionBackend` interface and `TransmissionController`. It composes
 WTP-Client Session with the execution-plan converter. Its explicit stream input
@@ -153,23 +153,13 @@ time. CI runs ordinary WTP tests on macOS and Linux; local macOS results do not
 establish a Linux runtime pass. The shared component controller and simulator tests
 remain independently runnable from `src/WSPR-Transmitter/src`.
 
-## Documentation impact and next slice
+## Integration and qualification
 
-This guide, the saved [execution prompt](development/wtp-slice5-prompt.md), review
-record and root/component progress links describe developer behavior. No operator
-configuration or UI changed. The separate Wsprry_Pi_Docs
-`Advanced_Operations/ini_configuration/transmitter_backends.md` and
-`Advanced_Operations/timing_calibration.md` were reviewed and left unchanged.
-Future authorized operator documentation must cover explicit Pico endpoint
-selection, USB permissions, independent device UTC prerequisites, per-event
-adjustments and unresolved-output recovery.
-
-Slice 6 adds the [early scheduler and absolute-UTC handoff](wtp-scheduling.md).
-[Production integration](wtp-production-integration.md) supplies status,
-configuration and the Impeccable-reviewed gated UI. [Network integration](wtp-network.md)
-extends the existing backend through explicit Plain LAN and TLS bindings. Actual Linux USB/DTR/unplug and
-firmware functional validation, process/service lifecycle, RF qualification and
-release readiness require separate evidence and authorization.
+The [early scheduler](wtp-scheduling.md) supplies absolute-UTC handoff.
+[Production integration](wtp-production-integration.md) supplies persisted
+configuration, status and operator controls; [network transport](wtp-network.md)
+uses explicit Plain LAN or TLS bindings through the same backend. Physical USB,
+firmware timing, installed-service lifecycle and RF require separate evidence.
 
 ## Extended finite jobs
 

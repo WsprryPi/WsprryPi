@@ -11,7 +11,7 @@ automatic fallback between bindings. The current
 Pico consumer default uses TCP port 31417 after station IPv4 and accepted SNTP.
 New-image physical Pico-to-WsprryPi interoperability remains to be checked.
 
-Phase 11.1 adds the parent-owned OpenSSL `TlsStream` behind the existing portable
+The parent-owned OpenSSL `TlsStream` implements TLS behind the portable
 WTP-Client `ByteStream`. The same application, scheduler, backend, Session,
 complete-job conversion, cancellation and recovery paths serve USB and network.
 The portable component and its provenance/fixtures are unchanged. There is no
@@ -150,7 +150,7 @@ link-local multicast UDP 5353 and usually does not cross routed/VLAN boundaries.
 Do not add static hosts entries to conceal stale DHCP resolution. A conflict may
 require direct-IP plus expected hostname access to inspect the intended device;
 TLS and WTP device checks remain mandatory. Physical Mac/Linux `.local`, DHCP
-reassignment and browser trust acceptance are Phase 11.4 gates.
+reassignment and browser trust require separate target validation.
 
 ## Credentials and TLS policy
 
@@ -288,11 +288,10 @@ Use a different `WTP_NETWORK_BUILD_DIR` for sanitizer flags; pass matching
 `CMAKE_C_FLAGS`/`CMAKE_CXX_FLAGS` to that CMake directory and
 `WTP_NETWORK_CXXFLAGS`/`WTP_NETWORK_LDFLAGS` to Make. The CI loopback job includes
 TLS, actual Pico interop and rendered browser tests. Local execution is not a CI
-run. See the [Phase 11.3 acceptance record](development/phase11-3-review.md) for exact results.
+run.
 
-Phase 11 is now closed within its documented software, bounded physical and
-scoped conducted-RF acceptance. WsprryPico's Phase 11.7 joint record is the
-authority for the assertion-level applicability ledger, exact 13-row conducted
-scope and retained exclusions. This guide's loopback results remain software
-evidence, not physical USB, GPIO, timing, RF, installation or service
-qualification; Phase 13 retains broad hardware and release qualification.
+Software loopback results do not qualify physical USB, GPIO, timing, RF,
+installation or service lifecycle. Physical claims require exact source,
+firmware, board, clock, mode, frequency and setup identities. The active
+[release evidence](../release_tools/4.0-Beta-1-Release-Evidence.md) records its
+selected candidate and remaining gates; no broader qualification is inferred.

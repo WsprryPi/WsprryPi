@@ -1,113 +1,69 @@
-<!-- omit in toc -->
 # Wsprry Pi
 
-*A QRP WSPR transmitter leveraging a Raspberry Pi*, (pronounced: (Whispery Pi))
+Wsprry Pi (pronounced “Whispery Pi”) transmits WSPR, QRSS, FSKCW and DFCW using
+a Raspberry Pi. It supports local schedules, test tones, connected Pico
+transmitters, and fleets of independent transmitters controlled from its web
+interface.
 
 [![Documentation Status](https://readthedocs.org/projects/wsprry-pi/badge/?version=stable)](https://wsprry-pi.readthedocs.io/en/stable/?badge=stable)
 
-<!-- omit in toc -->
-## Table of Contents
+## Transmitters and operation
 
-- [License](#license)
-- [Origins](#origins)
-- [Development and testing](#development-and-testing)
-- [Installation](#installation)
+Local output uses the supported Raspberry Pi GPIO backend or a Si5351 clock
+generator. Pi 5-family GPIO output uses the separately maintained
+RP1-GPCLK-DKMS provider. Available modes and frequencies depend on the selected
+backend and its admission policy. Software support does not establish RF power,
+frequency accuracy, spectral performance or suitability of a physical setup.
+Use suitable filtering, attenuation and a load for the selected output path.
 
-## License
+WsprryPico connects over USB or a supported network connection. Complete jobs
+execute on the transmitter, so symbol timing does not depend on continuous
+host delivery. Supporting Pico firmware also provides settings management,
+independent station-field saves, firmware installation and retained recovery.
+Firmware erase is a separate explicit action. Saving settings and applying
+saved station progress remain separate from transmit readiness.
 
-Versions 2.x+ of this project are distributed the [MIT License](LICENSE.MIT.md).
+A Pi can also serve as a network transmitter while running its own schedule.
+The controller supports up to eight independent remote output schedules.
+Select Fleet in Setup to manage remote transmitters. Ownership, output
+capabilities and recovery state govern whether a job can start.
 
-## Origins
+## Installation and use
 
-This idea likely traces its origins to an idea Oliver Mattos and Oskar Weigl presented at the PiFM project. While the website is no longer online, the Wayback Machine has [the last known good version]( http://web.archive.org/web/20131016184311/http://www.icrobotics.co.uk/wiki/index.php/Turning_the_Raspberry_Pi_Into_an_FM_Transmitter).
+The [operator manual](https://wsprry-pi.readthedocs.io/en/stable/) covers
+background, installation, configuration and operation.
 
-The original PiFM code is still hosted by the icrobotics.co.uk website. However, I suspect the domain has fallen into disrepair and may be unsafe, and no direct links are provided here. You can use the link above to see the site; should the code disappear, I have [saved it here](./historical/pifm.tar.gz).
+The installation entry point is:
 
-After a conversation with Bruce Raymond of TAPR; I forked @threeme3's repo and provided some rudimentary installation capabilities and associated orchestration.  Version's 1.x of this project were a fork of threeme3/WsprryPi, licensed under the GNU General Public License v3 (GPLv3). The original project is no longer maintained.
-
-In late 2024, George [K9TRV] of TAPR reached out to me about some questions related to using WsprryPi on the Pi 5.  While I have not yet made that jump, the conversation spurred me to discard the original code in favor of a more modern, extensible, and maintainable base.
-
-Version 2.x+ is re-written from scratch, is no longer a derivative work, and is released under the MIT license.
-
-## Development and testing
-
-Developers can exercise WsprryPi's application planning, scheduling,
-cancellation, status, failure, and cleanup paths on an ordinary Debian machine
-without GPIO, MMIO, mailbox, DMA, I2C, transmitter device nodes, or RF hardware.
-See the [hardware-free simulated backend guide](docs/simulated-backend.md) for
-building, explicit selection, deterministic virtual-time traces, bounded
-real-time tests, fault injection, repeated execution, Debian CI, and the limits
-of simulation evidence.
-
-The [WTP-Client component](src/WTP-Client/README.md) provides the portable WTP/1
-wire and session foundation for Phase 10 Pico integration. The parent
-[execution-plan converter](docs/wtp-execution-plan.md) prepares complete finite
-WTP jobs, and the [USB CDC adapter](docs/wtp-usb-cdc.md) provides the Linux host
-transport. The [complete-plan backend](docs/wtp-backend.md) now composes these
-layers through the shared transmitter controller, with hardware-free tests.
-The [early scheduler](docs/wtp-scheduling.md) freezes complete requests and hands
-off their exact UTC starts before the RF boundary. Its [status and recovery
-boundary](docs/wtp-status-recovery.md) publishes coherent observations and retains
-explicit recovery results. [Production integration](docs/wtp-production-integration.md)
-adds persisted endpoint selection, an owned runtime worker and explicit status/
-recovery controls through the visible Pico connections/settings toggle.
-Supported normal Pico firmware also provides [USB configuration and qualified
-UTC synchronization](docs/wtp-usb-management.md), including common-name and
-Wi-Fi create/replace/remove while Pico Wi-Fi is unavailable. Physical USB,
-target operation and RF qualification are accepted only within the bounded
-Phase 10/11 records; broad mode/band/clock, timing, spectral, reliability and
-release qualification remain outstanding in Phase 13.
-The [Pi WTP endpoint](docs/wtp-pi-operation.md) provides a Plain LAN WTP/1
-server, DNS-SD advertisement, local takeover and up to eight independent remote
-output schedules alongside the central Pi’s own schedule. Fleet is available
-in Setup. The Pi endpoint uses the selected native GPIO, RP1 GPCLK or Si5351
-adapter within its reported mode/frequency capabilities and admission policy. See the
-[implementation contract](docs/wtp-pi-endpoint-contract.md) and
-[execution record](docs/development/wtp-pi-execution-report.md) for acceptance scope and evidence.
-
-For containerized ARMv6 and AArch64 builds targeting Raspberry Pi OS Bookworm
-and Trixie, including 32-bit Pi 1/A+ and Pi Zero support, see the
-[container build guide](docs/container-builds.md). For installing those artifacts,
-see the [precompiled installer contract](docs/precompiled-installation.md).
-
-RP1 GPCLK support is compiled into the application as a consumer of the
-independently maintained `/dev/rp1-gpclk` provider. On Pi 5-family systems the
-installer can resolve and validate an eligible published provider release; it
-also supports fail-closed exact-source development selection. See the
-[RP1-GPCLK-DKMS installation contract](docs/rp1-gpclk-dkms-installation.md).
-On uninstall, WsprryPi removes only an unchanged provider that its secure
-ownership record proves WsprryPi installed; all pre-existing, legacy-recorded,
-ambiguous, or drifted providers are preserved. Operators can set
-`REMOVE_RP1_GPCLK_DKMS=false` to retain even a proven owned provider. WsprryPi
-establishes only route-neutral runtime administration during installation. It
-waits for a later explicit GPIO4/GPIO20 operator choice before executing a
-digest-reviewed route plan, and it never enables output as part of installation
-or route selection. Runtime checks establish application compatibility only; they do
-not qualify installation, GPIO behavior, timing, frequency accuracy, spectral
-performance, or RF output.
-
-## Installation
-
-Please see [the documentation](https://wsprry-pi.readthedocs.io/en/stable/) for background, installation, and use.
-
-If you want to get started and not read anything, here is how to install it:
-
-``` bash
+```sh
 curl -L installwspr.aa0nt.net | sudo bash
 ```
 
-Authenticated Pico network integration is documented in
-[WTP network configuration](docs/wtp-network.md) and the
-[shared browser API](docs/wtp-browser-api.md). See the
-[Phase 11.1 software acceptance record](docs/development/phase11-1-review.md)
-for the original host-software review and its Phase 11.7 addendum. WsprryPico's
-[authoritative joint closure](https://github.com/WsprryPi/WsprryPico/blob/devel/docs/development/phase11-7-review.md)
-closes Phase 11 within its documented software, bounded physical and scoped
-conducted-RF acceptance; it does not claim release qualification.
+RP1 installation establishes neutral runtime administration. Selecting GPIO4
+or GPIO20 is a later explicit action; installation and route selection do not
+enable output. Uninstallation preserves a pre-existing, changed or ambiguously
+owned RP1 provider. `REMOVE_RP1_GPCLK_DKMS=false` also retains a proven
+WsprryPi-owned provider.
 
-USB firmware installation, retained recovery and explicit full-flash erase for
-a selected Pico have bounded software and recorded physical acceptance; see
-[the implementation, deployment evidence and limits](docs/pico-usb-installer.md).
-Supporting firmware also provides [independent station progress](docs/wtp-browser-api.md#independent-saved-station-progress)
-through the selected Pi management connection; applying saved values is separate
-from saving valid fields and never substitutes for transmit readiness.
+## Development and testing
+
+The [development guide](docs/development/README.md) covers builds, components,
+contracts and hardware-free validation. The explicit
+[simulated backend](docs/simulated-backend.md) exercises planning, scheduling,
+cancellation, status and failure handling on Debian without hardware access.
+Simulation does not qualify timing, GPIO, installation, services or RF output.
+
+[Container builds](docs/container-builds.md) target Raspberry Pi OS Bookworm
+and Trixie on ARMv6 and AArch64, including 32-bit Pi 1/A+ and Pi Zero.
+[Precompiled installation](docs/precompiled-installation.md) verifies artifact
+identity and compatibility before deployment.
+
+Selected work and release gates are maintained in the
+[release punchlist](release_tools/Release%20Punchlist.md).
+
+## License and provenance
+
+Versions 2.x and later use the [MIT License](LICENSE.md). Earlier WsprryPi
+versions used GPLv3. The original PiFM source is retained in
+[historical/pifm.tar.gz](historical/pifm.tar.gz) for source provenance.
+Component licenses and attribution remain with their respective sources.

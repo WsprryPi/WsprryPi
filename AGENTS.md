@@ -33,6 +33,32 @@ These instructions apply to the entire WsprryPi repository unless a more specifi
 - If a task is divided into approved slices, implement only the current slice. Do not silently begin later slices.
 - If an ambiguity would materially change behavior, compatibility, persistence, hardware operation, or user workflow, stop and ask for direction.
 
+## Repository and Work-Harness Cleanup
+
+- For an explicit request to clean up WsprryPi, follow the
+  [reusable cleanup instructions](docs/development/repository-cleanup-prompt.md).
+- Present an exact DELETE / REWRITE / RETAIN / HOLD inventory before changes.
+  Include project-owned tracked, untracked and ignored artifacts, Mac work areas,
+  and the Raspberry Pi hosts authorized for the request. Verify physical paths,
+  active use, dependencies and recovery duties; preserve user work and shared tools.
+- Describe the current product in direct, impersonal language. Operator prose
+  explains capabilities, use and meaningful limitations. Keep required technical
+  detail in engineering guides; remove development diaries and future promises.
+- Delete completed, superseded and abandoned execution prompts, temporary
+  handoffs and obsolete evidence after consolidating needed current information.
+  Repair references; do not create an archive or permanent cleanup report.
+- Keep handoffs needed for selected unfinished work and genuinely reusable
+  instructions. The release punchlist is the selected work authority; preserve
+  its priorities and acceptance gates. Active release/research plans may retain
+  phase/step organization; remove that framing from ordinary documentation.
+- Preserve component boundaries, current behavioral tests/fixtures, source
+  provenance, dependencies, live settings and required rollback/recovery assets.
+  Keep permission-limited or ambiguous items on hold and continue independent work.
+- Cleanup does not authorize hardware operation, service/configuration changes,
+  sibling-repository edits, checkout synchronization, Git-history changes,
+  staging, commits, pushes or publication. Separate explicit requests govern them.
+- Reading or maintaining the instructions does not invoke cleanup.
+
 ## Raspberry Pi and Hardware Safety
 
 WsprryPi controls radio-transmission and Raspberry Pi hardware.
