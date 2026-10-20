@@ -6,6 +6,59 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
 
+function operationDisconnectFixture() {
+    const ok = (condition, message) => { if (!condition) throw Error(message); };
+    const original = { WebSocket: window.WebSocket, reloadAllData, getTxState, ajax: $.ajax, systemPaused };
+    const sockets = [], httpMethods = [];
+    class Socket {
+        static OPEN=1; static CONNECTING=0;
+        readyState=0; listeners={}; sent=[];
+        constructor() { sockets.push(this); }
+        addEventListener(type, callback) { (this.listeners[type] ||= []).push(callback); }
+        emit(type, event={}) { for (const callback of this.listeners[type] || []) callback(event); }
+        open() { this.readyState=1; this.emit('open'); }
+        message(value) { this.emit('message', {data:JSON.stringify(value)}); }
+        send(text) { this.sent.push(JSON.parse(text)); }
+    }
+    window.WebSocket=Socket; reloadAllData=()=>{}; getTxState=()=>{}; systemPaused=true;
+    $.ajax=options=>{httpMethods.push(String(options.method || options.type || 'GET').toUpperCase());return original.ajax(options);};
+    try {
+        for (const active of [false,true]) for (const failure of ['close','error','fallback']) {
+            clearWebSocketReconnectTimer(); clearWsprBandCatalogPendingRequest(); ws=null;
+            communicationInterrupted=false; reloadAfterReconnectPending=false;
+            backendCurrentlyConnected=true; websocketCurrentlyConnected=false;
+            const connected=connectWebSocket('ws://fixture'); connected.open();
+            currentRuntimeTransmitBackend='si5351';
+            handleOperationConfigSnapshot({mode:'WSPR',transmit:active,callsign:'K1ABC',gridsquare:'FN31',enableOnBoot:'Never',wsprFrequencyHz:14095600});
+            updateRuntimeControlConfigStatus('WSPR',active);
+            connected.message({tx_state:active?'transmitting':'idle'});
+            const expected=active?'Transmitting':'Transmit paused';
+            ok(document.getElementById('operationCurrentState').textContent===expected,'known runtime fixture must load');
+            const cached=JSON.stringify({operationSnapshot,currentRuntimeStatus,currentRuntimeConfigStatus});
+            let failing=connected;
+            if (failure==='fallback') { ws=null; failing=connectWebSocket('ws://fixture',5000,1); }
+            failing.readyState=3;
+            failing.emit(failure==='close'?'close':'error',{code:1006,message:'fixture disconnect'});
+            ok(document.getElementById('operationCurrentState').textContent==='Reconnecting',failure+' must repaint cached '+expected);
+            ok(document.getElementById('operationStateDetail').textContent.includes('Last known operating values'), 'cached values must be identified');
+            ok(!document.getElementById('operationRecoveryActions').hidden,'recovery controls must be visible');
+            ok(JSON.stringify({operationSnapshot,currentRuntimeStatus,currentRuntimeConfigStatus})===cached,'disconnect must retain authoritative cache');
+            clearWebSocketReconnectTimer(); clearWsprBandCatalogPendingRequest(); ws=null;
+            const resumed=connectWebSocket('ws://fixture'); resumed.open();
+            updateRuntimeControlConfigStatus('WSPR',false);
+            resumed.message({tx_state:'idle'});
+            ok(document.getElementById('operationCurrentState').textContent==='Transmit paused','fresh runtime must restore known status');
+        }
+        ok(httpMethods.every(method=>method==='GET'),'disconnect must not write HTTP configuration');
+        ok(sockets.every(socket=>socket.sent.every(message=>['wspr_band_catalog','get_tx_state','test_tone_status'].includes(message.command))), 'disconnect must not dispatch transmitter commands');
+        return 'PASS: actual close/error/fallback handlers repaint paused and active cached states without mutation';
+    } finally {
+        clearWebSocketReconnectTimer(); clearWsprBandCatalogPendingRequest(); ws=null;
+        window.WebSocket=original.WebSocket; reloadAllData=original.reloadAllData; getTxState=original.getTxState;
+        $.ajax=original.ajax; systemPaused=original.systemPaused;
+    }
+}
+
 async function reviewIntegratedUi(client, origin, evidence) {
     fs.mkdirSync(evidence, {recursive: true});
     const evaluate = async expression => {
@@ -61,6 +114,9 @@ async function reviewIntegratedUi(client, origin, evidence) {
         await client.send("Page.navigate", {url:`${origin}/index.php?page=${view}${view==='spots'?'&demo=1':''}`});
         await waitFor("document.readyState==='complete' && typeof applyThemePreference==='function' && window.PicoFirmwareSafety?.locked===false", `${view} load and idle host firmware status`);
         await client.send("Page.bringToFront");
+        if (view==='operation') {
+            console.log(await evaluate(`(${operationDisconnectFixture.toString()})()`));
+        }
         if (view === "logs") {
             await evaluate(`__reviewLogStream.onopen();__reviewLogStream.emit('message',{type:'journal',__REALTIME_TIMESTAMP:'1792173600000000',PRIORITY:'6',SYSLOG_IDENTIFIER:'wsprrypi-long-service-identifier',MESSAGE:'First visible record: '+ 'long-technical-value-'.repeat(14)});`);
             await waitFor("!!document.querySelector('.logs-line')", "production log record");

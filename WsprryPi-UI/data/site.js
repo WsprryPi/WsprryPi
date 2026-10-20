@@ -1528,6 +1528,10 @@ function clearWebSocketReconnectTimer() {
 }
 
 function syncConnectionAlert() {
+    if ((!backendCurrentlyConnected || !websocketCurrentlyConnected) &&
+        typeof updateOperationStatusSummary === "function") {
+        updateOperationStatusSummary(currentRuntimeStatus);
+    }
     if (typeof window.isRp1RouteStatusModalActive === "function" && window.isRp1RouteStatusModalActive()) {
         hideConnectionAlert();
         return;
