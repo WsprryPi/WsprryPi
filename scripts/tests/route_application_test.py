@@ -64,7 +64,10 @@ class Tests(unittest.TestCase):
             with self.assertRaises(Exception): app.edit(data, 'gpio20')
 
     def test_appended_sections_preserve_bytes_and_new_keys(self):
-        data = self.data + b'\n[Band GPIO]\n8m = \n[GPIO]\nRP1 Future Setting = 2\n'
+        # Model an older file before the current stock schema acquired 8m.
+        # The appended key must be new, not a duplicate of a stock assignment.
+        original = self.data.replace(b'\n8m =\n', b'\n').replace(b'\n8m Active High = false\n', b'\n')
+        data = original + b'\n[Band GPIO]\n8m = \n[GPIO]\nRP1 Future Setting = 2\n'
         self.assertEqual(app.configuration(data).getint('GPIO', 'RP1 Future Setting'), 2)
         self.assertEqual(app.edit(data, 'gpio20'),
                          data.replace(b'Transmit Pin = 4', b'Transmit Pin = 20'))
