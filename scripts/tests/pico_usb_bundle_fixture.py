@@ -1,10 +1,10 @@
-"""Synthetic public installer releases and a hardware-free executable core."""
+"""Synthetic verified installer source and a hardware-free executable core."""
+import base64
 import hashlib
 import json
 
 REPOSITORY = 'WsprryPi/WsprryPico'
 API = 'https://api.github.com/repos/'+REPOSITORY+'/'
-DOWNLOAD = 'https://github.com/'+REPOSITORY+'/releases/download/'
 SERIAL = '1545B6EFBF78028C'
 POLICY = {'schema':'wsprrypi-pico-usb-policy/1','contract':1,'channel':'devel'}
 
@@ -42,13 +42,12 @@ def main(argv=None,schema_bytes=None):
 
 
 def fixture(run=100,version='0.1.1'):
-    payload = {'usb_installer.py':core(version),'release-manifest-1.schema.json':b'{}\n'}
+    payload = {'usb_installer.py':core(version),'release-manifest-1.schema.json':encoded({'$id':'https://github.com/'+REPOSITORY+'/firmware-release-manifest/1'})}
     manifest = {'schema':'wsprrypico-usb-installer/1','repository':REPOSITORY,'contract':1,
         'result_schema':'wsprrypico-usb-result/1','transaction_schema':'wsprrypico-usb-transaction/1',
         'firmware_manifest_schema':1,'python_min':[3,10],'installer_version':version,'channel':'devel',
         'source':('a' if run==100 else 'b')*40,'run_id':run,'attempt':1,
-        'workflow':'.github/workflows/usb-installer.yml','verify_job':{'id':42,'name':'verify','status':'completed','conclusion':'success'},
-        'tag':f'usb-installer-v1-devel-{run}.1',
+        'workflow':'.github/workflows/software-build.yml','verify_job':{'id':42,'name':'verify','status':'completed','conclusion':'success'},
         'files':{name:{'sha256':hashlib.sha256(data).hexdigest(),'bytes':len(data)} for name,data in payload.items()}}
     return manifest,payload
 
@@ -56,29 +55,30 @@ def fixture(run=100,version='0.1.1'):
 class Network:
     def __init__(self,manifest,payload):
         self.manifest,self.payload,self.requests = manifest,payload,[]
+        self.original = dict(payload)
         self.failure = None
         self.mutate = lambda value:value
     def api(self,path):
         self.requests.append(path)
         if self.failure:
             raise self.failure
-        m=self.manifest;receipt=encoded(m)
-        if path=='releases/tags/usb-installer-v1-devel':
-            index={key:m[key] for key in ('schema','repository','contract','channel','source','run_id','attempt','tag')}
-            index['manifest_sha256']=hashlib.sha256(receipt).hexdigest()
-            return self.mutate({'draft':False,'prerelease':True,'assets':[],
-                'body':'<!-- wsprrypico-usb-installer/1\n'+json.dumps(index)+'\n-->'})
-        if path=='releases/tags/'+m['tag']:
-            return self.mutate({'draft':False,'prerelease':True,'tag_name':m['tag'],
-                'assets':[{'name':name,'state':'uploaded','size':len(data),'digest':'sha256:'+hashlib.sha256(data).hexdigest(),
-                           'browser_download_url':DOWNLOAD+m['tag']+'/'+name} for name,data in {**self.payload,'usb-installer.json':receipt}.items()]})
-        if path=='git/ref/tags/'+m['tag']:
-            return self.mutate({'object':{'type':'commit','sha':m['source'],'url':API+'git/commits/'+m['source']}})
-        if path==f"actions/runs/{m['run_id']}/attempts/1":
-            return self.mutate({'head_sha':m['source'],'head_branch':'devel','path':m['workflow'],'run_attempt':1,
-                               'event':'push','status':'completed','conclusion':'success'})
+        m=self.manifest
+        if path=='commits/devel':return self.mutate({'sha':m['source']})
+        if path=='actions/workflows/software-build.yml':return self.mutate({'id':123,'path':m['workflow']})
+        run={'id':m['run_id'],'head_sha':m['source'],'head_branch':'devel','path':m['workflow'],'workflow_id':123,
+             'repository':{'full_name':REPOSITORY},'head_repository':{'full_name':REPOSITORY},
+             'run_attempt':m['attempt'],'event':'push','status':'completed','conclusion':'success'}
+        if path.startswith('actions/workflows/software-build.yml/runs?'):return self.mutate({'workflow_runs':[run]})
+        if path==f"actions/runs/{m['run_id']}/attempts/1":return self.mutate(run)
+        if path==f"actions/runs/{m['run_id']}/attempts/1/jobs?per_page=100":
+            jobs=[{**m['verify_job'],'run_id':m['run_id'],'head_sha':m['source'],'run_attempt':1},
+                  {'id':43,'name':'publish','run_id':m['run_id'],'head_sha':m['source'],'run_attempt':1,'status':'completed','conclusion':'skipped'}]
+            return self.mutate({'total_count':2,'jobs':jobs})
         raise AssertionError(path)
     def get(self,url,limit=1024*1024):
         self.requests.append(url)
-        name=url.rsplit('/',1)[1]
-        return encoded(self.manifest) if name=='usb-installer.json' else self.payload[name]
+        name=url.split('?')[0].rsplit('/',1)[1]
+        data=self.payload[name];original=self.original[name]
+        return encoded(self.mutate({'type':'file','path':'scripts/'+('ci/' if name.endswith('.json') else '')+name,
+            'encoding':'base64','size':len(original),'content':base64.b64encode(data).decode(),
+            'sha':hashlib.sha1(b'blob '+str(len(original)).encode()+b'\0'+original).hexdigest()}))

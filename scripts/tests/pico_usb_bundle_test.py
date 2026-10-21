@@ -70,24 +70,72 @@ class DistributionTests(unittest.TestCase):
             code,result=self.invoke('erase','--device',SERIAL,'--board','pico2_w','--yes')
         self.assertEqual(code,0);self.assertEqual(result['operation'],'erase')
         self.assertTrue(all(p.read_bytes()==b'private fixture backup' for p in backups))
-    def test_verified_live_ci_and_exact_release_checks_fail_closed(self):
-        changes=[lambda r:r.update(draft=True),lambda r:r.update(head_sha='c'*40),lambda r:r.update(conclusion='failure'),
-                 lambda r:r.update(status='in_progress'),lambda r:r.update(path='other.yml'),
-                 lambda r:r.update(assets=[]),lambda r:r.update(object={'type':'commit','sha':'c'*40,'url':'private'})]
-        for change in changes:
+    def test_verified_ci_and_immutable_source_checks_fail_closed(self):
+        changes=[('head_sha','c'*40),('conclusion','failure'),('status','in_progress'),
+                 ('path','other.yml'),('workflow_id',124),('event','pull_request'),
+                 ('repository',{'full_name':'fork/WsprryPico'}),('head_repository',{'full_name':'fork/WsprryPico'}),
+                 ('run_attempt',2),('size',1),('sha','c'*40),('encoding','hex')]
+        for field,value in changes:
             net=Network(*fixture())
-            def mutate(value):
-                if (change==changes[0] and 'draft' in value) or (change in changes[1:5] and 'head_sha' in value) or (change==changes[5] and 'tag_name' in value) or (change==changes[6] and 'object' in value):change(value)
-                return value
+            def mutate(record):
+                if field in record:record[field]=value
+                return record
             net.mutate=mutate
-            with self.subTest(change=change),self.assertRaises(bundle.Unavailable):bundle.published(net,'devel')
+            with self.subTest(field=field),self.assertRaises(bundle.Unavailable):bundle.published(net,'devel')
         self.assertFalse((self.store.root/'active.json').exists())
     def test_incompatible_contract_runtime_and_payload_are_never_executed(self):
         for field,value in [('contract',2),('python_min',[99,0]),('transaction_schema','other'),('result_schema','other'),('firmware_manifest_schema',2)]:
             manifest,payload=fixture();manifest[field]=value
-            with self.subTest(field=field),self.assertRaises(bundle.Unavailable):bundle.published(Network(manifest,payload),'devel')
-        net=Network(*fixture());net.payload['usb_installer.py']+=b'changed'
-        with self.assertRaises(bundle.Unavailable):bundle.published(net,'devel')
+            with self.subTest(field=field),self.assertRaises(bundle.Unavailable):bundle.validate(manifest,'devel')
+        for name in self.payload:
+            net=Network(*fixture());net.payload[name]+=b'changed'
+            with self.subTest(name=name),self.assertRaises(bundle.Unavailable):bundle.published(net,'devel')
+        net=Network(*fixture());net.payload['usb_installer.py']=net.payload['usb_installer.py'].replace(b'wsprrypico-usb-result/1',b'wsprrypico-usb-result/2');net.original=dict(net.payload)
+        with self.assertRaisesRegex(bundle.Unavailable,'incompatible contract'):bundle.published(net,'devel')
+    def test_pending_branch_and_branch_race_keep_retained_installer(self):
+        identity=self.select()
+        self.net.mutate=lambda r: {**r,'workflow_runs':[]} if 'workflow_runs' in r else r
+        result=self.store.refresh(self.net,force=True)
+        self.assertEqual(result['identity'],identity);self.assertIn('retry after CI',result['update']['reason'])
+        net=Network(*fixture());count=0
+        def move(r):
+            nonlocal count
+            if set(r)=={'sha'}:
+                count+=1
+                if count==2:r['sha']='c'*40
+            return r
+        net.mutate=move
+        with self.assertRaisesRegex(bundle.Unavailable,'branch changed'):bundle.published(net,'devel')
+    def test_failed_verify_job_and_incomplete_jobs_refuse_source(self):
+        for mode in ('failure','skipped','missing','extra'):
+            net=Network(*fixture())
+            def mutate(r):
+                if 'jobs' in r:
+                    if mode=='missing':r['jobs'].pop()
+                    elif mode=='extra':r['jobs'].append(dict(r['jobs'][0]))
+                    else:r['jobs'][0]['conclusion']=mode
+                return r
+            net.mutate=mutate
+            with self.subTest(mode=mode),self.assertRaises(bundle.Unavailable):bundle.published(net,'devel')
+    def test_malformed_source_or_api_metadata_retains_checked_installer(self):
+        identity=self.select()
+        for field,value in [('content',7),('repository',[]),('head_repository',[]),('jobs',[1]),('workflow_runs',[1])]:
+            net=Network(*fixture())
+            def mutate(r):
+                if field in r:r[field]=value
+                return r
+            net.mutate=mutate
+            result=self.store.refresh(net,force=True)
+            self.assertEqual(result['identity'],identity)
+            self.assertEqual(result['update']['state'],'retained')
+    def test_legacy_receipt_metadata_stays_usable_without_network(self):
+        manifest,payload=fixture()
+        manifest.update(tag='retained-transaction-fixture',workflow='retired-workflow.yml')
+        identity=self.store.save(manifest,payload)
+        bucket=self.store.snapshot(self.state,identity)
+        tx=bucket/(SERIAL+'-pending')/'transaction.json';tx.parent.mkdir();tx.write_text('{}')
+        with patch.object(bundle,'Network',side_effect=AssertionError('offline recovery')):
+            self.assertEqual(self.store.recovery(tx,self.state)[0],manifest)
     def test_absent_update_keeps_verified_tool_and_reports_actual_reason(self):
         identity=self.select();self.net.failure=bundle.Unavailable('GitHub rate limit. Retry after tomorrow UTC.',error_code='github_rate_limited',retry_at=9999999999)
         selected=self.store.refresh(self.net,force=True)
@@ -97,6 +145,17 @@ class DistributionTests(unittest.TestCase):
         self.net.failure=bundle.Unavailable('offline')
         with self.assertRaises(bundle.Unavailable):self.select()
         self.assertFalse((self.store.root/'active.json').exists())
+    def test_identical_legacy_bytes_migrate_despite_cross_workflow_run_order(self):
+        manifest,payload=fixture();manifest.update(run_id=200,workflow='retired-workflow.yml')
+        old=self.store.save(manifest,payload)
+        bundle.write_json(self.store.root/'active.json',{'identity':old,'check_after':0,'update':{'state':'current'}})
+        self.store.bind('a'*32,old)
+        result=self.store.refresh(self.net,force=True)
+        self.assertEqual(result['update']['state'],'current')
+        self.assertNotEqual(result['identity'],old)
+        self.assertEqual(self.store.load(result['identity'])[1],payload)
+        self.assertEqual(self.store.planned('a'*32),old)
+        self.assertEqual(self.store.load(old)[0],manifest)
     def test_channel_cannot_roll_back_retained_newer_installer(self):
         self.store.refresh(Network(*fixture(101,'0.1.2')),force=True)
         current=self.store.refresh(self.net,force=True)

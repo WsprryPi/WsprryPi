@@ -150,16 +150,22 @@ omits private paths and never contains flash/credential bytes.
 `config/pico-usb-installer.json` declares installer contract 1 and an update
 channel. It contains no WsprryPico commit or file checksums. The protected Pi
 adapter understands the result, transaction and firmware-manifest contracts;
-compatible shared installer fixes are published by WsprryPico independently of
-Pi releases. The installer channel is independent of firmware image selection.
+compatible shared installer fixes are supplied from verified WsprryPico source
+independently of Pi releases. The installer channel is independent of firmware
+image selection.
 
 **Download and check image** checks the compatible installer channel before
 planning an image. Successful update checks are cached for ten minutes. The
-Pi accepts only an exact public version release, complete uploaded assets,
-SHA-256 checksums, matching source tag and successful installer CI provenance.
+Pi selects the configured main/devel branch head after a successful canonical
+software CI run and verification job. It downloads the Python installer and
+manifest schema at that immutable commit, checks Git blob identities, and
+retains SHA-256 hashes with the source and CI receipt. Separate installer releases
+and tags are unnecessary. Firmware still downloads as a compiled UF2 from its
+verified release; the Pi does not compile it.
 An incompatible contract, unsupported Python version, changed payload or failed
-CI cannot replace the installed copy. The first installation requires a valid
-published bundle; a refresh failure retains the previous verified copy and
+CI cannot replace the installed copy. The first installation requires a verified
+branch head; while its CI is pending, retry after verification completes. A
+refresh failure retains the previous verified copy and
 reports the reason beside the firmware controls. GitHub retry guidance is
 honored without retrying early. No GitHub credentials are loaded.
 

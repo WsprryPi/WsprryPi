@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 """Contract-1 installer distribution. No USB, firmware or RF authority."""
+import ast
+import base64
 import contextlib
 from datetime import datetime, timezone
 from email.utils import parsedate_to_datetime
@@ -20,7 +22,6 @@ import urllib.request
 
 REPOSITORY = 'WsprryPi/WsprryPico'
 API = 'https://api.github.com/repos/' + REPOSITORY + '/'
-DOWNLOAD = 'https://github.com/' + REPOSITORY + '/releases/download/'
 MARKER = 'wsprrypico-usb-installer/1'
 FILES = {'usb_installer.py', 'release-manifest-1.schema.json'}
 HEX = r'[0-9a-f]{64}'
@@ -104,7 +105,7 @@ def lock(root, owner=True):
 
 class Network:
     def get(self, url, limit=MAX_FILE):
-        require(url.startswith((API, DOWNLOAD)), 'Unexpected installer download origin')
+        require(url.startswith(API), 'Unexpected installer download origin')
         request = urllib.request.Request(url, headers={'User-Agent':'WsprryPi-USB-Installer/1', 'Accept':'application/vnd.github+json'})
         try:
             with urllib.request.urlopen(request, timeout=20) as response:
@@ -143,7 +144,7 @@ class Network:
                     raise Unavailable(f'GitHub installer update request rate-limited (HTTP {error.code}). Retry after {when}.{guidance}',
                                       error_code='github_rate_limited', retry_at=deadline) from error
                 if error.code == 404:
-                    raise Unavailable('A tested compatible installer channel is not published yet.', http_status=404) from error
+                    raise Unavailable('A verified compatible installer source is unavailable.', http_status=404) from error
                 raise Unavailable(f'Installer update request unavailable (HTTP {error.code}).', http_status=error.code) from error
         except (OSError, urllib.error.URLError) as error:
             raise Unavailable('Installer update check could not connect to GitHub.') from error
@@ -171,56 +172,82 @@ def validate(manifest, channel):
     return manifest
 
 
-def published(client, channel):
-    release = client.api('releases/tags/usb-installer-v1-'+channel)
-    require(release['draft'] is False and release['prerelease'] is True and not release['assets'], 'Invalid installer channel release')
-    body = release['body']
-    require(isinstance(body,str) and len(body) <= 16000, 'Oversized installer channel metadata')
-    records = re.findall(r'<!-- '+re.escape(MARKER)+r'\n(.*?)\n-->', body, re.S)
-    require(len(records) == 1, 'Missing or ambiguous installer channel')
-    index = decode(records[0])
-    run, attempt = index.get('run_id'), index.get('attempt')
-    require(index.get('schema') == MARKER and index.get('repository') == REPOSITORY and index.get('contract') == 1 and
-            index.get('channel') == channel and type(run) is int and run > 0 and type(attempt) is int and attempt > 0 and
-            re.fullmatch(r'[0-9a-f]{40}',index.get('source','')) and re.fullmatch(HEX,index.get('manifest_sha256','')) and
-            index.get('tag') == f'usb-installer-v1-{channel}-{run}.{attempt}', 'Invalid installer publication identity')
-    version = client.api('releases/tags/'+index['tag'])
-    assets = version['assets']
-    require(version['draft'] is False and version['prerelease'] is True and version['tag_name'] == index['tag'] and
-            len(assets) == 3 and {a['name'] for a in assets} == FILES | {'usb-installer.json'}, 'Incomplete installer publication')
-    base = DOWNLOAD+index['tag']+'/'
-    payload = {}
-    for asset in assets:
-        name = asset['name']
-        require(asset['state'] == 'uploaded' and asset['browser_download_url'] == base+name and
-                type(asset['size']) is int and 0 < asset['size'] <= MAX_FILE, 'Invalid installer asset identity')
-        data = client.get(base+name)
-        require(len(data) == asset['size'] and asset['digest'] == 'sha256:'+sha(data), 'Installer release checksum mismatch')
-        payload[name] = data
-    require(sha(payload['usb-installer.json']) == index['manifest_sha256'], 'Installer manifest checksum mismatch')
-    manifest = validate(decode(payload.pop('usb-installer.json')), channel)
-    for name,item in manifest['files'].items():
-        require(len(payload[name]) == item['bytes'] and sha(payload[name]) == item['sha256'],
-                'Installer content differs from its verified manifest')
-    require(all(manifest.get(key) == index[key] for key in ('source','run_id','attempt','tag')) and
-            manifest.get('workflow') == '.github/workflows/usb-installer.yml', 'Installer provenance differs from its channel')
-    job = manifest.get('verify_job',{})
-    require(job.get('name') == 'verify' and job.get('status') == 'completed' and job.get('conclusion') == 'success' and
-            type(job.get('id')) is int and job['id'] > 0, 'Installer publication has no successful verification receipt')
-    ref = client.api('git/ref/tags/'+index['tag'])
-    require(ref['object'].get('type') == 'commit' and ref['object'].get('sha') == manifest['source'],
-            'Installer tag points to different source')
+def source_file(client, path, source):
+    record = decode(client.get(API+'contents/'+path+'?ref='+source, 2*MAX_FILE))
+    require(isinstance(record,dict) and isinstance(record.get('content'),str) and
+            len(record['content']) <= 2*MAX_FILE and record.get('type') == 'file' and record.get('path') == path and
+            record.get('encoding') == 'base64' and type(record.get('size')) is int and
+            0 < record['size'] <= MAX_FILE, 'Invalid installer source file')
     try:
-        run_info = client.api(f'actions/runs/{run}/attempts/{attempt}')
-    except Unavailable as error:
-        if error.details.get('http_status') not in (404,410):
-            raise
-        # The immutable public receipt remains available after Actions expiry.
-    else:
-        require(run_info['head_sha'] == manifest['source'] and run_info['head_branch'] == channel and
-                run_info['path'] == manifest['workflow'] and run_info['run_attempt'] == attempt and
-                run_info['event'] in ('push','workflow_dispatch') and run_info['status'] == 'completed' and
-                run_info['conclusion'] == 'success', 'Installer CI has not completed successfully')
+        data = base64.b64decode(''.join(record['content'].split()), validate=True)
+    except (ValueError, TypeError) as error:
+        raise Unavailable('Invalid installer source encoding') from error
+    blob = hashlib.sha1(b'blob '+str(len(data)).encode()+b'\0'+data).hexdigest()
+    require(len(data) == record['size'] and blob == record.get('sha'), 'Installer Git blob checksum mismatch')
+    return data
+
+
+def metadata(client, path):
+    value = client.api(path)
+    require(isinstance(value,dict), 'Invalid installer verification metadata')
+    return value
+
+
+def published(client, channel):
+    # A branch is only a selector. Execute immutable source after its canonical
+    # software verification succeeds; cached transactions keep their old bytes.
+    require(channel in ('main', 'devel'), 'Unsupported installer channel')
+    source = metadata(client,'commits/'+channel)['sha']
+    require(isinstance(source, str) and re.fullmatch(r'[0-9a-f]{40}',source), 'Invalid installer source identity')
+    workflow = metadata(client,'actions/workflows/software-build.yml')
+    require(type(workflow.get('id')) is int and workflow['id'] > 0 and
+            workflow.get('path') == '.github/workflows/software-build.yml', 'Unexpected installer verification workflow')
+    runs = metadata(client,'actions/workflows/software-build.yml/runs?branch='+channel+'&head_sha='+source+'&status=success&per_page=10')['workflow_runs']
+    require(isinstance(runs,list) and len(runs) <= 10 and all(isinstance(r,dict) for r in runs),
+            'Invalid installer verification runs')
+    candidates = [r for r in runs if r.get('head_sha') == source and r.get('head_branch') == channel and
+                  type(r.get('id')) is int and r['id'] > 0 and type(r.get('run_attempt')) is int and r['run_attempt'] > 0 and
+                  r.get('event') in ('push','workflow_dispatch')]
+    require(candidates, 'Installer branch head has no successful software verification; retry after CI completes')
+    selected = max(candidates, key=lambda r:(r['id'],r['run_attempt']))
+    run, attempt = selected['id'], selected['run_attempt']
+    info = metadata(client,f'actions/runs/{run}/attempts/{attempt}')
+    require(info.get('id') == run and info.get('head_sha') == source and info.get('head_branch') == channel and
+            info.get('path') == workflow['path'] and info.get('workflow_id') == workflow['id'] and
+            isinstance(info.get('repository'),dict) and info['repository'].get('full_name') == REPOSITORY and
+            isinstance(info.get('head_repository'),dict) and info['head_repository'].get('full_name') == REPOSITORY and
+            info.get('run_attempt') == attempt and info.get('event') in ('push','workflow_dispatch') and
+            info.get('status') == 'completed' and info.get('conclusion') == 'success',
+            'Installer CI has not completed successfully on canonical source')
+    result = metadata(client,f'actions/runs/{run}/attempts/{attempt}/jobs?per_page=100')
+    jobs = result['jobs']
+    require(isinstance(jobs,list) and all(isinstance(j,dict) for j in jobs) and result.get('total_count') == len(jobs) and len(jobs) == 2 and
+            {j.get('name') for j in jobs} == {'verify','publish'}, 'Unexpected installer verification jobs')
+    job = next(j for j in jobs if j['name'] == 'verify')
+    require(all(j.get('run_id') == run and j.get('head_sha') == source and j.get('run_attempt') == attempt and
+                j.get('status') == 'completed' and j.get('conclusion') in ('success','skipped') for j in jobs) and
+            job.get('conclusion') == 'success' and type(job.get('id')) is int and job['id'] > 0,
+            'Installer source has no successful verification job')
+    payload = {name:source_file(client,path,source) for name,path in (
+        ('usb_installer.py','scripts/usb_installer.py'),
+        ('release-manifest-1.schema.json','scripts/ci/release-manifest-1.schema.json'))}
+    tree = ast.parse(payload['usb_installer.py'])
+    versions = [ast.literal_eval(n.value) for n in tree.body if isinstance(n,ast.Assign) and
+                any(isinstance(t,ast.Name) and t.id == 'INSTALLER_VERSION' for t in n.targets)]
+    require(len(versions) == 1 and isinstance(versions[0],str), 'Missing or ambiguous installer version')
+    constants = {n.value for n in ast.walk(tree) if isinstance(n,ast.Constant) and isinstance(n.value,str)}
+    schema = decode(payload['release-manifest-1.schema.json'])
+    require(isinstance(schema,dict) and {'wsprrypico-usb-result/1','wsprrypico-usb-transaction/1'} <= constants and
+            schema.get('$id') ==
+            'https://github.com/'+REPOSITORY+'/firmware-release-manifest/1', 'Installer source has an incompatible contract')
+    manifest = validate({'schema':MARKER,'repository':REPOSITORY,'contract':1,'channel':channel,
+        'source':source,'run_id':run,'attempt':attempt,'workflow':workflow['path'],
+        'delivery':'verified-source','verify_job':{k:job[k] for k in ('id','name','status','conclusion')},
+        'installer_version':versions[0],'python_min':[3,10],
+        'result_schema':'wsprrypico-usb-result/1','transaction_schema':'wsprrypico-usb-transaction/1',
+        'firmware_manifest_schema':1,
+        'files':{n:{'sha256':sha(d),'bytes':len(d)} for n,d in payload.items()}},channel)
+    require(metadata(client,'commits/'+channel)['sha'] == source, 'Installer branch changed during verification; retry')
     return manifest, payload
 
 
@@ -281,11 +308,15 @@ class Store:
             manifest,payload = published(client or Network(),self.channel)
             if current:
                 previous,_ = self.load(current['identity'])
-                require(previous['channel'] != self.channel or (manifest['run_id'],manifest['attempt']) >= (previous.get('run_id',0),previous.get('attempt',0)),
+                # Different workflows can verify identical source in a different
+                # run order. Migrating its receipt must preserve old plans.
+                same_content = manifest['source'] == previous['source'] and manifest['files'] == previous['files']
+                require(previous['channel'] != self.channel or same_content or
+                        (manifest['run_id'],manifest['attempt']) >= (previous.get('run_id',0),previous.get('attempt',0)),
                         'Installer channel attempted to replace a newer verified version')
             identity = self.save(manifest,payload)
             result = {'identity':identity,'check_after':int(time.time())+600,'update':{'state':'current'}}
-        except (ValueError, KeyError, TypeError, OSError) as error:
+        except (ValueError, KeyError, TypeError, OSError, SyntaxError) as error:
             if not current:
                 raise
             details = getattr(error,'details',{})
