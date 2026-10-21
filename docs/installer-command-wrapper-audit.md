@@ -28,6 +28,8 @@ The wrapper still controls status presentation, child-output suppression, and
 dry-run execution. Logging destinations and bounded failure-detail capture remain part of the
 installer contract.
 
+Source builds install their package dependencies before cloning the selected repository. Support-bundle encryption validation loads its helper after this checkout exists and completes before RP1 provider application or WsprryPi application installation. Precompiled inputs prepare the checkout during artifact validation and reuse it for later installation. Dry runs neither clone nor load the encryption-validation helper.
+
 ## Direct calls retained deliberately
 
 - **Read-only probes and captured data:** Git metadata, package and service
@@ -64,6 +66,8 @@ companion installation, service recovery, INI migration, Apache proxy settings,
 and RP1 installer contracts. Added coverage checks real wrapper output for
 executable publication and rollback, failed-publication reporting, configuration
 file integrity, and I2C write failure without a success or reboot claim.
+
+`scripts/tests/installer_bootstrap_test.py`, included in `installer-dependency-test`, streams the installer into Bash with no existing checkout. Filesystem fixtures and mocked external operations cover source preparation, encryption-tool validation, failure propagation, precompiled checkout reuse, existing-checkout installation, and dry runs without packages, services, or hardware access.
 
 Relevant hardware-free entry points, run from `src` on a supported Linux host:
 

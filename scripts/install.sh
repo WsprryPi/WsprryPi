@@ -9742,7 +9742,6 @@ manage_wsprry_pi() {
 
     # Define the group of functions to install/uninstall
     local install_group=(
-        "git_clone"
         "capture_install_sem_ver"
         "remove_legacy_services"
         "remove_legacy_files_and_dirs"
@@ -9765,7 +9764,6 @@ manage_wsprry_pi() {
 
     # Define functions to skip on uninstall using an indexed array
     local skip_on_uninstall=(
-        "git_clone"
         "capture_install_sem_ver"
         "prepare_install_executable"
         "cleanup_files_in_directories"
@@ -9800,7 +9798,7 @@ manage_wsprry_pi() {
     uninstall)
         debug_print "(UNINSTALL) Reversing and filtering install_group…" "$debug"
 
-        # Build a regex like: git_clone|remove_legacy_services|remove_legacy_files_and_dirs|cleanup_files_in_directories
+        # Build a regex from the install-only functions.
         local skip_regex
         skip_regex=$(printf "|%s" "${skip_on_uninstall[@]}")
         skip_regex=${skip_regex:1}
@@ -10000,6 +9998,11 @@ _main() {
         logI "Updating and managing required packages (this may take a few minutes)."
         prepare_rp1_gpclk_runtime_update "$debug" || return 1
         handle_apt_packages "$debug" || return 1
+        # Source builds need the checkout before loading its validation helper.
+        # Precompiled preparation has already cloned the selected source.
+        if [[ "$BINARY_SOURCE" == "build" ]]; then
+            git_clone "$debug" || return 1
+        fi
         validate_support_bundle_age_dependency "$debug" || return 1
         validate_precompiled_runtime "$debug" || return 1
         validate_rp1_gpclk_build_dependencies "$debug" || return 1
