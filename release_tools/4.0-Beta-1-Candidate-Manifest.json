@@ -5481,5 +5481,97 @@
         "sha256": "bf146d21928d25932d26cb697f796397d67936b655bb57ce00e1e989bf8afa0e"
       }
     ]
+  },
+  "publication_16d": {
+    "status": "preparing-unpublished",
+    "version": "4.0.0-beta.1",
+    "proposed_tag": "v4.0.0-beta.1",
+    "date": "2026-10-21",
+    "publication_method": "operator-selected developer-operated Option B; no Actions publisher implementation",
+    "reviewed_supporting_source_commit": "85bdbdd93aa29bca1783fa55f861952108012802",
+    "reviewed_supporting_source_tree": "b68f44a312571bb9f93e4cf061f81ff7ae8de04e",
+    "supporting_payload_identities": {
+      "WsprryPi-UI": {
+        "git_tree": "9b300b5e32775b0c1a6fe991dd1e619843a25213"
+      },
+      "config": {
+        "git_tree": "b76f3cf3b975c14129079dbef43d11349d505747"
+      },
+      "systemd": {
+        "git_tree": "2797ffef992454cd7a23cf06b21fb9d36c0bedfc"
+      },
+      "scripts/install.sh": {
+        "sha256": "69b986b3714977595b5c49640e80741337a78b75fa1a33c5a93bd35888258e49"
+      },
+      "scripts/precompiled_binary.py": {
+        "sha256": "f52884f36633f681dc11c6be344736e3968a3f10f795c6e7c4e2bcbec6da3b72"
+      },
+      "scripts/rp1_qualification.py": {
+        "sha256": "4bc98d559eadbd465614511ce4b6fc754bde683d75dc20430d4faa45d67bf6e8"
+      },
+      "scripts/pico_usb_bundle.py": {
+        "sha256": "bfbd630de8e8ca5c6d1e844fcf3381ab8024a532f412c8245af7558cae450cb2"
+      },
+      "release_tools/rp1-qualification-lock.json": {
+        "sha256": "10a1a7da96157e101767b7252d174e2e095efc90abfc56e583586f064c9a6fca"
+      }
+    },
+    "executable_source_commit": "1e047a44a44f07d2eb52dfd3c3537d2d24e60143",
+    "supporting_changes": [
+      {
+        "commit": "dfec0b52a6c404a70a23ac9040796f7cae94d287",
+        "change": "Install and consume pinned local RP1 evidence bundle without separate-release fetch"
+      },
+      {
+        "commit": "85bdbdd93aa29bca1783fa55f861952108012802",
+        "change": "Resolve compatible Pico installer using successful canonical CI and immutable source/blob identity"
+      }
+    ],
+    "operator_disposition": {
+      "accepted": true,
+      "scope": "Fresh isolated installation/repeat/interruption/ownership/status tests and historical target runtime evidence",
+      "retained_limitation": "No fresh target installation/status of changed supporting files",
+      "new_target_operations_authorized": false,
+      "historical_20_versus_18_exception_unchanged": true
+    },
+    "supporting_ci": {
+      "run_id": 39604874701,
+      "head_sha": "85bdbdd93aa29bca1783fa55f861952108012802",
+      "result": "success",
+      "jobs_passed": 14,
+      "url": "https://github.com/WsprryPi/WsprryPi/actions/runs/39604874701"
+    },
+    "fresh_checks": [
+      "52 accepted export files and four flat staged executables SHA-256 matched",
+      "Four exact immutable build images: unprivileged no-network ELF/ABI/loader/libraries/symbols and explicit simulated --version passed",
+      "Four bundled RP1 evidence hashes matched pinned source bb681544",
+      "Linux isolated installer/dependency, precompiled download/source selection, RP1 ownership/recovery, local status, UI publication and Pico distribution tests passed"
+    ],
+    "no_executable_or_build_payload_change_since_accepted_source": true,
+    "stable_latest_before": {
+      "tag": "v3.2.0",
+      "release_id": 361059831
+    },
+    "github_immutability_policy": {
+      "enabled": false,
+      "enforced_by_owner": false,
+      "changed": false
+    },
+    "declared_assets": [
+      "wsprrypi-armv6-bookworm",
+      "wsprrypi-armv6-trixie",
+      "wsprrypi-aarch64-bookworm",
+      "wsprrypi-aarch64-trixie",
+      "SHA256SUMS",
+      "publication-manifest.json"
+    ],
+    "publication_commit": null,
+    "docs_commit": "65066216296163c0fcf71b6a5ead09083373f842",
+    "public_asset_verification": null,
+    "16e": "not-started",
+    "docs_tag": "v4.0.0-beta.1",
+    "docs_versioned_url": "https://wsprry-pi.readthedocs.io/en/v4.0.0-beta.1/",
+    "independent_preparation_review": "Four P2 documentation findings repaired; final independent reassessment found no further actionable scoped findings before commits; external publication gates remain",
+    "guarded_install_recipe_regression": "Bookworm success + ten refusal cases passed; mocked sudo never called on failures"
   }
 }

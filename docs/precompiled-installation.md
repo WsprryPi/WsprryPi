@@ -68,12 +68,17 @@ canonical values take precedence. A failed or empty
 configuration merge stops installation and retains the existing configuration
 and its recovery copy.
 
-## Future release downloads
+## Explicit Beta release downloads
 
-Once release assets are published, use:
+For 4.0 Beta 1, clone the exact application tag first to select matching
+supporting files. Follow the
+[versioned Beta installation guide](https://wsprry-pi.readthedocs.io/en/v4.0.0-beta.1/Install/beta1.html)
+for architecture/OS selection, independent checksums, dependencies and recovery.
+Run from that tagged checkout:
 
 ```sh
-sudo ./scripts/install.sh --binary-source release --release-tag v3.2.0
+rm -f ~/finished
+sudo ./scripts/install.sh --binary-source release --release-tag v4.0.0-beta.1 && touch ~/finished
 ```
 
 The installer downloads one asset named `wsprrypi-<cpu>-<release>` from the
@@ -81,8 +86,10 @@ selected GitHub release, where `<cpu>` is `armv6` or `aarch64` and `<release>` i
 `bookworm` or `trixie`. This selects the executable only; normal installer
 branch selection controls supporting files. A missing or incompatible asset
 fails the installation without falling back to compilation. Release download
-support is implemented; published assets are not yet available for end-to-end
-validation.
+support does not perform a published-checksum comparison. To install independently
+checked bytes, use the guide's local-binary procedure. Beta public-download
+verification is tracked in the [release evidence](../release_tools/4.0-Beta-1-Release-Evidence.md);
+draft or dry-run checks alone do not establish public availability.
 
 `--dry-run` performs no downloads, package installation, executable replacement,
 or service changes. A local executable receives a basic ELF check; dependency
