@@ -32,6 +32,7 @@ python3 "${SCRIPT_DIR}/precompiled_binary_test.py"
 "${SCRIPT_DIR}/precompiled_installer_test.sh"
 python3 "${SCRIPT_DIR}/ini_upgrade_schema_test.py"
 python3 "${SCRIPT_DIR}/installer_dry_run_purity_test.py"
+python3 "${SCRIPT_DIR}/installer_bootstrap_test.py"
 python3 "${SCRIPT_DIR}/service_install_recovery_test.py"
 "${SCRIPT_DIR}/build_resource_preflight_test.sh"
 
@@ -238,10 +239,11 @@ fi
 
 if ! awk '
     /handle_apt_packages "\$debug" \|\| return 1/ { packages = NR }
+    /git_clone "\$debug" \|\| return 1/ { clone = NR }
     /validate_support_bundle_age_dependency "\$debug" \|\| return 1/ { validation = NR }
-    END { exit(packages > 0 && validation == packages + 1 ? 0 : 1) }
+    END { exit(packages > 0 && clone > packages && validation > clone ? 0 : 1) }
 ' "$INSTALLER"; then
-    echo "age validation must immediately follow successful package handling" >&2
+    echo "source checkout preparation must follow package handling and precede age validation" >&2
     exit 1
 fi
 
