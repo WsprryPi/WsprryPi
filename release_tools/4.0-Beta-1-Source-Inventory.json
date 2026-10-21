@@ -9591,7 +9591,7 @@
     "provider_tree": "4c1ad8acf513b36ba32e58a636942655accbb52d",
     "supplement_source": "bb6815446beb9b96853ad5a353b0d355d4975710",
     "disposition_16b": "complete-replacement-four-artifact-software-handoff",
-    "disposition_16c": "open-replacement-target-acceptance-needs-new-bounded-authorization",
+    "disposition_16c": "accepted-bounded-target-checks-and-explicit-unchanged-installer-ui-evidence-reuse",
     "future_source_tag_rule": "Any later tag/source selection must include the accepted support payload and identify these executables as built from 1e047a44; record-only commits do not reidentify them.",
     "post_original_acceptance_commits": [
       {
@@ -9630,6 +9630,8 @@
         "commit": "1e047a44a44f07d2eb52dfd3c3537d2d24e60143",
         "subject": "Encode RP1 endpoint dither profiles within the provider contract"
       }
-    ]
+    ],
+    "target_acceptance_date": "2026-10-21",
+    "target_acceptance_method": "two executable replacements and one restart; explicit unchanged normal-installer/UI evidence reuse; actual 5/3/4 within 7/4/5 caps"
   }
 }

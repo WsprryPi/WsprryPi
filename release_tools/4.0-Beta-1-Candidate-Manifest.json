@@ -1,7 +1,7 @@
 {
   "schema": "wsprrypi-beta-candidate/1",
   "publication": "unpublished",
-  "candidate_acceptance": "pending-replacement-installation-service-runtime-acceptance",
+  "candidate_acceptance": "accepted-bounded-executable-replacement-runtime-with-explicit-unchanged-support-reuse",
   "version": "4.0.0-beta.1",
   "source_commit": "1e047a44a44f07d2eb52dfd3c3537d2d24e60143",
   "source_branch": "devel",
@@ -648,7 +648,7 @@
     }
   ],
   "limits": [
-    "Replacement source 1e047a44 has fresh software and four-artifact evidence; installation/service/runtime acceptance remains open pending new bounded authorization. No target action performed.",
+    "Replacement source 1e047a44 accepted on wspr5 by two atomic executable replacements and one restart, each with full 300 s idle; unchanged normal-installer/UI/support evidence explicitly reused. This is not a fresh normal-installer acceptance run.",
     "Historical original-candidate acceptance only: October 20 wspr5 upgrade, repeat, restart, final UI installation and idle acceptance passed. The operator specifically accepted no fresh clean installation, other three exports on physical targets, reboot or fresh GPIO4 selection. Actual 20 requests exceeded approved 18; independently audited and explicitly accepted for 16c disposition, without retroactive authorization. No transmission, RF test, route change, provider update or Pico operation.",
     "Package repositories are not snapshotted; exports record their actual package versions.",
     "Final handoff documentation commits do not reidentify these executables; source and artifact hashes above remain authoritative."
@@ -4068,7 +4068,7 @@
   "reevaluation_16bc": {
     "date": "2026-10-20",
     "disposition_16b": "complete-replacement-four-artifact-software-handoff",
-    "disposition_16c": "open-replacement-target-acceptance-needs-new-bounded-authorization",
+    "disposition_16c": "accepted-bounded-target-checks-and-explicit-unchanged-installer-ui-evidence-reuse",
     "reviewed_pi_devel": "6e833e65cbc5e92b7b27f6f6276cc0ac67319aba",
     "reviewed_rp1_devel": "1db51cd33471cd51687eb8cc626553e8e8d16430",
     "selected_executable_source": "1e047a44a44f07d2eb52dfd3c3537d2d24e60143",
@@ -4110,17 +4110,17 @@
       {
         "row": "installer/configuration/UI/helpers/services",
         "classification": "reused-with-proven-applicability",
-        "evidence": "unchanged installed payload paths versus 4ea48c66; fresh installer/UI regressions; does not assert installed replacement alignment"
+        "evidence": "Unchanged 4ea48c66 supporting payload explicitly approved for reuse; fresh installed 366-path identity and compatibility checks plus Operation visual/keyboard/offline review. Generated unit and UI manifest metadata retain original identities."
       },
       {
         "row": "upgrade/repeat/service readiness/restart/idle",
-        "classification": "newly-invalidated-identity-requirement",
-        "evidence": "historical passes preserved; replacement binary requires newly authorized target acceptance"
+        "classification": "fresh-executable-replacement-and-runtime-with-explicit-installer-reuse",
+        "evidence": "Two atomic executable replacements and one explicit restart passed three full 300 s idle cases. Original normal-installer upgrade/repeat evidence explicitly reused; no installer invoked."
       },
       {
         "row": "installed config/ownership/route/receipt/cache/final safety",
-        "classification": "required-fresh-target-postconditions",
-        "evidence": "historical observations preserved; no current target inspection or mutation"
+        "classification": "fresh-target-postconditions",
+        "evidence": "Exact file/package/checkpoint/journal and ownership correspondence; GPIO20 exact_ready, output disabled, no owner/lease; transmit false boot Never WTP/Fleet disabled."
       },
       {
         "row": "published provider and supplement",
@@ -4135,11 +4135,11 @@
       {
         "row": "service cap",
         "classification": "historical-nonconformance",
-        "evidence": "approved18 actual20 past exception preserved; no new service allowance or target request"
+        "evidence": "Historical 18 approved / 20 actual exception unchanged. Fresh approved caps 7 application / 4 companion / 5 inspection; actual 5/3/4, no recovery or overruns."
       }
     ],
-    "target_actions_performed": false,
-    "new_service_requests": 0,
+    "target_actions_performed": true,
+    "new_service_requests": 5,
     "historical_service_requests": {
       "approved_cap": 18,
       "actual": 20,
@@ -4150,14 +4150,20 @@
     "16d": "not-started",
     "16e": "not-started",
     "proposed_target_acceptance": {
-      "authorized": false,
+      "authorized": true,
       "method": "two atomic executable replacements and one restart; unchanged installer/support acceptance requires explicit operator reuse decision",
       "application_request_cap": 7,
       "companion_start_cap": 4,
       "provider_inspection_cap": 5,
       "idle_cases": 3,
       "idle_seconds_each": 300,
-      "package_config_support_provider_changes": false
+      "package_config_support_provider_changes": false,
+      "authorization_date": "2026-10-21",
+      "operator_explicitly_accepted_installer_ui_evidence_reuse": true,
+      "execution_result": "PASS",
+      "actual_application_requests": 5,
+      "actual_companion_starts": 3,
+      "actual_provider_inspections": 4
     },
     "future_source_tag_rule": "Any later tag/source selection must include the accepted support payload and identify these executables as built from 1e047a44; record-only commits do not reidentify them.",
     "retained_evidence": [
@@ -4610,6 +4616,869 @@
         "path": "dist/beta1/validation/16bc-reevaluation/replacement-inspection/export-inspection.json",
         "bytes": 2123,
         "sha256": "73c712cfbd78d207fc0e49b24d38ceaf13851e217435000787b9c4f122933c0a"
+      }
+    ],
+    "acceptance_date": "2026-10-21",
+    "target_acceptance_2026_10_21": {
+      "date": "2026-10-21",
+      "result": "accepted-with-specific-limitations-and-explicit-support-evidence-reuse",
+      "executable_source": "1e047a44a44f07d2eb52dfd3c3537d2d24e60143",
+      "artifact_sha256": "82a563adcf3ff9cda8e43423e588a9739adcda9d2bb07683cb831f6df046feda",
+      "host": "wspr5",
+      "model": "Raspberry Pi 5 Model B Rev 1.0",
+      "os": "Debian 13.7 Trixie arm64",
+      "kernel": "6.18.34+rpt-rpi-2712",
+      "boot_id": "c1c98795-01be-48ba-a3ff-a3ca479ce976",
+      "baseline_pid": "1370737",
+      "final_pid": "1569571",
+      "cases": [
+        {
+          "case": "replacement-1",
+          "requested_utc": "2026-10-21T10:41:22.987062+00:00",
+          "pid": "1566871",
+          "readiness_seconds": 0.647988,
+          "idle_seconds": 300.0386501029716,
+          "samples": 31,
+          "result": "PASS"
+        },
+        {
+          "case": "replacement-2",
+          "requested_utc": "2026-10-21T10:46:51.982670+00:00",
+          "pid": "1568247",
+          "readiness_seconds": 0.578565,
+          "idle_seconds": 300.03880103398114,
+          "samples": 31,
+          "result": "PASS"
+        },
+        {
+          "case": "restart",
+          "requested_utc": "2026-10-21T10:52:09.191819+00:00",
+          "pid": "1569571",
+          "readiness_seconds": 5.15143,
+          "idle_seconds": 300.0390505460091,
+          "samples": 31,
+          "result": "PASS"
+        }
+      ],
+      "ledger": {
+        "authorized": "2026-10-21 user approval of 1e047a44 bounded plan and unchanged installer/UI evidence reuse",
+        "caps": {
+          "application": 7,
+          "companion": 4,
+          "inspection": 5
+        },
+        "used": {
+          "application": 5,
+          "companion": 3,
+          "inspection": 4
+        },
+        "events": [
+          {
+            "utc": "2026-10-21T10:37:48.264239+00:00",
+            "kind": "inspection",
+            "description": "baseline-provider passive runtime_provider inspect",
+            "cumulative": {
+              "application": 0,
+              "companion": 0,
+              "inspection": 1
+            }
+          },
+          {
+            "utc": "2026-10-21T10:41:15.633173+00:00",
+            "kind": "application",
+            "description": "replacement-1 stop wsprrypi.service",
+            "cumulative": {
+              "application": 1,
+              "companion": 0,
+              "inspection": 1
+            }
+          },
+          {
+            "utc": "2026-10-21T10:41:22.559738+00:00",
+            "kind": "application",
+            "description": "replacement-1 start wsprrypi.service",
+            "cumulative": {
+              "application": 2,
+              "companion": 0,
+              "inspection": 1
+            }
+          },
+          {
+            "utc": "2026-10-21T10:41:22.559932+00:00",
+            "kind": "companion",
+            "description": "replacement-1 expected ExecStartPost start wsprrypi-rp1-reconcile.service (charged before request)",
+            "cumulative": {
+              "application": 2,
+              "companion": 1,
+              "inspection": 1
+            }
+          },
+          {
+            "utc": "2026-10-21T10:46:24.571318+00:00",
+            "kind": "inspection",
+            "description": "replacement-1-provider passive runtime_provider inspect",
+            "cumulative": {
+              "application": 2,
+              "companion": 1,
+              "inspection": 2
+            }
+          },
+          {
+            "utc": "2026-10-21T10:46:50.901818+00:00",
+            "kind": "application",
+            "description": "replacement-2 stop wsprrypi.service",
+            "cumulative": {
+              "application": 3,
+              "companion": 1,
+              "inspection": 2
+            }
+          },
+          {
+            "utc": "2026-10-21T10:46:51.628344+00:00",
+            "kind": "application",
+            "description": "replacement-2 start wsprrypi.service",
+            "cumulative": {
+              "application": 4,
+              "companion": 1,
+              "inspection": 2
+            }
+          },
+          {
+            "utc": "2026-10-21T10:46:51.628706+00:00",
+            "kind": "companion",
+            "description": "replacement-2 expected ExecStartPost start wsprrypi-rp1-reconcile.service (charged before request)",
+            "cumulative": {
+              "application": 4,
+              "companion": 2,
+              "inspection": 2
+            }
+          },
+          {
+            "utc": "2026-10-21T10:51:53.529116+00:00",
+            "kind": "inspection",
+            "description": "replacement-2-provider passive runtime_provider inspect",
+            "cumulative": {
+              "application": 4,
+              "companion": 2,
+              "inspection": 3
+            }
+          },
+          {
+            "utc": "2026-10-21T10:52:08.824899+00:00",
+            "kind": "application",
+            "description": "restart restart wsprrypi.service",
+            "cumulative": {
+              "application": 5,
+              "companion": 2,
+              "inspection": 3
+            }
+          },
+          {
+            "utc": "2026-10-21T10:52:08.825287+00:00",
+            "kind": "companion",
+            "description": "restart expected ExecStartPost start wsprrypi-rp1-reconcile.service (charged before request)",
+            "cumulative": {
+              "application": 5,
+              "companion": 3,
+              "inspection": 3
+            }
+          },
+          {
+            "utc": "2026-10-21T10:57:15.329916+00:00",
+            "kind": "inspection",
+            "description": "restart-provider passive runtime_provider inspect",
+            "cumulative": {
+              "application": 5,
+              "companion": 3,
+              "inspection": 4
+            }
+          }
+        ],
+        "campaign_start_utc": "2026-10-21T10:35:28+00:00",
+        "campaign_deadline_utc": "2026-10-21T11:20:28+00:00"
+      },
+      "preserved_paths": 366,
+      "preserved_package_inventory_sha256": "3bfc0aa77e33398ed0146151da79d2bbc369990b72c20b7de6ebbf920e7afed8",
+      "preserved_checkpoint_and_journals": true,
+      "recovery": {
+        "backup": "/var/backups/wsprrypi-beta1-16bc-1e047a44.w_1p51ft",
+        "archive_sha256": "299de43121ab7c5cf0b33f100fe00b4780f7509b1a66e44ade7375cab6706fd4",
+        "paths": 367,
+        "mode": 448
+      },
+      "recovery_used": false,
+      "installer_run": false,
+      "supporting_source_content_equivalent_to": "4ea48c66b1df5e04d4d468c84991148955b5e902",
+      "installed_ui_source_commit": "4ea48c66b1df5e04d4d468c84991148955b5e902",
+      "installed_ui_application_version": "4.0.0-beta.1+3decc07",
+      "installed_ui_build_id": "sha256:bbf8bbcfe3ea3bd8e1735dbf350291b5de47c30e706c18ad0d750b3bc95f0a9c",
+      "provider_source": "8c16d3c237cb1267cbedafb5da2bb74132ca5de0",
+      "supplement_source": "bb6815446beb9b96853ad5a353b0d355d4975710",
+      "no_transmission_or_rf_test": true,
+      "no_package_configuration_provider_route_or_pico_changes": true,
+      "publication_performed": false,
+      "completed_target_observation_utc": "2026-10-21T10:57:15.225338+00:00"
+    },
+    "target_acceptance_retained_evidence": [
+      {
+        "path": "dist/beta1/validation/16bc-wspr5-1e047a44/acceptance-summary.json",
+        "bytes": 6374,
+        "sha256": "445350663c8049ba0df75fa6852475c3bd16509e691bc2e3af8c6a161beb7e90"
+      },
+      {
+        "path": "dist/beta1/validation/16bc-wspr5-1e047a44/baseline-provider.json",
+        "bytes": 48008,
+        "sha256": "1d3bf742e5d9f4eb7675f45656298b0c138224c596c05750a97cfafc7b6eb80b"
+      },
+      {
+        "path": "dist/beta1/validation/16bc-wspr5-1e047a44/baseline-provider.remote.py",
+        "bytes": 5123,
+        "sha256": "fb360fd995bcfd30764708d777098d2a5be923521254013d00ae1943926a3b09"
+      },
+      {
+        "path": "dist/beta1/validation/16bc-wspr5-1e047a44/baseline-provider.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": "dist/beta1/validation/16bc-wspr5-1e047a44/baseline-provider.stdout",
+        "bytes": 34306,
+        "sha256": "ac389ba14c22555051012e97ff542befb15c26e9b510699e60dd33b4eef1afc2"
+      },
+      {
+        "path": "dist/beta1/validation/16bc-wspr5-1e047a44/baseline.json",
+        "bytes": 223254,
+        "sha256": "9ac962bd4dc9acac29e354a38746b9dbcd1ba346f6f8f5fa573844183c892c51"
+      },
+      {
+        "path": "dist/beta1/validation/16bc-wspr5-1e047a44/baseline.remote.py",
+        "bytes": 4933,
+        "sha256": "b0ebd6d10e6496512e5582552dcdd068e04ba8302bbec5cde4ab8f03c48ad589"
+      },
+      {
+        "path": "dist/beta1/validation/16bc-wspr5-1e047a44/baseline.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": "dist/beta1/validation/16bc-wspr5-1e047a44/baseline.stdout",
+        "bytes": 189444,
+        "sha256": "b0e6d07f9a7a7a1e394fc93b4889c566af1b84268fc89c035407450dfebe524c"
+      },
+      {
+        "path": "dist/beta1/validation/16bc-wspr5-1e047a44/browser-network-requests.json",
+        "bytes": 15754,
+        "sha256": "c59a552ebe216c86f89b48b5571fe231b4a2c92f2acca3174d80071d7d64473e"
+      },
+      {
+        "path": "dist/beta1/validation/16bc-wspr5-1e047a44/browser-network-summary.json",
+        "bytes": 277,
+        "sha256": "728ad3b8d52bbac2ea28099627072b46cb39d14690ef58767573ac6f20a5b982"
+      },
+      {
+        "path": "dist/beta1/validation/16bc-wspr5-1e047a44/browser-offline.json",
+        "bytes": 400,
+        "sha256": "a677d45bdccaef140b44968d2c19ed3f060b3cdaa2c5159340e3912e70fa6f46"
+      },
+      {
+        "path": "dist/beta1/validation/16bc-wspr5-1e047a44/browser-recovered.json",
+        "bytes": 362,
+        "sha256": "8618c4e83a8bfff4c9d93b40bf29abb3918e9657afb59730849b7a2b7a0522de"
+      },
+      {
+        "path": "dist/beta1/validation/16bc-wspr5-1e047a44/campaign.py",
+        "bytes": 19653,
+        "sha256": "9dec7606417d132cb1ae677b1269015e712b0e8ba43a6783fae4a98bf8955242"
+      },
+      {
+        "path": "dist/beta1/validation/16bc-wspr5-1e047a44/keyboard-focus.json",
+        "bytes": 2241,
+        "sha256": "f1b81c2fa576950a49e04d24a6f94e25ec227949ba3ec97b42908d0c8a7acb6b"
+      },
+      {
+        "path": "dist/beta1/validation/16bc-wspr5-1e047a44/ledger.json",
+        "bytes": 3700,
+        "sha256": "2a690f6c5da61d705790a1e52e5e8ad68da241f8fb90b7dd35e46c80e7318132"
+      },
+      {
+        "path": "dist/beta1/validation/16bc-wspr5-1e047a44/operation-browser-offline.jpg",
+        "bytes": 87303,
+        "sha256": "f3b8b3c5ae8d34b415944f62246352f788f6adb2ae50b8bcf891d0aaecaeda85"
+      },
+      {
+        "path": "dist/beta1/validation/16bc-wspr5-1e047a44/operation-browser-recovered.jpg",
+        "bytes": 82039,
+        "sha256": "a85788863d907d2c927da86494a5d86a8d4cdd30d560ba0c6f5cea2e420865a0"
+      },
+      {
+        "path": "dist/beta1/validation/16bc-wspr5-1e047a44/operation-desktop-dark-text200.jpg",
+        "bytes": 154349,
+        "sha256": "e44c05996196056ac9b8d35d41d084020b86fd791bc656743fe8521f60080ccc"
+      },
+      {
+        "path": "dist/beta1/validation/16bc-wspr5-1e047a44/operation-desktop-dark.jpg",
+        "bytes": 83907,
+        "sha256": "5a6ab1866be136b067e55e6872d62465b75969761a404e2f07ffbf6d899f5441"
+      },
+      {
+        "path": "dist/beta1/validation/16bc-wspr5-1e047a44/operation-desktop-light.jpg",
+        "bytes": 82217,
+        "sha256": "d85444253b7116f232631c1d7a2838e2ade695f5bc6e62238508aba32e14d0ba"
+      },
+      {
+        "path": "dist/beta1/validation/16bc-wspr5-1e047a44/operation-final-connected.jpg",
+        "bytes": 78491,
+        "sha256": "8198b35ac9fb2fb6933ee40c77f6c1fd48e09b713d2bad4f633ded7d88f3ff8a"
+      },
+      {
+        "path": "dist/beta1/validation/16bc-wspr5-1e047a44/operation-mobile-dark-text200.jpg",
+        "bytes": 181157,
+        "sha256": "c3f223f7259a4465f6f4ff02b7a00962201f67ef83a163c910f441697126e024"
+      },
+      {
+        "path": "dist/beta1/validation/16bc-wspr5-1e047a44/operation-mobile-dark.jpg",
+        "bytes": 70548,
+        "sha256": "a4d546cf540606f6a1e647120bbdfe3e810f84c402d63541b41865bb0aa04f1b"
+      },
+      {
+        "path": "dist/beta1/validation/16bc-wspr5-1e047a44/operation-mobile-light-text200.jpg",
+        "bytes": 175670,
+        "sha256": "6f6827182dee9bfe49efee5917f74e398393527f3a18d9bedc5da5c22ca20f26"
+      },
+      {
+        "path": "dist/beta1/validation/16bc-wspr5-1e047a44/operation-mobile-light.jpg",
+        "bytes": 70695,
+        "sha256": "70a394721cea42b877afa368068201528f01774e4ba801a2be8b7e12731d3a70"
+      },
+      {
+        "path": "dist/beta1/validation/16bc-wspr5-1e047a44/operation-restored.jpg",
+        "bytes": 78102,
+        "sha256": "2303ad88c9ea07ed2276f1863c4aed67323b293cfb0e35112d37bf7f36c29704"
+      },
+      {
+        "path": "dist/beta1/validation/16bc-wspr5-1e047a44/recovery-backup.json",
+        "bytes": 188,
+        "sha256": "c5c8b44ced71a044bb427f5b00d1fe3c4817f257303310c92052f4883a9fbd17"
+      },
+      {
+        "path": "dist/beta1/validation/16bc-wspr5-1e047a44/recovery-backup.remote.py",
+        "bytes": 201924,
+        "sha256": "d77ada9cf6cc69e84fdf5b4b1b4a56602b75f14ed025316a08e6cb1942c24cd8"
+      },
+      {
+        "path": "dist/beta1/validation/16bc-wspr5-1e047a44/recovery-backup.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": "dist/beta1/validation/16bc-wspr5-1e047a44/recovery-backup.stdout",
+        "bytes": 178,
+        "sha256": "0c7a7b9329d10c49ab6bba2167782ffe352082957010a33aed9a2ab1a77a2a8b"
+      },
+      {
+        "path": "dist/beta1/validation/16bc-wspr5-1e047a44/replacement-1-PASS.json",
+        "bytes": 2040,
+        "sha256": "6c950feea11e205c4d41fabe6900da3de83b9c000d4985f6b149ec07b5a49d28"
+      },
+      {
+        "path": "dist/beta1/validation/16bc-wspr5-1e047a44/replacement-1-companion.json",
+        "bytes": 750,
+        "sha256": "e9c56a96eb9cd9569cde433f78ce9acc0aaed8790a5934ccbce96ff642653e37"
+      },
+      {
+        "path": "dist/beta1/validation/16bc-wspr5-1e047a44/replacement-1-companion.remote.py",
+        "bytes": 5120,
+        "sha256": "c8e7399bcc93b5c0033627e1414b25a69f035502d481b2e38dd9f3de67bd92f7"
+      },
+      {
+        "path": "dist/beta1/validation/16bc-wspr5-1e047a44/replacement-1-companion.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": "dist/beta1/validation/16bc-wspr5-1e047a44/replacement-1-companion.stdout",
+        "bytes": 708,
+        "sha256": "6daabf3a83ae6b05719cd2d89ea27791f718cc55afbbe071e548531465734371"
+      },
+      {
+        "path": "dist/beta1/validation/16bc-wspr5-1e047a44/replacement-1-console.log",
+        "bytes": 1108,
+        "sha256": "8d5967ffd6880d176ffaf63ae3d18fc4ef3be96da6f9b77c6478982d91c7a16a"
+      },
+      {
+        "path": "dist/beta1/validation/16bc-wspr5-1e047a44/replacement-1-final.json",
+        "bytes": 223326,
+        "sha256": "330562ea9314933e8067eaaff67c07a3966f2f54dc38ead442ffa7fc739ffd35"
+      },
+      {
+        "path": "dist/beta1/validation/16bc-wspr5-1e047a44/replacement-1-final.remote.py",
+        "bytes": 4933,
+        "sha256": "b0ebd6d10e6496512e5582552dcdd068e04ba8302bbec5cde4ab8f03c48ad589"
+      },
+      {
+        "path": "dist/beta1/validation/16bc-wspr5-1e047a44/replacement-1-final.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": "dist/beta1/validation/16bc-wspr5-1e047a44/replacement-1-final.stdout",
+        "bytes": 189516,
+        "sha256": "7db84c8556ed3453acead2038070187dc34af30ed51574e789407df80d274f70"
+      },
+      {
+        "path": "dist/beta1/validation/16bc-wspr5-1e047a44/replacement-1-idle.json",
+        "bytes": 4859,
+        "sha256": "8719f662f37e72cbd02ae3cd596852ca997d610762f89d43d3d07a11ac951837"
+      },
+      {
+        "path": "dist/beta1/validation/16bc-wspr5-1e047a44/replacement-1-idle.remote.py",
+        "bytes": 5586,
+        "sha256": "79747a80bae563d18044fa5e8d85ce54f04537d8e31f17cd9a2a23d2a55b78d6"
+      },
+      {
+        "path": "dist/beta1/validation/16bc-wspr5-1e047a44/replacement-1-idle.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": "dist/beta1/validation/16bc-wspr5-1e047a44/replacement-1-idle.stdout",
+        "bytes": 3609,
+        "sha256": "c0f28aac625764dee6a10c7c5a2aab0107b2d44c335a3e4a2a8d5e9bc46fa863"
+      },
+      {
+        "path": "dist/beta1/validation/16bc-wspr5-1e047a44/replacement-1-precheck.remote.py",
+        "bytes": 201587,
+        "sha256": "c3224e775ee88bdd2ccd52142b48044126ce10de4356f0572e6bbed684dae276"
+      },
+      {
+        "path": "dist/beta1/validation/16bc-wspr5-1e047a44/replacement-1-precheck.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": "dist/beta1/validation/16bc-wspr5-1e047a44/replacement-1-precheck.stdout",
+        "bytes": 12704,
+        "sha256": "0afabccecc307327ee6ed9009e68057d848ec53b5064a97950ba98d44d7ca357"
+      },
+      {
+        "path": "dist/beta1/validation/16bc-wspr5-1e047a44/replacement-1-provider.json",
+        "bytes": 48008,
+        "sha256": "b96005d54625dc77a8770f3517e7af399406c99182037706756a3c02f3b1e025"
+      },
+      {
+        "path": "dist/beta1/validation/16bc-wspr5-1e047a44/replacement-1-provider.remote.py",
+        "bytes": 5123,
+        "sha256": "fb360fd995bcfd30764708d777098d2a5be923521254013d00ae1943926a3b09"
+      },
+      {
+        "path": "dist/beta1/validation/16bc-wspr5-1e047a44/replacement-1-provider.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": "dist/beta1/validation/16bc-wspr5-1e047a44/replacement-1-provider.stdout",
+        "bytes": 34306,
+        "sha256": "cd6af5a5c01a925cba866ae187c5c55599e80c688f77954189e38c78bc3ad203"
+      },
+      {
+        "path": "dist/beta1/validation/16bc-wspr5-1e047a44/replacement-1-ready.json",
+        "bytes": 19516,
+        "sha256": "1810fb78a4a22d0fbfe0211eb4b3ef6791663625c06ed8610a2ccd06658eb309"
+      },
+      {
+        "path": "dist/beta1/validation/16bc-wspr5-1e047a44/replacement-1-ready.remote.py",
+        "bytes": 5708,
+        "sha256": "f2653b0e7d1b95d5138459711c9204d79e8547925d2e11271653b5b681acc103"
+      },
+      {
+        "path": "dist/beta1/validation/16bc-wspr5-1e047a44/replacement-1-ready.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": "dist/beta1/validation/16bc-wspr5-1e047a44/replacement-1-ready.stdout",
+        "bytes": 13376,
+        "sha256": "dbc6b97b6281e5a948b42ddc4aaeb273f618ec6ca476f061cdfa38a8ecf7d419"
+      },
+      {
+        "path": "dist/beta1/validation/16bc-wspr5-1e047a44/replacement-1-replace.remote.py",
+        "bytes": 202822,
+        "sha256": "75266536194d11da06e52d17c15bd08b3a79b29bae238518b71d2921e8703199"
+      },
+      {
+        "path": "dist/beta1/validation/16bc-wspr5-1e047a44/replacement-1-replace.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": "dist/beta1/validation/16bc-wspr5-1e047a44/replacement-1-replace.stdout",
+        "bytes": 530,
+        "sha256": "97f7ce25a213c413b43806d8c4930d9264924f2e81288ae76acb04d7a7bf14f9"
+      },
+      {
+        "path": "dist/beta1/validation/16bc-wspr5-1e047a44/replacement-1-start.json",
+        "bytes": 332,
+        "sha256": "18dcfdd3c9a6acef338379523c64df408c842077c8f59e575d9706bbac110406"
+      },
+      {
+        "path": "dist/beta1/validation/16bc-wspr5-1e047a44/replacement-1-start.remote.py",
+        "bytes": 201846,
+        "sha256": "539cedfe79d5ce235f1a5c4a32e7a7e1453ce0a822f8a3bc3da329256f0b1e47"
+      },
+      {
+        "path": "dist/beta1/validation/16bc-wspr5-1e047a44/replacement-1-start.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": "dist/beta1/validation/16bc-wspr5-1e047a44/replacement-1-start.stdout",
+        "bytes": 290,
+        "sha256": "b6b4a43d7d1ace6ad35b2153c4e1a2487a1b3f5a3f1fed7bdb45267add272cfc"
+      },
+      {
+        "path": "dist/beta1/validation/16bc-wspr5-1e047a44/replacement-2-PASS.json",
+        "bytes": 3221,
+        "sha256": "a199591cd4c40d8021ccfa89ae6430c4ccc8854b7dd5ba8015bf36de7f9a9a51"
+      },
+      {
+        "path": "dist/beta1/validation/16bc-wspr5-1e047a44/replacement-2-companion.json",
+        "bytes": 750,
+        "sha256": "90b57ad89e45ab04739c51ead40d5c3d1c656b6188cb8a3fe02afa7fbdb6cd32"
+      },
+      {
+        "path": "dist/beta1/validation/16bc-wspr5-1e047a44/replacement-2-companion.remote.py",
+        "bytes": 5120,
+        "sha256": "9e5e4a6363ca5e445886f66dfdd68d27029ccde750c5f3ecdd1135ce25ebe2eb"
+      },
+      {
+        "path": "dist/beta1/validation/16bc-wspr5-1e047a44/replacement-2-companion.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": "dist/beta1/validation/16bc-wspr5-1e047a44/replacement-2-companion.stdout",
+        "bytes": 708,
+        "sha256": "66bf3ac03a8b8174f7a858447d17b615969c212456ae7ece7e1434c82f5ce753"
+      },
+      {
+        "path": "dist/beta1/validation/16bc-wspr5-1e047a44/replacement-2-console.log",
+        "bytes": 1109,
+        "sha256": "906baa25addf925716d0c72a2fe358f586aca8a4343f0cdc3d696ce04d8d5b40"
+      },
+      {
+        "path": "dist/beta1/validation/16bc-wspr5-1e047a44/replacement-2-final.json",
+        "bytes": 223254,
+        "sha256": "75790f6871d60fc9e6b88b549d09b989d35d43460f1a6e4c89d2f5c044ebff21"
+      },
+      {
+        "path": "dist/beta1/validation/16bc-wspr5-1e047a44/replacement-2-final.remote.py",
+        "bytes": 4933,
+        "sha256": "b0ebd6d10e6496512e5582552dcdd068e04ba8302bbec5cde4ab8f03c48ad589"
+      },
+      {
+        "path": "dist/beta1/validation/16bc-wspr5-1e047a44/replacement-2-final.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": "dist/beta1/validation/16bc-wspr5-1e047a44/replacement-2-final.stdout",
+        "bytes": 189444,
+        "sha256": "e05b715dac97c7900b3de1727b91ab991657c575b31237f345456b91abe302d6"
+      },
+      {
+        "path": "dist/beta1/validation/16bc-wspr5-1e047a44/replacement-2-idle.json",
+        "bytes": 4859,
+        "sha256": "eeeeaa6b4b039a70404acc68c0685a073343289fd5ab4d833e07df1af2c74479"
+      },
+      {
+        "path": "dist/beta1/validation/16bc-wspr5-1e047a44/replacement-2-idle.remote.py",
+        "bytes": 5586,
+        "sha256": "5e762dbcc5fe2988580fc1b4d92db7e0e148c5c33e3efbcc6726ef02317e3d46"
+      },
+      {
+        "path": "dist/beta1/validation/16bc-wspr5-1e047a44/replacement-2-idle.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": "dist/beta1/validation/16bc-wspr5-1e047a44/replacement-2-idle.stdout",
+        "bytes": 3609,
+        "sha256": "f38308fe0a4721da32e7919dfad7af43e437a658f240dc723d67e1cb8c2eb429"
+      },
+      {
+        "path": "dist/beta1/validation/16bc-wspr5-1e047a44/replacement-2-precheck.remote.py",
+        "bytes": 201587,
+        "sha256": "c3224e775ee88bdd2ccd52142b48044126ce10de4356f0572e6bbed684dae276"
+      },
+      {
+        "path": "dist/beta1/validation/16bc-wspr5-1e047a44/replacement-2-precheck.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": "dist/beta1/validation/16bc-wspr5-1e047a44/replacement-2-precheck.stdout",
+        "bytes": 12704,
+        "sha256": "2c5191c0e4e7e02f35b2540cce1591a2eab6dced30eb85c7d9955415d98d3f08"
+      },
+      {
+        "path": "dist/beta1/validation/16bc-wspr5-1e047a44/replacement-2-provider.json",
+        "bytes": 48008,
+        "sha256": "a37a2ebf60fe7f8f125919aeb079dd31ccd966afab33cc3a7993903fcca4881b"
+      },
+      {
+        "path": "dist/beta1/validation/16bc-wspr5-1e047a44/replacement-2-provider.remote.py",
+        "bytes": 5123,
+        "sha256": "fb360fd995bcfd30764708d777098d2a5be923521254013d00ae1943926a3b09"
+      },
+      {
+        "path": "dist/beta1/validation/16bc-wspr5-1e047a44/replacement-2-provider.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": "dist/beta1/validation/16bc-wspr5-1e047a44/replacement-2-provider.stdout",
+        "bytes": 34306,
+        "sha256": "e881efccdb3cc89322527a1f6e5e5591e8ae3ed9f1e04674fb1a3f565a0a7a64"
+      },
+      {
+        "path": "dist/beta1/validation/16bc-wspr5-1e047a44/replacement-2-ready.json",
+        "bytes": 19516,
+        "sha256": "e391e6ffa44d8f78ffedf99412399314cd7531014e037aab4bc885df46414fe9"
+      },
+      {
+        "path": "dist/beta1/validation/16bc-wspr5-1e047a44/replacement-2-ready.remote.py",
+        "bytes": 5708,
+        "sha256": "0b1b7ff14ad551919fa9ad5e3d6b2fac9e2ccfc688d8e0ab6af4d1febf2c8398"
+      },
+      {
+        "path": "dist/beta1/validation/16bc-wspr5-1e047a44/replacement-2-ready.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": "dist/beta1/validation/16bc-wspr5-1e047a44/replacement-2-ready.stdout",
+        "bytes": 13376,
+        "sha256": "4718b50a424cbc4cc4e30531315ff163f44a4b93c654958a5f4b1f012153e3ab"
+      },
+      {
+        "path": "dist/beta1/validation/16bc-wspr5-1e047a44/replacement-2-replace.remote.py",
+        "bytes": 202822,
+        "sha256": "fb790b82c48ab9290950685050365a2941fe986f196e674a58313145c3c398a4"
+      },
+      {
+        "path": "dist/beta1/validation/16bc-wspr5-1e047a44/replacement-2-replace.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": "dist/beta1/validation/16bc-wspr5-1e047a44/replacement-2-replace.stdout",
+        "bytes": 530,
+        "sha256": "fe6ff9c2de733537402b6e5de82cf3df1e529cf9f1287ca8ba7158af3074b677"
+      },
+      {
+        "path": "dist/beta1/validation/16bc-wspr5-1e047a44/replacement-2-start.json",
+        "bytes": 332,
+        "sha256": "ac7090d84c7004d9da93cb178d88d6e50d6174c60792384b9cacd109bd3e66d2"
+      },
+      {
+        "path": "dist/beta1/validation/16bc-wspr5-1e047a44/replacement-2-start.remote.py",
+        "bytes": 201846,
+        "sha256": "539cedfe79d5ce235f1a5c4a32e7a7e1453ce0a822f8a3bc3da329256f0b1e47"
+      },
+      {
+        "path": "dist/beta1/validation/16bc-wspr5-1e047a44/replacement-2-start.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": "dist/beta1/validation/16bc-wspr5-1e047a44/replacement-2-start.stdout",
+        "bytes": 290,
+        "sha256": "99763faae910e8ac001909a06751fa36fd0657a44b825173f451f59cbcceb220"
+      },
+      {
+        "path": "dist/beta1/validation/16bc-wspr5-1e047a44/restart-PASS.json",
+        "bytes": 4104,
+        "sha256": "48c915a657edb5b6e8bc4fad5b1f0b52e83a38e282e277783bed8763e4599203"
+      },
+      {
+        "path": "dist/beta1/validation/16bc-wspr5-1e047a44/restart-companion.json",
+        "bytes": 750,
+        "sha256": "6e77a1e4dffd9906be7a5159d77dde258cfc6d260f6e0c55249ab72066919b68"
+      },
+      {
+        "path": "dist/beta1/validation/16bc-wspr5-1e047a44/restart-companion.remote.py",
+        "bytes": 5120,
+        "sha256": "809a08f151ae18199e6c6ad6c73d858bb0cf0ccd89a3f74f36b311b2b9f604a7"
+      },
+      {
+        "path": "dist/beta1/validation/16bc-wspr5-1e047a44/restart-companion.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": "dist/beta1/validation/16bc-wspr5-1e047a44/restart-companion.stdout",
+        "bytes": 708,
+        "sha256": "be3634c120afaea8cd8d3c7d1f8b1e66d14c4fb0df77dc1ef60d201f320c5014"
+      },
+      {
+        "path": "dist/beta1/validation/16bc-wspr5-1e047a44/restart-console.log",
+        "bytes": 485,
+        "sha256": "a92f460bf351dd95395144f5566df078118d6aa6c87c070fd1f8f26d8bc3c9e2"
+      },
+      {
+        "path": "dist/beta1/validation/16bc-wspr5-1e047a44/restart-final.json",
+        "bytes": 223254,
+        "sha256": "2c9c2c5997e194f09c1891b4d958eaef7717d9eb5c993846f6f0dbd27fa0e259"
+      },
+      {
+        "path": "dist/beta1/validation/16bc-wspr5-1e047a44/restart-final.remote.py",
+        "bytes": 4933,
+        "sha256": "b0ebd6d10e6496512e5582552dcdd068e04ba8302bbec5cde4ab8f03c48ad589"
+      },
+      {
+        "path": "dist/beta1/validation/16bc-wspr5-1e047a44/restart-final.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": "dist/beta1/validation/16bc-wspr5-1e047a44/restart-final.stdout",
+        "bytes": 189444,
+        "sha256": "6f34fdac29de68b0153fcacd0ab49792cdba30aa51a8b9e9155b5983370d9071"
+      },
+      {
+        "path": "dist/beta1/validation/16bc-wspr5-1e047a44/restart-idle.json",
+        "bytes": 4855,
+        "sha256": "04e11ecb75f0e057c6553dfbbfffa505b3ff0da2cfe2d7a1db5718fa09921795"
+      },
+      {
+        "path": "dist/beta1/validation/16bc-wspr5-1e047a44/restart-idle.remote.py",
+        "bytes": 5586,
+        "sha256": "d61e4bac33847265aac903bbc69420a4c26f3e6dca32721a1df59a77689ca43a"
+      },
+      {
+        "path": "dist/beta1/validation/16bc-wspr5-1e047a44/restart-idle.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": "dist/beta1/validation/16bc-wspr5-1e047a44/restart-idle.stdout",
+        "bytes": 3605,
+        "sha256": "b096d90ed46e2f37ad65b20803924a3c68aec89caeb6a4f7cc08adcbe720bdc7"
+      },
+      {
+        "path": "dist/beta1/validation/16bc-wspr5-1e047a44/restart-precheck.remote.py",
+        "bytes": 201587,
+        "sha256": "c3224e775ee88bdd2ccd52142b48044126ce10de4356f0572e6bbed684dae276"
+      },
+      {
+        "path": "dist/beta1/validation/16bc-wspr5-1e047a44/restart-precheck.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": "dist/beta1/validation/16bc-wspr5-1e047a44/restart-precheck.stdout",
+        "bytes": 12632,
+        "sha256": "31d8a6a38b5c9edad9446d0496db5018cdb522a154caf0f37ac20d35f41b91ad"
+      },
+      {
+        "path": "dist/beta1/validation/16bc-wspr5-1e047a44/restart-provider.json",
+        "bytes": 48008,
+        "sha256": "7c837a42f769cab8eb8cb899996240d7e0ad7800d9c978d5d438ef4898fd849b"
+      },
+      {
+        "path": "dist/beta1/validation/16bc-wspr5-1e047a44/restart-provider.remote.py",
+        "bytes": 5123,
+        "sha256": "fb360fd995bcfd30764708d777098d2a5be923521254013d00ae1943926a3b09"
+      },
+      {
+        "path": "dist/beta1/validation/16bc-wspr5-1e047a44/restart-provider.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": "dist/beta1/validation/16bc-wspr5-1e047a44/restart-provider.stdout",
+        "bytes": 34306,
+        "sha256": "67dd265295b07fdb406a929488c93e33fd2843957c3dda7c166491a962183904"
+      },
+      {
+        "path": "dist/beta1/validation/16bc-wspr5-1e047a44/restart-ready.json",
+        "bytes": 19515,
+        "sha256": "a117f976c4682d67bd8faa1f52d29371944185724e6ec94c1e1eeab196fdf074"
+      },
+      {
+        "path": "dist/beta1/validation/16bc-wspr5-1e047a44/restart-ready.remote.py",
+        "bytes": 5708,
+        "sha256": "926f0650df619207d3f8619d8799af7c8aa56f9a49f774b9d35c2e2ea0c6acb4"
+      },
+      {
+        "path": "dist/beta1/validation/16bc-wspr5-1e047a44/restart-ready.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": "dist/beta1/validation/16bc-wspr5-1e047a44/restart-ready.stdout",
+        "bytes": 13375,
+        "sha256": "16d3e51a9d0e3a7dd1584032dfab3efad97d8f3fe01f3c51664b5379a2f88289"
+      },
+      {
+        "path": "dist/beta1/validation/16bc-wspr5-1e047a44/restart-start.json",
+        "bytes": 332,
+        "sha256": "0c219ee586637db52cf4060f2165d1d2fa321801110ab5e7121f68c376e99a68"
+      },
+      {
+        "path": "dist/beta1/validation/16bc-wspr5-1e047a44/restart-start.remote.py",
+        "bytes": 201848,
+        "sha256": "1ad27eece04e3d7f3e9aeee091ffa74e2c766db952b14768cd292fee441f92aa"
+      },
+      {
+        "path": "dist/beta1/validation/16bc-wspr5-1e047a44/restart-start.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": "dist/beta1/validation/16bc-wspr5-1e047a44/restart-start.stdout",
+        "bytes": 290,
+        "sha256": "134105a842db95ed33b10753347296f505af4c6278a25d990e78ddcfbd9adaa1"
+      },
+      {
+        "path": "dist/beta1/validation/16bc-wspr5-1e047a44/stage-transfer.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": "dist/beta1/validation/16bc-wspr5-1e047a44/staged-inspection-initial.remote.py",
+        "bytes": 5948,
+        "sha256": "81042ffd681489b0e92ec9ff634271cc302963e2996606f6223c012a16238ae8"
+      },
+      {
+        "path": "dist/beta1/validation/16bc-wspr5-1e047a44/staged-inspection-initial.stderr",
+        "bytes": 89,
+        "sha256": "31e88e18f8aa64c427677f1eb9d35ee20d5395411de494288ed36126007b68d6"
+      },
+      {
+        "path": "dist/beta1/validation/16bc-wspr5-1e047a44/staged-inspection.json",
+        "bytes": 27916,
+        "sha256": "37ea646edb7cb607c308e8b64a2e3221ec1790bf2358140b4604d45686f501ba"
+      },
+      {
+        "path": "dist/beta1/validation/16bc-wspr5-1e047a44/staged-inspection.remote.py",
+        "bytes": 5898,
+        "sha256": "311cfa7a053886ac78393a0edadf3800f5a781b652798639798d70dcc823590f"
+      },
+      {
+        "path": "dist/beta1/validation/16bc-wspr5-1e047a44/staged-inspection.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": "dist/beta1/validation/16bc-wspr5-1e047a44/staged-inspection.stdout",
+        "bytes": 27900,
+        "sha256": "e4643ecf949318b6a72410ee68ca7503ae772eca366b9893978b2ba7d29a42a7"
+      },
+      {
+        "path": "dist/beta1/validation/16bc-wspr5-1e047a44/ui-review.json",
+        "bytes": 2009,
+        "sha256": "bf146d21928d25932d26cb697f796397d67936b655bb57ce00e1e989bf8afa0e"
       }
     ]
   }

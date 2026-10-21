@@ -3,7 +3,8 @@
 This is the selected work and release-gate authority. Items 1–15 are complete
 within their accepted scopes. Item 16 remains in progress. The original
 16b–16c acceptance retains its historical scope; the replacement executable
-at `1e047a44` has refreshed 16b artifacts and requires affected 16c acceptance.
+at `1e047a44` has refreshed 16b artifacts and accepted bounded 16c evidence,
+with explicit reuse of unchanged installer/UI acceptance.
 The original physical-test limitations and service-request cap exception
 remain recorded. Publication and announcements in 16d/16e remain
 not started and require separate authorization. Cleanup changes no selected
@@ -143,7 +144,7 @@ Status key: ✅ Complete · ⏳ In progress · ☐ Not started
       event compiler can emit endpoint dither profiles rejected by the published
       provider. Accepted installer/UI repairs are included in the new source.
       This step does not create a public tag or release.
-    - ⏳ **16c — Validate, accept and hand off Beta 1; stop before publication.**
+    - ✅ **16c — Validate, accept and hand off Beta 1; stop before publication.**
       Run required CI/regressions and applicable installation/upgrade/service/
       runtime checks against the exact candidate and artifacts using item 10's
       acceptance matrix. Record reused evidence, repeated checks, exclusions and
@@ -153,11 +154,15 @@ Status key: ✅ Complete · ⏳ In progress · ☐ Not started
       evidence handoff, ready for a separate publication decision. Do not merge
       to the release branch, create a tag/GitHub release or draft, upload assets,
       announce availability, or claim Beta 1 is published.
-      **Current disposition:** replacement-executable installation/runtime
-      acceptance remains open pending new bounded authorization. Software-only
-      checks cannot transfer the old installed-binary identity to this candidate.
-      Unchanged supporting installer/UI/configuration, provider and documentation
-      evidence is reused only at the correspondences in the active evidence ledger.
+      **Current disposition:** replacement `1e047a44` accepted on wspr5 through
+      two atomic executable replacements and one explicit restart, each with a
+      full five-minute idle/readiness case. The operator explicitly accepted
+      reuse of unchanged normal-installer/UI/support evidence; no normal installer
+      ran. All 366 preserved paths, packages, configuration and provider journals
+      remain unchanged. Actual requests are 5/7 application, 3/4 companion and
+      4/5 passive inspections, without recovery or an overrun. Operation visual,
+      keyboard and browser-only offline/recovery checks retain the existing
+      enlarged-text wrapping limitation. The evidence ledger owns exact details.
       **Historical original-candidate acceptance:** all functional target acceptance
       passed. The restored predecessor upgrade at `809ef2d6`, repeat at `cea6ac3`, replacement
       explicit restart at `cea6ac3`, and final UI installation at `4ea48c66` each passed
@@ -197,7 +202,7 @@ Status key: ✅ Complete · ⏳ In progress · ☐ Not started
 | 13 | 21 | ✅ Complete; #423 closed | Integrated application Impeccable review accepted for `d93c75c`; final closeout/planning-head CI each passed 11/11; bounded validation and qualification limits retained | `WsprryPi` |
 | 14 | — | ✅ Closed within bounded software scope | Full companion integrated at final `a84010d`; feature/devel CI each passed 12/12; eight exact compatibility pairs, affected Impeccable/adversarial repairs and published Docs accepted; nonblocking Pico wording follow-up retained | `WsprryPi`; affected operator docs: `WsprryPi-Docs` |
 | 15 | — | ✅ Pico software and originating assessment complete | Pico `1653034` closes four findings after fresh independent reassessment; 200 executed host groups, 13 sanitizer groups, both firmware builds and genuine browser checks passed. Pi adoption, P15.14 docs and physical qualification remain separate | `WsprryPi` coordination; `WsprryPico` implementation |
-| 16 | 22 | ⏳ In progress | Replacement `1e047a44` supersedes original `3decc072` exports; refreshed artifacts and affected installation/runtime acceptance govern 16b–16c. Historical `3decc072` / `4ea48c66` CI, finite wspr5 acceptance, physical-test limitations and 20/18 exception retain their original scope. 16d/16e remain not started | `WsprryPi` |
+| 16 | 22 | ⏳ In progress | Replacement `1e047a44` supersedes original `3decc072` exports; 16a–16c accepted with bounded executable/runtime checks and explicit unchanged installer/UI evidence reuse. Historical `3decc072` / `4ea48c66` CI, finite wspr5 acceptance, physical-test limitations and 20/18 exception retain their original scope. 16d/16e remain not started | `WsprryPi` |
 
 RP1 items 18–21 above are historical cross-references. The current provider
 ROADMAP tracks Beta work as item 22 and delegates exact application acceptance
@@ -282,9 +287,9 @@ Beta preparation or announcement does not itself close that stable release gate.
   complete; item 15's Pico implementation and originating assessment are
   complete within their recorded software scope. Pi/Beta adoption is now
   implemented under item 16. The original source/build and 16c acceptance retain
-  their historical identities; replacement artifacts are refreshed, while
-  affected installation/runtime acceptance remains open. Publication and
-  announcements remain separate.
+  their historical identities; replacement artifacts and bounded runtime
+  acceptance are complete with explicit unchanged installer/UI evidence reuse.
+  Publication and announcements remain separate.
 - ✅ **Pico Type 2/3 companion integration and acceptance:** item 14's complete
   companion integration, eight current/historical pairs, affected Impeccable/
   adversarial repairs and separately published operator documentation are
@@ -301,8 +306,9 @@ Beta preparation or announcement does not itself close that stable release gate.
   Pi station-progress adoption against `1653034`; P15.8 remains `p158`. The Pi
   operator workflow is updated in Docs `5214cdf`. Pico P15.14 and physical
   qualification remain separate; no new hardware operation is authorized.
-- ⏳ **Beta 1 release documentation and readiness:** 16a–16b are complete;
-  replacement 16c remains open under the current candidate manifest and re-evaluation.
+- ⏳ **Beta 1 release documentation and readiness:** 16a–16c are complete within
+  the current candidate manifest, bounded wspr5 acceptance and explicit unchanged
+  installer/UI evidence reuse.
   The sourced notes, compatibility guidance, exact candidate, four exports and
   acceptance handoff are recorded in the Beta 1 evidence. Fresh clean installation,
   physical-target acceptance of the other three exports, reboot and fresh GPIO4
