@@ -8,16 +8,20 @@ scripts/README.md and https://www.php.net/archive/2026.php#2026-10-21-1.
 from __future__ import annotations
 
 import argparse
-from dataclasses import dataclass
+from contextlib import redirect_stdout
+from dataclasses import dataclass, field
 from datetime import date, datetime, timezone
+import io
 import os
 from pathlib import Path
 import re
 import shlex
+import shutil
 import stat
 import subprocess
 import sys
 import tempfile
+import textwrap
 import uuid
 
 
@@ -200,7 +204,12 @@ def override_findings(root, directories, web_roots):
             for name in files:
                 if name in {".htaccess", ".user.ini"}:
                     paths.add(Path(current) / name)
+    seen = set()
     for path in sorted(paths):
+        identity = path.resolve(strict=True)
+        if identity in seen:
+            continue
+        seen.add(identity)
         for number, raw in enumerate(read_config(path).decode("utf-8").splitlines(), 1):
             line = raw.strip()
             if not line or line.startswith(("#", ";")):
@@ -235,6 +244,20 @@ class Inventory:
     packages: dict
     held: set | None
     issues: list
+    available: bool = True
+
+
+@dataclass
+class AuditReport:
+    os_info: OSInfo | None = None
+    inventory: Inventory | None = None
+    directories: list = field(default_factory=list)
+    records: list = field(default_factory=list)
+    findings: list = field(default_factory=list)
+    config_findings: list = field(default_factory=list)
+    services: dict = field(default_factory=dict)
+    changes: list = field(default_factory=list)
+    error: str | None = None
 
 
 def detect_os(root, today=None):
@@ -307,12 +330,12 @@ def php_support_finding(branch, today=None):
 
 def package_inventory(root):
     if root != Path("/") or sys.platform != "linux":
-        return Inventory({}, None, ["Package/candidate inspection unavailable: offline root or non-Linux host; host APT was not queried"])
+        return Inventory({}, None, ["Package inspection unavailable for an offline root or non-Linux host"], False)
     # Query all installed PHP source packages, including common/extensions/CLI,
     # so an upgrade command cannot silently omit another copy of PHP's core.
     text = query(["/usr/bin/dpkg-query", "-W", "-f=${binary:Package}\t${db:Status-Status}\t${Version}\t${source:Package}\n"])
     if text is None:
-        return Inventory({}, None, ["Installed PHP package inventory unavailable; verify the serving PHP installation manually"])
+        return Inventory({}, None, ["Installed PHP package inventory unavailable; verify the serving PHP installation manually"], False)
     packages, issues = {}, []
     for line in text.splitlines():
         fields = line.split("\t")
@@ -327,7 +350,7 @@ def package_inventory(root):
         if branch and re.fullmatch(PACKAGE_NAME, name):
             packages[name] = Package(name, branch[1], installed)
     if not packages:
-        return Inventory({}, None, ["No mapped PHP source packages installed; custom/container/legacy PHP needs vendor review"])
+        return Inventory({}, set(), [])
     held_text = query(["/usr/bin/apt-mark", *APT_CACHE_OPTIONS, "showhold"])
     held = set(held_text.split()) if held_text is not None else None
     if held is None:
@@ -355,6 +378,19 @@ def package_inventory(root):
 def held_package(name, held):
     return held is not None and (name in held or name.split(":", 1)[0] in held
                                 or (":" not in name and any(item.split(":", 1)[0] == name for item in held)))
+
+
+def upgrade_blockers(os_info, inventory, packages):
+    blockers = []
+    if not os_info.supported:
+        blockers.append("OS support is not verified")
+    if not all(version_fixed(p.branch, p.candidate) for p in packages):
+        blockers.append("APT has no confirmed fixed package for this branch")
+    if inventory.held is None:
+        blockers.append("package holds could not be checked")
+    elif any(held_package(p.name, inventory.held) and p.candidate != p.installed for p in packages):
+        blockers.append("held packages would need to change")
+    return blockers
 
 
 def package_guidance(os_info, inventory, root, today=None):
@@ -395,14 +431,15 @@ def package_guidance(os_info, inventory, root, today=None):
             findings.append(f"PHP {branch}: no complete verified patched candidate set; review repositories, pinning, mirror freshness, or vendor backports")
         names = [p.name for p in packages]
         print("Inspect package policy: " + shlex.join(["apt-cache", "policy", *names]))
-        if needs_upgrade and os_info.supported and verified_candidates and inventory.held is not None and not blocked:
+        blockers = upgrade_blockers(os_info, inventory, packages)
+        if needs_upgrade and not blockers:
             command = ["apt-get", "install", "--only-upgrade", "--no-remove", *names]
             print("After refreshing indexes and rerunning, simulate and review dependency changes:")
             print("  " + shlex.join(["apt-get", "--simulate", *command[1:]]))
             print("Upgrade these installed PHP packages (command shown only; not executed):")
             print("  " + shlex.join(["sudo", *command]))
         elif needs_upgrade:
-            print("UPGRADE COMMAND WITHHELD: unsupported/unverified OS, candidates, or holds. Do not assume ordinary APT upgrades fix this installation.")
+            print("UPGRADE COMMAND WITHHELD: " + "; ".join(blockers))
         else:
             print(f"PHP {branch}: installed packages meet the upstream fix; running web workers remain unverified.")
     return findings
@@ -418,6 +455,153 @@ def restart_guidance(directories):
     if any(d.name == "cgi" for d in directories):
         print("CGI: persistent FastCGI launcher is unknown; identify its supervisor before restarting. One-shot CGI has no persistent PHP worker.")
     print("Configuration trees can be inactive. Confirm the serving SAPI; a graceful reload may retain old workers.")
+
+
+def service_status(root, directories, inventory):
+    """Read systemd state only; never start a service or make a web request."""
+    units = {"apache2.service" if d.name == "apache2" else f"php{d.parent.name}-fpm.service"
+             for d in directories if d.name != "cgi"}
+    for package in inventory.packages.values():
+        name = package.name.split(":", 1)[0]
+        if name.startswith("libapache2-mod-php"):
+            units.add("apache2.service")
+        elif name == f"php{package.branch}-fpm":
+            units.add(f"php{package.branch}-fpm.service")
+    result = {}
+    for unit in sorted(units):
+        output = (query(["/usr/bin/systemctl", "show", "--property=LoadState,ActiveState", unit])
+                  if root == Path("/") and sys.platform == "linux" else None)
+        values = dict(line.split("=", 1) for line in (output or "").splitlines() if "=" in line)
+        state = values.get("ActiveState", "unknown")
+        result[unit] = "not installed" if values.get("LoadState") == "not-found" else state
+    return result
+
+
+def summary(report, args):
+    """Keep the default console view short; detailed evidence is opt-in."""
+    width = max(40, min(shutil.get_terminal_size((76, 24)).columns, 76))
+
+    def line(message=""):
+        print(textwrap.fill(message, width=width, subsequent_indent="  ",
+                            break_long_words=False, break_on_hyphens=False) if message else "")
+
+    def command(arguments):
+        current = "  "
+        for argument in map(shlex.quote, arguments):
+            if len(current) > 2 and len(current) + len(argument) + 1 > width - 2:
+                print(current.rstrip() + " \\")
+                current = "    "
+            current += argument + " "
+        print(current.rstrip())
+
+    inventory = report.inventory
+    absent = bool(inventory and inventory.available and not inventory.packages and not report.directories)
+    result = "CHECK FAILED" if report.error else "NOTHING TO CHECK" if absent else "CHECK COMPLETE"
+    line(f"PHP2Shell: {result}")
+    if not report.error and not absent:
+        line("Result: review needed." if report.findings else "Result: no outstanding static checks.")
+    writes = [path for kind, path in report.changes if kind == "write"]
+    line(f"Settings files changed: {len(writes)}." if writes else "No settings changed.")
+    if report.error:
+        line("Error: " + report.error)
+    if report.os_info:
+        line()
+        line("OS: " + report.os_info.name)
+        if not report.os_info.supported:
+            line(report.os_info.message)
+    if inventory and not inventory.available:
+        line("PHP packages: could not be checked.")
+    if absent:
+        line("No distribution PHP packages or web PHP configuration found.")
+    branches = sorted(({p.branch for p in inventory.packages.values()} if inventory else set())
+                      | {d.parent.name for d in report.directories})
+    for branch in branches:
+        packages = [p for p in inventory.packages.values() if p.branch == branch]
+        if not packages:
+            line()
+            line(f"PHP {branch}: configuration found; package version not verified.")
+            if issue := php_support_finding(branch):
+                line(issue)
+            continue
+        installed = ", ".join(sorted({p.installed for p in packages}))
+        candidates = ", ".join(sorted({p.candidate or "unknown" for p in packages}))
+        fixed = all(version_fixed(branch, p.installed) for p in packages)
+        ready = all(version_fixed(branch, p.candidate) for p in packages)
+        line()
+        line(f"PHP {branch}: {installed} ({len(packages)} packages)")
+        line("Fix: installed package versions meet the upstream fix." if fixed else
+             f"Fix: not verified. Upstream fixed release: {FIXED.get(branch, 'unknown for this branch')}.")
+        line(f"APT candidate: {candidates}" + (" (patched)." if ready else " (fix not verified)."))
+        if issue := php_support_finding(branch):
+            line(issue)
+        if inventory.held is None:
+            line("Package holds: could not be checked.")
+        elif any(held_package(p.name, inventory.held) for p in packages):
+            line("Held PHP packages need review; see --verbose.")
+    if report.services:
+        line()
+        labels = {"active": "running", "inactive": "not running", "failed": "failed",
+                  "unknown": "status unavailable", "not installed": "not installed"}
+        for unit, state in report.services.items():
+            name = "Apache" if unit == "apache2.service" else unit[:-8]
+            line(f"{name}: {labels.get(state, state)}")
+        line("Service state only; PHP requests were not tested.")
+    if report.records:
+        line()
+        missing = sum(not disabled(values.get("session.upload_progress.enabled")) for _, values in report.records)
+        line(f"Upload progress: not disabled in {missing} web {'configuration' if missing == 1 else 'configurations'}." if missing else "Upload progress: disabled in checked web configurations.")
+        if not args.allow_unlimited_memory and any(values.get("memory_limit") != "-1" for _, values in report.records):
+            line("Unlimited-memory mitigation: not selected (optional).")
+        backtraces = sum(plan.directory.parent.name == "8.5" and not disabled(values.get("fatal_error_backtraces")) for plan, values in report.records)
+        if backtraces:
+            line(f"Fatal backtraces: not disabled in {backtraces} PHP 8.5 configuration(s).")
+        limits = 0
+        for _, values in report.records:
+            post, upload = quantity(values.get("post_max_size")), quantity(values.get("upload_max_filesize"))
+            limits += not post or post > 8 * MIB or not upload or upload >= post
+        if limits:
+            line(f"Request/upload limits: {limits} configuration(s) need changes.")
+    if report.config_findings:
+        count = len(report.config_findings)
+        line(f"Config review: {count} {'item' if count == 1 else 'items'}; see --verbose.")
+    for kind, path in report.changes:
+        line(f"{'Backup' if kind == 'backup' else 'Changed'}: {path}")
+    restart_units = set()
+    if inventory and branches and not report.error:
+        needs = [branch for branch in branches if any(not version_fixed(branch, p.installed) for p in inventory.packages.values() if p.branch == branch)]
+        if needs:
+            line()
+            line("Next: refresh APT indexes, then rerun this script.")
+            command(["sudo", "apt", "update"])
+            for branch in needs:
+                packages = sorted((p for p in inventory.packages.values() if p.branch == branch), key=lambda p: p.name)
+                blockers = upgrade_blockers(report.os_info, inventory, packages)
+                if blockers:
+                    line(f"PHP {branch}: " + "; ".join(blockers) + ".")
+                else:
+                    line(f"PHP {branch} upgrade plan (confirm again after refreshing):")
+                    options = ["install", "--only-upgrade", "--no-remove", *[p.name for p in packages]]
+                    command(["apt-get", "--simulate", *options])
+                    command(["sudo", "apt-get", *options])
+                    for unit, state in report.services.items():
+                        if state == "active" and (unit == "apache2.service" or unit == f"php{branch}-fpm.service"):
+                            restart_units.add(unit)
+    if writes:
+        for unit, state in report.services.items():
+            if state == "active":
+                restart_units.add(unit)
+    if restart_units:
+        line("Restart after upgrades/settings changes:")
+        for unit in sorted(restart_units):
+            command(["sudo", "systemctl", "restart", unit])
+    line()
+    if report.error:
+        line("Inspection/apply did not finish. Any changed files listed above remain on disk.")
+    elif absent:
+        line("Custom/container PHP was not checked.")
+    else:
+        line("APT data may be stale. Settings are partial mitigations; a PHP update provides the complete fix.")
+    line("Use --verbose for package, configuration and restart details.")
 
 
 def validate_target(plan):
@@ -442,7 +626,7 @@ def validate_target(plan):
         raise ValueError(f"Configuration changed during inspection; rerun: {plan.target}")
 
 
-def apply_plans(plans):
+def apply_plans(plans, changes=None):
     # Preflight every destination before making the first change.
     for plan in plans:
         validate_target(plan)
@@ -457,6 +641,8 @@ def apply_plans(plans):
                 os.chmod(backup, 0o600)
                 output.write(plan.previous)
             print(f"BACKUP {backup}")
+            if changes is not None:
+                changes.append(("backup", backup))
         descriptor, temporary = tempfile.mkstemp(prefix=f".{NAME}.", dir=plan.target.parent)
         try:
             with os.fdopen(descriptor, "wb") as output:
@@ -469,6 +655,8 @@ def apply_plans(plans):
             if os.path.exists(temporary):
                 os.unlink(temporary)
         print(f"WROTE {plan.target}")
+        if changes is not None:
+            changes.append(("write", plan.target))
 
 
 def main(argv=None):
@@ -478,56 +666,66 @@ def main(argv=None):
     parser.add_argument("--sapi", action="append", choices=SAPIS, help="limit to this web SAPI (repeatable; default: all discovered)")
     parser.add_argument("--root", type=Path, default=Path("/"), help="filesystem root for offline audit only")
     parser.add_argument("--web-root", type=Path, action="append", help="additional web root to inspect (repeatable)")
+    parser.add_argument("--verbose", action="store_true", help="also show the full package and configuration evidence")
     args = parser.parse_args(argv)
     if args.apply and (args.root != Path("/") or sys.platform != "linux" or os.geteuid() != 0):
         parser.error("--apply requires Linux root on the live filesystem; offline roots are audit-only")
-    print("PHP2Shell: PARTIAL MITIGATIONS ONLY. Updating PHP is the complete fix.")
-    print("Static files only: active SAPI, effective request settings and worker restarts are NOT verified.")
+    report = AuditReport()
+    details = io.StringIO()
     try:
-        os_info = detect_os(args.root)
-        inventory = package_inventory(args.root)
-        findings = package_guidance(os_info, inventory, args.root)
-        directories = discover(args.root, args.sapi)
-        if not directories:
-            raise ValueError("No Debian web PHP trees found under etc/php (CLI PHP is not a web-SAPI check)")
-        restart_guidance(directories)
-        plans = []
-        for directory in directories:
-            plan, values, scoped = inspect(directory, args.allow_unlimited_memory)
-            plans.append(plan)
-            print(f"\nPHP {directory.parent.name}/{directory.name}: {directory}")
-            branch, sapi = directory.parent.name, directory.name
-            if not any(p.branch == branch for p in inventory.packages.values()):
-                if message := php_support_finding(branch):
-                    print(message)
-                    findings.append(message)
-            expected = f"libapache2-mod-php{branch}" if sapi == "apache2" else f"php{branch}-{sapi}"
-            if not any(p.name.split(":", 1)[0] == expected for p in inventory.packages.values()):
-                findings.append(f"{directory}: serving package {expected} not established; tree may be inactive/custom/offline")
-            for key in sorted(KEYS):
-                print(f"  {key} = {values.get(key, 'not explicitly set')}")
-            print("  Planned override: " + ", ".join(f"{key}={value}" for key, value in plan.settings.items()))
-            findings.extend(scoped)
-        web_roots = [args.root / "var/www", *(args.web_root or [])]
-        findings.extend(override_findings(args.root, directories, web_roots))
-        if args.apply:
-            if any("memory_limit" in p.settings for p in plans):
-                print("MEMORY: unlimited PHP memory selected/preserved; review worker cgroup/container availability limits.")
-            apply_plans(plans)
-        for plan in plans:
-            # Re-read after apply to catch later INI files that override this one.
-            _, values, _ = inspect(plan.directory, args.allow_unlimited_memory)
-            findings.extend(f"{plan.directory}: {item}" for item in settings_findings(values, plan.directory.parent.name))
-        for finding in findings:
-            print(f"REVIEW {finding}")
-        print("\nRequired: vendor PHP updates, override/diagnostic review, and a full restart of every serving PHP worker.")
-        print("CGI/custom launchers, external includes, custom INI scan paths and application ini_set() need separate review.")
-        print("INI snippets do not lock memory_limit against application or per-directory overrides; use reviewed admin settings.")
-        print("No packages, services, WsprryPi settings, GPIO or RF state were changed.")
-        return 1 if findings else 0
+        if not args.root.is_dir():
+            raise ValueError(f"Audit root is not a directory: {args.root}")
+        with redirect_stdout(details):
+            print("PARTIAL MITIGATIONS ONLY. Updating PHP is the complete fix.")
+            report.os_info = detect_os(args.root)
+            report.inventory = package_inventory(args.root)
+            inventory = report.inventory
+            report.findings = package_guidance(report.os_info, inventory, args.root)
+            directories = discover(args.root, args.sapi)
+            report.directories = directories
+            report.services = service_status(args.root, directories, inventory)
+            if directories:
+                restart_guidance(directories)
+            plans = []
+            for directory in directories:
+                plan, values, scoped = inspect(directory, args.allow_unlimited_memory)
+                plans.append(plan)
+                report.records.append((plan, values))
+                print(f"\nPHP {directory.parent.name}/{directory.name}: {directory}")
+                branch, sapi = directory.parent.name, directory.name
+                if not any(p.branch == branch for p in inventory.packages.values()):
+                    if message := php_support_finding(branch):
+                        print(message)
+                        report.findings.append(message)
+                expected = f"libapache2-mod-php{branch}" if sapi == "apache2" else f"php{branch}-{sapi}"
+                if not any(p.name.split(":", 1)[0] == expected for p in inventory.packages.values()):
+                    report.findings.append(f"{directory}: serving package {expected} not established; tree may be inactive/custom/offline")
+                for key in sorted(KEYS):
+                    print(f"  {key} = {values.get(key, 'not explicitly set')}")
+                print("  Planned override: " + ", ".join(f"{key}={value}" for key, value in plan.settings.items()))
+                report.config_findings.extend(scoped)
+            if directories:
+                web_roots = [args.root / "var/www", *(args.web_root or [])]
+                report.config_findings.extend(override_findings(args.root, directories, web_roots))
+            report.findings.extend(report.config_findings)
+            if args.apply:
+                if any("memory_limit" in p.settings for p in plans):
+                    print("MEMORY: unlimited PHP memory selected/preserved; review worker cgroup/container availability limits.")
+                apply_plans(plans, report.changes)
+            for index, plan in enumerate(plans):
+                # Re-read after apply to catch later INI files that override it.
+                _, values, _ = inspect(plan.directory, args.allow_unlimited_memory)
+                report.records[index] = (plan, values)
+                report.findings.extend(f"{plan.directory}: {item}" for item in settings_findings(values, plan.directory.parent.name))
+            for finding in report.findings:
+                print(f"REVIEW {finding}")
     except (OSError, ValueError, UnicodeError) as error:
-        print(f"ERROR {error}. Any WROTE files above remain on disk; services were not restarted.", file=sys.stderr)
-        return 2
+        report.error = str(error)
+    summary(report, args)
+    if args.verbose:
+        print("\nDetailed evidence\n")
+        print(details.getvalue(), end="")
+    return 2 if report.error else 1 if report.findings else 0
 
 
 if __name__ == "__main__":

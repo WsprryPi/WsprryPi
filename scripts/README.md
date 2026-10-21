@@ -27,6 +27,14 @@ Audit without making changes, from the repository root:
 python3 scripts/php2shell-mitigate.py
 ```
 
+The default report groups packages by PHP branch and puts the result, installed/candidate versions, web-service state, settings that need attention, and next action together. A completed audit that needs review is distinct from an inspection failure. If package inventory succeeds and finds no distribution PHP packages or web configuration, the report says **NOTHING TO CHECK**. Custom/container PHP remains outside that conclusion. Full package rows, configuration locations and conditional restart instructions are available with:
+
+```sh
+python3 scripts/php2shell-mitigate.py --verbose
+```
+
+On a live Linux system the script uses read-only `systemctl show` queries for the relevant Apache/FPM services. It reports running, stopped, failed or unavailable status without starting anything. Installed PHP packages and configuration trees do not prove PHP requests are being served; no PHP execution or web request is attempted. Summary restart commands apply only to services reported active and are shown after an available upgrade plan or changed settings. Verbose output retains conditional commands for all discovered web PHP trees.
+
 Apply the ordinary partial mitigations on the Pi:
 
 ```sh
@@ -49,11 +57,11 @@ The audit reads `php.ini` and alphabetically ordered `conf.d/*.ini`, reports rel
 
 Apply mode refuses foreign files at its managed filename, symlinked write paths, hardlinked managed files, and untrusted directory/file ownership or write permissions. Every destination is preflighted before writing. Replacing an owned snippet makes an exact, mode-0600 `.bak-<UTC timestamp>-<unique suffix>` copy beside it; unchanged files are not rewritten. Writes are atomic per file, not transactional across all PHP trees. If a later write fails, the output identifies the files already written. Existing `php.ini`, package snippets, Apache sites, FPM pools, and application files are preserved.
 
-After applying, review the reported conflicts, install vendor updates, and arrange a **full restart of every serving PHP worker**. For discovered Apache module trees the report prints `sudo systemctl restart apache2.service` once; for each FPM tree it prints the versioned command, such as `sudo systemctl restart php8.2-fpm.service`. These commands are conditional on that SAPI actually serving the site: installed configuration trees can be inactive, and the script does not query or operate systemd. For CGI it reports that a persistent FastCGI supervisor must be identified separately; one-shot CGI has no persistent PHP worker. A graceful reload can leave old workers alive. Confirm the actual web SAPI, patch level, effective settings, and WsprryPi web/log workflow after the restart. The request-size settings do not configure web-server/proxy decoded-body limits, field/part/header/nesting limits, cgroups, or application error handling; review those separately using the [OOM advisory](https://github.com/php/php-src/security/advisories/GHSA-w8hw-w9fx-j79w).
+After applying, review the reported conflicts, install vendor updates, and arrange a **full restart of every serving PHP worker**. For discovered Apache module trees the verbose report prints `sudo systemctl restart apache2.service` once; for each FPM tree it prints the versioned command, such as `sudo systemctl restart php8.2-fpm.service`. These commands are conditional on that SAPI actually serving the site: installed configuration trees can be inactive, and the script never operates services. For CGI it reports that a persistent FastCGI supervisor must be identified separately; one-shot CGI has no persistent PHP worker. A graceful reload can leave old workers alive. Confirm the actual web SAPI, patch level, effective settings, and WsprryPi web/log workflow after the restart. The request-size settings do not configure web-server/proxy decoded-body limits, field/part/header/nesting limits, cgroups, or application error handling; review those separately using the [OOM advisory](https://github.com/php/php-src/security/advisories/GHSA-w8hw-w9fx-j79w).
 
 To undo a first apply, remove only the exact managed snippet paths reported by the script. To undo a replacement, restore the corresponding reported backup to its original snippet path with root ownership and mode 0644. Review the restored settings, arrange the same worker restart, and audit again. Removing a snippet restores the underlying configuration, which may be less secure; keep vendor PHP updates installed.
 
-Exit status `0` means the static checks found no outstanding findings, `1` means review/update/mitigation work remains, and `2` means inspection or application failed. Unsupported OS/PHP coverage, unknown package/hold metadata, unverified installed fixes or candidate sets, and configuration conflicts produce status `1`. A successful apply can also return `1` when unlimited memory was not selected. Even status `0` does not establish runtime protection or replace updates.
+Exit status `0` means the static checks found no outstanding findings (including a supported system with no distribution PHP packages or web configuration), `1` means the check completed with review/update/mitigation work remaining, and `2` means inspection or application failed. Unsupported OS/PHP coverage, unknown package/hold metadata, unverified installed fixes or candidate sets, and configuration conflicts produce status `1`. A successful apply can also return `1` when unlimited memory was not selected. Even status `0` does not establish runtime protection or replace updates.
 
 Run the offline fixture tests from `src`:
 
