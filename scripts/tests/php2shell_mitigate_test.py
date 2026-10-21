@@ -438,7 +438,7 @@ class MitigationTest(unittest.TestCase):
         self.assertIn("sudo systemctl restart apache2.service", result.stdout)
         self.assertEqual(before, self.snapshot())
 
-    def report_scenario(self):
+    def report_scenario(self, patched=False, mitigated=False):
         """Representative multi-package installation from the operator report."""
         shutil.rmtree(self.root / "etc/php/8.2")
         for sapi in ["apache2", "cgi"]:
@@ -453,7 +453,10 @@ class MitigationTest(unittest.TestCase):
         (apache / "mods-enabled/php8.4.conf").symlink_to(policy)
         names = ["libapache2-mod-php8.4", "php8.4", "php8.4-cgi", "php8.4-cli", "php8.4-common",
                  "php8.4-mbstring", "php8.4-opcache", "php8.4-readline", "php8.4-xml"]
-        return helper.Inventory({name: helper.Package(name, "8.4", "8.4.26-1~deb13u1", "8.4.26-1~deb13u1") for name in names}, set(), [])
+        version = "8.4.27-1~deb13u1" if patched else "8.4.26-1~deb13u1"
+        if mitigated:
+            self.apply([self.inspect(directory)[0] for directory in helper.discover(self.root, None)])
+        return helper.Inventory({name: helper.Package(name, "8.4", version, version) for name in names}, set(), [])
 
     def test_report_groups_packages_and_deduplicates_config_symlinks(self):
         inventory = self.report_scenario()
@@ -465,7 +468,7 @@ class MitigationTest(unittest.TestCase):
         self.assertIn("(9 packages)", text)
         self.assertEqual(text.count("PHP 8.4: 8.4.26"), 1)
         self.assertIn("Apache: not running", text)
-        self.assertIn("Config review: 1 item", text)
+        self.assertIn("Configuration notes: 1 item (informational)", text)
         self.assertNotIn("sudo systemctl restart", text)
         self.assertNotIn("PACKAGE php8.4", text)
         self.assertNotIn("unsupported/unverified OS", text)
@@ -479,6 +482,123 @@ class MitigationTest(unittest.TestCase):
         self.assertIn("Detailed evidence", text)
         self.assertIn("PACKAGE php8.4-common", text)
         self.assertIn("Planned override", text)
+
+    def test_patched_operator_report_succeeds_with_finite_memory_and_config_note(self):
+        inventory = self.report_scenario(patched=True, mitigated=True)
+        before = self.snapshot()
+        for arguments in [[], ["--verbose"]]:
+            with self.subTest(arguments=arguments), patch.object(helper, "package_inventory", return_value=inventory), patch.object(helper, "service_status", return_value={"apache2.service": "active"}), contextlib.redirect_stdout(io.StringIO()) as output:
+                self.assertEqual(helper.main(["--root", str(self.root), *arguments]), 0)
+            text = output.getvalue()
+            self.assertIn("Result: PHP security fix installed.", text)
+            self.assertIn("Optional mitigations (not required for patched PHP)", text)
+            self.assertIn("Configuration notes: 1 item (informational)", text)
+            self.assertIn("Worker restart history", text)
+            self.assertNotIn("review needed", text)
+            self.assertNotIn("SECURITY ", text)
+            self.assertNotIn("sudo apt update", text)
+            self.assertNotIn("a PHP update provides the complete fix", text)
+            if arguments:
+                self.assertIn("OPTIONAL MITIGATION", text)
+                self.assertIn("CONFIG NOTE", text)
+        self.assertEqual(before, self.snapshot())
+
+    def test_patched_php_does_not_require_the_partial_mitigation_profile(self):
+        inventory = self.report_scenario(patched=True)
+        fpm = self.tree("8.5", "fpm")
+        (fpm / "php.ini").write_text("memory_limit=128M\npost_max_size=64M\nupload_max_filesize=64M\n")
+        package = helper.Package("php8.5-fpm", "8.5", "8.5.12-1", "8.5.12-1")
+        inventory.packages[package.name] = package
+        with patch.object(helper, "package_inventory", return_value=inventory), contextlib.redirect_stdout(io.StringIO()) as output:
+            self.assertEqual(helper.main(["--root", str(self.root), "--verbose"]), 0)
+        text = output.getvalue()
+        self.assertIn("not disabled in 3 web configurations", text)
+        self.assertIn("Fatal backtraces: not disabled", text)
+        self.assertIn("outside the mitigation profile", text)
+        self.assertIn("OPTIONAL MITIGATION", text)
+        self.assertNotIn("SECURITY ", text)
+
+    def test_mixed_patched_and_unverified_packages_still_need_security_review(self):
+        inventory = self.report_scenario(patched=True, mitigated=True)
+        inventory.packages["php8.4-cli"].installed = "8.4.26-1~deb13u1"
+        with patch.object(helper, "package_inventory", return_value=inventory), contextlib.redirect_stdout(io.StringIO()) as output:
+            self.assertEqual(helper.main(["--root", str(self.root), "--verbose"]), 1)
+        text = output.getvalue()
+        self.assertIn("Result: security review needed.", text)
+        self.assertIn("SECURITY php8.4-cli: installed fix unverified", text)
+        self.assertNotIn("Result: PHP security fix installed.", text)
+        self.assertIn("Optional partial mitigations", text)
+
+    def test_patched_packages_do_not_hide_unknown_serving_packages(self):
+        inventory = self.report_scenario(patched=True)
+        del inventory.packages["libapache2-mod-php8.4"]
+        self.tree("8.2", "fpm")
+        with patch.object(helper, "package_inventory", return_value=inventory), contextlib.redirect_stdout(io.StringIO()) as output:
+            self.assertEqual(helper.main(["--root", str(self.root), "--verbose"]), 1)
+        text = output.getvalue()
+        self.assertIn("serving package libapache2-mod-php8.4 not established", text)
+        self.assertIn("serving package php8.2-fpm not established", text)
+        self.assertNotIn("Result: PHP security fix installed.", text)
+
+    def test_upgrade_metadata_does_not_undo_a_verified_installed_fix(self):
+        inventory = self.report_scenario(patched=True)
+        for package in inventory.packages.values():
+            package.candidate = None
+        inventory.held = None
+        inventory.issues = ["APT hold state unavailable", "APT candidates unavailable"]
+        with patch.object(helper, "package_inventory", return_value=inventory), contextlib.redirect_stdout(io.StringIO()) as output:
+            self.assertEqual(helper.main(["--root", str(self.root), "--verbose"]), 0)
+        text = output.getvalue()
+        self.assertIn("Result: PHP security fix installed.", text)
+        self.assertIn("UPGRADE NOTE APT candidates unavailable", text)
+        self.assertNotIn("SECURITY ", text)
+        package = inventory.packages["php8.4-common"]
+        package.installed = "8.4.26-1~deb13u1"
+        with patch.object(helper, "package_inventory", return_value=inventory), contextlib.redirect_stdout(io.StringIO()):
+            self.assertEqual(helper.main(["--root", str(self.root)]), 1)
+
+    def test_patched_held_packages_with_older_candidates_are_not_security_findings(self):
+        inventory = self.report_scenario(patched=True)
+        inventory.held = set(inventory.packages)
+        for package in inventory.packages.values():
+            package.candidate = "8.4.26-1~deb13u1"
+        with patch.object(helper, "package_inventory", return_value=inventory), contextlib.redirect_stdout(io.StringIO()) as output:
+            self.assertEqual(helper.main(["--root", str(self.root), "--verbose"]), 0)
+        self.assertIn("FIXED INSTALLED", output.getvalue())
+        self.assertNotIn("SECURITY ", output.getvalue())
+
+    def test_patched_php_on_unsupported_os_still_needs_security_review(self):
+        inventory = self.report_scenario(patched=True)
+        (self.root / "etc/os-release").write_text("ID=debian\nVERSION_ID=11\nVERSION_CODENAME=bullseye\n")
+        with patch.object(helper, "package_inventory", return_value=inventory), contextlib.redirect_stdout(io.StringIO()) as output:
+            self.assertEqual(helper.main(["--root", str(self.root)]), 1)
+        self.assertIn("UNSUPPORTED RELEASE", output.getvalue())
+        self.assertIn("Result: security review needed.", output.getvalue())
+
+    def test_patched_upstream_eol_branch_still_has_a_support_finding(self):
+        package = helper.Package("php8.2-common", "8.2", "8.2.35-1", "8.2.35-1")
+        inventory = helper.Inventory({package.name: package}, set(), [])
+        with contextlib.redirect_stdout(io.StringIO()):
+            findings = helper.package_guidance(helper.detect_os(self.root), inventory, self.root, date(2027, 1, 1))
+        self.assertTrue(any("UNSUPPORTED/EOL" in finding for finding in findings))
+
+    def test_installed_inventory_failure_still_prevents_success(self):
+        self.report_scenario(patched=True)
+        inventory = helper.Inventory({}, None, ["Installed PHP package inventory unavailable"], False)
+        with patch.object(helper, "package_inventory", return_value=inventory), contextlib.redirect_stdout(io.StringIO()) as output:
+            self.assertEqual(helper.main(["--root", str(self.root), "--verbose"]), 1)
+        self.assertIn("SECURITY Installed PHP package inventory unavailable", output.getvalue())
+        self.assertNotIn("Result: PHP security fix installed.", output.getvalue())
+
+    def test_patched_packages_do_not_hide_inspection_failures(self):
+        inventory = self.report_scenario(patched=True)
+        (self.root / "etc/php/8.4/apache2/php.ini").write_text("post_max_size=010\n")
+        before = self.snapshot()
+        with patch.object(helper, "package_inventory", return_value=inventory), contextlib.redirect_stdout(io.StringIO()) as output:
+            self.assertEqual(helper.main(["--root", str(self.root)]), 2)
+        self.assertIn("CHECK FAILED", output.getvalue())
+        self.assertNotIn("Result: PHP security fix installed.", output.getvalue())
+        self.assertEqual(before, self.snapshot())
 
     def test_no_php_installed_is_not_a_failed_run(self):
         shutil.rmtree(self.root / "etc/php")
