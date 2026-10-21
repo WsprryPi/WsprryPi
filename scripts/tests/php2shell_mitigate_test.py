@@ -56,8 +56,10 @@ class MitigationTest(unittest.TestCase):
         with patch.object(helper.subprocess, "run") as command, contextlib.redirect_stdout(io.StringIO()) as output:
             self.assertEqual(helper.main(["--root", str(self.root)]), 1)
         command.assert_not_called()
-        self.assertIn("PARTIAL MITIGATIONS ONLY", output.getvalue())
-        self.assertIn("Worker services to review: apache2", output.getvalue())
+        self.assertIn("CHECK COMPLETE", output.getvalue())
+        self.assertIn("No settings changed.", output.getvalue())
+        self.assertIn("Apache: status unavailable", output.getvalue())
+        self.assertNotIn("Planned override", output.getvalue())
         self.assertEqual(before, self.snapshot())
 
     def test_cli_offline_apply_refused_without_changes(self):
@@ -129,8 +131,9 @@ class MitigationTest(unittest.TestCase):
     def test_restart_guidance_is_shown_even_when_limit_inspection_fails(self):
         (self.apache / "php.ini").write_text("post_max_size=010\n")
         with contextlib.redirect_stdout(io.StringIO()) as output, contextlib.redirect_stderr(io.StringIO()):
-            self.assertEqual(helper.main(["--root", str(self.root)]), 2)
+            self.assertEqual(helper.main(["--root", str(self.root), "--verbose"]), 2)
         self.assertIn("sudo systemctl restart apache2.service", output.getvalue())
+        self.assertIn("CHECK FAILED", output.getvalue())
 
     def test_ini_comments_quotes_duplicates_and_scoped_settings(self):
         (self.apache / "conf.d/20-test.ini").write_text(
@@ -429,11 +432,122 @@ class MitigationTest(unittest.TestCase):
     def test_unsupported_os_and_restart_commands_appear_in_cli_audit(self):
         (self.root / "etc/os-release").write_text("ID=debian\nVERSION_ID=11\nVERSION_CODENAME=bullseye\n")
         before = self.snapshot()
-        result = subprocess.run([sys.executable, "-B", str(SCRIPT), "--root", str(self.root)], capture_output=True, text=True)
+        result = subprocess.run([sys.executable, "-B", str(SCRIPT), "--root", str(self.root), "--verbose"], capture_output=True, text=True)
         self.assertEqual(result.returncode, 1)
         self.assertIn("UNSUPPORTED RELEASE", result.stdout)
         self.assertIn("sudo systemctl restart apache2.service", result.stdout)
         self.assertEqual(before, self.snapshot())
+
+    def report_scenario(self):
+        """Representative multi-package installation from the operator report."""
+        shutil.rmtree(self.root / "etc/php/8.2")
+        for sapi in ["apache2", "cgi"]:
+            tree = self.tree("8.4", sapi)
+            (tree / "php.ini").write_text("memory_limit=128M\npost_max_size=8M\nupload_max_filesize=2M\n")
+        (self.root / "etc/os-release").write_text('ID=debian\nVERSION_ID=13\nVERSION_CODENAME=trixie\nPRETTY_NAME="Debian GNU/Linux 13 (trixie)"\n')
+        apache = self.root / "etc/apache2"
+        (apache / "mods-available").mkdir(parents=True)
+        (apache / "mods-enabled").mkdir()
+        policy = apache / "mods-available/php8.4.conf"
+        policy.write_text("php_admin_value open_basedir none\n")
+        (apache / "mods-enabled/php8.4.conf").symlink_to(policy)
+        names = ["libapache2-mod-php8.4", "php8.4", "php8.4-cgi", "php8.4-cli", "php8.4-common",
+                 "php8.4-mbstring", "php8.4-opcache", "php8.4-readline", "php8.4-xml"]
+        return helper.Inventory({name: helper.Package(name, "8.4", "8.4.26-1~deb13u1", "8.4.26-1~deb13u1") for name in names}, set(), [])
+
+    def test_report_groups_packages_and_deduplicates_config_symlinks(self):
+        inventory = self.report_scenario()
+        before = self.snapshot()
+        with patch.object(helper, "package_inventory", return_value=inventory), patch.object(helper, "service_status", return_value={"apache2.service": "inactive"}), contextlib.redirect_stdout(io.StringIO()) as output:
+            self.assertEqual(helper.main(["--root", str(self.root)]), 1)
+        text = output.getvalue()
+        self.assertIn("CHECK COMPLETE", text)
+        self.assertIn("(9 packages)", text)
+        self.assertEqual(text.count("PHP 8.4: 8.4.26"), 1)
+        self.assertIn("Apache: not running", text)
+        self.assertIn("Config review: 1 item", text)
+        self.assertNotIn("sudo systemctl restart", text)
+        self.assertNotIn("PACKAGE php8.4", text)
+        self.assertNotIn("unsupported/unverified OS", text)
+        self.assertEqual(before, self.snapshot())
+
+    def test_report_verbose_preserves_full_evidence(self):
+        inventory = self.report_scenario()
+        with patch.object(helper, "package_inventory", return_value=inventory), contextlib.redirect_stdout(io.StringIO()) as output:
+            self.assertEqual(helper.main(["--root", str(self.root), "--verbose"]), 1)
+        text = output.getvalue()
+        self.assertIn("Detailed evidence", text)
+        self.assertIn("PACKAGE php8.4-common", text)
+        self.assertIn("Planned override", text)
+
+    def test_no_php_installed_is_not_a_failed_run(self):
+        shutil.rmtree(self.root / "etc/php")
+        with patch.object(helper, "package_inventory", return_value=helper.Inventory({}, set(), [])), contextlib.redirect_stdout(io.StringIO()) as output:
+            self.assertEqual(helper.main(["--root", str(self.root)]), 0)
+        self.assertIn("NOTHING TO CHECK", output.getvalue())
+        self.assertIn("No distribution PHP packages", output.getvalue())
+        self.assertNotIn("CHECK FAILED", output.getvalue())
+
+    def test_partial_apply_preserves_written_file_evidence(self):
+        first, _, _ = self.inspect()
+        second, _, _ = self.inspect(self.tree("8.4", "fpm"))
+        original = helper.os.replace
+        changes = []
+
+        def replace(source, destination):
+            if destination == second.target:
+                raise OSError("fixture failure on second file")
+            original(source, destination)
+
+        with patch.object(helper.os, "replace", side_effect=replace), contextlib.redirect_stdout(io.StringIO()), self.assertRaises(OSError):
+            helper.apply_plans([first, second], changes)
+        self.assertEqual(changes, [("write", first.target)])
+        report = helper.AuditReport(changes=changes, error="fixture failure on second file")
+        with contextlib.redirect_stdout(io.StringIO()) as output:
+            helper.summary(report, type("Args", (), {"allow_unlimited_memory": False})())
+        self.assertIn("CHECK FAILED", output.getvalue())
+        self.assertIn("Settings files changed: 1", output.getvalue())
+        self.assertIn(str(first.target), output.getvalue())
+
+    def test_service_queries_are_passive_and_unknown_is_not_stopped(self):
+        inventory = helper.Inventory({}, set(), [])
+        with patch.object(helper.sys, "platform", "linux"), patch.object(helper, "query", return_value="LoadState=loaded\nActiveState=active\n") as query:
+            states = helper.service_status(Path("/"), [self.apache], inventory)
+        self.assertEqual(states, {"apache2.service": "active"})
+        self.assertEqual(query.call_args.args[0], ["/usr/bin/systemctl", "show", "--property=LoadState,ActiveState", "apache2.service"])
+        with patch.object(helper.sys, "platform", "linux"), patch.object(helper, "query", return_value=None):
+            self.assertEqual(helper.service_status(Path("/"), [self.apache], inventory)["apache2.service"], "unknown")
+        with patch.object(helper, "query") as query:
+            helper.service_status(self.root, [self.apache], inventory)
+        query.assert_not_called()
+
+    def test_compact_report_fits_wide_and_narrow_terminals(self):
+        inventory = self.report_scenario()
+        for width in [80, 52]:
+            with self.subTest(width=width), patch.object(helper.shutil, "get_terminal_size", return_value=os.terminal_size((width, 24))), patch.object(helper, "package_inventory", return_value=inventory), contextlib.redirect_stdout(io.StringIO()) as output:
+                self.assertEqual(helper.main(["--root", str(self.root)]), 1)
+            self.assertTrue(all(len(line) <= width for line in output.getvalue().splitlines()))
+            self.assertLess(len(output.getvalue().splitlines()), 42)
+
+    @unittest.skipUnless(shutil.which("shellcheck"), "ShellCheck is not installed")
+    def test_compact_multiline_commands_pass_shellcheck(self):
+        inventory = self.report_scenario()
+        for package in inventory.packages.values():
+            package.candidate = "8.4.27-1~deb13u1"
+        for width in [80, 52]:
+            with patch.object(helper.shutil, "get_terminal_size", return_value=os.terminal_size((width, 24))), patch.object(helper, "package_inventory", return_value=inventory), patch.object(helper, "service_status", return_value={"apache2.service": "active"}), contextlib.redirect_stdout(io.StringIO()) as output:
+                helper.main(["--root", str(self.root)])
+            # Text wrapping also indents prose. Extract command blocks only.
+            lines, commands = output.getvalue().splitlines(), []
+            continued = False
+            for line in lines:
+                if line.startswith(("  sudo ", "  apt-get ")) or continued:
+                    commands.append(line)
+                    continued = line.endswith("\\")
+            script = "#!/bin/sh\nset -eu\n" + "\n".join(commands) + "\n"
+            self.assertIn("systemctl restart apache2.service", script)
+            result = subprocess.run([shutil.which("shellcheck"), "--shell=sh", "-"], input=script, capture_output=True, text=True)
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
 
 if __name__ == "__main__":
