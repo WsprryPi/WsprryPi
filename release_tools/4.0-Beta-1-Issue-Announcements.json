@@ -1,0 +1,3730 @@
+{
+  "schema": "wsprrypi-beta-issue-announcements/1",
+  "repository": "WsprryPi/WsprryPi",
+  "status": "complete",
+  "started_at": "2026-10-21T19:57:15.776209Z",
+  "prepared_at": "2026-10-21T20:00:19.322298Z",
+  "selection": {
+    "rule": "Open repository issues (excluding pull requests) carrying exact label Ready for Release. Other labels are not substitutes.",
+    "marker_description": "In devel and pending next release.",
+    "initial_open_enumeration": {
+      "name": "initial-open",
+      "endpoint": "repos/WsprryPi/WsprryPi/issues?state=open&sort=created&direction=asc&per_page=100",
+      "started_at": "2026-10-21T19:57:15.776209Z",
+      "finished_at": "2026-10-21T19:57:16.757563Z",
+      "exit_code": 0,
+      "page_sizes": [
+        30
+      ]
+    },
+    "initial_label_crosscheck": {
+      "name": "initial-ready",
+      "endpoint": "repos/WsprryPi/WsprryPi/issues?state=open&labels=Ready%20for%20Release&sort=created&direction=asc&per_page=100",
+      "started_at": "2026-10-21T19:57:15.777959Z",
+      "finished_at": "2026-10-21T19:57:16.726438Z",
+      "exit_code": 0,
+      "page_sizes": [
+        26
+      ]
+    },
+    "labels_enumeration": {
+      "name": "labels",
+      "endpoint": "repos/WsprryPi/WsprryPi/labels?per_page=100",
+      "started_at": "2026-10-21T19:57:15.778114Z",
+      "finished_at": "2026-10-21T19:57:16.364072Z",
+      "exit_code": 0,
+      "page_sizes": [
+        16
+      ]
+    },
+    "milestones_enumeration": {
+      "name": "milestones",
+      "endpoint": "repos/WsprryPi/WsprryPi/milestones?state=all&per_page=100",
+      "started_at": "2026-10-21T19:57:15.781133Z",
+      "finished_at": "2026-10-21T19:57:16.333731Z",
+      "exit_code": 0,
+      "page_sizes": [
+        0
+      ]
+    },
+    "initial_eligible_numbers": [
+      332,
+      346,
+      347,
+      348,
+      349,
+      352,
+      354,
+      355,
+      361,
+      364,
+      365,
+      367,
+      368,
+      379,
+      382,
+      383,
+      387,
+      390,
+      400,
+      401,
+      412,
+      414,
+      415,
+      416,
+      422,
+      426
+    ],
+    "initial_open_issue_count": 30,
+    "initial_open_pr_count": 0,
+    "initial_ready_count": 26,
+    "milestones": [],
+    "project_visibility": {
+      "visible_open_issue_count": 30,
+      "visible_association_counts": 0,
+      "association_pages": [
+        30
+      ],
+      "association_pagination_exhausted": true,
+      "repository_projects": "inaccessible: token lacks read:project; scopes not changed",
+      "limitation": "No claim about private/inaccessible Project readiness. No concrete additional applicable marker was identified.",
+      "observed_at": "2026-10-21T19:57:59.909110Z",
+      "observation_time_basis": "Successful response file completion time."
+    },
+    "excluded_open_issues": [
+      {
+        "number": 333,
+        "title": "Research Spike: Advanced Scheduling",
+        "url": "https://github.com/WsprryPi/WsprryPi/issues/333",
+        "reason": "Open but no Ready for Release label; separately deferred scope."
+      },
+      {
+        "number": 411,
+        "title": "Complete selectable hardware profiles and Linux CP2112/Si5351 support",
+        "url": "https://github.com/WsprryPi/WsprryPi/issues/411",
+        "reason": "Open but no Ready for Release label; separately deferred scope."
+      },
+      {
+        "number": 419,
+        "title": "Add a native macOS CP2112 transport beneath the Si5351 backend",
+        "url": "https://github.com/WsprryPi/WsprryPi/issues/419",
+        "reason": "Open but no Ready for Release label; separately deferred scope."
+      },
+      {
+        "number": 444,
+        "title": "Track Standard Feld-Hell implementation and qualification",
+        "url": "https://github.com/WsprryPi/WsprryPi/issues/444",
+        "reason": "Open but no Ready for Release label; separately deferred scope."
+      }
+    ],
+    "closed_issues_and_prs": "Excluded from announcements; #350 already shipped/closed and #423 closed; no writes to sibling repositories.",
+    "final_open_enumeration": {
+      "name": "stable-open",
+      "endpoint": "repos/WsprryPi/WsprryPi/issues?state=open&sort=created&direction=asc&per_page=100",
+      "started_at": "2026-10-21T20:05:57.389875Z",
+      "finished_at": "2026-10-21T20:05:58.580855Z",
+      "exit_code": 0,
+      "page_sizes": [
+        30
+      ]
+    },
+    "final_label_crosscheck": {
+      "name": "stable-ready",
+      "endpoint": "repos/WsprryPi/WsprryPi/issues?state=open&labels=Ready%20for%20Release&sort=created&direction=asc&per_page=100",
+      "started_at": "2026-10-21T20:05:58.582149Z",
+      "finished_at": "2026-10-21T20:05:59.498252Z",
+      "exit_code": 0,
+      "page_sizes": [
+        26
+      ]
+    },
+    "preceding_final_open_enumeration": {
+      "name": "final-open",
+      "endpoint": "repos/WsprryPi/WsprryPi/issues?state=open&sort=created&direction=asc&per_page=100",
+      "started_at": "2026-10-21T20:05:50.911576Z",
+      "finished_at": "2026-10-21T20:05:52.120976Z",
+      "exit_code": 0,
+      "page_sizes": [
+        30
+      ]
+    },
+    "preceding_final_label_crosscheck": {
+      "name": "final-ready",
+      "endpoint": "repos/WsprryPi/WsprryPi/issues?state=open&labels=Ready%20for%20Release&sort=created&direction=asc&per_page=100",
+      "started_at": "2026-10-21T20:05:50.913307Z",
+      "finished_at": "2026-10-21T20:05:51.972132Z",
+      "exit_code": 0,
+      "page_sizes": [
+        26
+      ]
+    },
+    "final_eligible_numbers": [
+      332,
+      346,
+      347,
+      348,
+      349,
+      352,
+      354,
+      355,
+      361,
+      364,
+      365,
+      367,
+      368,
+      379,
+      382,
+      383,
+      387,
+      390,
+      400,
+      401,
+      412,
+      414,
+      415,
+      416,
+      422,
+      426
+    ],
+    "final_open_issue_count": 30,
+    "final_ready_count": 26,
+    "additions": [],
+    "removals": [],
+    "stable_snapshot_window": {
+      "from": "2026-10-21T20:05:50.911576Z",
+      "through": "2026-10-21T20:05:59.498252Z",
+      "set_unchanged_across_complete_rest_enumerations": true
+    },
+    "protected_metadata_changed_numbers": []
+  },
+  "prerequisites": {
+    "verified_at": "2026-10-21T20:00:19.323076Z",
+    "release_id": 419746377,
+    "release_url": "https://github.com/WsprryPi/WsprryPi/releases/tag/v4.0.0-beta.1",
+    "draft": false,
+    "prerelease": true,
+    "immutable": false,
+    "attestations": "Unavailable under unchanged release policy; reused accepted 16d result.",
+    "latest_stable": "v3.2.0",
+    "annotated_tag_object": "e61768f5b87f1f7e2b8735b34c3cabcaee7305ec",
+    "publication_commit": "aa6ce2996e8f180670847ed4c89568fa10d4539b",
+    "publication_tree": "801898b144de09f01894e10b5c99838233e5d684",
+    "executable_commit": "1e047a44a44f07d2eb52dfd3c3537d2d24e60143",
+    "embedded_version": "4.0.0-beta.1+1e047a4",
+    "accepted_support_commit": "85bdbdd93aa29bca1783fa55f861952108012802",
+    "release_body_sha256": "051d32343ec3d99791bddd9fbc71b31dc1ce0c9e94871bb018547e34814c2b97",
+    "release_body_matches_reviewed_notes": true,
+    "assets": [
+      {
+        "id": 662986333,
+        "name": "publication-manifest.json",
+        "bytes": 10140,
+        "digest": "sha256:ced10dfce978be47de34154c55d99185b4ee42161eba9e2f6e402f45ccda3d62",
+        "url": "https://github.com/WsprryPi/WsprryPi/releases/download/v4.0.0-beta.1/publication-manifest.json"
+      },
+      {
+        "id": 662986273,
+        "name": "SHA256SUMS",
+        "bytes": 360,
+        "digest": "sha256:b0803fc0b03e147fc802547e06930f2611c314eb9b95eb95ee3f0e09afb77654",
+        "url": "https://github.com/WsprryPi/WsprryPi/releases/download/v4.0.0-beta.1/SHA256SUMS"
+      },
+      {
+        "id": 662986271,
+        "name": "wsprrypi-aarch64-bookworm",
+        "bytes": 6452024,
+        "digest": "sha256:47e5e588d95a7abb6f3799d738d33c6350e61000a59f0c2c51b562f0336ea403",
+        "url": "https://github.com/WsprryPi/WsprryPi/releases/download/v4.0.0-beta.1/wsprrypi-aarch64-bookworm"
+      },
+      {
+        "id": 662986286,
+        "name": "wsprrypi-aarch64-trixie",
+        "bytes": 6549328,
+        "digest": "sha256:82a563adcf3ff9cda8e43423e588a9739adcda9d2bb07683cb831f6df046feda",
+        "url": "https://github.com/WsprryPi/WsprryPi/releases/download/v4.0.0-beta.1/wsprrypi-aarch64-trixie"
+      },
+      {
+        "id": 662986285,
+        "name": "wsprrypi-armv6-bookworm",
+        "bytes": 5841936,
+        "digest": "sha256:351d1859b288d228e1eb952ef13c6f5df3cbf556ae582e62f588a35aba6a3348",
+        "url": "https://github.com/WsprryPi/WsprryPi/releases/download/v4.0.0-beta.1/wsprrypi-armv6-bookworm"
+      },
+      {
+        "id": 662986283,
+        "name": "wsprrypi-armv6-trixie",
+        "bytes": 5999744,
+        "digest": "sha256:604bcf1730c9635d62f953cccd7c886f1fe3afaf4b9114c5c6f5d19d3ccdd1f1",
+        "url": "https://github.com/WsprryPi/WsprryPi/releases/download/v4.0.0-beta.1/wsprrypi-armv6-trixie"
+      }
+    ],
+    "fresh_asset_metadata_comparison": "Exact six names/IDs/sizes/digests match accepted 16d records.",
+    "fresh_downloads": [
+      "publication-manifest.json",
+      "SHA256SUMS"
+    ],
+    "reused_executable_byte_checks": "All four accepted 16d unauthenticated public executable downloads/fetch-helper checks; no fresh executable download in 16e.",
+    "public_manifest_sha256": "ced10dfce978be47de34154c55d99185b4ee42161eba9e2f6e402f45ccda3d62",
+    "public_checksums_sha256": "b0803fc0b03e147fc802547e06930f2611c314eb9b95eb95ee3f0e09afb77654",
+    "docs_commit": "65066216296163c0fcf71b6a5ead09083373f842",
+    "docs_tag_object": "fd73304cfc149e6bfeb952f3e760fb82af11d40a",
+    "docs_build_id": 35301260,
+    "docs_urls_verified": [
+      {
+        "url": "https://wsprry-pi.readthedocs.io/en/v4.0.0-beta.1/",
+        "bytes": 23976,
+        "sha256": "8ac8f0f8e172c4998a23bce1fd466588c06617967cd23ce5b284d6c2ab5f0819"
+      },
+      {
+        "url": "https://wsprry-pi.readthedocs.io/en/v4.0.0-beta.1/Install/beta1.html",
+        "bytes": 21586,
+        "sha256": "0c0196193bd57d70e80ba9b467d4be7e77bd8e9b6ac56e258f1b84847307f93e"
+      }
+    ],
+    "docs_build_identity": "Accepted 16d exact build/tag evidence reused; fresh versioned HTML availability/content checked.",
+    "provider": {
+      "tag": "v1.0.0",
+      "source": "8c16d3c237cb1267cbedafb5da2bb74132ca5de0",
+      "immutable": true,
+      "bundled_evidence_source": "bb6815446beb9b96853ad5a353b0d355d4975710"
+    },
+    "prior_head_ci": {
+      "head": "7f79eb278e8326d5fcc0e3375412b666f2dae604",
+      "url": "https://github.com/WsprryPi/WsprryPi/actions/runs/39649247068",
+      "conclusion": "success",
+      "jobs": 14
+    },
+    "docs_installation_source_sha256": "500ce9334c3c60e5177dbb8a387a64d4a294bfba2c1654e1842f79fe9fa13525",
+    "docs_installation_source_verified_at": "2026-10-21T20:01:34.974023Z",
+    "final_release_metadata_verified_at": "2026-10-21T20:05:51.400751Z",
+    "final_release_metadata_unchanged": true
+  },
+  "retained_acceptance_limits": [
+    "No fresh target installation/status of changed supporting files.",
+    "No fresh clean installation, physical acceptance of other three exports, reboot, GPIO4 selection or target rollback rehearsal.",
+    "No general timing/electrical/frequency/power/spectrum/RF qualification.",
+    "Historical runtime evidence retains its identities; accepted past 20-versus-18 service-request nonconformance grants no new allowance.",
+    "Final 4.0 stable publication and #412 closure remain separate."
+  ],
+  "review": {
+    "method": "independent read-only subagent",
+    "prepublication_status": "approved",
+    "final_status": "approved",
+    "findings": [
+      {
+        "severity": "P2",
+        "stage": "prepublication",
+        "location": "source_content audit anchors for issues #361, #367, #368 and #382",
+        "reproduction": "Inspect original pointers: responsive_shell_logs_test.js does not assert WSPR field layout; config_handler.hpp#L208 is an old configuration example; bounded-tone.md alone omits band/custom parsing; Si5351 planner entry alone omits exception containment.",
+        "consequence": "Ancestry plus unrelated/partial anchors weakens direct frozen-content evidence, even though draft wording is accurate.",
+        "before": [
+          {
+            "number": 361,
+            "before": [
+              {
+                "commit": "aa6ce2996e8f180670847ed4c89568fa10d4539b",
+                "path": "docs/bounded-tone.md",
+                "sha256": "50670d17b7c4f946e4393c491e91697f8055fe13980fc95ae2990be31ec39650",
+                "url": "https://github.com/WsprryPi/WsprryPi/blob/aa6ce2996e8f180670847ed4c89568fa10d4539b/docs/bounded-tone.md#L1"
+              }
+            ]
+          },
+          {
+            "number": 367,
+            "before": [
+              {
+                "commit": "aa6ce2996e8f180670847ed4c89568fa10d4539b",
+                "path": "WsprryPi-UI/tests/responsive_shell_logs_test.js",
+                "sha256": "e0f9a1d78cba2d0a9300f345baef87326981c5a4f885e2f67746e3e8f4c05646",
+                "url": "https://github.com/WsprryPi/WsprryPi/blob/aa6ce2996e8f180670847ed4c89568fa10d4539b/WsprryPi-UI/tests/responsive_shell_logs_test.js#L1"
+              }
+            ]
+          },
+          {
+            "number": 368,
+            "before": [
+              {
+                "commit": "1e047a44a44f07d2eb52dfd3c3537d2d24e60143",
+                "path": "src/WSPR-Transmitter/src/wspr_transmit_backend_si5351.cpp",
+                "sha256": "be691bf41ba8431b44cf3fa3f5b78b10db1d5feab06ca7c29fc03f033eeafcd3",
+                "url": "https://github.com/WsprryPi/WsprryPi/blob/1e047a44a44f07d2eb52dfd3c3537d2d24e60143/src/WSPR-Transmitter/src/wspr_transmit_backend_si5351.cpp#L350"
+              }
+            ]
+          },
+          {
+            "number": 382,
+            "before": [
+              {
+                "commit": "1e047a44a44f07d2eb52dfd3c3537d2d24e60143",
+                "path": "src/config_handler.hpp",
+                "sha256": "59a52f64f9aae12e42448ad1ceaf047c2b055d4e8d26ce2c09dc90b118197a72",
+                "url": "https://github.com/WsprryPi/WsprryPi/blob/1e047a44a44f07d2eb52dfd3c3537d2d24e60143/src/config_handler.hpp#L208"
+              }
+            ]
+          }
+        ],
+        "repair": "Replaced/augmented with exact frozen request/planner, responsive CSS, Si5351 crystal-load programming/configuration and scheduler/command containment anchors; hashes regenerated from Git blobs.",
+        "verification": "Independent repaired-state reassessment recomputed all 26 body/source hashes and inspected corrected anchors; passed before first public write.",
+        "status": "closed"
+      }
+    ],
+    "prepublication_verified_at": "2026-10-21T20:01:56.663166Z",
+    "prepublication_result": "Independent reviewer read all 26 full issue bodies and all 104 comments; checked complete set, every exact body/source hash, frozen ancestry and repaired direct-content evidence. No remaining actionable finding.",
+    "final_verified_at": "2026-10-21T20:08:25.237045Z",
+    "independent_remote_readback_window": {
+      "from": "2026-10-21T20:06:22.634161Z",
+      "through": "2026-10-21T20:06:28.086401Z"
+    },
+    "final_result": "Independent reviewer fetched all 26 actual remote comment objects, freshly enumerated full open/ready set and compared 30 protected issue records, all 104 historical comments, complete final collections, body/source hashes, frozen mappings and complete record diff. No actionable finding remains; prior P2 closed.",
+    "originating_post_execution_assessment": "Separate; not claimed to have occurred."
+  },
+  "rows": [
+    {
+      "repository": "WsprryPi/WsprryPi",
+      "number": 332,
+      "title": "Define canonical band correlation and regional WSPR frequency presets",
+      "url": "https://github.com/WsprryPi/WsprryPi/issues/332",
+      "selection_marker": "Ready for Release",
+      "initial_state": "open",
+      "initial_observed_at": "2026-10-21T19:57:16.726438Z",
+      "disposition": "included with limits",
+      "scope": "This Beta includes the shared band-correlation catalog and Default, Preset and Custom WSPR dial-frequency preferences, including the legacy and WRC-15 60 m choices. Explicit custom values are preserved when changing profiles. Catalog membership does not establish hardware qualification or operating permission; the old 22 m entry is retired.",
+      "retained_limitation": "Band/mode/backend qualification and operating permission remain separate.",
+      "evidence": {
+        "commits": [
+          "bf6d83de4bf9e4c49f699ddfd8c9a222553fa98f"
+        ],
+        "commit_ancestry": {
+          "1e047a44": true,
+          "aa6ce299": true,
+          "v3.2.0": false
+        },
+        "source_content": [
+          {
+            "commit": "aa6ce2996e8f180670847ed4c89568fa10d4539b",
+            "path": "docs/band-and-wspr-presets.md",
+            "sha256": "e920aca44331b2fd8462ee81a1e1a0cb8fb52e5a6ee182245db8945b89e9ba83",
+            "url": "https://github.com/WsprryPi/WsprryPi/blob/aa6ce2996e8f180670847ed4c89568fa10d4539b/docs/band-and-wspr-presets.md#L133"
+          }
+        ],
+        "versioned_installation": "https://wsprry-pi.readthedocs.io/en/v4.0.0-beta.1/Install/beta1.html",
+        "acceptance_ledger": "release_tools/4.0-Beta-1-Release-Evidence.md"
+      },
+      "existing_announcement_search": {
+        "complete_comment_pages": [
+          8
+        ],
+        "comment_count": 8,
+        "observed_at": "2026-10-21T19:57:18.680408Z",
+        "semantic_review": "Independent reviewer read entire body and every comment; no equivalent Beta availability announcement.",
+        "matches": []
+      },
+      "intended_comment": {
+        "body": "[WsprryPi 4.0 Beta 1](https://github.com/WsprryPi/WsprryPi/releases/tag/v4.0.0-beta.1) is available for testing.\n\nThis Beta includes the shared band-correlation catalog and Default, Preset and Custom WSPR dial-frequency preferences, including the legacy and WRC-15 60 m choices. Explicit custom values are preserved when changing profiles. Catalog membership does not establish hardware qualification or operating permission; the old 22 m entry is retired.\n\nPlease check your saved band preferences and resulting dial/RF frequencies after upgrading. See the [Beta installation guide](https://wsprry-pi.readthedocs.io/en/v4.0.0-beta.1/Install/beta1.html).\n\n<!-- wsprrypi-beta-availability:v4.0.0-beta.1 -->\n",
+        "sha256": "6daaec4e35e84cecaaa0be97cff24de7d94c7bb9ab2e1c8d3e50d4a0261cc20c"
+      },
+      "action": "new_comment",
+      "outcome": "confirmed",
+      "verified_comment": {
+        "id": 6325321591,
+        "url": "https://github.com/WsprryPi/WsprryPi/issues/332#issuecomment-6325321591",
+        "author": "lbussy",
+        "body": "[WsprryPi 4.0 Beta 1](https://github.com/WsprryPi/WsprryPi/releases/tag/v4.0.0-beta.1) is available for testing.\n\nThis Beta includes the shared band-correlation catalog and Default, Preset and Custom WSPR dial-frequency preferences, including the legacy and WRC-15 60 m choices. Explicit custom values are preserved when changing profiles. Catalog membership does not establish hardware qualification or operating permission; the old 22 m entry is retired.\n\nPlease check your saved band preferences and resulting dial/RF frequencies after upgrading. See the [Beta installation guide](https://wsprry-pi.readthedocs.io/en/v4.0.0-beta.1/Install/beta1.html).\n\n<!-- wsprrypi-beta-availability:v4.0.0-beta.1 -->\n",
+        "sha256": "6daaec4e35e84cecaaa0be97cff24de7d94c7bb9ab2e1c8d3e50d4a0261cc20c",
+        "created_at": "2026-10-21T20:02:00Z",
+        "updated_at": "2026-10-21T20:02:00Z",
+        "readback_at": "2026-10-21T20:02:02.356518Z",
+        "write_exit_code": 0,
+        "recovered_lost_reply": false
+      },
+      "metadata_changes_observed": [],
+      "prewrite": {
+        "observed_at": "2026-10-21T20:01:59.833157Z",
+        "comment_page_sizes": [
+          8
+        ],
+        "protected_metadata": {
+          "repository_url": "https://api.github.com/repos/WsprryPi/WsprryPi",
+          "number": 332,
+          "url": "https://github.com/WsprryPi/WsprryPi/issues/332",
+          "state": "open",
+          "state_reason": null,
+          "title": "Define canonical band correlation and regional WSPR frequency presets",
+          "body_sha256": "1bb4a6c02aeca9702adc7edf8eea7c273435b1fe7b58a7278fbc08031b547c5c",
+          "labels": [
+            "Ready for Release",
+            "enhancement"
+          ],
+          "milestone": null,
+          "assignees": [],
+          "locked": false,
+          "active_lock_reason": null
+        },
+        "initial_metadata_unchanged": true,
+        "existing_comment_ids": [
+          5364001966,
+          5364096736,
+          5364221654,
+          5364320037,
+          5364463301,
+          5364527598,
+          5368761315,
+          5370290123
+        ]
+      },
+      "write_started_at": "2026-10-21T20:01:59.833387Z",
+      "postwrite": {
+        "observed_at": "2026-10-21T20:02:02.356585Z",
+        "protected_metadata": {
+          "repository_url": "https://api.github.com/repos/WsprryPi/WsprryPi",
+          "number": 332,
+          "url": "https://github.com/WsprryPi/WsprryPi/issues/332",
+          "state": "open",
+          "state_reason": null,
+          "title": "Define canonical band correlation and regional WSPR frequency presets",
+          "body_sha256": "1bb4a6c02aeca9702adc7edf8eea7c273435b1fe7b58a7278fbc08031b547c5c",
+          "labels": [
+            "Ready for Release",
+            "enhancement"
+          ],
+          "milestone": null,
+          "assignees": [],
+          "locked": false,
+          "active_lock_reason": null
+        },
+        "unchanged": true,
+        "comment_count": 9
+      },
+      "final_verification": {
+        "readback_at": "2026-10-21T20:05:51.482563Z",
+        "comment_id": 6325321591,
+        "sha256": "6daaec4e35e84cecaaa0be97cff24de7d94c7bb9ab2e1c8d3e50d4a0261cc20c",
+        "body_matches_reviewed": true,
+        "marker_count": 1,
+        "complete_comment_page_sizes": [
+          9
+        ],
+        "only_new_comment_is_this_execution": true,
+        "protected_metadata_unchanged": true,
+        "final_state": "open",
+        "final_ready_label": true
+      }
+    },
+    {
+      "repository": "WsprryPi/WsprryPi",
+      "number": 346,
+      "title": "Add GPIO 26 and GPIO 27 to the UI safe-pin list",
+      "url": "https://github.com/WsprryPi/WsprryPi/issues/346",
+      "selection_marker": "Ready for Release",
+      "initial_state": "open",
+      "initial_observed_at": "2026-10-21T19:57:16.726438Z",
+      "disposition": "included",
+      "scope": "GPIO26 and GPIO27 are included in the web interface pin choices, subject to the existing pin-ownership and conflict checks.",
+      "retained_limitation": "Pin availability is subject to ownership/conflict checks.",
+      "evidence": {
+        "commits": [
+          "ee3dce7213c2490c4078a05f7d0fb78e5efb0005"
+        ],
+        "commit_ancestry": {
+          "1e047a44": true,
+          "aa6ce299": true,
+          "v3.2.0": false
+        },
+        "source_content": [
+          {
+            "commit": "aa6ce2996e8f180670847ed4c89568fa10d4539b",
+            "path": "WsprryPi-UI/data/gpio_dropdown.php",
+            "sha256": "d248d8aca721e0bfbd5a9461724db2381a3031e21084edad2c3babdaf2fb5da6",
+            "url": "https://github.com/WsprryPi/WsprryPi/blob/aa6ce2996e8f180670847ed4c89568fa10d4539b/WsprryPi-UI/data/gpio_dropdown.php#L39"
+          }
+        ],
+        "versioned_installation": "https://wsprry-pi.readthedocs.io/en/v4.0.0-beta.1/Install/beta1.html",
+        "acceptance_ledger": "release_tools/4.0-Beta-1-Release-Evidence.md"
+      },
+      "existing_announcement_search": {
+        "complete_comment_pages": [
+          2
+        ],
+        "comment_count": 2,
+        "observed_at": "2026-10-21T19:57:18.656362Z",
+        "semantic_review": "Independent reviewer read entire body and every comment; no equivalent Beta availability announcement.",
+        "matches": []
+      },
+      "intended_comment": {
+        "body": "[WsprryPi 4.0 Beta 1](https://github.com/WsprryPi/WsprryPi/releases/tag/v4.0.0-beta.1) is available for testing.\n\nGPIO26 and GPIO27 are included in the web interface pin choices, subject to the existing pin-ownership and conflict checks.\n\nPlease check that your intended LED, shutdown and band-selector choices save and reload correctly. See the [Beta installation guide](https://wsprry-pi.readthedocs.io/en/v4.0.0-beta.1/Install/beta1.html).\n\n<!-- wsprrypi-beta-availability:v4.0.0-beta.1 -->\n",
+        "sha256": "b6b21a24e66c940f2896d14ece69af347621f59c352cefb1c6830ff19b3d08f7"
+      },
+      "action": "new_comment",
+      "outcome": "confirmed",
+      "verified_comment": {
+        "id": 6325324082,
+        "url": "https://github.com/WsprryPi/WsprryPi/issues/346#issuecomment-6325324082",
+        "author": "lbussy",
+        "body": "[WsprryPi 4.0 Beta 1](https://github.com/WsprryPi/WsprryPi/releases/tag/v4.0.0-beta.1) is available for testing.\n\nGPIO26 and GPIO27 are included in the web interface pin choices, subject to the existing pin-ownership and conflict checks.\n\nPlease check that your intended LED, shutdown and band-selector choices save and reload correctly. See the [Beta installation guide](https://wsprry-pi.readthedocs.io/en/v4.0.0-beta.1/Install/beta1.html).\n\n<!-- wsprrypi-beta-availability:v4.0.0-beta.1 -->\n",
+        "sha256": "b6b21a24e66c940f2896d14ece69af347621f59c352cefb1c6830ff19b3d08f7",
+        "created_at": "2026-10-21T20:02:08Z",
+        "updated_at": "2026-10-21T20:02:08Z",
+        "readback_at": "2026-10-21T20:02:10.565223Z",
+        "write_exit_code": 0,
+        "recovered_lost_reply": false
+      },
+      "metadata_changes_observed": [],
+      "prewrite": {
+        "observed_at": "2026-10-21T20:02:07.925686Z",
+        "comment_page_sizes": [
+          2
+        ],
+        "protected_metadata": {
+          "repository_url": "https://api.github.com/repos/WsprryPi/WsprryPi",
+          "number": 346,
+          "url": "https://github.com/WsprryPi/WsprryPi/issues/346",
+          "state": "open",
+          "state_reason": null,
+          "title": "Add GPIO 26 and GPIO 27 to the UI safe-pin list",
+          "body_sha256": "e92b6994c31a0dd965ada803189f6ad389e60989973fa4de525488de941a16d1",
+          "labels": [
+            "Ready for Release"
+          ],
+          "milestone": null,
+          "assignees": [],
+          "locked": false,
+          "active_lock_reason": null
+        },
+        "initial_metadata_unchanged": true,
+        "existing_comment_ids": [
+          5142197154,
+          5151934577
+        ]
+      },
+      "write_started_at": "2026-10-21T20:02:07.925994Z",
+      "postwrite": {
+        "observed_at": "2026-10-21T20:02:10.565272Z",
+        "protected_metadata": {
+          "repository_url": "https://api.github.com/repos/WsprryPi/WsprryPi",
+          "number": 346,
+          "url": "https://github.com/WsprryPi/WsprryPi/issues/346",
+          "state": "open",
+          "state_reason": null,
+          "title": "Add GPIO 26 and GPIO 27 to the UI safe-pin list",
+          "body_sha256": "e92b6994c31a0dd965ada803189f6ad389e60989973fa4de525488de941a16d1",
+          "labels": [
+            "Ready for Release"
+          ],
+          "milestone": null,
+          "assignees": [],
+          "locked": false,
+          "active_lock_reason": null
+        },
+        "unchanged": true,
+        "comment_count": 3
+      },
+      "final_verification": {
+        "readback_at": "2026-10-21T20:05:51.989264Z",
+        "comment_id": 6325324082,
+        "sha256": "b6b21a24e66c940f2896d14ece69af347621f59c352cefb1c6830ff19b3d08f7",
+        "body_matches_reviewed": true,
+        "marker_count": 1,
+        "complete_comment_page_sizes": [
+          3
+        ],
+        "only_new_comment_is_this_execution": true,
+        "protected_metadata_unchanged": true,
+        "final_state": "open",
+        "final_ready_label": true
+      }
+    },
+    {
+      "repository": "WsprryPi/WsprryPi",
+      "number": 347,
+      "title": "Actively reset/disable Si5351 on startup ?",
+      "url": "https://github.com/WsprryPi/WsprryPi/issues/347",
+      "selection_marker": "Ready for Release",
+      "initial_state": "open",
+      "initial_observed_at": "2026-10-21T19:57:16.726438Z",
+      "disposition": "included with limits",
+      "scope": "Startup quiescence includes an all-output disable operation for the configured Si5351 before ordinary programming. Readiness failures and cleanup errors are reported separately. Successful register writes/readback do not establish measured RF inactivity, and intermittent SYS_INIT failures previously observed on one setup remain unexplained.",
+      "retained_limitation": "Historical inhibited checks do not establish general reliability or RF-off measurement.",
+      "evidence": {
+        "commits": [
+          "a3d094418752207c266661bb7cf333d0781c6188"
+        ],
+        "commit_ancestry": {
+          "1e047a44": true,
+          "aa6ce299": true,
+          "v3.2.0": false
+        },
+        "source_content": [
+          {
+            "commit": "1e047a44a44f07d2eb52dfd3c3537d2d24e60143",
+            "path": "src/WSPR-Transmitter/src/wspr_transmit_backend_si5351.cpp",
+            "sha256": "be691bf41ba8431b44cf3fa3f5b78b10db1d5feab06ca7c29fc03f033eeafcd3",
+            "url": "https://github.com/WsprryPi/WsprryPi/blob/1e047a44a44f07d2eb52dfd3c3537d2d24e60143/src/WSPR-Transmitter/src/wspr_transmit_backend_si5351.cpp#L416"
+          }
+        ],
+        "versioned_installation": "https://wsprry-pi.readthedocs.io/en/v4.0.0-beta.1/Install/beta1.html",
+        "acceptance_ledger": "release_tools/4.0-Beta-1-Release-Evidence.md"
+      },
+      "existing_announcement_search": {
+        "complete_comment_pages": [
+          5
+        ],
+        "comment_count": 5,
+        "observed_at": "2026-10-21T19:57:18.668975Z",
+        "semantic_review": "Independent reviewer read entire body and every comment; no equivalent Beta availability announcement.",
+        "matches": []
+      },
+      "intended_comment": {
+        "body": "[WsprryPi 4.0 Beta 1](https://github.com/WsprryPi/WsprryPi/releases/tag/v4.0.0-beta.1) is available for testing.\n\nStartup quiescence includes an all-output disable operation for the configured Si5351 before ordinary programming. Readiness failures and cleanup errors are reported separately. Successful register writes/readback do not establish measured RF inactivity, and intermittent SYS_INIT failures previously observed on one setup remain unexplained.\n\nPlease report startup/readiness diagnostics with the board, reference and output configuration if a failure recurs. See the [Beta installation guide](https://wsprry-pi.readthedocs.io/en/v4.0.0-beta.1/Install/beta1.html).\n\n<!-- wsprrypi-beta-availability:v4.0.0-beta.1 -->\n",
+        "sha256": "ce228010ee0cc76b55d4dd17df7b8793c0a3a6331d6378a2a6b2d788fe14cc89"
+      },
+      "action": "new_comment",
+      "outcome": "confirmed",
+      "verified_comment": {
+        "id": 6325326288,
+        "url": "https://github.com/WsprryPi/WsprryPi/issues/347#issuecomment-6325326288",
+        "author": "lbussy",
+        "body": "[WsprryPi 4.0 Beta 1](https://github.com/WsprryPi/WsprryPi/releases/tag/v4.0.0-beta.1) is available for testing.\n\nStartup quiescence includes an all-output disable operation for the configured Si5351 before ordinary programming. Readiness failures and cleanup errors are reported separately. Successful register writes/readback do not establish measured RF inactivity, and intermittent SYS_INIT failures previously observed on one setup remain unexplained.\n\nPlease report startup/readiness diagnostics with the board, reference and output configuration if a failure recurs. See the [Beta installation guide](https://wsprry-pi.readthedocs.io/en/v4.0.0-beta.1/Install/beta1.html).\n\n<!-- wsprrypi-beta-availability:v4.0.0-beta.1 -->\n",
+        "sha256": "ce228010ee0cc76b55d4dd17df7b8793c0a3a6331d6378a2a6b2d788fe14cc89",
+        "created_at": "2026-10-21T20:02:15Z",
+        "updated_at": "2026-10-21T20:02:15Z",
+        "readback_at": "2026-10-21T20:02:17.393183Z",
+        "write_exit_code": 0,
+        "recovered_lost_reply": false
+      },
+      "metadata_changes_observed": [],
+      "prewrite": {
+        "observed_at": "2026-10-21T20:02:14.961412Z",
+        "comment_page_sizes": [
+          5
+        ],
+        "protected_metadata": {
+          "repository_url": "https://api.github.com/repos/WsprryPi/WsprryPi",
+          "number": 347,
+          "url": "https://github.com/WsprryPi/WsprryPi/issues/347",
+          "state": "open",
+          "state_reason": null,
+          "title": "Actively reset/disable Si5351 on startup ?",
+          "body_sha256": "45b637c633260a8f8825d87f0820f5b4002b50083ff7602998c086319e797b4c",
+          "labels": [
+            "Ready for Release"
+          ],
+          "milestone": null,
+          "assignees": [],
+          "locked": false,
+          "active_lock_reason": null
+        },
+        "initial_metadata_unchanged": true,
+        "existing_comment_ids": [
+          5151365469,
+          5160379342,
+          5165704559,
+          5172574771,
+          5172589174
+        ]
+      },
+      "write_started_at": "2026-10-21T20:02:14.961738Z",
+      "postwrite": {
+        "observed_at": "2026-10-21T20:02:17.393226Z",
+        "protected_metadata": {
+          "repository_url": "https://api.github.com/repos/WsprryPi/WsprryPi",
+          "number": 347,
+          "url": "https://github.com/WsprryPi/WsprryPi/issues/347",
+          "state": "open",
+          "state_reason": null,
+          "title": "Actively reset/disable Si5351 on startup ?",
+          "body_sha256": "45b637c633260a8f8825d87f0820f5b4002b50083ff7602998c086319e797b4c",
+          "labels": [
+            "Ready for Release"
+          ],
+          "milestone": null,
+          "assignees": [],
+          "locked": false,
+          "active_lock_reason": null
+        },
+        "unchanged": true,
+        "comment_count": 6
+      },
+      "final_verification": {
+        "readback_at": "2026-10-21T20:05:52.532785Z",
+        "comment_id": 6325326288,
+        "sha256": "ce228010ee0cc76b55d4dd17df7b8793c0a3a6331d6378a2a6b2d788fe14cc89",
+        "body_matches_reviewed": true,
+        "marker_count": 1,
+        "complete_comment_page_sizes": [
+          6
+        ],
+        "only_new_comment_is_this_execution": true,
+        "protected_metadata_unchanged": true,
+        "final_state": "open",
+        "final_ready_label": true
+      }
+    },
+    {
+      "repository": "WsprryPi/WsprryPi",
+      "number": 348,
+      "title": "Can we allow multiple bands to share a GPIO?",
+      "url": "https://github.com/WsprryPi/WsprryPi/issues/348",
+      "selection_marker": "Ready for Release",
+      "initial_state": "open",
+      "initial_observed_at": "2026-10-21T19:57:16.726438Z",
+      "disposition": "included",
+      "scope": "Multiple bands can share one selector GPIO when their Active High settings agree. Conflicting polarity or use by another enabled function is rejected.",
+      "retained_limitation": "Other enabled-function conflicts and differing polarity remain invalid.",
+      "evidence": {
+        "commits": [
+          "fc0d31dd61ea422d35249815146f5df27b0baa4c"
+        ],
+        "commit_ancestry": {
+          "1e047a44": true,
+          "aa6ce299": true,
+          "v3.2.0": false
+        },
+        "source_content": [
+          {
+            "commit": "1e047a44a44f07d2eb52dfd3c3537d2d24e60143",
+            "path": "src/tests/dial_frequency_semantics_test.cpp",
+            "sha256": "7c64505e933c693f9d0837d4e78871ffb48c134e9b20df00871f3a8bad0a865f",
+            "url": "https://github.com/WsprryPi/WsprryPi/blob/1e047a44a44f07d2eb52dfd3c3537d2d24e60143/src/tests/dial_frequency_semantics_test.cpp#L1280"
+          }
+        ],
+        "versioned_installation": "https://wsprry-pi.readthedocs.io/en/v4.0.0-beta.1/Install/beta1.html",
+        "acceptance_ledger": "release_tools/4.0-Beta-1-Release-Evidence.md"
+      },
+      "existing_announcement_search": {
+        "complete_comment_pages": [
+          3
+        ],
+        "comment_count": 3,
+        "observed_at": "2026-10-21T19:57:18.643432Z",
+        "semantic_review": "Independent reviewer read entire body and every comment; no equivalent Beta availability announcement.",
+        "matches": []
+      },
+      "intended_comment": {
+        "body": "[WsprryPi 4.0 Beta 1](https://github.com/WsprryPi/WsprryPi/releases/tag/v4.0.0-beta.1) is available for testing.\n\nMultiple bands can share one selector GPIO when their Active High settings agree. Conflicting polarity or use by another enabled function is rejected.\n\nPlease check shared-band assignments through save/reload and report any unexpected conflict message. See the [Beta installation guide](https://wsprry-pi.readthedocs.io/en/v4.0.0-beta.1/Install/beta1.html).\n\n<!-- wsprrypi-beta-availability:v4.0.0-beta.1 -->\n",
+        "sha256": "fac5351a0e8a259c21e9a0ffac4f8f1f55e1c81d44c9aa5e521c4b10b718d483"
+      },
+      "action": "new_comment",
+      "outcome": "confirmed",
+      "verified_comment": {
+        "id": 6325328677,
+        "url": "https://github.com/WsprryPi/WsprryPi/issues/348#issuecomment-6325328677",
+        "author": "lbussy",
+        "body": "[WsprryPi 4.0 Beta 1](https://github.com/WsprryPi/WsprryPi/releases/tag/v4.0.0-beta.1) is available for testing.\n\nMultiple bands can share one selector GPIO when their Active High settings agree. Conflicting polarity or use by another enabled function is rejected.\n\nPlease check shared-band assignments through save/reload and report any unexpected conflict message. See the [Beta installation guide](https://wsprry-pi.readthedocs.io/en/v4.0.0-beta.1/Install/beta1.html).\n\n<!-- wsprrypi-beta-availability:v4.0.0-beta.1 -->\n",
+        "sha256": "fac5351a0e8a259c21e9a0ffac4f8f1f55e1c81d44c9aa5e521c4b10b718d483",
+        "created_at": "2026-10-21T20:02:23Z",
+        "updated_at": "2026-10-21T20:02:23Z",
+        "readback_at": "2026-10-21T20:02:25.168083Z",
+        "write_exit_code": 0,
+        "recovered_lost_reply": false
+      },
+      "metadata_changes_observed": [],
+      "prewrite": {
+        "observed_at": "2026-10-21T20:02:22.269711Z",
+        "comment_page_sizes": [
+          3
+        ],
+        "protected_metadata": {
+          "repository_url": "https://api.github.com/repos/WsprryPi/WsprryPi",
+          "number": 348,
+          "url": "https://github.com/WsprryPi/WsprryPi/issues/348",
+          "state": "open",
+          "state_reason": null,
+          "title": "Can we allow multiple bands to share a GPIO?",
+          "body_sha256": "3d890f525e8e5b525fc558ecca984521fb86972a24ddfbee89fce92ba1d1da05",
+          "labels": [
+            "Ready for Release"
+          ],
+          "milestone": null,
+          "assignees": [],
+          "locked": false,
+          "active_lock_reason": null
+        },
+        "initial_metadata_unchanged": true,
+        "existing_comment_ids": [
+          5151374623,
+          5151528992,
+          5153463107
+        ]
+      },
+      "write_started_at": "2026-10-21T20:02:22.270005Z",
+      "postwrite": {
+        "observed_at": "2026-10-21T20:02:25.168141Z",
+        "protected_metadata": {
+          "repository_url": "https://api.github.com/repos/WsprryPi/WsprryPi",
+          "number": 348,
+          "url": "https://github.com/WsprryPi/WsprryPi/issues/348",
+          "state": "open",
+          "state_reason": null,
+          "title": "Can we allow multiple bands to share a GPIO?",
+          "body_sha256": "3d890f525e8e5b525fc558ecca984521fb86972a24ddfbee89fce92ba1d1da05",
+          "labels": [
+            "Ready for Release"
+          ],
+          "milestone": null,
+          "assignees": [],
+          "locked": false,
+          "active_lock_reason": null
+        },
+        "unchanged": true,
+        "comment_count": 4
+      },
+      "final_verification": {
+        "readback_at": "2026-10-21T20:05:52.537240Z",
+        "comment_id": 6325328677,
+        "sha256": "fac5351a0e8a259c21e9a0ffac4f8f1f55e1c81d44c9aa5e521c4b10b718d483",
+        "body_matches_reviewed": true,
+        "marker_count": 1,
+        "complete_comment_page_sizes": [
+          4
+        ],
+        "only_new_comment_is_this_execution": true,
+        "protected_metadata_unchanged": true,
+        "final_state": "open",
+        "final_ready_label": true
+      }
+    },
+    {
+      "repository": "WsprryPi/WsprryPi",
+      "number": 349,
+      "title": "WebSocket client threads are not reaped after browser disconnects",
+      "url": "https://github.com/WsprryPi/WsprryPi/issues/349",
+      "selection_marker": "Ready for Release",
+      "initial_state": "open",
+      "initial_observed_at": "2026-10-21T19:57:16.726438Z",
+      "disposition": "included",
+      "scope": "The WebSocket client-handler lifecycle fix is included: completed disconnected handlers release their thread resources, and shutdown waits for active handlers before destroying server state. This addresses the unreaped-thread defect discussed here.",
+      "retained_limitation": "No blanket memory-leak elimination claim.",
+      "evidence": {
+        "commits": [
+          "92909a9dd0a2dc107a2e9debc1be0b22b7be3323"
+        ],
+        "commit_ancestry": {
+          "1e047a44": true,
+          "aa6ce299": true,
+          "v3.2.0": false
+        },
+        "source_content": [
+          {
+            "commit": "1e047a44a44f07d2eb52dfd3c3537d2d24e60143",
+            "path": "src/web_socket.cpp",
+            "sha256": "890855bd66ce79d7a9d7cd8d8e875029c46978e20591e21ad2c3552c62ce8151",
+            "url": "https://github.com/WsprryPi/WsprryPi/blob/1e047a44a44f07d2eb52dfd3c3537d2d24e60143/src/web_socket.cpp#L388"
+          }
+        ],
+        "versioned_installation": "https://wsprry-pi.readthedocs.io/en/v4.0.0-beta.1/Install/beta1.html",
+        "acceptance_ledger": "release_tools/4.0-Beta-1-Release-Evidence.md"
+      },
+      "existing_announcement_search": {
+        "complete_comment_pages": [
+          12
+        ],
+        "comment_count": 12,
+        "observed_at": "2026-10-21T19:57:18.664765Z",
+        "semantic_review": "Independent reviewer read entire body and every comment; no equivalent Beta availability announcement.",
+        "matches": []
+      },
+      "intended_comment": {
+        "body": "[WsprryPi 4.0 Beta 1](https://github.com/WsprryPi/WsprryPi/releases/tag/v4.0.0-beta.1) is available for testing.\n\nThe WebSocket client-handler lifecycle fix is included: completed disconnected handlers release their thread resources, and shutdown waits for active handlers before destroying server state. This addresses the unreaped-thread defect discussed here.\n\nPlease report recurring resource growth during repeated browser connect/disconnect cycles with diagnostics; this is not a claim that every possible source of memory growth is eliminated. See the [Beta installation guide](https://wsprry-pi.readthedocs.io/en/v4.0.0-beta.1/Install/beta1.html).\n\n<!-- wsprrypi-beta-availability:v4.0.0-beta.1 -->\n",
+        "sha256": "f379103c61ec2bf2d94bac0822f5596d2a48d8680ddc5366961cadf86f5f0cf1"
+      },
+      "action": "new_comment",
+      "outcome": "confirmed",
+      "verified_comment": {
+        "id": 6325331306,
+        "url": "https://github.com/WsprryPi/WsprryPi/issues/349#issuecomment-6325331306",
+        "author": "lbussy",
+        "body": "[WsprryPi 4.0 Beta 1](https://github.com/WsprryPi/WsprryPi/releases/tag/v4.0.0-beta.1) is available for testing.\n\nThe WebSocket client-handler lifecycle fix is included: completed disconnected handlers release their thread resources, and shutdown waits for active handlers before destroying server state. This addresses the unreaped-thread defect discussed here.\n\nPlease report recurring resource growth during repeated browser connect/disconnect cycles with diagnostics; this is not a claim that every possible source of memory growth is eliminated. See the [Beta installation guide](https://wsprry-pi.readthedocs.io/en/v4.0.0-beta.1/Install/beta1.html).\n\n<!-- wsprrypi-beta-availability:v4.0.0-beta.1 -->\n",
+        "sha256": "f379103c61ec2bf2d94bac0822f5596d2a48d8680ddc5366961cadf86f5f0cf1",
+        "created_at": "2026-10-21T20:02:31Z",
+        "updated_at": "2026-10-21T20:02:31Z",
+        "readback_at": "2026-10-21T20:02:33.863137Z",
+        "write_exit_code": 0,
+        "recovered_lost_reply": false
+      },
+      "metadata_changes_observed": [],
+      "prewrite": {
+        "observed_at": "2026-10-21T20:02:29.834017Z",
+        "comment_page_sizes": [
+          12
+        ],
+        "protected_metadata": {
+          "repository_url": "https://api.github.com/repos/WsprryPi/WsprryPi",
+          "number": 349,
+          "url": "https://github.com/WsprryPi/WsprryPi/issues/349",
+          "state": "open",
+          "state_reason": null,
+          "title": "WebSocket client threads are not reaped after browser disconnects",
+          "body_sha256": "2a91fe8099be3f914d10482eec7cb112684475e48b5b72c7e1e12f84d4582012",
+          "labels": [
+            "Ready for Release"
+          ],
+          "milestone": null,
+          "assignees": [],
+          "locked": false,
+          "active_lock_reason": null
+        },
+        "initial_metadata_unchanged": true,
+        "existing_comment_ids": [
+          5151976676,
+          5160614506,
+          5163712571,
+          5164349118,
+          5165459681,
+          5166358716,
+          5171829608,
+          5172048357,
+          5172395769,
+          5172412321,
+          5172480043,
+          5172489862
+        ]
+      },
+      "write_started_at": "2026-10-21T20:02:29.834442Z",
+      "postwrite": {
+        "observed_at": "2026-10-21T20:02:33.863180Z",
+        "protected_metadata": {
+          "repository_url": "https://api.github.com/repos/WsprryPi/WsprryPi",
+          "number": 349,
+          "url": "https://github.com/WsprryPi/WsprryPi/issues/349",
+          "state": "open",
+          "state_reason": null,
+          "title": "WebSocket client threads are not reaped after browser disconnects",
+          "body_sha256": "2a91fe8099be3f914d10482eec7cb112684475e48b5b72c7e1e12f84d4582012",
+          "labels": [
+            "Ready for Release"
+          ],
+          "milestone": null,
+          "assignees": [],
+          "locked": false,
+          "active_lock_reason": null
+        },
+        "unchanged": true,
+        "comment_count": 13
+      },
+      "final_verification": {
+        "readback_at": "2026-10-21T20:05:52.647140Z",
+        "comment_id": 6325331306,
+        "sha256": "f379103c61ec2bf2d94bac0822f5596d2a48d8680ddc5366961cadf86f5f0cf1",
+        "body_matches_reviewed": true,
+        "marker_count": 1,
+        "complete_comment_page_sizes": [
+          13
+        ],
+        "only_new_comment_is_this_execution": true,
+        "protected_metadata_unchanged": true,
+        "final_state": "open",
+        "final_ready_label": true
+      }
+    },
+    {
+      "repository": "WsprryPi/WsprryPi",
+      "number": 352,
+      "title": "Feature: Add UI workflow to create and download a support bundle",
+      "url": "https://github.com/WsprryPi/WsprryPi/issues/352",
+      "selection_marker": "Ready for Release",
+      "initial_state": "open",
+      "initial_observed_at": "2026-10-21T19:57:16.726438Z",
+      "disposition": "included",
+      "scope": "Maintenance includes local support-bundle creation, review and download. Creating a bundle does not upload it; private sharing is a separate consented workflow. Bundles can contain identifying station and network information, so inspect them before sharing.",
+      "retained_limitation": "Collection alone does not upload; identifying information may be present.",
+      "evidence": {
+        "commits": [
+          "ce8af54b94f57cd12e9d3e707539a2764afa1b80"
+        ],
+        "commit_ancestry": {
+          "1e047a44": true,
+          "aa6ce299": true,
+          "v3.2.0": false
+        },
+        "source_content": [
+          {
+            "commit": "aa6ce2996e8f180670847ed4c89568fa10d4539b",
+            "path": "docs/support-bundle-private-intake.md",
+            "sha256": "9be542f76f31647908c345dc8b3fb8fb981ad4ada00850f13d8f25814c2905e4",
+            "url": "https://github.com/WsprryPi/WsprryPi/blob/aa6ce2996e8f180670847ed4c89568fa10d4539b/docs/support-bundle-private-intake.md#L91"
+          }
+        ],
+        "versioned_installation": "https://wsprry-pi.readthedocs.io/en/v4.0.0-beta.1/Install/beta1.html",
+        "acceptance_ledger": "release_tools/4.0-Beta-1-Release-Evidence.md"
+      },
+      "existing_announcement_search": {
+        "complete_comment_pages": [
+          0
+        ],
+        "comment_count": 0,
+        "observed_at": "2026-10-21T19:57:19.146967Z",
+        "semantic_review": "Independent reviewer read entire body and every comment; no equivalent Beta availability announcement.",
+        "matches": []
+      },
+      "intended_comment": {
+        "body": "[WsprryPi 4.0 Beta 1](https://github.com/WsprryPi/WsprryPi/releases/tag/v4.0.0-beta.1) is available for testing.\n\nMaintenance includes local support-bundle creation, review and download. Creating a bundle does not upload it; private sharing is a separate consented workflow. Bundles can contain identifying station and network information, so inspect them before sharing.\n\nPlease check collection warnings and that the downloaded bundle contains the diagnostics you intended to collect. See the [Beta installation guide](https://wsprry-pi.readthedocs.io/en/v4.0.0-beta.1/Install/beta1.html).\n\n<!-- wsprrypi-beta-availability:v4.0.0-beta.1 -->\n",
+        "sha256": "10c2a781d799b60c7a4829cd9c2c4ee4f52a43dafd92d60b98a484007472f59a"
+      },
+      "action": "new_comment",
+      "outcome": "confirmed",
+      "verified_comment": {
+        "id": 6325334377,
+        "url": "https://github.com/WsprryPi/WsprryPi/issues/352#issuecomment-6325334377",
+        "author": "lbussy",
+        "body": "[WsprryPi 4.0 Beta 1](https://github.com/WsprryPi/WsprryPi/releases/tag/v4.0.0-beta.1) is available for testing.\n\nMaintenance includes local support-bundle creation, review and download. Creating a bundle does not upload it; private sharing is a separate consented workflow. Bundles can contain identifying station and network information, so inspect them before sharing.\n\nPlease check collection warnings and that the downloaded bundle contains the diagnostics you intended to collect. See the [Beta installation guide](https://wsprry-pi.readthedocs.io/en/v4.0.0-beta.1/Install/beta1.html).\n\n<!-- wsprrypi-beta-availability:v4.0.0-beta.1 -->\n",
+        "sha256": "10c2a781d799b60c7a4829cd9c2c4ee4f52a43dafd92d60b98a484007472f59a",
+        "created_at": "2026-10-21T20:02:40Z",
+        "updated_at": "2026-10-21T20:02:40Z",
+        "readback_at": "2026-10-21T20:02:42.315275Z",
+        "write_exit_code": 0,
+        "recovered_lost_reply": false
+      },
+      "metadata_changes_observed": [],
+      "prewrite": {
+        "observed_at": "2026-10-21T20:02:39.870992Z",
+        "comment_page_sizes": [
+          0
+        ],
+        "protected_metadata": {
+          "repository_url": "https://api.github.com/repos/WsprryPi/WsprryPi",
+          "number": 352,
+          "url": "https://github.com/WsprryPi/WsprryPi/issues/352",
+          "state": "open",
+          "state_reason": null,
+          "title": "Feature: Add UI workflow to create and download a support bundle",
+          "body_sha256": "fb8bb29827097df77df402c12ae6a280e1cc7e854aa4f93e4d4206aa3f087b28",
+          "labels": [
+            "Ready for Release"
+          ],
+          "milestone": null,
+          "assignees": [],
+          "locked": false,
+          "active_lock_reason": null
+        },
+        "initial_metadata_unchanged": true,
+        "existing_comment_ids": []
+      },
+      "write_started_at": "2026-10-21T20:02:39.871259Z",
+      "postwrite": {
+        "observed_at": "2026-10-21T20:02:42.315370Z",
+        "protected_metadata": {
+          "repository_url": "https://api.github.com/repos/WsprryPi/WsprryPi",
+          "number": 352,
+          "url": "https://github.com/WsprryPi/WsprryPi/issues/352",
+          "state": "open",
+          "state_reason": null,
+          "title": "Feature: Add UI workflow to create and download a support bundle",
+          "body_sha256": "fb8bb29827097df77df402c12ae6a280e1cc7e854aa4f93e4d4206aa3f087b28",
+          "labels": [
+            "Ready for Release"
+          ],
+          "milestone": null,
+          "assignees": [],
+          "locked": false,
+          "active_lock_reason": null
+        },
+        "unchanged": true,
+        "comment_count": 1
+      },
+      "final_verification": {
+        "readback_at": "2026-10-21T20:05:53.025884Z",
+        "comment_id": 6325334377,
+        "sha256": "10c2a781d799b60c7a4829cd9c2c4ee4f52a43dafd92d60b98a484007472f59a",
+        "body_matches_reviewed": true,
+        "marker_count": 1,
+        "complete_comment_page_sizes": [
+          1
+        ],
+        "only_new_comment_is_this_execution": true,
+        "protected_metadata_unchanged": true,
+        "final_state": "open",
+        "final_ready_label": true
+      }
+    },
+    {
+      "repository": "WsprryPi/WsprryPi",
+      "number": 354,
+      "title": "Feature Request: Expand \"Spot\" Menu Item",
+      "url": "https://github.com/WsprryPi/WsprryPi/issues/354",
+      "selection_marker": "Ready for Release",
+      "initial_state": "open",
+      "initial_observed_at": "2026-10-21T19:57:16.726438Z",
+      "disposition": "included",
+      "scope": "The Spots menu includes WSPR spots and a QRSS Plus link, with the external QRSS view opening in a new tab.",
+      "retained_limitation": "External spot sources require Internet access.",
+      "evidence": {
+        "commits": [
+          "b8fd7bf550ee72d37c172236fe8897e99d6b2706"
+        ],
+        "commit_ancestry": {
+          "1e047a44": true,
+          "aa6ce299": true,
+          "v3.2.0": false
+        },
+        "source_content": [
+          {
+            "commit": "aa6ce2996e8f180670847ed4c89568fa10d4539b",
+            "path": "WsprryPi-UI/data/navbar.php",
+            "sha256": "70c67a306be6bd4e621ea563a1449f5ad22c46499bb3a42ab1cd9607331a3e65",
+            "url": "https://github.com/WsprryPi/WsprryPi/blob/aa6ce2996e8f180670847ed4c89568fa10d4539b/WsprryPi-UI/data/navbar.php#L48"
+          }
+        ],
+        "versioned_installation": "https://wsprry-pi.readthedocs.io/en/v4.0.0-beta.1/Install/beta1.html",
+        "acceptance_ledger": "release_tools/4.0-Beta-1-Release-Evidence.md"
+      },
+      "existing_announcement_search": {
+        "complete_comment_pages": [
+          4
+        ],
+        "comment_count": 4,
+        "observed_at": "2026-10-21T19:57:19.162693Z",
+        "semantic_review": "Independent reviewer read entire body and every comment; no equivalent Beta availability announcement.",
+        "matches": []
+      },
+      "intended_comment": {
+        "body": "[WsprryPi 4.0 Beta 1](https://github.com/WsprryPi/WsprryPi/releases/tag/v4.0.0-beta.1) is available for testing.\n\nThe Spots menu includes WSPR spots and a QRSS Plus link, with the external QRSS view opening in a new tab.\n\nPlease check both menu choices in your browser. Online spot sources still require Internet access. See the [Beta installation guide](https://wsprry-pi.readthedocs.io/en/v4.0.0-beta.1/Install/beta1.html).\n\n<!-- wsprrypi-beta-availability:v4.0.0-beta.1 -->\n",
+        "sha256": "d19c93ec096e70d38452c704668ecb61b55727ec5d16e924a0e41280976fb653"
+      },
+      "action": "new_comment",
+      "outcome": "confirmed",
+      "verified_comment": {
+        "id": 6325336599,
+        "url": "https://github.com/WsprryPi/WsprryPi/issues/354#issuecomment-6325336599",
+        "author": "lbussy",
+        "body": "[WsprryPi 4.0 Beta 1](https://github.com/WsprryPi/WsprryPi/releases/tag/v4.0.0-beta.1) is available for testing.\n\nThe Spots menu includes WSPR spots and a QRSS Plus link, with the external QRSS view opening in a new tab.\n\nPlease check both menu choices in your browser. Online spot sources still require Internet access. See the [Beta installation guide](https://wsprry-pi.readthedocs.io/en/v4.0.0-beta.1/Install/beta1.html).\n\n<!-- wsprrypi-beta-availability:v4.0.0-beta.1 -->\n",
+        "sha256": "d19c93ec096e70d38452c704668ecb61b55727ec5d16e924a0e41280976fb653",
+        "created_at": "2026-10-21T20:02:47Z",
+        "updated_at": "2026-10-21T20:02:47Z",
+        "readback_at": "2026-10-21T20:02:49.094711Z",
+        "write_exit_code": 0,
+        "recovered_lost_reply": false
+      },
+      "metadata_changes_observed": [],
+      "prewrite": {
+        "observed_at": "2026-10-21T20:02:46.831563Z",
+        "comment_page_sizes": [
+          4
+        ],
+        "protected_metadata": {
+          "repository_url": "https://api.github.com/repos/WsprryPi/WsprryPi",
+          "number": 354,
+          "url": "https://github.com/WsprryPi/WsprryPi/issues/354",
+          "state": "open",
+          "state_reason": null,
+          "title": "Feature Request: Expand \"Spot\" Menu Item",
+          "body_sha256": "e027e4a594c4d51abb5bad2692823c5934892a25edacaea6a03daed85c1bae44",
+          "labels": [
+            "Ready for Release"
+          ],
+          "milestone": null,
+          "assignees": [],
+          "locked": false,
+          "active_lock_reason": null
+        },
+        "initial_metadata_unchanged": true,
+        "existing_comment_ids": [
+          5158107933,
+          5167127970,
+          5167186651,
+          5168192615
+        ]
+      },
+      "write_started_at": "2026-10-21T20:02:46.831991Z",
+      "postwrite": {
+        "observed_at": "2026-10-21T20:02:49.094790Z",
+        "protected_metadata": {
+          "repository_url": "https://api.github.com/repos/WsprryPi/WsprryPi",
+          "number": 354,
+          "url": "https://github.com/WsprryPi/WsprryPi/issues/354",
+          "state": "open",
+          "state_reason": null,
+          "title": "Feature Request: Expand \"Spot\" Menu Item",
+          "body_sha256": "e027e4a594c4d51abb5bad2692823c5934892a25edacaea6a03daed85c1bae44",
+          "labels": [
+            "Ready for Release"
+          ],
+          "milestone": null,
+          "assignees": [],
+          "locked": false,
+          "active_lock_reason": null
+        },
+        "unchanged": true,
+        "comment_count": 5
+      },
+      "final_verification": {
+        "readback_at": "2026-10-21T20:05:53.093293Z",
+        "comment_id": 6325336599,
+        "sha256": "d19c93ec096e70d38452c704668ecb61b55727ec5d16e924a0e41280976fb653",
+        "body_matches_reviewed": true,
+        "marker_count": 1,
+        "complete_comment_page_sizes": [
+          5
+        ],
+        "only_new_comment_is_this_execution": true,
+        "protected_metadata_unchanged": true,
+        "final_state": "open",
+        "final_ready_label": true
+      }
+    },
+    {
+      "repository": "WsprryPi/WsprryPi",
+      "number": 355,
+      "title": "Web log viewer leaves journalctl processes running after navigation",
+      "url": "https://github.com/WsprryPi/WsprryPi/issues/355",
+      "selection_marker": "Ready for Release",
+      "initial_state": "open",
+      "initial_observed_at": "2026-10-21T19:57:16.726438Z",
+      "disposition": "included",
+      "scope": "The log viewer includes owned journalctl process cleanup when the browser disconnects or navigates away, including replay/follow handling.",
+      "retained_limitation": "This announces the software cleanup behavior, not fresh installed-service qualification.",
+      "evidence": {
+        "commits": [
+          "5e490f413d2b668efd38609e246d5abbf2e0934c"
+        ],
+        "commit_ancestry": {
+          "1e047a44": true,
+          "aa6ce299": true,
+          "v3.2.0": false
+        },
+        "source_content": [
+          {
+            "commit": "aa6ce2996e8f180670847ed4c89568fa10d4539b",
+            "path": "WsprryPi-UI/data/log_stream.php",
+            "sha256": "3b74b12a321878190f316935705b438a5856507976f4f026acf6ca79da1e5bf2",
+            "url": "https://github.com/WsprryPi/WsprryPi/blob/aa6ce2996e8f180670847ed4c89568fa10d4539b/WsprryPi-UI/data/log_stream.php#L86"
+          }
+        ],
+        "versioned_installation": "https://wsprry-pi.readthedocs.io/en/v4.0.0-beta.1/Install/beta1.html",
+        "acceptance_ledger": "release_tools/4.0-Beta-1-Release-Evidence.md"
+      },
+      "existing_announcement_search": {
+        "complete_comment_pages": [
+          2
+        ],
+        "comment_count": 2,
+        "observed_at": "2026-10-21T19:57:19.172147Z",
+        "semantic_review": "Independent reviewer read entire body and every comment; no equivalent Beta availability announcement.",
+        "matches": []
+      },
+      "intended_comment": {
+        "body": "[WsprryPi 4.0 Beta 1](https://github.com/WsprryPi/WsprryPi/releases/tag/v4.0.0-beta.1) is available for testing.\n\nThe log viewer includes owned journalctl process cleanup when the browser disconnects or navigates away, including replay/follow handling.\n\nPlease report persistent journalctl children after repeated log-viewer visits with the relevant process snapshot. See the [Beta installation guide](https://wsprry-pi.readthedocs.io/en/v4.0.0-beta.1/Install/beta1.html).\n\n<!-- wsprrypi-beta-availability:v4.0.0-beta.1 -->\n",
+        "sha256": "5f0be7e960b5643add88044145247e26b6f6511ad726254c7009447443ba5c43"
+      },
+      "action": "new_comment",
+      "outcome": "confirmed",
+      "verified_comment": {
+        "id": 6325338747,
+        "url": "https://github.com/WsprryPi/WsprryPi/issues/355#issuecomment-6325338747",
+        "author": "lbussy",
+        "body": "[WsprryPi 4.0 Beta 1](https://github.com/WsprryPi/WsprryPi/releases/tag/v4.0.0-beta.1) is available for testing.\n\nThe log viewer includes owned journalctl process cleanup when the browser disconnects or navigates away, including replay/follow handling.\n\nPlease report persistent journalctl children after repeated log-viewer visits with the relevant process snapshot. See the [Beta installation guide](https://wsprry-pi.readthedocs.io/en/v4.0.0-beta.1/Install/beta1.html).\n\n<!-- wsprrypi-beta-availability:v4.0.0-beta.1 -->\n",
+        "sha256": "5f0be7e960b5643add88044145247e26b6f6511ad726254c7009447443ba5c43",
+        "created_at": "2026-10-21T20:02:54Z",
+        "updated_at": "2026-10-21T20:02:54Z",
+        "readback_at": "2026-10-21T20:02:56.270577Z",
+        "write_exit_code": 0,
+        "recovered_lost_reply": false
+      },
+      "metadata_changes_observed": [],
+      "prewrite": {
+        "observed_at": "2026-10-21T20:02:53.644727Z",
+        "comment_page_sizes": [
+          2
+        ],
+        "protected_metadata": {
+          "repository_url": "https://api.github.com/repos/WsprryPi/WsprryPi",
+          "number": 355,
+          "url": "https://github.com/WsprryPi/WsprryPi/issues/355",
+          "state": "open",
+          "state_reason": null,
+          "title": "Web log viewer leaves journalctl processes running after navigation",
+          "body_sha256": "42a93b7edf9bcb1c3304ab79f3a072ae71f6793605d6b18cd626f0ac32240d19",
+          "labels": [
+            "Ready for Release"
+          ],
+          "milestone": null,
+          "assignees": [],
+          "locked": false,
+          "active_lock_reason": null
+        },
+        "initial_metadata_unchanged": true,
+        "existing_comment_ids": [
+          5160103208,
+          5160177092
+        ]
+      },
+      "write_started_at": "2026-10-21T20:02:53.644909Z",
+      "postwrite": {
+        "observed_at": "2026-10-21T20:02:56.270609Z",
+        "protected_metadata": {
+          "repository_url": "https://api.github.com/repos/WsprryPi/WsprryPi",
+          "number": 355,
+          "url": "https://github.com/WsprryPi/WsprryPi/issues/355",
+          "state": "open",
+          "state_reason": null,
+          "title": "Web log viewer leaves journalctl processes running after navigation",
+          "body_sha256": "42a93b7edf9bcb1c3304ab79f3a072ae71f6793605d6b18cd626f0ac32240d19",
+          "labels": [
+            "Ready for Release"
+          ],
+          "milestone": null,
+          "assignees": [],
+          "locked": false,
+          "active_lock_reason": null
+        },
+        "unchanged": true,
+        "comment_count": 3
+      },
+      "final_verification": {
+        "readback_at": "2026-10-21T20:05:53.506365Z",
+        "comment_id": 6325338747,
+        "sha256": "5f0be7e960b5643add88044145247e26b6f6511ad726254c7009447443ba5c43",
+        "body_matches_reviewed": true,
+        "marker_count": 1,
+        "complete_comment_page_sizes": [
+          3
+        ],
+        "only_new_comment_is_this_execution": true,
+        "protected_metadata_unchanged": true,
+        "final_state": "open",
+        "final_ready_label": true
+      }
+    },
+    {
+      "repository": "WsprryPi/WsprryPi",
+      "number": 361,
+      "title": "Add band selector and custom frequency to Test Tone",
+      "url": "https://github.com/WsprryPi/WsprryPi/issues/361",
+      "selection_marker": "Ready for Release",
+      "initial_state": "open",
+      "initial_observed_at": "2026-10-21T19:57:16.726438Z",
+      "disposition": "included with limits",
+      "scope": "Test Tone includes band selection and custom RF frequency planning, plus the later lifecycle and restoration fixes. Planning uses the current band/backend policy; the old 22 m catalog example in the original proposal is retired. A frequency preview does not itself start a tone or establish RF qualification.",
+      "retained_limitation": "Band/backend admission applies; no new RF qualification.",
+      "evidence": {
+        "commits": [
+          "37db7087326b51d077bc64a8ded6bf240220b7b0"
+        ],
+        "commit_ancestry": {
+          "1e047a44": true,
+          "aa6ce299": true,
+          "v3.2.0": false
+        },
+        "source_content": [
+          {
+            "commit": "1e047a44a44f07d2eb52dfd3c3537d2d24e60143",
+            "path": "src/test_tone_request.cpp",
+            "sha256": "7b92a440628baf9e3ec2a676097e360ed83c52f46bdc79dccce1273a416dedc3",
+            "url": "https://github.com/WsprryPi/WsprryPi/blob/1e047a44a44f07d2eb52dfd3c3537d2d24e60143/src/test_tone_request.cpp#L56"
+          },
+          {
+            "commit": "1e047a44a44f07d2eb52dfd3c3537d2d24e60143",
+            "path": "src/test_tone_frequency_plan.cpp",
+            "sha256": "359140f80cf72030576d71f28e101891fd3cca9cfec6d750bdd4eb7261b89193",
+            "url": "https://github.com/WsprryPi/WsprryPi/blob/1e047a44a44f07d2eb52dfd3c3537d2d24e60143/src/test_tone_frequency_plan.cpp#L7"
+          },
+          {
+            "commit": "aa6ce2996e8f180670847ed4c89568fa10d4539b",
+            "path": "docs/bounded-tone.md",
+            "sha256": "50670d17b7c4f946e4393c491e91697f8055fe13980fc95ae2990be31ec39650",
+            "url": "https://github.com/WsprryPi/WsprryPi/blob/aa6ce2996e8f180670847ed4c89568fa10d4539b/docs/bounded-tone.md#L1"
+          }
+        ],
+        "versioned_installation": "https://wsprry-pi.readthedocs.io/en/v4.0.0-beta.1/Install/beta1.html",
+        "acceptance_ledger": "release_tools/4.0-Beta-1-Release-Evidence.md"
+      },
+      "existing_announcement_search": {
+        "complete_comment_pages": [
+          0
+        ],
+        "comment_count": 0,
+        "observed_at": "2026-10-21T19:57:19.146836Z",
+        "semantic_review": "Independent reviewer read entire body and every comment; no equivalent Beta availability announcement.",
+        "matches": []
+      },
+      "intended_comment": {
+        "body": "[WsprryPi 4.0 Beta 1](https://github.com/WsprryPi/WsprryPi/releases/tag/v4.0.0-beta.1) is available for testing.\n\nTest Tone includes band selection and custom RF frequency planning, plus the later lifecycle and restoration fixes. Planning uses the current band/backend policy; the old 22 m catalog example in the original proposal is retired. A frequency preview does not itself start a tone or establish RF qualification.\n\nPlease check frequency preview and status/restoration feedback in your normal controlled test setup, following the manual. See the [Beta installation guide](https://wsprry-pi.readthedocs.io/en/v4.0.0-beta.1/Install/beta1.html).\n\n<!-- wsprrypi-beta-availability:v4.0.0-beta.1 -->\n",
+        "sha256": "cb03e619887507f2cbe143ab0dc00979cc2bafa8d6d4af5dee9d8904a9d17d11"
+      },
+      "action": "new_comment",
+      "outcome": "confirmed",
+      "verified_comment": {
+        "id": 6325341334,
+        "url": "https://github.com/WsprryPi/WsprryPi/issues/361#issuecomment-6325341334",
+        "author": "lbussy",
+        "body": "[WsprryPi 4.0 Beta 1](https://github.com/WsprryPi/WsprryPi/releases/tag/v4.0.0-beta.1) is available for testing.\n\nTest Tone includes band selection and custom RF frequency planning, plus the later lifecycle and restoration fixes. Planning uses the current band/backend policy; the old 22 m catalog example in the original proposal is retired. A frequency preview does not itself start a tone or establish RF qualification.\n\nPlease check frequency preview and status/restoration feedback in your normal controlled test setup, following the manual. See the [Beta installation guide](https://wsprry-pi.readthedocs.io/en/v4.0.0-beta.1/Install/beta1.html).\n\n<!-- wsprrypi-beta-availability:v4.0.0-beta.1 -->\n",
+        "sha256": "cb03e619887507f2cbe143ab0dc00979cc2bafa8d6d4af5dee9d8904a9d17d11",
+        "created_at": "2026-10-21T20:03:03Z",
+        "updated_at": "2026-10-21T20:03:03Z",
+        "readback_at": "2026-10-21T20:03:04.660726Z",
+        "write_exit_code": 0,
+        "recovered_lost_reply": false
+      },
+      "metadata_changes_observed": [],
+      "prewrite": {
+        "observed_at": "2026-10-21T20:03:02.250689Z",
+        "comment_page_sizes": [
+          0
+        ],
+        "protected_metadata": {
+          "repository_url": "https://api.github.com/repos/WsprryPi/WsprryPi",
+          "number": 361,
+          "url": "https://github.com/WsprryPi/WsprryPi/issues/361",
+          "state": "open",
+          "state_reason": null,
+          "title": "Add band selector and custom frequency to Test Tone",
+          "body_sha256": "ae66c0a86bd68cd597b4df34765d1ffd8f9ba9c6ec03d35bbc29c3534247d521",
+          "labels": [
+            "Ready for Release"
+          ],
+          "milestone": null,
+          "assignees": [],
+          "locked": false,
+          "active_lock_reason": null
+        },
+        "initial_metadata_unchanged": true,
+        "existing_comment_ids": []
+      },
+      "write_started_at": "2026-10-21T20:03:02.250983Z",
+      "postwrite": {
+        "observed_at": "2026-10-21T20:03:04.660757Z",
+        "protected_metadata": {
+          "repository_url": "https://api.github.com/repos/WsprryPi/WsprryPi",
+          "number": 361,
+          "url": "https://github.com/WsprryPi/WsprryPi/issues/361",
+          "state": "open",
+          "state_reason": null,
+          "title": "Add band selector and custom frequency to Test Tone",
+          "body_sha256": "ae66c0a86bd68cd597b4df34765d1ffd8f9ba9c6ec03d35bbc29c3534247d521",
+          "labels": [
+            "Ready for Release"
+          ],
+          "milestone": null,
+          "assignees": [],
+          "locked": false,
+          "active_lock_reason": null
+        },
+        "unchanged": true,
+        "comment_count": 1
+      },
+      "final_verification": {
+        "readback_at": "2026-10-21T20:05:53.601410Z",
+        "comment_id": 6325341334,
+        "sha256": "cb03e619887507f2cbe143ab0dc00979cc2bafa8d6d4af5dee9d8904a9d17d11",
+        "body_matches_reviewed": true,
+        "marker_count": 1,
+        "complete_comment_page_sizes": [
+          1
+        ],
+        "only_new_comment_is_this_execution": true,
+        "protected_metadata_unchanged": true,
+        "final_state": "open",
+        "final_ready_label": true
+      }
+    },
+    {
+      "repository": "WsprryPi/WsprryPi",
+      "number": 364,
+      "title": "Harden update detection contract for non-main branch builds",
+      "url": "https://github.com/WsprryPi/WsprryPi/issues/364",
+      "selection_marker": "Ready for Release",
+      "initial_state": "open",
+      "initial_observed_at": "2026-10-21T19:57:16.726438Z",
+      "disposition": "included",
+      "scope": "Update detection includes branch-aware comparisons and requires release eligibility or positive ancestry evidence before offering an update. Unknown or divergent history is not treated as an available update merely because commit IDs differ.",
+      "retained_limitation": "Network/ancestry uncertainty is not an update; default installer remains stable.",
+      "evidence": {
+        "commits": [
+          "cdd81a97b1086f630f11dabd41328b52f9aec025"
+        ],
+        "commit_ancestry": {
+          "1e047a44": true,
+          "aa6ce299": true,
+          "v3.2.0": false
+        },
+        "source_content": [
+          {
+            "commit": "aa6ce2996e8f180670847ed4c89568fa10d4539b",
+            "path": "WsprryPi-UI/data/site.js",
+            "sha256": "f0f5d934a8adf95201653d68f3145efb1fcbfa128260ab6d1e6fd2fa29b3c717",
+            "url": "https://github.com/WsprryPi/WsprryPi/blob/aa6ce2996e8f180670847ed4c89568fa10d4539b/WsprryPi-UI/data/site.js#L5057"
+          }
+        ],
+        "versioned_installation": "https://wsprry-pi.readthedocs.io/en/v4.0.0-beta.1/Install/beta1.html",
+        "acceptance_ledger": "release_tools/4.0-Beta-1-Release-Evidence.md"
+      },
+      "existing_announcement_search": {
+        "complete_comment_pages": [
+          0
+        ],
+        "comment_count": 0,
+        "observed_at": "2026-10-21T19:57:19.152163Z",
+        "semantic_review": "Independent reviewer read entire body and every comment; no equivalent Beta availability announcement.",
+        "matches": []
+      },
+      "intended_comment": {
+        "body": "[WsprryPi 4.0 Beta 1](https://github.com/WsprryPi/WsprryPi/releases/tag/v4.0.0-beta.1) is available for testing.\n\nUpdate detection includes branch-aware comparisons and requires release eligibility or positive ancestry evidence before offering an update. Unknown or divergent history is not treated as an available update merely because commit IDs differ.\n\nPlease report incorrect update prompts with the installed version/branch and target shown. The default installer continues to follow stable; use the Beta installation guide to select this prerelease. See the [Beta installation guide](https://wsprry-pi.readthedocs.io/en/v4.0.0-beta.1/Install/beta1.html).\n\n<!-- wsprrypi-beta-availability:v4.0.0-beta.1 -->\n",
+        "sha256": "06914400369ec4bae0ebc692bec345456960a248489ac124bf6f49394bc26714"
+      },
+      "action": "new_comment",
+      "outcome": "confirmed",
+      "verified_comment": {
+        "id": 6325343838,
+        "url": "https://github.com/WsprryPi/WsprryPi/issues/364#issuecomment-6325343838",
+        "author": "lbussy",
+        "body": "[WsprryPi 4.0 Beta 1](https://github.com/WsprryPi/WsprryPi/releases/tag/v4.0.0-beta.1) is available for testing.\n\nUpdate detection includes branch-aware comparisons and requires release eligibility or positive ancestry evidence before offering an update. Unknown or divergent history is not treated as an available update merely because commit IDs differ.\n\nPlease report incorrect update prompts with the installed version/branch and target shown. The default installer continues to follow stable; use the Beta installation guide to select this prerelease. See the [Beta installation guide](https://wsprry-pi.readthedocs.io/en/v4.0.0-beta.1/Install/beta1.html).\n\n<!-- wsprrypi-beta-availability:v4.0.0-beta.1 -->\n",
+        "sha256": "06914400369ec4bae0ebc692bec345456960a248489ac124bf6f49394bc26714",
+        "created_at": "2026-10-21T20:03:11Z",
+        "updated_at": "2026-10-21T20:03:11Z",
+        "readback_at": "2026-10-21T20:03:12.580409Z",
+        "write_exit_code": 0,
+        "recovered_lost_reply": false
+      },
+      "metadata_changes_observed": [],
+      "prewrite": {
+        "observed_at": "2026-10-21T20:03:10.154274Z",
+        "comment_page_sizes": [
+          0
+        ],
+        "protected_metadata": {
+          "repository_url": "https://api.github.com/repos/WsprryPi/WsprryPi",
+          "number": 364,
+          "url": "https://github.com/WsprryPi/WsprryPi/issues/364",
+          "state": "open",
+          "state_reason": null,
+          "title": "Harden update detection contract for non-main branch builds",
+          "body_sha256": "d0389de19fe8a64f4d55a5a4604a1f4a850e52f37d829a7754ab441c018bad97",
+          "labels": [
+            "Ready for Release"
+          ],
+          "milestone": null,
+          "assignees": [],
+          "locked": false,
+          "active_lock_reason": null
+        },
+        "initial_metadata_unchanged": true,
+        "existing_comment_ids": []
+      },
+      "write_started_at": "2026-10-21T20:03:10.154805Z",
+      "postwrite": {
+        "observed_at": "2026-10-21T20:03:12.580454Z",
+        "protected_metadata": {
+          "repository_url": "https://api.github.com/repos/WsprryPi/WsprryPi",
+          "number": 364,
+          "url": "https://github.com/WsprryPi/WsprryPi/issues/364",
+          "state": "open",
+          "state_reason": null,
+          "title": "Harden update detection contract for non-main branch builds",
+          "body_sha256": "d0389de19fe8a64f4d55a5a4604a1f4a850e52f37d829a7754ab441c018bad97",
+          "labels": [
+            "Ready for Release"
+          ],
+          "milestone": null,
+          "assignees": [],
+          "locked": false,
+          "active_lock_reason": null
+        },
+        "unchanged": true,
+        "comment_count": 1
+      },
+      "final_verification": {
+        "readback_at": "2026-10-21T20:05:53.752951Z",
+        "comment_id": 6325343838,
+        "sha256": "06914400369ec4bae0ebc692bec345456960a248489ac124bf6f49394bc26714",
+        "body_matches_reviewed": true,
+        "marker_count": 1,
+        "complete_comment_page_sizes": [
+          1
+        ],
+        "only_new_comment_is_this_execution": true,
+        "protected_metadata_unchanged": true,
+        "final_state": "open",
+        "final_ready_label": true
+      }
+    },
+    {
+      "repository": "WsprryPi/WsprryPi",
+      "number": 365,
+      "title": "Make GPIO4 and GPIO20 conditionally available outside GPIO RF output",
+      "url": "https://github.com/WsprryPi/WsprryPi/issues/365",
+      "selection_marker": "Ready for Release",
+      "initial_state": "open",
+      "initial_observed_at": "2026-10-21T19:57:16.726438Z",
+      "disposition": "included with limits",
+      "scope": "GPIO4/GPIO20 choices account for the selected RF output and other configured pin owners, allowing use by another function only when the pin is available. Pi 5-family GPIO support now uses the separate RP1 provider; the original pre-RP1 unsupported-Pi-5 wording is historical.",
+      "retained_limitation": "Availability does not qualify a physical wiring path; no fresh GPIO4 selection performed for this Beta.",
+      "evidence": {
+        "commits": [
+          "954bd9be9cc63571782ee72121a12af886aecda0"
+        ],
+        "commit_ancestry": {
+          "1e047a44": true,
+          "aa6ce299": true,
+          "v3.2.0": false
+        },
+        "source_content": [
+          {
+            "commit": "aa6ce2996e8f180670847ed4c89568fa10d4539b",
+            "path": "WsprryPi-UI/tests/conditional_transmit_gpio_integration_test.js",
+            "sha256": "729044501d9ae2f0876a3f474ec273babfc39887b1e11351333d0be5605c0124",
+            "url": "https://github.com/WsprryPi/WsprryPi/blob/aa6ce2996e8f180670847ed4c89568fa10d4539b/WsprryPi-UI/tests/conditional_transmit_gpio_integration_test.js#L1"
+          }
+        ],
+        "versioned_installation": "https://wsprry-pi.readthedocs.io/en/v4.0.0-beta.1/Install/beta1.html",
+        "acceptance_ledger": "release_tools/4.0-Beta-1-Release-Evidence.md"
+      },
+      "existing_announcement_search": {
+        "complete_comment_pages": [
+          1
+        ],
+        "comment_count": 1,
+        "observed_at": "2026-10-21T19:57:19.675890Z",
+        "semantic_review": "Independent reviewer read entire body and every comment; no equivalent Beta availability announcement.",
+        "matches": []
+      },
+      "intended_comment": {
+        "body": "[WsprryPi 4.0 Beta 1](https://github.com/WsprryPi/WsprryPi/releases/tag/v4.0.0-beta.1) is available for testing.\n\nGPIO4/GPIO20 choices account for the selected RF output and other configured pin owners, allowing use by another function only when the pin is available. Pi 5-family GPIO support now uses the separate RP1 provider; the original pre-RP1 unsupported-Pi-5 wording is historical.\n\nPlease check pin availability and conflict feedback for your selected backend before applying a configuration. See the [Beta installation guide](https://wsprry-pi.readthedocs.io/en/v4.0.0-beta.1/Install/beta1.html).\n\n<!-- wsprrypi-beta-availability:v4.0.0-beta.1 -->\n",
+        "sha256": "165dcc7000322581cb2d71813b32014dff3f2a9cc7c5d5f5f0d017cd14549b47"
+      },
+      "action": "new_comment",
+      "outcome": "confirmed",
+      "verified_comment": {
+        "id": 6325346740,
+        "url": "https://github.com/WsprryPi/WsprryPi/issues/365#issuecomment-6325346740",
+        "author": "lbussy",
+        "body": "[WsprryPi 4.0 Beta 1](https://github.com/WsprryPi/WsprryPi/releases/tag/v4.0.0-beta.1) is available for testing.\n\nGPIO4/GPIO20 choices account for the selected RF output and other configured pin owners, allowing use by another function only when the pin is available. Pi 5-family GPIO support now uses the separate RP1 provider; the original pre-RP1 unsupported-Pi-5 wording is historical.\n\nPlease check pin availability and conflict feedback for your selected backend before applying a configuration. See the [Beta installation guide](https://wsprry-pi.readthedocs.io/en/v4.0.0-beta.1/Install/beta1.html).\n\n<!-- wsprrypi-beta-availability:v4.0.0-beta.1 -->\n",
+        "sha256": "165dcc7000322581cb2d71813b32014dff3f2a9cc7c5d5f5f0d017cd14549b47",
+        "created_at": "2026-10-21T20:03:20Z",
+        "updated_at": "2026-10-21T20:03:20Z",
+        "readback_at": "2026-10-21T20:03:21.638283Z",
+        "write_exit_code": 0,
+        "recovered_lost_reply": false
+      },
+      "metadata_changes_observed": [],
+      "prewrite": {
+        "observed_at": "2026-10-21T20:03:19.150635Z",
+        "comment_page_sizes": [
+          1
+        ],
+        "protected_metadata": {
+          "repository_url": "https://api.github.com/repos/WsprryPi/WsprryPi",
+          "number": 365,
+          "url": "https://github.com/WsprryPi/WsprryPi/issues/365",
+          "state": "open",
+          "state_reason": "reopened",
+          "title": "Make GPIO4 and GPIO20 conditionally available outside GPIO RF output",
+          "body_sha256": "55cdd0384b87c2a8b7024df3cfa44f4f490e7e43ca2b6f4db41c0b763454245f",
+          "labels": [
+            "Ready for Release"
+          ],
+          "milestone": null,
+          "assignees": [],
+          "locked": false,
+          "active_lock_reason": null
+        },
+        "initial_metadata_unchanged": true,
+        "existing_comment_ids": [
+          5172955382
+        ]
+      },
+      "write_started_at": "2026-10-21T20:03:19.151038Z",
+      "postwrite": {
+        "observed_at": "2026-10-21T20:03:21.638367Z",
+        "protected_metadata": {
+          "repository_url": "https://api.github.com/repos/WsprryPi/WsprryPi",
+          "number": 365,
+          "url": "https://github.com/WsprryPi/WsprryPi/issues/365",
+          "state": "open",
+          "state_reason": "reopened",
+          "title": "Make GPIO4 and GPIO20 conditionally available outside GPIO RF output",
+          "body_sha256": "55cdd0384b87c2a8b7024df3cfa44f4f490e7e43ca2b6f4db41c0b763454245f",
+          "labels": [
+            "Ready for Release"
+          ],
+          "milestone": null,
+          "assignees": [],
+          "locked": false,
+          "active_lock_reason": null
+        },
+        "unchanged": true,
+        "comment_count": 2
+      },
+      "final_verification": {
+        "readback_at": "2026-10-21T20:05:54.057423Z",
+        "comment_id": 6325346740,
+        "sha256": "165dcc7000322581cb2d71813b32014dff3f2a9cc7c5d5f5f0d017cd14549b47",
+        "body_matches_reviewed": true,
+        "marker_count": 1,
+        "complete_comment_page_sizes": [
+          2
+        ],
+        "only_new_comment_is_this_execution": true,
+        "protected_metadata_unchanged": true,
+        "final_state": "open",
+        "final_ready_label": true
+      }
+    },
+    {
+      "repository": "WsprryPi/WsprryPi",
+      "number": 367,
+      "title": "Frequencies and Offsets Not Legible on Mobile",
+      "url": "https://github.com/WsprryPi/WsprryPi/issues/367",
+      "selection_marker": "Ready for Release",
+      "initial_state": "open",
+      "initial_observed_at": "2026-10-21T19:57:16.726438Z",
+      "disposition": "included",
+      "scope": "The responsive WSPR frequency/offset field changes are included, along with subsequent interface refinements.",
+      "retained_limitation": "No claim that all enlarged-text layouts are fully qualified.",
+      "evidence": {
+        "commits": [
+          "d4a1e12d4f080529db4ed12e1a01bbc59db3111b"
+        ],
+        "commit_ancestry": {
+          "1e047a44": true,
+          "aa6ce299": true,
+          "v3.2.0": false
+        },
+        "source_content": [
+          {
+            "commit": "aa6ce2996e8f180670847ed4c89568fa10d4539b",
+            "path": "WsprryPi-UI/data/index.css",
+            "sha256": "9fac8ed474388fe082a6b22c6b4721a234d85f785e86d058dc4ad16970c37063",
+            "url": "https://github.com/WsprryPi/WsprryPi/blob/aa6ce2996e8f180670847ed4c89568fa10d4539b/WsprryPi-UI/data/index.css#L767"
+          }
+        ],
+        "versioned_installation": "https://wsprry-pi.readthedocs.io/en/v4.0.0-beta.1/Install/beta1.html",
+        "acceptance_ledger": "release_tools/4.0-Beta-1-Release-Evidence.md"
+      },
+      "existing_announcement_search": {
+        "complete_comment_pages": [
+          4
+        ],
+        "comment_count": 4,
+        "observed_at": "2026-10-21T19:57:19.676081Z",
+        "semantic_review": "Independent reviewer read entire body and every comment; no equivalent Beta availability announcement.",
+        "matches": []
+      },
+      "intended_comment": {
+        "body": "[WsprryPi 4.0 Beta 1](https://github.com/WsprryPi/WsprryPi/releases/tag/v4.0.0-beta.1) is available for testing.\n\nThe responsive WSPR frequency/offset field changes are included, along with subsequent interface refinements.\n\nPlease check the frequency and offset fields on your phone or narrow browser window and report the browser, viewport and text-size setting if they are still clipped. See the [Beta installation guide](https://wsprry-pi.readthedocs.io/en/v4.0.0-beta.1/Install/beta1.html).\n\n<!-- wsprrypi-beta-availability:v4.0.0-beta.1 -->\n",
+        "sha256": "f9846bdac5fd569709652c3365206c5bf95e0b2e74ea1d9d24bdf3fe3bce439f"
+      },
+      "action": "new_comment",
+      "outcome": "confirmed",
+      "verified_comment": {
+        "id": 6325349150,
+        "url": "https://github.com/WsprryPi/WsprryPi/issues/367#issuecomment-6325349150",
+        "author": "lbussy",
+        "body": "[WsprryPi 4.0 Beta 1](https://github.com/WsprryPi/WsprryPi/releases/tag/v4.0.0-beta.1) is available for testing.\n\nThe responsive WSPR frequency/offset field changes are included, along with subsequent interface refinements.\n\nPlease check the frequency and offset fields on your phone or narrow browser window and report the browser, viewport and text-size setting if they are still clipped. See the [Beta installation guide](https://wsprry-pi.readthedocs.io/en/v4.0.0-beta.1/Install/beta1.html).\n\n<!-- wsprrypi-beta-availability:v4.0.0-beta.1 -->\n",
+        "sha256": "f9846bdac5fd569709652c3365206c5bf95e0b2e74ea1d9d24bdf3fe3bce439f",
+        "created_at": "2026-10-21T20:03:27Z",
+        "updated_at": "2026-10-21T20:03:27Z",
+        "readback_at": "2026-10-21T20:03:29.296767Z",
+        "write_exit_code": 0,
+        "recovered_lost_reply": false
+      },
+      "metadata_changes_observed": [],
+      "prewrite": {
+        "observed_at": "2026-10-21T20:03:26.674066Z",
+        "comment_page_sizes": [
+          4
+        ],
+        "protected_metadata": {
+          "repository_url": "https://api.github.com/repos/WsprryPi/WsprryPi",
+          "number": 367,
+          "url": "https://github.com/WsprryPi/WsprryPi/issues/367",
+          "state": "open",
+          "state_reason": null,
+          "title": "Frequencies and Offsets Not Legible on Mobile",
+          "body_sha256": "cdc7d13da60c560fb091231fc3b8df877eb6006eabd41db0f41898d1b29f5571",
+          "labels": [
+            "Ready for Release"
+          ],
+          "milestone": null,
+          "assignees": [],
+          "locked": false,
+          "active_lock_reason": null
+        },
+        "initial_metadata_unchanged": true,
+        "existing_comment_ids": [
+          5172643184,
+          5191264890,
+          5191541717,
+          5191579093
+        ]
+      },
+      "write_started_at": "2026-10-21T20:03:26.674364Z",
+      "postwrite": {
+        "observed_at": "2026-10-21T20:03:29.296836Z",
+        "protected_metadata": {
+          "repository_url": "https://api.github.com/repos/WsprryPi/WsprryPi",
+          "number": 367,
+          "url": "https://github.com/WsprryPi/WsprryPi/issues/367",
+          "state": "open",
+          "state_reason": null,
+          "title": "Frequencies and Offsets Not Legible on Mobile",
+          "body_sha256": "cdc7d13da60c560fb091231fc3b8df877eb6006eabd41db0f41898d1b29f5571",
+          "labels": [
+            "Ready for Release"
+          ],
+          "milestone": null,
+          "assignees": [],
+          "locked": false,
+          "active_lock_reason": null
+        },
+        "unchanged": true,
+        "comment_count": 5
+      },
+      "final_verification": {
+        "readback_at": "2026-10-21T20:05:54.192940Z",
+        "comment_id": 6325349150,
+        "sha256": "f9846bdac5fd569709652c3365206c5bf95e0b2e74ea1d9d24bdf3fe3bce439f",
+        "body_matches_reviewed": true,
+        "marker_count": 1,
+        "complete_comment_page_sizes": [
+          5
+        ],
+        "only_new_comment_is_this_execution": true,
+        "protected_metadata_unchanged": true,
+        "final_state": "open",
+        "final_ready_label": true
+      }
+    },
+    {
+      "repository": "WsprryPi/WsprryPi",
+      "number": 368,
+      "title": "Crash with Si5351 and 2m band",
+      "url": "https://github.com/WsprryPi/WsprryPi/issues/368",
+      "selection_marker": "Ready for Release",
+      "initial_state": "open",
+      "initial_observed_at": "2026-10-21T19:57:16.726438Z",
+      "disposition": "included with limits",
+      "scope": "The Si5351 planner-error containment changes are included, together with the later 2 m admission and scoped qualification work. An invalid or unavailable plan should report a failure rather than escape as the original planner crash. This does not qualify every Si5351 board/reference configuration; intermittent startup-readiness failures remain a separate known limitation.",
+      "retained_limitation": "No universal 2 m or startup-reliability claim.",
+      "evidence": {
+        "commits": [
+          "1aea948dbd171345aeeaa900354f24a09c56d8e7"
+        ],
+        "commit_ancestry": {
+          "1e047a44": true,
+          "aa6ce299": true,
+          "v3.2.0": false
+        },
+        "source_content": [
+          {
+            "commit": "1e047a44a44f07d2eb52dfd3c3537d2d24e60143",
+            "path": "src/scheduling_test_tone.cpp",
+            "sha256": "aa27ebcd20f70645d8fa90d7a6f586da4be5742e8e429818cf4356cb1170fc31",
+            "url": "https://github.com/WsprryPi/WsprryPi/blob/1e047a44a44f07d2eb52dfd3c3537d2d24e60143/src/scheduling_test_tone.cpp#L540"
+          },
+          {
+            "commit": "1e047a44a44f07d2eb52dfd3c3537d2d24e60143",
+            "path": "src/web_socket_commands.cpp",
+            "sha256": "939c465f6d9cd1471a2f37d318d1a6bd49642ca3e27902d2f9a84e10aa688732",
+            "url": "https://github.com/WsprryPi/WsprryPi/blob/1e047a44a44f07d2eb52dfd3c3537d2d24e60143/src/web_socket_commands.cpp#L535"
+          }
+        ],
+        "versioned_installation": "https://wsprry-pi.readthedocs.io/en/v4.0.0-beta.1/Install/beta1.html",
+        "acceptance_ledger": "release_tools/4.0-Beta-1-Release-Evidence.md"
+      },
+      "existing_announcement_search": {
+        "complete_comment_pages": [
+          5
+        ],
+        "comment_count": 5,
+        "observed_at": "2026-10-21T19:57:19.676284Z",
+        "semantic_review": "Independent reviewer read entire body and every comment; no equivalent Beta availability announcement.",
+        "matches": []
+      },
+      "intended_comment": {
+        "body": "[WsprryPi 4.0 Beta 1](https://github.com/WsprryPi/WsprryPi/releases/tag/v4.0.0-beta.1) is available for testing.\n\nThe Si5351 planner-error containment changes are included, together with the later 2 m admission and scoped qualification work. An invalid or unavailable plan should report a failure rather than escape as the original planner crash. This does not qualify every Si5351 board/reference configuration; intermittent startup-readiness failures remain a separate known limitation.\n\nPlease include the exact frequency, mode, board/reference settings and diagnostics if planning or readiness fails. See the [Beta installation guide](https://wsprry-pi.readthedocs.io/en/v4.0.0-beta.1/Install/beta1.html).\n\n<!-- wsprrypi-beta-availability:v4.0.0-beta.1 -->\n",
+        "sha256": "af80f968c6fca81d5980667470f7efa48382df4b1494478414d75a254cceb087"
+      },
+      "action": "new_comment",
+      "outcome": "confirmed",
+      "verified_comment": {
+        "id": 6325351396,
+        "url": "https://github.com/WsprryPi/WsprryPi/issues/368#issuecomment-6325351396",
+        "author": "lbussy",
+        "body": "[WsprryPi 4.0 Beta 1](https://github.com/WsprryPi/WsprryPi/releases/tag/v4.0.0-beta.1) is available for testing.\n\nThe Si5351 planner-error containment changes are included, together with the later 2 m admission and scoped qualification work. An invalid or unavailable plan should report a failure rather than escape as the original planner crash. This does not qualify every Si5351 board/reference configuration; intermittent startup-readiness failures remain a separate known limitation.\n\nPlease include the exact frequency, mode, board/reference settings and diagnostics if planning or readiness fails. See the [Beta installation guide](https://wsprry-pi.readthedocs.io/en/v4.0.0-beta.1/Install/beta1.html).\n\n<!-- wsprrypi-beta-availability:v4.0.0-beta.1 -->\n",
+        "sha256": "af80f968c6fca81d5980667470f7efa48382df4b1494478414d75a254cceb087",
+        "created_at": "2026-10-21T20:03:34Z",
+        "updated_at": "2026-10-21T20:03:34Z",
+        "readback_at": "2026-10-21T20:03:36.306548Z",
+        "write_exit_code": 0,
+        "recovered_lost_reply": false
+      },
+      "metadata_changes_observed": [],
+      "prewrite": {
+        "observed_at": "2026-10-21T20:03:33.652401Z",
+        "comment_page_sizes": [
+          5
+        ],
+        "protected_metadata": {
+          "repository_url": "https://api.github.com/repos/WsprryPi/WsprryPi",
+          "number": 368,
+          "url": "https://github.com/WsprryPi/WsprryPi/issues/368",
+          "state": "open",
+          "state_reason": null,
+          "title": "Crash with Si5351 and 2m band",
+          "body_sha256": "a0201bcc201ccb5af74daf928e7e3f5733e574b6e77aa03b4006973de34deddd",
+          "labels": [
+            "Ready for Release"
+          ],
+          "milestone": null,
+          "assignees": [],
+          "locked": false,
+          "active_lock_reason": null
+        },
+        "initial_metadata_unchanged": true,
+        "existing_comment_ids": [
+          5172769973,
+          5178335525,
+          5178775486,
+          5184924769,
+          5185926459
+        ]
+      },
+      "write_started_at": "2026-10-21T20:03:33.652778Z",
+      "postwrite": {
+        "observed_at": "2026-10-21T20:03:36.306598Z",
+        "protected_metadata": {
+          "repository_url": "https://api.github.com/repos/WsprryPi/WsprryPi",
+          "number": 368,
+          "url": "https://github.com/WsprryPi/WsprryPi/issues/368",
+          "state": "open",
+          "state_reason": null,
+          "title": "Crash with Si5351 and 2m band",
+          "body_sha256": "a0201bcc201ccb5af74daf928e7e3f5733e574b6e77aa03b4006973de34deddd",
+          "labels": [
+            "Ready for Release"
+          ],
+          "milestone": null,
+          "assignees": [],
+          "locked": false,
+          "active_lock_reason": null
+        },
+        "unchanged": true,
+        "comment_count": 6
+      },
+      "final_verification": {
+        "readback_at": "2026-10-21T20:05:54.626043Z",
+        "comment_id": 6325351396,
+        "sha256": "af80f968c6fca81d5980667470f7efa48382df4b1494478414d75a254cceb087",
+        "body_matches_reviewed": true,
+        "marker_count": 1,
+        "complete_comment_page_sizes": [
+          6
+        ],
+        "only_new_comment_is_this_execution": true,
+        "protected_metadata_unchanged": true,
+        "final_state": "open",
+        "final_ready_label": true
+      }
+    },
+    {
+      "repository": "WsprryPi/WsprryPi",
+      "number": 379,
+      "title": "Qualify 2m WSPR on GPIO and Si5351 backends",
+      "url": "https://github.com/WsprryPi/WsprryPi/issues/379",
+      "selection_marker": "Ready for Release",
+      "initial_state": "open",
+      "initial_observed_at": "2026-10-21T19:57:16.726438Z",
+      "disposition": "included with limits",
+      "scope": "The Beta carries the scoped Si5351 2 m WSPR qualification and the corresponding backend policy. Legacy direct-GPIO 2 m WSPR is not enabled by this announcement. The recorded Si5351 result applies to the documented setup; it does not qualify every board, reference, output, drive level, absolute frequency, power or spectrum.",
+      "retained_limitation": "Scoped Si5351 evidence; legacy direct-GPIO 2 m WSPR remains refused.",
+      "evidence": {
+        "commits": [
+          "3a56c24b74f0253dc33f9c02386ca5c5261f0ed9"
+        ],
+        "commit_ancestry": {
+          "1e047a44": true,
+          "aa6ce299": true,
+          "v3.2.0": false
+        },
+        "source_content": [
+          {
+            "commit": "1e047a44a44f07d2eb52dfd3c3537d2d24e60143",
+            "path": "src/WSPR-Transmitter/src/gpio_band_policy.hpp",
+            "sha256": "c435558e81eddab772b191a2438ed051889370c3121404baca90c426fdbd7c80",
+            "url": "https://github.com/WsprryPi/WsprryPi/blob/1e047a44a44f07d2eb52dfd3c3537d2d24e60143/src/WSPR-Transmitter/src/gpio_band_policy.hpp#L56"
+          }
+        ],
+        "versioned_installation": "https://wsprry-pi.readthedocs.io/en/v4.0.0-beta.1/Install/beta1.html",
+        "acceptance_ledger": "release_tools/4.0-Beta-1-Release-Evidence.md"
+      },
+      "existing_announcement_search": {
+        "complete_comment_pages": [
+          17
+        ],
+        "comment_count": 17,
+        "observed_at": "2026-10-21T19:57:19.737438Z",
+        "semantic_review": "Independent reviewer read entire body and every comment; no equivalent Beta availability announcement.",
+        "matches": []
+      },
+      "intended_comment": {
+        "body": "[WsprryPi 4.0 Beta 1](https://github.com/WsprryPi/WsprryPi/releases/tag/v4.0.0-beta.1) is available for testing.\n\nThe Beta carries the scoped Si5351 2 m WSPR qualification and the corresponding backend policy. Legacy direct-GPIO 2 m WSPR is not enabled by this announcement. The recorded Si5351 result applies to the documented setup; it does not qualify every board, reference, output, drive level, absolute frequency, power or spectrum.\n\nCheck the selected backend and its qualification status before operating, and report results with your exact setup. See the [Beta installation guide](https://wsprry-pi.readthedocs.io/en/v4.0.0-beta.1/Install/beta1.html).\n\n<!-- wsprrypi-beta-availability:v4.0.0-beta.1 -->\n",
+        "sha256": "a92e5fa1c99e276c0d9a8658f0b27cb37e1ab36827dbe5e5a187a85a55df2dbd"
+      },
+      "action": "new_comment",
+      "outcome": "confirmed",
+      "verified_comment": {
+        "id": 6325353801,
+        "url": "https://github.com/WsprryPi/WsprryPi/issues/379#issuecomment-6325353801",
+        "author": "lbussy",
+        "body": "[WsprryPi 4.0 Beta 1](https://github.com/WsprryPi/WsprryPi/releases/tag/v4.0.0-beta.1) is available for testing.\n\nThe Beta carries the scoped Si5351 2 m WSPR qualification and the corresponding backend policy. Legacy direct-GPIO 2 m WSPR is not enabled by this announcement. The recorded Si5351 result applies to the documented setup; it does not qualify every board, reference, output, drive level, absolute frequency, power or spectrum.\n\nCheck the selected backend and its qualification status before operating, and report results with your exact setup. See the [Beta installation guide](https://wsprry-pi.readthedocs.io/en/v4.0.0-beta.1/Install/beta1.html).\n\n<!-- wsprrypi-beta-availability:v4.0.0-beta.1 -->\n",
+        "sha256": "a92e5fa1c99e276c0d9a8658f0b27cb37e1ab36827dbe5e5a187a85a55df2dbd",
+        "created_at": "2026-10-21T20:03:42Z",
+        "updated_at": "2026-10-21T20:03:42Z",
+        "readback_at": "2026-10-21T20:03:44.208292Z",
+        "write_exit_code": 0,
+        "recovered_lost_reply": false
+      },
+      "metadata_changes_observed": [],
+      "prewrite": {
+        "observed_at": "2026-10-21T20:03:41.426218Z",
+        "comment_page_sizes": [
+          17
+        ],
+        "protected_metadata": {
+          "repository_url": "https://api.github.com/repos/WsprryPi/WsprryPi",
+          "number": 379,
+          "url": "https://github.com/WsprryPi/WsprryPi/issues/379",
+          "state": "open",
+          "state_reason": null,
+          "title": "Qualify 2m WSPR on GPIO and Si5351 backends",
+          "body_sha256": "acfe7fbc7558639b4db1d89c1ba2be44f16bf4a2bbd6af706dd8684b86c03da0",
+          "labels": [
+            "Ready for Release"
+          ],
+          "milestone": null,
+          "assignees": [],
+          "locked": false,
+          "active_lock_reason": null
+        },
+        "initial_metadata_unchanged": true,
+        "existing_comment_ids": [
+          5203266331,
+          5203345461,
+          5203403094,
+          5203461067,
+          5203614747,
+          5203674001,
+          5209709771,
+          5210025347,
+          5210094565,
+          5217004530,
+          5220430774,
+          5220626460,
+          5220757314,
+          5223284143,
+          5223793758,
+          5306348240,
+          5307558686
+        ]
+      },
+      "write_started_at": "2026-10-21T20:03:41.426696Z",
+      "postwrite": {
+        "observed_at": "2026-10-21T20:03:44.208366Z",
+        "protected_metadata": {
+          "repository_url": "https://api.github.com/repos/WsprryPi/WsprryPi",
+          "number": 379,
+          "url": "https://github.com/WsprryPi/WsprryPi/issues/379",
+          "state": "open",
+          "state_reason": null,
+          "title": "Qualify 2m WSPR on GPIO and Si5351 backends",
+          "body_sha256": "acfe7fbc7558639b4db1d89c1ba2be44f16bf4a2bbd6af706dd8684b86c03da0",
+          "labels": [
+            "Ready for Release"
+          ],
+          "milestone": null,
+          "assignees": [],
+          "locked": false,
+          "active_lock_reason": null
+        },
+        "unchanged": true,
+        "comment_count": 18
+      },
+      "final_verification": {
+        "readback_at": "2026-10-21T20:05:54.585234Z",
+        "comment_id": 6325353801,
+        "sha256": "a92e5fa1c99e276c0d9a8658f0b27cb37e1ab36827dbe5e5a187a85a55df2dbd",
+        "body_matches_reviewed": true,
+        "marker_count": 1,
+        "complete_comment_page_sizes": [
+          18
+        ],
+        "only_new_comment_is_this_execution": true,
+        "protected_metadata_unchanged": true,
+        "final_state": "open",
+        "final_ready_label": true
+      }
+    },
+    {
+      "repository": "WsprryPi/WsprryPi",
+      "number": 382,
+      "title": "Si5351 should set (and expose) XTAL loading capacitor",
+      "url": "https://github.com/WsprryPi/WsprryPi/issues/382",
+      "selection_marker": "Ready for Release",
+      "initial_state": "open",
+      "initial_observed_at": "2026-10-21T19:57:16.726438Z",
+      "disposition": "included with limits",
+      "scope": "Si5351 reference-source/frequency and crystal-load configuration are included. Crystal loading applies to a passive crystal, and settings must match the actual reference hardware. The informal tests in this discussion do not establish general passive-crystal or 25 MHz-reference 2 m qualification.",
+      "retained_limitation": "No generalized passive-crystal/25 MHz 2 m qualification.",
+      "evidence": {
+        "commits": [
+          "8776ad9e3e8138e44cdacbe0c28fbb32f29319a3"
+        ],
+        "commit_ancestry": {
+          "1e047a44": true,
+          "aa6ce299": true,
+          "v3.2.0": false
+        },
+        "source_content": [
+          {
+            "commit": "1e047a44a44f07d2eb52dfd3c3537d2d24e60143",
+            "path": "src/WSPR-Transmitter/src/si5351_device.cpp",
+            "sha256": "c44af9548a95f4657c9116cbadda469fe181929e531ad956d07e8a52e62da6d0",
+            "url": "https://github.com/WsprryPi/WsprryPi/blob/1e047a44a44f07d2eb52dfd3c3537d2d24e60143/src/WSPR-Transmitter/src/si5351_device.cpp#L231"
+          },
+          {
+            "commit": "aa6ce2996e8f180670847ed4c89568fa10d4539b",
+            "path": "config/wsprrypi.ini",
+            "sha256": "a24f5043fc5e210e0cf49f68c152a1dd5ceffe352f688c9c46877b73f8bbf637",
+            "url": "https://github.com/WsprryPi/WsprryPi/blob/aa6ce2996e8f180670847ed4c89568fa10d4539b/config/wsprrypi.ini#L175"
+          }
+        ],
+        "versioned_installation": "https://wsprry-pi.readthedocs.io/en/v4.0.0-beta.1/Install/beta1.html",
+        "acceptance_ledger": "release_tools/4.0-Beta-1-Release-Evidence.md"
+      },
+      "existing_announcement_search": {
+        "complete_comment_pages": [
+          16
+        ],
+        "comment_count": 16,
+        "observed_at": "2026-10-21T19:57:19.676409Z",
+        "semantic_review": "Independent reviewer read entire body and every comment; no equivalent Beta availability announcement.",
+        "matches": []
+      },
+      "intended_comment": {
+        "body": "[WsprryPi 4.0 Beta 1](https://github.com/WsprryPi/WsprryPi/releases/tag/v4.0.0-beta.1) is available for testing.\n\nSi5351 reference-source/frequency and crystal-load configuration are included. Crystal loading applies to a passive crystal, and settings must match the actual reference hardware. The informal tests in this discussion do not establish general passive-crystal or 25 MHz-reference 2 m qualification.\n\nPlease verify the selected reference and load values for your board and report its configuration with any startup/planning failure. See the [Beta installation guide](https://wsprry-pi.readthedocs.io/en/v4.0.0-beta.1/Install/beta1.html).\n\n<!-- wsprrypi-beta-availability:v4.0.0-beta.1 -->\n",
+        "sha256": "14ce3d63d08a9e2e876952e16e800d1ea76181b33fbce6c2d527bfc661e54ddd"
+      },
+      "action": "new_comment",
+      "outcome": "confirmed",
+      "verified_comment": {
+        "id": 6325356115,
+        "url": "https://github.com/WsprryPi/WsprryPi/issues/382#issuecomment-6325356115",
+        "author": "lbussy",
+        "body": "[WsprryPi 4.0 Beta 1](https://github.com/WsprryPi/WsprryPi/releases/tag/v4.0.0-beta.1) is available for testing.\n\nSi5351 reference-source/frequency and crystal-load configuration are included. Crystal loading applies to a passive crystal, and settings must match the actual reference hardware. The informal tests in this discussion do not establish general passive-crystal or 25 MHz-reference 2 m qualification.\n\nPlease verify the selected reference and load values for your board and report its configuration with any startup/planning failure. See the [Beta installation guide](https://wsprry-pi.readthedocs.io/en/v4.0.0-beta.1/Install/beta1.html).\n\n<!-- wsprrypi-beta-availability:v4.0.0-beta.1 -->\n",
+        "sha256": "14ce3d63d08a9e2e876952e16e800d1ea76181b33fbce6c2d527bfc661e54ddd",
+        "created_at": "2026-10-21T20:03:49Z",
+        "updated_at": "2026-10-21T20:03:49Z",
+        "readback_at": "2026-10-21T20:03:51.446450Z",
+        "write_exit_code": 0,
+        "recovered_lost_reply": false
+      },
+      "metadata_changes_observed": [],
+      "prewrite": {
+        "observed_at": "2026-10-21T20:03:48.761312Z",
+        "comment_page_sizes": [
+          16
+        ],
+        "protected_metadata": {
+          "repository_url": "https://api.github.com/repos/WsprryPi/WsprryPi",
+          "number": 382,
+          "url": "https://github.com/WsprryPi/WsprryPi/issues/382",
+          "state": "open",
+          "state_reason": null,
+          "title": "Si5351 should set (and expose) XTAL loading capacitor",
+          "body_sha256": "fe926d1a1530af3dcb0c938c75f73d535c21ce2610bfb3286bbb9f9d45228d65",
+          "labels": [
+            "Ready for Release"
+          ],
+          "milestone": null,
+          "assignees": [],
+          "locked": false,
+          "active_lock_reason": null
+        },
+        "initial_metadata_unchanged": true,
+        "existing_comment_ids": [
+          5203799896,
+          5204153379,
+          5204393332,
+          5204444457,
+          5235536717,
+          5239023792,
+          5239216711,
+          5248829914,
+          5252332474,
+          5252659938,
+          5252742430,
+          5255623423,
+          5266605709,
+          5266743333,
+          5267248283,
+          5268058429
+        ]
+      },
+      "write_started_at": "2026-10-21T20:03:48.761587Z",
+      "postwrite": {
+        "observed_at": "2026-10-21T20:03:51.446513Z",
+        "protected_metadata": {
+          "repository_url": "https://api.github.com/repos/WsprryPi/WsprryPi",
+          "number": 382,
+          "url": "https://github.com/WsprryPi/WsprryPi/issues/382",
+          "state": "open",
+          "state_reason": null,
+          "title": "Si5351 should set (and expose) XTAL loading capacitor",
+          "body_sha256": "fe926d1a1530af3dcb0c938c75f73d535c21ce2610bfb3286bbb9f9d45228d65",
+          "labels": [
+            "Ready for Release"
+          ],
+          "milestone": null,
+          "assignees": [],
+          "locked": false,
+          "active_lock_reason": null
+        },
+        "unchanged": true,
+        "comment_count": 17
+      },
+      "final_verification": {
+        "readback_at": "2026-10-21T20:05:54.853568Z",
+        "comment_id": 6325356115,
+        "sha256": "14ce3d63d08a9e2e876952e16e800d1ea76181b33fbce6c2d527bfc661e54ddd",
+        "body_matches_reviewed": true,
+        "marker_count": 1,
+        "complete_comment_page_sizes": [
+          17
+        ],
+        "only_new_comment_is_this_execution": true,
+        "protected_metadata_unchanged": true,
+        "final_state": "open",
+        "final_ready_label": true
+      }
+    },
+    {
+      "repository": "WsprryPi/WsprryPi",
+      "number": 383,
+      "title": "Apply Calibration.PPM to Si5351 synthesis planning",
+      "url": "https://github.com/WsprryPi/WsprryPi/issues/383",
+      "selection_marker": "Ready for Release",
+      "initial_state": "open",
+      "initial_observed_at": "2026-10-21T19:57:16.726438Z",
+      "disposition": "included with limits",
+      "scope": "Si5351 synthesis planning uses its own configured manual PPM correction and exposes backend-aware calibration controls. It does not consume the GPIO system-clock estimate.",
+      "retained_limitation": "Independent RF validation remains setup-specific.",
+      "evidence": {
+        "commits": [
+          "641c7d08a2de0cd831087a8c93f8acc43775bd7d"
+        ],
+        "commit_ancestry": {
+          "1e047a44": true,
+          "aa6ce299": true,
+          "v3.2.0": false
+        },
+        "source_content": [
+          {
+            "commit": "1e047a44a44f07d2eb52dfd3c3537d2d24e60143",
+            "path": "src/WSPR-Transmitter/src/wspr_transmit_backend_si5351.cpp",
+            "sha256": "be691bf41ba8431b44cf3fa3f5b78b10db1d5feab06ca7c29fc03f033eeafcd3",
+            "url": "https://github.com/WsprryPi/WsprryPi/blob/1e047a44a44f07d2eb52dfd3c3537d2d24e60143/src/WSPR-Transmitter/src/wspr_transmit_backend_si5351.cpp#L354"
+          }
+        ],
+        "versioned_installation": "https://wsprry-pi.readthedocs.io/en/v4.0.0-beta.1/Install/beta1.html",
+        "acceptance_ledger": "release_tools/4.0-Beta-1-Release-Evidence.md"
+      },
+      "existing_announcement_search": {
+        "complete_comment_pages": [
+          8
+        ],
+        "comment_count": 8,
+        "observed_at": "2026-10-21T19:57:20.198138Z",
+        "semantic_review": "Independent reviewer read entire body and every comment; no equivalent Beta availability announcement.",
+        "matches": []
+      },
+      "intended_comment": {
+        "body": "[WsprryPi 4.0 Beta 1](https://github.com/WsprryPi/WsprryPi/releases/tag/v4.0.0-beta.1) is available for testing.\n\nSi5351 synthesis planning uses its own configured manual PPM correction and exposes backend-aware calibration controls. It does not consume the GPIO system-clock estimate.\n\nPlease verify correction direction and residual error using an independent RF reference for your own board; clock synchronization alone does not calibrate the Si5351 output. See the [Beta installation guide](https://wsprry-pi.readthedocs.io/en/v4.0.0-beta.1/Install/beta1.html).\n\n<!-- wsprrypi-beta-availability:v4.0.0-beta.1 -->\n",
+        "sha256": "2aa8d593a326bde43588ad341a3c84a4caed975687f6b763c1706e0ed2c4cb24"
+      },
+      "action": "new_comment",
+      "outcome": "confirmed",
+      "verified_comment": {
+        "id": 6325358232,
+        "url": "https://github.com/WsprryPi/WsprryPi/issues/383#issuecomment-6325358232",
+        "author": "lbussy",
+        "body": "[WsprryPi 4.0 Beta 1](https://github.com/WsprryPi/WsprryPi/releases/tag/v4.0.0-beta.1) is available for testing.\n\nSi5351 synthesis planning uses its own configured manual PPM correction and exposes backend-aware calibration controls. It does not consume the GPIO system-clock estimate.\n\nPlease verify correction direction and residual error using an independent RF reference for your own board; clock synchronization alone does not calibrate the Si5351 output. See the [Beta installation guide](https://wsprry-pi.readthedocs.io/en/v4.0.0-beta.1/Install/beta1.html).\n\n<!-- wsprrypi-beta-availability:v4.0.0-beta.1 -->\n",
+        "sha256": "2aa8d593a326bde43588ad341a3c84a4caed975687f6b763c1706e0ed2c4cb24",
+        "created_at": "2026-10-21T20:03:56Z",
+        "updated_at": "2026-10-21T20:03:56Z",
+        "readback_at": "2026-10-21T20:03:58.271785Z",
+        "write_exit_code": 0,
+        "recovered_lost_reply": false
+      },
+      "metadata_changes_observed": [],
+      "prewrite": {
+        "observed_at": "2026-10-21T20:03:55.818963Z",
+        "comment_page_sizes": [
+          8
+        ],
+        "protected_metadata": {
+          "repository_url": "https://api.github.com/repos/WsprryPi/WsprryPi",
+          "number": 383,
+          "url": "https://github.com/WsprryPi/WsprryPi/issues/383",
+          "state": "open",
+          "state_reason": "reopened",
+          "title": "Apply Calibration.PPM to Si5351 synthesis planning",
+          "body_sha256": "d64a656f61e763bd7d9e4194ca29c16ffb10efdf16ee047eca282c6a0940cac6",
+          "labels": [
+            "Ready for Release"
+          ],
+          "milestone": null,
+          "assignees": [],
+          "locked": false,
+          "active_lock_reason": null
+        },
+        "initial_metadata_unchanged": true,
+        "existing_comment_ids": [
+          5204294312,
+          5204372973,
+          5204469614,
+          5204543753,
+          5205064632,
+          5206026215,
+          5209285132,
+          5209687864
+        ]
+      },
+      "write_started_at": "2026-10-21T20:03:55.819175Z",
+      "postwrite": {
+        "observed_at": "2026-10-21T20:03:58.271838Z",
+        "protected_metadata": {
+          "repository_url": "https://api.github.com/repos/WsprryPi/WsprryPi",
+          "number": 383,
+          "url": "https://github.com/WsprryPi/WsprryPi/issues/383",
+          "state": "open",
+          "state_reason": "reopened",
+          "title": "Apply Calibration.PPM to Si5351 synthesis planning",
+          "body_sha256": "d64a656f61e763bd7d9e4194ca29c16ffb10efdf16ee047eca282c6a0940cac6",
+          "labels": [
+            "Ready for Release"
+          ],
+          "milestone": null,
+          "assignees": [],
+          "locked": false,
+          "active_lock_reason": null
+        },
+        "unchanged": true,
+        "comment_count": 9
+      },
+      "final_verification": {
+        "readback_at": "2026-10-21T20:05:55.131889Z",
+        "comment_id": 6325358232,
+        "sha256": "2aa8d593a326bde43588ad341a3c84a4caed975687f6b763c1706e0ed2c4cb24",
+        "body_matches_reviewed": true,
+        "marker_count": 1,
+        "complete_comment_page_sizes": [
+          9
+        ],
+        "only_new_comment_is_this_execution": true,
+        "protected_metadata_unchanged": true,
+        "final_state": "open",
+        "final_ready_label": true
+      }
+    },
+    {
+      "repository": "WsprryPi/WsprryPi",
+      "number": 387,
+      "title": "Combine system clock frequency estimate and manual residual for GPIO accuracy",
+      "url": "https://github.com/WsprryPi/WsprryPi/issues/387",
+      "selection_marker": "Ready for Release",
+      "initial_state": "open",
+      "initial_observed_at": "2026-10-21T19:57:16.726438Z",
+      "disposition": "included with limits",
+      "scope": "GPIO correction can combine a qualified system-clock frequency estimate with a measured RF residual, with manual fallback and per-transmission correction snapshots. UTC synchronization/clock estimates are distinct from independently measured RF correction. Direct PPS RF calibration and alternative RP1 clock-parent experiments remain deferred.",
+      "retained_limitation": "No direct-PPS or new independent RF calibration claim.",
+      "evidence": {
+        "commits": [
+          "f405f1380bdae9aa29e935b65f1bfbc8ab1851c6"
+        ],
+        "commit_ancestry": {
+          "1e047a44": true,
+          "aa6ce299": true,
+          "v3.2.0": false
+        },
+        "source_content": [
+          {
+            "commit": "1e047a44a44f07d2eb52dfd3c3537d2d24e60143",
+            "path": "src/system_clock_frequency_estimate.cpp",
+            "sha256": "7b80acd77efd18bdb6760219d7373b38d688d37a2405e1038ea9e3797390a723",
+            "url": "https://github.com/WsprryPi/WsprryPi/blob/1e047a44a44f07d2eb52dfd3c3537d2d24e60143/src/system_clock_frequency_estimate.cpp#L198"
+          }
+        ],
+        "versioned_installation": "https://wsprry-pi.readthedocs.io/en/v4.0.0-beta.1/Install/beta1.html",
+        "acceptance_ledger": "release_tools/4.0-Beta-1-Release-Evidence.md"
+      },
+      "existing_announcement_search": {
+        "complete_comment_pages": [
+          1
+        ],
+        "comment_count": 1,
+        "observed_at": "2026-10-21T19:57:20.195832Z",
+        "semantic_review": "Independent reviewer read entire body and every comment; no equivalent Beta availability announcement.",
+        "matches": []
+      },
+      "intended_comment": {
+        "body": "[WsprryPi 4.0 Beta 1](https://github.com/WsprryPi/WsprryPi/releases/tag/v4.0.0-beta.1) is available for testing.\n\nGPIO correction can combine a qualified system-clock frequency estimate with a measured RF residual, with manual fallback and per-transmission correction snapshots. UTC synchronization/clock estimates are distinct from independently measured RF correction. Direct PPS RF calibration and alternative RP1 clock-parent experiments remain deferred.\n\nReview existing correction values to avoid double-counting the intrinsic term. Scripts using --use-ntp must migrate to --use-system-clock-frequency-estimate; see the versioned manual. See the [Beta installation guide](https://wsprry-pi.readthedocs.io/en/v4.0.0-beta.1/Install/beta1.html).\n\n<!-- wsprrypi-beta-availability:v4.0.0-beta.1 -->\n",
+        "sha256": "068e794bcad717c5ef2023ca65f0b777799e04fadd6afe2b4c7a19afb2f72d2b"
+      },
+      "action": "new_comment",
+      "outcome": "confirmed",
+      "verified_comment": {
+        "id": 6325361901,
+        "url": "https://github.com/WsprryPi/WsprryPi/issues/387#issuecomment-6325361901",
+        "author": "lbussy",
+        "body": "[WsprryPi 4.0 Beta 1](https://github.com/WsprryPi/WsprryPi/releases/tag/v4.0.0-beta.1) is available for testing.\n\nGPIO correction can combine a qualified system-clock frequency estimate with a measured RF residual, with manual fallback and per-transmission correction snapshots. UTC synchronization/clock estimates are distinct from independently measured RF correction. Direct PPS RF calibration and alternative RP1 clock-parent experiments remain deferred.\n\nReview existing correction values to avoid double-counting the intrinsic term. Scripts using --use-ntp must migrate to --use-system-clock-frequency-estimate; see the versioned manual. See the [Beta installation guide](https://wsprry-pi.readthedocs.io/en/v4.0.0-beta.1/Install/beta1.html).\n\n<!-- wsprrypi-beta-availability:v4.0.0-beta.1 -->\n",
+        "sha256": "068e794bcad717c5ef2023ca65f0b777799e04fadd6afe2b4c7a19afb2f72d2b",
+        "created_at": "2026-10-21T20:04:08Z",
+        "updated_at": "2026-10-21T20:04:08Z",
+        "readback_at": "2026-10-21T20:04:09.904203Z",
+        "write_exit_code": 0,
+        "recovered_lost_reply": false
+      },
+      "metadata_changes_observed": [],
+      "prewrite": {
+        "observed_at": "2026-10-21T20:04:07.423020Z",
+        "comment_page_sizes": [
+          1
+        ],
+        "protected_metadata": {
+          "repository_url": "https://api.github.com/repos/WsprryPi/WsprryPi",
+          "number": 387,
+          "url": "https://github.com/WsprryPi/WsprryPi/issues/387",
+          "state": "open",
+          "state_reason": "reopened",
+          "title": "Combine system clock frequency estimate and manual residual for GPIO accuracy",
+          "body_sha256": "af727b9aff79cda0e3aeb83e2e15e9821319c39c6fcfb4930e7aa957a76ea712",
+          "labels": [
+            "Ready for Release"
+          ],
+          "milestone": null,
+          "assignees": [],
+          "locked": false,
+          "active_lock_reason": null
+        },
+        "initial_metadata_unchanged": true,
+        "existing_comment_ids": [
+          5235221746
+        ]
+      },
+      "write_started_at": "2026-10-21T20:04:07.423365Z",
+      "postwrite": {
+        "observed_at": "2026-10-21T20:04:09.904279Z",
+        "protected_metadata": {
+          "repository_url": "https://api.github.com/repos/WsprryPi/WsprryPi",
+          "number": 387,
+          "url": "https://github.com/WsprryPi/WsprryPi/issues/387",
+          "state": "open",
+          "state_reason": "reopened",
+          "title": "Combine system clock frequency estimate and manual residual for GPIO accuracy",
+          "body_sha256": "af727b9aff79cda0e3aeb83e2e15e9821319c39c6fcfb4930e7aa957a76ea712",
+          "labels": [
+            "Ready for Release"
+          ],
+          "milestone": null,
+          "assignees": [],
+          "locked": false,
+          "active_lock_reason": null
+        },
+        "unchanged": true,
+        "comment_count": 2
+      },
+      "final_verification": {
+        "readback_at": "2026-10-21T20:05:55.387361Z",
+        "comment_id": 6325361901,
+        "sha256": "068e794bcad717c5ef2023ca65f0b777799e04fadd6afe2b4c7a19afb2f72d2b",
+        "body_matches_reviewed": true,
+        "marker_count": 1,
+        "complete_comment_page_sizes": [
+          2
+        ],
+        "only_new_comment_is_this_execution": true,
+        "protected_metadata_unchanged": true,
+        "final_state": "open",
+        "final_ready_label": true
+      }
+    },
+    {
+      "repository": "WsprryPi/WsprryPi",
+      "number": 390,
+      "title": "Qualify remaining GPIO and Si5351 band combinations, excluding 70 cm",
+      "url": "https://github.com/WsprryPi/WsprryPi/issues/390",
+      "selection_marker": "Ready for Release",
+      "initial_state": "open",
+      "initial_observed_at": "2026-10-21T19:57:16.726438Z",
+      "disposition": "included with limits",
+      "scope": "The Beta includes the consolidated backend/band qualification policy and the scoped results recorded for this work, including later mode-aware refinements. The initial matrix in this issue is historical; admission depends on the current backend, hardware profile, band and mode. A listed band is not universal hardware/RF qualification, and the unsuccessful 70 cm harmonic proposal is not shipped Si5351 support.",
+      "retained_limitation": "Historical and mode-specific evidence does not qualify all combinations.",
+      "evidence": {
+        "commits": [
+          "df9eade46e105bc801bcec3113121169199dc15d"
+        ],
+        "commit_ancestry": {
+          "1e047a44": true,
+          "aa6ce299": true,
+          "v3.2.0": false
+        },
+        "source_content": [
+          {
+            "commit": "1e047a44a44f07d2eb52dfd3c3537d2d24e60143",
+            "path": "src/WSPR-Transmitter/src/gpio_band_policy.hpp",
+            "sha256": "c435558e81eddab772b191a2438ed051889370c3121404baca90c426fdbd7c80",
+            "url": "https://github.com/WsprryPi/WsprryPi/blob/1e047a44a44f07d2eb52dfd3c3537d2d24e60143/src/WSPR-Transmitter/src/gpio_band_policy.hpp#L56"
+          }
+        ],
+        "versioned_installation": "https://wsprry-pi.readthedocs.io/en/v4.0.0-beta.1/Install/beta1.html",
+        "acceptance_ledger": "release_tools/4.0-Beta-1-Release-Evidence.md"
+      },
+      "existing_announcement_search": {
+        "complete_comment_pages": [
+          3
+        ],
+        "comment_count": 3,
+        "observed_at": "2026-10-21T19:57:20.195384Z",
+        "semantic_review": "Independent reviewer read entire body and every comment; no equivalent Beta availability announcement.",
+        "matches": []
+      },
+      "intended_comment": {
+        "body": "[WsprryPi 4.0 Beta 1](https://github.com/WsprryPi/WsprryPi/releases/tag/v4.0.0-beta.1) is available for testing.\n\nThe Beta includes the consolidated backend/band qualification policy and the scoped results recorded for this work, including later mode-aware refinements. The initial matrix in this issue is historical; admission depends on the current backend, hardware profile, band and mode. A listed band is not universal hardware/RF qualification, and the unsuccessful 70 cm harmonic proposal is not shipped Si5351 support.\n\nPlease report the exact backend/profile, mode, frequency and setup with any unexpected admission or result. See the [Beta installation guide](https://wsprry-pi.readthedocs.io/en/v4.0.0-beta.1/Install/beta1.html).\n\n<!-- wsprrypi-beta-availability:v4.0.0-beta.1 -->\n",
+        "sha256": "40ddeece832742005c8a64a37fde246792873408b9d108ce3b099db5608b8109"
+      },
+      "action": "new_comment",
+      "outcome": "confirmed",
+      "verified_comment": {
+        "id": 6325364453,
+        "url": "https://github.com/WsprryPi/WsprryPi/issues/390#issuecomment-6325364453",
+        "author": "lbussy",
+        "body": "[WsprryPi 4.0 Beta 1](https://github.com/WsprryPi/WsprryPi/releases/tag/v4.0.0-beta.1) is available for testing.\n\nThe Beta includes the consolidated backend/band qualification policy and the scoped results recorded for this work, including later mode-aware refinements. The initial matrix in this issue is historical; admission depends on the current backend, hardware profile, band and mode. A listed band is not universal hardware/RF qualification, and the unsuccessful 70 cm harmonic proposal is not shipped Si5351 support.\n\nPlease report the exact backend/profile, mode, frequency and setup with any unexpected admission or result. See the [Beta installation guide](https://wsprry-pi.readthedocs.io/en/v4.0.0-beta.1/Install/beta1.html).\n\n<!-- wsprrypi-beta-availability:v4.0.0-beta.1 -->\n",
+        "sha256": "40ddeece832742005c8a64a37fde246792873408b9d108ce3b099db5608b8109",
+        "created_at": "2026-10-21T20:04:16Z",
+        "updated_at": "2026-10-21T20:04:16Z",
+        "readback_at": "2026-10-21T20:04:18.582329Z",
+        "write_exit_code": 0,
+        "recovered_lost_reply": false
+      },
+      "metadata_changes_observed": [],
+      "prewrite": {
+        "observed_at": "2026-10-21T20:04:15.480884Z",
+        "comment_page_sizes": [
+          3
+        ],
+        "protected_metadata": {
+          "repository_url": "https://api.github.com/repos/WsprryPi/WsprryPi",
+          "number": 390,
+          "url": "https://github.com/WsprryPi/WsprryPi/issues/390",
+          "state": "open",
+          "state_reason": "reopened",
+          "title": "Qualify remaining GPIO and Si5351 band combinations, excluding 70 cm",
+          "body_sha256": "42b24630a44d398e80579e484ac9a5948c1d34da85e40102a18315cdad3b0646",
+          "labels": [
+            "Ready for Release"
+          ],
+          "milestone": null,
+          "assignees": [],
+          "locked": false,
+          "active_lock_reason": null
+        },
+        "initial_metadata_unchanged": true,
+        "existing_comment_ids": [
+          5229087937,
+          5229274144,
+          5233405447
+        ]
+      },
+      "write_started_at": "2026-10-21T20:04:15.481238Z",
+      "postwrite": {
+        "observed_at": "2026-10-21T20:04:18.582383Z",
+        "protected_metadata": {
+          "repository_url": "https://api.github.com/repos/WsprryPi/WsprryPi",
+          "number": 390,
+          "url": "https://github.com/WsprryPi/WsprryPi/issues/390",
+          "state": "open",
+          "state_reason": "reopened",
+          "title": "Qualify remaining GPIO and Si5351 band combinations, excluding 70 cm",
+          "body_sha256": "42b24630a44d398e80579e484ac9a5948c1d34da85e40102a18315cdad3b0646",
+          "labels": [
+            "Ready for Release"
+          ],
+          "milestone": null,
+          "assignees": [],
+          "locked": false,
+          "active_lock_reason": null
+        },
+        "unchanged": true,
+        "comment_count": 4
+      },
+      "final_verification": {
+        "readback_at": "2026-10-21T20:05:55.681685Z",
+        "comment_id": 6325364453,
+        "sha256": "40ddeece832742005c8a64a37fde246792873408b9d108ce3b099db5608b8109",
+        "body_matches_reviewed": true,
+        "marker_count": 1,
+        "complete_comment_page_sizes": [
+          4
+        ],
+        "only_new_comment_is_this_execution": true,
+        "protected_metadata_unchanged": true,
+        "final_state": "open",
+        "final_ready_label": true
+      }
+    },
+    {
+      "repository": "WsprryPi/WsprryPi",
+      "number": 400,
+      "title": "Add a hardware-free simulated backend for Debian development and CI",
+      "url": "https://github.com/WsprryPi/WsprryPi/issues/400",
+      "selection_marker": "Ready for Release",
+      "initial_state": "open",
+      "initial_observed_at": "2026-10-21T19:57:16.726438Z",
+      "disposition": "included",
+      "scope": "The explicit --backend simulated path and Debian CI coverage are included. It exercises application planning, scheduling, cancellation, status, failure and cleanup without GPIO/MMIO/DMA/mailbox/I2C or RF access. It is transient and never selected automatically after hardware failure.",
+      "retained_limitation": "Simulation qualifies software contracts only.",
+      "evidence": {
+        "commits": [
+          "ded94a46389854520fc4c328d2609997c315cf6c"
+        ],
+        "commit_ancestry": {
+          "1e047a44": true,
+          "aa6ce299": true,
+          "v3.2.0": false
+        },
+        "source_content": [
+          {
+            "commit": "aa6ce2996e8f180670847ed4c89568fa10d4539b",
+            "path": "docs/simulated-backend.md",
+            "sha256": "e3be969328692e8f78a511a734be58c0863fd690e2b2be49c6bddc2e89a9d4f7",
+            "url": "https://github.com/WsprryPi/WsprryPi/blob/aa6ce2996e8f180670847ed4c89568fa10d4539b/docs/simulated-backend.md#L1"
+          }
+        ],
+        "versioned_installation": "https://wsprry-pi.readthedocs.io/en/v4.0.0-beta.1/Install/beta1.html",
+        "acceptance_ledger": "release_tools/4.0-Beta-1-Release-Evidence.md"
+      },
+      "existing_announcement_search": {
+        "complete_comment_pages": [
+          1
+        ],
+        "comment_count": 1,
+        "observed_at": "2026-10-21T19:57:20.229372Z",
+        "semantic_review": "Independent reviewer read entire body and every comment; no equivalent Beta availability announcement.",
+        "matches": []
+      },
+      "intended_comment": {
+        "body": "[WsprryPi 4.0 Beta 1](https://github.com/WsprryPi/WsprryPi/releases/tag/v4.0.0-beta.1) is available for testing.\n\nThe explicit --backend simulated path and Debian CI coverage are included. It exercises application planning, scheduling, cancellation, status, failure and cleanup without GPIO/MMIO/DMA/mailbox/I2C or RF access. It is transient and never selected automatically after hardware failure.\n\nUse the checked-in simulated-backend guide for software testing. Simulator results do not qualify physical timing, hardware, installation, services or RF behavior. See the [Beta installation guide](https://wsprry-pi.readthedocs.io/en/v4.0.0-beta.1/Install/beta1.html).\n\n<!-- wsprrypi-beta-availability:v4.0.0-beta.1 -->\n",
+        "sha256": "a6356d48560ed4ef9fcbe7f12fcd8d39c4faad6a0486fd9af6129f0cd04c000d"
+      },
+      "action": "new_comment",
+      "outcome": "confirmed",
+      "verified_comment": {
+        "id": 6325367283,
+        "url": "https://github.com/WsprryPi/WsprryPi/issues/400#issuecomment-6325367283",
+        "author": "lbussy",
+        "body": "[WsprryPi 4.0 Beta 1](https://github.com/WsprryPi/WsprryPi/releases/tag/v4.0.0-beta.1) is available for testing.\n\nThe explicit --backend simulated path and Debian CI coverage are included. It exercises application planning, scheduling, cancellation, status, failure and cleanup without GPIO/MMIO/DMA/mailbox/I2C or RF access. It is transient and never selected automatically after hardware failure.\n\nUse the checked-in simulated-backend guide for software testing. Simulator results do not qualify physical timing, hardware, installation, services or RF behavior. See the [Beta installation guide](https://wsprry-pi.readthedocs.io/en/v4.0.0-beta.1/Install/beta1.html).\n\n<!-- wsprrypi-beta-availability:v4.0.0-beta.1 -->\n",
+        "sha256": "a6356d48560ed4ef9fcbe7f12fcd8d39c4faad6a0486fd9af6129f0cd04c000d",
+        "created_at": "2026-10-21T20:04:25Z",
+        "updated_at": "2026-10-21T20:04:25Z",
+        "readback_at": "2026-10-21T20:04:27.045060Z",
+        "write_exit_code": 0,
+        "recovered_lost_reply": false
+      },
+      "metadata_changes_observed": [],
+      "prewrite": {
+        "observed_at": "2026-10-21T20:04:24.347450Z",
+        "comment_page_sizes": [
+          1
+        ],
+        "protected_metadata": {
+          "repository_url": "https://api.github.com/repos/WsprryPi/WsprryPi",
+          "number": 400,
+          "url": "https://github.com/WsprryPi/WsprryPi/issues/400",
+          "state": "open",
+          "state_reason": null,
+          "title": "Add a hardware-free simulated backend for Debian development and CI",
+          "body_sha256": "6c796ca704c7cbf07dad1aeb53b89b07eca8e2697eafa01769467cab0065ef83",
+          "labels": [
+            "Ready for Release"
+          ],
+          "milestone": null,
+          "assignees": [],
+          "locked": false,
+          "active_lock_reason": null
+        },
+        "initial_metadata_unchanged": true,
+        "existing_comment_ids": [
+          5274173154
+        ]
+      },
+      "write_started_at": "2026-10-21T20:04:24.347894Z",
+      "postwrite": {
+        "observed_at": "2026-10-21T20:04:27.045105Z",
+        "protected_metadata": {
+          "repository_url": "https://api.github.com/repos/WsprryPi/WsprryPi",
+          "number": 400,
+          "url": "https://github.com/WsprryPi/WsprryPi/issues/400",
+          "state": "open",
+          "state_reason": null,
+          "title": "Add a hardware-free simulated backend for Debian development and CI",
+          "body_sha256": "6c796ca704c7cbf07dad1aeb53b89b07eca8e2697eafa01769467cab0065ef83",
+          "labels": [
+            "Ready for Release"
+          ],
+          "milestone": null,
+          "assignees": [],
+          "locked": false,
+          "active_lock_reason": null
+        },
+        "unchanged": true,
+        "comment_count": 2
+      },
+      "final_verification": {
+        "readback_at": "2026-10-21T20:05:55.681791Z",
+        "comment_id": 6325367283,
+        "sha256": "a6356d48560ed4ef9fcbe7f12fcd8d39c4faad6a0486fd9af6129f0cd04c000d",
+        "body_matches_reviewed": true,
+        "marker_count": 1,
+        "complete_comment_page_sizes": [
+          2
+        ],
+        "only_new_comment_is_this_execution": true,
+        "protected_metadata_unchanged": true,
+        "final_state": "open",
+        "final_ready_label": true
+      }
+    },
+    {
+      "repository": "WsprryPi/WsprryPi",
+      "number": 401,
+      "title": "Add mode-aware band qualification and experimental frequency overrides",
+      "url": "https://github.com/WsprryPi/WsprryPi/issues/401",
+      "selection_marker": "Ready for Release",
+      "initial_state": "open",
+      "initial_observed_at": "2026-10-21T19:57:16.726438Z",
+      "disposition": "included with limits",
+      "scope": "Band qualification is keyed by backend, hardware profile and mode, and explicit experimental frequency overrides are included. An override does not make an Unavailable plan valid and does not grant operating permission or hardware qualification.",
+      "retained_limitation": "Mode-specific admission; experimental permission does not qualify hardware or bypass Unavailable.",
+      "evidence": {
+        "commits": [
+          "c83c19b593ce915397e7e71a96688031e77c9fa2"
+        ],
+        "commit_ancestry": {
+          "1e047a44": true,
+          "aa6ce299": true,
+          "v3.2.0": false
+        },
+        "source_content": [
+          {
+            "commit": "1e047a44a44f07d2eb52dfd3c3537d2d24e60143",
+            "path": "src/WSPR-Transmitter/src/gpio_band_policy.hpp",
+            "sha256": "c435558e81eddab772b191a2438ed051889370c3121404baca90c426fdbd7c80",
+            "url": "https://github.com/WsprryPi/WsprryPi/blob/1e047a44a44f07d2eb52dfd3c3537d2d24e60143/src/WSPR-Transmitter/src/gpio_band_policy.hpp#L56"
+          }
+        ],
+        "versioned_installation": "https://wsprry-pi.readthedocs.io/en/v4.0.0-beta.1/Install/beta1.html",
+        "acceptance_ledger": "release_tools/4.0-Beta-1-Release-Evidence.md"
+      },
+      "existing_announcement_search": {
+        "complete_comment_pages": [
+          1
+        ],
+        "comment_count": 1,
+        "observed_at": "2026-10-21T19:57:20.227006Z",
+        "semantic_review": "Independent reviewer read entire body and every comment; no equivalent Beta availability announcement.",
+        "matches": []
+      },
+      "intended_comment": {
+        "body": "[WsprryPi 4.0 Beta 1](https://github.com/WsprryPi/WsprryPi/releases/tag/v4.0.0-beta.1) is available for testing.\n\nBand qualification is keyed by backend, hardware profile and mode, and explicit experimental frequency overrides are included. An override does not make an Unavailable plan valid and does not grant operating permission or hardware qualification.\n\nCheck the status for the exact band/mode/backend combination. Report unexpected refusals with that configuration rather than assuming a whole band is qualified. See the [Beta installation guide](https://wsprry-pi.readthedocs.io/en/v4.0.0-beta.1/Install/beta1.html).\n\n<!-- wsprrypi-beta-availability:v4.0.0-beta.1 -->\n",
+        "sha256": "2c293130f08e6856c40787828e90682fe889589ffc78e882cfa40366e6890936"
+      },
+      "action": "new_comment",
+      "outcome": "confirmed",
+      "verified_comment": {
+        "id": 6325369411,
+        "url": "https://github.com/WsprryPi/WsprryPi/issues/401#issuecomment-6325369411",
+        "author": "lbussy",
+        "body": "[WsprryPi 4.0 Beta 1](https://github.com/WsprryPi/WsprryPi/releases/tag/v4.0.0-beta.1) is available for testing.\n\nBand qualification is keyed by backend, hardware profile and mode, and explicit experimental frequency overrides are included. An override does not make an Unavailable plan valid and does not grant operating permission or hardware qualification.\n\nCheck the status for the exact band/mode/backend combination. Report unexpected refusals with that configuration rather than assuming a whole band is qualified. See the [Beta installation guide](https://wsprry-pi.readthedocs.io/en/v4.0.0-beta.1/Install/beta1.html).\n\n<!-- wsprrypi-beta-availability:v4.0.0-beta.1 -->\n",
+        "sha256": "2c293130f08e6856c40787828e90682fe889589ffc78e882cfa40366e6890936",
+        "created_at": "2026-10-21T20:04:32Z",
+        "updated_at": "2026-10-21T20:04:32Z",
+        "readback_at": "2026-10-21T20:04:34.331479Z",
+        "write_exit_code": 0,
+        "recovered_lost_reply": false
+      },
+      "metadata_changes_observed": [],
+      "prewrite": {
+        "observed_at": "2026-10-21T20:04:31.319792Z",
+        "comment_page_sizes": [
+          1
+        ],
+        "protected_metadata": {
+          "repository_url": "https://api.github.com/repos/WsprryPi/WsprryPi",
+          "number": 401,
+          "url": "https://github.com/WsprryPi/WsprryPi/issues/401",
+          "state": "open",
+          "state_reason": null,
+          "title": "Add mode-aware band qualification and experimental frequency overrides",
+          "body_sha256": "ed029ab22094fee0bc20ecd07391c90abe54935576fe7c8751f0d6d0a88859d1",
+          "labels": [
+            "Ready for Release"
+          ],
+          "milestone": null,
+          "assignees": [],
+          "locked": false,
+          "active_lock_reason": null
+        },
+        "initial_metadata_unchanged": true,
+        "existing_comment_ids": [
+          5308233874
+        ]
+      },
+      "write_started_at": "2026-10-21T20:04:31.320117Z",
+      "postwrite": {
+        "observed_at": "2026-10-21T20:04:34.331536Z",
+        "protected_metadata": {
+          "repository_url": "https://api.github.com/repos/WsprryPi/WsprryPi",
+          "number": 401,
+          "url": "https://github.com/WsprryPi/WsprryPi/issues/401",
+          "state": "open",
+          "state_reason": null,
+          "title": "Add mode-aware band qualification and experimental frequency overrides",
+          "body_sha256": "ed029ab22094fee0bc20ecd07391c90abe54935576fe7c8751f0d6d0a88859d1",
+          "labels": [
+            "Ready for Release"
+          ],
+          "milestone": null,
+          "assignees": [],
+          "locked": false,
+          "active_lock_reason": null
+        },
+        "unchanged": true,
+        "comment_count": 2
+      },
+      "final_verification": {
+        "readback_at": "2026-10-21T20:05:56.021706Z",
+        "comment_id": 6325369411,
+        "sha256": "2c293130f08e6856c40787828e90682fe889589ffc78e882cfa40366e6890936",
+        "body_matches_reviewed": true,
+        "marker_count": 1,
+        "complete_comment_page_sizes": [
+          2
+        ],
+        "only_new_comment_is_this_execution": true,
+        "protected_metadata_unchanged": true,
+        "final_state": "open",
+        "final_ready_label": true
+      }
+    },
+    {
+      "repository": "WsprryPi/WsprryPi",
+      "number": 412,
+      "title": "Integrate and release RP1 GPCLK DKMS support",
+      "url": "https://github.com/WsprryPi/WsprryPi/issues/412",
+      "selection_marker": "Ready for Release",
+      "initial_state": "open",
+      "initial_observed_at": "2026-10-21T19:57:16.726438Z",
+      "disposition": "included with limits",
+      "scope": "The Beta includes the accepted consumer integration of the separately published RP1-GPCLK-DKMS v1.0.0 provider for Pi 5/CM5, including GPIO4/GPIO20 route handling and bundled scoped route evidence. Provider publication and scoped consumer acceptance do not constitute final WsprryPi 4.0 stable publication or general RF qualification. Changed supporting helpers have software acceptance with historical target evidence reused; fresh target installation/status of those changed files was not performed.",
+      "retained_limitation": "Final stable closure open; no fresh changed-support target installation/status or general RF qualification.",
+      "evidence": {
+        "commits": [
+          "dc4044ba420d00839c79d72895e3f97e25bea99e"
+        ],
+        "commit_ancestry": {
+          "1e047a44": true,
+          "aa6ce299": true,
+          "v3.2.0": false
+        },
+        "source_content": [
+          {
+            "commit": "aa6ce2996e8f180670847ed4c89568fa10d4539b",
+            "path": "docs/rp1-provider-acceptance.md",
+            "sha256": "a446a4e89afc3311165f167a1cd275732e13973ce6effbf3113d4fdf053ae5b3",
+            "url": "https://github.com/WsprryPi/WsprryPi/blob/aa6ce2996e8f180670847ed4c89568fa10d4539b/docs/rp1-provider-acceptance.md#L1"
+          }
+        ],
+        "versioned_installation": "https://wsprry-pi.readthedocs.io/en/v4.0.0-beta.1/Install/beta1.html",
+        "acceptance_ledger": "release_tools/4.0-Beta-1-Release-Evidence.md"
+      },
+      "existing_announcement_search": {
+        "complete_comment_pages": [
+          3
+        ],
+        "comment_count": 3,
+        "observed_at": "2026-10-21T19:57:20.732113Z",
+        "semantic_review": "Independent reviewer read entire body and every comment; no equivalent Beta availability announcement.",
+        "matches": []
+      },
+      "intended_comment": {
+        "body": "[WsprryPi 4.0 Beta 1](https://github.com/WsprryPi/WsprryPi/releases/tag/v4.0.0-beta.1) is available for testing.\n\nThe Beta includes the accepted consumer integration of the separately published RP1-GPCLK-DKMS v1.0.0 provider for Pi 5/CM5, including GPIO4/GPIO20 route handling and bundled scoped route evidence. Provider publication and scoped consumer acceptance do not constitute final WsprryPi 4.0 stable publication or general RF qualification. Changed supporting helpers have software acceptance with historical target evidence reused; fresh target installation/status of those changed files was not performed.\n\nThis issue remains open for its final WsprryPi stable-release boundary. Beta feedback and final stable acceptance/publication remain separate. See the [Beta installation guide](https://wsprry-pi.readthedocs.io/en/v4.0.0-beta.1/Install/beta1.html).\n\n<!-- wsprrypi-beta-availability:v4.0.0-beta.1 -->\n",
+        "sha256": "d5ad7e84af73417bc02fc0e45cb81d72df7bf685d3b4e3cca1e5951335e654ff"
+      },
+      "action": "new_comment",
+      "outcome": "confirmed",
+      "verified_comment": {
+        "id": 6325372182,
+        "url": "https://github.com/WsprryPi/WsprryPi/issues/412#issuecomment-6325372182",
+        "author": "lbussy",
+        "body": "[WsprryPi 4.0 Beta 1](https://github.com/WsprryPi/WsprryPi/releases/tag/v4.0.0-beta.1) is available for testing.\n\nThe Beta includes the accepted consumer integration of the separately published RP1-GPCLK-DKMS v1.0.0 provider for Pi 5/CM5, including GPIO4/GPIO20 route handling and bundled scoped route evidence. Provider publication and scoped consumer acceptance do not constitute final WsprryPi 4.0 stable publication or general RF qualification. Changed supporting helpers have software acceptance with historical target evidence reused; fresh target installation/status of those changed files was not performed.\n\nThis issue remains open for its final WsprryPi stable-release boundary. Beta feedback and final stable acceptance/publication remain separate. See the [Beta installation guide](https://wsprry-pi.readthedocs.io/en/v4.0.0-beta.1/Install/beta1.html).\n\n<!-- wsprrypi-beta-availability:v4.0.0-beta.1 -->\n",
+        "sha256": "d5ad7e84af73417bc02fc0e45cb81d72df7bf685d3b4e3cca1e5951335e654ff",
+        "created_at": "2026-10-21T20:04:41Z",
+        "updated_at": "2026-10-21T20:04:41Z",
+        "readback_at": "2026-10-21T20:04:42.789916Z",
+        "write_exit_code": 0,
+        "recovered_lost_reply": false
+      },
+      "metadata_changes_observed": [],
+      "prewrite": {
+        "observed_at": "2026-10-21T20:04:39.822583Z",
+        "comment_page_sizes": [
+          3
+        ],
+        "protected_metadata": {
+          "repository_url": "https://api.github.com/repos/WsprryPi/WsprryPi",
+          "number": 412,
+          "url": "https://github.com/WsprryPi/WsprryPi/issues/412",
+          "state": "open",
+          "state_reason": null,
+          "title": "Integrate and release RP1 GPCLK DKMS support",
+          "body_sha256": "1597829e348948e5c80bbebda8a687f07c0d00299a4c031b31bdb5c42a625545",
+          "labels": [
+            "Ready for Release",
+            "enhancement"
+          ],
+          "milestone": null,
+          "assignees": [],
+          "locked": false,
+          "active_lock_reason": null
+        },
+        "initial_metadata_unchanged": true,
+        "existing_comment_ids": [
+          5531545740,
+          5540427347,
+          5653739857
+        ]
+      },
+      "write_started_at": "2026-10-21T20:04:39.822908Z",
+      "postwrite": {
+        "observed_at": "2026-10-21T20:04:42.789986Z",
+        "protected_metadata": {
+          "repository_url": "https://api.github.com/repos/WsprryPi/WsprryPi",
+          "number": 412,
+          "url": "https://github.com/WsprryPi/WsprryPi/issues/412",
+          "state": "open",
+          "state_reason": null,
+          "title": "Integrate and release RP1 GPCLK DKMS support",
+          "body_sha256": "1597829e348948e5c80bbebda8a687f07c0d00299a4c031b31bdb5c42a625545",
+          "labels": [
+            "Ready for Release",
+            "enhancement"
+          ],
+          "milestone": null,
+          "assignees": [],
+          "locked": false,
+          "active_lock_reason": null
+        },
+        "unchanged": true,
+        "comment_count": 4
+      },
+      "final_verification": {
+        "readback_at": "2026-10-21T20:05:56.243996Z",
+        "comment_id": 6325372182,
+        "sha256": "d5ad7e84af73417bc02fc0e45cb81d72df7bf685d3b4e3cca1e5951335e654ff",
+        "body_matches_reviewed": true,
+        "marker_count": 1,
+        "complete_comment_page_sizes": [
+          4
+        ],
+        "only_new_comment_is_this_execution": true,
+        "protected_metadata_unchanged": true,
+        "final_state": "open",
+        "final_ready_label": true
+      }
+    },
+    {
+      "repository": "WsprryPi/WsprryPi",
+      "number": 414,
+      "title": "Add encrypted private support-bundle intake",
+      "url": "https://github.com/WsprryPi/WsprryPi/issues/414",
+      "selection_marker": "Ready for Release",
+      "initial_state": "open",
+      "initial_observed_at": "2026-10-21T19:57:16.726438Z",
+      "disposition": "included with limits",
+      "scope": "Private support intake includes local review/download, separate explicit upload consent and encryption of the reviewed archive under the signed destination policy. Creating a bundle does not upload it, and opening the upload service is not confirmation of delivery.",
+      "retained_limitation": "Explicit consent; delivery and uploader identity are not certified.",
+      "evidence": {
+        "commits": [
+          "5c9cca004443c59ea660971f76a4d53d3881dd3d"
+        ],
+        "commit_ancestry": {
+          "1e047a44": true,
+          "aa6ce299": true,
+          "v3.2.0": false
+        },
+        "source_content": [
+          {
+            "commit": "aa6ce2996e8f180670847ed4c89568fa10d4539b",
+            "path": "docs/support-bundle-private-intake.md",
+            "sha256": "9be542f76f31647908c345dc8b3fb8fb981ad4ada00850f13d8f25814c2905e4",
+            "url": "https://github.com/WsprryPi/WsprryPi/blob/aa6ce2996e8f180670847ed4c89568fa10d4539b/docs/support-bundle-private-intake.md#L91"
+          }
+        ],
+        "versioned_installation": "https://wsprry-pi.readthedocs.io/en/v4.0.0-beta.1/Install/beta1.html",
+        "acceptance_ledger": "release_tools/4.0-Beta-1-Release-Evidence.md"
+      },
+      "existing_announcement_search": {
+        "complete_comment_pages": [
+          3
+        ],
+        "comment_count": 3,
+        "observed_at": "2026-10-21T19:57:20.639200Z",
+        "semantic_review": "Independent reviewer read entire body and every comment; no equivalent Beta availability announcement.",
+        "matches": []
+      },
+      "intended_comment": {
+        "body": "[WsprryPi 4.0 Beta 1](https://github.com/WsprryPi/WsprryPi/releases/tag/v4.0.0-beta.1) is available for testing.\n\nPrivate support intake includes local review/download, separate explicit upload consent and encryption of the reviewed archive under the signed destination policy. Creating a bundle does not upload it, and opening the upload service is not confirmation of delivery.\n\nPlease check the displayed sharing/privacy details and collection warnings before consenting. This is the scoped intake workflow, not a general security certification or proof of the uploader identity. See the [Beta installation guide](https://wsprry-pi.readthedocs.io/en/v4.0.0-beta.1/Install/beta1.html).\n\n<!-- wsprrypi-beta-availability:v4.0.0-beta.1 -->\n",
+        "sha256": "eddb9b3a2203ec76eb1ec050a2e3909f495e801ee3fb2e7a5a83ee8da123ede2"
+      },
+      "action": "new_comment",
+      "outcome": "confirmed",
+      "verified_comment": {
+        "id": 6325375116,
+        "url": "https://github.com/WsprryPi/WsprryPi/issues/414#issuecomment-6325375116",
+        "author": "lbussy",
+        "body": "[WsprryPi 4.0 Beta 1](https://github.com/WsprryPi/WsprryPi/releases/tag/v4.0.0-beta.1) is available for testing.\n\nPrivate support intake includes local review/download, separate explicit upload consent and encryption of the reviewed archive under the signed destination policy. Creating a bundle does not upload it, and opening the upload service is not confirmation of delivery.\n\nPlease check the displayed sharing/privacy details and collection warnings before consenting. This is the scoped intake workflow, not a general security certification or proof of the uploader identity. See the [Beta installation guide](https://wsprry-pi.readthedocs.io/en/v4.0.0-beta.1/Install/beta1.html).\n\n<!-- wsprrypi-beta-availability:v4.0.0-beta.1 -->\n",
+        "sha256": "eddb9b3a2203ec76eb1ec050a2e3909f495e801ee3fb2e7a5a83ee8da123ede2",
+        "created_at": "2026-10-21T20:04:50Z",
+        "updated_at": "2026-10-21T20:04:50Z",
+        "readback_at": "2026-10-21T20:04:51.813378Z",
+        "write_exit_code": 0,
+        "recovered_lost_reply": false
+      },
+      "metadata_changes_observed": [],
+      "prewrite": {
+        "observed_at": "2026-10-21T20:04:49.162774Z",
+        "comment_page_sizes": [
+          3
+        ],
+        "protected_metadata": {
+          "repository_url": "https://api.github.com/repos/WsprryPi/WsprryPi",
+          "number": 414,
+          "url": "https://github.com/WsprryPi/WsprryPi/issues/414",
+          "state": "open",
+          "state_reason": null,
+          "title": "Add encrypted private support-bundle intake",
+          "body_sha256": "8237ace6542f0c14f2968e1fab7fdc9fcaa8694d9506ea0d68eebbc93cad972a",
+          "labels": [
+            "Ready for Release",
+            "enhancement"
+          ],
+          "milestone": null,
+          "assignees": [],
+          "locked": false,
+          "active_lock_reason": null
+        },
+        "initial_metadata_unchanged": true,
+        "existing_comment_ids": [
+          5319164537,
+          5359193780,
+          5361091836
+        ]
+      },
+      "write_started_at": "2026-10-21T20:04:49.163212Z",
+      "postwrite": {
+        "observed_at": "2026-10-21T20:04:51.813421Z",
+        "protected_metadata": {
+          "repository_url": "https://api.github.com/repos/WsprryPi/WsprryPi",
+          "number": 414,
+          "url": "https://github.com/WsprryPi/WsprryPi/issues/414",
+          "state": "open",
+          "state_reason": null,
+          "title": "Add encrypted private support-bundle intake",
+          "body_sha256": "8237ace6542f0c14f2968e1fab7fdc9fcaa8694d9506ea0d68eebbc93cad972a",
+          "labels": [
+            "Ready for Release",
+            "enhancement"
+          ],
+          "milestone": null,
+          "assignees": [],
+          "locked": false,
+          "active_lock_reason": null
+        },
+        "unchanged": true,
+        "comment_count": 4
+      },
+      "final_verification": {
+        "readback_at": "2026-10-21T20:05:56.494706Z",
+        "comment_id": 6325375116,
+        "sha256": "eddb9b3a2203ec76eb1ec050a2e3909f495e801ee3fb2e7a5a83ee8da123ede2",
+        "body_matches_reviewed": true,
+        "marker_count": 1,
+        "complete_comment_page_sizes": [
+          4
+        ],
+        "only_new_comment_is_this_execution": true,
+        "protected_metadata_unchanged": true,
+        "final_state": "open",
+        "final_ready_label": true
+      }
+    },
+    {
+      "repository": "WsprryPi/WsprryPi",
+      "number": 415,
+      "title": "Absorb Git submodules into WsprryPi as ordinary tracked components",
+      "url": "https://github.com/WsprryPi/WsprryPi/issues/415",
+      "selection_marker": "Ready for Release",
+      "initial_state": "open",
+      "initial_observed_at": "2026-10-21T19:57:16.726438Z",
+      "disposition": "included",
+      "scope": "The former submodules are ordinary tracked directories in the parent repository. A normal clone contains the components; updates no longer require a separate submodule-pull procedure. Named component boundaries, standalone entry points, licensing and attribution remain.",
+      "retained_limitation": "Reusable component boundaries and attribution retained.",
+      "evidence": {
+        "commits": [
+          "0f7246d6b2272e45932fbfcc801f3e707d0a0e90"
+        ],
+        "commit_ancestry": {
+          "1e047a44": true,
+          "aa6ce299": true,
+          "v3.2.0": false
+        },
+        "source_content": [
+          {
+            "commit": "aa6ce2996e8f180670847ed4c89568fa10d4539b",
+            "path": "docs/components/README.md",
+            "sha256": "de8f77994ee687f6defbf493985986515a5d67f8456c237905fd92a3dbf19bd4",
+            "url": "https://github.com/WsprryPi/WsprryPi/blob/aa6ce2996e8f180670847ed4c89568fa10d4539b/docs/components/README.md#L1"
+          }
+        ],
+        "versioned_installation": "https://wsprry-pi.readthedocs.io/en/v4.0.0-beta.1/Install/beta1.html",
+        "acceptance_ledger": "release_tools/4.0-Beta-1-Release-Evidence.md"
+      },
+      "existing_announcement_search": {
+        "complete_comment_pages": [
+          0
+        ],
+        "comment_count": 0,
+        "observed_at": "2026-10-21T19:57:20.716452Z",
+        "semantic_review": "Independent reviewer read entire body and every comment; no equivalent Beta availability announcement.",
+        "matches": []
+      },
+      "intended_comment": {
+        "body": "[WsprryPi 4.0 Beta 1](https://github.com/WsprryPi/WsprryPi/releases/tag/v4.0.0-beta.1) is available for testing.\n\nThe former submodules are ordinary tracked directories in the parent repository. A normal clone contains the components; updates no longer require a separate submodule-pull procedure. Named component boundaries, standalone entry points, licensing and attribution remain.\n\nPlease report missing component content or clone/build instructions that still require the retired submodule workflow. See the [Beta installation guide](https://wsprry-pi.readthedocs.io/en/v4.0.0-beta.1/Install/beta1.html).\n\n<!-- wsprrypi-beta-availability:v4.0.0-beta.1 -->\n",
+        "sha256": "e33befc3f24ae567c9a0606d2cba1439738db3723c7835962f6e3d5d9b7675af"
+      },
+      "action": "new_comment",
+      "outcome": "confirmed",
+      "verified_comment": {
+        "id": 6325377843,
+        "url": "https://github.com/WsprryPi/WsprryPi/issues/415#issuecomment-6325377843",
+        "author": "lbussy",
+        "body": "[WsprryPi 4.0 Beta 1](https://github.com/WsprryPi/WsprryPi/releases/tag/v4.0.0-beta.1) is available for testing.\n\nThe former submodules are ordinary tracked directories in the parent repository. A normal clone contains the components; updates no longer require a separate submodule-pull procedure. Named component boundaries, standalone entry points, licensing and attribution remain.\n\nPlease report missing component content or clone/build instructions that still require the retired submodule workflow. See the [Beta installation guide](https://wsprry-pi.readthedocs.io/en/v4.0.0-beta.1/Install/beta1.html).\n\n<!-- wsprrypi-beta-availability:v4.0.0-beta.1 -->\n",
+        "sha256": "e33befc3f24ae567c9a0606d2cba1439738db3723c7835962f6e3d5d9b7675af",
+        "created_at": "2026-10-21T20:04:58Z",
+        "updated_at": "2026-10-21T20:04:58Z",
+        "readback_at": "2026-10-21T20:05:00.528614Z",
+        "write_exit_code": 0,
+        "recovered_lost_reply": false
+      },
+      "metadata_changes_observed": [],
+      "prewrite": {
+        "observed_at": "2026-10-21T20:04:57.997668Z",
+        "comment_page_sizes": [
+          0
+        ],
+        "protected_metadata": {
+          "repository_url": "https://api.github.com/repos/WsprryPi/WsprryPi",
+          "number": 415,
+          "url": "https://github.com/WsprryPi/WsprryPi/issues/415",
+          "state": "open",
+          "state_reason": null,
+          "title": "Absorb Git submodules into WsprryPi as ordinary tracked components",
+          "body_sha256": "ce7560e496f5a670ab352d0754eb3349e91357a6df8e4ec2ae1c52d4b97ee3b2",
+          "labels": [
+            "Ready for Release",
+            "enhancement"
+          ],
+          "milestone": null,
+          "assignees": [],
+          "locked": false,
+          "active_lock_reason": null
+        },
+        "initial_metadata_unchanged": true,
+        "existing_comment_ids": []
+      },
+      "write_started_at": "2026-10-21T20:04:57.998151Z",
+      "postwrite": {
+        "observed_at": "2026-10-21T20:05:00.528686Z",
+        "protected_metadata": {
+          "repository_url": "https://api.github.com/repos/WsprryPi/WsprryPi",
+          "number": 415,
+          "url": "https://github.com/WsprryPi/WsprryPi/issues/415",
+          "state": "open",
+          "state_reason": null,
+          "title": "Absorb Git submodules into WsprryPi as ordinary tracked components",
+          "body_sha256": "ce7560e496f5a670ab352d0754eb3349e91357a6df8e4ec2ae1c52d4b97ee3b2",
+          "labels": [
+            "Ready for Release",
+            "enhancement"
+          ],
+          "milestone": null,
+          "assignees": [],
+          "locked": false,
+          "active_lock_reason": null
+        },
+        "unchanged": true,
+        "comment_count": 1
+      },
+      "final_verification": {
+        "readback_at": "2026-10-21T20:05:56.630112Z",
+        "comment_id": 6325377843,
+        "sha256": "e33befc3f24ae567c9a0606d2cba1439738db3723c7835962f6e3d5d9b7675af",
+        "body_matches_reviewed": true,
+        "marker_count": 1,
+        "complete_comment_page_sizes": [
+          1
+        ],
+        "only_new_comment_is_this_execution": true,
+        "protected_metadata_unchanged": true,
+        "final_state": "open",
+        "final_ready_label": true
+      }
+    },
+    {
+      "repository": "WsprryPi/WsprryPi",
+      "number": 416,
+      "title": "Protect privileged controls with directly connected LAN safety",
+      "url": "https://github.com/WsprryPi/WsprryPi/issues/416",
+      "selection_marker": "Ready for Release",
+      "initial_state": "open",
+      "initial_observed_at": "2026-10-21T19:57:16.726438Z",
+      "disposition": "included with limits",
+      "scope": "Privileged browser controls use directly connected physical-LAN policy with the Apache proxy boundary, current interface/subnet discovery and revocation. Proxy client identity is accepted only through the documented trusted loopback path. This is network-location access control; it does not authenticate individual users or encrypt traffic.",
+      "retained_limitation": "LAN location control is not user authentication or encryption.",
+      "evidence": {
+        "commits": [
+          "ad2d0cb89af7d3df8ad5e69c3d3cec27411431ec"
+        ],
+        "commit_ancestry": {
+          "1e047a44": true,
+          "aa6ce299": true,
+          "v3.2.0": false
+        },
+        "source_content": [
+          {
+            "commit": "aa6ce2996e8f180670847ed4c89568fa10d4539b",
+            "path": "docs/privileged-network-safety.md",
+            "sha256": "895e68e8a100120385f34a4564a3f84ea4e3e68c894e10c909439e3e8b467070",
+            "url": "https://github.com/WsprryPi/WsprryPi/blob/aa6ce2996e8f180670847ed4c89568fa10d4539b/docs/privileged-network-safety.md#L1"
+          }
+        ],
+        "versioned_installation": "https://wsprry-pi.readthedocs.io/en/v4.0.0-beta.1/Install/beta1.html",
+        "acceptance_ledger": "release_tools/4.0-Beta-1-Release-Evidence.md"
+      },
+      "existing_announcement_search": {
+        "complete_comment_pages": [
+          4
+        ],
+        "comment_count": 4,
+        "observed_at": "2026-10-21T19:57:20.716630Z",
+        "semantic_review": "Independent reviewer read entire body and every comment; no equivalent Beta availability announcement.",
+        "matches": []
+      },
+      "intended_comment": {
+        "body": "[WsprryPi 4.0 Beta 1](https://github.com/WsprryPi/WsprryPi/releases/tag/v4.0.0-beta.1) is available for testing.\n\nPrivileged browser controls use directly connected physical-LAN policy with the Apache proxy boundary, current interface/subnet discovery and revocation. Proxy client identity is accepted only through the documented trusted loopback path. This is network-location access control; it does not authenticate individual users or encrypt traffic.\n\nUse a trusted LAN and review the network-safety guide before changing proxy/access settings. Plain LAN transmitter control has its own trust boundary. See the [Beta installation guide](https://wsprry-pi.readthedocs.io/en/v4.0.0-beta.1/Install/beta1.html).\n\n<!-- wsprrypi-beta-availability:v4.0.0-beta.1 -->\n",
+        "sha256": "351a27b507e8a5c60583dbaf33010c7b00ed8f2183ff39132d5289ff202d4462"
+      },
+      "action": "new_comment",
+      "outcome": "confirmed",
+      "verified_comment": {
+        "id": 6325380415,
+        "url": "https://github.com/WsprryPi/WsprryPi/issues/416#issuecomment-6325380415",
+        "author": "lbussy",
+        "body": "[WsprryPi 4.0 Beta 1](https://github.com/WsprryPi/WsprryPi/releases/tag/v4.0.0-beta.1) is available for testing.\n\nPrivileged browser controls use directly connected physical-LAN policy with the Apache proxy boundary, current interface/subnet discovery and revocation. Proxy client identity is accepted only through the documented trusted loopback path. This is network-location access control; it does not authenticate individual users or encrypt traffic.\n\nUse a trusted LAN and review the network-safety guide before changing proxy/access settings. Plain LAN transmitter control has its own trust boundary. See the [Beta installation guide](https://wsprry-pi.readthedocs.io/en/v4.0.0-beta.1/Install/beta1.html).\n\n<!-- wsprrypi-beta-availability:v4.0.0-beta.1 -->\n",
+        "sha256": "351a27b507e8a5c60583dbaf33010c7b00ed8f2183ff39132d5289ff202d4462",
+        "created_at": "2026-10-21T20:05:07Z",
+        "updated_at": "2026-10-21T20:05:07Z",
+        "readback_at": "2026-10-21T20:05:08.714873Z",
+        "write_exit_code": 0,
+        "recovered_lost_reply": false
+      },
+      "metadata_changes_observed": [],
+      "prewrite": {
+        "observed_at": "2026-10-21T20:05:06.071921Z",
+        "comment_page_sizes": [
+          4
+        ],
+        "protected_metadata": {
+          "repository_url": "https://api.github.com/repos/WsprryPi/WsprryPi",
+          "number": 416,
+          "url": "https://github.com/WsprryPi/WsprryPi/issues/416",
+          "state": "open",
+          "state_reason": null,
+          "title": "Protect privileged controls with directly connected LAN safety",
+          "body_sha256": "eaecb525d01a94bc52966763143209f692a3afc303d0fd040a36ffc293b5e653",
+          "labels": [
+            "Ready for Release",
+            "enhancement"
+          ],
+          "milestone": null,
+          "assignees": [],
+          "locked": false,
+          "active_lock_reason": null
+        },
+        "initial_metadata_unchanged": true,
+        "existing_comment_ids": [
+          5363565801,
+          5363657764,
+          5363674719,
+          5363690044
+        ]
+      },
+      "write_started_at": "2026-10-21T20:05:06.072321Z",
+      "postwrite": {
+        "observed_at": "2026-10-21T20:05:08.714949Z",
+        "protected_metadata": {
+          "repository_url": "https://api.github.com/repos/WsprryPi/WsprryPi",
+          "number": 416,
+          "url": "https://github.com/WsprryPi/WsprryPi/issues/416",
+          "state": "open",
+          "state_reason": null,
+          "title": "Protect privileged controls with directly connected LAN safety",
+          "body_sha256": "eaecb525d01a94bc52966763143209f692a3afc303d0fd040a36ffc293b5e653",
+          "labels": [
+            "Ready for Release",
+            "enhancement"
+          ],
+          "milestone": null,
+          "assignees": [],
+          "locked": false,
+          "active_lock_reason": null
+        },
+        "unchanged": true,
+        "comment_count": 5
+      },
+      "final_verification": {
+        "readback_at": "2026-10-21T20:05:56.854990Z",
+        "comment_id": 6325380415,
+        "sha256": "351a27b507e8a5c60583dbaf33010c7b00ed8f2183ff39132d5289ff202d4462",
+        "body_matches_reviewed": true,
+        "marker_count": 1,
+        "complete_comment_page_sizes": [
+          5
+        ],
+        "only_new_comment_is_this_execution": true,
+        "protected_metadata_unchanged": true,
+        "final_state": "open",
+        "final_ready_label": true
+      }
+    },
+    {
+      "repository": "WsprryPi/WsprryPi",
+      "number": 422,
+      "title": "Add immutable UI manifest, local-modification support, and refresh-safe upgrades",
+      "url": "https://github.com/WsprryPi/WsprryPi/issues/422",
+      "selection_marker": "Ready for Release",
+      "initial_state": "open",
+      "initial_observed_at": "2026-10-21T19:57:16.726438Z",
+      "disposition": "included with limits",
+      "scope": "The Beta includes packaged UI manifest identity, detection of local UI modifications and modification-aware upgrade/cache-refresh behavior. Packaged UI identity, installed UI state and the running executable version are separate. The binaries come from 1e047a44; the publication tag also contains accepted supporting installer/helper changes. Fresh target installation/status of those changed support files was not performed.",
+      "retained_limitation": "No fresh target installed-support claim; generated UI identity is not running-binary identity.",
+      "evidence": {
+        "commits": [
+          "433e62cc18323db34b4b200d32a398b7e72f2831"
+        ],
+        "commit_ancestry": {
+          "1e047a44": true,
+          "aa6ce299": true,
+          "v3.2.0": false
+        },
+        "source_content": [
+          {
+            "commit": "aa6ce2996e8f180670847ed4c89568fa10d4539b",
+            "path": "WsprryPi-UI/data/ui_version.php",
+            "sha256": "50d088448343e17d79ef98162b69d675a4a93d4b46cebdbb69341fd02da65464",
+            "url": "https://github.com/WsprryPi/WsprryPi/blob/aa6ce2996e8f180670847ed4c89568fa10d4539b/WsprryPi-UI/data/ui_version.php#L290"
+          }
+        ],
+        "versioned_installation": "https://wsprry-pi.readthedocs.io/en/v4.0.0-beta.1/Install/beta1.html",
+        "acceptance_ledger": "release_tools/4.0-Beta-1-Release-Evidence.md"
+      },
+      "existing_announcement_search": {
+        "complete_comment_pages": [
+          1
+        ],
+        "comment_count": 1,
+        "observed_at": "2026-10-21T19:57:20.716530Z",
+        "semantic_review": "Independent reviewer read entire body and every comment; no equivalent Beta availability announcement.",
+        "matches": []
+      },
+      "intended_comment": {
+        "body": "[WsprryPi 4.0 Beta 1](https://github.com/WsprryPi/WsprryPi/releases/tag/v4.0.0-beta.1) is available for testing.\n\nThe Beta includes packaged UI manifest identity, detection of local UI modifications and modification-aware upgrade/cache-refresh behavior. Packaged UI identity, installed UI state and the running executable version are separate. The binaries come from 1e047a44; the publication tag also contains accepted supporting installer/helper changes. Fresh target installation/status of those changed support files was not performed.\n\nBack up local web customizations and check the displayed installed/running identities after following the tagged Beta installation procedure. See the [Beta installation guide](https://wsprry-pi.readthedocs.io/en/v4.0.0-beta.1/Install/beta1.html).\n\n<!-- wsprrypi-beta-availability:v4.0.0-beta.1 -->\n",
+        "sha256": "754c6d6f44a96c990da05dc766232a90612b5de3d82310c8234836ab4203bb82"
+      },
+      "action": "new_comment",
+      "outcome": "confirmed",
+      "verified_comment": {
+        "id": 6325383001,
+        "url": "https://github.com/WsprryPi/WsprryPi/issues/422#issuecomment-6325383001",
+        "author": "lbussy",
+        "body": "[WsprryPi 4.0 Beta 1](https://github.com/WsprryPi/WsprryPi/releases/tag/v4.0.0-beta.1) is available for testing.\n\nThe Beta includes packaged UI manifest identity, detection of local UI modifications and modification-aware upgrade/cache-refresh behavior. Packaged UI identity, installed UI state and the running executable version are separate. The binaries come from 1e047a44; the publication tag also contains accepted supporting installer/helper changes. Fresh target installation/status of those changed support files was not performed.\n\nBack up local web customizations and check the displayed installed/running identities after following the tagged Beta installation procedure. See the [Beta installation guide](https://wsprry-pi.readthedocs.io/en/v4.0.0-beta.1/Install/beta1.html).\n\n<!-- wsprrypi-beta-availability:v4.0.0-beta.1 -->\n",
+        "sha256": "754c6d6f44a96c990da05dc766232a90612b5de3d82310c8234836ab4203bb82",
+        "created_at": "2026-10-21T20:05:14Z",
+        "updated_at": "2026-10-21T20:05:14Z",
+        "readback_at": "2026-10-21T20:05:17.103105Z",
+        "write_exit_code": 0,
+        "recovered_lost_reply": false
+      },
+      "metadata_changes_observed": [],
+      "prewrite": {
+        "observed_at": "2026-10-21T20:05:13.554518Z",
+        "comment_page_sizes": [
+          1
+        ],
+        "protected_metadata": {
+          "repository_url": "https://api.github.com/repos/WsprryPi/WsprryPi",
+          "number": 422,
+          "url": "https://github.com/WsprryPi/WsprryPi/issues/422",
+          "state": "open",
+          "state_reason": null,
+          "title": "Add immutable UI manifest, local-modification support, and refresh-safe upgrades",
+          "body_sha256": "ccf439a7451b8f9ff486db9719ee5809364bc8b7c4d0e26e622dd76bdda9b858",
+          "labels": [
+            "Ready for Release",
+            "enhancement"
+          ],
+          "milestone": null,
+          "assignees": [],
+          "locked": false,
+          "active_lock_reason": null
+        },
+        "initial_metadata_unchanged": true,
+        "existing_comment_ids": [
+          5373805254
+        ]
+      },
+      "write_started_at": "2026-10-21T20:05:13.554974Z",
+      "postwrite": {
+        "observed_at": "2026-10-21T20:05:17.103177Z",
+        "protected_metadata": {
+          "repository_url": "https://api.github.com/repos/WsprryPi/WsprryPi",
+          "number": 422,
+          "url": "https://github.com/WsprryPi/WsprryPi/issues/422",
+          "state": "open",
+          "state_reason": null,
+          "title": "Add immutable UI manifest, local-modification support, and refresh-safe upgrades",
+          "body_sha256": "ccf439a7451b8f9ff486db9719ee5809364bc8b7c4d0e26e622dd76bdda9b858",
+          "labels": [
+            "Ready for Release",
+            "enhancement"
+          ],
+          "milestone": null,
+          "assignees": [],
+          "locked": false,
+          "active_lock_reason": null
+        },
+        "unchanged": true,
+        "comment_count": 2
+      },
+      "final_verification": {
+        "readback_at": "2026-10-21T20:05:57.177859Z",
+        "comment_id": 6325383001,
+        "sha256": "754c6d6f44a96c990da05dc766232a90612b5de3d82310c8234836ab4203bb82",
+        "body_matches_reviewed": true,
+        "marker_count": 1,
+        "complete_comment_page_sizes": [
+          2
+        ],
+        "only_new_comment_is_this_execution": true,
+        "protected_metadata_unchanged": true,
+        "final_state": "open",
+        "final_ready_label": true
+      }
+    },
+    {
+      "repository": "WsprryPi/WsprryPi",
+      "number": 426,
+      "title": "Research isolated-LAN / offline field operation with Web UI",
+      "url": "https://github.com/WsprryPi/WsprryPi/issues/426",
+      "selection_marker": "Ready for Release",
+      "initial_state": "open",
+      "initial_observed_at": "2026-10-21T19:57:16.726438Z",
+      "disposition": "included with limits",
+      "scope": "The web interface can use an isolated physical Ethernet/Wi-Fi LAN without an Internet route, gateway or DNS for local-network authorization. Policy tracks current eligible addresses and revokes stale access as the network changes. Downloads, online spot/support services and other Internet features still need connectivity; scheduled transmissions still need a suitable clock.",
+      "retained_limitation": "Offline LAN access does not provide online services or automatic clock readiness.",
+      "evidence": {
+        "commits": [
+          "7bfe30fbd6d8f34de8bda26e3a325fb7addf4d62"
+        ],
+        "commit_ancestry": {
+          "1e047a44": true,
+          "aa6ce299": true,
+          "v3.2.0": false
+        },
+        "source_content": [
+          {
+            "commit": "aa6ce2996e8f180670847ed4c89568fa10d4539b",
+            "path": "docs/privileged-network-safety.md",
+            "sha256": "895e68e8a100120385f34a4564a3f84ea4e3e68c894e10c909439e3e8b467070",
+            "url": "https://github.com/WsprryPi/WsprryPi/blob/aa6ce2996e8f180670847ed4c89568fa10d4539b/docs/privileged-network-safety.md#L103"
+          }
+        ],
+        "versioned_installation": "https://wsprry-pi.readthedocs.io/en/v4.0.0-beta.1/Install/beta1.html",
+        "acceptance_ledger": "release_tools/4.0-Beta-1-Release-Evidence.md"
+      },
+      "existing_announcement_search": {
+        "complete_comment_pages": [
+          0
+        ],
+        "comment_count": 0,
+        "observed_at": "2026-10-21T19:57:21.109710Z",
+        "semantic_review": "Independent reviewer read entire body and every comment; no equivalent Beta availability announcement.",
+        "matches": []
+      },
+      "intended_comment": {
+        "body": "[WsprryPi 4.0 Beta 1](https://github.com/WsprryPi/WsprryPi/releases/tag/v4.0.0-beta.1) is available for testing.\n\nThe web interface can use an isolated physical Ethernet/Wi-Fi LAN without an Internet route, gateway or DNS for local-network authorization. Policy tracks current eligible addresses and revokes stale access as the network changes. Downloads, online spot/support services and other Internet features still need connectivity; scheduled transmissions still need a suitable clock.\n\nPlease check local access/reconnection on your intended network and establish clock readiness independently before scheduled operation. See the [Beta installation guide](https://wsprry-pi.readthedocs.io/en/v4.0.0-beta.1/Install/beta1.html).\n\n<!-- wsprrypi-beta-availability:v4.0.0-beta.1 -->\n",
+        "sha256": "432916fd08a1e8482fb7c3834f7527c2aed77b081957982045b3eede6cbf98f4"
+      },
+      "action": "new_comment",
+      "outcome": "confirmed",
+      "verified_comment": {
+        "id": 6325385353,
+        "url": "https://github.com/WsprryPi/WsprryPi/issues/426#issuecomment-6325385353",
+        "author": "lbussy",
+        "body": "[WsprryPi 4.0 Beta 1](https://github.com/WsprryPi/WsprryPi/releases/tag/v4.0.0-beta.1) is available for testing.\n\nThe web interface can use an isolated physical Ethernet/Wi-Fi LAN without an Internet route, gateway or DNS for local-network authorization. Policy tracks current eligible addresses and revokes stale access as the network changes. Downloads, online spot/support services and other Internet features still need connectivity; scheduled transmissions still need a suitable clock.\n\nPlease check local access/reconnection on your intended network and establish clock readiness independently before scheduled operation. See the [Beta installation guide](https://wsprry-pi.readthedocs.io/en/v4.0.0-beta.1/Install/beta1.html).\n\n<!-- wsprrypi-beta-availability:v4.0.0-beta.1 -->\n",
+        "sha256": "432916fd08a1e8482fb7c3834f7527c2aed77b081957982045b3eede6cbf98f4",
+        "created_at": "2026-10-21T20:05:22Z",
+        "updated_at": "2026-10-21T20:05:22Z",
+        "readback_at": "2026-10-21T20:05:23.860553Z",
+        "write_exit_code": 0,
+        "recovered_lost_reply": false
+      },
+      "metadata_changes_observed": [],
+      "prewrite": {
+        "observed_at": "2026-10-21T20:05:21.314878Z",
+        "comment_page_sizes": [
+          0
+        ],
+        "protected_metadata": {
+          "repository_url": "https://api.github.com/repos/WsprryPi/WsprryPi",
+          "number": 426,
+          "url": "https://github.com/WsprryPi/WsprryPi/issues/426",
+          "state": "open",
+          "state_reason": null,
+          "title": "Research isolated-LAN / offline field operation with Web UI",
+          "body_sha256": "6e0cb7b25ee67b4617f469a15df351f4ab4f72ce069308729e5a45965392be2e",
+          "labels": [
+            "Ready for Release",
+            "enhancement"
+          ],
+          "milestone": null,
+          "assignees": [],
+          "locked": false,
+          "active_lock_reason": null
+        },
+        "initial_metadata_unchanged": true,
+        "existing_comment_ids": []
+      },
+      "write_started_at": "2026-10-21T20:05:21.315265Z",
+      "postwrite": {
+        "observed_at": "2026-10-21T20:05:23.860602Z",
+        "protected_metadata": {
+          "repository_url": "https://api.github.com/repos/WsprryPi/WsprryPi",
+          "number": 426,
+          "url": "https://github.com/WsprryPi/WsprryPi/issues/426",
+          "state": "open",
+          "state_reason": null,
+          "title": "Research isolated-LAN / offline field operation with Web UI",
+          "body_sha256": "6e0cb7b25ee67b4617f469a15df351f4ab4f72ce069308729e5a45965392be2e",
+          "labels": [
+            "Ready for Release",
+            "enhancement"
+          ],
+          "milestone": null,
+          "assignees": [],
+          "locked": false,
+          "active_lock_reason": null
+        },
+        "unchanged": true,
+        "comment_count": 1
+      },
+      "final_verification": {
+        "readback_at": "2026-10-21T20:05:57.197447Z",
+        "comment_id": 6325385353,
+        "sha256": "432916fd08a1e8482fb7c3834f7527c2aed77b081957982045b3eede6cbf98f4",
+        "body_matches_reviewed": true,
+        "marker_count": 1,
+        "complete_comment_page_sizes": [
+          1
+        ],
+        "only_new_comment_is_this_execution": true,
+        "protected_metadata_unchanged": true,
+        "final_state": "open",
+        "final_ready_label": true
+      }
+    }
+  ],
+  "counts": {
+    "new_comments": 26,
+    "existing_comments": 0,
+    "repaired_comments": 0,
+    "failed": 0,
+    "unconfirmed": 0,
+    "initial_eligible": 26,
+    "final_eligible": 26,
+    "excluded_open": 4,
+    "additions": 0,
+    "removals": 0,
+    "omitted": 0,
+    "initial_existing_comment_count": 104,
+    "final_comment_count": 130,
+    "duplicate_announcements": 0
+  },
+  "validation": {
+    "live_snapshot_checks": {
+      "result": "pass",
+      "at": "2026-10-21T20:05:59.498252Z",
+      "checks": [
+        "Complete paginated open enumeration and independent labelled crosscheck twice after postings.",
+        "Final eligible set exactly equals 26 confirmed rows; no additions, removals or omissions.",
+        "All 26 comment IDs/repository/issue/author/bodies/SHA-256 read back; one marker each; existing 104 comments unchanged.",
+        "All 30 open issues preserve state/title/body/labels/milestones/assignees/locks; only selected comment counts/activity timestamps advance.",
+        "Release flags/body and exact six asset IDs/sizes/digests unchanged; latest remains v3.2.0."
+      ]
+    },
+    "record_checks": {
+      "result": "pass",
+      "commands": [
+        "python3 -m json.tool release_tools/4.0-Beta-1-Issue-Announcements.json",
+        "python3 validate.py (external scratch harness)",
+        "git diff --check",
+        "git diff --cached --check"
+      ],
+      "external_harness_sha256": "9028ef9386123b3582e20889dd18258b4c8fc4faf8fc6a56cfd45d7a4618e337",
+      "coverage": [
+        "JSON and unique issue/comment IDs; complete final coverage/counts and dispositions.",
+        "Exact stored body/SHA-256, one marker per issue, URLs, frozen source-file hashes/ancestry.",
+        "All 30 protected issue records and 104 historical comment bodies/update times unchanged.",
+        "Local Markdown targets, unchanged historical ledger prefix including P3 correction, source inventory/manifest/notes/checksums unchanged.",
+        "Complete scoped diff and no local/private paths in public bodies; no unrelated source changes."
+      ],
+      "application_tests": "Not run: record/comment-only task; no application/UI/component change.",
+      "runtime_and_hardware": "No new qualification or operation; accepted limitations unchanged."
+    }
+  },
+  "environment_events": [
+    "Initial sandboxed nested gh/curl reads could not resolve/connect; explicit network escalation succeeded; no public write occurred.",
+    "Initial Project association query exceeded node limit and requested restricted fields; bounded ID-free count query succeeded, zero visible associations; repository Project listing remains scope-limited.",
+    "Web reader could not fetch release/Docs URLs; authenticated release API and direct unauthenticated curl reads succeeded."
+  ],
+  "completed_at": "2026-10-21T20:08:25.237045Z",
+  "record_closeout": {
+    "branch": "devel",
+    "authorized_record_paths": [
+      "release_tools/4.0-Beta-1-Issue-Announcements.json",
+      "release_tools/4.0-Beta-1-Release-Evidence.md",
+      "release_tools/Release Punchlist.md"
+    ],
+    "commit_push_ci_verification": "Exact committed/pushed SHA, automatically triggered exact-head CI and independent remote parity are verified after record commit and reported externally/finally.",
+    "preserved_untracked_handoff": "Item 16e Beta 1 Issue Announcements Prompt.md remains unstaged; no source/component/sibling changes."
+  }
+}
