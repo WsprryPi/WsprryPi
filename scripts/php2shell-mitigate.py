@@ -1,0 +1,534 @@
+#!/usr/bin/env python3
+"""Audit/apply partial PHP2Shell mitigations in Debian's web PHP INI trees.
+
+No PHP execution, HTTP probes, package changes, or service operations. See
+scripts/README.md and https://www.php.net/archive/2026.php#2026-10-21-1.
+"""
+
+from __future__ import annotations
+
+import argparse
+from dataclasses import dataclass
+from datetime import date, datetime, timezone
+import os
+from pathlib import Path
+import re
+import shlex
+import stat
+import subprocess
+import sys
+import tempfile
+import uuid
+
+
+NAME = "99-wsprrypi-php2shell.ini"
+MARKER = "; Managed by WsprryPi php2shell-mitigate.py\n"
+FIXED = {"8.2": "8.2.35", "8.3": "8.3.36", "8.4": "8.4.27", "8.5": "8.5.12"}
+KEYS = {"session.upload_progress.enabled", "fatal_error_backtraces",
+        "memory_limit", "post_max_size", "upload_max_filesize"}
+SAPIS = ("apache2", "fpm", "cgi")
+MIB = 1024 * 1024
+# Release coverage is a conservative Debian baseline, not a vendor guarantee.
+# Sources: debian.org/releases/{bookworm,trixie,bullseye}/ (reviewed 2026-10-21).
+RELEASES = {"bookworm": ("12", date(2028, 6, 30)), "trixie": ("13", date(2030, 6, 30))}
+PHP_EOL = {"8.2": date(2026, 12, 31), "8.3": date(2027, 12, 31),
+           "8.4": date(2028, 12, 31), "8.5": date(2029, 12, 31)}
+APT_CACHE_OPTIONS = ["-o", "Dir::Cache::pkgcache=", "-o", "Dir::Cache::srcpkgcache="]
+PACKAGE_NAME = r"[a-z0-9][a-z0-9+.-]*(?::[a-z0-9-]+)?"
+
+
+def read_config(path):
+    # Application-owned .htaccess/.user.ini can be untrusted. Do not block on a
+    # FIFO/device or read an unbounded file, including through a symlink.
+    descriptor = os.open(path, os.O_RDONLY | os.O_NONBLOCK)
+    with os.fdopen(descriptor, "rb") as source:
+        if not stat.S_ISREG(os.fstat(source.fileno()).st_mode):
+            raise ValueError(f"Configuration is not a regular file: {path}")
+        contents = source.read(2 * MIB + 1)
+    if len(contents) > 2 * MIB:
+        raise ValueError(f"Configuration exceeds the 2 MiB inspection limit: {path}")
+    return contents
+
+
+def walk_error(error):
+    raise error
+
+
+@dataclass
+class Plan:
+    directory: Path
+    settings: dict
+    previous: bytes | None
+    contents: bytes
+
+    @property
+    def target(self):
+        return self.directory / "conf.d" / NAME
+
+
+def uncomment(line):
+    """PHP INI comments use semicolons outside quotes."""
+    quote = None
+    for index, char in enumerate(line):
+        if char in "\"'" and (index == 0 or line[index - 1] != "\\"):
+            quote = None if quote == char else char if quote is None else quote
+        if char == ";" and quote is None:
+            return line[:index].strip()
+    return line.strip()
+
+
+def ini_values(path):
+    values, scoped = {}, []
+    special_section = False
+    for number, raw in enumerate(read_config(path).decode("utf-8").splitlines(), 1):
+        line = uncomment(raw)
+        if line.startswith("["):
+            special_section = bool(re.match(r"\[\s*(?:PATH|HOST)\s*=", line, re.I))
+        match = re.match(r"([\w.]+)\s*=\s*(.*)$", line)
+        if match and match[1] in KEYS:
+            if special_section:
+                scoped.append(f"{path}:{number}: scoped {match[1]} requires review")
+            else:
+                value = match[2]
+                if len(value) >= 2 and value[0] == value[-1] and value[0] in "\"'":
+                    value = value[1:-1]
+                values[match[1]] = value
+    return values, scoped
+
+
+def quantity(value):
+    # PHP 8.2+ interprets leading-zero quantities as octal. Keep the static
+    # audit conservative across old PHP parsers and never relax such a limit.
+    match = re.fullmatch(r"(0|[1-9][0-9]*)\s*([KMG]?)", value or "", re.I)
+    if not match:
+        return None
+    return int(match[1]) * 1024 ** ("", "K", "M", "G").index(match[2].upper())
+
+
+def disabled(value):
+    return value is not None and value.lower() in {"", "0", "off", "false", "no", "none"}
+
+
+def discover(root, selected):
+    php = root / "etc/php"
+    if not php.is_dir():
+        return []
+    return [version / sapi for version in sorted(php.iterdir())
+            if re.fullmatch(r"[5-8]\.\d+", version.name) and version.is_dir()
+            for sapi in SAPIS if (not selected or sapi in selected)
+            and (version / sapi).is_dir()]
+
+
+def inspect(directory, allow_memory):
+    if not (directory / "php.ini").is_file() or not (directory / "conf.d").is_dir():
+        raise ValueError(f"Incomplete PHP configuration: {directory}")
+    version = tuple(map(int, directory.parent.name.split(".")))
+    if version < (5, 4) or version > (8, 5):
+        raise ValueError(f"PHP {directory.parent.name}: outside this advisory's supported range")
+    target = directory / "conf.d" / NAME
+    if target.is_symlink():
+        raise ValueError(f"Refusing a symlink at managed target: {target}")
+    previous = read_config(target) if target.exists() else None
+    if previous is not None and not previous.startswith(MARKER.encode()):
+        raise ValueError(f"Refusing an existing file without the ownership marker: {target}")
+
+    values, findings = {}, []
+    for path in [directory / "php.ini", *sorted((directory / "conf.d").glob("*.ini"))]:
+        current, scoped = ini_values(path)
+        values.update(current)
+        findings.extend(scoped)
+
+    # Preserve stricter positive request limits. Zero means unlimited for POST.
+    for key in ["post_max_size", "upload_max_filesize"]:
+        if key in values and quantity(values[key]) is None:
+            raise ValueError(f"Cannot safely preserve noncanonical {key} in {directory}; resolve expressions/environment/octal values to decimal bytes or K/M/G first")
+    post = min(quantity(values.get("post_max_size")) or 8 * MIB, 8 * MIB)
+    upload = min(quantity(values.get("upload_max_filesize")) or 2 * MIB, 2 * MIB, post // 2)
+    if upload < 1:
+        raise ValueError(f"POST limit is too small to set a positive lower upload limit: {directory}")
+    settings = {"session.upload_progress.enabled": "0", "post_max_size": str(post),
+                "upload_max_filesize": str(upload)}
+    if version == (8, 5):
+        settings["fatal_error_backtraces"] = "0"
+    # A repeat apply must not silently undo a previous explicit memory opt-in.
+    old_values = ini_values(target)[0] if previous is not None else {}
+    if allow_memory or old_values.get("memory_limit") == "-1":
+        settings["memory_limit"] = "-1"
+    contents = (MARKER + "; Partial mitigations only; install vendor PHP security updates.\n"
+                + "".join(f"{key} = {value}\n" for key, value in settings.items())).encode()
+    return Plan(directory, settings, previous, contents), values, findings
+
+
+def settings_findings(values, version):
+    findings = []
+    for key in ["session.upload_progress.enabled", *(["fatal_error_backtraces"] if version == "8.5" else [])]:
+        if not disabled(values.get(key)):
+            findings.append(f"{key}: needs 0 (currently {values.get(key, 'not explicitly set')})")
+    post, upload = quantity(values.get("post_max_size")), quantity(values.get("upload_max_filesize"))
+    if post is None or not 0 < post <= 8 * MIB:
+        findings.append("post_max_size: needs a positive limit of at most 8 MiB")
+    if upload is None or not upload > 0 or post is None or upload >= post:
+        findings.append("upload_max_filesize: needs a positive limit below post_max_size")
+    if values.get("memory_limit") != "-1":
+        findings.append("memory_limit: finite or unknown; optional OOM mitigation needs --allow-unlimited-memory")
+    return findings
+
+
+def override_findings(root, directories, web_roots):
+    """Conservative inventory, including inactive configs; never print their values."""
+    paths, findings = set(), []
+    for base in [root / "etc/apache2", root / "etc/nginx", *[d / "pool.d" for d in directories if d.name == "fpm"]]:
+        if base.is_dir():
+            for current, dirs, files in os.walk(base, onerror=walk_error):
+                for name in dirs:
+                    if (Path(current) / name).is_symlink():
+                        findings.append(f"{Path(current) / name}: config directory symlink not traversed; review separately")
+                for name in files:
+                    path = Path(current) / name
+                    # Standard server configuration only. In particular, do
+                    # not open private keys/certificates or arbitrary binaries.
+                    if path.suffix in {".conf", ".load"} or name in {"fastcgi_params", "scgi_params", "uwsgi_params"} or (path.parent.name in {"sites-available", "sites-enabled"} and not path.suffix):
+                        paths.add(path)
+    for base in web_roots:
+        if not base.is_dir():
+            findings.append(f"{base}: web root unavailable; application overrides not inspected")
+            continue
+        for current, dirs, files in os.walk(base, onerror=walk_error):
+            for name in dirs:
+                if (Path(current) / name).is_symlink():
+                    findings.append(f"{Path(current) / name}: symlink directory not traversed; review separately")
+            for name in files:
+                if name in {".htaccess", ".user.ini"}:
+                    paths.add(Path(current) / name)
+    for path in sorted(paths):
+        for number, raw in enumerate(read_config(path).decode("utf-8").splitlines(), 1):
+            line = raw.strip()
+            if not line or line.startswith(("#", ";")):
+                continue
+            if re.search(r"\bphp_(?:admin_)?(?:value|flag)\b|\bPHP_(?:ADMIN_)?VALUE\b", line, re.I):
+                findings.append(f"{path}:{number}: PHP override/diagnostic source requires review")
+            elif path.name == ".user.ini" and "=" in line:
+                findings.append(f"{path}:{number}: per-directory INI setting requires review")
+    return findings
+
+
+@dataclass
+class OSInfo:
+    name: str
+    identifier: str
+    version: str
+    codename: str
+    supported: bool
+    message: str
+
+
+@dataclass
+class Package:
+    name: str
+    branch: str
+    installed: str
+    candidate: str | None = None
+
+
+@dataclass
+class Inventory:
+    packages: dict
+    held: set | None
+    issues: list
+
+
+def detect_os(root, today=None):
+    today = today or date.today()
+    values = {}
+    for path in [root / "etc/os-release", root / "usr/lib/os-release"]:
+        if path.exists():
+            resolved_path, resolved_root = path.resolve(), root.resolve()
+            if resolved_path != resolved_root and resolved_root not in resolved_path.parents:
+                # Never resolve an offline image's absolute link onto the host.
+                continue
+            for line in read_config(path).decode("utf-8").splitlines():
+                if not line.strip() or line.lstrip().startswith("#"):
+                    continue
+                key, separator, value = line.partition("=")
+                if separator and key in {"PRETTY_NAME", "ID", "VERSION_ID", "VERSION_CODENAME"}:
+                    tokens = shlex.split(value, comments=False)
+                    if len(tokens) > 1:
+                        raise ValueError(f"Invalid os-release assignment: {path}: {key}")
+                    values[key] = tokens[0] if tokens else ""
+            break
+    identifier = values.get("ID", "unknown")
+    version = values.get("VERSION_ID", "unknown")
+    codename = values.get("VERSION_CODENAME", "")
+    if not codename:
+        codename = {"12": "bookworm", "13": "trixie"}.get(version, "unknown")
+    name = values.get("PRETTY_NAME", identifier)
+    supported = False
+    if identifier not in {"debian", "raspbian"}:
+        message = "UNSUPPORTED BY THIS SCRIPT: OS identity/release coverage unknown; consult the OS/PHP vendor"
+    elif (version.isdigit() and int(version) <= 11) or codename in {"bullseye", "buster", "stretch", "jessie", "wheezy"}:
+        message = ("UNSUPPORTED RELEASE: outside ordinary Debian security/LTS coverage; "
+                   "Bullseye LTS ended 2026-08-31. Migrate to a supported OS or verify separate vendor/ELTS coverage")
+    elif codename not in RELEASES or RELEASES[codename][0] != version:
+        message = "UNSUPPORTED BY THIS SCRIPT: unrecognized or inconsistent release; no verified distro upgrade guidance"
+    elif today > RELEASES[codename][1]:
+        message = f"UNSUPPORTED RELEASE: Debian baseline support ended {RELEASES[codename][1]}; review current vendor coverage"
+    else:
+        supported = True
+        message = f"SUPPORTED RELEASE BASELINE: Debian {codename} through {RELEASES[codename][1]}; vendor/architecture coverage still applies"
+    return OSInfo(name, identifier, version, codename, supported, message)
+
+
+def query(arguments):
+    """Only fixed read-only metadata commands call this helper."""
+    try:
+        result = subprocess.run(arguments, capture_output=True, text=True, timeout=10,
+                                check=False, env={**os.environ, "LC_ALL": "C", "LANG": "C"})
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    return result.stdout if result.returncode == 0 else None
+
+
+def version_fixed(branch, version):
+    # Do not infer vendor backports, prereleases, or other PHP branches as fixed.
+    match = re.fullmatch(r"(?:\d+:)?(\d+\.\d+\.\d+)(?:-[A-Za-z0-9.+~]+)?", version or "")
+    return bool(match and branch in FIXED and match[1].rsplit(".", 1)[0] == branch
+                and tuple(map(int, match[1].split("."))) >= tuple(map(int, FIXED[branch].split("."))))
+
+
+def php_support_finding(branch, today=None):
+    today = today or date.today()
+    if branch in PHP_EOL and today <= PHP_EOL[branch]:
+        return None
+    status = ("UPSTREAM UNSUPPORTED/EOL; vendor maintenance/backports need separate verification"
+              if tuple(map(int, branch.split("."))) < (8, 2) or branch in PHP_EOL
+              else "UNSUPPORTED BY THIS SCRIPT; upstream support and fix status unknown")
+    return f"PHP {branch}: {status}"
+
+
+def package_inventory(root):
+    if root != Path("/") or sys.platform != "linux":
+        return Inventory({}, None, ["Package/candidate inspection unavailable: offline root or non-Linux host; host APT was not queried"])
+    # Query all installed PHP source packages, including common/extensions/CLI,
+    # so an upgrade command cannot silently omit another copy of PHP's core.
+    text = query(["/usr/bin/dpkg-query", "-W", "-f=${binary:Package}\t${db:Status-Status}\t${Version}\t${source:Package}\n"])
+    if text is None:
+        return Inventory({}, None, ["Installed PHP package inventory unavailable; verify the serving PHP installation manually"])
+    packages, issues = {}, []
+    for line in text.splitlines():
+        fields = line.split("\t")
+        if len(fields) != 4 or fields[1] != "installed":
+            continue
+        name, _, installed, source = fields
+        branch = re.fullmatch(r"php(\d+\.\d+)", source)
+        if source == "php5":
+            # Older Debian releases named the source and binary packages php5,
+            # with the minor version visible only in the package version.
+            branch = re.match(r"(?:\d+:)?(5\.\d+)\.", installed)
+        if branch and re.fullmatch(PACKAGE_NAME, name):
+            packages[name] = Package(name, branch[1], installed)
+    if not packages:
+        return Inventory({}, None, ["No mapped PHP source packages installed; custom/container/legacy PHP needs vendor review"])
+    held_text = query(["/usr/bin/apt-mark", *APT_CACHE_OPTIONS, "showhold"])
+    held = set(held_text.split()) if held_text is not None else None
+    if held is None:
+        issues.append("APT hold state unavailable; upgrade commands withheld")
+    policy = query(["/usr/bin/apt-cache", *APT_CACHE_OPTIONS, "policy", *sorted(packages)])
+    if policy is None:
+        issues.append("APT candidates unavailable; refresh indexes and check configured repositories")
+    else:
+        current = None
+        for line in policy.splitlines():
+            header = re.fullmatch(f"({PACKAGE_NAME}):", line)
+            if header:
+                current = header[1] if header[1] in packages else None
+                if current is None and ":" not in header[1]:
+                    # Some APT releases omit the native architecture in policy
+                    # headers even when dpkg identifies a package with it.
+                    matches = [name for name in packages if name.split(":", 1)[0] == header[1]]
+                    current = matches[0] if len(matches) == 1 else None
+            elif current and (candidate := re.fullmatch(r"\s+Candidate:\s+(\S+)\s*", line)):
+                if candidate[1] != "(none)":
+                    packages[current].candidate = candidate[1]
+    return Inventory(packages, held, issues)
+
+
+def held_package(name, held):
+    return held is not None and (name in held or name.split(":", 1)[0] in held
+                                or (":" not in name and any(item.split(":", 1)[0] == name for item in held)))
+
+
+def package_guidance(os_info, inventory, root, today=None):
+    today = today or date.today()
+    findings = list(inventory.issues)
+    print(f"OS {os_info.name}; ID={os_info.identifier}; version={os_info.version}; codename={os_info.codename}")
+    print(os_info.message)
+    if not os_info.supported:
+        findings.append(os_info.message)
+    print("APT candidates use existing LOCAL indexes; indexes were not refreshed and mirror/download availability is unverified.")
+    if os_info.identifier in {"debian", "raspbian"}:
+        print("Refresh indexes, then rerun this audit before using an upgrade plan:")
+        print("  sudo apt update")
+        print("apt update alone does not install updates or upgrade the OS to a new release.")
+    if root != Path("/"):
+        print("Offline audit: no upgrade commands can be derived from the host's packages.")
+    for branch in sorted({p.branch for p in inventory.packages.values()}):
+        packages = sorted((p for p in inventory.packages.values() if p.branch == branch), key=lambda p: p.name)
+        if message := php_support_finding(branch, today):
+            print(message)
+            findings.append(message)
+        print(f"PHP {branch}: upstream PHP2Shell fixed release {FIXED.get(branch, 'not recorded by this script')}")
+        for package in packages:
+            installed_fixed = version_fixed(branch, package.installed)
+            candidate_fixed = version_fixed(branch, package.candidate)
+            status = "FIXED INSTALLED" if installed_fixed else "INSTALLED FIX UNVERIFIED"
+            candidate = "PATCHED CANDIDATE" if candidate_fixed else "NO VERIFIED PATCHED CANDIDATE"
+            hold = "; HELD" if held_package(package.name, inventory.held) else ""
+            print(f"PACKAGE {package.name}: installed={package.installed} [{status}]; candidate={package.candidate or 'none/unknown'} [{candidate}]{hold}")
+            if not installed_fixed:
+                findings.append(f"{package.name}: installed fix unverified; older versions may contain vendor backports")
+        needs_upgrade = any(not version_fixed(branch, p.installed) for p in packages)
+        blocked = [p.name for p in packages if held_package(p.name, inventory.held) and p.candidate != p.installed]
+        if blocked:
+            findings.append("HELD packages block an automatic upgrade recommendation: " + ", ".join(blocked))
+        verified_candidates = all(version_fixed(branch, p.candidate) for p in packages)
+        if not verified_candidates:
+            findings.append(f"PHP {branch}: no complete verified patched candidate set; review repositories, pinning, mirror freshness, or vendor backports")
+        names = [p.name for p in packages]
+        print("Inspect package policy: " + shlex.join(["apt-cache", "policy", *names]))
+        if needs_upgrade and os_info.supported and verified_candidates and inventory.held is not None and not blocked:
+            command = ["apt-get", "install", "--only-upgrade", "--no-remove", *names]
+            print("After refreshing indexes and rerunning, simulate and review dependency changes:")
+            print("  " + shlex.join(["apt-get", "--simulate", *command[1:]]))
+            print("Upgrade these installed PHP packages (command shown only; not executed):")
+            print("  " + shlex.join(["sudo", *command]))
+        elif needs_upgrade:
+            print("UPGRADE COMMAND WITHHELD: unsupported/unverified OS, candidates, or holds. Do not assume ordinary APT upgrades fix this installation.")
+        else:
+            print(f"PHP {branch}: installed packages meet the upstream fix; running web workers remain unverified.")
+    return findings
+
+
+def restart_guidance(directories):
+    services = sorted({"apache2.service" if d.name == "apache2" else f"php{d.parent.name}-fpm.service"
+                       for d in directories if d.name != "cgi"})
+    print("Worker services to review: " + (", ".join(services) or "CGI launcher/web server"))
+    print("Full restart commands AFTER updates/configuration changes, for SAPIs actually serving the site (not executed):")
+    for service in services:
+        print("  " + shlex.join(["sudo", "systemctl", "restart", service]))
+    if any(d.name == "cgi" for d in directories):
+        print("CGI: persistent FastCGI launcher is unknown; identify its supervisor before restarting. One-shot CGI has no persistent PHP worker.")
+    print("Configuration trees can be inactive. Confirm the serving SAPI; a graceful reload may retain old workers.")
+
+
+def validate_target(plan):
+    # The write path must consist of trusted, real directories, never symlinks.
+    inside_php = True
+    for directory in [plan.target.parent, *plan.target.parent.parents]:
+        info = directory.lstat()
+        if not stat.S_ISDIR(info.st_mode):
+            raise ValueError(f"Refusing a symlink/non-directory write path: {directory}")
+        if inside_php and (info.st_uid != os.geteuid() or info.st_mode & 0o022):
+            raise ValueError(f"Refusing an untrusted writable directory: {directory}")
+        if directory == plan.directory.parents[1]:
+            inside_php = False
+    if plan.target.is_symlink():
+        raise ValueError(f"Refusing a symlink at managed target: {plan.target}")
+    if plan.target.exists():
+        info = plan.target.lstat()
+        if not stat.S_ISREG(info.st_mode) or info.st_nlink != 1 or info.st_uid != os.geteuid() or info.st_mode & 0o022:
+            raise ValueError(f"Refusing an untrusted managed file: {plan.target}")
+    current = read_config(plan.target) if plan.target.exists() else None
+    if current != plan.previous:
+        raise ValueError(f"Configuration changed during inspection; rerun: {plan.target}")
+
+
+def apply_plans(plans):
+    # Preflight every destination before making the first change.
+    for plan in plans:
+        validate_target(plan)
+    for plan in plans:
+        if plan.previous == plan.contents:
+            print(f"UNCHANGED {plan.target}")
+            continue
+        if plan.previous is not None:
+            stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+            backup = plan.target.with_name(f"{NAME}.bak-{stamp}-{uuid.uuid4().hex[:8]}")
+            with backup.open("xb") as output:
+                os.chmod(backup, 0o600)
+                output.write(plan.previous)
+            print(f"BACKUP {backup}")
+        descriptor, temporary = tempfile.mkstemp(prefix=f".{NAME}.", dir=plan.target.parent)
+        try:
+            with os.fdopen(descriptor, "wb") as output:
+                output.write(plan.contents)
+                output.flush()
+                os.fsync(output.fileno())
+                os.fchmod(output.fileno(), 0o644)
+            os.replace(temporary, plan.target)
+        finally:
+            if os.path.exists(temporary):
+                os.unlink(temporary)
+        print(f"WROTE {plan.target}")
+
+
+def main(argv=None):
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--apply", action="store_true", help="write managed INI snippets; does not restart services")
+    parser.add_argument("--allow-unlimited-memory", action="store_true", help="include memory_limit=-1; removes PHP's per-request memory guard")
+    parser.add_argument("--sapi", action="append", choices=SAPIS, help="limit to this web SAPI (repeatable; default: all discovered)")
+    parser.add_argument("--root", type=Path, default=Path("/"), help="filesystem root for offline audit only")
+    parser.add_argument("--web-root", type=Path, action="append", help="additional web root to inspect (repeatable)")
+    args = parser.parse_args(argv)
+    if args.apply and (args.root != Path("/") or sys.platform != "linux" or os.geteuid() != 0):
+        parser.error("--apply requires Linux root on the live filesystem; offline roots are audit-only")
+    print("PHP2Shell: PARTIAL MITIGATIONS ONLY. Updating PHP is the complete fix.")
+    print("Static files only: active SAPI, effective request settings and worker restarts are NOT verified.")
+    try:
+        os_info = detect_os(args.root)
+        inventory = package_inventory(args.root)
+        findings = package_guidance(os_info, inventory, args.root)
+        directories = discover(args.root, args.sapi)
+        if not directories:
+            raise ValueError("No Debian web PHP trees found under etc/php (CLI PHP is not a web-SAPI check)")
+        restart_guidance(directories)
+        plans = []
+        for directory in directories:
+            plan, values, scoped = inspect(directory, args.allow_unlimited_memory)
+            plans.append(plan)
+            print(f"\nPHP {directory.parent.name}/{directory.name}: {directory}")
+            branch, sapi = directory.parent.name, directory.name
+            if not any(p.branch == branch for p in inventory.packages.values()):
+                if message := php_support_finding(branch):
+                    print(message)
+                    findings.append(message)
+            expected = f"libapache2-mod-php{branch}" if sapi == "apache2" else f"php{branch}-{sapi}"
+            if not any(p.name.split(":", 1)[0] == expected for p in inventory.packages.values()):
+                findings.append(f"{directory}: serving package {expected} not established; tree may be inactive/custom/offline")
+            for key in sorted(KEYS):
+                print(f"  {key} = {values.get(key, 'not explicitly set')}")
+            print("  Planned override: " + ", ".join(f"{key}={value}" for key, value in plan.settings.items()))
+            findings.extend(scoped)
+        web_roots = [args.root / "var/www", *(args.web_root or [])]
+        findings.extend(override_findings(args.root, directories, web_roots))
+        if args.apply:
+            if any("memory_limit" in p.settings for p in plans):
+                print("MEMORY: unlimited PHP memory selected/preserved; review worker cgroup/container availability limits.")
+            apply_plans(plans)
+        for plan in plans:
+            # Re-read after apply to catch later INI files that override this one.
+            _, values, _ = inspect(plan.directory, args.allow_unlimited_memory)
+            findings.extend(f"{plan.directory}: {item}" for item in settings_findings(values, plan.directory.parent.name))
+        for finding in findings:
+            print(f"REVIEW {finding}")
+        print("\nRequired: vendor PHP updates, override/diagnostic review, and a full restart of every serving PHP worker.")
+        print("CGI/custom launchers, external includes, custom INI scan paths and application ini_set() need separate review.")
+        print("INI snippets do not lock memory_limit against application or per-directory overrides; use reviewed admin settings.")
+        print("No packages, services, WsprryPi settings, GPIO or RF state were changed.")
+        return 1 if findings else 0
+    except (OSError, ValueError, UnicodeError) as error:
+        print(f"ERROR {error}. Any WROTE files above remain on disk; services were not restarted.", file=sys.stderr)
+        return 2
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
