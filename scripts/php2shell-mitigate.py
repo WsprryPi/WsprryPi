@@ -91,7 +91,7 @@ def ini_values(path):
         match = re.match(r"([\w.]+)\s*=\s*(.*)$", line)
         if match and match[1] in KEYS:
             if special_section:
-                scoped.append(f"{path}:{number}: scoped {match[1]} requires review")
+                scoped.append(f"{path}:{number}: scoped {match[1]} (not included in global INI checks)")
             else:
                 value = match[2]
                 if len(value) >= 2 and value[0] == value[-1] and value[0] in "\"'":
@@ -164,6 +164,7 @@ def inspect(directory, allow_memory):
 
 
 def settings_findings(values, version):
+    """Optional partial-mitigation checks; these do not establish patch status."""
     findings = []
     for key in ["session.upload_progress.enabled", *(["fatal_error_backtraces"] if version == "8.5" else [])]:
         if not disabled(values.get(key)):
@@ -174,7 +175,7 @@ def settings_findings(values, version):
     if upload is None or not upload > 0 or post is None or upload >= post:
         findings.append("upload_max_filesize: needs a positive limit below post_max_size")
     if values.get("memory_limit") != "-1":
-        findings.append("memory_limit: finite or unknown; optional OOM mitigation needs --allow-unlimited-memory")
+        findings.append("memory_limit: finite or unknown; optional unlimited-memory mitigation is not configured")
     return findings
 
 
@@ -215,9 +216,9 @@ def override_findings(root, directories, web_roots):
             if not line or line.startswith(("#", ";")):
                 continue
             if re.search(r"\bphp_(?:admin_)?(?:value|flag)\b|\bPHP_(?:ADMIN_)?VALUE\b", line, re.I):
-                findings.append(f"{path}:{number}: PHP override/diagnostic source requires review")
+                findings.append(f"{path}:{number}: PHP override/diagnostic source (effect not evaluated)")
             elif path.name == ".user.ini" and "=" in line:
-                findings.append(f"{path}:{number}: per-directory INI setting requires review")
+                findings.append(f"{path}:{number}: per-directory INI setting (effect not evaluated)")
     return findings
 
 
@@ -253,8 +254,10 @@ class AuditReport:
     inventory: Inventory | None = None
     directories: list = field(default_factory=list)
     records: list = field(default_factory=list)
-    findings: list = field(default_factory=list)
-    config_findings: list = field(default_factory=list)
+    security_findings: list = field(default_factory=list)
+    mitigations: list = field(default_factory=list)
+    config_notes: list = field(default_factory=list)
+    upgrade_notes: list = field(default_factory=list)
     services: dict = field(default_factory=dict)
     changes: list = field(default_factory=list)
     error: str | None = None
@@ -316,6 +319,11 @@ def version_fixed(branch, version):
     match = re.fullmatch(r"(?:\d+:)?(\d+\.\d+\.\d+)(?:-[A-Za-z0-9.+~]+)?", version or "")
     return bool(match and branch in FIXED and match[1].rsplit(".", 1)[0] == branch
                 and tuple(map(int, match[1].split("."))) >= tuple(map(int, FIXED[branch].split("."))))
+
+
+def installed_fix_verified(inventory):
+    return bool(inventory and inventory.available and inventory.packages
+                and all(version_fixed(p.branch, p.installed) for p in inventory.packages.values()))
 
 
 def php_support_finding(branch, today=None):
@@ -395,13 +403,15 @@ def upgrade_blockers(os_info, inventory, packages):
 
 def package_guidance(os_info, inventory, root, today=None):
     today = today or date.today()
-    findings = list(inventory.issues)
+    # Missing installed-package inventory blocks a conclusion. APT candidate or
+    # hold-query issues only affect upgrade planning, not an installed fix.
+    findings = [] if inventory.available else list(inventory.issues)
     print(f"OS {os_info.name}; ID={os_info.identifier}; version={os_info.version}; codename={os_info.codename}")
     print(os_info.message)
     if not os_info.supported:
         findings.append(os_info.message)
     print("APT candidates use existing LOCAL indexes; indexes were not refreshed and mirror/download availability is unverified.")
-    if os_info.identifier in {"debian", "raspbian"}:
+    if inventory.packages and not installed_fix_verified(inventory) and os_info.identifier in {"debian", "raspbian"}:
         print("Refresh indexes, then rerun this audit before using an upgrade plan:")
         print("  sudo apt update")
         print("apt update alone does not install updates or upgrade the OS to a new release.")
@@ -424,10 +434,10 @@ def package_guidance(os_info, inventory, root, today=None):
                 findings.append(f"{package.name}: installed fix unverified; older versions may contain vendor backports")
         needs_upgrade = any(not version_fixed(branch, p.installed) for p in packages)
         blocked = [p.name for p in packages if held_package(p.name, inventory.held) and p.candidate != p.installed]
-        if blocked:
+        if needs_upgrade and blocked:
             findings.append("HELD packages block an automatic upgrade recommendation: " + ", ".join(blocked))
         verified_candidates = all(version_fixed(branch, p.candidate) for p in packages)
-        if not verified_candidates:
+        if needs_upgrade and not verified_candidates:
             findings.append(f"PHP {branch}: no complete verified patched candidate set; review repositories, pinning, mirror freshness, or vendor backports")
         names = [p.name for p in packages]
         print("Inspect package policy: " + shlex.join(["apt-cache", "policy", *names]))
@@ -495,11 +505,15 @@ def summary(report, args):
         print(current.rstrip())
 
     inventory = report.inventory
+    patched = installed_fix_verified(inventory)
     absent = bool(inventory and inventory.available and not inventory.packages and not report.directories)
     result = "CHECK FAILED" if report.error else "NOTHING TO CHECK" if absent else "CHECK COMPLETE"
     line(f"PHP2Shell: {result}")
     if not report.error and not absent:
-        line("Result: review needed." if report.findings else "Result: no outstanding static checks.")
+        if report.security_findings:
+            line("Result: security review needed.")
+        else:
+            line("Result: PHP security fix installed." if patched else "Result: no outstanding security findings.")
     writes = [path for kind, path in report.changes if kind == "write"]
     line(f"Settings files changed: {len(writes)}." if writes else "No settings changed.")
     if report.error:
@@ -531,12 +545,13 @@ def summary(report, args):
         line(f"PHP {branch}: {installed} ({len(packages)} packages)")
         line("Fix: installed package versions meet the upstream fix." if fixed else
              f"Fix: not verified. Upstream fixed release: {FIXED.get(branch, 'unknown for this branch')}.")
-        line(f"APT candidate: {candidates}" + (" (patched)." if ready else " (fix not verified)."))
+        line(f"APT candidate: {candidates}" + (" (patched)." if ready else
+             " (upgrade availability unverified)." if fixed else " (fix not verified)."))
         if issue := php_support_finding(branch):
             line(issue)
-        if inventory.held is None:
+        if not fixed and inventory.held is None:
             line("Package holds: could not be checked.")
-        elif any(held_package(p.name, inventory.held) for p in packages):
+        elif not fixed and any(held_package(p.name, inventory.held) for p in packages):
             line("Held PHP packages need review; see --verbose.")
     if report.services:
         line()
@@ -548,10 +563,12 @@ def summary(report, args):
         line("Service state only; PHP requests were not tested.")
     if report.records:
         line()
+        line("Optional mitigations (not required for patched PHP):" if patched and not report.security_findings
+             else "Optional partial mitigations (do not replace a PHP update):")
         missing = sum(not disabled(values.get("session.upload_progress.enabled")) for _, values in report.records)
         line(f"Upload progress: not disabled in {missing} web {'configuration' if missing == 1 else 'configurations'}." if missing else "Upload progress: disabled in checked web configurations.")
         if not args.allow_unlimited_memory and any(values.get("memory_limit") != "-1" for _, values in report.records):
-            line("Unlimited-memory mitigation: not selected (optional).")
+            line("Unlimited-memory mitigation: not selected; current limit retained.")
         backtraces = sum(plan.directory.parent.name == "8.5" and not disabled(values.get("fatal_error_backtraces")) for plan, values in report.records)
         if backtraces:
             line(f"Fatal backtraces: not disabled in {backtraces} PHP 8.5 configuration(s).")
@@ -560,10 +577,14 @@ def summary(report, args):
             post, upload = quantity(values.get("post_max_size")), quantity(values.get("upload_max_filesize"))
             limits += not post or post > 8 * MIB or not upload or upload >= post
         if limits:
-            line(f"Request/upload limits: {limits} configuration(s) need changes.")
-    if report.config_findings:
-        count = len(report.config_findings)
-        line(f"Config review: {count} {'item' if count == 1 else 'items'}; see --verbose.")
+            line(f"Request/upload limits: {limits} configuration(s) outside the mitigation profile.")
+    if report.config_notes:
+        count = len(report.config_notes)
+        line(f"Configuration notes: {count} {'item' if count == 1 else 'items'} (informational); see --verbose.")
+    if report.upgrade_notes:
+        line(f"Upgrade metadata notes: {len(report.upgrade_notes)} (informational); see --verbose.")
+    if report.security_findings:
+        line(f"Security findings: {len(report.security_findings)}; see --verbose.")
     for kind, path in report.changes:
         line(f"{'Backup' if kind == 'backup' else 'Changed'}: {path}")
     restart_units = set()
@@ -599,6 +620,8 @@ def summary(report, args):
         line("Inspection/apply did not finish. Any changed files listed above remain on disk.")
     elif absent:
         line("Custom/container PHP was not checked.")
+    elif patched:
+        line("Worker restart history and loaded PHP versions were not checked.")
     else:
         line("APT data may be stale. Settings are partial mitigations; a PHP update provides the complete fix.")
     line("Use --verbose for package, configuration and restart details.")
@@ -676,11 +699,13 @@ def main(argv=None):
         if not args.root.is_dir():
             raise ValueError(f"Audit root is not a directory: {args.root}")
         with redirect_stdout(details):
-            print("PARTIAL MITIGATIONS ONLY. Updating PHP is the complete fix.")
+            print("PHP package status and optional partial mitigations.")
             report.os_info = detect_os(args.root)
             report.inventory = package_inventory(args.root)
             inventory = report.inventory
-            report.findings = package_guidance(report.os_info, inventory, args.root)
+            report.security_findings = package_guidance(report.os_info, inventory, args.root)
+            if inventory.available:
+                report.upgrade_notes.extend(inventory.issues)
             directories = discover(args.root, args.sapi)
             report.directories = directories
             report.services = service_status(args.root, directories, inventory)
@@ -696,18 +721,17 @@ def main(argv=None):
                 if not any(p.branch == branch for p in inventory.packages.values()):
                     if message := php_support_finding(branch):
                         print(message)
-                        report.findings.append(message)
+                        report.security_findings.append(message)
                 expected = f"libapache2-mod-php{branch}" if sapi == "apache2" else f"php{branch}-{sapi}"
                 if not any(p.name.split(":", 1)[0] == expected for p in inventory.packages.values()):
-                    report.findings.append(f"{directory}: serving package {expected} not established; tree may be inactive/custom/offline")
+                    report.security_findings.append(f"{directory}: serving package {expected} not established; tree may be inactive/custom/offline")
                 for key in sorted(KEYS):
                     print(f"  {key} = {values.get(key, 'not explicitly set')}")
-                print("  Planned override: " + ", ".join(f"{key}={value}" for key, value in plan.settings.items()))
-                report.config_findings.extend(scoped)
+                print("  Planned override (only with --apply): " + ", ".join(f"{key}={value}" for key, value in plan.settings.items()))
+                report.config_notes.extend(scoped)
             if directories:
                 web_roots = [args.root / "var/www", *(args.web_root or [])]
-                report.config_findings.extend(override_findings(args.root, directories, web_roots))
-            report.findings.extend(report.config_findings)
+                report.config_notes.extend(override_findings(args.root, directories, web_roots))
             if args.apply:
                 if any("memory_limit" in p.settings for p in plans):
                     print("MEMORY: unlimited PHP memory selected/preserved; review worker cgroup/container availability limits.")
@@ -716,16 +740,22 @@ def main(argv=None):
                 # Re-read after apply to catch later INI files that override it.
                 _, values, _ = inspect(plan.directory, args.allow_unlimited_memory)
                 report.records[index] = (plan, values)
-                report.findings.extend(f"{plan.directory}: {item}" for item in settings_findings(values, plan.directory.parent.name))
-            for finding in report.findings:
-                print(f"REVIEW {finding}")
+                report.mitigations.extend(f"{plan.directory}: {item}" for item in settings_findings(values, plan.directory.parent.name))
+            for finding in report.security_findings:
+                print(f"SECURITY {finding}")
+            for mitigation in report.mitigations:
+                print(f"OPTIONAL MITIGATION {mitigation}")
+            for note in report.config_notes:
+                print(f"CONFIG NOTE {note}")
+            for note in report.upgrade_notes:
+                print(f"UPGRADE NOTE {note}")
     except (OSError, ValueError, UnicodeError) as error:
         report.error = str(error)
     summary(report, args)
     if args.verbose:
         print("\nDetailed evidence\n")
         print(details.getvalue(), end="")
-    return 2 if report.error else 1 if report.findings else 0
+    return 2 if report.error else 1 if report.security_findings else 0
 
 
 if __name__ == "__main__":
