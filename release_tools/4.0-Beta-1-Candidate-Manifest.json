@@ -1,9 +1,9 @@
 {
   "schema": "wsprrypi-beta-candidate/1",
   "publication": "unpublished",
-  "candidate_acceptance": "accepted-with-specific-physical-test-limitations-and-documented-service-request-cap-exception",
+  "candidate_acceptance": "pending-replacement-installation-service-runtime-acceptance",
   "version": "4.0.0-beta.1",
-  "source_commit": "3decc072c0d59d410d888d307182c4a6f73b70e4",
+  "source_commit": "1e047a44a44f07d2eb52dfd3c3537d2d24e60143",
   "source_branch": "devel",
   "source_dirty": false,
   "superseded_preparation_commits": [
@@ -20,7 +20,7 @@
     "commit": "5e428aae0ccdd1e3662c9a0b881e4e2b18866f9e",
     "commits_beyond_stable": 779
   },
-  "candidate_commits_beyond_stable": 784,
+  "candidate_commits_beyond_stable": 804,
   "source_input_fingerprint": {
     "algorithm": "SHA256 of git ls-tree -r output",
     "roots": [
@@ -32,7 +32,7 @@
       ".dockerignore",
       ".github"
     ],
-    "sha256": "8238004d43b5836a2f31d96f3f0c897a0da69c96425a65143eafca68b8a00270"
+    "sha256": "fc66261f5ba92a331e33e530e9ba571a072d8ba49a8211eb07e019d826aa53bc"
   },
   "operator_docs": {
     "commit": "5214cdf8ee8517b570553edeeefbdced17f2ba93",
@@ -115,111 +115,110 @@
     }
   ],
   "ci": {
-    "id": 39351018294,
-    "head_sha": "3decc072c0d59d410d888d307182c4a6f73b70e4",
-    "html_url": "https://github.com/WsprryPi/WsprryPi/actions/runs/39351018294",
+    "id": 39520378385,
+    "head_sha": "1e047a44a44f07d2eb52dfd3c3537d2d24e60143",
+    "html_url": "https://github.com/WsprryPi/WsprryPi/actions/runs/39520378385",
     "status": "completed",
     "conclusion": "success",
-    "updated_at": "2026-10-20T01:18:44Z",
     "jobs": [
       {
-        "id": 118395017728,
-        "name": "non-hardware-validation",
-        "conclusion": "success",
-        "html_url": "https://github.com/WsprryPi/WsprryPi/actions/runs/39351018294/job/118395017728"
-      },
-      {
-        "id": 118395017877,
-        "name": "wtp-configuration-legacy (legacy)",
-        "conclusion": "success",
-        "html_url": "https://github.com/WsprryPi/WsprryPi/actions/runs/39351018294/job/118395017877"
-      },
-      {
-        "id": 118395017912,
-        "name": "strict-i2c-profile",
-        "conclusion": "success",
-        "html_url": "https://github.com/WsprryPi/WsprryPi/actions/runs/39351018294/job/118395017912"
-      },
-      {
-        "id": 118395017925,
-        "name": "wtp-usb-management-pair",
-        "conclusion": "success",
-        "html_url": "https://github.com/WsprryPi/WsprryPi/actions/runs/39351018294/job/118395017925"
-      },
-      {
-        "id": 118395017956,
+        "id": 118962502184,
         "name": "macos-simulated-profile",
         "conclusion": "success",
-        "html_url": "https://github.com/WsprryPi/WsprryPi/actions/runs/39351018294/job/118395017956"
+        "html_url": "https://github.com/WsprryPi/WsprryPi/actions/runs/39520378385/job/118962502184"
       },
       {
-        "id": 118395017974,
-        "name": "wtp-network-loopback",
+        "id": 118962502514,
+        "name": "wtp-usb-management-pair",
         "conclusion": "success",
-        "html_url": "https://github.com/WsprryPi/WsprryPi/actions/runs/39351018294/job/118395017974"
+        "html_url": "https://github.com/WsprryPi/WsprryPi/actions/runs/39520378385/job/118962502514"
       },
       {
-        "id": 118395018002,
-        "name": "wtp-configuration-legacy (p158)",
-        "conclusion": "success",
-        "html_url": "https://github.com/WsprryPi/WsprryPi/actions/runs/39351018294/job/118395018002"
-      },
-      {
-        "id": 118395018079,
-        "name": "wtp-configuration-legacy (p153)",
-        "conclusion": "success",
-        "html_url": "https://github.com/WsprryPi/WsprryPi/actions/runs/39351018294/job/118395018079"
-      },
-      {
-        "id": 118395018080,
-        "name": "wtp-configuration-legacy (p157)",
-        "conclusion": "success",
-        "html_url": "https://github.com/WsprryPi/WsprryPi/actions/runs/39351018294/job/118395018080"
-      },
-      {
-        "id": 118395018088,
+        "id": 118962502573,
         "name": "ubuntu-gcc13-release",
         "conclusion": "success",
-        "html_url": "https://github.com/WsprryPi/WsprryPi/actions/runs/39351018294/job/118395018088"
+        "html_url": "https://github.com/WsprryPi/WsprryPi/actions/runs/39520378385/job/118962502573"
       },
       {
-        "id": 118395018127,
-        "name": "wtp-configuration-legacy (p154)",
-        "conclusion": "success",
-        "html_url": "https://github.com/WsprryPi/WsprryPi/actions/runs/39351018294/job/118395018127"
-      },
-      {
-        "id": 118395018151,
-        "name": "wtp-configuration-legacy (p152)",
-        "conclusion": "success",
-        "html_url": "https://github.com/WsprryPi/WsprryPi/actions/runs/39351018294/job/118395018151"
-      },
-      {
-        "id": 118395018207,
+        "id": 118962502579,
         "name": "wtp-configuration-legacy (p156)",
         "conclusion": "success",
-        "html_url": "https://github.com/WsprryPi/WsprryPi/actions/runs/39351018294/job/118395018207"
+        "html_url": "https://github.com/WsprryPi/WsprryPi/actions/runs/39520378385/job/118962502579"
       },
       {
-        "id": 118395018383,
+        "id": 118962502597,
+        "name": "strict-i2c-profile",
+        "conclusion": "success",
+        "html_url": "https://github.com/WsprryPi/WsprryPi/actions/runs/39520378385/job/118962502597"
+      },
+      {
+        "id": 118962502658,
+        "name": "wtp-configuration-legacy (p157)",
+        "conclusion": "success",
+        "html_url": "https://github.com/WsprryPi/WsprryPi/actions/runs/39520378385/job/118962502658"
+      },
+      {
+        "id": 118962502682,
+        "name": "wtp-network-loopback",
+        "conclusion": "success",
+        "html_url": "https://github.com/WsprryPi/WsprryPi/actions/runs/39520378385/job/118962502682"
+      },
+      {
+        "id": 118962502702,
         "name": "wtp-configuration-legacy (extended)",
         "conclusion": "success",
-        "html_url": "https://github.com/WsprryPi/WsprryPi/actions/runs/39351018294/job/118395018383"
+        "html_url": "https://github.com/WsprryPi/WsprryPi/actions/runs/39520378385/job/118962502702"
+      },
+      {
+        "id": 118962502711,
+        "name": "wtp-configuration-legacy (legacy)",
+        "conclusion": "success",
+        "html_url": "https://github.com/WsprryPi/WsprryPi/actions/runs/39520378385/job/118962502711"
+      },
+      {
+        "id": 118962502716,
+        "name": "wtp-configuration-legacy (p153)",
+        "conclusion": "success",
+        "html_url": "https://github.com/WsprryPi/WsprryPi/actions/runs/39520378385/job/118962502716"
+      },
+      {
+        "id": 118962502717,
+        "name": "non-hardware-validation",
+        "conclusion": "success",
+        "html_url": "https://github.com/WsprryPi/WsprryPi/actions/runs/39520378385/job/118962502717"
+      },
+      {
+        "id": 118962502733,
+        "name": "wtp-configuration-legacy (p154)",
+        "conclusion": "success",
+        "html_url": "https://github.com/WsprryPi/WsprryPi/actions/runs/39520378385/job/118962502733"
+      },
+      {
+        "id": 118962502749,
+        "name": "wtp-configuration-legacy (p158)",
+        "conclusion": "success",
+        "html_url": "https://github.com/WsprryPi/WsprryPi/actions/runs/39520378385/job/118962502749"
+      },
+      {
+        "id": 118962502833,
+        "name": "wtp-configuration-legacy (p152)",
+        "conclusion": "success",
+        "html_url": "https://github.com/WsprryPi/WsprryPi/actions/runs/39520378385/job/118962502833"
       }
     ]
   },
   "artifacts": [
     {
       "target": "armv6-bookworm",
-      "path_relative_to_repository": "dist/beta1/armv6-bookworm",
-      "binary_bytes": 5841868,
-      "image": "sha256:2ec7005707b816be2109596d451238a3d68e82873e38dacfa84457768415ba6a",
+      "path_relative_to_repository": "dist/beta1-revalidated/1e047a44/armv6-bookworm",
+      "binary_bytes": 5841936,
+      "image": "sha256:516ed231829eb50c77f7d838d45d4094295fe4bc40bd8c15e7380c8da69856d8",
       "compiled_metadata": {
-        "MAKE_TAG": "4.0.0-beta.1+3decc07",
+        "MAKE_TAG": "4.0.0-beta.1+1e047a4",
         "MAKE_BRH": "devel",
         "MAKE_RAW_BRH": "devel",
         "MAKE_BRANCH_STATE": "branch",
-        "MAKE_COMMIT": "3decc072c0d59d410d888d307182c4a6f73b70e4",
+        "MAKE_COMMIT": "1e047a44a44f07d2eb52dfd3c3537d2d24e60143",
         "MAKE_DIRTY": "false",
         "MAKE_EXE": "wsprrypi",
         "MAKE_PRJ": "WsprryPi"
@@ -233,33 +232,32 @@
         "unprivileged_version_exit": 0
       },
       "export_sha256": {
-        "SHA256SUMS": "73171225395a883ca24a586adbb8f3c928f0634180752bf5728663c4c90aba71",
-        "build-image-id.txt": "9899b8382478cbd3496c30c4122f273aff1b729bc62910835af1042600976ee8",
-        "build-metadata.hpp": "e2e9693885e0abb6289b0807ca30ea6d68ac7b4f0c203afea0edd50e5d06bfb8",
+        "SHA256SUMS": "4b395a693eca4f9dbbfc4737e63f1dcc47e2e84fd3e2a9bfa4174fa4767eaead",
+        "build-image-id.txt": "00003540d65b2286de93e6bcf52b9f68da40309fc5787273318c5e1f6e6cb2bc",
+        "build-metadata.hpp": "6df168c6963277f06550b271b223094a79104fbfbf6f1f93d5ea4cb78c8c6f8a",
         "build-packages.txt": "2b97702b1882f23eb41240e1ef159f292bc0f4cea90ca86aa1c4d5b79229e52a",
         "elf-attributes.txt": "7a9d070ba32d27d4f8c9cf8063bf670f4736b5dd81ffaddb4fbe897fcf5745c3",
-        "elf-dynamic.txt": "94cb3ad2881dfecbf42829f5e55f8d6f5b97663d9af5be0774d101f53d49fd84",
-        "elf-header.txt": "829f7976a25bee8ad97393b93a2945d2b60ef48bdcc54b3795aae79bf53982df",
+        "elf-dynamic.txt": "acda7cb0e97db994b90636dec96d73080d6f4715227b8c880ab23c94842b5df3",
+        "elf-header.txt": "e805eb9034de03e27734066c641b7a22f9f6bc7e81be897fc020704af6977e4a",
         "elf-versions.txt": "d027d18dc46237ec5053a8b6016070a0e767a19b5c7e23988a1ffbfb63feb726",
-        "file.txt": "e03105e4102e32f7dc0f9710e304b3fe011d4bc2ac57740748ff992a07b9e75b",
+        "file.txt": "216c39858e5d26b07eb9b51260aad26d39ad89c41b98196d44c583115496a685",
         "os-release.txt": "8c7c20d66f556c1804af774a9fc89b38c3862960e2cd6571c8a4ad177fa77028",
         "shared-libraries.txt": "8e2ac80d161329af24593e9f7d6a6d4f7eb9326a53264ee467bb1e1af1ea943e",
         "target.txt": "6bf0e78dfec924f611421701b31d1fa29ff3027b19e6ee3c30703fcc11873f05",
-        "version.txt": "230591dc93bff3321501b08be739a75518a0ba87c70155d80074bb67de39f4f6",
-        "wsprrypi": "d08f7f6324e8e2734fd5dde28e83d98954a0e7ffac7cc3baf1bff9b7fab1a11c"
+        "wsprrypi": "351d1859b288d228e1eb952ef13c6f5df3cbf556ae582e62f588a35aba6a3348"
       }
     },
     {
       "target": "armv6-trixie",
-      "path_relative_to_repository": "dist/beta1/armv6-trixie",
-      "binary_bytes": 5999712,
-      "image": "sha256:60b6b461a3f35608480d7b54a4362974176c449422420eb64bda9ae8b8828e43",
+      "path_relative_to_repository": "dist/beta1-revalidated/1e047a44/armv6-trixie",
+      "binary_bytes": 5999744,
+      "image": "sha256:5db74b080202cfd6339291f7cc2deb0564ba92f2c256bec82cd2ae017469fb2b",
       "compiled_metadata": {
-        "MAKE_TAG": "4.0.0-beta.1+3decc07",
+        "MAKE_TAG": "4.0.0-beta.1+1e047a4",
         "MAKE_BRH": "devel",
         "MAKE_RAW_BRH": "devel",
         "MAKE_BRANCH_STATE": "branch",
-        "MAKE_COMMIT": "3decc072c0d59d410d888d307182c4a6f73b70e4",
+        "MAKE_COMMIT": "1e047a44a44f07d2eb52dfd3c3537d2d24e60143",
         "MAKE_DIRTY": "false",
         "MAKE_EXE": "wsprrypi",
         "MAKE_PRJ": "WsprryPi"
@@ -273,33 +271,32 @@
         "unprivileged_version_exit": 0
       },
       "export_sha256": {
-        "SHA256SUMS": "933ce1722f151cf1ecbd1032ec0f889c0bb032e82e0fec33114cba993c45e51a",
-        "build-image-id.txt": "12a93c23e9ac035709ff43be8b5a7101c7bba4d698b2ba8110728731f2cfe90c",
-        "build-metadata.hpp": "e2e9693885e0abb6289b0807ca30ea6d68ac7b4f0c203afea0edd50e5d06bfb8",
+        "SHA256SUMS": "568e0add66672e485f274faea225ef08eb33c8e86db0fb090d9ac7995fa4ed47",
+        "build-image-id.txt": "6110db69073a7c692835e8a14f505e8982917453a7de8a1011e3aa06c4e4ca53",
+        "build-metadata.hpp": "6df168c6963277f06550b271b223094a79104fbfbf6f1f93d5ea4cb78c8c6f8a",
         "build-packages.txt": "0ac68d146ef4af888c12f5cf90e0e7a7ffe51f3ef8535c2d709208dbe2e24ebc",
         "elf-attributes.txt": "7a9d070ba32d27d4f8c9cf8063bf670f4736b5dd81ffaddb4fbe897fcf5745c3",
-        "elf-dynamic.txt": "b8d1a0548c898b396400b55f10b51deae2f7b7896d12d3f1294a32514a7c86bb",
-        "elf-header.txt": "d83a93fabdd730ef581533f8e4ac650fe6a14a42a1ae580172765cd8b31fd784",
+        "elf-dynamic.txt": "ace1ba0f34ff783d48aa8577954f4f50d3d45ff738fb09903c393a56aba2125e",
+        "elf-header.txt": "5767a436d43d7a287e4f1459eb3148e5ca152deac404adcea825cbdc1bf19b91",
         "elf-versions.txt": "222d621068b50cc8a0ee508ad21c8c0cfebf3b9aafd8135247b3a1b8d16a6525",
-        "file.txt": "4d25a56616231a116483d726984d0f64adba6b332a0941c724288d0858ba9f91",
+        "file.txt": "fdcb04d5b79d58da978fab699a4cbc53ff896cea014c4cf59d4a24a03ee9bff6",
         "os-release.txt": "c5f3e5673a41105db643d44fda696588e1a2f5221d90a0e11e297757561ae1cb",
         "shared-libraries.txt": "3f3f524c627de72588bdf18961f29666134127f2c23e36ff4cff502883e9ad29",
         "target.txt": "34592eb14fd837efe2d23a59b347e8d5627cd24a89faae4c60b6a716597526dc",
-        "version.txt": "230591dc93bff3321501b08be739a75518a0ba87c70155d80074bb67de39f4f6",
-        "wsprrypi": "1c6c5b569f3c295a06ee67c4bd277612df69ca9850c1a063c7e592349ef465fc"
+        "wsprrypi": "604bcf1730c9635d62f953cccd7c886f1fe3afaf4b9114c5c6f5d19d3ccdd1f1"
       }
     },
     {
       "target": "aarch64-bookworm",
-      "path_relative_to_repository": "dist/beta1/aarch64-bookworm",
-      "binary_bytes": 6451856,
-      "image": "sha256:c612846ae686b347d0f3f7c438b0d40e2e2d19aeee9142664e950d6491dfa360",
+      "path_relative_to_repository": "dist/beta1-revalidated/1e047a44/aarch64-bookworm",
+      "binary_bytes": 6452024,
+      "image": "sha256:ae61c46cbd1fd3d8409eb38146ea2d871d7cdc40b02ad89899127f0181fb108a",
       "compiled_metadata": {
-        "MAKE_TAG": "4.0.0-beta.1+3decc07",
+        "MAKE_TAG": "4.0.0-beta.1+1e047a4",
         "MAKE_BRH": "devel",
         "MAKE_RAW_BRH": "devel",
         "MAKE_BRANCH_STATE": "branch",
-        "MAKE_COMMIT": "3decc072c0d59d410d888d307182c4a6f73b70e4",
+        "MAKE_COMMIT": "1e047a44a44f07d2eb52dfd3c3537d2d24e60143",
         "MAKE_DIRTY": "false",
         "MAKE_EXE": "wsprrypi",
         "MAKE_PRJ": "WsprryPi"
@@ -313,33 +310,32 @@
         "unprivileged_version_exit": 0
       },
       "export_sha256": {
-        "SHA256SUMS": "0a0dea8cbb4ee6a379cafc50b8f57aa88a3cabd7190d02c4ec3c5e66a55d6ed5",
-        "build-image-id.txt": "1588b31acf960b6ce6c0494aa3a6b5368da0bf01117cac9a08171dc90c4b1758",
-        "build-metadata.hpp": "e2e9693885e0abb6289b0807ca30ea6d68ac7b4f0c203afea0edd50e5d06bfb8",
+        "SHA256SUMS": "536633cabd4b0500b320ca4c11a1466ea6b02bbf6be2a79c6f73c816276ec37d",
+        "build-image-id.txt": "ccdf7af46e7bed2c1765451198fe294fcd81f5876c7d3686b0cc596c558a5380",
+        "build-metadata.hpp": "6df168c6963277f06550b271b223094a79104fbfbf6f1f93d5ea4cb78c8c6f8a",
         "build-packages.txt": "940573ce8239c978b0d55dae920e31ede11085dac701d3bcaadb240330761685",
         "elf-attributes.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-        "elf-dynamic.txt": "9fe8c6e761e26a97e6fbff7ac0ff1b557cb6157a7e1cd6f4bae0bc99a100b014",
-        "elf-header.txt": "72e616eb20810533277ebc5a6e2a11b0880757006b05314a1ee04954e1f8869c",
+        "elf-dynamic.txt": "46b9d26c3fba3f19f61a89c50448a52fbc07b3982640e99039affd6a48a8ae7a",
+        "elf-header.txt": "2cd7a0b60609e977ca03304242e610425cded8c91649e8256d16cff5956f91d3",
         "elf-versions.txt": "de81365baae803cc78f3cf426c2afc40ce8fb7ff075b806db7144a7e6c84ea90",
-        "file.txt": "2dbeebe8401487fbeba535dbf301a4233c2cd1881127397059353e5c17946be4",
+        "file.txt": "4b4cb3d65ef01e3310cc284ce83af5b95fe42229211055912b793035938f3f07",
         "os-release.txt": "59a77b5f2666d9c85c489bd1911a6eebbd91ef22fe48b90a3b75f1b21f3844d4",
-        "shared-libraries.txt": "e8e179fea6d955af2aa5eafe76e593f452b58bb69a7d1079b85000016770c2b8",
+        "shared-libraries.txt": "1b36c81940f1f45fababd3b154fefb3405801207e8a83b3858d3f459b7681fac",
         "target.txt": "d742ebc54118c65d32c5d17c94fad7cbd743c4c5c4fb9ec0d56198d2d6585c2d",
-        "version.txt": "230591dc93bff3321501b08be739a75518a0ba87c70155d80074bb67de39f4f6",
-        "wsprrypi": "a6b455367454905baec5dc578db5c7ee701da2eee503d8cc3316319bd8f23319"
+        "wsprrypi": "47e5e588d95a7abb6f3799d738d33c6350e61000a59f0c2c51b562f0336ea403"
       }
     },
     {
       "target": "aarch64-trixie",
-      "path_relative_to_repository": "dist/beta1/aarch64-trixie",
-      "binary_bytes": 6549304,
-      "image": "sha256:044236fe69e50f2d38036b735f315bc647a21b7c84c495eecc84685de3fd5d7f",
+      "path_relative_to_repository": "dist/beta1-revalidated/1e047a44/aarch64-trixie",
+      "binary_bytes": 6549328,
+      "image": "sha256:c700867ad614436c5d14d96e815c21a6735456f508e7b82899e3edf78dcfc545",
       "compiled_metadata": {
-        "MAKE_TAG": "4.0.0-beta.1+3decc07",
+        "MAKE_TAG": "4.0.0-beta.1+1e047a4",
         "MAKE_BRH": "devel",
         "MAKE_RAW_BRH": "devel",
         "MAKE_BRANCH_STATE": "branch",
-        "MAKE_COMMIT": "3decc072c0d59d410d888d307182c4a6f73b70e4",
+        "MAKE_COMMIT": "1e047a44a44f07d2eb52dfd3c3537d2d24e60143",
         "MAKE_DIRTY": "false",
         "MAKE_EXE": "wsprrypi",
         "MAKE_PRJ": "WsprryPi"
@@ -353,20 +349,19 @@
         "unprivileged_version_exit": 0
       },
       "export_sha256": {
-        "SHA256SUMS": "2792cd276cc46e72f8da2d27ce35169cb688dc9c7933e0c38bd4205433e55ec8",
-        "build-image-id.txt": "d957f2e5a32498152e39a33903bb7f4e538ba756056326c7b71dfb0692591151",
-        "build-metadata.hpp": "e2e9693885e0abb6289b0807ca30ea6d68ac7b4f0c203afea0edd50e5d06bfb8",
+        "SHA256SUMS": "7abd87b07ea2c6b088dc06ee1b5e206e397664e3363ae1b5bdab18274388cfa2",
+        "build-image-id.txt": "2f379c64e0e995c7193d50a6425945f685e010e89bca52f471bfc8f4322cfbeb",
+        "build-metadata.hpp": "6df168c6963277f06550b271b223094a79104fbfbf6f1f93d5ea4cb78c8c6f8a",
         "build-packages.txt": "6febb0bba7c7a5680eab36ddd63d0bc8372d1996586c0711d723b17c5c65d391",
         "elf-attributes.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-        "elf-dynamic.txt": "d8b4346febda2073c5ef1ffe6657eaaacdb8ddf1360222ec56ba8858d7effd72",
-        "elf-header.txt": "c0644afedc506e768ee6a1c63536b302b1779c5ee1edd5f229d3cd421b5295ca",
+        "elf-dynamic.txt": "242304b21524ec3562fee511508e138fbec2de41f1a7814978709e616f2cf757",
+        "elf-header.txt": "776ab83f87107bce0407af611d08810caf7d911e2c62f45cfd7c0221a3a99520",
         "elf-versions.txt": "3033748b66ee16b4d5aab5648ef8d38c3a172788695ca7186188f5e4ce9b647a",
-        "file.txt": "b0333410c90d06679cff91e443651ca51c281f59ed971d3c98d4e13a50a63148",
+        "file.txt": "0d8dd543403423811cc95ca9023efb49f7b5d12109b50a9eb827f04b7828e584",
         "os-release.txt": "14c430da04c2d571793fc68a8f5e17fce3d7a746e316c3f23192590861b18bd7",
-        "shared-libraries.txt": "5ab57c6ea4be8724084ebc55f7224264918472efd09dcc448bdd2bf00347f06b",
+        "shared-libraries.txt": "50d972ccfbce747d24dc24efdf5e3d24ba8ecac79ea1e077ed7f08ec59965d15",
         "target.txt": "102065d9385bede43e08b401e02b1ed1f267de82076b0cb78f1ca4935df878a7",
-        "version.txt": "230591dc93bff3321501b08be739a75518a0ba87c70155d80074bb67de39f4f6",
-        "wsprrypi": "5cc770d2dd9df828e1440a481150eeb2aa9ca08a798e1c1d24419e4d823208d1"
+        "wsprrypi": "82a563adcf3ff9cda8e43423e588a9739adcda9d2bb07683cb831f6df046feda"
       }
     }
   ],
@@ -653,7 +648,8 @@
     }
   ],
   "limits": [
-    "October 20 wspr5 upgrade, repeat, restart, final UI installation and idle acceptance passed. The operator specifically accepted no fresh clean installation, other three exports on physical targets, reboot or fresh GPIO4 selection. Actual 20 requests exceeded approved 18; independently audited and explicitly accepted for 16c disposition, without retroactive authorization. No transmission, RF test, route change, provider update or Pico operation.",
+    "Replacement source 1e047a44 has fresh software and four-artifact evidence; installation/service/runtime acceptance remains open pending new bounded authorization. No target action performed.",
+    "Historical original-candidate acceptance only: October 20 wspr5 upgrade, repeat, restart, final UI installation and idle acceptance passed. The operator specifically accepted no fresh clean installation, other three exports on physical targets, reboot or fresh GPIO4 selection. Actual 20 requests exceeded approved 18; independently audited and explicitly accepted for 16c disposition, without retroactive authorization. No transmission, RF test, route change, provider update or Pico operation.",
     "Package repositories are not snapshotted; exports record their actual package versions.",
     "Final handoff documentation commits do not reidentify these executables; source and artifact hashes above remain authoritative."
   ],
@@ -3788,6 +3784,833 @@
       }
     },
     "final_disposition": "accepted with specific physical-test limitations and documented 20-versus-18 service-request nonconformance explicitly accepted by operator",
-    "documentation_closeout_ci": "documentation-only final record head is checked after push and reported separately; it does not reidentify original executables or installed UI"
+    "documentation_closeout_ci": "documentation-only final record head is checked after push and reported separately; it does not reidentify original executables or installed UI",
+    "scope": "historical-original-candidate-only; not replacement installation/runtime acceptance"
+  },
+  "historical_original_candidate": {
+    "source_commit": "3decc072c0d59d410d888d307182c4a6f73b70e4",
+    "source_branch": "devel",
+    "source_dirty": false,
+    "candidate_acceptance": "accepted-with-specific-physical-test-limitations-and-documented-service-request-cap-exception",
+    "source_input_fingerprint": {
+      "algorithm": "SHA256 of git ls-tree -r output",
+      "roots": [
+        "src",
+        "WsprryPi-UI",
+        "scripts",
+        "containers",
+        "config",
+        ".dockerignore",
+        ".github"
+      ],
+      "sha256": "8238004d43b5836a2f31d96f3f0c897a0da69c96425a65143eafca68b8a00270"
+    },
+    "ci": {
+      "id": 39351018294,
+      "head_sha": "3decc072c0d59d410d888d307182c4a6f73b70e4",
+      "html_url": "https://github.com/WsprryPi/WsprryPi/actions/runs/39351018294",
+      "status": "completed",
+      "conclusion": "success",
+      "updated_at": "2026-10-20T01:18:44Z",
+      "jobs": [
+        {
+          "id": 118395017728,
+          "name": "non-hardware-validation",
+          "conclusion": "success",
+          "html_url": "https://github.com/WsprryPi/WsprryPi/actions/runs/39351018294/job/118395017728"
+        },
+        {
+          "id": 118395017877,
+          "name": "wtp-configuration-legacy (legacy)",
+          "conclusion": "success",
+          "html_url": "https://github.com/WsprryPi/WsprryPi/actions/runs/39351018294/job/118395017877"
+        },
+        {
+          "id": 118395017912,
+          "name": "strict-i2c-profile",
+          "conclusion": "success",
+          "html_url": "https://github.com/WsprryPi/WsprryPi/actions/runs/39351018294/job/118395017912"
+        },
+        {
+          "id": 118395017925,
+          "name": "wtp-usb-management-pair",
+          "conclusion": "success",
+          "html_url": "https://github.com/WsprryPi/WsprryPi/actions/runs/39351018294/job/118395017925"
+        },
+        {
+          "id": 118395017956,
+          "name": "macos-simulated-profile",
+          "conclusion": "success",
+          "html_url": "https://github.com/WsprryPi/WsprryPi/actions/runs/39351018294/job/118395017956"
+        },
+        {
+          "id": 118395017974,
+          "name": "wtp-network-loopback",
+          "conclusion": "success",
+          "html_url": "https://github.com/WsprryPi/WsprryPi/actions/runs/39351018294/job/118395017974"
+        },
+        {
+          "id": 118395018002,
+          "name": "wtp-configuration-legacy (p158)",
+          "conclusion": "success",
+          "html_url": "https://github.com/WsprryPi/WsprryPi/actions/runs/39351018294/job/118395018002"
+        },
+        {
+          "id": 118395018079,
+          "name": "wtp-configuration-legacy (p153)",
+          "conclusion": "success",
+          "html_url": "https://github.com/WsprryPi/WsprryPi/actions/runs/39351018294/job/118395018079"
+        },
+        {
+          "id": 118395018080,
+          "name": "wtp-configuration-legacy (p157)",
+          "conclusion": "success",
+          "html_url": "https://github.com/WsprryPi/WsprryPi/actions/runs/39351018294/job/118395018080"
+        },
+        {
+          "id": 118395018088,
+          "name": "ubuntu-gcc13-release",
+          "conclusion": "success",
+          "html_url": "https://github.com/WsprryPi/WsprryPi/actions/runs/39351018294/job/118395018088"
+        },
+        {
+          "id": 118395018127,
+          "name": "wtp-configuration-legacy (p154)",
+          "conclusion": "success",
+          "html_url": "https://github.com/WsprryPi/WsprryPi/actions/runs/39351018294/job/118395018127"
+        },
+        {
+          "id": 118395018151,
+          "name": "wtp-configuration-legacy (p152)",
+          "conclusion": "success",
+          "html_url": "https://github.com/WsprryPi/WsprryPi/actions/runs/39351018294/job/118395018151"
+        },
+        {
+          "id": 118395018207,
+          "name": "wtp-configuration-legacy (p156)",
+          "conclusion": "success",
+          "html_url": "https://github.com/WsprryPi/WsprryPi/actions/runs/39351018294/job/118395018207"
+        },
+        {
+          "id": 118395018383,
+          "name": "wtp-configuration-legacy (extended)",
+          "conclusion": "success",
+          "html_url": "https://github.com/WsprryPi/WsprryPi/actions/runs/39351018294/job/118395018383"
+        }
+      ]
+    },
+    "artifacts": [
+      {
+        "target": "armv6-bookworm",
+        "path_relative_to_repository": "dist/beta1/armv6-bookworm",
+        "binary_bytes": 5841868,
+        "image": "sha256:2ec7005707b816be2109596d451238a3d68e82873e38dacfa84457768415ba6a",
+        "compiled_metadata": {
+          "MAKE_TAG": "4.0.0-beta.1+3decc07",
+          "MAKE_BRH": "devel",
+          "MAKE_RAW_BRH": "devel",
+          "MAKE_BRANCH_STATE": "branch",
+          "MAKE_COMMIT": "3decc072c0d59d410d888d307182c4a6f73b70e4",
+          "MAKE_DIRTY": "false",
+          "MAKE_EXE": "wsprrypi",
+          "MAKE_PRJ": "WsprryPi"
+        },
+        "checks": {
+          "build_exit": 0,
+          "checksum": true,
+          "elf_abi": true,
+          "direct_avahi_linkage": true,
+          "build_environment_libraries_resolved": true,
+          "unprivileged_version_exit": 0
+        },
+        "export_sha256": {
+          "SHA256SUMS": "73171225395a883ca24a586adbb8f3c928f0634180752bf5728663c4c90aba71",
+          "build-image-id.txt": "9899b8382478cbd3496c30c4122f273aff1b729bc62910835af1042600976ee8",
+          "build-metadata.hpp": "e2e9693885e0abb6289b0807ca30ea6d68ac7b4f0c203afea0edd50e5d06bfb8",
+          "build-packages.txt": "2b97702b1882f23eb41240e1ef159f292bc0f4cea90ca86aa1c4d5b79229e52a",
+          "elf-attributes.txt": "7a9d070ba32d27d4f8c9cf8063bf670f4736b5dd81ffaddb4fbe897fcf5745c3",
+          "elf-dynamic.txt": "94cb3ad2881dfecbf42829f5e55f8d6f5b97663d9af5be0774d101f53d49fd84",
+          "elf-header.txt": "829f7976a25bee8ad97393b93a2945d2b60ef48bdcc54b3795aae79bf53982df",
+          "elf-versions.txt": "d027d18dc46237ec5053a8b6016070a0e767a19b5c7e23988a1ffbfb63feb726",
+          "file.txt": "e03105e4102e32f7dc0f9710e304b3fe011d4bc2ac57740748ff992a07b9e75b",
+          "os-release.txt": "8c7c20d66f556c1804af774a9fc89b38c3862960e2cd6571c8a4ad177fa77028",
+          "shared-libraries.txt": "8e2ac80d161329af24593e9f7d6a6d4f7eb9326a53264ee467bb1e1af1ea943e",
+          "target.txt": "6bf0e78dfec924f611421701b31d1fa29ff3027b19e6ee3c30703fcc11873f05",
+          "version.txt": "230591dc93bff3321501b08be739a75518a0ba87c70155d80074bb67de39f4f6",
+          "wsprrypi": "d08f7f6324e8e2734fd5dde28e83d98954a0e7ffac7cc3baf1bff9b7fab1a11c"
+        }
+      },
+      {
+        "target": "armv6-trixie",
+        "path_relative_to_repository": "dist/beta1/armv6-trixie",
+        "binary_bytes": 5999712,
+        "image": "sha256:60b6b461a3f35608480d7b54a4362974176c449422420eb64bda9ae8b8828e43",
+        "compiled_metadata": {
+          "MAKE_TAG": "4.0.0-beta.1+3decc07",
+          "MAKE_BRH": "devel",
+          "MAKE_RAW_BRH": "devel",
+          "MAKE_BRANCH_STATE": "branch",
+          "MAKE_COMMIT": "3decc072c0d59d410d888d307182c4a6f73b70e4",
+          "MAKE_DIRTY": "false",
+          "MAKE_EXE": "wsprrypi",
+          "MAKE_PRJ": "WsprryPi"
+        },
+        "checks": {
+          "build_exit": 0,
+          "checksum": true,
+          "elf_abi": true,
+          "direct_avahi_linkage": true,
+          "build_environment_libraries_resolved": true,
+          "unprivileged_version_exit": 0
+        },
+        "export_sha256": {
+          "SHA256SUMS": "933ce1722f151cf1ecbd1032ec0f889c0bb032e82e0fec33114cba993c45e51a",
+          "build-image-id.txt": "12a93c23e9ac035709ff43be8b5a7101c7bba4d698b2ba8110728731f2cfe90c",
+          "build-metadata.hpp": "e2e9693885e0abb6289b0807ca30ea6d68ac7b4f0c203afea0edd50e5d06bfb8",
+          "build-packages.txt": "0ac68d146ef4af888c12f5cf90e0e7a7ffe51f3ef8535c2d709208dbe2e24ebc",
+          "elf-attributes.txt": "7a9d070ba32d27d4f8c9cf8063bf670f4736b5dd81ffaddb4fbe897fcf5745c3",
+          "elf-dynamic.txt": "b8d1a0548c898b396400b55f10b51deae2f7b7896d12d3f1294a32514a7c86bb",
+          "elf-header.txt": "d83a93fabdd730ef581533f8e4ac650fe6a14a42a1ae580172765cd8b31fd784",
+          "elf-versions.txt": "222d621068b50cc8a0ee508ad21c8c0cfebf3b9aafd8135247b3a1b8d16a6525",
+          "file.txt": "4d25a56616231a116483d726984d0f64adba6b332a0941c724288d0858ba9f91",
+          "os-release.txt": "c5f3e5673a41105db643d44fda696588e1a2f5221d90a0e11e297757561ae1cb",
+          "shared-libraries.txt": "3f3f524c627de72588bdf18961f29666134127f2c23e36ff4cff502883e9ad29",
+          "target.txt": "34592eb14fd837efe2d23a59b347e8d5627cd24a89faae4c60b6a716597526dc",
+          "version.txt": "230591dc93bff3321501b08be739a75518a0ba87c70155d80074bb67de39f4f6",
+          "wsprrypi": "1c6c5b569f3c295a06ee67c4bd277612df69ca9850c1a063c7e592349ef465fc"
+        }
+      },
+      {
+        "target": "aarch64-bookworm",
+        "path_relative_to_repository": "dist/beta1/aarch64-bookworm",
+        "binary_bytes": 6451856,
+        "image": "sha256:c612846ae686b347d0f3f7c438b0d40e2e2d19aeee9142664e950d6491dfa360",
+        "compiled_metadata": {
+          "MAKE_TAG": "4.0.0-beta.1+3decc07",
+          "MAKE_BRH": "devel",
+          "MAKE_RAW_BRH": "devel",
+          "MAKE_BRANCH_STATE": "branch",
+          "MAKE_COMMIT": "3decc072c0d59d410d888d307182c4a6f73b70e4",
+          "MAKE_DIRTY": "false",
+          "MAKE_EXE": "wsprrypi",
+          "MAKE_PRJ": "WsprryPi"
+        },
+        "checks": {
+          "build_exit": 0,
+          "checksum": true,
+          "elf_abi": true,
+          "direct_avahi_linkage": true,
+          "build_environment_libraries_resolved": true,
+          "unprivileged_version_exit": 0
+        },
+        "export_sha256": {
+          "SHA256SUMS": "0a0dea8cbb4ee6a379cafc50b8f57aa88a3cabd7190d02c4ec3c5e66a55d6ed5",
+          "build-image-id.txt": "1588b31acf960b6ce6c0494aa3a6b5368da0bf01117cac9a08171dc90c4b1758",
+          "build-metadata.hpp": "e2e9693885e0abb6289b0807ca30ea6d68ac7b4f0c203afea0edd50e5d06bfb8",
+          "build-packages.txt": "940573ce8239c978b0d55dae920e31ede11085dac701d3bcaadb240330761685",
+          "elf-attributes.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "elf-dynamic.txt": "9fe8c6e761e26a97e6fbff7ac0ff1b557cb6157a7e1cd6f4bae0bc99a100b014",
+          "elf-header.txt": "72e616eb20810533277ebc5a6e2a11b0880757006b05314a1ee04954e1f8869c",
+          "elf-versions.txt": "de81365baae803cc78f3cf426c2afc40ce8fb7ff075b806db7144a7e6c84ea90",
+          "file.txt": "2dbeebe8401487fbeba535dbf301a4233c2cd1881127397059353e5c17946be4",
+          "os-release.txt": "59a77b5f2666d9c85c489bd1911a6eebbd91ef22fe48b90a3b75f1b21f3844d4",
+          "shared-libraries.txt": "e8e179fea6d955af2aa5eafe76e593f452b58bb69a7d1079b85000016770c2b8",
+          "target.txt": "d742ebc54118c65d32c5d17c94fad7cbd743c4c5c4fb9ec0d56198d2d6585c2d",
+          "version.txt": "230591dc93bff3321501b08be739a75518a0ba87c70155d80074bb67de39f4f6",
+          "wsprrypi": "a6b455367454905baec5dc578db5c7ee701da2eee503d8cc3316319bd8f23319"
+        }
+      },
+      {
+        "target": "aarch64-trixie",
+        "path_relative_to_repository": "dist/beta1/aarch64-trixie",
+        "binary_bytes": 6549304,
+        "image": "sha256:044236fe69e50f2d38036b735f315bc647a21b7c84c495eecc84685de3fd5d7f",
+        "compiled_metadata": {
+          "MAKE_TAG": "4.0.0-beta.1+3decc07",
+          "MAKE_BRH": "devel",
+          "MAKE_RAW_BRH": "devel",
+          "MAKE_BRANCH_STATE": "branch",
+          "MAKE_COMMIT": "3decc072c0d59d410d888d307182c4a6f73b70e4",
+          "MAKE_DIRTY": "false",
+          "MAKE_EXE": "wsprrypi",
+          "MAKE_PRJ": "WsprryPi"
+        },
+        "checks": {
+          "build_exit": 0,
+          "checksum": true,
+          "elf_abi": true,
+          "direct_avahi_linkage": true,
+          "build_environment_libraries_resolved": true,
+          "unprivileged_version_exit": 0
+        },
+        "export_sha256": {
+          "SHA256SUMS": "2792cd276cc46e72f8da2d27ce35169cb688dc9c7933e0c38bd4205433e55ec8",
+          "build-image-id.txt": "d957f2e5a32498152e39a33903bb7f4e538ba756056326c7b71dfb0692591151",
+          "build-metadata.hpp": "e2e9693885e0abb6289b0807ca30ea6d68ac7b4f0c203afea0edd50e5d06bfb8",
+          "build-packages.txt": "6febb0bba7c7a5680eab36ddd63d0bc8372d1996586c0711d723b17c5c65d391",
+          "elf-attributes.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "elf-dynamic.txt": "d8b4346febda2073c5ef1ffe6657eaaacdb8ddf1360222ec56ba8858d7effd72",
+          "elf-header.txt": "c0644afedc506e768ee6a1c63536b302b1779c5ee1edd5f229d3cd421b5295ca",
+          "elf-versions.txt": "3033748b66ee16b4d5aab5648ef8d38c3a172788695ca7186188f5e4ce9b647a",
+          "file.txt": "b0333410c90d06679cff91e443651ca51c281f59ed971d3c98d4e13a50a63148",
+          "os-release.txt": "14c430da04c2d571793fc68a8f5e17fce3d7a746e316c3f23192590861b18bd7",
+          "shared-libraries.txt": "5ab57c6ea4be8724084ebc55f7224264918472efd09dcc448bdd2bf00347f06b",
+          "target.txt": "102065d9385bede43e08b401e02b1ed1f267de82076b0cb78f1ca4935df878a7",
+          "version.txt": "230591dc93bff3321501b08be739a75518a0ba87c70155d80074bb67de39f4f6",
+          "wsprrypi": "5cc770d2dd9df828e1440a481150eeb2aa9ca08a798e1c1d24419e4d823208d1"
+        }
+      }
+    ],
+    "supporting_source_commit": "4ea48c66b1df5e04d4d468c84991148955b5e902",
+    "disposition": "superseded-by-confirmed-physical-event-encoding-defect; historical-16c-acceptance-preserved"
+  },
+  "aggregate_checksum_root_relative_to_repository": "dist/beta1-revalidated/1e047a44",
+  "reevaluation_16bc": {
+    "date": "2026-10-20",
+    "disposition_16b": "complete-replacement-four-artifact-software-handoff",
+    "disposition_16c": "open-replacement-target-acceptance-needs-new-bounded-authorization",
+    "reviewed_pi_devel": "6e833e65cbc5e92b7b27f6f6276cc0ac67319aba",
+    "reviewed_rp1_devel": "1db51cd33471cd51687eb8cc626553e8e8d16430",
+    "selected_executable_source": "1e047a44a44f07d2eb52dfd3c3537d2d24e60143",
+    "selected_supporting_source": "1e047a44a44f07d2eb52dfd3c3537d2d24e60143",
+    "support_payload_equivalent_to_accepted_source": "4ea48c66b1df5e04d4d468c84991148955b5e902",
+    "frozen_docs": "5214cdf8ee8517b570553edeeefbdced17f2ba93",
+    "current_docs_read_only": "c0a0ec5dd8ea6d7cb49fd7fa3d417ee0640c5672",
+    "provider_source": "8c16d3c237cb1267cbedafb5da2bb74132ca5de0",
+    "provider_tree": "4c1ad8acf513b36ba32e58a636942655accbb52d",
+    "supplement_source": "bb6815446beb9b96853ad5a353b0d355d4975710",
+    "runtime_component_paths_modified": [
+      "src/WSPR-Transmitter"
+    ],
+    "finding": {
+      "severity": "P2",
+      "trigger_hz": 14097100,
+      "caller_ppm": 46.369969482318,
+      "original_counts": [
+        0,
+        66792
+      ],
+      "repaired_counts": [
+        1,
+        66791
+      ],
+      "mean_error_hz": 0.000226999865,
+      "real_provider_cases": 30,
+      "original_provider_rejections": 5,
+      "repaired_provider_rejections": 0
+    },
+    "original_export_and_acceptance_files_rehashed": 405,
+    "original_mismatches": 0,
+    "evidence_reuse": [
+      {
+        "row": "four exports",
+        "classification": "fresh-software-evidence",
+        "evidence": "all four rebuilt clean from common source; isolated ELF/ABI/loader/full library trace/metadata/checksum checks"
+      },
+      {
+        "row": "installer/configuration/UI/helpers/services",
+        "classification": "reused-with-proven-applicability",
+        "evidence": "unchanged installed payload paths versus 4ea48c66; fresh installer/UI regressions; does not assert installed replacement alignment"
+      },
+      {
+        "row": "upgrade/repeat/service readiness/restart/idle",
+        "classification": "newly-invalidated-identity-requirement",
+        "evidence": "historical passes preserved; replacement binary requires newly authorized target acceptance"
+      },
+      {
+        "row": "installed config/ownership/route/receipt/cache/final safety",
+        "classification": "required-fresh-target-postconditions",
+        "evidence": "historical observations preserved; no current target inspection or mutation"
+      },
+      {
+        "row": "published provider and supplement",
+        "classification": "fresh-software-verification-and-scoped-reuse",
+        "evidence": "published seven-asset reconstruction/production resolver and independent four-asset supplement verification; RF scope unchanged"
+      },
+      {
+        "row": "fresh clean install/other physical exports/reboot/fresh GPIO4",
+        "classification": "specifically-accepted-unperformed-beta-check",
+        "evidence": "preserved historical limitations; not performed or reported as passes"
+      },
+      {
+        "row": "service cap",
+        "classification": "historical-nonconformance",
+        "evidence": "approved18 actual20 past exception preserved; no new service allowance or target request"
+      }
+    ],
+    "target_actions_performed": false,
+    "new_service_requests": 0,
+    "historical_service_requests": {
+      "approved_cap": 18,
+      "actual": 20,
+      "operator_accepted_past_exception": true,
+      "new_allowance": false
+    },
+    "publication_performed": false,
+    "16d": "not-started",
+    "16e": "not-started",
+    "proposed_target_acceptance": {
+      "authorized": false,
+      "method": "two atomic executable replacements and one restart; unchanged installer/support acceptance requires explicit operator reuse decision",
+      "application_request_cap": 7,
+      "companion_start_cap": 4,
+      "provider_inspection_cap": 5,
+      "idle_cases": 3,
+      "idle_seconds_each": 300,
+      "package_config_support_provider_changes": false
+    },
+    "future_source_tag_rule": "Any later tag/source selection must include the accepted support payload and identify these executables as built from 1e047a44; record-only commits do not reidentify them.",
+    "retained_evidence": [
+      {
+        "path": "dist/beta1/validation/16bc-reevaluation/contract-audit/component-checks.log",
+        "bytes": 289,
+        "sha256": "37b7a80d00cf6e7222730240dfbc91896e590b8e8f58d22b954d16863bb81a85"
+      },
+      {
+        "path": "dist/beta1/validation/16bc-reevaluation/contract-audit/component-checks.sh",
+        "bytes": 347,
+        "sha256": "a54d4ba1630b3efd3afeab1202860ad2e82c2abfd7e3a376fbe5e4de3975ab90"
+      },
+      {
+        "path": "dist/beta1/validation/16bc-reevaluation/contract-audit/component-direct-cxx17-failed.log",
+        "bytes": 2015,
+        "sha256": "bfc18f251da65eb702b3345b8c7e942a6db5760b770254ff115d5e8dbc671128"
+      },
+      {
+        "path": "dist/beta1/validation/16bc-reevaluation/contract-audit/component-noexec-failed.log",
+        "bytes": 336,
+        "sha256": "77f72e4de952ca0abc42a54dcff445b340f19cdce8b494523540ea1962b0a4bf"
+      },
+      {
+        "path": "dist/beta1/validation/16bc-reevaluation/contract-audit/component-scratch-path-failed.log",
+        "bytes": 109,
+        "sha256": "82482791fabb41e0b86ef8694b25e4bea029b8b969eb7bbc8f80bca6a23bc5db"
+      },
+      {
+        "path": "dist/beta1/validation/16bc-reevaluation/contract-audit/frozen-event-program.cpp",
+        "bytes": 9201,
+        "sha256": "02c061625835b5883826cc1fe64d86bc25165c6a722ce66e42f9332a8e47518d"
+      },
+      {
+        "path": "dist/beta1/validation/16bc-reevaluation/contract-audit/frozen-planner.cpp",
+        "bytes": 9836,
+        "sha256": "3be3dd3e7e8165d485390c69730bd9ee90ee51fe9100bdadb4f6cfe69a783426"
+      },
+      {
+        "path": "dist/beta1/validation/16bc-reevaluation/contract-audit/provider-checks.log",
+        "bytes": 334,
+        "sha256": "ca8c91a123fdb1478f150baf94d3b47bdcaa352602061cbc3b0e6b8bd434ff99"
+      },
+      {
+        "path": "dist/beta1/validation/16bc-reevaluation/contract-audit/provider-checks.sh",
+        "bytes": 836,
+        "sha256": "23ca1efc728a760b7247d91d5bae0a2ad21ca425cce77c6db6e110cb50017176"
+      },
+      {
+        "path": "dist/beta1/validation/16bc-reevaluation/contract-audit/published-core.c",
+        "bytes": 18629,
+        "sha256": "daa40effcc1623c8308786ec0ad6c33af46ccefd1dd5643f91bae8c66d86e570"
+      },
+      {
+        "path": "dist/beta1/validation/16bc-reevaluation/contract-audit/repaired-published-core.log",
+        "bytes": 6069,
+        "sha256": "c7d4a224fc511a990fe7dbd012a79aa1e46eff8e2e909c007d3035f6ef22f735"
+      },
+      {
+        "path": "dist/beta1/validation/16bc-reevaluation/contract-audit/repro.cpp",
+        "bytes": 2604,
+        "sha256": "404723f9c08420206996e716cf3241cc9cc36b54d8274da640e9269dd85db3a8"
+      },
+      {
+        "path": "dist/beta1/validation/16bc-reevaluation/contract-audit/repro.log",
+        "bytes": 2606,
+        "sha256": "16ed275bd78875b704764a231fa8fbd661b012a4ac95604bb681c692fb9d328f"
+      },
+      {
+        "path": "dist/beta1/validation/16bc-reevaluation/contract-audit/run-repro.sh",
+        "bytes": 634,
+        "sha256": "b6bea81a992d9e846cb68caa91185ccece0afc90519b6e51f9a417076a943ae2"
+      },
+      {
+        "path": "dist/beta1/validation/16bc-reevaluation/pi/aarch64-bookworm-identity.log",
+        "bytes": 26341,
+        "sha256": "753a6c8545148b49080a0cb1f5ee3a6bb3486c07cf2346a621d364ea918847c4"
+      },
+      {
+        "path": "dist/beta1/validation/16bc-reevaluation/pi/aarch64-bookworm-libraries.log",
+        "bytes": 22948,
+        "sha256": "d79dc8157849112e375c3719bfc8eb6c73165dba6984f96f5531890a7342e3d3"
+      },
+      {
+        "path": "dist/beta1/validation/16bc-reevaluation/pi/aarch64-bookworm-version.log",
+        "bytes": 130,
+        "sha256": "230591dc93bff3321501b08be739a75518a0ba87c70155d80074bb67de39f4f6"
+      },
+      {
+        "path": "dist/beta1/validation/16bc-reevaluation/pi/aarch64-trixie-identity.log",
+        "bytes": 26719,
+        "sha256": "f50c41638d5effbbd49e1aef0c8b37c1ca39bc4889b6fb6a88e5f18b899ba076"
+      },
+      {
+        "path": "dist/beta1/validation/16bc-reevaluation/pi/aarch64-trixie-libraries.log",
+        "bytes": 23366,
+        "sha256": "861e25c928d34ef165bc8cc58969697d43d143e54759d80c41030cdd3c86b880"
+      },
+      {
+        "path": "dist/beta1/validation/16bc-reevaluation/pi/aarch64-trixie-version.log",
+        "bytes": 130,
+        "sha256": "230591dc93bff3321501b08be739a75518a0ba87c70155d80074bb67de39f4f6"
+      },
+      {
+        "path": "dist/beta1/validation/16bc-reevaluation/pi/armv6-bookworm-identity.log",
+        "bytes": 34025,
+        "sha256": "3ede385ba1b6a1cd23f1428e35d1a1e66b96ffb928f6f085f729b818cb9e06ce"
+      },
+      {
+        "path": "dist/beta1/validation/16bc-reevaluation/pi/armv6-bookworm-libraries.log",
+        "bytes": 28594,
+        "sha256": "be2074d0c37194bf68378242eddc64bdd6b6e9eefdb11b0d807eab897a3c6201"
+      },
+      {
+        "path": "dist/beta1/validation/16bc-reevaluation/pi/armv6-bookworm-version.log",
+        "bytes": 130,
+        "sha256": "230591dc93bff3321501b08be739a75518a0ba87c70155d80074bb67de39f4f6"
+      },
+      {
+        "path": "dist/beta1/validation/16bc-reevaluation/pi/armv6-trixie-identity.log",
+        "bytes": 38093,
+        "sha256": "b5b162e4ca863cc661c7feb7a0dadeb8617083f93eb3ce998976896a36ff9e84"
+      },
+      {
+        "path": "dist/beta1/validation/16bc-reevaluation/pi/armv6-trixie-libraries.log",
+        "bytes": 26952,
+        "sha256": "0ccb51dc0f8c40396b9a88d69102e505c3622b7135db2415b8e614bdcc077301"
+      },
+      {
+        "path": "dist/beta1/validation/16bc-reevaluation/pi/armv6-trixie-version.log",
+        "bytes": 130,
+        "sha256": "230591dc93bff3321501b08be739a75518a0ba87c70155d80074bb67de39f4f6"
+      },
+      {
+        "path": "dist/beta1/validation/16bc-reevaluation/pi/build-aarch64-bookworm.log",
+        "bytes": 29935,
+        "sha256": "59e10ed61d31df9bebde9b2ccb0ac908ea12e786304fb4ac22eddce0f955975f"
+      },
+      {
+        "path": "dist/beta1/validation/16bc-reevaluation/pi/build-aarch64-trixie.log",
+        "bytes": 29850,
+        "sha256": "550b4ec847b804637495cbe7226b9acb034248e5f8c98aecb3048783fd2b8a95"
+      },
+      {
+        "path": "dist/beta1/validation/16bc-reevaluation/pi/build-armv6-bookworm.log",
+        "bytes": 29885,
+        "sha256": "f99fc54500b3e4aeebe3bfc31cf783ab03c1f9265b7206bb7dd6eda41dd23f30"
+      },
+      {
+        "path": "dist/beta1/validation/16bc-reevaluation/pi/build-armv6-trixie.log",
+        "bytes": 30086,
+        "sha256": "ea02332b37753dda3d45d68d1510aae9b1a05adeb9fd1cac50d082469d371153"
+      },
+      {
+        "path": "dist/beta1/validation/16bc-reevaluation/pi/candidate-ci-watch.log",
+        "bytes": 64680,
+        "sha256": "8fbdd73877f5c9acd8019e5874a0f635e9316c310ebd91cf5273190092c04966"
+      },
+      {
+        "path": "dist/beta1/validation/16bc-reevaluation/pi/ci-RP1-GPCLK-DKMS-1db51cd3.json",
+        "bytes": 30643,
+        "sha256": "efbd6086ac3908f0f6bc7e22009b72b9f8bfc369c07a5ff2c939a5f6cc465d23"
+      },
+      {
+        "path": "dist/beta1/validation/16bc-reevaluation/pi/ci-WsprryPi-1e047a44.json",
+        "bytes": 75323,
+        "sha256": "4e60c09a14293c9191a50ce72519f041354455736493d6c7d40b31299ccc6ad1"
+      },
+      {
+        "path": "dist/beta1/validation/16bc-reevaluation/pi/ci-WsprryPi-3decc072.json",
+        "bytes": 61876,
+        "sha256": "529b6a86645f65f1f9a452cfb4ed2f6ce756d5dd650991206248aa1668ad55c9"
+      },
+      {
+        "path": "dist/beta1/validation/16bc-reevaluation/pi/ci-WsprryPi-4ea48c66.json",
+        "bytes": 61876,
+        "sha256": "2904219e9eef6682ae20fffc7e0d1051e4c1d3f6d35c7e05c3f09f083436f3a2"
+      },
+      {
+        "path": "dist/beta1/validation/16bc-reevaluation/pi/ci-WsprryPi-6e833e65.json",
+        "bytes": 123796,
+        "sha256": "71d3ba834b11369e627a61359ef69a4064ec8a45082ef94b1c1d1fddd8c0bdbe"
+      },
+      {
+        "path": "dist/beta1/validation/16bc-reevaluation/pi/export-inspection.json",
+        "bytes": 2123,
+        "sha256": "90c57c0b37659f95152cb4deafe63adff2553635f832d567ccef07c4eab70132"
+      },
+      {
+        "path": "dist/beta1/validation/16bc-reevaluation/pi/fetch_ci.py",
+        "bytes": 1050,
+        "sha256": "3e79496a025cfcd2922bcdc941e0485d8ba113b92c3563fcfb160a4b44580499"
+      },
+      {
+        "path": "dist/beta1/validation/16bc-reevaluation/pi/initial-aarch64-bookworm-identity.log",
+        "bytes": 20864,
+        "sha256": "211d55bb392dd625dc45c81e5839d873848672e407a40cf3e552a99624510eb6"
+      },
+      {
+        "path": "dist/beta1/validation/16bc-reevaluation/pi/initial-aarch64-trixie-identity.log",
+        "bytes": 21357,
+        "sha256": "250426af6e7b2c47c69fb53d1dbeb234d6ee4d390c8708e48fe5a40dd7f761f6"
+      },
+      {
+        "path": "dist/beta1/validation/16bc-reevaluation/pi/initial-armv6-bookworm-identity.log",
+        "bytes": 20822,
+        "sha256": "98e05abc5dba70d5a26391dc76e2565d9558504edf058edbab1aae4fddd26d89"
+      },
+      {
+        "path": "dist/beta1/validation/16bc-reevaluation/pi/initial-armv6-trixie-identity.log",
+        "bytes": 21086,
+        "sha256": "4beebe9c8ef66f874f3317928a03d26a2d639d300ed6a331135ba03c4ee3b662"
+      },
+      {
+        "path": "dist/beta1/validation/16bc-reevaluation/pi/inspect_exports.py",
+        "bytes": 2591,
+        "sha256": "9e3d9d952a5e48233a95e5b27d95e8ed95992ef6d22ad2b5097522c633fb021c"
+      },
+      {
+        "path": "dist/beta1/validation/16bc-reevaluation/pi/inspect_replacement.py",
+        "bytes": 3440,
+        "sha256": "c3f94a57781e14275467eed726c5e87115a4d60314a923b31db4ca009c418cf8"
+      },
+      {
+        "path": "dist/beta1/validation/16bc-reevaluation/pi/linux-checks.sh",
+        "bytes": 1652,
+        "sha256": "5c50b94ce7bd4010d1f1ef85c954f7087e2139cceac5b1110bc227e2e9724b57"
+      },
+      {
+        "path": "dist/beta1/validation/16bc-reevaluation/pi/pi-linux-initial.log",
+        "bytes": 250237,
+        "sha256": "395a3914a63baf4a643e24587524feabc2bdb831f62e196a7c2a491a8170e5cb"
+      },
+      {
+        "path": "dist/beta1/validation/16bc-reevaluation/pi/refresh_packet.py",
+        "bytes": 8545,
+        "sha256": "d470268e7346fd78576cbba6f1fcaa39a6e7a001be68bf5c6765d5e91bdf9ea4"
+      },
+      {
+        "path": "dist/beta1/validation/16bc-reevaluation/pi/retained-verification.json",
+        "bytes": 45,
+        "sha256": "f09f51c3efe5018e4407093df70e2e1200cf49f864e2862fd588f0d15644305a"
+      },
+      {
+        "path": "dist/beta1/validation/16bc-reevaluation/pi/ui-unit-unsandboxed-loopback.log",
+        "bytes": 2851,
+        "sha256": "9bc5fa1c551c8b101a4a2d2bc968d4a1fec98db1f4ca9904149be74ff7a19379"
+      },
+      {
+        "path": "dist/beta1/validation/16bc-reevaluation/pi/ui-unit.log",
+        "bytes": 1723,
+        "sha256": "40f1982fb36bba7201094eaf2f138cd2e102484d3139ce7d5d3e597811548b6e"
+      },
+      {
+        "path": "dist/beta1/validation/16bc-reevaluation/provider/acceptance/build.log",
+        "bytes": 63,
+        "sha256": "07eda63ca7960135523bca6374b15513c4fef7a236b0fcc74a133755a9901bcf"
+      },
+      {
+        "path": "dist/beta1/validation/16bc-reevaluation/provider/acceptance/provider-validation.json",
+        "bytes": 205,
+        "sha256": "73f0985bd47d976a6cd7ce53512df7f073e9ac9b7fcaf70d5338c8a2bf35ff89"
+      },
+      {
+        "path": "dist/beta1/validation/16bc-reevaluation/provider/acceptance-matching/acceptance.json",
+        "bytes": 2216,
+        "sha256": "6d89a751d9c8cd3daf6327beb00f52f9d416468cdaa2a23b7c64999688342dd7"
+      },
+      {
+        "path": "dist/beta1/validation/16bc-reevaluation/provider/acceptance-matching/build.log",
+        "bytes": 63,
+        "sha256": "07eda63ca7960135523bca6374b15513c4fef7a236b0fcc74a133755a9901bcf"
+      },
+      {
+        "path": "dist/beta1/validation/16bc-reevaluation/provider/acceptance-matching/provider-validation.json",
+        "bytes": 205,
+        "sha256": "73f0985bd47d976a6cd7ce53512df7f073e9ac9b7fcaf70d5338c8a2bf35ff89"
+      },
+      {
+        "path": "dist/beta1/validation/16bc-reevaluation/provider/identity.json",
+        "bytes": 166,
+        "sha256": "85c547a5bc2237ddfd42043d3b11a765460ecf69aa622616117a089f39c2d843"
+      },
+      {
+        "path": "dist/beta1/validation/16bc-reevaluation/provider/maintenance-candidate.log",
+        "bytes": 272,
+        "sha256": "03df4827b403c0fc4446bfb49a96afa95663e8b412aca24cd6996a2faf7c42c8"
+      },
+      {
+        "path": "dist/beta1/validation/16bc-reevaluation/provider/maintenance-check-final.log",
+        "bytes": 3070,
+        "sha256": "7b2b8f72875bc1cbcccc567868b2e2720a5cd8aa2a63bf0206a8c5c753b40566"
+      },
+      {
+        "path": "dist/beta1/validation/16bc-reevaluation/provider/maintenance-check-nobody.log",
+        "bytes": 3357,
+        "sha256": "0685fb4ffb4463b5022f56ac013843cdafe9d802cc845873ee5cf0b0e24abce9"
+      },
+      {
+        "path": "dist/beta1/validation/16bc-reevaluation/provider/maintenance-check.log",
+        "bytes": 1336,
+        "sha256": "04bd17891d49fc9aa3e57e9cc50abea3dc331ebedf43a96b56f521ebc0d7811c"
+      },
+      {
+        "path": "dist/beta1/validation/16bc-reevaluation/provider/maintenance-package-check.log",
+        "bytes": 302,
+        "sha256": "ce2c82130b795bf5f4b8e104a2c644dca35dfff0df72ebbfb8dd2d5cd5958dde"
+      },
+      {
+        "path": "dist/beta1/validation/16bc-reevaluation/provider/maintenance-published-comparison.json",
+        "bytes": 2973,
+        "sha256": "267b83c8ea1511a09c2eba1decedd7cecde8070ced9741e8f699db6cf39dc0f4"
+      },
+      {
+        "path": "dist/beta1/validation/16bc-reevaluation/provider/published-acceptance-matching.log",
+        "bytes": 2297,
+        "sha256": "2b1d1a8df1953ca9ea619420e5b9f513edd4ea2f2e76117edce0c0f7f0930af3"
+      },
+      {
+        "path": "dist/beta1/validation/16bc-reevaluation/provider/published-acceptance.log",
+        "bytes": 74,
+        "sha256": "60fc250f9071c5439696bbfe34e720bb23c541a987c7f1ae2f5a587ef593a18b"
+      },
+      {
+        "path": "dist/beta1/validation/16bc-reevaluation/provider/rp1-ci-jobs-39502311132.json",
+        "bytes": 6978,
+        "sha256": "2d68bad90c095f76da0673307ff6598fc29a0cb177f272dfc6d1df76aa7a8942"
+      },
+      {
+        "path": "dist/beta1/validation/16bc-reevaluation/provider/rp1-ci-jobs-39502311240.json",
+        "bytes": 7000,
+        "sha256": "60f61a8f099d0a0186670192ef08d603a75c69b0409d57081255aad450ced219"
+      },
+      {
+        "path": "dist/beta1/validation/16bc-reevaluation/provider/rp1-head-ci-runs.json",
+        "bytes": 58893,
+        "sha256": "12b435eb8717086a345ec118b6bd4167c1003081e5663e848a776e85ccfb7af8"
+      },
+      {
+        "path": "dist/beta1/validation/16bc-reevaluation/provider/supplement-reconstruction.log",
+        "bytes": 1010,
+        "sha256": "8e58ad8b159828efd34c1d92369d464fcbcae711b31a78693f3952594bd58ae6"
+      },
+      {
+        "path": "dist/beta1/validation/16bc-reevaluation/provider/supplement-resolver.log",
+        "bytes": 449,
+        "sha256": "22e166715404268f44425271c7a2d46b00307b639eaf05c4471a1f0595574727"
+      },
+      {
+        "path": "dist/beta1/validation/16bc-reevaluation/replacement-inspection/aarch64-bookworm-identity.log",
+        "bytes": 26341,
+        "sha256": "a9a2b8f047dec65c30b40cf4db1accd78b6e795a164c02e14fda2ed0dfd9d17f"
+      },
+      {
+        "path": "dist/beta1/validation/16bc-reevaluation/replacement-inspection/aarch64-bookworm-libraries.log",
+        "bytes": 22948,
+        "sha256": "a3ff6e77d91fac1770aa1ea396fe424b8403806753ebb33feec0b64c97893645"
+      },
+      {
+        "path": "dist/beta1/validation/16bc-reevaluation/replacement-inspection/aarch64-bookworm-os.log",
+        "bytes": 267,
+        "sha256": "59a77b5f2666d9c85c489bd1911a6eebbd91ef22fe48b90a3b75f1b21f3844d4"
+      },
+      {
+        "path": "dist/beta1/validation/16bc-reevaluation/replacement-inspection/aarch64-bookworm-packages.log",
+        "bytes": 5263,
+        "sha256": "940573ce8239c978b0d55dae920e31ede11085dac701d3bcaadb240330761685"
+      },
+      {
+        "path": "dist/beta1/validation/16bc-reevaluation/replacement-inspection/aarch64-bookworm-version.log",
+        "bytes": 130,
+        "sha256": "4c8026c0de59e7397b8dbc946d0ab18fdf4448b7156da7d1c34861630984004f"
+      },
+      {
+        "path": "dist/beta1/validation/16bc-reevaluation/replacement-inspection/aarch64-trixie-identity.log",
+        "bytes": 26719,
+        "sha256": "e462f06b9c7a54330872ae6fdaa81ac0d6fc62878db6270377fd84f4316e8943"
+      },
+      {
+        "path": "dist/beta1/validation/16bc-reevaluation/replacement-inspection/aarch64-trixie-libraries.log",
+        "bytes": 23366,
+        "sha256": "7ec572f3a554dcfe256e468626901ecab820587c6c84108d5c01d36323b49563"
+      },
+      {
+        "path": "dist/beta1/validation/16bc-reevaluation/replacement-inspection/aarch64-trixie-os.log",
+        "bytes": 286,
+        "sha256": "14c430da04c2d571793fc68a8f5e17fce3d7a746e316c3f23192590861b18bd7"
+      },
+      {
+        "path": "dist/beta1/validation/16bc-reevaluation/replacement-inspection/aarch64-trixie-packages.log",
+        "bytes": 5129,
+        "sha256": "6febb0bba7c7a5680eab36ddd63d0bc8372d1996586c0711d723b17c5c65d391"
+      },
+      {
+        "path": "dist/beta1/validation/16bc-reevaluation/replacement-inspection/aarch64-trixie-version.log",
+        "bytes": 130,
+        "sha256": "4c8026c0de59e7397b8dbc946d0ab18fdf4448b7156da7d1c34861630984004f"
+      },
+      {
+        "path": "dist/beta1/validation/16bc-reevaluation/replacement-inspection/armv6-bookworm-identity.log",
+        "bytes": 34025,
+        "sha256": "46c0f9328e0c0b648f7848097c227c552238d5825e6720abb56941111087e31f"
+      },
+      {
+        "path": "dist/beta1/validation/16bc-reevaluation/replacement-inspection/armv6-bookworm-libraries.log",
+        "bytes": 28594,
+        "sha256": "be2074d0c37194bf68378242eddc64bdd6b6e9eefdb11b0d807eab897a3c6201"
+      },
+      {
+        "path": "dist/beta1/validation/16bc-reevaluation/replacement-inspection/armv6-bookworm-os.log",
+        "bytes": 309,
+        "sha256": "8c7c20d66f556c1804af774a9fc89b38c3862960e2cd6571c8a4ad177fa77028"
+      },
+      {
+        "path": "dist/beta1/validation/16bc-reevaluation/replacement-inspection/armv6-bookworm-packages.log",
+        "bytes": 12947,
+        "sha256": "2b97702b1882f23eb41240e1ef159f292bc0f4cea90ca86aa1c4d5b79229e52a"
+      },
+      {
+        "path": "dist/beta1/validation/16bc-reevaluation/replacement-inspection/armv6-bookworm-version.log",
+        "bytes": 130,
+        "sha256": "4c8026c0de59e7397b8dbc946d0ab18fdf4448b7156da7d1c34861630984004f"
+      },
+      {
+        "path": "dist/beta1/validation/16bc-reevaluation/replacement-inspection/armv6-trixie-identity.log",
+        "bytes": 38093,
+        "sha256": "d0105324b8d0a7bb87e79ffa1f4880633c2aa83696ea56a0398d6cdea15bc89e"
+      },
+      {
+        "path": "dist/beta1/validation/16bc-reevaluation/replacement-inspection/armv6-trixie-libraries.log",
+        "bytes": 26952,
+        "sha256": "0ccb51dc0f8c40396b9a88d69102e505c3622b7135db2415b8e614bdcc077301"
+      },
+      {
+        "path": "dist/beta1/validation/16bc-reevaluation/replacement-inspection/armv6-trixie-os.log",
+        "bytes": 328,
+        "sha256": "c5f3e5673a41105db643d44fda696588e1a2f5221d90a0e11e297757561ae1cb"
+      },
+      {
+        "path": "dist/beta1/validation/16bc-reevaluation/replacement-inspection/armv6-trixie-packages.log",
+        "bytes": 16732,
+        "sha256": "0ac68d146ef4af888c12f5cf90e0e7a7ffe51f3ef8535c2d709208dbe2e24ebc"
+      },
+      {
+        "path": "dist/beta1/validation/16bc-reevaluation/replacement-inspection/armv6-trixie-version.log",
+        "bytes": 130,
+        "sha256": "4c8026c0de59e7397b8dbc946d0ab18fdf4448b7156da7d1c34861630984004f"
+      },
+      {
+        "path": "dist/beta1/validation/16bc-reevaluation/replacement-inspection/export-inspection.json",
+        "bytes": 2123,
+        "sha256": "73c712cfbd78d207fc0e49b24d38ceaf13851e217435000787b9c4f122933c0a"
+      }
+    ]
   }
 }

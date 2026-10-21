@@ -1,9 +1,11 @@
 # Wsprry Pi 4.0 Release Punchlist
 
 This is the selected work and release-gate authority. Items 1–15 are complete
-within their accepted scopes. Item 16 remains in progress: 16a–16c are complete,
-with 16c accepted under its specific physical-test limitations and documented
-service-request cap exception. Publication and announcements in 16d/16e remain
+within their accepted scopes. Item 16 remains in progress. The original
+16b–16c acceptance retains its historical scope; the replacement executable
+at `1e047a44` has refreshed 16b artifacts and requires affected 16c acceptance.
+The original physical-test limitations and service-request cap exception
+remain recorded. Publication and announcements in 16d/16e remain
 not started and require separate authorization. Cleanup changes no selected
 requirement, priority, candidate identity or publication authority.
 
@@ -135,10 +137,13 @@ Status key: ✅ Complete · ⏳ In progress · ☐ Not started
       identities, and build/checksum candidate artifacts. Preserve the researched
       stable-to-Beta comparison range and record later changes. Any changed input
       requires a new candidate identity and repetition of affected acceptance
-      checks. Frozen source is `3decc07`, Docs `5214cdf`; all four exports and
+      checks. Replacement source is `1e047a44`, Docs `5214cdf`; all four exports and
       checksums are in the [candidate manifest](4.0-Beta-1-Candidate-Manifest.json).
+      The original `3decc072` exports are superseded because their physical RP1
+      event compiler can emit endpoint dither profiles rejected by the published
+      provider. Accepted installer/UI repairs are included in the new source.
       This step does not create a public tag or release.
-    - ✅ **16c — Validate, accept and hand off Beta 1; stop before publication.**
+    - ⏳ **16c — Validate, accept and hand off Beta 1; stop before publication.**
       Run required CI/regressions and applicable installation/upgrade/service/
       runtime checks against the exact candidate and artifacts using item 10's
       acceptance matrix. Record reused evidence, repeated checks, exclusions and
@@ -148,8 +153,13 @@ Status key: ✅ Complete · ⏳ In progress · ☐ Not started
       evidence handoff, ready for a separate publication decision. Do not merge
       to the release branch, create a tag/GitHub release or draft, upload assets,
       announce availability, or claim Beta 1 is published.
-      **Current disposition:** all functional target acceptance passed. The
-      restored predecessor upgrade at `809ef2d6`, repeat at `cea6ac3`, replacement
+      **Current disposition:** replacement-executable installation/runtime
+      acceptance remains open pending new bounded authorization. Software-only
+      checks cannot transfer the old installed-binary identity to this candidate.
+      Unchanged supporting installer/UI/configuration, provider and documentation
+      evidence is reused only at the correspondences in the active evidence ledger.
+      **Historical original-candidate acceptance:** all functional target acceptance
+      passed. The restored predecessor upgrade at `809ef2d6`, repeat at `cea6ac3`, replacement
       explicit restart at `cea6ac3`, and final UI installation at `4ea48c66` each passed
       full five-minute idle checks. Original executable source remains `3decc072`;
       final support/UI is `4ea48c66`. Custom settings and disabled admission/output
@@ -158,8 +168,9 @@ Status key: ✅ Complete · ⏳ In progress · ☐ Not started
       reboot/fresh-GPIO4 limitations and separately the documented 20-versus-18
       service-request nonconformance. This does not rewrite the approved limit.
       Exact-support CI `39420958734` passed 14/14, as did frozen-source CI.
-      16c is accepted with those specific limitations and the documented cap
-      exception. Final documentation-head CI is verified after the scoped record
+      Original-candidate 16c was accepted with those specific limitations and the
+      documented cap exception. That exception grants no new service allowance.
+      Final documentation-head CI is verified after the scoped record
       push and reported separately. 16d/16e remain not started.
     - ☐ **16d — Later: publish Beta 1 as a GitHub prerelease and verify.** Only
       after separate authorization, publish the accepted Beta 1 and corresponding
@@ -186,10 +197,11 @@ Status key: ✅ Complete · ⏳ In progress · ☐ Not started
 | 13 | 21 | ✅ Complete; #423 closed | Integrated application Impeccable review accepted for `d93c75c`; final closeout/planning-head CI each passed 11/11; bounded validation and qualification limits retained | `WsprryPi` |
 | 14 | — | ✅ Closed within bounded software scope | Full companion integrated at final `a84010d`; feature/devel CI each passed 12/12; eight exact compatibility pairs, affected Impeccable/adversarial repairs and published Docs accepted; nonblocking Pico wording follow-up retained | `WsprryPi`; affected operator docs: `WsprryPi-Docs` |
 | 15 | — | ✅ Pico software and originating assessment complete | Pico `1653034` closes four findings after fresh independent reassessment; 200 executed host groups, 13 sanitizer groups, both firmware builds and genuine browser checks passed. Pi adoption, P15.14 docs and physical qualification remain separate | `WsprryPi` coordination; `WsprryPico` implementation |
-| 16 | 22 | ⏳ In progress | 16a–16c complete: original `3decc07` exports and supporting `4ea48c66` each have 14/14 CI passes; finite wspr5 acceptance passed, specific physical-test limitations and documented service-request cap exception accepted. 16d/16e publication remains not started | `WsprryPi` |
+| 16 | 22 | ⏳ In progress | Replacement `1e047a44` supersedes original `3decc072` exports; refreshed artifacts and affected installation/runtime acceptance govern 16b–16c. Historical `3decc072` / `4ea48c66` CI, finite wspr5 acceptance, physical-test limitations and 20/18 exception retain their original scope. 16d/16e remain not started | `WsprryPi` |
 
-RP1 item numbers above are historical cross-references; the current provider
-ROADMAP has no numbered application release gates.
+RP1 items 18–21 above are historical cross-references. The current provider
+ROADMAP tracks Beta work as item 22 and delegates exact application acceptance
+to this checklist and its candidate records.
 
 The lead repository owns coordination and completion evidence. RP1-GPCLK-DKMS
 provides provider-specific support for item 10; a provider defect requires its
@@ -269,9 +281,10 @@ Beta preparation or announcement does not itself close that stable release gate.
   publication notifications. Item 14's affected integration addendum is now
   complete; item 15's Pico implementation and originating assessment are
   complete within their recorded software scope. Pi/Beta adoption is now
-  implemented under item 16. Its source/build handoff is complete; 16c is
-  accepted with its specific physical-test limitations and documented
-  service-request cap exception. Publication and announcements remain separate.
+  implemented under item 16. The original source/build and 16c acceptance retain
+  their historical identities; replacement artifacts are refreshed, while
+  affected installation/runtime acceptance remains open. Publication and
+  announcements remain separate.
 - ✅ **Pico Type 2/3 companion integration and acceptance:** item 14's complete
   companion integration, eight current/historical pairs, affected Impeccable/
   adversarial repairs and separately published operator documentation are
@@ -288,7 +301,8 @@ Beta preparation or announcement does not itself close that stable release gate.
   Pi station-progress adoption against `1653034`; P15.8 remains `p158`. The Pi
   operator workflow is updated in Docs `5214cdf`. Pico P15.14 and physical
   qualification remain separate; no new hardware operation is authorized.
-- ✅ **Beta 1 release documentation and readiness:** 16a–16c are complete.
+- ⏳ **Beta 1 release documentation and readiness:** 16a–16b are complete;
+  replacement 16c remains open under the current candidate manifest and re-evaluation.
   The sourced notes, compatibility guidance, exact candidate, four exports and
   acceptance handoff are recorded in the Beta 1 evidence. Fresh clean installation,
   physical-target acceptance of the other three exports, reboot and fresh GPIO4

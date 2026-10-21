@@ -9575,6 +9575,61 @@
       "Correct older-file route fixture after stock acquired 8m; duplicate-key rejection retained",
       "Refresh cached Operation status on actual socket close/error/fallback; preserve cached values and command behavior"
     ],
-    "acceptance": "accepted: predecessor upgrade, repeat, replacement restart, final UI installation and full five-minute idle passed; exact 4ea48c66 source CI passed 14/14; final independent reassessment found no actionable finding. Operator accepted precise physical-test limitations and documented 20-versus-18 service-request nonconformance. Original four executable identities unchanged; 16d/16e not started."
+    "acceptance": "accepted: predecessor upgrade, repeat, replacement restart, final UI installation and full five-minute idle passed; exact 4ea48c66 source CI passed 14/14; final independent reassessment found no actionable finding. Operator accepted precise physical-test limitations and documented 20-versus-18 service-request nonconformance. Original four executable identities unchanged; 16d/16e not started.",
+    "scope": "historical-original-candidate"
+  },
+  "reevaluation_16bc": {
+    "date": "2026-10-20",
+    "reviewed_pi_devel": "6e833e65cbc5e92b7b27f6f6276cc0ac67319aba",
+    "reviewed_rp1_devel": "1db51cd33471cd51687eb8cc626553e8e8d16430",
+    "selected_executable_source": "1e047a44a44f07d2eb52dfd3c3537d2d24e60143",
+    "selected_supporting_source": "1e047a44a44f07d2eb52dfd3c3537d2d24e60143",
+    "support_payload_equivalent_to_accepted_source": "4ea48c66b1df5e04d4d468c84991148955b5e902",
+    "frozen_docs": "5214cdf8ee8517b570553edeeefbdced17f2ba93",
+    "current_docs_read_only": "c0a0ec5dd8ea6d7cb49fd7fa3d417ee0640c5672",
+    "provider_source": "8c16d3c237cb1267cbedafb5da2bb74132ca5de0",
+    "provider_tree": "4c1ad8acf513b36ba32e58a636942655accbb52d",
+    "supplement_source": "bb6815446beb9b96853ad5a353b0d355d4975710",
+    "disposition_16b": "complete-replacement-four-artifact-software-handoff",
+    "disposition_16c": "open-replacement-target-acceptance-needs-new-bounded-authorization",
+    "future_source_tag_rule": "Any later tag/source selection must include the accepted support payload and identify these executables as built from 1e047a44; record-only commits do not reidentify them.",
+    "post_original_acceptance_commits": [
+      {
+        "commit": "6953cd512417b2b9f2a673a3b46003f83bcab225",
+        "subject": "Accept Beta 1 candidate with recorded limits and service-budget exception"
+      },
+      {
+        "commit": "c6336cf1d5f52f8a5327b86e459a13eaeface82d",
+        "subject": "Reconcile Beta 1 acceptance punchlist summaries"
+      },
+      {
+        "commit": "5ba2e8a9cea37f0e2f5d53d45c57b73b11ccd1f8",
+        "subject": "Separate parallel lifecycle fixture listener ports"
+      },
+      {
+        "commit": "4b22c4b6a642a18a6af75c1f59e518e2b95a73d5",
+        "subject": "Align RP1 clock-parent fixtures and invalidate cached tests"
+      },
+      {
+        "commit": "0cf6fa6953eb0388682103569c50662ede33f2e2",
+        "subject": "Allow cold network loopback CI builds to finish"
+      },
+      {
+        "commit": "0b4ff7f2a7d1e662cbb36953e3ed0a0c6d34d60a",
+        "subject": "Guard the legacy DMA probe clock-parent assumptions"
+      },
+      {
+        "commit": "261eeca484b142a72d3991c61c912b94142d6fcb",
+        "subject": "Serialize shared WTP archive builds before parallel test consumers"
+      },
+      {
+        "commit": "6e833e65cbc5e92b7b27f6f6276cc0ac67319aba",
+        "subject": "Remove obsolete 50 MHz RP1 DMA research probe"
+      },
+      {
+        "commit": "1e047a44a44f07d2eb52dfd3c3537d2d24e60143",
+        "subject": "Encode RP1 endpoint dither profiles within the provider contract"
+      }
+    ]
   }
 }
