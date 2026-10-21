@@ -1,6 +1,6 @@
 {
   "schema": "wsprrypi-beta-candidate/1",
-  "publication": "unpublished",
+  "publication": "published-prerelease",
   "candidate_acceptance": "accepted-bounded-executable-replacement-runtime-with-explicit-unchanged-support-reuse",
   "version": "4.0.0-beta.1",
   "source_commit": "1e047a44a44f07d2eb52dfd3c3537d2d24e60143",
@@ -5483,7 +5483,7 @@
     ]
   },
   "publication_16d": {
-    "status": "preparing-unpublished",
+    "status": "published-prerelease-public-assets-and-docs-verified",
     "version": "4.0.0-beta.1",
     "proposed_tag": "v4.0.0-beta.1",
     "date": "2026-10-21",
@@ -5565,13 +5565,260 @@
       "SHA256SUMS",
       "publication-manifest.json"
     ],
-    "publication_commit": null,
+    "publication_commit": "aa6ce2996e8f180670847ed4c89568fa10d4539b",
     "docs_commit": "65066216296163c0fcf71b6a5ead09083373f842",
-    "public_asset_verification": null,
+    "public_asset_verification": [
+      {
+        "asset": "wsprrypi-armv6-bookworm",
+        "bytes": 5841936,
+        "accepted_sha256": "351d1859b288d228e1eb952ef13c6f5df3cbf556ae582e62f588a35aba6a3348",
+        "downloaded_sha256": "351d1859b288d228e1eb952ef13c6f5df3cbf556ae582e62f588a35aba6a3348",
+        "result": "PASS"
+      },
+      {
+        "asset": "wsprrypi-armv6-trixie",
+        "bytes": 5999744,
+        "accepted_sha256": "604bcf1730c9635d62f953cccd7c886f1fe3afaf4b9114c5c6f5d19d3ccdd1f1",
+        "downloaded_sha256": "604bcf1730c9635d62f953cccd7c886f1fe3afaf4b9114c5c6f5d19d3ccdd1f1",
+        "result": "PASS"
+      },
+      {
+        "asset": "wsprrypi-aarch64-bookworm",
+        "bytes": 6452024,
+        "accepted_sha256": "47e5e588d95a7abb6f3799d738d33c6350e61000a59f0c2c51b562f0336ea403",
+        "downloaded_sha256": "47e5e588d95a7abb6f3799d738d33c6350e61000a59f0c2c51b562f0336ea403",
+        "result": "PASS"
+      },
+      {
+        "asset": "wsprrypi-aarch64-trixie",
+        "bytes": 6549328,
+        "accepted_sha256": "82a563adcf3ff9cda8e43423e588a9739adcda9d2bb07683cb831f6df046feda",
+        "downloaded_sha256": "82a563adcf3ff9cda8e43423e588a9739adcda9d2bb07683cb831f6df046feda",
+        "result": "PASS"
+      }
+    ],
     "16e": "not-started",
     "docs_tag": "v4.0.0-beta.1",
     "docs_versioned_url": "https://wsprry-pi.readthedocs.io/en/v4.0.0-beta.1/",
     "independent_preparation_review": "Four P2 documentation findings repaired; final independent reassessment found no further actionable scoped findings before commits; external publication gates remain",
-    "guarded_install_recipe_regression": "Bookworm success + ten refusal cases passed; mocked sudo never called on failures"
-  }
+    "guarded_install_recipe_regression": "Bookworm success + ten refusal cases passed; mocked sudo never called on failures",
+    "release_id": 419746377,
+    "release_url": "https://github.com/WsprryPi/WsprryPi/releases/tag/v4.0.0-beta.1",
+    "title": "WsprryPi 4.0 Beta 1",
+    "published_at": "2026-10-21T15:46:08Z",
+    "draft": false,
+    "prerelease": true,
+    "latest": false,
+    "previous_latest_stable": {
+      "tag": "v3.2.0",
+      "release_id": 361059831,
+      "preserved": true
+    },
+    "publication_tree": "801898b144de09f01894e10b5c99838233e5d684",
+    "annotated_tag_object": "e61768f5b87f1f7e2b8735b34c3cabcaee7305ec",
+    "supporting_source_commit": "aa6ce2996e8f180670847ed4c89568fa10d4539b",
+    "accepted_support_implementation_commit": "85bdbdd93aa29bca1783fa55f861952108012802",
+    "expected_generated_ui_identity": {
+      "source_commit": "aa6ce2996e8f180670847ed4c89568fa10d4539b",
+      "application_version": "4.0.0-beta.1+1e047a4",
+      "packaged_ui_build_id": "sha256:bbf8bbcfe3ea3bd8e1735dbf350291b5de47c30e706c18ad0d750b3bc95f0a9c"
+    },
+    "public_assets": [
+      {
+        "id": 662986333,
+        "name": "publication-manifest.json",
+        "bytes": 10140,
+        "digest": "sha256:ced10dfce978be47de34154c55d99185b4ee42161eba9e2f6e402f45ccda3d62",
+        "url": "https://github.com/WsprryPi/WsprryPi/releases/download/v4.0.0-beta.1/publication-manifest.json"
+      },
+      {
+        "id": 662986273,
+        "name": "SHA256SUMS",
+        "bytes": 360,
+        "digest": "sha256:b0803fc0b03e147fc802547e06930f2611c314eb9b95eb95ee3f0e09afb77654",
+        "url": "https://github.com/WsprryPi/WsprryPi/releases/download/v4.0.0-beta.1/SHA256SUMS"
+      },
+      {
+        "id": 662986271,
+        "name": "wsprrypi-aarch64-bookworm",
+        "bytes": 6452024,
+        "digest": "sha256:47e5e588d95a7abb6f3799d738d33c6350e61000a59f0c2c51b562f0336ea403",
+        "url": "https://github.com/WsprryPi/WsprryPi/releases/download/v4.0.0-beta.1/wsprrypi-aarch64-bookworm"
+      },
+      {
+        "id": 662986286,
+        "name": "wsprrypi-aarch64-trixie",
+        "bytes": 6549328,
+        "digest": "sha256:82a563adcf3ff9cda8e43423e588a9739adcda9d2bb07683cb831f6df046feda",
+        "url": "https://github.com/WsprryPi/WsprryPi/releases/download/v4.0.0-beta.1/wsprrypi-aarch64-trixie"
+      },
+      {
+        "id": 662986285,
+        "name": "wsprrypi-armv6-bookworm",
+        "bytes": 5841936,
+        "digest": "sha256:351d1859b288d228e1eb952ef13c6f5df3cbf556ae582e62f588a35aba6a3348",
+        "url": "https://github.com/WsprryPi/WsprryPi/releases/download/v4.0.0-beta.1/wsprrypi-armv6-bookworm"
+      },
+      {
+        "id": 662986283,
+        "name": "wsprrypi-armv6-trixie",
+        "bytes": 5999744,
+        "digest": "sha256:604bcf1730c9635d62f953cccd7c886f1fe3afaf4b9114c5c6f5d19d3ccdd1f1",
+        "url": "https://github.com/WsprryPi/WsprryPi/releases/download/v4.0.0-beta.1/wsprrypi-armv6-trixie"
+      }
+    ],
+    "all_six_draft_and_public_assets_byte_identical_to_frozen_packet": true,
+    "fetch_helper_verification": [
+      {
+        "target": "armv6-bookworm",
+        "image": "sha256:516ed231829eb50c77f7d838d45d4094295fe4bc40bd8c15e7380c8da69856d8",
+        "bytes": 5841936,
+        "sha256": "351d1859b288d228e1eb952ef13c6f5df3cbf556ae582e62f588a35aba6a3348",
+        "result": "PASS"
+      },
+      {
+        "target": "armv6-trixie",
+        "image": "sha256:5db74b080202cfd6339291f7cc2deb0564ba92f2c256bec82cd2ae017469fb2b",
+        "bytes": 5999744,
+        "sha256": "604bcf1730c9635d62f953cccd7c886f1fe3afaf4b9114c5c6f5d19d3ccdd1f1",
+        "result": "PASS"
+      },
+      {
+        "target": "aarch64-bookworm",
+        "image": "sha256:ae61c46cbd1fd3d8409eb38146ea2d871d7cdc40b02ad89899127f0181fb108a",
+        "bytes": 6452024,
+        "sha256": "47e5e588d95a7abb6f3799d738d33c6350e61000a59f0c2c51b562f0336ea403",
+        "result": "PASS"
+      },
+      {
+        "target": "aarch64-trixie",
+        "image": "sha256:c700867ad614436c5d14d96e815c21a6735456f508e7b82899e3edf78dcfc545",
+        "bytes": 6549328,
+        "sha256": "82a563adcf3ff9cda8e43423e588a9739adcda9d2bb07683cb831f6df046feda",
+        "result": "PASS"
+      }
+    ],
+    "docs_publication": {
+      "build_id": 35301260,
+      "commit": "65066216296163c0fcf71b6a5ead09083373f842",
+      "success": true,
+      "version": "v4.0.0-beta.1",
+      "tag_object": "fd73304cfc149e6bfeb952f3e760fb82af11d40a",
+      "tree": "394b763af9ade44f03cd5719fbda46a13b181b1c",
+      "url": "https://wsprry-pi.readthedocs.io/en/v4.0.0-beta.1/",
+      "verified": [
+        {
+          "format": "epub",
+          "url": "https://wsprry-pi.readthedocs.io/_/downloads/en/v4.0.0-beta.1/epub/",
+          "bytes": 6548096,
+          "sha256": "fef852085445c4b0a82456da9dd919517162dfa266f37e4c7569a01b71744986"
+        },
+        {
+          "format": "htmlzip",
+          "url": "https://wsprry-pi.readthedocs.io/_/downloads/en/v4.0.0-beta.1/htmlzip/",
+          "bytes": 14285625,
+          "sha256": "6b704ce4f01788761c5f9bf5f49e32844b31e727655463882ade1e50ee07e9dd"
+        },
+        {
+          "format": "pdf",
+          "url": "https://wsprry-pi.readthedocs.io/_/downloads/en/v4.0.0-beta.1/pdf/",
+          "bytes": 5951855,
+          "sha256": "e7a564dabf1f16cd6f5e78ef713cdb20235657238d7cdd4d3317f604aa7eb22f"
+        },
+        {
+          "path": "Install/beta1.html",
+          "url": "https://wsprry-pi.readthedocs.io/en/v4.0.0-beta.1/Install/beta1.html",
+          "content_verified": true,
+          "bytes": 21586
+        },
+        {
+          "path": "Advanced_Operations/rp1_gpclk.html",
+          "url": "https://wsprry-pi.readthedocs.io/en/v4.0.0-beta.1/Advanced_Operations/rp1_gpclk.html",
+          "content_verified": true,
+          "bytes": 27742
+        },
+        {
+          "path": "User_Interface/Setup/Transmitter/index.html",
+          "url": "https://wsprry-pi.readthedocs.io/en/v4.0.0-beta.1/User_Interface/Setup/Transmitter/index.html",
+          "content_verified": true,
+          "bytes": 57930
+        }
+      ],
+      "stable_latest_default_unchanged": true
+    },
+    "publication_ci": {
+      "run_id": 39625036036,
+      "commit": "aa6ce2996e8f180670847ed4c89568fa10d4539b",
+      "result": "success",
+      "url": "https://github.com/WsprryPi/WsprryPi/actions/runs/39625036036",
+      "jobs": [
+        {
+          "name": "wtp-network-loopback",
+          "result": "success"
+        },
+        {
+          "name": "non-hardware-validation",
+          "result": "success"
+        },
+        {
+          "name": "wtp-configuration-legacy (p154)",
+          "result": "success"
+        },
+        {
+          "name": "wtp-configuration-legacy (p157)",
+          "result": "success"
+        },
+        {
+          "name": "wtp-configuration-legacy (p158)",
+          "result": "success"
+        },
+        {
+          "name": "strict-i2c-profile",
+          "result": "success"
+        },
+        {
+          "name": "macos-simulated-profile",
+          "result": "success"
+        },
+        {
+          "name": "wtp-configuration-legacy (extended)",
+          "result": "success"
+        },
+        {
+          "name": "wtp-usb-management-pair",
+          "result": "success"
+        },
+        {
+          "name": "wtp-configuration-legacy (p152)",
+          "result": "success"
+        },
+        {
+          "name": "wtp-configuration-legacy (p153)",
+          "result": "success"
+        },
+        {
+          "name": "wtp-configuration-legacy (legacy)",
+          "result": "success"
+        },
+        {
+          "name": "wtp-configuration-legacy (p156)",
+          "result": "success"
+        },
+        {
+          "name": "ubuntu-gcc13-release",
+          "result": "success"
+        }
+      ]
+    },
+    "immutability": {
+      "release_immutable": false,
+      "policy_changed": false,
+      "release_and_asset_attestation_checks": "unavailable; both gh commands report no attestations; direct public hashes passed"
+    },
+    "final_closeout_head_ci": "Verify exact record commit after push; report final result without moving publication identities",
+    "16d": "complete-publication-and-required-public-verification",
+    "originating_conversation_post_execution_assessment": "not-performed; separate packet supplied",
+    "final_independent_public_state_review": "No actionable findings; independently rehashed all six public assets and four real fetch-helper downloads; closeout claims/mapping/limitations consistent"
+  },
+  "publication_mapping_authority": "publication_16d records the actual published mapping; candidate source, operator_docs, original acceptance and reevaluation fields retain their historical freeze identities"
 }

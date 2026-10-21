@@ -6,13 +6,14 @@ within their accepted scopes. Item 16 remains in progress. The original
 at `1e047a44` has refreshed 16b artifacts and accepted bounded 16c evidence,
 with explicit reuse of unchanged installer/UI acceptance.
 The original physical-test limitations and service-request cap exception
-remain recorded. Item 16d publication is separately authorized and in progress;
-item 16e announcements remain not started. Cleanup changes no selected
-requirement, priority, candidate identity or publication authority.
+remain recorded. Item 16d prerelease publication and all four public-download
+checks are verified; item 16e announcements remain not started. Cleanup changes
+no selected requirement, priority, candidate identity or publication authority.
 
-The current milestone is **WsprryPi 4.0 Beta 1**. Item 16d execution is authorized
-through verified prerelease publication. Stop before item 16e. Preparation or
-cleanup alone does not authorize publication, stable promotion or announcements.
+**WsprryPi 4.0 Beta 1 is published:** [v4.0.0-beta.1](https://github.com/WsprryPi/WsprryPi/releases/tag/v4.0.0-beta.1),
+with [versioned operator Docs](https://wsprry-pi.readthedocs.io/en/v4.0.0-beta.1/).
+Stop after verified item 16d; item 16e is not started. Stable promotion and
+announcements require their separate authority.
 
 The [Beta 1 evidence](4.0-Beta-1-Release-Evidence.md),
 [source inventory](4.0-Beta-1-Source-Inventory.json) and
@@ -177,7 +178,7 @@ Status key: ✅ Complete · ⏳ In progress · ☐ Not started
       Final documentation-head CI is verified after the scoped record
       push and reported separately. Item 16d is now separately authorized; 16e
       remains not started.
-    - ⏳ **16d — Publish Beta 1 as a GitHub prerelease and verify.** Only
+    - ✅ **16d — Publish Beta 1 as a GitHub prerelease and verify.** Only
       after separate authorization, publish the accepted Beta 1 and corresponding
       documentation through their separate workflows. Use the reviewed Markdown
       body and mark it as a prerelease. Attach all four accepted precompiled binaries
@@ -187,6 +188,19 @@ Status key: ✅ Complete · ⏳ In progress · ☐ Not started
       accepted candidate checksums. Also verify tag/source identities, notes and
       documentation. This is not final 4.0 stable publication. Do not perform 16e
       until actual Beta availability is verified.
+      **Verified October 21:** release `419746377`, published 15:46:08 UTC;
+      `draft=false`, `prerelease=true`, prior latest stable unchanged. Application
+      annotated tag `e61768f5` peels to publication/support `aa6ce299`; binaries
+      remain exact accepted `1e047a44` exports. All four fresh public downloads
+      match accepted sizes/SHA-256 values; the real fetch helper passed all four
+      userspaces. All six draft/public assets match staging. Docs tag `fd73304c`
+      peels to `6506621`; RTD build `35301260` and served HTML/PDF/EPUB passed.
+      Supporting-source acceptance uses the explicit bounded software/evidence
+      disposition below, retaining no fresh target support installation/status.
+      Exact publication CI passed 14/14. Final closeout-head CI and remote parity
+      are checked after the scoped record push; publication tags remain fixed.
+      The [public verification matrix](4.0-Beta-1-Release-Evidence.md#october-21-item-16d-publication-and-public-verification)
+      records all four downloaded hashes and the preserved limitations.
     - ☐ **16e — Later: update every open issue marked ready for release.**
       After 16d, freshly enumerate the complete open ready-for-release set using
       the project's actual readiness markers. Reconcile it against the accepted
@@ -206,7 +220,7 @@ Status key: ✅ Complete · ⏳ In progress · ☐ Not started
 | 13 | 21 | ✅ Complete; #423 closed | Integrated application Impeccable review accepted for `d93c75c`; final closeout/planning-head CI each passed 11/11; bounded validation and qualification limits retained | `WsprryPi` |
 | 14 | — | ✅ Closed within bounded software scope | Full companion integrated at final `a84010d`; feature/devel CI each passed 12/12; eight exact compatibility pairs, affected Impeccable/adversarial repairs and published Docs accepted; nonblocking Pico wording follow-up retained | `WsprryPi`; affected operator docs: `WsprryPi-Docs` |
 | 15 | — | ✅ Pico software and originating assessment complete | Pico `1653034` closes four findings after fresh independent reassessment; 200 executed host groups, 13 sanitizer groups, both firmware builds and genuine browser checks passed. Pi adoption, P15.14 docs and physical qualification remain separate | `WsprryPi` coordination; `WsprryPico` implementation |
-| 16 | 22 | ⏳ In progress | Replacement `1e047a44` supersedes original `3decc072` exports; 16a–16c accepted with bounded executable/runtime checks and explicit unchanged installer/UI evidence reuse. Historical `3decc072` / `4ea48c66` CI, finite wspr5 acceptance, physical-test limitations and 20/18 exception retain their original scope. 16d is authorized and in progress; 16e remains not started | `WsprryPi` |
+| 16 | 22 | ⏳ In progress | Replacement `1e047a44` supersedes original `3decc072` exports; 16a–16c accepted with bounded executable/runtime checks and explicit unchanged installer/UI evidence reuse. Historical `3decc072` / `4ea48c66` CI, finite wspr5 acceptance, physical-test limitations and 20/18 exception retain their original scope. 16d publication/all four public downloads/versioned Docs verified; 16e remains not started | `WsprryPi` |
 
 RP1 items 18–21 above are historical cross-references. The current provider
 ROADMAP tracks Beta work as item 22 and delegates exact application acceptance
@@ -319,9 +333,9 @@ Beta preparation or announcement does not itself close that stable release gate.
   selection remain unperformed, specifically accepted Beta limitations. The
   documented 20-versus-18 service-request exception accepts the past
   nonconformance for 16c disposition without retroactive authorization.
-  16d is now separately authorized and in progress; 16e remains not started.
-- ☐ **Later Beta 1 publication and issue announcements:** after separate
-  publication authorization, complete 16d verification before updating every
+  16d publication and public verification passed; 16e remains not started.
+- ☐ **Beta 1 issue announcements (16e):** 16d publication and verification
+  passed; separate authority is required before updating every
   open ready-for-release issue under 16e. Preserve issue states and audit coverage.
   Final 4.0 stable acceptance/publication remains a later separate gate.
 
