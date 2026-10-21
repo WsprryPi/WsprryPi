@@ -1,5 +1,6 @@
 #include "rp1_gpclk_transmit_backend.hpp"
 #include "rp1_gpclk_planner.hpp"
+#include "rp1_gpclk_event_program.hpp"
 #include "rp1_gpclk_uapi.h"
 #include "wspr_transmit.hpp"
 #include "execution_plan_compiler.hpp"
@@ -282,6 +283,123 @@ void test_direct_band_range()
     }
 }
 
+void test_physical_endpoint_dither_profiles()
+{
+    using Mode = wsprrypi::TransmissionMode;
+    // The 20 m operating frequency uses a caller correction that places its
+    // first tone on, or just beside, a Q16 endpoint. The intrinsic baseline
+    // remains part of the real event compiler, exactly once.
+    for (int gpio : {4, 20})
+    for (Mode mode : {Mode::TONE, Mode::WSPR, Mode::QRSS, Mode::FSKCW, Mode::DFCW})
+    for (double fractional_offset : {-0.000001, 0.0, 0.000001})
+    {
+        auto plan = mode == Mode::TONE ? tonePlan(true) :
+            mode == Mode::WSPR ? framePlan() :
+            mode == Mode::QRSS ? qrssPlan() : twoTonePlan(mode, mode == Mode::DFCW);
+        const double frequency = 14097100.0;
+        const double shift = frequency - plan.events.front().frequency_hz;
+        plan.reference_frequency_hz += shift;
+        for (auto& event : plan.events) event.frequency_hz += shift;
+        const double parent = frequency * (929780.0 + fractional_offset) / 65536.0;
+        plan.calibration.ppm = (parent / 200000000.0 - 1.0) * 1000000.0 + 46.245;
+        Owner owner;
+        auto provider = std::make_unique<Provider>();
+        auto* observed = provider.get();
+        WsprRp1GpclkBackend backend(owner, std::move(provider));
+        const auto configured = backend.configure(plan, developmentInputs(2, gpio));
+        expect(configured.ok,
+            "endpoint-rounded physical plans must configure in every supported mode/route");
+        if (!configured.ok) continue;
+        const auto executed = backend.execute(plan);
+        expect(executed.ok, "endpoint-rounded physical plans must submit and release");
+        if (!executed.ok) continue;
+        const auto& program = observed->event_program;
+        const auto realized = backend.realizedEventFrequencies();
+        expect(!program.tones.empty(), "endpoint-rounded plans must submit a tone");
+        expect(realized.size() >= program.events.size(),
+            "every submitted event must have a realized frequency");
+        for (const auto& tone : program.tones) {
+            expect(tone.upper_divider_word == tone.lower_divider_word + 1 &&
+                (tone.lower_divider_word >> 16) == (tone.upper_divider_word >> 16) &&
+                tone.upper_divider_word <= 0xffffffffULL &&
+                tone.lower_count > 0 && tone.upper_count > 0 &&
+                std::uint64_t{tone.lower_count} + tone.upper_count == 66792,
+                "physical profiles must meet the provider's adjacent-word positive-count contract");
+        }
+        for (std::size_t i = 0; i < program.events.size(); ++i) {
+            if (!program.events[i].rf_on) continue;
+            expect(program.events[i].tone_index < program.tones.size(),
+                "physical endpoint events must reference a submitted tone");
+            if (program.events[i].tone_index >= program.tones.size() || i >= realized.size()) continue;
+            const auto& tone = program.tones[program.events[i].tone_index];
+            const long double average = static_cast<long double>(parent) * 65536 *
+                (static_cast<long double>(tone.lower_count) / tone.lower_divider_word +
+                 static_cast<long double>(tone.upper_count) / tone.upper_divider_word) / 66792;
+            expect(std::fabs(average - plan.events[i].frequency_hz) <= 0.01L,
+                "canonical physical profiles must retain the original requested frequency tolerance");
+            expect(std::fabs(average - realized[i]) < 0.000001L,
+                "reported realized frequencies must describe the submitted physical profile");
+        }
+    }
+
+    // Exercise an exact word with both ordinary fractional bits and 0xffff.
+    // An integer-field boundary that cannot serve the full four-tone plan
+    // continues to fail before any provider acquisition.
+    for (double frequency : {51200000.0, 200000000.0 * 65536 / 983039,
+                             50000000.0, 200000000.0 * 65536 / 131073}) {
+        wsprrypi::TransmissionRequest request;
+        request.mode = Mode::TONE;
+        request.output.backend = wsprrypi::BackendKind::RP1_GPCLK;
+        request.calibration.ppm = 46.245;
+        request.payload = wsprrypi::TonePayload{frequency, std::chrono::seconds{1}, {}};
+        const auto plan = wsprrypi::ExecutionPlanCompiler{}.compile(request);
+        const auto compiled = wsprrypi::compileRp1GpclkEventProgram(plan, true);
+        if (frequency == 50000000.0) {
+            expect(!compiled.ok, "an integer transition in the four-tone plan must remain rejected");
+            continue;
+        }
+        if (frequency > 99000000.0) {
+            expect(!compiled.ok && compiled.error.find("physical dither") != std::string::npos,
+                "a provider-valid endpoint pair outside 0.01 Hz tolerance must remain rejected");
+            continue;
+        }
+        expect(compiled.ok, "exact fractional endpoint profiles must have a bounded physical representation");
+        if (compiled.ok) {
+            const auto& tone = compiled.program.tones.front();
+            expect(tone.upper_divider_word == tone.lower_divider_word + 1 &&
+                tone.lower_count > 0 && tone.upper_count > 0 &&
+                (tone.lower_divider_word >> 16) == (tone.upper_divider_word >> 16),
+                "canonical endpoint pairs must never cross an integer field");
+        }
+    }
+}
+
+void test_physical_program_validation()
+{
+    wsprrypi::Rp1GpclkProviderEventProgram valid;
+    valid.fractional_bits = 16; valid.tick_divider = 511;
+    valid.tones = {{0xfffffffeULL, 0xffffffffULL, 1, 66791}};
+    valid.events = {{1000000000, 0, true}};
+    valid.total_duration_ns = 1000000000;
+    std::string error;
+    expect(wsprrypi::validateRp1GpclkEventProgram(valid, error),
+        "the complete maximum Q16 word must remain representable");
+    for (auto invalid_tone : std::vector<wsprrypi::Rp1GpclkProviderSymbol>{
+            {65535, 65536, 1, 66791}, {65536, 65536, 1, 66791},
+            {65536, 65538, 1, 66791}, {65536, 65537, 0, 66792},
+            {65536, 65537, 66792, 0}, {65536, 65537, 1, RP1_GPCLK_DITHER_PERIOD_MAX},
+            {0xffffffffULL, 0x100000000ULL, 1, 66791}}) {
+        auto program = valid;
+        program.tones = {invalid_tone};
+        expect(!wsprrypi::validateRp1GpclkEventProgram(program, error),
+            "physical validation must reject every provider-invalid divider/count profile");
+    }
+    auto mixed = valid;
+    mixed.tones.push_back({65536, 65537, 1, 66791});
+    expect(!wsprrypi::validateRp1GpclkEventProgram(mixed, error),
+        "physical validation must reject mixed integer fields across tones");
+}
+
 class ChunkProvider final : public Provider
 {
 public:
@@ -498,6 +616,8 @@ void test_older_backend_cannot_replace_new_terminal_evidence()
 int main()
 {
     test_direct_band_range();
+    test_physical_endpoint_dither_profiles();
+    test_physical_program_validation();
     test_eight_second_product_plan();
     test_provider_exception_containment();
     test_eight_second_failure_lifecycle();

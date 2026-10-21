@@ -82,6 +82,11 @@ event compilation always uses the nominal 200 MHz parent. The separate
 not the nominal frequency used to calculate RF divider words.
 The 66,792-entry dither period is a numerical weighting cycle, not the number
 of divider writes guaranteed for each event or symbol.
+The physical event compiler encodes adjacent Q16 words with positive counts
+for both words. Exact numerical words and counts that round to an endpoint
+use the nearest such representation only when its recomputed average remains
+within 0.01 Hz of the requested frequency. Profiles that cannot meet that
+tolerance or keep one shared integer divider are rejected before acquisition.
 
 Implicit continuous tone is submitted as one maximum-duration finite event.
 WsprryPi retains stop ownership and requests bounded drain when the operator or

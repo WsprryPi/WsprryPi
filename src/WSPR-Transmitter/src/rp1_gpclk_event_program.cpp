@@ -28,6 +28,55 @@ bool noFade(const EnvelopeSettings& envelope)
         envelope.fade_in <= std::chrono::nanoseconds::zero() &&
         envelope.fade_out <= std::chrono::nanoseconds::zero();
 }
+
+bool physicalTone(const Rp1GpclkTonePlan& numerical, double parent_hz,
+    double maximum_error_hz, Rp1GpclkProviderSymbol& tone,
+    double& realized_hz)
+{
+    constexpr std::uint64_t maximum_word = 0xffffffffULL;
+    const std::uint64_t period = std::uint64_t{numerical.lower_word_count} +
+        numerical.upper_word_count;
+    if (period < 2 || period > RP1_GPCLK_DITHER_PERIOD_MAX)
+        return false;
+
+    auto lower = numerical.lower_divider_word;
+    auto upper = numerical.upper_divider_word;
+    // Numerical exact-word plans need a physical adjacent pair. Keep both
+    // words inside the same integer field, including its upper boundary.
+    if (lower == upper) {
+        if ((lower & 0xffffULL) == 0xffffULL) --lower;
+        upper = lower + 1;
+    }
+    if (lower < 65536 || upper > maximum_word || upper != lower + 1 ||
+        (lower >> 16) != (upper >> 16))
+        return false;
+    if (numerical.lower_word_count && numerical.upper_word_count) {
+        // Preserve the numerical planner's long-double rounding for ordinary
+        // profiles; only endpoint representations require conversion.
+        tone = {lower, upper, numerical.lower_word_count, numerical.upper_word_count};
+        realized_hz = numerical.average_frequency_hz;
+        return true;
+    }
+
+    const long double low_hz = static_cast<long double>(parent_hz) * 65536 / lower;
+    const long double high_div_hz = static_cast<long double>(parent_hz) * 65536 / upper;
+    const long double ratio = std::clamp(
+        (numerical.requested_frequency_hz - high_div_hz) / (low_hz - high_div_hz),
+        0.0L, 1.0L);
+    // The provider requires both counts to be positive. Rounding near an
+    // endpoint can otherwise turn a valid numerical plan into an invalid UAPI.
+    const auto lower_count = std::clamp<std::uint64_t>(
+        static_cast<std::uint64_t>(std::llround(ratio * period)), 1, period - 1);
+    const auto upper_count = period - lower_count;
+    const long double mean =
+        (low_hz * lower_count + high_div_hz * upper_count) / period;
+    if (std::fabs(mean - numerical.requested_frequency_hz) > maximum_error_hz)
+        return false;
+    tone = {lower, upper, static_cast<std::uint32_t>(lower_count),
+        static_cast<std::uint32_t>(upper_count)};
+    realized_hz = static_cast<double>(mean);
+    return true;
+}
 }
 
 bool validateRp1GpclkEventProgram(
@@ -48,12 +97,17 @@ bool validateRp1GpclkEventProgram(
         error = "RP1 GPCLK event program exceeds its bounded table contract.";
         return false;
     }
+    const auto integer = program.tones.front().lower_divider_word >> 16;
     for (const auto& tone : program.tones)
     {
-        if (!tone.lower_divider_word || !tone.upper_divider_word ||
-            (!tone.lower_count && !tone.upper_count) ||
-            tone.lower_count > std::numeric_limits<std::uint32_t>::max() -
-                tone.upper_count)
+        if (!integer || tone.upper_divider_word > 0xffffffffULL ||
+            tone.lower_divider_word >= tone.upper_divider_word ||
+            tone.upper_divider_word != tone.lower_divider_word + 1 ||
+            (tone.lower_divider_word >> 16) != integer ||
+            (tone.upper_divider_word >> 16) != integer ||
+            !tone.lower_count || !tone.upper_count ||
+            std::uint64_t{tone.lower_count} + tone.upper_count >
+                RP1_GPCLK_DITHER_PERIOD_MAX)
         {
             error = "RP1 GPCLK event program contains an invalid tone profile.";
             return false;
@@ -64,7 +118,7 @@ bool validateRp1GpclkEventProgram(
     {
         if (event.duration_ns < RP1_GPCLK_EVENT_DURATION_NS_MIN ||
             event.duration_ns > RP1_GPCLK_EVENT_DURATION_NS_MAX ||
-            (event.rf_on && event.tone_index >= program.tones.size()) ||
+            (event.rf_on ? event.tone_index >= program.tones.size() : event.tone_index != 0) ||
             event.duration_ns > std::numeric_limits<std::uint64_t>::max() - total)
         {
             error = "RP1 GPCLK event program contains an invalid event.";
@@ -161,6 +215,7 @@ Rp1GpclkEventCompileResult compileRp1GpclkEventProgram(
     };
 
     std::vector<std::size_t> planned_indexes;
+    std::vector<double> physical_frequencies;
     std::vector<double> realized;
     for (std::size_t i = 0; i < event_count; ++i)
     {
@@ -173,18 +228,23 @@ Rp1GpclkEventCompileResult compileRp1GpclkEventProgram(
         if (std::fabs(planned.plan.tones[planned_index].requested_frequency_hz -
                 event.frequency_hz) > 0.001)
             return reject("RP1 GPCLK event frequency does not map to the planned tone table.");
-        realized.push_back(planned.plan.tones[planned_index].average_frequency_hz);
-        if (std::find(planned_indexes.begin(), planned_indexes.end(), planned_index) ==
-            planned_indexes.end())
+        auto found = std::find(planned_indexes.begin(), planned_indexes.end(), planned_index);
+        if (found == planned_indexes.end())
         {
             if (planned_indexes.size() == RP1_GPCLK_MAX_TONES)
                 return reject("RP1 GPCLK finite event plan contains too many tones.");
+            Rp1GpclkProviderSymbol tone;
+            double frequency = 0.0;
+            if (!physicalTone(planned.plan.tones[planned_index],
+                    planned.plan.corrected_parent_frequency_hz,
+                    input.maximum_average_error_hz, tone, frequency))
+                return reject("RP1 GPCLK physical dither plan cannot meet the divider/count and average-error contract.");
             planned_indexes.push_back(planned_index);
-            const auto& tone = planned.plan.tones[planned_index];
-            program.tones.push_back({tone.lower_divider_word,
-                tone.upper_divider_word, tone.lower_word_count,
-                tone.upper_word_count});
+            program.tones.push_back(tone);
+            physical_frequencies.push_back(frequency);
+            found = planned_indexes.end() - 1;
         }
+        realized.push_back(physical_frequencies[found - planned_indexes.begin()]);
     }
 
     std::uint64_t total = 0;
