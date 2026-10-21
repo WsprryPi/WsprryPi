@@ -2,105 +2,78 @@
 
 # RP1 qualification evidence and status
 
-WsprryPi keeps installed provider identity, structural resource compatibility,
-route readiness, published qualification evidence, application eligibility and
-current output/ownership/cleanup state separate. The RP1 module continues to
-report `Compatible-unqualified` when its structural resource contract passes.
-Externally established qualification does not rewrite that module state.
+WsprryPi ships the RP1 route-evidence bundle with the application. Installation,
+updates and status do not download a separate qualification release. The helper
+checks the bundled files against the maintained
+[reference](../release_tools/rp1-qualification-lock.json) before interpreting them.
+Provider identity, structural compatibility, route readiness, scoped evidence,
+application eligibility and current output state remain separate facts.
 
-The original provider [release lock](../scripts/tests/fixtures/rp1-release-1.0.0.json)
-and all seven immutable `v1.0.0` assets remain unchanged. In particular the
-original compatibility manifest is empty. A separate
-`qualification-v1.0.0-r1` metadata publication records accepted evidence for
-software `1.0.0` / package `1.0.0-1`. The supplemental consumer reference pins
-its source, revision, complete four-asset inventory and every SHA-256.
-The production semantic-version module selector excludes supplemental tags.
+## Evidence identity and scope
+
+The [bundle](../release_tools/rp1-qualification/) contains `rp1-qualification.json`,
+`rp1-qualification.schema.json`, `qualification_status.py` and `SHA256SUMS`.
+These files are reproduced byte-for-byte from provider metadata source
+`bb6815446beb9b96853ad5a353b0d355d4975710` and retain their existing SHA-256
+identities. Resolve that source by its full commit. The metadata's `metadataTag`
+field is a stable evidence identifier; the application consumes the bundle locally.
+The original [software lock](../scripts/tests/fixtures/rp1-release-1.0.0.json)
+and immutable `v1.0.0` package remain unchanged.
 
 GPIO4 and GPIO20 have independent finite conducted TONE evidence at
-14,097,100 Hz, 2 mA and nominal 200 MHz `pll_sys`: seven passing cases per
-route, including completion, four STOP timings, owner close and service stop.
-The evidence retains its original source/build, configuration, physical path,
-receiver, cleanup and integrity references. Reuse for published `1.0.0` requires
-unchanged executable/build inputs and equal extracted candidate/release package
-members; their archive and source hashes remain different.
+14,097,100 Hz, 2 mA and nominal 200 MHz `pll_sys`: seven cases per route,
+including completion, four STOP timings, owner close and service stop.
+Evidence retains its source/build, physical-path, receiver, cleanup and integrity
+references. Attribution requires the exact released package/source, UAPIs,
+runtime inventory, loaded module build notes and active route to match.
+A development provider does not inherit release evidence from a version string.
 
 The maintained [application band table](https://wsprry-pi.readthedocs.io/en/devel/About_Wsprry_Pi/index.html#band-qualification)
-is the accepted application qualification statement, maintained and explicitly
-accepted by Lee Bussy, who holds the evidence provenance. Its Pi 5 / 200 MHz PLL_SYS column
-qualifies 2200 m through 10 m, including 12 m; 6 m and 4 m are unqualified;
-2 m, 1.25 m and 70 cm are unavailable. Application frequency construction and
-band/mode policy remain in `src/WSPR-Transmitter`. An experimental override
-cannot enable an Unavailable combination. Supplemental metadata contains no
-provider admission or enrollment requirement and cannot enable a transmission.
+is the application qualification authority, maintained and explicitly accepted
+by Lee Bussy, who holds the evidence provenance. The finite TONE cases do not
+establish every band, mode, board, kernel or RF setup. Structural
+`Compatible-unqualified` remains the module's resource state. Bundled evidence
+neither changes application band/mode policy nor grants transmission permission.
 
-## Resolution and runtime status
+## Installation and offline verification
 
-The application installer installs the maintained consumer interpreter and its
-separate reference. When provider installation is selected, it also attempts to
-refresh the pinned evidence cache. A failed
-refresh is reported without changing provider installation or application policy.
-Status never downloads metadata. Missing evidence reports `Evidence missing`;
-corrupt, substituted or stale bytes report `Evidence invalid`. Existing application
-qualification remains independent in both cases.
+The normal application installer installs the helper, reference and complete
+bundle under `/usr/local/lib/wsprrypi`, including updates that skip an unchanged
+provider. One application-owned receipt covers all six installed files.
+Legacy helper/reference receipts can be upgraded or removed; modified or foreign
+files are retained and reported. An interrupted upgrade can be retried.
+No separate evidence-cache refresh is required. The old network-populated cache
+is not used.
 
-After an application update that explicitly skips the unchanged provider, refresh
-the installed cache separately:
+To verify the checkout's bundle and optionally export an independent copy,
+without installing or inspecting a provider:
 
 ```sh
-sudo python3 -B /usr/local/lib/wsprrypi/rp1_qualification.py refresh
+python3 -B scripts/rp1_qualification.py resolve
+python3 -B scripts/rp1_qualification.py resolve --directory /absolute/evidence-copy
 ```
 
-This supported command resolves only the separately pinned supplement; it does
-not reinstall the provider. Verify its result and the installed status separately
-from installer success.
+The legacy `refresh` command is also an offline verification/export alias.
+Neither command accesses GitHub. Status reads the installed sibling bundle;
+a missing or corrupt installed file remains an installation-integrity problem,
+not a new application band restriction.
 
-To independently resolve and validate the supplemental publication without any
-installation, service, endpoint or target effects:
+## Status and attribution
 
-```sh
-python3 -B scripts/rp1_qualification.py resolve \
-  --directory /absolute/external/supplement-download
-```
-
-The resolver verifies the exact immutable release, metadata tag/source,
-original software tag/source, authoritative asset URLs, GitHub asset digests,
-complete asset set and pinned bytes before executing the reviewed supplemental
-interpreter. The schema and checksum assets are pinned as well. Changes require
-an intentional supplemental reference update; no latest-metadata lookup occurs.
-
-The installed command below reads the verified cache and performs the provider's
-bounded passive inspection. Running it on a target requires separate target
-authorization, including its passive endpoint inspection:
+The installed command reads the verified local bundle and performs bounded
+passive provider inspection. Target inspection requires separate authorization:
 
 ```sh
 python3 /usr/local/lib/wsprrypi/rp1_qualification.py status --route gpio4
 ```
 
-For offline review, supply captured `--provider-report` and `--ownership` JSON
-files and an external `--directory`. Exact released package/source, both UAPIs,
-active route, runtime overlay, installed artifact inventory and both loaded module
-build notes must match before evidence is attributed. Tested board/kernel values
-are observations, not new hardware or kernel permission lists. Scope is always
-shown alongside qualification; it is not an all-band or all-mode claim.
+For offline review, supply `--provider-report` and `--ownership` JSON files;
+`--directory` can select an explicit evidence input. Route evidence, structural
+compatibility, operational readiness and current output remain independent.
+An unknown or mismatched provider is reported as unattributed; local evidence
+availability never promotes it to qualified or ready.
 
-Detailed route status responses expose `qualificationEvidence`, `liveQualification` and
-`structuralCompatibility` independently of `operationalReady`, output inhibition,
-eligibility and route transactions. The retained detailed UI uses scoped route
-evidence and an independent application-eligibility label. Its compact route
-workflow and transmission controls keep their existing behavior. The old diagnostic
-executable inside frozen `1.0.0-1` has not been updated; use this consumer or
-the separately identified supplemental interpreter for qualification status.
-
-Ordinary scheduler status does not perform supplemental inspection while holding
-configuration or route locks. Its generic `rp1_eligibility` is `not-evaluated`
-until an application plan is assessed; a route's observational `eligible=false`
-does not mean an application band/mode is unavailable. Administrative responses
-that have not collected evidence explicitly report `Not inspected`.
-
-## Operator documentation follow-up
-
-`WsprryPi-Docs/docs/Advanced_Operations/rp1_gpclk.md` should explain the separate
-route-evidence and readiness facts, cache verification/missing-evidence wording,
-new diagnostic command and unchanged module diagnostic limitations. Preserve
-`docs/About_Wsprry_Pi/index.md` band dispositions and scope. That separate
-repository requires its own authorization and rendered documentation review.
+Ordinary scheduler status does not perform this inspection while holding
+configuration or route locks. The diagnostic executable frozen in provider
+`1.0.0-1` does not interpret this metadata; use the maintained application helper
+for scoped attribution.

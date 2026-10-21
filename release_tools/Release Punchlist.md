@@ -60,14 +60,14 @@ Status key: ✅ Complete · ⏳ In progress · ☐ Not started
    [1.0.0](https://github.com/WsprryPi/RP1-GPCLK-DKMS/releases/tag/v1.0.0) is
    published at `8c16d3c237cb1267cbedafb5da2bb74132ca5de0`; consumer integration
    is `dc4044ba420d00839c79d72895e3f97e25bea99e`. The seven software assets and
-   separate pinned qualification supplement retain their identities.
+   application-bundled qualification evidence retain their byte identities.
 10. ✅ **WsprryPi production integration of the published RP1 release.**
     Installation and idle runtime integration, neutral activation, both routes'
     selection/recovery and reboot restoration are accepted within their tested
     scope. Automatic selection applies only to positively identified Pi 5/CM5
     with explicit opt-out. Target rollback rehearsals were excluded; the
     provider's original empty `Unavailable` manifest remains accepted unchanged.
-    The supplement conveys scoped evidence rather than permission to transmit.
+    The local evidence bundle conveys scoped evidence rather than permission to transmit.
     See [release acceptance](../docs/rp1-provider-acceptance.md).
 11. ✅ **Documentation performance and remaining Impeccable housekeeping.**
     Image optimization, product metadata/reminder dispositions and hosted
@@ -75,7 +75,7 @@ Status key: ✅ Complete · ⏳ In progress · ☐ Not started
     retain their separate follow-ups.
 12. ✅ **Consolidated operator-documentation update.** The independent Docs
     repository covers shared resources, Test Tone, calibration, Si5351/inventory,
-    RP1 supplement, installation and recovery. Documentation acceptance does
+    RP1 scoped evidence, installation and recovery. Documentation acceptance does
     not establish application or physical qualification.
 13. ✅ **Final integrated Impeccable review (#423).** Closed for reviewed
     implementation `d93c75c`, with affected follow-up under items 14–15.
@@ -196,7 +196,7 @@ Status key: ✅ Complete · ⏳ In progress · ☐ Not started
 
 | WsprryPi item | RP1 item | Status | Work | Lead repository |
 | --- | --- | --- | --- | --- |
-| 10 | 18 | ✅ Complete within accepted scope | Published-provider installation/runtime integration; installed supplement and both-route status accepted; prior target passes/rollback exclusion and RF scope preserved | `WsprryPi` |
+| 10 | 18 | ✅ Complete within accepted scope | Published-provider installation/runtime integration; installed scoped evidence and both-route status accepted; prior target passes/rollback exclusion and RF scope preserved | `WsprryPi` |
 | 11 | 19 | ✅ Complete | Documentation performance and Impeccable housekeeping; hosted build/publication verified | `WsprryPi-Docs` |
 | 12 | 20 | ✅ Complete | Consolidated operator documentation; exact-revision hosted build/publication verified | `WsprryPi-Docs` |
 | 13 | 21 | ✅ Complete; #423 closed | Integrated application Impeccable review accepted for `d93c75c`; final closeout/planning-head CI each passed 11/11; bounded validation and qualification limits retained | `WsprryPi` |
@@ -264,13 +264,13 @@ Beta preparation or announcement does not itself close that stable release gate.
   lifecycle evidence is retained; target rollback rehearsals were explicitly
   excluded. The maintainer accepts the unchanged empty `Unavailable` manifest
   as the original release state. Existing RF qualification retains its recorded scope;
-  the separately pinned supplement and installed consumer report verified scoped
+  the pinned evidence and installed consumer report verified scoped
   evidence for each route without creating a provider permission gate. No new RF
   qualification is claimed. Follow the
   [published-release contract](../docs/rp1-gpclk-dkms-installation.md#published-releases).
 - ✅ **Operator documentation:** WsprryPi-Docs completed items 11–12, including
   the consolidated API/Phase 15.4, Test Tone, calibration, Si5351/inventory and
-  RP1 supplement/installation/recovery guidance. Exact-revision local/hosted
+  RP1 evidence/installation/recovery guidance. Exact-revision local/hosted
   validation and publication are recorded in item 12. This satisfies the docs
   prerequisite for item 13; integrated application review and Beta 1 acceptance
   remain separate gates.
@@ -322,6 +322,12 @@ Beta preparation or announcement does not itself close that stable release gate.
   Final 4.0 stable acceptance/publication remains a later separate gate.
 
 ## RP1 dependency order
+
+The application installs its pinned route-evidence bundle locally; no separate
+qualification release or network refresh is required. This installer/helper
+change requires supporting-source refreeze and affected installation/status
+acceptance before Beta 1 publication. Existing executable and RF evidence
+retain their original scopes.
 
 Keep provider preparation, consumer acceptance, provider publication and
 production consumption as separate gates:

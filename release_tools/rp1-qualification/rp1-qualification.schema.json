@@ -1,0 +1,684 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$comment": "SPDX-License-Identifier: MIT",
+  "title": "RP1 supplemental qualification metadata v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "SPDX-License-Identifier",
+    "schema",
+    "schemaVersion",
+    "metadataTag",
+    "revision",
+    "metadataSource",
+    "software",
+    "evidence",
+    "runtimeFiles"
+  ],
+  "properties": {
+    "SPDX-License-Identifier": {
+      "const": "MIT"
+    },
+    "schema": {
+      "const": "rp1-qualification-v1"
+    },
+    "schemaVersion": {
+      "const": 1
+    },
+    "metadataTag": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 2048
+    },
+    "revision": {
+      "type": "integer"
+    },
+    "metadataSource": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "commit",
+        "tree",
+        "inputSha256"
+      ],
+      "properties": {
+        "commit": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{40}$"
+        },
+        "tree": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{40}$"
+        },
+        "inputSha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      }
+    },
+    "software": {
+      "const": {
+        "schema": "wsprrypi-rp1-release-lock-v1",
+        "repository": "WsprryPi/RP1-GPCLK-DKMS",
+        "sourceCommit": "8c16d3c237cb1267cbedafb5da2bb74132ca5de0",
+        "sourceTree": "4c1ad8acf513b36ba32e58a636942655accbb52d",
+        "productVersion": "1.0.0",
+        "debianVersion": "1.0.0-1",
+        "classification": "release",
+        "published": true,
+        "qualification": false,
+        "compatibilityIdentities": {
+          "gpio4": "v1.0.0-rp1-gpio4",
+          "gpio20": "v1.0.0-rp1-gpio20"
+        },
+        "uapiSha256": {
+          "consumer": "4af14cdf60471ac4b318b10d7d70824a63c74029c2934e86bbdcd1b7f06cf633",
+          "controller": "52f34e567f06350eb3231049c1a456b30b92cc7d37bbb13ff948d1471aee926e"
+        },
+        "overlaySha256": {
+          "gpio4": "96b157b50961ebf74915f84186494f9a0d5427faa59bf9729a8bd4c95dc5f681",
+          "gpio20": "b43691796628e4675f9f8cae8aef187cc670b3f7a3713cb67e352ee585c53713"
+        },
+        "runtime": {
+          "binding": "rp1-gpclk-runtime-binding-v3",
+          "readiness": "rp1-gpclk-runtime-readiness-v1",
+          "update": "rp1-gpclk-runtime-update-v1"
+        },
+        "assets": {
+          "SHA256SUMS": "c2239f0c951f743dcbcc5297dd7c587a9cdaa83acaa7b24b9fb905d394c63925",
+          "candidate-validation.json": "2acea61b2cc370280fe55a843fb946224f3b697b623281e5cc0536f46ea41fae",
+          "release-metadata.json": "d8f5cba30cd57488a5ddff809f1ec3e7169536b3732ce8806e67f494cbf0f81c",
+          "rp1-gpclk-compatibility-manifest.json": "9cde8fbcdf2155312c90438eac6deb74474f557e56499b12788f911b217fca80",
+          "rp1-gpclk-dkms-1.0.0.tar.gz": "5720024b7be3faedf09d047087ab0d4597cf9fcb09db89e7cbf11216032ec237",
+          "rp1-gpclk-dkms-installation-manifest-v1.json": "111a7208522877c06ea81b0a20c05e5a7246121fa327b7720f86509225e7d969",
+          "rp1-gpclk-dkms_1.0.0-1_all.deb": "dd629b131f7937706d707cba14042a0a6feed59e31cced738821f9836429881f"
+        },
+        "releaseTag": "v1.0.0",
+        "releaseUrl": "https://github.com/WsprryPi/RP1-GPCLK-DKMS/releases/tag/v1.0.0",
+        "SPDX-License-Identifier": "MIT",
+        "tagObject": "52c5d42cf6e3f9c8a77fe9a03e1f012c3e8304a0"
+      }
+    },
+    "evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "SPDX-License-Identifier",
+        "revision",
+        "softwareTag",
+        "reuse",
+        "observations",
+        "evidence",
+        "routes",
+        "applicationQualification",
+        "limitations"
+      ],
+      "properties": {
+        "SPDX-License-Identifier": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 2048
+        },
+        "revision": {
+          "type": "integer"
+        },
+        "softwareTag": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 2048
+        },
+        "reuse": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "testedProviderCommit",
+            "publishedProviderCommit",
+            "unchangedInputs",
+            "candidatePackageSha256",
+            "packagePayload",
+            "rationale"
+          ],
+          "properties": {
+            "testedProviderCommit": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{40}$"
+            },
+            "publishedProviderCommit": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{40}$"
+            },
+            "unchangedInputs": {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 256,
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 2048
+              },
+              "uniqueItems": true
+            },
+            "candidatePackageSha256": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            "packagePayload": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 2048
+            },
+            "rationale": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 2048
+            }
+          }
+        },
+        "observations": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "board",
+            "kernel",
+            "architecture",
+            "compiler",
+            "kernelConfiguration",
+            "modules",
+            "application",
+            "headerBuilds"
+          ],
+          "properties": {
+            "board": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 2048
+            },
+            "kernel": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 2048
+            },
+            "architecture": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 2048
+            },
+            "compiler": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 2048
+            },
+            "kernelConfiguration": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 2048
+            },
+            "modules": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "rp1_gpclk_dkms",
+                "rp1_route_controller"
+              ],
+              "properties": {
+                "rp1_gpclk_dkms": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "path",
+                    "installedFileSha256",
+                    "decompressedElfSha256",
+                    "version"
+                  ],
+                  "properties": {
+                    "path": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 2048
+                    },
+                    "installedFileSha256": {
+                      "type": "string",
+                      "pattern": "^[0-9a-f]{64}$"
+                    },
+                    "decompressedElfSha256": {
+                      "type": "string",
+                      "pattern": "^[0-9a-f]{64}$"
+                    },
+                    "version": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 2048
+                    }
+                  }
+                },
+                "rp1_route_controller": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "path",
+                    "installedFileSha256",
+                    "decompressedElfSha256",
+                    "version"
+                  ],
+                  "properties": {
+                    "path": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 2048
+                    },
+                    "installedFileSha256": {
+                      "type": "string",
+                      "pattern": "^[0-9a-f]{64}$"
+                    },
+                    "decompressedElfSha256": {
+                      "type": "string",
+                      "pattern": "^[0-9a-f]{64}$"
+                    },
+                    "version": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 2048
+                    }
+                  }
+                }
+              }
+            },
+            "application": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "consumerCommit",
+                "providerCommit",
+                "binarySha256",
+                "companionSha256",
+                "helperSha256",
+                "planSha256",
+                "maximumPrograms",
+                "maximumProgrammedSeconds",
+                "automaticRetry",
+                "maximumInteriorCarrierGapSeconds"
+              ],
+              "properties": {
+                "consumerCommit": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{40}$"
+                },
+                "providerCommit": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{40}$"
+                },
+                "binarySha256": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{64}$"
+                },
+                "companionSha256": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{64}$"
+                },
+                "helperSha256": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{64}$"
+                },
+                "planSha256": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{64}$"
+                },
+                "maximumPrograms": {
+                  "type": "integer"
+                },
+                "maximumProgrammedSeconds": {
+                  "type": "integer"
+                },
+                "automaticRetry": {
+                  "type": "boolean"
+                },
+                "maximumInteriorCarrierGapSeconds": {
+                  "type": "number"
+                }
+              }
+            },
+            "headerBuilds": {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 256,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "kernel",
+                  "configurationSha256"
+                ],
+                "properties": {
+                  "kernel": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 2048
+                  },
+                  "configurationSha256": {
+                    "type": "string",
+                    "pattern": "^[0-9a-f]{64}$"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "evidence": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 256,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "id",
+              "sha256"
+            ],
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 2048
+              },
+              "sha256": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$"
+              }
+            }
+          }
+        },
+        "routes": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 2,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "route",
+              "routeId",
+              "state",
+              "scope",
+              "caseNames",
+              "caseSelectionSha256",
+              "evidenceId",
+              "evidenceSelector",
+              "acceptance",
+              "runtimeOverlaySha256",
+              "overlaySourceSha256",
+              "overlaySha256"
+            ],
+            "properties": {
+              "route": {
+                "enum": [
+                  "gpio4",
+                  "gpio20"
+                ]
+              },
+              "routeId": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 2048
+              },
+              "state": {
+                "const": "Qualified"
+              },
+              "scope": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "kind",
+                  "frequencyHz",
+                  "mode",
+                  "driveMa",
+                  "parent",
+                  "parentHz",
+                  "intrinsicPpm",
+                  "manualPpm",
+                  "systemClockEstimate",
+                  "maximumProgramSeconds",
+                  "physicalPath",
+                  "receiver"
+                ],
+                "properties": {
+                  "kind": {
+                    "const": "finite-conducted-tone"
+                  },
+                  "frequencyHz": {
+                    "type": "integer"
+                  },
+                  "mode": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 2048
+                  },
+                  "driveMa": {
+                    "type": "integer"
+                  },
+                  "parent": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 2048
+                  },
+                  "parentHz": {
+                    "type": "integer"
+                  },
+                  "intrinsicPpm": {
+                    "type": "number"
+                  },
+                  "manualPpm": {
+                    "type": "integer"
+                  },
+                  "systemClockEstimate": {
+                    "type": "boolean"
+                  },
+                  "maximumProgramSeconds": {
+                    "type": "integer"
+                  },
+                  "physicalPath": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 2048
+                  },
+                  "receiver": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 2048
+                  }
+                }
+              },
+              "caseNames": {
+                "type": "array",
+                "minItems": 1,
+                "maxItems": 256,
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 2048
+                },
+                "uniqueItems": true
+              },
+              "caseSelectionSha256": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$"
+              },
+              "evidenceId": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 2048
+              },
+              "evidenceSelector": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "field",
+                  "value"
+                ],
+                "properties": {
+                  "field": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 2048
+                  },
+                  "value": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 2048
+                  }
+                }
+              },
+              "acceptance": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 2048
+              },
+              "runtimeOverlaySha256": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$"
+              },
+              "overlaySourceSha256": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$"
+              },
+              "overlaySha256": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$"
+              }
+            }
+          },
+          "uniqueItems": true
+        },
+        "applicationQualification": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "authority",
+            "url",
+            "sourceRepository",
+            "sourceCommit",
+            "sourcePath",
+            "sourceSha256",
+            "scope",
+            "earlierCampaignProvenance",
+            "earlierCampaignObservations"
+          ],
+          "properties": {
+            "authority": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 2048
+            },
+            "url": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 2048
+            },
+            "sourceRepository": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 2048
+            },
+            "sourceCommit": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{40}$"
+            },
+            "sourcePath": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 2048
+            },
+            "sourceSha256": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            "scope": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 2048
+            },
+            "earlierCampaignProvenance": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 2048
+            },
+            "earlierCampaignObservations": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "parentRevision",
+                "transmitterComponentRevision",
+                "sourceOfObservation",
+                "providerSource",
+                "rfPath",
+                "routeScope",
+                "modeScope",
+                "applicability"
+              ],
+              "properties": {
+                "parentRevision": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 2048
+                },
+                "transmitterComponentRevision": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 2048
+                },
+                "sourceOfObservation": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 2048
+                },
+                "providerSource": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 2048
+                },
+                "rfPath": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 2048
+                },
+                "routeScope": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 2048
+                },
+                "modeScope": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 2048
+                },
+                "applicability": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 2048
+                }
+              }
+            }
+          }
+        },
+        "limitations": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 256,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2048
+          },
+          "uniqueItems": true
+        }
+      }
+    },
+    "runtimeFiles": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": {
+        "type": "string",
+        "pattern": "^[0-9a-f]{64}$"
+      }
+    }
+  }
+}

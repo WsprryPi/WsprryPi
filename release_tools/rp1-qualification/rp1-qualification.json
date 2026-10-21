@@ -1,0 +1,310 @@
+{
+  "SPDX-License-Identifier": "MIT",
+  "evidence": {
+    "SPDX-License-Identifier": "MIT",
+    "applicationQualification": {
+      "authority": "WsprryPi",
+      "earlierCampaignObservations": {
+        "applicability": "The accepted maintained application statement remains WsprryPi policy. Item 16 independently binds both 1.0.0 routes for finite TONE/lifecycle acceptance. This metadata references broader application evidence without claiming byte-identical old provider builds or expanding its scope.",
+        "modeScope": "TONE, WSPR, QRSS, FSKCW, DFCW; preserve each subordinate result and later application disposition",
+        "parentRevision": "d6789f1fc91fed3236392d6e85b761511522b4a0",
+        "providerSource": "The locally retained summaries do not identify an exact provider revision. Lee Bussy's acceptance establishes the maintained application scope; Item 16 supplies the separate exact 1.0.0 route/build binding.",
+        "rfPath": "conducted; no antenna; 20 dB per GPIO into splitter/combiner and SDRplay RSP1B 2404058C60; both routes physically connected, one active route",
+        "routeScope": "Earlier lower-band summaries identify GPIO20. Separate GPIO4 6 m/4 m audit records unsuccessful outcomes. Neither record is transferred to the other route.",
+        "sourceOfObservation": "retained fskcw630-review/plan.json; source fields describe that retained plan, not every earlier campaign",
+        "transmitterComponentRevision": "703c81c2f5a0ae16945a0f3ec51a39e788e3f419"
+      },
+      "earlierCampaignProvenance": "Lee Bussy maintains and accepts the evidence and its provenance. His explicit disposition establishes the maintained band table as the accepted application qualification scope. Item 16 retains its separate exact route evidence; subordinate earlier campaign records retain their original outcomes.",
+      "scope": "Maintained Pi 5 / 200 MHz PLL_SYS application statement. Separate from the finite TONE route cases; not a provider permission table.",
+      "sourceCommit": "01d9bef6f8d7a05ac2b3223f02270483f33caac4",
+      "sourcePath": "docs/About_Wsprry_Pi/index.md",
+      "sourceRepository": "WsprryPi/WsprryPi-Docs",
+      "sourceSha256": "6fccbee61d6af916775e5cf645741ba59de120134a2625dfcc1561e87857e076",
+      "url": "https://wsprry-pi.readthedocs.io/en/devel/About_Wsprry_Pi/index.html#band-qualification"
+    },
+    "evidence": [
+      {
+        "id": "urn:wsprrypi:item16:39bf443:817f3dc:conducted-tone",
+        "sha256": "6013848e3c708bf71710e8246b87d483855db02f643ccf7c00f307e51fa161bb"
+      },
+      {
+        "id": "urn:wsprrypi:item16:817f3dc:header-builds",
+        "sha256": "b20cd036dd3156b265d48f8a9a3ec1a8c2427b191ff99043cfbff56588265e94"
+      },
+      {
+        "id": "urn:wsprrypi:item16:817f3dc:package-lifecycle",
+        "sha256": "56ea561669985dc36ff8c99af80c1a8c31652658b3a4daf72a7ff63b44bf7b5c"
+      },
+      {
+        "id": "urn:wsprrypi:item10:release-payload-reuse",
+        "sha256": "0a32204a4afe5ec88304890ec79c3afe869d56ca4d3ac917ff35ee63080f2694"
+      },
+      {
+        "id": "urn:wsprrypi:harness:rp1-both-routes-20260831:gpio20-2200m-qualified-summary.json",
+        "sha256": "6423e4bf113b5ed53f3a1e0b0b0bd7316fa28b6db21ac24264878b1df615cc94"
+      },
+      {
+        "id": "urn:wsprrypi:harness:rp1-both-routes-20260831:gpio20-after630-summary.jsonl",
+        "sha256": "21ebe7f6d5f15f34107626b30f8d386b83190d95e7909e94f5c89514fc832c7e"
+      },
+      {
+        "id": "urn:wsprrypi:harness:rp1-both-routes-20260831:gpio20-remaining-summary.jsonl",
+        "sha256": "4299d3943c0f9b8bfc4461065e6b09ba26c170a7079c02c96918fd792c325909"
+      },
+      {
+        "id": "urn:wsprrypi:harness:rp1-both-routes-20260831:rf-path.json",
+        "sha256": "42140130d6f0839c1df9c6773b972de29624674bba3c9d977886dd8b1ac76fa4"
+      },
+      {
+        "id": "urn:wsprrypi:harness:rp1-gpio4-6m-4m-20260831T1833:measurement-audit.json",
+        "sha256": "f2f9d6273f1af8574abbe6554ebb126bb41919afd53265a8626d13edcace15f3"
+      },
+      {
+        "id": "urn:wsprrypi:harness:rp1-both-routes-20260831:fskcw630-review:plan.json",
+        "sha256": "d5e05f86d09b61e1f2b8db1ced9e965596f591412b6b9dc392a48ab62e131e45"
+      }
+    ],
+    "limitations": [
+      "Records accepted evidence; does not create qualification or grant execution authority.",
+      "Board and kernel are observations, not a structural compatibility allowlist.",
+      "No calibrated frequency, power, spectral compliance or general coexistence guarantee.",
+      "Item 16 is TONE-only at 14097100 Hz; does not qualify other bands or modes.",
+      "Application band/mode policy and its Unavailable dispositions remain exclusively in WsprryPi.",
+      "No GPIO4/GPIO20 evidence transfer; each route has its own seven cases."
+    ],
+    "observations": {
+      "application": {
+        "automaticRetry": false,
+        "binarySha256": "3586eb0864996f449249161aa4670886f9dfda0e96f70f5f4505d818e48def9e",
+        "companionSha256": "3d03c02db2a13feb32f29ee44d921635a44c2aeb97f7cebdfc512e8c025c463b",
+        "consumerCommit": "39bf443b49587149e15486a09dc1eb04db4c862e",
+        "helperSha256": "ca0e68bf443f1a88245b80458cd4d5cd7085aac25a1c7c343b9a996e669e8e08",
+        "maximumInteriorCarrierGapSeconds": 0.032768,
+        "maximumProgrammedSeconds": 112,
+        "maximumPrograms": 14,
+        "planSha256": "c73002ad129947931dd0a97f3e716921de3ba5741d83f7cd7efcbf6707ed18bf",
+        "providerCommit": "817f3dc6a194f4a92a7f94acf10147169e6439d6"
+      },
+      "architecture": "aarch64",
+      "board": "Raspberry Pi 5 Model B (wspr5); BCM2712/RP1",
+      "compiler": "Debian GCC/G++ 14.2.0-19",
+      "headerBuilds": [
+        {
+          "configurationSha256": "8282cb6fae3921b32278eb4ce0bfc10bc306e2e5e36111a54dcef79ba3be566c",
+          "kernel": "6.18.50+rpt-rpi-2712"
+        },
+        {
+          "configurationSha256": "a990ef94542fac5ff489753fef98157d0840474f0c88cc4617c8371c90c51b5d",
+          "kernel": "6.18.50+rpt-rpi-v8"
+        }
+      ],
+      "kernel": "6.18.34+rpt-rpi-2712",
+      "kernelConfiguration": "Matching stock target headers; complete target configuration digest is not retained in this reference.",
+      "modules": {
+        "rp1_gpclk_dkms": {
+          "decompressedElfSha256": "99d8a9264f6bb35e96d4e1405a89915dc82be9f5e2a043f5506b15a235c24614",
+          "installedFileSha256": "21b1c019b267a0939dfd48ee2d92b646163c8de6d62822e816eb3944f4c82843",
+          "path": "/lib/modules/6.18.34+rpt-rpi-2712/updates/dkms/rp1_gpclk_dkms.ko.xz",
+          "version": "1.0.0"
+        },
+        "rp1_route_controller": {
+          "decompressedElfSha256": "ef6bd37610d2a3ea18bdd2fcf438acc67103538b73c05a547c49f17a420b9b86",
+          "installedFileSha256": "26655f915f9946777b675a80994b438c675fdbbbe567ffc7ffb8b64db6f8d768",
+          "path": "/lib/modules/6.18.34+rpt-rpi-2712/updates/dkms/rp1_route_controller.ko.xz",
+          "version": "1.0.0"
+        }
+      }
+    },
+    "reuse": {
+      "candidatePackageSha256": "3baa570a8bc7657a26f934980ee7d3aa4e1bc9e372b28ff446f324f01328b590",
+      "packagePayload": "Identical Debian data/control members; archive container and release metadata have independent identities.",
+      "publishedProviderCommit": "8c16d3c237cb1267cbedafb5da2bb74132ca5de0",
+      "rationale": "The release-profile changes affect source/archive provenance and documentation, not execution, build, UAPI, overlays, packaged runtime or lifecycle inputs.",
+      "testedProviderCommit": "817f3dc6a194f4a92a7f94acf10147169e6439d6",
+      "unchangedInputs": [
+        "src",
+        "controller",
+        "include",
+        "overlays",
+        "Kbuild",
+        "Makefile",
+        "dkms.conf",
+        "debian",
+        "scripts/package_stage.py",
+        "scripts/package_preflight.py",
+        "scripts/package_indices.py",
+        "scripts/package_signatures.py",
+        "scripts/overlay_builder.py",
+        "scripts/rp1-gpclk-route-manager.py",
+        "scripts/build_runtime_binding.py",
+        "scripts/build_runtime_bundle.py",
+        "scripts/build_runtime_controller.py",
+        "scripts/development_route_manager.py",
+        "scripts/development_workflow.py",
+        "scripts/runtime_activation.py",
+        "scripts/runtime_application.py",
+        "scripts/runtime_binding.py",
+        "scripts/runtime_controller_admin.py",
+        "scripts/runtime_deployment.py",
+        "scripts/runtime_inhibitor_cleanup.py",
+        "scripts/runtime_inventory.py",
+        "scripts/runtime_layout.py",
+        "scripts/runtime_manager.py",
+        "scripts/runtime_output.py",
+        "scripts/runtime_provider.py",
+        "scripts/runtime_route_client.py"
+      ]
+    },
+    "revision": 1,
+    "routes": [
+      {
+        "acceptance": "Seven independently passing finite cases: completion, four STOP timings, owner close and service stop; stable cleanup and receiver silence verified.",
+        "caseNames": [
+          "complete",
+          "stop-start",
+          "stop-before-boundary",
+          "stop-after-boundary",
+          "stop-near-end",
+          "owner-close",
+          "service-stop"
+        ],
+        "caseSelectionSha256": "ccd839ae81ebba65748bd7c128b85931f3e4e0e64e52202369634ae5087071cc",
+        "evidenceId": "urn:wsprrypi:item16:39bf443:817f3dc:conducted-tone",
+        "evidenceSelector": {
+          "field": "cases.route",
+          "value": "GPIO4"
+        },
+        "overlaySha256": "96b157b50961ebf74915f84186494f9a0d5427faa59bf9729a8bd4c95dc5f681",
+        "overlaySourceSha256": "92aac0681f6a4ac220e9e2ef9d87e38c8d7fc8e03807ffe91e11719e46a6f5dd",
+        "route": "gpio4",
+        "routeId": "v1.0.0-rp1-gpio4",
+        "runtimeOverlaySha256": "364fcdf4d6f4039c5ab24dad858d1e75b5aa9109a70bb5d607f45c53fdf2e5ba",
+        "scope": {
+          "driveMa": 2,
+          "frequencyHz": 14097100,
+          "intrinsicPpm": -46.245,
+          "kind": "finite-conducted-tone",
+          "manualPpm": 0,
+          "maximumProgramSeconds": 8,
+          "mode": "TONE",
+          "parent": "pll_sys",
+          "parentHz": 200000000,
+          "physicalPath": "Maintainer confirmed GPIO4 and GPIO20 through proper attenuation to SDR; wiring unchanged",
+          "receiver": "SDRplay RSP1B serial 2404058C60;250ksps CF32;14087100Hz center;200kHz BW;20dB gain;AGC/bias off",
+          "systemClockEstimate": false
+        },
+        "state": "Qualified"
+      },
+      {
+        "acceptance": "Seven independently passing finite cases: completion, four STOP timings, owner close and service stop; stable cleanup and receiver silence verified.",
+        "caseNames": [
+          "complete",
+          "stop-start",
+          "stop-before-boundary",
+          "stop-after-boundary",
+          "stop-near-end",
+          "owner-close",
+          "service-stop"
+        ],
+        "caseSelectionSha256": "7ad6bddaf6f86b4d21395d9c78bb8037387f7e4dcb20c65f7afe27289a336b14",
+        "evidenceId": "urn:wsprrypi:item16:39bf443:817f3dc:conducted-tone",
+        "evidenceSelector": {
+          "field": "cases.route",
+          "value": "GPIO20"
+        },
+        "overlaySha256": "b43691796628e4675f9f8cae8aef187cc670b3f7a3713cb67e352ee585c53713",
+        "overlaySourceSha256": "b2d4464c8ff322733f66c6d41b0735d645505b8941400a29976ebc238395d7c1",
+        "route": "gpio20",
+        "routeId": "v1.0.0-rp1-gpio20",
+        "runtimeOverlaySha256": "e1dc4b66ebcc9eb4a2c6757ca44750b01d56de685eb12f40aed024b2ae08ef98",
+        "scope": {
+          "driveMa": 2,
+          "frequencyHz": 14097100,
+          "intrinsicPpm": -46.245,
+          "kind": "finite-conducted-tone",
+          "manualPpm": 0,
+          "maximumProgramSeconds": 8,
+          "mode": "TONE",
+          "parent": "pll_sys",
+          "parentHz": 200000000,
+          "physicalPath": "Maintainer confirmed GPIO4 and GPIO20 through proper attenuation to SDR; wiring unchanged",
+          "receiver": "SDRplay RSP1B serial 2404058C60;250ksps CF32;14087100Hz center;200kHz BW;20dB gain;AGC/bias off",
+          "systemClockEstimate": false
+        },
+        "state": "Qualified"
+      }
+    ],
+    "softwareTag": "v1.0.0"
+  },
+  "metadataSource": {
+    "commit": "bb6815446beb9b96853ad5a353b0d355d4975710",
+    "inputSha256": "cae7d712a90aac6ad995b41cec82263ddf0d27cb915ddd55d0aa93cd8b011b06",
+    "tree": "b659a6e27ac07e77dff6f0ec89490afbe9e0ceb4"
+  },
+  "metadataTag": "qualification-v1.0.0-r1",
+  "revision": 1,
+  "runtimeFiles": {
+    "/etc/systemd/system/rp1-gpclk-route-manager@.service.d/95-runtime-controller.conf": "f3b79216f3e95841baf734b8573b9fa6808ea3a12b2a8ecf55750844cf0200fb",
+    "/usr/lib/rp1-gpclk-dkms/package_preflight.py": "c5d3d6f79a8cce2133acd80cbd20aa8a1d6a8627dfe19f7804e7af90c98584ca",
+    "/usr/lib/rp1-gpclk-dkms/runtime-overlays/gpio20.dtbo": "e1dc4b66ebcc9eb4a2c6757ca44750b01d56de685eb12f40aed024b2ae08ef98",
+    "/usr/lib/rp1-gpclk-dkms/runtime-overlays/gpio4.dtbo": "364fcdf4d6f4039c5ab24dad858d1e75b5aa9109a70bb5d607f45c53fdf2e5ba",
+    "/usr/lib/rp1-gpclk-dkms/runtime-uapi/rp1_gpclk.h": "4af14cdf60471ac4b318b10d7d70824a63c74029c2934e86bbdcd1b7f06cf633",
+    "/usr/lib/rp1-gpclk-dkms/runtime-uapi/rp1_route_admin.h": "52f34e567f06350eb3231049c1a456b30b92cc7d37bbb13ff948d1471aee926e",
+    "/usr/lib/rp1-gpclk-dkms/runtime_activation.py": "99cb5ccbcef251a43c95834dc09ce4ce00bb71da369a7dd3622926b35c09cb44",
+    "/usr/lib/rp1-gpclk-dkms/runtime_application.py": "4853a3a7e6aa4e1c1f097c56124f39bb2c282c90140d5263506374b1aad3e7d3",
+    "/usr/lib/rp1-gpclk-dkms/runtime_binding.py": "2ff8a0d21cbe8eb4126bb974b3a13b53b7e8b3174328f556b950a3fb244d6646",
+    "/usr/lib/rp1-gpclk-dkms/runtime_controller_admin.py": "032f213189a17e63a9ed5fc5c8274d761a1f8b6dd37d068bb72a60d60a8e0b0e",
+    "/usr/lib/rp1-gpclk-dkms/runtime_deployment.py": "70f434b71b6ac9ce2afc37c9bfc55ab3ea178b7dc21fe160dbc74fd6ab412190",
+    "/usr/lib/rp1-gpclk-dkms/runtime_layout.py": "d45bafd058429e4d7520074a9034616a130a259086cdb4d637f513694b7ef0b4",
+    "/usr/lib/rp1-gpclk-dkms/runtime_manager.py": "61932249dc460699851662881edbc20e4e2f523b799f41203beb075102133b3a",
+    "/usr/lib/rp1-gpclk-dkms/runtime_output.py": "5c6bbac81844cbb249f5253c2df8bdd24284e37d68ce4c4d8756e61f8a0406f1",
+    "/usr/lib/rp1-gpclk-dkms/runtime_provider.py": "c2d5515e83203891be9d6d2be8cf15839011b4b1f76a53329ff961f29c541f06",
+    "/usr/lib/rp1-gpclk-dkms/runtime_route_client.py": "b480daa609f2372bfb3082d64a47250050d79f40e534fe6ff02ab3279f97aaa9",
+    "/usr/lib/rp1-gpclk-dkms/schema/rp1-gpclk-runtime-readiness-v1.schema.json": "94d44402c6053ad0dd14b2eb14abb78ef10733470b613eda67a80a3e3f1e9972",
+    "/usr/lib/systemd/system/rp1-gpclk-route-manager.socket": "336f2ca703ab95b4d124d643f9b08b939ec055b11c7f4bb573207f4cb99b4068",
+    "/usr/lib/systemd/system/rp1-gpclk-route-manager@.service": "0d14b1ba451af698d831cb4fa342ec046d513391569eacbe3c98b8fd9104e3ce"
+  },
+  "schema": "rp1-qualification-v1",
+  "schemaVersion": 1,
+  "software": {
+    "SPDX-License-Identifier": "MIT",
+    "assets": {
+      "SHA256SUMS": "c2239f0c951f743dcbcc5297dd7c587a9cdaa83acaa7b24b9fb905d394c63925",
+      "candidate-validation.json": "2acea61b2cc370280fe55a843fb946224f3b697b623281e5cc0536f46ea41fae",
+      "release-metadata.json": "d8f5cba30cd57488a5ddff809f1ec3e7169536b3732ce8806e67f494cbf0f81c",
+      "rp1-gpclk-compatibility-manifest.json": "9cde8fbcdf2155312c90438eac6deb74474f557e56499b12788f911b217fca80",
+      "rp1-gpclk-dkms-1.0.0.tar.gz": "5720024b7be3faedf09d047087ab0d4597cf9fcb09db89e7cbf11216032ec237",
+      "rp1-gpclk-dkms-installation-manifest-v1.json": "111a7208522877c06ea81b0a20c05e5a7246121fa327b7720f86509225e7d969",
+      "rp1-gpclk-dkms_1.0.0-1_all.deb": "dd629b131f7937706d707cba14042a0a6feed59e31cced738821f9836429881f"
+    },
+    "classification": "release",
+    "compatibilityIdentities": {
+      "gpio20": "v1.0.0-rp1-gpio20",
+      "gpio4": "v1.0.0-rp1-gpio4"
+    },
+    "debianVersion": "1.0.0-1",
+    "overlaySha256": {
+      "gpio20": "b43691796628e4675f9f8cae8aef187cc670b3f7a3713cb67e352ee585c53713",
+      "gpio4": "96b157b50961ebf74915f84186494f9a0d5427faa59bf9729a8bd4c95dc5f681"
+    },
+    "productVersion": "1.0.0",
+    "published": true,
+    "qualification": false,
+    "releaseTag": "v1.0.0",
+    "releaseUrl": "https://github.com/WsprryPi/RP1-GPCLK-DKMS/releases/tag/v1.0.0",
+    "repository": "WsprryPi/RP1-GPCLK-DKMS",
+    "runtime": {
+      "binding": "rp1-gpclk-runtime-binding-v3",
+      "readiness": "rp1-gpclk-runtime-readiness-v1",
+      "update": "rp1-gpclk-runtime-update-v1"
+    },
+    "schema": "wsprrypi-rp1-release-lock-v1",
+    "sourceCommit": "8c16d3c237cb1267cbedafb5da2bb74132ca5de0",
+    "sourceTree": "4c1ad8acf513b36ba32e58a636942655accbb52d",
+    "tagObject": "52c5d42cf6e3f9c8a77fe9a03e1f012c3e8304a0",
+    "uapiSha256": {
+      "consumer": "4af14cdf60471ac4b318b10d7d70824a63c74029c2934e86bbdcd1b7f06cf633",
+      "controller": "52f34e567f06350eb3231049c1a456b30b92cc7d37bbb13ff948d1471aee926e"
+    }
+  }
+}

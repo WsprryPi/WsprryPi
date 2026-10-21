@@ -282,15 +282,14 @@ fi
 
 # shellcheck disable=SC2119
 (
-    # Pin-verified supplemental metadata is application status data. Exercise
-    # its selection/failure boundary without executing any installer command.
+    # Evidence ships with the application, including updates that skip the
+    # unchanged provider. No installer command or network access is executed.
     # shellcheck source=../install.sh
     source "$INSTALLER"
     ACTION=install
     LOCAL_REPO_DIR=/fixture
     metadata_selected=false
-    metadata_refresh_fails=false
-    metadata_refreshes=0
+    metadata_helpers_fail=false
     metadata_helpers=0
     metadata_removals=0
     metadata_warnings=0
@@ -302,13 +301,10 @@ fi
         case "$description" in
             "Create route-runtime directory"|"Install route application companion"|\
             "Install runtime reconciliation support"|"Remove runtime reconciliation support") ;;
-            "Install RP1 qualification interpreter and separate reference")
+            "Install RP1 qualification helper and bundled evidence")
                 [[ "$#" == 3 && "$1" == python3 && "$2" == /fixture/scripts/rp1_qualification.py && "$3" == install-runtime ]] || return 1
-                metadata_helpers=$((metadata_helpers + 1)) ;;
-            "Refresh pinned RP1 qualification evidence")
-                [[ "$#" == 3 && "$1" == python3 && "$2" == /fixture/scripts/rp1_qualification.py && "$3" == refresh ]] || return 1
-                metadata_refreshes=$((metadata_refreshes + 1))
-                [[ "$metadata_refresh_fails" == false ]] || return 1 ;;
+                metadata_helpers=$((metadata_helpers + 1))
+                [[ "$metadata_helpers_fail" == false ]] || return 1 ;;
             "Remove attributable RP1 qualification helper files")
                 [[ "$#" == 3 && "$1" == python3 && "$2" == /fixture/scripts/rp1_qualification.py && "$3" == remove-runtime ]] || return 1
                 metadata_removals=$((metadata_removals + 1)) ;;
@@ -316,14 +312,15 @@ fi
         esac
     }
     manage_route_application
-    [[ "$metadata_helpers" == 1 && "$metadata_refreshes" == 0 ]]
+    [[ "$metadata_helpers" == 1 && "$metadata_warnings" == 0 ]]
     metadata_selected=true
-    metadata_refresh_fails=true
     manage_route_application
-    [[ "$metadata_helpers" == 2 && "$metadata_refreshes" == 1 && "$metadata_warnings" == 1 ]]
-    metadata_refresh_fails=false
-    manage_route_application
-    [[ "$metadata_refreshes" == 2 && "$metadata_warnings" == 1 ]]
+    [[ "$metadata_helpers" == 2 && "$metadata_warnings" == 0 ]]
+    metadata_helpers_fail=true
+    if manage_route_application; then
+        echo "bundled evidence installation failure must propagate" >&2
+        exit 1
+    fi
     ACTION=uninstall
     manage_route_application
     [[ "$metadata_removals" == 1 ]]

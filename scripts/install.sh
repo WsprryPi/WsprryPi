@@ -7280,12 +7280,8 @@ manage_route_application() {
             /usr/local/lib/wsprrypi/route_application.py "$@" || return 1
         exec_command "Install runtime reconciliation support" \
             python3 "${LOCAL_REPO_DIR}/scripts/install_runtime_reconcile.py" install "$@" || return 1
-        exec_command "Install RP1 qualification interpreter and separate reference" \
+        exec_command "Install RP1 qualification helper and bundled evidence" \
             python3 "${LOCAL_REPO_DIR}/scripts/rp1_qualification.py" install-runtime "$@" || return 1
-        if rp1_gpclk_dkms_installation_selected && ! exec_command "Refresh pinned RP1 qualification evidence" \
-            python3 "${LOCAL_REPO_DIR}/scripts/rp1_qualification.py" refresh "$@"; then
-            warn "RP1 qualification evidence could not be refreshed. Status will report missing or invalid evidence; application band/mode policy still applies."
-        fi
     elif [[ "$ACTION" == "uninstall" ]]; then
         exec_command "Remove attributable RP1 qualification helper files" \
             python3 "${LOCAL_REPO_DIR}/scripts/rp1_qualification.py" remove-runtime "$@" || return 1

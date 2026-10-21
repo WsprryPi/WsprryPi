@@ -8,10 +8,11 @@ Debian package `1.0.0-1`, both UAPIs, independent route identities and overlays,
 runtime binding v3/readiness v1/update v1, and all seven published asset hashes.
 It is maintained acceptance configuration, not a record of target qualification.
 
-The [supplemental qualification contract](rp1-qualification-metadata.md) uses a
-separate source/revision/asset reference. It records accepted route evidence
+The [bundled qualification contract](rp1-qualification-metadata.md) uses a
+local source/revision/asset reference. No qualification release is downloaded.
+It records accepted route evidence
 without rewriting this release lock or its original empty manifest. Missing or
-invalid supplemental evidence is reported separately from operational availability
+invalid installed evidence is reported separately from operational availability
 and application band/mode policy.
 
 | Selection | Entry point | Identity and effects |
@@ -99,7 +100,7 @@ qualification. Define the applicable acceptance matrix, identify reusable eviden
 and its applicability, and repeat checks affected by changed inputs. The
 [active release evidence](../release_tools/4.0-Beta-1-Release-Evidence.md) binds
 selected source/artifact identities, accepted published-provider integration,
-installed supplement verification and evidence-reuse limits. The
+installed bundle verification and evidence-reuse limits. The
 [release checklist](../release_tools/Release%20Punchlist.md) owns remaining
 candidate acceptance and publication gates. Software-only verification does
 not close installation or runtime acceptance.

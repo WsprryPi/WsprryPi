@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: MIT
-"""Resolve pinned RP1 evidence and report it independently of operation permission.
+"""Read bundled RP1 evidence independently of operation permission.
 
-Status is offline. Refresh downloads only a separately pinned metadata release;
-neither operation installs a provider, opens an endpoint or changes its policy.
+Evidence is installed with this application; no operation downloads metadata.
+Provider inspection and evidence attribution do not change operating policy.
 """
 import argparse
 import hashlib
@@ -16,9 +16,10 @@ import sys
 import tempfile
 
 ROOT = Path(__file__).resolve().parents[1]
-BASE = 'https://github.com/WsprryPi/RP1-GPCLK-DKMS/releases/'
 ASSETS = {'rp1-qualification.json', 'rp1-qualification.schema.json', 'qualification_status.py', 'SHA256SUMS'}
-CACHE = Path('/var/cache/wsprrypi/rp1-qualification')
+BUNDLE_NAME = 'rp1-qualification'
+HELPER_FILES = {'rp1_qualification.py', 'rp1-qualification-lock.json'}
+INSTALLED_FILES = HELPER_FILES | {BUNDLE_NAME + '/' + name for name in ASSETS}
 RUNTIME = Path('/usr/local/lib/wsprrypi')
 OWNERSHIP = Path('/var/lib/wsprrypi/rp1-gpclk-dkms-installation.json')
 PROVIDER = Path('/usr/lib/rp1-gpclk-dkms/runtime_provider.py')
@@ -48,6 +49,11 @@ def strict_json(raw):
 def lock_path():
     source = ROOT / 'release_tools/rp1-qualification-lock.json'
     return source if source.is_file() else Path(__file__).with_name('rp1-qualification-lock.json')
+
+
+def bundle_path():
+    source = ROOT / 'release_tools' / BUNDLE_NAME
+    return source if source.is_dir() else Path(__file__).with_name(BUNDLE_NAME)
 
 
 def read(path, limit=4*1024*1024, trusted=False):
@@ -83,50 +89,17 @@ def validate_assets(assets, lock):
     return metadata, scope['interpret']
 
 
-def resolve(client, lock):
-    tag = lock['metadataTag']
-    require(tag == 'qualification-v1.0.0-r' + str(lock['revision']), 'invalid supplemental tag')
-    matches = [r for r in client.releases() if r.get('tag_name') == tag]
-    require(len(matches) == 1, 'missing or ambiguous supplemental publication')
-    release = matches[0]
-    require(release.get('draft') is False and release.get('prerelease') is False and
-            release.get('immutable') is True and release.get('published_at') and
-            release.get('html_url') == BASE + 'tag/' + tag, 'unpublished or mutable supplemental release')
-    require(client.tag_commit(tag) == lock['metadataSource']['commit'], 'supplement tag source differs')
-    commit_object = client.json(installer_api() + '/git/commits/' + lock['metadataSource']['commit'])
-    require(commit_object.get('tree', {}).get('sha') == lock['metadataSource']['tree'],
-            'supplement source tree differs')
-    require(client.tag_commit('v1.0.0') == lock['software']['sourceCommit'], 'original software tag moved')
-    original_ref = client.json(installer_api() + '/git/ref/tags/v1.0.0')
-    require(original_ref.get('object', {}).get('type') == 'tag' and
-            original_ref['object']['sha'] == lock['software']['tagObject'], 'original annotated tag object moved')
-    objects = release.get('assets', [])
-    require(len(objects) == len(ASSETS) and {a.get('name') for a in objects} == ASSETS,
-            'missing, duplicate or unexpected supplemental assets')
-    result = {}
-    for asset in objects:
-        name = asset['name']
-        url = BASE + 'download/' + tag + '/' + name
-        require(asset.get('state') == 'uploaded' and asset.get('browser_download_url') == url and
-                asset.get('digest') == 'sha256:' + lock['assets'][name], 'supplement asset provenance differs')
-        result[name] = client.bytes(url, limit=4*1024*1024, allow_asset_redirect=True)
-    validate_assets(result, lock)
-    return result
-
-
-def installer_api():
-    return 'https://api.github.com/repos/WsprryPi/RP1-GPCLK-DKMS'
-
-
-def cached(directory, lock, trusted=True):
+def evidence_assets(directory, lock, trusted=False):
     if not directory.exists() and not directory.is_symlink():
-        raise FileNotFoundError('supplement cache absent')
-    require(directory.is_dir() and not directory.is_symlink(), 'supplement cache absent')
-    require({p.name for p in directory.iterdir()} == ASSETS, 'supplement cache asset set differs')
-    return validate_assets({name: read(directory / name, trusted=trusted) for name in ASSETS}, lock)
+        raise FileNotFoundError('bundled evidence absent')
+    require(directory.is_dir() and not directory.is_symlink(), 'unsafe evidence directory')
+    require({p.name for p in directory.iterdir()} == ASSETS, 'bundled evidence asset set differs')
+    assets = {name: read(directory / name, trusted=trusted) for name in ASSETS}
+    validate_assets(assets, lock)
+    return assets
 
 
-def status(lock, route, report=None, ownership=None, directory=CACHE):
+def status(lock, route, report=None, ownership=None, directory=None):
     live_inspection = report is None
     base = {'status': 'missing', 'state': 'Evidence missing', 'permissionGate': False,
             'applicationEligibility': 'WsprryPi band/mode policy'}
@@ -155,7 +128,8 @@ def status(lock, route, report=None, ownership=None, directory=CACHE):
         report = {}
         base['providerInspection'] = str(error)
     try:
-        metadata, interpret = cached(directory, lock, trusted=live_inspection)
+        assets = evidence_assets(directory or bundle_path(), lock, trusted=live_inspection)
+        metadata, interpret = validate_assets(assets, lock)
     except FileNotFoundError:
         return base
     except (OSError, ValueError, KeyError, TypeError) as error:
@@ -186,20 +160,31 @@ def write_atomic(path, data, mode=0o644, trusted=True):
 
 
 def install_runtime(lock):
-    """Install only application-owned helper/reference with a separate receipt."""
+    """Install the helper, reference and verified evidence with one receipt."""
     require(os.geteuid() == OWNER_UID, 'root required for application helper installation')
     receipt = RUNTIME / 'rp1-qualification-files.json'
+    assets = evidence_assets(bundle_path(), lock)
     targets = {'rp1_qualification.py': read(Path(__file__)),
-               'rp1-qualification-lock.json': read(lock_path())}
+               'rp1-qualification-lock.json': read(lock_path()),
+               **{BUNDLE_NAME + '/' + name: raw for name, raw in assets.items()}}
     RUNTIME.mkdir(parents=True, exist_ok=True)
     previous = strict_json(read(receipt, trusted=True)) if receipt.exists() else {}
+    require(isinstance(previous, dict) and (not previous or
+            set(previous) in (HELPER_FILES, INSTALLED_FILES)), 'invalid helper receipt')
+    bundle = RUNTIME / BUNDLE_NAME
+    require(not bundle.is_symlink() and (not bundle.exists() or
+            (bundle.is_dir() and {p.name for p in bundle.iterdir()} <= ASSETS)),
+            'foreign evidence directory retained')
     for name in targets:
         destination = RUNTIME / name
         if destination.exists() or destination.is_symlink():
             require(sha(read(destination, trusted=True)) in {previous.get(name), sha(targets[name])},
                     'foreign or modified qualification helper destination')
-    # Receipt covers old and new bytes during an interrupted update.
+    # Old and desired digests above permit retries after an interrupted update.
     pending = {name: sha(raw) for name, raw in targets.items()}
+    bundle.mkdir(exist_ok=True)
+    # Install evidence before publishing the helper that reads it.
+    targets = dict(sorted(targets.items(), key=lambda item: '/' not in item[0]))
     for name, raw in targets.items():
         write_atomic(RUNTIME / name, raw, 0o755 if name.endswith('.py') else 0o644)
     write_atomic(receipt, json.dumps(pending, sort_keys=True).encode())
@@ -209,17 +194,24 @@ def remove_runtime():
     require(os.geteuid() == OWNER_UID, 'root required for application helper removal')
     receipt = RUNTIME / 'rp1-qualification-files.json'
     if not receipt.exists():
-        require(not any((RUNTIME / name).exists() for name in
-            ('rp1_qualification.py', 'rp1-qualification-lock.json')), 'unattributed helper files remain')
+        require(not any((RUNTIME / name).exists() or (RUNTIME / name).is_symlink()
+                        for name in (*HELPER_FILES, BUNDLE_NAME)), 'unattributed helper files remain')
         return
     previous = strict_json(read(receipt, trusted=True))
-    require(set(previous) == {'rp1_qualification.py', 'rp1-qualification-lock.json'}, 'invalid helper receipt')
+    require(isinstance(previous, dict) and set(previous) in (HELPER_FILES, INSTALLED_FILES),
+            'invalid helper receipt')
+    bundle = RUNTIME / BUNDLE_NAME
+    if bundle.exists() or bundle.is_symlink():
+        require(set(previous) == INSTALLED_FILES and bundle.is_dir() and not bundle.is_symlink() and
+                {p.name for p in bundle.iterdir()} <= ASSETS, 'foreign evidence directory retained')
     for name, digest in previous.items():
         path = RUNTIME / name
         if path.exists() or path.is_symlink():
             require(sha(read(path, trusted=True)) == digest, 'modified helper file retained: ' + name)
     for name in previous:
         (RUNTIME / name).unlink(missing_ok=True)
+    if bundle.exists():
+        bundle.rmdir()
     receipt.unlink()
 
 
@@ -230,7 +222,8 @@ def main():
     parser.add_argument('--route', choices=['gpio4', 'gpio20'])
     parser.add_argument('--provider-report', type=Path)
     parser.add_argument('--ownership', type=Path)
-    parser.add_argument('--directory', type=Path, default=CACHE)
+    parser.add_argument('--directory', type=Path,
+                        help='offline evidence input for status, or export destination for resolve/refresh')
     args = parser.parse_args()
     try:
         if args.operation == 'remove-runtime':
@@ -241,14 +234,15 @@ def main():
             install_runtime(lock)
             return
         if args.operation in ('resolve', 'refresh'):
-            import rp1_gpclk_dkms_install as installer
-            assets = resolve(installer.GitHubClient(os.environ.get('GITHUB_TOKEN')), lock)
+            # Retain legacy command names as offline verification/export aliases.
+            assets = evidence_assets(bundle_path(), lock)
             destination = args.directory
-            require(not destination.is_symlink(), 'symlink cache refused')
-            destination.mkdir(parents=True, exist_ok=True)
-            for name, raw in assets.items():
-                write_atomic(destination / name, raw, trusted=args.operation == 'refresh')
-            print(json.dumps({'status': 'verified', 'metadataTag': lock['metadataTag'],
+            if destination is not None:
+                require(not destination.is_symlink(), 'symlink evidence destination refused')
+                destination.mkdir(parents=True, exist_ok=True)
+                for name, raw in assets.items():
+                    write_atomic(destination / name, raw, trusted=args.operation == 'refresh')
+            print(json.dumps({'status': 'verified', 'source': 'bundled', 'metadataTag': lock['metadataTag'],
                               'assets': lock['assets']}))
             return
         observed = strict_json(read(args.provider_report)) if args.provider_report else None

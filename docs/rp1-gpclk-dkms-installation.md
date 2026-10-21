@@ -89,8 +89,9 @@ the published bytes; the [active acceptance matrix](../release_tools/4.0-Beta-1-
 separates software acceptance from accepted target installation/runtime checks
 and the remaining application release gates. The published compatibility
 manifest defaults to `Unavailable` and has
-no qualified target entries. The separately pinned [qualification supplement](rp1-qualification-metadata.md)
-records accepted scoped evidence without modifying that manifest. Publication, reproducibility and successful DKMS
+no qualified target entries. The application-bundled [qualification evidence](rp1-qualification-metadata.md)
+records accepted scoped evidence without modifying that manifest or downloading
+a separate release. Publication, reproducibility and successful DKMS
 builds do not grant live eligibility or transmission authorization. See the
 [RP1 dependency order](../release_tools/Release%20Punchlist.md#rp1-dependency-order).
 
