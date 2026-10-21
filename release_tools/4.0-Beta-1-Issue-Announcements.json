@@ -376,7 +376,7 @@
       "through": "2026-10-21T20:06:28.086401Z"
     },
     "final_result": "Independent reviewer fetched all 26 actual remote comment objects, freshly enumerated full open/ready set and compared 30 protected issue records, all 104 historical comments, complete final collections, body/source hashes, frozen mappings and complete record diff. No actionable finding remains; prior P2 closed.",
-    "originating_post_execution_assessment": "Separate; not claimed to have occurred."
+    "originating_post_execution_assessment": "Passed separately with no actionable in-scope findings; see post_execution_assessment."
   },
   "rows": [
     {
@@ -3726,5 +3726,531 @@
     ],
     "commit_push_ci_verification": "Exact committed/pushed SHA, automatically triggered exact-head CI and independent remote parity are verified after record commit and reported externally/finally.",
     "preserved_untracked_handoff": "Item 16e Beta 1 Issue Announcements Prompt.md remains unstaged; no source/component/sibling changes."
+  },
+  "post_execution_assessment": {
+    "status": "passed-no-actionable-in-scope-findings",
+    "reviewed_record_commit": "5f26addddb3607841855ff087cc395333d1111c0",
+    "observation_window": {
+      "from": "2026-10-21T20:31:04.911529Z",
+      "through": "2026-10-21T20:33:35.034242Z"
+    },
+    "completed_at": "2026-10-21T20:33:35.748010Z",
+    "recorded_at": "2026-10-21T20:38:51.595554Z",
+    "prior_execution_status": "Separate; not claimed to have occurred.",
+    "review_method": "Originating in-thread adversarial assessment plus a separate independent read-only reviewer with fresh source/live-comment checks.",
+    "independent_review_completed_at": "2026-10-21T20:32:58Z",
+    "result": "Both assessments found no actionable in-scope finding; no corrective comment or product/record repair was required during assessment.",
+    "findings": [],
+    "repairs_required": false,
+    "comments_modified_during_assessment": 0,
+    "repository_files_modified_during_assessment": 0,
+    "selection": {
+      "rule": "Open repository issues (excluding pull requests) carrying exact label Ready for Release. Other labels are not substitutes.",
+      "initial_open_enumeration": {
+        "endpoint": "repos/WsprryPi/WsprryPi/issues?state=open&sort=created&direction=asc&per_page=100",
+        "started_at": "2026-10-21T20:31:04.911529Z",
+        "finished_at": "2026-10-21T20:31:05.763869Z",
+        "attempts": [
+          {
+            "exit_code": 0,
+            "error": ""
+          }
+        ],
+        "exit_code": 0,
+        "page_sizes": [
+          30
+        ]
+      },
+      "initial_label_crosscheck": {
+        "endpoint": "repos/WsprryPi/WsprryPi/issues?state=open&labels=Ready%20for%20Release&sort=created&direction=asc&per_page=100",
+        "started_at": "2026-10-21T20:31:04.913379Z",
+        "finished_at": "2026-10-21T20:31:05.874667Z",
+        "attempts": [
+          {
+            "exit_code": 0,
+            "error": ""
+          }
+        ],
+        "exit_code": 0,
+        "page_sizes": [
+          26
+        ]
+      },
+      "post_download_open_enumeration": {
+        "endpoint": "repos/WsprryPi/WsprryPi/issues?state=open&sort=created&direction=asc&per_page=100",
+        "started_at": "2026-10-21T20:31:21.981137Z",
+        "finished_at": "2026-10-21T20:31:22.912214Z",
+        "attempts": [
+          {
+            "exit_code": 0,
+            "error": ""
+          }
+        ],
+        "exit_code": 0,
+        "page_sizes": [
+          30
+        ]
+      },
+      "post_download_label_crosscheck": {
+        "endpoint": "repos/WsprryPi/WsprryPi/issues?state=open&labels=Ready%20for%20Release&sort=created&direction=asc&per_page=100",
+        "started_at": "2026-10-21T20:31:22.914072Z",
+        "finished_at": "2026-10-21T20:31:23.810695Z",
+        "attempts": [
+          {
+            "exit_code": 0,
+            "error": ""
+          }
+        ],
+        "exit_code": 0,
+        "page_sizes": [
+          26
+        ]
+      },
+      "final_open_enumeration": {
+        "endpoint": "repos/WsprryPi/WsprryPi/issues?state=open&sort=created&direction=asc&per_page=100",
+        "started_at": "2026-10-21T20:33:33.020198Z",
+        "finished_at": "2026-10-21T20:33:34.006637Z",
+        "attempts": [
+          {
+            "exit_code": 0,
+            "error": ""
+          }
+        ],
+        "exit_code": 0,
+        "page_sizes": [
+          30
+        ]
+      },
+      "final_label_crosscheck": {
+        "endpoint": "repos/WsprryPi/WsprryPi/issues?state=open&labels=Ready%20for%20Release&sort=created&direction=asc&per_page=100",
+        "started_at": "2026-10-21T20:33:34.009754Z",
+        "finished_at": "2026-10-21T20:33:35.034242Z",
+        "attempts": [
+          {
+            "exit_code": 0,
+            "error": ""
+          }
+        ],
+        "exit_code": 0,
+        "page_sizes": [
+          26
+        ]
+      },
+      "open_issue_count": 30,
+      "ready_issue_count": 26,
+      "eligible_numbers": [
+        332,
+        346,
+        347,
+        348,
+        349,
+        352,
+        354,
+        355,
+        361,
+        364,
+        365,
+        367,
+        368,
+        379,
+        382,
+        383,
+        387,
+        390,
+        400,
+        401,
+        412,
+        414,
+        415,
+        416,
+        422,
+        426
+      ],
+      "additions_since_execution": [],
+      "removals_since_execution": [],
+      "project_visibility": "All 30 visible open-issue Project association counts remain zero with exhausted pagination. Repository Project fields remain inaccessible without read:project; no scopes changed or claim about private/inaccessible readiness was made."
+    },
+    "comment_readbacks": [
+      {
+        "issue": 332,
+        "comment_id": 6325321591,
+        "url": "https://github.com/WsprryPi/WsprryPi/issues/332#issuecomment-6325321591",
+        "body_sha256": "6daaec4e35e84cecaaa0be97cff24de7d94c7bb9ab2e1c8d3e50d4a0261cc20c",
+        "readback_at": "2026-10-21T20:31:12.882416Z",
+        "marker_count": 1,
+        "result": "pass"
+      },
+      {
+        "issue": 346,
+        "comment_id": 6325324082,
+        "url": "https://github.com/WsprryPi/WsprryPi/issues/346#issuecomment-6325324082",
+        "body_sha256": "b6b21a24e66c940f2896d14ece69af347621f59c352cefb1c6830ff19b3d08f7",
+        "readback_at": "2026-10-21T20:31:12.915529Z",
+        "marker_count": 1,
+        "result": "pass"
+      },
+      {
+        "issue": 347,
+        "comment_id": 6325326288,
+        "url": "https://github.com/WsprryPi/WsprryPi/issues/347#issuecomment-6325326288",
+        "body_sha256": "ce228010ee0cc76b55d4dd17df7b8793c0a3a6331d6378a2a6b2d788fe14cc89",
+        "readback_at": "2026-10-21T20:31:12.965755Z",
+        "marker_count": 1,
+        "result": "pass"
+      },
+      {
+        "issue": 348,
+        "comment_id": 6325328677,
+        "url": "https://github.com/WsprryPi/WsprryPi/issues/348#issuecomment-6325328677",
+        "body_sha256": "fac5351a0e8a259c21e9a0ffac4f8f1f55e1c81d44c9aa5e521c4b10b718d483",
+        "readback_at": "2026-10-21T20:31:13.306839Z",
+        "marker_count": 1,
+        "result": "pass"
+      },
+      {
+        "issue": 349,
+        "comment_id": 6325331306,
+        "url": "https://github.com/WsprryPi/WsprryPi/issues/349#issuecomment-6325331306",
+        "body_sha256": "f379103c61ec2bf2d94bac0822f5596d2a48d8680ddc5366961cadf86f5f0cf1",
+        "readback_at": "2026-10-21T20:31:13.397489Z",
+        "marker_count": 1,
+        "result": "pass"
+      },
+      {
+        "issue": 352,
+        "comment_id": 6325334377,
+        "url": "https://github.com/WsprryPi/WsprryPi/issues/352#issuecomment-6325334377",
+        "body_sha256": "10c2a781d799b60c7a4829cd9c2c4ee4f52a43dafd92d60b98a484007472f59a",
+        "readback_at": "2026-10-21T20:31:13.462619Z",
+        "marker_count": 1,
+        "result": "pass"
+      },
+      {
+        "issue": 354,
+        "comment_id": 6325336599,
+        "url": "https://github.com/WsprryPi/WsprryPi/issues/354#issuecomment-6325336599",
+        "body_sha256": "d19c93ec096e70d38452c704668ecb61b55727ec5d16e924a0e41280976fb653",
+        "readback_at": "2026-10-21T20:31:13.535546Z",
+        "marker_count": 1,
+        "result": "pass"
+      },
+      {
+        "issue": 355,
+        "comment_id": 6325338747,
+        "url": "https://github.com/WsprryPi/WsprryPi/issues/355#issuecomment-6325338747",
+        "body_sha256": "5f0be7e960b5643add88044145247e26b6f6511ad726254c7009447443ba5c43",
+        "readback_at": "2026-10-21T20:31:13.548684Z",
+        "marker_count": 1,
+        "result": "pass"
+      },
+      {
+        "issue": 361,
+        "comment_id": 6325341334,
+        "url": "https://github.com/WsprryPi/WsprryPi/issues/361#issuecomment-6325341334",
+        "body_sha256": "cb03e619887507f2cbe143ab0dc00979cc2bafa8d6d4af5dee9d8904a9d17d11",
+        "readback_at": "2026-10-21T20:31:13.920539Z",
+        "marker_count": 1,
+        "result": "pass"
+      },
+      {
+        "issue": 364,
+        "comment_id": 6325343838,
+        "url": "https://github.com/WsprryPi/WsprryPi/issues/364#issuecomment-6325343838",
+        "body_sha256": "06914400369ec4bae0ebc692bec345456960a248489ac124bf6f49394bc26714",
+        "readback_at": "2026-10-21T20:31:14.004073Z",
+        "marker_count": 1,
+        "result": "pass"
+      },
+      {
+        "issue": 365,
+        "comment_id": 6325346740,
+        "url": "https://github.com/WsprryPi/WsprryPi/issues/365#issuecomment-6325346740",
+        "body_sha256": "165dcc7000322581cb2d71813b32014dff3f2a9cc7c5d5f5f0d017cd14549b47",
+        "readback_at": "2026-10-21T20:31:13.987219Z",
+        "marker_count": 1,
+        "result": "pass"
+      },
+      {
+        "issue": 367,
+        "comment_id": 6325349150,
+        "url": "https://github.com/WsprryPi/WsprryPi/issues/367#issuecomment-6325349150",
+        "body_sha256": "f9846bdac5fd569709652c3365206c5bf95e0b2e74ea1d9d24bdf3fe3bce439f",
+        "readback_at": "2026-10-21T20:31:14.107223Z",
+        "marker_count": 1,
+        "result": "pass"
+      },
+      {
+        "issue": 368,
+        "comment_id": 6325351396,
+        "url": "https://github.com/WsprryPi/WsprryPi/issues/368#issuecomment-6325351396",
+        "body_sha256": "af80f968c6fca81d5980667470f7efa48382df4b1494478414d75a254cceb087",
+        "readback_at": "2026-10-21T20:31:14.123982Z",
+        "marker_count": 1,
+        "result": "pass"
+      },
+      {
+        "issue": 379,
+        "comment_id": 6325353801,
+        "url": "https://github.com/WsprryPi/WsprryPi/issues/379#issuecomment-6325353801",
+        "body_sha256": "a92e5fa1c99e276c0d9a8658f0b27cb37e1ab36827dbe5e5a187a85a55df2dbd",
+        "readback_at": "2026-10-21T20:31:14.478555Z",
+        "marker_count": 1,
+        "result": "pass"
+      },
+      {
+        "issue": 382,
+        "comment_id": 6325356115,
+        "url": "https://github.com/WsprryPi/WsprryPi/issues/382#issuecomment-6325356115",
+        "body_sha256": "14ce3d63d08a9e2e876952e16e800d1ea76181b33fbce6c2d527bfc661e54ddd",
+        "readback_at": "2026-10-21T20:31:14.601662Z",
+        "marker_count": 1,
+        "result": "pass"
+      },
+      {
+        "issue": 383,
+        "comment_id": 6325358232,
+        "url": "https://github.com/WsprryPi/WsprryPi/issues/383#issuecomment-6325358232",
+        "body_sha256": "2aa8d593a326bde43588ad341a3c84a4caed975687f6b763c1706e0ed2c4cb24",
+        "readback_at": "2026-10-21T20:31:14.579593Z",
+        "marker_count": 1,
+        "result": "pass"
+      },
+      {
+        "issue": 387,
+        "comment_id": 6325361901,
+        "url": "https://github.com/WsprryPi/WsprryPi/issues/387#issuecomment-6325361901",
+        "body_sha256": "068e794bcad717c5ef2023ca65f0b777799e04fadd6afe2b4c7a19afb2f72d2b",
+        "readback_at": "2026-10-21T20:31:14.609422Z",
+        "marker_count": 1,
+        "result": "pass"
+      },
+      {
+        "issue": 390,
+        "comment_id": 6325364453,
+        "url": "https://github.com/WsprryPi/WsprryPi/issues/390#issuecomment-6325364453",
+        "body_sha256": "40ddeece832742005c8a64a37fde246792873408b9d108ce3b099db5608b8109",
+        "readback_at": "2026-10-21T20:31:14.789467Z",
+        "marker_count": 1,
+        "result": "pass"
+      },
+      {
+        "issue": 400,
+        "comment_id": 6325367283,
+        "url": "https://github.com/WsprryPi/WsprryPi/issues/400#issuecomment-6325367283",
+        "body_sha256": "a6356d48560ed4ef9fcbe7f12fcd8d39c4faad6a0486fd9af6129f0cd04c000d",
+        "readback_at": "2026-10-21T20:31:15.060625Z",
+        "marker_count": 1,
+        "result": "pass"
+      },
+      {
+        "issue": 401,
+        "comment_id": 6325369411,
+        "url": "https://github.com/WsprryPi/WsprryPi/issues/401#issuecomment-6325369411",
+        "body_sha256": "2c293130f08e6856c40787828e90682fe889589ffc78e882cfa40366e6890936",
+        "readback_at": "2026-10-21T20:31:15.164221Z",
+        "marker_count": 1,
+        "result": "pass"
+      },
+      {
+        "issue": 412,
+        "comment_id": 6325372182,
+        "url": "https://github.com/WsprryPi/WsprryPi/issues/412#issuecomment-6325372182",
+        "body_sha256": "d5ad7e84af73417bc02fc0e45cb81d72df7bf685d3b4e3cca1e5951335e654ff",
+        "readback_at": "2026-10-21T20:31:15.245203Z",
+        "marker_count": 1,
+        "result": "pass"
+      },
+      {
+        "issue": 414,
+        "comment_id": 6325375116,
+        "url": "https://github.com/WsprryPi/WsprryPi/issues/414#issuecomment-6325375116",
+        "body_sha256": "eddb9b3a2203ec76eb1ec050a2e3909f495e801ee3fb2e7a5a83ee8da123ede2",
+        "readback_at": "2026-10-21T20:31:15.217098Z",
+        "marker_count": 1,
+        "result": "pass"
+      },
+      {
+        "issue": 415,
+        "comment_id": 6325377843,
+        "url": "https://github.com/WsprryPi/WsprryPi/issues/415#issuecomment-6325377843",
+        "body_sha256": "e33befc3f24ae567c9a0606d2cba1439738db3723c7835962f6e3d5d9b7675af",
+        "readback_at": "2026-10-21T20:31:15.495906Z",
+        "marker_count": 1,
+        "result": "pass"
+      },
+      {
+        "issue": 416,
+        "comment_id": 6325380415,
+        "url": "https://github.com/WsprryPi/WsprryPi/issues/416#issuecomment-6325380415",
+        "body_sha256": "351a27b507e8a5c60583dbaf33010c7b00ed8f2183ff39132d5289ff202d4462",
+        "readback_at": "2026-10-21T20:31:15.590377Z",
+        "marker_count": 1,
+        "result": "pass"
+      },
+      {
+        "issue": 422,
+        "comment_id": 6325383001,
+        "url": "https://github.com/WsprryPi/WsprryPi/issues/422#issuecomment-6325383001",
+        "body_sha256": "754c6d6f44a96c990da05dc766232a90612b5de3d82310c8234836ab4203bb82",
+        "readback_at": "2026-10-21T20:31:15.711850Z",
+        "marker_count": 1,
+        "result": "pass"
+      },
+      {
+        "issue": 426,
+        "comment_id": 6325385353,
+        "url": "https://github.com/WsprryPi/WsprryPi/issues/426#issuecomment-6325385353",
+        "body_sha256": "432916fd08a1e8482fb7c3834f7527c2aed77b081957982045b3eede6cbf98f4",
+        "readback_at": "2026-10-21T20:31:15.865670Z",
+        "marker_count": 1,
+        "result": "pass"
+      }
+    ],
+    "preservation_checks": {
+      "protected_issue_records_unchanged": 30,
+      "historical_comments_unchanged": 104,
+      "total_selected_issue_comments": 130,
+      "owned_announcement_count": 26,
+      "duplicates": 0,
+      "omissions": 0,
+      "failed": 0,
+      "unconfirmed": 0,
+      "issue_412_state": "open",
+      "original_16d_and_P3_ledger_prefix": "Byte-preserved against 7f79eb278e8326d5fcc0e3375412b666f2dae604."
+    },
+    "source_checks": "Every cited frozen source-content hash and implementation ancestry/previous-stable absence check passed. Actual frozen code and accepted scope substantiate public behavior and limitation statements; current devel alone was not treated as inclusion evidence.",
+    "release_checks": {
+      "release_id": 419746377,
+      "tag": "v4.0.0-beta.1",
+      "draft": false,
+      "prerelease": true,
+      "immutable": false,
+      "latest_stable": "v3.2.0",
+      "body_matches_accepted_notes": true,
+      "body_sha256": "051d32343ec3d99791bddd9fbc71b31dc1ce0c9e94871bb018547e34814c2b97",
+      "frozen_application_docs_provider_identities": "Unchanged and consistent with the accepted public manifest and original prerequisites.",
+      "fresh_public_asset_downloads": [
+        {
+          "name": "publication-manifest.json",
+          "url": "https://github.com/WsprryPi/WsprryPi/releases/download/v4.0.0-beta.1/publication-manifest.json",
+          "bytes": 10140,
+          "accepted_sha256": "ced10dfce978be47de34154c55d99185b4ee42161eba9e2f6e402f45ccda3d62",
+          "downloaded_sha256": "ced10dfce978be47de34154c55d99185b4ee42161eba9e2f6e402f45ccda3d62",
+          "download_started_at": "2026-10-21T20:31:15.866417Z",
+          "download_finished_at": "2026-10-21T20:31:16.544273Z",
+          "result": "pass"
+        },
+        {
+          "name": "SHA256SUMS",
+          "url": "https://github.com/WsprryPi/WsprryPi/releases/download/v4.0.0-beta.1/SHA256SUMS",
+          "bytes": 360,
+          "accepted_sha256": "b0803fc0b03e147fc802547e06930f2611c314eb9b95eb95ee3f0e09afb77654",
+          "downloaded_sha256": "b0803fc0b03e147fc802547e06930f2611c314eb9b95eb95ee3f0e09afb77654",
+          "download_started_at": "2026-10-21T20:31:15.868198Z",
+          "download_finished_at": "2026-10-21T20:31:16.544483Z",
+          "result": "pass"
+        },
+        {
+          "name": "wsprrypi-aarch64-bookworm",
+          "url": "https://github.com/WsprryPi/WsprryPi/releases/download/v4.0.0-beta.1/wsprrypi-aarch64-bookworm",
+          "bytes": 6452024,
+          "accepted_sha256": "47e5e588d95a7abb6f3799d738d33c6350e61000a59f0c2c51b562f0336ea403",
+          "downloaded_sha256": "47e5e588d95a7abb6f3799d738d33c6350e61000a59f0c2c51b562f0336ea403",
+          "download_started_at": "2026-10-21T20:31:15.870075Z",
+          "download_finished_at": "2026-10-21T20:31:17.316013Z",
+          "result": "pass"
+        },
+        {
+          "name": "wsprrypi-aarch64-trixie",
+          "url": "https://github.com/WsprryPi/WsprryPi/releases/download/v4.0.0-beta.1/wsprrypi-aarch64-trixie",
+          "bytes": 6549328,
+          "accepted_sha256": "82a563adcf3ff9cda8e43423e588a9739adcda9d2bb07683cb831f6df046feda",
+          "downloaded_sha256": "82a563adcf3ff9cda8e43423e588a9739adcda9d2bb07683cb831f6df046feda",
+          "download_started_at": "2026-10-21T20:31:16.544712Z",
+          "download_finished_at": "2026-10-21T20:31:18.346306Z",
+          "result": "pass"
+        },
+        {
+          "name": "wsprrypi-armv6-bookworm",
+          "url": "https://github.com/WsprryPi/WsprryPi/releases/download/v4.0.0-beta.1/wsprrypi-armv6-bookworm",
+          "bytes": 5841936,
+          "accepted_sha256": "351d1859b288d228e1eb952ef13c6f5df3cbf556ae582e62f588a35aba6a3348",
+          "downloaded_sha256": "351d1859b288d228e1eb952ef13c6f5df3cbf556ae582e62f588a35aba6a3348",
+          "download_started_at": "2026-10-21T20:31:16.544798Z",
+          "download_finished_at": "2026-10-21T20:31:18.527274Z",
+          "result": "pass"
+        },
+        {
+          "name": "wsprrypi-armv6-trixie",
+          "url": "https://github.com/WsprryPi/WsprryPi/releases/download/v4.0.0-beta.1/wsprrypi-armv6-trixie",
+          "bytes": 5999744,
+          "accepted_sha256": "604bcf1730c9635d62f953cccd7c886f1fe3afaf4b9114c5c6f5d19d3ccdd1f1",
+          "downloaded_sha256": "604bcf1730c9635d62f953cccd7c886f1fe3afaf4b9114c5c6f5d19d3ccdd1f1",
+          "download_started_at": "2026-10-21T20:31:17.318174Z",
+          "download_finished_at": "2026-10-21T20:31:20.061604Z",
+          "result": "pass"
+        }
+      ],
+      "new_binary_execution_or_build": false,
+      "attestations": "No new attestation check or application immutability claim; accepted policy remains unchanged."
+    },
+    "docs_checks": {
+      "versioned_manual": {
+        "name": "manual",
+        "url": "https://wsprry-pi.readthedocs.io/en/v4.0.0-beta.1/",
+        "started_at": "2026-10-21T20:31:20.063687Z",
+        "finished_at": "2026-10-21T20:31:20.441879Z",
+        "bytes": 23976,
+        "sha256": "8ac8f0f8e172c4998a23bce1fd466588c06617967cd23ce5b284d6c2ab5f0819"
+      },
+      "versioned_installation": {
+        "name": "installation",
+        "url": "https://wsprry-pi.readthedocs.io/en/v4.0.0-beta.1/Install/beta1.html",
+        "started_at": "2026-10-21T20:31:20.442251Z",
+        "finished_at": "2026-10-21T20:31:20.770471Z",
+        "bytes": 21586,
+        "sha256": "0c0196193bd57d70e80ba9b467d4be7e77bd8e9b6ac56e258f1b84847307f93e"
+      },
+      "served_installation_source": {
+        "name": "installation-source",
+        "url": "https://wsprry-pi.readthedocs.io/en/v4.0.0-beta.1/_sources/Install/beta1.md.txt",
+        "started_at": "2026-10-21T20:31:20.770697Z",
+        "finished_at": "2026-10-21T20:31:20.975703Z",
+        "bytes": 5296,
+        "sha256": "500ce9334c3c60e5177dbb8a387a64d4a294bfba2c1654e1842f79fe9fa13525"
+      },
+      "accepted_source_sha256": "500ce9334c3c60e5177dbb8a387a64d4a294bfba2c1654e1842f79fe9fa13525",
+      "result": "pass"
+    },
+    "reviewed_head_ci": {
+      "head_sha": "5f26addddb3607841855ff087cc395333d1111c0",
+      "run_id": 39667786070,
+      "url": "https://github.com/WsprryPi/WsprryPi/actions/runs/39667786070",
+      "result": "success",
+      "jobs_passed": 14,
+      "observed_at": "2026-10-21T20:31:06.394703Z",
+      "new_run_dispatched": false
+    },
+    "validation": {
+      "result": "pass",
+      "commands": [
+        "python3 validate.py (external assessment harness)",
+        "git diff --check",
+        "git diff --cached --check"
+      ],
+      "external_harness_sha256": "ca2095b5232efd56975e642f4023118e725a23d4dfbedfaea05dfff142488a00",
+      "scope": "Live coverage/metadata/history, exact comment/source hashes, ancestry, all six public asset bytes, manifest/notes/tag/Docs identities, reviewed-head CI, historical ledger preservation and local Markdown links."
+    },
+    "retained_boundaries": [
+      "16e and overall item 16 remain complete only for the accepted Beta milestone.",
+      "#412 closure and final 4.0 stable publication remain separately authorized.",
+      "Existing changed-support installation, clean-install/other-physical-export/reboot/GPIO4/rollback and general hardware/RF qualification limits remain unchanged.",
+      "No installation, service/configuration, GPIO, transmission, RF, SDR or Pico operation; no application/UI/component/workflow or sibling-repository change."
+    ],
+    "recording_scope": [
+      "release_tools/4.0-Beta-1-Issue-Announcements.json",
+      "release_tools/4.0-Beta-1-Release-Evidence.md"
+    ],
+    "recording_note": "This later explicit request records the already completed successful assessment. It does not imply that assessment required a corrective change. Recording-commit CI and remote parity are reported after push without changing frozen publication identities."
   }
 }
