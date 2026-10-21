@@ -20,6 +20,8 @@ component needed to build and test the product.
 | `src/Singleton` | Single-process ownership through a loopback socket |
 | `src/WSPR-Reference` | WSPR encoding, decoding, and correlation |
 | `src/WSPR-Transmitter` | Transmission planning and backend execution |
+| `src/WTP-Client` | Portable WTP/1 client framing, codecs and sessions |
+| `src/WTP-Server` | Portable WTP/1 server and job-policy core |
 
 Each component root owns its source hierarchy, public interfaces, README,
 standalone build or test entry points, and extraction boundary. Application

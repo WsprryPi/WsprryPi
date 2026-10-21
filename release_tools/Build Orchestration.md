@@ -1,115 +1,69 @@
-# Release Orchestration
+# Release artifact preparation
 
-Wsprry Pi builds require the tag and branch to be consistent for use in the install script as well as the executable linking for compiler tags. To do that, we will follow these steps.
+WsprryPi provides four container build commands for producing standalone,
+dynamically linked executables. The commands export locally; they do not create
+tags, upload assets or publish a release. The
+[release punchlist](Release%20Punchlist.md) governs selected release work and
+acceptance gates. Publication requires its own authorization.
 
-This guide outlines the precise steps to prepare a release where the Git **branch** and **tag** share the same name. In this situation, Git can be ambiguous when resolving references. We resolve this by being explicit with `refs/heads/` (branches) and `refs/tags/` (tags) in all commands.
+## Source and version identity
 
-Globally search/replace `3.2.0` and `v3.2.0` with your desired version.
+Build a release candidate from a clean checkout at an accepted full commit.
+Record the commit, tree, branch or detached state, supporting-source identities
+and selected version before building. Keep the source fixed while producing
+the complete target set.
 
----
+An unpublished candidate can supply a SemVer without creating a tag:
 
-## Build Orchestration Steps
-
-1. **Create or update your release branch**
-
-   ```bash
-   git checkout main
-   git pull origin main
-   git merge devel
-   ```
-
-   * Merge any release features into main.
-
-2. **Edit your source and install script**
-
-    * Update `scripts\install.sh` with proper version:
-
-        ```bash
-        declare DEFAULT_REPO_BRANCH="devel"
-        declare DEFAULT_SEM_VER="3.2.0"
-        ```
-
-    * Apply any required feature changes or bug fixes.
-
-3. **Commit those edits**
-
-   ```bash
-   git add scripts/install.sh
-   git add "release_tools/Build Orchestration.md" # This file because you updated the tags
-   git commit -m "Prepare 3.2.0 release"
-   ```
-
-4. **Create an annotated tag on that commit**
-
-   ```bash
-   git tag -a v3.2.0 -m "Release 3.2.0"
-   ```
-
-5. **Compilation**: If a version-specific compile or any other process depends on the tag, execute that process now
-
-   * **Stage any additional changes**: If you need to use the tag locally such as with compiled executables, do these now.
-
-      ```bash
-      git add ./executables/
-      ```
-
-   * **Amend the previous commit to include the binary**
-
-      ```bash
-      git commit --amend --no-edit
-      ```
-
-   * **Force the tag to point to the amended commit**
-
-      ```bash
-      git tag -f v3.2.0
-      ```
-
-6. **Push the branch and tag to the origin** (with -f if needed)
-
-   ```bash
-   git push origin HEAD:refs/heads/main
-   git push origin tag v3.2.0
-   ```
-
----
-
-## Why This Order?
-
-* **Tag before build**: Ensures `git describe --tags` returns the correct version for embedding in the executable.
-* **Build before staging**: Guarantees the binary contains that exact tag.
-* **Amend + retag**: Ensures all release content (code, install script, and binary) lives in a single commit.
-* **Explicit refs**: Prevents ambiguity between `refs/tags/main` and `refs/heads/main`.
-* **Force-push allowed only on release branches**: Avoid rewriting history on `main`.
-
----
-
-## Notes
-
-* `git checkout main` will prefer the **branch**.
-
-* To check out the tag explicitly, use:
-
-  ```bash
-  git checkout refs/tags/main
-  ```
-
----
-
-## Validation Tip
-
-Verify what `git describe` sees before and after the tag:
-
-```bash
-git describe --tags --always
+```sh
+./scripts/build-aarch64-trixie-container.sh /absolute/new/output --release-version 4.0.0-beta.1
 ```
 
-To confirm the tag points to the correct commit:
+Each wrapper accepts the same version option. Embedded metadata retains the
+actual commit and dirty state; the option does not make a modified checkout
+clean. Follow the [container build contract](../docs/container-builds.md) for
+prerequisites, all four commands, isolated output directories and export checks.
 
-```bash
-git show refs/tags/main
-```
+## Target and asset identity
 
----
+| Build target | Release executable name |
+| --- | --- |
+| ARMv6 Bookworm | `wsprrypi-armv6-bookworm` |
+| ARMv6 Trixie | `wsprrypi-armv6-trixie` |
+| AArch64 Bookworm | `wsprrypi-aarch64-bookworm` |
+| AArch64 Trixie | `wsprrypi-aarch64-trixie` |
 
-By following this process with **explicit reference usage**, your release artifacts will remain consistent and unambiguous across source, install scripts, and compiled binaries.
+The wrappers export each executable as `wsprrypi` in its own target directory.
+The release asset names above are the installer's download contract, not an
+upload operation performed by the wrappers. Preserve each export's checksum,
+build metadata, target/OS identity, ELF attributes, resolved dependencies,
+package inventory and build-image identity. Verify the complete matrix against
+the accepted source and version. ARMv7 `armhf` is not the ARMv6 baseline.
+
+Keep generated executables and build evidence outside tracked source. Do not
+amend the accepted source commit to include binaries or move a tag after
+building. A changed source requires a new candidate identity, affected builds
+and acceptance checks. Resolve a release tag explicitly through
+`refs/tags/<tag>` and verify its commit against the accepted candidate before
+any separately authorized upload or publication.
+
+## Acceptance and publication boundaries
+
+Build and dependency inspection establish artifact properties, not target
+installation, service, GPIO, timing or RF correctness. The
+[precompiled installation contract](../docs/precompiled-installation.md)
+defines deployment checks and recovery limits; live installation remains a
+separately authorized operation.
+
+Beta 1's [candidate manifest](4.0-Beta-1-Candidate-Manifest.json),
+[checksums](4.0-Beta-1-SHA256SUMS) and
+[release evidence](4.0-Beta-1-Release-Evidence.md) bind its accepted artifacts,
+reused evidence and remaining gates. Later documentation or supporting-source
+changes do not silently replace those identities or complete their acceptance.
+
+The repository has no release-upload workflow. The
+[four-target release-process proposal](Four-Target%20Release%20Executable%20Implementation%20Prompt.md)
+retains an unresolved choice between Actions orchestration and a
+developer-operated process. Neither option is selected by artifact preparation
+or cleanup. Preserve the selected candidate until that decision and the
+applicable publication gates are resolved.

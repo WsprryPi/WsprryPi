@@ -48,6 +48,8 @@ artifact production. Building an executable does not qualify installation or RF.
   [Si5351 support limits](../si5351-support.md).
 - [Installer/support tools](../../scripts/README.md) and
   [maintainer runbook](../../release_tools/WsprryPi%20Full%20Regression%20Test%20Runbook.md).
+- [Release artifact preparation](../../release_tools/Build%20Orchestration.md)
+  and [calibration authority and scope](../../release_tools/Calibration%20Scope%20Decisions.md).
 
 The CI rollback regression and its imported helper remain at
 `wtp-reply-routing-results/rollback_test.py` and `live_target.py`. The regression

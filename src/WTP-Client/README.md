@@ -1,7 +1,7 @@
 # WTP-Client
 
-Portable C++20 WTP/1 wire and session support, implemented as Phase 10 Slices
-1–2. This is an ordinary component of the WsprryPi repository. Its public headers, sources,
+Portable C++20 WTP/1 wire and session support. This is an ordinary component
+of the WsprryPi repository. Its public headers, sources,
 tests, MIT license and fixture provenance stay together if it is extracted.
 It has no Pico SDK, application, OS, hardware or third-party runtime dependency.
 
@@ -22,22 +22,21 @@ It has no Pico SDK, application, OS, hardware or third-party runtime dependency.
   exact-byte recovery and authoritative STATUS reconciliation. See the
   [session API and recovery contract](SESSION.md).
 
-The production application does not select this component yet. The portable
-component itself contains no backend, endpoint discovery, USB I/O, Console time
-provisioning, scheduler integration, configuration or UI in these slices. The Session layer
+The parent application uses this component through its WTP integration layer.
+The portable component itself contains no backend, endpoint discovery, USB I/O,
+Console time provisioning, scheduler integration, configuration or UI. The Session layer
 validates an `ARM` acknowledgment against its request and advertised clock bounds;
 the wire codec alone does not. Writing a frame does not establish acknowledgment.
 The codec preserves explicit active-output evidence in status, terminal
 records and events; a decoded terminal state is not a success verdict.
 
-Phase 10 Slice 3 adds a separate parent application
-[execution-plan converter](../../docs/wtp-execution-plan.md). It consumes this
+The parent application's separate
+[execution-plan converter](../../docs/wtp-execution-plan.md) consumes this
 component's types without introducing a WSPR-Transmitter dependency here.
-Slice 4 adds the parent's [USB CDC transport](../../docs/wtp-usb-cdc.md), with
-Linux identity resolution and hardware-free POSIX tests. Neither adapter adds
-OS dependencies to this portable component. Slice 5 adds the parent's
-[complete-plan backend](../../docs/wtp-backend.md), tested through the shared
-transmitter controller. This component retains its standalone boundary.
+The parent also owns the [USB CDC transport](../../docs/wtp-usb-cdc.md), with
+Linux identity resolution and hardware-free POSIX tests, and the
+[complete-plan backend](../../docs/wtp-backend.md). These adapters add no OS or
+transmitter dependencies to this portable component.
 
 ## Building and testing
 
@@ -128,39 +127,23 @@ not reinterpret that value as permission for a shorter lease.
 
 [wtp]: https://github.com/WsprryPi/WsprryPico/blob/40812e7438f180c5e8d8ad75d4eb227271152b10/docs/protocol/WTP.md
 
-## Remaining Phase 10 prerequisites
+## Parent integration and qualification
 
-Slice 6 implements the parent [early scheduler and UTC handoff](../../docs/wtp-scheduling.md).
-Slice 7 adds parent [runtime status and recovery reporting](../../docs/wtp-status-recovery.md).
-The parent [production integration](../../docs/wtp-production-integration.md)
-now supplies configuration, selection, an owned worker and operator/UI wiring.
-The USB CDC adapter is implemented but still needs physical target validation.
-No new job
-may be inferred safe from a disconnect, lost acknowledgment, boot change,
-expired result or `JOB_NOT_FOUND`. The complete approved plan still governs
-those later slices; wire tests do not complete Phase 10.
+The parent owns [early scheduling and UTC handoff](../../docs/wtp-scheduling.md),
+[status and recovery](../../docs/wtp-status-recovery.md), and
+[production configuration and selection](../../docs/wtp-production-integration.md).
+It supplies an owned worker, USB CDC and network transports, and the browser
+interface. This library retains its independent wire/session boundary.
 
-For later scheduling, the device must already have independently provisioned
-valid UTC with acceptable uncertainty, holdover and leap state. `GET_CLOCK`
-only observes that state. Host UTC validity and RF calibration do not establish
-device UTC validity. USB Console time provisioning remains a separate proposed
-adapter requiring its own scope; this component never opens the Console.
+Device UTC must be valid within the advertised uncertainty, holdover and leap
+limits. `GET_CLOCK` observes that state; host UTC validity and RF calibration do
+not establish device UTC validity. The parent's
+[USB management/time adapter](../../docs/wtp-usb-management.md) provisions
+qualified host observations separately. This component never opens the Console.
 
-The parent UI includes a default-off, browser-local development visibility
-toggle. It preserves saved backend selection and never enables transmission or
-clears a fault. It is temporary development control, separate from backend
-admission checks; this portable component owns no UI or persistent settings.
-
-## Documentation impact
-
-This README and the parent development link document the new developer API.
-No operator behavior changes in Slices 1–7. The separate `Wsprry_Pi_Docs` repository
-was reviewed and remains unchanged. Later status/configuration/UI slices need
-separately authorized updates to `docs/Command_Line_Operations/transmitter_backends.md`,
-`docs/Advanced_Operations/ini_configuration/transmitter_backends.md`,
-`docs/User_Interface/Setup/Transmitter/index.md`, and the applicable Operations
-guidance for endpoint identity, finite jobs, clock prerequisites, cancellation
-and output-unknown status. The development toggle needs developer guidance,
-not permanent operator documentation.
-
-The portable client API and implementation are unchanged in Slice 7.
+A disconnect, lost acknowledgment, boot change, expired result or
+`JOB_NOT_FOUND` does not establish that another execution is safe. Physical
+transport, target lifecycle, timing and RF claims require evidence for the
+exact source, device and setup. Wire/session tests qualify software contracts
+only. Operator instructions live in the
+[Wsprry Pi manual](https://wsprry-pi.readthedocs.io/en/stable/).

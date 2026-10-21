@@ -1,9 +1,10 @@
 # WTP session and transaction API
 
-Phase 10 Slice 2 adds `wtp/transport.hpp` and `wtp/session.hpp` to the portable
-component. The application still does not link/select WTP. There is no physical
-transport adapter, discovery, Console access, scheduler, persisted recovery
-journal or operator configuration in this slice.
+`wtp/transport.hpp` and `wtp/session.hpp` provide the portable byte-stream and
+transaction boundary. The parent application supplies physical transports,
+discovery, scheduling and configuration through its
+[WTP integration layer](../../docs/wtp-production-integration.md). This component
+owns no Console access or persisted recovery journal.
 
 ## Ownership of the API
 
@@ -157,7 +158,7 @@ where the server lifecycle permits it. Other new mutations remain blocked.
 
 `disconnect()` is local cancellation/shutdown, not remote ABORT. It preserves
 uncertain work and invalidates output evidence. The parent backend consumes
-and reports unresolved results during shutdown. This slice provides no durable
+and reports unresolved results during shutdown. This component provides no durable
 process-restart recovery or physical emergency-stop mechanism.
 
 ## Tests and reference endpoint
@@ -187,8 +188,8 @@ transitions. No full protocol/firmware conformance claim is made.
 
 ## Parent network integration
 
-Phase 11.1 supplies authenticated TLS in the parent integration layer, alongside
-USB, through this same byte-stream contract. TLS, resolution, credentials, worker
+The parent integration layer supplies authenticated TLS, Plain LAN and USB
+through this same byte-stream contract. TLS, resolution, credentials, worker
 ownership and shared browser resources remain outside this portable library.
 An explicitly selected parent Plain LAN binding may create a session with an
 empty expected device ID and `learn_device_identity=true`. The first valid

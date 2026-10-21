@@ -1,38 +1,10 @@
-# Calibration Scope Decisions for Wsprry Pi 4.0
+# Calibration authority and scope
 
-Decision: October 15, 2026. **Native/direct PPS RF calibration is deferred
-beyond 4.0. RP1's nominal 200 MHz `pll_sys` parent is already implemented;
-evaluation of other parents is deferred.** This completes the calibration
-scope review, not PPS implementation or backend/RF qualification. No evidence
-reviewed establishes a 4.0 requirement for a new calibration mechanism.
-
-The source findings describe the reviewed baseline. Their separately authorized
-implementation follow-up is recorded in [Chrony report repairs](#chrony-report-repairs).
-
-## Evidence boundary
-
-The application review uses `devel`
-`6a39398bb23d69ba0628e1b82171717040115ec8` (equal to refreshed `origin/devel`).
-Provider inspection is read-only at RP1-GPCLK-DKMS `devel`
-`924c7e546ab82a40497339c4baeb813f95f3408e`; operator documentation is read-only
-at WsprryPi-Docs `devel` `01d9bef6f8d7a05ac2b3223f02270483f33caac4`.
-Relative application source links below refer to the reviewed application
-revision. Unrelated working-tree WTP/UI edits are excluded from this decision
-and its commit. Sibling revisions are local observations, not remote refreshes.
-
-Relevant history, reviewed against current source:
-
-- [`b2b6a40`](https://github.com/WsprryPi/WsprryPi/commit/b2b6a40032597d688eae948524b5737b81e3fb9b)
-  centralized intrinsic offsets; [`93c8002`](https://github.com/WsprryPi/WsprryPi/commit/93c8002ebef91d6d73ec456a4ec825616d3cfe9f)
-  reconciled additional-only requests, legacy models and correction provenance.
-- [`81309e9`](https://github.com/WsprryPi/WsprryPi/commit/81309e9f14b724a0ae2088c2ec9515304caef60d)
-  adopted 200 MHz RP1 planning. Later canonical-UAPI and native WTP work
-  (`f3314e355468c3d7394e653bccc2e04220701a92`,
-  `c01cd5c8d08fecf5478ec0d9024c215258ad7525`) retains that parent and composition.
-- `15e677e1c3b4435edff802b50f58a36cd747b603` hardened unusably small manual
-  values. Accepted #448 commits `a6c867fafc88bd1ed092552d159662c23be4f000`
-  and `91d7cdc614c7f0883ce62922668b1e4cbd4f1294` concern negotiated Pico
-  configuration updates/type validation, not a new calibration authority.
+Native/direct PPS RF calibration and alternative RP1 clock-parent evaluation
+are deferred beyond WsprryPi 4.0. RP1 output uses nominal 200 MHz `pll_sys`.
+The [release punchlist](Release%20Punchlist.md#saved-items) retains those scope
+decisions and their reopening criteria. Existing correction settings and
+backend ownership apply independently of those deferred features.
 
 ## Current capability and correction authority
 
@@ -59,8 +31,7 @@ GPIO inputs within +/-200 ppm; [serialization](../src/config_handler_serializati
 persists estimate enable, residual and manual separately. `Calibration.PPM`
 persists Si5351 reference calibration. [Form population](../WsprryPi-UI/data/site.js)
 uses these separate saved values; configuration saves do not persist a live
-estimate, intrinsic term or composed RF total. No migration/default/save path
-changes in this task.
+estimate, intrinsic term or composed RF total. Saved values retain these independent semantics.
 
 [Qualification constants](../src/system_clock_frequency_estimate.hpp) require
 three stable evaluations with spread <=0.1 ppm, at least three retained provider
@@ -70,11 +41,21 @@ These are evaluations, not proof of three distinct new PPS observations or a
 fixed observation duration. Reuse requires a previously qualified snapshot,
 with its reported age plus monotonic elapsed time since that qualification
 evaluation <=900 seconds; an old first observation cannot qualify itself.
-This is the implemented age arithmetic, not independently verified reference
-freshness: cached provider reports do not accrue age at consumption (F1 below).
-A current unavailable/converging sample can
-therefore still select the bounded stale correction; qualification and selected
-correction mode are different fields.
+These age gates are software policy, not independent verification of the
+physical reference. Missing, malformed or ambiguous selected-source age remains
+unknown. Snapshots carry a monotonic acquisition anchor and cached copies accrue
+elapsed age at consumption, including copies already aged by the component.
+The application rechecks age when selecting correction for future requests,
+including inbound WTP preparation. A current unavailable/converging sample can
+still select a previously qualified estimate within the bounded stale interval;
+qualification and selected correction mode are different fields.
+
+Provenance considers selected (`*`) and combined (`+`) source rows. Chrony mode
+`#` identifies a local reference; `^` and `=` identify network sources. Only a
+cross-kind combination is `Mixed`; unrecognized modes remain `Unknown`.
+Unselected PPS/GNSS rows and source names do not establish local provenance,
+reference lock or RF accuracy. See the
+[PPM-Manager contract](../src/PPM-Manager/README.md) for acquisition and parsing.
 
 Let `E` be the selected qualified/retained estimate, `R` the configured conducted
 residual, `M` fixed manual, `I` intrinsic, and `A` additional correction:
@@ -183,9 +164,8 @@ work, require:
    sessions. Separately authorize hardware/RF operation and verify safe stopping,
    output-off and cleanup. Frequency acceptance does not qualify power/spurs.
 
-No capture-path demonstration or new measurement was performed here. A demand
-to implement this before 4.0 would be a scope change, not an unfinished part of
-this decision task.
+A PPS-latched RF capture path and its measurement benefit remain unestablished.
+Implementation before 4.0 would change the selected release scope.
 
 ## RP1 parent disposition
 
@@ -204,9 +184,9 @@ For ancestry context, inspect Raspberry Pi's stock
 This is an upstream source snapshot, not an observation of an installed kernel.
 PLL cores derive from XOSC; `pll_sys` is an output of `pll_sys_core`.
 
-| Historical item | Disposition | Identity constraint for any future evaluation |
+| Clock path | Disposition | Identity constraint for any future evaluation |
 | --- | --- | --- |
-| `pll_sys` | **Implemented**, nominal 200 MHz; remove the stale future-feature classification. | Keep current provider identity, correction composition, ownership and set/restore contract. |
+| `pll_sys` | **Implemented**, nominal 200 MHz. | Keep current provider identity, correction composition, ownership and set/restore contract. |
 | `clk_i2s` | **Deferred alternative-parent evaluation** beyond 4.0. | A mux/divider with XOSC, audio-PLL and GP inputs; `CLK_SET_RATE_PARENT` can affect ancestors. No new nominal rate selected. |
 | `clk_adc` | **Deferred alternative-parent evaluation** beyond 4.0. | A mux/divider with XOSC/GP inputs in the pinned source; not an independent oscillator. No new nominal rate selected. |
 | `clk_sys` | **Deferred alternative-path evaluation** beyond 4.0. | A critical mux/divider which can derive from `pll_sys` or XOSC; a different path can share the same physical source. No new nominal rate selected. |
@@ -231,206 +211,28 @@ Those finite TONE observations do not establish all-board equivalence,
 corrected-output closure, temporal stability, GPIO4 evidence or current
 candidate qualification. History is retained by immutable links, not rewritten.
 
-## Source findings requiring separate runtime scope
+## Validation and documentation boundaries
 
-These remain open follow-ups; this documentation task does not repair them or
-infer a failure in a normally formed Chrony report.
-
-| Finding / severity | Source evidence and impact | Smallest next step and required verification |
-| --- | --- | --- |
-| F1 / P2: reported freshness can be overstated | [Parser lines 291-297](https://github.com/WsprryPi/WsprryPi/blob/6a39398bb23d69ba0628e1b82171717040115ec8/src/PPM-Manager/src/ppm_manager.cpp#L291-L297) leave age zero for missing/malformed selected-source age. Also, reports are cached between the 120-second provider updates; [consumption](../src/scheduling.cpp) reconstructs snapshot time as now minus reported age, and repeated successful evaluations reset the qualifier's last-qualified time without aging that cached report. Thus missing/invalid metadata can pass age gates and cached-report reuse can overstate reference freshness. | Separately approve preserving unknown/invalid age and carrying acquisition time so cached observations accrue age. Add parser-to-qualifier fixtures for absent/malformed/valid age, repeated cached consumption, elapsed expiry and bounded prior-qualified fallback; run on a safe Linux surface. |
-| F2 / P2: provenance can over-credit a local reference | [Parser lines 322-335](https://github.com/WsprryPi/WsprryPi/blob/6a39398bb23d69ba0628e1b82171717040115ec8/src/PPM-Manager/src/ppm_manager.cpp#L322-L335) search the entire `sources_csv` for PPS/GPS/GNSS/PHC substrings, even unselected rows; a selected network source plus an unselected PPS row can be labeled local. This affects attribution, not proof of physical lock. | Separately approve provenance derived from selected/combined source records with explicit unknowns. Verify selected-network/unselected-PPS, mixed and unknown fixtures; never infer lock/routing from text. |
-
-Neither finding establishes a requirement for native PPS. Their correction-path
-impact needs separate triage; completion of this scope decision does not close
-them or declare them repaired.
-
-## Documentation Impact
-
-- **Updated:** this maintainer decision, the two calibration entries in
-  [Release Punchlist](Release%20Punchlist.md), and the discovery link in
-  [release tools README](README.md). No application/component source changes.
-- **Considered unchanged:** WsprryPi-Docs
-  `docs/Advanced_Operations/ini_configuration/runtime.md` adds no new setting;
-  existing Chrony UTC, Si5351 independence and WTP no-host-correction guidance
-  remain applicable. `Experimental/rp1_gpio` is historical, not provider authority.
-- **Still required under separate cross-repository scope:** in
-  `docs/Advanced_Operations/timing_calibration.md`, distinguish additional from
-  intrinsic RF compensation, document residual/manual accounting and bounded
-  stale fallback even when current qualification is unavailable/converging, and
-  state that PPS through Chrony is host timing/estimate support, not direct RF
-  measurement. In `docs/Advanced_Operations/rp1_gpclk.md`, document the current
-  nominal 200 MHz parent and correction/default versus qualification boundary.
-  In `docs/User_Interface/Setup/Transmitter/index.md`, explain existing
-  candidate versus committed additional-only correction/provenance and link the
-  calibration guidance. Keep intrinsic/total internal; add no operator parent
-  selector or PPS control. Review any resulting rendered UI documentation with
-  Impeccable; replace screenshots only if materially inaccurate.
-
-## Validation and decision-review boundary
-
-Documentation-only validation runs on the local macOS host: source/history and
-link review, complete scoped diff review, and Git whitespace checks. No C++
-compilation, standalone component tests, integration suites, live Chrony query,
-sibling build/render or hardware operation is needed or claimed. The focused
-Makefile recipes and PPM-Manager fixed parser fixtures were inspected, not run;
-no available noncompeting Linux validation surface was assumed. Source findings
-F1/F2 are source assessments, not reproduced test failures.
-
-Executed documentation checks (macOS, no C++ semantics profile):
+The maintained software checks cover report parsing and aging, selected-source
+provenance, current/stale expiry, source loss/replacement, correction composition,
+fallback and persistence. From `src`, relevant entry points are:
 
 ```sh
-python3 /tmp/verify_calibration_scope.py
-git diff --check
-git diff --cached --check
-```
-
-The temporary checker validates local file/heading links, pinned repository
-objects and the intended two-row punchlist patch. All passed after repairs;
-the final staged diff must contain only the three named maintainer paths.
-`git fetch origin devel` passed with `git rev-list --left-right --count
-HEAD...origin/devel` reporting `0 0` before documentation work; no fast-forward
-was needed. Upstream ancestry evidence was pinned by `git ls-remote
-https://github.com/raspberrypi/linux.git refs/heads/rpi-6.12.y` and reading that
-exact revision's source. An initial sandbox DNS failure required a read-only
-network retry. A later Git refresh could not write restricted `.git/FETCH_HEAD`;
-its authorized retry passed. No hardware or system operation followed.
-
-### Adversarial assessment and repairs
-
-| Assessment finding | Required correction and verification |
-| --- | --- |
-| R1 / P2: saved `pll_sys` wording classified implemented behavior as future work. | Corrected only the two authorized saved rows; checked provider overlay, setup/execution and userspace planner at the pinned revisions. |
-| R2 / P2: first-draft stale-window wording could be read as a physical freshness guarantee. | Clarified reported-age/evaluation arithmetic and recorded the cached-report limitation in open F1; rechecked provider caching, scheduler consumption and qualifier reset paths. |
-| R3 / P3: scheduler provenance wording could imply inbound WTP uses those same status fields. | Limited that wording to local scheduling and distinguished inbound prepare-time freezing; rechecked receiving runtime and tone-engine preparation. |
-| R4 / P3: first draft lacked exact validation commands/results and line-specific parser evidence. | Added commands, honest skips and pinned parser links; reran link/scope and whitespace checks. |
-
-Reassessment after repairs found no actionable in-scope finding. It challenged
-UTC versus RF measurement, reference presence versus verified routing, XOSC
-history versus current 200 MHz, aliases/ancestry versus independent oscillators,
-nominal versus measured rate, product defaults versus board calibration,
-correction signs/ranges/double counting, candidate versus committed values,
-Si5351/WTP isolation, persistence/default behavior, optional scope, reopening
-criteria, missing evidence and unrelated changes. F1/F2 remain explicitly open
-runtime follow-ups. No software test or hardware success is inferred from this
-assessment.
-
-Runtime behavior, defaults, correction algorithms/signs, persistence, clock
-parents, provider lifecycle and accepted #448 work are unchanged by this task.
-The [RP1 publication dependency order](Release%20Punchlist.md#rp1-dependency-order),
-macOS deferral and Standard Feld post-4.0 scope remain unchanged. Independent
-route, mode, timing, installation/service, frequency, spectral and RF
-qualification and existing release gates remain outstanding. Settling scope
-does not establish release readiness.
-
-## Chrony report repairs
-
-The separately authorized October 15 follow-up repairs F1 and F2 in the existing
-Chrony correction path. The direct PPS and alternative-parent deferrals above
-remain unchanged. This is software validation, not calibrated RF evidence.
-
-- **F1 repaired:** absent/malformed age stays unknown; acquisition is anchored
-  before report collection with a monotonic clock. Cached snapshots accrue
-  elapsed age, including copies already aged by the component. The application
-  maps and qualifies that current age whenever selecting correction for future
-  requests, including inbound WTP preparation. Existing 300/900-second limits,
-  manual/zero fallback, intrinsic values, correction signs and persisted
-  settings are unchanged. Invalid or ambiguous selected-source identity cannot
-  establish freshness. Committed execution requests are not rewritten.
-- **F2 repaired:** provenance considers only selected/combined source records
-  and their Chrony modes (`#` local, `^`/`=` network). Network-only and local-only
-  combinations retain those identities; only a cross-kind combination is
-  `Mixed`, and unrecognized modes remain `Unknown`. Neither source names nor
-  unselected PPS/GNSS records establish reference provenance or lock.
-- **Related UI repair:** unknown/null, malformed and negative age displays
-  **age unknown** in the existing correction panel. Actual numeric zero remains
-  **age 0 s**. Candidate/committed presentation and additional-only reporting
-  retain their existing semantics.
-
-Implementation boundaries: reusable `src/PPM-Manager` owns report parsing,
-acquisition metadata and aging; parent `system_clock_frequency_estimate` owns
-mapping/qualification/fallback, and scheduling consumes it. The UI only fixes
-unknown-age normalization/display. No new calibration control, direct PPS,
-clock selection, correction algorithm, provider operation or configuration
-migration is introduced. The component README documents the additive C++ API;
-explicit timestamp arguments are transient deterministic test inputs.
-
-### Follow-up validation
-
-Initial tests used an isolated snapshot of
-`534328d7dd37955bc8dbc8d06e4310ac350b3d3b`; the final integration check uses
-`a5605c54630d501dc84b51ea7834f59768a250ef` plus this fix, preserving newly
-published WTP work and excluding unrelated uncommitted work. The Linux surface is a
-new disposable Docker container from
-`wsprrypi-issue412-qualification:debian-trixie` (image `6ceba8b34e64`), Debian
-13.6 ARM64 with GCC 14.2.0. It runs as UID 501 without network, capabilities or
-hardware-device mounts. No existing bench/container process was operated.
-
-Commands from the snapshot's `src` directory, with
-`WSPRRYPI_DISABLE_HARDWARE_ACCESS=1`, passed:
-
-```sh
-make -C PPM-Manager/src test -j2
-make -j2 gpio-frequency-correction-test chipset-offsets-test \
-  legacy-gpio-clock-model-test rp1-gpclk-planner-test SUDO=
-make -j2 calibration-roundtrip-test BACKENDS=simulated ANCILLARY_GPIO=0 SUDO=
+make -C PPM-Manager/src test
+make gpio-frequency-correction-test chipset-offsets-test SUDO=
+make calibration-roundtrip-test BACKENDS=simulated ANCILLARY_GPIO=0 SUDO=
 node ../WsprryPi-UI/tests/gpio_correction_provenance_test.js
-node --check ../WsprryPi-UI/data/site.js
 ```
 
-The new report-to-correction test runs under `gpio-frequency-correction-test`
-and therefore under existing semantics-suite callers. It covers malformed and
-missing age, cached consumption, exact current/stale limits and expiry, source
-loss/replacement, holdover identity and manual/zero fallback using controlled
-time. Standalone tests cover selected/combined source modes and ignored sources.
-The application integration uses the explicit simulated-only build profile;
-this is not a full semantics-suite pass. Its subnormal-manual-value warning is
-expected fixture output.
+Inspect the recipes and use a supported Linux build environment. These commands
+exercise software contracts; they do not qualify host-clock correlation with RF,
+reference routing/lock, target timing, services, installation, power or spectrum.
+No direct PPS control, clock-parent selector or automatic custom-value migration
+is provided by this scope decision.
 
-Initial source-archive builds lacked Git metadata, then Docker mount ownership
-prevented metadata generation. An isolated shallow Git metadata copy and a
-process-only `safe.directory=/work` resolved these limitations before the final
-application build/test passed; host Git configuration was not changed.
-
-Impeccable review used the established operation-panel markup, styles and
-renderer with qualified, bounded-stale and unknown-age/manual fixtures.
-Desktop/light (1440 by 1000) and mobile/dark (390 by 1400) screenshots were
-inspected; unknown age and unchanged committed fixture values remained legible
-without horizontal overflow. The detector's three existing literal-color
-findings elsewhere in `site.js` are outside this change and were not broadened
-into palette work. No UI assets or operator screenshots were replaced.
-
-### Follow-up adversarial review
-
-| Finding | Repair and verification |
-| --- | --- |
-| P2: ambiguous selected-source records could leave a misleading age/identity. | Require one nonempty selected-source identity; standalone malformed/duplicate/missing-selection fixtures reject freshness and attribution. |
-| P2: correction selection outside configuration refresh could reuse an old qualified candidate. | Recheck the aged provider whenever selecting correction for a future request, including inbound WTP. The production mapper-to-qualifier tests cover expiry/fallback, and the application integration compiles the scheduler wiring. Committed-request preservation is source-reviewed; no live execution is claimed. |
-| P2: UI numeric conversion turned JSON null into a fresh-looking zero. | Preserve unknown age and render it explicitly. UI regressions reject null, missing, malformed and negative age while accepting a real numeric zero; desktop/mobile fixtures verify the result. |
-
-Reassessment checks age anchoring/rebasing, monotonic expiry, holdover
-provenance, source composition, future versus committed correction,
-range/sign/default/persistence preservation and component boundaries.
-
-Negative controls in the disposable snapshot deliberately restored invalid-age
-zero, frozen cache age, unselected-PPS attribution and UI null-to-zero behavior.
-All four were rejected by regression assertions; restored source and affected
-tests passed. No mutation was applied to the working checkout. The final
-reassessment found no actionable in-scope finding.
-
-### Follow-up Documentation Impact
-
-- **Updated:** component README, this closure record and focused test/build
-  entry points; existing UI wording now represents unknown age accurately.
-- **Considered unchanged:** calibration settings, manual/residual accounting,
-  Si5351 and WTP calibration isolation, direct PPS deferral and RP1 parents.
-- **Still required in separately authorized WsprryPi-Docs work:**
-  `docs/Advanced_Operations/timing_calibration.md` should describe unknown age,
-  bounded prior-qualified reuse even when the current report is unavailable,
-  and selected/combined source provenance without implying verified lock.
-  `docs/User_Interface/Setup/Transmitter/index.md` should explain the existing
-  candidate/committed panel and unknown-age status. Earlier intrinsic/RP1
-  documentation follow-ups remain. That repository was inspected read-only.
-
-No local macOS C++ build, full suite, live Chrony query, service/installation
-change, device access or hardware/RF qualification was performed by this repair.
+The independent [operator manual](https://wsprry-pi.readthedocs.io/en/stable/)
+covers frequency calibration in `Advanced_Operations/timing_calibration.md`
+and RP1 operation in `Advanced_Operations/rp1_gpclk.md`.
+Its calibration guidance distinguishes intrinsic/additional accounting, bounded
+prior-qualified reuse, unknown age and candidate/committed values. The component
+and parent contracts above retain implementation detail and qualification limits.

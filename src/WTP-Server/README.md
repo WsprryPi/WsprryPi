@@ -19,7 +19,8 @@ timeout. These changes add no WTP operation or wire field.
 
 The component does not open a socket, select a Raspberry Pi backend, control
 hardware, or establish WsprryPi local-output arbitration. The parent
-application must supply those adapters before this can be a Pi WTP endpoint.
+application supplies those adapters through its
+[Pi endpoint integration](../../docs/wtp-pi-endpoint-contract.md).
 
 Build the standalone archive with `make -C src/WTP-Server`. The archive is
 separate from the WTP client library. Do not add the raw component sources to
