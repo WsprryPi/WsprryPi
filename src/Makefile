@@ -1539,6 +1539,10 @@ support-bundle-runtime-installer-test:
 installer-dependency-test:
 	$(Q)bash ../scripts/tests/installer_dependency_test.sh
 
+.PHONY: php2shell-test
+php2shell-test:
+	$(Q)python3 -B ../scripts/tests/php2shell_mitigate_test.py
+
 rp1-gpclk-dkms-installer-test:
 	$(Q)python3 ../scripts/tests/rp1_gpclk_dkms_install_test.py
 
