@@ -39,6 +39,8 @@ mode installs runtime libraries and inspection tools, omits application
 compilers and development headers, and skips application compilation and its
 swap preparation. Existing development packages are not removed.
 
+The normal APT handler installs Git, runtime packages and inspection tools before RP1 planning or artifact preparation. After artifact inspection identifies additional runtime packages, the same handler installs those packages without repeating the index refresh or dependency-repair transaction. Invalid artifacts can therefore be rejected after baseline dependencies have been installed; the installed executable remains unchanged.
+
 Executables built with DNS-SD support use the Avahi runtime libraries
 `libavahi-client3` and `libavahi-common3`. The installer includes
 `libavahi-client3`; its package dependencies provide `libavahi-common3`.

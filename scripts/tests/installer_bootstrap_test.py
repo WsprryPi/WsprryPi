@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import os
+import shutil
 import subprocess
 import tempfile
 import unittest
@@ -21,9 +22,7 @@ FIXTURE = r'''
 record() { printf '%s\n' "$1" >>"$EVENTS"; }
 for step in process_args enforce_sudo setup_log validate_depends validate_sys_accs \
     validate_env_vars check_bash check_sh_ver check_bitness check_release \
-    check_arch check_internet prepare_rp1_gpclk_dkms_installation start_script \
-    preflight_build_resources print_model_name print_system print_version \
-    display_compilation_resource_notes detect_apache_web_mode set_time \
+    check_arch check_internet set_time \
     validate_apache_web_availability capture_install_sem_ver remove_legacy_services \
     remove_legacy_files_and_dirs manage_exe manage_support_bundle_runtime \
     manage_pico_usb_runtime manage_route_application manage_config manage_i2c \
@@ -35,13 +34,38 @@ for step in process_args enforce_sudo setup_log validate_depends validate_sys_ac
 done
 logI() { :; }
 logE() { printf '[ERROR] %s\n' "$1" >&2; }
+logW() { printf '[WARN] %s\n' "$1" >&2; }
 warn() { printf '[WARN] %s\n' "$1" >&2; }
 sleep() { :; }
+start_script() { record confirmation; [[ "$FAIL_AT" != confirmation ]]; }
+preflight_build_resources() { record resources; [[ "$FAIL_AT" != resources ]]; }
+print_model_name() { record model-info; }
+print_system() { record system-info; }
+print_version() { record version-info; }
+display_compilation_resource_notes() { record parallelism-info; }
+detect_apache_web_mode() { record apache-mode; }
+rp1_gpclk_dkms_installation_selected() { [[ "$RP1_SELECTED" == true ]]; }
 prepare_rp1_gpclk_runtime_update() { record neutral-runtime; }
-handle_apt_packages() {
-    record packages
-    [[ "$FAIL_AT" != packages ]]
+resolve_libgpiod_runtime_pkg() { printf '%s\n' libgpiod-runtime-fixture; }
+apt-get() {
+    local IFS=' '
+    case "$*" in
+        update) record apt-update; [[ "$FAIL_AT" != apt-update ]];;
+        'install -f -y') record apt-repair; [[ "$FAIL_AT" != apt-repair ]];;
+        'install -y libprecompiled-fixture')
+            record precompiled-packages
+            [[ "$FAIL_AT" != precompiled-packages ]];;
+        'install -y '*)
+            [[ " $* " == *' git '* ]] || return 92
+            record packages
+            [[ "$FAIL_AT" != packages ]] || return 1
+            cp "$GIT_STUB" "$FIXTURE_BIN/git"
+            chmod 0755 "$FIXTURE_BIN/git"
+            ;;
+        *) return 93;;
+    esac
 }
+curl() { cp "$RP1_HELPER" "$RP1_GPCLK_DKMS_HELPER"; }
 validate_precompiled_runtime() { :; }
 validate_rp1_gpclk_build_dependencies() { record rp1-dependencies; }
 apply_rp1_gpclk_dkms_installation() { record provider; }
@@ -55,6 +79,7 @@ runuser() {
        "$9" == "$LOCAL_REPO_DIR" ]] || return 90
     record clone
     [[ "$FAIL_AT" != clone ]] || return 18
+    command -v git >/dev/null || return 94
     [[ ! -e "$LOCAL_REPO_DIR" ]] || return 91
     mkdir -p "$LOCAL_REPO_DIR/scripts"
     cp "$AGE_HELPER" "$LOCAL_REPO_DIR/scripts/support_bundle_age_dependency.sh"
@@ -71,8 +96,8 @@ HELPER
 prepare_precompiled_executable() {
     [[ "$BINARY_SOURCE" != build ]] || return 0
     [[ "$DRY_RUN" != true ]] || return 0
-    # Precompiled preparation already clones before resolving its packages.
-    git_clone "$@"
+    git_clone "$@" || return 1
+    BINARY_RUNTIME_PACKAGES=(libprecompiled-fixture)
 }
 if [[ "$EXISTING_CHECKOUT" == true ]]; then
     handle_execution_context() { IS_REPO=true; }
@@ -89,6 +114,32 @@ class InstallerBootstrapTest(unittest.TestCase):
         self.root = Path(self.temporary.name)
         self.checkout = self.root / "WsprryPi"
         self.events = self.root / "events"
+        self.bin = self.root / "bin"
+        self.bin.mkdir()
+        # Only these tools exist in the fixture PATH. Git is genuinely absent
+        # until the mocked APT transaction installs it; host Git cannot mask it.
+        for name in ("bash", "python3", "dirname", "basename", "realpath", "uname",
+                     "whoami", "tr", "sed", "grep", "awk", "cut", "cat", "cp",
+                     "chmod", "mkdir", "mktemp", "rm", "tail", "tee", "sleep", "stat"):
+            tool = shutil.which(name)
+            self.assertIsNotNone(tool, name)
+            (self.bin / name).symlink_to(tool)
+        self.git_stub = self.root / "git-stub"
+        self.git_stub.write_text('#!/bin/sh\n[ "$1" = --version ]\n', encoding="utf-8")
+        self.rp1_helper = self.root / "rp1-helper.py"
+        self.rp1_helper.write_text('''import os, subprocess, sys
+from pathlib import Path
+try:
+    subprocess.run(["git", "--version"], check=True, capture_output=True)
+except (OSError, subprocess.CalledProcessError):
+    print("RP1-GPCLK-DKMS operation refused: required command is unavailable: git", file=sys.stderr)
+    sys.exit(1)
+with Path(os.environ["EVENTS"]).open("a") as events:
+    events.write("rp1-plan\\n")
+if os.environ["FAIL_AT"] == "plan":
+    print("RP1-GPCLK-DKMS operation refused: fixture source rejected", file=sys.stderr)
+    sys.exit(17)
+''', encoding="utf-8")
         self.age_root = self.root / "age-root"
         (self.age_root / "usr/bin").mkdir(parents=True)
         for name in ("age", "age-keygen"):
@@ -104,6 +155,8 @@ class InstallerBootstrapTest(unittest.TestCase):
             FIXTURE_UID=str(os.getuid()), EVENTS=str(self.events), FAIL_AT="",
             EXISTING_CHECKOUT="false", BINARY_SOURCE="build", ACTION="install",
             DRY_RUN="false", REPO_BRANCH="main", NO_WEB="true",
+            PATH=str(self.bin), FIXTURE_BIN=str(self.bin), GIT_STUB=str(self.git_stub),
+            RP1_HELPER=str(self.rp1_helper), RP1_SELECTED="false",
         )
         environment.update(values)
         source = INSTALLER.read_text(encoding="utf-8")
@@ -129,7 +182,7 @@ class InstallerBootstrapTest(unittest.TestCase):
                 result = self.run_installer(USER_HOME=str(home), REPO_BRANCH=branch)
                 self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
                 self.assertEqual(self.recorded_events(), [
-                    "neutral-runtime", "packages", "clone", "age-validation",
+                    *self.package_events(), "neutral-runtime", "clone", "age-validation",
                     "rp1-dependencies", "provider", "application",
                 ])
                 self.assertIn("Complete: Validate support-bundle encryption tools.", result.stdout)
@@ -137,13 +190,13 @@ class InstallerBootstrapTest(unittest.TestCase):
     def test_clone_failure_stops_before_validation_and_provider_changes(self) -> None:
         result = self.run_installer(FAIL_AT="clone")
         self.assertNotEqual(result.returncode, 0)
-        self.assertEqual(self.recorded_events(), ["neutral-runtime", "packages", "clone"])
+        self.assertEqual(self.recorded_events(), [*self.package_events(), "neutral-runtime", "clone"])
         self.assertFalse(self.checkout.exists())
 
     def test_package_failure_does_not_clone_or_load_helper(self) -> None:
         result = self.run_installer(FAIL_AT="packages")
         self.assertNotEqual(result.returncode, 0)
-        self.assertEqual(self.recorded_events(), ["neutral-runtime", "packages"])
+        self.assertEqual(self.recorded_events(), self.package_events())
         self.assertFalse(self.checkout.exists())
 
     def test_unsafe_age_stops_before_provider_and_application_changes(self) -> None:
@@ -151,7 +204,7 @@ class InstallerBootstrapTest(unittest.TestCase):
         result = self.run_installer()
         self.assertNotEqual(result.returncode, 0)
         self.assertEqual(self.recorded_events(), [
-            "neutral-runtime", "packages", "clone", "age-validation",
+            *self.package_events(), "neutral-runtime", "clone", "age-validation",
         ])
         self.assertIn("Failed: Validate support-bundle encryption tools.", result.stdout)
 
@@ -167,7 +220,7 @@ class InstallerBootstrapTest(unittest.TestCase):
         result = self.run_installer(BINARY_SOURCE="local")
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertEqual(self.recorded_events(), [
-            "clone", "neutral-runtime", "packages", "age-validation",
+            *self.package_events(), "clone", "neutral-runtime", "precompiled-packages", "age-validation",
             "rp1-dependencies", "provider", "application",
         ])
 
@@ -187,6 +240,86 @@ support_bundle_validate_age_dependency() {
         self.assertNotIn("clone", self.recorded_events())
         self.assertIn("age-validation", self.recorded_events())
         self.assertIn("application", self.recorded_events())
+
+    @staticmethod
+    def package_events() -> list[str]:
+        return ["confirmation", "resources", "model-info", "system-info", "version-info",
+                "parallelism-info", "apache-mode", "apt-update", "apt-repair", "packages"]
+
+    def test_fresh_pi5_installs_git_before_rp1_planning(self) -> None:
+        self.assertIsNone(shutil.which("git", path=str(self.bin)))
+        result = self.run_installer(REPO_BRANCH="devel", RP1_SELECTED="true")
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(self.recorded_events(), [
+            *self.package_events(), "rp1-plan", "neutral-runtime", "clone", "age-validation",
+            "rp1-dependencies", "provider", "application",
+        ])
+
+    def test_package_failures_stop_before_rp1_planning(self) -> None:
+        for failure in ("apt-update", "apt-repair", "packages"):
+            with self.subTest(failure=failure):
+                self.events.unlink(missing_ok=True)
+                result = self.run_installer(FAIL_AT=failure, RP1_SELECTED="true")
+                self.assertNotEqual(result.returncode, 0)
+                self.assertNotIn("rp1-plan", self.recorded_events())
+                self.assertNotIn("provider", self.recorded_events())
+                self.assertNotIn("application", self.recorded_events())
+
+    def test_rejected_confirmation_or_resources_does_not_install_packages(self) -> None:
+        for failure in ("confirmation", "resources"):
+            with self.subTest(failure=failure):
+                self.events.unlink(missing_ok=True)
+                result = self.run_installer(FAIL_AT=failure, RP1_SELECTED="true")
+                self.assertNotEqual(result.returncode, 0)
+                self.assertNotIn("apt-update", self.recorded_events())
+                self.assertNotIn("rp1-plan", self.recorded_events())
+                self.assertFalse((self.bin / "git").exists())
+
+    def test_planning_failure_reports_helper_diagnostic_and_stops_installation(self) -> None:
+        result = self.run_installer(FAIL_AT="plan", RP1_SELECTED="true")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertEqual(self.recorded_events(), [*self.package_events(), "rp1-plan"])
+        self.assertIn("RP1-GPCLK-DKMS operation refused: fixture source rejected", result.stderr)
+        self.assertNotIn("before package mutation", result.stderr)
+
+    def test_pi5_dry_run_does_not_install_git_or_execute_the_planner(self) -> None:
+        result = self.run_installer(DRY_RUN="true", RP1_SELECTED="true")
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(self.recorded_events(), [
+            "confirmation", "resources", "model-info", "system-info", "version-info",
+            "parallelism-info", "apache-mode", "neutral-runtime",
+            "rp1-dependencies", "provider", "application",
+        ])
+        self.assertFalse((self.bin / "git").exists())
+        self.assertFalse(self.checkout.exists())
+
+    def test_precompiled_package_failure_stops_before_application_changes(self) -> None:
+        result = self.run_installer(BINARY_SOURCE="local", FAIL_AT="precompiled-packages")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertEqual(self.recorded_events(), [
+            *self.package_events(), "clone", "neutral-runtime", "precompiled-packages",
+        ])
+
+    def test_planning_failure_is_retained_in_the_real_installer_log(self) -> None:
+        log_file = self.root / "installer.log"
+        result = subprocess.run(
+            ["bash", "-c", r'''
+source "$INSTALLER"
+init_log() { :; }
+setup_log
+rp1_gpclk_dkms_installation_selected() { return 0; }
+python3() { printf 'RP1-GPCLK-DKMS operation refused: fixture source rejected\n' >&2; return 17; }
+if prepare_rp1_gpclk_dkms_installation; then exit 1; fi
+[[ -z "$RP1_GPCLK_DKMS_STATE_DIR" ]]
+'''],
+            env={**os.environ, "INSTALLER": str(INSTALLER), "LOG_FILE": str(log_file),
+                 "LOG_OUTPUT": "both", "LOG_LEVEL": "INFO", "TERM": "dumb", "COLUMNS": "200",
+                 "ACTION": "install", "DRY_RUN": "false"},
+            text=True, capture_output=True, timeout=30, check=False,
+        )
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        for output in (result.stdout, log_file.read_text(encoding="utf-8")):
+            self.assertIn("fixture source rejected", output)
 
 
 if __name__ == "__main__":

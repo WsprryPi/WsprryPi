@@ -2566,12 +2566,12 @@ cleanup_rp1_gpclk_dkms_state() {
 }
 
 # -----------------------------------------------------------------------------
-# @brief Resolve and validate the RP1-GPCLK-DKMS installation before mutation.
+# @brief Resolve and validate the RP1-GPCLK-DKMS installation before provider mutation.
 # @details Uses the checked-out helper when available. A streamed installer
 #          retrieves the helper from the exact WsprryPi source selector already
 #          chosen for this installer invocation. The helper enumerates and
 #          validates release metadata or resolves an immutable development
-#          source before any package-manager operation.
+#          source after APT dependencies and before provider/application changes.
 # -----------------------------------------------------------------------------
 prepare_rp1_gpclk_dkms_installation() {
     local debug
@@ -2626,10 +2626,15 @@ prepare_rp1_gpclk_dkms_installation() {
         prepare_args+=(--debug)
     fi
 
+    local failure_output_file=""
+    if [[ "$DRY_RUN" != "true" ]]; then
+        failure_output_file="$RP1_GPCLK_DKMS_STATE_DIR/prepare-output.log"
+    fi
     if ! EXEC_COMMAND_STATUS_MODE=info \
+        EXEC_COMMAND_FAILURE_OUTPUT_FILE="$failure_output_file" \
         exec_command "Resolve RP1-GPCLK-DKMS installation plan" \
         python3 "$RP1_GPCLK_DKMS_HELPER" "${prepare_args[@]}" "$debug"; then
-        warn "RP1-GPCLK-DKMS installation planning failed before package mutation."
+        warn "RP1-GPCLK-DKMS installation planning failed before provider or application installation."
         cleanup_rp1_gpclk_dkms_state
         return 1
     fi
@@ -2676,7 +2681,7 @@ apply_rp1_gpclk_dkms_installation() {
 }
 
 # -----------------------------------------------------------------------------
-# @brief Recover owned RP1 administration before package/provider mutation.
+# @brief Recover owned RP1 administration before provider/application mutation.
 # @details A repeat installation must not invalidate a completed activation
 #          journal by replacing or restarting WsprryPi first. The helper
 #          performs only the provider's digest-reviewed recovery transaction;
@@ -5687,6 +5692,17 @@ handle_apt_packages() {
     local error_count=0
     local runtime_pkg=""
     local packages_to_install=()
+
+    # Artifact inspection discovers additional libraries only after Git and
+    # binutils are available. Reuse this package handler without repeating the
+    # index refresh or dependency-repair transaction.
+    if [[ "${1:-}" == "precompiled-runtime" ]]; then
+        [[ "$BINARY_SOURCE" != "build" ]] || return 1
+        (( ${#BINARY_RUNTIME_PACKAGES[@]} > 0 )) || return 0
+        exec_command "Install precompiled runtime packages" apt-get install -y \
+            "${BINARY_RUNTIME_PACKAGES[@]}" "$debug"
+        return "$?"
+    fi
 
     # Update package list and fix broken installs
     if ! exec_command "Update local package index" apt-get update "$debug"; then
@@ -9962,21 +9978,13 @@ _main() {
     check_arch "$debug"        # Validate Raspberry Pi model compatibility
     check_internet "$debug"    # Verify internet connectivity if required
 
-    # Resolve the independently owned RP1 provider before any package-manager
-    # mutation. Automatic selection skips non-Pi-5/unknown systems, while an
-    # explicit true request is only an installation override.
-    if [[ "$ACTION" != "uninstall" ]]; then
-        prepare_rp1_gpclk_dkms_installation "$debug" || return 1
-    fi
-
     # Start the script
-    start_script "$debug"
+    start_script "$debug" || return 1
 
     # The operator has confirmed the install; enforce build resources before
     # any package, service, or compilation mutation begins.
     if [[ "$ACTION" != "uninstall" ]]; then
         preflight_build_resources "$debug" || return 1
-        prepare_precompiled_executable "$debug" || return 1
     fi
 
     # Print/display the environment
@@ -9993,11 +10001,17 @@ _main() {
         detect_apache_web_mode "$debug"
     fi
 
-    # Prepare an owned runtime, then install and validate dependencies.
+    # Use the ordinary APT closure before source planning or artifact inspection:
+    # both the RP1 planner and precompiled preparation require Git on fresh Pis.
     if [[ "$ACTION" != "uninstall" ]]; then
         logI "Updating and managing required packages (this may take a few minutes)."
-        prepare_rp1_gpclk_runtime_update "$debug" || return 1
         handle_apt_packages "$debug" || return 1
+        prepare_rp1_gpclk_dkms_installation "$debug" || return 1
+        prepare_precompiled_executable "$debug" || return 1
+        prepare_rp1_gpclk_runtime_update "$debug" || return 1
+        if [[ "$BINARY_SOURCE" != "build" ]]; then
+            handle_apt_packages precompiled-runtime "$debug" || return 1
+        fi
         # Source builds need the checkout before loading its validation helper.
         # Precompiled preparation has already cloned the selected source.
         if [[ "$BINARY_SOURCE" == "build" ]]; then

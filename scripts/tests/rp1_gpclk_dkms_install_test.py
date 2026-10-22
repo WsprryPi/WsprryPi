@@ -2126,7 +2126,7 @@ remove_owned_rp1_gpclk_dkms_provider debug
         self.assertNotRegex(helper_source, r'\["(?:dtoverlay|modprobe|insmod|rmmod|systemctl|service|reboot|shutdown)"')
         self.assertNotRegex(helper_source, r"config\.txt[^\n]*(?:write|replace|unlink)")
 
-    def test_prepare_precedes_packages_and_runtime_recovery_precedes_apply(self):
+    def test_packages_precede_planning_and_runtime_recovery_precedes_apply(self):
         source = (ROOT / "scripts/install.sh").read_text()
         prepare = source.index('prepare_rp1_gpclk_dkms_installation "$debug" || return 1')
         packages = source.index('handle_apt_packages "$debug" || return 1')
@@ -2137,10 +2137,13 @@ remove_owned_rp1_gpclk_dkms_provider debug
             'logI "Updating and managing required packages (this may take a few minutes)."'
         )
         application = source.index('manage_wsprry_pi "$debug"')
+        self.assertLess(source.index('print_version "$debug"'), package_notice)
+        self.assertLess(source.index('display_compilation_resource_notes "$debug"'), package_notice)
+        self.assertLess(source.index('detect_apache_web_mode "$debug"'), package_notice)
+        self.assertLess(package_notice, packages)
+        self.assertLess(packages, prepare)
         self.assertLess(prepare, update)
-        self.assertLess(package_notice, update)
-        self.assertLess(update, packages)
-        self.assertLess(packages, dependencies)
+        self.assertLess(update, dependencies)
         self.assertLess(dependencies, apply)
         self.assertLess(update, application)
         group = source[source.index("local install_group=("):]

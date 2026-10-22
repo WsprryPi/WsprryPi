@@ -66,6 +66,8 @@ non-Pi-5 systems or when `INSTALL_RP1_GPCLK_DKMS=false`. `build-essential` and
 `python3` remain ordinary WsprryPi installer prerequisites on every supported
 platform.
 
+The installer reports the environment, build resources and Apache mode before running its normal APT dependency handler. These packages, including Git, are installed before RP1 source planning. RP1 planning and runtime recovery must then succeed before provider installation or application replacement. A planning failure can leave updated dependency packages installed; it does not replace the application or install the RP1 provider.
+
 Examples:
 
 ```sh
@@ -111,7 +113,7 @@ exactly one Debian package plus `SHA256SUMS` and
 
 The installer validates authoritative asset URLs, GitHub asset digests when
 present, tag resolution, the checksum file, manifest consistency, Debian control identity, safe archive paths and
-symlinks, complete package inventory, and UAPI identity before package-manager
+symlinks, complete package inventory, and UAPI identity before provider package-manager
 mutation. If the highest selected release is corrupt, validation stops; an
 older release is not silently substituted. Historical releases without this
 manifest are not eligible.
@@ -189,8 +191,8 @@ WsprryPi v2 ownership record, a repeated installation may enter the same bound
 deployment and recovery workflow; it does not treat that partial state as a
 foreign installation or publish v3 readiness before final neutral proof.
 The selected immutable source must advertise `rp1-gpclk-runtime-update-v1`
-during read-only source resolution, before package, application, or provider
-mutation. An unsupported source fails with an instruction to select a compatible
+during read-only source resolution, after APT dependencies but before application
+or provider mutation. An unsupported source fails with an instruction to select a compatible
 provider. Release installations therefore require a provider release containing
 this interface; development installations still resolve their explicit selection
 to an exact commit.
@@ -211,7 +213,7 @@ Foreign state and changed ownership remain refusals.
 
 ## Plan, record, and safety boundary
 
-Before package mutation a real installation displays the WsprryPi channel,
+After APT dependencies and before provider mutation, RP1 planning resolves the WsprryPi channel,
 detected platform, selection reason and override state, requested and resolved
 source, immutable tag or commit, version and expected hashes, lifecycle command
 class, and the output-disabled boundary. With `DRY_RUN=true`, the standard
@@ -220,7 +222,7 @@ and the application command as a skipped execution item. It does not invoke
 Python, download or clone provider inputs, run upstream preflight, inspect a
 package, or mutate provider state. Debug mode shows the exact helper command.
 During a real run, the command wrapper owns the status display and suppresses
-ordinary helper output. If provider apply fails, its last 20 output lines,
+ordinary helper output. If planning or provider apply fails, its last 20 output lines,
 bounded to 16 KiB and stripped of terminal-control bytes, are copied into the
 console report and retained installer log before temporary planning state is
 removed. The same bounded diagnostic capture applies to pre-update runtime
@@ -239,7 +241,7 @@ upstream evidence, rollback record, and captured upstream rollback entrypoint.
 Failed provider installs and dry runs create no ownership record. A stale record
 blocks a new provider installation rather than being overwritten.
 
-Before package mutation or provider verification, and before replacing application
+Before provider package mutation or provider verification, and before replacing application
 files or restarting the service, WsprryPi requests provider update preparation.
 The same workflow applies whether the selected source is unchanged or newer.
 

@@ -220,14 +220,15 @@ if ! awk '
 fi
 
 if ! awk '
+    /prepare_rp1_gpclk_dkms_installation "\$debug" \|\| return 1/ { planning = NR }
     /prepare_rp1_gpclk_runtime_update "\$debug" \|\| return 1/ { recovery = NR }
     /handle_apt_packages "\$debug" \|\| return 1/ { packages = NR }
     /validate_support_bundle_age_dependency "\$debug" \|\| return 1/ { age = NR }
     /validate_rp1_gpclk_build_dependencies "\$debug" \|\| return 1/ { rp1 = NR }
     /apply_rp1_gpclk_dkms_installation "\$debug" \|\| return 1/ { apply = NR }
-    END { exit(recovery > 0 && packages > recovery && age > packages && rp1 > age && apply > rp1 ? 0 : 1) }
+    END { exit(packages > 0 && planning > packages && recovery > planning && age > recovery && rp1 > age && apply > rp1 ? 0 : 1) }
 ' "$INSTALLER"; then
-    echo "RP1 runtime recovery must precede package mutation and provider apply" >&2
+    echo "APT dependencies must precede RP1 planning; recovery and dependency validation must precede provider apply" >&2
     exit 1
 fi
 
