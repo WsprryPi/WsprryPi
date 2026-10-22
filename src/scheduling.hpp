@@ -40,13 +40,10 @@
 #define _SCHEDULING_HPP
 
 // Project headers
-#include "config_types.hpp"
+#include "arg_parser.hpp"
 #include "ppm_manager.hpp"
-#include "system_clock_frequency_estimate.hpp"
 #include "transmission_request.hpp"
-#include "transmission_backend.hpp"
 #include "wspr_transmit_types.hpp"
-#include "test_tone_types.hpp"
 
 // Standard library headers
 #include <atomic>
@@ -54,14 +51,11 @@
 #include <cstddef>
 #include <cstdint>
 #include <condition_variable>
-#include <functional>
 #include <optional>
 #include <string>
 #include <string_view>
 #include <thread>
 #include <vector>
-
-#include "WSPR-Transmitter/src/rp1_gpclk_application_idle.hpp"
 
 /**
  * @brief Mutex to protect access to the shutdown flag for the WSPR loop.
@@ -107,9 +101,6 @@ extern bool exitwspr_ready;
  */
 extern std::atomic<bool> shutdown_flag;
 extern std::atomic<bool> reboot_flag;
-void set_rp1_route_transaction_inhibited(bool inhibited) noexcept;
-bool rp1_route_transaction_inhibited_state() noexcept;
-wsprrypi::Rp1GpclkApplicationIdleState rp1_gpclk_application_idle_state() noexcept;
 
 /**
  * @brief Callback triggered by a shutdown GPIO event.
@@ -207,55 +198,17 @@ bool ppm_init();
  * directly. This is transient runtime behavior; it does not persist tone mode
  * or frequency into configuration files.
  */
-using TestToneFrequencySource = TestToneRequestSource;
-using TestToneRequest = ParsedTestToneRequest;
-
-// Lifecycle transactions serialize in the scheduler. Worker callbacks only
-// publish generation-fenced observations and never acquire this mutex.
-std::recursive_mutex &test_tone_lifecycle_mutex();
-struct TestToneStatus
-{
-    std::uint64_t generation = 0;
-    std::uint64_t revision = 0;
-    bool owned = false;
-    std::string state = "idle";
-    std::string message;
-    std::string restoration = "none";
-};
-TestToneStatus current_test_tone_status();
-void reconcile_test_tone_runtime();
-void record_test_tone_event(std::uint64_t generation,
-                           WsprTransmissionCallbackEvent event,
-                           const std::string &message);
-using TestToneLifecycleHook = std::function<void(std::string_view)>;
-void set_test_tone_lifecycle_hook_for_test(TestToneLifecycleHook hook);
-
 struct TestToneStartResult
 {
-    TestToneStatus lifecycle;
     bool started = false;
     bool already_active = false;
     bool blocked_by_active_transmission = false;
     bool blocked_by_enabled_transmission = false;
-    TestToneFrequencySource source = TestToneFrequencySource::LegacyDefault;
-    std::string band;
-    std::uint64_t dial_frequency_hz = 0;
-    std::uint64_t audio_offset_hz = 0;
-    std::uint64_t actual_rf_frequency_hz = 0;
-    WsprBandResolutionSource resolution_source =
-        WsprBandResolutionSource::BuiltInPreset;
-    std::optional<std::string> preset;
-    bool selector_gpio_enabled = false;
-    int selector_gpio = -1;
-    bool selector_gpio_active_high = false;
-    // Host cleanup deadline only; the committed RF duration remains unchanged.
-    std::optional<std::chrono::nanoseconds> bounded_cleanup_delay;
     std::string message;
 };
 
 TestToneStartResult start_test_tone(
     std::optional<std::uint64_t> frequency_hz_override = std::nullopt);
-TestToneStartResult start_test_tone(const TestToneRequest &request);
 
 /**
  * @brief End the transient runtime test tone and restore prior flow.
@@ -267,9 +220,6 @@ TestToneStartResult start_test_tone(const TestToneRequest &request);
  */
 struct TestToneStopResult
 {
-    TestToneStatus lifecycle;
-    bool restoration_failed = false;
-    bool output_inactive = false;
     bool stopped = false;
     bool tone_was_active = false;
     bool scheduler_restored = false;
@@ -277,10 +227,7 @@ struct TestToneStopResult
     std::string message;
 };
 
-enum class TestToneEndPolicy { RestorePrevious, Quiesce };
-TestToneStopResult end_test_tone(
-    std::uint64_t expected_generation = 0,
-    TestToneEndPolicy policy = TestToneEndPolicy::RestorePrevious);
+TestToneStopResult end_test_tone();
 
 /**
  * @brief Run the main orchestration loop.
@@ -288,7 +235,7 @@ TestToneStopResult end_test_tone(
  * @details
  * Coordinates all core runtime components:
  * - Validates startup configuration.
- * - Initializes optional system-clock frequency-estimate correction.
+ * - Initializes optional NTP/PPM drift correction.
  * - Starts the TCP command server and sets its priority.
  * - Commits the initial execution request for WSPR or direct tone.
  * - Launches the transmitter using only committed requests.
@@ -301,16 +248,18 @@ extern bool wspr_loop();
 /**
  * @brief Synchronize disk and reboot the machine.
  *
- * On Linux this flushes filesystem buffers and invokes reboot(2) directly.
- * Unsupported platforms log a diagnostic and leave the machine running.
+ * This function calls sync() to flush filesystem buffers, then
+ * invokes the reboot(2) syscall directly. The process must have
+ * the CAP_SYS_BOOT capability (typically run as root).
  */
 void reboot_machine();
 
 /**
  * @brief Flush filesystems and power off the machine.
  *
- * On Linux this flushes filesystem buffers and invokes reboot(2) directly.
- * Unsupported platforms log a diagnostic and leave the machine running.
+ * Calls sync() to ensure all disk buffers are written, then invokes
+ * the reboot(2) syscall with the POWER_OFF command. Requires root or
+ * the CAP_SYS_BOOT capability.
  */
 void shutdown_machine();
 
@@ -351,7 +300,6 @@ struct WsprRuntimeStatusSnapshot
 {
     std::string tx_state;
     std::string runtime_mode;
-    std::string transmit_backend;
     std::string next_transmission_at;
     double frequency_hz = 0.0;
     double offset_hz = 0.0;
@@ -371,55 +319,14 @@ struct WsprRuntimeStatusSnapshot
     std::string frame_locator;
     std::string cw_message;
     int cw_active_char_index = -1;
-    std::string frequency_estimate_qualification;
-    std::string frequency_estimate_provider;
-    std::string frequency_estimate_provenance;
-    std::string frequency_correction_mode;
-    std::string frequency_estimate_reason;
-    double frequency_estimate_ppm = 0.0;
-    bool frequency_estimate_ppm_available = false;
-    double gpio_frequency_residual_ppm = 0.0;
-    double effective_gpio_ppm = 0.0;
-    double additional_gpio_ppm = 0.0; // Operator-facing correction, excluding chipset compensation.
-    double frequency_estimate_age_seconds = 0.0;
-    struct GpioCorrectionProvenance
-    {
-        bool available = false;
-        bool active = false;
-        std::string processor_profile;
-        std::string selected_parent;
-        double nominal_rate_hz = 0.0;
-        double intrinsic_ppm = 0.0;
-        double selected_component_ppm = 0.0;
-        double conducted_residual_ppm = 0.0;
-        double final_ppm = 0.0;
-        double additional_ppm = 0.0;
-        std::string correction_mode;
-        std::string provider_name;
-        std::string provider_source_signature;
-        std::string provider_snapshot_time;
-        std::string execution_identity;
-    };
-    GpioCorrectionProvenance gpio_correction_candidate;
-    GpioCorrectionProvenance gpio_correction_committed;
-    std::string rp1_route_requested;
-    std::string rp1_route_persisted;
-    std::string rp1_route_configured;
-    std::string rp1_route_active;
-    std::string rp1_eligibility;
-    std::string rp1_cleanup_state;
-    std::string rp1_journal_state;
 };
 
 WsprRuntimeStatusSnapshot current_tx_runtime_status_snapshot();
 
-// Freeze the same additional GPIO correction used by local requests.
-GpioFrequencyCorrection gpio_frequency_correction_for_request(const ArgParserConfig&);
-
 /**
  * @brief Apply updated transmission parameters and reinitialize DMA.
  *
- * Retrieves the current system-clock frequency estimate when enabled, captures
+ * Retrieves the current PPM value if NTP calibration is enabled, captures
  * the latest configuration settings, and reconfigures the WSPR transmitter
  * with the specified frequency and parameters.
  *
@@ -498,32 +405,7 @@ TransmissionRequest current_transmission_request_for_test();
 void set_current_transmission_request_for_test(
     const TransmissionRequest &request) noexcept;
 std::optional<wsprrypi::TransmissionRequest> current_controller_request_for_test();
-wsprrypi::TransmissionRequest controller_request_from_legacy_for_test(
-    const TransmissionRequest &request,
-    wsprrypi::TransmissionMode mode);
 void reset_current_transmission_request_for_test() noexcept;
-void set_current_frequency_estimate_for_test(
-    const SystemClockFrequencyEstimate &estimate);
 void reset_current_controller_request_for_test() noexcept;
-using TestToneCommitInvokerForTest = std::function<void()>;
-void set_test_tone_commit_invoker_for_test(TestToneCommitInvokerForTest invoker);
-void reset_test_tone_commit_invoker_for_test() noexcept;
-
-using DirectToneStartInvokerForTest = std::function<void()>;
-void set_direct_tone_start_invoker_for_test(DirectToneStartInvokerForTest invoker);
-void reset_direct_tone_start_invoker_for_test() noexcept;
-bool start_direct_tone_execution_for_test(
-    const ArgParserConfig &cfg,
-    const WsprFrequencyEntry &entry,
-    double actual_rf_frequency_hz,
-    std::string *error_message = nullptr);
-
-using StartupQuiesceInvokerForTest =
-    std::function<wsprrypi::StartupQuiesceResult()>;
-void set_startup_quiesce_invoker_for_test(StartupQuiesceInvokerForTest invoker);
-void reset_startup_quiesce_for_test() noexcept;
-bool run_startup_quiesce_gate_for_test(const ArgParserConfig &cfg);
-bool startup_quiesce_inhibited_for_test() noexcept;
-std::string startup_quiesce_error_for_test();
 
 #endif // _SCHEDULING_HPP

@@ -16,10 +16,3 @@
 *.jpg binary
 *.pdf binary
 *.ico binary
-
-# Unified diff syntax includes context-marker spaces that are not file defects.
-tools/rp1_gpclk_provider/kernel/*.patch -whitespace
-
-# These imported Markdown files intentionally use two-space hard line breaks.
-WsprryPi-UI/API_syslog.md whitespace=-trailing-space
-WsprryPi-UI/DESIGN.md whitespace=-trailing-space

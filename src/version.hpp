@@ -93,12 +93,6 @@ extern std::string get_exe_commit();
  */
 extern std::string get_exe_build_dirty();
 
-/** Return the canonical comma-separated transmission backends in this build. */
-extern std::string get_compiled_backends();
-
-/** Return whether ancillary libgpiod controls are compiled into this build. */
-extern bool has_ancillary_gpio() noexcept;
-
 /**
  * @brief Retrieves the current debug state based on the build configuration.
  *
@@ -141,14 +135,10 @@ extern std::string get_debug_state();
  */
 extern std::string get_pi_model();
 int get_raspberry_pi_generation();
-void set_hardware_platform_detection_enabled(bool enabled) noexcept;
 bool platform_supports_gpio_clock_transmission(
     std::string *error_message = nullptr);
-bool operator_exposes_rp1_gpio() noexcept;
 void set_raspberry_pi_generation_override_for_test(int generation) noexcept;
 void clear_raspberry_pi_generation_override_for_test() noexcept;
-void set_rp1_gpclk_provider_available_override_for_test(bool available) noexcept;
-void clear_rp1_gpclk_provider_available_override_for_test() noexcept;
 
 /**
  * @brief Return the operating system version name.

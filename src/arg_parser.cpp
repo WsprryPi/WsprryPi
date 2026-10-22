@@ -28,17 +28,16 @@
 
 // Primary header for this source file
 #include "arg_parser.hpp"
-#include "arg_parser_internal.hpp"
 
 // Project headers
 #include "config_handler.hpp"
+#include "gpio_input.hpp"
+#include "gpio_output.hpp"
 #include "logging.hpp"
-#include "privileged_network_runtime.hpp"
 #include "scheduling.hpp"
 #include "signal_handler.hpp"
-#include "system_clock_frequency_estimate.hpp"
-#include "band_lookup.hpp"
-#include "version.hpp"
+#include "wspr_band_lookup.hpp"
+#include "wspr_transmit.hpp"
 
 // Standard library headers
 #include <algorithm>
@@ -46,19 +45,18 @@
 #include <cctype>
 #include <cmath>
 #include <cstring>
+#include <iomanip>
 #include <mutex>
 #include <optional>
 #include <regex>
 #include <sstream>
 #include <stdexcept>
-#include <charconv>
 #include <string>
 #include <utility>
 #include <vector>
 
 // System headers
 #include <getopt.h>
-#include <sched.h>
 
 /**
  * @brief Global instance of the MonitorFile for INI file change detection.
@@ -78,9 +76,9 @@
 MonitorFile iniMonitor;
 
 /**
- * @brief Instance of BandLookup.
+ * @brief Instance of WSPRBandLookup.
  *
- * This instance of BandLookup is used to translate frequency representations:
+ * This instance of WSPRBandLookup is used to translate frequency representations:
  * - Converts from a short-hand (Hx) to a higher order (e.g., MHz) and vice versa.
  * - Validates frequency values.
  * - Translates terms (e.g., "20m") into a valid WSPR frequency.
@@ -88,7 +86,7 @@ MonitorFile iniMonitor;
  * Use this instance for any operations requiring frequency conversions and validation
  * within the WSPR system.
  */
-BandLookup lookup;
+WSPRBandLookup lookup;
 
 /**
  * @brief Semaphore indicating a pending INI file reload.
@@ -110,7 +108,7 @@ BandLookup lookup;
 std::atomic<bool> ini_reload_pending(false);
 std::atomic<std::uint64_t> ini_reload_generation(0);
 static std::atomic<bool> startup_config_handoff_ready{false};
-std::atomic<bool> startup_diagnostic_deferral_enabled{false};
+static std::atomic<bool> startup_diagnostic_deferral_enabled{false};
 static std::mutex deferred_startup_diagnostics_mtx;
 
 struct DeferredStartupDiagnostic
@@ -229,7 +227,7 @@ namespace
     static std::string get_wspr_gpio_suffix_for_entry(
         const WsprFrequencyEntry &entry,
         const ArgParserConfig &config,
-        BandLookup &lookup)
+        WSPRBandLookup &lookup)
     {
         int gpio = kSelectorGpioUnset;
         bool active_high = false;
@@ -254,33 +252,7 @@ namespace
 
 } // namespace
 
-bool arg_parser_internal::persisted_qrss_config_available(
-    const ArgParserConfig &cfg) noexcept
-{
-    return ::persisted_qrss_config_available(cfg);
-}
-
-bool arg_parser_internal::persisted_fskcw_config_available(
-    const ArgParserConfig &cfg) noexcept
-{
-    return ::persisted_fskcw_config_available(cfg);
-}
-
-bool arg_parser_internal::persisted_dfcw_config_available(
-    const ArgParserConfig &cfg) noexcept
-{
-    return ::persisted_dfcw_config_available(cfg);
-}
-
-std::string arg_parser_internal::get_wspr_gpio_suffix_for_entry(
-    const WsprFrequencyEntry &entry,
-    const ArgParserConfig &config,
-    BandLookup &lookup)
-{
-    return ::get_wspr_gpio_suffix_for_entry(entry, config, lookup);
-}
-
-void defer_startup_diagnostic(LogLevel level, std::string message)
+static void defer_startup_diagnostic(LogLevel level, std::string message)
 {
     std::lock_guard<std::mutex> lock(deferred_startup_diagnostics_mtx);
     deferred_startup_diagnostics.push_back(
@@ -310,6 +282,20 @@ void emit_deferred_startup_diagnostics()
 void set_startup_diagnostic_deferral(bool enabled) noexcept
 {
     startup_diagnostic_deferral_enabled.store(enabled, std::memory_order_release);
+}
+
+template <typename... Args>
+void log_startup_config_message(LogLevel level, Args &&...args)
+{
+    if (startup_diagnostic_deferral_enabled.load(std::memory_order_acquire))
+    {
+        std::ostringstream oss;
+        (oss << ... << args);
+        defer_startup_diagnostic(level, oss.str());
+        return;
+    }
+
+    llog.logS(level, std::forward<Args>(args)...);
 }
 
 /**
@@ -356,17 +342,6 @@ void callback_ini_changed()
     (void)set_config(true);
 }
 
-void start_runtime_config_monitor(const std::string &filename)
-{
-    iniMonitor.filemon(filename, callback_ini_changed);
-    iniMonitor.setPriority(SCHED_RR, 10);
-}
-
-void stop_runtime_config_monitor() noexcept
-{
-    iniMonitor.stop();
-}
-
 static void normalize_wspr_callsign(std::string &callsign)
 {
     std::transform(callsign.begin(), callsign.end(), callsign.begin(), ::toupper);
@@ -396,135 +371,6 @@ static std::string transmit_gpio_validation_message()
     return oss.str();
 }
 
-static bool validate_pi_io_gpio_assignments(
-    const ArgParserConfig &candidate,
-    std::string *error_message)
-{
-    struct ReservedAssignment
-    {
-        int gpio;
-        const char *label;
-    };
-
-    std::vector<ReservedAssignment> reserved_assignments;
-    if (candidate.use_led && candidate.led_pin >= 0)
-    {
-        reserved_assignments.push_back({candidate.led_pin, "Transmit LED"});
-    }
-    if (candidate.use_shutdown && candidate.shutdown_pin >= 0)
-    {
-        reserved_assignments.push_back({candidate.shutdown_pin, "Shutdown Button"});
-    }
-    if (candidate.use_amp && candidate.amp_pin >= 0)
-    {
-        reserved_assignments.push_back({candidate.amp_pin, "Amp Control"});
-    }
-
-    const bool gpio_rf_output_reserved =
-        transmit_backend_uses_gpio_output(candidate.transmit_backend) &&
-        is_supported_transmit_gpio(candidate.gpio_tx_pin);
-
-    if (gpio_rf_output_reserved)
-    {
-        for (const ReservedAssignment &reserved : reserved_assignments)
-        {
-            if (reserved.gpio != candidate.gpio_tx_pin)
-            {
-                continue;
-            }
-
-            if (error_message != nullptr)
-            {
-                *error_message = "GPIO" + std::to_string(candidate.gpio_tx_pin) +
-                                 " is reserved by GPIO RF Output.";
-            }
-            return false;
-        }
-    }
-
-    for (std::size_t i = 0; i < reserved_assignments.size(); ++i)
-    {
-        for (std::size_t j = i + 1; j < reserved_assignments.size(); ++j)
-        {
-            if (reserved_assignments[i].gpio != reserved_assignments[j].gpio)
-            {
-                continue;
-            }
-
-            if (error_message != nullptr)
-            {
-                *error_message =
-                    "GPIO" + std::to_string(reserved_assignments[i].gpio) +
-                    " is assigned to both " + reserved_assignments[i].label +
-                    " and " + reserved_assignments[j].label + ".";
-            }
-            return false;
-        }
-    }
-
-    for (const BandGPIOConfig &band_config : candidate.band_gpio)
-    {
-        if (!band_config.enabled || band_config.gpio < 0)
-        {
-            continue;
-        }
-
-        if (gpio_rf_output_reserved && band_config.gpio == candidate.gpio_tx_pin)
-        {
-            if (error_message != nullptr)
-            {
-                *error_message = "GPIO" + std::to_string(band_config.gpio) +
-                                 " is reserved by GPIO RF Output.";
-            }
-            return false;
-        }
-
-        for (const ReservedAssignment &reserved : reserved_assignments)
-        {
-            if (band_config.gpio != reserved.gpio)
-            {
-                continue;
-            }
-
-            if (error_message != nullptr)
-            {
-                *error_message = "GPIO" + std::to_string(band_config.gpio) +
-                                 " is reserved by " + reserved.label + ".";
-            }
-            return false;
-        }
-    }
-
-    for (std::size_t i = 0; i < candidate.band_gpio.size(); ++i)
-    {
-        const BandGPIOConfig &first = candidate.band_gpio[i];
-        if (!first.enabled || first.gpio < 0)
-        {
-            continue;
-        }
-
-        for (std::size_t j = i + 1; j < candidate.band_gpio.size(); ++j)
-        {
-            const BandGPIOConfig &second = candidate.band_gpio[j];
-            if (!second.enabled || second.gpio != first.gpio ||
-                second.active_high == first.active_high)
-            {
-                continue;
-            }
-
-            if (error_message != nullptr)
-            {
-                *error_message = "Bands sharing GPIO" +
-                                 std::to_string(first.gpio) +
-                                 " must use the same Active High setting.";
-            }
-            return false;
-        }
-    }
-
-    return true;
-}
-
 bool backend_ready_for_transmission(
     const ArgParserConfig &candidate,
     std::string *error_message)
@@ -532,11 +378,6 @@ bool backend_ready_for_transmission(
     if (candidate.transmit_backend == TransmitBackendKind::GPIO)
     {
         return platform_supports_gpio_clock_transmission(error_message);
-    }
-
-    if (candidate.transmit_backend == TransmitBackendKind::RP1_GPCLK)
-    {
-        return true;
     }
 
     if (candidate.transmit_backend == TransmitBackendKind::SI5351)
@@ -640,8 +481,7 @@ static std::string trim_copy_string(std::string value)
 }
 
 static TransmitBackendKind parse_transmit_backend_option(
-    const std::string &value,
-    bool require_compiled = true)
+    const std::string &value)
 {
     std::string lowered = trim_copy_string(value);
     std::transform(
@@ -653,45 +493,18 @@ static TransmitBackendKind parse_transmit_backend_option(
             return static_cast<char>(std::tolower(c));
         });
 
-    if (lowered == "wtp") return TransmitBackendKind::WTP;
     if (lowered == "gpio")
     {
-        if (require_compiled &&
-            !transmit_backend_is_compiled(TransmitBackendKind::GPIO))
-            throw std::invalid_argument(
-                transmit_backend_unavailable_message(TransmitBackendKind::GPIO));
         return TransmitBackendKind::GPIO;
-    }
-
-    if (lowered == "rp1-gpclk")
-    {
-        if (require_compiled &&
-            !transmit_backend_is_compiled(TransmitBackendKind::RP1_GPCLK))
-            throw std::invalid_argument(
-                transmit_backend_unavailable_message(TransmitBackendKind::RP1_GPCLK));
-        return TransmitBackendKind::RP1_GPCLK;
     }
 
     if (lowered == "si5351")
     {
-        if (require_compiled &&
-            !transmit_backend_is_compiled(TransmitBackendKind::SI5351))
-            throw std::invalid_argument(
-                transmit_backend_unavailable_message(TransmitBackendKind::SI5351));
         return TransmitBackendKind::SI5351;
     }
 
-    if (lowered == "simulated")
-    {
-        if (require_compiled &&
-            !transmit_backend_is_compiled(TransmitBackendKind::SIMULATED))
-            throw std::invalid_argument(
-                transmit_backend_unavailable_message(TransmitBackendKind::SIMULATED));
-        return TransmitBackendKind::SIMULATED;
-    }
-
     throw std::invalid_argument(
-        "Invalid backend. Expected 'gpio', 'rp1-gpclk', 'si5351', 'wtp', or 'simulated'.");
+        "Invalid backend. Expected 'gpio' or 'si5351'.");
 }
 
 static int parse_integer_option(
@@ -814,53 +627,6 @@ static double parse_frequency_hz_option(
     return rounded;
 }
 
-static bool validate_cli_frequency_hz(
-    double frequency_hz,
-    bool allow_zero,
-    const std::string &raw_token,
-    const std::string &context,
-    std::string *error_message)
-{
-    const bool valid_sign = allow_zero ? frequency_hz >= 0.0 : frequency_hz > 0.0;
-    if (!std::isfinite(frequency_hz) || !valid_sign)
-    {
-        if (error_message != nullptr)
-        {
-            *error_message =
-                "Invalid " + context + " frequency '" + raw_token +
-                "': expected " + (allow_zero ? "zero or " : "") +
-                "a positive whole-number frequency in Hz.";
-        }
-        return false;
-    }
-
-    if (std::trunc(frequency_hz) != frequency_hz)
-    {
-        if (error_message != nullptr)
-        {
-            *error_message =
-                "Invalid " + context + " frequency '" + raw_token +
-                "': the value must resolve to a whole-number frequency in Hz. "
-                "Use an Hz, kHz, MHz, or GHz suffix for decimal unit values.";
-        }
-        return false;
-    }
-
-    const double signed_hz_exclusive_upper_bound = std::ldexp(1.0, 63);
-    if (frequency_hz >= signed_hz_exclusive_upper_bound)
-    {
-        if (error_message != nullptr)
-        {
-            *error_message =
-                "Invalid " + context + " frequency '" + raw_token +
-                "': the value is outside the supported RF range.";
-        }
-        return false;
-    }
-
-    return true;
-}
-
 static ModeType parse_mode_option(const char *raw_value)
 {
     std::string value = trim_copy_string(raw_value == nullptr ? "" : raw_value);
@@ -907,16 +673,6 @@ static int parse_si5351_tx_output_option(const char *raw_value)
 
     throw std::invalid_argument(
         "Invalid Si5351 TX output. Expected CLK0, CLK1, CLK2, 0, 1, or 2.");
-}
-
-static std::string parse_si5351_reference_source_option(const char *raw_value)
-{
-    std::string value = raw_value == nullptr ? "" : raw_value;
-    std::transform(value.begin(), value.end(), value.begin(),
-                   [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
-    if (value == "external_tcxo" || value == "crystal") return value;
-    throw std::invalid_argument(
-        "--si5351-reference-source must be external_tcxo or crystal.");
 }
 
 static WsprPlannerPreference parse_planner_preference_option(const char *raw_value)
@@ -1027,13 +783,6 @@ static bool parse_frequency_entry_token(
         return true;
     }
 
-    if (!has_ancillary_gpio())
-    {
-        error_message =
-            "Ancillary GPIO is unavailable in this build; @GPIO selectors are not supported.";
-        return false;
-    }
-
     if (token.find('@', at_pos + 1U) != std::string::npos)
     {
         error_message =
@@ -1123,13 +872,12 @@ bool set_direct_tone_startup_request(
     {
         const double actual_rf_frequency_hz =
             lookup.parse_string_to_frequency(entry.token, false);
-        if (!validate_cli_frequency_hz(
-                actual_rf_frequency_hz,
-                false,
-                entry.token,
-                "direct RF test tone",
-                error_message))
+        if (actual_rf_frequency_hz <= 0.0)
         {
+            if (error_message != nullptr)
+            {
+                *error_message = "Invalid direct RF test tone frequency (<=0).";
+            }
             return false;
         }
 
@@ -1432,6 +1180,225 @@ void clear_dfcw_startup_request() noexcept
     dfcw_startup_request.reset();
 }
 
+/**
+ * @brief Displays the usage information for the WsprryPi application.
+ *
+ * This function prints a brief help message to `std::cerr`, outlining
+ * the command-line syntax and key options available. Optionally, an error
+ * message can be displayed before the usage information.
+ *
+ * The function also determines whether the program exits or continues
+ * running based on the `exit_code` parameter.
+ *
+ * @note This function **always terminates the program**, unless `exit_code`
+ *       is `3`, in which case it simply returns.
+ *
+ * @param message An optional error message to display before the usage
+ *        information. If empty, only the usage message is shown.
+ * @param exit_code Determines the program's exit behavior:
+ *        - `0` → Exits with `EXIT_SUCCESS`.
+ *        - `1` → Exits with `EXIT_FAILURE`.
+ *        - `3` → Returns from the function without exiting.
+ *        - Any other value → Calls `std::exit(exit_code)`.
+ *
+ * @example
+ * **Returning (does not exit):**
+ * @code
+ * print_usage();               // Prints usage and returns (default: exit_code = 3).
+ * print_usage("Invalid args"); // Prints error message, then usage, returns.
+ * print_usage(3);              // Prints usage and returns.
+ * @endcode
+ *
+ * **Exiting the program:**
+ * @code
+ * print_usage(0);              // Prints usage and exits with EXIT_SUCCESS.
+ * print_usage(1);              // Prints usage and exits with EXIT_FAILURE.
+ * print_usage("Fatal error", 1); // Prints error message, then exits with EXIT_FAILURE.
+ * print_usage("Custom exit", 5); // Prints error message, then exits with code 5.
+ * @endcode
+ */
+void print_usage(const std::string &message, int exit_code)
+{
+    if (!message.empty())
+    {
+        std::cout << "\n"
+                  << message << std::endl;
+    }
+    else
+    {
+        std::cerr << "\n"
+                  << get_version_string() << std::endl;
+    }
+
+    std::cerr << "\nUsage:\n"
+              << "  (sudo) wsprrypi [options] CALLSIGN GRID POWER FREQ [FREQ...]\n"
+              << "  (sudo) wsprrypi -i /path/to/wsprrypi.ini\n"
+              << "  (sudo) wsprrypi --test-tone RF_FREQ [backend/options]\n"
+              << "  (sudo) wsprrypi --mode QRSS --cw-message TEXT --cw-base-frequency FREQ [cw/options]\n"
+              << "  (sudo) wsprrypi --qrss-message TEXT --qrss-frequency HZ --qrss-dot-seconds SEC\n"
+              << "  (sudo) wsprrypi --fskcw-message TEXT --fskcw-mark-frequency HZ --fskcw-space-frequency HZ --fskcw-dot-seconds SEC\n"
+              << "  (sudo) wsprrypi --dfcw-message TEXT --dfcw-dot-frequency HZ --dfcw-dash-frequency HZ --dfcw-dot-seconds SEC\n\n"
+              << "General:\n"
+              << "  -h, --help                         Display this help message.\n"
+              << "  -v, --version                      Show the WsprryPi version.\n"
+              << "  -i, --ini-file <file>              Load and monitor an INI file for daemon/service style operation.\n"
+              << "  -r, --repeat                       Repeat direct CLI transmissions until stopped.\n"
+              << "  -x, --terminate <count>            Stop after count iterations of the direct CLI WSPR frequency list.\n"
+              << "  -J, --journald                     Use journald for log output.\n"
+              << "  -D, --date-time-log                Prefix stream log output with date/time stamps.\n"
+              << "  --debug-logging, --no-debug-logging\n"
+              << "                                     Enable or disable DEBUG-level application logging.\n\n"
+              << "WSPR Identity And Frequency:\n"
+              << "  Positional CALLSIGN GRID POWER FREQ [FREQ...]\n"
+              << "                                     Transmit WSPR directly from CLI. POWER is rounded to a standard WSPR dBm value.\n"
+              << "  FREQ                               Band aliases such as 20m, numeric dial frequencies, or 0 to skip a slot.\n"
+              << "                                     Append @GPIO, @GPIOH, or @GPIOL for one-slot selector GPIO overrides.\n"
+              << "  --planner-preference <auto|prefer_paired|require_paired>\n"
+              << "                                     Select single-frame or paired WSPR planning policy.\n"
+              << "  -o, --offset                       Enable random WSPR transmit offset.\n"
+              << "  --no-offset                        Disable random WSPR transmit offset.\n\n"
+              << "Backend Selection:\n"
+              << "  --backend <gpio|si5351>            Select the RF transmit backend. Default: gpio.\n"
+              << "                                     GPIO RF is supported only on Raspberry Pi 1 through 4.\n"
+              << "  --power-level <level>\n"
+              << "    Set transmit power level for the active backend:\n"
+              << "      GPIO: 0-7\n"
+              << "      Si5351: 1-4\n"
+              << "  --gpio-power-level <0-7>           Set GPIO backend RF power level.\n"
+              << "  --si5351-power-level <1-4>         Set Si5351 drive-strength level.\n\n"
+              << "GPIO Backend:\n"
+              << "  -a, --transmit-gpio <4|20>         Select the RF transmit GPIO.\n"
+              << "      --transmit-pin <4|20>          Legacy alias for --transmit-gpio.\n"
+              << "  -n, --use-ntp                      Enable GPIO-backed NTP/PPM calibration.\n"
+              << "      --no-use-ntp                   Disable GPIO NTP calibration and use manual PPM.\n"
+              << "  -p, --ppm <value>                  Set manual PPM correction (-200 through 200) and disable --use-ntp.\n\n"
+              << "Si5351 Backend:\n"
+              << "  --si5351-i2c-bus <bus>             Linux I2C bus number. Default: 1.\n"
+              << "  --si5351-i2c-address <addr>        I2C address, decimal or 0x-prefixed hex. Valid: 0x03 through 0x77.\n"
+              << "  --si5351-reference-frequency <hz>  Reference oscillator frequency in Hz.\n"
+              << "  --si5351-tx-output <CLK0|CLK1|CLK2>\n"
+              << "                                     Transmit clock output. CLI/INI only; not exposed in the Web UI.\n\n"
+              << "CW, QRSS, FSKCW, And DFCW:\n"
+              << "  --mode <WSPR|QRSS|FSKCW|DFCW>      Select direct CLI mode. Non-WSPR modes use the CW options below.\n"
+              << "  --cw-message <text>                Message for QRSS, FSKCW, or DFCW.\n"
+              << "  --cw-base-frequency <freq>         Base RF frequency. Accepts whole-number Hz or Hz/kHz/MHz/GHz suffixes.\n"
+              << "  --cw-shift-hz <hz>                 FSKCW/DFCW frequency shift in Hz.\n"
+              << "  --cw-dot-seconds <seconds>         Dot length in seconds.\n"
+              << "  --cw-start-minute <0-59>           Scheduled non-WSPR start minute.\n"
+              << "  --cw-start-second <0-59>           Seconds after the scheduled CW start minute. Default: 5.\n"
+              << "  --cw-repeat-minutes <minutes>      Scheduled non-WSPR repeat interval.\n"
+              << "  --cw-intra-element-gap <multiple>  Gap between Morse elements.\n"
+              << "  --cw-inter-character-gap <multiple>\n"
+              << "                                     Gap between Morse characters.\n"
+              << "  --cw-inter-word-gap <multiple>     Gap between Morse words.\n"
+              << "  --dfcw-intra-element-gap <multiple>\n"
+              << "                                     DFCW off gap between dot/dash symbols.\n"
+              << "  --dfcw-inter-character-gap <multiple>\n"
+              << "                                     DFCW off gap between characters.\n"
+              << "  --dfcw-inter-word-gap <multiple>   DFCW off gap between words.\n"
+              << "  --cw-fade-shape <none|linear|raised_cosine>\n"
+              << "                                     Envelope fade shape. Advanced CLI/INI control hidden from normal Web UI.\n"
+              << "  --cw-fade-in-ms <ms>, --cw-fade-out-ms <ms>, --cw-fade-slice-ms <ms>\n"
+              << "                                     Advanced CW envelope timing controls.\n"
+              << "  --qrss-message/--qrss-frequency/--qrss-dot-seconds\n"
+              << "                                     Legacy transient QRSS startup options; all three are required together.\n"
+              << "  --fskcw-message/--fskcw-mark-frequency/--fskcw-space-frequency/--fskcw-dot-seconds\n"
+              << "                                     Legacy transient FSKCW startup options; all four are required together.\n"
+              << "  --dfcw-message/--dfcw-dot-frequency/--dfcw-dash-frequency/--dfcw-dot-seconds\n"
+              << "                                     Legacy transient DFCW startup options; all four are required together.\n\n"
+              << "GPIO Controls And Service Ports:\n"
+              << "  --no-web                           Disable the HTTP web UI and WebSocket server for this run.\n"
+              << "  -w, --web-port <port>              HTTP REST/Web UI port. Default: 31415.\n"
+              << "  -k, --socket-port <port>           WebSocket server port. Default: 31416.\n"
+              << "  -l, --led_pin <gpio>               Enable the TX LED on the given GPIO.\n"
+              << "      --led-pin <gpio>               Alias for --led_pin.\n"
+              << "      --use-led, --no-led            Enable or disable the TX LED using the configured/default pin.\n"
+              << "      --amp-pin <gpio>               Configure external amplifier control GPIO.\n"
+              << "      --amp-pin-active-high          Set Amp Pin polarity active-high.\n"
+              << "      --amp-pin-active-low           Set Amp Pin polarity active-low. Default.\n"
+              << "      --no-amp-pin                   Disable external amplifier control.\n"
+              << "  -s, --shutdown_button <gpio>       Enable shutdown button monitoring on the given GPIO.\n"
+              << "      --shutdown-button <gpio>       Alias for --shutdown_button.\n"
+              << "      --use-shutdown, --no-shutdown  Enable or disable shutdown button monitoring.\n"
+              << "  Band GPIO                          Configure per-band selector GPIOs in INI or with FREQ @GPIO suffixes.\n\n"
+              << "Test Tone:\n"
+              << "  -t, --test-tone <rf_frequency>     Start a transient direct RF test tone. Invalid with --ini-file.\n\n";
+
+    // Handle exit behavior
+    switch (exit_code)
+    {
+    case 0:
+        std::exit(EXIT_SUCCESS);
+        break;
+    case 1:
+        std::exit(EXIT_FAILURE);
+        break;
+    case 3:
+        return; // Simply return without exiting
+    default:
+        std::exit(exit_code);
+        break;
+    }
+}
+
+/**
+ * @brief Displays the current configuration values from the INI file.
+ *
+ * If an INI file is loaded, this function logs the current configuration
+ * settings such as transmit settings, power levels, and additional options.
+ * The output format is structured for readability.
+ *
+ * @param reload If true, indicates that the configuration has been reloaded.
+ */
+void show_config_values(bool reload)
+{
+    // Print current configuration details
+    //
+    // [Control]
+    llog.logS(DEBUG, "Transmit Enabled: ", config.transmit ? "true" : "false");
+    // [Common]
+    llog.logS(DEBUG, "Call Sign: ", config.callsign);
+    llog.logS(DEBUG, "Grid Square: ", config.grid_square);
+    llog.logS(DEBUG, "Transmit Power: ", config.power_dbm);
+    llog.logS(DEBUG, "WSPR Dial Frequencies: ", config.frequencies);
+    llog.logS(DEBUG, "Transmit Backend: ",
+              transmit_backend_kind_to_string(config.transmit_backend));
+    if (config.transmit_backend == TransmitBackendKind::SI5351)
+    {
+        std::ostringstream address;
+        address << "0x" << std::hex << std::uppercase
+                << config.si5351_i2c_address;
+        llog.logS(DEBUG, "Si5351 I2C Bus: ", config.si5351_i2c_bus);
+        llog.logS(DEBUG, "Si5351 I2C Address: ", address.str());
+        llog.logS(DEBUG, "Si5351 Reference Frequency Hz: ",
+                  config.si5351_reference_hz);
+        llog.logS(DEBUG, "Si5351 TX Output: ",
+                  std::string("CLK") + std::to_string(config.si5351_tx_output));
+    }
+    else
+
+    {
+        llog.logS(DEBUG, "Transmit GPIO: ", config.tx_pin);
+    }
+    // [Extended]
+    llog.logS(DEBUG, "PPM Offset: ", config.ppm);
+    llog.logS(DEBUG, "WSPR Audio Offset Hz: ", config.wspr.audio_offset_hz);
+    llog.logS(
+        DEBUG,
+        config.transmit_backend == TransmitBackendKind::SI5351
+            ? "Si5351 Drive Level: "
+            : "GPIO Power Level: ",
+        config.power_level);
+    llog.logS(DEBUG, "Use LED: ", config.use_led ? "true" : "false");
+    llog.logS(DEBUG, "LED on GPIO", config.led_pin);
+    llog.logS(DEBUG, "Debug Logging: ", config.debug_logging ? "true" : "false");
+    // [Server]
+    llog.logS(DEBUG, "Web UI enabled: ", config.enable_web ? "true" : "false");
+    llog.logS(DEBUG, "Web server runs on port: ", config.web_port);
+    llog.logS(DEBUG, "Socket server runs on port: ", config.socket_port);
+    llog.logS(DEBUG, "Use shutdown button: ", config.use_shutdown ? "true" : "false");
+    llog.logS(DEBUG, "Shutdown button GPIO", config.shutdown_pin);
+}
 
 /**
  * @brief Validates and loads configuration data from the INI class.
@@ -1447,56 +1414,8 @@ void clear_dfcw_startup_request() noexcept
 
 bool validate_config_candidate(
     ArgParserConfig &candidate,
-    std::string *error_message,
-    bool require_live_backend)
+    std::string *error_message)
 {
-    if (error_message != nullptr)
-    {
-        error_message->clear();
-    }
-    if (!transmit_backend_is_compiled(candidate.transmit_backend))
-    {
-        if (error_message != nullptr)
-        {
-            *error_message =
-                transmit_backend_unavailable_message(candidate.transmit_backend);
-        }
-        return false;
-    }
-
-    try {
-        validate_wtp_settings(candidate.wtp, candidate.transmit_backend == TransmitBackendKind::WTP);
-        if (candidate.transmit_backend == TransmitBackendKind::WTP &&
-            (candidate.use_led || candidate.use_amp || candidate.use_shutdown || candidate.frequencies.find('@') != std::string::npos ||
-             std::any_of(candidate.band_gpio.begin(), candidate.band_gpio.end(),
-                         [](const BandGPIOConfig &entry) { return entry.enabled; })))
-            throw std::runtime_error("Pico WTP requires TX LED, amplifier, shutdown-button and band GPIO controls disabled.");
-    } catch (const std::exception &e) {
-        if (error_message) *error_message = e.what();
-        return false;
-    }
-
-    if (!has_ancillary_gpio())
-    {
-        const bool band_gpio_requested = std::any_of(
-            candidate.band_gpio.begin(),
-            candidate.band_gpio.end(),
-            [](const BandGPIOConfig &entry)
-            {
-                return entry.enabled;
-            });
-        if (candidate.use_led || candidate.use_amp || candidate.use_shutdown ||
-            band_gpio_requested)
-        {
-            if (error_message != nullptr)
-            {
-                *error_message =
-                    "Ancillary GPIO is unavailable in this build; disable TX LED, amplifier, shutdown-button, and band GPIO controls.";
-            }
-            return false;
-        }
-    }
-
     resolve_backend_specific_config(candidate);
 
     const bool backend_validation_required =
@@ -1645,11 +1564,6 @@ bool validate_config_candidate(
         return false;
     }
 
-    if (!validate_pi_io_gpio_assignments(candidate, error_message))
-    {
-        return false;
-    }
-
     const bool frequencies_ok = set_frequencies(candidate);
     if (candidate.transmit &&
         !frequencies_ok &&
@@ -1663,16 +1577,9 @@ bool validate_config_candidate(
         return false;
     }
 
-    if (transmit_backend_uses_gpio_output(candidate.transmit_backend))
+    if (candidate.transmit_backend == TransmitBackendKind::GPIO)
     {
-        const bool route_neutral_pi5_gpio_configuration =
-            candidate.transmit_backend == TransmitBackendKind::GPIO &&
-            get_raspberry_pi_generation() == 5 &&
-            operator_exposes_rp1_gpio() &&
-            (!require_live_backend || !backend_validation_required);
-        if (candidate.transmit_backend == TransmitBackendKind::GPIO &&
-            !route_neutral_pi5_gpio_configuration &&
-            !platform_supports_gpio_clock_transmission(error_message))
+        if (!platform_supports_gpio_clock_transmission(error_message))
         {
             return false;
         }
@@ -1687,19 +1594,7 @@ bool validate_config_candidate(
             return false;
         }
 
-        if (candidate.transmit_backend == TransmitBackendKind::RP1_GPCLK &&
-            !is_supported_rp1_gpio_drive_ma(candidate.rp1_gpio_drive_ma))
-        {
-            if (error_message != nullptr)
-            {
-                *error_message =
-                    "Invalid RP1 GPIO drive. Expected 2, 4, 8, or 12 mA.";
-            }
-            return false;
-        }
-
-        if (candidate.transmit_backend == TransmitBackendKind::GPIO &&
-            (candidate.gpio_power_level < 0 || candidate.gpio_power_level > 7))
+        if (candidate.gpio_power_level < 0 || candidate.gpio_power_level > 7)
         {
             if (error_message != nullptr)
             {
@@ -1723,13 +1618,13 @@ bool validate_config_candidate(
             return false;
         }
 
-        if (candidate.si5351_i2c_address < 0x60 ||
-            candidate.si5351_i2c_address > 0x6F)
+        if (candidate.si5351_i2c_address < 0x03 ||
+            candidate.si5351_i2c_address > 0x77)
         {
             if (error_message != nullptr)
             {
                 *error_message =
-                    "Invalid Si5351 I2C address. Expected 0x60 through 0x6F.";
+                    "Invalid Si5351 I2C address. Expected 0x03 through 0x77.";
             }
 
             return false;
@@ -1743,22 +1638,6 @@ bool validate_config_candidate(
                     "Invalid Si5351 reference frequency. Expected a positive frequency in Hz.";
             }
 
-            return false;
-        }
-
-        if (candidate.si5351_reference_source != "external_tcxo" &&
-            candidate.si5351_reference_source != "crystal")
-        {
-            if (error_message != nullptr)
-                *error_message = "Invalid Si5351 reference source. Expected external_tcxo or crystal.";
-            return false;
-        }
-        if (candidate.si5351_crystal_load_capacitance_pf != 6 &&
-            candidate.si5351_crystal_load_capacitance_pf != 8 &&
-            candidate.si5351_crystal_load_capacitance_pf != 10)
-        {
-            if (error_message != nullptr)
-                *error_message = "Invalid Si5351 crystal load capacitance. Expected 6, 8, or 10 pF.";
             return false;
         }
 
@@ -1785,7 +1664,7 @@ bool validate_config_candidate(
             return false;
         }
 
-        if (require_live_backend && backend_validation_required &&
+        if (backend_validation_required &&
             !backend_ready_for_transmission(candidate, error_message))
         {
             return false;
@@ -1940,15 +1819,399 @@ static bool validation_error_is_missing_required(
     return validation_error.rfind("Missing", 0) == 0;
 }
 
-static bool validation_error_is_capability_failure(
-    const std::string &validation_error)
+void apply_runtime_config_side_effects()
 {
-    return validation_error.rfind("Ancillary GPIO is unavailable", 0) == 0 ||
-        (validation_error.rfind("Backend '", 0) == 0 &&
-         validation_error.find("unavailable in this build") != std::string::npos);
+    const wsprrypi::BackendKind backend_kind =
+        config.transmit_backend == TransmitBackendKind::SI5351
+            ? wsprrypi::BackendKind::SI5351
+            : wsprrypi::BackendKind::RPI_CLOCK_GPIO;
+    WsprTransmitter::Si5351RuntimeConfig si5351_config;
+    si5351_config.i2c_bus = config.si5351_i2c_bus;
+    si5351_config.i2c_address = config.si5351_i2c_address;
+    si5351_config.reference_hz = config.si5351_reference_hz;
+    si5351_config.tx_output = config.si5351_tx_output;
+    si5351_config.power_level = config.power_level;
+    si5351_config.app_managed = config.use_ini;
+    wsprTransmitter.selectBackend(backend_kind, si5351_config);
+
+    llog.logS(INFO,
+              "Transmit backend: ",
+              transmit_backend_kind_to_string(config.transmit_backend));
+
+    if (config.transmit_backend == TransmitBackendKind::SI5351)
+    {
+        std::ostringstream address;
+        address << "0x" << std::hex << std::uppercase
+                << config.si5351_i2c_address;
+        llog.logS(DEBUG, "Si5351 I2C bus: ", config.si5351_i2c_bus);
+        llog.logS(DEBUG, "Si5351 I2C address: ", address.str());
+        llog.logS(DEBUG, "Si5351 reference frequency Hz: ",
+                  config.si5351_reference_hz);
+        llog.logS(DEBUG, "Si5351 TX output: ",
+                  std::string("CLK") +
+                      std::to_string(config.si5351_tx_output));
+        if (config.use_ini)
+        {
+            std::ostringstream parked_outputs;
+            bool first_output = true;
+            for (int output = 0; output < 3; ++output)
+            {
+                if (output == config.si5351_tx_output)
+                    continue;
+
+                if (!first_output)
+                    parked_outputs << ", ";
+                parked_outputs << "CLK" << output;
+                first_output = false;
+            }
+
+            llog.logS(
+                DEBUG,
+                "Si5351 unused output parking: ",
+                parked_outputs.str(),
+                " held in a safe non-transmitting state; internal PLL remains parked.");
+        }
+    }
+    else
+    {
+        llog.logS(INFO, "Transmit GPIO: ", config.tx_pin);
+    }
+    if (!config.use_ntp && config.ppm != 0.0)
+    {
+        log_startup_config_message(INFO,
+                                   "PPM value to be used for tone generation: ",
+                                   std::fixed,
+                                   std::setprecision(2),
+                                   config.ppm);
+    }
+    else if (!config.use_ntp && config.ppm != 0.0)
+    {
+        config.ppm = 0.0;
+        log_startup_config_message(WARN, "NTP disabled and PPM not set.");
+    }
+
+    if (config.use_led && (config.led_pin >= 0 && config.led_pin <= 27))
+    {
+        if (!ledControl.enableGPIOPin(config.led_pin, true))
+        {
+            llog.logS(ERROR,
+                      "Failed to enable TX LED GPIO ",
+                      config.led_pin,
+                      ": ",
+                      ledControl.lastError());
+        }
+    }
+    else
+    {
+        llog.logS(DEBUG, "Invalid or disabled LED settings, turning off LED.");
+        ledControl.stop();
+    }
+
+    if (config.use_amp && config.amp_pin >= 0 && config.amp_pin <= 27)
+    {
+        if (!ampControl.enableGPIOPin(
+                config.amp_pin,
+                config.amp_pin_active_high))
+        {
+            llog.logS(ERROR,
+                      "Failed to enable Amp Control GPIO ",
+                      config.amp_pin,
+                      ": ",
+                      ampControl.lastError());
+        }
+    }
+    else
+    {
+        llog.logS(DEBUG, "Invalid or disabled Amp Control settings, turning off Amp Control.");
+        ampControl.stop();
+    }
+
+    if (config.use_shutdown && (config.shutdown_pin >= 0 && config.shutdown_pin <= 27))
+    {
+        if (!shutdownMonitor.enable(
+            config.shutdown_pin,
+            false,
+            GPIOInput::PullMode::PullUp,
+            callback_shutdown_system))
+        {
+            llog.logS(ERROR,
+                      "Failed to enable shutdown monitor GPIO ",
+                      config.shutdown_pin,
+                      ": ",
+                      shutdownMonitor.lastError());
+        }
+        else if (!shutdownMonitor.setPriority(SCHED_RR, 10))
+        {
+            llog.logS(WARN,
+                      "Shutdown monitor GPIO ",
+                      config.shutdown_pin,
+                      " enabled, but failed to raise thread priority.");
+        }
+    }
+    else
+    {
+        llog.logS(DEBUG, "Disabling shutdown pin functionality.");
+        shutdownMonitor.stop();
+    }
+
+    if (config.mode == ModeType::TONE)
+    {
+        WsprFrequencyEntry entry;
+        double actual_rf_frequency_hz = 0.0;
+        if (!try_get_direct_tone_startup_request(entry, actual_rf_frequency_hz))
+        {
+            log_startup_config_message(ERROR, " - Missing direct RF test tone frequency.");
+            return;
+        }
+
+        log_startup_config_message(
+            INFO,
+            "A direct RF test tone will be generated at: ",
+            lookup.freq_display_string(actual_rf_frequency_hz));
+        return;
+    }
+
+    if (config.mode == ModeType::QRSS)
+    {
+        std::string message;
+        double frequency_hz = 0.0;
+        double dot_seconds = 0.0;
+        if (!try_get_qrss_startup_request(message, frequency_hz, dot_seconds))
+        {
+            if (!persisted_qrss_config_available(config))
+            {
+                log_startup_config_message(ERROR, " - Missing QRSS configuration.");
+                return;
+            }
+
+            message = config.qrss.message;
+            frequency_hz = config.qrss.frequency_hz;
+            dot_seconds = config.qrss.dot_seconds;
+        }
+
+        log_startup_config_message(INFO, "QRSS configuration loaded:");
+        log_startup_config_message(INFO, "- Message: \"", message, "\"");
+        log_startup_config_message(
+            INFO,
+            "- Base Freq: ",
+            lookup.freq_display_string(frequency_hz));
+        log_startup_config_message(INFO, "- Dot Timing: ", dot_seconds, "s");
+        if (config.transmit_backend == TransmitBackendKind::GPIO)
+        {
+            log_startup_config_message(
+                INFO,
+                "- GPIO Transmit Power: ",
+                config.gpio_power_level);
+        }
+        else if (config.transmit_backend == TransmitBackendKind::SI5351)
+        {
+            log_startup_config_message(
+                INFO,
+                "- Si5351 Transmit Power: ",
+                config.si5351_power_level);
+        }
+        return;
+    }
+
+    if (config.mode == ModeType::FSKCW)
+    {
+        std::string message;
+        double mark_frequency_hz = 0.0;
+        double space_frequency_hz = 0.0;
+        double dot_seconds = 0.0;
+        if (!try_get_fskcw_startup_request(
+                message,
+                mark_frequency_hz,
+                space_frequency_hz,
+                dot_seconds))
+        {
+            if (!persisted_fskcw_config_available(config))
+            {
+                log_startup_config_message(ERROR, " - Missing FSKCW configuration.");
+                return;
+            }
+
+            message = config.fskcw.message;
+            mark_frequency_hz = config.fskcw.mark_frequency_hz;
+            space_frequency_hz = config.fskcw.space_frequency_hz;
+            dot_seconds = config.fskcw.dot_seconds;
+        }
+
+        log_startup_config_message(INFO, "FSKCW configuration loaded: ");
+        log_startup_config_message(INFO, "- Message: \"", message, "\"");
+        log_startup_config_message(
+            INFO,
+            "- Mark Freq: ",
+            lookup.freq_display_string(mark_frequency_hz));
+        log_startup_config_message(
+            INFO,
+            "- Space Freq: ",
+            lookup.freq_display_string(space_frequency_hz));
+        log_startup_config_message(INFO, "- Dot Timing: ", dot_seconds, "s");
+        if (config.transmit_backend == TransmitBackendKind::GPIO)
+        {
+            log_startup_config_message(
+                INFO,
+                "- GPIO Transmit Power: ",
+                config.gpio_power_level);
+        }
+        else if (config.transmit_backend == TransmitBackendKind::SI5351)
+        {
+            log_startup_config_message(
+                INFO,
+                "- Si5351 Transmit Power: ",
+                config.si5351_power_level);
+        }
+        return;
+    }
+
+    if (config.mode == ModeType::DFCW)
+    {
+        std::string message;
+        double dot_frequency_hz = 0.0;
+        double dash_frequency_hz = 0.0;
+        double dot_seconds = 0.0;
+        if (!try_get_dfcw_startup_request(
+                message,
+                dot_frequency_hz,
+                dash_frequency_hz,
+                dot_seconds))
+        {
+            if (!persisted_dfcw_config_available(config))
+            {
+                log_startup_config_message(ERROR, " - Missing DFCW configuration.");
+                return;
+            }
+
+            message = config.dfcw.message;
+            dot_frequency_hz = config.dfcw.dot_frequency_hz;
+            dash_frequency_hz = config.dfcw.dash_frequency_hz;
+            dot_seconds = config.dfcw.dot_seconds;
+        }
+
+        log_startup_config_message(INFO, "DFCW configuration loaded:");
+        log_startup_config_message(INFO, "- Message: \"", message, "\"");
+        log_startup_config_message(
+            INFO,
+            "- Dot Freq: ",
+            lookup.freq_display_string(dot_frequency_hz));
+        log_startup_config_message(
+            INFO,
+            "- Dash Freq: ",
+            lookup.freq_display_string(dash_frequency_hz));
+        log_startup_config_message(INFO, "- Dot Timing: ", dot_seconds, "s");
+        if (config.transmit_backend == TransmitBackendKind::GPIO)
+        {
+            log_startup_config_message(
+                INFO,
+                "- GPIO Transmit Power: ",
+                config.gpio_power_level);
+        }
+        else if (config.transmit_backend == TransmitBackendKind::SI5351)
+        {
+            log_startup_config_message(
+                INFO,
+                "- Si5351 Transmit Power: ",
+                config.si5351_power_level);
+        }
+        return;
+    }
+
+    if (config.mode != ModeType::WSPR)
+    {
+        return;
+    }
+
+    if (config.transmit)
+    {
+        log_startup_config_message(INFO, "WSPR packet payload:");
+        log_startup_config_message(INFO, "- Callsign: ", config.callsign);
+        log_startup_config_message(INFO, "- Locator: ", config.grid_square);
+        log_startup_config_message(INFO, "- Power: ", config.power_dbm, " dBm");
+        if (config.transmit_backend == TransmitBackendKind::GPIO)
+        {
+            log_startup_config_message(
+                INFO,
+                "- GPIO Transmit Power: ",
+                config.gpio_power_level);
+        }
+        else if (config.transmit_backend == TransmitBackendKind::SI5351)
+        {
+            log_startup_config_message(
+                INFO,
+                "- Si5351 Transmit Power: ",
+                config.si5351_power_level);
+        }
+
+        if (config.wspr_frequency_entries.size() > 1)
+        {
+            log_startup_config_message(INFO, "Requested WSPR dial frequencies:");
+
+            for (const auto &entry : config.wspr_frequency_entries)
+            {
+                if (entry.dial_frequency_hz == 0.0)
+                {
+                    log_startup_config_message(INFO, "- Skip (0.0)");
+                }
+                else
+                {
+                    log_startup_config_message(
+                        INFO,
+                        "- ",
+                        lookup.freq_display_string(entry.dial_frequency_hz),
+                        get_wspr_gpio_suffix_for_entry(entry, config, lookup));
+                }
+            }
+        }
+        else
+        {
+            const WsprFrequencyEntry &entry = config.wspr_frequency_entries[0];
+
+            if (entry.dial_frequency_hz == 0.0)
+            {
+                log_startup_config_message(INFO, "Requested WSPR dial frequency: ", "Skip (0.0)");
+            }
+            else
+            {
+                log_startup_config_message(
+                    INFO,
+                    "Requested WSPR dial frequency: ",
+                    lookup.freq_display_string(entry.dial_frequency_hz),
+                    get_wspr_gpio_suffix_for_entry(entry, config, lookup));
+            }
+        }
+
+        if (config.use_offset)
+        {
+            log_startup_config_message(
+                INFO,
+                "A random offset will be added to all transmissions.");
+        }
+    }
+
+    if (!config.use_ini)
+    {
+        if (config.loop_tx)
+        {
+            log_startup_config_message(
+                INFO,
+                "Transmissions will continue until it receives a signal to stop.");
+        }
+        else
+        {
+            if (config.tx_iterations.load() <= 0)
+            {
+                config.tx_iterations.store(1);
+                config.transmit = true;
+            }
+            log_startup_config_message(
+                INFO,
+                "TX will stop after: ",
+                config.tx_iterations.load(),
+                "iteration(s) of the WSPR dial-frequency list.");
+        }
+    }
 }
-
-
 
 bool validate_config_data_for_test(
     std::string *validation_error) noexcept
@@ -2006,30 +2269,6 @@ bool validate_config_data()
                 ? "Missing required parameters."
                 : "Invalid configuration.");
 
-        if (config.transmit_backend == TransmitBackendKind::WTP)
-        {
-            // WTP validation can stop before legacy derived fields are populated.
-            // Preserve the actual endpoint/admission failure instead of reporting
-            // an unrelated empty derived frequency list.
-            llog.logE(ERROR, " - ", validation_error);
-            if (config.use_ini) return false;
-            std::exit(EXIT_FAILURE);
-        }
-
-        if (validation_error_is_capability_failure(validation_error))
-        {
-            llog.logE(ERROR, " - ", validation_error);
-            if (config.use_ini)
-            {
-                llog.logE(ERROR, "Please check the INI file for unavailable features.");
-                return false;
-            }
-
-            llog.logE(ERROR, "Try: wsprrypi --help");
-            std::cerr << std::endl;
-            std::exit(EXIT_FAILURE);
-        }
-
         if (config.callsign.empty())
         {
             llog.logE(ERROR, " - Missing callsign.");
@@ -2059,7 +2298,7 @@ bool validate_config_data()
             (void)platform_supports_gpio_clock_transmission(&platform_error);
             llog.logE(ERROR, " - ", platform_error);
         }
-        if (transmit_backend_uses_gpio_output(config.transmit_backend) &&
+        if (config.transmit_backend == TransmitBackendKind::GPIO &&
             !is_valid_runtime_transmit_gpio(config.tx_pin))
         {
             llog.logE(ERROR, " - ", transmit_gpio_validation_message());
@@ -2084,29 +2323,16 @@ bool validate_config_data()
                 llog.logE(ERROR,
                           " - Invalid Si5351 I2C bus. Expected a non-negative bus number.");
             }
-            if (config.si5351_i2c_address < 0x60 ||
-                config.si5351_i2c_address > 0x6F)
+            if (config.si5351_i2c_address < 0x03 ||
+                config.si5351_i2c_address > 0x77)
             {
                 llog.logE(ERROR,
-                          " - Invalid Si5351 I2C address. Expected 0x60 through 0x6F.");
+                          " - Invalid Si5351 I2C address. Expected 0x03 through 0x77.");
             }
             if (config.si5351_reference_hz <= 0)
             {
                 llog.logE(ERROR,
                           " - Invalid Si5351 reference frequency. Expected a positive frequency in Hz.");
-            }
-            if (config.si5351_reference_source != "external_tcxo" &&
-                config.si5351_reference_source != "crystal")
-            {
-                llog.logE(ERROR,
-                          " - Invalid Si5351 reference source. Expected external_tcxo or crystal.");
-            }
-            if (config.si5351_crystal_load_capacitance_pf != 6 &&
-                config.si5351_crystal_load_capacitance_pf != 8 &&
-                config.si5351_crystal_load_capacitance_pf != 10)
-            {
-                llog.logE(ERROR,
-                          " - Invalid Si5351 crystal load capacitance. Expected 6, 8, or 10 pF.");
             }
             if (config.si5351_tx_output < 0 ||
                 config.si5351_tx_output > 2)
@@ -2270,28 +2496,7 @@ bool set_frequencies(ArgParserConfig &target)
 
         try
         {
-            const auto band_resolution = lookup.resolve_wspr_band_frequency(
-                entry.token,
-                target.wspr.frequency_profile,
-                target.wspr.band_preferences);
-            const double freq = band_resolution
-                ? static_cast<double>(band_resolution->dial_frequency_hz)
-                : lookup.parse_string_to_frequency(
-                      entry.token,
-                      false,
-                      target.wspr.frequency_profile,
-                      preset_only_band_preferences(target.wspr.band_preferences));
-            std::string frequency_error;
-            if (!validate_cli_frequency_hz(
-                    freq,
-                    true,
-                    entry.token,
-                    "WSPR dial",
-                    &frequency_error))
-            {
-                llog.logE(WARN, frequency_error);
-                continue;
-            }
+            const double freq = lookup.parse_string_to_frequency(entry.token, false);
             entry.dial_frequency_hz = freq;
             entry.allow_band_gpio_fallback =
                 entry.selector_gpio == kSelectorGpioUnset;
@@ -2353,7 +2558,6 @@ bool set_frequencies()
  * Supported early options:
  * - `-h`, `--help`
  * - `-v`, `--version`
- * - `--list-backends`
  *
  * @param argc Argument count.
  * @param argv Argument vector.
@@ -2366,8 +2570,6 @@ bool handle_early_cli_options(int argc, char *argv[])
     bool early_enable_timestamps = config.date_time_log;
     bool early_debug_logging = config.debug_logging;
     TransmitBackendKind early_backend = config.transmit_backend;
-    bool explicit_backend = false;
-    std::string backend_parse_error;
 
     for (int i = 1; i < argc; ++i)
     {
@@ -2392,29 +2594,23 @@ bool handle_early_cli_options(int argc, char *argv[])
         }
         else if (arg == "--backend" && i + 1 < argc)
         {
-            explicit_backend = true;
             try
             {
-                early_backend = parse_transmit_backend_option(argv[i + 1], false);
-                backend_parse_error.clear();
+                early_backend = parse_transmit_backend_option(argv[i + 1]);
             }
-            catch (const std::exception &error)
+            catch (const std::exception &)
             {
-                backend_parse_error = error.what();
             }
         }
         else if (arg.rfind("--backend=", 0) == 0)
         {
-            explicit_backend = true;
             try
             {
                 early_backend =
-                    parse_transmit_backend_option(arg.substr(10), false);
-                backend_parse_error.clear();
+                    parse_transmit_backend_option(arg.substr(10));
             }
-            catch (const std::exception &error)
+            catch (const std::exception &)
             {
-                backend_parse_error = error.what();
             }
         }
         else if (arg.size() > 1U && arg[0] == '-' && arg[1] != '-')
@@ -2451,26 +2647,10 @@ bool handle_early_cli_options(int argc, char *argv[])
 
         if (arg == "-v" || arg == "--version")
         {
-            std::cout << get_version_string() << std::endl
-                      << "Compiled backends: " << get_compiled_backends() << std::endl
-                      << "Ancillary GPIO: " << (has_ancillary_gpio() ? "enabled" : "disabled") << std::endl;
-            std::exit(EXIT_SUCCESS);
-        }
-
-        if (arg == "--list-backends")
-        {
-            std::cout << get_compiled_backends() << std::endl;
+            std::cout << get_version_string() << std::endl;
             std::exit(EXIT_SUCCESS);
         }
     }
-
-    if (!backend_parse_error.empty())
-        print_usage(backend_parse_error, EXIT_FAILURE);
-
-    if (explicit_backend && !transmit_backend_is_compiled(early_backend))
-        print_usage(
-            transmit_backend_unavailable_message(early_backend),
-            EXIT_FAILURE);
 
     return false;
 }
@@ -2485,7 +2665,6 @@ bool parse_command_line(int argc, char *argv[])
     clear_dfcw_startup_request();
 
     bool explicit_cw_start_second = false;
-    bool explicit_socket_loopback_family = false;
     for (int i = 1; i < argc; ++i)
     {
         const std::string arg = argv[i];
@@ -2503,24 +2682,6 @@ bool parse_command_line(int argc, char *argv[])
         print_usage("No arguments provided.", EXIT_FAILURE);
     }
 
-    // Explicit simulation is a process lifetime boundary, including managed
-    // reloads and web transactions. It is never written to the INI.
-    for (int i = 1; i < argc; ++i) {
-        const std::string option = argv[i];
-        std::optional<std::string> backend;
-        if (option == "--backend" && i + 1 < argc) backend = argv[++i];
-        else if (option.rfind("--backend=", 0) == 0) backend = option.substr(10);
-        if (backend) {
-            try {
-                config.simulated_backend_override =
-                    parse_transmit_backend_option(*backend, false) == TransmitBackendKind::SIMULATED;
-            } catch (const std::invalid_argument&) {
-                // The normal option pass reports invalid values. This early
-                // scan only establishes the boundary before INI validation.
-                config.simulated_backend_override = false;
-            }
-        }
-    }
     // Create original JSON
     init_config_json();
     json_to_config();
@@ -2540,8 +2701,6 @@ bool parse_command_line(int argc, char *argv[])
 
             try
             {
-                iniFile.set_raw_passthrough_keys(
-                    {{"Security", "Privileged Network Safety"}});
                 iniFile.set_filename(config.ini_filename);
 
                 if (!load_json(config.ini_filename, &load_error, &warning_messages))
@@ -2594,29 +2753,6 @@ bool parse_command_line(int argc, char *argv[])
                 startup_config_handoff_ready.store(true, std::memory_order_release);
             }
 
-            std::optional<std::string> privileged_network_setting;
-            try
-            {
-                privileged_network_setting = iniFile.get_string_value(
-                    "Security", "Privileged Network Safety");
-            }
-            catch (const std::exception &)
-            {
-                privileged_network_setting = std::nullopt;
-            }
-            initialize_privileged_network_runtime(privileged_network_setting);
-            const auto network_safety = privileged_network_runtime_state();
-            if (!network_safety.setting_was_valid)
-            {
-                defer_startup_diagnostic(
-                    WARN,
-                    "Privileged Network Safety is missing or invalid; enforcing local-LAN safety.");
-            }
-            else if (network_safety.active == PrivilegedNetworkMode::insecure_disabled)
-            {
-                defer_startup_diagnostic(WARN, "NETWORK SAFETY OFF");
-            }
-
             // Remove "-i <file>" from args
             args.erase(it, it + 2);
             break; // Exit loop after removing argument
@@ -2635,12 +2771,12 @@ bool parse_command_line(int argc, char *argv[])
             if (arg == "--backend" && i + 1 < argc)
             {
                 config.transmit_backend =
-                    parse_transmit_backend_option(argv[i + 1], false);
+                    parse_transmit_backend_option(argv[i + 1]);
             }
             else if (arg.rfind("--backend=", 0) == 0)
             {
                 config.transmit_backend =
-                    parse_transmit_backend_option(arg.substr(10), false);
+                    parse_transmit_backend_option(arg.substr(10));
             }
         }
         catch (const std::exception &)
@@ -2654,25 +2790,16 @@ bool parse_command_line(int argc, char *argv[])
     static struct option long_options[] = {
         {"help", no_argument, nullptr, 'h'},
         {"version", no_argument, nullptr, 'v'},
-        {"use-system-clock-frequency-estimate", no_argument, nullptr, 'n'},
+        {"use-ntp", no_argument, nullptr, 'n'},         // Via: [GPIO] Use NTP = True
         {"repeat", no_argument, nullptr, 'r'},          // Global: config.loop_tx
         {"offset", no_argument, nullptr, 'o'},          // Via: [Extended] Offset = True
         {"journald", no_argument, nullptr, 'J'},        // Global: config.use_journald
         {"date-time-log", no_argument, nullptr, 'D'},   // Global: config.date_time_log
         {"debug-logging", no_argument, nullptr, 1018},  // Global: config.debug_logging
         {"no-debug-logging", no_argument, nullptr, 1019},
-        {"allow-unqualified-frequency", no_argument, nullptr, 1056},
-        {"no-allow-unqualified-frequency", no_argument, nullptr, 1057},
-        {"allow-non-amateur-frequency", no_argument, nullptr, 1058},
-        {"no-allow-non-amateur-frequency", no_argument, nullptr, 1059},
         {"no-web", no_argument, nullptr, 1020},
-        {"no-http", no_argument, nullptr, 1061},
         {"no-offset", no_argument, nullptr, 1021},
-        {"no-system-clock-frequency-estimate", no_argument, nullptr, 1022},
-        {"gpio-frequency-residual-ppm", required_argument, nullptr, 1051},
-        {"gpio-manual-ppm", required_argument, nullptr, 'p'},
-        {"ppm", required_argument, nullptr, 'p'}, // Compatibility alias for GPIO manual PPM.
-        {"si5351-ppm", required_argument, nullptr, 1052},
+        {"no-use-ntp", no_argument, nullptr, 1022},
         {"mode", required_argument, nullptr, 1023},
         {"cw-message", required_argument, nullptr, 1024},
         {"cw-base-frequency", required_argument, nullptr, 1025},
@@ -2693,7 +2820,6 @@ bool parse_command_line(int argc, char *argv[])
         {"use-shutdown", no_argument, nullptr, 1039},
         {"no-shutdown", no_argument, nullptr, 1040},
         {"gpio-power-level", required_argument, nullptr, 1041},
-        {"rp1-gpio-drive-ma", required_argument, nullptr, 1055},
         {"si5351-power-level", required_argument, nullptr, 1042},
         {"amp-pin", required_argument, nullptr, 1043},
         {"amp-pin-active-high", no_argument, nullptr, 1044},
@@ -2718,16 +2844,13 @@ bool parse_command_line(int argc, char *argv[])
         {"si5351-i2c-bus", required_argument, nullptr, 1014},
         {"si5351-i2c-address", required_argument, nullptr, 1015},
         {"si5351-reference-frequency", required_argument, nullptr, 1016},
-        {"si5351-reference-source", required_argument, nullptr, 1053},
-        {"si5351-crystal-load-capacitance", required_argument, nullptr, 1054},
         {"si5351-tx-output", required_argument, nullptr, 1017},
         {"si5351_i2c_bus", required_argument, nullptr, 1014},
         {"si5351_i2c_address", required_argument, nullptr, 1015},
         {"si5351_reference_frequency", required_argument, nullptr, 1016},
-        {"si5351_reference_source", required_argument, nullptr, 1053},
-        {"si5351_crystal_load_capacitance", required_argument, nullptr, 1054},
         {"si5351_tx_output", required_argument, nullptr, 1017},
         // Required arguments
+        {"ppm", required_argument, nullptr, 'p'},       // Via: [Extended] PPM = 0.0
         {"terminate", required_argument, nullptr, 'x'}, // Global: config.tx_iterations
         {"test-tone", required_argument, nullptr, 't'},
         {"transmit-gpio", required_argument, nullptr, 'a'}, // Via: [GPIO] Transmit Pin = 4
@@ -2740,10 +2863,6 @@ bool parse_command_line(int argc, char *argv[])
         {"power-level", required_argument, nullptr, 'd'},
         {"web-port", required_argument, nullptr, 'w'},    // Via: [Server] Port = 31415
         {"socket-port", required_argument, nullptr, 'k'}, // Via: [Server] Port = 31416
-        {"socket-loopback-only", no_argument, nullptr, 1060},
-        {"socket-loopback-family", required_argument, nullptr, 1062},
-        {"rp1-development-confirmation-json", required_argument, nullptr, 1063},
-        {"wtp-server-port", required_argument, nullptr, 1064},
         {nullptr, 0, nullptr, 0}};
 
     while (true)
@@ -2762,42 +2881,6 @@ bool parse_command_line(int argc, char *argv[])
         switch (c)
         {
         // No arguments
-        case 1064:
-        {
-            const std::string value = optarg;
-            unsigned int parsed = 0;
-            const auto result = std::from_chars(value.data(),
-                                                value.data() + value.size(), parsed);
-            if (result.ec != std::errc{} ||
-                result.ptr != value.data() + value.size() ||
-                parsed == 0 || parsed > 65535)
-                print_usage("WTP server port must be 1 through 65535.", EXIT_FAILURE);
-            config.wtp_server_port_override = static_cast<std::uint16_t>(parsed);
-            break;
-        }
-        case 1060:
-            config.socket_loopback_only = true;
-            break;
-        case 1061:
-            config.enable_http = false;
-            break;
-        case 1062:
-        {
-            explicit_socket_loopback_family = true;
-            const std::string family = optarg;
-            if (family == "auto")
-                config.socket_loopback_family = WebSocketLoopbackFamily::Auto;
-            else if (family == "ipv6")
-                config.socket_loopback_family = WebSocketLoopbackFamily::IPv6;
-            else if (family == "ipv4")
-                config.socket_loopback_family = WebSocketLoopbackFamily::IPv4;
-            else
-                print_usage("Socket loopback family must be auto, ipv6, or ipv4.", EXIT_FAILURE);
-            break;
-        }
-        case 1063:
-            config.rp1_development_confirmation_json = optarg;
-            break;
         case 'h': // Help/Usage
         case '?':
         {
@@ -2805,14 +2888,12 @@ bool parse_command_line(int argc, char *argv[])
         }
         case 'v': // Version
         {
-            std::cout << get_version_string() << std::endl
-                      << "Compiled backends: " << get_compiled_backends() << std::endl
-                      << "Ancillary GPIO: " << (has_ancillary_gpio() ? "enabled" : "disabled") << std::endl;
+            std::cout << get_version_string() << std::endl;
             std::exit(EXIT_SUCCESS);
         }
-        case 'n': // Use system-clock frequency estimate
+        case 'n': // Use NTP
         {
-            config.gpio_use_system_clock_frequency_estimate = true;
+            config.gpio_use_ntp = true;
             resolve_backend_specific_config(config);
             break;
         }
@@ -2846,26 +2927,6 @@ bool parse_command_line(int argc, char *argv[])
             config.debug_logging = false;
             break;
         }
-        case 1056:
-        {
-            config.allow_unqualified_frequency = true;
-            break;
-        }
-        case 1057:
-        {
-            config.allow_unqualified_frequency = false;
-            break;
-        }
-        case 1058:
-        {
-            config.allow_non_amateur_frequency = true;
-            break;
-        }
-        case 1059:
-        {
-            config.allow_non_amateur_frequency = false;
-            break;
-        }
         case 1020:
         {
             config.enable_web = false;
@@ -2878,44 +2939,8 @@ bool parse_command_line(int argc, char *argv[])
         }
         case 1022:
         {
-            config.gpio_use_system_clock_frequency_estimate = false;
+            config.gpio_use_ntp = false;
             resolve_backend_specific_config(config);
-            break;
-        }
-        case 1051:
-        {
-            try
-            {
-                const double ppm = std::stod(optarg);
-                if (!std::isfinite(ppm) || ppm < -200.0 || ppm > 200.0)
-                {
-                    print_usage("GPIO frequency residual PPM must be a finite number from -200 through 200.", EXIT_FAILURE);
-                }
-                config.gpio_frequency_residual_ppm = ppm;
-                resolve_backend_specific_config(config);
-            }
-            catch (const std::exception &)
-            {
-                print_usage("GPIO frequency residual PPM must be a number.", EXIT_FAILURE);
-            }
-            break;
-        }
-        case 1052:
-        {
-            try
-            {
-                const double ppm = std::stod(optarg);
-                if (!std::isfinite(ppm) || ppm < -200.0 || ppm > 200.0)
-                {
-                    print_usage("Si5351 PPM must be a finite number from -200 through 200.", EXIT_FAILURE);
-                }
-                config.si5351_ppm = ppm;
-                resolve_backend_specific_config(config);
-            }
-            catch (const std::exception &)
-            {
-                print_usage("Si5351 PPM must be a number.", EXIT_FAILURE);
-            }
             break;
         }
         case 1023:
@@ -3255,28 +3280,6 @@ bool parse_command_line(int argc, char *argv[])
             }
             break;
         }
-        case 1055:
-        {
-            try
-            {
-                const int drive =
-                    parse_integer_option(optarg, "--rp1-gpio-drive-ma");
-                if (!is_supported_rp1_gpio_drive_ma(drive))
-                {
-                    print_usage(
-                        "Invalid RP1 GPIO drive. Expected 2, 4, 8, or 12 mA.",
-                        EXIT_FAILURE);
-                }
-                config.rp1_gpio_drive_ma = drive;
-                resolve_backend_specific_config(config);
-                explicit_power_level = true;
-            }
-            catch (const std::exception &e)
-            {
-                print_usage(e.what(), EXIT_FAILURE);
-            }
-            break;
-        }
         case 1043:
         {
             try
@@ -3382,7 +3385,6 @@ bool parse_command_line(int argc, char *argv[])
             {
                 config.transmit_backend =
                     parse_transmit_backend_option(optarg);
-                config.simulated_backend_override = config.transmit_backend == TransmitBackendKind::SIMULATED;
                 if (config.transmit_backend == TransmitBackendKind::SI5351 &&
                     !explicit_power_level)
                 {
@@ -3449,32 +3451,6 @@ bool parse_command_line(int argc, char *argv[])
             }
             break;
         }
-        case 1053:
-        {
-            try
-            {
-                config.si5351_reference_source =
-                    parse_si5351_reference_source_option(optarg);
-            }
-            catch (const std::exception &e)
-            {
-                print_usage(e.what(), EXIT_FAILURE);
-            }
-            break;
-        }
-        case 1054:
-        {
-            try
-            {
-                config.si5351_crystal_load_capacitance_pf =
-                    parse_integer_option(optarg, "--si5351-crystal-load-capacitance");
-            }
-            catch (const std::exception &e)
-            {
-                print_usage(e.what(), EXIT_FAILURE);
-            }
-            break;
-        }
         case 1017:
         {
             try
@@ -3489,32 +3465,32 @@ bool parse_command_line(int argc, char *argv[])
             break;
         }
         // Required arguments
-        case 'p': // Apply GPIO manual PPM
+        case 'p': // Apply PPM
         {
             try
             {
                 double ppm = std::stod(optarg);
                 if (!std::isfinite(ppm))
                 {
-                    print_usage("GPIO manual PPM must be a finite number.", EXIT_FAILURE);
+                    print_usage("Calibration.PPM must be a finite number.", EXIT_FAILURE);
                 }
-                if (ppm < -kMaximumGpioFrequencyCorrectionPpm ||
-                    ppm > kMaximumGpioFrequencyCorrectionPpm)
+                double clamped_ppm = std::clamp(ppm, -200.0, 200.0);
+
+                if (ppm != clamped_ppm)
                 {
-                    print_usage(
-                        "GPIO manual PPM must be within -200 to 200.",
-                        EXIT_FAILURE);
+                    llog.logE(ERROR, "PPM value is outside bounds (-200 to 200), applying clamped value: ", clamped_ppm);
                 }
 
-                config.gpio_manual_ppm = ppm;
-                config.gpio_use_system_clock_frequency_estimate = false;
+                // Apply the clamped value
+                config.ppm = clamped_ppm;
+                config.gpio_use_ntp = false;
                 resolve_backend_specific_config(config);
             }
             catch (const std::exception &)
             {
-                config.gpio_use_system_clock_frequency_estimate = true;
+                config.gpio_use_ntp = true;
                 resolve_backend_specific_config(config);
-                print_usage("GPIO manual PPM must be a number.", EXIT_FAILURE);
+                print_usage("Calibration.PPM must be a number.", EXIT_FAILURE);
             }
             break;
         }
@@ -3640,13 +3616,6 @@ bool parse_command_line(int argc, char *argv[])
                         config.si5351_power_level = power;
                     }
                 }
-                else if (config.transmit_backend == TransmitBackendKind::RP1_GPCLK)
-                {
-                    config.rp1_gpio_drive_ma =
-                        is_supported_rp1_gpio_drive_ma(power)
-                            ? power
-                            : kDefaultRp1GpioDriveMa;
-                }
                 else if (power < 0 or power > 7)
                 {
                     config.gpio_power_level = 7;
@@ -3664,11 +3633,6 @@ bool parse_command_line(int argc, char *argv[])
                 {
                     llog.logE(WARN, "Invalid Si5351 power level, defaulting to 1.");
                     config.si5351_power_level = 1;
-                }
-                else if (config.transmit_backend == TransmitBackendKind::RP1_GPCLK)
-                {
-                    llog.logE(WARN, "Invalid RP1 GPIO drive, defaulting to 2 mA.");
-                    config.rp1_gpio_drive_ma = kDefaultRp1GpioDriveMa;
                 }
                 else
                 {
@@ -3797,9 +3761,7 @@ bool parse_command_line(int argc, char *argv[])
         !qrss_dot_seconds_arg.empty();
     if (any_qrss_arg)
     {
-        // A managed WTP run may take its authenticated transport identity
-        // from the INI while binding one explicit finite startup request.
-        if (config.use_ini && config.transmit_backend != TransmitBackendKind::WTP)
+        if (config.use_ini)
         {
             print_usage("QRSS test mode is invalid when using INI file.", EXIT_FAILURE);
         }
@@ -3839,7 +3801,7 @@ bool parse_command_line(int argc, char *argv[])
         !fskcw_dot_seconds_arg.empty();
     if (any_fskcw_arg)
     {
-        if (config.use_ini && config.transmit_backend != TransmitBackendKind::WTP)
+        if (config.use_ini)
         {
             print_usage("FSKCW test mode is invalid when using INI file.", EXIT_FAILURE);
         }
@@ -3890,7 +3852,7 @@ bool parse_command_line(int argc, char *argv[])
     }
     if (any_dfcw_arg)
     {
-        if (config.use_ini && config.transmit_backend != TransmitBackendKind::WTP)
+        if (config.use_ini)
         {
             print_usage("DFCW test mode is invalid when using INI file.", EXIT_FAILURE);
         }
@@ -3981,9 +3943,6 @@ bool parse_command_line(int argc, char *argv[])
             sync_wspr_mode_config(config);
         }
     }
-    if (explicit_socket_loopback_family && !config.socket_loopback_only)
-        print_usage("--socket-loopback-family requires --socket-loopback-only.", EXIT_FAILURE);
-
     resolve_backend_specific_config(config);
 
     if (config.mode == ModeType::WSPR)

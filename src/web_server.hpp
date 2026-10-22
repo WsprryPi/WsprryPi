@@ -29,24 +29,18 @@
 #ifndef WEB_SERVER_HPP
 #define WEB_SERVER_HPP
 
-#include "support_request_guard.hpp"
+#include "httplib.hpp"
+#include "json.hpp"
 #include <condition_variable>
-#include <functional>
 #include <mutex>
 #include <thread>
 #include <stdexcept>
 #include <iostream>
-#include <memory>
 #include <string>
-
-class SupportBundleJobManager;
-class PrivilegedNetworkAdmin;
-namespace httplib { class Server; struct Response; }
-namespace wsprrypi { class Rp1GpclkRouteService; }
 
 /**
  * @class WebServer
- * @brief A simple web server that runs in a separate thread.
+ * @brief A simple web server that runs in a separate thread with CORS support.
  *
  * @details
  * The WebServer class creates an HTTP server that listens on a user-specified port.
@@ -55,7 +49,7 @@ namespace wsprrypi { class Rp1GpclkRouteService; }
  *  - GET requests by sending a JSON response.
  *  - PUT and PATCH requests by parsing the request body as JSON, printing it for debugging,
  *    and returning a text response.
- *  - OPTIONS requests without granting cross-origin browser access.
+ *  - OPTIONS requests to support CORS preflight, setting the proper headers.
  *
  * The server runs in its own thread and can be stopped cleanly by calling stop(), which uses
  * condition variables for synchronization.
@@ -89,9 +83,6 @@ public:
      */
     void start(int port);
 
-    // True only after the HTTP listener has bound, not merely after thread start.
-    bool isListening();
-
     /**
      * @brief Stops the web server.
      *
@@ -111,17 +102,8 @@ public:
     bool setThreadPriority(int schedPolicy, int priority);
 
 private:
-    friend class WebServerNetworkLifecycleTest;
-
     int port_;                         ///< Port on which the server listens.
-    // Declared before svr so route captures are destroyed before the manager.
-    std::unique_ptr<SupportBundleJobManager> supportBundleJobManager_;
-    std::unique_ptr<PrivilegedNetworkAdmin> privilegedNetworkAdmin_;
-    wsprrypi::Rp1GpclkRouteService* rp1GpclkRouteService_ = nullptr;
-    bool supportBundleRoutesRegistered_ = false;
-    std::function<SupportRequestGuardSnapshot()> network_snapshot_provider_{
-        [] { return SupportRequestGuard::discover_local_networks(); }};
-    std::unique_ptr<httplib::Server> svr; ///< Underlying HTTP server from cpp-httplib.
+    httplib::Server svr;               ///< Underlying HTTP server from cpp-httplib.
     std::thread serverThread;          ///< Thread running the HTTP server.
     std::mutex mtx;                    ///< Mutex for synchronizing start/stop operations.
     std::condition_variable cvStarted; ///< Condition variable to signal when the server has started.

@@ -1,10 +1,8 @@
 const assert = require("assert");
 const fs = require("fs");
-const path = require("path");
 const vm = require("vm");
 
-const sitePath = path.resolve(__dirname, "..", "..", "WsprryPi-UI", "data", "site.js");
-const siteSource = fs.readFileSync(sitePath, "utf8");
+const siteSource = fs.readFileSync("/home/pi/WsprryPi/WsprryPi-UI/data/site.js", "utf8");
 
 function jqueryStub() {
     const chain = {};
@@ -119,17 +117,6 @@ assert.strictEqual(
 );
 assert.strictEqual(comparison.versionComparisonStatus, "local_ahead");
 
-comparison = context.updateCheckCommitComparisonResult(currentSha, targetSha, "diverged");
-assert.strictEqual(
-    comparison.updateAvailable,
-    false,
-    "diverged histories must not report an update"
-);
-assert.strictEqual(comparison.versionComparisonStatus, "diverged");
-
-const compareGithubCommitsUnderTest = context.compareGithubCommits;
-const selectGithubUpdateBranchUnderTest = context.selectGithubUpdateBranch;
-
 vm.runInContext(`
     __semanticUpdateAvailable = false;
     __semanticStatus = "equal";
@@ -191,94 +178,6 @@ async function runBuildPriorityCase({
     assert.strictEqual(context.branchAllowsCommitUpdate("main"), false);
     assert.strictEqual(context.branchAllowsCommitUpdate("gpio_for_amp"), true);
 
-    const buildHttp404 = () => {
-        const error = new Error("not found");
-        error.status = 404;
-        return error;
-    };
-    const normalFetchGithubJson = context.fetchGithubJson;
-    context.fetchGithubJson = async () => {
-        throw buildHttp404();
-    };
-    await assert.rejects(
-        compareGithubCommitsUnderTest(currentSha, targetSha),
-        (error) => error?.code === "comparison_unavailable" && error?.updateCheckFailed === true,
-        "GitHub compare 404 must be a failed/unknown comparison, not an update"
-    );
-    context.fetchGithubJson = normalFetchGithubJson;
-
-    const normalLookupGithubBranch = context.lookupGithubBranch;
-    const normalReachabilityCheck = context.isCurrentShaReachableFromBranchHead;
-    context.lookupGithubBranch = async (branch) => {
-        if (branch === "deleted_feature") {
-            throw buildHttp404();
-        }
-        return { branch, headSha: targetSha };
-    };
-    context.isCurrentShaReachableFromBranchHead = async () => ({
-        contained: false,
-        status: "diverged",
-        uncertain: false,
-    });
-    await assert.rejects(
-        selectGithubUpdateBranchUnderTest({
-            currentSha,
-            currentBranch: "deleted_feature",
-            branchState: "branch",
-        }),
-        (error) => error?.code === "unsafe_target" && error?.updateCheckFailed === true,
-        "missing same-name branch must not fall back to devel without proven containment"
-    );
-    context.isCurrentShaReachableFromBranchHead = async () => ({
-        contained: true,
-        status: "ahead",
-        uncertain: false,
-    });
-    const containedFallback = await selectGithubUpdateBranchUnderTest({
-        currentSha,
-        currentBranch: "deleted_feature",
-        branchState: "branch",
-    });
-    assert.strictEqual(containedFallback.branch, "devel");
-    assert.strictEqual(containedFallback.fallbackUsed, true);
-    assert.ok(containedFallback.selectionReason.includes("containment-gated fallback"));
-
-    context.lookupGithubBranch = async (branch) => {
-        if (branch === "devel") {
-            throw buildHttp404();
-        }
-        return { branch, headSha: targetSha };
-    };
-    context.isCurrentShaReachableFromBranchHead = async () => ({
-        contained: false,
-        status: "behind",
-        uncertain: false,
-    });
-    await assert.rejects(
-        selectGithubUpdateBranchUnderTest({
-            currentSha,
-            currentBranch: "devel",
-            branchState: "branch",
-        }),
-        (error) => error?.code === "unsafe_target" && error?.updateCheckFailed === true,
-        "missing upstream devel must not fall back to main without proven containment"
-    );
-    context.isCurrentShaReachableFromBranchHead = async () => ({
-        contained: true,
-        status: "ahead",
-        uncertain: false,
-    });
-    const containedMainFallback = await selectGithubUpdateBranchUnderTest({
-        currentSha,
-        currentBranch: "devel",
-        branchState: "branch",
-    });
-    assert.strictEqual(containedMainFallback.branch, "main");
-    assert.strictEqual(containedMainFallback.fallbackUsed, true);
-    assert.ok(containedMainFallback.selectionReason.includes("containment-gated fallback"));
-    context.lookupGithubBranch = normalLookupGithubBranch;
-    context.isCurrentShaReachableFromBranchHead = normalReachabilityCheck;
-
     let result = await runBuildPriorityCase({
         branch: "main",
         targetHeadSha: targetSha,
@@ -338,14 +237,14 @@ async function runBuildPriorityCase({
 
     const originalGetElementById = context.document.getElementById;
     let promptAttempts = 0;
-    let promptOptions = null;
-    let refreshModalVisible = false;
-    context.window.WSPRRYPI_INSTALLED_UI_BUILD_ID = "loaded-build";
+    let promptReturnValue = false;
+    context.window.WSPRRYPI_UI_BUILD_ID = "loaded-build";
+    context.window.WSPRRYPI_UI_VERSION = "3.0.0";
     context.document.getElementById = (id) => {
         if (id === "confirmModal") {
             return {
                 classList: {
-                    contains: () => refreshModalVisible,
+                    contains: () => false,
                 },
             };
         }
@@ -353,65 +252,27 @@ async function runBuildPriorityCase({
     };
     context.showConfirmationDialog = (options) => {
         promptAttempts += 1;
-        promptOptions = options;
         assert.strictEqual(options.title, "UI refresh required");
         assert.strictEqual(options.confirmLabel, "Refresh");
-        refreshModalVisible = true;
-        return true;
+        promptReturnValue = promptAttempts > 1;
+        return promptReturnValue;
     };
 
     context.maybePromptForUiRefresh({
-        installed_ui_build_id: "loaded-build",
+        ui_build_id: "server-build",
+        ui_version: "3.0.1",
     });
-    assert.strictEqual(promptAttempts, 0, "a stable installed identity must not prompt");
+    assert.strictEqual(promptAttempts, 1);
 
     context.maybePromptForUiRefresh({
-        ui_build_id: "service-build",
-        ui_version: "9.9.9",
+        ui_build_id: "server-build",
+        ui_version: "3.0.1",
     });
-    assert.strictEqual(promptAttempts, 0, "service version metadata must not prompt");
-
-    context.maybePromptForUiRefresh({
-        installed_ui_build_id: "changed-build",
-    });
-    assert.strictEqual(promptAttempts, 1, "an installed-file change must prompt once");
-    context.maybePromptForUiRefresh({ installed_ui_build_id: "changed-build" });
-    assert.strictEqual(promptAttempts, 1, "an active prompt must not repeat");
-
-    let replacedUrl = "";
-    context.window.location.replace = (url) => { replacedUrl = url; };
-    promptOptions.onConfirm();
-    assert.ok(replacedUrl.includes("ui_refresh=changed-build"), "refresh must cache-bust with the new installed identity");
-
-    refreshModalVisible = false;
-    promptOptions.onCancel();
-    context.maybePromptForUiRefresh({ installed_ui_build_id: "changed-build" });
-    assert.strictEqual(promptAttempts, 1, "a dismissed identity must stay suppressed while stable");
-
-    let historyUrl = "";
-    context.window.history = { replaceState: (_state, _title, url) => { historyUrl = url; } };
-    context.window.location.href = "http://localhost/?ui_refresh=loaded-build";
-    assert.strictEqual(context.checkUiRefreshConvergence(), true);
-    assert.ok(!historyUrl.includes("ui_refresh"), "successful convergence must remove the refresh token");
-
-    let diagnosticMessage = "";
-    let diagnosticShown = false;
-    const diagnostic = {
-        classList: { remove: (name) => { diagnosticShown = name === "d-none"; } },
-        querySelector: () => ({
-            set textContent(value) { diagnosticMessage = value; },
-        }),
-    };
-    context.document.getElementById = (id) => id === "uiConsistencyDiagnostic"
-        ? diagnostic
-        : originalGetElementById(id);
-    context.window.location.href = "http://localhost/?ui_refresh=requested-build";
-    assert.strictEqual(context.checkUiRefreshConvergence(), false);
-    assert.strictEqual(diagnosticShown, true);
-    assert.ok(diagnosticMessage.includes("requested-build"));
-    assert.ok(diagnosticMessage.includes("loaded-build"));
-    context.maybePromptForUiRefresh({ installed_ui_build_id: "another-build" });
-    assert.strictEqual(promptAttempts, 1, "a convergence diagnostic must replace further prompts");
+    assert.strictEqual(
+        promptAttempts,
+        2,
+        "polling must retry the UI refresh prompt when the first modal show attempt does not become active"
+    );
 
     context.document.getElementById = originalGetElementById;
 
@@ -572,7 +433,6 @@ async function runBuildPriorityCase({
     const commitModalText = bodyEl.children.map((child) => child.textContent || "").join("");
     assert.ok(commitModalText.includes("gpio_for_amp+30a9baf"));
     assert.ok(commitModalText.includes("Review the update channel given to you for this pre-release version."));
-    assert.strictEqual(labelEl.textContent, "Newer branch build available");
     assert.ok(!commitModalText.includes("GitHub releases"));
     assert.strictEqual(
         bodyEl.children.some((child) => child.tagName === "a"),
@@ -592,7 +452,6 @@ async function runBuildPriorityCase({
         versionComparisonUsed: "semver",
     }));
     const taggedModalText = bodyEl.children.map((child) => child.textContent || "").join("");
-    assert.strictEqual(labelEl.textContent, "Update available");
     assert.ok(taggedModalText.includes("A release is available for this update: "));
     assert.strictEqual(
         bodyEl.children.some((child) => child.tagName === "a" && child.textContent === "WsprryPi 3.0.1"),

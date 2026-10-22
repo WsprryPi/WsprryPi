@@ -30,19 +30,12 @@
 #define WEBSOCKET_HPP
 
 #include <atomic>
-#include <chrono>
 #include <condition_variable>
 #include <cstdint>
-#include <functional>
 #include <mutex>
-#include <map>
-#include <optional>
 #include <string>
 #include <thread>
 #include <vector>
-
-#include "websocket_listener_config.hpp"
-#include "support_request_guard.hpp"
 
 /**
  * @brief Default keep-alive interval for WebSocket ping frames (in seconds).
@@ -66,8 +59,6 @@ extern const uint32_t SOCKET_KEEPALIVE;
  */
 class WebSocketServer
 {
-    friend class WebSocketLifecycleTest;
-    friend class TestToneLifecycleTest;
 public:
     /**
      * @brief Constructs a new WebSocketServer instance.
@@ -88,19 +79,10 @@ public:
      *
      * @param port Port number to bind (must be between 1024 and 49151).
      * @param keep_alive_secs Keep-alive ping interval in seconds (0 disables ping).
-     * @param loopback_only Restrict the listener to a literal loopback address.
-     * @param loopback_family Family policy used only for a loopback listener.
      * @return true if the server started successfully.
      * @return false if startup failed (e.g. bind or listen error).
      */
-    bool start(
-        uint16_t port,
-        uint32_t keep_alive_secs = 30,
-        bool loopback_only = false,
-        WebSocketLoopbackFamily loopback_family = WebSocketLoopbackFamily::Auto);
-
-    /** Returns the exact bound literal while the listener is running. */
-    const std::string &listening_address() const noexcept;
+    bool start(uint16_t port, uint32_t keep_alive_secs = 30);
 
     /**
      * @brief Stops the server and closes any open connections.
@@ -140,12 +122,6 @@ public:
     void sendAllClients(const std::string &message);
 
 private:
-    struct ClientAuthorizationContext
-    {
-        std::string peer_address;
-        std::string upgrade_request;
-    };
-
     int listen_fd_;             ///< Socket file descriptor for listening.
     std::atomic<bool> running_; ///< Indicates whether the server is running.
     uint32_t keep_alive_secs_;  ///< Interval for keep-alive pings.
@@ -153,59 +129,7 @@ private:
     // For each connection:
     std::mutex clients_mutex_;
     std::vector<int> client_sockets_;
-    std::map<int, ClientAuthorizationContext> client_authorizations_;
-    std::vector<int> handshaking_sockets_;
-    std::size_t active_client_handlers_{0};
-    bool client_registration_closed_{false};
-    std::condition_variable client_handlers_cv_;
-    std::recursive_mutex stop_mutex_;
-    std::mutex test_tone_command_mutex_;
-    std::mutex bounded_tone_mutex_;
-    std::condition_variable bounded_tone_cv_;
-    bool bounded_tone_stop_requested_{false};
-    std::string bounded_tone_request_id_;
-    std::thread bounded_tone_watchdog_;
-    std::uint64_t bounded_tone_generation_{0};
-    std::chrono::steady_clock::time_point bounded_tone_deadline_;
-    // Typed, transient test seams; no production request/configuration surface.
-    std::function<void()> bounded_expiry_ready_for_test_;
-    bool fail_bounded_thread_creation_for_test_{false};
-    std::function<void(const std::string &)> reply_ready_for_test_;
-    std::function<void(const std::string &)> inbound_message_for_test_;
-    void boundedToneLoop();
-    void cancelBoundedTone();
-    bool loopback_only_{false};
-    std::string listening_address_;
-    std::function<SupportRequestGuardSnapshot()> network_snapshot_provider_{
-        [] { return SupportRequestGuard::discover_local_networks(); }};
-
-    enum class StartupFailureStage
-    {
-        None,
-        Socket,
-        ReuseAddress,
-        IPv6Only,
-        Bind,
-        Listen
-    };
-
-    struct StartupAttempt
-    {
-        bool started{false};
-        StartupFailureStage stage{StartupFailureStage::None};
-        int error_number{0};
-    };
-
-    std::function<std::optional<StartupAttempt>(WebSocketLoopbackFamily)>
-        startup_attempt_override_;
-
-    StartupAttempt startLoopbackCandidate(
-        uint16_t port,
-        WebSocketLoopbackFamily family);
-    StartupAttempt startWildcard(uint16_t port);
-    bool finishStart(uint32_t keep_alive_secs);
-    void closeFailedListener() noexcept;
-    static bool ipv6Unavailable(const StartupAttempt &attempt) noexcept;
+    std::vector<std::thread> client_threads_;
 
     std::condition_variable keep_alive_cv_; ///< Conditional to break from loop
     std::mutex keep_alive_mutex_;           ///< Mutex to control loop break
@@ -214,7 +138,7 @@ private:
     // std::mutex client_mutex_;       ///< Mutex to guard access to client socket.
 
     // Helper for per‐client work:
-    void clientLoop(int client_fd, ClientAuthorizationContext authorization);
+    void clientLoop(int client_fd);
 
     /**
      * @brief Main server loop that accepts and manages the client connection.
@@ -238,12 +162,7 @@ private:
      * @param client Socket descriptor for the client.
      * @return true if handshake succeeded, false otherwise.
      */
-    bool performHandshake(
-        int client,
-        const std::string &peer_address,
-        std::string &upgrade_request);
-    [[nodiscard]] bool clientAuthorizationCurrent(
-        const ClientAuthorizationContext &authorization) const;
+    bool performHandshake(int client);
 
     /**
      * @brief Trims whitespace from both ends of a string.
@@ -271,9 +190,6 @@ private:
      * @param message The decoded and unmasked client message.
      */
     void handleMessage(const std::string &message);
-
-    /** Stops and joins any bounded-tone command owned by this server. */
-    void stopBoundedTone();
 
     /**
      * @brief Serialize a given object to JSON and send it to the connected client.

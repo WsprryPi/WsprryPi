@@ -13,8 +13,6 @@ src/*.d
 skills-lock.json
 package.json
 package-lock.json
-!WsprryPi-UI/package.json
-!WsprryPi-UI/package-lock.json
 
 # macOS / AppleDouble files
 .DS_Store

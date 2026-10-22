@@ -1,5 +1,5 @@
 #include "config_handler.hpp"
-#include "band_lookup.hpp"
+#include "wspr_band_lookup.hpp"
 
 #include <cstdlib>
 #include <fstream>
@@ -81,9 +81,7 @@ int main()
     patch_all_from_web({
         {"Band GPIO",
          {{"20m", {{"GPIO", 17}, {"Enabled", true}, {"Active High", true}}},
-          {"40m", {{"GPIO", 27}, {"Enabled", true}, {"Active High", false}}},
-          {"1.25m", {{"GPIO", 6}, {"Enabled", true}, {"Active High", false}}},
-          {"70cm", {{"GPIO", 5}, {"Enabled", true}, {"Active High", true}}}}}
+          {"40m", {{"GPIO", 27}, {"Enabled", true}, {"Active High", false}}}}}
     });
     require(
         config.band_gpio[ham_band_index(HamBand::BAND_20M)].gpio == 17 &&
@@ -91,15 +89,10 @@ int main()
             config.band_gpio[ham_band_index(HamBand::BAND_20M)].active_high &&
             config.band_gpio[ham_band_index(HamBand::BAND_40M)].gpio == 27 &&
             config.band_gpio[ham_band_index(HamBand::BAND_40M)].enabled &&
-            !config.band_gpio[ham_band_index(HamBand::BAND_40M)].active_high &&
-            config.band_gpio[ham_band_index(HamBand::BAND_1_25M)].gpio == 6 &&
-            config.band_gpio[ham_band_index(HamBand::BAND_1_25M)].enabled &&
-            config.band_gpio[ham_band_index(HamBand::BAND_70CM)].gpio == 5 &&
-            config.band_gpio[ham_band_index(HamBand::BAND_70CM)].enabled &&
-            config.band_gpio[ham_band_index(HamBand::BAND_70CM)].active_high,
+            !config.band_gpio[ham_band_index(HamBand::BAND_40M)].active_high,
         "explicit Band GPIO mappings must still be honored");
 
-    BandLookup lookup;
+    WSPRBandLookup lookup;
     require(
         lookup.lookup_ham_band(14095600.0).has_value() &&
             *lookup.lookup_ham_band(14095600.0) == HamBand::BAND_20M,
@@ -115,8 +108,6 @@ int main()
         stock_ini.find("2200m = \n2200m Active High = false") != std::string::npos &&
             stock_ini.find("20m = \n20m Active High = false") != std::string::npos &&
             stock_ini.find("2m =\n2m Active High = false") != std::string::npos &&
-            stock_ini.find("1.25m =\n1.25m Active High = false") != std::string::npos &&
-            stock_ini.find("70cm =\n70cm Active High = false") != std::string::npos &&
             stock_ini.find("Active High = true") == std::string::npos,
         "stock INI must declare explicit disabled Band GPIO defaults for every band");
 

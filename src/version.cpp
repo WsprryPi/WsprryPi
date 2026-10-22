@@ -29,9 +29,6 @@
 // Primary header for this source file
 #include "version.hpp"
 
-#include "build_metadata.hpp"
-#include "backend_capabilities.hpp"
-
 #include "logging.hpp"
 
 // Standard library headers
@@ -45,7 +42,6 @@
 #include <sstream>
 #include <string>
 #include <unordered_map>
-#include <unistd.h>
 
 #ifdef DEBUG_WSPR
 constexpr bool kDebugWspr = true;
@@ -56,8 +52,6 @@ constexpr bool kDebugWspr = false;
 namespace
 {
     std::optional<int> g_pi_generation_override;
-    bool g_hardware_platform_detection_enabled = true;
-    std::optional<bool> g_rp1_gpclk_provider_available_override;
 
     std::optional<int> parse_generation_from_pi_model(
         const std::string &model)
@@ -179,16 +173,6 @@ constexpr std::string_view RAW_BRH = to_string_view(MAKE_RAW_BRH); ///< Raw bran
 constexpr std::string_view BRANCH_STATE = to_string_view(MAKE_BRANCH_STATE); ///< Git branch state.
 constexpr std::string_view SANITIZED_COMMIT = to_string_view(MAKE_COMMIT); ///< Sanitized commit SHA.
 constexpr std::string_view BUILD_DIRTY = to_string_view(MAKE_DIRTY); ///< Build-time dirty state.
-
-std::string get_compiled_backends()
-{
-    return std::string(WSPRRYPI_COMPILED_BACKENDS) + ",wtp";
-}
-
-bool has_ancillary_gpio() noexcept
-{
-    return WSPRRYPI_ANCILLARY_GPIO;
-}
 constexpr std::string_view SANITIZED_EXE = to_string_view(MAKE_EXE); ///< Sanitized executable name.
 constexpr std::string_view SANITIZED_PRJ = to_string_view(MAKE_PRJ); ///< Sanitized project name.
 
@@ -522,9 +506,6 @@ std::string get_pi_model()
 
 int get_raspberry_pi_generation()
 {
-    if (!g_hardware_platform_detection_enabled)
-        return -1;
-
     if (g_pi_generation_override.has_value())
     {
         return *g_pi_generation_override;
@@ -547,11 +528,6 @@ int get_raspberry_pi_generation()
     return -1;
 }
 
-void set_hardware_platform_detection_enabled(bool enabled) noexcept
-{
-    g_hardware_platform_detection_enabled = enabled;
-}
-
 bool platform_supports_gpio_clock_transmission(
     std::string *error_message)
 {
@@ -563,18 +539,8 @@ bool platform_supports_gpio_clock_transmission(
 
     if (generation >= 5)
     {
-        const bool rp1_provider_available =
-            g_rp1_gpclk_provider_available_override.value_or(
-                !g_pi_generation_override.has_value() &&
-                ::access("/dev/rp1-gpclk", R_OK | W_OK) == 0);
-        if (generation == 5 && rp1_provider_available)
-        {
-            return true;
-        }
-
-        std::string message = generation == 5
-            ? "GPIO transmission on Raspberry Pi 5 requires the canonical RP1 GPCLK provider at /dev/rp1-gpclk."
-            : "GPIO transmission mode is unsupported beyond Raspberry Pi 5.";
+        std::string message =
+            "GPIO transmission mode is unsupported on Raspberry Pi 5 and newer.";
         const std::string model = get_pi_model();
         if (!model.empty())
         {
@@ -607,11 +573,6 @@ bool platform_supports_gpio_clock_transmission(
     return false;
 }
 
-bool operator_exposes_rp1_gpio() noexcept
-{
-    return get_raspberry_pi_generation() == 5 && WSPRRYPI_BACKEND_RP1_GPCLK;
-}
-
 void set_raspberry_pi_generation_override_for_test(int generation) noexcept
 {
     g_pi_generation_override = generation;
@@ -620,16 +581,6 @@ void set_raspberry_pi_generation_override_for_test(int generation) noexcept
 void clear_raspberry_pi_generation_override_for_test() noexcept
 {
     g_pi_generation_override.reset();
-}
-
-void set_rp1_gpclk_provider_available_override_for_test(bool available) noexcept
-{
-    g_rp1_gpclk_provider_available_override = available;
-}
-
-void clear_rp1_gpclk_provider_available_override_for_test() noexcept
-{
-    g_rp1_gpclk_provider_available_override.reset();
 }
 
 /**
