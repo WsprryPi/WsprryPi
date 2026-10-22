@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """Check standalone WsprryPi executables against the host OS and ABI."""
 import argparse
+import hashlib
+import json
 import os
 from pathlib import Path
 import re
@@ -10,6 +12,7 @@ import urllib.parse
 import urllib.request
 
 MAX_BINARY = 64 * 1024 * 1024
+MAX_METADATA = 4 * 1024 * 1024
 
 
 def output(*args):
@@ -86,6 +89,89 @@ def download(url, path, limit):
             dest.write(block)
 
 
+def release_base(repo, tag):
+    if not re.fullmatch(r'[A-Za-z0-9_.-]+/WsprryPi', repo):
+        raise ValueError('invalid release repository')
+    if not re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9._+-]*', tag):
+        raise ValueError('invalid release tag')
+    return f'https://github.com/{repo}/releases/download/{urllib.parse.quote(tag, safe="")}/'
+
+
+def read_json(url):
+    request = urllib.request.Request(url, headers={'User-Agent': 'WsprryPi-Installer/1'})
+    with urllib.request.urlopen(request, timeout=30) as response:
+        data = response.read(MAX_METADATA + 1)
+    if len(data) > MAX_METADATA:
+        raise ValueError('release metadata exceeds its size limit')
+    return json.loads(data)
+
+
+def resolve_release(repo, branch):
+    if not re.fullmatch(r'[A-Za-z0-9_.-]+/WsprryPi', repo):
+        raise ValueError('invalid release repository')
+    try:
+        cpu, release = host_target()
+    except ValueError as error:
+        if str(error).startswith('precompiled installs require '):
+            return None
+        raise
+    releases = []
+    for page in range(1, 11):
+        records = read_json(f'https://api.github.com/repos/{repo}/releases?per_page=100&page={page}')
+        if not isinstance(records, list) or len(records) > 100 or not all(isinstance(r, dict) for r in records):
+            raise ValueError('invalid release listing')
+        releases.extend(r for r in records if not r.get('draft') and r.get('published_at'))
+        if len(records) < 100:
+            break
+    else:
+        raise ValueError('release listing exceeds its page limit')
+    releases.sort(key=lambda r: (r['published_at'], r.get('id', 0)), reverse=True)
+    name = f'wsprrypi-{cpu}-{release}'
+    for record in releases:
+        assets = record.get('assets', [])
+        if not isinstance(assets, list) or not all(isinstance(a, dict) for a in assets):
+            raise ValueError('invalid release asset listing')
+        matches = [a for a in assets if a.get('name') == name and a.get('state') == 'uploaded']
+        if not matches:
+            continue
+        if len(matches) != 1:
+            raise ValueError('ambiguous released executable')
+        tag = record.get('tag_name', '')
+        base = release_base(repo, tag)
+        branch_name = record.get('target_commitish')
+        manifest = None
+        if any(a.get('name') == 'publication-manifest.json' and a.get('state') == 'uploaded' for a in assets):
+            manifest = read_json(base + 'publication-manifest.json')
+            if not isinstance(manifest, dict) or manifest.get('release_tag') != tag:
+                raise ValueError('publication manifest does not identify its release')
+            executable = manifest.get('executable_source')
+            if not isinstance(executable, dict) or not isinstance(executable.get('branch'), str):
+                raise ValueError('publication manifest has no executable branch')
+            branch_name = executable['branch']
+        if branch_name != branch:
+            continue
+        asset = matches[0]
+        if type(asset.get('size')) is not int or not 0 < asset['size'] <= MAX_BINARY:
+            raise ValueError('invalid released executable size')
+        checksum = ''
+        if asset.get('digest'):
+            if not re.fullmatch(r'sha256:[0-9a-f]{64}', asset['digest']):
+                raise ValueError('invalid released executable checksum')
+            checksum = asset['digest'][7:]
+        if manifest is not None:
+            inventory = manifest.get('assets')
+            if not isinstance(inventory, list) or not all(isinstance(a, dict) for a in inventory):
+                raise ValueError('invalid publication manifest asset inventory')
+            declared = [a for a in inventory if a.get('name') == name]
+            if len(declared) != 1 or declared[0].get('bytes') != asset['size'] or not re.fullmatch(r'[0-9a-f]{64}', str(declared[0].get('sha256', ''))):
+                raise ValueError('publication manifest does not identify the released executable')
+            if checksum and checksum != declared[0]['sha256']:
+                raise ValueError('released executable checksums disagree')
+            checksum = declared[0]['sha256']
+        return tag, checksum
+    return None
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     sub = parser.add_subparsers(dest='action', required=True)
@@ -94,22 +180,30 @@ def main():
     check.add_argument('--full', action='store_true')
     check.add_argument('--runtime-user')
     check.add_argument('--field', choices=('version', 'runtime_packages'))
+    resolve = sub.add_parser('resolve')
+    resolve.add_argument('--repo', required=True)
+    resolve.add_argument('--branch', required=True)
     fetch = sub.add_parser('fetch')
     fetch.add_argument('--repo', required=True)
     fetch.add_argument('--tag', required=True)
     fetch.add_argument('--directory', required=True)
+    fetch.add_argument('--sha256')
     args = parser.parse_args()
     try:
-        if args.action == 'fetch':
+        if args.action == 'resolve':
+            selected = resolve_release(args.repo, args.branch)
+            print('build' if selected is None else f'release {selected[0]} {selected[1] or "-"}')
+        elif args.action == 'fetch':
             cpu, release = host_target()
-            if not re.fullmatch(r'[A-Za-z0-9_.-]+/WsprryPi', args.repo):
-                raise ValueError('invalid release repository')
-            if not re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9._+-]*', args.tag):
-                raise ValueError('invalid release tag')
             name = f'wsprrypi-{cpu}-{release}'
-            base = f'https://github.com/{args.repo}/releases/download/{urllib.parse.quote(args.tag, safe="")}/{name}'
+            url = release_base(args.repo, args.tag) + name
+            if args.sha256 and not re.fullmatch(r'[0-9a-f]{64}', args.sha256):
+                raise ValueError('invalid expected executable checksum')
             directory = Path(args.directory)
-            download(base, directory / 'wsprrypi', MAX_BINARY)
+            binary = directory / 'wsprrypi'
+            download(url, binary, MAX_BINARY)
+            if args.sha256 and hashlib.sha256(binary.read_bytes()).hexdigest() != args.sha256:
+                raise ValueError('released executable checksum mismatch')
         else:
             cpu, release = host_target()
             elf_header(args.binary, cpu)

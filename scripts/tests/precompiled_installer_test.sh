@@ -11,6 +11,53 @@ trap 'rm -rf "$fixture"' EXIT
 logI() { :; }; logE() { :; }; logW() { :; }
 expect_failure() { if "$@"; then echo "Expected failure: $*" >&2; exit 1; fi; }
 contains_pkg() { printf '%s\n' "${RESOLVED_APT_PACKAGES[@]}" | grep -Fxq -- "$1"; }
+# Automatic resolution runs before packages/resources, and explicit builds do
+# not consult release metadata. Never compile as a consequence of a failed lookup.
+(
+    python3() { printf '%s\n' "$selection_fixture"; }
+    BINARY_SOURCE=auto
+    selection_fixture="release v4.0.0-beta.1 $(printf '%064d' 0)"
+    resolve_binary_source
+    [[ "$BINARY_SOURCE" == release && "$BINARY_RELEASE_TAG" == v4.0.0-beta.1 ]]
+    [[ "$BINARY_RELEASE_SHA256" == "$(printf '%064d' 0)" ]]
+    INSTALL_RP1_GPCLK_DKMS=false
+    BUILD_RESOURCE_MEMINFO_PATH=/does/not/exist
+    preflight_build_resources
+    compile_binary() { printf called >"$fixture/unwanted-build"; }
+    validate_precompiled_runtime() { :; }
+    prepare_install_executable wsprrypi
+    [[ ! -e "$fixture/unwanted-build" ]]
+    BINARY_SOURCE=auto
+    BINARY_RELEASE_TAG=
+    selection_fixture=build
+    resolve_binary_source
+    [[ "$BINARY_SOURCE" == build ]]
+    python3() { printf called >"$fixture/unwanted-lookup"; return 17; }
+    BINARY_SOURCE=build
+    resolve_binary_source
+    [[ ! -e "$fixture/unwanted-lookup" ]]
+    BINARY_SOURCE=auto
+    BUILD_TYPE_OVERRIDE=DEBUG
+    resolve_binary_source
+    [[ "$BINARY_SOURCE" == build && ! -e "$fixture/unwanted-lookup" ]]
+    BUILD_TYPE_OVERRIDE=invalid
+    BINARY_SOURCE=auto
+    expect_failure resolve_binary_source
+    [[ "$BINARY_SOURCE" == auto && ! -e "$fixture/unwanted-lookup" ]]
+    BUILD_TYPE_OVERRIDE=
+    # shellcheck disable=SC2119
+    set_release_build
+    [[ "$BINARY_SOURCE" == build && ! -e "$fixture/unwanted-lookup" ]]
+    BUILD_TYPE_OVERRIDE=
+    BINARY_SOURCE=auto
+    DRY_RUN=true
+    resolve_binary_source
+    [[ "$BINARY_SOURCE" == auto && ! -e "$fixture/unwanted-lookup" ]]
+    DRY_RUN=false
+    expect_failure resolve_binary_source
+    [[ "$BINARY_SOURCE" == auto ]]
+)
+
 # An outside-checkout invocation must not use an existing directory as its
 # selected source. In particular, the nonempty string "false" is not consent
 # to reuse its helper, UI, configuration, or service templates.

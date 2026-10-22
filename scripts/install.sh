@@ -253,9 +253,10 @@ declare RP1_GPCLK_DKMS_STATE_DIR=""
 declare RP1_GPCLK_DKMS_HELPER=""
 declare RP1_GPCLK_DKMS_PROVIDER_REMOVAL_UNPROVEN="false"
 declare -a RESOLVED_APT_PACKAGES=()
-declare BINARY_SOURCE="${BINARY_SOURCE:-build}"
+declare BINARY_SOURCE="${BINARY_SOURCE:-auto}"
 declare BINARY_PATH="${BINARY_PATH:-}"
 declare BINARY_RELEASE_TAG="${BINARY_RELEASE_TAG:-}"
+declare BINARY_RELEASE_SHA256=""
 declare BINARY_STAGE=""
 declare BINARY_VERSION=""
 declare -a BINARY_RUNTIME_PACKAGES=()
@@ -5948,7 +5949,7 @@ OPTIONS_LIST=(
     "-h|--help 0 usage Show these instructions 1"
     "-v|--version 0 print_version Display $WSPR_SERVICE version 1"
     "--no-web 0 set_no_web Disable web UI installation and Apache integration (service will run with --no-web) 0"
-    "--binary-source 1 set_binary_source Choose build (default), local, or release executable 0"
+    "--binary-source 1 set_binary_source Choose auto (default), build, local, or release executable 0"
     "--binary-path 1 set_binary_path Use a local executable (default: invoking user's ~/wsprrypi) 0"
     "--release-tag 1 set_binary_release_tag Select the release tag for --binary-source release 0"
     "--release 0 set_release_build Build as release regardless of branch 0"
@@ -5996,6 +5997,7 @@ set_release_build() {
     eval set -- "$(debug_filter "$@")"
 
     BUILD_TYPE_OVERRIDE="RELEASE"
+    [[ "$BINARY_SOURCE" != "auto" ]] || BINARY_SOURCE=build
     resolve_build_settings "$debug"
     if [[ "${LOG_LEVEL_SET_FROM_ENV}" != "true" ]]; then
         LOG_LEVEL="INFO"
@@ -6981,7 +6983,7 @@ run_precompiled_helper() {
 
 validate_binary_options() {
     case "$BINARY_SOURCE" in
-        build)
+        auto|build)
             [[ -z "$BINARY_PATH$BINARY_RELEASE_TAG" ]] || {
                 logE "Binary path/tag options require --binary-source local or release."; return 1;
             } ;;
@@ -6993,12 +6995,62 @@ validate_binary_options() {
             }
             [[ "$BINARY_RELEASE_TAG" =~ ^[A-Za-z0-9][A-Za-z0-9._+-]*$ ]] || { logE "Invalid release tag."; return 1; }
             ;;
-        *) logE "--binary-source must be build, local, or release."; return 1 ;;
+        *) logE "--binary-source must be auto, build, local, or release."; return 1 ;;
     esac
+    if [[ "$ACTION" == "uninstall" && "$BINARY_SOURCE" == "auto" ]]; then
+        BINARY_SOURCE=build
+    fi
     if [[ "$ACTION" == "uninstall" && "$BINARY_SOURCE" != "build" ]]; then
         logE "Uninstall does not take executable-source options. Run uninstall without them."
         return 1
     fi
+}
+
+# Resolve before resource estimates and APT package selection. A lookup failure
+# is not evidence that no released binary exists, so it never triggers a build.
+resolve_binary_source() {
+    [[ "$BINARY_SOURCE" == "auto" ]] || return 0
+    case "${BUILD_TYPE_OVERRIDE^^}" in
+        DEBUG) BINARY_SOURCE=build; return 0 ;;
+        ""|RELEASE) ;;
+        *) logE "BUILD_TYPE_OVERRIDE must be DEBUG or RELEASE."; return 1 ;;
+    esac
+    if [[ "$DRY_RUN" == "true" ]]; then
+        logI "Dry run: would select the newest released executable for branch $REPO_BRANCH; build only if none exists."
+        return 0
+    fi
+    local script_source="${BASH_SOURCE[0]:-}" helper="" helper_source="" selection=""
+    local selected_source="" selected_tag="" selected_sha="" extra=""
+    if [[ -n "$script_source" && "$script_source" != "bash" ]]; then
+        helper="$(cd "$(dirname "$script_source")" && pwd -P)/precompiled_binary.py"
+    fi
+    if [[ -n "$helper" && -f "$helper" ]]; then
+        run_precompiled_helper selection "$helper" resolve --repo "$REPO_ORG/$REPO_NAME" --branch "$REPO_BRANCH" || return 1
+    else
+        helper_source=$(curl --proto '=https' --tlsv1.2 --fail --silent --show-error --max-filesize 262144 \
+            "$GIT_RAW_BASE/$REPO_ORG/$REPO_NAME/$REPO_BRANCH/scripts/precompiled_binary.py") || {
+            logE "Unable to load the released-executable selector."
+            return 1
+        }
+        run_precompiled_helper selection -c "$helper_source" resolve --repo "$REPO_ORG/$REPO_NAME" --branch "$REPO_BRANCH" || return 1
+    fi
+    IFS=' ' read -r selected_source selected_tag selected_sha extra <<<"$selection"
+    case "$selected_source" in
+        build)
+            [[ -z "$selected_tag$selected_sha$extra" ]] || return 1
+            BINARY_SOURCE=build
+            logI "No compatible released executable for branch $REPO_BRANCH; building from source."
+            ;;
+        release)
+            [[ "$selected_tag" =~ ^[A-Za-z0-9][A-Za-z0-9._+-]*$ && -z "$extra" &&
+                ( "$selected_sha" == "-" || "$selected_sha" =~ ^[0-9a-f]{64}$ ) ]] || return 1
+            BINARY_SOURCE=release
+            BINARY_RELEASE_TAG="$selected_tag"
+            [[ "$selected_sha" == "-" ]] || BINARY_RELEASE_SHA256="$selected_sha"
+            logI "Selected released executable $BINARY_RELEASE_TAG for branch $REPO_BRANCH."
+            ;;
+        *) logE "Invalid released-executable selection."; return 1 ;;
+    esac
 }
 
 cleanup_precompiled_executable() {
@@ -7060,7 +7112,9 @@ prepare_precompiled_executable() {
         # Caller-owned files are copied, never removed, and checked after copying.
         exec_command "Stage precompiled executable" cp -- "$binary" "$BINARY_STAGE/wsprrypi" "$@" || return 1
     else
-        run_precompiled_helper '' "$helper" fetch --repo "$REPO_ORG/$REPO_NAME" --tag "$BINARY_RELEASE_TAG" --directory "$BINARY_STAGE" || return 1
+        local fetch_args=(fetch --repo "$REPO_ORG/$REPO_NAME" --tag "$BINARY_RELEASE_TAG" --directory "$BINARY_STAGE")
+        [[ -z "$BINARY_RELEASE_SHA256" ]] || fetch_args+=(--sha256 "$BINARY_RELEASE_SHA256")
+        run_precompiled_helper '' "$helper" "${fetch_args[@]}" || return 1
     fi
     exec_command "Set precompiled executable permissions" chmod 755 "$BINARY_STAGE/wsprrypi" "$@" || return 1
     run_precompiled_helper packages "$helper" check --binary "$BINARY_STAGE/wsprrypi" --field runtime_packages || return 1
@@ -9909,7 +9963,9 @@ display_action_notes() {
         if rp1_gpclk_dkms_installation_selected; then
             logI "Resolve RP1-GPCLK-DKMS installation plan."
         fi
-        if [[ "$BINARY_SOURCE" != "build" ]]; then
+        if [[ "$BINARY_SOURCE" == "auto" ]]; then
+            logI "Dry run: release availability is unresolved; application build steps depend on that selection."
+        elif [[ "$BINARY_SOURCE" != "build" ]]; then
             logI "Using the $BINARY_SOURCE executable; application build disabled."
             if [[ "$DRY_RUN" == "true" ]]; then
                 logI "Dry run: would validate and stage the $BINARY_SOURCE executable; no download or copy performed."
@@ -9988,6 +10044,7 @@ _main() {
     validate_sys_accs "$debug" # Verify critical system files are accessible
     validate_env_vars "$debug" # Check for required environment variables
     get_proj_params "$debug"   # Get project and git parameters
+    resolve_binary_source || return 1
     [[ "$BINARY_SOURCE" == "build" ]] || BUILD_TYPE_OVERRIDE="RELEASE"
     resolve_build_settings "$debug"
     if [[ "${LOG_LEVEL_SET_FROM_ENV}" != "true" ]]; then

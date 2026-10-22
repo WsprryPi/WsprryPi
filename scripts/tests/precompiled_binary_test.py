@@ -137,6 +137,70 @@ class BinaryTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 m.download('https://example.invalid/asset', self.root / 'download', 4)
 
+    def released(self, tag='v4.0.0-beta.1', target='devel', date='2026-10-21T00:00:00Z', manifest=False):
+        assets=[{'name':'wsprrypi-aarch64-trixie','state':'uploaded','size':64,'digest':'sha256:'+'a'*64}]
+        if manifest:
+            assets.append({'name':'publication-manifest.json','state':'uploaded'})
+        return {'id':1,'tag_name':tag,'target_commitish':target,'published_at':date,
+                'draft':False,'prerelease':True,'assets':assets}
+
+    def test_newest_published_binary_is_bound_to_executable_branch(self):
+        records=[self.released('v9.0.0','main','2026-10-22T00:00:00Z'),
+                 self.released('v3.0.0','devel','2026-01-01T00:00:00Z'),
+                 self.released(target='b'*40,manifest=True)]
+        manifest={'release_tag':'v4.0.0-beta.1','executable_source':{'branch':'devel'},
+                  'assets':[{'name':'wsprrypi-aarch64-trixie','bytes':64,'sha256':'a'*64}]}
+        with patch.object(m,'host_target',return_value=('aarch64','trixie')), \
+             patch.object(m,'read_json',side_effect=lambda url: records if '/releases?' in url else manifest):
+            self.assertEqual(m.resolve_release('WsprryPi/WsprryPi','devel'),('v4.0.0-beta.1','a'*64))
+
+    def test_automatic_selection_matches_all_four_binary_targets(self):
+        for cpu in ('armv6','aarch64'):
+            for release in ('bookworm','trixie'):
+                record=self.released()
+                record['assets'][0]['name']=f'wsprrypi-{cpu}-{release}'
+                with self.subTest(cpu=cpu,release=release), \
+                     patch.object(m,'host_target',return_value=(cpu,release)), \
+                     patch.object(m,'read_json',return_value=[record]):
+                    self.assertEqual(m.resolve_release('WsprryPi/WsprryPi','devel'),('v4.0.0-beta.1','a'*64))
+
+    def test_no_matching_branch_or_asset_allows_source_build(self):
+        for records in ([],[self.released(target='main')],[self.released(target='b'*40)],
+                        [{**self.released(),'assets':[]}],[{**self.released(),'draft':True}]):
+            with self.subTest(records=records),patch.object(m,'host_target',return_value=('aarch64','trixie')), \
+                 patch.object(m,'read_json',return_value=records):
+                self.assertIsNone(m.resolve_release('WsprryPi/WsprryPi','devel'))
+
+    def test_broken_release_metadata_does_not_allow_compilation_fallback(self):
+        for manifest in (
+                {'release_tag':'wrong'},
+                {'release_tag':'v4.0.0-beta.1','executable_source':{'branch':'devel'},'assets':[]},
+                {'release_tag':'v4.0.0-beta.1','executable_source':{'branch':'devel'},
+                 'assets':[{'name':'wsprrypi-aarch64-trixie','bytes':64,'sha256':'b'*64}]}):
+            with self.subTest(manifest=manifest),patch.object(m,'host_target',return_value=('aarch64','trixie')), \
+                 patch.object(m,'read_json',side_effect=[[self.released(manifest=True)],manifest]), \
+                 self.assertRaises(ValueError):
+                m.resolve_release('WsprryPi/WsprryPi','devel')
+        with patch.object(m,'host_target',return_value=('aarch64','trixie')), \
+             patch.object(m,'read_json',side_effect=OSError('offline')),self.assertRaises(OSError):
+            m.resolve_release('WsprryPi/WsprryPi','devel')
+
+    def test_release_resolver_paginates_before_selecting_newest_publication(self):
+        first=[{**self.released(),'assets':[]} for _ in range(100)]
+        with patch.object(m,'host_target',return_value=('aarch64','trixie')), \
+             patch.object(m,'read_json',side_effect=[first,[self.released()]]) as read:
+            self.assertEqual(m.resolve_release('WsprryPi/WsprryPi','devel'),('v4.0.0-beta.1','a'*64))
+            self.assertIn('page=2',read.call_args.args[0])
+
+    def test_fetch_rejects_checksum_mismatch(self):
+        argv=['helper','fetch','--repo','WsprryPi/WsprryPi','--tag','v4.0.0-beta.1',
+              '--directory',str(self.root),'--sha256','a'*64]
+        with patch.object(m,'host_target',return_value=('aarch64','trixie')), \
+             patch.object(m,'download',side_effect=lambda url,path,limit:path.write_bytes(b'corrupt')), \
+             patch.object(sys,'argv',argv),self.assertRaises(SystemExit) as failure:
+            m.main()
+        self.assertEqual(failure.exception.code,1)
+
     def test_release_asset_selection(self):
         for cpu in ('armv6', 'aarch64'):
             for release in ('bookworm', 'trixie'):

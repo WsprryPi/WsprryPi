@@ -66,11 +66,17 @@ apt-get() {
         *) return 93;;
     esac
 }
-curl() { cp "$RP1_HELPER" "$RP1_GPCLK_DKMS_HELPER"; }
+curl() {
+    if [[ "${*: -1}" == */scripts/precompiled_binary.py ]]; then
+        cat "$BINARY_HELPER"
+    else
+        cp "$RP1_HELPER" "$RP1_GPCLK_DKMS_HELPER"
+    fi
+}
 validate_precompiled_runtime() { :; }
 validate_rp1_gpclk_build_dependencies() { record rp1-dependencies; }
 apply_rp1_gpclk_dkms_installation() { record provider; }
-prepare_install_executable() { record application; }
+prepare_install_executable() { printf "%s\n" "$BINARY_SOURCE" >"$RESOLVED_BINARY"; record application; }
 rollback_executable() { record rollback; }
 
 runuser() {
@@ -141,6 +147,17 @@ if os.environ["FAIL_AT"] == "plan":
     print("RP1-GPCLK-DKMS operation refused: fixture source rejected", file=sys.stderr)
     sys.exit(17)
 ''', encoding="utf-8")
+        self.binary_helper = self.root / "binary-helper.py"
+        self.binary_helper.write_text('''import os, sys
+from pathlib import Path
+with Path(os.environ["EVENTS"]).open("a") as events:
+    events.write("binary-resolution\\n")
+result=os.environ.get("AUTO_BINARY_RESULT","release")
+if result=="failure":
+    print("fixture release lookup failed",file=sys.stderr)
+    sys.exit(17)
+print("release v4.0.0-beta.1 "+"a"*64 if result=="release" else "build")
+''',encoding="utf-8")
         self.age_root = self.root / "age-root"
         (self.age_root / "usr/bin").mkdir(parents=True)
         for name in ("age", "age-keygen"):
@@ -158,6 +175,7 @@ if os.environ["FAIL_AT"] == "plan":
             DRY_RUN="false", REPO_BRANCH="main", NO_WEB="true",
             PATH=str(self.bin), FIXTURE_BIN=str(self.bin), GIT_STUB=str(self.git_stub),
             RP1_HELPER=str(self.rp1_helper), RP1_SELECTED="false",
+            BINARY_HELPER=str(self.binary_helper), RESOLVED_BINARY=str(self.root / "resolved-binary"),
         )
         environment.update(values)
         source = INSTALLER.read_text(encoding="utf-8")
@@ -187,6 +205,38 @@ if os.environ["FAIL_AT"] == "plan":
                     "rp1-dependencies", "provider", "application",
                 ])
                 self.assertIn("Complete: Validate support-bundle encryption tools.", result.stdout)
+
+    def test_default_resolves_branch_release_before_resource_and_package_selection(self) -> None:
+        for result in ("release", "build"):
+            with self.subTest(result=result):
+                home=self.root / result
+                home.mkdir()
+                self.events.unlink(missing_ok=True)
+                (self.bin / "git").unlink(missing_ok=True)
+                run=self.run_installer(USER_HOME=str(home),REPO_BRANCH="devel",
+                                       BINARY_SOURCE="",AUTO_BINARY_RESULT=result)
+                self.assertEqual(run.returncode,0,run.stdout+run.stderr)
+                self.assertEqual((self.root / "resolved-binary").read_text().strip(),result)
+                events=self.recorded_events()
+                self.assertLess(events.index("binary-resolution"),events.index("resources"))
+                self.assertLess(events.index("binary-resolution"),events.index("apt-update"))
+                lines=run.stdout.splitlines()
+                self.assertLess(max(i for i,line in enumerate(lines) if "[INFO ]" in line),
+                                min(i for i,line in enumerate(lines) if "Running:" in line))
+
+    def test_default_lookup_failure_stops_without_compiling_or_installing_packages(self) -> None:
+        result=self.run_installer(BINARY_SOURCE="",AUTO_BINARY_RESULT="failure")
+        self.assertNotEqual(result.returncode,0)
+        self.assertEqual(self.recorded_events(),["binary-resolution"])
+        self.assertFalse((self.bin / "git").exists())
+        self.assertIn("fixture release lookup failed",result.stderr)
+
+    def test_default_dry_run_does_not_resolve_or_download_release(self) -> None:
+        result=self.run_installer(BINARY_SOURCE="",DRY_RUN="true")
+        self.assertEqual(result.returncode,0,result.stdout+result.stderr)
+        self.assertNotIn("binary-resolution",self.recorded_events())
+        self.assertFalse(self.checkout.exists())
+        self.assertIn("release availability is unresolved",result.stdout)
 
     def test_all_info_precedes_command_progress(self) -> None:
         for mode in ("build", "local", "release"):

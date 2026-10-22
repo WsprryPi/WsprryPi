@@ -84,6 +84,10 @@ boundaries. Successful dry runs end with an explicit notice that the selected
 plan completed without applying changes; they do not report an installation or
 uninstallation as completed.
 
+## Default executable selection
+
+The installer downloads the newest released executable matching the selected branch and the Pi's OS/userspace architecture. Branch identity comes from the publication manifest's executable source or a branch-named release target. It builds only when no matching binary is published, or when `--binary-source build`, `--release`, or a debug build override explicitly requests compilation. Failed lookups and invalid downloads stop installation; they do not trigger a source build. Explicit local and release-tag selections remain supported. See [precompiled installation](../docs/precompiled-installation.md) for validation, checksum and dry-run behavior.
+
 ## Low-memory build preflight
 
 Before an approved installation changes packages, services, or compiled artifacts, the installer records total and available RAM and inventories active swap. Resource planning and other INFO notices appear before command progress begins; any required temporary swap is created after these notices and before package installation. Compressed RAM swap such as `/dev/zram0` is reported but is not counted as independently backed capacity for the compile gate. Systems below 1.5 GiB of RAM are forced to single-job compilation. They must also have this much *free* file- or partition-backed swap:

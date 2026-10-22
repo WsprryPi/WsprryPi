@@ -1,9 +1,16 @@
 # Installing a precompiled executable
 
-The installer builds from source by default. To use an existing executable,
-select `--binary-source local`. Only the executable is required; no sidecar,
-source fingerprint, or matching Git commit is needed. Supporting files use the
-normal installer workflow.
+The installer selects the newest published executable for the selected source branch and the Pi's OS/userspace architecture by default. Published prereleases are eligible when their executable branch matches. The release target identifies the branch when it names one; a published `publication-manifest.json` identifies the executable branch when the release target is a commit SHA. Supporting files still come from the selected application checkout or branch.
+
+If no compatible published executable exists for that branch, the installer builds from source. A release lookup or validation failure stops installation rather than silently compiling. An explicit `--binary-source build`, `--release`, or debug build override requests compilation. Explicit local and tagged-release choices remain available through `--binary-source local` and `--binary-source release`.
+
+To force a source build from a checkout:
+
+```sh
+sudo ./scripts/install.sh --binary-source build
+```
+
+To use an existing executable, select `--binary-source local`. Only the executable is required; no sidecar, source fingerprint, or matching Git commit is needed.
 
 Run from the intended application checkout to select its supporting files.
 Outside a checkout, an existing destination directory is refused; it is not
@@ -88,11 +95,12 @@ selected GitHub release, where `<cpu>` is `armv6` or `aarch64` and `<release>` i
 `bookworm` or `trixie`. This selects the executable only; normal installer
 branch selection controls supporting files. A missing or incompatible asset
 fails the installation without falling back to compilation. Release download
-support does not perform a published-checksum comparison. To install independently
-checked bytes, use the guide's local-binary procedure. Beta public-download
+support performs a checksum comparison when automatic selection supplies the published manifest or GitHub asset checksum. An explicit tagged-release invocation without an expected checksum retains its existing validation behavior. To install independently checked bytes, use the guide's local-binary procedure. Beta public-download
 verification is tracked in the [release evidence](../release_tools/4.0-Beta-1-Release-Evidence.md);
 draft or dry-run checks alone do not establish public availability.
 
 `--dry-run` performs no downloads, package installation, executable replacement,
 or service changes. A local executable receives a basic ELF check; dependency
 and version checks wait for a real installation.
+
+Automatic selection resolves the release before build-resource estimates and package selection. A selected executable skips application compilation, its time/parallelism estimates, and application build dependencies. Optional RP1 provider preparation remains separate. Dry runs do not query release metadata or download executables; they report that release availability and any source-build fallback remain unresolved.

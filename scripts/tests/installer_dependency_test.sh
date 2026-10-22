@@ -103,6 +103,7 @@ done
     }
 
     INSTALL_RP1_GPCLK_DKMS=false
+    BINARY_SOURCE=build
     resolve_apt_package_list libgpiod-runtime-test
     contains_package build-essential "${RESOLVED_APT_PACKAGES[@]}"
     contains_package python3 "${RESOLVED_APT_PACKAGES[@]}"
