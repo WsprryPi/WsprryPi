@@ -139,6 +139,32 @@ for policy in auto true false; do
     done
 done
 
+# Installer planning reports resources and selects -j1 before the information
+# block, then creates swap only when the command phase starts.
+reset_case
+write_meminfo 524288 262144
+preflight_build_resources defer-swap
+assert_eq "$JOBS" 1
+assert_eq "$PLANNED_BUILD_SWAP_REQUIRED_KB" 2097152
+assert_eq "$PLANNED_BUILD_SWAP_AVAILABLE_KB" 0
+[[ ! -e "$SWAP_ROOT" ]] || fail "resource planning created swap before command progress"
+apply_build_resource_plan
+[[ -f "$TEMP_BUILD_SWAP_PATH" ]] || fail "deferred resource preparation did not create swap"
+assert_eq "$PLANNED_BUILD_SWAP_REQUIRED_KB" 0
+planned_swap_path="$TEMP_BUILD_SWAP_PATH"
+apply_build_resource_plan
+assert_eq "$TEMP_BUILD_SWAP_PATH" "$planned_swap_path"
+cleanup_temp_build_swap
+
+reset_case
+write_meminfo 524288 262144
+DRY_RUN=true
+preflight_build_resources defer-swap
+assert_eq "$PLANNED_BUILD_SWAP_REQUIRED_KB" 0
+apply_build_resource_plan
+[[ ! -e "$SWAP_ROOT" ]] || fail "deferred dry-run created swap state"
+grep -q 'Dry run: would create' "$TEST_LOG" || fail "deferred dry-run omitted the swap plan"
+
 # A precompiled application bypasses resources unless provider compilation is selected.
 for binary_source in local release; do
     reset_case

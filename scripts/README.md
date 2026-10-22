@@ -86,12 +86,7 @@ uninstallation as completed.
 
 ## Low-memory build preflight
 
-Before an approved installation changes packages, services, or compiled
-artifacts, the installer records total and available RAM and inventories active
-swap. Compressed RAM swap such as `/dev/zram0` is reported but is not counted as
-independently backed capacity for the compile gate. Systems below 1.5 GiB of RAM
-are forced to single-job compilation. They must also have this much *free*
-file- or partition-backed swap:
+Before an approved installation changes packages, services, or compiled artifacts, the installer records total and available RAM and inventories active swap. Resource planning and other INFO notices appear before command progress begins; any required temporary swap is created after these notices and before package installation. Compressed RAM swap such as `/dev/zram0` is reported but is not counted as independently backed capacity for the compile gate. Systems below 1.5 GiB of RAM are forced to single-job compilation. They must also have this much *free* file- or partition-backed swap:
 
 - below 768 MiB RAM: 2 GiB
 - from 768 MiB up to, but not including, 1.5 GiB RAM: 1 GiB

@@ -207,6 +207,8 @@ declare BUILD_RESOURCE_VERY_LOW_RAM_SWAP_KB=$((2048 * 1024))
 declare BUILD_RESOURCE_DISK_RESERVE_KB=$((512 * 1024))
 declare BUILD_RESOURCE_SWAP_METADATA_ALLOWANCE_KB=1024
 declare BUILD_RESOURCE_SWAP_ALLOCATION_QUANTUM_KB=1024
+declare PLANNED_BUILD_SWAP_REQUIRED_KB=0
+declare PLANNED_BUILD_SWAP_AVAILABLE_KB=0
 declare TEMP_BUILD_SWAP_PATH=""
 declare TEMP_BUILD_SWAP_OWNED="false"
 declare TEMP_BUILD_SWAP_ACTIVE="false"
@@ -1997,7 +1999,7 @@ exec_command() {
     fi
 
     case "$status_mode" in
-        execution|info) ;;
+        execution|info|quiet) ;;
         *)
             warn "Unsupported exec_command status mode: $status_mode"
             debug_end "$debug"
@@ -2024,11 +2026,12 @@ exec_command() {
         fi
     fi
 
-    # Read-only planning is useful operator context, not a completed mutation.
-    # Keep it inside this wrapper so dry runs still suppress command execution
-    # and debug mode still renders the exact argv.
-    if [[ "$status_mode" == "info" ]]; then
-        logI "$exec_name."
+    # Read-only helpers may report context or stay quiet after the initial
+    # informational phase. Both modes retain dry-run and failure handling.
+    if [[ "$status_mode" != "execution" ]]; then
+        if [[ "$status_mode" == "info" ]]; then
+            logI "$exec_name."
+        fi
         if [[ "$DRY_RUN" == "true" ]]; then
             debug_end "$debug"
             return 0
@@ -2630,7 +2633,7 @@ prepare_rp1_gpclk_dkms_installation() {
     if [[ "$DRY_RUN" != "true" ]]; then
         failure_output_file="$RP1_GPCLK_DKMS_STATE_DIR/prepare-output.log"
     fi
-    if ! EXEC_COMMAND_STATUS_MODE=info \
+    if ! EXEC_COMMAND_STATUS_MODE=quiet \
         EXEC_COMMAND_FAILURE_OUTPUT_FILE="$failure_output_file" \
         exec_command "Resolve RP1-GPCLK-DKMS installation plan" \
         python3 "$RP1_GPCLK_DKMS_HELPER" "${prepare_args[@]}" "$debug"; then
@@ -2794,7 +2797,6 @@ prepare_owned_rp1_gpclk_runtime_removal() {
         local_helper="$(cd "$(dirname "$script_source")" && pwd -P)/rp1_gpclk_dkms_install.py"
     fi
     if [[ "$DRY_RUN" == "true" ]]; then
-        logI "Dry run: would recover exact owned RP1 runtime before application teardown."
         debug_end "$debug"
         return 0
     fi
@@ -2854,7 +2856,6 @@ remove_owned_rp1_gpclk_dkms_provider() {
     esac
     if [[ "$REMOVE_RP1_GPCLK_DKMS" == "false" ]]; then
         RP1_GPCLK_DKMS_PROVIDER_REMOVAL_UNPROVEN="false"
-        logI "RP1-GPCLK-DKMS preserved by explicit operator opt-out."
         debug_end "$debug"
         return 0
     fi
@@ -5466,7 +5467,7 @@ git_clone() {
 
     debug_print "Ensuring destination directory does not exist: '$dest_root'" "$debug"
     if [[ -d "$dest_root" ]]; then
-        logI "Destination directory already exists: '$dest_root'" "$debug"
+        logE "Destination directory already exists: '$dest_root'" "$debug"
         debug_end "$debug"
         return 1
     fi
@@ -6576,7 +6577,6 @@ cleanup_temp_build_swap() {
         rmdir -- "$BUILD_RESOURCE_SWAP_ROOT" 2>/dev/null || true
     fi
 
-    logI "Removed installer-owned temporary build swap."
     TEMP_BUILD_SWAP_PATH=""
     TEMP_BUILD_SWAP_OWNED="false"
     TEMP_BUILD_SWAP_ROOT_OWNED="false"
@@ -6601,7 +6601,6 @@ create_temp_build_swap() {
 
     if [[ "${TEMP_BUILD_SWAP_OWNED:-false}" == "true" ]]; then
         if temp_build_swap_is_active "${TEMP_BUILD_SWAP_PATH:-}"; then
-            logI "Invocation-owned temporary build swap is already active."
             return 0
         fi
         logE "Refusing to replace tracked temporary build swap that is not active: ${TEMP_BUILD_SWAP_PATH:-unknown}"
@@ -6702,7 +6701,6 @@ create_temp_build_swap() {
         return 1
     fi
 
-    logI "Enabled ${allocation_kb} KiB of invocation-owned temporary build swap."
     return 0
 }
 
@@ -6711,6 +6709,8 @@ create_temp_build_swap() {
 # -----------------------------------------------------------------------------
 # shellcheck disable=SC2317
 preflight_build_resources() {
+    PLANNED_BUILD_SWAP_REQUIRED_KB=0
+    PLANNED_BUILD_SWAP_AVAILABLE_KB=0
     if [[ "$BINARY_SOURCE" != "build" ]] && ! rp1_gpclk_dkms_installation_selected; then
         logI "Precompiled executable: skipping application build and build swap."
         return 0
@@ -6795,7 +6795,21 @@ preflight_build_resources() {
     if [[ "$ALLOW_TEMP_BUILD_SWAP" == "auto" ]]; then
         logI "Automatic temporary build swap selected for a low-memory build with insufficient independently backed swap."
     fi
+    if [[ "${1:-}" == "defer-swap" && "$DRY_RUN" != "true" ]]; then
+        PLANNED_BUILD_SWAP_REQUIRED_KB="$required_swap_kb"
+        PLANNED_BUILD_SWAP_AVAILABLE_KB="$non_zram_swap_free_kb"
+        return 0
+    fi
     create_temp_build_swap "$required_swap_kb" "$non_zram_swap_free_kb"
+}
+
+# Apply resource preparation only after the informational phase is complete.
+apply_build_resource_plan() {
+    (( PLANNED_BUILD_SWAP_REQUIRED_KB > 0 )) || return 0
+    create_temp_build_swap "$PLANNED_BUILD_SWAP_REQUIRED_KB" \
+        "$PLANNED_BUILD_SWAP_AVAILABLE_KB" || return 1
+    PLANNED_BUILD_SWAP_REQUIRED_KB=0
+    PLANNED_BUILD_SWAP_AVAILABLE_KB=0
 }
 
 # -----------------------------------------------------------------------------
@@ -7017,7 +7031,6 @@ rollback_executable() {
             rm -f -- "$BINARY_DESTINATION" || return 1
     fi
     BINARY_INSTALLED="false"
-    logI "Restored the previous executable after installation failure."
 }
 
 prepare_precompiled_executable() {
@@ -7026,7 +7039,6 @@ prepare_precompiled_executable() {
     helper="${LOCAL_REPO_DIR}/scripts/precompiled_binary.py"
     binary="${BINARY_PATH:-${USER_HOME}/wsprrypi}"
     if [[ "$DRY_RUN" == "true" ]]; then
-        logI "Dry run: would validate and stage the $BINARY_SOURCE executable; no download or copy performed."
         if [[ "$BINARY_SOURCE" == "local" && -f "$helper" ]]; then
             run_precompiled_helper '' "$helper" check --binary "$binary" || return 1
             BINARY_VERSION="dry-run-unvalidated"
@@ -7034,7 +7046,6 @@ prepare_precompiled_executable() {
             mapfile -t BINARY_RUNTIME_PACKAGES <<<"$packages"
         else
             BINARY_VERSION="dry-run-unvalidated"
-            logI "Dry run: artifact version and dependencies require validation during a real installation."
         fi
         return 0
     fi
@@ -7054,12 +7065,11 @@ prepare_precompiled_executable() {
     exec_command "Set precompiled executable permissions" chmod 755 "$BINARY_STAGE/wsprrypi" "$@" || return 1
     run_precompiled_helper packages "$helper" check --binary "$BINARY_STAGE/wsprrypi" --field runtime_packages || return 1
     mapfile -t BINARY_RUNTIME_PACKAGES <<<"$packages"
-    logI "Checked $BINARY_SOURCE executable architecture; application build disabled."
 }
 
 validate_precompiled_runtime() {
     [[ "$BINARY_SOURCE" != "build" ]] || return 0
-    [[ "$DRY_RUN" != "true" ]] || { logI "Dry run: runtime library checks await installed dependencies."; return 0; }
+    [[ "$DRY_RUN" != "true" ]] || return 0
     run_precompiled_helper BINARY_VERSION "$LOCAL_REPO_DIR/scripts/precompiled_binary.py" check \
         --binary "$BINARY_STAGE/wsprrypi" --full --runtime-user "$SUDO_USER" --field version || return 1
 }
@@ -7202,7 +7212,6 @@ manage_exe() {
             source_path="${BINARY_STAGE}/wsprrypi"
         fi
         if [[ "$DRY_RUN" == "true" ]]; then
-            logI "Dry run: would install the validated executable at $exe_path."
             return 0
         fi
         [[ -f "$source_path" ]] || { logE "Executable is missing: $source_path"; return 1; }
@@ -9036,7 +9045,6 @@ validate_apache_web_availability() {
         return 1
     fi
 
-    logI "Apache unavailable, but --no-web is set; continuing without web UI."
     debug_end "$debug"
     return 0
 }
@@ -9884,13 +9892,6 @@ manage_wsprry_pi() {
         fi
     done
 
-    # Keep informational summaries after the per-step execution output. The
-    # readiness check runs earlier in the group, but reaching this point with a
-    # successful install proves that it and all subsequent steps completed.
-    if [[ "$ACTION" == "install" && "$DRY_RUN" != "true" && "$overall_status" -eq 0 ]]; then
-        logI "WsprryPi runtime readiness verified."
-    fi
-
     # Indicate if a reboot will be necessary
     flag_need_reboot "$debug"
 
@@ -9899,6 +9900,33 @@ manage_wsprry_pi() {
 
     debug_end "$debug"
     return "$overall_status"
+}
+
+# Report planned work before the first exec_command progress row. Messages
+# about completed operations belong to the existing command results instead.
+display_action_notes() {
+    if [[ "$ACTION" == "install" ]]; then
+        if rp1_gpclk_dkms_installation_selected; then
+            logI "Resolve RP1-GPCLK-DKMS installation plan."
+        fi
+        if [[ "$BINARY_SOURCE" != "build" ]]; then
+            logI "Using the $BINARY_SOURCE executable; application build disabled."
+            if [[ "$DRY_RUN" == "true" ]]; then
+                logI "Dry run: would validate and stage the $BINARY_SOURCE executable; no download or copy performed."
+                logI "Dry run: artifact version and dependencies require validation during a real installation."
+            fi
+        fi
+        if [[ "$DRY_RUN" == "true" ]]; then
+            logI "Dry run: would install the validated executable at ${BINARY_INSTALL_DIR}/${WSPR_EXE}."
+        fi
+        if [[ "$NO_WEB" == "true" ]]; then
+            logI "Web UI disabled (--no-web)."
+        fi
+    elif [[ "$REMOVE_RP1_GPCLK_DKMS" == "false" ]]; then
+        logI "RP1-GPCLK-DKMS preserved by explicit operator opt-out."
+    elif [[ "$DRY_RUN" == "true" ]]; then
+        logI "Dry run: would recover exact owned RP1 runtime before application teardown."
+    fi
 }
 
 ############
@@ -9984,7 +10012,8 @@ _main() {
     # The operator has confirmed the install; enforce build resources before
     # any package, service, or compilation mutation begins.
     if [[ "$ACTION" != "uninstall" ]]; then
-        preflight_build_resources "$debug" || return 1
+        preflight_build_resources defer-swap "$debug" || return 1
+        set_time "$debug"
     fi
 
     # Print/display the environment
@@ -10001,10 +10030,14 @@ _main() {
         detect_apache_web_mode "$debug"
     fi
 
+    display_action_notes "$debug"
+
     # Use the ordinary APT closure before source planning or artifact inspection:
     # both the RP1 planner and precompiled preparation require Git on fresh Pis.
     if [[ "$ACTION" != "uninstall" ]]; then
         logI "Updating and managing required packages (this may take a few minutes)."
+        # All informational output precedes resource and installation commands.
+        apply_build_resource_plan || return 1
         handle_apt_packages "$debug" || return 1
         prepare_rp1_gpclk_dkms_installation "$debug" || return 1
         prepare_precompiled_executable "$debug" || return 1
@@ -10022,9 +10055,6 @@ _main() {
         validate_rp1_gpclk_build_dependencies "$debug" || return 1
         apply_rp1_gpclk_dkms_installation "$debug" || return 1
     fi
-
-    # Handle correcting timezone
-    [[ "$ACTION" != "uninstall" ]] && set_time "$debug"
 
     # After package management, Apache must actually be available unless web
     # installation has been explicitly disabled.

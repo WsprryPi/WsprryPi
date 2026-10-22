@@ -32,13 +32,14 @@ for step in process_args enforce_sudo setup_log validate_depends validate_sys_ac
     finish_script egress; do
     eval "$step() { :; }"
 done
-logI() { :; }
+logI() { printf '[INFO ] %s\n' "$1"; }
 logE() { printf '[ERROR] %s\n' "$1" >&2; }
 logW() { printf '[WARN] %s\n' "$1" >&2; }
 warn() { printf '[WARN] %s\n' "$1" >&2; }
 sleep() { :; }
 start_script() { record confirmation; [[ "$FAIL_AT" != confirmation ]]; }
 preflight_build_resources() { record resources; [[ "$FAIL_AT" != resources ]]; }
+apply_build_resource_plan() { record build-resources; [[ "$FAIL_AT" != build-resources ]]; }
 print_model_name() { record model-info; }
 print_system() { record system-info; }
 print_version() { record version-info; }
@@ -187,6 +188,33 @@ if os.environ["FAIL_AT"] == "plan":
                 ])
                 self.assertIn("Complete: Validate support-bundle encryption tools.", result.stdout)
 
+    def test_all_info_precedes_command_progress(self) -> None:
+        for mode in ("build", "local", "release"):
+            for dry_run in ("false", "true"):
+                for rp1 in ("false", "true"):
+                    with self.subTest(mode=mode, dry_run=dry_run, rp1=rp1):
+                        home = self.root / f"{mode}-{dry_run}-{rp1}"
+                        home.mkdir()
+                        self.events.unlink(missing_ok=True)
+                        (self.bin / "git").unlink(missing_ok=True)
+                        result = self.run_installer(
+                            USER_HOME=str(home), REPO_BRANCH="devel", LOG_LEVEL="INFO",
+                            BINARY_SOURCE=mode, DRY_RUN=dry_run, RP1_SELECTED=rp1,
+                            BINARY_RELEASE_TAG="v4.0.0-beta.1" if mode == "release" else "",
+                        )
+                        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                        lines = result.stdout.splitlines()
+                        info = [i for i, line in enumerate(lines) if "[INFO ]" in line]
+                        progress = [i for i, line in enumerate(lines)
+                                    if "Running:" in line or "Complete:" in line]
+                        self.assertTrue(info, result.stdout)
+                        self.assertTrue(progress, result.stdout)
+                        self.assertLess(max(info), min(progress), result.stdout)
+                        announcement = "[INFO ] Resolve RP1-GPCLK-DKMS installation plan."
+                        self.assertEqual(result.stdout.count(announcement), int(rp1 == "true"))
+                        self.assertNotIn("Complete: Resolve RP1-GPCLK-DKMS installation plan.",
+                                         result.stdout)
+
     def test_clone_failure_stops_before_validation_and_provider_changes(self) -> None:
         result = self.run_installer(FAIL_AT="clone")
         self.assertNotEqual(result.returncode, 0)
@@ -244,7 +272,7 @@ support_bundle_validate_age_dependency() {
     @staticmethod
     def package_events() -> list[str]:
         return ["confirmation", "resources", "model-info", "system-info", "version-info",
-                "parallelism-info", "apache-mode", "apt-update", "apt-repair", "packages"]
+                "parallelism-info", "apache-mode", "build-resources", "apt-update", "apt-repair", "packages"]
 
     def test_fresh_pi5_installs_git_before_rp1_planning(self) -> None:
         self.assertIsNone(shutil.which("git", path=str(self.bin)))
@@ -266,7 +294,7 @@ support_bundle_validate_age_dependency() {
                 self.assertNotIn("application", self.recorded_events())
 
     def test_rejected_confirmation_or_resources_does_not_install_packages(self) -> None:
-        for failure in ("confirmation", "resources"):
+        for failure in ("confirmation", "resources", "build-resources"):
             with self.subTest(failure=failure):
                 self.events.unlink(missing_ok=True)
                 result = self.run_installer(FAIL_AT=failure, RP1_SELECTED="true")
@@ -280,6 +308,8 @@ support_bundle_validate_age_dependency() {
         self.assertNotEqual(result.returncode, 0)
         self.assertEqual(self.recorded_events(), [*self.package_events(), "rp1-plan"])
         self.assertIn("RP1-GPCLK-DKMS operation refused: fixture source rejected", result.stderr)
+        self.assertIn("Failed: Resolve RP1-GPCLK-DKMS installation plan.", result.stderr)
+        self.assertNotIn("Complete: Resolve RP1-GPCLK-DKMS installation plan.", result.stdout)
         self.assertNotIn("before package mutation", result.stderr)
 
     def test_pi5_dry_run_does_not_install_git_or_execute_the_planner(self) -> None:
@@ -287,7 +317,7 @@ support_bundle_validate_age_dependency() {
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertEqual(self.recorded_events(), [
             "confirmation", "resources", "model-info", "system-info", "version-info",
-            "parallelism-info", "apache-mode", "neutral-runtime",
+            "parallelism-info", "apache-mode", "build-resources", "neutral-runtime",
             "rp1-dependencies", "provider", "application",
         ])
         self.assertFalse((self.bin / "git").exists())
