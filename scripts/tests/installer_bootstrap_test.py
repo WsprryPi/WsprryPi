@@ -47,6 +47,14 @@ display_compilation_resource_notes() { record parallelism-info; }
 detect_apache_web_mode() { record apache-mode; }
 rp1_gpclk_dkms_installation_selected() { [[ "$RP1_SELECTED" == true ]]; }
 prepare_rp1_gpclk_runtime_update() { record neutral-runtime; }
+ensure_picotool() {
+    exec_command "Install and validate USB-capable picotool" fixture_picotool
+}
+fixture_picotool() {
+    [[ -d "$LOCAL_REPO_DIR/scripts" ]] || return 94
+    record picotool
+    [[ "$FAIL_AT" != picotool ]]
+}
 resolve_libgpiod_runtime_pkg() { printf '%s\n' libgpiod-runtime-fixture; }
 apt-get() {
     local IFS=' '
@@ -202,7 +210,7 @@ print("release v4.0.0-beta.1 "+"a"*64 if result=="release" else "build")
                 self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
                 self.assertEqual(self.recorded_events(), [
                     *self.package_events(), "neutral-runtime", "clone", "age-validation",
-                    "rp1-dependencies", "provider", "application",
+                    "picotool", "rp1-dependencies", "provider", "application",
                 ])
                 self.assertIn("Complete: Validate support-bundle encryption tools.", result.stdout)
 
@@ -286,6 +294,13 @@ print("release v4.0.0-beta.1 "+"a"*64 if result=="release" else "build")
         ])
         self.assertIn("Failed: Validate support-bundle encryption tools.", result.stdout)
 
+    def test_picotool_failure_stops_before_provider_and_application_changes(self) -> None:
+        result = self.run_installer(FAIL_AT="picotool")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("picotool", self.recorded_events())
+        self.assertNotIn("provider", self.recorded_events())
+        self.assertNotIn("application", self.recorded_events())
+
     def test_fresh_dry_run_does_not_clone_or_load_helper(self) -> None:
         result = self.run_installer(DRY_RUN="true")
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
@@ -299,7 +314,7 @@ print("release v4.0.0-beta.1 "+"a"*64 if result=="release" else "build")
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertEqual(self.recorded_events(), [
             *self.package_events(), "clone", "neutral-runtime", "precompiled-packages", "age-validation",
-            "rp1-dependencies", "provider", "application",
+            "picotool", "rp1-dependencies", "provider", "application",
         ])
 
     def test_existing_checkout_is_used_without_cloning(self) -> None:
@@ -330,7 +345,7 @@ support_bundle_validate_age_dependency() {
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertEqual(self.recorded_events(), [
             *self.package_events(), "rp1-plan", "neutral-runtime", "clone", "age-validation",
-            "rp1-dependencies", "provider", "application",
+            "picotool", "rp1-dependencies", "provider", "application",
         ])
 
     def test_package_failures_stop_before_rp1_planning(self) -> None:

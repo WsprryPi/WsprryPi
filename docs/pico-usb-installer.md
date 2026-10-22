@@ -1,5 +1,7 @@
 # Selected Pico USB firmware access
 
+The main Pi installer supplies Python, libusb and USB-capable picotool. It reuses a compatible installed picotool 2.3 or newer within 2.x; otherwise it downloads the pinned picotool 2.3.1 release package matching Bookworm or Trixie and 32-bit ARMv6 or 64-bit AArch64 userspace. It verifies the archive and every packaged file against the application checkout's checksum policy, checks the executable's ABI and USB command support, and installs the executable, support data and upstream notices under `/usr/local/lib/wsprrypi/picotool`, with a command link at `/usr/local/bin/picotool`. Picotool is never compiled on the Pi. The browser uses the installed tool; it does not install picotool on demand.
+
 WsprryPi provides **Pico firmware over USB** beside selected Pico controls in
 Setup. The shared core remains owned by WsprryPico; WsprryPi provides protected routes,
 process/permission boundaries, selected-member maintenance and presentation.
@@ -193,13 +195,7 @@ The package creates private root-owned backup/control/cache directories,
 `dialout` USB permissions for WsprryPico CDC and RP2350 BOOTSEL, and a setgid
 per-device lock directory restored by tmpfiles at boot. Permissions apply to
 new USB enumeration after rules reload; reconnect a cable when necessary.
-Python 3.10+ and USB-enabled picotool 2.3 or newer within 2.x are required. The
-Pi deployment does not install an SDK, compiler or picotool, or change unrelated
-backend settings. The imported Fleet entry never downloads or removes tools.
-The separate [standalone bootstrap](https://wsprrypico.readthedocs.io/en/devel/install.html#run-directly-with-curl)
-can offer a verified official picotool download and cleanup. When using it on a
-WsprryPi host, follow the [service handoff](https://wsprrypico.readthedocs.io/en/devel/wsprrypi.html#standalone-installer-on-a-wsprrypi-host)
-so only one process uses the selected USB connection.
+Python 3.10+ and USB-enabled picotool 2.3 or newer within 2.x are required. The main Pi installer supplies Python, libusb and the matching prebuilt picotool package without installing a Pico SDK or compiling picotool. The imported Fleet entry never downloads or removes tools, and deploying the USB adapter does not change unrelated backend settings. The separate [standalone bootstrap](https://wsprrypico.readthedocs.io/en/devel/install.html#run-directly-with-curl) can offer an official picotool download and cleanup. When using it on a WsprryPi host, follow the [service handoff](https://wsprrypico.readthedocs.io/en/devel/wsprrypi.html#standalone-installer-on-a-wsprrypi-host) so only one process uses the selected USB connection.
 
 ## Validation boundary
 

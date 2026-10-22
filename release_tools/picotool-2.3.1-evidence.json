@@ -1,0 +1,147 @@
+{
+  "build_notes": [
+    "GCC ARM parameter-passing notes retained in local build logs.",
+    "Optional mbedTLS signing/hashing support is not built; required USB commands and libusb linkage passed."
+  ],
+  "date": "2026-10-22",
+  "documentation": "Release notes, build guide and internal installation guides updated. Separate operator manual not modified; Install/index.md and Install/beta1.md can document automatic prebuilt picotool provisioning.",
+  "issue": "https://github.com/WsprryPi/WsprryPi/issues/453",
+  "original_assets": "Original six asset IDs, SHA-256 values and sizes unchanged; six additive picotool assets.",
+  "picotool_revision": "2041936441b48a3cc53ae3da9e805229fe8f4e18",
+  "public_assets": {
+    "picotool-SHA256SUMS": {
+      "bytes": 388,
+      "sha256": "3dc1218f4174f1f66cbacd1ecb5cd728651a9ce18c54d0d6faf842180a40a695"
+    },
+    "picotool-aarch64-bookworm.tar.gz": {
+      "bytes": 641705,
+      "sha256": "229607d08118a3fb013e171808385b5ae14e360c291149077365d97d4703f645"
+    },
+    "picotool-aarch64-trixie.tar.gz": {
+      "bytes": 643459,
+      "sha256": "b3323dbe98d70f6cdb46f5a84a0f2a176ea9e6ea4e812453f1f07cc9b2abce62"
+    },
+    "picotool-armv6-bookworm.tar.gz": {
+      "bytes": 614272,
+      "sha256": "235d737c81b1019721be00307a9741ce02ff28aec9f92124f32498d3066635c4"
+    },
+    "picotool-armv6-trixie.tar.gz": {
+      "bytes": 618268,
+      "sha256": "aa89811243ffee6d990ff1cdb11cc16526a22b5d15611b3889a43f28b4dc0aa7"
+    },
+    "picotool-manifest.json": {
+      "bytes": 13386,
+      "sha256": "74b535b50c8ffa0f0a82e9491f804aa77ab7086f9f6451ad64de83efe0b95901"
+    }
+  },
+  "release": "https://github.com/WsprryPi/WsprryPi/releases/tag/v4.0.0-beta.1",
+  "schema": "wsprrypi-picotool-evidence/1",
+  "sdk_revision": "a1438dff1d38bd9c65dbd693f0e5db4b9ae91779",
+  "source": {
+    "config/picotool-release.json": "74b535b50c8ffa0f0a82e9491f804aa77ab7086f9f6451ad64de83efe0b95901",
+    "containers/picotool/Dockerfile": "e088d480423025c49a081f7216c22552db36c5092aa3a0e4aa5d84014f02d13d",
+    "scripts/build_picotool.py": "bfaa8c4d609c36374fb9800df584c1b36db495fd89d78f20c00ebc25a44bb699",
+    "scripts/install.sh": "bfe9c1b7944aa93c2fb09e8e9056d968e9221dbc48f2d9e459bd6c6f94ab5d72",
+    "scripts/picotool_install.py": "9a24a5a19d4cbfa83b60a9d624b6188af96ab9f373491446abd5fcc057c8329f"
+  },
+  "tag": "Existing annotated v4.0.0-beta.1 tag retained at aa6ce2996e8f180670847ed4c89568fa10d4539b.",
+  "targets": {
+    "aarch64-bookworm": {
+      "archive_sha256": "229607d08118a3fb013e171808385b5ae14e360c291149077365d97d4703f645",
+      "asset": "picotool-aarch64-bookworm.tar.gz",
+      "build": {
+        "base_image": "debian:bookworm-slim@sha256:7b140f374b289a7c2befc338f42ebe6441b7ea838a042bbd5acbfca6ec875818",
+        "builder_sha256": "bfaa8c4d609c36374fb9800df584c1b36db495fd89d78f20c00ebc25a44bb699",
+        "dockerfile_sha256": "e088d480423025c49a081f7216c22552db36c5092aa3a0e4aa5d84014f02d13d",
+        "image": "sha256:2d7f0f12fb3c15cbdb5ce270095dfb08f98ffb8ea15c3fd9d6987a4852010b68",
+        "picotool_revision": "2041936441b48a3cc53ae3da9e805229fe8f4e18",
+        "sdk_revision": "a1438dff1d38bd9c65dbd693f0e5db4b9ae91779",
+        "target": "aarch64-bookworm"
+      },
+      "public_installation": {
+        "archive_sha256": "229607d08118a3fb013e171808385b5ae14e360c291149077365d97d4703f645",
+        "files_verified": 18,
+        "installed": true,
+        "mode": "public",
+        "reused": true,
+        "target": "aarch64-bookworm"
+      }
+    },
+    "aarch64-trixie": {
+      "archive_sha256": "b3323dbe98d70f6cdb46f5a84a0f2a176ea9e6ea4e812453f1f07cc9b2abce62",
+      "asset": "picotool-aarch64-trixie.tar.gz",
+      "build": {
+        "base_image": "debian:trixie-slim@sha256:3a39a0592364683e6bab97937b72cad5a8fa6dcbbee90edb3bb48c7f8e94f258",
+        "builder_sha256": "bfaa8c4d609c36374fb9800df584c1b36db495fd89d78f20c00ebc25a44bb699",
+        "dockerfile_sha256": "e088d480423025c49a081f7216c22552db36c5092aa3a0e4aa5d84014f02d13d",
+        "image": "sha256:a62801383dd233f343783fd7469dfcb1f4114359e6c972a305c5a98c68e56b01",
+        "picotool_revision": "2041936441b48a3cc53ae3da9e805229fe8f4e18",
+        "sdk_revision": "a1438dff1d38bd9c65dbd693f0e5db4b9ae91779",
+        "target": "aarch64-trixie"
+      },
+      "public_installation": {
+        "archive_sha256": "b3323dbe98d70f6cdb46f5a84a0f2a176ea9e6ea4e812453f1f07cc9b2abce62",
+        "files_verified": 18,
+        "installed": true,
+        "mode": "public",
+        "reused": true,
+        "target": "aarch64-trixie"
+      }
+    },
+    "armv6-bookworm": {
+      "archive_sha256": "235d737c81b1019721be00307a9741ce02ff28aec9f92124f32498d3066635c4",
+      "asset": "picotool-armv6-bookworm.tar.gz",
+      "build": {
+        "base_image": "balenalib/raspberry-pi:bookworm-build@sha256:5e44b1697cd34bac1eaf43fbadab44c54d25246ff0b57144b054b8039d85141a",
+        "builder_sha256": "bfaa8c4d609c36374fb9800df584c1b36db495fd89d78f20c00ebc25a44bb699",
+        "dockerfile_sha256": "e088d480423025c49a081f7216c22552db36c5092aa3a0e4aa5d84014f02d13d",
+        "image": "sha256:d0f361c75b0aa725e7416fce47c36392f9b154d742cc139788bc0d321df75f33",
+        "picotool_revision": "2041936441b48a3cc53ae3da9e805229fe8f4e18",
+        "sdk_revision": "a1438dff1d38bd9c65dbd693f0e5db4b9ae91779",
+        "target": "armv6-bookworm"
+      },
+      "public_installation": {
+        "archive_sha256": "235d737c81b1019721be00307a9741ce02ff28aec9f92124f32498d3066635c4",
+        "files_verified": 18,
+        "installed": true,
+        "mode": "public",
+        "reused": true,
+        "target": "armv6-bookworm"
+      }
+    },
+    "armv6-trixie": {
+      "archive_sha256": "aa89811243ffee6d990ff1cdb11cc16526a22b5d15611b3889a43f28b4dc0aa7",
+      "asset": "picotool-armv6-trixie.tar.gz",
+      "build": {
+        "base_image": "balenalib/raspberry-pi:bookworm-build@sha256:5e44b1697cd34bac1eaf43fbadab44c54d25246ff0b57144b054b8039d85141a",
+        "builder_sha256": "bfaa8c4d609c36374fb9800df584c1b36db495fd89d78f20c00ebc25a44bb699",
+        "dockerfile_sha256": "e088d480423025c49a081f7216c22552db36c5092aa3a0e4aa5d84014f02d13d",
+        "image": "sha256:3974636852c1b8283bf7dbc7c03ca01c778fc6b7d1a4bb6d6d0c46abb1ee6bb1",
+        "picotool_revision": "2041936441b48a3cc53ae3da9e805229fe8f4e18",
+        "sdk_revision": "a1438dff1d38bd9c65dbd693f0e5db4b9ae91779",
+        "target": "armv6-trixie"
+      },
+      "public_installation": {
+        "archive_sha256": "aa89811243ffee6d990ff1cdb11cc16526a22b5d15611b3889a43f28b4dc0aa7",
+        "files_verified": 18,
+        "installed": true,
+        "mode": "public",
+        "reused": true,
+        "target": "armv6-trixie"
+      }
+    }
+  },
+  "validation": {
+    "build_runtime": "Version/help and dependency checks in exact images, unprivileged, read-only and without network.",
+    "hardware": "No Pi target installation, attached USB device, service, GPIO, transmission or RF operation.",
+    "installation": "Local-package and actual public-URL installation/reuse checks in each disposable target userspace; 18 packaged files verified per target.",
+    "regression_command": "cd src && make installer-dependency-test rp1-gpclk-dkms-installer-test SUDO=",
+    "regression_result": "PASS in isolated Linux container",
+    "static_checks": [
+      "bash -n scripts/install.sh",
+      "shellcheck -x scripts/install.sh scripts/tests/installer_dependency_test.sh",
+      "git diff --check"
+    ]
+  },
+  "version": "2.3.1"
+}

@@ -33,6 +33,8 @@ python3 "${SCRIPT_DIR}/precompiled_binary_test.py"
 python3 "${SCRIPT_DIR}/ini_upgrade_schema_test.py"
 python3 "${SCRIPT_DIR}/installer_dry_run_purity_test.py"
 python3 "${SCRIPT_DIR}/installer_bootstrap_test.py"
+python3 -B "${SCRIPT_DIR}/picotool_install_test.py"
+python3 -B "${SCRIPT_DIR}/picotool_build_test.py"
 python3 "${SCRIPT_DIR}/service_install_recovery_test.py"
 "${SCRIPT_DIR}/build_resource_preflight_test.sh"
 

@@ -1,0 +1,325 @@
+{
+  "picotool_revision": "2041936441b48a3cc53ae3da9e805229fe8f4e18",
+  "release_tag": "v4.0.0-beta.1",
+  "schema": "wsprrypi-picotool-release/1",
+  "sdk_revision": "a1438dff1d38bd9c65dbd693f0e5db4b9ae91779",
+  "targets": {
+    "aarch64-bookworm": {
+      "asset": "picotool-aarch64-bookworm.tar.gz",
+      "bytes": 641705,
+      "files": {
+        "enc_bootloader.elf": {
+          "bytes": 20104,
+          "sha256": "9ce3c424d61226225d2c1f5b80a8854f15174b09dd447e58e4439240b274fb3d"
+        },
+        "licenses/pico-sdk/LICENSE.TXT": {
+          "bytes": 1489,
+          "sha256": "483f865953435b66c443dee7558debe3cc3cf8fcbb6a112fd9fc6a795d53f1f6"
+        },
+        "licenses/pico-sdk/src/rp2_common/cmsis/stub/CMSIS/LICENSE.txt": {
+          "bytes": 11357,
+          "sha256": "b40930bbcf80744c86c46a12bc9da056641d722716c378f5659b9e555ef833e1"
+        },
+        "licenses/pico-sdk/src/rp2_common/pico_btstack/LICENSE.RP": {
+          "bytes": 2281,
+          "sha256": "3b9280bbfedf57d9f7793d2f9af7beb5d5c45f16b587fa3c3568aaedd16fedf4"
+        },
+        "licenses/pico-sdk/src/rp2_common/pico_printf/LICENSE": {
+          "bytes": 1080,
+          "sha256": "3fd3a80a06465d0b4affa1d1a16e18a8d2ef42a52eb52060109ae12f1f878f72"
+        },
+        "licenses/pico-sdk/test/pico_float_test/llvm/LICENSE.TXT": {
+          "bytes": 3192,
+          "sha256": "abd4d8794808bacb1eb6924d49efafd9ab6eef88faaaeb5d3cfa13ee3670d672"
+        },
+        "licenses/picotool/LICENSE.TXT": {
+          "bytes": 1489,
+          "sha256": "483f865953435b66c443dee7558debe3cc3cf8fcbb6a112fd9fc6a795d53f1f6"
+        },
+        "licenses/picotool/clipp/LICENSE": {
+          "bytes": 1110,
+          "sha256": "72c5d1a6f8c76c88b4559d26710c3a298a0ba9822ab3d187d0b4a5b2e8e2b219"
+        },
+        "licenses/picotool/lib/littlefs/LICENSE.md": {
+          "bytes": 1523,
+          "sha256": "0cb4ff1daf5fdc1359c6a6ee3116092f08fc100c9d58b1b77ab17bfd801f856d"
+        },
+        "licenses/picotool/lib/nlohmann_json/LICENSE.MIT": {
+          "bytes": 1076,
+          "sha256": "86b998c792894ccb911a1cb7994f7a9652894e7a094c0b5e45be2f553f45cf14"
+        },
+        "licenses/picotool/lib/oofatfs/LICENSE": {
+          "bytes": 1151,
+          "sha256": "4449f912502843f47a0a258e740054f916a21586f849a27ce40f936c095e2f6c"
+        },
+        "picotool": {
+          "bytes": 2041888,
+          "sha256": "241177cae7c1a1b2d786e4c7686c25ff2b8041acce8565786bc977c922d372fc"
+        },
+        "picotoolConfig.cmake": {
+          "bytes": 96,
+          "sha256": "ca12b6fee18e6583713cfdcb2e81886aaee741d40304ea2cc88c4f5b2df2b6c3"
+        },
+        "picotoolConfigVersion.cmake": {
+          "bytes": 2877,
+          "sha256": "cf26012f498ac4d89a647027f32a9a7298f61918f220c2535d99a8a9717885d6"
+        },
+        "picotoolTargets-release.cmake": {
+          "bytes": 767,
+          "sha256": "e40085002e565de850554e772c90f1a1c4cffb545f853eaa231b145e498f7c0f"
+        },
+        "picotoolTargets.cmake": {
+          "bytes": 3639,
+          "sha256": "ea77404e2cab994c08834f33f76f1779b35d3a16db292ac77382c15425e4e6a1"
+        },
+        "rp2350_otp_contents.json": {
+          "bytes": 366602,
+          "sha256": "aeb787cb25fafc09b9199d34bd0ac30d70c7a9421f3bfa877194d0149a08e69d"
+        },
+        "xip_ram_perms.elf": {
+          "bytes": 34004,
+          "sha256": "afac0e166ee9b632f84717c7db02e7e5e648f03a51cc4795938adcd282c6103b"
+        }
+      },
+      "sha256": "229607d08118a3fb013e171808385b5ae14e360c291149077365d97d4703f645"
+    },
+    "aarch64-trixie": {
+      "asset": "picotool-aarch64-trixie.tar.gz",
+      "bytes": 643459,
+      "files": {
+        "enc_bootloader.elf": {
+          "bytes": 20104,
+          "sha256": "9ce3c424d61226225d2c1f5b80a8854f15174b09dd447e58e4439240b274fb3d"
+        },
+        "licenses/pico-sdk/LICENSE.TXT": {
+          "bytes": 1489,
+          "sha256": "483f865953435b66c443dee7558debe3cc3cf8fcbb6a112fd9fc6a795d53f1f6"
+        },
+        "licenses/pico-sdk/src/rp2_common/cmsis/stub/CMSIS/LICENSE.txt": {
+          "bytes": 11357,
+          "sha256": "b40930bbcf80744c86c46a12bc9da056641d722716c378f5659b9e555ef833e1"
+        },
+        "licenses/pico-sdk/src/rp2_common/pico_btstack/LICENSE.RP": {
+          "bytes": 2281,
+          "sha256": "3b9280bbfedf57d9f7793d2f9af7beb5d5c45f16b587fa3c3568aaedd16fedf4"
+        },
+        "licenses/pico-sdk/src/rp2_common/pico_printf/LICENSE": {
+          "bytes": 1080,
+          "sha256": "3fd3a80a06465d0b4affa1d1a16e18a8d2ef42a52eb52060109ae12f1f878f72"
+        },
+        "licenses/pico-sdk/test/pico_float_test/llvm/LICENSE.TXT": {
+          "bytes": 3192,
+          "sha256": "abd4d8794808bacb1eb6924d49efafd9ab6eef88faaaeb5d3cfa13ee3670d672"
+        },
+        "licenses/picotool/LICENSE.TXT": {
+          "bytes": 1489,
+          "sha256": "483f865953435b66c443dee7558debe3cc3cf8fcbb6a112fd9fc6a795d53f1f6"
+        },
+        "licenses/picotool/clipp/LICENSE": {
+          "bytes": 1110,
+          "sha256": "72c5d1a6f8c76c88b4559d26710c3a298a0ba9822ab3d187d0b4a5b2e8e2b219"
+        },
+        "licenses/picotool/lib/littlefs/LICENSE.md": {
+          "bytes": 1523,
+          "sha256": "0cb4ff1daf5fdc1359c6a6ee3116092f08fc100c9d58b1b77ab17bfd801f856d"
+        },
+        "licenses/picotool/lib/nlohmann_json/LICENSE.MIT": {
+          "bytes": 1076,
+          "sha256": "86b998c792894ccb911a1cb7994f7a9652894e7a094c0b5e45be2f553f45cf14"
+        },
+        "licenses/picotool/lib/oofatfs/LICENSE": {
+          "bytes": 1151,
+          "sha256": "4449f912502843f47a0a258e740054f916a21586f849a27ce40f936c095e2f6c"
+        },
+        "picotool": {
+          "bytes": 2034256,
+          "sha256": "0ba2c08bc284fc8796888d6431604135af9b03f38d993a00a7186b5f37b23cd5"
+        },
+        "picotoolConfig.cmake": {
+          "bytes": 96,
+          "sha256": "ca12b6fee18e6583713cfdcb2e81886aaee741d40304ea2cc88c4f5b2df2b6c3"
+        },
+        "picotoolConfigVersion.cmake": {
+          "bytes": 2303,
+          "sha256": "13b646e8805c565ed4bf7db8d439bbc75d0fd0350942d9ac8f5e9e466f25e4ed"
+        },
+        "picotoolTargets-release.cmake": {
+          "bytes": 767,
+          "sha256": "e40085002e565de850554e772c90f1a1c4cffb545f853eaa231b145e498f7c0f"
+        },
+        "picotoolTargets.cmake": {
+          "bytes": 3857,
+          "sha256": "82c7a624e34d7d9541fa32a2cea088dd40d73ac595942e4a5511b25a0f0eb7b1"
+        },
+        "rp2350_otp_contents.json": {
+          "bytes": 366602,
+          "sha256": "aeb787cb25fafc09b9199d34bd0ac30d70c7a9421f3bfa877194d0149a08e69d"
+        },
+        "xip_ram_perms.elf": {
+          "bytes": 34004,
+          "sha256": "afac0e166ee9b632f84717c7db02e7e5e648f03a51cc4795938adcd282c6103b"
+        }
+      },
+      "sha256": "b3323dbe98d70f6cdb46f5a84a0f2a176ea9e6ea4e812453f1f07cc9b2abce62"
+    },
+    "armv6-bookworm": {
+      "asset": "picotool-armv6-bookworm.tar.gz",
+      "bytes": 614272,
+      "files": {
+        "enc_bootloader.elf": {
+          "bytes": 20104,
+          "sha256": "9ce3c424d61226225d2c1f5b80a8854f15174b09dd447e58e4439240b274fb3d"
+        },
+        "licenses/pico-sdk/LICENSE.TXT": {
+          "bytes": 1489,
+          "sha256": "483f865953435b66c443dee7558debe3cc3cf8fcbb6a112fd9fc6a795d53f1f6"
+        },
+        "licenses/pico-sdk/src/rp2_common/cmsis/stub/CMSIS/LICENSE.txt": {
+          "bytes": 11357,
+          "sha256": "b40930bbcf80744c86c46a12bc9da056641d722716c378f5659b9e555ef833e1"
+        },
+        "licenses/pico-sdk/src/rp2_common/pico_btstack/LICENSE.RP": {
+          "bytes": 2281,
+          "sha256": "3b9280bbfedf57d9f7793d2f9af7beb5d5c45f16b587fa3c3568aaedd16fedf4"
+        },
+        "licenses/pico-sdk/src/rp2_common/pico_printf/LICENSE": {
+          "bytes": 1080,
+          "sha256": "3fd3a80a06465d0b4affa1d1a16e18a8d2ef42a52eb52060109ae12f1f878f72"
+        },
+        "licenses/pico-sdk/test/pico_float_test/llvm/LICENSE.TXT": {
+          "bytes": 3192,
+          "sha256": "abd4d8794808bacb1eb6924d49efafd9ab6eef88faaaeb5d3cfa13ee3670d672"
+        },
+        "licenses/picotool/LICENSE.TXT": {
+          "bytes": 1489,
+          "sha256": "483f865953435b66c443dee7558debe3cc3cf8fcbb6a112fd9fc6a795d53f1f6"
+        },
+        "licenses/picotool/clipp/LICENSE": {
+          "bytes": 1110,
+          "sha256": "72c5d1a6f8c76c88b4559d26710c3a298a0ba9822ab3d187d0b4a5b2e8e2b219"
+        },
+        "licenses/picotool/lib/littlefs/LICENSE.md": {
+          "bytes": 1523,
+          "sha256": "0cb4ff1daf5fdc1359c6a6ee3116092f08fc100c9d58b1b77ab17bfd801f856d"
+        },
+        "licenses/picotool/lib/nlohmann_json/LICENSE.MIT": {
+          "bytes": 1076,
+          "sha256": "86b998c792894ccb911a1cb7994f7a9652894e7a094c0b5e45be2f553f45cf14"
+        },
+        "licenses/picotool/lib/oofatfs/LICENSE": {
+          "bytes": 1151,
+          "sha256": "4449f912502843f47a0a258e740054f916a21586f849a27ce40f936c095e2f6c"
+        },
+        "picotool": {
+          "bytes": 1845868,
+          "sha256": "691850a79940cd36e3b8e12ab57e28e87a8bea9870c0605f107536d56f402148"
+        },
+        "picotoolConfig.cmake": {
+          "bytes": 96,
+          "sha256": "ca12b6fee18e6583713cfdcb2e81886aaee741d40304ea2cc88c4f5b2df2b6c3"
+        },
+        "picotoolConfigVersion.cmake": {
+          "bytes": 2877,
+          "sha256": "7b25ebd343be6a6ce315e0afb2d423f73a74bf0eb2c93d0d9c399ec3a62ebf46"
+        },
+        "picotoolTargets-release.cmake": {
+          "bytes": 767,
+          "sha256": "e40085002e565de850554e772c90f1a1c4cffb545f853eaa231b145e498f7c0f"
+        },
+        "picotoolTargets.cmake": {
+          "bytes": 3639,
+          "sha256": "ea77404e2cab994c08834f33f76f1779b35d3a16db292ac77382c15425e4e6a1"
+        },
+        "rp2350_otp_contents.json": {
+          "bytes": 366602,
+          "sha256": "aeb787cb25fafc09b9199d34bd0ac30d70c7a9421f3bfa877194d0149a08e69d"
+        },
+        "xip_ram_perms.elf": {
+          "bytes": 34004,
+          "sha256": "afac0e166ee9b632f84717c7db02e7e5e648f03a51cc4795938adcd282c6103b"
+        }
+      },
+      "sha256": "235d737c81b1019721be00307a9741ce02ff28aec9f92124f32498d3066635c4"
+    },
+    "armv6-trixie": {
+      "asset": "picotool-armv6-trixie.tar.gz",
+      "bytes": 618268,
+      "files": {
+        "enc_bootloader.elf": {
+          "bytes": 20104,
+          "sha256": "9ce3c424d61226225d2c1f5b80a8854f15174b09dd447e58e4439240b274fb3d"
+        },
+        "licenses/pico-sdk/LICENSE.TXT": {
+          "bytes": 1489,
+          "sha256": "483f865953435b66c443dee7558debe3cc3cf8fcbb6a112fd9fc6a795d53f1f6"
+        },
+        "licenses/pico-sdk/src/rp2_common/cmsis/stub/CMSIS/LICENSE.txt": {
+          "bytes": 11357,
+          "sha256": "b40930bbcf80744c86c46a12bc9da056641d722716c378f5659b9e555ef833e1"
+        },
+        "licenses/pico-sdk/src/rp2_common/pico_btstack/LICENSE.RP": {
+          "bytes": 2281,
+          "sha256": "3b9280bbfedf57d9f7793d2f9af7beb5d5c45f16b587fa3c3568aaedd16fedf4"
+        },
+        "licenses/pico-sdk/src/rp2_common/pico_printf/LICENSE": {
+          "bytes": 1080,
+          "sha256": "3fd3a80a06465d0b4affa1d1a16e18a8d2ef42a52eb52060109ae12f1f878f72"
+        },
+        "licenses/pico-sdk/test/pico_float_test/llvm/LICENSE.TXT": {
+          "bytes": 3192,
+          "sha256": "abd4d8794808bacb1eb6924d49efafd9ab6eef88faaaeb5d3cfa13ee3670d672"
+        },
+        "licenses/picotool/LICENSE.TXT": {
+          "bytes": 1489,
+          "sha256": "483f865953435b66c443dee7558debe3cc3cf8fcbb6a112fd9fc6a795d53f1f6"
+        },
+        "licenses/picotool/clipp/LICENSE": {
+          "bytes": 1110,
+          "sha256": "72c5d1a6f8c76c88b4559d26710c3a298a0ba9822ab3d187d0b4a5b2e8e2b219"
+        },
+        "licenses/picotool/lib/littlefs/LICENSE.md": {
+          "bytes": 1523,
+          "sha256": "0cb4ff1daf5fdc1359c6a6ee3116092f08fc100c9d58b1b77ab17bfd801f856d"
+        },
+        "licenses/picotool/lib/nlohmann_json/LICENSE.MIT": {
+          "bytes": 1076,
+          "sha256": "86b998c792894ccb911a1cb7994f7a9652894e7a094c0b5e45be2f553f45cf14"
+        },
+        "licenses/picotool/lib/oofatfs/LICENSE": {
+          "bytes": 1151,
+          "sha256": "4449f912502843f47a0a258e740054f916a21586f849a27ce40f936c095e2f6c"
+        },
+        "picotool": {
+          "bytes": 1840436,
+          "sha256": "2d9c942f6ed5aff3adffcfa70eab9411342cc4989efdf1548ba51a7bba83ef15"
+        },
+        "picotoolConfig.cmake": {
+          "bytes": 96,
+          "sha256": "ca12b6fee18e6583713cfdcb2e81886aaee741d40304ea2cc88c4f5b2df2b6c3"
+        },
+        "picotoolConfigVersion.cmake": {
+          "bytes": 2303,
+          "sha256": "13b646e8805c565ed4bf7db8d439bbc75d0fd0350942d9ac8f5e9e466f25e4ed"
+        },
+        "picotoolTargets-release.cmake": {
+          "bytes": 767,
+          "sha256": "e40085002e565de850554e772c90f1a1c4cffb545f853eaa231b145e498f7c0f"
+        },
+        "picotoolTargets.cmake": {
+          "bytes": 3857,
+          "sha256": "82c7a624e34d7d9541fa32a2cea088dd40d73ac595942e4a5511b25a0f0eb7b1"
+        },
+        "rp2350_otp_contents.json": {
+          "bytes": 366602,
+          "sha256": "aeb787cb25fafc09b9199d34bd0ac30d70c7a9421f3bfa877194d0149a08e69d"
+        },
+        "xip_ram_perms.elf": {
+          "bytes": 34004,
+          "sha256": "afac0e166ee9b632f84717c7db02e7e5e648f03a51cc4795938adcd282c6103b"
+        }
+      },
+      "sha256": "aa89811243ffee6d990ff1cdb11cc16526a22b5d15611b3889a43f28b4dc0aa7"
+    }
+  },
+  "version": "2.3.1"
+}

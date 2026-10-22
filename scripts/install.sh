@@ -819,6 +819,7 @@ readonly RUNTIME_APT_PACKAGES=(
     "git"
     "python3"
     "chrony"
+    "libusb-1.0-0"
     "age"
     "libatomic1"
     "libstdc++6"
@@ -5758,6 +5759,17 @@ handle_apt_packages() {
 }
 
 # shellcheck disable=SC2317
+ensure_picotool() {
+    local debug
+    debug=$(debug_start "$@")
+    eval set -- "$(debug_filter "$@")"
+    [[ "$ACTION" == "install" ]] || return 0
+    local helper="${LOCAL_REPO_DIR}/scripts/picotool_install.py"
+    exec_command "Install and validate USB-capable picotool" python3 "$helper" \
+        --policy "${LOCAL_REPO_DIR}/config/picotool-release.json" "$debug"
+}
+
+# shellcheck disable=SC2317
 run_support_bundle_age_dependency_validation() {
     # shellcheck source=scripts/support_bundle_age_dependency.sh
     source "${LOCAL_REPO_DIR}/scripts/support_bundle_age_dependency.sh" &&
@@ -10113,6 +10125,7 @@ _main() {
             git_clone "$debug" || return 1
         fi
         validate_support_bundle_age_dependency "$debug" || return 1
+        ensure_picotool "$debug" || return 1
         validate_precompiled_runtime "$debug" || return 1
         validate_rp1_gpclk_build_dependencies "$debug" || return 1
         apply_rp1_gpclk_dkms_installation "$debug" || return 1

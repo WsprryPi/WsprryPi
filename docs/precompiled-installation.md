@@ -41,10 +41,7 @@ The installer does not compare the executable with the checkout's commit.
 
 ## Dependencies and resource use
 
-Runtime packages are separate from application build packages. Precompiled
-mode installs runtime libraries and inspection tools, omits application
-compilers and development headers, and skips application compilation and its
-swap preparation. Existing development packages are not removed.
+Runtime packages are separate from application build packages. Precompiled mode installs runtime libraries and inspection tools, omits application compilers and development headers, and skips application compilation and its swap preparation. A compatible installed picotool is reused; otherwise the installer downloads the matching prebuilt picotool package, verifies its checksum and file inventory, and installs its executable and support files. Picotool installation never invokes a compiler or falls back to building from source. Existing development packages are not removed. Pi 5-family RP1 driver preparation retains its separate build requirements.
 
 The normal APT handler installs Git, runtime packages and inspection tools before RP1 planning or artifact preparation. After artifact inspection identifies additional runtime packages, the same handler installs those packages without repeating the index refresh or dependency-repair transaction. Invalid artifacts can therefore be rejected after baseline dependencies have been installed; the installed executable remains unchanged.
 

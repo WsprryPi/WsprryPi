@@ -61,6 +61,22 @@ Beta 1's [candidate manifest](4.0-Beta-1-Candidate-Manifest.json),
 reused evidence and remaining gates. Later documentation or supporting-source
 changes do not silently replace those identities or complete their acceptance.
 
+## Picotool release packages
+
+Picotool is built by the maintainer in the same four userspaces as WsprryPi, using each target's existing digest-pinned base image and the signed Raspbian Trixie upgrade for ARMv6. `scripts/build_picotool.py` pins upstream picotool 2.3.1 and Pico SDK header commits, enables USB support, and exports the executable, its required support data and upstream notices. This separate tool build does not rebuild or reidentify an existing WsprryPi executable. The installation helper only downloads packages; it never invokes the build helper or installs compiler packages.
+
+```sh
+python3 -B scripts/build_picotool.py armv6-bookworm dist/picotool-2.3.1/exports/armv6-bookworm
+python3 -B scripts/build_picotool.py armv6-trixie dist/picotool-2.3.1/exports/armv6-trixie
+python3 -B scripts/build_picotool.py aarch64-bookworm dist/picotool-2.3.1/exports/aarch64-bookworm
+python3 -B scripts/build_picotool.py aarch64-trixie dist/picotool-2.3.1/exports/aarch64-trixie
+python3 -B scripts/build_picotool.py stage dist/picotool-2.3.1/release --exports dist/picotool-2.3.1/exports --release-tag v4.0.0-beta.1
+```
+
+Each absent or empty export directory receives `picotool-<target>.tar.gz`, an exact file inventory, ELF and dependency evidence, package inventory, pinned source identities and the build-image identity. After compilation, version/help checks run in that exact image with no network, no elevated capabilities, a read-only filesystem and an unprivileged user. ARMv6 exports must retain ARMv6/VFPv2 hard-float attributes. These checks do not access a Pico or qualify firmware programming.
+
+Staging produces four named archives, `picotool-SHA256SUMS` and `picotool-manifest.json`. Review the manifest, copy it to `config/picotool-release.json`, and run the installer regression suite before committing. With explicit release authorization, upload those six new assets to the stated release without replacing its existing assets or moving its tag. Verify every public archive against the staged bytes and exercise the actual installer helper in all four container userspaces. An absent or corrupt package stops installation; there is no compilation fallback. Existing compatible tools are retained, and uninstallation does not remove this shared host tool.
+
 ## Beta 1 publication procedure
 
 For item 16d, the operator selected the developer-operated procedure (Option B)
