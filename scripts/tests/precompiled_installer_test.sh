@@ -58,6 +58,45 @@ contains_pkg() { printf '%s\n' "${RESOLVED_APT_PACKAGES[@]}" | grep -Fxq -- "$1"
     [[ "$BINARY_SOURCE" == auto ]]
 )
 
+# Streamed installs delete their temporary checkout before the exit trap.
+# Render the result once while the helper exists, including the missing-result
+# diagnostic; an exit report must not try to reopen the deleted helper.
+(
+    FGGLD='' RESET='' FGGRN='' FGRED='' MOVE_UP='' CLEAR_LINE=''
+    IS_REPO=false
+    DRY_RUN=false
+    UI_PUBLICATION_ATTEMPTED=true
+    for result_exists in true false; do
+        LOCAL_REPO_DIR="$fixture/publication-$result_exists"
+        mkdir -p "$LOCAL_REPO_DIR/scripts"
+        cat >"$LOCAL_REPO_DIR/scripts/copy_ui.py" <<'PYTHON'
+import sys
+from pathlib import Path
+assert sys.argv[1] == '--render-result'
+assert Path(sys.argv[2]).is_file()
+print('Fixture publication report')
+PYTHON
+        UI_PUBLICATION_RESULT_FILE="$fixture/result-$result_exists.json"
+        [[ "$result_exists" == false ]] || printf '{}' >"$UI_PUBLICATION_RESULT_FILE"
+        UI_PUBLICATION_REPORTED=false
+        if ! cleanup_files_in_directories >"$fixture/report-$result_exists" 2>"$fixture/report-error-$result_exists"; then
+            cat "$fixture/report-error-$result_exists" >&2
+            exit 1
+        fi
+        [[ ! -d "$LOCAL_REPO_DIR" && "$UI_PUBLICATION_REPORTED" == true ]]
+        report_ui_publication_result >>"$fixture/report-$result_exists" 2>>"$fixture/report-error-$result_exists"
+        if [[ -s "$fixture/report-error-$result_exists" ]]; then
+            cat "$fixture/report-error-$result_exists" >&2
+            exit 1
+        fi
+        if [[ "$result_exists" == true ]]; then
+            [[ $(grep -c 'Fixture publication report' "$fixture/report-$result_exists") == 1 ]]
+        else
+            [[ $(grep -c 'UI replacement issue' "$fixture/report-$result_exists") == 1 ]]
+        fi
+    done
+)
+
 # An outside-checkout invocation must not use an existing directory as its
 # selected source. In particular, the nonempty string "false" is not consent
 # to reuse its helper, UI, configuration, or service templates.

@@ -245,6 +245,7 @@ declare GIT_API_BASE="https://api.github.com/repos"
 declare GIT_CLONE_BASE="https://github.com"
 declare FAIL_ON_UI_MODIFICATIONS="${FAIL_ON_UI_MODIFICATIONS:-false}"
 declare UI_PUBLICATION_ATTEMPTED="false"
+declare UI_PUBLICATION_REPORTED="false"
 declare UI_PUBLICATION_RESULT_FILE=""
 declare INSTALL_RP1_GPCLK_DKMS="${INSTALL_RP1_GPCLK_DKMS:-auto}"
 declare RP1_GPCLK_DKMS_SOURCE="${RP1_GPCLK_DKMS_SOURCE:-auto}"
@@ -8365,6 +8366,7 @@ manage_web() {
         UI_PUBLICATION_RESULT_FILE="/run/wsprrypi-ui-publication-${$}.json"
         if [[ "$DRY_RUN" != "true" ]]; then
             UI_PUBLICATION_ATTEMPTED="true"
+            UI_PUBLICATION_REPORTED="false"
             rm -f "$UI_PUBLICATION_RESULT_FILE"
         fi
         publisher_args=(
@@ -9561,6 +9563,8 @@ cleanup_files_in_directories() {
             debug_end "$debug"
             return 0
         elif [[ -d "$dest_root" ]]; then
+            # Render the publication report while its checkout helper exists.
+            report_ui_publication_result
             # Delete the repository directory
             exec_command "Delete local repository" rm -fr "${dest_root}" "$debug" || {
                 logE "Failed to delete local install files."
@@ -9657,7 +9661,7 @@ flag_need_reboot() {
 
 # -----------------------------------------------------------------------------
 report_ui_publication_result() {
-    if [[ "$UI_PUBLICATION_ATTEMPTED" != "true" ]]; then
+    if [[ "$UI_PUBLICATION_ATTEMPTED" != "true" || "$UI_PUBLICATION_REPORTED" == "true" ]]; then
         return 0
     fi
     if [[ -n "$UI_PUBLICATION_RESULT_FILE" && -f "$UI_PUBLICATION_RESULT_FILE" ]]; then
@@ -9668,6 +9672,7 @@ report_ui_publication_result() {
         printf "  Publication details are unavailable because the UI publisher did not create its result file.\n"
         printf "  Confirm the installed UI state before retrying.\n"
     fi
+    UI_PUBLICATION_REPORTED="true"
 }
 
 # @brief Finalizes the installation or uninstallation process.
