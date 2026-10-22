@@ -154,20 +154,7 @@ compatible shared installer fixes are supplied from verified WsprryPico source
 independently of Pi releases. The installer channel is independent of firmware
 image selection.
 
-**Download and check image** checks the compatible installer channel before
-planning an image. Successful update checks are cached for ten minutes. The
-Pi selects the configured main/devel branch head after a successful canonical
-software CI run and verification job. It downloads the Python installer and
-manifest schema at that immutable commit, checks Git blob identities, and
-retains SHA-256 hashes with the source and CI receipt. Separate installer releases
-and tags are unnecessary. Firmware still downloads as a compiled UF2 from its
-verified release; the Pi does not compile it.
-An incompatible contract, unsupported Python version, changed payload or failed
-CI cannot replace the installed copy. The first installation requires a verified
-branch head; while its CI is pending, retry after verification completes. A
-refresh failure retains the previous verified copy and
-reports the reason beside the firmware controls. GitHub retry guidance is
-honored without retrying early. No GitHub credentials are loaded.
+**Download and check image** checks the compatible installer channel before planning an image. Successful update checks are cached for ten minutes. The Pi resolves the configured main/devel branch head through compact Git reference metadata, then requires a successful canonical software CI run and verification job. Large commit diffs do not change the bounded metadata download budget. It downloads the Python installer and manifest schema at that immutable commit, checks Git blob identities, and retains SHA-256 hashes with the source and CI receipt. Separate installer releases and tags are unnecessary. Firmware still downloads as a compiled UF2 from its verified release; the Pi does not compile it. An incompatible contract, unsupported Python version, changed payload or failed CI cannot replace the installed copy. The first installation requires a verified branch head; while its CI is pending, retry after verification completes. A refresh failure retains the previous verified copy and reports the reason beside the firmware controls. GitHub retry guidance is honored without retrying early. No GitHub credentials are loaded.
 
 A checked image retains its installer identity. Installing it does not check
 for or substitute a newer installer. Before the first possible firmware write,

@@ -3,6 +3,8 @@
 import copy
 import importlib.util
 import json
+import os
+import subprocess
 from pathlib import Path
 import shutil
 import tempfile
@@ -104,6 +106,51 @@ class DeploymentTests(unittest.TestCase):
         with patch.object(entry,'ROOT',self.target):
             code,result=entry.invoke(manifest,original,['discover'])
         self.assertEqual(code,0);self.assertEqual(result['installer_contract'],1);self.assertEqual(result['marker'],'0.1.1')
+
+
+class RuntimeProvisionTests(unittest.TestCase):
+    def test_failed_deployment_reports_child_diagnostic_and_skips_rule_reload(self):
+        with tempfile.TemporaryDirectory() as name:
+            root=Path(name)
+            (root/'scripts').mkdir()
+            (root/'scripts/pico_usb_deploy.py').write_text(
+                'import sys\nprint("specific Pico deployment failure", file=sys.stderr)\nsys.exit(17)\n')
+            result=subprocess.run(['bash','-c',r'''
+source "$INSTALL_SCRIPT"
+source "$RUNTIME_SCRIPT"
+logW() { printf '[WARN] %s\n' "$1"; }
+warn() { printf '[WARN] %s\n' "$1" >&2; }
+logD() { :; }
+udevadm() { printf invoked >"$SENTINEL"; }
+FGGLD= RESET= FGGRN= FGRED= MOVE_UP= CLEAR_LINE=
+DRY_RUN=false
+if pico_usb_runtime_provision install "$REPOSITORY"; then exit 99; fi
+[[ ! -e "$SENTINEL" ]]
+'''],text=True,capture_output=True,timeout=30,env={**os.environ,
+                'INSTALL_SCRIPT':str(SCRIPTS/'install.sh'),
+                'RUNTIME_SCRIPT':str(SCRIPTS/'pico_usb_runtime_install.sh'),
+                'REPOSITORY':str(root),'SENTINEL':str(root/'reload'),'TMPDIR':str(root)})
+            self.assertEqual(result.returncode,0,result.stdout+result.stderr)
+            self.assertIn('Failed: Deploy identified shared Pico USB installer.',result.stdout)
+            self.assertIn('specific Pico deployment failure',result.stdout)
+            self.assertNotIn('Complete: Deploy identified shared Pico USB installer.',result.stdout)
+            self.assertFalse(list(root.glob('wsprrypi-pico-deploy.*')))
+    def test_dry_run_creates_no_diagnostics_or_deployment(self):
+        with tempfile.TemporaryDirectory() as name:
+            root=Path(name)
+            result=subprocess.run(['bash','-c',r'''
+source "$INSTALL_SCRIPT"
+source "$RUNTIME_SCRIPT"
+FGGLD= RESET= FGGRN= FGRED= MOVE_UP= CLEAR_LINE=
+DRY_RUN=true
+pico_usb_runtime_provision install "$REPOSITORY"
+'''],text=True,capture_output=True,timeout=30,env={**os.environ,
+                'INSTALL_SCRIPT':str(SCRIPTS/'install.sh'),
+                'RUNTIME_SCRIPT':str(SCRIPTS/'pico_usb_runtime_install.sh'),
+                'REPOSITORY':str(root),'TMPDIR':str(root)})
+            self.assertEqual(result.returncode,0,result.stdout+result.stderr)
+            self.assertIn('Complete: (dry) Deploy identified shared Pico USB installer.',result.stdout)
+            self.assertEqual(list(root.iterdir()),[])
 
 
 if __name__=='__main__':unittest.main()

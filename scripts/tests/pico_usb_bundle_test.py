@@ -92,6 +92,22 @@ class DistributionTests(unittest.TestCase):
             with self.subTest(name=name),self.assertRaises(bundle.Unavailable):bundle.published(net,'devel')
         net=Network(*fixture());net.payload['usb_installer.py']=net.payload['usb_installer.py'].replace(b'wsprrypico-usb-result/1',b'wsprrypico-usb-result/2');net.original=dict(net.payload)
         with self.assertRaisesRegex(bundle.Unavailable,'incompatible contract'):bundle.published(net,'devel')
+    def test_large_commit_resolution_uses_compact_refs_and_rechecks_head(self):
+        manifest,payload=bundle.published(self.net,'devel')
+        self.assertEqual(manifest['source'],self.manifest['source'])
+        self.assertEqual(payload,self.payload)
+        self.assertEqual(self.net.requests.count('git/ref/heads/devel'),2)
+        self.assertFalse(any(path.startswith('commits/') for path in self.net.requests))
+    def test_malformed_or_wrong_branch_refs_are_rejected(self):
+        for reference in (
+                {'ref':'refs/heads/main','object':{'type':'commit','sha':'a'*40}},
+                {'ref':'refs/heads/devel','object':{'type':'tag','sha':'a'*40}},
+                {'ref':'refs/heads/devel','object':{'type':'commit','sha':'invalid'}},
+                {'ref':'refs/heads/devel','object':None}):
+            net=Network(*fixture())
+            net.mutate=lambda record:reference if 'ref' in record else record
+            with self.subTest(reference=reference),self.assertRaises(bundle.Unavailable):
+                bundle.published(net,'devel')
     def test_pending_branch_and_branch_race_keep_retained_installer(self):
         identity=self.select()
         self.net.mutate=lambda r: {**r,'workflow_runs':[]} if 'workflow_runs' in r else r
@@ -100,9 +116,9 @@ class DistributionTests(unittest.TestCase):
         net=Network(*fixture());count=0
         def move(r):
             nonlocal count
-            if set(r)=={'sha'}:
+            if r.get('ref')=='refs/heads/devel':
                 count+=1
-                if count==2:r['sha']='c'*40
+                if count==2:r['object']['sha']='c'*40
             return r
         net.mutate=move
         with self.assertRaisesRegex(bundle.Unavailable,'branch changed'):bundle.published(net,'devel')

@@ -63,7 +63,7 @@ class Network:
         if self.failure:
             raise self.failure
         m=self.manifest
-        if path=='commits/devel':return self.mutate({'sha':m['source']})
+        if path=='git/ref/heads/devel':return self.mutate({'ref':'refs/heads/devel','object':{'type':'commit','sha':m['source']}})
         if path=='actions/workflows/software-build.yml':return self.mutate({'id':123,'path':m['workflow']})
         run={'id':m['run_id'],'head_sha':m['source'],'head_branch':'devel','path':m['workflow'],'workflow_id':123,
              'repository':{'full_name':REPOSITORY},'head_repository':{'full_name':REPOSITORY},

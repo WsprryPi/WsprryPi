@@ -193,12 +193,23 @@ def metadata(client, path):
     return value
 
 
+def branch_head(client, channel):
+    # The commits endpoint includes file diffs and can exceed the metadata
+    # budget on large commits. A Git ref binds the same head without the diff.
+    reference = metadata(client, 'git/ref/heads/'+channel)
+    obj = reference.get('object')
+    require(reference.get('ref') == 'refs/heads/'+channel and isinstance(obj,dict) and
+            obj.get('type') == 'commit', 'Invalid installer branch reference')
+    source = obj.get('sha')
+    require(isinstance(source,str) and re.fullmatch(r'[0-9a-f]{40}',source), 'Invalid installer source identity')
+    return source
+
+
 def published(client, channel):
     # A branch is only a selector. Execute immutable source after its canonical
     # software verification succeeds; cached transactions keep their old bytes.
     require(channel in ('main', 'devel'), 'Unsupported installer channel')
-    source = metadata(client,'commits/'+channel)['sha']
-    require(isinstance(source, str) and re.fullmatch(r'[0-9a-f]{40}',source), 'Invalid installer source identity')
+    source = branch_head(client,channel)
     workflow = metadata(client,'actions/workflows/software-build.yml')
     require(type(workflow.get('id')) is int and workflow['id'] > 0 and
             workflow.get('path') == '.github/workflows/software-build.yml', 'Unexpected installer verification workflow')
@@ -247,7 +258,7 @@ def published(client, channel):
         'result_schema':'wsprrypico-usb-result/1','transaction_schema':'wsprrypico-usb-transaction/1',
         'firmware_manifest_schema':1,
         'files':{n:{'sha256':sha(d),'bytes':len(d)} for n,d in payload.items()}},channel)
-    require(metadata(client,'commits/'+channel)['sha'] == source, 'Installer branch changed during verification; retry')
+    require(branch_head(client,channel) == source, 'Installer branch changed during verification; retry')
     return manifest, payload
 
 
