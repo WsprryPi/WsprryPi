@@ -34,7 +34,11 @@ defines the canonical unprivileged suite. Use [container builds](../container-bu
 and the [precompiled-installation contract](../precompiled-installation.md) for
 artifact production. Building an executable does not qualify installation or RF.
 
-Pushes and pull requests that change only Markdown, reStructuredText or documentation images/PDFs skip the full non-hardware CI workflow. Images/PDFs are excluded only under `docs/`; application assets remain eligible. A mixed documentation and code change still runs the suite, as do executable helpers, fixtures, manifests, configuration and workflow changes, including those under `docs/` and `release_tools/`. See the workflow's `paths-ignore` lists for the exact patterns.
+On its selected branches, the non-hardware workflow starts with a lightweight change-classification job. It inspects the complete Git diff rather than GitHub's bounded path-filter list. Only ordinary documentation skips the full jobs: the root `README.md`, prose under `docs/` or `release_tools/`, and images/PDFs under `docs/`. Other paths, including Markdown in source or test directories, require full validation. The exact policy lives in `scripts/ci/change_scope.py`.
+
+`AGENTS.md`, the support-bundle intake contract, distributed license notices and protected fixture/evidence directories remain checked inputs. Mixed changes, executable bits, symlinks, submodule/type changes and moves across the documentation boundary also require full CI. Pushes use a two-dot comparison; pull requests use the merge-base comparison. New branches, force pushes, empty or unavailable comparisons and classification failures default to full validation. Cancellation still stops dependent jobs. Run the focused regressions from `src` with `make ci-change-scope-test SUDO= CXX=true GPIOD_CPP_HEADER_AVAILABLE=0`.
+
+Concurrency groups include the commit SHA so a documentation-only successor cannot cancel or replace an earlier code-validation run. Different commits can therefore validate concurrently; duplicate runs of the same commit retain cancellation. When documentation becomes a build or regression input, add it to the classifier's checked-input policy before relying on it in tests.
 
 ## Maintained contracts and tools
 
