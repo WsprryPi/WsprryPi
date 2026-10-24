@@ -3,40 +3,38 @@ name: Non-hardware validation
 on:
   pull_request:
     branches: [devel, main]
-    # Keep executable helpers, fixtures and release-policy inputs eligible.
-    paths-ignore:
-      - '**/*.md'
-      - '**/*.rst'
-      - 'docs/**/*.png'
-      - 'docs/**/*.jpg'
-      - 'docs/**/*.jpeg'
-      - 'docs/**/*.gif'
-      - 'docs/**/*.svg'
-      - 'docs/**/*.webp'
-      - 'docs/**/*.pdf'
   push:
     branches: [devel, main, codex/rp1-1.0-candidate-acceptance, codex/p15-8-wspr-type23, codex/step14-pico-type23-integration]
-    # Keep executable helpers, fixtures and release-policy inputs eligible.
-    paths-ignore:
-      - '**/*.md'
-      - '**/*.rst'
-      - 'docs/**/*.png'
-      - 'docs/**/*.jpg'
-      - 'docs/**/*.jpeg'
-      - 'docs/**/*.gif'
-      - 'docs/**/*.svg'
-      - 'docs/**/*.webp'
-      - 'docs/**/*.pdf'
 
 permissions:
   contents: read
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  # A documentation-only successor must not cancel an in-flight code check.
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}-${{ github.sha }}
   cancel-in-progress: true
 
 jobs:
+  change_scope:
+    name: Choose validation scope
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      run_full_ci: ${{ steps.classify.outputs.run_full_ci }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Check change-classification regressions
+        run: make -C src ci-change-scope-test SUDO= CXX=true GPIOD_CPP_HEADER_AVAILABLE=0
+      - name: Inspect the complete Git comparison
+        id: classify
+        run: python3 -B scripts/ci/change_scope.py
+
   macos-simulated-profile:
+    needs: change_scope
+    if: ${{ !cancelled() && (needs.change_scope.result != 'success' || needs.change_scope.outputs.run_full_ci != 'false') }}
     runs-on: macos-15
     timeout-minutes: 10
     steps:
@@ -65,6 +63,8 @@ jobs:
           python3 scripts/tests/container_avahi_contract_test.py
 
   wtp-network-loopback:
+    needs: change_scope
+    if: ${{ !cancelled() && (needs.change_scope.result != 'success' || needs.change_scope.outputs.run_full_ci != 'false') }}
     runs-on: ubuntu-24.04
     # Cold C++ builds share this budget with TLS, routing, and browser checks.
     timeout-minutes: 30
@@ -121,6 +121,8 @@ jobs:
           WSPRRYPI_RUN_RECOVERY_BROWSER=1 node tests/wtp_recovery_ui_integration_test.js
 
   wtp-usb-management-pair:
+    needs: change_scope
+    if: ${{ !cancelled() && (needs.change_scope.result != 'success' || needs.change_scope.outputs.run_full_ci != 'false') }}
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
@@ -151,6 +153,8 @@ jobs:
           node WsprryPi-UI/tests/wtp_usb_pair_test.js src/build/wtp-network/wtp_usb_pair_client src/build/usb-reference/pico-host/usb_management_driver
 
   wtp-configuration-legacy:
+    needs: change_scope
+    if: ${{ !cancelled() && (needs.change_scope.result != 'success' || needs.change_scope.outputs.run_full_ci != 'false') }}
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     strategy:
@@ -187,6 +191,8 @@ jobs:
         run: make wtp-config-interop-test SUDO= PICO_COMPAT_PROFILE="$PROFILE" PICO_SOURCE=build/network-reference/pico MBEDTLS_SOURCE=build/network-reference/mbedtls
 
   strict-i2c-profile:
+    needs: change_scope
+    if: ${{ !cancelled() && (needs.change_scope.result != 'success' || needs.change_scope.outputs.run_full_ci != 'false') }}
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     container: ubuntu:24.04
@@ -218,6 +224,8 @@ jobs:
           ../scripts/tests/strict_i2c_install_path_test.sh
 
   ubuntu-gcc13-release:
+    needs: change_scope
+    if: ${{ !cancelled() && (needs.change_scope.result != 'success' || needs.change_scope.outputs.run_full_ci != 'false') }}
     runs-on: ubuntu-24.04
     # Six serial warning-as-error profiles exceeded 15 minutes on the runner.
     timeout-minutes: 30
@@ -259,6 +267,8 @@ jobs:
           done
 
   non-hardware-validation:
+    needs: change_scope
+    if: ${{ !cancelled() && (needs.change_scope.result != 'success' || needs.change_scope.outputs.run_full_ci != 'false') }}
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     container: debian:trixie-slim

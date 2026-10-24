@@ -1181,6 +1181,10 @@ backend-capabilities-make-regression-test:
 semantics-make-regression-test:
 	$(Q)python3 $(SEMANTICS_MAKE_REGRESSION_TEST)
 
+.PHONY: ci-change-scope-test
+ci-change-scope-test:
+	$(Q)python3 -B ../scripts/tests/ci_change_scope_test.py
+
 .PHONY: wtp-client-host-build wtp-protocol-test
 wtp-client-host-build:
 	$(Q)$(MAKE) --no-print-directory -C WTP-Client all
