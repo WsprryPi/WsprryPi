@@ -137,15 +137,7 @@ blocked, an empty list cannot distinguish that from no advertising devices;
 the UI leaves reachability unverified. Manual profiles and configured direct
 endpoints remain usable.
 
-The accepted TXT format is version 1: `txtvers=1` must be first, and exactly
-one `binding=tls` or `binding=plain` must appear. Required keys are duplicate-checked
-without ASCII case; unknown keys are ignored. TXT does not contain a port,
-device ID, WTP version, credentials, or RF capability. HELLO and CAPS provide
-protocol/device facts. The service name and direct-connection default port
-31417 are provisional pending IANA assignment. Discovery is link-local and
-does not imply that a Pico listener is reachable or RF ready. See the
-[Pico DNS-SD profile](https://github.com/WsprryPi/WsprryPico/blob/devel/engineering/protocol/WTP-DNS-SD.md)
-and [WTP/1 protocol](https://github.com/WsprryPi/WsprryPico/blob/devel/engineering/protocol/WTP.md).
+The accepted TXT format is version 1: `txtvers=1` must be first, and exactly one `binding=tls` or `binding=plain` must appear. Required keys are duplicate-checked without ASCII case; unknown keys are ignored. TXT does not contain a port, device ID, WTP version, credentials, or RF capability. HELLO and CAPS provide protocol/device facts. The service name and direct-connection default port 31417 are provisional pending IANA assignment. Discovery is link-local and does not imply that a Pico listener is reachable or RF ready. See the [Pico DNS-SD profile](https://github.com/WsprryPi/WsprryPico/blob/devel/engineering/protocol/WTP-DNS-SD.md) and [WTP/1 protocol](https://github.com/WsprryPi/WsprryPico/blob/devel/engineering/protocol/WTP.md).
 
 An instance name, hostname, address, TXT record, or Plain LAN HELLO is never
 used as a durable trusted identity. A discovered profile needs explicit

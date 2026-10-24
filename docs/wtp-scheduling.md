@@ -142,13 +142,7 @@ make wtp-backend-test wtp-protocol-test wtp-plan-test wtp-usb-test SUDO=
 make semantics-make-regression-test semantics-test-portable SUDO=
 ```
 
-Ordinary tests use virtual host/device clocks and a scripted peer with real
-framing, Session, backend, compiler and controller. They include a complete
-162-event WSPR job, early exact-UTC ARM, lease renewal, frozen requests, repeats,
-clock failures, pending/deferred reload, concurrent notification at commitment,
-stop and blocked recovery. Optional interoperability compiles the selected Pico sources, including edits, and runs its actual endpoint/job service with a software clock/engine.
-It opens no physical USB device. macOS/Linux CI includes the ordinary scheduler
-tests; a local macOS pass does not establish a Linux runtime pass.
+Ordinary tests use virtual host/device clocks and a scripted peer with real framing, Session, backend, compiler and controller. They include a complete 162-event WSPR job, early exact-UTC ARM, lease renewal, frozen requests, repeats, clock failures, pending/deferred reload, concurrent notification at commitment, stop and blocked recovery. Optional interoperability compiles the selected Pico sources, including edits, and runs its actual endpoint/job service with a software clock/engine. It opens no physical USB device. macOS/Linux CI includes the ordinary scheduler tests; a local macOS pass does not establish a Linux runtime pass.
 
 ## Integration and qualification
 
