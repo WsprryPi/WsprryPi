@@ -34,6 +34,8 @@ defines the canonical unprivileged suite. Use [container builds](../container-bu
 and the [precompiled-installation contract](../precompiled-installation.md) for
 artifact production. Building an executable does not qualify installation or RF.
 
+Pushes and pull requests that change only Markdown, reStructuredText or documentation images/PDFs skip the full non-hardware CI workflow. Images/PDFs are excluded only under `docs/`; application assets remain eligible. A mixed documentation and code change still runs the suite, as do executable helpers, fixtures, manifests, configuration and workflow changes, including those under `docs/` and `release_tools/`. See the workflow's `paths-ignore` lists for the exact patterns.
+
 ## Maintained contracts and tools
 
 - [WTP execution plans](../wtp-execution-plan.md), [backend](../wtp-backend.md),

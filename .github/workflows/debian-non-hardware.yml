@@ -3,8 +3,30 @@ name: Non-hardware validation
 on:
   pull_request:
     branches: [devel, main]
+    # Keep executable helpers, fixtures and release-policy inputs eligible.
+    paths-ignore:
+      - '**/*.md'
+      - '**/*.rst'
+      - 'docs/**/*.png'
+      - 'docs/**/*.jpg'
+      - 'docs/**/*.jpeg'
+      - 'docs/**/*.gif'
+      - 'docs/**/*.svg'
+      - 'docs/**/*.webp'
+      - 'docs/**/*.pdf'
   push:
     branches: [devel, main, codex/rp1-1.0-candidate-acceptance, codex/p15-8-wspr-type23, codex/step14-pico-type23-integration]
+    # Keep executable helpers, fixtures and release-policy inputs eligible.
+    paths-ignore:
+      - '**/*.md'
+      - '**/*.rst'
+      - 'docs/**/*.png'
+      - 'docs/**/*.jpg'
+      - 'docs/**/*.jpeg'
+      - 'docs/**/*.gif'
+      - 'docs/**/*.svg'
+      - 'docs/**/*.webp'
+      - 'docs/**/*.pdf'
 
 permissions:
   contents: read
