@@ -1,6 +1,6 @@
 # The roadmap
 
-This roadmap covers the shared frequency contract for WsprryPi and WsprryPico. Work starts from Pi `devel` on `codex/shared-frequency-contract` and coordinates the affected Pico and operator-documentation sources. Stage 0 inspection and Stage 1 implementation, validation and corrective review are complete. Stage 2 implementation, local hardware-free validation, documentation and corrective review are complete. Stages 3 through 5 are not started.
+This roadmap covers the shared frequency contract for WsprryPi and WsprryPico. Work starts from Pi `devel` on `codex/shared-frequency-contract` and coordinates the affected Pico and operator-documentation sources. Stage 0 inspection and Stage 1 implementation, validation and corrective review are complete. Stage 2 implementation, local hardware-free validation, documentation and corrective review are complete. Stage 3 implementation, local hardware-free validation, documentation and corrective review are complete. Stages 4 and 5 are not started.
 
 ## Agreed contract and scope
 
@@ -77,7 +77,7 @@ Application/UI and operator-documentation commits and normal feature-branch push
 
 ### Status
 
-Stage 2 implementation, local hardware-free validation, operator documentation and adversarial corrective review are complete. Coordinated feature pushes select Pico `codex/shared-frequency-contract` for both Pi network and USB jobs, record the actual selected revision and retain explicit `pico_ref` override precedence. Other contexts keep the normal `devel` default. Submitted-commit CI is checked separately from the local evidence below. Stages 3 through 5 remain unstarted.
+Stage 2 implementation, local hardware-free validation, operator documentation and adversarial corrective review are complete. Coordinated feature pushes select Pico `codex/shared-frequency-contract` for both Pi network and USB jobs, record the actual selected revision and retain explicit `pico_ref` override precedence. Other contexts keep the normal `devel` default. Submitted-commit CI is checked separately from the local evidence below. At Stage 2 closeout, Stages 3 through 5 were unstarted.
 
 Standalone input and persistence use whole-Hz WSPR USB dial `wspr_dial_frequency_hz`. One checked integer-nHz calculation constructs the four nominal RF targets around dial +1500 Hz, with no random placement, and both frames retain those targets. Dial `14095600` produces center `14097100 Hz` and exact targets `14097097802734375`, `14097099267578125`, `14097100732421875`, `14097102197265625` nHz. The dedicated resource retains `frequency_hz` and schema version 1. Application views 1–4, the strict Pi adapter and management display use only `schedule_dial_frequency_nhz`, with the existing nontransmitting `"0"` sentinel; standalone status retains null for unset. Generic resources redact and preserve the independent dial.
 
@@ -110,6 +110,55 @@ Adversarial review closed inconsistent first Console selection enablement, uncha
 - Run affected Pico host, schema, browser, Console, installer-preservation and asset-integrity tests, plus Pi configuration and interoperability tests. Review desktop and mobile controls with Impeccable.
 
 ## Stage 3 Pico CW references and shift direction
+
+### Status
+
+Stage 3 implementation, hardware-free validation, operator/API documentation and adversarial corrective review are complete. QRSS enters carrier, FSKCW enters space and DFCW enters dot. The two-frequency browser modes add a positive shift. For B = 14096900 Hz and s = 5 Hz, QRSS carrier is 14096900 Hz; FSKCW space is 14096900 Hz and mark is 14096905 Hz; DFCW dot is 14096900 Hz and dash is 14096905 Hz. Exact B and B+s values are 14096900000000000 and 14096905000000000 nHz. The unchanged explicit API and encoder retain either distinct positive DFCW orientation. Stages 4 and 5 remain unstarted; submitted-commit CI is assessed separately from this local evidence.
+
+The browser shares exact BigInt frequency construction between preview and submission, checks uint64 addition and each advertised engine range, ignores the disabled QRSS shift without discarding it, and preserves raw frequency, shift, message and timing drafts. Local invalid requests reach neither LOAD_MESSAGE nor ARM. Server policy, ownership, clock admission, allow_frequency_adjustment and calibration ownership remain authoritative. The decoder, Morse encoder, standalone WSPR dial/snapshots, Test Tone/Fleet semantics, timing defaults, repeats and raw absolute job behavior are unchanged.
+
+All 157 applicable Linux host tests passed without skips with separately pinned MbedTLS and the optional NumPy/Harness analysis dependencies present. After formatting the changed C++ test lines, all eight focused browser, network, core, RF-stream, consumer-session, frequency-policy and operator-asset checks passed again. The WTP validator passed 23 schema, seven raw-JSON, one framing and eight transition cases. Source hashes matched all 865 selected files in both isolated build environments; edited sources were accepted before commits without clean-checkout or source-revision gates.
+
+The actual-browser integration serves generated app.min.js through compiled production handlers and exercises consumer and engineering forms with native Tab/Enter submission. Submitted requests, decoded/accepted compiled jobs and independently specified events agree. The repeated "A E" vector has 12 events and duration 85000001000 ns for QRSS/FSKCW or 73000001000 ns for DFCW. Separate "AE" checks cover character gaps. Exact fractional nHz, both explicit DFCW orientations, invalid/equal/reversed API requests, raw job files, finite tones, local validation, server policy rejection, preserved drafts, offline/login recovery, unchanged journals, named previews and accessible labels passed. Repeat gaps stay RF-off in every mode and the final tail stays 1000 ns RF-off.
+
+The following commands ran in isolated Linux environments; host/browser commands use /work/stage3-source as the Pico working directory. The retained Chromium wrapper only supplies the container's required --no-sandbox flag. The Harness path supplies existing offline analysis modules, not hardware access.
+
+```sh
+cmake -S /work/stage3-source -B /work/stage3-host-writable -DCMAKE_BUILD_TYPE=Debug -DWSPRRY_PICO_BUILD_FIRMWARE=OFF -DWSPRRY_PICO_BUILD_TESTS=ON -DWSPRRY_PICO_TEST_MBEDTLS_PATH=/sdk-input/lib/mbedtls -DWSPRRY_PICO_HARNESS_PYTHON=/usr/bin/python3
+cmake --build /work/stage3-host-writable --parallel 4
+PYTHONPATH=/work/stage3-harness-src NODE_OPTIONS=--experimental-websocket ctest --test-dir /work/stage3-host-writable --output-on-failure --timeout 240
+python3 -B scripts/validate_wtp_contract.py
+CHROME_BIN=/work/chrome NODE_OPTIONS=--experimental-websocket node tests/message_frequency_ui_integration.mjs /work/stage3-host-writable/consumer_bootstrap_driver /work/stage3-cw-ui-reviewed
+CHROME_BIN=/work/chrome NODE_OPTIONS=--experimental-websocket node tests/standalone_frequency_ui_integration.mjs /work/stage3-host-writable/consumer_bootstrap_driver /work/stage3-standalone-ui
+```
+
+Normal WsprryPico and WsprryPico-Inhibited firmware cross-builds passed with SDK 2.3.1 at 079c6f39023649b154152db30f1d781e884879bc, Arm GNU 15.3.1 and picotool 2.3.0. The normal image uses the 138 MHz RF application and the inhibited image uses its simulator. Application identity, BOOTSEL topology, flash/journal separation, stack/heap guards, allocator/pool hooks and applicable RF-worker checks passed. Both UF2 payloads match their linked ELFs. The selected source snapshot is writable because the pinned SDK/picotool build touches CMakeLists.txt; repository sources remain read-only mounts. The Arm tools are on PATH for post-link checkers. Picotool reports its intentional build without USB support. Neither image was flashed.
+
+```sh
+cmake -S /work/stage3-source -B /work/stage3-firmware -G Ninja -DCMAKE_BUILD_TYPE=Release -DWSPRRY_PICO_BUILD_FIRMWARE=ON -DWSPRRY_PICO_BUILD_TESTS=OFF -DPICO_BOARD=pico2_w -DPICO_SDK_PATH=/sdk -DPICO_TOOLCHAIN_PATH=/work/arm-gnu-toolchain-15.3.rel1-x86_64-arm-none-eabi -DPICOTOOL_FETCH_FROM_GIT_PATH=/work/stage3-firmware/_deps -DPICOTOOL_FORCE_FETCH_FROM_GIT=ON -DPICOTOOL_GIT_REPOSITORY_URL=/picotool/picotool-src
+PATH=/work/arm-gnu-toolchain-15.3.rel1-x86_64-arm-none-eabi/bin:$PATH cmake --build /work/stage3-firmware --target WsprryPico WsprryPico-Inhibited --parallel 4
+```
+
+Pi plan/frequency-vector, QRSS execution, Fleet, configuration interoperability and network interoperability tests passed against the edited Pico sources. The retained standalone MbedTLS checkout at /work/mbedtls has the same pinned 0bebf8b8c7f07abe3571ded48a11aa907a1ffb20 revision; the original bind-mounted submodule's Git indirection is not usable inside that container. These commands ran from the Pi src directory with hardware access disabled:
+
+```sh
+WSPRRYPI_DISABLE_HARDWARE_ACCESS=1 make wtp-plan-test qrss-execution-regression-test wtp-fleet-test SUDO=
+WSPRRYPI_DISABLE_HARDWARE_ACCESS=1 make wtp-config-interop-test wtp-network-interop-test SUDO= PICO_SOURCE=/pico MBEDTLS_SOURCE=/work/mbedtls
+```
+
+Impeccable review inspected the existing design and final desktop/mobile form, preview, keyboard focus, invalid input, refusal and 200% text views. The intentionally light-only theme remains light under a dark preference. The mechanical detector ran with degraded parser availability and reported nine preexisting design-sidecar token advisories; no unrelated sidecar or design changes were made. Manual contrast checks include 8.14:1 for action errors, 5.94:1 for help, 12.35:1 for body text and 6.92:1 for primary buttons. Rendered operator instructions passed desktop/mobile review without horizontal overflow.
+
+Adversarial assessment closed stale accepted-job feedback beside an edited draft and dimmed server-refusal feedback inside a disabled fieldset. Editing now clears the old action result; action status remains outside disabled controls with explicit regression assertions and reviewed screenshots. Fixture corrections model an idle boot with saved settings, observe the correct consumer/engineering instance, retain unique terminal job identities and use the production frequency-policy engine. Initial read-only-output, missing analysis-module, Arm-tool PATH and MbedTLS Git-indirection failures were corrected in the isolated environments without weakening tests or source/dependency policy. The final complete assessment found no unresolved actionable Stage 3 issue.
+
+Documentation impact: Pico docs/operate.md and engineering/browser-api.md describe the implemented references, positive shift, direct RF inputs, named previews, validation and explicit API capability. Pico README, existing screenshots and Pi operator instructions in Install/pico.md, User_Interface/Setup/Signal_Setup/cw.md, Command_Line_Operations/cw_modes.md and User_Interface/Setup/Transmitter/index.md were considered and remain accurate. No Pi operator-documentation edit or empty commit is needed. The project-local strict Sphinx build, documentation/link checker and image-delivery test passed; no documentation was deployed. No further Stage 3 documentation is required.
+
+```sh
+docs/.venv/bin/python -m sphinx -E -a -n -W --keep-going -b html docs docs/_build/html
+docs/.venv/bin/python scripts/check_documentation.py
+docs/.venv/bin/python tests/test_image_delivery.py
+```
+
+Feature pushes retain the Stage 2 coordinated Pico branch selection and explicit pico_ref override precedence. The Pico publication workflow's main/devel/tag restrictions remain unchanged; no arbitrary feature publication or release metadata was introduced. Software, browser and firmware-build evidence does not establish physical RF, target timing, USB hardware, installation or service qualification. No live device, service, GPIO or RF operation was performed.
 
 ### Work
 
