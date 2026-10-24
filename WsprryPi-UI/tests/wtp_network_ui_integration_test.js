@@ -133,6 +133,9 @@ async function main() {
         consumer:JSON.parse(fs.readFileSync(path.join(resourceBuild,'resources-pending-consumer_station.json'))),
         fault:JSON.parse(fs.readFileSync(path.join(resourceBuild,'resources-fault-engineering_mtls.json')))
     };
+    resourceFixtures.unset = structuredClone(resourceFixtures.loaded);
+    resourceFixtures.unset.application.recurrence.schedule_dial_frequency_nhz = '0';
+    resourceFixtures.unset.application.recurrence.enabled = false;
     let chrome, client, php, failure;
     const capture = async (name, parameters = {format:'png'}) => {
         if (!captureScreenshots) return;
@@ -366,9 +369,13 @@ async function main() {
         await waitFor(async()=>await evaluate('document.getElementById("wtp-management").getAttribute("aria-busy")==="false"'),'restore engineering management');
         // One batched P15.4 visual pass: real emitted resource fixtures, with
         // mocked browser transport only. Actual carrier evidence runs separately.
-        for (const state of ['loaded','consumer','fault','unsupported']) {
+        for (const state of ['loaded','unset','consumer','fault','unsupported']) {
             await evaluate(`window.__resourceState='${state}'; window.WtpManagement.setAvailability(true,true); document.getElementById('wtp-member-load').click();`);
             await waitFor(async()=>await evaluate('document.getElementById("wtp-management").getAttribute("aria-busy")==="false"'),'shared resource load');
+            if(state==='unset') {
+                assert.match(await evaluate('document.getElementById("wtp-member-recurrence").textContent'),/WSPR dial not configured/);
+                assert.doesNotMatch(await evaluate('document.getElementById("wtp-member-recurrence").textContent'),/WSPR dial 0 Hz/);
+            }
             if(state==='loaded') {
                 assert.equal(await evaluate('document.getElementById("wtp-member-station-save").disabled'),false);
                 assert.equal(await evaluate(`(()=>{

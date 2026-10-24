@@ -39,7 +39,7 @@ async function stop(child) {
       return response(result.body,result.status,result.etag);
     };
     const original=await dump(); assert(original.healthy);
-    assert.equal(original.config.wspr_base_frequency_hz,3570100);
+    assert.equal(original.config.wspr_dial_frequency_hz,3568600);
     // Discovery must read current resources without mutating saved settings.
     const resourcesBrowser=browser(exchange);
     await resourcesBrowser.click('wtp-member-load');
@@ -52,6 +52,8 @@ async function stop(child) {
     assert.deepEqual(await dump(),original,'resource discovery must not mutate the member');
     assert.equal(resources.status,200,JSON.stringify(resources));
     assert.equal(resources.body.schema,'wsprrypi-member-resources/1');
+    assert.match(resourcesBrowser.element('wtp-member-recurrence').textContent,/WSPR dial 3568600 Hz/);
+    assert.equal(resources.body.application.recurrence.schedule_dial_frequency_nhz,'3568600000000000');
     assert.equal(resources.body.application.hardware.saved.rf_gp,28);
     assert.equal(resources.body.application.hardware.active.rf_gp,28);
     assert(!resourcesBrowser.element('wtp-member-station-save').disabled);
@@ -93,7 +95,7 @@ async function stop(child) {
       b.element('wtp-remote-ntp').value=enabled?'192.0.2.2':loaded.wifi.ntp_ipv4;
       await b.click('wtp-remote-save');
       const edited=calls.at(-1).result; assert.equal(edited.status,200,JSON.stringify(edited));
-      assert.equal((await dump()).config.wspr_base_frequency_hz,3570100,'ordinary saves preserve independent standalone RF base');
+      assert.equal((await dump()).config.wspr_dial_frequency_hz,3568600,'ordinary saves preserve independent standalone WSPR dial');
       assert.equal(edited.exchanges.filter(e=>e.method!=='GET').length,1);
       persisted=await dump(); assert.equal(persisted.config.enabled,enabled);
       assert.equal(persisted.config.wifi.ntp_ipv4,enabled?'192.0.2.2':loaded.wifi.ntp_ipv4);

@@ -160,7 +160,7 @@ struct Test {
     f.api.progress_settings(progress);
     if (configured) {
       auto config = *pico::standalone::parse_config(network_test::config);
-      config.wspr_base_frequency_hz = 3570100;
+      config.wspr_dial_frequency_hz = 3568600;
       assert(f.scheduler.command("CONFIG " + pico::standalone::serialize_config(config)).find("true") != std::string::npos);
       assert(f.store.reserve(1791970000000000000ULL));
     }
@@ -335,8 +335,8 @@ void recovery_cases() {
   assert(t.mutations==0&&t.wtp.io==0);
 }
 
-// Current closed configuration resources retain independent standalone RF
-// selection for ordinary PUT, merge and replace, without snapshot producers.
+// Current closed configuration resources retain independent standalone WSPR
+// dial selection for ordinary PUT, merge and replace, without snapshot producers.
 void configuration_write_preservation_cases() {
   for (const bool ap : {false, true}) for (const std::string mode : {"put", "merge", "replace"}) {
     Test t;
@@ -345,7 +345,7 @@ void configuration_write_preservation_cases() {
       t.interface = pico::network::ConsumerInterface::AccessPoint;
     }
     auto initial = *t.f.store.config();
-    initial.wspr_base_frequency_hz = 3570237;
+    initial.wspr_dial_frequency_hz = 3568737;
     initial.allow_unqualified_frequency = initial.allow_non_amateur_frequency = true;
     assert(t.f.store.save(initial));
     const auto watermark = t.f.store.watermark();
@@ -355,7 +355,7 @@ void configuration_write_preservation_cases() {
     if (read.status != 200) std::cerr << "Configuration read: " << read.status << " " << read.body << std::endl;
     assert(read.status == 200);
     const auto closed = Json::parse(read.body).at("config");
-    assert(!closed.contains("wspr_base_frequency_hz") && closed["wifi"]["password"].is_null());
+    assert(!closed.contains("wspr_dial_frequency_hz") && closed["wifi"]["password"].is_null());
     Json candidate = mode == "merge" ? Json{{"expires_utc_s", 1900000000}} : closed;
     candidate["expires_utc_s"] = 1900000000;
     const auto payload = [&](const Json &value) -> Json {
@@ -382,7 +382,7 @@ void configuration_write_preservation_cases() {
     assert(c->request(resource, method, payload(candidate).dump(), fresh.etag).status == 503);
     assert(*t.f.store.config() == expected && t.f.store.watermark() == watermark && t.wtp.io == 0);
   }
-  std::cout << "Current PUT/merge/replace preserve independent RF base and unrelated settings; target, revision and atomic-save checks passed\n";
+  std::cout << "Current PUT/merge/replace preserve independent WSPR dial and unrelated settings; target, revision and atomic-save checks passed\n";
 }
 
 void alias_fixed_vector(const Json &vector) {

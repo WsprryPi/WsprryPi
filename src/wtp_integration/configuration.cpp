@@ -134,9 +134,9 @@ bool application_shape(const Json &j, const Json &target, bool usb = false) {
     if (revision.size() != 64 || !std::all_of(revision.begin(), revision.end(), [](char value) {
           return (value >= '0' && value <= '9') || (value >= 'a' && value <= 'f'); })) return false;
   }
-  if (!fields(r, {"authority", "enabled", "suspended", "expires_utc_s", "schedules", "schedule_base_frequency_nhz"}) ||
+  if (!fields(r, {"authority", "enabled", "suspended", "expires_utc_s", "schedules", "schedule_dial_frequency_nhz"}) ||
       r["authority"] != "member" || !r["enabled"].is_boolean() || !r["suspended"].is_boolean() ||
-      !decimal(r["expires_utc_s"]) || !decimal(r["schedule_base_frequency_nhz"]) ||
+      !decimal(r["expires_utc_s"]) || !decimal(r["schedule_dial_frequency_nhz"]) ||
       !shape(Json{{"schedules", r["schedules"]}}, true, true)) return false;
   if (!fields(c, {"management_carrier", "application_read", "station_write", "hardware_write", "max_update_bytes",
           "max_config_bytes", "hardware_activation", "station_encoding", "station_power_meaning", "recurrence_authorities",

@@ -62,9 +62,9 @@ int main(int argc, char **argv) {
   if (argc > 3 && std::string(argv[3]) != "blank") {
     auto config = *wsprrypico::standalone::parse_config(network_test::config);
     config.power_dbm = 20;
-    // A complete current-source fixture selects its standalone RF base at
-    // runtime. This is independent of absolute WTP events, not a USB dial.
-    config.wspr_base_frequency_hz = 3570100;
+    // A complete current-source fixture selects its standalone WSPR dial at
+    // runtime. This whole-Hz USB dial is independent of absolute WTP events.
+    config.wspr_dial_frequency_hz = 3568600;
     config.pins.rf = 28;
     config.allow_unqualified_frequency = config.allow_non_amateur_frequency = true;
     if (!store.save(config) || !store.reserve(1'700'000'000'000'000'000ULL)) return 1;

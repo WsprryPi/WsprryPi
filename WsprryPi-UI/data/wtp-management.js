@@ -282,7 +282,7 @@
         const keep = resourceLoaded && (resourceReconcile || !a.station.storage_healthy || !h.storage_healthy || h.application_error !== null);
         resourceObserved = new Date().toLocaleTimeString();
         member("identity").textContent = `Observed ${resourceObserved}: ${resourceIdentity(data)}`;
-        member("recurrence").textContent = `Member-owned; ${a.recurrence.enabled ? "enabled" : "disabled"}; ${a.recurrence.suspended ? "STOP suspended" : "not suspended"}; expiry ${a.recurrence.expires_utc_s}; base ${frequencyText(a.recurrence.schedule_base_frequency_nhz)}; schedule periods/phases: ${a.recurrence.schedules.map(s => `${s.period_s}/${s.phase_s} s`).join(", ") || "none"}. Live observations may change independently.`;
+        member("recurrence").textContent = `Member-owned; ${a.recurrence.enabled ? "enabled" : "disabled"}; ${a.recurrence.suspended ? "STOP suspended" : "not suspended"}; expiry ${a.recurrence.expires_utc_s}; WSPR dial ${a.recurrence.schedule_dial_frequency_nhz === "0" ? "not configured" : frequencyText(a.recurrence.schedule_dial_frequency_nhz)}; schedule periods/phases: ${a.recurrence.schedules.map(s => `${s.period_s}/${s.phase_s} s`).join(", ") || "none"}. Live observations may change independently.`;
         member("health").textContent = `Station storage ${a.station.storage_healthy ? "healthy" : "faulted"}; hardware storage ${h.storage_healthy ? "healthy" : "faulted"}; ${h.application_error || "no hardware application fault reported"}; execution engine ${h.execution_engine}.`;
         member("saved").textContent = `${planText(h.saved)}; saved generation ${h.saved_generation ?? "unavailable"}.`;
         member("active").textContent = `${planText(h.active)}; observation ${h.active_revision ?? "unavailable"}.`;

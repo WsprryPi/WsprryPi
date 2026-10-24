@@ -57,6 +57,27 @@ const {browser,reply,target}=require("./wtp_usb_settings_test.js");
         assert.equal(station.status,200,JSON.stringify(station));
         const settings=await request({method:"GET",path:"/api/v1/member/configuration",body:""});assert.equal(settings.status,200,JSON.stringify(settings));
         assert.equal(settings.body.config.wifi.ssid,"");assert.equal(settings.body.config.station.callsign,"K1ABC");
+        const dial=await request({raw_resource:'standalone-frequency'});
+        assert.equal(dial.status,200,JSON.stringify(dial)); assert.equal(dial.body.frequency_hz,null);
+        const selectedDial=await request({raw_resource:'standalone-frequency',method:'PUT',revision:dial.etag,
+            body:JSON.stringify({schema:'transmitter-standalone-frequency/1',target,frequency_hz:3568737})});
+        assert.equal(selectedDial.status,200,JSON.stringify(selectedDial));assert.equal(selectedDial.body.frequency_hz,3568737);
+        for(const mode of ['put','merge','replace']) {
+            const read=await request({raw_resource:'config/2'});assert.equal(read.status,200,JSON.stringify(read));
+            const config=mode==='merge'?{expires_utc_s:1900000000}:read.body.config;
+            config.expires_utc_s=1900000000;
+            const saved=await request({raw_resource:mode==='put'?'config/2':'config/update/2',method:mode==='put'?'PUT':'POST',revision:read.etag,
+                body:JSON.stringify(mode==='put'?config:{schema:'transmitter-config-update/1',target,mode,config})});
+            assert.equal(saved.status,200,JSON.stringify(saved));
+            assert.equal((await request({raw_resource:'standalone-frequency'})).body.frequency_hz,3568737);
+            const view=await request({raw_resource:'application/4'});
+            assert.equal(view.body.recurrence.schedule_dial_frequency_nhz,'3568737000000000');
+            assert.equal(view.body.recurrence.enabled,false);
+            assert(!Object.hasOwn(saved.body.config,'wspr_dial_frequency_hz'));
+            const stale=await request({raw_resource:'standalone-frequency',method:'PUT',revision:read.etag,
+                body:JSON.stringify({schema:'transmitter-standalone-frequency/1',target,frequency_hz:14095600})});
+            assert.equal(stale.status,412,JSON.stringify(stale));
+        }
         const driveInitial=await request({method:"GET",path:"/api/v1/member/gpio-drive",body:""});
         if(process.env.WSPRRYPI_GPIO_DRIVE_REQUIRED === "1") assert.equal(driveInitial.status,200,JSON.stringify(driveInitial));
         if(driveInitial.status===200) { assert.equal(driveInitial.body.saved,4);
