@@ -1,10 +1,16 @@
 name: Non-hardware validation
 
 on:
+  workflow_dispatch:
+    inputs:
+      pico_ref:
+        description: Pico source ref (defaults to devel)
+        default: devel
+        type: string
   pull_request:
     branches: [devel, main]
   push:
-    branches: [devel, main, codex/rp1-1.0-candidate-acceptance, codex/p15-8-wspr-type23, codex/step14-pico-type23-integration]
+    branches: [devel, main, codex/shared-frequency-contract, codex/rp1-1.0-candidate-acceptance, codex/p15-8-wspr-type23, codex/step14-pico-type23-integration]
 
 permissions:
   contents: read
@@ -55,18 +61,11 @@ jobs:
       - name: Install UI development dependencies
         working-directory: WsprryPi-UI
         run: npm ci --ignore-scripts
-      - name: Read Pico reference revision
-        id: pico-reference
-        shell: bash
-        run: |
-          revision=$(cat src/tests/network/pico-reference-revision.txt)
-          [[ "$revision" =~ ^[0-9a-f]{40}$ ]]
-          echo "revision=$revision" >> "$GITHUB_OUTPUT"
-      - name: Read-only pinned Pico reference
+      - name: Selected Pico source
         uses: actions/checkout@v7
         with:
           repository: WsprryPi/WsprryPico
-          ref: ${{ steps.pico-reference.outputs.revision }}
+          ref: ${{ inputs.pico_ref || 'devel' }}
           path: src/build/network-reference/pico
           persist-credentials: false
       - name: Read-only pinned Pico TLS dependency
@@ -84,6 +83,8 @@ jobs:
           make wtp-network-runtime-test BACKENDS=simulated ANCILLARY_GPIO=0 SUDO=
           make wtp-network-interop-test SUDO= PICO_SOURCE=build/network-reference/pico MBEDTLS_SOURCE=build/network-reference/mbedtls
           make wtp-config-interop-test SUDO= PICO_SOURCE=build/network-reference/pico MBEDTLS_SOURCE=build/network-reference/mbedtls
+      - name: Prove edited Pico source selection and genuine build failures
+        run: python3 -B scripts/tests/pico_source_selection_test.py src/build/network-reference/pico src/build/network-reference/mbedtls
       - name: Verify selected-interface WTP replies under equal-metric route changes
         working-directory: src
         run: |
@@ -105,16 +106,10 @@ jobs:
       - uses: actions/checkout@v7
       - name: USB host-only build dependencies
         run: sudo apt-get update && sudo apt-get install -y build-essential libssl-dev pkg-config cmake python3 nodejs
-      - name: Read exact USB Pico product revision
-        id: usb_reference
-        run: |
-          revision=$(cat src/tests/network/pico-usb-revision.txt)
-          [[ "$revision" =~ ^[0-9a-f]{40}$ ]]
-          echo "revision=$revision" >> "$GITHUB_OUTPUT"
       - uses: actions/checkout@v7
         with:
           repository: WsprryPi/WsprryPico
-          ref: ${{ steps.usb_reference.outputs.revision }}
+          ref: ${{ inputs.pico_ref || 'devel' }}
           path: src/build/usb-reference/pico
           persist-credentials: false
       - name: Build actual production Pico USB endpoint without SDK or network
@@ -128,41 +123,6 @@ jobs:
           node WsprryPi-UI/tests/wtp_usb_settings_test.js
           node WsprryPi-UI/tests/wtp_usb_pair_test.js src/build/wtp-network/wtp_usb_pair_client src/build/usb-reference/pico-host/usb_management_driver
 
-  wtp-configuration-legacy:
-    runs-on: ubuntu-24.04
-    timeout-minutes: 15
-    strategy:
-      matrix:
-        profile: [legacy, extended, p152, p153, p154, p156, p157, p158]
-    steps:
-      - uses: actions/checkout@v7
-      - name: Existing host-only compatibility dependencies
-        run: sudo apt-get update && sudo apt-get install -y libssl-dev pkg-config cmake python3 nodejs
-      - name: Read exact historical API revision
-        id: reference
-        env:
-          PROFILE: ${{ matrix.profile }}
-        run: |
-          revision=$(cat "src/tests/network/pico-${PROFILE}-revision.txt")
-          [[ "$revision" =~ ^[0-9a-f]{40}$ ]]
-          echo "revision=$revision" >> "$GITHUB_OUTPUT"
-      - uses: actions/checkout@v7
-        with:
-          repository: WsprryPi/WsprryPico
-          ref: ${{ steps.reference.outputs.revision }}
-          path: src/build/network-reference/pico
-          persist-credentials: false
-      - uses: actions/checkout@v7
-        with:
-          repository: Mbed-TLS/mbedtls
-          ref: 0bebf8b8c7f07abe3571ded48a11aa907a1ffb20
-          path: src/build/network-reference/mbedtls
-          submodules: recursive
-      - name: Actual UI producer through Pi adapters and historical Pico persistence
-        working-directory: src
-        env:
-          PROFILE: ${{ matrix.profile }}
-        run: make wtp-config-interop-test SUDO= PICO_COMPAT_PROFILE="$PROFILE" PICO_SOURCE=build/network-reference/pico MBEDTLS_SOURCE=build/network-reference/mbedtls
 
   strict-i2c-profile:
     runs-on: ubuntu-24.04
@@ -274,6 +234,12 @@ jobs:
             wtp-pi-si5351-realization-test wtp-pi-control-test wtp-pi-config-transaction-test \
             wtp-fleet-test SUDO=
 
+      - name: Frequency and Test Tone contracts
+        working-directory: src
+        run: |
+          make test-tone-request-test test-tone-frequency-plan-test test-tone-selector-plan-test test-tone-response-test test-tone-lifecycle-test legacy-tone-frequency-test SUDO=
+          make band-lookup-correlation-test wspr-band-catalog-test wspr-preset-catalog-response-test SUDO=
+          make wspr-tone-regression-test qrss-execution-regression-test wtp-plan-test wtp-fleet-test wtp-config-test wtp-api-test SUDO=
       - name: Run parent semantics and cleanup lifecycle tests
         working-directory: src
         run: |

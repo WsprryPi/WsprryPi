@@ -87,7 +87,7 @@ rejected at submission. After dispatch, normal wake-up/processing delay consumes
 the preparation allowance; a request past the last preparation/ARM cutoff is
 rejected, never shifted into another slot. Timing allowances are host policy,
 not measured USB latency guarantees. Slow operations may still miss the window
-and fail safely. The pinned fragmented-endpoint test uses an explicit 8,000 ms
+and fail safely. The selected-source fragmented-endpoint test uses an explicit 8,000 ms
 preparation allowance while retaining the 1,000 ms ARM reserve.
 The production `WtpApplication` uses a separate 12,000 ms preparation allowance
 and the same 1,000 ms ARM-submission reserve. This covers bounded complete-job
@@ -160,8 +160,7 @@ Ordinary tests use virtual host/device clocks and a scripted peer with real
 framing, Session, backend, compiler and controller. They include a complete
 162-event WSPR job, early exact-UTC ARM, lease renewal, frozen requests, repeats,
 clock failures, pending/deferred reload, concurrent notification at commitment,
-stop and blocked recovery. Optional interoperability verifies the existing Pico
-source pin and runs its actual endpoint/job service with a software clock/engine.
+stop and blocked recovery. Optional interoperability compiles the selected Pico sources, including edits, and runs its actual endpoint/job service with a software clock/engine.
 It opens no physical USB device. macOS/Linux CI includes the ordinary scheduler
 tests; a local macOS pass does not establish a Linux runtime pass.
 

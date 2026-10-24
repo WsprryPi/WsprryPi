@@ -174,10 +174,7 @@ node WsprryPi-UI/tests/wtp_usb_pair_test.js   src/build/wtp-network/wtp_usb_pair
 
 This qualifies software interoperability, not Linux USB topology, electrical
 behavior, physical unplug/re-enumeration, AP advertising, RF or target timing.
-The dedicated USB CI pin selects Pico product
-`100e749c815f7485d5097c9086852d3b97adca9f`. Exact source manifests, independent
-review, command results and bounded physical USB/AP evidence are recorded in
-the coordinated Pico execution record. Unpublished source does not claim a remote CI pass.
+USB CI selects current Pico `devel` sources by default and accepts the explicit `pico_ref` dispatch override. The host-only endpoint build consumes that selected checkout; source revision and dirty state are diagnostic.
 
 ## Related configuration
 

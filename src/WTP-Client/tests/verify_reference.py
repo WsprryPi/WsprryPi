@@ -1,28 +1,17 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: MIT
-"""Read-only verification before optional reference endpoint compilation."""
-import json
+"""Validate selected source availability; Git identity is informational."""
 from pathlib import Path
 import subprocess
 import sys
 
-root = Path(__file__).resolve().parents[1]
 if len(sys.argv) != 2 or not sys.argv[1]:
-    raise SystemExit("Set PICO_SOURCE to the explicit pinned WsprryPico checkout")
+    raise SystemExit("Set PICO_SOURCE to the selected WsprryPico source directory")
 source = Path(sys.argv[1]).resolve()
-pin = json.loads((root / "PROVENANCE.json").read_text())["revision"]
-
-
-def git(*args):
-    return subprocess.check_output(["git", "-C", str(source), *args])
-
-
-if git("rev-parse", "HEAD").decode().strip() != pin:
-    raise SystemExit("Reference checkout HEAD does not match PROVENANCE.json")
-paths = git("ls-tree", "-r", "--name-only", pin, "src/wtp").decode().splitlines()
-if not paths:
-    raise SystemExit("Missing reference WTP sources")
-for path in paths:
-    if (source / path).read_bytes() != git("show", f"{pin}:{path}"):
-        raise SystemExit(f"Reference source differs from pin: {path}")
-print(f"Read-only reference verification passed: {pin}, {len(paths)} source files")
+required = ["endpoint", "job_service", "codec", "json", "frame_parser", "sha256"]
+for name in required:
+    if not (source / "src/wtp" / (name + ".cpp")).is_file():
+        raise SystemExit(f"Missing required Pico source: {name}.cpp in {source}")
+print(f"Pico source: {source}", flush=True)
+for args in [("rev-parse", "HEAD"), ("status", "--short")]:
+    subprocess.run(["git", "-C", str(source), *args], check=False)

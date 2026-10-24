@@ -2026,7 +2026,6 @@ wtp-tls-build:
 		wtp_integration/application.cpp wtp_integration/status.cpp wtp_integration/scheduler.cpp wtp_integration/backend.cpp wtp_integration/execution_plan.cpp \
 		WSPR-Transmitter/src/execution_plan_compiler.cpp WSPR-Transmitter/src/transmission_controller.cpp \
 		"$(WTP_NETWORK_BUILD_DIR)/client/libwtp_client.a" $(OPENSSL_LIBS) $(WTP_NETWORK_LDFLAGS) -o "$(WTP_NETWORK_BUILD_DIR)/wtp_network_interop_test"
-PICO_COMPAT_PROFILE ?= current
 wtp-config-client-build:
 	$(Q)pkg-config --atleast-version=3.0 openssl
 	$(Q)mkdir -p "$(WTP_NETWORK_BUILD_DIR)"
@@ -2036,14 +2035,19 @@ wtp-config-client-build:
 		wtp_integration/scheduler.cpp wtp_integration/backend.cpp wtp_integration/execution_plan.cpp \
 		WSPR-Transmitter/src/execution_plan_compiler.cpp WSPR-Transmitter/src/transmission_controller.cpp \
 		"$(WTP_NETWORK_BUILD_DIR)/client/libwtp_client.a" $(OPENSSL_LIBS) $(WTP_NETWORK_LDFLAGS) -o "$(WTP_NETWORK_BUILD_DIR)/wtp_configuration_client"
+# These fixtures share a CMake tree, credentials and loopback TLS port.
+# Serialize an invocation that requests both; parallel recipe builds still use CMake -j.
+ifneq ($(filter wtp-config-interop-test wtp-network-interop-test,$(MAKECMDGOALS)),)
+.NOTPARALLEL:
+endif
 wtp-config-interop-test: wtp-config-client-build wtp-config-test
-	$(Q)cmake -S tests/network -B "$(WTP_NETWORK_BUILD_DIR)" -DPICO_COMPAT_PROFILE=$(PICO_COMPAT_PROFILE) -DPICO_SOURCE="$(abspath $(PICO_SOURCE))" -DMBEDTLS_SOURCE="$(abspath $(MBEDTLS_SOURCE))"
+	$(Q)cmake -S tests/network -B "$(WTP_NETWORK_BUILD_DIR)" -DPICO_SOURCE="$(abspath $(PICO_SOURCE))" -DMBEDTLS_SOURCE="$(abspath $(MBEDTLS_SOURCE))"
 	$(Q)cmake --build "$(WTP_NETWORK_BUILD_DIR)" -j 2
-	$(Q)node ../WsprryPi-UI/tests/wtp_configuration_interop_test.js "$(abspath $(WTP_NETWORK_BUILD_DIR))" $(PICO_COMPAT_PROFILE) "$(abspath $(PICO_SOURCE))"
-	$(Q)if [ "$(PICO_COMPAT_PROFILE)" = current ]; then node ../WsprryPi-UI/tests/wtp_progress_interop_test.js "$(abspath $(WTP_NETWORK_BUILD_DIR))"; fi
-	$(Q)if [ "$(PICO_COMPAT_PROFILE)" = current ] || [ "$(PICO_COMPAT_PROFILE)" = p158 ] || [ "$(PICO_COMPAT_PROFILE)" = p157 ] || [ "$(PICO_COMPAT_PROFILE)" = p156 ] || [ "$(PICO_COMPAT_PROFILE)" = p153 ] || [ "$(PICO_COMPAT_PROFILE)" = p154 ]; then "$(WTP_NETWORK_BUILD_DIR)/consumer_interop" "$(abspath $(PICO_SOURCE))/docs/protocol/Consumer-Radio-v1-vectors.json"; fi
-	$(Q)if [ "$(PICO_COMPAT_PROFILE)" = current ] || [ "$(PICO_COMPAT_PROFILE)" = p158 ] || [ "$(PICO_COMPAT_PROFILE)" = p157 ]; then node ../WsprryPi-UI/tests/wtp_resources_interop_test.js "$(abspath $(WTP_NETWORK_BUILD_DIR))"; fi
-	$(Q)if [ "$(PICO_COMPAT_PROFILE)" = current ] || [ "$(PICO_COMPAT_PROFILE)" = p158 ] || [ "$(PICO_COMPAT_PROFILE)" = p157 ]; then node tests/network/consumer_browser_interop.js "$(abspath $(WTP_NETWORK_BUILD_DIR))" "$(abspath $(PICO_SOURCE))"; fi
+	$(Q)node ../WsprryPi-UI/tests/wtp_configuration_interop_test.js "$(abspath $(WTP_NETWORK_BUILD_DIR))"
+	$(Q)node ../WsprryPi-UI/tests/wtp_progress_interop_test.js "$(abspath $(WTP_NETWORK_BUILD_DIR))"
+	$(Q)"$(WTP_NETWORK_BUILD_DIR)/consumer_interop" "$(abspath $(PICO_SOURCE))/engineering/protocol/Consumer-Radio-v1-vectors.json"
+	$(Q)node ../WsprryPi-UI/tests/wtp_resources_interop_test.js "$(abspath $(WTP_NETWORK_BUILD_DIR))"
+	$(Q)node tests/network/consumer_browser_interop.js "$(abspath $(WTP_NETWORK_BUILD_DIR))" "$(abspath $(PICO_SOURCE))"
 wtp-network-interop-test: wtp-tls-build wtp-api-test wtp-network-process-test
 	$(Q)cmake -S tests/network -B "$(WTP_NETWORK_BUILD_DIR)" -DPICO_SOURCE="$(abspath $(PICO_SOURCE))" -DMBEDTLS_SOURCE="$(abspath $(MBEDTLS_SOURCE))"
 	$(Q)cmake --build "$(WTP_NETWORK_BUILD_DIR)" -j 4

@@ -6,10 +6,7 @@
 #include "network/bootstrap_codec.hpp"
 #include "network/pico/consumer_radio_crypto.hpp"
 #include "network_support.hpp"
-#if __has_include("standalone/progress.hpp")
 #include "standalone/progress.hpp"
-#define WSPRRYPI_PROGRESS_FIXTURE 1
-#endif
 #include "provisioning/consumer_profile.hpp"
 #include "wtp_integration/application.hpp"
 #include "wtp_integration/browser_api.hpp"
@@ -111,35 +108,23 @@ struct ResourceFixture {
 };
 struct Test {
   ResourceFixture f;
-#ifdef WSPRRYPI_PROGRESS_FIXTURE
   network_test::Flash progress_flash;
   pico::standalone::Progress progress{progress_flash};
-#endif
   Media media;
   Random random;
   HostClock host;
   NoWtp wtp;
   pico::provisioning::ProfileStore profiles{media};
   pico::provisioning::RuntimeProfile runtime;
-#ifdef WSPRRY_PICO_MULTI_SESSIONS
   pico::network::PicoConsumerRadioCrypto crypto[4];
-#else
-  pico::network::PicoConsumerRadioCrypto crypto;
-#endif
   pico::network::ConsumerRadioApi radio{f.api,
                                         profiles,
                                         runtime,
                                         random,
-#ifdef WSPRRY_PICO_MULTI_SESSIONS
                                         {&crypto[0], &crypto[1], &crypto[2]},
-#else
-                                        crypto,
-#endif
                                         device,
                                         f.service.status().boot_id
-#ifdef WSPRRY_PICO_RECOVERY
                                         , &crypto[3]
-#endif
                                         };
   WtpSettings settings;
   std::unique_ptr<pi::WtpApplication> app;
@@ -171,12 +156,12 @@ struct Test {
     assert(runtime.load(profiles, device,
                         pico::provisioning::BuildBundleState::Absent));
     f.api.consumer_config(runtime);
-#ifdef WSPRRYPI_PROGRESS_FIXTURE
     assert(progress.load());
     f.api.progress_settings(progress);
-#endif
     if (configured) {
-      assert(f.scheduler.command("CONFIG " + network_test::config).find("true") != std::string::npos);
+      auto config = *pico::standalone::parse_config(network_test::config);
+      config.wspr_base_frequency_hz = 3570100;
+      assert(f.scheduler.command("CONFIG " + pico::standalone::serialize_config(config)).find("true") != std::string::npos);
       assert(f.store.reserve(1791970000000000000ULL));
     }
     radio.admission(true);
@@ -307,7 +292,6 @@ void cases(bool ap) {
   assert(t.coordinated(*c, "POST", edit.dump(), fresh.etag).status == 409 &&
          t.mutations == 1);
   auto stranger = t.client();
-#ifdef WSPRRY_PICO_MULTI_SESSIONS
   t.host.now += 1000;
   assert(stranger->login(device, carrier, "test-password").status == 200);
   for (unsigned i=0;i<3;++i) {
@@ -321,9 +305,6 @@ void cases(bool ap) {
   assert(third->request("status","GET").status==200);
   stranger->logout();
   assert(c->request("status","GET").status==200);
-#else
-  assert(stranger->login(device, carrier, "test-password").status == 409);
-#endif
   assert(c->active());
   assert(c->request("jobs", "POST", "{}").status == 404 && t.mutations == 1);
   t.origin = "http://foreign.local";
@@ -331,7 +312,6 @@ void cases(bool ap) {
   assert(t.mutations == 1);
 }
 void recovery_cases() {
-#ifdef WSPRRY_PICO_RECOVERY
   Test t; auto a=t.client(),b=t.client(),c=t.client();
   for (auto* client : {a.get(),b.get(),c.get()}) {
     assert(client->login(device,"consumer_station","test-password").status==200);t.host.now+=1000;
@@ -353,11 +333,6 @@ void recovery_cases() {
   auto stale=scope;stale["boot_id"]=std::string(32,'f');t.host.now+=1000;
   assert(b->retire(device,"consumer_station",t.authority,"test-password",stale).status==409);
   assert(t.mutations==0&&t.wtp.io==0);
-#else
-  Test t;auto c=t.client();assert(c->login(device,"consumer_station","test-password").status==200);
-  assert(c->recovery(device,"consumer_station",t.authority).status!=200);
-  assert(c->active()&&c->request("config","GET").status==200);
-#endif
 }
 
 void alias_fixed_vector(const Json &vector) {
@@ -389,7 +364,6 @@ void alias_fixed_vector(const Json &vector) {
 }
 
 void retirement_job_authority_cases() {
-#ifdef WSPRRY_PICO_RECOVERY
   for (unsigned phase=0;phase<5;++phase) {
     Test t;auto victim=t.client(),peer=t.client();
     assert(victim->login(device,"consumer_station","test-password").status==200);
@@ -435,12 +409,10 @@ void retirement_job_authority_cases() {
     assert(t.f.scheduler.status()==scheduler && t.f.store.watermark()==watermark && t.f.service.output_inhibited()==inhibit);
     assert(t.f.engine.disables==disables && t.f.engine.prepares==prepares && t.mutations==0 && t.wtp.io==0);
   }
-#endif
 }
 
 
 void local_retirement_refusal_cases() {
-#ifdef WSPRRY_PICO_RECOVERY
   Test t;auto native=t.client(),peer=t.client();
   assert(native->login(device,"consumer_station","test-password").status==200);
   t.host.now+=1000;assert(peer->login(device,"consumer_station","test-password").status==200);
@@ -459,14 +431,12 @@ void local_retirement_refusal_cases() {
   assert(native->active() && native->request("status","GET").status==200 && peer->request("status","GET").status==200);
   assert(t.handler_calls["/api/consumer/v1/recovery/start"]==starts+1 && t.handler_calls["/api/consumer/v1/recovery/finish"]==finishes);
   assert(t.mutations==0 && t.wtp.io==0);
-#endif
 }
 
 struct RuntimeReset {
   ~RuntimeReset() {select_wtp_runtime(std::nullopt);}
 };
 void runtime_recovery_continuity_cases() {
-#ifdef WSPRRY_PICO_RECOVERY
   for (bool after_effect : {false,true}) {
     Test t;
     set_wtp_runtime_for_test(t.settings,t.host,t.wtp,{std::string(32,'1'),std::string(32,'2'),device},[]{return false;});
@@ -532,7 +502,6 @@ void runtime_recovery_continuity_cases() {
     assert(state().at("connected")==false && healthy->request("status","GET").status==200);
     assert(t.mutations==0 && t.wtp.io==0);
   }
-#endif
 }
 
 struct PeerClock : pi::WtpScheduleClock {
@@ -542,7 +511,6 @@ struct PeerClock : pi::WtpScheduleClock {
   void wait_ms(std::uint64_t n) override {peer.advance(peer.now+n);}
 };
 void runtime_recovery_admission_cases() {
-#ifdef WSPRRY_PICO_RECOVERY
   for (unsigned phase=0;phase<7;++phase) {
     // Failed/unknown output is deliberately latched by the production host.
     // Isolate each fixture instead of bypassing that latch for test teardown.
@@ -589,7 +557,6 @@ void runtime_recovery_admission_cases() {
     // alive; no fixture operation clears ownership or output uncertainty.
     std::exit(0);
   }
-#endif
 }
 
 void resource_admission_cases() {
@@ -625,7 +592,6 @@ void resource_admission_cases() {
     assert(result.status==409 && t.f.flash.bytes==bytes && t.f.service.status()==status && t.mutations==0 && t.wtp.io==0);
   }
 }
-#ifdef WSPRRY_PICO_TYPE23
 void type23_profile_cases() {
   for (bool ap : {false,true}) for (const auto &call : {"AA0NT/P","<AA0NT>","PJ4/AA0NT","W1A/AA0NT","<W1A/AA0NT>","AA0NT/09"}) {
     const std::string grid=std::string(call)=="AA0NT/P" ? "EM18" : "EM18IG";
@@ -649,7 +615,6 @@ void type23_profile_cases() {
   }
   std::cout<<"Type 2/3 profile readback through native station/AP crypto and strict resource adapters passed\n";
 }
-#endif
 void interactive(bool ap,bool configured=true) {
   Test t(configured);
   if (ap) { t.authority="192.168.4.1"; t.origin="http://192.168.4.1"; t.interface=pico::network::ConsumerInterface::AccessPoint; }
@@ -714,14 +679,12 @@ int main(int argc, char **argv) {
   vector_file >> vectors;
   pi::consumer_radio_fixed_vectors(vectors);
   alias_fixed_vector(vectors);
-#ifdef WSPRRY_PICO_RECOVERY
   std::ifstream recovery_vector_file(std::filesystem::path(argv[1]).parent_path()/"Consumer-Recovery-v1-vectors.json");
   assert(recovery_vector_file.is_open());
   Json recovery_vectors;recovery_vector_file >> recovery_vectors;
   pi::consumer_radio_fixed_vectors(recovery_vectors);
   alias_fixed_vector(recovery_vectors);
   std::cout << "Consumer-Recovery/1 fixed AEAD/HKDF and native selector vectors passed\n";
-#endif
   retirement_job_authority_cases();
   local_retirement_refusal_cases();
   runtime_recovery_continuity_cases();
@@ -730,9 +693,7 @@ int main(int argc, char **argv) {
   cases(false);
   cases(true);
   resource_admission_cases();
-#ifdef WSPRRY_PICO_TYPE23
   type23_profile_cases();
-#endif
   {
     Test t;
     auto c = t.client();

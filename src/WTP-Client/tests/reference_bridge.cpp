@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-// Hardware-free adapter to the separately compiled, pinned reference server.
+// Hardware-free adapter to the separately compiled, selected-source reference server.
 #include "reference_bridge.hpp"
 #include "wtp/endpoint.hpp"
 #include <algorithm>

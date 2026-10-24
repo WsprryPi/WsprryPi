@@ -178,7 +178,7 @@ make semantics-test-portable SUDO=
 make wtp-scheduler-interop-test SUDO= PICO_SOURCE=WTP-Client/build/pico-reference
 ```
 
-The final command requires the pinned reference checkout described in the
+The final command uses the selected Pico source checkout described in the
 [scheduler contract](wtp-scheduling.md). These checks exercise software and
 injected endpoint behavior only. They do not validate physical enumeration,
 permissions, disconnect/reboot behavior, services, installation, RP2350 timing,

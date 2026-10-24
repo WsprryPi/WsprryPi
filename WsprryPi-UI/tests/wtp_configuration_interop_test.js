@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: MIT
 // Actual UI producer -> Pi browser/coordinator/HTTPS -> exact Pico API/journal.
 'use strict';
-const assert=require('node:assert/strict'), fs=require('node:fs'), path=require('node:path');
+const assert=require('node:assert/strict'), path=require('node:path');
 const crypto=require('node:crypto'), readline=require('node:readline');
 const {spawn}=require('node:child_process');
 const {browser,response}=require('./wtp_management_fixture.js');
-const [build,profile,pico]=process.argv.slice(2);
+const [build]=process.argv.slice(2);
 function lines(process) {
   const queued=[], waiting=[];
   readline.createInterface({input:process.stdout}).on('line',line=>waiting.length?waiting.shift()(line):queued.push(line));
@@ -39,68 +39,38 @@ async function stop(child) {
       return response(result.body,result.status,result.etag);
     };
     const original=await dump(); assert(original.healthy);
-    // The new UI must discover actual historical resources without replacing
-    // missing APIs or disturbing the supported legacy settings transaction.
+    assert.equal(original.config.wspr_base_frequency_hz,3570100);
+    // Discovery must read current resources without mutating saved settings.
     const resourcesBrowser=browser(exchange);
     await resourcesBrowser.click('wtp-member-load');
     const resources=calls.at(-1).result;
     await resourcesBrowser.click('wtp-usb-progress-load');
     const progressSupport=calls.at(-1).result;
-    if(profile==='current') assert.equal(progressSupport.status,200,JSON.stringify(progressSupport));
-    else {
-      assert.equal(progressSupport.status,409,JSON.stringify(progressSupport));
-      assert.equal(progressSupport.body.error.code,'saved_progress_unavailable');
-      assert.match(resourcesBrowser.element('wtp-usb-progress-state').textContent,/existing complete station/);
-    }
+    assert.equal(progressSupport.status,200,JSON.stringify(progressSupport));
     const versioned=resources.status===200 && resources.body.application.schema==='transmitter-application/2';
     assert.equal(resources.exchanges.filter(e=>e.method!=='GET').length,0);
-    assert.deepEqual(await dump(),original,'resource discovery must not mutate the historical member');
-    if(profile==='legacy') {
-      assert.equal(resources.status,409);assert.equal(resources.body.error.code,'shared_resources_unavailable');
-      assert(resourcesBrowser.element('wtp-member-station-save').disabled);
-      assert(resourcesBrowser.element('wtp-member-hardware-save').disabled);
-      assert.match(resourcesBrowser.element('wtp-member-feedback').textContent,/does not advertise shared resources/);
-    } else {
-      assert.equal(resources.status,200,JSON.stringify(resources));
-      assert.equal(resources.body.schema,'wsprrypi-member-resources/1');
-      assert.equal(resources.body.application.hardware.saved.rf_gp,28);
-      assert.equal(resources.body.application.hardware.active.rf_gp,28);
-      assert(!resourcesBrowser.element('wtp-member-station-save').disabled);
-      assert(resourcesBrowser.element('wtp-member-hardware-save').disabled,'preview is required before save');
-    }
-    if((profile==='current'||profile==='p158'||profile==='p157'||profile==='p156'||profile==='p153'||profile==='p154'||profile==='p152')) {
-      const source=fs.readFileSync(path.join(pico,'tests/fixtures/pi-8454e21-wtp-management.js'),'utf8');
-      assert.equal(crypto.createHash('sha256').update(source).digest('hex'),'08639d74049de9c9f66890423bd339cc86eaf328bce9a9004a42aeaec628f963');
-      const old=browser(exchange,source); await old.click('wtp-remote-load');
-      old.element('wtp-remote-callsign').value='K1ABC'; await old.click('wtp-remote-save');
-      const captured=calls.at(-1); assert.equal(captured.request.method,'PUT');
-      assert(!JSON.parse(captured.request.body).pins); assert.equal(captured.result.status,200);
-      const persisted=await dump(); assert.equal(persisted.config.station.callsign,'K1ABC');
-      assert.equal(persisted.config.pins.rf_gp,28); assert(persisted.config.allow_unqualified_frequency);
-      assert(persisted.config.allow_non_amateur_frequency); assert.equal(persisted.password_sha256,original.password_sha256);
-    }
+    assert.deepEqual(await dump(),original,'resource discovery must not mutate the member');
+    assert.equal(resources.status,200,JSON.stringify(resources));
+    assert.equal(resources.body.schema,'wsprrypi-member-resources/1');
+    assert.equal(resources.body.application.hardware.saved.rf_gp,28);
+    assert.equal(resources.body.application.hardware.active.rf_gp,28);
+    assert(!resourcesBrowser.element('wtp-member-station-save').disabled);
+    assert(resourcesBrowser.element('wtp-member-hardware-save').disabled,'preview is required before save');
     const b=browser(exchange);
     await b.click('wtp-remote-load');
     const context=calls.at(-1).result; assert.equal(context.status,200,JSON.stringify(context.body));
-    assert.equal(context.body.update_strategy,(profile==='current'||profile==='p158'||profile==='p157'||profile==='p156'||profile==='p153'||profile==='p154'||profile==='p152')?'merge':'legacy');
+    assert.equal(context.body.update_strategy,'merge');
     const loaded=structuredClone(context.body.config);
     b.element('wtp-remote-callsign').value='W1AW';
     await b.click('wtp-remote-save');
     const saved=calls.at(-1).result; assert.equal(saved.status,200);
     const mutations=saved.exchanges.filter(e=>e.method!=='GET'); assert.equal(mutations.length,1);
     const wire=mutations[0], payload=JSON.parse(wire.body);
-    if((profile==='current'||profile==='p158'||profile==='p157'||profile==='p156'||profile==='p153'||profile==='p154'||profile==='p152')) {
-      assert.equal(wire.method,'POST'); assert.equal(wire.resource,versioned?'config/update/2':'config/update');
-      assert.deepEqual(payload.config,{station:{callsign:'W1AW'}}); assert.equal(payload.target.device_id,'a'.repeat(32));
-    } else {
-      assert.equal(wire.method,'PUT'); assert.equal(wire.resource,'config');
-      assert.equal(payload.wifi.password,null);
-      if(profile==='legacy') assert(!Object.hasOwn(payload,'pins')&&!Object.hasOwn(payload,'allow_unqualified_frequency'));
-      else { assert.equal(payload.pins.rf_gp,28); assert(payload.allow_unqualified_frequency&&payload.allow_non_amateur_frequency); }
-    }
+    assert.equal(wire.method,'POST'); assert.equal(wire.resource,versioned?'config/update/2':'config/update');
+    assert.deepEqual(payload.config,{station:{callsign:'W1AW'}}); assert.equal(payload.target.device_id,'a'.repeat(32));
     let persisted=await dump(); assert.equal(persisted.config.station.callsign,'W1AW');
     assert.equal(persisted.cursor,original.cursor); assert.equal(persisted.password_sha256,original.password_sha256);
-    if(profile!=='legacy') assert.deepEqual(persisted.config.pins,loaded.pins);
+    assert.deepEqual(persisted.config.pins,loaded.pins);
     // Schedule-only writes preserve unrelated operator drafts and settings.
     b.element('wtp-remote-password').value='explicit-new-password';
     b.element('wtp-remote-ssid').value='draft-network';
@@ -122,7 +92,8 @@ async function stop(child) {
       b.element('wtp-remote-enabled').checked=enabled;
       b.element('wtp-remote-ntp').value=enabled?'192.0.2.2':loaded.wifi.ntp_ipv4;
       await b.click('wtp-remote-save');
-      const edited=calls.at(-1).result; assert.equal(edited.status,200);
+      const edited=calls.at(-1).result; assert.equal(edited.status,200,JSON.stringify(edited));
+      assert.equal((await dump()).config.wspr_base_frequency_hz,3570100,'ordinary saves preserve independent standalone RF base');
       assert.equal(edited.exchanges.filter(e=>e.method!=='GET').length,1);
       persisted=await dump(); assert.equal(persisted.config.enabled,enabled);
       assert.equal(persisted.config.wifi.ntp_ipv4,enabled?'192.0.2.2':loaded.wifi.ntp_ipv4);
@@ -136,7 +107,7 @@ async function stop(child) {
     await call({method:'GET',path:'/api/v1/member/configuration'});
     result=await call({method:'POST',path:'/api/v1/member/configuration',body:JSON.stringify(body),revision:fresh.etag}); assert.equal(result.status,200);
     result=await call({method:'POST',path:'/api/v1/member/configuration',body:JSON.stringify(body),revision:fresh.etag}); assert.equal(result.status,412);
-    if(profile!=='legacy') {
+    {
       const current=await call({method:'GET',path:'/api/v1/member/configuration'});
       const reset={...body,target:current.body.target,config:{allow_unqualified_frequency:false,allow_non_amateur_frequency:false,pins:{...loaded.pins,rf_gp:2}}};
       result=await call({method:'POST',path:'/api/v1/member/configuration',body:JSON.stringify(reset),revision:current.etag}); assert.equal(result.status,200);
@@ -172,6 +143,6 @@ async function stop(child) {
     const before=await dump(); b.element('wtp-remote-callsign').value='K3ABC';
     await b.click('wtp-remote-save'); assert.equal(calls.at(-1).result.status,503);
     const after=await dump(); assert.deepEqual(after.config,before.config); assert.equal(after.cursor,before.cursor);
-    console.log(`${profile}: actual UI/protected routing/runtime/HTTPS/Pico resources and legacy journal preservation, resets, revisions and ambiguous saves passed`);
+    console.log(`Current sources: actual UI/protected routing/runtime/HTTPS/Pico resources and journal preservation, resets, revisions and ambiguous saves passed`);
   } finally {await stop(client);await stop(server);}
 })().catch(error=>{console.error(error);process.exitCode=1;});

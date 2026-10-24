@@ -144,6 +144,15 @@
     }
     function modeFields() {
         const mode = text("mode");
+        const frequencyText = {
+            wspr: ["WSPR RF center (Hz)", "Absolute RF center, not USB dial or tone 0. For 20m use 14097100 Hz; no dial conversion is applied."],
+            tone: ["Carrier frequency (Hz)", "One steady RF carrier. The target must support this frequency."],
+            qrss: ["QRSS carrier (Hz)", "RF carrier frequency. No WSPR placement is applied."],
+            fskcw: ["FSKCW space (Hz)", "Space frequency; mark = space + positive shift."],
+            dfcw: ["DFCW dot (Hz)", "Dot frequency; dash = dot + positive shift."]
+        }[mode];
+        byId("fleet-schedule-frequency-label").textContent = frequencyText[0];
+        byId("fleet-schedule-frequency-help").textContent = frequencyText[1];
         byId("fleet-schedule-editor").querySelectorAll("[data-schedule-modes]").forEach(group => {
             group.hidden = !group.dataset.scheduleModes.split(" ").includes(mode);
             group.querySelectorAll("input").forEach(field => {field.disabled = !visible || busy || group.hidden;});

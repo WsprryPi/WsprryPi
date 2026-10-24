@@ -80,11 +80,9 @@ void tcp_err(tcp_pcb* p, void (*f)(void*, err_t)) {
 void tcp_sent(tcp_pcb* p, err_t (*f)(void*, tcp_pcb*, u16_t)) {
     p->sent = f;
 }
-#ifdef WSPRRY_PICO_EXTENDED_API
 void tcp_nagle_disable(tcp_pcb* p) {
     p->nagle_disabled = true;
 }
-#endif
 void tcp_abort(tcp_pcb* p) {
     close(p->fd);
     clients.erase(std::remove(clients.begin(), clients.end(), p), clients.end());

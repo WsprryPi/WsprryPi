@@ -63,7 +63,7 @@ CRC golden values, every split of a known frame, large coalesced streams,
 resynchronization limits, timeouts with virtual clocks, partial writes,
 immutable payload ownership and deterministic malformed-input stress.
 Session tests add scripted transport failures, leases, replay and reconciliation.
-The optional [pinned endpoint test](SESSION.md#tests-and-reference-endpoint)
+The optional [selected-source endpoint test](SESSION.md#tests-and-reference-endpoint)
 exercises the Pico endpoint/job service using a software engine. Ordinary tests
 do not establish endpoint interoperability; neither suite establishes target,
 USB or RF qualification. Parent portable semantics tests do not exercise WTP.
@@ -125,7 +125,7 @@ schema permits `minimum_lease_ms <= 5000` without a lower bound, while actual
 lease requests and grants remain bounded to 5000–60000 ms. The wire layer does
 not reinterpret that value as permission for a shorter lease.
 
-[wtp]: https://github.com/WsprryPi/WsprryPico/blob/40812e7438f180c5e8d8ad75d4eb227271152b10/docs/protocol/WTP.md
+[wtp]: https://github.com/WsprryPi/WsprryPico/blob/devel/engineering/protocol/WTP.md
 
 ## Parent integration and qualification
 
