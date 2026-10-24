@@ -55,7 +55,7 @@ struct Member {
               {"saved_generation", "1"}, {"active", config["pins"]}, {"active_revision", std::string(64, 'a')},
               {"pending_restart", false}, {"execution_engine", "test"}, {"storage_healthy", true}, {"application_error", nullptr}}},
           {"recurrence", {{"authority", "member"}, {"enabled", false}, {"suspended", false}, {"expires_utc_s", "0"},
-              {"schedules", config["schedules"]}, {"schedule_base_frequency_nhz", "3570100000000000"}}},
+              {"schedules", config["schedules"]}, {"schedule_dial_frequency_nhz", "3568600000000000"}}},
           {"capabilities", {{"management_carrier", "authenticated_https"}, {"application_read", true},
               {"station_write", true}, {"hardware_write", true}, {"max_update_bytes", 1024}, {"max_config_bytes", 1800},
               {"hardware_activation", "restart"}, {"station_encoding", "wspr_type1"}, {"station_power_meaning", "reported_wspr_dbm"},
@@ -147,6 +147,18 @@ void checks() {
     Member m; m.job["state"] = state;
     CHECK(m.call().status == 409 && m.mutations == 0);
   }
+  Member old_frequency; old_frequency.modern();
+  old_frequency.corrupt_application = [](Json &j) {
+    auto &r = j["recurrence"];
+    r["schedule_base_frequency_nhz"] = r["schedule_dial_frequency_nhz"];
+    r.erase("schedule_dial_frequency_nhz");
+  };
+  CHECK(old_frequency.call().status == 502 && old_frequency.mutations == 0);
+  Member both_frequencies; both_frequencies.modern();
+  both_frequencies.corrupt_application = [](Json &j) {
+    j["recurrence"]["schedule_base_frequency_nhz"] = "3568600000000000";
+  };
+  CHECK(both_frequencies.call().status == 502 && both_frequencies.mutations == 0);
   Member unhealthy; unhealthy.modern();
   unhealthy.corrupt_application = [](Json &j) { j["hardware"]["storage_healthy"] = false; };
   CHECK(unhealthy.call().status == 409 && unhealthy.mutations == 0);

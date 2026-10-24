@@ -1,12 +1,9 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Lee Bussy
-// WsprryPi-owned harness: actual unmodified Pico TLS server and common service.
+// WsprryPi-owned harness: selected Pico TLS server and common service.
 #include "network/pico/server.hpp"
 #include "network_support.hpp"
-#if __has_include("standalone/progress.hpp")
 #include "standalone/progress.hpp"
-#define WSPRRYPI_PROGRESS_FIXTURE 1
-#endif
 #include "network_credentials.hpp"
 #include "pico/time.h"
 #include <chrono>
@@ -65,10 +62,11 @@ int main(int argc, char **argv) {
   if (argc > 3 && std::string(argv[3]) != "blank") {
     auto config = *wsprrypico::standalone::parse_config(network_test::config);
     config.power_dbm = 20;
-#ifdef WSPRRY_PICO_EXTENDED_API
+    // A complete current-source fixture selects its standalone WSPR dial at
+    // runtime. This whole-Hz USB dial is independent of absolute WTP events.
+    config.wspr_dial_frequency_hz = 3568600;
     config.pins.rf = 28;
     config.allow_unqualified_frequency = config.allow_non_amateur_frequency = true;
-#endif
     if (!store.save(config) || !store.reserve(1'700'000'000'000'000'000ULL)) return 1;
   }
   Clock clock;
@@ -80,26 +78,18 @@ int main(int argc, char **argv) {
   network_test::Network network;
   const std::string device(32, argc > 2 ? argv[2][0] : 'a');
   wsprrypico::network::BrowserApi api{service, store, scheduler, network, device, "phase11-host-test"};
-#ifdef WSPRRYPI_PROGRESS_FIXTURE
   network_test::Flash progress_flash;
   wsprrypico::standalone::Progress progress(progress_flash);
   if (!progress.load()) return 1;
   api.progress_settings(progress);
-#endif
-  // Match the pinned Pico standalone image's active-job connection policy.
+  // Match the Pico standalone image's active-job connection policy.
   api.set_active_job_connections(true);
-#ifdef WSPRRY_PICO_MANAGEMENT_API
   api.management_availability({wsprrypico::network::ManagementProfile::Engineering,
       0, false, true, false, false, false});
-#endif
-#ifdef WSPRRY_PICO_EXTENDED_API
   using namespace wsprrypico::network::credentials;
   const wsprrypico::provisioning::CredentialMaterial material{device_id,hostname,port,certificate,key,ca};
   wsprrypico::network::PicoServer server{service, api, device, "phase11-host-test",material};
-#else
-  wsprrypico::network::PicoServer server{service, api, device, "phase11-host-test"};
-#endif
-  if (!server.start()) { std::cerr << "TLS server initialization failed\n"; return 1; }
+  if (!server.start()) { std::cerr << "TLS server initialization failed: " << server.last_error() << "\n"; return 1; }
   std::cout << "READY " << server.port() << std::endl;
   while (true) {
     pollfd command{STDIN_FILENO, POLLIN, 0};
@@ -131,10 +121,8 @@ int main(int argc, char **argv) {
                   << ",\"cursor\":\"" << reload.watermark() << "\",\"password_sha256\":\"" << digest
                   << "\",\"generation\":\"" << reload.config_sequence() << "\",\"bytes_sha256\":\"" << flash_digest
                   << '"'
-#ifdef WSPRRY_PICO_EXTENDED_API
                   << ",\"inhibit\":" << (service.output_inhibited() ? "true" : "false")
                   << ",\"pending_restart\":" << (scheduler.hardware_restart_required() ? "true" : "false")
-#endif
                   << ",\"disables\":" << engine.disables << ",\"prepares\":" << engine.prepares
                   << ",\"suspended\":" << (status ? std::string(status->get("suspended")->raw) : "null") << "}" << std::endl;
       }

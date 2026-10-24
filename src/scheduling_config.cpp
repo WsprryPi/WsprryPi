@@ -490,6 +490,8 @@ bool set_config(bool force)
             force ? WsprFrequencyEntry{} : current_frequency_entry;
         TransmissionRequest next_transmission_request =
             force ? TransmissionRequest{} : current_transmission_request;
+        std::optional<WsprPlanPlacement> next_active_wspr_plan_placement =
+            force ? std::nullopt : active_wspr_plan_placement;
         PreparedWsprTransmission next_active_wspr_plan =
             force ? PreparedWsprTransmission{} : active_wspr_plan;
         std::size_t next_active_wspr_frame_index =
@@ -508,7 +510,7 @@ bool set_config(bool force)
         static double last_freq = 0.0;
         static WsprFrequencyEntry last_frequency_entry{};
         int next_frequency_entry_index = -1;
-        if (next_active_wspr_plan_in_progress && next_active_wspr_frame_index > 0U)
+        if (next_active_wspr_plan_in_progress)
         {
             next_current_dial_frequency = next_active_wspr_plan_dial_frequency;
             next_current_frequency_entry = next_active_wspr_plan_frequency_entry;
@@ -663,6 +665,7 @@ bool set_config(bool force)
                 current_dial_frequency = 0.0;
                 current_frequency_entry = WsprFrequencyEntry{};
                 freq_iterator = next_freq_iterator;
+                active_wspr_plan_placement = next_active_wspr_plan_placement;
                 active_wspr_plan = next_active_wspr_plan;
                 active_wspr_frame_index = next_active_wspr_frame_index;
                 active_wspr_plan_dial_frequency = next_active_wspr_plan_dial_frequency;
@@ -702,6 +705,7 @@ bool set_config(bool force)
                     INFO,
                     "Skipping transmission period because the planned frequency is 0 Hz.");
 
+                next_active_wspr_plan_placement.reset();
                 next_active_wspr_plan = PreparedWsprTransmission{};
                 next_active_wspr_frame_index = 0U;
                 next_active_wspr_plan_dial_frequency = 0.0;
@@ -721,25 +725,6 @@ bool set_config(bool force)
             }
             else
             {
-                const double base_actual_rf_frequency_hz = resolve_actual_rf_frequency_hz(
-                    next_current_dial_frequency,
-                    working_config.wspr.audio_offset_hz,
-                    FrequencyPath::WsprDial);
-                const double actual_rf_frequency_hz =
-                    maybe_apply_wspr_random_offset(base_actual_rf_frequency_hz,
-                                                   working_config);
-                const double applied_offset_hz =
-                    actual_rf_frequency_hz - base_actual_rf_frequency_hz;
-
-                llog.logS(
-                    DEBUG,
-                    "Resolved WSPR dial frequency ",
-                    lookup.freq_display_string(next_current_dial_frequency),
-                    " to actual RF ",
-                    lookup.freq_display_string(actual_rf_frequency_hz),
-                    " using audio offset ",
-                    working_config.wspr.audio_offset_hz,
-                    " Hz.");
                 if (!configure_current_wspr_transmission(
                         working_config,
                         committed_ppm,
@@ -750,7 +735,7 @@ bool set_config(bool force)
                         next_active_wspr_plan_dial_frequency,
                         next_active_wspr_plan_frequency_entry,
                         next_active_wspr_plan_in_progress,
-                        actual_rf_frequency_hz,
+                        next_active_wspr_plan_placement,
                         next_transmission_request))
                 {
                     if (newer_reload_arrived())
@@ -800,8 +785,6 @@ bool set_config(bool force)
                     ini_reload_pending.store(false, std::memory_order_relaxed);
                     return false;
                 }
-
-                next_transmission_request.applied_offset_hz = applied_offset_hz;
 
                 BandGPIOResolution selector_resolution;
                 const BandGPIOPrepareStatus selector_status =
@@ -900,9 +883,13 @@ bool set_config(bool force)
                 ppm_reload_pending.store(false, std::memory_order_relaxed);
             }
 
+            // Backend preparation may throw. Publish the candidate plan and its
+            // placement only after the request has been accepted.
+            commit_execution_request(next_transmission_request);
             current_dial_frequency = next_current_dial_frequency;
             current_frequency_entry = next_current_frequency_entry;
             freq_iterator = next_freq_iterator;
+            active_wspr_plan_placement = next_active_wspr_plan_placement;
             active_wspr_plan = next_active_wspr_plan;
             active_wspr_frame_index = next_active_wspr_frame_index;
             active_wspr_plan_dial_frequency = next_active_wspr_plan_dial_frequency;
@@ -911,7 +898,6 @@ bool set_config(bool force)
             last_freq = next_current_dial_frequency;
             last_frequency_entry = next_current_frequency_entry;
             log_scheduler_path_selection(working_config.mode);
-            commit_execution_request(next_transmission_request);
             if (next_transmission_request.rp1_development.enabled)
             {
                 llog.logS(
@@ -940,7 +926,7 @@ bool set_config(bool force)
         {
             if (do_random)
             {
-                llog.logS(DEBUG, "New random frequency.");
+                llog.logS(DEBUG, "WSPR plan placement prepared.");
             }
             else
             {

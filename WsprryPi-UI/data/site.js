@@ -2635,7 +2635,7 @@ function createTestToneSelectionPreview(selection) {
             dialFrequencyHz: selection.dialFrequencyHz,
             audioOffsetHz: selection.audioOffsetHz,
             toneFrequencyHz: selection.toneFrequencyHz,
-            text: `${selection.band}: WSPR dial ${selection.dialFrequencyHz} Hz + ${selection.audioOffsetHz} Hz offset = ${selection.toneFrequencyHz} Hz RF tone.`
+            text: `${selection.band}: WSPR dial ${selection.dialFrequencyHz} Hz + ${selection.audioOffsetHz} Hz placement = ${selection.toneFrequencyHz} Hz RF center / steady carrier. No random placement.`
         });
     }
 
@@ -2644,7 +2644,7 @@ function createTestToneSelectionPreview(selection) {
             valid: true,
             mode: selection.mode,
             frequencyHz: selection.frequencyHz,
-            text: `${selection.frequencyHz} Hz exact RF. No WSPR offset is applied; the backend validates and resolves the band at start.`
+            text: `${selection.frequencyHz} Hz requested carrier. No WSPR or random placement; the backend validates the target at start.`
         });
     }
 
@@ -3041,7 +3041,7 @@ function testToneFrequencyContextText() {
             currentTestToneConfigContext.configuredFrequencyHz + wsprAudioOffsetHz
         );
         if (detected) {
-            return `Configured frequency: ${configured}. WSPR uses USB dial-frequency semantics, so the test tone should be detected ${wsprAudioOffsetHz} Hz higher at ${detected}.`;
+            return `Configured frequency: ${configured}. USB dial + ${wsprAudioOffsetHz} Hz gives the Test Tone carrier target ${detected}, without random placement.`;
         }
     }
 
@@ -3435,7 +3435,7 @@ function renderRuntimeFrequencyPane(node, currentMode, status) {
         node.classList.add("operation-panel__stack--split");
         if (secondaryLabelNode) {
             secondaryLabelNode.hidden = false;
-            secondaryLabelNode.textContent = "Offset";
+            secondaryLabelNode.textContent = currentMode === "WSPR" ? "Random placement" : "Positive shift";
         }
     }
 
@@ -3455,7 +3455,7 @@ function renderRuntimeFrequencyPane(node, currentMode, status) {
 function runtimeFrequencyPrimaryLabel(currentMode, status) {
     const normalizedMode = typeof currentMode === "string" ? currentMode : "";
     if (normalizedMode !== "WSPR") {
-        return "Frequency";
+        return ({QRSS: "Carrier", FSKCW: "Space", DFCW: "Dot", TONE: "Carrier target"})[normalizedMode] || "Frequency";
     }
 
     const txState = status && typeof status.txState === "string"
@@ -3470,10 +3470,10 @@ function runtimeFrequencyPrimaryLabel(currentMode, status) {
         eventState === "starting" ||
         (status && status.frequencyIsSkip === true && eventState === "skipped")
     ) {
-        return "Frequency";
+        return "USB dial";
     }
 
-    return "Next Frequency";
+    return "Next USB dial";
 }
 
 function buildRuntimeFrequencyItems(currentMode, status) {
@@ -3499,9 +3499,13 @@ function buildRuntimeFrequencyItems(currentMode, status) {
     );
 
     if (normalizedMode === "WSPR") {
-        return frequencyValue === "Not available"
-            ? []
-            : [{ label: "", value: frequencyValue }];
+        if (frequencyValue === "Not available") return [];
+        const items = [{ label: "", value: frequencyValue }];
+        if (!isSkipWindow && status && Number.isFinite(status.offsetHz)) {
+            const placement = status.offsetHz;
+            items.push({ label: "", value: `${placement > 0 ? "+" : ""}${placement.toLocaleString(undefined, {maximumFractionDigits: 4})} Hz` });
+        }
+        return items;
     }
     if (normalizedMode === "QRSS") {
         return frequencyValue === "Not available"

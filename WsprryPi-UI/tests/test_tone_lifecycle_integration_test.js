@@ -128,12 +128,23 @@ async function browserTest() {
     renderTestToneSelection();
     const modal = bootstrap.Modal.getOrCreateInstance(node("testToneModal")); modal.show();
     await new Promise(resolve => node("testToneModal").addEventListener("shown.bs.modal", resolve, { once: true }));
+    node("testToneSourceBand").checked = true; node("testToneSourceCustom").checked = false;
+    node("testToneBand").value = "20m"; renderTestToneSelection();
+    ok(node("testToneSelectionPreview").textContent.includes("14097100 Hz RF center"), "standard 20m preview targets center");
+    onTestToneStart.call(node("testToneStart"), event);
+    ok(ws.sent.at(-1).frequency_source === "wspr_band" && ws.sent.at(-1).band === "20m" && !('frequency_hz' in ws.sent.at(-1)), "band request retains typed frequency meaning");
+    handleTestToneCommandResponse({command:"tone_start",client_request_id:ws.sent.at(-1).client_request_id,started:true,frequency_source:"wspr_band",band:"20m",dial_frequency_hz:14095600,audio_offset_hz:1500,actual_rf_frequency_hz:14097100,selector_gpio_enabled:false,test_tone:{generation:1,revision:1,state:"starting",owned:true,restoration:"none"}});
+    ok(node("testToneExecutionResult").textContent.includes("Requested frequency committed"), "band acceptance agrees without repeating preview arithmetic");
+    onTestToneEnd.call(node("testToneEnd"), event);
+    handleTestToneCommandResponse({command:"tone_end",client_request_id:ws.sent.at(-1).client_request_id,stopped:true,test_tone:{generation:1,revision:2,state:"ended",owned:false,restoration:"scheduler"}});
+    node("testToneSourceCustom").checked = true; node("testToneSourceBand").checked = false;
+    renderTestToneSelection();
     const preview = node("testToneSelectionPreview").textContent;
     onTestToneStart.call(node("testToneStart"), event);
     ok(testToneLifecycleState === "start_pending", "Start pending");
     ok(node("testToneExecutionResult").textContent.includes("awaiting acceptance"), "pending announced");
     const startId = ws.sent.at(-1).client_request_id;
-    const status = (revision, state, owned = true, message = "", restoration = "none") => ({ generation: 2, revision, state, owned, message, restoration });
+    const status = (revision, state, owned = true, message = "", restoration = "none") => ({ generation: 2, revision: revision + 2, state, owned, message, restoration });
     const accepted = { command: "tone_start", client_request_id: startId, started: true,
         frequency_source: "custom_rf", band: "20m", actual_rf_frequency_hz: 14097123,
         selector_gpio_enabled: true, selector_gpio: 17, selector_gpio_active_high: false,
@@ -226,7 +237,7 @@ async function browserTest() {
            before: providerDraft, after: node("testToneFrequencyHz").value, endDisabled: node("testToneEnd").disabled }));
     clearWebSocketReconnectTimer();
     window.toneVisual = { status, accepted };
-    return { assertions: "passed", workflows: 17 };
+    return { assertions: "passed", workflows: 18 };
 }
 
 async function main() {
@@ -290,7 +301,7 @@ async function main() {
         console.log("Browser fixture isolation: CSP blocks direct fallback; application, journal and spot endpoints refuse execution");
         const run = await client.send("Runtime.evaluate", { expression: `(${browserTest.toString()})()`, awaitPromise: true, returnByValue: true });
         if (run.exceptionDetails) throw new Error(run.exceptionDetails.exception?.description || run.exceptionDetails.text);
-        assert.deepEqual(run.result.value, { assertions: "passed", workflows: 17 });
+        assert.deepEqual(run.result.value, { assertions: "passed", workflows: 18 });
         const inputFocus = await client.send("Runtime.evaluate", { expression: `
             document.getElementById('testToneSourceCustom').checked=true;
             document.getElementById('testToneSourceBand').checked=false;
@@ -308,7 +319,9 @@ async function main() {
         ]) {
             await client.send("Emulation.setDeviceMetricsOverride", { ...{ width: viewport.width, height: viewport.height }, deviceScaleFactor: 1, mobile: viewport.name === "mobile" });
             for (const [name, expression] of [
-                ["accepted", `testToneLatestRevision=-1; reconcileTestToneStatus(toneVisual.status(10,'starting'));`],
+                ["band-preview", `testToneLatestRevision=-1;reconcileTestToneStatus(toneVisual.status(9,'ended',false));document.getElementById('testToneSourceBand').checked=true;document.getElementById('testToneSourceCustom').checked=false;document.getElementById('testToneBand').value='20m';renderTestToneSelection();`],
+                ["invalid-custom", `document.getElementById('testToneSourceBand').checked=false;document.getElementById('testToneSourceCustom').checked=true;document.getElementById('testToneFrequencyHz').value='1.5';renderTestToneSelection();`],
+                ["accepted", `document.getElementById('testToneFrequencyHz').value='14097123';renderTestToneSelection();testToneLatestRevision=-1; reconcileTestToneStatus(toneVisual.status(10,'starting'));`],
                 ["active-difference", `testToneLatestRevision=-1; testToneCommittedDetails='Committed on 20m at exact 14.097100 MHz RF (different from the request). Selector: GPIO 17, active low.'; reconcileTestToneStatus(toneVisual.status(11,'active'));`],
                 ["restored", `testToneLatestRevision=-1; reconcileTestToneStatus(toneVisual.status(12,'ended',false,'Test Tone ended; previous CLI direct tone restored (startup requested).','direct_tone'));`],
                 ["recovery", `testToneLatestRevision=-1; reconcileTestToneStatus(toneVisual.status(13,'unknown',false,'Test Tone ended; direct tone restoration failed. Output cleanup is unconfirmed. Use End or local recovery.','failed'));`],
@@ -321,12 +334,15 @@ async function main() {
                         overflow:document.documentElement.scrollWidth>innerWidth, modalWidth:rect.width,
                         resultOverflow:result.scrollWidth>result.clientWidth, live:result.getAttribute('aria-live'),
                         color:getComputedStyle(result).color, font:getComputedStyle(result).fontSize,
+                        errorContrast:(()=>{const n=document.getElementById('testToneSelectionError');const rgb=c=>c.match(/[0-9.]+/g).slice(0,3).map(Number);const lum=c=>rgb(c).map(v=>{v/=255;return v<=.04045?v/12.92:((v+.055)/1.055)**2.4;}).reduce((s,v,i)=>s+v*[.2126,.7152,.0722][i],0);const a=lum(getComputedStyle(n).color),b=lum(getComputedStyle(n.closest('.modal-content')).backgroundColor);return (Math.max(a,b)+.05)/(Math.min(a,b)+.05);})(),
                         endDisabled:document.getElementById('testToneEnd').disabled}; })()`, returnByValue: true });
                 assert.ok(!r.exceptionDetails, JSON.stringify(r.exceptionDetails));
                 const metrics = r.result.value;
                 assert.equal(metrics.overflow, false, JSON.stringify(metrics));
                 assert.equal(metrics.resultOverflow, false, JSON.stringify(metrics));
-                assert.equal(metrics.live, "polite"); measurements.push(metrics);
+                assert.equal(metrics.live, "polite");
+                if(name === "invalid-custom") assert.ok(metrics.errorContrast >= 4.5, JSON.stringify(metrics));
+                measurements.push(metrics);
                 const shot = await client.send("Page.captureScreenshot", { format: "png" });
                 fs.writeFileSync(path.join(evidence, `${theme}-${viewport.name}-${name}.png`), Buffer.from(shot.data, "base64"));
             }
@@ -338,7 +354,7 @@ async function main() {
         const shot = await client.send("Page.captureScreenshot", { format: "png" });
         fs.writeFileSync(path.join(evidence, "dark-mobile-200-percent.png"), Buffer.from(shot.data, "base64"));
         fs.writeFileSync(path.join(evidence, "measurements.json"), JSON.stringify({ run: run.result.value, measurements, textZoom: zoom.result.value }, null, 2));
-        console.log(`Test Tone browser: 17 workflows passed; 21 screenshots in ${evidence}`);
+        console.log(`Test Tone browser: 18 workflows passed; 29 screenshots in ${evidence}`);
         await require("./integrated_review_browser.js").reviewIntegratedUi(client, `http://127.0.0.1:${phpPort}`, path.join(evidence, "integrated"));
     } catch (error) { failure = error; }
     finally {

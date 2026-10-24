@@ -79,6 +79,8 @@ saved/active/restart fields. Unhealthy storage or application faults block
 mutation. Pico still validates the complete resulting Config and its 1,800-byte
 limit.
 
+The independently saved Pico `wspr_dial_frequency_hz` stays outside generic configuration resources. Complete PUT, merge, replace, partial saves and Console omission preserve the dial while retaining each operation’s existing ownership of other domains, including explicit replacement resets. A first selection leaves schedules disabled; later dial changes activate at the next job and preserve STOP and accepted jobs. The dedicated resource owns whole-Hz dial values; the strict recurrence projection and display use exact nHz strings. No base-to-dial conversion or old-member reader is applied.
+
 ## Negotiation and fallback
 
 | Observed context | One selected mutation |

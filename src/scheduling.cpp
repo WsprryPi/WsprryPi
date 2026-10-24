@@ -478,6 +478,9 @@ static std::atomic<std::size_t> band_gpio_prepare_call_counter_for_test{0U};
  * this saved scheduler state instead of asking the planner for a new
  * policy decision.
  */
+std::optional<WsprPlanPlacement> active_wspr_plan_placement{};
+static ScopedWsprRandomPlacementForTest::Provider wspr_random_placement_for_test{};
+static std::recursive_mutex wspr_random_placement_scope_mutex;
 PreparedWsprTransmission active_wspr_plan{};
 std::size_t active_wspr_frame_index = 0;
 double active_wspr_plan_dial_frequency = 0.0;
@@ -1239,9 +1242,12 @@ static wsprrypi::TransmissionRequest build_controller_request_from_legacy(
 
 static void freeze_gpio_correction_provenance(
     TransmissionRequest &request,
-    std::optional<std::pair<double, double>> exact_frequency_range = std::nullopt)
+    std::optional<std::pair<double, double>> exact_frequency_range = std::nullopt,
+    WsprRuntimeStatusSnapshot::GpioCorrectionProvenance *candidate_provenance = nullptr)
 {
-    committed_gpio_correction_provenance = {};
+    auto &provenance = candidate_provenance != nullptr
+        ? *candidate_provenance : committed_gpio_correction_provenance;
+    provenance = {};
     if (!transmit_backend_uses_gpio_output(config.transmit_backend) ||
         request.isSkipWindow() || request.actual_rf_frequency_hz <= 0.0)
     {
@@ -1268,7 +1274,7 @@ static void freeze_gpio_correction_provenance(
         frozen.execution_identity =
             "gpio-execution-" +
             std::to_string(++committed_gpio_execution_sequence);
-        committed_gpio_correction_provenance = frozen;
+        provenance = frozen;
         current_gpio_candidate_provenance.final_ppm = frozen.final_ppm;
         return;
     }
@@ -1321,7 +1327,7 @@ static void freeze_gpio_correction_provenance(
     frozen.additional_ppm = selection.correction.additional_ppm;
     frozen.execution_identity =
         "gpio-execution-" + std::to_string(++committed_gpio_execution_sequence);
-    committed_gpio_correction_provenance = frozen;
+    provenance = frozen;
     current_gpio_candidate_provenance.selected_parent = frozen.selected_parent;
     current_gpio_candidate_provenance.nominal_rate_hz = frozen.nominal_rate_hz;
     current_gpio_candidate_provenance.intrinsic_ppm = frozen.intrinsic_ppm;
@@ -1340,6 +1346,27 @@ static void freeze_gpio_correction_provenance(
 void commit_execution_request(
     const TransmissionRequest &request)
 {
+    if (!request.isTone() && !request.isSkipWindow())
+    {
+        TransmissionRequest candidate = request;
+        WsprRuntimeStatusSnapshot::GpioCorrectionProvenance candidate_provenance;
+        freeze_gpio_correction_provenance(candidate, std::nullopt, &candidate_provenance);
+        auto controller_request = build_controller_request_from_legacy(
+            candidate, wsprrypi::TransmissionMode::WSPR);
+        wsprrypi::WsprPayload payload;
+        payload.prepared = request.payload;
+        payload.base_frequency_hz = request.actual_rf_frequency_hz;
+        controller_request.payload = payload;
+        if (!suppress_scheduler_execution_for_test)
+            transmitter_configure_execution(controller_request, candidate);
+        current_transmission_request = std::move(candidate);
+        committed_gpio_correction_provenance = std::move(candidate_provenance);
+        current_controller_request_for_test_storage = std::move(controller_request);
+        committed_execution_route_for_test_storage =
+            CommittedExecutionRouteForTest::CONTROLLER_WSPR;
+        return;
+    }
+
     current_transmission_request = request;
     freeze_gpio_correction_provenance(current_transmission_request);
     current_controller_request_for_test_storage.reset();
@@ -1396,28 +1423,6 @@ void commit_execution_request(
 
     if (suppress_scheduler_execution_for_test)
     {
-        return;
-    }
-
-    if (!current_transmission_request.isSkipWindow())
-    {
-        wsprrypi::TransmissionRequest controller_request =
-            build_controller_request_from_legacy(
-                current_transmission_request,
-                wsprrypi::TransmissionMode::WSPR);
-
-        wsprrypi::WsprPayload payload;
-        payload.prepared = current_transmission_request.payload;
-        payload.base_frequency_hz =
-            current_transmission_request.actual_rf_frequency_hz;
-        controller_request.payload = payload;
-        current_controller_request_for_test_storage = controller_request;
-        committed_execution_route_for_test_storage =
-            CommittedExecutionRouteForTest::CONTROLLER_WSPR;
-
-        transmitter_configure_execution(
-            controller_request,
-            current_transmission_request);
         return;
     }
 
@@ -1702,6 +1707,7 @@ static std::string format_utc_schedule_time(
 
 void reset_active_wspr_plan_state()
 {
+    active_wspr_plan_placement.reset();
     active_wspr_plan = PreparedWsprTransmission{};
     active_wspr_frame_index = 0;
     active_wspr_plan_dial_frequency = 0.0;
@@ -2390,6 +2396,20 @@ BandGPIOPrepareStatus prepare_band_gpio_for_frequency_or_log(
     return apply_band_gpio_resolution(resolution);
 }
 
+ScopedWsprRandomPlacementForTest::ScopedWsprRandomPlacementForTest(Provider provider)
+    : scope_lock_(wspr_random_placement_scope_mutex)
+{
+    std::lock_guard<std::mutex> lock(set_config_mtx);
+    previous_ = std::move(wspr_random_placement_for_test);
+    wspr_random_placement_for_test = std::move(provider);
+}
+
+ScopedWsprRandomPlacementForTest::~ScopedWsprRandomPlacementForTest()
+{
+    std::lock_guard<std::mutex> lock(set_config_mtx);
+    wspr_random_placement_for_test = std::move(previous_);
+}
+
 double maybe_apply_wspr_random_offset(
     double actual_rf_frequency_hz,
     const ArgParserConfig &cfg)
@@ -2397,6 +2417,14 @@ double maybe_apply_wspr_random_offset(
     if (!cfg.use_offset || actual_rf_frequency_hz == 0.0)
     {
         return actual_rf_frequency_hz;
+    }
+
+    if (wspr_random_placement_for_test)
+    {
+        const double placement = wspr_random_placement_for_test();
+        if (!std::isfinite(placement) || std::abs(placement) > kWsprRandomOffsetHz)
+            throw std::invalid_argument("WSPR test placement must be finite and within +/-80 Hz.");
+        return actual_rf_frequency_hz + placement;
     }
 
     std::random_device rd;
@@ -3017,7 +3045,7 @@ void commit_band_gpio_snapshot_to_request(
  * execution request. If a paired plan spans multiple slots, later slots
  * reuse the saved scheduler plan instead of making a new planning choice.
  *
- * @param actual_rf_frequency_hz RF frequency already chosen by the scheduler.
+ * @param placement Candidate nominal placement, selected once for a new plan.
  * @param request_out Receives the committed request snapshot for one slot.
  * @return `true` if the request was built successfully.
  */
@@ -3031,7 +3059,7 @@ bool configure_current_wspr_transmission(
     double &active_plan_dial_frequency,
     WsprFrequencyEntry &active_plan_frequency_entry,
     bool &active_plan_in_progress,
-    double actual_rf_frequency_hz,
+    std::optional<WsprPlanPlacement> &placement,
     TransmissionRequest &request_out)
 {
     try
@@ -3048,6 +3076,8 @@ bool configure_current_wspr_transmission(
             // Continue the already selected paired plan. This reuses saved
             // scheduler state and does not invoke a new planning policy
             // decision for the second slot.
+            if (!placement)
+                throw std::logic_error("Active WSPR plan has no nominal placement.");
             plan = active_plan;
             slot_plan = slot_plan_for_frame(plan, active_frame_index);
 
@@ -3154,8 +3184,16 @@ bool configure_current_wspr_transmission(
             }
 
             slot_plan = slot_plan_for_frame(plan, active_frame_index);
+            const double base_center_hz = resolve_actual_rf_frequency_hz(
+                dial_frequency_hz, cfg.wspr.audio_offset_hz, FrequencyPath::WsprDial);
+            const double center_hz = maybe_apply_wspr_random_offset(base_center_hz, cfg);
+            placement = WsprPlanPlacement{center_hz, center_hz - base_center_hz};
         }
 
+        llog.logS(DEBUG, "Resolved WSPR dial frequency ",
+                  lookup.freq_display_string(dial_frequency_hz),
+                  " to nominal RF center ", lookup.freq_display_string(placement->rf_center_hz),
+                  " with random placement ", placement->applied_offset_hz, " Hz.");
         llog.logS(DEBUG, "Selected WSPR plan.");
 
         llog.logS(DEBUG,
@@ -3179,9 +3217,9 @@ bool configure_current_wspr_transmission(
             committed_ppm,
             slot_plan,
             dial_frequency_hz,
-            actual_rf_frequency_hz,
+            placement->rf_center_hz,
             frequency_entry,
-            0.0);
+            placement->applied_offset_hz);
 
         std::string development_error;
         if (!apply_direct_rp1_development_confirmation(
@@ -3214,6 +3252,7 @@ bool configure_current_wspr_transmission(
     }
     catch (const std::exception &e)
     {
+        placement.reset();
         active_plan = PreparedWsprTransmission{};
         active_frame_index = 0;
         active_plan_dial_frequency = 0.0;

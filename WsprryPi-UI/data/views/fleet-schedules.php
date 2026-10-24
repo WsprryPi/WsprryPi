@@ -21,9 +21,9 @@
                 <select id="fleet-schedule-mode" class="form-select" form="wtp-independent"><option value="tone">Finite tone</option><option value="wspr">WSPR</option><option value="qrss">QRSS</option><option value="fskcw">FSKCW</option><option value="dfcw">DFCW</option></select>
             </div>
             <div class="col-12 col-lg-6 config-stacked-field">
-                <label for="fleet-schedule-frequency" class="form-label">RF base frequency (Hz)</label>
-                <input id="fleet-schedule-frequency" class="form-control" type="number" min="1" max="200000000" step="any" value="14097100" form="wtp-independent">
-                <div class="form-text">Lowest tone for WSPR; space for FSKCW; dot for DFCW. The target must support this frequency.</div>
+                <label id="fleet-schedule-frequency-label" for="fleet-schedule-frequency" class="form-label">Carrier frequency (Hz)</label>
+                <input id="fleet-schedule-frequency" aria-describedby="fleet-schedule-frequency-help" class="form-control" type="number" min="1" max="200000000" step="any" value="14097100" form="wtp-independent">
+                <div id="fleet-schedule-frequency-help" class="form-text">One steady RF carrier. The target must support this frequency.</div>
             </div>
             <div class="col-12 col-lg-6 config-stacked-field" data-schedule-modes="tone">
                 <label for="fleet-schedule-duration" class="form-label">Tone duration (seconds)</label>

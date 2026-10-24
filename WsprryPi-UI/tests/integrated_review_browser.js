@@ -117,6 +117,18 @@ async function reviewIntegratedUi(client, origin, evidence) {
         if (view==='operation') {
             console.log(await evaluate(`(${operationDisconnectFixture.toString()})()`));
         }
+        if (view === "operation") {
+            for (const [name, state] of [['frequency',{frequencyHz:14095600,offsetHz:0,txState:'transmitting'}],['frequency_gpio',{frequencyHz:14095600,offsetHz:-37,txState:'idle',selectorGpioEnabled:true,selectorGpio:7,selectorGpioActiveHigh:false}]]) {
+                await client.send('Emulation.setDeviceMetricsOverride',{width:1440,height:1000,deviceScaleFactor:1,mobile:false});
+                await evaluate(`applyThemePreference('light');renderRuntimeFrequencyPane(document.getElementById('runtime_frequency_value'),'WSPR',${JSON.stringify(state)});`);
+                await settled();
+                assert.match(await evaluate("document.getElementById('runtime_frequency_secondary_label').textContent"), /Random placement/);
+                if (state.offsetHz < 0) assert.match(await evaluate("document.getElementById('runtime_frequency_value').textContent"), /-37 Hz/);
+                const clip=await evaluate("(()=>{const b=document.getElementById('runtime_frequency_value').closest('article').getBoundingClientRect();return {x:b.x,y:b.y,width:b.width,height:b.height,scale:1};})()");
+                const shot=await client.send('Page.captureScreenshot',{format:'png',clip});
+                fs.writeFileSync(path.join(evidence,'docs-'+name+'.png'),Buffer.from(shot.data,'base64'));
+            }
+        }
         if (view === "logs") {
             await evaluate(`__reviewLogStream.onopen();__reviewLogStream.emit('message',{type:'journal',__REALTIME_TIMESTAMP:'1792173600000000',PRIORITY:'6',SYSLOG_IDENTIFIER:'wsprrypi-long-service-identifier',MESSAGE:'First visible record: '+ 'long-technical-value-'.repeat(14)});`);
             await waitFor("!!document.querySelector('.logs-line')", "production log record");
@@ -219,7 +231,19 @@ async function reviewIntegratedUi(client, origin, evidence) {
             for (const mode of ["WSPR","QRSS","FSKCW","DFCW"]) {
                 await evaluate(`configAutosaveSuspended=true;applyConfigModeSelection('${mode}');`);await settled();
                 assert.equal(await evaluate("selectedConfigMode()"),mode);
+                const draft = await evaluate("document.getElementById('qrss_frequency').value");
+                if(mode !== 'WSPR') assert.equal(await evaluate("document.querySelector('label[for=\"qrss_frequency\"]').textContent"), ({QRSS:'Carrier frequency:',FSKCW:'Space frequency:',DFCW:'Dot frequency:'})[mode]);
                 await capture(`config-${mode}-dark-mobile`);
+                assert.equal(await evaluate("document.getElementById('qrss_frequency').value"),draft);
+                if(mode === 'QRSS') {
+                    await client.send('Emulation.setDeviceMetricsOverride',{width:1440,height:1800,deviceScaleFactor:1,mobile:false});
+                    await evaluate("applyThemePreference('light');document.querySelector('footer.fixed-bottom').style.visibility='hidden';document.getElementById('qrss_config').scrollIntoView({block:'start'});window.scrollBy(0,-100)");await settled();
+                    const clip=await evaluate("(()=>{const b=document.getElementById('qrss_config').getBoundingClientRect();return {x:b.x,y:b.y+scrollY,width:b.width,height:b.height,scale:1};})()");
+                    const shot=await client.send('Page.captureScreenshot',{format:'png',captureBeyondViewport:true,clip});
+                    fs.writeFileSync(path.join(evidence,'docs-CW_Mode.png'),Buffer.from(shot.data,'base64'));
+                    await client.send('Emulation.setDeviceMetricsOverride',{width:390,height:844,deviceScaleFactor:1,mobile:true});
+                    await evaluate("document.querySelector('footer.fixed-bottom').style.visibility='';applyThemePreference('dark');window.scrollTo(0,0)");await settled();
+                }
             }
         }
     }

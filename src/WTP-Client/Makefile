@@ -37,7 +37,9 @@ PICO_SOURCE ?=
 REFERENCE_NAMES = endpoint job_service codec json frame_parser sha256
 REFERENCE_OBJECTS = $(addprefix $(BUILD_DIR)/reference/,$(addsuffix .o,$(REFERENCE_NAMES)))
 REFERENCE_HEADERS = $(wildcard $(PICO_SOURCE)/src/wtp/*.hpp)
-$(REFERENCE_OBJECTS) $(BUILD_DIR)/reference_bridge.o: PROVENANCE.json
+# A different selected source tree must never reuse objects from a prior tree.
+.PHONY: selected-reference
+$(REFERENCE_OBJECTS) $(BUILD_DIR)/reference_bridge.o: selected-reference
 .PHONY: interop-test reference-run
 interop-test:
 	$(PYTHON) -B tests/verify_reference.py "$(PICO_SOURCE)"

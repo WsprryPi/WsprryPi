@@ -187,6 +187,8 @@ common ETag must agree. Live recurrence/active observations can change
 independently; the UI identifies when they were observed. Decimal uint64 strings
 remain strings. Hardware `active_revision` is an observation digest.
 
+Pico application views 1 through 4 expose member recurrence as `schedule_dial_frequency_nhz`, an exact integer nHz string for the saved whole-Hz WSPR USB dial. The nontransmitting string `"0"` means unset; the management summary displays **WSPR dial not configured**. The strict Pi adapter requires the current member name in its negotiated closed views. Dial `3568600` projects as `"3568600000000000"`; standalone WSPR centers its four tones at `3570100 Hz`, without random placement. Pico owns selection through `/api/v1/standalone-frequency` (`transmitter-standalone-frequency/1`, whole-Hz `frequency_hz`) and Console CONFIG. Pi exposes the read-only recurrence summary. Fleet WSPR inputs and WTP events remain absolute RF targets.
+
 Station PUT forwards a complete `transmitter-station/1` object containing exact
 `target` and all three station fields. Hardware PUT forwards a complete
 `transmitter-hardware/1` object containing exact `target` and `pins`. Both require

@@ -4,6 +4,8 @@
 #include "wtp_integration/fleet_runtime.hpp"
 #include "wtp_integration/fleet_recovery.hpp"
 #include "wtp_settings_json.hpp"
+#include "WSPR-Transmitter/src/execution_plan_compiler.hpp"
+#include <cmath>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
@@ -90,6 +92,24 @@ int main(){
     const Json wspr={{"mode","wspr"},{"frequency_hz",14097100},{"callsign","K1ABC"},{"locator","FN42"},
         {"power_dbm",10},{"period_seconds",120},{"phase_seconds",0}};
     validate_wtp_fleet_schedule(wspr);
+    const auto request = wtp_fleet_request(wspr);
+    check(std::get<WsprPayload>(request.payload).base_frequency_hz == 14097100,
+          "Fleet frequency remains the entered absolute RF center");
+    const auto plan = ExecutionPlanCompiler{}.compile(request);
+    const double expected[] = {14097097.802734375, 14097099.267578125, 14097100.732421875, 14097102.197265625};
+    check(plan.events.size() == 162, "Fleet WSPR compiles a complete RF frame");
+    bool seen[4] = {};
+    for (const auto &event : plan.events) {
+        bool matches = false;
+        for (unsigned i = 0; i < 4; ++i) {
+            const bool same = std::fabs(event.frequency_hz - expected[i]) < 1e-8;
+            matches |= same;
+            seen[i] |= same;
+        }
+        check(matches, "Fleet tones surround entered center without dial conversion");
+    }
+
+    check(seen[0] && seen[1] && seen[2] && seen[3], "Fleet emits all four expected tone targets");
     check(wtp_fleet_next_slot(wspr,10000000000ULL,0)==121000000000ULL,"WSPR uses second one of two-minute slot");
     for(const auto* mode:{"qrss","fskcw","dfcw"}){
         Json morse={{"mode",mode},{"frequency_hz",14097000},{"message","E"},{"dot_ms",3000},{"period_seconds",60},{"phase_seconds",0}};

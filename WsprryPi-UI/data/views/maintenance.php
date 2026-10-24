@@ -468,7 +468,7 @@ require __DIR__ . '/../card_header.php';
                             </fieldset>
                             <div class="mt-3">
                                 <label for="testToneBand" class="form-label">WSPR band</label>
-                                <select id="testToneBand" class="form-select" disabled>
+                                <select id="testToneBand" class="form-select" aria-describedby="testToneSelectionPreview" disabled>
                                     <option value="">Select a WSPR band</option>
                                 </select>
                             </div>
@@ -480,6 +480,7 @@ require __DIR__ . '/../card_header.php';
                                 <input
                                     type="number"
                                     id="testToneFrequencyHz"
+                                    aria-describedby="testToneSelectionPreview testToneSelectionError"
                                     class="form-control"
                                     inputmode="numeric"
                                     min="1"
@@ -488,7 +489,7 @@ require __DIR__ . '/../card_header.php';
                             <p id="testToneSelectionPreview" class="small mb-0 mt-3" aria-live="polite">
                                 Select a frequency source.
                             </p>
-                            <p id="testToneSelectionError" class="small text-danger mb-0 mt-2" role="alert"></p>
+                            <p id="testToneSelectionError" class="small text-danger-emphasis mb-0 mt-2" role="alert"></p>
                             <p
                                 id="testToneExecutionResult"
                                 class="small mb-0 mt-2"

@@ -48,16 +48,7 @@ unchanged. A confirmed action stops any job owned by this controller; removing
 also deletes the saved schedule. If another operator changes schedules while
 the dialog is open, refresh and review before repeating the action.
 
-Each assignment stores its own mode, RF base frequency in Hz, repeat period and
-UTC phase. Finite tones use duration in seconds in the UI (integer milliseconds
-on the API). QRSS, FSKCW and DFCW use a message and dot duration. FSKCW and DFCW
-also specify shift. WSPR accepts a single-frame callsign/locator and dBm; its
-period and phase align to two minutes and transmission starts at second one.
-The target's current CAPS must accept the compiled job. Native GPIO, RP1 and
-Si5351 Pi endpoints report their WSPR, TONE, QRSS, FSKCW and DFCW capabilities.
-Existing processor, route, development authorization and frequency policies
-still apply. RP1 retains its exact-operation host confirmation; Fleet does not
-create that confirmation. Pi and Pico assignments are checked against current CAPS.
+Each assignment stores its own mode, absolute RF reference in Hz, repeat period and UTC phase. Finite tones use duration in seconds in the UI (integer milliseconds on the API). QRSS, FSKCW and DFCW use a message and dot duration. FSKCW and DFCW also specify shift. WSPR accepts a single-frame callsign/locator and dBm; its period and phase align to two minutes and transmission starts at second one. The target's current CAPS must accept the compiled job. Native GPIO, RP1 and Si5351 Pi endpoints report their WSPR, TONE, QRSS, FSKCW and DFCW capabilities. Existing processor, route, development authorization and frequency policies still apply. RP1 retains its exact-operation host confirmation; Fleet does not create that confirmation. Pi and Pico assignments are checked against current CAPS.
 
 Assignments obey the controller's current frequency-policy settings.
 WTP remains an unqualified physical route in that policy, so starting remote
@@ -146,15 +137,7 @@ blocked, an empty list cannot distinguish that from no advertising devices;
 the UI leaves reachability unverified. Manual profiles and configured direct
 endpoints remain usable.
 
-The accepted TXT format is version 1: `txtvers=1` must be first, and exactly
-one `binding=tls` or `binding=plain` must appear. Required keys are duplicate-checked
-without ASCII case; unknown keys are ignored. TXT does not contain a port,
-device ID, WTP version, credentials, or RF capability. HELLO and CAPS provide
-protocol/device facts. The service name and direct-connection default port
-31417 are provisional pending IANA assignment. Discovery is link-local and
-does not imply that a Pico listener is reachable or RF ready. See the
-[Pico DNS-SD profile](https://github.com/WsprryPi/WsprryPico/blob/devel/docs/protocol/WTP-DNS-SD.md)
-and [WTP/1 protocol](https://github.com/WsprryPi/WsprryPico/blob/devel/docs/protocol/WTP.md).
+The accepted TXT format is version 1: `txtvers=1` must be first, and exactly one `binding=tls` or `binding=plain` must appear. Required keys are duplicate-checked without ASCII case; unknown keys are ignored. TXT does not contain a port, device ID, WTP version, credentials, or RF capability. HELLO and CAPS provide protocol/device facts. The service name and direct-connection default port 31417 are provisional pending IANA assignment. Discovery is link-local and does not imply that a Pico listener is reachable or RF ready. See the [Pico DNS-SD profile](https://github.com/WsprryPi/WsprryPico/blob/devel/engineering/protocol/WTP-DNS-SD.md) and [WTP/1 protocol](https://github.com/WsprryPi/WsprryPico/blob/devel/engineering/protocol/WTP.md).
 
 An instance name, hostname, address, TXT record, or Plain LAN HELLO is never
 used as a durable trusted identity. A discovered profile needs explicit
@@ -188,17 +171,6 @@ use carries `catalog_revision` in its JSON body and uses `If-Match` for the
 active host config. Missing revisions return 428 and stale revisions 412.
 There is no browser-local credential store or independent job authority.
 
-`make wtp-catalog-test` exercises the injected discovery store, TXT parser,
-nondefault SRV port, interface collision, loss/restart/failure, legacy import,
-revision guard, and Plain LAN consent without an Avahi daemon. The portable
-Mac profile compiles the unavailable adapter. Linux CI declares Avahi
-development headers and compiles the native adapter. These are source/software
-checks. Live Avahi/multicast discovery, listener advertisement, physical
-TCP/TLS acceptance, GPIO, services, and RF remain separate qualification.
-The network interop reference at `src/tests/network/pico-reference-revision.txt`
-still pins `95aac22bf7cc31b67fe5773761708d743d8a6473`; its WTP wire
-coverage does not exercise the later published DNS-SD advertisement commit
-`c13fc16819749e9b53a42609f31702c3aca9931c`. Use that published Pico
-revision when comparing the published profile with live advertisements. The
-older interoperability fixture retains its source pin; it does not qualify
-later Pico firmware or a physical LAN setup.
+`make wtp-catalog-test` exercises the injected discovery store, TXT parser, nondefault SRV port, interface collision, loss/restart/failure, legacy import, revision guard, and Plain LAN consent without an Avahi daemon. The portable Mac profile compiles the unavailable adapter. Linux CI declares Avahi development headers and compiles the native adapter. These are source/software checks. Live Avahi/multicast discovery, listener advertisement, physical TCP/TLS acceptance, GPIO, services, and RF remain separate qualification. Interoperability tests compile the selected current Pico sources, including edits; source identity is informational. Software tests do not qualify DNS-SD advertisements, physical transport or RF.
+
+Fleet WSPR `frequency_hz` is an absolute RF center, not a USB dial or tone 0. At `14097100 Hz`, tones are 14,097,097.802734375; 14,097,099.267578125; 14,097,100.732421875; and 14,097,102.197265625 Hz. No dial or random placement is applied. Finite tone and QRSS use a carrier, FSKCW uses space, and DFCW uses dot; mark and dash add the positive shift. Mode changes update labels without changing the frequency draft or saved numeric meaning. WTP carries absolute event targets; the receiving endpoint does not add 1,500 Hz or reapply standalone settings or Pi calibration.

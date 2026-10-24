@@ -588,7 +588,7 @@ int main()
             site_source.find("renderRuntimeFrequencyPane(frequencyNode, currentMode, currentRuntimeStatus);") != std::string::npos &&
             site_source.find("function buildRuntimeFrequencyItems(currentMode, status)") != std::string::npos &&
             site_source.find("function runtimeFrequencyPrimaryLabel(currentMode, status)") != std::string::npos &&
-            site_source.find("return \"Next Frequency\";") != std::string::npos &&
+            site_source.find("return \"Next USB dial\";") != std::string::npos &&
             site_source.find("return \"(Skip)\";") != std::string::npos &&
             site_source.find("queueRuntimeStatusRefresh();") != std::string::npos &&
             site_source.find("function formatDisplayFrequency(valueHz, options = {})") != std::string::npos &&

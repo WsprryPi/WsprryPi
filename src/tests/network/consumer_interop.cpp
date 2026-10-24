@@ -6,10 +6,7 @@
 #include "network/bootstrap_codec.hpp"
 #include "network/pico/consumer_radio_crypto.hpp"
 #include "network_support.hpp"
-#if __has_include("standalone/progress.hpp")
 #include "standalone/progress.hpp"
-#define WSPRRYPI_PROGRESS_FIXTURE 1
-#endif
 #include "provisioning/consumer_profile.hpp"
 #include "wtp_integration/application.hpp"
 #include "wtp_integration/browser_api.hpp"
@@ -28,6 +25,7 @@
 #include <unistd.h>
 #include <openssl/rand.h>
 #include <random>
+#include <set>
 extern "C" mbedtls_ms_time_t mbedtls_ms_time(void) { return 1000; }
 extern "C" int mbedtls_hardware_poll(void *, unsigned char *out,
                                      std::size_t count, std::size_t *received) {
@@ -87,7 +85,13 @@ struct FixtureEngine : pico::wtp::RfEngine {
   pico::standalone::DryRunEngine dry;
   bool can_disable=true, failure_report=false, reported_active=false;
   unsigned disables{},prepares{};
-  pico::wtp::PrepareResult prepare(const pico::wtp::Job &j) override { ++prepares;return dry.prepare(j); }
+  std::optional<pico::wtp::Job> accepted;
+  pico::wtp::PrepareResult prepare(const pico::wtp::Job &j) override {
+    ++prepares;
+    auto result = dry.prepare(j);
+    if (result.accepted) accepted = j;
+    return result;
+  }
   bool schedules_locally() const override { return true; }
   bool schedule(const pico::wtp::Job &j,std::uint64_t n,const pico::wtp::LocalStartConditions &c) override {return dry.schedule(j,n,c);}
   bool begin(const pico::wtp::Job &j,std::uint64_t n) override {return dry.begin(j,n);}
@@ -111,35 +115,23 @@ struct ResourceFixture {
 };
 struct Test {
   ResourceFixture f;
-#ifdef WSPRRYPI_PROGRESS_FIXTURE
   network_test::Flash progress_flash;
   pico::standalone::Progress progress{progress_flash};
-#endif
   Media media;
   Random random;
   HostClock host;
   NoWtp wtp;
   pico::provisioning::ProfileStore profiles{media};
   pico::provisioning::RuntimeProfile runtime;
-#ifdef WSPRRY_PICO_MULTI_SESSIONS
   pico::network::PicoConsumerRadioCrypto crypto[4];
-#else
-  pico::network::PicoConsumerRadioCrypto crypto;
-#endif
   pico::network::ConsumerRadioApi radio{f.api,
                                         profiles,
                                         runtime,
                                         random,
-#ifdef WSPRRY_PICO_MULTI_SESSIONS
                                         {&crypto[0], &crypto[1], &crypto[2]},
-#else
-                                        crypto,
-#endif
                                         device,
                                         f.service.status().boot_id
-#ifdef WSPRRY_PICO_RECOVERY
                                         , &crypto[3]
-#endif
                                         };
   WtpSettings settings;
   std::unique_ptr<pi::WtpApplication> app;
@@ -171,12 +163,12 @@ struct Test {
     assert(runtime.load(profiles, device,
                         pico::provisioning::BuildBundleState::Absent));
     f.api.consumer_config(runtime);
-#ifdef WSPRRYPI_PROGRESS_FIXTURE
     assert(progress.load());
     f.api.progress_settings(progress);
-#endif
     if (configured) {
-      assert(f.scheduler.command("CONFIG " + network_test::config).find("true") != std::string::npos);
+      auto config = *pico::standalone::parse_config(network_test::config);
+      config.wspr_dial_frequency_hz = 3568600;
+      assert(f.scheduler.command("CONFIG " + pico::standalone::serialize_config(config)).find("true") != std::string::npos);
       assert(f.store.reserve(1791970000000000000ULL));
     }
     radio.admission(true);
@@ -307,7 +299,6 @@ void cases(bool ap) {
   assert(t.coordinated(*c, "POST", edit.dump(), fresh.etag).status == 409 &&
          t.mutations == 1);
   auto stranger = t.client();
-#ifdef WSPRRY_PICO_MULTI_SESSIONS
   t.host.now += 1000;
   assert(stranger->login(device, carrier, "test-password").status == 200);
   for (unsigned i=0;i<3;++i) {
@@ -321,9 +312,6 @@ void cases(bool ap) {
   assert(third->request("status","GET").status==200);
   stranger->logout();
   assert(c->request("status","GET").status==200);
-#else
-  assert(stranger->login(device, carrier, "test-password").status == 409);
-#endif
   assert(c->active());
   assert(c->request("jobs", "POST", "{}").status == 404 && t.mutations == 1);
   t.origin = "http://foreign.local";
@@ -331,7 +319,6 @@ void cases(bool ap) {
   assert(t.mutations == 1);
 }
 void recovery_cases() {
-#ifdef WSPRRY_PICO_RECOVERY
   Test t; auto a=t.client(),b=t.client(),c=t.client();
   for (auto* client : {a.get(),b.get(),c.get()}) {
     assert(client->login(device,"consumer_station","test-password").status==200);t.host.now+=1000;
@@ -353,11 +340,56 @@ void recovery_cases() {
   auto stale=scope;stale["boot_id"]=std::string(32,'f');t.host.now+=1000;
   assert(b->retire(device,"consumer_station",t.authority,"test-password",stale).status==409);
   assert(t.mutations==0&&t.wtp.io==0);
-#else
-  Test t;auto c=t.client();assert(c->login(device,"consumer_station","test-password").status==200);
-  assert(c->recovery(device,"consumer_station",t.authority).status!=200);
-  assert(c->active()&&c->request("config","GET").status==200);
-#endif
+}
+
+// Current closed configuration resources retain independent standalone WSPR
+// dial selection for ordinary PUT, merge and replace, without snapshot producers.
+void configuration_write_preservation_cases() {
+  for (const bool ap : {false, true}) for (const std::string mode : {"put", "merge", "replace"}) {
+    Test t;
+    if (ap) {
+      t.authority = "192.168.4.1"; t.origin = "http://192.168.4.1";
+      t.interface = pico::network::ConsumerInterface::AccessPoint;
+    }
+    auto initial = *t.f.store.config();
+    initial.wspr_dial_frequency_hz = 3568737;
+    initial.allow_unqualified_frequency = initial.allow_non_amateur_frequency = true;
+    assert(t.f.store.save(initial));
+    const auto watermark = t.f.store.watermark();
+    auto c = t.client();
+    assert(c->login(device, ap ? "consumer_ap" : "consumer_station", "test-password").status == 200);
+    const auto read = c->request("config", "GET");
+    if (read.status != 200) std::cerr << "Configuration read: " << read.status << " " << read.body << std::endl;
+    assert(read.status == 200);
+    const auto closed = Json::parse(read.body).at("config");
+    assert(!closed.contains("wspr_dial_frequency_hz") && closed["wifi"]["password"].is_null());
+    Json candidate = mode == "merge" ? Json{{"expires_utc_s", 1900000000}} : closed;
+    candidate["expires_utc_s"] = 1900000000;
+    const auto payload = [&](const Json &value) -> Json {
+      return mode == "put" ? value : Json{{"schema", "transmitter-config-update/1"},
+        {"target", {{"scope", "member"}, {"device_id", c->device()}, {"boot_id", c->boot()}}},
+        {"mode", mode}, {"config", value}};
+    };
+    const std::string resource = mode == "put" ? "config/2" : "config/update/2";
+    const std::string method = mode == "put" ? "PUT" : "POST";
+    if (mode != "put") {
+      auto wrong = payload(candidate); wrong["target"]["device_id"] = std::string(32, 'b');
+      assert(c->request(resource, method, wrong.dump(), read.etag).status == 409);
+      assert(*t.f.store.config() == initial && t.f.store.watermark() == watermark);
+    }
+    const auto saved = c->request(resource, method, payload(candidate).dump(), read.etag);
+    if (saved.status != 200) std::cerr << "Configuration " << mode << ": " << saved.status << " " << saved.body << std::endl;
+    assert(saved.status == 200);
+    auto expected = initial; expected.expires_utc_s = 1900000000;
+    assert(*t.f.store.config() == expected && t.f.store.watermark() == watermark);
+    assert(c->request(resource, method, payload(candidate).dump(), read.etag).status == 412);
+    const auto fresh = c->request("config", "GET"); assert(fresh.status == 200);
+    candidate["expires_utc_s"] = 1900000010;
+    t.f.flash.fail = true;
+    assert(c->request(resource, method, payload(candidate).dump(), fresh.etag).status == 503);
+    assert(*t.f.store.config() == expected && t.f.store.watermark() == watermark && t.wtp.io == 0);
+  }
+  std::cout << "Current PUT/merge/replace preserve independent WSPR dial and unrelated settings; target, revision and atomic-save checks passed\n";
 }
 
 void alias_fixed_vector(const Json &vector) {
@@ -389,7 +421,6 @@ void alias_fixed_vector(const Json &vector) {
 }
 
 void retirement_job_authority_cases() {
-#ifdef WSPRRY_PICO_RECOVERY
   for (unsigned phase=0;phase<5;++phase) {
     Test t;auto victim=t.client(),peer=t.client();
     assert(victim->login(device,"consumer_station","test-password").status==200);
@@ -435,12 +466,10 @@ void retirement_job_authority_cases() {
     assert(t.f.scheduler.status()==scheduler && t.f.store.watermark()==watermark && t.f.service.output_inhibited()==inhibit);
     assert(t.f.engine.disables==disables && t.f.engine.prepares==prepares && t.mutations==0 && t.wtp.io==0);
   }
-#endif
 }
 
 
 void local_retirement_refusal_cases() {
-#ifdef WSPRRY_PICO_RECOVERY
   Test t;auto native=t.client(),peer=t.client();
   assert(native->login(device,"consumer_station","test-password").status==200);
   t.host.now+=1000;assert(peer->login(device,"consumer_station","test-password").status==200);
@@ -459,14 +488,12 @@ void local_retirement_refusal_cases() {
   assert(native->active() && native->request("status","GET").status==200 && peer->request("status","GET").status==200);
   assert(t.handler_calls["/api/consumer/v1/recovery/start"]==starts+1 && t.handler_calls["/api/consumer/v1/recovery/finish"]==finishes);
   assert(t.mutations==0 && t.wtp.io==0);
-#endif
 }
 
 struct RuntimeReset {
   ~RuntimeReset() {select_wtp_runtime(std::nullopt);}
 };
 void runtime_recovery_continuity_cases() {
-#ifdef WSPRRY_PICO_RECOVERY
   for (bool after_effect : {false,true}) {
     Test t;
     set_wtp_runtime_for_test(t.settings,t.host,t.wtp,{std::string(32,'1'),std::string(32,'2'),device},[]{return false;});
@@ -532,7 +559,6 @@ void runtime_recovery_continuity_cases() {
     assert(state().at("connected")==false && healthy->request("status","GET").status==200);
     assert(t.mutations==0 && t.wtp.io==0);
   }
-#endif
 }
 
 struct PeerClock : pi::WtpScheduleClock {
@@ -542,7 +568,6 @@ struct PeerClock : pi::WtpScheduleClock {
   void wait_ms(std::uint64_t n) override {peer.advance(peer.now+n);}
 };
 void runtime_recovery_admission_cases() {
-#ifdef WSPRRY_PICO_RECOVERY
   for (unsigned phase=0;phase<7;++phase) {
     // Failed/unknown output is deliberately latched by the production host.
     // Isolate each fixture instead of bypassing that latch for test teardown.
@@ -589,7 +614,6 @@ void runtime_recovery_admission_cases() {
     // alive; no fixture operation clears ownership or output uncertainty.
     std::exit(0);
   }
-#endif
 }
 
 void resource_admission_cases() {
@@ -625,7 +649,6 @@ void resource_admission_cases() {
     assert(result.status==409 && t.f.flash.bytes==bytes && t.f.service.status()==status && t.mutations==0 && t.wtp.io==0);
   }
 }
-#ifdef WSPRRY_PICO_TYPE23
 void type23_profile_cases() {
   for (bool ap : {false,true}) for (const auto &call : {"AA0NT/P","<AA0NT>","PJ4/AA0NT","W1A/AA0NT","<W1A/AA0NT>","AA0NT/09"}) {
     const std::string grid=std::string(call)=="AA0NT/P" ? "EM18" : "EM18IG";
@@ -649,7 +672,6 @@ void type23_profile_cases() {
   }
   std::cout<<"Type 2/3 profile readback through native station/AP crypto and strict resource adapters passed\n";
 }
-#endif
 void interactive(bool ap,bool configured=true) {
   Test t(configured);
   if (ap) { t.authority="192.168.4.1"; t.origin="http://192.168.4.1"; t.interface=pico::network::ConsumerInterface::AccessPoint; }
@@ -705,8 +727,89 @@ void interactive(bool ap,bool configured=true) {
       {"wtp_io",t.wtp.io},{"mutations",t.mutations}}.dump()<<std::endl;
   }
 }
+void scheduler_frequency_interop(const char *path) {
+  ResourceFixture f;
+  auto config = *pico::standalone::parse_config(network_test::config);
+  config.wspr_dial_frequency_hz = 3568600; // Deliberately unrelated to the remote jobs.
+  config.manual_correction_ppb = 2500;
+  assert(f.store.save(config));
+  const auto saved = f.flash.bytes;
+  unsigned sequence = 0;
+  auto send = [&](const Json &wire) {
+    const Json body{{"session_id",wire.at("session_id")},
+                    {"request_id",wire.at("request_id")},
+                    {"operation",wire.at("op")},{"body",wire.at("body")}};
+    pico::network::HttpRequest request{"POST","/api/v1/jobs",body.dump(),
+        {{"host","127.0.0.1:8443"},{"origin","https://127.0.0.1:8443"},
+         {"x-wsprrypico-request","1"},{"content-type","application/json"}}};
+    const auto response = f.api.handle(request,"scheduler-frequency-test","127.0.0.1:8443");
+    if (response.status != 200) std::cerr << response.body_text() << '\n';
+    assert(response.status == 200 && Json::parse(response.body_text()).at("ok") == true);
+  };
+  auto command = [&](const char *operation, const Json &body) {
+    send(Json{{"session_id",std::string(32,'1')},
+              {"request_id",std::string(24,'0') + std::to_string(10000000 + ++sequence)},
+              {"op",operation},{"body",body}});
+  };
+  command("HELLO",{{"versions",{"WTP/1"}},{"client_name","scheduler frequency interop"},{"client_version","1"}});
+  command("CLAIM",{{"owner_id",std::string(32,'2')},{"lease_ms",30000}});
+  std::ifstream input(path);
+  assert(input.is_open());
+  std::string line;
+  unsigned frame = 0;
+  const std::array<std::uint64_t,4> zero{
+      14097097802734375ULL,14097099267578125ULL,14097100732421875ULL,14097102197265625ULL};
+  while (std::getline(input,line)) {
+    assert(frame < 5);
+    const auto wire = Json::parse(line);
+    send(wire);
+    assert(f.engine.accepted && f.engine.accepted->mode == "wspr");
+    const auto &job = *f.engine.accepted;
+    assert(f.engine.prepares == frame + 1 && job.job_id == wire.at("body").at("job_id").get<std::string>() &&
+           job.events.size() == 162 && job.total_duration_ns == 110591999892ULL);
+    const auto shift = frame < 2 ? 37000000000LL : frame == 2 ? -21000000000LL : 0LL;
+    std::set<std::uint64_t> actual;
+    for (std::size_t i = 0; i < job.events.size(); ++i) {
+      const auto &event = job.events[i];
+      const auto &sent = wire.at("body").at("events").at(i);
+      assert(event.rf_on && event.frequency_nhz &&
+             *event.frequency_nhz == std::stoull(sent.at("frequency_nhz").get<std::string>()) &&
+             event.offset_ns == i * 682666666ULL && event.duration_ns == 682666666ULL);
+      actual.insert(*event.frequency_nhz);
+    }
+    std::set<std::uint64_t> expected;
+    for (auto tone : zero) expected.insert(static_cast<std::uint64_t>(static_cast<std::int64_t>(tone) + shift));
+    assert(actual == expected);
+    assert(f.flash.bytes == saved); // Neither the dial nor calibration is persisted again.
+    command("ABORT",{{"job_id",job.job_id}});
+    ++frame;
+  }
+  assert(frame == 5);
+  command("RELEASE",Json::object());
+
+  // Compare to a real Pico standalone producer, rather than another helper call.
+  FixtureEngine standalone_engine;
+  network_test::Fixture standalone{0,device,&standalone_engine};
+  config.wspr_dial_frequency_hz = 14095600;
+  config.callsign = "AA0NT/12";
+  config.locator = "EM18IG";
+  config.power_dbm = 20;
+  config.enabled = true;
+  assert(standalone.store.save(config));
+  pico::standalone::Scheduler scheduler{standalone.store,standalone.service};
+  standalone.clock.now = 115000000000ULL; // Six seconds before the next UTC slot.
+  scheduler.poll();
+  assert(standalone_engine.accepted);
+  std::set<std::uint64_t> standalone_grid;
+  for (const auto &event : standalone_engine.accepted->events)
+    if (event.rf_on) standalone_grid.insert(*event.frequency_nhz);
+  assert(standalone_grid == std::set<std::uint64_t>(zero.begin(),zero.end()));
+  std::cout << "Five scheduler-produced Pi WSPR slots passed Pico receiving handlers unchanged; "
+               "+37/-21/zero grids and actual nonrandom Pico standalone grid agree\n";
+}
 } // namespace
 int main(int argc, char **argv) {
+  if (argc == 3 && std::string(argv[1]) == "--scheduler-frequency") { scheduler_frequency_interop(argv[2]); return 0; }
   if (argc == 3 && std::string(argv[1])=="--stdio") { interactive(std::string(argv[2]).starts_with("ap"),!std::string(argv[2]).ends_with("-blank")); return 0; }
   assert(argc == 2);
   std::ifstream vector_file(argv[1]);
@@ -714,14 +817,13 @@ int main(int argc, char **argv) {
   vector_file >> vectors;
   pi::consumer_radio_fixed_vectors(vectors);
   alias_fixed_vector(vectors);
-#ifdef WSPRRY_PICO_RECOVERY
   std::ifstream recovery_vector_file(std::filesystem::path(argv[1]).parent_path()/"Consumer-Recovery-v1-vectors.json");
   assert(recovery_vector_file.is_open());
   Json recovery_vectors;recovery_vector_file >> recovery_vectors;
   pi::consumer_radio_fixed_vectors(recovery_vectors);
   alias_fixed_vector(recovery_vectors);
   std::cout << "Consumer-Recovery/1 fixed AEAD/HKDF and native selector vectors passed\n";
-#endif
+  configuration_write_preservation_cases();
   retirement_job_authority_cases();
   local_retirement_refusal_cases();
   runtime_recovery_continuity_cases();
@@ -730,9 +832,7 @@ int main(int argc, char **argv) {
   cases(false);
   cases(true);
   resource_admission_cases();
-#ifdef WSPRRY_PICO_TYPE23
   type23_profile_cases();
-#endif
   {
     Test t;
     auto c = t.client();

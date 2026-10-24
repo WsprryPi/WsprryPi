@@ -1,3 +1,4 @@
+#include "arg_parser.hpp"
 #include "config_handler.hpp"
 #include "band_lookup.hpp"
 
@@ -46,6 +47,7 @@ namespace
 
 int main()
 {
+    set_raspberry_pi_generation_override_for_test(4);
     set_patch_all_from_web_runtime_apply_suppressed_for_test(true);
 
     init_default_config();
@@ -110,7 +112,7 @@ int main()
         "band lookup must still resolve 80m dial frequencies normally");
 
     const std::string stock_ini =
-        read_text_file("/home/pi/WsprryPi/config/wsprrypi.ini");
+        read_text_file("../config/wsprrypi.ini");
     require(
         stock_ini.find("2200m = \n2200m Active High = false") != std::string::npos &&
             stock_ini.find("20m = \n20m Active High = false") != std::string::npos &&

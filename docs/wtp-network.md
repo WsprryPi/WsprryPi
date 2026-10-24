@@ -236,12 +236,7 @@ requires a Pico restart; this interface does not request one. Disabling Pico
 Wi-Fi can disconnect control; restoring network access then requires its supported
 Console/restart workflow.
 
-The clean Pico implementation revision is pinned once in
-`src/tests/network/pico-reference-revision.txt`. Both the network CI checkout and
-`src/tests/network/CMakeLists.txt` read that full commit SHA. Update that file to
-advance the reference, publish the Pico commit before CI tries to fetch it, and
-run `wtp-network-interop-test` against a clean checkout of that revision. This
-host-only reference pin does not establish physical RF or resource qualification.
+Interoperability builds use the caller-selected `PICO_SOURCE`, including uncommitted source edits. Source path, HEAD and dirty state are diagnostics, not admission gates. CI selects Pico `devel` by default; dispatch input `pico_ref` can select another source ref. Missing sources and genuine compiler/API failures fail validation. MbedTLS retains its separate exact dependency pin and clean-checkout policy. Host-only tests do not qualify firmware, hardware or RF.
 
 The Pico engineering TLS binding defaults off; the standard consumer image
 defaults to Plain LAN. TLS mode supports two TLS sessions with one waiting TCP
@@ -259,7 +254,7 @@ numeric legacy access while preventing name/IP cross-origin combinations.
 
 ## Hardware-free validation
 
-From `src`, with clean read-only source checkouts at the documented pins:
+From `src`, with the selected Pico sources and the separately pinned MbedTLS dependency:
 
 ```sh
 make wtp-api-test SUDO=

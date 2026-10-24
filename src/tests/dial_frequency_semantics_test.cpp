@@ -1,3 +1,4 @@
+#include "test_tone_frequency_plan.hpp"
 #include "arg_parser.hpp"
 #include "si5351_inventory_process.hpp"
 #include "backend_capabilities.hpp"
@@ -6511,6 +6512,9 @@ int main(int argc, char *argv[])
             set_config(true),
             "idle WSPR scheduler regression must commit the normal waiting request");
 
+        const auto waiting_controller = current_controller_request_for_test();
+        require(waiting_controller && waiting_controller->mode == wsprrypi::TransmissionMode::WSPR,
+                "suppressed scheduling must retain the production WSPR controller snapshot");
         const TestToneStartResult tone_start_result = start_test_tone();
         require(
             !tone_start_result.started &&
@@ -6519,9 +6523,15 @@ int main(int argc, char *argv[])
         require(
             current_transmission_request_for_test().mode == TransmissionMode::WSPR,
             "idle WSPR test tone rejection must preserve the committed waiting request");
+        const auto retained_controller = current_controller_request_for_test();
         require(
-            !current_controller_request_for_test().has_value(),
-            "idle GPIO WSPR test tone rejection must not commit a controller execution request");
+            retained_controller && retained_controller->mode == wsprrypi::TransmissionMode::WSPR &&
+                retained_controller->id.value == waiting_controller->id.value &&
+                std::get<wsprrypi::WsprPayload>(retained_controller->payload).base_frequency_hz ==
+                    std::get<wsprrypi::WsprPayload>(waiting_controller->payload).base_frequency_hz &&
+                std::get<wsprrypi::WsprPayload>(retained_controller->payload).prepared.frames[0].symbols ==
+                    std::get<wsprrypi::WsprPayload>(waiting_controller->payload).prepared.frames[0].symbols,
+            "idle GPIO WSPR test tone rejection must preserve the committed WSPR controller request");
         require(
             committed_execution_route_for_test() !=
                 CommittedExecutionRouteForTest::LEGACY,
@@ -8751,7 +8761,7 @@ int main(int argc, char *argv[])
                 "direct CLI test tone must reject values outside the signed integral-Hz correlation range");
         }
 
-        for (const std::string token : {"0.136MHz", "136kHz", "136000", "2200m", "0.136MHz@22"})
+        for (const std::string token : {"0.136MHz", "136kHz", "136000", "0.136MHz@22"})
         {
             std::string error;
             require(
@@ -8771,6 +8781,79 @@ int main(int argc, char *argv[])
             }
             clear_direct_tone_startup_request();
         }
+    }
+
+    {
+        init_default_config();
+        const auto assert_tone = [&](const std::string &token, double expected) {
+            clear_direct_tone_startup_request();
+            std::string error;
+            require(set_direct_tone_startup_request(token, &error), "Test Tone token: " + token + " " + error);
+            WsprFrequencyEntry entry;
+            double carrier = 0;
+            require(try_get_direct_tone_startup_request(entry, carrier) &&
+                    nearly_equal(carrier, expected), "Test Tone target: " + token);
+        };
+        config.use_offset = true;
+        for (const auto &band : lookup.canonical_wspr_band_catalog())
+            assert_tone(band.band, band.dial_frequency_hz + 1500);
+        assert_tone("20M@22H", 14097100);
+        assert_tone("lf", 137500);
+        assert_tone("mf", 475700);
+        for (const auto &token : {"14095600", "14095600Hz", "14095.6kHz", "14.0956MHz", "0.0140956GHz", ".0140956GHz", "14095600.Hz"})
+            assert_tone(token, 14095600);
+        config.wspr.frequency_profile = "wrc15";
+        assert_tone("60m", 5366200);
+        config.wspr.band_preferences = {{"60m", std::uint64_t{5379500}}, {"2200m", std::uint64_t{136100}}, {"8m", std::uint64_t{40680000}}};
+        assert_tone("60m", 5381000);
+        assert_tone("60m:legacy", 5288700);
+        assert_tone("60m:wrc15", 5366200);
+        assert_tone("lf", 137600);
+        assert_tone("8m", 40681500);
+        const auto web = plan_explicit_test_tone_frequency(
+            {TestToneRequestSource::WsprBand, "60m", {}}, 1500,
+            config.wspr.frequency_profile, config.wspr.band_preferences);
+        assert_tone("60m", web.plan->actual_rf_frequency_hz);
+        for (const auto &token : {"0", "1.5Hz", "14.0956.0MHz", "nan", "inf", "-1", "14095600junk", "999999999999999999999999999999999"}) {
+            clear_direct_tone_startup_request();
+            require(!set_direct_tone_startup_request(token), "invalid Test Tone rejected: " + std::string(token));
+        }
+        for (const auto &args : std::vector<std::vector<std::string>>{
+            {"wsprrypi", "--test-tone", "20m", "--offset", "--backend", "simulated"},
+            {"wsprrypi", "--backend", "simulated", "--offset", "--test-tone", "20m"},
+            {"wsprrypi", "--test-tone", "60m", "--backend", "simulated", "--test-tone", "20m"}}) {
+            reset_getopt_state();
+            auto copy = args;
+            auto argv = argv_for(copy);
+            require(parse_command_line(static_cast<int>(argv.size()), argv.data()), "reordered CLI parse");
+            WsprFrequencyEntry entry; double carrier = 0;
+            require(try_get_direct_tone_startup_request(entry, carrier) && nearly_equal(carrier, 14097100), "reordered CLI same center without random placement");
+            set_scheduler_execution_suppressed_for_test(true);
+            reset_current_transmission_request_for_test();
+            set_direct_tone_start_invoker_for_test([] {});
+            std::string error;
+            require(start_direct_tone_execution_for_test(config, entry, carrier, &error), "CLI steady carrier request commits: " + error);
+            require(nearly_equal(current_transmission_request_for_test().actual_rf_frequency_hz, 14097100), "CLI execution retains the planned center exactly once");
+            reset_direct_tone_start_invoker_for_test();
+            reset_current_transmission_request_for_test();
+            set_scheduler_execution_suppressed_for_test(false);
+        }
+        require_cli_parse_rejected({"--test-tone", "0", "--test-tone", "20m", "--backend", "simulated"}, "later valid tone must not hide earlier invalid tone");
+        require_cli_parse_rejected({"--test-tone", "20m", "--test-tone", "0", "--backend", "simulated"}, "last invalid tone remains rejected");
+        require_cli_parse_rejected({"--test-tone", "broken", "--qrss-message", "E", "--qrss-frequency", "14096900", "--qrss-dot-seconds", "1", "--backend", "simulated"}, "CW override must not hide invalid tone");
+        const ScopedTemporaryFile tone_ini("/tmp/wsprrypi-stage1-tone-admission-XXXXXX");
+        write_managed_ini_file(tone_ini.path(), make_managed_ini_data("AA0NT", "EM18", "20m", false));
+        require_cli_parse_rejected({"--test-tone", "20m", "-i", tone_ini.path()}, "tone before INI is prohibited");
+        require_cli_parse_rejected({"-i", tone_ini.path(), "--test-tone", "20m"}, "tone after INI is prohibited");
+        require(!set_qrss_startup_request("E", "20m", "1"), "transient QRSS rejects band alias");
+        require(!set_fskcw_startup_request("E", "20m", "14096900", "1"), "transient FSKCW rejects band alias");
+        require(!set_dfcw_startup_request("E", "20m", "14096905", "1"), "transient DFCW rejects band alias");
+        require(set_qrss_startup_request("E", "14096900.25", "1"), "transient numeric fractional-Hz carrier remains valid");
+        clear_qrss_startup_request(); clear_fskcw_startup_request(); clear_dfcw_startup_request();
+        for (const auto &mode : {"QRSS", "FSKCW", "DFCW"})
+            require_cli_parse_rejected({"--mode", mode, "--cw-base-frequency", "20m"}, "CW rejects WSPR alias");
+        clear_direct_tone_startup_request();
+        init_default_config();
     }
 
     {

@@ -76,6 +76,16 @@ accepted compatibility aliases for `2200m` and `630m`, but output should use the
 canonical name. Display formatting such as `1.25 m` is presentation, not
 identity.
 
+## Frequency input and RF targets
+
+WSPR band selections in CLI and web controls represent USB dial `D`. Scheduled WSPR requests use RF center `C = D + 1500 + r`, with the existing optional random placement `r`. Tone `k` targets `Fk = C + (k - 1.5) × 1.46484375 Hz`, `k = 0, 1, 2, 3`. With standard `20m`, dial is 14,095,600 Hz and RF center without random placement is 14,097,100 Hz. Tones 0–3 are 14,097,097.802734375; 14,097,099.267578125; 14,097,100.732421875; and 14,097,102.197265625 Hz.
+
+Web band-selected Test Tone and CLI `--test-tone 20m` target one steady carrier at 14,097,100 Hz. The typed band planner applies the fixed 1,500 Hz placement once, using effective profile and preferences. Qualified presets override those defaults. Numeric `--test-tone 14095600` and equivalent Hz/kHz/MHz/GHz inputs target exactly 14,095,600 Hz. Test Tone never applies random placement. CLI resolution runs after option parsing; INI admission rules remain separate and unchanged.
+
+CW controls are numeric: QRSS carrier, FSKCW space with mark = space + positive shift, and DFCW dot with dash = dot + positive shift. Band aliases are rejected. Band correlation still applies to filter selection, frequency policy and output limits. QRSS/DFCW gaps have RF off; FSKCW retains space. Frequency labels do not alter timing or saved values.
+
+Fleet WSPR `frequency_hz` already means absolute RF center. The same `14097100` value yields the four tones above without a dial conversion. WTP event frequencies are absolute RF targets; receiving endpoints do not add 1,500 Hz, consult standalone frequency settings or apply Pi calibration again. Requested targets, backend realization and independent measured RF are separate evidence.
+
 ## WSPR preset identity
 
 A band has one correlation identity but may have multiple WSPR frequency
@@ -134,11 +144,7 @@ qualified, so changing the selected profile cannot change its meaning. Numeric
 preferences provide the implemented local-frequency mechanism; they do not
 create new named presets.
 
-The UI exposes all 19 bands from 2200 m through 70 cm. Each row can follow the
-profile/default, select an available named preset, or use a custom integral USB
-dial frequency. It previews the effective dial and RF tone, validates before
-autosave, clears by removing only that band's preference, and preserves the
-typed preset-string or numeric representation across round trips.
+The UI exposes all 19 bands from 2200 m through 70 cm. Each row can follow the profile/default, select an available named preset, or use a custom integral USB dial frequency. It previews the effective dial and RF center / Test Tone target, validates before autosave, clears by removing only that band's preference, and preserves the typed preset-string or numeric representation across round trips.
 
 WSPR frequency resolution precedence is:
 

@@ -28,6 +28,7 @@
 
 // Primary header for this source file
 #include "arg_parser.hpp"
+#include "test_tone_frequency_plan.hpp"
 #include "arg_parser_internal.hpp"
 
 // Project headers
@@ -1121,8 +1122,45 @@ bool set_direct_tone_startup_request(
 
     try
     {
-        const double actual_rf_frequency_hz =
-            lookup.parse_string_to_frequency(entry.token, false);
+        double actual_rf_frequency_hz = 0.0;
+        std::string normalized = entry.token;
+        std::transform(normalized.begin(), normalized.end(), normalized.begin(),
+            [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+        if (normalized == "lf") normalized = "2200m";
+        if (normalized == "mf") normalized = "630m";
+        const auto effective = lookup.resolve_wspr_band_frequency(
+            normalized, config.wspr.frequency_profile, config.wspr.band_preferences);
+        if (effective || entry.token.find(':') != std::string::npos)
+        {
+            const double dial = effective ? static_cast<double>(effective->dial_frequency_hz)
+                : lookup.parse_string_to_frequency(entry.token, false);
+            const auto band = lookup.lookup_ham_band(dial);
+            if (!band)
+                throw std::invalid_argument("WSPR preset has no correlated band");
+            const std::string canonical = ham_band_to_string(*band);
+            auto preferences = config.wspr.band_preferences;
+            // Qualified presets are explicit; bare names and aliases use the
+            // same effective profile/preferences as the web band catalog.
+            if (entry.token.find(':') != std::string::npos)
+                preferences[canonical] = entry.token;
+            const auto planned = plan_explicit_test_tone_frequency(
+                {TestToneRequestSource::WsprBand, canonical, {}},
+                config.wspr.audio_offset_hz, config.wspr.frequency_profile,
+                preferences);
+            if (!planned)
+                throw std::invalid_argument(planned.error);
+            actual_rf_frequency_hz = planned.plan->actual_rf_frequency_hz;
+        }
+        else
+        {
+            // Reject partial parses such as 14.0956.0MHz before constructing
+            // startup state. Range and integral-Hz validation follows below.
+            static const std::regex numeric(
+                R"(^(?:[0-9]+(?:\.[0-9]*)?|\.[0-9]+)\s*(?:[kKmMgG]?[hH][zZ])?$)");
+            if (!std::regex_match(entry.token, numeric))
+                throw std::invalid_argument("Expected a numeric RF frequency or WSPR preset");
+            actual_rf_frequency_hz = lookup.parse_string_to_frequency(entry.token, false);
+        }
         if (!validate_cli_frequency_hz(
                 actual_rf_frequency_hz,
                 false,
@@ -1191,7 +1229,7 @@ bool set_qrss_startup_request(
             return false;
         }
 
-        const double parsed_frequency_hz = std::stod(frequency_hz);
+        const double parsed_frequency_hz = parse_double_option(frequency_hz.c_str(), "CW frequency");
         if (parsed_frequency_hz <= 0.0)
         {
             if (error_message != nullptr)
@@ -1265,7 +1303,7 @@ bool set_fskcw_startup_request(
             return false;
         }
 
-        const double parsed_mark_frequency_hz = std::stod(mark_frequency_hz);
+        const double parsed_mark_frequency_hz = parse_double_option(mark_frequency_hz.c_str(), "CW frequency");
         if (parsed_mark_frequency_hz <= 0.0)
         {
             if (error_message != nullptr)
@@ -1273,7 +1311,7 @@ bool set_fskcw_startup_request(
             return false;
         }
 
-        const double parsed_space_frequency_hz = std::stod(space_frequency_hz);
+        const double parsed_space_frequency_hz = parse_double_option(space_frequency_hz.c_str(), "CW frequency");
         if (parsed_space_frequency_hz <= 0.0)
         {
             if (error_message != nullptr)
@@ -1357,7 +1395,7 @@ bool set_dfcw_startup_request(
             return false;
         }
 
-        const double parsed_dot_frequency_hz = std::stod(dot_frequency_hz);
+        const double parsed_dot_frequency_hz = parse_double_option(dot_frequency_hz.c_str(), "CW frequency");
         if (parsed_dot_frequency_hz <= 0.0)
         {
             if (error_message != nullptr)
@@ -1365,7 +1403,7 @@ bool set_dfcw_startup_request(
             return false;
         }
 
-        const double parsed_dash_frequency_hz = std::stod(dash_frequency_hz);
+        const double parsed_dash_frequency_hz = parse_double_option(dash_frequency_hz.c_str(), "CW frequency");
         if (parsed_dash_frequency_hz <= 0.0)
         {
             if (error_message != nullptr)
@@ -2484,6 +2522,7 @@ bool parse_command_line(int argc, char *argv[])
     clear_fskcw_startup_request();
     clear_dfcw_startup_request();
 
+    std::vector<std::string> test_tone_tokens;
     bool explicit_cw_start_second = false;
     bool explicit_socket_loopback_family = false;
     for (int i = 1; i < argc; ++i)
@@ -3543,11 +3582,7 @@ bool parse_command_line(int argc, char *argv[])
         {
             if (!config.use_ini)
             {
-                std::string error_message;
-                if (!set_direct_tone_startup_request(optarg, &error_message))
-                {
-                    print_usage(error_message, EXIT_FAILURE);
-                }
+                test_tone_tokens.emplace_back(optarg);
 
                 // Direct test tone is a transient startup mode selected from
                 // the CLI. It is not persisted into config storage.
@@ -3985,6 +4020,17 @@ bool parse_command_line(int argc, char *argv[])
         print_usage("--socket-loopback-family requires --socket-loopback-only.", EXIT_FAILURE);
 
     resolve_backend_specific_config(config);
+
+    // Validate every occurrence with the final effective settings. Deferral
+    // must not let a later option hide an invalid earlier tone argument.
+    for (const auto &token : test_tone_tokens)
+    {
+        std::string error_message;
+        if (!set_direct_tone_startup_request(token, &error_message))
+            print_usage(error_message, EXIT_FAILURE);
+    }
+    if (config.mode != ModeType::TONE)
+        clear_direct_tone_startup_request();
 
     if (config.mode == ModeType::WSPR)
     {

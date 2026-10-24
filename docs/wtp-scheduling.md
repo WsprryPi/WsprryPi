@@ -80,21 +80,7 @@ The typed `WtpSchedulePolicy` defaults are:
 | `clock_step_tolerance_ms` | 100 | Maximum cumulative host UTC departure from anchored monotonic time |
 | `maximum_wait_ms` | 86,400,000 | Maximum requested start distance; at most one day |
 
-Dispatch time is requested UTC minus preparation allowance, ARM submission
-allowance and negotiated minimum ARM lead. That combined interval must fit CAPS'
-maximum ARM horizon. Requests already closer than the combined interval are
-rejected at submission. After dispatch, normal wake-up/processing delay consumes
-the preparation allowance; a request past the last preparation/ARM cutoff is
-rejected, never shifted into another slot. Timing allowances are host policy,
-not measured USB latency guarantees. Slow operations may still miss the window
-and fail safely. The pinned fragmented-endpoint test uses an explicit 8,000 ms
-preparation allowance while retaining the 1,000 ms ARM reserve.
-The production `WtpApplication` uses a separate 12,000 ms preparation allowance
-and the same 1,000 ms ARM-submission reserve. This covers bounded complete-job
-upload and response processing before handoff while preserving the final device
-lead. It does not put RF event timing on the host: after ARM, the Pico executes
-the complete job locally. Preparation that consumes the production allowance
-still fails before ARM and never shifts or shortens the job.
+Dispatch time is requested UTC minus preparation allowance, ARM submission allowance and negotiated minimum ARM lead. That combined interval must fit CAPS' maximum ARM horizon. Requests already closer than the combined interval are rejected at submission. After dispatch, normal wake-up/processing delay consumes the preparation allowance; a request past the last preparation/ARM cutoff is rejected, never shifted into another slot. Timing allowances are host policy, not measured USB latency guarantees. Slow operations may still miss the window and fail safely. The selected-source fragmented-endpoint test uses an explicit 8,000 ms preparation allowance while retaining the 1,000 ms ARM reserve. The production `WtpApplication` uses a separate 12,000 ms preparation allowance and the same 1,000 ms ARM-submission reserve. This covers bounded complete-job upload and response processing before handoff while preserving the final device lead. It does not put RF event timing on the host: after ARM, the Pico executes the complete job locally. Preparation that consumes the production allowance still fails before ARM and never shifts or shortens the job.
 
 Waiting uses at most 10 ms increments and is bounded by the requested slot. The
 sole session owner refreshes STATUS every five seconds during this wait, keeping
@@ -156,14 +142,7 @@ make wtp-backend-test wtp-protocol-test wtp-plan-test wtp-usb-test SUDO=
 make semantics-make-regression-test semantics-test-portable SUDO=
 ```
 
-Ordinary tests use virtual host/device clocks and a scripted peer with real
-framing, Session, backend, compiler and controller. They include a complete
-162-event WSPR job, early exact-UTC ARM, lease renewal, frozen requests, repeats,
-clock failures, pending/deferred reload, concurrent notification at commitment,
-stop and blocked recovery. Optional interoperability verifies the existing Pico
-source pin and runs its actual endpoint/job service with a software clock/engine.
-It opens no physical USB device. macOS/Linux CI includes the ordinary scheduler
-tests; a local macOS pass does not establish a Linux runtime pass.
+Ordinary tests use virtual host/device clocks and a scripted peer with real framing, Session, backend, compiler and controller. They include a complete 162-event WSPR job, early exact-UTC ARM, lease renewal, frozen requests, repeats, clock failures, pending/deferred reload, concurrent notification at commitment, stop and blocked recovery. Optional interoperability compiles the selected Pico sources, including edits, and runs its actual endpoint/job service with a software clock/engine. It opens no physical USB device. macOS/Linux CI includes the ordinary scheduler tests; a local macOS pass does not establish a Linux runtime pass.
 
 ## Integration and qualification
 
@@ -173,3 +152,28 @@ persisted USB/network selection, application lifecycle and operator controls.
 Early preparation and ARM handoff remain separate from device-local RF start.
 Physical timing, USB/DTR/unplug behavior, installed services and RF require
 their own evidence.
+
+## Local WSPR message-plan placement
+
+The local Pi scheduler resolves a WSPR USB dial using `C = D + 1500 + r` and compiles each tone as `Fk = C + (k - 1.5) * 1.46484375 Hz`. It selects one uniform random placement in the existing ±80 Hz range when preparing a new message plan. A two-frame plan retains its nominal center and applied placement across both slot requests; the encoded symbol sequences may differ. A subsequent independent plan takes a fresh draw, which may repeat the previous value. Disabled randomization selects zero without calling the provider. Zero is a valid selected placement, distinct from absent plan state.
+
+Placement follows the scheduler's candidate copy, request commit and plan reset boundaries. Re-entering preparation for an active pair reuses its dial, frequency entry and placement, including before its first frame finishes. Forced reconfiguration replaces the plan. A reload deferred during transmission follows the existing completion policy: discard the remaining pair and prepare from the accepted replacement configuration. Invalid or superseded candidates cannot publish placement. Cancellation, failure, skipped entries, completion, mode change, Test Tone restoration and shutdown release the abandoned plan's placement. Backend preparation must succeed before the candidate request and placement are published.
+
+Each committed compiler request still contains one executable WSPR frame. Pair progress and frame identities remain scheduler state. For dial `14095600 Hz` and placement `+37 Hz`, both frames have center `14097137 Hz` and tones `14097134.802734375`, `14097136.267578125`, `14097137.732421875` and `14097139.197265625 Hz`. Placement is nominal RF policy; correction is selected independently for each request, and backend realization or measured RF may differ. Test Tone, CW, Fleet assignments and received absolute WTP events do not consult this local plan snapshot. WTP conversion encodes the compiler's absolute events without adding another placement or 1500 Hz.
+
+Run the production scheduler, compiler and WTP converter regression without hardware from Linux `src`:
+
+```sh
+WSPRRYPI_DISABLE_HARDWARE_ACCESS=1 make wspr-plan-placement-test SUDO=
+```
+
+The target is also part of full and portable semantics coverage. It uses controlled terminal callbacks rather than waiting through WSPR slots. `ScopedWsprRandomPlacementForTest` is a transient typed developer seam; installation, provider calls and restoration use the scheduler configuration mutex. Providers must not re-enter scheduler configuration. Exception unwinding restores the previous provider. Override lifetimes serialize across threads and nest on the owning thread so an expired callback cannot be restored. No CLI, environment or persisted setting selects it.
+
+The configuration interoperability target also passes five scheduler-produced slots through the production compiler, WTP serializer, Pico browser job handler, WTP decoder and job service. It checks both `+37 Hz` frames, the next `-21 Hz` plan and a nonrandom pair against independent integer-nHz constants, then compares the nonrandom grid with an actual Pico standalone scheduler job using the same station and dial. The receiving fixture has a different saved standalone dial and nonzero manual correction; accepted nominal events and persisted settings remain unchanged. This compares frequency grids while retaining the two producers' existing timing representations.
+
+```sh
+WSPRRYPI_DISABLE_HARDWARE_ACCESS=1 make -j4 wtp-config-interop-test SUDO= \
+  PICO_SOURCE=/path/to/selected/WsprryPico MBEDTLS_SOURCE=/path/to/pinned/mbedtls
+```
+
+The recipe builds a separate `wspr_scheduler_frequency_export` test binary with explicit `BACKENDS=simulated ANCILLARY_GPIO=0`. It does not require physical-backend build dependencies or replace the ordinary placement-test binary. The selected Pico sources may include edits; the separate MbedTLS dependency policy still applies. No physical transport, RF, installation or service qualification is established.

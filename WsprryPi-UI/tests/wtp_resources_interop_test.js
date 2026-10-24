@@ -60,6 +60,9 @@ async function cases(carrier, failure="storage") {
       assert.equal(initial.wtp_io,0);
     }
     if(failure==='blank') {
+      assert.equal(loaded.body.application.recurrence.schedule_dial_frequency_nhz,'0');
+      assert.match(b.element('wtp-member-recurrence').textContent,/WSPR dial not configured/);
+      assert.doesNotMatch(b.element('wtp-member-recurrence').textContent,/WSPR dial 0 Hz/);
       assert.equal(loaded.body.application.hardware.active,null);assert.equal(loaded.body.application.hardware.saved,null);
       assert.match(b.element('wtp-member-active').textContent,/Unknown/);assert(b.element('wtp-member-hardware-save').disabled);
       assert(!b.element('wtp-member-validate').disabled);assert.equal(b.element('wtp-member-rf').value,'');

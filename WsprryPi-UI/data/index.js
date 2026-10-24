@@ -158,7 +158,7 @@ function renderBandPreferenceRows() {
                 <button type="button" class="btn btn-outline-secondary band-preference-clear" aria-label="Clear ${band} preference">Clear</button>
             </div><span class="band-preferences__error" aria-live="polite"></span></td>
             <td data-label="Effective dial" class="band-preferences__value band-preference-dial"></td>
-            <td data-label="Effective RF" class="band-preferences__value band-preference-tone"></td>`;
+            <td data-label="RF center / Test Tone" class="band-preferences__value band-preference-tone"></td>`;
         body.appendChild(row);
         row.querySelector(".band-preference-mode").value = mode;
         row.querySelector(".band-preference-preset").value = typeof preference === "string" ? preference : (presets[0]?.preset || "");
@@ -191,7 +191,7 @@ function updateBandPreferenceCatalog(catalog) {
     currentWsprBandPreferenceCatalog = catalog;
     const status = document.getElementById("band-preferences-status");
     if (status) status.textContent = catalog
-        ? `Effective RF includes the ${formatBandPreferenceFrequency(catalog.audioOffsetHz)} audio offset.`
+        ? `RF center / Test Tone includes the ${formatBandPreferenceFrequency(catalog.audioOffsetHz)} placement above USB dial. Scheduled WSPR may add random placement.`
         : "Effective frequencies are unavailable while the controller catalog is unavailable.";
     renderBandPreferenceRows();
 }
@@ -4016,6 +4016,8 @@ function clickQRSSModeToggle() {
 function syncSelectedCwModeControls() {
     const selectedMode = $('input[name="qrss_type"]:checked').val();
     const shiftField = document.getElementById("fsk_offset");
+    const frequencyLabel = document.querySelector('label[for="qrss_frequency"]');
+    if (frequencyLabel) frequencyLabel.textContent = ({QRSS: "Carrier frequency:", FSKCW: "Space frequency:", DFCW: "Dot frequency:"})[selectedMode] || "Carrier / space / dot frequency:";
     const dfcwSelected = selectedMode === "DFCW";
     const activeGroup = dfcwSelected ? "dfcw" : "conventional";
     cwSpacingSelectionOverride[activeGroup] = null;

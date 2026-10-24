@@ -6,6 +6,8 @@ the reusable WSPR-Transmitter execution-plan type and produces WTP-Client
 types. Neither component depends on the other. The adapter is compiled by its
 focused test target; it is not linked into the production application yet.
 
+WTP event frequencies are absolute RF targets. Any WSPR USB dial placement is complete before conversion into these events. Fleet WSPR `frequency_hz` is already RF center. A receiving endpoint adds neither 1,500 Hz nor standalone settings or Pi calibration. Accepted targets and backend realization are distinct from measured RF.
+
 ## API and authority
 
 `prepare_wtp_plan(plan, caps, options)` returns an owned `WtpPreparedPlan` or a

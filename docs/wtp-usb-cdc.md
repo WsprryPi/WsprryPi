@@ -162,7 +162,7 @@ the selected job's uncertainty limits. GET_CLOCK observes it; supporting
 firmware can accept qualified controller UTC through the separate
 [USB management](wtp-usb-management.md) exchange.
 
-[pico-usb]: https://github.com/WsprryPi/WsprryPico/blob/40812e7438f180c5e8d8ad75d4eb227271152b10/docs/development/usb-cdc.md
-[wtp]: https://github.com/WsprryPi/WsprryPico/blob/40812e7438f180c5e8d8ad75d4eb227271152b10/docs/protocol/WTP.md
+[pico-usb]: https://github.com/WsprryPi/WsprryPico/blob/devel/engineering/development/usb-cdc.md
+[wtp]: https://github.com/WsprryPi/WsprryPico/blob/devel/engineering/protocol/WTP.md
 [exclusive]: https://man7.org/linux/man-pages/man2/TIOCEXCL.2const.html
 [termios]: https://man7.org/linux/man-pages/man3/termios.3.html

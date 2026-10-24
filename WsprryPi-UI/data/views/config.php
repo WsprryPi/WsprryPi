@@ -186,7 +186,7 @@ $bandGpioBands = ['2200m', '630m', '160m', '80m', '60m', '40m', '30m', '20m', '1
                                                 title="Enter WSPR presets, numeric dial frequencies, or 0. Separate entries with spaces or commas."
                                                 required />
                                             <div id="frequencies-hint" class="form-text mt-2">
-                                                Separate entries with spaces or commas. Use presets such as `20m`, `60m:legacy`, or `60m:wrc15`; numeric values; or `0` to skip a slot. Qualified names select a WSPR dial convention, not a different amateur band. Optional `@GPIO`, `@GPIOH`, or `@GPIOL` suffixes are supported.
+                                                WSPR entries are USB dial frequencies; RF center = dial + 1500 Hz + optional random placement. Separate entries with spaces or commas. Use presets such as `20m`, `60m:legacy`, or `60m:wrc15`; numeric values; or `0` to skip a slot. Qualified names select a WSPR dial convention, not a different amateur band. Optional `@GPIO`, `@GPIOH`, or `@GPIOL` suffixes are supported.
                                             </div>
                                         </div>
 
@@ -201,11 +201,11 @@ $bandGpioBands = ['2200m', '630m', '160m', '80m', '60m', '40m', '30m', '20m', '1
                                                     role="switch"
                                                     aria-describedby="useoffset-hint"
                                                     data-bs-toggle="tooltip"
-                                                    title="Randomly shift each WSPR transmission around the dial-derived RF frequency."
+                                                    title="Choose one random placement per WSPR plan; paired frames retain it."
                                                     id="useoffset" />
                                             </div>
                                             <div id="useoffset-hint" class="form-text mt-2">
-                                                Shift each WSPR transmission randomly around the selected dial-derived RF frequency.
+                                                Choose placement within ±80 Hz once per WSPR plan; paired frames keep it. Test Tone uses no random placement.
                                             </div>
                                         </div>
 
@@ -303,7 +303,7 @@ $bandGpioBands = ['2200m', '630m', '160m', '80m', '60m', '40m', '30m', '20m', '1
                                                         <th scope="col">Use</th>
                                                         <th scope="col">Selection</th>
                                                         <th scope="col">Effective dial</th>
-                                                        <th scope="col">Effective RF</th>
+                                                        <th scope="col">RF center / Test Tone</th>
                                                     </tr>
                                                 </thead>
                                                 <tbody id="band-preferences-body"></tbody>
@@ -423,7 +423,7 @@ $bandGpioBands = ['2200m', '630m', '160m', '80m', '60m', '40m', '30m', '20m', '1
                                                     </div>
                                                 </div>
                                                 <div id="qrss-mode-hint" class="form-text mt-2">
-                                                    QRSS uses the base frequency directly. FSKCW and DFCW also use the offset field to generate the second tone.
+                                                    QRSS uses a carrier frequency. FSKCW uses space, with mark = space + shift. DFCW uses dot, with dash = dot + shift.
                                                 </div>
                                             </fieldset>
                                         </div>
@@ -448,7 +448,7 @@ $bandGpioBands = ['2200m', '630m', '160m', '80m', '60m', '40m', '30m', '20m', '1
                                         </div>
 
                                         <div class="col-12 col-lg-4 config-stacked-field">
-                                            <label for="fsk_offset" class="form-label">Frequency Offset:</label>
+                                            <label for="fsk_offset" class="form-label">Positive shift (Hz):</label>
                                             <input
                                                 type="number"
                                                 class="form-control"
@@ -470,7 +470,7 @@ $bandGpioBands = ['2200m', '630m', '160m', '80m', '60m', '40m', '30m', '20m', '1
                                     <div class="row gx-2 gy-3 align-items-start mt-1">
 
                                         <div class="col-12 col-lg-4 config-stacked-field">
-                                            <label for="qrss_frequency" class="form-label">Base Frequency:</label>
+                                            <label for="qrss_frequency" class="form-label">Carrier / space / dot frequency:</label>
                                             <input
                                                 type="text"
                                                 class="form-control"
@@ -482,7 +482,7 @@ $bandGpioBands = ['2200m', '630m', '160m', '80m', '60m', '40m', '30m', '20m', '1
                                                 value="14096900"
                                                 required />
                                             <div id="qrss-frequency-hint" class="form-text mt-2">
-                                                Enter whole-number Hz such as `14096900`, or include `Hz`, `kHz`, `MHz`, or `GHz` for decimal values such as `14.0969MHz`.
+                                                Enter a numeric frequency in whole-number Hz or with Hz, kHz, MHz, or GHz units, such as 14.0969MHz. WSPR band names are not accepted. Band correlation still selects filters and output limits.
                                             </div>
                                         </div>
 

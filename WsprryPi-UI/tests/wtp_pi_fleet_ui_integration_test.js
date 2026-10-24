@@ -184,6 +184,20 @@ async function main() {
         await waitFor(async()=>await evaluate('!document.getElementById("fleet-schedule-feedback").textContent.includes("Fleet status unavailable:")'),'recovered Fleet feedback');
         await evaluate('document.getElementById("fleet-schedule-new").click()');
         await waitFor(async () => await evaluate('!document.getElementById("fleet-schedule-editor").hidden'), 'assignment editor');
+        for (const [mode, label, help] of [
+            ['wspr','WSPR RF center (Hz)','not USB dial or tone 0'],
+            ['qrss','QRSS carrier (Hz)','carrier frequency'],
+            ['fskcw','FSKCW space (Hz)','mark = space + positive shift'],
+            ['dfcw','DFCW dot (Hz)','dash = dot + positive shift'],
+            ['tone','Carrier frequency (Hz)','steady RF carrier']]) {
+            const saved=await evaluate('JSON.stringify(__fleet.assignments)');
+            await evaluate(`document.getElementById('fleet-schedule-frequency').value='14097123';document.getElementById('fleet-schedule-mode').value='${mode}';document.getElementById('fleet-schedule-mode').dispatchEvent(new Event('change'));`);
+            assert.equal(await evaluate('document.getElementById("fleet-schedule-frequency-label").textContent'), label);
+            assert.ok((await evaluate('document.getElementById("fleet-schedule-frequency-help").textContent')).includes(help));
+            assert.equal(await evaluate('document.getElementById("fleet-schedule-frequency").value'), '14097123');
+            assert.equal(await evaluate('JSON.stringify(__fleet.assignments)'), saved);
+            assert.equal(await evaluate('document.getElementById("fleet-schedule-frequency").getAttribute("aria-describedby")'), 'fleet-schedule-frequency-help');
+        }
         await evaluate(`document.getElementById('fleet-schedule-duration').value='4';document.getElementById('fleet-schedule-plain').checked=true;window.__fleetConflict=true;document.getElementById('fleet-schedule-save').click();`);
         await waitFor(async () => await evaluate('document.getElementById("fleet-schedule-editor-feedback").textContent.includes("draft is preserved")'), 'revision conflict');
         assert.equal(await evaluate('document.getElementById("fleet-schedule-duration").value'), '4');
@@ -236,6 +250,9 @@ async function main() {
                 const shot=await client.send('Page.captureScreenshot',{format:'png',captureBeyondViewport:true,
                     clip:{x:0,y:0,width:viewport.width,height,scale:1}});
                 fs.writeFileSync(path.join(output,viewport.name+'-'+section+'.png'),Buffer.from(shot.data,'base64'));
+                const clip=await evaluate(`(()=>{const b=document.getElementById('${element}').getBoundingClientRect();return {x:Math.max(0,b.x),y:b.y+scrollY,width:Math.min(b.width,innerWidth),height:b.height,scale:1};})()`);
+                const detail=await client.send('Page.captureScreenshot',{format:'png',captureBeyondViewport:true,clip});
+                fs.writeFileSync(path.join(output,viewport.name+'-'+section+'-detail.png'),Buffer.from(detail.data,'base64'));
                 await evaluate(`document.getElementById('capture-chrome').remove()`);
             }
         }
@@ -287,6 +304,11 @@ async function main() {
         await evaluate(`document.getElementById('fleet-schedule-new').click()`);
         await waitFor(async()=>await evaluate('!document.getElementById("fleet-schedule-editor").hidden'),'editor reopened');
         await capture('assignment','fleet-schedule-editor');
+        for (const mode of ['wspr','qrss','fskcw','dfcw']) {
+            await evaluate(`document.getElementById('fleet-schedule-mode').value='${mode}';document.getElementById('fleet-schedule-mode').dispatchEvent(new Event('change'));`);
+            await capture('assignment-'+mode,'fleet-schedule-editor');
+        }
+
         await evaluate(`document.getElementById('fleet-schedule-cancel').click();document.getElementById('fleet-listener').open=true;`);
         await waitFor(async()=>await evaluate('document.getElementById("fleet-listener-feedback").textContent.includes("Listening")'),'listener status');
         await capture('listener','fleet-listener');

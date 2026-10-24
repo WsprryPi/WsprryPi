@@ -67,7 +67,7 @@ void print_usage(const std::string &message, int exit_code)
     std::cerr << "\nUsage:\n"
               << "  (sudo) wsprrypi [options] CALLSIGN GRID POWER FREQ [FREQ...]\n"
               << "  (sudo) wsprrypi -i /path/to/wsprrypi.ini\n"
-              << "  (sudo) wsprrypi --test-tone RF_FREQ [backend/options]\n"
+              << "  (sudo) wsprrypi --test-tone BAND_OR_RF_FREQ [backend/options]\n"
               << "  (sudo) wsprrypi --mode QRSS --cw-message TEXT --cw-base-frequency FREQ [cw/options]\n"
               << "  (sudo) wsprrypi --qrss-message TEXT --qrss-frequency HZ --qrss-dot-seconds SEC\n"
               << "  (sudo) wsprrypi --fskcw-message TEXT --fskcw-mark-frequency HZ --fskcw-space-frequency HZ --fskcw-dot-seconds SEC\n"
@@ -184,8 +184,8 @@ void print_usage(const std::string &message, int exit_code)
               << "      --use-shutdown, --no-shutdown  Enable or disable shutdown button monitoring.\n"
               << "  Band GPIO                          Configure per-band selector GPIOs in INI or with FREQ @GPIO suffixes.\n\n"
               << "Test Tone:\n"
-              << "  -t, --test-tone <rf_frequency>     Start a transient direct RF test tone using whole-number Hz or a unit-qualified value.\n"
-              << "                                     Band aliases resolve to their WSPR dial frequency; use an explicit value for another RF carrier.\n"
+              << "  -t, --test-tone <band|rf_frequency> Start one steady carrier: WSPR band dial + 1500 Hz, or the exact numeric RF in Hz/kHz/MHz/GHz. No random placement.\n"
+              << "                                     Standard 20m targets 14097100 Hz; numeric 14095600 targets exactly 14095600 Hz.\n"
               << "                                     Invalid with --ini-file.\n\n";
 
     // Handle exit behavior

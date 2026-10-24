@@ -715,7 +715,7 @@ assert.equal(bandPreview.valid, true, "band preview must be presentation-ready")
 assert.equal(bandPreview.band, "30m", "band preview must retain the canonical band");
 assert.equal(bandPreview.audioOffsetHz, 2750, "band preview must retain the non-default backend offset");
 assert.equal(bandPreview.toneFrequencyHz, 10141450, "band preview must retain the final RF tone");
-assert.match(bandPreview.text, /WSPR dial .*\+ 2750 Hz offset/, "band preview must explain dial and offset");
+assert.match(bandPreview.text, /WSPR dial .*\+ 2750 Hz placement/, "band preview must explain dial and offset");
 
 const customSelection = context.createTestToneSelection("custom_rf", "14097123", selectionCatalog);
 assert.equal(customSelection.valid, true, "valid custom RF must create a selection");
@@ -729,8 +729,8 @@ assert.equal(Object.hasOwn(customSelection, "audioOffsetHz"), false,
     "custom selection must not apply a WSPR offset");
 const customPreview = context.createTestToneSelectionPreview(customSelection);
 assert.equal(customPreview.valid, true, "custom preview must be presentation-ready");
-assert.match(customPreview.text, /No WSPR offset is applied/, "custom preview must state exact-RF semantics");
-assert.match(customPreview.text, /backend validates and resolves the band/i,
+assert.match(customPreview.text, /No WSPR or random placement/, "custom preview must state exact-RF semantics");
+assert.match(customPreview.text, /backend validates the target/i,
     "custom preview must preserve backend authority");
 
 for (const value of ["", " ", "+1", "-1", "1.5", "1e6", "14MHz", "0", "001", "9007199254740992", null, 14097123]) {
@@ -809,7 +809,7 @@ assert.deepEqual(elements.testToneBand.options.map((option) => option.value), ["
     "band selector must contain exactly the canonical catalog order without aliases");
 assert.equal(elements.testToneSourceBand.checked, true, "configured 30m defaults to band mode");
 assert.equal(elements.testToneBand.value, "30m", "configured 30m selects its canonical catalog row");
-assert.match(elements.testToneSelectionPreview.textContent, /WSPR dial .*\+ 2750 Hz offset/,
+assert.match(elements.testToneSelectionPreview.textContent, /WSPR dial .*\+ 2750 Hz placement/,
     "band mode preview must show the catalog dial and non-default offset");
 
 context.setTestToneConfiguration("WSPR", "20m", 0);
@@ -862,7 +862,7 @@ elements.testToneSourceCustom.checked = true;
 elements.testToneFrequencyHz.value = "14097123";
 dispatch(elements.testToneSourceCustom, "change", { preventDefault() {} });
 dispatch(elements.testToneFrequencyHz, "input", { preventDefault() {} });
-assert.match(elements.testToneSelectionPreview.textContent, /No WSPR offset is applied/,
+assert.match(elements.testToneSelectionPreview.textContent, /No WSPR or random placement/,
     "custom mode preview must state exact-RF offset behavior");
 dispatch(elements.testToneStart, "click", { preventDefault() {} });
 assert.equal(JSON.stringify(context.toneStartMessages(first)[1]), JSON.stringify({
