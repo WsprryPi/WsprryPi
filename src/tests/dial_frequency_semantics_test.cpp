@@ -8811,7 +8811,8 @@ int main(int argc, char *argv[])
         }
         for (const auto &args : std::vector<std::vector<std::string>>{
             {"wsprrypi", "--test-tone", "20m", "--offset", "--backend", "simulated"},
-            {"wsprrypi", "--backend", "simulated", "--offset", "--test-tone", "20m"}}) {
+            {"wsprrypi", "--backend", "simulated", "--offset", "--test-tone", "20m"},
+            {"wsprrypi", "--test-tone", "60m", "--backend", "simulated", "--test-tone", "20m"}}) {
             reset_getopt_state();
             auto copy = args;
             auto argv = argv_for(copy);
@@ -8828,6 +8829,9 @@ int main(int argc, char *argv[])
             reset_current_transmission_request_for_test();
             set_scheduler_execution_suppressed_for_test(false);
         }
+        require_cli_parse_rejected({"--test-tone", "0", "--test-tone", "20m", "--backend", "simulated"}, "later valid tone must not hide earlier invalid tone");
+        require_cli_parse_rejected({"--test-tone", "20m", "--test-tone", "0", "--backend", "simulated"}, "last invalid tone remains rejected");
+        require_cli_parse_rejected({"--test-tone", "broken", "--qrss-message", "E", "--qrss-frequency", "14096900", "--qrss-dot-seconds", "1", "--backend", "simulated"}, "CW override must not hide invalid tone");
         const ScopedTemporaryFile tone_ini("/tmp/wsprrypi-stage1-tone-admission-XXXXXX");
         write_managed_ini_file(tone_ini.path(), make_managed_ini_data("AA0NT", "EM18", "20m", false));
         require_cli_parse_rejected({"--test-tone", "20m", "-i", tone_ini.path()}, "tone before INI is prohibited");

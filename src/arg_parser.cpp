@@ -2522,7 +2522,7 @@ bool parse_command_line(int argc, char *argv[])
     clear_fskcw_startup_request();
     clear_dfcw_startup_request();
 
-    std::optional<std::string> test_tone_token;
+    std::vector<std::string> test_tone_tokens;
     bool explicit_cw_start_second = false;
     bool explicit_socket_loopback_family = false;
     for (int i = 1; i < argc; ++i)
@@ -3582,7 +3582,7 @@ bool parse_command_line(int argc, char *argv[])
         {
             if (!config.use_ini)
             {
-                test_tone_token = optarg;
+                test_tone_tokens.emplace_back(optarg);
 
                 // Direct test tone is a transient startup mode selected from
                 // the CLI. It is not persisted into config storage.
@@ -4021,12 +4021,16 @@ bool parse_command_line(int argc, char *argv[])
 
     resolve_backend_specific_config(config);
 
-    if (test_tone_token && config.mode == ModeType::TONE)
+    // Validate every occurrence with the final effective settings. Deferral
+    // must not let a later option hide an invalid earlier tone argument.
+    for (const auto &token : test_tone_tokens)
     {
         std::string error_message;
-        if (!set_direct_tone_startup_request(*test_tone_token, &error_message))
+        if (!set_direct_tone_startup_request(token, &error_message))
             print_usage(error_message, EXIT_FAILURE);
     }
+    if (config.mode != ModeType::TONE)
+        clear_direct_tone_startup_request();
 
     if (config.mode == ModeType::WSPR)
     {
