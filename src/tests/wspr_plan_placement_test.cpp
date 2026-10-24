@@ -414,9 +414,44 @@ void gpio_correction_lifetime() {
     check(draws.calls == 1, "GPIO correction updates do not redraw nominal placement");
 #endif
 }
+void export_scheduler_vectors(const char *path) {
+    Fixture f;
+    Draws draws{{37, -21}};
+    ScopedWsprRandomPlacementForTest provider([&] { return draws.next(); });
+    std::ofstream output(path);
+    check(output.is_open(), "open scheduler interoperability vectors");
+    for (unsigned i = 0; i < 5; ++i) {
+        if (i == 0) check(set_config(true), "export randomized pair");
+        else if (i == 3) {
+            config.use_offset = false;
+            identity(true);
+            check(set_config(true), "export nonrandom pair");
+        } else {
+            if (i == 2) identity(false);
+            event(WsprTransmissionCallbackEvent::COMPLETE);
+        }
+        const auto request = current_controller_request_for_test();
+        check(request.has_value(), "export committed scheduler request");
+        const auto plan = wsprrypi::ExecutionPlanCompiler{}.compile(*request);
+        const auto wire = wsprrypi::prepare_wtp_plan(plan, capabilities(),
+            {std::string(32, static_cast<char>('a' + i)), 1'800'000'000'000'000'000ULL, 1000});
+        check(bool(wire), "export production WTP conversion");
+        const auto encoded = wtp::encode_request({std::string(32, '1'),
+            std::string(32, static_cast<char>('a' + i)), wtp::Operation::Load, wire.prepared->job});
+        check(bool(encoded), "encode scheduler-produced WTP LOAD");
+        output << *encoded.payload << '\n';
+    }
+    output.close();
+    check(bool(output) && draws.calls == 2, "export complete with one draw per randomized plan");
+}
 } // namespace
-int main() {
+int main(int argc, char **argv) {
     try {
+        if (argc == 3 && std::string(argv[1]) == "--export-wtp") {
+            export_scheduler_vectors(argv[2]);
+            return 0;
+        }
+        check(argc == 1, "unexpected test arguments");
         pair_and_independent();
         disabled_single_and_rotation();
         cancellation_skips_and_modes();

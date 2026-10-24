@@ -2046,6 +2046,9 @@ wtp-config-interop-test: wtp-config-client-build wtp-config-test
 	$(Q)node ../WsprryPi-UI/tests/wtp_configuration_interop_test.js "$(abspath $(WTP_NETWORK_BUILD_DIR))"
 	$(Q)node ../WsprryPi-UI/tests/wtp_progress_interop_test.js "$(abspath $(WTP_NETWORK_BUILD_DIR))"
 	$(Q)"$(WTP_NETWORK_BUILD_DIR)/consumer_interop" "$(abspath $(PICO_SOURCE))/engineering/protocol/Consumer-Radio-v1-vectors.json"
+	$(Q)$(MAKE) --no-print-directory $(BIN_DIR)/wspr_scheduler_frequency_export BACKENDS=simulated ANCILLARY_GPIO=0 SUDO=
+	$(Q)WSPRRYPI_DISABLE_HARDWARE_ACCESS=1 ./$(BIN_DIR)/wspr_scheduler_frequency_export --export-wtp "$(WTP_NETWORK_BUILD_DIR)/scheduler-frequency.jsonl"
+	$(Q)"$(WTP_NETWORK_BUILD_DIR)/consumer_interop" --scheduler-frequency "$(WTP_NETWORK_BUILD_DIR)/scheduler-frequency.jsonl"
 	$(Q)node ../WsprryPi-UI/tests/wtp_resources_interop_test.js "$(abspath $(WTP_NETWORK_BUILD_DIR))"
 	$(Q)node tests/network/consumer_browser_interop.js "$(abspath $(WTP_NETWORK_BUILD_DIR))" "$(abspath $(PICO_SOURCE))"
 wtp-network-interop-test: wtp-tls-build wtp-api-test wtp-network-process-test
@@ -2140,7 +2143,7 @@ pico-usb-installer-test: pico-usb-installer-cpp-test
 	$(Q)python3 -B ../scripts/tests/pico_usb_bundle_test.py
 
 .PHONY: wspr-plan-placement-test
-$(BIN_DIR)/wspr_plan_placement_test: tests/wspr_plan_placement_test.cpp $(SEMANTICS_TEST_DEPS)
+$(BIN_DIR)/wspr_plan_placement_test $(BIN_DIR)/wspr_scheduler_frequency_export: tests/wspr_plan_placement_test.cpp $(SEMANTICS_TEST_DEPS)
 	$(Q)mkdir -p $(BIN_DIR)
 	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) $^ -o $@ $(LDFLAGS)
 wspr-plan-placement-test: $(BIN_DIR)/wspr_plan_placement_test

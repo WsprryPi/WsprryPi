@@ -25,6 +25,7 @@
 #include <unistd.h>
 #include <openssl/rand.h>
 #include <random>
+#include <set>
 extern "C" mbedtls_ms_time_t mbedtls_ms_time(void) { return 1000; }
 extern "C" int mbedtls_hardware_poll(void *, unsigned char *out,
                                      std::size_t count, std::size_t *received) {
@@ -84,7 +85,13 @@ struct FixtureEngine : pico::wtp::RfEngine {
   pico::standalone::DryRunEngine dry;
   bool can_disable=true, failure_report=false, reported_active=false;
   unsigned disables{},prepares{};
-  pico::wtp::PrepareResult prepare(const pico::wtp::Job &j) override { ++prepares;return dry.prepare(j); }
+  std::optional<pico::wtp::Job> accepted;
+  pico::wtp::PrepareResult prepare(const pico::wtp::Job &j) override {
+    ++prepares;
+    auto result = dry.prepare(j);
+    if (result.accepted) accepted = j;
+    return result;
+  }
   bool schedules_locally() const override { return true; }
   bool schedule(const pico::wtp::Job &j,std::uint64_t n,const pico::wtp::LocalStartConditions &c) override {return dry.schedule(j,n,c);}
   bool begin(const pico::wtp::Job &j,std::uint64_t n) override {return dry.begin(j,n);}
@@ -720,8 +727,89 @@ void interactive(bool ap,bool configured=true) {
       {"wtp_io",t.wtp.io},{"mutations",t.mutations}}.dump()<<std::endl;
   }
 }
+void scheduler_frequency_interop(const char *path) {
+  ResourceFixture f;
+  auto config = *pico::standalone::parse_config(network_test::config);
+  config.wspr_dial_frequency_hz = 3568600; // Deliberately unrelated to the remote jobs.
+  config.manual_correction_ppb = 2500;
+  assert(f.store.save(config));
+  const auto saved = f.flash.bytes;
+  unsigned sequence = 0;
+  auto send = [&](const Json &wire) {
+    const Json body{{"session_id",wire.at("session_id")},
+                    {"request_id",wire.at("request_id")},
+                    {"operation",wire.at("op")},{"body",wire.at("body")}};
+    pico::network::HttpRequest request{"POST","/api/v1/jobs",body.dump(),
+        {{"host","127.0.0.1:8443"},{"origin","https://127.0.0.1:8443"},
+         {"x-wsprrypico-request","1"},{"content-type","application/json"}}};
+    const auto response = f.api.handle(request,"scheduler-frequency-test","127.0.0.1:8443");
+    if (response.status != 200) std::cerr << response.body_text() << '\n';
+    assert(response.status == 200 && Json::parse(response.body_text()).at("ok") == true);
+  };
+  auto command = [&](const char *operation, const Json &body) {
+    send(Json{{"session_id",std::string(32,'1')},
+              {"request_id",std::string(24,'0') + std::to_string(10000000 + ++sequence)},
+              {"op",operation},{"body",body}});
+  };
+  command("HELLO",{{"versions",{"WTP/1"}},{"client_name","scheduler frequency interop"},{"client_version","1"}});
+  command("CLAIM",{{"owner_id",std::string(32,'2')},{"lease_ms",30000}});
+  std::ifstream input(path);
+  assert(input.is_open());
+  std::string line;
+  unsigned frame = 0;
+  const std::array<std::uint64_t,4> zero{
+      14097097802734375ULL,14097099267578125ULL,14097100732421875ULL,14097102197265625ULL};
+  while (std::getline(input,line)) {
+    assert(frame < 5);
+    const auto wire = Json::parse(line);
+    send(wire);
+    assert(f.engine.accepted && f.engine.accepted->mode == "wspr");
+    const auto &job = *f.engine.accepted;
+    assert(f.engine.prepares == frame + 1 && job.job_id == wire.at("body").at("job_id").get<std::string>() &&
+           job.events.size() == 162 && job.total_duration_ns == 110591999892ULL);
+    const auto shift = frame < 2 ? 37000000000LL : frame == 2 ? -21000000000LL : 0LL;
+    std::set<std::uint64_t> actual;
+    for (std::size_t i = 0; i < job.events.size(); ++i) {
+      const auto &event = job.events[i];
+      const auto &sent = wire.at("body").at("events").at(i);
+      assert(event.rf_on && event.frequency_nhz &&
+             *event.frequency_nhz == std::stoull(sent.at("frequency_nhz").get<std::string>()) &&
+             event.offset_ns == i * 682666666ULL && event.duration_ns == 682666666ULL);
+      actual.insert(*event.frequency_nhz);
+    }
+    std::set<std::uint64_t> expected;
+    for (auto tone : zero) expected.insert(static_cast<std::uint64_t>(static_cast<std::int64_t>(tone) + shift));
+    assert(actual == expected);
+    assert(f.flash.bytes == saved); // Neither the dial nor calibration is persisted again.
+    command("ABORT",{{"job_id",job.job_id}});
+    ++frame;
+  }
+  assert(frame == 5);
+  command("RELEASE",Json::object());
+
+  // Compare to a real Pico standalone producer, rather than another helper call.
+  FixtureEngine standalone_engine;
+  network_test::Fixture standalone{0,device,&standalone_engine};
+  config.wspr_dial_frequency_hz = 14095600;
+  config.callsign = "AA0NT/12";
+  config.locator = "EM18IG";
+  config.power_dbm = 20;
+  config.enabled = true;
+  assert(standalone.store.save(config));
+  pico::standalone::Scheduler scheduler{standalone.store,standalone.service};
+  standalone.clock.now = 115000000000ULL; // Six seconds before the next UTC slot.
+  scheduler.poll();
+  assert(standalone_engine.accepted);
+  std::set<std::uint64_t> standalone_grid;
+  for (const auto &event : standalone_engine.accepted->events)
+    if (event.rf_on) standalone_grid.insert(*event.frequency_nhz);
+  assert(standalone_grid == std::set<std::uint64_t>(zero.begin(),zero.end()));
+  std::cout << "Five scheduler-produced Pi WSPR slots passed Pico receiving handlers unchanged; "
+               "+37/-21/zero grids and actual nonrandom Pico standalone grid agree\n";
+}
 } // namespace
 int main(int argc, char **argv) {
+  if (argc == 3 && std::string(argv[1]) == "--scheduler-frequency") { scheduler_frequency_interop(argv[2]); return 0; }
   if (argc == 3 && std::string(argv[1])=="--stdio") { interactive(std::string(argv[2]).starts_with("ap"),!std::string(argv[2]).ends_with("-blank")); return 0; }
   assert(argc == 2);
   std::ifstream vector_file(argv[1]);

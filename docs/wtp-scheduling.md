@@ -168,3 +168,12 @@ WSPRRYPI_DISABLE_HARDWARE_ACCESS=1 make wspr-plan-placement-test SUDO=
 ```
 
 The target is also part of full and portable semantics coverage. It uses controlled terminal callbacks rather than waiting through WSPR slots. `ScopedWsprRandomPlacementForTest` is a transient typed developer seam; installation, provider calls and restoration use the scheduler configuration mutex. Providers must not re-enter scheduler configuration. Exception unwinding restores the previous provider. Override lifetimes serialize across threads and nest on the owning thread so an expired callback cannot be restored. No CLI, environment or persisted setting selects it.
+
+The configuration interoperability target also passes five scheduler-produced slots through the production compiler, WTP serializer, Pico browser job handler, WTP decoder and job service. It checks both `+37 Hz` frames, the next `-21 Hz` plan and a nonrandom pair against independent integer-nHz constants, then compares the nonrandom grid with an actual Pico standalone scheduler job using the same station and dial. The receiving fixture has a different saved standalone dial and nonzero manual correction; accepted nominal events and persisted settings remain unchanged. This compares frequency grids while retaining the two producers' existing timing representations.
+
+```sh
+WSPRRYPI_DISABLE_HARDWARE_ACCESS=1 make -j4 wtp-config-interop-test SUDO= \
+  PICO_SOURCE=/path/to/selected/WsprryPico MBEDTLS_SOURCE=/path/to/pinned/mbedtls
+```
+
+The recipe builds a separate `wspr_scheduler_frequency_export` test binary with explicit `BACKENDS=simulated ANCILLARY_GPIO=0`. It does not require physical-backend build dependencies or replace the ordinary placement-test binary. The selected Pico sources may include edits; the separate MbedTLS dependency policy still applies. No physical transport, RF, installation or service qualification is established.
