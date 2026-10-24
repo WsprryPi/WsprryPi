@@ -2,6 +2,8 @@
 
 This roadmap covers the shared frequency contract for WsprryPi and WsprryPico. Work starts from Pi `devel` on `codex/shared-frequency-contract` and coordinates the affected Pico and operator-documentation sources. Stage 0 inspection and Stage 1 implementation, validation and corrective review are complete. Stage 2 implementation, local hardware-free validation, documentation and corrective review are complete. Stage 3 implementation, local hardware-free validation, documentation and corrective review are complete. Stages 4 and 5 are not started.
 
+The original Stage 2 scope remains complete. The first-use frequency-save corrective follow-up under Stage 2 has completed implementation, local hardware-free validation, documentation and adversarial corrective review after Stage 3. Submitted-commit CI is assessed separately from the local evidence below. Stages 4 and 5 remain unstarted.
+
 ## Agreed contract and scope
 
 - A WSPR band selection represents a USB dial frequency in both CLI and UI. Resolve the effective preset, profile and per-band preference consistently before calculating RF targets.
@@ -109,6 +111,64 @@ Adversarial review closed inconsistent first Console selection enablement, uncha
 - Exercise actual browser-generated requests, Pi adapters and Pico handlers together against the selected edited sources. Remote WTP jobs retain their absolute event frequencies regardless of standalone settings.
 - Run affected Pico host, schema, browser, Console, installer-preservation and asset-integrity tests, plus Pi configuration and interoperability tests. Review desktop and mobile controls with Impeccable.
 
+### Corrective follow-up First-use frequency save
+
+Status: implementation, local hardware-free validation, documentation and adversarial corrective review are complete. This follow-up follows completed Stage 3 and precedes unstarted Stage 4; the original Stage 2 scope and Stage 3 remain complete. Pico corrective commit `d48be0fd4aab303838877db4e82906413b933753` is published on `origin/codex/shared-frequency-contract`. The accompanying Pi roadmap commit uses that coordinated branch; submitted-commit CI is assessed separately from this local evidence.
+
+The first-use defect was reproduced in current production-handler fixtures: healthy frequency storage and a null frequency do not establish an effective applied station, and a complete station draft remains unapplied. The original investigation used historical sources and RAM journals; it did not inspect the tester's physical Pico or exact firmware. Its evidence remains at `/Users/lbussy/Codex-Local/2026-10-24/referenced-chatgpt-conversation-this-is-an/outputs/frequency-save-investigation-evidence.zip`.
+
+#### Implemented correction
+
+The editor brackets frequency and saved-progress reads with the existing `station/2` resource. All observations must agree on member identity, boot and configuration revision; saved progress must agree with the authoritative applied station. Draft completeness controls guidance only. No standalone journal is required for an applied consumer overlay. Network-only profiles, including those with a station-like backing record, and unapplied USB-managed profiles remain unavailable for frequency Save. An applied station with an unset frequency can select its first dial.
+
+Browser text is retained while the station prerequisite is missing, through explicit application and reconnect, and after refused or ambiguous saves. Missing/incomplete and complete-draft guidance uses the actual profile's Save and Apply controls. A complete draft points directly to Apply. `not_configured` explains that prerequisite without an ineffective read/save loop. New boot/target observations retain explicit draft adoption. Observed revision changes invalidate readiness. Application refreshes readiness without a page reload; the shared action lock covers both automatic readiness refresh and explicit frequency reads/saves, preventing overlapping consumer requests. Independent consumer-password ETags are excluded from configuration-revision observation.
+
+The backend guard, whole-Hz WSPR dial, exact integer-nHz conversion, four-tone policy, journal format, recurrence projection, both-frame snapshots, absolute WTP targets, Phase 1 semantics and Phase 3 CW behavior are unchanged. The correction introduces no endpoint, schema, station manufacture, implicit draft application, schedule enablement, ownership grant, STOP/inhibit reset, accepted-job retune or browser persistence.
+
+#### Validation and corrective assessment
+
+All 158 applicable Linux host tests passed without internal skips as an ordinary container user, with pinned MbedTLS and the retained NumPy/Harness analysis dependencies. Independent backend coverage confirms `409 not_configured` before configuration persistence for missing and draft-only stations. Named network-only, network-with-backing-record, USB-managed and consumer-overlay fixtures confirm explicit application, unset first selection, journal reload/reboot, disabled schedules and inactive output. Actual committed-frequency reply loss is read back after reauthentication and simulated reboot without replay. The WTP validator passed 23 schema, seven raw-JSON, one framing and eight transition cases. All 866 selected source hashes matched the final edited checkout in the host and firmware environments; source identities remain informational rather than admission gates.
+
+Generated shipped assets ran through `consumer_bootstrap_driver` and production HTTP/session/API/journal handlers. Desktop/mobile browser checks inspected actual integer-Hz requests and independent journal observations for missing station, complete draft, explicit application, first save, refusal, ambiguous connection loss, reload/reboot and explicit new-boot adoption. The configured workflow retained policy, stale-revision, identity and storage-failure coverage. A current-revision test adapter isolates the actual `not_configured` refusal from the separately tested stale-revision guard; it does not bypass the production station guard. Existing consumer and engineering CW integrations retained their exact requests and compiled event assertions.
+
+```sh
+cmake -S /work/first-use-source -B /work/first-use-host -DCMAKE_BUILD_TYPE=Debug -DWSPRRY_PICO_BUILD_FIRMWARE=OFF -DWSPRRY_PICO_BUILD_TESTS=ON -DWSPRRY_PICO_TEST_MBEDTLS_PATH=/sdk-input/lib/mbedtls -DWSPRRY_PICO_HARNESS_PYTHON=/usr/bin/python3
+cmake --build /work/first-use-host --parallel 4
+PYTHONPATH=/work/stage3-harness-src NODE_OPTIONS=--experimental-websocket ctest --test-dir /work/first-use-host --output-on-failure --timeout 240
+python3 -B scripts/validate_wtp_contract.py
+CHROME_BIN=/work/chrome NODE_OPTIONS=--experimental-websocket node tests/standalone_frequency_ui_integration.mjs /work/first-use-host/consumer_bootstrap_driver /work/first-use-configured-ui-closed
+CHROME_BIN=/work/chrome NODE_OPTIONS=--experimental-websocket node tests/standalone_frequency_ui_integration.mjs /work/first-use-host/consumer_bootstrap_driver /work/first-use-network-doc-final first-use:network
+CHROME_BIN=/work/chrome NODE_OPTIONS=--experimental-websocket node tests/standalone_frequency_ui_integration.mjs /work/first-use-host/consumer_bootstrap_driver /work/first-use-usb-ui-final first-use:usb
+CHROME_BIN=/work/chrome NODE_OPTIONS=--experimental-websocket node tests/standalone_frequency_ui_integration.mjs /work/first-use-host/consumer_bootstrap_driver /work/first-use-overlay-ui-final first-use:overlay
+CHROME_BIN=/work/chrome NODE_OPTIONS=--experimental-websocket node tests/standalone_frequency_ui_integration.mjs /work/first-use-host/consumer_bootstrap_driver /work/first-use-network-backing-ui first-use:network-backing
+CHROME_BIN=/work/chrome NODE_OPTIONS=--experimental-websocket node tests/standalone_frequency_ui_integration.mjs /work/first-use-host/consumer_bootstrap_driver /work/first-use-refusal-ui-final first-use:refusal
+CHROME_BIN=/work/chrome NODE_OPTIONS=--experimental-websocket node tests/message_frequency_ui_integration.mjs /work/first-use-host/consumer_bootstrap_driver /work/first-use-cw-ui
+```
+
+Normal and inhibited firmware cross-builds passed with SDK 2.3.1 `079c6f39023649b154152db30f1d781e884879bc`, Arm GNU 15.3.1 and picotool 2.3.0. Applicable identity, topology, flash/journal separation, stack/heap, allocator/pool and RF-worker link/image checks passed. Both UF2 payloads matched their linked ELFs. Picotool's intentional no-USB build warning remains; no firmware was flashed.
+
+```sh
+cmake -S /work/first-use-source -B /work/first-use-firmware -G Ninja -DCMAKE_BUILD_TYPE=Release -DWSPRRY_PICO_BUILD_FIRMWARE=ON -DWSPRRY_PICO_BUILD_TESTS=OFF -DPICO_BOARD=pico2_w -DPICO_SDK_PATH=/sdk -DPICO_TOOLCHAIN_PATH=/work/arm-gnu-toolchain-15.3.rel1-x86_64-arm-none-eabi -DPICOTOOL_FETCH_FROM_GIT_PATH=/work/first-use-firmware/_deps -DPICOTOOL_FORCE_FETCH_FROM_GIT=ON -DPICOTOOL_GIT_REPOSITORY_URL=/picotool/picotool-src
+PATH=/work/arm-gnu-toolchain-15.3.rel1-x86_64-arm-none-eabi/bin:$PATH cmake --build /work/first-use-firmware --target WsprryPico WsprryPico-Inhibited --parallel 4
+WSPRRYPI_DISABLE_HARDWARE_ACCESS=1 make wtp-config-interop-test wtp-network-interop-test SUDO= PICO_SOURCE=/pico MBEDTLS_SOURCE=/work/mbedtls WTP_NETWORK_BUILD_DIR=build/first-use-network
+```
+
+The Pi command runs from the isolated Pi `src` directory against the selected edited Pico sources, with the independently pinned MbedTLS revision `0bebf8b8c7f07abe3571ded48a11aa907a1ffb20`. Configuration, saved-progress, native station/AP, shipped crypto-context and actual TLS loopback interoperability checks passed. An initial copied CMake-cache path failure was repaired with the unused build directory above. The initial root host run's three ordinary-user installer skips were resolved by running the complete suite as the ordinary user; no required skipped case is counted as passing.
+
+Impeccable hardening/clarification and the existing visual language guided implementation. Inspected desktop/mobile screenshots cover missing station, complete draft, applied readiness, first save, local validation, server refusal, ambiguous disconnect, reconnect/identity review, keyboard Tab/Enter and 200% text without horizontal overflow. The frequency status is a polite live region associated with the input. The detector reported no findings on affected files but ran with degraded parser availability, so it is not independent computed-contrast evidence. No unrelated design-sidecar changes were made.
+
+Adversarial review and corrective reassessment closed overlapping post-login/readiness requests in `app.js` by holding the shared action lock until readback completes; production-lifecycle held-promise assertions and the shipped application/reconnect test cover the repair. Review also closed unrelated password-ETag invalidation, repetitive complete-draft guidance, contradictory discard feedback and the outdated station-draft screenshot. Browser/unit coverage, independent journal observations, strict documentation builds and inspected final screenshots cover those repairs. A complete final assessment of the repaired diff and evidence found no unresolved actionable corrective issue. No assertion was weakened to hide a guard failure.
+
+Documentation impact: Pico `README.md`, `docs/configure.md`, `docs/troubleshoot.md`, `engineering/browser-api.md` and the materially inaccurate `station-draft.jpg` were updated. The required order is station details, valid-field save, explicit station application and confirmation, dial save/readback, then separate schedule enablement. Pi operator `Install/pico.md` and transmitter/member-resource instructions were reviewed and remain accurate; no Pi operator-documentation edit or empty commit is required. The strict Sphinx build, local-target checker and image-delivery test passed, and affected rendered pages were inspected at desktop/mobile sizes. No further documentation is required for this correction.
+
+```sh
+docs/.venv/bin/python -m sphinx -E -a -n -W --keep-going -b html docs docs/_build/html
+docs/.venv/bin/python scripts/check_documentation.py
+docs/.venv/bin/python tests/test_image_delivery.py
+```
+
+Publication retains the coordinated feature-branch Pico selection and explicit `pico_ref` override precedence. Pico firmware publication restrictions remain unchanged; the feature branch has no applicable automatic Pico publication workflow. No PR, tag, release, hardware deployment, physical USB, service, GPIO or RF operation is part of this correction. No wspr5 or other development-host connection was used. Stages 4 and 5 remain unstarted, with this first-use regression retained in Stage 5 acceptance.
+
 ## Stage 3 Pico CW references and shift direction
 
 ### Status
@@ -200,6 +260,7 @@ Feature pushes retain the Stage 2 coordinated Pico branch selection and explicit
 ### Acceptance
 
 - Every supported input path has one documented meaning, and tests establish the resulting request and execution-plan frequencies without omitted or repeated conversion.
+- Include the Stage 2 first-use frequency-save correction: missing applied station and draft-only states cannot issue an unusable UI save; explicit station application permits an unset dial to be selected; direct invalid PUT remains guarded; successful persistence survives simulated reboot with schedules disabled. Retain draft/error recovery, identity/revision/storage protections, consumer-profile overlay coverage and the Stage 3 CW regressions through actual shipped assets and production handlers.
 - No prerelease migration layer, historical Pico checkout gate, obsolete document-path fallback or CLI/UI band exception remains in the affected scope.
 - Review the complete diffs, generated assets, documentation output and working-tree state. Report tests, visual evidence, documentation impact and remaining validation separately for each repository.
 - Hardware, RF, installation and service qualification require an explicitly authorized finite campaign; they are not established by these software checks.
