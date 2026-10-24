@@ -144,12 +144,7 @@ make backend-profile-factory-test BACKENDS=simulated ANCILLARY_GPIO=0 SUDO=
 make semantics-test-portable SUDO=
 ```
 
-The optional interoperability target uses the caller-selected Pico sources, including uncommitted changes. Source path, HEAD and dirty state are informational; missing required files and genuine compile failures still fail. It does not clone or install anything. It compiles the actual Pico endpoint/job service in separate translation
-units, with a software clock/engine and no SDK, USB or RF. The ordinary backend
-tests use a scripted peer, actual framing/Session/converter/controller and virtual
-time. CI runs ordinary WTP tests on macOS and Linux; local macOS results do not
-establish a Linux runtime pass. The shared component controller and simulator tests
-remain independently runnable from `src/WSPR-Transmitter/src`.
+The optional interoperability target uses the caller-selected Pico sources, including uncommitted changes. Source path, HEAD and dirty state are informational; missing required files and genuine compile failures still fail. It does not clone or install anything. It compiles the actual Pico endpoint/job service in separate translation units, with a software clock/engine and no SDK, USB or RF. The ordinary backend tests use a scripted peer, actual framing/Session/converter/controller and virtual time. CI runs ordinary WTP tests on macOS and Linux; local macOS results do not establish a Linux runtime pass. The shared component controller and simulator tests remain independently runnable from `src/WSPR-Transmitter/src`.
 
 ## Integration and qualification
 

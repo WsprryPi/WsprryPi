@@ -110,13 +110,7 @@ label or a reused owner string.
 
 ## Hardware-free validation
 
-From `src`, `make wtp-status-test SUDO=` exercises the actual wire/Session/backend/
-controller/scheduler with injected clocks and peers, including concurrent readers,
-mutation acknowledgement loss, changed identity, missing history, foreign ownership,
-missed starts, cancellation and fault persistence. The existing scheduler interop
-target also checks reports against the selected Pico endpoint sources with a
-software clock/engine. See the [development guide](development/README.md) for
-commands and validation boundaries.
+From `src`, `make wtp-status-test SUDO=` exercises the actual wire/Session/backend/ controller/scheduler with injected clocks and peers, including concurrent readers, mutation acknowledgement loss, changed identity, missing history, foreign ownership, missed starts, cancellation and fault persistence. The existing scheduler interop target also checks reports against the selected Pico endpoint sources with a software clock/engine. See the [development guide](development/README.md) for commands and validation boundaries.
 
 The [production integration](wtp-production-integration.md) now supplies endpoint,
 clock/configuration and operator controls. [Network integration](wtp-network.md)

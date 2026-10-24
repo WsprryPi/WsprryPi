@@ -144,11 +144,7 @@ qualified, so changing the selected profile cannot change its meaning. Numeric
 preferences provide the implemented local-frequency mechanism; they do not
 create new named presets.
 
-The UI exposes all 19 bands from 2200 m through 70 cm. Each row can follow the
-profile/default, select an available named preset, or use a custom integral USB
-dial frequency. It previews the effective dial and RF center / Test Tone target, validates before
-autosave, clears by removing only that band's preference, and preserves the
-typed preset-string or numeric representation across round trips.
+The UI exposes all 19 bands from 2200 m through 70 cm. Each row can follow the profile/default, select an available named preset, or use a custom integral USB dial frequency. It previews the effective dial and RF center / Test Tone target, validates before autosave, clears by removing only that band's preference, and preserves the typed preset-string or numeric representation across round trips.
 
 WSPR frequency resolution precedence is:
 

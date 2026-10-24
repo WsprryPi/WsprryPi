@@ -178,13 +178,7 @@ make semantics-test-portable SUDO=
 make wtp-scheduler-interop-test SUDO= PICO_SOURCE=WTP-Client/build/pico-reference
 ```
 
-The final command uses the selected Pico source checkout described in the
-[scheduler contract](wtp-scheduling.md). These checks exercise software and
-injected endpoint behavior only. They do not validate physical enumeration,
-permissions, disconnect/reboot behavior, services, installation, RP2350 timing,
-output electrical state, RF calibration or the transmitter chain. Target
-acceptance must bind exact host and firmware revisions, selected endpoint and
-clock state, route, frequency/mode/duration, connected RF path and stop procedure.
+The final command uses the selected Pico source checkout described in the [scheduler contract](wtp-scheduling.md). These checks exercise software and injected endpoint behavior only. They do not validate physical enumeration, permissions, disconnect/reboot behavior, services, installation, RP2350 timing, output electrical state, RF calibration or the transmitter chain. Target acceptance must bind exact host and firmware revisions, selected endpoint and clock state, route, frequency/mode/duration, connected RF path and stop procedure.
 
 The installer contains the status/recovery proxy mapping; no installation or
 service validation is implied by source tests. The separate operator manual

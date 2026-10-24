@@ -48,16 +48,7 @@ unchanged. A confirmed action stops any job owned by this controller; removing
 also deletes the saved schedule. If another operator changes schedules while
 the dialog is open, refresh and review before repeating the action.
 
-Each assignment stores its own mode, absolute RF reference in Hz, repeat period and
-UTC phase. Finite tones use duration in seconds in the UI (integer milliseconds
-on the API). QRSS, FSKCW and DFCW use a message and dot duration. FSKCW and DFCW
-also specify shift. WSPR accepts a single-frame callsign/locator and dBm; its
-period and phase align to two minutes and transmission starts at second one.
-The target's current CAPS must accept the compiled job. Native GPIO, RP1 and
-Si5351 Pi endpoints report their WSPR, TONE, QRSS, FSKCW and DFCW capabilities.
-Existing processor, route, development authorization and frequency policies
-still apply. RP1 retains its exact-operation host confirmation; Fleet does not
-create that confirmation. Pi and Pico assignments are checked against current CAPS.
+Each assignment stores its own mode, absolute RF reference in Hz, repeat period and UTC phase. Finite tones use duration in seconds in the UI (integer milliseconds on the API). QRSS, FSKCW and DFCW use a message and dot duration. FSKCW and DFCW also specify shift. WSPR accepts a single-frame callsign/locator and dBm; its period and phase align to two minutes and transmission starts at second one. The target's current CAPS must accept the compiled job. Native GPIO, RP1 and Si5351 Pi endpoints report their WSPR, TONE, QRSS, FSKCW and DFCW capabilities. Existing processor, route, development authorization and frequency policies still apply. RP1 retains its exact-operation host confirmation; Fleet does not create that confirmation. Pi and Pico assignments are checked against current CAPS.
 
 Assignments obey the controller's current frequency-policy settings.
 WTP remains an unqualified physical route in that policy, so starting remote
@@ -188,13 +179,6 @@ use carries `catalog_revision` in its JSON body and uses `If-Match` for the
 active host config. Missing revisions return 428 and stale revisions 412.
 There is no browser-local credential store or independent job authority.
 
-`make wtp-catalog-test` exercises the injected discovery store, TXT parser,
-nondefault SRV port, interface collision, loss/restart/failure, legacy import,
-revision guard, and Plain LAN consent without an Avahi daemon. The portable
-Mac profile compiles the unavailable adapter. Linux CI declares Avahi
-development headers and compiles the native adapter. These are source/software
-checks. Live Avahi/multicast discovery, listener advertisement, physical
-TCP/TLS acceptance, GPIO, services, and RF remain separate qualification.
-Interoperability tests compile the selected current Pico sources, including edits; source identity is informational. Software tests do not qualify DNS-SD advertisements, physical transport or RF.
+`make wtp-catalog-test` exercises the injected discovery store, TXT parser, nondefault SRV port, interface collision, loss/restart/failure, legacy import, revision guard, and Plain LAN consent without an Avahi daemon. The portable Mac profile compiles the unavailable adapter. Linux CI declares Avahi development headers and compiles the native adapter. These are source/software checks. Live Avahi/multicast discovery, listener advertisement, physical TCP/TLS acceptance, GPIO, services, and RF remain separate qualification. Interoperability tests compile the selected current Pico sources, including edits; source identity is informational. Software tests do not qualify DNS-SD advertisements, physical transport or RF.
 
 Fleet WSPR `frequency_hz` is an absolute RF center, not a USB dial or tone 0. At `14097100 Hz`, tones are 14,097,097.802734375; 14,097,099.267578125; 14,097,100.732421875; and 14,097,102.197265625 Hz. No dial or random placement is applied. Finite tone and QRSS use a carrier, FSKCW uses space, and DFCW uses dot; mark and dash add the positive shift. Mode changes update labels without changing the frequency draft or saved numeric meaning. WTP carries absolute event targets; the receiving endpoint does not add 1,500 Hz or reapply standalone settings or Pi calibration.

@@ -80,21 +80,7 @@ The typed `WtpSchedulePolicy` defaults are:
 | `clock_step_tolerance_ms` | 100 | Maximum cumulative host UTC departure from anchored monotonic time |
 | `maximum_wait_ms` | 86,400,000 | Maximum requested start distance; at most one day |
 
-Dispatch time is requested UTC minus preparation allowance, ARM submission
-allowance and negotiated minimum ARM lead. That combined interval must fit CAPS'
-maximum ARM horizon. Requests already closer than the combined interval are
-rejected at submission. After dispatch, normal wake-up/processing delay consumes
-the preparation allowance; a request past the last preparation/ARM cutoff is
-rejected, never shifted into another slot. Timing allowances are host policy,
-not measured USB latency guarantees. Slow operations may still miss the window
-and fail safely. The selected-source fragmented-endpoint test uses an explicit 8,000 ms
-preparation allowance while retaining the 1,000 ms ARM reserve.
-The production `WtpApplication` uses a separate 12,000 ms preparation allowance
-and the same 1,000 ms ARM-submission reserve. This covers bounded complete-job
-upload and response processing before handoff while preserving the final device
-lead. It does not put RF event timing on the host: after ARM, the Pico executes
-the complete job locally. Preparation that consumes the production allowance
-still fails before ARM and never shifts or shortens the job.
+Dispatch time is requested UTC minus preparation allowance, ARM submission allowance and negotiated minimum ARM lead. That combined interval must fit CAPS' maximum ARM horizon. Requests already closer than the combined interval are rejected at submission. After dispatch, normal wake-up/processing delay consumes the preparation allowance; a request past the last preparation/ARM cutoff is rejected, never shifted into another slot. Timing allowances are host policy, not measured USB latency guarantees. Slow operations may still miss the window and fail safely. The selected-source fragmented-endpoint test uses an explicit 8,000 ms preparation allowance while retaining the 1,000 ms ARM reserve. The production `WtpApplication` uses a separate 12,000 ms preparation allowance and the same 1,000 ms ARM-submission reserve. This covers bounded complete-job upload and response processing before handoff while preserving the final device lead. It does not put RF event timing on the host: after ARM, the Pico executes the complete job locally. Preparation that consumes the production allowance still fails before ARM and never shifts or shortens the job.
 
 Waiting uses at most 10 ms increments and is bounded by the requested slot. The
 sole session owner refreshes STATUS every five seconds during this wait, keeping

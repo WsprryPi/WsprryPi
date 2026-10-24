@@ -172,9 +172,7 @@ volatile flash and no network. Run the UI producer with the executable pair:
 node WsprryPi-UI/tests/wtp_usb_pair_test.js   src/build/wtp-network/wtp_usb_pair_client /absolute/path/to/usb_management_driver
 ```
 
-This qualifies software interoperability, not Linux USB topology, electrical
-behavior, physical unplug/re-enumeration, AP advertising, RF or target timing.
-USB CI selects current Pico `devel` sources by default and accepts the explicit `pico_ref` dispatch override. The host-only endpoint build consumes that selected checkout; source revision and dirty state are diagnostic.
+This qualifies software interoperability, not Linux USB topology, electrical behavior, physical unplug/re-enumeration, AP advertising, RF or target timing. USB CI selects current Pico `devel` sources by default and accepts the explicit `pico_ref` dispatch override. The host-only endpoint build consumes that selected checkout; source revision and dirty state are diagnostic.
 
 ## Related configuration
 

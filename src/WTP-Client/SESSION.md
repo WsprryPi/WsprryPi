@@ -173,10 +173,7 @@ For the optional selected-source WsprryPico endpoint/job-service interoperabilit
 make interop-test PICO_SOURCE=/absolute/path/to/WsprryPico
 ```
 
-The target compiles the caller's `PICO_SOURCE`, including uncommitted changes. Source path, HEAD and dirty state are informational. Missing sources and compiler errors fail the test. It reads the selected checkout and writes only to this component's BUILD_DIR. Separate translation units prevent the
-client/server header names from masking each other. A software engine tests
-local execution without transport input; it is not GPIO, timing or RF evidence.
-Ordinary component tests and the library require no sibling checkout.
+The target compiles the caller's `PICO_SOURCE`, including uncommitted changes. Source path, HEAD and dirty state are informational. Missing sources and compiler errors fail the test. It reads the selected checkout and writes only to this component's BUILD_DIR. Separate translation units prevent the client/server header names from masking each other. A software engine tests local execution without transport input; it is not GPIO, timing or RF evidence. Ordinary component tests and the library require no sibling checkout.
 
 The maintained transition vectors describe the server's lifecycle graph. Client
 STATUS observations may skip intermediate states after disconnection, so that

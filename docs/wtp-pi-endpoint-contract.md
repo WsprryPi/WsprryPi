@@ -7,16 +7,7 @@ source tests, live network tests and RF observations are reported separately.
 
 ## Protocol authority and goal
 
-The maintained, device-neutral protocol lives in the WsprryPico
-[protocol directory](https://github.com/WsprryPi/WsprryPico/tree/devel/engineering/protocol).
-In particular, [WTP/1](https://github.com/WsprryPi/WsprryPico/blob/devel/engineering/protocol/WTP.md),
-the [DNS-SD profile](https://github.com/WsprryPi/WsprryPico/blob/devel/engineering/protocol/WTP-DNS-SD.md),
-the [machine-readable contract](https://github.com/WsprryPi/WsprryPico/blob/devel/engineering/protocol/wtp-1-contract.json),
-the [schema](https://github.com/WsprryPi/WsprryPico/blob/devel/engineering/protocol/wtp-1.schema.json),
-and the [test vectors](https://github.com/WsprryPi/WsprryPico/blob/devel/engineering/protocol/test-vectors/wtp-1.json)
-are the protocol references. Pin their exact revision for an implementation or
-acceptance run. Resolve any disagreement among those artifacts at the protocol
-source before claiming conformance; this local document does not revise WTP/1.
+The maintained, device-neutral protocol lives in the WsprryPico [protocol directory](https://github.com/WsprryPi/WsprryPico/tree/devel/engineering/protocol). In particular, [WTP/1](https://github.com/WsprryPi/WsprryPico/blob/devel/engineering/protocol/WTP.md), the [DNS-SD profile](https://github.com/WsprryPi/WsprryPico/blob/devel/engineering/protocol/WTP-DNS-SD.md), the [machine-readable contract](https://github.com/WsprryPi/WsprryPico/blob/devel/engineering/protocol/wtp-1-contract.json), the [schema](https://github.com/WsprryPi/WsprryPico/blob/devel/engineering/protocol/wtp-1.schema.json), and the [test vectors](https://github.com/WsprryPi/WsprryPico/blob/devel/engineering/protocol/test-vectors/wtp-1.json) are the protocol references. Record the selected source path, revision and edits for an implementation or acceptance run as evidence diagnostics, without constraining source selection. Resolve any disagreement among those artifacts at the protocol source before claiming conformance; this local document does not revise WTP/1.
 
 A WsprryPi can act as a WTP/1 **server** for its selected transmitter output.
 A WTP client must be able to discover, identify, inspect, claim, load, arm,

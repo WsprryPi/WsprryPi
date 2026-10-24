@@ -57,16 +57,7 @@ changing compiler flags; existing objects do not track command-line changes.
 The parent entry point is `make wtp-protocol-test SUDO=` from `WsprryPi/src`.
 The existing non-hardware CI workflow runs this target on macOS and Debian.
 
-Tests cover maintained schema/raw-JSON/framing vectors, all operation and
-event bodies, independent malformed-message and boundary expectations,
-CRC golden values, every split of a known frame, large coalesced streams,
-resynchronization limits, timeouts with virtual clocks, partial writes,
-immutable payload ownership and deterministic malformed-input stress.
-Session tests add scripted transport failures, leases, replay and reconciliation.
-The optional [selected-source endpoint test](SESSION.md#tests-and-reference-endpoint)
-exercises the Pico endpoint/job service using a software engine. Ordinary tests
-do not establish endpoint interoperability; neither suite establishes target,
-USB or RF qualification. Parent portable semantics tests do not exercise WTP.
+Tests cover maintained schema/raw-JSON/framing vectors, all operation and event bodies, independent malformed-message and boundary expectations, CRC golden values, every split of a known frame, large coalesced streams, resynchronization limits, timeouts with virtual clocks, partial writes, immutable payload ownership and deterministic malformed-input stress. Session tests add scripted transport failures, leases, replay and reconciliation. The optional [selected-source endpoint test](SESSION.md#tests-and-reference-endpoint) exercises the Pico endpoint/job service using a software engine. Ordinary tests do not establish endpoint interoperability; neither suite establishes target, USB or RF qualification. Parent portable semantics tests do not exercise WTP.
 
 ## Using the wire primitives
 
