@@ -51,6 +51,14 @@ extern bool selector_gpio_drive_enabled;
 extern std::atomic<bool> shutdown_after_wspr_plan;
 extern std::atomic<bool> shutdown_after_current_transmission;
 extern std::atomic<std::uint64_t> non_wspr_schedule_generation;
+// Nominal placement belongs to a prepared plan, independently of calibration.
+// Presence is explicit: a randomized 0 Hz placement is valid.
+struct WsprPlanPlacement
+{
+    double rf_center_hz = 0.0;
+    double applied_offset_hz = 0.0;
+};
+extern std::optional<WsprPlanPlacement> active_wspr_plan_placement;
 extern PreparedWsprTransmission active_wspr_plan;
 extern std::size_t active_wspr_frame_index;
 extern double active_wspr_plan_dial_frequency;
@@ -104,7 +112,8 @@ TransmissionRequest make_skip_window_request(
 bool configure_current_wspr_transmission(
     const ArgParserConfig &, double, double, const WsprFrequencyEntry &,
     PreparedWsprTransmission &, std::size_t &, double &,
-    WsprFrequencyEntry &, bool &, double, TransmissionRequest &);
+    WsprFrequencyEntry &, bool &, std::optional<WsprPlanPlacement> &,
+    TransmissionRequest &);
 void refresh_frequency_estimate_for_config();
 GpioFrequencyCorrection select_and_publish_gpio_correction_for_config(
     const ArgParserConfig &);

@@ -453,6 +453,21 @@ void transmitter_cb(WsprTransmissionCallbackEvent event,
 bool managed_reload_tx_inhibited_state() noexcept;
 bool managed_reload_tx_inhibited_for_test() noexcept;
 void reset_managed_reload_runtime_for_test() noexcept;
+// Overrides are installed/restored under the scheduler configuration mutex.
+// Providers run under that mutex and must not re-enter scheduler configuration.
+class ScopedWsprRandomPlacementForTest
+{
+public:
+    using Provider = std::function<double()>; // Placement in Hz, within +/-80.
+    explicit ScopedWsprRandomPlacementForTest(Provider provider);
+    ~ScopedWsprRandomPlacementForTest();
+    ScopedWsprRandomPlacementForTest(const ScopedWsprRandomPlacementForTest &) = delete;
+    ScopedWsprRandomPlacementForTest &operator=(const ScopedWsprRandomPlacementForTest &) = delete;
+private:
+    std::unique_lock<std::recursive_mutex> scope_lock_;
+    Provider previous_;
+};
+
 void set_scheduler_execution_suppressed_for_test(bool suppressed) noexcept;
 
 enum class CommittedExecutionRouteForTest

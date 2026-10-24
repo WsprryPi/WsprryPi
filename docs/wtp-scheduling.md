@@ -152,3 +152,19 @@ persisted USB/network selection, application lifecycle and operator controls.
 Early preparation and ARM handoff remain separate from device-local RF start.
 Physical timing, USB/DTR/unplug behavior, installed services and RF require
 their own evidence.
+
+## Local WSPR message-plan placement
+
+The local Pi scheduler resolves a WSPR USB dial using `C = D + 1500 + r` and compiles each tone as `Fk = C + (k - 1.5) * 1.46484375 Hz`. It selects one uniform random placement in the existing ±80 Hz range when preparing a new message plan. A two-frame plan retains its nominal center and applied placement across both slot requests; the encoded symbol sequences may differ. A subsequent independent plan takes a fresh draw, which may repeat the previous value. Disabled randomization selects zero without calling the provider. Zero is a valid selected placement, distinct from absent plan state.
+
+Placement follows the scheduler's candidate copy, request commit and plan reset boundaries. Re-entering preparation for an active pair reuses its dial, frequency entry and placement, including before its first frame finishes. Forced reconfiguration replaces the plan. A reload deferred during transmission follows the existing completion policy: discard the remaining pair and prepare from the accepted replacement configuration. Invalid or superseded candidates cannot publish placement. Cancellation, failure, skipped entries, completion, mode change, Test Tone restoration and shutdown release the abandoned plan's placement. Backend preparation must succeed before the candidate request and placement are published.
+
+Each committed compiler request still contains one executable WSPR frame. Pair progress and frame identities remain scheduler state. For dial `14095600 Hz` and placement `+37 Hz`, both frames have center `14097137 Hz` and tones `14097134.802734375`, `14097136.267578125`, `14097137.732421875` and `14097139.197265625 Hz`. Placement is nominal RF policy; correction is selected independently for each request, and backend realization or measured RF may differ. Test Tone, CW, Fleet assignments and received absolute WTP events do not consult this local plan snapshot. WTP conversion encodes the compiler's absolute events without adding another placement or 1500 Hz.
+
+Run the production scheduler, compiler and WTP converter regression without hardware from Linux `src`:
+
+```sh
+WSPRRYPI_DISABLE_HARDWARE_ACCESS=1 make wspr-plan-placement-test SUDO=
+```
+
+The target is also part of full and portable semantics coverage. It uses controlled terminal callbacks rather than waiting through WSPR slots. `ScopedWsprRandomPlacementForTest` is a transient typed developer seam; installation, provider calls and restoration use the scheduler configuration mutex. Providers must not re-enter scheduler configuration. Exception unwinding restores the previous provider. Override lifetimes serialize across threads and nest on the owning thread so an expired callback cannot be restored. No CLI, environment or persisted setting selects it.

@@ -6512,6 +6512,9 @@ int main(int argc, char *argv[])
             set_config(true),
             "idle WSPR scheduler regression must commit the normal waiting request");
 
+        const auto waiting_controller = current_controller_request_for_test();
+        require(waiting_controller && waiting_controller->mode == wsprrypi::TransmissionMode::WSPR,
+                "suppressed scheduling must retain the production WSPR controller snapshot");
         const TestToneStartResult tone_start_result = start_test_tone();
         require(
             !tone_start_result.started &&
@@ -6520,9 +6523,15 @@ int main(int argc, char *argv[])
         require(
             current_transmission_request_for_test().mode == TransmissionMode::WSPR,
             "idle WSPR test tone rejection must preserve the committed waiting request");
+        const auto retained_controller = current_controller_request_for_test();
         require(
-            !current_controller_request_for_test().has_value(),
-            "idle GPIO WSPR test tone rejection must not commit a controller execution request");
+            retained_controller && retained_controller->mode == wsprrypi::TransmissionMode::WSPR &&
+                retained_controller->id.value == waiting_controller->id.value &&
+                std::get<wsprrypi::WsprPayload>(retained_controller->payload).base_frequency_hz ==
+                    std::get<wsprrypi::WsprPayload>(waiting_controller->payload).base_frequency_hz &&
+                std::get<wsprrypi::WsprPayload>(retained_controller->payload).prepared.frames[0].symbols ==
+                    std::get<wsprrypi::WsprPayload>(waiting_controller->payload).prepared.frames[0].symbols,
+            "idle GPIO WSPR test tone rejection must preserve the committed WSPR controller request");
         require(
             committed_execution_route_for_test() !=
                 CommittedExecutionRouteForTest::LEGACY,

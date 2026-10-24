@@ -1,8 +1,8 @@
 # The roadmap
 
-This roadmap covers the shared frequency contract for WsprryPi and WsprryPico. Work starts from Pi `devel` on `codex/shared-frequency-contract` and coordinates the affected Pico and operator-documentation sources. Stage 0 inspection and Stage 1 implementation, validation and corrective review are complete. Stage 2 implementation, local hardware-free validation, documentation and corrective review are complete. Stage 3 implementation, local hardware-free validation, documentation and corrective review are complete. Stages 4 and 5 are not started.
+This roadmap covers the shared frequency contract for WsprryPi and WsprryPico. Work starts from Pi `devel` on `codex/shared-frequency-contract` and coordinates the affected Pico and operator-documentation sources. Stage 0 inspection and Stage 1 implementation, validation and corrective review are complete. Stage 2 implementation, local hardware-free validation, documentation and corrective review are complete. Stage 3 implementation, local hardware-free validation, documentation and corrective review are complete. Stage 4 implementation and validation are in progress; Stage 5 is not started.
 
-The original Stage 2 scope remains complete. The first-use frequency-save corrective follow-up under Stage 2 has completed implementation, local hardware-free validation, documentation and adversarial corrective review after Stage 3. Submitted-commit CI is assessed separately from the local evidence below. Stages 4 and 5 remain unstarted.
+The original Stage 2 scope remains complete. The first-use frequency-save corrective follow-up under Stage 2 has completed implementation, local hardware-free validation, documentation and adversarial corrective review after Stage 3. Submitted-commit CI is assessed separately from the local evidence below. Stage 4 is in progress; Stage 5 remains unstarted.
 
 ## Agreed contract and scope
 
@@ -113,7 +113,7 @@ Adversarial review closed inconsistent first Console selection enablement, uncha
 
 ### Corrective follow-up First-use frequency save
 
-Status: implementation, local hardware-free validation, documentation and adversarial corrective review are complete. This follow-up follows completed Stage 3 and precedes unstarted Stage 4; the original Stage 2 scope and Stage 3 remain complete. Pico corrective commit `d48be0fd4aab303838877db4e82906413b933753` is published on `origin/codex/shared-frequency-contract`. The accompanying Pi roadmap commit uses that coordinated branch; submitted-commit CI is assessed separately from this local evidence.
+Status: implementation, local hardware-free validation, documentation and adversarial corrective review are complete. This follow-up follows completed Stage 3 and precedes Stage 4; the original Stage 2 scope and Stage 3 remain complete. Pico corrective commit `d48be0fd4aab303838877db4e82906413b933753` is published on `origin/codex/shared-frequency-contract`. The accompanying Pi roadmap commit uses that coordinated branch; submitted-commit CI is assessed separately from this local evidence.
 
 The first-use defect was reproduced in current production-handler fixtures: healthy frequency storage and a null frequency do not establish an effective applied station, and a complete station draft remains unapplied. The original investigation used historical sources and RAM journals; it did not inspect the tester's physical Pico or exact firmware. Its evidence remains at `/Users/lbussy/Codex-Local/2026-10-24/referenced-chatgpt-conversation-this-is-an/outputs/frequency-save-investigation-evidence.zip`.
 
@@ -167,13 +167,13 @@ docs/.venv/bin/python scripts/check_documentation.py
 docs/.venv/bin/python tests/test_image_delivery.py
 ```
 
-Publication retains the coordinated feature-branch Pico selection and explicit `pico_ref` override precedence. Pico firmware publication restrictions remain unchanged; the feature branch has no applicable automatic Pico publication workflow. No PR, tag, release, hardware deployment, physical USB, service, GPIO or RF operation is part of this correction. No wspr5 or other development-host connection was used. Stages 4 and 5 remain unstarted, with this first-use regression retained in Stage 5 acceptance.
+Publication retains the coordinated feature-branch Pico selection and explicit `pico_ref` override precedence. Pico firmware publication restrictions remain unchanged; the feature branch has no applicable automatic Pico publication workflow. No PR, tag, release, hardware deployment, physical USB, service, GPIO or RF operation is part of this correction. No wspr5 or other development-host connection was used. At this corrective follow-up closeout, Stages 4 and 5 were unstarted; its first-use regression remains in Stage 5 acceptance.
 
 ## Stage 3 Pico CW references and shift direction
 
 ### Status
 
-Stage 3 implementation, hardware-free validation, operator/API documentation and adversarial corrective review are complete. QRSS enters carrier, FSKCW enters space and DFCW enters dot. The two-frequency browser modes add a positive shift. For B = 14096900 Hz and s = 5 Hz, QRSS carrier is 14096900 Hz; FSKCW space is 14096900 Hz and mark is 14096905 Hz; DFCW dot is 14096900 Hz and dash is 14096905 Hz. Exact B and B+s values are 14096900000000000 and 14096905000000000 nHz. The unchanged explicit API and encoder retain either distinct positive DFCW orientation. Stages 4 and 5 remain unstarted; submitted-commit CI is assessed separately from this local evidence.
+Stage 3 implementation, hardware-free validation, operator/API documentation and adversarial corrective review are complete. QRSS enters carrier, FSKCW enters space and DFCW enters dot. The two-frequency browser modes add a positive shift. For B = 14096900 Hz and s = 5 Hz, QRSS carrier is 14096900 Hz; FSKCW space is 14096900 Hz and mark is 14096905 Hz; DFCW dot is 14096900 Hz and dash is 14096905 Hz. Exact B and B+s values are 14096900000000000 and 14096905000000000 nHz. The unchanged explicit API and encoder retain either distinct positive DFCW orientation. At Stage 3 closeout, Stages 4 and 5 were unstarted; submitted-commit CI is assessed separately from this local evidence.
 
 The browser shares exact BigInt frequency construction between preview and submission, checks uint64 addition and each advertised engine range, ignores the disabled QRSS shift without discarding it, and preserves raw frequency, shift, message and timing drafts. Local invalid requests reach neither LOAD_MESSAGE nor ARM. Server policy, ownership, clock admission, allow_frequency_adjustment and calibration ownership remain authoritative. The decoder, Morse encoder, standalone WSPR dial/snapshots, Test Tone/Fleet semantics, timing defaults, repeats and raw absolute job behavior are unchanged.
 
@@ -233,6 +233,38 @@ Feature pushes retain the Stage 2 coordinated Pico branch selection and explicit
 - Retain behavioral tests for explicit-frequency API orientation and bounds. Review mode changes, validation, preview and responsive controls with Impeccable at desktop and mobile sizes.
 
 ## Stage 4 Pi WSPR message pair placement
+
+### Status
+
+Implementation, local hardware-free validation, documentation and three adversarial assessment rounds are complete. Publication and submitted-commit CI closeout remain pending. Stage 5 is not started.
+
+The scheduler snapshots nominal center and applied random placement with the prepared plan, copies them into candidates and publishes them only after backend preparation accepts the slot request. Both encoded frames retain one grid. Re-entry retains the pair's dial and frequency entry, including before first-frame completion. Central reset clears placement with the plan, including completion, cancellation, skipped entries, mode changes, Test Tone abandonment and process shutdown. Existing deferred reload and inhibited-reload recovery policies are preserved. Each request remains one executable frame. Calibration capture retains its pre-prepare boundary and refreshes independently for the next frame.
+
+`make wspr-plan-placement-test SUDO=` passed 13,488 checks using production scheduler callbacks, committed legacy/controller requests, the production compiler and WTP converter. Dial `14095600 Hz` with `+37 Hz` produces center `14097137 Hz` for both frames; the next independent `-21 Hz` draw produces center `14097079 Hz`. Independent exact binary64 and integer-nHz tone constants verify every symbol and event timeline. The pair takes one draw, the next plan takes one draw, status and continuation take none, disabled placement takes none, zero is valid and a new plan may repeat the previous value. Single/pair transitions, rotation, skips, cancellation, reload, superseded candidates, planning and both-frame backend preparation failures, retry, Test Tone, shutdown, nested/unwound/concurrent overrides and production-provider restoration are covered. GPIO correction changes from `+2.5` to `-3.25 PPM` between frames without changing nominal `+37 Hz` placement. An isolated per-frame-redraw mutation failed on the first repeated preparation with `committed placement: -21.000000`.
+
+Linux validation used task-owned `/work/phase4-pi` in the retained Ubuntu 24.04 ARM64 container, GCC 13.3.0 and libgpiod C++ 1.6.3. Its baseline is Pi `abb477173d16d553d010b0099dfab62a153d62f0` plus the reviewed Phase 4 diff; source hashes matched the Mac feature checkout. No local macOS C++ compilation was attempted. The following commands passed from Linux `src` with `WSPRRYPI_DISABLE_HARDWARE_ACCESS=1`:
+
+```sh
+make wspr-plan-placement-test SUDO=
+make wspr-tone-regression-test wtp-plan-test SUDO=
+make test-tone-frequency-plan-test test-tone-response-test test-tone-lifecycle-test legacy-tone-frequency-test SUDO=
+make qrss-execution-regression-test non-wspr-repeat-policy-test wtp-fleet-test SUDO=
+make wtp-scheduler-test wtp-backend-test wtp-status-test SUDO=
+make guarded-mode-change-persistence-test band-gpio-default-convergence-test band-gpio-rotation-test selector-shutdown-cleanup-test semantics-make-regression-test SUDO=
+strace -f -e trace=file -o /work/phase4-semantics.strace make semantics-test SUDO=
+../scripts/ci/assert-no-transmitter-hardware.sh /work/phase4-semantics.strace
+make release debug SUDO=
+../scripts/ci/verify-simulated-wspr.sh
+../scripts/ci/assert-no-transmitter-hardware.sh /tmp/wsprrypi-wspr-simulator.strace
+```
+
+Local make invocations used `-j4`. Full semantics, cleanup and both hardware-access audits passed. The full default release/debug profile passed with warnings as errors. Explicit simulated application integration produced two identical 162-event traces with `110.591999892` logical seconds, without waiting through real slots. Expected device-tree absence, injected failures and incomplete legacy-fixture INI default warnings remain visible; no required case was skipped. Initial fixture, dependency and scratch-repository naming failures were corrected and rerun. The band-GPIO convergence fixture now selects its existing Pi 4 test identity explicitly and reads the stock INI relative to `src`.
+
+UI `npm run test:unit` and `npm run test:browser` passed in the retained Debian ARM64 Chromium/PHP container using locked Node dependencies. The random-offset tooltip/help states the plan lifetime; layout and controls are unchanged. Impeccable review inspected the changed help in light/dark themes at 1440×1000 and 390×844, plus existing browser coverage of five pages, four modes, three widths and 200% text. No page overflow or broken images was observed. The existing design sidecar drift was left untouched. The documentation detector used its declared regex fallback because optional HTML parser modules were absent; this is limited scan evidence, separate from rendered review.
+
+Operator documentation in `WsprryPi-Docs` updates WSPR setup, CLI options, INI guidance/default comments and canonical-band arithmetic. Its required virtualenv Sphinx command passed without warnings; four affected pages were inspected at desktop/mobile widths. Existing screenshots were considered and retained because they remain materially accurate. `docs/wtp-scheduling.md` documents the runtime lifetime and exact focused command. No migration or Phase 5 guidance was added.
+
+Assessment 1 closed request publication before backend acceptance, overlapping override lifetimes, first-frame re-entry rotation and failed continuation status identity. Assessment 2 preserved the original calibration-capture boundary and added GPIO correction/placement coverage; it also tightened continuation rollback so a later launch failure cannot relabel an already committed second frame. The complete third assessment reviewed those repairs, state copy/commit/reset paths, tests, numerical constants, absolute WTP conversion, operator help and publication scope and found no unresolved actionable Phase 4 issue. The original Pi checkout and Pico source remain unchanged; no physical device, RF, firmware, installation, target configuration or service operation occurred.
 
 ### Work
 

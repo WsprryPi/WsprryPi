@@ -201,11 +201,11 @@ $bandGpioBands = ['2200m', '630m', '160m', '80m', '60m', '40m', '30m', '20m', '1
                                                     role="switch"
                                                     aria-describedby="useoffset-hint"
                                                     data-bs-toggle="tooltip"
-                                                    title="Randomly shift each WSPR transmission around the dial-derived RF frequency."
+                                                    title="Choose one random placement per WSPR plan; paired frames retain it."
                                                     id="useoffset" />
                                             </div>
                                             <div id="useoffset-hint" class="form-text mt-2">
-                                                Add optional random placement around the RF center: USB dial + 1500 Hz. Test Tone uses no random placement.
+                                                Choose placement within ±80 Hz once per WSPR plan; paired frames keep it. Test Tone uses no random placement.
                                             </div>
                                         </div>
 

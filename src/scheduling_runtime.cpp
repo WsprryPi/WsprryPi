@@ -180,6 +180,8 @@ void transmitter_cb(WsprTransmissionCallbackEvent event,
             consume_tx_iteration_if_needed();
         const double elapsed = value;
         bool do_config = true;
+        const std::size_t previous_wspr_frame_index = active_wspr_frame_index;
+        bool continuing_wspr_plan = false;
         const bool deferred_reload_pending =
             ini_reload_pending.load(std::memory_order_acquire);
 
@@ -233,8 +235,9 @@ void transmitter_cb(WsprTransmissionCallbackEvent event,
         else if (do_config && active_wspr_plan_has_more_frames_after_current())
         {
             ++active_wspr_frame_index;
+            continuing_wspr_plan = true;
         }
-        else if (active_wspr_plan_in_progress)
+        else if (active_wspr_plan_in_progress || active_wspr_plan_placement)
         {
             reset_active_wspr_plan_state();
         }
@@ -268,7 +271,21 @@ void transmitter_cb(WsprTransmissionCallbackEvent event,
         // Set config will determine if we have work to do.
         if (do_config)
         {
-            set_config();
+            try
+            {
+                set_config();
+            }
+            catch (...)
+            {
+                // A rejected second-frame backend request was not committed.
+                // Keep status identity aligned with the retained request.
+                if (continuing_wspr_plan &&
+                    previous_wspr_frame_index < active_wspr_plan.frame_callsigns.size() &&
+                    current_transmission_request.payload.frame_callsign ==
+                        active_wspr_plan.frame_callsigns[previous_wspr_frame_index])
+                    active_wspr_frame_index = previous_wspr_frame_index;
+                throw;
+            }
         }
 
         break;
@@ -560,6 +577,7 @@ void stop_runtime_components_for_process_exit() noexcept
     shutdownMonitor.stop();
     ppmManager.stop();
     transmitter_shutdown_for_process_exit();
+    reset_active_wspr_plan_state();
     deassert_transmit_gpio_outputs(
         &config,
         false,
