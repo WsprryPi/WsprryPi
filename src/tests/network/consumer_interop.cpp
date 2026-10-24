@@ -335,6 +335,56 @@ void recovery_cases() {
   assert(t.mutations==0&&t.wtp.io==0);
 }
 
+// Current closed configuration resources retain independent standalone RF
+// selection for ordinary PUT, merge and replace, without snapshot producers.
+void configuration_write_preservation_cases() {
+  for (const bool ap : {false, true}) for (const std::string mode : {"put", "merge", "replace"}) {
+    Test t;
+    if (ap) {
+      t.authority = "192.168.4.1"; t.origin = "http://192.168.4.1";
+      t.interface = pico::network::ConsumerInterface::AccessPoint;
+    }
+    auto initial = *t.f.store.config();
+    initial.wspr_base_frequency_hz = 3570237;
+    initial.allow_unqualified_frequency = initial.allow_non_amateur_frequency = true;
+    assert(t.f.store.save(initial));
+    const auto watermark = t.f.store.watermark();
+    auto c = t.client();
+    assert(c->login(device, ap ? "consumer_ap" : "consumer_station", "test-password").status == 200);
+    const auto read = c->request("config", "GET");
+    if (read.status != 200) std::cerr << "Configuration read: " << read.status << " " << read.body << std::endl;
+    assert(read.status == 200);
+    const auto closed = Json::parse(read.body).at("config");
+    assert(!closed.contains("wspr_base_frequency_hz") && closed["wifi"]["password"].is_null());
+    Json candidate = mode == "merge" ? Json{{"expires_utc_s", 1900000000}} : closed;
+    candidate["expires_utc_s"] = 1900000000;
+    const auto payload = [&](const Json &value) -> Json {
+      return mode == "put" ? value : Json{{"schema", "transmitter-config-update/1"},
+        {"target", {{"scope", "member"}, {"device_id", c->device()}, {"boot_id", c->boot()}}},
+        {"mode", mode}, {"config", value}};
+    };
+    const std::string resource = mode == "put" ? "config/2" : "config/update/2";
+    const std::string method = mode == "put" ? "PUT" : "POST";
+    if (mode != "put") {
+      auto wrong = payload(candidate); wrong["target"]["device_id"] = std::string(32, 'b');
+      assert(c->request(resource, method, wrong.dump(), read.etag).status == 409);
+      assert(*t.f.store.config() == initial && t.f.store.watermark() == watermark);
+    }
+    const auto saved = c->request(resource, method, payload(candidate).dump(), read.etag);
+    if (saved.status != 200) std::cerr << "Configuration " << mode << ": " << saved.status << " " << saved.body << std::endl;
+    assert(saved.status == 200);
+    auto expected = initial; expected.expires_utc_s = 1900000000;
+    assert(*t.f.store.config() == expected && t.f.store.watermark() == watermark);
+    assert(c->request(resource, method, payload(candidate).dump(), read.etag).status == 412);
+    const auto fresh = c->request("config", "GET"); assert(fresh.status == 200);
+    candidate["expires_utc_s"] = 1900000010;
+    t.f.flash.fail = true;
+    assert(c->request(resource, method, payload(candidate).dump(), fresh.etag).status == 503);
+    assert(*t.f.store.config() == expected && t.f.store.watermark() == watermark && t.wtp.io == 0);
+  }
+  std::cout << "Current PUT/merge/replace preserve independent RF base and unrelated settings; target, revision and atomic-save checks passed\n";
+}
+
 void alias_fixed_vector(const Json &vector) {
   // The fixed grant enters the production native login path. Losing its finish
   // reply leaves only the public alias, whose expected bytes are independently
@@ -685,6 +735,7 @@ int main(int argc, char **argv) {
   pi::consumer_radio_fixed_vectors(recovery_vectors);
   alias_fixed_vector(recovery_vectors);
   std::cout << "Consumer-Recovery/1 fixed AEAD/HKDF and native selector vectors passed\n";
+  configuration_write_preservation_cases();
   retirement_job_authority_cases();
   local_retirement_refusal_cases();
   runtime_recovery_continuity_cases();
