@@ -336,6 +336,34 @@ void usb_management_contract() {
   changed=contract;changed["operations"]["DELETE"]={"wifi"};CHECK(!valid(changed));
   changed=contract;changed["future"]=true;CHECK(!valid(changed));
   CHECK(!valid_management_contract(contract,"engineering_mtls",device,boot,""));
+  auto current = contract;
+  current["schema"] = "transmitter-management/5";
+  current["limits"]["idle_ms"] = 1800000;
+  current["limits"]["absolute_ms"] = 28800000;
+  CHECK(valid(current));
+  CHECK(valid_management_descriptor(
+      {{"schema", "transmitter-management/5"}, {"path", "/api/v1/management"}},
+      "usb_physical"));
+  CHECK(!valid_management_descriptor(
+      {{"schema", "transmitter-management/5"}, {"path", "/api/v1/management"}},
+      "consumer_station"));
+  for (const auto key : {"idle_ms", "absolute_ms"}) {
+    changed = current;
+    changed["limits"][key] = contract["limits"][key];
+    CHECK(!valid(changed));
+    changed = contract;
+    changed["limits"][key] = current["limits"][key];
+    CHECK(!valid(changed));
+  }
+  for (const Json &invalid : {Json(true), Json(1800000.0), Json("1800000"),
+                              Json(-1), Json(nullptr)}) {
+    changed = current;
+    changed["limits"]["idle_ms"] = invalid;
+    CHECK(!valid(changed));
+  }
+  changed = current;
+  changed["schema"] = "transmitter-management/6";
+  CHECK(!valid(changed));
 }
 void http_boundaries() {
   for (const auto raw : {"HTTP/1.1 \r\n\r\n", "HTTP/1.1 20x OK\r\n\r\n", "HTTP/1.1 200X\r\n\r\n",

@@ -145,7 +145,19 @@ struct Secrets {
     wipe(password);
   }
 };
+bool supported_management_schema(const Json &schema, bool usb) {
+  return usb ? (schema == "transmitter-management/3" ||
+                schema == "transmitter-management/5")
+             : (schema == "transmitter-management/1" ||
+                schema == "transmitter-management/2" ||
+                schema == "transmitter-management/4");
+}
 } // namespace
+bool valid_management_descriptor(const Json &j, const std::string &carrier) {
+  return fields(j, {"schema", "path"}) &&
+         supported_management_schema(j["schema"], carrier == "usb_physical") &&
+         j["path"] == "/api/v1/management";
+}
 bool valid_management_contract(const Json &j, const std::string &carrier,
                                const std::string &device,
                                const std::string &boot,
@@ -155,9 +167,8 @@ bool valid_management_contract(const Json &j, const std::string &carrier,
     if (!fields(j, {"schema", "target", "profile", "preclock",
                     "profile_generation", "selected", "carriers", "unsupported",
                     "operations", "limits"}) ||
-        (usb ? j["schema"] != "transmitter-management/3" :
-         (j["schema"] != "transmitter-management/1" && j["schema"] != "transmitter-management/2")) || j["selected"] != carrier ||
-        !j["preclock"].is_boolean() ||
+        !supported_management_schema(j["schema"], usb) ||
+        j["selected"] != carrier || !j["preclock"].is_boolean() ||
         j["target"] !=
             Json{{"scope", "member"}, {"device_id", device}, {"boot_id", boot}})
       return false;
@@ -198,9 +209,14 @@ bool valid_management_contract(const Json &j, const std::string &carrier,
                          {"config", 1800},        {"update", 2048},
                          {"login_ms", 30000},     {"idle_ms", 300000},
                          {"absolute_ms", 900000}, {"consumer_sessions", 1}};
-    if (usb || j["schema"] == "transmitter-management/2") {
+    if (j["schema"] != "transmitter-management/1") {
       limits["consumer_sessions"] = 3;
       limits["consumer_pending_logins"] = 1;
+    }
+    if (j["schema"] == "transmitter-management/4" ||
+        j["schema"] == "transmitter-management/5") {
+      limits["idle_ms"] = 1800000;
+      limits["absolute_ms"] = 28800000;
     }
     for (const auto &[name, value] : limits.items()) {
       (void)value;
@@ -226,6 +242,8 @@ void ConsumerRadioClient::clear() noexcept {
   wipe(session_);
   authenticated_ = false;
   sequence_ = started_ = seen_ = 0;
+  idle_ms_ = 300000;
+  absolute_ms_ = 900000;
   device_.clear();
   boot_.clear();
   generation_.clear();
@@ -233,7 +251,7 @@ void ConsumerRadioClient::clear() noexcept {
 bool ConsumerRadioClient::active() const {
   const auto now = clock_();
   return authenticated_ && now >= started_ && now >= seen_ &&
-         now - started_ < 900000 && now - seen_ < 300000;
+         now - started_ < absolute_ms_ && now - seen_ < idle_ms_;
 }
 std::string ConsumerRadioClient::seal(std::string_view plain,
                                       std::span<const unsigned char, 32> key,
@@ -466,12 +484,16 @@ PicoHttpResponse ConsumerRadioClient::handshake(const std::string &device,
     sequence_ = 1;
     started_ = seen_ = clock_();
     r = request("management", "GET");
+    const auto management =
+        r.status == 200 ? strict_browser_json(r.body) : Json(nullptr);
     if (r.status != 200 ||
-        !valid_management_contract(strict_browser_json(r.body), carrier,
-                                   device_, boot_, generation_)) {
+        !valid_management_contract(management, carrier, device_, boot_,
+                                   generation_)) {
       logout();
       return error(409, "unsupported_management_contract");
     }
+    idle_ms_ = management["limits"]["idle_ms"].get<std::uint64_t>();
+    absolute_ms_ = management["limits"]["absolute_ms"].get<std::uint64_t>();
     return {200,
             Json{{"connected", true},
                  {"carrier", carrier},

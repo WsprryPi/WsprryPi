@@ -49,6 +49,8 @@ private:
   std::array<unsigned char, 16> session_{};
   std::array<unsigned char, 32> transcript_{}, request_key_{}, response_key_{};
   std::uint64_t sequence_{}, started_{}, seen_{};
+  // Conservative defaults until authenticated management discovery is checked.
+  std::uint64_t idle_ms_{300000}, absolute_ms_{900000};
   bool authenticated_{};
   std::string seal(std::string_view, std::span<const unsigned char, 32>,
                    std::uint64_t);
@@ -68,4 +70,6 @@ bool valid_management_contract(const nlohmann::json &,
                                const std::string &device,
                                const std::string &boot,
                                const std::string &generation = {});
+bool valid_management_descriptor(const nlohmann::json &,
+                                 const std::string &carrier);
 } // namespace wsprrypi
