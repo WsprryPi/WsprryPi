@@ -214,10 +214,8 @@ PicoHttpResponse pico_configuration_request(const PicoManagementExchange &exchan
     require(!caps.contains("application_resources_v2") || caps.contains("application_resources"),
         "unsupported_configuration_context",409);
     if (caps.contains("management_carriers")) {
-      require(fields(caps["management_carriers"], {"schema", "path"}) &&
-          (carrier == "usb_physical" ? caps["management_carriers"]["schema"] == "transmitter-management/3" :
-           (caps["management_carriers"]["schema"] == "transmitter-management/1" || caps["management_carriers"]["schema"] == "transmitter-management/2")) &&
-          caps["management_carriers"]["path"] == "/api/v1/management", "unsupported_management_contract", 409);
+      require(valid_management_descriptor(caps["management_carriers"], carrier),
+              "unsupported_management_contract", 409);
       const auto management = parsed(read("management"));
       require(valid_management_contract(management, carrier, device, boot, generation) &&
           management["schema"] == caps["management_carriers"]["schema"],
@@ -791,9 +789,8 @@ PicoHttpResponse pico_resource_request(const PicoManagementExchange &exchange,
     auto caps = parsed(read("capabilities",16384));
     require(caps.is_object() && caps.contains("api_version") && caps["api_version"].is_number_integer() && caps["api_version"] == 1,"unsupported_remote_api",409);
     if (caps.contains("management_carriers")) {
-      require((carrier == "usb_physical" ? caps["management_carriers"] == Json{{"schema","transmitter-management/3"},{"path","/api/v1/management"}} :
-              (caps["management_carriers"] == Json{{"schema","transmitter-management/1"},{"path","/api/v1/management"}} ||
-               caps["management_carriers"] == Json{{"schema","transmitter-management/2"},{"path","/api/v1/management"}})),"unsupported_management_contract",409);
+      require(valid_management_descriptor(caps["management_carriers"], carrier),
+              "unsupported_management_contract", 409);
       const auto management = parsed(read("management",16384));
       require(valid_management_contract(management,carrier,device,boot,generation) &&
           management["schema"] == caps["management_carriers"]["schema"],"unsupported_management_contract",409);

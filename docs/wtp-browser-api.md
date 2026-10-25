@@ -277,17 +277,7 @@ evicted. Supported older management/1 firmware retains its single-session
 local keys; its remote slot can remain occupied until expiry. Wait or close the
 owning session explicitly; this client never uses an unrelated logout.
 
-Carrier/authority changes require explicit selection and new authentication.
-There is no redirect follow, alternate-carrier fallback, WTP-principal password,
-or automatic mutation retry. Authenticate the supported `transmitter-management/1`
-or `/2` document before using capabilities; public identity is an untrusted hint.
-Each version has exact closed fields and integer limits. Version 2 advertises
-`consumer_sessions:3` and `consumer_pending_logins:1`; version 1 remains frozen
-at one consumer session. Old Pi clients explicitly refuse version 2.
-The legacy closed application's `authenticated_https` label remains for old
-clients; it does not inventory actual carriers. Unsupported discovery refuses.
-Plain LAN WTP and TLS-WTP carry job control rather than JSON administration.
-USB-Management/1 support is described in [USB management](wtp-usb-management.md).
+Carrier/authority changes require explicit selection and new authentication. There is no redirect follow, alternate-carrier fallback, WTP-principal password, or automatic mutation retry. Authenticate the supported `transmitter-management/1` or `/2` document before using capabilities; public identity is an untrusted hint. Each version has exact closed fields and integer limits. Current network management/4 and USB management/5 retain the /2 and /3 shapes but advertise 1800000 ms idle and 28800000 ms absolute (thirty minutes/eight hours). Historical /1, /2 and /3 retain 300000/900000 ms. Updated native clients select local deadlines only after validating authenticated discovery; older clients explicitly refuse /4 and /5. Public traffic does not renew idle time, and authenticated traffic never renews the absolute lifetime. Version 2 advertises `consumer_sessions:3` and `consumer_pending_logins:1`; version 1 remains frozen at one consumer session. Old Pi clients explicitly refuse version 2. The legacy closed application's `authenticated_https` label remains for old clients; it does not inventory actual carriers. Unsupported discovery refuses. Plain LAN WTP and TLS-WTP carry job control rather than JSON administration. USB-Management/1 support is described in [USB management](wtp-usb-management.md).
 
 
 Host capabilities report built-in management adapters separately from actual

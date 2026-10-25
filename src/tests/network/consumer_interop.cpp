@@ -113,6 +113,49 @@ struct ResourceFixture {
   pico::network::BrowserApi api{service,store,scheduler,network,device,"test-firmware"};
   ResourceFixture(){assert(store.load());}
 };
+// Simulate a historical discovery policy inside a genuine encrypted response.
+// Ordinary tests delegate unchanged to production Mbed TLS.
+struct PolicyCrypto : pico::network::ConsumerRadioCrypto {
+  pico::network::PicoConsumerRadioCrypto actual;
+  unsigned version{};
+  bool begin() override { return actual.begin(); }
+  std::array<std::uint8_t, 32> public_key() const override {
+    return actual.public_key();
+  }
+  bool authenticate(pico::wtp::FrameBuffer &packet,
+                    const pico::network::ConsumerRadioBinding &binding,
+                    std::string_view password) override {
+    return actual.authenticate(packet, binding, password);
+  }
+  std::optional<pico::wtp::InputView>
+  open(pico::wtp::FrameBuffer &packet,
+       const pico::network::ConsumerRadioBinding &binding,
+       std::uint64_t sequence) override {
+    return actual.open(packet, binding, sequence);
+  }
+  std::optional<pico::network::HttpResponse>
+  seal(pico::wtp::InputView plain,
+       const pico::network::ConsumerRadioBinding &binding,
+       std::uint64_t sequence) override {
+    if (version) {
+      auto value = Json::parse(static_cast<std::string>(plain), nullptr, false);
+      if (value.is_object() && value.contains("body") &&
+          value["body"].contains("limits")) {
+        auto &body = value["body"];
+        body["schema"] = "transmitter-management/" + std::to_string(version);
+        body["limits"]["idle_ms"] = 300000;
+        body["limits"]["absolute_ms"] = 900000;
+        if (version == 1) {
+          body["limits"]["consumer_sessions"] = 1;
+          body["limits"].erase("consumer_pending_logins");
+        }
+        return actual.seal(value.dump(), binding, sequence);
+      }
+    }
+    return actual.seal(plain, binding, sequence);
+  }
+  void clear() override { actual.clear(); }
+};
 struct Test {
   ResourceFixture f;
   network_test::Flash progress_flash;
@@ -123,7 +166,7 @@ struct Test {
   NoWtp wtp;
   pico::provisioning::ProfileStore profiles{media};
   pico::provisioning::RuntimeProfile runtime;
-  pico::network::PicoConsumerRadioCrypto crypto[4];
+  PolicyCrypto crypto[4];
   pico::network::ConsumerRadioApi radio{f.api,
                                         profiles,
                                         runtime,
@@ -317,6 +360,50 @@ void cases(bool ap) {
   t.origin = "http://foreign.local";
   assert(c->request("config", "GET").status != 200 && !c->active());
   assert(t.mutations == 1);
+}
+void session_policy_cases() {
+  for (const auto version : {1, 2, 4}) {
+    Test t;
+    if (version != 4)
+      for (auto &crypto : t.crypto)
+        crypto.version = version;
+    auto c = t.client();
+    assert(c->login(device, "consumer_station", "test-password").status == 200);
+    const auto started = t.host.now;
+    const std::uint64_t idle = version == 4 ? 1800000 : 300000,
+                        absolute = version == 4 ? 28800000 : 900000;
+    t.host.now = started + idle - 1;
+    assert(c->active());
+    assert(c->request("status", "GET").status == 200);
+    // Authenticated status renewed idle time; public identity does not renew
+    // it.
+    t.host.now += idle - 1;
+    assert(c->active());
+    assert(t.send("/api/consumer/v1/identity", "GET", {}, "application/json")
+               .status == 200);
+    ++t.host.now;
+    const auto calls = t.exchanges;
+    assert(c->request("status", "GET").status == 401 && t.exchanges == calls);
+    ++t.host.now;
+    assert(c->login(device, "consumer_station", "test-password").status == 200);
+    const auto fresh = t.host.now;
+    for (std::uint64_t elapsed = idle / 2; elapsed < absolute;
+         elapsed += idle / 2) {
+      t.host.now = fresh + elapsed;
+      assert(c->request("status", "GET").status == 200);
+    }
+    t.host.now = fresh + absolute - 1;
+    assert(c->active());
+    ++t.host.now;
+    assert(c->request("status", "GET").status == 401);
+    ++t.host.now;
+    assert(c->login(device, "consumer_station", "test-password").status == 200);
+    --t.host.now;
+    assert(!c->active());
+    assert(t.mutations == 0 && t.wtp.io == 0);
+  }
+  std::cout << "Native authenticated policy selection: historical 5/15-minute "
+               "and current 30-minute/8-hour boundaries passed\n";
 }
 void recovery_cases() {
   Test t; auto a=t.client(),b=t.client(),c=t.client();
@@ -829,6 +916,7 @@ int main(int argc, char **argv) {
   runtime_recovery_continuity_cases();
   runtime_recovery_admission_cases();
   recovery_cases();
+  session_policy_cases();
   cases(false);
   cases(true);
   resource_admission_cases();
@@ -867,7 +955,7 @@ int main(int argc, char **argv) {
     Test t;
     auto c = t.client();
     assert(c->login(device, "consumer_station", "test-password").status == 200);
-    t.host.now += 300000;
+    t.host.now += 1800000;
     assert(c->request("config", "GET").status == 401 && t.mutations == 0);
   }
   {
@@ -951,18 +1039,34 @@ int main(int argc, char **argv) {
       assert(!pi::valid_management_contract(bad, "consumer_station", device,
                                             t.f.service.status().boot_id, "1"));
     }
-    for (const auto version : {1,2}) {
+    for (const auto version : {1, 2, 4}) {
       auto supported=good;
       supported["schema"]="transmitter-management/"+std::to_string(version);
+      supported["limits"]["idle_ms"] = version == 4 ? 1800000 : 300000;
+      supported["limits"]["absolute_ms"] = version == 4 ? 28800000 : 900000;
       supported["limits"]["consumer_sessions"]=version==1?1:3;
       supported["limits"].erase("consumer_pending_logins");
-      if(version==2)supported["limits"]["consumer_pending_logins"]=1;
+      if (version != 1)
+        supported["limits"]["consumer_pending_logins"] = 1;
       assert(pi::valid_management_contract(supported,"consumer_station",device,t.f.service.status().boot_id,"1"));
+      assert(pi::valid_management_descriptor(
+          {{"schema", supported["schema"]}, {"path", "/api/v1/management"}},
+          "consumer_station"));
+      for (const auto key : {"idle_ms", "absolute_ms"}) {
+        auto bad = supported;
+        bad["limits"][key] = version == 4 ? 300000 : 1800000;
+        assert(!pi::valid_management_contract(bad, "consumer_station", device,
+                                              t.f.service.status().boot_id,
+                                              "1"));
+      }
       for(const Json& invalid : {Json(-1),Json(0),Json(true),Json(1.5),Json(4),Json("3"),Json(nullptr)}) {
         auto bad=supported;bad["limits"]["consumer_sessions"]=invalid;
         assert(!pi::valid_management_contract(bad,"consumer_station",device,t.f.service.status().boot_id,"1"));
-        if(version==2){bad=supported;bad["limits"]["consumer_pending_logins"]=invalid;
-          assert(!pi::valid_management_contract(bad,"consumer_station",device,t.f.service.status().boot_id,"1"));}
+        if (version != 1) {
+          bad = supported;
+          bad["limits"]["consumer_pending_logins"] = invalid;
+          assert(!pi::valid_management_contract(bad,"consumer_station",device,t.f.service.status().boot_id,"1"));
+        }
       }
     }
     assert(t.mutations == 0);
