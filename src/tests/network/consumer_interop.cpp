@@ -785,7 +785,7 @@ void interactive(bool ap,bool configured=true) {
     if (command.contains("control")) {
       const auto control=command["control"];
       if (control=="drop_mutation_reply") t.drop_mutation=true;
-      if (control=="expire") t.host.now+=300001;
+      if (control=="expire") t.host.now+=pico::network::ConsumerRadioApi::idle_ms+1;
       if (control=="advance") t.host.now+=1001;
       if (control=="change_profile") {
         auto profile=*t.runtime.consumer_profile(); profile.request_sha256=std::string(64,'b');
@@ -990,7 +990,7 @@ int main(int argc, char **argv) {
     const auto before = t.mutations;
     assert(t.coordinated(*c, "POST", edit.dump(), context.etag).status != 200);
     assert(t.mutations == before); // No replay or alternative strategy.
-    t.host.now += 300001;
+    t.host.now += pico::network::ConsumerRadioApi::idle_ms + 1;
     assert(c->login(device, "consumer_station", "test-password").status == 200);
     const auto readback = t.coordinated(*c);
     assert(readback.status == 200 && readback.etag != context.etag);
