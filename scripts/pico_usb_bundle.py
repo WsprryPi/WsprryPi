@@ -35,6 +35,10 @@ class Unavailable(ValueError):
         self.details = details
 
 
+class Incompatible(Unavailable):
+    """Verified source that cannot be used by this adapter or Python host."""
+
+
 def require(ok, message):
     if not ok:
         raise Unavailable(message)
@@ -206,21 +210,40 @@ def branch_head(client, channel):
 
 
 def published(client, channel):
-    # A branch is only a selector. Execute immutable source after its canonical
-    # software verification succeeds; cached transactions keep their old bytes.
+    # Bootstrap only from successful canonical CI, newest first. A pending or
+    # incompatible branch tip must not hide an older verified compatible core.
     require(channel in ('main', 'devel'), 'Unsupported installer channel')
-    source = branch_head(client,channel)
+    head = branch_head(client,channel)
     workflow = metadata(client,'actions/workflows/software-build.yml')
     require(type(workflow.get('id')) is int and workflow['id'] > 0 and
             workflow.get('path') == '.github/workflows/software-build.yml', 'Unexpected installer verification workflow')
-    runs = metadata(client,'actions/workflows/software-build.yml/runs?branch='+channel+'&head_sha='+source+'&status=success&per_page=10')['workflow_runs']
-    require(isinstance(runs,list) and len(runs) <= 10 and all(isinstance(r,dict) for r in runs),
-            'Invalid installer verification runs')
-    candidates = [r for r in runs if r.get('head_sha') == source and r.get('head_branch') == channel and
-                  type(r.get('id')) is int and r['id'] > 0 and type(r.get('run_attempt')) is int and r['run_attempt'] > 0 and
-                  r.get('event') in ('push','workflow_dispatch')]
-    require(candidates, 'Installer branch head has no successful software verification; retry after CI completes')
-    selected = max(candidates, key=lambda r:(r['id'],r['run_attempt']))
+    seen = set()
+    # Bound metadata requests and anonymous API use to thirty recent runs.
+    for page in range(1,4):
+        runs = metadata(client,'actions/workflows/software-build.yml/runs?branch='+channel+
+                        '&status=success&per_page=10&page='+str(page))['workflow_runs']
+        require(isinstance(runs,list) and len(runs) <= 10 and all(isinstance(r,dict) for r in runs),
+                'Invalid installer verification runs')
+        candidates = [r for r in runs if r.get('head_branch') == channel and
+                      isinstance(r.get('head_sha'),str) and re.fullmatch(r'[0-9a-f]{40}',r['head_sha']) and
+                      type(r.get('id')) is int and r['id'] > 0 and type(r.get('run_attempt')) is int and r['run_attempt'] > 0 and
+                      r.get('event') in ('push','workflow_dispatch')]
+        for selected in sorted(candidates,key=lambda r:(r['id'],r['run_attempt']),reverse=True):
+            if selected['head_sha'] in seen:
+                continue
+            seen.add(selected['head_sha'])
+            try:
+                return verified_source(client,channel,workflow,selected,head)
+            except Incompatible:
+                continue
+        if len(runs) < 10:
+            break
+    raise Unavailable('No verified compatible Pico USB installer is available in recent '+channel+
+                      ' CI runs; retry after compatible software verification completes')
+
+
+def verified_source(client, channel, workflow, selected, head):
+    source = selected['head_sha']
     run, attempt = selected['id'], selected['run_attempt']
     info = metadata(client,f'actions/runs/{run}/attempts/{attempt}')
     require(info.get('id') == run and info.get('head_sha') == source and info.get('head_branch') == channel and
@@ -239,26 +262,58 @@ def published(client, channel):
                 j.get('status') == 'completed' and j.get('conclusion') in ('success','skipped') for j in jobs) and
             job.get('conclusion') == 'success' and type(job.get('id')) is int and job['id'] > 0,
             'Installer source has no successful verification job')
+    if source != head:
+        # GitHub omits changed files after the first comparison page. Keep
+        # ancestry metadata bounded even when pending commits have large diffs.
+        history = metadata(client,f'compare/{source}...{head}?per_page=1&page=2')
+        require(isinstance(history.get('base_commit'),dict) and history['base_commit'].get('sha') == source and
+                history.get('status') in ('ahead','behind','identical','diverged') and
+                isinstance(history.get('merge_base_commit'),dict) and
+                isinstance(history['merge_base_commit'].get('sha'),str) and
+                re.fullmatch(r'[0-9a-f]{40}',history['merge_base_commit']['sha']), 'Invalid installer branch ancestry')
+        if history['status'] not in ('ahead','identical') or history['merge_base_commit'].get('sha') != source:
+            raise Incompatible('Installer source is outside the selected branch history')
     payload = {name:source_file(client,path,source) for name,path in (
         ('usb_installer.py','scripts/usb_installer.py'),
         ('release-manifest-1.schema.json','scripts/ci/release-manifest-1.schema.json'))}
-    tree = ast.parse(payload['usb_installer.py'])
-    versions = [ast.literal_eval(n.value) for n in tree.body if isinstance(n,ast.Assign) and
-                any(isinstance(t,ast.Name) and t.id == 'INSTALLER_VERSION' for t in n.targets)]
-    require(len(versions) == 1 and isinstance(versions[0],str), 'Missing or ambiguous installer version')
+    try:
+        tree = ast.parse(payload['usb_installer.py'])
+        compile(tree, '<verified-pico-installer>', 'exec')
+    except SyntaxError as error:
+        raise Incompatible('Installer source needs an unsupported Python version') from error
+    try:
+        versions = [ast.literal_eval(n.value) for n in tree.body if isinstance(n,ast.Assign) and
+                    any(isinstance(t,ast.Name) and t.id == 'INSTALLER_VERSION' for t in n.targets)]
+    except (ValueError,TypeError) as error:
+        raise Incompatible('Installer source has an incompatible version contract') from error
+    if len(versions) != 1 or not isinstance(versions[0],str) or not re.fullmatch(r'[0-9]+\.[0-9]+\.[0-9]+',versions[0]):
+        raise Incompatible('Installer source has an incompatible version contract')
+    minimum = (3,10)
+    for node in tree.body:
+        test = node.test if isinstance(node,ast.If) else None
+        if (isinstance(test,ast.Compare) and isinstance(test.left,ast.Attribute) and
+                isinstance(test.left.value,ast.Name) and test.left.value.id == 'sys' and test.left.attr == 'version_info' and
+                len(test.ops) == 1 and isinstance(test.ops[0],ast.Lt) and
+                any(isinstance(statement,ast.Raise) for statement in node.body)):
+            required = ast.literal_eval(test.comparators[0])
+            if isinstance(required,tuple) and len(required) == 2 and all(type(n) is int for n in required):
+                minimum = max(minimum,required)
+    if minimum > sys.version_info[:2]:
+        raise Incompatible('Installer source needs an unsupported Python version')
     constants = {n.value for n in ast.walk(tree) if isinstance(n,ast.Constant) and isinstance(n.value,str)}
     schema = decode(payload['release-manifest-1.schema.json'])
-    require(isinstance(schema,dict) and {'wsprrypico-usb-result/1','wsprrypico-usb-transaction/1'} <= constants and
-            schema.get('$id') ==
-            'https://github.com/'+REPOSITORY+'/firmware-release-manifest/1', 'Installer source has an incompatible contract')
+    mains = [n for n in tree.body if isinstance(n,ast.FunctionDef) and n.name == 'main']
+    if not (isinstance(schema,dict) and {'wsprrypico-usb-result/1','wsprrypico-usb-transaction/1'} <= constants and
+            schema.get('$id') == 'https://github.com/'+REPOSITORY+'/firmware-release-manifest/1' and
+            len(mains) == 1 and 'schema_bytes' in {a.arg for a in (*mains[0].args.args,*mains[0].args.kwonlyargs)}):
+        raise Incompatible('Installer source has an incompatible contract')
     manifest = validate({'schema':MARKER,'repository':REPOSITORY,'contract':1,'channel':channel,
         'source':source,'run_id':run,'attempt':attempt,'workflow':workflow['path'],
         'delivery':'verified-source','verify_job':{k:job[k] for k in ('id','name','status','conclusion')},
-        'installer_version':versions[0],'python_min':[3,10],
+        'installer_version':versions[0],'python_min':list(minimum),
         'result_schema':'wsprrypico-usb-result/1','transaction_schema':'wsprrypico-usb-transaction/1',
         'firmware_manifest_schema':1,
         'files':{n:{'sha256':sha(d),'bytes':len(d)} for n,d in payload.items()}},channel)
-    require(branch_head(client,channel) == source, 'Installer branch changed during verification; retry')
     return manifest, payload
 
 
@@ -455,7 +510,8 @@ class Store:
         for path in bindings.glob('*.json'):
             keep.add(decode(self.read(path,4096))['identity'])
         bundles = self.root/'bundles'
-        for path in bundles.iterdir():
+        safe(bundles,self.owner)
+        for path in (bundles.iterdir() if bundles.exists() else ()):
             safe(path,self.owner)
             require(re.fullmatch(HEX,path.name) and path.is_dir(), 'Unknown installer cache member')
             if path.name not in keep:

@@ -2,6 +2,7 @@
 import base64
 import hashlib
 import json
+from urllib.parse import parse_qs, urlsplit
 
 REPOSITORY = 'WsprryPi/WsprryPico'
 API = 'https://api.github.com/repos/'+REPOSITORY+'/'
@@ -46,7 +47,7 @@ def fixture(run=100,version='0.1.1'):
     manifest = {'schema':'wsprrypico-usb-installer/1','repository':REPOSITORY,'contract':1,
         'result_schema':'wsprrypico-usb-result/1','transaction_schema':'wsprrypico-usb-transaction/1',
         'firmware_manifest_schema':1,'python_min':[3,10],'installer_version':version,'channel':'devel',
-        'source':('a' if run==100 else 'b')*40,'run_id':run,'attempt':1,
+        'source':f'{run:040x}','run_id':run,'attempt':1,
         'workflow':'.github/workflows/software-build.yml','verify_job':{'id':42,'name':'verify','status':'completed','conclusion':'success'},
         'files':{name:{'sha256':hashlib.sha256(data).hexdigest(),'bytes':len(data)} for name,data in payload.items()}}
     return manifest,payload
@@ -58,27 +59,46 @@ class Network:
         self.original = dict(payload)
         self.failure = None
         self.mutate = lambda value:value
+        self.older = []
+        self.head = manifest['source']
+        self.off_branch = set()
+    def sources(self):return [self,*self.older]
+    def record(self,source):
+        m=source.manifest
+        return {'id':m['run_id'],'head_sha':m['source'],'head_branch':m['channel'],'path':m['workflow'],'workflow_id':123,
+                'repository':{'full_name':REPOSITORY},'head_repository':{'full_name':REPOSITORY},
+                'run_attempt':m['attempt'],'event':'push','status':'completed','conclusion':'success'}
     def api(self,path):
         self.requests.append(path)
         if self.failure:
             raise self.failure
         m=self.manifest
-        if path=='git/ref/heads/devel':return self.mutate({'ref':'refs/heads/devel','object':{'type':'commit','sha':m['source']}})
+        if path=='git/ref/heads/'+m['channel']:
+            return self.mutate({'ref':'refs/heads/'+m['channel'],'object':{'type':'commit','sha':self.head}})
         if path=='actions/workflows/software-build.yml':return self.mutate({'id':123,'path':m['workflow']})
-        run={'id':m['run_id'],'head_sha':m['source'],'head_branch':'devel','path':m['workflow'],'workflow_id':123,
-             'repository':{'full_name':REPOSITORY},'head_repository':{'full_name':REPOSITORY},
-             'run_attempt':m['attempt'],'event':'push','status':'completed','conclusion':'success'}
-        if path.startswith('actions/workflows/software-build.yml/runs?'):return self.mutate({'workflow_runs':[run]})
-        if path==f"actions/runs/{m['run_id']}/attempts/1":return self.mutate(run)
-        if path==f"actions/runs/{m['run_id']}/attempts/1/jobs?per_page=100":
-            jobs=[{**m['verify_job'],'run_id':m['run_id'],'head_sha':m['source'],'run_attempt':1},
-                  {'id':43,'name':'publish','run_id':m['run_id'],'head_sha':m['source'],'run_attempt':1,'status':'completed','conclusion':'skipped'}]
-            return self.mutate({'total_count':2,'jobs':jobs})
+        if path.startswith('actions/workflows/software-build.yml/runs?'):
+            page=int(parse_qs(urlsplit(path).query)['page'][0])
+            return self.mutate({'workflow_runs':[self.record(s) for s in self.sources()][(page-1)*10:page*10]})
+        for source in self.sources():
+            item=source.manifest
+            if path==f"actions/runs/{item['run_id']}/attempts/1":return self.mutate(self.record(source))
+            if path==f"actions/runs/{item['run_id']}/attempts/1/jobs?per_page=100":
+                jobs=[{**item['verify_job'],'run_id':item['run_id'],'head_sha':item['source'],'run_attempt':1},
+                      {'id':43,'name':'publish','run_id':item['run_id'],'head_sha':item['source'],'run_attempt':1,'status':'completed','conclusion':'skipped'}]
+                return self.mutate({'total_count':2,'jobs':jobs})
+        if path.startswith('compare/'):
+            base,head=path.removeprefix('compare/').split('?')[0].split('...')
+            assert head==self.head
+            on_branch=base not in self.off_branch and any(s.manifest['source']==base for s in self.sources())
+            return self.mutate({'status':'ahead' if on_branch else 'diverged','base_commit':{'sha':base},
+                                'merge_base_commit':{'sha':base if on_branch else 'f'*40}})
         raise AssertionError(path)
     def get(self,url,limit=1024*1024):
         self.requests.append(url)
         name=url.split('?')[0].rsplit('/',1)[1]
-        data=self.payload[name];original=self.original[name]
+        revision=parse_qs(urlsplit(url).query)['ref'][0]
+        source=next(s for s in self.sources() if s.manifest['source']==revision)
+        data=source.payload[name];original=source.original[name]
         return encoded(self.mutate({'type':'file','path':'scripts/'+('ci/' if name.endswith('.json') else '')+name,
             'encoding':'base64','size':len(original),'content':base64.b64encode(data).decode(),
             'sha':hashlib.sha1(b'blob '+str(len(original)).encode()+b'\0'+original).hexdigest()}))

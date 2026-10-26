@@ -156,7 +156,11 @@ compatible shared installer fixes are supplied from verified WsprryPico source
 independently of Pi releases. The installer channel is independent of firmware
 image selection.
 
-**Download and check image** checks the compatible installer channel before planning an image. Successful update checks are cached for ten minutes. The Pi resolves the configured main/devel branch head through compact Git reference metadata, then requires a successful canonical software CI run and verification job. Large commit diffs do not change the bounded metadata download budget. It downloads the Python installer and manifest schema at that immutable commit, checks Git blob identities, and retains SHA-256 hashes with the source and CI receipt. Separate installer releases and tags are unnecessary. Firmware still downloads as a compiled UF2 from its verified release; the Pi does not compile it. An incompatible contract, unsupported Python version, changed payload or failed CI cannot replace the installed copy. The first installation requires a verified branch head; while its CI is pending, retry after verification completes. A refresh failure retains the previous verified copy and reports the reason beside the firmware controls. GitHub retry guidance is honored without retrying early. No GitHub credentials are loaded.
+The Pi package installs the protected adapter, policy, USB permissions and required tools without contacting WsprryPico. An empty installer cache is a valid installed state. WsprryPi installation, application startup, ordinary Pico discovery, status polling and normal transmission do not download the shared installer. Existing verified installers and private recovery snapshots survive package updates.
+
+**Download and check image** obtains a compatible shared installer on first use; an explicit full-erase request also bootstraps it when needed. Successful update checks are cached for ten minutes. The Pi searches up to thirty recent successful canonical software CI runs in the configured channel, newest first, skips duplicate source revisions, and selects the first source compatible with this adapter and Python host. A pending branch tip or a newer incompatible installer does not hide an earlier verified compatible commit. Successful sources outside the selected branch history are excluded. Branch and ancestry metadata omit large file diffs. CI workflow, repository, attempt and verification-job checks precede downloading the Python installer and schema at an immutable commit. Git blob identities and retained SHA-256 hashes bind the bytes to the source and CI receipt. No downloaded installer code runs during selection. Separate installer releases and tags are unnecessary; firmware still downloads as a compiled UF2.
+
+An incompatible result or schema contract, unsupported Python version, changed payload or failed CI cannot replace the installed copy. If bootstrap cannot obtain a verified compatible source, only the requested Pico firmware operation fails; an erase bootstrap refusal reports that no device recovery is required because USB has not been accessed. A refresh failure retains the previous verified copy and reports the reason beside the firmware controls. GitHub retry guidance is honored without retrying early. No GitHub credentials are loaded.
 
 A checked image retains its installer identity. Installing it does not check
 for or substitute a newer installer. Before the first possible firmware write,
@@ -184,8 +188,8 @@ existing maximum of 32 boards and remain separate from saved settings.
 ## Package lifecycle
 
 `scripts/pico_usb_deploy.py` installs the protected entry, distribution manager
-and channel policy. It obtains a compatible public installer on first install
-and validates all bytes before publishing executable content. Migration keeps
+and channel policy without a Pico source download. The first explicit image
+check or erase obtains and verifies a compatible shared installer. Migration keeps
 the previous exact installer for legacy recovery. An explicit maintainer
 `--development-source` deployment remains labelled `unpublished-working-tree`;
 it never impersonates a verified CI publication. Removal retains private

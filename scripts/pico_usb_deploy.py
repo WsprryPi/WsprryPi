@@ -39,7 +39,7 @@ def retained(prior,payload,channel,kind='retained-installation'):
             'files':{name:{'sha256':bundle.sha(data),'bytes':len(data)} for name,data in payload.items()}}
 
 
-def provision(action,repository,root=Path('/'),fetch=None,development_source=None):
+def provision(action,repository,root=Path('/'),development_source=None):
     prefix = lambda name:root/name.lstrip('/')
     target = prefix('/usr/local/lib/wsprrypi/pico-usb')
     policy = bundle.decode((repository/'config/pico-usb-installer.json').read_bytes())
@@ -102,18 +102,10 @@ def provision(action,repository,root=Path('/'),fetch=None,development_source=Non
                     payload[Path(name).name] = (source/name).read_bytes()
                 identity = store.save(retained({'revision':'0'*40},payload,policy['channel'],'unpublished-working-tree'),payload)
                 bundle.write_json(stage/'active.json',{'identity':identity,'check_after':0,'update':{'state':'retained'}})
-            elif not (stage/'active.json').exists():
-                client = None
-                if fetch is not None:
-                    class Client(bundle.Network):
-                        def get(self,url,limit=bundle.MAX_FILE):
-                            data = fetch(url)
-                            bundle.require(len(data) <= limit,'Oversized installer download')
-                            return data
-                    client = Client()
-                store.refresh(client)
-            else:
+            elif store.active() is not None:
                 store.load(store.active()['identity'])
+            # Fresh packages deploy only the local adapter. The shared Pico
+            # core is fetched by an explicit firmware plan or erase request.
             files = {'entry.py':(repository/'scripts/pico_usb_entry.py').read_bytes(),
                      'bundle.py':(repository/'scripts/pico_usb_bundle.py').read_bytes(),
                      'policy.json':(json.dumps(policy,indent=2,sort_keys=True)+'\n').encode()}

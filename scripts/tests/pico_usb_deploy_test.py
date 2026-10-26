@@ -11,7 +11,7 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-from pico_usb_bundle_fixture import POLICY, encoded, fixture
+from pico_usb_bundle_fixture import Network, POLICY, encoded, fixture
 
 SCRIPTS=Path(__file__).resolve().parents[1]
 def load(name):
@@ -90,10 +90,27 @@ class DeploymentTests(unittest.TestCase):
         deploy.provision('uninstall',self.repository,self.root)
         self.install()
         self.assertTrue((self.target/'entry.py').exists());self.assertEqual(private.read_bytes(),b'private')
-    def test_unavailable_first_install_publishes_no_executable(self):
-        with patch.object(bundle.Network,'get',side_effect=bundle.Unavailable('offline')):
-            with self.assertRaises(bundle.Unavailable):self.install()
-        self.assertFalse((self.target/'entry.py').exists())
+    def test_fresh_install_and_reinstall_need_no_pico_network_or_ci(self):
+        with patch.object(bundle,'Network',side_effect=AssertionError('package requested network')):
+            self.install();self.install()
+        self.assertTrue((self.target/'entry.py').is_file())
+        self.assertIsNone(self.store().active())
+        self.assertFalse((self.target/'bundles').exists())
+        self.assertEqual(set(json.loads((self.target/'deployment.json').read_text())['adapter_files']),
+                         {'entry.py','bundle.py','policy.json'})
+        self.assertTrue((self.root/'etc/udev/rules.d/70-wsprrypico-usb.rules').is_file())
+    def test_first_firmware_request_bootstraps_after_adapter_only_deployment(self):
+        with patch.object(bundle,'Network',side_effect=AssertionError('package requested network')):self.install()
+        cache=self.root/'var/cache/wsprrypi/pico-usb';state=self.root/'var/lib/wsprrypi/pico-usb'
+        network=Network(self.manifest,self.payload);network.head='c'*40
+        with patch.object(bundle,'Network',return_value=network):
+            code,result=entry.run(['plan','--output',str(cache/('1'*32))],bundle,self.store(),cache,state)
+        self.assertEqual(code,0);self.assertTrue(result['ok'])
+        self.assertEqual(result['installer_source'],self.manifest['source'])
+    def test_uninstall_and_reinstall_before_first_use_stay_offline(self):
+        with patch.object(bundle,'Network',side_effect=AssertionError('package requested network')):
+            self.install();deploy.provision('uninstall',self.repository,self.root);self.install()
+        self.assertTrue((self.target/'entry.py').is_file());self.assertIsNone(self.store().active())
     def test_uninstalling_legacy_package_still_retains_its_recovery_core(self):
         self.legacy();deploy.provision('uninstall',self.repository,self.root)
         store=self.store();identity=json.loads((self.target/'legacy.json').read_text())['identity']
