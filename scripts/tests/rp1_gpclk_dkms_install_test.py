@@ -2130,7 +2130,7 @@ remove_owned_rp1_gpclk_dkms_provider debug
         apply = source.index('apply_rp1_gpclk_dkms_installation "$debug" || return 1')
         update = source.index('prepare_rp1_gpclk_runtime_update "$debug" || return 1')
         package_notice = source.index(
-            'logI "Updating and managing required packages (this may take a few minutes)."'
+            'logI "Managing required packages (this may take a few minutes)."'
         )
         application = source.index('manage_wsprry_pi "$debug"')
         self.assertLess(source.index('print_version "$debug"'), package_notice)
@@ -2156,7 +2156,7 @@ remove_owned_rp1_gpclk_dkms_provider debug
         package_handler_start = source.index("handle_apt_packages() {")
         package_handler_end = source.index("\n}\n", package_handler_start)
         self.assertNotIn(
-            "Updating and managing required packages",
+            "Managing required packages",
             source[package_handler_start:package_handler_end],
         )
 

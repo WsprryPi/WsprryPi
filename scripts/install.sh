@@ -2145,6 +2145,7 @@ exec_command() {
 # @param  $1  Filename to process.
 # @param  $2  Suffix to match at end of lines (literal, not a regex).
 # @param  $3  Action: "comment" to add "# ", "uncomment" to remove it.
+# @param  $4  Optional progress task name (defaults to the file path).
 #
 # @global DRY_RUN  If "true", commands are only logged.
 #
@@ -2161,6 +2162,7 @@ modify_comment_lines() {
     local file="$1"; shift
     local suffix="$1"; shift
     local action="$1"; shift
+    local task_name="${1:-Update log directives in $file}"
 
     # Sanity checks
     if [[ -z "$file" || -z "$suffix" || -z "$action" ]]; then
@@ -2201,7 +2203,7 @@ modify_comment_lines() {
         logD "Exec: sed -i '$sed_script' '$file'"
     else
         # Actually apply it
-        exec_command "Update log directives in $file" sed -i "$sed_script" "$file" "$debug" || {
+        exec_command "$task_name" sed -i "$sed_script" "$file" "$debug" || {
             logE "sed failed on $file"
             debug_end "$debug"; return 1
         }
@@ -2221,6 +2223,7 @@ modify_comment_lines() {
 # @param $1 Path to the file to modify.
 # @param $2 Search string (without % signs).
 # @param $3 Replacement string.
+# @param $4 Optional progress task name (defaults to placeholder and file).
 #
 # @global None.
 #
@@ -2241,6 +2244,7 @@ replace_string_in_script() {
     local file_path="$1"
     local search_string="$2"
     local replace_string="$3"
+    local task_name="${4:-Set $search_string in $file_path}"
 
     if [[ "$DRY_RUN" == "true" ]]; then
         local planned_command
@@ -2262,7 +2266,7 @@ replace_string_in_script() {
     # Use sed to replace all occurrences of %SEARCH_STRING% with REPLACE_STRING.
     # Propagate failure so callers staging privileged files cannot continue with
     # an incomplete render.
-    if ! exec_command "Set $search_string in $file_path" \
+    if ! exec_command "$task_name" \
         sed -i "s|${pattern}|${replace_string}|g" "$file_path" "$debug"; then
         logE "Failed to replace '${pattern}' in '$file_path'."
         debug_end "$debug"
@@ -2974,17 +2978,15 @@ print_system() {
 }
 
 # -----------------------------------------------------------------------------
-# @brief Print the script version and optionally log it.
-# @details This function displays the version of the script stored in the global
-#          variable `SEM_VER`. If called by `process_args`, it uses `printf` to
-#          display the version; otherwise, it logs the version using `logI`.
-#          If the debug flag is set to "debug," additional debug information
-#          will be printed.
+# @brief Describe the selected version before source or executable validation.
+# @details Release tags identify the selected release, not a validated binary
+#          version. Local executables and streamed source builds do not have a
+#          known version yet. The success summary reports the captured version.
 #
 # @param $1 [Optional] Debug flag. Pass "debug" to enable debug output.
 #
 # @global THIS_SCRIPT The name of the script.
-# @global SEM_VER The version of the script.
+# @global SEM_VER The source version, when running from a checkout.
 #
 # @return None
 #
@@ -2996,7 +2998,24 @@ print_version() {
     local debug
     debug=$(debug_start "$@")
     eval set -- "$(debug_filter "$@")"
-    logI "Wsprry Pi version: ${SEM_VER}"
+    case "$BINARY_SOURCE" in
+        release)
+            logI "Wsprry Pi version: pending executable validation."
+            ;;
+        local)
+            logI "Wsprry Pi version: pending local executable validation."
+            ;;
+        build)
+            if [[ "$IS_REPO" == "true" ]]; then
+                logI "Wsprry Pi source version: $SEM_VER"
+            else
+                logI "Wsprry Pi version: pending source checkout."
+            fi
+            ;;
+        auto)
+            logI "Wsprry Pi version: unresolved (dry run)."
+            ;;
+    esac
 
     debug_end "$debug"
     return 0
@@ -7443,7 +7462,7 @@ manage_config() {
     config_name="${config_name%.*}"
     source_path="${LOCAL_CONFIG_DIR}/${config_file}"
 
-    config_path="${config_path}/${config_file}"
+    config_path="${config_path%/}/${config_file}"
 
     if [[ "$ACTION" == "install" ]]; then
         # Validate source file exists
@@ -7506,6 +7525,7 @@ manage_config() {
             "$config_path" \
             "SEMANTIC_VERSION" \
             "$SEM_VER" \
+            "Set version in INI" \
             "$debug" || retval=1
 
         # Install the stock configuration copy for the primary INI
@@ -7526,6 +7546,7 @@ manage_config() {
                 "$stock_config_path" \
                 "SEMANTIC_VERSION" \
                 "$SEM_VER" \
+                "Set version in INI backup" \
                 "$debug" || retval=1
 
             debug_print \
@@ -8011,10 +8032,10 @@ install_systemd_service_unit() {
     fi
 
     if ! exec_command "Stage systemd service unit" cp -- "$source_path" "$staged_path" "$debug" ||
-        ! replace_string_in_script "$staged_path" "SEMANTIC_VERSION" "$semantic_version" "$debug" ||
-        ! replace_string_in_script "$staged_path" "DAEMON_NAME" "$daemon_name" "$debug" ||
-        ! replace_string_in_script "$staged_path" "EXEC_START" "$exec_start" "$debug" ||
-        ! replace_string_in_script "$staged_path" "SYSLOG_IDENTIFIER" "$syslog_identifier" "$debug" ||
+        ! replace_string_in_script "$staged_path" "SEMANTIC_VERSION" "$semantic_version" "Set version in service file" "$debug" ||
+        ! replace_string_in_script "$staged_path" "DAEMON_NAME" "$daemon_name" "Set daemon name in service file" "$debug" ||
+        ! replace_string_in_script "$staged_path" "EXEC_START" "$exec_start" "Set start exe in service file" "$debug" ||
+        ! replace_string_in_script "$staged_path" "SYSLOG_IDENTIFIER" "$syslog_identifier" "Set syslog ID in service file" "$debug" ||
         ! exec_command "Change ownership on staged systemd unit" \
             chown root:root "$staged_path" "$debug" ||
         ! exec_command "Change permissions on staged systemd unit" \
@@ -8759,7 +8780,7 @@ manage_apache() {
 
         # If stock page, comment out log lines in the vhost before enabling.
         if [[ "${APACHE_WEB_MODE:-unknown}" == "stock" ]] && is_stock_apache_page "/var/www/html/index.html" "$debug"; then
-            modify_comment_lines "${site_conf}" ".log" comment "$debug"
+            modify_comment_lines "${site_conf}" ".log" comment "Update log directives Apache conf" "$debug"
         fi
 
         # Enable required modules
@@ -9750,6 +9771,9 @@ finish_script() {
     if [[ "$overall_status" -eq 0 ]]; then
         debug_print "$action_message completed successfully." "$debug"
         printf "\n%s successful: %s.\n" "$action_message" "$REPO_TITLE"
+        if [[ "$ACTION" == "install" ]]; then
+            printf "Wsprry Pi version: %s\n" "$SEM_VER"
+        fi
     else
         logE "$action_message failed: $REPO_TITLE."
         debug_print "$action_message encountered errors." "$debug"
@@ -10093,7 +10117,7 @@ _main() {
     # Print/display the environment
     print_model_name "$debug"   # Log board variant
     print_system "$debug"       # Log system information
-    print_version "$debug"      # Log the script version
+    print_version "$debug"      # Describe the selected source or release
 
     # Feedback on multi-proc compilation
     [[ "$ACTION" != "uninstall" ]] && display_compilation_resource_notes "$debug"
@@ -10109,7 +10133,7 @@ _main() {
     # Use the ordinary APT closure before source planning or artifact inspection:
     # both the RP1 planner and precompiled preparation require Git on fresh Pis.
     if [[ "$ACTION" != "uninstall" ]]; then
-        logI "Updating and managing required packages (this may take a few minutes)."
+        logI "Managing required packages (this may take a few minutes)."
         # All informational output precedes resource and installation commands.
         apply_build_resource_plan || return 1
         handle_apt_packages "$debug" || return 1
