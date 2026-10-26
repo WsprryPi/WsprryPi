@@ -4,7 +4,9 @@ Wsprry Pi builds require the tag and branch to be consistent for use in the inst
 
 This guide outlines the precise steps to prepare a release where the Git **branch** and **tag** share the same name. In this situation, Git can be ambiguous when resolving references. We resolve this by being explicit with `refs/heads/` (branches) and `refs/tags/` (tags) in all commands.
 
-Globally search/replace `3.2.0` and `v3.2.0` with your desired version.
+Globally search/replace `3.2.1` and `v3.2.1` with your desired version.
+
+For the 3.2.1 maintenance release, use current `main` without merging `devel`; the 4.0 Beta work is outside this release. The reviewed release body is [3.2.1-Release-Notes.md](3.2.1-Release-Notes.md). The stable 3.2.0 release had no uploaded binaries, so 3.2.1 also publishes source without reusing Beta binaries.
 
 ---
 
@@ -25,8 +27,8 @@ Globally search/replace `3.2.0` and `v3.2.0` with your desired version.
     * Update `scripts\install.sh` with proper version:
 
         ```bash
-        declare DEFAULT_REPO_BRANCH="devel"
-        declare DEFAULT_SEM_VER="3.2.0"
+        declare DEFAULT_REPO_BRANCH="main"
+        declare DEFAULT_SEM_VER="3.2.1"
         ```
 
     * Apply any required feature changes or bug fixes.
@@ -36,13 +38,13 @@ Globally search/replace `3.2.0` and `v3.2.0` with your desired version.
    ```bash
    git add scripts/install.sh
    git add "release_tools/Build Orchestration.md" # This file because you updated the tags
-   git commit -m "Prepare 3.2.0 release"
+   git commit -m "Prepare 3.2.1 release"
    ```
 
 4. **Create an annotated tag on that commit**
 
    ```bash
-   git tag -a v3.2.0 -m "Release 3.2.0"
+   git tag -a v3.2.1 -m "Release 3.2.1"
    ```
 
 5. **Compilation**: If a version-specific compile or any other process depends on the tag, execute that process now
@@ -62,14 +64,14 @@ Globally search/replace `3.2.0` and `v3.2.0` with your desired version.
    * **Force the tag to point to the amended commit**
 
       ```bash
-      git tag -f v3.2.0
+      git tag -f v3.2.1
       ```
 
 6. **Push the branch and tag to the origin** (with -f if needed)
 
    ```bash
    git push origin HEAD:refs/heads/main
-   git push origin tag v3.2.0
+   git push origin tag v3.2.1
    ```
 
 ---
