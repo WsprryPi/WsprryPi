@@ -10002,7 +10002,7 @@ manage_wsprry_pi() {
 display_action_notes() {
     if [[ "$ACTION" == "install" ]]; then
         if rp1_gpclk_dkms_installation_selected; then
-            logI "Resolve RP1-GPCLK-DKMS installation plan."
+            logI "Resolved RP1-GPCLK-DKMS installation plan."
         fi
         if [[ "$BINARY_SOURCE" == "auto" ]]; then
             logI "Dry run: release availability is unresolved; application build steps depend on that selection."
