@@ -364,6 +364,86 @@ void usb_management_contract() {
   changed = current;
   changed["schema"] = "transmitter-management/6";
   CHECK(!valid(changed));
+
+  // Every management entry point must refuse before reaching resources or
+  // dispatching a write when discovery is unsupported or inconsistent.
+  for (unsigned fault = 0; fault < 12; ++fault) {
+    Json descriptor{{"schema", "transmitter-management/5"}, {"path", "/api/v1/management"}};
+    auto advertised = current;
+    if (fault == 0) descriptor["path"] = "/api/v1/other";
+    if (fault == 1) descriptor["schema"] = "transmitter-management/6";
+    if (fault == 2) descriptor["extra"] = true;
+    if (fault == 3) descriptor["schema"] = "transmitter-management/4";
+    if (fault == 4) descriptor["schema"] = "transmitter-management/3";
+    if (fault == 5) advertised["limits"]["idle_ms"] = 300000;
+    if (fault == 6) advertised["extra"] = true;
+    if (fault == 7) advertised["schema"] = 5;
+    if (fault == 8) advertised["target"]["boot_id"] = std::string(32, 'f');
+    if (fault == 9) advertised.erase("schema");
+    if (fault == 10) advertised = Json::array();
+    if (fault == 11) advertised = nullptr;
+    const Json caps{{"api_version", 1}, {"management_carriers", descriptor},
+      {"saved_progress", {{"schema", "transmitter-progress/1"}, {"read", "/api/v1/progress"},
+        {"save", "/api/v1/progress/update"}, {"apply", "/api/v1/progress/apply"}, {"max_bytes", 2048}}}};
+    unsigned writes = 0, resource_reads = 0, management_reads = 0;
+    const PicoManagementExchange exchange = [&](auto resource, auto method, auto, auto) {
+      if (method != "GET") ++writes;
+      if (resource == "capabilities") return PicoHttpResponse{200, caps.dump(), {}};
+      if (resource == "management") {
+        ++management_reads;
+        return PicoHttpResponse{200, advertised.dump(), {}};
+      }
+      ++resource_reads;
+      return PicoHttpResponse{503, "{}", {}};
+    };
+    for (const auto &response : {
+      pico_configuration_request(exchange, device, boot, "GET", {}, {}, "usb_physical"),
+      pico_progress_request(exchange, device, boot, "progress", "GET", {}, {}, "usb_physical"),
+      pico_resource_request(exchange, device, boot, "application", "GET", {}, {}, "usb_physical"),
+      pico_configuration_request(exchange, device, boot, "POST",
+        Json{{"schema", "wsprrypi-pico-settings/1"}, {"target", target},
+          {"operation", "save"}, {"config", {{"enabled", false}}}}.dump(), "\"r1\"", "usb_physical"),
+      pico_progress_request(exchange, device, boot, "progress/update", "POST",
+        Json{{"schema", "transmitter-progress/1"}, {"target", target},
+          {"request_id", std::string(32, 'a')}, {"fields", {{"callsign", "AA0NT"}}}}.dump(), "\"r1\"", "usb_physical"),
+      pico_resource_request(exchange, device, boot, "station", "PUT",
+        Json{{"schema", "transmitter-station/2"}, {"target", target},
+          {"station", {{"callsign", "K1ABC"}, {"locator", "EM18"}, {"power_dbm", 20}}}}.dump(), "\"r1\"", "usb_physical")}) {
+      CHECK(response.status == 409);
+      const auto refusal = strict_browser_json(response.body);
+      CHECK(refusal["error"]["code"] == "unsupported_management_contract");
+      CHECK(refusal["mutation_attempted"] == false);
+    }
+    CHECK(writes == 0 && resource_reads == 0);
+    if (fault < 4) CHECK(management_reads == 0);
+  }
+}
+void management_descriptor_matrix() {
+  for (const auto carrier : {"engineering_mtls", "engineering_field", "consumer_station",
+                             "consumer_ap", "usb_physical", "unknown"}) {
+    for (unsigned version = 0; version <= 6; ++version) {
+      const Json descriptor{{"schema", "transmitter-management/" + std::to_string(version)},
+                            {"path", "/api/v1/management"}};
+      const bool expected = std::string(carrier) == "usb_physical" ? version == 3 || version == 5 :
+          std::string(carrier) != "unknown" && (version == 1 || version == 2 || version == 4);
+      CHECK(valid_management_descriptor(descriptor, carrier) == expected);
+      auto invalid = descriptor;
+      invalid["path"] = "/api/v1/other";
+      CHECK(!valid_management_descriptor(invalid, carrier));
+      invalid = descriptor;
+      invalid["extra"] = true;
+      CHECK(!valid_management_descriptor(invalid, carrier));
+      for (const Json &bad_schema : {Json(nullptr), Json(true), Json(version),
+                                     Json::array(), Json::object()}) {
+        invalid = descriptor;
+        invalid["schema"] = bad_schema;
+        CHECK(!valid_management_descriptor(invalid, carrier));
+      }
+    }
+  }
+  CHECK(!valid_management_descriptor(nullptr, "usb_physical"));
+  CHECK(!valid_management_descriptor(Json::array(), "consumer_station"));
+  std::cout << "Closed management versions, carriers, descriptors and pre-mutation refusal matrix passed\n";
 }
 void http_boundaries() {
   for (const auto raw : {"HTTP/1.1 \r\n\r\n", "HTTP/1.1 20x OK\r\n\r\n", "HTTP/1.1 200X\r\n\r\n",
@@ -377,4 +457,4 @@ void http_boundaries() {
   CHECK(wtp_json_http_exchange(valid,[&]{return ++tick;},"",100,true).status==200);
 }
 } // namespace
-int main() { try { checks(); progress_checks(); usb_management_contract(); http_boundaries(); } catch (const std::exception &e) { std::cerr << e.what() << '\n'; return 1; } }
+int main() { try { checks(); progress_checks(); usb_management_contract(); management_descriptor_matrix(); http_boundaries(); } catch (const std::exception &e) { std::cerr << e.what() << '\n'; return 1; } }

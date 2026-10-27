@@ -263,21 +263,23 @@ local code, but does not strengthen that trust model. The browser-to-Pi link use
 the existing trusted-LAN operator policy: protect that link and its operator
 session when entering a shared password. No personal-account isolation is added.
 
-The password is used during login, then its parsed transient storage is wiped;
-HTTP request/parser buffers have their ordinary request lifetime. The UI clears
-login input after an attempt. Only traffic keys remain in RAM, with 5-minute idle
-and 15-minute absolute expiry; no durable credential reference is created.
-Do not put passwords in URLs, saved INI, device catalogs or browser storage.
-Disconnect logs out only this client's session. Pico management/2 supports three
-independent consumer sessions, including native Pi plus phone and Mac. At most
-one of those slots may be a pending login. Full capacity, pending-login quota and
-one-second pacing have distinct finite refusal feedback; no healthy session is
-evicted. Supported older management/1 firmware retains its single-session
-`radio_session_busy` refusal. A lost encrypted reply clears
-local keys; its remote slot can remain occupied until expiry. Wait or close the
-owning session explicitly; this client never uses an unrelated logout.
+The password is used during login, then its parsed transient storage is wiped; HTTP request/parser buffers have their ordinary request lifetime. The UI clears login input after an attempt. Only traffic keys remain in RAM, with idle and absolute expiry selected from authenticated management discovery; no durable credential reference is created. Do not put passwords in URLs, saved INI, device catalogs or browser storage.
 
-Carrier/authority changes require explicit selection and new authentication. There is no redirect follow, alternate-carrier fallback, WTP-principal password, or automatic mutation retry. Authenticate the supported `transmitter-management/1` or `/2` document before using capabilities; public identity is an untrusted hint. Each version has exact closed fields and integer limits. Current network management/4 and USB management/5 retain the /2 and /3 shapes but advertise 1800000 ms idle and 28800000 ms absolute (thirty minutes/eight hours). Historical /1, /2 and /3 retain 300000/900000 ms. Updated native clients select local deadlines only after validating authenticated discovery; older clients explicitly refuse /4 and /5. Public traffic does not renew idle time, and authenticated traffic never renews the absolute lifetime. Version 2 advertises `consumer_sessions:3` and `consumer_pending_logins:1`; version 1 remains frozen at one consumer session. Old Pi clients explicitly refuse version 2. The legacy closed application's `authenticated_https` label remains for old clients; it does not inventory actual carriers. Unsupported discovery refuses. Plain LAN WTP and TLS-WTP carry job control rather than JSON administration. USB-Management/1 support is described in [USB management](wtp-usb-management.md).
+Disconnect logs out only this client's session. Management/2 and /4 support three independent consumer sessions, including native Pi plus phone and Mac, with at most one pending ordinary login. Full capacity, pending-login quota and one-second pacing have distinct finite refusal feedback; no healthy session is evicted. Supported management/1 firmware retains its single-session `radio_session_busy` refusal. A lost encrypted reply clears local keys; its remote slot can remain occupied until expiry. Wait or close the owning session explicitly; this client never uses an unrelated logout.
+
+Carrier/authority changes require explicit selection and new authentication. There is no redirect follow, alternate-carrier fallback, WTP-principal password, or automatic mutation retry. Public identity is an untrusted hint. Each supported management version has exact closed fields and integer limits:
+
+| Management version | Discovery carrier | Consumer idle limit | Consumer absolute limit |
+| --- | --- | --- | --- |
+| /1 | Network; one consumer session | 300000 ms (five minutes) | 900000 ms (fifteen minutes) |
+| /2 | Network; three sessions, one pending login | 300000 ms | 900000 ms |
+| /3 | USB; includes the physical USB carrier row | 300000 ms | 900000 ms |
+| /4 | Network; same shape and capacity as /2 | 1800000 ms (thirty minutes) | 28800000 ms (eight hours) |
+| /5 | USB; same shape and capacity as /3 | 1800000 ms | 28800000 ms |
+
+The Pi validates the complete discovery document and its advertised schema/route descriptor before using it. Unknown versions, carrier mismatches, changed historical limits, non-integer limits and inconsistent device/boot/profile bindings are refused. Native consumer deadlines change only after authenticated discovery passes these checks. Public traffic does not renew idle time, and authenticated traffic never renews the absolute lifetime. A new selection clears the previous policy; older firmware retains its historical deadlines. Older Pi clients that do not recognize /4 and /5 refuse them explicitly.
+
+The USB projection describes the same consumer policy; USB management does not acquire a consumer password session. The legacy closed application's `authenticated_https` label remains for old clients; it does not inventory actual carriers. Plain LAN WTP and TLS-WTP carry job control rather than JSON administration. WTP/1 and resource schemas remain independently versioned. USB-Management/1 support is described in [USB management](wtp-usb-management.md).
 
 
 Host capabilities report built-in management adapters separately from actual

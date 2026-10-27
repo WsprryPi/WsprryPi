@@ -549,11 +549,11 @@ PicoHttpResponse pico_progress_request(const PicoManagementExchange &exchange,
         caps["saved_progress"]["max_bytes"].is_number_integer() && caps["saved_progress"]==Json{{"schema","transmitter-progress/1"},{"read","/api/v1/progress"},
         {"save","/api/v1/progress/update"},{"apply","/api/v1/progress/apply"},{"max_bytes",2048}},"unsupported_saved_progress",409);
     if (caps.contains("management_carriers")) {
+      require(valid_management_descriptor(caps["management_carriers"],carrier),
+          "unsupported_management_contract",409);
       const auto management=parsed(read("management"));
-      require(fields(caps["management_carriers"],{"schema","path"}) &&
-          caps["management_carriers"]["path"]=="/api/v1/management" &&
-          management["schema"]==caps["management_carriers"]["schema"] &&
-          valid_management_contract(management,carrier,device,boot,generation),"unsupported_management_contract",409);
+      require(valid_management_contract(management,carrier,device,boot,generation) &&
+          management["schema"]==caps["management_carriers"]["schema"],"unsupported_management_contract",409);
     } else require(carrier=="engineering_mtls","unsupported_management_contract",409);
     const auto before=read("progress"); const auto old=progress_readback(before,target);
     if (method=="GET") return before;

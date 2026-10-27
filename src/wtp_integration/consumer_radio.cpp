@@ -154,7 +154,10 @@ bool supported_management_schema(const Json &schema, bool usb) {
 }
 } // namespace
 bool valid_management_descriptor(const Json &j, const std::string &carrier) {
-  return fields(j, {"schema", "path"}) &&
+  const bool known_carrier = carrier == "usb_physical" ||
+      carrier == "engineering_mtls" || carrier == "engineering_field" ||
+      carrier == "consumer_station" || carrier == "consumer_ap";
+  return known_carrier && fields(j, {"schema", "path"}) &&
          supported_management_schema(j["schema"], carrier == "usb_physical") &&
          j["path"] == "/api/v1/management";
 }
