@@ -212,8 +212,9 @@ private:
       if (!source.is_object() || source.size() != 4 ||
           !source.at("enabled").is_boolean() ||
           !source.at("maximum_severity").is_number_integer() ||
-          source.at("maximum_severity").get<int>() < 0 ||
-          source.at("maximum_severity").get<int>() > 7 ||
+          (!source.at("maximum_severity").is_number_unsigned() &&
+           source.at("maximum_severity").get<std::int64_t>() < 0) ||
+          source.at("maximum_severity").get<std::uint64_t>() > 7 ||
           !identity(source.at("catalog_id").get<std::string>()) ||
           !identity(source.at("device_id").get<std::string>()) ||
           !ids.insert(source.at("device_id").get<std::string>()).second)
@@ -551,7 +552,7 @@ Json parse_usb_log(const std::string &line, const std::string &device,
       value.at("origin_kind") != "pico" || value.at("origin_id") != device ||
       value.at("boot_id") != boot || !identity(device) || !identity(boot) ||
       !value.at("severity").is_number_unsigned() ||
-      value.at("severity").get<unsigned>() > 7 || value.at("facility") != 23 ||
+      value.at("severity").get<std::uint64_t>() > 7 || value.at("facility") != 23 ||
       !printable(value.at("event").get<std::string>(), 32) ||
       !printable(value.at("origin_name").get<std::string>(), 63) ||
       !printable(value.at("message").get<std::string>(), 192))

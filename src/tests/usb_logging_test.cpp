@@ -60,6 +60,8 @@ int main() {
   value["message"] = "safe";
   value["severity"] = 3;
   reject(frame(), device, boot);
+  value["severity"] = 4294967302ULL;
+  reject(frame(), device, boot);
   value["severity"] = 6;
   value["unexpected"] = "field";
   reject(frame(), device, boot);
@@ -102,6 +104,9 @@ int main() {
   assert(nlohmann::json::parse(read.body).at("sources") == policy.at("sources"));
   auto enabled = policy; enabled["sources"][0]["enabled"] = true;
   assert(usb_logging_api("PUT", enabled.dump(), read.etag).status == 409);
+  auto oversized_severity = policy;
+  oversized_severity["sources"][0]["maximum_severity"] = 4294967302ULL;
+  assert(usb_logging_api("PUT", oversized_severity.dump(), read.etag).status == 409);
   auto unknown = policy; unknown["sources"][0]["catalog_id"] = std::string(32, 'd');
   assert(usb_logging_api("PUT", unknown.dump(), read.etag).status == 409);
   assert(chmod((ini + ".usb-logs.json").c_str(), 0644) == 0);

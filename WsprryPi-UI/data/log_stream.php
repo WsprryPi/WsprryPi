@@ -36,7 +36,7 @@
 // - playback=0|1 (default 1) controls whether replay/backlog happens at all
 // - backlog=N (default 200, clamped) controls journalctl -n N for replay
 // - priority_min=0..7 / priority_max=0..7
-// - unit=a.service,b.service  (default wsprrypi.service) or unit=* to disable
+// - source=all|local|pico:<device-id> (default all); unit is fixed to wsprrypi.service
 // - heartbeat=seconds (default 15, clamped)
 
 declare(strict_types=1);
