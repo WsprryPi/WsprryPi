@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Force the actual logger's predicate-to-wait shutdown window on Linux."""
 import os
+import re
 from pathlib import Path
 import subprocess
 import tempfile
@@ -32,7 +33,7 @@ FIXTURE = r'''
 #include <thread>
 static std::atomic<unsigned> records{0};
 static bool sink(int, const std::string&, const std::string&) { ++records; return true; }
-static void drained() { if (records != 200) std::_Exit(3); }
+static void drained() { std::cout << "SINK_COUNT=" << records << "\n"; }
 int main(int argc, char**) {
     if (argc > 1) std::atexit(drained); // Runs after the logger's destructor.
     auto& logger = getLogger();
@@ -40,7 +41,8 @@ int main(int argc, char**) {
     logger.enableJournald(true);
     if (argc > 1) {
         for (unsigned i = 0; i < 100; ++i) {
-            logger.logS(INFO, "out"); logger.logS(ERROR, "err");
+            logger.logS(INFO, "drain-" + std::to_string(i * 2));
+            logger.logS(ERROR, "drain-" + std::to_string(i * 2 + 1));
         }
     } else {
         auto entered = reinterpret_cast<int (*)()>(dlsym(RTLD_DEFAULT, "test_wait_entered"));
@@ -68,5 +70,13 @@ with tempfile.TemporaryDirectory(prefix='wsprrypi-logger-shutdown-') as director
     for attempt in range(5):
         subprocess.run([str(work/'fixture')], env=dict(os.environ, LD_PRELOAD=str(work/'wait.so')),
                        check=True, timeout=4, capture_output=True)
-        subprocess.run([str(work/'fixture'), 'drain'], check=True, timeout=4, capture_output=True)
+        result = subprocess.run([str(work/'fixture'), 'drain'], check=True, timeout=4,
+                                capture_output=True, text=True)
+        # A worker already waiting in stream mode may validly drain there while
+        # journald is being enabled. Count both sinks rather than assuming the
+        # mode transition retroactively changes the worker's current batch.
+        count = re.findall(r'SINK_COUNT=(\d+)', result.stdout)
+        streamed = re.findall(r'drain-(\d+)', result.stdout + result.stderr)
+        assert len(count) == 1 and len(streamed) == len(set(streamed)), result
+        assert int(count[0]) + len(streamed) == 200, result
 print('10 actual logger forced-wait shutdown and pending-record drain checks passed')
