@@ -23,7 +23,9 @@ for tool in awk cat curl date grep mktemp ps sed sleep sudo systemctl tr; do
     fi
 done
 
-UNIT_FILTER="${PROCESS_PREFIX}$$-$(date +%s).service"
+UNIT_FILTER="wsprrypi.service"
+SOURCE_FILTER="$(printf '%032x' "$(( $$ * 1000000000 + $(date +%s) ))")"
+readonly SOURCE_FILTER
 readonly UNIT_FILTER
 DIAGNOSTICS_DIR="$(mktemp -d "/tmp/issue355-log-stream.XXXXXX")"
 if [[ -z "$DIAGNOSTICS_DIR" || ! -d "$DIAGNOSTICS_DIR" ]]; then
@@ -104,7 +106,7 @@ discover_request_tree() {
         pid="${comm_file#/proc/}"
         pid="${pid%/comm}"
         args="$(process_args "$pid")"
-        if [[ " $args " == *" -u $UNIT_FILTER "* ]]; then
+        if [[ " $args " == *" -u $UNIT_FILTER "* && " $args " == *" WSPRRY_ORIGIN_ID=$SOURCE_FILTER "* ]]; then
             found_pid="$pid"
             found_count=$((found_count + 1))
         fi
@@ -310,7 +312,7 @@ if ps -eo args= | grep -F -- "$PROCESS_PREFIX" | grep -v -F -- "$UNIT_FILTER" | 
     exit 1
 fi
 
-url="${ENDPOINT}?playback=0&heartbeat=${HEARTBEAT_SECONDS}&unit=${UNIT_FILTER}"
+url="${ENDPOINT}?playback=0&heartbeat=${HEARTBEAT_SECONDS}&source=pico:${SOURCE_FILTER}"
 curl --silent --show-error --fail --no-buffer --noproxy '*' \
     --dump-header "$HEADER_FILE" "$url" > "$RESPONSE_FILE" 2>&1 &
 client_pid=$!
@@ -355,7 +357,7 @@ while (( SECONDS < deadline )); do
     sleep 1
 done
 if ! same_process "$journal_pid" "$journal_start"; then
-    fail "expected exactly one live journalctl for the unique unit"
+    fail "expected exactly one live journalctl for the unique scoped source"
     exit 1
 fi
 

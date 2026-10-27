@@ -40,6 +40,7 @@ PicoHttpResponse WtpBrowserApi::handle(const BrowserRequest &r) {
     const auto host = status_();
 
     return {200, nlohmann::json{{"api_version", 1}, {"scope", "wsprrypi-host/1"},
+        {"host_logging", {{"schema","host-usb-logging/1"},{"path","/api/v1/host/logging"},{"maximum_sources",8}}},
         {"wtp", host.value("capabilities", nlohmann::json(nullptr))},
         {"features", {{"config", true}, {"schedules", true}, {"network", true},
                       {"jobs", true}, {"member_resources",true}, {"softap", false}, {"ble", false}}},
@@ -59,10 +60,10 @@ PicoHttpResponse WtpBrowserApi::handle(const BrowserRequest &r) {
     if (r.method == "POST") { usb_resource_reads_.clear(); member_context_.clear(); member_revision_.clear(); legacy_read_required_ = true; alias_reads_required_ = {"config","schedules","network"}; }
     return management_("member/management", r.method, r.body, {}, {});
   }
-  for (const std::string resource : {"wifi","hostname","restart","ap","progress","progress/update","progress/apply","gpio-drive","gpio-drive-progress"}) {
+  for (const std::string resource : {"wifi","hostname","logging","restart","ap","progress","progress/update","progress/apply","gpio-drive","gpio-drive-progress"}) {
     if (r.path != "/api/v1/member/" + resource) continue;
-    const bool read = r.method == "GET" && (resource == "wifi" || resource == "hostname" || resource == "progress" || resource == "gpio-drive" || resource == "gpio-drive-progress");
-    const bool write = (r.method == "PUT" && (resource == "wifi" || resource == "hostname" || resource == "gpio-drive" || resource == "gpio-drive-progress")) ||
+    const bool read = r.method == "GET" && (resource == "wifi" || resource == "hostname" || resource == "logging" || resource == "progress" || resource == "gpio-drive" || resource == "gpio-drive-progress");
+    const bool write = (r.method == "PUT" && (resource == "wifi" || resource == "hostname" || resource == "logging" || resource == "gpio-drive" || resource == "gpio-drive-progress")) ||
         (r.method == "DELETE" && resource == "wifi") ||
         (r.method == "POST" && (resource == "gpio-drive-progress" || resource == "restart" || resource == "ap" || resource == "progress/update" || resource == "progress/apply"));
     if (!read && !write) return error(404,"not_found");

@@ -31,9 +31,52 @@
 #include "config_handler.hpp"
 #include "lcblog.hpp"
 #include "version.hpp"
+#include "wtp_endpoint/identity.hpp"
+#include <atomic>
+#include <chrono>
+#include <unistd.h>
+#if defined(__linux__) && LIB_JOURNALD
+#include <systemd/sd-journal.h>
+#include <sys/timex.h>
+#endif
 
 namespace
 {
+    bool native_journal_record(int priority, const std::string& identifier, const std::string& message)
+    {
+#if defined(__linux__) && LIB_JOURNALD
+        try {
+            static const auto device = wsprrypi::wtp_pi_device_id();
+            static const auto boot = wsprrypi::WtpPiBootIdentity{}.new_boot_id();
+            static std::atomic<std::uint64_t> sequence{0};
+            auto previous = sequence.load();
+            do { if (previous == UINT64_MAX) return true; }
+            while (!sequence.compare_exchange_weak(previous, previous + 1));
+            char hostname[256]{};
+            if (gethostname(hostname, sizeof(hostname) - 1)) hostname[0] = 0;
+            const auto mono = std::chrono::duration_cast<std::chrono::nanoseconds>(
+                std::chrono::steady_clock::now().time_since_epoch()).count();
+            const auto utc = std::chrono::duration_cast<std::chrono::nanoseconds>(
+                std::chrono::system_clock::now().time_since_epoch()).count();
+            timex quality{};
+            const bool valid_utc = adjtimex(&quality) == TIME_OK && !(quality.status & (STA_UNSYNC | STA_CLOCKERR));
+            const auto utc_text = valid_utc ? std::to_string(utc) : std::string{};
+            return sd_journal_send("MESSAGE=%s", message.c_str(), "PRIORITY=%d", priority,
+                "SYSLOG_IDENTIFIER=%s", identifier.c_str(), "SYSLOG_FACILITY=23",
+                "WSPRRY_LOG_SCHEMA=wsprry-log/1", "WSPRRY_ORIGIN_KIND=pi",
+                "WSPRRY_ORIGIN_ID=%s", device.c_str(), "WSPRRY_ORIGIN_NAME=%s", hostname,
+                "WSPRRY_ORIGIN_BOOT=%s", boot.c_str(),
+                "WSPRRY_ORIGIN_SEQUENCE=%s", std::to_string(previous + 1).c_str(),
+                "WSPRRY_ORIGIN_MONOTONIC_NS=%s", std::to_string(mono).c_str(),
+                "WSPRRY_ORIGIN_UTC_NS=%s", utc_text.c_str(),
+                "WSPRRY_EVENT=PI_LOG", "WSPRRY_INGRESS=native", "WSPRRY_COLLECTOR_ID=%s", device.c_str(),
+                "WSPRRY_FORWARDERS=[]", nullptr) >= 0;
+        } catch (...) { return false; }
+#else
+        (void)priority; (void)identifier; (void)message;
+        return false;
+#endif
+    }
     void apply_log_level(bool enable_debug_logging)
     {
         llog.setLogLevel(enable_debug_logging ? DEBUG : INFO);
@@ -52,6 +95,7 @@ void initialize_logger(
     bool enable_timestamps,
     bool enable_debug_logging)
 {
+    LCBLog::setJournaldSink(native_journal_record);
     apply_log_level(enable_debug_logging);
 
     if (use_journald)

@@ -47,6 +47,10 @@ jobs:
       - name: Check out source
         uses: actions/checkout@v7
 
+      - name: Check bounded USB logging parser and policy
+        working-directory: src
+        run: make usb-logging-test BACKENDS=simulated ANCILLARY_GPIO=0 SUDO=
+
       - name: Run portable semantics profile
         working-directory: src
         run: |
@@ -249,6 +253,10 @@ jobs:
       - name: Trust parent checkout ownership
         run: |
           git config --global --add safe.directory "$GITHUB_WORKSPACE"
+
+      - name: Check bounded USB logging parser and policy
+        working-directory: src
+        run: make usb-logging-test BACKENDS=simulated ANCILLARY_GPIO=0 SUDO=
 
       - name: Build parent debug executable
         working-directory: src

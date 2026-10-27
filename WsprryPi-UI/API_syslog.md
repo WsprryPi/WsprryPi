@@ -158,7 +158,9 @@ Replay occurs even on resume when enabled, scoped by cursor if present.
 ### Filtering
 
 - `priority_min`, `priority_max` map to `journalctl -p`
-- `unit` filters systemd units (`*` disables filtering)
+- `source=all|local|pico:<32-lowercase-hex-device-id>` selects origins; default `all`. Invalid source values fall back to local records.
+- Access remains scoped to `wsprrypi.service`; the legacy `unit` query is ignored, including `unit=*`.
+- `priority_min` and `priority_max` filter severity inside that scope.
 
 ---
 
@@ -220,3 +222,11 @@ They share the same schema and never advance cursors.
 
 Transport-only API.  
 Rendering, persistence, and UI conventions are consumer-defined.
+
+## USB origin metadata
+
+Journal entries additionally expose `log_schema`, `source`, `origin_kind`, `origin_id`, `origin_name`, `origin_boot`, `origin_sequence`, `origin_utc_ns`, `origin_monotonic_ns`, `event_code`, `facility`, `dropped`, `collector_id`, `receipt_us`, `ingress` and `forwarders`. Counters and times remain decimal strings; unavailable origin values remain null. Historical native records may lack origin session/sequence metadata. `__CURSOR` always remains the actual journal cursor.
+
+Imported USB records are sent by the application process to its journal unit with custom `WSPRRY_*` origin fields. The adapter preserves journald's trusted fields and receipt timestamp. The browser uses origin UTC when available and explicitly labels receipt-only timestamps `received`. Source and severity context include the verified collector identity in the cursor storage key. No cursor is resumed or stored before collector identity is verified, and internal SSE messages cannot advance it.
+
+`GET`/`PUT /api/v1/host/logging` manage the Pi-owned `host-usb-logging/1` collection policy. PUT requires the exact `collector_id`, `If-Match` and a bounded list of saved Fleet USB source identities. Firmware export is independent: `GET`/`PUT /api/v1/member/logging`, through selected physical USB management, proxy `transmitter-logging/1` with target/revision guards. Closing or pausing the browser view does not change either policy.

@@ -36,10 +36,12 @@
 // - playback=0|1 (default 1) controls whether replay/backlog happens at all
 // - backlog=N (default 200, clamped) controls journalctl -n N for replay
 // - priority_min=0..7 / priority_max=0..7
-// - unit=a.service,b.service  (default wsprrypi.service) or unit=* to disable
+// - source=all|local|pico:<device-id> (default all); unit is fixed to wsprrypi.service
 // - heartbeat=seconds (default 15, clamped)
 
 declare(strict_types=1);
+require_once __DIR__ . '/log_origin.php';
+$logSource = log_source($_GET['source'] ?? 'all');
 
 header('Content-Type: text/event-stream; charset=utf-8');
 header('Cache-Control: no-cache, no-transform');
@@ -301,7 +303,7 @@ if ($priorityMin !== null && $priorityMax !== null && $priorityMin > $priorityMa
 }
 
 // Unit filter: default to the project unit, unless unit=* is requested.
-$unitParam = $_GET['unit'] ?? null;
+$unitParam = 'wsprrypi.service'; // This endpoint exposes only the application service.
 $units = [];
 $unitFilterDisabled = false;
 
@@ -548,6 +550,8 @@ function normalize_realtime_timestamp($value): ?string
 
 function send_entry(array $entry, bool $isPlayback): ?string
 {
+    global $logSource;
+    if (!log_scope_matches($entry) || !log_source_matches($entry, $logSource)) return null;
     $cursor = $entry['__CURSOR'] ?? null;
     $realtimeTimestamp = normalize_realtime_timestamp(
         $entry['__REALTIME_TIMESTAMP'] ?? ($entry['_SOURCE_REALTIME_TIMESTAMP'] ?? null)
@@ -568,6 +572,7 @@ function send_entry(array $entry, bool $isPlayback): ?string
         'GID' => isset($entry['_GID']) ? (int)$entry['_GID'] : null,
     ];
 
+    $payload = array_merge($payload, log_origin($entry));
     $sseCursor = is_string($cursor) && $cursor !== '' ? $cursor : null;
     emit_payload($payload, 'journal', $sseCursor);
 
@@ -579,8 +584,10 @@ function drain_process(
     bool $followMode,
     ?string $internalUnit,
     int $heartbeatSec,
-    bool $isPlayback
+    bool $isPlayback,
+    ?string $probeCursor = null
 ): array {
+    global $logSource;
     $pipes = $started['pipes'];
 
     $stdoutBuf = '';
@@ -721,7 +728,9 @@ function drain_process(
                 continue;
             }
 
-            $c = send_entry($entry, $isPlayback);
+            $c = $probeCursor !== null
+                ? (log_cursor_matches($entry, $probeCursor, $logSource) ? $probeCursor : null)
+                : send_entry($entry, $isPlayback);
             $entryCount += 1;
             if ($c !== null) {
                 $lastCursor = $c;
@@ -752,7 +761,9 @@ function drain_process(
             continue;
         }
 
-        $c = send_entry($entry, $isPlayback);
+        $c = $probeCursor !== null
+                ? (log_cursor_matches($entry, $probeCursor, $logSource) ? $probeCursor : null)
+                : send_entry($entry, $isPlayback);
         $entryCount += 1;
         if ($c !== null) {
             $lastCursor = $c;
@@ -805,6 +816,10 @@ if (!$unitFilterDisabled) {
     }
 }
 
+if (str_starts_with($logSource, 'pico:')) {
+    $journalFilters[] = 'WSPRRY_ORIGIN_ID=' . substr($logSource, 5);
+}
+
 emit_internal(
     'SSE connected. playback=' . ($playbackEnabled ? '1' : '0') .
     ' backlog=' . (string)$initialBacklog .
@@ -822,7 +837,8 @@ function run_replay_command(
     array $parts,
     ?string $internalUnit,
     int $heartbeatSec,
-    string $label
+    string $label,
+    ?string $probeCursor = null
 ): array {
     emit_playback_event('playback_start', true);
     emit_internal($label . ' starting', '7', $internalUnit, true);
@@ -836,7 +852,7 @@ function run_replay_command(
             emit_internal($label . ' exited quickly; draining output', '7', $internalUnit, true);
         }
 
-        $res = drain_process($started, false, $internalUnit, $heartbeatSec, true);
+        $res = drain_process($started, false, $internalUnit, $heartbeatSec, true, $probeCursor);
 
         if (empty($res['cleanup']['terminated'])) {
             emit_internal(
@@ -960,6 +976,18 @@ if ($playbackEnabled && $initialBacklog > 0) {
         $cursorReplayFailed = !$replayOutcome['ok'];
         $cursorReplayEmpty = ($cursorReplayEntries === 0);
 
+        // Zero new entries is normal at the current tail. Probe the exact
+        // scoped cursor without emitting it; only a removed/invalid cursor
+        // warrants backlog recovery after rotation.
+        if (!$cursorReplayFailed && $cursorReplayEmpty) {
+            $probe = run_replay_command(
+                array_merge($replayBaseParts, ['--cursor', $lastCursor, '-n', '1']),
+                $internalUnit, $heartbeatSec, 'journalctl resume cursor check', $lastCursor
+            );
+            if (empty($probe['result']['cleanup']['terminated'])) exit;
+            $cursorReplayEmpty = !$probe['ok'] ||
+                ($probe['result']['lastCursor'] ?? null) !== $lastCursor;
+        }
         if ($cursorReplayFailed || $cursorReplayEmpty) {
             $reason = $cursorReplayFailed ? 'cursor replay failed' : 'cursor replay returned 0 entries';
             emit_internal(

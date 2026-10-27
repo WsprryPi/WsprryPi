@@ -23,8 +23,31 @@ require __DIR__ . '/../card_header.php';
                             class="btn btn-outline-primary btn-sm logs-toolbar-btn"
                             type="button">Start stream</button>
                     </div>
+                    <div class="logs-source-control">
+                        <label for="logs-source" class="form-label mb-0">Source</label>
+                        <select id="logs-source" class="form-select" aria-describedby="logs-source-status">
+                            <option value="all">All sources</option>
+                            <option value="local">Local Pi</option>
+                        </select>
+                    </div>
                 </div>
 
+                <p id="logs-source-status" class="logs-source-status" role="status" aria-live="polite"></p>
+                <details class="logs-options">
+                    <summary>Log options</summary>
+                    <div class="logs-options-controls">
+                        <label for="logs-severity">Show severity</label>
+                        <select id="logs-severity" class="form-select">
+                            <option value="7">All levels</option><option value="6">Info and higher</option>
+                            <option value="4">Warnings and errors</option><option value="3">Errors only</option>
+                        </select>
+                        <button id="logs-refresh-sources" class="btn btn-outline-secondary" type="button">Refresh sources</button>
+                        <button id="logs-pause" class="btn btn-outline-secondary" type="button">Pause view</button>
+                        <button id="logs-export" class="btn btn-outline-secondary" type="button">Export visible logs</button>
+                        <label><input id="logs-collect" type="checkbox" disabled> Collect this Pico's USB logs</label>
+                        <p class="mb-0">Collection continues when this page is closed. Turn collection off before using the Pico Console in another tool. Enable USB logging on the Pico separately.</p>
+                    </div>
+                </details>
                 <button id="btn-jump-bottom" type="button" class="btn btn-sm btn-primary logs-jump-bottom" hidden>Jump to newest</button>
                 <div id="log-scroll">
                     <div id="logsTabContent">

@@ -78,6 +78,7 @@ std::string logLevelToString(LogLevel level)
 }
 
 namespace {
+std::atomic<LCBLog::JournaldSink> journal_sink{nullptr};
 
 int logLevelToJournaldPriority(LogLevel level)
 {
@@ -116,6 +117,7 @@ std::string sanitizeJournaldLine(const std::string &line)
 #if LCBLOG_HAS_JOURNALD
 void sendToJournald(int priority, const std::string &ident, const std::string &line)
 {
+    if (const auto sink = journal_sink.load(std::memory_order_acquire); sink && sink(priority, ident, line)) return;
     if (ident.empty())
     {
         (void)sd_journal_print(priority, "%s", line.c_str());
@@ -430,6 +432,11 @@ void LCBLog::enableJournald(bool enable)
         outCv_.notify_all();
         errCv_.notify_all();
     }
+}
+
+void LCBLog::setJournaldSink(JournaldSink sink)
+{
+    journal_sink.store(sink, std::memory_order_release);
 }
 
 void LCBLog::setJournaldIdentifier(const std::string &ident)

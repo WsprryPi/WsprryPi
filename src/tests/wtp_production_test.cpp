@@ -507,6 +507,12 @@ void run(const std::string &credentials) {
   auto pi_endpoint = browser.Get("/api/v1/host/wtp-endpoint", read_headers);
   CHECK(pi_endpoint && pi_endpoint->status == 200 &&
         nlohmann::json::parse(pi_endpoint->body).at("schema") == "wsprrypi-wtp-endpoint/1");
+  auto logs_unstarted = browser.Get("/api/v1/host/logging", read_headers);
+  CHECK(logs_unstarted && logs_unstarted->status == 503 &&
+        nlohmann::json::parse(logs_unstarted->body).at("error").at("code") == "usb_logging_unavailable");
+  auto logging_missing_origin = browser.Put("/api/v1/host/logging", read_headers,
+      R"({})", "application/json");
+  CHECK(logging_missing_origin && logging_missing_origin->status == 403);
   auto fleet_unstarted = browser.Get("/api/v1/host/fleet", read_headers);
   CHECK(fleet_unstarted && fleet_unstarted->status == 503 &&
         nlohmann::json::parse(fleet_unstarted->body).at("error").at("code") == "fleet_unavailable");
