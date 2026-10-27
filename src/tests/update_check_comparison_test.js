@@ -395,19 +395,19 @@ async function runBuildPriorityCase({
     assert.ok(!historyUrl.includes("ui_refresh"), "successful convergence must remove the refresh token");
 
     let diagnosticMessage = "";
-    let diagnosticShown = false;
     const diagnostic = {
-        classList: { remove: (name) => { diagnosticShown = name === "d-none"; } },
-        querySelector: () => ({
-            set textContent(value) { diagnosticMessage = value; },
-        }),
+        hidden: true,
+        querySelector: (selector) => {
+            assert.strictEqual(selector, ".page-warning__message", "the diagnostic must populate the shared warning message");
+            return { set textContent(value) { diagnosticMessage = value; } };
+        },
     };
     context.document.getElementById = (id) => id === "uiConsistencyDiagnostic"
         ? diagnostic
         : originalGetElementById(id);
     context.window.location.href = "http://localhost/?ui_refresh=requested-build";
     assert.strictEqual(context.checkUiRefreshConvergence(), false);
-    assert.strictEqual(diagnosticShown, true);
+    assert.strictEqual(diagnostic.hidden, false, "failed convergence must reveal the page warning");
     assert.ok(diagnosticMessage.includes("requested-build"));
     assert.ok(diagnosticMessage.includes("loaded-build"));
     context.maybePromptForUiRefresh({ installed_ui_build_id: "another-build" });

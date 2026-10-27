@@ -76,8 +76,9 @@ jobs:
     needs: change_scope
     if: ${{ !cancelled() && (needs.change_scope.result != 'success' || needs.change_scope.outputs.run_full_ci != 'false') }}
     runs-on: ubuntu-24.04
-    # Cold C++ builds share this budget with TLS, routing, and browser checks.
-    timeout-minutes: 30
+    # Cold dependency installation and C++ builds share this budget with TLS,
+    # routing, and browser checks; allow the final checks to finish on cold runners.
+    timeout-minutes: 45
     env:
       WSPRRYPI_DISABLE_HARDWARE_ACCESS: "1"
     steps:
