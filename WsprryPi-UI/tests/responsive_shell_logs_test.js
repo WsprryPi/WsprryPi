@@ -11,6 +11,7 @@ const logsJs = fs.readFileSync(path.join(root, "data/view_logs.js"), "utf8");
 const indexCss = fs.readFileSync(path.join(root, "data/index.css"), "utf8");
 const configView = fs.readFileSync(path.join(root, "data/views/config.php"), "utf8");
 const pageShell = fs.readFileSync(path.join(root, "data/page_shell_start.php"), "utf8");
+const pageWarning = fs.readFileSync(path.join(root, "data/page_warning.php"), "utf8");
 
 assert.match(
     siteCss,
@@ -44,14 +45,15 @@ assert.match(
 );
 assert.match(
     pageShell,
-    /id="uiConsistencyDiagnostic"[\s\S]*?role="status"[\s\S]*?aria-live="polite"[\s\S]*?UI consistency could not be confirmed/,
+    /renderPageWarning\('uiConsistencyDiagnostic',[^\n]*UI consistency could not be confirmed/,
     "the shared shell must provide a persistent, assistive-technology-readable UI consistency diagnostic"
 );
 assert.match(
     siteCss,
-    /\.ui-consistency-diagnostic\s*{[\s\S]*?overflow-wrap:\s*anywhere;/,
+    /\.page-warning\s*{[\s\S]*?overflow-wrap:\s*anywhere;/,
     "long UI identities must wrap without overflowing the diagnostic"
 );
+assert.match(pageWarning, /role="status" aria-live="polite"/, "page warnings must retain live-region semantics");
 assert.match(
     logsJs,
     /isConnecting[\s\S]*?"Connecting…"[\s\S]*?btn\.disabled = isConnecting;[\s\S]*?aria-disabled/,

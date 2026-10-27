@@ -258,5 +258,6 @@ async function reviewIntegratedUi(client, origin, evidence) {
     await capture('maintenance-keyboard-return-dark-mobile');
     fs.writeFileSync(path.join(evidence,"measurements.json"),JSON.stringify(measurements,null,2));
     console.log(`Integrated console: 5 pages, 4 modes, 2 themes x 3 viewports, 200% text, button contrast, descriptions and first-record clearance passed; ${evidence}`);
+    await require("./page_warning_browser.js").reviewPageWarnings(client, origin, path.join(evidence, "page-warnings"));
 }
 module.exports={reviewIntegratedUi};

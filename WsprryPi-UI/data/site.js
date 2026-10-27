@@ -6714,7 +6714,7 @@ function refreshUiForIdentity(installedBuildId) {
 
 function showUiConsistencyDiagnostic(expectedBuildId, loadedBuildId) {
     const diagnostic = document.getElementById("uiConsistencyDiagnostic");
-    const message = diagnostic?.querySelector(".ui-consistency-diagnostic__message");
+    const message = diagnostic?.querySelector(".page-warning__message");
 
     uiConsistencyDiagnosticActive = true;
     if (!diagnostic || !message) {
@@ -6725,7 +6725,7 @@ function showUiConsistencyDiagnostic(expectedBuildId, loadedBuildId) {
     const expected = normalizeUiBuildId(expectedBuildId) || "unavailable";
     const loaded = normalizeUiBuildId(loadedBuildId) || "unavailable";
     message.textContent = `The requested UI identity (${expected}) did not match the page that loaded (${loaded}). The installation may still be changing. Wait for it to finish, then reload this page once.`;
-    diagnostic.classList.remove("d-none");
+    diagnostic.hidden = false;
 }
 
 function checkUiRefreshConvergence() {

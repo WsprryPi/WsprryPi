@@ -18,7 +18,8 @@
             const text = active ? observed || localPending
                 ? "Pico firmware maintenance is active. Settings, device selection, transmission, reboot and shutdown are disabled. Use Pico firmware over USB to continue or recover the update."
                 : "Checking Pico firmware status before allowing changes. Settings, transmission, reboot and shutdown remain disabled until the controller responds." : "";
-            if (banner.textContent !== text) banner.textContent = text;
+            const message = banner.querySelector('.page-warning__message');
+            if (message && message.textContent !== text) message.textContent = text;
         }
         if (active) {
             root.document.querySelectorAll("button, input, select, textarea").forEach(control => {

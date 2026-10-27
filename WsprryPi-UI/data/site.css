@@ -188,14 +188,15 @@
         visibility 0s linear 0s;
 }
 
-.ui-consistency-diagnostic {
-    max-width: 72rem;
-    margin: 0 auto 1rem;
+.page-warning {
+    align-self: stretch;
+    min-width: 0;
+    margin: 0;
     overflow-wrap: anywhere;
     border-color: color-mix(in srgb, var(--wspr-state-warning) 58%, var(--bs-border-color));
 }
 
-.ui-consistency-diagnostic__title {
+.page-warning__title {
     display: flex;
     gap: 0.5rem;
     align-items: center;
@@ -206,7 +207,7 @@
     line-height: var(--leading-tight);
 }
 
-.ui-consistency-diagnostic__message {
+.page-warning__message {
     max-width: 68ch;
 }
 
