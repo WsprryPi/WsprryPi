@@ -57,6 +57,7 @@ endif()
 execute_process(COMMAND "${Python3_EXECUTABLE}" "${PICO_SOURCE}/scripts/generate_web_assets.py" "${PICO_SOURCE}" "${CMAKE_BINARY_DIR}/generated/web_assets.cpp" COMMAND_ERROR_IS_FATAL ANY)
 add_subdirectory("${PICO_SOURCE}/src/microchrony" "${CMAKE_BINARY_DIR}/microchrony")
 set(core
+    logging/logger.cpp
     application/config_update.cpp
     application/resources.cpp
     application/frequency_policy.cpp

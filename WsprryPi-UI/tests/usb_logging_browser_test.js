@@ -114,6 +114,10 @@ async function main(){
   assert.equal(await evaluate(`document.getElementById('logs-collect').disabled`),false,'Removed Fleet profile retains disable control');
   await evaluate(`document.getElementById('logs-collect').click()`);await until(()=>Promise.resolve(policy.sources.length===0));
   await evaluate(`document.querySelector('.logs-options').open=true;document.getElementById('logs-source').focus()`);
+  assert(await evaluate(`document.querySelector('.logs-options').textContent.includes('Console remains available')`));
+  policy={...policy,status:{...policy.status,[b]:{state:'dedicated_logging_unsupported'}}};
+  await evaluate(`document.getElementById('logs-source').value='pico:'+ '${'b'.repeat(32)}';document.getElementById('logs-source').dispatchEvent(new Event('change'));document.getElementById('logs-refresh-sources').click()`);
+  await until(()=>evaluate(`document.getElementById('logs-source-status').textContent.includes('Update Pico firmware')`));
   for(const [width,height,theme,name] of [[1440,960,'light','options-desktop-light'],[390,844,'light','options-mobile-light'],[1440,960,'dark','options-desktop-dark'],[390,844,'dark','options-mobile-dark']]){
    await client.send('Emulation.setDeviceMetricsOverride',{width,height,deviceScaleFactor:1,mobile:width<600});
    await evaluate(`document.documentElement.dataset.bsTheme='${theme}';window.scrollTo(0,0)`);await wait(150);

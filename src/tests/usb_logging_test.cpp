@@ -65,6 +65,42 @@ int main() {
   value["severity"] = 6;
   value["unexpected"] = "field";
   reject(frame(), device, boot);
+  nlohmann::json handshake = {{"schema", "usb-logging/1"},
+    {"target", {{"device_id", device}, {"boot_id", boot}}},
+    {"active", {{"enabled", true}, {"maximum_severity", 6}, {"streaming", false},
+                {"connected", true}, {"queued", 0}, {"dropped", "0"}}}};
+  assert(parse_usb_logging_status(handshake.dump(), device) == handshake);
+  for (unsigned variant = 0; variant < 12; ++variant) {
+    auto invalid = handshake;
+    switch (variant) {
+    case 0: invalid["schema"] = "usb-logging/2"; break;
+    case 1: invalid["extra"] = true; break;
+    case 2: invalid["target"] = nullptr; break;
+    case 3: invalid["target"]["device_id"] = std::string(32, 'c'); break;
+    case 4: invalid["active"]["maximum_severity"] = 4294967302ULL; break;
+    case 5: invalid["active"]["queued"] = 17; break;
+    case 6: invalid["active"]["enabled"] = 1; break;
+    case 7: invalid["active"]["connected"] = false; break;
+    case 8: invalid["active"]["dropped"] = "01"; break;
+    case 9: invalid["active"].erase("streaming"); break;
+    case 10: invalid["target"]["boot_id"] = 3; break;
+    case 11: invalid["active"]["queued"] = -1; break;
+    }
+    bool refused = false;
+    try { (void)parse_usb_logging_status(invalid.dump(), device, boot); } catch (...) { refused = true; }
+    assert(refused);
+  }
+  auto ack = nlohmann::json{{"schema", "usb-logging/1"},
+      {"target", handshake["target"]}, {"streaming", true}};
+  validate_usb_logging_start(ack.dump(), device, boot);
+  for (const auto &invalid : {std::string("{\"ok\":true}"),
+       std::string("{\"schema\":\"usb-logging/1\",\"schema\":\"usb-logging/1\",\"target\":") +
+       handshake["target"].dump() + ",\"streaming\":true}",
+       nlohmann::json{{"schema", "usb-logging/1"}, {"target", handshake["target"]}, {"streaming", false}}.dump()}) {
+    bool refused = false;
+    try { validate_usb_logging_start(invalid, device, boot); } catch (...) { refused = true; }
+    assert(refused);
+  }
   const nlohmann::json attached = {{"available", true}, {"candidates", {{{"settings", {{"USB Serial", "1545B6EFBF78028C"}}}}, {{"settings", {{"USB Serial", "invalid"}}}}}}};
   const auto observed = usb_logging_attached_sources(attached);
   assert(observed.size() == 1 && observed[0]["device_id"] == "c2a3a2a314c948b50a8562a1aeb69669");

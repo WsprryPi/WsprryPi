@@ -135,13 +135,14 @@ PicoCdcSelection paired_linux_cdc(const PicoCdcSelection &selected,
           candidate.control_interface != static_cast<unsigned>(role) ||
           candidate.usb_serial != source.usb_serial || candidate.vendor_id != source.vendor_id ||
           candidate.product_id != source.product_id) continue;
-      if (result) throw std::logic_error("Ambiguous USB management interface");
+      if (result) throw std::logic_error("Ambiguous USB role interface");
       result = PicoCdcSelection{candidate.path,candidate.usb_serial,
           candidate.vendor_id,candidate.product_id,role};
     } catch (const std::logic_error &) { throw; }
       catch (const std::exception &) { /* Other tty devices are not candidates. */ }
   }
-  if (!result) throw std::runtime_error("Selected firmware has no paired USB management interface");
+  if (!result) throw std::runtime_error(role == PicoCdcRole::Logging
+      ? "dedicated_logging_unsupported" : "Selected firmware has no paired USB management interface");
   return *result;
 }
 
@@ -237,7 +238,7 @@ bool UsbCdcStream::begin_open(const PicoCdcSelection &selection,
     if (!valid_text(selection.path, 4096) ||
         !std::filesystem::path(selection.path).is_absolute() ||
         !valid_text(selection.usb_serial, 256) || !selection.vendor_id ||
-        !selection.product_id || (selection.role != PicoCdcRole::Console && selection.role != PicoCdcRole::Wtp && selection.role != PicoCdcRole::Management))
+        !selection.product_id || (selection.role != PicoCdcRole::Console && selection.role != PicoCdcRole::Wtp && selection.role != PicoCdcRole::Management && selection.role != PicoCdcRole::Logging))
       throw std::runtime_error(
           "Explicit endpoint, USB serial and VID/PID are required");
     const auto identity = system_.inspect(selection.path);
