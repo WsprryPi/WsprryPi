@@ -113,11 +113,11 @@ struct Source {
   std::string input, output, boot, name, state = "disconnected", last_boot,
                                          dropped = "0";
   std::size_t output_offset = 0;
-  std::uint64_t deadline = 0, retry = 0, last_sequence = 0, rejected = 0;
+  std::uint64_t deadline = 0, retry = 0, next_status = 0, last_sequence = 0, rejected = 0;
   std::uint64_t rate_window = 0;
   unsigned rate_count = 0;
   bool discarding = false, status_sent = false, start_acked = false,
-       export_enabled = false;
+       export_enabled = false, status_pending = false;
   void close() {
     stream.close();
     lease.reset();
@@ -125,7 +125,7 @@ struct Source {
     output.clear();
     output_offset = 0;
     boot.clear();
-    discarding = status_sent = start_acked = false;
+    discarding = status_sent = start_acked = status_pending = false;
   }
   ~Source() { close(); }
 };
@@ -328,10 +328,14 @@ private:
     source.stream.poll_open(now);
     if (source.stream.state() != CdcState::Ready)
       return;
-    if (!source.status_sent) {
+    if (!source.status_sent ||
+        (source.start_acked && !source.status_pending && now >= source.next_status &&
+         source.output_offset == source.output.size())) {
       source.output = "SYSLOG STATUS\n";
       source.output_offset = 0;
-      source.status_sent = true;
+      source.status_sent = source.status_pending = true;
+      source.next_status = now + 5000;
+      source.deadline = now + 3000;
     }
     if (source.output_offset < source.output.size()) {
       const auto bytes = std::span(
@@ -349,7 +353,7 @@ private:
     if (received.state == wtp::IoState::Closed ||
         received.state == wtp::IoState::Failed)
       throw std::runtime_error("console_disconnected");
-    if (!source.start_acked && now > source.deadline)
+    if ((!source.start_acked || source.status_pending) && now > source.deadline)
       throw std::runtime_error("unsupported_or_unresponsive_firmware");
     for (std::size_t index = 0; index < received.count; ++index) {
       const char byte = static_cast<char>(bytes[index]);
@@ -369,9 +373,7 @@ private:
         ++source.rejected;
         continue;
       }
-      if (source.boot.empty()) {
-        if (line.empty() || line[0] != '{')
-          continue; // bounded startup/ordinary Console text
+      if (line.starts_with("{") && source.status_pending) {
         const auto reply = Json::parse(line, nullptr, false);
         if (!reply.is_object() ||
             reply.value("schema", "") != "transmitter-logging/1")
@@ -380,17 +382,27 @@ private:
         if (target.at("device_id") != settings.device_id ||
             !identity(target.at("boot_id").get<std::string>()))
           throw std::runtime_error("logging_identity_changed");
-        source.boot = target.at("boot_id").get<std::string>();
+        const auto observed_boot = target.at("boot_id").get<std::string>();
+        if (!source.boot.empty() && source.boot != observed_boot)
+          throw std::runtime_error("logging_identity_changed");
+        const bool initial = source.boot.empty();
+        source.boot = observed_boot;
+        source.status_pending = false;
         if (source.last_boot != source.boot) {
           source.last_sequence = 0;
           source.last_boot = source.boot;
         }
-        source.export_enabled = reply.at("active").value("enabled", false);
-        source.state =
-            source.export_enabled ? "starting" : "firmware_logging_disabled";
-        source.output =
-            "SYSLOG START " + settings.device_id + " " + source.boot + "\n";
-        source.output_offset = 0;
+        source.export_enabled = reply.at("active").at("enabled").get<bool>();
+        source.dropped = reply.at("active").at("dropped").get<std::string>();
+        (void)decimal(Json(source.dropped));
+        source.state = source.export_enabled
+                           ? (source.start_acked ? "streaming" : "starting")
+                           : "firmware_logging_disabled";
+        if (initial) {
+          source.output =
+              "SYSLOG START " + settings.device_id + " " + source.boot + "\n";
+          source.output_offset = 0;
+        }
       } else if (!source.start_acked && line.starts_with("{")) {
         const auto reply = Json::parse(line, nullptr, false);
         if (reply.is_object() && reply.value("ok", false)) {
