@@ -90,6 +90,7 @@ async function main(){
   await client.send('Page.navigate',{url:`http://127.0.0.1:${server.address().port}/index.php?page=logs`});
   await until(()=>evaluate(`document.querySelectorAll('#all .logs-line').length===3 && document.getElementById('logs-source').options.length===4`));
   assert(await evaluate(`document.querySelector('#all .logs-msg').textContent.includes('Pi service ready')`));
+  assert(await evaluate(`document.getElementById('logs-source-status').textContent==='' && document.getElementById('logs-source-status').getBoundingClientRect().height===0`),'Routine source caption must reclaim its vertical space');
   assert(await evaluate(`!document.querySelector('#all script') && document.getElementById('all').textContent.includes('<script>')`));
   for(const [width,height,theme,name] of [[1440,960,'light','desktop-light'],[390,844,'light','mobile-light'],[1440,960,'dark','desktop-dark'],[390,844,'dark','mobile-dark']]){
    await client.send('Emulation.setDeviceMetricsOverride',{width,height,deviceScaleFactor:1,mobile:width<600});

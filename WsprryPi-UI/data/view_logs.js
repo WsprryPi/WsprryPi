@@ -804,7 +804,7 @@
                 `Pico ${id} · ${collectionStateLabel(state?.state)}` +
                 (state?.rejected && state.rejected !== "0" ? ` · ${state.rejected} rejected records` : "") +
                 (state?.dropped && state.dropped !== "0" ? ` · ${state.dropped} Pico events dropped` : ""));
-        } else sourceStatus(selectedSource === "all" ? "Local Pi and collected Pico records." : "Records originating on this Pi.");
+        } else sourceStatus("");
     }
     async function refreshSources(review = false) {
         try {
