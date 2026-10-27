@@ -292,18 +292,7 @@ bool set_config(bool force)
             {
                 llog.logS(
                     INFO,
-                    "GPIO frequency correction updated: mode=",
-                    to_string(selected_correction.mode),
-                    ", provider=",
-                    selected_correction.provider_name,
-                    ", estimate_ppm=",
-                    selected_correction.estimate_ppm.value_or(0.0),
-                    ", residual_ppm=",
-                    selected_correction.residual_ppm,
-                    ", effective_ppm=",
-                    selected_correction.additional_ppm,
-                    ", qualification=",
-                    to_string(selected_correction.qualification));
+                    "GPIO frequency correction updated.");
                 runtime_ppm_changed = true;
                 do_config = true;
             }

@@ -1834,7 +1834,7 @@ bool apply_enable_on_boot_startup_policy()
     case EnableOnBootBehavior::Never:
         llog.logS(
             INFO,
-            "Operation.Enable on Boot policy Never: setting Operation.Transmit=false for startup.");
+            "Enable on Boot policy: Never.");
         config.transmit = false;
         config_to_json();
         json_to_ini();

@@ -685,8 +685,7 @@ bool wspr_loop()
         else if (reconciliation.policy_domain == "startup-idle")
         {
             llog.logS(INFO,
-                "RP1 GPCLK route reconciled for safe idle startup; exact provider "
-                "identity and operation-scoped authorization remain required.");
+                "RP1 GPCLK route reconciled for safe idle startup.");
         }
     }
 
@@ -783,9 +782,7 @@ bool wspr_loop()
         else if (network_snapshot.networks.empty())
         {
             llog.logS(INFO,
-                "Privileged network safety is enforced with no eligible LAN. "
-                "Listeners remain available for loopback; protected "
-                "non-loopback clients are rejected.");
+                "Privileged network safety is enforced.");
         }
     }
 
