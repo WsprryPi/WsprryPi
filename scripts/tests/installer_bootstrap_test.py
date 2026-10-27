@@ -271,7 +271,7 @@ print("release v4.0.0-beta.1 "+"a"*64 if result=="release" else "build")
                         self.assertLess(max(info), min(progress), result.stdout)
                         self.assertIn("[INFO ] Managing required packages (this may take a few minutes).",
                                       result.stdout)
-                        announcement = "[INFO ] Resolve RP1-GPCLK-DKMS installation plan."
+                        announcement = "[INFO ] Resolved RP1-GPCLK-DKMS installation plan."
                         self.assertEqual(result.stdout.count(announcement), int(rp1 == "true"))
                         self.assertNotIn("Complete: Resolve RP1-GPCLK-DKMS installation plan.",
                                          result.stdout)
