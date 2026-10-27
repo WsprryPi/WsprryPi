@@ -133,9 +133,9 @@ struct Source {
 };
 class Collector {
 public:
-  explicit Collector(std::string ini)
+  explicit Collector(std::string ini, std::string self = wtp_pi_device_id(), bool allow_devices = true)
       : ini_(std::move(ini)), path_(ini_ + ".usb-logs.json"),
-        self_(wtp_pi_device_id()) {
+        self_(std::move(self)), allow_devices_(allow_devices) {
     reload();
     thread_ = std::thread([this] { run(); });
   }
@@ -199,7 +199,7 @@ public:
                                         {"device_id", settings.device_id},
                                         {"name", profile.at("name")}});
     }
-    result["attached"] = usb_logging_attached_sources(wtp_usb_discovery());
+    result["attached"] = allow_devices_ ? usb_logging_attached_sources(wtp_usb_discovery()) : Json::array();
     for (auto &attached : result["attached"])
       for (const auto &profile : known.at("profiles"))
         if (profile.at("settings").value("Device ID", "") == attached.at("device_id").get<std::string>()) {
@@ -313,6 +313,7 @@ private:
   }
   void poll(Source &source, const WtpSettings &settings, unsigned maximum,
             std::uint64_t now) {
+    if (!allow_devices_) throw std::runtime_error("hardware_access_disabled");
     if (pico_usb_update_blocked(settings.usb_serial)) {
       source.close();
       source.state = "maintenance";
@@ -530,6 +531,7 @@ private:
     }
   }
   std::string ini_, path_, self_;
+  const bool allow_devices_;
   Json saved_ = {{"schema", "host-usb-logging/1"},
                  {"collector_id", self_},
                  {"sources", Json::array()}};
@@ -627,6 +629,15 @@ void start_usb_logging(const std::string &ini) {
       disabled && std::string(disabled) == "1")
     return;
   auto candidate = std::make_shared<Collector>(ini);
+  std::shared_ptr<Collector> old;
+  {
+    std::lock_guard lock(manager_mutex);
+    old.swap(manager);
+    manager = std::move(candidate);
+  }
+}
+void testing::start_usb_logging_policy(const std::string &ini, const std::string &machine_id_path) {
+  auto candidate = std::make_shared<Collector>(ini, wtp_pi_device_id(machine_id_path), false);
   std::shared_ptr<Collector> old;
   {
     std::lock_guard lock(manager_mutex);

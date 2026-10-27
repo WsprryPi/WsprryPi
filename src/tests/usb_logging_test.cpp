@@ -69,11 +69,12 @@ int main() {
   const auto observed = usb_logging_attached_sources(attached);
   assert(observed.size() == 1 && observed[0]["device_id"] == "c2a3a2a314c948b50a8562a1aeb69669");
   assert(usb_logging_attached_sources({{"available", false}}).empty());
-#if defined(__linux__)
   // Policy authority and persistence are exercised without opening hardware.
   char directory[] = "/tmp/wsprrypi-log-test-XXXXXX";
   assert(mkdtemp(directory));
   const auto ini = std::string(directory) + "/station.ini";
+  const auto machine = std::string(directory) + "/machine-id";
+  { std::ofstream file(machine); file << std::string(32, '1'); }
   WtpSettings settings;
   settings.path = "/dev/nonexistent-usb-logging-test";
   settings.usb_serial = "1234567890ABCDEF";
@@ -86,7 +87,7 @@ int main() {
     {"legacy_unverified", false}, {"settings", wtp_settings_json(settings)}}}}};
   { std::ofstream file(ini + ".wtp-devices.json"); file << catalog.dump(); }
   assert(chmod((ini + ".wtp-devices.json").c_str(), 0600) == 0);
-  start_usb_logging(ini);
+  testing::start_usb_logging_policy(ini, machine);
   auto read = usb_logging_api("GET", "", "");
   assert(read.status == 200);
   const auto initial = nlohmann::json::parse(read.body);
@@ -102,7 +103,7 @@ int main() {
   struct stat metadata{};
   assert(stat((ini + ".usb-logs.json").c_str(), &metadata) == 0);
   assert((metadata.st_mode & 0777) == 0600);
-  stop_usb_logging(); start_usb_logging(ini);
+  stop_usb_logging(); testing::start_usb_logging_policy(ini, machine);
   read = usb_logging_api("GET", "", "");
   assert(read.etag == saved.etag);
   assert(nlohmann::json::parse(read.body).at("sources") == policy.at("sources"));
@@ -117,5 +118,4 @@ int main() {
   assert(usb_logging_api("GET", "", "").status == 409);
   stop_usb_logging();
   std::filesystem::remove_all(directory);
-#endif
 }

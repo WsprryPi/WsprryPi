@@ -4,6 +4,10 @@
 namespace wsprrypi {
 void start_usb_logging(const std::string &ini_path);
 void stop_usb_logging() noexcept;
+namespace testing {
+// Policy-only manager with synthetic identity; never inventories or opens USB.
+void start_usb_logging_policy(const std::string &ini_path, const std::string &machine_id_path);
+}
 PicoHttpResponse usb_logging_api(const std::string &method,
                                  const std::string &body,
                                  const std::string &revision);
