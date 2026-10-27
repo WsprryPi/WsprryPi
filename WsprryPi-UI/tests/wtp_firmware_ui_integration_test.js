@@ -160,6 +160,8 @@ async function main() {
         const states={
             checked:{operation:'plan',plan_id:'fixture-plan',result:{ok:true,branch:'main',version:'0.1.0-ci.40000000000.1',source:'a'.repeat(40),workflow:{run_id:40000000000,attempt:1}}},
             pending:{operation:'upgrade',running:true,maintenance:true,result:null},
+            bootstrap_pending:{operation:'plan',running:true,result:null},
+            bootstrap_unavailable:{operation:'plan',result:{ok:false,recovery_required:false,error:'No verified compatible Pico USB installer is available in recent devel CI runs; retry after compatible software verification completes'}},
             refusal:{operation:'plan',result:{ok:false,error:'No verified main CI download is available.'}},
             failure:{operation:'upgrade',maintenance:true,recovery_plan_id:'fixture-plan',recovery_version:'0.1.0-ci.40000000000.1',result:{ok:false,error:'Saved semantic state differs after reboot; keep member in maintenance'}},
             reconnect:{operation:'recover',maintenance:true,recovery_plan_id:'fixture-plan',recovery_version:'0.1.0-ci.40000000000.1',result:{ok:false,error:'Firmware verified; Pi reconnection remains unconfirmed.'}},
@@ -190,7 +192,7 @@ async function main() {
                 assert.equal(observed.installDisabled,state!=="checked",`${name}/${theme}/${state} installation gate`);assert.equal(observed.recoverHidden,!value.maintenance);
                 findings.push({name,theme,state,...observed});
                 const shot=await client.send("Page.captureScreenshot",{format:"png"});fs.writeFileSync(path.join(output,`${name}-${theme}-${state}.png`),Buffer.from(shot.data,"base64"));
-                if(name==="mobile" && (state==="erase_waiting" || state==="erased")) {
+                if(name==="mobile" && ["erase_waiting","erased","bootstrap_pending","bootstrap_unavailable"].includes(state)) {
                     await evaluate("document.getElementById('wtp-firmware-feedback').scrollIntoView({block:'center',behavior:'instant'})");
                     const detail=await client.send("Page.captureScreenshot",{format:"png"});fs.writeFileSync(path.join(output,`${name}-${theme}-${state}-detail.png`),Buffer.from(detail.data,"base64"));
                 }

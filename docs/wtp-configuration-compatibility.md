@@ -134,12 +134,9 @@ changes must use Pico setup when Pico rejects them; Pi never claims they saved.
 
 ## Compatibility fixture boundaries
 
-The nine network rows listed above retain their separately pinned sources and
-expectations. Tests use actual Pico handlers, native TLS and consumer station/AP
-fixtures. Older peers retain their supported legacy editor; absent shared
-resources or authenticated retirement remain unavailable. Management/1 and
-management/2 discovery are validated exactly. Unsupported versions, malformed
-limits and inconsistent targets refuse before mutation or fallback.
+The nine network rows listed above retain their separately pinned sources and expectations. Tests use actual Pico handlers, native TLS and consumer station/AP fixtures. Older peers retain their supported legacy editor; absent shared resources or authenticated retirement remain unavailable.
+
+Network management/1, /2 and /4 and USB management/3 and /5 discovery are validated exactly. Historical /1–/3 retain five-minute idle and fifteen-minute absolute consumer limits. Current /4 and /5 retain their respective carrier shapes with thirty-minute idle and eight-hour absolute limits. The capability descriptor and returned document must agree on the supported version and selected carrier. Unsupported versions, malformed limits and inconsistent targets refuse before mutation or fallback. See the [management policy table](wtp-browser-api.md) for the exact per-version limits and session capacities.
 
 The strict legacy server's ETag hashes boot/config/network values without modern
 device/generation binding. It cannot detect an external A-to-B-to-A sequence.

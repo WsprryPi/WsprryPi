@@ -7,6 +7,7 @@
 #include "wtp_runtime_bridge.hpp"
 #include "wtp_endpoint/runtime.hpp"
 #include "wtp_integration/fleet_runtime.hpp"
+#include "wtp_integration/usb_logging.hpp"
 #include "wtp_pi_control.hpp"
 #include "transmitter_runtime_bridge.hpp"
 #include "scheduling_internal.hpp"
@@ -572,6 +573,7 @@ void stop_runtime_components_for_process_exit() noexcept
     webServer.stop();
     socketServer.stop();
     stop_runtime_config_monitor();
+    wsprrypi::stop_usb_logging();
     wsprrypi::stop_wtp_fleet();
     wsprrypi::stop_wtp_pi_endpoint();
     shutdownMonitor.stop();
@@ -592,6 +594,7 @@ void stop_runtime_components_for_test() noexcept
     webServer.stop();
     socketServer.stop();
     stop_runtime_config_monitor();
+    wsprrypi::stop_usb_logging();
     wsprrypi::stop_wtp_fleet();
     wsprrypi::stop_wtp_pi_endpoint();
     shutdownMonitor.stop();
@@ -685,8 +688,7 @@ bool wspr_loop()
         else if (reconciliation.policy_domain == "startup-idle")
         {
             llog.logS(INFO,
-                "RP1 GPCLK route reconciled for safe idle startup; exact provider "
-                "identity and operation-scoped authorization remain required.");
+                "RP1 GPCLK route reconciled for safe idle startup.");
         }
     }
 
@@ -697,7 +699,11 @@ bool wspr_loop()
             llog.logS(ERROR, "WTP Pi endpoint unavailable: ", endpoint_error);
     }
 
-    if (config.use_ini) wsprrypi::start_wtp_fleet(config.ini_filename);
+    if (config.use_ini) {
+        wsprrypi::start_wtp_fleet(config.ini_filename);
+        try { wsprrypi::start_usb_logging(config.ini_filename); }
+        catch (const std::exception&) { llog.logS(ERROR, "USB log collector unavailable; review its saved settings."); }
+    }
     const bool start_web = web_server_start_enabled(config);
     const bool start_websocket = websocket_server_start_enabled(config);
     const int startup_web_port = config.web_port;
@@ -783,9 +789,7 @@ bool wspr_loop()
         else if (network_snapshot.networks.empty())
         {
             llog.logS(INFO,
-                "Privileged network safety is enforced with no eligible LAN. "
-                "Listeners remain available for loopback; protected "
-                "non-loopback clients are rejected.");
+                "Privileged network safety is enforced.");
         }
     }
 
@@ -980,6 +984,7 @@ bool wspr_loop()
     llog.logS(DEBUG, "Stopping configuration monitor.");
     ini_reload_pending.store(false, std::memory_order_relaxed);
     stop_runtime_config_monitor(); // Stop config file monitor before transmitter teardown.
+    wsprrypi::stop_usb_logging();
     wsprrypi::stop_wtp_fleet();
     wsprrypi::stop_wtp_pi_endpoint();
     llog.logS(DEBUG, "Configuration monitor stopped.");

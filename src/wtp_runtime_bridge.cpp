@@ -636,6 +636,7 @@ wsprrypi::PicoHttpResponse wtp_runtime_management(const std::string &resource,
           r->usb_management->device(),r->usb_management->boot(),resource.substr(7),method,body,revision,"usb_physical");
         else if (resource.starts_with("member/progress")) response = wsprrypi::pico_progress_request(exchange,
           r->usb_management->device(),r->usb_management->boot(),resource.substr(7),method,body,revision,"usb_physical");
+        else if (resource == "member/logging") response = exchange("/api/v1/logging",method,body,revision);
         else if (resource == "member/wifi") response = exchange("/api/usb/v1/wifi",method,body,revision);
         else if (resource == "member/hostname") { response = exchange("/api/v1/hostname",method,body,revision); r->observe_usb_name(response); }
         else if (resource == "member/ap") response = exchange("/api/usb/v1/ap",method,body,revision);

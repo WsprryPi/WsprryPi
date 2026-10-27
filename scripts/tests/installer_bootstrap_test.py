@@ -19,6 +19,7 @@ AGE_HELPER = ROOT / "scripts/support_bundle_age_dependency.sh"
 # Keep context detection, orchestration, cloning, command reporting, helper
 # loading, metadata validation, and the application dispatcher unchanged.
 FIXTURE = r'''
+eval "$(declare -f print_version | sed '1s/print_version/installer_print_version/')"
 record() { printf '%s\n' "$1" >>"$EVENTS"; }
 for step in process_args enforce_sudo setup_log validate_depends validate_sys_accs \
     validate_env_vars check_bash check_sh_ver check_bitness check_release \
@@ -42,7 +43,7 @@ preflight_build_resources() { record resources; [[ "$FAIL_AT" != resources ]]; }
 apply_build_resource_plan() { record build-resources; [[ "$FAIL_AT" != build-resources ]]; }
 print_model_name() { record model-info; }
 print_system() { record system-info; }
-print_version() { record version-info; }
+print_version() { record version-info; installer_print_version "$@"; }
 display_compilation_resource_notes() { record parallelism-info; }
 detect_apache_web_mode() { record apache-mode; }
 rp1_gpclk_dkms_installation_selected() { [[ "$RP1_SELECTED" == true ]]; }
@@ -268,6 +269,8 @@ print("release v4.0.0-beta.1 "+"a"*64 if result=="release" else "build")
                         self.assertTrue(info, result.stdout)
                         self.assertTrue(progress, result.stdout)
                         self.assertLess(max(info), min(progress), result.stdout)
+                        self.assertIn("[INFO ] Managing required packages (this may take a few minutes).",
+                                      result.stdout)
                         announcement = "[INFO ] Resolve RP1-GPCLK-DKMS installation plan."
                         self.assertEqual(result.stdout.count(announcement), int(rp1 == "true"))
                         self.assertNotIn("Complete: Resolve RP1-GPCLK-DKMS installation plan.",

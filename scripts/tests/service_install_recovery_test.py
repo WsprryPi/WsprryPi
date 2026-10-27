@@ -262,6 +262,16 @@ class ServiceInstallRecoveryTest(unittest.TestCase):
         self.assertEqual(after.st_uid, before.st_uid)
         self.assertEqual(after.st_gid, before.st_gid)
 
+    def test_service_progress_is_concise_and_template_values_are_preserved(self) -> None:
+        result = self.run_case()
+        for label in ("Set version in service file", "Set daemon name in service file",
+                      "Set start exe in service file", "Set syslog ID in service file"):
+            self.assertIn(f"Complete: {label}.", result.stdout)
+        self.assert_regular_unit()
+        self.assertIn("SyslogIdentifier=wsprrypi\n", self.persistent.read_text())
+        self.assertNotIn("%", self.persistent.read_text())
+        self.assertNotIn(".service.tmp.", result.stdout)
+
     def test_persistent_mask_with_nonzero_is_enabled_status_is_repaired(self) -> None:
         self.mask(self.persistent)
         self.set_state("masked", 1)

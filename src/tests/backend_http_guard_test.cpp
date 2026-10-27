@@ -30,7 +30,7 @@ int main() {
         assert(evaluate(method, "/api/v1/member/configuration", "192.168.50.42", "wsprrypi", "http://evil") == BackendHttpGuardDecision::rejected);
     }
 
-    for (const std::string path : {"/api/v1/config", "/api/v1/network", "/api/v1/schedules", "/api/v1/host/config"}) {
+    for (const std::string path : {"/api/v1/config", "/api/v1/network", "/api/v1/schedules", "/api/v1/host/config", "/api/v1/host/logging", "/api/v1/member/logging"}) {
         for (const std::string method : {"GET", "PUT"}) {
             assert(evaluate(method, path, "192.168.50.42", "wsprrypi", "http://wsprrypi") == BackendHttpGuardDecision::allowed);
             assert(evaluate(method, path, "203.0.113.4", "wsprrypi", "http://wsprrypi") == BackendHttpGuardDecision::rejected);

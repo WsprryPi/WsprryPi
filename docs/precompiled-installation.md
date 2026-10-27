@@ -39,6 +39,8 @@ executable's `--version` response are checked without root privileges, before
 replacing the installed executable. These checks do not qualify RF operation.
 The installer does not compare the executable with the checkout's commit.
 
+The initial notices identify the selected release and make clear when the executable version is still pending validation. A source build from an existing checkout identifies its source version; a streamed source build waits for its checkout. After a successful installation, the summary reports the captured version used in the INI and service metadata. For precompiled installations, this is the executable's validated version, which can differ from its release tag or the supporting checkout. Dry runs do not report an installed version.
+
 ## Dependencies and resource use
 
 Runtime packages are separate from application build packages. Precompiled mode installs runtime libraries and inspection tools, omits application compilers and development headers, and skips application compilation and its swap preparation. A compatible installed picotool is reused; otherwise the installer downloads the matching prebuilt picotool package, verifies its checksum and file inventory, and installs its executable and support files. Picotool installation never invokes a compiler or falls back to building from source. Existing development packages are not removed. Pi 5-family RP1 driver preparation retains its separate build requirements.

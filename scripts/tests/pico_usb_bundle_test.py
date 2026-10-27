@@ -91,12 +91,12 @@ class DistributionTests(unittest.TestCase):
             net=Network(*fixture());net.payload[name]+=b'changed'
             with self.subTest(name=name),self.assertRaises(bundle.Unavailable):bundle.published(net,'devel')
         net=Network(*fixture());net.payload['usb_installer.py']=net.payload['usb_installer.py'].replace(b'wsprrypico-usb-result/1',b'wsprrypico-usb-result/2');net.original=dict(net.payload)
-        with self.assertRaisesRegex(bundle.Unavailable,'incompatible contract'):bundle.published(net,'devel')
-    def test_large_commit_resolution_uses_compact_refs_and_rechecks_head(self):
+        with self.assertRaisesRegex(bundle.Unavailable,'No verified compatible'):bundle.published(net,'devel')
+    def test_large_commit_resolution_uses_compact_refs_and_immutable_source(self):
         manifest,payload=bundle.published(self.net,'devel')
         self.assertEqual(manifest['source'],self.manifest['source'])
         self.assertEqual(payload,self.payload)
-        self.assertEqual(self.net.requests.count('git/ref/heads/devel'),2)
+        self.assertEqual(self.net.requests.count('git/ref/heads/devel'),1)
         self.assertFalse(any(path.startswith('commits/') for path in self.net.requests))
     def test_malformed_or_wrong_branch_refs_are_rejected(self):
         for reference in (
@@ -108,20 +108,108 @@ class DistributionTests(unittest.TestCase):
             net.mutate=lambda record:reference if 'ref' in record else record
             with self.subTest(reference=reference),self.assertRaises(bundle.Unavailable):
                 bundle.published(net,'devel')
-    def test_pending_branch_and_branch_race_keep_retained_installer(self):
+    def test_no_successful_ci_keeps_retained_installer(self):
         identity=self.select()
         self.net.mutate=lambda r: {**r,'workflow_runs':[]} if 'workflow_runs' in r else r
         result=self.store.refresh(self.net,force=True)
-        self.assertEqual(result['identity'],identity);self.assertIn('retry after CI',result['update']['reason'])
-        net=Network(*fixture());count=0
-        def move(r):
-            nonlocal count
-            if r.get('ref')=='refs/heads/devel':
-                count+=1
-                if count==2:r['object']['sha']='c'*40
-            return r
-        net.mutate=move
-        with self.assertRaisesRegex(bundle.Unavailable,'branch changed'):bundle.published(net,'devel')
+        self.assertEqual(result['identity'],identity)
+        self.assertIn('No verified compatible',result['update']['reason'])
+    def test_pending_tip_bootstraps_latest_verified_ancestor(self):
+        self.net.head='c'*40
+        selected=self.select()
+        manifest,payload=self.store.load(selected)
+        self.assertEqual(manifest['source'],self.manifest['source']);self.assertEqual(payload,self.payload)
+        self.assertTrue(any(p.startswith('compare/') and 'page=2' in p for p in self.net.requests))
+        self.assertFalse(any('head_sha=' in p for p in self.net.requests))
+    def test_incompatible_newer_sources_fall_back_without_execution(self):
+        changes=(
+            lambda p:p['usb_installer.py'].replace(b'wsprrypico-usb-result/1',b'wsprrypico-usb-result/2'),
+            lambda p:p['usb_installer.py'].replace(b'schema_bytes=None',b'other_schema=None'),
+            lambda p:b'import sys\nif sys.version_info < (99,0):\n    raise SystemExit(2)\n'+p['usb_installer.py'],
+            lambda p:p['usb_installer.py']+b'\nunsupported syntax here\n',
+            lambda p:p['usb_installer.py'].replace(b"INSTALLER_VERSION='0.1.2'",b"INSTALLER_VERSION='invalid'"),
+        )
+        for change in changes:
+            with self.subTest(change=change):
+                latest=Network(*fixture(101,'0.1.2'))
+                latest.payload['usb_installer.py']=change(latest.payload)
+                latest.original=dict(latest.payload);latest.older=[self.net]
+                with patch.object(entry,'invoke',side_effect=AssertionError('resolver executed installer')):
+                    manifest,payload=bundle.published(latest,'devel')
+                self.assertEqual(manifest['source'],self.manifest['source']);self.assertEqual(payload,self.payload)
+    def test_verified_sources_outside_branch_history_are_skipped(self):
+        latest=Network(*fixture(101,'0.1.2'));latest.head='c'*40;latest.older=[self.net]
+        latest.off_branch.add(latest.manifest['source'])
+        manifest,_=bundle.published(latest,'devel')
+        self.assertEqual(manifest['source'],self.manifest['source'])
+    def test_bad_integrity_is_not_treated_as_an_incompatible_version(self):
+        latest=Network(*fixture(101,'0.1.2'));latest.older=[self.net]
+        latest.payload['usb_installer.py']+=b'changed'
+        with self.assertRaisesRegex(bundle.Unavailable,'checksum mismatch'):bundle.published(latest,'devel')
+        self.assertFalse(any('?ref='+self.manifest['source'] in p for p in latest.requests))
+    def test_successful_runs_are_paginated_and_duplicate_sources_checked_once(self):
+        versions=[Network(*fixture(110-i,'0.1.2')) for i in range(10)]
+        latest=versions[0]
+        for source in versions:
+            source.manifest['source']=latest.head
+            source.payload['usb_installer.py']=source.payload['usb_installer.py'].replace(b'wsprrypico-usb-result/1',b'wsprrypico-usb-result/2')
+            source.original=dict(source.payload)
+        latest.older=[*versions[1:],self.net]
+        manifest,_=bundle.published(latest,'devel')
+        self.assertEqual(manifest['source'],self.manifest['source'])
+        self.assertTrue(any('runs?branch=devel&status=success&per_page=10&page=2' in p for p in latest.requests))
+        self.assertEqual(sum(p.endswith('attempts/1') for p in latest.requests),2)
+    def test_successful_run_search_is_bounded(self):
+        self.net.payload['usb_installer.py']=self.net.payload['usb_installer.py'].replace(b'wsprrypico-usb-result/1',b'wsprrypico-usb-result/2')
+        self.net.original=dict(self.net.payload);self.net.older=[self.net]*39
+        with self.assertRaisesRegex(bundle.Unavailable,'No verified compatible'):bundle.published(self.net,'devel')
+        self.assertEqual(sum('runs?branch=' in p for p in self.net.requests),3)
+    def test_cold_plan_fetches_core_only_after_explicit_request(self):
+        with patch.object(bundle,'Network',return_value=self.net):
+            code,result=self.invoke('plan','--output',str(self.cache/('1'*32)))
+        self.assertEqual(code,0);self.assertTrue(self.net.requests)
+        self.assertEqual(result['installer_version'],'0.1.1');self.assertTrue(result['ok'])
+        self.assertEqual(self.store.planned('1'*32),self.store.active()['identity'])
+    def test_cold_erase_bootstraps_and_freezes_its_core(self):
+        with patch.object(bundle,'Network',return_value=self.net):
+            code,result=self.invoke('erase','--device',SERIAL,'--board','pico2_w','--yes')
+        self.assertEqual(code,0);self.assertEqual(result['operation'],'erase')
+        self.assertTrue((Path(result['transaction']).parent.parent/'usb-installer.json').is_file())
+    def test_discovery_without_a_core_never_downloads_one(self):
+        with patch.object(bundle,'Network',side_effect=AssertionError('discovery requested network')):
+            with self.assertRaisesRegex(bundle.Unavailable,'download and check an image first'):self.invoke('discover')
+        self.assertIsNone(self.store.active())
+    def test_failed_cold_bootstrap_can_retry_without_a_partial_plan_or_transaction(self):
+        self.net.failure=bundle.Unavailable('offline')
+        with patch.object(bundle,'Network',return_value=self.net):
+            with self.assertRaisesRegex(bundle.Unavailable,'offline'):
+                self.invoke('plan','--output',str(self.cache/('1'*32)))
+            self.assertIsNone(self.store.active());self.assertEqual(list(self.cache.iterdir()),[])
+            self.assertFalse((self.store.root/'plans').exists());self.assertFalse(list(self.state.rglob('transaction.json')))
+            self.net.failure=None
+            self.assertEqual(self.invoke('plan','--output',str(self.cache/('1'*32)))[0],0)
+    def test_failed_cold_erase_bootstrap_requires_no_device_recovery(self):
+        self.net.failure=bundle.Unavailable('offline')
+        with patch.object(bundle,'Network',return_value=self.net),patch.object(entry,'invoke',side_effect=AssertionError('USB invoked')):
+            code,result=self.invoke('erase','--device',SERIAL,'--board','pico2_w','--yes')
+        self.assertEqual(code,2);self.assertFalse(result['ok']);self.assertFalse(result['recovery_required'])
+        self.assertEqual(result['operation'],'erase');self.assertEqual(result['error'],'offline')
+        self.assertIsNone(self.store.active());self.assertFalse(list(self.state.rglob('transaction.json')))
+    def test_malformed_ancestry_does_not_trigger_older_source_fallback(self):
+        for field,value in [('base_commit',None),('merge_base_commit',{}),('status','invalid')]:
+            net=Network(*fixture());net.head='c'*40
+            def mutate(record):
+                if 'base_commit' in record:record[field]=value
+                return record
+            net.mutate=mutate
+            with self.subTest(field=field),self.assertRaisesRegex(bundle.Unavailable,'Invalid installer branch ancestry'):
+                bundle.published(net,'devel')
+    def test_channel_selection_never_substitutes_another_branch(self):
+        self.net.mutate=lambda record: {**record,'head_branch':'main'} if 'head_branch' in record else record
+        with self.assertRaisesRegex(bundle.Unavailable,'canonical source'):bundle.published(self.net,'devel')
+        self.assertFalse(any('/contents/' in p for p in self.net.requests))
+        main=Network(*fixture());main.manifest['channel']='main'
+        manifest,_=bundle.published(main,'main');self.assertEqual(manifest['channel'],'main')
     def test_failed_verify_job_and_incomplete_jobs_refuse_source(self):
         for mode in ('failure','skipped','missing','extra'):
             net=Network(*fixture())

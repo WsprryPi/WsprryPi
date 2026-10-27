@@ -269,8 +269,26 @@ public:
         {
             WebSocketServer ordered;
             assert(ordered.start(39526, 0, true, WebSocketLoopbackFamily::IPv4));
-            Gate reply;
+            // Host maintenance state is deliberately fail-closed, including
+            // unreadable root-owned updater directories. This simulator test
+            // owns its maintenance input rather than reading the host's state.
+            bool maintenance = true;
+            ordered.firmware_maintenance_for_test_ = [&] { return maintenance; };
             std::vector<nlohmann::json> replies;
+            ordered.reply_ready_for_test_ = [&](const std::string &payload) {
+                replies.push_back(nlohmann::json::parse(payload));
+            };
+            ordered.handleMessage("{\"command\":\"tone_start\",\"frequency_hz\":14097100,\"client_request_id\":\"blocked-start\"}");
+            ordered.handleMessage("{\"command\":\"tone_end\",\"client_request_id\":\"blocked-end\"}");
+            assert(replies.size() == 2);
+            for (const auto &rejected : replies)
+                assert(rejected.at("error") == "pico_firmware_maintenance");
+            assert(replies[0].at("client_request_id") == "blocked-start" &&
+                   replies[1].at("client_request_id") == "blocked-end");
+            assert(!current_test_tone_status().owned && !config.transmit);
+            maintenance = false;
+            replies.clear();
+            Gate reply;
             ordered.reply_ready_for_test_ = [&](const std::string &payload) {
                 replies.push_back(nlohmann::json::parse(payload));
                 if (replies.back().value("command", "") == "tone_start") reply.arrive();
@@ -288,6 +306,8 @@ public:
                 ordered.handleMessage("{\"command\":\"tone_end\",\"client_request_id\":\"end-1\"}");
             });
             reply.release(); done(start); done(end);
+            if (replies.size() != 2 || replies[0].value("started", false) != true)
+                std::cerr << "Ordered Start/Stop/End replies: " << nlohmann::json(replies).dump() << '\n';
             assert(replies.size() == 2 && replies[0]["started"] == true);
             assert(replies[0]["client_request_id"] == "start-1" && replies[1]["client_request_id"] == "end-1");
             assert(replies[1]["test_tone"]["revision"] > replies[0]["test_tone"]["revision"]);
@@ -295,6 +315,7 @@ public:
             ordered.stop();
         }
         setup(); WebSocketServer server;
+        server.firmware_maintenance_for_test_ = [] { return false; };
         assert(server.start(39526, 0, true, WebSocketLoopbackFamily::IPv4));
         Gate expired;
         server.bounded_expiry_ready_for_test_ = [&] { expired.arrive(); };
@@ -311,6 +332,7 @@ public:
         server.stop();
 
         setup(); WebSocketServer rollover;
+        rollover.firmware_maintenance_for_test_ = [] { return false; };
         assert(rollover.start(39526, 0, true, WebSocketLoopbackFamily::IPv4));
         bounded_start(rollover, "one"); auto first = current_test_tone_status(); assert(first.owned);
         rollover.handleMessage("{\"command\":\"stop\",\"persist_transmit\":false}");
@@ -322,6 +344,7 @@ public:
         rollover.stop(); assert(!current_test_tone_status().owned);
 
         setup(); WebSocketServer failing;
+        failing.firmware_maintenance_for_test_ = [] { return false; };
         assert(failing.start(39526, 0, true, WebSocketLoopbackFamily::IPv4));
         failing.fail_bounded_thread_creation_for_test_ = true;
         bounded_start(failing, "no-thread");
@@ -330,6 +353,7 @@ public:
 
         setup(); {
             WebSocketServer destruction;
+            destruction.firmware_maintenance_for_test_ = [] { return false; };
             assert(destruction.start(39526, 0, true, WebSocketLoopbackFamily::IPv4));
             bounded_start(destruction, "destruction");
         }

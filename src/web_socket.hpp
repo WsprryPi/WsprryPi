@@ -171,6 +171,7 @@ private:
     std::function<void()> bounded_expiry_ready_for_test_;
     bool fail_bounded_thread_creation_for_test_{false};
     std::function<void(const std::string &)> reply_ready_for_test_;
+    std::function<bool()> firmware_maintenance_for_test_;
     std::function<void(const std::string &)> inbound_message_for_test_;
     void boundedToneLoop();
     void cancelBoundedTone();

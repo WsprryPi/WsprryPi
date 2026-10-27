@@ -8,7 +8,7 @@
 #include <string>
 
 namespace wsprrypi {
-enum class PicoCdcRole : unsigned { Wtp = 2, Management = 4 };
+enum class PicoCdcRole : unsigned { Console = 0, Wtp = 2, Management = 4 };
 struct PicoCdcSelection {
   std::string path, usb_serial;
   std::uint16_t vendor_id{},

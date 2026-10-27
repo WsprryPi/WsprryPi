@@ -390,3 +390,7 @@ Temporary source manifests, exact command scripts, complete logs, mutation evide
 - No prerelease migration layer, historical Pico checkout gate, obsolete document-path fallback or CLI/UI band exception remains in the affected scope.
 - Review the complete diffs, generated assets, documentation output and working-tree state. Report tests, visual evidence, documentation impact and remaining validation separately for each repository.
 - Hardware, RF, installation and service qualification require an explicitly authorized finite campaign; they are not established by these software checks.
+
+## Coordinated USB logging
+
+USB logging implementation and acceptance are tracked by the [WsprryPico combined backlog](https://github.com/WsprryPi/WsprryPico/blob/devel/engineering/development/consolidated-backlog.md#combined-ui--backend) and its USB execution prompt. Pi deliverables include bounded Console collection, origin-preserving journald projection, source-scoped Logs filtering and cursor state, maintenance exclusion, settings controls and operator documentation. UDP remains pending under the same canonical backlog; this document does not create a second feature authority.

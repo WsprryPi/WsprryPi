@@ -254,6 +254,15 @@
                 <h5 id="wtp-usb-settings-heading" class="h6">USB name and Wi-Fi</h5>
                 <p class="form-text">The common name is the Pico's Wi-Fi hostname, including .local. Saved names or network changes may need a restart. Removing Wi-Fi keeps USB control and transmitter settings.</p>
                 <button type="button" class="btn btn-outline-primary mb-3" id="wtp-usb-load">Read name and Wi-Fi</button>
+                <details class="mb-3" id="wtp-usb-logging-controls">
+                    <summary>USB logging on this Pico</summary>
+                    <button type="button" class="btn btn-outline-primary mt-2" id="wtp-usb-logging-read">Read logging settings</button>
+                    <label class="form-check mt-2"><input type="checkbox" class="form-check-input" id="wtp-usb-logging-enabled" disabled> Enable USB log export</label>
+                    <label for="wtp-usb-logging-severity" class="form-label">Maximum severity</label>
+                    <select class="form-select" id="wtp-usb-logging-severity" disabled><option value="0">Emergency only</option><option value="1">Alert and higher</option><option value="2">Critical and higher</option><option value="3">Errors only</option><option value="4">Warnings and errors</option><option value="5">Notice and higher</option><option value="6">Info and higher</option><option value="7">All levels</option></select>
+                    <button type="button" class="btn btn-outline-primary mt-2" id="wtp-usb-logging-save" disabled>Save Pico logging</button>
+                    <p id="wtp-usb-logging-status" class="form-text" role="status" aria-live="polite">Read settings to see saved and active export state. Select collection separately on Logs.</p>
+                </details>
                 <p id="wtp-usb-identity" class="form-text text-break"></p>
                 <div class="row gx-3 gy-3">
                     <div class="col-12 col-lg-6">

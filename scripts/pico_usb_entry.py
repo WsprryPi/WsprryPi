@@ -98,7 +98,14 @@ def run(arguments,distribution,store,cache=CACHE,state=STATE):
                 else:
                     # Erase needs no firmware plan or download. Freeze the active
                     # verified installer so interrupted erases recover offline.
-                    selected = store.refresh()
+                    try:
+                        selected = store.refresh()
+                    except Exception as error:
+                        # Bootstrap cannot touch USB. Let the host reconnect and
+                        # release its preliminary hold instead of demanding recovery.
+                        return 2,{'schema':'wsprrypico-usb-result/1','installer_contract':1,
+                                  'installer_version':'adapter','ok':False,'operation':'erase',
+                                  'error':str(error),**getattr(error,'details',{}),'recovery_required':False}
                     identity,update = selected['identity'],selected['update']
                 if pending >= 8:
                     raise ValueError('Eight unresolved firmware transactions retained; finish recovery before another update')
@@ -109,7 +116,10 @@ def run(arguments,distribution,store,cache=CACHE,state=STATE):
                 else:
                     arguments += ['--state-dir',str(bucket)]
             else:
-                identity = store.active()['identity']
+                current = store.active()
+                distribution.require(current is not None,
+                                     'Pico USB installer is not cached; download and check an image first')
+                identity = current['identity']
             manifest,payload = store.load(identity)
         try:
             code,result = invoke(manifest,payload,arguments)

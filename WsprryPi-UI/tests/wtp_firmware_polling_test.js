@@ -120,6 +120,21 @@ async function main() {
     retained.root.WtpFirmware.setAvailability(true,"C","selection");await retained.advance(0);
     assert(!retained.el("installer-update").hidden);assert.match(retained.el("installer-update").textContent,/retained flash tool.*rate-limited.*image remains usable/);
     assert(!retained.el("upgrade").disabled,"a retained verified installer can use the checked image");retained.events.pagehide();
+    const bootstrap=fixture();bootstrap.root.WtpFirmware.setAvailability(true,"C","selection");await bootstrap.advance(0);
+    assert(bootstrap.requests.every(r=>r.method==="GET"),"status polling never bootstraps the installer");
+    await bootstrap.click("plan");
+    bootstrap.setState({running:false,operation:"plan",result:{ok:false,recovery_required:false,
+        error:"No verified compatible Pico USB installer is available in recent devel CI runs; retry after compatible software verification completes"}});
+    await bootstrap.advance(1500);
+    assert.match(bootstrap.el("feedback").textContent,/No verified compatible Pico USB installer/);
+    assert.match(bootstrap.el("feedback").textContent,/No firmware was written/);
+    assert(!bootstrap.el("plan").disabled);assert(bootstrap.el("upgrade").disabled);
+    const failedPosts=bootstrap.requests.filter(r=>r.method==="POST").length;
+    await bootstrap.advance(10000);
+    assert.equal(bootstrap.requests.filter(r=>r.method==="POST").length,failedPosts,"bootstrap failures do not auto-retry downloads");
+    await bootstrap.click("plan");bootstrap.complete();await bootstrap.advance(1500);
+    assert(!bootstrap.el("upgrade").disabled,"an explicit retry can check an image after bootstrap becomes available");
+    bootstrap.events.pagehide();
     console.log("Firmware polling: completion, retry cooldown/expiry, optional CI limits, lost replies, invalidation, lifecycle and exact USB binding passed");
 }
 main().catch(error=>{console.error(error);process.exitCode=1;});

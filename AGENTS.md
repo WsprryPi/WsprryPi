@@ -33,6 +33,20 @@ These instructions apply to the entire WsprryPi repository unless a more specifi
 - If a task is divided into approved slices, implement only the current slice. Do not silently begin later slices.
 - If an ambiguity would materially change behavior, compatibility, persistence, hardware operation, or user workflow, stop and ask for direction.
 
+## Pi/Pico capability and protocol completion gate
+
+Changes to advertised capabilities, protocol/API schemas, descriptors, carrier support, wire formats, limits/units, session policies or protocol-facing interfaces are coordinated WsprryPi/WsprryPico changes.
+
+- Inspect the producer and every affected companion client before implementation. Update capability advertisements, version descriptors, companion negotiation/parsing, strict validators, runtime consumption, serialization, generated assets, paired test adapters and documentation together in the same task.
+- Preserve exact closed-contract validation for every supported version, including historical limits and semantics. Validate document shape before field access. Reject unsupported versions/carriers, missing or extra fields, wrong types, inconsistent advertised/returned schemas, and invalid device/boot/profile bindings before mutation.
+- Keep independently versioned contracts independent. Introduce an explicit version when a closed contract changes; do not silently redefine historical versions, accept arbitrary version ranges, relax validation, substitute an older peer, or add hidden downgrade/carrier fallback to make tests pass.
+- Both actual network and USB integration suites must pass before completion, including when a change initially appears specific to one carrier. Exercise the production Pi client/coordinator and Pico handlers, crypto, serialization, framing/ACK and journals using the intended candidate sources from both repositories. Mock-only checks, isolated unit tests, builds, old green CI or tests against stale or unintended snapshots do not satisfy this gate.
+- Use the checked-in WsprryPi `.github/workflows/debian-non-hardware.yml` recipes for `wtp-network-loopback` and `wtp-usb-management-pair`. Network coverage includes `wtp-network-runtime-test`, `wtp-network-interop-test` and `wtp-config-interop-test`; USB coverage includes building the actual Pico `usb_management_driver`, `wtp-usb-pair-client-build`, `wtp-usb-management-test` and running `WsprryPi-UI/tests/wtp_usb_pair_test.js` through the production Pi/Pico pair. Select the actual edited/candidate Pico source and required pinned dependencies explicitly.
+- Cover valid historical/current contracts and negative cases for unknown versions, malformed descriptors/documents, changed limits, identity/revision mismatches and refusal before writes. Update affected test adapters when production interfaces change; preserve production-path coverage.
+- Failed, cancelled, timed-out or skipped required integration checks remain unresolved. Investigate and fix or rerun them; do not declare completion while either required suite lacks a successful result for the intended source pair. An inherited companion mismatch that prevents validating the changed contract is part of the integration work.
+- Keep repository authority and Git boundaries separate. Ensure required companion changes are available on the intended paired refs; do not claim delivery on `devel` or `main` when the companion update exists only on an unmerged side branch. Report missing authority or unavailable dependencies as blockers instead of leaving a companion follow-up behind a completion claim.
+- Report both source revisions and any tested uncommitted changes, exact commands/results and relevant CI links. These integration fixtures are hardware-free software evidence; physical USB, installation, service, timing and RF qualification remain separate.
+
 ## Repository and Work-Harness Cleanup
 
 - For an explicit request to clean up WsprryPi, follow the

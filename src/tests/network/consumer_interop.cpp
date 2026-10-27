@@ -118,6 +118,7 @@ struct ResourceFixture {
 struct PolicyCrypto : pico::network::ConsumerRadioCrypto {
   pico::network::PicoConsumerRadioCrypto actual;
   unsigned version{};
+  std::function<void(Json &)> management_edit;
   bool begin() override { return actual.begin(); }
   std::array<std::uint8_t, 32> public_key() const override {
     return actual.public_key();
@@ -136,23 +137,44 @@ struct PolicyCrypto : pico::network::ConsumerRadioCrypto {
   std::optional<pico::network::HttpResponse>
   seal(pico::wtp::InputView plain,
        const pico::network::ConsumerRadioBinding &binding,
-       std::uint64_t sequence) override {
-    if (version) {
+       std::uint64_t sequence) {
+    if (version || management_edit) {
       auto value = Json::parse(static_cast<std::string>(plain), nullptr, false);
       if (value.is_object() && value.contains("body") &&
           value["body"].contains("limits")) {
         auto &body = value["body"];
-        body["schema"] = "transmitter-management/" + std::to_string(version);
-        body["limits"]["idle_ms"] = 300000;
-        body["limits"]["absolute_ms"] = 900000;
-        if (version == 1) {
-          body["limits"]["consumer_sessions"] = 1;
-          body["limits"].erase("consumer_pending_logins");
+        if (version) {
+          body["schema"] = "transmitter-management/" + std::to_string(version);
+          body["limits"]["idle_ms"] = 300000;
+          body["limits"]["absolute_ms"] = 900000;
+          if (version == 1) {
+            body["limits"]["consumer_sessions"] = 1;
+            body["limits"].erase("consumer_pending_logins");
+          }
         }
+        if (management_edit) management_edit(body);
         return actual.seal(value.dump(), binding, sequence);
       }
     }
     return actual.seal(plain, binding, sequence);
+  }
+  std::optional<pico::network::HttpResponse>
+  seal_parts(std::span<const pico::wtp::InputView> parts,
+             const pico::network::ConsumerRadioBinding &binding,
+             std::uint64_t sequence) override {
+    if (version || management_edit) {
+      std::string plain;
+      for (const auto part : parts) plain += static_cast<std::string>(part);
+      return seal(plain, binding, sequence);
+    }
+    return actual.seal_parts(parts, binding, sequence);
+  }
+  std::optional<pico::network::HttpResponse>
+  seal_buffer(pico::wtp::OutputBuffer plain,
+              const pico::network::ConsumerRadioBinding &binding,
+              std::uint64_t sequence) override {
+    if (version || management_edit) return seal(plain.view(), binding, sequence);
+    return actual.seal_buffer(std::move(plain), binding, sequence);
   }
   void clear() override { actual.clear(); }
 };
@@ -362,13 +384,19 @@ void cases(bool ap) {
   assert(t.mutations == 1);
 }
 void session_policy_cases() {
-  for (const auto version : {1, 2, 4}) {
+  for (const bool ap : {false, true}) for (const auto version : {1, 2, 4}) {
     Test t;
+    if (ap) {
+      t.authority = "192.168.4.1";
+      t.origin = "http://192.168.4.1";
+      t.interface = pico::network::ConsumerInterface::AccessPoint;
+    }
+    const std::string carrier = ap ? "consumer_ap" : "consumer_station";
     if (version != 4)
       for (auto &crypto : t.crypto)
         crypto.version = version;
     auto c = t.client();
-    assert(c->login(device, "consumer_station", "test-password").status == 200);
+    assert(c->login(device, carrier, "test-password").status == 200);
     const auto started = t.host.now;
     const std::uint64_t idle = version == 4 ? 1800000 : 300000,
                         absolute = version == 4 ? 28800000 : 900000;
@@ -385,7 +413,7 @@ void session_policy_cases() {
     const auto calls = t.exchanges;
     assert(c->request("status", "GET").status == 401 && t.exchanges == calls);
     ++t.host.now;
-    assert(c->login(device, "consumer_station", "test-password").status == 200);
+    assert(c->login(device, carrier, "test-password").status == 200);
     const auto fresh = t.host.now;
     for (std::uint64_t elapsed = idle / 2; elapsed < absolute;
          elapsed += idle / 2) {
@@ -395,11 +423,47 @@ void session_policy_cases() {
     t.host.now = fresh + absolute - 1;
     assert(c->active());
     ++t.host.now;
-    assert(c->request("status", "GET").status == 401);
+    const auto absolute_calls = t.exchanges;
+    assert(!c->active());
+    assert(c->request("status", "GET").status == 401 &&
+           t.exchanges == absolute_calls);
     ++t.host.now;
-    assert(c->login(device, "consumer_station", "test-password").status == 200);
+    assert(c->login(device, carrier, "test-password").status == 200);
     --t.host.now;
     assert(!c->active());
+    assert(t.mutations == 0 && t.wtp.io == 0);
+  }
+  // Reusing a client for an older peer must not retain the longer policy.
+  {
+    Test t;
+    auto c = t.client();
+    assert(c->login(device, "consumer_station", "test-password").status == 200);
+    c->logout();
+    for (auto &crypto : t.crypto) crypto.version = 1;
+    t.host.now += 1000;
+    assert(c->login(device, "consumer_station", "test-password").status == 200);
+    t.host.now += 300000;
+    const auto calls = t.exchanges;
+    assert(c->request("status", "GET").status == 401 && t.exchanges == calls);
+    assert(t.mutations == 0 && t.wtp.io == 0);
+  }
+  // Even authentic encrypted discovery cannot extend an unsupported policy.
+  for (unsigned fault = 0; fault < 8; ++fault) {
+    Test t;
+    for (auto &crypto : t.crypto) crypto.management_edit = [fault](Json &body) {
+      if (fault == 0) body["schema"] = "transmitter-management/6";
+      if (fault == 1) body["limits"]["idle_ms"] = 1800000.0;
+      if (fault == 2) body["limits"]["absolute_ms"] = 28800001;
+      if (fault == 3) body["target"]["boot_id"] = std::string(32, 'b');
+      if (fault == 4) body["schema"] = "transmitter-management/2";
+      if (fault == 5) body["schema"] = "transmitter-management/5";
+      if (fault == 6) body["profile_generation"] = 1;
+      if (fault == 7) body["limits"]["future"] = true;
+    };
+    auto c = t.client();
+    const auto result = c->login(device, "consumer_station", "test-password");
+    assert(result.status == 409 && !c->active());
+    assert(Json::parse(result.body)["error"]["code"] == "unsupported_management_contract");
     assert(t.mutations == 0 && t.wtp.io == 0);
   }
   std::cout << "Native authenticated policy selection: historical 5/15-minute "
@@ -1090,22 +1154,22 @@ int main(int argc, char **argv) {
         if(variant==9)j=Json::array();
         if(variant==10)j=nullptr;
         if(variant==11){
-          const bool old=j["schema"]=="transmitter-management/1";
-          j["schema"]=old?"transmitter-management/2":"transmitter-management/1";
-          j["limits"]["consumer_sessions"]=old?3:1;
-          j["limits"].erase("consumer_pending_logins");
-          if(old)j["limits"]["consumer_pending_logins"]=1;
+          // Valid historical contract, inconsistent with advertised /4.
+          j["schema"]="transmitter-management/2";
+          j["limits"]["idle_ms"]=300000;
+          j["limits"]["absolute_ms"]=900000;
         }
         response.body=j.dump();
       }
       return response;
     };
-    pi::PicoHttpResponse config,resource;
+    pi::PicoHttpResponse config,resource,progress;
     assert(t.app->idle_management([&]{
       config=pi::pico_configuration_request(exchange,c->device(),c->boot(),"GET",{}, {},"consumer_station",c->generation());
       resource=pi::pico_resource_request(exchange,c->device(),c->boot(),"application","GET",{}, {},"consumer_station",c->generation());
+      progress=pi::pico_progress_request(exchange,c->device(),c->boot(),"progress","GET",{}, {},"consumer_station",c->generation());
     },true));
-    assert(config.status==409 && resource.status==409 && t.mutations==0 && c->active());
+    assert(config.status==409 && resource.status==409 && progress.status==409 && t.mutations==0 && c->active());
   }
   for (const auto profile : {pico::network::ManagementProfile::Blank,
                              pico::network::ManagementProfile::Recovery,

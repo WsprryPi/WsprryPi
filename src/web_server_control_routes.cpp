@@ -18,6 +18,7 @@
 #include "wtp_integration/usb_discovery.hpp"
 #include "wtp_integration/identity_probe.hpp"
 #include "wtp_settings_json.hpp"
+#include "wtp_integration/usb_logging.hpp"
 #include "transmitter_runtime_bridge.hpp"
 #include <utility>
 #include <mutex>
@@ -225,6 +226,10 @@ void register_control(
             result = request.method == "GET" || context
                 ? wtp_runtime_firmware(request.method, request.body)
                 : wsprrypi::PicoHttpResponse{403, R"({"error":{"code":"origin_or_content_type"}})", {}};
+        } else if (request.path == "/api/v1/host/logging") {
+            result = request.method != "GET" && !context
+                ? wsprrypi::PicoHttpResponse{403, R"({"error":{"code":"origin_or_content_type"}})", {}}
+                : wsprrypi::usb_logging_api(request.method, request.body, request.get_header_value("If-Match"));
         } else if (request.path == "/api/v1/host/fleet") {
             result = request.method == "GET" || context
                 ? wsprrypi::wtp_fleet_api(request.method, request.body, request.get_header_value("If-Match"))
