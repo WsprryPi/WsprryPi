@@ -211,8 +211,12 @@ LCBLog::LCBLog(std::ostream &outStream, std::ostream &errStream)
  */
 LCBLog::~LCBLog()
 {
-    // Tell workers to exit their processing loops
-    done_.store(true, std::memory_order_release);
+    // Publish shutdown while holding both predicate mutexes. An atomic flag
+    // alone allows a notify between a worker's predicate check and its wait.
+    {
+        std::scoped_lock lock(outMtx_, errMtx_);
+        done_.store(true, std::memory_order_release);
+    }
 
     // Wake up any workers that are waiting on the condition variables
     outCv_.notify_all();

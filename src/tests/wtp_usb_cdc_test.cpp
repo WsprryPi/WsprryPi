@@ -499,16 +499,18 @@ struct Tree {
   }
 };
 void pairing() {
+ for (unsigned role_number : {4U, 6U}) {
+  const auto selected_role = static_cast<PicoCdcRole>(role_number);
   Pty wtp_port, management_port, other_port;
   Tree tree(wtp_port.slave);
   const auto devices=tree.root/"device-nodes";
   std::filesystem::create_directories(tree.root/"class/tty");
   std::filesystem::create_directories(devices);
   const auto add=[&](Pty &port,const std::filesystem::path &usb,const std::string &name) {
-    const auto interface=usb/"interface4";
+    const auto interface=usb/("interface" + std::to_string(role_number));
     std::filesystem::create_directories(interface/"tty"/name);
     Tree::write(usb/"serial","PICO123\n");Tree::write(usb/"idVendor","cafe\n");Tree::write(usb/"idProduct","4012\n");
-    Tree::write(interface/"bInterfaceNumber","04\n");Tree::write(interface/"bInterfaceClass","02\n");
+    Tree::write(interface/"bInterfaceNumber",role_number == 6 ? "06\n" : "04\n");Tree::write(interface/"bInterfaceClass","02\n");
     Tree::write(interface/"bInterfaceSubClass","02\n");Tree::write(interface/"bInterfaceProtocol","00\n");
     std::filesystem::create_symlink(tree.root/"drivers/cdc_acm",interface/"driver");
     struct stat info{};CHECK(::stat(port.slave.c_str(),&info)==0);
@@ -516,22 +518,30 @@ void pairing() {
     std::filesystem::create_directory(tree.root/"class/tty"/name);
     std::filesystem::create_symlink(port.slave,devices/name);
   };
+  auto missing=selection();missing.path=wtp_port.slave;
+  bool unsupported=false;
+  try { (void)paired_linux_cdc(missing,selected_role,tree.root,devices); }
+  catch(const std::exception &e) {
+    unsupported = role_number == 6 ? std::string(e.what()) == "dedicated_logging_unsupported" : true;
+  }
+  CHECK(unsupported); // Metadata-only: never open or fall back to Console.
   add(management_port,tree.usb,"arbitrary-role-name");
   add(other_port,tree.root/"devices/usb/other-board","not-this-board");
   auto selected=selection();selected.path=wtp_port.slave;
-  const auto paired=paired_linux_cdc(selected,PicoCdcRole::Management,tree.root,devices);
-  CHECK(paired.path==management_port.slave && paired.role==PicoCdcRole::Management);
+  const auto paired=paired_linux_cdc(selected,selected_role,tree.root,devices);
+  CHECK(paired.path==management_port.slave && paired.role==selected_role);
   // Duplicate serials on other physical parents do not select another board.
   CHECK(paired.path!=other_port.slave);
   std::filesystem::create_directory(tree.root/"class/tty"/"duplicate-role-alias");
   std::filesystem::create_symlink(management_port.slave,devices/"duplicate-role-alias");
-  bool refused=false;try {(void)paired_linux_cdc(selected,PicoCdcRole::Management,tree.root,devices);}catch(...){refused=true;}
+  bool refused=false;try {(void)paired_linux_cdc(selected,selected_role,tree.root,devices);}catch(...){refused=true;}
   CHECK(refused);
-  Fake system;system.device.control_interface=4;UsbCdcStream stream(system);
-  auto role=selection();role.role=PicoCdcRole::Management;
+  Fake system;system.device.control_interface=role_number;UsbCdcStream stream(system);
+  auto role=selection();role.role=selected_role;
   CHECK(stream.begin_open(role,0));stream.close();
-  CHECK(!stream.begin_open(selection(),0));
+  CHECK(!stream.begin_open(selection(),0)); }
 }
+
 void metadata() {
   Pty p;
   Tree t(p.slave);

@@ -15,6 +15,11 @@ PicoHttpResponse usb_logging_api(const std::string &method,
 nlohmann::json usb_logging_attached_sources(const nlohmann::json &discovery);
 // Bounded, device-bound decoding seam used by deterministic tests and
 // collector.
+// Closed USB-Logging/1 handshake validators, also used by paired fixtures.
+nlohmann::json parse_usb_logging_status(const std::string &line, const std::string &device,
+                                      const std::string &boot = "");
+void validate_usb_logging_start(const std::string &line, const std::string &device,
+                                const std::string &boot);
 nlohmann::json parse_usb_log(const std::string &line, const std::string &device,
                              const std::string &boot);
 } // namespace wsprrypi

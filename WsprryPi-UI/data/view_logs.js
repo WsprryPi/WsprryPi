@@ -782,9 +782,10 @@
         select.appendChild(option);
     }
     function collectionStateLabel(state) {
-        return ({disabled:"Collection disabled",disconnected:"Disconnected",connecting:"Connecting to Console",starting:"Starting Console stream",streaming:"Collecting USB logs",
+        return ({disabled:"Collection disabled",disconnected:"Disconnected",connecting:"Connecting to Logging port",starting:"Starting log stream",streaming:"Collecting USB logs",
             maintenance:"Firmware maintenance",firmware_logging_disabled:"Pico export disabled",journal_unavailable:"System journal unavailable",
-            console_busy_or_disconnected:"Console busy or disconnected",console_disconnected:"Console disconnected",
+            logging_busy_or_disconnected:"Logging port busy or disconnected",logging_disconnected:"Logging port disconnected",
+            dedicated_logging_unsupported:"Update Pico firmware for a dedicated Logging port",
             unsupported_or_unresponsive_firmware:"Firmware unsupported or unresponsive",logging_identity_changed:"Device identity changed; review Fleet",
             source_removed_from_fleet:"Source removed from Fleet",collector_unavailable:"Collection unavailable; refresh sources"})[state] || "Collection disabled or unavailable";
     }

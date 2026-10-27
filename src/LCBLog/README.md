@@ -113,3 +113,9 @@ logger.setJournaldIdentifier("wsprrypi");
 
 Covered by the WsprryPi root MIT license. An extracted copy should carry its own
 license file.
+
+## Shutdown validation
+
+Logger destruction publishes its shutdown predicate under both queue mutexes, wakes the workers and joins them after releasing the locks. Pending messages drain before destruction returns. Logging producers must stop before the logger is destroyed.
+
+From the WsprryPi repository root on Linux with the existing C/C++ toolchain and libsystemd development package, run `python3 scripts/tests/logger_shutdown_test.py`. This compiles the actual component, forces the predicate-to-wait scheduling window and checks pending-record drain. `python3 scripts/tests/early_cli_exit_test.py src/build/bin/wsprrypi` checks bounded informational CLI exits against an already built application; neither command starts the application service or submits RF jobs.

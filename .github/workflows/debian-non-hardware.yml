@@ -230,7 +230,9 @@ jobs:
             esac
             ../scripts/tests/backend_capability_reporting_test.sh \
               ./build/bin/wsprrypi "$profile" "$omitted"
+            python3 ../scripts/tests/early_cli_exit_test.py ./build/bin/wsprrypi
           done
+          python3 ../scripts/tests/logger_shutdown_test.py
 
   non-hardware-validation:
     needs: change_scope

@@ -45,7 +45,7 @@ require __DIR__ . '/../card_header.php';
                         <button id="logs-pause" class="btn btn-outline-secondary" type="button">Pause view</button>
                         <button id="logs-export" class="btn btn-outline-secondary" type="button">Export visible logs</button>
                         <label><input id="logs-collect" type="checkbox" disabled> Collect this Pico's USB logs</label>
-                        <p class="mb-0">Collection continues when this page is closed. Turn collection off before using the Pico Console in another tool. Enable USB logging on the Pico separately.</p>
+                        <p class="mb-0">Collection continues when this page is closed. The Pico Console remains available while logs are collected. Enable USB logging on the Pico separately.</p>
                     </div>
                 </details>
                 <button id="btn-jump-bottom" type="button" class="btn btn-sm btn-primary logs-jump-bottom" hidden>Jump to newest</button>

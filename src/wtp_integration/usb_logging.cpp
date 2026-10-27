@@ -330,9 +330,9 @@ private:
           {settings.path, settings.usb_serial,
            static_cast<std::uint16_t>(settings.vendor_id),
            static_cast<std::uint16_t>(settings.product_id), PicoCdcRole::Wtp},
-          PicoCdcRole::Console);
+          PicoCdcRole::Logging);
       if (!source.stream.begin_open(selected, now))
-        throw std::runtime_error("console_busy_or_disconnected");
+        throw std::runtime_error("logging_busy_or_disconnected");
       source.deadline = now + 3000;
       source.state = "connecting";
     }
@@ -356,14 +356,14 @@ private:
           source.stream.write(bytes.subspan(source.output_offset));
       if (result.state == wtp::IoState::Closed ||
           result.state == wtp::IoState::Failed)
-        throw std::runtime_error("console_disconnected");
+        throw std::runtime_error("logging_disconnected");
       source.output_offset += result.count;
     }
     std::array<std::uint8_t, 1024> bytes{};
     const auto received = source.stream.read(bytes);
     if (received.state == wtp::IoState::Closed ||
         received.state == wtp::IoState::Failed)
-      throw std::runtime_error("console_disconnected");
+      throw std::runtime_error("logging_disconnected");
     if ((!source.start_acked || source.status_pending) && now > source.deadline)
       throw std::runtime_error("unsupported_or_unresponsive_firmware");
     for (std::size_t index = 0; index < received.count; ++index) {
@@ -385,18 +385,12 @@ private:
         continue;
       }
       if (line.starts_with("{") && source.status_pending) {
-        const auto reply = Json::parse(line, nullptr, false);
-        if (!reply.is_object() ||
-            reply.value("schema", "") != "transmitter-logging/1")
-          continue;
-        const auto target = reply.at("target");
-        if (target.at("device_id") != settings.device_id ||
-            !identity(target.at("boot_id").get<std::string>()))
-          throw std::runtime_error("logging_identity_changed");
+        const auto reply = parse_usb_logging_status(line, settings.device_id, source.boot);
+        const auto &target = reply.at("target");
         const auto observed_boot = target.at("boot_id").get<std::string>();
         if (!source.boot.empty() && source.boot != observed_boot)
           throw std::runtime_error("logging_identity_changed");
-        const bool initial = source.boot.empty();
+        const bool needs_start = source.boot.empty() || !reply.at("active").at("streaming").get<bool>();
         source.boot = observed_boot;
         source.status_pending = false;
         if (source.last_boot != source.boot) {
@@ -406,22 +400,21 @@ private:
         source.export_enabled = reply.at("active").at("enabled").get<bool>();
         source.dropped = reply.at("active").at("dropped").get<std::string>();
         (void)decimal(Json(source.dropped));
+        if (needs_start) source.start_acked = false;
         source.state = source.export_enabled
                            ? (source.start_acked ? "streaming" : "starting")
                            : "firmware_logging_disabled";
-        if (initial) {
+        if (needs_start) {
+          source.deadline = now + 3000;
           source.output =
               "SYSLOG START " + settings.device_id + " " + source.boot + "\n";
           source.output_offset = 0;
         }
       } else if (!source.start_acked && line.starts_with("{")) {
-        const auto reply = Json::parse(line, nullptr, false);
-        if (reply.is_object() && reply.value("ok", false)) {
-          source.start_acked = true;
-          source.state =
-              source.export_enabled ? "streaming" : "firmware_logging_disabled";
-        }
-      } else if (line.starts_with("@SYSLOG ")) {
+        validate_usb_logging_start(line, settings.device_id, source.boot);
+        source.start_acked = true;
+        source.state = source.export_enabled ? "streaming" : "firmware_logging_disabled";
+      } else if (line.starts_with("@SYSLOG ") && source.start_acked) {
         if (source.rate_window != now / 1000) {
           source.rate_window = now / 1000;
           source.rate_count = 0;
@@ -566,6 +559,51 @@ Json usb_logging_attached_sources(const Json &discovery) {
     result.push_back({{"device_id", id}, {"name", "Attached Pico " + serial}});
   }
   return result;
+}
+namespace {
+void logging_target(const Json &reply, const std::string &device, const std::string &boot) {
+  if (!reply.is_object() || reply.size() != 3 ||
+      !reply.contains("schema") || !reply.at("schema").is_string() ||
+      reply.at("schema") != "usb-logging/1" || !reply.contains("target"))
+    throw std::runtime_error("invalid_logging_handshake");
+  const auto &target = reply.at("target");
+  if (!target.is_object() || target.size() != 2 || !target.contains("device_id") ||
+      !target.contains("boot_id") || !target.at("device_id").is_string() ||
+      !target.at("boot_id").is_string() || target.at("device_id") != device ||
+      !identity(target.at("boot_id").get<std::string>()) ||
+      (!boot.empty() && target.at("boot_id") != boot))
+    throw std::runtime_error("logging_identity_changed");
+}
+bool bounded_integer(const Json &value, std::uint64_t maximum) {
+  return value.is_number_integer() &&
+      (value.is_number_unsigned() || value.get<std::int64_t>() >= 0) &&
+      value.get<std::uint64_t>() <= maximum;
+}
+} // namespace
+Json parse_usb_logging_status(const std::string &line, const std::string &device,
+                              const std::string &boot) {
+  const auto reply = strict_json(line);
+  logging_target(reply, device, boot);
+  if (!reply.contains("active") || !reply.at("active").is_object())
+    throw std::runtime_error("invalid_logging_status");
+  const auto &active = reply.at("active");
+  if (active.size() != 6 || !active.contains("enabled") || !active.contains("maximum_severity") ||
+      !active.contains("streaming") || !active.contains("connected") ||
+      !active.contains("queued") || !active.contains("dropped") ||
+      !active.at("enabled").is_boolean() || !active.at("streaming").is_boolean() ||
+      !active.at("connected").is_boolean() || !active.at("connected").get<bool>() ||
+      !bounded_integer(active.at("maximum_severity"), 7) || !bounded_integer(active.at("queued"), 16))
+    throw std::runtime_error("invalid_logging_status");
+  (void)decimal(active.at("dropped"));
+  return reply;
+}
+void validate_usb_logging_start(const std::string &line, const std::string &device,
+                                const std::string &boot) {
+  const auto reply = strict_json(line);
+  logging_target(reply, device, boot);
+  if (!reply.contains("streaming") || !reply.at("streaming").is_boolean() ||
+      !reply.at("streaming").get<bool>())
+    throw std::runtime_error("invalid_logging_start");
 }
 Json parse_usb_log(const std::string &line, const std::string &device,
                    const std::string &boot) {
