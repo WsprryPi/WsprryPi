@@ -40,6 +40,8 @@
 // - heartbeat=seconds (default 15, clamped)
 
 declare(strict_types=1);
+require_once __DIR__ . '/log_origin.php';
+$logSource = log_source($_GET['source'] ?? 'all');
 
 header('Content-Type: text/event-stream; charset=utf-8');
 header('Cache-Control: no-cache, no-transform');
@@ -301,7 +303,7 @@ if ($priorityMin !== null && $priorityMax !== null && $priorityMin > $priorityMa
 }
 
 // Unit filter: default to the project unit, unless unit=* is requested.
-$unitParam = $_GET['unit'] ?? null;
+$unitParam = 'wsprrypi.service'; // This endpoint exposes only the application service.
 $units = [];
 $unitFilterDisabled = false;
 
@@ -548,6 +550,8 @@ function normalize_realtime_timestamp($value): ?string
 
 function send_entry(array $entry, bool $isPlayback): ?string
 {
+    global $logSource;
+    if (!log_scope_matches($entry) || !log_source_matches($entry, $logSource)) return null;
     $cursor = $entry['__CURSOR'] ?? null;
     $realtimeTimestamp = normalize_realtime_timestamp(
         $entry['__REALTIME_TIMESTAMP'] ?? ($entry['_SOURCE_REALTIME_TIMESTAMP'] ?? null)
@@ -568,6 +572,7 @@ function send_entry(array $entry, bool $isPlayback): ?string
         'GID' => isset($entry['_GID']) ? (int)$entry['_GID'] : null,
     ];
 
+    $payload = array_merge($payload, log_origin($entry));
     $sseCursor = is_string($cursor) && $cursor !== '' ? $cursor : null;
     emit_payload($payload, 'journal', $sseCursor);
 
@@ -803,6 +808,10 @@ if (!$unitFilterDisabled) {
         $journalFilters[] = '-u';
         $journalFilters[] = $u;
     }
+}
+
+if (str_starts_with($logSource, 'pico:')) {
+    $journalFilters[] = 'WSPRRY_ORIGIN_ID=' . substr($logSource, 5);
 }
 
 emit_internal(

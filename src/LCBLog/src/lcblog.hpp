@@ -205,6 +205,10 @@ public:
      * @param ident Identifier string (for example "wsprrypi").
      */
     void setJournaldIdentifier(const std::string &ident);
+    // Optional application-owned journald projection. Returning false retains
+    // the default sink; ordinary stream and severity behavior is unchanged.
+    using JournaldSink = bool (*)(int, const std::string&, const std::string&);
+    static void setJournaldSink(JournaldSink sink);
 
     /**
      * @brief Enqueue a formatted log message.

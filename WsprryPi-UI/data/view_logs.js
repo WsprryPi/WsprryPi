@@ -34,7 +34,7 @@
         // Connected state shows a manual reconnect action; otherwise start the stream.
         const isConnected = (state === "connected");
         const isConnecting = (state === "reconnecting");
-        btn.textContent = isConnected
+        btn.textContent = paused ? "Resume view" : isConnected
             ? "Refresh stream"
             : isConnecting
                 ? "Connecting…"
@@ -532,6 +532,7 @@
         logViewActionsBound = true;
 
         onClick("btn-clear", () => {
+            visibleRecords = [];
             clearPanes();
         });
 
@@ -761,21 +762,129 @@
     let logViewActionsBound = false;
     let logStreamInitialized = false;
 
-    const CURSOR_STORAGE_KEY = "log_stream_last_cursor";
+    let selectedSource = "all", selectedSeverity = "7", collectorIdentity = "";
+    let collectorSnapshot = null, collectorRevision = null, collectionUncertain = false;
+    let paused = false, visibleRecords = [];
+    const cursorStorageKey = () => `log_stream_cursor_v2:${collectorIdentity}:${selectedSource}:${selectedSeverity}`;
+    const validSource = value => /^(all|local|pico:[0-9a-f]{32})$/.test(value);
+    const loggingApi = () => (window.WSPRRYPI_PATHS?.sharedApiPath || "/api/v1") + "/host/logging";
+    function sourceStatus(text) {
+        const status = document.getElementById("logs-source-status");
+        if (status) status.textContent = text;
+    }
+    function addSource(value, label) {
+        const select = document.getElementById("logs-source");
+        if (!select || !validSource(value)) return;
+        const existing = [...select.options].find(option => option.value === value);
+        if (existing) { existing.textContent = label; return; }
+        if (select.options.length >= 66) return;
+        const option = document.createElement("option"); option.value = value; option.textContent = label;
+        select.appendChild(option);
+    }
+    function collectionStateLabel(state) {
+        return ({disabled:"Collection disabled",disconnected:"Disconnected",connecting:"Connecting to Console",starting:"Starting Console stream",streaming:"Collecting USB logs",
+            maintenance:"Firmware maintenance",firmware_logging_disabled:"Pico export disabled",journal_unavailable:"System journal unavailable",
+            console_busy_or_disconnected:"Console busy or disconnected",console_disconnected:"Console disconnected",
+            unsupported_or_unresponsive_firmware:"Firmware unsupported or unresponsive",logging_identity_changed:"Device identity changed; review Fleet",
+            source_removed_from_fleet:"Source removed from Fleet",collector_unavailable:"Collection unavailable; refresh sources"})[state] || "Collection disabled or unavailable";
+    }
+    function updateCollectionControl() {
+        const input = document.getElementById("logs-collect");
+        const id = selectedSource.startsWith("pico:") ? selectedSource.slice(5) : "";
+        const candidate = collectorSnapshot?.candidates?.find(row => row.device_id === id);
+        const saved = collectorSnapshot?.sources?.find(row => row.device_id === id);
+        if (input) { input.disabled = (!candidate && !saved) || collectionUncertain || (!collectorSnapshot?.journal_available && !saved?.enabled); input.checked = !!saved?.enabled; }
+        if (id) {
+            const state = collectorSnapshot?.status?.[id];
+            sourceStatus(collectionUncertain ? "Collection save is unconfirmed. Refresh sources to read the saved state before saving again." :
+                `Pico ${id} · ${collectionStateLabel(state?.state)}` +
+                (state?.rejected && state.rejected !== "0" ? ` · ${state.rejected} rejected records` : "") +
+                (state?.dropped && state.dropped !== "0" ? ` · ${state.dropped} Pico events dropped` : ""));
+        } else sourceStatus(selectedSource === "all" ? "Local Pi and collected Pico records." : "Records originating on this Pi.");
+    }
+    async function refreshSources(review = false) {
+        try {
+            const response = await fetch(loggingApi(), {cache:"no-store", signal:AbortSignal.timeout(10000)});
+            if (!response.ok) throw new Error("Source list unavailable. Refresh sources to retry; journal viewing remains available.");
+            const data = await response.json();
+            if (data.schema !== "host-usb-logging/1" || !/^[0-9a-f]{32}$/.test(data.collector_id) || !Array.isArray(data.candidates))
+                throw new Error("The source list is invalid. Refresh sources to retry.");
+            collectorSnapshot = data; collectorRevision = response.headers.get("ETag");
+            const changedCollector = collectorIdentity !== data.collector_id;
+            collectorIdentity = data.collector_id;
+            if (changedCollector) changeLogContext();
+            for (const row of data.candidates.slice(0,64)) addSource(`pico:${row.device_id}`, `${row.name || "Pico"} · ${row.device_id}`);
+            for (const row of (data.sources || []).slice(0,8))
+                if (!data.candidates.some(candidate => candidate.device_id === row.device_id))
+                    addSource(`pico:${row.device_id}`, `Saved collection policy · ${row.device_id}`);
+            if (review) collectionUncertain = false;
+            updateCollectionControl();
+        } catch (error) { sourceStatus(error.message); }
+    }
+    async function saveCollection() {
+        if (!collectorSnapshot || collectionUncertain) return;
+        const id = selectedSource.slice(5), input = document.getElementById("logs-collect");
+        const candidate = collectorSnapshot.candidates.find(row => row.device_id === id);
+        if (!input || input.checked && !candidate) return;
+        const sources = collectorSnapshot.sources.filter(row => row.device_id !== id && row.enabled);
+        if (input.checked) sources.push({catalog_id:candidate.catalog_id,device_id:id,enabled:true,maximum_severity:7});
+        if (sources.length > 8) { sourceStatus("Collection supports up to eight Picos. Turn off and remove an unused source first."); input.checked = false; return; }
+        input.disabled = true; collectionUncertain = true;
+        try {
+            const response = await fetch(loggingApi(), {method:"PUT",cache:"no-store",signal:AbortSignal.timeout(10000),
+                headers:{"Content-Type":"application/json","X-WsprryPico-Request":"1","If-Match":collectorRevision || ""},
+                body:JSON.stringify({schema:"host-usb-logging/1",collector_id:collectorSnapshot.collector_id,sources})});
+            if (!response.ok) throw new Error("Collection save is unconfirmed. Refresh sources and review the saved setting before trying again.");
+            await refreshSources(true);
+        } catch (error) { sourceStatus(error.message); }
+    }
+    function changeLogContext() {
+        stopLogStream();
+        selectedSource = document.getElementById("logs-source")?.value || "all";
+        selectedSeverity = document.getElementById("logs-severity")?.value || "7";
+        hiddenBuffer = []; hiddenBufferedCount = 0; visibleRecords = [];
+        for (const id of ["all","internal"]) { const pane = document.getElementById(id); if (pane) pane.replaceChildren(); }
+        updateCollectionControl();
+        renderEmptyState("all", "No records in this view", "Waiting for matching records. Check the source's collection status or choose All sources.");
+        if (!paused) startLogStream();
+    }
+    function bindSourceControls() {
+        document.getElementById("logs-source")?.addEventListener("change", changeLogContext);
+        document.getElementById("logs-severity")?.addEventListener("change", changeLogContext);
+        document.getElementById("logs-refresh-sources")?.addEventListener("click", () => refreshSources(true));
+        document.getElementById("logs-collect")?.addEventListener("change", saveCollection);
+        document.getElementById("logs-pause")?.addEventListener("click", event => {
+            paused = !paused;
+            event.currentTarget.textContent = paused ? "Resume view" : "Pause view";
+            if (paused) { stopLogStream(); setSseStatus("disconnected", "Paused", "Journal viewing paused; collection continues"); }
+            else startLogStream();
+        });
+        document.getElementById("logs-export")?.addEventListener("click", () => {
+            const blob = new Blob([visibleRecords.map(row => JSON.stringify(row)).join("\n") + "\n"], {type:"application/x-ndjson"});
+            const url = URL.createObjectURL(blob), link = document.createElement("a");
+            link.href = url; link.download = "wsprry-logs.jsonl"; link.click(); setTimeout(() => URL.revokeObjectURL(url), 1000);
+        });
+        refreshSources();
+        const sourcesTimer = window.setInterval(() => { if (!document.hidden) refreshSources(); }, 10000);
+        window.addEventListener("beforeunload", () => window.clearInterval(sourcesTimer), {once:true});
+    }
+
 
     function getStoredCursor() {
+        if (!/^[0-9a-f]{32}$/.test(collectorIdentity)) return null;
         try {
-            const v = localStorage.getItem(CURSOR_STORAGE_KEY);
+            const v = localStorage.getItem(cursorStorageKey());
             return (v && v.trim() !== "") ? v.trim() : null;
         } catch (e) {
             return null;
         }
     }
 
-    function storeCursor(cursor) {
+    function storeCursor(cursor, contextKey, verified) {
+        if (!verified) return;
         if (!cursor || cursor.trim() === "") return;
         try {
-            localStorage.setItem(CURSOR_STORAGE_KEY, cursor.trim());
+            localStorage.setItem(contextKey, cursor.trim());
         } catch (e) {
             // Ignore storage failures (private mode, quota, etc.)
         }
@@ -852,6 +961,8 @@
         url.searchParams.set("playback", "1");
         url.searchParams.set("backlog", "200");
         url.searchParams.set("unit", "wsprrypi.service");
+        url.searchParams.set("source", selectedSource);
+        url.searchParams.set("priority_max", selectedSeverity);
 
         const cursor = getStoredCursor();
         if (cursor) url.searchParams.set("cursor", cursor);
@@ -873,6 +984,7 @@
     }
 
     function startLogStream() {
+        if (paused) return;
         if (!("EventSource" in window)) {
             setSseStatus("disconnected", "Unavailable", "This browser does not support server-sent events");
             renderEmptyState(
@@ -893,6 +1005,8 @@
 
         setSseStatus("reconnecting", "Connecting", "Connecting to log stream");
         evt = new EventSource(url);
+        const stream = evt;
+        const contextKey = cursorStorageKey(), verifiedContext = /^[0-9a-f]{32}$/.test(collectorIdentity);
 
         lastEventAtMs = Date.now();
         reconnectPending = false;
@@ -901,6 +1015,7 @@
         installUnloadHookOnce();
 
         evt.onopen = () => {
+            if (evt !== stream) return;
             setSseStatus("connected", "Connected", "Connected to log stream");
             debugConsole("debug", "Connected to log stream");
             reconnectAttempts = 0;
@@ -910,6 +1025,7 @@
         };
 
         const handler = (e) => {
+            if (evt !== stream || paused) return;
             lastEventAtMs = Date.now();
             reconnectPending = false;
 
@@ -954,11 +1070,14 @@
                 const inferredType =
                     (payload.type ?? ((e.type && e.type !== "message") ? e.type : null));
 
-                // Persist cursor for resume safety (Last-Event-ID / cursor).
-                if (typeof e.lastEventId === "string" && e.lastEventId.trim() !== "") {
-                    storeCursor(decodeURIComponent(e.lastEventId));
-                } else if (payload.__CURSOR && typeof payload.__CURSOR === "string") {
-                    storeCursor(payload.__CURSOR);
+                // Internal SSE messages may inherit the previous event id.
+                // Only actual journal records advance this context's cursor.
+                if (inferredType === "journal" && typeof payload.__CURSOR === "string" && payload.__CURSOR) {
+                    storeCursor(payload.__CURSOR, contextKey, verifiedContext);
+                    visibleRecords.push(payload);
+                    if (visibleRecords.length > MAX_LINES) visibleRecords.shift();
+                    if (validSource(payload.source || "") && payload.source.startsWith("pico:"))
+                        addSource(payload.source, `${payload.origin_name || "Pico"} · ${payload.origin_id}`);
                 }
 
                 // If this is the initial SSE connection status and playback is enabled,
@@ -988,8 +1107,12 @@
                 // Split into lines so continuations can render with a bold Z timestamp.
                 const msgLines = sev.message.split(/\r?\n/);
 
-                const ts = formatTimestampUTC(payload);
-                const unit = payload._SYSTEMD_UNIT ? formatUnitFixed16(String(payload._SYSTEMD_UNIT)) : "";
+                const originUs = typeof payload.origin_utc_ns === "string" ? payload.origin_utc_ns.slice(0,-3) : null;
+                const remote = payload.origin_kind === "pico";
+                const ts = formatTimestampUTC(originUs ? {...payload,__REALTIME_TIMESTAMP:originUs} : payload) +
+                    (remote && !originUs ? " received" : "");
+                const unit = remote ? `${payload.origin_name || "Pico"} [${String(payload.origin_id || "").slice(0,8)}]` :
+                    (payload._SYSTEMD_UNIT ? formatUnitFixed16(String(payload._SYSTEMD_UNIT)) : "");
                 const severity = sev.label;
 
                 // When the page is not visible, browsers may throttle animation frames
@@ -1105,6 +1228,7 @@
     }
 
     function restartLogStream() {
+        if (paused) { paused = false; const button = document.getElementById("logs-pause"); if (button) button.textContent = "Pause view"; }
         stopLogStream();
         startLogStream();
     }
@@ -1120,6 +1244,7 @@
     }
 
     function handleBrowserOnline() {
+        if (paused) return;
         renderEmptyState(
             "all",
             "Reconnecting log stream",
@@ -1174,6 +1299,7 @@
         // from loadPage(). We intentionally do not auto-start here to avoid
         // double-connecting if the page framework controls init order.
         bindLogViewActions();
+        bindSourceControls();
         window.addEventListener("offline", handleBrowserOffline);
         window.addEventListener("online", handleBrowserOnline);
         startWatchdog();
@@ -1188,7 +1314,7 @@
             formatTimestampUTC,
             extractSeverityAndMessage,
             formatUnitFixed16,
-            priorityToLabel
+            priorityToLabel, buildStreamUrl, cursorStorageKey, validSource
         };
     }
 

@@ -2152,3 +2152,10 @@ $(BIN_DIR)/wspr_plan_placement_test $(BIN_DIR)/wspr_scheduler_frequency_export: 
 	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) $^ -o $@ $(LDFLAGS)
 wspr-plan-placement-test: $(BIN_DIR)/wspr_plan_placement_test
 	$(Q)WSPRRYPI_DISABLE_HARDWARE_ACCESS=1 ./$(BIN_DIR)/wspr_plan_placement_test
+
+# Hardware-free bounded USB parser and Linux collection-policy persistence.
+.PHONY: usb-logging-test
+usb-logging-test:
+	$(Q)mkdir -p build/usb-logging
+	$(Q)$(CXX) -std=c++20 -Wall -Wextra -Werror -pthread -I. -IWTP-Client/include -DLIB_JOURNALD=0 $(OPENSSL_CFLAGS) -IWTP-Server/include tests/usb_logging_test.cpp WTP-Server/src/sha256.cpp wtp_integration/usb_logging.cpp wtp_integration/usb_cdc.cpp wtp_integration/catalog.cpp wtp_endpoint/identity.cpp $(OPENSSL_LIBS) -o build/usb-logging/usb_logging_test
+	$(Q)build/usb-logging/usb_logging_test

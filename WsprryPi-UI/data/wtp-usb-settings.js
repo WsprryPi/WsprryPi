@@ -16,20 +16,59 @@
         byId("name-save").disabled = busy || !available || !nameRevision || hostname?.writable !== true;
         byId("wifi-save").disabled = busy || !available || !wifiRevision;
         byId("wifi-remove").disabled = busy || !available || !wifiRevision || !wifi?.wifi;
+        if (byId("logging-read")) byId("logging-read").disabled = busy || !available || loggingBusy;
+        for (const id of ["logging-save","logging-enabled","logging-severity"])
+            if (byId(id)) byId(id).disabled = busy || !available || loggingBusy || !logging;
         for (const action of ["restart", "ap"]) byId(action).disabled = busy || !available || !nameRevision;
     }
-    function invalidate() { nameRevision = wifiRevision = ""; }
+    function invalidate() { nameRevision = wifiRevision = ""; loggingEpoch += 1; logging = null; if (byId("logging-save")) byId("logging-save").disabled = true; }
     async function exchange(resource, method = "GET", body, revision) {
         const response = await root.fetch(api(resource), {
             method, cache: "no-store", signal: AbortSignal.timeout(12000),
             ...(body ? { headers: {"Content-Type":"application/json", "X-WsprryPico-Request":"1", "If-Match":revision}, body:JSON.stringify(body) } : {})
         });
         const value = await response.json();
+        if (!response.ok && resource === "logging") throw new Error(response.status === 404 ? "This firmware does not support USB logging. Update it, then read logging settings."
+            : response.status === 412 ? "Logging settings changed elsewhere. Read logging settings and review your draft before another save."
+            : response.status === 409 ? "USB management is unavailable or needs a fresh read. Select USB cable, reconcile any job, then read logging settings."
+            : "The logging request was not confirmed. Read logging settings and review saved state before another save; your draft is preserved.");
         if (!response.ok) throw new Error(response.status === 412 ? "Settings changed elsewhere. Read name and Wi-Fi, review your preserved draft, then save again."
             : response.status === 409 ? "USB management is unavailable or needs a fresh read. Select USB cable above, reconcile any job, then read name and Wi-Fi."
             : "The Pico request was not confirmed. A change may already be saved. Read name and Wi-Fi before sending another change; your draft is preserved.");
         return {value, revision:response.headers.get("ETag") || ""};
     }
+    let logging = null, loggingRevision = "", loggingBusy = false, loggingEpoch = 0;
+    async function loggingAction(save) {
+        if (loggingBusy || !available || save && !logging) return;
+        loggingBusy = true;
+        const controls = ["logging-read","logging-save","logging-enabled","logging-severity"];
+        for (const id of controls) if (byId(id)) byId(id).disabled = true;
+        const expected = logging, epoch = loggingEpoch; logging = null;
+        try {
+            if (save) await exchange("logging","PUT",{schema:"transmitter-logging/1",target:expected.target,
+                logging:{enabled:byId("logging-enabled").checked,maximum_severity:Number(byId("logging-severity").value)}},loggingRevision);
+            const observed = await exchange("logging");
+            if (epoch !== loggingEpoch || !available) return;
+            const value = observed.value;
+            if (value.schema !== "transmitter-logging/1" || value.target?.scope !== "member" ||
+                !/^[0-9a-f]{32}$/.test(value.target?.device_id || "") || !/^[0-9a-f]{32}$/.test(value.target?.boot_id || "") ||
+                typeof value.saved?.enabled !== "boolean" || !Number.isInteger(value.saved?.maximum_severity) ||
+                value.saved.maximum_severity < 0 || value.saved.maximum_severity > 7 ||
+                typeof value.active?.enabled !== "boolean" || typeof value.active?.streaming !== "boolean" ||
+                !/^(0|[1-9][0-9]{0,19})$/.test(value.active?.dropped || "") || !observed.revision)
+                throw new Error("This firmware does not support USB logging settings.");
+            logging = observed.value; loggingRevision = observed.revision;
+            byId("logging-enabled").checked = logging.saved.enabled;
+            byId("logging-severity").value = String(logging.saved.maximum_severity);
+            byId("logging-status").textContent = `Saved: ${logging.saved.enabled ? "enabled" : "disabled"}. Active: ${logging.active.enabled ? "enabled" : "disabled"}; ${logging.active.streaming ? "stream started" : "stream stopped"}; ${logging.active.dropped} dropped events. Enable Pi collection on Logs.`;
+            for (const id of controls) if (byId(id)) byId(id).disabled = false;
+        } catch (error) {
+            if (epoch !== loggingEpoch || !available) return;
+            byId("logging-status").textContent = (save ? "Save unconfirmed. Read logging settings before another save. " : "") + error.message;
+        } finally { loggingBusy = false; render(); }
+    }
+    byId("logging-read")?.addEventListener("click", () => loggingAction(false));
+    byId("logging-save")?.addEventListener("click", () => loggingAction(true));
     async function perform(action) {
         if (busy || !available) return;
         busy = true; render();
@@ -78,7 +117,7 @@
             byId("feedback").textContent = error.message || "Request unconfirmed. Read back before another change; your draft is preserved.";
         } finally { busy = false; render(); }
     }
-    root.WtpUsbSettings = {invalidate() { invalidate(); render(); }, setAvailability(value) { available = value; render(); }};
+    root.WtpUsbSettings = {invalidate() { invalidate(); render(); }, setAvailability(value) { if (!value) invalidate(); available = value; render(); }};
     function init() {
         if (!byId("settings")) return;
         for (const action of ["load", "name-save", "wifi-save", "wifi-remove", "restart", "ap"])

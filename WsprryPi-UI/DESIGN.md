@@ -172,6 +172,8 @@ At narrow widths, navigation stacks, toolbars wrap, and controls expand when tou
 
 Observation lists pair labels and wrap-safe values in columns on wide screens, then stack each label above its value on narrow screens. Keep related status and recovery controls in the same flat section.
 
+The Logs toolbar keeps Clear and Refresh at the start, the labeled Source selector between those actions and the connection badge, and streamed records below the controls. On narrow screens, the toolbar wraps without clipping the source value or connection state; secondary log controls remain in the bounded Log options disclosure.
+
 **The One-Shell Rule.** Keep one dominant page card; use spacing, borders, and tonal panels for interior hierarchy.
 
 **The Responsive Truth Rule.** Mobile may stack or scroll, but it must preserve every operational distinction and behavior.
@@ -241,6 +243,22 @@ Borders are structural and complete. Avoid decorative side stripes, arbitrary cl
 - **Tables:** Compact readable type, sticky headings where useful, and horizontal scrolling when technical columns must remain legible.
 - **Stateful Content:** Expose loading with `aria-busy`, keep recovery nearby, and distinguish empty results from failed requests.
 - **Observations:** Label historical output with its observation age. Unavailable evidence remains explicitly unknown; place recovery progress and results beside the recovery action with polite status announcements.
+
+### Logs Source and View Controls
+
+- **Source:** Use a labeled native selector for All sources, Local Pi, and identified Pico sources. Keep source and collection status immediately beneath the toolbar with polite announcements; a connection badge describes the viewing stream, while source status describes collection.
+- **Bounded Options:** Keep severity, Refresh sources, Pause view / Resume view, Export visible logs, and the selected Pico's collection checkbox inside Log options. Pause affects viewing; export contains the bounded visible records. Collection continues when the page closes and is controlled separately from Pico USB export.
+- **Context Changes:** Source or severity changes clear the visible records and restart the selected view unless paused. Resume cursors belong to the verified collector identity, source, and severity together; unknown collector identity cannot reuse or persist a cursor. An empty matching view retains a direct source-status recovery hint.
+- **Time and Provenance:** Preserve readable monospace records and explicit Pico origin. Use the “received” timestamp label when only Pi receipt time is available; do not present receipt as device event time.
+- **Collection Recovery:** Show unavailable, disconnected, unsupported, rejected, or dropped states as text. An unconfirmed collection save requires Refresh sources and review of saved state before another change; retain a nearby recovery action.
+
+### Fleet USB Logging Settings
+
+- **Placement:** Keep USB logging in an inline disclosure beside the existing USB settings, using the incumbent Bootstrap labels, fields, buttons, and status text. Enable USB log export and Maximum severity form one compact group with Read logging settings and Save Pico logging.
+- **Read Before Save:** Fields and Save remain disabled until an explicit supported read confirms the selected device's saved logging state. A save is followed by readback; the nearby polite status distinguishes saved export, active export, stream state, and dropped events, then points to separate Pi collection on Logs.
+- **Availability and Connection Changes:** Retire the logging read state when management becomes unavailable or the connection is invalidated. Disable editing and Save until a fresh read; ignore responses from a retired connection so stale results cannot re-enable the form.
+- **Logging Recovery:** Keep firmware support, changed settings, unavailable USB management, and unconfirmed-save guidance beside the logging controls. Recovery names Read logging settings and preserves the draft until readback; it must not direct logging recovery through the name and Wi-Fi form.
+- **Visual Evidence:** Desktop and mobile captures in both themes cover Logs and the Fleet logging layout, including error states. Static companion fixtures establish layout only; native authentication has not been visually proven. The visual review resolved three Logs findings and two companion-form findings with disposition “ship”; this is an incumbent Operate refinement, with the existing fonts, palette, shell, and assets retained.
 
 ## Do's and Don'ts
 

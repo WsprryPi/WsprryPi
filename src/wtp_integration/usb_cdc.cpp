@@ -237,7 +237,7 @@ bool UsbCdcStream::begin_open(const PicoCdcSelection &selection,
     if (!valid_text(selection.path, 4096) ||
         !std::filesystem::path(selection.path).is_absolute() ||
         !valid_text(selection.usb_serial, 256) || !selection.vendor_id ||
-        !selection.product_id || (selection.role != PicoCdcRole::Wtp && selection.role != PicoCdcRole::Management))
+        !selection.product_id || (selection.role != PicoCdcRole::Console && selection.role != PicoCdcRole::Wtp && selection.role != PicoCdcRole::Management))
       throw std::runtime_error(
           "Explicit endpoint, USB serial and VID/PID are required");
     const auto identity = system_.inspect(selection.path);
