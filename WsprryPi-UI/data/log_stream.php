@@ -584,8 +584,10 @@ function drain_process(
     bool $followMode,
     ?string $internalUnit,
     int $heartbeatSec,
-    bool $isPlayback
+    bool $isPlayback,
+    ?string $probeCursor = null
 ): array {
+    global $logSource;
     $pipes = $started['pipes'];
 
     $stdoutBuf = '';
@@ -726,7 +728,9 @@ function drain_process(
                 continue;
             }
 
-            $c = send_entry($entry, $isPlayback);
+            $c = $probeCursor !== null
+                ? (log_cursor_matches($entry, $probeCursor, $logSource) ? $probeCursor : null)
+                : send_entry($entry, $isPlayback);
             $entryCount += 1;
             if ($c !== null) {
                 $lastCursor = $c;
@@ -757,7 +761,9 @@ function drain_process(
             continue;
         }
 
-        $c = send_entry($entry, $isPlayback);
+        $c = $probeCursor !== null
+                ? (log_cursor_matches($entry, $probeCursor, $logSource) ? $probeCursor : null)
+                : send_entry($entry, $isPlayback);
         $entryCount += 1;
         if ($c !== null) {
             $lastCursor = $c;
@@ -831,7 +837,8 @@ function run_replay_command(
     array $parts,
     ?string $internalUnit,
     int $heartbeatSec,
-    string $label
+    string $label,
+    ?string $probeCursor = null
 ): array {
     emit_playback_event('playback_start', true);
     emit_internal($label . ' starting', '7', $internalUnit, true);
@@ -845,7 +852,7 @@ function run_replay_command(
             emit_internal($label . ' exited quickly; draining output', '7', $internalUnit, true);
         }
 
-        $res = drain_process($started, false, $internalUnit, $heartbeatSec, true);
+        $res = drain_process($started, false, $internalUnit, $heartbeatSec, true, $probeCursor);
 
         if (empty($res['cleanup']['terminated'])) {
             emit_internal(
@@ -969,6 +976,18 @@ if ($playbackEnabled && $initialBacklog > 0) {
         $cursorReplayFailed = !$replayOutcome['ok'];
         $cursorReplayEmpty = ($cursorReplayEntries === 0);
 
+        // Zero new entries is normal at the current tail. Probe the exact
+        // scoped cursor without emitting it; only a removed/invalid cursor
+        // warrants backlog recovery after rotation.
+        if (!$cursorReplayFailed && $cursorReplayEmpty) {
+            $probe = run_replay_command(
+                array_merge($replayBaseParts, ['--cursor', $lastCursor, '-n', '1']),
+                $internalUnit, $heartbeatSec, 'journalctl resume cursor check', $lastCursor
+            );
+            if (empty($probe['result']['cleanup']['terminated'])) exit;
+            $cursorReplayEmpty = !$probe['ok'] ||
+                ($probe['result']['lastCursor'] ?? null) !== $lastCursor;
+        }
         if ($cursorReplayFailed || $cursorReplayEmpty) {
             $reason = $cursorReplayFailed ? 'cursor replay failed' : 'cursor replay returned 0 entries';
             emit_internal(

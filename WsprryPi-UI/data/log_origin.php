@@ -17,6 +17,9 @@ function log_source_matches(array $entry, string $source): bool {
     $pico = ($entry['WSPRRY_ORIGIN_KIND'] ?? null) === 'pico' && is_string($id) && preg_match('/^[0-9a-f]{32}$/D', $id);
     return $source === 'all' || ($source === 'local' ? !$pico : $pico && substr($source, 5) === $id);
 }
+function log_cursor_matches(array $entry, string $cursor, string $source): bool {
+    return ($entry['__CURSOR'] ?? null) === $cursor && log_scope_matches($entry) && log_source_matches($entry, $source);
+}
 function log_origin(array $entry): array {
     $field = static function (string $key, int $limit = 128) use ($entry): ?string {
         $value = $entry[$key] ?? null;

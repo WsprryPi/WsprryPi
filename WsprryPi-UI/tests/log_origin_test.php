@@ -16,4 +16,12 @@ check($normal['origin_utc_ns']==='1793098800123456789');check($normal['receipt_u
 check(log_source('*')==='local');check(log_source('pico:'.$id)==='pico:'.$id);
 $entry['WSPRRY_ORIGIN_NAME']="injected\nline";check(log_origin($entry)['origin_name']===null);
 $entry['WSPRRY_ORIGIN_KIND']='pi';check(log_source_matches($entry,'local'));check(log_origin($entry)['origin_boot']===str_repeat('b',32));
-echo "Log origin PHP: source isolation, string counters and injection rejection passed\n";
+
+
+$cursorEntry = ['__CURSOR'=>'opaque-cursor','_SYSTEMD_UNIT'=>'wsprrypi.service','WSPRRY_ORIGIN_KIND'=>'pico','WSPRRY_ORIGIN_ID'=>str_repeat('a',32)];
+check(log_cursor_matches($cursorEntry,'opaque-cursor','pico:'.str_repeat('a',32)));
+check(!log_cursor_matches($cursorEntry,'different','all'));
+check(!log_cursor_matches($cursorEntry,'opaque-cursor','local'));
+$cursorEntry['_SYSTEMD_UNIT']='ssh.service';
+check(!log_cursor_matches($cursorEntry,'opaque-cursor','all'));
+echo "Log origin PHP: source/cursor isolation, string counters and injection rejection passed\n";
