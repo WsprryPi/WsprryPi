@@ -221,7 +221,9 @@ void WebSocketServer::handleMessage(const std::string &raw_message)
                 std::unique_lock<std::mutex>(test_tone_command_mutex_);
         }
 
-        if (wtp_runtime_firmware_busy() && wsprrypi::pico_usb_command_mutation(cmd))
+        const bool firmware_busy = firmware_maintenance_for_test_
+            ? firmware_maintenance_for_test_() : wtp_runtime_firmware_busy();
+        if (firmware_busy && wsprrypi::pico_usb_command_mutation(cmd))
         {
             reply["command"]=cmd;
             reply["status"]="error";
