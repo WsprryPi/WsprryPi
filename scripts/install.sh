@@ -6739,16 +6739,14 @@ create_temp_build_swap() {
 }
 
 # -----------------------------------------------------------------------------
-# @brief Enforce deterministic build resources before installer mutation.
+# @brief Enforce application source-build resources before installer mutation.
 # -----------------------------------------------------------------------------
 # shellcheck disable=SC2317
 preflight_build_resources() {
     PLANNED_BUILD_SWAP_REQUIRED_KB=0
     PLANNED_BUILD_SWAP_AVAILABLE_KB=0
-    if [[ "$BINARY_SOURCE" != "build" ]] && ! rp1_gpclk_dkms_installation_selected; then
-        logI "Precompiled executable: skipping application build and build swap."
-        return 0
-    fi
+    # RP1 provider selection does not require the application's build-swap plan.
+    [[ "$BINARY_SOURCE" == "build" ]] || return 0
     local mem_total_kb
     local mem_available_kb
     local swap_free_kb

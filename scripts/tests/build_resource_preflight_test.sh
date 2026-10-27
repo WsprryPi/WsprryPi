@@ -165,21 +165,26 @@ apply_build_resource_plan
 [[ ! -e "$SWAP_ROOT" ]] || fail "deferred dry-run created swap state"
 grep -q 'Dry run: would create' "$TEST_LOG" || fail "deferred dry-run omitted the swap plan"
 
-# A precompiled application bypasses resources unless provider compilation is selected.
+# Precompiled applications bypass resource reads, reporting and swap preparation,
+# including when the separate RP1 provider is selected.
 for binary_source in local release; do
-    reset_case
-    BINARY_SOURCE="$binary_source"
-    BUILD_RESOURCE_MEMINFO_PATH="$FIXTURE/absent-meminfo"
-    preflight_build_resources
-    [[ ! -e "$SWAP_ROOT" ]] || fail "precompiled-only install allocated swap"
-    assert_eq "$JOBS" 4
-    INSTALL_RP1_GPCLK_DKMS=true
-    BUILD_RESOURCE_MEMINFO_PATH="$MEMINFO"
-    write_meminfo 524288 262144
-    preflight_build_resources
-    [[ -f "$TEMP_BUILD_SWAP_PATH" ]] || fail "provider build skipped automatic swap"
-    assert_eq "$JOBS" 1
-    cleanup_temp_build_swap
+    for provider_selected in false true; do
+        reset_case
+        BINARY_SOURCE="$binary_source"
+        INSTALL_RP1_GPCLK_DKMS="$provider_selected"
+        BUILD_RESOURCE_MEMINFO_PATH="$FIXTURE/absent-meminfo"
+        BUILD_RESOURCE_SWAPS_PATH="$FIXTURE/absent-swaps"
+        PLANNED_BUILD_SWAP_REQUIRED_KB=2097152
+        PLANNED_BUILD_SWAP_AVAILABLE_KB=0
+        preflight_build_resources defer-swap
+        apply_build_resource_plan
+        display_compilation_resource_notes
+        [[ ! -e "$SWAP_ROOT" ]] || fail "precompiled install allocated swap"
+        [[ ! -s "$TEST_LOG" ]] || fail "precompiled install reported build resources"
+        assert_eq "$JOBS" 4
+        assert_eq "$PLANNED_BUILD_SWAP_REQUIRED_KB" 0
+        assert_eq "$PLANNED_BUILD_SWAP_AVAILABLE_KB" 0
+    done
 done
 
 assert_eq "$(required_non_zram_build_swap_kb $((256 * 1024)))" "$((2048 * 1024))"
