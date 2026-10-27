@@ -238,7 +238,9 @@ jobs:
     needs: change_scope
     if: ${{ !cancelled() && (needs.change_scope.result != 'success' || needs.change_scope.outputs.run_full_ci != 'false') }}
     runs-on: ubuntu-24.04
-    timeout-minutes: 15
+    # Cold container builds and the full regression suite can exceed 15 minutes,
+    # including cleanup after the final assertions have passed.
+    timeout-minutes: 25
     container: debian:trixie-slim
     env:
       WSPRRYPI_DISABLE_HARDWARE_ACCESS: "1"
