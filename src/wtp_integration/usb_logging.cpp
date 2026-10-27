@@ -202,7 +202,7 @@ public:
     result["attached"] = usb_logging_attached_sources(wtp_usb_discovery());
     for (auto &attached : result["attached"])
       for (const auto &profile : known.at("profiles"))
-        if (profile.at("settings").value("Device ID", "") == attached.at("device_id")) {
+        if (profile.at("settings").value("Device ID", "") == attached.at("device_id").get<std::string>()) {
           attached["name"] = profile.at("name");
           break;
         }
