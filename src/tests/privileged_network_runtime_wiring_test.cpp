@@ -34,10 +34,14 @@ int main() {
     assert(scheduling.find("reconcile_privileged_network_policy(") == std::string::npos);
     assert(scheduling.find("PrivilegedNetworkStartupRecovery") == std::string::npos);
     assert(scheduling.find("HTTP listener started on port") != std::string::npos);
+    assert(http.find("Web server started on port") == std::string::npos);
     assert(scheduling.find("HTTP listener failed to bind or listen") !=
            std::string::npos);
     assert(scheduling.find("socketServer.start(") != std::string::npos);
-    assert(scheduling.find("no eligible LAN") != std::string::npos);
+    assert(scheduling.find("network_snapshot.networks.empty()") != std::string::npos);
+    assert(scheduling.find("Privileged network safety is enforced.") != std::string::npos);
+    assert(http.find("enforced safety has no eligible LAN") != std::string::npos);
+    assert(websocket.find("enforced safety has no eligible LAN") != std::string::npos);
     assert(stock_ini.find("[Security]") != std::string::npos);
     assert(stock_ini.find("Privileged Network Safety = enforced") != std::string::npos);
 

@@ -328,10 +328,15 @@ bool WebSocketServer::start(
     if (!finishStart(keep_alive_secs))
         return false;
 
+    const std::string endpoint_address =
+        listening_address_.find(':') != std::string::npos
+            ? "[" + listening_address_ + "]"
+            : listening_address_;
+    const std::string endpoint = endpoint_address + ":" + std::to_string(port);
     llog.logS(
         INFO,
-        "Socket server started on address ", listening_address_, ":", port,
-        loopback_only ? " (loopback only)" : "");
+        "WebSocket listener started on ", endpoint,
+        loopback_only ? " (loopback only)." : ".");
     return true;
 }
 

@@ -143,8 +143,6 @@ void WebServer::start(int port)
         }
     }
 
-    llog.logS(INFO, "Web server started on port: ", config.web_port);
-
     // Launch the server in a separate thread.
     serverThread = std::thread([this]()
                                {
