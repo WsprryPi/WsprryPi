@@ -3,6 +3,8 @@
 #include "catalog.hpp"
 #include "pico_usb_installer_state.hpp"
 #include "usb_cdc.hpp"
+#include "usb_discovery.hpp"
+#include <openssl/sha.h>
 #include "wtp_endpoint/identity.hpp"
 #include "wtp_settings_json.hpp"
 #include <algorithm>
@@ -197,6 +199,13 @@ public:
                                         {"device_id", settings.device_id},
                                         {"name", profile.at("name")}});
     }
+    result["attached"] = usb_logging_attached_sources(wtp_usb_discovery());
+    for (auto &attached : result["attached"])
+      for (const auto &profile : known.at("profiles"))
+        if (profile.at("settings").value("Device ID", "") == attached.at("device_id")) {
+          attached["name"] = profile.at("name");
+          break;
+        }
     return {200, result.dump(), etag()};
   }
 
@@ -533,6 +542,29 @@ private:
 std::mutex manager_mutex;
 std::shared_ptr<Collector> manager;
 } // namespace
+Json usb_logging_attached_sources(const Json &discovery) {
+  Json result = Json::array();
+  if (!discovery.value("available", false)) return result;
+  for (const auto &candidate : discovery.at("candidates")) {
+    if (result.size() >= 64) break;
+    const auto serial = candidate.at("settings").value("USB Serial", "");
+    if (serial.size() != 16 || serial.find_first_not_of("0123456789ABCDEF") != std::string::npos)
+      continue;
+    std::string bytes = "WsprryPico/1";
+    const std::string digits = "0123456789ABCDEF";
+    for (std::size_t i = 0; i < serial.size(); i += 2)
+      bytes += static_cast<char>((digits.find(serial[i]) << 4) | digits.find(serial[i + 1]));
+    unsigned char digest[SHA256_DIGEST_LENGTH];
+    SHA256(reinterpret_cast<const unsigned char *>(bytes.data()), bytes.size(), digest);
+    std::string id;
+    for (unsigned i = 0; i < 16; ++i) {
+      id += "0123456789abcdef"[digest[i] >> 4];
+      id += "0123456789abcdef"[digest[i] & 15];
+    }
+    result.push_back({{"device_id", id}, {"name", "Attached Pico " + serial}});
+  }
+  return result;
+}
 Json parse_usb_log(const std::string &line, const std::string &device,
                    const std::string &boot) {
   if (line.size() > 1536 || !line.starts_with("@SYSLOG ") ||

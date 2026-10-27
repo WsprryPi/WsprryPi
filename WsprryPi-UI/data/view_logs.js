@@ -796,6 +796,10 @@
         if (input) { input.disabled = (!candidate && !saved) || collectionUncertain || (!collectorSnapshot?.journal_available && !saved?.enabled); input.checked = !!saved?.enabled; }
         if (id) {
             const state = collectorSnapshot?.status?.[id];
+            if (!candidate && !saved && collectorSnapshot?.attached?.some(row => row.device_id === id)) {
+                sourceStatus(`Pico ${id} · Save this Pico as a USB device in Fleet to collect logs.`);
+                return;
+            }
             sourceStatus(collectionUncertain ? "Collection save is unconfirmed. Refresh sources to read the saved state before saving again." :
                 `Pico ${id} · ${collectionStateLabel(state?.state)}` +
                 (state?.rejected && state.rejected !== "0" ? ` · ${state.rejected} rejected records` : "") +
@@ -813,6 +817,7 @@
             const changedCollector = collectorIdentity !== data.collector_id;
             collectorIdentity = data.collector_id;
             if (changedCollector) changeLogContext();
+            for (const row of (data.attached || []).slice(0,64)) addSource(`pico:${row.device_id}`, `${row.name || "Attached Pico"} · ${row.device_id}`);
             for (const row of data.candidates.slice(0,64)) addSource(`pico:${row.device_id}`, `${row.name || "Pico"} · ${row.device_id}`);
             for (const row of (data.sources || []).slice(0,8))
                 if (!data.candidates.some(candidate => candidate.device_id === row.device_id))

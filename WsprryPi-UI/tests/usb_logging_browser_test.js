@@ -119,6 +119,18 @@ async function main(){
    assert(await evaluate(`document.documentElement.scrollWidth<=${width}`));
    const metrics=await client.send('Page.getLayoutMetrics');const shot=await client.send('Page.captureScreenshot',{format:'png',captureBeyondViewport:true,clip:{x:0,y:0,width,height:metrics.cssContentSize.height,scale:1}});fs.writeFileSync(path.join(evidence,name+'.png'),Buffer.from(shot.data,'base64'));
   }
+  policy={...policy,attached:[{device_id:'d'.repeat(32),name:'Attached Pico (fixture)'}]};
+  await evaluate(`document.getElementById('logs-refresh-sources').click()`);await wait(150);
+  assert(await evaluate(`Array.from(document.getElementById('logs-source').options).some(row=>row.value==='pico:'+ 'd'.repeat(32))`));
+  await evaluate(`document.getElementById('logs-source').value='pico:'+ 'd'.repeat(32);document.getElementById('logs-source').dispatchEvent(new Event('change'))`);await wait(150);
+  assert(await evaluate(`document.getElementById('logs-collect').disabled && document.getElementById('logs-source-status').textContent.includes('Fleet')`));
+  assert.equal(policy.sources.length,0,'Attached inventory must never auto-enroll collection');
+  for(const [width,height,theme,name] of [[1440,960,'light','attached-desktop-light'],[390,844,'light','attached-mobile-light'],[1440,960,'dark','attached-desktop-dark'],[390,844,'dark','attached-mobile-dark']]){
+   await client.send('Emulation.setDeviceMetricsOverride',{width,height,deviceScaleFactor:1,mobile:width<600});
+   await evaluate(`document.documentElement.dataset.bsTheme='${theme}';window.scrollTo(0,0)`);await wait(150);
+   assert(await evaluate(`document.documentElement.scrollWidth<=${width}`));
+   const metrics=await client.send('Page.getLayoutMetrics');const shot=await client.send('Page.captureScreenshot',{format:'png',captureBeyondViewport:true,clip:{x:0,y:0,width,height:metrics.cssContentSize.height,scale:1}});fs.writeFileSync(path.join(evidence,name+'.png'),Buffer.from(shot.data,'base64'));
+  }
   console.log('USB Logs browser: source isolation, cursor scope, pause/resume, collection save, injection resistance and four rendered viewports passed');
  }finally{client?.close();if(chrome)await stopIsolatedProcess(chrome);await new Promise(resolve=>server.close(resolve));}
 }

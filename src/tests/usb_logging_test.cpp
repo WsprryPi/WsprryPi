@@ -65,6 +65,10 @@ int main() {
   value["severity"] = 6;
   value["unexpected"] = "field";
   reject(frame(), device, boot);
+  const nlohmann::json attached = {{"available", true}, {"candidates", {{{"settings", {{"USB Serial", "1545B6EFBF78028C"}}}}, {{"settings", {{"USB Serial", "invalid"}}}}}}};
+  const auto observed = usb_logging_attached_sources(attached);
+  assert(observed.size() == 1 && observed[0]["device_id"] == "c2a3a2a314c948b50a8562a1aeb69669");
+  assert(usb_logging_attached_sources({{"available", false}}).empty());
 #if defined(__linux__)
   // Policy authority and persistence are exercised without opening hardware.
   char directory[] = "/tmp/wsprrypi-log-test-XXXXXX";
