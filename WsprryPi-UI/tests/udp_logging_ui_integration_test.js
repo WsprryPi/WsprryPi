@@ -79,7 +79,7 @@ window.editor=WsprryUdp.mount(document.getElementById('editor'),{host,context:()
    await cdp.eval('if(fixtureHost){window.saved.sender.enabled=true;window.saved.sender.native_enabled=true;window.saved.sender.destination_ipv4="192.0.2.30";window.saved.sender.interface="eth0";}else {window.saved.enabled=true;window.saved.destination_ipv4="192.0.2.30";}editor.invalidate();editor.read()');
    assert.equal(await cdp.eval('[...document.querySelectorAll("button")].find(b=>b.textContent.includes("Test saved UDP export")).disabled'),false);
    await cdp.eval('[...document.querySelectorAll("button")].find(b=>b.textContent.includes("Test saved UDP export")).click()');
-   await until(()=>cdp.eval('window.tests===1 && ![...document.querySelectorAll("button")].find(b=>b.textContent.includes("Read UDP")).disabled')); 
+   await until(()=>cdp.eval('window.tests===1 && ![...document.querySelectorAll("button")].find(b=>b.textContent.includes("Read UDP")).disabled'));
    await cdp.eval('document.querySelector("form").dispatchEvent(new Event("input",{bubbles:true}))');
    for(const width of [360,390,1280])for(const theme of ['light','dark']){
     await cdp.send('Emulation.setDeviceMetricsOverride',{width,height:1000,deviceScaleFactor:1,mobile:width<500});
