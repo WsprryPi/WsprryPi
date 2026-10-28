@@ -266,6 +266,8 @@ make wtp-network-interop-test SUDO= \
 node ../WsprryPi-UI/tests/wtp_network_ui_integration_test.js
 ```
 
+The selected Pico browser has an independent `pico-public-read/1` discovery for redacted settings and detailed observations without a login. This does not alter the Pi's closed authenticated Consumer-Radio management or USB contracts. The network interoperability executable verifies public discovery/redaction and mutation refusals on both station and AP before exercising the existing production Pi client/coordinator. `.github/workflows/debian-non-hardware.yml` also builds the selected Pico's `consumer_session_driver` and runs its actual-HTTP/crypto session and shipped-browser checks. Explicit `pico_ref` takes precedence over coordinated branch selection; network and USB jobs record the selected full Pico revision. Both pair jobs remain required.
+
 Mbed TLS pin: `0bebf8b8c7f07abe3571ded48a11aa907a1ffb20`, including its SDK
 submodules. CMake verifies both clean tracked source trees and pins; no download
 or sibling modification occurs. Ephemeral keys, generated credential headers,
