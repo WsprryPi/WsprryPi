@@ -1019,7 +1019,10 @@ static void public_read_cases(const Json &descriptor_schema) {
            t.f.service.status() == status && t.mutations == 0 &&
            !t.radio.active(t.host.now));
     auto client = t.client();
-    assert(client->login("test-password"));
+    assert(client
+               ->login(device, ap ? "consumer_ap" : "consumer_station",
+                       "test-password")
+               .status == 200);
     assert(t.coordinated(*client).status == 200);
   }
   std::cout << "Independent public read descriptor, redaction, no-write "
