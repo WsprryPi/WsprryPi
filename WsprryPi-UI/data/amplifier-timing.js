@@ -8,11 +8,12 @@
   const timing=v=>keys(v,'lead_ms,tail_ms') && ['lead_ms','tail_ms'].every(k=>Number.isInteger(v[k]) && v[k]>=0 && v[k]<=1000);
   const valid=v=>keys(v,'schema,target,saved,boot_active,pending_restart,phase,output_active,rf_active,storage_healthy') &&
     v.schema===descriptor.schema && keys(v.target,'scope,device_id,boot_id') && v.target.scope==='member' &&
-    ['device_id','boot_id'].every(k=>/^[0-9a-f]{32}$/.test(v.target[k])) &&
+    ['device_id','boot_id'].every(k=>typeof v.target[k]==='string' && /^[0-9a-f]{32}$/.test(v.target[k])) &&
     (v.saved===null || timing(v.saved)) && (v.boot_active===null || timing(v.boot_active)) &&
     ['pending_restart','output_active','rf_active','storage_healthy'].every(k=>typeof v[k]==='boolean') &&
     ['inactive','waiting','lead','rf','tail','fault'].includes(v.phase) &&
-    v.rf_active===(v.phase==='rf') && (!['lead','rf','tail'].includes(v.phase) || v.output_active);
+    v.rf_active===(v.phase==='rf') && (!['lead','rf','tail'].includes(v.phase) || v.output_active) &&
+    (!v.saved || !v.boot_active || v.pending_restart || v.saved.lead_ms===v.boot_active.lead_ms && v.saved.tail_ms===v.boot_active.tail_ms);
   function create({lead,tail,read,save,discard,adopt,status,exchange,afterSave=()=>{},run=fn=>fn(),expectedTarget=()=>null}) {
     let readable=false,writable=false,busy=false,observed=null,revision='',epoch=0,edited=false,draftTarget='',review=false;
     const identity=v=>JSON.stringify([v.target.scope,v.target.device_id,v.target.boot_id]);
