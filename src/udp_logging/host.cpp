@@ -260,7 +260,7 @@ PicoHttpResponse udp_logging_api(const std::string &method,
             old["bind_ipv4"] != collector["bind_ipv4"] ||
             old["port"] != collector["port"] ||
             old["interface"] != collector["interface"]) {
-          const int probe = socket(AF_INET, SOCK_DGRAM | SOCK_CLOEXEC, 0);
+          const int probe = udp::ipv4_datagram_socket();
           udp::require(probe >= 0, "udp_bind_probe_unavailable");
           sockaddr_in endpoint{};
           endpoint.sin_family = AF_INET;

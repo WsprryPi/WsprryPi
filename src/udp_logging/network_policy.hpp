@@ -2,6 +2,7 @@
 #pragma once
 #include <arpa/inet.h>
 #include <array>
+#include <cerrno>
 #include <cstring>
 #include <net/if.h>
 #include <optional>
@@ -39,6 +40,16 @@ route_generation(std::string_view table, const std::string &interface) {
   }
   return result;
 }
+// This service requires Linux/systemd. Portable application builds retain the
+// management surface but cannot open a listener or invent Linux inventory.
+inline int ipv4_datagram_socket() {
+#ifdef __linux__
+  return socket(AF_INET, SOCK_DGRAM | SOCK_CLOEXEC, 0);
+#else
+  errno = ENOTSUP;
+  return -1;
+#endif
+}
 struct InterfaceInventory {
   std::optional<in_addr> address;
   bool valid = false, destination_allowed = false;
@@ -46,9 +57,10 @@ struct InterfaceInventory {
 inline InterfaceInventory
 interface_inventory(const std::string &name,
                     std::optional<std::uint32_t> destination = {}) {
+#ifdef __linux__
   // getifaddrs normally opens AF_NETLINK, which this service deliberately
   // cannot use. Inventory IPv4 addresses through the permitted ioctl socket.
-  const int inventory = socket(AF_INET, SOCK_DGRAM | SOCK_CLOEXEC, 0);
+  const int inventory = ipv4_datagram_socket();
   if (inventory < 0)
     return {};
   std::array<ifreq, 64> entries{};
@@ -102,6 +114,11 @@ interface_inventory(const std::string &name,
   if (destination && (*destination & 0xffff0000U) == 0xa9fe0000U && !result)
     forbidden = true;
   return {result, true, !forbidden};
+#else
+  (void)name;
+  (void)destination;
+  return {};
+#endif
 }
 inline std::optional<in_addr>
 interface_address(const std::string &name,
