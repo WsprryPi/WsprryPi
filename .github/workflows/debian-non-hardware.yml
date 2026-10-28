@@ -92,7 +92,7 @@ jobs:
         uses: actions/checkout@v7
         with:
           repository: WsprryPi/WsprryPico
-          ref: ${{ inputs.pico_ref || ((github.head_ref || github.ref_name) == 'codex/shared-frequency-contract' && 'codex/shared-frequency-contract') || 'devel' }}
+          ref: ${{ inputs.pico_ref || ((github.head_ref || github.ref_name) == 'codex/udp-logging' && 'codex/udp-logging') || ((github.head_ref || github.ref_name) == 'codex/shared-frequency-contract' && 'codex/shared-frequency-contract') || 'devel' }}
           path: src/build/network-reference/pico
           persist-credentials: false
       - name: Record selected Pico source
@@ -145,7 +145,7 @@ jobs:
       - uses: actions/checkout@v7
         with:
           repository: WsprryPi/WsprryPico
-          ref: ${{ inputs.pico_ref || ((github.head_ref || github.ref_name) == 'codex/shared-frequency-contract' && 'codex/shared-frequency-contract') || 'devel' }}
+          ref: ${{ inputs.pico_ref || ((github.head_ref || github.ref_name) == 'codex/udp-logging' && 'codex/udp-logging') || ((github.head_ref || github.ref_name) == 'codex/shared-frequency-contract' && 'codex/shared-frequency-contract') || 'devel' }}
           path: src/build/usb-reference/pico
           persist-credentials: false
       - name: Record selected Pico source
