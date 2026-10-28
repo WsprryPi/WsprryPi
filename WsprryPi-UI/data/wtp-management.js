@@ -235,7 +235,7 @@
         }
     }
     function invalidateEditors() {
-        driveEditor?.invalidate();
+        driveEditor?.invalidate(); timingEditor?.invalidate();
         root.WtpUsbSettings?.invalidate();
         root.WsprryMemberUdp?.invalidate();
         invalidateProgress();
@@ -510,6 +510,15 @@
                 operation: onlySchedules ? "schedules" : "save", config }, configRevision);
         } catch (error) { byId("wtp-management-feedback").textContent = error.message; }
     }
+    const timingEditor = root.WsprryAmplifierTiming && byId('amplifier-lead-ms') ? root.WsprryAmplifierTiming.create({
+        lead:byId('amplifier-lead-ms'),tail:byId('amplifier-tail-ms'),read:byId('amplifier-timing-read'),save:byId('amplifier-timing-save'),discard:byId('amplifier-timing-discard'),adopt:byId('amplifier-timing-adopt'),status:byId('amplifier-timing-status'),
+        exchange:async(method,body,revision)=>{
+            const r=await root.fetch((root.WSPRRYPI_PATHS?.sharedApiPath || '/api/v1')+'/member/amplifier-timing',{
+                method,cache:'no-store',signal:AbortSignal.timeout(20000),...(body ? {headers:{'Content-Type':'application/json','X-WsprryPico-Request':'1','If-Match':revision},body:JSON.stringify(body)} : {})});
+            const data=await r.json();if(!r.ok)throw Error('Amplifier timing request was refused or unconfirmed. Read saved timing and verify the selected Pico.');
+            return {data,revision:r.headers.get('ETag') || ''};
+        },afterSave:()=>{configRevision=''; resources=null;render();}
+    }) : null;
     const driveEditor = root.WsprryGpioDrive && byId('gpio-drive-select') ? root.WsprryGpioDrive.create({
         select:byId('gpio-drive-select'),read:byId('gpio-drive-read'),save:byId('gpio-drive-save'),discard:byId('gpio-drive-discard'),status:byId('gpio-drive-status'),saveDraft:byId('gpio-drive-save-draft'),applyDraft:byId('gpio-drive-apply-draft'),draftStatus:byId('gpio-drive-draft-status'),
         exchange:async(method,body,revision,resource = 'gpio-drive')=>{
@@ -529,7 +538,7 @@
         driveSelection = key;
         canSelect = selectable;
         available = !explicitDisconnected && (consumerConnected ? selectable : value);
-        driveEditor?.setAvailability(available);
+        driveEditor?.setAvailability(available); timingEditor?.setAvailability(available);
         render();
         if (selectable && !selectionObserved && !busy) {
             selectionObserved = true;

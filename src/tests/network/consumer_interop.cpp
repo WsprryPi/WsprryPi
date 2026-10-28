@@ -1248,6 +1248,47 @@ int main(int argc, char **argv) {
     },true));
     assert(config.status==409 && resource.status==409 && progress.status==409 && t.mutations==0 && c->active());
   }
+  // Hostile timing descriptors/documents travel over the real encrypted peer;
+  // the production coordinator must refuse each before touching its journal.
+  for (unsigned variant=0;variant<14;++variant) {
+    Test t; auto c=t.client();
+    assert(c->login(device,"consumer_station","test-password").status==200);
+    const auto real=[&](auto p,auto m,auto b,auto e){return c->request(p,m,b,e);};
+    pi::PicoHttpResponse before;
+    assert(t.app->idle_management([&]{before=pi::pico_resource_request(real,c->device(),c->boot(),"amplifier-timing","GET",{}, {},"consumer_station",c->generation());},true));
+    assert(before.status==200);
+    const auto target=Json::parse(before.body)["target"];
+    const auto bytes=t.f.flash.bytes;
+    const auto hostile=[&](auto p,auto m,auto b,auto e){
+      auto r=real(p,m,b,e); auto v=Json::parse(r.body);
+      if(p=="capabilities" && variant<6){
+        auto &d=v["amplifier_timing"];
+        if(variant==0)d["schema"]="transmitter-amplifier-timing/2";
+        if(variant==1)d["maximum"]=1001;
+        if(variant==2)d["default_lead_ms"]=true;
+        if(variant==3)d.erase("units");
+        if(variant==4)d["extra"]=0;
+        if(variant==5)d=Json::array();
+      }
+      if(p=="amplifier-timing" && variant>=6){
+        if(variant==6)v["extra"]=0;
+        if(variant==7)v["saved"]["lead_ms"]=200.0;
+        if(variant==8)v["target"]["boot_id"]=std::string(32,'f');
+        if(variant==9)v["phase"]="lead";
+        if(variant==10){v["saved"]["lead_ms"]=0;v["pending_restart"]=false;}
+        if(variant==11)v.erase("schema");
+        if(variant==12)v=nullptr;
+        if(variant==13)v["saved"]["tail_ms"]=1001;
+      }
+      r.body=v.dump();return r;
+    };
+    const Json input{{"schema","transmitter-amplifier-timing/1"},{"target",target},{"timing",{{"lead_ms",0},{"tail_ms",0}}}};
+    pi::PicoHttpResponse result;
+    assert(t.app->idle_management([&]{result=pi::pico_resource_request(hostile,c->device(),c->boot(),"amplifier-timing","PUT",input.dump(),before.etag,"consumer_station",c->generation());},true));
+    assert(result.status==(variant<6?409:502));
+    assert(Json::parse(result.body)["mutation_attempted"]==false && t.mutations==0 && t.f.flash.bytes==bytes);
+    c->logout();
+  }
   for (const auto profile : {pico::network::ManagementProfile::Blank,
                              pico::network::ManagementProfile::Recovery,
                              pico::network::ManagementProfile::Unavailable}) {

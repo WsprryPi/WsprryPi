@@ -73,7 +73,7 @@ int main(int argc,char **argv) {
       if(resource=="member/management")return PicoHttpResponse{200,Json{{"carrier","usb_physical"},{"selection_id","pipe-selection"},
         {"connected",true},{"host",""},{"session",nullptr}}.dump(),{}};
       if(resource=="member/configuration")return pico_configuration_request(exchange,client.device(),client.boot(),method,body,revision,"usb_physical");
-      if(resource=="member/application"||resource=="member/station"||resource=="member/hardware"||resource=="member/gpio-drive"||resource=="member/gpio-drive-progress"||resource=="member/pins"||resource=="member/pins/validate")
+      if(resource=="member/application"||resource=="member/station"||resource=="member/hardware"||(resource=="member/gpio-drive"||resource=="member/amplifier-timing")||resource=="member/gpio-drive-progress"||resource=="member/pins"||resource=="member/pins/validate")
         return pico_resource_request(exchange,client.device(),client.boot(),resource.substr(7),method,body,revision,"usb_physical");
       if(resource=="member/udp-logging"||resource=="member/udp-logging/capabilities"||resource=="member/udp-logging/test"||resource=="member/udp-logging/test/capabilities")return pico_udp_logging_request(exchange,client.device(),client.boot(),resource.substr(7),method,body,revision);
       if(resource.starts_with("member/progress"))return pico_progress_request(exchange,client.device(),client.boot(),resource.substr(7),method,body,revision,"usb_physical");

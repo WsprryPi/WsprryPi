@@ -77,8 +77,8 @@ PicoHttpResponse pico_http_request(TlsStream &stream, const TlsSelection &select
   const bool mutation = method == "PUT" || method == "POST";
   const bool allowed = (method == "GET" && (resource == "config" || resource == "schedules" ||
       resource == "network" || resource == "udp-logging" || resource == "udp-logging/capabilities" || resource == "udp-logging/test/capabilities" || resource == "capabilities" || resource == "status" || resource == "application" || resource == "management" ||
-       resource == "station" || resource == "hardware" || resource == "pins" || resource == "application/2" || resource == "station/2" || resource == "gpio-drive" || resource == "config/3" || resource == "hardware/2" || resource == "application/3" || resource == "progress/2" || resource == "progress")) ||
-      (method == "PUT" && (resource == "udp-logging" || resource == "config" || resource == "schedules" || resource == "network" || resource == "station" || resource == "hardware" || resource == "config/2" || resource == "station/2" || resource == "gpio-drive" || resource == "config/3")) ||
+       resource == "station" || resource == "hardware" || resource == "pins" || resource == "application/2" || resource == "station/2" || (resource == "gpio-drive" || resource == "amplifier-timing") || resource == "config/3" || resource == "hardware/2" || resource == "application/3" || resource == "progress/2" || resource == "progress")) ||
+      (method == "PUT" && (resource == "udp-logging" || resource == "config" || resource == "schedules" || resource == "network" || resource == "station" || resource == "hardware" || resource == "config/2" || resource == "station/2" || (resource == "gpio-drive" || resource == "amplifier-timing") || resource == "config/3")) ||
       (method == "POST" && (resource == "udp-logging/test" || resource == "config/update" || resource == "config/update/2" || resource == "config/update/3" || resource == "progress/update/2" || resource == "progress/apply/2" || resource == "progress/update" || resource == "progress/apply" || resource == "pins/validate"));
   if (!allowed)
     return error(404, "not_found");

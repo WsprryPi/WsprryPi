@@ -690,6 +690,79 @@ PicoHttpResponse gpio_drive_progress_request(const PicoManagementExchange &excha
   } catch(const Rejected &e) {return {e.status,Json{{"error",{{"code",e.code}}},{"mutation_attempted",attempted}}.dump(),{}};}
     catch(...) {return {502,Json{{"error",{{"code",attempted?"management_outcome_unknown":"invalid_remote_resource"}}},{"mutation_attempted",attempted}}.dump(),{}};}
 }
+PicoHttpResponse amplifier_timing_request(const PicoManagementExchange &exchange,
+    const std::string &device, const std::string &boot, const std::string &method,
+    const std::string &body, const std::string &revision,
+    const std::string &carrier, const std::string &generation) {
+  bool attempted = false;
+  try {
+    require(identity(device) && identity(boot),"member_identity_unavailable",409);
+    require(method == "GET" || method == "PUT","not_found",404);
+    require(body.size() <= 1024,"body_too_large",413);
+    const Json target{{"scope","member"},{"device_id",device},{"boot_id",boot}};
+    const auto timing = [](const Json &v) {
+      if (!fields(v,{"lead_ms","tail_ms"})) return false;
+      for (const auto key : {"lead_ms","tail_ms"})
+        if (!v[key].is_number_integer() || v[key] < 0 || v[key] > 1000) return false;
+      return true;
+    };
+    Json input;
+    if (method == "PUT") {
+      require(etag(revision),"revision_required",428);
+      try { input = strict_browser_json(body); } catch (...) { throw Rejected{400,"invalid_json"}; }
+      require(fields(input,{"schema","target","timing"}) && input["schema"] == "transmitter-amplifier-timing/1" &&
+          input["target"] == target && timing(input["timing"]),"invalid_amplifier_timing",400);
+    }
+    const auto caps_response=exchange("capabilities","GET",{},{}); success(caps_response);
+    const auto caps=parsed(caps_response);
+    const auto expected=Json::parse(R"({"schema":"transmitter-amplifier-timing/1","path":"/api/v1/amplifier-timing","method":"PUT","units":"ms","minimum":0,"maximum":1000,"default_lead_ms":200,"default_tail_ms":200,"activation":"restart","scope":"complete_job"})");
+    require(caps.is_object() && caps.contains("amplifier_timing") && caps["amplifier_timing"] == expected,
+        "amplifier_timing_unavailable",409);
+    require(caps.contains("management_carriers") && valid_management_descriptor(caps["management_carriers"],carrier),
+        "unsupported_management_contract",409);
+    const auto management_response=exchange("management","GET",{},{}); success(management_response);
+    const auto management=parsed(management_response);
+    require(valid_management_contract(management,carrier,device,boot,generation) &&
+        management["schema"] == caps["management_carriers"]["schema"],"unsupported_management_contract",409);
+    const auto read = [&] {
+      auto r=exchange("amplifier-timing","GET",{},{}); success(r);
+      const auto v=parsed(r);
+      require(fields(v,{"schema","target","saved","boot_active","pending_restart","phase","output_active","rf_active","storage_healthy"}) &&
+          v["schema"] == "transmitter-amplifier-timing/1" && v["target"] == target && etag(r.etag),"invalid_remote_resource");
+      require((v["saved"].is_null() || timing(v["saved"])) && (v["boot_active"].is_null() || timing(v["boot_active"])),"invalid_remote_resource");
+      for (const auto key : {"pending_restart","output_active","rf_active","storage_healthy"}) require(v[key].is_boolean(),"invalid_remote_resource");
+      require(v["phase"] == "inactive" || v["phase"] == "waiting" || v["phase"] == "lead" || v["phase"] == "rf" ||
+          v["phase"] == "tail" || v["phase"] == "fault","invalid_remote_resource");
+      require(v["rf_active"] == (v["phase"] == "rf") &&
+          (!(v["phase"] == "lead" || v["phase"] == "rf" || v["phase"] == "tail") || v["output_active"] == true),"invalid_remote_resource");
+      require(v["saved"].is_null() || v["boot_active"].is_null() || v["saved"] == v["boot_active"] || v["pending_restart"] == true,"invalid_remote_resource");
+      return r;
+    };
+    const auto before=read();
+    if (method == "GET") return before;
+    require(before.etag == revision,"revision_conflict",412);
+    const auto v=parsed(before);
+    require(v["storage_healthy"] == true && !v["saved"].is_null() && v["output_active"] == false && v["phase"] == "inactive",
+        "remote_busy_or_output_unresolved",409);
+    const auto status_response=exchange("status","GET",{},{}); success(status_response);
+    const auto status=parsed(status_response);
+    require(status.is_object() && status.contains("job") && status["job"].is_object(),"invalid_remote_resource");
+    const auto &job=status["job"];
+    require(job.contains("boot_id") && job["boot_id"] == boot && job.contains("output_active") && job["output_active"] == false &&
+        job.contains("owner_id") && job["owner_id"].is_null() && job.contains("state") &&
+        (job["state"] == "empty" || job["state"] == "complete" || job["state"] == "aborted" || job["state"] == "missed"),"remote_busy_or_output_unresolved",409);
+    attempted=true;
+    const auto result=exchange("amplifier-timing","PUT",body,revision); success(result);
+    const auto confirmed=read();
+    require(result.etag != revision && result.etag == confirmed.etag && parsed(result) == parsed(confirmed) &&
+        parsed(confirmed)["saved"] == input["timing"],"management_outcome_unknown");
+    return result;
+  } catch (const Rejected &e) {
+    return {e.status,Json{{"error",{{"code",e.code}}},{"mutation_attempted",attempted}}.dump(),{}};
+  } catch (...) {
+    return {502,Json{{"error",{{"code",attempted ? "management_outcome_unknown" : "invalid_remote_resource"}}},{"mutation_attempted",attempted}}.dump(),{}};
+  }
+}
 PicoHttpResponse gpio_drive_request(const PicoManagementExchange &exchange,
     const std::string &device, const std::string &boot, const std::string &method,
     const std::string &body, const std::string &revision,
@@ -759,6 +832,7 @@ PicoHttpResponse pico_resource_request(const PicoManagementExchange &exchange,
     const std::string &device, const std::string &boot, const std::string &resource,
     const std::string &method, const std::string &body, const std::string &revision,
     const std::string &carrier, const std::string &generation) {
+  if (resource == "amplifier-timing") return amplifier_timing_request(exchange,device,boot,method,body,revision,carrier,generation);
   if (resource == "gpio-drive-progress") return gpio_drive_progress_request(exchange,device,boot,method,body,revision,carrier,generation);
   if (resource == "gpio-drive") return gpio_drive_request(exchange,device,boot,method,body,revision,carrier,generation);
   bool attempted = false;

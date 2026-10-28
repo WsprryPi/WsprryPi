@@ -2055,6 +2055,7 @@ wtp-config-interop-test: wtp-config-client-build wtp-config-test
 	$(Q)WSPRRYPI_DISABLE_HARDWARE_ACCESS=1 ./$(BIN_DIR)/wspr_scheduler_frequency_export --export-wtp "$(WTP_NETWORK_BUILD_DIR)/scheduler-frequency.jsonl"
 	$(Q)"$(WTP_NETWORK_BUILD_DIR)/consumer_interop" --scheduler-frequency "$(WTP_NETWORK_BUILD_DIR)/scheduler-frequency.jsonl"
 	$(Q)node ../WsprryPi-UI/tests/wtp_resources_interop_test.js "$(abspath $(WTP_NETWORK_BUILD_DIR))"
+	$(Q)node ../WsprryPi-UI/tests/wtp_amplifier_timing_interop_test.js "$(abspath $(WTP_NETWORK_BUILD_DIR))"
 	$(Q)node tests/network/consumer_browser_interop.js "$(abspath $(WTP_NETWORK_BUILD_DIR))" "$(abspath $(PICO_SOURCE))"
 wtp-network-interop-test: wtp-tls-build wtp-api-test wtp-network-process-test
 	$(Q)cmake -S tests/network -B "$(WTP_NETWORK_BUILD_DIR)" -DPICO_SOURCE="$(abspath $(PICO_SOURCE))" -DMBEDTLS_SOURCE="$(abspath $(MBEDTLS_SOURCE))"

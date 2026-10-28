@@ -169,3 +169,7 @@ limit. The authority retains up to 512 session epochs per service boot to preven
 pre-takeover sessions reclaiming after local Disable; exhausted epoch capacity
 allows inspection only until local recovery/restart. This does not alter WTP's
 normal lease, response replay or retained-job bounds.
+
+## Selected Pico amplifier timing
+
+The selected Pico member hardware area places amplifier lead and tail beside pin settings. Each accepts 0–1000 whole milliseconds with 200 ms defaults. Read, explicitly save while idle/unowned, and restart the Pico to activate; saving never operates an output. The independently negotiated `transmitter-amplifier-timing/1` resource preserves historical Config views and unrepresented values through legacy saves. The Pi validates exact descriptor, carrier/profile, device/boot target, shape, range, revision and post-save readback before confirming success. Lead precedes scheduled RF and tail follows normal RF completion without changing waveform duration; faults bypass tail. Native Pi amplifier behavior is independent.

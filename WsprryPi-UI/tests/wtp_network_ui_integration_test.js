@@ -122,7 +122,7 @@ class CdpClient {
 async function main() {
     const fs = require('node:fs');
     const phpPort = await freePort(), debugPort = await freePort();
-    const url = `http://127.0.0.1:${phpPort}/index.php?page=config&setup_tab=%23fleet-pane`;
+    const url = `${process.env.WSPRRYPI_UI_FIXTURE_URL || `http://127.0.0.1:${phpPort}/`}index.php?page=config&setup_tab=%23fleet-pane`;
     const profileDir = `/tmp/wsprrypi-network-ui-${process.pid}`;
     const output = path.resolve(UI_ROOT, '../src/build/wtp-network/ui');
     fs.mkdirSync(output, { recursive: true });
@@ -143,8 +143,10 @@ async function main() {
         fs.writeFileSync(path.join(output, name), Buffer.from(shot.data, 'base64'));
     };
     try {
-        php = spawnFixtureChild('php', ['-S', `127.0.0.1:${phpPort}`, '-t', 'data', 'tests/browser_fixture_router.php'], { cwd: UI_ROOT });
-        await waitForSpawn(php);
+        if (!process.env.WSPRRYPI_UI_FIXTURE_URL) {
+            php = spawnFixtureChild('php', ['-S', `127.0.0.1:${phpPort}`, '-t', 'data', 'tests/browser_fixture_router.php'], { cwd: UI_ROOT });
+            await waitForSpawn(php);
+        }
         await waitFor(async () => await getStatus(url) === 200, 'PHP fixture');
         chrome = spawnIsolatedProcess(process.env.CHROME_BIN || (process.platform === 'darwin' ? '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome' : 'chromium'),
             ['--headless', '--no-sandbox', '--disable-gpu', '--no-first-run', '--no-default-browser-check', '--disable-background-networking', `--remote-debugging-port=${debugPort}`, `--user-data-dir=${profileDir}`, url]);
@@ -216,6 +218,11 @@ async function main() {
                 remote:{output_active:false}, owns:false, network:{hostname:'wsprrypico-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.local',port:18443,expected_identity:'wsprrypico-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.local',resolved_address:'192.0.2.27',authenticated_identity:'wsprrypico-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.local',state:'ready',observed_ms:'9000'} };
             window.fetch = async (url, options = {}) => {
                 window.__requests.push({url,options});
+                if (String(url).endsWith('/member/amplifier-timing')) {
+                    window.__timing ||= {schema:'transmitter-amplifier-timing/1',target:window.__resourceFixtures.loaded.target,saved:{lead_ms:200,tail_ms:200},boot_active:{lead_ms:200,tail_ms:200},pending_restart:false,phase:'inactive',output_active:false,rf_active:false,storage_healthy:true};
+                    if(options.method==='PUT'){window.__timing.saved=JSON.parse(options.body).timing;window.__timing.pending_restart=true;}
+                    return {ok:true,headers:{get:()=>window.__timing.pending_restart?'\"timing-r2\"':'\"timing-r1\"'},json:async()=>structuredClone(window.__timing)};
+                }
                 if (String(url).endsWith('/member/management')) {
                     const body = options.body ? JSON.parse(options.body) : null;
                     if (body?.action === 'connect' && window.__consumerBusy) return {ok:false,status:window.__consumerBusy==='rate'?429:409,json:async()=>({error:{code:({capacity:'radio_session_capacity',pending:'radio_login_pending',rate:'radio_login_rate_limited'})[window.__consumerBusy]||'radio_session_busy'}})};
@@ -518,6 +525,16 @@ async function main() {
         assert(client.dialogs.length > 0, 'saved-state review must show a real browser confirmation');
         console.log(`Accepted ${client.dialogs.length} expected saved-state review confirmations`);
         console.log('Rendered desktop/mobile: transport selection, preserved inactive settings, management revision failure, status failure and drafts passed');
+        await evaluate(`document.getElementById('fleet-tab').click(); document.getElementById('wtp-management').hidden=false; document.getElementById('wtp-management').open=true; WtpManagement.setAvailability(true,true); document.getElementById('amplifier-timing-read').click()`);
+        await waitFor(()=>evaluate('document.getElementById("amplifier-lead-ms").value === "200"'),'member amplifier timing readback');
+        assert.equal(await evaluate('document.getElementById("amplifier-tail-ms").value'),'200');
+        for(const viewport of [{name:'desktop',width:1280,height:1100},{name:'mobile',width:390,height:1100}]) {
+            await client.send('Emulation.setDeviceMetricsOverride',{width:viewport.width,height:viewport.height,deviceScaleFactor:1,mobile:viewport.width<600});
+            await evaluate('document.querySelectorAll("details").forEach(d=>d.open=d.contains(document.getElementById("amplifier-timing-settings")) || d.querySelector(":scope > summary")?.textContent.startsWith("Platform limits"));scrollTo(0,0)');
+            assert.equal(await evaluate('document.documentElement.scrollWidth<=innerWidth'),true,'timing layout overflow');
+            const timingLayout=await client.send('Page.getLayoutMetrics');
+            await capture(`amplifier-timing-${viewport.name}.png`,{format:'png',captureBeyondViewport:true,clip:{x:0,y:0,width:viewport.width,height:timingLayout.cssContentSize.height,scale:1}});
+        }
         console.log(captureScreenshots ? 'Screenshots: '+output : 'Screenshot capture disabled; existing visual evidence retained.');
     } catch (error) {
         failure = new Error(`${error.message}\n${childDiagnostic(chrome || php)}`, { cause: error });
