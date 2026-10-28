@@ -963,13 +963,83 @@ void scheduler_frequency_interop(const char *path) {
                "+37/-21/zero grids and actual nonrandom Pico standalone grid agree\n";
 }
 } // namespace
+// The independent public read surface does not alter the Pi's closed login,
+// authenticated management, or carrier authority contracts.
+static void public_read_cases(const Json &descriptor_schema) {
+  for (const bool ap : {false, true}) {
+    Test t;
+    if (ap) {
+      t.authority = "192.168.4.1";
+      t.origin = "http://192.168.4.1";
+      t.interface = pico::network::ConsumerInterface::AccessPoint;
+    }
+    const auto flash = t.f.flash.bytes;
+    const auto sequence = t.f.store.config_sequence();
+    const auto status = t.f.service.status();
+    const auto discovery =
+        t.send("/api/consumer/v1/read", "GET", {}, "application/json");
+    assert(discovery.status == 200);
+    const auto d = Json::parse(discovery.body);
+    assert(d.size() == 4 && d.at("schema") == "pico-public-read/1" &&
+           d.at("prefix") == "/api/consumer/v1/read/" &&
+           d.at("resources") ==
+               descriptor_schema.at("properties").at("resources").at("const"));
+    assert(d.at("target").size() == 3 &&
+           d.at("target").at("scope") == "member" &&
+           d.at("target").at("device_id") == device &&
+           d.at("target").at("boot_id") == t.f.service.status().boot_id);
+    for (const auto &name :
+         {"operations", "config/4", "station/2", "hardware/3", "progress/3"}) {
+      const auto r = t.send(std::string("/api/consumer/v1/read/") + name, "GET",
+                            {}, "application/json");
+      assert(r.status == 200);
+      if (std::string(name) == "config/4")
+        assert(Json::parse(r.body)
+                   .at("config")
+                   .at("wifi")
+                   .at("password")
+                   .is_null());
+      assert(r.body.find("test-password") == std::string::npos);
+    }
+    for (const auto &name : d.at("resources"))
+      for (const auto &method : {"POST", "PUT", "DELETE"})
+        assert(t.send("/api/consumer/v1/read/" + name.get<std::string>(),
+                      method, "{}", "application/json")
+                   .status == 405);
+    for (const auto &name :
+         {"jobs", "restart", "config/update/4", "progress/apply/3", "../jobs"})
+      assert(t.send(std::string("/api/consumer/v1/read/") + name, "GET", {},
+                    "application/json")
+                 .status == 404);
+    assert(
+        t.send("/api/consumer/v1/read/config", "GET", "{}", "application/json")
+            .status == 400);
+    assert(t.f.flash.bytes == flash &&
+           t.f.store.config_sequence() == sequence &&
+           t.f.service.status() == status && t.mutations == 0 &&
+           !t.radio.active(t.host.now));
+    auto client = t.client();
+    assert(client->login("test-password"));
+    assert(t.coordinated(*client).status == 200);
+  }
+  std::cout << "Independent public read descriptor, redaction, no-write "
+               "refusal and existing Pi carrier management passed\n";
+}
+
 int main(int argc, char **argv) {
-  if (argc == 3 && std::string(argv[1]) == "--scheduler-frequency") { scheduler_frequency_interop(argv[2]); return 0; }
+  if (argc == 3 && std::string(argv[1]) == "--scheduler-frequency") {
+    scheduler_frequency_interop(argv[2]);
+    return 0;
+  }
   if (argc == 3 && std::string(argv[1])=="--stdio") { interactive(std::string(argv[2]).starts_with("ap"),!std::string(argv[2]).ends_with("-blank")); return 0; }
   assert(argc == 2);
   std::ifstream vector_file(argv[1]);
   Json vectors;
   vector_file >> vectors;
+  std::ifstream public_schema_file(std::filesystem::path(argv[1]).parent_path()/"pico-public-read-1.schema.json");
+  assert(public_schema_file.is_open());
+  Json public_schema;public_schema_file>>public_schema;
+  public_read_cases(public_schema);
   pi::consumer_radio_fixed_vectors(vectors);
   alias_fixed_vector(vectors);
   std::ifstream recovery_vector_file(std::filesystem::path(argv[1]).parent_path()/"Consumer-Recovery-v1-vectors.json");
