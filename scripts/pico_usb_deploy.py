@@ -13,7 +13,7 @@ import tempfile
 SPEC = importlib.util.spec_from_file_location('pico_usb_bundle',Path(__file__).with_name('pico_usb_bundle.py'))
 bundle = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(bundle)
-FILES = {'scripts/usb_installer.py','scripts/ci/release-manifest-1.schema.json'}
+LEGACY_FILES = {'scripts/usb_installer.py','scripts/ci/release-manifest-1.schema.json'}
 
 
 def remove_empty_legacy_directories(target):
@@ -32,9 +32,12 @@ def retained(prior,payload,channel,kind='retained-installation'):
     versions = [ast.literal_eval(node.value) for node in tree.body if isinstance(node,ast.Assign)
                 and any(isinstance(t,ast.Name) and t.id == 'INSTALLER_VERSION' for t in node.targets)]
     bundle.require(len(versions) == 1, 'Installer has no unambiguous version')
-    return {'schema':bundle.MARKER,'repository':bundle.REPOSITORY,'contract':1,'channel':channel,
+    contract=bundle.firmware_contract(tree)
+    bundle.require(set(payload)=={'usb_installer.py',f'release-manifest-{contract}.schema.json'},'Installer payload contract mismatch')
+    bundle.require(bundle.decode(payload[f'release-manifest-{contract}.schema.json']).get('$id')=='https://github.com/'+bundle.REPOSITORY+'/firmware-release-manifest/'+str(contract),'Installer schema identity mismatch')
+    return {'schema':bundle.MARKER if contract==1 else 'wsprrypico-usb-installer/2','repository':bundle.REPOSITORY,'contract':contract,'channel':channel,
             'result_schema':'wsprrypico-usb-result/1','transaction_schema':'wsprrypico-usb-transaction/1',
-            'firmware_manifest_schema':1,'python_min':[3,10],'installer_version':versions[0],
+            'firmware_manifest_schema':contract,'python_min':[3,10],'installer_version':versions[0],
             'source':prior['revision'],'origin':{'kind':kind,'previous_deployment':prior},
             'files':{name:{'sha256':bundle.sha(data),'bytes':len(data)} for name,data in payload.items()}}
 
@@ -52,7 +55,7 @@ def provision(action,repository,root=Path('/'),development_source=None):
             expected = (prior['adapter_files'] if prior.get('schema') == 'wsprrypi-pico-usb-deployment/2' else
                         {**prior['files'],'entry.py':prior['entry_sha256']})
             bundle.require((prior.get('removed') is True and expected == {}) or
-                           set(expected) == ({'entry.py','bundle.py','policy.json'} if 'adapter_files' in prior else FILES | {'entry.py'}),
+                           set(expected) == ({'entry.py','bundle.py','policy.json'} if 'adapter_files' in prior else LEGACY_FILES | {'entry.py'}),
                            'Unknown deployed installer inventory')
             for name,digest in expected.items():
                 path = target/name
@@ -64,7 +67,7 @@ def provision(action,repository,root=Path('/'),development_source=None):
                 return
             if 'adapter_files' not in prior:
                 store = bundle.Store(target,policy,owner=root == Path('/'))
-                payload = {Path(name).name:(target/name).read_bytes() for name in FILES}
+                payload = {Path(name).name:(target/name).read_bytes() for name in LEGACY_FILES}
                 identity = store.save(retained(prior,payload,policy['channel']),payload)
                 bundle.write_json(target/'legacy.json',{'identity':identity})
                 bundle.write_json(target/'active.json',{'identity':identity,'check_after':0,'update':{'state':'retained'}})
@@ -87,19 +90,19 @@ def provision(action,repository,root=Path('/'),development_source=None):
                 shutil.copytree(target,stage,dirs_exist_ok=True)
             store = bundle.Store(stage,policy,owner=root == Path('/'))
             if prior is not None and 'adapter_files' not in prior:
-                payload = {Path(name).name:(target/name).read_bytes() for name in FILES}
+                payload = {Path(name).name:(target/name).read_bytes() for name in LEGACY_FILES}
                 identity = store.save(retained(prior,payload,policy['channel']),payload)
                 bundle.write_json(stage/'legacy.json',{'identity':identity})
                 bundle.write_json(stage/'active.json',{'identity':identity,'check_after':0,'update':{'state':'retained'}})
-                for name in FILES:
+                for name in LEGACY_FILES:
                     (stage/name).unlink()
                 remove_empty_legacy_directories(stage)
             if development_source is not None:
                 source = development_source.resolve(strict=True)
-                payload = {}
-                for name in FILES:
-                    bundle.safe(source/name,owner=False)
-                    payload[Path(name).name] = (source/name).read_bytes()
+                core=source/'scripts/usb_installer.py';bundle.safe(core,owner=False)
+                core_bytes=core.read_bytes();contract=bundle.firmware_contract(core_bytes)
+                schema=source/f'scripts/ci/release-manifest-{contract}.schema.json';bundle.safe(schema,owner=False)
+                payload={'usb_installer.py':core_bytes,schema.name:schema.read_bytes()}
                 identity = store.save(retained({'revision':'0'*40},payload,policy['channel'],'unpublished-working-tree'),payload)
                 bundle.write_json(stage/'active.json',{'identity':identity,'check_after':0,'update':{'state':'retained'}})
             elif store.active() is not None:
@@ -127,7 +130,7 @@ def provision(action,repository,root=Path('/'),development_source=None):
                         os.replace(path,target/path.name)
                 os.replace(stage/'deployment.json',target/'deployment.json')
                 if prior and 'adapter_files' not in prior:
-                    for name in FILES:
+                    for name in LEGACY_FILES:
                         (target/name).unlink()
                     remove_empty_legacy_directories(target)
         finally:

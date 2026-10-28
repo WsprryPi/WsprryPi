@@ -48,6 +48,7 @@ require __DIR__ . '/../card_header.php';
                         <p class="mb-0">Collection continues when this page is closed. The Pico Console remains available while logs are collected. Enable USB logging on the Pico separately.</p>
                     </div>
                 </details>
+                <details class="logs-options"><summary>Logging on this Pi</summary><div id="host-udp-logging-controls" class="logs-options-controls"></div></details>
                 <button id="btn-jump-bottom" type="button" class="btn btn-sm btn-primary logs-jump-bottom" hidden>Jump to newest</button>
                 <div id="log-scroll">
                     <div id="logsTabContent">

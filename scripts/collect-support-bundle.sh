@@ -1053,12 +1053,38 @@ for identifier in "${SYSLOG_IDENTIFIERS[@]}"; do
   fi
 done
 
-log "Collecting general logs..."
+log "Collecting UDP logging counters and service metadata..."
+systemctl show wsprrypi-log.service -p ActiveState -p SubState -p User -p MemoryCurrent -p TasksCurrent > "${OUT_DIR}/logs/udp-logging-service.txt" 2>&1 || true
+if [[ -f /usr/local/lib/wsprrypi/udp_log_control.py && -x "$RP1_PYTHON" ]]; then
+  "$RP1_PYTHON" /usr/local/lib/wsprrypi/udp_log_control.py status --ini "$INSTALLED_INI" > "${OUT_DIR}/logs/udp-logging-status.json" 2>/dev/null || true
+fi
 
+log "Collecting general logs (network log bodies omitted)..."
+collect_system_journal_without_udp() {
+  local destination="$1"
+  shift
+  if [[ ! -x "$RP1_PYTHON" ]]; then
+    echo 'System journal overview unavailable; use the collected application unit logs.' > "$destination"
+    return
+  fi
+  journalctl --no-pager -o json "$@" 2> "${OUT_DIR}/logs/journal-system-query-error.txt" | "$RP1_PYTHON" -c '
+import json,sys
+while True:
+    line=sys.stdin.buffer.readline(65537)
+    if not line:break
+    if len(line)>65536:
+        while line and not line.endswith(b"\n"):line=sys.stdin.buffer.readline(65537)
+        continue
+    try:value=json.loads(line)
+    except (ValueError,UnicodeError):continue
+    if isinstance(value,dict) and value.get("_SYSTEMD_UNIT")!="wsprrypi-log.service":
+        print(json.dumps(value,ensure_ascii=True,separators=(",",":")))
+' > "$destination"
+}
 if [[ "$INCLUDE_FULL_LOGS" -eq 1 ]]; then
-  journalctl --no-pager > "${OUT_DIR}/logs/journal-system.txt" 2>&1 || true
+  collect_system_journal_without_udp "${OUT_DIR}/logs/journal-system.txt"
 else
-  journalctl --no-pager -n 800 > "${OUT_DIR}/logs/journal-system-recent.txt" 2>&1 || true
+  collect_system_journal_without_udp "${OUT_DIR}/logs/journal-system-recent.txt" -n 800
 fi
 
 dmesg -T > "${OUT_DIR}/logs/dmesg.txt" 2>&1 || dmesg > "${OUT_DIR}/logs/dmesg.txt" 2>&1 || true

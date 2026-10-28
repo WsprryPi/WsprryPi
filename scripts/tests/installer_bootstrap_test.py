@@ -27,7 +27,7 @@ for step in process_args enforce_sudo setup_log validate_depends validate_sys_ac
     validate_apache_web_availability capture_install_sem_ver remove_legacy_services \
     remove_legacy_files_and_dirs manage_exe manage_support_bundle_runtime \
     manage_pico_usb_runtime manage_route_application manage_config manage_i2c \
-    manage_service activate_rp1_gpclk_runtime_administration manage_web \
+    manage_service manage_udp_logging activate_rp1_gpclk_runtime_administration manage_web \
     manage_apache validate_wsprrypi_runtime manage_sound \
     cleanup_files_in_directories restore_daemon_state flag_need_reboot \
     finish_script egress; do

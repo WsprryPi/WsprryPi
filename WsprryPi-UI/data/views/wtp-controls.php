@@ -250,6 +250,7 @@
         <details id="wtp-management" class="wtp-status mt-3" hidden>
             <summary class="cw-control-section__title">Pico standalone settings and Wi-Fi</summary>
             <p class="form-text">These settings belong to Pico's standalone scheduler, separate from WsprryPi's schedule. Management is available only while the host has no pending, owned or unresolved job. Saves preserve settings outside this form. Network or pin changes may require a Pico restart; each save reports the requirement.</p>
+            <details class="mb-4"><summary>UDP logging on this Pico</summary><div id="member-udp-logging-controls"></div></details>
             <section id="wtp-usb-settings" class="mb-4" aria-labelledby="wtp-usb-settings-heading" hidden>
                 <h5 id="wtp-usb-settings-heading" class="h6">USB name and Wi-Fi</h5>
                 <p class="form-text">The common name is the Pico's Wi-Fi hostname, including .local. Saved names or network changes may need a restart. Removing Wi-Fi keeps USB control and transmitter settings.</p>

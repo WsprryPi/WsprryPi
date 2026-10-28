@@ -1,3 +1,4 @@
+#include "udp_worker_image.hpp"
 /**
  * @file main.cpp
  * @brief Entry point for the Wsprry Pi application.
@@ -224,6 +225,8 @@ void callback_signal_handler(int signum, bool is_critical)
  */
 int main(int argc, char *argv[])
 {
+    // Export only the bundled diagnostic worker; no singleton or transmitter initialization.
+    if (const auto worker_exit = udp_worker_image_main(argc,argv)) return *worker_exit;
     // Inventory workers never acquire the application singleton or initialize output.
     if (const auto inventory_exit = si5351_inventory_process::helper_main(argc, argv))
         return *inventory_exit;

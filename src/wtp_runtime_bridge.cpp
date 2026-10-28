@@ -1,3 +1,4 @@
+#include "udp_logging/management.hpp"
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Lee Bussy
 #include "wtp_runtime_bridge.hpp"
@@ -636,6 +637,8 @@ wsprrypi::PicoHttpResponse wtp_runtime_management(const std::string &resource,
           r->usb_management->device(),r->usb_management->boot(),resource.substr(7),method,body,revision,"usb_physical");
         else if (resource.starts_with("member/progress")) response = wsprrypi::pico_progress_request(exchange,
           r->usb_management->device(),r->usb_management->boot(),resource.substr(7),method,body,revision,"usb_physical");
+        else if (resource == "member/udp-logging" || resource == "member/udp-logging/capabilities" || resource == "member/udp-logging/test" || resource == "member/udp-logging/test/capabilities") response = wsprrypi::pico_udp_logging_request(exchange,
+          r->usb_management->device(),r->usb_management->boot(),resource.substr(7),method,body,revision);
         else if (resource == "member/logging") response = exchange("/api/v1/logging",method,body,revision);
         else if (resource == "member/wifi") response = exchange("/api/usb/v1/wifi",method,body,revision);
         else if (resource == "member/hostname") { response = exchange("/api/v1/hostname",method,body,revision); r->observe_usb_name(response); }
@@ -663,6 +666,8 @@ wsprrypi::PicoHttpResponse wtp_runtime_management(const std::string &resource,
         else if (resource.starts_with("member/progress")) response = wsprrypi::pico_progress_request(exchange,
           r->consumer_management->device(),r->consumer_management->boot(),resource.substr(7),method,body,revision,
           r->management_carrier,r->consumer_management->generation());
+        else if (resource == "member/udp-logging" || resource == "member/udp-logging/capabilities" || resource == "member/udp-logging/test" || resource == "member/udp-logging/test/capabilities") response = wsprrypi::pico_udp_logging_request(exchange,
+          r->consumer_management->device(),r->consumer_management->boot(),resource.substr(7),method,body,revision);
         else response = exchange(resource, method, body, revision);
       }, true)) return failure(409, "host_busy_or_output_unresolved");
       return response;
@@ -692,6 +697,9 @@ wsprrypi::PicoHttpResponse wtp_runtime_management(const std::string &resource,
         const auto identity = r->app->status().identity;
         response = wsprrypi::pico_progress_request(exchange,identity ? identity->device_id : "",identity ? identity->boot_id : "",
             resource.substr(7),method,body,revision);
+      } else if (resource == "member/udp-logging" || resource == "member/udp-logging/capabilities" || resource == "member/udp-logging/test" || resource == "member/udp-logging/test/capabilities") {
+        const auto identity = r->app->status().identity;
+        response = wsprrypi::pico_udp_logging_request(exchange,identity ? identity->device_id : "",identity ? identity->boot_id : "",resource.substr(7),method,body,revision);
       } else response = exchange(resource, method, body, revision);
     }, false, !(method == "PUT" && (resource == "member/station" || resource == "member/hardware" || resource == "member/gpio-drive" || resource == "member/gpio-drive-progress"))))
       return {409, R"({"error":{"code":"host_busy_or_output_unresolved"}})", {}};

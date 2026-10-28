@@ -27,6 +27,7 @@
  */
 
 #include "logging.hpp"
+#include "udp_logging/udp_event_policy.hpp"
 
 #include "config_handler.hpp"
 #include "lcblog.hpp"
@@ -61,6 +62,7 @@ namespace
             timex quality{};
             const bool valid_utc = adjtimex(&quality) == TIME_OK && !(quality.status & (STA_UNSYNC | STA_CLOCKERR));
             const auto utc_text = valid_utc ? std::to_string(utc) : std::string{};
+            const bool export_safe=wsprry::logging::export_safe_pi("PI_LOG",message);
             return sd_journal_send("MESSAGE=%s", message.c_str(), "PRIORITY=%d", priority,
                 "SYSLOG_IDENTIFIER=%s", identifier.c_str(), "SYSLOG_FACILITY=23",
                 "WSPRRY_LOG_SCHEMA=wsprry-log/1", "WSPRRY_ORIGIN_KIND=pi",
@@ -70,7 +72,7 @@ namespace
                 "WSPRRY_ORIGIN_MONOTONIC_NS=%s", std::to_string(mono).c_str(),
                 "WSPRRY_ORIGIN_UTC_NS=%s", utc_text.c_str(),
                 "WSPRRY_EVENT=PI_LOG", "WSPRRY_INGRESS=native", "WSPRRY_COLLECTOR_ID=%s", device.c_str(),
-                "WSPRRY_FORWARDERS=[]", nullptr) >= 0;
+                "WSPRRY_FORWARDERS=[]", "WSPRRY_EXPORT_EVENT=%s", export_safe?"PI_LOG":"", "WSPRRY_EXPORT_MESSAGE=%s", export_safe?message.c_str():"", nullptr) >= 0;
         } catch (...) { return false; }
 #else
         (void)priority; (void)identifier; (void)message;
@@ -125,4 +127,12 @@ void initialize_logger(
 void refresh_logger_level_from_config()
 {
     apply_log_level(config.debug_logging);
+}
+
+bool native_journal_available() {
+#if defined(__linux__) && LIB_JOURNALD
+    return config.use_journald && ::access("/run/systemd/journal/socket",W_OK)==0;
+#else
+    return false;
+#endif
 }

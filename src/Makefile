@@ -246,6 +246,7 @@ MACHINE_POWER_CPP_SOURCES := \
 LOCAL_CPP_SOURCES := $(filter-out $(ANCILLARY_GPIO_REAL_CPP_SOURCES) $(ANCILLARY_GPIO_STUB_CPP_SOURCES) $(MACHINE_POWER_CPP_SOURCES),$(LOCAL_CPP_SOURCES))
 LOCAL_CPP_SOURCES += $(if $(filter 1,$(ANCILLARY_GPIO)),$(ANCILLARY_GPIO_REAL_CPP_SOURCES),$(ANCILLARY_GPIO_STUB_CPP_SOURCES))
 LOCAL_CPP_SOURCES += $(if $(filter Linux,$(HOST_OS)),./machine_power_control_linux.cpp,./machine_power_control_unavailable.cpp)
+LOCAL_CPP_SOURCES += ./udp_logging/host.cpp
 COMPONENT_CPP_SOURCES := $(shell find $(COMPONENT_SRCDIRS) -type f -name '*.cpp' ! -name '._*' ! -name 'main.cpp' 2>/dev/null)
 TRANSMITTER_SHARED_CPP_SOURCES := \
 	./WSPR-Transmitter/src/execution_plan_compiler.cpp \
@@ -2159,3 +2160,26 @@ usb-logging-test:
 	$(Q)mkdir -p build/usb-logging
 	$(Q)$(CXX) -std=c++20 -Wall -Wextra -Werror -pthread -I. -IWTP-Client/include -DLIB_JOURNALD=0 $(OPENSSL_CFLAGS) -IWTP-Server/include tests/usb_logging_test.cpp WTP-Server/src/sha256.cpp wtp_integration/usb_logging.cpp wtp_integration/usb_discovery.cpp wtp_integration/usb_cdc.cpp wtp_integration/catalog.cpp wtp_endpoint/identity.cpp $(OPENSSL_LIBS) -o build/usb-logging/usb_logging_test
 	$(Q)build/usb-logging/usb_logging_test
+
+# Dedicated worker is bundled into the verified executable for source and
+# precompiled installation, then extracted as a separate unprivileged image.
+UDP_WORKER_BIN := build/udp-logging/wsprrypi-log
+UDP_WORKER_HEADER := $(BUILD_METADATA_DIR)/udp_worker_image.inc
+UDP_WORKER_INPUTS := udp_logging/main.cpp udp_logging/network_policy.hpp udp_logging/resource_limits.hpp udp_logging/contract.hpp udp_logging/io.hpp udp_logging/udp_wire.hpp udp_logging/udp_event_policy.hpp json.hpp
+.PHONY: udp-logging-worker udp-logging-test
+$(UDP_WORKER_BIN): $(UDP_WORKER_INPUTS)
+	$(Q)mkdir -p build/udp-logging
+	$(Q)$(CXX) -std=c++20 -O2 -Wall -Wextra -Wpedantic -Werror -pthread -I. udp_logging/main.cpp -lsystemd -lcrypto -o $@
+udp-logging-worker: $(UDP_WORKER_BIN)
+ifeq ($(HAVE_JOURNALD),1)
+$(UDP_WORKER_HEADER): $(UDP_WORKER_BIN) ../scripts/embed_udp_worker.py
+	$(Q)python3 ../scripts/embed_udp_worker.py $(UDP_WORKER_BIN) $@
+else
+$(UDP_WORKER_HEADER): ../scripts/embed_udp_worker.py
+	$(Q)python3 ../scripts/embed_udp_worker.py unavailable $@
+endif
+$(OBJ_DIR_RELEASE)/./udp_worker_image.o $(OBJ_DIR_DEBUG)/./udp_worker_image.o: $(UDP_WORKER_HEADER)
+udp-logging-test:
+	$(Q)mkdir -p build/udp-logging
+	$(Q)$(CXX) -std=c++20 -O2 -Wall -Wextra -Wpedantic -Werror -I. -IWTP-Client/include tests/udp_logging_test.cpp -o build/udp-logging/udp_logging_test
+	$(Q)build/udp-logging/udp_logging_test

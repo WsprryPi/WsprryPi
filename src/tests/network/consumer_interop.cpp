@@ -103,6 +103,8 @@ struct FixtureEngine : pico::wtp::RfEngine {
 };
 struct ResourceFixture {
   network_test::Flash flash;
+  network_test::Flash udp_flash;
+  pico::logging::UdpStore udp_store{udp_flash};
   pico::standalone::Store store{flash};
   network_test::Clock clock;
   FixtureEngine engine;
@@ -111,7 +113,9 @@ struct ResourceFixture {
   pico::standalone::Scheduler scheduler{store,service};
   network_test::Network network;
   pico::network::BrowserApi api{service,store,scheduler,network,device,"test-firmware"};
-  ResourceFixture(){assert(store.load());}
+  pico::logging::UdpSender udp_sender{device,service.status().boot_id,"pico.local"};
+  pico::logging::Logger udp_logger{device,service.status().boot_id,"pico.local"};
+  ResourceFixture(){assert(store.load());assert(udp_store.load());api.udp_logging_service(udp_store,udp_sender);udp_logger.udp_sink(udp_sender);api.logging_service(udp_logger);}
 };
 // Simulate a historical discovery policy inside a genuine encrypted response.
 // Ordinary tests delegate unchanged to production Mbed TLS.

@@ -42,11 +42,11 @@ def main(argv=None,schema_bytes=None):
 ''').encode()
 
 
-def fixture(run=100,version='0.1.1'):
-    payload = {'usb_installer.py':core(version),'release-manifest-1.schema.json':encoded({'$id':'https://github.com/'+REPOSITORY+'/firmware-release-manifest/1'})}
-    manifest = {'schema':'wsprrypico-usb-installer/1','repository':REPOSITORY,'contract':1,
+def fixture(run=100,version='0.1.1',contract=1):
+    payload = {'usb_installer.py':(f'FIRMWARE_MANIFEST_SCHEMA={contract}\n'.encode() if contract!=1 else b'')+core(version),f'release-manifest-{contract}.schema.json':encoded({'$id':'https://github.com/'+REPOSITORY+'/firmware-release-manifest/'+str(contract)})}
+    manifest = {'schema':f'wsprrypico-usb-installer/{contract}','repository':REPOSITORY,'contract':contract,
         'result_schema':'wsprrypico-usb-result/1','transaction_schema':'wsprrypico-usb-transaction/1',
-        'firmware_manifest_schema':1,'python_min':[3,10],'installer_version':version,'channel':'devel',
+        'firmware_manifest_schema':contract,'python_min':[3,10],'installer_version':version,'channel':'devel',
         'source':f'{run:040x}','run_id':run,'attempt':1,
         'workflow':'.github/workflows/software-build.yml','verify_job':{'id':42,'name':'verify','status':'completed','conclusion':'success'},
         'files':{name:{'sha256':hashlib.sha256(data).hexdigest(),'bytes':len(data)} for name,data in payload.items()}}

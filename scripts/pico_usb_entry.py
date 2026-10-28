@@ -54,11 +54,11 @@ def invoke(manifest,payload,arguments):
                   'recovery_required':False,
                   'error':'The retained USB installer lacks full erase. Check for an installer update before erasing.'}
     with contextlib.redirect_stdout(io.StringIO()) as output:
-        code = module.main(arguments,schema_bytes=payload['release-manifest-1.schema.json'])
+        code = module.main(arguments,schema_bytes=payload[f"release-manifest-{manifest['firmware_manifest_schema']}.schema.json"])
     result = json.loads(output.getvalue())
     if result.get('schema') != 'wsprrypico-usb-result/1' or result.get('installer_version') != manifest['installer_version']:
         raise ValueError('Incompatible shared installer result')
-    result['installer_contract'] = 1
+    result['installer_contract'] = 1  # Host result/transaction contract is independent of storage layout.
     result['installer_source'] = manifest['source']
     return code,result
 

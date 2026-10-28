@@ -30,6 +30,18 @@ class DistributionTests(unittest.TestCase):
     def tearDown(self):self.temp.cleanup()
     def select(self):return self.store.refresh(self.net,force=True)['identity']
     def invoke(self,*args):return entry.run(list(args),bundle,self.store,self.cache,self.state)
+    def test_contract_two_uses_its_exact_schema_and_preserves_old_installer(self):
+        original=self.select();policy=copy.deepcopy(POLICY)
+        manifest,payload=fixture(102,'0.3.0',contract=2)
+        current=self.store.refresh(Network(manifest,payload),force=True);saved,files=self.store.load(current['identity'])
+        self.assertEqual(saved['contract'],2);self.assertEqual(saved['schema'],'wsprrypico-usb-installer/2')
+        self.assertEqual(set(files),{'usb_installer.py','release-manifest-2.schema.json'})
+        self.assertEqual(self.store.load(original)[0]['contract'],1);self.assertEqual(POLICY,policy)
+        for changed in ({**saved,'firmware_manifest_schema':1},{**saved,'schema':'wsprrypico-usb-installer/1'}):
+            with self.assertRaises(bundle.Unavailable):bundle.validate(changed,'devel')
+        for text in (b'FIRMWARE_MANIFEST_SCHEMA=3',b'FIRMWARE_MANIFEST_SCHEMA=True',b'FIRMWARE_MANIFEST_SCHEMA=2\nFIRMWARE_MANIFEST_SCHEMA=1'):
+            with self.assertRaises(bundle.Unavailable):bundle.firmware_contract(text)
+
     def test_compatible_update_changes_no_pi_policy_or_adapter(self):
         initial=self.select();policy=copy.deepcopy(POLICY)
         newer=Network(*fixture(101,'0.1.2'))
