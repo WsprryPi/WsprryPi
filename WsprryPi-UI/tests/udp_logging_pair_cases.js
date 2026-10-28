@@ -14,7 +14,8 @@ module.exports=async function(request){
  const event=await request({method:'POST',path:path+'/test',revision:read.etag,body:JSON.stringify({schema:'udp-logging-test/1',target:read.body.target})});assert.equal(event.status,200,JSON.stringify(event));assert.equal(event.body.schema,'udp-logging-test/1');assert.equal(event.body.accepted,true);assert.equal(event.body.receipt,'unknown');
  const afterEvent=await request({method:'GET',path,body:''});assert.equal(afterEvent.etag,read.etag);assert.equal(BigInt(afterEvent.body.active.counters.generated),BigInt(read.body.active.counters.generated)+1n);
  read=await request({method:'GET',path,body:''});const staleEvent=await request({method:'POST',path:path+'/test',revision:read.etag,body:JSON.stringify({schema:'udp-logging-test/1',target:{...read.body.target,boot_id:'e'.repeat(32)}})});assert.equal(staleEvent.status,400,JSON.stringify(staleEvent));
- const invalid=[{...candidate,rate:9},{...candidate,rate:true},{...candidate,destination_ipv4:'127.0.0.1'},{...candidate,destination_ipv4:'239.1.2.3'},{...candidate,burst:17},{...candidate,extra:false},{...candidate,event_codes:['BOOT','BOOT']}];
+ let nested={};for(let i=0;i<9;i++)nested={nested};
+ const invalid=[{...candidate,rate:9},{...candidate,rate:true},{...candidate,destination_ipv4:'127.0.0.1'},{...candidate,destination_ipv4:'239.1.2.3'},{...candidate,burst:17},{...candidate,extra:false},{...candidate,event_codes:['BOOT','BOOT']},{...candidate,extra:nested}];
  for(const settings of invalid){
   read=await request({method:'GET',path,body:''});const bad=await request({method:'PUT',path,revision:read.etag,body:JSON.stringify(envelope(settings))});assert.equal(bad.status,400,JSON.stringify(bad));
   const after=await request({method:'GET',path,body:''});assert.equal(after.etag,read.etag);assert.deepEqual(after.body.saved,candidate);
