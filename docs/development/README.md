@@ -78,6 +78,6 @@ recovery assets; retire obsolete prompts and evidence without creating an archiv
 
 ## Selected coordinated logging work
 
-The [UDP syslog plan](udp-syslog-plan.md) links the reviewed cross-repository proposal and required Pi/backend/UI deliverables. Feature implementation and runtime acceptance remain pending.
+The [UDP syslog plan](udp-syslog-plan.md) links the reviewed cross-repository design and coordinated Pi/backend/UI deliverables.
 
-The [UDP logging implementation candidate](udp-logging.md) describes the worker package, export-safe journal projection, independent installation status and finite tests. Qualification and the coordinated backlog item remain unfinished.
+The [UDP logging contract](udp-logging.md) describes the worker package, export-safe journal projection, independent installation status and finite tests. The linked Pico qualification record identifies successful production pairs, physical acceptance and restoration; the combined backlog tracks coordinated publication.
