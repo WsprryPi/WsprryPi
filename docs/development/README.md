@@ -75,3 +75,7 @@ Follow the [repository and work-harness cleanup instructions](repository-cleanup
 for an explicit cleanup request. Inventory exact deletion, rewrite, retention
 and hold decisions first. Preserve current dependencies, active work and
 recovery assets; retire obsolete prompts and evidence without creating an archive.
+
+## Selected coordinated logging work
+
+The [UDP syslog plan](udp-syslog-plan.md) links the reviewed cross-repository proposal and required Pi/backend/UI deliverables. Feature implementation and runtime acceptance remain pending.
