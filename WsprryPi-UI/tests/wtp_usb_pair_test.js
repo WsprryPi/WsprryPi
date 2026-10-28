@@ -27,6 +27,7 @@ const {browser,reply,target}=require("./wtp_usb_settings_test.js");
         await b.click("wifi-save");assert.match(b.element("wtp-usb-feedback").textContent,/Settings saved/);await b.click("load");assert.equal(b.element("wtp-usb-ssid").value,"synthetic-network");
         b.element("wtp-usb-ssid").value="replacement-network";b.element("wtp-usb-password").value="replacement-synthetic-password";await b.click("wifi-save");assert.match(b.element("wtp-usb-feedback").textContent,/Settings saved/);await b.click("load");assert.equal(b.element("wtp-usb-ssid").value,"replacement-network");
         await b.click("wifi-remove");assert.match(b.element("wtp-usb-feedback").textContent,/removed/);await b.click("load");assert.equal(b.element("wtp-usb-ssid").value,"");assert.equal(b.element("wtp-usb-hostname").value,"usb-bench.local");
+        await require('./udp_logging_pair_cases.js')(request);
         const preclock=await request({method:"GET",path:"/api/v1/member/progress",body:""});
         assert.equal(preclock.status,200,JSON.stringify(preclock));
         const preclockSave=await request({method:"POST",path:"/api/v1/member/progress/update",revision:preclock.etag,

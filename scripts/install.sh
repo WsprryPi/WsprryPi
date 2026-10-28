@@ -8209,6 +8209,16 @@ manage_service() {
 #          fallback so Apache and readiness checks follow preserved INI values.
 #          Results are returned in WSPRRYPI_WEB_PORT and WSPRRYPI_SOCKET_PORT.
 # -----------------------------------------------------------------------------
+# The dedicated worker is extracted from the same verified application image.
+manage_udp_logging() {
+    [[ "$DRY_RUN" == "true" ]] && return 0
+    local operation=install
+    [[ "$ACTION" == "uninstall" ]] && operation=remove
+    exec_command "Manage optional UDP logging service" python3 \
+        "$LOCAL_REPO_DIR/scripts/udp_log_control.py" "$operation" \
+        --ini "/usr/local/etc/$WSPR_INI" --application "$BINARY_INSTALL_DIR/$WSPR_EXE"
+}
+
 resolve_wsprrypi_service_ports() {
     local debug
     debug=$(debug_start "$@")
@@ -9870,6 +9880,7 @@ manage_wsprry_pi() {
         "manage_config \"$WSPR_INI\" \"/usr/local/etc/\""
         "manage_i2c"
         "manage_service \"/usr/bin/$WSPR_EXE\" \"$service_command\" \"false\""
+        "manage_udp_logging"
         "activate_rp1_gpclk_runtime_administration"
         "manage_web"
         "manage_apache"

@@ -164,6 +164,20 @@
     white-space: nowrap;
 }
 
+/* Network provenance can exceed the local unit label; keep its message on
+   a separate row and wrap the claimed origin and relay text. */
+.logs-line.logs-network {
+    grid-template-columns: max-content minmax(8rem, 1fr) max-content;
+}
+.logs-network .logs-unit {
+    min-width: 0;
+    white-space: normal;
+    overflow-wrap: anywhere;
+}
+.logs-network .logs-msg {
+    grid-column: 1 / -1;
+}
+
 .logs-msg {
     min-width: 0;
     overflow-wrap: anywhere;
@@ -301,7 +315,8 @@
         bottom: 3.6rem;
     }
 
-    .logs-line {
+    .logs-line,
+    .logs-line.logs-network {
         grid-template-columns: minmax(0, 1fr) max-content;
         gap: 0.1rem 0.65rem;
         padding-block: 0.5rem;

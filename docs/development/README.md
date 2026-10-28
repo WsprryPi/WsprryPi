@@ -79,3 +79,5 @@ recovery assets; retire obsolete prompts and evidence without creating an archiv
 ## Selected coordinated logging work
 
 The [UDP syslog plan](udp-syslog-plan.md) links the reviewed cross-repository proposal and required Pi/backend/UI deliverables. Feature implementation and runtime acceptance remain pending.
+
+The [UDP logging implementation candidate](udp-logging.md) describes the worker package, export-safe journal projection, independent installation status and finite tests. Qualification and the coordinated backlog item remain unfinished.

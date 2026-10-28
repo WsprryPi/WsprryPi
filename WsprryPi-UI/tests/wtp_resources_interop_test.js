@@ -48,6 +48,7 @@ async function cases(carrier, failure="storage") {
       assert.equal(calls.at(-1).result.status,200);
     }
     const load=async()=>{await b.click('wtp-member-load');const r=calls.at(-1).result;assert.equal(r.status,200,JSON.stringify(r));return r;};
+    await require('./udp_logging_pair_cases.js')(call);
     let loaded=await load(); if(failure==="storage")fs.writeFileSync(path.join(build,`resources-loaded-${carrier}.json`),JSON.stringify(loaded.body)); const initial=await control('dump');
     assert.equal(loaded.body.profile_owned_station,consumer);
     const extendedFormats=loaded.body.application.schema==='transmitter-application/2';

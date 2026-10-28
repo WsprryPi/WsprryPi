@@ -237,6 +237,7 @@
     function invalidateEditors() {
         driveEditor?.invalidate();
         root.WtpUsbSettings?.invalidate();
+        root.WsprryMemberUdp?.invalidate();
         invalidateProgress();
         configRevision = networkRevision = ""; target = null; reconcile = loaded;
         invalidateResources();

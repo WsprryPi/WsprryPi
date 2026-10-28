@@ -157,19 +157,30 @@ class Network:
         return decode(self.get(API+path, 256*1024))
 
 
+def firmware_contract(source):
+    try:
+        tree=ast.parse(source) if isinstance(source,(bytes,str)) else source
+        declared=[ast.literal_eval(n.value) for n in tree.body if isinstance(n,ast.Assign) and
+                  any(isinstance(t,ast.Name) and t.id=='FIRMWARE_MANIFEST_SCHEMA' for t in n.targets)]
+    except (SyntaxError,ValueError,TypeError) as error:
+        raise Incompatible('Unknown firmware manifest contract') from error
+    require(not declared or (len(declared)==1 and type(declared[0]) is int and declared[0] in (1,2)),
+            'Unknown firmware manifest contract')
+    return declared[0] if declared else 1
+
 def validate(manifest, channel):
-    require(isinstance(manifest, dict) and manifest.get('schema') == MARKER and type(manifest.get('contract')) is int and manifest['contract'] == 1 and
+    require(isinstance(manifest, dict) and manifest.get('schema') == {1:MARKER,2:'wsprrypico-usb-installer/2'}.get(manifest.get('contract')) and type(manifest.get('contract')) is int and manifest['contract'] in (1, 2) and
             manifest.get('repository') == REPOSITORY and manifest.get('channel') == channel and
             channel in ('main', 'devel') and re.fullmatch(r'[0-9a-f]{40}', manifest.get('source','')) and
             re.fullmatch(r'[0-9]+\.[0-9]+\.[0-9]+', manifest.get('installer_version','')) and
             manifest.get('result_schema') == 'wsprrypico-usb-result/1' and
             manifest.get('transaction_schema') == 'wsprrypico-usb-transaction/1' and
-            type(manifest.get('firmware_manifest_schema')) is int and manifest['firmware_manifest_schema'] == 1,
+            type(manifest.get('firmware_manifest_schema')) is int and manifest['firmware_manifest_schema'] == manifest['contract'],
             'Installer update has an incompatible contract')
     minimum = manifest.get('python_min')
     require(isinstance(minimum, list) and len(minimum) == 2 and all(type(n) is int and 0 <= n < 100 for n in minimum)
             and tuple(minimum) >= (3,10) and tuple(minimum) <= sys.version_info[:2], 'Installer needs an unsupported Python version')
-    require(set(manifest.get('files',{})) == FILES, 'Installer file inventory differs from the supported contract')
+    require(set(manifest.get('files',{})) == {'usb_installer.py', f"release-manifest-{manifest['contract']}.schema.json"}, 'Installer file inventory differs from the supported contract')
     for item in manifest['files'].values():
         require(set(item) == {'sha256','bytes'} and re.fullmatch(HEX,item['sha256']) and
                 type(item['bytes']) is int and 0 < item['bytes'] <= MAX_FILE, 'Invalid installer checksum inventory')
@@ -273,9 +284,7 @@ def verified_source(client, channel, workflow, selected, head):
                 re.fullmatch(r'[0-9a-f]{40}',history['merge_base_commit']['sha']), 'Invalid installer branch ancestry')
         if history['status'] not in ('ahead','identical') or history['merge_base_commit'].get('sha') != source:
             raise Incompatible('Installer source is outside the selected branch history')
-    payload = {name:source_file(client,path,source) for name,path in (
-        ('usb_installer.py','scripts/usb_installer.py'),
-        ('release-manifest-1.schema.json','scripts/ci/release-manifest-1.schema.json'))}
+    payload = {'usb_installer.py':source_file(client,'scripts/usb_installer.py',source)}
     try:
         tree = ast.parse(payload['usb_installer.py'])
         compile(tree, '<verified-pico-installer>', 'exec')
@@ -301,18 +310,21 @@ def verified_source(client, channel, workflow, selected, head):
     if minimum > sys.version_info[:2]:
         raise Incompatible('Installer source needs an unsupported Python version')
     constants = {n.value for n in ast.walk(tree) if isinstance(n,ast.Constant) and isinstance(n.value,str)}
-    schema = decode(payload['release-manifest-1.schema.json'])
+    manifest_version = firmware_contract(tree)
+    schema_name = f'release-manifest-{manifest_version}.schema.json'
+    payload[schema_name] = source_file(client,'scripts/ci/'+schema_name,source)
+    schema = decode(payload[schema_name])
     mains = [n for n in tree.body if isinstance(n,ast.FunctionDef) and n.name == 'main']
     if not (isinstance(schema,dict) and {'wsprrypico-usb-result/1','wsprrypico-usb-transaction/1'} <= constants and
-            schema.get('$id') == 'https://github.com/'+REPOSITORY+'/firmware-release-manifest/1' and
+            schema.get('$id') == 'https://github.com/'+REPOSITORY+'/firmware-release-manifest/'+str(manifest_version) and
             len(mains) == 1 and 'schema_bytes' in {a.arg for a in (*mains[0].args.args,*mains[0].args.kwonlyargs)}):
         raise Incompatible('Installer source has an incompatible contract')
-    manifest = validate({'schema':MARKER,'repository':REPOSITORY,'contract':1,'channel':channel,
+    manifest = validate({'schema':MARKER if manifest_version==1 else 'wsprrypico-usb-installer/2','repository':REPOSITORY,'contract':manifest_version,'channel':channel,
         'source':source,'run_id':run,'attempt':attempt,'workflow':workflow['path'],
         'delivery':'verified-source','verify_job':{k:job[k] for k in ('id','name','status','conclusion')},
         'installer_version':versions[0],'python_min':list(minimum),
         'result_schema':'wsprrypico-usb-result/1','transaction_schema':'wsprrypico-usb-transaction/1',
-        'firmware_manifest_schema':1,
+        'firmware_manifest_schema':manifest_version,
         'files':{n:{'sha256':sha(d),'bytes':len(d)} for n,d in payload.items()}},channel)
     return manifest, payload
 
@@ -520,6 +532,7 @@ class Store:
             if not any(directory.glob('*/transaction.json')):
                 safe(directory,self.owner)
                 # Only the three recognized immutable snapshot members remain.
-                require({p.name for p in directory.iterdir()} == FILES | {'usb-installer.json'}, 'Unknown retained installer data')
+                snapshot=validate(decode((directory/'usb-installer.json').read_bytes()),self.channel)
+                require({p.name for p in directory.iterdir()} == set(snapshot['files']) | {'usb-installer.json'}, 'Unknown retained installer data')
                 shutil.rmtree(directory)
         return len(pending)

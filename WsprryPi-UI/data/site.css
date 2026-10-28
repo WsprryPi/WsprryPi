@@ -1174,3 +1174,26 @@ footer .container {
         transition: none !important;
     }
 }
+
+/* UDP logging extends the incumbent explicit settings forms. */
+.udp-logging-controls { min-width: 0; overflow-wrap: anywhere; }
+.udp-logging-controls fieldset { display: grid; gap: 1rem; min-width: 0; }
+.udp-logging-controls label { display: flex; flex-direction: column; gap: .375rem; min-width: 0; }
+.udp-logging-controls label.check, .udp-logging-controls label.form-check { flex-direction: row; align-items: center; flex-wrap: wrap; }
+.udp-logging-controls input:not([type=checkbox]), .udp-logging-controls textarea { width: 100%; min-width: 0; box-sizing: border-box; }
+.udp-logging-controls input[type=checkbox] { flex: 0 0 auto; }
+.udp-logging-controls button, .udp-logging-controls input:not([type=checkbox]), .udp-logging-controls summary { min-height: 44px; }
+.udp-logging-controls details > label { margin-top: .75rem; }
+.udp-logging-controls h3 { margin-top: 1.5rem; }
+
+@media (min-width: 900px) {
+    .udp-logging-controls fieldset { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .udp-logging-controls fieldset > p, .udp-logging-controls fieldset > details, .udp-logging-controls fieldset > h3, .udp-logging-controls fieldset > div, .udp-logging-controls fieldset > button, .udp-logging-controls label.check, .udp-logging-controls label.form-check { grid-column: 1 / -1; }
+}
+.udp-logging-controls button { justify-self: start; max-width: 100%; }
+.udp-logging-controls .btn:disabled {
+    color: var(--bs-secondary-color);
+    background-color: var(--bs-secondary-bg);
+    border-color: var(--bs-border-color);
+    opacity: 1;
+}

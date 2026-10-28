@@ -58,6 +58,8 @@ execute_process(COMMAND "${Python3_EXECUTABLE}" "${PICO_SOURCE}/scripts/generate
 add_subdirectory("${PICO_SOURCE}/src/microchrony" "${CMAKE_BINARY_DIR}/microchrony")
 set(core
     logging/logger.cpp
+    logging/udp_settings.cpp
+    network/udp_logging.cpp
     application/config_update.cpp
     application/resources.cpp
     application/frequency_policy.cpp

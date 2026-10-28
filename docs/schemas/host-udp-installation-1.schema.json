@@ -1,0 +1,63 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "target",
+    "worker_state",
+    "policy_state",
+    "service_state",
+    "native_journal_state"
+  ],
+  "properties": {
+    "schema": {
+      "const": "host-udp-installation/1"
+    },
+    "target": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "scope",
+        "collector_id"
+      ],
+      "properties": {
+        "scope": {
+          "const": "host"
+        },
+        "collector_id": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{32}$"
+        }
+      }
+    },
+    "worker_state": {
+      "enum": [
+        "missing",
+        "unsafe",
+        "installed"
+      ]
+    },
+    "policy_state": {
+      "enum": [
+        "valid",
+        "invalid",
+        "unavailable"
+      ]
+    },
+    "service_state": {
+      "enum": [
+        "inactive",
+        "running",
+        "bind_error",
+        "ready"
+      ]
+    },
+    "native_journal_state": {
+      "enum": [
+        "available",
+        "unavailable"
+      ]
+    }
+  }
+}

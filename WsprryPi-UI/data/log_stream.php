@@ -41,7 +41,10 @@
 
 declare(strict_types=1);
 require_once __DIR__ . '/log_origin.php';
-$logSource = log_source($_GET['source'] ?? 'all');
+$requestedStreamVersion=$_GET['stream_version'] ?? '1';
+if (!is_string($requestedStreamVersion)||!in_array($requestedStreamVersion,['1','2'],true)) {http_response_code(400);exit;}
+$logStreamVersion=(int)$requestedStreamVersion;
+$logSource = log_source($_GET['source'] ?? 'all',$logStreamVersion);
 
 header('Content-Type: text/event-stream; charset=utf-8');
 header('Cache-Control: no-cache, no-transform');
@@ -550,8 +553,8 @@ function normalize_realtime_timestamp($value): ?string
 
 function send_entry(array $entry, bool $isPlayback): ?string
 {
-    global $logSource;
-    if (!log_scope_matches($entry) || !log_source_matches($entry, $logSource)) return null;
+    global $logSource, $logStreamVersion;
+    if (!log_scope_matches($entry,$logStreamVersion) || !log_source_matches($entry, $logSource,$logStreamVersion)) return null;
     $cursor = $entry['__CURSOR'] ?? null;
     $realtimeTimestamp = normalize_realtime_timestamp(
         $entry['__REALTIME_TIMESTAMP'] ?? ($entry['_SOURCE_REALTIME_TIMESTAMP'] ?? null)
@@ -572,7 +575,7 @@ function send_entry(array $entry, bool $isPlayback): ?string
         'GID' => isset($entry['_GID']) ? (int)$entry['_GID'] : null,
     ];
 
-    $payload = array_merge($payload, log_origin($entry));
+    $payload = array_merge($payload, log_origin($entry,$logStreamVersion));
     $sseCursor = is_string($cursor) && $cursor !== '' ? $cursor : null;
     emit_payload($payload, 'journal', $sseCursor);
 
@@ -587,7 +590,7 @@ function drain_process(
     bool $isPlayback,
     ?string $probeCursor = null
 ): array {
-    global $logSource;
+    global $logSource, $logStreamVersion;
     $pipes = $started['pipes'];
 
     $stdoutBuf = '';
@@ -729,7 +732,7 @@ function drain_process(
             }
 
             $c = $probeCursor !== null
-                ? (log_cursor_matches($entry, $probeCursor, $logSource) ? $probeCursor : null)
+                ? (log_cursor_matches($entry, $probeCursor, $logSource,$logStreamVersion) ? $probeCursor : null)
                 : send_entry($entry, $isPlayback);
             $entryCount += 1;
             if ($c !== null) {
@@ -762,7 +765,7 @@ function drain_process(
         }
 
         $c = $probeCursor !== null
-                ? (log_cursor_matches($entry, $probeCursor, $logSource) ? $probeCursor : null)
+                ? (log_cursor_matches($entry, $probeCursor, $logSource,$logStreamVersion) ? $probeCursor : null)
                 : send_entry($entry, $isPlayback);
         $entryCount += 1;
         if ($c !== null) {
@@ -787,6 +790,8 @@ if ($journalctlPath === '') {
     emit_internal('journalctl not found in PATH', '3', $internalUnit, false);
     exit;
 }
+
+if ($logStreamVersion === 2) $units=["wsprrypi.service","wsprrypi-log.service"];
 
 // -----------------------------------------------------------------------------
 // Build journalctl filter args (shared by replay + follow).
@@ -816,8 +821,15 @@ if (!$unitFilterDisabled) {
     }
 }
 
-if (str_starts_with($logSource, 'pico:')) {
-    $journalFilters[] = 'WSPRRY_ORIGIN_ID=' . substr($logSource, 5);
+if (str_starts_with($logSource, 'pico:') || str_starts_with($logSource, 'usb:')) {
+    $journalFilters[] = 'WSPRRY_ORIGIN_ID=' . substr($logSource, strpos($logSource, ':')+1);
+}
+
+if ($logStreamVersion===2 && str_starts_with($logSource,'udp:')) {
+    $originParts=explode(':',$logSource);
+    $journalFilters[]='WSPRRY_PEER_SLOT='.$originParts[1];
+    $journalFilters[]='WSPRRY_ORIGIN_KIND='.$originParts[2];
+    $journalFilters[]='WSPRRY_ORIGIN_ID='.$originParts[3];
 }
 
 emit_internal(

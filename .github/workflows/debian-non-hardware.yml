@@ -107,6 +107,8 @@ jobs:
       - name: Parent TLS, shared API and actual Pico interoperability
         working-directory: src
         run: |
+          make udp-logging-worker udp-logging-test SUDO=
+          python3 -B ../scripts/tests/udp_log_control_test.py
           make wtp-catalog-test SUDO=
           make wtp-tls-test SUDO=
           make wtp-network-runtime-test BACKENDS=simulated ANCILLARY_GPIO=0 SUDO=
@@ -124,6 +126,9 @@ jobs:
         env:
           CHROME_BIN: /usr/bin/google-chrome
         run: |
+          node tests/udp_logging_ui_integration_test.js ../src/build/network-reference/pico
+          (cd data && php -r '$_GET["page"]="logs";include "index.php";') > /tmp/udp-logs-rendered.html
+          LOGGING_RENDERED_HTML=/tmp/udp-logs-rendered.html node tests/udp_logging_logs_browser_test.js
           node tests/wtp_network_ui_integration_test.js
           node tests/wtp_pi_fleet_ui_integration_test.js
           WSPRRYPI_RUN_RECOVERY_BROWSER=1 node tests/wtp_recovery_ui_integration_test.js

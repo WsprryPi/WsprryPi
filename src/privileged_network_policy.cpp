@@ -90,7 +90,11 @@ PrivilegedOperationClass classify_privileged_http_operation(
     }
 
     if (path.starts_with("/api/v1/")) {
-        if ((path == "/api/v1/host/logging" || path == "/api/v1/member/logging") &&
+        if(path=="/api/v1/host/udp-logging/installation" && method=="GET")return PrivilegedOperationClass::protected_operation;
+        if (((path == "/api/v1/member/udp-logging/test/capabilities" || path == "/api/v1/host/udp-logging/test/capabilities") && method == "GET") ||
+            ((path == "/api/v1/member/udp-logging/test" || path == "/api/v1/host/udp-logging/test") && method == "POST"))
+            return PrivilegedOperationClass::protected_operation;
+        if ((path == "/api/v1/host/logging" || path == "/api/v1/member/logging" || path == "/api/v1/member/udp-logging" || path == "/api/v1/member/udp-logging/capabilities" || path == "/api/v1/host/udp-logging" || path == "/api/v1/udp-logging/capabilities") &&
             (method == "GET" || method == "PUT"))
             return PrivilegedOperationClass::protected_operation;
         if (path == "/api/v1/member/firmware" && (method == "GET" || method == "POST"))

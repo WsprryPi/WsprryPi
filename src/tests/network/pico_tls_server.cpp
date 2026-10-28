@@ -78,6 +78,13 @@ int main(int argc, char **argv) {
   network_test::Network network;
   const std::string device(32, argc > 2 ? argv[2][0] : 'a');
   wsprrypico::network::BrowserApi api{service, store, scheduler, network, device, "phase11-host-test"};
+  network_test::Flash udp_flash;
+  wsprrypico::logging::UdpStore udp_store(udp_flash);
+  if(!udp_store.load())return 1;
+  wsprrypico::logging::UdpSender udp_sender(device,service.status().boot_id,"pico.local");
+  api.udp_logging_service(udp_store,udp_sender);
+    wsprrypico::logging::Logger udp_logger(device,service.status().boot_id,"pico.local");
+    udp_logger.udp_sink(udp_sender);api.logging_service(udp_logger);
   network_test::Flash progress_flash;
   wsprrypico::standalone::Progress progress(progress_flash);
   if (!progress.load()) return 1;

@@ -8,6 +8,7 @@
 #include "wtp_endpoint/runtime.hpp"
 #include "wtp_integration/fleet_runtime.hpp"
 #include "wtp_integration/usb_logging.hpp"
+#include "udp_logging/host.hpp"
 #include "wtp_pi_control.hpp"
 #include "transmitter_runtime_bridge.hpp"
 #include "scheduling_internal.hpp"
@@ -701,6 +702,7 @@ bool wspr_loop()
 
     if (config.use_ini) {
         wsprrypi::start_wtp_fleet(config.ini_filename);
+        wsprrypi::start_udp_logging_policy(config.ini_filename);
         try { wsprrypi::start_usb_logging(config.ini_filename); }
         catch (const std::exception&) { llog.logS(ERROR, "USB log collector unavailable; review its saved settings."); }
     }

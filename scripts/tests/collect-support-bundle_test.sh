@@ -71,6 +71,12 @@ EOF
 exit 0
 EOF
   done
+  cat > "$directory/journalctl" <<'EOF'
+#!/usr/bin/env bash
+if [[ "$*" == *'-o json'* ]]; then
+  printf '%s\n' '{"_SYSTEMD_UNIT":"wsprrypi-log.service","MESSAGE":"udp-private-body-do-not-collect"}' '{"_SYSTEMD_UNIT":"wsprrypi.service","MESSAGE":"native-journal-fixture"}'
+fi
+EOF
   cat > "$directory/systemctl" <<'EOF'
 #!/usr/bin/bash
 if [[ "$*" == 'show wsprrypi --property=ActiveState --value' ]]; then
@@ -370,6 +376,10 @@ assert_contains "$process_dir/all-processes.txt" '[REDACTED]'
 assert_not_contains "$process_dir/wsprrypi-cmdline.txt" 'cmdline-secret'
 assert_contains "$process_dir/wsprrypi-cmdline.txt" '[REDACTED]'
 ! tar -tzf "$archive" | grep -Eq '/fd(/|$)' || fail 'FD inventory or targets were archived'
+
+# UDP imports are omitted from the general journal support overview.
+assert_contains "$TEST_ROOT/extracted-success/bundle/logs/journal-system-recent.txt" 'native-journal-fixture'
+assert_not_contains "$TEST_ROOT/extracted-success/bundle/logs/journal-system-recent.txt" 'udp-private-body-do-not-collect'
 
 # Stopped, zero, malformed, missing, disappearing, reused, and unreadable states remain explicit.
 run_process_case success 0 inactive "$TEST_ROOT/extracted-stopped"

@@ -49,6 +49,15 @@ class DeploymentTests(unittest.TestCase):
                'files':files,'entry_sha256':bundle.sha((self.target/'entry.py').read_bytes())}
         (self.target/'deployment.json').write_bytes(encoded(prior))
         return prior
+    def test_development_contract_two_selects_schema_two_without_changing_legacy_migration(self):
+        manifest,payload=fixture(102,'0.3.0',contract=2)
+        (self.source/'scripts/usb_installer.py').write_bytes(payload['usb_installer.py'])
+        (self.source/'scripts/ci/release-manifest-2.schema.json').write_bytes(payload['release-manifest-2.schema.json'])
+        self.seed();store=self.store();saved,files=store.load(store.active()['identity'])
+        self.assertEqual(saved['schema'],'wsprrypico-usb-installer/2');self.assertEqual(saved['contract'],2)
+        self.assertEqual(set(files),{'usb_installer.py','release-manifest-2.schema.json'})
+        self.assertEqual(saved['origin']['kind'],'unpublished-working-tree')
+
     def test_development_deployment_never_claims_ci_or_reintroduces_source_pin(self):
         self.seed();store=self.store();manifest,_=store.load(store.active()['identity'])
         self.assertEqual(manifest['origin']['kind'],'unpublished-working-tree')

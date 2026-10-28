@@ -147,6 +147,7 @@
         }
         root.WtpFirmware?.setAvailability(selected() && transport === "usb" && (snapshot?.selected === true || statusReadFailed),
             JSON.stringify([read()["USB Serial"], read().Endpoint, read()["Device ID"]]), snapshot?.firmware_selection_id || "", read()["USB Serial"]);
+        root.WsprryMemberUdp?.setAvailability(selected() && snapshot?.selected === true && snapshot.phase === "idle" && !snapshot.worker_active && !snapshot.recovery_required && !snapshot.owns);
         root.WtpUsbSettings?.setAvailability(selected() && transport === "usb" && snapshot?.management_available === true);
         const state = summarize(snapshot);
         for (const [id, value] of [["wtp-status-text", state.text], ["wtp-output", state.output], ["wtp-clock", state.clock], ["wtp-identity", state.identity], ["wtp-history", state.history]]) byId(id).textContent = value;

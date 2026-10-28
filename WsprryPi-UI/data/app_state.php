@@ -22,7 +22,7 @@ $viewMetadata = [
         'bodyClass' => '',
         'htmlTheme' => 'light',
         'css' => ['index.css'],
-        'js' => ['cw_timing_state.js', 'local-wtp.js', 'wtp.js', 'gpio-drive.js', 'wtp-management.js', 'wtp-usb-settings.js', 'wtp-firmware.js', 'fleet-schedules.js', 'index.js'],
+        'js' => ['udp-logging.js', 'udp-logging-controls.js', 'cw_timing_state.js', 'local-wtp.js', 'wtp.js', 'gpio-drive.js', 'wtp-management.js', 'wtp-usb-settings.js', 'wtp-firmware.js', 'fleet-schedules.js', 'index.js'],
         'partial' => __DIR__ . '/views/config.php',
     ],
     'logs' => [
@@ -34,7 +34,7 @@ $viewMetadata = [
         'bodyClass' => 'bg-body-tertiary',
         'htmlTheme' => 'light',
         'css' => ['view_logs.css'],
-        'js' => ['view_logs.js'],
+        'js' => ['udp-logging.js', 'udp-logging-controls.js', 'view_logs.js'],
         'partial' => __DIR__ . '/views/logs.php',
     ],
     'spots' => [

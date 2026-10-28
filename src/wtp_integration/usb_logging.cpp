@@ -70,7 +70,7 @@ bool printable(const std::string &text, std::size_t limit) {
          std::none_of(text.begin(), text.end(),
                       [](unsigned char c) { return c < 32 || c > 126; });
 }
-bool project_journal(const Json &event, const std::string &collector) {
+bool project_journal(const Json &event, const std::string &collector, const std::string &profile) {
 #if defined(__linux__) && LIB_JOURNALD
   const auto receipt = std::chrono::duration_cast<std::chrono::microseconds>(
                            std::chrono::system_clock::now().time_since_epoch())
@@ -101,10 +101,11 @@ bool project_journal(const Json &event, const std::string &collector) {
              event.at("dropped").get<std::string>().c_str(),
              "WSPRRY_COLLECTOR_ID=%s", collector.c_str(), "WSPRRY_INGRESS=usb",
              "WSPRRY_RECEIPT_US=%s", std::to_string(receipt).c_str(),
-             "WSPRRY_FORWARDERS=[]", nullptr) >= 0;
+             "WSPRRY_FORWARDERS=[]", "WSPRRY_PROFILE_ID=%s", profile.c_str(), nullptr) >= 0;
 #else
   (void)event;
   (void)collector;
+  (void)profile;
   return false;
 #endif
 }
@@ -311,7 +312,7 @@ private:
     if (sync)
       throw std::runtime_error("logging_save_unconfirmed");
   }
-  void poll(Source &source, const WtpSettings &settings, unsigned maximum,
+  void poll(Source &source, const WtpSettings &settings, const std::string& profile, unsigned maximum,
             std::uint64_t now) {
     if (!allow_devices_) throw std::runtime_error("hardware_access_disabled");
     if (pico_usb_update_blocked(settings.usb_serial)) {
@@ -435,7 +436,7 @@ private:
           source.name = event.at("origin_name").get<std::string>();
           source.dropped = event.at("dropped").get<std::string>();
           source.state = event.at("severity").get<unsigned>() > maximum ||
-                                 project_journal(event, self_)
+                                 project_journal(event, self_, profile)
                              ? "streaming"
                              : "journal_unavailable";
         } catch (...) {
@@ -489,7 +490,7 @@ private:
                 if (settings.transport != "usb" || settings.device_id != id)
                   throw std::runtime_error("logging_identity_changed");
                 found = true;
-                poll(*source, settings,
+                poll(*source, settings, item.at("catalog_id").get<std::string>(),
                      item.at("maximum_severity").get<unsigned>(), now);
               }
             if (!found)

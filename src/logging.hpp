@@ -48,5 +48,7 @@ extern void initialize_logger(bool use_journald = false,
  * timestamp routing, which remain startup-scoped runtime choices.
  */
 extern void refresh_logger_level_from_config();
+// Startup-owned transport state; UDP never changes this native logging choice.
+bool native_journal_available();
 
 #endif // _LOGGING_HPP

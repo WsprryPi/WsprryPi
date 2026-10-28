@@ -19,6 +19,7 @@
 #include "wtp_integration/identity_probe.hpp"
 #include "wtp_settings_json.hpp"
 #include "wtp_integration/usb_logging.hpp"
+#include "udp_logging/host.hpp"
 #include "transmitter_runtime_bridge.hpp"
 #include <utility>
 #include <mutex>
@@ -226,6 +227,12 @@ void register_control(
             result = request.method == "GET" || context
                 ? wtp_runtime_firmware(request.method, request.body)
                 : wsprrypi::PicoHttpResponse{403, R"({"error":{"code":"origin_or_content_type"}})", {}};
+        } else if(request.path=="/api/v1/host/udp-logging/installation") {
+            result=request.method=="GET"?wsprrypi::udp_logging_installation():wsprrypi::PicoHttpResponse{405,R"({"error":{"code":"method_not_allowed"}})",{}};
+        } else if (request.path == "/api/v1/host/udp-logging" || request.path == "/api/v1/udp-logging/capabilities" || request.path == "/api/v1/host/udp-logging/test" || request.path == "/api/v1/host/udp-logging/test/capabilities") {
+            result = request.method != "GET" && !context
+                ? wsprrypi::PicoHttpResponse{403, R"({"error":{"code":"origin_or_content_type"}})", {}}
+                : wsprrypi::udp_logging_api(request.method, request.body, request.get_header_value("If-Match"),request.path.ends_with("/capabilities"),request.path.find("/test")!=std::string::npos);
         } else if (request.path == "/api/v1/host/logging") {
             result = request.method != "GET" && !context
                 ? wsprrypi::PicoHttpResponse{403, R"({"error":{"code":"origin_or_content_type"}})", {}}

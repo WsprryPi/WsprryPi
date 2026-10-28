@@ -268,7 +268,7 @@
         }
 
         const div = document.createElement("div");
-        div.className = "logs-line" + (lineParts.prefix.playback ? " logs-playback" : "");
+        div.className = "logs-line" + (lineParts.prefix.playback ? " logs-playback" : "") + (lineParts.prefix.network ? " logs-network" : "");
 
         const tsSpan = document.createElement("span");
         tsSpan.className = "logs-ts" + (lineParts.prefix.continuation ? " logs-ts-cont" : "");
@@ -767,14 +767,18 @@
     let logStreamInitialized = false;
 
     let selectedSource = "all", selectedSeverity = "7", collectorIdentity = "";
+    let udpPeerAddresses = new Map(), networkSourceWarning = "";
     let collectorSnapshot = null, collectorRevision = null, collectionUncertain = false;
     let paused = false, visibleRecords = [];
-    const cursorStorageKey = () => `log_stream_cursor_v2:${collectorIdentity}:${selectedSource}:${selectedSeverity}`;
-    const validSource = value => /^(all|local|pico:[0-9a-f]{32})$/.test(value);
+    const cursorStorageKey = () => `log_stream_cursor_v3:stream2:playback1:backlog200:${collectorIdentity}:${selectedSource}:${selectedSeverity}:${selectedSource.startsWith("udp:")?udpPeerAddresses.get(selectedSource.split(":")[1])||"unverified":""}`;
+    const validSource = value => /^(all|local|(?:pico|usb):[0-9a-f]{32}|udp:[A-Za-z0-9_-]{1,32}:(?:pico|pi):[0-9a-f]{32}(?::(?:direct|relay))?)$/.test(value);
     const loggingApi = () => (window.WSPRRYPI_PATHS?.sharedApiPath || "/api/v1") + "/host/logging";
     function sourceStatus(text) {
         const status = document.getElementById("logs-source-status");
-        if (status) status.textContent = text;
+        if (status) {
+            const scope = selectedSource.startsWith("udp:") ? selectedSource.split(":") : null;
+            status.textContent = scope ? `${scope[2]} ${scope[3]} via ${scope[1]} · ${scope[4] || "all paths"}. ${text}` : text;
+        }
     }
     function picoDisplayName(id, reportedName, sources = collectorSnapshot) {
         const binding = sources?.sources?.find(row => row.device_id === id);
@@ -788,16 +792,34 @@
     function picoLogUnit(id, reportedName, sources = collectorSnapshot) {
         return `${picoDisplayName(id, reportedName, sources)} [${String(id || "").slice(0,8)}]`;
     }
+    const udpMenuOrigins = new Map();
     function addSource(value, name) {
         const select = document.getElementById("logs-source");
         if (!select || !validSource(value)) return;
-        const id = value.startsWith("pico:") ? value.slice(5) : "";
-        const label = id ? `${picoDisplayName(id, name)} · ${id}` : name;
+        const id = /^(pico|usb):/.test(value) ? value.split(":")[1] : "";
+        const udpParts = value.startsWith("udp:") ? value.split(":") : null;
+        const label = id ? `${picoDisplayName(id, name)} · ${id}` : udpParts ? `${name} · ${udpParts[2]} ${udpParts[3]} · ${udpParts[4] || "all paths"}` : name;
         const existing = [...select.options].find(option => option.value === value);
         if (existing) { existing.textContent = label; return; }
-        if (select.options.length >= 66) return;
+        if (value.startsWith("udp:")) {
+            const parts=value.split(":"), peer=parts[1], origin=parts[2]+":"+parts[3];
+            if (!udpPeerAddresses.has(peer)) return;
+            if ([...udpMenuOrigins].some(([other,origins])=>other!==peer&&[...origins].some(v=>v.endsWith(":"+parts[3]))))
+                sourceStatus("An origin ID is claimed by multiple UDP peers. Their arrival scopes remain separate; these claims are not authenticated.");
+            if ((!udpMenuOrigins.has(peer) && udpMenuOrigins.size >= 32) || (udpMenuOrigins.has(peer) && !udpMenuOrigins.get(peer).has(origin) && udpMenuOrigins.get(peer).size >= 64)) {
+                sourceStatus("More network origins are present than this source list can show. Choose All sources to inspect them."); return;
+            }
+            if (!udpMenuOrigins.has(peer)) udpMenuOrigins.set(peer,new Set());
+            udpMenuOrigins.get(peer).add(origin);
+        }
+        if (select.options.length >= 4106) return;
         const option = document.createElement("option"); option.value = value; option.textContent = label;
         select.appendChild(option);
+    }
+    function rememberJournalSource(payload) {
+        if (!validSource(payload.source || "") || !/^(pico|usb|udp):/.test(payload.source)) return;
+        if (payload.ingress === "udp" && udpPeerAddresses.get(payload.peer_slot) !== payload.peer_ipv4) return;
+        addSource(payload.source, `${payload.origin_name || payload.origin_kind || "Unknown origin"}${payload.ingress === "udp" ? ` via ${payload.peer_slot || "unknown peer"} · UDP claim` : ""}`);
     }
     function collectionStateLabel(state) {
         return ({disabled:"Collection disabled",disconnected:"Disconnected",connecting:"Connecting to Logging port",starting:"Starting log stream",streaming:"Collecting USB logs",
@@ -809,7 +831,7 @@
     }
     function updateCollectionControl() {
         const input = document.getElementById("logs-collect");
-        const id = selectedSource.startsWith("pico:") ? selectedSource.slice(5) : "";
+        const id = /^(pico|usb):/.test(selectedSource) ? selectedSource.split(":")[1] : "";
         const candidate = collectorSnapshot?.candidates?.find(row => row.device_id === id);
         const saved = collectorSnapshot?.sources?.find(row => row.device_id === id);
         if (input) { input.disabled = (!candidate && !saved) || collectionUncertain || (!collectorSnapshot?.journal_available && !saved?.enabled); input.checked = !!saved?.enabled; }
@@ -823,8 +845,9 @@
                 `Pico ${id} · ${collectionStateLabel(state?.state)}` +
                 (state?.rejected && state.rejected !== "0" ? ` · ${state.rejected} rejected records` : "") +
                 (state?.dropped && state.dropped !== "0" ? ` · ${state.dropped} Pico events dropped` : ""));
-        } else sourceStatus("");
+        } else sourceStatus(networkSourceWarning || (selectedSource.startsWith("udp:")?"UDP origin claims are unauthenticated. A spoof can affect its peer scope but cannot suppress verified USB logs.":""));
     }
+    window.addEventListener("wsprry-udp-policy-changed",()=>{void refreshSources();});
     async function refreshSources(review = false) {
         try {
             const response = await fetch(loggingApi(), {cache:"no-store", signal:AbortSignal.timeout(10000)});
@@ -835,21 +858,47 @@
             collectorSnapshot = data; collectorRevision = response.headers.get("ETag");
             const changedCollector = collectorIdentity !== data.collector_id;
             collectorIdentity = data.collector_id;
-            if (changedCollector) changeLogContext();
-            for (const row of (data.attached || []).slice(0,64)) addSource(`pico:${row.device_id}`, row.name || "Attached Pico");
-            for (const row of data.candidates.slice(0,64)) addSource(`pico:${row.device_id}`, row.name || "Pico");
+            const previousPeers=udpPeerAddresses;udpPeerAddresses=new Map();networkSourceWarning="";
+            try {
+                const api=window.WSPRRYPI_PATHS?.sharedApiPath||"/api/v1";
+                const c=await fetch(api+"/udp-logging/capabilities",{cache:"no-store",signal:AbortSignal.timeout(10000)});
+                if(!c.ok)throw Error("Network logging is unavailable");
+                const capabilities=window.WsprryUdp.parseJson(await c.text());
+                if(!window.WsprryUdp.capabilities(capabilities,true)||capabilities.target.collector_id!==collectorIdentity)throw Error("Collector changed");
+                const r=await fetch(api+"/host/udp-logging",{cache:"no-store",signal:AbortSignal.timeout(10000)});
+                if(!r.ok)throw Error("Network policy unavailable");
+                const settings=window.WsprryUdp.parseJson(await r.text());
+                if(!window.WsprryUdp.readback(settings,capabilities,true))throw Error("Invalid network policy");
+                udpPeerAddresses=new Map(settings.saved.collector.peers.map(p=>[p.slot,p.ipv4]));
+            } catch (_) {networkSourceWarning="Network source settings are unavailable. All sources still includes retained network history.";}
+            for(const peer of [...udpMenuOrigins.keys()])if(!udpPeerAddresses.has(peer)||previousPeers.get(peer)!==udpPeerAddresses.get(peer))udpMenuOrigins.delete(peer);
+            const picker=document.getElementById("logs-source");
+            for(const option of [...(picker?.options||[])])if(option.value.startsWith("udp:")) {
+                const peer=option.value.split(":")[1];
+                if(!udpPeerAddresses.has(peer)||previousPeers.get(peer)!==udpPeerAddresses.get(peer))option.remove();
+            }
+            if(selectedSource.startsWith("udp:") && (!udpPeerAddresses.has(selectedSource.split(":")[1]) || previousPeers.get(selectedSource.split(":")[1])!==udpPeerAddresses.get(selectedSource.split(":")[1]))) {
+                selectedSource="all";if(picker)picker.value="all";changeLogContext();
+                networkSourceWarning="The selected peer was removed or its address changed. Its view cursor was reset; other source cursors are unchanged.";
+            }
+            for (const row of (data.attached || []).slice(0,64)) addSource(`usb:${row.device_id}`, row.name || "Attached Pico");
+            for (const row of data.candidates.slice(0,64)) addSource(`usb:${row.device_id}`, row.name || "Pico");
             for (const row of (data.sources || []).slice(0,8))
                 if (!data.candidates.some(candidate => candidate.device_id === row.device_id))
-                    addSource(`pico:${row.device_id}`, "Saved collection policy");
+                    addSource(`usb:${row.device_id}`, "Saved collection policy");
             for (const span of document.querySelectorAll(".logs-unit[data-pico-id]"))
                 span.textContent = `${picoLogUnit(span.dataset.picoId, span.dataset.picoName)} `;
+            // Replay may beat the asynchronous peer-policy read. Rebuild only
+            // from bounded retained records after the current binding is known.
+            for (const payload of visibleRecords) rememberJournalSource(payload);
+            if (changedCollector) changeLogContext();
             if (review) collectionUncertain = false;
             updateCollectionControl();
         } catch (error) { sourceStatus(error.message); }
     }
     async function saveCollection() {
         if (!collectorSnapshot || collectionUncertain) return;
-        const id = selectedSource.slice(5), input = document.getElementById("logs-collect");
+        const id = selectedSource.split(":")[1], input = document.getElementById("logs-collect");
         const candidate = collectorSnapshot.candidates.find(row => row.device_id === id);
         if (!input || input.checked && !candidate) return;
         const sources = collectorSnapshot.sources.filter(row => row.device_id !== id && row.enabled);
@@ -987,6 +1036,7 @@
         url.searchParams.set("playback", "1");
         url.searchParams.set("backlog", "200");
         url.searchParams.set("unit", "wsprrypi.service");
+        url.searchParams.set("stream_version", "2");
         url.searchParams.set("source", selectedSource);
         url.searchParams.set("priority_max", selectedSeverity);
 
@@ -1102,8 +1152,7 @@
                     storeCursor(payload.__CURSOR, contextKey, verifiedContext);
                     visibleRecords.push(payload);
                     if (visibleRecords.length > MAX_LINES) visibleRecords.shift();
-                    if (validSource(payload.source || "") && payload.source.startsWith("pico:"))
-                        addSource(payload.source, payload.origin_name || "Pico");
+                    rememberJournalSource(payload);
                 }
 
                 // If this is the initial SSE connection status and playback is enabled,
@@ -1134,10 +1183,11 @@
                 const msgLines = sev.message.split(/\r?\n/);
 
                 const originUs = typeof payload.origin_utc_ns === "string" ? payload.origin_utc_ns.slice(0,-3) : null;
-                const remote = payload.origin_kind === "pico";
+                const usbPico = payload.origin_kind === "pico" && payload.ingress !== "udp";
+                const remote = payload.origin_kind === "pico" || payload.ingress === "udp";
                 const ts = formatTimestampUTC(originUs ? {...payload,__REALTIME_TIMESTAMP:originUs} : payload) +
                     (remote && !originUs ? " received" : "");
-                const unit = remote ? picoLogUnit(payload.origin_id, payload.origin_name) :
+                const unit = payload.ingress === "udp" ? `${payload.origin_name || "Unknown origin"} [${String(payload.origin_id || "").slice(0,8)}] via ${payload.peer_slot || "unknown peer"} · UDP claim${payload.forwarders && payload.forwarders !== "[]" ? " · relayed" : ""}` : usbPico ? picoLogUnit(payload.origin_id, payload.origin_name) :
                     (payload._SYSTEMD_UNIT ? formatUnitFixed16(String(payload._SYSTEMD_UNIT)) : "");
                 const severity = sev.label;
 
@@ -1149,8 +1199,9 @@
                             prefix: {
                                 timestamp: ts,
                                 unit: unit,
-                                originId: remote ? String(payload.origin_id || "") : "",
-                                originName: remote ? payload.origin_name : "",
+                                network: payload.ingress === "udp",
+                                originId: usbPico ? String(payload.origin_id || "") : "",
+                                originName: usbPico ? payload.origin_name : "",
                                 severity: severity,
                                 severityClass: severityClassFromLabel(severity),
                                 playback: !!payload.playback,
@@ -1175,8 +1226,9 @@
                         prefix: {
                             timestamp: ts,
                             unit: unit,
-                            originId: remote ? String(payload.origin_id || "") : "",
-                            originName: remote ? payload.origin_name : "",
+                            network: payload.ingress === "udp",
+                            originId: usbPico ? String(payload.origin_id || "") : "",
+                            originName: usbPico ? payload.origin_name : "",
                             severity: severity,
                             severityClass: severityClassFromLabel(severity),
                             playback: !!payload.playback,

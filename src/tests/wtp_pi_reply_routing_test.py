@@ -152,9 +152,15 @@ def main(probe):
             with selectors.DefaultSelector() as selector:
                 selector.register(child.stderr, selectors.EVENT_READ)
                 deadline = time.monotonic()+3
+                diagnostics = bytearray()
                 while True:
-                    assert selector.select(max(0, deadline-time.monotonic())), 'capture startup deadline'
-                    if b'listening on' in child.stderr.readline():
+                    remaining = deadline-time.monotonic()
+                    assert remaining > 0 and selector.select(remaining), 'capture startup deadline'
+                    data = os.read(child.stderr.fileno(), 4096)
+                    assert data, ('capture exited before readiness', child.poll(), diagnostics.decode(errors='replace'))
+                    diagnostics.extend(data)
+                    assert len(diagnostics) <= 8192, 'capture startup diagnostics overflow'
+                    if b'listening on' in diagnostics:
                         break
             return child, out, path
 
