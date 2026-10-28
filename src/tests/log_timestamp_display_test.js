@@ -148,3 +148,24 @@ for (const sample of invalidSamples) {
 }
 
 console.log("PASS: log timestamp display regression tests");
+
+// Display aliases never rewrite reported identity or network data.
+const picoId = "a".repeat(32);
+const names = {
+    candidates: [{device_id: picoId, name: "Saved USB Fleet name.local"}],
+    attached: [{device_id: picoId, name: "Other transport Fleet name.local"}]
+};
+const originalNames = JSON.stringify(names);
+requireCondition(hooks.picoDisplayName(picoId, "reported-host.local", names) === "Saved USB Fleet name", "saved USB Fleet name wins over attached and reported names");
+requireCondition(hooks.picoLogUnit(picoId, "reported-host.local", names) === "Saved USB Fleet name [aaaaaaaa]", "log prefix uses the same display name and retains short device identity");
+requireCondition(hooks.picoDisplayName(picoId, "reported-host.local", {attached: names.attached}) === "Other transport Fleet name", "attached saved name remains authoritative without a USB profile");
+requireCondition(hooks.picoDisplayName(picoId, "reported-host.LOCAL") === "reported-host", "unknown source hostname suffix is removed only for display");
+requireCondition(hooks.picoDisplayName(picoId, "host.local.example") === "host.local.example", "nonterminal .local remains intact");
+requireCondition(hooks.picoDisplayName(picoId, "") === "Pico", "missing source name has a readable fallback");
+requireCondition(JSON.stringify(names) === originalNames, "display formatting must not change saved Fleet data");
+const boundNames = {sources: [{device_id: picoId, catalog_id: "selected"}], candidates: [
+    {device_id: picoId, catalog_id: "other", name: "Another USB profile"},
+    {device_id: picoId, catalog_id: "selected", name: "Collected Fleet profile"}
+]};
+requireCondition(hooks.picoDisplayName(picoId, "reported-host.local", boundNames) === "Collected Fleet profile", "collection-bound Fleet name wins when multiple profiles share a device identity");
+console.log("Pico display names: Fleet precedence, hostname suffix and stable ID passed");

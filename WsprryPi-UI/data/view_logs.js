@@ -276,7 +276,11 @@
 
         const unitSpan = document.createElement("span");
         unitSpan.className = "logs-unit";
-        unitSpan.textContent = lineParts.prefix.unit ? `${lineParts.prefix.unit} ` : "";
+        if (lineParts.prefix.originId) {
+            unitSpan.dataset.picoId = lineParts.prefix.originId;
+            unitSpan.dataset.picoName = lineParts.prefix.originName || "";
+            unitSpan.textContent = `${picoLogUnit(unitSpan.dataset.picoId, unitSpan.dataset.picoName)} `;
+        } else unitSpan.textContent = lineParts.prefix.unit ? `${lineParts.prefix.unit} ` : "";
 
         const sevSpan = document.createElement("span");
         sevSpan.className = "logs-sev" + (lineParts.prefix.severityClass ? " " + lineParts.prefix.severityClass : "");
@@ -772,9 +776,23 @@
         const status = document.getElementById("logs-source-status");
         if (status) status.textContent = text;
     }
-    function addSource(value, label) {
+    function picoDisplayName(id, reportedName, sources = collectorSnapshot) {
+        const binding = sources?.sources?.find(row => row.device_id === id);
+        const saved = (binding && sources?.candidates?.find(row => row.device_id === id && row.catalog_id === binding.catalog_id)) ||
+            sources?.candidates?.find(row => row.device_id === id);
+        const attached = sources?.attached?.find(row => row.device_id === id);
+        // Fleet aliases are authoritative; a journal event only supplies a fallback.
+        const name = saved?.name || attached?.name || reportedName || "Pico";
+        return String(name).replace(/\.local$/i, "") || "Pico";
+    }
+    function picoLogUnit(id, reportedName, sources = collectorSnapshot) {
+        return `${picoDisplayName(id, reportedName, sources)} [${String(id || "").slice(0,8)}]`;
+    }
+    function addSource(value, name) {
         const select = document.getElementById("logs-source");
         if (!select || !validSource(value)) return;
+        const id = value.startsWith("pico:") ? value.slice(5) : "";
+        const label = id ? `${picoDisplayName(id, name)} · ${id}` : name;
         const existing = [...select.options].find(option => option.value === value);
         if (existing) { existing.textContent = label; return; }
         if (select.options.length >= 66) return;
@@ -818,11 +836,13 @@
             const changedCollector = collectorIdentity !== data.collector_id;
             collectorIdentity = data.collector_id;
             if (changedCollector) changeLogContext();
-            for (const row of (data.attached || []).slice(0,64)) addSource(`pico:${row.device_id}`, `${row.name || "Attached Pico"} · ${row.device_id}`);
-            for (const row of data.candidates.slice(0,64)) addSource(`pico:${row.device_id}`, `${row.name || "Pico"} · ${row.device_id}`);
+            for (const row of (data.attached || []).slice(0,64)) addSource(`pico:${row.device_id}`, row.name || "Attached Pico");
+            for (const row of data.candidates.slice(0,64)) addSource(`pico:${row.device_id}`, row.name || "Pico");
             for (const row of (data.sources || []).slice(0,8))
                 if (!data.candidates.some(candidate => candidate.device_id === row.device_id))
-                    addSource(`pico:${row.device_id}`, `Saved collection policy · ${row.device_id}`);
+                    addSource(`pico:${row.device_id}`, "Saved collection policy");
+            for (const span of document.querySelectorAll(".logs-unit[data-pico-id]"))
+                span.textContent = `${picoLogUnit(span.dataset.picoId, span.dataset.picoName)} `;
             if (review) collectionUncertain = false;
             updateCollectionControl();
         } catch (error) { sourceStatus(error.message); }
@@ -1083,7 +1103,7 @@
                     visibleRecords.push(payload);
                     if (visibleRecords.length > MAX_LINES) visibleRecords.shift();
                     if (validSource(payload.source || "") && payload.source.startsWith("pico:"))
-                        addSource(payload.source, `${payload.origin_name || "Pico"} · ${payload.origin_id}`);
+                        addSource(payload.source, payload.origin_name || "Pico");
                 }
 
                 // If this is the initial SSE connection status and playback is enabled,
@@ -1117,7 +1137,7 @@
                 const remote = payload.origin_kind === "pico";
                 const ts = formatTimestampUTC(originUs ? {...payload,__REALTIME_TIMESTAMP:originUs} : payload) +
                     (remote && !originUs ? " received" : "");
-                const unit = remote ? `${payload.origin_name || "Pico"} [${String(payload.origin_id || "").slice(0,8)}]` :
+                const unit = remote ? picoLogUnit(payload.origin_id, payload.origin_name) :
                     (payload._SYSTEMD_UNIT ? formatUnitFixed16(String(payload._SYSTEMD_UNIT)) : "");
                 const severity = sev.label;
 
@@ -1129,6 +1149,8 @@
                             prefix: {
                                 timestamp: ts,
                                 unit: unit,
+                                originId: remote ? String(payload.origin_id || "") : "",
+                                originName: remote ? payload.origin_name : "",
                                 severity: severity,
                                 severityClass: severityClassFromLabel(severity),
                                 playback: !!payload.playback,
@@ -1153,6 +1175,8 @@
                         prefix: {
                             timestamp: ts,
                             unit: unit,
+                            originId: remote ? String(payload.origin_id || "") : "",
+                            originName: remote ? payload.origin_name : "",
                             severity: severity,
                             severityClass: severityClassFromLabel(severity),
                             playback: !!payload.playback,
@@ -1320,7 +1344,7 @@
             formatTimestampUTC,
             extractSeverityAndMessage,
             formatUnitFixed16,
-            priorityToLabel, buildStreamUrl, cursorStorageKey, validSource
+            priorityToLabel, buildStreamUrl, cursorStorageKey, validSource, picoDisplayName, picoLogUnit
         };
     }
 

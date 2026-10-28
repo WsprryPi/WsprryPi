@@ -47,7 +47,7 @@ class CdpClient {
 
 
 const a='a'.repeat(32), b='b'.repeat(32), host='c'.repeat(32), urls=[];
-const candidates=[{catalog_id:'1'.repeat(32),device_id:a,name:'Pico A (fixture)'},{catalog_id:'2'.repeat(32),device_id:b,name:'Pico B (fixture)'}];
+const candidates=[{catalog_id:'1'.repeat(32),device_id:a,name:'Pico A (fixture)'},{catalog_id:'2'.repeat(32),device_id:b,name:'bench-b.local'}];
 let policy={schema:'host-usb-logging/1',collector_id:host,sources:[],candidates,journal_available:true,status:{[a]:{state:'streaming',rejected:'0'},[b]:{state:'disconnected',rejected:'2'}}};
 const rows=[{source:'local',origin_kind:'pi',MESSAGE:'Pi service ready (synthetic fixture)',__CURSOR:'pi-1'},
  {source:`pico:${a}`,origin_kind:'pico',origin_id:a,origin_name:'pico-a.local',origin_boot:'4'.repeat(32),origin_sequence:'9007199254740993',origin_utc_ns:null,MESSAGE:'Pico A USB logging active (synthetic fixture)',__CURSOR:'a-1'},
@@ -56,7 +56,8 @@ const server=http.createServer((req,res)=>{
  const url=new URL(req.url,'http://fixture');
  if(url.pathname==='/api/v1/host/logging'){
   if(req.method==='PUT'){let body='';req.on('data',data=>body+=data);req.on('end',()=>{const next=JSON.parse(body);policy={...policy,sources:next.sources};res.setHeader('ETag','"logging2"');res.end(JSON.stringify(policy));});return;}
-  res.setHeader('Content-Type','application/json');res.setHeader('ETag','"logging1"');res.end(JSON.stringify(policy));return;
+  res.setHeader('Content-Type','application/json');res.setHeader('ETag','"logging1"');
+  setTimeout(()=>res.end(JSON.stringify(policy)),150);return;
  }
  if(url.pathname==='/log_stream.php'){
   urls.push(req.url);res.writeHead(200,{'Content-Type':'text/event-stream','Cache-Control':'no-cache'});
@@ -89,6 +90,10 @@ async function main(){
   await client.send('Page.addScriptToEvaluateOnNewDocument',{source:`window.WebSocket=class{static OPEN=1;static CONNECTING=0;readyState=0;addEventListener(){}close(){}};localStorage.setItem('wsprrypi.updateCheckDisabled','true');window.WSPRRYPI_ENABLE_LOG_TEST_HOOKS=true;`});
   await client.send('Page.navigate',{url:`http://127.0.0.1:${server.address().port}/index.php?page=logs`});
   await until(()=>evaluate(`document.querySelectorAll('#all .logs-line').length===3 && document.getElementById('logs-source').options.length===4`));
+  await until(()=>evaluate(`document.querySelector('#all .logs-unit[data-pico-id="${a}"]')?.textContent==='Pico A (fixture) [aaaaaaaa] '`));
+  assert.equal(await evaluate(`document.querySelector('#logs-source option[value="pico:${a}"]').textContent`),`Pico A (fixture) · ${a}`,'Incoming hostname must not replace the Fleet alias');
+  assert.equal(await evaluate(`document.querySelector('#logs-source option[value="pico:${b}"]').textContent`),`bench-b · ${b}`,'Only display text omits terminal .local');
+  assert.equal(await evaluate(`document.querySelector('#all .logs-unit[data-pico-id="${b}"]').textContent`),'bench-b [bbbbbbbb] ');
   assert(await evaluate(`document.querySelector('#all .logs-msg').textContent.includes('Pi service ready')`));
   assert(await evaluate(`document.getElementById('logs-source-status').textContent==='' && document.getElementById('logs-source-status').getBoundingClientRect().height===0`),'Routine source caption must reclaim its vertical space');
   assert(await evaluate(`!document.querySelector('#all script') && document.getElementById('all').textContent.includes('<script>')`));
@@ -96,6 +101,7 @@ async function main(){
    await client.send('Emulation.setDeviceMetricsOverride',{width,height,deviceScaleFactor:1,mobile:width<600});
    await evaluate(`document.documentElement.dataset.bsTheme='${theme}'`);await wait(150);
    assert(await evaluate(`document.documentElement.scrollWidth<=${width}`),name+' horizontal overflow');
+   assert(await evaluate(`Array.from(document.querySelectorAll('.logs-unit[data-pico-id]')).every(row=>row.scrollWidth<=row.clientWidth)`),name+' Pico name and bracketed ID must remain visible');
    const shot=await client.send('Page.captureScreenshot',{format:'png'});fs.writeFileSync(path.join(evidence,name+'.png'),Buffer.from(shot.data,'base64'));
   }
   const select=async source=>{await evaluate(`document.getElementById('logs-source').value=${JSON.stringify(source)};document.getElementById('logs-source').dispatchEvent(new Event('change'));`);await until(()=>evaluate(`document.querySelectorAll('#all .logs-line').length===1`));};
@@ -107,7 +113,14 @@ async function main(){
   const before=urls.length;await evaluate(`document.getElementById('logs-pause').click()`);await wait(100);assert.equal(urls.length,before);
   assert.equal(await evaluate(`document.getElementById('btn-reconnect').textContent`),'Resume view');
   await evaluate(`window.dispatchEvent(new Event('online'))`);await wait(100);assert.equal(urls.length,before,'Online recovery must preserve explicit pause');
+  candidates[0].name='Renamed Pico A (fixture)';
+  await evaluate(`document.getElementById('logs-refresh-sources').click()`);
+  await until(()=>evaluate(`document.querySelector('#all .logs-unit[data-pico-id="${a}"]')?.textContent==='Renamed Pico A (fixture) [aaaaaaaa] '`));
+  assert.equal(urls.length,before,'Name refresh must preserve pause and stream cursor');
+  assert.equal(await evaluate(`document.querySelector('#logs-source option[value="pico:${a}"]').textContent`),`Renamed Pico A (fixture) · ${a}`);
   await evaluate(`document.getElementById('btn-reconnect').click()`);await until(()=>urls.length>before);
+  await until(()=>evaluate(`document.querySelector('#all .logs-unit[data-pico-id="${a}"]')?.textContent==='Renamed Pico A (fixture) [aaaaaaaa] '`));
+  assert.equal(await evaluate(`document.querySelector('#logs-source option[value="pico:${a}"]').textContent`),`Renamed Pico A (fixture) · ${a}`,'Replayed events must not overwrite the saved name');
   await evaluate(`document.getElementById('logs-collect').click()`);await until(()=>Promise.resolve(policy.sources.length===1));assert.equal(policy.sources[0].device_id,a);
   policy={...policy,candidates:candidates.filter(row=>row.device_id!==a)};
   await evaluate(`document.getElementById('logs-refresh-sources').click()`);await wait(150);
@@ -125,7 +138,8 @@ async function main(){
    const metrics=await client.send('Page.getLayoutMetrics');const shot=await client.send('Page.captureScreenshot',{format:'png',captureBeyondViewport:true,clip:{x:0,y:0,width,height:metrics.cssContentSize.height,scale:1}});fs.writeFileSync(path.join(evidence,name+'.png'),Buffer.from(shot.data,'base64'));
   }
   policy={...policy,attached:[{device_id:'d'.repeat(32),name:'Attached Pico (fixture)'}]};
-  await evaluate(`document.getElementById('logs-refresh-sources').click()`);await wait(150);
+  await evaluate(`document.getElementById('logs-refresh-sources').click()`);
+  await until(()=>evaluate(`Array.from(document.getElementById('logs-source').options).some(row=>row.value==='pico:'+ 'd'.repeat(32))`));
   assert(await evaluate(`Array.from(document.getElementById('logs-source').options).some(row=>row.value==='pico:'+ 'd'.repeat(32))`));
   await evaluate(`document.getElementById('logs-source').value='pico:'+ 'd'.repeat(32);document.getElementById('logs-source').dispatchEvent(new Event('change'))`);await wait(150);
   assert(await evaluate(`document.getElementById('logs-collect').disabled && document.getElementById('logs-source-status').textContent.includes('Fleet')`));
@@ -136,7 +150,19 @@ async function main(){
    assert(await evaluate(`document.documentElement.scrollWidth<=${width}`));
    const metrics=await client.send('Page.getLayoutMetrics');const shot=await client.send('Page.captureScreenshot',{format:'png',captureBeyondViewport:true,clip:{x:0,y:0,width,height:metrics.cssContentSize.height,scale:1}});fs.writeFileSync(path.join(evidence,name+'.png'),Buffer.from(shot.data,'base64'));
   }
-  console.log('USB Logs browser: source isolation, cursor scope, pause/resume, collection save, injection resistance and four rendered viewports passed');
+  rows.push({source:`pico:${'e'.repeat(32)}`,origin_kind:'pico',origin_id:'e'.repeat(32),origin_name:'unknown.LOCAL',MESSAGE:'Unregistered hostname fixture',__CURSOR:'e-1'});
+  rows.push({source:`pico:${'f'.repeat(32)}`,origin_kind:'pico',origin_id:'f'.repeat(32),origin_name:'lab.local.example',MESSAGE:'Nonterminal suffix fixture',__CURSOR:'f-1'});
+  await evaluate(`document.getElementById('logs-source').value='all';document.getElementById('logs-source').dispatchEvent(new Event('change'))`);
+  await until(()=>evaluate(`document.querySelectorAll('#all .logs-line').length===5`));
+  assert.equal(await evaluate(`document.querySelector('#all .logs-unit[data-pico-id="${'e'.repeat(32)}"]').textContent`),'unknown [eeeeeeee] ');
+  assert.equal(await evaluate(`document.querySelector('#logs-source option[value="pico:${'e'.repeat(32)}"]').textContent`),`unknown · ${'e'.repeat(32)}`);
+  assert.equal(await evaluate(`document.querySelector('#all .logs-unit[data-pico-id="${'f'.repeat(32)}"]').textContent`),'lab.local.example [ffffffff] ');
+  const exported=await evaluate(`(async()=>{const original=URL.createObjectURL;URL.createObjectURL=blob=>{window.exportedLogs=blob;return original.call(URL,blob)};document.getElementById('logs-export').click();return await window.exportedLogs.text()})()`);
+  const exportedRows=exported.trim().split('\n').map(JSON.parse);
+  assert.equal(exportedRows.find(row=>row.origin_id===a).origin_name,'pico-a.local','Exports retain reported names, not Fleet aliases');
+  assert.equal(exportedRows.find(row=>row.origin_id==='e'.repeat(32)).origin_name,'unknown.LOCAL','Display formatting must not mutate records');
+  assert.equal(candidates[1].name,'bench-b.local','Display formatting must not modify Fleet names');
+  console.log('USB Logs browser: stable Fleet aliases, live rename, hostname display/export separation, source isolation, pause/resume and four rendered viewports passed');
  }finally{client?.close();if(chrome)await stopIsolatedProcess(chrome);await new Promise(resolve=>server.close(resolve));}
 }
 main().catch(error=>{console.error(error);process.exitCode=1;});

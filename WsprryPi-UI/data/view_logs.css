@@ -321,6 +321,11 @@
         scrollbar-width: thin;
     }
 
+    .logs-unit[data-pico-id] {
+        white-space: normal;
+        overflow-wrap: anywhere;
+    }
+
     .logs-sev {
         grid-column: 2;
     }
