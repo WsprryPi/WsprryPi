@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Lee Bussy
 #include "wtp_integration/tls.hpp"
+#include <openssl/crypto.h>
+#include <openssl/err.h>
 #include <chrono>
 #include <iostream>
 #include <thread>
@@ -9,6 +11,11 @@ std::uint64_t now() {
   return std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now().time_since_epoch()).count();
 }
 int main(int argc, char **argv) {
+  if (argc == 2 && std::string(argv[1]) == "--version") {
+    std::cout << "headers: " << OPENSSL_VERSION_TEXT << "; runtime: "
+              << OpenSSL_version(OPENSSL_VERSION) << '\n';
+    return 0;
+  }
   if (argc != 8) return 2;
   try {
     TlsSelection selection{argv[1], argv[2], argv[4], argv[5], argv[6], static_cast<unsigned>(std::stoul(argv[3]))};
@@ -16,7 +23,10 @@ int main(int argc, char **argv) {
     TlsStream stream(now, TlsStream::Access::LoopbackTest);
     if (!stream.begin_open(selection, credentials, "http/1.1")) throw std::runtime_error("open failed");
     while (stream.opening()) { stream.poll_open(); std::this_thread::sleep_for(std::chrono::milliseconds(1)); }
-    if (!stream.ready()) throw std::runtime_error(stream.observation().diagnostic);
+    if (!stream.ready()) {
+      ERR_print_errors_fp(stderr);
+      throw std::runtime_error(stream.observation().diagnostic);
+    }
     if (std::string(argv[7]) == "backpressure") {
       std::array<std::uint8_t, 4096> block{};
       std::size_t accepted = 0; bool blocked = false;

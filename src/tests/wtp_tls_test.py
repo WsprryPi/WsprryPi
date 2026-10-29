@@ -14,9 +14,16 @@ build = pathlib.Path(sys.argv[1]).resolve()
 credentials = build / 'tls-fixtures'
 os.umask(0o077)
 credentials.mkdir(parents=True, exist_ok=True)
+prefix = subprocess.check_output(['pkg-config', '--variable=prefix', 'openssl'], text=True).strip()
+openssl_tool = pathlib.Path(prefix) / 'bin/openssl'
+if not prefix or not openssl_tool.is_file():
+    raise RuntimeError(f'The selected OpenSSL development package needs its fixture tool: {openssl_tool}')
+print('TLS fixture tool:', subprocess.check_output([str(openssl_tool), 'version'], text=True).strip(), flush=True)
+print('TLS fixture server:', ssl.OPENSSL_VERSION, flush=True)
+subprocess.run([str(build / 'wtp_tls_probe'), '--version'], check=True)
 
 def openssl(*args):
-    subprocess.run(['openssl', *args], cwd=credentials, check=True, capture_output=True)
+    subprocess.run([str(openssl_tool), *args], cwd=credentials, check=True, capture_output=True)
 
 openssl('req', '-x509', '-newkey', 'ec', '-pkeyopt', 'ec_paramgen_curve:P-256', '-nodes',
         '-keyout', 'ca.key', '-out', 'ca.crt', '-days', '2', '-subj', '/CN=Temporary host tests',
@@ -62,6 +69,7 @@ class Server:
         self.socket.settimeout(.1)
         self.port = self.socket.getsockname()[1]
         self.stop = threading.Event()
+        self.errors = []
         self.backpressure = backpressure
         self.stall, self.abrupt, self.large = stall, abrupt, large
         self.thread = threading.Thread(target=self.run)
@@ -93,8 +101,8 @@ class Server:
                         body = b'x' * (16384 if self.large else 17)
                         message = b'HTTP/1.1 200 OK\r\nContent-Length: ' + str(len(body)).encode() + b'\r\n\r\n' + body
                         for pos in range(0, len(message), 31): tls.sendall(message[pos:pos+31])
-                except (ssl.SSLError, OSError):
-                    pass
+                except (ssl.SSLError, OSError) as error:
+                    self.errors.append(str(error))
     def close(self):
         self.stop.set()
         self.socket.close()
@@ -104,10 +112,11 @@ class Server:
 count = 0
 def probe(server, success, host='127.0.0.1', identity='127.0.0.1', cert='client', key=None, ca='ca', mode='/'):
     global count
+    errors_before = len(server.errors)
     result = subprocess.run([str(build / 'wtp_tls_probe'), host, identity, str(server.port),
         str(credentials / (ca + '.crt')), str(credentials / (cert + '.crt')), str(credentials / ((key or cert) + '.key')), mode],
         capture_output=True, text=True, timeout=25)
-    assert (result.returncode == 0) == success, (host, identity, cert, result.stderr)
+    assert (result.returncode == 0) == success, (host, identity, cert, result.stderr, server.errors[errors_before:])
     assert 'PRIVATE KEY' not in result.stdout + result.stderr
     count += 1
 

@@ -42,10 +42,18 @@ jobs:
     needs: change_scope
     if: ${{ !cancelled() && (needs.change_scope.result != 'success' || needs.change_scope.outputs.run_full_ci != 'false') }}
     runs-on: macos-15
-    timeout-minutes: 10
+    timeout-minutes: 15
     steps:
       - name: Check out source
         uses: actions/checkout@v7
+
+      - name: Select OpenSSL 4 development and fixture tools
+        run: |
+          brew install openssl@4
+          macos_openssl_prefix=$(brew --prefix openssl@4)
+          echo "${macos_openssl_prefix}/bin" >> "$GITHUB_PATH"
+          echo "PKG_CONFIG_PATH=${macos_openssl_prefix}/lib/pkgconfig" >> "$GITHUB_ENV"
+          "${macos_openssl_prefix}/bin/openssl" version
 
       - name: Check bounded USB logging parser and policy
         working-directory: src
