@@ -1,6 +1,6 @@
 # UDP syslog coordinated work
 
-Status: implementation and finite runtime acceptance passed, 2026-10-28; coordinated publication is tracked in the canonical Pico backlog. The [canonical Pico proposal](https://github.com/WsprryPi/WsprryPico/blob/devel/engineering/development/udp-syslog-proposal.md) records the reviewed design, closed resource shapes, resource budgets, review findings and acceptance matrix. The [implementation contract](udp-logging.md) and linked qualification record describe the resulting behavior and actual acceptance evidence. This is a linked Pi deliverable, not a second feature authority.
+The [Pico UDP logging contract](https://github.com/WsprryPi/WsprryPico/blob/devel/engineering/development/udp-logging.md) defines the implemented shared wire profile, independent resources, resource bounds and validation applicability. The [Pi implementation contract](udp-logging.md) defines the host worker, service and UI. Selected work is maintained in the canonical Pico backlog.
 
 ## Pi and first-party UI deliverables
 
@@ -12,8 +12,4 @@ Status: implementation and finite runtime acceptance passed, 2026-10-28; coordin
 - [x] Extend codec, USB logging, native event redaction, service/installer, journal/SSE and browser tests. Exercise the complete current `.github/workflows/debian-non-hardware.yml` network and actual USB pair recipes with explicit candidate Pico sources and pinned TLS dependencies. Neither mocks nor old green CI close this gate.
 - [x] Coordinate the linked WsprryPi-Docs TODO and Pico operator documentation; run finite RF-inhibited native Pi → collector and physical USB Pico → member → collector campaigns, record exact identities/images/configuration and restore the setup. Record both source revisions, tested dirty changes and CI links before feature acceptance.
 
-The UI is ordinary tracked parent content at `WsprryPi-UI`, not a submodule. All deliverables above passed their software and finite runtime gates. The [qualification record](https://github.com/WsprryPi/WsprryPico/blob/devel/engineering/development/udp-logging-qualification.md) records exact sources, tested images, actual packet/journal counts and restored host/device state; it does not qualify RF behavior.
-
-## Proposal validation
-
-The original design inspection used Pi `d89e7062e891c80ba933aa63b6bbb0b5295cf831` and Pico `6e8e1afd4ba5532602669947dd540781b03aeae8`. The canonical proposal records two in-thread adversarial assessments and corrections; no independent review is claimed. Proposal validation covered links/anchors, source paths, wire-size arithmetic, schema/identity consistency and whitespace. The later implementation and acceptance sources are recorded separately in the qualification record.
+The UI is ordinary tracked parent content at `WsprryPi-UI`. The [source-bound validation applicability](https://github.com/WsprryPi/WsprryPico/blob/devel/engineering/development/udp-logging.md#validation-and-applicability) identifies the retained software and physical scope; it does not qualify RF behavior.
