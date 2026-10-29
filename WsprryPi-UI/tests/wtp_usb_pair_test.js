@@ -63,6 +63,13 @@ const {browser,reply,target}=require("./wtp_usb_settings_test.js");
         const selectedDial=await request({raw_resource:'standalone-frequency',method:'PUT',revision:dial.etag,
             body:JSON.stringify({schema:'transmitter-standalone-frequency/1',target,frequency_hz:3568737})});
         assert.equal(selectedDial.status,200,JSON.stringify(selectedDial));assert.equal(selectedDial.body.frequency_hz,3568737);
+        // An incomplete saved draft and Pico-owned hostname are independent of applied station settings.
+        const independentDraft=await request({raw_resource:'progress/2'});
+        const savedDraft=await request({raw_resource:'progress/update/2',method:'POST',revision:independentDraft.etag,
+            body:JSON.stringify({schema:'transmitter-progress/2',target,request_id:'a'.repeat(32),fields:{callsign:'BB1BB',locator:null}})});
+        assert.equal(savedDraft.status,200,JSON.stringify(savedDraft));assert.equal(savedDraft.body.station_complete,false);
+        const hostname=await request({method:'GET',path:'/api/v1/member/hostname',body:''});
+        assert.equal(hostname.status,200,JSON.stringify(hostname));assert.match(JSON.stringify(hostname.body),/usb-bench\.local/);
         for(const mode of ['put','merge','replace']) {
             const read=await request({raw_resource:'config/2'});assert.equal(read.status,200,JSON.stringify(read));
             const config=mode==='merge'?{expires_utc_s:1900000000}:read.body.config;
@@ -75,6 +82,15 @@ const {browser,reply,target}=require("./wtp_usb_settings_test.js");
             assert.equal(view.body.recurrence.schedule_dial_frequency_nhz,'3568737000000000');
             assert.equal(view.body.recurrence.enabled,false);
             assert(!Object.hasOwn(saved.body.config,'wspr_dial_frequency_hz'));
+            assert.equal(saved.body.config.station.callsign,'K1ABC');
+            const retainedDraft=await request({raw_resource:'progress/2'});
+            assert.equal(retainedDraft.status,200,JSON.stringify(retainedDraft));
+            assert.deepEqual(retainedDraft.body.fields,savedDraft.body.fields);
+            assert.equal(retainedDraft.body.draft_revision,savedDraft.body.draft_revision);
+            const retainedHostname=await request({method:'GET',path:'/api/v1/member/hostname',body:''});
+            assert.equal(retainedHostname.status,200,JSON.stringify(retainedHostname));
+            assert.deepEqual(retainedHostname.body,hostname.body);
+
             const stale=await request({raw_resource:'standalone-frequency',method:'PUT',revision:read.etag,
                 body:JSON.stringify({schema:'transmitter-standalone-frequency/1',target,frequency_hz:14095600})});
             assert.equal(stale.status,412,JSON.stringify(stale));

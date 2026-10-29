@@ -119,10 +119,12 @@ jobs:
           CHROME_BIN: /usr/bin/google-chrome
         run: |
           cmake -S src/build/network-reference/pico -B src/build/network-reference/pico-browser -DWSPRRY_PICO_BUILD_FIRMWARE=OFF -DWSPRRY_PICO_BUILD_TESTS=ON -DCMAKE_BUILD_TYPE=Debug -DWSPRRY_PICO_TEST_MBEDTLS_PATH="$PWD/src/build/network-reference/mbedtls"
-          cmake --build src/build/network-reference/pico-browser --target consumer_session_driver -j2
+          cmake --build src/build/network-reference/pico-browser --target consumer_session_driver consumer_bootstrap_driver -j2
           npm --prefix src/build/network-reference/pico/src/network/bootstrap_web ci --ignore-scripts
           node src/build/network-reference/pico/tests/consumer_sessions.test.mjs src/build/network-reference/pico-browser/consumer_session_driver
           node src/build/network-reference/pico/tests/operator_cleanup_browser.mjs src/build/network-reference/pico-browser/consumer_session_driver
+          PROGRESS_BROWSER_NO_CAPTURE=1 node src/build/network-reference/pico/tests/progress_browser_integration.mjs src/build/network-reference/pico-browser/consumer_bootstrap_driver
+          node src/build/network-reference/pico/tests/consumer_recovery_browser.mjs src/build/network-reference/pico-browser/consumer_bootstrap_driver
       - name: Prove edited Pico source selection and genuine build failures
         run: python3 -B scripts/tests/pico_source_selection_test.py src/build/network-reference/pico src/build/network-reference/mbedtls
       - name: Verify selected-interface WTP replies under equal-metric route changes

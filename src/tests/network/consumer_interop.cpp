@@ -8,6 +8,7 @@
 #include "network_support.hpp"
 #include "standalone/progress.hpp"
 #include "provisioning/consumer_profile.hpp"
+#include "provisioning/hostname.hpp"
 #include "wtp_integration/application.hpp"
 #include "wtp_integration/browser_api.hpp"
 #include "wtp_integration/configuration.hpp"
@@ -499,6 +500,93 @@ void recovery_cases() {
 
 // Current closed configuration resources retain independent standalone WSPR
 // dial selection for ordinary PUT, merge and replace, without snapshot producers.
+struct HostnamePlatform : pico::provisioning::ConsumerClaimCommitPlatform {
+  bool safe_to_commit() override { return true; }
+  std::uint64_t monotonic_now_ms() override { return 1000; }
+  bool station_ready(std::string_view) override { return true; }
+  std::optional<std::uint64_t> trusted_utc_now() override { return {}; }
+  std::string_view local_hostname() override {
+    return "wsprrypico-0a60df.local";
+  }
+  bool valid_owner_point(std::string_view) override { return false; }
+  bool generate_tls(std::string_view, std::string_view, std::uint64_t,
+                    pico::provisioning::ConsumerTls &) override {
+    return false;
+  }
+  bool valid_tls(const pico::provisioning::ConsumerTls &, std::string_view,
+                 std::uint64_t) override {
+    return false;
+  }
+};
+
+void hostname_progress_preservation_cases() {
+  for (const bool ap : {false, true}) {
+    Test t;
+    auto &progress = t.progress;
+    const auto fields =
+        pico::wtp::json::parse(R"({"callsign":"BB1BB","locator":null})");
+    assert(progress.save(*fields, std::string(64, 'a')));
+    const auto saved_draft = progress.fields();
+    const auto saved_sequence = progress.sequence();
+    HostnamePlatform platform;
+    const auto active = t.runtime.consumer_profile()->tls.hostname;
+    pico::provisioning::HostnameSettings settings(
+        t.profiles, t.runtime, platform, device, active, active);
+    t.f.api.hostname_settings(settings);
+    if (ap) {
+      t.authority = "192.168.4.1";
+      t.origin = "http://192.168.4.1";
+      t.interface = pico::network::ConsumerInterface::AccessPoint;
+    }
+    auto c = t.client();
+    const auto carrier = ap ? "consumer_ap" : "consumer_station";
+    assert(c->login(device, carrier, "test-password").status == 200);
+    const auto exchanges_before = t.exchanges;
+    const auto unsupported = pi::pico_resource_request(
+        [&](auto p, auto m, auto b, auto e) { return c->request(p, m, b, e); },
+        c->device(), c->boot(), "hostname", "PUT", "{}", "", carrier,
+        c->generation());
+    assert(unsupported.status == 404 && t.exchanges == exchanges_before);
+    assert(c->request("hostname", "GET", {}, {}).status == 404);
+    assert(c->request("hostname", "PUT", "{}", {}).status == 404);
+    assert(t.exchanges == exchanges_before);
+    // Hostname belongs to the Pico profile. Rename through its production
+    // coordinator; authenticated HTTP saves are covered by hostname_sessions.
+    assert(settings.save(std::string{"pico-a.local"}).empty());
+    assert(Json::parse(settings.readback(c->boot()))["pending_restart"] ==
+           true);
+    assert(t.runtime.consumer_profile()->tls.hostname == "pico-a.local");
+    t.f.api.management_availability({pico::network::ManagementProfile::Consumer,
+                                     t.profiles.sequence(), true, false, false,
+                                     true, true});
+    assert(t.coordinated(*c).status !=
+           200); // Old generation cannot keep its session.
+    t.host.now += 1000;
+    c = t.client();
+    assert(c->login(device, carrier, "test-password").status == 200);
+    auto config = t.coordinated(*c);
+    assert(config.status == 200);
+    // The production Pi configuration coordinator must preserve both
+    // independent stores.
+    const auto value = Json::parse(config.body);
+    const Json edit = {{"schema", "wsprrypi-pico-settings/1"},
+                       {"target", value["target"]},
+                       {"operation", "save"},
+                       {"config", {{"allow_non_amateur_frequency", true}}}};
+    assert(t.coordinated(*c, "POST", edit.dump(), config.etag).status == 200);
+    assert(t.runtime.consumer_profile()->tls.hostname == "pico-a.local");
+    assert(t.f.store.watermark() == 1791970000000000000ULL && t.wtp.io == 0);
+    assert(progress.fields() == saved_draft &&
+           progress.sequence() == saved_sequence);
+    assert(t.f.store.config()->callsign != "BB1BB");
+    assert(c->request("progress", "GET", {}, {}).status == 200);
+    std::cout << carrier
+              << " Pi relogin/read/save retains Pico-owned hostname and "
+                 "incomplete saved progress"
+              << std::endl;
+  }
+}
+
 void configuration_write_preservation_cases() {
   for (const bool ap : {false, true}) for (const std::string mode : {"put", "merge", "replace"}) {
     Test t;
@@ -1052,6 +1140,7 @@ int main(int argc, char **argv) {
   alias_fixed_vector(recovery_vectors);
   std::cout << "Consumer-Recovery/1 fixed AEAD/HKDF and native selector vectors passed\n";
   configuration_write_preservation_cases();
+  hostname_progress_preservation_cases();
   retirement_job_authority_cases();
   local_retirement_refusal_cases();
   runtime_recovery_continuity_cases();

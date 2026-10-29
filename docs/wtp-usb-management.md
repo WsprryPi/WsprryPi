@@ -162,11 +162,7 @@ make wtp-production-test BACKENDS=simulated ANCILLARY_GPIO=0 SUDO=
 node ../WsprryPi-UI/tests/wtp_usb_settings_test.js
 ```
 
-Use an identified Linux environment for C++ builds. The actual-pair runner
-builds wtp-usb-pair-client-build and Pico's usb_management_driver. It executes
-production Pi framing/browser/configuration adapters against production Pico
-USB/application/time handlers over fragmented anonymous pipes with erased
-volatile flash and no network. Run the UI producer with the executable pair:
+Use an identified Linux environment for C++ builds. The actual-pair runner builds wtp-usb-pair-client-build and Pico's usb_management_driver. It executes production Pi framing/browser/configuration adapters against production Pico USB/application/time handlers over fragmented anonymous pipes with erased volatile flash and no network. The pair verifies that PUT, merge and replace preserve the Pico-owned hostname and an incomplete saved draft independently of the applied station. Run the UI producer with the executable pair:
 
 ```sh
 node WsprryPi-UI/tests/wtp_usb_pair_test.js   src/build/wtp-network/wtp_usb_pair_client /absolute/path/to/usb_management_driver
