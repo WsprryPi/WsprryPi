@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 #include "wtp_integration/tls.hpp"
 #include "wtp_settings_json.hpp"
+#include <openssl/pem.h>
 #include <algorithm>
 #include <chrono>
 #include <condition_variable>
@@ -26,6 +27,41 @@ int main(int argc, char **argv) {
     TlsSelection selection{"pico-test.local", {}, dir + "/ca.crt", dir + "/client.crt", dir + "/client.key", 18444};
     auto credentials = std::make_shared<TlsCredentials>(selection);
     CHECK(credentials->matches(TlsCredentials(selection)));
+    // Local credential loading must reject malformed and non-RFC5280 dates,
+    // even when a general ASN.1 time parser accepts their wider syntax.
+    const auto reject_date = [&](bool start, int type, const std::string &value) {
+      std::unique_ptr<BIO, decltype(&BIO_free)> input(
+          BIO_new_file(selection.certificate_file.c_str(), "r"), BIO_free);
+      CHECK(input);
+      std::unique_ptr<X509, decltype(&X509_free)> certificate(
+          PEM_read_bio_X509(input.get(), nullptr, nullptr, nullptr), X509_free);
+      CHECK(certificate);
+      std::unique_ptr<ASN1_TIME, decltype(&ASN1_TIME_free)> date(
+          ASN1_STRING_type_new(type), ASN1_TIME_free);
+      CHECK(date && ASN1_STRING_set(date.get(), value.data(), value.size()) == 1);
+      CHECK((start ? X509_set1_notBefore : X509_set1_notAfter)(certificate.get(), date.get()) == 1);
+      CHECK(i2d_re_X509_tbs(certificate.get(), nullptr) > 0);
+      auto invalid = selection; invalid.certificate_file = dir + "/invalid-time.crt";
+      {
+        std::unique_ptr<BIO, decltype(&BIO_free)> output(
+            BIO_new_file(invalid.certificate_file.c_str(), "w"), BIO_free);
+        CHECK(output && PEM_write_bio_X509(output.get(), certificate.get()) == 1);
+      }
+      bool rejected = false;
+      try { (void)TlsCredentials(invalid); }
+      catch (const std::runtime_error &e) {
+        rejected = std::string(e.what()).find("invalid or outside its validity period") != std::string::npos;
+      }
+      std::filesystem::remove(invalid.certificate_file);
+      if (!rejected) throw std::runtime_error("Certificate date was not rejected: " + value);
+    };
+    for (const bool start : {false, true}) {
+      reject_date(start, V_ASN1_UTCTIME, "not-a-time");
+      reject_date(start, V_ASN1_UTCTIME, "201301000000Z");
+      reject_date(start, V_ASN1_UTCTIME, start ? "2001010000Z" : "4901010000Z");
+      reject_date(start, V_ASN1_UTCTIME, start ? "200101000000+0000" : "490101000000+0000");
+      reject_date(start, V_ASN1_GENERALIZEDTIME, start ? "20200101000000.1Z" : "20900101000000.1Z");
+    }
     auto alternate = selection; alternate.certificate_file = dir + "/other.crt"; alternate.key_file = dir + "/other.key";
     CHECK(!credentials->matches(TlsCredentials(alternate)));
     auto rotated = selection;
@@ -152,6 +188,7 @@ int main(int argc, char **argv) {
       CHECK(rejected);
     }
     CHECK(wtp_settings_json(s).dump().find("PRIVATE KEY") == std::string::npos);
-    std::cout << "TLS resolver deadlines/cancellation/address refresh, production guard, credential fingerprints and legacy/settings round trips passed\n";
+    std::cout << "TLS certificate-date rejection, resolver deadlines/cancellation/address refresh, production guard, credential fingerprints and legacy/settings round trips passed with "
+              << OpenSSL_version(OPENSSL_VERSION) << '\n';
   } catch (const std::exception &e) { std::cerr << e.what() << '\n'; return 1; }
 }

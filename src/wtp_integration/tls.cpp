@@ -14,6 +14,7 @@
 #include <cerrno>
 #include <cstdlib>
 #include <cstring>
+#include <ctime>
 #include <fcntl.h>
 #include <mutex>
 #include <netdb.h>
@@ -132,6 +133,18 @@ bool literal(const std::string &s) {
   return inet_pton(AF_INET, s.c_str(), &value) == 1 ||
          inet_pton(AF_INET6, s.c_str(), &value) == 1;
 }
+int compare_certificate_time(const ASN1_TIME *value, std::time_t now) {
+  if (!value) return -2;
+  const auto type = ASN1_STRING_type(value);
+  const int expected = type == V_ASN1_UTCTIME ? 13 : type == V_ASN1_GENERALIZEDTIME ? 15 : 0;
+  const auto *data = ASN1_STRING_get0_data(value);
+  // General ASN.1 comparisons accept omitted seconds, offsets and fractions.
+  // Certificate dates retain the strict RFC 5280 form and fail closed on errors.
+  if (!expected || ASN1_STRING_length(value) != expected || !data || data[expected - 1] != 'Z' ||
+      !std::all_of(data, data + expected - 1, [](unsigned char c) { return c >= '0' && c <= '9'; }))
+    return -2;
+  return ASN1_TIME_cmp_time_t(value, now);
+}
 // OpenSSL's socket BIO can raise SIGPIPE. This BIO uses per-send suppression,
 // preserving the application's signal policy and nonblocking retry semantics.
 BIO_METHOD *socket_method() {
@@ -199,8 +212,11 @@ TlsCredentials::TlsCredentials(const TlsSelection &s) : impl_(std::make_unique<I
   if (!count) throw std::runtime_error("TLS trust bundle has no certificates");
   bio = BIO_new_mem_buf(cert.data(), static_cast<int>(cert.size()));
   auto *leaf = PEM_read_bio_X509(bio, nullptr, no_password, nullptr);
-  const bool valid = leaf && X509_cmp_current_time(X509_get0_notBefore(leaf)) < 0 &&
-      X509_cmp_current_time(X509_get0_notAfter(leaf)) > 0 && SSL_CTX_use_certificate(ctx, leaf) == 1;
+  const auto now = std::time(nullptr);
+  const int not_before = leaf ? compare_certificate_time(X509_get0_notBefore(leaf), now) : -2;
+  const bool valid = leaf && now != static_cast<std::time_t>(-1) &&
+      (not_before == -1 || not_before == 0) &&
+      compare_certificate_time(X509_get0_notAfter(leaf), now) == 1 && SSL_CTX_use_certificate(ctx, leaf) == 1;
   X509_free(leaf);
   if (!valid) { BIO_free(bio); throw std::runtime_error("TLS client certificate is invalid or outside its validity period"); }
   while (auto *chain = PEM_read_bio_X509(bio, nullptr, no_password, nullptr)) {
@@ -355,7 +371,8 @@ void TlsStream::poll_open() {
     auto *parameters = SSL_get0_param(p.ssl);
     X509_VERIFY_PARAM_set_hostflags(parameters, X509_CHECK_FLAG_NO_WILDCARDS | X509_CHECK_FLAG_NEVER_CHECK_SUBJECT);
     const bool identity = literal(name) ? X509_VERIFY_PARAM_set1_ip_asc(parameters, name.c_str()) == 1
-        : SSL_set1_host(p.ssl, name.c_str()) == 1 && SSL_set_tlsext_host_name(p.ssl, name.c_str()) == 1;
+        : X509_VERIFY_PARAM_set1_host(parameters, name.c_str(), name.size()) == 1 &&
+          SSL_set_tlsext_host_name(p.ssl, name.c_str()) == 1;
     std::string wire(1, static_cast<char>(p.alpn.size())); wire += p.alpn;
     if (!identity || SSL_set_alpn_protos(p.ssl, reinterpret_cast<const unsigned char *>(wire.data()), wire.size())) {
       p.fail("TLS identity or ALPN setup failed"); return;

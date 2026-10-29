@@ -154,14 +154,7 @@ reassignment and browser trust require separate target validation.
 
 ## Credentials and TLS policy
 
-Use maintained OS OpenSSL 3 development/runtime packages (`libssl-dev` and
-`pkg-config` on Debian). The parent now discovers `openssl`, linking both libssl
-and libcrypto; existing installer dependencies already include libssl-dev.
-The build rejects older headers. TLS 1.3, server-chain and expected-name/IP
-verification against exact DNS SAN or IP SAN (no CN fallback or wildcard), a matching client certificate/key and exact ALPN `wtp/1` are
-mandatory. Idle management uses the same credentials with ALPN `http/1.1`.
-There is no plaintext mode, trust-on-first-use, verification bypass, session
-resumption cache or early-data submission.
+Use maintained OS packages for OpenSSL 3.x or 4.x (`libssl-dev` and `pkg-config` on Debian). The build discovers `openssl` through `pkg-config` and links libssl and libcrypto; versions older than OpenSSL 3 are rejected. TLS 1.3, server-chain and expected-name/IP verification against exact DNS SAN or IP SAN (no CN fallback or wildcard), a matching client certificate/key and exact ALPN `wtp/1` are mandatory. Idle management uses the same credentials with ALPN `http/1.1`. The TLS binding has no plaintext fallback, trust-on-first-use, verification bypass, session resumption cache or early-data submission.
 
 Credential references are absolute local paths, not uploaded PEM or browser
 storage. Files must be readable regular files, at most 256 KiB each, with no

@@ -57,6 +57,12 @@ jobs:
           make semantics-make-regression-test SUDO=
           make semantics-test-portable SUDO=
 
+      - name: Run TLS adapter and certificate regressions
+        working-directory: src
+        run: |
+          pkg-config --modversion openssl
+          make wtp-tls-test SUDO=
+
       - name: Run WTP component, plan, USB adapter, backend, scheduler and status tests
         working-directory: src
         run: |
