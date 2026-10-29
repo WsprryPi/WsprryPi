@@ -64,6 +64,8 @@ set(core
     application/resources.cpp
     application/frequency_policy.cpp
     hardware/pins.cpp
+    hardware/filter_settings.cpp
+    rf/filter_selector.cpp
     provisioning/profile.cpp
     provisioning/network_profile.cpp
     provisioning/consumer_profile.cpp

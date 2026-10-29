@@ -17,5 +17,6 @@ function lines(child){const queue=[],waiters=[];readline.createInterface({input:
   assert.equal(selection.status,200,carrier+': '+JSON.stringify(selection));
   if(process.env.WSPRRYPI_INTEROP_TRACE)console.error(carrier,selection,await get('management'));
   await require('./amplifier_timing_pair_cases.js')(call);
+  await require('./filter_selector_pair_cases.js')(call);
  }finally{for(const child of [client,server])if(child&&child.exitCode===null){child.stdin.end();child.kill();}}
 }})().catch(e=>{console.error(e);process.exitCode=1;});

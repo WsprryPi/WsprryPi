@@ -102,6 +102,7 @@ const {browser,reply,target}=require("./wtp_usb_settings_test.js");
         assert.equal(applyDrive.status,200,JSON.stringify(applyDrive));assert.equal(applyDrive.body.config.gpio_drive_ma,8);
         } else assert.equal(driveInitial.status,409,JSON.stringify(driveInitial));
         await require('./amplifier_timing_pair_cases.js')(request);
+  await require('./filter_selector_pair_cases.js')(request);
         // Removal is not a reset: unrelated station and schedules are retained.
         await b.click("load");b.element("wtp-usb-ssid").value="recreated-network";b.element("wtp-usb-password").value="different-synthetic-password";await b.click("wifi-save");
         assert.match(b.element("wtp-usb-feedback").textContent,/Settings saved/);await b.click("load");assert.equal(b.element("wtp-usb-ssid").value,"recreated-network");

@@ -312,3 +312,9 @@ healthy status or connection read alone cannot enable writing. A lost retirement
 reply leaves the outcome uncertain; read the selected session state before any
 new deliberate action. Software fixtures do not qualify flash, transport timing
 or RF behavior.
+
+## Selected-member LPF and band selector
+
+`GET/PUT /api/v1/member/filter-selector` routes to the selected Pico's advertised `transmitter-filter-selector/1` resource through its current management carrier. It validates the exact descriptor, closed settings/readback shapes, device/boot and carrier/profile binding, Config revision, fixed limits, GPIO conflicts and confirmed saved readback. Unknown schemas, changed limits, malformed or extra fields and identity/revision mismatches refuse before mutation. No fallback carrier or automatic write retry is used. Current unreleased capability shapes are extended in place; WTP/1 remains unchanged.
+
+Settings are five optional named GPIO resources, ten declared whole-Hz ranges, fixed/manual or required policy and independent release/settling intervals of 0–250 ms. The Pico owns complete-job coverage, boot-frozen execution and local cleanup. Fleet renders the shared editor with explicit read/save/discard and saved/active/restart state; native Pi band GPIO behavior remains independent. See the [Pico selector contract](https://github.com/WsprryPi/WsprryPico/blob/devel/engineering/development/lpf-band-selector.md).

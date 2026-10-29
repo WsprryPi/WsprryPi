@@ -235,7 +235,7 @@
         }
     }
     function invalidateEditors() {
-        driveEditor?.invalidate(); timingEditor?.invalidate();
+        driveEditor?.invalidate(); timingEditor?.invalidate(); filterEditor?.invalidate();
         root.WtpUsbSettings?.invalidate();
         root.WsprryMemberUdp?.invalidate();
         invalidateProgress();
@@ -510,6 +510,15 @@
                 operation: onlySchedules ? "schedules" : "save", config }, configRevision);
         } catch (error) { byId("wtp-management-feedback").textContent = error.message; }
     }
+    const filterEditor = root.WsprryFilters ? root.WsprryFilters.mount(byId('filter-selector-controls'), {
+        pi:true,
+        exchange:async(method,body,revision)=>{
+            const r=await root.fetch((root.WSPRRYPI_PATHS?.sharedApiPath || '/api/v1')+'/member/filter-selector',{
+                method,cache:'no-store',signal:AbortSignal.timeout(20000),...(body?{headers:{'Content-Type':'application/json','X-WsprryPico-Request':'1','If-Match':revision},body:JSON.stringify(body)}:{})});
+            const data=await r.json();if(!r.ok){const e=Error('Selector request was refused or unconfirmed. Read saved selectors and verify the selected Pico.');e.code=data.error?.code;throw e;}
+            return {data,revision:r.headers.get('ETag')||''};
+        },afterSave:()=>{configRevision='';resources=null;render();}
+    }) : null;
     const timingEditor = root.WsprryAmplifierTiming && byId('amplifier-lead-ms') ? root.WsprryAmplifierTiming.create({
         lead:byId('amplifier-lead-ms'),tail:byId('amplifier-tail-ms'),read:byId('amplifier-timing-read'),save:byId('amplifier-timing-save'),discard:byId('amplifier-timing-discard'),adopt:byId('amplifier-timing-adopt'),status:byId('amplifier-timing-status'),
         exchange:async(method,body,revision)=>{
@@ -538,7 +547,7 @@
         driveSelection = key;
         canSelect = selectable;
         available = !explicitDisconnected && (consumerConnected ? selectable : value);
-        driveEditor?.setAvailability(available); timingEditor?.setAvailability(available);
+        driveEditor?.setAvailability(available); timingEditor?.setAvailability(available); filterEditor?.setAvailability(available);
         render();
         if (selectable && !selectionObserved && !busy) {
             selectionObserved = true;

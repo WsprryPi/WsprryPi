@@ -633,7 +633,7 @@ wsprrypi::PicoHttpResponse wtp_runtime_management(const std::string &resource,
         if (resource == "member/configuration") response = wsprrypi::pico_configuration_request(exchange,
           r->usb_management->device(),r->usb_management->boot(),method,body,revision,"usb_physical");
         else if (resource == "member/application" || resource == "member/station" || resource == "member/hardware" ||
-            (resource == "member/gpio-drive" || resource == "member/amplifier-timing") || resource == "member/gpio-drive-progress" || resource == "member/pins" || resource == "member/pins/validate") response = wsprrypi::pico_resource_request(exchange,
+            (resource == "member/gpio-drive" || resource == "member/amplifier-timing" || resource == "member/filter-selector") || resource == "member/gpio-drive-progress" || resource == "member/pins" || resource == "member/pins/validate") response = wsprrypi::pico_resource_request(exchange,
           r->usb_management->device(),r->usb_management->boot(),resource.substr(7),method,body,revision,"usb_physical");
         else if (resource.starts_with("member/progress")) response = wsprrypi::pico_progress_request(exchange,
           r->usb_management->device(),r->usb_management->boot(),resource.substr(7),method,body,revision,"usb_physical");
@@ -660,7 +660,7 @@ wsprrypi::PicoHttpResponse wtp_runtime_management(const std::string &resource,
               r->consumer_management->boot(), method, body, revision, r->management_carrier,
               r->consumer_management->generation());
         else if (resource == "member/application" || resource == "member/station" || resource == "member/hardware" ||
-            (resource == "member/gpio-drive" || resource == "member/amplifier-timing") || resource == "member/gpio-drive-progress" || resource == "member/pins" || resource == "member/pins/validate")
+            (resource == "member/gpio-drive" || resource == "member/amplifier-timing" || resource == "member/filter-selector") || resource == "member/gpio-drive-progress" || resource == "member/pins" || resource == "member/pins/validate")
           response = wsprrypi::pico_resource_request(exchange,r->consumer_management->device(),r->consumer_management->boot(),
               resource.substr(7),method,body,revision,r->management_carrier,r->consumer_management->generation());
         else if (resource.starts_with("member/progress")) response = wsprrypi::pico_progress_request(exchange,
@@ -689,7 +689,7 @@ wsprrypi::PicoHttpResponse wtp_runtime_management(const std::string &resource,
             identity ? identity->device_id : "", identity ? identity->boot_id : "",
             method, body, revision);
       } else if (resource == "member/application" || resource == "member/station" || resource == "member/hardware" ||
-          (resource == "member/gpio-drive" || resource == "member/amplifier-timing") || resource == "member/gpio-drive-progress" || resource == "member/pins" || resource == "member/pins/validate") {
+          (resource == "member/gpio-drive" || resource == "member/amplifier-timing" || resource == "member/filter-selector") || resource == "member/gpio-drive-progress" || resource == "member/pins" || resource == "member/pins/validate") {
         const auto identity = r->app->status().identity;
         response = wsprrypi::pico_resource_request(exchange,identity ? identity->device_id : "",identity ? identity->boot_id : "",
             resource.substr(7),method,body,revision);
@@ -701,7 +701,7 @@ wsprrypi::PicoHttpResponse wtp_runtime_management(const std::string &resource,
         const auto identity = r->app->status().identity;
         response = wsprrypi::pico_udp_logging_request(exchange,identity ? identity->device_id : "",identity ? identity->boot_id : "",resource.substr(7),method,body,revision);
       } else response = exchange(resource, method, body, revision);
-    }, false, !(method == "PUT" && (resource == "member/station" || resource == "member/hardware" || (resource == "member/gpio-drive" || resource == "member/amplifier-timing") || resource == "member/gpio-drive-progress"))))
+    }, false, !(method == "PUT" && (resource == "member/station" || resource == "member/hardware" || (resource == "member/gpio-drive" || resource == "member/amplifier-timing" || resource == "member/filter-selector") || resource == "member/gpio-drive-progress"))))
       return {409, R"({"error":{"code":"host_busy_or_output_unresolved"}})", {}};
   } catch (...) { return {503, R"({"error":{"code":"management_unavailable"}})", {}}; }
   return response;

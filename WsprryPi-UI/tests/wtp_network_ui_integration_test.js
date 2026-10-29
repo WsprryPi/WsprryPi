@@ -218,6 +218,12 @@ async function main() {
                 remote:{output_active:false}, owns:false, network:{hostname:'wsprrypico-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.local',port:18443,expected_identity:'wsprrypico-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.local',resolved_address:'192.0.2.27',authenticated_identity:'wsprrypico-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.local',state:'ready',observed_ms:'9000'} };
             window.fetch = async (url, options = {}) => {
                 window.__requests.push({url,options});
+                if (String(url).endsWith('/member/filter-selector')) {
+                    const defaults={policy:'fixed_manual',release_ms:20,settle_ms:20,selectors:[],ranges:[]};
+                    window.__filters ||= {schema:'transmitter-filter-selector/1',target:window.__resourceFixtures.loaded.target,saved:structuredClone(defaults),boot_active:structuredClone(defaults),pending_restart:false,selected_id:null,selection_known:true,admission_error:null,output_active:false,rf_active:false,storage_healthy:true,reserved:[{gp:2,role:'rf'},{gp:14,role:'button'}]};
+                    if(options.method==='PUT'){window.__filters.saved=JSON.parse(options.body).settings;window.__filters.pending_restart=true;}
+                    return {ok:true,headers:{get:()=> '"'+(window.__filters.pending_restart?'4':'3').repeat(64)+'"'},json:async()=>structuredClone(window.__filters)};
+                }
                 if (String(url).endsWith('/member/amplifier-timing')) {
                     window.__timing ||= {schema:'transmitter-amplifier-timing/1',target:window.__resourceFixtures.loaded.target,saved:{lead_ms:200,tail_ms:200},boot_active:{lead_ms:200,tail_ms:200},pending_restart:false,phase:'inactive',output_active:false,rf_active:false,storage_healthy:true};
                     if(options.method==='PUT'){window.__timing.saved=JSON.parse(options.body).timing;window.__timing.pending_restart=true;}
@@ -535,6 +541,23 @@ async function main() {
             const timingLayout=await client.send('Page.getLayoutMetrics');
             await capture(`amplifier-timing-${viewport.name}.png`,{format:'png',captureBeyondViewport:true,clip:{x:0,y:0,width:viewport.width,height:timingLayout.cssContentSize.height,scale:1}});
         }
+        const filterButton=text=>evaluate(`Array.from(document.querySelectorAll('#filter-selector-controls button')).find(b=>b.textContent===${JSON.stringify(text)}).click()`);
+        const filterField=(label,value)=>evaluate(`(()=>{const l=Array.from(document.querySelectorAll('#filter-selector-controls label')).find(l=>l.firstChild?.textContent===${JSON.stringify(label)}),input=l.querySelector('input,select');input.value=${JSON.stringify(String(value))};input.dispatchEvent(new Event('input',{bubbles:true}));})()`);
+        await filterButton('Read saved selectors');await waitFor(()=>evaluate('document.getElementById("filter-selector-controls").innerText.includes("Saved: fixed")'),'selector read');
+        await filterButton('Add selector');await filterField('Selector name','HF filters');await filterField('Pico GPIO',6);await filterField('Polarity','false');
+        await filterButton('Add frequency range');await filterField('Range name','40m');await filterField('Selector',1);await filterField('From (Hz)',7000000);await filterField('Through (Hz)',7300000);await filterField('Selection policy','required');
+        assert.equal(await evaluate(`Array.from(document.querySelectorAll('#filter-selector-controls button')).find(b=>b.textContent==='Save selectors').disabled`),false);
+        if(process.env.WSPRRYPI_FILTER_CAPTURE_DIR){const filterOutput=path.resolve(process.env.WSPRRYPI_FILTER_CAPTURE_DIR);fs.mkdirSync(filterOutput,{recursive:true});
+            for(const [name,width,height] of [['desktop',1280,1000],['mobile',390,1000]])for(const theme of ['light','dark']){
+                await client.send('Emulation.setDeviceMetricsOverride',{width,height,deviceScaleFactor:1,mobile:width<600});
+                await evaluate(`document.documentElement.setAttribute('data-bs-theme','${theme}');document.querySelectorAll('details').forEach(d=>{if(d.contains(document.getElementById('filter-selector-controls')))d.open=true;});document.getElementById('filter-selector-controls').scrollIntoView();document.getAnimations().forEach(a=>a.finish());`);
+                assert.equal(await evaluate('document.documentElement.scrollWidth<=innerWidth'),true,'selector '+name+' '+theme);
+                const clip=await evaluate('(()=>{const r=document.getElementById("filter-selector-controls").getBoundingClientRect();return {x:0,y:r.top+scrollY,width:innerWidth,height:r.height,scale:1};})()');
+                const shot=await client.send('Page.captureScreenshot',{format:'png',captureBeyondViewport:true,clip});fs.writeFileSync(path.join(filterOutput,`filter-pi-${name}-${theme}.png`),Buffer.from(shot.data,'base64'));
+            }
+        }
+        await filterButton('Save selectors');await waitFor(()=>evaluate('document.getElementById("filter-selector-controls").innerText.includes("Selectors saved")'),'selector confirmed save');assert.equal(await evaluate('__filters.saved.selectors[0].gp'),6);assert.equal(await evaluate('__filters.saved.selectors[0].active_high'),false);
+        console.log('Rendered selector workflow, GPIO/polarity input, exact readback and themes passed');
         console.log(captureScreenshots ? 'Screenshots: '+output : 'Screenshot capture disabled; existing visual evidence retained.');
     } catch (error) {
         failure = new Error(`${error.message}\n${childDiagnostic(chrome || php)}`, { cause: error });

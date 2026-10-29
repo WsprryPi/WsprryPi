@@ -386,7 +386,7 @@ void shared_application(const Json &j, const Json &target, bool usb = false) {
       (h["storage_healthy"] == true || h["saved"].is_null()) &&
       h["active"].is_null() == h["active_revision"].is_null(), "invalid_remote_resource");
   for (const auto key : {"saved","active"}) require(h[key].is_null() || plan_valid(h[key]), "invalid_remote_resource");
-  Json unavailable=Json::array({"recurrence_transfer","si5351","amplifier","lpf","drive","reference_calibration","waveform_preferences"});
+  Json unavailable=Json::array({"recurrence_transfer","si5351","amplifier","drive","reference_calibration","waveform_preferences"});
   if (!usb) unavailable.push_back("usb_json_management");
   unavailable.push_back("plain_lan_json_management");unavailable.push_back("ble_json_management");
   require(c["station_write"] == true && c["hardware_write"] == true && c["max_update_bytes"] == 1024 &&
@@ -690,6 +690,83 @@ PicoHttpResponse gpio_drive_progress_request(const PicoManagementExchange &excha
   } catch(const Rejected &e) {return {e.status,Json{{"error",{{"code",e.code}}},{"mutation_attempted",attempted}}.dump(),{}};}
     catch(...) {return {502,Json{{"error",{{"code",attempted?"management_outcome_unknown":"invalid_remote_resource"}}},{"mutation_attempted",attempted}}.dump(),{}};}
 }
+
+bool valid_filter_settings(const Json &v) {
+  if (!fields(v,{"policy","release_ms","settle_ms","selectors","ranges"}) ||
+      !(v["policy"] == "fixed_manual" || v["policy"] == "required") ||
+      !v["selectors"].is_array() || v["selectors"].size()>5 || !v["ranges"].is_array() || v["ranges"].size()>10 || v.dump().size()>1536) return false;
+  const auto number=[](const Json &n,unsigned low,unsigned high) { return n.is_number_integer() && n>=low && n<=high; };
+  const auto gp=[&](const Json &n) { return number(n,0,22) || number(n,26,28); };
+  const auto name=[](const Json &n) {return n.is_string() && std::regex_match(n.get<std::string>(),std::regex("[A-Za-z0-9_/-]([A-Za-z0-9 _/-]{0,14}[A-Za-z0-9_/-])?"));};
+  if (!number(v["release_ms"],0,250) || !number(v["settle_ms"],0,250)) return false;
+  std::set<unsigned> ids,pins; std::set<std::string> names;
+  for (const auto &o:v["selectors"]) {
+    if (!fields(o,{"id","name","gp","active_high"}) || !number(o["id"],1,5) || !name(o["name"]) || !gp(o["gp"]) || !o["active_high"].is_boolean()) return false;
+    if (!ids.insert(o["id"].get<unsigned>()).second || !pins.insert(o["gp"].get<unsigned>()).second || !names.insert(o["name"].get<std::string>()).second) return false;
+  }
+  names.clear();
+  for (const auto &r:v["ranges"]) {
+    if (!fields(r,{"name","selector","low_hz","high_hz"}) || !name(r["name"]) || !number(r["selector"],1,5) || !ids.contains(r["selector"].get<unsigned>()) ||
+        !number(r["low_hz"],1,1000000000) || !number(r["high_hz"],1,1000000000) || r["low_hz"]>r["high_hz"] || !names.insert(r["name"].get<std::string>()).second) return false;
+    for (const auto &p:v["ranges"])
+      if (fields(p,{"name","selector","low_hz","high_hz"}) && p["selector"]!=r["selector"] && r["low_hz"]<=p["high_hz"] && p["low_hz"]<=r["high_hz"]) return false;
+  }
+  return true;
+}
+PicoHttpResponse filter_selector_request(const PicoManagementExchange &exchange,
+    const std::string &device,const std::string &boot,const std::string &method,
+    const std::string &body,const std::string &revision,const std::string &carrier,const std::string &generation) {
+  bool attempted=false;
+  try {
+    require(identity(device) && identity(boot),"member_identity_unavailable",409);
+    require(method=="GET" || method=="PUT","not_found",404);
+    require(body.size()<=1792,"body_too_large",413);
+    const Json target{{"scope","member"},{"device_id",device},{"boot_id",boot}};
+    Json input;
+    if (method=="PUT") {
+      require(etag(revision),"revision_required",428);
+      try {input=strict_browser_json(body);} catch (...) {throw Rejected{400,"invalid_json"};}
+      require(fields(input,{"schema","target","settings"}) && input["schema"]=="transmitter-filter-selector/1" && input["target"]==target && valid_filter_settings(input["settings"]),"invalid_filter_settings",400);
+    }
+    const auto caps_response=exchange("capabilities","GET",{},{});success(caps_response);const auto caps=parsed(caps_response);
+    const auto expected=Json::parse(R"({"schema":"transmitter-filter-selector/1","path":"/api/v1/filter-selector"})");
+    require(caps.is_object() && caps.contains("filter_selector") && caps["filter_selector"]==expected,"filter_selector_unavailable",409);
+    require(caps.contains("management_carriers") && valid_management_descriptor(caps["management_carriers"],carrier),"unsupported_management_contract",409);
+    const auto management_response=exchange("management","GET",{},{});success(management_response);const auto management=parsed(management_response);
+    require(valid_management_contract(management,carrier,device,boot,generation) && management["schema"]==caps["management_carriers"]["schema"],"unsupported_management_contract",409);
+    const auto read=[&] {
+      auto r=exchange("filter-selector","GET",{},{});success(r);const auto v=parsed(r);
+      require(fields(v,{"schema","target","saved","boot_active","pending_restart","selected_id","selection_known","admission_error","output_active","rf_active","storage_healthy","reserved"}) && v["schema"]=="transmitter-filter-selector/1" && v["target"]==target && etag(r.etag),"invalid_remote_resource");
+      for (const auto key:{"pending_restart","selection_known","output_active","rf_active","storage_healthy"})require(v[key].is_boolean(),"invalid_remote_resource");
+      require((v["saved"].is_null() || valid_filter_settings(v["saved"])) && (v["boot_active"].is_null() || valid_filter_settings(v["boot_active"])) && v["storage_healthy"]==(!v["saved"].is_null() && !v["boot_active"].is_null()),"invalid_remote_resource");
+      require(v["admission_error"].is_null() || v["admission_error"]=="filter_coverage_required","invalid_remote_resource");
+      require(v["reserved"].is_array() && v["reserved"].size()<=26,"invalid_remote_resource");std::set<unsigned> reserved;
+      for(const auto &p:v["reserved"]) {
+        require(fields(p,{"gp","role"}) && p["gp"].is_number_integer() && ((p["gp"]>=0 && p["gp"]<=22)||(p["gp"]>=26 && p["gp"]<=28)) &&
+            (p["role"]=="rf" || p["role"]=="button" || p["role"]=="amplifier" || p["role"]=="indicator" || p["role"]=="i2c_sda" || p["role"]=="i2c_scl"),"invalid_remote_resource");
+        require(reserved.insert(p["gp"].get<unsigned>()).second,"invalid_remote_resource");
+      }
+      if(!v["saved"].is_null()) for(const auto &o:v["saved"]["selectors"])require(!reserved.contains(o["gp"].get<unsigned>()),"invalid_remote_resource");
+      require(v["saved"].is_null() || v["boot_active"].is_null() || v["saved"]==v["boot_active"] || v["pending_restart"]==true,"invalid_remote_resource");
+      require(v["rf_active"]==false || v["output_active"]==true,"invalid_remote_resource");
+      require(v["selected_id"].is_null() || (v["selected_id"].is_number_integer() && v["selection_known"]==true && v["output_active"]==true && !v["boot_active"].is_null() && v["boot_active"]["policy"]=="required" &&
+          std::any_of(v["boot_active"]["selectors"].begin(),v["boot_active"]["selectors"].end(),[&](const auto &o){return o["id"]==v["selected_id"];})),"invalid_remote_resource");
+      return r;
+    };
+    const auto before=read();if(method=="GET")return before;
+    require(before.etag==revision,"revision_conflict",412);const auto state=parsed(before);
+    require(state["storage_healthy"]==true && state["selection_known"]==true && state["output_active"]==false,"remote_busy_or_output_unresolved",409);
+    for(const auto &o:input["settings"]["selectors"])for(const auto &p:state["reserved"])require(o["gp"]!=p["gp"],"filter_pin_conflict",400);
+    const auto status_response=exchange("status","GET",{},{});success(status_response);const auto status=parsed(status_response);
+    require(status.is_object() && status.contains("job") && status["job"].is_object(),"invalid_remote_resource");const auto &job=status["job"];
+    require(job.contains("boot_id") && job["boot_id"]==boot && job.contains("output_active") && job["output_active"]==false && job.contains("owner_id") && job["owner_id"].is_null() && job.contains("state") &&
+        (job["state"]=="empty" || job["state"]=="complete" || job["state"]=="aborted" || job["state"]=="missed"),"remote_busy_or_output_unresolved",409);
+    attempted=true;const auto result=exchange("filter-selector","PUT",body,revision);success(result);const auto confirmed=read();
+    require(result.etag!=revision && result.etag==confirmed.etag && parsed(result)==parsed(confirmed) && parsed(confirmed)["saved"]==input["settings"],"management_outcome_unknown");return result;
+  } catch (const Rejected &e) {return {e.status,Json{{"error",{{"code",e.code}}},{"mutation_attempted",attempted}}.dump(),{}};}
+    catch (...) {return {502,Json{{"error",{{"code",attempted?"management_outcome_unknown":"invalid_remote_resource"}}},{"mutation_attempted",attempted}}.dump(),{}};}
+}
+
 PicoHttpResponse amplifier_timing_request(const PicoManagementExchange &exchange,
     const std::string &device, const std::string &boot, const std::string &method,
     const std::string &body, const std::string &revision,
@@ -832,6 +909,7 @@ PicoHttpResponse pico_resource_request(const PicoManagementExchange &exchange,
     const std::string &device, const std::string &boot, const std::string &resource,
     const std::string &method, const std::string &body, const std::string &revision,
     const std::string &carrier, const std::string &generation) {
+  if (resource == "filter-selector") return filter_selector_request(exchange,device,boot,method,body,revision,carrier,generation);
   if (resource == "amplifier-timing") return amplifier_timing_request(exchange,device,boot,method,body,revision,carrier,generation);
   if (resource == "gpio-drive-progress") return gpio_drive_progress_request(exchange,device,boot,method,body,revision,carrier,generation);
   if (resource == "gpio-drive") return gpio_drive_request(exchange,device,boot,method,body,revision,carrier,generation);

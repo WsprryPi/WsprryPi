@@ -1289,6 +1289,33 @@ int main(int argc, char **argv) {
     assert(Json::parse(result.body)["mutation_attempted"]==false && t.mutations==0 && t.f.flash.bytes==bytes);
     c->logout();
   }
+  // Malformed selector metadata/readback must refuse before persistence.
+  for (unsigned variant=0;variant<16;++variant) {
+    Test t;auto c=t.client();assert(c->login(device,"consumer_station","test-password").status==200);
+    const auto real=[&](auto p,auto m,auto b,auto e){return c->request(p,m,b,e);};
+    pi::PicoHttpResponse before;
+    assert(t.app->idle_management([&]{before=pi::pico_resource_request(real,c->device(),c->boot(),"filter-selector","GET",{}, {},"consumer_station",c->generation());},true));assert(before.status==200);
+    const auto readback=Json::parse(before.body);const auto target=readback["target"];const auto bytes=t.f.flash.bytes;
+    const auto hostile=[&](auto p,auto m,auto b,auto e){auto r=real(p,m,b,e);auto v=Json::parse(r.body);
+      if(p=="capabilities" && variant<4){auto &d=v["filter_selector"];if(variant==0)d["schema"]="transmitter-filter-selector/2";if(variant==1)d["path"]="/api/v1/config";if(variant==2)d=Json::array();if(variant==3)d["maximum_ranges"]=11;}
+      if(p=="filter-selector" && variant>=4){
+        if(variant==4)v["extra"]=0;
+        if(variant==5)v["saved"]["release_ms"]=20.0;
+        if(variant==6)v["target"]["boot_id"]=std::string(32,'f');
+        if(variant==7)v["selected_id"]=9;
+        if(variant==8)v["boot_active"]=Json::array();
+        if(variant==9){v["saved"]["policy"]="required";v["pending_restart"]=false;}
+        if(variant==10)v["reserved"][0]["role"]="relay";
+        if(variant==11)v["reserved"].push_back(v["reserved"][0]);
+        if(variant==12)v["storage_healthy"]=false;
+        if(variant==13){v["selection_known"]=false;v["selected_id"]=1;}
+        if(variant==14){v["rf_active"]=true;v["output_active"]=false;}
+        if(variant==15)v["saved"]["settle_ms"]=251;
+      }r.body=v.dump();return r;};
+    const Json input{{"schema","transmitter-filter-selector/1"},{"target",target},{"settings",readback["saved"]}};pi::PicoHttpResponse result;
+    assert(t.app->idle_management([&]{result=pi::pico_resource_request(hostile,c->device(),c->boot(),"filter-selector","PUT",input.dump(),before.etag,"consumer_station",c->generation());},true));
+    assert(result.status==(variant<4?409:502));assert(Json::parse(result.body)["mutation_attempted"]==false && t.mutations==0 && t.f.flash.bytes==bytes);c->logout();
+  }
   for (const auto profile : {pico::network::ManagementProfile::Blank,
                              pico::network::ManagementProfile::Recovery,
                              pico::network::ManagementProfile::Unavailable}) {
