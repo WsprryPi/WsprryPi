@@ -50,6 +50,9 @@ int main() {
   assert(!udp::route_generation(std::string(65536, 'x'), "wlan1"));
   assert(!udp::route_generation("wlan1\tbroken\n", "wlan1"));
 
+  for (const auto text : {"UTC available", "UTC unavailable", "UTC synchronized", "UTC holdover"})
+    assert(wsprry::logging::export_safe_pico("CLOCK_STATE", text));
+  assert(!wsprry::logging::export_safe_pico("CLOCK_STATE", "UTC holdover secret"));
   assert(wsprry::logging::export_safe_pi("PI_LOG", "UDP logging test event"));
   for (auto text : {"password=secret", "Authorization: Bearer token",
                     "raw HTTP configuration", "UDP logging test event secret"})

@@ -27,6 +27,15 @@ int main() {
     return "@SYSLOG " + std::to_string(r.size()) + " " + r;
   };
   assert(parse_usb_log(frame(), device, boot) == value);
+  for (const auto &[text, severity] : std::vector<std::pair<std::string, unsigned>>{
+           {"UTC synchronized", 6}, {"UTC holdover", 7}, {"UTC unavailable", 4},
+           {"UTC available", 5}}) {
+    auto event = value;
+    event["event"] = "CLOCK_STATE"; event["severity"] = severity; event["message"] = text;
+    const auto record = "<" + std::to_string(184 + severity) + ">1 - pico.local WsprryPico - CLOCK_STATE - " + event.dump();
+    assert(parse_usb_log("@SYSLOG " + std::to_string(record.size()) + " " + record, device, boot) == event);
+  }
+
   const auto reject = [&](std::string text, std::string id,
                           std::string session) {
     bool failed = false;

@@ -71,7 +71,9 @@ const server=http.createServer((req,res)=>{
  if(url.pathname==='/log_stream.php'){
   urls.push(req.url);res.writeHead(200,{'Content-Type':'text/event-stream','Cache-Control':'no-cache'});
   const selected=url.searchParams.get('source')||'all';
-  for(const row of rows.filter(row=>selected==='all'||row.source===selected)){
+  const cursor=url.searchParams.get('cursor'), after=rows.findIndex(row=>row.__CURSOR===cursor);
+  const severity=Number(url.searchParams.get('priority_max')||7);
+  for(const row of rows.filter((row,index)=>(after<0||index>after)&&(selected==='all'||row.source===selected)&&Number(row.PRIORITY||6)<=severity)){
    const data={type:'journal',playback:false,__REALTIME_TIMESTAMP:'1793098800123456',PRIORITY:'6',_SYSTEMD_UNIT:'wsprrypi.service',...row};
    res.write(`id: ${row.__CURSOR}\nevent: journal\ndata: ${JSON.stringify(data)}\n\n`);
   }

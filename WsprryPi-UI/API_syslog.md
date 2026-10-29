@@ -119,6 +119,8 @@ Example rendered timestamp:
 
 ---
 
+The Logs viewer loads up to 200 recent matching records when the page opens or its source or severity changes, including when returning to a previously viewed source. A reconnect or Resume view continues the records retained in that browser view from its last verified journal cursor. Clear removes the displayed records and retains that continuation point; reconnecting does not restore the cleared rows. Persisted cursors from a previous page are not used to populate an empty new view. Collector and peer binding changes invalidate the affected current view; unverified collector identities cannot store or resume cursors.
+
 ## Reconnect Semantics
 
 - Browsers auto-reconnect on transient network errors.
@@ -232,3 +234,7 @@ Imported USB records are sent by the application process to its journal unit wit
 `GET`/`PUT /api/v1/host/logging` manage the Pi-owned `host-usb-logging/1` collection policy. PUT requires the exact `collector_id`, `If-Match` and a bounded list of saved Fleet USB source identities. Firmware export is independent: `GET`/`PUT /api/v1/member/logging`, through selected physical USB management, proxy `transmitter-logging/1` with target/revision guards. Closing or pausing the browser view does not change either policy.
 
 The collector resolves only dedicated Logging role 6 under the selected physical USB parent. Console role 0 remains available during collection. USB-Logging/1 STATUS and START replies are closed, versioned and device/boot-bound; settings resources retain their independent schemas. Earlier firmware lacking role 6 reports `dedicated_logging_unsupported` without opening Console.
+
+## Pico clock-state events
+
+`CLOCK_STATE` identifies `UTC synchronized`, `UTC holdover`, and `UTC unavailable`. First usable UTC and recovery from unavailable use Info (6); routine synchronized/holdover transitions use Debug (7); loss of previously usable UTC uses Warning (4). Startup without UTC and unchanged states are quiet. Holdover retains UTC within the existing clock validity and uncertainty policy. Historical `UTC available` records remain readable and do not identify which usable state applied. Event schema, numeric severity semantics, and saved filters are unchanged.

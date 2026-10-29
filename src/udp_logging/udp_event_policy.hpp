@@ -32,7 +32,9 @@ inline constexpr PicoExportTemplate pico_export_templates[] = {
     {"JOB_STATE", "Running"},
     {"JOB_STATE", "Complete"},
     {"JOB_STATE", "Failed"},
-    {"JOB_STATE", "Aborted"}};
+    {"JOB_STATE", "Aborted"},
+    {"CLOCK_STATE", "UTC synchronized"},
+    {"CLOCK_STATE", "UTC holdover"}};
 inline unsigned pico_export_template(std::string_view code, std::string_view message) {
     unsigned index = 0;
     for (const auto& entry : pico_export_templates) {

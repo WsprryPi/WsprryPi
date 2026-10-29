@@ -536,7 +536,7 @@
         logViewActionsBound = true;
 
         onClick("btn-clear", () => {
-            visibleRecords = [];
+            visibleRecords = []; hiddenBuffer = []; hiddenBufferedCount = 0;
             clearPanes();
         });
 
@@ -770,6 +770,7 @@
     let udpPeerAddresses = new Map(), networkSourceWarning = "";
     let collectorSnapshot = null, collectorRevision = null, collectionUncertain = false;
     let paused = false, visibleRecords = [];
+    let viewCursor = null, sourceRefreshGeneration = 0, collectionReviewPending = false, activeSourceRefreshes = 0;
     const cursorStorageKey = () => `log_stream_cursor_v3:stream2:playback1:backlog200:${collectorIdentity}:${selectedSource}:${selectedSeverity}:${selectedSource.startsWith("udp:")?udpPeerAddresses.get(selectedSource.split(":")[1])||"unverified":""}`;
     const validSource = value => /^(all|local|(?:pico|usb):[0-9a-f]{32}|udp:[A-Za-z0-9_-]{1,32}:(?:pico|pi):[0-9a-f]{32}(?::(?:direct|relay))?)$/.test(value);
     const loggingApi = () => (window.WSPRRYPI_PATHS?.sharedApiPath || "/api/v1") + "/host/logging";
@@ -849,28 +850,35 @@
     }
     window.addEventListener("wsprry-udp-policy-changed",()=>{void refreshSources();});
     async function refreshSources(review = false) {
+        const generation = ++sourceRefreshGeneration;
+        activeSourceRefreshes++;
+        if (review) collectionReviewPending = true;
         try {
             const response = await fetch(loggingApi(), {cache:"no-store", signal:AbortSignal.timeout(10000)});
             if (!response.ok) throw new Error("Source list unavailable. Refresh sources to retry; journal viewing remains available.");
             const data = await response.json();
             if (data.schema !== "host-usb-logging/1" || !/^[0-9a-f]{32}$/.test(data.collector_id) || !Array.isArray(data.candidates))
                 throw new Error("The source list is invalid. Refresh sources to retry.");
-            collectorSnapshot = data; collectorRevision = response.headers.get("ETag");
-            const changedCollector = collectorIdentity !== data.collector_id;
-            collectorIdentity = data.collector_id;
-            const previousPeers=udpPeerAddresses;udpPeerAddresses=new Map();networkSourceWarning="";
+            let nextPeers = new Map(), nextWarning = "";
             try {
                 const api=window.WSPRRYPI_PATHS?.sharedApiPath||"/api/v1";
                 const c=await fetch(api+"/udp-logging/capabilities",{cache:"no-store",signal:AbortSignal.timeout(10000)});
                 if(!c.ok)throw Error("Network logging is unavailable");
                 const capabilities=window.WsprryUdp.parseJson(await c.text());
-                if(!window.WsprryUdp.capabilities(capabilities,true)||capabilities.target.collector_id!==collectorIdentity)throw Error("Collector changed");
+                if(!window.WsprryUdp.capabilities(capabilities,true)||capabilities.target.collector_id!==data.collector_id)throw Error("Collector changed");
                 const r=await fetch(api+"/host/udp-logging",{cache:"no-store",signal:AbortSignal.timeout(10000)});
                 if(!r.ok)throw Error("Network policy unavailable");
                 const settings=window.WsprryUdp.parseJson(await r.text());
                 if(!window.WsprryUdp.readback(settings,capabilities,true))throw Error("Invalid network policy");
-                udpPeerAddresses=new Map(settings.saved.collector.peers.map(p=>[p.slot,p.ipv4]));
-            } catch (_) {networkSourceWarning="Network source settings are unavailable. All sources still includes retained network history.";}
+                nextPeers=new Map(settings.saved.collector.peers.map(p=>[p.slot,p.ipv4]));
+            } catch (_) {nextWarning="Network source settings are unavailable. All sources still includes retained network history.";}
+            if (generation !== sourceRefreshGeneration) return;
+            const changedCollector = collectorIdentity !== data.collector_id;
+            collectorSnapshot = data; collectorRevision = response.headers.get("ETag");
+            collectorIdentity = data.collector_id;
+            const previousPeers = udpPeerAddresses; udpPeerAddresses = nextPeers;
+            networkSourceWarning = nextWarning;
+            let changedPeer = false;
             for(const peer of [...udpMenuOrigins.keys()])if(!udpPeerAddresses.has(peer)||previousPeers.get(peer)!==udpPeerAddresses.get(peer))udpMenuOrigins.delete(peer);
             const picker=document.getElementById("logs-source");
             for(const option of [...(picker?.options||[])])if(option.value.startsWith("udp:")) {
@@ -878,7 +886,7 @@
                 if(!udpPeerAddresses.has(peer)||previousPeers.get(peer)!==udpPeerAddresses.get(peer))option.remove();
             }
             if(selectedSource.startsWith("udp:") && (!udpPeerAddresses.has(selectedSource.split(":")[1]) || previousPeers.get(selectedSource.split(":")[1])!==udpPeerAddresses.get(selectedSource.split(":")[1]))) {
-                selectedSource="all";if(picker)picker.value="all";changeLogContext();
+                selectedSource="all";if(picker)picker.value="all";changedPeer=true;
                 networkSourceWarning="The selected peer was removed or its address changed. Its view cursor was reset; other source cursors are unchanged.";
             }
             for (const row of (data.attached || []).slice(0,64)) addSource(`usb:${row.device_id}`, row.name || "Attached Pico");
@@ -891,10 +899,11 @@
             // Replay may beat the asynchronous peer-policy read. Rebuild only
             // from bounded retained records after the current binding is known.
             for (const payload of visibleRecords) rememberJournalSource(payload);
-            if (changedCollector) changeLogContext();
-            if (review) collectionUncertain = false;
+            if (changedCollector || changedPeer) changeLogContext();
+            if (collectionReviewPending) { collectionUncertain = false; collectionReviewPending = false; }
             updateCollectionControl();
-        } catch (error) { sourceStatus(error.message); }
+        } catch (error) { if (generation === sourceRefreshGeneration) sourceStatus(error.message); }
+        finally { activeSourceRefreshes--; }
     }
     async function saveCollection() {
         if (!collectorSnapshot || collectionUncertain) return;
@@ -918,9 +927,13 @@
         selectedSource = document.getElementById("logs-source")?.value || "all";
         selectedSeverity = document.getElementById("logs-severity")?.value || "7";
         hiddenBuffer = []; hiddenBufferedCount = 0; visibleRecords = [];
+        viewCursor = null; inPlayback = false;
         for (const id of ["all","internal"]) { const pane = document.getElementById(id); if (pane) pane.replaceChildren(); }
         updateCollectionControl();
-        renderEmptyState("all", "No records in this view", "Waiting for matching records. Check the source's collection status or choose All sources.");
+        renderEmptyState("all", "No records in this view",
+            selectedSource === "all"
+                ? "Waiting for records. Check collection status in Log options or use Refresh sources."
+                : "Waiting for matching records. Check collection status in Log options or choose All sources.");
         if (!paused) startLogStream();
     }
     function bindSourceControls() {
@@ -940,24 +953,23 @@
             link.href = url; link.download = "wsprry-logs.jsonl"; link.click(); setTimeout(() => URL.revokeObjectURL(url), 1000);
         });
         refreshSources();
-        const sourcesTimer = window.setInterval(() => { if (!document.hidden) refreshSources(); }, 10000);
+        const sourcesTimer = window.setInterval(() => { if (!document.hidden && activeSourceRefreshes === 0) refreshSources(); }, 10000);
         window.addEventListener("beforeunload", () => window.clearInterval(sourcesTimer), {once:true});
     }
 
 
-    function getStoredCursor() {
+    function getViewCursor() {
+        // A persisted cursor describes a previous view, whose rows are absent
+        // after navigation/reload. Only continue the rows retained in this view
+        // (including an explicit Clear); a context change starts a fresh tail.
         if (!/^[0-9a-f]{32}$/.test(collectorIdentity)) return null;
-        try {
-            const v = localStorage.getItem(cursorStorageKey());
-            return (v && v.trim() !== "") ? v.trim() : null;
-        } catch (e) {
-            return null;
-        }
+        return viewCursor?.contextKey === cursorStorageKey() ? viewCursor.cursor : null;
     }
 
     function storeCursor(cursor, contextKey, verified) {
         if (!verified) return;
         if (!cursor || cursor.trim() === "") return;
+        viewCursor = {contextKey, cursor:cursor.trim()};
         try {
             localStorage.setItem(contextKey, cursor.trim());
         } catch (e) {
@@ -1040,7 +1052,7 @@
         url.searchParams.set("source", selectedSource);
         url.searchParams.set("priority_max", selectedSeverity);
 
-        const cursor = getStoredCursor();
+        const cursor = getViewCursor();
         if (cursor) url.searchParams.set("cursor", cursor);
 
         // Hint the server for SSE retry cadence (ms).
@@ -1255,12 +1267,14 @@
 
         // Deterministic replay boundaries.
         evt.addEventListener("playback_start", () => {
+            if (evt !== stream || paused) return;
             lastEventAtMs = Date.now();
             inPlayback = true;
             autoFollow = true;
             scrollLogsToBottom(true);
         });
         evt.addEventListener("playback_end", () => {
+            if (evt !== stream || paused) return;
             lastEventAtMs = Date.now();
             inPlayback = false;
             autoFollow = true;
@@ -1273,13 +1287,13 @@
         evt.addEventListener("heartbeat", handler);
 
         evt.onerror = () => {
-            if (!evt) return;
+            if (evt !== stream || paused) return;
 
             // If the browser gives up (CLOSED), we handle reconnect with backoff.
             if (evt.readyState === EventSource.CLOSED && !isReloading) {
                 debugConsole("warn", "SSE connection closed. Forcing reconnect");
                 setSseStatus("disconnected", "Disconnected", "Stream closed. Reconnecting");
-                renderEmptyState(
+                if (!viewCursor && visibleRecords.length === 0) renderEmptyState(
                     "all",
                     navigator.onLine === false ? "Offline" : "Log stream disconnected",
                     navigator.onLine === false
@@ -1317,7 +1331,8 @@
 
     function handleBrowserOffline() {
         stopLogStream();
-        renderEmptyState(
+        setSseStatus("disconnected", "Offline", "Browser offline; displayed records retained");
+        if (!viewCursor && visibleRecords.length === 0) renderEmptyState(
             "all",
             "Offline",
             "The browser is offline, so the live log stream is paused. Reconnect to the network and start the stream again.",
@@ -1327,7 +1342,7 @@
 
     function handleBrowserOnline() {
         if (paused) return;
-        renderEmptyState(
+        if (!viewCursor && visibleRecords.length === 0) renderEmptyState(
             "all",
             "Reconnecting log stream",
             "Network connectivity returned. The viewer is reconnecting to the local log feed now."
@@ -1396,7 +1411,8 @@
             formatTimestampUTC,
             extractSeverityAndMessage,
             formatUnitFixed16,
-            priorityToLabel, buildStreamUrl, cursorStorageKey, validSource, picoDisplayName, picoLogUnit
+            priorityToLabel, buildStreamUrl, cursorStorageKey, validSource, picoDisplayName, picoLogUnit,
+            viewState: () => ({inPlayback, paused, records:visibleRecords.length, cursor:viewCursor?.cursor})
         };
     }
 
