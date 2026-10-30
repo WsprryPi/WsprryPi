@@ -38,7 +38,13 @@ int main(int argc, char **argv) {
       CHECK(certificate);
       std::unique_ptr<ASN1_TIME, decltype(&ASN1_TIME_free)> date(
           ASN1_STRING_type_new(type), ASN1_TIME_free);
-      CHECK(date && ASN1_STRING_set(date.get(), value.data(), value.size()) == 1);
+      CHECK(date);
+#if OPENSSL_VERSION_NUMBER >= 0x40100000L
+      CHECK(ASN1_STRING_set1_data(date.get(),
+          reinterpret_cast<const unsigned char *>(value.data()), value.size()) == 1);
+#else
+      CHECK(ASN1_STRING_set(date.get(), value.data(), value.size()) == 1);
+#endif
       CHECK((start ? X509_set1_notBefore : X509_set1_notAfter)(certificate.get(), date.get()) == 1);
       CHECK(i2d_re_X509_tbs(certificate.get(), nullptr) > 0);
       auto invalid = selection; invalid.certificate_file = dir + "/invalid-time.crt";
@@ -61,6 +67,10 @@ int main(int argc, char **argv) {
       reject_date(start, V_ASN1_UTCTIME, start ? "2001010000Z" : "4901010000Z");
       reject_date(start, V_ASN1_UTCTIME, start ? "200101000000+0000" : "490101000000+0000");
       reject_date(start, V_ASN1_GENERALIZEDTIME, start ? "20200101000000.1Z" : "20900101000000.1Z");
+      reject_date(start, V_ASN1_UTCTIME,
+          std::string(start ? "200101000000Z" : "490101000000Z") + '\0');
+      reject_date(start, V_ASN1_GENERALIZEDTIME,
+          std::string(start ? "20200101000000Z" : "20900101000000Z") + '\0');
     }
     auto alternate = selection; alternate.certificate_file = dir + "/other.crt"; alternate.key_file = dir + "/other.key";
     CHECK(!credentials->matches(TlsCredentials(alternate)));

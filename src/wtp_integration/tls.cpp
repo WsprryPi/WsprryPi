@@ -136,11 +136,16 @@ bool literal(const std::string &s) {
 int compare_certificate_time(const ASN1_TIME *value, std::time_t now) {
   if (!value) return -2;
   const auto type = ASN1_STRING_type(value);
-  const int expected = type == V_ASN1_UTCTIME ? 13 : type == V_ASN1_GENERALIZEDTIME ? 15 : 0;
+  const std::size_t expected = type == V_ASN1_UTCTIME ? 13 : type == V_ASN1_GENERALIZEDTIME ? 15 : 0;
   const auto *data = ASN1_STRING_get0_data(value);
+#if OPENSSL_VERSION_NUMBER >= 0x40100000L
+  const auto length = ASN1_STRING_get_length(value);
+#else
+  const auto length = static_cast<std::size_t>(ASN1_STRING_length(value));
+#endif
   // General ASN.1 comparisons accept omitted seconds, offsets and fractions.
   // Certificate dates retain the strict RFC 5280 form and fail closed on errors.
-  if (!expected || ASN1_STRING_length(value) != expected || !data || data[expected - 1] != 'Z' ||
+  if (!expected || length != expected || !data || data[expected - 1] != 'Z' ||
       !std::all_of(data, data + expected - 1, [](unsigned char c) { return c >= '0' && c <= '9'; }))
     return -2;
   return ASN1_TIME_cmp_time_t(value, now);
