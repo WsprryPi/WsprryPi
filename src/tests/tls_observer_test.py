@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Linux-only loopback validation of the private Phase 11.5 OpenSSL observer."""
+"""Linux-only loopback validation of the test-only OpenSSL observer."""
 import argparse
 import os
 from pathlib import Path
@@ -67,6 +67,10 @@ def decode_regressions():
     decode(encoded(valid))
     decode(encoded(start+[(3,1,b'hello')]+end,b'P115TLS1'))
     decode(encoded(start+[(7,1,b'x'*65552),(3,1,b'x'*65552)]+end))
+    for openings in ([(1,2,b''),(1,1,b'')], [(1,1,b''),(1,1,b'')]):
+        try: decode(encoded([(0,0,b'')]+openings+[(6,0,b'')]))
+        except ValueError as error: require(str(error) == 'Connection identity reused', str(error))
+        else: raise ValueError('Reordered or reused connection identity accepted')
     invalid=[[(3,1,b'hello')],[(7,1,b'hello'),(3,1,b'wrong')],
              [(7,1,b'hello')],[(8,1,b'')],[(7,1,b'hello'),(7,1,b'hello')],
              [(7,1,b'x'*65553),(3,1,b'x'*65553)]]
@@ -132,7 +136,7 @@ def main():
     if args.child: child(args.child);return
     require(sys.platform == 'linux' and args.observer and args.observer.is_file(),
             'Linux observer library required')
-    with tempfile.TemporaryDirectory(prefix='phase115-observer-test-') as directory:
+    with tempfile.TemporaryDirectory(prefix='tls-observer-test-') as directory:
         root=Path(directory); path=root/'events.bin'
         subprocess.run(['openssl','req','-x509','-newkey','rsa:2048','-nodes','-days','1',
                         '-subj','/CN=localhost','-addext','subjectAltName=DNS:localhost',

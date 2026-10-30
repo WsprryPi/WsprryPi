@@ -90,8 +90,10 @@ SSL *SSL_new(SSL_CTX *context) {
     if (i == 64 || next_id == UINT64_MAX) _exit(99);
     connections[i].ssl = ssl; connections[i].id = ++next_id;
     uint64_t id = connections[i].id;
-    pthread_mutex_unlock(&identities);
+    /* Publish allocation and its opening record in the same order, even when
+     * several callers finish SSL_new concurrently. The decoder requires it. */
     record(1, id, NULL, 0);
+    pthread_mutex_unlock(&identities);
     return ssl;
 }
 void SSL_free(SSL *ssl) {

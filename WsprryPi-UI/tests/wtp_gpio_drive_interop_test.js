@@ -1,9 +1,11 @@
 // Actual protected Pi -> engineering TLS / authenticated Consumer-Radio -> Pico.
 'use strict';
 const assert=require('node:assert/strict'),path=require('node:path'),readline=require('node:readline'),{spawn}=require('node:child_process');
-const build=path.resolve(process.argv[2]),unsupported=process.argv.includes('--unsupported'),legacy=process.argv.includes('--legacy-ui');
+if(!process.argv[2])throw Error('Usage: node wtp_gpio_drive_interop_test.js BUILD_DIRECTORY');
+const {driveCases}=require('./gpio_drive_pair_cases.js');
+const build=path.resolve(process.argv[2]),unsupported=process.argv.includes('--unsupported');
 function lines(child){const queue=[],waiters=[];readline.createInterface({input:child.stdout}).on('line',l=>waiters.length?waiters.shift()(l):queue.push(l));return()=>queue.length?Promise.resolve(queue.shift()):new Promise((resolve,reject)=>{const t=setTimeout(()=>reject(Error('GPIO pair deadline')),30000);waiters.push(l=>{clearTimeout(t);resolve(l);});});}
-(async()=>{for(const carrier of (legacy||process.argv.includes('--engineering-only'))?['engineering']:['engineering','station','ap']){
+(async()=>{for(const carrier of process.argv.includes('--engineering-only')?['engineering']:['engineering','station','ap']){
  let server,client;
  try{
   let readServer;
@@ -16,21 +18,10 @@ function lines(child){const queue=[],waiters=[];readline.createInterface({input:
   const selection=await connect();
   assert.equal(selection.status,200,carrier+': '+JSON.stringify(selection));
   if(process.env.WSPRRYPI_INTEROP_TRACE)console.error(carrier,selection,await get('management'));
-  if(legacy){
-   const {browser,response}=require(path.resolve(process.argv[4]||path.join(__dirname,'wtp_management_fixture.js')));
-   const b=browser(async r=>{const result=await call({method:r.method,path:r.url,body:r.body?JSON.stringify(r.body):'',revision:r.headers?.['If-Match']||'',headers:r.headers||{}});return response(result.body,result.status,result.etag);});
-   for(const drive of [2,4,8,12]){
-    server.stdin.write('DUMP\n');const original=JSON.parse((await readServer()).slice(5));
-    const c={...original.config,wifi:{...original.config.wifi,password:'test-password'},gpio_drive_ma:drive};
-    server.stdin.write('CONFIG '+JSON.stringify(c)+'\n');assert.equal(JSON.parse(await readServer()).ok,true);
-    await b.click('wtp-remote-load');b.element('wtp-remote-callsign').value='K1ABC';await b.click('wtp-remote-save');
-    server.stdin.write('DUMP\n');const after=JSON.parse((await readServer()).slice(5));assert.equal(after.config.gpio_drive_ma??4,drive);assert.equal(after.config.station.callsign,'K1ABC');
-   }
-   console.log('Immutable pre-change Pi UI/client + new Pico: unrelated actual saves preserve all four GPIO drive values');continue;
-  }
   const initial=await get('gpio-drive');
   if(unsupported){assert.equal(initial.status,409,JSON.stringify(initial));const settings=await get('configuration');assert.equal(settings.status,200,JSON.stringify(settings));const r=await post('configuration',{schema:'wsprrypi-pico-settings/1',target:settings.body.target,operation:'save',config:{expires_utc_s:0}},settings.etag);assert.equal(r.status,200,JSON.stringify(r));console.log(carrier+': old firmware drive unavailable; unrelated settings remain usable');continue;}
   assert.equal(initial.status,200,JSON.stringify(initial));const target=initial.body.target;
+  await driveCases(call,{profileOwnedStation:carrier!=='engineering'});
   for(const drive of [2,4,8,12]){
    const before=await get('gpio-drive');const written=await post('gpio-drive',{schema:'transmitter-gpio-drive/1',target,gpio_drive_ma:drive},before.etag);
    assert.equal(written.status,200,JSON.stringify(written));assert.equal(written.body.saved,drive);assert.equal(written.body.pad_readback,null);

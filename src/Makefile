@@ -2056,6 +2056,7 @@ wtp-config-interop-test: wtp-config-client-build wtp-config-test
 	$(Q)"$(WTP_NETWORK_BUILD_DIR)/consumer_interop" --scheduler-frequency "$(WTP_NETWORK_BUILD_DIR)/scheduler-frequency.jsonl"
 	$(Q)node ../WsprryPi-UI/tests/wtp_resources_interop_test.js "$(abspath $(WTP_NETWORK_BUILD_DIR))"
 	$(Q)node ../WsprryPi-UI/tests/wtp_amplifier_timing_interop_test.js "$(abspath $(WTP_NETWORK_BUILD_DIR))"
+	$(Q)node ../WsprryPi-UI/tests/wtp_gpio_drive_interop_test.js "$(abspath $(WTP_NETWORK_BUILD_DIR))"
 	$(Q)node tests/network/consumer_browser_interop.js "$(abspath $(WTP_NETWORK_BUILD_DIR))" "$(abspath $(PICO_SOURCE))"
 wtp-network-interop-test: wtp-tls-build wtp-api-test wtp-network-process-test
 	$(Q)cmake -S tests/network -B "$(WTP_NETWORK_BUILD_DIR)" -DPICO_SOURCE="$(abspath $(PICO_SOURCE))" -DMBEDTLS_SOURCE="$(abspath $(MBEDTLS_SOURCE))"
@@ -2184,3 +2185,15 @@ udp-logging-test:
 	$(Q)mkdir -p build/udp-logging
 	$(Q)$(CXX) -std=c++20 -O2 -Wall -Wextra -Wpedantic -Werror -I. -IWTP-Client/include tests/udp_logging_test.cpp -o build/udp-logging/udp_logging_test
 	$(Q)build/udp-logging/udp_logging_test
+
+# Actual application and finite read-only load, built without physical backends.
+.PHONY: production-browser-regression-test tls-observer-test
+TEST_NETNS_RUNNER ?= unshare --net
+production-browser-regression-test: debug
+	$(Q)python3 -B tests/production_browser_load_test.py
+	$(Q)$(TEST_NETNS_RUNNER) python3 -B tests/production_ini_roundtrip_test.py "$(abspath $(PROFILE_DEBUG_BIN))"
+
+tls-observer-test:
+	$(Q)mkdir -p "$(WTP_NETWORK_BUILD_DIR)"
+	$(Q)$(CC) -std=c11 -shared -fPIC -Wall -Wextra -Werror tests/network/tls_observer.c -o "$(WTP_NETWORK_BUILD_DIR)/tls_observer.so" $(OPENSSL_CFLAGS) $(OPENSSL_LIBS) -ldl -pthread
+	$(Q)python3 -B tests/tls_observer_test.py --observer "$(abspath $(WTP_NETWORK_BUILD_DIR))/tls_observer.so"

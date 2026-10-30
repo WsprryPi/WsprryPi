@@ -2,6 +2,7 @@
 "use strict";
 const assert=require("node:assert/strict"), readline=require("node:readline"),{spawn}=require("node:child_process");
 const {browser,reply,target}=require("./wtp_usb_settings_test.js");
+const {driveCases}=require("./gpio_drive_pair_cases.js");
 (async()=>{
     const args=process.argv.slice(2);if(!args.length)throw new Error("Usage: node wtp_usb_pair_test.js CLIENT_COMMAND [arguments]");
     const child=spawn(args[0],args.slice(1),{stdio:["pipe","pipe","inherit"]});
@@ -98,6 +99,7 @@ const {browser,reply,target}=require("./wtp_usb_settings_test.js");
         const driveInitial=await request({method:"GET",path:"/api/v1/member/gpio-drive",body:""});
         if(process.env.WSPRRYPI_GPIO_DRIVE_REQUIRED === "1") assert.equal(driveInitial.status,200,JSON.stringify(driveInitial));
         if(driveInitial.status===200) { assert.equal(driveInitial.body.saved,4);
+            await driveCases(request);
         for (const value of [2,8,12,4]) {
             const read=await request({method:"GET",path:"/api/v1/member/gpio-drive",body:""});
             const write=await request({method:"PUT",path:"/api/v1/member/gpio-drive",body:JSON.stringify({schema:"transmitter-gpio-drive/1",target,gpio_drive_ma:value}),revision:read.etag});

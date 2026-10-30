@@ -1,11 +1,12 @@
 // SPDX-License-Identifier: MIT
-// Hardware-free rendered WTP network workflow with mocked HTTP responses.
+// Hardware-free rendered USB profile, settings and logging workflow with mocked HTTP responses.
 "use strict";
 
 const assert = require("node:assert/strict");
 const http = require("node:http");
 const net = require("node:net");
 const path = require("node:path");
+const os = require("node:os");
 const { spawnFixtureChild, waitForSpawn, childDiagnostic, spawnIsolatedProcess, stopIsolatedProcess, stopChild } = require("./browser_fixture_process.js");
 const WebSocket = require("ws");
 
@@ -107,7 +108,8 @@ class CdpClient {
     send(method, params = {}) {
         const id = this.nextId++;
         return new Promise((resolve, reject) => {
-            this.pending.set(id, { resolve, reject });
+            const timer=setTimeout(()=>{this.pending.delete(id);reject(new Error("CDP deadline: "+method));},15000);
+            this.pending.set(id, { resolve:value=>{clearTimeout(timer);resolve(value);}, reject:error=>{clearTimeout(timer);reject(error);} });
             this.socket.send(JSON.stringify({ id, method, params }));
         });
     }
@@ -121,11 +123,11 @@ async function main() {
     const fs=require("node:fs");
     const phpPort=await freePort(), debugPort=await freePort();
     const url=`http://127.0.0.1:${phpPort}/index.php?page=config`;
-    const output=path.resolve(UI_ROOT,"../src/build/wtp-network/ui-usb-progress");fs.mkdirSync(output,{recursive:true});
-    const profileDir=`/tmp/wsprrypi-usb-ui-${process.pid}`;
-    let php,chrome,client;
+    const output=path.resolve(process.env.WSPRRYPI_USB_UI_EVIDENCE_DIR || path.join(UI_ROOT,"../src/build/wtp-network/ui-usb-progress"));fs.mkdirSync(output,{recursive:true});
+    const profileDir=fs.mkdtempSync(path.join(os.tmpdir(),"wsprrypi-usb-ui-"));
+    let php,chrome,client,failure;
     try {
-        php=spawnFixtureChild("php",["-S",`127.0.0.1:${phpPort}`,"-t","data","tests/browser_fixture_router.php"],{cwd:UI_ROOT});
+        php=spawnFixtureChild(process.env.PHP_BIN || "php",["-S",`127.0.0.1:${phpPort}`,"-t","data","tests/browser_fixture_router.php"],{cwd:UI_ROOT});
         await waitForSpawn(php);await waitFor(async()=>await getStatus(url)===200,"PHP fixture");
         chrome=spawnIsolatedProcess(process.env.CHROME_BIN || (process.platform==="darwin"?"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome":"chromium"),
             ["--headless","--no-sandbox","--disable-gpu","--no-first-run","--no-default-browser-check","--disable-background-networking",`--remote-debugging-port=${debugPort}`,`--user-data-dir=${profileDir}`,url]);
@@ -151,18 +153,19 @@ async function main() {
                         window.__catalog.profiles[0].settings=body.settings;
                     }
                 }
-                const path=String(url),header={get:()=> '\\"usb-r1\\"'};
+                const path=String(url);if(path.endsWith('/member/logging') && window.__loggingConflict)return {ok:false,status:412,headers:{get:()=>''},json:async()=>({error:{code:'revision_conflict'}})};const header={get:()=> '\\"usb-r1\\"'};
                 let value=(path.includes('/api/wtp') || path.endsWith('/api/v1/status'))?window.__snapshot:
-                    path.endsWith('/member/management')?{carrier:'usb_physical',connected:true,host:'',selection_id:'usb-selection',session:null}:
+                    path.endsWith('/member/management')?{carrier:'usb_physical',connected:true,host:'',selection_id:'f'.repeat(32),session:null}:
                     path.endsWith('/member/hostname')?{schema:'transmitter-hostname/1',target,saved:'workbench-pico.local',active:'workbench-pico.local',default:'wsprrypico-aaaaaaaa.local',writable:true,pending_restart:false}:
-                    path.endsWith('/member/progress')?{schema:'transmitter-progress/1',target,draft_revision:'1',station:{callsign:'AA0NT',locator:null,power_dbm:null},station_complete:false,complete:false,apply_domains:{station:false},matches_applied:false,schedule_suspended:true}:
+                    path.endsWith('/member/progress')?{schema:'transmitter-progress/1',target,draft_revision:'1',config_revision:'0',profile_revision:'0',fields:{callsign:'AA0NT'},last_receipt:null,last_outcomes:{},applied_station:null,station:{callsign:'AA0NT',locator:null,power_dbm:null},station_complete:false,complete:false,apply_domains:{all:false,network:false,radio:false,station:false},wspr_plan:null,schedule_enabled:false,matches_applied:false,schedule_suspended:true}:
+                    path.endsWith('/member/logging')?{schema:'transmitter-logging/1',target,saved:{enabled:true,maximum_severity:6},active:{enabled:true,maximum_severity:6,streaming:false,dropped:'0'}}:
                     path.endsWith('/member/wifi')?{schema:'transmitter-wifi/1',target,wifi:null,pending_restart:false,storage_healthy:true}:
                     path.endsWith('/host/devices')?window.__catalog:
                     path.endsWith('/host/discovery')?{available:false,candidates:[],reason:'USB workflow'}:{};
                 return {ok:true,status:200,headers:header,json:async()=>value};
             };
             WtpUi.populate({Transport:'usb',Endpoint:'/dev/serial/by-id/pico-if02','USB Serial':'PICO123','USB Vendor ID':51966,'USB Product ID':16402,'Device ID':'a'.repeat(32),'Start Uncertainty ns':1000000,'Allow Frequency Adjustment':false});
-            WtpUi.select(true);bootstrap.Tab.getOrCreateInstance(document.getElementById('transmitter-hardware-tab')).show();
+            WtpUi.select(true);bootstrap.Tab.getOrCreateInstance(document.getElementById('transmitter-hardware-tab')).show();bootstrap.Tab.getOrCreateInstance(document.getElementById('fleet-tab')).show();
 
             document.getElementById('wtp-management').open=true;
         })()`);
@@ -171,6 +174,8 @@ async function main() {
         await waitFor(async()=>await evaluate("document.getElementById('wtp-usb-feedback').textContent.includes('No saved Wi-Fi')"),"USB no-network state");
         await evaluate("document.getElementById('wtp-usb-progress-load').click()");
         await waitFor(async()=>await evaluate("document.getElementById('wtp-usb-progress-state').textContent.includes('station incomplete')"),"partial saved progress");
+        await evaluate("document.getElementById('wtp-usb-logging-read').click()");
+        await waitFor(async()=>await evaluate("!document.getElementById('wtp-usb-logging-save').disabled"),"logging readback through shipped controls");
         const findings=[];
         for(const [name,width,height] of [["desktop",1440,1100],["mobile",390,844]]) {
             await client.send("Emulation.setDeviceMetricsOverride",{width,height,deviceScaleFactor:1,mobile:name==="mobile"});
@@ -178,12 +183,29 @@ async function main() {
                 await evaluate(`applyThemePreference('${theme}');document.getElementById('wtp-usb-settings').scrollIntoView({block:'start',behavior:'instant'});window.scrollBy(0,-110)`);
                 await new Promise(resolve=>setTimeout(resolve,100));
                 assert.equal(await evaluate('document.documentElement.scrollWidth<=innerWidth'),true,`${name}/${theme} horizontal overflow`);
-                assert.equal(await evaluate('document.getElementById("fleet-tab").textContent'),"Pico","normal toggle exposes Pico; advanced fleet schedules remain hidden");
+                await evaluate("document.getElementById('wtp-usb-logging-controls').open=true;document.getElementById('wtp-usb-logging-enabled').focus()");
+                assert.equal(await evaluate("document.activeElement.id"),'wtp-usb-logging-enabled',await evaluate("JSON.stringify((()=>{const a=[];for(let e=document.getElementById('wtp-usb-logging-enabled');e;e=e.parentElement)a.push({id:e.id,cls:e.className,hidden:e.hidden,disabled:e.disabled,display:getComputedStyle(e).display});return a;})())"));
+                assert.equal(await evaluate('document.documentElement.scrollWidth<=innerWidth'),true,'full-page logging controls fit');
+                assert.equal(await evaluate('document.getElementById("fleet-tab").textContent.trim()'),"Fleet","shipped Fleet navigation label");
+                assert.equal(await evaluate('document.getElementById("fleet-pane").classList.contains("active")'),true);
                 assert.equal(await evaluate('document.getElementById("wtp-usb-wifi-save").disabled'),false);
                 const state=await evaluate(`(() => {const input=document.getElementById('wtp-usb-ssid'),s=getComputedStyle(input),r=input.getBoundingClientRect();input.focus();return {font:s.fontSize,height:r.height,width:r.width,focus:document.activeElement===input};})()`);
                 assert(state.focus&&state.height>0&&state.width>150,JSON.stringify(state));findings.push({name,theme,...state});
                 await evaluate("document.getElementById('wtp-usb-progress-heading').scrollIntoView({block:'start',behavior:'instant'});window.scrollBy(0,-120)");
                 const shot=await client.send("Page.captureScreenshot",{format:"png"});fs.writeFileSync(path.join(output,`${name}-${theme}.png`),Buffer.from(shot.data,"base64"));
+            }
+        }
+        await evaluate("window.__loggingConflict=true;document.getElementById('wtp-usb-logging-read').click()");
+        await waitFor(async()=>await evaluate("document.getElementById('wtp-usb-logging-status').textContent.includes('changed elsewhere')"),"authoritative logging conflict feedback");
+        assert.equal(await evaluate("document.getElementById('wtp-usb-logging-save').disabled"),true);
+        for(const [name,width,height] of [["desktop",1440,1100],["mobile",390,844]]) {
+            await client.send("Emulation.setDeviceMetricsOverride",{width,height,deviceScaleFactor:1,mobile:name==="mobile"});
+            for(const theme of ["light","dark"]) {
+                await evaluate(`(async()=>{applyThemePreference('${theme}');document.activeElement?.blur();await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));document.getElementById('wtp-usb-logging-status').scrollIntoView({block:'center',behavior:'instant'});await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));})()`);
+                assert.equal(await evaluate('document.documentElement.scrollWidth<=innerWidth'),true,'logging refusal fits full page');
+                assert.equal(await evaluate("(()=>{const r=document.getElementById('wtp-usb-logging-status').getBoundingClientRect();return r.bottom>110 && r.top<innerHeight-40;})()"),true,'logging refusal is visible in the captured viewport');
+                assert.equal(await evaluate("document.getElementById('wtp-usb-logging-status').closest('fieldset:disabled')"),null,'refusal stays outside disabled controls');
+                const shot=await client.send("Page.captureScreenshot",{format:"png"});fs.writeFileSync(path.join(output,`logging-conflict-${name}-${theme}.png`),Buffer.from(shot.data,"base64"));
             }
         }
         // Exercise the actual profile editor and active form. Choosing the preset
@@ -209,9 +231,10 @@ async function main() {
             for(const theme of ["light","dark"]) {
                 await evaluate(`applyThemePreference('${theme}')`);
                 for(const surface of ["fleet","wtp"]) {
+                    await evaluate(`bootstrap.Tab.getOrCreateInstance(document.getElementById('fleet-tab')).show()`);
                     const field=surface==="fleet"?"fleet-uncertainty":"wtp_uncertainty";
                     const preset=surface==="fleet"?"fleet-uncertainty-default":field;
-                    await evaluate(`document.getElementById('${field}').closest('.config-stacked-field').scrollIntoView({block:'center',behavior:'instant'});document.getElementById('${preset}').focus()`);
+                    await evaluate(`for(let e=document.getElementById('${field}');e;e=e.parentElement)if(e.tagName==='DETAILS'&&!e.open)e.querySelector('summary').click();document.getElementById('${field}').closest('.config-stacked-field').scrollIntoView({block:'center',behavior:'instant'});document.getElementById('${preset}').focus()`);
                     await new Promise(resolve=>setTimeout(resolve,100));
                     const state=await evaluate(`(() => {const input=document.getElementById('${field}'),button=document.getElementById('${preset}'),r=input.getBoundingClientRect();return {focus:document.activeElement===button,width:r.width,height:r.height,value:input.value,overflow:document.documentElement.scrollWidth>innerWidth};})()`);
                     assert(state.focus&&state.width>150&&state.height>0&&!state.overflow,JSON.stringify(state));
@@ -220,6 +243,7 @@ async function main() {
                 }
             }
         }
+        await evaluate("bootstrap.Tab.getOrCreateInstance(document.getElementById('fleet-tab')).show()");
         await evaluate("window.confirm=()=>true;document.getElementById('fleet-save').click()");
         await waitFor(async()=>await evaluate("document.getElementById('fleet-editor').hidden"),"explicit profile save");
         const mutations=await evaluate("window.__mutations");
@@ -231,11 +255,14 @@ async function main() {
         await evaluate("document.getElementById('fleet-edit').click()");
         assert.equal(await evaluate("document.getElementById('fleet-uncertainty').value"),"100000000");
         fs.writeFileSync(path.join(output,"checks.json"),JSON.stringify(findings,null,2)+"\n");
-        console.log("Rendered ordinary Pico toggle, configured common name and USB no-network editor at desktop/mobile in light/dark; no horizontal overflow; advanced fleet remains hidden by default; 100 ms profile draft-only adoption, active form collection, explicit profile save/reload and focus/input sizes passed");
+        console.log("Rendered Fleet navigation, configured common name and USB no-network/logging editors at desktop/mobile in light/dark; no horizontal overflow; 100 ms profile draft-only adoption, active form collection, explicit profile save/reload and focus/input sizes passed");
         console.log(output);
-    } finally {
-        if(client)client.close();if(chrome)await stopIsolatedProcess(chrome);if(php)await stopChild(php);
-        fs.rmSync(profileDir,{recursive:true,force:true});
+    } catch(error) {failure=error;throw error;} finally {
+        if(client)client.close();
+        const stopped=await Promise.allSettled([stopIsolatedProcess(chrome),stopChild(php)]);
+        const errors=stopped.filter(result=>result.status==='rejected').map(result=>result.reason);
+        if(errors.length)throw new AggregateError(failure?[failure,...errors]:errors,'USB UI fixture shutdown failed');
+        fs.rmSync(profileDir,{recursive:true,force:true,maxRetries:10,retryDelay:100});
     }
 }
 main().catch(error=>{console.error(error);process.exitCode=1;});

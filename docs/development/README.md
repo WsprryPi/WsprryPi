@@ -40,6 +40,19 @@ On its selected branches, the non-hardware workflow starts with a lightweight ch
 
 Concurrency groups include the commit SHA so a documentation-only successor cannot cancel or replace an earlier code-validation run. Different commits can therefore validate concurrently; duplicate runs of the same commit retain cancellation. When documentation becomes a build or regression input, add it to the classifier's checked-input policy before relying on it in tests.
 
+## Production application and browser regressions
+
+The Linux application regression builds the current source with only simulated and WTP backends and ancillary GPIO disabled. It starts the explicit simulated backend in a private network namespace, verifies canonical INI values and safe refusal of case-mismatched keys and DEFAULT values used in place of required canonical keys through the actual application, and runs finite browser-read profiles with synthetic schedule time. Reads must preserve both saved INI bytes and exposed configuration. It opens no transmitter device and supplies no RF qualification.
+
+```sh
+make -C src production-browser-regression-test BACKENDS=simulated ANCILLARY_GPIO=0 SUDO= TEST_NETNS_RUNNER="sudo unshare --net"
+make -C src tls-observer-test SUDO=
+```
+
+The TLS observer regression uses fresh loopback certificates, concurrent local streams and strict validation of record identity, ordering, partial writes and corrupt/truncated input. Both historical observer record versions remain accepted explicitly. The production network CI lane runs these checks and the rendered USB profile editor, including custom uncertainty values, explicit preset application, logging refusal feedback and desktop/mobile light/dark layouts.
+
+Both production network and USB pairs exercise all four GPIO drive strengths and a byte-identical Pi management producer from revision `411883266bfe4bcbf845b3b8f1caabd74851c23e`, before drive-field support. The checked fixture's hash and provenance are verified before execution. Engineering TLS and USB accept its complete-station Save while preserving the separate drive setting. Consumer-Radio refuses its profile-owned station writes without changing Pico journal bytes, generation or cursor and preserves drive during valid unrelated saves. Invalid strengths must fail without mutation. The USB CI invocation sets `WSPRRYPI_GPIO_DRIVE_REQUIRED=1`, so missing drive support cannot silently bypass these cases. These checks establish software interoperability, not physical pad current or RF output. Installed-journal resume checks and hardware probes remain explicit opt-in tools.
+
 ## Maintained contracts and tools
 
 - [WTP execution plans](../wtp-execution-plan.md), [backend](../wtp-backend.md),
