@@ -209,7 +209,7 @@ async function main() {
             const style = document.createElement('style'); style.textContent='* { scroll-behavior: auto !important; }'; document.head.append(style);
             window.__resourceFixtures = ${JSON.stringify(resourceFixtures)};
             window.__resourceState = 'loaded';
-            window.__progress = {"schema": "progress", "target": {"scope": "member", "device_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "boot_id": "11111111111111111111111111111111"}, "draft_revision": "1", "config_revision": "1", "profile_revision": "0", "fields": {"callsign": "AA0NT", "locator": null, "power_dbm": null}, "last_receipt": null, "last_outcomes": {}, "applied_station": {"callsign": "AA0NT", "locator": "EM18", "power_dbm": 20}, "station": {"callsign": "AA0NT", "locator": null, "power_dbm": null}, "station_complete": false, "complete": false, "apply_domains": {"station": false, "network": false, "radio": false, "all": false}, "wspr_plan": null, "schedule_enabled": false, "schedule_suspended": true, "matches_applied": false};
+            window.__progress = {"contract":"Wsprry-Control/1","schema": "progress", "target": {"scope": "member", "device_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "boot_id": "11111111111111111111111111111111"}, "draft_revision": "1", "config_revision": "1", "profile_revision": "0", "fields": {"callsign": "AA0NT", "locator": null, "power_dbm": null}, "last_receipt": null, "last_outcomes": {}, "applied_station": {"callsign": "AA0NT", "locator": "EM18", "power_dbm": 20}, "station": {"callsign": "AA0NT", "locator": null, "power_dbm": null}, "station_complete": false, "complete": false, "apply_domains": {"drive":false,"station": false, "network": false, "radio": false, "all": false}, "wspr_plan": null, "schedule_enabled": false, "schedule_suspended": true, "matches_applied": false};
             window.__requests = [];
             window.__remoteFailure = false;
             window.__statusFailure = false;
@@ -220,12 +220,12 @@ async function main() {
                 window.__requests.push({url,options});
                 if (String(url).endsWith('/member/filter-selector')) {
                     const defaults={policy:'fixed_manual',release_ms:20,settle_ms:20,selectors:[],ranges:[]};
-                    window.__filters ||= {schema:'filter-selector',target:window.__resourceFixtures.loaded.target,saved:structuredClone(defaults),boot_active:structuredClone(defaults),pending_restart:false,selected_id:null,selection_known:true,admission_error:null,output_active:false,rf_active:false,storage_healthy:true,reserved:[{gp:2,role:'rf'},{gp:14,role:'button'}]};
+                    window.__filters ||= {contract:'Wsprry-Control/1',schema:'filter-selector',target:window.__resourceFixtures.loaded.target,saved:structuredClone(defaults),boot_active:structuredClone(defaults),pending_restart:false,selected_id:null,selection_known:true,admission_error:null,output_active:false,rf_active:false,storage_healthy:true,reserved:[{gp:2,role:'rf'},{gp:14,role:'button'}]};
                     if(options.method==='PUT'){window.__filters.saved=JSON.parse(options.body).settings;window.__filters.pending_restart=true;}
                     return {ok:true,headers:{get:()=> '"'+(window.__filters.pending_restart?'4':'3').repeat(64)+'"'},json:async()=>structuredClone(window.__filters)};
                 }
                 if (String(url).endsWith('/member/amplifier-timing')) {
-                    window.__timing ||= {schema:'amplifier-timing',target:window.__resourceFixtures.loaded.target,saved:{lead_ms:200,tail_ms:200},boot_active:{lead_ms:200,tail_ms:200},pending_restart:false,phase:'inactive',output_active:false,rf_active:false,storage_healthy:true};
+                    window.__timing ||= {contract:'Wsprry-Control/1',schema:'amplifier-timing',target:window.__resourceFixtures.loaded.target,saved:{lead_ms:200,tail_ms:200},boot_active:{lead_ms:200,tail_ms:200},pending_restart:false,phase:'inactive',output_active:false,rf_active:false,storage_healthy:true};
                     if(options.method==='PUT'){window.__timing.saved=JSON.parse(options.body).timing;window.__timing.pending_restart=true;}
                     return {ok:true,headers:{get:()=>window.__timing.pending_restart?'\"timing-r2\"':'\"timing-r1\"'},json:async()=>structuredClone(window.__timing)};
                 }
