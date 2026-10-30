@@ -775,10 +775,11 @@
     const validSource = value => /^(all|local|(?:pico|usb):[0-9a-f]{32}|udp:[A-Za-z0-9_-]{1,32}:(?:pico|pi):[0-9a-f]{32}(?::(?:direct|relay))?)$/.test(value);
     const loggingApi = () => (window.WSPRRYPI_PATHS?.sharedApiPath || "/api/v1") + "/host/logging";
     function sourceStatus(text) {
-        const status = document.getElementById("logs-source-status");
-        if (status) {
-            const scope = selectedSource.startsWith("udp:") ? selectedSource.split(":") : null;
-            status.textContent = scope ? `${scope[2]} ${scope[3]} via ${scope[1]} · ${scope[4] || "all paths"}. ${text}` : text;
+        const scope = selectedSource.startsWith("udp:") ? selectedSource.split(":") : null;
+        const message = scope ? `${scope[2]} ${scope[3]} via ${scope[1]} · ${scope[4] || "all paths"}. ${text}` : text;
+        for (const id of ["logs-source-status", "logs-options-status"]) {
+            const status = document.getElementById(id);
+            if (status) status.textContent = message;
         }
     }
     function picoDisplayName(id, reportedName, sources = collectorSnapshot) {

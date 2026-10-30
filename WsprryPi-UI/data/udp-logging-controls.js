@@ -28,10 +28,10 @@ function init(){
    try{const {value:v}=await exchange('host/udp-logging/installation');
     if(!root.WsprryUdp.keys(v,['schema','target','worker_state','native_journal_state','policy_state','service_state'])||v.schema!=='host-udp-installation/1'||!root.WsprryUdp.keys(v.target,['scope','collector_id'])||v.target.scope!=='host'||v.target.collector_id!==result.value.target.collector_id||!['missing','unsafe','installed'].includes(v.worker_state)||!['available','unavailable'].includes(v.native_journal_state)||!['valid','invalid','unavailable'].includes(v.policy_state)||!['inactive','running','bind_error','ready'].includes(v.service_state))throw Error('Invalid installation status');
     installation.textContent=`Logging worker: ${v.worker_state}. Native journal: ${v.native_journal_state}. Policy: ${v.policy_state}. Service: ${v.service_state.replaceAll('_',' ')}.`;
-   }catch(_){installation.textContent='Logging installation status is unavailable. Read settings to retry.';}
+   }catch(_){installation.textContent='Logging installation status is unavailable. Reopen the Logs page to retry.';}
   }return result;
  }
- root.WsprryHostUdp=root.WsprryUdp.mount(host,{...common,host:true,capabilitiesPath:'udp-logging/capabilities',resourcePath:'host/udp-logging',exchange:hostExchange,
+ root.WsprryHostUdp=root.WsprryUdp.mount(host,{...common,host:true,autoRead:true,capabilitiesPath:'udp-logging/capabilities',resourcePath:'host/udp-logging',exchange:hostExchange,
   usbSources:async()=>{const r=await exchange('host/logging');if(r.value.schema!=='host-usb-logging/1')throw Error('USB collection settings unavailable');return r.value;}});
  }
 }

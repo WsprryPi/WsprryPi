@@ -91,7 +91,8 @@
     background: var(--logs-overlay-surface);
 }
 
-#logs-overlay-controls .btn {
+#logs-overlay-controls .btn,
+#sse-status-badge {
     box-sizing: border-box;
     margin: 0;
     border-width: 1px;
@@ -107,17 +108,8 @@
     box-shadow: none;
 }
 
-/* SSE status badge (top-right overlay). */
+/* Stream state shares toolbar control geometry without becoming interactive. */
 #sse-status-badge {
-    min-height: 2rem;
-    padding: 0.3rem 0.75rem;
-    border-radius: 999px;
-    font-size: var(--text-kicker);
-    font-weight: var(--weight-semibold);
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
-    line-height: 1.4;
-    border: 1px solid var(--logs-overlay-border);
     color: var(--logs-text);
     user-select: none;
     pointer-events: none;
@@ -358,7 +350,6 @@
 }
 
 .logs-source-control {
-    order: -1;
     display: flex;
     align-items: center;
     gap: 0.75rem;
@@ -369,10 +360,10 @@
 .logs-source-control .form-select { min-height: 2.75rem; min-width: 0; }
 .logs-source-status { font-family: var(--bs-body-font-family); color: var(--logs-muted); overflow-wrap: anywhere; }
 .logs-source-status:empty { display: none; }
-.logs-options { margin-bottom: 0.75rem; font-family: var(--bs-body-font-family); }
-.logs-options-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 0.75rem; padding: 0.75rem 0; }
+.logs-options-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 0.75rem; }
 .logs-options-controls .form-select { width: auto; min-height: 2.75rem; }
 .logs-options-controls p { flex-basis: 100%; }
+.logs-modal .btn { min-height: 2.75rem; }
 @media (max-width: 767.98px) {
     .logs-source-control { order: 0; flex-basis: 100%; }
     .logs-options-controls .btn { min-height: 2.75rem; }

@@ -43,10 +43,10 @@ function mount(element,options){
  const host=options.host===true,prefix=`udp-log-${++serial}-`,doc=root.document;
  let snapshot=null,revision='',epoch=0,available=true,writable=true,busy=false,dirty=false,diagnostic=null,reviewRequired=false;
  const el=(tag,text)=>{const node=doc.createElement(tag);if(text!==undefined)node.textContent=text;return node;};
- const read=el('button','Read UDP logging settings');read.type='button';read.className=options.buttonClass||'';
+ const read=el('button',options.autoRead?'Retry loading settings':'Read UDP logging settings');read.type='button';read.className=options.buttonClass||'';
  const test=el('button','Test saved UDP export');test.type='button';test.className=options.buttonClass||'';
  const form=el('form'),fieldset=el('fieldset');fieldset.disabled=true;form.append(fieldset);
- const status=el('p','Read settings to see saved and active UDP logging state.');status.setAttribute('role','status');status.setAttribute('aria-live','polite');
+ const status=el('p',options.autoRead?'Loading saved and active UDP logging settings…':'Read settings to see saved and active UDP logging state.');status.setAttribute('role','status');status.setAttribute('aria-live','polite');
  const identity=el('p');identity.className='text-break';const nodes={};
  const comparison=el('details'),savedList=el('ul'),review=el('button','Confirm review');
  comparison.append(el('summary','Saved UDP logging settings'),savedList,review);comparison.hidden=true;
@@ -89,7 +89,7 @@ function mount(element,options){
  }
  const save=el('button',host?'Save logging on this Pi':'Save Pico UDP logging');save.type='submit';save.className=options.buttonClass||'';fieldset.append(save);
  element.append(read,test,identity,comparison,form,status);
- const show=()=>{const policy=snapshot&&(host?snapshot.saved.sender:snapshot.saved);const testable=diagnostic&&policy?.enabled&&(!host||policy.native_enabled)&&policy.maximum_severity>=(host?6:5)&&(!policy.event_codes.length||policy.event_codes.includes(diagnostic.event_code));test.disabled=busy||!available||!writable||!testable||dirty;test.title=testable?'Send one fixed event using the saved policy; receipt remains unknown.':diagnostic?'Enable and save export with the test event included before testing.':'Test events are unavailable until compatible settings are read.';read.disabled=busy||!available;fieldset.disabled=busy||!available||!snapshot;save.disabled=busy||!writable||!available||!snapshot||reviewRequired;review.hidden=!snapshot||!reviewRequired;review.disabled=busy||!available||!writable||!snapshot;};
+ const show=()=>{const policy=snapshot&&(host?snapshot.saved.sender:snapshot.saved);const testable=diagnostic&&policy?.enabled&&(!host||policy.native_enabled)&&policy.maximum_severity>=(host?6:5)&&(!policy.event_codes.length||policy.event_codes.includes(diagnostic.event_code));test.disabled=busy||!available||!writable||!testable||dirty;test.title=testable?'Send one fixed event using the saved policy; receipt remains unknown.':diagnostic?'Enable and save export with the test event included before testing.':'Test events are unavailable until compatible settings are read.';read.disabled=busy||!available;read.hidden=options.autoRead===true&&(busy||snapshot!==null);element.setAttribute('aria-busy',busy?'true':'false');fieldset.disabled=busy||!available||!snapshot;save.disabled=busy||!writable||!available||!snapshot||reviewRequired;review.hidden=!snapshot||!reviewRequired;review.disabled=busy||!available||!writable||!snapshot;};
  const invalidate=()=>{diagnostic=null;snapshot=null;revision='';comparison.hidden=true;identity.textContent='';reviewRequired=dirty;++epoch;show();};
  const fromForm=()=>{
   const s={enabled:nodes.enabled.checked,destination_ipv4:nodes.destination_ipv4.value||null,destination_port:Number(nodes.destination_port.value),maximum_severity:Number(nodes.maximum_severity.value),event_codes:nodes.event_codes.value.split(',').map(x=>x.trim()).filter(Boolean),rate:Number(nodes.rate.value),burst:Number(nodes.burst.value)};
@@ -144,7 +144,7 @@ function mount(element,options){
    status.textContent=`Saved revision ${revision}; applied ${snapshot.active.applied_revision||'none'}. Export: ${(host?snapshot.saved.sender:snapshot.saved).enabled?'enabled':'disabled'}. Active: ${active.state.replaceAll('_',' ')}. Locally submitted: ${active.counters.locally_submitted}; local failures: ${active.counters.locally_failed}; queued: ${active.queued}; overflow: ${active.counters.overflow}; expired: ${active.counters.expired}. Collector receipt is unknown.${host?` Collection: ${snapshot.active.collector.state.replaceAll('_',' ')} at ${snapshot.active.collector.bind_ipv4||'no bound address'}:${snapshot.active.collector.port||'no port'}. Accepted into journal: ${snapshot.active.collector.counters.journal_submitted}; duplicates: ${snapshot.active.collector.counters.duplicate}; conflicts: ${snapshot.active.collector.counters.conflict}; discontinuities: ${snapshot.active.collector.counters.discontinuity}.`:''}${dirty?' Your draft is preserved; review it against the saved state before saving.':''}`;
    if(reviewRequired)status.textContent+=' Compare the saved settings above with your preserved draft, then confirm review before saving.';
   }catch(error){snapshot=null;revision='';dirty=dirty||saveRequested;reviewRequired=dirty;comparison.hidden=true;status.textContent=`${saveRequested?'Save unconfirmed. ':''}${error.message||'UDP logging unavailable.'} Read settings and review saved state before another save. Your draft is preserved.`;}
-  finally{busy=false;show();}
+  finally{busy=false;if(options.autoRead)status.textContent=status.textContent.replaceAll('Read settings','Retry loading settings').replaceAll('read settings','retry loading settings');show();}
  }
  form.addEventListener('input',()=>{dirty=true;show();});form.addEventListener('submit',e=>{e.preventDefault();perform(true);});read.addEventListener('click',()=>perform(false));
  review.addEventListener('click',()=>{if(!snapshot||busy||!writable)return;reviewRequired=false;status.textContent='Saved settings reviewed. Your draft is unchanged. Save explicitly to apply it.';show();});
@@ -158,8 +158,9 @@ function mount(element,options){
    busy=false;await perform(false);
    status.textContent+=(r.accepted?' One test event was admitted locally.':' The test event was dropped locally.')+' Collector receipt is unknown.';
   }catch(error){snapshot=null;revision='';status.textContent='Test result unconfirmed. Read settings before another test or save. '+error.message;}
-  finally{busy=false;show();}
+  finally{busy=false;if(options.autoRead)status.textContent=status.textContent.replaceAll('Read settings','Retry loading settings').replaceAll('read settings','retry loading settings');show();}
  });show();
+ if(options.autoRead)perform(false);
  return {invalidate,setAvailability(value){if(available!==value){available=value;if(!value)invalidate();}show();},setWritable(value){writable=value;show();},read:()=>perform(false)};
 }
 function parseJson(text,limit=16384){

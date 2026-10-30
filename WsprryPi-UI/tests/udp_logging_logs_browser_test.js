@@ -47,6 +47,7 @@ class CdpClient {
 
 
 const a='a'.repeat(32), b='b'.repeat(32), host='c'.repeat(32), urls=[];
+let failHostRead=false,failHostSave=false,hostWrites=0;
 const candidates=[{catalog_id:'1'.repeat(32),device_id:a,name:'Pico A (fixture)'},{catalog_id:'2'.repeat(32),device_id:b,name:'bench-b.local'}];
 let policy={schema:'host-usb-logging/1',collector_id:host,sources:[],candidates,journal_available:true,status:{[a]:{state:'streaming',rejected:'0'},[b]:{state:'disconnected',rejected:'2'}}};
 const rows=[{source:'local',origin_kind:'pi',MESSAGE:'Pi service ready (synthetic fixture)',__CURSOR:'pi-1'},
@@ -58,6 +59,13 @@ const hostPolicy={schema:'host-udp-logging/1',target:cap.target,saved:{sender:{e
 for(const ingress of ['direct','relay'])rows.push({source:`udp:member:pico:${a}:${ingress}`,ingress:'udp',peer_slot:'member',peer_ipv4:'192.0.2.10',origin_kind:'pico',origin_id:a,origin_name:'Repeated <name>',origin_boot:'4'.repeat(32),origin_sequence:'1',forwarders:ingress==='relay'?'[{"id":"'+host+'","receipt_us":"1","ingress":"usb"}]':'[]',MESSAGE:'UDP logging test event',__CURSOR:'udp-'+ingress});
 const server=http.createServer((req,res)=>{
  const url=new URL(req.url,'http://fixture');
+ if(url.pathname==='/api/v1/host/udp-logging'&&req.method==='PUT'){
+  hostWrites++;res.writeHead(failHostSave?503:500,{'Content-Type':'application/json'});res.end('{}');return;
+ }
+ if(url.pathname==='/api/v1/host/udp-logging'&&failHostRead){res.writeHead(503,{'Content-Type':'application/json'});res.end('{}');return;}
+ if(url.pathname==='/api/v1/host/udp-logging/installation'){
+  res.setHeader('Content-Type','application/json');res.end(JSON.stringify({schema:'host-udp-installation/1',target:cap.target,worker_state:'installed',native_journal_state:'available',policy_state:'valid',service_state:'inactive'}));return;
+ }
  if(url.pathname==='/api/v1/udp-logging/capabilities'||url.pathname==='/api/v1/host/udp-logging'){
   res.setHeader('Content-Type','application/json');res.setHeader('ETag','"udp1"');
   setTimeout(()=>res.end(JSON.stringify(url.pathname.endsWith('/capabilities')?cap:hostPolicy)),200);return;
@@ -101,6 +109,59 @@ async function main(){
   await client.send('Page.addScriptToEvaluateOnNewDocument',{source:`window.WebSocket=class{static OPEN=1;static CONNECTING=0;readyState=0;addEventListener(){}close(){}};localStorage.setItem('wsprrypi.updateCheckDisabled','true');window.WSPRRYPI_ENABLE_LOG_TEST_HOOKS=true;`});
   await client.send('Page.navigate',{url:`http://127.0.0.1:${server.address().port}/index.php?page=logs`});
   await until(()=>evaluate(`document.querySelectorAll('#all .logs-line').length===5 && document.querySelectorAll('#logs-source option[value^="udp:"]').length===2`));
+  const editor='#host-udp-logging-controls';
+  await until(()=>evaluate(`!document.querySelector('${editor} fieldset').disabled`));
+  assert.equal(await evaluate(`document.querySelector('${editor} [name=destination_port]').value`),'5514','Settings must populate on page load before opening the dialog');
+  assert.equal(await evaluate(`document.querySelector('${editor} > button').hidden`),true,'Successful automatic loading removes the read action');
+  assert.deepEqual(await evaluate(`[...document.querySelectorAll('#logs-overlay-controls button')].map(b=>b.textContent.trim())`),['Clear','Refresh stream','Pause view','Log options','Logging on this Pi']);
+  const openModal=async id=>{
+   await evaluate(`document.querySelector('[data-bs-target="#${id}"]').focus();document.querySelector('[data-bs-target="#${id}"]').click()`);
+   await until(()=>evaluate(`document.getElementById('${id}').classList.contains('show') && document.getElementById('${id}').contains(document.activeElement)`));
+  };
+  const closeModal=async id=>{
+   await client.send('Input.dispatchKeyEvent',{type:'keyDown',key:'Escape',code:'Escape',windowsVirtualKeyCode:27});
+   await client.send('Input.dispatchKeyEvent',{type:'keyUp',key:'Escape',code:'Escape',windowsVirtualKeyCode:27});
+   await until(()=>evaluate(`!document.querySelector('.modal.show') && document.activeElement.dataset.bsTarget==='#${id}' && !document.querySelector('.modal-backdrop')`));
+  };
+  await openModal('host-logging-modal');
+  await evaluate(`document.querySelector('${editor} [name=destination_port]').value='5515';document.querySelector('${editor} form').dispatchEvent(new Event('input',{bubbles:true}))`);
+  await closeModal('host-logging-modal');await openModal('host-logging-modal');
+  assert.equal(await evaluate(`document.querySelector('${editor} [name=destination_port]').value`),'5515','Closing the modal must preserve drafts');
+  failHostSave=true;
+  await evaluate(`document.querySelector('${editor} form').requestSubmit()`);
+  await until(()=>evaluate(`document.querySelector('${editor} > p:last-child').textContent.includes('Save unconfirmed')`));
+  assert.equal(await evaluate(`document.querySelector('${editor} > button').hidden`),false,'An uncertain save needs an explicit recovery action');
+  await evaluate(`document.querySelector('${editor} > button').click()`);
+  await until(()=>evaluate(`!document.querySelector('${editor} fieldset').disabled`));
+  assert.equal(await evaluate(`document.querySelector('${editor} [name=destination_port]').value`),'5515');
+  assert.equal(await evaluate(`document.querySelector('${editor} button[type=submit]').disabled`),true,'Preserved draft still requires review after uncertain save');
+  await closeModal('host-logging-modal');
+  failHostRead=true;
+  await client.send('Page.navigate',{url:`http://127.0.0.1:${server.address().port}/index.php?page=logs`});
+  await until(()=>evaluate(`document.querySelector('${editor} > button')?.hidden===false`));
+  assert.equal(await evaluate(`document.querySelector('${editor} fieldset').disabled`),true,'Failed automatic reads must keep editing disabled');
+  failHostRead=false;
+  await openModal('host-logging-modal');
+  await evaluate(`document.querySelector('${editor} > button').click()`);
+  await until(()=>evaluate(`!document.querySelector('${editor} fieldset').disabled`));
+  assert.equal(hostWrites,1,'Loading, opening, closing and recovery must never write settings');
+  await closeModal('host-logging-modal');
+  for(const width of [390,1280])for(const theme of ['light','dark']){
+   await client.send('Emulation.setDeviceMetricsOverride',{width,height:960,deviceScaleFactor:1,mobile:width<600});
+   await evaluate(`document.documentElement.dataset.bsTheme='${theme}'`);await wait(200);
+   assert(await evaluate(`document.documentElement.scrollWidth<=innerWidth`),'Toolbar must reflow without page overflow');
+   assert(await evaluate(`['height','fontSize','fontWeight','borderRadius','paddingTop','paddingLeft'].every(k=>getComputedStyle(document.getElementById('btn-clear'))[k]===getComputedStyle(document.getElementById('sse-status-badge'))[k])`),'Stream status must share button geometry and typography');
+   let shot=await client.send('Page.captureScreenshot',{format:'png'});fs.writeFileSync(path.join(evidence,`toolbar-${width}-${theme}.png`),Buffer.from(shot.data,'base64'));
+   for(const id of ['logs-options-modal','host-logging-modal']){
+    await openModal(id);
+    assert(await evaluate(`document.documentElement.scrollWidth<=innerWidth && document.querySelector('#${id} .modal-body').scrollWidth<=document.querySelector('#${id} .modal-body').clientWidth`),'Modal controls must wrap without horizontal scrolling');
+    await client.send('Input.dispatchKeyEvent',{type:'keyDown',key:'Tab',code:'Tab',windowsVirtualKeyCode:9});
+    await client.send('Input.dispatchKeyEvent',{type:'keyUp',key:'Tab',code:'Tab',windowsVirtualKeyCode:9});
+    assert(await evaluate(`document.getElementById('${id}').contains(document.activeElement)`),'Keyboard focus must stay in the dialog');
+    shot=await client.send('Page.captureScreenshot',{format:'png'});fs.writeFileSync(path.join(evidence,`${id}-${width}-${theme}.png`),Buffer.from(shot.data,'base64'));
+    await closeModal(id);
+   }
+  }
   for (const width of [360,390,801,1280]) {
    await client.send('Emulation.setDeviceMetricsOverride',{width,height:960,deviceScaleFactor:1,mobile:width<600});
    assert(await evaluate(`[...document.querySelectorAll('.logs-network')].every(r=>r.scrollWidth<=r.clientWidth+1&&r.querySelector('.logs-msg').clientWidth>0)`),'Network provenance must wrap without obscuring severity or message');
@@ -137,7 +198,7 @@ async function main(){
   await evaluate(`document.documentElement.style.zoom='2'`);
   assert(await evaluate(`document.documentElement.scrollWidth<=document.documentElement.clientWidth`),'200% CSS zoom reflow');
   await evaluate(`document.documentElement.style.zoom='1'`);
-  console.log('UDP Logs browser: replay-before-policy race, stable ID labels, direct/relay source filters and safe text rendering passed');
- }finally{client?.close();if(chrome)await stopIsolatedProcess(chrome);await new Promise(resolve=>server.close(resolve));}
+  console.log('UDP Logs browser: toolbar order, modal focus/reflow, automatic settings, failed-read recovery, preserved drafts, uncertain-save review, replay-before-policy race, stable ID labels, direct/relay source filters and safe text rendering passed');
+ }finally{client?.close();if(chrome)await stopIsolatedProcess(chrome);server.closeAllConnections();await new Promise(resolve=>server.close(resolve));}
 }
 main().catch(error=>{console.error(error);process.exitCode=1;});
