@@ -108,7 +108,7 @@ remove the profile only after the browser group has stopped. A successful
 workflow followed by failed cleanup is a failed test. Do not replace this with
 PID-only termination, process-name kills or ignored removal errors.
 
-The PHP fixture router supplies a synthetic, read-only `GET /api/v1/status`
+The PHP fixture router supplies a synthetic, read-only `GET /api/control/v1/status`
 response with `host.firmware_maintenance: false`. Wait for
 `PicoFirmwareSafety.locked === false` before exercising controls, including
 after navigation. Keep the production maintenance guard active; the router

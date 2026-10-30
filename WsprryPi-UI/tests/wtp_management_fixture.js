@@ -3,7 +3,7 @@
 const assert = require('node:assert/strict');
 const fs = require('node:fs'), vm = require('node:vm'), path = require('node:path');
 const source = fs.readFileSync(path.join(__dirname, '../data/wtp-management.js'), 'utf8');
-const config = {version:1,enabled:false,station:{callsign:'AA0NT',locator:'EM18',power_dbm:20},
+const config = {enabled:false,station:{callsign:'AA0NT',locator:'EM18',power_dbm:20},
   wifi:{ssid:'test-network',password:null,ntp_ipv4:'192.0.2.1'},schedules:[{period_s:120,phase_s:0}],
   allow_unqualified_frequency:true,allow_non_amateur_frequency:true};
 const target = {scope:'member',device_id:'a'.repeat(32),boot_id:'1'.repeat(32)};
@@ -15,7 +15,7 @@ function browser(exchange, producer = source) {
     return fields.get(id);
   };
   class Option {constructor(text,value){this.textContent=text;this.value=value;}}
-  const root = {Option,confirm:()=>true,document:{readyState:'complete',getElementById:element,querySelectorAll:selector=>selector==='[data-wtp-resource]' ? [...fields.entries()].filter(([id])=>/^wtp-member-(callsign|locator|power|rf|button|indicator|indicator-gp|polarity)$/.test(id)).map(([,e])=>e) : []},
+  const root = {Option,confirm:()=>true,document:{readyState:'complete',getElementById:element,querySelectorAll:selector=>selector==='[data-wtp-resource]' ? [...fields.entries()].filter(([id])=>/^wtp-member-(callsign|locator|power|rf|button|amplifier|amplifier-polarity|indicator|indicator-gp|polarity)$/.test(id)).map(([,e])=>e) : []},
     WtpUi:{read:()=>({Transport:'network'})}, crypto:require("node:crypto").webcrypto, AbortSignal, AbortController,setTimeout,clearTimeout,
     fetch:async (url, options) => {
       const request = {url,...options,body:options.body ? JSON.parse(options.body) : null};
@@ -28,6 +28,6 @@ function browser(exchange, producer = source) {
   root.WtpManagement.setAvailability(true);
   return {root,fields,requests,element,click:async id=>{ await new Promise(resolve=>setImmediate(resolve)); return element(id).listeners.click(); }};
 }
-const response = (body, status=200, etag='"r1"') => ({ok:status===200,status,headers:{get:()=>etag},json:async()=>body});
-const context = (c=config) => ({schema:'wsprrypi-pico-settings/1',target,config:structuredClone(c),update_strategy:'merge',reboot_required:false});
+const response = (body, status=200, etag='"r1"') => ({ok:status===200,status,headers:{get:()=>etag},json:async()=>({...body,contract:"Wsprry-Control/1"})});
+const context = (c=config) => ({schema:'pico-settings',target,config:structuredClone(c),update_strategy:'merge',reboot_required:false});
 module.exports = {browser, response, context, config, target};

@@ -31,11 +31,12 @@ int main() {
     pico_usb_remove_hold(controls/"pending.json");CHECK(!pico_usb_any_update_blocked(controls));
     { std::ofstream file(root/"not-a-directory"); file<<"invalid"; }
     CHECK(pico_usb_any_update_blocked(root/"not-a-directory"));
-    CHECK(!pico_usb_http_mutation("GET","/api/v1/status"));
-    CHECK(!pico_usb_http_mutation("POST","/api/v1/member/firmware"));
-    for(const auto* path:{"/config","/config/repair","/api/v1/jobs","/api/v1/host/devices/use","/api/v1/member/config"})
+    CHECK(!pico_usb_http_mutation("GET","/api/control/v1/status"));
+    CHECK(!pico_usb_http_mutation("POST","/api/control/v1/member/firmware"));
+    for(const auto* path:{"/config","/config/repair","/api/control/v1/jobs","/api/control/v1/host/devices/use","/api/control/v1/member/config"})
       CHECK(pico_usb_http_mutation("POST",path));
-    CHECK(pico_usb_http_mutation("PUT","/api/v1/member/firmware"));
+    CHECK(pico_usb_http_mutation("PUT","/api/control/v1/member/firmware"));
+    CHECK(pico_usb_http_mutation("POST","/api/v1/member/firmware"));
     for(const auto* cmd:{"reboot","shutdown","tone_start","tone_end","bounded_tone","stop","unknown"}) CHECK(pico_usb_command_mutation(cmd));
     for(const auto* cmd:{"get_tx_state","wspr_band_catalog","echo"}) CHECK(!pico_usb_command_mutation(cmd));
     const std::string code="import json,sys; print(json.dumps(dict(schema='wsprrypico-usb-result/1',installer_contract=1,installer_version='0.9.3',ok=True,argument=sys.argv[1])))";

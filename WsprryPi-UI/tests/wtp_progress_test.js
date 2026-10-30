@@ -3,9 +3,9 @@
 "use strict";
 const assert = require("node:assert/strict");
 const {browser,response,target} = require("./wtp_management_fixture.js");
-const base = () => ({schema:"transmitter-progress/1",target:structuredClone(target),draft_revision:"0",config_revision:"0",profile_revision:"0",
+const base = () => ({schema:"progress",target:structuredClone(target),draft_revision:"0",config_revision:"0",profile_revision:"0",
     fields:{},last_receipt:null,last_outcomes:{},applied_station:null,station:{callsign:null,locator:null,power_dbm:null},
-    station_complete:false,complete:false,apply_domains:{station:false,network:false,radio:false,all:false},wspr_plan:null,
+    station_complete:false,complete:false,apply_domains:{station:false,network:false,radio:false,all:false,drive:false},wspr_plan:null,
     schedule_enabled:false,schedule_suspended:true,matches_applied:false});
 const turn = () => new Promise(resolve => setImmediate(resolve));
 async function tests() {
@@ -17,7 +17,7 @@ async function tests() {
             const outcomes={callsign:"saved",locator:"invalid",power_dbm:sent.fields.power_dbm===null?"cleared":"saved"};
             state={...state,draft_revision:"1",station:{callsign:sent.fields.callsign,locator:null,power_dbm:sent.fields.power_dbm},outcomes,request_id:sent.request_id};
         }
-        return response(malformed ? {...state,schema:"transmitter-progress/99"} : structuredClone(state));
+        return response(malformed ? {...state,schema:"progress9"} : structuredClone(state));
     });
     let usbInvalidations=0;
     b.root.WtpUsbSettings={invalidate(){++usbInvalidations;}};
@@ -56,7 +56,7 @@ async function tests() {
     assert.match(b.element("wtp-usb-progress-state").textContent,/different Pico/);
     await b.click("wtp-usb-progress-discard");assert(!b.element("wtp-usb-progress-save").disabled);
     state={...base(),target:state.target,draft_revision:"2",station:{callsign:"AA0NT",locator:"EM18",power_dbm:0},station_complete:true,
-        apply_domains:{station:true,network:false,radio:false,all:false}};
+        apply_domains:{station:true,network:false,radio:false,all:false,drive:false}};
     b.root.managementState={carrier:"consumer_station",host:"192.0.2.1",connected:true,selection_id:"f".repeat(32),session:null};
     await b.click("wtp-management-state");
     await b.click("wtp-usb-progress-load");

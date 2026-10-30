@@ -25,12 +25,12 @@ int main() {
             method, path, peer, host, origin, snapshot);
     };
     for (const std::string method : {"GET", "POST"}) {
-        assert(evaluate(method, "/api/v1/member/configuration", "192.168.50.42", "wsprrypi", "http://wsprrypi") == BackendHttpGuardDecision::allowed);
-        assert(evaluate(method, "/api/v1/member/configuration", "203.0.113.4", "wsprrypi", "http://wsprrypi") == BackendHttpGuardDecision::rejected);
-        assert(evaluate(method, "/api/v1/member/configuration", "192.168.50.42", "wsprrypi", "http://evil") == BackendHttpGuardDecision::rejected);
+        assert(evaluate(method, "/api/control/v1/member/configuration", "192.168.50.42", "wsprrypi", "http://wsprrypi") == BackendHttpGuardDecision::allowed);
+        assert(evaluate(method, "/api/control/v1/member/configuration", "203.0.113.4", "wsprrypi", "http://wsprrypi") == BackendHttpGuardDecision::rejected);
+        assert(evaluate(method, "/api/control/v1/member/configuration", "192.168.50.42", "wsprrypi", "http://evil") == BackendHttpGuardDecision::rejected);
     }
 
-    for (const std::string path : {"/api/v1/config", "/api/v1/network", "/api/v1/schedules", "/api/v1/host/config", "/api/v1/host/logging", "/api/v1/member/logging"}) {
+    for (const std::string path : {"/api/control/v1/config", "/api/control/v1/network", "/api/control/v1/schedules", "/api/control/v1/host/config", "/api/control/v1/host/logging", "/api/control/v1/member/logging"}) {
         for (const std::string method : {"GET", "PUT"}) {
             assert(evaluate(method, path, "192.168.50.42", "wsprrypi", "http://wsprrypi") == BackendHttpGuardDecision::allowed);
             assert(evaluate(method, path, "203.0.113.4", "wsprrypi", "http://wsprrypi") == BackendHttpGuardDecision::rejected);
@@ -43,7 +43,7 @@ int main() {
                 PrivilegedNetworkMode::enforced, {"192.168.50.42"}) == BackendHttpGuardDecision::rejected);
         }
     }
-    assert(evaluate("POST", "/api/v1/unknown", "127.0.0.1", "wsprrypi") == BackendHttpGuardDecision::rejected);
+    assert(evaluate("POST", "/api/control/v1/unknown", "127.0.0.1", "wsprrypi") == BackendHttpGuardDecision::rejected);
     assert(evaluate("POST", "/api/wtp/recover", "192.168.50.42", "wsprrypi", "http://wsprrypi") == BackendHttpGuardDecision::allowed);
     assert(evaluate("POST", "/api/wtp/recover", "192.168.51.42", "wsprrypi") == BackendHttpGuardDecision::rejected);
     assert(evaluate("POST", "/api/wtp/recover", "192.168.50.42", "wsprrypi", "http://evil") == BackendHttpGuardDecision::rejected);

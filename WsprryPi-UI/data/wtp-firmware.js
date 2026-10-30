@@ -6,7 +6,7 @@
     let available = false, busy = false, reading = false, state = null, timer = null, boundMember = "", boundSelection = "", generation = 0;
     let closed = false, uncertain = false, requestAction = "", expectedSerial = "", imageEdited = false;
     let clockTimer = null, monitoringSince = null, lastRead = null, failures = 0;
-    const url = () => (root.WSPRRYPI_PATHS?.sharedApiPath || "/api/v1") + "/member/firmware";
+    const url = () => (root.WSPRRYPI_PATHS?.sharedApiPath || "/api/control/v1") + "/member/firmware";
     const erasing = () => state?.operation === "erase" || state?.recovery_operation === "erase" || state?.result?.operation === "erase";
     const erased = () => state?.result?.ok === true && state.result.operation === "erase" &&
         state.result.erase_verified === true && state.result.erased_bytes === 4194304;

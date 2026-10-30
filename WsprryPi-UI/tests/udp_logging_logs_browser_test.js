@@ -54,24 +54,24 @@ const rows=[{source:'local',origin_kind:'pi',MESSAGE:'Pi service ready (syntheti
  {source:`usb:${a}`,origin_kind:'pico',origin_id:a,origin_name:'pico-a.local',origin_boot:'4'.repeat(32),origin_sequence:'9007199254740993',origin_utc_ns:null,MESSAGE:'Pico A USB logging active (synthetic fixture)',__CURSOR:'a-1'},
  {source:`usb:${b}`,origin_kind:'pico',origin_id:b,origin_name:'pico-b.local',origin_boot:'5'.repeat(32),origin_sequence:'2',origin_utc_ns:'1793098800000000000',MESSAGE:'Pico B <script> stays plain text (synthetic fixture)',__CURSOR:'b-1'}];
 const counts=Object.fromEntries(['generated','filtered','redacted_rejected','queued','overflow','expired','reconfigured_drops','truncated','attempted','locally_submitted','locally_failed'].map(k=>[k,'0']));
-const cap={schema:'udp-logging-capabilities/1',target:{scope:'host',collector_id:host},resource:'/api/v1/host/udp-logging',settings_schema:'host-udp-logging/1',wire_schema:'wsprry-udp/1',limits:{payload_bytes:480,queue_records:256,maximum_sources:8,maximum_peers:32,maximum_rate:64,maximum_burst:128,address_family:'ipv4'}};
+const cap={schema:'udp-logging-capabilities',target:{scope:'host',collector_id:host},resource:'/api/control/v1/host/udp-logging',settings_schema:'host-udp-logging/1',wire_schema:'wsprry-udp/1',limits:{payload_bytes:480,queue_records:256,maximum_sources:8,maximum_peers:32,maximum_rate:64,maximum_burst:128,address_family:'ipv4'}};
 const hostPolicy={schema:'host-udp-logging/1',target:cap.target,saved:{sender:{enabled:false,destination_ipv4:null,destination_port:5514,maximum_severity:6,event_codes:[],rate:16,burst:32,interface:null,native_enabled:false,usb_sources:[]},collector:{enabled:false,bind_ipv4:null,interface:null,port:5514,peers:[{slot:'member',ipv4:'192.0.2.10'}]}},active:{applied_revision:null,sender:{state:'disabled',receipt:'unknown',queued:0,counters:counts},collector:{state:'disabled',bind_ipv4:null,port:null,peers:[],counters:Object.fromEntries(['received','oversize','disallowed','malformed','duplicate','conflict','limited','overflow','journal_failed','journal_submitted','discontinuity'].map(k=>[k,'0']))}}};
 for(const ingress of ['direct','relay'])rows.push({source:`udp:member:pico:${a}:${ingress}`,ingress:'udp',peer_slot:'member',peer_ipv4:'192.0.2.10',origin_kind:'pico',origin_id:a,origin_name:'Repeated <name>',origin_boot:'4'.repeat(32),origin_sequence:'1',forwarders:ingress==='relay'?'[{"id":"'+host+'","receipt_us":"1","ingress":"usb"}]':'[]',MESSAGE:'UDP logging test event',__CURSOR:'udp-'+ingress});
 const server=http.createServer((req,res)=>{
  const url=new URL(req.url,'http://fixture');
- if(url.pathname==='/api/v1/host/udp-logging'&&req.method==='PUT'){
+ if(url.pathname==='/api/control/v1/host/udp-logging'&&req.method==='PUT'){
   hostWrites++;res.writeHead(failHostSave?503:500,{'Content-Type':'application/json'});res.end('{}');return;
  }
- if(url.pathname==='/api/v1/host/udp-logging'&&failHostRead){res.writeHead(503,{'Content-Type':'application/json'});res.end('{}');return;}
- if(url.pathname==='/api/v1/host/udp-logging/installation'){
-  res.setHeader('Content-Type','application/json');res.end(JSON.stringify({schema:'host-udp-installation/1',target:cap.target,worker_state:'installed',native_journal_state:'available',policy_state:'valid',service_state:'inactive'}));return;
+ if(url.pathname==='/api/control/v1/host/udp-logging'&&failHostRead){res.writeHead(503,{'Content-Type':'application/json'});res.end('{}');return;}
+ if(url.pathname==='/api/control/v1/host/udp-logging/installation'){
+  res.setHeader('Content-Type','application/json');res.end(JSON.stringify({contract:'Wsprry-Control/1',schema:'host-udp-installation/1',target:cap.target,worker_state:'installed',native_journal_state:'available',policy_state:'valid',service_state:'inactive'}));return;
  }
- if(url.pathname==='/api/v1/udp-logging/capabilities'||url.pathname==='/api/v1/host/udp-logging'){
+ if(url.pathname==='/api/control/v1/udp-logging/capabilities'||url.pathname==='/api/control/v1/host/udp-logging'){
   res.setHeader('Content-Type','application/json');res.setHeader('ETag','"udp1"');
   setTimeout(()=>res.end(JSON.stringify(url.pathname.endsWith('/capabilities')?cap:hostPolicy)),200);return;
  }
 
- if(url.pathname==='/api/v1/host/logging'){
+ if(url.pathname==='/api/control/v1/host/logging'){
   if(req.method==='PUT'){let body='';req.on('data',data=>body+=data);req.on('end',()=>{const next=JSON.parse(body);policy={...policy,sources:next.sources};res.setHeader('ETag','"logging2"');res.end(JSON.stringify(policy));});return;}
   res.setHeader('Content-Type','application/json');res.setHeader('ETag','"logging1"');
   setTimeout(()=>res.end(JSON.stringify(policy)),150);return;
@@ -89,7 +89,7 @@ const server=http.createServer((req,res)=>{
   const timer=setInterval(()=>res.write(': heartbeat\n\n'),1000);req.on('close',()=>clearInterval(timer));return;
  }
  if(url.pathname==='/index.php'||url.pathname==='/'){res.setHeader('Content-Type','text/html');res.end(html);return;}
- if(url.pathname==='/api/v1/status'){res.setHeader('Content-Type','application/json');res.end('{"host":{"selected":false,"firmware_maintenance":false}}');return;}
+ if(url.pathname==='/api/control/v1/status'){res.setHeader('Content-Type','application/json');res.end('{"host":{"selected":false,"firmware_maintenance":false}}');return;}
  const file=path.resolve(root,'.'+url.pathname);
  if(file.startsWith(root+path.sep)&&fs.existsSync(file)&&fs.statSync(file).isFile()&&!file.endsWith('.php')){
   const ext=path.extname(file);res.setHeader('Content-Type',({'.css':'text/css','.js':'application/javascript','.woff2':'font/woff2','.png':'image/png','.svg':'image/svg+xml'})[ext]||'application/octet-stream');res.end(fs.readFileSync(file));return;

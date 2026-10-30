@@ -2,6 +2,7 @@
 // UI producer -> protected classification/browser -> production runtime/gate ->
 // actual engineering TLS or Consumer-Radio station/AP crypto -> Pico/journal.
 'use strict';
+const controlRequest=require('./control_pair_request.js');
 const assert=require('node:assert/strict'), fs=require('node:fs'), path=require('node:path'), readline=require('node:readline');
 const {spawn}=require('node:child_process');
 const {browser,response}=require('./wtp_management_fixture.js');
@@ -30,7 +31,7 @@ async function cases(carrier, failure="storage") {
     client=spawn(path.join(build,consumer?'consumer_interop':'wtp_configuration_client'),consumer?['--stdio',(carrier==='consumer_ap'?'ap':'station')+(failure==='blank'?'-blank':'')]:[path.join(build,'credentials-v3')],{stdio:['pipe','pipe','inherit']});
     const next=lines(client),calls=[];
     if (consumer) assert.match(await next(),/^READY /);
-    const call=async request=>{trace(carrier,request.method||request.control,request.path||request.corruption);if(request.headers){request.headers={...request.headers};if(Object.hasOwn(request,'revision'))request.headers['If-Match']=request.revision;if(Object.hasOwn(request,'member_context'))request.headers['X-WsprryPi-Member-Context']=request.member_context;}client.stdin.write(JSON.stringify(request)+'\n');const result=JSON.parse(await next());calls.push({request,result});return result;};
+    const call=async request=>{request=controlRequest(request);trace(carrier,request.method||request.control,request.path||request.corruption);if(request.headers){request.headers={...request.headers};if(Object.hasOwn(request,'revision'))request.headers['If-Match']=request.revision;if(Object.hasOwn(request,'member_context'))request.headers['X-WsprryPi-Member-Context']=request.member_context;}client.stdin.write(JSON.stringify(request)+'\n');const result=JSON.parse(await next());calls.push({request,result});return result;};
     const control=async name=> {
       trace(carrier,"server",name);
       if (consumer) return call({control:name});
@@ -51,10 +52,10 @@ async function cases(carrier, failure="storage") {
     await require('./udp_logging_pair_cases.js')(call);
     let loaded=await load(); if(failure==="storage")fs.writeFileSync(path.join(build,`resources-loaded-${carrier}.json`),JSON.stringify(loaded.body)); const initial=await control('dump');
     assert.equal(loaded.body.profile_owned_station,consumer);
-    const extendedFormats=loaded.body.application.schema==='transmitter-application/2';
-    assert.match(b.element('wtp-member-station-hint').textContent, extendedFormats ? /automatically selects Type 1, Type 2 or Type 3/ : /Type 1 station writes only/);
+    assert.equal(loaded.body.application.schema,'application');
+    assert.match(b.element('wtp-member-station-hint').textContent, /automatically selects WSPR Type 1, 2 or 3/);
     assert.equal(b.element('wtp-member-station-hint').textContent.includes('measured RF output'),true);
-    const remoteResource=r=>extendedFormats&&['application','station'].includes(r)?r+'/2':r;
+    const remoteResource=r=>r;
     if (consumer) {
       assert.match(b.element('wtp-member-active').textContent,/Unknown/);
       assert(b.element('wtp-member-station-save').disabled);assert.match(b.element('wtp-member-station-feedback').textContent,/setup owns/);
@@ -110,8 +111,8 @@ async function cases(carrier, failure="storage") {
         ['application','/recurrence',{...a.recurrence,enabled:true,schedules:[]}],
         ['application','/recurrence/schedules',[{period_s:240,phase_s:0},{period_s:120,phase_s:0}]],
         ['application','/capabilities/station_encoding','wspr_type2'],
-        ['capabilities',extendedFormats?'/application_resources_v2/schema':'/application_resources/schema',extendedFormats?'transmitter-application/99':'transmitter-application/2'],
-        ['capabilities',extendedFormats?'/application_resources_v2':'/application_resources',null],
+        ['capabilities','/application_resources/schema','unknown-application'],
+        ['capabilities','/application_resources',null],
         ['capabilities','/features/consumer_setup_identity',true],
         ['management','/selected','consumer_ap'],
         ['pins','/active/rf_gp',14],
@@ -130,7 +131,7 @@ async function cases(carrier, failure="storage") {
         await b.click('wtp-member-load');assert.notEqual(calls.at(-1).result.status,200,`${resource}${pointer} float`);assert.deepEqual(await control('dump'),initial);
       }
       for(const option of ['duplicate','oversized']) {
-        await call({control:'corrupt',corruption:{resource:remoteResource('application'),pointer:'/schema',value:'transmitter-application/1',[option]:true}});
+        await call({control:'corrupt',corruption:{resource:remoteResource('application'),pointer:'/schema',value:'application',[option]:true}});
         await b.click('wtp-member-load');assert.notEqual(calls.at(-1).result.status,200);assert.deepEqual(await control('dump'),initial);
       }
       await call({control:'clear'});loaded=await load();
@@ -162,7 +163,7 @@ async function cases(carrier, failure="storage") {
       r=await call({...preview,...negative});assert.notEqual(r.status,200);assert.deepEqual(await control('dump'),before);
     }
     // Unknown, duplicate, oversized and malformed candidate bodies have zero mutations.
-    for(const body of [JSON.stringify({...plan,unknown:true}),'{"engine":"direct","engine":"i2c"}', ' '.repeat(2049), JSON.stringify({...plan,rf_gp:3.5})]) {
+    for(const body of [JSON.stringify({...plan,unknown:true}),'{"contract":"Wsprry-Control/1","engine":"direct","engine":"i2c"}', ' '.repeat(2049), JSON.stringify({...plan,rf_gp:3.5})]) {
       r=await call({...preview,body});assert.notEqual(r.status,200);assert.deepEqual(await control('dump'),before);
     }
     // The UI never autosaves preview. Explicit complete hardware save consumes one journal generation.
@@ -181,12 +182,12 @@ async function cases(carrier, failure="storage") {
     assert.match(b.element('wtp-member-restart').textContent,/latched/);
     fs.writeFileSync(path.join(build,`resources-pending-${carrier}.json`),JSON.stringify(loaded.body));
     // Cross-resource stale contexts, target mismatch and no Config fallback.
-    for(const changes of [p=>{p.target.device_id='b'.repeat(32);},p=>{p.target.boot_id='b'.repeat(32);},p=>{p.target.boot_id=9007199254740993;},p=>{p.schema='transmitter-hardware/2';},p=>{p.pins.amplifier_gp=5;}]) {
+    for(const changes of [p=>{p.target.device_id='b'.repeat(32);},p=>{p.target.boot_id='b'.repeat(32);},p=>{p.target.boot_id=9007199254740993;},p=>{p.schema='unknown-hardware';},p=>{p.pins.amplifier_gp=p.pins.rf_gp;}]) {
       const fresh=await load(),payload=JSON.parse(hardwareWire.body);changes(payload);
       r=await call({...hardwareWire,body:JSON.stringify(payload),revision:fresh.etag,member_context:fresh.body.member_context});
       assert.notEqual(r.status,200);assert.deepEqual(await control('dump'),saved);
     }
-    // Existing complete station and legacy editors remain distinct.
+    // Existing complete station and settings editors remain distinct.
     await b.click('wtp-remote-load');assert.equal(calls.at(-1).result.status,200);
     b.element('wtp-remote-password').value='preserved-credential-draft';
     loaded=await load();
@@ -198,33 +199,31 @@ async function cases(carrier, failure="storage") {
       let state=await control('dump');assert.equal(state.config.station.locator,'FN42AB');assert(state.pending_restart&&state.inhibit);
       assert.equal(state.password_sha256,initial.password_sha256);
       loaded=await load();
-      if(extendedFormats) {
+      {
         for(const [scenario,callsign,locator,types] of [['type1','AA0NT','EM18',['type1']],['ordinary-six','AA0NT','EM18IG',['type1']],['type2','K1ABC/P','FN42',['type2']],['type3','<AA0NT>','EM18IG',['type3']],['pair','PJ4/AA0NT','EM18IG',['type2','type3']],['w1a','W1A/AA0NT','EM18IG',['type2','type3']],['w1a-type3','<W1A/AA0NT>','EM18IG',['type3']],['ambiguity','AA0NT/09','EM18IG',['type2','type3']]]) {
           loaded=await load();b.element('wtp-member-callsign').value=callsign;b.element('wtp-member-locator').value=locator;
           await b.click('wtp-member-station-save');assert.equal(calls.at(-1).result.status,200,JSON.stringify(calls.at(-1)));
-          assert.equal(JSON.parse(calls.at(-1).request.body).schema,'transmitter-station/2');
+          assert.equal(JSON.parse(calls.at(-1).request.body).schema,'station');
           state=await control('dump');assert.equal(state.config.station.callsign,callsign);assert.equal(state.config.station.locator,locator);
           assert.equal(state.cursor,initial.cursor);assert.equal(state.password_sha256,initial.password_sha256);assert.deepEqual(state.config.schedules,initial.config.schedules);
           loaded=await load();assert.deepEqual(loaded.body.application.wspr_plan.frame_types,types);
           fs.writeFileSync(path.join(build,`resources-wspr-${scenario}.json`),JSON.stringify(loaded.body));
           if(callsign==='AA0NT/09'){assert.equal(loaded.body.application.wspr_plan.type2_ambiguous,true);assert.equal(loaded.body.application.wspr_plan.alternate_callsign,'AA0NT/Z');}
         }
-      } else {
-        const extended=JSON.parse(stationWire.body);extended.station.callsign='K1ABC/P';
-        r=await call({...stationWire,body:JSON.stringify(extended),revision:loaded.etag,member_context:loaded.body.member_context});
-        assert.equal(r.status,400);assert.equal(r.body.error.code,'unsupported_station_encoding');assert.deepEqual(await control('dump'),state);
       }
-      // A successful legacy write invalidates the shared editor context.
+      // A successful settings update invalidates the shared editor context.
       loaded=await load();await b.click('wtp-remote-load');b.element('wtp-remote-callsign').value='W1AW';
       b.element('wtp-remote-password').value='';await b.click('wtp-remote-save');assert.equal(calls.at(-1).result.status,200);
       r=await call({...hardwareWire,revision:loaded.etag,member_context:loaded.body.member_context});assert.equal(r.status,409);
-      // The supported aliases can refresh and write after an invalidated shared context.
-      const alias=await call({method:'GET',path:'/api/v1/schedules'});
-      r=await call({method:'PUT',path:'/api/v1/schedules',body:JSON.stringify({schedules:state.config.schedules}),revision:alias.etag});assert.equal(r.status,200);
+      // The retained network editor refreshes after shared-context invalidation;
+      // the redundant schedule alias is retired in favor of config/update.
+      assert.equal((await call({method:'GET',path:'/api/control/v1/schedules'})).status,404);
+      const alias=await call({method:'GET',path:'/api/control/v1/network'});assert.equal(alias.status,200,JSON.stringify(alias));
+      r=await call({method:'PUT',path:'/api/control/v1/network',body:JSON.stringify({enabled:alias.body.enabled}),revision:alias.etag});assert.equal(r.status,200,JSON.stringify(r));
     } else {
       const count=calls.length;await b.click('wtp-member-station-save');assert.equal(calls.length,count);
-      const payload={schema:extendedFormats?'transmitter-station/2':'transmitter-station/1',target:loaded.body.target,station:{callsign:'K1ABC',locator:'FN42AB',power_dbm:10}};
-      r=await call({method:'PUT',path:'/api/v1/member/station',body:JSON.stringify(payload),revision:loaded.etag,member_context:loaded.body.member_context});
+      const payload={schema:'station',target:loaded.body.target,station:{callsign:'K1ABC',locator:'FN42AB',power_dbm:10}};
+      r=await call({method:'PUT',path:'/api/control/v1/member/station',body:JSON.stringify(payload),revision:loaded.etag,member_context:loaded.body.member_context});
       assert.equal(r.status,409);assert.equal(r.body.error.code,'consumer_setup_identity_required');
     }
     // Restore the old pins: restart/output inhibition must remain latched.
@@ -260,10 +259,18 @@ async function cases(carrier, failure="storage") {
     assert.equal(b.element('wtp-member-rf').value,'5');assert.equal(b.element('wtp-remote-password').value,consumer?'preserved-credential-draft':'');
     // Carrier selection invalidates an otherwise unchanged revision/context.
     const old=loaded;
-    await call({method:'POST',path:'/api/v1/member/management',body:JSON.stringify({action:consumer?'disconnect':'engineering_mtls'})});
+    await call({method:'POST',path:'/api/control/v1/member/management',body:JSON.stringify({action:consumer?'disconnect':'engineering_mtls'})});
     r=await call({...hardwareWire,revision:old.etag,member_context:old.body.member_context});assert.equal(r.status,409);
     if(consumer) {await control('advance');b.element('wtp-management-password').value='test-password';await b.click('wtp-management-connect');assert.equal(calls.at(-1).result.status,200,JSON.stringify(calls.at(-1).result));}
     if(!consumer) {
+      loaded=await load();await b.click('wtp-member-validate');
+      const beforeRaw=await control('dump');
+      await call({control:'corrupt',corruption:{resource:'hardware',method:'PUT',pointer:'/gpio_drive/saved',value:loaded.body.application.hardware.gpio_drive.saved,as_float:true}});
+      await b.click('wtp-member-hardware-save');
+      const badRaw=calls.at(-1).result;assert.equal(badRaw.status,502,JSON.stringify(badRaw));assert.equal(badRaw.body.mutation_attempted,true);
+      assert.equal(badRaw.exchanges.filter(e=>e.method!=='GET').length,1,'Malformed immediate response must never trigger replay');
+      assert.deepEqual((await control('dump')).config.pins,beforeRaw.config.pins);
+      await call({control:'clear'});loaded=await load();assert.equal(loaded.body.application.hardware.gpio_drive.saved,beforeRaw.config.gpio_drive_ma??4);
       loaded=await load();b.element('wtp-member-power').value='13';
       await call({control:'corrupt',corruption:{resource:remoteResource('station'),method:'PUT',pointer:'/station/power_dbm',value:13,as_float:true}});
       await b.click('wtp-member-station-save');assert.notEqual(calls.at(-1).result.status,200);assert.equal(calls.at(-1).result.body.mutation_attempted,true);

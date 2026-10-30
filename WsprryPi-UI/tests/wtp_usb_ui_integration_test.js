@@ -154,12 +154,12 @@ async function main() {
                     }
                 }
                 const path=String(url);if(path.endsWith('/member/logging') && window.__loggingConflict)return {ok:false,status:412,headers:{get:()=>''},json:async()=>({error:{code:'revision_conflict'}})};const header={get:()=> '\\"usb-r1\\"'};
-                let value=(path.includes('/api/wtp') || path.endsWith('/api/v1/status'))?window.__snapshot:
+                let value=(path.includes('/api/wtp') || path.endsWith('/api/control/v1/status'))?window.__snapshot:
                     path.endsWith('/member/management')?{carrier:'usb_physical',connected:true,host:'',selection_id:'f'.repeat(32),session:null}:
-                    path.endsWith('/member/hostname')?{schema:'transmitter-hostname/1',target,saved:'workbench-pico.local',active:'workbench-pico.local',default:'wsprrypico-aaaaaaaa.local',writable:true,pending_restart:false}:
-                    path.endsWith('/member/progress')?{schema:'transmitter-progress/1',target,draft_revision:'1',config_revision:'0',profile_revision:'0',fields:{callsign:'AA0NT'},last_receipt:null,last_outcomes:{},applied_station:null,station:{callsign:'AA0NT',locator:null,power_dbm:null},station_complete:false,complete:false,apply_domains:{all:false,network:false,radio:false,station:false},wspr_plan:null,schedule_enabled:false,matches_applied:false,schedule_suspended:true}:
-                    path.endsWith('/member/logging')?{schema:'transmitter-logging/1',target,saved:{enabled:true,maximum_severity:6},active:{enabled:true,maximum_severity:6,streaming:false,dropped:'0'}}:
-                    path.endsWith('/member/wifi')?{schema:'transmitter-wifi/1',target,wifi:null,pending_restart:false,storage_healthy:true}:
+                    path.endsWith('/member/hostname')?{schema:'hostname',target,saved:'workbench-pico.local',active:'workbench-pico.local',default:'wsprrypico-aaaaaaaa.local',writable:true,pending_restart:false}:
+                    path.endsWith('/member/progress')?{schema:'progress',target,draft_revision:'1',config_revision:'0',profile_revision:'0',fields:{callsign:'AA0NT'},last_receipt:null,last_outcomes:{},applied_station:null,station:{callsign:'AA0NT',locator:null,power_dbm:null},station_complete:false,complete:false,apply_domains:{all:false,network:false,radio:false,station:false},wspr_plan:null,schedule_enabled:false,matches_applied:false,schedule_suspended:true}:
+                    path.endsWith('/member/logging')?{schema:'logging',target,saved:{enabled:true,maximum_severity:6},active:{enabled:true,maximum_severity:6,streaming:false,dropped:'0'}}:
+                    path.endsWith('/member/wifi')?{schema:'wifi',target,wifi:null,pending_restart:false,storage_healthy:true}:
                     path.endsWith('/host/devices')?window.__catalog:
                     path.endsWith('/host/discovery')?{available:false,candidates:[],reason:'USB workflow'}:{};
                 return {ok:true,status:200,headers:header,json:async()=>value};

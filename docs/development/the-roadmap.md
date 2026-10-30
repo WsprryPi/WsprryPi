@@ -96,7 +96,7 @@ Adversarial review closed inconsistent first Console selection enablement, uncha
 ### Work
 
 - Replace the persisted and internal standalone frequency member with `wspr_dial_frequency_hz`. Calculate the RF center and four tones during preparation, exactly once, using the agreed formula and no random placement.
-- Keep the independent `/api/v1/standalone-frequency` resource and its generic `frequency_hz` member. Define the value as whole-Hz WSPR dial frequency throughout capability descriptions, validation, readback and browser controls.
+- Keep the independent `/api/control/v1/standalone-frequency` resource and its generic `frequency_hz` member. Define the value as whole-Hz WSPR dial frequency throughout capability descriptions, validation, readback and browser controls.
 - Rename the recurrence projection to `schedule_dial_frequency_nhz` across Pico status, existing application schema views, Pi's strict parser, management display and all affected fixtures.
 - Update configuration parsing, serialization, scheduler pair snapshots, generic-update preservation, Console, browser drafts, installer-preservation coverage and affected offline analysis tools together. Preserve independent and unrelated settings through ordinary updates.
 - Validate every resulting RF tone against the actual selected engine limits and frequency policy, with checked arithmetic and exact nHz handling. Keep unset frequency intentional and schedule enabling separate from frequency saving.

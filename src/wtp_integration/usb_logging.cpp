@@ -231,7 +231,7 @@ private:
         throw std::runtime_error("invalid_logging_source");
   }
   void reload() {
-    Json loaded = {{"schema", "host-usb-logging/1"},
+    Json loaded = {{"contract","Wsprry-Control/1"},{"schema", "host-usb-logging/1"},
                    {"collector_id", self_},
                    {"sources", Json::array()}};
     const int fd = ::open(path_.c_str(), O_RDONLY | O_NOFOLLOW | O_CLOEXEC);
@@ -526,7 +526,7 @@ private:
   }
   std::string ini_, path_, self_;
   const bool allow_devices_;
-  Json saved_ = {{"schema", "host-usb-logging/1"},
+  Json saved_ = {{"contract","Wsprry-Control/1"},{"schema", "host-usb-logging/1"},
                  {"collector_id", self_},
                  {"sources", Json::array()}};
   Json status_ = Json::object();

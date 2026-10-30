@@ -209,9 +209,9 @@ inline void capabilities(const Json &c, std::string_view device,
                          std::string_view boot) {
   require(fields(c, {"schema", "target", "resource", "settings_schema",
                      "wire_schema", "limits"}) &&
-              c["schema"] == "udp-logging-capabilities/1" &&
-              c["resource"] == "/api/v1/udp-logging" &&
-              c["settings_schema"] == "transmitter-udp-logging/1" &&
+              c["schema"] == "udp-logging-capabilities" &&
+              c["resource"] == "/api/control/v1/udp-logging" &&
+              c["settings_schema"] == "udp-logging" &&
               c["wire_schema"] == "wsprry-udp/1",
           "udp_capabilities");
   target(c["target"], device, boot);
@@ -227,7 +227,7 @@ inline void capabilities(const Json &c, std::string_view device,
 inline void member_readback(const Json &v, std::string_view device,
                             std::string_view boot) {
   require(fields(v, {"schema", "target", "saved", "active"}) &&
-              v["schema"] == "transmitter-udp-logging/1",
+              v["schema"] == "udp-logging",
           "udp_member_resource");
   target(v["target"], device, boot);
   sender(v["saved"]);

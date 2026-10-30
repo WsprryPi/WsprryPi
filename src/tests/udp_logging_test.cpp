@@ -109,10 +109,10 @@ int main() {
   const std::string device(32, 'a'), boot(32, 'b');
   const udp::Json target = {
       {"scope", "member"}, {"device_id", device}, {"boot_id", boot}};
-  udp::Json caps = {{"schema", "udp-logging-capabilities/1"},
+  udp::Json caps = {{"contract", "Wsprry-Control/1"}, {"schema", "udp-logging-capabilities"},
                     {"target", target},
-                    {"resource", "/api/v1/udp-logging"},
-                    {"settings_schema", "transmitter-udp-logging/1"},
+                    {"resource", "/api/control/v1/udp-logging"},
+                    {"settings_schema", "udp-logging"},
                     {"wire_schema", "wsprry-udp/1"},
                     {"limits",
                      {{"payload_bytes", 480},
@@ -132,7 +132,7 @@ int main() {
                             {"receipt", "unknown"},
                             {"queued", 0},
                             {"counters", udp::counters()}};
-  const udp::Json read = {{"schema", "transmitter-udp-logging/1"},
+  const udp::Json read = {{"contract", "Wsprry-Control/1"}, {"schema", "udp-logging"},
                           {"target", target},
                           {"saved", saved},
                           {"active", active}};
@@ -147,7 +147,8 @@ int main() {
                                   {}, {})
              .status == 200);
   const auto body = udp::Json{
-      {"schema", "transmitter-udp-logging/1"},
+      {"contract", "Wsprry-Control/1"},
+      {"schema", "udp-logging"},
       {"target", target},
       {"settings",
        saved}}.dump();

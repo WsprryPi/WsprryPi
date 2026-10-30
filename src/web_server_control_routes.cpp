@@ -76,19 +76,19 @@ wsprrypi::PicoHttpResponse catalog_request(const httplib::Request &request) {
         static std::mutex mutation_mutex;
         std::unique_lock mutation_lock(mutation_mutex, std::defer_lock);
         if (request.method == "POST" &&
-            (request.path == "/api/v1/host/devices" ||
-             request.path == "/api/v1/host/devices/use")) mutation_lock.lock();
+            (request.path == "/api/control/v1/host/devices" ||
+             request.path == "/api/control/v1/host/devices/use")) mutation_lock.lock();
         const auto active = selected_wtp();
-        if (request.path == "/api/v1/host/discovery" && request.method == "GET") {
+        if (request.path == "/api/control/v1/host/discovery" && request.method == "GET") {
             auto result = wsprrypi::wtp_discovery().snapshot(discovery_now());
             result["usb"] = wsprrypi::wtp_usb_discovery();
             return {200, result.dump(), {}};
         }
-        if (request.path == "/api/v1/host/devices" && request.method == "GET") {
+        if (request.path == "/api/control/v1/host/devices" && request.method == "GET") {
             auto [snapshot, revision] = catalog().snapshot(active);
             return {200, snapshot.dump(), revision};
         }
-        if (request.path == "/api/v1/host/discovery/identify" && request.method == "POST") {
+        if (request.path == "/api/control/v1/host/discovery/identify" && request.method == "POST") {
             const auto body = wsprrypi::strict_browser_json(request.body);
             if (!body.is_object() || body.size() != 2) throw std::runtime_error("Invalid identify request");
             const auto settings = candidate_settings(body, true);
@@ -99,7 +99,7 @@ wsprrypi::PicoHttpResponse catalog_request(const httplib::Request &request) {
             });
             return {200, observation.dump(), {}};
         }
-        if (request.path == "/api/v1/host/devices" && request.method == "POST") {
+        if (request.path == "/api/control/v1/host/devices" && request.method == "POST") {
             if (request.get_header_value("If-Match").empty())
                 return {428, R"({"error":{"code":"revision_required"}})", {}};
             auto body = wsprrypi::strict_browser_json(request.body);
@@ -134,7 +134,7 @@ wsprrypi::PicoHttpResponse catalog_request(const httplib::Request &request) {
                 request.get_header_value("If-Match"), active);
             return {200, result.dump(), revision};
         }
-        if (request.path == "/api/v1/host/devices/use" && request.method == "POST") {
+        if (request.path == "/api/control/v1/host/devices/use" && request.method == "POST") {
             if (request.get_header_value("If-Match").empty())
                 return {428, R"({"error":{"code":"revision_required"}})", {}};
             const auto body = wsprrypi::strict_browser_json(request.body);
@@ -223,27 +223,27 @@ void register_control(
         }
         const bool context = browser_request->mutation_context;
         wsprrypi::PicoHttpResponse result;
-        if (request.path == "/api/v1/member/firmware") {
+        if (request.path == "/api/control/v1/member/firmware") {
             result = request.method == "GET" || context
                 ? wtp_runtime_firmware(request.method, request.body)
                 : wsprrypi::PicoHttpResponse{403, R"({"error":{"code":"origin_or_content_type"}})", {}};
-        } else if(request.path=="/api/v1/host/udp-logging/installation") {
+        } else if(request.path=="/api/control/v1/host/udp-logging/installation") {
             result=request.method=="GET"?wsprrypi::udp_logging_installation():wsprrypi::PicoHttpResponse{405,R"({"error":{"code":"method_not_allowed"}})",{}};
-        } else if (request.path == "/api/v1/host/udp-logging" || request.path == "/api/v1/udp-logging/capabilities" || request.path == "/api/v1/host/udp-logging/test" || request.path == "/api/v1/host/udp-logging/test/capabilities") {
+        } else if (request.path == "/api/control/v1/host/udp-logging" || request.path == "/api/control/v1/udp-logging/capabilities" || request.path == "/api/control/v1/host/udp-logging/test" || request.path == "/api/control/v1/host/udp-logging/test/capabilities") {
             result = request.method != "GET" && !context
                 ? wsprrypi::PicoHttpResponse{403, R"({"error":{"code":"origin_or_content_type"}})", {}}
                 : wsprrypi::udp_logging_api(request.method, request.body, request.get_header_value("If-Match"),request.path.ends_with("/capabilities"),request.path.find("/test")!=std::string::npos);
-        } else if (request.path == "/api/v1/host/logging") {
+        } else if (request.path == "/api/control/v1/host/logging") {
             result = request.method != "GET" && !context
                 ? wsprrypi::PicoHttpResponse{403, R"({"error":{"code":"origin_or_content_type"}})", {}}
                 : wsprrypi::usb_logging_api(request.method, request.body, request.get_header_value("If-Match"));
-        } else if (request.path == "/api/v1/host/fleet") {
+        } else if (request.path == "/api/control/v1/host/fleet") {
             result = request.method == "GET" || context
                 ? wsprrypi::wtp_fleet_api(request.method, request.body, request.get_header_value("If-Match"))
                 : wsprrypi::PicoHttpResponse{403, R"({"error":{"code":"origin_or_content_type"}})", {}};
-        } else if (request.path == "/api/v1/host/wtp-endpoint" && request.method == "GET") {
+        } else if (request.path == "/api/control/v1/host/wtp-endpoint" && request.method == "GET") {
             result = {200, wsprrypi::wtp_pi_endpoint_status_json(), {}};
-        } else if (request.path == "/api/v1/host/wtp-endpoint/recover" && request.method == "POST") {
+        } else if (request.path == "/api/control/v1/host/wtp-endpoint/recover" && request.method == "POST") {
             if (!context) result = {403, R"({"error":{"code":"origin_or_content_type"}})", {}};
             else try {
                 if (wsprrypi::strict_browser_json(request.body) != nlohmann::json{{"confirmed", true}})
@@ -253,7 +253,7 @@ void register_control(
             } catch (const std::exception &error) {
                 result = {409, nlohmann::json{{"error", {{"message", error.what()}}}}.dump(), {}};
             }
-        } else if (request.path == "/api/v1/host/wtp-endpoint/enable" && request.method == "POST") {
+        } else if (request.path == "/api/control/v1/host/wtp-endpoint/enable" && request.method == "POST") {
             if (!context) result = {403, R"({"error":{"code":"origin_or_content_type"}})", {}};
             else if (request.get_header_value("If-Match").empty())
                 result = {428, R"({"error":{"code":"revision_required"}})", {}};
@@ -278,13 +278,13 @@ void register_control(
                     nlohmann::json{{"error", {{"code", reason}}},
                         {"status", nlohmann::json::parse(wsprrypi::wtp_pi_endpoint_status_json())}}.dump(), {}};
             }
-        } else if (request.path == "/api/v1/host/discovery" ||
-            request.path == "/api/v1/host/discovery/identify" ||
-            request.path == "/api/v1/host/devices" ||
-            request.path == "/api/v1/host/devices/use") {
+        } else if (request.path == "/api/control/v1/host/discovery" ||
+            request.path == "/api/control/v1/host/discovery/identify" ||
+            request.path == "/api/control/v1/host/devices" ||
+            request.path == "/api/control/v1/host/devices/use") {
             result = context || request.method == "GET" ? catalog_request(request)
                 : wsprrypi::PicoHttpResponse{403, R"({"error":{"code":"origin_or_content_type"}})", {}};
-        } else if (request.path == "/api/v1/host/config") {
+        } else if (request.path == "/api/control/v1/host/config") {
             try {
                 if (request.method == "PUT") {
                     if (!context) result = {403, R"({"error":{"code":"origin_or_content_type"}})", {}};
@@ -310,10 +310,10 @@ void register_control(
         response.headers.erase("Access-Control-Allow-Origin");
         response.set_content(result.body, "application/json");
     };
-    server.Get(R"(/api/v1/.*)", shared);
-    server.Put(R"(/api/v1/.*)", shared);
-    server.Post(R"(/api/v1/.*)", shared);
-    server.Delete(R"(/api/v1/.*)", shared);
+    server.Get(R"(/api/control/v1/.*)", shared);
+    server.Put(R"(/api/control/v1/.*)", shared);
+    server.Post(R"(/api/control/v1/.*)", shared);
+    server.Delete(R"(/api/control/v1/.*)", shared);
     server.Get("/api/wtp", [](const httplib::Request &, httplib::Response &response) {
         response.set_header("Cache-Control", "no-store");
         response.set_content(wtp_runtime_json(), "application/json");

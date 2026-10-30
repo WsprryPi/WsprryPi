@@ -9374,8 +9374,8 @@ install_wsprrypi_proxy_block() {
     ProxyPass        /wsprrypi/api/rp1-gpclk-route http://127.0.0.1:${WSPRRYPI_WEB_PORT}/api/rp1-gpclk-route
     ProxyPassReverse /wsprrypi/api/rp1-gpclk-route http://127.0.0.1:${WSPRRYPI_WEB_PORT}/api/rp1-gpclk-route
 
-    ProxyPass        /wsprrypi/api/v1 http://127.0.0.1:${WSPRRYPI_WEB_PORT}/api/v1
-    ProxyPassReverse /wsprrypi/api/v1 http://127.0.0.1:${WSPRRYPI_WEB_PORT}/api/v1
+    ProxyPass        /wsprrypi/api/control/v1 http://127.0.0.1:${WSPRRYPI_WEB_PORT}/api/control/v1
+    ProxyPassReverse /wsprrypi/api/control/v1 http://127.0.0.1:${WSPRRYPI_WEB_PORT}/api/control/v1
     ProxyPass        /wsprrypi/api/wtp http://127.0.0.1:${WSPRRYPI_WEB_PORT}/api/wtp
     ProxyPassReverse /wsprrypi/api/wtp http://127.0.0.1:${WSPRRYPI_WEB_PORT}/api/wtp
 

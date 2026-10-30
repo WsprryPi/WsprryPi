@@ -773,7 +773,7 @@
     let viewCursor = null, sourceRefreshGeneration = 0, collectionReviewPending = false, activeSourceRefreshes = 0;
     const cursorStorageKey = () => `log_stream_cursor_v3:stream2:playback1:backlog200:${collectorIdentity}:${selectedSource}:${selectedSeverity}:${selectedSource.startsWith("udp:")?udpPeerAddresses.get(selectedSource.split(":")[1])||"unverified":""}`;
     const validSource = value => /^(all|local|(?:pico|usb):[0-9a-f]{32}|udp:[A-Za-z0-9_-]{1,32}:(?:pico|pi):[0-9a-f]{32}(?::(?:direct|relay))?)$/.test(value);
-    const loggingApi = () => (window.WSPRRYPI_PATHS?.sharedApiPath || "/api/v1") + "/host/logging";
+    const loggingApi = () => (window.WSPRRYPI_PATHS?.sharedApiPath || "/api/control/v1") + "/host/logging";
     function sourceStatus(text) {
         const scope = selectedSource.startsWith("udp:") ? selectedSource.split(":") : null;
         const message = scope ? `${scope[2]} ${scope[3]} via ${scope[1]} · ${scope[4] || "all paths"}. ${text}` : text;
@@ -862,7 +862,7 @@
                 throw new Error("The source list is invalid. Refresh sources to retry.");
             let nextPeers = new Map(), nextWarning = "";
             try {
-                const api=window.WSPRRYPI_PATHS?.sharedApiPath||"/api/v1";
+                const api=window.WSPRRYPI_PATHS?.sharedApiPath||"/api/control/v1";
                 const c=await fetch(api+"/udp-logging/capabilities",{cache:"no-store",signal:AbortSignal.timeout(10000)});
                 if(!c.ok)throw Error("Network logging is unavailable");
                 const capabilities=window.WsprryUdp.parseJson(await c.text());
@@ -918,7 +918,7 @@
         try {
             const response = await fetch(loggingApi(), {method:"PUT",cache:"no-store",signal:AbortSignal.timeout(10000),
                 headers:{"Content-Type":"application/json","X-WsprryPico-Request":"1","If-Match":collectorRevision || ""},
-                body:JSON.stringify({schema:"host-usb-logging/1",collector_id:collectorSnapshot.collector_id,sources})});
+                body:JSON.stringify({contract:'Wsprry-Control/1',schema:"host-usb-logging/1",collector_id:collectorSnapshot.collector_id,sources})});
             if (!response.ok) throw new Error("Collection save is unconfirmed. Refresh sources and review the saved setting before trying again.");
             await refreshSources(true);
         } catch (error) { sourceStatus(error.message); }

@@ -103,7 +103,7 @@ INI change must be reconciled before committing the transition.
 
 An accepted direct HTTP configuration write that sets `Operation.Transmit=true`
 is likewise a noninteractive local takeover request. This includes `PUT` or
-`PATCH /config` and `PUT /api/v1/host/config`; the server SHALL not infer an
+`PATCH /config` and `PUT /api/control/v1/host/config`; the server SHALL not infer an
 interactive prompt from the request's browser headers, origin, or route. With
 remote ownership present, it SHALL close remote admission and initiate the
 trusted local abort immediately after validating the write, with no controller

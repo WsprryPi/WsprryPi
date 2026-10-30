@@ -1,0 +1,11 @@
+{
+  "policy": "wsprry-control-lifecycle",
+  "phase": "prerelease",
+  "major": 1,
+  "contract": "Wsprry-Control/1",
+  "namespace": "/api/control/v1/",
+  "schema_id": "urn:wsprry:control:1",
+  "first_release": null,
+  "schema_sha256": null,
+  "public_prefix": "/api/consumer/v1/read/"
+}

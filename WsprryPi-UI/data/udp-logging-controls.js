@@ -2,7 +2,7 @@
 (function(root){
 'use strict';
 if(!root.document)return;
-const base=()=>root.WSPRRYPI_PATHS?.sharedApiPath||'/api/v1';
+const base=()=>root.WSPRRYPI_PATHS?.sharedApiPath||'/api/control/v1';
 async function exchange(path,method='GET',body,revision){
  const response=await root.fetch(`${base()}/${path}`,{method,cache:'no-store',signal:AbortSignal.timeout(15000),...(body?{headers:{'Content-Type':'application/json','X-WsprryPico-Request':'1','If-Match':revision},body:JSON.stringify(body)}:{})});
  const value=root.WsprryUdp.parseJson(await response.text());

@@ -4,7 +4,7 @@
     "use strict";
     if (!root.document) return;
     const byId = id => root.document.getElementById(`wtp-usb-${id}`);
-    const api = resource => (root.WSPRRYPI_PATHS?.sharedApiPath || "/api/v1") + "/member/" + resource;
+    const api = resource => (root.WSPRRYPI_PATHS?.sharedApiPath || "/api/control/v1") + "/member/" + resource;
     let available = false, busy = false, hostname = null, wifi = null, nameRevision = "", wifiRevision = "", dirty = false, uncertain = false, reviewRequired = false;
     function render() {
         const section = byId("settings");
@@ -45,12 +45,12 @@
         for (const id of controls) if (byId(id)) byId(id).disabled = true;
         const expected = logging, epoch = loggingEpoch; logging = null;
         try {
-            if (save) await exchange("logging","PUT",{schema:"transmitter-logging/1",target:expected.target,
+            if (save) await exchange("logging","PUT",{contract:'Wsprry-Control/1',schema:"logging",target:expected.target,
                 logging:{enabled:byId("logging-enabled").checked,maximum_severity:Number(byId("logging-severity").value)}},loggingRevision);
             const observed = await exchange("logging");
             if (epoch !== loggingEpoch || !available) return;
             const value = observed.value;
-            if (value.schema !== "transmitter-logging/1" || value.target?.scope !== "member" ||
+            if (value.schema !== "logging" || value.target?.scope !== "member" ||
                 !/^[0-9a-f]{32}$/.test(value.target?.device_id || "") || !/^[0-9a-f]{32}$/.test(value.target?.boot_id || "") ||
                 typeof value.saved?.enabled !== "boolean" || !Number.isInteger(value.saved?.maximum_severity) ||
                 value.saved.maximum_severity < 0 || value.saved.maximum_severity > 7 ||
@@ -75,7 +75,7 @@
         try {
             if (action === "load") {
                 const name = await exchange("hostname"), network = await exchange("wifi");
-                if (name.value.schema !== "transmitter-hostname/1" || network.value.schema !== "transmitter-wifi/1" ||
+                if (name.value.schema !== "hostname" || network.value.schema !== "wifi" ||
                     !name.revision || !network.revision || !name.value.target || !network.value.target ||
                     name.value.target.scope !== "member" || name.value.target.device_id !== network.value.target.device_id || name.value.target.boot_id !== network.value.target.boot_id)
                     throw new Error("Name and Wi-Fi identity could not be confirmed. Your draft is preserved; read again.");
@@ -96,10 +96,10 @@
                 if (action === "wifi-save" && !byId("password").value && wifi?.wifi?.ssid !== byId("ssid").value)
                     throw new Error("Enter the password for this new or renamed Wi-Fi network. Your draft is preserved.");
                 const target = hostname?.target;
-                const payload = action === "name-save" ? {schema:"transmitter-hostname/1",target,hostname:byId("hostname").value || null}
-                    : action === "wifi-save" ? {schema:"transmitter-wifi/1",target,wifi:{ssid:byId("ssid").value,password:byId("password").value || (wifi?.wifi ? null : ""),time_server:byId("time-server").value}}
-                    : action === "wifi-remove" ? {schema:"transmitter-wifi/1",target,wifi:null}
-                    : action === "ap" ? {schema:"transmitter-ap-request/1",target} : {};
+                const payload = action === "name-save" ? {contract:'Wsprry-Control/1',schema:"hostname",target,hostname:byId("hostname").value || null}
+                    : action === "wifi-save" ? {contract:'Wsprry-Control/1',schema:"wifi",target,wifi:{ssid:byId("ssid").value,password:byId("password").value || (wifi?.wifi ? null : ""),time_server:byId("time-server").value}}
+                    : action === "wifi-remove" ? {contract:'Wsprry-Control/1',schema:"wifi",target,wifi:null}
+                    : action === "ap" ? {contract:'Wsprry-Control/1',schema:"ap-request",target} : {};
                 const revision = action.startsWith("wifi-") ? wifiRevision : nameRevision;
                 invalidate(); root.WtpManagement?.invalidate(); uncertain = true;
                 await exchange(action === "name-save" ? "hostname" : action.startsWith("wifi-") ? "wifi" : action,

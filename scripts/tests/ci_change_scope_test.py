@@ -64,6 +64,12 @@ class PolicyTests(unittest.TestCase):
             with self.subTest(raw=raw), self.assertRaises((ValueError, UnicodeError)):
                 scope.parse_changes(raw)
 
+    def test_tag_push_always_requires_full_ci(self):
+        for reference in ('refs/tags/v1.0.0', 'refs/tags/v1.0.0-beta.1'):
+            required, reason = scope.full_ci_required(ROOT, 'push', {'ref': reference})
+            self.assertTrue(required)
+            self.assertIn('tag validation', reason)
+
     def test_comparison_errors_default_to_full_ci(self):
         event = {"before": "1"*40, "after": "2"*40}
         for failure in [OSError("missing Git"), subprocess.CalledProcessError(128, "git"),

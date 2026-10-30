@@ -145,7 +145,7 @@ async function main() {
                     if(options.method==='POST')window.__requests.push(JSON.parse(options.body));
                     return {ok:true,status:200,headers:{get:()=>''},json:async()=>window.__fw};
                 }
-                const value=String(url).endsWith('/api/v1/status')||String(url).includes('/api/wtp')?window.__snapshot:
+                const value=String(url).endsWith('/api/control/v1/status')||String(url).includes('/api/wtp')?window.__snapshot:
                     String(url).endsWith('/host/devices')?{scope:'wsprrypi-wtp-catalog/1',profiles:[],active_id:null}:
                     String(url).endsWith('/host/discovery')?{available:false,candidates:[],reason:'fixture'}:{};
                 return {ok:true,status:200,headers:{get:()=>''},json:async()=>value===window.__snapshot ? {host:{...value,firmware_maintenance:window.__fw.maintenance===true}} : value};

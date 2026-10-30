@@ -78,13 +78,13 @@ interrupted slot or take over another owner's job.
 
 Pi assignments explicitly select Plain LAN and a status HTTP port (default
 31415). Before CLAIM and ARM, the controller reads the target's durable takeover
-generation at `/api/v1/host/wtp-endpoint`. A changed generation deletes that
+generation at `/api/control/v1/host/wtp-endpoint`. A changed generation deletes that
 output's saved assignment even when takeover happened while the controller was
 offline. Local Enable never waits for this controller. Losing network contact
 pauses progress; it does not prove output-off, select another device, or remove
 an assignment as if the operator had taken over.
 
-`GET/POST /api/v1/host/fleet` returns the assignment document, per-output runtime
+`GET/POST /api/control/v1/host/fleet` returns the assignment document, per-output runtime
 observations and a quoted ETag. POST requires `If-Match` and the existing host
 request guard. Operations are `assign`, `enable`, `pause`, `schedule`, `recover`,
 and `remove`. See [Pi endpoint operation](wtp-pi-operation.md) for inbound
@@ -114,9 +114,9 @@ are retained. Discovery and draft preparation never apply the profile. Removing
 a cable removes its live observation without deleting its saved profile or
 discarding an open draft.
 
-`GET /api/v1/host/discovery` retains its network `wtp-dns-sd/1` representation
+`GET /api/control/v1/host/discovery` retains its network `wtp-dns-sd/1` representation
 and adds a `usb` object (`scope: wtp-usb/1`) containing availability, a reason
-and metadata-only candidates. USB IDs in `POST /api/v1/host/discovery/identify`
+and metadata-only candidates. USB IDs in `POST /api/control/v1/host/discovery/identify`
 are resolved again against current metadata and matched to the supplied USB
 settings before identification. The UI refreshes observations with status;
 unchanged observations preserve the open selector.
@@ -162,9 +162,9 @@ normal connection behavior. No binding fallback is attempted.
 
 ## Host API and validation boundary
 
-Protected host resources are `GET /api/v1/host/discovery`,
-`GET/POST /api/v1/host/devices`, `POST /api/v1/host/discovery/identify`, and
-`POST /api/v1/host/devices/use`. The same trusted-LAN peer, proxy, Host and
+Protected host resources are `GET /api/control/v1/host/discovery`,
+`GET/POST /api/control/v1/host/devices`, `POST /api/control/v1/host/discovery/identify`, and
+`POST /api/control/v1/host/devices/use`. The same trusted-LAN peer, proxy, Host and
 Origin policy applies to each route. POST also requires same-origin JSON intent
 headers and a 32 KiB body limit. Catalog POST uses `If-Match` for the catalog;
 use carries `catalog_revision` in its JSON body and uses `If-Match` for the

@@ -27,7 +27,7 @@ nlohmann::json wtp_pi_revocation_status(const WtpSettings& settings, unsigned po
   if (authority.find(':')!=std::string::npos) authority='['+authority+']';
   authority+=':'+std::to_string(port);
   const auto reply=wtp_json_http_exchange(stream,now,
-      "GET /api/v1/host/wtp-endpoint HTTP/1.1\r\nHost: "+authority+
+      "GET /api/control/v1/host/wtp-endpoint HTTP/1.1\r\nHost: "+authority+
       "\r\nConnection: close\r\n\r\n",deadline,false);
   if (reply.status!=200) throw std::runtime_error("Pi takeover record is unavailable");
   auto state=strict_browser_json(reply.body);

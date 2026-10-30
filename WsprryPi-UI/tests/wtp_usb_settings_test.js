@@ -11,13 +11,13 @@ function browser(exchange) {
     root.window=root;vm.runInNewContext(source,root);root.WtpUsbSettings.setAvailability(true);
     return {root,requests,element,click:async name=>element("wtp-usb-"+name).listeners.click()};
 }
-const reply=(body,status=200,etag='"r1"')=>({ok:status>=200&&status<300,status,headers:{get:()=>etag},json:async()=>body});
+const reply=(body,status=200,etag='"r1"')=>({ok:status>=200&&status<300,status,headers:{get:()=>etag},json:async()=>({...body,contract:"Wsprry-Control/1"})});
 async function unit() {
     let saved=null, name="pico-one.local", revision=1, fail=false;
     const b=browser(async(url,options)=>{
-        if(url.endsWith("progress"))return reply({schema:"transmitter-progress/1",target,draft_revision:"1",station:{callsign:"AA0NT",locator:null,power_dbm:null},station_complete:false,complete:false,apply_domains:{station:false},schedule_suspended:true,matches_applied:false});
+        if(url.endsWith("progress"))return reply({schema:"progress",target,draft_revision:"1",station:{callsign:"AA0NT",locator:null,power_dbm:null},station_complete:false,complete:false,apply_domains:{station:false},schedule_suspended:true,matches_applied:false});
         if(url.endsWith("progress/update"))return reply({outcomes:{callsign:"saved",locator:"cleared",power_dbm:"invalid"}});
-        if(options.method==="GET")return reply(url.endsWith("hostname")?{schema:"transmitter-hostname/1",target,saved:name,active:"pico-one.local",default:"pico-default.local",writable:true,pending_restart:name!=="pico-one.local"}:{schema:"transmitter-wifi/1",target,wifi:saved,pending_restart:false},200,`"r${revision}"`);
+        if(options.method==="GET")return reply(url.endsWith("hostname")?{schema:"hostname",target,saved:name,active:"pico-one.local",default:"pico-default.local",writable:true,pending_restart:name!=="pico-one.local"}:{schema:"wifi",target,wifi:saved,pending_restart:false},200,`"r${revision}"`);
         if(fail)throw new Error("simulated disconnect");
         const body=JSON.parse(options.body);revision++;
         if(url.endsWith("wifi"))saved=body.wifi?{...body.wifi,password:null}:null;

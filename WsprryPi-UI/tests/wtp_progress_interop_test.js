@@ -45,14 +45,23 @@ async function scenario(carrier) {
         const initial=await dump();
         // Preserve the established API's non-station units while the new UI
         // edits station only. Pins normalize their omitted default polarity.
-        const originalProgress=await command({method:"GET",path:"/api/v1/member/progress",body:""});
+        const originalProgress=await command({method:"GET",path:"/api/control/v1/member/progress",body:""});
         assert.equal(originalProgress.status,200,JSON.stringify(originalProgress));
         const pins={engine:"direct",rf_gp:28,i2c_pair:null,button_gp:14,amplifier_gp:null,lpf_gps:[],indicator:"onboard_led",indicator_gp:null};
-        const independent=await command({method:"POST",path:"/api/v1/member/progress/update",revision:originalProgress.etag,
-            body:JSON.stringify({schema:"transmitter-progress/1",target:originalProgress.body.target,request_id:"7".repeat(32),fields:{pins,enabled:false,schedules:[]}})});
+        const independent=await command({method:"POST",path:"/api/control/v1/member/progress/update",revision:originalProgress.etag,
+            body:JSON.stringify({contract:'Wsprry-Control/1',schema:"progress",target:originalProgress.body.target,request_id:"7".repeat(32),fields:{pins,enabled:false,schedules:[]}})});
         assert.equal(independent.status,200,JSON.stringify(independent));
         assert.equal(independent.body.fields.enabled,false);assert.deepEqual(independent.body.fields.schedules,[]);
         assert.equal(independent.body.fields.pins.indicator_active_high,true);
+        // A valid omission preserves a prior false draft rather than defaulting true.
+        for(const [id,plan] of [['8',{...pins,amplifier_active_high:false}],['9',pins]]) {
+            const current=await command({method:'GET',path:'/api/control/v1/member/progress',body:''});assert.equal(current.status,200,JSON.stringify(current));
+            const changed=await command({method:'POST',path:'/api/control/v1/member/progress/update',revision:current.etag,
+                body:JSON.stringify({contract:'Wsprry-Control/1',schema:'progress',target:current.body.target,request_id:id.repeat(32),fields:{pins:plan}})});
+            assert.equal(changed.status,200,JSON.stringify(changed));assert.equal(changed.body.fields.pins.amplifier_active_high,false);
+            const emitted=changed.exchanges?.find(e=>e.method==='POST')?.body;
+            if(id==='9'&&typeof emitted==='string')assert(!Object.hasOwn(JSON.parse(emitted).fields.pins,'amplifier_active_high'));
+        }
         const edit=(name,value)=>{b.element("wtp-member-"+name).value=value;b.element("wtp-member-"+name).listeners.input();};
         await b.click("wtp-usb-progress-load");assert.equal(calls.at(-1).status,200,JSON.stringify(calls.at(-1)));
         edit("callsign","K1ABC");edit("locator","");edit("power","0");
@@ -70,8 +79,8 @@ async function scenario(carrier) {
         const saved=calls.at(-1);
         if(consumer) {
             assert(b.element("wtp-usb-progress-apply").disabled);
-            const refused=await command({method:"POST",path:"/api/v1/member/progress/apply",revision:saved.etag,
-                body:JSON.stringify({schema:"transmitter-progress/1",target:saved.body.target,application:{draft_revision:saved.body.draft_revision,domain:"station"}})});
+            const refused=await command({method:"POST",path:"/api/control/v1/member/progress/apply",revision:saved.etag,
+                body:JSON.stringify({contract:'Wsprry-Control/1',schema:"progress",target:saved.body.target,application:{draft_revision:saved.body.draft_revision,domain:"station"}})});
             assert.equal(refused.status,409,JSON.stringify(refused));assert.equal(refused.body.error.code,"consumer_setup_identity_required");
             assert.deepEqual((await dump()).config,initial.config);
         } else {

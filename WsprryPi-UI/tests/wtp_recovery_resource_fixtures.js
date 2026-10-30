@@ -11,11 +11,11 @@ function loadResourceFixtures(build) {
         plans: []
     };
     const schema = fixtures.loaded.application.schema;
-    if (!['transmitter-application/1', 'transmitter-application/2'].includes(schema)) throw new Error('Unexpected loaded application schema');
-    if (schema === 'transmitter-application/2') {
+    if (schema !== 'application') throw new Error('Unexpected loaded application schema');
+    if (schema === 'application') {
         fixtures.plans = planNames.map(name => {
             const saved = read(`resources-wspr-${name}.json`);
-            if (saved.application.schema !== 'transmitter-application/2') throw new Error(`Wrong versioned fixture: ${name}`);
+            if (saved.application.schema !== 'application') throw new Error(`Wrong control fixture: ${name}`);
             return [name, saved];
         });
     }

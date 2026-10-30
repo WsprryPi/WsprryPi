@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Lee Bussy
 #include "network_http.hpp"
+#include "control_contract.hpp"
 #include "json.hpp"
 #include <array>
 #include <charconv>
@@ -75,17 +76,13 @@ PicoHttpResponse pico_http_request(TlsStream &stream, const TlsSelection &select
     return PicoHttpResponse{status, nlohmann::json{{"error", {{"code", code}}}}.dump(), {}};
   };
   const bool mutation = method == "PUT" || method == "POST";
-  const bool allowed = (method == "GET" && (resource == "config" || resource == "schedules" ||
-      resource == "network" || resource == "udp-logging" || resource == "udp-logging/capabilities" || resource == "udp-logging/test/capabilities" || resource == "capabilities" || resource == "status" || resource == "application" || resource == "management" ||
-       resource == "station" || resource == "hardware" || resource == "pins" || resource == "application/2" || resource == "station/2" || (resource == "gpio-drive" || resource == "amplifier-timing" || resource == "filter-selector") || resource == "config/3" || resource == "hardware/2" || resource == "application/3" || resource == "progress/2" || resource == "progress")) ||
-      (method == "PUT" && (resource == "udp-logging" || resource == "config" || resource == "schedules" || resource == "network" || resource == "station" || resource == "hardware" || resource == "config/2" || resource == "station/2" || (resource == "gpio-drive" || resource == "amplifier-timing" || resource == "filter-selector") || resource == "config/3")) ||
-      (method == "POST" && (resource == "udp-logging/test" || resource == "config/update" || resource == "config/update/2" || resource == "config/update/3" || resource == "progress/update/2" || resource == "progress/apply/2" || resource == "progress/update" || resource == "progress/apply" || resource == "pins/validate"));
+  const bool allowed = pi_management_route(resource, method);
   if (!allowed)
     return error(404, "not_found");
   if (body.size() > 32768 || revision.size() > 128 || revision.find_first_of("\r\n") != std::string::npos)
     return error(400, "invalid_request");
   if (method == "POST" && body.size() > 2048) return error(413, "body_too_large");
-  if (method == "PUT" && (resource == "station" || resource == "station/2" || resource == "hardware") && body.size() > 1024)
+  if (method == "PUT" && (resource == "station" || resource == "hardware") && body.size() > 1024)
     return error(413,"body_too_large");
   if (mutation && resource != "pins/validate" && revision.empty()) return error(428, "revision_required");
   if (!stream.begin_open(selection, std::move(credentials), "http/1.1")) return error(503, "network_unavailable");
@@ -100,7 +97,7 @@ PicoHttpResponse pico_http_request(TlsStream &stream, const TlsSelection &select
   auto authority = stream.observation().authenticated_identity;
   if (authority.find(':') != std::string::npos) authority = '[' + authority + ']';
   if (selection.port != 443) authority += ':' + std::to_string(selection.port);
-  std::string request = method + " /api/v1/" + resource + " HTTP/1.1\r\nHost: " + authority + "\r\n";
+  std::string request = method + " /api/control/v1/" + resource + " HTTP/1.1\r\nHost: " + authority + "\r\n";
   if (mutation) request += "Origin: https://" + authority +
       "\r\nContent-Type: application/json\r\nX-WsprryPico-Request: 1\r\n" + (revision.empty() ? "" : "If-Match: " + revision + "\r\n") +
       "Content-Length: " + std::to_string(body.size()) + "\r\n";

@@ -84,6 +84,15 @@ int main(int argc, char **argv) {
     const auto http = [&](const std::string &resource, const std::string &method = "GET", const std::string &body = "", const std::string &revision = "") {
       return pico_http_request(tls, selection, credentials, [&] { return clock.now_ms(); }, resource, method, body, revision);
     };
+    const auto resolver_calls=resolution->calls;
+    const auto transport_state=tls.observation().state;
+    for(const auto &[resource,method]:{std::pair{"jobs","POST"}, {"jobs/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/abort","POST"},
+        {"restart","POST"},{"hostname","PUT"},{"hostname","GET"},{"jobs","GET"},{"consumer/password","PUT"},
+        {"consumer/password","GET"},{"consumer/setup/api/owner/v1/public-status","GET"},
+        {"consumer/setup/api/bootstrap/v1/start","POST"},{"consumer/logout","POST"}}) {
+      CHECK(http(resource,method,R"({"contract":"Wsprry-Control/1"})","\"r1\"").status==404);
+      CHECK(resolution->calls==resolver_calls && tls.observation().state==transport_state);
+    }
     const auto restart = [](const char *which) {
       std::cout << "RESTART " << which << std::endl;
       std::string ready; std::getline(std::cin, ready); CHECK(ready == "READY");
@@ -109,11 +118,15 @@ int main(int argc, char **argv) {
     }
     config = http("config"); CHECK(config.status == 200);
 
-    const std::string body = R"({"version":1,"enabled":false,"station":{"callsign":"AA0NT","locator":"EM18","power_dbm":20},"wifi":{"ssid":"test","password":"never-echo-this","ntp_ipv4":"192.0.2.1"},"schedules":[{"period_s":120,"phase_s":0}]})";
-    CHECK(http("config", "PUT", body).status == 428);
-    auto saved = http("config", "PUT", body, config.etag);
+    const auto application=http("application");CHECK(application.status==200);
+    const auto target=nlohmann::json::parse(application.body).at("target");
+    const std::string body=nlohmann::json{{"contract","Wsprry-Control/1"},{"schema","config-update"},{"target",target},{"mode","merge"},
+      {"config",{{"enabled",false},{"station",{{"callsign","AA0NT"},{"locator","EM18"},{"power_dbm",20}}},
+      {"wifi",{{"ssid","test"},{"password","never-echo-this"},{"ntp_ipv4","192.0.2.1"}}},{"schedules",nlohmann::json::array({{{"period_s",120},{"phase_s",0}}})}}}}.dump();
+    CHECK(http("config/update", "POST", body).status == 428);
+    auto saved = http("config/update", "POST", body, config.etag);
     CHECK(saved.status == 200 && saved.body.find("never-echo-this") == std::string::npos);
-    CHECK(http("config", "PUT", body, config.etag).status == 412);
+    CHECK(http("config/update", "POST", body, config.etag).status == 412);
     CHECK(http("schedules").status == 200);
     CHECK(http("network").status == 200);
     WtpSettings settings;

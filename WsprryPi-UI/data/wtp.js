@@ -167,7 +167,7 @@
         let receivedStatus = false;
         try {
             const url = recover ? (root.WSPRRYPI_PATHS?.wtpPath || "/api/wtp") + "/recover"
-                : (root.WSPRRYPI_PATHS?.sharedApiPath || "/api/v1") + "/status";
+                : (root.WSPRRYPI_PATHS?.sharedApiPath || "/api/control/v1") + "/status";
             const response = await root.fetch(url, {
                 method: recover ? "POST" : "GET", cache: "no-store", signal: controller.signal,
                 ...(recover ? { headers: { "Content-Type": "application/json" }, body: JSON.stringify({ operation: "reconcile" }) } : {})
@@ -209,7 +209,7 @@
     }
     let fleetCatalog = null, fleetDiscovery = null, fleetRevision = "", fleetChoice = "", fleetEditId = "", fleetObservedId = "", fleetBusy = false;
     let fleetLoading = false, fleetUsbId = "", fleetProbeGeneration = 0, fleetOptionsSignature = "";
-    const fleetUrl = suffix => (root.WSPRRYPI_PATHS?.sharedApiPath || "/api/v1") + "/host/" + suffix;
+    const fleetUrl = suffix => (root.WSPRRYPI_PATHS?.sharedApiPath || "/api/control/v1") + "/host/" + suffix;
     const fleetFeedback = message => { if (byId("fleet-feedback")) byId("fleet-feedback").textContent = message; };
     const editorFeedback = message => { if (byId("fleet-editor-feedback")) byId("fleet-editor-feedback").textContent = message; };
     const fleetCandidate = id => [...(fleetDiscovery?.candidates || []),
@@ -524,7 +524,7 @@
         try {
             if (!browserSession) browserSession = Array.from(root.crypto.getRandomValues(new Uint8Array(16)), b => b.toString(16).padStart(2, "0")).join("");
             const requestId = Array.from(root.crypto.getRandomValues(new Uint8Array(16)), b => b.toString(16).padStart(2, "0")).join("");
-            const response = await root.fetch((root.WSPRRYPI_PATHS?.sharedApiPath || "/api/v1") + "/jobs", {
+            const response = await root.fetch((root.WSPRRYPI_PATHS?.sharedApiPath || "/api/control/v1") + "/jobs", {
                 method: "POST", cache: "no-store", signal: controller.signal,
                 headers: { "Content-Type": "application/json", "X-WsprryPico-Request": "1" },
                 body: JSON.stringify({session_id: browserSession, request_id: requestId, operation: "ABORT", body: {job_id: job}})

@@ -59,7 +59,7 @@ int main() {
   std::uint64_t now{}; Device device; bool cancelled=false;
   UsbManagementClient client(device,[&]{return now;},[&](unsigned n){now+=n;},[&]{return cancelled;});
   CHECK(client.hello(std::string(32,'a')));
-  CHECK(client.request("/api/v1/hostname","GET").status==200 && device.acks==1);
+  CHECK(client.request("/api/control/v1/hostname","GET").status==200 && device.acks==1);
   CHECK(device.operations[1].at("target")==device.target && device.operations[2].at("operation")=="ack");
   CHECK(client.request("/api/usb/v1/wifi","DELETE","{}","\"r1\"").status==200 && device.mutations==1);
   unsigned observations{};
@@ -126,13 +126,13 @@ int main() {
   CHECK(!client.synchronize([]{return HostUtcObservation{};}));
   CHECK(client.observation().at("time").at("reason")=="host_utc_unqualified");
   const auto before=device.operations.size(); cancelled=true;
-  CHECK(client.request("/api/v1/hostname","GET").status==503 && device.closed && device.operations.size()==before);
+  CHECK(client.request("/api/control/v1/hostname","GET").status==503 && device.closed && device.operations.size()==before);
   // Cancellation of a silent endpoint must end before the ten-second deadline.
   Device silent; cancelled=false;
   UsbManagementClient bounded(silent,[&]{return now;},[&](unsigned n){now+=n;if(now%100000>=7)cancelled=true;},[&]{return cancelled;});
   CHECK(bounded.hello(std::string(32,'a')));silent.drop=true;const auto cancel_start=now;
   cancelled=false;
-  CHECK(bounded.request("/api/v1/status","GET").status==503 && now-cancel_start<=7 && silent.closed);
+  CHECK(bounded.request("/api/control/v1/status","GET").status==503 && now-cancel_start<=7 && silent.closed);
   cancelled=false;
   Device wrong;UsbManagementClient rejected(wrong,[&]{return now;},[&](unsigned n){now+=n;});
   CHECK(!rejected.hello(std::string(32,'d')) && wrong.closed);
@@ -148,27 +148,27 @@ int main() {
   WtpBrowserApi api([]{return Json::object();},[&](auto resource,auto method,auto,auto,auto) {
     if(resource=="member/management")return PicoHttpResponse{200,Json{{"carrier","usb_physical"},{"selection_id",selection}}.dump(),{}};
     if(method!="GET")++writes;
-    return PicoHttpResponse{200,"{}","\"r1\""};
+    return PicoHttpResponse{200,R"({"contract":"Wsprry-Control/1"})","\"r1\""};
   },[](auto){return PicoHttpResponse{};});
   for(const auto resource:{"wifi","hostname"}) {
-    const std::string path="/api/v1/member/"+std::string(resource);
+    const std::string path="/api/control/v1/member/"+std::string(resource);
     CHECK(classify_privileged_http_operation("GET",path)==PrivilegedOperationClass::protected_operation);
-    CHECK(api.handle({"PUT",path,"{}","\"r1\"",false}).status==403);
-    CHECK(api.handle({"PUT",path,"{}","\"r1\"",true}).status==409);
+    CHECK(api.handle({"PUT",path,R"({"contract":"Wsprry-Control/1"})","\"r1\"",false}).status==403);
+    CHECK(api.handle({"PUT",path,R"({"contract":"Wsprry-Control/1"})","\"r1\"",true}).status==409);
     CHECK(api.handle({"GET",path,{},{},false}).status==200);
-    CHECK(api.handle({"PUT",path,"{}","\"r1\"",true}).status==200);
-    CHECK(api.handle({"PUT",path,"{}","\"r1\"",true}).status==409);
+    CHECK(api.handle({"PUT",path,R"({"contract":"Wsprry-Control/1"})","\"r1\"",true}).status==200);
+    CHECK(api.handle({"PUT",path,R"({"contract":"Wsprry-Control/1"})","\"r1\"",true}).status==409);
   }
-  CHECK(api.handle({"GET","/api/v1/member/wifi",{},{},false}).status==200);selection="selection2";
-  CHECK(api.handle({"DELETE","/api/v1/member/wifi","{}","\"r1\"",true}).status==409 && writes==2);
-  CHECK(classify_privileged_http_operation("DELETE","/api/v1/member/wifi")==PrivilegedOperationClass::protected_operation);
-  CHECK(classify_privileged_http_operation("DELETE","/api/v1/member/hostname")==PrivilegedOperationClass::reject);
-  CHECK(classify_privileged_http_operation("GET","/api/v1/member/progress")==PrivilegedOperationClass::protected_operation);
-  CHECK(classify_privileged_http_operation("POST","/api/v1/member/progress/apply")==PrivilegedOperationClass::protected_operation);
-  CHECK(api.handle({"POST","/api/v1/member/progress/update","{}","\"r1\"",true}).status==409);
-  CHECK(api.handle({"GET","/api/v1/member/progress",{},{},false}).status==200);
-  CHECK(api.handle({"POST","/api/v1/member/progress/update","{}","\"r1\"",true}).status==200);
-  CHECK(api.handle({"POST","/api/v1/member/progress/apply","{}","\"r1\"",true}).status==409);
+  CHECK(api.handle({"GET","/api/control/v1/member/wifi",{},{},false}).status==200);selection="selection2";
+  CHECK(api.handle({"DELETE","/api/control/v1/member/wifi",R"({"contract":"Wsprry-Control/1"})","\"r1\"",true}).status==409 && writes==2);
+  CHECK(classify_privileged_http_operation("DELETE","/api/control/v1/member/wifi")==PrivilegedOperationClass::protected_operation);
+  CHECK(classify_privileged_http_operation("DELETE","/api/control/v1/member/hostname")==PrivilegedOperationClass::reject);
+  CHECK(classify_privileged_http_operation("GET","/api/control/v1/member/progress")==PrivilegedOperationClass::protected_operation);
+  CHECK(classify_privileged_http_operation("POST","/api/control/v1/member/progress/apply")==PrivilegedOperationClass::protected_operation);
+  CHECK(api.handle({"POST","/api/control/v1/member/progress/update",R"({"contract":"Wsprry-Control/1"})","\"r1\"",true}).status==409);
+  CHECK(api.handle({"GET","/api/control/v1/member/progress",{},{},false}).status==200);
+  CHECK(api.handle({"POST","/api/control/v1/member/progress/update",R"({"contract":"Wsprry-Control/1"})","\"r1\"",true}).status==200);
+  CHECK(api.handle({"POST","/api/control/v1/member/progress/apply",R"({"contract":"Wsprry-Control/1"})","\"r1\"",true}).status==409);
   std::cout<<"USB management framing, ACK, identity, replay refusal, time bounds, cancellation, deadline and browser revision guards passed\n";
  } catch(const std::exception &e){std::cerr<<e.what()<<'\n';return 1;}
 }

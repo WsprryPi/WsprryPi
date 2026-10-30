@@ -3,7 +3,7 @@
 (function (root) {
     "use strict";
     const byId = id => root.document.getElementById(id);
-    const url = suffix => (root.WSPRRYPI_PATHS?.sharedApiPath || "/api/v1") + "/host/" + suffix;
+    const url = suffix => (root.WSPRRYPI_PATHS?.sharedApiPath || "/api/control/v1") + "/host/" + suffix;
     let pendingChoice = null, busy = false, closed = false, timer;
     function render(state) {
         const panel = byId("local-wtp-control");

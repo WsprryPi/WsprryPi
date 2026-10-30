@@ -6,9 +6,9 @@ $path = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
 header("Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self'; form-action 'none'; frame-src 'none'");
 // Supply only synthetic read-only status so the production maintenance guard
 // can settle. No request is forwarded to an application or attached device.
-if ($path === '/api/v1/status' && $_SERVER['REQUEST_METHOD'] === 'GET') {
+if ($path === '/api/control/v1/status' && $_SERVER['REQUEST_METHOD'] === 'GET') {
     header('Content-Type: application/json');
-    echo json_encode(['host' => ['selected' => false, 'firmware_maintenance' => false,
+    echo json_encode(['contract' => 'Wsprry-Control/1', 'host' => ['selected' => false, 'firmware_maintenance' => false,
         'ready' => false, 'phase' => 'idle', 'session_phase' => 'disconnected']]);
     return true;
 }

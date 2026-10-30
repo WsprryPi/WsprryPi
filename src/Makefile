@@ -688,6 +688,17 @@ endif
 # ─────────────────────────────────────────────────────────────────────────────
 # Compile rules (debug)
 # ─────────────────────────────────────────────────────────────────────────────
+.PHONY: all
+all: release
+
+.PHONY: control-contract-check
+control-contract-check:
+	$(Q)python3 ../scripts/generate_control_contract.py --check
+
+# One prerequisite per make invocation; optimized release remains a candidate
+# build. Stable publication policy is selected only by an explicit stable tag.
+$(CPP_OBJECTS) $(CPP_DEBUG_OBJECTS) $(PROFILE_RELEASE_BIN) $(PROFILE_DEBUG_BIN): | control-contract-check
+
 
 $(OBJ_DIR_DEBUG)/%.o: %.cpp
 	$(Q)mkdir -p $(dir $@)
@@ -2008,11 +2019,11 @@ wtp-production-test: $(BIN_DIR)/wtp_production_test
 WTP_NETWORK_BUILD_DIR ?= build/wtp-network
 WTP_NETWORK_CXXFLAGS ?= -O2 -g
 WTP_NETWORK_LDFLAGS ?=
-WTP_NETWORK_FLAGS = -std=c++20 -pthread -Wall -Wextra -Wpedantic -Werror $(WTP_NETWORK_CXXFLAGS) -I. -IWTP-Client/include $(OPENSSL_CFLAGS)
+WTP_NETWORK_FLAGS = -std=c++20 -pthread -Wall -Wextra -Wpedantic -Werror $(WTP_NETWORK_CXXFLAGS) -I. -IWTP-Client/include -IWTP-Client/src $(OPENSSL_CFLAGS)
 .PHONY: wtp-api-test wtp-config-test wtp-config-client-build wtp-config-interop-test wtp-tls-build wtp-network-interop-test wtp-network-process-test
 wtp-config-test:
 	$(Q)mkdir -p "$(WTP_NETWORK_BUILD_DIR)"
-	$(Q)$(CXX) $(WTP_NETWORK_FLAGS) tests/wtp_configuration_test.cpp wtp_integration/configuration.cpp wtp_integration/consumer_radio.cpp wtp_integration/plain_tcp.cpp wtp_integration/browser_api.cpp wtp_integration/network_http.cpp wtp_integration/tls.cpp $(OPENSSL_LIBS) $(WTP_NETWORK_LDFLAGS) -o "$(WTP_NETWORK_BUILD_DIR)/wtp_configuration_test"
+	$(Q)$(CXX) $(WTP_NETWORK_FLAGS) tests/wtp_configuration_test.cpp WTP-Client/src/codec.cpp WTP-Client/src/detail/json.cpp wtp_integration/configuration.cpp wtp_integration/consumer_radio.cpp wtp_integration/plain_tcp.cpp wtp_integration/browser_api.cpp wtp_integration/network_http.cpp wtp_integration/tls.cpp $(OPENSSL_LIBS) $(WTP_NETWORK_LDFLAGS) -o "$(WTP_NETWORK_BUILD_DIR)/wtp_configuration_test"
 	$(Q)"$(WTP_NETWORK_BUILD_DIR)/wtp_configuration_test"
 	$(Q)node ../WsprryPi-UI/tests/wtp_management_test.js
 wtp-network-process-test:
@@ -2127,7 +2138,7 @@ wtp-usb-management-test:
 	$(Q)$(CXX) $(WTP_NETWORK_FLAGS) tests/wtp_usb_management_test.cpp wtp_integration/usb_management.cpp wtp_integration/browser_api.cpp privileged_network_policy.cpp $(WTP_NETWORK_LDFLAGS) -o "$(WTP_NETWORK_BUILD_DIR)/wtp_usb_management_test"
 	$(Q)"$(WTP_NETWORK_BUILD_DIR)/wtp_usb_management_test"
 
-WTP_USB_PAIR_SOURCES := tests/wtp_usb_pair_client.cpp wtp_integration/usb_cdc.cpp wtp_integration/usb_management.cpp wtp_integration/configuration.cpp wtp_integration/browser_api.cpp wtp_integration/consumer_radio.cpp wtp_integration/plain_tcp.cpp wtp_integration/network_http.cpp wtp_integration/tls.cpp privileged_network_policy.cpp backend_http_guard.cpp support_request_guard.cpp httplib.cpp
+WTP_USB_PAIR_SOURCES := WTP-Client/src/codec.cpp WTP-Client/src/detail/json.cpp tests/wtp_usb_pair_client.cpp wtp_integration/usb_cdc.cpp wtp_integration/usb_management.cpp wtp_integration/configuration.cpp wtp_integration/browser_api.cpp wtp_integration/consumer_radio.cpp wtp_integration/plain_tcp.cpp wtp_integration/network_http.cpp wtp_integration/tls.cpp privileged_network_policy.cpp backend_http_guard.cpp support_request_guard.cpp httplib.cpp
 WTP_USB_PAIR_OBJECTS := $(addprefix $(WTP_NETWORK_BUILD_DIR)/usb-pair/,$(WTP_USB_PAIR_SOURCES:.cpp=.o))
 .PHONY: wtp-usb-pair-client-build
 wtp-usb-pair-client-build: $(WTP_NETWORK_BUILD_DIR)/wtp_usb_pair_client

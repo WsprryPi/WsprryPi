@@ -209,7 +209,8 @@ struct Test {
   pico::network::ConsumerInterface interface =
       pico::network::ConsumerInterface::Station;
   bool drop = false, drop_mutation = false, tamper = false, replay = false;
-  unsigned mutations{}, exchanges{};
+  unsigned mutations{}, exchanges{}, last_response_status{};
+  bool last_response_encrypted{};
   bool drop_recovery_finish=false, drop_before_recovery_finish=false;
   std::map<std::string,unsigned> handler_calls;
   std::string previous_packet;
@@ -289,6 +290,7 @@ struct Test {
     const auto before = f.store.config_sequence();
     const auto tx = transaction++;
     auto response = radio.handle(r, host.now, tx, interface);
+    last_response_status=response.status;last_response_encrypted=response.type=="application/octet-stream";
     if (f.store.config_sequence() != before) {
       ++mutations;
       if (drop_mutation) {
@@ -349,7 +351,7 @@ void cases(bool ap) {
   auto state = Json::parse(context.body);
   assert(state["config"]["wifi"]["password"].is_null());
   const auto original = *t.f.store.config();
-  Json edit = {{"schema", "wsprrypi-pico-settings/1"},
+  Json edit = {{"contract","Wsprry-Control/1"},{"schema", "pico-settings"},
                {"target", state["target"]},
                {"operation", "save"},
                {"config",
@@ -383,13 +385,15 @@ void cases(bool ap) {
   stranger->logout();
   assert(c->request("status","GET").status==200);
   assert(c->active());
-  assert(c->request("jobs", "POST", "{}").status == 404 && t.mutations == 1);
+  const auto prohibited_exchanges=t.exchanges;
+  assert(c->request("jobs", "POST", R"({"contract":"Wsprry-Control/1"})", "\"r1\"").status == 404 && t.mutations == 1);
+  assert(t.exchanges==prohibited_exchanges);
   t.origin = "http://foreign.local";
   assert(c->request("config", "GET").status != 200 && !c->active());
   assert(t.mutations == 1);
 }
 void session_policy_cases() {
-  for (const bool ap : {false, true}) for (const auto version : {1, 2, 4}) {
+  for (const bool ap : {false, true}) for (const bool shorter : {false, true}) {
     Test t;
     if (ap) {
       t.authority = "192.168.4.1";
@@ -397,14 +401,14 @@ void session_policy_cases() {
       t.interface = pico::network::ConsumerInterface::AccessPoint;
     }
     const std::string carrier = ap ? "consumer_ap" : "consumer_station";
-    if (version != 4)
-      for (auto &crypto : t.crypto)
-        crypto.version = version;
+    if (shorter) for (auto &crypto : t.crypto) crypto.management_edit=[](Json &body) {
+      body["limits"]["idle_ms"]=300000;body["limits"]["absolute_ms"]=900000;
+    };
     auto c = t.client();
     assert(c->login(device, carrier, "test-password").status == 200);
     const auto started = t.host.now;
-    const std::uint64_t idle = version == 4 ? 1800000 : 300000,
-                        absolute = version == 4 ? 28800000 : 900000;
+    const std::uint64_t idle = shorter ? 300000 : 1800000,
+                        absolute = shorter ? 900000 : 28800000;
     t.host.now = started + idle - 1;
     assert(c->active());
     assert(c->request("status", "GET").status == 200);
@@ -438,30 +442,22 @@ void session_policy_cases() {
     assert(!c->active());
     assert(t.mutations == 0 && t.wtp.io == 0);
   }
-  // Reusing a client for an older peer must not retain the longer policy.
-  {
-    Test t;
-    auto c = t.client();
-    assert(c->login(device, "consumer_station", "test-password").status == 200);
-    c->logout();
-    for (auto &crypto : t.crypto) crypto.version = 1;
-    t.host.now += 1000;
-    assert(c->login(device, "consumer_station", "test-password").status == 200);
-    t.host.now += 300000;
-    const auto calls = t.exchanges;
-    assert(c->request("status", "GET").status == 401 && t.exchanges == calls);
-    assert(t.mutations == 0 && t.wtp.io == 0);
+  // Historical peers refuse at negotiation; they cannot regain mutation authority.
+  for (const auto old : {1U,2U,3U,4U,5U}) {
+    Test t;for (auto &crypto:t.crypto) crypto.version=old;
+    auto c=t.client();assert(c->login(device,"consumer_station","test-password").status==409);
+    assert(!c->active() && t.mutations==0 && t.wtp.io==0);
   }
   // Even authentic encrypted discovery cannot extend an unsupported policy.
   for (unsigned fault = 0; fault < 8; ++fault) {
     Test t;
     for (auto &crypto : t.crypto) crypto.management_edit = [fault](Json &body) {
-      if (fault == 0) body["schema"] = "transmitter-management/6";
+      if (fault == 0) body["schema"] = "unknown-management";
       if (fault == 1) body["limits"]["idle_ms"] = 1800000.0;
-      if (fault == 2) body["limits"]["absolute_ms"] = 28800001;
+      if (fault == 2) body["limits"]["absolute_ms"] = 86400001;
       if (fault == 3) body["target"]["boot_id"] = std::string(32, 'b');
-      if (fault == 4) body["schema"] = "transmitter-management/2";
-      if (fault == 5) body["schema"] = "transmitter-management/5";
+      if (fault == 4) body["contract"] = "Wsprry-Control/2";
+      if (fault == 5) body["selected"] = "usb_physical";
       if (fault == 6) body["profile_generation"] = 1;
       if (fault == 7) body["limits"]["future"] = true;
     };
@@ -471,8 +467,8 @@ void session_policy_cases() {
     assert(Json::parse(result.body)["error"]["code"] == "unsupported_management_contract");
     assert(t.mutations == 0 && t.wtp.io == 0);
   }
-  std::cout << "Native authenticated policy selection: historical 5/15-minute "
-               "and current 30-minute/8-hour boundaries passed\n";
+  std::cout << "Native authenticated bounded policy selection: short "
+               "and default boundaries plus historical-peer refusal passed\n";
 }
 void recovery_cases() {
   Test t; auto a=t.client(),b=t.client(),c=t.client();
@@ -499,7 +495,7 @@ void recovery_cases() {
 }
 
 // Current closed configuration resources retain independent standalone WSPR
-// dial selection for ordinary PUT, merge and replace, without snapshot producers.
+// dial selection for current merge updates, without snapshot producers.
 struct HostnamePlatform : pico::provisioning::ConsumerClaimCommitPlatform {
   bool safe_to_commit() override { return true; }
   std::uint64_t monotonic_now_ms() override { return 1000; }
@@ -547,9 +543,14 @@ void hostname_progress_preservation_cases() {
         c->device(), c->boot(), "hostname", "PUT", "{}", "", carrier,
         c->generation());
     assert(unsupported.status == 404 && t.exchanges == exchanges_before);
-    assert(c->request("hostname", "GET", {}, {}).status == 404);
-    assert(c->request("hostname", "PUT", "{}", {}).status == 404);
-    assert(t.exchanges == exchanges_before);
+    // The Pico browser owns hostname changes; the Pi management role cannot
+    // access them even though the Pico's complete route catalog advertises them.
+    assert(c->request("hostname","GET",{},{}).status==404);
+    const auto profile_sequence=t.profiles.sequence();
+    assert(c->request("hostname", "PUT", Json{{"contract","Wsprry-Control/1"},{"schema","hostname"},{"target",{{"scope","member"},{"device_id",device},{"boot_id",c->boot()}}},{"hostname","pico-safe.local"}}.dump(), "\"r1\"").status == 404);
+    assert(t.exchanges==exchanges_before);
+    assert(t.profiles.sequence()==profile_sequence && t.runtime.consumer_profile()->tls.hostname==active);
+    assert(progress.fields()==saved_draft && progress.sequence()==saved_sequence);
     // Hostname belongs to the Pico profile. Rename through its production
     // coordinator; authenticated HTTP saves are covered by hostname_sessions.
     assert(settings.save(std::string{"pico-a.local"}).empty());
@@ -569,7 +570,7 @@ void hostname_progress_preservation_cases() {
     // The production Pi configuration coordinator must preserve both
     // independent stores.
     const auto value = Json::parse(config.body);
-    const Json edit = {{"schema", "wsprrypi-pico-settings/1"},
+    const Json edit = {{"contract","Wsprry-Control/1"},{"schema", "pico-settings"},
                        {"target", value["target"]},
                        {"operation", "save"},
                        {"config", {{"allow_non_amateur_frequency", true}}}};
@@ -588,7 +589,8 @@ void hostname_progress_preservation_cases() {
 }
 
 void configuration_write_preservation_cases() {
-  for (const bool ap : {false, true}) for (const std::string mode : {"put", "merge", "replace"}) {
+  for (const bool ap : {false, true}) {
+    const std::string mode="merge";
     Test t;
     if (ap) {
       t.authority = "192.168.4.1"; t.origin = "http://192.168.4.1";
@@ -606,20 +608,21 @@ void configuration_write_preservation_cases() {
     assert(read.status == 200);
     const auto closed = Json::parse(read.body).at("config");
     assert(!closed.contains("wspr_dial_frequency_hz") && closed["wifi"]["password"].is_null());
-    Json candidate = mode == "merge" ? Json{{"expires_utc_s", 1900000000}} : closed;
-    candidate["expires_utc_s"] = 1900000000;
+    Json candidate{{"expires_utc_s", 1900000000}};
     const auto payload = [&](const Json &value) -> Json {
-      return mode == "put" ? value : Json{{"schema", "transmitter-config-update/1"},
+      return Json{{"contract","Wsprry-Control/1"},{"schema", "config-update"},
         {"target", {{"scope", "member"}, {"device_id", c->device()}, {"boot_id", c->boot()}}},
         {"mode", mode}, {"config", value}};
     };
-    const std::string resource = mode == "put" ? "config/2" : "config/update/2";
-    const std::string method = mode == "put" ? "PUT" : "POST";
-    if (mode != "put") {
-      auto wrong = payload(candidate); wrong["target"]["device_id"] = std::string(32, 'b');
-      assert(c->request(resource, method, wrong.dump(), read.etag).status == 409);
-      assert(*t.f.store.config() == initial && t.f.store.watermark() == watermark);
-    }
+    const std::string resource = "config/update";
+    const std::string method = "POST";
+    auto wrong = payload(candidate); wrong["target"]["device_id"] = std::string(32, 'b');
+    assert(c->request(resource, method, wrong.dump(), read.etag).status == 409);
+    assert(*t.f.store.config() == initial && t.f.store.watermark() == watermark);
+    assert(c->request("config","PUT",payload(candidate).dump(),read.etag).status==404);
+    auto unsupported=payload(candidate);unsupported["mode"]="replace";
+    assert(c->request(resource,method,unsupported.dump(),read.etag).status==400);
+    assert(*t.f.store.config()==initial && t.f.store.watermark()==watermark);
     const auto saved = c->request(resource, method, payload(candidate).dump(), read.etag);
     if (saved.status != 200) std::cerr << "Configuration " << mode << ": " << saved.status << " " << saved.body << std::endl;
     assert(saved.status == 200);
@@ -632,7 +635,7 @@ void configuration_write_preservation_cases() {
     assert(c->request(resource, method, payload(candidate).dump(), fresh.etag).status == 503);
     assert(*t.f.store.config() == expected && t.f.store.watermark() == watermark && t.wtp.io == 0);
   }
-  std::cout << "Current PUT/merge/replace preserve independent WSPR dial and unrelated settings; target, revision and atomic-save checks passed\n";
+  std::cout << "Current merge updates preserve independent WSPR dial and unrelated settings; target, revision and atomic-save checks passed\n";
 }
 
 void alias_fixed_vector(const Json &vector) {
@@ -870,7 +873,7 @@ void resource_admission_cases() {
     };
     const auto loaded=request("GET"); assert(loaded.status==200);
     const auto app=Json::parse(loaded.body);
-    const Json edit={{"schema","transmitter-hardware/1"},{"target",app["target"]},{"pins",app["application"]["hardware"]["saved"]}};
+    const Json edit={{"contract","Wsprry-Control/1"},{"schema","hardware"},{"target",app["target"]},{"pins",app["application"]["hardware"]["saved"]}};
     unsigned sequence=0;
     const auto invoke=[&](std::string operation,pico::wtp::RequestBody body) {
       pico::wtp::Request r; r.principal="fixture-owner";r.session_id=std::string(32,'b');
@@ -908,7 +911,7 @@ void type23_profile_cases() {
       c->device(),c->boot(),"application","GET",{}, {},carrier,c->generation());},true));
     assert(resources.status==200);
     const auto application=Json::parse(resources.body)["application"];
-    assert(application["schema"]=="transmitter-application/2" && application["station"]["station"]["callsign"]==call && application["wspr_plan"]["supported"]==true);
+    assert(application["schema"]=="application" && application["station"]["station"]["callsign"]==call && application["wspr_plan"]["supported"]==true);
     assert(application["wspr_plan"]["frames"]==(grid.size()==4 || std::string(call).starts_with('<') ? 1 : 2));
     assert(t.f.flash.bytes==before && t.profiles.sequence()==profile && t.wtp.io==0 && t.mutations==0);
     c->logout();
@@ -979,10 +982,10 @@ void scheduler_frequency_interop(const char *path) {
   const auto saved = f.flash.bytes;
   unsigned sequence = 0;
   auto send = [&](const Json &wire) {
-    const Json body{{"session_id",wire.at("session_id")},
+    const Json body{{"contract","Wsprry-Control/1"},{"session_id",wire.at("session_id")},
                     {"request_id",wire.at("request_id")},
                     {"operation",wire.at("op")},{"body",wire.at("body")}};
-    pico::network::HttpRequest request{"POST","/api/v1/jobs",body.dump(),
+    pico::network::HttpRequest request{"POST","/api/control/v1/jobs",body.dump(),
         {{"host","127.0.0.1:8443"},{"origin","https://127.0.0.1:8443"},
          {"x-wsprrypico-request","1"},{"content-type","application/json"}}};
     const auto response = f.api.handle(request,"scheduler-frequency-test","127.0.0.1:8443");
@@ -1053,7 +1056,7 @@ void scheduler_frequency_interop(const char *path) {
 } // namespace
 // The independent public read surface does not alter the Pi's closed login,
 // authenticated management, or carrier authority contracts.
-static void public_read_cases(const Json &descriptor_schema) {
+static void public_read_cases() {
   for (const bool ap : {false, true}) {
     Test t;
     if (ap) {
@@ -1068,20 +1071,22 @@ static void public_read_cases(const Json &descriptor_schema) {
         t.send("/api/consumer/v1/read", "GET", {}, "application/json");
     assert(discovery.status == 200);
     const auto d = Json::parse(discovery.body);
-    assert(d.size() == 4 && d.at("schema") == "pico-public-read/1" &&
-           d.at("prefix") == "/api/consumer/v1/read/" &&
-           d.at("resources") ==
-               descriptor_schema.at("properties").at("resources").at("const"));
+    assert(d.size() == 5 && d.at("contract")=="Wsprry-Control/1" && d.at("schema") == "public-read" &&
+           d.at("prefix") == "/api/consumer/v1/read/" && d.at("resources").is_array());
+    std::set<std::string> reads;
+    for (const auto &name:d.at("resources")) assert(name.is_string() && reads.insert(name.get<std::string>()).second);
+    for (const auto required:{"config","application","hardware","progress","amplifier-timing","ntp-timeout"}) assert(reads.contains(required));
+    for (const auto obsolete:{"config/4","application/2","hardware/3","progress/2","ntp-timeout/2"}) assert(!reads.contains(obsolete));
     assert(d.at("target").size() == 3 &&
            d.at("target").at("scope") == "member" &&
            d.at("target").at("device_id") == device &&
            d.at("target").at("boot_id") == t.f.service.status().boot_id);
     for (const auto &name :
-         {"operations", "config/4", "station/2", "hardware/3", "progress/3"}) {
+         {"operations", "config", "station", "hardware", "progress"}) {
       const auto r = t.send(std::string("/api/consumer/v1/read/") + name, "GET",
                             {}, "application/json");
       assert(r.status == 200);
-      if (std::string(name) == "config/4")
+      if (std::string(name) == "config")
         assert(Json::parse(r.body)
                    .at("config")
                    .at("wifi")
@@ -1095,7 +1100,7 @@ static void public_read_cases(const Json &descriptor_schema) {
                       method, "{}", "application/json")
                    .status == 405);
     for (const auto &name :
-         {"jobs", "restart", "config/update/4", "progress/apply/3", "../jobs"})
+         {"jobs", "restart", "config/update", "progress/apply", "../jobs"})
       assert(t.send(std::string("/api/consumer/v1/read/") + name, "GET", {},
                     "application/json")
                  .status == 404);
@@ -1127,10 +1132,7 @@ int main(int argc, char **argv) {
   std::ifstream vector_file(argv[1]);
   Json vectors;
   vector_file >> vectors;
-  std::ifstream public_schema_file(std::filesystem::path(argv[1]).parent_path()/"pico-public-read-1.schema.json");
-  assert(public_schema_file.is_open());
-  Json public_schema;public_schema_file>>public_schema;
-  public_read_cases(public_schema);
+  public_read_cases();
   pi::consumer_radio_fixed_vectors(vectors);
   alias_fixed_vector(vectors);
   std::ifstream recovery_vector_file(std::filesystem::path(argv[1]).parent_path()/"Consumer-Recovery-v1-vectors.json");
@@ -1209,7 +1211,7 @@ int main(int argc, char **argv) {
     assert(c->login(device, "consumer_station", "test-password").status == 200);
     auto context = t.coordinated(*c);
     auto state = Json::parse(context.body);
-    Json edit = {{"schema", "wsprrypi-pico-settings/1"},
+    Json edit = {{"contract","Wsprry-Control/1"},{"schema", "pico-settings"},
                  {"target", state["target"]},
                  {"operation", "save"},
                  {"config", {{"allow_unqualified_frequency", true}}}};
@@ -1233,17 +1235,19 @@ int main(int argc, char **argv) {
 
   {
     Test t;
-    const auto good = Json::parse(pico::network::management_contract(
+    auto good = Json::parse(pico::network::management_contract(
         {pico::network::ManagementProfile::Consumer, 1, true, false, false,
          true, true},
         pico::network::ManagementCarrier::ConsumerStation, device,
         t.f.service.status().boot_id));
+    // The external API wrapper adds the common contract to this internal document.
+    good["contract"]="Wsprry-Control/1";
     assert(pi::valid_management_contract(good, "consumer_station", device,
                                          t.f.service.status().boot_id, "1"));
-    for (unsigned variant = 0; variant < 12; ++variant) {
+    for (unsigned variant = 0; variant < 13; ++variant) {
       auto bad = good;
       if (variant == 0)
-        bad["schema"] = "transmitter-management/3";
+        bad["schema"] = "unknown-management";
       if (variant == 1)
         bad["limits"]["update"] = 2048.0;
       if (variant == 2)
@@ -1266,37 +1270,20 @@ int main(int argc, char **argv) {
         bad["preclock"] = 1;
       if (variant == 11)
         bad["carriers"][2]["available"] = "true";
+      if (variant == 12) bad.erase("contract");
       assert(!pi::valid_management_contract(bad, "consumer_station", device,
                                             t.f.service.status().boot_id, "1"));
     }
-    for (const auto version : {1, 2, 4}) {
-      auto supported=good;
-      supported["schema"]="transmitter-management/"+std::to_string(version);
-      supported["limits"]["idle_ms"] = version == 4 ? 1800000 : 300000;
-      supported["limits"]["absolute_ms"] = version == 4 ? 28800000 : 900000;
-      supported["limits"]["consumer_sessions"]=version==1?1:3;
-      supported["limits"].erase("consumer_pending_logins");
-      if (version != 1)
-        supported["limits"]["consumer_pending_logins"] = 1;
-      assert(pi::valid_management_contract(supported,"consumer_station",device,t.f.service.status().boot_id,"1"));
-      assert(pi::valid_management_descriptor(
-          {{"schema", supported["schema"]}, {"path", "/api/v1/management"}},
-          "consumer_station"));
-      for (const auto key : {"idle_ms", "absolute_ms"}) {
-        auto bad = supported;
-        bad["limits"][key] = version == 4 ? 300000 : 1800000;
-        assert(!pi::valid_management_contract(bad, "consumer_station", device,
-                                              t.f.service.status().boot_id,
-                                              "1"));
-      }
-      for(const Json& invalid : {Json(-1),Json(0),Json(true),Json(1.5),Json(4),Json("3"),Json(nullptr)}) {
-        auto bad=supported;bad["limits"]["consumer_sessions"]=invalid;
+    for (const auto old:{1,2,3,4,5}) {
+      auto unsupported=good;unsupported["schema"]="transmitter-management/"+std::to_string(old);
+      assert(!pi::valid_management_contract(unsupported,"consumer_station",device,t.f.service.status().boot_id,"1"));
+    }
+    for (const auto idle:{300000,1800000,3600000}) {
+      auto current=good;current["limits"]["idle_ms"]=idle;
+      assert(pi::valid_management_contract(current,"consumer_station",device,t.f.service.status().boot_id,"1"));
+      for(const Json &invalid:{Json(-1),Json(0),Json(true),Json(1.5),Json(86400001),Json("3"),Json(nullptr)}) {
+        auto bad=current;bad["limits"]["idle_ms"]=invalid;
         assert(!pi::valid_management_contract(bad,"consumer_station",device,t.f.service.status().boot_id,"1"));
-        if (version != 1) {
-          bad = supported;
-          bad["limits"]["consumer_pending_logins"] = invalid;
-          assert(!pi::valid_management_contract(bad,"consumer_station",device,t.f.service.status().boot_id,"1"));
-        }
       }
     }
     assert(t.mutations == 0);
@@ -1304,24 +1291,25 @@ int main(int argc, char **argv) {
   // Discovery refusals pass through the actual native coordinator and never write.
   for (unsigned variant=0;variant<12;++variant) {
     Test t;auto c=t.client();assert(c->login(device,"consumer_station","test-password").status==200);
+    const auto before_bytes=t.f.flash.bytes;
     const auto exchange=[&](const std::string& resource,const std::string& method,const std::string& body,const std::string& revision) {
       auto response=c->request(resource,method,body,revision);
       if(resource=="management") {
         auto j=Json::parse(response.body);
-        if(variant==0)j["schema"]="transmitter-management/3";
+        if(variant==0)j["schema"]="unknown-management";
         if(variant==1)j["limits"]["consumer_sessions"]=0;
         if(variant==2)j["limits"]["consumer_sessions"]=true;
         if(variant==3)j["limits"]["consumer_sessions"]=3.0;
         if(variant==4)j["limits"]["consumer_sessions"]=-1;
         if(variant==5)j["limits"]["consumer_sessions"]=100;
-        if(variant==6)j["limits"]["consumer_pending_logins"]=2;
+        if(variant==6){j["limits"]["consumer_sessions"]=1;j["limits"]["consumer_pending_logins"]=2;}
         if(variant==7)j["target"]["boot_id"]=std::string(32,'b');
         if(variant==8)j.erase("schema");
         if(variant==9)j=Json::array();
         if(variant==10)j=nullptr;
         if(variant==11){
-          // Valid historical contract, inconsistent with advertised /4.
-          j["schema"]="transmitter-management/2";
+          // Unknown control major with otherwise bounded policy values.
+          j["contract"]="Wsprry-Control/2";
           j["limits"]["idle_ms"]=300000;
           j["limits"]["absolute_ms"]=900000;
         }
@@ -1335,7 +1323,14 @@ int main(int argc, char **argv) {
       resource=pi::pico_resource_request(exchange,c->device(),c->boot(),"application","GET",{}, {},"consumer_station",c->generation());
       progress=pi::pico_progress_request(exchange,c->device(),c->boot(),"progress","GET",{}, {},"consumer_station",c->generation());
     },true));
-    assert(config.status==409 && resource.status==409 && progress.status==409 && t.mutations==0 && c->active());
+    // The resource reader rejects malformed outer documents before descriptor
+    // negotiation; config/progress classify these at the descriptor boundary.
+    const unsigned resource_status=(variant==9 || variant==10 || variant==11)?502:409;
+    if(!(config.status==409 && resource.status==resource_status && progress.status==409 && t.mutations==0 && c->active()))
+      std::cerr<<"Management hostile variant "<<variant<<" config "<<config.status<<" "<<config.body<<" resource "<<resource.status<<" "<<resource.body<<" progress "<<progress.status<<" "<<progress.body<<" mutations "<<t.mutations<<" active "<<c->active()<<std::endl;
+    assert(config.status==409 && resource.status==resource_status && progress.status==409);
+    if(resource_status==502)assert(Json::parse(resource.body)["error"]["code"]=="invalid_remote_response");
+    assert(t.mutations==0 && t.f.flash.bytes==before_bytes && c->active());
   }
   // Hostile timing descriptors/documents travel over the real encrypted peer;
   // the production coordinator must refuse each before touching its journal.
@@ -1352,7 +1347,7 @@ int main(int argc, char **argv) {
       auto r=real(p,m,b,e); auto v=Json::parse(r.body);
       if(p=="capabilities" && variant<6){
         auto &d=v["amplifier_timing"];
-        if(variant==0)d["schema"]="transmitter-amplifier-timing/2";
+        if(variant==0)d["schema"]="unknown-amplifier-timing";
         if(variant==1)d["maximum"]=1001;
         if(variant==2)d["default_lead_ms"]=true;
         if(variant==3)d.erase("units");
@@ -1371,10 +1366,13 @@ int main(int argc, char **argv) {
       }
       r.body=v.dump();return r;
     };
-    const Json input{{"schema","transmitter-amplifier-timing/1"},{"target",target},{"timing",{{"lead_ms",0},{"tail_ms",0}}}};
+    const Json input{{"contract","Wsprry-Control/1"},{"schema","amplifier-timing"},{"target",target},{"timing",{{"lead_ms",0},{"tail_ms",0}}}};
     pi::PicoHttpResponse result;
     assert(t.app->idle_management([&]{result=pi::pico_resource_request(hostile,c->device(),c->boot(),"amplifier-timing","PUT",input.dump(),before.etag,"consumer_station",c->generation());},true));
-    assert(result.status==(variant<6?409:502));
+    const unsigned timing_status=(variant==5 || variant>=6)?502U:409U;
+    if(result.status!=timing_status)std::cerr<<"Timing hostile variant "<<variant<<" status "<<result.status<<" "<<result.body<<" mutations "<<t.mutations<<" unchanged "<<(t.f.flash.bytes==bytes)<<std::endl;
+    assert(result.status==timing_status);
+    if(variant==5)assert(Json::parse(result.body)["error"]["code"]=="invalid_remote_response");
     assert(Json::parse(result.body)["mutation_attempted"]==false && t.mutations==0 && t.f.flash.bytes==bytes);
     c->logout();
   }
@@ -1386,7 +1384,7 @@ int main(int argc, char **argv) {
     assert(t.app->idle_management([&]{before=pi::pico_resource_request(real,c->device(),c->boot(),"filter-selector","GET",{}, {},"consumer_station",c->generation());},true));assert(before.status==200);
     const auto readback=Json::parse(before.body);const auto target=readback["target"];const auto bytes=t.f.flash.bytes;
     const auto hostile=[&](auto p,auto m,auto b,auto e){auto r=real(p,m,b,e);auto v=Json::parse(r.body);
-      if(p=="capabilities" && variant<4){auto &d=v["filter_selector"];if(variant==0)d["schema"]="transmitter-filter-selector/2";if(variant==1)d["path"]="/api/v1/config";if(variant==2)d=Json::array();if(variant==3)d["maximum_ranges"]=11;}
+      if(p=="capabilities" && variant<4){auto &d=v["filter_selector"];if(variant==0)d["schema"]="unknown-filter-selector";if(variant==1)d["path"]="/api/control/v1/config";if(variant==2)d=Json::array();if(variant==3)d["maximum_ranges"]=11;}
       if(p=="filter-selector" && variant>=4){
         if(variant==4)v["extra"]=0;
         if(variant==5)v["saved"]["release_ms"]=20.0;
@@ -1401,9 +1399,11 @@ int main(int argc, char **argv) {
         if(variant==14){v["rf_active"]=true;v["output_active"]=false;}
         if(variant==15)v["saved"]["settle_ms"]=251;
       }r.body=v.dump();return r;};
-    const Json input{{"schema","transmitter-filter-selector/1"},{"target",target},{"settings",readback["saved"]}};pi::PicoHttpResponse result;
+    const Json input{{"contract","Wsprry-Control/1"},{"schema","filter-selector"},{"target",target},{"settings",readback["saved"]}};pi::PicoHttpResponse result;
     assert(t.app->idle_management([&]{result=pi::pico_resource_request(hostile,c->device(),c->boot(),"filter-selector","PUT",input.dump(),before.etag,"consumer_station",c->generation());},true));
-    assert(result.status==(variant<4?409:502));assert(Json::parse(result.body)["mutation_attempted"]==false && t.mutations==0 && t.f.flash.bytes==bytes);c->logout();
+    const unsigned selector_status=(variant==2 || variant>=4)?502U:409U;
+    if(result.status!=selector_status)std::cerr<<"Selector hostile variant "<<variant<<" status "<<result.status<<" "<<result.body<<" mutations "<<t.mutations<<" unchanged "<<(t.f.flash.bytes==bytes)<<std::endl;
+    assert(result.status==selector_status);if(variant==2)assert(Json::parse(result.body)["error"]["code"]=="invalid_remote_response");assert(Json::parse(result.body)["mutation_attempted"]==false && t.mutations==0 && t.f.flash.bytes==bytes);c->logout();
   }
   for (const auto profile : {pico::network::ManagementProfile::Blank,
                              pico::network::ManagementProfile::Recovery,
@@ -1423,13 +1423,17 @@ int main(int argc, char **argv) {
     assert(c->request("config/update", "POST", std::string(2049, 'x'), "\"r\"")
                .status == 413);
     for (const auto route :
-         {"jobs", "station", "hardware",
-          "consumer/setup/api/bootstrap/v1/start", "../config", "config?x"})
-      assert(c->request(route, "POST", "{}", "\"r\"").status == 404);
+         {"station", "hardware", "jobs", "restart", "hostname", "consumer/password",
+          "jobs/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/abort", "consumer/setup/api/bootstrap/v1/start", "../config", "config?x"})
+      assert(c->request(route, "POST", R"({"contract":"Wsprry-Control/1"})", "\"r\"").status == 404);
+    for(const auto route:{"jobs","hostname","consumer/password","consumer/setup/api/owner/v1/public-status"})
+      assert(c->request(route,"GET",{},"\"r\"").status==404);
+    assert(c->request("consumer/password","PUT",R"({"contract":"Wsprry-Control/1"})","\"r\"").status==404);
     assert(c->request("config", "DELETE", "{}", "\"r\"").status == 404);
     assert(t.exchanges == exchanges && t.mutations == 0);
     c->logout();
     assert(!c->active() && !t.radio.active(t.host.now) && t.mutations == 0);
+    assert(t.last_response_status==200 && t.last_response_encrypted); // Valid encrypted logout, not protocol-error retirement.
   }
   for (bool fail : {false, true}) {
     Test t;
@@ -1437,7 +1441,7 @@ int main(int argc, char **argv) {
     assert(c->login(device, "consumer_station", "test-password").status == 200);
     const auto context = t.coordinated(*c);
     const auto state = Json::parse(context.body);
-    const Json edit = {{"schema", "wsprrypi-pico-settings/1"},
+    const Json edit = {{"contract","Wsprry-Control/1"},{"schema", "pico-settings"},
                        {"target", state["target"]},
                        {"operation", "save"},
                        {"config", {{"allow_unqualified_frequency", true}}}};

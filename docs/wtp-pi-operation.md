@@ -153,15 +153,15 @@ and is never written to the INI or chosen as a failure fallback.
 All routes use the existing host peer/Host/Origin guards. The API is for the
 local Pi's own web application; WTP job operations remain device-neutral.
 
-- `GET /api/v1/host/wtp-endpoint`: listener, local requested/effective Enable,
+- `GET /api/control/v1/host/wtp-endpoint`: listener, local requested/effective Enable,
   remote ownership/job, output uncertainty, takeover generation and launch observation.
-- `POST /api/v1/host/wtp-endpoint/enable`: requires current config `If-Match` and
+- `POST /api/control/v1/host/wtp-endpoint/enable`: requires current config `If-Match` and
   JSON `choice` (`end_now` or `finish_current`), `confirmed`, `observed_owner`,
   and `observed_job`. A claim/job race returns confirmation-required with fresh
   status. An unconfirmed request changes nothing when remote ownership exists.
-- `POST /api/v1/host/wtp-endpoint/recover`: JSON `{"confirmed":true}` requests
+- `POST /api/control/v1/host/wtp-endpoint/recover`: JSON `{"confirmed":true}` requests
   local output recovery. Success requires confirmed inactive output.
-- `GET/POST /api/v1/host/fleet`: independent assignment management, described in
+- `GET/POST /api/control/v1/host/fleet`: independent assignment management, described in
   [Fleet](wtp-fleet.md).
 
 The bounded listener accepts eight concurrent sockets with a 30-second idle
@@ -172,4 +172,4 @@ normal lease, response replay or retained-job bounds.
 
 ## Selected Pico amplifier timing
 
-The selected Pico member hardware area places amplifier lead and tail beside pin settings. Each accepts 0–1000 whole milliseconds with 200 ms defaults. Read, explicitly save while idle/unowned, and restart the Pico to activate; saving never operates an output. The independently negotiated `transmitter-amplifier-timing/1` resource preserves historical Config views and unrepresented values through legacy saves. The Pi validates exact descriptor, carrier/profile, device/boot target, shape, range, revision and post-save readback before confirming success. Lead precedes scheduled RF and tail follows normal RF completion without changing waveform duration; faults bypass tail. Native Pi amplifier behavior is independent.
+The selected Pico member hardware area places amplifier lead and tail beside pin settings. Each accepts 0–1000 whole milliseconds with 200 ms defaults. Read, explicitly save while idle/unowned, and restart the Pico to activate; saving never operates an output. The `amplifier-timing` resource belongs to `Wsprry-Control/1`; unrelated settings updates preserve it. Amplifier-enable GPIO and polarity are also editable in the selected member hardware plan, with independent pin validation and explicit restart activation. The Pi validates exact descriptor, carrier/profile, device/boot target, shape, range, revision and post-save readback before confirming success. Lead precedes scheduled RF and tail follows normal RF completion without changing waveform duration; faults bypass tail. Native Pi amplifier behavior is independent.

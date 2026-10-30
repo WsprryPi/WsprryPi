@@ -99,6 +99,8 @@ def comparison(event_name: str, event: dict) -> str:
 
 
 def full_ci_required(repo: Path, event_name: str, event: dict) -> tuple[bool, str]:
+    if event_name == "push" and isinstance(event, dict) and isinstance(event.get("ref"), str) and event["ref"].startswith("refs/tags/"):
+        return True, "tag validation always requires full CI"
     try:
         revision = comparison(event_name, event)
         raw = subprocess.check_output(

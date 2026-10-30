@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Actual UI producer -> Pi browser/coordinator/HTTPS -> exact Pico API/journal.
 'use strict';
+const controlRequest=require('./control_pair_request.js');
 const assert=require('node:assert/strict'), path=require('node:path');
 const crypto=require('node:crypto'), readline=require('node:readline');
 const {spawn}=require('node:child_process');
@@ -28,7 +29,7 @@ async function stop(child) {
     const serverLine=lines(server); assert.match(await serverLine(),/^READY /);
     client=spawn(path.join(build,'wtp_configuration_client'),[path.join(build,'credentials-v3')],{stdio:['pipe','pipe','inherit']});
     const clientLine=lines(client), calls=[];
-    const call=async request=>{
+    const call=async request=>{request=controlRequest(request);
       client.stdin.write(JSON.stringify(request)+'\n');
       const result=JSON.parse(await clientLine()); calls.push({request,result}); return result;
     };
@@ -47,11 +48,11 @@ async function stop(child) {
     await resourcesBrowser.click('wtp-usb-progress-load');
     const progressSupport=calls.at(-1).result;
     assert.equal(progressSupport.status,200,JSON.stringify(progressSupport));
-    const versioned=resources.status===200 && resources.body.application.schema==='transmitter-application/2';
+    assert.equal(resources.status,200,JSON.stringify(resources));assert.equal(resources.body.application.schema,'application');
     assert.equal(resources.exchanges.filter(e=>e.method!=='GET').length,0);
     assert.deepEqual(await dump(),original,'resource discovery must not mutate the member');
     assert.equal(resources.status,200,JSON.stringify(resources));
-    assert.equal(resources.body.schema,'wsprrypi-member-resources/1');
+    assert.equal(resources.body.schema,'member-resources');
     assert.match(resourcesBrowser.element('wtp-member-recurrence').textContent,/WSPR dial 3568600 Hz/);
     assert.equal(resources.body.application.recurrence.schedule_dial_frequency_nhz,'3568600000000000');
     assert.equal(resources.body.application.hardware.saved.rf_gp,28);
@@ -68,17 +69,21 @@ async function stop(child) {
     const saved=calls.at(-1).result; assert.equal(saved.status,200);
     const mutations=saved.exchanges.filter(e=>e.method!=='GET'); assert.equal(mutations.length,1);
     const wire=mutations[0], payload=JSON.parse(wire.body);
-    assert.equal(wire.method,'POST'); assert.equal(wire.resource,versioned?'config/update/2':'config/update');
+    assert.equal(wire.method,'POST'); assert.equal(wire.resource,'config/update');
     assert.deepEqual(payload.config,{station:{callsign:'W1AW'}}); assert.equal(payload.target.device_id,'a'.repeat(32));
     let persisted=await dump(); assert.equal(persisted.config.station.callsign,'W1AW');
     assert.equal(persisted.cursor,original.cursor); assert.equal(persisted.password_sha256,original.password_sha256);
-    assert.deepEqual(persisted.config.pins,loaded.pins);
+    // DUMP is the unchanged sparse private storage projection; canonical wire
+    // readback explicitly includes default amplifier polarity. Preserve stored pins.
+    assert.deepEqual(persisted.config.pins,original.config.pins);
+    assert.equal(loaded.pins.amplifier_active_high,true);
     // Schedule-only writes preserve unrelated operator drafts and settings.
     b.element('wtp-remote-password').value='explicit-new-password';
     b.element('wtp-remote-ssid').value='draft-network';
     b.element('wtp-remote-schedules').value='240 0';
     await b.click('wtp-schedules-save'); assert.equal(calls.at(-1).result.status,200);
-    assert.equal(calls.at(-1).result.exchanges.filter(e=>e.method!=='GET')[0].resource,'schedules');
+    const scheduleWrite=calls.at(-1).result.exchanges.filter(e=>e.method!=='GET')[0];
+    assert.equal(scheduleWrite.resource,'config/update');assert.deepEqual(JSON.parse(scheduleWrite.body).config,{schedules:[{period_s:240,phase_s:0}]});
     assert.equal(b.element('wtp-remote-password').value,'explicit-new-password');
     persisted=await dump(); assert.equal(persisted.config.wifi.ssid,original.config.wifi.ssid);
     assert.deepEqual(persisted.config.schedules,[{period_s:240,phase_s:0}]);
@@ -102,28 +107,28 @@ async function stop(child) {
       assert.equal(persisted.cursor,original.cursor);
     }
     // Host-target and stale writers reject before any outbound mutation.
-    const fresh=await call({method:'GET',path:'/api/v1/member/configuration'});
-    const body={schema:'wsprrypi-pico-settings/1',target:fresh.body.target,operation:'save',config:{expires_utc_s:0}};
-    let result=await call({method:'POST',path:'/api/v1/member/configuration',body:JSON.stringify({...body,target:{...body.target,device_id:'b'.repeat(32)}}),revision:fresh.etag});
+    const fresh=await call({method:'GET',path:'/api/control/v1/member/configuration'});
+    const body={schema:'pico-settings',target:fresh.body.target,operation:'save',config:{expires_utc_s:0}};
+    let result=await call({method:'POST',path:'/api/control/v1/member/configuration',body:JSON.stringify({...body,target:{...body.target,device_id:'b'.repeat(32)}}),revision:fresh.etag});
     assert.equal(result.status,409); assert.equal(result.exchanges.filter(e=>e.method!=='GET').length,0);
-    await call({method:'GET',path:'/api/v1/member/configuration'});
-    result=await call({method:'POST',path:'/api/v1/member/configuration',body:JSON.stringify(body),revision:fresh.etag}); assert.equal(result.status,200);
-    result=await call({method:'POST',path:'/api/v1/member/configuration',body:JSON.stringify(body),revision:fresh.etag}); assert.equal(result.status,412);
+    await call({method:'GET',path:'/api/control/v1/member/configuration'});
+    result=await call({method:'POST',path:'/api/control/v1/member/configuration',body:JSON.stringify(body),revision:fresh.etag}); assert.equal(result.status,200);
+    result=await call({method:'POST',path:'/api/control/v1/member/configuration',body:JSON.stringify(body),revision:fresh.etag}); assert.equal(result.status,412);
     {
-      const current=await call({method:'GET',path:'/api/v1/member/configuration'});
+      const current=await call({method:'GET',path:'/api/control/v1/member/configuration'});
       const reset={...body,target:current.body.target,config:{allow_unqualified_frequency:false,allow_non_amateur_frequency:false,pins:{...loaded.pins,rf_gp:2}}};
-      result=await call({method:'POST',path:'/api/v1/member/configuration',body:JSON.stringify(reset),revision:current.etag}); assert.equal(result.status,200);
+      result=await call({method:'POST',path:'/api/control/v1/member/configuration',body:JSON.stringify(reset),revision:current.etag}); assert.equal(result.status,200);
       const resetState=await dump(); assert(!resetState.config.allow_unqualified_frequency&&!resetState.config.allow_non_amateur_frequency);
-      const pending=await call({method:'GET',path:'/api/v1/member/configuration'});
+      const pending=await call({method:'GET',path:'/api/control/v1/member/configuration'});
       assert.equal(pending.body.application.hardware.pending_restart,true);
       assert.equal(pending.body.application.hardware.saved.rf_gp,2);
       assert.equal(pending.body.application.hardware.active.rf_gp,28);
-      const a=await call({method:'GET',path:'/api/v1/member/configuration'});
-      const b=await call({method:'POST',path:'/api/v1/member/configuration',body:JSON.stringify({...body,config:{expires_utc_s:1900000000}}),revision:a.etag});
+      const a=await call({method:'GET',path:'/api/control/v1/member/configuration'});
+      const b=await call({method:'POST',path:'/api/control/v1/member/configuration',body:JSON.stringify({...body,config:{expires_utc_s:1900000000}}),revision:a.etag});
       assert.equal(b.status,200);
-      const back=await call({method:'POST',path:'/api/v1/member/configuration',body:JSON.stringify(body),revision:b.etag});
+      const back=await call({method:'POST',path:'/api/control/v1/member/configuration',body:JSON.stringify(body),revision:b.etag});
       assert.equal(back.status,200);
-      const aba=await call({method:'POST',path:'/api/v1/member/configuration',body:JSON.stringify(body),revision:a.etag});
+      const aba=await call({method:'POST',path:'/api/control/v1/member/configuration',body:JSON.stringify(body),revision:a.etag});
       assert.equal(aba.status,412); assert.equal(aba.exchanges.filter(e=>e.method!=='GET').length,0);
     }
     // Actual Pico commit followed by a deliberately discarded client reply.

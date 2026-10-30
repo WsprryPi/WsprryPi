@@ -123,10 +123,10 @@ struct WtpTargetRuntime {
       const auto management_device=usb_management->device(), management_boot=usb_management->boot();
       { std::lock_guard lock(usb_observation_mutex); learned_usb_device=management_device; learned_usb_boot=management_boot; }
       if (!reserve_output(management_device)) { reject_usb_binding(); usb_management->close(); return usb_unavailable(); }
-      auto name = usb_management->request("/api/v1/hostname","GET");
+      auto name = usb_management->request("/api/control/v1/hostname","GET");
       if (name.status == 200) {
         auto parsed = nlohmann::json::parse(name.body);
-        if (parsed.value("schema","") == "transmitter-hostname/1" && parsed.contains("target") &&
+        if (parsed.value("schema","") == "hostname" && parsed.contains("target") &&
             parsed["target"].value("device_id","") == management_device &&
             parsed["target"].value("boot_id","") == usb_management->boot()) {
           std::lock_guard lock(usb_observation_mutex); usb_name=std::move(parsed); usb_name_confirmed=true;
@@ -185,7 +185,7 @@ struct WtpTargetRuntime {
     if (response.status != 200) return;
     try {
       auto value=nlohmann::json::parse(response.body);
-      if (value.value("schema","") != "transmitter-hostname/1" || !usb_management ||
+      if (value.value("schema","") != "hostname" || !usb_management ||
           value.at("target").value("device_id","") != usb_management->device() ||
           value.at("target").value("boot_id","") != usb_management->boot()) return;
       std::lock_guard lock(usb_observation_mutex); usb_name=std::move(value); usb_name_confirmed=true;

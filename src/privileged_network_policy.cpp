@@ -89,50 +89,50 @@ PrivilegedOperationClass classify_privileged_http_operation(
         return PrivilegedOperationClass::reject;
     }
 
-    if (path.starts_with("/api/v1/")) {
-        if(path=="/api/v1/host/udp-logging/installation" && method=="GET")return PrivilegedOperationClass::protected_operation;
-        if (((path == "/api/v1/member/udp-logging/test/capabilities" || path == "/api/v1/host/udp-logging/test/capabilities") && method == "GET") ||
-            ((path == "/api/v1/member/udp-logging/test" || path == "/api/v1/host/udp-logging/test") && method == "POST"))
+    if (path.starts_with("/api/control/v1/")) {
+        if(path=="/api/control/v1/host/udp-logging/installation" && method=="GET")return PrivilegedOperationClass::protected_operation;
+        if (((path == "/api/control/v1/member/udp-logging/test/capabilities" || path == "/api/control/v1/host/udp-logging/test/capabilities") && method == "GET") ||
+            ((path == "/api/control/v1/member/udp-logging/test" || path == "/api/control/v1/host/udp-logging/test") && method == "POST"))
             return PrivilegedOperationClass::protected_operation;
-        if ((path == "/api/v1/host/logging" || path == "/api/v1/member/logging" || path == "/api/v1/member/udp-logging" || path == "/api/v1/member/udp-logging/capabilities" || path == "/api/v1/host/udp-logging" || path == "/api/v1/udp-logging/capabilities") &&
+        if ((path == "/api/control/v1/host/logging" || path == "/api/control/v1/member/logging" || path == "/api/control/v1/member/udp-logging" || path == "/api/control/v1/member/udp-logging/capabilities" || path == "/api/control/v1/host/udp-logging" || path == "/api/control/v1/udp-logging/capabilities") &&
             (method == "GET" || method == "PUT"))
             return PrivilegedOperationClass::protected_operation;
-        if (path == "/api/v1/member/firmware" && (method == "GET" || method == "POST"))
+        if (path == "/api/control/v1/member/firmware" && (method == "GET" || method == "POST"))
             return PrivilegedOperationClass::protected_operation;
         if (((method == "GET" || method == "PUT") &&
-             (path == "/api/v1/member/wifi" || path == "/api/v1/member/hostname")) ||
-            (method == "DELETE" && path == "/api/v1/member/wifi") ||
-            (method == "GET" && path == "/api/v1/member/progress") ||
-            (method == "POST" && (path == "/api/v1/member/restart" || path == "/api/v1/member/ap" ||
-              path == "/api/v1/member/gpio-drive-progress" || path == "/api/v1/member/progress/update" || path == "/api/v1/member/progress/apply")))
+             (path == "/api/control/v1/member/wifi" || path == "/api/control/v1/member/hostname")) ||
+            (method == "DELETE" && path == "/api/control/v1/member/wifi") ||
+            (method == "GET" && path == "/api/control/v1/member/progress") ||
+            (method == "POST" && (path == "/api/control/v1/member/restart" || path == "/api/control/v1/member/ap" ||
+              path == "/api/control/v1/member/gpio-drive-progress" || path == "/api/control/v1/member/progress/update" || path == "/api/control/v1/member/progress/apply")))
             return PrivilegedOperationClass::protected_operation;
-        if ((method == "GET" && (path == "/api/v1/member/application" || path == "/api/v1/member/station" ||
-              (path == "/api/v1/member/gpio-drive" || path == "/api/v1/member/amplifier-timing" || path == "/api/v1/member/filter-selector") || path == "/api/v1/member/gpio-drive-progress" || path == "/api/v1/member/hardware" || path == "/api/v1/member/pins")) ||
-            (method == "PUT" && (path == "/api/v1/member/station" || (path == "/api/v1/member/gpio-drive" || path == "/api/v1/member/amplifier-timing" || path == "/api/v1/member/filter-selector") || path == "/api/v1/member/gpio-drive-progress" || path == "/api/v1/member/hardware")) ||
-            (method == "POST" && path == "/api/v1/member/pins/validate"))
+        if ((method == "GET" && (path == "/api/control/v1/member/application" || path == "/api/control/v1/member/station" ||
+              (path == "/api/control/v1/member/gpio-drive" || path == "/api/control/v1/member/amplifier-timing" || path == "/api/control/v1/member/filter-selector") || path == "/api/control/v1/member/gpio-drive-progress" || path == "/api/control/v1/member/hardware" || path == "/api/control/v1/member/pins")) ||
+            (method == "PUT" && (path == "/api/control/v1/member/station" || (path == "/api/control/v1/member/gpio-drive" || path == "/api/control/v1/member/amplifier-timing" || path == "/api/control/v1/member/filter-selector") || path == "/api/control/v1/member/gpio-drive-progress" || path == "/api/control/v1/member/hardware")) ||
+            (method == "POST" && path == "/api/control/v1/member/pins/validate"))
             return PrivilegedOperationClass::protected_operation;
-        if ((path == "/api/v1/member/configuration" || path == "/api/v1/member/management") && (method == "GET" || method == "POST"))
+        if ((path == "/api/control/v1/member/configuration" || path == "/api/control/v1/member/management") && (method == "GET" || method == "POST"))
             return PrivilegedOperationClass::protected_operation;
-        if (method == "GET" && (path == "/api/v1/status" || path == "/api/v1/jobs" || path == "/api/v1/capabilities"))
+        if (method == "GET" && (path == "/api/control/v1/status" || path == "/api/control/v1/jobs" || path == "/api/control/v1/capabilities"))
             return PrivilegedOperationClass::read_only;
         // Remote management reads consume the sole TLS slot and host config
         // reveals local administrator-managed references: protect these too.
         if ((method == "GET" || method == "PUT") &&
-            (path == "/api/v1/config" || path == "/api/v1/schedules" || path == "/api/v1/network" || path == "/api/v1/host/config"))
+            (path == "/api/control/v1/config" || path == "/api/control/v1/schedules" || path == "/api/control/v1/network" || path == "/api/control/v1/host/config"))
             return PrivilegedOperationClass::protected_operation;
-        if ((method == "GET" && (path == "/api/v1/host/devices" ||
-                                 path == "/api/v1/host/discovery" ||
-                                 path == "/api/v1/host/fleet" ||
-                                 path == "/api/v1/host/wtp-endpoint")) ||
-            (method == "POST" && (path == "/api/v1/host/devices" ||
-                                  path == "/api/v1/host/devices/use" ||
-                                  path == "/api/v1/host/fleet" ||
-                                  path == "/api/v1/host/wtp-endpoint/enable" ||
-                                  path == "/api/v1/host/wtp-endpoint/recover" ||
-                                  path == "/api/v1/host/discovery/identify")))
+        if ((method == "GET" && (path == "/api/control/v1/host/devices" ||
+                                 path == "/api/control/v1/host/discovery" ||
+                                 path == "/api/control/v1/host/fleet" ||
+                                 path == "/api/control/v1/host/wtp-endpoint")) ||
+            (method == "POST" && (path == "/api/control/v1/host/devices" ||
+                                  path == "/api/control/v1/host/devices/use" ||
+                                  path == "/api/control/v1/host/fleet" ||
+                                  path == "/api/control/v1/host/wtp-endpoint/enable" ||
+                                  path == "/api/control/v1/host/wtp-endpoint/recover" ||
+                                  path == "/api/control/v1/host/discovery/identify")))
             return PrivilegedOperationClass::protected_operation;
-        if (method == "POST" && (path == "/api/v1/jobs" ||
-            (path.starts_with("/api/v1/jobs/") && path.ends_with("/abort") && path.size() == 51)))
+        if (method == "POST" && (path == "/api/control/v1/jobs" ||
+            (path.starts_with("/api/control/v1/jobs/") && path.ends_with("/abort") && path.size() == std::string("/api/control/v1/jobs/").size() + 32 + std::string("/abort").size())))
             return PrivilegedOperationClass::protected_operation;
         return PrivilegedOperationClass::reject;
     }

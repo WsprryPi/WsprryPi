@@ -181,7 +181,7 @@ async function main() {
                 if (window.__remoteFailure) return {ok:false,status:412,json:async()=>({error:{code:'revision_conflict'}})};
                 if (String(url).endsWith('/member/configuration')) {
                     if (options.method === 'POST' && window.__mutationFailure) return {ok:false,status:window.__mutationFailure==='unsupported'?409:503,json:async()=>({error:{code:window.__mutationFailure==='unsupported'?'unsupported_configuration_updates':'management_outcome_unknown'}})};
-                    return {ok:true,headers:{get:()=> '\"remote-r1\"'},json:async()=>({schema:'wsprrypi-pico-settings/1',target:{scope:'member',device_id:'a'.repeat(32),boot_id:'1'.repeat(32)},update_strategy:'merge',reboot_required:false,config:{version:1,enabled:false,station:{callsign:'AA0NT',locator:'EM18',power_dbm:20},wifi:{ssid:'Bench Wi-Fi',password:null,ntp_ipv4:'192.0.2.1'},schedules:[{period_s:120,phase_s:0}]}})};
+                    return {ok:true,headers:{get:()=> '\"remote-r1\"'},json:async()=>({schema:'pico-settings',target:{scope:'member',device_id:'a'.repeat(32),boot_id:'1'.repeat(32)},update_strategy:'merge',reboot_required:false,config:{version:1,enabled:false,station:{callsign:'AA0NT',locator:'EM18',power_dbm:20},wifi:{ssid:'Bench Wi-Fi',password:null,ntp_ipv4:'192.0.2.1'},schedules:[{period_s:120,phase_s:0}]}})};
                 }
                 return {ok:true,headers:{get:()=> '"remote-r1"'},json:async()=>({config:{version:1,enabled:false,station:{callsign:'AA0NT',locator:'EM18',power_dbm:20},wifi:{ssid:'Bench Wi-Fi',password:null,ntp_ipv4:'192.0.2.1'},schedules:[{period_s:120,phase_s:0}]}})};
             };
@@ -272,7 +272,7 @@ async function main() {
               await evaluate(`document.getElementById('wtp-member-callsign').scrollIntoView({block:'start',behavior:'instant'});window.scrollBy(0,-160);new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)))`);
               assert(await evaluate('document.getElementById("wtp-member-callsign").getBoundingClientRect().top>=100'),'station field framing');
               assert(await evaluate('document.documentElement.scrollWidth<=innerWidth+1'),'WSPR plan feedback overflow');
-              assert.match(await evaluate('document.getElementById("wtp-member-station-hint").textContent'),scenario==='legacy'?/Type 1 station writes only/:/automatically selects Type 1, Type 2 or Type 3/);
+              assert.match(await evaluate('document.getElementById("wtp-member-station-hint").textContent'),scenario==='legacy'?/Type 1 station writes only/:/automatically selects WSPR Type 1, 2 or 3/);
               assert.equal(await evaluate('document.getElementById("wtp-member-locator").getAttribute("aria-describedby")'),'wtp-member-station-hint wtp-member-locator-progress');
               assert(await evaluate('document.getElementById("wtp-member-locator").getAttribute("aria-describedby").split(/\\s+/).every(id=>document.getElementById(id))'),'station descriptions resolve to existing feedback');
               const bounds=await evaluate(`(() => { const top=document.getElementById('wtp-member-station-hint').getBoundingClientRect().top+scrollY;const bottom=document.getElementById('wtp-member-station-feedback').getBoundingClientRect().bottom+scrollY;return {x:0,y:Math.max(0,top-160),width:innerWidth,height:bottom-Math.max(0,top-160)+320,scale:1}; })()`);

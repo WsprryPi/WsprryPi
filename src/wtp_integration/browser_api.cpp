@@ -27,41 +27,68 @@ nlohmann::json strict_browser_json(const std::string &body) {
     return true;
   });
 }
-PicoHttpResponse WtpBrowserApi::handle(const BrowserRequest &r) {
+PicoHttpResponse WtpBrowserApi::handle(const BrowserRequest &request) {
+  if (!request.path.starts_with("/api/control/v1/")) return error(404,"not_found");
+  if (request.body.size() > 32768) return error(413,"body_too_large");
+  if (request.method != "GET" && !request.mutation_context) return error(403,"origin_or_content_type");
+  auto selected = request;
+  if (request.method != "GET" &&
+      request.path != "/api/control/v1/member/firmware") {
+    try {
+      auto input = strict_browser_json(request.body);
+      if (!input.is_object() || input.value("contract", "") != "Wsprry-Control/1")
+        return error(409,"unsupported_control_contract");
+      // Selection is a host command; its bounded action parser owns the body.
+      if (request.path == "/api/control/v1/member/management" || request.path == "/api/control/v1/jobs" ||
+          request.path.starts_with("/api/control/v1/jobs/")) {
+        input.erase("contract"); selected.body=input.dump();
+      }
+    } catch (...) { return error(400,"invalid_json"); }
+  }
+  auto result = handle_control(selected);
+  try {
+    auto value = strict_browser_json(result.body);
+    if (!value.is_object()) return error(502,"invalid_control_response");
+    value["contract"] = "Wsprry-Control/1";
+    result.body=value.dump();
+  } catch (...) { return error(502,"invalid_control_response"); }
+  return result;
+}
+PicoHttpResponse WtpBrowserApi::handle_control(const BrowserRequest &r) {
   if (r.body.size() > 32768) return error(413, "body_too_large");
   if (r.method != "GET" && !r.mutation_context) return error(403, "origin_or_content_type");
-  if (r.method == "GET" && (r.path == "/api/v1/status" || r.path == "/api/v1/jobs")) {
+  if (r.method == "GET" && (r.path == "/api/control/v1/status" || r.path == "/api/control/v1/jobs")) {
     const auto host = status_();
     return {200, nlohmann::json{{"job", host.value("remote", nlohmann::json(nullptr))},
         {"standalone", nullptr}, {"network", host.value("network", nlohmann::json(nullptr))},
         {"host", host}, {"scope", "wsprrypi-host/1"}}.dump(), {}};
   }
-  if (r.method == "GET" && r.path == "/api/v1/capabilities") {
+  if (r.method == "GET" && r.path == "/api/control/v1/capabilities") {
     const auto host = status_();
 
-    return {200, nlohmann::json{{"api_version", 1}, {"scope", "wsprrypi-host/1"},
-        {"host_logging", {{"schema","host-usb-logging/1"},{"path","/api/v1/host/logging"},{"maximum_sources",8}}},
+    return {200, nlohmann::json{{"scope", "wsprrypi-host/1"},
+        {"host_logging", {{"contract","Wsprry-Control/1"},{"schema","host-usb-logging/1"},{"path","/api/control/v1/host/logging"},{"maximum_sources",8}}},
         {"wtp", host.value("capabilities", nlohmann::json(nullptr))},
-        {"features", {{"config", true}, {"schedules", true}, {"network", true},
+        {"features", {{"member_configuration", true}, {"network", true},
                       {"jobs", true}, {"member_resources",true}, {"softap", false}, {"ble", false}}},
-        {"member_resources", {{"scope","pico-member"},{"application","/api/v1/member/application"},
-          {"station","/api/v1/member/station"},{"hardware","/api/v1/member/hardware"},
-          {"pins","/api/v1/member/pins"},{"preview","/api/v1/member/pins/validate"},
+        {"member_resources", {{"scope","pico-member"},{"application","/api/control/v1/member/application"},
+          {"station","/api/control/v1/member/station"},{"hardware","/api/control/v1/member/hardware"},
+          {"pins","/api/control/v1/member/pins"},{"preview","/api/control/v1/member/pins/validate"},
           {"remote_support","authenticated_resource_discovery_required"}}},
         {"job_operations", {"ABORT"}}, {"job_submission", "host-application"},
         {"management_scope", "pico-standalone"},
         {"management_carriers", {{"scope", "wsprrypi-host/1"}, {"built_in", {"engineering_mtls", "consumer_station", "consumer_ap", "usb_physical"}},
-          {"selection", "/api/v1/member/management"}, {"remote_capabilities", "authenticated_read_required"}}}, {"active_job_connections", false},
+          {"selection", "/api/control/v1/member/management"}, {"remote_capabilities", "authenticated_read_required"}}}, {"active_job_connections", false},
         {"max_body_bytes", 32768}}.dump(), {}};
   }
-  if (r.path == "/api/v1/member/management" && (r.method == "GET" || r.method == "POST")) {
+  if (r.path == "/api/control/v1/member/management" && (r.method == "GET" || r.method == "POST")) {
     std::lock_guard lock(management_mutex_);
     if (r.body.size() > 512) return error(413, "body_too_large");
-    if (r.method == "POST") { usb_resource_reads_.clear(); member_context_.clear(); member_revision_.clear(); legacy_read_required_ = true; alias_reads_required_ = {"config","schedules","network"}; }
+    if (r.method == "POST") { usb_resource_reads_.clear(); member_context_.clear(); member_revision_.clear(); legacy_read_required_ = true; alias_reads_required_ = {"network"}; }
     return management_("member/management", r.method, r.body, {}, {});
   }
   for (const std::string resource : {"wifi","hostname","logging","udp-logging","udp-logging/capabilities","udp-logging/test","udp-logging/test/capabilities","restart","ap","progress","progress/update","progress/apply","gpio-drive","gpio-drive-progress","amplifier-timing","filter-selector"}) {
-    if (r.path != "/api/v1/member/" + resource) continue;
+    if (r.path != "/api/control/v1/member/" + resource) continue;
     const bool read = r.method == "GET" && (resource == "wifi" || resource == "hostname" || resource == "logging" || resource == "udp-logging" || resource == "udp-logging/capabilities" || resource == "udp-logging/test/capabilities" || resource == "progress" || (resource == "gpio-drive" || resource == "amplifier-timing" || resource == "filter-selector") || resource == "gpio-drive-progress");
     const bool write = (r.method == "PUT" && (resource == "wifi" || resource == "hostname" || resource == "logging" || resource == "udp-logging" || (resource == "gpio-drive" || resource == "amplifier-timing" || resource == "filter-selector") || resource == "gpio-drive-progress")) ||
         (r.method == "DELETE" && resource == "wifi") ||
@@ -86,14 +113,14 @@ PicoHttpResponse WtpBrowserApi::handle(const BrowserRequest &r) {
       catch (...) { return error(400,"invalid_json"); }
       // A mutation can change the global revision. Every editor must read again.
       usb_resource_reads_.clear(); member_context_.clear(); member_revision_.clear();
-      legacy_read_required_=true; alias_reads_required_={"config","schedules","network"};
+      legacy_read_required_=true; alias_reads_required_={"network"};
     }
     auto result=management_("member/"+resource,r.method,r.body,r.revision,selection);
     if (read && result.status==200 && !result.etag.empty()) usb_resource_reads_[resource]={selection,result.etag};
     return result;
   }
   for (const std::string resource : {"application", "station", "hardware", "pins", "pins/validate"}) {
-    if (r.path != "/api/v1/member/" + resource) continue;
+    if (r.path != "/api/control/v1/member/" + resource) continue;
     const bool read = r.method == "GET" && resource != "pins/validate";
     const bool preview = r.method == "POST" && resource == "pins/validate";
     const bool write = r.method == "PUT" && (resource == "station" || resource == "hardware");
@@ -114,7 +141,7 @@ PicoHttpResponse WtpBrowserApi::handle(const BrowserRequest &r) {
         return error(409,"member_read_required");
     }
     if (!preview) { member_context_.clear(); member_revision_.clear(); }
-    if (write) { legacy_read_required_ = true; alias_reads_required_ = {"config","schedules","network"}; }
+    if (write) { legacy_read_required_ = true; alias_reads_required_ = {"network"}; }
     auto result = management_("member/" + resource,r.method,r.body,r.revision,selection);
     if (read && result.status == 200) {
       try {
@@ -145,9 +172,9 @@ PicoHttpResponse WtpBrowserApi::handle(const BrowserRequest &r) {
   };
   const auto invalidate_management = [&] {
     member_context_.clear(); member_revision_.clear(); legacy_read_required_=true;
-    alias_reads_required_={"config","schedules","network"};
+    alias_reads_required_={"network"};
   };
-  if (r.path == "/api/v1/member/configuration" && (r.method == "GET" || r.method == "POST")) {
+  if (r.path == "/api/control/v1/member/configuration" && (r.method == "GET" || r.method == "POST")) {
     std::lock_guard lock(management_mutex_);
     if (r.body.size() > 2048) return error(413, "body_too_large");
     if (r.method == "POST") {
@@ -161,12 +188,11 @@ PicoHttpResponse WtpBrowserApi::handle(const BrowserRequest &r) {
     auto result = management_("member/configuration", r.method, r.body, r.revision,selection);
     if (result.status == 200) {
       legacy_selection_=selection; legacy_read_required_=false;
-      if (r.method == "GET") for (const auto alias : {"config","schedules"}) { alias_reads_required_.erase(alias); alias_selections_[alias]=selection; }
     }
     return result;
   }
-  for (const std::string resource : {"config", "schedules", "network"}) {
-    if (r.path == "/api/v1/" + resource && (r.method == "GET" || r.method == "PUT")) {
+  for (const std::string resource : {"network"}) {
+    if (r.path == "/api/control/v1/" + resource && (r.method == "GET" || r.method == "PUT")) {
       std::lock_guard lock(management_mutex_);
       if (r.method == "PUT") {
         if (r.revision.empty()) return error(428, "revision_required");
@@ -179,12 +205,11 @@ PicoHttpResponse WtpBrowserApi::handle(const BrowserRequest &r) {
       auto result = management_(resource, r.method, r.body, r.revision,selection);
       if (result.status == 200) {
         alias_reads_required_.erase(resource); alias_selections_[resource]=selection;
-        if (r.method == "GET" && resource == "config") { alias_reads_required_.erase("schedules"); alias_selections_["schedules"]=selection; }
       }
       return result;
     }
   }
-  if (r.method != "POST" || (r.path != "/api/v1/jobs" && !r.path.starts_with("/api/v1/jobs/")))
+  if (r.method != "POST" || (r.path != "/api/control/v1/jobs" && !r.path.starts_with("/api/control/v1/jobs/")))
     return error(404, "not_found");
   nlohmann::json j;
   try { j = strict_browser_json(r.body); }
@@ -197,7 +222,7 @@ PicoHttpResponse WtpBrowserApi::handle(const BrowserRequest &r) {
     return error(400, "unsupported_or_invalid_job_request");
   const std::string session = j["session_id"], request = j["request_id"], job = j["body"]["job_id"];
   if (!identity(session) || !identity(request) || !identity(job)) return error(400, "invalid_identity");
-  if (r.path != "/api/v1/jobs" && r.path != "/api/v1/jobs/" + job + "/abort") return error(400, "job_id_mismatch");
+  if (r.path != "/api/control/v1/jobs" && r.path != "/api/control/v1/jobs/" + job + "/abort") return error(400, "job_id_mismatch");
   std::lock_guard lock(mutex_);
   const auto key = session + request;
   const auto payload = j.dump();

@@ -40,7 +40,7 @@
         polling = true;
         clearTimeout(timer);
         try {
-            const response = await root.fetch((root.WSPRRYPI_PATHS?.sharedApiPath || "/api/v1") + "/status",
+            const response = await root.fetch((root.WSPRRYPI_PATHS?.sharedApiPath || "/api/control/v1") + "/status",
                 {cache:"no-store", signal:AbortSignal.timeout(5000)});
             if (!response.ok) throw Error("Status unavailable");
             const status = await response.json();

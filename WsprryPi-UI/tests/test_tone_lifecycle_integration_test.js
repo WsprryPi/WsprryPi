@@ -283,10 +283,10 @@ async function main() {
                 request.onerror = () => resolve(true); request.onload = () => resolve(false);
                 request.open('GET', foreign); request.send();
             });
-            const hostStatus = await fetch('/api/v1/status');
+            const hostStatus = await fetch('/api/control/v1/status');
             return {fetchBlocked, xhrBlocked, hostStatus: await hostStatus.json(),
-                statusMutation: (await fetch('/api/v1/status', {method:'POST'})).status,
-                firmwareMutation: (await fetch('/api/v1/member/firmware', {method:'POST'})).status,
+                statusMutation: (await fetch('/api/control/v1/status', {method:'POST'})).status,
+                firmwareMutation: (await fetch('/api/control/v1/member/firmware', {method:'POST'})).status,
                 config: (await fetch('/config')).status,
                 logs: (await fetch('/log_stream.php')).status,
                 spots: (await fetch('/fetch_spots.php')).status};
@@ -294,7 +294,7 @@ async function main() {
         assert.ok(!isolation.exceptionDetails, JSON.stringify(isolation.exceptionDetails));
         assert.deepEqual(isolation.result.value,
             {fetchBlocked: true, xhrBlocked: true,
-                hostStatus: {host: {selected: false, firmware_maintenance: false,
+                hostStatus: {contract:"Wsprry-Control/1",host: {selected: false, firmware_maintenance: false,
                     ready: false, phase: "idle", session_phase: "disconnected"}},
                 statusMutation: 503, firmwareMutation: 503, config: 503, logs: 503, spots: 503});
         assert.equal(escapedRequests, 0, "no request reaches the other-port application sentinel");

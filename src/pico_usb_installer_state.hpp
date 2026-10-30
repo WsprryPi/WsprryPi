@@ -24,7 +24,7 @@ inline bool pico_usb_any_update_blocked(const std::filesystem::path& root="/var/
 }
 inline bool pico_usb_http_mutation(std::string_view method,std::string_view path) {
   return method!="GET" && method!="HEAD" && method!="OPTIONS" &&
-      !(method=="POST" && path=="/api/v1/member/firmware");
+      !(method=="POST" && path=="/api/control/v1/member/firmware");
 }
 inline bool pico_usb_command_mutation(std::string_view command) {
   return command!="get_tx_state" && command!="wspr_band_catalog" && command!="echo";

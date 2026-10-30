@@ -55,7 +55,7 @@ struct ReclaimedManagement : wsprrypi::wtp::ByteStream {
           if(operation=="hello")body=R"({"schema":"usb-management-discovery/1"})";
           if(operation=="request") {
             const auto path=request.at("path").get<std::string>();
-            if(path=="/api/v1/hostname") {++name_reads;body=nlohmann::json{{"schema","transmitter-hostname/1"},{"target",target},{"saved","pico.local"}}.dump();}
+            if(path=="/api/control/v1/hostname") {++name_reads;body=nlohmann::json{{"schema","hostname"},{"target",target},{"saved","pico.local"}}.dump();}
             else if(path=="/api/usb/v1/time/sample")body=R"({"sample":"fresh","monotonic_ns":"1000000"})";
             else if(path=="/api/usb/v1/time/submit") {++time_submits;body=R"({"accepted":true,"selected":true,"source":"controller"})";}
             else if(request.at("method")!="GET")++config_mutations;
@@ -386,19 +386,19 @@ void run(const std::string &credentials) {
   browser.set_read_timeout(15, 0);
   const std::string authority = "localhost:" + std::to_string(port);
   const httplib::Headers read_headers{{"Host", authority}};
-  auto resource = browser.Get("/api/v1/host/config", read_headers);
+  auto resource = browser.Get("/api/control/v1/host/config", read_headers);
   CHECK(resource && resource->status == 200 && resource->has_header("ETag"));
   CHECK(!resource->has_header("Access-Control-Allow-Origin"));
   const auto revision = resource->get_header_value("ETag");
   httplib::Headers headers{{"Host", authority}, {"Origin", "http://" + authority},
     {"X-WsprryPico-Request", "1"}, {"If-Match", revision}};
   const std::string patch = R"({"Operation":{"Transmit Backend":"wtp"},"WTP":{"Endpoint":"/dev/ttyACM1","USB Serial":"000012345678","USB Vendor ID":51966,"USB Product ID":16402,"Device ID":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","Hostname":"PrEsErVeD.LoCaL.","TCP Port":18443,"TLS Server Identity":"CeRtIfIcAtE.LoCaL.","TLS CA File":"/etc/pico/ca.crt","TLS Client Certificate":"/etc/pico/client.crt","TLS Client Key":"/etc/pico/client.key"}})";
-  auto updated = browser.Put("/api/v1/host/config", headers, patch, "application/json");
+  auto updated = browser.Put("/api/control/v1/host/config", headers, patch, "application/json");
   if (updated && updated->status != 200) {
     std::cerr << updated->status << " " << updated->body << "\n";
   }
   CHECK(updated && updated->status == 200 && updated->get_header_value("ETag") != revision);
-  auto stale = browser.Put("/api/v1/host/config", headers, patch, "application/json");
+  auto stale = browser.Put("/api/control/v1/host/config", headers, patch, "application/json");
   CHECK(stale && stale->status == 412);
   RuntimeConfigCandidate network_candidate;
   prepare_runtime_config_candidate(filename, network_candidate);
@@ -406,15 +406,15 @@ void run(const std::string &credentials) {
   CHECK(network_candidate.normalized_config.wtp.tls_identity == "CeRtIfIcAtE.LoCaL.");
   CHECK(network_candidate.normalized_config.wtp.tls_key == "/etc/pico/client.key");
   headers.erase("If-Match");
-  auto missing = browser.Put("/api/v1/host/config", headers, "{}", "application/json");
+  auto missing = browser.Put("/api/control/v1/host/config", headers, "{}", "application/json");
   CHECK(missing && missing->status == 428);
   headers.erase("Origin");
-  auto csrf = browser.Put("/api/v1/host/config", headers, "{}", "application/json");
+  auto csrf = browser.Put("/api/control/v1/host/config", headers, "{}", "application/json");
   CHECK(csrf && csrf->status == 403);
   headers.emplace("Origin", "http://evil");
-  auto evil = browser.Put("/api/v1/host/config", headers, "{}", "application/json");
+  auto evil = browser.Put("/api/control/v1/host/config", headers, "{}", "application/json");
   CHECK(evil && evil->status == 403);
-  auto unknown = browser.Get("/api/v1/unknown", read_headers);
+  auto unknown = browser.Get("/api/control/v1/unknown", read_headers);
   CHECK(unknown && unknown->status == 403);
   const auto old_gpio = jConfig.at("GPIO");
   WtpSettings settings{"/dev/ttyACM1", "000012345678", backend_test::device,
@@ -503,25 +503,25 @@ void run(const std::string &credentials) {
     CHECK(failed && config.wtp == active_before &&
           get_public_config_snapshot() == before);
   }
-  auto discovered = browser.Get("/api/v1/host/discovery", read_headers);
-  auto pi_endpoint = browser.Get("/api/v1/host/wtp-endpoint", read_headers);
+  auto discovered = browser.Get("/api/control/v1/host/discovery", read_headers);
+  auto pi_endpoint = browser.Get("/api/control/v1/host/wtp-endpoint", read_headers);
   CHECK(pi_endpoint && pi_endpoint->status == 200 &&
         nlohmann::json::parse(pi_endpoint->body).at("schema") == "wsprrypi-wtp-endpoint/1");
-  auto logs_unstarted = browser.Get("/api/v1/host/logging", read_headers);
+  auto logs_unstarted = browser.Get("/api/control/v1/host/logging", read_headers);
   CHECK(logs_unstarted && logs_unstarted->status == 503 &&
         nlohmann::json::parse(logs_unstarted->body).at("error").at("code") == "usb_logging_unavailable");
-  auto logging_missing_origin = browser.Put("/api/v1/host/logging", read_headers,
+  auto logging_missing_origin = browser.Put("/api/control/v1/host/logging", read_headers,
       R"({})", "application/json");
   CHECK(logging_missing_origin && logging_missing_origin->status == 403);
-  auto fleet_unstarted = browser.Get("/api/v1/host/fleet", read_headers);
+  auto fleet_unstarted = browser.Get("/api/control/v1/host/fleet", read_headers);
   CHECK(fleet_unstarted && fleet_unstarted->status == 503 &&
         nlohmann::json::parse(fleet_unstarted->body).at("error").at("code") == "fleet_unavailable");
-  auto pi_missing_origin = browser.Post("/api/v1/host/wtp-endpoint/recover", read_headers,
+  auto pi_missing_origin = browser.Post("/api/control/v1/host/wtp-endpoint/recover", read_headers,
       R"({"confirmed":true})", "application/json");
   CHECK(pi_missing_origin && pi_missing_origin->status == 403);
   CHECK(discovered && discovered->status == 200 &&
         nlohmann::json::parse(discovered->body).at("scope") == "wtp-dns-sd/1");
-  auto known = browser.Get("/api/v1/host/devices", read_headers);
+  auto known = browser.Get("/api/control/v1/host/devices", read_headers);
   CHECK(known && known->status == 200 && known->has_header("ETag"));
   const auto known_json = nlohmann::json::parse(known->body);
   CHECK(known_json.at("profiles").size() == 1 &&
@@ -532,18 +532,18 @@ void run(const std::string &credentials) {
       {"If-Match", known->get_header_value("ETag")}};
   auto catalog_conflict = catalog_headers;
   catalog_conflict.erase("If-Match");
-  auto missing_catalog_revision = browser.Post("/api/v1/host/devices", catalog_conflict,
+  auto missing_catalog_revision = browser.Post("/api/control/v1/host/devices", catalog_conflict,
       R"({"operation":"remove","id":"00000000000000000000000000000000"})", "application/json");
   CHECK(missing_catalog_revision && missing_catalog_revision->status == 428);
   catalog_conflict.erase("Origin");
-  auto missing_catalog_origin = browser.Post("/api/v1/host/devices", catalog_conflict,
+  auto missing_catalog_origin = browser.Post("/api/control/v1/host/devices", catalog_conflict,
       R"({"operation":"remove","id":"00000000000000000000000000000000"})", "application/json");
   CHECK(missing_catalog_origin && missing_catalog_origin->status == 403);
-  auto active_host = browser.Get("/api/v1/host/config", read_headers);
+  auto active_host = browser.Get("/api/control/v1/host/config", read_headers);
   CHECK(active_host && active_host->status == 200);
   catalog_headers.erase("If-Match");
   catalog_headers.emplace("If-Match", active_host->get_header_value("ETag"));
-  auto use_current = browser.Post("/api/v1/host/devices/use", catalog_headers,
+  auto use_current = browser.Post("/api/control/v1/host/devices/use", catalog_headers,
       nlohmann::json{{"id", known_json.at("active_id")},
                      {"catalog_revision", known->get_header_value("ETag")}}.dump(), "application/json");
   CHECK(use_current && use_current->status == 200 && config.wtp == settings);
@@ -599,11 +599,11 @@ void run(const std::string &credentials) {
       (void)wtp_runtime_safe_probe([&] { probe_ran = true; return nlohmann::json::object(); });
     } catch (...) { probe_refused = true; }
     CHECK(probe_refused && !probe_ran);
-    auto pending_config = browser.Get("/api/v1/host/config", read_headers);
+    auto pending_config = browser.Get("/api/control/v1/host/config", read_headers);
     CHECK(pending_config && pending_config->status == 200);
     catalog_headers.erase("If-Match");
     catalog_headers.emplace("If-Match", pending_config->get_header_value("ETag"));
-    auto blocked_use = browser.Post("/api/v1/host/devices/use", catalog_headers,
+    auto blocked_use = browser.Post("/api/control/v1/host/devices/use", catalog_headers,
         nlohmann::json{{"id", known_json.at("active_id")},
                        {"catalog_revision", known->get_header_value("ETag")}}.dump(),
         "application/json");

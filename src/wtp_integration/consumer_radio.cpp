@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 #include "consumer_radio.hpp"
 #include "browser_api.hpp"
+#include "control_contract.hpp"
 #include "identity.hpp"
 #include <algorithm>
 #include <charconv>
@@ -11,6 +12,7 @@
 #include <openssl/kdf.h>
 #include <openssl/rand.h>
 #include <thread>
+#include <set>
 namespace wsprrypi {
 namespace {
 using Json = nlohmann::json;
@@ -145,12 +147,8 @@ struct Secrets {
     wipe(password);
   }
 };
-bool supported_management_schema(const Json &schema, bool usb) {
-  return usb ? (schema == "transmitter-management/3" ||
-                schema == "transmitter-management/5")
-             : (schema == "transmitter-management/1" ||
-                schema == "transmitter-management/2" ||
-                schema == "transmitter-management/4");
+bool supported_management_schema(const Json &schema, bool) {
+  return schema == "management";
 }
 } // namespace
 bool valid_management_descriptor(const Json &j, const std::string &carrier) {
@@ -159,7 +157,7 @@ bool valid_management_descriptor(const Json &j, const std::string &carrier) {
       carrier == "consumer_station" || carrier == "consumer_ap";
   return known_carrier && fields(j, {"schema", "path"}) &&
          supported_management_schema(j["schema"], carrier == "usb_physical") &&
-         j["path"] == "/api/v1/management";
+         j["path"] == "/api/control/v1/management";
 }
 bool valid_management_contract(const Json &j, const std::string &carrier,
                                const std::string &device,
@@ -167,10 +165,10 @@ bool valid_management_contract(const Json &j, const std::string &carrier,
                                const std::string &generation) {
   try {
     const bool usb=carrier=="usb_physical";
-    if (!fields(j, {"schema", "target", "profile", "preclock",
+    if (!fields(j, {"contract", "schema", "target", "profile", "preclock",
                     "profile_generation", "selected", "carriers", "unsupported",
                     "operations", "limits"}) ||
-        !supported_management_schema(j["schema"], usb) ||
+        j["contract"] != "Wsprry-Control/1" || !supported_management_schema(j["schema"], usb) ||
         j["selected"] != carrier || !j["preclock"].is_boolean() ||
         j["target"] !=
             Json{{"scope", "member"}, {"device_id", device}, {"boot_id", boot}})
@@ -188,48 +186,53 @@ bool valid_management_contract(const Json &j, const std::string &carrier,
     } else if (!(j["profile_generation"].is_null() ||
                  decimal(j["profile_generation"])))
       return false;
-    if (!j["carriers"].is_array() || j["carriers"].size() != (usb ? 5U : 4U))
+    if (!j["carriers"].is_array() || j["carriers"].size() != 5U)
       return false;
     const char *names[] = {"engineering_mtls", "engineering_field",
                            "consumer_station", "consumer_ap", "usb_physical"};
     bool admitted = false;
-    for (unsigned i = 0; i < (usb ? 5U : 4U); ++i) {
+    std::set<std::string> seen_carriers;
+    for (unsigned i = 0; i < 5U; ++i) {
       const auto &row = j["carriers"][i];
       if (!fields(row, {"carrier", "built_in", "available"}) ||
-          row["carrier"] != names[i] || !row["built_in"].is_boolean() ||
+          !row["carrier"].is_string() || !row["built_in"].is_boolean() ||
           !row["available"].is_boolean() ||
           (row["available"] == true && row["built_in"] != true))
         return false;
+      const auto name = row["carrier"].get<std::string>();
+      if (!seen_carriers.insert(name).second ||
+          std::none_of(std::begin(names), std::end(names), [&](const char* known) { return name == known; })) return false;
       if (row["carrier"] == carrier)
         admitted = row["built_in"] == true && row["available"] == true;
     }
-    const Json operations = {{"GET",
-                              {"capabilities", "status", "config", "schedules",
-                               "network", "application", "management"}},
-                             {"PUT", {"config", "schedules", "network"}},
-                             {"POST", {"config/update"}}};
-    Json limits = {{"http_body", 32768},    {"consumer_plaintext", 32724},
-                         {"config", 1800},        {"update", 2048},
-                         {"login_ms", 30000},     {"idle_ms", 300000},
-                         {"absolute_ms", 900000}, {"consumer_sessions", 1}};
-    if (j["schema"] != "transmitter-management/1") {
-      limits["consumer_sessions"] = 3;
-      limits["consumer_pending_logins"] = 1;
+    if (!fields(j["operations"], {"GET", "PUT", "POST"})) return false;
+    for (const auto &[method, resources] : j["operations"].items()) {
+      (void)method;
+      if (!resources.is_array() || resources.size()>128) return false;
+      std::set<std::string> seen;
+      for (const auto &entry : resources) {
+        if (!entry.is_string()) return false;
+        const auto &name=entry.get_ref<const std::string&>();
+        if (name.empty() || name.size()>128 || (name != "jobs/{id}/abort" && !std::all_of(name.begin(),name.end(),[](unsigned char c) {
+              return (c>='a' && c<='z') || (c>='0' && c<='9') || c=='/' || c=='-';
+            })) || !seen.insert(name).second) return false;
+      }
     }
-    if (j["schema"] == "transmitter-management/4" ||
-        j["schema"] == "transmitter-management/5") {
-      limits["idle_ms"] = 1800000;
-      limits["absolute_ms"] = 28800000;
+    const std::pair<const char*,std::uint64_t> ceilings[] = {
+      {"http_body",32768},{"consumer_plaintext",32724},{"config",1800},{"update",2048},
+      {"login_ms",60000},{"idle_ms",86400000},{"absolute_ms",86400000},
+      {"consumer_sessions",16},{"consumer_pending_logins",16}};
+    if (!j["limits"].is_object() || j["limits"].size()!=std::size(ceilings)) return false;
+    for (const auto &[name, maximum] : ceilings) {
+      if (!j["limits"].contains(name) || !j["limits"][name].is_number_integer() ||
+          j["limits"][name] <= 0 || j["limits"][name] > maximum) return false;
     }
-    for (const auto &[name, value] : limits.items()) {
-      (void)value;
-      if (!j["limits"].is_object() || !j["limits"].contains(name) ||
-          !j["limits"][name].is_number_integer())
-        return false;
-    }
-    return admitted && j["operations"] == operations && j["limits"] == limits &&
-           j["unsupported"] == (usb ? Json::array({"plain_wtp_json","tls_wtp_json","ble_json"}) :
-             Json::array({"usb_json", "plain_wtp_json", "tls_wtp_json", "ble_json"}));
+    return admitted &&
+      j["limits"]["idle_ms"] <= j["limits"]["absolute_ms"] &&
+      j["limits"]["consumer_pending_logins"] <= j["limits"]["consumer_sessions"] &&
+      j["limits"]["update"] <= j["limits"]["consumer_plaintext"] &&
+      j["limits"]["consumer_plaintext"] < j["limits"]["http_body"] &&
+      j["unsupported"] == Json::array({"plain_wtp_json","tls_wtp_json","ble_json"});
   } catch (...) {
     return false;
   }
@@ -572,20 +575,11 @@ PicoHttpResponse ConsumerRadioClient::request(const std::string &resource,
     clear();
     return error(401, "consumer_login_required");
   }
-  const bool allowed =
-      (method == "GET" && (resource == "udp-logging" || resource == "udp-logging/capabilities" || resource == "udp-logging/test/capabilities" || resource == "capabilities" || resource == "status" ||
-                           resource == "config" || resource == "schedules" ||
-                           resource == "network" || resource == "application" ||
-                           resource == "management" || resource == "station" || resource == "hardware" || resource == "pins" || resource == "application/2" || resource == "station/2" || (resource == "gpio-drive" || resource == "amplifier-timing" || resource == "filter-selector") || resource == "config/3" || resource == "hardware/2" || resource == "application/3" || resource == "progress/2" || resource == "progress")) ||
-      (method == "PUT" && (resource == "udp-logging" || resource == "config" || resource == "schedules" ||
-                           resource == "network" || resource == "station" || resource == "hardware" || resource == "config/2" || resource == "station/2" || (resource == "gpio-drive" || resource == "amplifier-timing" || resource == "filter-selector") || resource == "config/3")) ||
-      (method == "POST" &&
-       (resource == "udp-logging/test" || resource == "config/update" || resource == "config/update/2" || resource == "config/update/3" || resource == "progress/update/2" || resource == "progress/apply/2" || resource == "progress/update" || resource == "progress/apply" || resource == "consumer/logout" || resource == "pins/validate"));
-  if (!allowed)
-    return error(404, "not_found");
-  if (body.size() > ((resource == "config/update" || resource == "config/update/2" || resource == "config/update/3" || resource == "progress/update/2" || resource == "progress/apply/2" || resource == "progress/update" || resource == "progress/apply" || resource == "pins/validate") ? 2048U :
-      (resource == "station" || resource == "station/2" || resource == "hardware") ? 1024U : 1800U) ||
-      revision.size() > 80)
+  if (!pi_management_route(resource,method) && !pi_consumer_session_route(resource,method))
+    return error(404,"not_found");
+  const auto body_limit = resource == "config/update" || resource.starts_with("progress/") || resource == "pins/validate" ? 2048U :
+      resource == "station" || resource == "hardware" ? 1024U : 1800U;
+  if (body.size() > body_limit || revision.size() > 80)
     return error(413, "body_too_large");
   if (mutation && resource != "consumer/logout" && resource != "pins/validate" && revision.empty())
     return error(428, "revision_required");
@@ -599,7 +593,7 @@ PicoHttpResponse ConsumerRadioClient::request(const std::string &resource,
     const auto seq = sequence_++;
     Json envelope = {
         {"method", method},
-        {"path", "/api/v1/" + resource},
+        {"path", "/api/control/v1/" + resource},
         {"if_match", revision.empty() ? Json(nullptr) : Json(revision)},
         {"body", parsed}};
     auto plain = envelope.dump();
@@ -631,7 +625,7 @@ PicoHttpResponse ConsumerRadioClient::request(const std::string &resource,
 }
 void ConsumerRadioClient::logout() {
   if (active())
-    (void)request("consumer/logout", "POST", "{}");
+    (void)request("consumer/logout", "POST", Json{{"contract",std::string(control_contract)}}.dump());
   clear();
 }
 

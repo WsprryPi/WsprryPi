@@ -2,7 +2,7 @@
 (function (root) {
     "use strict";
     const byId = id => root.document.getElementById(id);
-    const url = suffix => (root.WSPRRYPI_PATHS?.sharedApiPath || "/api/v1") + "/host/" + suffix;
+    const url = suffix => (root.WSPRRYPI_PATHS?.sharedApiPath || "/api/control/v1") + "/host/" + suffix;
     const number = name => Number(byId("fleet-schedule-" + name).value);
     const text = name => byId("fleet-schedule-" + name).value.trim();
     let data = null, revision = "", editorRevision = "", profiles = [], editId = "", busy = false, closed = false, visible = false, timer, observedAt = 0, listenerBusy = false;

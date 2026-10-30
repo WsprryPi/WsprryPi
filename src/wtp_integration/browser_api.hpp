@@ -22,6 +22,7 @@ public:
       : status_(std::move(status)), management_(std::move(management)), cancel_(std::move(cancel)) {}
   PicoHttpResponse handle(const BrowserRequest &);
 private:
+  PicoHttpResponse handle_control(const BrowserRequest &);
   Status status_;
   Management management_;
   Cancel cancel_;

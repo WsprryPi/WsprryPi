@@ -60,11 +60,20 @@ int main(int argc,char **argv) {
   } else {pipe=std::make_unique<Pipe>(argv[1]);selected=pipe.get();}
   UsbManagementClient client(*selected,now_ms,[](unsigned ms){std::this_thread::sleep_for(std::chrono::milliseconds(ms));});
   if(!client.hello(expected))throw std::runtime_error(client.observation().dump());
+  Json corruption, exchanges=Json::array();
   const auto exchange=[&](const std::string &path,const std::string &method,const std::string &body,const std::string &revision) {
-    return client.request(path.starts_with("/")?path:"/api/v1/"+path,method,body,revision);
+    const auto resource=path.starts_with("/api/control/v1/")?path.substr(16):path;
+    exchanges.push_back({{"resource",resource},{"method",method}});
+    auto result=client.request(path.starts_with("/")?path:"/api/control/v1/"+path,method,body,revision);
+    if(corruption.is_object() && corruption.value("resource","")==resource && method=="GET" && result.status==200) {
+      auto value=strict_browser_json(result.body);
+      value[Json::json_pointer(corruption.at("pointer").get<std::string>())]=corruption.at("value");
+      result.body=value.dump();
+    }
+    return result;
   };
   WtpBrowserApi api([&]{
-      const auto result=exchange("/api/v1/status","GET",{},{});
+      const auto result=exchange("/api/control/v1/status","GET",{},{});
       if(result.status!=200)throw std::runtime_error("Pico status unavailable");
       const auto pico=strict_browser_json(result.body);
       return Json{{"selected",true},{"transport","usb"},{"pico",pico},{"remote",pico.value("job",Json(nullptr))},{"usb",client.observation()}};
@@ -77,12 +86,17 @@ int main(int argc,char **argv) {
         return pico_resource_request(exchange,client.device(),client.boot(),resource.substr(7),method,body,revision,"usb_physical");
       if(resource=="member/udp-logging"||resource=="member/udp-logging/capabilities"||resource=="member/udp-logging/test"||resource=="member/udp-logging/test/capabilities")return pico_udp_logging_request(exchange,client.device(),client.boot(),resource.substr(7),method,body,revision);
       if(resource.starts_with("member/progress"))return pico_progress_request(exchange,client.device(),client.boot(),resource.substr(7),method,body,revision,"usb_physical");
-      return exchange(resource=="member/wifi"?"/api/usb/v1/wifi":resource=="member/hostname"?"/api/v1/hostname":resource=="member/ap"?"/api/usb/v1/ap":resource=="member/restart"?"/api/v1/restart":resource,method,body,revision);
+      return exchange(resource=="member/wifi"?"/api/usb/v1/wifi":resource=="member/hostname"?"/api/control/v1/hostname":resource=="member/ap"?"/api/usb/v1/ap":resource=="member/restart"?"/api/control/v1/restart":resource,method,body,revision);
     },[](auto){return PicoHttpResponse{409,"{}",{}};});
   std::string line;
   while(std::getline(std::cin,line)) {
     try {
-      const auto command=strict_browser_json(line);
+      const auto command=strict_browser_json(line); exchanges=Json::array();
+      if(command.contains("control")) {
+        if(physical)throw std::runtime_error("Test corruption unavailable on physical USB");
+        corruption=command.value("corruption",Json(nullptr));
+        std::cout<<"{}"<<std::endl;continue;
+      }
       if(command.contains("raw_resource")) {
         const auto r=exchange(command.at("raw_resource"),command.value("method","GET"),command.value("body",""),command.value("revision",""));
         std::cout<<Json{{"status",r.status},{"body",strict_browser_json(r.body)},{"etag",r.etag},{"bytes",r.body.size()}}.dump()<<std::endl;
@@ -99,7 +113,7 @@ int main(int argc,char **argv) {
         continue;
       }
       auto result=protected_browser_fixture(api,command);
-      std::cout<<Json{{"status",result.status},{"body",strict_browser_json(result.body)},{"etag",result.etag}}.dump()<<std::endl;
+      std::cout<<Json{{"status",result.status},{"body",strict_browser_json(result.body)},{"etag",result.etag},{"exchanges",exchanges}}.dump()<<std::endl;
     }catch(const std::exception &e){std::cout<<Json{{"failure",e.what()}}.dump()<<std::endl;}
   }
  } catch(const std::exception &e){std::cerr<<e.what()<<'\n';return 1;}

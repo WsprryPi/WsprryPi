@@ -24,7 +24,7 @@ Release selection, identity, UF2 bounds, backup, programming and preservation
 are implemented only in the shared core. The browser cannot pass a command,
 filesystem path, download URL or arbitrary device.
 
-`GET/POST /api/v1/member/firmware` uses existing privileged API authorization;
+`GET/POST /api/control/v1/member/firmware` uses existing privileged API authorization;
 POST additionally requires the same-origin mutation context. Closed request
 shapes bind the current `selection_id`. Plan defaults to main when branch is
 omitted. Upgrade requires its current `plan_id` and `confirmed: true`. Recover

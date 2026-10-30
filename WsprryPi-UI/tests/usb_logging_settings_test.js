@@ -4,12 +4,12 @@ const assert=require('node:assert/strict');
 const {browser,reply,target}=require('./wtp_usb_settings_test.js');
 async function main(){
  let enabled=false,severity=6,revision=1,fail=false,pending=null;
- const resource=()=>({schema:'transmitter-logging/1',target,saved:{enabled,maximum_severity:severity},active:{enabled,maximum_severity:severity,streaming:false,dropped:'0'}});
+ const resource=()=>({schema:'logging',target,saved:{enabled,maximum_severity:severity},active:{enabled,maximum_severity:severity,streaming:false,dropped:'0'}});
  const test=browser(async(url,options)=>{
   assert(url.endsWith('/logging'));
   if(pending)return new Promise(resolve=>pending.resolve=resolve);
   if(options.method==='PUT'){
-   const body=JSON.parse(options.body);assert.equal(body.schema,'transmitter-logging/1');assert.deepEqual(body.target,target);
+   const body=JSON.parse(options.body);assert.equal(body.schema,'logging');assert.deepEqual(body.target,target);
    enabled=body.logging.enabled;severity=body.logging.maximum_severity;revision++;
    if(fail)throw Error('simulated lost save reply');
   }

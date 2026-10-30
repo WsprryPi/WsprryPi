@@ -77,7 +77,7 @@ def http(host, port, method, path, body=None, revision=None):
                'Origin': f'http://{host}:{port}'}
     if revision:
         headers['If-Match'] = revision
-    request = urllib.request.Request(f'http://{host}:{port}/api/v1/host/{path}',
+    request = urllib.request.Request(f'http://{host}:{port}/api/control/v1/host/{path}',
                                      json.dumps(body).encode() if body is not None else None,
                                      headers, method=method)
     try:

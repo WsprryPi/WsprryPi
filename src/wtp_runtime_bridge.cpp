@@ -628,7 +628,7 @@ wsprrypi::PicoHttpResponse wtp_runtime_management(const std::string &resource,
         std::lock_guard connection(r->usb_connection_mutex);
         if (!r->ensure_usb_management()) { response=failure(409,"usb_management_unavailable"); return; }
         const auto exchange = [&](const std::string &path,const std::string &verb,const std::string &payload,const std::string &etag) {
-          return r->usb_management->request(path.starts_with("/") ? path : "/api/v1/" + path,verb,payload,etag);
+          return r->usb_management->request(path.starts_with("/") ? path : "/api/control/v1/" + path,verb,payload,etag);
         };
         if (resource == "member/configuration") response = wsprrypi::pico_configuration_request(exchange,
           r->usb_management->device(),r->usb_management->boot(),method,body,revision,"usb_physical");
@@ -639,11 +639,11 @@ wsprrypi::PicoHttpResponse wtp_runtime_management(const std::string &resource,
           r->usb_management->device(),r->usb_management->boot(),resource.substr(7),method,body,revision,"usb_physical");
         else if (resource == "member/udp-logging" || resource == "member/udp-logging/capabilities" || resource == "member/udp-logging/test" || resource == "member/udp-logging/test/capabilities") response = wsprrypi::pico_udp_logging_request(exchange,
           r->usb_management->device(),r->usb_management->boot(),resource.substr(7),method,body,revision);
-        else if (resource == "member/logging") response = exchange("/api/v1/logging",method,body,revision);
+        else if (resource == "member/logging") response = exchange("/api/control/v1/logging",method,body,revision);
         else if (resource == "member/wifi") response = exchange("/api/usb/v1/wifi",method,body,revision);
-        else if (resource == "member/hostname") { response = exchange("/api/v1/hostname",method,body,revision); r->observe_usb_name(response); }
+        else if (resource == "member/hostname") { response = exchange("/api/control/v1/hostname",method,body,revision); r->observe_usb_name(response); }
         else if (resource == "member/ap") response = exchange("/api/usb/v1/ap",method,body,revision);
-        else if (resource == "member/restart") response = exchange("/api/v1/restart",method,body,revision);
+        else if (resource == "member/restart") response = exchange("/api/control/v1/restart",method,body,revision);
         else response = exchange(resource,method,body,revision);
       },true)) return failure(409,"host_busy_or_output_unresolved");
       return response;

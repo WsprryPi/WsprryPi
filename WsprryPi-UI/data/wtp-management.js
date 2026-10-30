@@ -30,13 +30,8 @@
         }
         return patch;
     }
-    function stationHint(schema) {
-        const guidance = "Save the complete station together. Reported WSPR power is message metadata, separate from drive, measured RF output and calibration. ";
-        return guidance + (schema === "transmitter-application/2"
-            ? "This firmware automatically selects Type 1, Type 2 or Type 3 from the complete callsign and locator."
-            : schema === "transmitter-application/1"
-            ? "This firmware supports Type 1 station writes only; six-character locators are retained and encoded using the first four."
-            : "Load member resources to check this firmware's supported station formats.");
+    function stationHint() {
+        return "Save the complete station together. The Pico automatically selects WSPR Type 1, 2 or 3 from the callsign and locator. Reported power is message metadata; it does not set measured RF output.";
     }
     if (typeof module !== "undefined" && module.exports) module.exports = { schedules, changes, stationHint };
     if (!root.document) return;
@@ -111,10 +106,10 @@
     const stationEdits = {callsign:0,locator:0,power:0};
     const stationNames = {callsign:"callsign",locator:"locator",power:"power_dbm"};
     function validProgress(value) {
-        const keys = "schema,target,draft_revision,config_revision,profile_revision,fields,last_receipt,last_outcomes,applied_station,station,station_complete,complete,apply_domains,wspr_plan,schedule_enabled,schedule_suspended,matches_applied".split(",");
+        const keys = "contract,schema,target,draft_revision,config_revision,profile_revision,fields,last_receipt,last_outcomes,applied_station,station,station_complete,complete,apply_domains,wspr_plan,schedule_enabled,schedule_suspended,matches_applied".split(",");
         const sequence = v => typeof v === "string" && /^(0|[1-9][0-9]{0,19})$/.test(v) && BigInt(v) <= 18446744073709551615n;
         return value && Object.keys(value).every(k => keys.includes(k) || ["outcomes","request_id"].includes(k)) && keys.every(k => Object.hasOwn(value,k)) &&
-            value.schema === "transmitter-progress/1" && value.target?.scope === "member" &&
+            value.contract === "Wsprry-Control/1" && value.schema === "progress" && value.target?.scope === "member" &&
             /^[0-9a-f]{32}$/.test(value.target.device_id) && /^[0-9a-f]{32}$/.test(value.target.boot_id) &&
             ["draft_revision","config_revision","profile_revision"].every(k => sequence(value[k])) &&
             value.station && Object.keys(value.station).sort().join(",") === "callsign,locator,power_dbm" &&
@@ -122,7 +117,7 @@
             (value.station.power_dbm === null || [0,3,7,10,13,17,20,23,27,30,33,37,40,43,47,50,53,57,60].includes(value.station.power_dbm)) &&
             ["station_complete","complete","matches_applied","schedule_enabled","schedule_suspended"].every(k => typeof value[k] === "boolean") &&
             value.fields && typeof value.fields === "object" && !Array.isArray(value.fields) &&
-            value.apply_domains && Object.keys(value.apply_domains).sort().join(",") === "all,network,radio,station" &&
+            value.apply_domains && Object.keys(value.apply_domains).sort().join(",") === "all,drive,network,radio,station" &&
             Object.values(value.apply_domains).every(v => typeof v === "boolean");
     }
     function invalidateProgress() {
@@ -162,17 +157,17 @@
         let payload;
         if (action === "save") {
             const power = values.power;
-            payload = {schema:"transmitter-progress/1",target:prior.target,
+            payload = {contract:'Wsprry-Control/1',schema:"progress",target:prior.target,
                 request_id:Array.from(root.crypto.getRandomValues(new Uint8Array(16)),b=>b.toString(16).padStart(2,"0")).join(""),
                 fields:{callsign:values.callsign || null,locator:values.locator || null,power_dbm:power === "" ? null : Number.isSafeInteger(Number(power)) ? Number(power) : power}};
-        } else if (action === "apply") payload = {schema:"transmitter-progress/1",target:prior.target,
+        } else if (action === "apply") payload = {contract:'Wsprry-Control/1',schema:"progress",target:prior.target,
             application:{draft_revision:prior.draft_revision,domain:"station"}};
         const needsReview = progressReview;
         if (action !== "load") invalidateEditors(); else progressRevision = "";
         const ticket = ++progressEpoch;
         busy = true; render(); progressControl("state").textContent = action === "load" ? "Reading saved station progress…" : action === "save" ? "Saving valid station fields…" : "Applying device-saved station progress…";
         try {
-            const response = await root.fetch((root.WSPRRYPI_PATHS?.sharedApiPath || "/api/v1") + "/member/progress" + (action === "load" ? "" : `/${action === "save" ? "update" : "apply"}`), {
+            const response = await root.fetch((root.WSPRRYPI_PATHS?.sharedApiPath || "/api/control/v1") + "/member/progress" + (action === "load" ? "" : `/${action === "save" ? "update" : "apply"}`), {
                 method:action === "load" ? "GET" : "POST",cache:"no-store",signal:AbortSignal.timeout(120000),
                 ...(payload ? {headers:{"Content-Type":"application/json","X-WsprryPico-Request":"1","If-Match":revision},body:JSON.stringify(payload)} : {})
             });
@@ -245,14 +240,14 @@
     function hardwareCandidate() {
         const gp = name => member(name).value === "" ? null : Number(member(name).value);
         return { engine: "direct", rf_gp: gp("rf"), i2c_pair: null, button_gp: gp("button"),
-            amplifier_gp: null, lpf_gps: [], indicator: member("indicator").value,
+            amplifier_gp: gp("amplifier"), amplifier_active_high: member("amplifier-polarity").value === "true", lpf_gps: [], indicator: member("indicator").value,
             indicator_gp: member("indicator").value === "external" ? gp("indicator-gp") : null,
             indicator_active_high: member("polarity").value === "true" };
     }
     function planText(p) {
         if (p === null) return "Unknown / unavailable";
         const pin = n => n === null ? "disabled" : `GP${n}`;
-        return `${p.engine === "direct" ? `Direct PIO RF ${pin(p.rf_gp)}` : `I2C pair ${p.i2c_pair}`}; button ${pin(p.button_gp)}; indicator ${{onboard_led:"onboard LED",external:"external",disabled:"disabled"}[p.indicator]}${p.indicator === "external" ? ` ${pin(p.indicator_gp)}, active ${p.indicator_active_high === false ? "low" : "high"}` : ""}`;
+        return `${p.engine === "direct" ? `Direct PIO RF ${pin(p.rf_gp)}` : `I2C pair ${p.i2c_pair}`}; amplifier ${pin(p.amplifier_gp)}, active ${p.amplifier_active_high === false ? "low" : "high"}; button ${pin(p.button_gp)}; indicator ${{onboard_led:"onboard LED",external:"external",disabled:"disabled"}[p.indicator]}${p.indicator === "external" ? ` ${pin(p.indicator_gp)}, active ${p.indicator_active_high === false ? "low" : "high"}` : ""}`;
     }
     function resourceRender() {
         if (!member("load")) return;
@@ -265,12 +260,13 @@
         root.document.querySelectorAll("[data-wtp-resource]").forEach(input => {
             input.disabled = busy || (input.dataset.wtpResource === "station" ? (!progressReady && (!(writable || (previewReady && resources?.carrier === "usb_physical" && resources.application.station.storage_healthy)) || resources.profile_owned_station)) : !previewReady);
         });
+        member("amplifier-polarity").disabled = busy || !previewReady || member("amplifier").value === "";
         member("station-save").disabled = busy || !writable || resources?.profile_owned_station;
         progressRender();
         member("validate").disabled = busy || !previewReady;
         member("hardware-save").disabled = busy || !writable || !validatedPlan || validatedPlan !== JSON.stringify(hardwareCandidate());
         for (const name of ["indicator-gp", "polarity"]) member(name).disabled = busy || !previewReady || member("indicator").value !== "external";
-        const roles = {rf:"RF", button:"button", "indicator-gp":"indicator"};
+        const roles = {rf:"RF", button:"button", amplifier:"amplifier", "indicator-gp":"indicator"};
         for (const [name, role] of Object.entries(roles)) for (const option of member(name).options || []) {
             const owner = Object.keys(roles).find(other => other !== name && option.value !== "" && member(other).value === option.value &&
                 (other !== "indicator-gp" || member("indicator").value === "external"));
@@ -279,6 +275,8 @@
         }
     }
     function resourcePopulate(data) {
+        driveEditor?.setPolicy(data.control_capabilities?.gpio_drive);
+        timingEditor?.setPolicy(data.control_capabilities?.amplifier_timing);
         const a = data.application, h = a.hardware, station = a.station.station;
         const keep = resourceLoaded && (resourceReconcile || !a.station.storage_healthy || !h.storage_healthy || h.application_error !== null);
         resourceObserved = new Date().toLocaleTimeString();
@@ -292,7 +290,7 @@
             ? "Station storage is faulted; saved values are unavailable. Any retained fields are previous drafts. Resolve the storage fault before saving."
             : data.profile_owned_station
             ? `Read-only: Pico transactional setup owns the effective station. ${station ? `${station.callsign}, ${station.locator}, ${station.power_dbm} dBm.` : "Effective station unavailable."}`
-            : station ? `Saved: ${station.callsign}, ${station.locator}, ${station.power_dbm} dBm.${keep ? " Your draft is preserved; review before saving." : a.schema === "transmitter-application/2" ? "" : " This firmware supports Type 1 station writes only."}`
+            : station ? `Saved: ${station.callsign}, ${station.locator}, ${station.power_dbm} dBm.${keep ? " Your draft is preserved; review before saving." : ""}`
                 : "No saved station. Use the existing setup workflow first.";
         if (a.wspr_plan) member("station-feedback").textContent += ` Saved plan: ${a.wspr_plan.frame_types.join(" → ")}. ${a.wspr_plan.rationale}`;
         member("pairs").textContent = data.pin_choices.i2c_pairs.map(p => `Pair ${p.id}: I2C${p.controller} GP${p.sda_gp}/GP${p.scl_gp}`).join("; ");
@@ -301,10 +299,10 @@
             const options = (name, optional) => {
                 member(name).innerHTML = `<option value="">${optional ? "Disabled" : "Select GP"}</option>` + data.pin_choices.eligible_gps.map(gp => `<option value="${gp}">GP${gp}</option>`).join("");
             };
-            options("rf", false); options("button", true); options("indicator-gp", false);
-            if (h.saved) for (const [name,value] of Object.entries({rf:h.saved.rf_gp,button:h.saved.button_gp,indicator:h.saved.indicator,"indicator-gp":h.saved.indicator_gp,polarity:h.saved.indicator_active_high !== false}))
+            options("rf", false); options("button", true); options("amplifier", true); options("indicator-gp", false);
+            if (h.saved) for (const [name,value] of Object.entries({rf:h.saved.rf_gp,button:h.saved.button_gp,amplifier:h.saved.amplifier_gp,"amplifier-polarity":h.saved.amplifier_active_high !== false,indicator:h.saved.indicator,"indicator-gp":h.saved.indicator_gp,polarity:h.saved.indicator_active_high !== false}))
                 member(name).value = value === null ? "" : String(value);
-            else for (const name of ["rf","button","indicator","indicator-gp","polarity"]) member(name).value = "";
+            else for (const name of ["rf","button","amplifier","amplifier-polarity","indicator","indicator-gp","polarity"]) member(name).value = "";
         }
         resources = data; resourceLoaded = true; resourceReconcile = false; validatedPlan = "";
         member("pin-feedback").textContent = "Candidate has not been validated. Validation never saves or activates pins.";
@@ -319,7 +317,7 @@
         resourceReview = false;
         if (station && member("power").value === "") { member("station-feedback").textContent = "Select reported power for a complete station save, or save the unset field as progress."; return; }
         const payload = station ? { callsign:member("callsign").value, locator:member("locator").value, power_dbm:Number(member("power").value) } : hardwareCandidate();
-        return request(`member/${kind}`, "PUT", {schema:station ? resources.application.station.schema : `transmitter-${kind}/1`, target:resources.target, [station ? "station" : "pins"]:payload}, resourceRevision);
+        return request(`member/${kind}`, "PUT", {contract:'Wsprry-Control/1',schema:station ? resources.application.station.schema : "hardware", target:resources.target, [station ? "station" : "pins"]:payload}, resourceRevision);
     }
     async function request(resource, method = "GET", body = null, revision = "") {
         if (busy || (resource === "member/management" ? !canSelect : !available)) return;
@@ -329,7 +327,7 @@
             : byId(resource === "member/management" ? "wtp-management-connection-feedback" : "wtp-management-feedback");
         const context = resourceContext;
         if (method !== "GET" && ["member/configuration","member/station","member/hardware"].includes(resource)) {
-            const intended = JSON.parse(JSON.stringify(body));
+            const intended = JSON.parse(JSON.stringify({...body,contract:"Wsprry-Control/1"}));
             if (intended.config?.wifi) intended.config.wifi.password = null;
             lastAttempt = {resource,method,revision,target:body.target,selectionId,intended,sent:true};
         }
@@ -339,9 +337,9 @@
         const controller = new AbortController();
         const timeout = setTimeout(() => controller.abort(), 180000);
         try {
-            const response = await root.fetch((root.WSPRRYPI_PATHS?.sharedApiPath || "/api/v1") + "/" + resource, {
+            const response = await root.fetch((root.WSPRRYPI_PATHS?.sharedApiPath || "/api/control/v1") + "/" + resource, {
                 method, cache: "no-store", signal: controller.signal,
-                ...(body ? { headers: { "Content-Type": "application/json", "X-WsprryPico-Request": "1", "If-Match": revision, ...(shared ? { "X-WsprryPi-Member-Context": context } : {}) }, body: JSON.stringify(body) } : {})
+                ...(body ? { headers: { "Content-Type": "application/json", "X-WsprryPico-Request": "1", "If-Match": revision, ...(shared ? { "X-WsprryPi-Member-Context": context } : {}) }, body: JSON.stringify({...body,contract:"Wsprry-Control/1"}) } : {})
             });
             const data = await response.json();
             if (!response.ok) {
@@ -386,7 +384,7 @@
                 if (shared && ["unsupported_resource_capabilities","unsupported_pin_capabilities","invalid_remote_resource","invalid_remote_pins","invalid_pin_validation","unsupported_management_contract"].includes(code)) throw failure("This Pico's resources could not be validated safely. Your draft is preserved; load resources before saving. No automatic fallback was attempted.");
                 throw failure(response.status === 412
                     ? "Pico settings changed elsewhere. Your draft is preserved. Load saved Pico settings before saving again."
-                    : code === "unsupported_configuration_updates" || code === "unsupported_legacy_field" || code === "invalid_remote_configuration"
+                    : code === "unsupported_configuration_updates" || code === "invalid_remote_configuration"
                         ? "This Pico's settings cannot be preserved safely. No automatic fallback was attempted. Your draft is preserved."
                         : ["host_busy_or_output_unresolved", "remote_busy_or_output_unresolved", "busy"].includes(code)
                             ? "Pico management is busy or output is unresolved. Finish or reconcile that work, then load saved settings. Your draft is preserved."
@@ -399,7 +397,7 @@
             const etag = response.headers.get("ETag") || "";
             if (shared) {
                 if (method === "GET") {
-                    if (data.schema !== "wsprrypi-member-resources/1" || !data.application || !data.target || typeof data.member_context !== "string" || !etag)
+                    if (data.schema !== "member-resources" || !data.application || !data.target || typeof data.member_context !== "string" || !etag)
                         throw failure("Member resources are incomplete. Your draft is preserved; load resources again.");
                     resourceReview = resourceReconcile && resourceLoaded;
                     resourcePopulate(data); resourceRevision = etag; resourceContext = data.member_context;
@@ -454,7 +452,7 @@
                 feedback.textContent = `Pico Wi-Fi: ${data.enabled ? "enabled" : "disabled"}.${discovery}${problem} ${method === "PUT" ? "Network control may now disconnect its network carrier. USB management stays available." : "This is a remote observation."}`;
                 if (method === "PUT") { networkRevision = ""; configRevision = ""; reconcile = true; }
             } else {
-                if (data.schema !== "wsprrypi-pico-settings/1" || !data.target || !Object.hasOwn(data, "config") || !etag)
+                if (data.schema !== "pico-settings" || !data.target || !Object.hasOwn(data, "config") || !etag)
                     throw failure("Pico settings context is incomplete. Your draft is preserved; load saved settings again.");
                 configRevision = etag; target = data.target;
                 if (method === "GET") {
@@ -465,7 +463,7 @@
                     loaded = true; reconcile = false;
                     feedback.textContent = keepDraft
                         ? "Saved Pico settings read. Your draft and password entry are preserved. Review the saved values before saving again."
-                        : saved ? `Saved Pico settings loaded. ${data.update_strategy === "merge" ? "Pico supports settings-preserving edits." : "Compatible legacy saves preserve understood settings."}`
+                        : saved ? `Saved Pico settings loaded. Changes preserve settings outside the edited fields.`
                             : "Pico has no saved standalone settings. Complete the fields before saving.";
                     feedback.textContent += restartFeedback(data.reboot_required);
                 } else {
@@ -499,43 +497,47 @@
             if (!onlySchedules) {
                 const expiry = Number(field("expiry").value), power = Number(field("power").value);
                 if (!Number.isSafeInteger(expiry) || expiry < 0 || expiry > 2147483647 || !Number.isInteger(power)) throw new Error("Enter whole-number power and expiry values; expiry must be at most 2147483647.");
-                config = changes(saved, { version: 1, enabled: field("enabled").checked,
+                config = changes(saved, { enabled: field("enabled").checked,
                     station: { callsign: field("callsign").value, locator: field("locator").value, power_dbm: power },
                     wifi: { ssid: field("ssid").value, ntp_ipv4: field("ntp").value,
                         password: field("password").value || (saved ? null : "") },
                     schedules: entries, expires_utc_s: expiry });
                 if (!Object.keys(config).length) { byId("wtp-management-feedback").textContent = "No Pico settings changed."; return; }
             }
-            return request("member/configuration", "POST", { schema: "wsprrypi-pico-settings/1", target,
+            return request("member/configuration", "POST", { schema: "pico-settings", target,
                 operation: onlySchedules ? "schedules" : "save", config }, configRevision);
         } catch (error) { byId("wtp-management-feedback").textContent = error.message; }
+    }
+    function controlValue(value) {
+        if (!value || value.contract !== "Wsprry-Control/1") throw Error("The Pico control reply is incompatible. Update both applications and reload saved settings.");
+        const result={...value}; delete result.contract; return result;
     }
     const filterEditor = root.WsprryFilters ? root.WsprryFilters.mount(byId('filter-selector-controls'), {
         pi:true,
         exchange:async(method,body,revision)=>{
-            const r=await root.fetch((root.WSPRRYPI_PATHS?.sharedApiPath || '/api/v1')+'/member/filter-selector',{
-                method,cache:'no-store',signal:AbortSignal.timeout(20000),...(body?{headers:{'Content-Type':'application/json','X-WsprryPico-Request':'1','If-Match':revision},body:JSON.stringify(body)}:{})});
+            const r=await root.fetch((root.WSPRRYPI_PATHS?.sharedApiPath || '/api/control/v1')+'/member/filter-selector',{
+                method,cache:'no-store',signal:AbortSignal.timeout(20000),...(body?{headers:{'Content-Type':'application/json','X-WsprryPico-Request':'1','If-Match':revision},body:JSON.stringify({...body,contract:"Wsprry-Control/1"})}:{})});
             const data=await r.json();if(!r.ok){const e=Error('Selector request was refused or unconfirmed. Read saved selectors and verify the selected Pico.');e.code=data.error?.code;throw e;}
-            return {data,revision:r.headers.get('ETag')||''};
+            return {data:controlValue(data),revision:r.headers.get('ETag')||''};
         },afterSave:()=>{configRevision='';resources=null;render();}
     }) : null;
     const timingEditor = root.WsprryAmplifierTiming && byId('amplifier-lead-ms') ? root.WsprryAmplifierTiming.create({
         lead:byId('amplifier-lead-ms'),tail:byId('amplifier-tail-ms'),read:byId('amplifier-timing-read'),save:byId('amplifier-timing-save'),discard:byId('amplifier-timing-discard'),adopt:byId('amplifier-timing-adopt'),status:byId('amplifier-timing-status'),
         exchange:async(method,body,revision)=>{
-            const r=await root.fetch((root.WSPRRYPI_PATHS?.sharedApiPath || '/api/v1')+'/member/amplifier-timing',{
-                method,cache:'no-store',signal:AbortSignal.timeout(20000),...(body ? {headers:{'Content-Type':'application/json','X-WsprryPico-Request':'1','If-Match':revision},body:JSON.stringify(body)} : {})});
+            const r=await root.fetch((root.WSPRRYPI_PATHS?.sharedApiPath || '/api/control/v1')+'/member/amplifier-timing',{
+                method,cache:'no-store',signal:AbortSignal.timeout(20000),...(body ? {headers:{'Content-Type':'application/json','X-WsprryPico-Request':'1','If-Match':revision},body:JSON.stringify({...body,contract:"Wsprry-Control/1"})} : {})});
             const data=await r.json();if(!r.ok)throw Error('Amplifier timing request was refused or unconfirmed. Read saved timing and verify the selected Pico.');
-            return {data,revision:r.headers.get('ETag') || ''};
+            return {data:controlValue(data),revision:r.headers.get('ETag') || ''};
         },afterSave:()=>{configRevision=''; resources=null;render();}
     }) : null;
     const driveEditor = root.WsprryGpioDrive && byId('gpio-drive-select') ? root.WsprryGpioDrive.create({
         select:byId('gpio-drive-select'),read:byId('gpio-drive-read'),save:byId('gpio-drive-save'),discard:byId('gpio-drive-discard'),status:byId('gpio-drive-status'),saveDraft:byId('gpio-drive-save-draft'),applyDraft:byId('gpio-drive-apply-draft'),draftStatus:byId('gpio-drive-draft-status'),
         exchange:async(method,body,revision,resource = 'gpio-drive')=>{
-            if (resource === 'progress/update/2') method = 'PUT';
-            const r = await root.fetch((root.WSPRRYPI_PATHS?.sharedApiPath || '/api/v1') + '/member/' + (resource === 'gpio-drive' ? 'gpio-drive' : 'gpio-drive-progress'),{
-                method,cache:'no-store',signal:AbortSignal.timeout(20000),...(body ? {headers:{'Content-Type':'application/json','X-WsprryPico-Request':'1','If-Match':revision},body:JSON.stringify(body)} : {})});
+            if (resource === 'progress/update') method = 'PUT';
+            const r = await root.fetch((root.WSPRRYPI_PATHS?.sharedApiPath || '/api/control/v1') + '/member/' + (resource === 'gpio-drive' ? 'gpio-drive' : 'gpio-drive-progress'),{
+                method,cache:'no-store',signal:AbortSignal.timeout(20000),...(body ? {headers:{'Content-Type':'application/json','X-WsprryPico-Request':'1','If-Match':revision},body:JSON.stringify({...body,contract:"Wsprry-Control/1"})} : {})});
             const data = await r.json(); if (!r.ok) throw new Error(r.status === 409 ? 'Selected Pico does not support this setting or needs fresh identity/readback.' : 'Request was not confirmed.');
-            return {data,revision:r.headers.get('ETag') || ''};
+            return {data:controlValue(data),revision:r.headers.get('ETag') || ''};
         },afterSave:()=>invalidateEditors()
     }) : null;
     let driveSelection = "";
@@ -602,16 +604,13 @@
             stationDirty = true;
             if (!progressDraftTarget) progressDraftTarget = JSON.stringify(progress?.target || resources?.target || null);
             const call=member("callsign").value, grid=member("locator").value;
-            const formats=resources?.application.schema === "transmitter-application/2";
-            member("station-feedback").textContent = !formats && /[<>/]/.test(call) ?
-                "This firmware supports Type 1 station writes only. Your draft is preserved." :
-                call.startsWith("<") && grid.length !== 6 ? "A bracketed callsign needs a six-character locator. Your draft has not been saved." :
+            member("station-feedback").textContent = call.startsWith("<") && grid.length !== 6 ? "A bracketed callsign needs a six-character locator. Your draft has not been saved." :
                 "Draft plan: " + (call.startsWith("<") ? "Type 3, one hash frame; receiver context is needed." : call.includes("/") ?
                 grid.length === 6 ? "Type 2 then Type 3, two frames in adjacent even-minute windows (230.592 seconds total); receiver hash context may be needed." :
                 "Type 2, one frame without a locator." : "Type 1, one frame; first four locator characters on air, all six retained.") +
                 (!call.startsWith("<") && /\/(?:[Q-Z]|0[0-9])$/.test(call) ? " Type 2 is ambiguous with another suffix; the saved call and Type 3 hash retain the requested identity." : "") + " The Pico validates encoding before saving.";
         });
-        for (const name of ["rf", "button", "indicator", "indicator-gp", "polarity"]) member(name)?.addEventListener("change", () => {
+        for (const name of ["rf", "button", "amplifier", "amplifier-polarity", "indicator", "indicator-gp", "polarity"]) member(name)?.addEventListener("change", () => {
             validatedPlan = ""; member("pin-feedback").textContent = "Candidate changed. Validate the complete plan before saving."; render();
         });
         byId("wtp-remote-load").addEventListener("click", () => request("member/configuration"));
