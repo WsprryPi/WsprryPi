@@ -53,6 +53,14 @@ int main() {
   for (const auto text : {"UTC available", "UTC unavailable", "UTC synchronized", "UTC holdover"})
     assert(wsprry::logging::export_safe_pico("CLOCK_STATE", text));
   assert(!wsprry::logging::export_safe_pico("CLOCK_STATE", "UTC holdover secret"));
+  for (const auto text : {"USB control connection changed", "USB WTP port opened",
+                          "USB WTP port closed", "USB Management port opened",
+                          "USB Management port closed"})
+    assert(wsprry::logging::export_safe_pico("USB_STATE", text));
+  for (const auto text : {"USB WTP port opened password=secret", "USB Console port opened",
+                          "USB Management port changed"})
+    assert(!wsprry::logging::export_safe_pico("USB_STATE", text));
+  assert(!wsprry::logging::export_safe_pico("UNKNOWN", "USB WTP port opened"));
   assert(wsprry::logging::export_safe_pi("PI_LOG", "UDP logging test event"));
   for (auto text : {"password=secret", "Authorization: Bearer token",
                     "raw HTTP configuration", "UDP logging test event secret"})

@@ -34,7 +34,11 @@ inline constexpr PicoExportTemplate pico_export_templates[] = {
     {"JOB_STATE", "Failed"},
     {"JOB_STATE", "Aborted"},
     {"CLOCK_STATE", "UTC synchronized"},
-    {"CLOCK_STATE", "UTC holdover"}};
+    {"CLOCK_STATE", "UTC holdover"},
+    {"USB_STATE", "USB WTP port opened"},
+    {"USB_STATE", "USB WTP port closed"},
+    {"USB_STATE", "USB Management port opened"},
+    {"USB_STATE", "USB Management port closed"}};
 inline unsigned pico_export_template(std::string_view code, std::string_view message) {
     unsigned index = 0;
     for (const auto& entry : pico_export_templates) {

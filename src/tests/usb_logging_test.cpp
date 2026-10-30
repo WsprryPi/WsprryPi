@@ -35,6 +35,15 @@ int main() {
     const auto record = "<" + std::to_string(184 + severity) + ">1 - pico.local WsprryPico - CLOCK_STATE - " + event.dump();
     assert(parse_usb_log("@SYSLOG " + std::to_string(record.size()) + " " + record, device, boot) == event);
   }
+  for (const auto &[text, severity] : std::vector<std::pair<std::string, unsigned>>{
+           {"USB control connection changed", 6}, {"USB WTP port opened", 7},
+           {"USB WTP port closed", 7}, {"USB Management port opened", 7},
+           {"USB Management port closed", 7}}) {
+    auto event = value;
+    event["event"] = "USB_STATE"; event["severity"] = severity; event["message"] = text;
+    const auto record = "<" + std::to_string(184 + severity) + ">1 - pico.local WsprryPico - USB_STATE - " + event.dump();
+    assert(parse_usb_log("@SYSLOG " + std::to_string(record.size()) + " " + record, device, boot) == event);
+  }
 
   const auto reject = [&](std::string text, std::string id,
                           std::string session) {
