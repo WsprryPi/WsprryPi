@@ -49,19 +49,25 @@ int main(int argc, char **argv) {
     std::string response;
     const auto deadline = now() + 10000;
     while (now() < deadline) {
+      bool progress = false;
       if (sent < request.size()) {
         auto result = stream.write(std::span(reinterpret_cast<const std::uint8_t *>(request.data() + sent), std::min<std::size_t>(7, request.size() - sent)));
-        if (result.state == wtp::IoState::Progress) sent += result.count;
+        if (result.state == wtp::IoState::Progress) { sent += result.count; progress = result.count != 0; }
         else if (result.state != wtp::IoState::WouldBlock) throw std::runtime_error("write failed");
       }
       std::array<std::uint8_t, 13> bytes{};
       const auto result = stream.read(bytes);
-      if (result.state == wtp::IoState::Progress) response.append(reinterpret_cast<const char *>(bytes.data()), result.count);
+      if (result.state == wtp::IoState::Progress) {
+        response.append(reinterpret_cast<const char *>(bytes.data()), result.count);
+        progress = progress || result.count != 0;
+      }
       else if (result.state != wtp::IoState::WouldBlock) {
         if (response.find("HTTP/1.1 200") != 0) throw std::runtime_error("No successful authenticated response");
         std::cout << response; return 0;
       }
-      std::this_thread::sleep_for(std::chrono::milliseconds(1));
+      // Retain tiny reads/writes without imposing a scheduler delay per byte
+      // fragment already buffered by TLS. Only an idle poll needs a wait.
+      if (!progress) std::this_thread::sleep_for(std::chrono::milliseconds(1));
     }
     throw std::runtime_error("I/O deadline");
   } catch (const std::exception &e) { std::cerr << e.what() << '\n'; return 1; }

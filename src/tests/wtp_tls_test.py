@@ -117,6 +117,11 @@ def probe(server, success, host='127.0.0.1', identity='127.0.0.1', cert='client'
         str(credentials / (ca + '.crt')), str(credentials / (cert + '.crt')), str(credentials / ((key or cert) + '.key')), mode],
         capture_output=True, text=True, timeout=25)
     assert (result.returncode == 0) == success, (host, identity, cert, result.stderr, server.errors[errors_before:])
+    if success and mode != 'backpressure':
+        head, body = result.stdout.split('\n\n', 1)
+        expected = 16384 if server.large else 17
+        assert f'Content-Length: {expected}' in head, head
+        assert body == 'x' * expected, (len(body), expected)
     assert 'PRIVATE KEY' not in result.stdout + result.stderr
     count += 1
 
