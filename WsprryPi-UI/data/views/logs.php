@@ -19,7 +19,7 @@ require __DIR__ . '/../card_header.php';
                         <button class="btn btn-outline-secondary btn-sm logs-toolbar-btn" type="button"
                             data-bs-toggle="modal" data-bs-target="#logs-options-modal">Log options</button>
                         <button class="btn btn-outline-secondary btn-sm logs-toolbar-btn" type="button"
-                            data-bs-toggle="modal" data-bs-target="#host-logging-modal">Logging on this Pi</button>
+                            data-bs-toggle="modal" data-bs-target="#host-logging-modal">Local logging</button>
                     </div>
                     <div class="logs-source-control">
                         <label for="logs-source" class="form-label mb-0">Source</label>

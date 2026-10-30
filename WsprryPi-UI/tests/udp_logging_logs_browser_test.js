@@ -113,7 +113,7 @@ async function main(){
   await until(()=>evaluate(`!document.querySelector('${editor} fieldset').disabled`));
   assert.equal(await evaluate(`document.querySelector('${editor} [name=destination_port]').value`),'5514','Settings must populate on page load before opening the dialog');
   assert.equal(await evaluate(`document.querySelector('${editor} > button').hidden`),true,'Successful automatic loading removes the read action');
-  assert.deepEqual(await evaluate(`[...document.querySelectorAll('#logs-overlay-controls button')].map(b=>b.textContent.trim())`),['Clear','Refresh stream','Pause view','Log options','Logging on this Pi']);
+  assert.deepEqual(await evaluate(`[...document.querySelectorAll('#logs-overlay-controls button')].map(b=>b.textContent.trim())`),['Clear','Refresh stream','Pause view','Log options','Local logging']);
   const openModal=async id=>{
    await evaluate(`document.querySelector('[data-bs-target="#${id}"]').focus();document.querySelector('[data-bs-target="#${id}"]').click()`);
    await until(()=>evaluate(`document.getElementById('${id}').classList.contains('show') && document.getElementById('${id}').contains(document.activeElement)`));

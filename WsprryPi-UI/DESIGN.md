@@ -172,7 +172,7 @@ At narrow widths, navigation stacks, toolbars wrap, and controls expand when tou
 
 Observation lists pair labels and wrap-safe values in columns on wide screens, then stack each label above its value on narrow screens. Keep related status and recovery controls in the same flat section.
 
-The Logs toolbar presents Clear, Refresh stream, Pause view / Resume view, Log options, and Logging on this Pi in that order. The labeled Source selector and a noninteractive connection status share the control row; the status uses the same height, typography, padding, and corners as the buttons. On narrow screens, controls wrap without clipping, with streamed records below them. Log options and Logging on this Pi open labeled, scrollable Bootstrap dialogs with keyboard focus containment, Escape dismissal, and focus returned to their opening buttons.
+The Logs toolbar presents Clear, Refresh stream, Pause view / Resume view, Log options, and Local logging in that order. The labeled Source selector and a noninteractive connection status share the control row; the status uses the same height, typography, padding, and corners as the buttons. On narrow screens, controls wrap without clipping, with streamed records below them. Log options and Local logging open labeled, scrollable Bootstrap dialogs with keyboard focus containment, Escape dismissal, and focus returned to their opening buttons.
 
 **The One-Shell Rule.** Keep one dominant page card; use spacing, borders, and tonal panels for interior hierarchy.
 
