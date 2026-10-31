@@ -188,16 +188,50 @@ async function main(){
   rows.splice(0,rows.length,...maximum);
   await client.send('Page.navigate',{url:`http://127.0.0.1:${server.address().port}/index.php?page=logs`});
   await until(()=>evaluate(`document.querySelectorAll('#all .logs-line').length===4160 && document.querySelectorAll('#logs-source option[value^="udp:"]').length===4096`));
+  // Force the formerly racy ordering: policy/status readback finishes after
+  // the maximum history has populated its bounded source picker.
+  await evaluate('window.WSPRRYPI_LOG_TEST_HOOKS.refreshSources()');
   assert(await evaluate(`document.getElementById('logs-source-status').textContent.includes('More network origins')`));
+  assert(await evaluate(`document.getElementById('logs-options-status').textContent===document.getElementById('logs-source-status').textContent`));
   for(const width of [360,390,1280])for(const theme of ['light','dark']){
    await client.send('Emulation.setDeviceMetricsOverride',{width,height:960,deviceScaleFactor:1,mobile:width<600});
    await evaluate(`document.documentElement.setAttribute('data-bs-theme','${theme}')`);
    assert(await evaluate(`document.documentElement.scrollWidth<=innerWidth && [...document.querySelectorAll('.logs-network')].every(r=>r.scrollWidth<=r.clientWidth+1)`),'Maximum source history must remain bounded and wrap');
+   const warning=await evaluate(`(()=>{
+    const e=document.getElementById('logs-source-status'),s=getComputedStyle(e);
+    const canvas=document.createElement('canvas');canvas.width=canvas.height=1;const ctx=canvas.getContext('2d');
+    const rgba=c=>{ctx.clearRect(0,0,1,1);ctx.fillStyle=c;ctx.fillRect(0,0,1,1);return [...ctx.getImageData(0,0,1,1).data];};
+    const blend=(c,b)=>c.slice(0,3).map((v,i)=>v*c[3]/255+b[i]*(1-c[3]/255));
+    const chain=[];for(let p=e;p;p=p.parentElement)chain.unshift(p);
+    let bg=[255,255,255];for(const p of chain)bg=blend(rgba(getComputedStyle(p).backgroundColor),bg);
+    const fg=blend(rgba(s.color),bg);
+    const lum=c=>c.map(v=>v/255).map(v=>v<=0.04045?v/12.92:((v+0.055)/1.055)**2.4).reduce((n,v,i)=>n+v*[0.2126,0.7152,0.0722][i],0);
+    const a=lum(fg),b=lum(bg);return {contrast:(Math.max(a,b)+0.05)/(Math.min(a,b)+0.05),fontSize:parseFloat(s.fontSize),role:e.getAttribute('role'),live:e.getAttribute('aria-live')};
+   })()`);
+   assert(warning.contrast>=4.5&&warning.fontSize>=16&&warning.role==='status'&&warning.live==='polite','Warning must remain readable and announced');
+   if(width===360||width===1280){
+    fs.writeFileSync(path.join(evidence,`source-warning-${width}-${theme}.json`),JSON.stringify(warning));
+    const shot=await client.send('Page.captureScreenshot',{format:'png',captureBeyondViewport:false});
+    fs.writeFileSync(path.join(evidence,`source-overflow-${width}-${theme}.png`),Buffer.from(shot.data,'base64'));
+   }
   }
   await client.send('Emulation.setDeviceMetricsOverride',{width:1280,height:960,deviceScaleFactor:1,mobile:false});
   await evaluate(`document.documentElement.style.zoom='2'`);
   assert(await evaluate(`document.documentElement.scrollWidth<=document.documentElement.clientWidth`),'200% CSS zoom reflow');
   await evaluate(`document.documentElement.style.zoom='1'`);
+  const replacementPeer=hostPolicy.saved.collector.peers[0],replacementOrigin='f'.repeat(32);
+  rows.splice(0,rows.length,{source:`udp:${replacementPeer.slot}:pico:${replacementOrigin}:direct`,ingress:'udp',peer_slot:replacementPeer.slot,peer_ipv4:replacementPeer.ipv4,origin_kind:'pico',origin_id:replacementOrigin,origin_name:'replacement-collector.local',origin_boot:'4'.repeat(32),origin_sequence:'1',MESSAGE:'Replacement collector fixture',__CURSOR:'replacement-1'});
+  const secondPeer=hostPolicy.saved.collector.peers[1];
+  rows.push({...rows[0],source:`udp:${secondPeer.slot}:pico:${replacementOrigin}:direct`,peer_slot:secondPeer.slot,peer_ipv4:secondPeer.ipv4,__CURSOR:'replacement-2'});
+  policy.collector_id='d'.repeat(32);cap.target.collector_id=policy.collector_id;
+  await evaluate('window.WSPRRYPI_LOG_TEST_HOOKS.refreshSources()');
+  await until(()=>evaluate(`document.querySelectorAll('#all .logs-line').length===2 && document.querySelectorAll('#logs-source option[value^="udp:"]').length===2`));
+  assert(await evaluate(`!document.getElementById('logs-source-status').textContent.includes('More network origins')`),'Replacement collector discards the preceding collector menu and warning');
+  await evaluate('window.WSPRRYPI_LOG_TEST_HOOKS.refreshSources()');
+  assert(await evaluate(`document.getElementById('logs-source-status').textContent.includes('An origin ID is claimed by multiple UDP peers')`),'Duplicate-origin warning also survives policy/status readback');
+  hostPolicy.saved.collector.peers=[];
+  await evaluate('window.WSPRRYPI_LOG_TEST_HOOKS.refreshSources()');
+  assert(await evaluate(`!document.getElementById('logs-source-status').textContent.includes('More network origins') && document.querySelectorAll('#logs-source option[value^="udp:"]').length===0 && document.querySelectorAll('#all .logs-line').length===2 && !document.getElementById('logs-source-status').textContent.includes('An origin ID is claimed')`),'Changed peer bindings clear stale menu warnings without removing All sources history');
   console.log('UDP Logs browser: toolbar order, modal focus/reflow, automatic settings, failed-read recovery, preserved drafts, uncertain-save review, replay-before-policy race, stable ID labels, direct/relay source filters and safe text rendering passed');
  }finally{client?.close();if(chrome)await stopIsolatedProcess(chrome);server.closeAllConnections();await new Promise(resolve=>server.close(resolve));}
 }

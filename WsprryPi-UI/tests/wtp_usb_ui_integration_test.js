@@ -105,10 +105,10 @@ class CdpClient {
         });
     }
 
-    send(method, params = {}) {
+    send(method, params = {}, timeoutMs = 15000) {
         const id = this.nextId++;
         return new Promise((resolve, reject) => {
-            const timer=setTimeout(()=>{this.pending.delete(id);reject(new Error("CDP deadline: "+method));},15000);
+            const timer=setTimeout(()=>{this.pending.delete(id);reject(new Error("CDP deadline: "+method));},timeoutMs);
             this.pending.set(id, { resolve:value=>{clearTimeout(timer);resolve(value);}, reject:error=>{clearTimeout(timer);reject(error);} });
             this.socket.send(JSON.stringify({ id, method, params }));
         });
@@ -130,10 +130,12 @@ async function main() {
         php=spawnFixtureChild(process.env.PHP_BIN || "php",["-S",`127.0.0.1:${phpPort}`,"-t","data","tests/browser_fixture_router.php"],{cwd:UI_ROOT});
         await waitForSpawn(php);await waitFor(async()=>await getStatus(url)===200,"PHP fixture");
         chrome=spawnIsolatedProcess(process.env.CHROME_BIN || (process.platform==="darwin"?"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome":"chromium"),
-            ["--headless","--no-sandbox","--disable-gpu","--no-first-run","--no-default-browser-check","--disable-background-networking",`--remote-debugging-port=${debugPort}`,`--user-data-dir=${profileDir}`,url]);
+            ["--headless","--no-sandbox","--disable-gpu","--no-first-run","--no-default-browser-check","--disable-background-networking",`--remote-debugging-port=${debugPort}`,`--user-data-dir=${profileDir}`,"about:blank"]);
         await waitForSpawn(chrome);
         const page=await waitFor(async()=>(await getJson(`http://127.0.0.1:${debugPort}/json`)).find(p=>p.type==="page"),"Chrome",60000);
         client=new CdpClient(page.webSocketDebuggerUrl);await client.open();await client.send("Page.enable");
+        // Navigate the owned target explicitly; startup can expose a blank page.
+        await client.send("Page.navigate", {url}, 60000);
         const evaluate=async expression=>{const result=await client.send("Runtime.evaluate",{expression,awaitPromise:true,returnByValue:true});if(result.exceptionDetails)throw new Error(result.exceptionDetails.exception?.description||result.exceptionDetails.text);return result.result.value;};
         await waitFor(async()=>await evaluate('document.readyState==="complete" && !!window.WtpUi && !!window.WtpUsbSettings'),"USB scripts");
         await evaluate(`(() => {

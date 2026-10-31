@@ -795,6 +795,9 @@
         return `${picoDisplayName(id, reportedName, sources)} [${String(id || "").slice(0,8)}]`;
     }
     const udpMenuOrigins = new Map();
+    let udpMenuOverflow = false, udpMenuConflict = false;
+    const udpMenuConflictMessage = "An origin ID is claimed by multiple UDP peers. Their arrival scopes remain separate; these claims are not authenticated.";
+    const udpMenuOverflowMessage = "More network origins are present than this source list can show. Choose All sources to inspect them.";
     function addSource(value, name) {
         const select = document.getElementById("logs-source");
         if (!select || !validSource(value)) return;
@@ -806,10 +809,13 @@
         if (value.startsWith("udp:")) {
             const parts=value.split(":"), peer=parts[1], origin=parts[2]+":"+parts[3];
             if (!udpPeerAddresses.has(peer)) return;
-            if ([...udpMenuOrigins].some(([other,origins])=>other!==peer&&[...origins].some(v=>v.endsWith(":"+parts[3]))))
-                sourceStatus("An origin ID is claimed by multiple UDP peers. Their arrival scopes remain separate; these claims are not authenticated.");
+            if ([...udpMenuOrigins].some(([other,origins])=>other!==peer&&[...origins].some(v=>v.endsWith(":"+parts[3])))) {
+                udpMenuConflict = true;
+                sourceStatus(udpMenuOverflow ? udpMenuOverflowMessage : udpMenuConflictMessage);
+            }
             if ((!udpMenuOrigins.has(peer) && udpMenuOrigins.size >= 32) || (udpMenuOrigins.has(peer) && !udpMenuOrigins.get(peer).has(origin) && udpMenuOrigins.get(peer).size >= 64)) {
-                sourceStatus("More network origins are present than this source list can show. Choose All sources to inspect them."); return;
+                udpMenuOverflow = true;
+                sourceStatus(udpMenuOverflowMessage); return;
             }
             if (!udpMenuOrigins.has(peer)) udpMenuOrigins.set(peer,new Set());
             udpMenuOrigins.get(peer).add(origin);
@@ -847,7 +853,7 @@
                 `Pico ${id} · ${collectionStateLabel(state?.state)}` +
                 (state?.rejected && state.rejected !== "0" ? ` · ${state.rejected} rejected records` : "") +
                 (state?.dropped && state.dropped !== "0" ? ` · ${state.dropped} Pico events dropped` : ""));
-        } else sourceStatus(networkSourceWarning || (selectedSource.startsWith("udp:")?"UDP origin claims are unauthenticated. A spoof can affect its peer scope but cannot suppress verified USB logs.":""));
+        } else sourceStatus(networkSourceWarning || (udpMenuOverflow ? udpMenuOverflowMessage : "") || (udpMenuConflict ? udpMenuConflictMessage : "") || (selectedSource.startsWith("udp:")?"UDP origin claims are unauthenticated. A spoof can affect its peer scope but cannot suppress verified USB logs.":""));
     }
     window.addEventListener("wsprry-udp-policy-changed",()=>{void refreshSources();});
     async function refreshSources(review = false) {
@@ -878,13 +884,21 @@
             collectorSnapshot = data; collectorRevision = response.headers.get("ETag");
             collectorIdentity = data.collector_id;
             const previousPeers = udpPeerAddresses; udpPeerAddresses = nextPeers;
+            // Preserve overflow through status refreshes; changed bindings
+            // rebuild its evidence from the currently retained records.
+            if (changedCollector || previousPeers.size !== nextPeers.size ||
+                [...nextPeers].some(([peer, address]) => previousPeers.get(peer) !== address)) {
+                udpMenuOverflow = false;
+                udpMenuConflict = false;
+            }
             networkSourceWarning = nextWarning;
+            if (changedCollector) udpMenuOrigins.clear();
             let changedPeer = false;
             for(const peer of [...udpMenuOrigins.keys()])if(!udpPeerAddresses.has(peer)||previousPeers.get(peer)!==udpPeerAddresses.get(peer))udpMenuOrigins.delete(peer);
             const picker=document.getElementById("logs-source");
             for(const option of [...(picker?.options||[])])if(option.value.startsWith("udp:")) {
                 const peer=option.value.split(":")[1];
-                if(!udpPeerAddresses.has(peer)||previousPeers.get(peer)!==udpPeerAddresses.get(peer))option.remove();
+                if(changedCollector||!udpPeerAddresses.has(peer)||previousPeers.get(peer)!==udpPeerAddresses.get(peer))option.remove();
             }
             if(selectedSource.startsWith("udp:") && (!udpPeerAddresses.has(selectedSource.split(":")[1]) || previousPeers.get(selectedSource.split(":")[1])!==udpPeerAddresses.get(selectedSource.split(":")[1]))) {
                 selectedSource="all";if(picker)picker.value="all";changedPeer=true;
@@ -899,7 +913,8 @@
                 span.textContent = `${picoLogUnit(span.dataset.picoId, span.dataset.picoName)} `;
             // Replay may beat the asynchronous peer-policy read. Rebuild only
             // from bounded retained records after the current binding is known.
-            for (const payload of visibleRecords) rememberJournalSource(payload);
+            if (!changedCollector)
+                for (const payload of visibleRecords) rememberJournalSource(payload);
             if (changedCollector || changedPeer) changeLogContext();
             if (collectionReviewPending) { collectionUncertain = false; collectionReviewPending = false; }
             updateCollectionControl();
@@ -1413,6 +1428,7 @@
             extractSeverityAndMessage,
             formatUnitFixed16,
             priorityToLabel, buildStreamUrl, cursorStorageKey, validSource, picoDisplayName, picoLogUnit,
+            refreshSources,
             viewState: () => ({inPlayback, paused, records:visibleRecords.length, cursor:viewCursor?.cursor})
         };
     }
