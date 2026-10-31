@@ -21,13 +21,14 @@ function lines(child){const queue=[],waiters=[];readline.createInterface({input:
   if(process.env.WSPRRYPI_INTEROP_TRACE)console.error(carrier,selection,await get('management'));
   const initial=await get('gpio-drive');
   assert.equal(initial.status,200,JSON.stringify(initial));const target=initial.body.target;
+  assert.equal(initial.body.boot_active,carrier==='engineering'?4:12,'saved engineering setting versus fresh consumer boot default');
   await driveCases(call,{profileOwnedStation:carrier!=='engineering'});
   for(const drive of [2,4,8,12]){
    const before=await get('gpio-drive');const written=await post('gpio-drive',{schema:'gpio-drive',target,gpio_drive_ma:drive},before.etag);
    assert.equal(written.status,200,JSON.stringify(written));assert.equal(written.body.saved,drive);assert.equal(written.body.pad_readback,null);
    const settings=await get('configuration');assert.equal(settings.status,200,JSON.stringify(settings));assert.equal(settings.body.config.gpio_drive_ma,drive);
    const unrelated=await post('configuration',{schema:'pico-settings',target,operation:'save',config:{expires_utc_s:0}},settings.etag);assert.equal(unrelated.status,200,JSON.stringify(unrelated));
-   const after=await get('gpio-drive');assert.equal(after.body.saved,drive);assert.equal(after.body.boot_active,4);
+   const after=await get('gpio-drive');assert.equal(after.body.saved,drive);assert.equal(after.body.boot_active,initial.body.boot_active);
    const bad=await post('gpio-drive',{schema:'gpio-drive',target,gpio_drive_ma:6},after.etag);assert.equal(bad.status,400,JSON.stringify(bad));
   }
   const draftRead=await get('gpio-drive-progress');assert.equal(draftRead.status,200,JSON.stringify(draftRead));

@@ -19,6 +19,8 @@ filter selection retain their domain resources and transaction boundaries.
 Changed hardware remains inhibited until explicit restart, including A/B/A
 saves. No save measures RF power or proves hardware readiness.
 
+New Pico station settings default to a disabled ten-minute UTC-aligned WSPR schedule, a 14095600 Hz dial, 12 mA direct GPIO drive and disabled active-low amplifier control. Existing saved selections retain their values on upgrade. The `N0CALL` and `ZZ99` setup placeholders must be replaced before station application; the Pi rejects those placeholders before writes.
+
 Ordinary settings updates contain intended changes only and preserve omitted
 settings. Explicit false and zero remain values. Pi does not reconstruct full
 configuration from a redacted read or switch automatically to an older save

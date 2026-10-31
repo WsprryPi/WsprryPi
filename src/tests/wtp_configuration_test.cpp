@@ -197,6 +197,16 @@ void checks() {
   Member initial; initial.config = nullptr;
   const auto initial_result=initial.call();if(initial_result.status!=400)std::cerr<<initial_result.status<<" "<<initial_result.body<<"\n";
   CHECK(initial_result.status == 400 && initial.mutations == 1 && initial.config.is_null());
+  for (const auto placeholder : {"N0CALL", "<N0CALL>"}) {
+    Member member;
+    CHECK(member.call(Json{{"station", {{"callsign", placeholder}}}}).status == 400);
+    CHECK(member.mutations == 0);
+  }
+  {
+    Member member;
+    CHECK(member.call(Json{{"station", {{"locator", "ZZ99"}}}}).status == 400);
+    CHECK(member.mutations == 0);
+  }
   Member type23; type23.type23();
   CHECK(type23.call(Json{{"station",{{"callsign","<K1ABC>"},{"locator","FN42AA"}}}}).status==200);
   CHECK(type23.resource=="config/update" && type23.emitted["config"]["station"]["callsign"]=="<K1ABC>");
@@ -285,17 +295,17 @@ struct ProgressPeer {
 };
 void advertised_policy_checks() {
   Member config_peer;
-  config_peer.caps["gpio_drive"]["values"]={2,4};
+  config_peer.caps["gpio_drive"]["values"]={2,4};config_peer.caps["gpio_drive"]["default"]=4;
   CHECK(config_peer.call({{"gpio_drive_ma",8}}).status==400);
   CHECK(config_peer.mutations==0);
   config_peer.config["gpio_drive_ma"]=8;
   CHECK(config_peer.call({{"enabled",false}}).status==502);
   CHECK(config_peer.mutations==0);
   Member inconsistent_app;
-  inconsistent_app.caps["gpio_drive"]["values"]={2,4};
+  inconsistent_app.caps["gpio_drive"]["values"]={2,4};inconsistent_app.caps["gpio_drive"]["default"]=4;
   inconsistent_app.corrupt_application=[](Json &app){app["hardware"]["gpio_drive"]["boot_active"]=8;};
   CHECK(inconsistent_app.call({{"enabled",false}}).status==502);CHECK(inconsistent_app.mutations==0);
-  auto caps=canonical_caps();caps["gpio_drive"]["values"]={2,4};
+  auto caps=canonical_caps();caps["gpio_drive"]["values"]={2,4};caps["gpio_drive"]["default"]=4;
   caps["amplifier_timing"]["minimum"]=100;caps["amplifier_timing"]["maximum"]=300;
   unsigned writes=0; Json saved{{"lead_ms",200},{"tail_ms",200}};
   const PicoManagementExchange exchange=[&](auto path,auto method,auto,auto) {
@@ -318,7 +328,7 @@ void advertised_policy_checks() {
   CHECK(call("amplifier-timing","GET",{}).status==502);
   CHECK(writes==0);
   ProgressPeer progress;
-  progress.caps["gpio_drive"]["values"]={2,4};
+  progress.caps["gpio_drive"]["values"]={2,4};progress.caps["gpio_drive"]["default"]=4;
   CHECK(progress.call({{"gpio_drive_ma",8}}).status==400);CHECK(progress.writes==0);
   progress.value["fields"]["gpio_drive_ma"]=8;
   progress.value["draft_revision"]="1";progress.value["apply_domains"]["drive"]=true;

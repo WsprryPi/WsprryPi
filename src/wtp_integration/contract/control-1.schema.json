@@ -2375,7 +2375,7 @@
               "type": "string",
               "minLength": 3,
               "maxLength": 12,
-              "pattern": "(?:[A-Z0-9]+(?:/[A-Z0-9]+)*|<[A-Z0-9]+(?:/[A-Z0-9]+)*>)"
+              "pattern": "^(?!N0CALL$|<N0CALL>$)(?:[A-Z0-9]+(?:/[A-Z0-9]+)*|<[A-Z0-9]+(?:/[A-Z0-9]+)*>)$"
             },
             "locator": {
               "type": "string",
@@ -3505,7 +3505,7 @@
               "type": "string",
               "minLength": 3,
               "maxLength": 12,
-              "pattern": "^(?:[A-Z0-9]+(?:/[A-Z0-9]+)*|<[A-Z0-9]+(?:/[A-Z0-9]+)*>)$"
+              "pattern": "^(?!N0CALL$|<N0CALL>$)(?:[A-Z0-9]+(?:/[A-Z0-9]+)*|<[A-Z0-9]+(?:/[A-Z0-9]+)*>)$"
             },
             "locator": {
               "type": "string",
@@ -3545,7 +3545,7 @@
               "type": "string",
               "minLength": 3,
               "maxLength": 12,
-              "pattern": "^(?:[A-Z0-9]+(?:/[A-Z0-9]+)*|<[A-Z0-9]+(?:/[A-Z0-9]+)*>)$"
+              "pattern": "^(?!N0CALL$|<N0CALL>$)(?:[A-Z0-9]+(?:/[A-Z0-9]+)*|<[A-Z0-9]+(?:/[A-Z0-9]+)*>)$"
             },
             "locator": {
               "type": "string",
@@ -3901,7 +3901,7 @@
           "const": null
         },
         "default_active_high": {
-          "const": true
+          "const": false
         },
         "activation": {
           "const": "restart"
@@ -5271,7 +5271,7 @@
               "const": "next_job"
             },
             "default": {
-              "const": null
+              "const": 14095600
             }
           }
         },
@@ -8130,7 +8130,7 @@
         8,
         12
       ],
-      "default": 4,
+      "default": 12,
       "units": "mA",
       "engine": "pio",
       "activation": "restart",
@@ -8154,7 +8154,7 @@
       "progress": "/api/control/v1/progress",
       "progress_schema": "progress",
       "default_pin": null,
-      "default_active_high": true,
+      "default_active_high": false,
       "activation": "restart"
     },
     "amplifier_timing": {
@@ -8198,7 +8198,7 @@
       "units": "Hz",
       "reference": "wspr_usb_dial",
       "activation": "next_job",
-      "default": null
+      "default": 14095600
     },
     "rf_calibration": {
       "schema": "rf-calibration",

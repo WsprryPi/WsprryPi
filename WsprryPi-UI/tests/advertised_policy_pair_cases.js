@@ -29,7 +29,9 @@ module.exports=async call=>{
  const drive=await get('gpio-drive'),config=await get('configuration'),progress=await get('progress');
  for(const r of [drive,config,progress])assert.equal(r.status,200,JSON.stringify(r));
  try {
-  await inject('gpio_drive',{...descriptors.gpio_drive,values:[2,4],default:4});
+  // The narrowed policy must still admit the immutable fresh 12 mA boot.
+  // Eight mA remains outside this policy and must dispatch no write.
+  await inject('gpio_drive',{...descriptors.gpio_drive,values:[2,4,12],default:4});
   await refuse({method:'PUT',path:prefix+'gpio-drive',revision:drive.etag,body:JSON.stringify({contract:'Wsprry-Control/1',schema:'gpio-drive',target,gpio_drive_ma:8})});
   const admittedConfig=await get('configuration');assert.equal(admittedConfig.status,200,JSON.stringify(admittedConfig));
   await refuse({method:'POST',path:prefix+'configuration',revision:admittedConfig.etag,body:JSON.stringify({contract:'Wsprry-Control/1',schema:'pico-settings',target,operation:'save',config:{gpio_drive_ma:8}})});
