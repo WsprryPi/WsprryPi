@@ -61,7 +61,9 @@ const {driveCases}=require("./gpio_drive_pair_cases.js");
         const settings=await request({method:"GET",path:"/api/control/v1/member/configuration",body:""});assert.equal(settings.status,200,JSON.stringify(settings));
         assert.equal(settings.body.config.wifi.ssid,"");assert.equal(settings.body.config.station.callsign,"K1ABC");
         const dial=await request({raw_resource:'standalone-frequency'});
-        assert.equal(dial.status,200,JSON.stringify(dial)); assert.equal(dial.body.frequency_hz,null);
+        assert.equal(dial.status,200,JSON.stringify(dial)); assert.equal(dial.body.frequency_hz,14095600);
+        assert.equal(settings.body.config.enabled,false,'new station creation keeps schedules disabled');
+        assert.deepEqual(settings.body.config.schedules,[{period_s:600,phase_s:0}]);
         const selectedDial=await request({raw_resource:'standalone-frequency',method:'PUT',revision:dial.etag,
             body:JSON.stringify({contract:'Wsprry-Control/1',schema:'standalone-frequency',target,frequency_hz:3568737})});
         assert.equal(selectedDial.status,200,JSON.stringify(selectedDial));assert.equal(selectedDial.body.frequency_hz,3568737);
@@ -99,7 +101,8 @@ const {driveCases}=require("./gpio_drive_pair_cases.js");
         }
         const driveInitial=await request({method:"GET",path:"/api/control/v1/member/gpio-drive",body:""});
         assert.equal(driveInitial.status,200,JSON.stringify(driveInitial));
-        if(driveInitial.status===200) { assert.equal(driveInitial.body.saved,4);
+        if(driveInitial.status===200) { assert.equal(driveInitial.body.saved,12);
+            assert.equal(driveInitial.body.boot_active,12);
             await driveCases(request);
         for (const value of [2,8,12,4]) {
             const read=await request({method:"GET",path:"/api/control/v1/member/gpio-drive",body:""});

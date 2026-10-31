@@ -59,6 +59,8 @@ bool shape(const Json &j, bool partial, bool redacted) {
     if (!(partial ? fields(s, {}, {"callsign", "locator", "power_dbm"}) && !s.empty()
                   : fields(s, {"callsign", "locator", "power_dbm"}))) return false;
     for (const auto key : {"callsign", "locator"}) if (s.contains(key) && !s[key].is_string()) return false;
+    if (s.contains("callsign") && (s["callsign"] == "N0CALL" || s["callsign"] == "<N0CALL>")) return false;
+    if (s.contains("locator") && s["locator"] == "ZZ99") return false;
     if (s.contains("power_dbm") && !s["power_dbm"].is_number_integer()) return false;
   }
   if (j.contains("wifi")) {
@@ -414,6 +416,7 @@ bool station_valid(const Json &j, bool extended = false) {
   static const std::regex call("[A-Z0-9]+(/[A-Z0-9]+)*"), extended_call("([A-Z0-9]+(/[A-Z0-9]+)*|<[A-Z0-9]+(/[A-Z0-9]+)*>)"), grid("[A-R]{2}[0-9]{2}([A-X]{2})?");
   const Json powers = {0,3,7,10,13,17,20,23,27,30,33,37,40,43,47,50,53,57,60};
   return fields(j, {"callsign", "locator", "power_dbm"}) && j["callsign"].is_string() &&
+      j["callsign"] != "N0CALL" && j["callsign"] != "<N0CALL>" &&
       j["callsign"].get_ref<const std::string &>().size() >= 3 && j["callsign"].get_ref<const std::string &>().size() <= 12 &&
       std::regex_match(j["callsign"].get_ref<const std::string &>(), extended ? extended_call : call) && j["locator"].is_string() &&
       j["callsign"].get_ref<const std::string &>().find_first_of("ABCDEFGHIJKLMNOPQRSTUVWXYZ") != std::string::npos &&
