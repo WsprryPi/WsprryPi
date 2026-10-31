@@ -106,10 +106,17 @@ class CdpClient {
         });
     }
 
-    send(method, params = {}) {
+    send(method, params = {}, timeoutMs = 15000) {
         const id = this.nextId++;
         return new Promise((resolve, reject) => {
-            this.pending.set(id, { resolve, reject });
+            const timer = setTimeout(() => {
+                this.pending.delete(id);
+                reject(new Error('CDP deadline: ' + method));
+            }, timeoutMs);
+            this.pending.set(id, {
+                resolve: value => { clearTimeout(timer); resolve(value); },
+                reject: error => { clearTimeout(timer); reject(error); }
+            });
             this.socket.send(JSON.stringify({ id, method, params }));
         });
     }
@@ -149,12 +156,14 @@ async function main() {
         }
         await waitFor(async () => await getStatus(url) === 200, 'PHP fixture');
         chrome = spawnIsolatedProcess(process.env.CHROME_BIN || (process.platform === 'darwin' ? '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome' : 'chromium'),
-            ['--headless', '--no-sandbox', '--disable-gpu', '--no-first-run', '--no-default-browser-check', '--disable-background-networking', `--remote-debugging-port=${debugPort}`, `--user-data-dir=${profileDir}`, url]);
+            ['--headless', '--no-sandbox', '--disable-gpu', '--no-first-run', '--no-default-browser-check', '--disable-background-networking', `--remote-debugging-port=${debugPort}`, `--user-data-dir=${profileDir}`, "about:blank"]);
         await waitForSpawn(chrome);
         // A fresh CI Chrome profile can take longer than workflow assertions to start.
         // Keep startup finite without changing any UI assertion deadline.
         const page = await waitFor(async () => (await getJson(`http://127.0.0.1:${debugPort}/json`)).find(p => p.type === 'page'), 'browser startup', 60000);
         client = new CdpClient(page.webSocketDebuggerUrl); await client.open();
+        // Navigate the owned target explicitly; startup can expose a blank page.
+        await client.send("Page.navigate", {url}, 60000);
         await client.send('Page.enable');
         const evaluate = async expression => {
             if (client.dialogError) throw client.dialogError;

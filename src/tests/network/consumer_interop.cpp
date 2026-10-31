@@ -181,6 +181,22 @@ struct PolicyCrypto : pico::network::ConsumerRadioCrypto {
     if (version || management_edit) return seal(plain.view(), binding, sequence);
     return actual.seal_buffer(std::move(plain), binding, sequence);
   }
+  std::optional<pico::network::HttpResponse>
+  seal_source(pico::wtp::ResponseSourcePtr plain,
+              const pico::network::ConsumerRadioBinding &binding,
+              std::uint64_t sequence) override {
+    if (version || management_edit) {
+      std::string text;
+      for (std::size_t offset = 0; offset < plain->size();) {
+        const auto part = plain->at(offset);
+        assert(!part.empty());
+        text.append(reinterpret_cast<const char *>(part.data()), part.size());
+        offset += part.size();
+      }
+      return seal(text, binding, sequence);
+    }
+    return actual.seal_source(std::move(plain), binding, sequence);
+  }
   void clear() override { actual.clear(); }
 };
 struct Test {
