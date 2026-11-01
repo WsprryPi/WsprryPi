@@ -1344,7 +1344,7 @@ wtp-plan-test:
 	$(Q)mkdir -p "$(WTP_PLAN_BUILD_DIR)"
 	$(Q)$(CXX) -std=c++20 -Wall -Wextra -Wpedantic -Werror $(WTP_PLAN_CXXFLAGS) -I. -IWTP-Client/include \
 		tests/wtp_execution_plan_test.cpp wtp_integration/execution_plan.cpp \
-		WSPR-Transmitter/src/execution_plan_compiler.cpp "$(WTP_PLAN_BUILD_DIR)/client/libwtp_client.a" \
+		WSPR-Transmitter/src/execution_plan_compiler.cpp WSPR-Transmitter/src/standard_feld.cpp "$(WTP_PLAN_BUILD_DIR)/client/libwtp_client.a" \
 		$(WTP_PLAN_LDFLAGS) -o "$(WTP_PLAN_BUILD_DIR)/wtp_execution_plan_test"
 	$(Q)"$(WTP_PLAN_BUILD_DIR)/wtp_execution_plan_test"
 	$(Q)python3 -B tests/wtp_frequency_vectors.py "$(WTP_PLAN_BUILD_DIR)/wtp_execution_plan_test"
@@ -1861,7 +1861,7 @@ rp1-gpclk-route-service-test: $(BIN_DIR)/$(RP1_GPCLK_ROUTE_SERVICE_TEST_OUT) $(B
 	$(Q)python3 ../scripts/tests/route_application_test.py
 	$(Q)python3 ../scripts/tests/runtime_reconcile_test.py
 
-$(BIN_DIR)/$(RP1_GPCLK_TRANSMIT_BACKEND_TEST_OUT): WSPR-Transmitter/src/execution_plan_compiler.cpp WSPR-Transmitter/src/rp1_gpclk_transmit_backend_test.cpp WSPR-Transmitter/src/rp1_gpclk_transmit_backend.cpp WSPR-Transmitter/src/rp1_gpclk_development_policy.cpp WSPR-Transmitter/src/rp1_gpclk_event_program.cpp WSPR-Transmitter/src/rp1_gpclk_backend.cpp WSPR-Transmitter/src/rp1_gpclk_linux_provider.cpp WSPR-Transmitter/src/rp1_gpclk_planner.cpp WSPR-Transmitter/src/rp1_gpclk_planner.hpp WSPR-Transmitter/src/rp1_gpclk_reconciliation.cpp Chipset-Offsets/src/chipset_offsets.hpp WSPR-Transmitter/src/rp1_gpclk_consumer_contract.hpp WSPR-Transmitter/src/rp1_gpclk_backend.hpp WSPR-Transmitter/src/rp1_gpclk_transmit_backend.hpp
+$(BIN_DIR)/$(RP1_GPCLK_TRANSMIT_BACKEND_TEST_OUT): WSPR-Transmitter/src/execution_plan_compiler.cpp WSPR-Transmitter/src/standard_feld.cpp WSPR-Transmitter/src/rp1_gpclk_transmit_backend_test.cpp WSPR-Transmitter/src/rp1_gpclk_transmit_backend.cpp WSPR-Transmitter/src/rp1_gpclk_development_policy.cpp WSPR-Transmitter/src/rp1_gpclk_event_program.cpp WSPR-Transmitter/src/rp1_gpclk_backend.cpp WSPR-Transmitter/src/rp1_gpclk_linux_provider.cpp WSPR-Transmitter/src/rp1_gpclk_planner.cpp WSPR-Transmitter/src/rp1_gpclk_planner.hpp WSPR-Transmitter/src/rp1_gpclk_reconciliation.cpp Chipset-Offsets/src/chipset_offsets.hpp WSPR-Transmitter/src/rp1_gpclk_consumer_contract.hpp WSPR-Transmitter/src/rp1_gpclk_backend.hpp WSPR-Transmitter/src/rp1_gpclk_transmit_backend.hpp
 	$(Q)mkdir -p $(BIN_DIR)
 	$(Q)$(CXX) $(RP1_GPCLK_PLANNER_TEST_FLAGS) $(OPENSSL_CFLAGS) -pthread $(filter %.cpp,$^) $(OPENSSL_LIBS) -o $@
 
@@ -1998,7 +1998,7 @@ wtp-backend-test:
 	$(Q)mkdir -p "$(WTP_BACKEND_BUILD_DIR)"
 	$(Q)$(CXX) -std=c++20 -Wall -Wextra -Wpedantic -Werror $(WTP_BACKEND_CXXFLAGS) -I. -IWTP-Client/include \
 		tests/wtp_backend_test.cpp wtp_integration/backend.cpp wtp_integration/execution_plan.cpp \
-		WSPR-Transmitter/src/execution_plan_compiler.cpp WSPR-Transmitter/src/transmission_controller.cpp \
+		WSPR-Transmitter/src/execution_plan_compiler.cpp WSPR-Transmitter/src/standard_feld.cpp WSPR-Transmitter/src/transmission_controller.cpp \
 		"$(WTP_BACKEND_BUILD_DIR)/client/libwtp_client.a" $(WTP_BACKEND_LDFLAGS) -o "$(WTP_BACKEND_BUILD_DIR)/wtp_backend_test"
 	$(Q)"$(WTP_BACKEND_BUILD_DIR)/wtp_backend_test"
 
@@ -2009,7 +2009,7 @@ wtp-backend-interop-test:
 	$(Q)$(MAKE) --no-print-directory -C WTP-Client interop-test PICO_SOURCE="$(abspath $(PICO_SOURCE))" BUILD_DIR="$(abspath $(WTP_BACKEND_REFERENCE_BUILD_DIR))"
 	$(Q)$(CXX) -std=c++20 -Wall -Wextra -Wpedantic -Werror -O2 -g -I. -IWTP-Client/include \
 		tests/wtp_backend_reference_test.cpp wtp_integration/backend.cpp wtp_integration/execution_plan.cpp \
-		WSPR-Transmitter/src/execution_plan_compiler.cpp WSPR-Transmitter/src/transmission_controller.cpp \
+		WSPR-Transmitter/src/execution_plan_compiler.cpp WSPR-Transmitter/src/standard_feld.cpp WSPR-Transmitter/src/transmission_controller.cpp \
 		"$(WTP_BACKEND_REFERENCE_BUILD_DIR)/libwtp_client.a" "$(WTP_BACKEND_REFERENCE_BUILD_DIR)/reference_bridge.o" \
 		$(WTP_BACKEND_REFERENCE_BUILD_DIR)/reference/*.o -o "$(WTP_BACKEND_REFERENCE_BUILD_DIR)/backend_reference_test"
 	$(Q)"$(WTP_BACKEND_REFERENCE_BUILD_DIR)/backend_reference_test"
@@ -2024,7 +2024,7 @@ wtp-scheduler-test:
 	$(Q)mkdir -p "$(WTP_SCHEDULER_BUILD_DIR)"
 	$(Q)$(CXX) -std=c++20 -Wall -Wextra -Wpedantic -Werror $(WTP_SCHEDULER_CXXFLAGS) -I. -IWTP-Client/include \
 		tests/wtp_scheduler_test.cpp wtp_integration/scheduler.cpp wtp_integration/backend.cpp wtp_integration/execution_plan.cpp \
-		WSPR-Transmitter/src/execution_plan_compiler.cpp WSPR-Transmitter/src/transmission_controller.cpp \
+		WSPR-Transmitter/src/execution_plan_compiler.cpp WSPR-Transmitter/src/standard_feld.cpp WSPR-Transmitter/src/transmission_controller.cpp \
 		"$(WTP_SCHEDULER_BUILD_DIR)/client/libwtp_client.a" $(WTP_SCHEDULER_LDFLAGS) -o "$(WTP_SCHEDULER_BUILD_DIR)/wtp_scheduler_test"
 	$(Q)"$(WTP_SCHEDULER_BUILD_DIR)/wtp_scheduler_test"
 
@@ -2032,7 +2032,7 @@ wtp-scheduler-test:
 wtp-scheduler-interop-test: wtp-backend-interop-test
 	$(Q)$(CXX) -std=c++20 -Wall -Wextra -Wpedantic -Werror -O2 -g -I. -IWTP-Client/include \
 		tests/wtp_scheduler_reference_test.cpp wtp_integration/scheduler.cpp wtp_integration/backend.cpp wtp_integration/execution_plan.cpp \
-		WSPR-Transmitter/src/execution_plan_compiler.cpp WSPR-Transmitter/src/transmission_controller.cpp \
+		WSPR-Transmitter/src/execution_plan_compiler.cpp WSPR-Transmitter/src/standard_feld.cpp WSPR-Transmitter/src/transmission_controller.cpp \
 		"$(WTP_BACKEND_REFERENCE_BUILD_DIR)/libwtp_client.a" "$(WTP_BACKEND_REFERENCE_BUILD_DIR)/reference_bridge.o" \
 		$(WTP_BACKEND_REFERENCE_BUILD_DIR)/reference/*.o -o "$(WTP_BACKEND_REFERENCE_BUILD_DIR)/scheduler_reference_test"
 	$(Q)"$(WTP_BACKEND_REFERENCE_BUILD_DIR)/scheduler_reference_test"
@@ -2047,7 +2047,7 @@ wtp-status-test:
 	$(Q)mkdir -p "$(WTP_STATUS_BUILD_DIR)"
 	$(Q)$(CXX) -std=c++20 -pthread -Wall -Wextra -Wpedantic -Werror $(WTP_STATUS_CXXFLAGS) -I. -IWTP-Client/include \
 		tests/wtp_status_test.cpp wtp_integration/status.cpp wtp_integration/scheduler.cpp wtp_integration/backend.cpp wtp_integration/execution_plan.cpp \
-		WSPR-Transmitter/src/execution_plan_compiler.cpp WSPR-Transmitter/src/transmission_controller.cpp \
+		WSPR-Transmitter/src/execution_plan_compiler.cpp WSPR-Transmitter/src/standard_feld.cpp WSPR-Transmitter/src/transmission_controller.cpp \
 		"$(WTP_STATUS_BUILD_DIR)/client/libwtp_client.a" $(WTP_STATUS_LDFLAGS) -o "$(WTP_STATUS_BUILD_DIR)/wtp_status_test"
 	$(Q)"$(WTP_STATUS_BUILD_DIR)/wtp_status_test"
 
@@ -2060,7 +2060,7 @@ wtp-application-test:
 	$(Q)mkdir -p "$(WTP_APPLICATION_BUILD_DIR)"
 	$(Q)$(CXX) -std=c++20 -pthread -Wall -Wextra -Wpedantic -Werror $(WTP_APPLICATION_CXXFLAGS) -I. -IWTP-Client/include \
 		tests/wtp_application_test.cpp wtp_integration/application.cpp wtp_integration/status.cpp wtp_integration/scheduler.cpp wtp_integration/backend.cpp wtp_integration/execution_plan.cpp \
-		WSPR-Transmitter/src/execution_plan_compiler.cpp WSPR-Transmitter/src/transmission_controller.cpp \
+		WSPR-Transmitter/src/execution_plan_compiler.cpp WSPR-Transmitter/src/standard_feld.cpp WSPR-Transmitter/src/transmission_controller.cpp \
 		"$(WTP_APPLICATION_BUILD_DIR)/client/libwtp_client.a" $(WTP_APPLICATION_LDFLAGS) -o "$(WTP_APPLICATION_BUILD_DIR)/wtp_application_test"
 	$(Q)"$(WTP_APPLICATION_BUILD_DIR)/wtp_application_test"
 
@@ -2123,7 +2123,7 @@ wtp-network-client-build:
 	$(Q)$(MAKE) --no-print-directory -C WTP-Client all BUILD_DIR="$(abspath $(WTP_NETWORK_BUILD_DIR)/client)" CXXFLAGS="$(WTP_NETWORK_CXXFLAGS)"
 	$(Q)$(CXX) $(WTP_NETWORK_FLAGS) tests/wtp_network_interop_test.cpp wtp_integration/tls.cpp wtp_integration/network_http.cpp \
 		wtp_integration/application.cpp wtp_integration/status.cpp wtp_integration/scheduler.cpp wtp_integration/backend.cpp wtp_integration/execution_plan.cpp \
-		WSPR-Transmitter/src/execution_plan_compiler.cpp WSPR-Transmitter/src/transmission_controller.cpp \
+		WSPR-Transmitter/src/execution_plan_compiler.cpp WSPR-Transmitter/src/standard_feld.cpp WSPR-Transmitter/src/transmission_controller.cpp \
 		"$(WTP_NETWORK_BUILD_DIR)/client/libwtp_client.a" $(OPENSSL_LIBS) $(WTP_NETWORK_LDFLAGS) -o "$(WTP_NETWORK_BUILD_DIR)/wtp_network_interop_test"
 wtp-config-client-build:
 	$(Q)pkg-config --atleast-version=3.0 openssl
@@ -2132,7 +2132,7 @@ wtp-config-client-build:
 	$(Q)$(CXX) $(WTP_NETWORK_FLAGS) -IWSPR-Transmitter/src tests/wtp_configuration_client.cpp wtp_integration/tls.cpp wtp_integration/network_http.cpp wtp_runtime_bridge.cpp wtp_integration/output_lease.cpp wtp_integration/usb_cdc.cpp wtp_integration/usb_management.cpp privileged_network_policy.cpp backend_http_guard.cpp support_request_guard.cpp httplib.cpp \
 		wtp_integration/configuration.cpp wtp_integration/consumer_radio.cpp wtp_integration/plain_tcp.cpp wtp_integration/browser_api.cpp wtp_integration/application.cpp wtp_integration/status.cpp \
 		wtp_integration/scheduler.cpp wtp_integration/backend.cpp wtp_integration/execution_plan.cpp \
-		WSPR-Transmitter/src/execution_plan_compiler.cpp WSPR-Transmitter/src/transmission_controller.cpp \
+		WSPR-Transmitter/src/execution_plan_compiler.cpp WSPR-Transmitter/src/standard_feld.cpp WSPR-Transmitter/src/transmission_controller.cpp \
 		"$(WTP_NETWORK_BUILD_DIR)/client/libwtp_client.a" $(OPENSSL_LIBS) $(WTP_NETWORK_LDFLAGS) -o "$(WTP_NETWORK_BUILD_DIR)/wtp_configuration_client"
 # These fixtures share a CMake tree, credentials and loopback TLS port.
 # Serialize an invocation that requests both; parallel recipe builds still use CMake -j.

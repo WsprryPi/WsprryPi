@@ -843,6 +843,9 @@ wsprrypi::BackendCompileResult WsprRpiBackend::configure(
         return result;
     }
 
+    if (!platform_supports_gpio_clock_transmission(&result.error))
+        return result;
+
     if (plan.mode == wsprrypi::TransmissionMode::STANDARD_FELD)
     {
         const auto validation =
@@ -873,9 +876,6 @@ wsprrypi::BackendCompileResult WsprRpiBackend::configure(
             result.error = "Unsupported execution plan.";
         return result;
     }
-
-    if (!platform_supports_gpio_clock_transmission(&result.error))
-        return result;
 
     const WsprTransmissionConfigureResult applied =
         setup_dma_freq_table(compat->compatibility_plan);

@@ -471,7 +471,7 @@ startup-quiesce-test: build/bin/startup_quiesce_test
 legacy-tone-frequency-test: build/bin/legacy_tone_frequency_test
 	$(Q)./build/bin/legacy_tone_frequency_test
 
-build/bin/legacy_tone_frequency_test: legacy_tone_frequency_test.cc gpio_frequency_plan.cpp gpio_frequency_plan.hpp legacy_gpio_clock_model.cpp legacy_gpio_clock_model.hpp execution_plan_compiler.cpp execution_plan_compiler.hpp transmission_payloads.hpp transmission_request.hpp wspr_transmit_types.hpp ../../Chipset-Offsets/src/chipset_offsets.hpp
+build/bin/legacy_tone_frequency_test: legacy_tone_frequency_test.cc gpio_frequency_plan.cpp gpio_frequency_plan.hpp legacy_gpio_clock_model.cpp legacy_gpio_clock_model.hpp execution_plan_compiler.cpp standard_feld.cpp execution_plan_compiler.hpp transmission_payloads.hpp transmission_request.hpp wspr_transmit_types.hpp ../../Chipset-Offsets/src/chipset_offsets.hpp
 	$(Q)mkdir -p $(BIN_DIR)
 	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) $(filter %.cc %.cpp,$^) -o $@ $(LDFLAGS)
 
