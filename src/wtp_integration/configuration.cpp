@@ -379,6 +379,17 @@ PicoHttpResponse pico_configuration_request(const PicoManagementExchange &exchan
     }
     if (method == "POST") {
       const auto &patch = input["config"];
+      if ((carrier == "consumer_station" || carrier == "consumer_ap") && patch.contains("station")) {
+        bool changed = config.is_null();
+        for (const auto& field : patch["station"].items())
+          changed = changed || config.is_null() || config["station"][field.key()] != field.value();
+        if (changed)
+          require(caps.contains("features") && caps["features"].is_object() &&
+              caps["features"].contains("station_live_apply") &&
+              caps["features"]["station_live_apply"].is_boolean() &&
+              caps["features"]["station_live_apply"] == true,
+              "consumer_setup_identity_required",409);
+      }
       const std::string resource = "config/update", verb = "POST";
       Json candidate{{"contract","Wsprry-Control/1"},{"schema","config-update"},
           {"target",target},{"mode","merge"},{"config",patch}};
@@ -682,10 +693,23 @@ PicoHttpResponse pico_progress_request(const PicoManagementExchange &exchange,
       const auto domain=input["application"]["domain"].get<std::string>();
       require(input["application"]["draft_revision"]==old["draft_revision"] && old["apply_domains"][domain]==true,
           "invalid_progress_application",409);
-      if (carrier!="usb_physical" && (domain=="station" || domain=="network" || domain=="all"))
-        require(caps.contains("features") && caps["features"].contains("consumer_setup_identity") &&
-            caps["features"]["consumer_setup_identity"].is_boolean() && caps["features"]["consumer_setup_identity"]==false,
-            "consumer_setup_identity_required",409);
+      if (carrier != "usb_physical" &&
+          (domain == "station" || domain == "network" || domain == "all")) {
+        require(caps.contains("features") &&
+                    caps["features"].contains("consumer_setup_identity") &&
+                    caps["features"]["consumer_setup_identity"].is_boolean(),
+                "invalid_remote_resource");
+        require(!caps["features"].contains("station_live_apply") ||
+                    caps["features"]["station_live_apply"].is_boolean(),
+                "invalid_remote_resource");
+        const bool live_station =
+            domain == "station" &&
+            (carrier == "consumer_station" || carrier == "consumer_ap") &&
+            caps["features"].value("station_live_apply", false);
+        require(caps["features"]["consumer_setup_identity"] == false ||
+                    live_station,
+                "consumer_setup_identity_required", 409);
+      }
     }
     const auto status=parsed(read("status")); const auto &job=status.at("job");
     require(job.at("boot_id")==boot && job.at("output_active")==false && job.at("owner_id").is_null() &&
@@ -1031,8 +1055,19 @@ PicoHttpResponse pico_resource_request(const PicoManagementExchange &exchange,
         caps["features"]["consumer_setup_identity"].is_boolean(),"invalid_remote_resource");
     for (const auto feature : {"application","station","hardware"})
       require(caps["features"].contains(feature) && caps["features"][feature] == true,"unsupported_resource_capabilities",409);
-    const bool profile_owned = carrier != "usb_physical" && caps["features"]["consumer_setup_identity"] == true;
-    if (carrier != "usb_physical" && caps.contains("management_carriers")) require(profile_owned == (carrier == "consumer_station" || carrier == "consumer_ap"),"invalid_remote_resource");
+    const bool consumer =
+        carrier == "consumer_station" || carrier == "consumer_ap";
+    require(!caps["features"].contains("station_live_apply") ||
+                caps["features"]["station_live_apply"].is_boolean(),
+            "invalid_remote_resource");
+    const bool live_station =
+        consumer && caps["features"].value("station_live_apply", false);
+    const bool profile_owned =
+        carrier != "usb_physical" &&
+        caps["features"]["consumer_setup_identity"] == true && !live_station;
+    if (carrier != "usb_physical" && caps.contains("management_carriers"))
+      require((caps["features"]["consumer_setup_identity"] == true) == consumer,
+              "invalid_remote_resource");
     const auto first = read(application_path); auto application = parsed(first); shared_application(application,target,carrier == "usb_physical");
     require(application["schema"] == "application","invalid_remote_resource");
     require(etag(first.etag),"invalid_remote_resource");

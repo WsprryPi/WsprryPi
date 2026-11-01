@@ -209,6 +209,8 @@ struct Test {
   NoWtp wtp;
   pico::provisioning::ProfileStore profiles{media};
   pico::provisioning::RuntimeProfile runtime;
+  pico::provisioning::LocalSettings local_settings{
+      profiles, runtime, f.store, progress, device, "wsprrypico-0a60df.local"};
   PolicyCrypto crypto[4];
   pico::network::ConsumerRadioApi radio{f.api,
                                         profiles,
@@ -230,7 +232,8 @@ struct Test {
   bool drop_recovery_finish=false, drop_before_recovery_finish=false;
   std::map<std::string,unsigned> handler_calls;
   std::string previous_packet;
-  std::uint64_t transaction = 1;
+  std::function<void()> before_identity;
+  std::uint64_t transaction = 1, observed_generation = 1;
   explicit Test(bool configured=true, std::string callsign="AA0NT", std::string locator="EM18") {
     pico::provisioning::ConsumerProfile profile;
     profile.device_id = device;
@@ -252,6 +255,7 @@ struct Test {
     f.api.consumer_config(runtime);
     assert(progress.load());
     f.api.progress_settings(progress);
+    f.api.local_usb_settings(local_settings);
     if (configured) {
       auto config = *pico::standalone::parse_config(network_test::config);
       config.wspr_dial_frequency_hz = 3568600;
@@ -280,6 +284,17 @@ struct Test {
   pi::PicoHttpResponse send(const std::string &path, const std::string &method,
                             std::string body, const std::string &type) {
     ++exchanges;
+    if (path == "/api/consumer/v1/identity" && before_identity) {
+      auto action = std::move(before_identity);
+      before_identity = {};
+      action();
+    }
+    if (runtime.generation() != observed_generation) {
+      observed_generation = runtime.generation();
+      f.api.management_availability({pico::network::ManagementProfile::Consumer,
+                                     runtime.generation(), true, false, false,
+                                     true, true});
+    }
     if (drop_before_recovery_finish && path == "/api/consumer/v1/recovery/finish") {
       drop_before_recovery_finish=false;
       return {503,R"({"error":{"code":"reply_lost_before_dispatch"}})",{}};
@@ -382,7 +397,7 @@ void cases(bool ap) {
   const auto seq = t.f.store.config_sequence();
   assert(t.coordinated(*c, "POST", edit.dump(), context.etag).status == 412 &&
          t.f.store.config_sequence() == seq);
-  edit["config"] = {{"station", {{"callsign", "K1ABC"}}}};
+  edit["config"] = {{"wifi", {{"ssid", "other-network"}}}};
   auto fresh = t.coordinated(*c);
   assert(t.coordinated(*c, "POST", edit.dump(), fresh.etag).status == 409 &&
          t.mutations == 1);
@@ -652,6 +667,68 @@ void configuration_write_preservation_cases() {
     assert(*t.f.store.config() == expected && t.f.store.watermark() == watermark && t.wtp.io == 0);
   }
   std::cout << "Current merge updates preserve independent WSPR dial and unrelated settings; target, revision and atomic-save checks passed\n";
+}
+
+void live_station_application_cases() {
+  for (const bool ap : {false, true}) {
+    Test t;
+    if (ap) {
+      t.authority = "192.168.4.1";
+      t.origin = "http://192.168.4.1";
+      t.interface = pico::network::ConsumerInterface::AccessPoint;
+    }
+    const std::string carrier = ap ? "consumer_ap" : "consumer_station";
+    auto a = t.client(), b = t.client();
+    assert(a->login(device, carrier, "test-password").status == 200);
+    t.host.now += 1000;
+    assert(b->login(device, carrier, "test-password").status == 200);
+    const auto old = a->request("config", "GET");
+    const auto before = *t.f.store.config();
+    const auto watermark = t.f.store.watermark();
+    const Json target = {
+        {"scope", "member"}, {"device_id", device}, {"boot_id", a->boot()}};
+    const Json patch = {{"contract", "Wsprry-Control/1"},
+                        {"schema", "config-update"},
+                        {"target", target},
+                        {"mode", "merge"},
+                        {"config", {{"station", {{"power_dbm", 0}}}}}};
+    t.host.now += 1'799'900;
+    assert(a->request("status", "GET").status == 200);
+    t.before_identity = [&] {
+      t.host.now +=
+          200; // Cross the old idle deadline after the authenticated reply.
+      assert(
+          a->request("config/update", "POST", patch.dump(), old.etag).status ==
+          200);
+    };
+    assert(b->request("management", "GET").status == 200);
+    assert(!t.before_identity); // Policy/identity race retained the original
+                                // session.
+    assert(a->active() && b->active());
+    assert(b->request("config/update", "POST", patch.dump(), old.etag).status ==
+           412);
+    assert(t.f.store.config()->power_dbm == 0 &&
+           t.f.store.watermark() == watermark);
+    auto expected = before;
+    expected.power_dbm = 0;
+    assert(*t.f.store.config() == expected);
+    const auto exchange = [&](auto p, auto m, auto body, auto revision) {
+      return b->request(p, m, body, revision);
+    };
+    const auto context = pi::pico_resource_request(
+        exchange, b->device(), b->boot(), "application", "GET", {}, {}, carrier,
+        b->generation());
+    assert(context.status == 200);
+    assert(Json::parse(context.body)["profile_owned_station"] == false);
+    assert(b->generation() == std::to_string(t.profiles.sequence()));
+    t.host.now += 61'000;
+    assert(a->request("status", "GET").status == 200 &&
+           b->request("status", "GET").status == 200);
+    a->logout();
+    b->logout();
+  }
+  std::cout << "Live station application retains native consumer sessions and "
+               "strict current policy on LAN/AP\n";
 }
 
 void alias_fixed_vector(const Json &vector) {
@@ -1158,6 +1235,7 @@ int main(int argc, char **argv) {
   alias_fixed_vector(recovery_vectors);
   std::cout << "Consumer-Recovery/1 fixed AEAD/HKDF and native selector vectors passed\n";
   configuration_write_preservation_cases();
+  live_station_application_cases();
   hostname_progress_preservation_cases();
   retirement_job_authority_cases();
   local_retirement_refusal_cases();

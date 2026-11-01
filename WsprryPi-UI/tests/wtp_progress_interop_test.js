@@ -77,21 +77,13 @@ async function scenario(carrier) {
         await b.click("wtp-usb-progress-save");assert.equal(calls.at(-1).status,200,JSON.stringify(calls.at(-1)));
         await b.click("wtp-usb-progress-load");assert.equal(calls.at(-1).body.station_complete,true);
         const saved=calls.at(-1);
-        if(consumer) {
-            assert(b.element("wtp-usb-progress-apply").disabled);
-            const refused=await command({method:"POST",path:"/api/control/v1/member/progress/apply",revision:saved.etag,
-                body:JSON.stringify({contract:'Wsprry-Control/1',schema:"progress",target:saved.body.target,application:{draft_revision:saved.body.draft_revision,domain:"station"}})});
-            assert.equal(refused.status,409,JSON.stringify(refused));assert.equal(refused.body.error.code,"consumer_setup_identity_required");
-            assert.deepEqual((await dump()).config,initial.config);
-        } else {
-            assert(!b.element("wtp-usb-progress-apply").disabled);
-            await b.click("wtp-usb-progress-apply");assert.equal(calls.at(-1).status,200,JSON.stringify(calls.at(-1)));
-            assert.deepEqual(calls.at(-1).body.config.station,{callsign:"K1ABC",locator:"EM18",power_dbm:0});
-            assert.match(b.element("wtp-usb-progress-state").textContent,/station progress applied/);
-            const applied=await dump();assert.equal(applied.config.station.callsign,"K1ABC");
-            assert.deepEqual(applied.config.wifi,initial.config.wifi);assert.deepEqual(applied.config.pins,initial.config.pins);
-            assert.deepEqual(applied.config.schedules,initial.config.schedules);
-        }
+        assert(!b.element("wtp-usb-progress-apply").disabled);
+        await b.click("wtp-usb-progress-apply");assert.equal(calls.at(-1).status,200,JSON.stringify(calls.at(-1)));
+        assert.deepEqual(calls.at(-1).body.config.station,{callsign:"K1ABC",locator:"EM18",power_dbm:0});
+        assert.match(b.element("wtp-usb-progress-state").textContent,/station progress applied/);
+        const applied=await dump();assert.equal(applied.config.station.callsign,"K1ABC");
+        assert.deepEqual(applied.config.wifi,initial.config.wifi);assert.deepEqual(applied.config.pins,initial.config.pins);
+        assert.deepEqual(applied.config.schedules,initial.config.schedules);
         console.log(`${carrier}: genuine UI partial/null/zero/invalid field persistence, unchanged applied configuration and explicit application/profile authority passed`);
     } finally {await stop(client);await stop(server);}
 }

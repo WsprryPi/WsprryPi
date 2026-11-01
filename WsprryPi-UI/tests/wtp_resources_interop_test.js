@@ -51,14 +51,15 @@ async function cases(carrier, failure="storage") {
     const load=async()=>{await b.click('wtp-member-load');const r=calls.at(-1).result;assert.equal(r.status,200,JSON.stringify(r));return r;};
     await require('./udp_logging_pair_cases.js')(call);
     let loaded=await load(); if(failure==="storage")fs.writeFileSync(path.join(build,`resources-loaded-${carrier}.json`),JSON.stringify(loaded.body)); const initial=await control('dump');
-    assert.equal(loaded.body.profile_owned_station,consumer);
+    assert.equal(loaded.body.profile_owned_station,false);
     assert.equal(loaded.body.application.schema,'application');
     assert.match(b.element('wtp-member-station-hint').textContent, /automatically selects WSPR Type 1, 2 or 3/);
     assert.equal(b.element('wtp-member-station-hint').textContent.includes('measured RF output'),true);
     const remoteResource=r=>r;
     if (consumer) {
       assert.match(b.element('wtp-member-active').textContent,/Unknown/);
-      assert(b.element('wtp-member-station-save').disabled);assert.match(b.element('wtp-member-station-feedback').textContent,/setup owns/);
+      assert.equal(b.element('wtp-member-station-save').disabled, failure === 'blank');
+      assert.doesNotMatch(b.element('wtp-member-station-feedback').textContent,/setup owns/);
       assert.equal(initial.wtp_io,0);
     }
     if(failure==='blank') {
@@ -114,6 +115,7 @@ async function cases(carrier, failure="storage") {
         ['capabilities','/application_resources/schema','unknown-application'],
         ['capabilities','/application_resources',null],
         ['capabilities','/features/consumer_setup_identity',true],
+        ['capabilities','/features/station_live_apply','true'],
         ['management','/selected','consumer_ap'],
         ['pins','/active/rf_gp',14],
         ['pins','/choices/adapter_support/i2c_rf',true],
@@ -221,10 +223,11 @@ async function cases(carrier, failure="storage") {
       const alias=await call({method:'GET',path:'/api/control/v1/network'});assert.equal(alias.status,200,JSON.stringify(alias));
       r=await call({method:'PUT',path:'/api/control/v1/network',body:JSON.stringify({enabled:alias.body.enabled}),revision:alias.etag});assert.equal(r.status,200,JSON.stringify(r));
     } else {
-      const count=calls.length;await b.click('wtp-member-station-save');assert.equal(calls.length,count);
-      const payload={schema:'station',target:loaded.body.target,station:{callsign:'K1ABC',locator:'FN42AB',power_dbm:10}};
-      r=await call({method:'PUT',path:'/api/control/v1/member/station',body:JSON.stringify(payload),revision:loaded.etag,member_context:loaded.body.member_context});
-      assert.equal(r.status,409);assert.equal(r.body.error.code,'consumer_setup_identity_required');
+      await b.click('wtp-member-station-save');
+      assert.equal(calls.at(-1).result.status,200,JSON.stringify(calls.at(-1)));
+      const state=await control('dump');
+      assert.deepEqual(state.config.station,{callsign:'K1ABC',locator:'FN42AB',power_dbm:10});
+      assert.equal(state.password_sha256,initial.password_sha256);
     }
     // Restore the old pins: restart/output inhibition must remain latched.
     loaded=await load();b.element('wtp-member-rf').value=String(consumer?2:28);
@@ -242,10 +245,10 @@ async function cases(carrier, failure="storage") {
       b.element('wtp-management-password').value='test-password';await b.click('wtp-management-connect');assert.equal(calls.at(-1).result.status,200);
     }
     if(consumer) {
-      loaded=await load();const before=await control('dump');await control('change_profile');await b.click('wtp-member-load');
+      loaded=await load();const beforeGeneration=loaded.body.profile_generation;const before=await control('dump');await control('change_profile');await b.click('wtp-member-load');
       assert.notEqual(calls.at(-1).result.status,200);assert.deepEqual(await control('dump'),before);assert.equal(b.element('wtp-member-rf').value,'6');
       await control('advance');b.element('wtp-management-password').value='test-password';await b.click('wtp-management-connect');assert.equal(calls.at(-1).result.status,200);
-      loaded=await load();assert.equal(loaded.body.profile_generation,'2');
+      loaded=await load();assert.equal(loaded.body.profile_generation,(BigInt(beforeGeneration)+1n).toString());
     }
     // A dropped post-commit response never causes replay or fallback.
     loaded=await load();b.element('wtp-member-rf').value='5';await b.click('wtp-member-validate');
@@ -277,7 +280,7 @@ async function cases(carrier, failure="storage") {
       assert.equal((await control('dump')).config.station.power_dbm,13);assert(b.element('wtp-member-station-save').disabled);
       await call({control:'clear'});loaded=await load();assert.equal(loaded.body.application.station.station.power_dbm,13);
     }
-    loaded=await load();await b.click('wtp-member-validate');const bytes=(await control('dump')).bytes_sha256;
+    loaded=await load();b.element('wtp-member-rf').value='7';await b.click('wtp-member-validate');const bytes=(await control('dump')).bytes_sha256;
     await control('fail_storage');await b.click('wtp-member-hardware-save');assert.equal(calls.at(-1).result.status,503);
     assert.equal((await control('dump')).bytes_sha256,bytes);
     loaded=await load();fs.writeFileSync(path.join(build,`resources-fault-${carrier}.json`),JSON.stringify(loaded.body));assert.equal(loaded.body.application.hardware.storage_healthy,false);assert(b.element('wtp-member-hardware-save').disabled);

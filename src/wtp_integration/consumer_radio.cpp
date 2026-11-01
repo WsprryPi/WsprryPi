@@ -253,6 +253,7 @@ void ConsumerRadioClient::clear() noexcept {
   device_.clear();
   boot_.clear();
   generation_.clear();
+  carrier_.clear();
 }
 bool ConsumerRadioClient::active() const {
   const auto now = clock_();
@@ -487,6 +488,7 @@ PicoHttpResponse ConsumerRadioClient::handshake(const std::string &device,
             authenticated["device_id"] == device_ &&
             authenticated["boot_id"] == boot_);
     authenticated_ = true;
+    carrier_ = carrier;
     sequence_ = 1;
     started_ = seen_ = clock_();
     r = request("management", "GET");
@@ -570,6 +572,13 @@ PicoHttpResponse ConsumerRadioClient::request(const std::string &resource,
                                               const std::string &method,
                                               const std::string &body,
                                               const std::string &revision) {
+  return request_once(resource, method, body, revision, true);
+}
+PicoHttpResponse ConsumerRadioClient::request_once(const std::string &resource,
+                                                   const std::string &method,
+                                                   const std::string &body,
+                                                   const std::string &revision,
+                                                   bool refresh_policy) {
   const bool mutation = method != "GET";
   if (!active()) {
     clear();
@@ -615,7 +624,35 @@ PicoHttpResponse ConsumerRadioClient::request(const std::string &resource,
                           ? std::string{}
                           : result["etag"].get<std::string>();
     require(etag.size() <= 128);
-    seen_ = clock_();
+    seen_ = clock_(); // Only the authenticated reply renews idle time.
+    if (resource == "management" && method == "GET" &&
+        result["status"] == 200) {
+      const auto identity_reply = transport_("/api/consumer/v1/identity", "GET",
+                                             {}, "application/json");
+      const auto identity = identity_reply.status == 200
+                                ? strict_browser_json(identity_reply.body)
+                                : Json(nullptr);
+      require(fields(identity, {"version", "device_id", "boot_id", "generation",
+                                "authentication"}) &&
+              identity["version"].is_number_integer() &&
+              identity["version"] == 1 && identity["device_id"] == device_ &&
+              identity["boot_id"] == boot_ &&
+              identity["authentication"] == "saved_wifi_passphrase" &&
+              decimal(identity["generation"]) &&
+              result["body"].contains("profile_generation") &&
+              decimal(result["body"]["profile_generation"]));
+      require(valid_management_contract(
+          result["body"], carrier_, device_, boot_,
+          result["body"]["profile_generation"].get<std::string>()));
+      if (result["body"]["profile_generation"] != identity["generation"]) {
+        // At most one read-only reread bridges the single station transfer.
+        // Never retry a mutation or change the original crypto transcript.
+        require(refresh_policy);
+        return request_once(resource, method, body, revision, false);
+      }
+      // This is observed policy generation, never a replacement transcript.
+      generation_ = identity["generation"].get<std::string>();
+    }
     return {result["status"].get<unsigned>(), result["body"].dump(), etag};
   } catch (...) {
     clear();
