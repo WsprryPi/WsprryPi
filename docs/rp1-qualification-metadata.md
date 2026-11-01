@@ -20,6 +20,8 @@ field is a stable evidence identifier; the application consumes the bundle local
 The original [software lock](../scripts/tests/fixtures/rp1-release-1.0.0.json)
 and immutable `v1.0.0` package remain unchanged.
 
+The consumer compatibility contract selects `v1.0.1`, whose source, package, module version, and route identities differ. The retained `v1.0.0` bundle does not qualify that provider. Its status is unattributed to this evidence, while structural compatibility and readiness remain independently reported. No evidence files or hashes are relabeled for the patch.
+
 GPIO4 and GPIO20 have independent finite conducted TONE evidence at
 14,097,100 Hz, 2 mA and nominal 200 MHz `pll_sys`: seven cases per route,
 including completion, four STOP timings, owner close and service stop.

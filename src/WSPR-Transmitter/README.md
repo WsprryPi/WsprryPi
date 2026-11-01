@@ -17,18 +17,7 @@ directory for hardware-free table and frequency-contract coverage. See the
 [frequency correction and validation note](../../docs/issue-446-validation.md)
 for historical test-tone calibration handling and physical-validation limits.
 
-On Raspberry Pi 5, RP1 output exclusively uses the externally provisioned
-endpoint `/dev/rp1-gpclk`; it never falls back to the legacy DMA backend.
-This component does not install or attest the provider. Runtime protocol and
-capability checks, operation-scoped ownership, bounded one-second DMA chunks,
-operational readiness, and cleanup remain required. WsprryPi translates every
-supported product mode into the provider's generic finite-event UAPI; product
-mode and operator authorization remain application policy and are not sent to
-the kernel. GPIO4 and GPIO20 are independent routes. The root-owned, mode-0600
-endpoint is the production authority. The consumer accepts module `1.0.0` and
-the distinct `v1.0.0-rp1-gpio4` and `v1.0.0-rp1-gpio20` identities through its
-typed consumer contract. That compatibility gate does not grant output
-authorization, publication status, or qualification.
+On Raspberry Pi 5, RP1 output exclusively uses the externally provisioned endpoint `/dev/rp1-gpclk`; it never falls back to the legacy DMA backend. This component does not install or attest the provider. Runtime protocol and capability checks, operation-scoped ownership, bounded one-second DMA chunks, operational readiness, and cleanup remain required. WsprryPi translates every supported product mode into the provider's generic finite-event UAPI; product mode and operator authorization remain application policy and are not sent to the kernel. GPIO4 and GPIO20 are independent routes. The root-owned, mode-0600 endpoint is the production authority. The consumer accepts module `1.0.1` and the distinct `v1.0.1-rp1-gpio4` and `v1.0.1-rp1-gpio20` identities through its typed consumer contract. That compatibility gate does not grant output authorization, publication status, or qualification.
 
 ### Parent WTP backend integration
 

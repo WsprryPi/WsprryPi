@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: MIT
-"""Non-installing acceptance of the locked published RP1 1.0.0 release.
+"""Non-installing acceptance of the locked published RP1 1.0.1 release.
 
 This maintainer entry point validates assets without installing them.
 Publication verification is an explicit, read-only network option.
@@ -21,7 +21,7 @@ import tempfile
 
 sys.dont_write_bytecode = True
 ROOT = Path(__file__).resolve().parents[2]
-LOCK_PATH = ROOT / "scripts/tests/fixtures/rp1-release-1.0.0.json"
+LOCK_PATH = ROOT / "scripts/tests/fixtures/rp1-release-1.0.1.json"
 spec = importlib.util.spec_from_file_location("rp1_installer", ROOT / "scripts/rp1_gpclk_dkms_install.py")
 installer = importlib.util.module_from_spec(spec)
 sys.modules[spec.name] = installer

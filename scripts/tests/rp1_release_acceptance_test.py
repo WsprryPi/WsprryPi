@@ -28,13 +28,13 @@ class Tests(unittest.TestCase):
                 for route, identity in self.lock['compatibilityIdentities'].items()},
             uapi={file: {'sha256': self.lock['uapiSha256'][name]} for name, file in
                 (('consumer', 'rp1_gpclk.h'), ('controller', 'rp1_route_admin.h'))})
-        self.package = 'rp1-gpclk-dkms_1.0.0-1_all.deb'
-        inventory = [{'path': 'usr/src/rp1-gpclk-dkms-1.0.0/include/uapi/linux/rp1_gpclk.h',
+        self.package = 'rp1-gpclk-dkms_1.0.1-1_all.deb'
+        inventory = [{'path': 'usr/src/rp1-gpclk-dkms-1.0.1/include/uapi/linux/rp1_gpclk.h',
                       'type': 'file', 'mode': '0644', 'sha256': self.lock['uapiSha256']['consumer']}]
         self.manifest = {'schema': A.installer.MANIFEST_SCHEMA, 'schemaVersion': 1,
-            'repository': A.installer.REPOSITORY, 'releaseTag': 'v1.0.0',
-            'sourceCommit': self.lock['sourceCommit'], 'productVersion': '1.0.0',
-            'debianVersion': '1.0.0-1', 'dkmsModule': 'rp1-gpclk-dkms',
+            'repository': A.installer.REPOSITORY, 'releaseTag': 'v1.0.1',
+            'sourceCommit': self.lock['sourceCommit'], 'productVersion': '1.0.1',
+            'debianVersion': '1.0.1-1', 'dkmsModule': 'rp1-gpclk-dkms',
             'kernelModule': 'rp1_gpclk_dkms', 'releaseChannel': 'release',
             'administrationProtocol': A.installer.ADMIN_PROTOCOL,
             'package': {'name': 'rp1-gpclk-dkms', 'filename': self.package,
@@ -68,6 +68,20 @@ class Tests(unittest.TestCase):
         self.assertTrue(result['releaseProfileVerified'])
         for field in ('published', 'qualification', 'productionSelectable', 'installationPerformed'):
             self.assertIs(result[field], False)
+
+    def test_installer_selects_patch_over_original_release(self):
+        original_lock = json.loads((ROOT/'scripts/tests/fixtures/rp1-release-1.0.0.json').read_bytes())
+        current = self.publication()
+        original = copy.deepcopy(current)
+        original.update(tag_name=original_lock['releaseTag'], html_url=original_lock['releaseUrl'])
+        original['assets'] = [
+            {'name': name, 'state': 'uploaded', 'digest': 'sha256:' + digest,
+             'browser_download_url': original_lock['releaseUrl'].replace('/tag/', '/download/') + '/' + name}
+            for name, digest in original_lock['assets'].items()]
+        selected = A.installer.select_release([original, current])
+        self.assertEqual(selected['tag_name'], 'v1.0.1')
+        self.assertEqual(A.installer.source_selector('auto', 'production'), ('release', None))
+        self.assertEqual(A.installer.source_selector('auto', 'development'), ('devel', None))
 
     def test_wrong_source_commit_tree_dirty_or_attached_never_read_assets(self):
         identity = {'commit': self.lock['sourceCommit'], 'tree': self.lock['sourceTree']}
@@ -106,7 +120,7 @@ class Tests(unittest.TestCase):
             lambda x: x['runtime'].update(binding='rp1-gpclk-runtime-binding-v2'),
             lambda x: x['runtime'].update(readiness='wrong'), lambda x: x['runtime'].update(update='wrong'),
             lambda x: x['routes']['gpio4'].update(compatibilityId='v0.9.0-pi5'),
-            lambda x: x['routes']['gpio20'].update(compatibilityId='v1.0.0-rp1-gpio4'),
+            lambda x: x['routes']['gpio20'].update(compatibilityId='v1.0.1-rp1-gpio4'),
             lambda x: x['uapi']['rp1_gpclk.h'].update(sha256='f'*64),
             lambda x: x['uapi']['rp1_route_admin.h'].update(sha256='f'*64)]
         for index, mutate in enumerate(mutations):
@@ -148,10 +162,10 @@ class Tests(unittest.TestCase):
         result = A.validate_publication(client, self.lock)
         self.assertTrue(result['publicationVerified'])
         self.assertTrue(result['productionSelectable'])
-        client.json.assert_called_once_with(A.installer.API_BASE + '/releases/tags/v1.0.0')
+        client.json.assert_called_once_with(A.installer.API_BASE + '/releases/tags/v1.0.1')
         mutations = [lambda x: x.update(draft=True), lambda x: x.update(prerelease=True),
             lambda x: x.update(immutable=False), lambda x: x.update(published_at=None),
-            lambda x: x.update(tag_name='v1.0.1'), lambda x: x.update(html_url='https://example.invalid'),
+            lambda x: x.update(tag_name='v1.0.0'), lambda x: x.update(html_url='https://example.invalid'),
             lambda x: x['assets'].pop(),
             lambda x: x['assets'][0].update(digest='sha256:' + '0'*64),
             lambda x: x['assets'][0].update(browser_download_url='https://example.invalid/asset'),
@@ -169,7 +183,7 @@ class Tests(unittest.TestCase):
     def test_unpublished_release_selection_remains_unavailable(self):
         with self.assertRaisesRegex(A.installer.ContractError, 'no eligible'):
             A.installer.select_release([])
-        self.assertFalse(A.installer.release_candidate({'tag_name': 'v1.0.0', 'published_at': None,
+        self.assertFalse(A.installer.release_candidate({'tag_name': 'v1.0.1', 'published_at': None,
             'draft': False, 'prerelease': False, 'immutable': False, 'assets': []}))
 
     def test_production_resolution_uses_installer_and_rejects_substitution(self):
@@ -191,8 +205,8 @@ class Tests(unittest.TestCase):
                 git.assert_called_once_with(mock.ANY, self.source, 'rev-parse', 'HEAD^{tree}')
                 apply.assert_not_called()
                 mutations = [lambda x: x.update(channel='development'),
-                    lambda x: x.update(tag='v1.0.1'), lambda x: x.update(commit='0'*40),
-                    lambda x: x['manifest'].update(debianVersion='1.0.0-2'),
+                    lambda x: x.update(tag='v1.0.0'), lambda x: x.update(commit='0'*40),
+                    lambda x: x['manifest'].update(debianVersion='1.0.1-2'),
                     lambda x: x['manifest']['package'].update(sha256='0'*64)]
                 for index, mutate in enumerate(mutations):
                     bad = copy.deepcopy(resolved); mutate(bad); download.return_value = bad

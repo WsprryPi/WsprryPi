@@ -364,11 +364,11 @@ jobs:
               rp1-gpclk-route-service-test rp1-gpclk-transmit-backend-test \
               rp1-gpclk-diagnostics-test rp1-release-acceptance-test SUDO=
 
-      - name: Read-only published RP1 1.0.0 provider reference
+      - name: Read-only published RP1 1.0.1 provider reference
         uses: actions/checkout@v7
         with:
           repository: WsprryPi/RP1-GPCLK-DKMS
-          ref: 8c16d3c237cb1267cbedafb5da2bb74132ca5de0
+          ref: b52ab7b796e44d8690b2a91bccb21ae5d8b670df
           path: src/build/rp1-provider-reference
           persist-credentials: false
 

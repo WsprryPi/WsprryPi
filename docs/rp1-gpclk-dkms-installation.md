@@ -80,22 +80,11 @@ sudo INSTALL_RP1_GPCLK_DKMS=true \
 
 ## Published releases
 
-The immutable [RP1-GPCLK-DKMS v1.0.0 release](https://github.com/WsprryPi/RP1-GPCLK-DKMS/releases/tag/v1.0.0)
-is published at commit `8c16d3c237cb1267cbedafb5da2bb74132ca5de0` (module/DKMS
-`1.0.0`, Debian `1.0.0-1`). Production/main automatic selection consumes an
-eligible published release; explicit `RP1_GPCLK_DKMS_SOURCE=release` selects
-that path on `devel` too. Development automatic selection remains exact-source
-development. An unavailable or corrupt release fails closed without fallback.
-The [release lock and acceptance workflow](rp1-provider-acceptance.md) bind
-the published bytes; the [active acceptance matrix](../release_tools/4.0-Beta-1-Release-Evidence.md#october-19-item-10-reuse-matrix-and-remaining-gates)
-separates software acceptance from accepted target installation/runtime checks
-and the remaining application release gates. The published compatibility
-manifest defaults to `Unavailable` and has
-no qualified target entries. The application-bundled [qualification evidence](rp1-qualification-metadata.md)
-records accepted scoped evidence without modifying that manifest or downloading
-a separate release. Publication, reproducibility and successful DKMS
-builds do not grant live eligibility or transmission authorization. See the
-[RP1 dependency order](../release_tools/Release%20Punchlist.md#rp1-dependency-order).
+The immutable [RP1-GPCLK-DKMS v1.0.1 release](https://github.com/WsprryPi/RP1-GPCLK-DKMS/releases/tag/v1.0.1) is published at commit `b52ab7b796e44d8690b2a91bccb21ae5d8b670df` (module/DKMS `1.0.1`, Debian `1.0.1-1`). The transmitter adapter accepts its exact GPIO4/GPIO20 compatibility identities. Production/main automatic selection consumes the newest eligible published release; explicit `RP1_GPCLK_DKMS_SOURCE=release` selects that path on `devel` too. Development automatic selection remains exact-source development. An unavailable or corrupt release fails closed without fallback.
+
+The [release lock and acceptance workflow](rp1-provider-acceptance.md) bind the published bytes. The compatibility manifest defaults to `Unavailable` with no qualified target entries. The application-bundled [qualification evidence](rp1-qualification-metadata.md) remains bound to `v1.0.0` and does not qualify this patch. Publication, reproducibility, and successful DKMS builds do not grant live eligibility or transmission authorization. Historical [application acceptance](../release_tools/4.0-Beta-1-Release-Evidence.md#october-19-item-10-reuse-matrix-and-remaining-gates) does not establish target installation/runtime acceptance for `v1.0.1`.
+
+An installed `1.0.0` provider requires its owning runtime cleanup and removal before clean `1.0.1` installation. Direct replacement and in-place downgrade remain refused. Retain exact rollback inputs; version ordering alone is not a migration procedure. See the [RP1 dependency order](../release_tools/Release%20Punchlist.md#rp1-dependency-order).
 
 Release selection enumerates published, immutable, non-draft, non-prerelease
 semantic versions rather than following a `latest` redirect. A candidate must provide
@@ -141,17 +130,7 @@ from the exact checkout's canonical source header and binds that header by hash.
 WsprryPi does not infer a development version from release metadata
 or supply a version to the upstream installer.
 
-The maintained exact-source installer must provide the explicit
-`runtime-controller` DKMS profile through a route-neutral installation without
-loading either module. A single DKMS instance owns
-the consumer and controller; WsprryPi verifies the returned exact commit,
-canonical version, kernel, UAPI, both installed-file and decompressed-ELF hashes,
-null route, and quiescent unowned state before recording success. Development
-provenance records version-derived GPIO4 and GPIO20 compatibility identities
-separately. The `1.0.0` identities are `v1.0.0-rp1-gpio4` and
-`v1.0.0-rp1-gpio20`. The historical `v0.9.0-pi5` value is accepted only as
-captured `0.9.0` predecessor removal authority. Exact commit, kernel, route,
-hashes, enrollment, and qualification remain separate facts.
+The maintained exact-source installer must provide the explicit `runtime-controller` DKMS profile through a route-neutral installation without loading either module. A single DKMS instance owns the consumer and controller; WsprryPi verifies the returned exact commit, canonical version, kernel, UAPI, both installed-file and decompressed-ELF hashes, null route, and quiescent unowned state before recording success. Development provenance records version-derived GPIO4 and GPIO20 compatibility identities separately. The `1.0.1` identities are `v1.0.1-rp1-gpio4` and `v1.0.1-rp1-gpio20`. The historical `v0.9.0-pi5` value is accepted only as captured `0.9.0` predecessor removal authority. Exact commit, kernel, route, hashes, enrollment, and qualification remain separate facts.
 
 Runtime-capable source selection additionally requires commit
 `817f3dc6a194f4a92a7f94acf10147169e6439d6`, which provides the single-owner
@@ -162,11 +141,7 @@ whose Git history contains it. A development checkout or immutable release that
 cannot prove that ancestry is rejected before provider mutation or runtime bundle
 creation.
 
-An upstream `devel` tip predating that minimum is refused. The published
-`1.0.0` source includes that lifecycle prerequisite; its immutable source and
-asset identities are selected independently. The separate
-[published-provider verification](rp1-provider-acceptance.md) command never
-installs a package or changes ordinary source selection.
+An upstream `devel` tip predating that minimum is refused. The published `1.0.1` source includes that lifecycle prerequisite; its immutable source and asset identities are selected independently. The separate [published-provider verification](rp1-provider-acceptance.md) command never installs a package or changes ordinary source selection.
 
 A repeated development installation is a no-op only when WsprryPi's existing
 v2 ownership record and the complete inactive provider inventory still match

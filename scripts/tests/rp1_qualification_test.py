@@ -95,6 +95,22 @@ class Tests(unittest.TestCase):
                 Q.validate_assets(changed, self.lock)
         with self.assertRaises(ValueError): Q.strict_json('{"x":1,"x":2}')
 
+    def test_patch_release_does_not_inherit_original_route_evidence(self):
+        current = Q.strict_json((ROOT/'scripts/tests/fixtures/rp1-release-1.0.1.json').read_bytes())
+        for route in ('gpio4', 'gpio20'):
+            report, owner = observed(self.metadata, route)
+            binding = report['identities']['installedBinding']['value']
+            binding['sourceCommit'] = current['sourceCommit']
+            binding['productVersion'] = current['productVersion']
+            binding['compatibilityIdentities'] = current['compatibilityIdentities']
+            owner.update(sourceCommit=current['sourceCommit'], tag=current['releaseTag'],
+                         manifest={'package': {'sha256': current['assets']['rp1-gpclk-dkms_1.0.1-1_all.deb']}})
+            with patch.object(socket, 'socket', side_effect=AssertionError('network forbidden')):
+                result = Q.status(self.lock, route, report, owner)
+            self.assertEqual(result['status'], 'unattributed')
+            self.assertFalse(result['permissionGate'])
+            self.assertEqual(result['structuralCompatibility'], 'Compatible-unqualified')
+
     def test_missing_corrupt_oversized_symlink_and_fifo_inputs(self):
         report, owner = observed(self.metadata, 'gpio4')
         with self.deployment() as (runtime, source):
