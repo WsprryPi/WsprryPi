@@ -1345,6 +1345,7 @@ class ApplyPolicyTests(unittest.TestCase):
             with mock.patch.object(MOD, "load_ownership_record", return_value=(record, identity, None)), \
                  mock.patch.object(MOD, "recover_and_remove_owned_runtime") as prepare, \
                  mock.patch.object(MOD, "validate_candidate_before_update"), \
+                 mock.patch.object(MOD, "retain_provider_migration"), \
                  mock.patch.object(MOD, "validate_development_rollback_authority"), \
                  mock.patch.object(MOD, "replace_owned_record") as replace:
                 MOD.prepare_runtime_update(args, FakeRunner())
@@ -3088,6 +3089,25 @@ class InstallerMigrationTests(unittest.TestCase):
         (evidence/'previous-development-rollback.json').write_text('changed')
         with self.assertRaisesRegex(MOD.ContractError,'retained development recovery input differs'):
             MOD.retain_provider_migration(self.record,previous,selected,FakeRunner())
+
+
+    def test_same_version_development_source_change_retains_immutable_recovery(self):
+        previous,entrypoint,rollback=self.development_recovery_inputs()
+        previous['productVersion']=MOD.CONSUMER_PROVIDER_VERSION
+        previous['compatibilityIdentity']=MOD.development_compatibility(MOD.CONSUMER_PROVIDER_VERSION)
+        self.write_record(previous); args=self.plan()
+        def remove(*_):
+            evidence=list(self.root.glob('rp1-provider-migration.*/previous-development-rollback.json'))
+            self.assertEqual(len(evidence),1)
+            self.assertEqual(digest(evidence[0].read_bytes()),previous['rollbackRecordSha256'])
+            self.record.unlink()
+        with mock.patch.object(MOD,'validate_candidate_before_update'), \
+             mock.patch.object(MOD,'validate_development_rollback_authority',return_value=(entrypoint,rollback)), \
+             mock.patch.object(MOD,'remove_owned_provider',side_effect=remove) as owned_remove, \
+             mock.patch.object(MOD,'verify_provider_absent'), \
+             mock.patch.object(MOD,'apply_development') as install:
+            MOD.apply(args,FakeRunner())
+        owned_remove.assert_called_once(); install.assert_called_once()
 
 
 if __name__ == "__main__":

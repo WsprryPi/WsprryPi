@@ -2254,12 +2254,10 @@ def validate_consumer_provider(resolved: Mapping[str, Any]) -> None:
 
 
 def provider_migration_required(record: Mapping[str, Any], resolved: Mapping[str, Any]) -> bool:
-    # Same-channel development migrations retain their existing exact-source
-    # rollback handling. Release updates and channel changes use the owner's
-    # removal transaction, never an in-place package replacement.
+    # Source changes, including same-version development commits, need the
+    # owner's removal transaction and retained recovery inputs too.
     return (record.get("channel") != resolved.get("channel") or
-            (record.get("channel") == "release" and
-             record.get("sourceCommit") != resolved.get("commit")))
+            record.get("sourceCommit") != resolved.get("commit"))
 
 
 def retain_provider_migration(record_path: pathlib.Path, record: Mapping[str, Any],
