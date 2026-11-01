@@ -29,7 +29,8 @@
     "message-schedule",
     "consumer/password",
     "consumer/setup/api/owner/v1/public-status",
-    "amplifier-timing"
+    "amplifier-timing",
+    "si5351"
   ],
   "oneOf": [
     {
@@ -397,6 +398,9 @@
     },
     {
       "$ref": "#/$defs/browser-time-sample"
+    },
+    {
+      "$ref": "#/$defs/si5351"
     }
   ],
   "$defs": {
@@ -2093,7 +2097,9 @@
                   "amplifier",
                   "indicator",
                   "i2c_sda",
-                  "i2c_scl"
+                  "i2c_scl",
+                  "loopback",
+                  "si5351_gate"
                 ]
               }
             }
@@ -3730,6 +3736,16 @@
                 8,
                 12
               ]
+            },
+            "si5351": {
+              "anyOf": [
+                {
+                  "type": "null"
+                },
+                {
+                  "$ref": "#/$defs/si5351-settings"
+                }
+              ]
             }
           },
           "required": [
@@ -3787,6 +3803,16 @@
                 4,
                 8,
                 12
+              ]
+            },
+            "si5351": {
+              "anyOf": [
+                {
+                  "type": "null"
+                },
+                {
+                  "$ref": "#/$defs/si5351-settings"
+                }
               ]
             }
           },
@@ -5197,7 +5223,8 @@
         "max_wtp_connections",
         "max_pending_connections",
         "max_handshakes",
-        "max_body_bytes"
+        "max_body_bytes",
+        "si5351"
       ],
       "properties": {
         "contract": {
@@ -5902,6 +5929,179 @@
               "const": "pico_password"
             }
           }
+        },
+        "si5351": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "schema",
+            "read",
+            "config",
+            "update",
+            "update_schema",
+            "activation",
+            "supported_device",
+            "addresses",
+            "reference_hz",
+            "reference_sources",
+            "crystal_load_pf",
+            "drive_ma",
+            "outputs",
+            "capture_gps",
+            "reference_uses",
+            "default_reference_use",
+            "automatic_calibration",
+            "gps",
+            "physically_qualified",
+            "execution_gate",
+            "maximum_tones",
+            "maximum_events",
+            "minimum_transition_ns",
+            "manual_correction_limit_ppb",
+            "trusted_uncertainty_maximum_ppb",
+            "maximum_measurement_age_ns",
+            "minimum_measurement_window_ns",
+            "maximum_measurement_window_ns",
+            "reference_loss_policy",
+            "frequency_disagreement",
+            "i2c_hz",
+            "completion_control_timeout_ns"
+          ],
+          "properties": {
+            "schema": {
+              "const": "si5351"
+            },
+            "read": {
+              "const": "/api/control/v1/si5351"
+            },
+            "config": {
+              "const": "/api/control/v1/config"
+            },
+            "update": {
+              "const": "/api/control/v1/config/update"
+            },
+            "update_schema": {
+              "const": "config-update"
+            },
+            "activation": {
+              "const": "restart"
+            },
+            "supported_device": {
+              "const": "si5351a_10_msop"
+            },
+            "addresses": {
+              "const": [
+                96
+              ]
+            },
+            "reference_hz": {
+              "const": [
+                25000000,
+                27000000
+              ]
+            },
+            "reference_sources": {
+              "const": [
+                "crystal",
+                "external_xa"
+              ]
+            },
+            "crystal_load_pf": {
+              "const": [
+                6,
+                8,
+                10
+              ]
+            },
+            "drive_ma": {
+              "const": [
+                2,
+                4,
+                6,
+                8
+              ]
+            },
+            "outputs": {
+              "const": [
+                0,
+                1,
+                2
+              ]
+            },
+            "capture_gps": {
+              "const": [
+                1,
+                3,
+                5,
+                7,
+                9,
+                11,
+                13,
+                15,
+                17,
+                19,
+                21,
+                27
+              ]
+            },
+            "reference_uses": {
+              "const": [
+                "measurement_only",
+                "trusted_local"
+              ]
+            },
+            "default_reference_use": {
+              "const": "measurement_only"
+            },
+            "automatic_calibration": {
+              "const": false
+            },
+            "gps": {
+              "const": false
+            },
+            "physically_qualified": {
+              "const": false
+            },
+            "execution_gate": {
+              "const": "engineering_build"
+            },
+            "maximum_tones": {
+              "const": 4
+            },
+            "maximum_events": {
+              "const": 512
+            },
+            "minimum_transition_ns": {
+              "const": "10000000"
+            },
+            "manual_correction_limit_ppb": {
+              "const": 100000
+            },
+            "trusted_uncertainty_maximum_ppb": {
+              "const": 100000
+            },
+            "maximum_measurement_age_ns": {
+              "const": "30000000000"
+            },
+            "minimum_measurement_window_ns": {
+              "const": "10000000000"
+            },
+            "maximum_measurement_window_ns": {
+              "const": "60000000000"
+            },
+            "reference_loss_policy": {
+              "const": "retain_timer_rate_center_with_utc_holdover"
+            },
+            "frequency_disagreement": {
+              "const": "inhibit_utc_admission"
+            },
+            "i2c_hz": {
+              "const": 100000
+            },
+            "completion_control_timeout_ns": {
+              "const": "8000000"
+            }
+          }
         }
       },
       "title": "Control/1 capabilities"
@@ -5995,6 +6195,9 @@
                     8,
                     12
                   ]
+                },
+                "si5351": {
+                  "$ref": "#/$defs/si5351-settings"
                 }
               }
             }
@@ -6526,8 +6729,8 @@
           "properties": {
             "GET": {
               "type": "array",
-              "minItems": 30,
-              "maxItems": 30,
+              "minItems": 31,
+              "maxItems": 31,
               "uniqueItems": true,
               "items": {
                 "enum": [
@@ -6560,7 +6763,8 @@
                   "schedules",
                   "ntp-observations",
                   "consumer/field",
-                  "consumer/time"
+                  "consumer/time",
+                  "si5351"
                 ]
               }
             },
@@ -8389,6 +8593,561 @@
           }
         }
       }
+    },
+    "si5351-settings": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "reference_hz",
+        "reference_source",
+        "crystal_load_pf",
+        "address",
+        "drive_ma",
+        "transmit_output",
+        "loopback_output",
+        "loopback_input_gp",
+        "rf_gate_gp",
+        "rf_gate_active_high",
+        "reference_use",
+        "trusted_uncertainty_ppb",
+        "manual_correction_ppb",
+        "automatic_calibration"
+      ],
+      "properties": {
+        "reference_hz": {
+          "enum": [
+            25000000,
+            27000000
+          ]
+        },
+        "reference_source": {
+          "enum": [
+            "crystal",
+            "external_xa"
+          ]
+        },
+        "crystal_load_pf": {
+          "enum": [
+            null,
+            6,
+            8,
+            10
+          ]
+        },
+        "address": {
+          "const": 96
+        },
+        "drive_ma": {
+          "enum": [
+            2,
+            4,
+            6,
+            8
+          ]
+        },
+        "transmit_output": {
+          "enum": [
+            0,
+            1,
+            2
+          ]
+        },
+        "loopback_output": {
+          "enum": [
+            null,
+            0,
+            1,
+            2
+          ]
+        },
+        "loopback_input_gp": {
+          "enum": [
+            null,
+            1,
+            3,
+            5,
+            7,
+            9,
+            11,
+            13,
+            15,
+            17,
+            19,
+            21,
+            27
+          ]
+        },
+        "rf_gate_gp": {
+          "anyOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "integer",
+              "enum": [
+                0,
+                1,
+                2,
+                3,
+                4,
+                5,
+                6,
+                7,
+                8,
+                9,
+                10,
+                11,
+                12,
+                13,
+                14,
+                15,
+                16,
+                17,
+                18,
+                19,
+                20,
+                21,
+                22,
+                26,
+                27,
+                28
+              ]
+            }
+          ]
+        },
+        "rf_gate_active_high": {
+          "type": "boolean"
+        },
+        "reference_use": {
+          "enum": [
+            "measurement_only",
+            "trusted_local"
+          ]
+        },
+        "trusted_uncertainty_ppb": {
+          "anyOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100000
+            }
+          ]
+        },
+        "manual_correction_ppb": {
+          "type": "integer",
+          "minimum": -100000,
+          "maximum": 100000
+        },
+        "automatic_calibration": {
+          "const": false
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "reference_source": {
+                "const": "crystal"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "crystal_load_pf": {
+                "enum": [
+                  6,
+                  8,
+                  10
+                ]
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "crystal_load_pf": {
+                "type": "null"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "loopback_output": {
+                "type": "null"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "loopback_input_gp": {
+                "type": "null"
+              },
+              "reference_use": {
+                "const": "measurement_only"
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "loopback_input_gp": {
+                "type": "integer"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "reference_use": {
+                "const": "trusted_local"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "trusted_uncertainty_ppb": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 100000
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "trusted_uncertainty_ppb": {
+                "type": "null"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "transmit_output": {
+                "const": 0
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "loopback_output": {
+                "not": {
+                  "const": 0
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "transmit_output": {
+                "const": 1
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "loopback_output": {
+                "not": {
+                  "const": 1
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "transmit_output": {
+                "const": 2
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "loopback_output": {
+                "not": {
+                  "const": 2
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "si5351-measurement": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "start_raw_ns",
+        "observed_raw_ns",
+        "duration_ns",
+        "edges",
+        "endpoint_uncertainty_ns",
+        "plan_generation",
+        "observed_millihz",
+        "ratio_error_ppb",
+        "uncertainty_ppb",
+        "local_rate_ppb",
+        "reference_use",
+        "age_ns"
+      ],
+      "properties": {
+        "start_raw_ns": {
+          "type": "string",
+          "pattern": "^(0|[1-9][0-9]{0,19})$",
+          "maxLength": 20,
+          "x-maximum": "18446744073709551615"
+        },
+        "observed_raw_ns": {
+          "type": "string",
+          "pattern": "^(0|[1-9][0-9]{0,19})$",
+          "maxLength": 20,
+          "x-maximum": "18446744073709551615"
+        },
+        "duration_ns": {
+          "type": "string",
+          "pattern": "^(0|[1-9][0-9]{0,19})$",
+          "maxLength": 20,
+          "x-maximum": "18446744073709551615"
+        },
+        "edges": {
+          "type": "string",
+          "pattern": "^(0|[1-9][0-9]{0,19})$",
+          "maxLength": 20,
+          "x-maximum": "18446744073709551615"
+        },
+        "endpoint_uncertainty_ns": {
+          "type": "string",
+          "pattern": "^(0|[1-9][0-9]{0,19})$",
+          "maxLength": 20,
+          "x-maximum": "18446744073709551615"
+        },
+        "plan_generation": {
+          "type": "string",
+          "pattern": "^(0|[1-9][0-9]{0,19})$",
+          "maxLength": 20,
+          "x-maximum": "18446744073709551615"
+        },
+        "observed_millihz": {
+          "type": "string",
+          "pattern": "^(0|[1-9][0-9]{0,19})$",
+          "maxLength": 20,
+          "x-maximum": "18446744073709551615"
+        },
+        "ratio_error_ppb": {
+          "type": "string",
+          "pattern": "^-?(0|[1-9][0-9]{0,8})$",
+          "maxLength": 10
+        },
+        "uncertainty_ppb": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 200100
+        },
+        "local_rate_ppb": {
+          "anyOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "integer",
+              "minimum": -100000,
+              "maximum": 100000
+            }
+          ]
+        },
+        "reference_use": {
+          "enum": [
+            "measurement_only",
+            "trusted_local"
+          ]
+        },
+        "age_ns": {
+          "type": "string",
+          "pattern": "^(0|[1-9][0-9]{0,19})$",
+          "maxLength": 20,
+          "x-maximum": "18446744073709551615"
+        }
+      }
+    },
+    "si5351-runtime": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "transmit",
+        "reference_output",
+        "communication",
+        "engineering_enabled",
+        "inhibited",
+        "epoch",
+        "enable_command_completed_ns",
+        "disable_command_completed_ns",
+        "reference_measurement",
+        "measurement_error",
+        "clock_reference_state",
+        "clock_reference_observed_raw_ns"
+      ],
+      "properties": {
+        "transmit": {
+          "enum": [
+            "unknown",
+            "register_disabled",
+            "register_enabled"
+          ]
+        },
+        "reference_output": {
+          "enum": [
+            "unknown",
+            "register_disabled",
+            "register_enabled"
+          ]
+        },
+        "communication": {
+          "enum": [
+            "unknown",
+            "register_control_verified"
+          ]
+        },
+        "engineering_enabled": {
+          "type": "boolean"
+        },
+        "inhibited": {
+          "type": "boolean"
+        },
+        "epoch": {
+          "type": "string",
+          "pattern": "^(0|[1-9][0-9]{0,19})$",
+          "maxLength": 20,
+          "x-maximum": "18446744073709551615"
+        },
+        "enable_command_completed_ns": {
+          "type": "string",
+          "pattern": "^(0|[1-9][0-9]{0,19})$",
+          "maxLength": 20,
+          "x-maximum": "18446744073709551615"
+        },
+        "disable_command_completed_ns": {
+          "type": "string",
+          "pattern": "^(0|[1-9][0-9]{0,19})$",
+          "maxLength": 20,
+          "x-maximum": "18446744073709551615"
+        },
+        "reference_measurement": {
+          "anyOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/si5351-measurement"
+            }
+          ]
+        },
+        "measurement_error": {
+          "anyOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9_]{0,79}$",
+              "maxLength": 80
+            }
+          ]
+        },
+        "clock_reference_state": {
+          "enum": [
+            "none",
+            "selected",
+            "quality",
+            "disagreement",
+            "expired",
+            "awaiting_utc"
+          ]
+        },
+        "clock_reference_observed_raw_ns": {
+          "type": "string",
+          "pattern": "^(0|[1-9][0-9]{0,19})$",
+          "maxLength": 20,
+          "x-maximum": "18446744073709551615"
+        }
+      }
+    },
+    "si5351": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema",
+        "target",
+        "saved",
+        "boot_active",
+        "pending_restart",
+        "physically_qualified",
+        "execution_engine",
+        "runtime",
+        "storage_healthy",
+        "contract"
+      ],
+      "properties": {
+        "schema": {
+          "const": "si5351"
+        },
+        "target": {
+          "$ref": "#/$defs/application/$defs/target"
+        },
+        "saved": {
+          "anyOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/si5351-settings"
+            }
+          ]
+        },
+        "boot_active": {
+          "anyOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/si5351-settings"
+            }
+          ]
+        },
+        "pending_restart": {
+          "type": "boolean"
+        },
+        "physically_qualified": {
+          "const": false
+        },
+        "execution_engine": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        },
+        "runtime": {
+          "anyOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/si5351-runtime"
+            }
+          ]
+        },
+        "storage_healthy": {
+          "type": "boolean"
+        },
+        "contract": {
+          "const": "Wsprry-Control/1"
+        }
+      }
     }
   },
   "management_routes": {
@@ -8422,7 +9181,8 @@
       "schedules",
       "ntp-observations",
       "consumer/field",
-      "consumer/time"
+      "consumer/time",
+      "si5351"
     ],
     "PUT": [
       "network",
@@ -8622,6 +9382,77 @@
       "fallback_reopen_s": 300,
       "station_stable_s": 30,
       "authentication": "pico_password"
+    },
+    "si5351": {
+      "schema": "si5351",
+      "read": "/api/control/v1/si5351",
+      "config": "/api/control/v1/config",
+      "update": "/api/control/v1/config/update",
+      "update_schema": "config-update",
+      "activation": "restart",
+      "supported_device": "si5351a_10_msop",
+      "addresses": [
+        96
+      ],
+      "reference_hz": [
+        25000000,
+        27000000
+      ],
+      "reference_sources": [
+        "crystal",
+        "external_xa"
+      ],
+      "crystal_load_pf": [
+        6,
+        8,
+        10
+      ],
+      "drive_ma": [
+        2,
+        4,
+        6,
+        8
+      ],
+      "outputs": [
+        0,
+        1,
+        2
+      ],
+      "capture_gps": [
+        1,
+        3,
+        5,
+        7,
+        9,
+        11,
+        13,
+        15,
+        17,
+        19,
+        21,
+        27
+      ],
+      "reference_uses": [
+        "measurement_only",
+        "trusted_local"
+      ],
+      "default_reference_use": "measurement_only",
+      "automatic_calibration": false,
+      "gps": false,
+      "physically_qualified": false,
+      "execution_gate": "engineering_build",
+      "maximum_tones": 4,
+      "maximum_events": 512,
+      "minimum_transition_ns": "10000000",
+      "manual_correction_limit_ppb": 100000,
+      "trusted_uncertainty_maximum_ppb": 100000,
+      "maximum_measurement_age_ns": "30000000000",
+      "minimum_measurement_window_ns": "10000000000",
+      "maximum_measurement_window_ns": "60000000000",
+      "reference_loss_policy": "retain_timer_rate_center_with_utc_holdover",
+      "frequency_disagreement": "inhibit_utc_admission",
+      "i2c_hz": 100000,
+      "completion_control_timeout_ns": "8000000"
     }
   },
   "descriptor_runtime_fields": {
@@ -8723,7 +9554,8 @@
         "gpio-drive",
         "amplifier-timing",
         "filter-selector",
-        "progress"
+        "progress",
+        "si5351"
       ],
       "PUT": [
         "udp-logging",

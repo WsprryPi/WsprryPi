@@ -54,7 +54,7 @@
   function valid(v) {
     if(!keys(v,'schema,target,saved,boot_active,pending_restart,selected_id,selection_known,admission_error,output_active,rf_active,storage_healthy,reserved') ||
        v.schema!==descriptor.schema || !identity(v.target) || !Array.isArray(v.reserved) || v.reserved.length>26 ||
-       v.reserved.some(o=>!keys(o,'gp,role') || !gp(o.gp) || !['rf','button','amplifier','indicator','i2c_sda','i2c_scl'].includes(o.role)) ||
+       v.reserved.some(o=>!keys(o,'gp,role') || !gp(o.gp) || !['rf','button','amplifier','indicator','i2c_sda','i2c_scl','loopback','si5351_gate'].includes(o.role)) ||
        new Set(v.reserved.map(o=>o.gp)).size!==v.reserved.length ||
        ['pending_restart','selection_known','output_active','rf_active','storage_healthy'].some(k=>typeof v[k]!=='boolean') ||
        !(v.selected_id===null || integer(v.selected_id,1,5)) || v.rf_active && !v.output_active ||

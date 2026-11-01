@@ -12,6 +12,9 @@
 namespace wsprrypi {
 namespace {
 using Json = nlohmann::json;
+PicoHttpResponse filter_selector_request(const PicoManagementExchange &, const std::string &,
+    const std::string &, const std::string &, const std::string &, const std::string &,
+    const std::string &, const std::string &);
 bool plan_shape(const Json &p);
 bool plan_valid(const Json &p);
 Json normalized_plan(Json plan, bool amplifier = true) {
@@ -43,12 +46,58 @@ bool etag(const std::string &s) {
   return s.size() >= 2 && s.size() <= 128 && s.front() == '"' && s.back() == '"' &&
       std::all_of(s.begin()+1, s.end()-1, [](unsigned char c) { return c >= 33 && c < 127 && c != '"'; });
 }
+bool si_settings(const Json &v) {
+  if (!fields(v,{"reference_hz","reference_source","crystal_load_pf","address","drive_ma",
+        "transmit_output","loopback_output","loopback_input_gp","rf_gate_gp","rf_gate_active_high",
+        "reference_use","trusted_uncertainty_ppb","manual_correction_ppb","automatic_calibration"})) return false;
+  const auto integer=[](const Json &x,std::int64_t low,std::int64_t high) {
+    return x.is_number_integer() && x>=low && x<=high;
+  };
+  const auto gpio=[&](const Json &x) {return integer(x,0,22)||integer(x,26,28);};
+  if (!integer(v["reference_hz"],25000000,27000000) || (v["reference_hz"]!=25000000 && v["reference_hz"]!=27000000) ||
+      !integer(v["address"],96,96) || !integer(v["drive_ma"],2,8) || v["drive_ma"].get<unsigned>()%2 ||
+      !integer(v["transmit_output"],0,2) || !v["rf_gate_active_high"].is_boolean() ||
+      !v["automatic_calibration"].is_boolean() || v["automatic_calibration"]!=false ||
+      !integer(v["manual_correction_ppb"],-100000,100000)) return false;
+  if (v["reference_source"]=="crystal") {
+    if (!integer(v["crystal_load_pf"],6,10) || v["crystal_load_pf"].get<unsigned>()%2) return false;
+  } else if (v["reference_source"]!="external_xa" || !v["crystal_load_pf"].is_null()) return false;
+  if (v["loopback_output"].is_null()) {
+    if (!v["loopback_input_gp"].is_null() || v["reference_use"]!="measurement_only") return false;
+  } else if (!integer(v["loopback_output"],0,2) || v["transmit_output"]==v["loopback_output"] ||
+      !gpio(v["loopback_input_gp"]) || !(v["loopback_input_gp"].get<unsigned>()%2)) return false;
+  if (!v["rf_gate_gp"].is_null() && (!gpio(v["rf_gate_gp"]) || v["rf_gate_gp"]==v["loopback_input_gp"])) return false;
+  if (v["reference_use"]=="trusted_local") return integer(v["trusted_uncertainty_ppb"],1,100000);
+  return v["reference_use"]=="measurement_only" && v["trusted_uncertainty_ppb"].is_null();
+}
+bool si_allocation(const Json &config, const Json &selectors = Json::array()) {
+  if (!config.is_object() || !config.contains("pins") || !plan_valid(config["pins"])) return false;
+  const auto &p=config["pins"];
+  if (p["engine"]=="direct") return !config.contains("si5351") || config["si5351"].is_null() || si_settings(config["si5351"]);
+  if (!config.contains("si5351") || !si_settings(config["si5351"])) return false;
+  const auto &s=config["si5351"];
+  std::set<unsigned> pins;
+  const auto claim=[&](const Json &v) { return v.is_null() || pins.insert(v.get<unsigned>()).second; };
+  if (!claim(p["button_gp"]) || !claim(p["amplifier_gp"]) || !claim(p["indicator_gp"]) ||
+      !claim(s["loopback_input_gp"]) || !claim(s["rf_gate_gp"])) return false;
+  static constexpr unsigned pairs[][2]={{0,1},{4,5},{8,9},{12,13},{16,17},{20,21},
+      {2,3},{6,7},{10,11},{14,15},{18,19},{26,27}};
+  const auto id=p["i2c_pair"].get<unsigned>();
+  if (id>=12 || !pins.insert(pairs[id][0]).second || !pins.insert(pairs[id][1]).second) return false;
+  if (!selectors.is_array()) return false;
+  for (const auto &output:selectors)
+    if (!output.is_object() || !output.contains("gp") || !output["gp"].is_number_integer() || output["gp"]<0 || output["gp"]>28 ||
+        !pins.insert(output["gp"].get<unsigned>()).second) return false;
+  return true;
+}
 bool shape(const Json &j, bool partial, bool redacted) {
   if (!partial && j.dump().size() > 1800) return false;
   if (!(partial ? fields(j, {}, {"enabled", "station", "wifi", "schedules", "pins",
-        "expires_utc_s", "allow_unqualified_frequency", "allow_non_amateur_frequency", "gpio_drive_ma"}) && !j.empty()
+        "expires_utc_s", "allow_unqualified_frequency", "allow_non_amateur_frequency", "gpio_drive_ma", "si5351"}) && !j.empty()
       : fields(j, {"enabled", "station", "wifi", "schedules"}, {"pins",
-        "expires_utc_s", "allow_unqualified_frequency", "allow_non_amateur_frequency", "gpio_drive_ma"}))) return false;
+        "expires_utc_s", "allow_unqualified_frequency", "allow_non_amateur_frequency", "gpio_drive_ma", "si5351"}))) return false;
+  if (j.contains("si5351") && !(j["si5351"].is_null() ? !redacted : si_settings(j["si5351"]))) return false;
+  if (!partial && j.contains("pins") && !si_allocation(j)) return false;
   if (j.contains("gpio_drive_ma") && (!j["gpio_drive_ma"].is_number_integer() || !(j["gpio_drive_ma"] == 2 || j["gpio_drive_ma"] == 4 || j["gpio_drive_ma"] == 8 || j["gpio_drive_ma"] == 12))) return false;
   for (const auto key : {"enabled", "allow_unqualified_frequency", "allow_non_amateur_frequency"})
     if (j.contains(key) && !j[key].is_boolean()) return false;
@@ -95,6 +144,40 @@ bool decimal(const Json &j) {
   return !s.empty() && s.size() <= 20 && (s.size() == 1 || s.front() != '0') &&
       std::all_of(s.begin(), s.end(), [](char c) { return c >= '0' && c <= '9'; }) &&
       (s.size() < 20 || s <= "18446744073709551615");
+}
+bool si_runtime(const Json &v) {
+  if (!fields(v,{"transmit","reference_output","communication","engineering_enabled","inhibited",
+        "epoch","enable_command_completed_ns","disable_command_completed_ns","reference_measurement","measurement_error","clock_reference_state","clock_reference_observed_raw_ns"}) ||
+      !v["engineering_enabled"].is_boolean() || !v["inhibited"].is_boolean()) return false;
+  for (const auto key:{"transmit","reference_output"})
+    if (v[key]!="unknown" && v[key]!="register_disabled" && v[key]!="register_enabled") return false;
+  const bool unknown=v["transmit"]=="unknown" || v["reference_output"]=="unknown";
+  if (v["communication"]!=(unknown ? "unknown" : "register_control_verified")) return false;
+  for (const auto key:{"epoch","enable_command_completed_ns","disable_command_completed_ns"}) if (!decimal(v[key])) return false;
+  if (v["clock_reference_state"]!="none" && v["clock_reference_state"]!="selected" && v["clock_reference_state"]!="quality" && v["clock_reference_state"]!="disagreement" && v["clock_reference_state"]!="expired" && v["clock_reference_state"]!="awaiting_utc") return false;
+  if (!decimal(v["clock_reference_observed_raw_ns"]) ||
+      (v["clock_reference_state"]=="none")!=(v["clock_reference_observed_raw_ns"]=="0")) return false;
+  if (!v["measurement_error"].is_null() && (!v["measurement_error"].is_string() ||
+      !std::regex_match(v["measurement_error"].get<std::string>(),std::regex("[a-z][a-z0-9_]{0,79}")))) return false;
+  const auto &m=v["reference_measurement"];
+  if (m.is_null()) return true;
+  if (!fields(m,{"start_raw_ns","observed_raw_ns","duration_ns","edges","endpoint_uncertainty_ns",
+        "plan_generation","observed_millihz","ratio_error_ppb","uncertainty_ppb","local_rate_ppb","reference_use","age_ns"})) return false;
+  for (const auto key:{"start_raw_ns","observed_raw_ns","duration_ns","edges","endpoint_uncertainty_ns","plan_generation","observed_millihz","age_ns"})
+    if (!decimal(m[key])) return false;
+  if (!m["ratio_error_ppb"].is_string() || !std::regex_match(m["ratio_error_ppb"].get<std::string>(),std::regex("0|-?[1-9][0-9]{0,7}"))) return false;
+  const auto number=[&](const char *key) { return std::stoull(m[key].get<std::string>()); };
+  if (std::abs(std::stoll(m["ratio_error_ppb"].get<std::string>()))>10000000 ||
+      number("observed_millihz")<990000 || number("observed_millihz")>10100000000ULL ||
+      !number("edges") || !number("plan_generation") || number("duration_ns")<10000000000ULL || number("duration_ns")>60000000000ULL ||
+      number("observed_raw_ns")<=number("start_raw_ns") || number("observed_raw_ns")-number("start_raw_ns")!=number("duration_ns") ||
+      number("endpoint_uncertainty_ns")>=number("duration_ns") || number("age_ns")>30000000000ULL ||
+      !m["uncertainty_ppb"].is_number_integer() || m["uncertainty_ppb"]<1 || m["uncertainty_ppb"]>200100) return false;
+  const auto end=number("observed_raw_ns"),age=number("age_ns");
+  if (end>UINT64_MAX-age || std::stoull(v["clock_reference_observed_raw_ns"].get<std::string>())>end+age) return false;
+  if (m["reference_use"]=="measurement_only") return m["local_rate_ppb"].is_null();
+  return m["reference_use"]=="trusted_local" && m["local_rate_ppb"].is_number_integer() &&
+      m["local_rate_ppb"]>=-100000 && m["local_rate_ppb"]<=100000;
 }
 bool supported_descriptor(const Json &value, std::string_view name) {
   const auto expected=Json::parse(control_descriptor(name));
@@ -322,6 +405,7 @@ PicoHttpResponse pico_configuration_request(const PicoManagementExchange &exchan
     };
     const auto caps = parsed(read("capabilities"),true);
     require(caps.is_object(),"unsupported_remote_contract",409);
+    require(caps.contains("si5351") && supported_descriptor(caps["si5351"],"si5351"),"unsupported_si5351_capabilities",409);
     require(caps.contains("application_resources"),
         "unsupported_configuration_context",409);
     if (caps.contains("management_carriers")) {
@@ -379,6 +463,17 @@ PicoHttpResponse pico_configuration_request(const PicoManagementExchange &exchan
     }
     if (method == "POST") {
       const auto &patch = input["config"];
+      Json proposed=config.is_null()?Json::object():config;
+      for (const auto &[name,value]:patch.items()) proposed[name]=value;
+      if (proposed.contains("si5351") || (proposed.contains("pins") && proposed["pins"].value("engine","")=="i2c")) {
+        const auto filters=filter_selector_request(exchange,device,boot,"GET",{}, {},carrier,generation);
+        success(filters);
+        const auto checked_filters=parsed(filters);
+        require(filters.etag==original.etag,"revision_conflict",412);
+        require(checked_filters.contains("saved") && checked_filters["saved"].is_object() &&
+            checked_filters["saved"].contains("selectors") &&
+            si_allocation(proposed,checked_filters["saved"]["selectors"]),"invalid_si5351_allocation",400);
+      }
       if ((carrier == "consumer_station" || carrier == "consumer_ap") && patch.contains("station")) {
         bool changed = config.is_null();
         for (const auto& field : patch["station"].items())
@@ -401,6 +496,9 @@ PicoHttpResponse pico_configuration_request(const PicoManagementExchange &exchan
       require(result.contains("config") && shape(result["config"], false, true) && etag(r.etag), "management_outcome_unknown");
       require(drive_policy_fields(result["config"],caps),"management_outcome_unknown");
       if (!expected_config_pins.is_null()) require(result["config"].at("pins").dump()==expected_config_pins.dump(),"management_outcome_unknown");
+      if (patch.contains("si5351")) require(patch["si5351"].is_null()
+          ? !result["config"].contains("si5351")
+          : result["config"].contains("si5351") && result["config"]["si5351"]==patch["si5351"],"management_outcome_unknown");
       config = result["config"]; original.etag = r.etag;
       reboot = result.contains("reboot_required") && result["reboot_required"].is_boolean()
           ? result["reboot_required"] : Json(nullptr);
@@ -479,7 +577,7 @@ Json review_plan(const Json &p) {
   }
   for (const auto &pair : pairs) result["i2c_available"].push_back(
       !result["owners"].contains("GP" + std::to_string(pair[1])) && !result["owners"].contains("GP" + std::to_string(pair[2])));
-  result["operational_supported"] = result["valid"] == true && direct && p["lpf_gps"].empty();
+  result["operational_supported"] = result["valid"] == true && p["lpf_gps"].empty();
   return result;
 }
 bool plan_valid(const Json &p) { return plan_shape(p) && review_plan(p)["operational_supported"] == true; }
@@ -529,7 +627,7 @@ void pin_choices(const Json &j) {
       c["schema"] == "pins" && c["numbering"] == "pico_gp" && c["eligible_gps"] == eligible &&
       c["indicator_choices"] == Json::array({"onboard_led","external","disabled"}) && c["activation_supported"] == true &&
       c["adapter_support"] == Json{{"rf","configurable_pio_gpio"},{"button","configurable_active_low_when_enabled"},
-        {"indicator","configurable_shared_cues_and_tx"},{"amplifier",true},{"lpf",false},{"i2c_rf",false}} &&
+        {"indicator","configurable_shared_cues_and_tx"},{"amplifier",true},{"lpf",false},{"i2c_rf",true}} &&
       c["i2c_pairs"].is_array() && c["i2c_pairs"].size() == 12, "unsupported_pin_capabilities",409);
   for (unsigned i=0;i<12;++i) {
     const auto &p = c["i2c_pairs"][i];
@@ -840,7 +938,7 @@ PicoHttpResponse filter_selector_request(const PicoManagementExchange &exchange,
       require(v["reserved"].is_array() && v["reserved"].size()<=26,"invalid_remote_resource");std::set<unsigned> reserved;
       for(const auto &p:v["reserved"]) {
         require(fields(p,{"gp","role"}) && p["gp"].is_number_integer() && ((p["gp"]>=0 && p["gp"]<=22)||(p["gp"]>=26 && p["gp"]<=28)) &&
-            (p["role"]=="rf" || p["role"]=="button" || p["role"]=="amplifier" || p["role"]=="indicator" || p["role"]=="i2c_sda" || p["role"]=="i2c_scl"),"invalid_remote_resource");
+            (p["role"]=="rf" || p["role"]=="button" || p["role"]=="amplifier" || p["role"]=="indicator" || p["role"]=="i2c_sda" || p["role"]=="i2c_scl" || p["role"]=="loopback" || p["role"]=="si5351_gate"),"invalid_remote_resource");
         require(reserved.insert(p["gp"].get<unsigned>()).second,"invalid_remote_resource");
       }
       if(!v["saved"].is_null()) for(const auto &o:v["saved"]["selectors"])require(!reserved.contains(o["gp"].get<unsigned>()),"invalid_remote_resource");
@@ -1008,6 +1106,33 @@ PicoHttpResponse pico_resource_request(const PicoManagementExchange &exchange,
     const std::string &device, const std::string &boot, const std::string &resource,
     const std::string &method, const std::string &body, const std::string &revision,
     const std::string &carrier, const std::string &generation) {
+  if (resource == "si5351") {
+    try {
+      require(method=="GET" && body.empty(),"not_found",404);
+      require(identity(device) && identity(boot),"member_identity_unavailable",409);
+      const auto cr=exchange("capabilities","GET",{},{});success(cr);const auto caps=parsed(cr,true);
+      require(caps.contains("si5351") && supported_descriptor(caps["si5351"],"si5351"),"unsupported_si5351_capabilities",409);
+      require(caps.contains("management_carriers") && valid_management_descriptor(caps["management_carriers"],carrier),"unsupported_management_contract",409);
+      const auto mr=exchange("management","GET",{},{});success(mr);const auto management=strict_browser_json(mr.body);
+      require(valid_management_contract(management,carrier,device,boot,generation) && management["schema"]==caps["management_carriers"]["schema"],"unsupported_management_contract",409);
+      const auto result=exchange("si5351","GET",{},{});success(result);const auto value=parsed(result);
+      const Json target{{"scope","member"},{"device_id",device},{"boot_id",boot}};
+      require(fields(value,{"schema","target","saved","boot_active","pending_restart","physically_qualified","execution_engine","runtime","storage_healthy"}) &&
+          value["schema"]=="si5351" && value["target"]==target && etag(result.etag) &&
+          value["physically_qualified"].is_boolean() && value["physically_qualified"]==false &&
+          value["pending_restart"].is_boolean() && value["storage_healthy"].is_boolean() &&
+          value["execution_engine"].is_string() && !value["execution_engine"].empty() && value["execution_engine"].get<std::string>().size()<=64,"invalid_remote_resource");
+      for (const auto key:{"saved","boot_active"}) require(value[key].is_null() || si_settings(value[key]),"invalid_remote_resource");
+      require(value["runtime"].is_null() || (!value["boot_active"].is_null() && si_runtime(value["runtime"])),"invalid_remote_resource");
+      if (!value["runtime"].is_null() && !value["runtime"]["reference_measurement"].is_null())
+        require(!value["boot_active"]["loopback_output"].is_null() &&
+            value["runtime"]["reference_measurement"]["reference_use"]==value["boot_active"]["reference_use"],"invalid_remote_resource");
+      require(value["storage_healthy"]==true || value["saved"].is_null(),"invalid_remote_resource");
+      return result;
+    } catch (const Rejected &e) {
+      return {e.status,Json{{"error",{{"code",e.code}}},{"mutation_attempted",false}}.dump(),{}};
+    } catch (...) { return {502,R"({"error":{"code":"invalid_remote_resource"},"mutation_attempted":false})",{}}; }
+  }
   if (resource == "filter-selector") return filter_selector_request(exchange,device,boot,method,body,revision,carrier,generation);
   if (resource == "amplifier-timing") return amplifier_timing_request(exchange,device,boot,method,body,revision,carrier,generation);
   if (resource == "gpio-drive-progress") return gpio_drive_progress_request(exchange,device,boot,method,body,revision,carrier,generation);
@@ -1089,7 +1214,7 @@ PicoHttpResponse pico_resource_request(const PicoManagementExchange &exchange,
         drive_policy_observation(after["hardware"]["gpio_drive"],caps),"invalid_remote_resource");
     application = after;
     Json control_capabilities=Json::object();
-    for (const auto feature : {"gpio_drive","amplifier_enable","amplifier_timing","filter_selector"}) {
+    for (const auto feature : {"gpio_drive","amplifier_enable","amplifier_timing","filter_selector","si5351"}) {
       if (!caps.contains(feature)) continue;
       require(supported_descriptor(caps[feature],feature),"unsupported_resource_capabilities",409);
       control_capabilities[feature]=caps[feature];

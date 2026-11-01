@@ -65,6 +65,9 @@ set(core
     application/resources.cpp
     application/frequency_policy.cpp
     hardware/pins.cpp
+    hardware/si5351_settings.cpp
+    rf/si5351_plan.cpp
+    rf/reference_measurement.cpp
     hardware/filter_settings.cpp
     rf/filter_selector.cpp
     provisioning/profile.cpp

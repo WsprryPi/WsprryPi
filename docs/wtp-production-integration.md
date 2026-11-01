@@ -184,3 +184,9 @@ The installer contains the status/recovery proxy mapping; no installation or
 service validation is implied by source tests. The separate operator manual
 needs corresponding backend, INI, Transmitter-tab and recovery documentation
 under its own repository authorization before general operator publication.
+
+## Pico Si5351 allocation
+
+Selected Pico members expose Direct GPIO and Si5351 RF-output drafts. The Pico Si5351 allocation uses a complete approved I²C pair, reference/source, distinct transmit/optional loopback clocks, counter input, optional independent gate and engine-specific manual correction. These are Pico GP resources, independent of the Pi local Si5351 backend. Saving sends one revision/identity-bound configuration mutation; current descriptors, filter ownership and complete allocations are validated before writes. Engine/reference changes latch restart and inhibition, including A/B/A saves. Inactive settings are retained without owning pins.
+
+Read-only Si5351 status is supported over USB, engineering TLS and Consumer-Radio. Register communication, output state, measurement ratio/uncertainty/age and clock-reference selection remain separate observations. Physical qualification is false; ordinary Pico firmware refuses Si5351 output activation. Engineering firmware requires verified electrical, conducted RF and shutdown conditions. Trusted-local rate input supplies no UTC epoch or RF calibration. GPS/PPS ingestion and automatic RF calibration remain unavailable.
