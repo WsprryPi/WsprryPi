@@ -34,15 +34,15 @@ def digest(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
 
 
-def inventory_for_uapi(content: bytes = b"uapi\n") -> list[dict[str, object]]:
+def inventory_for_uapi(content: bytes = b"uapi\n", version: str = "2.1.0") -> list[dict[str, object]]:
     return [{
-        "path": "usr/src/rp1-gpclk-dkms-2.1.0/include/uapi/linux/rp1_gpclk.h",
+        "path": f"usr/src/rp1-gpclk-dkms-{version}/include/uapi/linux/rp1_gpclk.h",
         "type": "file", "mode": "0644", "sha256": digest(content),
     }]
 
 
 def valid_manifest(version: str = "2.1.0", commit: str = "a" * 40) -> dict[str, object]:
-    inventory = inventory_for_uapi()
+    inventory = inventory_for_uapi(version=version)
     return {
         "schema": MOD.MANIFEST_SCHEMA,
         "schemaVersion": 1,
@@ -148,7 +148,7 @@ class PlatformAndSelectionTests(unittest.TestCase):
             self.assertEqual(MOD.source_selector("auto", MOD.wsprry_channel(source))[0], "release")
         for source in ("devel", "codex/feature", "issue-412"):
             self.assertEqual(MOD.wsprry_channel(source), "development")
-            self.assertEqual(MOD.source_selector("auto", MOD.wsprry_channel(source))[0], "devel")
+            self.assertEqual(MOD.source_selector("auto", MOD.wsprry_channel(source))[0], "release")
         for ambiguous in ("", "HEAD", "detached", "unknown"):
             with self.assertRaises(MOD.ContractError):
                 MOD.wsprry_channel(ambiguous)
@@ -1190,7 +1190,7 @@ class ApplyPolicyTests(unittest.TestCase):
             "schema": MOD.STATE_SCHEMA, "dryRun": dry_run,
             "decision": {"install": True},
             "resolved": {"channel": "development", "commit": "a" * 40,
-                         "version": "1.0.0"},
+                         "version": MOD.CONSUMER_PROVIDER_VERSION},
         })
         return MOD.parser().parse_args([
             "prepare-runtime-update", "--state-dir", str(self.state),
@@ -1344,6 +1344,7 @@ class ApplyPolicyTests(unittest.TestCase):
             MOD.atomic_json(self.state / "plan.json", plan)
             with mock.patch.object(MOD, "load_ownership_record", return_value=(record, identity, None)), \
                  mock.patch.object(MOD, "recover_and_remove_owned_runtime") as prepare, \
+                 mock.patch.object(MOD, "validate_candidate_before_update"), \
                  mock.patch.object(MOD, "validate_development_rollback_authority"), \
                  mock.patch.object(MOD, "replace_owned_record") as replace:
                 MOD.prepare_runtime_update(args, FakeRunner())
@@ -1552,7 +1553,7 @@ class ApplyPolicyTests(unittest.TestCase):
         ])
         owned = {"schema": MOD.RECORD_SCHEMA}
         resolved = {"channel": "development", "commit": "a" * 40,
-                    "version": "1.2.3", "sourceTree": "b" * 40,
+                    "version": MOD.CONSUMER_PROVIDER_VERSION, "sourceTree": "b" * 40,
                     "uapiSha256": "c" * 64}
         with mock.patch.object(
                 MOD, "runtime_residue_inventory",
@@ -2752,6 +2753,232 @@ class RemovalPolicyTests(unittest.TestCase):
         self.assertEqual(runner.passthrough_calls,
                          [(str(entrypoint), "--record", str(rollback))])
         self.assertFalse(self.record.exists())
+
+
+class InstallerMigrationTests(unittest.TestCase):
+    # Reuse the existing strict ownership fixtures, not alternate production views.
+    release_record = RemovalPolicyTests.release_record
+    write_record = RemovalPolicyTests.write_record
+
+    def setUp(self):
+        RemovalPolicyTests.setUp(self)
+        self.state = self.root / 'state'; self.state.mkdir(mode=0o700)
+        self.selected = {'channel': 'development', 'commit': 'd' * 40,
+                         'version': MOD.CONSUMER_PROVIDER_VERSION,
+                         'checkout': {'commit': 'd' * 40, 'path': str(self.root / 'candidate')}}
+        self.old = self.release_record()
+        self.payload = b'exact predecessor package'
+        self.old['manifest']['package']['sha256'] = digest(self.payload)
+
+    def plan(self, selected=None):
+        MOD.atomic_json(self.state / 'plan.json', {'schema': MOD.STATE_SCHEMA,
+            'dryRun': False, 'decision': {'install': True}, 'resolved': selected or self.selected})
+        return MOD.parser().parse_args(['apply', '--state-dir', str(self.state),
+                                      '--record', str(self.record), '--root', str(self.root)])
+
+    def test_consumer_version_matches_cpp_and_published_reference(self):
+        source = (ROOT / 'src/WSPR-Transmitter/src/rp1_gpclk_consumer_contract.hpp').read_text()
+        self.assertIn('version = "' + MOD.CONSUMER_PROVIDER_VERSION + '"', source)
+        lock = json.loads((ROOT / 'scripts/tests/fixtures/rp1-release-1.0.1.json').read_text())
+        self.assertEqual(lock['productVersion'], MOD.CONSUMER_PROVIDER_VERSION)
+
+    def test_explicit_development_remains_explicit(self):
+        self.assertEqual(MOD.source_selector('auto', 'development'), ('release', None))
+        self.assertEqual(MOD.source_selector('devel', 'development'), ('devel', None))
+
+    def test_incompatible_candidate_fails_before_ownership_or_runtime_effects(self):
+        selected = dict(self.selected, version='1.0.0'); args = self.plan(selected)
+        args.command = 'prepare-runtime-update'
+        with mock.patch.object(MOD, 'load_ownership_record') as ownership, \
+             mock.patch.object(MOD, 'recover_and_remove_owned_runtime') as effects:
+            with self.assertRaisesRegex(MOD.ContractError, 'not accepted'):
+                MOD.prepare_runtime_update(args, FakeRunner())
+        ownership.assert_not_called(); effects.assert_not_called()
+
+    def test_unknown_candidate_channel_refused_before_removal(self):
+        args = self.plan(dict(self.selected, channel='unknown'))
+        with mock.patch.object(MOD, 'remove_owned_provider') as remove:
+            with self.assertRaisesRegex(MOD.ContractError, 'channel is invalid'):
+                MOD.apply(args, FakeRunner())
+        remove.assert_not_called()
+
+    def test_source_binding_checked_before_runtime_update(self):
+        selected = copy.deepcopy(self.selected); selected['checkout']['commit'] = 'e' * 40
+        with self.assertRaisesRegex(MOD.ContractError, 'commits differ'):
+            MOD.validate_candidate_before_update(selected, FakeRunner())
+
+    def test_source_product_checked_again_before_runtime_update(self):
+        with mock.patch.object(MOD, 'revalidate_checkout', return_value=self.root), \
+             mock.patch.object(MOD, 'runtime_source_interface'), \
+             mock.patch.object(MOD, 'runtime_source_identity', side_effect=MOD.ContractError('source version differs')):
+            with self.assertRaisesRegex(MOD.ContractError, 'source version differs'):
+                MOD.validate_candidate_before_update(self.selected, FakeRunner())
+
+    def test_rollback_is_retained_and_verified_before_removal(self):
+        self.write_record(self.old); args = self.plan(); events = []
+        def remove(arguments, runner):
+            directories = list(self.root.glob('rp1-provider-migration.*'))
+            self.assertEqual(len(directories), 1)
+            self.assertEqual((directories[0] / self.old['manifest']['package']['filename']).read_bytes(), self.payload)
+            self.assertEqual(json.loads((directories[0] / 'previous-installation.json').read_text()), self.old)
+            self.assertEqual(arguments.remove, 'true')
+            events.append('remove'); self.record.unlink()
+        with mock.patch.object(MOD, 'validate_candidate_before_update', side_effect=lambda *_:events.append('candidate')), \
+             mock.patch.object(MOD.GitHubClient, 'bytes', return_value=self.payload), \
+             mock.patch.object(MOD, 'validate_package'), \
+             mock.patch.object(MOD, 'remove_owned_provider', side_effect=remove), \
+             mock.patch.object(MOD, 'verify_provider_absent', side_effect=lambda *_:events.append('absence')), \
+             mock.patch.object(MOD, 'apply_development', side_effect=lambda *_:events.append('install')):
+            MOD.apply(args, FakeRunner())
+        self.assertEqual(events, ['candidate', 'remove', 'absence', 'install'])
+
+    def test_corrupt_rollback_package_preserves_installed_provider(self):
+        self.write_record(self.old); args = self.plan()
+        with mock.patch.object(MOD, 'validate_candidate_before_update'), \
+             mock.patch.object(MOD.GitHubClient, 'bytes', return_value=b'corrupt'), \
+             mock.patch.object(MOD, 'remove_owned_provider') as remove, \
+             mock.patch.object(MOD, 'apply_development') as install:
+            with self.assertRaisesRegex(MOD.ContractError, 'rollback package SHA-256'):
+                MOD.apply(args, FakeRunner())
+        self.assertEqual(json.loads(self.record.read_text()), self.old)
+        remove.assert_not_called(); install.assert_not_called()
+
+    def test_failed_owned_removal_never_installs_candidate(self):
+        self.write_record(self.old); args = self.plan()
+        with mock.patch.object(MOD, 'validate_candidate_before_update'), \
+             mock.patch.object(MOD.GitHubClient, 'bytes', return_value=self.payload), \
+             mock.patch.object(MOD, 'validate_package'), \
+             mock.patch.object(MOD, 'remove_owned_provider', side_effect=MOD.ContractError('cleanup refused')), \
+             mock.patch.object(MOD, 'apply_development') as install:
+            with self.assertRaisesRegex(MOD.ContractError, 'cleanup refused'):
+                MOD.apply(args, FakeRunner())
+        install.assert_not_called()
+        self.assertTrue(self.record.exists())
+        self.assertTrue(list(self.root.glob('rp1-provider-migration.*/previous-installation.json')))
+
+    def test_retained_package_is_reused_offline_and_corruption_is_refused(self):
+        with mock.patch.object(MOD.GitHubClient, 'bytes', return_value=self.payload) as download, \
+             mock.patch.object(MOD, 'validate_package'):
+            directory = MOD.retain_provider_migration(self.record, self.old, self.selected, FakeRunner())
+            MOD.retain_provider_migration(self.record, self.old, self.selected, FakeRunner())
+            self.assertEqual(download.call_count, 1)
+            (directory / self.old['manifest']['package']['filename']).write_bytes(b'bad cached input')
+            with self.assertRaisesRegex(MOD.ContractError, 'retained predecessor rollback package differs'):
+                MOD.retain_provider_migration(self.record, self.old, self.selected, FakeRunner())
+            self.assertEqual(download.call_count, 1)
+
+    def test_retained_package_symlink_is_preserved_and_refused(self):
+        with mock.patch.object(MOD.GitHubClient, 'bytes', return_value=self.payload), \
+             mock.patch.object(MOD, 'validate_package'):
+            directory = MOD.retain_provider_migration(self.record, self.old, self.selected, FakeRunner())
+            package = directory / self.old['manifest']['package']['filename']; package.unlink()
+            target = self.root / 'foreign'; target.write_bytes(self.payload); package.symlink_to(target)
+            with self.assertRaisesRegex(MOD.ContractError, 'rollback package differs'):
+                MOD.retain_provider_migration(self.record, self.old, self.selected, FakeRunner())
+            self.assertTrue(package.is_symlink()); self.assertEqual(target.read_bytes(), self.payload)
+
+    def test_same_provider_does_not_create_migration_or_remove_it(self):
+        self.assertFalse(MOD.provider_migration_required(self.old, {
+            'channel':'release', 'commit':self.old['sourceCommit']}))
+        self.assertTrue(MOD.provider_migration_required(self.old, {'channel':'release','commit':'f'*40}))
+        self.assertTrue(MOD.provider_migration_required({'channel':'development','sourceCommit':'a'*40},
+                                                       {'channel':'release','commit':'a'*40}))
+
+    def test_empty_owned_dropin_removed_but_foreign_content_is_preserved(self):
+        directory = self.root / 'etc/systemd/system/rp1-gpclk-route-manager@.service.d'
+        directory.mkdir(parents=True); MOD.remove_empty_runtime_dropin(self.root)
+        self.assertFalse(directory.exists())
+        directory.mkdir(); foreign = directory / 'operator.conf'; foreign.write_text('keep')
+        with self.assertRaisesRegex(MOD.ContractError, 'preserve its contents'):
+            MOD.remove_empty_runtime_dropin(self.root)
+        self.assertEqual(foreign.read_text(), 'keep')
+
+    def test_runtime_dropin_symlink_and_parent_substitution_are_refused(self):
+        directory = self.root / 'etc/systemd/system/rp1-gpclk-route-manager@.service.d'
+        directory.parent.mkdir(parents=True); foreign = self.root / 'foreign'; foreign.mkdir()
+        directory.symlink_to(foreign)
+        with self.assertRaisesRegex(MOD.ContractError, 'substituted'):
+            MOD.remove_empty_runtime_dropin(self.root)
+        self.assertTrue(foreign.is_dir()); self.assertTrue(directory.is_symlink())
+        directory.unlink(); directory.parent.rmdir(); directory.parent.symlink_to(foreign)
+        (foreign / directory.name).mkdir()
+        with self.assertRaisesRegex(MOD.ContractError, 'substituted'):
+            MOD.remove_empty_runtime_dropin(self.root)
+        self.assertTrue((foreign / directory.name).is_dir())
+
+
+    def release_candidate(self):
+        manifest = valid_manifest(MOD.CONSUMER_PROVIDER_VERSION, 'd' * 40)
+        package = self.state / manifest['package']['filename']; package.write_bytes(b'candidate package')
+        manifest['package']['sha256'] = digest(package.read_bytes())
+        return dict(self.selected, channel='release', manifest=manifest,
+                    tag=manifest['releaseTag'], packagePath=str(package))
+
+    def test_corrupt_candidate_package_does_not_start_runtime_cleanup(self):
+        selected = self.release_candidate(); args = self.plan(selected)
+        args.command = 'prepare-runtime-update'
+        with mock.patch.object(MOD, 'validate_package', side_effect=MOD.ContractError('candidate corrupt')), \
+             mock.patch.object(MOD, 'recover_and_remove_owned_runtime') as cleanup, \
+             mock.patch.object(MOD, 'load_ownership_record') as owned:
+            with self.assertRaisesRegex(MOD.ContractError, 'candidate corrupt'):
+                MOD.prepare_runtime_update(args, FakeRunner())
+        cleanup.assert_not_called(); owned.assert_not_called()
+
+    def test_release_version_migration_verifies_candidate_before_owned_removal(self):
+        self.write_record(self.old); selected = self.release_candidate(); args = self.plan(selected); events=[]
+        def remove(arguments, runner):events.append('remove'); self.record.unlink()
+        def package(path, *_):events.append('candidate' if path.parent==self.state else 'rollback')
+        with mock.patch.object(MOD.GitHubClient, 'bytes', return_value=self.payload), \
+             mock.patch.object(MOD, 'validate_package', side_effect=package), \
+             mock.patch.object(MOD, 'revalidate_checkout', return_value=self.root), \
+             mock.patch.object(MOD, 'runtime_source_interface'), \
+             mock.patch.object(MOD, 'runtime_source_identity'), \
+             mock.patch.object(MOD, 'remove_owned_provider', side_effect=remove), \
+             mock.patch.object(MOD, 'verify_provider_absent', side_effect=lambda *_:events.append('absence')), \
+             mock.patch.object(MOD, 'apply_release', side_effect=lambda *_:events.append('install')):
+            MOD.apply(args, FakeRunner())
+        self.assertEqual(events, ['candidate','rollback','remove','absence','install'])
+
+    def test_development_to_release_retains_exact_rollback_authority(self):
+        previous=RemovalPolicyTests.development_record(self); self.write_record(previous)
+        args=self.plan(self.release_candidate())
+        with mock.patch.object(MOD, 'validate_candidate_before_update'), \
+             mock.patch.object(MOD, 'validate_development_rollback_authority') as rollback, \
+             mock.patch.object(MOD, 'remove_owned_provider', side_effect=lambda *_:self.record.unlink()), \
+             mock.patch.object(MOD, 'verify_provider_absent'), \
+             mock.patch.object(MOD, 'apply_release') as install:
+            MOD.apply(args, FakeRunner())
+        rollback.assert_called_once_with(previous, pathlib.Path('/')); install.assert_called_once()
+        retained=list(self.root.glob('rp1-provider-migration.*/previous-installation.json'))
+        self.assertEqual(json.loads(retained[0].read_text()), previous)
+
+    def test_concurrent_ownership_change_after_retention_stops_removal(self):
+        self.write_record(self.old); args=self.plan()
+        changed=copy.deepcopy(self.old); changed['sourceCommit']='e'*40
+        with mock.patch.object(MOD, 'validate_candidate_before_update'), \
+             mock.patch.object(MOD, 'retain_provider_migration', side_effect=lambda *_:self.write_record(changed)), \
+             mock.patch.object(MOD, 'remove_owned_provider') as remove, \
+             mock.patch.object(MOD, 'apply_development') as install:
+            with self.assertRaisesRegex(MOD.ContractError, 'ownership changed'):
+                MOD.apply(args, FakeRunner())
+        remove.assert_not_called(); install.assert_not_called()
+        self.assertEqual(json.loads(self.record.read_text()), changed)
+
+    def test_changed_retained_ownership_stops_retry(self):
+        with mock.patch.object(MOD.GitHubClient, 'bytes', return_value=self.payload), \
+             mock.patch.object(MOD, 'validate_package'):
+            directory=MOD.retain_provider_migration(self.record,self.old,self.selected,FakeRunner())
+            path=directory/'previous-installation.json'; value=json.loads(path.read_text())
+            value['moduleArtifacts'][0]['sha256']='e'*64; MOD.atomic_json(path,value)
+            with self.assertRaisesRegex(MOD.ContractError,'retained predecessor ownership differs'):
+                MOD.retain_provider_migration(self.record,self.old,self.selected,FakeRunner())
+
+    def test_dangling_runtime_dropin_symlink_is_preserved(self):
+        directory=self.root/'etc/systemd/system/rp1-gpclk-route-manager@.service.d'
+        directory.parent.mkdir(parents=True); directory.symlink_to(self.root/'missing')
+        with self.assertRaisesRegex(MOD.ContractError,'substituted'):
+            MOD.remove_empty_runtime_dropin(self.root)
+        self.assertTrue(directory.is_symlink())
 
 
 if __name__ == "__main__":

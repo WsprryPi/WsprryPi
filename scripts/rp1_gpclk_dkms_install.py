@@ -293,7 +293,7 @@ def wsprry_channel(source: str) -> str:
 
 def source_selector(requested: str, channel: str) -> tuple[str, str | None]:
     if requested == "auto":
-        return ("release", None) if channel == "production" else ("devel", None)
+        return "release", None
     if requested in {"release", "devel"}:
         return requested, None
     if requested.startswith("commit:"):
@@ -1225,6 +1225,7 @@ def prepare(args: argparse.Namespace, runner: Runner) -> dict[str, Any]:
             )
         else:
             plan["resolved"] = prepare_development(state_dir, selector, value, runner)
+        validate_consumer_provider(plan["resolved"])
     atomic_json(state_dir / "plan.json", plan)
     render_plan(plan)
     return plan
@@ -1689,6 +1690,7 @@ def recover_and_remove_owned_runtime(
                 and digest == sha256_bytes(canonical(planned["plan"])),
                 "runtime update plan digest differs")
         if planned["status"] == "prepared":
+            remove_empty_runtime_dropin()
             return
         require(digest not in seen, "runtime update made no progress; preserve evidence and re-plan")
         seen.add(digest)
@@ -2236,6 +2238,129 @@ def runtime_product_version(resolved: Mapping[str, Any]) -> str:
     return value
 
 
+# Must match Rp1GpclkConsumerContract; checked against the C++ authority in tests.
+CONSUMER_PROVIDER_VERSION = "1.0.1"
+
+
+def validate_consumer_provider(resolved: Mapping[str, Any]) -> None:
+    require(resolved.get("channel") in {"release", "development"}, "prepared source channel is invalid")
+    if resolved["channel"] == "release":
+        require(isinstance(resolved.get("manifest"), dict), "prepared release manifest is not an object")
+    version = runtime_product_version(resolved)
+    require(version == CONSUMER_PROVIDER_VERSION,
+            f"selected RP1 provider {version} is not accepted by this WsprryPi "
+            f"(requires {CONSUMER_PROVIDER_VERSION}); update the application/provider "
+            "selection before changing the installed runtime")
+
+
+def provider_migration_required(record: Mapping[str, Any], resolved: Mapping[str, Any]) -> bool:
+    # Same-channel development migrations retain their existing exact-source
+    # rollback handling. Release updates and channel changes use the owner's
+    # removal transaction, never an in-place package replacement.
+    return (record.get("channel") != resolved.get("channel") or
+            (record.get("channel") == "release" and
+             record.get("sourceCommit") != resolved.get("commit")))
+
+
+def retain_provider_migration(record_path: pathlib.Path, record: Mapping[str, Any],
+                              resolved: Mapping[str, Any], runner: Runner) -> pathlib.Path | None:
+    if not provider_migration_required(record, resolved):
+        return None
+    if record["channel"] == "release":
+        validate_manifest(record["manifest"], tag=record["tag"], tag_commit=record["sourceCommit"])
+    else:
+        validate_development_rollback_authority(record, pathlib.Path("/"))
+    identity = {"previousChannel": record["channel"],
+                "previousCommit": record["sourceCommit"],
+                "selectedChannel": resolved["channel"], "selectedCommit": resolved["commit"]}
+    directory = record_path.parent / ("rp1-provider-migration." + sha256_bytes(canonical(identity))[:24])
+    secure_record_parent(directory / "identity.json")
+    identity_file = directory / "identity.json"
+    if identity_file.exists() or identity_file.is_symlink():
+        require(not identity_file.is_symlink() and identity_file.is_file() and
+                json.loads(identity_file.read_bytes()) == identity,
+                "retained provider migration identity differs")
+    else:
+        atomic_json_new(identity_file, identity)
+    previous = directory / "previous-installation.json"
+    if not previous.exists() and not previous.is_symlink():
+        atomic_json_new(previous, record)
+    require(not previous.is_symlink() and previous.is_file(),
+            "retained predecessor ownership is unsafe")
+    retained = json.loads(previous.read_bytes())
+    retained_base = dict(retained)
+    current_base = dict(record)
+    for value in (retained_base, current_base):
+        value.pop("runtime", None)
+        value["schema"] = RECORD_SCHEMA
+    require(retained_base == current_base,
+            "retained predecessor ownership differs")
+    if record["channel"] == "release":
+        manifest = record["manifest"]
+        package = manifest["package"]
+        destination = directory / package["filename"]
+        if not destination.exists() and not destination.is_symlink():
+            url = (f"https://github.com/{REPOSITORY}/releases/download/"
+                   f"{manifest['releaseTag']}/{package['filename']}")
+            payload = GitHubClient().bytes(url, limit=MAX_PACKAGE_BYTES, allow_asset_redirect=True)
+            require(sha256_bytes(payload) == package["sha256"],
+                    "predecessor rollback package SHA-256 differs")
+            descriptor, temporary = tempfile.mkstemp(prefix=".rollback-", dir=directory)
+            try:
+                with os.fdopen(descriptor, "wb") as stream:
+                    stream.write(payload)
+                    stream.flush()
+                    os.fsync(stream.fileno())
+                os.link(temporary, destination, follow_symlinks=False)
+                parent = os.open(directory, os.O_RDONLY | getattr(os, "O_DIRECTORY", 0))
+                try:
+                    os.fsync(parent)
+                finally:
+                    os.close(parent)
+            finally:
+                os.unlink(temporary)
+        require(not destination.is_symlink() and destination.is_file() and
+                sha256_file(destination) == package["sha256"],
+                "retained predecessor rollback package differs")
+        validate_package(destination, manifest, runner)
+    print(f"Verified predecessor recovery inputs retained at {directory}")
+    return directory
+
+
+def validate_candidate_before_update(resolved: Mapping[str, Any], runner: Runner) -> None:
+    validate_consumer_provider(resolved)
+    if resolved.get("channel") == "release":
+        validate_manifest(resolved["manifest"], tag=resolved["tag"], tag_commit=resolved["commit"])
+        path = pathlib.Path(str(resolved.get("packagePath", "")))
+        require(path.is_file() and not path.is_symlink(), "prepared candidate package is missing or substituted")
+        validate_package(path, resolved["manifest"], runner)
+    checkout = resolved.get("checkout")
+    require(isinstance(checkout, dict), "prepared provider source checkout is missing")
+    require(checkout.get("commit") == resolved.get("commit"), "prepared source and checkout commits differ")
+    source = revalidate_checkout(checkout, runner)
+    runtime_source_interface(source, runner)
+    runtime_source_identity(source, runtime_product_version(resolved))
+
+
+def remove_empty_runtime_dropin(root: pathlib.Path = pathlib.Path("/")) -> None:
+    # Invoked only after the owning, digest-reviewed runtime update reports
+    # prepared. The provider removes its file but older implementations leave
+    # this directory, which their own package preflight refuses. Never recurse
+    # or remove a foreign file or a substituted path.
+    directory = root_path(root, "/etc/systemd/system/rp1-gpclk-route-manager@.service.d")
+    if not directory.exists() and not directory.is_symlink():
+        return
+    try:
+        require(directory.absolute() == directory.resolve(strict=True) and directory.is_dir(),
+                "runtime drop-in directory is substituted; preserve it")
+    except OSError as error:
+        raise ContractError("runtime drop-in directory is substituted; preserve it") from error
+    try:
+        directory.rmdir()
+    except OSError as error:
+        raise ContractError("runtime drop-in directory is not empty or removable; preserve its contents") from error
+
+
 def validate_runtime_bundle(
     bundle: pathlib.Path,
     resolved: Mapping[str, Any],
@@ -2516,6 +2641,7 @@ def prepare_runtime_update(args: argparse.Namespace, runner: Runner) -> None:
             return
         resolved = plan.get("resolved")
         require(isinstance(resolved, dict), "prepared runtime source identity is missing")
+        validate_candidate_before_update(resolved, runner)
     record, identity, reason = load_ownership_record(args.record)
     if record is None or identity is None:
         print(f"No owned RP1 runtime requires preparation: {reason or 'ownership is unproven'}.")
@@ -2523,6 +2649,8 @@ def prepare_runtime_update(args: argparse.Namespace, runner: Runner) -> None:
     if record.get("schema") not in {RECORD_SCHEMA, RUNTIME_RECORD_SCHEMA}:
         print("No owned runtime administration requires preparation.")
         return
+    if resolved is not None:
+        retain_provider_migration(args.record, record, resolved, runner)
     # v2 includes the interrupted window before the application recorded a
     # neutral-activation receipt. The provider decides whether residue exists.
     remove_owned_runtime_for_fresh_activation(args.record, record, identity, runner, resolved)
@@ -2611,10 +2739,22 @@ def apply(args: argparse.Namespace, runner: Runner) -> None:
         return
     resolved = plan.get("resolved")
     require(isinstance(resolved, dict), "prepared installation identity is missing")
+    validate_candidate_before_update(resolved, runner)
     record = args.record
     require(record.is_absolute(), "installation record path must be absolute")
     secure_record_parent(record)
     root = args.root.resolve(strict=True)
+    recover_pending_removal(record)
+    previous, previous_identity, _ = load_ownership_record(record)
+    if previous is not None and previous_identity is not None and provider_migration_required(previous, resolved):
+        retain_provider_migration(record, previous, resolved, runner)
+        require_unchanged_ownership(record, previous, previous_identity, "provider migration")
+        # Reuse exactly the same ownership, runtime, package preflight, pending
+        # removal journal and absence checks as explicit supported removal.
+        remove_owned_provider(argparse.Namespace(remove="true", record=record, root=root), runner)
+        require(not record.exists() and not record.is_symlink(),
+                "predecessor removal did not retire its ownership; candidate not installed")
+        verify_provider_absent(root, runner)
     if resolved["channel"] == "release":
         apply_release(state_dir, resolved, record, root, runner)
     elif resolved["channel"] == "development":

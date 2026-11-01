@@ -81,7 +81,8 @@ class Tests(unittest.TestCase):
         selected = A.installer.select_release([original, current])
         self.assertEqual(selected['tag_name'], 'v1.0.1')
         self.assertEqual(A.installer.source_selector('auto', 'production'), ('release', None))
-        self.assertEqual(A.installer.source_selector('auto', 'development'), ('devel', None))
+        self.assertEqual(A.installer.source_selector('auto', 'development'), ('release', None))
+        self.assertEqual(A.installer.source_selector('devel', 'development'), ('devel', None))
 
     def test_wrong_source_commit_tree_dirty_or_attached_never_read_assets(self):
         identity = {'commit': self.lock['sourceCommit'], 'tree': self.lock['sourceTree']}

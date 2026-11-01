@@ -40,9 +40,8 @@ not assert current-boot ownership.
 
 `RP1_GPCLK_DKMS_SOURCE` accepts exactly:
 
-- `auto` (default): select a published release for WsprryPi `main`/release
-  installation, or the DKMS `origin/devel` tip for a named non-production
-  WsprryPi branch;
+- `auto` (default): select a published release on every WsprryPi branch,
+  including `devel`;
 - `release`: select the latest eligible published stable release;
 - `devel`: resolve upstream `origin/devel` once to a full commit;
 - `commit:FULL_40_CHARACTER_SHA`: select an exact upstream commit; or
@@ -80,11 +79,11 @@ sudo INSTALL_RP1_GPCLK_DKMS=true \
 
 ## Published releases
 
-The immutable [RP1-GPCLK-DKMS v1.0.1 release](https://github.com/WsprryPi/RP1-GPCLK-DKMS/releases/tag/v1.0.1) is published at commit `b52ab7b796e44d8690b2a91bccb21ae5d8b670df` (module/DKMS `1.0.1`, Debian `1.0.1-1`). The transmitter adapter accepts its exact GPIO4/GPIO20 compatibility identities. Production/main automatic selection consumes the newest eligible published release; explicit `RP1_GPCLK_DKMS_SOURCE=release` selects that path on `devel` too. Development automatic selection remains exact-source development. An unavailable or corrupt release fails closed without fallback.
+The immutable [RP1-GPCLK-DKMS v1.0.1 release](https://github.com/WsprryPi/RP1-GPCLK-DKMS/releases/tag/v1.0.1) is published at commit `b52ab7b796e44d8690b2a91bccb21ae5d8b670df` (module/DKMS `1.0.1`, Debian `1.0.1-1`). The transmitter adapter accepts its exact GPIO4/GPIO20 compatibility identities. Automatic selection consumes the newest eligible published release on every application branch. Explicit development selectors remain available for provider development. The selected module version and runtime compatibility identities must match the application consumer contract before installed runtime state is changed. An unavailable, incompatible, or corrupt selection fails closed without fallback.
 
 The [release lock and acceptance workflow](rp1-provider-acceptance.md) bind the published bytes. The compatibility manifest defaults to `Unavailable` with no qualified target entries. The application-bundled [qualification evidence](rp1-qualification-metadata.md) remains bound to `v1.0.0` and does not qualify this patch. Publication, reproducibility, and successful DKMS builds do not grant live eligibility or transmission authorization. Historical [application acceptance](../release_tools/4.0-Beta-1-Release-Evidence.md#october-19-item-10-reuse-matrix-and-remaining-gates) does not establish target installation/runtime acceptance for `v1.0.1`.
 
-An installed `1.0.0` provider requires its owning runtime cleanup and removal before clean `1.0.1` installation. Direct replacement and in-place downgrade remain refused. Retain exact rollback inputs; version ordering alone is not a migration procedure. See the [RP1 dependency order](../release_tools/Release%20Punchlist.md#rp1-dependency-order).
+The normal installer migrates an attributable, unchanged predecessor through its owning cleanup-first workflow, including release version changes and changes between release and development providers. It verifies the candidate and retains the predecessor ownership record and exact recovery inputs under `/var/lib/wsprrypi/rp1-provider-migration.*` before runtime teardown. Release recovery includes the checksummed original Debian package; development recovery retains the original rollback authority. The installer removes the owned predecessor, verifies complete absence, then installs the selected candidate. It never replaces a different provider in place. Foreign files, modified ownership, an unavailable recovery package, or a failed cleanup stop migration. Only an empty runtime-owned service drop-in directory is retired after successful owning cleanup; foreign content is preserved. See the [RP1 dependency order](../release_tools/Release%20Punchlist.md#rp1-dependency-order).
 
 Release selection enumerates published, immutable, non-draft, non-prerelease
 semantic versions rather than following a `latest` redirect. A candidate must provide
