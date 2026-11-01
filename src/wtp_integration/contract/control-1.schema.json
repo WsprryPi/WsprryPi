@@ -385,6 +385,18 @@
     },
     {
       "$ref": "#/$defs/management"
+    },
+    {
+      "$ref": "#/$defs/field-access"
+    },
+    {
+      "$ref": "#/$defs/browser-time"
+    },
+    {
+      "$ref": "#/$defs/browser-time-challenge"
+    },
+    {
+      "$ref": "#/$defs/browser-time-sample"
     }
   ],
   "$defs": {
@@ -5822,6 +5834,74 @@
               "maximum": 2048
             }
           }
+        },
+        "field_access": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "schema",
+            "path",
+            "time",
+            "challenge",
+            "submit",
+            "carrier",
+            "holdover_s",
+            "drift_ppb",
+            "initial_uncertainty_ns",
+            "maximum_uncertainty_ns",
+            "fallback_after_s",
+            "fallback_window_s",
+            "fallback_reopen_s",
+            "station_stable_s",
+            "authentication"
+          ],
+          "properties": {
+            "schema": {
+              "const": "field-access"
+            },
+            "path": {
+              "const": "/api/control/v1/consumer/field"
+            },
+            "time": {
+              "const": "/api/control/v1/consumer/time"
+            },
+            "challenge": {
+              "const": "/api/control/v1/consumer/time/challenge"
+            },
+            "submit": {
+              "const": "/api/control/v1/consumer/time/submit"
+            },
+            "carrier": {
+              "const": "consumer_ap"
+            },
+            "holdover_s": {
+              "const": 3600
+            },
+            "drift_ppb": {
+              "const": 50000
+            },
+            "initial_uncertainty_ns": {
+              "const": "250000000"
+            },
+            "maximum_uncertainty_ns": {
+              "const": "500000000"
+            },
+            "fallback_after_s": {
+              "const": 60
+            },
+            "fallback_window_s": {
+              "const": 600
+            },
+            "fallback_reopen_s": {
+              "const": 300
+            },
+            "station_stable_s": {
+              "const": 30
+            },
+            "authentication": {
+              "const": "pico_password"
+            }
+          }
         }
       },
       "title": "Control/1 capabilities"
@@ -6446,8 +6526,8 @@
           "properties": {
             "GET": {
               "type": "array",
-              "minItems": 28,
-              "maxItems": 28,
+              "minItems": 30,
+              "maxItems": 30,
               "uniqueItems": true,
               "items": {
                 "enum": [
@@ -6478,14 +6558,16 @@
                   "management",
                   "network",
                   "schedules",
-                  "ntp-observations"
+                  "ntp-observations",
+                  "consumer/field",
+                  "consumer/time"
                 ]
               }
             },
             "PUT": {
               "type": "array",
-              "minItems": 15,
-              "maxItems": 15,
+              "minItems": 16,
+              "maxItems": 16,
               "uniqueItems": true,
               "items": {
                 "enum": [
@@ -6503,14 +6585,15 @@
                   "schedules",
                   "consumer/password",
                   "message-schedule",
-                  "logging"
+                  "logging",
+                  "consumer/field"
                 ]
               }
             },
             "POST": {
               "type": "array",
-              "minItems": 11,
-              "maxItems": 11,
+              "minItems": 13,
+              "maxItems": 13,
               "uniqueItems": true,
               "items": {
                 "enum": [
@@ -6524,7 +6607,9 @@
                   "wspr-plan",
                   "jobs",
                   "message-schedule/pause",
-                  "jobs/{id}/abort"
+                  "jobs/{id}/abort",
+                  "consumer/time/challenge",
+                  "consumer/time/submit"
                 ]
               }
             }
@@ -8037,6 +8122,273 @@
           "additionalProperties": false
         }
       }
+    },
+    "field-access": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "contract",
+            "schema",
+            "target",
+            "enabled"
+          ],
+          "properties": {
+            "contract": {
+              "const": "Wsprry-Control/1"
+            },
+            "schema": {
+              "const": "field-access"
+            },
+            "target": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "scope",
+                "device_id",
+                "boot_id"
+              ],
+              "properties": {
+                "scope": {
+                  "const": "member"
+                },
+                "device_id": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{32}$"
+                },
+                "boot_id": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{32}$"
+                }
+              }
+            },
+            "enabled": {
+              "type": "boolean"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "contract",
+            "schema",
+            "target",
+            "enabled",
+            "storage_healthy"
+          ],
+          "properties": {
+            "contract": {
+              "const": "Wsprry-Control/1"
+            },
+            "schema": {
+              "const": "field-access"
+            },
+            "target": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "scope",
+                "device_id",
+                "boot_id"
+              ],
+              "properties": {
+                "scope": {
+                  "const": "member"
+                },
+                "device_id": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{32}$"
+                },
+                "boot_id": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{32}$"
+                }
+              }
+            },
+            "enabled": {
+              "type": "boolean"
+            },
+            "storage_healthy": {
+              "type": "boolean"
+            }
+          }
+        }
+      ]
+    },
+    "browser-time": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "contract",
+        "schema",
+        "target",
+        "source",
+        "age_ns",
+        "uncertainty_ns",
+        "disagreement",
+        "clock_state"
+      ],
+      "properties": {
+        "contract": {
+          "const": "Wsprry-Control/1"
+        },
+        "schema": {
+          "const": "browser-time"
+        },
+        "target": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "scope",
+            "device_id",
+            "boot_id"
+          ],
+          "properties": {
+            "scope": {
+              "const": "member"
+            },
+            "device_id": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{32}$"
+            },
+            "boot_id": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{32}$"
+            }
+          }
+        },
+        "source": {
+          "enum": [
+            "none",
+            "network",
+            "controller",
+            "browser",
+            "disagreement"
+          ]
+        },
+        "age_ns": {
+          "type": "string",
+          "pattern": "^(0|[1-9][0-9]{0,19})$"
+        },
+        "uncertainty_ns": {
+          "type": "string",
+          "pattern": "^(0|[1-9][0-9]{0,19})$"
+        },
+        "disagreement": {
+          "type": "boolean"
+        },
+        "clock_state": {
+          "enum": [
+            "synchronized",
+            "holdover",
+            "unsynchronized"
+          ]
+        }
+      }
+    },
+    "browser-time-challenge": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "contract",
+        "schema",
+        "target",
+        "nonce"
+      ],
+      "properties": {
+        "contract": {
+          "const": "Wsprry-Control/1"
+        },
+        "schema": {
+          "const": "browser-time-challenge"
+        },
+        "target": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "scope",
+            "device_id",
+            "boot_id"
+          ],
+          "properties": {
+            "scope": {
+              "const": "member"
+            },
+            "device_id": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{32}$"
+            },
+            "boot_id": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{32}$"
+            }
+          }
+        },
+        "nonce": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{32}$"
+        }
+      }
+    },
+    "browser-time-sample": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "contract",
+        "schema",
+        "target",
+        "sample"
+      ],
+      "properties": {
+        "contract": {
+          "const": "Wsprry-Control/1"
+        },
+        "schema": {
+          "const": "browser-time-sample"
+        },
+        "target": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "scope",
+            "device_id",
+            "boot_id"
+          ],
+          "properties": {
+            "scope": {
+              "const": "member"
+            },
+            "device_id": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{32}$"
+            },
+            "boot_id": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{32}$"
+            }
+          }
+        },
+        "sample": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "nonce",
+            "utc_ns"
+          ],
+          "properties": {
+            "nonce": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{32}$"
+            },
+            "utc_ns": {
+              "type": "string",
+              "pattern": "^(0|[1-9][0-9]{0,19})$"
+            }
+          }
+        }
+      }
     }
   },
   "management_routes": {
@@ -8068,7 +8420,9 @@
       "management",
       "network",
       "schedules",
-      "ntp-observations"
+      "ntp-observations",
+      "consumer/field",
+      "consumer/time"
     ],
     "PUT": [
       "network",
@@ -8085,7 +8439,8 @@
       "schedules",
       "consumer/password",
       "message-schedule",
-      "logging"
+      "logging",
+      "consumer/field"
     ],
     "POST": [
       "config/update",
@@ -8098,7 +8453,9 @@
       "wspr-plan",
       "jobs",
       "message-schedule/pause",
-      "jobs/{id}/abort"
+      "jobs/{id}/abort",
+      "consumer/time/challenge",
+      "consumer/time/submit"
     ]
   },
   "request_limits": {
@@ -8120,7 +8477,10 @@
     "message-schedule/pause": 2048,
     "logging": 512,
     "udp-logging": 2048,
-    "filter-selector": 1792
+    "filter-selector": 1792,
+    "consumer/field": 512,
+    "consumer/time/challenge": 512,
+    "consumer/time/submit": 512
   },
   "resource_descriptors": {
     "gpio_drive": {
@@ -8245,6 +8605,23 @@
     "management_carriers": {
       "schema": "management",
       "path": "/api/control/v1/management"
+    },
+    "field_access": {
+      "schema": "field-access",
+      "path": "/api/control/v1/consumer/field",
+      "time": "/api/control/v1/consumer/time",
+      "challenge": "/api/control/v1/consumer/time/challenge",
+      "submit": "/api/control/v1/consumer/time/submit",
+      "carrier": "consumer_ap",
+      "holdover_s": 3600,
+      "drift_ppb": 50000,
+      "initial_uncertainty_ns": "250000000",
+      "maximum_uncertainty_ns": "500000000",
+      "fallback_after_s": 60,
+      "fallback_window_s": 600,
+      "fallback_reopen_s": 300,
+      "station_stable_s": 30,
+      "authentication": "pico_password"
     }
   },
   "descriptor_runtime_fields": {
