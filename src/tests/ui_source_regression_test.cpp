@@ -1326,7 +1326,7 @@ int main()
             footer_source.find("wsprrypiAssetUrl('site.js')") != std::string::npos &&
             index_page_source.find("wsprrypiAssetUrl($stylesheet)") != std::string::npos &&
             index_page_source.find("wsprrypiAssetUrl($script)") != std::string::npos &&
-            script_include_source.find("wsprrypiAssetUrl('vendor/js/jquery-3.7.1.min.js')") != std::string::npos &&
+            script_include_source.find("wsprrypiAssetUrl('vendor/js/jquery-4.0.0.min.js')") != std::string::npos &&
             script_include_source.find("wsprrypiAssetUrl('vendor/js/bootstrap.bundle-5.3.8.min.js')") != std::string::npos,
         "PHP pages and UI-owned endpoints must use the installed content identity for asset cache busting and report packaged, modified, added, missing, and unknown state without replacing the running-service /version contract");
     require(

@@ -9,9 +9,12 @@ const base = () => ({schema:"progress",target:structuredClone(target),draft_revi
     schedule_enabled:false,schedule_suspended:true,matches_applied:false});
 const turn = () => new Promise(resolve => setImmediate(resolve));
 async function tests() {
-    let state=base(), sent, delay, release, malformed=false;
+    let state=base(), sent, delay, release, malformed=false, profileOwnedStation=true, authorityRevision='"r1"';
     const b=browser(async r=>{
         if (delay) await new Promise(resolve=>{release=resolve;});
+        if (r.url.endsWith('/member/application'))
+            return response({schema:'member-resources',target:structuredClone(state.target),
+                carrier:'consumer_station',profile_owned_station:profileOwnedStation},200,authorityRevision);
         if (r.method === "POST") {
             sent=r.body;
             const outcomes={callsign:"saved",locator:"invalid",power_dbm:sent.fields.power_dbm===null?"cleared":"saved"};
@@ -62,6 +65,14 @@ async function tests() {
     await b.click("wtp-usb-progress-load");
     assert(b.element("wtp-usb-progress-apply").disabled,"profile station application belongs to transactional Pico setup");
     assert(!b.element("wtp-usb-progress-save").disabled,"independent draft saves remain available");
+    profileOwnedStation=false;state.applied_station=structuredClone(state.station);
+    await b.click("wtp-usb-progress-load");
+    assert(!b.element("wtp-usb-progress-apply").disabled,"established Config station can apply without recommissioning");
+    const retainedDraft=b.element("wtp-member-callsign").value;
+    authorityRevision='"stale"';await b.click("wtp-usb-progress-load");
+    assert(b.element("wtp-usb-progress-save").disabled,"mismatched authority/progress revisions refuse mutation");
+    assert.equal(b.element("wtp-member-callsign").value,retainedDraft,"authority races preserve the draft");
+    authorityRevision='"r1"';await b.click("wtp-usb-progress-load");
     delay=true;const pending=b.click("wtp-usb-progress-load");await turn();b.root.WtpManagement.invalidate();release();await pending;
     assert(b.element("wtp-usb-progress-save").disabled,"a late read cannot restore an invalidated context");
     console.log("Station progress: incomplete/null/zero, invalid siblings, late edits, malformed success, explicit review, cross-member drafts and profile authority passed");
