@@ -2981,5 +2981,24 @@ class InstallerMigrationTests(unittest.TestCase):
         self.assertTrue(directory.is_symlink())
 
 
+    def test_reinstalled_same_source_has_independent_recovery_inputs(self):
+        with mock.patch.object(MOD.GitHubClient, 'bytes', return_value=self.payload), \
+             mock.patch.object(MOD, 'validate_package'):
+            first=MOD.retain_provider_migration(self.record,self.old,self.selected,FakeRunner())
+            rebuilt=copy.deepcopy(self.old); rebuilt['moduleArtifacts'][0]['sha256']='e'*64
+            second=MOD.retain_provider_migration(self.record,rebuilt,self.selected,FakeRunner())
+        self.assertNotEqual(first,second)
+        self.assertEqual(json.loads((first/'previous-installation.json').read_text()),self.old)
+        self.assertEqual(json.loads((second/'previous-installation.json').read_text()),rebuilt)
+
+    def test_malformed_retained_ownership_stops_retry(self):
+        with mock.patch.object(MOD.GitHubClient, 'bytes', return_value=self.payload), \
+             mock.patch.object(MOD, 'validate_package'):
+            directory=MOD.retain_provider_migration(self.record,self.old,self.selected,FakeRunner())
+            (directory/'previous-installation.json').write_text('[]')
+            with self.assertRaisesRegex(MOD.ContractError,'retained predecessor ownership is unreadable'):
+                MOD.retain_provider_migration(self.record,self.old,self.selected,FakeRunner())
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

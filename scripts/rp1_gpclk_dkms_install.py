@@ -2270,16 +2270,25 @@ def retain_provider_migration(record_path: pathlib.Path, record: Mapping[str, An
         validate_manifest(record["manifest"], tag=record["tag"], tag_commit=record["sourceCommit"])
     else:
         validate_development_rollback_authority(record, pathlib.Path("/"))
+    current_base = dict(record)
+    current_base.pop("runtime", None)
+    current_base["schema"] = RECORD_SCHEMA
     identity = {"previousChannel": record["channel"],
                 "previousCommit": record["sourceCommit"],
+                "previousInstallationSha256": sha256_bytes(canonical(current_base)),
                 "selectedChannel": resolved["channel"], "selectedCommit": resolved["commit"]}
     directory = record_path.parent / ("rp1-provider-migration." + sha256_bytes(canonical(identity))[:24])
     secure_record_parent(directory / "identity.json")
     identity_file = directory / "identity.json"
     if identity_file.exists() or identity_file.is_symlink():
         require(not identity_file.is_symlink() and identity_file.is_file() and
-                json.loads(identity_file.read_bytes()) == identity,
+                identity_file.stat().st_size <= MAX_RECORD_BYTES,
                 "retained provider migration identity differs")
+        try:
+            retained_identity = json.loads(identity_file.read_bytes())
+        except (OSError, ValueError) as error:
+            raise ContractError("retained provider migration identity is unreadable") from error
+        require(retained_identity == identity, "retained provider migration identity differs")
     else:
         atomic_json_new(identity_file, identity)
     previous = directory / "previous-installation.json"
@@ -2287,9 +2296,9 @@ def retain_provider_migration(record_path: pathlib.Path, record: Mapping[str, An
         atomic_json_new(previous, record)
     require(not previous.is_symlink() and previous.is_file(),
             "retained predecessor ownership is unsafe")
-    retained = json.loads(previous.read_bytes())
+    retained, _, reason = load_ownership_record(previous)
+    require(retained is not None, f"retained predecessor ownership is unreadable: {reason}")
     retained_base = dict(retained)
-    current_base = dict(record)
     for value in (retained_base, current_base):
         value.pop("runtime", None)
         value["schema"] = RECORD_SCHEMA
