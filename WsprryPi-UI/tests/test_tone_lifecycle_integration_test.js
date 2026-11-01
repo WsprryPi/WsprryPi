@@ -370,4 +370,5 @@ async function main() {
         if (errors.length) throw new AggregateError(errors, "Test Tone browser workflow or cleanup failed");
     }
 }
-main().catch(error => { console.error(error); process.exitCode=1; });
+module.exports = { CdpClient, freePort, getJson, getStatus, waitFor };
+if (require.main === module) main().catch(error => { console.error(error); process.exitCode=1; });

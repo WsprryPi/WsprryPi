@@ -30,6 +30,7 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/html_cache_headers.php';
+require_once __DIR__ . '/ui_version.php';
 
 $scriptName = $_SERVER['SCRIPT_NAME'] ?? '/';
 $basePath = rtrim(str_replace('\\', '/', dirname($scriptName)), '/');
@@ -49,20 +50,15 @@ $pathConfig = [
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Logs</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link
-        rel="stylesheet"
-        href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@500;600;700&family=Source+Sans+3:wght@400;500;600;700&display=swap">
+    <link rel="stylesheet" href="<?= htmlspecialchars(wsprrypiAssetUrl('vendor/fonts/google/fonts.css')) ?>">
 
     <script>
         window.WSPRRYPI_PATHS = <?= json_encode($pathConfig, JSON_UNESCAPED_SLASHES) ?>;
     </script>
 
-    <!-- Bootstrap + jQuery (CDN). -->
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-    <script src="https://cdn.jsdelivr.net/npm/jquery@3.7.1/dist/jquery.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <!-- Plain Bootstrap preserves this standalone viewer's styling. -->
+    <link rel="stylesheet" href="<?= htmlspecialchars(wsprrypiAssetUrl('vendor/css/bootstrap-5.3.8.min.css')) ?>">
+    <?php require __DIR__ . '/site.js.includes.php'; ?>
 
     <style>
         :root {

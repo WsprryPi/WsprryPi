@@ -5,7 +5,7 @@ This license file is distributed with the corresponding assets under
 `WsprryPi-UI/data/vendor/`.
 
 Font Awesome Free webfonts:
-Copyright (c) 2023 Fonticons, Inc. (https://fontawesome.com)
+Copyright (c) 2026 Fonticons, Inc. (https://fontawesome.com)
 Reserved Font Name: "Font Awesome"
 
 Barlow Semi Condensed:

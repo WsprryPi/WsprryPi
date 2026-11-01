@@ -12,9 +12,18 @@ if ($path === '/api/control/v1/status' && $_SERVER['REQUEST_METHOD'] === 'GET') 
         'ready' => false, 'phase' => 'idle', 'session_phase' => 'disconnected']]);
     return true;
 }
+// Read-only dependency regression responses; never proxy or persist anything.
+if ($_SERVER['REQUEST_METHOD'] === 'GET' && str_starts_with($path, '/__dependency_fixture__/')) {
+    header('Content-Type: application/json');
+    switch ($path) {
+        case '/__dependency_fixture__/ok': echo '{"fixture":true}'; return true;
+        case '/__dependency_fixture__/invalid': echo '{broken'; return true;
+        case '/__dependency_fixture__/slow': usleep(300000); echo '{}'; return true;
+    }
+}
 $file = realpath($root . '/' . rawurldecode($path));
 $pages = ['index.php', 'maintenance.php', 'view_logs.php', 'view_spots.php',
-    'ui-version.php', 'ui-manifest.php', 'version.php'];
+    'ui-version.php', 'ui-manifest.php', 'version.php', 'view_diag_logs.php'];
 $static = ['css', 'js', 'ttf', 'woff2', 'png', 'ico', 'webmanifest'];
 if ($path === '/' || ($file && str_starts_with($file, $root . '/') &&
     (in_array(ltrim($path, '/'), $pages, true) ||
