@@ -5668,6 +5668,10 @@
             },
             "restart": {
               "type": "boolean"
+            },
+            "station_live_apply": {
+              "type": "boolean",
+              "description": "An established consumer station supports live Config application without retiring sessions or restarting."
             }
           },
           "maxProperties": 64,

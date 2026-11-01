@@ -34,18 +34,22 @@ public:
   bool active() const;
   const std::string &device() const { return device_; }
   const std::string &boot() const { return boot_; }
+  // Current observed management generation; the crypto transcript stays frozen.
   const std::string &generation() const { return generation_; }
 
 private:
 #ifdef WSPRRYPI_CONSUMER_CRYPTO_TEST
   friend void consumer_radio_fixed_vectors(const nlohmann::json &);
 #endif
+  PicoHttpResponse request_once(const std::string &, const std::string &,
+                                const std::string &, const std::string &,
+                                bool refresh_policy);
   PicoHttpResponse handshake(const std::string &, const std::string &,
                              std::string_view, const nlohmann::json &);
   nlohmann::json lost_session_ = nullptr;
   Transport transport_;
   TlsStream::Clock clock_;
-  std::string device_, boot_, generation_;
+  std::string device_, boot_, generation_, carrier_;
   std::array<unsigned char, 16> session_{};
   std::array<unsigned char, 32> transcript_{}, request_key_{}, response_key_{};
   std::uint64_t sequence_{}, started_{}, seen_{};

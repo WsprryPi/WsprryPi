@@ -94,6 +94,7 @@
     }
     let resources = null, resourceRevision = "", resourceContext = "", resourceLoaded = false, resourceReconcile = false, validatedPlan = "";
     let resourceObserved = "";
+    let progressLiveStation = false;
     let progress = null, progressRevision = "", progressEpoch = 0, progressLoaded = false, progressReview = false, stationDirty = false;
     const member = name => byId(`wtp-member-${name}`);
     const resourceIdentity = data => `${data.target.device_id} / ${data.target.boot_id} / ${{engineering_mtls:"Engineering HTTPS",consumer_station:"Consumer Wi-Fi",consumer_ap:"Consumer setup Wi-Fi",usb_physical:"USB"}[data.carrier]}${data.profile_generation === null ? "" : ` / profile ${data.profile_generation}`}`;
@@ -129,14 +130,14 @@
         progressControl("load").disabled = busy || !available;
         const ready = available && progressRevision && progress;
         progressControl("save").disabled = busy || !ready || progressTargetMismatch;
-        const profileOwned = managementCarrier.startsWith("consumer_");
+        const profileOwned = managementCarrier.startsWith("consumer_") && !progressLiveStation;
         progressControl("apply").disabled = busy || !ready || progressTargetMismatch || profileOwned || progress.draft_revision === "0" || progress.apply_domains.station !== true;
         if (progressControl("discard")) progressControl("discard").disabled = busy || !ready;
         if (progressLoaded) member("station-hint").textContent = "Save valid station fields independently; incomplete fields remain drafts. Apply saved station progress separately. Complete station save remains available. Reported WSPR power is message metadata, separate from drive and measured RF output.";
     }
     function progressSummary(value) {
         const text = station => station ? `${station.callsign ?? "unset"}, ${station.locator ?? "unset"}, ${station.power_dbm ?? "unset"} dBm` : "none";
-        return `Saved progress: ${text(value.station)}. Applied station: ${text(value.applied_station)}. Draft ${value.draft_revision}; station ${value.station_complete ? "complete" : "incomplete"}; full configuration ${value.complete ? "complete" : "incomplete"}. STOP ${value.schedule_suspended ? "suspended" : "not suspended"}. Saving progress does not establish transmit readiness. Consumer profile station changes require Pico setup.`;
+        return `Saved progress: ${text(value.station)}. Applied station: ${text(value.applied_station)}. Draft ${value.draft_revision}; station ${value.station_complete ? "complete" : "incomplete"}; full configuration ${value.complete ? "complete" : "incomplete"}. STOP ${value.schedule_suspended ? "suspended" : "not suspended"}. Saving progress does not establish transmit readiness. Established stations apply without restarting or signing in again.`;
     }
     async function stationProgress(action) {
         if (busy || !available || (action !== "load" && !progressRevision)) return;
@@ -167,6 +168,15 @@
         const ticket = ++progressEpoch;
         busy = true; render(); progressControl("state").textContent = action === "load" ? "Reading saved station progress…" : action === "save" ? "Saving valid station fields…" : "Applying device-saved station progress…";
         try {
+            let liveAuthority = null;
+            if (action === "load" && managementCarrier.startsWith("consumer_")) {
+                progressLiveStation = false;
+                const reply = await root.fetch((root.WSPRRYPI_PATHS?.sharedApiPath || "/api/control/v1") + "/member/application", {
+                    method:"GET",cache:"no-store",signal:AbortSignal.timeout(120000)
+                });
+                liveAuthority = {reply,value:await reply.json()};
+                if (ticket !== progressEpoch) return;
+            }
             const response = await root.fetch((root.WSPRRYPI_PATHS?.sharedApiPath || "/api/control/v1") + "/member/progress" + (action === "load" ? "" : `/${action === "save" ? "update" : "apply"}`), {
                 method:action === "load" ? "GET" : "POST",cache:"no-store",signal:AbortSignal.timeout(120000),
                 ...(payload ? {headers:{"Content-Type":"application/json","X-WsprryPico-Request":"1","If-Match":revision},body:JSON.stringify(payload)} : {})
@@ -195,6 +205,13 @@
             if (action === "save" && (result.request_id !== payload.request_id || !result.outcomes ||
                 Object.keys(result.outcomes).sort().join(",") !== "callsign,locator,power_dbm" ||
                 Object.values(result.outcomes).some(v => !["saved","cleared","invalid"].includes(v)))) throw new Error("Station save outcomes were not confirmed. Read saved progress before another change.");
+            if (liveAuthority) {
+                const {reply:contextReply,value:context} = liveAuthority;
+                if (!contextReply.ok || context.schema !== "member-resources" || context.carrier !== managementCarrier ||
+                    JSON.stringify(context.target) !== JSON.stringify(result.target) || contextReply.headers.get("ETag") !== etag ||
+                    typeof context.profile_owned_station !== "boolean") throw new Error("Station application authority changed. Read saved progress again; your draft is preserved.");
+                progressLiveStation = context.profile_owned_station === false && result.applied_station !== null;
+            }
             progress = result; progressLoaded = true;
             if (action === "load") {
                 progressReview = needsReview;

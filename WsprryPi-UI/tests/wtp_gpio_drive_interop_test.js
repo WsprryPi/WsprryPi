@@ -22,7 +22,7 @@ function lines(child){const queue=[],waiters=[];readline.createInterface({input:
   const initial=await get('gpio-drive');
   assert.equal(initial.status,200,JSON.stringify(initial));const target=initial.body.target;
   assert.equal(initial.body.boot_active,carrier==='engineering'?4:12,'saved engineering setting versus fresh consumer boot default');
-  await driveCases(call,{profileOwnedStation:carrier!=='engineering'});
+  await driveCases(call);
   for(const drive of [2,4,8,12]){
    const before=await get('gpio-drive');const written=await post('gpio-drive',{schema:'gpio-drive',target,gpio_drive_ma:drive},before.etag);
    assert.equal(written.status,200,JSON.stringify(written));assert.equal(written.body.saved,drive);assert.equal(written.body.pad_readback,null);
@@ -40,10 +40,10 @@ function lines(child){const queue=[],waiters=[];readline.createInterface({input:
     body:JSON.stringify({contract:'Wsprry-Control/1',schema:'progress',target,application:{draft_revision:freshDraft.body.draft_revision,domain:'drive'}})});
   assert.equal(applied.status,200,JSON.stringify(applied));assert.equal((await get('gpio-drive')).body.saved,8);
   const a=await get('gpio-drive');await call({control:'drop_mutation_reply'});
-  const dropped=await post('gpio-drive',{schema:'gpio-drive',target,gpio_drive_ma:8},a.etag);assert.notEqual(dropped.status,200);
+  const dropped=await post('gpio-drive',{schema:'gpio-drive',target,gpio_drive_ma:4},a.etag);assert.notEqual(dropped.status,200);
   let reconciled=await get('gpio-drive');
   if(carrier!=='engineering'){assert.notEqual(reconciled.status,200);await call({control:'expire'});const reconnected=await connect();assert.equal(reconnected.status,200,JSON.stringify(reconnected));reconciled=await get('gpio-drive');}
-  assert.equal(reconciled.status,200,JSON.stringify(reconciled));assert.equal(reconciled.body.saved,8);assert.equal(reconciled.body.pending_restart,true);
+  assert.equal(reconciled.status,200,JSON.stringify(reconciled));assert.equal(reconciled.body.saved,4);assert.equal(reconciled.body.pending_restart,true);
   console.log(carrier+': all strengths, settings updates, invalid mutation and lost-reply reconciliation passed through actual protected runtime/carrier/Pico services');
  }finally{for(const child of [client,server])if(child&&child.exitCode===null){child.stdin.end();child.kill();}}
 }})().catch(e=>{console.error(e);process.exitCode=1;});

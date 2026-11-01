@@ -54,8 +54,11 @@ RF power, filter response or amplifier readiness.
 Ordinary configuration updates contain intended changes only. Omitted settings
 remain saved; explicit false and zero remain values. Pi never reconstructs a
 complete configuration from a redacted read, and unsupported context never
-selects an older save method. Profile-owned station/network credentials retain
-Pico transactional setup. Aggregate observations do not imply one atomic write
+selects an older save method. Wi-Fi and initial station commissioning retain
+Pico transactional setup. Established consumer stations advertise
+`features.station_live_apply`; their station editor and saved station Apply use
+Config authority without rebooting or retiring valid logins. Reported WSPR power
+remains message metadata, independent of GPIO drive and amplifier control. Aggregate observations do not imply one atomic write
 across independent journals.
 
 Saved progress accepts bounded known field units, per-field outcomes and exact
@@ -120,3 +123,12 @@ pair, including amplifier-enable operations and superseded-contract refusal.
 Source provenance, generated artifacts and tested full-source identities remain
 separate records. Software checks do not establish installed proxy/service,
 physical USB, GPIO, timing or RF qualification.
+
+Consumer sessions retain their original crypto transcript across the Pico's exact
+station-only authority transfer. Management discovery reports the current
+profile generation and is checked against fresh exact device/boot identity;
+this observation does not reset session keys, sequences or expiry. One bounded
+read-only policy reread handles a station transfer between observations; it never
+retries a mutation or accepts malformed policy. Other profile
+and credential changes retain their invalidation rules. The progress editor
+checks matching member authority and revision before offering consumer Apply.
