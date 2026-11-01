@@ -3000,5 +3000,63 @@ class InstallerMigrationTests(unittest.TestCase):
                 MOD.retain_provider_migration(self.record,self.old,self.selected,FakeRunner())
 
 
+    def test_predecessor_rollback_recreated_dropin_is_removed_before_candidate(self):
+        self.write_record(self.old); args=self.plan()
+        directory=self.root/'etc/systemd/system/rp1-gpclk-route-manager@.service.d'
+        def remove(*_):
+            self.record.unlink(); directory.mkdir(parents=True)
+        def install(*_):self.assertFalse(directory.exists())
+        with mock.patch.object(MOD,'validate_candidate_before_update'), \
+             mock.patch.object(MOD.GitHubClient,'bytes',return_value=self.payload), \
+             mock.patch.object(MOD,'validate_package'), \
+             mock.patch.object(MOD,'remove_owned_provider',side_effect=remove), \
+             mock.patch.object(MOD,'verify_provider_absent'), \
+             mock.patch.object(MOD,'apply_development',side_effect=install) as candidate:
+            MOD.apply(args,FakeRunner())
+        candidate.assert_called_once()
+
+    def test_interrupted_post_removal_retry_uses_bound_evidence(self):
+        directory=self.root/'etc/systemd/system/rp1-gpclk-route-manager@.service.d'
+        directory.mkdir(parents=True)
+        with mock.patch.object(MOD.GitHubClient,'bytes',return_value=self.payload), \
+             mock.patch.object(MOD,'validate_package'):
+            evidence=MOD.retain_provider_migration(self.record,self.old,self.selected,FakeRunner())
+            with mock.patch.object(MOD,'verify_provider_absent') as absence:
+                MOD.resume_removed_provider_migration(self.record,self.selected,self.root,FakeRunner())
+        self.assertFalse(directory.exists()); self.assertTrue(evidence.is_dir()); absence.assert_called_once()
+
+    def test_empty_foreign_dropin_without_migration_proof_is_preserved(self):
+        directory=self.root/'etc/systemd/system/rp1-gpclk-route-manager@.service.d'
+        directory.mkdir(parents=True)
+        MOD.resume_removed_provider_migration(self.record,self.selected,self.root,FakeRunner())
+        self.assertTrue(directory.is_dir())
+
+    def test_post_removal_retry_refuses_foreign_or_active_provider_state(self):
+        directory=self.root/'etc/systemd/system/rp1-gpclk-route-manager@.service.d'
+        directory.mkdir(parents=True)
+        with mock.patch.object(MOD.GitHubClient,'bytes',return_value=self.payload), \
+             mock.patch.object(MOD,'validate_package'):
+            MOD.retain_provider_migration(self.record,self.old,self.selected,FakeRunner())
+            with mock.patch.object(MOD,'verify_provider_absent',side_effect=MOD.ContractError('foreign active provider')):
+                with self.assertRaisesRegex(MOD.ContractError,'foreign active provider'):
+                    MOD.resume_removed_provider_migration(self.record,self.selected,self.root,FakeRunner())
+        self.assertTrue(directory.exists())
+
+
+    def test_unrecognized_retained_artifact_does_not_authorize_cleanup(self):
+        directory=self.root/'etc/systemd/system/rp1-gpclk-route-manager@.service.d'
+        directory.mkdir(parents=True)
+        evidence=self.root/'rp1-provider-migration.foreign'; evidence.mkdir(mode=0o700)
+        MOD.atomic_json(evidence/'identity.json',{'selectedCommit':self.selected['commit']})
+        MOD.resume_removed_provider_migration(self.record,self.selected,self.root,FakeRunner())
+        self.assertTrue(directory.exists()); self.assertTrue(evidence.exists())
+
+    def test_unproven_current_ownership_blocks_migration_resumption(self):
+        self.record.write_text('[]')
+        with self.assertRaisesRegex(MOD.ContractError,'unproven installation ownership'):
+            MOD.resume_removed_provider_migration(self.record,self.selected,self.root,FakeRunner())
+        self.assertEqual(self.record.read_text(),'[]')
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

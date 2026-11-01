@@ -2370,6 +2370,46 @@ def remove_empty_runtime_dropin(root: pathlib.Path = pathlib.Path("/")) -> None:
         raise ContractError("runtime drop-in directory is not empty or removable; preserve its contents") from error
 
 
+def resume_removed_provider_migration(record_path: pathlib.Path, resolved: Mapping[str, Any],
+                                      root: pathlib.Path, runner: Runner) -> None:
+    require(not record_path.exists() and not record_path.is_symlink(),
+            "unproven installation ownership blocks migration resumption")
+    directory = root_path(root, "/etc/systemd/system/rp1-gpclk-route-manager@.service.d")
+    if not directory.exists() and not directory.is_symlink():
+        return
+    candidates = sorted(record_path.parent.glob("rp1-provider-migration.*"))
+    require(len(candidates) <= 128, "provider migration evidence inventory exceeds its bound")
+    for evidence in candidates:
+        secure_record_parent(evidence / "identity.json")
+        identity_path = evidence / "identity.json"
+        require(identity_path.is_file() and not identity_path.is_symlink() and
+                identity_path.stat().st_size <= MAX_RECORD_BYTES,
+                "provider migration identity is missing or substituted")
+        try:
+            identity = json.loads(identity_path.read_bytes())
+        except (OSError, ValueError) as error:
+            raise ContractError("provider migration identity is unreadable") from error
+        require(isinstance(identity, dict), "provider migration identity is not an object")
+        if set(identity) != {"previousChannel", "previousCommit", "previousInstallationSha256",
+                             "selectedChannel", "selectedCommit"}:
+            # Unrecognized retained artifacts are preserved, never used as
+            # authority to remove a directory or install a predecessor.
+            continue
+        if (identity.get("selectedCommit") != resolved["commit"] or
+                identity.get("selectedChannel") != resolved["channel"]):
+            continue
+        previous, _, reason = load_ownership_record(evidence / "previous-installation.json")
+        require(previous is not None, f"predecessor recovery evidence is invalid: {reason}")
+        # Recompute the current identity from the retained ownership and verify
+        # the exact original recovery inputs. A directory alone is never proof
+        # that a foreign drop-in may be removed.
+        verified = retain_provider_migration(record_path, previous, resolved, runner)
+        require(verified == evidence, "predecessor migration evidence binding differs")
+        verify_provider_absent(root, runner)
+        remove_empty_runtime_dropin(root)
+        return
+
+
 def validate_runtime_bundle(
     bundle: pathlib.Path,
     resolved: Mapping[str, Any],
@@ -2764,6 +2804,11 @@ def apply(args: argparse.Namespace, runner: Runner) -> None:
         require(not record.exists() and not record.is_symlink(),
                 "predecessor removal did not retire its ownership; candidate not installed")
         verify_provider_absent(root, runner)
+        # Some predecessor rollback tools recreate this empty directory after
+        # runtime preparation. Retire it after their lifecycle completes too.
+        remove_empty_runtime_dropin(root)
+    elif previous is None:
+        resume_removed_provider_migration(record, resolved, root, runner)
     if resolved["channel"] == "release":
         apply_release(state_dir, resolved, record, root, runner)
     elif resolved["channel"] == "development":
