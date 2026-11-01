@@ -417,9 +417,16 @@ async function main() {
                 assert.equal(await evaluate('document.getElementById("wtp-member-hardware-save").disabled'),false);
             }
             if(state==='consumer') {
-                assert.equal(await evaluate('document.getElementById("wtp-member-station-save").disabled'),true);
+                assert.equal(resourceFixtures.consumer.profile_owned_station,false,'current consumer connection permits live station edits');
+                assert.equal(await evaluate('document.getElementById("wtp-member-station-save").disabled'),false,'live station authority enables explicit station save');
                 assert.match(await evaluate('document.getElementById("wtp-member-active").textContent'),/Unknown/);
                 assert.match(await evaluate('document.getElementById("wtp-member-restart").textContent'),/latched/);
+                await evaluate(`window.__resourceFixtures.consumer.profile_owned_station=true; document.getElementById('wtp-member-load').click()`);
+                await waitFor(async()=>await evaluate('document.getElementById("wtp-management").getAttribute("aria-busy")==="false"'),'profile-owned station readback');
+                assert.equal(await evaluate('document.getElementById("wtp-member-station-save").disabled'),true,'profile-owned station remains read-only');
+                await evaluate(`window.__resourceFixtures.consumer.profile_owned_station=false; document.getElementById('wtp-member-load').click()`);
+                await waitFor(async()=>await evaluate('document.getElementById("wtp-management").getAttribute("aria-busy")==="false"'),'live station authority readback');
+                assert.equal(await evaluate('document.getElementById("wtp-member-station-save").disabled'),false,'live authority restores explicit station save');
             }
             if(state==='fault'||state==='unsupported') assert.equal(await evaluate('document.getElementById("wtp-member-hardware-save").disabled'),true);
             for(const theme of ['light','dark'])for(const viewport of [{name:'desktop',width:1280,height:900},{name:'mobile',width:390,height:844}]) {
