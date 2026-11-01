@@ -2939,11 +2939,20 @@ class InstallerMigrationTests(unittest.TestCase):
             MOD.apply(args, FakeRunner())
         self.assertEqual(events, ['candidate','rollback','remove','absence','install'])
 
+    def development_recovery_inputs(self):
+        previous=RemovalPolicyTests.development_record(self)
+        entrypoint=self.root/'development-rollback'; entrypoint.write_bytes(b'original owning rollback entrypoint')
+        rollback=self.root/'ROLLBACK.json'; rollback.write_bytes(b'{"checkpoint":"installed"}')
+        previous.update(rollbackRecord=str(rollback),rollbackEntrypoint=str(entrypoint),
+                        rollbackRecordSha256=digest(rollback.read_bytes()),
+                        rollbackEntrypointSha256=digest(entrypoint.read_bytes()))
+        return previous,entrypoint,rollback
+
     def test_development_to_release_retains_exact_rollback_authority(self):
-        previous=RemovalPolicyTests.development_record(self); self.write_record(previous)
+        previous,entrypoint,rollback_input=self.development_recovery_inputs(); self.write_record(previous)
         args=self.plan(self.release_candidate())
         with mock.patch.object(MOD, 'validate_candidate_before_update'), \
-             mock.patch.object(MOD, 'validate_development_rollback_authority') as rollback, \
+             mock.patch.object(MOD, 'validate_development_rollback_authority', return_value=(entrypoint,rollback_input)) as rollback, \
              mock.patch.object(MOD, 'remove_owned_provider', side_effect=lambda *_:self.record.unlink()), \
              mock.patch.object(MOD, 'verify_provider_absent'), \
              mock.patch.object(MOD, 'apply_release') as install:
@@ -3056,6 +3065,29 @@ class InstallerMigrationTests(unittest.TestCase):
         with self.assertRaisesRegex(MOD.ContractError,'unproven installation ownership'):
             MOD.resume_removed_provider_migration(self.record,self.selected,self.root,FakeRunner())
         self.assertEqual(self.record.read_text(),'[]')
+
+
+    def test_development_retry_uses_original_receipt_after_owning_rollback_changes_it(self):
+        previous,entrypoint,rollback=self.development_recovery_inputs()
+        selected=self.release_candidate()
+        with mock.patch.object(MOD,'validate_development_rollback_authority',return_value=(entrypoint,rollback)) as authority:
+            evidence=MOD.retain_provider_migration(self.record,previous,selected,FakeRunner())
+            rollback.write_text('{"checkpoint":"rolled-back"}')
+            MOD.retain_provider_migration(self.record,previous,selected,FakeRunner())
+        authority.assert_called_once()
+        self.assertEqual(digest((evidence/'previous-development-rollback.json').read_bytes()),previous['rollbackRecordSha256'])
+        directory=self.root/'etc/systemd/system/rp1-gpclk-route-manager@.service.d'; directory.mkdir(parents=True)
+        with mock.patch.object(MOD,'verify_provider_absent') as absence:
+            MOD.resume_removed_provider_migration(self.record,selected,self.root,FakeRunner())
+        absence.assert_called_once(); self.assertFalse(directory.exists())
+
+    def test_changed_retained_development_receipt_is_not_accepted(self):
+        previous,entrypoint,rollback=self.development_recovery_inputs(); selected=self.release_candidate()
+        with mock.patch.object(MOD,'validate_development_rollback_authority',return_value=(entrypoint,rollback)):
+            evidence=MOD.retain_provider_migration(self.record,previous,selected,FakeRunner())
+        (evidence/'previous-development-rollback.json').write_text('changed')
+        with self.assertRaisesRegex(MOD.ContractError,'retained development recovery input differs'):
+            MOD.retain_provider_migration(self.record,previous,selected,FakeRunner())
 
 
 if __name__ == "__main__":

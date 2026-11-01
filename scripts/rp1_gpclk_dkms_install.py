@@ -2268,8 +2268,6 @@ def retain_provider_migration(record_path: pathlib.Path, record: Mapping[str, An
         return None
     if record["channel"] == "release":
         validate_manifest(record["manifest"], tag=record["tag"], tag_commit=record["sourceCommit"])
-    else:
-        validate_development_rollback_authority(record, pathlib.Path("/"))
     current_base = dict(record)
     current_base.pop("runtime", None)
     current_base["schema"] = RECORD_SCHEMA
@@ -2332,6 +2330,38 @@ def retain_provider_migration(record_path: pathlib.Path, record: Mapping[str, An
                 sha256_file(destination) == package["sha256"],
                 "retained predecessor rollback package differs")
         validate_package(destination, manifest, runner)
+    else:
+        rollback_copy = directory / "previous-development-rollback.json"
+        entrypoint_copy = directory / "previous-development-rollback"
+        if not rollback_copy.exists() or not entrypoint_copy.exists():
+            entrypoint, rollback = validate_development_rollback_authority(record, pathlib.Path("/"))
+            for original, destination, expected in (
+                    (rollback, rollback_copy, record["rollbackRecordSha256"]),
+                    (entrypoint, entrypoint_copy, record["rollbackEntrypointSha256"])):
+                if destination.exists() or destination.is_symlink():
+                    continue
+                payload = original.read_bytes()
+                require(sha256_bytes(payload) == expected, "development recovery input changed before retention")
+                descriptor, temporary = tempfile.mkstemp(prefix=".rollback-", dir=directory)
+                try:
+                    with os.fdopen(descriptor, "wb") as stream:
+                        stream.write(payload)
+                        stream.flush()
+                        os.fsync(stream.fileno())
+                    os.link(temporary, destination, follow_symlinks=False)
+                    parent = os.open(directory, os.O_RDONLY | getattr(os, "O_DIRECTORY", 0))
+                    try:
+                        os.fsync(parent)
+                    finally:
+                        os.close(parent)
+                finally:
+                    os.unlink(temporary)
+        # The owning rollback legitimately rewrites its live receipt when it
+        # completes. Retry authority is the immutable copy retained beforehand.
+        for path, expected in ((rollback_copy, record["rollbackRecordSha256"]),
+                               (entrypoint_copy, record["rollbackEntrypointSha256"])):
+            require(path.is_file() and not path.is_symlink() and sha256_file(path) == expected,
+                    "retained development recovery input differs")
     print(f"Verified predecessor recovery inputs retained at {directory}")
     return directory
 
