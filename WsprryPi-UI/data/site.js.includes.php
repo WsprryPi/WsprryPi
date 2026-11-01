@@ -1,7 +1,7 @@
 <?php require_once __DIR__ . '/ui_version.php'; ?>
-<!-- jQuery 3.7.1 -->
+<!-- jQuery 4.0.0 -->
 <script
-    src="<?= htmlspecialchars(wsprrypiAssetUrl('vendor/js/jquery-3.7.1.min.js')) ?>">
+    src="<?= htmlspecialchars(wsprrypiAssetUrl('vendor/js/jquery-4.0.0.min.js')) ?>">
 </script>
 
 <!-- Bootstrap Bundle JS (Includes Popper) -->

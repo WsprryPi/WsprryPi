@@ -3,6 +3,57 @@
 This is the Bootstrap UI for [Wsprry Pi](https://github.com/WsprryPi/WsprryPi/).
 It is installed with the current application installation.
 
+## Browser dependencies
+
+The UI serves its browser libraries and fonts locally, including the standalone
+diagnostic-log viewer. The main interface uses Bootswatch Zephyr; the standalone
+viewer uses plain Bootstrap CSS and does not load the shared application shell.
+
+| Asset | Version |
+| --- | --- |
+| jQuery, full browser build | 4.0.0 |
+| Bootstrap / Bootswatch Zephyr | 5.3.8 |
+| Popper, included in the Bootstrap bundle | 2.11.8 |
+| Bootstrap Icons | 1.13.2 |
+| Font Awesome Free, CSS and WOFF2 | 7.3.1 |
+| Barlow Semi Condensed, weights 500/600/700 | 1.422 |
+| Source Sans 3, weights 400/500/600/700 | 3.052 |
+
+Use current desktop and mobile browsers. jQuery 4 drops older browser versions
+supported by jQuery 3; its exact dependency-level support policy is documented
+in the [jQuery 4 migration guide](https://jquery.com/upgrade-guide/4.0/).
+That policy is not a qualification of the complete console on every listed
+browser. The browser fixtures use Chromium.
+
+`ws` 8.22.1 is a development-only dependency for browser fixtures; it is not a
+browser library or a requirement on the installed UI host. Node.js remains
+required only for development/testing, with the existing minimum of 18.
+
+Asset updates participate in the existing packaged UI identity and cache-key
+mechanism. An already open page continues using its loaded scripts until the
+operator accepts the existing refresh prompt or reloads it. Save or otherwise
+resolve unsaved drafts before choosing a refresh; a page reload does not promise
+to preserve every transient draft. Dependency updates do not change settings,
+storage keys, authentication, or control-session policy.
+
+Distribution sources, licenses, and local asset-path adjustments are recorded in
+[`data/vendor/THIRD_PARTY_NOTICES.md`](data/vendor/THIRD_PARTY_NOTICES.md).
+When updating vendored CSS, keep fonts and CSS together and run `npm test`;
+the vendor-resource check rejects missing or external CSS resources. Run
+`npm run test:browser` to exercise actual assets, AJAX, Bootstrap interactions,
+stored preferences, and synthetic log streams. Optional `JQUERY_MIGRATE_PATH`
+points the dependency browser fixture at an official development Migrate 4
+script for a temporary browser-response-only migration check. The normal suite
+runs without Migrate. `DEPENDENCY_EVIDENCE_DIR` selects a screenshot directory
+for the standalone viewer.
+
+Apache and PHP are distribution-managed dependencies selected by the installer.
+Their installed versions and security-backport status must be checked on each
+serving host, including the PHP web SAPI rather than only PHP CLI. See
+[`../scripts/README.md`](../scripts/README.md) for the existing PHP security
+inspection and mitigation guidance. Browser-library updates do not update or
+qualify those server packages.
+
 ## Packaged UI manifest
 
 `scripts/generate_ui_manifest.py` generates and validates the schema-v1,
