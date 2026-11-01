@@ -164,6 +164,7 @@ add_executable(consumer_interop consumer_interop.cpp
     ../../wtp_integration/application.cpp ../../wtp_integration/status.cpp
     ../../wtp_integration/scheduler.cpp ../../wtp_integration/backend.cpp
     ../../wtp_integration/execution_plan.cpp ../../WSPR-Transmitter/src/execution_plan_compiler.cpp
+    ../../WSPR-Transmitter/src/standard_feld.cpp
     ../../WSPR-Transmitter/src/transmission_controller.cpp)
 target_compile_definitions(consumer_interop PRIVATE WSPRRYPI_CONSUMER_CRYPTO_TEST=1 MBEDTLS_CONFIG_FILE="${MBEDTLS_CONFIG_FILE}")
 target_include_directories(consumer_interop PRIVATE ../.. ../../WTP-Client/include ../../WSPR-Transmitter/src
