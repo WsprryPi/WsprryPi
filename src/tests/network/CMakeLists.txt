@@ -3,6 +3,7 @@ project(WsprryPiNetworkInterop LANGUAGES C CXX)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 find_package(Python3 REQUIRED COMPONENTS Interpreter)
+find_package(OpenSSL REQUIRED COMPONENTS SSL Crypto)
 # The executable embeds the ephemeral private key as well as its generated header.
 file(CHMOD "${CMAKE_BINARY_DIR}" PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE)
 # Pico is caller-selected source, including edited work. Git identity is diagnostic.
@@ -161,6 +162,6 @@ add_executable(consumer_interop consumer_interop.cpp
 target_compile_definitions(consumer_interop PRIVATE WSPRRYPI_CONSUMER_CRYPTO_TEST=1 MBEDTLS_CONFIG_FILE="${MBEDTLS_CONFIG_FILE}")
 target_include_directories(consumer_interop PRIVATE ../.. ../../WTP-Client/include ../../WSPR-Transmitter/src
     "${PICO_SOURCE}/src" "${PICO_SOURCE}/tests" "${CMAKE_BINARY_DIR}/generated" "${MBEDTLS_SOURCE}/include")
-target_link_libraries(consumer_interop PRIVATE pico_consumer_fixture mbedcrypto ssl crypto
+target_link_libraries(consumer_interop PRIVATE pico_consumer_fixture mbedcrypto OpenSSL::SSL OpenSSL::Crypto
     "${CMAKE_BINARY_DIR}/client/libwtp_client.a" pthread)
 target_compile_options(consumer_interop PRIVATE -Wall -Wextra -Wpedantic -Werror -UNDEBUG)
