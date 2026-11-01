@@ -221,7 +221,8 @@ void boundaries() {
   p.policy.allow_quantization = true;
   CHECK(convert(p).job.allow_frequency_adjustment == true);
   p = plan();
-  for (auto bad : {TransmissionMode::CW, static_cast<TransmissionMode>(999)}) {
+  for (auto bad : {TransmissionMode::CW, TransmissionMode::STANDARD_FELD,
+                   static_cast<TransmissionMode>(999)}) {
     p.mode = bad;
     rejected(p, WtpPlanError::UnsupportedMode);
   }

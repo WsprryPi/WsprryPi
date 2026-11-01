@@ -69,7 +69,8 @@ The ordering intentionally places asset selection before glyph-bearing fixtures.
 | Phase 5 Slice 4 | Passed at source/non-device level: internal Raspberry Pi execution, RF-transition gating, finalization, and progress lifecycle validated without running production or hardware paths |
 | Operator-facing parent integration | Not implemented: CLI, INI, JSON, web, WebSocket, and UI remain unavailable |
 | Production backend execution | Raspberry Pi internal route implemented but not physically qualified; Si5351 explicitly rejects Standard Feld |
-| Regression debt | `guarded-mode-change-persistence-test` has a baseline-reproduced pre-Slice-2 QRSS empty-message failure |
+| WTP transport | No Standard Feld wire mode; the Pi adapter rejects Standard Feld plans before transport |
+| Guarded mode persistence | `guarded-mode-change-persistence-test` passes against the current rebased sources |
 | Standalone transmitter build | Pre-existing parent-header include-boundary limitation remains documented |
 | Hardware qualification | Not assessed |
 | RF/spectral qualification | Not assessed |

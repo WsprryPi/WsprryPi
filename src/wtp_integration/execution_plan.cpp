@@ -72,6 +72,7 @@ std::optional<wtp::Mode> mode(TransmissionMode value) {
   case TransmissionMode::TONE:
     return wtp::Mode::Tone;
   case TransmissionMode::CW:
+  case TransmissionMode::STANDARD_FELD:
     return {};
   }
   return {};
