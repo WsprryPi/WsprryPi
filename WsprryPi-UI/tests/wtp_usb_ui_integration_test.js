@@ -153,6 +153,7 @@ async function main() {
                     if(String(url).endsWith('/host/devices') && options.method==='POST') {
                         const body=JSON.parse(options.body);
                         window.__catalog.profiles[0].settings=body.settings;
+                        window.__catalog.profiles[0].name=body.name;
                     }
                 }
                 const path=String(url);if(path.endsWith('/member/logging') && window.__loggingConflict)return {ok:false,status:412,headers:{get:()=>''},json:async()=>({error:{code:'revision_conflict'}})};const header={get:()=> '\\"usb-r1\\"'};
@@ -210,8 +211,8 @@ async function main() {
                 const shot=await client.send("Page.captureScreenshot",{format:"png"});fs.writeFileSync(path.join(output,`logging-conflict-${name}-${theme}.png`),Buffer.from(shot.data,"base64"));
             }
         }
-        // Exercise the actual profile editor and active form. Choosing the preset
-        // has an explicit save; active host field edits use existing autosave.
+        // Stored transport fields survive unrelated edits. UTC uncertainty is
+        // reported for operator judgment; it is no longer an editable veto.
         await waitFor(async()=>await evaluate("document.getElementById('fleet-edit').disabled===false"),"saved profile list");
         await evaluate("document.getElementById('fleet-add').click()");
         assert.equal(await evaluate("document.getElementById('fleet-uncertainty').value"),"100000000");
@@ -221,25 +222,20 @@ async function main() {
             await evaluate(`WtpUi.populate({...WtpUi.read(),'Start Uncertainty ns':${saved}})`);
             assert.equal(await evaluate("WtpUi.read()['Start Uncertainty ns']"),saved);
         }
-        await evaluate("document.getElementById('fleet-uncertainty-default').click();document.getElementById('wtp_uncertainty').value='100000000'");
-        assert.equal(await evaluate("document.getElementById('fleet-uncertainty').value"),"100000000");
-        assert.equal(await evaluate("WtpUi.read()['Start Uncertainty ns']"),100000000);
-        assert.equal(await evaluate("window.__mutations.length"),0,"preset actions must not save, connect or arm");
-        assert.match(await evaluate("document.getElementById('fleet-editor-feedback').textContent"),/Save the profile/);
-        assert.match(await evaluate("document.getElementById('wtp-uncertainty-hint').textContent"),/valid edits save automatically/);
-        assert.equal(await evaluate("buildConfigPayload().WTP['Start Uncertainty ns']"),100000000);
+        await evaluate("WtpUi.populate({...WtpUi.read(),'Start Uncertainty ns':1000000});document.getElementById('fleet-name').value='Bench Pico renamed';document.getElementById('fleet-name').dispatchEvent(new Event('input',{bubbles:true}))");
+        assert.equal(await evaluate("document.getElementById('fleet-uncertainty').value"),"1000000");
+        assert.equal(await evaluate("window.__mutations.length"),0,"profile drafts must not save, connect or arm");
+        assert.equal(await evaluate("buildConfigPayload().WTP['Start Uncertainty ns']"),1000000);
         for(const [name,width,height] of [["desktop",1440,1100],["mobile",390,844]]) {
             await client.send("Emulation.setDeviceMetricsOverride",{width,height,deviceScaleFactor:1,mobile:name==="mobile"});
             for(const theme of ["light","dark"]) {
                 await evaluate(`applyThemePreference('${theme}')`);
+                await evaluate(`bootstrap.Tab.getOrCreateInstance(document.getElementById('fleet-tab')).show();document.getElementById('fleet-name').scrollIntoView({block:'center',behavior:'instant'});document.getElementById('fleet-name').focus()`);
                 for(const surface of ["fleet","wtp"]) {
-                    await evaluate(`bootstrap.Tab.getOrCreateInstance(document.getElementById('fleet-tab')).show()`);
                     const field=surface==="fleet"?"fleet-uncertainty":"wtp_uncertainty";
-                    const preset=surface==="fleet"?"fleet-uncertainty-default":field;
-                    await evaluate(`for(let e=document.getElementById('${field}');e;e=e.parentElement)if(e.tagName==='DETAILS'&&!e.open)e.querySelector('summary').click();document.getElementById('${field}').closest('.config-stacked-field').scrollIntoView({block:'center',behavior:'instant'});document.getElementById('${preset}').focus()`);
                     await new Promise(resolve=>setTimeout(resolve,100));
-                    const state=await evaluate(`(() => {const input=document.getElementById('${field}'),button=document.getElementById('${preset}'),r=input.getBoundingClientRect();return {focus:document.activeElement===button,width:r.width,height:r.height,value:input.value,overflow:document.documentElement.scrollWidth>innerWidth};})()`);
-                    assert(state.focus&&state.width>150&&state.height>0&&!state.overflow,JSON.stringify(state));
+                    const state=await evaluate(`(() => {const input=document.getElementById('${field}'),r=input.getBoundingClientRect(),name=document.getElementById('fleet-name');return {hidden:!!input.closest('[hidden]'),focus:document.activeElement===name,width:r.width,height:r.height,value:input.value,nameWidth:name.getBoundingClientRect().width,overflow:document.documentElement.scrollWidth>innerWidth};})()`);
+                    assert(state.hidden&&state.focus&&state.width===0&&state.height===0&&state.nameWidth>150&&!state.overflow,JSON.stringify(state));
                     findings.push({name,theme,surface,...state});
                     const shot=await client.send("Page.captureScreenshot",{format:"png"});fs.writeFileSync(path.join(output,`policy-${surface}-${name}-${theme}.png`),Buffer.from(shot.data,"base64"));
                 }
@@ -251,13 +247,15 @@ async function main() {
         const mutations=await evaluate("window.__mutations");
         assert.equal(mutations.length,1);
         assert(mutations[0].url.endsWith('/host/devices'));
-        assert.equal(mutations[0].body.settings['Start Uncertainty ns'],100000000);
+        assert.equal(mutations[0].body.settings['Start Uncertainty ns'],1000000);
         assert.equal(mutations[0].body.operation,'edit');
+        assert.equal(mutations[0].body.name,'Bench Pico renamed');
         assert.equal(await evaluate("window.__catalog.profiles[0].settings['USB Serial']"),'PICO123');
         await evaluate("document.getElementById('fleet-edit').click()");
-        assert.equal(await evaluate("document.getElementById('fleet-uncertainty').value"),"100000000");
+        assert.equal(await evaluate("document.getElementById('fleet-uncertainty').value"),"1000000");
+        assert.equal(await evaluate("document.getElementById('fleet-name').value"),"Bench Pico renamed");
         fs.writeFileSync(path.join(output,"checks.json"),JSON.stringify(findings,null,2)+"\n");
-        console.log("Rendered Fleet navigation, configured common name and USB no-network/logging editors at desktop/mobile in light/dark; no horizontal overflow; 100 ms profile draft-only adoption, active form collection, explicit profile save/reload and focus/input sizes passed");
+        console.log("Rendered Fleet navigation, configured common name and USB no-network/logging editors at desktop/mobile in light/dark; uncertainty veto controls stay hidden, stored values survive explicit profile rename/save/reload, visible focus and layout passed");
         console.log(output);
     } catch(error) {failure=error;throw error;} finally {
         if(client)client.close();
