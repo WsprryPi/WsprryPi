@@ -46,10 +46,12 @@
         : m.reference_use === 'trusted_local' && integer(m.local_rate_ppb,-100000,100000);
   }
   function validRuntime(v) {
-    if (!keys(v,'transmit,reference_output,communication,engineering_enabled,inhibited,epoch,enable_command_completed_ns,disable_command_completed_ns,reference_measurement,measurement_error,clock_reference_state,clock_reference_observed_raw_ns')) return false;
+    if (!keys(v,'transmit,reference_output,communication,engineering_enabled,inhibited,epoch,enable_command_completed_ns,disable_command_completed_ns,reference_measurement,measurement_error,clock_reference_state,clock_reference_observed_raw_ns,clock_reference_age_ns')) return false;
     for (const k of ['transmit','reference_output']) if (!['unknown','register_disabled','register_enabled'].includes(v[k])) return false;
-    if(!['none','selected','quality','disagreement','expired','awaiting_utc'].includes(v.clock_reference_state) || !decimal(v.clock_reference_observed_raw_ns) || (v.clock_reference_state==='none') !== (v.clock_reference_observed_raw_ns==='0')) return false;
-    if(v.reference_measurement && decimal(v.reference_measurement.observed_raw_ns) && decimal(v.reference_measurement.age_ns) && BigInt(v.clock_reference_observed_raw_ns)>BigInt(v.reference_measurement.observed_raw_ns)+BigInt(v.reference_measurement.age_ns)) return false;
+    if(!['none','selected','quality','disagreement','expired','awaiting_utc'].includes(v.clock_reference_state) || !decimal(v.clock_reference_observed_raw_ns) || !decimal(v.clock_reference_age_ns) ||
+       BigInt(v.clock_reference_observed_raw_ns)+BigInt(v.clock_reference_age_ns)>18446744073709551615n ||
+       (v.clock_reference_state==='none' && v.clock_reference_age_ns!=='0') || (v.clock_reference_state==='none') !== (v.clock_reference_observed_raw_ns==='0')) return false;
+    if(v.reference_measurement && decimal(v.reference_measurement.observed_raw_ns) && decimal(v.reference_measurement.age_ns) && (v.clock_reference_state!=='none' && BigInt(v.clock_reference_observed_raw_ns)+BigInt(v.clock_reference_age_ns)!==BigInt(v.reference_measurement.observed_raw_ns)+BigInt(v.reference_measurement.age_ns))) return false;
     return v.communication === (v.transmit === 'unknown' || v.reference_output === 'unknown' ? 'unknown' : 'register_control_verified') &&
         typeof v.engineering_enabled === 'boolean' && typeof v.inhibited === 'boolean' &&
         ['epoch','enable_command_completed_ns','disable_command_completed_ns'].every(k=>decimal(v[k])) &&
@@ -199,7 +201,7 @@
       const status = container.querySelector('[data-si-status]');
       const r = v?.runtime, m = r?.reference_measurement;
       status.textContent = !r ? 'Runtime observation unavailable. Saving settings does not prove hardware is connected or RF is inactive.' :
-          `Transmit ${r.transmit.replaceAll('_',' ')}; reference clock ${r.reference_output.replaceAll('_',' ')}. ${r.inhibited ? 'Output inhibited for this boot. ' : ''}Clock reference: ${{none:'no trusted rate input',selected:'trusted local rate selected',quality:'existing clock-rate estimate has lower uncertainty',disagreement:'frequency disagreement; UTC admission blocked',expired:'lost or stale; normal clock holdover',awaiting_utc:'rate input ready; an accepted UTC source is still required'}[r.clock_reference_state]}. ${executionDescription(v)} `+
+          `Transmit ${r.transmit.replaceAll('_',' ')}; reference clock ${r.reference_output.replaceAll('_',' ')}. ${r.inhibited ? 'Output inhibited for this boot. ' : ''}Clock reference: ${{none:'no trusted rate input',selected:'trusted local rate selected',quality:'existing clock-rate estimate has lower uncertainty',disagreement:'frequency disagreement; UTC admission blocked',expired:'capture lost or stale; learned timer rate retained with growing uncertainty',awaiting_utc:'rate input ready; an accepted UTC source is still required'}[r.clock_reference_state]}. ${r.clock_reference_state!=='none' ? 'Last reference rate sample '+(Number(r.clock_reference_age_ns)/1e9).toFixed(1)+' s ago. ' : ''}${executionDescription(v)} `+
           (m ? `Loopback ratio error ${m.ratio_error_ppb} ppb, uncertainty ≤${m.uncertainty_ppb} ppb; ${(Number(m.duration_ns)/1e9).toFixed(1)} s window, ${(Number(m.age_ns)/1e9).toFixed(1)} s old. ${m.reference_use==='measurement_only' ? 'Measurement only.' : 'Local rate estimate; no UTC epoch or absolute RF calibration.'}` : `No current loopback measurement${r.measurement_error ? ': '+r.measurement_error.replaceAll('_',' ') : ''}.`);
     }
     show(false);

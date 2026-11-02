@@ -28,7 +28,7 @@ bool wtp_host_utc_valid() noexcept {
   const int result = adjtimex(&observation);
   return result >= 0 && result != TIME_ERROR &&
          !(observation.status & (STA_UNSYNC | STA_CLOCKERR)) &&
-         observation.maxerror >= 0 && observation.maxerror <= 500000;
+         observation.maxerror >= 0;
 #else
   return false;
 #endif
@@ -175,8 +175,11 @@ void WtpApplication::prepare(TransmissionRequest request) {
     number >>= 4;
   }
   mode_ = request.mode;
+  const auto capabilities = scheduler_.status().capabilities;
+  if (!capabilities)
+    throw std::runtime_error("Pico capabilities are unavailable");
   if (!scheduler_.submit(std::move(request), job_prefix_ + suffix,
-                         settings_.start_uncertainty_ns,
+                         capabilities->maximum_arm_uncertainty_ns,
                          production_schedule_policy))
     throw std::runtime_error(scheduler_.diagnostic());
 }

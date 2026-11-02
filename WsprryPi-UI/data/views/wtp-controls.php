@@ -79,7 +79,7 @@
                         <label class="form-label" for="fleet-key">Client key file on host</label>
                         <input class="form-control" id="fleet-key" maxlength="512" autocomplete="off">
                     </div>
-                    <div class="col-12 col-lg-6 config-stacked-field">
+                    <div class="col-12 col-lg-6 config-stacked-field" hidden aria-hidden="true">
                         <label class="form-label" for="fleet-uncertainty">Maximum UTC uncertainty (ns)</label>
                         <input class="form-control" id="fleet-uncertainty" type="number" min="1" max="1000000000" value="100000000" aria-describedby="fleet-uncertainty-hint">
                         <div class="form-text" id="fleet-uncertainty-hint">Recommended: 100,000,000 ns = 100 ms. Existing saved limits are kept.</div>
@@ -147,7 +147,7 @@
                 <input class="form-control" id="wtp_product" type="number" min="1" max="65535" step="1" data-wtp-key="USB Product ID" aria-describedby="wtp-product-hint" disabled>
                 <div class="form-text" id="wtp-product-hint">Decimal USB identifier.</div>
             </div>
-            <div class="col-12 col-lg-6 config-stacked-field">
+            <div class="col-12 col-lg-6 config-stacked-field" hidden aria-hidden="true">
                 <label class="form-label" for="wtp_uncertainty">Maximum UTC uncertainty (ns)</label>
                 <input class="form-control" id="wtp_uncertainty" type="number" min="1" max="1000000000" step="1" value="100000000" data-wtp-key="Start Uncertainty ns" aria-describedby="wtp-uncertainty-hint" disabled>
                 <div class="form-text" id="wtp-uncertainty-hint">Recommended: 100,000,000 ns = 100 ms. Existing saved limits are kept. Enter a new value to change it; valid edits save automatically. Pico checks the limit at ARM and launch.</div>
@@ -180,7 +180,7 @@
                 <p class="form-text mb-0">Accepts the device's reported realizable frequencies. This does not establish RF accuracy.</p>
             </div>
         </div>
-        <p class="form-text mt-3">The host needs synchronized UTC. The Pico needs its own valid UTC clock with bounded uncertainty; USB automatically supplies qualified host UTC on supported firmware. Network WTP does not set that clock. GPSDO frequency discipline alone is not UTC.</p>
+        <p class="form-text mt-3">The host needs synchronized UTC. The Pico needs its own valid UTC clock with reported uncertainty; USB automatically supplies qualified host UTC on supported firmware. Network WTP does not set that clock. GPSDO frequency discipline alone is not UTC.</p>
         <div class="wtp-status" aria-labelledby="wtp-status-heading">
             <h4 id="wtp-status-heading" class="cw-control-section__title">Pico status</h4>
             <p id="wtp-status-text" class="mb-2" role="status" aria-live="polite">Status has not been checked.</p>

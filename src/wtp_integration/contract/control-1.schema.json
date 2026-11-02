@@ -5235,7 +5235,8 @@
           "additionalProperties": false,
           "required": [
             "schema",
-            "path"
+            "path",
+            "utc_uncertainty_policy"
           ],
           "properties": {
             "schema": {
@@ -5243,6 +5244,9 @@
             },
             "path": {
               "const": "/api/control/v1/operations"
+            },
+            "utc_uncertainty_policy": {
+              "const": "informational"
             }
           }
         },
@@ -5875,12 +5879,12 @@
             "holdover_s",
             "drift_ppb",
             "initial_uncertainty_ns",
-            "maximum_uncertainty_ns",
             "fallback_after_s",
             "fallback_window_s",
             "fallback_reopen_s",
             "station_stable_s",
-            "authentication"
+            "authentication",
+            "utc_uncertainty_policy"
           ],
           "properties": {
             "schema": {
@@ -5910,9 +5914,6 @@
             "initial_uncertainty_ns": {
               "const": "250000000"
             },
-            "maximum_uncertainty_ns": {
-              "const": "500000000"
-            },
             "fallback_after_s": {
               "const": 60
             },
@@ -5927,6 +5928,9 @@
             },
             "authentication": {
               "const": "pico_password"
+            },
+            "utc_uncertainty_policy": {
+              "const": "informational"
             }
           }
         },
@@ -9068,7 +9072,8 @@
         "reference_measurement",
         "measurement_error",
         "clock_reference_state",
-        "clock_reference_observed_raw_ns"
+        "clock_reference_observed_raw_ns",
+        "clock_reference_age_ns"
       ],
       "properties": {
         "transmit": {
@@ -9148,6 +9153,12 @@
           ]
         },
         "clock_reference_observed_raw_ns": {
+          "type": "string",
+          "pattern": "^(0|[1-9][0-9]{0,19})$",
+          "maxLength": 20,
+          "x-maximum": "18446744073709551615"
+        },
+        "clock_reference_age_ns": {
           "type": "string",
           "pattern": "^(0|[1-9][0-9]{0,19})$",
           "maxLength": 20,
@@ -9603,7 +9614,8 @@
     },
     "operations_status": {
       "schema": "operations",
-      "path": "/api/control/v1/operations"
+      "path": "/api/control/v1/operations",
+      "utc_uncertainty_policy": "informational"
     },
     "management_carriers": {
       "schema": "management",
@@ -9619,12 +9631,12 @@
       "holdover_s": 3600,
       "drift_ppb": 50000,
       "initial_uncertainty_ns": "250000000",
-      "maximum_uncertainty_ns": "500000000",
       "fallback_after_s": 60,
       "fallback_window_s": 600,
       "fallback_reopen_s": 300,
       "station_stable_s": 30,
-      "authentication": "pico_password"
+      "authentication": "pico_password",
+      "utc_uncertainty_policy": "informational"
     },
     "si5351": {
       "schema": "si5351",

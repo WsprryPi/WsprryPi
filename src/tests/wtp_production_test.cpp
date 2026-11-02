@@ -79,11 +79,11 @@ struct ReclaimedManagement : wsprrypi::wtp::ByteStream {
 void ordinary_usb_utc_admission() {
   for (unsigned scenario = 0; scenario < 3; ++scenario) {
     Clock clock;
-    const std::uint64_t uncertainty = scenario == 1 ? 100'000'001 : 18'000'000;
+    const std::uint64_t uncertainty = scenario == 1 ? 5'000'000'000ULL : 18'000'000ULL;
     clock.peer.filter = [=](auto operation, std::string &reply) {
       if (operation != wsprrypi::wtp::Operation::Caps && operation != wsprrypi::wtp::Operation::GetClock) return;
       auto j = nlohmann::json::parse(reply);
-      if (operation == wsprrypi::wtp::Operation::Caps) j["body"]["maximum_arm_uncertainty_ns"] = "500000000";
+      if (operation == wsprrypi::wtp::Operation::Caps) j["body"]["maximum_arm_uncertainty_ns"] = "18446744073709551615";
       else j["body"]["uncertainty_ns"] = std::to_string(uncertainty);
       reply = j.dump();
     };
@@ -108,9 +108,9 @@ void ordinary_usb_utc_admission() {
       const auto command = nlohmann::json::parse(payload);
       if (command.at("op") != "ARM") continue;
       ++arms;
-      CHECK(command.at("body").at("max_start_uncertainty_ns") == std::to_string(settings.start_uncertainty_ns));
+      CHECK(command.at("body").at("max_start_uncertainty_ns") == std::string("18446744073709551615"));
     }
-    CHECK(arms == (scenario == 0 ? 1 : 0));
+    CHECK(arms == 1); // Displayed UTC uncertainty and legacy stored limits do not veto jobs.
     CHECK(target.app->stop().ok);
   }
 }

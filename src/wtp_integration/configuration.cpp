@@ -147,7 +147,7 @@ bool decimal(const Json &j) {
 }
 bool si_runtime(const Json &v) {
   if (!fields(v,{"transmit","reference_output","communication","engineering_enabled","inhibited",
-        "epoch","enable_command_completed_ns","disable_command_completed_ns","reference_measurement","measurement_error","clock_reference_state","clock_reference_observed_raw_ns"}) ||
+        "epoch","enable_command_completed_ns","disable_command_completed_ns","reference_measurement","measurement_error","clock_reference_state","clock_reference_observed_raw_ns","clock_reference_age_ns"}) ||
       !v["engineering_enabled"].is_boolean() || !v["inhibited"].is_boolean()) return false;
   for (const auto key:{"transmit","reference_output"})
     if (v[key]!="unknown" && v[key]!="register_disabled" && v[key]!="register_enabled") return false;
@@ -155,8 +155,12 @@ bool si_runtime(const Json &v) {
   if (v["communication"]!=(unknown ? "unknown" : "register_control_verified")) return false;
   for (const auto key:{"epoch","enable_command_completed_ns","disable_command_completed_ns"}) if (!decimal(v[key])) return false;
   if (v["clock_reference_state"]!="none" && v["clock_reference_state"]!="selected" && v["clock_reference_state"]!="quality" && v["clock_reference_state"]!="disagreement" && v["clock_reference_state"]!="expired" && v["clock_reference_state"]!="awaiting_utc") return false;
-  if (!decimal(v["clock_reference_observed_raw_ns"]) ||
+  if (!decimal(v["clock_reference_observed_raw_ns"]) || !decimal(v["clock_reference_age_ns"]) ||
       (v["clock_reference_state"]=="none")!=(v["clock_reference_observed_raw_ns"]=="0")) return false;
+  const auto reference_raw=std::stoull(v["clock_reference_observed_raw_ns"].get<std::string>());
+  const auto reference_age=std::stoull(v["clock_reference_age_ns"].get<std::string>());
+  if (reference_raw>UINT64_MAX-reference_age ||
+      (v["clock_reference_state"]=="none" && reference_age)) return false;
   if (!v["measurement_error"].is_null() && (!v["measurement_error"].is_string() ||
       !std::regex_match(v["measurement_error"].get<std::string>(),std::regex("[a-z][a-z0-9_]{0,79}")))) return false;
   const auto &m=v["reference_measurement"];
@@ -174,7 +178,7 @@ bool si_runtime(const Json &v) {
       number("endpoint_uncertainty_ns")>=number("duration_ns") || number("age_ns")>30000000000ULL ||
       !m["uncertainty_ppb"].is_number_integer() || m["uncertainty_ppb"]<1 || m["uncertainty_ppb"]>200100) return false;
   const auto end=number("observed_raw_ns"),age=number("age_ns");
-  if (end>UINT64_MAX-age || std::stoull(v["clock_reference_observed_raw_ns"].get<std::string>())>end+age) return false;
+  if (end>UINT64_MAX-age || (v["clock_reference_state"]!="none" && reference_raw+reference_age!=end+age)) return false;
   if (m["reference_use"]=="measurement_only") return m["local_rate_ppb"].is_null();
   return m["reference_use"]=="trusted_local" && m["local_rate_ppb"].is_number_integer() &&
       m["local_rate_ppb"]>=-100000 && m["local_rate_ppb"]<=100000;
