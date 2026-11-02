@@ -2159,9 +2159,9 @@
             },
             "frequency_hz": {
               "type": "integer",
-              "minimum": 98503,
-              "maximum": 74998496,
-              "description": "Whole-Hz WSPR USB dial. Nominal RF center is dial + 1500 Hz; all four RF tones must satisfy the selected engine and frequency permissions. Bounds cover supported 132/138/150 MHz engines; the server applies the selected engine limits."
+              "minimum": 6503,
+              "maximum": 159998496,
+              "description": "Whole-Hz WSPR USB dial. Nominal RF center is dial + 1500 Hz; all four RF tones must satisfy the selected engine and frequency permissions. The domain covers the Direct GPIO and Si5351 engines; admission applies the actual selected engine limits."
             },
             "contract": {
               "const": "Wsprry-Control/1"
@@ -2190,9 +2190,9 @@
               "anyOf": [
                 {
                   "type": "integer",
-                  "minimum": 98503,
-                  "maximum": 74998496,
-                  "description": "Whole-Hz WSPR USB dial. Nominal RF center is dial + 1500 Hz; all four RF tones must satisfy the selected engine and frequency permissions. Bounds cover supported 132/138/150 MHz engines; the server applies the selected engine limits."
+                  "minimum": 6503,
+                  "maximum": 159998496,
+                  "description": "Whole-Hz WSPR USB dial. Nominal RF center is dial + 1500 Hz; all four RF tones must satisfy the selected engine and frequency permissions. The domain covers the Direct GPIO and Si5351 engines; admission applies the actual selected engine limits."
                 },
                 {
                   "type": "null"
@@ -5952,7 +5952,6 @@
             "default_reference_use",
             "automatic_calibration",
             "gps",
-            "physically_qualified",
             "execution_gate",
             "maximum_tones",
             "maximum_events",
@@ -5965,7 +5964,13 @@
             "reference_loss_policy",
             "frequency_disagreement",
             "i2c_hz",
-            "completion_control_timeout_ns"
+            "completion_control_timeout_ns",
+            "ordinary_profile",
+            "trusted_epoch_sources",
+            "frequency_minimum_nhz",
+            "frequency_maximum_nhz",
+            "transmit_strategies",
+            "vhf_pll_family"
           ],
           "properties": {
             "schema": {
@@ -6059,11 +6064,8 @@
             "gps": {
               "const": false
             },
-            "physically_qualified": {
-              "const": false
-            },
             "execution_gate": {
-              "const": "engineering_build"
+              "const": "qualified_profile_or_engineering_build"
             },
             "maximum_tones": {
               "const": 4
@@ -6100,6 +6102,81 @@
             },
             "completion_control_timeout_ns": {
               "const": "8000000"
+            },
+            "ordinary_profile": {
+              "const": {
+                "id": "qrp-labs-rev6-25mhz-clk0-8ma",
+                "qualified": true,
+                "system_clock_hz": 138000000,
+                "i2c_pair": 1,
+                "address": 96,
+                "reference_hz": 25000000,
+                "reference_source": "external_xa",
+                "crystal_load_pf": null,
+                "transmit_output": 0,
+                "drive_ma": 8,
+                "loopback_output": 2,
+                "loopback_input_gp": 7,
+                "allow_none": true,
+                "rf_gate_gp": null,
+                "reference_uses": [
+                  "measurement_only",
+                  "trusted_local"
+                ],
+                "modes": [
+                  "wspr",
+                  "tone",
+                  "qrss",
+                  "fskcw",
+                  "dfcw"
+                ],
+                "frequency_points_hz": [
+                  137500,
+                  475700,
+                  1838100,
+                  3570100,
+                  5288700,
+                  7050000,
+                  10140200,
+                  14097100,
+                  18106100,
+                  21096100,
+                  24926100,
+                  28126100,
+                  40001000,
+                  50294500,
+                  60001000,
+                  70400000,
+                  144490500
+                ]
+              }
+            },
+            "trusted_epoch_sources": {
+              "const": [
+                "ntp",
+                "browser"
+              ]
+            },
+            "frequency_minimum_nhz": {
+              "const": "8000000000000"
+            },
+            "frequency_maximum_nhz": {
+              "const": "160000000000000000"
+            },
+            "transmit_strategies": {
+              "const": [
+                "fixed_pll_multisynth",
+                "fixed_integer_multisynth_pll"
+              ]
+            },
+            "vhf_pll_family": {
+              "const": {
+                "denominator_minimum": 983040,
+                "denominator_maximum": 1048575,
+                "denominator_span_maximum": 4095,
+                "common_p1": true,
+                "maximum_candidate_evaluations": 32768
+              }
             }
           }
         }
@@ -9091,7 +9168,8 @@
         "execution_engine",
         "runtime",
         "storage_healthy",
-        "contract"
+        "contract",
+        "qualification"
       ],
       "properties": {
         "schema": {
@@ -9124,7 +9202,7 @@
           "type": "boolean"
         },
         "physically_qualified": {
-          "const": false
+          "type": "boolean"
         },
         "execution_engine": {
           "type": "string",
@@ -9146,8 +9224,173 @@
         },
         "contract": {
           "const": "Wsprry-Control/1"
+        },
+        "qualification": {
+          "anyOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "profile_id",
+                "system_clock_hz",
+                "i2c_pair"
+              ],
+              "properties": {
+                "profile_id": {
+                  "const": "qrp-labs-rev6-25mhz-clk0-8ma"
+                },
+                "system_clock_hz": {
+                  "const": 138000000
+                },
+                "i2c_pair": {
+                  "const": 1
+                }
+              }
+            }
+          ]
         }
-      }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "physically_qualified": {
+                "const": true
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "qualification": {
+                "not": {
+                  "type": "null"
+                }
+              },
+              "boot_active": {
+                "type": "object",
+                "properties": {
+                  "reference_hz": {
+                    "const": 25000000
+                  },
+                  "reference_source": {
+                    "const": "external_xa"
+                  },
+                  "crystal_load_pf": {
+                    "const": null
+                  },
+                  "address": {
+                    "const": 96
+                  },
+                  "transmit_output": {
+                    "const": 0
+                  },
+                  "drive_ma": {
+                    "const": 8
+                  },
+                  "rf_gate_gp": {
+                    "const": null
+                  },
+                  "loopback_output": {
+                    "enum": [
+                      null,
+                      2
+                    ]
+                  },
+                  "loopback_input_gp": {
+                    "enum": [
+                      null,
+                      7
+                    ]
+                  }
+                }
+              },
+              "execution_engine": {
+                "enum": [
+                  "si5351",
+                  "si5351-engineering"
+                ]
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "qualification": {
+                "type": "null"
+              },
+              "execution_engine": {
+                "not": {
+                  "const": "si5351"
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "physically_qualified": {
+                "const": true
+              },
+              "execution_engine": {
+                "const": "si5351"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "runtime": {
+                "anyOf": [
+                  {
+                    "type": "null"
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "engineering_enabled": {
+                        "const": false
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "physically_qualified": {
+                "const": true
+              },
+              "execution_engine": {
+                "const": "si5351-engineering"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "runtime": {
+                "anyOf": [
+                  {
+                    "type": "null"
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "engineering_enabled": {
+                        "const": true
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        }
+      ]
     }
   },
   "management_routes": {
@@ -9439,8 +9682,7 @@
       "default_reference_use": "measurement_only",
       "automatic_calibration": false,
       "gps": false,
-      "physically_qualified": false,
-      "execution_gate": "engineering_build",
+      "execution_gate": "qualified_profile_or_engineering_build",
       "maximum_tones": 4,
       "maximum_events": 512,
       "minimum_transition_ns": "10000000",
@@ -9452,7 +9694,70 @@
       "reference_loss_policy": "retain_timer_rate_center_with_utc_holdover",
       "frequency_disagreement": "inhibit_utc_admission",
       "i2c_hz": 100000,
-      "completion_control_timeout_ns": "8000000"
+      "completion_control_timeout_ns": "8000000",
+      "ordinary_profile": {
+        "id": "qrp-labs-rev6-25mhz-clk0-8ma",
+        "qualified": true,
+        "system_clock_hz": 138000000,
+        "i2c_pair": 1,
+        "address": 96,
+        "reference_hz": 25000000,
+        "reference_source": "external_xa",
+        "crystal_load_pf": null,
+        "transmit_output": 0,
+        "drive_ma": 8,
+        "loopback_output": 2,
+        "loopback_input_gp": 7,
+        "allow_none": true,
+        "rf_gate_gp": null,
+        "reference_uses": [
+          "measurement_only",
+          "trusted_local"
+        ],
+        "modes": [
+          "wspr",
+          "tone",
+          "qrss",
+          "fskcw",
+          "dfcw"
+        ],
+        "frequency_points_hz": [
+          137500,
+          475700,
+          1838100,
+          3570100,
+          5288700,
+          7050000,
+          10140200,
+          14097100,
+          18106100,
+          21096100,
+          24926100,
+          28126100,
+          40001000,
+          50294500,
+          60001000,
+          70400000,
+          144490500
+        ]
+      },
+      "trusted_epoch_sources": [
+        "ntp",
+        "browser"
+      ],
+      "frequency_minimum_nhz": "8000000000000",
+      "frequency_maximum_nhz": "160000000000000000",
+      "transmit_strategies": [
+        "fixed_pll_multisynth",
+        "fixed_integer_multisynth_pll"
+      ],
+      "vhf_pll_family": {
+        "denominator_minimum": 983040,
+        "denominator_maximum": 1048575,
+        "denominator_span_maximum": 4095,
+        "common_p1": true,
+        "maximum_candidate_evaluations": 32768
+      }
     }
   },
   "descriptor_runtime_fields": {

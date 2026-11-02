@@ -1117,13 +1117,24 @@ PicoHttpResponse pico_resource_request(const PicoManagementExchange &exchange,
       require(valid_management_contract(management,carrier,device,boot,generation) && management["schema"]==caps["management_carriers"]["schema"],"unsupported_management_contract",409);
       const auto result=exchange("si5351","GET",{},{});success(result);const auto value=parsed(result);
       const Json target{{"scope","member"},{"device_id",device},{"boot_id",boot}};
-      require(fields(value,{"schema","target","saved","boot_active","pending_restart","physically_qualified","execution_engine","runtime","storage_healthy"}) &&
+      require(fields(value,{"schema","target","saved","boot_active","pending_restart","physically_qualified","qualification","execution_engine","runtime","storage_healthy"}) &&
           value["schema"]=="si5351" && value["target"]==target && etag(result.etag) &&
-          value["physically_qualified"].is_boolean() && value["physically_qualified"]==false &&
+          value["physically_qualified"].is_boolean() &&
           value["pending_restart"].is_boolean() && value["storage_healthy"].is_boolean() &&
           value["execution_engine"].is_string() && !value["execution_engine"].empty() && value["execution_engine"].get<std::string>().size()<=64,"invalid_remote_resource");
       for (const auto key:{"saved","boot_active"}) require(value[key].is_null() || si_settings(value[key]),"invalid_remote_resource");
       require(value["runtime"].is_null() || (!value["boot_active"].is_null() && si_runtime(value["runtime"])),"invalid_remote_resource");
+      if (value["physically_qualified"]==true) {
+        const auto &p=caps["si5351"]["ordinary_profile"], &q=value["qualification"], &b=value["boot_active"];
+        require(p["qualified"]==true && fields(q,{"profile_id","system_clock_hz","i2c_pair"}) &&
+            q["profile_id"]==p["id"] && q["system_clock_hz"]==p["system_clock_hz"] && q["i2c_pair"]==p["i2c_pair"] && !b.is_null(),"invalid_remote_resource");
+        for (const auto key:{"reference_hz","reference_source","crystal_load_pf","address","transmit_output","drive_ma","rf_gate_gp"})
+          require(b[key]==p[key],"invalid_remote_resource");
+        require(b["loopback_output"].is_null() ? p["allow_none"]==true :
+            b["loopback_output"]==p["loopback_output"] && b["loopback_input_gp"]==p["loopback_input_gp"],"invalid_remote_resource");
+        require((value["execution_engine"]=="si5351" || value["execution_engine"]=="si5351-engineering") &&
+            (value["runtime"].is_null() || value["runtime"]["engineering_enabled"]==(value["execution_engine"]=="si5351-engineering")),"invalid_remote_resource");
+      } else require(value["qualification"].is_null() && value["execution_engine"]!="si5351","invalid_remote_resource");
       if (!value["runtime"].is_null() && !value["runtime"]["reference_measurement"].is_null())
         require(!value["boot_active"]["loopback_output"].is_null() &&
             value["runtime"]["reference_measurement"]["reference_use"]==value["boot_active"]["reference_use"],"invalid_remote_resource");
