@@ -97,6 +97,10 @@
     let progressLiveStation = false;
     let progress = null, progressRevision = "", progressEpoch = 0, progressLoaded = false, progressReview = false, stationDirty = false;
     const member = name => byId(`wtp-member-${name}`);
+    let siObservation = null;
+    const siEditor = root.WsprrySi5351 && byId('wtp-si5351-controls') ? root.WsprrySi5351.create(byId('wtp-si5351-controls'), {
+        bootstrap:true,changed:()=>{validatedPlan='';resourceReconcile=resourceLoaded;resourceRender();}
+    }) : null;
     const resourceIdentity = data => `${data.target.device_id} / ${data.target.boot_id} / ${{engineering_mtls:"Engineering HTTPS",consumer_station:"Consumer Wi-Fi",consumer_ap:"Consumer setup Wi-Fi",usb_physical:"USB"}[data.carrier]}${data.profile_generation === null ? "" : ` / profile ${data.profile_generation}`}`;
     function frequencyText(value) {
         const nhz = BigInt(value), fraction = String(nhz % 1000000000n).padStart(9,"0").replace(/0+$/,"");
@@ -256,7 +260,8 @@
     }
     function hardwareCandidate() {
         const gp = name => member(name).value === "" ? null : Number(member(name).value);
-        return { engine: "direct", rf_gp: gp("rf"), i2c_pair: null, button_gp: gp("button"),
+        const si=member("engine")?.value==="i2c";
+        return { engine: si?"i2c":"direct", rf_gp: si?null:gp("rf"), i2c_pair: si?siEditor?.pair():null, button_gp: gp("button"),
             amplifier_gp: gp("amplifier"), amplifier_active_high: member("amplifier-polarity").value === "true", lpf_gps: [], indicator: member("indicator").value,
             indicator_gp: member("indicator").value === "external" ? gp("indicator-gp") : null,
             indicator_active_high: member("polarity").value === "true" };
@@ -280,10 +285,17 @@
         member("amplifier-polarity").disabled = busy || !previewReady || member("amplifier").value === "";
         member("station-save").disabled = busy || !writable || resources?.profile_owned_station;
         progressRender();
+        const si=member('engine')?.value==='i2c';
+        if(member('engine')?.options) for(const option of member('engine').options)
+            if(option.value==='i2c') option.disabled=!siEditor || !root.WsprryControl?.supported('si5351',resources?.control_capabilities?.si5351);
+        siEditor?.show(si);siEditor?.enable(!busy && Boolean(writable));
+        if(member('direct-rf')) member('direct-rf').hidden=si;
+        if(si) member('rf').disabled=true;
+        if(byId('gpio-drive-form')) byId('gpio-drive-form').hidden=si;
         member("validate").disabled = busy || !previewReady;
         member("hardware-save").disabled = busy || !writable || !validatedPlan || validatedPlan !== JSON.stringify(hardwareCandidate());
         for (const name of ["indicator-gp", "polarity"]) member(name).disabled = busy || !previewReady || member("indicator").value !== "external";
-        const roles = {rf:"RF", button:"button", amplifier:"amplifier", "indicator-gp":"indicator"};
+        const roles = si ? {button:"button", amplifier:"amplifier", "indicator-gp":"indicator"} : {rf:"RF", button:"button", amplifier:"amplifier", "indicator-gp":"indicator"};
         for (const [name, role] of Object.entries(roles)) for (const option of member(name).options || []) {
             const owner = Object.keys(roles).find(other => other !== name && option.value !== "" && member(other).value === option.value &&
                 (other !== "indicator-gp" || member("indicator").value === "external"));
@@ -316,11 +328,17 @@
             const options = (name, optional) => {
                 member(name).innerHTML = `<option value="">${optional ? "Disabled" : "Select GP"}</option>` + data.pin_choices.eligible_gps.map(gp => `<option value="${gp}">GP${gp}</option>`).join("");
             };
+            const directDraft=member("rf").value;
             options("rf", false); options("button", true); options("amplifier", true); options("indicator-gp", false);
             if (h.saved) for (const [name,value] of Object.entries({rf:h.saved.rf_gp,button:h.saved.button_gp,amplifier:h.saved.amplifier_gp,"amplifier-polarity":h.saved.amplifier_active_high !== false,indicator:h.saved.indicator,"indicator-gp":h.saved.indicator_gp,polarity:h.saved.indicator_active_high !== false}))
-                member(name).value = value === null ? "" : String(value);
+                member(name).value = name==="rf" && h.saved.engine==="i2c" ? directDraft : value === null ? "" : String(value);
             else for (const name of ["rf","button","amplifier","amplifier-polarity","indicator","indicator-gp","polarity"]) member(name).value = "";
         }
+        if(!keep) {
+            if(member('engine')) member('engine').value=h.saved?.engine || 'direct';
+            siEditor?.load(siObservation?.saved ?? null,h.saved?.i2c_pair);
+        }
+        if(siObservation) siEditor?.observation(siObservation);
         resources = data; resourceLoaded = true; resourceReconcile = false; validatedPlan = "";
         member("pin-feedback").textContent = "Candidate has not been validated. Validation never saves or activates pins.";
         member("hardware-feedback").textContent = keep ? "Your hardware draft is preserved beside fresh saved and active observations. Validate it before saving." : "";
@@ -334,6 +352,21 @@
         resourceReview = false;
         if (station && member("power").value === "") { member("station-feedback").textContent = "Select reported power for a complete station save, or save the unset field as progress."; return; }
         const payload = station ? { callsign:member("callsign").value, locator:member("locator").value, power_dbm:Number(member("power").value) } : hardwareCandidate();
+        if(!station && (payload.engine==='i2c' || siObservation?.saved)) {
+            try {
+                const config={pins:payload};
+                if(payload.engine==='i2c') {
+                    config.si5351=siEditor.validate(payload).settings;
+                    if(!root.WsprrySi5351.allocation(config.si5351,payload)) throw Error('The Si5351 pair, loopback, gate and other GPIO roles conflict. Choose separate pins.');
+                }
+                const result=await request('member/configuration','POST',{contract:'Wsprry-Control/1',schema:'pico-settings',target:resources.target,operation:'save',config},resourceRevision);
+                if(result) {
+                    await request('member/application');
+                    member('hardware-feedback').textContent='RF output settings saved. Restart Pico explicitly to activate them.';
+                } else member('hardware-feedback').textContent='RF output save is unconfirmed. Load member resources and review saved settings before another save.';
+                return result;
+            } catch(error) {member('hardware-feedback').textContent=error.message;error.control?.focus();error.control?.reportValidity();return;}
+        }
         return request(`member/${kind}`, "PUT", {contract:'Wsprry-Control/1',schema:station ? resources.application.station.schema : "hardware", target:resources.target, [station ? "station" : "pins"]:payload}, resourceRevision);
     }
     async function request(resource, method = "GET", body = null, revision = "") {
@@ -354,6 +387,15 @@
         const controller = new AbortController();
         const timeout = setTimeout(() => controller.abort(), 180000);
         try {
+            if (resource === 'member/configuration' && method === 'POST' && body?.config?.pins) {
+                // The complete configuration coordinator has its own read binding.
+                // Establish it under this serialized owner without overwriting any draft.
+                const contextResponse=await root.fetch((root.WSPRRYPI_PATHS?.sharedApiPath || '/api/control/v1')+'/member/configuration',{method:'GET',cache:'no-store',signal:controller.signal});
+                const contextData=await contextResponse.json();
+                if (!contextResponse.ok || contextData.contract!=='Wsprry-Control/1' || contextData.schema!=='pico-settings' ||
+                    contextResponse.headers.get('ETag')!==revision || JSON.stringify(contextData.target)!==JSON.stringify(body.target))
+                    throw failure('Pico configuration changed or could not be confirmed. No RF output save was sent. Load member resources and review the preserved draft.');
+            }
             const response = await root.fetch((root.WSPRRYPI_PATHS?.sharedApiPath || "/api/control/v1") + "/" + resource, {
                 method, cache: "no-store", signal: controller.signal,
                 ...(body ? { headers: { "Content-Type": "application/json", "X-WsprryPico-Request": "1", "If-Match": revision, ...(shared ? { "X-WsprryPi-Member-Context": context } : {}) }, body: JSON.stringify({...body,contract:"Wsprry-Control/1"}) } : {})
@@ -417,6 +459,13 @@
                     if (data.schema !== "member-resources" || !data.application || !data.target || typeof data.member_context !== "string" || !etag)
                         throw failure("Member resources are incomplete. Your draft is preserved; load resources again.");
                     resourceReview = resourceReconcile && resourceLoaded;
+                    if(siEditor) {
+                        if(!root.WsprryControl?.supported('si5351',data.control_capabilities?.si5351)) throw failure('The current Si5351 descriptor is unavailable. No settings were changed.');
+                        const observation=await root.fetch((root.WSPRRYPI_PATHS?.sharedApiPath || '/api/control/v1')+'/member/si5351',{method:'GET',cache:'no-store',signal:controller.signal});
+                        const value=await observation.json();
+                        if(!observation.ok || observation.headers.get('ETag')!==etag || !root.WsprrySi5351.readback(value,data.target)) throw failure('Si5351 readback changed or is malformed. Load member resources again.');
+                        siObservation=value;
+                    }
                     resourcePopulate(data); resourceRevision = etag; resourceContext = data.member_context;
                     feedback.textContent = "Member resources loaded. Saved configuration was reconciled under one revision. Station and hardware are separate explicit saves.";
                 } else if (resource.endsWith("validate")) {
@@ -489,6 +538,7 @@
                     feedback.textContent = (body.operation === "schedules" ? "Pico schedules saved. Other drafts are preserved." : "Pico settings saved.") + restartFeedback(data.reboot_required);
                 }
             }
+            return data;
         } catch (error) {
             // No retry or strategy switch: even a failed delivery can follow a commit.
             if (shared) invalidateResources();
@@ -612,10 +662,17 @@
         byId("wtp-management-state")?.addEventListener("click", () => request("member/management"));
         byId("wtp-management-disconnect")?.addEventListener("click", () => request("member/management", "POST", { action: "disconnect" }));
         for (const action of ["load","save","apply","discard"]) byId(`wtp-usb-progress-${action}`)?.addEventListener("click", () => stationProgress(action));
+        member("engine")?.addEventListener("change",()=>{validatedPlan="";resourceReconcile=resourceLoaded;resourceRender();});
         member("load")?.addEventListener("click", () => request("member/application"));
         member("station-save")?.addEventListener("click", () => resourceSave("station"));
         member("hardware-save")?.addEventListener("click", () => resourceSave("hardware"));
-        member("validate")?.addEventListener("click", () => request("member/pins/validate", "POST", hardwareCandidate(), resourceRevision));
+        member("validate")?.addEventListener("click", () => {
+            try {
+                const candidate=hardwareCandidate();
+                if(candidate.engine==='i2c' && !root.WsprrySi5351.allocation(siEditor.read().settings,candidate)) throw Error('Resolve the Si5351 GPIO conflicts before validating.');
+                return request("member/pins/validate", "POST", candidate, resourceRevision);
+            } catch(error) {member('pin-feedback').textContent=error.message;error.control?.focus();error.control?.reportValidity();}
+        });
         for (const name of ["callsign","locator","power"]) member(name)?.addEventListener("input", () => {
             ++stationEdits[name];
             stationDirty = true;

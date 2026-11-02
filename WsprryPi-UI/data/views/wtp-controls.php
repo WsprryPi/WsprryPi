@@ -79,7 +79,7 @@
                         <label class="form-label" for="fleet-key">Client key file on host</label>
                         <input class="form-control" id="fleet-key" maxlength="512" autocomplete="off">
                     </div>
-                    <div class="col-12 col-lg-6 config-stacked-field">
+                    <div class="col-12 col-lg-6 config-stacked-field" hidden aria-hidden="true">
                         <label class="form-label" for="fleet-uncertainty">Maximum UTC uncertainty (ns)</label>
                         <input class="form-control" id="fleet-uncertainty" type="number" min="1" max="1000000000" value="100000000" aria-describedby="fleet-uncertainty-hint">
                         <div class="form-text" id="fleet-uncertainty-hint">Recommended: 100,000,000 ns = 100 ms. Existing saved limits are kept.</div>
@@ -147,7 +147,7 @@
                 <input class="form-control" id="wtp_product" type="number" min="1" max="65535" step="1" data-wtp-key="USB Product ID" aria-describedby="wtp-product-hint" disabled>
                 <div class="form-text" id="wtp-product-hint">Decimal USB identifier.</div>
             </div>
-            <div class="col-12 col-lg-6 config-stacked-field">
+            <div class="col-12 col-lg-6 config-stacked-field" hidden aria-hidden="true">
                 <label class="form-label" for="wtp_uncertainty">Maximum UTC uncertainty (ns)</label>
                 <input class="form-control" id="wtp_uncertainty" type="number" min="1" max="1000000000" step="1" value="100000000" data-wtp-key="Start Uncertainty ns" aria-describedby="wtp-uncertainty-hint" disabled>
                 <div class="form-text" id="wtp-uncertainty-hint">Recommended: 100,000,000 ns = 100 ms. Existing saved limits are kept. Enter a new value to change it; valid edits save automatically. Pico checks the limit at ARM and launch.</div>
@@ -180,7 +180,7 @@
                 <p class="form-text mb-0">Accepts the device's reported realizable frequencies. This does not establish RF accuracy.</p>
             </div>
         </div>
-        <p class="form-text mt-3">The host needs synchronized UTC. The Pico needs its own valid UTC clock with bounded uncertainty; USB automatically supplies qualified host UTC on supported firmware. Network WTP does not set that clock. GPSDO frequency discipline alone is not UTC.</p>
+        <p class="form-text mt-3">The host needs synchronized UTC. The Pico needs its own valid UTC clock with reported uncertainty; USB automatically supplies qualified host UTC on supported firmware. Network WTP does not set that clock. GPSDO frequency discipline alone is not UTC.</p>
         <div class="wtp-status" aria-labelledby="wtp-status-heading">
             <h4 id="wtp-status-heading" class="cw-control-section__title">Pico status</h4>
             <p id="wtp-status-text" class="mb-2" role="status" aria-live="polite">Status has not been checked.</p>
@@ -383,7 +383,11 @@
                 <p class="form-text" id="wtp-member-pin-hint">Pico GP numbering. Direct PIO output, active-low button and indicator are supported. Button actions require the member's button adapter to be enabled. Changes are saved for restart; saving does not change physical routing or enable RF. Pin selection does not establish RF qualification.</p>
                 <div class="row gx-3 gy-3">
                     <div class="col-12 col-lg-6 config-stacked-field">
-                        <label class="form-label" for="wtp-member-rf">Direct RF output</label>
+                        <label class="form-label" for="wtp-member-engine">RF output engine</label>
+                        <select class="form-select" id="wtp-member-engine" data-wtp-resource="hardware" disabled><option value="direct">Direct GPIO / PIO</option><option value="i2c" disabled>Si5351 (engineering)</option></select>
+                    </div>
+                    <div id="wtp-member-direct-rf" class="col-12 col-lg-6 config-stacked-field">
+                        <label class="form-label" for="wtp-member-rf">Direct RF output GPIO</label>
                         <select class="form-select" id="wtp-member-rf" data-wtp-resource="hardware" aria-describedby="wtp-member-pin-hint" disabled></select>
                     </div>
                     <div class="col-12 col-lg-6 config-stacked-field">
@@ -413,8 +417,9 @@
                 <p class="form-text" id="wtp-member-amplifier-hint">Disabled by default. The pin must be unused by RF, the button, indicator or filter selectors. Save the hardware plan, then restart the Pico to activate it. Saving does not enable RF.</p>
                 <div class="d-flex flex-wrap gap-2 mt-3">
                     <button type="button" class="btn btn-outline-primary" id="wtp-member-validate" disabled>Validate candidate pins</button>
-                    <button type="button" class="btn btn-primary" id="wtp-member-hardware-save" disabled>Save member hardware</button>
+                    <button type="button" class="btn btn-primary" id="wtp-member-hardware-save" disabled>Save RF output settings</button>
                 </div>
+                <div id="wtp-si5351-controls" class="mt-3" hidden></div>
                 <p class="form-text mt-2" id="wtp-member-pin-feedback" role="status" aria-live="polite">Validation is a preview. It never saves or activates pins.</p>
                 <p class="form-text" id="wtp-member-hardware-feedback" role="status" aria-live="polite"></p><fieldset class="mt-3" id="amplifier-timing-settings"><legend>Amplifier lead and tail</legend><div class="row g-3"><label class="form-label col-12 col-lg-6" for="amplifier-lead-ms">Enable before RF (ms)<input id="amplifier-lead-ms" class="form-control" type="number" min="0" max="1000" step="1" disabled aria-describedby="amplifier-timing-help amplifier-timing-status"></label><label class="form-label col-12 col-lg-6" for="amplifier-tail-ms">Disable after RF (ms)<input id="amplifier-tail-ms" class="form-control" type="number" min="0" max="1000" step="1" disabled aria-describedby="amplifier-timing-help amplifier-timing-status"></label></div><small class="form-text d-block" id="amplifier-timing-help">Default 200 ms each; range 0–1000 ms in whole milliseconds. Lead allows the amplifier to settle before the timed RF start; tail follows RF completion. Neither changes transmission duration. Zero removes that interval. A disabled amplifier pin uses neither interval. Save, then restart to activate.</small><p class="form-text text-break" id="amplifier-timing-status" role="status" aria-live="polite">Read saved amplifier timing before editing.</p><div class="d-flex flex-wrap gap-2 mt-3"><button class="btn btn-outline-primary" id="amplifier-timing-read" type="button">Read saved timing</button><button id="amplifier-timing-save" type="button" class="btn btn-primary" disabled>Save amplifier timing</button><button class="btn btn-outline-primary" id="amplifier-timing-discard" type="button" disabled>Discard timing entries</button><button class="btn btn-outline-primary" id="amplifier-timing-adopt" type="button" hidden disabled>Use entries for this Pico</button></div></fieldset><div id="filter-selector-controls" class="mt-3"></div><div id="gpio-drive-form"><fieldset class="mt-3" aria-labelledby="gpio-drive-label"><label id="gpio-drive-label" class="form-label" for="gpio-drive-select">GPIO drive strength</label><select class="form-select" id="gpio-drive-select" aria-describedby="gpio-drive-help gpio-drive-status" disabled><option value="2">2 mA</option><option value="4">4 mA (default)</option><option value="8">8 mA</option><option value="12">12 mA</option></select><small class="form-text d-block" id="gpio-drive-help">Electrical RF-pin drive; actual RF power depends on load and frequency. Save, then explicitly restart to activate.</small><p class="form-text text-break" id="gpio-drive-status" role="status" aria-live="polite">GPIO drive has not been read.</p><div class="d-flex flex-wrap gap-2"><button class="btn btn-outline-primary" id="gpio-drive-read" type="button">Read GPIO drive</button><button class="btn btn-primary" id="gpio-drive-save" type="button" disabled>Save GPIO drive</button><button class="btn btn-outline-primary" id="gpio-drive-discard" type="button" disabled>Discard drive draft</button></div><details class="mt-3"><summary>Saved drive progress</summary><p>Save drive independently of station identity. Apply saved drive separately, then restart to activate changed hardware.</p><button class="btn btn-outline-primary" id="gpio-drive-save-draft" type="button" disabled>Save drive progress</button><button class="btn btn-outline-primary" id="gpio-drive-apply-draft" type="button" disabled>Apply saved drive</button><p class="form-text text-break" id="gpio-drive-draft-status" role="status" aria-live="polite">Drive progress has not been read.</p></details></fieldset></div>
                 <details class="mt-3"><summary>Platform limits and fixed I2C choices</summary>

@@ -41,7 +41,7 @@ void check_caps(const Json& row,const WtpRuntimeStatus& status) {
     const auto admission=evaluate_gpio_band_policy(plan);
     if(!admission.allowed)throw std::runtime_error(admission.error);
     const auto prepared=prepare_wtp_plan(plan,*status.capabilities,
-        {std::string(32,'1'),121000000000ULL,parse_wtp_settings(row.at("settings"),true).start_uncertainty_ns});
+        {std::string(32,'1'),121000000000ULL,status.capabilities->maximum_arm_uncertainty_ns});
     if(!prepared) throw std::runtime_error(prepared.explanation);
 }
 class OutputWorker {

@@ -1499,6 +1499,33 @@ int main(int argc, char **argv) {
     if(result.status!=selector_status)std::cerr<<"Selector hostile variant "<<variant<<" status "<<result.status<<" "<<result.body<<" mutations "<<t.mutations<<" unchanged "<<(t.f.flash.bytes==bytes)<<std::endl;
     assert(result.status==selector_status);if(variant==2)assert(Json::parse(result.body)["error"]["code"]=="invalid_remote_response");assert(Json::parse(result.body)["mutation_attempted"]==false && t.mutations==0 && t.f.flash.bytes==bytes);c->logout();
   }
+  // Si5351 metadata/readback failures use the actual encrypted carrier and
+  // must be rejected without any persistence or fallback.
+  for (unsigned variant=0;variant<10;++variant) {
+    Test t;auto c=t.client();assert(c->login(device,"consumer_station","test-password").status==200);
+    const auto bytes=t.f.flash.bytes;
+    const auto hostile=[&](auto p,auto m,auto b,auto e){auto r=c->request(p,m,b,e);auto v=Json::parse(r.body);
+      if(p=="capabilities") {
+        if(variant==0)v["si5351"]["schema"]="superseded-si5351";
+        if(variant==1)v["si5351"]["maximum_events"]=513;
+        if(variant==2)v["si5351"]=Json::array();
+        if(variant==3)v.erase("si5351");
+      }
+      if(p=="si5351") {
+        if(variant==4)v["extra"]=0;
+        if(variant==5)v["target"]["boot_id"]=std::string(32,'f');
+        if(variant==6)v["saved"]=Json::array();
+        if(variant==7)v["runtime"]=Json::object();
+        if(variant==8)v["physically_qualified"]=true;
+        if(variant==9)v["pending_restart"]=1;
+      }
+      r.body=v.dump();return r;
+    };
+    pi::PicoHttpResponse result;
+    assert(t.app->idle_management([&]{result=pi::pico_resource_request(hostile,c->device(),c->boot(),"si5351","GET",{}, {},"consumer_station",c->generation());},true));
+    assert(result.status!=200 && Json::parse(result.body)["mutation_attempted"]==false);
+    assert(t.mutations==0 && t.f.flash.bytes==bytes);c->logout();
+  }
   for (const auto profile : {pico::network::ManagementProfile::Blank,
                              pico::network::ManagementProfile::Recovery,
                              pico::network::ManagementProfile::Unavailable}) {

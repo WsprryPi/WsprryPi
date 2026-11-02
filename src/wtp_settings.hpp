@@ -12,6 +12,8 @@ inline constexpr std::uint64_t default_wtp_start_uncertainty_ns = 100'000'000ULL
 struct WtpSettings {
   std::string path, usb_serial, device_id;
   int vendor_id{}, product_id{};
+  // Retain stored profile data across upgrades. First-party submissions use
+  // the peer's advertised ceiling; this historical value no longer gates UTC.
   std::uint64_t start_uncertainty_ns{default_wtp_start_uncertainty_ns};
   bool allow_frequency_adjustment{false};
   std::string transport{"usb"};

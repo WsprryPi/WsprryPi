@@ -118,7 +118,7 @@ async function cases(carrier, failure="storage") {
         ['capabilities','/features/station_live_apply','true'],
         ['management','/selected','consumer_ap'],
         ['pins','/active/rf_gp',14],
-        ['pins','/choices/adapter_support/i2c_rf',true],
+        ['pins','/choices/adapter_support/i2c_rf',false],
         ['pins','/choices/i2c_pairs/0/controller',1],
       ];
       for (const [resource,pointer,value] of variants) {
@@ -156,8 +156,9 @@ async function cases(carrier, failure="storage") {
     b.element('wtp-member-rf').value='14';await b.click('wtp-member-validate');assert.equal(calls.at(-1).result.body.valid,false);
     assert(b.element('wtp-member-hardware-save').disabled);assert.deepEqual(await control('dump'),before);
     let plan=JSON.parse(preview.body);
-    const unsupported={...plan,engine:'i2c',rf_gp:null,i2c_pair:0};
-    let r=await call({...preview,body:JSON.stringify(unsupported)});assert.equal(r.status,200);assert(r.body.valid&&!r.body.operational_supported);
+    // Pin-adapter support does not establish a complete Si5351 allocation or RF qualification.
+    const i2c={...plan,engine:'i2c',rf_gp:null,i2c_pair:0};
+    let r=await call({...preview,body:JSON.stringify(i2c)});assert.equal(r.status,200);assert(r.body.valid&&r.body.operational_supported);
     assert.deepEqual(await control('dump'),before);
     // Missing protected mutation intent is refused before runtime/carrier dispatch.
     r=await call({...preview,mutation_context:false});assert.equal(r.status,403);assert.deepEqual(await control('dump'),before);

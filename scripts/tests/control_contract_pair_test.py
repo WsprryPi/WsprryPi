@@ -13,6 +13,7 @@ FILES = {
     'engineering/protocol/control-policy.json': VENDOR / 'control-policy.json',
     'scripts/check_control_policy.py': VENDOR / 'check_control_policy.py',
     'src/network/web/control-contract.js': ROOT / 'WsprryPi-UI/data/control-contract.js',
+    'src/network/web/si5351.js': ROOT / 'WsprryPi-UI/data/si5351.js',
 }
 environment = dict(os.environ, GITHUB_REF='refs/heads/control-pair-test')
 with tempfile.TemporaryDirectory() as directory:
@@ -31,6 +32,7 @@ with tempfile.TemporaryDirectory() as directory:
         destination.write_bytes(original + b'\n ')
         result = subprocess.run(command, capture_output=True, text=True, env=environment)
         assert result.returncode != 0, 'Selected-source drift accepted: ' + relative
-        assert 'differs from selected Pico source' in result.stderr, result.stderr
+        assert ('differs from selected Pico source' in result.stderr or
+                'Shared Si5351 controls differ from selected Pico source' in result.stderr), result.stderr
         destination.write_bytes(original)
-print('PASS selected-source schema, lifecycle, checker and browser registry parity')
+print('PASS selected-source schema, lifecycle, checker, browser registry and Si5351 control parity')

@@ -106,7 +106,7 @@ PrivilegedOperationClass classify_privileged_http_operation(
             (method == "POST" && (path == "/api/control/v1/member/restart" || path == "/api/control/v1/member/ap" ||
               path == "/api/control/v1/member/gpio-drive-progress" || path == "/api/control/v1/member/progress/update" || path == "/api/control/v1/member/progress/apply")))
             return PrivilegedOperationClass::protected_operation;
-        if ((method == "GET" && (path == "/api/control/v1/member/application" || path == "/api/control/v1/member/station" ||
+        if ((method == "GET" && (path == "/api/control/v1/member/si5351" || path == "/api/control/v1/member/application" || path == "/api/control/v1/member/station" ||
               (path == "/api/control/v1/member/gpio-drive" || path == "/api/control/v1/member/amplifier-timing" || path == "/api/control/v1/member/filter-selector") || path == "/api/control/v1/member/gpio-drive-progress" || path == "/api/control/v1/member/hardware" || path == "/api/control/v1/member/pins")) ||
             (method == "PUT" && (path == "/api/control/v1/member/station" || (path == "/api/control/v1/member/gpio-drive" || path == "/api/control/v1/member/amplifier-timing" || path == "/api/control/v1/member/filter-selector") || path == "/api/control/v1/member/gpio-drive-progress" || path == "/api/control/v1/member/hardware")) ||
             (method == "POST" && path == "/api/control/v1/member/pins/validate"))
