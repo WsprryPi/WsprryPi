@@ -472,6 +472,18 @@
     function fleetInit() {
         if (!byId("fleet-device")) return;
         byId("fleet-tab")?.addEventListener("shown.bs.tab", fleetLoad);
+        const saveHint = byId("configSaveStatusHint");
+        const title = byId("configPageTitle");
+        const originalHint = saveHint?.textContent;
+        const updateHeader = () => {
+            const fleet = byId("fleet-tab")?.classList.contains("active");
+            if (title) title.textContent = fleet ? "Fleet" : "Signal setup";
+            if (saveHint) saveHint.textContent = fleet
+                ? "Device profiles, output schedules, and Pico settings use their own save buttons. This Pi's Use Pico and connection fields save automatically."
+                : originalHint;
+        };
+        byId("configTabs")?.addEventListener("shown.bs.tab", updateHeader);
+        updateHeader();
         byId("fleet-refresh").addEventListener("click", fleetLoad);
         byId("fleet-device").addEventListener("change", event => { fleetChoice = event.target.value; fleetRender(); });
         byId("fleet-add").addEventListener("click", () => fleetEditorOpen(false));

@@ -32,6 +32,29 @@ endpoint is published. A write failure leaves the old endpoint active; an
 unexpected failure after persistence is reported as `runtime_apply_unconfirmed`
 and requires a fresh config/status read before further work.
 
+## Fleet editing workflow
+
+Fleet identifies which actions save explicitly. Device selection and catalog,
+assignment, and listener drafts do not participate in this Pi's automatic
+configuration save. **Use Pico** and this Pi's connection fields retain their
+automatic save behavior. A new output assignment uses the selected saved device;
+without a matching saved selection, choose an output explicitly.
+
+Under **Pico standalone settings and Wi-Fi**, management prerequisites appear
+before the editors. Read saved station progress, save valid station fields, and
+apply saved progress separately. **Complete station save** is an alternative
+that saves all three station fields together after reading member resources.
+**RF output, GPS, and pins** groups the hardware plan and places validation and
+saving after its pin, GPS, and optional Si5351 controls. Amplifier timing, filter
+selectors, and GPIO drive retain their own actions. Controls depend on the
+selected Pico's supported capabilities and current readback.
+
+**Standalone schedules and combined settings** contains the combined editor.
+**Save schedules only** changes recurrence; **Save combined settings** can also
+change station, Wi-Fi, expiry, and standalone Enable. USB name and Wi-Fi have
+dedicated controls above. These alternatives retain their existing save and
+readback requirements; opening a disclosure never applies settings.
+
 ## Independent output schedules
 
 **Output schedules** supports zero through eight remote outputs alongside this

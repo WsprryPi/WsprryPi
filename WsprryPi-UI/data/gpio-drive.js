@@ -107,7 +107,7 @@
       allowedValues=supported(value)?[...value.values]:[];
       for(const option of select.options || []) if(option.value!=='')option.disabled=!allowedValues.includes(Number(option.value));
       render();
-    },setAvailability(value) { if (!value && available) { ++epoch; revision = ''; review = true; status.textContent = 'Disconnected or target changed. Drive readback unknown; your draft is preserved.'; } available = value; render(); }, invalidate() { ++epoch; revision = ''; review = true; status.textContent = 'Target or saved revision changed. Read GPIO drive again; your original member-bound draft is preserved.'; render(); }};
+    },setAvailability(value) { if (!value && available) { ++epoch; revision = ''; review = true; status.textContent = observed || edited ? 'Disconnected or target changed. Drive readback unknown; your draft is preserved.' : 'GPIO drive has not been read. Confirm the Pico connection, then read GPIO drive before editing.'; } available = value; render(); }, invalidate() { ++epoch; revision = ''; review = true; status.textContent = observed || edited ? 'Target or saved revision changed. Read GPIO drive again; your original member-bound draft is preserved.' : 'GPIO drive has not been read. Confirm the Pico connection, then read GPIO drive before editing.'; render(); }};
   }
   root.WsprryGpioDrive = {create,valid,supported};
   if (typeof module !== 'undefined') module.exports = {create,valid,supported};

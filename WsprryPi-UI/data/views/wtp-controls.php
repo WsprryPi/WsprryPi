@@ -3,7 +3,7 @@
 <div id="wtp-fleet">
     <section id="wtp-controls" class="transmitter-backend-fields" aria-labelledby="wtp-heading">
         <h3 id="wtp-heading" class="transmitter-backend-fields__title">WTP outputs</h3>
-        <section class="fleet-catalog mb-4" aria-labelledby="fleet-catalog-heading">
+        <section class="fleet-catalog mb-4" data-independent-wtp aria-labelledby="fleet-catalog-heading">
             <h4 id="fleet-catalog-heading" class="cw-control-section__title">Known and nearby devices</h4>
             <label class="form-label" for="fleet-device">Device</label>
             <select class="form-select" id="fleet-device" aria-describedby="fleet-device-detail" disabled>
@@ -250,6 +250,7 @@
         <details id="wtp-management" class="wtp-status mt-3" hidden>
             <summary class="cw-control-section__title">Pico standalone settings and Wi-Fi</summary>
             <p class="form-text">These settings belong to Pico's standalone scheduler, separate from WsprryPi's schedule. Management is available only while the host has no pending, owned or unresolved job. Saves preserve settings outside this form. Network or pin changes may require a Pico restart; each save reports the requirement.</p>
+            <p id="wtp-management-availability" class="form-text mt-2" role="status" aria-live="polite" hidden></p>
             <details class="mb-4"><summary>UDP logging on this Pico</summary><div id="member-udp-logging-controls"></div></details>
             <section id="wtp-usb-settings" class="mb-4" aria-labelledby="wtp-usb-settings-heading" hidden>
                 <h5 id="wtp-usb-settings-heading" class="h6">USB name and Wi-Fi</h5>
@@ -343,7 +344,7 @@
                     <div><dt>Restart required</dt><dd id="wtp-member-restart">Unknown</dd></div>
                 </dl>
                 <h5 class="cw-control-section__title">Standalone station defaults</h5>
-                <p class="form-text" id="wtp-member-station-hint">Save the complete station together. The Pico automatically selects WSPR Type 1, 2 or 3 from the callsign and locator. Reported power is message metadata; it does not set measured RF output.</p>
+                <p class="form-text" id="wtp-member-station-hint">Read saved progress, save valid station fields, then apply the saved progress separately. Complete station save is an alternative below. The Pico automatically selects WSPR Type 1, 2 or 3; reported power is metadata, not measured RF output.</p>
                 <div class="row gx-3 gy-3">
                     <div class="col-12 col-lg-4 config-stacked-field">
                         <label class="form-label" for="wtp-member-callsign">Callsign</label>
@@ -366,8 +367,7 @@
                         <p class="form-text mb-0" id="wtp-member-power-progress" role="status" aria-live="polite"></p>
                     </div>
                 </div>
-                <button type="button" class="btn btn-primary mt-3" id="wtp-member-station-save" disabled>Save member station</button>
-                <p class="form-text mt-2" id="wtp-member-station-feedback" role="status" aria-live="polite"></p>
+
                 <section class="mt-3" aria-labelledby="wtp-usb-progress-heading">
                     <h6 id="wtp-usb-progress-heading">Save station progress</h6>
                     <p class="form-text">Read saved progress, then edit the station fields above to save valid fields independently. Applying saved station progress is a separate action. Neither action transmits, resumes STOP or changes clock readiness. Older firmware retains the complete station save.</p>
@@ -379,7 +379,14 @@
                     </div>
                     <p id="wtp-usb-progress-state" class="form-text mt-2" role="status" aria-live="polite">Saved progress and applied configuration have not been read.</p>
                 </section>
-                <h5 class="cw-control-section__title mt-4">Supported pin plan</h5>
+                <details class="mt-3" id="wtp-complete-station">
+                    <summary>Complete station save</summary>
+                    <p class="form-text mt-2">Alternative to saving and applying station progress: read member resources, complete all three station fields above, then save them together. Use this path when saved progress is unsupported. It does not start a transmission.</p>
+                    <button type="button" class="btn btn-outline-primary" id="wtp-member-station-save" disabled>Save member station</button>
+                </details>
+                <p class="form-text mt-2" id="wtp-member-station-feedback" role="status" aria-live="polite"></p>
+                <details id="wtp-hardware-settings" class="mt-4">
+                <summary class="cw-control-section__title">RF output, GPS, and pins</summary>
                 <p class="form-text" id="wtp-member-pin-hint">Pico GP numbering. Direct PIO output, active-low button and indicator are supported. Button actions require the member's button adapter to be enabled. Changes are saved for restart; saving does not change physical routing or enable RF. Pin selection does not establish RF qualification.</p>
                 <div class="row gx-3 gy-3">
                     <div class="col-12 col-lg-6 config-stacked-field">
@@ -415,19 +422,24 @@
                     <div class="col-12 col-md-6"><label class="form-label" for="wtp-member-amplifier-polarity">Amplifier enable polarity</label><select class="form-select" id="wtp-member-amplifier-polarity" data-wtp-resource="hardware" disabled><option value="true">Active high</option><option value="false">Active low</option></select></div>
                 </div>
                 <p class="form-text" id="wtp-member-amplifier-hint">Disabled by default. The pin must be unused by RF, the button, indicator or filter selectors. Save the hardware plan, then restart the Pico to activate it. Saving does not enable RF.</p>
-                <div class="d-flex flex-wrap gap-2 mt-3">
-                    <button type="button" class="btn btn-outline-primary" id="wtp-member-validate" disabled>Validate candidate pins</button>
-                    <button type="button" class="btn btn-primary" id="wtp-member-hardware-save" disabled>Save RF output settings</button>
-                </div>
                 <div id="wtp-gps-controls" class="mt-3"></div>
                 <div id="wtp-si5351-controls" class="mt-3" hidden></div>
+                <p class="form-text mt-3">Validate and save the complete pin, GPS, and Si5351 plan together. Restart the Pico explicitly to activate saved hardware changes.</p>
+                <div class="d-flex flex-wrap gap-2 mt-3">
+                    <button type="button" class="btn btn-outline-primary" id="wtp-member-validate" disabled>Validate hardware plan</button>
+                    <button type="button" class="btn btn-primary" id="wtp-member-hardware-save" disabled>Save RF output settings</button>
+                </div>
                 <p class="form-text mt-2" id="wtp-member-pin-feedback" role="status" aria-live="polite">Validation is a preview. It never saves or activates pins.</p>
                 <p class="form-text" id="wtp-member-hardware-feedback" role="status" aria-live="polite"></p><fieldset class="mt-3" id="amplifier-timing-settings"><legend>Amplifier lead and tail</legend><div class="row g-3"><label class="form-label col-12 col-lg-6" for="amplifier-lead-ms">Enable before RF (ms)<input id="amplifier-lead-ms" class="form-control" type="number" min="0" max="1000" step="1" disabled aria-describedby="amplifier-timing-help amplifier-timing-status"></label><label class="form-label col-12 col-lg-6" for="amplifier-tail-ms">Disable after RF (ms)<input id="amplifier-tail-ms" class="form-control" type="number" min="0" max="1000" step="1" disabled aria-describedby="amplifier-timing-help amplifier-timing-status"></label></div><small class="form-text d-block" id="amplifier-timing-help">Default 200 ms each; range 0–1000 ms in whole milliseconds. Lead allows the amplifier to settle before the timed RF start; tail follows RF completion. Neither changes transmission duration. Zero removes that interval. A disabled amplifier pin uses neither interval. Save, then restart to activate.</small><p class="form-text text-break" id="amplifier-timing-status" role="status" aria-live="polite">Read saved amplifier timing before editing.</p><div class="d-flex flex-wrap gap-2 mt-3"><button class="btn btn-outline-primary" id="amplifier-timing-read" type="button">Read saved timing</button><button id="amplifier-timing-save" type="button" class="btn btn-primary" disabled>Save amplifier timing</button><button class="btn btn-outline-primary" id="amplifier-timing-discard" type="button" disabled>Discard timing entries</button><button class="btn btn-outline-primary" id="amplifier-timing-adopt" type="button" hidden disabled>Use entries for this Pico</button></div></fieldset><div id="filter-selector-controls" class="mt-3"></div><div id="gpio-drive-form"><fieldset class="mt-3" aria-labelledby="gpio-drive-label"><label id="gpio-drive-label" class="form-label" for="gpio-drive-select">GPIO drive strength</label><select class="form-select" id="gpio-drive-select" aria-describedby="gpio-drive-help gpio-drive-status" disabled><option value="2">2 mA</option><option value="4">4 mA (default)</option><option value="8">8 mA</option><option value="12">12 mA</option></select><small class="form-text d-block" id="gpio-drive-help">Electrical RF-pin drive; actual RF power depends on load and frequency. Save, then explicitly restart to activate.</small><p class="form-text text-break" id="gpio-drive-status" role="status" aria-live="polite">GPIO drive has not been read.</p><div class="d-flex flex-wrap gap-2"><button class="btn btn-outline-primary" id="gpio-drive-read" type="button">Read GPIO drive</button><button class="btn btn-primary" id="gpio-drive-save" type="button" disabled>Save GPIO drive</button><button class="btn btn-outline-primary" id="gpio-drive-discard" type="button" disabled>Discard drive draft</button></div><details class="mt-3"><summary>Saved drive progress</summary><p>Save drive independently of station identity. Apply saved drive separately, then restart to activate changed hardware.</p><button class="btn btn-outline-primary" id="gpio-drive-save-draft" type="button" disabled>Save drive progress</button><button class="btn btn-outline-primary" id="gpio-drive-apply-draft" type="button" disabled>Apply saved drive</button><p class="form-text text-break" id="gpio-drive-draft-status" role="status" aria-live="polite">Drive progress has not been read.</p></details></fieldset></div>
-                <details class="mt-3"><summary>Platform limits and fixed I2C choices</summary>
-                    <p class="form-text">Si5351/I2C RF, LPF, reference calibration and waveform settings are unavailable in this pin editor. Amplifier lead/tail timing and GPIO drive are edited separately above. Pi BCM and physical header numbers do not apply here. Structurally eligible I2C pairs cannot be saved as operational RF hardware.</p>
+                <details class="mt-3" id="wtp-platform-limits"><summary>Platform limits and fixed I2C choices</summary>
+                    <p class="form-text">Read member resources to check this Pico's supported controls. Si5351 settings appear when its supported RF engine is selected; automatic filter selectors appear when supported by the current firmware and connection. Amplifier timing and GPIO drive have separate save actions. Pico GP numbers are GPIOs, not Pi BCM or physical header numbers. Available choices do not establish physical or RF qualification.</p>
                     <p class="form-text" id="wtp-member-pairs">Choices unavailable until loaded.</p>
                 </details>
+                </details>
             </section>
+            <details id="wtp-combined-settings" class="mt-4">
+            <summary>Standalone schedules and combined settings</summary>
+            <p class="form-text mt-2">For station edits, use saved progress above; for USB name and Wi-Fi, use USB name and Wi-Fi. This form also supports network management and firmware without those separate editors. Save schedules only changes recurrence; Save combined settings can also change station, Wi-Fi, expiry, and standalone Enable.</p>
             <button type="button" class="btn btn-outline-primary" id="wtp-remote-load">Load saved Pico settings</button>
             <p class="form-text">Loading replaces the standalone draft below. After a conflicting or unconfirmed save, loading reads saved values and keeps your draft for review. Status polling preserves it.</p>
             <div class="row gx-3 gy-3" id="wtp-remote-fields">
@@ -477,14 +489,15 @@
                 </div>
             </div>
             <div class="d-flex flex-wrap gap-2 mt-3">
-                <button type="button" class="btn btn-primary" id="wtp-remote-save" disabled>Save Pico settings</button>
+                <button type="button" class="btn btn-primary" id="wtp-remote-save" disabled>Save combined settings</button>
                 <button type="button" class="btn btn-outline-primary" id="wtp-schedules-save" disabled>Save schedules only</button>
                 <button type="button" class="btn btn-outline-primary" id="wtp-network-load">Read Pico Wi-Fi status</button>
                 <button type="button" class="btn btn-outline-danger" id="wtp-network-disable" disabled>Disable Pico Wi-Fi</button>
             </div>
             <p class="form-text mt-2">Disabling Wi-Fi disconnects network control. Re-enable it using the physical USB Console or a restart. This is a temporary switch, separate from saved standalone settings.</p>
             <p id="wtp-management-feedback" class="form-text" role="status" aria-live="polite"></p>
-            <p id="wtp-management-availability" class="form-text" role="status" aria-live="polite" hidden></p>
+            </details>
+
         </details>
     </section>
 </div>

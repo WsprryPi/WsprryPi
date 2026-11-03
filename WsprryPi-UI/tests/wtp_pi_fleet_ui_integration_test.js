@@ -172,7 +172,7 @@ async function main() {
                     }
                     return reply(window.__fleet,200,'"fleet-'+window.__fleetRevision+'"');
                 }
-                if(path.endsWith('/host/devices')){if(window.__catalogLoadFailure)throw new Error('Catalog unavailable');return reply({scope:'wsprrypi-wtp-catalog/1',version:1,active_id:'',profiles:[{id:'1'.repeat(32),name:'New Pi',method:'manual',discovery_id:'',legacy_unverified:false,settings:window.__settings}]},200,'"catalog-r1"');}
+                if(path.endsWith('/host/devices')){if(window.__catalogLoadFailure)throw new Error('Catalog unavailable');return reply({scope:'wsprrypi-wtp-catalog/1',version:1,active_id:'',profiles:[{id:'1'.repeat(32),name:'New Pi',method:'manual',discovery_id:'',legacy_unverified:false,settings:window.__settings},{id:'2'.repeat(32),name:'Selected Pico',method:'manual',discovery_id:'',legacy_unverified:false,settings:{...window.__settings,Transport:'usb','Device ID':'b'.repeat(32),Endpoint:'/dev/serial/by-id/fixture-pico-if02','USB Serial':'fixture-pico','USB Vendor ID':51966,'USB Product ID':16402}}]},200,'"catalog-r1"');}
                 if(path.endsWith('/host/discovery'))return reply({available:true,candidates:[]});
                 if(path.endsWith('/status'))return reply({host:{selected:false,firmware_maintenance:false,ready:false,phase:'idle',session_phase:'disconnected'}});
                 return reply({});
@@ -191,8 +191,24 @@ async function main() {
         await waitFor(async()=>await evaluate('document.getElementById("fleet-schedule-feedback").textContent.includes("Fleet status unavailable:")'),'disconnected Fleet feedback');
         await evaluate(`window.__fleetLoadFailure=false;document.getElementById('fleet-schedule-refresh').click();`);
         await waitFor(async()=>await evaluate('!document.getElementById("fleet-schedule-feedback").textContent.includes("Fleet status unavailable:")'),'recovered Fleet feedback');
+        // Browsing and independent drafts must never dirty the host autosave.
+        await evaluate(`document.getElementById('fleet-refresh').click()`);
+        await waitFor(async()=>await evaluate(`document.getElementById('fleet-device').options.length===2`),'catalog loaded');
+        assert.equal(await evaluate(`document.getElementById('configPageTitle').textContent`),'Fleet');
+        assert.match(await evaluate(`document.getElementById('configSaveStatusHint').textContent`),/own save buttons/);
+        await evaluate(`configAutosaveSuspended=false;configAutosaveDirty=false;document.getElementById('fleet-device').value='known:'+'2'.repeat(32);document.getElementById('fleet-device').dispatchEvent(new Event('change',{bubbles:true}));`);
+        assert.equal(await evaluate('configAutosaveDirty'),false,'Selecting a profile must not queue host autosave');
+        await evaluate(`document.getElementById('fleet-edit').click();document.getElementById('fleet-name').value='Unsaved name';document.getElementById('fleet-name').dispatchEvent(new Event('input',{bubbles:true}));`);
+        assert.equal(await evaluate('configAutosaveDirty'),false,'Editing a profile draft must not queue host autosave');
+        await evaluate(`document.getElementById('fleet-editor-cancel').click();configAutosaveSuspended=true;`);
         await evaluate('document.getElementById("fleet-schedule-new").click()');
         await waitFor(async () => await evaluate('!document.getElementById("fleet-schedule-editor").hidden'), 'assignment editor');
+        assert.equal(await evaluate('document.getElementById("fleet-schedule-device").value'),'2'.repeat(32),'Assignment retains selected saved output');
+        await evaluate(`configAutosaveSuspended=false;configAutosaveDirty=false;document.getElementById('fleet-schedule-frequency').dispatchEvent(new Event('input',{bubbles:true}));document.getElementById('fleet-listener-port').dispatchEvent(new Event('input',{bubbles:true}));`);
+        assert.equal(await evaluate('configAutosaveDirty'),false,'Schedule and listener drafts are independent');
+        await evaluate(`document.getElementById('wtp_endpoint').dispatchEvent(new Event('input',{bubbles:true}));`);
+        assert.equal(await evaluate('configAutosaveDirty'),true,'Host connection fields retain autosave');
+        await evaluate(`clearTimeout(configAutosaveTimer);configAutosaveTimer=null;configAutosaveDirty=false;configAutosaveSuspended=true`);
         for (const [mode, label, help] of [
             ['wspr','WSPR RF center (Hz)','not USB dial or tone 0'],
             ['qrss','QRSS carrier (Hz)','carrier frequency'],
@@ -321,6 +337,64 @@ async function main() {
         await evaluate(`document.getElementById('fleet-schedule-cancel').click();document.getElementById('fleet-listener').open=true;`);
         await waitFor(async()=>await evaluate('document.getElementById("fleet-listener-feedback").textContent.includes("Listening")'),'listener status');
         await capture('listener','fleet-listener');
+        await evaluate(`document.getElementById('fleet-device').selectedIndex=-1;document.getElementById('fleet-device').dispatchEvent(new Event('change',{bubbles:true}));document.getElementById('fleet-schedule-new').click();`);
+        await waitFor(async()=>await evaluate(`!document.getElementById('fleet-schedule-editor').hidden && !document.getElementById('fleet-schedule-save').disabled`),'unselected assignment');
+        assert.equal(await evaluate(`document.getElementById('fleet-schedule-device').value`),'','No catalog selection must not silently choose the first device');
+        const beforeUnselected=await fleetPosts();
+        await evaluate(`document.getElementById('fleet-schedule-save').click()`);
+        assert.equal(await fleetPosts(),beforeUnselected,'Unselected output cannot be saved');
+        await evaluate(`document.getElementById('fleet-schedule-cancel').click();document.getElementById('fleet-listener').open=false;document.getElementById('wtp-management').open=true;WtpManagement.invalidate();`);
+        assert.match(await evaluate(`document.getElementById('gpio-drive-status').textContent`),/has not been read/);
+        assert.doesNotMatch(await evaluate(`document.getElementById('gpio-drive-status').textContent`),/changed|preserved/);
+        assert.doesNotMatch(await evaluate(`document.getElementById('filter-selector-controls-status').textContent`),/Entries preserved/);
+        assert.equal(await evaluate(`document.getElementById('wtp-management-availability').compareDocumentPosition(document.getElementById('wtp-usb-settings')) & Node.DOCUMENT_POSITION_FOLLOWING`),4,'Prerequisites precede forms');
+        assert.equal(await evaluate(`document.getElementById('wtp-gps-controls').compareDocumentPosition(document.getElementById('wtp-member-hardware-save')) & Node.DOCUMENT_POSITION_FOLLOWING`),4,'Hardware save follows GPS');
+        assert.equal(await evaluate(`document.getElementById('wtp-si5351-controls').compareDocumentPosition(document.getElementById('wtp-member-hardware-save')) & Node.DOCUMENT_POSITION_FOLLOWING`),4,'Hardware save follows Si5351');
+        assert.equal(await evaluate(`document.getElementById('wtp-complete-station').open || document.getElementById('wtp-combined-settings').open`),false,'Alternative forms are disclosed explicitly');
+        await evaluate(`document.querySelector('#wtp-complete-station summary').focus()`);
+        await client.send('Input.dispatchKeyEvent',{type:'keyDown',key:'Enter',code:'Enter',windowsVirtualKeyCode:13});
+        await client.send('Input.dispatchKeyEvent',{type:'char',text:'\r',key:'Enter',code:'Enter',windowsVirtualKeyCode:13});
+        await client.send('Input.dispatchKeyEvent',{type:'keyUp',key:'Enter',code:'Enter',windowsVirtualKeyCode:13});
+        assert.equal(await evaluate(`document.getElementById('wtp-complete-station').open`),true,'Keyboard opens complete station alternative');
+        await evaluate(`document.getElementById('wtp-complete-station').open=false;document.getElementById('radio-tab').click()`);
+        await waitFor(async()=>await evaluate(`document.getElementById('configPageTitle').textContent==='Signal setup'`),'restored host guidance');
+        assert.match(await evaluate(`document.getElementById('configSaveStatusHint').textContent`),/Changes save automatically/);
+        await evaluate(`document.getElementById('fleet-tab').click()`);
+        await waitFor(async()=>await evaluate(`document.getElementById('configPageTitle').textContent==='Fleet'`),'restored Fleet guidance');
+        // The real disabled/first-read state is a useful operator path of its own.
+        // Capture at all requested sizes and themes, with actual fixed chrome.
+        for (const theme of ['light','dark']) {
+            await evaluate(`applyThemePreference('${theme}')`);
+            for (const viewport of viewports) {
+                await client.send('Emulation.setDeviceMetricsOverride',{...viewport,deviceScaleFactor:1,mobile:viewport.name==='mobile'});
+                await evaluate(`document.getElementById('wtp-hardware-settings').open=false;document.getElementById('wtp-complete-station').open=false;document.getElementById('wtp-combined-settings').open=false;window.scrollTo({top:0,behavior:'instant'});document.getAnimations().forEach(a=>a.finish());`);
+                await new Promise(resolve=>setTimeout(resolve,150));
+                const screenshot=async name=>{
+                    const shot=await client.send('Page.captureScreenshot',{format:'png'});
+                    fs.writeFileSync(path.join(output,viewport.name+'-'+theme+'-'+name+'.png'),Buffer.from(shot.data,'base64'));
+                };
+                assert.equal(await evaluate('document.documentElement.scrollWidth <= innerWidth'),true,'Fleet '+theme+' overflow');
+                await screenshot('fleet');
+                for (const [name,id] of [['management','wtp-management'],['station','wtp-usb-progress-heading'],['complete-station','wtp-complete-station'],['gps','wtp-gps-controls'],['hardware-actions','wtp-member-validate'],['capability-guidance','wtp-platform-limits'],['alternatives','wtp-combined-settings']]) {
+                    await evaluate(`document.getElementById('wtp-hardware-settings').open=true;if(document.getElementById('${id}').tagName==='DETAILS')document.getElementById('${id}').open=true;document.getElementById('${id}').scrollIntoView({block:'start'});window.scrollBy(0,-180);document.getAnimations().forEach(a=>a.finish());`);
+                    assert.equal(await evaluate('document.documentElement.scrollWidth <= innerWidth'),true,name+' '+theme+' overflow');
+                    await screenshot(name);
+                }
+                const contrast=await evaluate(`(()=>{const s=getComputedStyle(document.getElementById('wtp-selection-hint'));return {color:s.color,bg:getComputedStyle(document.body).backgroundColor};})()`);
+                const rgb=text=>text.match(/[\d.]+/g).map(Number);
+                const fg=rgb(contrast.color),bg=rgb(contrast.bg),alpha=fg[3]??1;
+                const luminance=values=>values.slice(0,3).map(v=>{v/=255;return v<=0.04045?v/12.92:((v+0.055)/1.055)**2.4;}).reduce((sum,v,i)=>sum+v*[0.2126,0.7152,0.0722][i],0);
+                const f=luminance(fg.map((v,i)=>v*alpha+bg[i]*(1-alpha))),b=luminance(bg);
+                const ratio=(Math.max(f,b)+0.05)/(Math.min(f,b)+0.05);
+                assert(ratio>=4.5,theme+' help-text contrast');
+                console.log(viewport.name+' '+theme+' help-text contrast: '+ratio.toFixed(2)+':1');
+            }
+        }
+
+        // The keyboard interaction grants native user activation. This fixture
+        // has no host config readback, so establish its synthetic baseline before
+        // leaving Setup; otherwise the real unsaved-edit guard correctly blocks.
+        await evaluate(`configAutosaveDirty=false;configAutosaveInFlight=false;configAutosavePendingAfterFlight=false;lastSavedConfigPayload=currentConfigPayloadSnapshot();`);
         await client.send('Page.navigate',{url:base+'?page=operation'});
         await waitFor(async()=>await evaluate('document.readyState==="complete" && !!window.LocalWtp && typeof requestTransmitEnabledChange==="function"'),'Operation view');
         await evaluate(mock);

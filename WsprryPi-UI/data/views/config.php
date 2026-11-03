@@ -16,6 +16,8 @@ $bandGpioBands = ['2200m', '630m', '160m', '80m', '60m', '40m', '30m', '20m', '1
                                 <span
                                     id="configSaveStatus"
                                     class="config-save-status"
+                                    role="status"
+                                    aria-label="This Pi settings save status"
                                     aria-describedby="configSaveStatusHint configSaveStatusDetail"
                                     aria-live="polite"
                                     aria-atomic="true"></span>

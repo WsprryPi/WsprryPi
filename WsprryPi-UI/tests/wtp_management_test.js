@@ -12,6 +12,15 @@ const {schedules,changes} = require('../data/wtp-management.js');
   assert.match(stationHint('application'),/automatically selects WSPR Type 1, 2 or 3/);
   for(const name of ['callsign','locator','power']) assert.match(view,new RegExp('id="wtp-member-'+name+'"[^>]*aria-describedby="wtp-member-station-hint [^"]*"'));
 
+  // No observation or draft exists on first load, including availability loss.
+  const element=()=>({value:'',disabled:false,textContent:'',options:[],listeners:{},setAttribute(){},addEventListener(name,fn){this.listeners[name]=fn;}});
+  const driveStatus=element();
+  const drive=require('../data/gpio-drive.js').create({select:element(),read:element(),save:element(),discard:element(),status:driveStatus,
+    exchange:async()=>({revision:'"drive-1"',data:{schema:'gpio-drive',target:{scope:'member',device_id:'a'.repeat(32),boot_id:'1'.repeat(32)},saved:4,boot_active:4,pad_readback:4,pending_restart:false,application_error:null,rf_gp:0,execution_engine:'pio',storage_healthy:true}})});
+  drive.invalidate();assert.match(driveStatus.textContent,/has not been read/);assert.doesNotMatch(driveStatus.textContent,/changed|preserved/);
+  drive.setAvailability(true);drive.setAvailability(false);assert.match(driveStatus.textContent,/has not been read/);
+  drive.setAvailability(true);await drive.load();drive.invalidate();assert.match(driveStatus.textContent,/Target or saved revision changed/);
+
   assert.deepEqual(schedules(''), []);
   assert.throws(()=>schedules('121 0'));
   assert.deepEqual(changes(config,{enabled:false,station:config.station,wifi:config.wifi,schedules:config.schedules,expires_utc_s:0}),{});

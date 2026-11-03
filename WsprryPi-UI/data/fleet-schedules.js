@@ -179,6 +179,7 @@
         // Bind the draft to the schedule displayed when it was opened. Status
         // polling must not silently authorize overwriting another operator.
         const reviewedRevision = revision;
+        const catalogChoice = byId("fleet-device")?.value || "";
         busy = true;clearTimeout(timer);setVisible(visible);
         try {
             const saved = await fetchJson("devices");
@@ -189,8 +190,12 @@
             // its original target and revision.
             profiles = nextProfiles;editId = id;editorRevision = reviewedRevision;
             const selector = byId("fleet-schedule-device");selector.replaceChildren();
+            const placeholder = root.document.createElement("option");
+            placeholder.value = "";placeholder.textContent = "Choose a saved output";selector.append(placeholder);
             for (const profile of profiles) {const option = root.document.createElement("option");option.value = profile.id;option.textContent = profile.name;selector.append(option);}
             selector.disabled = !!id;
+            if (!id && catalogChoice.startsWith("known:") && profiles.some(p => p.id === catalogChoice.slice(6)))
+                selector.value = catalogChoice.slice(6);
             if (id) {
                 const option = root.document.createElement("option");option.value = "assigned";option.textContent = assignment.name;selector.append(option);selector.value = "assigned";
                 const s = assignment.schedule;

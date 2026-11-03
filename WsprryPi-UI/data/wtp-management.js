@@ -31,7 +31,7 @@
         return patch;
     }
     function stationHint() {
-        return "Save the complete station together. The Pico automatically selects WSPR Type 1, 2 or 3 from the callsign and locator. Reported power is message metadata; it does not set measured RF output.";
+        return "Read saved progress, save valid station fields, then apply the saved progress separately. Complete station save is an alternative below. The Pico automatically selects WSPR Type 1, 2 or 3; reported power is metadata, not measured RF output.";
     }
     if (typeof module !== "undefined" && module.exports) module.exports = { schedules, changes, stationHint };
     if (!root.document) return;
@@ -64,7 +64,9 @@
         const availability = byId("wtp-management-availability");
         if (availability) {
             availability.hidden = available;
-            const message = "Management is unavailable until the host is idle and Pico state is confirmed.";
+            const message = root.WtpUi?.selected?.() || canSelect
+                ? "Management is unavailable until this Pi is idle and the Pico connection is confirmed. Review Pico status above before reading settings."
+                : "Select and use a saved Pico above, then turn on Use Pico for this Pi. Management reads require an idle host and a confirmed Pico connection.";
             if (!available && availability.textContent !== message) availability.textContent = message;
         }
     }

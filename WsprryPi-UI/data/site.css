@@ -1197,3 +1197,14 @@ footer .container {
     border-color: var(--bs-border-color);
     opacity: 1;
 }
+
+/* Fleet instructions remain readable on the canvas and neutral panels. */
+.config-header-copy,
+#fleet-pane {
+    --bs-secondary-color: rgba(var(--bs-body-color-rgb), 0.9);
+}
+
+#fleet-pane .btn-outline-secondary:disabled {
+    color: var(--bs-secondary-color);
+    border-color: var(--bs-border-color);
+}
