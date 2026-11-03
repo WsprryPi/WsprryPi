@@ -29,8 +29,25 @@ Status key: ✅ Complete · ⏳ In progress · ▧ Not started
 6. ✅ **Installer Git clone requirement.** Research complete; retain the
    current clone requirement to deliver supporting tooling, configuration,
    service templates, and web assets. Closed for now with no installer changes.
-7. ▧ **All-host tooling updates.** Address the separate host-tooling follow-up
-   retained after documentation performance and housekeeping acceptance.
+7. ✅ **All-host tooling updates.** Closed November 3, 2026, for the
+   maintainer-selected hosts: this Mac (`/Users/lbussy`) and `wspr5`
+   (`/home/pi`). Both hosts' user-level `.agents/skills/impeccable` and
+   `.codex/skills/impeccable` installations were updated from 4.1.1 to 4.8.0,
+   matching the official version endpoint and npm package at execution time.
+   `npx --yes impeccable@4.8.0 update --global --yes --no-hooks` succeeded
+   on both hosts and installed the platform engine (release 0.1.18).
+   The current installer targets `.agents`, including when Codex is selected;
+   the legacy `.codex` copies were refreshed from the installed payloads after
+   retaining temporary 4.1.1 backups. All four skill metadata checks reported
+   4.8.0, all four engine `--version` checks passed with 4.8.0, and all four
+   `SKILL.md` SHA-256 values matched
+   `fab04b31f946573b00a8559db1fc070f8ea5825254d491c2b13156e5661a86d7`.
+   The CLI `check` command inspected project scope and reported no project
+   installation; user-level verification used the explicit installed paths.
+   Fresh agent sessions are required to load the updated skill instructions.
+   Hook manifests, application code, services, and hardware were unchanged.
+   Operator documentation was reviewed for impact; this maintainer-tool update
+   changes no operator behavior and requires no operator-manual update.
 8. ▧ **Pico Type 1 rationale wording.** Address the deferred, nonblocking
    wording follow-up from Pico WSPR Type 2/3 integration.
 9. ▧ **Pico P15.14 operator documentation.** Complete the separate Pico
