@@ -1,10 +1,11 @@
 # Calibration authority and scope
 
-Native/direct PPS RF calibration and alternative RP1 clock-parent evaluation
-are deferred beyond WsprryPi 4.0. RP1 output uses nominal 200 MHz `pll_sys`.
-The [release punchlist](Release%20Punchlist.md#saved-items) retains those scope
-decisions and their reopening criteria. Existing correction settings and
-backend ownership apply independently of those deferred features.
+Native/direct PPS RF calibration remains deferred beyond WsprryPi 4.0.
+The bounded alternative RP1 clock-parent review is closed: retain nominal
+200 MHz `pll_sys`, with no alternative-parent hardware testing selected.
+The [release punchlist](Release%20Punchlist.md#saved-items) retains unfinished
+work; the decisions and reopening criteria below govern these scopes.
+Existing correction settings and backend ownership remain unchanged.
 
 ## Current capability and correction authority
 
@@ -187,13 +188,80 @@ PLL cores derive from XOSC; `pll_sys` is an output of `pll_sys_core`.
 | Clock path | Disposition | Identity constraint for any future evaluation |
 | --- | --- | --- |
 | `pll_sys` | **Implemented**, nominal 200 MHz. | Keep current provider identity, correction composition, ownership and set/restore contract. |
-| `clk_i2s` | **Deferred alternative-parent evaluation** beyond 4.0. | A mux/divider with XOSC, audio-PLL and GP inputs; `CLK_SET_RATE_PARENT` can affect ancestors. No new nominal rate selected. |
-| `clk_adc` | **Deferred alternative-parent evaluation** beyond 4.0. | A mux/divider with XOSC/GP inputs in the pinned source; not an independent oscillator. No new nominal rate selected. |
-| `clk_sys` | **Deferred alternative-path evaluation** beyond 4.0. | A critical mux/divider which can derive from `pll_sys` or XOSC; a different path can share the same physical source. No new nominal rate selected. |
+| `clk_i2s` | **Review closed; not selected.** | A mux/divider with XOSC, audio-PLL and GP inputs; `CLK_SET_RATE_PARENT` can affect ancestors. No new nominal rate selected. |
+| `clk_adc` | **Review closed; not selected.** | A mux/divider with XOSC/GP inputs in the pinned source; not an independent oscillator. No new nominal rate selected. |
+| `clk_sys` | **Review closed; not selected.** | A critical mux/divider which can derive from `pll_sys` or XOSC; a different path can share the same physical source. No new nominal rate selected. |
 
-Future evaluation must first resolve the exact provider IDs, aliases, available
-ancestry and nominal rates on the proposed kernel/firmware, excluding cycles
-and feedback. Then evaluate ownership/conflicts with other consumers, achievable
+### Bounded feasibility finding
+
+Retain nominal 200 MHz `pll_sys`. The source and numerical review found no
+alternative parent with a materially better divider plan at the operating
+frequencies considered. No alternative-parent hardware testing is selected.
+This closes the review, not physical qualification of any alternative.
+
+Raspberry Pi's reviewed stock
+[`rpi-6.12.y` clock driver](https://github.com/raspberrypi/linux/blob/rpi-6.12.y/drivers/clk/clk-rp1.c)
+limits `clk_i2s` and `clk_adc` to 50 MHz and critical `clk_sys` to 200 MHz.
+The direct audio-PLL parent entry for GPCLK0 is disabled in that source;
+the audio VCO rate does not establish a selectable GHz GPCLK0 parent.
+The companion [device tree](https://github.com/raspberrypi/linux/blob/rpi-6.12.y/arch/arm64/boot/dts/broadcom/rp1.dtsi)
+assigns nominal XOSC/audio output rates of 50, 61.44, and 153.6 MHz.
+These branch links describe the source reviewed, not an immutable source pin
+or an inspection of an installed kernel. Additional GP source entries do not
+establish an independent reference, usable rate, or exclusive ownership.
+
+The production numerical planner at WsprryPi
+`5d72dd57465251f63ac937f9876900d38e46cee4` was compiled in a temporary,
+hardware-free comparison harness. It used Q16 dividers, WSPR spacing
+`12000/8192` Hz, and the production 66,792-entry dither period. The 17 centers
+covered established WSPR presets from 2200 m through 4 m, including both 60 m
+presets, plus representative 42.5 MHz and 61 MHz centers for 8 m and 5 m.
+WSPR presets included the default 1,500 Hz dial-to-RF offset; representative
+centers were direct RF inputs, not new presets or qualification claims.
+
+At zero modeled correction, representative maximum adjacent-word separations
+and absolute dither-average errors across each four-tone plan were:
+
+| RF center | 200 MHz step | 50 MHz step | 200 MHz average error | 50 MHz average error |
+| --- | --- | --- | --- | --- |
+| 7.040100 MHz | 3.781 Hz | 15.125 Hz | 0.000028 Hz | 0.000102 Hz |
+| 14.097100 MHz | 15.162 Hz | 60.647 Hz | 0.000096 Hz | 0.000389 Hz |
+| 28.126100 MHz | 60.354 Hz | 241.419 Hz | 0.000204 Hz | 0.001583 Hz |
+| 50.294500 MHz | 192.988 Hz | Not representable | 0.000257 Hz | Not representable |
+| 70.092500 MHz | 374.829 Hz | Not representable | 0.002212 Hz | Not representable |
+
+All 17 nominal 200 MHz plans passed. A further 20,451 cases per parent used
+those centers, offsets of -100, 0, and +100 Hz, and 401 total-correction samples
+from -246.245 through +153.755 ppm in 1 ppm increments. The 200 MHz parent
+passed every case; its largest numerical average error was below 0.002806 Hz,
+within the planner's 0.01 Hz limit. Neither 50 MHz nor 12.288 MHz rescued a
+failed 200 MHz plan, and both lost upper-frequency coverage. Equal fractional
+corrections were numerical sensitivity inputs only; the measured RP1 intrinsic
+correction is not transferable to another parent.
+
+A separate optimistic screen considered 710 distinct rates obtained by
+integer division (divisors 1 through 255) of the nominal 50, 61.44, and
+153.6 MHz sources, retaining rates at or below 50 MHz. This screen did not
+establish live availability or ownership. Some rates improved individual
+nearest-word errors: 30.72 MHz reduced the worst nearest-word error at the
+10 m preset from 29.27 Hz to 6.64 Hz. However, its dither-average error was
+worse, its adjacent-word excursion was larger, and it resolved no existing
+acceptance failure. Every valid candidate plan had wider adjacent-word steps
+than the 200 MHz plan. These isolated coincidences do not justify replacing
+the current parent or initiating a hardware comparison.
+
+Reopen only for a specific measured spectral problem, a reproducible planning
+rejection, or a newly supported higher-rate parent that provides a concrete
+predicted benefit. The sampled comparisons are not an exhaustive proof for
+every custom frequency, spacing, or correction. Phase noise, spurs, absolute
+accuracy, live ownership, and restoration of alternative parents remain
+unmeasured. No parent selector, fallback, PLL tuning, provider contract change,
+or alternative-parent hardware campaign is authorized by this decision.
+
+Any separately approved reopened evaluation must first resolve the exact
+provider IDs, aliases, available ancestry and nominal rates on the proposed
+kernel/firmware, excluding cycles and feedback. Then evaluate
+ownership/conflicts with other consumers, achievable
 range, divider resolution, frequency accuracy/repeatability, phase noise/spurs,
 cancellation, output-off and parent/rate restoration. Coordinate module/userspace
 compatibility and maintain independent GPIO4/GPIO20 evidence. Finer arithmetic
