@@ -22,8 +22,10 @@ Status key: ✅ Complete · ⏳ In progress · ▧ Not started
 3. ✅ **Alternative RP1 clock parents.** Bounded feasibility review complete;
    retain nominal 200 MHz `pll_sys`. No alternative-parent hardware testing
    selected or physical qualification claimed; see the [parent disposition](Calibration%20Scope%20Decisions.md#rp1-parent-disposition).
-4. ⏳ **[#411 — Complete selectable hardware profiles and Linux MCP2221A/Si5351 support](https://github.com/WsprryPi/WsprryPi/issues/411).**
-   First in the retained post-release queue.
+4. ✅ **[#411 — Complete selectable hardware profiles and Linux MCP2221A/Si5351 support](https://github.com/WsprryPi/WsprryPi/issues/411).**
+   Implementation and scoped Ubuntu/Raspberry Pi OS bench qualification accepted;
+   **Ready for Release**. Keep the issue open for its next release boundary,
+   including exact release-candidate validation and publication.
 5. ▧ **[#419 — Add a native macOS MCP2221A transport beneath the Si5351 backend](https://github.com/WsprryPi/WsprryPi/issues/419).**
    Follows #411.
 6. ✅ **Installer Git clone requirement.** Research complete; retain the
