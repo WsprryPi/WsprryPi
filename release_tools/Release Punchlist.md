@@ -23,10 +23,9 @@ Status key: ✅ Complete · ⏳ In progress · ▧ Not started
    First in the retained post-release queue.
 4. ▧ **[#419 — Add a native macOS MCP2221A transport beneath the Si5351 backend](https://github.com/WsprryPi/WsprryPi/issues/419).**
    Follows #411.
-5. ▧ **Installer Git clone requirement.** Examine whether installing the
-   prebuilt executable requires a Git clone, identify supporting files or
-   installer steps that depend on a checkout, and recommend any installer or
-   documentation changes.
+5. ✅ **Installer Git clone requirement.** Research complete; retain the
+   current clone requirement to deliver supporting tooling, configuration,
+   service templates, and web assets. Closed for now with no installer changes.
 6. ▧ **All-host tooling updates.** Address the separate host-tooling follow-up
    retained after documentation performance and housekeeping acceptance.
 7. ▧ **Pico Type 1 rationale wording.** Address the deferred, nonblocking
