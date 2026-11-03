@@ -66,6 +66,7 @@ set(core
     application/frequency_policy.cpp
     hardware/pins.cpp
     hardware/si5351_settings.cpp
+    hardware/gps_settings.cpp
     rf/si5351_plan.cpp
     rf/reference_measurement.cpp
     hardware/filter_settings.cpp
@@ -115,6 +116,8 @@ set(core
     rf/calibration.cpp
     time/ntp_filter.cpp
     time/ntp_client.cpp
+    time/gps.cpp
+    time/gps_calibration.cpp
     time/controller_time.cpp
     time/utc_discipline.cpp
     time/usb_time_source.cpp

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Lee Bussy
 #include "configuration.hpp"
+#include "gps_contract.hpp"
 #include "consumer_radio.hpp"
 #include "browser_api.hpp"
 #include "control_contract.hpp"
@@ -57,13 +58,13 @@ bool si_settings(const Json &v) {
   if (!integer(v["reference_hz"],25000000,27000000) || (v["reference_hz"]!=25000000 && v["reference_hz"]!=27000000) ||
       !integer(v["address"],96,96) || !integer(v["drive_ma"],2,8) || v["drive_ma"].get<unsigned>()%2 ||
       !integer(v["transmit_output"],0,2) || !v["rf_gate_active_high"].is_boolean() ||
-      !v["automatic_calibration"].is_boolean() || v["automatic_calibration"]!=false ||
+      !v["automatic_calibration"].is_boolean() ||
       !integer(v["manual_correction_ppb"],-100000,100000)) return false;
   if (v["reference_source"]=="crystal") {
     if (!integer(v["crystal_load_pf"],6,10) || v["crystal_load_pf"].get<unsigned>()%2) return false;
   } else if (v["reference_source"]!="external_xa" || !v["crystal_load_pf"].is_null()) return false;
   if (v["loopback_output"].is_null()) {
-    if (!v["loopback_input_gp"].is_null() || v["reference_use"]!="measurement_only") return false;
+    if (!v["loopback_input_gp"].is_null() || v["reference_use"]!="measurement_only" || v["automatic_calibration"]==true) return false;
   } else if (!integer(v["loopback_output"],0,2) || v["transmit_output"]==v["loopback_output"] ||
       !gpio(v["loopback_input_gp"]) || !(v["loopback_input_gp"].get<unsigned>()%2)) return false;
   if (!v["rf_gate_gp"].is_null() && (!gpio(v["rf_gate_gp"]) || v["rf_gate_gp"]==v["loopback_input_gp"])) return false;
@@ -93,9 +94,11 @@ bool si_allocation(const Json &config, const Json &selectors = Json::array()) {
 bool shape(const Json &j, bool partial, bool redacted) {
   if (!partial && j.dump().size() > 1800) return false;
   if (!(partial ? fields(j, {}, {"enabled", "station", "wifi", "schedules", "pins",
-        "expires_utc_s", "allow_unqualified_frequency", "allow_non_amateur_frequency", "gpio_drive_ma", "si5351"}) && !j.empty()
+        "expires_utc_s", "allow_unqualified_frequency", "allow_non_amateur_frequency", "gpio_drive_ma", "si5351", "gps"}) && !j.empty()
       : fields(j, {"enabled", "station", "wifi", "schedules"}, {"pins",
-        "expires_utc_s", "allow_unqualified_frequency", "allow_non_amateur_frequency", "gpio_drive_ma", "si5351"}))) return false;
+        "expires_utc_s", "allow_unqualified_frequency", "allow_non_amateur_frequency", "gpio_drive_ma", "si5351", "gps"}))) return false;
+  if (j.contains("gps") && !(j["gps"].is_null() ? !redacted : gps_contract::settings(j["gps"]))) return false;
+  if (!partial && !gps_contract::allocation(j)) return false;
   if (j.contains("si5351") && !(j["si5351"].is_null() ? !redacted : si_settings(j["si5351"]))) return false;
   if (!partial && j.contains("pins") && !si_allocation(j)) return false;
   if (j.contains("gpio_drive_ma") && (!j["gpio_drive_ma"].is_number_integer() || !(j["gpio_drive_ma"] == 2 || j["gpio_drive_ma"] == 4 || j["gpio_drive_ma"] == 8 || j["gpio_drive_ma"] == 12))) return false;
@@ -410,6 +413,7 @@ PicoHttpResponse pico_configuration_request(const PicoManagementExchange &exchan
     const auto caps = parsed(read("capabilities"),true);
     require(caps.is_object(),"unsupported_remote_contract",409);
     require(caps.contains("si5351") && supported_descriptor(caps["si5351"],"si5351"),"unsupported_si5351_capabilities",409);
+    require(caps.contains("gps") && supported_descriptor(caps["gps"],"gps"),"unsupported_gps_capabilities",409);
     require(caps.contains("application_resources"),
         "unsupported_configuration_context",409);
     if (caps.contains("management_carriers")) {
@@ -469,14 +473,20 @@ PicoHttpResponse pico_configuration_request(const PicoManagementExchange &exchan
       const auto &patch = input["config"];
       Json proposed=config.is_null()?Json::object():config;
       for (const auto &[name,value]:patch.items()) proposed[name]=value;
-      if (proposed.contains("si5351") || (proposed.contains("pins") && proposed["pins"].value("engine","")=="i2c")) {
+      if (proposed.contains("gps") || proposed.contains("si5351") || (proposed.contains("pins") && proposed["pins"].value("engine","")=="i2c")) {
         const auto filters=filter_selector_request(exchange,device,boot,"GET",{}, {},carrier,generation);
         success(filters);
         const auto checked_filters=parsed(filters);
         require(filters.etag==original.etag,"revision_conflict",412);
         require(checked_filters.contains("saved") && checked_filters["saved"].is_object() &&
             checked_filters["saved"].contains("selectors") &&
-            si_allocation(proposed,checked_filters["saved"]["selectors"]),"invalid_si5351_allocation",400);
+            si_allocation(proposed,checked_filters["saved"]["selectors"]) &&
+            gps_contract::allocation(proposed,checked_filters["saved"]["selectors"]),"invalid_hardware_allocation",400);
+        if (proposed.contains("si5351") && proposed["si5351"].is_object() &&
+            proposed["si5351"].value("automatic_calibration",false))
+          require(proposed.contains("gps") && proposed["gps"].is_object() &&
+            gps_contract::settings(proposed["gps"]) && proposed["gps"]["enabled"]==true &&
+            proposed["gps"]["pairing_qualified"]==true,"gps_required",400);
       }
       if ((carrier == "consumer_station" || carrier == "consumer_ap") && patch.contains("station")) {
         bool changed = config.is_null();
@@ -500,6 +510,9 @@ PicoHttpResponse pico_configuration_request(const PicoManagementExchange &exchan
       require(result.contains("config") && shape(result["config"], false, true) && etag(r.etag), "management_outcome_unknown");
       require(drive_policy_fields(result["config"],caps),"management_outcome_unknown");
       if (!expected_config_pins.is_null()) require(result["config"].at("pins").dump()==expected_config_pins.dump(),"management_outcome_unknown");
+      if (patch.contains("gps")) require(patch["gps"].is_null()
+          ? !result["config"].contains("gps")
+          : result["config"].contains("gps") && result["config"]["gps"]==patch["gps"],"management_outcome_unknown");
       if (patch.contains("si5351")) require(patch["si5351"].is_null()
           ? !result["config"].contains("si5351")
           : result["config"].contains("si5351") && result["config"]["si5351"]==patch["si5351"],"management_outcome_unknown");
@@ -942,7 +955,7 @@ PicoHttpResponse filter_selector_request(const PicoManagementExchange &exchange,
       require(v["reserved"].is_array() && v["reserved"].size()<=26,"invalid_remote_resource");std::set<unsigned> reserved;
       for(const auto &p:v["reserved"]) {
         require(fields(p,{"gp","role"}) && p["gp"].is_number_integer() && ((p["gp"]>=0 && p["gp"]<=22)||(p["gp"]>=26 && p["gp"]<=28)) &&
-            (p["role"]=="rf" || p["role"]=="button" || p["role"]=="amplifier" || p["role"]=="indicator" || p["role"]=="i2c_sda" || p["role"]=="i2c_scl" || p["role"]=="loopback" || p["role"]=="si5351_gate"),"invalid_remote_resource");
+            (p["role"]=="rf" || p["role"]=="button" || p["role"]=="amplifier" || p["role"]=="indicator" || p["role"]=="i2c_sda" || p["role"]=="i2c_scl" || p["role"]=="loopback" || p["role"]=="si5351_gate" || p["role"]=="gps_rx" || p["role"]=="gps_pps" || p["role"]=="gps_tx"),"invalid_remote_resource");
         require(reserved.insert(p["gp"].get<unsigned>()).second,"invalid_remote_resource");
       }
       if(!v["saved"].is_null()) for(const auto &o:v["saved"]["selectors"])require(!reserved.contains(o["gp"].get<unsigned>()),"invalid_remote_resource");
@@ -1110,17 +1123,36 @@ PicoHttpResponse pico_resource_request(const PicoManagementExchange &exchange,
     const std::string &device, const std::string &boot, const std::string &resource,
     const std::string &method, const std::string &body, const std::string &revision,
     const std::string &carrier, const std::string &generation) {
-  if (resource == "si5351") {
+  if (resource == "si5351" || resource == "gps") {
     try {
       require(method=="GET" && body.empty(),"not_found",404);
       require(identity(device) && identity(boot),"member_identity_unavailable",409);
       const auto cr=exchange("capabilities","GET",{},{});success(cr);const auto caps=parsed(cr,true);
-      require(caps.contains("si5351") && supported_descriptor(caps["si5351"],"si5351"),"unsupported_si5351_capabilities",409);
+      require(caps.contains(resource) && supported_descriptor(caps[resource],resource),"unsupported_resource_capabilities",409);
       require(caps.contains("management_carriers") && valid_management_descriptor(caps["management_carriers"],carrier),"unsupported_management_contract",409);
       const auto mr=exchange("management","GET",{},{});success(mr);const auto management=strict_browser_json(mr.body);
       require(valid_management_contract(management,carrier,device,boot,generation) && management["schema"]==caps["management_carriers"]["schema"],"unsupported_management_contract",409);
-      const auto result=exchange("si5351","GET",{},{});success(result);const auto value=parsed(result);
+      const auto result=exchange(resource,"GET",{},{});success(result);const auto value=parsed(result);
       const Json target{{"scope","member"},{"device_id",device},{"boot_id",boot}};
+      if (resource=="gps") {
+        require(fields(value,{"schema","target","saved","boot_active","pending_restart","storage_healthy","runtime"}) &&
+          value["schema"]=="gps" && value["target"]==target && etag(result.etag) &&
+          value["pending_restart"].is_boolean() && value["storage_healthy"].is_boolean(),"invalid_remote_resource");
+        for (const auto key:{"saved","boot_active"})
+          require(value[key].is_null() || gps_contract::settings(value[key]),"invalid_remote_resource");
+        require(gps_contract::runtime(value["runtime"]) &&
+          (value["storage_healthy"]==true || value["saved"].is_null()),"invalid_remote_resource");
+        if (!value["runtime"].is_null()) {
+          const auto &active=value["boot_active"], &runtime=value["runtime"];
+          require(!active.is_null() && active["enabled"]==true &&
+            (runtime["time_valid"]==false || active["pairing_qualified"]==true) &&
+            (runtime["time_valid"]==false || std::stoull(runtime["capture_error_bound_ns"].get<std::string>())<=active["capture_uncertainty_us"].get<std::uint64_t>()*1000ULL) &&
+            (runtime["position_valid"]==false ||
+              std::stoull(runtime["position"]["age_ns"].get<std::string>())<=
+                active["position_maximum_age_s"].get<std::uint64_t>()*1000000000ULL),"invalid_remote_resource");
+        }
+        return result;
+      }
       require(fields(value,{"schema","target","saved","boot_active","pending_restart","physically_qualified","qualification","execution_engine","runtime","storage_healthy"}) &&
           value["schema"]=="si5351" && value["target"]==target && etag(result.etag) &&
           value["physically_qualified"].is_boolean() &&
@@ -1229,7 +1261,7 @@ PicoHttpResponse pico_resource_request(const PicoManagementExchange &exchange,
         drive_policy_observation(after["hardware"]["gpio_drive"],caps),"invalid_remote_resource");
     application = after;
     Json control_capabilities=Json::object();
-    for (const auto feature : {"gpio_drive","amplifier_enable","amplifier_timing","filter_selector","si5351"}) {
+    for (const auto feature : {"gpio_drive","amplifier_enable","amplifier_timing","filter_selector","si5351","gps"}) {
       if (!caps.contains(feature)) continue;
       require(supported_descriptor(caps[feature],feature),"unsupported_resource_capabilities",409);
       control_capabilities[feature]=caps[feature];

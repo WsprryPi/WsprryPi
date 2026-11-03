@@ -12,7 +12,7 @@
     if (!keys(v,fields) || ![25000000,27000000].includes(v.reference_hz) || v.address !== 96 ||
         ![2,4,6,8].includes(v.drive_ma) || ![0,1,2].includes(v.transmit_output) ||
         ![null,0,1,2].includes(v.loopback_output) || v.transmit_output === v.loopback_output ||
-        typeof v.rf_gate_active_high !== 'boolean' || v.automatic_calibration !== false ||
+        typeof v.rf_gate_active_high !== 'boolean' || typeof v.automatic_calibration !== 'boolean' || v.automatic_calibration && v.loopback_output===null ||
         !integer(v.manual_correction_ppb,-100000,100000)) return false;
     if (v.reference_source === 'crystal' ? ![6,8,10].includes(v.crystal_load_pf)
         : v.reference_source !== 'external_xa' || v.crystal_load_pf !== null) return false;
@@ -123,11 +123,12 @@
       <label>Reference use<select data-si="reference_use"><option value="measurement_only">Measure only</option><option value="trusted_local">Trust local reference for Pico rate</option></select></label>
       <label data-si-group="trusted">Declared reference uncertainty (ppb)<input data-si="trusted_uncertainty_ppb" type="number" min="1" max="100000" step="1" required></label>
       <label>Manual Si5351 correction (ppb)<input data-si="manual_correction_ppb" type="number" min="-100000" max="100000" step="1" value="0" required></label>
+      <label>Automatic Si5351 correction<select data-si="automatic_calibration"><option value="false">Disabled</option><option value="true">Use GPS/PPS and loopback</option></select></label>
       <label>Independent RF gate GPIO<select data-si="rf_gate_gp"><option value="">None wired</option>${[...Array(23).keys(),26,27,28].map(p=>`<option value="${p}">GP${p}</option>`).join('')}</select></label>
       <label data-si-group="gate">RF gate polarity<select data-si="rf_gate_active_high"><option value="true">Active-high</option><option value="false">Active-low</option></select></label>
       </div>
       <p>External XA requires compatible module wiring, levels and grounding. It does not select CLKIN. A gate requires an inactive hardware bias. Output drive is electrical current, not RF power or reported WSPR dBm.</p>
-      <p>Positive correction lowers programmed RF for a fast reference. Loopback measures a clock ratio; it does not establish UTC or absolute RF accuracy. Trusted use can reduce timer drift after NTP or phone time is accepted. It requires a known reference uncertainty and does not extend time validity. Automatic RF calibration is unavailable.</p>
+      <p>Positive correction lowers programmed RF for a fast reference. Loopback measures a clock ratio; it does not establish UTC or absolute RF accuracy. Trusted use can reduce timer drift after NTP or phone time is accepted. It requires a known reference uncertainty and does not extend time validity. Automatic correction requires enabled GPS with a validated UTC/PPS association and a separate loopback measurement.</p>
       <p data-si-status role="status" aria-live="polite">Reference measurements have not been read.</p>`;
     if(bootstrap) {
       container.querySelector('.fields').className='row g-3';
@@ -136,7 +137,7 @@
       for(const p of container.querySelectorAll('p')) p.className='form-text text-break';
     }
     const input = name => container.querySelector(`[data-si="${name}"]`);
-    for (const name of ['pair',...fields.split(',').filter(k=>k!=='automatic_calibration')]) {
+    for (const name of ['pair',...fields.split(',')]) {
       const field = input(name);
       if (field) {
         field.id = `${container.id}-${name}`;
@@ -166,7 +167,7 @@
       for (const key of fields.split(',')) {
         const field = input(key);
         if (!field) continue;
-        const fallback = {address:96,drive_ma:2,reference_use:'measurement_only',manual_correction_ppb:0,rf_gate_active_high:true};
+        const fallback = {address:96,drive_ma:2,reference_use:'measurement_only',manual_correction_ppb:0,rf_gate_active_high:true,automatic_calibration:false};
         field.value = value?.[key] === null || value?.[key] === undefined ? String(fallback[key] ?? '') : String(value[key]);
         field.setCustomValidity('');
       }
@@ -186,9 +187,8 @@
       const value = {};
       const nullable = new Set(['crystal_load_pf','loopback_output','loopback_input_gp','rf_gate_gp','trusted_uncertainty_ppb']);
       for (const key of fields.split(',')) {
-        if (key==='automatic_calibration') {value[key]=false;continue;}
         const field = input(key), text = field.value;
-        value[key] = key==='rf_gate_active_high' ? text==='true' : ['reference_source','reference_use'].includes(key) ? text :
+        value[key] = ['rf_gate_active_high','automatic_calibration'].includes(key) ? text==='true' : ['reference_source','reference_use'].includes(key) ? text :
             nullable.has(key) && (field.closest('[data-si-group]')?.hidden || text==='') ? null : Number(text);
       }
       if (!valid(value)) {

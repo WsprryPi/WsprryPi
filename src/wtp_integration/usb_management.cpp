@@ -6,6 +6,7 @@
 #include <array>
 #include <charconv>
 #include <chrono>
+#include <initializer_list>
 #include <set>
 #include <stdexcept>
 #if defined(__linux__)
@@ -25,6 +26,10 @@ std::uint64_t decimal(const Json &j) {
   if (s.empty() || s.size()>20 || (s.size()>1 && s[0]=='0') || result.ec!=std::errc{} || result.ptr!=s.data()+s.size())
     throw std::runtime_error("invalid_decimal");
   return value;
+}
+bool fields(const Json &v,std::initializer_list<const char*> names) {
+  return v.is_object() && v.size()==names.size() &&
+    std::all_of(names.begin(),names.end(),[&](const char* key){return v.contains(key);});
 }
 }
 HostUtcObservation qualified_host_utc() noexcept {
@@ -186,8 +191,10 @@ bool UsbManagementClient::synchronize(const std::function<HostUtcObservation()> 
       return reject("usb_sample_delay_or_clock_step");
     const auto step=sample_step+ack_step;
     const auto value=strict_browser_json(sample.body);
+    if(!fields(value,{"monotonic_ns","sample"}))return reject("invalid_time_sample");
     (void)decimal(value.at("monotonic_ns"));
-    if (!value.at("sample").is_string()) return reject("invalid_time_sample");
+    if (!value.at("sample").is_string() || value.at("sample").get_ref<const std::string&>().empty() ||
+        value.at("sample").get_ref<const std::string&>().size()>64) return reject("invalid_time_sample");
     const auto error=std::max({before.uncertainty_ns,after.uncertainty_ns,confirmed.uncertainty_ns});
     // The Pico sample lies somewhere inside [before, after]. Its UTC
     // midpoint has a worst-case radius of ceil(RTT/2), even with fully
@@ -200,7 +207,16 @@ bool UsbManagementClient::synchronize(const std::function<HostUtcObservation()> 
     const auto result=request_locked("/api/usb/v1/time/submit","POST",Json{{"sample",value.at("sample")},
       {"utc_ns",std::to_string(utc)},{"uncertainty_ns",std::to_string(uncertainty)},{"leap","normal"}}.dump(),{},500);
     const auto outcome=strict_browser_json(result.body);
-    const bool accepted=result.status==200 && outcome.is_object() && outcome.value("accepted",false);
+    if(result.status!=200)return reject("pico_time_refused");
+    if(!fields(outcome,{"accepted","selected","source","uncertainty_ns","age_ns"}) ||
+        !outcome["accepted"].is_boolean() || !outcome["selected"].is_boolean() ||
+        !outcome["source"].is_string() || outcome["accepted"]!=outcome["selected"])
+      return reject("invalid_time_exchange");
+    (void)decimal(outcome["uncertainty_ns"]);(void)decimal(outcome["age_ns"]);
+    const bool accepted=outcome["accepted"].get<bool>();
+    const auto source=outcome["source"].get<std::string>();
+    if(accepted ? source!="controller" : source!="sntp" && source!="gps")
+      return reject("invalid_time_exchange");
     time_={{"source","usb-physical"},{"accepted",accepted},{"selected",outcome.value("selected",false)},
       {"selected_source",outcome.value("source",std::string{})},{"uncertainty_ns",std::to_string(uncertainty)},
       {"host_uncertainty_ns",std::to_string(error)},{"sample_round_trip_ns",std::to_string(elapsed)},

@@ -17,6 +17,8 @@ struct Device : wtp::ByteStream {
   unsigned mutations{}, acks{};
   std::function<void(const Json &)> on_request;
   std::size_t chunk{3};
+  Json time_result{{"accepted",true},{"selected",true},{"source","controller"},{"uncertainty_ns","1000000"},{"age_ns","0"}};
+  Json time_sample{{"sample","token"},{"monotonic_ns","1000000000"}};
   Json target{{"scope","member"},{"device_id",std::string(32,'a')},{"boot_id",std::string(32,'b')}};
   void respond(const Json &request) {
     operations.push_back(request);
@@ -28,8 +30,8 @@ struct Device : wtp::ByteStream {
     if(operation=="hello")body=Json{{"schema","usb-management-discovery/1"},{"product","WsprryPico"}}.dump();
     if(operation=="request") {
       if(request.at("method")!="GET")++mutations;
-      if(request.at("path")=="/api/usb/v1/time/sample")body=R"({"sample":"token","monotonic_ns":"1000000000"})";
-      if(request.at("path")=="/api/usb/v1/time/submit")body=R"({"accepted":true,"selected":true})";
+      if(request.at("path")=="/api/usb/v1/time/sample")body=time_sample.dump();
+      if(request.at("path")=="/api/usb/v1/time/submit")body=time_result.dump();
     }
     auto binding=target;if(bad_boot)binding["boot_id"]=std::string(32,'c');
     auto text=Json{{"schema","usb-management/1"},{"id",request.at("id")},{"status",200},
@@ -68,6 +70,34 @@ int main() {
   CHECK(std::stoull(time.at("uncertainty_ns").get<std::string>())==800000ULL && time.at("leap")=="normal");
   CHECK(client.observation().at("time").at("sample_round_trip_ns")=="1000000");
   CHECK(client.observation().at("time").at("host_uncertainty_ns")=="200000");
+  const auto qualified=[] {return HostUtcObservation{true,1000000000,1700000000000000000,200000};};
+  for(const auto source:{"gps","sntp"}) {
+    Device peer;peer.time_result["accepted"]=false;peer.time_result["selected"]=false;peer.time_result["source"]=source;
+    UsbManagementClient checked(peer,[&]{return now;},[&](unsigned n){now+=n;});CHECK(checked.hello(""));
+    CHECK(!checked.synchronize(qualified));
+    CHECK(checked.observation().at("time").at("selected_source")==source);
+  }
+  for(unsigned fault=0;fault<7;++fault) {
+    Device peer;
+    if(fault==0)peer.time_result.erase("age_ns");
+    if(fault==1)peer.time_result["extra"]=true;
+    if(fault==2)peer.time_result["source"]="unknown";
+    if(fault==3)peer.time_result["selected"]=false;
+    if(fault==4)peer.time_result["accepted"]="true";
+    if(fault==5)peer.time_result["uncertainty_ns"]="18446744073709551616";
+    if(fault==6)peer.time_result["age_ns"]="01";
+    UsbManagementClient checked(peer,[&]{return now;},[&](unsigned n){now+=n;});CHECK(checked.hello(""));
+    CHECK(!checked.synchronize(qualified));CHECK(checked.observation().at("time").at("reason")=="invalid_time_exchange");
+  }
+  for(unsigned fault=0;fault<4;++fault) {
+    Device peer;
+    if(fault==0)peer.time_sample.erase("sample");
+    if(fault==1)peer.time_sample["extra"]=true;
+    if(fault==2)peer.time_sample["sample"]="";
+    if(fault==3)peer.time_sample["monotonic_ns"]=1000000000;
+    UsbManagementClient checked(peer,[&]{return now;},[&](unsigned n){now+=n;});CHECK(checked.hello(""));
+    CHECK(!checked.synchronize(qualified));CHECK(peer.mutations==0);
+  }
 
   // A delayed delivery ACK is outside the device-sample bracket. It must
   // neither bias the UTC midpoint nor inflate the transfer uncertainty.

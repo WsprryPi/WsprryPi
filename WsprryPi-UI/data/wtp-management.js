@@ -97,8 +97,11 @@
     let progressLiveStation = false;
     let progress = null, progressRevision = "", progressEpoch = 0, progressLoaded = false, progressReview = false, stationDirty = false;
     const member = name => byId(`wtp-member-${name}`);
-    let siObservation = null;
+    let siObservation = null, gpsObservation = null;
     const siEditor = root.WsprrySi5351 && byId('wtp-si5351-controls') ? root.WsprrySi5351.create(byId('wtp-si5351-controls'), {
+        bootstrap:true,changed:()=>{validatedPlan='';resourceReconcile=resourceLoaded;resourceRender();}
+    }) : null;
+    const gpsEditor = root.WsprryGps && byId('wtp-gps-controls') ? root.WsprryGps.create(byId('wtp-gps-controls'), {
         bootstrap:true,changed:()=>{validatedPlan='';resourceReconcile=resourceLoaded;resourceRender();}
     }) : null;
     const resourceIdentity = data => `${data.target.device_id} / ${data.target.boot_id} / ${{engineering_mtls:"Engineering HTTPS",consumer_station:"Consumer Wi-Fi",consumer_ap:"Consumer setup Wi-Fi",usb_physical:"USB"}[data.carrier]}${data.profile_generation === null ? "" : ` / profile ${data.profile_generation}`}`;
@@ -289,6 +292,7 @@
         if(member('engine')?.options) for(const option of member('engine').options)
             if(option.value==='i2c') option.disabled=!siEditor || !root.WsprryControl?.supported('si5351',resources?.control_capabilities?.si5351);
         siEditor?.show(si);siEditor?.enable(!busy && Boolean(writable));
+        gpsEditor?.enable(!busy && Boolean(writable) && root.WsprryControl?.supported('gps',resources?.control_capabilities?.gps));
         if(member('direct-rf')) member('direct-rf').hidden=si;
         if(si) member('rf').disabled=true;
         if(byId('gpio-drive-form')) byId('gpio-drive-form').hidden=si;
@@ -337,8 +341,10 @@
         if(!keep) {
             if(member('engine')) member('engine').value=h.saved?.engine || 'direct';
             siEditor?.load(siObservation?.saved ?? null,h.saved?.i2c_pair);
+            gpsEditor?.load(gpsObservation?.saved ?? null);
         }
         if(siObservation) siEditor?.observation(siObservation);
+        if(gpsObservation) gpsEditor?.observation(gpsObservation);
         resources = data; resourceLoaded = true; resourceReconcile = false; validatedPlan = "";
         member("pin-feedback").textContent = "Candidate has not been validated. Validation never saves or activates pins.";
         member("hardware-feedback").textContent = keep ? "Your hardware draft is preserved beside fresh saved and active observations. Validate it before saving." : "";
@@ -352,14 +358,17 @@
         resourceReview = false;
         if (station && member("power").value === "") { member("station-feedback").textContent = "Select reported power for a complete station save, or save the unset field as progress."; return; }
         const payload = station ? { callsign:member("callsign").value, locator:member("locator").value, power_dbm:Number(member("power").value) } : hardwareCandidate();
-        if(!station && (payload.engine==='i2c' || siObservation?.saved)) {
+        if(!station && (payload.engine==='i2c' || siObservation?.saved || gpsEditor)) {
             try {
                 const config={pins:payload};
                 if(payload.engine==='i2c') {
                     config.si5351=siEditor.validate(payload).settings;
                     if(!root.WsprrySi5351.allocation(config.si5351,payload)) throw Error('The Si5351 pair, loopback, gate and other GPIO roles conflict. Choose separate pins.');
                 }
-                const result=await request('member/configuration','POST',{contract:'Wsprry-Control/1',schema:'pico-settings',target:resources.target,operation:'save',config},resourceRevision);
+                const gps=gpsEditor?.read(payload,config.si5351 || siObservation?.saved);
+                if(gps)config.gps=gps;
+                if(config.si5351?.automatic_calibration && (!gps?.enabled || !gps?.pairing_qualified))throw Error('Enable GPS and validate the UTC/PPS association before selecting automatic Si5351 correction.');
+                const result=await request('member/configuration' ,'POST',{contract:'Wsprry-Control/1',schema:'pico-settings',target:resources.target,operation:'save',config},resourceRevision);
                 if(result) {
                     await request('member/application');
                     member('hardware-feedback').textContent='RF output settings saved. Restart Pico explicitly to activate them.';
@@ -465,6 +474,13 @@
                         const value=await observation.json();
                         if(!observation.ok || observation.headers.get('ETag')!==etag || !root.WsprrySi5351.readback(value,data.target)) throw failure('Si5351 readback changed or is malformed. Load member resources again.');
                         siObservation=value;
+                    }
+                    if(gpsEditor) {
+                        if(!root.WsprryControl?.supported('gps',data.control_capabilities?.gps))throw failure('The current GPS descriptor is unavailable. No settings were changed.');
+                        const observation=await root.fetch((root.WSPRRYPI_PATHS?.sharedApiPath || '/api/control/v1')+'/member/gps',{method:'GET',cache:'no-store',signal:controller.signal});
+                        const value=await observation.json();
+                        if(!observation.ok || observation.headers.get('ETag')!==etag || !root.WsprryGps.readback(value,data.target))throw failure('GPS readback changed or is malformed. Load member resources again.');
+                        gpsObservation=value;
                     }
                     resourcePopulate(data); resourceRevision = etag; resourceContext = data.member_context;
                     feedback.textContent = "Member resources loaded. Saved configuration was reconciled under one revision. Station and hardware are separate explicit saves.";
@@ -669,7 +685,10 @@
         member("validate")?.addEventListener("click", () => {
             try {
                 const candidate=hardwareCandidate();
-                if(candidate.engine==='i2c' && !root.WsprrySi5351.allocation(siEditor.read().settings,candidate)) throw Error('Resolve the Si5351 GPIO conflicts before validating.');
+                const si=candidate.engine==='i2c' ? siEditor.read().settings : siObservation?.saved;
+                if(candidate.engine==='i2c' && !root.WsprrySi5351.allocation(si,candidate)) throw Error('Resolve the Si5351 GPIO conflicts before validating.');
+                const gps=gpsEditor?.read(candidate,si);
+                if(si?.automatic_calibration && (!gps?.enabled || !gps?.pairing_qualified)) throw Error('Si5351 automatic correction requires enabled GPS with a validated UTC/PPS association.');
                 return request("member/pins/validate", "POST", candidate, resourceRevision);
             } catch(error) {member('pin-feedback').textContent=error.message;error.control?.focus();error.control?.reportValidity();}
         });
