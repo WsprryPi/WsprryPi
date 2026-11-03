@@ -6243,7 +6243,10 @@
             "pps_offset_limit_ns",
             "pps_gps",
             "pps_capture",
-            "pwm_slice_policy"
+            "pwm_slice_policy",
+            "message_delay_maximum_ms",
+            "message_delay_span_maximum_ms",
+            "pulse_history_edges"
           ],
           "properties": {
             "schema": {
@@ -6313,7 +6316,7 @@
               ]
             },
             "pairing": {
-              "const": "qualified_preceding_edge_rmc"
+              "const": "qualified_unique_captured_edge_rmc"
             },
             "receiver_uncertainty_maximum_us": {
               "const": 100000
@@ -6382,6 +6385,15 @@
             },
             "pwm_slice_policy": {
               "const": "exclusive_from_si5351_loopback"
+            },
+            "message_delay_maximum_ms": {
+              "const": 1999
+            },
+            "message_delay_span_maximum_ms": {
+              "const": 999
+            },
+            "pulse_history_edges": {
+              "const": 5
             }
           }
         }
@@ -9729,12 +9741,12 @@
         "minimum_message_delay_ms": {
           "type": "integer",
           "minimum": 0,
-          "maximum": 999
+          "maximum": 1999
         },
         "maximum_message_delay_ms": {
           "type": "integer",
           "minimum": 0,
-          "maximum": 999
+          "maximum": 1999
         },
         "receiver_uncertainty_us": {
           "type": "integer",
@@ -10626,7 +10638,7 @@
         0,
         1
       ],
-      "pairing": "qualified_preceding_edge_rmc",
+      "pairing": "qualified_unique_captured_edge_rmc",
       "receiver_uncertainty_maximum_us": 100000,
       "capture_uncertainty_maximum_us": 100000,
       "position_maximum_age_s": 3600,
@@ -10664,7 +10676,10 @@
         27
       ],
       "pps_capture": "input_only_pwm_gated_timestamp",
-      "pwm_slice_policy": "exclusive_from_si5351_loopback"
+      "pwm_slice_policy": "exclusive_from_si5351_loopback",
+      "message_delay_maximum_ms": 1999,
+      "message_delay_span_maximum_ms": 999,
+      "pulse_history_edges": 5
     }
   },
   "descriptor_runtime_fields": {

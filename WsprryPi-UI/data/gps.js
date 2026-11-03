@@ -28,8 +28,9 @@
     if (v.tx_gp!==null && (v.receiver==='qlg3' || txUart(v.tx_gp)===null ||
         txUart(v.tx_gp)!==uart(v.rx_gp) || v.tx_gp===v.pps_gp)) return false;
     return integer(v.utc_second_offset,-1,1) && integer(v.pps_offset_ns,-500000000,500000000) &&
-      integer(v.minimum_message_delay_ms,0,999) && integer(v.maximum_message_delay_ms,0,999) &&
+      integer(v.minimum_message_delay_ms,0,1999) && integer(v.maximum_message_delay_ms,0,1999) &&
       v.minimum_message_delay_ms<=v.maximum_message_delay_ms &&
+      v.maximum_message_delay_ms-v.minimum_message_delay_ms<1000 &&
       integer(v.receiver_uncertainty_us,1,100000) && integer(v.capture_uncertainty_us,1,100000) &&
       ['manual','gps'].includes(v.location) && integer(v.position_maximum_age_s,1,3600) &&
       integer(v.calibration_maximum_age_s,10,86400) && ['always','day','night'].includes(v.daylight) &&
@@ -121,15 +122,16 @@
       ${bool('pairing_qualified','Validated UTC/PPS association')}
       ${number('utc_second_offset','RMC second offset (-1, 0, or 1)',-1,1)}
       ${number('pps_offset_ns','PPS edge delay from UTC boundary (ns)',-500000000,500000000)}
-      ${number('minimum_message_delay_ms','Minimum RMC delay after PPS (ms)',0,999)}
-      ${number('maximum_message_delay_ms','Maximum RMC delay after PPS (ms)',0,999)}
+      ${number('minimum_message_delay_ms','Minimum RMC delay after PPS (ms)',0,1999)}
+      ${number('maximum_message_delay_ms','Maximum RMC delay after PPS (ms)',0,1999)}
       ${number('receiver_uncertainty_us','Receiver timing error allowance (µs)',1,100000)}
       ${number('capture_uncertainty_us','Capture timestamp error allowance (µs)',1,100000)}
       ${number('position_maximum_age_s','Maximum location age (s)',1,3600)}
       ${bool('automatic_rf_calibration','Automatic direct GPIO RF correction')}
       ${number('calibration_maximum_age_s','Maximum RF calibration age (s)',10,86400)}</div>
       <p>Enable validated association only after checking the receiver's UTC second and capture path. A positive edge delay means the edge arrives after the UTC boundary. PPS alone supplies no date. Timing allowances must include the receiver, cable, and capture path; typical specifications are not guaranteed bounds.</p>
-      <p>The RMC second offset assigns UTC to the selected PPS edge immediately preceding the sentence: 0 uses the sentence timestamp, −1 assigns one second earlier, and +1 assigns one second later. Validate this relationship for the receiver before enabling it.</p>
+      <p>The RMC second offset assigns UTC to the uniquely selected captured PPS edge: 0 uses the sentence timestamp, −1 assigns one second earlier, and +1 assigns one second later. Validate this relationship for the receiver before enabling it.</p>
+      <p>PPS marks the second boundary; serial UTC labels a captured pulse and can arrive after another pulse. Set a measured delay range narrower than one second, with delays up to 1,999 ms.</p>
       <p>PPS uses an input-only, gated PWM counter to timestamp the electrical edge and measure interrupt latency. Choose an odd GPIO and keep its PWM slice separate from Si5351 loopback. A counter wrap, ambiguous edge, clock change or flash capture gap requires fresh pairs.</p>
       <p>This receiver profile has no advance leap announcement. GPS time pauses for five seconds on either side of a UTC month boundary, then reacquires; jobs crossing that boundary are refused. GPS holdover lasts at most one hour, with increasing uncertainty.</p>
       <p>Direct GPIO correction requires a verified shared oscillator. Si5351 correction uses its separate control and PPS-qualified CLK2 loopback. Manual correction becomes a residual trim when automatic correction is enabled. A job keeps its accepted correction and locator until completion.</p></details>
@@ -189,6 +191,7 @@
       if(!value.enabled && (value.location==='gps' || value.daylight!=='always' || value.automatic_rf_calibration))
         fail('Enable GPS input, or use the manual locator, All day schedule and disabled automatic correction.','enabled');
       if(value.minimum_message_delay_ms>value.maximum_message_delay_ms)fail('Maximum serial delay must be at least the minimum delay.','maximum_message_delay_ms');
+      if(value.maximum_message_delay_ms-value.minimum_message_delay_ms>=1000)fail('Keep the serial-delay window narrower than one second so its PPS association is unique.','maximum_message_delay_ms');
       if(value.automatic_rf_calibration && !value.pairing_qualified)fail('Validate the receiver UTC/PPS association before enabling automatic correction.','pairing_qualified');
       if(!valid(value))fail('GPS settings are incomplete or unsupported. Read the saved settings and review the draft.','enabled');
       if(!allocation(value,pins,si,selectors)) {

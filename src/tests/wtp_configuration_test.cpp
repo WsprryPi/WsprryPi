@@ -343,14 +343,35 @@ void gps_resource_binding_checks() {
   const Json valid{{"schema","gps"},{"target",target},{"saved",active},{"boot_active",active},
     {"pending_restart",false},{"storage_healthy",true},{"runtime",runtime}};
   auto resource=valid;
+  auto advertised=canonical_caps();
+  unsigned gps_reads=0;
   const PicoManagementExchange exchange=[&](auto path,auto method,auto,auto) {
     CHECK(method=="GET");
-    if(path=="capabilities")return PicoHttpResponse{200,document(canonical_caps()),{}};
+    if(path=="capabilities")return PicoHttpResponse{200,document(advertised),{}};
     if(path=="management")return PicoHttpResponse{200,management().dump(),{}};
-    CHECK(path=="gps");return PicoHttpResponse{200,document(resource),"\"r1\""};
+    CHECK(path=="gps");++gps_reads;return PicoHttpResponse{200,document(resource),"\"r1\""};
   };
   const auto read=[&]{return pico_resource_request(exchange,device,boot,"gps","GET");};
   CHECK(read().status==200);
+  for (const auto key : {"saved", "boot_active"}) {
+    resource[key]["minimum_message_delay_ms"]=600;
+    resource[key]["maximum_message_delay_ms"]=1200;
+  }
+  CHECK(read().status==200);
+  for (const auto key : {"saved", "boot_active"})
+    resource[key]["minimum_message_delay_ms"]=0;
+  CHECK(read().status==502); // Refuse ambiguous-width windows before consumption.
+  resource=valid;
+  const auto reads_before=gps_reads;
+  advertised["gps"]["pairing"]="qualified_preceding_edge_rmc";
+  CHECK(read().status==502 && gps_reads==reads_before);
+  advertised=canonical_caps();
+  advertised["gps"]["message_delay_maximum_ms"]=2000;
+  CHECK(read().status==502 && gps_reads==reads_before);
+  advertised=canonical_caps();
+  advertised["gps"].erase("pulse_history_edges");
+  CHECK(read().status==502 && gps_reads==reads_before);
+  advertised=canonical_caps();
   const std::vector<std::function<void(Json&)>> corrupt={
     [](auto& v){v["boot_active"]=nullptr;},
     [](auto& v){v["boot_active"]["enabled"]=false;},

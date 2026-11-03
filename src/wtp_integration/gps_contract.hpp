@@ -61,9 +61,11 @@ inline bool settings(const Json &v) {
     return false;
   if (!integer(v["utc_second_offset"], -1, 1) ||
       !integer(v["pps_offset_ns"], -500000000, 500000000) ||
-      !integer(v["minimum_message_delay_ms"], 0, 999) ||
-      !integer(v["maximum_message_delay_ms"], 0, 999) ||
+      !integer(v["minimum_message_delay_ms"], 0, 1999) ||
+      !integer(v["maximum_message_delay_ms"], 0, 1999) ||
       v["minimum_message_delay_ms"] > v["maximum_message_delay_ms"] ||
+      v["maximum_message_delay_ms"].get<unsigned>() -
+          v["minimum_message_delay_ms"].get<unsigned>() >= 1000 ||
       !integer(v["receiver_uncertainty_us"], 1, 100000) ||
       !integer(v["capture_uncertainty_us"], 1, 100000) ||
       !integer(v["position_maximum_age_s"], 1, 3600) ||
