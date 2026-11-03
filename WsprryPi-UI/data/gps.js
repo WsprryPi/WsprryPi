@@ -104,7 +104,7 @@
         (!v.runtime.time_valid || BigInt(v.runtime.capture_error_bound_ns)<=BigInt(v.boot_active.capture_uncertainty_us)*1000n) &&
         (!v.runtime.position_valid || BigInt(v.runtime.position.age_ns)<=BigInt(v.boot_active.position_maximum_age_s)*1000000000n));
   }
-  function create(container,{changed=()=>{},bootstrap=false}={}) {
+  function create(container,{changed=()=>{},bootstrap=false,compact=false,scheduleContainer=null}={}) {
     const options = values => values.map(([value,label])=>`<option value="${value}">${label}</option>`).join('');
     const select=(name,label,values)=>`<label>${label}<select data-gps="${name}">${options(values)}</select></label>`;
     const number=(name,label,min,max)=>`<label>${label}<input data-gps="${name}" type="number" step="1" min="${min}" max="${max}" required></label>`;
@@ -113,7 +113,7 @@
       <div class="fields">${bool('enabled','GPS input')}${select('receiver','Receiver',[['qlg3','QRP Labs QLG3 (receive only)'],['e108','E108 / GK9501 with optional configuration output']])}
       ${select('location','Station locator',[['manual','Use saved manual locator'],['gps','Use current GPS location']])}
       ${select('daylight','Automatic beacon schedule',[['always','All day'],['day','Daylight only'],['night','Night only']])}</div>
-      <details><summary>GPS wiring and timing</summary><p>GP numbers identify GPIOs, not physical header pins. QLG3 uses receiver TX to Pico RX; it has no receiver RX header. The Pico keeps its PPS pin as an input.</p>
+      <details><summary>GPS wiring and timing</summary>${compact ? '' : '<p>GP numbers identify GPIOs, not physical header pins. QLG3 uses receiver TX to Pico RX; it has no receiver RX header. The Pico keeps its PPS pin as an input.</p>'}
       <div class="fields">${select('rx_gp','GPS serial input GPIO',[1,5,9,13,17,21].map(v=>[v,`GP${v}`]))}
       ${select('pps_gp','PPS input GPIO',[1,3,5,7,9,11,13,15,17,19,21,27].map(v=>[v,`GP${v}`]))}
       ${select('baud','Serial baud rate',[9600,19200,38400,115200].map(v=>[v,String(v)]))}
@@ -129,12 +129,13 @@
       ${number('position_maximum_age_s','Maximum location age (s)',1,3600)}
       ${bool('automatic_rf_calibration','Automatic direct GPIO RF correction')}
       ${number('calibration_maximum_age_s','Maximum RF calibration age (s)',10,86400)}</div>
+      ${compact ? '' : `
       <p>Enable validated association only after checking the receiver's UTC second and capture path. A positive edge delay means the edge arrives after the UTC boundary. PPS alone supplies no date. Timing allowances must include the receiver, cable, and capture path; typical specifications are not guaranteed bounds.</p>
       <p>The RMC second offset assigns UTC to the uniquely selected captured PPS edge: 0 uses the sentence timestamp, −1 assigns one second earlier, and +1 assigns one second later. Validate this relationship for the receiver before enabling it.</p>
       <p>PPS marks the second boundary; serial UTC labels a captured pulse and can arrive after another pulse. Set a measured delay range narrower than one second, with delays up to 1,999 ms.</p>
       <p>PPS uses an input-only, gated PWM counter to timestamp the electrical edge and measure interrupt latency. Choose an odd GPIO and keep its PWM slice separate from Si5351 loopback. A counter wrap, ambiguous edge, clock change or flash capture gap requires fresh pairs.</p>
       <p>This receiver profile has no advance leap announcement. GPS time pauses for five seconds on either side of a UTC month boundary, then reacquires; jobs crossing that boundary are refused. GPS holdover lasts at most one hour, with increasing uncertainty.</p>
-      <p>Direct GPIO correction requires a verified shared oscillator. Si5351 correction uses its separate control and PPS-qualified CLK2 loopback. Manual correction becomes a residual trim when automatic correction is enabled. A job keeps its accepted correction and locator until completion.</p></details>
+      <p>Direct GPIO correction requires a verified shared oscillator. Si5351 correction uses its separate control and PPS-qualified CLK2 loopback. Manual correction becomes a residual trim when automatic correction is enabled. A job keeps its accepted correction and locator until completion.</p>`}</details>
       <p data-gps-status role="status" aria-live="polite">GPS observations have not been read.</p>`;
     if(bootstrap) {
       for(const row of container.querySelectorAll('.fields'))row.className='row g-3';
@@ -142,7 +143,11 @@
       for(const field of container.querySelectorAll('input,select'))field.className=field.tagName==='SELECT'?'form-select':'form-control';
       for(const p of container.querySelectorAll('p'))p.className='form-text text-break';
     }
-    const input=key=>container.querySelector(`[data-gps="${key}"]`);
+    const fields=new Map([...container.querySelectorAll('[data-gps]')].map(field=>[field.dataset.gps,field]));
+    const input=key=>fields.get(key);
+    if(scheduleContainer) {
+      scheduleContainer.append(input('daylight').closest('label'));
+    }
     const clearValidity=()=>{for(const key of Object.keys(defaults))input(key).setCustomValidity('');};
     let enabled=false, configured=false, edited=false;
     for(const key of Object.keys(defaults)) {
@@ -152,7 +157,7 @@
       field.addEventListener('input',()=>{edited=true;clearValidity();changed();});
     }
     function sync() {
-      for(const field of container.querySelectorAll('input,select'))field.disabled=!enabled;
+      for(const field of fields.values())field.disabled=!enabled;
       for(const option of input('tx_gp').options)option.disabled=input('receiver').value==='qlg3' && option.value!=='';
     }
     function load(value) {
@@ -212,7 +217,7 @@
     }
     function observation(value) {
       const r=value?.runtime, text=container.querySelector('[data-gps-status]');
-      if(!r) {text.textContent='GPS runtime is unavailable. Saving settings does not verify wiring or timing.';return;}
+      if(!r) {text.textContent=compact ? 'GPS runtime is unavailable.' : 'GPS runtime is unavailable. Saving settings does not verify wiring or timing.';return;}
       const describe=(name,c)=>c?`${name}: ${c.oscillator_error_ppb} ± ${c.uncertainty_ppb} ppb, ${(Number(c.age_ns)/1e9).toFixed(1)} s old${c.fresh?'':' (expired)'}. `:'';
       text.textContent=`Serial ${r.serial_present?'present':'unavailable'}; PPS ${r.pps_present?'present':'unavailable'}; UTC pairing ${r.time_valid?'valid':'not available'}; ${r.satellites} satellites. ${r.position_valid?'GPS locator '+r.position.locator+'. ':'No current position fix. '}Capture IRQ latency ${(Number(r.irq_latency_ns)/1000).toFixed(1)} µs (maximum ${(Number(r.maximum_irq_latency_ns)/1000).toFixed(1)} µs); timestamp bound ${(Number(r.capture_error_bound_ns)/1000).toFixed(1)} µs; ${r.capture_rejections} rejected captures. ${describe('Pico clock',r.timer_calibration)}${describe('Si5351 reference',r.synthesizer_calibration)}${r.error?'Receiver state: '+r.error.replaceAll('_',' ')+'. ':''}${value.pending_restart?'Saved changes need an explicit Pico restart.':''}`;
     }
