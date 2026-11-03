@@ -9,6 +9,7 @@
 #include <cstdlib>
 #include <fcntl.h>
 #include <linux/i2c-dev.h>
+#include <linux/i2c.h>
 #include <sys/ioctl.h>
 #include <thread>
 #include <unistd.h>
@@ -27,6 +28,7 @@ class LinuxAdapter final : public Si5351Device::I2CAdapter
 public:
     int openDevice(const std::string& path, int flags) override
     { return ::open(path.c_str(), flags); }
+    int queryCapabilities(int fd, unsigned long& capabilities) override { return ::ioctl(fd, I2C_FUNCS, &capabilities); }
     int selectSlave(int fd, std::uint8_t address) override
     { return ::ioctl(fd, I2C_SLAVE, address); }
     ssize_t writeData(int fd, const void* data, std::size_t size) override

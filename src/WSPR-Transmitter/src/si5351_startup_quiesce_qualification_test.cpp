@@ -18,6 +18,7 @@ class FakeAdapter final : public Si5351Device::I2CAdapter
 public:
     bool fail_open{false}; bool fail_quiesce_write{false}; bool preserve_register{false}; int opens{0}; int closes{0}; int quiesce_writes{0}; int fd{19}; std::uint8_t selected_register{0}; std::uint8_t register_three{0x00};
     int openDevice(const std::string& path, int) override { ++opens; if (path.rfind("/dev/i2c-", 0) != 0 || fail_open) { errno = ENOENT; return -1; } return fd; }
+    int queryCapabilities(int, unsigned long& capabilities) override { capabilities = 1; return 0; } // Fake raw-I2C support.
     int selectSlave(int supplied_fd, std::uint8_t address) override { if (supplied_fd != fd || address != 0x60) { errno = EPERM; return -1; } return 0; }
     ssize_t writeData(int supplied_fd, const void* data, std::size_t size) override { const auto* b = static_cast<const std::uint8_t*>(data); if (supplied_fd != fd || b == nullptr || b[0] != 3 || (size == 2 && b[1] != 0xff) || (size != 1 && size != 2)) { errno = EPERM; return -1; } if (size == 1) selected_register = b[0]; else { ++quiesce_writes; if (fail_quiesce_write) { errno = EIO; return -1; } if (!preserve_register) register_three = b[1]; } return static_cast<ssize_t>(size); }
     ssize_t readData(int supplied_fd, void* data, std::size_t size) override { if (supplied_fd != fd || selected_register != 3 || size != 1) { errno = EPERM; return -1; } *static_cast<std::uint8_t*>(data) = register_three; return 1; }

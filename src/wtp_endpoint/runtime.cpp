@@ -108,6 +108,7 @@ public:
                 settings.si5351_reference_source == "crystal",
                 settings.si5351_crystal_load_capacitance_pf,
                 settings.si5351_tx_output, settings.si5351_power_level);
+            config.device.adapter_identity = settings.si5351_adapter_identity;
             backend_ = std::make_unique<WsprSi5351Backend>(bridge_, config);
             inputs.power_level = settings.si5351_power_level;
             ppm = settings.si5351_ppm;
@@ -341,7 +342,7 @@ std::optional<ArgParserConfig> pending_settings;
 auto output_settings(const ArgParserConfig& s) {
     return std::tuple{s.transmit_backend, s.gpio_tx_pin, s.gpio_power_level, s.rp1_gpio_drive_ma,
         s.gpio_use_system_clock_frequency_estimate, s.gpio_frequency_residual_ppm,
-        s.gpio_manual_ppm, s.rp1_development_confirmation_json, s.si5351_i2c_bus, s.si5351_i2c_address,
+        s.gpio_manual_ppm, s.rp1_development_confirmation_json, s.si5351_i2c_bus, s.si5351_adapter_identity, s.si5351_i2c_address,
         s.si5351_reference_hz, s.si5351_reference_source, s.si5351_crystal_load_capacitance_pf,
         s.si5351_tx_output, s.si5351_power_level, s.si5351_ppm, s.wtp_server,
         s.wtp_server_port_override, s.allow_unqualified_frequency,

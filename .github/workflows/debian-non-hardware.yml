@@ -414,7 +414,7 @@ jobs:
           timeout 5s ./build/bin/simulated_transmit_backend_realtime_test
           make transmission-controller-contract-test
           make startup-quiesce-test
-          make si5351-transition-test
+          make linux-i2c-identity-test si5351-transition-test
 
       - name: Build and test WSPR reference component
         working-directory: src/WSPR-Reference

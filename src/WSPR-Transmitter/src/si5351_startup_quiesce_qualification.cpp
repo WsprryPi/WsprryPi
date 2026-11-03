@@ -9,6 +9,7 @@
 #include <fcntl.h>
 #include <iomanip>
 #include <linux/i2c-dev.h>
+#include <linux/i2c.h>
 #include <sstream>
 #include <sys/ioctl.h>
 #include <unistd.h>
@@ -38,6 +39,7 @@ class LinuxAdapter final : public Si5351Device::I2CAdapter
 {
 public:
     int openDevice(const std::string& path, int flags) override { return ::open(path.c_str(), flags); }
+    int queryCapabilities(int fd, unsigned long& capabilities) override { return ::ioctl(fd, I2C_FUNCS, &capabilities); }
     int selectSlave(int fd, std::uint8_t address) override { return ::ioctl(fd, I2C_SLAVE, address); }
     ssize_t writeData(int fd, const void* data, std::size_t size) override { return ::write(fd, data, size); }
     ssize_t readData(int fd, void* data, std::size_t size) override { return ::read(fd, data, size); }
@@ -59,6 +61,7 @@ public:
         if (fd >= 0) { open_fd_ = fd; trace_.push_back("open " + path); }
         return fd;
     }
+    int queryCapabilities(int fd, unsigned long& capabilities) override { return delegate_->queryCapabilities(fd, capabilities); }
     int selectSlave(int fd, std::uint8_t address) override
     {
         if (fd != open_fd_ || address != address_) return reject("rejected slave selection");

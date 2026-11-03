@@ -6,6 +6,7 @@
 #include "wtp_settings_json.hpp"
 #include "wtp_server_settings_json.hpp"
 #include "config_handler_deserialization.hpp"
+#include "WSPR-Transmitter/src/linux_i2c_identity.hpp"
 #include "config_handler.hpp"
 #include "config_handler_serialization.hpp"
 #include "band_lookup.hpp"
@@ -592,6 +593,10 @@ void deserialize_json_to_runtime_config(const nlohmann::json &source, ArgParserC
         "GPIO.Manual PPM");
     const nlohmann::json si5351 =
         source.contains("Si5351") ? source.at("Si5351") : nlohmann::json::object();
+    target.si5351_adapter_identity = si5351.contains("Adapter Identity")
+        ? si5351.at("Adapter Identity").get<std::string>() : std::string{};
+    if (!linux_i2c_identity::valid(target.si5351_adapter_identity))
+        throw std::runtime_error("Invalid stable Si5351 adapter identity.");
     target.si5351_i2c_bus =
         si5351.contains("I2C Bus")
             ? config_handler_serialization::config_serialization_integer(si5351.at("I2C Bus"), "Si5351.I2C Bus")

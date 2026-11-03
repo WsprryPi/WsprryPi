@@ -908,7 +908,7 @@ $bandGpioBands = ['2200m', '630m', '160m', '80m', '60m', '40m', '30m', '20m', '1
 
                                 <div class="row gx-3 gy-3 align-items-start">
                                     <div class="col-12 col-lg-3">
-                                        <label for="si5351_i2c_bus" class="form-label">I2C Bus</label>
+                                        <label for="si5351_i2c_bus" class="form-label">I2C adapter</label>
                                         <select
                                             id="si5351_i2c_bus"
                                             class="form-select"

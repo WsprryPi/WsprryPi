@@ -592,6 +592,7 @@ const configSchema = {
         required: false,
         keys: {
             "I2C Bus": { required: false, type: "number" },
+            "Adapter Identity": { required: false, type: "string" },
             "I2C Address": { required: false, type: "string" },
             "Reference Frequency": { required: false, type: "number" },
             "Reference Source": { required: false, type: "string" },
@@ -2085,7 +2086,7 @@ function populateConfig(callback = null) {
                     if (typeof populateRp1GpioDrive === "function") {
                         populateRp1GpioDrive(rp1GpioDriveMa);
                     }
-                    populateI2cBuses(si5351I2cBus);
+                    populateI2cBuses(si5351I2cBus, configJson?.Si5351?.["Adapter Identity"] || "");
                     if (typeof populateSi5351Addresses === "function") {
                         populateSi5351Addresses(
                             si5351I2cBus,
@@ -2110,7 +2111,7 @@ function populateConfig(callback = null) {
 
                     if (selectedTransmitBackend() === "si5351" &&
                         typeof refreshSi5351Addresses === "function") {
-                        refreshSi5351Addresses(si5351I2cBus, si5351I2cAddressRaw);
+                        refreshSi5351Addresses(selectedI2cBusValue(), si5351I2cAddressRaw);
                     }
 
                     // Enable the form

@@ -33,6 +33,7 @@ void apply_runtime_config_side_effects()
                     : wsprrypi::BackendKind::RPI_CLOCK_GPIO;
     WsprTransmitter::Si5351RuntimeConfig si5351_config;
     si5351_config.i2c_bus = config.si5351_i2c_bus;
+    si5351_config.adapter_identity = config.si5351_adapter_identity;
     si5351_config.i2c_address = config.si5351_i2c_address;
     si5351_config.reference_hz = config.si5351_reference_hz;
     si5351_config.reference_source = config.si5351_reference_source == "crystal"
@@ -63,7 +64,9 @@ void apply_runtime_config_side_effects()
         std::ostringstream address;
         address << "0x" << std::hex << std::uppercase
                 << config.si5351_i2c_address;
-        llog.logS(DEBUG, "Si5351 I2C bus: ", config.si5351_i2c_bus);
+        llog.logS(INFO, "Si5351 transport: linux-i2c; configured adapter: ",
+                  config.si5351_adapter_identity.empty() ? "explicit numeric bus" : config.si5351_adapter_identity);
+        llog.logS(DEBUG, "Si5351 configured numeric I2C bus: ", config.si5351_i2c_bus);
         llog.logS(DEBUG, "Si5351 I2C address: ", address.str());
         llog.logS(DEBUG, "Si5351 reference frequency Hz: ",
                   config.si5351_reference_hz);

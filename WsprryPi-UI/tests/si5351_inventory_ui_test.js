@@ -15,6 +15,7 @@ const context = {
     document: { getElementById: id => id === "si5351_i2c_address" ? field : hint },
     selectedTransmitBackend: () => backend,
     selectedI2cBusValue: () => bus,
+    selectedAdapterIdentity: () => "",
     formatSi5351Address: String,
     normalizedSi5351Addresses: list => Array.isArray(list) ? list : [],
     Option: function () {},

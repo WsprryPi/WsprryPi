@@ -33,6 +33,7 @@
 
 // Project headers
 #include "config_handler.hpp"
+#include "WSPR-Transmitter/src/linux_i2c_identity.hpp"
 #include "logging.hpp"
 #include "privileged_network_runtime.hpp"
 #include "scheduling.hpp"
@@ -546,7 +547,7 @@ bool backend_ready_for_transmission(
             candidate.si5351_i2c_bus,
             candidate.si5351_i2c_address,
             candidate.si5351_reference_hz,
-            error_message);
+            error_message, candidate.si5351_adapter_identity);
     }
 
     return true;
@@ -1750,6 +1751,10 @@ bool validate_config_candidate(
     }
     else if (candidate.transmit_backend == TransmitBackendKind::SI5351)
     {
+        if (!linux_i2c_identity::valid(candidate.si5351_adapter_identity)) {
+            if (error_message) *error_message = "Invalid stable Si5351 adapter identity.";
+            return false;
+        }
         if (candidate.si5351_i2c_bus < 0)
         {
             if (error_message != nullptr)
@@ -2495,6 +2500,19 @@ bool handle_early_cli_options(int argc, char *argv[])
             std::exit(EXIT_SUCCESS);
         }
 
+        if (arg == "--list-i2c-adapters")
+        {
+            const auto inventory = linux_i2c_identity::discover();
+            auto adapters = nlohmann::json::array();
+            for (const auto& adapter : inventory.adapters)
+                adapters.push_back({{"Number", adapter.bus}, {"Name", adapter.name},
+                    {"Identity", adapter.identity}, {"Node", adapter.node.string()},
+                    {"Selection Error", linux_i2c_identity::resolve(inventory, adapter.identity, adapter.bus).error}});
+            std::cout << nlohmann::json{{"Transport", "linux-i2c"},
+                {"I2C Adapters", adapters}, {"Discovery Error", inventory.error}}.dump(2) << std::endl;
+            std::exit(inventory.error.empty() ? EXIT_SUCCESS : EXIT_FAILURE);
+        }
+
         if (arg == "--list-backends")
         {
             std::cout << get_compiled_backends() << std::endl;
@@ -2755,6 +2773,7 @@ bool parse_command_line(int argc, char *argv[])
         {"dfcw-dash-frequency", required_argument, nullptr, 1012},
         {"dfcw-dot-seconds", required_argument, nullptr, 1013},
         {"si5351-i2c-bus", required_argument, nullptr, 1014},
+        {"si5351-adapter-identity", required_argument, nullptr, 1080},
         {"si5351-i2c-address", required_argument, nullptr, 1015},
         {"si5351-reference-frequency", required_argument, nullptr, 1016},
         {"si5351-reference-source", required_argument, nullptr, 1053},
@@ -3449,6 +3468,9 @@ bool parse_command_line(int argc, char *argv[])
         {
             break;
         }
+        case 1080:
+            config.si5351_adapter_identity = optarg;
+            break;
         case 1014:
         {
             try

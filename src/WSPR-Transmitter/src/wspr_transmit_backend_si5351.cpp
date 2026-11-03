@@ -437,6 +437,7 @@ wsprrypi::StartupQuiesceResult WsprSi5351Backend::quiesceForStartup()
         return result;
     }
 
+    log_si5351(owner_, WsprTransmitLogLevel::INFO, device_.transportDiagnostic());
     bool disabled = device_.disableAllOutputs();
     if (disabled && config_.confirm_output_disable)
     {
@@ -449,7 +450,11 @@ wsprrypi::StartupQuiesceResult WsprSi5351Backend::quiesceForStartup()
             device_, "Could not disable Si5351 outputs for startup quiesce.");
         log_si5351(owner_, WsprTransmitLogLevel::ERROR, result.error);
     }
-    device_.close();
+    if (!device_.close()) {
+        disabled = false;
+        if (!result.error.empty()) result.error += "; ";
+        result.error += device_.getLastError();
+    }
 
     result.ok = disabled;
     if (result.ok)
@@ -501,7 +506,8 @@ wsprrypi::ExecutionResult WsprSi5351Backend::execute(
         if (config_.confirm_output_disable && !outputIsDisabled())
             record("Si5351 output-disable confirmation failed (output state unknown)",
                    device_error_or(device_, "output-disable bit was not set"));
-        device_.close();
+        if (!device_.close())
+            record("Could not close Si5351 I2C device", device_.getLastError());
         execution_cleanup_completed_ = true;
         log_si5351(owner_, execution_cleanup_result_.ok
             ? WsprTransmitLogLevel::DEBUG : WsprTransmitLogLevel::ERROR,
@@ -536,7 +542,7 @@ wsprrypi::ExecutionResult WsprSi5351Backend::execute(
             log_si5351(
                 owner_,
                 WsprTransmitLogLevel::DEBUG,
-                "Si5351 device opened.");
+                "Si5351 device opened: " + device_.transportDiagnostic());
         }
 
         if (!config_.dry_run)
@@ -936,8 +942,8 @@ wsprrypi::CleanupResult WsprSi5351Backend::cleanup() noexcept
 
     if (!configured_)
     {
-        device_.close();
-        return {true, {}};
+        const bool closed = device_.close();
+        return {closed, closed ? std::string{} : device_.getLastError()};
     }
 
     auto retain_cleanup = [this](const wsprrypi::CleanupResult& result) {
@@ -954,9 +960,14 @@ wsprrypi::CleanupResult WsprSi5351Backend::cleanup() noexcept
     }
 
     const bool disabled = disableTransmitOutput();
-    device_.close();
-    wsprrypi::CleanupResult result{
-        disabled, disabled ? std::string{} : "Could not disable Si5351 output."};
+    std::string failure = disabled ? std::string{} : device_error_or(
+        device_, "Could not disable Si5351 output; output state is unconfirmed.");
+    const bool closed = device_.close();
+    if (!closed) {
+        if (!failure.empty()) failure += "; ";
+        failure += device_.getLastError();
+    }
+    wsprrypi::CleanupResult result{disabled && closed, failure};
     if (configured_)
     {
         log_si5351(

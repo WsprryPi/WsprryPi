@@ -18,6 +18,7 @@ class FakeAdapter final : public Si5351Device::I2CAdapter
 {
 public:
     int openDevice(const std::string&, int) override { ++opens; return 17; }
+    int queryCapabilities(int, unsigned long& capabilities) override { capabilities = 1; return 0; } // Fake raw-I2C support.
     int selectSlave(int fd, std::uint8_t address) override
     { return fd == 17 && address == 0x60 ? 0 : -1; }
     ssize_t writeData(int, const void* data, std::size_t size) override

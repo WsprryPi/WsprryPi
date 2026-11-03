@@ -1064,7 +1064,7 @@ async function browserTest() {
     populateI2cBuses(10);
     clickTransmitBackend();
     ok(field("si5351_i2c_bus").disabled, "empty remains disabled after toggle");
-    ok(field("si5351-bus-hint").textContent.includes("No I2C buses"), "empty explanation");
+    ok(field("si5351-bus-hint").textContent.includes("No I2C adapters"), "empty explanation");
     equal(buildConfigPayload().Si5351["I2C Bus"], 10, "disabled selector retains value");
     field("transmit_backend").checked = false;
     clickTransmitBackend();
