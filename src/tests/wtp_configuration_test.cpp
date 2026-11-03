@@ -363,14 +363,21 @@ void gps_resource_binding_checks() {
   CHECK(read().status==502); // Refuse ambiguous-width windows before consumption.
   resource=valid;
   const auto reads_before=gps_reads;
+  const auto unsupported=[&] {
+    const auto response=read();
+    CHECK(response.status==409 && gps_reads==reads_before);
+    const auto body=Json::parse(response.body);
+    CHECK(body["error"]["code"]=="unsupported_resource_capabilities");
+    CHECK(body["mutation_attempted"]==false);
+  };
   advertised["gps"]["pairing"]="qualified_preceding_edge_rmc";
-  CHECK(read().status==502 && gps_reads==reads_before);
+  unsupported();
   advertised=canonical_caps();
   advertised["gps"]["message_delay_maximum_ms"]=2000;
-  CHECK(read().status==502 && gps_reads==reads_before);
+  unsupported();
   advertised=canonical_caps();
   advertised["gps"].erase("pulse_history_edges");
-  CHECK(read().status==502 && gps_reads==reads_before);
+  unsupported();
   advertised=canonical_caps();
   const std::vector<std::function<void(Json&)>> corrupt={
     [](auto& v){v["boot_active"]=nullptr;},
