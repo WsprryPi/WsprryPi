@@ -48,8 +48,16 @@ Status key: ✅ Complete · ⏳ In progress · ▧ Not started
    Hook manifests, application code, services, and hardware were unchanged.
    Operator documentation was reviewed for impact; this maintainer-tool update
    changes no operator behavior and requires no operator-manual update.
-8. ▧ **Pico Type 1 rationale wording.** Address the deferred, nonblocking
-   wording follow-up from Pico WSPR Type 2/3 integration.
+8. ✅ **Pico Type 1 rationale wording.** Closed November 3, 2026, in
+   WsprryPico `devel` commit `cb560ae8` (pushed with `[no ci]`). The explanation
+   now makes six-character locator retention conditional and states that only
+   the first four characters are transmitted. Four- and six-character locator
+   previews passed production-handler and authenticated browser regression
+   checks; WSPR planner, resource, and schema tests passed. Impeccable review
+   included desktop/mobile browser captures and a detector check with no
+   findings. The operator manual already describes both locator lengths
+   correctly and required no change. Encoding, persistence, and protocol
+   schemas are unchanged; validation was hardware-free.
 9. ▧ **Pico P15.14 operator documentation.** Complete the separate Pico
    operator-documentation follow-up for independent valid-field saves.
 10. ▧ **Publish new Pico beta.** Prepare, validate, and publish the next Pico
