@@ -12,7 +12,7 @@ Status key: ✅ Complete · ⏳ In progress · ▧ Not started
 
 ## Ordered backlog
 
-1. ⏳ **UI Review.** Review the current application interface using Impeccable,
+1. ✅ **UI Review.** Review the current application interface using Impeccable,
    including desktop and mobile workflows. Record findings and the validation
    required for any resulting changes. This is a new review; prior Beta review
    acceptance remains bound to its recorded implementation.
