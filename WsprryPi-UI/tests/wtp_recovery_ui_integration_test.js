@@ -177,6 +177,10 @@ async function main() {
                     const resource=window.__resourceFixtures[window.__resourceState];
                     return {ok:true,headers:{get:()=> '\"resource-r1\"'},json:async()=>({contract:'Wsprry-Control/1',schema:'si5351',target:resource.target,saved:null,boot_active:null,pending_restart:false,physically_qualified:false,qualification:null,execution_engine:resource.application.hardware.execution_engine,runtime:null,storage_healthy:resource.application.hardware.storage_healthy})};
                 }
+                if (String(url).endsWith('/member/gps')) {
+                    const resource=window.__resourceFixtures[window.__resourceState];
+                    return {ok:true,headers:{get:()=> '\"resource-r1\"'},json:async()=>({contract:'Wsprry-Control/1',schema:'gps',target:resource.target,saved:null,boot_active:null,pending_restart:false,runtime:null,storage_healthy:resource.application.hardware.storage_healthy})};
+                }
                 if (String(url).endsWith('/member/application')) {
                     if(window.__resourceState==='unsupported')return {ok:false,status:409,json:async()=>({error:{code:'shared_resources_unavailable'}})};
                     return {ok:true,headers:{get:()=> '\"resource-r1\"'},json:async()=>structuredClone(window.__resourceFixtures[window.__resourceState])};
