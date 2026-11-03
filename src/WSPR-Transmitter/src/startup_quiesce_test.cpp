@@ -98,6 +98,7 @@ namespace
             }
             return 42;
         }
+        int queryCapabilities(int, unsigned long& capabilities) override { capabilities = 1; return 0; } // Fake raw-I2C support.
         int selectSlave(int, std::uint8_t) override
         {
             ++select_calls;

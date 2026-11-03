@@ -292,7 +292,8 @@ struct ArgParserConfig
     double gpio_frequency_residual_ppm; ///< RF residual added to a usable provider estimate.
     double gpio_manual_ppm; ///< Fixed GPIO correction and final configured fallback.
     double si5351_ppm; ///< Persisted Si5351 reference-oscillator correction.
-    int si5351_i2c_bus; ///< Si5351 I2C bus number.
+    int si5351_i2c_bus; ///< Explicit numeric selection, ignored when identity is configured.
+    std::string si5351_adapter_identity; ///< Stable Linux USB adapter identity.
     int si5351_i2c_address; ///< Si5351 I2C slave address.
     int si5351_reference_hz; ///< Si5351 reference frequency in Hz.
     std::string si5351_reference_source; ///< external_tcxo or crystal.
@@ -475,6 +476,7 @@ struct ArgParserConfig
         gpio_manual_ppm = other.gpio_manual_ppm;
         si5351_ppm = other.si5351_ppm;
         si5351_i2c_bus = other.si5351_i2c_bus;
+        si5351_adapter_identity = other.si5351_adapter_identity;
         si5351_i2c_address = other.si5351_i2c_address;
         si5351_reference_hz = other.si5351_reference_hz;
         si5351_reference_source = other.si5351_reference_source;

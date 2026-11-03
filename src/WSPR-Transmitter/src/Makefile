@@ -462,3 +462,9 @@ help:
 	$(Q)echo "  macros     Show macros"
 	$(Q)echo "  clean      Remove build artifacts"
 	$(Q)echo "  help       This message"
+
+.PHONY: linux-i2c-identity-test
+linux-i2c-identity-test:
+	@mkdir -p build/bin
+	$(CXX) -std=c++20 -Wall -Wextra -Werror linux_i2c_identity_test.cc -o build/bin/linux_i2c_identity_test
+	./build/bin/linux_i2c_identity_test

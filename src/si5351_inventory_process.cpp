@@ -178,9 +178,9 @@ std::optional<int> helper_main(int argc, char** argv) {
         const auto parsed = std::from_chars(input.data(), input.data() + input.size(), value);
         return !input.empty() && parsed.ec == std::errc{} && parsed.ptr == input.data() + input.size();
     };
-    if ((argc != 4 && argc != 5) || !integer(argv[2], bus) || bus < 0 ||
+    if ((argc != 4 && argc != 5 && argc != 6) || !integer(argv[2], bus) || bus < 0 ||
         !integer(argv[3], reference) || reference <= 0 ||
-        (argc == 5 && (!integer(argv[4], selected) || selected < 0x60 || selected > 0x6F))) return 2;
+        (argc >= 5 && (!integer(argv[4], selected) || selected < 0x60 || selected > 0x6F))) return 2;
     nlohmann::json result = {{"bus", bus}, {"addresses", nlohmann::json::array()}, {"error", ""}};
 #if defined(__linux__) && WSPRRYPI_BACKEND_SI5351
     const auto* disabled = std::getenv("WSPRRYPI_DISABLE_HARDWARE_ACCESS");
@@ -191,6 +191,7 @@ std::optional<int> helper_main(int argc, char** argv) {
              address <= (selected < 0 ? 0x6F : selected); ++address) {
             Si5351Device::Config settings;
             settings.i2c_bus = bus;
+            if (argc == 6) settings.adapter_identity = argv[5];
             settings.i2c_address = static_cast<std::uint8_t>(address);
             settings.reference_hz = static_cast<std::uint32_t>(reference);
             Si5351Device device(settings);
@@ -201,6 +202,11 @@ std::optional<int> helper_main(int argc, char** argv) {
                 break;
             }
             if (device.probe()) result["addresses"].push_back(address);
+            if (!device.close()) {
+                result["addresses"] = nlohmann::json::array();
+                result["error"] = device.getLastError();
+                break;
+            }
         }
     }
 #else

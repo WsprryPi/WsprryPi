@@ -500,6 +500,7 @@ std::unique_ptr<wsprrypi::ITransmissionBackend> WsprTransmitter::createBackend(
 #if WSPRRYPI_BACKEND_SI5351
             WsprSi5351Backend::Config si5351_config;
             si5351_config.device.i2c_bus = runtime_config.i2c_bus;
+            si5351_config.device.adapter_identity = runtime_config.adapter_identity;
             si5351_config.device.i2c_address =
                 static_cast<std::uint8_t>(runtime_config.i2c_address);
             si5351_config.device.reference_hz =

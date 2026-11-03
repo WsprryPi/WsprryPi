@@ -9,6 +9,7 @@
 #include "config_handler_serialization.hpp"
 #include "arg_parser.hpp"
 #include "i2c_bus_inventory.hpp"
+#include "WSPR-Transmitter/src/linux_i2c_identity.hpp"
 
 #include <algorithm>
 #include <cctype>
@@ -72,6 +73,7 @@ void serialize_runtime_config_to_json(
     target["Calibration"]["PPM"] = source.si5351_ppm;
 
     target["Si5351"]["I2C Bus"] = source.si5351_i2c_bus;
+    target["Si5351"]["Adapter Identity"] = source.si5351_adapter_identity;
     target["Si5351"]["I2C Address"] =
         config_serialization_si5351_i2c_address(source.si5351_i2c_address);
     target["Si5351"]["Reference Frequency"] = source.si5351_reference_hz;
@@ -196,7 +198,7 @@ nlohmann::json public_config_from_internal_json(const nlohmann::json &source)
                       "Si5351.Reference Frequency")
                 : kDefaultSi5351ReferenceHz;
         si5351_address_inventory = cached_si5351_addresses(
-            i2c_bus, reference_hz);
+            i2c_bus, reference_hz, si5351.value("Adapter Identity", std::string{}));
         si5351_detected = si5351_address_inventory.contains(i2c_address);
         if (!si5351_detected)
         {
@@ -227,15 +229,20 @@ nlohmann::json public_config_from_internal_json(const nlohmann::json &source)
     public_json["Band GPIO"] = source.at("Band GPIO");
     const auto i2c_inventory = i2c_bus_inventory::discover();
     auto i2c_buses = nlohmann::json::array();
-    for (const auto &bus : i2c_inventory.buses)
-        i2c_buses.push_back({{"Number", bus.number}, {"Name", bus.name}});
+    const auto adapter_inventory = linux_i2c_identity::discover();
+    for (const auto &bus : i2c_inventory.buses) {
+        std::string identity;
+        for (const auto& adapter : adapter_inventory.adapters)
+            if (adapter.bus == bus.number) identity = adapter.identity;
+        i2c_buses.push_back({{"Number", bus.number}, {"Name", bus.name}, {"Identity", identity}});
+    }
     auto si5351_addresses = nlohmann::json::array();
     for (const int address : si5351_address_inventory.addresses)
         si5351_addresses.push_back(
             config_serialization_si5351_i2c_address(address));
     public_json["Platform"] = {
         {"I2C Buses", i2c_buses},
-        {"I2C Bus Discovery Error", i2c_inventory.error},
+        {"I2C Bus Discovery Error", i2c_inventory.error.empty() ? adapter_inventory.error : i2c_inventory.error},
         {"Si5351 Address Bus", si5351_address_inventory.i2c_bus},
         {"Si5351 Inventory Checked", si5351_address_inventory.checked},
         {"Si5351 Addresses", si5351_addresses},

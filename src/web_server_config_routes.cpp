@@ -69,7 +69,9 @@ void register_config(
                 : std::string();
             write_route_response(
                 response,
-                build_si5351_addresses_response(bus),
+                build_si5351_addresses_response(bus,
+                    request.get_param_value("identity"),
+                    request.get_param_value("address")),
                 set_cors_headers);
         });
 

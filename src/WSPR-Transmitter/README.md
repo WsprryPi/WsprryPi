@@ -247,6 +247,32 @@ The standalone `Makefile` resolves them at `../WSPR-Reference`, `../Mailbox`,
 and `../Signal-Handler` relative to this component root. The compatibility
 stubs under `external/` remain part of this component's standalone boundary.
 
+## Linux I2C adapter identity
+
+The Si5351 device uses the `linux-i2c` transport. Set
+`Si5351Device::Config::adapter_identity` to a metadata-discovered USB identity
+for stable selection; a nonempty identity overrides `i2c_bus` without rewriting
+it. VID/PID plus serial must match exactly one adapter. Without a serial, an
+explicit canonical USB topology identity is local to the host and port.
+MCP2221A requires stable identity; generic numeric I2C selection is retained.
+Metadata discovery never opens a device or probes a slave.
+
+Injected `I2CAdapter` implementations must implement `queryCapabilities()`.
+Opening requires raw `I2C_FUNC_I2C` support before slave selection, and the
+production adapter verifies its retained sysfs/device binding before transfers.
+Fake adapters declare their capabilities explicitly. `Si5351Device::close()`
+returns success/failure; callers must preserve a close failure in startup or
+cleanup results. The production transmission controller combines execution and
+cleanup results, and repeated cleanup retains its receipt without reopening.
+These software checks do not prove physical output inhibition.
+
+Run `make linux-i2c-identity-test` from this component's `src` directory for
+metadata-only identity, ambiguity, permission, renumbering, and rebind fixtures.
+The [parent engineering guide](../../docs/development/linux-i2c-identity.md)
+describes configuration integration, local container validation, and the
+separate physical qualification boundary. No native macOS USB transport is
+provided by this Linux path.
+
 ## Building
 
 ```bash
@@ -265,6 +291,7 @@ Common targets:
   backend-neutral contracts
 - `si5351-transition-test` uses fake I2C, and `startup-quiesce-test` uses fake
   device boundaries
+- `linux-i2c-identity-test` exercises metadata-only USB identity resolution
 - `clean` removes build artifacts
 
 The `watchdog` and `gdb` targets are live diagnostics, not ordinary tests. They
