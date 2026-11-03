@@ -44,6 +44,12 @@ namespace
             return 42;
         }
 
+        int queryCapabilities(int, unsigned long& capabilities) override {
+            ++capability_calls; capabilities = raw_i2c ? 1 : 0;
+            if (fail_capabilities) { errno = EACCES; return -1; }
+            return 0;
+        }
+
         int selectSlave(int, std::uint8_t) override
         {
             ++select_calls;
@@ -96,11 +102,14 @@ namespace
         int closeDevice(int) override
         {
             ++close_calls;
+            if (fail_close) { errno = EIO; return -1; }
             return 0;
         }
 
         ssize_t write_failure_result = -1;
         bool fail_slave = false;
+        bool raw_i2c = true, fail_capabilities = false, fail_close = false;
+        unsigned capability_calls = 0;
         int fail_select_address = -1;
         std::size_t fail_select_occurrence = 0;
         ssize_t select_result = -1;
@@ -1393,6 +1402,44 @@ int main()
         expect(admitted == 1 && on - start >= std::chrono::milliseconds{30},
                "leading RF-off retains the requested silent duration");
         expect(backend.cleanup().ok, "silent-prefix plan cleans up");
+    }
+    // Capability failure must precede slave selection, register-pointer writes,
+    // configuration writes, and output admission. Closing is still mandatory.
+    for (bool denied : {false, true}) {
+        auto adapter = std::make_shared<FakeI2CAdapter>();
+        adapter->raw_i2c = false; adapter->fail_capabilities = denied;
+        Si5351Device device({}, adapter);
+        expect(!device.open() && adapter->capability_calls == 1 && adapter->select_calls == 0 &&
+               adapter->writes.empty() && adapter->close_calls == 1,
+               "missing/denied I2C capability refuses before slave transactions");
+    }
+    {
+        TestBridge bridge; auto adapter = std::make_shared<FakeI2CAdapter>();
+        adapter->fail_close = true;
+        WsprSi5351Backend backend(bridge, config(adapter));
+        const auto startup = backend.quiesceForStartup();
+        expect(!startup.ok && startup.error.find("Close I2C") != std::string::npos,
+               "startup close failure inhibits output admission");
+    }
+    {
+        TestBridge bridge; auto adapter = std::make_shared<FakeI2CAdapter>();
+        WsprSi5351Backend backend(bridge, config(adapter));
+        auto plan = single_tone_plan(0.0);
+        FixedPlanCompiler compiler(plan);
+        wsprrypi::TransmissionController controller(compiler, backend);
+        wsprrypi::TransmissionRequest request;
+        request.id.value = plan.request_id.value;
+        request.output.backend = wsprrypi::BackendKind::SI5351;
+        expect(controller.prepare(request, wsprrypi::TransmissionPrepareOptions{1}).ok,
+               "close-failure plan prepares through production controller");
+        adapter->fail_close = true;
+        const auto execution = controller.execute_prepared();
+        const auto cleanup = backend.cleanup();
+        expect(!execution.ok && !cleanup.ok && cleanup.error.find("Close I2C") != std::string::npos,
+               "execution close failure is retained in cleanup receipt");
+        const auto closes = adapter->close_calls;
+        expect(!backend.cleanup().ok && adapter->close_calls == closes,
+               "repeated cleanup preserves close failure without reopening");
     }
     test_all_ordered_pll_transitions();
     test_envelope_deadlines_and_off_retune_readiness();

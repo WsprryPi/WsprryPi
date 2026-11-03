@@ -102,6 +102,7 @@ def main() -> None:
         stock_ini = root / "installed.ini.stock"
 
         custom = {
+            "Si5351": {"Adapter Identity": "usb:04d8:00dd:serial:6164616672756974", "I2C Bus": "17"},
             "WTP": {"Transport": "network", "Hostname": "station.example", "TCP Port": "31418",
                     "TLS Server Identity": "station.example", "TLS CA File": "/etc/station/ca.pem",
                     "TLS Client Certificate": "/etc/station/client.pem", "TLS Client Key": "/etc/station/client.key",

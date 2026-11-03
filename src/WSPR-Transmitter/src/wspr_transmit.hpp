@@ -144,6 +144,7 @@ public:
         };
 
         int i2c_bus = 1;
+        std::string adapter_identity;
         int i2c_address = 0x60;
         int reference_hz = 27000000;
         ReferenceSource reference_source = ReferenceSource::EXTERNAL_TCXO;

@@ -33,6 +33,7 @@
 #include "wtp_runtime_bridge.hpp"
 #include "config_handler.hpp"
 #include "i2c_bus_inventory.hpp"
+#include "WSPR-Transmitter/src/linux_i2c_identity.hpp"
 #include "config_handler_deserialization.hpp"
 #include "config_handler_serialization.hpp"
 
@@ -129,6 +130,8 @@ namespace
     std::mutex si5351_inventory_mutex;
     Si5351AddressInventory si5351_inventory_cache;
     int si5351_inventory_reference = 0;
+    std::string si5351_inventory_identity;
+    std::optional<linux_i2c_identity::Adapter> si5351_inventory_binding;
     std::optional<std::vector<std::string>> si5351_inventory_command_override;
     std::string interactive_enable_file_stamp;
 
@@ -613,6 +616,7 @@ void init_default_config()
     config.gpio_manual_ppm = 0.0;
     config.si5351_ppm = 0.0;
     config.si5351_i2c_bus = kDefaultSi5351I2cBus;
+    config.si5351_adapter_identity.clear();
     config.si5351_i2c_address = kDefaultSi5351I2cAddress;
     config.si5351_reference_hz = kDefaultSi5351ReferenceHz;
     config.si5351_reference_source = kDefaultSi5351ReferenceSource;
@@ -710,7 +714,8 @@ bool si5351_device_detected(
     int i2c_bus,
     int i2c_address,
     int reference_hz,
-    std::string *error_message)
+    std::string *error_message,
+    const std::string &adapter_identity)
 {
     if (g_si5351_detection_override.has_value())
     {
@@ -721,7 +726,7 @@ bool si5351_device_detected(
         return *g_si5351_detection_override;
     }
 
-    const auto inventory = discover_si5351_addresses(i2c_bus, reference_hz, i2c_address);
+    const auto inventory = discover_si5351_addresses(i2c_bus, reference_hz, i2c_address, adapter_identity);
     const bool detected = inventory.contains(i2c_address);
     if (!detected && error_message)
         *error_message = si5351_detection_unavailable_message(inventory.error);
@@ -731,7 +736,8 @@ bool si5351_device_detected(
 Si5351AddressInventory discover_si5351_addresses(
     int i2c_bus,
     int reference_hz,
-    int selected_address)
+    int selected_address,
+    const std::string &adapter_identity)
 {
     if (g_si5351_address_inventory_override.has_value())
     {
@@ -764,6 +770,18 @@ Si5351AddressInventory discover_si5351_addresses(
     }
 
     Si5351AddressInventory result;
+    if (!adapter_identity.empty() && (selected_address < 0x60 || selected_address > 0x6F)) {
+        result.i2c_bus = i2c_bus;
+        result.error = "A valid configured Si5351 address is required before probing.";
+        return result;
+    }
+    std::optional<linux_i2c_identity::Adapter> binding;
+    if (!adapter_identity.empty()) {
+        const auto resolved = linux_i2c_identity::resolve(linux_i2c_identity::discover(), adapter_identity, i2c_bus);
+        if (!resolved.error.empty()) { result.error = resolved.error; result.i2c_bus = i2c_bus; return result; }
+        i2c_bus = resolved.adapter.bus;
+        binding = resolved.adapter;
+    }
     result.i2c_bus = i2c_bus;
     const std::string bus_error = si5351_inventory_command_override ? std::string() :
         i2c_bus_inventory::selection_error(i2c_bus_inventory::discover(), i2c_bus);
@@ -777,6 +795,7 @@ Si5351AddressInventory discover_si5351_addresses(
         "/proc/self/exe", "--internal-si5351-inventory",
         std::to_string(i2c_bus), std::to_string(reference_hz)};
     if (selected_address >= 0) command.push_back(std::to_string(selected_address));
+    if (!adapter_identity.empty()) command.push_back(adapter_identity);
     const auto reply = si5351_inventory_process::run(
         si5351_inventory_command_override.value_or(command));
     result.error = reply.error;
@@ -810,25 +829,45 @@ Si5351AddressInventory discover_si5351_addresses(
             result.error = "Invalid Si5351 discovery reply.";
         }
     }
-    if (selected_address < 0)
+    if (binding) {
+        const auto current = linux_i2c_identity::resolve(linux_i2c_identity::discover(), adapter_identity, i2c_bus);
+        if (!current.error.empty() || !(current.adapter == *binding)) {
+            result.addresses.clear(); result.error = "I2C adapter changed during address discovery. Reload and retry.";
+        }
+    }
+    if (selected_address < 0 || !adapter_identity.empty())
     {
         std::lock_guard lock(si5351_inventory_mutex);
         si5351_inventory_cache = result;
         si5351_inventory_reference = reference_hz;
+        si5351_inventory_identity = adapter_identity;
+        si5351_inventory_binding = binding;
     }
 
     return result;
 }
 
-Si5351AddressInventory cached_si5351_addresses(int i2c_bus, int reference_hz)
+Si5351AddressInventory cached_si5351_addresses(int i2c_bus, int reference_hz, const std::string &adapter_identity)
 {
     si5351_inventory_process::reap(); // Nonblocking cleanup only; never launches a probe.
     // Test fixtures model already available inventory, without starting a probe.
     if (g_si5351_address_inventory_override || g_si5351_detection_override)
-        return discover_si5351_addresses(i2c_bus, reference_hz);
+        return discover_si5351_addresses(i2c_bus, reference_hz, -1, adapter_identity);
+    std::optional<linux_i2c_identity::Adapter> current_binding;
+    if (!adapter_identity.empty()) {
+        const auto resolved = linux_i2c_identity::resolve(linux_i2c_identity::discover(), adapter_identity, i2c_bus);
+        if (!resolved.error.empty()) {
+            Si5351AddressInventory result;
+            result.i2c_bus = i2c_bus; result.error = resolved.error;
+            return result;
+        }
+        i2c_bus = resolved.adapter.bus;
+        current_binding = resolved.adapter;
+    }
     std::lock_guard lock(si5351_inventory_mutex);
     if (si5351_inventory_cache.i2c_bus == i2c_bus &&
-        si5351_inventory_reference == reference_hz)
+        si5351_inventory_reference == reference_hz && si5351_inventory_identity == adapter_identity &&
+        current_binding == si5351_inventory_binding)
         return si5351_inventory_cache;
     Si5351AddressInventory result;
     result.i2c_bus = i2c_bus;
@@ -1144,6 +1183,7 @@ namespace
 
         target["Si5351"] = {
             {"I2C Bus", kDefaultSi5351I2cBus},
+            {"Adapter Identity", ""},
             {"I2C Address", format_si5351_i2c_address(kDefaultSi5351I2cAddress)},
             {"Reference Frequency", kDefaultSi5351ReferenceHz},
             {"Reference Source", kDefaultSi5351ReferenceSource},
@@ -1218,6 +1258,7 @@ namespace
         target.gpio_manual_ppm = source.gpio_manual_ppm;
         target.si5351_ppm = source.si5351_ppm;
         target.si5351_i2c_bus = source.si5351_i2c_bus;
+        target.si5351_adapter_identity = source.si5351_adapter_identity;
         target.si5351_i2c_address = source.si5351_i2c_address;
         target.si5351_reference_hz = source.si5351_reference_hz;
         target.si5351_reference_source = source.si5351_reference_source;
@@ -1425,7 +1466,8 @@ namespace
                 }
 
                 if ((section == "WTP" && wtp_settings_json(WtpSettings{}).value(key, nlohmann::json()).is_string()) ||
-                    (section == "WTP Server" && key == "Interface"))
+                    (section == "WTP Server" && key == "Interface") ||
+                    (section == "Si5351" && key == "Adapter Identity"))
                 {
                     patch[section][key] = trimmed;
                 }
@@ -1704,7 +1746,7 @@ build_persistent_ini_data(const nlohmann::json &source)
                 (section_name == "Calibration" &&
                  key == "PPM") ||
                 (section_name == "Si5351" &&
-                 (key == "I2C Bus" ||
+                 (key == "Adapter Identity" || key == "I2C Bus" ||
                   key == "I2C Address" ||
                   key == "Reference Frequency" ||
                   key == "Reference Source" ||
@@ -2038,16 +2080,20 @@ std::string patch_all_from_web_revision(const nlohmann::json &j, const std::stri
 
         // Validate new selections against fresh host metadata, never client Platform data.
         // An unchanged unavailable bus must not prevent recovery to another backend.
-        if (candidate_config.si5351_i2c_bus != config.si5351_i2c_bus ||
+        if (candidate_config.si5351_adapter_identity != config.si5351_adapter_identity ||
+            candidate_config.si5351_i2c_bus != config.si5351_i2c_bus ||
             (candidate_config.transmit_backend == TransmitBackendKind::SI5351 &&
              config.transmit_backend != TransmitBackendKind::SI5351))
         {
-            error_message = i2c_bus_inventory::selection_error(
-                i2c_bus_inventory::discover(), candidate_config.si5351_i2c_bus);
+            error_message = candidate_config.si5351_adapter_identity.empty()
+                ? i2c_bus_inventory::selection_error(i2c_bus_inventory::discover(), candidate_config.si5351_i2c_bus)
+                : linux_i2c_identity::resolve(linux_i2c_identity::discover(),
+                    candidate_config.si5351_adapter_identity, candidate_config.si5351_i2c_bus).error;
             if (!error_message.empty()) throw std::runtime_error(error_message);
         }
 
         const bool si5351_selection_changed =
+            candidate_config.si5351_adapter_identity != config.si5351_adapter_identity ||
             candidate_config.si5351_i2c_bus != config.si5351_i2c_bus ||
             candidate_config.si5351_i2c_address != config.si5351_i2c_address;
         const bool selecting_si5351 =
@@ -2065,7 +2111,9 @@ std::string patch_all_from_web_revision(const nlohmann::json &j, const std::stri
             }
             const auto inventory = discover_si5351_addresses(
                 candidate_config.si5351_i2c_bus,
-                candidate_config.si5351_reference_hz);
+                candidate_config.si5351_reference_hz,
+                candidate_config.si5351_adapter_identity.empty() ? -1 : candidate_config.si5351_i2c_address,
+                candidate_config.si5351_adapter_identity);
             if (!inventory.error.empty()) throw std::runtime_error(inventory.error);
             if (!inventory.contains(candidate_config.si5351_i2c_address))
             {

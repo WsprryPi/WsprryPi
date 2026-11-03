@@ -21,7 +21,8 @@ RouteResponse build_config_response()
     return {200, get_public_config_json().dump(4), "application/json", true};
 }
 
-RouteResponse build_si5351_addresses_response(const std::string &i2c_bus)
+RouteResponse build_si5351_addresses_response(const std::string &i2c_bus,
+    const std::string &adapter_identity, const std::string &address)
 {
     int bus = -1;
     const auto parsed = std::from_chars(
@@ -40,7 +41,13 @@ RouteResponse build_si5351_addresses_response(const std::string &i2c_bus)
         std::lock_guard lock(config_update_mutex());
         reference_hz = config.si5351_reference_hz;
     }
-    const auto inventory = discover_si5351_addresses(bus, reference_hz);
+    int selected = -1;
+    if (!adapter_identity.empty()) {
+        const auto parsed_address = std::from_chars(address.data(), address.data() + address.size(), selected);
+        if (parsed_address.ec != std::errc{} || parsed_address.ptr != address.data() + address.size() || selected < 0x60 || selected > 0x6f)
+            return {400, "Invalid Si5351 address.", "text/plain", true};
+    }
+    const auto inventory = discover_si5351_addresses(bus, reference_hz, selected, adapter_identity);
     auto addresses = nlohmann::json::array();
     for (const int address : inventory.addresses)
         addresses.push_back(

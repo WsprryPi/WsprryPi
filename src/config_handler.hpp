@@ -132,14 +132,16 @@ bool si5351_device_detected(
     int i2c_bus,
     int i2c_address,
     int reference_hz,
-    std::string *error_message = nullptr);
+    std::string *error_message = nullptr,
+    const std::string &adapter_identity = {});
 void set_si5351_inventory_command_override_for_test(const std::vector<std::string>& command);
 void clear_si5351_inventory_command_override_for_test();
-Si5351AddressInventory cached_si5351_addresses(int i2c_bus, int reference_hz);
+Si5351AddressInventory cached_si5351_addresses(int i2c_bus, int reference_hz, const std::string &adapter_identity = {});
 Si5351AddressInventory discover_si5351_addresses(
     int i2c_bus,
     int reference_hz,
-    int selected_address = -1);
+    int selected_address = -1,
+    const std::string &adapter_identity = {});
 void set_si5351_detection_override_for_test(bool detected) noexcept;
 void clear_si5351_detection_override_for_test() noexcept;
 void set_si5351_address_inventory_override_for_test(

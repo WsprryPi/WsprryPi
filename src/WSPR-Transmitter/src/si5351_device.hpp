@@ -57,7 +57,9 @@ public:
     public:
         virtual ~I2CAdapter() = default;
         virtual int openDevice(const std::string& path, int flags) = 0;
+        virtual int queryCapabilities(int fd, unsigned long& capabilities) = 0;
         virtual int selectSlave(int fd, std::uint8_t address) = 0;
+        virtual std::string diagnostic() const { return {}; }
         virtual ssize_t writeData(int fd, const void* data, std::size_t size) = 0;
         virtual ssize_t readData(int fd, void* data, std::size_t size) = 0;
         virtual int closeDevice(int fd) = 0;
@@ -102,6 +104,7 @@ public:
     struct Config
     {
         int i2c_bus = 1;
+        std::string adapter_identity; // Empty retains explicit generic numeric selection.
         std::uint8_t i2c_address = 0x60;
         std::uint32_t reference_hz = 27000000;
         ReferenceSource reference_source =
@@ -151,7 +154,7 @@ public:
     /**
      * @brief Close the I2C device if open
      */
-    void close();
+    bool close();
 
     /**
      * @brief Check whether the device is currently open
@@ -259,6 +262,7 @@ public:
      * @return Human-readable error text
      */
     const std::string& getLastError() const noexcept;
+    std::string transportDiagnostic() const { return adapter_->diagnostic(); }
 
 private:
     /**

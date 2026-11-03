@@ -850,6 +850,49 @@ int main(int argc, char *argv[])
         test_idle_startup_overrides();
         return EXIT_SUCCESS;
     }
+    if (argc == 2 && std::string(argv[1]) == "--linux-i2c-identity-config-only") {
+        init_config_json(); json_to_config();
+        const auto original = jConfig;
+        const std::string identity = "usb:04d8:00dd:serial:6164616672756974";
+        require(config.si5351_adapter_identity.empty(), "legacy config defaults to numeric selection");
+        require(web_server_routes::build_si5351_addresses_response("1", identity, "").status == 400 &&
+                web_server_routes::build_si5351_addresses_response("1", identity, "95").status == 400,
+                "stable address requests require an explicit valid address before any probe");
+        config.si5351_adapter_identity = identity;
+        config.si5351_i2c_bus = 7;
+        config_to_json();
+        require(jConfig.at("Si5351").at("Adapter Identity") == identity &&
+                jConfig.at("Si5351").at("I2C Bus") == 7, "identity is separate from numeric selection");
+        ArgParserConfig copy(config);
+        require(copy.si5351_adapter_identity == identity, "runtime snapshots retain identity");
+        config.si5351_adapter_identity.clear(); json_to_config();
+        require(config.si5351_adapter_identity == identity, "JSON identity round trip");
+        ScopedTemporaryFile ini("/tmp/wsprrypi-stable-i2c-XXXXXX");
+        iniFile.set_filename(ini.path()); config.use_ini = true;
+        json_to_ini();
+        require(read_text_file(ini.path()).find(identity) != std::string::npos, "INI persists exact identity");
+        config.si5351_adapter_identity.clear(); ini_to_json(ini.path()); json_to_config();
+        require(config.si5351_adapter_identity == identity, "INI identity round trip");
+        jConfig["Si5351"]["Adapter Identity"] = 7;
+        bool rejected = false;
+        try { json_to_config(); } catch (const std::exception&) { rejected = true; }
+        require(rejected, "wrong identity type rejected");
+        jConfig = original; json_to_config();
+        jConfig["Si5351"]["Adapter Identity"] = "usb:bad";
+        rejected = false;
+        try { json_to_config(); } catch (const std::exception& failure) {
+            rejected = std::string(failure.what()).find("identity") != std::string::npos;
+        }
+        require(rejected, "malformed identity rejected before physical validation");
+        init_config_json(); json_to_config();
+        const auto before = jConfig;
+        rejected = false;
+        try { patch_all_from_web({{"Si5351", {{"Adapter Identity", identity}}}}); }
+        catch (const std::exception& failure) { rejected = std::string(failure.what()).find("matching adapter") != std::string::npos; }
+        require(rejected && jConfig == before, "unavailable identity refuses before persistence");
+        std::cout << "Stable I2C JSON/INI/snapshot, malformed type, and refusal-before-persistence tests passed" << std::endl;
+        return EXIT_SUCCESS;
+    }
     if (argc == 2 && std::string(argv[1]) == "--i2c-bus-selection-only")
     {
         init_config_json();

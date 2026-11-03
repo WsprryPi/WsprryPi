@@ -13,7 +13,8 @@
 namespace web_server_routes
 {
 RouteResponse build_config_response();
-RouteResponse build_si5351_addresses_response(const std::string &i2c_bus);
+RouteResponse build_si5351_addresses_response(const std::string &i2c_bus,
+    const std::string &adapter_identity = {}, const std::string &address = {});
 RouteResponse apply_config_update(const std::string &request_body);
 RouteResponse apply_config_repair(const std::string &request_body);
 RouteResponse stop_transmission(const std::string &request_body);
