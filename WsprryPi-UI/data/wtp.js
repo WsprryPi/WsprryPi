@@ -92,6 +92,20 @@
     }
     if (typeof module !== "undefined" && module.exports) module.exports = { defaults, errors, summarize, validNetworkIdentity };
     if (!root.document) return;
+    async function readReply(response) {
+        try {
+            const value = await response.json();
+            if (!value || typeof value !== "object" || Array.isArray(value)) throw new TypeError("Expected an object reply");
+            return value;
+        }
+        catch (error) {
+            if (["AbortError", "TimeoutError"].includes(error.name)) throw error;
+            root.console?.warn("Controller reply could not be read", {status: response.status, error: error.name});
+            throw new Error(response.ok
+                ? "The controller returned an unreadable reply. Refresh and review its state before trying again."
+                : `The controller is unavailable (HTTP ${response.status}). Check its connection before trying again.`);
+        }
+    }
     const byId = id => root.document.getElementById(id);
     let saved = { ...defaults }, snapshot = null, busy = false, timer = null, initialized = false, closed = false, statusReadFailed = false, hostRevision = "", cancelling = false;
     let browserSession = "";
@@ -172,7 +186,7 @@
                 method: recover ? "POST" : "GET", cache: "no-store", signal: controller.signal,
                 ...(recover ? { headers: { "Content-Type": "application/json" }, body: JSON.stringify({ operation: "reconcile" }) } : {})
             });
-            const data = await response.json();
+            const data = await readReply(response);
             if (recover && data.status) { snapshot = data.status; receivedStatus = true; }
             if (!response.ok) throw new Error(data.error || `Request failed (${response.status}).`);
             if (!recover) {
@@ -208,6 +222,7 @@
         render();
     }
     let fleetCatalog = null, fleetDiscovery = null, fleetRevision = "", fleetChoice = "", fleetEditId = "", fleetObservedId = "", fleetBusy = false;
+    let fleetReadFailed = false;
     let fleetLoading = false, fleetUsbId = "", fleetProbeGeneration = 0, fleetOptionsSignature = "";
     const fleetUrl = suffix => (root.WSPRRYPI_PATHS?.sharedApiPath || "/api/control/v1") + "/host/" + suffix;
     const fleetFeedback = message => { if (byId("fleet-feedback")) byId("fleet-feedback").textContent = message; };
@@ -281,17 +296,19 @@
                 root.fetch(fleetUrl("discovery"), {cache:"no-store"})
             ]);
             if (!catalogResponse.ok) throw new Error(`Catalog unavailable (${catalogResponse.status}).`);
-            const catalog = await catalogResponse.json();
+            const catalog = await readReply(catalogResponse);
             if (catalog.scope !== "wsprrypi-wtp-catalog/1" || !Array.isArray(catalog.profiles))
                 throw new Error("Catalog response is invalid.");
             fleetCatalog = catalog;
             fleetRevision = catalogResponse.headers?.get?.("ETag") || "";
-            fleetDiscovery = discoveryResponse.ok ? await discoveryResponse.json() :
+            fleetDiscovery = discoveryResponse.ok ? await readReply(discoveryResponse) :
                 {available:false, reason:"Discovery read failed", candidates:[]};
             if (!Array.isArray(fleetDiscovery.candidates)) fleetDiscovery.candidates = [];
             if (!Array.isArray(fleetDiscovery.usb?.candidates)) fleetDiscovery.usb = {available:false, candidates:[]};
             if (!fleetDiscovery.usb.available) fleetDiscovery.usb.candidates = [];
             fleetRender();
+            if (fleetReadFailed) fleetFeedback("Device list refreshed.");
+            fleetReadFailed = false;
             const network = fleetDiscovery.available ?
                 fleetDiscovery.candidates.length ? "Nearby observations are connection hints, not device authentication." :
                     "Avahi is listening, but no service has been observed. Multicast reachability is unverified." :
@@ -301,6 +318,7 @@
                 ? usb.reason || (usb.candidates.length ? "Attached USB Picos are listed automatically." : "No USB Pico is attached.")
                 : usb.reason || "USB discovery unavailable."} ${network}`;
         } catch (error) {
+            fleetReadFailed = true;
             if (fleetDiscovery?.usb) {
                 fleetDiscovery.usb = {available:false, reason:"USB discovery unavailable; refresh the device list.", candidates:[]};
                 fleetRender();
@@ -372,7 +390,7 @@
             const response = await root.fetch(fleetUrl("devices"), {method:"POST", cache:"no-store",
                 headers:{"Content-Type":"application/json", "X-WsprryPico-Request":"1", "If-Match":fleetRevision},
                 body:JSON.stringify(body)});
-            const data = await response.json();
+            const data = await readReply(response);
             if (!response.ok) throw new Error(data.error?.message || data.error?.code || `Request failed (${response.status}).`);
             fleetRevision = response.headers?.get?.("ETag") || "";
             fleetFeedback(feedback);
@@ -399,7 +417,7 @@
             const response = await root.fetch(fleetUrl("discovery/identify"), {method:"POST", cache:"no-store",
                 headers:{"Content-Type":"application/json", "X-WsprryPico-Request":"1"},
                 body:JSON.stringify({discovery_id:discoveryId, settings})});
-            const data = await response.json();
+            const data = await readReply(response);
             if (generation !== fleetProbeGeneration || byId("fleet-editor").hidden ||
                 JSON.stringify(settings) !== JSON.stringify(fleetDraftRead())) return;
             if (!response.ok) throw new Error(data.error?.message || data.error?.code || "Identification failed.");
@@ -454,7 +472,7 @@
             const response = await root.fetch(fleetUrl("devices/use"), {method:"POST", cache:"no-store",
                 headers:{"Content-Type":"application/json", "X-WsprryPico-Request":"1", "If-Match":hostRevision},
                 body:JSON.stringify({id:profile.id, catalog_revision:fleetRevision})});
-            const data = await response.json();
+            const data = await readReply(response);
             if (!response.ok) throw new Error(data.error?.message || data.error?.code || "Selection was rejected.");
             hostRevision = response.headers.get("ETag") || hostRevision;
             fleetFeedback(`${profile.name} was applied to the host. Review Pico status before transmitting.`);
@@ -499,7 +517,12 @@
             byId("fleet-uncertainty").focus();
         });
         byId("fleet-identify").addEventListener("click", fleetIdentify);
-        byId("fleet-editor-cancel").addEventListener("click", () => { ++fleetProbeGeneration; fleetUsbId = ""; byId("fleet-editor").hidden = true; editorFeedback(""); });
+        byId("fleet-editor-cancel").addEventListener("click", () => {
+            ++fleetProbeGeneration; fleetUsbId = "";
+            byId("fleet-editor").hidden = true; editorFeedback("");
+            const trigger = byId(fleetEditId ? "fleet-edit" : "fleet-add");
+            (trigger && !trigger.hidden && !trigger.disabled ? trigger : byId("fleet-device")).focus();
+        });
         byId("fleet-binding").addEventListener("change", () => { fleetObservedId = ""; fleetEditorRender(); });
         byId("fleet-method").addEventListener("change", fleetEditorRender);
         byId("fleet-editor").addEventListener("input", () => { fleetObservedId = ""; });
@@ -541,7 +564,7 @@
                 headers: { "Content-Type": "application/json", "X-WsprryPico-Request": "1" },
                 body: JSON.stringify({session_id: browserSession, request_id: requestId, operation: "ABORT", body: {job_id: job}})
             });
-            const result = await response.json();
+            const result = await readReply(response);
             if (!response.ok || !result.ok) throw new Error(result.error?.code || "Cancellation was not confirmed");
             feedback.textContent = "Cleanup confirmed. Review the job outcome and output observation above.";
         } catch (error) {

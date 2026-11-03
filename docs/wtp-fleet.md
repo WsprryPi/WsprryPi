@@ -38,7 +38,10 @@ Fleet identifies which actions save explicitly. Device selection and catalog,
 assignment, and listener drafts do not participate in this Pi's automatic
 configuration save. **Use Pico** and this Pi's connection fields retain their
 automatic save behavior. A new output assignment uses the selected saved device;
-without a matching saved selection, choose an output explicitly.
+without a matching saved selection, choose an output explicitly. The Pi status
+HTTP port is hidden for USB Pico assignments; network profiles retain the field
+for Pi takeover reconciliation. Hiding it preserves the assignment document
+format and the existing port value.
 
 Under **Pico standalone settings and Wi-Fi**, management prerequisites appear
 before the editors. Read saved station progress, save valid station fields, and

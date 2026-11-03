@@ -1,6 +1,20 @@
 // SPDX-License-Identifier: MIT
 (function (root) {
     "use strict";
+    async function readReply(response) {
+        try {
+            const value = await response.json();
+            if (!value || typeof value !== "object" || Array.isArray(value)) throw new TypeError("Expected an object reply");
+            return value;
+        }
+        catch (error) {
+            if (["AbortError", "TimeoutError"].includes(error.name)) throw error;
+            root.console?.warn("Controller reply could not be read", {status: response.status, error: error.name});
+            throw new Error(response.ok
+                ? "The controller returned an unreadable reply. Refresh and review its state before trying again."
+                : `The controller is unavailable (HTTP ${response.status}). Check its connection before trying again.`);
+        }
+    }
     const byId = id => root.document.getElementById(id);
     const url = suffix => (root.WSPRRYPI_PATHS?.sharedApiPath || "/api/control/v1") + "/host/" + suffix;
     const number = name => Number(byId("fleet-schedule-" + name).value);
@@ -33,7 +47,7 @@
     async function fetchJson(suffix, method = "GET", body, etag) {
         const response = await root.fetch(url(suffix), {method, cache: "no-store", signal: AbortSignal.timeout(method === "GET" ? 7000 : 45000),
             ...(body ? {headers: {"Content-Type": "application/json", "X-WsprryPico-Request": "1", "If-Match": etag}, body: JSON.stringify(body)} : {})});
-        const value = await response.json();
+        const value = await readReply(response);
         if (!response.ok) throw Object.assign(new Error(response.status === 412 ? "Schedules changed. Refresh and review before trying again."
             : value.error?.message || value.error?.code || `Request failed (${response.status}).`), {status: response.status});
         return {value, etag: response.headers.get("ETag")};
@@ -159,7 +173,7 @@
         });
         const profile = profiles.find(p => p.id === text("device"));
         byId("fleet-schedule-plain-field").hidden = !!editId || profile?.settings.Transport !== "network_plain";
-        byId("fleet-schedule-management-field").hidden = !!editId;
+        byId("fleet-schedule-management-field").hidden = !!editId || profile?.settings.Transport === "usb";
         byId("fleet-schedule-enable-field").hidden = !!editId;
     }
     function schedule() {

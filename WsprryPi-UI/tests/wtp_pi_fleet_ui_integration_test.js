@@ -149,6 +149,13 @@ async function main() {
                 window.__requests.push({url:String(url),options});
                 const path=String(url), body=options.body?JSON.parse(options.body):{};
                 const reply=(value,status=200,etag='"host-r1"')=>({ok:status>=200&&status<300,status,headers:{get:()=>etag},json:async()=>value});
+                if(window.__badJsonSuffix && path.endsWith(window.__badJsonSuffix)) {
+                    window.__badReplyCount=(window.__badReplyCount||0)+1;
+                    return {ok:window.__badJsonStatus===200,status:window.__badJsonStatus,headers:{get:()=>null},json:async()=>{
+                        if(window.__badJsonNull)return null;
+                        throw new SyntaxError("Unexpected token '<', <!DOCTYPE is not valid JSON");
+                    }};
+                }
                 if(path.endsWith('/host/config')) {if(options.method==='PUT')Object.assign(window.__host,body);return reply({config:window.__host});}
                 if(path.endsWith('/host/wtp-endpoint/enable')) {
                     if(!body.confirmed && window.__endpoint.remote_owner)return reply({error:{code:'local_takeover_confirmation_required'},status:window.__endpoint},409);
@@ -191,6 +198,25 @@ async function main() {
         await waitFor(async()=>await evaluate('document.getElementById("fleet-schedule-feedback").textContent.includes("Fleet status unavailable:")'),'disconnected Fleet feedback');
         await evaluate(`window.__fleetLoadFailure=false;document.getElementById('fleet-schedule-refresh').click();`);
         await waitFor(async()=>await evaluate('!document.getElementById("fleet-schedule-feedback").textContent.includes("Fleet status unavailable:")'),'recovered Fleet feedback');
+        // HTML error pages, malformed success replies, and null documents are
+        // failures with operator guidance, never raw parser text or success.
+        for (const [status, nullBody] of [[503,false],[200,false],[200,true]]) {
+            await evaluate(`window.__badJsonSuffix='/host/fleet';window.__badJsonStatus=${status};window.__badJsonNull=${nullBody};window.__badReplyCount=0;document.getElementById('fleet-schedule-feedback').textContent='';document.getElementById('fleet-schedule-refresh').click();`);
+            await waitFor(async()=>await evaluate(`__badReplyCount>0 && document.getElementById('fleet-schedule-feedback').textContent.includes('${status===503?'HTTP 503':'unreadable reply'}')`),'safe malformed Fleet reply');
+            assert.doesNotMatch(await evaluate(`document.getElementById('fleet-schedule-feedback').textContent`),/Unexpected token|DOCTYPE|Cannot read/);
+            assert.match(await evaluate(`document.getElementById('fleet-output-list').textContent`),/Garden Pico/,'Last observed rows survive failed reads');
+        }
+        await evaluate(`window.__badJsonSuffix='';document.getElementById('fleet-schedule-refresh').click()`);
+        await waitFor(async()=>await evaluate(`document.getElementById('fleet-schedule-feedback').textContent===''`),'malformed Fleet read recovery');
+        await evaluate(`window.__badJsonSuffix='/status';window.__badJsonStatus=503;window.__badJsonNull=false;`);
+        await waitFor(async()=>await evaluate(`document.getElementById('wtp-feedback').textContent.includes('HTTP 503')`),'safe malformed Pico status');
+        assert.doesNotMatch(await evaluate(`document.getElementById('wtp-feedback').textContent`),/Unexpected token|DOCTYPE/);
+        assert.equal(await evaluate('WtpUi.selected()'),false);
+        await evaluate(`window.__badJsonSuffix='/host/devices';window.__badJsonStatus=200;document.getElementById('fleet-refresh').click()`);
+        await waitFor(async()=>await evaluate(`document.getElementById('fleet-feedback').textContent.includes('unreadable reply')`),'safe malformed catalog');
+        await evaluate(`window.__badJsonSuffix='';document.getElementById('fleet-refresh').click()`);
+        await waitFor(async()=>await evaluate(`document.getElementById('fleet-feedback').textContent==='Device list refreshed.'`),'catalog recovery feedback');
+        await waitFor(async()=>await evaluate(`document.getElementById('wtp-feedback').textContent==='Status connection restored.'`),'Pico status recovery');
         // Browsing and independent drafts must never dirty the host autosave.
         await evaluate(`document.getElementById('fleet-refresh').click()`);
         await waitFor(async()=>await evaluate(`document.getElementById('fleet-device').options.length===2`),'catalog loaded');
@@ -201,9 +227,23 @@ async function main() {
         await evaluate(`document.getElementById('fleet-edit').click();document.getElementById('fleet-name').value='Unsaved name';document.getElementById('fleet-name').dispatchEvent(new Event('input',{bubbles:true}));`);
         assert.equal(await evaluate('configAutosaveDirty'),false,'Editing a profile draft must not queue host autosave');
         await evaluate(`document.getElementById('fleet-editor-cancel').click();configAutosaveSuspended=true;`);
+        assert.equal(await evaluate('document.activeElement.id'),'fleet-edit','Cancel restores Edit focus');
+        await evaluate(`document.getElementById('fleet-add').click();document.getElementById('fleet-editor-cancel').click()`);
+        assert.equal(await evaluate('document.activeElement.id'),'fleet-add','Cancel restores Add focus');
+        await evaluate(`document.getElementById('fleet-edit').click();document.getElementById('fleet-device').selectedIndex=-1;document.getElementById('fleet-device').dispatchEvent(new Event('change'));document.getElementById('fleet-editor-cancel').click()`);
+        assert.equal(await evaluate('document.activeElement.id'),'fleet-device','Hidden opener falls back to device selector');
+        await evaluate(`document.getElementById('fleet-device').value='known:'+'2'.repeat(32);document.getElementById('fleet-device').dispatchEvent(new Event('change'))`);
         await evaluate('document.getElementById("fleet-schedule-new").click()');
         await waitFor(async () => await evaluate('!document.getElementById("fleet-schedule-editor").hidden'), 'assignment editor');
         assert.equal(await evaluate('document.getElementById("fleet-schedule-device").value'),'2'.repeat(32),'Assignment retains selected saved output');
+        assert.equal(await evaluate(`document.getElementById('fleet-schedule-management-field').hidden`),true,'USB Pico hides Pi HTTP port');
+        await evaluate(`document.getElementById('fleet-schedule-device').value='1'.repeat(32);document.getElementById('fleet-schedule-device').dispatchEvent(new Event('change'));document.getElementById('fleet-schedule-management').value='31416';`);
+        assert.equal(await evaluate(`document.getElementById('fleet-schedule-management-field').hidden`),false,'Network Pi retains HTTP port');
+        await evaluate(`document.getElementById('fleet-schedule-device').value='2'.repeat(32);document.getElementById('fleet-schedule-device').dispatchEvent(new Event('change'));`);
+        assert.equal(await evaluate(`document.getElementById('fleet-schedule-management').value`),'31416','Hidden port retains its draft value');
+        await evaluate(`document.getElementById('fleet-schedule-device').value='1'.repeat(32);document.getElementById('fleet-schedule-device').dispatchEvent(new Event('change'));`);
+        assert.equal(await evaluate(`document.getElementById('fleet-schedule-management').value`),'31416','Returning to Pi preserves custom port');
+        await evaluate(`document.getElementById('fleet-schedule-management').value='31415';document.getElementById('fleet-schedule-device').value='2'.repeat(32);document.getElementById('fleet-schedule-device').dispatchEvent(new Event('change'));`);
         await evaluate(`configAutosaveSuspended=false;configAutosaveDirty=false;document.getElementById('fleet-schedule-frequency').dispatchEvent(new Event('input',{bubbles:true}));document.getElementById('fleet-listener-port').dispatchEvent(new Event('input',{bubbles:true}));`);
         assert.equal(await evaluate('configAutosaveDirty'),false,'Schedule and listener drafts are independent');
         await evaluate(`document.getElementById('wtp_endpoint').dispatchEvent(new Event('input',{bubbles:true}));`);
@@ -230,6 +270,7 @@ async function main() {
         await waitFor(async () => await evaluate('document.getElementById("fleet-schedule-editor").hidden'), 'assignment saved');
         assert.equal(await evaluate('__host.Operation.Transmit'), false);
         assert.equal(await evaluate('__fleet.assignments.length'), 3);
+        assert.equal(await evaluate(`JSON.parse(__requests.filter(r=>r.url.endsWith('/host/fleet')&&r.options.method==='POST').at(-1).options.body).management_port`),31415,'USB assignment retains current API field');
         // A successful status refresh while a draft is open must not rebase its
         // If-Match revision. Cover both editing and creating an assignment.
         for (const editing of [true,false]) {
@@ -375,6 +416,23 @@ async function main() {
                 };
                 assert.equal(await evaluate('document.documentElement.scrollWidth <= innerWidth'),true,'Fleet '+theme+' overflow');
                 await screenshot('fleet');
+                await evaluate(`document.getElementById('fleet-device').value='known:'+'2'.repeat(32);document.getElementById('fleet-device').dispatchEvent(new Event('change'));document.getElementById('fleet-schedule-new').click();`);
+                await waitFor(async()=>await evaluate(`!document.getElementById('fleet-schedule-editor').hidden && !document.getElementById('fleet-schedule-save').disabled`),'USB draft visual state');
+                await evaluate(`document.getElementById('fleet-schedule-editor').scrollIntoView({block:'start'});window.scrollBy(0,-180);`);
+                assert.equal(await evaluate(`document.getElementById('fleet-schedule-management').getBoundingClientRect().height`),0,'USB port removed from layout');
+                assert.equal(await evaluate('document.documentElement.scrollWidth<=innerWidth'),true,'USB draft overflow');
+                await screenshot('usb-assignment');
+                const draft=await evaluate(`JSON.stringify([...document.querySelectorAll('#fleet-schedule-editor input,#fleet-schedule-editor select')].map(e=>[e.id,e.value,e.checked]))`);
+                await evaluate(`window.__badJsonSuffix='/host/fleet';window.__badJsonStatus=503;window.__badJsonNull=false;document.getElementById('fleet-schedule-refresh').click();`);
+                await waitFor(async()=>await evaluate(`document.getElementById('fleet-schedule-feedback').textContent.includes('HTTP 503')`),'outage visual state');
+                assert.equal(await evaluate(`JSON.stringify([...document.querySelectorAll('#fleet-schedule-editor input,#fleet-schedule-editor select')].map(e=>[e.id,e.value,e.checked]))`),draft,'Outage preserves open draft');
+                await evaluate(`document.getElementById('fleet-schedule-feedback').scrollIntoView({block:'start'});window.scrollBy(0,-180);`);
+                await screenshot('connection-error');
+                await evaluate(`window.__badJsonSuffix='';document.getElementById('fleet-schedule-refresh').click();`);
+                await waitFor(async()=>await evaluate(`document.getElementById('fleet-schedule-feedback').textContent===''`),'visual outage recovered');
+                await evaluate(`document.getElementById('fleet-schedule-cancel').click();document.getElementById('fleet-edit').click();document.getElementById('fleet-editor-cancel').click();document.getElementById('fleet-edit').scrollIntoView({block:'center'});`);
+                assert.equal(await evaluate('document.activeElement.id'),'fleet-edit');
+                await screenshot('profile-cancel-focus');
                 for (const [name,id] of [['management','wtp-management'],['station','wtp-usb-progress-heading'],['complete-station','wtp-complete-station'],['gps','wtp-gps-controls'],['hardware-actions','wtp-member-validate'],['capability-guidance','wtp-platform-limits'],['alternatives','wtp-combined-settings']]) {
                     await evaluate(`document.getElementById('wtp-hardware-settings').open=true;if(document.getElementById('${id}').tagName==='DETAILS')document.getElementById('${id}').open=true;document.getElementById('${id}').scrollIntoView({block:'start'});window.scrollBy(0,-180);document.getAnimations().forEach(a=>a.finish());`);
                     assert.equal(await evaluate('document.documentElement.scrollWidth <= innerWidth'),true,name+' '+theme+' overflow');
