@@ -58,8 +58,11 @@ Status key: ✅ Complete · ⏳ In progress · ▧ Not started
    findings. The operator manual already describes both locator lengths
    correctly and required no change. Encoding, persistence, and protocol
    schemas are unchanged; validation was hardware-free.
-9. ▧ **Pico P15.14 operator documentation.** Complete the separate Pico
-   operator-documentation follow-up for independent valid-field saves.
+9. ✅ **Pico operator documentation for independent valid-field saves.**
+   Closed November 3, 2026. The Pico operator manual's `docs/configure.md`
+   covers independent valid-field saves, incomplete progress, explicit
+   application, and uncertain-save recovery. The historical P15.14
+   documentation reference was superseded by P15.20 numbering.
 10. ▧ **Publish new Pico beta.** Prepare, validate, and publish the next Pico
    beta under separate release authorization.
 11. ▧ **Publish new beta.** Prepare, validate, and publish the next beta under
