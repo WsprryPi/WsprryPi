@@ -103,13 +103,13 @@
     const pair = pairs[profile.i2c_pair];
     return `Qualified setup: QRP Labs Rev. 6 with a ${profile.reference_hz/1e6} MHz TCXO into XA; SDA GP${pair[0]} / SCL GP${pair[1]}; CLK${profile.transmit_output} at ${profile.drive_ma} mA. Loopback: None or CLK${profile.loopback_output} to GP${profile.loopback_input_gp}. Independent RF gate: None wired. Pico clock: ${profile.system_clock_hz/1e6} MHz.`;
   }
-  function create(container, {changed = ()=>{}, bootstrap = false} = {}) {
+  function create(container, {changed = ()=>{}, bootstrap = false, compact = false} = {}) {
     const profile = root.WsprryControl?.descriptors?.si5351?.ordinary_profile;
     const ordinary = profile?.qualified === true;
     const introduction = ordinary ? 'Ordinary firmware supports the qualified setup below. Other configurations require an engineering build.' :
       'Si5351 transmission requires an engineering build while physical qualification is incomplete.';
-    container.innerHTML = `<p>${introduction} Saving settings does not enable an output.</p>
-      ${ordinary ? `<p data-si-profile>${profileDescription(profile)}</p>` : ''}
+    container.innerHTML = `${compact ? '<h3 data-si-heading>Si5351 I²C setup</h3>' : ''}
+      ${compact ? '' : `<p>${introduction} Saving settings does not enable an output.</p>${ordinary ? `<p data-si-profile>${profileDescription(profile)}</p>` : ''}`}
       <div class="fields">
       <label>I²C SDA/SCL pair<select data-si="pair" required><option value="">Choose a pair</option>${pairs.map((p,i)=>`<option value="${i}">I²C${i<6?0:1}: GP${p[0]} / GP${p[1]}</option>`).join('')}</select></label>
       <label>Device address<select data-si="address"><option value="96">0x60 (supported address)</option></select></label>
@@ -127,8 +127,9 @@
       <label>Independent RF gate GPIO<select data-si="rf_gate_gp"><option value="">None wired</option>${[...Array(23).keys(),26,27,28].map(p=>`<option value="${p}">GP${p}</option>`).join('')}</select></label>
       <label data-si-group="gate">RF gate polarity<select data-si="rf_gate_active_high"><option value="true">Active-high</option><option value="false">Active-low</option></select></label>
       </div>
+      ${compact ? '' : `
       <p>External XA requires compatible module wiring, levels and grounding. It does not select CLKIN. A gate requires an inactive hardware bias. Output drive is electrical current, not RF power or reported WSPR dBm.</p>
-      <p>Positive correction lowers programmed RF for a fast reference. Loopback measures a clock ratio; it does not establish UTC or absolute RF accuracy. Trusted use can reduce timer drift after NTP or phone time is accepted. It requires a known reference uncertainty and does not extend time validity. Automatic correction requires enabled GPS with a validated UTC/PPS association and a separate loopback measurement.</p>
+      <p>Positive correction lowers programmed RF for a fast reference. Loopback measures a clock ratio; it does not establish UTC or absolute RF accuracy. Trusted use can reduce timer drift after NTP or phone time is accepted. It requires a known reference uncertainty and does not extend time validity. Automatic correction requires enabled GPS with a validated UTC/PPS association and a separate loopback measurement.</p>`}
       <p data-si-status role="status" aria-live="polite">Reference measurements have not been read.</p>`;
     if(bootstrap) {
       container.querySelector('.fields').className='row g-3';
@@ -200,7 +201,7 @@
     function observation(v) {
       const status = container.querySelector('[data-si-status]');
       const r = v?.runtime, m = r?.reference_measurement;
-      status.textContent = !r ? 'Runtime observation unavailable. Saving settings does not prove hardware is connected or RF is inactive.' :
+      status.textContent = !r ? (compact ? 'Runtime observation unavailable.' : 'Runtime observation unavailable. Saving settings does not prove hardware is connected or RF is inactive.') :
           `Transmit ${r.transmit.replaceAll('_',' ')}; reference clock ${r.reference_output.replaceAll('_',' ')}. ${r.inhibited ? 'Output inhibited for this boot. ' : ''}Clock reference: ${{none:'no trusted rate input',selected:'trusted local rate selected',quality:'existing clock-rate estimate has lower uncertainty',disagreement:'frequency disagreement; UTC admission blocked',expired:'capture lost or stale; learned timer rate retained with growing uncertainty',awaiting_utc:'rate input ready; an accepted UTC source is still required'}[r.clock_reference_state]}. ${r.clock_reference_state!=='none' ? 'Last reference rate sample '+(Number(r.clock_reference_age_ns)/1e9).toFixed(1)+' s ago. ' : ''}${executionDescription(v)} `+
           (m ? `Loopback ratio error ${m.ratio_error_ppb} ppb, uncertainty ≤${m.uncertainty_ppb} ppb; ${(Number(m.duration_ns)/1e9).toFixed(1)} s window, ${(Number(m.age_ns)/1e9).toFixed(1)} s old. ${m.reference_use==='measurement_only' ? 'Measurement only.' : 'Local rate estimate; no UTC epoch or absolute RF calibration.'}` : `No current loopback measurement${r.measurement_error ? ': '+r.measurement_error.replaceAll('_',' ') : ''}.`);
     }
