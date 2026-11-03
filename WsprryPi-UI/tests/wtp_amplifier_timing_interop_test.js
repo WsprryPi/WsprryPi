@@ -22,5 +22,6 @@ function lines(child){const queue=[],waiters=[];readline.createInterface({input:
   if(carrier==='engineering')await require('./advertised_policy_pair_cases.js')(call);
   await require('./filter_selector_pair_cases.js')(call);
   await require('./si5351_pair_cases.js')(call);
+  await require('./gps_pair_cases.js')(call);
  }finally{for(const child of [client,server])if(child&&child.exitCode===null){child.stdin.end();child.kill();}}
 }})().catch(e=>{console.error(e);process.exitCode=1;});

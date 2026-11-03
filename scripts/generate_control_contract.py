@@ -38,15 +38,19 @@ def main():
             (ROOT/'WsprryPi-UI/data/control-contract.js').write_bytes(javascript)
             si5351=(args.source/'src/network/web/si5351.js').read_bytes()
             (ROOT/'WsprryPi-UI/data/si5351.js').write_bytes(si5351)
+            gps=(args.source/'src/network/web/gps.js').read_bytes()
+            (ROOT/'WsprryPi-UI/data/gps.js').write_bytes(gps)
             revision = subprocess.check_output(['git','-C',str(args.source),'rev-parse','HEAD'],text=True).strip()
             dirty = bool(subprocess.check_output(['git','-C',str(args.source),'status','--porcelain'],text=True))
-            (DEST / 'PROVENANCE.json').write_text(json.dumps({'repository':'https://github.com/WsprryPi/WsprryPico','source_base_revision':revision,'source_uncommitted':dirty,'upstream':'engineering/protocol/control-1.schema.json','sha256':hashlib.sha256(contents).hexdigest(),'javascript_sha256':hashlib.sha256(javascript).hexdigest(),'si5351_javascript_sha256':hashlib.sha256(si5351).hexdigest(),'policy_sha256':hashlib.sha256((DEST/'control-policy.json').read_bytes()).hexdigest(),'policy_checker_sha256':hashlib.sha256((DEST/'check_control_policy.py').read_bytes()).hexdigest()},indent=2)+'\n')
+            (DEST / 'PROVENANCE.json').write_text(json.dumps({'repository':'https://github.com/WsprryPi/WsprryPico','source_base_revision':revision,'source_uncommitted':dirty,'upstream':'engineering/protocol/control-1.schema.json','sha256':hashlib.sha256(contents).hexdigest(),'javascript_sha256':hashlib.sha256(javascript).hexdigest(),'si5351_javascript_sha256':hashlib.sha256(si5351).hexdigest(),'gps_javascript_sha256':hashlib.sha256(gps).hexdigest(),'policy_sha256':hashlib.sha256((DEST/'control-policy.json').read_bytes()).hexdigest(),'policy_checker_sha256':hashlib.sha256((DEST/'check_control_policy.py').read_bytes()).hexdigest()},indent=2)+'\n')
         elif spec_path.read_bytes() != contents:
             raise ValueError('Vendored Control/1 differs from selected Pico source')
         if args.check and (ROOT / 'WsprryPi-UI/data/control-contract.js').read_bytes() != (args.source / 'src/network/web/control-contract.js').read_bytes():
             raise ValueError('Shared browser registry differs from selected Pico source')
     if args.source and args.check and (ROOT/'WsprryPi-UI/data/si5351.js').read_bytes() != (args.source/'src/network/web/si5351.js').read_bytes():
         raise ValueError('Shared Si5351 controls differ from selected Pico source')
+    if args.source and args.check and (ROOT/'WsprryPi-UI/data/gps.js').read_bytes() != (args.source/'src/network/web/gps.js').read_bytes():
+        raise ValueError('Shared GPS controls differ from selected Pico source')
     contents = spec_path.read_bytes()
     spec = json.loads(contents)
     provenance = json.loads((DEST / 'PROVENANCE.json').read_text())
@@ -56,6 +60,8 @@ def main():
         raise ValueError('Generated browser registry provenance mismatch')
     if provenance.get('si5351_javascript_sha256') != hashlib.sha256((ROOT/'WsprryPi-UI/data/si5351.js').read_bytes()).hexdigest():
         raise ValueError('Shared Si5351 control provenance mismatch')
+    if provenance.get('gps_javascript_sha256') != hashlib.sha256((ROOT/'WsprryPi-UI/data/gps.js').read_bytes()).hexdigest():
+        raise ValueError('Shared GPS control provenance mismatch')
     for name, key in [('control-policy.json', 'policy_sha256'), ('check_control_policy.py', 'policy_checker_sha256')]:
         if provenance.get(key) != hashlib.sha256((DEST / name).read_bytes()).hexdigest():
             raise ValueError('Vendored lifecycle guard provenance mismatch: ' + name)

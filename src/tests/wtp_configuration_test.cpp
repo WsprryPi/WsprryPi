@@ -21,7 +21,7 @@ Json canonical_caps() {
     {"features",Json::object()},{"active_job_connections",false},{"max_network_connections",2},{"max_wtp_connections",1},
     {"max_pending_connections",1},{"max_handshakes",1},{"max_body_bytes",32768}};
   for(const auto name:{"config","schedules","jobs","network","application","station","hardware","consumer_setup_identity","softap","ble","restart"})result["features"][name]=std::string(name)!="consumer_setup_identity";
-  for(const auto name:{"application_resources","configuration_updates","management_carriers","saved_progress","gpio_drive","amplifier_timing","si5351"})result[name]=Json::parse(control_descriptor(name));
+  for(const auto name:{"application_resources","configuration_updates","management_carriers","saved_progress","gpio_drive","amplifier_timing","si5351","gps"})result[name]=Json::parse(control_descriptor(name));
   return result;
 }
 Json management() {
@@ -337,6 +337,34 @@ void advertised_policy_checks() {
   CHECK(apply.status==502);CHECK(progress.writes==0);
   std::cout<<"Advertised GPIO/timing policy rejects requests, stale readbacks and draft apply before writes passed\n";
 }
+void gps_resource_binding_checks() {
+  const auto active=Json::parse(R"({"enabled":true,"receiver":"qlg3","rx_gp":1,"pps_gp":3,"tx_gp":null,"baud":9600,"pps_active_high":true,"pairing_qualified":true,"utc_second_offset":0,"pps_offset_ns":0,"minimum_message_delay_ms":0,"maximum_message_delay_ms":800,"receiver_uncertainty_us":100,"capture_uncertainty_us":100,"location":"manual","position_maximum_age_s":30,"automatic_rf_calibration":false,"calibration_maximum_age_s":3600,"daylight":"always"})");
+  const auto runtime=Json::parse(R"({"serial_present":true,"pps_present":true,"time_valid":true,"position_valid":true,"satellites":8,"observation_raw_ns":"2000000000","age_ns":"0","position":{"latitude_e7":390000000,"longitude_e7":-940000000,"locator":"EM39AA","observed_raw_ns":"2000000000","age_ns":"0"},"candidate_utc_ns":"1793620802000000000","candidate_raw_ns":"2100000000","candidate_pps_raw_ns":"2000000000","observations":1,"rejected_sentences":0,"dropped":0,"uart_errors":0,"irq_latency_ns":"4000","maximum_irq_latency_ns":"6000","capture_error_bound_ns":"8000","capture_rejections":0,"error":"","timer_calibration":null,"synthesizer_calibration":null})");
+  const Json valid{{"schema","gps"},{"target",target},{"saved",active},{"boot_active",active},
+    {"pending_restart",false},{"storage_healthy",true},{"runtime",runtime}};
+  auto resource=valid;
+  const PicoManagementExchange exchange=[&](auto path,auto method,auto,auto) {
+    CHECK(method=="GET");
+    if(path=="capabilities")return PicoHttpResponse{200,document(canonical_caps()),{}};
+    if(path=="management")return PicoHttpResponse{200,management().dump(),{}};
+    CHECK(path=="gps");return PicoHttpResponse{200,document(resource),"\"r1\""};
+  };
+  const auto read=[&]{return pico_resource_request(exchange,device,boot,"gps","GET");};
+  CHECK(read().status==200);
+  const std::vector<std::function<void(Json&)>> corrupt={
+    [](auto& v){v["boot_active"]=nullptr;},
+    [](auto& v){v["boot_active"]["enabled"]=false;},
+    [](auto& v){v["boot_active"]["pairing_qualified"]=false;},
+    [](auto& v){v["storage_healthy"]=false;},
+    [](auto& v){v["runtime"]["position"]["age_ns"]="31000000000";},
+    [](auto& v){v["runtime"]["position"]["locator"]="EM18AA";},
+    [](auto& v){v["runtime"].erase("time_valid");},
+    [](auto& v){v["target"]["boot_id"]=std::string(32,'f');},
+  };
+  for(const auto& change:corrupt){resource=valid;change(resource);CHECK(read().status==502);}
+  resource=valid;resource["boot_active"]=nullptr;resource["runtime"]=nullptr;
+  CHECK(read().status==200); // A saved-only configuration has no active evidence.
+}
 void config_pin_omission_checks() {
   for(const auto polarity:{false,true}) {
     Member peer;peer.config["pins"]["amplifier_active_high"]=polarity;
@@ -601,4 +629,4 @@ void http_boundaries() {
   CHECK(wtp_json_http_exchange(valid,[&]{return ++tick;},"",100,true).status==200);
 }
 } // namespace
-int main() { try { checks(); advertised_policy_checks(); config_pin_omission_checks(); sibling_document_checks(); progress_polarity_checks(); progress_checks(); usb_management_contract(); management_descriptor_matrix(); http_boundaries(); } catch (const std::exception &e) { std::cerr << e.what() << '\n'; return 1; } }
+int main() { try { checks(); advertised_policy_checks(); gps_resource_binding_checks(); config_pin_omission_checks(); sibling_document_checks(); progress_polarity_checks(); progress_checks(); usb_management_contract(); management_descriptor_matrix(); http_boundaries(); } catch (const std::exception &e) { std::cerr << e.what() << '\n'; return 1; } }

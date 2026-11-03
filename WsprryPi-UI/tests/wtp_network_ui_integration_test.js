@@ -260,6 +260,10 @@ async function main() {
                     }
                     return {ok:true,headers:{get:()=> '\"progress-r1\"'},json:async()=>result};
                 }
+                if (String(url).endsWith('/member/gps')) {
+                    const resource=window.__resourceFixtures[window.__resourceState];
+                    return {ok:true,headers:{get:()=> '\"resource-r1\"'},json:async()=>({contract:'Wsprry-Control/1',schema:'gps',target:resource.target,saved:null,boot_active:null,pending_restart:false,runtime:null,storage_healthy:resource.application.hardware.storage_healthy})};
+                }
                 if (String(url).endsWith('/member/si5351')) {
                     const resource=window.__resourceFixtures[window.__resourceState];
                     return {ok:true,headers:{get:()=> '\"resource-r1\"'},json:async()=>({contract:'Wsprry-Control/1',schema:'si5351',target:resource.target,saved:null,boot_active:null,pending_restart:false,physically_qualified:false,qualification:null,execution_engine:resource.application.hardware.execution_engine,runtime:null,storage_healthy:resource.application.hardware.storage_healthy})};
@@ -414,6 +418,32 @@ async function main() {
                 })()`),true,'member draft changes must never schedule host autosave');
                 await evaluate(`document.getElementById('wtp-member-load').click()`);
                 await waitFor(async()=>await evaluate('!document.getElementById("wtp-member-validate").disabled'),'resources after carrier draft change');
+                assert.equal(await evaluate(`document.querySelector('#wtp-gps-controls [data-gps="enabled"]').disabled`),false);
+                const previews=await evaluate('window.__requests.filter(r=>r.url.endsWith("/member/pins/validate")).length');
+                await evaluate(`(()=>{const e=document.querySelector('#wtp-gps-controls [data-gps="location"]');e.value='gps';e.dispatchEvent(new Event('change',{bubbles:true}));document.getElementById('wtp-member-validate').click();})()`);
+                assert.equal(await evaluate('document.activeElement.dataset.gps'),'enabled');
+                assert.equal(await evaluate('window.__requests.filter(r=>r.url.endsWith("/member/pins/validate")).length'),previews);
+                await evaluate(`(()=>{const e=document.querySelector('#wtp-gps-controls [data-gps="location"]');e.value='manual';e.dispatchEvent(new Event('change',{bubbles:true}));})()`);
+                assert.equal(await evaluate(`document.querySelector('#wtp-gps-controls [data-gps="enabled"]').checkValidity()`),true,'Policy correction clears dependent GPS validity');
+                await evaluate(`(()=>{
+                    const set=(key,value)=>{const e=document.querySelector('#wtp-gps-controls [data-gps="'+key+'"]');e.value=String(value);e.dispatchEvent(new Event('change',{bubbles:true}));};
+                    document.querySelector('#wtp-gps-controls details').open=true;
+                    set('enabled',true);set('rx_gp',1);set('pps_gp',1);
+                    document.getElementById('wtp-member-validate').click();
+                })()`);
+                assert.equal(await evaluate('document.activeElement.dataset.gps'),'pps_gp');
+                assert.equal(await evaluate('window.__requests.filter(r=>r.url.endsWith("/member/pins/validate")).length'),previews,'GPS conflict refuses before sending pin preview');
+                await evaluate(`(()=>{for(const [key,value] of [['pps_gp','3'],['enabled','false']]){const e=document.querySelector('#wtp-gps-controls [data-gps="'+key+'"]');e.value=value;e.dispatchEvent(new Event('change',{bubbles:true}));}})()`);
+                for(const view of [{name:'desktop',width:1280,height:900},{name:'mobile',width:390,height:844},{name:'landscape',width:740,height:360}]) {
+                    await client.send('Emulation.setDeviceMetricsOverride',{width:view.width,height:view.height,deviceScaleFactor:1,mobile:view.name!=='desktop'});
+                    await new Promise(resolve=>setTimeout(resolve,200));
+                    await evaluate(`document.getElementById('wtp-gps-controls').scrollIntoView({block:'start',behavior:'instant'})`);
+                    await evaluate('new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)))');
+                    const clip=await evaluate(`(()=>{const r=document.getElementById('wtp-gps-controls').getBoundingClientRect();return {x:0,y:r.top+scrollY,width:innerWidth,height:Math.ceil(r.height),scale:1}})()`);
+                    await capture(`gps-${view.name}.png`,{format:'png',clip,captureBeyondViewport:true});
+                    assert(await evaluate('document.documentElement.scrollWidth<=innerWidth+1'),'GPS editor has no horizontal overflow');
+                }
+                await client.send('Emulation.setDeviceMetricsOverride',{width:1280,height:900,deviceScaleFactor:1,mobile:false});
                 const before=await evaluate('window.__requests.filter(r=>r.options.method==="PUT").length');
                 await evaluate(`document.getElementById('wtp-member-validate').click()`);
                 await waitFor(async()=>await evaluate('document.getElementById("wtp-member-pin-feedback").textContent.includes("Preview only")'),'pin preview');
@@ -472,7 +502,9 @@ async function main() {
                 assert(await evaluate(`['callsign','locator','power'].every(n=>document.getElementById('wtp-member-'+n).getAttribute('aria-describedby').includes('wtp-member-'+n+'-progress'))`),'field outcome descriptions');
             }
         }
-        await evaluate(`window.__progressFailure='';document.documentElement.style.zoom='2';document.getElementById('wtp-usb-progress-load').scrollIntoView({block:'center',behavior:'instant'})`);
+        await evaluate(`window.__progressFailure='';document.getElementById('wtp-usb-progress-load').click()`);
+        await waitFor(async()=>await evaluate('!document.getElementById("wtp-usb-progress-save").disabled'),'restored progress after unsupported fixture');
+        await evaluate(`document.documentElement.style.zoom='2';document.getElementById('wtp-usb-progress-load').scrollIntoView({block:'center',behavior:'instant'})`);
         assert(await evaluate('document.documentElement.scrollWidth<=innerWidth+1'),'station progress 200% zoom overflow');
         await capture('mobile-station-progress-zoom.png',{format:'png'});
         await evaluate(`document.documentElement.style.zoom='';document.getElementById('wtp-usb-progress-load').focus()`);
