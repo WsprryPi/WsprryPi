@@ -28,6 +28,7 @@ jobs:
     timeout-minutes: 5
     outputs:
       run_full_ci: ${{ steps.classify.outputs.run_full_ci }}
+      pico_sha: ${{ steps.pico-output.outputs.pico_sha }}
     steps:
       - uses: actions/checkout@v7
         with:
@@ -42,6 +43,27 @@ jobs:
       - name: Inspect the complete Git comparison
         id: classify
         run: python3 -B scripts/ci/change_scope.py
+      - name: Install workflow validation dependency
+        run: sudo apt-get update && sudo apt-get install -y python3-yaml
+      - name: Verify execution owners and source-selection refusals
+        run: python3 -B scripts/tests/ci_execution_graph_test.py
+      - name: Validate requested Pico ref
+        if: steps.classify.outputs.run_full_ci != 'false' && github.event_name == 'workflow_dispatch'
+        env:
+          PICO_REF: ${{ inputs.pico_ref }}
+        run: python3 -B scripts/ci/selected_source.py selection "$PICO_REF"
+      - name: Resolve Pico source once
+        if: steps.classify.outputs.run_full_ci != 'false'
+        uses: actions/checkout@v7
+        with:
+          repository: WsprryPi/WsprryPico
+          ref: ${{ inputs.pico_ref || 'devel' }}
+          path: src/build/selected-pico
+          persist-credentials: false
+      - name: Record immutable Pico source
+        if: steps.classify.outputs.run_full_ci != 'false'
+        id: pico-output
+        run: python3 -B scripts/ci/selected_source.py record src/build/selected-pico
 
   macos-simulated-profile:
     env:
@@ -140,15 +162,21 @@ jobs:
       - name: Install UI development dependencies
         working-directory: WsprryPi-UI
         run: npm ci --ignore-scripts
+      - name: Require immutable Pico selection
+        env:
+          PICO_SHA: ${{ needs.change_scope.outputs.pico_sha }}
+        run: python3 -B scripts/ci/selected_source.py require "$PICO_SHA"
       - name: Selected Pico source
         uses: actions/checkout@v7
         with:
           repository: WsprryPi/WsprryPico
-          ref: ${{ inputs.pico_ref || 'devel' }}
+          ref: ${{ needs.change_scope.outputs.pico_sha }}
           path: src/build/network-reference/pico
           persist-credentials: false
-      - name: Record selected Pico source
-        run: git -C src/build/network-reference/pico log -1 --format='%H %D'
+      - name: Verify immutable Pico source
+        env:
+          PICO_SHA: ${{ needs.change_scope.outputs.pico_sha }}
+        run: python3 -B scripts/ci/selected_source.py verify "$PICO_SHA" src/build/network-reference/pico
       - name: Verify shared contract and lifecycle against the selected Pico
         run: python3 scripts/generate_control_contract.py --source src/build/network-reference/pico --check
       - name: Read-only pinned Pico TLS dependency
@@ -166,7 +194,6 @@ jobs:
           make production-browser-regression-test BACKENDS=simulated ANCILLARY_GPIO=0 SUDO= TEST_NETNS_RUNNER="sudo unshare --net"
           make tls-observer-test SUDO=
           make wtp-catalog-test SUDO=
-          make wtp-tls-test SUDO=
           make wtp-network-runtime-test BACKENDS=simulated ANCILLARY_GPIO=0 SUDO=
           make wtp-network-interop-test SUDO= PICO_SOURCE=build/network-reference/pico MBEDTLS_SOURCE=build/network-reference/mbedtls
           make wtp-config-interop-test SUDO= PICO_SOURCE=build/network-reference/pico MBEDTLS_SOURCE=build/network-reference/mbedtls
@@ -220,14 +247,20 @@ jobs:
       - uses: actions/checkout@v7
       - name: USB host-only build dependencies
         run: sudo apt-get update && sudo apt-get install -y build-essential libssl-dev pkg-config cmake python3 nodejs
+      - name: Require immutable Pico selection
+        env:
+          PICO_SHA: ${{ needs.change_scope.outputs.pico_sha }}
+        run: python3 -B scripts/ci/selected_source.py require "$PICO_SHA"
       - uses: actions/checkout@v7
         with:
           repository: WsprryPi/WsprryPico
-          ref: ${{ inputs.pico_ref || 'devel' }}
+          ref: ${{ needs.change_scope.outputs.pico_sha }}
           path: src/build/usb-reference/pico
           persist-credentials: false
-      - name: Record selected Pico source
-        run: git -C src/build/usb-reference/pico log -1 --format='%H %D'
+      - name: Verify immutable Pico source
+        env:
+          PICO_SHA: ${{ needs.change_scope.outputs.pico_sha }}
+        run: python3 -B scripts/ci/selected_source.py verify "$PICO_SHA" src/build/usb-reference/pico
       - name: Verify shared contract and lifecycle against the selected Pico
         run: python3 scripts/generate_control_contract.py --source src/build/usb-reference/pico --check
       - name: Build actual production Pico USB endpoint without SDK or network
@@ -335,7 +368,7 @@ jobs:
           apt-get update
           DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
             age build-essential ca-certificates chromium cmake device-tree-compiler git libgpiod-dev libssl-dev libavahi-client-dev \
-            libsystemd-dev nodejs npm php-cli pkg-config python3 strace
+            libsystemd-dev nodejs npm php-cli pkg-config python3 shellcheck strace
 
       - name: Check out source
         uses: actions/checkout@v7
@@ -359,7 +392,7 @@ jobs:
       - name: Run WTP component, plan, USB adapter, backend, scheduler and status tests
         working-directory: src
         run: |
-          make wtp-protocol-test wtp-plan-test wtp-usb-test wtp-usb-management-test wtp-backend-test wtp-scheduler-test wtp-status-test wtp-application-test wtp-production-test SUDO=
+          make wtp-protocol-test wtp-plan-test wtp-usb-test wtp-usb-management-test wtp-backend-test wtp-scheduler-test wtp-status-test wtp-application-test wtp-production-cpp-test SUDO=
           make wtp-pi-authority-test wtp-pi-listener-test wtp-pi-revocation-test \
             wtp-pi-tone-engine-test wtp-pi-identity-test wtp-pi-interface-selection-test \
             wtp-pi-si5351-realization-test wtp-pi-control-test wtp-pi-config-transaction-test \
@@ -368,9 +401,9 @@ jobs:
       - name: Frequency and Test Tone contracts
         working-directory: src
         run: |
-          make test-tone-request-test test-tone-frequency-plan-test test-tone-selector-plan-test test-tone-response-test test-tone-lifecycle-test legacy-tone-frequency-test SUDO=
+          make test-tone-request-test test-tone-frequency-plan-test test-tone-selector-plan-test test-tone-response-test SUDO=
           make band-lookup-correlation-test wspr-band-catalog-test wspr-preset-catalog-response-test SUDO=
-          make wspr-tone-regression-test qrss-execution-regression-test wtp-plan-test wtp-fleet-test wtp-config-test wtp-api-test SUDO=
+          make wspr-tone-regression-test qrss-execution-regression-test wtp-config-cpp-test wtp-api-cpp-test SUDO=
       - name: Run parent semantics and cleanup lifecycle tests
         working-directory: src
         run: |
@@ -408,6 +441,18 @@ jobs:
               rp1-gpclk-development-policy-test rp1-gpclk-route-runtime-wiring-test \
               rp1-gpclk-route-service-test rp1-gpclk-transmit-backend-test \
               rp1-gpclk-diagnostics-test rp1-release-acceptance-test SUDO=
+
+      - name: Execute focused state, network policy and support lifecycle obligations
+        working-directory: src
+        run: |
+          strace -f -e trace=openat,open -o /tmp/wsprrypi-focused.strace \
+            make ci-focused-state-test ci-network-policy-test ci-support-lifecycle-test SUDO=
+      - name: Execute offline installer and maintenance obligations
+        working-directory: src
+        run: |
+          command -v shellcheck
+          strace -f -e trace=openat,open -o /tmp/wsprrypi-installer.strace \
+            make ci-installer-offline-test php2shell-test SUDO=
 
       - name: Read-only published RP1 1.0.1 provider reference
         uses: actions/checkout@v7
@@ -459,7 +504,7 @@ jobs:
           timeout 5s ./build/bin/simulated_transmit_backend_realtime_test
           make transmission-controller-contract-test
           make startup-quiesce-test
-          make linux-i2c-identity-test si5351-transition-test
+          make si5351-transition-test
 
       - name: Build and test WSPR reference component
         working-directory: src/WSPR-Reference
@@ -496,5 +541,7 @@ jobs:
             /tmp/wsprrypi-semantics.strace \
             /tmp/wsprrypi-startup-quiesce-parent.strace \
             /tmp/wsprrypi-rp1.strace \
+            /tmp/wsprrypi-focused.strace \
+            /tmp/wsprrypi-installer.strace \
             /tmp/wsprrypi-simulator.strace \
             /tmp/wsprrypi-wspr-simulator.strace

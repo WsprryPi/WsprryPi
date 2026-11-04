@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import subprocess
+import shlex
 import tempfile
 from pathlib import Path
 
@@ -20,20 +21,22 @@ def run_renderer(ini_text: str, existing_policy: str | None = None) -> str:
         subprocess.run([
             "python3", str(RENDERER), "--ini", str(ini),
             "--output", str(output),
-        ], check=True)
+        ], check=True, timeout=30)
         return output.read_text(encoding="utf-8")
 
 
 enforced = run_renderer(
     "[Security]\nPrivileged Network Safety = enforced\n")
-assert "Current-network authorization is enforced" in enforced
-assert "RequestHeader unset X-WsprryPi-Client-Address" in enforced
-assert (
-    'RequestHeader set X-WsprryPi-Client-Address '
-    '"expr=%{CONN_REMOTE_ADDR}"'
-) in enforced
-assert "Require ip" not in enforced
-assert "^/wsprrypi/(?:config(?:/|$)|control(?:/|$)|version$|api(?:/|$)|socket(?:/|$))" in enforced
+def directives(text):
+    return [shlex.split(line) for line in text.splitlines() if line.strip() and not line.lstrip().startswith('#')]
+
+expected = [
+    ['<LocationMatch', '^/wsprrypi/(?:config(?:/|$)|control(?:/|$)|version$|api(?:/|$)|socket(?:/|$))>'],
+    ['RequestHeader', 'unset', 'X-WsprryPi-Client-Address'],
+    ['RequestHeader', 'set', 'X-WsprryPi-Client-Address', 'expr=%{CONN_REMOTE_ADDR}'],
+    ['</LocationMatch>'],
+]
+assert directives(enforced) == expected
 
 invalid = run_renderer(
     "[Security]\nPrivileged Network Safety = true\n")
@@ -44,9 +47,7 @@ assert missing == enforced
 
 disabled = run_renderer(
     "[Security]\nPrivileged Network Safety = insecure-disabled\n")
-assert "NETWORK SAFETY OFF" in disabled
-assert "RequestHeader unset X-WsprryPi-Client-Address" in disabled
-assert "RequestHeader set X-WsprryPi-Client-Address" in disabled
+assert directives(disabled) == expected
 
 # Upgrade from the former startup-snapshot policy must atomically replace its
 # stale Require-ip CIDRs instead of retaining or merging them.

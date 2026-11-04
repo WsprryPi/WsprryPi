@@ -5,6 +5,7 @@
 #include <cstdlib>
 #include <exception>
 #include <fstream>
+#include <filesystem>
 #include <iostream>
 #include <iterator>
 #include <string>
@@ -48,7 +49,10 @@ int main()
     set_si5351_detection_override_for_test(true);
 
     config.use_ini = true;
-    config.ini_filename = "/tmp/guarded_mode_change_single_persist.ini";
+    char scratch[] = "/tmp/wsprrypi-mode-persistence-XXXXXX";
+    require(::mkdtemp(scratch) != nullptr, "must create owned temporary directory");
+    const std::filesystem::path test_root(scratch);
+    config.ini_filename = (test_root / "settings.ini").string();
     config.mode = ModeType::WSPR;
     config.transmit = true;
     config.callsign = "AA0NT";
@@ -133,6 +137,7 @@ int main()
 
     set_scheduler_execution_suppressed_for_test(false);
     clear_si5351_detection_override_for_test();
+    std::filesystem::remove_all(test_root);
     std::cout << "guarded_mode_change_persistence_test passed" << std::endl;
     return EXIT_SUCCESS;
 }

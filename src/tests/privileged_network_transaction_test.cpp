@@ -2,6 +2,7 @@
 #include "../INI-Handler/src/ini_file.hpp"
 
 #include <cassert>
+#include <cstdlib>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
@@ -183,8 +184,10 @@ int main() {
                                  "reload", "restore"});
     }
 
-    const auto ini_path = std::filesystem::temp_directory_path() /
-        "wsprrypi-privileged-network-passthrough.ini";
+    char scratch[] = "/tmp/wsprrypi-network-transaction-XXXXXX";
+    assert(::mkdtemp(scratch) != nullptr);
+    const std::filesystem::path test_root(scratch);
+    const auto ini_path = test_root / "settings.ini";
     {
         std::ofstream output(ini_path, std::ios::binary | std::ios::trunc);
         output << "[Security]\n"
@@ -202,7 +205,7 @@ int main() {
         "Privileged Network Safety=insecure-disabled  ; retain exact spacing\n") !=
         std::string::npos);
     assert(saved.find("Ordinary = after\n") != std::string::npos);
-    std::filesystem::remove(ini_path);
+    std::filesystem::remove_all(test_root);
 
     std::cout << "privileged_network_transaction_test: PASS\n";
 }

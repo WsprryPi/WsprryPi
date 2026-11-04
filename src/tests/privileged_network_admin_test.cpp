@@ -2,6 +2,7 @@
 #include "../privileged_network_runtime.hpp"
 
 #include <cassert>
+#include <cstdlib>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
@@ -33,9 +34,9 @@ int main() {
     assert(!render_privileged_network_ini(
         "[Security]\n[Security]\n", "enforced").has_value());
 
-    const auto root = std::filesystem::temp_directory_path() /
-        ("wsprrypi-network-admin-" + std::to_string(::getpid()));
-    std::filesystem::create_directories(root);
+    char scratch[] = "/tmp/wsprrypi-network-admin-XXXXXX";
+    assert(::mkdtemp(scratch) != nullptr);
+    const std::filesystem::path root(scratch);
     const auto ini = root / "wsprrypi.ini";
     const auto policy = root / "policy.conf";
     write_file(ini, original);
@@ -74,9 +75,11 @@ int main() {
     initialize_privileged_network_runtime("enforced");
     set_active_privileged_network_mode(PrivilegedNetworkMode::enforced);
     std::vector<bool> outcomes{true, false, true};
+    std::vector<std::vector<std::string>> rollback_calls;
     PrivilegedNetworkAdmin rollback_admin(
         {ini.string(), policy.string(), "/mock/apache2ctl", "/mock/systemctl"},
-        [&](const std::vector<std::string> &) {
+        [&](const std::vector<std::string> &arguments) {
+            rollback_calls.push_back(arguments);
             assert(!outcomes.empty());
             const bool result = outcomes.front();
             outcomes.erase(outcomes.begin());
@@ -89,6 +92,8 @@ int main() {
     assert(read_text_file(policy.string()) ==
            std::optional<std::string>("old-policy\n"));
     assert(active_privileged_network_mode() == PrivilegedNetworkMode::enforced);
+    assert(outcomes.empty());
+    assert(rollback_calls == std::vector<std::vector<std::string>>({calls[0], calls[1], calls[1]}));
 
     std::filesystem::remove_all(root);
     std::cout << "privileged_network_admin_test: PASS\n";

@@ -5,6 +5,7 @@
 #include <iostream>
 #include <fstream>
 #include <thread>
+#include <future>
 #define CHECK(x) do {if(!(x)) throw std::runtime_error(#x);} while(false)
 int main() {
   using namespace wsprrypi;
@@ -56,19 +57,25 @@ int main() {
     refused=false;
     try {
       (void)pico_usb_installer_process({"/usr/bin/python3","-c",
-          "import subprocess,sys; p=subprocess.Popen(['/usr/bin/python3','-c','import time; time.sleep(20)'],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL); open(sys.argv[1],'w').write(str(p.pid)); print('{}')",
+          "import subprocess,sys; p=subprocess.Popen(['/usr/bin/python3','-c','import signal; signal.pause()'],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL); open(sys.argv[1],'w').write(str(p.pid)); print('{}')",
           orphan.string()});
     } catch(...) {refused=true;}
     CHECK(refused);
     std::ifstream child_record(orphan); int descendant=0; child_record>>descendant; CHECK(descendant>0);
     bool gone=false;
-    for(int i=0;i<100;++i) {
+    const auto cleanup_started = std::chrono::steady_clock::now();
+    const auto cleanup_guard = cleanup_started + std::chrono::seconds(1);
+    std::string last_state = "not observed";
+    while (std::chrono::steady_clock::now() < cleanup_guard) {
       std::ifstream state("/proc/"+std::to_string(descendant)+"/stat"); std::string line; std::getline(state,line);
       const auto end=line.rfind(')');
+      last_state = !state ? "absent" : end!=std::string::npos ? line.substr(end+2,1) : "malformed";
       if(!state || (end!=std::string::npos && line.substr(end+2,1)=="Z")) {gone=true;break;}
       std::this_thread::sleep_for(std::chrono::milliseconds(10));
     }
-    CHECK(gone); // No surviving writer after an invalid/crashed leader.
+    if (!gone) throw std::runtime_error("stage=descendant-cleanup; expected=absent or zombie; last="+last_state+
+      "; pid="+std::to_string(descendant)+"; hang_guard=1s; elapsed_ms="+
+      std::to_string(std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now()-cleanup_started).count()));
     refused=false;
     try {(void)pico_usb_installer_process({"/usr/bin/python3","-c",code+"; sys.exit(2)",argument});} catch(...) {refused=true;}
     CHECK(refused);
@@ -131,10 +138,27 @@ int main() {
     const auto erase_running=pico_usb_public_task({{"operation","recover"},{"running",true},
         {"recovery_operation","erase"},{"result",nullptr}});
     CHECK(erase_running.at("recovery_operation")=="erase" && erase_running.at("result").is_null());
+    // Entered/release acknowledgments establish exclusion, independent of host speed.
+    std::promise<void> entered, release;
+    auto started = entered.get_future();
+    auto released = release.get_future().share();
     PicoUsbInstallerTask task;
-    CHECK(task.start([] {std::this_thread::sleep_for(std::chrono::milliseconds(100));return nlohmann::json{{"ok",true}};},{{"operation","fixture"}}));
+    CHECK(task.start([&] {
+      entered.set_value();
+      if (released.wait_for(std::chrono::seconds(5)) != std::future_status::ready)
+        throw std::runtime_error("stage=fixture-release; expected=release acknowledgment; hang_guard=5s");
+      return nlohmann::json{{"ok",true}};
+    },{{"operation","fixture"}}));
+    CHECK(started.wait_for(std::chrono::seconds(5)) == std::future_status::ready);
+    CHECK(task.status().at("running") == true);
     CHECK(!task.start([] {return nlohmann::json{};},{}));
-    for(int i=0;i<100 && task.status().at("running")==true;++i)std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    release.set_value();
+    const auto completion_guard = std::chrono::steady_clock::now() + std::chrono::seconds(5);
+    while (task.status().at("running") == true) {
+      if (std::chrono::steady_clock::now() >= completion_guard)
+        throw std::runtime_error("stage=task-completion; expected=not running; last=" + task.status().dump() + "; hang_guard=5s");
+      std::this_thread::yield();
+    }
     CHECK(task.status().at("result").at("ok")==true);
     std::filesystem::remove_all(root);
     std::cout<<"Shared installer argv/result, private durable holds and task exclusion passed\n";

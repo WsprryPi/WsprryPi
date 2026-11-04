@@ -45,7 +45,10 @@ namespace
             std::this_thread::sleep_for(interval);
         }
 
-        return predicate();
+        if (predicate()) return true;
+        std::cerr << "stage=monitor-observation; expected=state predicate; last=pending; "
+                  << "hang_guard_ms=" << timeout.count() << std::endl;
+        return false;
     }
 } // namespace
 
@@ -53,15 +56,14 @@ int main()
 {
     namespace fs = std::filesystem;
 
-    const fs::path test_dir =
-        fs::temp_directory_path() / "wsprrypi_monitor_file_regression";
+    char scratch[] = "/tmp/wsprrypi-monitor-regression-XXXXXX";
+    require(::mkdtemp(scratch) != nullptr, "must create owned monitor directory");
+    const fs::path test_dir = fs::canonical(scratch);
     const fs::path ini_path = test_dir / "watched.ini";
     const fs::path replace_path = test_dir / "watched.ini.tmp";
 
     std::error_code ec;
-    fs::remove_all(test_dir, ec);
-    fs::create_directories(test_dir, ec);
-    require(!ec, "must create test directory");
+
 
     write_text_file(ini_path, "AAAAAAAA\n");
 

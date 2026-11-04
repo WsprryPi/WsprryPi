@@ -2023,9 +2023,16 @@ wtp-catalog-test:
 $(BIN_DIR)/wtp_production_test: tests/wtp_production_test.cpp $(SEMANTICS_TEST_DEPS)
 	$(Q)mkdir -p $(BIN_DIR)
 	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -Itests $^ -o $@ $(LDFLAGS)
-wtp-production-test: $(BIN_DIR)/wtp_production_test
+wtp-production-cpp-test: $(BIN_DIR)/wtp_production_test
 	$(Q)WSPRRYPI_DISABLE_HARDWARE_ACCESS=1 ./$(BIN_DIR)/wtp_production_test
+
+wtp-production-test: wtp-production-cpp-test wtp-ui-test
+
+.PHONY: wtp-production-cpp-test wtp-api-cpp-test wtp-config-cpp-test wtp-ui-test wtp-management-ui-test
+wtp-ui-test:
 	$(Q)node ../WsprryPi-UI/tests/wtp_ui_test.js
+wtp-management-ui-test:
+	$(Q)node ../WsprryPi-UI/tests/wtp_management_test.js
 
 # Parent network adapters; no physical USB/RF. The explicit interoperability
 # runner starts only the pinned Pico server's loopback host adapter.
@@ -2034,18 +2041,20 @@ WTP_NETWORK_CXXFLAGS ?= -O2 -g
 WTP_NETWORK_LDFLAGS ?=
 WTP_NETWORK_FLAGS = -std=c++20 -pthread -Wall -Wextra -Wpedantic -Werror $(WTP_NETWORK_CXXFLAGS) -I. -IWTP-Client/include -IWTP-Client/src $(OPENSSL_CFLAGS)
 .PHONY: wtp-api-test wtp-config-test wtp-config-client-build wtp-config-interop-test wtp-tls-build wtp-network-interop-test wtp-network-process-test
-wtp-config-test:
+wtp-config-cpp-test:
 	$(Q)mkdir -p "$(WTP_NETWORK_BUILD_DIR)"
 	$(Q)$(CXX) $(WTP_NETWORK_FLAGS) tests/wtp_configuration_test.cpp WTP-Client/src/codec.cpp WTP-Client/src/detail/json.cpp wtp_integration/configuration.cpp wtp_integration/consumer_radio.cpp wtp_integration/plain_tcp.cpp wtp_integration/browser_api.cpp wtp_integration/network_http.cpp wtp_integration/tls.cpp $(OPENSSL_LIBS) $(WTP_NETWORK_LDFLAGS) -o "$(WTP_NETWORK_BUILD_DIR)/wtp_configuration_test"
 	$(Q)"$(WTP_NETWORK_BUILD_DIR)/wtp_configuration_test"
-	$(Q)node ../WsprryPi-UI/tests/wtp_management_test.js
+
+wtp-config-test: wtp-config-cpp-test wtp-management-ui-test
 wtp-network-process-test:
 	$(Q)python3 -B tests/wtp_network_process_test.py
-wtp-api-test:
+wtp-api-cpp-test:
 	$(Q)mkdir -p "$(WTP_NETWORK_BUILD_DIR)"
 	$(Q)$(CXX) $(WTP_NETWORK_FLAGS) tests/wtp_browser_api_test.cpp wtp_integration/browser_api.cpp privileged_network_policy.cpp $(WTP_NETWORK_LDFLAGS) -o "$(WTP_NETWORK_BUILD_DIR)/wtp_browser_api_test"
 	$(Q)"$(WTP_NETWORK_BUILD_DIR)/wtp_browser_api_test"
-	$(Q)node ../WsprryPi-UI/tests/wtp_ui_test.js
+
+wtp-api-test: wtp-api-cpp-test wtp-ui-test
 wtp-tls-build:
 	$(Q)pkg-config --atleast-version=3.0 openssl || { echo "OpenSSL 3 development headers/libraries and pkg-config are required" >&2; exit 1; }
 	$(Q)mkdir -p "$(WTP_NETWORK_BUILD_DIR)"
@@ -2162,14 +2171,16 @@ $(WTP_NETWORK_BUILD_DIR)/usb-pair/%.o: %.cpp
 	$(Q)$(CXX) $(WTP_NETWORK_FLAGS) -MMD -MP -c "$<" -o "$@"
 -include $(WTP_USB_PAIR_OBJECTS:.o=.d)
 
-.PHONY: pico-usb-installer-test pico-usb-installer-cpp-test
+.PHONY: pico-usb-installer-test pico-usb-installer-cpp-test pico-usb-installer-offline-test
 pico-usb-installer-cpp-test:
 	$(Q)mkdir -p "$(WTP_NETWORK_BUILD_DIR)"
 	$(Q)$(CXX) $(WTP_NETWORK_FLAGS) tests/pico_usb_installer_test.cpp -o "$(WTP_NETWORK_BUILD_DIR)/pico_usb_installer_test"
 	$(Q)"$(WTP_NETWORK_BUILD_DIR)/pico_usb_installer_test"
 
-pico-usb-installer-test: pico-usb-installer-cpp-test
+pico-usb-installer-test: pico-usb-installer-offline-test
 	$(Q)node ../WsprryPi-UI/tests/wtp_firmware_test.js
+
+pico-usb-installer-offline-test: pico-usb-installer-cpp-test
 	$(Q)python3 -B ../scripts/tests/pico_usb_deploy_test.py
 	$(Q)python3 -B ../scripts/tests/pico_usb_bundle_test.py
 
@@ -2233,3 +2244,13 @@ linux-i2c-identity-config-test: $(BIN_DIR)/$(SEMANTICS_TEST_OUT)
 .PHONY: mcp2221a-transport-test
 mcp2221a-transport-test:
 	$(MAKE) -C WSPR-Transmitter/src mcp2221a-transport-test SI5351_TRANSPORT=$(SI5351_TRANSPORT)
+
+
+.PHONY: ci-focused-state-test ci-network-policy-test ci-support-lifecycle-test ci-installer-offline-test
+ci-focused-state-test: guarded-mode-change-persistence-test band-gpio-default-convergence-test band-gpio-rotation-test selector-shutdown-cleanup-test monitor-file-regression-test gpio-line-resolver-test non-wspr-repeat-policy-test
+ci-network-policy-test: support-request-guard-test privileged-network-policy-test backend-http-guard-test websocket-upgrade-guard-test privileged-network-transaction-test privileged-network-runtime-test privileged-network-admin-test
+ci-support-lifecycle-test: support-bundle-result-validator-test support-bundle-runtime-test support-bundle-download-file-test support-bundle-checksum-file-test support-bundle-archive-digest-test support-bundle-download-preparation-test support-bundle-job-directory-remover-test support-bundle-startup-cleanup-test
+ci-installer-offline-test: support-bundle-runtime-installer-test pico-usb-installer-offline-test
+	$(Q)python3 -B ../scripts/tests/apache_privileged_network_policy_renderer_test.py
+
+.PHONY: gpio-line-resolver-test non-wspr-repeat-policy-test

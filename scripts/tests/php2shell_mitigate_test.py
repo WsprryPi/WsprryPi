@@ -64,7 +64,7 @@ class MitigationTest(unittest.TestCase):
 
     def test_cli_offline_apply_refused_without_changes(self):
         before = self.snapshot()
-        result = subprocess.run([sys.executable, "-B", str(SCRIPT), "--root", str(self.root), "--apply"], capture_output=True, text=True)
+        result = subprocess.run([sys.executable, "-B", str(SCRIPT), "--root", str(self.root), "--apply"], capture_output=True, text=True, timeout=30)
         self.assertEqual(result.returncode, 2)
         self.assertIn("offline roots are audit-only", result.stderr)
         self.assertEqual(before, self.snapshot())
@@ -426,13 +426,13 @@ class MitigationTest(unittest.TestCase):
         self.assertTrue(any("systemctl restart" in command for command in commands))
         result = subprocess.run([shutil.which("shellcheck"), "--shell=sh", "-"],
                                 input="#!/bin/sh\nset -eu\n" + "\n".join(commands) + "\n",
-                                capture_output=True, text=True, check=False)
+                                capture_output=True, text=True, check=False, timeout=30)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
     def test_unsupported_os_and_restart_commands_appear_in_cli_audit(self):
         (self.root / "etc/os-release").write_text("ID=debian\nVERSION_ID=11\nVERSION_CODENAME=bullseye\n")
         before = self.snapshot()
-        result = subprocess.run([sys.executable, "-B", str(SCRIPT), "--root", str(self.root), "--verbose"], capture_output=True, text=True)
+        result = subprocess.run([sys.executable, "-B", str(SCRIPT), "--root", str(self.root), "--verbose"], capture_output=True, text=True, timeout=30)
         self.assertEqual(result.returncode, 1)
         self.assertIn("UNSUPPORTED RELEASE", result.stdout)
         self.assertIn("sudo systemctl restart apache2.service", result.stdout)
@@ -666,7 +666,7 @@ class MitigationTest(unittest.TestCase):
                     continued = line.endswith("\\")
             script = "#!/bin/sh\nset -eu\n" + "\n".join(commands) + "\n"
             self.assertIn("systemctl restart apache2.service", script)
-            result = subprocess.run([shutil.which("shellcheck"), "--shell=sh", "-"], input=script, capture_output=True, text=True)
+            result = subprocess.run([shutil.which("shellcheck"), "--shell=sh", "-"], input=script, capture_output=True, text=True, timeout=30)
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
 
