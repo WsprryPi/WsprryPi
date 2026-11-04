@@ -33,3 +33,19 @@ nor these inhibited I2C observations qualify another setup, a complete encoded
 WSPR transmission, calibrated power/frequency/spectrum or temperature extremes.
 The [active release evidence](../release_tools/4.0-Beta-1-Release-Evidence.md)
 records the selected candidate and its remaining acceptance gates.
+
+## Native macOS transport
+
+`SI5351_TRANSPORT=mcp2221a-hid` selects the native macOS MCP2221A HID path
+beneath this same backend. It does not select a new RF backend. The
+[transport guide](development/macos-mcp2221a.md) covers build prerequisites,
+exact adapter identity, 100 kHz transactions, and bounded transport deadlines.
+Native CLI configuration and explicit selected-address validation are available;
+native web adapter/status workflow support remains separate.
+
+A lost or faulted HID session cannot prove that a separately powered Si5351
+stopped generating clocks. Adapter transfer cancellation is not output disable.
+The backend retains primary and cleanup failures, and no adapter, transport,
+bus, or simulated fallback is automatic. macOS physical acceptance remains
+outstanding under #419; existing Linux and RF qualification is not extended by
+software builds or fake-channel tests.

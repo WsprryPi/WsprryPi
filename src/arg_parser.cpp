@@ -34,6 +34,9 @@
 // Project headers
 #include "config_handler.hpp"
 #include "WSPR-Transmitter/src/linux_i2c_identity.hpp"
+#if defined(__APPLE__) && defined(WSPRRYPI_SI5351_TRANSPORT)
+#include "WSPR-Transmitter/src/mcp2221a_macos.hpp"
+#endif
 #include "logging.hpp"
 #include "privileged_network_runtime.hpp"
 #include "scheduling.hpp"
@@ -2502,6 +2505,18 @@ bool handle_early_cli_options(int argc, char *argv[])
 
         if (arg == "--list-i2c-adapters")
         {
+#if defined(__APPLE__) && defined(WSPRRYPI_SI5351_TRANSPORT)
+            const auto inventory = mcp2221a::discover();
+            auto adapters = nlohmann::json::array();
+            for (const auto& adapter : inventory.endpoints) {
+                mcp2221a::Endpoint resolved; std::string error;
+                mcp2221a::resolve(inventory, adapter.identity, resolved, error);
+                adapters.push_back({{"Identity", adapter.identity}, {"Selection Error", error}});
+            }
+            std::cout << nlohmann::json{{"Transport", "mcp2221a-hid"},
+                {"I2C Adapters", adapters}, {"Discovery Error", inventory.error}}.dump(2) << std::endl;
+            std::exit(inventory.error.empty() ? EXIT_SUCCESS : EXIT_FAILURE);
+#else
             const auto inventory = linux_i2c_identity::discover();
             auto adapters = nlohmann::json::array();
             for (const auto& adapter : inventory.adapters)
@@ -2511,6 +2526,16 @@ bool handle_early_cli_options(int argc, char *argv[])
             std::cout << nlohmann::json{{"Transport", "linux-i2c"},
                 {"I2C Adapters", adapters}, {"Discovery Error", inventory.error}}.dump(2) << std::endl;
             std::exit(inventory.error.empty() ? EXIT_SUCCESS : EXIT_FAILURE);
+#endif
+        }
+
+        if (arg == "--si5351-transport") {
+#ifdef WSPRRYPI_SI5351_TRANSPORT
+            std::cout << WSPRRYPI_SI5351_TRANSPORT << std::endl;
+#else
+            std::cout << "not compiled" << std::endl;
+#endif
+            std::exit(EXIT_SUCCESS);
         }
 
         if (arg == "--list-backends")

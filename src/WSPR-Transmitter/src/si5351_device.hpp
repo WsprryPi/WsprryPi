@@ -1,6 +1,6 @@
 /**
  * @file si5351_device.hpp
- * @brief Low-level Linux I2C access helper for Si5351 devices.
+ * @brief Portable register access helper for Si5351 devices.
  *
  * Copyright © 2025 - 2026 Lee C. Bussy (@LBussy). All rights reserved.
  *
@@ -30,7 +30,8 @@
 #include <cstdint>
 #include <memory>
 #include <string>
-#include <sys/types.h>
+#include "si5351_transport.hpp"
+#include "si5351_i2c_compat.hpp"
 #include <vector>
 
 /**
@@ -51,19 +52,8 @@
 class Si5351Device
 {
 public:
-    /** Injectable Linux I2C operations for source-level hardware tests. */
-    class I2CAdapter
-    {
-    public:
-        virtual ~I2CAdapter() = default;
-        virtual int openDevice(const std::string& path, int flags) = 0;
-        virtual int queryCapabilities(int fd, unsigned long& capabilities) = 0;
-        virtual int selectSlave(int fd, std::uint8_t address) = 0;
-        virtual std::string diagnostic() const { return {}; }
-        virtual ssize_t writeData(int fd, const void* data, std::size_t size) = 0;
-        virtual ssize_t readData(int fd, void* data, std::size_t size) = 0;
-        virtual int closeDevice(int fd) = 0;
-    };
+    // Compatibility seam for existing Linux qualification tools and fixtures.
+    using I2CAdapter = Si5351I2CAdapter;
 
     /**
      * @brief Supported output clocks
@@ -131,7 +121,7 @@ public:
      */
     explicit Si5351Device(
         const Config& config,
-        std::shared_ptr<I2CAdapter> adapter = {});
+        std::shared_ptr<Si5351Transport> adapter = {});
 
     /**
      * @brief Destroy the device wrapper
@@ -266,13 +256,6 @@ public:
 
 private:
     /**
-     * @brief Build the Linux I2C device path for the configured bus
-     *
-     * @return Device path such as /dev/i2c-1
-     */
-    std::string buildI2CDevicePath() const;
-
-    /**
      * @brief Update the cached register value if caching is enabled
      *
      * @param address Register address
@@ -288,11 +271,14 @@ private:
     void setLastError(const std::string& message);
 
     Config config_;
-    std::shared_ptr<I2CAdapter> adapter_;
-    int fd_;
+    std::shared_ptr<Si5351Transport> adapter_;
+    bool open_ = false;
     std::string last_error_;
     std::vector<bool> cache_valid_;
     std::vector<std::uint8_t> cache_values_;
 };
+
+// Exactly one production definition is selected by the build profile.
+std::shared_ptr<Si5351Transport> make_si5351_transport(const Si5351Device::Config&);
 
 #endif

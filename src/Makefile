@@ -90,7 +90,8 @@ BACKENDS ?= $(DEFAULT_BACKENDS)
 ANCILLARY_GPIO ?= 1
 comma := ,
 BACKEND_LIST := $(subst $(comma), ,$(BACKENDS))
-BACKEND_PROFILE_KEY := $(subst $(comma),+,$(BACKENDS))+ancillary-gpio$(ANCILLARY_GPIO)
+include WSPR-Transmitter/src/si5351_transport_rules.mk
+BACKEND_PROFILE_KEY := $(subst $(comma),+,$(BACKENDS))+ancillary-gpio$(ANCILLARY_GPIO)$(SI5351_TRANSPORT_KEY)
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Components
@@ -247,7 +248,9 @@ LOCAL_CPP_SOURCES := $(filter-out $(ANCILLARY_GPIO_REAL_CPP_SOURCES) $(ANCILLARY
 LOCAL_CPP_SOURCES += $(if $(filter 1,$(ANCILLARY_GPIO)),$(ANCILLARY_GPIO_REAL_CPP_SOURCES),$(ANCILLARY_GPIO_STUB_CPP_SOURCES))
 LOCAL_CPP_SOURCES += $(if $(filter Linux,$(HOST_OS)),./machine_power_control_linux.cpp,./machine_power_control_unavailable.cpp)
 LOCAL_CPP_SOURCES += ./udp_logging/host.cpp
+ALL_SI5351_TRANSPORT_SOURCES := ./WSPR-Transmitter/src/si5351_transport_linux.cpp ./WSPR-Transmitter/src/si5351_transport_macos.cpp
 COMPONENT_CPP_SOURCES := $(shell find $(COMPONENT_SRCDIRS) -type f -name '*.cpp' ! -name '._*' ! -name 'main.cpp' 2>/dev/null)
+COMPONENT_CPP_SOURCES := $(filter-out $(ALL_SI5351_TRANSPORT_SOURCES),$(COMPONENT_CPP_SOURCES))
 TRANSMITTER_SHARED_CPP_SOURCES := \
 	./WSPR-Transmitter/src/execution_plan_compiler.cpp \
 	./WSPR-Transmitter/src/rp1_gpclk_development_policy.cpp \
@@ -270,6 +273,7 @@ RP1_GPCLK_BACKEND_CPP_SOURCES := \
 	./WSPR-Transmitter/src/rp1_gpclk_transmit_backend.cpp
 SI5351_BACKEND_CPP_SOURCES := \
 	./WSPR-Transmitter/src/si5351_device.cpp \
+	$(addprefix ./WSPR-Transmitter/src/,$(SI5351_TRANSPORT_SOURCE)) \
 	./WSPR-Transmitter/src/si5351_planner.cpp \
 	./WSPR-Transmitter/src/wspr_transmit_backend_si5351.cpp
 SIMULATED_BACKEND_CPP_SOURCES := \
@@ -632,7 +636,7 @@ endif
 
 CXX_VERSION_LINE := $(shell $(CXX) --version 2>/dev/null | head -n 1)
 ifneq ($(findstring clang,$(CXX_VERSION_LINE)),)
-COMPILER_DIAGNOSTIC_FLAGS :=
+COMPILER_DIAGNOSTIC_FLAGS := -ferror-limit=10
 else
 COMPILER_DIAGNOSTIC_FLAGS := -fmax-errors=10
 endif
@@ -640,7 +644,7 @@ endif
 COMMON_FLAGS := -Wall -Werror $(COMPILER_DIAGNOSTIC_FLAGS) -MMD -MP
 
 # Base compiler flags
-CXXFLAGS := -Wno-psabi -std=c++$(CXXVER) \
+CXXFLAGS := $(SI5351_TRANSPORT_FLAGS) $(if $(findstring clang,$(CXX_VERSION_LINE)),,-Wno-psabi) -std=c++$(CXXVER) \
            $(COMMON_FLAGS) \
            $(PKG_CFLAGS) \
            $(OPENSSL_CFLAGS) \
@@ -668,7 +672,7 @@ else
 ATOMIC_LIB :=
 endif
 
-LDFLAGS := -lpthread $(ATOMIC_LIB) \
+LDFLAGS := $(SI5351_TRANSPORT_LIBS) -lpthread $(ATOMIC_LIB) \
            $(PKG_LIBS) \
            $(OPENSSL_LIBS) \
            $(AVAHI_LIBS) \
@@ -2216,3 +2220,7 @@ linux-i2c-identity-test:
 .PHONY: linux-i2c-identity-config-test
 linux-i2c-identity-config-test: $(BIN_DIR)/$(SEMANTICS_TEST_OUT)
 	$(Q)./$(BIN_DIR)/$(SEMANTICS_TEST_OUT) --linux-i2c-identity-config-only
+
+.PHONY: mcp2221a-transport-test
+mcp2221a-transport-test:
+	$(MAKE) -C WSPR-Transmitter/src mcp2221a-transport-test SI5351_TRANSPORT=$(SI5351_TRANSPORT)

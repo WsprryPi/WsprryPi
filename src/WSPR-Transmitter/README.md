@@ -249,7 +249,7 @@ stubs under `external/` remain part of this component's standalone boundary.
 
 ## Linux I2C adapter identity
 
-The Si5351 device uses the `linux-i2c` transport. Set
+On Linux, the Si5351 device uses the `linux-i2c` transport. Set
 `Si5351Device::Config::adapter_identity` to a metadata-discovered USB identity
 for stable selection; a nonempty identity overrides `i2c_bus` without rewriting
 it. VID/PID plus serial must match exactly one adapter. Without a serial, an
@@ -272,6 +272,33 @@ The [parent engineering guide](../../docs/development/linux-i2c-identity.md)
 describes configuration integration, local container validation, and the
 separate physical qualification boundary. No native macOS USB transport is
 provided by this Linux path.
+
+## Native macOS MCP2221A transport
+
+The same Si5351 backend can use the explicitly selected `mcp2221a-hid`
+transport on macOS. Its production interface is `Si5351Transport`: open,
+checked byte transactions, close, and retained diagnostics. Linux descriptors
+remain inside the Linux compatibility adapter. Existing qualification tools
+and fake-I2C fixtures retain their `I2CAdapter` seam; new transports implement
+`Si5351Transport` directly.
+
+Build from the parent `src` with `BACKENDS=si5351 ANCILLARY_GPIO=0
+SI5351_TRANSPORT=mcp2221a-hid`. IOKit and CoreFoundation come from macOS;
+there is no HIDAPI dependency. `--si5351-transport` reports the compiled
+transport without probing. `--list-i2c-adapters` reads native registry metadata
+only. Set the exact reported `Adapter Identity` through the existing INI/CLI
+configuration; native HID ignores the retained Linux bus setting.
+
+The [native transport guide](../../docs/development/macos-mcp2221a.md) defines
+identity, deadline, cancellation, and qualification limits. CLI configuration
+and selected-address validation are implemented; the native web adapter/status
+workflow and deferred machine-power UI slice are separate work. Compilation
+and scripted reports do not qualify a physical adapter or synthesizer.
+
+From this component's `src`, run `make SI5351_TRANSPORT=mcp2221a-hid
+mcp2221a-transport-test si5351-planner-test si5351-transition-test
+si5351-startup-portable-test SUDO=`. The last target retains the Si5351 and
+controller startup assertions without linking Linux GPIO/MMIO sources.
 
 ## Building
 

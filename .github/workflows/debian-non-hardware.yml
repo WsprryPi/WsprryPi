@@ -11,7 +11,7 @@ on:
     branches: [devel, main]
   push:
     tags: ['v*']
-    branches: [devel, main, codex/shared-frequency-contract, codex/rp1-1.0-candidate-acceptance, codex/p15-8-wspr-type23, codex/step14-pico-type23-integration]
+    branches: [devel, main, codex/issue-419-native-macos, codex/shared-frequency-contract, codex/rp1-1.0-candidate-acceptance, codex/p15-8-wspr-type23, codex/step14-pico-type23-integration]
 
 permissions:
   contents: read
@@ -44,6 +44,8 @@ jobs:
         run: python3 -B scripts/ci/change_scope.py
 
   macos-simulated-profile:
+    env:
+      SI5351_TRANSPORT: mcp2221a-hid
     needs: change_scope
     if: ${{ !cancelled() && (needs.change_scope.result != 'success' || needs.change_scope.outputs.run_full_ci != 'false') }}
     runs-on: macos-15
@@ -90,6 +92,35 @@ jobs:
         run: |
           python3 scripts/tests/container_build_test.py
           python3 scripts/tests/container_avahi_contract_test.py
+
+  macos-si5351-profile:
+    needs: change_scope
+    if: ${{ !cancelled() && (needs.change_scope.result != 'success' || needs.change_scope.outputs.run_full_ci != 'false') }}
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [macos-15, macos-15-intel]
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 20
+    env:
+      SI5351_TRANSPORT: mcp2221a-hid
+      WSPRRYPI_DISABLE_HARDWARE_ACCESS: "1"
+    steps:
+      - uses: actions/checkout@v7
+      - name: Select OpenSSL development libraries
+        run: |
+          brew install openssl@4
+          echo "PKG_CONFIG_PATH=$(brew --prefix openssl@4)/lib/pkgconfig" >> "$GITHUB_ENV"
+      - name: Build the explicit native physical profile without opening hardware
+        run: make -C src release backend-profile-factory-test BACKENDS=si5351 ANCILLARY_GPIO=0 SUDO=
+      - name: Exercise transport selection and scripted HID failures
+        run: |
+          python3 scripts/tests/si5351_transport_make_test.py
+          make -C src/WSPR-Transmitter/src mcp2221a-transport-test si5351-planner-test si5351-transition-test si5351-startup-portable-test SUDO=
+      - name: Audit the native binary and compiled transport
+        run: |
+          python3 scripts/tests/macos_si5351_audit.py src/build/bin/wsprrypi
+          python3 scripts/tests/early_cli_exit_test.py src/build/bin/wsprrypi mcp2221a-hid
 
   wtp-network-loopback:
     needs: change_scope

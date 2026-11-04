@@ -4,6 +4,7 @@
 #include <iostream>
 #include <cerrno>
 #include <fcntl.h>
+#include <filesystem>
 #include <string>
 #include <thread>
 #include <unistd.h>
@@ -22,7 +23,7 @@ int main(int argc, char** argv) {
         if (mode == "fail") return 4;
         if (mode == "success") { std::cout << "ready"; return 0; }
     }
-    const std::string self = "/proc/self/exe";
+    const std::string self = std::filesystem::canonical(argv[0]).string();
     auto result = si5351_inventory_process::run({self, "success"});
     assert(result.error.empty() && result.output == "ready");
     const int inherited = ::open("/dev/null", O_RDONLY);
