@@ -9,11 +9,10 @@ import json
 import os
 from pathlib import Path
 import shutil
-import stat
 import subprocess
 import sys
-import tempfile
 import unittest
+from fixture_filesystem import temporary_root
 from unittest import mock
 
 
@@ -27,31 +26,13 @@ sys.modules[SPEC.name] = MODULE
 SPEC.loader.exec_module(MODULE)
 
 
-def recipient(payload: bytes) -> str:
-    charset = MODULE.age_provisioning.BECH32_CHARSET
-    accumulator = bits = 0
-    values = []
-    for byte in payload:
-        accumulator = (accumulator << 8) | byte
-        bits += 8
-        while bits >= 5:
-            bits -= 5
-            values.append((accumulator >> bits) & 31)
-    if bits:
-        values.append((accumulator << (5 - bits)) & 31)
-    expanded = [ord(c) >> 5 for c in "age"] + [0] + [ord(c) & 31 for c in "age"]
-    polymod = MODULE.age_provisioning.bech32_polymod(expanded + values + [0] * 6) ^ 1
-    values += [(polymod >> (5 * (5 - index))) & 31 for index in range(6)]
-    return "age1" + "".join(charset[value] for value in values)
+from support_intake_fixture import encode_recipient as recipient
 
 
 class TrustCompilationTest(unittest.TestCase):
     def setUp(self) -> None:
-        self.temporary = tempfile.TemporaryDirectory(prefix="wsprrypi-trust-compilation-")
-        self.root = Path(self.temporary.name)
+        self.root = temporary_root(self, "wsprrypi-trust-compilation-")
 
-    def tearDown(self) -> None:
-        self.temporary.cleanup()
 
     def signing(self, suffix: str, raw: bytes) -> Path:
         encoded = base64.urlsafe_b64encode(raw).decode("ascii").rstrip("=")

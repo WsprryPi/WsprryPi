@@ -5,7 +5,7 @@ from unittest import mock
 from pathlib import Path
 ROOT=Path(__file__).resolve().parents[2]; sys.path[:0]=[str(ROOT/"scripts/maintainer"),str(ROOT/"scripts/tests")]
 import verify_support_bundle_intake_publication as verify
-import support_bundle_intake_publication_commit_test as fixtures
+from support_intake_fixture import assert_no_undeclared_crypto, PublicationFixture
 class Transport:
     def __init__(self,values,on_fetch=None): self.values=list(values); self.on_fetch=on_fetch
     def fetch(self,index):
@@ -15,9 +15,8 @@ class Transport:
         return value
 class VerificationTest(unittest.TestCase):
     def setUp(self):
-        self.f=fixtures.PublicationTest(methodName="runTest"); self.f.setUp(); result=self.f.publish(True)
+        self.f=PublicationFixture(); self.addCleanup(self.f.close); self.addCleanup(assert_no_undeclared_crypto, self.f.root); result=self.f.publish(True)
         self.commit=result.publication_commit; self.manifest=(self.f.staging/"generation-1/intake.json").read_bytes(); self.signature=(self.f.staging/"generation-1/intake.json.sig").read_bytes()
-    def tearDown(self):self.f.tearDown()
     def verify(self,transport,expected=None):
         return verify.verify_for_test(expected_commit=expected or self.commit,git_path=self.f.git,repository=self.f.repository,
             openssl=self.f.openssl,staging_root=self.f.staging,signing_metadata_path=self.f.signing,transport=transport)

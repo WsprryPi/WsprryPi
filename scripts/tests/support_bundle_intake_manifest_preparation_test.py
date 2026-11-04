@@ -11,8 +11,9 @@ from pathlib import Path
 import stat
 import subprocess
 import sys
-import tempfile
 import unittest
+from fixture_filesystem import temporary_root
+from support_intake_fixture import assert_no_undeclared_crypto
 from unittest import mock
 
 
@@ -30,50 +31,19 @@ BUNDLE_ID = "wsprrypi-bundle-2099-01"
 SIGNATURE = bytes(range(64))
 
 
-def encode_recipient(payload: bytes) -> str:
-    accumulator = bits = 0
-    values = []
-    for byte in payload:
-        accumulator = (accumulator << 8) | byte; bits += 8
-        while bits >= 5:
-            bits -= 5; values.append((accumulator >> bits) & 31)
-    if bits:
-        values.append((accumulator << (5 - bits)) & 31)
-    expanded = [ord(c) >> 5 for c in "age"] + [0] + [ord(c) & 31 for c in "age"]
-    polymod = MODULE.bech32_polymod(expanded + values + [0] * 6) ^ 1
-    checksum = [(polymod >> (5 * (5 - i))) & 31 for i in range(6)]
-    return "age1" + "".join(MODULE.BECH32_CHARSET[v] for v in values + checksum)
+from support_intake_fixture import encode_recipient
 
 
 RECIPIENT = encode_recipient(bytes(reversed(range(32))))
 
 
-def make_fake_openssl(directory: Path, mode: str = "success") -> Path:
-    path = directory / f"openssl-{mode}"
-    source = f'''#!/usr/bin/env python3
-import sys
-mode = {mode!r}
-if sys.argv[1] == "pkey":
-    value = {MODULE.ED25519_SPKI_PREFIX + RAW_PUBLIC!r}
-    if mode == "wrong-public": value = value[:-1] + b"x"
-    sys.stdout.buffer.write(value); raise SystemExit(0)
-if sys.argv[1] == "pkeyutl" and "-sign" in sys.argv:
-    if mode == "sign-failure": raise SystemExit(23)
-    value = {SIGNATURE!r}
-    if mode == "short-signature": value = value[:-1]
-    sys.stdout.buffer.write(value); raise SystemExit(0)
-if sys.argv[1] == "pkeyutl" and "-verify" in sys.argv:
-    raise SystemExit(24 if mode == "verify-failure" else 0)
-raise SystemExit(64)
-'''
-    path.write_text(source, encoding="utf-8"); path.chmod(0o755)
-    return path
+from support_intake_fixture import make_fake_openssl, write_key_metadata
 
 
 class PreparationTest(unittest.TestCase):
     def setUp(self) -> None:
-        self.temporary = tempfile.TemporaryDirectory(prefix="wsprrypi-manifest-preparation-")
-        self.root = Path(self.temporary.name)
+        self.root = temporary_root(self, "wsprrypi-manifest-preparation-")
+        self.addCleanup(assert_no_undeclared_crypto, self.root)
         self.private = self.root / "private.pem"
         self.private.write_text("test private key\n", encoding="ascii"); self.private.chmod(0o400)
         self.signing = self.root / "signing.json"
@@ -81,24 +51,9 @@ class PreparationTest(unittest.TestCase):
         self.staging = self.root / "staging"; self.staging.mkdir(mode=0o700)
         self.write_metadata()
 
-    def tearDown(self) -> None:
-        self.temporary.cleanup()
 
     def write_metadata(self) -> None:
-        public_text = base64.urlsafe_b64encode(RAW_PUBLIC).decode("ascii").rstrip("=")
-        self.signing.write_text(json.dumps({
-            "schema_version": 1, "project_id": "wsprrypi",
-            "purpose": "support_intake_manifest_signing", "algorithm": "Ed25519",
-            "key_id": SIGNING_ID, "public_key": {"encoding": "base64url", "value": public_text},
-            "created_at_utc": "2099-01-01T00:00:00Z",
-            "fingerprint": {"algorithm": "sha256", "value": hashlib.sha256(RAW_PUBLIC).hexdigest()},
-        }) + "\n", encoding="utf-8")
-        self.bundle.write_text(json.dumps({
-            "schema_version": 1, "project_id": "wsprrypi", "purpose": "support_bundle_encryption",
-            "algorithm": "age-x25519", "key_id": BUNDLE_ID, "recipient": RECIPIENT,
-            "created_at_utc": "2099-01-01T00:00:00Z",
-            "fingerprint": {"algorithm": "sha256", "value": hashlib.sha256(RECIPIENT.encode()).hexdigest()},
-        }) + "\n", encoding="utf-8")
+        write_key_metadata(self.signing, self.bundle)
 
     def prepare(self, executable: Path | None = None, **changes):
         values = dict(openssl=executable or make_fake_openssl(self.root),
@@ -113,9 +68,27 @@ class PreparationTest(unittest.TestCase):
         values.update(changes)
         return MODULE.prepare(**values)
 
+    def test_fixture_builders_preserve_invalid_state_and_case_isolation(self):
+        from support_intake_fixture import signing_metadata
+        invalid = signing_metadata(); invalid["fingerprint"]["value"] = "0" * 64
+        self.signing.write_text(json.dumps(invalid) + "\n")
+        before = self.signing.read_bytes()
+        fresh = signing_metadata()
+        self.assertNotEqual(fresh["fingerprint"]["value"], invalid["fingerprint"]["value"])
+        with self.assertRaises(MODULE.PreparationError): self.prepare()
+        self.assertEqual(self.signing.read_bytes(), before)
+        self.assertEqual(list(self.staging.iterdir()), [])
+        executable = make_fake_openssl(self.root)
+        wrong = subprocess.run([str(executable), "pkey", "-in", str(self.private), "-delete", "DER"], capture_output=True, timeout=10)
+        self.assertEqual(wrong.returncode, 64, "undeclared crypto command cannot default to success")
+        with self.assertRaises(AssertionError): assert_no_undeclared_crypto(self.root)
+        (self.root / "openssl-undeclared").unlink()  # Acknowledge this deliberate refusal.
+
     def test_exact_active_pair_is_signed_and_non_disclosing(self) -> None:
         result = self.prepare()
         self.assertEqual(result.status, MODULE.PreparationStatus.committed)
+        commands = [json.loads(line) for line in (self.root / "openssl-commands.jsonl").read_text().splitlines()]
+        self.assertEqual([args[:2] for args in commands], [["pkey", "-in"], ["pkeyutl", "-sign"], ["pkeyutl", "-verify"]])
         manifest_bytes = result.manifest_path.read_bytes()
         self.assertTrue(manifest_bytes.endswith(b"\n"))
         manifest = json.loads(manifest_bytes)

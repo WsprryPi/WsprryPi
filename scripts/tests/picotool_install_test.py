@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """Hardware-free release-download, package-integrity and rollback coverage."""
 import io
-import json
 import os
 from pathlib import Path
 import subprocess
@@ -36,8 +35,11 @@ def fixture(directory, target='armv6-bookworm'):
 class PicotoolTest(unittest.TestCase):
     @staticmethod
     def output(*arguments, **_kwargs):
-        return ('picotool v2.3.1 (Linux, GNU, Release)\n' if arguments[1] == 'version'
-                else ' '.join(tool.OPTIONS[arguments[2]]))
+        if arguments[1:] == ('version',):
+            return 'picotool v2.3.1 (Linux, GNU, Release)\n'
+        if len(arguments) == 3 and arguments[1] == 'help' and arguments[2] in tool.OPTIONS:
+            return ' '.join(tool.OPTIONS[arguments[2]])
+        raise AssertionError('unexpected picotool command')
 
     def test_validate_only_uses_version_and_help(self):
         with patch.object(tool, 'run', side_effect=self.output) as run:

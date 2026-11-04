@@ -10,8 +10,8 @@ import os
 from pathlib import Path
 import stat
 import subprocess
-import tempfile
 import unittest
+from fixture_filesystem import temporary_root
 from unittest import mock
 
 
@@ -58,14 +58,11 @@ raise SystemExit(64)
 
 class ProvisioningTest(unittest.TestCase):
     def setUp(self) -> None:
-        self.temporary = tempfile.TemporaryDirectory(prefix="wsprrypi-signing-provisioning-")
-        self.root = Path(self.temporary.name)
+        self.root = temporary_root(self, "wsprrypi-signing-provisioning-")
         self.private = self.root / "private"
         self.private.mkdir(mode=0o700)
         self.public = self.root / "public.json"
 
-    def tearDown(self) -> None:
-        self.temporary.cleanup()
 
     def provision(self, executable: Path | None = None):
         return MODULE.provision(executable or make_openssl(self.root), self.private,

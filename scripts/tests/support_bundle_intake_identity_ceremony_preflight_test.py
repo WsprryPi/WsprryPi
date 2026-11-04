@@ -7,10 +7,9 @@ import importlib.util
 import io
 import os
 from pathlib import Path
-import stat
 import sys
-import tempfile
 import unittest
+from fixture_filesystem import temporary_root, snapshot
 from unittest import mock
 
 
@@ -29,8 +28,7 @@ BUNDLE_ID = "wsprrypi-bundle-2099-01"
 
 class CeremonyPreflightTest(unittest.TestCase):
     def setUp(self) -> None:
-        self.temporary = tempfile.TemporaryDirectory(prefix="wsprrypi-identity-preflight-")
-        self.root = Path(self.temporary.name)
+        self.root = temporary_root(self, "wsprrypi-identity-preflight-")
         self.signing_private = self.directory("signing-private", 0o700)
         self.bundle_private = self.directory("bundle-private", 0o700)
         self.public = self.directory("public", 0o700)
@@ -39,8 +37,6 @@ class CeremonyPreflightTest(unittest.TestCase):
         self.age = self.executable("age-keygen")
         self.openssl = self.executable("openssl")
 
-    def tearDown(self) -> None:
-        self.temporary.cleanup()
 
     def directory(self, name: str, mode: int) -> Path:
         path = self.root / name
@@ -66,14 +62,8 @@ class CeremonyPreflightTest(unittest.TestCase):
         values.update(overrides)
         return MODULE.preflight(**values)
 
-    def snapshot(self) -> tuple:
-        result = []
-        for path in sorted(self.root.rglob("*")):
-            info = path.lstat()
-            result.append((str(path.relative_to(self.root)), stat.S_IFMT(info.st_mode),
-                           stat.S_IMODE(info.st_mode),
-                           path.read_bytes() if stat.S_ISREG(info.st_mode) else b""))
-        return tuple(result)
+    def snapshot(self):
+        return snapshot(self.root)
 
     def test_ready_is_idempotent_read_only_and_does_not_execute_tools(self) -> None:
         before = self.snapshot()

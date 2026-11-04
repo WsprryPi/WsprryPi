@@ -3,15 +3,15 @@
 from __future__ import annotations
 
 import base64
-import hashlib
 import json
 import os
 from pathlib import Path
 import shutil
 import subprocess
 import sys
-import tempfile
 import unittest
+from fixture_filesystem import temporary_root
+from support_intake_fixture import assert_no_undeclared_crypto
 from unittest import mock
 
 
@@ -27,44 +27,21 @@ SIGNING_ID = "wsprrypi-intake-2099-01"
 BUNDLE_ID = "wsprrypi-bundle-2099-01"
 
 
-def encode_recipient(payload: bytes) -> str:
-    accumulator = bits = 0
-    values = []
-    for byte in payload:
-        accumulator = (accumulator << 8) | byte; bits += 8
-        while bits >= 5:
-            bits -= 5; values.append((accumulator >> bits) & 31)
-    if bits: values.append((accumulator << (5 - bits)) & 31)
-    expanded = [ord(c) >> 5 for c in "age"] + [0] + [ord(c) & 31 for c in "age"]
-    polymod = preparation.bech32_polymod(expanded + values + [0] * 6) ^ 1
-    checksum = [(polymod >> (5 * (5 - i))) & 31 for i in range(6)]
-    return "age1" + "".join(preparation.BECH32_CHARSET[v] for v in values + checksum)
+from support_intake_fixture import encode_recipient
 
 
 RECIPIENT = encode_recipient(bytes(reversed(range(32))))
 
 
-def fake_openssl(root: Path, mode: str = "success") -> Path:
-    path = root / f"openssl-{mode}"
-    path.write_text(f'''#!/usr/bin/env python3
-import sys
-mode={mode!r}
-if sys.argv[1] == "pkey":
- sys.stdout.buffer.write({preparation.ED25519_SPKI_PREFIX + RAW_PUBLIC!r}); raise SystemExit(0)
-if sys.argv[1] == "pkeyutl" and "-sign" in sys.argv:
- sys.stdout.buffer.write({SIGNATURE!r}); raise SystemExit(0)
-if sys.argv[1] == "pkeyutl" and "-verify" in sys.argv:
- raise SystemExit(23 if mode == "verify-failure" else 0)
-raise SystemExit(64)
-''', encoding="utf-8")
-    path.chmod(0o755)
-    return path
+from functools import partial
+from support_intake_fixture import make_fake_openssl, write_key_metadata
+fake_openssl = partial(make_fake_openssl, verify_failure=23)
 
 
 class LifecycleTest(unittest.TestCase):
     def setUp(self) -> None:
-        self.temporary = tempfile.TemporaryDirectory(prefix="wsprrypi-lifecycle-")
-        self.root = Path(self.temporary.name)
+        self.root = temporary_root(self, "wsprrypi-lifecycle-")
+        self.addCleanup(assert_no_undeclared_crypto, self.root)
         self.staging = self.root / "staging"; self.staging.mkdir(mode=0o700)
         self.private = self.root / "private.pem"; self.private.write_text("test private\n"); self.private.chmod(0o400)
         self.signing = self.root / "signing.json"
@@ -73,24 +50,9 @@ class LifecycleTest(unittest.TestCase):
         self.write_metadata(RAW_PUBLIC)
         self.prepare_initial()
 
-    def tearDown(self) -> None:
-        self.temporary.cleanup()
 
     def write_metadata(self, raw_public: bytes) -> None:
-        encoded = base64.urlsafe_b64encode(raw_public).decode().rstrip("=")
-        self.signing.write_text(json.dumps({
-            "schema_version": 1, "project_id": "wsprrypi",
-            "purpose": "support_intake_manifest_signing", "algorithm": "Ed25519",
-            "key_id": SIGNING_ID, "public_key": {"encoding": "base64url", "value": encoded},
-            "created_at_utc": "2099-01-01T00:00:00Z",
-            "fingerprint": {"algorithm": "sha256", "value": hashlib.sha256(raw_public).hexdigest()},
-        }) + "\n")
-        self.bundle.write_text(json.dumps({
-            "schema_version": 1, "project_id": "wsprrypi", "purpose": "support_bundle_encryption",
-            "algorithm": "age-x25519", "key_id": BUNDLE_ID, "recipient": RECIPIENT,
-            "created_at_utc": "2099-01-01T00:00:00Z",
-            "fingerprint": {"algorithm": "sha256", "value": hashlib.sha256(RECIPIENT.encode()).hexdigest()},
-        }) + "\n")
+        write_key_metadata(self.signing, self.bundle, raw_public)
 
     def prepare_initial(self) -> None:
         preparation.prepare(openssl=self.openssl, private_key=self.private,

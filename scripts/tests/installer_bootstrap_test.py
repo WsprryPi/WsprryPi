@@ -6,8 +6,9 @@ from __future__ import annotations
 import os
 import shutil
 import subprocess
-import tempfile
 import unittest
+from fixture_commands import run_shell as run_fixture_shell
+from fixture_filesystem import temporary_root
 from pathlib import Path
 
 
@@ -125,9 +126,7 @@ FGGLD= RESET= FGGRN= FGRED= MOVE_UP= CLEAR_LINE=
 
 class InstallerBootstrapTest(unittest.TestCase):
     def setUp(self) -> None:
-        self.temporary = tempfile.TemporaryDirectory(prefix="wsprrypi-bootstrap-")
-        self.addCleanup(self.temporary.cleanup)
-        self.root = Path(self.temporary.name)
+        self.root = temporary_root(self, "wsprrypi-bootstrap-")
         self.checkout = self.root / "WsprryPi"
         self.events = self.root / "events"
         self.bin = self.root / "bin"
@@ -190,12 +189,9 @@ print("release v4.0.0-beta.1 "+"a"*64 if result=="release" else "build")
         source = INSTALLER.read_text(encoding="utf-8")
         entry_point = '\nif [[ -z "${BASH_SOURCE[0]:-}" || "${BASH_SOURCE[0]}" == "$0" ]]; then'
         self.assertEqual(source.count(entry_point), 1)
-        return subprocess.run(
-            ["bash"], input='getent() { printf "fixture:x:1:1::%s:/bin/sh\\n" "$USER_HOME"; }\n'
-            + source.replace(entry_point, "\n" + FIXTURE + entry_point),
-            cwd=self.root, env=environment, text=True, capture_output=True,
-            timeout=30, check=False,
-        )
+        return run_fixture_shell('getent() { printf "fixture:x:1:1::%s:/bin/sh\\n" "$USER_HOME"; }\n'
+            + source.replace(entry_point, "\n" + FIXTURE + entry_point), cwd=self.root, env=environment,
+                                 stage=self._testMethodName, stdin=True)
 
     def recorded_events(self) -> list[str]:
         return self.events.read_text(encoding="utf-8").splitlines()

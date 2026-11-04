@@ -24,23 +24,7 @@ KEY_ID = "wsprrypi-bundle-2026-01"
 SECRET = "AGE-SECRET-KEY-1" + "Q" * 58
 
 
-def encode_recipient(payload: bytes) -> str:
-    accumulator = 0
-    bits = 0
-    values = []
-    for byte in payload:
-        accumulator = (accumulator << 8) | byte
-        bits += 8
-        while bits >= 5:
-            bits -= 5
-            values.append((accumulator >> bits) & 31)
-    if bits:
-        values.append((accumulator << (5 - bits)) & 31)
-    expanded = [ord(character) >> 5 for character in "age"] + [0]
-    expanded += [ord(character) & 31 for character in "age"]
-    polymod = MODULE.bech32_polymod(expanded + values + [0] * 6) ^ 1
-    checksum = [(polymod >> (5 * (5 - index))) & 31 for index in range(6)]
-    return "age1" + "".join(MODULE.BECH32_CHARSET[value] for value in values + checksum)
+from support_intake_fixture import encode_recipient
 
 
 RECIPIENT = encode_recipient(bytes(range(32)))

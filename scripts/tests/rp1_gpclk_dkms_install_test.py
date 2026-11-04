@@ -4,7 +4,6 @@
 from __future__ import annotations
 
 import copy
-import base64
 import hashlib
 import importlib.util
 import io
@@ -19,6 +18,8 @@ import tarfile
 import tempfile
 import unittest
 from unittest import mock
+from fixture_commands import Command, StrictCommands
+from fixture_filesystem import temporary_root
 
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
@@ -88,25 +89,37 @@ def release(tag: str, *, draft: bool = False, prerelease: bool = False, complete
     }
 
 
-class FakeRunner(MOD.Runner):
-    def __init__(self, responses: dict[tuple[str, ...], MOD.CommandResult] | None = None):
-        super().__init__()
-        self.responses = responses or {}
-        self.calls: list[tuple[str, ...]] = []
-        self.passthrough_calls: list[tuple[str, ...]] = []
-
-    def run(self, argv, *, check=True, cwd=None, passthrough=False):
-        key = tuple(str(item) for item in argv)
-        self.calls.append(key)
-        if passthrough:
-            self.passthrough_calls.append(key)
-        result = self.responses.get(key, MOD.CommandResult("", "", 0))
-        if check and result.returncode:
-            raise MOD.ContractError(result.stderr or "fake command failure")
-        return result
+class RunnerFixtures:
+    def runner(self, responses=None, *, steps=()):
+        runner = StrictCommands({key: value for key, value in (responses or {}).items()
+                                 if (key.argv if isinstance(key, Command) else key) not in {step.argv for step in steps}},
+            steps=steps, responses={(key.argv if isinstance(key, Command) else key): value
+                                   for key, value in (responses or {}).items()
+                                   if (key.argv if isinstance(key, Command) else key) in {step.argv for step in steps}},
+            result=lambda: MOD.CommandResult("", "", 0), error=MOD.ContractError)
+        self.addCleanup(runner.assert_complete)
+        return runner
 
 
-class PlatformAndSelectionTests(unittest.TestCase):
+class PlatformAndSelectionTests(RunnerFixtures, unittest.TestCase):
+    def test_strict_fixture_cannot_hide_missing_mutations_or_caught_refusals(self):
+        operation = Command(("apt-get", "remove", "-y", MOD.PACKAGE_NAME), passthrough=True, stage="removal")
+        runner = StrictCommands(steps=[operation])
+        with self.assertRaisesRegex(AssertionError, "required fixture commands"):
+            runner.assert_complete()
+        with self.assertRaisesRegex(AssertionError, "unexpected fixture command"):
+            runner.run(["reboot"])
+        with self.assertRaisesRegex(AssertionError, "caught by production"):
+            runner.assert_complete()
+        with self.assertRaises(ValueError):
+            StrictCommands({operation.argv: MOD.CommandResult("", "", 0)}, steps=[operation])
+        with self.assertRaises(TypeError):
+            StrictCommands(steps=[operation], responses={operation: MOD.CommandResult("", "refused", 19)})
+        runner = StrictCommands(steps=[operation], responses={operation.argv: MOD.CommandResult("", "refused", 19)}, error=MOD.ContractError)
+        with self.assertRaisesRegex(MOD.ContractError, "refused"):
+            runner.run(operation.argv, passthrough=True)
+        runner.assert_complete()
+
     def detected(self, model: bytes, compatible: bytes):
         with tempfile.TemporaryDirectory() as raw:
             root = pathlib.Path(raw)
@@ -168,16 +181,16 @@ class PlatformAndSelectionTests(unittest.TestCase):
             "git", "-C", str(source), "merge-base", "--is-ancestor",
             MOD.CORRECTED_RUNTIME_COMMIT, selected,
         )
-        missing = FakeRunner({
+        missing = self.runner({
             ("git", "-C", str(source), "cat-file", "-e",
              f"{MOD.CORRECTED_RUNTIME_COMMIT}^{{commit}}"): MOD.CommandResult("", "missing", 1),
         })
         with self.assertRaisesRegex(MOD.ContractError, "cannot prove the corrected"):
             MOD.require_compatible_runtime_source(source, selected, missing)
-        predates = FakeRunner({ancestor: MOD.CommandResult("", "", 1)})
+        predates = self.runner({("git", "-C", str(source), "cat-file", "-e", f"{MOD.CORRECTED_RUNTIME_COMMIT}^{{commit}}"): MOD.CommandResult("", "", 0), ancestor: MOD.CommandResult("", "", 1)})
         with self.assertRaisesRegex(MOD.ContractError, "predates the corrected"):
             MOD.require_compatible_runtime_source(source, selected, predates)
-        compatible = FakeRunner()
+        compatible = self.runner({("git", "-C", str(source), "cat-file", "-e", f"{MOD.CORRECTED_RUNTIME_COMMIT}^{{commit}}"): MOD.CommandResult("", "", 0), ancestor: MOD.CommandResult("", "", 0)})
         MOD.require_compatible_runtime_source(source, selected, compatible)
         self.assertIn(ancestor, compatible.calls)
 
@@ -200,7 +213,7 @@ class PlatformAndSelectionTests(unittest.TestCase):
                 MOD.Runner().run(["apt-get", "install"], passthrough=True)
 
 
-class ReleaseTests(unittest.TestCase):
+class ReleaseTests(RunnerFixtures, unittest.TestCase):
     def test_release_resolution_binds_exact_runtime_source_checkout(self):
         package = b"fixture package"
         manifest = valid_manifest()
@@ -235,7 +248,9 @@ class ReleaseTests(unittest.TestCase):
                  mock.patch.object(MOD, "runtime_source_interface") as interface, \
                  mock.patch.object(MOD, "development_identity", return_value={"version": "2.1.0"}), \
                  mock.patch.object(MOD, "runtime_source_identity") as identity:
-                resolved = MOD.download_release(state, Client(), FakeRunner())
+                resolved = MOD.download_release(state, Client(), self.runner({
+                    ("git", "-C", str(state / "source"), "cat-file", "-e", f"{MOD.CORRECTED_RUNTIME_COMMIT}^{{commit}}"): MOD.CommandResult("", "", 0),
+                    ("git", "-C", str(state / "source"), "merge-base", "--is-ancestor", MOD.CORRECTED_RUNTIME_COMMIT, "a" * 40): MOD.CommandResult("", "", 0)}))
             clone.assert_called_once_with(state, "commit", "a" * 40, mock.ANY)
             interface.assert_called_once_with(state / "source", mock.ANY)
             identity.assert_called_once_with(state / "source", "2.1.0")
@@ -335,7 +350,7 @@ class ReleaseTests(unittest.TestCase):
         self.assertIsNone(observed["authorization"])
 
 
-class ArchiveTests(unittest.TestCase):
+class ArchiveTests(RunnerFixtures, unittest.TestCase):
     def make_tar(self, members):
         temporary = tempfile.NamedTemporaryFile(suffix=".tar", delete=False)
         temporary.close()
@@ -383,7 +398,7 @@ class ArchiveTests(unittest.TestCase):
                 MOD.tar_inventory(self.make_tar(members))
 
 
-class CheckoutTests(unittest.TestCase):
+class CheckoutTests(RunnerFixtures, unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
@@ -451,7 +466,7 @@ class CheckoutTests(unittest.TestCase):
                 MOD.clone_exact(missing_state, "commit", "f" * 40, MOD.Runner())
 
 
-class DevelopmentInterfaceTests(unittest.TestCase):
+class DevelopmentInterfaceTests(RunnerFixtures, unittest.TestCase):
     def lifecycle_source(self, help_text: str) -> pathlib.Path:
         root = pathlib.Path(self.temp.name)
         scripts = root / "scripts"
@@ -639,8 +654,8 @@ class DevelopmentInterfaceTests(unittest.TestCase):
         }
         identity = mock.Mock(st_dev=1, st_ino=2)
         record = pathlib.Path(self.temp.name) / "record.json"
-        runner = FakeRunner({
-            (str(source / "scripts/development-install"), "--help"):
+        runner = self.runner({
+            Command((str(source / "scripts/development-install"), "--help"), cwd=str(source)):
                 MOD.CommandResult("usage: development-install --route-neutral --runtime-controller\n", "", 0),
         })
         stdout = io.StringIO()
@@ -704,8 +719,8 @@ class DevelopmentInterfaceTests(unittest.TestCase):
             "compatibilityIdentity": MOD.development_compatibility("1.0.0"),
         }
         identity = mock.Mock(st_dev=1, st_ino=2)
-        runner = FakeRunner({
-            (str(source / "scripts/development-install"), "--help"):
+        runner = self.runner({
+            Command((str(source / "scripts/development-install"), "--help"), cwd=str(source)):
                 MOD.CommandResult(
                     "usage: development-install --route-neutral "
                     "--runtime-controller\n", "", 0,
@@ -761,8 +776,8 @@ class DevelopmentInterfaceTests(unittest.TestCase):
             "compatibilityIdentity": MOD.development_compatibility("1.0.0"),
         }
         identity = mock.Mock(st_dev=1, st_ino=2)
-        runner = FakeRunner({
-            (str(source / "scripts/development-install"), "--help"):
+        runner = self.runner({
+            Command((str(source / "scripts/development-install"), "--help"), cwd=str(source)):
                 MOD.CommandResult(
                     "usage: development-install --route-neutral "
                     "--runtime-controller\n", "", 0,
@@ -816,7 +831,7 @@ class DevelopmentInterfaceTests(unittest.TestCase):
             "installedOverlays": [], "enrollment": False,
             "developmentManager": False,
         }
-        runner = FakeRunner({
+        runner = self.runner({
             ("modinfo", "-k", MOD.platform.release(), "-F", "version",
              MOD.MODULE_NAME): MOD.CommandResult("1.0.0\n", "", 0),
         })
@@ -858,8 +873,8 @@ class DevelopmentInterfaceTests(unittest.TestCase):
             "targetKernel": MOD.platform.release(),
             "compatibilityIdentity": MOD.development_compatibility("1.0.0"),
         }
-        runner = FakeRunner({
-            (str(source / "scripts/development-install"), "--help"):
+        runner = self.runner({
+            Command((str(source / "scripts/development-install"), "--help"), cwd=str(source)):
                 MOD.CommandResult("usage: development-install --route-neutral --runtime-controller\n", "", 0),
         })
         with mock.patch.object(MOD, "revalidate_checkout", return_value=source), \
@@ -915,10 +930,10 @@ class DevelopmentInterfaceTests(unittest.TestCase):
         record = pathlib.Path(self.temp.name) / "record.json"
         rollback = pathlib.Path("/var/lib/wsprrypi/evidence/ROLLBACK.json")
         entrypoint = pathlib.Path("/var/lib/wsprrypi/evidence/rendered-source/scripts/development-rollback")
-        runner = FakeRunner({
-            (str(source / "scripts/development-install"), "--help"):
+        runner = self.runner({
+            Command((str(source / "scripts/development-install"), "--help"), cwd=str(source)):
                 MOD.CommandResult("usage: development-install --route-neutral --runtime-controller\n", "", 0),
-        })
+        }, steps=[Command(("/var/lib/wsprrypi/evidence/rendered-source/scripts/development-rollback", "--record", "/var/lib/wsprrypi/evidence/ROLLBACK.json"), cwd="/var/lib/wsprrypi/evidence/rendered-source", passthrough=True, stage="rollback")])
         events = []
         def authority(*unused):
             events.append("authority")
@@ -977,8 +992,8 @@ class DevelopmentInterfaceTests(unittest.TestCase):
             "targetKernel": MOD.platform.release(),
             "compatibilityIdentity": MOD.development_compatibility("1.0.0"),
         }
-        runner = FakeRunner({
-            (str(source / "scripts/development-install"), "--help"):
+        runner = self.runner({
+            Command((str(source / "scripts/development-install"), "--help"), cwd=str(source)):
                 MOD.CommandResult(
                     "usage: development-install --route-neutral "
                     "--runtime-controller\n", "", 0
@@ -1014,8 +1029,8 @@ class DevelopmentInterfaceTests(unittest.TestCase):
             "runtimeResidue": ["/var/lib/rp1-gpclk-dkms/runtime-admin"],
         }
         owned_provider = {"schema": MOD.RECORD_SCHEMA, "channel": "development"}
-        runner = FakeRunner({
-            (str(source / "scripts/development-install"), "--help"):
+        runner = self.runner({
+            Command((str(source / "scripts/development-install"), "--help"), cwd=str(source)):
                 MOD.CommandResult("usage: development-install --route-neutral --runtime-controller\n", "", 0),
         })
         with mock.patch.object(MOD, "revalidate_checkout", return_value=source), \
@@ -1058,7 +1073,7 @@ class DevelopmentInterfaceTests(unittest.TestCase):
         record = pathlib.Path(self.temp.name) / "record.json"
         rollback = pathlib.Path("/var/lib/wsprrypi/evidence/ROLLBACK.json")
         entrypoint = pathlib.Path("/var/lib/wsprrypi/evidence/rendered-source/scripts/development-rollback")
-        runner = FakeRunner()
+        runner = self.runner(steps=[Command((str(entrypoint), "--record", str(rollback)), cwd=str(entrypoint.parent.parent), passthrough=True, stage="rollback")])
         with mock.patch.object(MOD, "revalidate_checkout", return_value=source), \
              mock.patch.object(MOD, "route_neutral_interface",
                                return_value=("route-neutral-flag", ["--route-neutral"])), \
@@ -1116,7 +1131,7 @@ class DevelopmentInterfaceTests(unittest.TestCase):
              mock.patch.object(MOD, "ensure_new_ownership_record",
                                side_effect=MOD.ContractError("stop after checkpoint")):
             with self.assertRaisesRegex(MOD.ContractError, "stop after checkpoint"):
-                MOD.apply_development(resolved, record, FakeRunner())
+                MOD.apply_development(resolved, record, self.runner())
         self.assertEqual(events, ["verify-absent", "record-remove"])
 
     def test_runtime_controller_residue_blocks_development_before_mutation(self):
@@ -1158,7 +1173,8 @@ class DevelopmentInterfaceTests(unittest.TestCase):
         controller = root / "lib/modules/fixture/updates/dkms/rp1_route_controller.ko"
         controller.parent.mkdir(parents=True)
         controller.write_bytes(b"module")
-        runner = FakeRunner({
+        runner = self.runner({
+            ("dkms", "status", "-m", MOD.DKMS_NAME): MOD.CommandResult("", "", 0),
             ("dpkg-query", "-W", "-f=${Status}\n${Version}\n", MOD.PACKAGE_NAME):
                 MOD.CommandResult("", "not installed", 1),
         })
@@ -1170,7 +1186,7 @@ class DevelopmentInterfaceTests(unittest.TestCase):
         self.assertEqual(inventory["controllerCandidates"], [str(controller)])
 
 
-class ApplyPolicyTests(unittest.TestCase):
+class ApplyPolicyTests(RunnerFixtures, unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
@@ -1242,7 +1258,7 @@ class ApplyPolicyTests(unittest.TestCase):
         with mock.patch.object(MOD, "runtime_update_provider", return_value=pathlib.Path("/provider")), \
              mock.patch.object(MOD, "runtime_call", side_effect=[first, executed, final]) as calls, \
              mock.patch.object(MOD, "require_unchanged_ownership") as unchanged:
-            MOD.recover_and_remove_owned_runtime(self.record, record, identity, FakeRunner())
+            MOD.recover_and_remove_owned_runtime(self.record, record, identity, self.runner())
         self.assertEqual([call.args[2] for call in calls.call_args_list],
                          ["update-plan", "update-execute", "update-plan"])
         self.assertEqual(unchanged.call_count, 3)
@@ -1262,7 +1278,7 @@ class ApplyPolicyTests(unittest.TestCase):
                      mock.patch.object(MOD, "runtime_call", return_value=bad) as calls, \
                      mock.patch.object(MOD, "require_unchanged_ownership"):
                     with self.assertRaises(MOD.ContractError):
-                        MOD.recover_and_remove_owned_runtime(self.record, record, mock.Mock(), FakeRunner())
+                        MOD.recover_and_remove_owned_runtime(self.record, record, mock.Mock(), self.runner())
                 self.assertEqual(calls.call_count, 1)
         planned = self.public_update(record)
         bad = self.public_update(record, prepared=True, operation="update-execute", marker=99)
@@ -1270,7 +1286,7 @@ class ApplyPolicyTests(unittest.TestCase):
              mock.patch.object(MOD, "runtime_call", side_effect=[planned, bad]), \
              mock.patch.object(MOD, "require_unchanged_ownership"):
             with self.assertRaisesRegex(MOD.ContractError, "reviewed plan"):
-                MOD.recover_and_remove_owned_runtime(self.record, record, mock.Mock(), FakeRunner())
+                MOD.recover_and_remove_owned_runtime(self.record, record, mock.Mock(), self.runner())
 
 
     def test_update_never_repeats_effects_after_failure_or_no_progress(self):
@@ -1281,7 +1297,7 @@ class ApplyPolicyTests(unittest.TestCase):
                  mock.patch.object(MOD, "runtime_call", side_effect=replies) as calls, \
                  mock.patch.object(MOD, "require_unchanged_ownership"):
                 with self.assertRaises(MOD.ContractError):
-                    MOD.recover_and_remove_owned_runtime(self.record, record, mock.Mock(), FakeRunner())
+                    MOD.recover_and_remove_owned_runtime(self.record, record, mock.Mock(), self.runner())
                 self.assertEqual(sum(call.args[2] == "update-execute" for call in calls.call_args_list), 1)
 
 
@@ -1291,7 +1307,7 @@ class ApplyPolicyTests(unittest.TestCase):
              mock.patch.object(MOD, "runtime_call", return_value=self.public_update(record)) as calls, \
              mock.patch.object(MOD, "require_unchanged_ownership", side_effect=[None, MOD.ContractError("changed")]):
             with self.assertRaisesRegex(MOD.ContractError, "changed"):
-                MOD.recover_and_remove_owned_runtime(self.record, record, mock.Mock(), FakeRunner())
+                MOD.recover_and_remove_owned_runtime(self.record, record, mock.Mock(), self.runner())
         self.assertEqual(calls.call_count, 1)
 
 
@@ -1304,12 +1320,12 @@ class ApplyPolicyTests(unittest.TestCase):
         old = MOD.CommandResult("", "unsupported operation", 2)
         supported = MOD.CommandResult(json.dumps(capabilities), "", 0)
         with mock.patch.object(MOD, "RUNTIME_PROVIDER", installed):
-            runner = FakeRunner({("python3", str(installed), "capabilities"): old,
+            runner = self.runner({("python3", str(installed), "capabilities"): old,
                                  ("python3", str(candidate), "capabilities"): supported})
             self.assertEqual(MOD.runtime_update_provider(runner, candidate), candidate)
             with self.assertRaisesRegex(MOD.ContractError, "exact compatible provider source"):
-                MOD.runtime_update_provider(FakeRunner({("python3", str(installed), "capabilities"): old}))
-            runner = FakeRunner({("python3", str(installed), "capabilities"): supported})
+                MOD.runtime_update_provider(self.runner({("python3", str(installed), "capabilities"): old}))
+            runner = self.runner({("python3", str(installed), "capabilities"): supported})
             self.assertEqual(MOD.runtime_update_provider(runner, candidate), installed)
             self.assertEqual(len(runner.calls), 1)
 
@@ -1322,12 +1338,12 @@ class ApplyPolicyTests(unittest.TestCase):
                  'receipt': record['runtime']}
         with mock.patch.object(MOD, 'runtime_call', return_value=value), \
              mock.patch.object(MOD, 'validate_development_rollback_authority') as rollback:
-            self.assertEqual(MOD.validate_resumable_neutral_activation(record, {}, FakeRunner()), record['runtime'])
+            self.assertEqual(MOD.validate_resumable_neutral_activation(record, {}, self.runner()), record['runtime'])
         rollback.assert_not_called()
 
     def test_source_preflight_rejects_unsupported_candidate_before_effects(self):
         candidate = self.root / "scripts/runtime_provider.py"
-        runner = FakeRunner({("python3", str(candidate), "capabilities"):
+        runner = self.runner({("python3", str(candidate), "capabilities"):
                              MOD.CommandResult("", "unsupported", 2)})
         with mock.patch.object(pathlib.Path, "is_file", return_value=True), \
              mock.patch.object(pathlib.Path, "is_symlink", return_value=False):
@@ -1348,7 +1364,7 @@ class ApplyPolicyTests(unittest.TestCase):
                  mock.patch.object(MOD, "retain_provider_migration"), \
                  mock.patch.object(MOD, "validate_development_rollback_authority"), \
                  mock.patch.object(MOD, "replace_owned_record") as replace:
-                MOD.prepare_runtime_update(args, FakeRunner())
+                MOD.prepare_runtime_update(args, self.runner())
             prepare.assert_called_once()
             replacement = replace.call_args.args[3]
             self.assertEqual(replacement["schema"], MOD.RECORD_SCHEMA)
@@ -1361,7 +1377,7 @@ class ApplyPolicyTests(unittest.TestCase):
              mock.patch.object(MOD, 'recover_and_remove_owned_runtime') as effects:
             with self.assertRaisesRegex(MOD.ContractError, 'rollback changed'):
                 MOD.remove_owned_runtime_for_fresh_activation(self.record,
-                    self.runtime_update_record(), mock.Mock(), FakeRunner())
+                    self.runtime_update_record(), mock.Mock(), self.runner())
         effects.assert_not_called()
 
     def test_runtime_call_reports_provider_failure_detail(self):
@@ -1372,10 +1388,10 @@ class ApplyPolicyTests(unittest.TestCase):
             "conflicts": ["application-not-neutral"],
             "remediation": ["inspect wsprrypi.service"],
         }
-        runner = FakeRunner({
+        runner = self.runner({
             ("python3", str(provider), "remove"):
                 MOD.CommandResult(json.dumps(response), "", 12),
-        })
+        }, steps=[Command(("python3", str(provider), "remove"), stage="runtime removal")])
         with self.assertRaisesRegex(
                 MOD.RuntimeOperationError,
                 "application restoration verification failed.*"
@@ -1389,7 +1405,7 @@ class ApplyPolicyTests(unittest.TestCase):
         args = self.runtime_update_args(dry_run=True)
         with mock.patch.object(MOD, "runtime_call") as calls:
             with self.assertRaisesRegex(MOD.ContractError, "dry-run"):
-                MOD.prepare_runtime_update(args, FakeRunner())
+                MOD.prepare_runtime_update(args, self.runner())
         calls.assert_not_called()
 
 
@@ -1405,14 +1421,14 @@ class ApplyPolicyTests(unittest.TestCase):
     def test_foreign_and_mixed_state_refused_before_apt(self):
         source = self.root / "usr/src/rp1-gpclk-dkms-foreign"
         source.mkdir(parents=True)
-        runner = FakeRunner(self.responses())
+        runner = self.runner(self.responses())
         with mock.patch.object(MOD, "validate_package"):
             with self.assertRaisesRegex(MOD.ContractError, "foreign or mixed"):
                 MOD.apply_release(self.state, self.resolved, self.record, self.root, runner)
         self.assertFalse(any(call and call[0] == "apt-get" for call in runner.calls))
 
     def test_different_installed_version_requires_owner_migration(self):
-        runner = FakeRunner(self.responses("9.9.9-1"))
+        runner = self.runner(self.responses("9.9.9-1"))
         with mock.patch.object(MOD, "validate_package"):
             with self.assertRaisesRegex(MOD.ContractError, "cleanup-first migration"):
                 MOD.apply_release(self.state, self.resolved, self.record, self.root, runner)
@@ -1420,7 +1436,7 @@ class ApplyPolicyTests(unittest.TestCase):
 
     def test_active_module_and_development_manager_refused(self):
         (self.root / "proc/modules").write_text(f"{MOD.MODULE_NAME} 1 0 - Live 0x0\n")
-        runner = FakeRunner(self.responses())
+        runner = self.runner(self.responses())
         with mock.patch.object(MOD, "validate_package"):
             with self.assertRaisesRegex(MOD.ContractError, "active"):
                 MOD.apply_release(self.state, self.resolved, self.record, self.root, runner)
@@ -1442,7 +1458,7 @@ class ApplyPolicyTests(unittest.TestCase):
             module = self.root / f"lib/modules/fixture/updates/dkms/{name}.ko"
             module.parent.mkdir(parents=True, exist_ok=True)
             module.write_bytes(name.encode())
-        runner = FakeRunner(responses)
+        runner = self.runner(responses)
         with mock.patch.object(MOD, "validate_package"):
             MOD.apply_release(self.state, self.resolved, self.record, self.root, runner)
         self.assertFalse(any(call and call[0] == "apt-get" for call in runner.calls))
@@ -1473,7 +1489,7 @@ class ApplyPolicyTests(unittest.TestCase):
         installed.parent.mkdir(parents=True)
         installed.write_bytes(b"uapi\n")
         (self.root / "usr/src/rp1-gpclk-dkms-foreign").mkdir()
-        runner = FakeRunner(self.responses(
+        runner = self.runner(self.responses(
             "2.1.0-1",
             "rp1-gpclk-dkms/2.1.0, fixture-kernel, arm64: installed\n",
         ))
@@ -1482,7 +1498,7 @@ class ApplyPolicyTests(unittest.TestCase):
                 MOD.apply_release(self.state, self.resolved, self.record, self.root, runner)
 
     def test_fresh_release_uses_normal_debian_path(self):
-        runner = FakeRunner(self.responses())
+        runner = self.runner(self.responses(), steps=[Command(("apt-get", "install", "--no-install-recommends", "-y", str(self.package)), passthrough=True, stage="installation")])
         artifacts = [{
             "path": f"/lib/modules/fixture/updates/dkms/{name}.ko",
             "sha256": digest(b"module"),
@@ -1510,13 +1526,13 @@ class ApplyPolicyTests(unittest.TestCase):
             "--source", "auto", "--wsprry-source", "main",
             "--model-file", str(model), "--compatible-file", str(compatible), "--dry-run",
         ])
-        plan = MOD.prepare(args, FakeRunner())
+        plan = MOD.prepare(args, self.runner())
         self.assertTrue(plan["dryRun"])
         apply_args = MOD.parser().parse_args([
             "apply", "--state-dir", str(self.state), "--record", str(self.record), "--root", str(self.root),
         ])
         with self.assertRaisesRegex(MOD.ContractError, "dry-run"):
-            MOD.apply(apply_args, FakeRunner())
+            MOD.apply(apply_args, self.runner())
 
     def test_prepare_rejects_runtime_residue_before_source_resolution(self):
         model = self.root / "model"
@@ -1537,7 +1553,7 @@ class ApplyPolicyTests(unittest.TestCase):
              mock.patch.object(MOD, "existing_inventory") as full_inventory, \
              mock.patch.object(MOD, "prepare_development") as resolve:
             with self.assertRaisesRegex(MOD.ContractError, "residue blocks installation planning"):
-                MOD.prepare(args, FakeRunner())
+                MOD.prepare(args, self.runner())
         full_inventory.assert_not_called()
         resolve.assert_not_called()
         self.assertFalse((self.state / "plan.json").exists())
@@ -1563,7 +1579,7 @@ class ApplyPolicyTests(unittest.TestCase):
                                return_value=(owned, mock.sentinel.identity, None)), \
              mock.patch.object(MOD, "prepare_development",
                                return_value=resolved) as resolve:
-            plan = MOD.prepare(args, FakeRunner())
+            plan = MOD.prepare(args, self.runner())
         resolve.assert_called_once()
         self.assertEqual(plan["resolved"], resolved)
 
@@ -1737,7 +1753,7 @@ class ApplyPolicyTests(unittest.TestCase):
              mock.patch.object(MOD, "runtime_call", side_effect=replies) as calls, \
              mock.patch.object(MOD, "validate_development_rollback_authority"), \
              mock.patch.object(MOD, "replace_owned_record", side_effect=replace):
-            MOD.activate_runtime(args, FakeRunner())
+            MOD.activate_runtime(args, self.runner())
         self.assertEqual(calls.call_count, 7)
         self.assertEqual(captured["schema"], MOD.RUNTIME_RECORD_SCHEMA)
         runtime = captured["runtime"]
@@ -2413,53 +2429,53 @@ printf '%s\n' "$RP1_GPCLK_DKMS_PROVIDER_REMOVAL_UNPROVEN"
         self.assertNotIn("Uninstallation successful", stdout)
 
 
-class RemovalPolicyTests(unittest.TestCase):
+def write_record(path, value):
+    path.write_text(json.dumps(value))
+    path.chmod(0o600)
+
+
+def development_record() -> dict[str, object]:
+    return {
+        "schema": MOD.RECORD_SCHEMA, "repository": MOD.REPOSITORY,
+        "owner": "WsprryPi", "channel": "development",
+        "installationMethod": "upstream-development-rollback",
+        "sourceCommit": "a" * 40, "productVersion": "1.0.0",
+        "sourceTree": "b" * 40, "uapiSha256": "c" * 64,
+        "versionSource": "include/rp1_gpclk/version.h",
+        "versionSourceSha256": "d" * 64,
+        "targetKernel": MOD.platform.release(),
+        "compatibilityIdentity": MOD.development_compatibility("1.0.0"),
+        "upstreamEvidence": "/var/lib/wsprrypi/rp1-gpclk-dkms-development-evidence",
+        "rollbackRecord": "/var/lib/wsprrypi/rp1-gpclk-dkms-development-evidence/ROLLBACK.json",
+        "rollbackRecordSha256": "e" * 64,
+        "rollbackEntrypoint": "/var/lib/wsprrypi/rp1-gpclk-dkms-development-evidence/rendered-source/scripts/development-rollback",
+        "rollbackEntrypointSha256": "f" * 64,
+        "installedModulePath": f"/lib/modules/{MOD.platform.release()}/updates/dkms/rp1_gpclk_dkms.ko",
+        "installedModuleSha256": "1" * 64,
+        "decompressedModuleSha256": "2" * 64,
+        "routeActivation": "disabled", "output": "disabled",
+        "qualificationClaim": False,
+    }
+
+def release_record() -> dict[str, object]:
+    return {
+        "schema": MOD.RECORD_SCHEMA, "repository": MOD.REPOSITORY,
+        "owner": "WsprryPi", "channel": "release",
+        "installationMethod": "debian-package", "tag": "v2.1.0",
+        "sourceCommit": "a" * 40, "manifest": valid_manifest(),
+        "moduleArtifacts": [{
+            "path": f"/lib/modules/fixture/updates/dkms/{name}.ko",
+            "sha256": "c" * 64,
+        } for name in (MOD.MODULE_NAME, MOD.CONTROLLER_MODULE_NAME)],
+        "routeActivation": "disabled", "output": "disabled",
+        "qualificationClaim": False,
+    }
+
+class RemovalPolicyTests(RunnerFixtures, unittest.TestCase):
     def setUp(self):
-        self.temp = tempfile.TemporaryDirectory()
-        self.addCleanup(self.temp.cleanup)
-        self.root = pathlib.Path(self.temp.name).resolve()
+        self.root = temporary_root(self, "rp1-removal-").resolve()
         self.record = self.root / "ownership.json"
 
-    def release_record(self) -> dict[str, object]:
-        return {
-            "schema": MOD.RECORD_SCHEMA, "repository": MOD.REPOSITORY,
-            "owner": "WsprryPi", "channel": "release",
-            "installationMethod": "debian-package", "tag": "v2.1.0",
-            "sourceCommit": "a" * 40, "manifest": valid_manifest(),
-            "moduleArtifacts": [{
-                "path": f"/lib/modules/fixture/updates/dkms/{name}.ko",
-                "sha256": "c" * 64,
-            } for name in (MOD.MODULE_NAME, MOD.CONTROLLER_MODULE_NAME)],
-            "routeActivation": "disabled", "output": "disabled",
-            "qualificationClaim": False,
-        }
-
-    def development_record(self) -> dict[str, object]:
-        return {
-            "schema": MOD.RECORD_SCHEMA, "repository": MOD.REPOSITORY,
-            "owner": "WsprryPi", "channel": "development",
-            "installationMethod": "upstream-development-rollback",
-            "sourceCommit": "a" * 40, "productVersion": "1.0.0",
-            "sourceTree": "b" * 40, "uapiSha256": "c" * 64,
-            "versionSource": "include/rp1_gpclk/version.h",
-            "versionSourceSha256": "d" * 64,
-            "targetKernel": MOD.platform.release(),
-            "compatibilityIdentity": MOD.development_compatibility("1.0.0"),
-            "upstreamEvidence": "/var/lib/wsprrypi/rp1-gpclk-dkms-development-evidence",
-            "rollbackRecord": "/var/lib/wsprrypi/rp1-gpclk-dkms-development-evidence/ROLLBACK.json",
-            "rollbackRecordSha256": "e" * 64,
-            "rollbackEntrypoint": "/var/lib/wsprrypi/rp1-gpclk-dkms-development-evidence/rendered-source/scripts/development-rollback",
-            "rollbackEntrypointSha256": "f" * 64,
-            "installedModulePath": f"/lib/modules/{MOD.platform.release()}/updates/dkms/rp1_gpclk_dkms.ko",
-            "installedModuleSha256": "1" * 64,
-            "decompressedModuleSha256": "2" * 64,
-            "routeActivation": "disabled", "output": "disabled",
-            "qualificationClaim": False,
-        }
-
-    def write_record(self, value: dict[str, object]) -> None:
-        self.record.write_text(json.dumps(value))
-        self.record.chmod(0o600)
 
     def args(self):
         return MOD.parser().parse_args(["remove", "--record", str(self.record), "--root", str(self.root)])
@@ -2484,7 +2500,7 @@ class RemovalPolicyTests(unittest.TestCase):
             MOD.module_artifacts(self.root)
 
     def test_legacy_compatibility_is_rollback_authority_only_for_exact_predecessor(self):
-        record = self.development_record()
+        record = development_record()
         evidence = self.root / ("var/lib/wsprrypi/rp1-gpclk-dkms-development-evidence." + "a" * 24)
         entrypoint = evidence / "rendered-source/scripts/development-rollback"
         entrypoint.parent.mkdir(parents=True)
@@ -2501,7 +2517,8 @@ class RemovalPolicyTests(unittest.TestCase):
             MOD.validate_development_rollback_authority(record, self.root)
 
     def test_untrusted_records_report_absence_when_no_provider_exists(self):
-        runner = FakeRunner({
+        runner = self.runner({
+            ("dkms", "status", "-m", MOD.DKMS_NAME): MOD.CommandResult("", "", 0),
             ("dpkg-query", "-W", "-f=${Status}\n${Version}\n", MOD.PACKAGE_NAME):
                 MOD.CommandResult("", "", 1),
         })
@@ -2513,9 +2530,9 @@ class RemovalPolicyTests(unittest.TestCase):
         for value in (
             {"schema": MOD.LEGACY_RECORD_SCHEMA},
             {"schema": MOD.RECORD_SCHEMA, "owner": "attacker"},
-            {**self.release_record(), "tag": 210},
+            {**release_record(), "tag": 210},
         ):
-            self.write_record(value)
+            write_record(self.record, value)
             stdout = io.StringIO()
             with mock.patch.object(MOD.sys, "stdout", stdout):
                 MOD.remove_owned_provider(self.args(), runner)
@@ -2524,7 +2541,7 @@ class RemovalPolicyTests(unittest.TestCase):
             self.record.unlink()
 
         target = self.root / "target.json"
-        target.write_text(json.dumps(self.release_record()))
+        target.write_text(json.dumps(release_record()))
         self.record.symlink_to(target)
         stdout = io.StringIO()
         with mock.patch.object(MOD.sys, "stdout", stdout):
@@ -2537,17 +2554,17 @@ class RemovalPolicyTests(unittest.TestCase):
         source.mkdir(parents=True)
         stdout = io.StringIO()
         with mock.patch.object(MOD.sys, "stdout", stdout):
-            MOD.remove_owned_provider(self.args(), FakeRunner())
+            MOD.remove_owned_provider(self.args(), self.runner({("dpkg-query", "-W", "-f=${Status}\n${Version}\n", MOD.PACKAGE_NAME): MOD.CommandResult("", "missing", 1), ("dkms", "status", "-m", MOD.DKMS_NAME): MOD.CommandResult("", "", 0)}))
         self.assertIn("preserved", stdout.getvalue())
         self.assertTrue(source.exists())
 
     def test_explicit_opt_out_preserves_even_a_valid_owned_provider(self):
-        self.write_record(self.release_record())
+        write_record(self.record, release_record())
         args = MOD.parser().parse_args([
             "remove", "--remove", "false", "--record", str(self.record),
             "--root", str(self.root),
         ])
-        runner = FakeRunner()
+        runner = self.runner()
         stdout = io.StringIO()
         with mock.patch.object(MOD.sys, "stdout", stdout):
             MOD.remove_owned_provider(args, runner)
@@ -2556,12 +2573,12 @@ class RemovalPolicyTests(unittest.TestCase):
         self.assertEqual(runner.calls, [])
 
     def test_owned_release_uses_package_removal_then_deletes_record(self):
-        self.write_record(self.release_record())
-        runner = FakeRunner()
+        write_record(self.record, release_record())
+        runner = self.runner(steps=[Command(("apt-get", "remove", "-y", MOD.PACKAGE_NAME), passthrough=True, stage="removal")])
         def guard(*_):
             self.assertFalse(self.record.exists())
             pending = MOD.removal_pending_path(self.record)
-            self.assertEqual(json.loads(pending.read_bytes()), self.release_record())
+            self.assertEqual(json.loads(pending.read_bytes()), release_record())
             with self.assertRaisesRegex(MOD.ContractError, "pending"):
                 MOD.ensure_new_ownership_record(self.record)
         with mock.patch.object(MOD, "validate_release_removal"), \
@@ -2574,7 +2591,7 @@ class RemovalPolicyTests(unittest.TestCase):
         self.assertFalse(MOD.removal_pending_path(self.record).exists())
 
     def test_passive_packaged_units_do_not_repeat_runtime_removal(self):
-        record = self.release_record()
+        record = release_record()
         record["schema"] = MOD.RUNTIME_RECORD_SCHEMA
         residue = []
         for name in ("rp1-gpclk-route-manager.socket", "rp1-gpclk-route-manager@.service"):
@@ -2585,9 +2602,9 @@ class RemovalPolicyTests(unittest.TestCase):
             record["manifest"]["packageInventory"].append({
                 "path": relative, "type": "file", "mode": "0644", "sha256": digest(unit.read_bytes())})
             residue.append(str(unit))
-        self.write_record(record)
+        write_record(self.record, record)
         identity = self.record.stat()
-        runner = FakeRunner()
+        runner = self.runner(steps=[Command(("apt-get", "remove", "-y", MOD.PACKAGE_NAME), passthrough=True, stage="removal")])
         with mock.patch.object(MOD, "load_ownership_record", return_value=(record, identity, None)), \
              mock.patch.object(MOD, "existing_inventory", return_value={"packageVersion": "2.1.0-1", "runtimeResidue": residue}), \
              mock.patch.object(MOD, "recover_and_remove_owned_runtime") as runtime_remove, \
@@ -2600,8 +2617,8 @@ class RemovalPolicyTests(unittest.TestCase):
         self.assertFalse(self.record.exists())
 
     def test_identity_drift_preserves_record_without_package_mutation(self):
-        self.write_record(self.release_record())
-        runner = FakeRunner()
+        write_record(self.record, release_record())
+        runner = self.runner()
         stdout = io.StringIO()
         with mock.patch.object(MOD, "validate_release_removal", side_effect=MOD.ContractError("artifact drift")), \
              mock.patch.object(MOD.sys, "stdout", stdout):
@@ -2611,7 +2628,7 @@ class RemovalPolicyTests(unittest.TestCase):
         self.assertTrue(self.record.exists())
 
     def test_release_allows_only_same_version_additional_kernel_artifacts(self):
-        record = self.release_record()
+        record = release_record()
         artifacts = [
             *record["moduleArtifacts"],
             {
@@ -2627,14 +2644,14 @@ class RemovalPolicyTests(unittest.TestCase):
             ("modinfo", "-k", "fixture", "-F", "version", MOD.MODULE_NAME): MOD.CommandResult("2.1.0\n", "", 0),
             ("modinfo", "-k", "new-kernel", "-F", "version", MOD.MODULE_NAME): MOD.CommandResult("2.1.0\n", "", 0),
         }
-        runner = FakeRunner(responses)
+        runner = self.runner(responses)
         for kernel in ("fixture", "new-kernel"):
-            runner.responses[("modinfo", "-k", kernel, "-F", "version", MOD.CONTROLLER_MODULE_NAME)] = MOD.CommandResult("2.1.0\n", "", 0)
+            runner.allow_read(("modinfo", "-k", kernel, "-F", "version", MOD.CONTROLLER_MODULE_NAME), MOD.CommandResult("2.1.0\n", "", 0))
         with mock.patch.object(MOD, "verify_installed_release"), \
              mock.patch.object(MOD, "module_artifacts", return_value=artifacts), \
              mock.patch.object(MOD, "package_preflight") as preflight:
             MOD.validate_release_removal(record, self.root, runner)
-        runner.responses[("modinfo", "-k", "new-kernel", "-F", "version", MOD.MODULE_NAME)] = MOD.CommandResult("9.9.9\n", "", 0)
+        runner.allow_read(("modinfo", "-k", "new-kernel", "-F", "version", MOD.MODULE_NAME), MOD.CommandResult("9.9.9\n", "", 0))
         with mock.patch.object(MOD, "verify_installed_release"), \
              mock.patch.object(MOD, "module_artifacts", return_value=artifacts), \
              mock.patch.object(MOD, "package_preflight") as preflight:
@@ -2642,9 +2659,9 @@ class RemovalPolicyTests(unittest.TestCase):
                 MOD.validate_release_removal(record, self.root, runner)
 
     def test_package_removal_failure_retains_record_and_fails(self):
-        self.write_record(self.release_record())
+        write_record(self.record, release_record())
         failed = MOD.CommandResult("", "package busy", 1)
-        runner = FakeRunner({("apt-get", "remove", "-y", MOD.PACKAGE_NAME): failed})
+        runner = self.runner({("apt-get", "remove", "-y", MOD.PACKAGE_NAME): failed}, steps=[Command(("apt-get", "remove", "-y", MOD.PACKAGE_NAME), passthrough=True, stage="removal")])
         with mock.patch.object(MOD, "validate_release_removal"), \
              mock.patch.object(MOD, "package_removal_preflight"):
             with self.assertRaises(MOD.ContractError):
@@ -2652,42 +2669,42 @@ class RemovalPolicyTests(unittest.TestCase):
         self.assertTrue(self.record.exists())
 
     def test_guard_refusal_restores_ownership_without_apt(self):
-        self.write_record(self.release_record())
-        runner = FakeRunner()
+        write_record(self.record, release_record())
+        runner = self.runner()
         with mock.patch.object(MOD, "validate_release_removal"), \
              mock.patch.object(MOD, "package_removal_preflight", side_effect=MOD.ContractError("foreign overlay preserved")):
             with self.assertRaisesRegex(MOD.ContractError, "foreign overlay preserved"):
                 MOD.remove_owned_provider(self.args(), runner)
-        self.assertEqual(json.loads(self.record.read_bytes()), self.release_record())
+        self.assertEqual(json.loads(self.record.read_bytes()), release_record())
         self.assertFalse(MOD.removal_pending_path(self.record).exists())
         self.assertEqual(runner.calls, [])
 
     def test_interrupted_package_removal_recovers_exact_authority(self):
-        value = self.release_record()
+        value = release_record()
         MOD.atomic_json_new(MOD.removal_pending_path(self.record), value)
         with mock.patch.object(MOD, "verify_provider_absent"):
-            MOD.remove_owned_provider(self.args(), FakeRunner())
+            MOD.remove_owned_provider(self.args(), self.runner())
         self.assertFalse(self.record.exists())
         self.assertFalse(MOD.removal_pending_path(self.record).exists())
 
     def test_pending_removal_never_overwrites_concurrent_record(self):
-        value = self.release_record()
+        value = release_record()
         MOD.atomic_json_new(MOD.removal_pending_path(self.record), value)
         other = {**value, "sourceCommit": "b" * 40}
-        self.write_record(other)
+        write_record(self.record, other)
         with self.assertRaisesRegex(MOD.ContractError, "conflicts"):
-            MOD.remove_owned_provider(self.args(), FakeRunner())
+            MOD.remove_owned_provider(self.args(), self.runner())
         self.assertEqual(json.loads(self.record.read_bytes()), other)
         self.assertEqual(json.loads(MOD.removal_pending_path(self.record).read_bytes()), value)
 
     def test_record_change_after_preflight_blocks_package_mutation(self):
-        self.write_record(self.release_record())
-        runner = FakeRunner()
+        write_record(self.record, release_record())
+        runner = self.runner()
 
         def change_record(*_):
-            changed = self.release_record()
+            changed = release_record()
             changed["sourceCommit"] = "b" * 40
-            self.write_record(changed)
+            write_record(self.record, changed)
 
         with mock.patch.object(MOD, "validate_release_removal", side_effect=change_record):
             with self.assertRaisesRegex(MOD.ContractError, "ownership changed"):
@@ -2696,7 +2713,7 @@ class RemovalPolicyTests(unittest.TestCase):
         self.assertTrue(self.record.exists())
 
     def test_owned_development_uses_captured_upstream_rollback(self):
-        self.write_record(self.development_record())
+        write_record(self.record, development_record())
         evidence = self.root / "evidence/rendered-source/scripts"
         evidence.mkdir(parents=True)
         entrypoint = evidence / "development-rollback"
@@ -2705,7 +2722,7 @@ class RemovalPolicyTests(unittest.TestCase):
         rollback = self.root / "evidence/ROLLBACK.json"
         rollback.write_text("{}")
         rollback.chmod(0o600)
-        runner = FakeRunner()
+        runner = self.runner(steps=[Command((str(entrypoint), "--record", str(rollback)), cwd=str(entrypoint.parent.parent), passthrough=True, stage="rollback")])
         with mock.patch.object(MOD, "validate_development_removal", return_value=(entrypoint, rollback)), \
              mock.patch.object(MOD, "verify_provider_absent"):
             MOD.remove_owned_provider(self.args(), runner)
@@ -2713,7 +2730,7 @@ class RemovalPolicyTests(unittest.TestCase):
         self.assertFalse(self.record.exists())
 
     def test_owned_runtime_uninstall_recovers_before_dkms_rollback(self):
-        record = self.development_record()
+        record = development_record()
         record["schema"] = MOD.RUNTIME_RECORD_SCHEMA
         record["runtime"] = {
             "readinessContract": MOD.RUNTIME_READINESS_CONTRACT,
@@ -2727,7 +2744,7 @@ class RemovalPolicyTests(unittest.TestCase):
             "controllerGeneration": 0, "state": "neutral_ready", "route": None,
             "output": "disabled",
         }
-        self.write_record(record)
+        write_record(self.record, record)
         args = MOD.parser().parse_args(["remove", "--record", str(self.record)])
         entrypoint = self.root / "evidence/rendered-source/scripts/development-rollback"
         entrypoint.parent.mkdir(parents=True)
@@ -2738,7 +2755,7 @@ class RemovalPolicyTests(unittest.TestCase):
         rollback.write_text("{}")
         rollback.chmod(0o600)
         events = []
-        runner = FakeRunner()
+        runner = self.runner(steps=[Command((str(entrypoint), "--record", str(rollback)), cwd=str(entrypoint.parent.parent), passthrough=True, stage="rollback")])
         with mock.patch.object(MOD, "existing_inventory",
                                return_value={"runtimeResidue": ["owned"]}), \
              mock.patch.object(MOD, "validate_development_rollback_authority",
@@ -2756,18 +2773,17 @@ class RemovalPolicyTests(unittest.TestCase):
         self.assertFalse(self.record.exists())
 
 
-class InstallerMigrationTests(unittest.TestCase):
+class InstallerMigrationTests(RunnerFixtures, unittest.TestCase):
     # Reuse the existing strict ownership fixtures, not alternate production views.
-    release_record = RemovalPolicyTests.release_record
-    write_record = RemovalPolicyTests.write_record
 
     def setUp(self):
-        RemovalPolicyTests.setUp(self)
+        self.root = temporary_root(self, "rp1-migration-").resolve()
+        self.record = self.root / "ownership.json"
         self.state = self.root / 'state'; self.state.mkdir(mode=0o700)
         self.selected = {'channel': 'development', 'commit': 'd' * 40,
                          'version': MOD.CONSUMER_PROVIDER_VERSION,
                          'checkout': {'commit': 'd' * 40, 'path': str(self.root / 'candidate')}}
-        self.old = self.release_record()
+        self.old = release_record()
         self.payload = b'exact predecessor package'
         self.old['manifest']['package']['sha256'] = digest(self.payload)
 
@@ -2793,30 +2809,30 @@ class InstallerMigrationTests(unittest.TestCase):
         with mock.patch.object(MOD, 'load_ownership_record') as ownership, \
              mock.patch.object(MOD, 'recover_and_remove_owned_runtime') as effects:
             with self.assertRaisesRegex(MOD.ContractError, 'not accepted'):
-                MOD.prepare_runtime_update(args, FakeRunner())
+                MOD.prepare_runtime_update(args, self.runner())
         ownership.assert_not_called(); effects.assert_not_called()
 
     def test_unknown_candidate_channel_refused_before_removal(self):
         args = self.plan(dict(self.selected, channel='unknown'))
         with mock.patch.object(MOD, 'remove_owned_provider') as remove:
             with self.assertRaisesRegex(MOD.ContractError, 'channel is invalid'):
-                MOD.apply(args, FakeRunner())
+                MOD.apply(args, self.runner())
         remove.assert_not_called()
 
     def test_source_binding_checked_before_runtime_update(self):
         selected = copy.deepcopy(self.selected); selected['checkout']['commit'] = 'e' * 40
         with self.assertRaisesRegex(MOD.ContractError, 'commits differ'):
-            MOD.validate_candidate_before_update(selected, FakeRunner())
+            MOD.validate_candidate_before_update(selected, self.runner())
 
     def test_source_product_checked_again_before_runtime_update(self):
         with mock.patch.object(MOD, 'revalidate_checkout', return_value=self.root), \
              mock.patch.object(MOD, 'runtime_source_interface'), \
              mock.patch.object(MOD, 'runtime_source_identity', side_effect=MOD.ContractError('source version differs')):
             with self.assertRaisesRegex(MOD.ContractError, 'source version differs'):
-                MOD.validate_candidate_before_update(self.selected, FakeRunner())
+                MOD.validate_candidate_before_update(self.selected, self.runner())
 
     def test_rollback_is_retained_and_verified_before_removal(self):
-        self.write_record(self.old); args = self.plan(); events = []
+        write_record(self.record, self.old); args = self.plan(); events = []
         def remove(arguments, runner):
             directories = list(self.root.glob('rp1-provider-migration.*'))
             self.assertEqual(len(directories), 1)
@@ -2830,29 +2846,29 @@ class InstallerMigrationTests(unittest.TestCase):
              mock.patch.object(MOD, 'remove_owned_provider', side_effect=remove), \
              mock.patch.object(MOD, 'verify_provider_absent', side_effect=lambda *_:events.append('absence')), \
              mock.patch.object(MOD, 'apply_development', side_effect=lambda *_:events.append('install')):
-            MOD.apply(args, FakeRunner())
+            MOD.apply(args, self.runner())
         self.assertEqual(events, ['candidate', 'remove', 'absence', 'install'])
 
     def test_corrupt_rollback_package_preserves_installed_provider(self):
-        self.write_record(self.old); args = self.plan()
+        write_record(self.record, self.old); args = self.plan()
         with mock.patch.object(MOD, 'validate_candidate_before_update'), \
              mock.patch.object(MOD.GitHubClient, 'bytes', return_value=b'corrupt'), \
              mock.patch.object(MOD, 'remove_owned_provider') as remove, \
              mock.patch.object(MOD, 'apply_development') as install:
             with self.assertRaisesRegex(MOD.ContractError, 'rollback package SHA-256'):
-                MOD.apply(args, FakeRunner())
+                MOD.apply(args, self.runner())
         self.assertEqual(json.loads(self.record.read_text()), self.old)
         remove.assert_not_called(); install.assert_not_called()
 
     def test_failed_owned_removal_never_installs_candidate(self):
-        self.write_record(self.old); args = self.plan()
+        write_record(self.record, self.old); args = self.plan()
         with mock.patch.object(MOD, 'validate_candidate_before_update'), \
              mock.patch.object(MOD.GitHubClient, 'bytes', return_value=self.payload), \
              mock.patch.object(MOD, 'validate_package'), \
              mock.patch.object(MOD, 'remove_owned_provider', side_effect=MOD.ContractError('cleanup refused')), \
              mock.patch.object(MOD, 'apply_development') as install:
             with self.assertRaisesRegex(MOD.ContractError, 'cleanup refused'):
-                MOD.apply(args, FakeRunner())
+                MOD.apply(args, self.runner())
         install.assert_not_called()
         self.assertTrue(self.record.exists())
         self.assertTrue(list(self.root.glob('rp1-provider-migration.*/previous-installation.json')))
@@ -2860,22 +2876,22 @@ class InstallerMigrationTests(unittest.TestCase):
     def test_retained_package_is_reused_offline_and_corruption_is_refused(self):
         with mock.patch.object(MOD.GitHubClient, 'bytes', return_value=self.payload) as download, \
              mock.patch.object(MOD, 'validate_package'):
-            directory = MOD.retain_provider_migration(self.record, self.old, self.selected, FakeRunner())
-            MOD.retain_provider_migration(self.record, self.old, self.selected, FakeRunner())
+            directory = MOD.retain_provider_migration(self.record, self.old, self.selected, self.runner())
+            MOD.retain_provider_migration(self.record, self.old, self.selected, self.runner())
             self.assertEqual(download.call_count, 1)
             (directory / self.old['manifest']['package']['filename']).write_bytes(b'bad cached input')
             with self.assertRaisesRegex(MOD.ContractError, 'retained predecessor rollback package differs'):
-                MOD.retain_provider_migration(self.record, self.old, self.selected, FakeRunner())
+                MOD.retain_provider_migration(self.record, self.old, self.selected, self.runner())
             self.assertEqual(download.call_count, 1)
 
     def test_retained_package_symlink_is_preserved_and_refused(self):
         with mock.patch.object(MOD.GitHubClient, 'bytes', return_value=self.payload), \
              mock.patch.object(MOD, 'validate_package'):
-            directory = MOD.retain_provider_migration(self.record, self.old, self.selected, FakeRunner())
+            directory = MOD.retain_provider_migration(self.record, self.old, self.selected, self.runner())
             package = directory / self.old['manifest']['package']['filename']; package.unlink()
             target = self.root / 'foreign'; target.write_bytes(self.payload); package.symlink_to(target)
             with self.assertRaisesRegex(MOD.ContractError, 'rollback package differs'):
-                MOD.retain_provider_migration(self.record, self.old, self.selected, FakeRunner())
+                MOD.retain_provider_migration(self.record, self.old, self.selected, self.runner())
             self.assertTrue(package.is_symlink()); self.assertEqual(target.read_bytes(), self.payload)
 
     def test_same_provider_does_not_create_migration_or_remove_it(self):
@@ -2922,11 +2938,11 @@ class InstallerMigrationTests(unittest.TestCase):
              mock.patch.object(MOD, 'recover_and_remove_owned_runtime') as cleanup, \
              mock.patch.object(MOD, 'load_ownership_record') as owned:
             with self.assertRaisesRegex(MOD.ContractError, 'candidate corrupt'):
-                MOD.prepare_runtime_update(args, FakeRunner())
+                MOD.prepare_runtime_update(args, self.runner())
         cleanup.assert_not_called(); owned.assert_not_called()
 
     def test_release_version_migration_verifies_candidate_before_owned_removal(self):
-        self.write_record(self.old); selected = self.release_candidate(); args = self.plan(selected); events=[]
+        write_record(self.record, self.old); selected = self.release_candidate(); args = self.plan(selected); events=[]
         def remove(arguments, runner):events.append('remove'); self.record.unlink()
         def package(path, *_):events.append('candidate' if path.parent==self.state else 'rollback')
         with mock.patch.object(MOD.GitHubClient, 'bytes', return_value=self.payload), \
@@ -2937,11 +2953,11 @@ class InstallerMigrationTests(unittest.TestCase):
              mock.patch.object(MOD, 'remove_owned_provider', side_effect=remove), \
              mock.patch.object(MOD, 'verify_provider_absent', side_effect=lambda *_:events.append('absence')), \
              mock.patch.object(MOD, 'apply_release', side_effect=lambda *_:events.append('install')):
-            MOD.apply(args, FakeRunner())
+            MOD.apply(args, self.runner())
         self.assertEqual(events, ['candidate','rollback','remove','absence','install'])
 
     def development_recovery_inputs(self):
-        previous=RemovalPolicyTests.development_record(self)
+        previous=development_record()
         entrypoint=self.root/'development-rollback'; entrypoint.write_bytes(b'original owning rollback entrypoint')
         rollback=self.root/'ROLLBACK.json'; rollback.write_bytes(b'{"checkpoint":"installed"}')
         previous.update(rollbackRecord=str(rollback),rollbackEntrypoint=str(entrypoint),
@@ -2950,38 +2966,38 @@ class InstallerMigrationTests(unittest.TestCase):
         return previous,entrypoint,rollback
 
     def test_development_to_release_retains_exact_rollback_authority(self):
-        previous,entrypoint,rollback_input=self.development_recovery_inputs(); self.write_record(previous)
+        previous,entrypoint,rollback_input=self.development_recovery_inputs(); write_record(self.record, previous)
         args=self.plan(self.release_candidate())
         with mock.patch.object(MOD, 'validate_candidate_before_update'), \
              mock.patch.object(MOD, 'validate_development_rollback_authority', return_value=(entrypoint,rollback_input)) as rollback, \
              mock.patch.object(MOD, 'remove_owned_provider', side_effect=lambda *_:self.record.unlink()), \
              mock.patch.object(MOD, 'verify_provider_absent'), \
              mock.patch.object(MOD, 'apply_release') as install:
-            MOD.apply(args, FakeRunner())
+            MOD.apply(args, self.runner())
         rollback.assert_called_once_with(previous, pathlib.Path('/')); install.assert_called_once()
         retained=list(self.root.glob('rp1-provider-migration.*/previous-installation.json'))
         self.assertEqual(json.loads(retained[0].read_text()), previous)
 
     def test_concurrent_ownership_change_after_retention_stops_removal(self):
-        self.write_record(self.old); args=self.plan()
+        write_record(self.record, self.old); args=self.plan()
         changed=copy.deepcopy(self.old); changed['sourceCommit']='e'*40
         with mock.patch.object(MOD, 'validate_candidate_before_update'), \
-             mock.patch.object(MOD, 'retain_provider_migration', side_effect=lambda *_:self.write_record(changed)), \
+             mock.patch.object(MOD, 'retain_provider_migration', side_effect=lambda *_:write_record(self.record, changed)), \
              mock.patch.object(MOD, 'remove_owned_provider') as remove, \
              mock.patch.object(MOD, 'apply_development') as install:
             with self.assertRaisesRegex(MOD.ContractError, 'ownership changed'):
-                MOD.apply(args, FakeRunner())
+                MOD.apply(args, self.runner())
         remove.assert_not_called(); install.assert_not_called()
         self.assertEqual(json.loads(self.record.read_text()), changed)
 
     def test_changed_retained_ownership_stops_retry(self):
         with mock.patch.object(MOD.GitHubClient, 'bytes', return_value=self.payload), \
              mock.patch.object(MOD, 'validate_package'):
-            directory=MOD.retain_provider_migration(self.record,self.old,self.selected,FakeRunner())
+            directory=MOD.retain_provider_migration(self.record,self.old,self.selected,self.runner())
             path=directory/'previous-installation.json'; value=json.loads(path.read_text())
             value['moduleArtifacts'][0]['sha256']='e'*64; MOD.atomic_json(path,value)
             with self.assertRaisesRegex(MOD.ContractError,'retained predecessor ownership differs'):
-                MOD.retain_provider_migration(self.record,self.old,self.selected,FakeRunner())
+                MOD.retain_provider_migration(self.record,self.old,self.selected,self.runner())
 
     def test_dangling_runtime_dropin_symlink_is_preserved(self):
         directory=self.root/'etc/systemd/system/rp1-gpclk-route-manager@.service.d'
@@ -2994,9 +3010,9 @@ class InstallerMigrationTests(unittest.TestCase):
     def test_reinstalled_same_source_has_independent_recovery_inputs(self):
         with mock.patch.object(MOD.GitHubClient, 'bytes', return_value=self.payload), \
              mock.patch.object(MOD, 'validate_package'):
-            first=MOD.retain_provider_migration(self.record,self.old,self.selected,FakeRunner())
+            first=MOD.retain_provider_migration(self.record,self.old,self.selected,self.runner())
             rebuilt=copy.deepcopy(self.old); rebuilt['moduleArtifacts'][0]['sha256']='e'*64
-            second=MOD.retain_provider_migration(self.record,rebuilt,self.selected,FakeRunner())
+            second=MOD.retain_provider_migration(self.record,rebuilt,self.selected,self.runner())
         self.assertNotEqual(first,second)
         self.assertEqual(json.loads((first/'previous-installation.json').read_text()),self.old)
         self.assertEqual(json.loads((second/'previous-installation.json').read_text()),rebuilt)
@@ -3004,14 +3020,14 @@ class InstallerMigrationTests(unittest.TestCase):
     def test_malformed_retained_ownership_stops_retry(self):
         with mock.patch.object(MOD.GitHubClient, 'bytes', return_value=self.payload), \
              mock.patch.object(MOD, 'validate_package'):
-            directory=MOD.retain_provider_migration(self.record,self.old,self.selected,FakeRunner())
+            directory=MOD.retain_provider_migration(self.record,self.old,self.selected,self.runner())
             (directory/'previous-installation.json').write_text('[]')
             with self.assertRaisesRegex(MOD.ContractError,'retained predecessor ownership is unreadable'):
-                MOD.retain_provider_migration(self.record,self.old,self.selected,FakeRunner())
+                MOD.retain_provider_migration(self.record,self.old,self.selected,self.runner())
 
 
     def test_predecessor_rollback_recreated_dropin_is_removed_before_candidate(self):
-        self.write_record(self.old); args=self.plan()
+        write_record(self.record, self.old); args=self.plan()
         directory=self.root/'etc/systemd/system/rp1-gpclk-route-manager@.service.d'
         def remove(*_):
             self.record.unlink(); directory.mkdir(parents=True)
@@ -3022,7 +3038,7 @@ class InstallerMigrationTests(unittest.TestCase):
              mock.patch.object(MOD,'remove_owned_provider',side_effect=remove), \
              mock.patch.object(MOD,'verify_provider_absent'), \
              mock.patch.object(MOD,'apply_development',side_effect=install) as candidate:
-            MOD.apply(args,FakeRunner())
+            MOD.apply(args,self.runner())
         candidate.assert_called_once()
 
     def test_interrupted_post_removal_retry_uses_bound_evidence(self):
@@ -3030,15 +3046,15 @@ class InstallerMigrationTests(unittest.TestCase):
         directory.mkdir(parents=True)
         with mock.patch.object(MOD.GitHubClient,'bytes',return_value=self.payload), \
              mock.patch.object(MOD,'validate_package'):
-            evidence=MOD.retain_provider_migration(self.record,self.old,self.selected,FakeRunner())
+            evidence=MOD.retain_provider_migration(self.record,self.old,self.selected,self.runner())
             with mock.patch.object(MOD,'verify_provider_absent') as absence:
-                MOD.resume_removed_provider_migration(self.record,self.selected,self.root,FakeRunner())
+                MOD.resume_removed_provider_migration(self.record,self.selected,self.root,self.runner())
         self.assertFalse(directory.exists()); self.assertTrue(evidence.is_dir()); absence.assert_called_once()
 
     def test_empty_foreign_dropin_without_migration_proof_is_preserved(self):
         directory=self.root/'etc/systemd/system/rp1-gpclk-route-manager@.service.d'
         directory.mkdir(parents=True)
-        MOD.resume_removed_provider_migration(self.record,self.selected,self.root,FakeRunner())
+        MOD.resume_removed_provider_migration(self.record,self.selected,self.root,self.runner())
         self.assertTrue(directory.is_dir())
 
     def test_post_removal_retry_refuses_foreign_or_active_provider_state(self):
@@ -3046,10 +3062,10 @@ class InstallerMigrationTests(unittest.TestCase):
         directory.mkdir(parents=True)
         with mock.patch.object(MOD.GitHubClient,'bytes',return_value=self.payload), \
              mock.patch.object(MOD,'validate_package'):
-            MOD.retain_provider_migration(self.record,self.old,self.selected,FakeRunner())
+            MOD.retain_provider_migration(self.record,self.old,self.selected,self.runner())
             with mock.patch.object(MOD,'verify_provider_absent',side_effect=MOD.ContractError('foreign active provider')):
                 with self.assertRaisesRegex(MOD.ContractError,'foreign active provider'):
-                    MOD.resume_removed_provider_migration(self.record,self.selected,self.root,FakeRunner())
+                    MOD.resume_removed_provider_migration(self.record,self.selected,self.root,self.runner())
         self.assertTrue(directory.exists())
 
 
@@ -3058,13 +3074,13 @@ class InstallerMigrationTests(unittest.TestCase):
         directory.mkdir(parents=True)
         evidence=self.root/'rp1-provider-migration.foreign'; evidence.mkdir(mode=0o700)
         MOD.atomic_json(evidence/'identity.json',{'selectedCommit':self.selected['commit']})
-        MOD.resume_removed_provider_migration(self.record,self.selected,self.root,FakeRunner())
+        MOD.resume_removed_provider_migration(self.record,self.selected,self.root,self.runner())
         self.assertTrue(directory.exists()); self.assertTrue(evidence.exists())
 
     def test_unproven_current_ownership_blocks_migration_resumption(self):
         self.record.write_text('[]')
         with self.assertRaisesRegex(MOD.ContractError,'unproven installation ownership'):
-            MOD.resume_removed_provider_migration(self.record,self.selected,self.root,FakeRunner())
+            MOD.resume_removed_provider_migration(self.record,self.selected,self.root,self.runner())
         self.assertEqual(self.record.read_text(),'[]')
 
 
@@ -3072,30 +3088,30 @@ class InstallerMigrationTests(unittest.TestCase):
         previous,entrypoint,rollback=self.development_recovery_inputs()
         selected=self.release_candidate()
         with mock.patch.object(MOD,'validate_development_rollback_authority',return_value=(entrypoint,rollback)) as authority:
-            evidence=MOD.retain_provider_migration(self.record,previous,selected,FakeRunner())
+            evidence=MOD.retain_provider_migration(self.record,previous,selected,self.runner())
             rollback.write_text('{"checkpoint":"rolled-back"}')
-            MOD.retain_provider_migration(self.record,previous,selected,FakeRunner())
+            MOD.retain_provider_migration(self.record,previous,selected,self.runner())
         authority.assert_called_once()
         self.assertEqual(digest((evidence/'previous-development-rollback.json').read_bytes()),previous['rollbackRecordSha256'])
         directory=self.root/'etc/systemd/system/rp1-gpclk-route-manager@.service.d'; directory.mkdir(parents=True)
         with mock.patch.object(MOD,'verify_provider_absent') as absence:
-            MOD.resume_removed_provider_migration(self.record,selected,self.root,FakeRunner())
+            MOD.resume_removed_provider_migration(self.record,selected,self.root,self.runner())
         absence.assert_called_once(); self.assertFalse(directory.exists())
 
     def test_changed_retained_development_receipt_is_not_accepted(self):
         previous,entrypoint,rollback=self.development_recovery_inputs(); selected=self.release_candidate()
         with mock.patch.object(MOD,'validate_development_rollback_authority',return_value=(entrypoint,rollback)):
-            evidence=MOD.retain_provider_migration(self.record,previous,selected,FakeRunner())
+            evidence=MOD.retain_provider_migration(self.record,previous,selected,self.runner())
         (evidence/'previous-development-rollback.json').write_text('changed')
         with self.assertRaisesRegex(MOD.ContractError,'retained development recovery input differs'):
-            MOD.retain_provider_migration(self.record,previous,selected,FakeRunner())
+            MOD.retain_provider_migration(self.record,previous,selected,self.runner())
 
 
     def test_same_version_development_source_change_retains_immutable_recovery(self):
         previous,entrypoint,rollback=self.development_recovery_inputs()
         previous['productVersion']=MOD.CONSUMER_PROVIDER_VERSION
         previous['compatibilityIdentity']=MOD.development_compatibility(MOD.CONSUMER_PROVIDER_VERSION)
-        self.write_record(previous); args=self.plan()
+        write_record(self.record, previous); args=self.plan()
         def remove(*_):
             evidence=list(self.root.glob('rp1-provider-migration.*/previous-development-rollback.json'))
             self.assertEqual(len(evidence),1)
@@ -3106,7 +3122,7 @@ class InstallerMigrationTests(unittest.TestCase):
              mock.patch.object(MOD,'remove_owned_provider',side_effect=remove) as owned_remove, \
              mock.patch.object(MOD,'verify_provider_absent'), \
              mock.patch.object(MOD,'apply_development') as install:
-            MOD.apply(args,FakeRunner())
+            MOD.apply(args,self.runner())
         owned_remove.assert_called_once(); install.assert_called_once()
 
 

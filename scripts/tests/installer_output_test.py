@@ -5,8 +5,9 @@ from __future__ import annotations
 
 import os
 import subprocess
-import tempfile
 import unittest
+from fixture_commands import run_shell as run_fixture_shell
+from fixture_filesystem import temporary_root
 from pathlib import Path
 
 
@@ -45,9 +46,7 @@ upgrade_ini() { command cp -- "$2" "$3"; }
 
 class InstallerOutputTest(unittest.TestCase):
     def setUp(self) -> None:
-        temporary = tempfile.TemporaryDirectory(prefix="wsprrypi-output-")
-        self.addCleanup(temporary.cleanup)
-        self.root = Path(temporary.name)
+        self.root = temporary_root(self, "wsprrypi-output-")
 
     def run_shell(self, shell: str, **values: str) -> subprocess.CompletedProcess[str]:
         environment = {
@@ -60,10 +59,8 @@ class InstallerOutputTest(unittest.TestCase):
             "BINARY_RELEASE_TAG": "v4.0.0-beta.1", "TEST_BINARY_VERSION": "",
         }
         environment.update(values)
-        result = subprocess.run(
-            ["bash", "-c", HARNESS + shell], cwd=self.root, env=environment,
-            text=True, capture_output=True, check=False, timeout=30,
-        )
+        result = run_fixture_shell(HARNESS + shell, cwd=self.root, env=environment,
+                                 stage=self._testMethodName)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         return result
 

@@ -3,12 +3,12 @@
 
 from __future__ import annotations
 
-import hashlib
 import os
 import stat
 import subprocess
-import tempfile
 import unittest
+from fixture_commands import run_shell as run_fixture_shell
+from fixture_filesystem import temporary_root, snapshot, bash_quote
 from pathlib import Path
 
 
@@ -16,59 +16,35 @@ ROOT = Path(__file__).resolve().parents[2]
 INSTALLER = ROOT / "scripts" / "install.sh"
 
 
-def bash_quote(value: str | Path) -> str:
-    return subprocess.run(
-        ["bash", "-c", 'printf "%q" "$1"', "bash-quote", str(value)],
-        text=True,
-        stdout=subprocess.PIPE,
-        check=True,
-    ).stdout
-
-
-def snapshot(root: Path) -> dict[str, tuple[str, int, int, str]]:
-    result: dict[str, tuple[str, int, int, str]] = {}
-    for path in sorted((root, *root.rglob("*"))):
-        metadata = path.lstat()
-        relative = "." if path == root else str(path.relative_to(root))
-        if stat.S_ISREG(metadata.st_mode):
-            digest = hashlib.sha256(path.read_bytes()).hexdigest()
-            kind = "file"
-        elif stat.S_ISDIR(metadata.st_mode):
-            digest = ""
-            kind = "directory"
-        elif stat.S_ISLNK(metadata.st_mode):
-            digest = os.readlink(path)
-            kind = "symlink"
-        else:
-            digest = ""
-            kind = "other"
-        result[relative] = (kind, stat.S_IMODE(metadata.st_mode), metadata.st_mtime_ns, digest)
-    return result
-
-
 class InstallerDryRunPurityTest(unittest.TestCase):
     def setUp(self) -> None:
-        self.temporary = tempfile.TemporaryDirectory(prefix="wsprrypi-dry-run-")
-        self.root = Path(self.temporary.name)
+        self.root = temporary_root(self, "wsprrypi-dry-run-")
 
-    def tearDown(self) -> None:
-        self.temporary.cleanup()
 
     def run_shell(self, source: str, **values: Path | str) -> subprocess.CompletedProcess[str]:
         environment = os.environ.copy()
         environment.update({"INSTALLER": str(INSTALLER)})
         environment.update({name: '' for name in ('FGGLD', 'RESET', 'FGGRN', 'FGRED', 'MOVE_UP', 'CLEAR_LINE')})
         environment.update({name: str(value) for name, value in values.items()})
-        result = subprocess.run(
-            ["bash", "-c", source],
-            text=True,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            env=environment,
-            check=False,
-        )
+        result = run_fixture_shell(source, cwd=self.root, env=environment,
+                                 stage=self._testMethodName)
         self.assertEqual(result.returncode, 0, result.stderr)
         return result
+
+    def test_fixture_snapshot_keeps_links_special_files_and_substitution_visible(self):
+        outside = temporary_root(self, "snapshot-outside-")
+        target = outside / "untouched"; target.write_bytes(b"external sentinel")
+        (self.root / "link").symlink_to(target)
+        regular = self.root / "file"; regular.write_bytes(b"same bytes")
+        os.link(regular, self.root / "hardlink")
+        os.mkfifo(self.root / "fifo")
+        before = snapshot(self.root)
+        self.assertEqual(before["link"][-1], str(target))
+        self.assertEqual(before["file"][4], 2)
+        self.assertEqual(before["fifo"][0], stat.S_IFIFO)
+        regular.unlink(); regular.write_bytes(b"same bytes")
+        self.assertNotEqual(snapshot(self.root), before, "same-byte replacement must retain inode/link evidence")
+        self.assertEqual(target.read_bytes(), b"external sentinel")
 
     def test_terminal_setup_tolerates_unavailable_capabilities(self) -> None:
         for terminal in ("unknown", "dumb"):

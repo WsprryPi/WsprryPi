@@ -15,7 +15,7 @@ from unittest import mock
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "scripts/maintainer")); sys.path.insert(0, str(ROOT / "scripts/tests"))
 import push_support_bundle_intake_publication as push
-import support_bundle_intake_publication_commit_test as fixture_module
+from support_intake_fixture import assert_no_undeclared_crypto, PublicationFixture
 
 
 class Transport:
@@ -35,10 +35,9 @@ class Transport:
 
 class PushTest(unittest.TestCase):
     def setUp(self):
-        self.fixture = fixture_module.PublicationTest(methodName="runTest"); self.fixture.setUp()
+        self.fixture = PublicationFixture(); self.addCleanup(self.fixture.close); self.addCleanup(assert_no_undeclared_crypto, self.fixture.root)
         committed = self.fixture.publish(True)
         self.candidate = committed.publication_commit; self.parent = committed.previous_commit
-    def tearDown(self): self.fixture.tearDown()
     def line(self, oid): return f"{oid}\trefs/heads/main\n".encode()
     def resolve(self, transport, approve=False, helper="osxkeychain"):
         f = self.fixture

@@ -7,6 +7,7 @@ import sys
 import tempfile
 import unittest
 from unittest.mock import patch
+from fixture_commands import Command, StrictCommands
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import build_picotool as builder
@@ -78,27 +79,53 @@ class BuildTest(unittest.TestCase):
     def test_unprivileged_no_network_validation_and_cleanup(self):
         with tempfile.TemporaryDirectory() as temporary:
             output = Path(temporary)/'export'
-            calls = []
+            created = []
+            real_temporary = tempfile.TemporaryDirectory
+            def temporary(*args, **kwargs):
+                owned = real_temporary(*args, **kwargs)
+                created.append(Path(owned.name))
+                return owned
+            stages = iter(('buildx', 'create', 'cp', 'run'))
+            cleanup_runner = StrictCommands(steps=[Command(('docker', 'rm', '-f', 'picotool-export-fixture'), stage='cleanup')])
+            self.addCleanup(cleanup_runner.assert_complete)
+            def cleanup(argv, **kwargs):
+                self.assertEqual(kwargs, {'check': False, 'stdout': subprocess.DEVNULL})
+                return cleanup_runner.run(argv, check=False)
             def docker(*args, **kwargs):
-                calls.append(args)
+                self.assertEqual(args[0], 'docker')
+                self.assertEqual(args[1], next(stages), 'required export stage order')
                 if args[1] == 'buildx':
-                    Path(args[args.index('--iidfile')+1]).write_text('sha256:' + 'a'*64)
+                    iid = created[0] / 'image-id'
+                    self.assertEqual(Path(args[args.index('--iidfile')+1]), iid)
+                    self.assertEqual(kwargs, {})
+                    self.assertEqual(tuple(str(arg) for arg in args[:7]), ('docker', 'buildx', 'build', '--platform', 'linux/arm64', '--file', str(builder.REPO/'containers/picotool/Dockerfile')))
+                    base = next(line.split()[1] for line in (builder.REPO/'containers/aarch64-bookworm/Dockerfile').read_text().splitlines() if line.startswith('FROM ') and line.endswith(' AS build'))
+                    self.assertEqual(args[7:9], ('--build-arg', 'BASE_IMAGE=' + base))
+                    self.assertEqual(tuple(str(arg) for arg in args[9:]), ('--build-arg', 'PICOTOOL_TARGET=aarch64-bookworm', '--iidfile', str(iid), '--tag', 'wsprrypi-picotool:aarch64-bookworm', '--load', str(builder.REPO)))
+                    iid.write_text('sha256:' + 'a'*64)
                     self.assertEqual(args[args.index('--platform')+1], 'linux/arm64')
                     self.assertTrue(any(str(arg).startswith('BASE_IMAGE=debian:bookworm-slim@sha256:') for arg in args))
+                elif args[1] == 'create':
+                    self.assertEqual(args, ('docker', 'create', '--name', 'picotool-export-fixture', '--platform', 'linux/arm64', 'sha256:' + 'a'*64))
+                    self.assertEqual(kwargs, {'stdout': subprocess.PIPE})
                 elif args[1] == 'cp':
-                    stage = Path(args[-1])
+                    stage = created[1]
+                    self.assertEqual(args, ('docker', 'cp', 'picotool-export-fixture:/artifact/.', stage))
+                    self.assertEqual(kwargs, {})
                     (stage/'elf-dynamic.txt').write_text('(NEEDED) Shared library: [libusb-1.0.so.0]\n')
                 elif args[1] == 'run':
-                    self.assertEqual(args[args.index('--network')+1], 'none')
-                    self.assertIn('--read-only', args)
-                    self.assertIn('65534:65534', args)
-                    self.assertIn('no-new-privileges', args)
+                    self.assertEqual(args, ('docker', 'run', '--rm', '--platform', 'linux/arm64', '--network', 'none', '--cap-drop', 'ALL', '--security-opt', 'no-new-privileges', '--user', '65534:65534', '--read-only', '--ulimit', 'core=0', '--env', 'LD_TRACE_LOADED_OBJECTS=1', '--entrypoint', str(tool.PREFIX/'picotool'), 'sha256:' + 'a'*64, 'version'))
+                    self.assertEqual(kwargs, {'capture_output': True, 'timeout': 120})
                     raise subprocess.TimeoutExpired(args, 120)
                 return subprocess.CompletedProcess(args, 0, stdout='', stderr='')
-            with patch.object(builder, 'run', side_effect=docker), patch.object(builder.subprocess, 'run') as cleanup:
+            with patch.object(builder, 'run', side_effect=docker), \
+                    patch.object(builder.tempfile, 'TemporaryDirectory', side_effect=temporary), \
+                    patch.object(builder.uuid, 'uuid4', return_value=type('FixtureId', (), {'hex': 'fixture'})()), \
+                    patch.object(builder.subprocess, 'run', side_effect=cleanup):
                 with self.assertRaises(subprocess.TimeoutExpired):
                     builder.build('aarch64-bookworm', output)
-                self.assertEqual(cleanup.call_count, 1)
+                self.assertEqual(list(stages), [], "required validation stage was reached")
+                cleanup_runner.assert_complete()
             self.assertFalse(output.exists())
             self.assertFalse(list(output.parent.glob('.picotool-export-*')))
 
