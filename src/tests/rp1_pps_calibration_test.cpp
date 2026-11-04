@@ -6,10 +6,11 @@
 #include <cmath>
 #include <deque>
 #include <iostream>
+#include <initializer_list>
 #include <limits>
 #include <mutex>
 #include <stdexcept>
-#include <thread>
+#include <sstream>
 
 using namespace wsprrypi;
 using Clock = std::chrono::steady_clock;
@@ -71,73 +72,141 @@ void instruction_model() {
     }
 }
 
+// A call to measure() acknowledges publication of the preceding result:
+// the production worker publishes before requesting another measurement.
+// Tests release one batch at a time and inspect state only at that boundary.
 struct Queue {
     std::mutex mutex;
-    std::deque<Rp1PpsMeasurement> samples;
+    std::condition_variable changed;
+    std::deque<double> samples;
+    unsigned calls = 0;
     bool fail = false;
+    bool closed = false;
+    Clock::time_point completed_at{};
     std::atomic<unsigned> destroyed{0};
+
+    void close() {
+        std::lock_guard lock(mutex);
+        closed = true;
+        changed.notify_all();
+    }
 };
 struct FakeCapture : Rp1PpsCapture {
     std::shared_ptr<Queue> queue;
     explicit FakeCapture(std::shared_ptr<Queue> value) : queue(std::move(value)) {}
     ~FakeCapture() override { ++queue->destroyed; }
-    Rp1PpsMeasurement measure(const std::atomic<bool>& stop) override {
-        for (;;) {
-            { std::lock_guard lock(queue->mutex);
-              if (queue->fail) throw std::runtime_error("reference lost");
-              if (!queue->samples.empty()) {
-                auto m = queue->samples.front(); queue->samples.pop_front(); return m;
-              }
-            }
-            if (stop) throw std::runtime_error("stopped");
-            std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    Rp1PpsMeasurement measure(const std::atomic<bool>&) override {
+        std::unique_lock lock(queue->mutex);
+        ++queue->calls;
+        queue->changed.notify_all();
+        queue->changed.wait(lock, [&] {
+            return queue->closed || queue->fail || !queue->samples.empty();
+        });
+        if (queue->closed) throw std::runtime_error("test capture closed");
+        if (queue->fail) {
+            queue->fail = false;
+            throw std::runtime_error("reference lost");
         }
+        const auto m = measurement(queue->samples.front());
+        queue->samples.pop_front();
+        queue->completed_at = m.completed_at;
+        return m;
     }
 };
-template<class Predicate> SystemClockFrequencyEstimate await_sample(Rp1PpsCalibration& c, Predicate p) {
-    auto deadline = Clock::now() + std::chrono::seconds(3);
-    while (Clock::now() < deadline) {
-        auto s = c.snapshot(true);
-        if (p(s)) return s;
-        std::this_thread::sleep_for(std::chrono::milliseconds(1));
+struct CaptureSession {
+    std::shared_ptr<Queue> queue = std::make_shared<Queue>();
+    Rp1PpsCalibration calibration{[q = queue] { return std::make_unique<FakeCapture>(q); }};
+    CaptureSession() {
+        std::cerr << "PPS worker phase: initial capture request\n";
+        calibration.snapshot(true);
+        std::unique_lock lock(queue->mutex);
+        queue->changed.wait(lock, [&] { return queue->calls >= 1; });
     }
-    throw std::runtime_error("capture worker deadline");
+    ~CaptureSession() {
+        // Also unblock measure() during assertion-failure stack unwinding.
+        queue->close();
+        calibration.snapshot(false);
+    }
+    SystemClockFrequencyEstimate advance(const char* phase,
+                                         std::initializer_list<double> samples,
+                                         bool fail = false) {
+        // CI's job timeout remains the deadlock watchdog, not a state assertion.
+        // Emit the pending phase before blocking so a stalled handshake is named.
+        std::cerr << "PPS worker phase: " << phase << '\n';
+        std::unique_lock lock(queue->mutex);
+        const auto target = queue->calls + samples.size() + unsigned(fail);
+        queue->samples.insert(queue->samples.end(), samples);
+        queue->fail = fail;
+        queue->changed.notify_all();
+        queue->changed.wait(lock, [&] { return queue->calls >= target; });
+        require(queue->calls == target, "capture advanced past the requested boundary");
+        // Explicit sample time keeps freshness assertions independent of host
+        // scheduling. Expiry itself is exercised with explicit time below.
+        const auto now = queue->completed_at;
+        lock.unlock();
+        return calibration.snapshot(true, now);
+    }
+};
+template<class Predicate>
+void expect_phase(const char* phase, const SystemClockFrequencyEstimate& s, Predicate p) {
+    if (p(s)) return;
+    std::ostringstream message;
+    message << phase << ": samples=" << s.retained_source_samples
+            << ", qualification=" << static_cast<int>(s.qualification)
+            << ", reason=" << s.reason;
+    throw std::runtime_error(message.str());
 }
 
 void worker_and_selection() {
-    auto queue = std::make_shared<Queue>();
-    Rp1PpsCalibration c([queue] { return std::make_unique<FakeCapture>(queue); });
-    { std::lock_guard lock(queue->mutex); queue->samples.push_back(measurement(-42.3)); }
-    auto first = await_sample(c, [](const auto& s) { return s.retained_source_samples == 1; });
-    require(first.qualification == FrequencyEstimateQualification::Converging, "one measurement cannot qualify");
+    CaptureSession session;
+    auto& c = session.calibration;
+    auto queue = session.queue;
+    auto first = session.advance("first measurement", {-42.3});
+    expect_phase("first measurement", first, [](const auto& s) {
+        return s.retained_source_samples == 1 &&
+               s.qualification == FrequencyEstimateQualification::Converging;
+    });
     auto fallback = select_gpio_frequency_correction(true, 7, -3, first);
     require(fallback.effective_ppm == -3 && fallback.mode == GpioCorrectionMode::FixedManual, "acquisition uses manual without residual");
-    { std::lock_guard lock(queue->mutex);
-      queue->samples.push_back(measurement(-42.31)); queue->samples.push_back(measurement(-42.29)); }
-    auto s = await_sample(c, [](const auto& s) { return s.qualification == FrequencyEstimateQualification::Qualified; });
+    auto s = session.advance("initial qualification", {-42.31, -42.29});
+    expect_phase("initial qualification", s, [](const auto& value) {
+        return value.retained_source_samples == 3 &&
+               value.qualification == FrequencyEstimateQualification::Qualified;
+    });
     const auto selected = select_gpio_frequency_correction(true, 0.1, -3, s);
     const auto total = compose_gpio_frequency_correction(-46.245, selected);
     require(total.valid && std::abs(total.effective_ppm - (-42.19)) < 0.002, "intrinsic applies once; direct replaces host; residual once");
-    { std::lock_guard lock(queue->mutex); queue->samples.push_back(measurement(-41.9)); }
-    auto unsettled = await_sample(c, [](const auto& value) { return value.retained_source_samples == 4; });
-    require(unsettled.qualification == FrequencyEstimateQualification::Converging,
-            "new rate instability immediately retires qualification");
+    auto unsettled = session.advance("unstable measurement", {-41.9});
+    expect_phase("unstable measurement", unsettled, [](const auto& value) {
+        return value.retained_source_samples == 4 &&
+               value.qualification == FrequencyEstimateQualification::Converging;
+    });
     require(select_gpio_frequency_correction(true, 0.1, -3, unsettled).mode == GpioCorrectionMode::FixedManual,
             "unstable PPS does not retain a formerly qualified value");
-    { std::lock_guard lock(queue->mutex);
-      for (unsigned i = 0; i < 3; ++i) queue->samples.push_back(measurement(-42.3)); }
-    await_sample(c, [](const auto& value) { return value.qualification == FrequencyEstimateQualification::Qualified; });
-    auto stale = c.snapshot(true, Clock::now() + std::chrono::seconds(31));
+    auto requalified = session.advance("qualification after instability", {-42.3, -42.3, -42.3});
+    expect_phase("qualification after instability", requalified, [](const auto& value) {
+        return value.retained_source_samples == 7 &&
+               value.qualification == FrequencyEstimateQualification::Qualified;
+    });
+    auto stale = c.snapshot(true, queue->completed_at + std::chrono::seconds(31));
     require(!stale.frequency_ppm && stale.qualification == FrequencyEstimateQualification::Unavailable, "monotonic expiry never reuses old estimates");
     require(select_gpio_frequency_correction(true, 0.1, -3, stale).effective_ppm == -3, "expiry selects manual");
     auto backward = c.snapshot(true, Clock::time_point{});
     require(!backward.frequency_ppm, "backward clock cannot grant freshness");
-    { std::lock_guard lock(queue->mutex); queue->fail = true; }
-    await_sample(c, [](const auto& s) { return s.reason == "reference lost"; });
+    auto lost = session.advance("reference loss", {}, true);
+    expect_phase("reference loss", lost, [](const auto& value) {
+        return value.reason == "reference lost" && !value.frequency_ppm &&
+               value.retained_source_samples == 0 &&
+               value.qualification == FrequencyEstimateQualification::Unavailable;
+    });
     require(queue->destroyed >= 1, "capture errors release resources");
-    { std::lock_guard lock(queue->mutex); queue->fail = false; queue->samples.push_back(measurement(-42.3)); }
-    auto recovered = await_sample(c, [](const auto& s) { return s.retained_source_samples == 1; });
-    require(recovered.qualification == FrequencyEstimateQualification::Converging, "reacquisition starts a new qualification history");
+    auto recovered = session.advance("reacquisition", {-42.3});
+    expect_phase("reacquisition", recovered, [](const auto& value) {
+        return value.retained_source_samples == 1 &&
+               value.qualification == FrequencyEstimateQualification::Converging;
+    });
+    std::cerr << "PPS worker phase: disable and release capture\n";
+    queue->close();
     c.snapshot(false);
     require(queue->destroyed >= 2, "disable closes the owned input capture");
 }
