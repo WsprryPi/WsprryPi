@@ -1,18 +1,20 @@
 # Calibration authority and scope
 
-Native/direct PPS RF calibration remains deferred beyond WsprryPi 4.0.
+Optional direct PPS RF calibration is implemented for Raspberry Pi 5/RP1.
+Its independent conducted acceptance is tracked in the release punchlist.
+Direct capture for Pi 1–4 remains outside the selected implementation.
 The bounded alternative RP1 clock-parent review is closed: retain nominal
 200 MHz `pll_sys`, with no alternative-parent hardware testing selected.
 The [release punchlist](Release%20Punchlist.md#saved-items) retains unfinished
 work; the decisions and reopening criteria below govern these scopes.
-Existing correction settings and backend ownership remain unchanged.
+Existing correction units, intrinsic composition, and backend ownership remain unchanged.
 
 ## Current capability and correction authority
 
 | Path or authority | Implemented behavior | Limit or ownership boundary |
 | --- | --- | --- |
 | UTC and slots | Chrony disciplines host time; the application schedules against host wall time. | Keep Chrony as UTC authority. Slot alignment is distinct from RF-frequency accuracy and backend launch latency. |
-| Chrony adapter | [PPMManager](../src/PPM-Manager/src/ppm_manager.cpp), `get_chrony_snapshot` / `parseChronyReports`, reads `chronyc -c tracking`, `sources -n`, and `sourcestats -n`; signed tracking frequency passes through unchanged. | Source signatures and heuristic provenance describe reports, not authenticated GNSS lock or a verified RF reference path. No native PPS device/capture API was found in application source. |
+| Chrony adapter | [PPMManager](../src/PPM-Manager/src/ppm_manager.cpp), `get_chrony_snapshot` / `parseChronyReports`, reads `chronyc -c tracking`, `sources -n`, and `sourcestats -n`; signed tracking frequency passes through unchanged. | Source signatures and heuristic provenance describe reports, not authenticated GNSS lock or a verified RF reference path. The optional RP1 adapter separately counts the RF clock domain against PPS. |
 | GPIO estimate selection | [Qualifier and selector](../src/system_clock_frequency_estimate.cpp) use synchronization, selected source, normal leap status, identity, quality, stability and age, then select usable estimate plus conducted residual, fixed manual, or zero additional correction. | A host-clock estimate is a proxy for RF error; retained behavior does not establish cross-domain accuracy. Details and source limitations follow below. |
 | Intrinsic RF defaults | [Shared selector](../src/Chipset-Offsets/src/chipset_offsets.hpp): BCM2835 **-2.5 ppm**; BCM2836/BCM2837 and BCM2711 **0 ppm**; RP1 **-46.245 ppm**. | Product defaults with different evidence histories, not certificates for individual boards. Physical GPIO backends add the intrinsic term once. |
 | Legacy GPIO | [Clock models](../src/WSPR-Transmitter/src/legacy_gpio_clock_model.cpp) use PLLD 500 MHz for BCM2835/6/7, PLLD 750 MHz for BCM2711, and BCM2711 oscillator 54 MHz when PLLD cannot represent the tone range. | Processor, complete frequency range and corrected-divider representability select the parent; unsupported cases fail. RF correction and PWM/DMA timing are separate. |
@@ -104,32 +106,27 @@ Inbound WTP separately freezes the receiving Pi's correction into its plan at
 `WtpPiToneEngine::prepare`; this does not assert that inbound jobs populate the
 local scheduler's candidate/committed status fields.
 
-## Direct PPS disposition and reopening criteria
+## Direct PPS disposition and acceptance criteria
 
-**Defer native PPS RF calibration beyond 4.0; retain the existing capabilities.**
-Chrony can already use administrator-configured PPS/GNSS for host synchronization
-and its frequency estimate. Reading the same host timestamps directly offers
-diagnostics or another host-clock estimator, but does not independently measure
-an unobserved RF clock. Linux PPS supplies edge timestamps/sequence numbers;
-the timestamp domain, capture latency and jitter still matter. See the
-[Chrony tracking reference](https://chrony-project.org/doc/4.4/chronyc.html#tracking)
-and [Linux PPS API](https://www.kernel.org/doc/html/latest/driver-api/pps.html).
+**RP1 direct capture is selected; legacy direct capture remains unimplemented.**
+The optional [RP1 adapter](../docs/direct-pps-calibration.md) uses one input-only
+PIO state machine to count ten complete GPIO17 PPS periods. It verifies that
+nominal 200 MHz `clk_sys` derives directly from `pll_sys`. It replaces the
+host-frequency estimate, subtracts the existing intrinsic term before passing
+additional correction to the backend, and leaves Chrony as UTC authority.
+Three distinct stable observations qualify a candidate; capture errors, changed
+reference identity, and expiry retire it. The public PIO UAPI is pinned and
+vendored with its upstream licenses. This is a measurement of a verified RF
+parent derivative, not software timing of PPS callbacks.
 
-| Backend | What must be measured for new RF-calibration value | Present evidence gap |
-| --- | --- | --- |
-| Legacy GPIO | Count the selected PLLD/oscillator or a rigorously identified divider derivative over reference-defined intervals. The host estimate can track correlated drift, but an exact host-timebase-to-RF-parent relationship cannot be assumed across processors/parents. | No reviewed application contract provides a PPS-latched RF counter/capture path; software timestamping alone measures the host domain. Capture facility, routing, ratio and uncertainty remain unproven. |
-| RP1 | Measure RP1 `pll_sys`/GPCLK or a verified derivative against an independent reference. Host UTC/frequency estimates do not establish the error of the separate RP1 clock domain. | Current provider has no selected PPS-latched RF measurement interface. Stock-provider frequency counting uses `clk_slow_sys` (derived from XOSC), not a demonstrated independent PPS gate; see the pinned source below. |
+Pi 1–4 transmit from a main-SoC clock parent. Their host and RF clocks can share
+an oscillator, but a portable raw-host-counter/PLLD or oscillator ratio has not
+been established here. The existing host estimate remains available there.
+No Pi 1–4 direct capture implementation or hardware acceptance is implied.
 
-A hardware edge counter latched at PPS boundaries could supply the missing
-frequency observation for either backend, provided its input really is that
-RF parent or a verified derivative and the gate/reference is independent.
-No such facility, electrical path or supported capture interface is established
-by this review; feasibility must precede estimator implementation.
-
-Reopen only when a separately approved slice can demonstrate material RF
-accuracy, drift tracking or repeatability benefit beyond the retained
-Chrony/intrinsic/manual/conducted-residual path. Before implementation or live
-work, require:
+The following requirements govern acceptance and any later capture adapter.
+The independent RF campaign must satisfy its declared cases before the
+punchlist can mark this feature complete:
 
 1. **Reference and capture identity:** exact receiver/GPSDO, lock/status evidence,
    PPS routing/level, RF parent/derivative and divider ratio, counter width,
@@ -141,12 +138,14 @@ work, require:
    ideal 200 MHz counting for 1 second gives 0.005 ppm per count; a divided
    1 MHz input gives 1 ppm per count. These are arithmetic examples, not measured
    uncertainty. Both interval boundaries and capture errors need budgeting.
-3. **Acceptance target proposed for that slice:** independently measured
-   absolute residual <=0.1 ppm with expanded measurement uncertainty <=0.05 ppm
-   on every predeclared board/parent/route/frequency/temperature case, with
-   repeatability and improvement over the existing baseline greater than the
-   combined comparison uncertainty. Approve or revise these engineering targets
-   before the campaign; they are not current product limits or achieved results.
+3. **Declared acceptance:** the selected wspr5 finite-TONE cases use measured
+   absolute residual <=0.1 ppm and conditional receiver/reference engineering
+   allowance <=0.05 ppm, with baseline improvement exceeding the comparison
+   allowances. The [validation record](../docs/direct-pps-validation.md) states
+   the assumptions, repeated observations, stopped attempts, and limitations.
+   It does not claim traceable expanded metrological uncertainty, all-board
+   equivalence, or an accuracy certificate. Any broader slice must declare its
+   cases, measurement budget, and comparison target before testing.
 4. **One correction authority:** select whether the result replaces the host
    estimate or supplies a residual relative to it. Define positive/negative
    conversion and `I`, `E`, `R`, `M` accounting; never add two full estimates.
@@ -165,8 +164,10 @@ work, require:
    sessions. Separately authorize hardware/RF operation and verify safe stopping,
    output-off and cleanup. Frequency acceptance does not qualify power/spurs.
 
-A PPS-latched RF capture path and its measurement benefit remain unestablished.
-Implementation before 4.0 would change the selected release scope.
+The capture path has input-only device evidence and independent conducted
+accuracy, repeatability, improvement, and cleanup evidence for the selected
+wspr5 cases. Those results do not qualify another board, wiring, reference,
+operating duration, or installation.
 
 ## RP1 parent disposition
 
@@ -295,8 +296,8 @@ node ../WsprryPi-UI/tests/gpio_correction_provenance_test.js
 Inspect the recipes and use a supported Linux build environment. These commands
 exercise software contracts; they do not qualify host-clock correlation with RF,
 reference routing/lock, target timing, services, installation, power or spectrum.
-No direct PPS control, clock-parent selector or automatic custom-value migration
-is provided by this scope decision.
+The optional RP1 direct PPS control is documented separately. No alternative
+clock-parent selector or automatic custom-value migration is provided.
 
 The independent [operator manual](https://wsprry-pi.readthedocs.io/en/stable/)
 covers frequency calibration in `Advanced_Operations/timing_calibration.md`

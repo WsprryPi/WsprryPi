@@ -43,6 +43,7 @@
 #include "scheduling_internal.hpp"
 #include "chipset_offsets.hpp"
 #include "rp1_route_bridge.hpp"
+#include "rp1_pps_calibration.hpp"
 #include "WSPR-Transmitter/src/rp1_gpclk_development_policy.hpp"
 #include "WSPR-Transmitter/src/rp1_gpclk_planner.hpp"
 
@@ -107,7 +108,10 @@ namespace
 {
     std::mutex frequency_estimate_mutex;
     FrequencyEstimateQualifier frequency_estimate_qualifier;
+    wsprrypi::Rp1PpsCalibration direct_pps_calibration;
+    std::string direct_pps_reference_identity;
     SystemClockFrequencyEstimate current_frequency_estimate{};
+    SystemClockFrequencyEstimate current_chrony_frequency_estimate{};
     GpioFrequencyCorrection current_gpio_correction{};
     WsprRuntimeStatusSnapshot::GpioCorrectionProvenance
         current_gpio_candidate_provenance{};
@@ -168,10 +172,28 @@ namespace
         std::lock_guard<std::mutex> lock(frequency_estimate_mutex);
         // Every future request, including inbound WTP preparation, must check
         // the cached report's current age. Committed requests remain frozen.
-        if (cfg.use_system_clock_frequency_estimate && provider.age_reference_time)
-            current_frequency_estimate = qualify_provider_snapshot(provider);
+        const bool direct_pps = cfg.gpio_use_direct_pps_calibration &&
+            cfg.transmit_backend == TransmitBackendKind::RP1_GPCLK;
+        const auto reference = provider.withAgeAt(std::chrono::steady_clock::now());
+        const bool reference_ready = wsprrypi::rp1_pps_reference_ready(reference);
+        if (direct_pps && direct_pps_reference_identity != reference.source_signature) {
+            (void)direct_pps_calibration.snapshot(false);
+            direct_pps_reference_identity = reference.source_signature;
+        }
+        auto direct_sample = direct_pps_calibration.snapshot(direct_pps && reference_ready);
+        if (direct_pps && !reference_ready) {
+            direct_sample.provider_name = "RP1 PPS";
+            direct_sample.reason = "Direct PPS requires a current, single selected local Chrony reference. Check GPS/PPS lock and source configuration; using manual fallback.";
+        }
+        if (direct_pps)
+            current_frequency_estimate = std::move(direct_sample);
+        else {
+            if (cfg.use_system_clock_frequency_estimate && provider.age_reference_time)
+                current_chrony_frequency_estimate = qualify_provider_snapshot(provider);
+            current_frequency_estimate = current_chrony_frequency_estimate;
+        }
         GpioFrequencyCorrection selected = select_gpio_frequency_correction(
-            cfg.use_system_clock_frequency_estimate,
+            cfg.use_system_clock_frequency_estimate || direct_pps,
             cfg.gpio_frequency_residual_ppm,
             cfg.gpio_manual_ppm,
             current_frequency_estimate);
@@ -254,7 +276,7 @@ namespace
     {
         const PPMProviderSnapshot provider = ppmManager.getProviderSnapshot();
         std::lock_guard<std::mutex> lock(frequency_estimate_mutex);
-        current_frequency_estimate = qualify_provider_snapshot(provider);
+        current_chrony_frequency_estimate = qualify_provider_snapshot(provider);
     }
 
     std::string get_active_gpio_suffix()
@@ -3331,6 +3353,10 @@ WsprRuntimeStatusSnapshot current_tx_runtime_status_snapshot()
 {
     std::lock_guard<std::mutex> lk(set_config_mtx);
 
+    if (config.gpio_use_direct_pps_calibration &&
+        config.transmit_backend == TransmitBackendKind::RP1_GPCLK)
+        (void)select_and_publish_gpio_correction(config);
+
     WsprRuntimeStatusSnapshot snapshot;
     snapshot.transmit_backend = transmit_backend_kind_to_string(config.transmit_backend);
     const std::string configured_rp1_route =
@@ -3878,6 +3904,7 @@ void set_current_frequency_estimate_for_test(
 {
     std::lock_guard<std::mutex> lock(frequency_estimate_mutex);
     current_frequency_estimate = estimate;
+    current_chrony_frequency_estimate = estimate;
     current_gpio_correction = GpioFrequencyCorrection{};
 }
 

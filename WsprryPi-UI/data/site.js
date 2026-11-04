@@ -561,6 +561,7 @@ const configSchema = {
             "Power Level": { required: false, type: "number" },
             "RP1 Drive mA": { required: false, type: "number" },
             "Use System Clock Frequency Estimate": { required: false, type: "boolean" },
+            "Use Direct PPS Calibration": { required: false, type: "boolean" },
             "Frequency Residual PPM": { required: false, type: "number" },
             "Manual PPM": { required: false, type: "number" }
         }
@@ -2084,6 +2085,7 @@ function populateConfig(callback = null) {
 
                     // Frequency Calibration
                     $("#use_system_clock_frequency_estimate").prop("checked", use_system_clock_frequency_estimate).trigger("change");
+                    $("#use_direct_pps_calibration").prop("checked", getConfigBoolValue(gpio, "GPIO", "Use Direct PPS Calibration", false)).trigger("change");
                     $("#gpio_frequency_residual_ppm").val(gpio_frequency_residual_ppm).trigger("change");
                     populateGpioManualPpm(gpio_manual_ppm);
                     $("#ppm").val(ppm).trigger("change");
@@ -3194,6 +3196,13 @@ function renderRuntimeStatus(status) {
 }
 
 function renderGpioFrequencyCorrection(status) {
+    const ppsStatus = document.getElementById("direct-pps-status");
+    if (ppsStatus && status) {
+        const text = status.frequencyEstimateProvider === "RP1 PPS"
+            ? `Direct PPS: ${status.frequencyEstimateQualification}. ${status.frequencyEstimateReason || ""}`
+            : "";
+        if (ppsStatus.textContent !== text) ppsStatus.textContent = text;
+    }
     const panelNode = document.getElementById("gpio_frequency_correction_panel");
     const valueNode = document.getElementById("gpio_frequency_correction_value");
     const detailNode = document.getElementById("gpio_frequency_correction_detail");

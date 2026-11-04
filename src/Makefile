@@ -1445,9 +1445,18 @@ $(BIN_DIR)/$(GPIO_FREQUENCY_CORRECTION_TEST_OUT): tests/gpio_frequency_correctio
 	$(Q)mkdir -p $(BIN_DIR)
 	$(Q)$(CXX) $(GPIO_FREQUENCY_CORRECTION_TEST_FLAGS) $(filter %.cpp,$^) -o $@
 
-gpio-frequency-correction-test: $(BIN_DIR)/$(GPIO_FREQUENCY_CORRECTION_TEST_OUT) chrony-frequency-correction-test
+gpio-frequency-correction-test: $(BIN_DIR)/$(GPIO_FREQUENCY_CORRECTION_TEST_OUT) chrony-frequency-correction-test rp1-pps-calibration-test
 	$(Q)echo "Running hardware-independent GPIO frequency-correction tests."
 	$(Q)./$(BIN_DIR)/$(GPIO_FREQUENCY_CORRECTION_TEST_OUT)
+
+.PHONY: rp1-pps-calibration-test
+rp1-pps-calibration-test: $(BIN_DIR)/rp1_pps_calibration_test
+	$(Q)python3 ../scripts/tests/rp1_pps_vendor_test.py
+	$(Q)./$(BIN_DIR)/rp1_pps_calibration_test
+
+$(BIN_DIR)/rp1_pps_calibration_test: tests/rp1_pps_calibration_test.cpp rp1_pps_calibration.cpp system_clock_frequency_estimate.cpp WSPR-Transmitter/src/legacy_gpio_clock_model.cpp rp1_pps_calibration.hpp vendor/rp1_pio/rp1_pio_if.h
+	$(Q)mkdir -p $(BIN_DIR)
+	$(Q)$(CXX) $(GPIO_FREQUENCY_CORRECTION_TEST_FLAGS) $(filter %.cpp,$^) -lpthread -o $@
 
 $(BIN_DIR)/chrony_frequency_correction_test: tests/chrony_frequency_correction_test.cpp system_clock_frequency_estimate.cpp PPM-Manager/src/ppm_manager.cpp WSPR-Transmitter/src/legacy_gpio_clock_model.cpp system_clock_frequency_estimate.hpp PPM-Manager/src/ppm_manager.hpp Chipset-Offsets/src/chipset_offsets.hpp
 	$(Q)mkdir -p $(BIN_DIR)

@@ -289,7 +289,8 @@ GpioFrequencyCorrection select_gpio_frequency_correction(
 
     result.effective_ppm = 0.0;
     result.mode = GpioCorrectionMode::Uncalibrated;
-    result.reason = "No valid provider estimate or fixed manual correction is available.";
+    result.reason = (use_estimate && !estimate.reason.empty() ? estimate.reason + " " : "") +
+        "No valid provider estimate or fixed manual correction is available.";
     return result;
 }
 

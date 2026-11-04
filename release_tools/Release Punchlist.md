@@ -16,9 +16,17 @@ Status key: ✅ Complete · ⏳ In progress · ▧ Not started
    including desktop and mobile workflows. Record findings and the validation
    required for any resulting changes. This is a new review; prior Beta review
    acceptance remains bound to its recorded implementation.
-2. ▧ **Direct PPS frequency calibration.** Retain current
-    correction behavior. Reopening requires an identified measurement path and
-    measurable improvement; see the [scope and reopening criteria](Calibration%20Scope%20Decisions.md#direct-pps-disposition-and-reopening-criteria).
+2. ✅ **Direct PPS frequency calibration.** Optional Pi 5/RP1 input-only
+   GPIO17 capture replaces the host-rate proxy, with bounded qualification,
+   per-job correction, residual adjustment, and manual fallback. Thirty
+   conducted cases on wspr5's GPIO4/GPIO20 routes passed the declared scoped
+   accuracy/trim checks; full Linux, UI, and actual Pi/Pico network/USB suites
+   passed, and adversarial findings are closed. Pi 1–4 direct capture remains
+   outside this adapter. Delivered on `codex/direct-pps-calibration`; no merge,
+   installation, or release implied. See the
+   [capture contract](../docs/direct-pps-calibration.md),
+   [validation and RF evidence](../docs/direct-pps-validation.md), and
+   [scope](Calibration%20Scope%20Decisions.md#direct-pps-disposition-and-acceptance-criteria).
 3. ✅ **Alternative RP1 clock parents.** Bounded feasibility review complete;
    retain nominal 200 MHz `pll_sys`. No alternative-parent hardware testing
    selected or physical qualification claimed; see the [parent disposition](Calibration%20Scope%20Decisions.md#rp1-parent-disposition).

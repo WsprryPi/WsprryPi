@@ -299,6 +299,8 @@ bool set_config(bool force)
         }
         else
         {
+            // Retire an input capture when changing to a non-GPIO backend.
+            (void)select_and_publish_gpio_correction_for_config(working_config);
             committed_ppm = working_config.si5351_ppm;
             working_config.ppm = committed_ppm;
         }

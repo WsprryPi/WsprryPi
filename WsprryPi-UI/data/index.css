@@ -1050,6 +1050,12 @@ legend {
     color: var(--bs-secondary-color);
 }
 
+#direct-pps-hint,
+#direct-pps-status {
+    max-width: 68ch;
+    overflow-wrap: anywhere;
+}
+
 #cw_frequency_controls > .config-stacked-field,
 #cw_schedule_controls > .config-stacked-field {
     width: 100%;
