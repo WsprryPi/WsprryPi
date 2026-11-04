@@ -81,7 +81,7 @@ Status key: ✅ Complete · ⏳ In progress · ▧ Not started
    covers independent valid-field saves, incomplete progress, explicit
    application, and uncertain-save recovery. The historical P15.14
    documentation reference was superseded by P15.20 numbering.
-10. ⏳ **Review and Streamline UI.**
+10. ⏳ **Review and Streamline CI.**
 11. ▧ **Publish new Pico beta.** Prepare, validate, and publish the next Pico
    beta under separate release authorization.
 12. ▧ **Ensure WsprryPi consumes the latest RP1 release.** Verify the latest
