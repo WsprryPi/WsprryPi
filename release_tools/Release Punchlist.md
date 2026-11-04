@@ -22,8 +22,8 @@ Status key: ✅ Complete · ⏳ In progress · ▧ Not started
    conducted cases on wspr5's GPIO4/GPIO20 routes passed the declared scoped
    accuracy/trim checks; full Linux, UI, and actual Pi/Pico network/USB suites
    passed, and adversarial findings are closed. Pi 1–4 direct capture remains
-   outside this adapter. Delivered on `codex/direct-pps-calibration`; no merge,
-   installation, or release implied. See the
+   outside this adapter. Merged into `devel`; the release build is installed on
+   wspr5 with direct PPS enabled and qualified. No published release implied. See the
    [capture contract](../docs/direct-pps-calibration.md),
    [validation and RF evidence](../docs/direct-pps-validation.md), and
    [scope](Calibration%20Scope%20Decisions.md#direct-pps-disposition-and-acceptance-criteria).

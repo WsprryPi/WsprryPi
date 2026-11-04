@@ -784,5 +784,115 @@
       "final_source_sha256": "6dc88159c85fd2c34d716dd1bfe4d4e0d22be80d52e7caeb441b7a7a40e0c297",
       "change": "avoid replacing identical live-status text on polling; control producer unchanged; final UI/browser tests and desktop/mobile review passed"
     }
+  ],
+  "frequency_comparison": [
+    {
+      "route_gpio": 20,
+      "frequency_hz": 7040100,
+      "baseline_errors_hz": [
+        -11.876220469363034,
+        -15.910527586005628
+      ],
+      "direct_pps_errors_hz": [
+        -0.35099289007484913,
+        0.09584172535687685
+      ],
+      "largest_conditional_allowance_hz": 0.22200272777440402,
+      "worst_corrected_absolute_error_upper_bound_hz": 0.5714394932247784,
+      "best_baseline_absolute_error_lower_bound_hz": 11.654621216677672,
+      "resolved_improvement_across_both_repeats": true,
+      "plus_0_5_ppm_residual_error_hz": -3.991539736278355,
+      "trim_allowance_hz": 0.22081069788056493
+    },
+    {
+      "route_gpio": 20,
+      "frequency_hz": 14097100,
+      "baseline_errors_hz": [
+        -26.964474968612194,
+        -34.29419059865177
+      ],
+      "direct_pps_errors_hz": [
+        -0.6547424476593733,
+        0.2539419550448656
+      ],
+      "largest_conditional_allowance_hz": 0.2944112962959618,
+      "worst_corrected_absolute_error_upper_bound_hz": 0.945789429106306,
+      "best_baseline_absolute_error_lower_bound_hz": 26.670796724506108,
+      "resolved_improvement_across_both_repeats": true,
+      "plus_0_5_ppm_residual_error_hz": -7.253439836204052,
+      "trim_allowance_hz": 0.29170692377145857
+    },
+    {
+      "route_gpio": 20,
+      "frequency_hz": 28126100,
+      "baseline_errors_hz": [
+        -58.450461439788334,
+        -70.85046455636619
+      ],
+      "direct_pps_errors_hz": [
+        0.35709090158343315,
+        -1.0004280246794224
+      ],
+      "largest_conditional_allowance_hz": 0.4383573258107468,
+      "worst_corrected_absolute_error_upper_bound_hz": 1.4317995784865987,
+      "best_baseline_absolute_error_lower_bound_hz": 58.01334425068928,
+      "resolved_improvement_across_both_repeats": true,
+      "plus_0_5_ppm_residual_error_hz": -13.380805220454931,
+      "trim_allowance_hz": 0.43260972771090295
+    },
+    {
+      "route_gpio": 4,
+      "frequency_hz": 7040100,
+      "baseline_errors_hz": [
+        -15.54928444791585,
+        -15.575233763083817
+      ],
+      "direct_pps_errors_hz": [
+        -0.12265847902745008,
+        -0.03317788243293762
+      ],
+      "largest_conditional_allowance_hz": 0.22196919470387977,
+      "worst_corrected_absolute_error_upper_bound_hz": 0.34308224622459604,
+      "best_baseline_absolute_error_lower_bound_hz": 15.32731784842893,
+      "resolved_improvement_across_both_repeats": true,
+      "plus_0_5_ppm_residual_error_hz": -3.653678430244326,
+      "trim_allowance_hz": 0.22077690803348718
+    },
+    {
+      "route_gpio": 4,
+      "frequency_hz": 14097100,
+      "baseline_errors_hz": [
+        -31.11350899375975,
+        -31.16497559286654
+      ],
+      "direct_pps_errors_hz": [
+        -0.15883568301796913,
+        0.27502135187387466
+      ],
+      "largest_conditional_allowance_hz": 0.2940983403740181,
+      "worst_corrected_absolute_error_upper_bound_hz": 0.5659753467134524,
+      "best_baseline_absolute_error_lower_bound_hz": 30.819415800611775,
+      "resolved_improvement_across_both_repeats": true,
+      "plus_0_5_ppm_residual_error_hz": -6.993430422618985,
+      "trim_allowance_hz": 0.29168091996999657
+    },
+    {
+      "route_gpio": 4,
+      "frequency_hz": 28126100,
+      "baseline_errors_hz": [
+        -61.994351878762245,
+        -62.19615010544658
+      ],
+      "direct_pps_errors_hz": [
+        -0.269482608884573,
+        0.7147519029676914
+      ],
+      "largest_conditional_allowance_hz": 0.43749179916819575,
+      "worst_corrected_absolute_error_upper_bound_hz": 1.1459519199151238,
+      "best_baseline_absolute_error_lower_bound_hz": 61.5568802616365,
+      "resolved_improvement_across_both_repeats": true,
+      "plus_0_5_ppm_residual_error_hz": -13.859734520316124,
+      "trim_allowance_hz": 0.4326576259091114
+    }
   ]
 }

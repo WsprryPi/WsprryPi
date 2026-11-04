@@ -1,9 +1,11 @@
 # Direct PPS calibration validation
 
-The feature branch implements optional direct RF-clock calibration for Pi 5/RP1.
+Optional direct RF-clock calibration is implemented for Pi 5/RP1.
 Independent conducted acceptance, the required software suites, documentation
 review, and repeated adversarial assessments passed for the scoped cases below.
-Delivery is on feature branches; no merge, installation, or release is implied.
+The application is merged into `devel` at `99bf53d3`; matching operator
+documentation is merged at `d63ceeb`. wspr5 runs the merged release with direct
+PPS enabled and qualified. No published release is implied.
 
 ## Sources and delivery boundary
 
@@ -133,6 +135,45 @@ attempts; neither their time nor their failure is discarded.
 | GPIO20 | −2.519 to −1.687 ppm | −0.050 to +0.018 ppm | −0.567 to −0.476 ppm |
 | GPIO4 | −2.212 to −2.204 ppm | −0.017 to +0.026 ppm | −0.519 to −0.493 ppm |
 
+#### Frequency-by-frequency comparison
+
+Errors are measured relative to the requested RF frequency. Both repetitions
+are shown in command order. The baseline uses intrinsic compensation plus a
+frozen contemporaneous host estimate; it is not a manual-zero baseline. PPS
+results use zero residual. This table uses hertz, matching the Pico comparison
+format, while the per-run record also retains PPM.
+
+| Route | Nominal RF (Hz) | Host-baseline errors, repeats 1 / 2 (Hz) | Direct-PPS errors, repeats 1 / 2 (Hz) | Largest allowance among these four records (Hz) |
+| --- | ---: | ---: | ---: | ---: |
+| GPIO20 | 7,040,100 | −11.876 / −15.911 | −0.351 / +0.096 | ±0.223 |
+| GPIO20 | 14,097,100 | −26.964 / −34.294 | −0.655 / +0.254 | ±0.295 |
+| GPIO20 | 28,126,100 | −58.450 / −70.850 | +0.357 / −1.000 | ±0.439 |
+| GPIO4 | 7,040,100 | −15.549 / −15.575 | −0.123 / −0.033 | ±0.222 |
+| GPIO4 | 14,097,100 | −31.114 / −31.165 | −0.159 / +0.275 | ±0.295 |
+| GPIO4 | 28,126,100 | −61.994 / −62.196 | −0.269 / +0.715 | ±0.438 |
+
+Allowances are rounded outward to 0.001 Hz. Under the declared engineering
+allowances, improvement is resolved when the largest corrected absolute-error
+upper bound across both repeats is below the smallest baseline absolute-error
+lower bound. All six route/frequency combinations pass that criterion. These
+conditional allowances are not a calibration certificate.
+
+#### Residual-trim results
+
+A +0.5 ppm residual intentionally shifts output downward. These are measured
+errors relative to the original requested RF, not paired differences at an
+unchanged oscillator state. The nominal shift column shows the approximate
+−0.5 ppm contribution; per-job PPS correction accounts for changing clock rate.
+
+| Route | Nominal RF (Hz) | RF error with +0.5 ppm residual (Hz) | Nominal −0.5 ppm contribution (Hz) | Conditional allowance (Hz) |
+| --- | ---: | ---: | ---: | ---: |
+| GPIO20 | 7,040,100 | −3.992 | −3.520 | ±0.221 |
+| GPIO20 | 14,097,100 | −7.253 | −7.049 | ±0.292 |
+| GPIO20 | 28,126,100 | −13.381 | −14.063 | ±0.433 |
+| GPIO4 | 7,040,100 | −3.654 | −3.520 | ±0.221 |
+| GPIO4 | 14,097,100 | −6.993 | −7.049 | ±0.292 |
+| GPIO4 | 28,126,100 | −13.860 | −14.063 | ±0.433 |
+
 Every untrimmed six-second result and every two-second subwindow met ±0.1 ppm.
 The largest untrimmed subwindow error was 0.091 ppm. Every trim result and
 subwindow, after accounting for its commanded −0.5 ppm RF shift, also met
@@ -248,5 +289,25 @@ considered and retained because their depicted controls remain applicable.
 No operator-documentation follow-up remains for the selected scope. The parent
 repository contains the execution prompt, capture contract, scope decision,
 validation record, and public RF measurements; private bench data stay outside
-Git. Release, installation, other-board, and broader RF qualification remain
-separate activities.
+Git. Published releases, other-board qualification, and broader RF qualification
+remain separate activities. The subsequent wspr5 installation acceptance is
+recorded below.
+
+
+## wspr5 installation acceptance
+
+On 2026-11-04, the standard installer deployed a source-built release from
+application merge `99bf53d3267feedc577278e7536a43a7c78b749f`. Its completion
+marker was created at `/home/pi/finished` only after success. The installed
+executable and live UI identify `4.0.0-beta.4-devel+99bf53d`.
+
+The installed GPIO setting `Use Direct PPS Calibration` is enabled. All other
+post-installer settings were preserved. Read-only status observation confirmed
+qualification across three distinct fresh measurement updates; the live Setup
+control is on and displays qualified status. The service is active, GPIO20 is
+selected, transmission is disabled, and Enable on Boot remains Never. Existing
+Chrony/PPS and the working RP1 driver are retained. No additional RF transmission
+was started for installation acceptance; the tables above describe the earlier
+conducted candidate campaign, not new RF measurements of the installed release.
+Private binary/configuration/service rollback copies and installation logs
+remain outside Git on wspr5.
